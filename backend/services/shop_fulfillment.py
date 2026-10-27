@@ -280,6 +280,27 @@ class MockupTemplate:
     area_height: int
     positioning: str
     orientation: str
+    # ``template``/``primary`` sind die eigentlichen Vorlagen (für die Vorschau bevorzugt), ``unknown`` geht auch (#2091).
+    role: str | None = None
+
+
+class Rows(tuple):
+    """Gelesene Zeilen einer Liste vom Anbieter plus kurze Gründe, warum einzelne Zeilen übersprungen wurden (#2091) -
+    ohne Werte aus der Antwort, nur Platzierung, Technik, Feld und erwarteter Typ. Sonst ein gewöhnliches Tupel.
+
+    ``incomplete``: Paare (Platzierung, Technik), zu denen mindestens eine Zeile übersprungen wurde - deren gelesene
+    Zeilen sind unvollständig (etwa fehlt die Fläche einer Tassengröße). ``unreadable``: so viele übersprungene Zeilen,
+    deren Platzierung oder Technik nicht lesbar war - sie lassen sich keinem Paar zuordnen."""
+    skipped: tuple[str, ...]
+    incomplete: frozenset[tuple[str, str]]
+    unreadable: int
+
+    def __new__(cls, items=(), skipped=(), incomplete=(), unreadable=0):
+        rows = super().__new__(cls, items)
+        rows.skipped = tuple(skipped)
+        rows.incomplete = frozenset(incomplete)
+        rows.unreadable = int(unreadable)
+        return rows
 
 
 @dataclass(frozen=True, slots=True)
@@ -370,6 +391,7 @@ ERROR_TEXTS = {
     "not_found": "Beim Anbieter nicht gefunden",
     "redirect": "Der Anbieter leitet um - wird nicht verfolgt",
     "invalid_response": "Der Anbieter antwortet, aber nicht wie erwartet",
+    "no_usable_rows": "Der Anbieter liefert keine einzige brauchbare Zeile",
     "no_key": "Kein lesbarer Schlüssel für den Anbieter hinterlegt",
     "unexpected": "Unerwartete Antwort des Anbieters",
     "bad_request": "Der Anbieter lehnt die Daten ab",

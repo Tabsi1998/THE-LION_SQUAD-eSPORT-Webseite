@@ -239,8 +239,8 @@ async def refresh_print_templates(product_id: str, body: Reasoned, me: dict = De
     provider = await _provider(db)
     result = await print_templates.refresh(db, printful["product_id"], provider=provider, actor_id=me["id"],
                                            reason=body.reason)
-    return await _view(product_id, template_result={key: result[key] for key in ("ok", "changed", "changes",
-                                                                                 "detail")})
+    return await _view(product_id, template_result={key: result.get(key) for key in ("ok", "changed", "changes",
+                                                                                     "detail", "warning")})
 
 
 PNG_HEADERS = {"X-Content-Type-Options": "nosniff", "Cache-Control": "private, no-store",

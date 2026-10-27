@@ -225,6 +225,86 @@ test("Farben und Größen wählen zählt die Varianten und schickt Technik, Farb
   expect(screen.getByTestId("shop-variant-PF1")).toHaveTextContent("lieferbar");
 });
 
+test("Drucktechniken mit deutschem Namen und Erklärung, Vorgabe Direktdruck (#2091)", async () => {
+  const many = view({ product: {
+    technique: null, offer: null,
+    printful: { ...view().product.printful, techniques: ["embroidery", "dtfilm", "dtg"], default_technique: null,
+      placements: [{ placement: "front", technique: "dtg", width_in: 12, height_in: 16 }] },
+  }, variants: [] });
+  apiMock.get.mockImplementation((url) => Promise.resolve({ data: url === "/admin/shop/products" ? LIST : many }));
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  expect(await screen.findByTestId("shop-printful-techniques")).toHaveTextContent("Stickerei, DTF-Transfer (DTFlex), DTG-Direktdruck");
+  expect(screen.getByTestId("shop-printful-loaded")).toHaveTextContent("front (DTG-Direktdruck)");
+  await user.click(screen.getByTestId("shop-step-offer"));
+  expect(screen.getByTestId("shop-offer-technique-dtg")).toHaveAttribute("aria-checked", "true");
+  expect(screen.getByTestId("shop-offer-technique-dtfilm")).toHaveTextContent("DTF-Transfer (DTFlex)");
+  expect(screen.getByTestId("shop-offer-technique-hint")).toHaveTextContent("ideal für helle Shirts");
+  await user.click(screen.getByTestId("shop-offer-technique-embroidery"));
+  expect(screen.getByTestId("shop-offer-technique-hint")).toHaveTextContent("nur kleine Flächen");
+  expect(screen.getAllByText(/nur kleine Flächen/)).toHaveLength(1);
+});
+
+test("Abgleichen während einer ungespeicherten Auswahl lässt die Auswahl stehen - Schritt 2 (#2091)", async () => {
+  apiMock.post.mockResolvedValue({ data: { ...view(), result: { ok: true } } });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-offer"));
+  await user.click(screen.getByTestId("shop-offer-color-Navy"));
+  await user.click(screen.getByTestId("shop-sync-run"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/shop/products/p1/sync", {}));
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalled());
+  expect(screen.getByTestId("shop-offer-color-Navy")).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByTestId("shop-offer-count")).toHaveTextContent("6 Varianten");
+});
+
+test("Abgleichen während einer ungespeicherten Auswahl lässt die Auswahl stehen - Schritt 3 (#2091)", async () => {
+  apiMock.post.mockResolvedValue({ data: { ...view(), result: { ok: true } } });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-designs"));
+  await user.click(screen.getByTestId("shop-area-use-back"));
+  expect(screen.getByTestId("shop-area-use-back")).toBeChecked();
+  await user.click(screen.getByTestId("shop-sync-run"));
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalled());
+  expect(screen.getByTestId("shop-area-use-back")).toBeChecked();
+  expect(screen.getByTestId("shop-area-add-motif-back")).toBeInTheDocument();
+});
+
+test("ohne gespeichertes Angebot lassen sich Farben und Größen wählen (#2091)", async () => {
+  const fresh = view({ product: { offer: null, technique: null }, variants: [] });
+  apiMock.get.mockImplementation((url) => Promise.resolve({ data: url === "/admin/shop/products" ? LIST : fresh }));
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-offer"));
+  expect(screen.getByTestId("shop-offer-count")).toHaveTextContent("0 Varianten");
+  expect(screen.getByTestId("shop-offer-submit")).toHaveAttribute("aria-disabled", "true");
+  await user.click(screen.getByTestId("shop-offer-color-Black"));
+  await user.click(screen.getByTestId("shop-offer-size-M"));
+  expect(screen.getByTestId("shop-offer-color-Black")).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByTestId("shop-offer-size-M")).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByTestId("shop-offer-count")).toHaveTextContent("1 Varianten");
+  expect(screen.getByTestId("shop-offer-submit")).toHaveAttribute("aria-disabled", "false");
+});
+
+test("ein gespeichertes Angebot bleibt vorbelegt und übernimmt den neuen Stand nach dem Speichern (#2091)", async () => {
+  const saved = view({ product: { offer: { colors: ["Navy"], sizes: ["XL"] } } });
+  apiMock.put.mockResolvedValue({ data: saved });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-offer"));
+  expect(screen.getByTestId("shop-offer-color-Black")).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByTestId("shop-offer-size-M")).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByTestId("shop-offer-color-Navy")).toHaveAttribute("aria-pressed", "false");
+  await user.click(screen.getByTestId("shop-offer-color-Navy"));
+  expect(screen.getByTestId("shop-offer-color-Navy")).toHaveAttribute("aria-pressed", "true");
+  await user.click(screen.getByTestId("shop-offer-submit"));
+  await waitFor(() => expect(screen.getByTestId("shop-offer-color-Black")).toHaveAttribute("aria-pressed", "false"));
+  expect(screen.getByTestId("shop-offer-color-Navy")).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByTestId("shop-offer-size-XL")).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByTestId("shop-offer-count")).toHaveTextContent("1 Varianten");
+});
+
 test("Druckflächen: exakte Größe von Printful, Vorlagenbild, Motiv mit Vorgabe und Größe in cm und Zoll", async () => {
   apiMock.put.mockResolvedValue({ data: view() });
   const user = userEvent.setup();
@@ -438,7 +518,7 @@ test("Produktsuche: über den Namen oder einen Dashboard-Link - „Übernehmen�
   await user.click(screen.getByTestId("shop-search-submit"));
   expect(apiMock.get).toHaveBeenCalledWith("/admin/shop/printful-catalog", { params: { q: "Gildan 5000" } });
   const hit = await screen.findByTestId("shop-search-hit-71");
-  expect(hit).toHaveTextContent("dtg, dtfilm · 50 Farben · 8 Größen");
+  expect(hit).toHaveTextContent("DTG-Direktdruck, DTF-Transfer (DTFlex) · 50 Farben · 8 Größen");
   expect(screen.getByTestId("shop-search-pick-71")).toHaveTextContent("Gewählt");
   await user.selectOptions(screen.getByTestId("shop-search-category"), "24");
   await user.click(screen.getByTestId("shop-search-submit"));
@@ -486,4 +566,40 @@ test("nicht abbildbare alte Platzierungen: rote Meldung, Produkt nicht bestellba
   expect(box).toHaveTextContent("Nicht bestellbar");
   expect(box).toHaveTextContent("Ärmel links");
   expect(box.className).toContain("text-live");
+});
+
+test("ein übernommener alter Stand der Druckvorlage ist sichtbar eine Warnung (#2091)", async () => {
+  const warning = "Printful liefert unvollständig, es gilt weiter der letzte vollständige Stand (seit 2026-10-27): Rückseite (dtg).";
+  const base = view();
+  const items = checkItems();
+  items.splice(1, 0, { key: "template", label: "Druckvorlage von Printful", ok: true, state: "warn", detail: warning, for_review: true });
+  apiMock.get.mockResolvedValue({ data: view({ items, extra: {
+    print_template: { ...base.print_template, warning, carried: [{ placement: "back", technique: "dtg", label: "Rückseite (dtg)", carried_since: "2026-10-27T05:20:00+00:00" }] },
+    sync: { ...base.sync, detail: `4 Varianten abgeglichen. Druckvorlage: ${warning}`, warning },
+  } }) });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  expect(await screen.findByTestId("shop-sync")).toHaveTextContent("Druckvorlage: Printful liefert unvollständig");
+  expect(screen.getByTestId("shop-sync").querySelector("[data-state='warn']")).not.toBeNull();
+  await user.click(screen.getByTestId("shop-step-publish"));
+  expect(screen.getByTestId("shop-check-template")).toHaveAttribute("data-state", "warn");
+  expect(within(screen.getByTestId("shop-check-template")).getByLabelText("Warnung")).toBeInTheDocument();
+  await user.click(screen.getByTestId("shop-step-designs"));
+  expect(screen.getByTestId("shop-template-carried")).toHaveTextContent("Rückseite (dtg)");
+});
+
+test("ohne Vorlagenbild bleibt die Fläche wählbar, mit Hinweis; übersprungene Zeilen stehen darüber (#2091)", async () => {
+  const skipped = "Vorlagenbild back (dtg): Feld image_url fehlt oder passt nicht (erwartet: https-Adresse des Vorlagenbilds; ohne sie bleibt die Vorschau ohne Bild).";
+  const base = view();
+  apiMock.get.mockResolvedValue({ data: view({ extra: { print_template: { ...base.print_template, skipped: [skipped] } } }) });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-designs"));
+  expect(screen.getByTestId("shop-layout-technique")).toHaveTextContent("Flächen für DTG-Direktdruck");
+  expect(screen.getByTestId("shop-template-skipped")).toHaveTextContent("Feld image_url");
+  expect(screen.queryByTestId("shop-preview-front-no-image")).toBeNull();
+  await user.click(screen.getByTestId("shop-area-use-back"));
+  expect(screen.getByTestId("shop-preview-back")).toBeInTheDocument();
+  expect(screen.getByTestId("shop-preview-back-no-image")).toHaveTextContent("Kein Vorlagenbild von Printful");
+  expect(screen.getByTestId("shop-area-add-motif-back")).toBeEnabled();
 });

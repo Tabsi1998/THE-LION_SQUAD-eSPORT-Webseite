@@ -28,7 +28,7 @@ die Sammlungen direkt. Jede Katalogänderung ist eine Adminaktion mit Person und
 | `shop_designs` | Druckdatei des Vereins je Fassung: `design_key`, `version` (zählt hoch), `file_ref`, `sha256`, Druckposition; seit #1708 dazu `public_id` (Zufallsschlüssel der öffentlichen Adresse), Pixel, DPI und Druckmaße in Zoll, mit denen sie geprüft wurde, Transparenz, Ausgangsformat und `public_disabled_at` (Aufbewahrung); seit #2069 die Fassung (`variant`: `dark` für dunkle, `light` für helle Shirts), Herkunft (`origin`: `upload` oder `auto_light`), bei SVG das bereinigte SVG (`svg_ref`, nie öffentlich), erkannte Farben (`colors`) und `view_box`, bei einer umgefärbten Fassung `derived_from` und `recolor`. Alte Fassungen bleiben | `design_key` + `version`; `public_id` |
 | `shop_design_profiles` | Design bzw. Motiv (#1708, #2069): Titel, Platzierung, feste **Shirtfarben** (`garment_colors`, freiwillig), Notiz, `version`; seit #2069 `light_mode` (`auto` oder `file`), `light_auto` (Stand der automatischen Fassung) und Ausnahmen je Shirtfarbe (`color_variants`) | `design_key` |
 | `shop_gamertag_files` | Gamertag-Druckdatei (#1711): Herkunft `gamertag`, Zweck (`test`, `order`), `sha256`, `file_ref`, `public_id`, Maße, Anker, Farbe, `rules_hash`; bei Bestelldateien Konto, Bestellung und Position (personenbezogen: das PNG zeigt den Namen) - nie der Name als Text | `purpose` + `sha256` (nur Testdateien); `public_id` |
-| `shop_print_templates` | Druckvorlage je Printful-Produkt (#2069): Maße je Fläche, Technik und Gruppe (`entries`), Vorlagenbilder (`previews`), `hash` der Maße, `changes` mit `changed_at`, `checked_at`, `last_error` | `printful_product_id` |
+| `shop_print_templates` | Druckvorlage je Printful-Produkt (#2069): Maße je Fläche, Technik und Gruppe (`entries`), Vorlagenbilder (`previews`), `hash` der Maße, `changes` mit `changed_at`, `checked_at`, `last_error`, übersprungene Zeilen mit Grund (`skipped`, #2091) | `printful_product_id` |
 | `shop_print_files` | Druckdatei je Produkt, Fläche, Farbe und Gruppe (#2069): Herkunft (`composed`, `upload`), Zweck (`base` mit `version`, `order` je Bestellposition), `sha256`, `file_ref`, `public_id`, Maße, `layout_hash`, `template_hash`, Quellen; bei Bestelldateien Konto, Bestellung und Position (personenbezogen) | `public_id`; Produkt + Fläche + Gruppe + Farbe + Version (nur `base`) |
 | `shop_printful_catalog` | Zwischenstand des Printful-Katalogs für die Produktsuche (#2069): Produkte, Kategorien, `fetched_at` - keine Person | `id` |
 | `shop_design_colors` | Belegung einer Shirtfarbe je Platzierung durch ein Design (#1708): `placement`, `color_key` (kleingeschrieben), `color`, `design_key` - macht „eine Farbe, ein Design“ atomar | `placement` + `color_key` |
@@ -531,7 +531,11 @@ Grund ist optional, **Pflicht nur beim Veröffentlichen** - dann geht das Produk
    Varianten bleiben (Bestellungen zeigen auf sie), werden aber inaktiv.
 2. **Farben und Größen:** Technik, Farben, Größen. Je Farbe × Größe eine Variante (SKU `PF<Printful-Variante>-<Produkt>`)
    mit Zuordnung zur Printful-Variante; danach holt der Abgleich die Einkaufspreise **nur für diese** (höchstens 80 je
-   Produkt - je Variante ein Preisaufruf).
+   Produkt - je Variante ein Preisaufruf). Techniken heißen im Admin deutsch mit kurzer Erklärung unter der Auswahl
+   (#2091, zentral in `frontend/src/lib/shopTechniques.js`: `dtg` DTG-Direktdruck, `dtfilm` DTF-Transfer (DTFlex),
+   `embroidery` Stickerei …; unbekannte Schlüssel bleiben stehen). Vorgabe: gespeicherte Wahl, sonst der Standard von
+   Printful (`default_technique`), sonst Direktdruck vor Transfer vor Stickerei - im Backend genauso
+   (`shop_print_templates.TECHNIQUE_PREFERENCE`).
 3. **Druckflächen** (seit #2069, Abschnitt „Druckvorlagen und Druckdateien“): je Printful-Fläche aus der Druckvorlage
    Motiv, Vorgabe-Position aus der Liste und Größe in cm; Gamertag bzw. Vereinsnummer als Platzhalter (Datei je
    Bestellung) nur mit passender Personalisierung. „Druckdateien erzeugen“ baut je Farbe die Datei in der exakten
@@ -640,6 +644,27 @@ der Rest ist transparent. Abgeglichen mit den offiziellen Vorlagen (Maße in `ma
   abgleichen“, im täglichen Abgleich und mit „Vorlagen neu laden“. Die Prüfsumme (`hash`) deckt nur die Maße ab. Ändert
   Printful eine Fläche, stehen die Sätze in `changes` und im Protokoll (`shop.print_template.change`), und alle Dateien
   dieser Fläche gelten als **veraltet**. Scheitert Printful, bleibt der letzte Stand (`last_error`).
+- **Zeilenweise gelesen (#2091):** Eine Zeile, die nicht passt, wird übersprungen statt die ganze Antwort zu verwerfen.
+  Der Grund nennt nur Platzierung und Technik (wenn lesbar), Feldname und erwarteten Typ - **keine Werte, keine
+  Adressen** - und steht unter „übersprungen“ (`skipped`, gleiche Gründe zusammengefasst) und einmal je Abruf im Log.
+  Großzügig, wo es sicher ist: Zahlen als int, float oder Zahl-Text, Pixel gerundet; DPI muss eine ganze Zahl von 72
+  bis 1200 sein. Vorlagenbilder mit `role` `extra`/`advanced_template` (oder `template_type` `advanced`) werden still
+  ausgelassen, `template`/`primary` für die Vorschau bevorzugt. Ein fehlendes oder nicht-https Vorlagenbild kostet nur
+  die Vorschau dieser Zeile (ein schlechter Hintergrund nur den Hintergrund); sind die Vorlagenbilder gar nicht
+  abrufbar (außer vorübergehend), bleiben die Druckflächen wählbar - mit den bisher gespeicherten Vorlagenbildern,
+  sonst Vorschau ohne Bild mit Hinweis. Nur wenn mockup-styles **keine einzige** brauchbare Zeile liefert, scheitert
+  der Abruf (`no_usable_rows`) mit dem häufigsten Grund in der Meldung.
+- **Nie halb übernehmen (#2091):** Fehlt zu einer Platzierung und Technik eine übersprungene Zeile, gelten für genau
+  dieses Paar die Einträge des gespeicherten Stands weiter - kein „Entfällt“, kein Hin und Her im Protokoll, Prüfsumme
+  stabil. Ohne gespeicherten Stand fehlt das Paar ganz, bis Printful es vollständig liefert - eine fehlende Gruppe
+  (etwa die 15-oz-Tasse) fällt nie auf die allgemeine Fläche. Ist Platzierung oder Technik einer übersprungenen Zeile
+  nicht lesbar, werden keine neuen Maße übernommen (`last_error`, `skipped`, alter Stand bleibt).
+  Übernommene Paare stehen mit Datum in `carried` (`carried_since`, das erste Datum bleibt; eine vollständige Antwort
+  leert die Liste). Solange eines übernommen ist, warnt die Prüfung „Druckvorlage“ (gelb) und der Abgleich meldet eine
+  Warnung statt „ok“ (`catalog_sync.warning`, `sync_all` zählt `warnings`); nach `TEMPLATE_MAX_AGE_DAYS` (14 Tage)
+  wird die Prüfung rot wie bei einer veralteten Vorlage.
+- **Zu große Flächen** (über `MAX_FILE_PIXELS`) sind gültige Zeilen: das ganze Paar fällt weg und wird **nie** aus dem
+  alten Stand übernommen - „Entfällt“ im Protokoll, betroffene Varianten gesperrt, statt Druckdateien in falscher Größe.
 - Ein Sicherheitsbereich als Zahl steht nicht in v2 (er ist ins Vorlagenbild gezeichnet) - dafür gibt es einen
   einstellbaren **Sicherheitsrand** je Art der Fläche (Vorgabe 0 cm).
 - **Vorlagenbilder über die Website:** `GET /api/admin/shop/print-templates/{printful_product_id}/images/{index}` holt
