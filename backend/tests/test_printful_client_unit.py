@@ -3,6 +3,7 @@ Webhook-Signatur, Fehlerklassen und Wiederholungen.
 
 Kein echter Aufruf an Printful (httpx-MockTransport über ``tests/printful_fake.py``), kein echter Schlüssel, keine
 echten Personen. Die Datenbank ist mongomock - nur für Stufe, Notschalter, Schlüssel und den Idempotenzschutz."""
+import asyncio
 import inspect
 import logging
 import sys
@@ -10,9 +11,12 @@ import pathlib
 
 import httpx
 import pytest
+import pytest_asyncio
 from mongomock_motor import AsyncMongoMockClient
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+
+import database  # noqa: E402
 
 from printful_fake import API_KEY, WEBHOOK_SECRET_HEX, ContractViolation, FakePrintful, SPEC, validate  # noqa: E402
 from services import printful_client, shop_config  # noqa: E402
@@ -29,9 +33,16 @@ BACK = Placement(placement="back", technique="dtg", file_url="https://lsw.exampl
 CLUB = Recipient(name="Testverein Löwen", address1="Teststraße 1", city="Testdorf", zip="6410", country_code="AT")
 
 
-@pytest.fixture
-def db():
-    return AsyncMongoMockClient()["printful_adapter"]
+@pytest_asyncio.fixture
+async def db():
+    """Mit den Indizes, die jeder Start anlegt - die eindeutigen tragen die Claims beim Anlegen und Bestätigen."""
+    instance = AsyncMongoMockClient()["printful_adapter"]
+    await database.init_audit_indexes(instance)
+    return instance
+
+
+def stale() -> str:
+    return "2026-01-01T00:00:00+00:00"
 
 
 @pytest.fixture
@@ -252,9 +263,70 @@ async def test_creating_is_not_repeated_by_the_client(client, fake, db, pauses):
         await client.create_draft(db, draft())
     assert caught.value.status == 503
     assert len(fake.calls_to("createOrder")) == 1
-    # Danach erkennt ein neuer Versuch über die external_id, ob es den Auftrag schon gibt.
+    # Ausgang offen: gleich danach wartet ein neuer Versuch, statt ein zweites Mal zu senden.
+    with pytest.raises(FulfillmentTransient) as waiting:
+        await client.create_draft(db, draft())
+    assert waiting.value.reason == "draft_in_progress" and len(fake.calls_to("createOrder")) == 1
+    # Nach der Sperrfrist sucht er über die external_id nach; gibt es nichts, sendet er - genau einmal.
+    await db[printful_client.DRAFTS].update_one({"external_id": "lsw-test-0001"}, {"$set": {"claimed_at": stale()}})
     order = await client.create_draft(db, draft())
-    assert order.status == "draft" and len(fake.orders) == 1
+    assert order.status == "draft" and len(fake.orders) == 1 and len(fake.calls_to("createOrder")) == 2
+    claim = await db[printful_client.DRAFTS].find_one({"external_id": "lsw-test-0001"})
+    assert claim["state"] == "created" and claim["printful_order_id"] == order.id.value
+
+
+@pytest.mark.asyncio
+async def test_two_parallel_creates_send_only_once(fake, db, pauses):
+    """Codex-Befund: beide finden keinen Auftrag und senden beide. Der Claim per eindeutigem Index lässt nur einen."""
+    await settle(db)
+
+    async def interleaved(request: httpx.Request) -> httpx.Response:
+        # Wie im Netz: jede Anfrage gibt die Kontrolle ab - so laufen Nachsuche und Senden beider ineinander.
+        for _ in range(3):
+            await asyncio.sleep(0)
+        return fake._handle(request)
+
+    client = PrintfulClient(API_KEY, transport=httpx.MockTransport(interleaved))
+    results = await asyncio.gather(client.create_draft(db, draft()), client.create_draft(db, draft()),
+                                   return_exceptions=True)
+    assert len(fake.calls_to("createOrder")) == 1 and len(fake.orders) == 1
+    orders = [row for row in results if not isinstance(row, Exception)]
+    waits = [row for row in results if isinstance(row, Exception)]
+    assert orders, results
+    assert all(isinstance(row, FulfillmentTransient) and row.reason == "draft_in_progress" for row in waits), waits
+
+
+@pytest.mark.asyncio
+async def test_a_stale_sending_claim_is_taken_over_only_after_a_search(client, fake, db):
+    """Hat Printful den Auftrag damals doch angelegt, kommt dieser zurück - kein zweiter POST."""
+    await settle(db)
+    await db[printful_client.DRAFTS].insert_one({"external_id": "lsw-test-0001", "state": "sending",
+                                                 "claimed_at": stale(), "printful_order_id": None})
+    fake._op_createOrder([], {}, printful_client.order_payload(draft()))
+    order = await client.create_draft(db, draft())
+    assert order.external_id == "lsw-test-0001" and fake.calls_to("createOrder") == []
+    claim = await db[printful_client.DRAFTS].find_one({"external_id": "lsw-test-0001"})
+    assert claim["state"] == "created" and claim["printful_order_id"] == order.id.value
+
+
+@pytest.mark.asyncio
+async def test_a_fresh_sending_claim_makes_the_second_caller_wait(client, fake, db):
+    await settle(db)
+    await db[printful_client.DRAFTS].insert_one({"external_id": "lsw-test-0001", "state": "sending",
+                                                 "claimed_at": "2999-01-01T00:00:00+00:00", "printful_order_id": None})
+    with pytest.raises(FulfillmentTransient) as caught:
+        await client.create_draft(db, draft())
+    assert caught.value.reason == "draft_in_progress" and fake.calls_to("createOrder") == []
+
+
+@pytest.mark.asyncio
+async def test_a_refused_draft_frees_the_external_id(client, fake, db):
+    await settle(db)
+    fake.fail(400, operation="createOrder")
+    with pytest.raises(FulfillmentInvalid):
+        await client.create_draft(db, draft())
+    order = await client.create_draft(db, draft())
+    assert order.status == "draft" and len(fake.calls_to("createOrder")) == 2
 
 
 @pytest.mark.asyncio
@@ -341,66 +413,124 @@ async def test_one_key_belongs_to_one_order(client, fake, db):
     assert fake.confirmations == [first.id.value]
 
 
+async def confirmation_claim(db, order_id: int) -> dict | None:
+    return await db[printful_client.CONFIRMATIONS].find_one({"order_id": order_id})
+
+
+@pytest.mark.parametrize("status", [400, 409, 422])
 @pytest.mark.asyncio
-async def test_confirming_is_not_repeated_and_a_refused_try_can_be_made_again(client, fake, db):
+async def test_a_clear_refusal_frees_the_claim_and_a_new_try_may_send(client, fake, db, status):
     await settle(db, switch=True)
     order = await client.create_draft(db, draft())
-    fake.fail(503, operation="confirmOrder")
-    with pytest.raises(FulfillmentTransient):
+    fake.fail(status, operation="confirmOrder")
+    with pytest.raises(FulfillmentInvalid):
         await client.confirm_order(db, order.id, idempotency_key="test-confirm-0001")
-    assert len(fake.calls_to("confirmOrder")) == 1 and fake.confirmations == []
+    assert await confirmation_claim(db, order.id.value) is None
     confirmed = await client.confirm_order(db, order.id, idempotency_key="test-confirm-0001")
     assert confirmed.status == "pending" and fake.confirmations == [order.id.value]
+    assert len(fake.calls_to("confirmOrder")) == 2
+
+
+@pytest.mark.parametrize("what", ["timeout", "network", 500, 503, 429])
+@pytest.mark.asyncio
+async def test_an_unclear_confirmation_is_never_sent_again_automatically(client, fake, db, what):
+    """Codex-Befund: Printful v2 kennt keinen Idempotenzschlüssel. Nach unklarem Ausgang wird nur nachgelesen."""
+    await settle(db, switch=True)
+    order = await client.create_draft(db, draft())
+    fake.fail(what, operation="confirmOrder", retry_after="1")
+    with pytest.raises(FulfillmentTransient):
+        await client.confirm_order(db, order.id, idempotency_key="test-confirm-0001")
+    assert (await confirmation_claim(db, order.id.value))["state"] == "unclear"
+    for key in ("test-confirm-0001", "test-confirm-0002"):
+        with pytest.raises(FulfillmentPermanent) as caught:
+            await client.confirm_order(db, order.id, idempotency_key=key)
+        assert caught.value.reason == "confirm_unclear" and "Printful prüfen" in str(caught.value)
+    assert len(fake.calls_to("confirmOrder")) == 1 and fake.confirmations == []
 
 
 @pytest.mark.asyncio
-async def test_a_confirmation_with_unknown_outcome_blocks_the_same_key_for_a_while(client, fake, db):
-    """Zeitüberschreitung beim Bestätigen: ob Printful bestätigt hat, ist offen. Derselbe Schlüssel gleich danach
-    wartet, statt ein zweites Mal zu senden."""
+async def test_an_unclear_confirmation_that_went_through_is_recognised(client, fake, db):
     await settle(db, switch=True)
     order = await client.create_draft(db, draft())
     fake.fail("timeout", operation="confirmOrder")
     with pytest.raises(FulfillmentTransient):
         await client.confirm_order(db, order.id, idempotency_key="test-confirm-0001")
-    with pytest.raises(FulfillmentTransient) as caught:
-        await client.confirm_order(db, order.id, idempotency_key="test-confirm-0001")
-    assert caught.value.reason == "confirm_in_progress"
-    assert len(fake.calls_to("confirmOrder")) == 1
+    fake.set_order_status(order.id.value, "pending")   # Printful hatte doch bestätigt
+    current = await client.confirm_order(db, order.id, idempotency_key="test-confirm-0001")
+    assert current.status == "pending" and len(fake.calls_to("confirmOrder")) == 1
+    assert (await confirmation_claim(db, order.id.value))["state"] == "confirmed"
 
 
 @pytest.mark.asyncio
-async def test_a_stale_claim_is_taken_over_by_exactly_one_caller(client, fake, db, monkeypatch):
-    """Nach der Sperrfrist darf derselbe Schlüssel es wieder versuchen - der Stand bei Printful entscheidet. Kommen zwei
-    gleichzeitig, übernimmt nur einer."""
+async def test_sending_again_after_review_needs_the_explicit_parameter(client, fake, db):
     await settle(db, switch=True)
     order = await client.create_draft(db, draft())
+    fake.fail(503, operation="confirmOrder")
+    with pytest.raises(FulfillmentTransient):
+        await client.confirm_order(db, order.id, idempotency_key="test-confirm-0001")
+    confirmed = await client.confirm_order(db, order.id, idempotency_key="test-confirm-0001", force_after_review=True)
+    assert confirmed.status == "pending" and fake.confirmations == [order.id.value]
+    assert len(fake.calls_to("confirmOrder")) == 2
+    assert (await confirmation_claim(db, order.id.value))["state"] == "confirmed"
+
+
+@pytest.mark.asyncio
+async def test_force_after_review_is_taken_by_exactly_one_caller(client, fake, db, monkeypatch):
+    await settle(db, switch=True)
+    order = await client.create_draft(db, draft())
+    await db[printful_client.CONFIRMATIONS].insert_one({"idempotency_key": "test-confirm-0001", "order_id": order.id.value,
+                                                        "state": "unclear", "claimed_at": stale()})
     store = db[printful_client.CONFIRMATIONS]
-    await store.insert_one({"_id": "test-confirm-0001", "order_id": order.id.value, "state": "claimed",
-                            "claimed_at": "2026-01-01T00:00:00+00:00"})
     collection_type = type(store)
     original = collection_type.update_one
     raced = {"done": False}
 
     async def someone_else_first(self, query, change, **kwargs):
-        if not raced["done"] and "claimed_at" in query:
+        if not raced["done"] and query.get("state") == "unclear":
             raced["done"] = True
-            await original(self, {"_id": query["_id"]}, {"$set": {"claimed_at": "2026-10-27T09:59:59+00:00"}})
+            await original(self, {"order_id": order.id.value}, {"$set": {"state": "sending"}})
         return await original(self, query, change, **kwargs)
 
     monkeypatch.setattr(collection_type, "update_one", someone_else_first)
+    with pytest.raises(FulfillmentTransient) as caught:
+        await client.confirm_order(db, order.id, idempotency_key="test-confirm-0001", force_after_review=True)
+    assert caught.value.reason == "confirm_in_progress" and fake.calls_to("confirmOrder") == []
+
+
+@pytest.mark.asyncio
+async def test_a_failed_read_before_sending_leaves_no_claim(client, fake, db, pauses):
+    await settle(db, switch=True)
+    order = await client.create_draft(db, draft())
+    fake.fail(500, operation="getOrder", times=3)
+    with pytest.raises(FulfillmentTransient):
+        await client.confirm_order(db, order.id, idempotency_key="test-confirm-0001")
+    assert await confirmation_claim(db, order.id.value) is None and fake.calls_to("confirmOrder") == []
+    confirmed = await client.confirm_order(db, order.id, idempotency_key="test-confirm-0001")
+    assert confirmed.status == "pending"
+
+
+@pytest.mark.asyncio
+async def test_a_running_confirmation_makes_the_second_caller_wait(client, fake, db):
+    await settle(db, switch=True)
+    order = await client.create_draft(db, draft())
+    await db[printful_client.CONFIRMATIONS].insert_one({"idempotency_key": "test-confirm-0001", "order_id": order.id.value,
+                                                        "state": "sending", "claimed_at": "2999-01-01T00:00:00+00:00"})
     with pytest.raises(FulfillmentTransient) as caught:
         await client.confirm_order(db, order.id, idempotency_key="test-confirm-0001")
     assert caught.value.reason == "confirm_in_progress" and fake.calls_to("confirmOrder") == []
 
 
 @pytest.mark.asyncio
-async def test_a_stale_claim_on_a_draft_confirms(client, fake, db):
+async def test_a_stale_sending_claim_on_a_draft_is_unclear_and_not_sent(client, fake, db):
+    """Ein Aufruf, der mitten im Senden abgebrochen ist: Ausgang offen - nachlesen, nicht noch einmal senden."""
     await settle(db, switch=True)
     order = await client.create_draft(db, draft())
-    await db[printful_client.CONFIRMATIONS].insert_one({"_id": "test-confirm-0001", "order_id": order.id.value,
-                                                        "state": "claimed", "claimed_at": "2026-01-01T00:00:00+00:00"})
-    confirmed = await client.confirm_order(db, order.id, idempotency_key="test-confirm-0001")
-    assert confirmed.status == "pending" and fake.confirmations == [order.id.value]
+    await db[printful_client.CONFIRMATIONS].insert_one({"idempotency_key": "test-confirm-0001", "order_id": order.id.value,
+                                                        "state": "sending", "claimed_at": stale()})
+    with pytest.raises(FulfillmentPermanent) as caught:
+        await client.confirm_order(db, order.id, idempotency_key="test-confirm-0001")
+    assert caught.value.reason == "confirm_unclear" and fake.calls_to("confirmOrder") == []
+    assert (await confirmation_claim(db, order.id.value))["state"] == "unclear"
 
 
 def test_a_store_number_must_be_a_real_number():

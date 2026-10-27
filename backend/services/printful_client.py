@@ -57,8 +57,12 @@ MAX_PAGES = 20
 ESTIMATE_POLLS = 10
 ESTIMATE_PAUSE = 1.0
 CONFIRMATIONS = "shop_printful_confirmations"
-# So lange gilt eine Bestätigung ohne bekanntes Ergebnis (Zeitüberschreitung) als „läuft noch“.
+DRAFTS = "shop_printful_drafts"
+# So lange gilt ein Claim im Zustand „sending“ als „läuft noch“; danach: Entwurf erst nachsuchen, Bestätigung unklar.
 CONFIRM_CLAIM_SECONDS = 300
+DRAFT_CLAIM_SECONDS = 60
+# Nur diese Antworten sind eine eindeutige Ablehnung der Bestätigung - alles andere ist ein unklarer Ausgang.
+CONFIRM_REFUSED = frozenset({400, 409, 422})
 IDEMPOTENCY_KEY_RE = re.compile(r"[A-Za-z0-9:_-]{8,128}")
 FILENAME_RE = re.compile(r"[A-Za-z0-9._-]{1,100}")
 CURRENCY_RE = re.compile(r"[A-Z]{3}")
@@ -442,20 +446,83 @@ class PrintfulClient:
                 return None
             raise
 
+    @staticmethod
+    def _fresh(stamp, seconds: int, now: datetime) -> bool:
+        """Ist ein Claim jünger als ``seconds``? Ein unlesbarer Stempel gilt als alt - danach wird ohnehin erst
+        nachgesehen (Entwurf) bzw. nie gesendet (Bestätigung)."""
+        try:
+            claimed = datetime.fromisoformat(str(stamp))
+        except ValueError:
+            return False
+        if claimed.tzinfo is None:
+            claimed = claimed.replace(tzinfo=timezone.utc)
+        return now - claimed < timedelta(seconds=seconds)
+
+    async def _draft_claim(self, store, external_id: str):
+        """Den Claim für ``external_id`` gewinnen. Liefert ``(claim_id, None)`` - dann sendet dieser Aufruf - oder
+        ``(None, auftrag)``, wenn es den Auftrag schon gibt. Sonst ``FulfillmentTransient("draft_in_progress")``."""
+        now = datetime.now(timezone.utc)
+        try:
+            inserted = await store.insert_one({"external_id": external_id, "state": "sending",
+                                               "claimed_at": now.isoformat(), "printful_order_id": None})
+        except DuplicateKeyError:
+            earlier = await store.find_one({"external_id": external_id})
+            if earlier is None:
+                raise FulfillmentTransient("draft_in_progress") from None
+            if earlier.get("state") == "created" and type(earlier.get("printful_order_id")) is int:
+                return None, await self.get_order(PrintfulOrderId(earlier["printful_order_id"]))
+            if earlier.get("state") == "sending" and self._fresh(earlier.get("claimed_at"), DRAFT_CLAIM_SECONDS, now):
+                raise FulfillmentTransient("draft_in_progress") from None
+            # Abgelaufen oder abgelehnt: erst bei Printful nachsehen, dann per bedingtem Update übernehmen.
+            found = await self._find(external_id)
+            if found is not None:
+                await store.update_one({"_id": earlier["_id"]},
+                                       {"$set": {"state": "created", "printful_order_id": found.id.value}})
+                return None, found
+            taken = await store.update_one({"_id": earlier["_id"], "state": earlier.get("state"),
+                                            "claimed_at": earlier.get("claimed_at")},
+                                           {"$set": {"state": "sending", "claimed_at": now.isoformat()}})
+            if taken.modified_count != 1:
+                raise FulfillmentTransient("draft_in_progress") from None
+            return earlier["_id"], None
+        claim_id = inserted.inserted_id
+        try:
+            found = await self._find(external_id)
+        except FulfillmentError:
+            await store.update_one({"_id": claim_id, "state": "sending"}, {"$set": {"state": "failed"}})
+            raise
+        if found is not None:
+            await store.update_one({"_id": claim_id}, {"$set": {"state": "created", "printful_order_id": found.id.value}})
+            return None, found
+        return claim_id, None
+
     async def create_draft(self, db, draft: DraftOrder) -> FulfillmentOrder:
         """Einen Auftrag als **Entwurf** anlegen. Bestätigen geht hier nicht: es gibt keinen Parameter dafür, v2 legt
-        immer einen Entwurf an, und der Weg zur Bestätigung ist in ``_request`` gesperrt. Gibt es die ``external_id``
-        bei Printful schon, kommt dieser Auftrag zurück - kein zweiter."""
+        immer einen Entwurf an, und der Weg zur Bestätigung ist in ``_request`` gesperrt.
+
+        Nie zwei Aufträge zu einer ``external_id``: vor dem Senden ein Claim in ``shop_printful_drafts`` (eindeutiger
+        Index). Nur wer ihn gewinnt, sendet; ein zweiter Aufruf bekommt den Auftrag oder „läuft schon“. Ein Claim ohne
+        bekannten Ausgang wird nach ``DRAFT_CLAIM_SECONDS`` erst nach einer Nachsuche über ``@external_id``
+        übernommen."""
         require(draft, DraftOrder, "draft")
         await shop_config.require_printful_drafts(db)
-        existing = await self._find(draft.external_id)
+        store = db[DRAFTS]
+        claim_id, existing = await self._draft_claim(store, draft.external_id)
         if existing is not None:
             return existing
-        body = await self._request("POST", "/v2/orders", operation="createOrder", payload=order_payload(draft))
-        data = _data(body)
-        if type(data.get("id")) is not int:
-            raise FulfillmentPermanent("invalid_response")
-        return await self.get_order(PrintfulOrderId(data["id"]))
+        try:
+            body = await self._request("POST", "/v2/orders", operation="createOrder", payload=order_payload(draft))
+            data = _data(body)
+            if type(data.get("id")) is not int:
+                raise FulfillmentPermanent("invalid_response")
+        except FulfillmentError as exc:
+            if exc.status is not None and 400 <= exc.status < 500:
+                # Printful hat abgelehnt, es gibt keinen Auftrag: die external_id ist wieder frei.
+                await store.update_one({"_id": claim_id, "state": "sending"}, {"$set": {"state": "failed"}})
+            raise
+        order_id = PrintfulOrderId(data["id"])
+        await store.update_one({"_id": claim_id}, {"$set": {"state": "created", "printful_order_id": order_id.value}})
+        return await self.get_order(order_id)
 
     async def delete_draft(self, db, order_id: PrintfulOrderId) -> None:
         """Einen Entwurf löschen. Was kein Entwurf mehr ist, bleibt unberührt (``not_draft``) - storniert wird ein
@@ -466,53 +533,95 @@ class PrintfulClient:
         if current.status != "draft":
             raise FulfillmentInvalid("not_draft")
         await self._request("DELETE", f"/v2/orders/{order_id.value}", operation="deleteOrder")
+        # Der Entwurf ist weg - seine external_id darf wieder angelegt werden (Testentwürfe, #2062).
+        await db[DRAFTS].delete_one({"printful_order_id": order_id.value, "state": "created"})
 
-    async def confirm_order(self, db, order_id: PrintfulOrderId, *, idempotency_key: str) -> FulfillmentOrder:
-        """Einen Entwurf bestätigen - **kostet Geld**, darum nur mit Notschalter an. Ein Schlüssel gehört zu genau einem
-        Auftrag; derselbe Schlüssel noch einmal sendet nicht noch einmal. Ist der Auftrag kein Entwurf mehr, wird nie
-        gesendet. Nie still wiederholt; bei unbekanntem Ausgang (Zeitüberschreitung) bleibt der Schlüssel eine Weile
-        belegt, danach entscheidet der Stand bei Printful."""
+    async def _resume_confirmation(self, store, order_id: PrintfulOrderId, key: str, *, force_after_review: bool):
+        """Es gibt schon einen Claim für diesen Auftrag oder Schlüssel. Liefert ``(claim_id, None)`` - dann sendet
+        dieser Aufruf (nur mit ``force_after_review``) - oder ``(None, auftrag)``. Sonst ein Fehler; nie ein stilles
+        zweites Senden."""
+        now = datetime.now(timezone.utc)
+        same_key = await store.find_one({"idempotency_key": key})
+        if same_key is not None and same_key.get("order_id") != order_id.value:
+            raise FulfillmentInvalid("idempotency_conflict")
+        earlier = await store.find_one({"order_id": order_id.value})
+        if earlier is None:
+            raise FulfillmentTransient("confirm_in_progress")
+        state = earlier.get("state")
+        if state == "sending" and self._fresh(earlier.get("claimed_at"), CONFIRM_CLAIM_SECONDS, now):
+            raise FulfillmentTransient("confirm_in_progress")
+        current = await self.get_order(order_id)
+        if current.status != "draft":
+            await store.update_one({"_id": earlier["_id"]}, {"$set": {"state": "confirmed", "status": current.status}})
+            return None, current
+        if state == "sending":
+            # Abgebrochen mitten im Senden: Ausgang offen.
+            moved = await store.update_one({"_id": earlier["_id"], "state": "sending",
+                                            "claimed_at": earlier.get("claimed_at")}, {"$set": {"state": "unclear"}})
+            if moved.modified_count != 1:
+                raise FulfillmentTransient("confirm_in_progress")
+            state = "unclear"
+        if state not in ("unclear", "confirmed"):
+            raise FulfillmentTransient("confirm_in_progress")
+        # Noch Entwurf nach unklarem Ausgang (oder „bestätigt“ vermerkt, aber Printful sagt Entwurf): ein Mensch sieht
+        # in Printful nach. Erneut senden nur ausdrücklich - und nur einer übernimmt.
+        if not force_after_review:
+            raise FulfillmentPermanent("confirm_unclear")
+        taken = await store.update_one({"_id": earlier["_id"], "state": state},
+                                       {"$set": {"state": "sending", "claimed_at": now.isoformat(),
+                                                 "forced_by": key}})
+        if taken.modified_count != 1:
+            raise FulfillmentTransient("confirm_in_progress")
+        return earlier["_id"], None
+
+    async def confirm_order(self, db, order_id: PrintfulOrderId, *, idempotency_key: str,
+                            force_after_review: bool = False) -> FulfillmentOrder:
+        """Einen Entwurf bestätigen - **kostet Geld**, darum nur mit Notschalter an.
+
+        Printful v2 kennt keinen Idempotenzschlüssel, darum ein Claim in ``shop_printful_confirmations`` (eindeutig je
+        Auftrag und je Schlüssel). Nur wer ihn gewinnt, sendet - und nur, solange der Auftrag ein Entwurf ist.
+        - Eindeutige Ablehnung (400, 409, 422): Claim frei, ein neuer Versuch darf senden.
+        - Unklarer Ausgang (Zeitüberschreitung, Netz, 5xx, 429, jede andere Antwort): Claim ``unclear``. Danach wird
+          nur nachgelesen: kein Entwurf mehr heißt bestätigt; noch Entwurf heißt ``confirm_unclear`` - ein Mensch prüft
+          in Printful und sendet dann ausdrücklich mit ``force_after_review=True``."""
         require(order_id, PrintfulOrderId, "order_id")
         if not isinstance(idempotency_key, str) or not IDEMPOTENCY_KEY_RE.fullmatch(idempotency_key):
             raise ValueError("Idempotenzschlüssel: 8 bis 128 Zeichen aus Buchstaben, Ziffern, :, - und _")
+        if type(force_after_review) is not bool:
+            raise TypeError("force_after_review ist True oder False")
         await shop_config.require_printful_writes(db)
         store = db[CONFIRMATIONS]
-        now = datetime.now(timezone.utc)
         try:
-            await store.insert_one({"_id": idempotency_key, "order_id": order_id.value, "state": "claimed",
-                                    "claimed_at": now.isoformat()})
+            inserted = await store.insert_one({"idempotency_key": idempotency_key, "order_id": order_id.value,
+                                               "state": "sending",
+                                               "claimed_at": datetime.now(timezone.utc).isoformat()})
         except DuplicateKeyError:
-            earlier = await store.find_one({"_id": idempotency_key}) or {}
-            if earlier.get("order_id") != order_id.value:
-                raise FulfillmentInvalid("idempotency_conflict") from None
-            if earlier.get("state") == "done":
-                return await self.get_order(order_id)
-            stamp = str(earlier.get("claimed_at") or "")
+            claim_id, current = await self._resume_confirmation(store, order_id, idempotency_key,
+                                                                force_after_review=force_after_review)
+            if current is not None:
+                return current
+        else:
+            claim_id = inserted.inserted_id
             try:
-                claimed = datetime.fromisoformat(stamp)
-            except ValueError:
-                claimed = now
-            if now - claimed < timedelta(seconds=CONFIRM_CLAIM_SECONDS):
-                raise FulfillmentTransient("confirm_in_progress") from None
-            # Übernehmen nur, wenn niemand anderes es inzwischen getan hat (bedingtes Update auf den alten Stempel).
-            taken = await store.update_one({"_id": idempotency_key, "state": "claimed", "claimed_at": stamp},
-                                           {"$set": {"claimed_at": now.isoformat()}})
-            if taken.modified_count != 1:
-                raise FulfillmentTransient("confirm_in_progress") from None
-        current = await self.get_order(order_id)
-        if current.status != "draft":
-            await store.update_one({"_id": idempotency_key}, {"$set": {"state": "done", "status": current.status}})
-            return current
+                current = await self.get_order(order_id)
+            except FulfillmentError:
+                # Nichts gesendet: Claim wieder frei.
+                await store.delete_one({"_id": claim_id, "state": "sending"})
+                raise
+            if current.status != "draft":
+                await store.update_one({"_id": claim_id}, {"$set": {"state": "confirmed", "status": current.status}})
+                return current
         try:
             body = await self._request("POST", f"/v2/orders/{order_id.value}/confirmation", operation="confirmOrder",
                                        allow_confirmation=True)
+            data = _data(body)
         except FulfillmentError as exc:
-            if exc.status is not None:
-                # Printful hat geantwortet und abgelehnt: ein neuer Versuch mit demselben Schlüssel ist möglich.
-                await store.delete_one({"_id": idempotency_key, "state": "claimed"})
+            if exc.status in CONFIRM_REFUSED:
+                await store.delete_one({"_id": claim_id, "state": "sending"})
+            else:
+                await store.update_one({"_id": claim_id, "state": "sending"}, {"$set": {"state": "unclear"}})
             raise
-        data = _data(body)
-        await store.update_one({"_id": idempotency_key}, {"$set": {"state": "done", "status": str(data.get("status"))}})
+        await store.update_one({"_id": claim_id}, {"$set": {"state": "confirmed", "status": str(data.get("status"))}})
         return await self.get_order(order_id)
 
     # ------------------------------------------------ Druckdateien

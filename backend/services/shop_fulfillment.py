@@ -279,6 +279,8 @@ ERROR_TEXTS = {
     "server": "Fehler beim Anbieter",
     "estimate_pending": "Die Kostenschätzung ist noch nicht fertig",
     "confirm_in_progress": "Die Bestätigung läuft schon - Ergebnis abwarten",
+    "draft_in_progress": "Der Entwurf wird gerade angelegt - Ergebnis abwarten",
+    "confirm_unclear": "Bestätigung unklar – bitte in Printful prüfen",
     "unauthorized": "Der Anbieter lehnt den Schlüssel ab",
     "forbidden": "Dem Schlüssel fehlt ein Recht beim Anbieter",
     "not_found": "Beim Anbieter nicht gefunden",
@@ -351,7 +353,8 @@ class FulfillmentProvider(Protocol):
 
     async def delete_draft(self, db, order_id: PrintfulOrderId) -> None: ...
 
-    async def confirm_order(self, db, order_id: PrintfulOrderId, *, idempotency_key: str) -> FulfillmentOrder: ...
+    async def confirm_order(self, db, order_id: PrintfulOrderId, *, idempotency_key: str,
+                            force_after_review: bool = False) -> FulfillmentOrder: ...
 
     async def add_file(self, db, url: str, *, filename: str | None = None) -> PrintFile: ...
 
