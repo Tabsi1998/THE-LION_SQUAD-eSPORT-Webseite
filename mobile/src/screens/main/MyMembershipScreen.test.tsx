@@ -231,3 +231,18 @@ test("Meine Einwilligungen (#1537): nicht geladen heißt sichtbar nicht geladen"
   await waitFor(() => expect(screen.getByTestId("consents-error")).toHaveTextContent(/nicht geladen/));
   expect(screen.getByTestId("consents-retry")).toBeTruthy();
 });
+
+test("Meine Nummer (#2050): steht im eigenen Mitgliederbereich, gleich unter dem Mitgliedsstatus", async () => {
+  mockGet.mockImplementation((path: string) => {
+    if (path === "/membership/me") return Promise.resolve({ data: ledByDolibarr });
+    if (path === "/membership/me/jersey-number") {
+      return Promise.resolve({ data: { available: true, number: 12, can_choose: false, set_by: "member", chosen_at: "2026-10-26T10:00:00+00:00",
+        free_count: 0, free_numbers: [], range: { min: 0, max: 99 }, reserved: [], dolibarr: { state: "ok", text: "" }, open_request: null, requests: [] } });
+    }
+    return Promise.reject(new Error("nope"));
+  });
+  await render(<MyMembershipScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("jersey-number")).toHaveTextContent("12"));
+  expect(mockGet).toHaveBeenCalledWith("/membership/me/jersey-number");
+  expect(screen.getByTestId("jersey-ask")).toBeTruthy();
+});

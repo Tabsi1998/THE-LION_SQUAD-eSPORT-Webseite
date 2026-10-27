@@ -8,6 +8,7 @@ import { SkeletonList } from "../../components/ListState";
 import { MemberCardArt } from "../../components/MemberCardArt";
 import { MemberConsents } from "../../components/MemberConsents";
 import { MemberFileAccounts } from "../../components/MemberFileAccounts";
+import { MemberJerseyNumber } from "../../components/MemberJerseyNumber";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
@@ -253,6 +254,9 @@ export function MyMembershipScreen({ navigation }: Props) {
             <Body style={styles.inlineLinkText}>Mitgliedskarte anzeigen</Body>
           </Pressable>
         </Card>
+
+        {/* Meine Nummer (#2050, wie im Web #2034): einmal wählen, danach nur über den Vorstand; der Server sagt, ob es sie gibt. */}
+        <MemberJerseyNumber />
 
         {fee ? (
           <Card style={[styles.card, fee.tone === "warn" ? styles.warn : fee.tone === "info" ? styles.info : styles.ok]} testID="membership-fee">
