@@ -1,19 +1,17 @@
 # Changelog
 
-## [1.42.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.41.0...v1.42.0) (2026-10-27)
-
+## 1.42.0 (27.10.2026)
 
 ### Neu
 
-* Betrieb: Check „Spamschutz“ meldet Spitzen und Turnstile-Ausfälle ([#2067](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2067)) ([6ea2981](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/6ea29813508a41e726bae002c3d66c57b8f713e6))
-* Einstellungen → Spamschutz: Schwellen, Limits und optional Cloudflare Turnstile ([#2067](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2067)) ([6ea2981](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/6ea29813508a41e726bae002c3d66c57b8f713e6))
-* Kontakt-Inbox: verdächtige Nachrichten im Spam-Ordner ohne Mail, „Kein Spam“ holt sie zurück, tägliche Sammel-Mail ([#2067](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2067)) ([6ea2981](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/6ea29813508a41e726bae002c3d66c57b8f713e6))
-* Spamschutz für Kontakt und Registrierung - unsichtbares Lockfeld, Formular-Token und Inhaltsprüfung, ohne externen Dienst ([#2067](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2067)) ([6ea2981](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/6ea29813508a41e726bae002c3d66c57b8f713e6))
-
+* Betrieb: Check „Spamschutz“ meldet Spitzen und Turnstile-Ausfälle (#2067)
+* Einstellungen → Spamschutz: Schwellen, Limits und optional Cloudflare Turnstile (#2067)
+* Kontakt-Inbox: verdächtige Nachrichten im Spam-Ordner ohne Mail, „Kein Spam“ holt sie zurück, tägliche Sammel-Mail (#2067)
+* Spamschutz für Kontakt und Registrierung - unsichtbares Lockfeld, Formular-Token und Inhaltsprüfung, ohne externen Dienst (#2067)
 
 ### Fehlerbehebungen
 
-* Mail-Warteschlange verschickt Mails mit gleichem Schlüssel garantiert nur einmal ([#2067](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2067)) ([6ea2981](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/6ea29813508a41e726bae002c3d66c57b8f713e6))
+* Mail-Warteschlange verschickt Mails mit gleichem Schlüssel garantiert nur einmal (#2067)
 
 ## 1.41.0 (27.10.2026)
 
