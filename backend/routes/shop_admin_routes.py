@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from auth import require_area
 from database import get_db
-from services import printful_client, shop_catalog, shop_config, shop_orders
+from services import printful_client, shop_catalog, shop_config, shop_orders, shop_products
 from services.permissions import can_use_area, is_superadmin
 from services.shop_common import ShopConflict, ShopError
 
@@ -95,8 +95,11 @@ def _refused(exc: Exception) -> HTTPException:
 
 @router.get("/products")
 async def list_products(me: dict = Depends(require_area("finance"))):
-    return {"products": await shop_catalog.list_products(get_db()), "statuses": shop_catalog.STATUSES,
-            "visibilities": shop_catalog.VISIBILITIES}
+    db = get_db()
+    return {"products": await shop_catalog.list_products(db), "overview": await shop_products.list_view(db),
+            "statuses": shop_catalog.STATUSES, "visibilities": shop_catalog.VISIBILITIES,
+            "labels": {"statuses": shop_catalog.STATUS_LABELS, "visibilities": shop_catalog.VISIBILITY_LABELS,
+                       "personalizations": shop_catalog.PERSONALIZATION_LABELS}}
 
 
 @router.post("/products")
@@ -110,11 +113,12 @@ async def create_product(body: ProductCreate, me: dict = Depends(require_area("f
 
 @router.get("/products/{product_id}")
 async def product_detail(product_id: str, me: dict = Depends(require_area("finance"))):
-    db = get_db()
-    product = await shop_catalog.get_product(db, product_id)
-    if not product:
-        raise HTTPException(404, "Produkt nicht gefunden.")
-    return {"product": product, "variants": await shop_catalog.variants_of(db, product_id)}
+    """Das Produkt mit allem für den geführten Aufbau (#1707): Varianten mit Einkauf und Preisen, Platzierungen,
+    Designs je Farbe, Vorab-Prüfung und Stand des Abgleichs."""
+    try:
+        return await shop_products.admin_view(get_db(), product_id)
+    except LookupError as exc:
+        raise HTTPException(404, "Produkt nicht gefunden.") from exc
 
 
 @router.patch("/products/{product_id}")

@@ -162,6 +162,20 @@ async def _safe_seasons_weather():
         _log_task_failure("seasons_weather", exc)
 
 
+async def _safe_shop_catalog_sync():
+    """Shop (#1709): täglich Lager und Einkaufspreise der angebotenen Varianten mit Printful abgleichen - nicht
+    Lieferbares sperren, Preisänderungen als Warnung. Ohne Printful-Schlüssel tut der Job nichts; bei Ausfall bleibt
+    der letzte Stand mit Datum."""
+    try:
+        from database import get_db
+        from services.shop_catalog_sync import sync_all
+        result = await sync_all(get_db())
+        if result.get("products"):
+            logger.info(f"[scheduler] shop_catalog_sync products={result['products']} failed={result['failed']}")
+    except Exception as exc:
+        _log_task_failure("shop_catalog_sync", exc)
+
+
 async def _safe_season_rank_snapshots():
     """Erfolge II (#613): täglich der Platz je Person in jeder laufenden Saison - daraus zählt „Aufsteiger“."""
     try:
@@ -1061,6 +1075,9 @@ def start_scheduler() -> AsyncIOScheduler:
                   id="achievements_reconcile", max_instances=1, coalesce=True)
     sched.add_job(_single_replica("season_rank_snapshots", _safe_season_rank_snapshots), CronTrigger(hour=3, minute=35, timezone="Europe/Vienna"),
                   id="season_rank_snapshots", max_instances=1, coalesce=True)
+    # Shop (#1709): Katalogabgleich mit Printful einmal am Tag - je Variante ein Preisaufruf, unter 120 je Minute.
+    sched.add_job(_single_replica("shop_catalog_sync", _safe_shop_catalog_sync, lease_seconds=900.0), CronTrigger(hour=5, minute=20, timezone="Europe/Vienna"),
+                  id="shop_catalog_sync", max_instances=1, coalesce=True)
     sched.add_job(_single_replica("achievement_of_week", _safe_achievement_of_week), CronTrigger(day_of_week="mon", hour=8, minute=0, timezone="Europe/Vienna"),
                   id="achievement_of_week", replace_existing=True)
     sched.add_job(_single_replica("achievement_recap", _safe_achievement_recap, lease_seconds=900.0), CronTrigger(day_of_week="mon", hour=9, minute=0, timezone="Europe/Vienna"),
