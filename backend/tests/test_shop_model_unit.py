@@ -80,6 +80,8 @@ async def test_later_catalog_changes_do_not_touch_a_placed_order(db):
     product, variant = await catalog(db)
     order, _ = await place(db, variant)
     before = await shop_orders.items_for(db, order["id"])
+    # Veröffentlicht ändert man Preise nur nach dem Zurückziehen (#1707).
+    await db.shop_products.update_one({"id": product["id"]}, {"$set": {"status": "draft"}})
     await shop_catalog.update_product(db, product["id"], {"base_price_cents": 3990, "markup_cents": 900,
                                                           "title": "Neues Shirt", "tax_profile": "reduced"}, **BY)
     await shop_catalog.update_variant(db, variant["id"], {"label": "M, Weiß", "price_cents": 4500}, **BY)
@@ -91,6 +93,7 @@ async def test_later_catalog_changes_do_not_touch_a_placed_order(db):
     assert stored["frozen"] == order["frozen"]
     assert await shop_orders.items_for(db, order["id"]) == before
     # Eine neue Bestellung sieht den neuen Stand.
+    await publish_unchecked(db, product["id"])
     newer, _ = await place(db, variant, key="bestellung-0002")
     item = (await shop_orders.items_for(db, newer["id"]))[0]
     assert (item["unit_price_cents"], item["design"]["version"], item["printful"]["variant_id"]) == (4500, 2, 9999)

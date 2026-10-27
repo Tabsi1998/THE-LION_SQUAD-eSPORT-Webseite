@@ -265,6 +265,20 @@ test("Veröffentlichen bleibt gesperrt, solange die Mockup-Prüfung offen ist; p
   expect(apiMock.post).toHaveBeenCalledWith("/admin/shop/products/p1/status", { status: "draft", reason: "Noch ändern" });
 });
 
+test("veröffentlicht: Sichtbarkeit, Personalisierung und Aufschlag sind gesperrt, gesperrte Varianten zeigen den Grund", async () => {
+  const blocked = variant("White / L", "PF4", { blocked_reason: "Lager bei Printful unbekannt.", in_stock: null });
+  apiMock.get.mockResolvedValue({ data: view({ product: { status: "active" }, variants: [variant("Black / M", "PF1"), blocked], extra: { editable: false, transitions: ["draft", "archived"] } }) });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  expect(await screen.findByTestId("shop-product-locked")).toHaveTextContent("zurückziehen");
+  expect(screen.getByTestId("shop-basics-visibility-public")).toBeDisabled();
+  expect(screen.getByTestId("shop-basics-personalization-none")).toBeDisabled();
+  await user.click(screen.getByTestId("shop-step-prices"));
+  expect(screen.getByTestId("shop-markup-source-product")).toBeDisabled();
+  expect(screen.getByTestId("shop-markup-locked")).toBeInTheDocument();
+  expect(screen.getByTestId("shop-price-PF4")).toHaveTextContent("Lager bei Printful unbekannt.");
+});
+
 test("eine fehlende Datei für eine Farbe sperrt „geprüft“ und nennt die Farbe", async () => {
   const items = checkItems({ files: { ok: false, state: "failed", detail: "Ohne gültige Datei: Rücken: White" } });
   apiMock.get.mockResolvedValue({ data: view({ items }) });

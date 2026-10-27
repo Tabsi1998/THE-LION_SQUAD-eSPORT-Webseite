@@ -11,11 +11,14 @@ kein stilles „ohne Umsatzsteuer“). Beträge sind ganze Cent, nie negativ, mi
 from __future__ import annotations
 
 import re
+from contextlib import asynccontextmanager
 from typing import Any
 
 from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
+from services import shop_config
+from services.mutation_lock import MutationLockBusy, mutation_lock
 from services.pricing import TAX_PROFILES
 from services.shop_common import MODEL_FIELDS, ShopConflict, ShopError, record_admin_action
 
@@ -221,14 +224,16 @@ async def update_product(db, product_id: str, fields: dict, *, actor_id: str, re
     update = {key: values[key] for key in changed}
     merged = {**product, **update}
     _check_personalization(merged)
+    structural = sorted(set(update) - set(TEXT_FIELDS))
+    _check_editable(product, structural)
+    if update.get("base_price_cents") is not None:
+        await _check_min_price(db, update["base_price_cents"])
     extra_set: dict = {}
     if "personalization" in update:
-        # Die Personalisierung bestimmt die Platzierungen (Gamertag-Feld) - also wie ein Umbau des Produkts.
-        if product.get("status") == "active":
-            raise ShopConflict("Veröffentlicht: zum Ändern der Personalisierung das Produkt erst zurückziehen.")
         extra_set["gamertag_allowed"] = allows_gamertag(merged)
-        if product.get("status") == "reviewed":
-            extra_set["status"] = "draft"
+    if structural and product.get("status") == "reviewed":
+        # Preis, Sichtbarkeit, Aufschlag, Personalisierung … gehören zur Prüfung - geprüft gilt nicht mehr.
+        extra_set.update(status="draft", review=None)
     try:
         result = await db.shop_products.update_one(
             {"id": product_id, "version": product.get("version", 1)},
@@ -239,10 +244,63 @@ async def update_product(db, product_id: str, fields: dict, *, actor_id: str, re
         raise ShopConflict("Das Produkt wurde gerade geändert - bitte neu laden.")
     await _log_changes(db, "product", product_id, product, changed, actor_id=actor_id, reason=reason, extra=update)
     if extra_set.get("status"):
-        await record_admin_action(db, "shop.product.status", actor_id=actor_id, target_id=product_id, reason=reason,
-                                  data={"before": {"status": product["status"]}, "after": {"status": "draft"},
-                                        "cause": "Personalisierung geändert"})
+        await _log_back_to_draft(db, product_id, actor_id=actor_id, reason=reason,
+                                 cause=f"geändert: {', '.join(structural)}")
     return await get_product(db, product_id), changed
+
+
+# ---------------------------------------------------------------- Regeln für die alten Wege (#1707)
+# PATCH Produkt/Variante, Variante anlegen, Printful-Zuordnung von Hand: dieselben Regeln wie der geführte Aufbau.
+# Veröffentlicht oder archiviert ändert man nur Titel und Beschreibung; geprüft fällt bei jeder anderen Änderung auf
+# „Entwurf“; Preise und Angebot eines Printful-Produkts nur über „Preise übernehmen“ bzw. „Farben und Größen“.
+
+TEXT_FIELDS = ("title", "description")
+NOT_EDITABLE_ACTIVE = "Veröffentlicht: zum Ändern das Produkt erst zurückziehen (zurück auf „Entwurf“)."
+NOT_EDITABLE_ARCHIVED = "Archiviert: zum Ändern erst wieder als Entwurf öffnen."
+PRINTFUL_PRICES = "Preise eines Printful-Produkts nur über „Preise übernehmen“ (Schritt Preise)."
+PRINTFUL_OFFER = "Varianten eines Printful-Produkts entstehen aus „Farben und Größen“ (Schritt 2)."
+
+
+def _check_editable(product: dict, structural: list[str]) -> None:
+    if not structural:
+        return
+    if product.get("status") == "active":
+        raise ShopConflict(NOT_EDITABLE_ACTIVE)
+    if product.get("status") == "archived":
+        raise ShopConflict(NOT_EDITABLE_ARCHIVED)
+
+
+async def _check_min_price(db, cents: int | None) -> None:
+    shop_config.check_min_price(await shop_config.load(db), cents)
+
+
+async def _log_back_to_draft(db, product_id: str, *, actor_id: str, reason: str, cause: str) -> None:
+    await record_admin_action(db, "shop.product.status", actor_id=actor_id, target_id=product_id, reason=reason,
+                              data={"before": {"status": "reviewed"}, "after": {"status": "draft"}, "cause": cause})
+
+
+async def _variant_change_allowed(db, product: dict, changed: list[str], *, actor_id: str, reason: str) -> None:
+    """Prüft eine Änderung an Varianten bzw. ihrer Zuordnung und setzt „geprüft“ zurück auf „Entwurf“."""
+    _check_editable(product, changed)
+    if product.get("printful"):
+        if "price_cents" in changed:
+            raise ShopError(PRINTFUL_PRICES)
+        if set(changed) - {"label"}:
+            raise ShopError(PRINTFUL_OFFER)
+    if changed:
+        await _reset_reviewed(db, product, cause=f"Variante geändert: {', '.join(changed)}", actor_id=actor_id,
+                              reason=reason)
+
+
+async def _reset_reviewed(db, product: dict, *, cause: str, actor_id: str, reason: str) -> None:
+    if product.get("status") == "reviewed":
+        result = await db.shop_products.update_one(
+            {"id": product["id"], "version": product.get("version", 1)},
+            {"$set": {"status": "draft", "review": None, "updated_at": now_utc().isoformat(), "updated_by": actor_id},
+             "$inc": {"version": 1}})
+        if getattr(result, "matched_count", 0) != 1:
+            raise ShopConflict("Das Produkt wurde gerade geändert - bitte neu laden.")
+        await _log_back_to_draft(db, product["id"], actor_id=actor_id, reason=reason, cause=cause)
 
 
 async def save_setup(db, product: dict, update: dict, *, actor_id: str) -> dict:
@@ -261,6 +319,20 @@ async def save_setup(db, product: dict, update: dict, *, actor_id: str) -> dict:
     return await get_product(db, product["id"])
 
 
+PRODUCT_BUSY = "Das Produkt wird gerade geändert oder mit Printful abgeglichen - bitte gleich noch einmal."
+
+
+@asynccontextmanager
+async def product_lock(db, product_id: str, *, wait_seconds: float = 5.0):
+    """Schreiben am Aufbau eines Produkts und der Schreibteil des Abgleichs (#1709) nacheinander - auch über mehrere
+    Prozesse (MongoDB-Sperre mit Ablauf). Besetzt: ``ShopConflict``."""
+    try:
+        async with mutation_lock(db, f"shop:product:{product_id}", wait_seconds=wait_seconds, lease_seconds=60.0):
+            yield
+    except MutationLockBusy as exc:
+        raise ShopConflict(PRODUCT_BUSY) from exc
+
+
 async def record_catalog_sync(db, product_id: str, state: dict) -> None:
     """Stand des letzten Abgleichs mit Printful (#1709) - ohne Versionssprung: er ändert keine Entscheidung der
     Finanzen, und ein gleichzeitiges Speichern im Admin soll daran nicht scheitern."""
@@ -274,8 +346,14 @@ async def create_variant(db, product_id: str, fields: dict, *, actor_id: str, re
     for required in ("sku", "label"):
         if required not in values:
             raise ShopError(f"{required} fehlt.")
-    if not await get_product(db, product_id):
+    product = await get_product(db, product_id)
+    if not product:
         raise LookupError("Produkt nicht gefunden.")
+    _check_editable(product, ["variant"])
+    if product.get("printful"):
+        raise ShopError(PRINTFUL_OFFER)
+    await _check_min_price(db, values.get("price_cents"))
+    await _variant_change_allowed(db, product, ["variant"], actor_id=actor_id, reason=reason)
     now = now_utc().isoformat()
     variant = {"id": new_id(), "product_id": product_id, "size": None, "color": None, "price_cents": None,
                "active": True, **values, "version": 1, "created_at": now, "created_by": actor_id, "updated_at": now,
@@ -307,6 +385,11 @@ async def update_variant(db, variant_id: str, fields: dict, *, actor_id: str, re
     if not changed:
         return variant, []
     update = {key: values[key] for key in changed}
+    product = await get_product(db, variant["product_id"]) or {}
+    _check_editable(product, changed)
+    if update.get("price_cents") is not None:
+        await _check_min_price(db, update["price_cents"])
+    await _variant_change_allowed(db, product, changed, actor_id=actor_id, reason=reason)
     try:
         result = await db.shop_variants.update_one(
             {"id": variant_id, "version": variant.get("version", 1)},
@@ -373,6 +456,7 @@ async def set_printful_variant(db, variant_id: str, *, printful_variant_id: int,
     if not variant:
         raise LookupError("Variante nicht gefunden.")
     product = await get_product(db, variant["product_id"]) or {}
+    _check_editable(product, ["printful_variant"])
     printful = product.get("printful") or {}
     if printful:
         # Gegen Verwechslungen (#1709): nur Nummern aus dem geladenen Katalog genau dieses Produkts.
@@ -380,6 +464,7 @@ async def set_printful_variant(db, variant_id: str, *, printful_variant_id: int,
         if printful_product_id != printful.get("product_id") or printful_variant_id not in known:
             raise ShopError("Diese Printful-Nummer gehört nicht zum gewählten Printful-Produkt "
                             f"({printful.get('product_id')}) - Produkt- und Variantennummer prüfen.")
+    await _reset_reviewed(db, product, cause="Printful-Zuordnung geändert", actor_id=actor_id, reason=reason)
     row = {"provider": "printful", "variant_id": variant_id, "printful_variant_id": printful_variant_id,
            "printful_product_id": printful_product_id, "updated_at": now_utc().isoformat(), "updated_by": actor_id}
     await db.shop_printful_variants.update_one({"provider": "printful", "variant_id": variant_id}, {"$set": row},

@@ -158,6 +158,7 @@ class ConfigUpdate(Reasoned):
     orders_to_printful: bool | None = Field(None, strict=True)
     public_markup_cents: int | None = Field(None, ge=0, le=shop_config.MAX_PUBLIC_MARKUP_CENTS)
     fallback_shipping_cents: int | None = Field(None, ge=1, le=shop_config.MAX_FALLBACK_SHIPPING_CENTS)
+    min_price_cents: int | None = Field(None, ge=1, le=shop_config.MAX_MIN_PRICE_CENTS)
 
 
 class TaxClearance(Reasoned):

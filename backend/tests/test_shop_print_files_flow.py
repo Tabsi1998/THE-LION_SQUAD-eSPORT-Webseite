@@ -128,9 +128,9 @@ async def test_an_order_keeps_its_version_after_a_new_upload(flow):
     product = await shop_catalog.create_product(
         flow.db, {"slug": "loewe", "title": "Löwen-Shirt", "base_price_cents": 2000, "design_key": "loewe-weiss"},
         **by)
-    await publish_unchecked(flow.db, product["id"])
     variant = await shop_catalog.create_variant(flow.db, product["id"], {"sku": "L-SCHWARZ-M", "label": "M",
                                                                          "color": "Schwarz"}, **by)
+    await publish_unchecked(flow.db, product["id"])
     address = {"street": "Probegasse 1", "zip": "1010", "city": "Wien", "country": "AT"}
     order, _ = await shop_orders.place_order(
         flow.db, user_id="konto-test", idempotency_key="design-0001", buyer_kind="member",

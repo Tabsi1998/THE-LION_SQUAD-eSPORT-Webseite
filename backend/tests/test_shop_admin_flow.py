@@ -66,8 +66,8 @@ async def seeded_order(flow) -> dict:
 
     fields = {"slug": "bestellt", "title": "Bestellt", "base_price_cents": 2000}
     product = await shop_catalog.create_product(flow.db, fields, **BY)
-    await publish_unchecked(flow.db, product["id"])
     variant = await shop_catalog.create_variant(flow.db, product["id"], {"sku": "B-1", "label": "M"}, **BY)
+    await publish_unchecked(flow.db, product["id"])
     order, _ = await shop_orders.place_order(
         flow.db, user_id="konto-test", idempotency_key="flow-0001", buyer_kind="member",
         lines=[{"variant_id": variant["id"], "quantity": 1}], shipping_estimate_cents=590,

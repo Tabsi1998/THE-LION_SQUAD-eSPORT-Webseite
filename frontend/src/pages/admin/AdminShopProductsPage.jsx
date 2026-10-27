@@ -121,11 +121,11 @@ function CheckIcon({ state }) {
   return <XOctagon className="w-4 h-4 text-warn shrink-0" aria-label="fehlt" />;
 }
 
-function ChoiceGroup({ label, options, value, onChange, testId, disabledKeys = [] }) {
+function ChoiceGroup({ label, options, value, onChange, testId, disabledKeys = [], disabled: allDisabled = false }) {
   return (
     <div role="radiogroup" aria-label={label} className="flex flex-wrap gap-2" data-testid={testId}>
       {options.map((option) => {
-        const disabled = disabledKeys.includes(option.value);
+        const disabled = allDisabled || disabledKeys.includes(option.value);
         return (
           <button key={option.value} type="button" role="radio" aria-checked={value === option.value} disabled={disabled}
             onClick={() => onChange(option.value)} title={option.hint}
@@ -273,12 +273,12 @@ function BasicsForm({ view, busy, run }) {
       </div>
       <div className="space-y-1">
         <div className="text-sm text-white/70">Sichtbarkeit</div>
-        <ChoiceGroup label="Sichtbarkeit" testId="shop-basics-visibility" value={visibility} onChange={setVisibility}
+        <ChoiceGroup label="Sichtbarkeit" testId="shop-basics-visibility" value={visibility} onChange={setVisibility} disabled={!view.editable}
           options={["public", "members", "hidden"].map((key) => ({ value: key, label: labels.visibilities[key], hint: VISIBILITY_HINTS[key] }))} />
       </div>
       <div className="space-y-1">
         <div className="text-sm text-white/70">Personalisierung</div>
-        <ChoiceGroup label="Personalisierung" testId="shop-basics-personalization" value={personalization} onChange={setPersonalization}
+        <ChoiceGroup label="Personalisierung" testId="shop-basics-personalization" value={personalization} onChange={setPersonalization} disabled={!view.editable}
           options={["none", "gamertag", "member_number", "both"].map((key) => ({ value: key, label: labels.personalizations[key] }))} />
       </div>
       {conflict && <p className="text-xs text-warn" data-testid="shop-basics-conflict">Öffentlich und Personalisierung schließen sich aus – der Server lehnt das ab.</p>}
@@ -558,14 +558,15 @@ function MarkupForm({ view, busy, run }) {
   return (
     <div className="space-y-2" data-testid="shop-markup">
       <div className="text-sm text-white/70">Aufschlag für den öffentlichen Preis</div>
-      <ChoiceGroup label="Aufschlag" testId="shop-markup-source" value={own ? "product" : "general"} onChange={(value) => setOwn(value === "product")}
+      <ChoiceGroup label="Aufschlag" testId="shop-markup-source" value={own ? "product" : "general"} onChange={(value) => setOwn(value === "product")} disabled={!view.editable}
         options={[{ value: "general", label: `Allgemeiner Aufschlag (${money(pricing.general_markup_cents)})` }, { value: "product", label: "Eigener Aufschlag" }]} />
       {own && (
         <Field label="Eigener Aufschlag je Artikel (Euro)" hint="Ersetzt den allgemeinen Aufschlag – er kommt nicht dazu. 0 heißt: öffentlich zum Selbstkostenpreis.">
           <input value={amount} onChange={(event) => setAmount(event.target.value)} inputMode="decimal" className={`${INPUT} tabular-nums max-w-xs`} data-testid="shop-markup-amount" />
         </Field>
       )}
-      <ReasonedButton id="shop-markup" label="Aufschlag speichern" busy={busy === "markup"} disabled={!valid || !changed}
+      {!view.editable && <p className="text-xs text-white/50" data-testid="shop-markup-locked">Veröffentlicht oder archiviert: den Aufschlag erst nach dem Zurückziehen ändern.</p>}
+      <ReasonedButton id="shop-markup" label="Aufschlag speichern" busy={busy === "markup"} disabled={!valid || !changed || !view.editable}
         onSubmit={(reason) => run("markup", () => api.patch(`${BASE}/${product.id}`, { markup_cents: cents, reason }), "Aufschlag gespeichert.", { reload: true })} />
     </div>
   );
@@ -596,7 +597,7 @@ function PricesStep({ view, busy, run }) {
           <tbody>
             {offered.map((row) => (
               <tr key={row.id} className="border-t border-white/10" data-testid={`shop-price-${row.sku}`}>
-                <td className="py-1.5 pr-3">{row.label}</td>
+                <td className="py-1.5 pr-3">{row.label}{row.blocked_reason && <span className="block text-xs text-warn">{row.blocked_reason}</span>}</td>
                 <td className="py-1.5 pr-3 text-right text-white/60">{money(row.base_cost_cents)}</td>
                 <td className="py-1.5 pr-3 text-right">{money(row.cost_cents)}</td>
                 <td className={`py-1.5 pr-3 text-right font-bold ${row.price_cents !== row.cost_cents ? "text-warn" : ""}`}>{row.price_cents === null ? "nicht übernommen" : money(row.price_cents)}</td>

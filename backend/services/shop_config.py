@@ -41,12 +41,15 @@ SHIPPING_COUNTRIES = ("AT",)
 MEMBER_MARKUP_CENTS = 0
 MAX_PUBLIC_MARKUP_CENTS = 10_000
 MAX_FALLBACK_SHIPPING_CENTS = 10_000
+# Kein Artikel unter diesem Verkaufspreis (#1707): 0 € oder ein Tippfehler im Cent-Bereich wird nie veröffentlicht.
+DEFAULT_MIN_PRICE_CENTS = 100
+MAX_MIN_PRICE_CENTS = 10_000
 MIN_KEY_LENGTH = 20
 MAX_KEY_LENGTH = 300
 UNREADABLE_KEY = "gespeichert, aber nicht lesbar – SETTINGS_ENCRYPTION_KEY in der .env prüfen"
 NO_TAX_CLEARANCE = "Erst wenn die Steuer geklärt ist (#1701) – die Freigabe setzt der Superadmin."
 ONLY_SUPERADMIN = "„Öffentlich“ schaltet nur der Superadmin ein."
-UPDATE_FIELDS = ("stage", "orders_to_printful", "public_markup_cents", "fallback_shipping_cents")
+UPDATE_FIELDS = ("stage", "orders_to_printful", "public_markup_cents", "fallback_shipping_cents", "min_price_cents")
 
 
 class ShopForbidden(ShopError):
@@ -83,6 +86,8 @@ def normalized(raw: dict | None) -> dict:
         "public_markup_cents": _cents(raw.get("public_markup_cents"), maximum=MAX_PUBLIC_MARKUP_CENTS) or 0,
         "fallback_shipping_cents": _cents(raw.get("fallback_shipping_cents"), minimum=1,
                                           maximum=MAX_FALLBACK_SHIPPING_CENTS),
+        "min_price_cents": _cents(raw.get("min_price_cents"), minimum=1, maximum=MAX_MIN_PRICE_CENTS)
+        or DEFAULT_MIN_PRICE_CENTS,
         "tax_cleared": _tax_cleared(raw.get("tax_cleared")),
         "printful_api_key": raw.get("printful_api_key") or "",
         "printful_key_saved_at": raw.get("printful_key_saved_at"),
@@ -138,6 +143,13 @@ def markup_cents(config: dict, buyer_kind: str, product: dict) -> int:
     if isinstance(own, int) and not isinstance(own, bool):
         return own
     return int(config.get("public_markup_cents") or 0)
+
+
+def check_min_price(config: dict, cents: int | None, label: str = "Preis") -> None:
+    """Verkaufspreise unter dem Mindestpreis (Vorgabe 1 €) gibt es nicht - auch nicht 0 €."""
+    if cents is not None and cents < config["min_price_cents"]:
+        minimum = config["min_price_cents"]
+        raise ShopError(f"{label} unter dem Mindestpreis ({minimum // 100},{minimum % 100:02d} €).")
 
 
 def check_shipping_country(country: str) -> None:
@@ -224,6 +236,8 @@ async def update(db, changes: dict, *, actor: dict, is_superadmin: bool, reason:
         if field == "fallback_shipping_cents" and value is not None and _cents(
                 value, minimum=1, maximum=MAX_FALLBACK_SHIPPING_CENTS) is None:
             raise ShopError("Ersatzpauschale: ganze Cent, 0,01 bis 100 € - oder leer für keine.")
+        if field == "min_price_cents" and _cents(value, minimum=1, maximum=MAX_MIN_PRICE_CENTS) is None:
+            raise ShopError("Mindestpreis: ganze Cent, 0,01 bis 100 €.")
         if current[field] != value:
             after[field] = value
     if not after:
@@ -340,6 +354,7 @@ async def admin_view(db, config: dict, *, is_superadmin: bool, can_edit_access: 
             "orders_to_printful": config["orders_to_printful"],
             "public_markup_cents": config["public_markup_cents"], "member_markup_cents": MEMBER_MARKUP_CENTS,
             "fallback_shipping_cents": config["fallback_shipping_cents"],
+            "min_price_cents": config["min_price_cents"],
             "shipping_countries": list(SHIPPING_COUNTRIES),
             "tax_cleared": ({"at": tax["at"], "by": names.get(tax.get("by"), "unbekannt"), "reason": tax.get("reason")}
                             if tax else None),
@@ -353,5 +368,6 @@ async def admin_view(db, config: dict, *, is_superadmin: bool, can_edit_access: 
         "stages": stages,
         "rights": {"can_set_public": bool(is_superadmin and tax), "can_set_tax": is_superadmin,
                    "can_edit_access": can_edit_access},
-        "limits": {"public_markup_cents": MAX_PUBLIC_MARKUP_CENTS, "fallback_shipping_cents": MAX_FALLBACK_SHIPPING_CENTS},
+        "limits": {"public_markup_cents": MAX_PUBLIC_MARKUP_CENTS, "fallback_shipping_cents": MAX_FALLBACK_SHIPPING_CENTS,
+                   "min_price_cents": MAX_MIN_PRICE_CENTS},
     }
