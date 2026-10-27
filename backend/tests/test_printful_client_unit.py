@@ -5,6 +5,7 @@ Kein echter Aufruf an Printful (httpx-MockTransport über ``tests/printful_fake.
 echten Personen. Die Datenbank ist mongomock - nur für Stufe, Notschalter, Schlüssel und den Idempotenzschutz."""
 import asyncio
 import inspect
+from datetime import datetime, timedelta, timezone
 import logging
 import sys
 import pathlib
@@ -43,6 +44,15 @@ async def db():
 
 def stale() -> str:
     return "2026-01-01T00:00:00+00:00"
+
+
+def just_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def far_future() -> str:
+    """Ein Stempel aus einer vorgehenden Uhr (Clock-Skew) - darf nie unbegrenzt als frisch gelten."""
+    return (datetime.now(timezone.utc) + timedelta(hours=2)).isoformat()
 
 
 @pytest.fixture
@@ -313,10 +323,68 @@ async def test_a_stale_sending_claim_is_taken_over_only_after_a_search(client, f
 async def test_a_fresh_sending_claim_makes_the_second_caller_wait(client, fake, db):
     await settle(db)
     await db[printful_client.DRAFTS].insert_one({"external_id": "lsw-test-0001", "state": "sending",
-                                                 "claimed_at": "2999-01-01T00:00:00+00:00", "printful_order_id": None})
+                                                 "claimed_at": just_now(), "printful_order_id": None})
     with pytest.raises(FulfillmentTransient) as caught:
         await client.create_draft(db, draft())
     assert caught.value.reason == "draft_in_progress" and fake.calls_to("createOrder") == []
+
+
+@pytest.mark.asyncio
+async def test_a_draft_claim_from_the_future_counts_as_stale(client, fake, db):
+    """Codex-Befund: ein Stempel in der Zukunft (Clock-Skew) blockierte bis dahin alles."""
+    await settle(db)
+    await db[printful_client.DRAFTS].insert_one({"external_id": "lsw-test-0001", "state": "sending",
+                                                 "claimed_at": far_future(), "printful_order_id": None})
+    order = await client.create_draft(db, draft())
+    assert order.status == "draft" and len(fake.calls_to("createOrder")) == 1
+    assert fake.calls_to("getOrder"), "erst nachsuchen, dann übernehmen"
+
+
+@pytest.mark.asyncio
+async def test_a_created_claim_whose_order_is_gone_is_taken_over(client, fake, db):
+    """Codex-Befund: DELETE ging durch, der Claim blieb ``created`` liegen - die external_id war dauerhaft blockiert."""
+    await settle(db)
+    first = await client.create_draft(db, draft())
+    del fake.orders[first.id.value]
+    del fake.order_items[first.id.value]
+    again = await client.create_draft(db, draft())
+    assert again.id != first.id and again.status == "draft"
+    assert len(fake.calls_to("createOrder")) == 2
+    claim = await db[printful_client.DRAFTS].find_one({"external_id": "lsw-test-0001"})
+    assert claim["state"] == "created" and claim["printful_order_id"] == again.id.value
+
+
+@pytest.mark.asyncio
+async def test_an_interrupted_delete_leaves_a_claim_that_is_checked_next_time(client, fake, db, monkeypatch):
+    await settle(db)
+    order = await client.create_draft(db, draft())
+    store = db[printful_client.DRAFTS]
+    collection_type = type(store)
+    original = collection_type.delete_one
+
+    async def crash(self, *args, **kwargs):
+        raise RuntimeError("Abbruch nach dem DELETE (Test)")
+
+    monkeypatch.setattr(collection_type, "delete_one", crash)
+    with pytest.raises(RuntimeError):
+        await client.delete_draft(db, order.id)
+    monkeypatch.setattr(collection_type, "delete_one", original)
+    assert fake.orders == {}
+    assert (await store.find_one({"external_id": "lsw-test-0001"}))["state"] == "deleting"
+    again = await client.create_draft(db, draft())
+    assert again.status == "draft" and len(fake.calls_to("createOrder")) == 2
+
+
+@pytest.mark.asyncio
+async def test_a_refused_delete_keeps_the_claim_created(client, fake, db):
+    await settle(db)
+    order = await client.create_draft(db, draft())
+    fake.fail(409, operation="deleteOrder")
+    with pytest.raises(FulfillmentInvalid):
+        await client.delete_draft(db, order.id)
+    claim = await db[printful_client.DRAFTS].find_one({"external_id": "lsw-test-0001"})
+    assert claim["state"] == "created" and claim["printful_order_id"] == order.id.value
+    assert (await client.create_draft(db, draft())).id == order.id and len(fake.calls_to("createOrder")) == 1
 
 
 @pytest.mark.asyncio
@@ -514,10 +582,22 @@ async def test_a_running_confirmation_makes_the_second_caller_wait(client, fake,
     await settle(db, switch=True)
     order = await client.create_draft(db, draft())
     await db[printful_client.CONFIRMATIONS].insert_one({"idempotency_key": "test-confirm-0001", "order_id": order.id.value,
-                                                        "state": "sending", "claimed_at": "2999-01-01T00:00:00+00:00"})
+                                                        "state": "sending", "claimed_at": just_now()})
     with pytest.raises(FulfillmentTransient) as caught:
         await client.confirm_order(db, order.id, idempotency_key="test-confirm-0001")
     assert caught.value.reason == "confirm_in_progress" and fake.calls_to("confirmOrder") == []
+
+
+@pytest.mark.asyncio
+async def test_a_confirmation_claim_from_the_future_is_unclear_and_not_sent(client, fake, db):
+    await settle(db, switch=True)
+    order = await client.create_draft(db, draft())
+    await db[printful_client.CONFIRMATIONS].insert_one({"idempotency_key": "test-confirm-0001", "order_id": order.id.value,
+                                                        "state": "sending", "claimed_at": far_future()})
+    with pytest.raises(FulfillmentPermanent) as caught:
+        await client.confirm_order(db, order.id, idempotency_key="test-confirm-0001")
+    assert caught.value.reason == "confirm_unclear" and fake.calls_to("confirmOrder") == []
+    assert (await confirmation_claim(db, order.id.value))["state"] == "unclear"
 
 
 @pytest.mark.asyncio

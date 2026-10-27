@@ -61,6 +61,8 @@ DRAFTS = "shop_printful_drafts"
 # So lange gilt ein Claim im Zustand „sending“ als „läuft noch“; danach: Entwurf erst nachsuchen, Bestätigung unklar.
 CONFIRM_CLAIM_SECONDS = 300
 DRAFT_CLAIM_SECONDS = 60
+# So weit darf ein Stempel in der Zukunft liegen (Uhren mehrerer Server), bevor er als abgelaufen gilt.
+CLOCK_SKEW_SECONDS = 60
 # Nur diese Antworten sind eine eindeutige Ablehnung der Bestätigung - alles andere ist ein unklarer Ausgang.
 CONFIRM_REFUSED = frozenset({400, 409, 422})
 IDEMPOTENCY_KEY_RE = re.compile(r"[A-Za-z0-9:_-]{8,128}")
@@ -448,15 +450,17 @@ class PrintfulClient:
 
     @staticmethod
     def _fresh(stamp, seconds: int, now: datetime) -> bool:
-        """Ist ein Claim jünger als ``seconds``? Ein unlesbarer Stempel gilt als alt - danach wird ohnehin erst
-        nachgesehen (Entwurf) bzw. nie gesendet (Bestätigung)."""
+        """Ist ein Claim jünger als ``seconds``? Ein unlesbarer Stempel gilt als alt, ebenso einer, der mehr als
+        ``CLOCK_SKEW_SECONDS`` in der Zukunft liegt - eine vorgehende Uhr blockierte sonst bis dahin alles. Danach wird
+        ohnehin erst nachgesehen (Entwurf) bzw. nie gesendet (Bestätigung)."""
         try:
             claimed = datetime.fromisoformat(str(stamp))
         except ValueError:
             return False
         if claimed.tzinfo is None:
             claimed = claimed.replace(tzinfo=timezone.utc)
-        return now - claimed < timedelta(seconds=seconds)
+        age = now - claimed
+        return -timedelta(seconds=CLOCK_SKEW_SECONDS) <= age < timedelta(seconds=seconds)
 
     async def _draft_claim(self, store, external_id: str):
         """Den Claim für ``external_id`` gewinnen. Liefert ``(claim_id, None)`` - dann sendet dieser Aufruf - oder
@@ -470,18 +474,27 @@ class PrintfulClient:
             if earlier is None:
                 raise FulfillmentTransient("draft_in_progress") from None
             if earlier.get("state") == "created" and type(earlier.get("printful_order_id")) is int:
-                return None, await self.get_order(PrintfulOrderId(earlier["printful_order_id"]))
-            if earlier.get("state") == "sending" and self._fresh(earlier.get("claimed_at"), DRAFT_CLAIM_SECONDS, now):
+                try:
+                    return None, await self.get_order(PrintfulOrderId(earlier["printful_order_id"]))
+                except FulfillmentPermanent as exc:
+                    # Den Auftrag gibt es nicht mehr (etwa: DELETE ging durch, der Claim blieb liegen) - unten
+                    # nachsuchen und übernehmen, statt die external_id dauerhaft zu blockieren.
+                    if exc.reason != "not_found":
+                        raise
+            elif earlier.get("state") == "sending" and self._fresh(earlier.get("claimed_at"), DRAFT_CLAIM_SECONDS, now):
                 raise FulfillmentTransient("draft_in_progress") from None
-            # Abgelaufen oder abgelehnt: erst bei Printful nachsehen, dann per bedingtem Update übernehmen.
+            # Abgelaufen, abgelehnt, beim Löschen abgebrochen oder verschwunden: erst bei Printful nachsehen, dann per
+            # bedingtem Update (auf Stand, Stempel und Nummer von eben) übernehmen.
             found = await self._find(external_id)
             if found is not None:
                 await store.update_one({"_id": earlier["_id"]},
                                        {"$set": {"state": "created", "printful_order_id": found.id.value}})
                 return None, found
             taken = await store.update_one({"_id": earlier["_id"], "state": earlier.get("state"),
-                                            "claimed_at": earlier.get("claimed_at")},
-                                           {"$set": {"state": "sending", "claimed_at": now.isoformat()}})
+                                            "claimed_at": earlier.get("claimed_at"),
+                                            "printful_order_id": earlier.get("printful_order_id")},
+                                           {"$set": {"state": "sending", "claimed_at": now.isoformat(),
+                                                     "printful_order_id": None}})
             if taken.modified_count != 1:
                 raise FulfillmentTransient("draft_in_progress") from None
             return earlier["_id"], None
@@ -532,9 +545,20 @@ class PrintfulClient:
         current = await self.get_order(order_id)
         if current.status != "draft":
             raise FulfillmentInvalid("not_draft")
-        await self._request("DELETE", f"/v2/orders/{order_id.value}", operation="deleteOrder")
+        # Erst den Claim auf „deleting“, dann DELETE, dann Claim weg. Bricht es dazwischen ab, prüft das nächste
+        # Anlegen mit dieser external_id bei Printful nach, statt sie zu blockieren.
+        store = db[DRAFTS]
+        await store.update_one({"printful_order_id": order_id.value, "state": "created"}, {"$set": {"state": "deleting"}})
+        try:
+            await self._request("DELETE", f"/v2/orders/{order_id.value}", operation="deleteOrder")
+        except FulfillmentError as exc:
+            if exc.status is not None and 400 <= exc.status < 500 and exc.status != 404:
+                # Printful hat abgelehnt: der Entwurf steht noch.
+                await store.update_one({"printful_order_id": order_id.value, "state": "deleting"},
+                                       {"$set": {"state": "created"}})
+            raise
         # Der Entwurf ist weg - seine external_id darf wieder angelegt werden (Testentwürfe, #2062).
-        await db[DRAFTS].delete_one({"printful_order_id": order_id.value, "state": "created"})
+        await store.delete_one({"printful_order_id": order_id.value, "state": "deleting"})
 
     async def _resume_confirmation(self, store, order_id: PrintfulOrderId, key: str, *, force_after_review: bool):
         """Es gibt schon einen Claim für diesen Auftrag oder Schlüssel. Liefert ``(claim_id, None)`` - dann sendet
