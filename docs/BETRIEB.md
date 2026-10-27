@@ -214,6 +214,13 @@ proxy_max_temp_file_size 0;
 
 Keine aggressive Cache-Regel auf `/api/uploads/*`.
 
+Der Frontend-Build trägt `PUBLIC_UPLOAD_BACKEND_URL` und `PUBLIC_BACKEND_URL` automatisch in
+`connect-src` der Content-Security-Policy ein (`frontend/csp-connect-origins.sh`). Ohne diesen Eintrag blockiert der
+Browser jeden Upload an den Upload-Host schon vor dem Senden. In der Oberfläche steht dann nur „Network Error“, und
+Backend wie nginx sehen keine Anfrage. Nach einer Änderung der Adresse daher das Frontend neu bauen:
+`docker compose up -d --build frontend`. Leer gelassen laufen die Uploads über die eigene Adresse, dann gilt das
+Cloudflare-Limit von 100 MB.
+
 ## Ergebnis-Bilder auslesen (#1756)
 
 Im Ergebnis-Blatt einer Serie liest „Bild auslesen“ (oder Strg+V) einen Screenshot des Veranstalters. Gelesen wird
