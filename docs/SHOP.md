@@ -23,7 +23,7 @@ die Sammlungen direkt. Jede Katalogänderung ist eine Adminaktion mit Person und
 | `shop_variants` | Variante eines Produkts: SKU, Bezeichnung, Größe, Farbe, eigener Preis (sonst der des Produkts), aktiv, `version` | `sku` |
 | `shop_designs` | Druckdatei des Vereins je Fassung: `design_key`, `version` (zählt hoch), `file_ref`, `sha256`, Druckposition; seit #1708 dazu `public_id` (Zufallsschlüssel der öffentlichen Adresse), Pixel, DPI und Druckmaße in Zoll, mit denen sie geprüft wurde, Transparenz, Ausgangsformat und `public_disabled_at` (Aufbewahrung). Alte Fassungen bleiben | `design_key` + `version`; `public_id` |
 | `shop_design_profiles` | Design (#1708): Titel, Platzierung und die **Shirtfarben**, für die es gilt (`garment_colors`), Notiz, `version` | `design_key` |
-| `shop_gamertag_files` | Gamertag-Druckdatei (#1711): Herkunft `gamertag`, Zweck (`test`, `order`), `sha256`, `file_ref`, `public_id`, Maße, Anker, Farbe, `rules_hash` - nie der Name | `sha256`; `public_id` |
+| `shop_gamertag_files` | Gamertag-Druckdatei (#1711): Herkunft `gamertag`, Zweck (`test`, `order`), `sha256`, `file_ref`, `public_id`, Maße, Anker, Farbe, `rules_hash`; bei Bestelldateien Konto, Bestellung und Position (personenbezogen: das PNG zeigt den Namen) - nie der Name als Text | `purpose` + `sha256` (nur Testdateien); `public_id` |
 | `shop_design_colors` | Belegung einer Shirtfarbe je Platzierung durch ein Design (#1708): `placement`, `color_key` (kleingeschrieben), `color`, `design_key` - macht „eine Farbe, ein Design“ atomar | `placement` + `color_key` |
 | `shop_printful_variants` | Zuordnung Variante → Printful-Variante und -Produkt (Anbieter `printful`) | `provider` + `variant_id` |
 | `shop_carts` | Warenkorb je Konto: Variante, Menge, Gamertag – keine Preise | `user_id` |
@@ -343,17 +343,32 @@ nur in der Datei selbst und (später) an der Bestellposition. Tests prüfen das 
 
 **Ablage** in `shop_gamertag_files` (Herkunft `origin = "gamertag"`; hochgeladene Designs tragen seit #1711
 `origin = "upload"`): Datei im Speicher der Designs (`UPLOAD_DIR/shop-designs/<zufällig>.png`), SHA-256, eigener
-Zufallsschlüssel (256 Bit), Maße, Anker, Farbe, `rules_hash`, `purpose` (`test` oder `order`), `last_used_at`. Eindeutig
-sind `sha256` und `public_id`: dieselbe Datei gibt es einmal, sie behält ihre Adresse. Öffentlich wie die Designs:
-`GET /api/shop/print-files/<public_id>/gamertag-<prüfsumme16>.png` (Name ohne Gamertag). Bei Testdateien steht die
-Kennung der Finanzen an der Zeile, bei Bestelldateien kein Konto.
+Zufallsschlüssel (256 Bit), Maße, Anker, Farbe, `rules_hash`, `purpose` (`test` oder `order`), `last_used_at`.
+Öffentlich wie die Designs: `GET /api/shop/print-files/<public_id>/gamertag-<prüfsumme16>.png` (Name ohne Gamertag).
 
-**Einfrieren (für #1712/#1713):** `store(db, name, purpose="order", color_key=…)` prüft, rendert und legt ab;
-`frozen_for_order(row, name)` liefert, was die Position einfriert: den bestätigten Namen und Datei-Kennung,
-Prüfsumme, `rules_hash`, Maße, Anker, Farbe, Platzierung. Spätere Regeln erzeugen neue Dateien; die eingefrorene bleibt
-liegen. Eine Testdatei, die eine Bestellung braucht, wird zur Bestelldatei (nie umgekehrt). `render` allein prüft den
-Wortfilter nicht und ist nicht für Aufrufe von außen gedacht. Wer ein Gamertag-Feld sehen darf (nur Mitglieder,
-Produkte mit Gamertag), prüft die Bestellung selbst (#1712).
+- **Testdateien** (nur Finanzen, erfundene Namen) werden geteilt: je Prüfsumme eine Zeile (eindeutig `purpose` +
+  `sha256` für `purpose = "test"`), sie behält ihre Adresse. Kennung der Finanzen an der Zeile, kein Konto -
+  Vereinsinhalt mit der 30-Tage-Regel unten.
+- **Bestelldateien** werden **nie geteilt**: jede Bestellung bekommt ihre eigene Datei mit eigener Adresse, auch bei
+  gleichem Namen - nie die einer anderen Bestellung oder einer Testdatei, und aus einer Testdatei wird nie eine
+  Bestelldatei. Sie sind **personenbezogen** (das PNG zeigt den Namen): `user_id` ist Pflicht, dazu `order_id` und
+  `order_item_id` (#1712 trägt sie ein). Auskunft: Eintrag `shop_gamertag_files` (ohne Schlüssel und Ablageort).
+  **Kontolöschung** (`erase_for_user`): die Verknüpfung zum Konto geht; braucht kein offener Printful-Auftrag die
+  Datei, ist die Adresse sofort aus (`public_disabled_at`, 404) und die Datei gelöscht (`file_deleted_at`). Braucht ein
+  offener Auftrag (Bestellung mit `printful_order_id`, Stand nicht abgeschlossen - die endgültigen Stände liefert
+  #1716) sie noch, bleibt sie nur dafür abrufbar (`erase_pending_at`); der Job `ops_retention` schaltet sie nach dem
+  Abschluss ab und löscht sie (`complete_pending_erasures`). Die Zeile bleibt ohne Konto mit Prüfsumme und Maßen.
+
+**Einfrieren (für #1712/#1713):** `store(db, name, purpose="order", user_id=…, order_id=…, order_item_id=…,
+color_key=…)` prüft, rendert und legt ab; `frozen_for_order(row, name)` liefert, was die Position einfriert: den
+bestätigten Namen und Datei-Kennung, Prüfsumme, `rules_hash`, Maße, Anker, Farbe, Platzierung. Spätere Regeln erzeugen
+neue Dateien; die eingefrorene bleibt liegen. `render` allein prüft den Wortfilter nicht und ist nicht für Aufrufe von
+außen gedacht. Wer ein Gamertag-Feld sehen darf (nur Mitglieder, Produkte mit Gamertag), prüft die Bestellung selbst
+(#1712).
+
+**Größenlimit:** Vorschau und Testdatei nehmen höchstens 8 KB, Regeln 32 KB - geprüft am Eingang
+(`services/body_limits.py`, `shop_gamertag.body_limits`), bevor Pydantic etwas liest; nginx begrenzt
+`/api/admin/shop/gamertag/` auf 40 KB.
 
 **Vorbelegung aus der Mitgliederakte:** `prefill_from_member_file(db, user)` liest den Gamertag aus dem
 Website-Profil (Feld laut Zuordnung Dolibarr → Funktionen, `directory_field_map`) - nur mit bestätigter Zuordnung
@@ -361,8 +376,8 @@ bzw. Bindung. Antwortet Dolibarr nicht, kommt der zuletzt vom Abgleich übernomm
 mit Datum (`source = "last_known"`, Hinweis für den Käufer). Ergebnis mit `valid`/`problem` nach den Regeln. Der
 Shop **schreibt nie nach Dolibarr** zurück; eine Änderung gilt nur für die eine Bestellung.
 
-**Aufbewahrung (nur Bericht):** `shop_gamertag.retention_plan(db)` nennt Testdateien, die 30 Tage niemand benutzt hat
-und die keine Bestellung braucht - sie dürften weg. Gelöscht wird nichts; Fristen für Bestelldateien regelt #1731.
+**Aufbewahrung der Testdateien (nur Bericht):** `shop_gamertag.retention_plan(db)` nennt Testdateien, die 30 Tage
+niemand benutzt hat - sie dürften weg. Gelöscht wird nichts; Fristen für Bestelldateien ohne Kontolöschung regelt #1731.
 
 | Route (alle `require_area("finance")`) | Zweck |
 | --- | --- |
