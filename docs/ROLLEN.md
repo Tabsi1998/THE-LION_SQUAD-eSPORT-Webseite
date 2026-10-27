@@ -13,7 +13,7 @@ Rechte hängen an Bereichen, nicht an einer Rangfolge. Eine Person kann mehrere 
 | Turnierleitung | `tournaments` | Turniere, Events, Stationen, Fast Lap, Saisons, Spiele, Gewinne, Strafen, Zugangslinks, PDF-Exporte |
 | Redaktion | `content` | News, Galerie, Medien, Sponsoren, Partner, Referenzen, Serien (externe Wettbewerbe), Navigation, Sticker, Erfolge (Achievements), Seiten-Banner, Newsletter, Twitch-Streams |
 | Vereinsverwaltung | `club` | Mitglieder und öffentliche Profile, Anträge, Dokumente, Vorteile, Vorstand, Kontakt-Inbox, Benutzerliste (lesen, bannen mit Grund – Konten mit Adminbereich oder Admin-Rolle bannt nur der Superadmin, Superadmin-Konten niemand), Discord-Zähler |
-| Finanzen | `finance` | Kosten und Abrechnung an Events (später Turnieren), Finanzübersicht mit Rechnungsaufträgen, Freigaben (#322, docs/ABRECHNUNG.md), Rechnungsangaben: Zahlungsziel, Zahlungsart, Bankkonto, Sprache der PDFs, „Steuersätze geprüft“, „gleich freigeben“ (#1358) – die übrige Dolibarr-Technik bleibt bei System |
+| Finanzen | `finance` | Kosten und Abrechnung an Events (später Turnieren), Finanzübersicht mit Rechnungsaufträgen, Freigaben (#322, docs/ABRECHNUNG.md), Rechnungsangaben: Zahlungsziel, Zahlungsart, Bankkonto, Sprache der PDFs, „Steuersätze geprüft“, „gleich freigeben“ (#1358), Vereinsshop: Produkte, Preise, Varianten, Bestellungen (#1704, docs/SHOP.md) – die übrige Dolibarr-Technik bleibt bei System |
 | System | `system` | Einstellungen (Mail, Branding, Discord, Auth), Game-Server, Betrieb, Logs, Audit, App-Logs, Push-Tests, App-Versionen, E-Mail-Vorlagen, Wartungsläufe für Uploads |
 | Moderation | `moderation` | Moderationsseite: Meldungen, Wortfilter, Bildprüfung, Verwarnungen und Chat-Sperren (bei Konten mit Adminbereich nur der Superadmin, siehe unten); Direktnachrichten an jede Person. Keine Turnierrechte – wer zusätzlich als Helfer eingetragen ist, hat dort genau die Rechte des Einsatzes |
 
@@ -67,6 +67,23 @@ Turnierleitung dieses Turniers; Moderatoren nur, wenn die Bildprüfung ein Foto 
 Dasselbe gilt je Fast Lap (Challenge → Staff). Turnierrechte, Fast-Lap-Zeiten, Events und Exporte
 kommen nur aus dem Bereich Turnierleitung (Rolle oder Freigabe), Club-Admin, Superadmin oder einem solchen
 Einsatz – auch für Moderatoren.
+
+## Shop (#1704)
+
+Der Vereinsshop hängt am Bereich **Finanzen** – kein eigener Bereich, Zwei-Faktor Pflicht. Der Server prüft jede
+Route mit `require_area("finance")`; `scripts/check-code-patterns.py` (Regel 3) lässt keine Shop-Route ohne diesen
+Wächter und keine öffentliche Shop-Route durch. Jede Änderung steht mit Person und Grund in den Adminaktionen, nie mit
+Anschrift (docs/SHOP.md).
+
+| Shop-Admin (`/api/admin/shop/…`) | Spieler | Mitglied | Turnierleitung | Finanzen (Freigabe) | Club-Admin | Superadmin |
+| --- | --- | --- | --- | --- | --- | --- |
+| Produkte und Bestellungen lesen | – | – | – | ja | ja | ja |
+| Produkt anlegen, ändern (Preis, Sichtbarkeit) | – | – | – | ja, mit Grund | ja, mit Grund | ja, mit Grund |
+| Variante anlegen, ändern | – | – | – | ja, mit Grund | ja, mit Grund | ja, mit Grund |
+| ohne bestätigte Zwei-Faktor-Anmeldung | – | – | – | – | – | – |
+
+Moderator und Vereinsverwaltung (Vorstand) haben keinen Zugriff, solange ihnen Finanzen nicht ausdrücklich
+freigegeben ist. Öffentliche Shop-Seiten und Bestellungen für Mitglieder gibt es noch nicht (#1706, #1712).
 
 ## Bannen, Strikes und Chat-Sperren (#1300, #1350)
 
@@ -377,7 +394,7 @@ Finanzen; die Turnierleitung Turniere, Stationen, Strafen und Gewinne; der Admin
 | Übersicht | Dashboard (Turnierleitung, Redaktion, Vereinsverwaltung, Finanzen, System) · Mein Dienst (Helfer mit Einsatz, Captains externer Serien, Moderation ohne Verwaltungsbereich) | Dashboard mit einem dieser Bereiche und Zwei-Faktor (Server: `require_dashboard`, #992, #1353); „Mein Dienst“ (#1352) für Helfer und reine Moderation – im Benutzermenü statt „Admin“, `/admin` führt Helfer nach `/admin/dienst`, Moderation nach `/admin/moderation`, Konten ohne Dienst auf „Kein Zugriff“ mit dem Satz „Die Verwaltung ist für Vereinsdienste …“ |
 | Verein | Vereinsdaten (System) · Über uns, Sponsoren, Partner, Referenzen, Serien (Redaktion) · Vorstand, Kontakt-Inbox (Vereinsverwaltung) | je Eintrag |
 | Mitglieder | Mitglieder (mit dem Reiter Öffentliche Profile), Bewerbungen, Mitgliedervorteile, Dokumente, Alle Benutzer (Vereinsverwaltung) · Dolibarr (Vereinsverwaltung und System) | Vereinsverwaltung |
-| Finanzen | Finanzübersicht | Finanzen |
+| Finanzen | Finanzübersicht (einen Eintrag „Shop“ gibt es erst mit der Produktverwaltung, #1707) | Finanzen |
 | eSports | Turniere, Fast Lap, Stationen (Turnierleitung, Helfer) · Turnier-Leitfaden, Jahreswertung, Spiele, Gewinne, Strafen (Turnierleitung) · Game-Server (System) | Turnierleitung |
 | Content | Events (Turnierleitung) · News, Galerie, Medien, Navigation, Erfolge, Sticker (Redaktion) · Downloads & QR (Turnierleitung, Redaktion, Vereinsverwaltung, System) | Redaktion |
 | Verbindungen | Alle Verbindungen (Übersicht mit Zustand: aktiv, aus, fehlt, nicht lesbar, Fehler) · je Dienst eine Seite (Google, Resend, SMTP, Discord, Twitch, Steam, …) | System |

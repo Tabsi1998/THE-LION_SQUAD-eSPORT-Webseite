@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7.9 - 2026-10-27
+
+- Mobile: Wunschnummer unter „Meine Mitgliedschaft“: einmal frei von 0 bis 99 wählen, jede Nummer gibt es nur einmal. (#2050)
+- Mobile: Danach ändert sich die Nummer nur per Antrag an den Vorstand – mit Grund und optionaler Wunschnummer. (#2050)
+- Mobile: Die gewählte Nummer setzt sich mit ruhiger Bewegung und Vibration. (#2050)
+
 ## 1.7.8 - 2026-10-26
 
 - Mobile: Turnierserien wie TFT sprechen von Turniertagen und zeigen keinen Ort und keine Flagge. (#2024)

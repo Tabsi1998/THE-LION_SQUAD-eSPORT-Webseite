@@ -193,6 +193,7 @@ GitHub sortiert Releases nach Veröffentlichungsdatum, nicht nach Version. Alte 
 
 Neueste oben.
 
+- `1.7.9`: Build 103, Wunschnummer in der Mitgliedschaft wählen bzw. per Antrag ändern (#2050)
 - `1.7.8`: Build 102, Turnierserien mit Turniertagen ohne Ort und Flagge, „Termin folgt“, Einsätze in den Wörtern der Serie (#2024); erste Store-Version nach 1.7.5 (1.7.6 und 1.7.7 nie gebaut)
 - `1.7.7`: Build 101, Original-Bilder im Vollbild (#1933), „Daten von …“ (#1964), Fahrer-Anpassungen in der Teamwertung (#2000), Mikro-Bewegung, Fast Lap mit Komma und wischbare Reiter (#1969)
 - `1.7.6`: Build 100, Referenzen nachgezogen: Runde mit Läufen und Ergebnis je Runde, Statistik, Team-Liga mit Map-Veto und Map-Statistik, Turnierserien, Sonderregeln, Partner und Komma-Zeiten (#1974)

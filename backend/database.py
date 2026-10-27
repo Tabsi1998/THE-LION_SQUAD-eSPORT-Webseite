@@ -535,6 +535,18 @@ AUDIT_UNIQUE_INDEXES: tuple[tuple[str, Any, str, dict], ...] = (
     ("prize_pickups", FASTLAP_PRIZE_KEY, "fastlap_place_user", {"partialFilterExpression": {"source_type": "fastlap"}}),
     ("season_points", [("season_id", 1), ("source_type", 1), ("source_id", 1), ("user_id", 1)], "fastlap_source_user",
      {"partialFilterExpression": {"source_type": "fastlap"}}),
+    # Shop (#1703, docs/SHOP.md): je Idempotenzschlüssel eine Bestellung, je Bestellung ein Printful-Auftrag, jedes
+    # einmalige Ereignis einmal je Bestellung, jede Position einmal; Katalog mit eindeutigen Schlüsseln. Anlegen,
+    # Trockenlauf und Rückweg: services/shop_schema.py (Migration 13).
+    ("shop_orders", "idempotency_key", "idempotency_key", {}),
+    ("shop_orders", "printful_external_id", "printful_external_id", {}),
+    ("shop_order_items", [("order_id", 1), ("position", 1)], "order_position", {}),
+    ("shop_order_events", [("order_id", 1), ("event_key", 1)], "order_event", {}),
+    ("shop_products", "slug", "slug", {}),
+    ("shop_variants", "sku", "sku", {}),
+    ("shop_designs", [("design_key", 1), ("version", 1)], "design_version", {}),
+    ("shop_printful_variants", [("provider", 1), ("variant_id", 1)], "provider_variant", {}),
+    ("shop_carts", "user_id", "user", {}),
 )
 AUDIT_INDEXES: tuple[tuple[str, Any], ...] = (
     ("platform_links", "user_id"),
@@ -577,6 +589,16 @@ AUDIT_INDEXES: tuple[tuple[str, Any], ...] = (
     # Statistik je Server (#631): Auskunft und Löschen je Konto, Aufräumen und Fenster je Tag.
     ("discord_guild_active", "user_id"),
     ("discord_guild_active", "day"),
+    # Shop (#1703): Kennungen statt Schlüssel - Bestellungen je Konto und nach Stand, Positionen und Ereignisse je
+    # Bestellung, Varianten je Produkt.
+    ("shop_orders", "id"),
+    ("shop_orders", "user_id"),
+    ("shop_orders", [("status", 1), ("created_at", -1)]),
+    ("shop_order_items", "user_id"),
+    ("shop_order_events", [("order_id", 1), ("at", 1)]),
+    ("shop_products", "id"),
+    ("shop_variants", "id"),
+    ("shop_variants", "product_id"),
 )
 
 

@@ -49,6 +49,15 @@ EXPECTED = {
     # Fast Lap (#1584): ein Gewinn je Platz und Person, eine Punktezeile je Saison, Strecke und Person.
     "prize_pickups": {"fastlap_place_user_unique"},
     "season_points": {"fastlap_source_user_unique"},
+    # Shop (#1703): Idempotenz je Bestellung und Printful-Auftrag, einmalige Ereignisse, eindeutiger Katalog.
+    "shop_orders": {"idempotency_key_unique", "printful_external_id_unique", "id_1", "user_id_1", "status_1_created_at_-1"},
+    "shop_order_items": {"order_position_unique", "user_id_1"},
+    "shop_order_events": {"order_event_unique", "order_id_1_at_1"},
+    "shop_products": {"slug_unique", "id_1"},
+    "shop_variants": {"sku_unique", "id_1", "product_id_1"},
+    "shop_designs": {"design_version_unique"},
+    "shop_printful_variants": {"provider_variant_unique"},
+    "shop_carts": {"user_unique"},
 }
 
 
