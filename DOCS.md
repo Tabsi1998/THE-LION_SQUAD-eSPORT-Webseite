@@ -26,6 +26,7 @@ Was die Funktionen können und was ihr dafür einrichtet – zum Durchlesen, ohn
 | [Dolibarr](docs/DOLIBARR.md) | Anbindung der Vereinsverwaltung: Mitglieder, Beiträge, Vorstand, Versammlungen |
 | [Abrechnung](docs/ABRECHNUNG.md) | Kosten, Startgelder, Rechnungen, Freigaben |
 | [Vereinsshop](docs/SHOP.md) | Datenmodell, Rechte und Protokoll des Shops (noch unsichtbar) |
+| [Liga](docs/LIGA.md) | Stufe 1 der CoD-Liga: Datenmodell, Rechte, Abläufe, Nebenwirkungen, Dateigrenzen |
 | [Rollen](docs/ROLLEN.md) | Rollen, Bereiche und wer was darf |
 | [Moderation](docs/MODERATION.md) | Meldungen, Wortfilter, Bildprüfung, Sperren |
 | [Jahreszeiten](docs/SEASONS.md) | Saison-Deko und Aktionen in Web und App |
