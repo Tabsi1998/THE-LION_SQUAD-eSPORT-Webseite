@@ -145,6 +145,21 @@ def test_missing_and_null_keys_collide_like_in_the_index():
     run(scenario())
 
 
+def test_a_sparse_index_ignores_rows_without_the_field():
+    # Druckdateien (#1708): ältere Versionen haben keinen öffentlichen Schlüssel. Der Index ist sparse und kennt sie
+    # nicht - also sind sie auch keine Dubletten. Ein doppelter Schlüssel bleibt eine.
+    async def scenario():
+        db = fresh()
+        await db.shop_designs.insert_many([{"design_key": "a", "version": 1}, {"design_key": "a", "version": 2}])
+        report = {row["index"]: row for row in await unique_duplicates.plan(db)}
+        assert report["shop_designs.public_id"]["groups"] == 0
+        await db.shop_designs.insert_many([{"design_key": "b", "version": 1, "public_id": "k"},
+                                           {"design_key": "b", "version": 2, "public_id": "k"}])
+        report = {row["index"]: row for row in await unique_duplicates.plan(db)}
+        assert report["shop_designs.public_id"]["groups"] == 1 and report["shop_designs.public_id"]["surplus"] == 1
+    run(scenario())
+
+
 def load_script():
     spec = importlib.util.spec_from_file_location("unique_index_duplicates_script", SCRIPT)
     module = importlib.util.module_from_spec(spec)
