@@ -21,7 +21,8 @@ Die Stufen, in dieser Reihenfolge:
    abgelaufen (Vorgabe 2 h), gefälscht, für ein anderes Formular oder zu oft benutzt heißt: sicher ein Bot.
 4. **Cloudflare Turnstile** (optional, Vorgabe aus): siehe ``turnstile_*``.
 5. **Inhalt** (``score_content``): Punkte mit Gründen - Zufallszeichen in allen Feldern, Gmail mit Punkt-Trick, viele
-   Links, bekannte Spam-Wörter und der Wortfilter der Moderation.
+   Links, bekannte Spam-Wörter und der Wortfilter der Moderation. Verdächtig wird ein Inhalt nur mit einem starken
+   Merkmal (``STRONG_REASONS``); schwache Merkmale allein reichen nie, egal wie die Gewichte stehen (``is_suspect``).
 
 Ergebnis (``Verdict``): ``drop`` (sicher Spam - still verwerfen, die Antwort sieht aus wie ein Erfolg), ``suspect``
 (nur der Inhalt ist verdächtig - annehmen, markieren, keine Mail an den Vorstand) oder ``accept``. Gespeichert wird je
@@ -76,6 +77,8 @@ TURNSTILE_FORMS = WEB_ONLY_FORMS
 # von vor einem Deploy). Dann eine sichtbare Meldung statt eines stillen Abbruchs - echte Menschen gehen nie verloren.
 STALE_PAGE_FORMS = ("register",)
 STALE_PAGE = "Die Seite war zu lange offen – bitte neu laden und noch einmal absenden."
+# Zähler der App-Registrierung unter eigenem Namen - für den Betriebs-Check „Spitze bei App-Registrierungen“.
+APP_REGISTER_STATS = "register_app"
 LIMIT_BUCKETS = {"contact": "contact:submit", "forgot_password": "auth:forgot", "resend_verification": "auth:verify-resend"}
 
 HONEYPOT_FIELD = "hp_fax"
@@ -103,17 +106,25 @@ REASON_LABELS = {
     "gmail_dots": "Gmail mit Punkt-Trick",
     "links": "Viele Links",
     "spam_words": "Spam-Wörter",
-    "word_filter": "Wortfilter",
+    "word_filter": "Wortfilter (markieren)",
+    "word_filter_hold": "Wortfilter (zurückhalten)",
     "ip": "Limit je IP",
     "email": "Limit je E-Mail",
+    "app_ip": "App-Registrierung: Limit je IP",
+    "app_global": "App-Registrierung: Limit für alle",
 }
-CONTENT_REASONS = ("random_text", "gmail_dots", "links", "spam_words", "word_filter")
+CONTENT_REASONS = ("random_text", "gmail_dots", "links", "spam_words", "word_filter", "word_filter_hold")
+# Nur diese Merkmale machen einen Inhalt verdächtig. Gmail-Punkte, Links, Spam-Wörter und ein „markieren“-Treffer im
+# Wortfilter sind schwache Signale: sie zählen mit, reichen allein aber nie - gleich wie hoch die Punkte stehen.
+STRONG_REASONS = ("random_text", "word_filter_hold")
+# Ohne Formular-Token (oder ein aufgebrauchtes) bzw. ohne Turnstile-Antwort: immer Verdacht, nie verworfen.
+FORCED_REASONS = ("token_missing", "token_reused", "turnstile_missing")
 
 DEFAULT_SPAM_WORDS = (
     "casino", "viagra", "cialis", "crypto investment", "bitcoin investment", "binary options", "seo services",
     "backlinks", "escort", "porn", "loan offer", "betting tips", "make money fast", "weight loss", "forex trading",
 )
-DEFAULT_WEIGHTS = {"random_text": 6, "gmail_dots": 2, "links": 3, "spam_words": 3, "word_filter_hold": 3, "word_filter_flag": 1}
+DEFAULT_WEIGHTS = {"random_text": 6, "gmail_dots": 1, "links": 2, "spam_words": 1, "word_filter_hold": 3, "word_filter_flag": 1}
 DEFAULT_LIMITS = {
     # Wie bisher: Kontakt 5 je IP in 15 Minuten; neu je E-Mail. „Passwort vergessen“ und „erneut senden“ wie bisher.
     "contact": {"ip_limit": 5, "ip_window_minutes": 15, "email_limit": 5, "email_window_minutes": 60},
@@ -130,6 +141,10 @@ NUMBERS = {
     "gmail_dots_min": (3, 2, 20),
     "links_min": (3, 1, 50),
     "peak_per_hour": (30, 5, 10000),
+    # Registrierung aus der App (#2067): ohne Formular-Token, darum enger begrenzt - je IP und für alle zusammen.
+    "app_register_ip_per_hour": (3, 1, 100),
+    "app_register_global_per_hour": (30, 1, 10000),
+    "app_register_peak_per_hour": (15, 1, 10000),
 }
 WEIGHT_RANGE = (0, 50)
 LIMIT_RANGES = {"ip_limit": (1, 1000), "email_limit": (1, 1000), "ip_window_minutes": (1, 1440), "email_window_minutes": (1, 1440)}
@@ -138,6 +153,9 @@ UPDATE_FIELDS = ("enabled", *NUMBERS, "weights", "spam_words", "limits")
 
 TURNSTILE_MODES = ("always", "suspect")
 TURNSTILE_MODE_LABELS = {"always": "Immer", "suspect": "Nur bei Verdacht"}
+# „Nur bei Verdacht“: zusätzlich ein Zufallsanteil unauffälliger Anfragen - sonst verrät die Rückfrage (428) einem
+# Bot, dass er aufgefallen ist. (Vorgabe, kleinster, größter Wert in Prozent.)
+SAMPLE_PERCENT = (10, 0, 100)
 SITEVERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
 TIMEOUT_SECONDS = 5.0
 # Für Tests: ein httpx-Transport statt des Netzes. Ein echter Aufruf an Cloudflare passiert in Tests nie.
@@ -196,6 +214,7 @@ def _turnstile(raw: Any) -> dict:
         "site_key": str(raw.get("site_key") or "") if SITE_KEY_PATTERN.match(str(raw.get("site_key") or "")) else "",
         "secret_key": str(raw.get("secret_key") or ""),
         "forms": {form: forms.get(form) is not False for form in TURNSTILE_FORMS},
+        "sample_percent": _number(raw.get("sample_percent"), *SAMPLE_PERCENT),
         "secret_saved_at": raw.get("secret_saved_at"),
         "last_test": raw.get("last_test") if isinstance(raw.get("last_test"), dict) else None,
     }
@@ -435,6 +454,14 @@ def score_content(config: dict, fields: dict | None, *, email: Any = None) -> di
     return {"score": score, "reasons": reasons}
 
 
+def is_suspect(config: dict, reasons: list[str], score: int) -> bool:
+    """Verdacht heißt: ein fehlendes bzw. aufgebrauchtes Token oder eine fehlende Turnstile-Antwort - oder genug Punkte
+    **und** mindestens ein starkes Merkmal. Schwache Merkmale allein machen nie Spam (Codex-Befund zu #2067)."""
+    if any(reason in FORCED_REASONS for reason in reasons):
+        return True
+    return score >= config["suspect_score"] and any(reason in STRONG_REASONS for reason in reasons)
+
+
 def word_filter_points(config: dict, result: dict) -> int:
     action = (result or {}).get("action")
     if action == "hold":
@@ -562,10 +589,12 @@ async def update_turnstile(db, changes: dict, *, actor: dict, reason: Any) -> di
     text = clean_reason(reason)
     current = await load(db)
     turnstile = dict(current["turnstile"])
-    unknown = sorted(set(changes) - {"enabled", "site_key", "mode", "forms"})
+    unknown = sorted(set(changes) - {"enabled", "site_key", "mode", "forms", "sample_percent"})
     if unknown:
         raise SpamGuardError(f"Unbekannte Turnstile-Einstellungen ({', '.join(unknown)}).")
     after: dict = {}
+    if "sample_percent" in changes:
+        after["sample_percent"] = _strict_number("Zufallsanteil (%)", changes["sample_percent"], *SAMPLE_PERCENT[1:])
     if "site_key" in changes:
         after["site_key"] = clean_site_key(changes["site_key"])
     if "mode" in changes:
@@ -702,23 +731,83 @@ async def stats_view(db, *, now: datetime | None = None) -> dict:
     week = _summary(rows)
     today = _summary([row for row in rows if row["hour"] >= today_start])
     per_hour: dict[str, int] = {}
-    unavailable = 0
+    app_per_hour: dict[str, int] = {}
+    unavailable = app_global_hits = 0
     for row in rows:
         if row["hour"] < day_start:
             continue
+        count = int(row.get("count") or 0)
         if row.get("outcome") == "turnstile_unavailable":
-            unavailable += int(row.get("count") or 0)
+            unavailable += count
         elif row.get("outcome") in ("dropped", "suspect"):
-            per_hour[row["hour"]] = per_hour.get(row["hour"], 0) + int(row.get("count") or 0)
+            per_hour[row["hour"]] = per_hour.get(row["hour"], 0) + count
+        if row.get("form") == APP_REGISTER_STATS and row.get("outcome") != "turnstile_unavailable":
+            app_per_hour[row["hour"]] = app_per_hour.get(row["hour"], 0) + count
+            if row.get("reason") == "app_global":
+                app_global_hits += count
     peak_hour = max(per_hour, key=per_hour.get) if per_hour else None
+    app_peak_hour = max(app_per_hour, key=app_per_hour.get) if app_per_hour else None
     submissions = week["dropped"] + week["suspect"] + week["accepted"]
     return {
         "today": today, "week": week,
         "quote_week": round(week["caught"] / submissions * 100, 1) if submissions else None,
         "peak_24h": {"hour": f"{peak_hour}:00Z" if peak_hour else None, "count": per_hour.get(peak_hour, 0) if peak_hour else 0},
         "turnstile_unavailable_24h": unavailable,
+        # App-Registrierungen (alle Versuche, auch abgewiesene) in der stärksten Stunde und Treffer des globalen Limits.
+        "app_register_peak_24h": {"hour": f"{app_peak_hour}:00Z" if app_peak_hour else None,
+                                  "count": app_per_hour.get(app_peak_hour, 0) if app_peak_hour else 0,
+                                  "global_limit_hits": app_global_hits},
         "labels": REASON_LABELS,
     }
+
+
+# ---------------------------------------------------------------- Kontakt-Inbox: Empfänger und tägliche Sammel-Mail
+
+
+async def inbox_recipient(db) -> str | None:
+    """Wer die Mails der Kontakt-Inbox bekommt: Kontakt-Adresse des Vereins, sonst Absender, sonst der Superadmin."""
+    branding = await db.settings.find_one({"id": "branding"}, {"_id": 0, "contact_email": 1, "sender_email": 1}) or {}
+    recipient = branding.get("contact_email") or branding.get("sender_email")
+    if not recipient:
+        admin = await db.users.find_one({"role": "superadmin"}, {"email": 1, "_id": 0})
+        recipient = admin.get("email") if admin else None
+    return recipient
+
+
+DIGEST_TEMPLATE = "spam_digest"
+
+
+async def queue_spam_digest(db, *, now: datetime | None = None) -> dict:
+    """Einmal am Tag (Scheduler): „N Nachrichten im Spam-Ordner – bitte kurz prüfen“ - nur die Zahl und ein Link,
+    nie Absender oder Text. Gezählt werden die vom Spamschutz markierten, noch nicht freigegebenen Nachrichten der
+    letzten 24 Stunden; ohne neue keine Mail. Je Wiener Tag höchstens eine (``dedupe_key``)."""
+    now = now or datetime.now(timezone.utc)
+    since = (now - timedelta(hours=24)).isoformat()
+    query = {"status": "spam", "spam.reasons": {"$exists": True}, "spam.cleared_at": {"$exists": False}}
+    count = await db.contact_messages.count_documents({**query, "created_at": {"$gte": since}})
+    if not count:
+        return {"queued": False, "count": 0}
+    recipient = await inbox_recipient(db)
+    if not recipient:
+        return {"queued": False, "count": count}
+    waiting = await db.contact_messages.count_documents(query)
+    from zoneinfo import ZoneInfo
+
+    from email_service import _wrap
+    from services.mail_outbox import enqueue_mail
+
+    day = now.astimezone(ZoneInfo("Europe/Vienna")).date().isoformat()
+    link = f"{os.environ.get('FRONTEND_URL', '').rstrip('/')}/admin/contact"
+    label = "1 Nachricht" if count == 1 else f"{count} Nachrichten"
+    html = _wrap(f"{label} im Spam-Ordner", (
+        f"<p>Der Spamschutz hat in den letzten 24 Stunden {label} als verdächtig markiert. Sie stehen in der "
+        f"Kontakt-Inbox unter „Spam“ – bisher ging dazu keine Mail hinaus.</p>"
+        f"<p>Bitte kurz prüfen: Ist eine echte Anfrage dabei, holt „Kein Spam“ Bestätigung und Benachrichtigung nach.</p>"
+        f"<p>Insgesamt warten {waiting} markierte Nachrichten.</p>"
+        f"<p><a href=\"{link}\">Zur Kontakt-Inbox</a></p>"))
+    await enqueue_mail(to=recipient, subject=f"[TLS Kontakt] {label} im Spam-Ordner – bitte kurz prüfen", html=html,
+                       template_key=DIGEST_TEMPLATE, meta={"count": count}, dedupe_key=f"{DIGEST_TEMPLATE}:{day}")
+    return {"queued": True, "count": count}
 
 
 # ---------------------------------------------------------------- Die Prüfung
@@ -744,9 +833,31 @@ async def _enforce_limits(request: Request, db, config: dict, form: str, email: 
             raise
 
 
+async def _enforce_app_register_limits(request: Request, db, config: dict) -> None:
+    """Registrierung aus der App (#2067): es gibt keine App-Bescheinigung, darum ein enges Limit je IP und ein Limit für
+    alle App-Registrierungen zusammen je Stunde. Wer darüber liegt, bekommt 429 - wie bei jedem Limit sichtbar."""
+    from services.rate_limit import enforce_rate_limit, get_client_ip, keyed_subject
+
+    checks = [("app_ip", "auth:mobile-register:ip", config["app_register_ip_per_hour"], keyed_subject(f"ip:{get_client_ip(request)}")),
+              ("app_global", "auth:mobile-register:all", config["app_register_global_per_hour"], "alle")]
+    for reason, name, limit, subject in checks:
+        try:
+            await enforce_rate_limit(request, name, limit=limit, window_seconds=3600, subject=subject,
+                                     message="Gerade kommen sehr viele Registrierungen an. Bitte versuche es in {wait} noch einmal.")
+        except HTTPException as exc:
+            if exc.status_code == 429:
+                await record(db, APP_REGISTER_STATS, "limited", reason)
+            raise
+
+
+def _sampled(config: dict) -> bool:
+    return secrets.randbelow(100) < config["turnstile"]["sample_percent"]
+
+
 async def screen(request: Request, form: str, *, token: Any = None, honeypot: Any = None, turnstile_token: Any = None,
                  email: str | None = None, fields: dict | None = None, client: str = "web", db=None) -> Verdict:
-    """Die ganze Prüfung für ein Formular. Wirft 429 (Limit) und 428 (Turnstile nötig, Modus „nur bei Verdacht“)."""
+    """Die ganze Prüfung für ein Formular. Wirft 429 (Limit), 400 (Registrierung: Seite zu lange offen) und 428
+    (Turnstile nötig, Modus „nur bei Verdacht“)."""
     if form not in FORMS:
         raise ValueError("unbekanntes Formular")
     if db is None:
@@ -754,30 +865,36 @@ async def screen(request: Request, form: str, *, token: Any = None, honeypot: An
 
         db = get_db()
     config = await load(db)
+    app_register = form == "register" and client == "app"
+    stats_form = APP_REGISTER_STATS if app_register else form
+    if app_register:
+        await _enforce_app_register_limits(request, db, config)
     await _enforce_limits(request, db, config, form, email)
     if not config["enabled"]:
-        await record(db, form, "accepted")
+        await record(db, stats_form, "accepted")
         return Verdict(form, ACCEPT)
     if str(honeypot or "").strip():
-        return await _drop(db, form, "honeypot")
+        return await _drop(db, stats_form, "honeypot")
     token_value = str(token or "")
-    marked: list[str] = []
+    missing = None if token_value else "token_missing"
     if token_value:
         ok, why = verify_token(config, token_value, form)
         if not ok:
             if why == "expired" and form in STALE_PAGE_FORMS:
-                await record(db, form, "refused", "token_expired")
+                await record(db, stats_form, "refused", "token_expired")
                 raise HTTPException(400, STALE_PAGE)
-            return await _drop(db, form, f"token_{why}")
+            return await _drop(db, stats_form, f"token_{why}")
         if not await _token_use_allowed(db, config, token_value):
-            return await _drop(db, form, "token_reused")
-    elif client == "web" and form in STALE_PAGE_FORMS:
-        # Registrierung ohne Token: eher eine alte Seite als ein Bot - sichtbar sagen statt still verwerfen.
-        await record(db, form, "refused", "token_missing")
+            # Gültig, nur aufgebraucht (Codex-Befund): gilt wie ein fehlendes Token - nie still verwerfen.
+            missing, token_value = "token_reused", ""
+    marked: list[str] = []
+    if missing and client == "web" and form in STALE_PAGE_FORMS:
+        # Registrierung ohne (gültiges) Token: eher eine alte Seite als ein Bot - sichtbar sagen statt still verwerfen.
+        await record(db, stats_form, "refused", missing)
         raise HTTPException(400, STALE_PAGE)
-    elif client == "web" and form in WEB_ONLY_FORMS:
-        # Kontakt ohne Token (etwa ein Tab von vor einem Deploy): nie verlieren, nur als Verdacht markieren.
-        marked.append("token_missing")
+    if missing and client == "web" and form in WEB_ONLY_FORMS:
+        # Kontakt ohne (gültiges) Token, etwa ein Tab von vor einem Deploy: nie verlieren, nur als Verdacht markieren.
+        marked.append(missing)
     # Website heißt: ein gültiges Token ist da. Ohne Token (App, ältere Clients) gibt es kein Turnstile.
     turnstile = turnstile_applies(config, form) if client == "web" and token_value else False
     mode = config["turnstile"]["mode"]
@@ -788,38 +905,39 @@ async def screen(request: Request, form: str, *, token: Any = None, honeypot: An
     if joined.strip():
         from services import word_filter
 
-        points = word_filter_points(config, await word_filter.check_text(db, joined))
+        result = await word_filter.check_text(db, joined)
+        points = word_filter_points(config, result)
         if points:
-            reasons.append("word_filter")
+            reasons.append("word_filter_hold" if result.get("action") == "hold" else "word_filter")
             score += points
-    forced = bool(marked)
     if turnstile and mode == "always":
         result = await check_turnstile(db, config, form, turnstile_token)
         if result == "invalid":
-            return await _drop(db, form, "turnstile_invalid")
+            return await _drop(db, stats_form, "turnstile_invalid")
         if result == "missing":
             # Ein Werbeblocker kann das Widget verhindern: dann nicht verwerfen, sondern markieren.
             reasons.append("turnstile_missing")
-            forced = True
         elif result == "unavailable":
             # Cloudflare hakt: die eigenen Stufen entscheiden allein, der Betrieb sieht es im Check.
-            await record(db, form, "turnstile_unavailable")
-    suspect = forced or score >= config["suspect_score"]
-    if suspect and turnstile and mode == "suspect":
+            await record(db, stats_form, "turnstile_unavailable")
+    suspect = is_suspect(config, reasons, score)
+    # „Nur bei Verdacht“: auch ein Zufallsanteil unauffälliger Anfragen muss bestätigen, und eine mitgeschickte
+    # Antwort wird immer geprüft - so ist die Rückfrage für einen Bot kein sicheres Zeichen, aufgefallen zu sein.
+    if turnstile and mode == "suspect" and (suspect or turnstile_token or _sampled(config)):
         result = await check_turnstile(db, config, form, turnstile_token)
         if result == "missing":
-            await record(db, form, "challenged", reasons[0] if reasons else None)
+            await record(db, stats_form, "challenged", reasons[0] if reasons else None)
             raise turnstile_required_error(config, form)
         if result == "invalid":
-            return await _drop(db, form, "turnstile_invalid")
+            return await _drop(db, stats_form, "turnstile_invalid")
         if result == "ok":
-            await record(db, form, "accepted", "turnstile_passed")
+            await record(db, stats_form, "accepted", "turnstile_passed")
             return Verdict(form, ACCEPT, ["turnstile_passed"], score)
-        await record(db, form, "turnstile_unavailable")
+        await record(db, stats_form, "turnstile_unavailable")
     if suspect:
-        await record(db, form, "suspect", reasons[0] if reasons else None)
+        await record(db, stats_form, "suspect", reasons[0] if reasons else None)
         return Verdict(form, SUSPECT, reasons, score)
-    await record(db, form, "accepted")
+    await record(db, stats_form, "accepted")
     return Verdict(form, ACCEPT, [], score)
 
 
@@ -842,6 +960,8 @@ def admin_view(config: dict) -> dict:
             "enabled": turnstile["enabled"], "ready": turnstile_ready(config), "mode": turnstile["mode"],
             "modes": [{"key": key, "label": TURNSTILE_MODE_LABELS[key]} for key in TURNSTILE_MODES],
             "site_key": turnstile["site_key"], "forms": turnstile["forms"],
+            "sample_percent": turnstile["sample_percent"],
+            "sample_bounds": {"min": SAMPLE_PERCENT[1], "max": SAMPLE_PERCENT[2]},
             "secret": {"state": state, "saved_at": turnstile["secret_saved_at"] if state != "missing" else None,
                        "detail": UNREADABLE_SECRET if state == "unreadable" else None},
             "last_test": turnstile["last_test"],

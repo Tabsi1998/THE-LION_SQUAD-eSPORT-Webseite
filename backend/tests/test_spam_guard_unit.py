@@ -84,11 +84,37 @@ def test_lowercase_random_without_vowels_is_random():
     assert not spam_guard.looks_random("Donaudampfschifffahrt", min_length=12)
 
 
-def test_many_links_and_spam_words_add_up():
+def test_many_links_and_spam_words_are_noted_but_weak():
     text = "Best casino bonus http://a.example http://b.example www.c.example"
     verdict = spam_guard.score_content(CONFIG, {"name": "Bob", "subject": "Offer", "message": text})
     assert {"links", "spam_words"} <= set(verdict["reasons"])
-    assert verdict["score"] >= CONFIG["suspect_score"]
+    assert spam_guard.is_suspect(CONFIG, verdict["reasons"], verdict["score"]) is False
+
+
+def test_weak_signals_alone_stay_below_the_threshold():
+    """Codex-Befund (#2067): eine Gmail-Adresse mit vielen Punkten plus drei Links war allein schon „Spam“."""
+    sample = {"name": "Anna", "subject": "Sponsoring",
+              "message": "Unsere Seiten: https://a.example https://b.example https://c.example - Lust auf einen Casino-Abend?"}
+    verdict = spam_guard.score_content(CONFIG, sample, email="anna.maria.lisa.huber@gmail.com")
+    assert {"gmail_dots", "links"} <= set(verdict["reasons"])
+    assert verdict["score"] < CONFIG["suspect_score"]
+    assert spam_guard.is_suspect(CONFIG, verdict["reasons"], verdict["score"]) is False
+
+
+def test_without_a_strong_signal_no_weights_make_it_spam():
+    loud = spam_guard.normalized({"weights": {"gmail_dots": 50, "links": 50, "spam_words": 50, "word_filter_flag": 50}})
+    assert spam_guard.is_suspect(loud, ["gmail_dots", "links", "spam_words", "word_filter"], 200) is False
+    assert spam_guard.is_suspect(loud, ["random_text"], 6) is True
+    assert spam_guard.is_suspect(loud, ["word_filter_hold", "links"], 53) is True
+    # Fehlt das Token oder Turnstile, zählt das als Verdacht - unabhängig von den Punkten.
+    assert spam_guard.is_suspect(CONFIG, ["token_missing"], 0) is True
+
+
+def test_turnstile_defaults_to_always_and_samples_ten_percent():
+    turnstile = spam_guard.normalized(None)["turnstile"]
+    assert turnstile["mode"] == "always"
+    assert turnstile["sample_percent"] == 10
+    assert spam_guard.normalized({"turnstile": {"sample_percent": 150}})["turnstile"]["sample_percent"] == 10
 
 
 def test_one_link_is_fine():

@@ -165,10 +165,23 @@ async def test_token_cannot_be_used_endlessly(flow):
     config = spam_guard.defaults()
     for index in range(config["token_max_uses"]):
         await contact(flow, {**HUMAN, "email": f"p{index}@lionsquad-test.at"}, **fields)
-    assert await flow.db.contact_messages.count_documents({}) == config["token_max_uses"]
-    await contact(flow, {**HUMAN, "email": "noch@lionsquad-test.at"}, **fields)
-    assert await flow.db.contact_messages.count_documents({}) == config["token_max_uses"]
+    assert await flow.db.contact_messages.count_documents({"status": "new"}) == config["token_max_uses"]
+    # Ein gültiges, nur aufgebrauchtes Token gilt wie ein fehlendes: Verdacht, nicht verworfen (Codex-Befund).
+    response = await contact(flow, {**HUMAN, "email": "noch@lionsquad-test.at"}, **fields)
+    stored = await flow.db.contact_messages.find_one({"id": response.json()["id"]}, {"_id": 0})
+    assert stored["status"] == "spam" and stored["spam"]["reasons"][0] == "token_reused"
     assert await caught(flow, "token_reused") == 1
+
+
+@pytest.mark.asyncio
+async def test_used_up_token_at_registration_asks_to_reload(flow):
+    await flow.db.settings.update_one({"id": spam_guard.SETTINGS_ID}, {"$set": {"id": spam_guard.SETTINGS_ID, "token_max_uses": 2}}, upsert=True)
+    fields = form_fields("register")
+    for index in range(2):
+        body = {**REGISTRATION, "username": f"spieler{index}", "email": f"spieler{index}@lionsquad-test.at", **fields}
+        assert (await flow.post("/api/auth/register", json=body)).status_code == 200
+    again = await flow.post("/api/auth/register", json={**REGISTRATION, **fields})
+    assert again.status_code == 400 and again.json()["detail"] == spam_guard.STALE_PAGE
 
 
 # ---------------------------------------------------------------- Kontakt: verdächtiger Inhalt
@@ -518,6 +531,8 @@ async def test_turnstile_missing_marks_as_suspect(flow):
 @pytest.mark.asyncio
 async def test_turnstile_only_on_suspicion(flow):
     await enable_turnstile(flow, mode="suspect")
+    # Ohne Zufallsanteil, sonst wäre der Test vom Zufall abhängig (der Anteil hat einen eigenen Test).
+    await flow.db.settings.update_one({"id": spam_guard.SETTINGS_ID}, {"$set": {"turnstile.sample_percent": 0}})
     seen = []
     spam_guard.TRANSPORT = cloudflare(GOOD, seen=seen)
     human = await contact(flow, HUMAN, **form_fields("contact"))
@@ -583,3 +598,131 @@ async def test_app_registration_never_sees_turnstile(flow):
     assert response.status_code == 200
     assert await flow.db.users.count_documents({"email": REGISTRATION["email"]}) == 1
     assert seen == []
+
+
+# ---------------------------------------------------------------- Codex-Befunde (#2067)
+
+
+@pytest.mark.asyncio
+async def test_dotted_gmail_with_links_is_no_spam(flow):
+    body = {**HUMAN, "email": "anna.maria.lisa.huber@gmail.com",
+            "message": "Hallo! Unsere Seiten: https://a.example https://b.example https://c.example - meldet euch gern."}
+    response = await contact(flow, body, **form_fields("contact"))
+    stored = await flow.db.contact_messages.find_one({"id": response.json()["id"]}, {"_id": 0})
+    assert stored["status"] == "new"
+    assert len(await board_mails(flow)) == 1
+
+
+@pytest.mark.asyncio
+async def test_daily_digest_names_only_the_count(flow):
+    assert await spam_guard.queue_spam_digest(flow.db) == {"queued": False, "count": 0}
+    await contact(flow, BOT, **form_fields("contact"))
+    await contact(flow, {**BOT, "email": "x.y.z.w@gmail.com"}, **form_fields("contact"))
+    result = await spam_guard.queue_spam_digest(flow.db)
+    assert result == {"queued": True, "count": 2}
+    jobs = await board_mails(flow)
+    assert len(jobs) == 1 and jobs[0]["template_key"] == "spam_digest"
+    assert "2 Nachrichten" in jobs[0]["subject"] and "/admin/contact" in jobs[0]["html"]
+    for secret in (BOT["name"], BOT["subject"], BOT["message"], BOT["email"]):
+        assert secret not in jobs[0]["html"] and secret not in jobs[0]["subject"]
+    # Einmal am Tag: ein zweiter Lauf verschickt nichts doppelt.
+    await spam_guard.queue_spam_digest(flow.db)
+    assert len(await board_mails(flow)) == 1
+
+
+@pytest.mark.asyncio
+async def test_scheduler_job_queues_the_digest(flow):
+    from services import scheduler
+
+    await scheduler._safe_spam_digest()
+    assert await board_mails(flow) == []
+    await contact(flow, BOT, **form_fields("contact"))
+    await scheduler._safe_spam_digest()
+    jobs = await board_mails(flow)
+    assert [job["template_key"] for job in jobs] == ["spam_digest"]
+
+
+@pytest.mark.asyncio
+async def test_app_registration_has_its_own_ip_limit(flow):
+    for index in range(3):
+        body = {**REGISTRATION, "username": f"appspieler{index}", "email": f"app{index}@lionsquad-test.at"}
+        assert (await flow.post("/api/auth/mobile/register", json=body)).status_code == 200
+    blocked = await flow.post("/api/auth/mobile/register", json={**REGISTRATION, "username": "appspieler9", "email": "app9@lionsquad-test.at"})
+    assert blocked.status_code == 429
+    assert await caught(flow, "app_ip") == 1
+
+
+@pytest.mark.asyncio
+async def test_app_registration_has_a_global_limit(flow, monkeypatch):
+    await flow.db.settings.update_one({"id": spam_guard.SETTINGS_ID}, {"$set": {"id": spam_guard.SETTINGS_ID, "app_register_ip_per_hour": 100,
+                                                                              "app_register_global_per_hour": 2}}, upsert=True)
+    from services import rate_limit
+
+    import itertools
+
+    # Jede Anfrage aus einem anderen Netz: nur das globale Limit kann greifen.
+    counter = itertools.count(1)
+    monkeypatch.setattr(rate_limit, "get_client_ip", lambda _request: f"10.0.{next(counter)}.1")
+    for index in range(2):
+        body = {**REGISTRATION, "username": f"appspieler{index}", "email": f"app{index}@lionsquad-test.at"}
+        assert (await flow.post("/api/auth/mobile/register", json=body)).status_code == 200
+    blocked = await flow.post("/api/auth/mobile/register", json={**REGISTRATION, "username": "appspieler9", "email": "app9@lionsquad-test.at"})
+    assert blocked.status_code == 429
+    assert await caught(flow, "app_global") == 1
+    from services import ops_checks
+
+    check = await ops_checks.check_spam_guard(flow.db)
+    assert check["status"] == "warn" and "App-Registrierungen" in check["detail"]
+
+
+@pytest.mark.asyncio
+async def test_suspect_mode_also_asks_a_random_share(flow):
+    await enable_turnstile(flow, mode="suspect")
+    spam_guard.TRANSPORT = cloudflare(GOOD)
+    await flow.db.settings.update_one({"id": spam_guard.SETTINGS_ID}, {"$set": {"turnstile.sample_percent": 100}})
+    asked = await contact(flow, HUMAN, **form_fields("contact"))
+    assert asked.status_code == 428
+    await flow.db.settings.update_one({"id": spam_guard.SETTINGS_ID}, {"$set": {"turnstile.sample_percent": 0}})
+    assert (await contact(flow, HUMAN, **form_fields("contact"))).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_sample_percent_is_set_with_reason(flow):
+    flow.act_as(await flow.add_staff())
+    assert (await flow.put("/api/spam-guard/turnstile", json={"sample_percent": 101, "reason": "mehr prüfen"})).status_code == 400
+    saved = await flow.put("/api/spam-guard/turnstile", json={"sample_percent": 25, "reason": "mehr prüfen"})
+    assert saved.status_code == 200 and saved.json()["turnstile"]["sample_percent"] == 25
+
+
+@pytest.mark.asyncio
+async def test_not_spam_can_be_retried_after_a_crash(flow, monkeypatch):
+    response = await contact(flow, BOT, **form_fields("contact"))
+    cid = response.json()["id"]
+    flow.act_as(await flow.add_staff())
+    from services import mail_outbox
+
+    real = mail_outbox.enqueue_mail
+    calls = {"n": 0}
+
+    async def crash_after_first(*args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 2:
+            raise RuntimeError("Absturz zwischen den Mails")
+        return await real(*args, **kwargs)
+
+    monkeypatch.setattr(mail_outbox, "enqueue_mail", crash_after_first)
+    with pytest.raises(RuntimeError):
+        await flow.post(f"/api/contact/{cid}/not-spam")
+    stored = await flow.db.contact_messages.find_one({"id": cid}, {"_id": 0})
+    assert stored["status"] == "spam" and stored["spam"]["release"]["state"] == "releasing"
+    monkeypatch.setattr(mail_outbox, "enqueue_mail", real)
+    # Gleich danach: es läuft noch (oder hängt) - kein zweiter Start, aber auch kein 409.
+    assert (await flow.post(f"/api/contact/{cid}/not-spam")).status_code == 423
+    # Nach ein paar Minuten darf es neu angestoßen werden - ohne doppelte Mails.
+    await flow.db.contact_messages.update_one({"id": cid}, {"$set": {"spam.release.started_at": "2000-01-01T00:00:00+00:00"}})
+    retried = await flow.post(f"/api/contact/{cid}/not-spam")
+    assert retried.status_code == 200, retried.text
+    assert retried.json()["status"] == "new" and retried.json()["spam"]["release"]["state"] == "released"
+    assert await flow.db.mail_jobs.count_documents({"to": BOT["email"]}) == 1
+    assert len(await board_mails(flow)) == 1
+    assert (await flow.post(f"/api/contact/{cid}/not-spam")).status_code == 409

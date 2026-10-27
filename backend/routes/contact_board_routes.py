@@ -8,6 +8,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from pymongo import ReturnDocument
+from datetime import timedelta
 from typing import Optional, Literal
 
 from database import get_db
@@ -39,6 +40,8 @@ TOPIC_LABELS = {
 }
 
 ContactStatus = Literal["new", "in_progress", "answered", "closed", "spam"]
+# „Kein Spam“ (#2067): so lange gilt eine laufende Freigabe als in Arbeit; danach darf sie neu angestoßen werden.
+RELEASE_STALE_MINUTES = 5
 
 
 class ContactSubmit(BaseModel):
@@ -107,15 +110,15 @@ async def submit_contact(body: ContactSubmit, request: Request, me=Depends(get_c
 
 
 async def _notify_contact(db, doc: dict) -> None:
-    """Hinweis im Vorstands-Kanal, Bestätigung an den Absender und Mail an die Vereinsadresse."""
+    """Bestätigung an den Absender, Mail an die Vereinsadresse und Hinweis im Vorstands-Kanal.
+
+    Die Mails tragen einen Schlüssel je Nachricht und Mail-Art (``dedupe_key``): ein zweiter Durchlauf - etwa ein
+    wiederholtes „Kein Spam“ nach einem Absturz - reiht keine Mail doppelt ein. Der Discord-Hinweis kommt zuletzt."""
     name, email, subject, message, topic = doc["name"], doc["email"], doc["subject"], doc["message"], doc["topic"]
-    # Vorstands-Kanal (#300): Thema ja, Absender und Text nein - die stehen in der Kontakt-Inbox.
-    from services.discord_announcements import notify_board
-    await notify_board("contact.request", f"Thema: {TOPIC_LABELS.get(topic, topic)}")
     # Auto-reply via mail queue (uses render_template if admin customised it)
     from email_service import _wrap
+    from services import mail_outbox
     from services.email_delivery import fill_placeholders
-    from services.mail_queue import enqueue_mail
     from routes.phase_ef_routes import render_template
     topic_label = TOPIC_LABELS.get(topic, topic)
     first_name = name.split()[0] if name else "dort"
@@ -135,19 +138,16 @@ async def _notify_contact(db, doc: dict) -> None:
         fallback_subject="Bestätigung: Wir haben deine Nachricht erhalten — {{subject}}",
         fallback_html=fallback_user_html,
     )
-    await enqueue_mail(
+    await mail_outbox.enqueue_mail(
         to=email,
         subject=user_subj,
         html=user_html,
         template_key="contact_autoreply",
         meta={"contact_id": doc["id"]},
+        dedupe_key=f"contact:{doc['id']}:autoreply",
     )
     # Admin notification
-    branding = await db.settings.find_one({"id": "branding"}, {"_id": 0}) or {}
-    admin_to = branding.get("contact_email") or branding.get("sender_email")
-    if not admin_to:
-        admin = await db.users.find_one({"role": "superadmin"}, {"email": 1, "_id": 0})
-        admin_to = admin.get("email") if admin else None
+    admin_to = await spam_guard.inbox_recipient(db)
     if admin_to:
         admin_html = fill_placeholders(_wrap(
             "Neue Nachricht: {{topic}}",
@@ -156,13 +156,17 @@ async def _notify_contact(db, doc: dict) -> None:
             "<blockquote style='margin:8px 0;padding:8px 12px;border-left:3px solid #29B6E8;color:#D1D5DB'>{{message}}</blockquote>"
             "<p style='color:#6B7280;font-size:12px'>ID: {{id}}</p>",
         ), {"topic": topic_label, "name": name, "email": email, "subject": subject, "message": message, "id": doc["id"]}, as_html=True)
-        await enqueue_mail(
+        await mail_outbox.enqueue_mail(
             to=admin_to,
             subject=f"[TLS Kontakt] {topic_label}: {subject[:60]}",
             html=admin_html,
             template_key="contact_admin_notify",
             meta={"contact_id": doc["id"]},
+            dedupe_key=f"contact:{doc['id']}:admin",
         )
+    # Vorstands-Kanal (#300): Thema ja, Absender und Text nein - die stehen in der Kontakt-Inbox.
+    from services.discord_announcements import notify_board
+    await notify_board("contact.request", f"Thema: {TOPIC_LABELS.get(topic, topic)}")
 
 
 @contact_router.get("/topics")
@@ -206,22 +210,37 @@ async def patch_contact_message(cid: str, body: ContactPatch, me: dict = Depends
 async def mark_contact_not_spam(cid: str, me: dict = Depends(require_area("club"))):
     """„Kein Spam“ (#2067): die Nachricht normal einordnen und die Mails nachholen, die beim Eingang unterblieben.
 
-    Bedingt geschrieben: nur eine Nachricht, die der Spamschutz beim Eingang markiert hat (von Hand auf „Spam“
-    gesetzte hatten ihre Mails schon) und die noch nie freigegeben wurde - zwei Klicks verschicken nichts doppelt."""
+    Nur für Nachrichten, die der Spamschutz beim Eingang markiert hat (von Hand auf „Spam“ gesetzte hatten ihre Mails
+    schon). Zweistufig, damit ein Absturz nichts verliert und nichts doppelt schickt:
+
+    1. ``spam.release.state = "releasing"`` - bedingt gesetzt, auch neu, wenn ein früherer Versuch länger als
+       ``RELEASE_STALE_MINUTES`` hängt.
+    2. Mails einreihen - mit Schlüssel je Nachricht und Mail-Art, ein zweiter Versuch reiht nichts doppelt ein.
+    3. ``released``: Status „Neu“. Erst danach antwortet ein weiterer Klick mit 409.
+    """
     db = get_db()
-    now = now_utc().isoformat()
+    now = now_utc()
+    stale = (now - timedelta(minutes=RELEASE_STALE_MINUTES)).isoformat()
     doc = await db.contact_messages.find_one_and_update(
-        {"id": cid, "status": "spam", "spam.reasons": {"$exists": True}, "spam.cleared_at": {"$exists": False}},
-        {"$set": {"status": "new", "spam.cleared_at": now, "spam.cleared_by": me["id"]}},
+        {"id": cid, "status": "spam", "spam.reasons": {"$exists": True},
+         "$or": [{"spam.release": {"$exists": False}},
+                 {"spam.release.state": "releasing", "spam.release.started_at": {"$lt": stale}}]},
+        {"$set": {"spam.release": {"state": "releasing", "started_at": now.isoformat(), "by": me["id"]}}},
         return_document=ReturnDocument.AFTER)
-    if doc:
-        doc.pop("_id", None)
     if not doc:
-        if not await db.contact_messages.find_one({"id": cid}, {"_id": 1}):
+        current = await db.contact_messages.find_one({"id": cid}, {"_id": 0, "status": 1, "spam": 1})
+        if not current:
             raise HTTPException(404, "Nachricht nicht gefunden.")
+        if (current.get("spam") or {}).get("release", {}).get("state") == "releasing" and current.get("status") == "spam":
+            raise HTTPException(423, "Die Freigabe läuft gerade - bitte in ein paar Minuten noch einmal versuchen.")
         raise HTTPException(409, "Diese Nachricht ist nicht als Spam markiert oder wurde schon freigegeben.")
+    doc.pop("_id", None)
     await _notify_contact(db, doc)
-    return doc
+    done = now_utc().isoformat()
+    await db.contact_messages.update_one({"id": cid}, {"$set": {
+        "status": "new", "spam.cleared_at": done, "spam.cleared_by": me["id"], "spam.release.state": "released",
+        "spam.release.finished_at": done}})
+    return await db.contact_messages.find_one({"id": cid}, {"_id": 0})
 
 
 @contact_router.delete("/{cid}")

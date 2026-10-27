@@ -536,6 +536,11 @@ async def check_spam_guard(db) -> dict:
     peak = stats["peak_24h"]
     if peak["count"] >= config["peak_per_hour"]:
         problems.append(f"Spitze: {peak['count']} abgefangen in einer Stunde ({peak['hour']}), Schwelle {config['peak_per_hour']}")
+    app = stats["app_register_peak_24h"]
+    if app["global_limit_hits"] or app["count"] >= config["app_register_peak_per_hour"]:
+        # Die App-Registrierung hat kein Formular-Token - eine Spitze dort ist der wahrscheinlichste Umweg für Bots.
+        problems.append(f"Spitze bei App-Registrierungen: {app['count']} in einer Stunde ({app['hour']})"
+                        + (f", globales Limit {app['global_limit_hits']}× erreicht" if app["global_limit_hits"] else ""))
     if stats["turnstile_unavailable_24h"]:
         problems.append(f"Turnstile {stats['turnstile_unavailable_24h']}× nicht erreichbar in 24 h – es wirkten nur die eigenen Stufen")
     if config["turnstile"]["enabled"] and spam_guard.secret_state(config) != "ok":

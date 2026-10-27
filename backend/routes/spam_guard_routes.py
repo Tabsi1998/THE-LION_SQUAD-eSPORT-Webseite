@@ -71,6 +71,8 @@ class TurnstileChange(BaseModel):
     site_key: str | None = Field(default=None, max_length=200)
     mode: str | None = Field(default=None, max_length=20)
     forms: dict[str, bool] | None = None
+    # „Nur bei Verdacht“: Anteil unauffälliger Anfragen in Prozent, die trotzdem bestätigen müssen.
+    sample_percent: int | None = None
     reason: str = Field(default="", max_length=500)
 
 
