@@ -534,10 +534,24 @@ async def test_a_temporary_template_failure_keeps_the_last_state(db, provider, f
     assert (await templates.get(db, SHIRT))["previews"] == good["previews"]
 
 
-def test_the_client_still_refuses_a_response_without_a_list(fake, provider):
-    fake.off_contract.add(STYLES)
+def test_an_empty_list_is_no_error_for_the_client(fake, provider):
     fake.print_areas[SHIRT] = []
     assert asyncio.run(provider.print_areas(CatalogProductId(SHIRT))) == ()
+
+
+@pytest.mark.parametrize("data", [{"placement": "front"}, "front", None])
+def test_the_client_still_refuses_a_response_without_a_list(data):
+    """Zeilenweise lesen gilt nur für Zeilen - ist ``data`` gar keine Liste, ist die ganze Antwort unbrauchbar."""
+    from services.shop_fulfillment import FulfillmentPermanent
+
+    def answer(_request):
+        return httpx.Response(200, json={"data": data, "paging": {"total": 1, "offset": 0, "limit": 100}})
+
+    client = PrintfulClient(API_KEY, transport=httpx.MockTransport(answer))
+    for read in (client.print_areas, client.mockup_templates):
+        with pytest.raises(FulfillmentPermanent) as refused:
+            asyncio.run(read(CatalogProductId(SHIRT)))
+        assert refused.value.reason == "invalid_response"
 
 
 def test_without_a_chosen_technique_direct_print_comes_first():
