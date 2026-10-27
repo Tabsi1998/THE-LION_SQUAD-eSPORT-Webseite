@@ -57,6 +57,7 @@ EXPECTED = {
     "shop_variants": {"sku_unique", "id_1", "product_id_1"},
     "shop_designs": {"design_version_unique", "public_id_unique"},
     "shop_design_profiles": {"design_key_unique"},
+    "shop_gamertag_files": {"test_sha256_unique", "public_id_unique", "user_id_1"},
     "shop_design_colors": {"placement_color_unique"},
     "shop_printful_variants": {"provider_variant_unique"},
     "shop_carts": {"user_unique"},

@@ -37,7 +37,15 @@ MODEL_FIELDS: dict[str, tuple[str, ...]] = {
                      # Druckdatei (#1708, services/shop_designs.py): Maße, Prüfung und öffentlicher Zufallsschlüssel
                      "public_id", "public_disabled_at", "content_type", "size_bytes", "width_px", "height_px",
                      "has_alpha", "source_format", "dpi", "print_width_in", "print_height_in", "min_dpi",
-                     "area_width_in", "area_height_in"),
+                     "area_width_in", "area_height_in", "origin"),
+    # Gamertag-Druckdateien (#1711, services/shop_gamertag.py): Herkunft „gamertag“, ohne den Namen als Text - aber
+    # das PNG einer Bestelldatei zeigt ihn: die Zeile gehört dann zu Konto, Bestellung und Position.
+    "shop_gamertag_files": ("id", "origin", "purpose", "sha256", "file_ref", "public_id", "content_type", "size_bytes",
+                            "placement", "width_px", "height_px", "dpi", "print_width_in", "print_height_in",
+                            "text_height_in", "text_width_in", "scaled", "font", "align", "color_key", "color_hex",
+                            "anchor_x_in", "anchor_y_in", "anchor_y_px", "rules_hash", "user_id", "order_id",
+                            "order_item_id", "created_at", "created_by", "last_used_at", "public_disabled_at",
+                            "erase_pending_at", "file_deleted_at"),
     "shop_design_profiles": ("design_key", "title", "placement", "garment_colors", "note", "version", "created_at",
                              "created_by", "updated_at", "updated_by"),
     "shop_design_colors": ("placement", "color_key", "color", "design_key", "claimed_at"),
@@ -61,6 +69,7 @@ PERSONAL_FIELDS: dict[str, tuple[str, ...]] = {
     "shop_orders": ("user_id", "billing_address", "shipping_address"),
     "shop_order_items": ("user_id", "gamertag"),
     "shop_carts": ("user_id", "items"),
+    "shop_gamertag_files": ("user_id",),  # und die Datei selbst (sie zeigt den Gamertag)
 }
 
 
@@ -157,6 +166,8 @@ ADMIN_ACTIONS: dict[str, str] = {
     "shop.design.add": "Druckdatei-Fassung angelegt",
     "shop.design.profile": "Design angelegt oder geändert (Titel, Shirtfarben)",
     "shop.design.placement": "Druckbereich einer Platzierung geändert",
+    "shop.gamertag.rules": "Regeln der Gamertag-Druckdatei geändert",
+    "shop.gamertag.file": "Gamertag-Testdatei erzeugt",
     "shop.printful_variant.set": "Printful-Variante zugeordnet",
     "shop.order.release": "Bestellung freigegeben",
     "shop.order.printful_confirm": "Bei Printful bestätigt",
