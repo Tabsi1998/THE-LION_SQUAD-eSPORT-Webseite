@@ -40,6 +40,11 @@ class UserRegister(BaseModel):
     newsletter_consent: bool = False  # explicitly opt-in, not auto-checked
     # Wohin es nach der Mail-Bestätigung geht (#1225) - der Server prüft es (services/return_path.py).
     next: Optional[str] = Field(default=None, max_length=2048)
+    # Spamschutz (#2067): Formular-Token und unsichtbares Feld der Website, ggf. die Antwort von Turnstile.
+    # Die App schickt nichts davon (Übergangsregel in services/spam_guard.py).
+    form_token: Optional[str] = Field(default=None, max_length=300)
+    hp_fax: Optional[str] = Field(default=None, max_length=300)
+    turnstile_token: Optional[str] = Field(default=None, max_length=4096)
 
 
 class UserLogin(BaseModel):
@@ -239,6 +244,9 @@ class UserSocialUpdate(BaseModel):
 
 class ForgotPasswordBody(BaseModel):
     email: EmailStr
+    # Spamschutz (#2067): nur von der Website; die App ruft dieselbe Adresse ohne beides auf.
+    form_token: Optional[str] = Field(default=None, max_length=300)
+    hp_fax: Optional[str] = Field(default=None, max_length=300)
 
 
 class ResetPasswordBody(BaseModel):

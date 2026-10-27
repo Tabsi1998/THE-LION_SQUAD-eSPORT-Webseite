@@ -46,6 +46,8 @@ export const STATUS_LABELS = {
 export const SETTINGS_SECTIONS = {
   google: { tab: "auth", group: "Verbindungen", label: "Google", superOnly: true },
   zugang: { tab: "auth", group: "System", label: "Zugang", superOnly: true },
+  // Spamschutz öffentlicher Formulare (#2067): Schwellen und Turnstile, wie die übrigen Sicherheitseinstellungen nur Superadmin.
+  spamschutz: { tab: "spam", group: "System", label: "Spamschutz", superOnly: true },
   resend: { tab: "email", group: "Verbindungen", label: "Resend" },
   smtp: { tab: "smtp", group: "Verbindungen", label: "SMTP" },
   newsletter: { tab: "newsletter", group: "E-Mail", label: "Newsletter" },

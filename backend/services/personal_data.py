@@ -244,4 +244,7 @@ NO_PERSON = frozenset({
     "shop_printful_drafts", "shop_printful_confirmations",
     # Zwischenstand des Printful-Katalogs für die Produktsuche (#2069): Namen, Marken, Kategorien - keine Person.
     "shop_printful_catalog",
+    # Spamschutz (#2067): Zähler je Stunde, Formular, Ergebnis und Grund - ohne Inhalt, Adresse oder IP (90 Tage) - und
+    # der Hash eines benutzten Formular-Tokens mit der Zahl der Versuche (läuft mit dem Token ab).
+    "spam_guard_stats", "spam_guard_tokens",
 })

@@ -42,7 +42,7 @@ const REASON_HINT = "Bitte kurz einen Grund angeben – er kommt ins Protokoll."
 // Grund und Knopf gehören zusammen. Der Grund ist optional (Entscheidung Obmann 27.10.2026) - Pflicht (`required`) nur
 // bei kritischen Schritten: Steuer freigeben, „Öffentlich“, Notschalter einschalten, Schlüssel entfernen. Der Knopf
 // bleibt klickbar und sagt, was fehlt - statt still nichts zu tun; fehlt oben etwas, nennt `blockedHint` es.
-function ReasonedButton({ id, label, busy, disabled, blockedHint, onSubmit, required = false, variant = "primary", placeholder }) {
+export function ReasonedButton({ id, label, busy, disabled, blockedHint, onSubmit, required = false, variant = "primary", placeholder }) {
   const [reason, setReason] = useState("");
   const [hint, setHint] = useState("");
   const input = useRef(null);

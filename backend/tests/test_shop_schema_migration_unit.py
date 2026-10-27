@@ -43,7 +43,9 @@ def test_the_migration_is_registered_once_after_the_existing_ones():
     versions = [version for version, _name, _run in migrations.MIGRATIONS]
     assert versions == sorted(versions) and len(versions) == len(set(versions))
     entry = [row for row in migrations.MIGRATIONS if row[1] == "shop_data_model"]
-    assert entry and entry[0][0] == shop_schema.MIGRATION_VERSION == max(versions)
+    assert len(entry) == 1 and entry[0][0] == shop_schema.MIGRATION_VERSION == 13
+    # Danach nur Shop-Migrationen, die auf dem Datenmodell aufbauen (#2069: Motive).
+    assert [name for version, name, _run in migrations.MIGRATIONS if version > 13] == ["shop_motif_variants"]
 
 
 @pytest.mark.asyncio
@@ -56,7 +58,7 @@ async def test_the_dry_run_only_reads_and_names_what_is_missing(db):
 
 @pytest.mark.asyncio
 async def test_there_and_back_again(db):
-    result = await migrations.MIGRATIONS[-1][2](db)
+    result = await next(run for _version, name, run in migrations.MIGRATIONS if name == "shop_data_model")(db)
     assert "shop indexes ready" in result
     report = await shop_schema.plan(db)
     assert report["missing_unique"] == [] and report["missing_plain"] == []

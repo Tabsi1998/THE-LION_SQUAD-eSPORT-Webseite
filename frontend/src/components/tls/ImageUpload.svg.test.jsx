@@ -61,9 +61,9 @@ test("Fotos, Avatare und Banner bleiben ohne SVG", async () => {
 
 test("ein zu großes SVG wird gleich im Browser abgewiesen", async () => {
   render(<ImageUpload value="" onChange={vi.fn()} testId="game-logo" logo />);
-  const big = new File(["x".repeat(1024 * 1024 + 1)], "riesig.svg", { type: "image/svg+xml" });
+  const big = new File(["x".repeat(2 * 1024 * 1024 + 1)], "riesig.svg", { type: "image/svg+xml" });
   await pick("game-logo", big);
-  expect(toastMock.error).toHaveBeenCalledWith(expect.stringContaining("höchstens 1 MB"));
+  expect(toastMock.error).toHaveBeenCalledWith(expect.stringContaining("höchstens 2 MB"));
   expect(apiMock.post).not.toHaveBeenCalled();
 });
 

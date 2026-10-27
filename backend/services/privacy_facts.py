@@ -44,7 +44,7 @@ def platform_facts(branding: dict | None) -> list[dict]:
 
 
 def facts_from(branding: dict | None, auth: dict | None, discord: dict | None, email: dict | None, dolibarr: dict | None, media_scan: dict | None = None,
-               platforms: list[dict] | None = None) -> dict:
+               platforms: list[dict] | None = None, spam_turnstile: bool = False) -> dict:
     """Reine Rechnung aus den Einstellungsdokumenten - ohne Geheimnisse."""
     b = branding or {}
     d = dolibarr or {}
@@ -63,6 +63,8 @@ def facts_from(branding: dict | None, auth: dict | None, discord: dict | None, e
         "hosting": {"provider": str(b.get("hosting_provider") or "").strip(), "country": str(b.get("hosting_country") or "").strip()},
         "media_scan": media_scan_facts(media_scan),
         "platforms": list(platforms or []),
+        # Spamschutz (#2067): Cloudflare Turnstile ist an und gilt für mindestens ein Formular.
+        "spam_turnstile": bool(spam_turnstile),
     }
 
 
@@ -78,4 +80,8 @@ async def privacy_facts(db) -> dict:
     email = await db.settings.find_one({"id": "email"}, {"_id": 0, "provider": 1, "smtp_host": 1, "resend_api_key": 1}) or {}
     dolibarr = await db.settings.find_one({"id": "dolibarr"}, {"_id": 0, "mode": 1, "write_enabled": 1}) or {}
     from services.media_scan import load_settings as load_media_scan
-    return facts_from(branding, await load_auth_settings(db), discord, email, dolibarr, media_scan=await load_media_scan(db), platforms=platform_facts(branding))
+    from services import spam_guard
+    spam = await spam_guard.load(db)
+    turnstile = any(spam_guard.turnstile_applies(spam, form) for form in spam_guard.TURNSTILE_FORMS)
+    return facts_from(branding, await load_auth_settings(db), discord, email, dolibarr, media_scan=await load_media_scan(db), platforms=platform_facts(branding),
+                      spam_turnstile=turnstile)

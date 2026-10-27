@@ -435,11 +435,14 @@ def test_nginx_caps_the_gamertag_routes_small():
     import re
 
     nginx = (pathlib.Path(__file__).resolve().parents[2] / "frontend" / "nginx.conf").read_text(encoding="utf-8")
-    start = nginx.index("location /api/admin/shop/gamertag/ {")
+    start = nginx.index("location ~ ^/api/admin/shop/gamertag(/|$) {")
     block = nginx[start:nginx.index("}", start)]
     limit = re.search(r"client_max_body_size (\d+)k;", block)
     assert limit and int(limit.group(1)) <= 64
     assert "proxy_pass http://backend:8001;" in block
+    # Kein Präfix-Block mit Schrägstrich am Ende vor einer Admin-API: der leitet die Adresse ohne Schrägstrich per 301
+    # um (hinter dem Proxy mit falschem Schema) - die Gamertag-Seite zeigte nur „Network Error“.
+    assert not re.search(r"location /api/[^\s]*/ \{", nginx)
 
 
 # ---------------------------------------------------------------- Bestelldateien sind personenbezogen

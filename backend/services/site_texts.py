@@ -202,6 +202,8 @@ def privacy_page(legal: dict, facts: dict) -> dict:
         recipients.append(f"Verknüpfung {row['label']}: {row.get('operator') or row['label']} (nur beim Verknüpfen, nur Kennung und Name)")
     if f.get("dolibarr"):
         recipients.append("Vereinsverwaltung Dolibarr: eigenes System des Vereins, kein Dritter")
+    if f.get("spam_turnstile"):
+        recipients.append("Spamschutz: Cloudflare, Inc. (Turnstile), nur beim Laden der betroffenen Formulare")
 
     sections = [
         section("controller", "Verantwortlicher", info([
@@ -267,6 +269,20 @@ def privacy_page(legal: dict, facts: dict) -> dict:
         section("forms", "Kontaktformular und Mitgliedsantrag",
                 p("Angaben aus Formularen werden zur Bearbeitung der Anfrage, zur Kommunikation und zur Dokumentation verarbeitet. Bei "
                   "Mitgliedsanträgen werden die Daten zusätzlich zur Prüfung, Aufnahme und Verwaltung der Mitgliedschaft genutzt.")),
+        # Spamschutz (#2067): die eigenen Stufen immer, Turnstile nur, wenn es wirklich an ist.
+        section("spam-protection", "Schutz vor Spam in Formularen",
+                p("Öffentliche Formulare (Kontakt, Registrierung, „Passwort vergessen“) schützen wir auf unserem eigenen Server: mit einem "
+                  "unsichtbaren Feld, einem signierten Zeitstempel und einer automatischen Prüfung des Inhalts auf typische Spam-Merkmale. "
+                  "Wie oft von einer IP-Adresse oder für eine E-Mail-Adresse gesendet wird, zählen wir nur kurz und nur als Prüfwert "
+                  "(Hash), nach spätestens einem Tag ist der Zähler gelöscht. Sicher erkannter Spam wird ohne Inhalt verworfen – "
+                  "gespeichert wird nur ein Zähler mit dem Grund. Nachrichten, die nur verdächtig wirken, landen gekennzeichnet in "
+                  "unserem Posteingang und werden von Menschen geprüft. Grundlage ist unser berechtigtes Interesse an einem sicheren "
+                  "Websitebetrieb (Art. 6 Abs. 1 lit. f DSGVO).", "privacy-spam-guard"),
+                p("Zusätzlich nutzen wir bei einzelnen Formularen **Cloudflare Turnstile** (Cloudflare, Inc., USA; "
+                  "EU-Standardvertragsklauseln). Nur auf diesen Formularen lädt dein Browser ein Skript von Cloudflare; Cloudflare "
+                  "erhält dabei deine IP-Adresse und technische Merkmale des Browsers, um zu prüfen, ob ein Mensch das Formular bedient. "
+                  "Zu Werbezwecken setzt Turnstile keine Cookies. Grundlage ist unser berechtigtes Interesse am Schutz vor "
+                  "automatisierten Anfragen (Art. 6 Abs. 1 lit. f DSGVO).", "privacy-turnstile") if f.get("spam_turnstile") else None),
         section("account", "Konto und Anmeldung",
                 p("Die Anmeldung läuft mit Benutzername und Passwort (Passwörter nur als Hash gespeichert), auf Wunsch mit einem **Passkey** "
                   "(WebAuthn): Der Schlüssel bleibt auf deinem Gerät oder in deinem Passwort-Manager, die Website speichert nur den öffentlichen "

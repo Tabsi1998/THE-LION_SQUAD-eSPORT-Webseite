@@ -27,7 +27,7 @@ from typing import Any
 from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
-from services import shop_catalog, shop_common, shop_config, shop_print_files
+from services import shop_catalog, shop_common, shop_config, shop_motifs, shop_print_files
 from services.shop_common import ShopConflict, ShopError, assert_no_address
 
 BUYER_KINDS = ("member", "public")
@@ -88,6 +88,30 @@ async def _same_order(db, order: dict, request_hash: str) -> tuple[dict, bool]:
     return order, False
 
 
+async def _freeze_legacy_designs(db, product: dict, variant: dict, line: dict, position: int) -> list[dict]:
+    """Produkte ohne Printful-Vorlage mit Platzierungen aus #1707 (Design je Farbe, Position in Zoll): je Platzierung die
+    Fassung des Motivs für die Shirtfarbe (#2069 Teil A) - wie vor den Druckvorlagen."""
+    out = []
+    color = " ".join(str(variant.get("color") or "").split()).casefold()
+    for row in product.get("placements") or []:
+        entry = {"placement": row["key"], "kind": row.get("kind", "design"),
+                 "printful_placement": row.get("printful_placement"), "technique": product.get("technique"),
+                 "position": dict(row.get("position") or {}), "design_key": None, "version": None, "sha256": None}
+        if entry["kind"] == "design":
+            key = next((cell["design_key"] for cell in row.get("designs") or []
+                        if str(cell.get("color") or "").casefold() == color), None)
+            latest = await shop_motifs.file_for_garment(db, key, color=variant.get("color"),
+                                                        color_hex=variant.get("color_code")) if key else None
+            if not latest:
+                raise ShopError(f"Position {position}: für diese Farbe fehlt eine Druckdatei.")
+            entry.update(design_key=latest["design_key"], version=latest["version"], sha256=latest["sha256"],
+                         variant=latest.get("variant") or "dark")
+        elif entry["kind"] == "gamertag" and not line["gamertag"]:
+            raise ShopError(f"Position {position}: für dieses Produkt fehlt der Gamertag.")
+        out.append(entry)
+    return out
+
+
 async def _freeze_designs(db, product: dict, variant: dict, line: dict, position: int, *, user_id: str,
                           order_id: str, item_id: str, mapping: dict | None) -> tuple[list[dict], list[dict]]:
     """Je Druckfläche des Produkts genau eine Druckdatei (#2069): die Grunddatei der Farbe oder - mit Gamertag - eine
@@ -96,12 +120,16 @@ async def _freeze_designs(db, product: dict, variant: dict, line: dict, position
     #1718) genau, was beim Bestellen galt."""
     if not product.get("placements"):
         return [], []
+    if not product.get("printful") and not all(shop_print_files.is_layout(row) for row in product["placements"]):
+        return [], await _freeze_legacy_designs(db, product, variant, line, position)
     files, sources = await shop_print_files.freeze_line(
         db, product, variant, gamertag=line["gamertag"], position=position, user_id=user_id, order_id=order_id,
         item_id=item_id, printful_variant_id=(mapping or {}).get("printful_variant_id"))
+    # Die Fassung des Motivs (hell oder dunkel) samt Version - so bleibt ihre Adresse für die Bestellung öffentlich.
     designs = [{"placement": source["placement"], "kind": "design", "design_key": source.get("design_key"),
-                "version": source.get("version"), "sha256": source.get("sha256")}
-               for source in sources if source.get("source") == "design"]
+                "variant": source.get("variant") or "dark", "version": source.get("version"),
+                "sha256": source.get("sha256")}
+               for source in sources if source.get("source") in ("motif", "design")]
     return files, designs
 
 
@@ -124,7 +152,9 @@ async def _freeze_line(db, line: dict, position: int, buyer_kind: str, config: d
     if unit < config["min_price_cents"]:
         raise ShopError(f"Position {position}: dieser Artikel ist nicht bestellbar (Preis unter dem Mindestpreis).")
     if not product.get("placements") and product.get("design_key"):
-        latest = await shop_catalog.latest_design(db, product["design_key"])
+        # Auch hier die Fassung für die Shirtfarbe (#2069 Teil A) - nicht immer die Hauptdatei.
+        latest = await shop_motifs.file_for_garment(db, product["design_key"], color=variant.get("color"),
+                                                    color_hex=variant.get("color_code"))
         if not latest:
             raise ShopError(f"Position {position}: zur Druckdatei gibt es noch keine Fassung.")
         design = {"design_key": latest["design_key"], "version": latest["version"], "sha256": latest["sha256"]}

@@ -427,7 +427,8 @@ async def add_design_version(db, design_key: str, *, file_ref: str, sha256: str,
         raise ShopError(f"Unbekannte Felder der Druckdatei: {', '.join(unknown)}.")
     ref = _text(file_ref, "Datei", 300, required=True)
     for _attempt in range(3):
-        latest = await latest_design(db, design_key)
+        # Die Nummer zählt über alle Fassungen eines Motivs - auch die für helle Shirts (#2069).
+        latest = await _newest_design_row(db, design_key)
         design = {**extra, "id": new_id(), "design_key": design_key,
                   "version": (latest or {}).get("version", 0) + 1, "file_ref": ref, "sha256": sha256,
                   "placement": placement, "created_at": now_utc().isoformat(), "created_by": actor_id}
@@ -437,14 +438,23 @@ async def add_design_version(db, design_key: str, *, file_ref: str, sha256: str,
             continue  # gleichzeitig eine Fassung angelegt - die nächste Nummer nehmen
         await record_admin_action(db, "shop.design.add", actor_id=actor_id, target_id=design_key, reason=reason,
                                   data={"version": design["version"], "sha256": sha256, "placement": placement,
-                                        **{name: extra[name] for name in ("width_px", "height_px", "dpi")
+                                        **{name: extra[name] for name in ("width_px", "height_px", "dpi", "variant",
+                                                                          "origin", "source_format")
                                            if name in extra}})
         return design
     raise ShopConflict("Die Druckdatei wurde gerade mehrfach geändert - bitte erneut versuchen.")
 
 
-async def latest_design(db, design_key: str) -> dict | None:
+async def _newest_design_row(db, design_key: str) -> dict | None:
     rows = await db.shop_designs.find({"design_key": design_key}, {"_id": 0}).sort("version", -1).to_list(1)
+    return rows[0] if rows else None
+
+
+async def latest_design(db, design_key: str) -> dict | None:
+    """Die neueste Hauptdatei („für dunkle Shirts“) eines Designs bzw. Motivs. Fassungen für helle Shirts (#2069,
+    ``variant = "light"``) zählen hier nicht - die wählt ``shop_motifs.file_for_garment`` je Shirtfarbe."""
+    rows = await db.shop_designs.find({"design_key": design_key, "variant": {"$ne": "light"}},
+                                      {"_id": 0}).sort("version", -1).to_list(1)
     return rows[0] if rows else None
 
 

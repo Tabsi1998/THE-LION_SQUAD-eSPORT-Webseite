@@ -86,11 +86,22 @@ Migration 5 für #1029). Sie nimmt nur Konten im vollständigen Löschzustand: Z
 | Upload-Protokoll mit IP-Adresse (`upload_events`) | 60 Tage (`UPLOAD_EVENT_RETENTION_DAYS`), läuft auch nach einer Kontolöschung ab | Missbrauch und Fehler bei Uploads nachvollziehen |
 | Fehlerprotokoll der App (`mobile_client_logs`) | 90 Tage, bei der Kontolöschung sofort | Fehlersuche |
 | Anmeldeversuche, Zähler gegen zu viele Anfragen | eine Stunde bzw. höchstens ein Tag | Schutz vor Durchprobieren |
+| Spamschutz öffentlicher Formulare (#2067): Zähler je IP und E-Mail nur als Schlüssel-Hash (`rate_limits`), benutzte Formular-Token als Hash (`spam_guard_tokens`), Zähler je Stunde, Formular, Ergebnis und Grund ohne Inhalt, Adresse oder IP (`spam_guard_stats`) | höchstens ein Tag; Token bis eine Stunde nach Ablauf; Zähler 90 Tage | Schutz vor Spam; sicher erkannter Spam wird ohne Inhalt verworfen, verdächtige Kontaktanfragen bleiben als „Spam“ in der Inbox |
 | Entfernte Bilder in der Quarantäne der Bildprüfung | 90 Tage, einstellbar | Nachprüfung einer Entscheidung |
 | Fotos zu Ergebnismeldungen | 30 Tage nach dem Anhängen | Nachweis bei Einsprüchen |
 | Nach einer Kontolöschung: Einwilligungsnachweise (Website und Mitgliederverwaltung), Moderationsfälle (Meldungen von und über die Person, Verwarnungen, Sperren), Ergebnismeldungen, angemeldet geschriebene Kontaktanfragen als Vorgang | drei Jahre ab der Löschung (Entscheidung des Vereins zu #1029). Die Löschung setzt `erase_after`, der tägliche Job `ops_retention` löscht Abgelaufenes (`purge_expired_records`). Für früher gelöschte Konten setzt Migration 5 die Frist ab dem damaligen `anonymized_at`. Einträge aktiver Konten laufen nicht ab | Nachweis |
 | Ergebnisse und Tabellen | ohne Frist | sportliche Integrität, Teil des Turnierverlaufs |
 | Anzeigenamen von Fast-Lap-Gästen ohne Konto (`f1_guests`, #1585) | 90 Tage nach dem Anlegen (Entscheidung des Vereins, 14.10.2026), dann „Gast <Nummer>“; ein mit einem Konto verknüpfter Gast bleibt als Nachweis mit der Kennung des Kontos stehen (Job `ops_retention`, `services/fastlap_guests.py`); die Zeiten bleiben ohne Namen | Gäste haben kein Konto, also weder Auskunft noch Löschung darüber – die Frist ersetzt sie. Vorher löscht die Leitung einen Namen auf Wunsch durch Umbenennen. Der Name geht nicht an Discord |
+
+**Restlücke Spamschutz: Registrierung aus der App (#2067).** Die LionsAPP schickt kein Formular-Token, und eine echte
+Bescheinigung, dass eine Anfrage aus der App kommt, gibt es nicht. `POST /api/auth/mobile/register` ist darum nur
+begrenzt, nicht verschlossen: höchstens 3 Registrierungen je IP und Stunde, höchstens 30 je Stunde für alle zusammen
+(beides unter Einstellungen → Spamschutz einstellbar), dazu die „Grenze je Netz“ aus „Zugang“; der Benutzername wird
+wie auf der Website bewertet, der Betriebs-Check „Spamschutz“ meldet Spitzen bei App-Registrierungen. Was ein Bot dort
+erreicht: ein Konto mit **unbestätigter** E-Mail-Adresse. Mit Passwort kann sich damit niemand anmelden – Website und
+App lehnen das Login ohne bestätigte Adresse ab –, ohne Anmeldung gibt es weder Chat noch Profil noch Turnier-Anmeldung.
+Es bleiben zwei Folgen: Benutzername und Adresse sind belegt, und an die angegebene Adresse geht eine Bestätigungsmail
+(darum die Limits). Unbestätigte Konten werden derzeit nicht automatisch gelöscht.
 
 Betriebsdaten ohne Personenbezug (`ops_errors`, `ops_slow_requests`, `ops_vitals`: nur „angemeldet“ oder „anonym“)
 laufen nach 30 Tagen ab. Die Ereignis-Kennungen signierter Webhooks der Mitgliederverwaltung (`dolibarr_webhook_events`:

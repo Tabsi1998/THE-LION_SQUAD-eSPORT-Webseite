@@ -43,7 +43,10 @@ MODEL_FIELDS: dict[str, tuple[str, ...]] = {
                      # Druckdatei (#1708, services/shop_designs.py): Maße, Prüfung und öffentlicher Zufallsschlüssel
                      "public_id", "public_disabled_at", "content_type", "size_bytes", "width_px", "height_px",
                      "has_alpha", "source_format", "dpi", "print_width_in", "print_height_in", "min_dpi",
-                     "area_width_in", "area_height_in", "origin"),
+                     "area_width_in", "area_height_in", "origin",
+                     # Motive (#2069, services/shop_motifs.py): Variante für dunkle bzw. helle Shirts, bereinigtes
+                     # SVG (nie öffentlich), erkannte Farben, viewBox, Herkunft einer umgefärbten Fassung
+                     "variant", "svg_ref", "colors", "view_box", "derived_from", "recolor"),
     # Gamertag-Druckdateien (#1711, services/shop_gamertag.py): Herkunft „gamertag“, ohne den Namen als Text - aber
     # das PNG einer Bestelldatei zeigt ihn: die Zeile gehört dann zu Konto, Bestellung und Position.
     "shop_gamertag_files": ("id", "origin", "purpose", "sha256", "file_ref", "public_id", "content_type", "size_bytes",
@@ -64,7 +67,9 @@ MODEL_FIELDS: dict[str, tuple[str, ...]] = {
                          "order_id", "order_item_id", "created_at", "created_by", "public_disabled_at",
                          "erase_pending_at", "file_deleted_at"),
     "shop_design_profiles": ("design_key", "title", "placement", "garment_colors", "note", "version", "created_at",
-                             "created_by", "updated_at", "updated_by"),
+                             "created_by", "updated_at", "updated_by",
+                             # Motive (#2069): Hell-Variante automatisch oder eigene Datei, Ausnahmen je Shirtfarbe
+                             "light_mode", "light_auto", "color_variants"),
     "shop_design_colors": ("placement", "color_key", "color", "design_key", "claimed_at"),
     "shop_printful_variants": ("provider", "variant_id", "printful_variant_id", "printful_product_id", "updated_at",
                                "updated_by",
@@ -191,6 +196,8 @@ ADMIN_ACTIONS: dict[str, str] = {
     "shop.design.add": "Druckdatei-Fassung angelegt",
     "shop.design.profile": "Design angelegt oder geändert (Titel, Shirtfarben)",
     "shop.design.placement": "Druckbereich einer Platzierung geändert",
+    "shop.design.light": "Motiv: Fassung für helle Shirts umgestellt (automatisch oder eigene Datei)",
+    "shop.motif.settings": "Motive: Ersatzfarbe bzw. Helligkeits-Schwelle geändert",
     "shop.gamertag.rules": "Regeln der Gamertag-Druckdatei geändert",
     "shop.gamertag.file": "Gamertag-Testdatei erzeugt",
     "shop.printful_variant.set": "Printful-Variante zugeordnet",
