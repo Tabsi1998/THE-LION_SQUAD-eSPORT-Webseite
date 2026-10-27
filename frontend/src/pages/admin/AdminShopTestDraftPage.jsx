@@ -191,6 +191,39 @@ function formatValue(label, value) {
   return String(value);
 }
 
+// Nach einem unklaren oder hängenden Senden (Zeitüberschreitung, Abbruch): derselbe Rumpf noch einmal - der Server
+// findet einen schon angelegten Entwurf über die external_id, statt einen zweiten anzulegen.
+function Resend({ draft, onUpdated, testId }) {
+  const [busy, setBusy] = useState(false);
+  const resend = async () => {
+    setBusy(true);
+    try {
+      const { data } = await api.post(`${BASE}/${draft.id}/send`, { idempotency_key: newKey() });
+      toast.success(`Nachgesehen: Entwurf bei Printful (Auftrag ${data.printful_order_id}).`);
+      onUpdated(data);
+    } catch (failure) {
+      toast.error(formatRequestError(failure, "Erneut senden hat nicht geklappt."));
+      try {
+        const { data } = await api.get(`${BASE}/${draft.id}`);
+        onUpdated(data);
+      } catch {
+        // Der Stand lässt sich gerade nicht lesen - die Liste lädt beim nächsten Mal neu.
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="space-y-1">
+      <p className="text-xs text-warn">Ob Printful den Entwurf angelegt hat, ist offen. „Erneut senden / nachsehen“ schickt dieselben Daten; einen schon angelegten Entwurf findet Printful wieder, statt einen zweiten anzulegen.</p>
+      <button type="button" onClick={resend} disabled={busy} data-testid={`${testId}-resend`}
+        className="tls-btn tls-btn--secondary min-h-10 px-3 text-xs font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-1.5 disabled:opacity-40">
+        <Send className="w-3.5 h-3.5" aria-hidden="true" /> {busy ? "Sieht nach …" : "Erneut senden / nachsehen"}
+      </button>
+    </div>
+  );
+}
+
 function Result({ draft, onDeleted, testId }) {
   return (
     <div className="space-y-3" data-testid={testId}>
@@ -212,7 +245,8 @@ function Result({ draft, onDeleted, testId }) {
         </p>
       )}
       {draft.deviations && <Deviations draft={draft} />}
-      {draft.state === "sent" && <ConfirmDelete draft={draft} onDeleted={onDeleted} testId={testId} />}
+      {draft.actions?.resend && <Resend draft={draft} onUpdated={onDeleted} testId={testId} />}
+      {(draft.actions ? draft.actions.delete : draft.state === "sent") && <ConfirmDelete draft={draft} onDeleted={onDeleted} testId={testId} />}
     </div>
   );
 }
@@ -290,6 +324,17 @@ export default function AdminShopTestDraftPage() {
       load();
     } catch (failure) {
       toast.error(formatRequestError(failure, "Senden hat nicht geklappt."));
+      // Den Stand neu holen: wieder Vorschau mit Ursache (last_error) - oder „Ausgang unklar“, dann mit „Erneut senden“.
+      try {
+        const { data: current } = await api.get(`${BASE}/${preview.id}`);
+        if (current.state === "preview") setPreview(current);
+        else {
+          setResult(current);
+          load();
+        }
+      } catch {
+        // Nicht lesbar: die Vorschau bleibt stehen, der Fehler steht im Hinweis oben.
+      }
     } finally {
       setBusy("");
     }
@@ -431,7 +476,7 @@ export default function AdminShopTestDraftPage() {
               </p>
               <p className="text-sm text-white/55" data-testid="shop-test-draft-mockup">Mockup: {preview.mockup.detail}</p>
               {preview.warnings.map((warning) => <p key={warning} className="text-xs text-warn" data-testid="shop-test-draft-warning">{warning}</p>)}
-              {preview.last_error && <p className="text-xs text-warn">Letzter Versuch: {preview.last_error.text}{preview.last_error.provider_detail ? ` (Printful: ${preview.last_error.provider_detail})` : ""}</p>}
+              {preview.last_error && <p className="text-xs text-warn" data-testid="shop-test-draft-preview-error">Letzter Versuch: {preview.last_error.text}{preview.last_error.provider_detail ? ` (Printful: ${preview.last_error.provider_detail})` : ""}</p>}
               <button type="button" onClick={send} disabled={!!busy || !data.access.allowed} data-testid="shop-test-draft-send"
                 className="tls-btn tls-btn--primary min-h-10 px-4 text-xs font-bold uppercase tracking-wider rounded-sm disabled:opacity-40 inline-flex items-center gap-1.5">
                 <Send className="w-4 h-4" aria-hidden="true" /> {busy === "send" ? "Sendet …" : "Als Entwurf an Printful senden"}

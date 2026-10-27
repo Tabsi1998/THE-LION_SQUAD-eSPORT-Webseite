@@ -161,6 +161,55 @@ test("Ablehnung des Servers steht verständlich da, ohne Stufe und Schlüssel is
   unmount();
 });
 
+test("nach abgelehntem Senden holt die Seite den Stand neu und zeigt die Ursache an der Vorschau", async () => {
+  apiMock.post.mockImplementation(async (url) => {
+    if (url.endsWith("/preview")) return { data: PREVIEW };
+    throw { response: { data: { detail: "Printful: Der Anbieter lehnt die Daten ab (400). Einzelheiten stehen im Protokoll des Testentwurfs." } } };
+  });
+  show();
+  await fillUntilPreview();
+  await userEvent.click(screen.getByTestId("shop-test-draft-preview-button"));
+  await screen.findByTestId("shop-test-draft-send");
+  apiMock.get.mockResolvedValueOnce({ data: { ...PREVIEW, last_error: { reason: "bad_request", text: "Der Anbieter lehnt die Daten ab", provider_detail: "Variant 4014 not found" } } });
+  await userEvent.click(screen.getByTestId("shop-test-draft-send"));
+  expect(await screen.findByTestId("shop-test-draft-preview-error")).toHaveTextContent("Der Anbieter lehnt die Daten ab (Printful: Variant 4014 not found)");
+  expect(apiMock.get).toHaveBeenCalledWith("/admin/shop/test-drafts/td-1");
+  expect(toastMock.error).toHaveBeenCalledWith(expect.stringContaining("lehnt die Daten ab"));
+});
+
+test("unklarer Ausgang: Ergebnis mit „Erneut senden / nachsehen“ - derselbe Entwurf, kein Löschen davor", async () => {
+  const UNCLEAR = { ...PREVIEW, state: "unclear", state_label: "Ausgang unklar - erneut senden", printful_order_id: null,
+    last_error: { reason: "timeout", text: "Der Anbieter antwortet nicht (Zeitüberschreitung)" }, actions: { resend: true, delete: false } };
+  let sends = 0;
+  apiMock.post.mockImplementation(async (url) => {
+    if (url.endsWith("/preview")) return { data: PREVIEW };
+    sends += 1;
+    if (sends === 1) throw { response: { status: 503, data: { detail: "Printful: Der Anbieter antwortet nicht (Zeitüberschreitung). Bitte gleich noch einmal versuchen." } } };
+    return { data: { ...SENT, actions: { resend: false, delete: true } } };
+  });
+  show();
+  await fillUntilPreview();
+  await userEvent.click(screen.getByTestId("shop-test-draft-preview-button"));
+  apiMock.get.mockResolvedValueOnce({ data: UNCLEAR });
+  await userEvent.click(await screen.findByTestId("shop-test-draft-send"));
+  const result = await screen.findByTestId("shop-test-draft-result");
+  expect(result).toHaveTextContent("Ausgang unklar");
+  expect(within(result).getByTestId("shop-test-draft-result-last-error")).toHaveTextContent("Zeitüberschreitung");
+  expect(within(result).queryByTestId("shop-test-draft-result-delete")).toBeNull();
+  await userEvent.click(within(result).getByTestId("shop-test-draft-result-resend"));
+  await waitFor(() => expect(within(screen.getByTestId("shop-test-draft-result")).getByTestId("shop-test-draft-result-order-id")).toHaveTextContent("9001"));
+  const keys = apiMock.post.mock.calls.filter(([path]) => path.endsWith("/send")).map(([, body]) => body.idempotency_key);
+  expect(keys).toHaveLength(2);
+  expect(screen.getByTestId("shop-test-draft-result-delete")).toBeInTheDocument();
+});
+
+test("die Shop-Reiter wischen in ihrer Leiste, ohne Abstand unter der Unterstreichung", async () => {
+  show();
+  const tabs = await screen.findByTestId("shop-tabs");
+  expect(tabs).toHaveClass("tls-swipe", "pb-0");
+  expect(screen.getByTestId("shop-tab-testentwurf")).toHaveAttribute("aria-current", "page");
+});
+
 test("eine unvollständige Vereinsadresse zeigt den Hinweis und sperrt die Vorschau", async () => {
   apiMock.get.mockResolvedValue({ data: overview({ address: { address: { ...ADDRESS, street: "" }, complete: false, hint: "Die Vereinsadresse ist nicht vollständig." } }) });
   show();
