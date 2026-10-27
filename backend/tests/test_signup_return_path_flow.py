@@ -12,11 +12,14 @@ import pytest_asyncio
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
+from spam_forms import form_fields  # noqa: E402
 from services.return_path import safe_next_path  # noqa: E402
 
 
 @pytest_asyncio.fixture
 async def flow(monkeypatch):
+    # Formular-Token und Zähler des Spamschutzes (#2067) brauchen das Server-Geheimnis.
+    monkeypatch.setenv("JWT_SECRET", "spam-guard-aware-tests-secret-with-32-characters")
     instance, shutdown = make_flow()
     from routes import auth_routes
 
@@ -31,7 +34,8 @@ async def flow(monkeypatch):
 
 
 def registration(name: str, next_path=None) -> dict:
-    body = {"username": name, "email": f"{name}@lionsquad-test.at", "password": "testtest-42", "accept_privacy": True, "accept_terms": True}
+    body = {"username": name, "email": f"{name}@lionsquad-test.at", "password": "testtest-42", "accept_privacy": True, "accept_terms": True,
+            **form_fields("register")}
     if next_path is not None:
         body["next"] = next_path
     return body

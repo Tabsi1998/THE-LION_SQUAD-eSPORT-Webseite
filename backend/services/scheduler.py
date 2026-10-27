@@ -8,6 +8,7 @@ Runs recurring jobs in the FastAPI process:
   - prize_expiry every 60 minutes
   - f1_prize_reminders every 5 minutes
   - birthday_greetings every 6 hours
+  - spam_digest daily 08:15 Vienna (#2067)
   - game_server_sync every 5 minutes
   - mobile_push_receipts every 5 minutes
 
@@ -277,6 +278,18 @@ async def _safe_birthday_greetings():
             logger.info("[scheduler] birthday_greetings completed")
     except Exception as exc:
         _log_task_failure("birthday_greetings", exc)
+
+
+async def _safe_spam_digest():
+    """Spamschutz (#2067): einmal am Tag „N Nachrichten im Spam-Ordner – bitte kurz prüfen“ - nur bei N > 0."""
+    try:
+        from database import get_db
+        from services.spam_guard import queue_spam_digest
+        res = await queue_spam_digest(get_db())
+        if res.get("queued"):
+            logger.info(f"[scheduler] spam_digest {res}")
+    except Exception as exc:
+        _log_task_failure("spam_digest", exc)
 
 
 async def _safe_club_birthday():
@@ -1093,6 +1106,8 @@ def start_scheduler() -> AsyncIOScheduler:
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("club_birthday", _safe_club_birthday), IntervalTrigger(minutes=10), id="club_birthday",
                   max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("spam_digest", _safe_spam_digest), CronTrigger(hour=8, minute=15, timezone="Europe/Vienna"),
+                  id="spam_digest", max_instances=1, coalesce=True)
     sched.add_job(_single_replica("steam_presence", _safe_steam_presence), IntervalTrigger(seconds=120), id="steam_presence",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("twitch_clips", _safe_twitch_clips, lease_seconds=300.0), IntervalTrigger(hours=1), id="twitch_clips",

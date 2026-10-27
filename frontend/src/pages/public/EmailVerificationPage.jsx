@@ -5,6 +5,8 @@ import { Logo } from "@/components/tls/Logo";
 import { AuthFormAlert, AuthTextField } from "@/components/tls/AuthFormFields";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
+import { useSpamGuard } from "@/hooks/useSpamGuard";
+import { SpamGuardFields } from "@/components/tls/SpamGuardFields";
 import { DEFAULT_RETURN_PATH, nextQuery, safeNextPath } from "@/lib/returnPath";
 
 export default function EmailVerificationPage() {
@@ -12,6 +14,8 @@ export default function EmailVerificationPage() {
   const [params] = useSearchParams();
   const location = useLocation();
   const { submitting, submitOnce } = useSubmissionGuard();
+  // Spamschutz (#2067) für „Bestätigungslink anfordern“: Formular-Token und unsichtbares Feld.
+  const guard = useSpamGuard("resend_verification");
   const token = params.get("token") || "";
   const [email, setEmail] = useState(location.state?.email || params.get("email") || "");
   const [status, setStatus] = useState(token ? "checking" : params.get("sent") === "1" ? "sent" : "idle");
@@ -38,8 +42,9 @@ export default function EmailVerificationPage() {
   const resend = async (event) => {
     event.preventDefault();
     if (!email.trim()) return;
-    const attempt = await submitOnce(() => api.post("/auth/resend-verification", { email: email.trim() }));
+    const attempt = await submitOnce(async () => api.post("/auth/resend-verification", { email: email.trim(), ...(await guard.prepare()) }));
     if (!attempt.started) return;
+    guard.afterAttempt();
     if (!attempt.error) {
       setStatus("sent");
       setMessage("Falls eine Bestätigung aussteht, wurde der Versand angefordert. Bitte prüfe in einigen Minuten dein Postfach und den Spam-Ordner.");
@@ -65,6 +70,7 @@ export default function EmailVerificationPage() {
         {status !== "success" && (
           <form onSubmit={resend} className="mt-6 space-y-3">
             <AuthTextField id="verify-email" label="E-Mail" type="email" value={email} onChange={setEmail} autoComplete="email" required />
+            <SpamGuardFields guard={guard} idPrefix="verify-resend" />
             <button type="submit" disabled={submitting || status === "checking"} className="tls-btn tls-btn--secondary w-full py-3 font-bold uppercase rounded-sm disabled:opacity-50" data-testid="verify-resend-submit">
               {submitting ? "Versand wird angefordert …" : "Bestätigungslink anfordern"}
             </button>

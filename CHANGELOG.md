@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.42.0 (27.10.2026)
+
+### Neu
+
+* Betrieb: Check „Spamschutz“ meldet Spitzen und Turnstile-Ausfälle (#2067)
+* Einstellungen → Spamschutz: Schwellen, Limits und optional Cloudflare Turnstile (#2067)
+* Kontakt-Inbox: verdächtige Nachrichten im Spam-Ordner ohne Mail, „Kein Spam“ holt sie zurück, tägliche Sammel-Mail (#2067)
+* Spamschutz für Kontakt und Registrierung - unsichtbares Lockfeld, Formular-Token und Inhaltsprüfung, ohne externen Dienst (#2067)
+
+### Fehlerbehebungen
+
+* Mail-Warteschlange verschickt Mails mit gleichem Schlüssel garantiert nur einmal (#2067)
+
+## 1.41.0 (27.10.2026)
+
+### Neu
+
+* Vereinsshop: Mindestpreis einstellbar, der Produkt-Aufschlag ersetzt den allgemeinen (#1707)
+* Vereinsshop: Produktverwaltung in 5 Schritten - Printful-Produkt, Farben und Größen, Designs je Platzierung, Selbstkostenpreis, Prüfen und Veröffentlichen (#1707)
+* Vereinsshop: täglicher Abgleich mit Printful - nicht lieferbare oder preislose Varianten gesperrt, Preisänderungen gemeldet (#1709)
+
 ## 1.40.0 (27.10.2026)
 
 ### Neu

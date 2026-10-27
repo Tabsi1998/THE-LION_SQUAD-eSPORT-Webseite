@@ -35,7 +35,8 @@ test("existing unverified account has a recovery path without re-registration", 
   let sends = 0;
   await page.route("**/api/auth/resend-verification", async (route) => {
     sends += 1;
-    expect(route.request().postDataJSON()).toEqual({ email: "existing@example.test" });
+    // Seit dem Spamschutz (#2067) gehen Formular-Token und leeres Lockfeld mit; die Adresse bleibt dieselbe.
+    expect(route.request().postDataJSON()).toMatchObject({ email: "existing@example.test", hp_fax: "" });
     await new Promise((resolve) => setTimeout(resolve, 150));
     await route.fulfill({ contentType: "application/json", body: '{"ok":true}' });
   });

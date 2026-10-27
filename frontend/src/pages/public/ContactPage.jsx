@@ -8,7 +8,9 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { usePublicSiteSettings } from "@/hooks/usePublicSiteSettings";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
+import { useSpamGuard } from "@/hooks/useSpamGuard";
 import { AuthFormAlert } from "@/components/tls/AuthFormFields";
+import { SpamGuardFields } from "@/components/tls/SpamGuardFields";
 import { toast } from "sonner";
 import { Mail, MessageSquare, MapPin, Send, Check } from "lucide-react";
 
@@ -27,6 +29,8 @@ export default function ContactPage() {
   const [topics, setTopics] = useState([]);
   const [done, setDone] = useState(false);
   const { submitting, submitOnce } = useSubmissionGuard();
+  // Spamschutz (#2067): Formular-Token, unsichtbares Feld, ggf. Turnstile.
+  const guard = useSpamGuard("contact");
   const [fieldErrors, setFieldErrors] = useState({});
   const [submitError, setSubmitError] = useState("");
   const [form, setForm] = useState(() => ({
@@ -76,14 +80,16 @@ export default function ContactPage() {
       message: form.message.trim(),
     };
     setSubmitError("");
-    const attempt = await submitOnce(() => api.post("/contact/submit", payload));
+    const attempt = await submitOnce(async () => api.post("/contact/submit", { ...payload, ...(await guard.prepare()) }));
     if (!attempt.started) return;
+    guard.afterAttempt(attempt.error);
     if (!attempt.error) {
       setDone(true);
+      guard.reset();
       toast.success("Nachricht gesendet — Bestätigungsmail folgt.");
     } else {
       const err = attempt.error;
-      const message = formatApiError(err.response?.data?.detail) || "Fehler beim Versand.";
+      const message = guard.handleError(err) || formatApiError(err.response?.data?.detail) || "Fehler beim Versand.";
       setSubmitError(message);
       toast.error(message);
     }
@@ -159,6 +165,7 @@ export default function ContactPage() {
                 <input id="contact-privacy" type="checkbox" required checked={form.accept_privacy} onChange={(e) => updateField("accept_privacy", e.target.checked)} data-testid="contact-privacy" aria-invalid={!!fieldErrors.accept_privacy} aria-describedby={fieldErrors.accept_privacy ? "contact-privacy-error" : undefined} className="mt-1 accent-[#29B6E8]" />
                 <span>Ich habe die <Link to="/privacy" className="text-[#29B6E8] hover:underline">Datenschutzhinweise</Link> gelesen und stimme der Speicherung meiner Angaben zur Bearbeitung der Anfrage zu.{fieldErrors.accept_privacy && <span id="contact-privacy-error" role="alert" className="block mt-1 text-xs text-[#FF8A80]">{fieldErrors.accept_privacy}</span>}</span>
               </label>
+              <SpamGuardFields guard={guard} idPrefix="contact" />
               {submitError && <AuthFormAlert id="contact-submit-error">{submitError}</AuthFormAlert>}
               <button type="submit" disabled={submitting} data-testid="contact-submit" className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-6 py-3 font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">
                 <Send className="w-4 h-4" /> {submitting ? "Sende…" : "Nachricht senden"}
