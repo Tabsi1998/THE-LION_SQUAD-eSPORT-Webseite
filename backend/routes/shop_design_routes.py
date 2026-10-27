@@ -111,13 +111,6 @@ async def upload_design(file: UploadFile = File(...), design_key: str = Form(...
             **await shop_motifs.admin_view(db)}
 
 
-def _pair_refused(exc: Exception):
-    """Paar-Prüfung Rot (400) bzw. Gelb ohne Bestätigung (409): die Meldung und der Prüfbericht für die Ampel."""
-    if isinstance(exc, shop_motifs.PairRefused):
-        return JSONResponse({"detail": str(exc), "pair": exc.report}, status_code=exc.status)
-    raise _refused(exc) from exc
-
-
 async def _pair_files(file_dark: UploadFile, file_light: UploadFile) -> tuple[tuple, tuple]:
     out = []
     for upload in (file_dark, file_light):
@@ -139,7 +132,7 @@ async def check_design_pair(request: Request, file_dark: UploadFile = File(...),
         return await shop_motifs.check_pair(get_db(), dark_file=dark, light_file=light, design_key=design_key or None,
                                             placement=placement or None, auto_assign=auto_assign)
     except (ShopError, LookupError) as exc:
-        return _pair_refused(exc)
+        raise _refused(exc) from exc
 
 
 @router.post("/designs/upload-pair")
@@ -161,7 +154,11 @@ async def upload_design_pair(request: Request, file_dark: UploadFile = File(...)
                                               placement=placement or None, garment_colors=garment_colors,
                                               auto_assign=auto_assign, confirm_warnings=confirm_warnings)
     except (ShopError, LookupError) as exc:
-        return _pair_refused(exc)
+        raise _refused(exc) from exc
+    refusal = saved.get("refused")
+    if refusal:
+        # Rot (400) bzw. Gelb ohne Bestätigung (409): Meldung aus dem Prüfbericht, dazu der Bericht für die Nachfrage.
+        return JSONResponse({"detail": refusal["detail"], "pair": refusal["pair"]}, status_code=refusal["status"])
     return {"uploaded_pair": {"design_key": saved["dark"]["design_key"], "dark_version": saved["dark"]["version"],
                               "light_version": saved["light"]["version"], "warnings": saved["warnings"],
                               "pair": saved["pair"]},

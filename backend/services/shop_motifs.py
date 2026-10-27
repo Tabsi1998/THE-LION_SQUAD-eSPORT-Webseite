@@ -609,15 +609,6 @@ MARK_COLOR = (255, 0, 170, 255)  # Markierung in der Vorschau: grelles Magenta, 
 SIDE_LABELS = {"dark": "Datei für dunkle Shirts", "light": "Datei für helle Shirts"}
 
 
-class PairRefused(ShopError):
-    """Paar abgelehnt (Rot) bzw. mit Warnungen ohne Bestätigung (Gelb, 409) - mit dem Prüfbericht."""
-
-    def __init__(self, message: str, report: dict, status: int):
-        super().__init__(message)
-        self.status = status
-        self.report = report
-
-
 def _de(value: float, digits: int = 2) -> str:
     return f"{value:.{digits}f}".replace(".", ",")
 
@@ -1047,8 +1038,9 @@ async def upload_pair(db, *, design_key: Any, dark_file: tuple, light_file: tupl
                       auto_assign: bool = False, confirm_warnings: bool = False) -> dict:
     """Beide Fassungen eines Motivs in einem Schritt (#2084): prüfen, Paar-Prüfung, dann **beide oder keine**.
 
-    - Rot (Format, Seitenverhältnis, Druckbereich): nichts wird gespeichert (``PairRefused``, 400).
-    - Gelb (Umrisse, Kontrast): gespeichert nur mit ``confirm_warnings`` - sonst ``PairRefused`` mit 409 und dem
+    - Rot (Format, Seitenverhältnis, Druckbereich): nichts wird gespeichert - Ergebnis ``{"refused": {"status": 400,
+      "detail": Meldung, "pair": Bericht}}`` (keine Ausnahme: die Route baut die Antwort aus Bericht und festen Texten).
+    - Gelb (Umrisse, Kontrast): gespeichert nur mit ``confirm_warnings`` - sonst ``refused`` mit 409 und dem
       Prüfbericht, damit die Oberfläche nachfragen kann.
     - Beide Versionen entstehen zuerst als ``pending`` - unsichtbar für Bestellungen, Ansicht und „neueste Fassung“.
       Erst wenn beide liegen, gilt ``light_mode`` „file“ und beide werden zusammen freigeschaltet. Scheitert etwas,
@@ -1079,9 +1071,9 @@ async def _upload_pair_locked(db, *, design_key: str, dark_file: tuple, light_fi
               "assign_uncertain": uncertain}
     report["summary"] = _summary(report)
     if report["level"] == "red":
-        raise PairRefused(report["summary"], report, 400)
+        return {"refused": {"status": 400, "detail": report["summary"], "pair": report}}
     if report["level"] == "yellow" and not confirm_warnings:
-        raise PairRefused("Bitte bestätigen: " + report["summary"], report, 409)
+        return {"refused": {"status": 409, "detail": "Bitte bestätigen: " + report["summary"], "pair": report}}
 
     created = []
 
