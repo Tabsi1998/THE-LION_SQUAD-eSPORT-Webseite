@@ -95,9 +95,12 @@ def trusted_http_hosts(environ: Mapping[str, str] | None = None) -> tuple[str, .
         raise RuntimeError("TRUSTED_HOSTS='*' is not allowed in production.")
 
     hosts = list(configured)
+    # Der eigene Upload-Host (PUBLIC_UPLOAD_BACKEND_URL, z. B. upload.lionsquad.at an Cloudflare vorbei) zeigt auf
+    # dasselbe Backend - ohne ihn hier lehnte die Host-Prüfung jeden Upload mit 400 „Invalid host header“ ab.
     for raw_url in (
         str(source.get("FRONTEND_URL", "")),
         *str(source.get("CORS_ORIGINS", "")).split(","),
+        str(source.get("PUBLIC_UPLOAD_BACKEND_URL", "")),
     ):
         value = raw_url.strip()
         if not value or value == "*":

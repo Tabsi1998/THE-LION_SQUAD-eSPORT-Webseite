@@ -221,6 +221,10 @@ Backend wie nginx sehen keine Anfrage. Nach einer Änderung der Adresse daher da
 `docker compose up -d --build frontend`. Leer gelassen laufen die Uploads über die eigene Adresse, dann gilt das
 Cloudflare-Limit von 100 MB.
 
+Das Backend nimmt denselben Host automatisch in seine Host-Prüfung auf (`runtime_config.trusted_http_hosts`, die
+Variable reicht `docker-compose.yml` an den Backend-Container weiter). Fehlt er dort, antwortet das Backend auf jeden
+Upload mit 400 und dem reinen Text „Invalid host header“. In `TRUSTED_HOSTS` muss er also nicht stehen.
+
 ## Ergebnis-Bilder auslesen (#1756)
 
 Im Ergebnis-Blatt einer Serie liest „Bild auslesen“ (oder Strg+V) einen Screenshot des Veranstalters. Gelesen wird
