@@ -130,18 +130,28 @@ def _matches(product: dict, words: list[str]) -> bool:
     return True
 
 
+# So sehen Produktadressen im Printful-Dashboard aus: /dashboard/custom/<Bereich>/<Unterbereich …>/<produkt> - nur dieses
+# Muster zählt; alles andere (Shop-Seiten, Vorlagen, andere Hosts) ergibt keinen Treffer, dann wird gesucht.
+DASHBOARD_HOSTS = frozenset({"printful.com", "www.printful.com"})
+DASHBOARD_PREFIX = ("dashboard", "custom")
+
+
 def dashboard_slug(link: Any) -> str | None:
-    """Der Produktteil eines Dashboard-Links (``…/dashboard/custom/mens/shirts/unisex-classic-tee-gildan-5000?…``) -
-    nur von printful.com, sonst ``None``."""
+    """Der Produktteil eines Dashboard-Links (``https://www.printful.com/dashboard/custom/mens/shirts/
+    unisex-classic-tee-gildan-5000?…``) - nur https bzw. ohne Schema, nur printful.com, nur ``/dashboard/custom/…`` mit
+    mindestens einem Bereich vor dem Produkt; sonst ``None``."""
     text = str(link or "").strip()
     if not text or len(text) > 500:
         return None
     parsed = urlparse(text if "://" in text else f"https://{text}")
-    host = (parsed.hostname or "").lower()
-    if not (host == "printful.com" or host.endswith(".printful.com")):
+    if parsed.scheme != "https" or (parsed.hostname or "").lower() not in DASHBOARD_HOSTS or parsed.port not in (None, 443):
         return None
-    last = [part for part in parsed.path.split("/") if part][-1:] or [""]
-    candidate = last[0].lower()
+    if parsed.username or parsed.password:
+        return None
+    parts = [part for part in parsed.path.split("/") if part]
+    if len(parts) < 4 or tuple(part.lower() for part in parts[:2]) != DASHBOARD_PREFIX:
+        return None
+    candidate = parts[-1].lower()
     return candidate if SLUG.match(candidate) else None
 
 

@@ -116,9 +116,16 @@ async def test_a_dashboard_link_finds_the_product_only_when_it_is_unique(db, pro
             "?technique=DTFILM&color=Black&size=S")
     found = shop_catalog_search.search(catalog, link=link)
     assert found["link"]["ok"] is True and [row["id"] for row in found["results"]] == [71]
-    assert shop_catalog_search.search(catalog, link="printful.com/dashboard/x/black-glossy-mug")["results"][0]["id"] == 74
+    assert shop_catalog_search.search(catalog, link="printful.com/dashboard/custom/home-living/black-glossy-mug")["results"][0]["id"] == 74
     for wrong in ("https://evil.example.test/unisex-classic-tee-gildan-5000", "nur Text",
-                  "https://www.printful.com/dashboard/custom/mens/shirts/gibt-es-nicht"):
+                  "https://www.printful.com/dashboard/custom/mens/shirts/gibt-es-nicht",
+                  # nur echte Dashboard-Pfade: Shop-Seite, Vorlagen, http, andere Unterdomäne
+                  "https://www.printful.com/custom/mens/shirts/unisex-classic-tee-gildan-5000",
+                  "https://www.printful.com/dashboard/product-templates/unisex-classic-tee-gildan-5000",
+                  "https://www.printful.com/dashboard/custom/unisex-classic-tee-gildan-5000",
+                  "http://www.printful.com/dashboard/custom/mens/unisex-classic-tee-gildan-5000",
+                  "https://files.printful.com/dashboard/custom/mens/unisex-classic-tee-gildan-5000",
+                  "https://user@www.printful.com/dashboard/custom/mens/unisex-classic-tee-gildan-5000"):
         assert shop_catalog_search.search(catalog, link=wrong)["results"] == [], wrong
     # Zwei Produkte mit demselben Namen: kein Raten.
     fake.products[1000]["name"] = "Black Glossy Mug"
