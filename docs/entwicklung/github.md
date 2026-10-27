@@ -56,7 +56,7 @@ grünen CI-Laufs (sie bleiben sieben Tage):
 gh run download <lauf-id> -p "backend-test-results-*" -D ci-zeiten/backend
 gh run download <lauf-id> -p "frontend-e2e-timings-*" -D ci-zeiten/browser
 python scripts/test-shards.py durations ci-zeiten/backend/*/backend-junit-*.xml > backend/tests/shard-durations.json
-cd frontend && node scripts/e2e-shards.mjs durations ../ci-zeiten/browser/*/e2e-report.json > e2e/shard-durations.json
+cd frontend && node scripts/e2e-shards.mjs durations ../ci-zeiten/browser/*/e2e-durations-*.json > e2e/shard-durations.json
 ```
 
 Lokal ändert sich nichts: `python -m pytest -m "not live"` und `yarn test:e2e` laufen wie bisher ganz.

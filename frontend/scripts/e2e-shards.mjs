@@ -9,7 +9,8 @@
 // einem Teil - und das Skript prüft das mit Playwright selbst, bevor ein Test startet.
 //
 //   node scripts/e2e-shards.mjs plan 2/6 e2e-shard.txt     Testliste für Teil 2 von 6 schreiben und prüfen
-//   node scripts/e2e-shards.mjs durations report*.json     Dauern aus JSON-Berichten von CI-Läufen ausgeben
+//   node scripts/e2e-shards.mjs durations a.json b.json    Dauern je Gruppe aus JSON-Berichten von Playwright oder
+//                                                          aus den Dauer-Dateien der CI-Teile zusammenzählen
 //
 // Die Dauern stehen in e2e/shard-durations.json (Sekunden je Gruppe). Fehlt eine Gruppe (neue Datei), wird sie
 // nach der Zahl ihrer Tests geschätzt; aktualisieren siehe docs/entwicklung/tests.md.
@@ -123,12 +124,18 @@ export function planShards(tests, total, durations = {}) {
   return shards;
 }
 
-/** Sekunden je Gruppe aus einem oder mehreren JSON-Berichten (alle Versuche eines Tests zählen). */
+/**
+ * Sekunden je Gruppe aus JSON-Berichten von Playwright (alle Versuche eines Tests zählen) oder aus schon
+ * zusammengefassten Dauern (wie e2e/shard-durations.json, so lädt die CI sie je Teil hoch).
+ */
 export function durationsFromReports(reports) {
   const seconds = {};
+  const add = (key, value) => { seconds[key] = (seconds[key] || 0) + value; };
   for (const report of reports) {
-    for (const test of collectTests(report)) {
-      seconds[groupKey(test)] = (seconds[groupKey(test)] || 0) + test.duration;
+    if (Array.isArray(report.suites)) {
+      for (const test of collectTests(report)) add(groupKey(test), test.duration);
+    } else {
+      for (const [key, value] of Object.entries(report)) if (typeof value === "number") add(key, value);
     }
   }
   return Object.fromEntries(Object.entries(seconds)
@@ -185,7 +192,7 @@ function main(argv) {
   const [command, ...rest] = argv;
   if (command === "plan") return plan(rest[0], rest[1]);
   if (command === "durations") {
-    const reports = rest.map((file) => JSON.parse(fs.readFileSync(file, "utf8")));
+    const reports = rest.map((file) => JSON.parse(fs.readFileSync(file, "utf8").replace(/^﻿/, "")));
     return process.stdout.write(`${JSON.stringify(durationsFromReports(reports), null, 2)}\n`);
   }
   console.error("Aufruf: e2e-shards.mjs plan <n/gesamt> <datei> | durations <bericht.json>...");

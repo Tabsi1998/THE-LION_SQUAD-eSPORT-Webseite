@@ -298,16 +298,34 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         run: yarn install --frozen-lockfile
+      - name: Restore browser and its system packages from the cache
+        # Ein langsamer Paketspiegel kostete am 27.10. einen Teil neun Minuten (51 kB/s, #2054). Browser und die
+        # .deb-Pakete von --with-deps kommen deshalb aus dem Cache; apt lädt dann nur, was fehlt oder neuer ist.
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/apt-debs
+          key: playwright-ubuntu-24.04-${{ hashFiles('frontend/yarn.lock') }}
+          restore-keys: playwright-ubuntu-24.04-
       - name: Install Playwright browser
         working-directory: frontend
         # Antwortet ein Ubuntu-Paketspiegel nicht, wartete apt-get ohne Ende (am 7.10. zweimal 25 Minuten, dann brach
         # der ganze Teil ab). Jetzt: kurze Zeitlimits für apt, je Versuch höchstens 5 Minuten, bis zu drei Versuche.
         timeout-minutes: 18
         run: |
-          printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\nAcquire::Languages "none";\n' \
+          printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\nAcquire::Languages "none";\nAPT::Keep-Downloaded-Packages "true";\n' \
             | sudo tee /etc/apt/apt.conf.d/99-tls-timeouts > /dev/null
+          if compgen -G "$HOME/apt-debs/*.deb" > /dev/null; then
+            sudo cp "$HOME"/apt-debs/*.deb /var/cache/apt/archives/
+          fi
           for attempt in 1 2 3; do
-            if timeout --kill-after=15 300 npx playwright install --with-deps chromium; then exit 0; fi
+            if timeout --kill-after=15 300 npx playwright install --with-deps chromium; then
+              # Für den Cache (gespeichert nur, wenn es den Schlüssel noch nicht gab).
+              mkdir -p "$HOME/apt-debs"
+              cp /var/cache/apt/archives/*.deb "$HOME/apt-debs/" 2>/dev/null || true
+              exit 0
+            fi
             echo "::warning::Browser-Installation hing oder brach ab (Versuch $attempt von 3)"
             # Ein abgebrochenes apt-get hält sonst seine Sperre und der nächste Versuch scheitert sofort.
             sudo pkill -9 -f '/usr/lib/apt/methods|apt-get' || true
@@ -321,13 +339,20 @@ jobs:
       - name: Run browser smoke tests desktop and mobile (part ${{ matrix.shard }} of 6)
         working-directory: frontend
         run: yarn test:e2e --test-list="$RUNNER_TEMP/e2e-shard.txt"
-      - name: Upload browser test timings
+      - name: Sum up browser test timings
         # Daraus lassen sich die Dauern für die Verteilung auffrischen (docs/entwicklung/github.md).
+        if: ${{ !cancelled() }}
+        working-directory: frontend
+        run: |
+          if [ -f test-results/e2e-report.json ]; then
+            node scripts/e2e-shards.mjs durations test-results/e2e-report.json > "$RUNNER_TEMP/e2e-durations-${{ matrix.shard }}.json"
+          fi
+      - name: Upload browser test timings
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: frontend-e2e-timings-${{ matrix.shard }}
-          path: frontend/test-results/e2e-report.json
+          path: ${{ runner.temp }}/e2e-durations-${{ matrix.shard }}.json
           if-no-files-found: ignore
           retention-days: 7
       - name: Upload browser test diagnostics

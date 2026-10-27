@@ -66,3 +66,15 @@ test("Dauern summieren alle Versuche je Gruppe", () => {
   assert.deepEqual(durationsFromReports([REPORT, REPORT])["[chromium] › a.spec.js"], 60);
   assert.equal(durationsFromReports([REPORT])["[chromium] › e.spec.js"], 0);
 });
+
+test("die Dauer-Dateien der Teile lassen sich wieder zusammenzählen", () => {
+  const parts = [{ "[chromium] › a.spec.js": 30 }, { "[mobile] › a.spec.js": 10, "[chromium] › a.spec.js": 5 }];
+  assert.deepEqual(durationsFromReports([...parts, REPORT]), {
+    "[chromium] › a.spec.js": 65,
+    "[chromium] › b.spec.js": 10,
+    "[chromium] › c.spec.js": 20,
+    "[chromium] › d.spec.js": 20,
+    "[chromium] › e.spec.js": 0,
+    "[mobile] › a.spec.js": 20,
+  });
+});
