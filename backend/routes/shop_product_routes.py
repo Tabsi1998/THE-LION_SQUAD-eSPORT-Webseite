@@ -177,6 +177,21 @@ async def set_layout(product_id: str, body: Layout, me: dict = Depends(require_a
     return await _view(product_id)
 
 
+@router.post("/products/{product_id}/layout/preview")
+async def preview_layout(product_id: str, body: Layout, me: dict = Depends(require_area("finance"))):
+    """Pläne für den ungespeicherten Aufbau aus Schritt 3 - die Vorschau zeigt so genau die Fassung, die der Server je
+    Shirtfarbe drucken würde. Speichert nichts, schreibt nichts ins Protokoll."""
+    placements = []
+    for item in body.placements:
+        row = item.model_dump(exclude_none=True)
+        row["layers"] = [layer.model_dump(exclude_none=True) for layer in item.layers]
+        placements.append(row)
+    try:
+        return await shop_products.plan_layout(get_db(), product_id, placements)
+    except (ShopError, LookupError) as exc:
+        raise _refused(exc) from exc
+
+
 @router.post("/products/{product_id}/print-files")
 async def generate_print_files(product_id: str, body: Reasoned, me: dict = Depends(require_area("finance"))):
     """„Druckdateien erzeugen“: je Fläche und Farbe exakt in der Pixelgröße von Printful - nur, was fehlt oder

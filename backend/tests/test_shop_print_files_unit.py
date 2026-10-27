@@ -492,3 +492,54 @@ async def test_every_color_is_checked_with_the_motif_it_really_prints(db, provid
     assert "ruecken-schwarz" in line and "ragt unten" in line
     assert not any("Black" in text for text in item["blocked"]), "Schwarz passt"
     assert (await shop_catalog.get_product(db, product["id"]))["placements"] == LEGACY
+
+@pytest.mark.asyncio
+async def test_one_unmappable_area_makes_the_whole_product_not_orderable(db, provider):
+    """Codex, vierte Runde: eine abbildbare und eine nicht abbildbare Fläche - keine Bestellung, nie eine still fehlende
+    Fläche. Die Kundschaft liest nur den festen Satz, der Admin sieht Fläche und Grund in der Prüfung (rot)."""
+    from shop_testdata import publish_unchecked
+    from test_shop_products_unit import BILLING, SHIPPING, variant_for
+
+    from services import shop_orders
+
+    product = await legacy_product(db, provider)
+    await shop_products.accept_prices(db, product["id"], **BY)
+    sleeve = {"key": "sleeve_left", "kind": "design", "printful_placement": "sleeve_left",
+              "position": {"left_in": 0.5, "top_in": 0.5, "width_in": 2, "height_in": 2},
+              "designs": [{"color": "Black", "design_key": "loewe-weiss"}]}
+    await db.shop_products.update_one({"id": product["id"]}, {"$set": {"placements": [*LEGACY, sleeve]}})
+    await shop_products.generate_print_files(db, product["id"], **BY)  # die abbildbaren Flächen hätten Dateien
+    await publish_unchecked(db, product["id"])
+    black = await variant_for(db, product["id"], 4012)
+    with pytest.raises(ShopError) as refused:
+        await shop_orders.place_order(
+            db, user_id="konto-1", idempotency_key="bestellung-0080", buyer_kind="member",
+            lines=[{"variant_id": black["id"], "quantity": 1, "gamertag": "Testlöwe"}], shipping_estimate_cents=490,
+            billing_address=dict(BILLING), shipping_address=dict(SHIPPING), actor_id="konto-1")
+    assert str(refused.value) == "Position 1: Dieses Produkt ist gerade nicht bestellbar."
+    assert await db.shop_orders.count_documents({}) == 0
+    assert await db.shop_print_files.count_documents({"purpose": "order"}) == 0
+    view = await shop_products.admin_view(db, product["id"])
+    item = next(row for row in view["check"]["items"] if row["key"] == "layout")
+    assert item["ok"] is False and item["state"] == "failed" and "Ärmel links" in item["detail"]
+    assert view["check"]["review_ready"] is False and view["layout_blocked"]
+
+
+@pytest.mark.asyncio
+async def test_the_draft_layout_preview_shows_the_version_the_server_would_print(db, provider):
+    product = await configured(db, provider, accept=False)
+    before = await shop_catalog.get_product(db, product["id"])
+    draft = [{"key": "front", "layers": [{**LION, "motif": {"key": "loewe-weiss", "by_color": {"White": "loewe-schwarz"}}}]},
+             {"key": "back", "layers": [BACK]}]
+    planned = await shop_products.plan_layout(db, product["id"], draft)
+    front = next(row for row in planned["placements"] if row["key"] == "front")
+    white = next(state for state in front["files"] if state["color"] == "White")
+    layer = white["plan"]["layers"][0]
+    schwarz = await shop_catalog.latest_design(db, "loewe-schwarz")
+    assert layer["source"]["design_key"] == "loewe-schwarz" and layer["image_path"] == shop_designs.public_path(schwarz)
+    assert layer["aspect"] == round(1300 / 1200, 6) and white["state"] == "outdated"
+    assert await shop_catalog.get_product(db, product["id"]) == before, "nichts gespeichert"
+    # Was nicht passt, zeigt die Vorschau als Plan mit Problem - gespeichert würde es abgelehnt.
+    moved = await shop_products.plan_layout(db, product["id"], [{"key": "front", "layers": [{**LION, "offset_x_cm": -20}]}])
+    state = moved["placements"][0]["files"][0]
+    assert state["state"] == "invalid" and "ragt links" in state["detail"]

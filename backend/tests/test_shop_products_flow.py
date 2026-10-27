@@ -114,6 +114,7 @@ def new_routes(product_id: str) -> list[tuple[str, str, dict]]:
         ("put", f"{BASE}/{product_id}/layout", {"placements": PLACEMENTS, "included_placement": None,
                                                 "reason": "Test"}),
         ("post", f"{BASE}/{product_id}/print-files", {"reason": "Test"}),
+        ("post", f"{BASE}/{product_id}/layout/preview", {"placements": PLACEMENTS}),
         ("post", f"{BASE}/{product_id}/print-templates/refresh", {"reason": "Test"}),
         ("get", f"{BASE}/{product_id}/preview?placement=front&color=Black", None),
         ("get", f"{BASE}/{product_id}/print-files/x", None),

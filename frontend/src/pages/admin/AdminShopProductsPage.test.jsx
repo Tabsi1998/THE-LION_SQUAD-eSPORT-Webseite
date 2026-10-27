@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
@@ -450,4 +450,40 @@ test("Produktsuche: über den Namen oder einen Dashboard-Link - „Übernehmen�
   await user.type(screen.getByTestId("shop-search-link"), link);
   await user.click(screen.getByTestId("shop-search-link-submit"));
   expect(apiMock.get).toHaveBeenLastCalledWith("/admin/shop/printful-catalog", { params: { link } });
+});
+
+test("ungespeicherte Ausnahme: die Vorschau fragt den Server nach der Fassung und ist bis dahin ausgegraut", async () => {
+  const drafted = view().placements.map((row) => ({ key: row.key, files: row.files.map((state) => (state.color !== "White" ? state : {
+    ...state, plan: { layers: [{ index: 0, kind: "motif", source: { design_key: "loewe-schwarz", variant: "light", version: 3 }, image_path: "/api/shop/print-files/k9/loewe-schwarz-v3.png", aspect: 1.25 }] },
+  })) }));
+  let answer;
+  apiMock.post.mockImplementation((url) => (url.endsWith("/layout/preview") ? new Promise((resolve) => { answer = () => resolve({ data: { placements: drafted } }); }) : Promise.resolve({ data: view() })));
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-designs"));
+  await user.click(screen.getByTestId("shop-preview-color-White"));
+  await user.click(screen.getByTestId("shop-layer-front-0-exceptions-toggle"));
+  await user.selectOptions(screen.getByTestId("shop-layer-front-0-exception-White"), "loewe-schwarz");
+  expect(screen.getByTestId("shop-preview-front")).toHaveAttribute("data-stale", "true");
+  expect(screen.getByTestId("shop-layout-draft-preview")).toHaveTextContent("Vorschau wird berechnet");
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/shop/products/p1/layout/preview", expect.objectContaining({
+    placements: expect.arrayContaining([expect.objectContaining({ key: "front", layers: expect.arrayContaining([expect.objectContaining({ motif: { key: "loewe-weiss", by_color: { White: "loewe-schwarz" } } })]) })]),
+  })));
+  answer();
+  await waitFor(() => expect(screen.getByTestId("shop-preview-front")).not.toHaveAttribute("data-stale"));
+  const image = screen.getByTestId("shop-preview-front-layer-0");
+  expect(image.querySelector("img").getAttribute("src")).toContain("loewe-schwarz-v3");
+  // Seitenverhältnis der Fassung vom Server (1,25): der Rahmen ist höher als breit.
+  expect(parseFloat(image.style.height) * 2400).toBeGreaterThan(parseFloat(image.style.width) * 1800);
+});
+
+test("nicht abbildbare alte Platzierungen: rote Meldung, Produkt nicht bestellbar", async () => {
+  apiMock.get.mockResolvedValue({ data: view({ extra: { layout_converted: true, layout_blocked: ["„Ärmel links“ bleibt unverändert: die Fläche sleeve_left hat keine Druckvorgabe bei Printful."] } }) });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-designs"));
+  const box = screen.getByTestId("shop-layout-blocked");
+  expect(box).toHaveTextContent("Nicht bestellbar");
+  expect(box).toHaveTextContent("Ärmel links");
+  expect(box.className).toContain("text-live");
 });

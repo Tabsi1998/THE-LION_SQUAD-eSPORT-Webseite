@@ -37,7 +37,7 @@ const STATUS_TONES = {
 const STEPS = [
   { key: "product", label: "Produkt wählen", checks: ["printful"] },
   { key: "offer", label: "Farben und Größen", checks: ["offer", "stock"] },
-  { key: "designs", label: "Druckflächen", checks: ["template", "placements", "files", "personalization"] },
+  { key: "designs", label: "Druckflächen", checks: ["template", "layout", "placements", "files", "personalization"] },
   { key: "prices", label: "Preise", checks: ["prices"] },
   { key: "publish", label: "Prüfen und veröffentlichen", checks: ["mockup"] },
 ];

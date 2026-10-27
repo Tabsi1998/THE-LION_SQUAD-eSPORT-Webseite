@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, ExternalLink, Image as ImageIcon, Move, Plus, RefreshCw, RotateCcw, Trash2, Upload, Wand2 } from "lucide-react";
-import { api, resolveMediaUrl, uploadApi } from "@/lib/api";
+import { api, formatRequestError, resolveMediaUrl, uploadApi } from "@/lib/api";
 import { viennaDateTime } from "@/lib/vienna";
 import { cmText, maxWidthCm, resolveLayers } from "@/lib/shopLayout";
 
@@ -16,6 +16,7 @@ const QUIET_BTN = "tls-btn tls-btn--quiet min-h-9 px-2 text-xs rounded-sm inline
 const STATE_TONES = { ok: "text-ok", not_needed: "text-white/55", missing: "text-warn", outdated: "text-honor", invalid: "text-warn", no_area: "text-warn" };
 const STATE_TEXT = { ok: "aktuell", not_needed: "Platzhalter", missing: "fehlt", outdated: "veraltet", invalid: "passt nicht", no_area: "Fläche fehlt" };
 const NUDGE_CM = 0.1;
+const DRAFT_PREVIEW_DELAY_MS = 350;
 
 function round1(value) {
   return Math.round(Number(value) * 10) / 10;
@@ -67,7 +68,7 @@ function savedSources(view) {
 
 // ---------------------------------------------------------------- Vorschau mit Vorlagenbild, Ziehen und Pfeiltasten
 
-function LayoutPreview({ area, preview, layers, resolved, colorCode, motifFor, selected, onSelect, onNudge, editable, testId }) {
+function LayoutPreview({ area, preview, layers, resolved, colorCode, motifFor, selected, onSelect, onNudge, editable, testId, stale = false }) {
   const areaRef = useRef(null);
   const drag = useRef(null);
   const templateW = preview?.template_width || area.width_px;
@@ -107,7 +108,7 @@ function LayoutPreview({ area, preview, layers, resolved, colorCode, motifFor, s
   };
 
   return (
-    <div className="relative w-full overflow-hidden rounded-sm border border-white/10 select-none" style={{ aspectRatio: `${templateW} / ${templateH}`, backgroundColor: colorCode || "#808080" }} data-testid={testId}>
+    <div className={`relative w-full overflow-hidden rounded-sm border border-white/10 select-none transition-opacity duration-150 ${stale ? "opacity-50" : ""}`} style={{ aspectRatio: `${templateW} / ${templateH}`, backgroundColor: colorCode || "#808080" }} data-testid={testId} data-stale={stale ? "true" : undefined}>
       {background && <img src={background} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full pointer-events-none" />}
       {preview?.positioning === "background" && imagePath && <img src={imagePath} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full pointer-events-none" />}
       <div ref={areaRef} className="absolute outline outline-1 outline-dashed outline-white/40" style={{ left: pct(box.left, templateW), top: pct(box.top, templateH), width: pct(box.width, templateW), height: pct(box.height, templateH) }}
@@ -279,7 +280,7 @@ function FileStates({ productId, row, mode, editable, busy, onUpload }) {
 
 // ---------------------------------------------------------------- Eine Fläche
 
-function PlacementCard({ view, available, state, savedRow, used, onToggle, onChange, colors, previewColor, codes, motifsByKey, sources, editable, busy, onUpload }) {
+function PlacementCard({ view, available, state, savedRow, used, onToggle, onChange, colors, previewColor, codes, motifsByKey, sources, stale, editable, busy, onUpload }) {
   const area = areaOf(available);
   const presets = view.presets || [];
   const motifPresets = presets.filter((preset) => available.presets.motif.includes(preset.key));
@@ -344,7 +345,7 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
           </div>
           <div className="grid gap-4 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
             <div className="space-y-1">
-              <LayoutPreview area={{ ...area, safe_margin_cm: available.safe_margin_cm }} preview={available.preview} layers={visible}
+              <LayoutPreview stale={stale} area={{ ...area, safe_margin_cm: available.safe_margin_cm }} preview={available.preview} layers={visible}
                 resolved={resolved} colorCode={codes[previewColor]} motifFor={motifFor} selected={selected} onSelect={setSelected}
                 onNudge={nudge}
                 editable={editable} testId={`shop-preview-${available.key}`} />
@@ -433,9 +434,6 @@ export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGrou
   const sources = useMemo(() => savedSources(view), [view]);
   const savedRows = Object.fromEntries((view.placements || []).map((row) => [row.key, row]));
   const available = view.available_placements || [];
-  if (!product.printful) return <p className="text-sm text-white/55" data-testid="shop-layout">Zuerst in Schritt 1 das Printful-Produkt laden.</p>;
-  if (!available.length) return <div className="space-y-2" data-testid="shop-layout"><TemplateStatus view={view} busy={busy} run={run} /><p className="text-sm text-white/55">Ohne Druckvorlage von Printful lassen sich keine Flächen wählen.</p></div>;
-
   const used = available.filter((row) => draft[row.key]);
   const payload = used.map((row) => ({ key: row.key, mode: draft[row.key].mode || "layout", layers: draft[row.key].layers.map(cleanLayer) }));
   const missingMotif = payload.some((row) => row.mode === "layout" && row.layers.some((layer) => layer.kind === "motif" && !layer.motif.key));
@@ -443,8 +441,34 @@ export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGrou
   const usedKeys = used.map((row) => row.key);
   const includedValue = usedKeys.includes(included) ? included : (usedKeys.includes("front") ? "front" : usedKeys[0] || null);
   const blocked = !payload.length ? "Mindestens eine Fläche wählen." : missingMotif ? "Für jedes Motiv bitte ein Motiv aus der Liste wählen." : emptyArea ? "Jede gewählte Fläche braucht ein Motiv oder einen Platzhalter." : null;
-  const changed = JSON.stringify(payload) !== JSON.stringify((view.placements || []).map((row) => ({ key: row.key, mode: row.mode || "layout", layers: (row.layers || []).map(cleanLayer) }))) || includedValue !== (view.included_placement || null) || view.layout_converted;
+  const payloadJson = JSON.stringify(payload);
+  const changed = payloadJson !== JSON.stringify((view.placements || []).map((row) => ({ key: row.key, mode: row.mode || "layout", layers: (row.layers || []).map(cleanLayer) }))) || includedValue !== (view.included_placement || null) || view.layout_converted;
   const failedFiles = (view.placements || []).flatMap((row) => row.files || []).filter((state) => ["missing", "outdated"].includes(state.state));
+  // Ungespeicherter Stand: der Server rechnet die Pläne (Fassung je Shirtfarbe, Bild, Seitenverhältnis) - eine Wahrheit
+  // für Vorschau und Druck. Gedrosselt; bis die Antwort da ist, ist die Vorschau ausgegraut.
+  const [draftPreview, setDraftPreview] = useState({ json: null, sources: null, error: "" });
+  const previewWanted = !!product.printful && available.length > 0 && changed && !blocked;
+  useEffect(() => {
+    if (!previewWanted) return undefined;
+    let live = true;
+    const timer = setTimeout(async () => {
+      const layers = Object.fromEntries(JSON.parse(payloadJson).map((row) => [row.key, row.layers]));
+      try {
+        const { data } = await api.post(`${BASE}/${product.id}/layout/preview`, { placements: JSON.parse(payloadJson) });
+        const rows = (data?.placements || []).map((row) => ({ ...row, layers: layers[row.key] || [] }));
+        if (live) setDraftPreview({ json: payloadJson, sources: savedSources({ placements: rows }), error: "" });
+      } catch (failure) {
+        if (live) setDraftPreview({ json: payloadJson, sources: null, error: formatRequestError(failure, "Die Vorschau lässt sich gerade nicht berechnen.") });
+      }
+    }, DRAFT_PREVIEW_DELAY_MS);
+    return () => { live = false; clearTimeout(timer); };
+  }, [previewWanted, payloadJson, product.id, product.printful]);
+  const draftReady = previewWanted && draftPreview.json === payloadJson && !!draftPreview.sources;
+  const stale = changed && !draftReady;
+  const shownSources = draftReady ? draftPreview.sources : sources;
+  if (!product.printful) return <p className="text-sm text-white/55" data-testid="shop-layout">Zuerst in Schritt 1 das Printful-Produkt laden.</p>;
+  if (!available.length) return <div className="space-y-2" data-testid="shop-layout"><TemplateStatus view={view} busy={busy} run={run} /><p className="text-sm text-white/55">Ohne Druckvorlage von Printful lassen sich keine Flächen wählen.</p></div>;
+
   const onUpload = (placement, color, group, file, key) => {
     const form = new FormData();
     form.append("file", file);
@@ -460,10 +484,15 @@ export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGrou
       <TemplateStatus view={view} busy={busy} run={run} />
       {view.layout_converted && <p className="text-xs text-honor" data-testid="shop-layout-converted">Aus den alten Zoll-Positionen umgerechnet - bitte prüfen und speichern.</p>}
       {view.layout_blocked?.length > 0 && (
-        <div className="border border-warn/40 bg-warn/10 rounded-sm p-2 text-xs" role="alert" data-testid="shop-layout-blocked">
-          <div className="font-bold">Nicht umgerechnet - gespeichert bleibt die alte Fassung, bis du hier neu speicherst:</div>
+        <div className="border border-live/50 bg-live/10 text-live rounded-sm p-2 text-xs" role="alert" data-testid="shop-layout-blocked">
+          <div className="font-bold">Nicht bestellbar: diese alten Platzierungen lassen sich nicht abbilden. Bitte die Flächen hier neu setzen und speichern.</div>
           <ul className="mt-1 space-y-0.5">{view.layout_blocked.map((line) => <li key={line}>{line}</li>)}</ul>
         </div>
+      )}
+      {stale && (
+        <p className="text-xs text-honor" role="status" data-testid="shop-layout-draft-preview">
+          {draftPreview.error && draftPreview.json === payloadJson ? `Vorschau: ${draftPreview.error}` : blocked ? "Vorschau nach dem Speichern." : "Vorschau wird berechnet …"}
+        </p>
       )}
       <p className="text-xs text-white/55 max-w-3xl">Je Fläche: Motiv, Position aus der Liste und Größe in cm. Die Website erzeugt die Druckdatei in der exakten Größe von Printful - das Motiv an seiner Stelle, der Rest durchsichtig. Positionen „vom Träger aus“: Brust rechts liegt von vorne gesehen links.</p>
       {colors.length > 0 && (
@@ -490,7 +519,7 @@ export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGrou
               return next;
             })}
             onChange={(next) => setDraft((now) => ({ ...now, [row.key]: next }))}
-            colors={colors} previewColor={previewColor} codes={codes} motifsByKey={motifsByKey} sources={sources} editable={view.editable} busy={busy} onUpload={onUpload} />
+            colors={colors} previewColor={previewColor} codes={codes} motifsByKey={motifsByKey} sources={shownSources} stale={stale} editable={view.editable} busy={busy} onUpload={onUpload} />
         ))}
       </ul>
       {usedKeys.length > 1 && (

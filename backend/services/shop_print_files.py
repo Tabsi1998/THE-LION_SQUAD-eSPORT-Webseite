@@ -46,6 +46,7 @@ from services.shop_common import ShopConflict, ShopError, clean_reason, record_a
 logger = logging.getLogger("tls-arena.shop-print-files")
 
 RENDERER_VERSION = 1  # ändert sich, wenn der Generator andere Pixel liefert - dann gelten erzeugte Dateien nicht mehr
+NOT_ORDERABLE = "Dieses Produkt ist gerade nicht bestellbar."
 LAYER_KINDS = {"motif": "Motiv", "gamertag": "Gamertag (Datei je Bestellung)",
                "member_number": "Vereinsnummer (Datei je Bestellung, #1727)"}
 TEXT_KINDS = ("gamertag", "member_number")
@@ -892,9 +893,10 @@ async def freeze_line(db, product: dict, variant: dict, *, gamertag: str | None,
 
     Liefert (Druckdateien, Motiv-Fassungen). Fehlt etwas: ``ShopError`` - die Position ist dann nicht bestellbar."""
     context = await _context(db, product)
-    if product.get("placements") and not context["rows"]:
-        raise ShopError(f"Position {position}: die Druckflächen sind noch nicht auf die Druckvorlagen umgestellt - "
-                        "nicht bestellbar.")
+    # Fail-closed: lässt sich auch nur eine alte Platzierung nicht abbilden, ist das ganze Produkt nicht bestellbar -
+    # nie eine Bestellung, in der eine Fläche still fehlt. Die Kundschaft liest nur den festen Satz, keine Interna.
+    if product.get("placements") and (not context["rows"] or (await layout_conversion(db, product))["blocked"]):
+        raise ShopError(f"Position {position}: {NOT_ORDERABLE}")
     color = " ".join(str(variant.get("color") or "").split())
     color_hex = context["codes"].get(color) or variant.get("color_code")
     files, sources = [], []

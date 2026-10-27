@@ -405,6 +405,26 @@ async def set_layout(db, product_id: str, placements: Any, *, included_placement
                                data={"before": before, "after": after, "included_placement": included_placement})
 
 
+async def plan_layout(db, product_id: str, placements: Any) -> dict:
+    """Vorschau für einen noch nicht gespeicherten Aufbau: dieselbe Prüfung und dieselben Pläne wie beim Speichern - je
+    Fläche und Farbe die Fassung des Motivs, die gedruckt würde (Bild, Seitenverhältnis, Rahmen). Speichert nichts."""
+    product = await _product(db, product_id)
+    if not product.get("printful"):
+        raise ShopError("Erst das Printful-Produkt laden (Schritt 1).")
+    template = await templates.get(db, product["printful"]["product_id"])
+    if not template or not template.get("entries"):
+        raise ShopError("Erst die Druckvorlagen von Printful laden („Mit Printful abgleichen“).")
+    presets_doc = await templates.load_presets(db)
+    available = {row["key"]: row for row in await available_placements(db, product, template=template,
+                                                                        presets_doc=presets_doc)}
+    rows = await _clean_layout(db, product, placements, available, presets_doc)
+    states = await shop_print_files.states(db, {**product, "placements": rows})
+    return {"placements": [{"key": row["key"], "files": [{key: state[key] for key in ("placement", "color", "group",
+                                                                                         "state", "detail", "plan")}
+                                                         for state in states if state["placement"] == row["key"]]}
+                           for row in rows]}
+
+
 async def generate_print_files(db, product_id: str, *, actor_id: str, reason: Any) -> dict:
     """„Druckdateien erzeugen“: je Fläche und Farbe die Grunddatei, die fehlt oder veraltet ist."""
     product = await _product(db, product_id)
@@ -527,6 +547,12 @@ async def run_check(db, product: dict) -> dict:
     items.append(_item("personalization", "Sichtbarkeit und Personalisierung", not problems,
                        " ".join(problems) or f"{shop_catalog.VISIBILITY_LABELS.get(product.get('visibility'))}, "
                                              f"Personalisierung: {shop_catalog.PERSONALIZATION_LABELS[personalization]}."))
+    conversion = await shop_print_files.layout_conversion(db, product) if printful else {"blocked": []}
+    if conversion["blocked"]:
+        # Alte Platzierungen, die sich nicht abbilden lassen: das ganze Produkt ist nicht bestellbar (fail-closed).
+        items.append(_item("layout", "Druckflächen umgestellt", False,
+                           "Nicht bestellbar - nicht abbildbar: " + " ".join(conversion["blocked"])
+                           + " Bitte in Schritt 3 neu setzen und speichern."))
     printed = [row for row in rows if row.get("mode") == "upload"
                or any(layer.get("kind") == "motif" for layer in row.get("layers") or [])]
     items.append(_item("placements", "Druckflächen", bool(printed),
