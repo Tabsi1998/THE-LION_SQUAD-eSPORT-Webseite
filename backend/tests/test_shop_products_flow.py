@@ -34,6 +34,7 @@ async def flow():
     instance, shutdown = make_flow()
     try:
         await shop_schema.apply(instance.db)
+        await instance.db.mutation_locks.create_index("resource", unique=True)
         yield instance
     finally:
         await shutdown()
@@ -252,3 +253,62 @@ async def test_the_daily_sync_is_a_scheduled_job_and_needs_a_key(flow):
 
     assert '"shop_catalog_sync"' in inspect.getsource(scheduler.start_scheduler)
     assert (await shop_catalog_sync.sync_all(flow.db))["skipped"] == "kein Printful-Schlüssel"
+
+
+# ---------------------------------------------------------------- Befunde aus der Prüfung (Codex)
+
+@pytest.mark.asyncio
+async def test_the_old_patch_ways_keep_the_rules_of_the_guided_setup(flow, fake):
+    """Befund 1 und 6 über die Routen: veröffentlicht keine Preis-, Aktiv- oder Sichtbarkeitsänderung, Printful-Preise
+    nur über „Preise übernehmen“, und kein Verkaufspreis unter dem Mindestpreis."""
+    from services import shop_catalog
+    from shop_testdata import publish_unchecked
+
+    await with_key(flow)
+    await club_designs(flow)
+    who = await people(flow)
+    flow.act_as(who["finanzen"])
+    product_id = await build(flow)
+    medium = next(row for row in (await flow.get(f"{BASE}/{product_id}")).json()["variants"] if row["label"] == "Black / M")
+    price = await flow.patch(f"/api/admin/shop/variants/{medium['id']}", json={"price_cents": 1200, "reason": "Billiger"})
+    assert price.status_code == 400 and "Preise übernehmen" in price.json()["detail"]
+    await publish_unchecked(flow.db, product_id)
+    for body in ({"price_cents": 0}, {"active": False}):
+        answer = await flow.patch(f"/api/admin/shop/variants/{medium['id']}", json={**body, "reason": "Direkt"})
+        assert answer.status_code == 409 and "zurückziehen" in answer.json()["detail"], body
+    for body in ({"visibility": "hidden"}, {"markup_cents": 0}):
+        answer = await flow.patch(f"{BASE}/{product_id}", json={**body, "reason": "Direkt"})
+        assert answer.status_code == 409, body
+    stored = await shop_catalog.get_product(flow.db, product_id)
+    assert stored["visibility"] == "members" and stored["markup_cents"] is None
+    plain = (await flow.post(BASE, json={**NEW, "title": "Kappe Test", "personalization": "none"})).json()["product"]
+    zero = await flow.post(f"{BASE}/{plain['id']}/variants", json={"sku": "KAPPE-0", "label": "Eine", "price_cents": 0,
+                                                                   "reason": "Gratis"})
+    assert zero.status_code == 400 and "Mindestpreis" in zero.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_the_minimum_price_is_a_setting_with_reason(flow):
+    who = await people(flow)
+    flow.act_as(who["finanzen"])
+    shown = (await flow.get("/api/admin/shop/config")).json()["config"]
+    assert shown["min_price_cents"] == 100
+    changed = await flow.patch("/api/admin/shop/config", json={"min_price_cents": 500, "reason": "Mindestens 5 Euro"})
+    assert changed.status_code == 200 and changed.json()["config"]["min_price_cents"] == 500
+    refused = await flow.patch("/api/admin/shop/config", json={"min_price_cents": 0, "reason": "Gratis"})
+    assert refused.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_a_second_sync_while_one_runs_answers_409(flow, fake):
+    from services import shop_catalog_sync
+    from services.mutation_lock import mutation_lock
+
+    await with_key(flow)
+    await club_designs(flow)
+    who = await people(flow)
+    flow.act_as(who["finanzen"])
+    product_id = await build(flow)
+    async with mutation_lock(flow.db, shop_catalog_sync.SYNC_RESOURCE, wait_seconds=0, lease_seconds=30):
+        answer = await flow.post(f"{BASE}/{product_id}/sync", json={})
+    assert answer.status_code == 409 and "läuft gerade" in answer.json()["detail"]

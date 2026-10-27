@@ -33,17 +33,19 @@ def included_placement(product: dict) -> str | None:
 
 def cost_cents(product: dict, mapping: dict | None) -> int | None:
     """Einkauf je Variante: Grundpreis der Technik plus Aufpreis jeder weiteren Druckfläche. ``None``, wenn ein Preis
-    fehlt - dann gibt es keinen Preis, nie einen geratenen."""
-    if not mapping or not isinstance(mapping.get("base_cost_cents"), int):
+    fehlt - dann gibt es keinen Preis, nie einen geratenen. Ein Einkauf von 0 € (oder weniger) ist kein Preis, sondern
+    ein Fehler in den Daten (#1709) - auch dann ``None``."""
+    base = (mapping or {}).get("base_cost_cents")
+    if isinstance(base, bool) or not isinstance(base, int) or base <= 0:
         return None
-    total = mapping["base_cost_cents"]
+    total = base
     included = included_placement(product)
     costs = mapping.get("placement_costs") or {}
     for placement in used_printful_placements(product):
         if placement == included:
             continue
         extra = costs.get(placement)
-        if not isinstance(extra, int):
+        if isinstance(extra, bool) or not isinstance(extra, int) or extra < 0:
             return None
         total += extra
     return total

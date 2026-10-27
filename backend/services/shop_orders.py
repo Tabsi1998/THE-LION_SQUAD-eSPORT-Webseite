@@ -128,9 +128,14 @@ async def _freeze_line(db, line: dict, position: int, buyer_kind: str, config: d
             raise ShopError(f"Position {position}: zur Druckdatei gibt es noch keine Fassung.")
         design = {"design_key": latest["design_key"], "version": latest["version"], "sha256": latest["sha256"]}
     mapping = await shop_catalog.printful_variant_for(db, variant["id"])
+    if product.get("printful") and (not mapping or mapping.get("in_stock") is not True):
+        # Fail-closed (#1709): nur, was Printful zuletzt ausdrücklich als lieferbar gemeldet hat.
+        raise ShopError(f"Position {position}: dieser Artikel ist nicht bestellbar.")
     unit = variant["price_cents"] if variant.get("price_cents") is not None else product.get("base_price_cents")
     if unit is None:
         raise ShopError(f"Position {position}: für diesen Artikel ist noch kein Preis übernommen.")
+    if unit < config["min_price_cents"]:
+        raise ShopError(f"Position {position}: dieser Artikel ist nicht bestellbar (Preis unter dem Mindestpreis).")
     markup = shop_config.markup_cents(config, buyer_kind, product)
     return {
         "position": position, "product_id": product["id"], "variant_id": variant["id"],

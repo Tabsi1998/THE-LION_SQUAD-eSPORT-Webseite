@@ -229,6 +229,34 @@ async def test_a_long_run_of_calls_stays_under_printfuls_rate_limit(fake, monkey
         assert len(in_window) <= printful_client.RATE_BUDGET_PER_MINUTE < printful_client.RATE_LIMIT_PER_MINUTE
 
 
+@pytest.mark.asyncio
+async def test_two_clients_with_the_same_key_share_the_rate_limit(fake, monkeypatch):
+    """Zwei gleichzeitige Abgleiche (je ein Client) teilen sich das Fenster - zusammen nie über das Budget."""
+    fake.add_product(74, tuple((7000 + index, f"T{index}") for index in range(70)))
+    clock = {"now": 5000.0}
+
+    async def wait(seconds):
+        clock["now"] += seconds
+        await asyncio.sleep(0)
+
+    monkeypatch.setattr(printful_client, "_sleep", wait)
+    monkeypatch.setattr(printful_client, "_clock", lambda: clock["now"])
+    stamps: list[float] = []
+    real_handle = fake._handle
+
+    def counting(request):
+        stamps.append(clock["now"])
+        return real_handle(request)
+
+    first = PrintfulClient(API_KEY, transport=httpx.MockTransport(counting))
+    second = PrintfulClient(API_KEY, transport=httpx.MockTransport(counting))
+    await asyncio.gather(first.catalog_variants(CatalogProductId(74)), second.catalog_variants(CatalogProductId(74)))
+    assert len(stamps) > printful_client.RATE_BUDGET_PER_MINUTE
+    stamps.sort()
+    for index, stamp in enumerate(stamps):
+        assert len([other for other in stamps[index:] if other - stamp < 60]) <= printful_client.RATE_BUDGET_PER_MINUTE
+
+
 # ---------------------------------------------------------------- Kostenschätzung
 
 @pytest.mark.asyncio

@@ -59,6 +59,8 @@ def provider(fake, monkeypatch):
 async def db():
     instance = AsyncMongoMockClient()["shop_produkte"]
     await shop_schema.apply(instance)
+    # Wie beim Start (database.init_audit_indexes): Sperren sind je Ressource eindeutig.
+    await instance.mutation_locks.create_index("resource", unique=True)
     return instance
 
 
@@ -515,3 +517,193 @@ async def test_a_product_with_a_gamertag_placement_needs_a_gamertag_and_blocked_
                                       lines=[{"variant_id": medium["id"], "quantity": 1, "gamertag": "Testlöwe"}],
                                       **base)
     assert await db.shop_orders.count_documents({}) == 0
+
+
+# ---------------------------------------------------------------- Befunde aus der Prüfung (Codex)
+
+@pytest.mark.asyncio
+async def test_published_products_take_no_direct_price_offer_or_visibility_changes(db, provider):
+    """Befund 1: die alten Wege (PATCH Produkt/Variante) umgehen den Aufbau nicht."""
+    product = await configured(db, provider)
+    await publish_unchecked(db, product["id"])
+    medium = await variant_for(db, product["id"], BLACK_M)
+    for fields in ({"price_cents": 0}, {"price_cents": 990}, {"active": False}):
+        with pytest.raises(ShopConflict, match="zurückziehen"):
+            await shop_catalog.update_variant(db, medium["id"], fields, **BY)
+    for fields in ({"visibility": "hidden"}, {"markup_cents": 0}, {"base_price_cents": 100}, {"tax_profile": None,
+                                                                                            "design_key": "x"}):
+        with pytest.raises(ShopConflict, match="zurückziehen"):
+            await shop_catalog.update_product(db, product["id"], fields, **BY)
+    with pytest.raises(ShopConflict, match="zurückziehen"):
+        await shop_catalog.create_variant(db, product["id"], {"sku": "NEU-1", "label": "Neu"}, **BY)
+    # Titel und Beschreibung gehen auch veröffentlicht.
+    changed, _ = await shop_catalog.update_product(db, product["id"], {"title": "Vereinsshirt 2026"}, **BY)
+    assert changed["title"] == "Vereinsshirt 2026" and changed["status"] == "active"
+    assert (await variant_for(db, product["id"], BLACK_M))["price_cents"] == 1500
+
+
+@pytest.mark.asyncio
+async def test_printful_variants_get_prices_and_offer_only_through_the_guided_steps(db, provider):
+    product = await configured(db, provider)
+    medium = await variant_for(db, product["id"], BLACK_M)
+    for fields in ({"price_cents": 1200}, {"active": False}, {"sku": "ANDERS-1"}):
+        with pytest.raises(ShopError, match="Preise übernehmen|Farben und Größen"):
+            await shop_catalog.update_variant(db, medium["id"], fields, **BY)
+    with pytest.raises(ShopError, match="Farben und Größen"):
+        await shop_catalog.create_variant(db, product["id"], {"sku": "NEU-2", "label": "Neu"}, **BY)
+
+
+@pytest.mark.asyncio
+async def test_a_change_through_the_old_ways_sends_a_reviewed_product_back_to_draft(db, provider):
+    product = await configured(db, provider)
+    await shop_products.set_status(db, product["id"], "reviewed", **BY)
+    await shop_catalog.update_product(db, product["id"], {"markup_cents": 250}, **BY)
+    assert (await shop_catalog.get_product(db, product["id"]))["status"] == "draft"
+    await shop_products.set_status(db, product["id"], "reviewed", **BY)
+    medium = await variant_for(db, product["id"], BLACK_M)
+    await shop_catalog.update_variant(db, medium["id"], {"label": "Schwarz / M"}, **BY)
+    assert (await shop_catalog.get_product(db, product["id"]))["status"] == "draft"
+    await shop_products.set_status(db, product["id"], "reviewed", **BY)
+    await shop_catalog.update_product(db, product["id"], {"title": "Nur der Titel"}, **BY)
+    assert (await shop_catalog.get_product(db, product["id"]))["status"] == "reviewed"
+
+
+@pytest.mark.asyncio
+async def test_an_unknown_stock_blocks_the_variant_and_the_order_needs_in_stock(db, provider, fake):
+    """Befund 2: „Lager unbekannt“ ist nicht lieferbar - fail-closed, auch in der Bestellung."""
+    product = await configured(db, provider)
+    await publish_unchecked(db, product["id"])
+    medium = await variant_for(db, product["id"], BLACK_M)
+    fake.stock[BLACK_M] = "out of stock"
+    await shop_catalog_sync.sync_product(db, product["id"], provider=provider, **BY)
+    del fake.stock[BLACK_M]  # Printful meldet für diese Variante nichts mehr
+    real = fake._op_getProductStockAvailabilityById
+
+    def without_black_m(args, params, body):
+        status, payload = real(args, params, body)
+        payload["data"] = [row for row in payload["data"] if row["catalog_variant_id"] != BLACK_M]
+        return status, payload
+
+    fake.stock[BLACK_M] = "in stock"
+    fake._op_getProductStockAvailabilityById = without_black_m
+    result = await shop_catalog_sync.sync_product(db, product["id"], provider=provider, **BY)
+    assert result["unblocked"] == [], "unbekannt entsperrt nicht"
+    medium = await variant_for(db, product["id"], BLACK_M)
+    assert medium["blocked_reason"]
+    # Eine Variante ohne Sperre, deren Lager aber nicht „lieferbar“ ist, nimmt die Bestellung trotzdem nicht.
+    white = await variant_for(db, product["id"], WHITE_M)
+    await shop_catalog.set_catalog_mapping(db, white["id"], {"in_stock": None}, actor_id=ACTOR)
+    with pytest.raises(ShopError, match="nicht bestellbar"):
+        await shop_orders.place_order(
+            db, user_id="konto-1", idempotency_key="bestellung-0010", buyer_kind="member",
+            lines=[{"variant_id": white["id"], "quantity": 1, "gamertag": "Testlöwe"}], shipping_estimate_cents=490,
+            billing_address=dict(BILLING), shipping_address=dict(SHIPPING), actor_id="konto-1")
+
+
+@pytest.mark.asyncio
+async def test_a_new_variant_with_unknown_stock_is_blocked_with_its_own_reason(db, provider, fake):
+    real = fake._op_getProductStockAvailabilityById
+
+    def without_white_l(args, params, body):
+        status, payload = real(args, params, body)
+        payload["data"] = [row for row in payload["data"] if row["catalog_variant_id"] != WHITE_L]
+        return status, payload
+
+    fake._op_getProductStockAvailabilityById = without_white_l
+    product = await configured(db, provider)
+    large = await variant_for(db, product["id"], WHITE_L)
+    assert large["blocked_reason"] == "Lager bei Printful unbekannt."
+
+
+@pytest.mark.asyncio
+async def test_the_sync_discards_its_result_when_the_product_changed_meanwhile(db, provider, fake):
+    """Befund 3: der Abgleich schreibt nur auf den Stand, den er gelesen hat."""
+    from decimal import Decimal
+
+    product = await configured(db, provider)
+    fake.prices[BLACK_M] = Decimal("11.00")
+    real = provider.catalog_variants
+
+    async def changed_meanwhile(*args, **kwargs):
+        rows = await real(*args, **kwargs)
+        await shop_products.set_placements(db, product["id"], PLACEMENTS[:2], included_placement="front",
+                                           actor_id=ACTOR, reason="Rückseite weg")
+        return rows
+
+    provider.catalog_variants = changed_meanwhile
+    result = await shop_catalog_sync.sync_product(db, product["id"], provider=provider, **BY)
+    assert result["ok"] is False and result["skipped"] is True
+    assert "übersprungen" in result["detail"]
+    medium = await variant_for(db, product["id"], BLACK_M)
+    assert (await shop_catalog.printful_variant_for(db, medium["id"]))["base_cost_cents"] == 975
+    stored = await shop_catalog.get_product(db, product["id"])
+    assert "übersprungen" in stored["catalog_sync"]["detail"]
+
+
+@pytest.mark.asyncio
+async def test_only_one_sync_runs_at_a_time(db, provider):
+    """Befund 4: eine Sperre mit Ablauf - ein zweiter Abgleich bekommt „läuft gerade“."""
+    from services.mutation_lock import mutation_lock
+
+    product = await configured(db, provider)
+    async with mutation_lock(db, shop_catalog_sync.SYNC_RESOURCE, wait_seconds=0, lease_seconds=30):
+        with pytest.raises(ShopConflict, match="läuft gerade"):
+            await shop_catalog_sync.sync_product(db, product["id"], provider=provider, **BY)
+        summary = await shop_catalog_sync.sync_all(db, provider=provider)
+        assert summary["skipped"] == "Abgleich läuft gerade"
+    assert (await shop_catalog_sync.sync_product(db, product["id"], provider=provider, **BY))["ok"] is True
+
+
+@pytest.mark.asyncio
+async def test_the_daily_sync_pages_through_all_products(db, provider, monkeypatch):
+    """Befund 5: keine stille Grenze bei 500 - seitenweise alle."""
+    seen = []
+
+    async def record(_db, product_id, **_kwargs):
+        seen.append(product_id)
+        return {"ok": True}
+
+    for index in range(7):
+        product = await new_product(db, title=f"Seitentest {index}")
+        await db.shop_products.update_one({"id": product["id"]}, {"$set": {"printful": {"product_id": 71}}})
+    monkeypatch.setattr(shop_catalog_sync, "PAGE_SIZE", 3)
+    monkeypatch.setattr(shop_catalog_sync, "_sync_product_unlocked", record)
+    summary = await shop_catalog_sync.sync_all(db, provider=provider)
+    assert summary["products"] == 7 and len(set(seen)) == 7
+
+
+@pytest.mark.asyncio
+async def test_a_purchase_price_of_zero_blocks_the_variant(db, provider, fake):
+    """Befund 6: Einkauf 0,00 € oder fehlend ist kein Preis - die Variante wird gesperrt („Preis fehlt“)."""
+    from decimal import Decimal
+
+    fake.prices[WHITE_M] = Decimal("0.00")
+    product = await configured(db, provider, accept=False)
+    white = await variant_for(db, product["id"], WHITE_M)
+    assert white["blocked_reason"] == "Preis fehlt bei Printful."
+    view = await shop_products.admin_view(db, product["id"])
+    assert next(row for row in view["variants"] if row["label"] == "White / M")["cost_cents"] is None
+    with pytest.raises(ShopError, match="Einkaufspreis"):
+        await shop_products.accept_prices(db, product["id"], **BY)
+    fake.prices[WHITE_M] = Decimal("9.75")
+    result = await shop_catalog_sync.sync_product(db, product["id"], provider=provider, **BY)
+    assert result["unblocked"] == ["White / M"]
+
+
+@pytest.mark.asyncio
+async def test_a_sales_price_needs_the_minimum_price(db, provider):
+    """Befund 6: Verkaufspreis mindestens der Mindestpreis (einstellbar, Vorgabe 1 €)."""
+    plain = await new_product(db, title="Kappe Test", personalization="none")
+    with pytest.raises(ShopError, match="Mindestpreis"):
+        await shop_catalog.update_product(db, plain["id"], {"base_price_cents": 0}, **BY)
+    with pytest.raises(ShopError, match="Mindestpreis"):
+        await shop_catalog.create_variant(db, plain["id"], {"sku": "K-1", "label": "Eine", "price_cents": 99}, **BY)
+    variant = await shop_catalog.create_variant(db, plain["id"], {"sku": "K-2", "label": "Eine", "price_cents": 100},
+                                                **BY)
+    with pytest.raises(ShopError, match="Mindestpreis"):
+        await shop_catalog.update_variant(db, variant["id"], {"price_cents": 0}, **BY)
+    product = await configured(db, provider)
+    await db.settings.update_one({"id": "shop"}, {"$set": {"id": "shop", "min_price_cents": 2000}}, upsert=True)
+    view = await shop_products.admin_view(db, product["id"])
+    prices = check_item(view, "prices")
+    assert prices["ok"] is False and "Mindestpreis" in prices["detail"]

@@ -24,6 +24,7 @@ Jeder Schritt braucht einen Grund und steht im Protokoll (Aktionen ``shop.produc
 """
 from __future__ import annotations
 
+import functools
 import math
 from typing import Any
 
@@ -49,6 +50,16 @@ MAX_PLACEMENTS = len(PRINTFUL_PLACEMENTS)
 NOT_EDITABLE_ACTIVE = "Veröffentlicht: zum Ändern das Produkt erst zurückziehen (zurück auf „Entwurf“)."
 NOT_EDITABLE_ARCHIVED = "Archiviert: zum Ändern erst wieder als Entwurf öffnen."
 MOCKUP_OPEN = "Offen: die Mockup-Prüfung kommt mit #1710 - bis dahin lässt sich nichts veröffentlichen."
+
+
+def _locked(func):
+    """Schritte des Aufbaus und der Schreibteil des Abgleichs nacheinander (``shop_catalog.product_lock``)."""
+    @functools.wraps(func)
+    async def wrapper(db, product_id: str, *args, **kwargs):
+        async with shop_catalog.product_lock(db, product_id):
+            return await func(db, product_id, *args, **kwargs)
+
+    return wrapper
 
 
 class CatalogUnavailable(ShopError):
@@ -155,6 +166,7 @@ def _printful_number(value: Any) -> int:
     return value
 
 
+@_locked
 async def load_printful_product(db, product_id: str, printful_product_id: Any, *, provider: FulfillmentProvider,
                                 actor_id: str, reason: Any) -> dict:
     """Schritt 1: das Katalogprodukt bei Printful laden und als Abzug speichern (ohne Preise - die holt Schritt 2 nur
@@ -210,8 +222,22 @@ def _list(raw: Any, label: str) -> list:
 
 async def set_offer(db, product_id: str, *, technique: Any, colors: Any, sizes: Any, provider: FulfillmentProvider,
                     actor_id: str, reason: Any) -> dict:
-    """Schritt 2: welche Farben und Größen angeboten werden. Legt die Varianten an und holt danach die Einkaufspreise."""
+    """Schritt 2: welche Farben und Größen angeboten werden. Legt die Varianten an und holt danach die Einkaufspreise.
+    Läuft gerade ein anderer Abgleich, bleiben die Preise offen (Prüfung „Preis“) - „Mit Printful abgleichen“ holt sie."""
     reason = clean_reason(reason)
+    async with shop_catalog.product_lock(db, product_id):
+        saved = await _save_offer(db, product_id, technique=technique, colors=colors, sizes=sizes, actor_id=actor_id,
+                                  reason=reason)
+    try:
+        await shop_catalog_sync.sync_product(db, product_id, provider=provider, actor_id=actor_id, reason=reason,
+                                             wait_seconds=5.0)
+    except ShopConflict:
+        pass  # ein anderer Abgleich läuft - die Ansicht zeigt die fehlenden Preise
+    return await shop_catalog.get_product(db, product_id) or saved
+
+
+async def _save_offer(db, product_id: str, *, technique: Any, colors: Any, sizes: Any, actor_id: str,
+                      reason: str) -> dict:
     product = await _product(db, product_id)
     _editable(product)
     printful = product.get("printful")
@@ -247,8 +273,7 @@ async def set_offer(db, product_id: str, *, technique: Any, colors: Any, sizes: 
     for variant in await shop_catalog.variants_of(db, product_id):
         if variant["id"] not in offered_ids and variant.get("active"):
             await shop_catalog.set_variant_state(db, variant["id"], {"active": False}, actor_id=actor_id)
-    await shop_catalog_sync.sync_product(db, product_id, provider=provider, actor_id=actor_id, reason=reason)
-    return await shop_catalog.get_product(db, product_id) or saved
+    return saved
 
 
 # ---------------------------------------------------------------- 3. Platzierungen und Designs
@@ -270,6 +295,7 @@ async def available_placements(db, product: dict) -> list[dict]:
     return out
 
 
+@_locked
 async def set_placements(db, product_id: str, placements: Any, *, included_placement: str | None, actor_id: str,
                          reason: Any) -> dict:
     """Platzierungen mit Art (Design, Gamertag, Vereinsnummer) und Position in Zoll. Designs bleiben bei Platzierungen,
@@ -320,6 +346,7 @@ async def set_placements(db, product_id: str, placements: Any, *, included_place
                                data={"before": before, "after": after, "included_placement": included_placement})
 
 
+@_locked
 async def set_designs(db, product_id: str, assignments: Any, *, actor_id: str, reason: Any) -> dict:
     """Je Platzierung und Farbe ein Design aus #1708 (``design_key`` oder ``None`` zum Entfernen)."""
     reason = clean_reason(reason)
@@ -372,6 +399,7 @@ async def _offered(db, product: dict) -> list[tuple[dict, dict | None]]:
     return [(variant, mappings.get(variant["id"])) for variant in variants]
 
 
+@_locked
 async def accept_prices(db, product_id: str, *, actor_id: str, reason: Any) -> dict:
     """Die Einkaufspreise als Mitgliederpreis übernehmen (Selbstkostenpreis) - nur so kommen Preise von Printful in
     den Shop. Beendet offene Preiswarnungen des Abgleichs."""
@@ -484,13 +512,21 @@ async def run_check(db, product: dict) -> dict:
     items.append(_item("stock", "Lieferbar", bool(offered) and not unavailable,
                        ("Nicht lieferbar oder Lager unbekannt: " + ", ".join(unavailable)) if unavailable else
                        "Alle angebotenen Varianten sind bei Printful lieferbar." if offered else "Keine Varianten."))
-    unpriced = []
+    unpriced, too_cheap = [], []
+    minimum = (await shop_config.load(db))["min_price_cents"]
     for variant, mapping in offered:
         cost = cost_cents(product, mapping)
         if cost is None or variant.get("price_cents") != cost or (mapping or {}).get("price_warning"):
             unpriced.append(variant["label"])
-    items.append(_item("prices", "Preis berechnet und übernommen", bool(offered) and not unpriced,
-                       ("Preis fehlt oder weicht vom Einkauf ab: " + ", ".join(unpriced)) if unpriced else
+        elif variant["price_cents"] < minimum:
+            too_cheap.append(variant["label"])
+    problems = []
+    if unpriced:
+        problems.append("Preis fehlt oder weicht vom Einkauf ab: " + ", ".join(unpriced))
+    if too_cheap:
+        problems.append(f"Unter dem Mindestpreis ({minimum // 100},{minimum % 100:02d} €): " + ", ".join(too_cheap))
+    items.append(_item("prices", "Preis berechnet und übernommen", bool(offered) and not problems,
+                       ". ".join(problems) if problems else
                        "Mitgliederpreis = Einkauf, übernommen." if offered else "Keine Varianten."))
     mockup = await mockup_check(db, product)
     items.append({"key": "mockup", "label": "Mockup-Prüfung", "ok": bool(mockup.get("ok")),
@@ -509,6 +545,7 @@ TRANSITIONS = {
 }
 
 
+@_locked
 async def set_status(db, product_id: str, status: str, *, actor_id: str, reason: Any) -> dict:
     """Entwurf → geprüft (Prüfung ohne Mockups bestanden) → veröffentlicht (alles bestanden, auch Mockups) →
     archiviert. Zurück auf „Entwurf“ geht immer (Zurückziehen, wieder öffnen)."""
