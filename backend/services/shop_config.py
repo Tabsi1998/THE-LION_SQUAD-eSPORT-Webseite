@@ -207,7 +207,6 @@ async def update(db, changes: dict, *, actor: dict, is_superadmin: bool, reason:
     unknown = sorted(set(changes) - set(UPDATE_FIELDS))
     if unknown:
         raise ShopError(f"Unbekannte Einstellungen ({', '.join(unknown)}).")
-    shop_common.clean_reason(reason)
     current = await load(db)
     after: dict = {}
     for field, value in changes.items():
@@ -230,6 +229,8 @@ async def update(db, changes: dict, *, actor: dict, is_superadmin: bool, reason:
         if not current["tax_cleared"]:
             raise ShopConflict("„Öffentlich“ ist gesperrt, bis die Steuer geklärt ist (#1701).")
     switching_on = after.get("orders_to_printful") is True
+    # Kritisch und deshalb mit Pflicht-Grund: „Öffentlich“ und Notschalter einschalten.
+    shop_common.clean_reason(reason, required=after.get("stage") == "public" or switching_on)
     if switching_on and key_state(current) != "ok":
         raise ShopConflict(NO_KEY)
     # Einschalten nur, solange der Schlüssel noch da ist - als ein bedingtes Update, damit ein gleichzeitiges
@@ -245,7 +246,7 @@ async def update(db, changes: dict, *, actor: dict, is_superadmin: bool, reason:
 async def set_tax_clearance(db, cleared: bool, *, actor: dict, reason: Any) -> dict:
     """Freigabe „Steuer geklärt“ (#1701) - nur Superadmin (prüft die Route), Pflicht-Grund. Zurücknehmen geht nur, wenn
     der Shop nicht öffentlich ist."""
-    text = shop_common.clean_reason(reason)
+    text = shop_common.clean_reason(reason, required=True)
     current = await load(db)
     if bool(current["tax_cleared"]) == cleared:
         return current
@@ -269,7 +270,6 @@ def clean_key(raw: Any) -> str:
 async def set_printful_key(db, raw_key: Any, *, actor: dict, reason: Any) -> dict:
     """Schlüssel verschlüsselt speichern. Ins Protokoll kommt nur „hinterlegt“, nie der Wert."""
     key = clean_key(raw_key)
-    shop_common.clean_reason(reason)
     current = await load(db)
     before = "hinterlegt" if key_state(current) != "missing" else "fehlt"
     await shop_common.record_admin_action(db, "shop.config", actor_id=actor["id"], target_id=SETTINGS_ID,
@@ -282,7 +282,7 @@ async def set_printful_key(db, raw_key: Any, *, actor: dict, reason: Any) -> dic
 
 async def remove_printful_key(db, *, actor: dict, reason: Any) -> dict:
     """Schlüssel entfernen - der Notschalter geht dabei mit aus: ohne Schlüssel kann nichts gesendet werden."""
-    shop_common.clean_reason(reason)
+    shop_common.clean_reason(reason, required=True)
     current = await load(db)
     if key_state(current) == "missing":
         return current

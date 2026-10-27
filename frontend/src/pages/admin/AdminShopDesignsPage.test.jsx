@@ -98,7 +98,7 @@ test("der Hintergrund der Vorschau wechselt auf dunkles und helles Shirt", async
   expect(screen.getByTestId("shop-design-preview")).toHaveClass("bg-white");
 });
 
-test("eine neue Version hochladen braucht Datei und Grund und schickt nur Datei, Kennung und Grund", async () => {
+test("eine neue Version hochladen braucht eine Datei - der Grund ist optional", async () => {
   uploadApiMock.post.mockResolvedValue({ data: { ...view(), uploaded: { design_key: "loewe-weiss", version: 3, sha256: SHA, warnings: ["Kein durchsichtiger Hintergrund."] } } });
   const user = userEvent.setup();
   show();
@@ -107,9 +107,8 @@ test("eine neue Version hochladen braucht Datei und Grund und schickt nur Datei,
   expect(submit).toBeDisabled();
   const file = new File([new Uint8Array([137, 80, 78, 71])], "loewe.png", { type: "image/png" });
   await user.upload(screen.getByTestId("shop-design-file"), file);
-  expect(submit).toBeDisabled();
-  await user.type(screen.getByTestId("shop-design-reason"), "Linien dicker");
   expect(submit).toBeEnabled();
+  await user.type(screen.getByTestId("shop-design-reason"), "Linien dicker");
   await user.click(submit);
   expect(uploadApiMock.post).toHaveBeenCalledTimes(1);
   const [url, form] = uploadApiMock.post.mock.calls[0];
@@ -179,7 +178,7 @@ test("einen Druckbereich ändern zeigt cm mit und schickt Zoll mit Grund", async
   expect(screen.getByTestId("shop-placement-front_right")).toHaveTextContent("= 11,4 cm");
   expect(screen.getByTestId("shop-placement-front_right")).toHaveTextContent("nötig: 1350 px Breite");
   const save = screen.getByTestId("shop-placement-front_right-save");
-  expect(save).toBeDisabled();
+  expect(save).toBeEnabled();
   await user.type(screen.getByTestId("shop-placement-front_right-reason"), "Löwe größer");
   await user.click(save);
   expect(apiMock.put).toHaveBeenCalledWith("/admin/shop/designs/placements/front_right", {

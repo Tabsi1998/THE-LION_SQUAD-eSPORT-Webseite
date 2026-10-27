@@ -55,27 +55,41 @@ test("zeigt den Status und sperrt „Öffentlich“ mit Hinweis, solange die Ste
   expect(screen.queryByTestId("shop-key-input")).toBeNull();
 });
 
-test("Stufe umstellen braucht einen Grund und schickt nur Stufe und Grund", async () => {
+test("Stufe umstellen geht ohne Grund - der Grund ist optional", async () => {
   apiMock.patch.mockResolvedValue({ data: view({ config: { stage: "admins", stage_label: "Nur Admins (Test)" } }) });
   const user = userEvent.setup();
   render(<AdminShopPage />);
   await user.click(await screen.findByTestId("shop-stage-admins"));
   expect(screen.getByTestId("shop-stage-change")).toHaveTextContent("Von Aus auf Nur Admins (Test)");
+  expect(screen.getByTestId("shop-stage-save-reason")).toHaveAttribute("placeholder", "Grund (optional, kommt ins Protokoll)");
   const save = screen.getByTestId("shop-stage-save-submit");
-  expect(save).toBeDisabled();
-  await user.type(screen.getByTestId("shop-stage-save-reason"), "Test mit dem Vorstand");
-  expect(save).toBeEnabled();
+  expect(save).toHaveAttribute("aria-disabled", "false");
   await user.click(save);
-  expect(apiMock.patch).toHaveBeenCalledWith("/admin/shop/config", { stage: "admins", reason: "Test mit dem Vorstand" });
+  expect(apiMock.patch).toHaveBeenCalledWith("/admin/shop/config", { stage: "admins", reason: "" });
   expect(toastMock.success).toHaveBeenCalledWith("Stufe jetzt: Nur Admins (Test).");
   expect(await screen.findByTestId("shop-status-stage")).toHaveTextContent("Nur Admins (Test)");
 });
 
-test("der Notschalter lässt sich ohne Schlüssel nicht einschalten", async () => {
+test("der Notschalter lässt sich ohne Schlüssel nicht einschalten - der Knopf sagt, warum", async () => {
+  const user = userEvent.setup();
   render(<AdminShopPage />);
   expect(await screen.findByTestId("shop-switch-needs-key")).toBeInTheDocument();
-  expect(screen.getByTestId("shop-switch-toggle-submit")).toBeDisabled();
+  const toggle = screen.getByTestId("shop-switch-toggle-submit");
+  expect(toggle).toHaveAttribute("aria-disabled", "true");
+  await user.type(screen.getByTestId("shop-switch-toggle-reason"), "Test einschalten");
+  await user.click(toggle);
+  expect(apiMock.patch).not.toHaveBeenCalled();
+  expect(screen.getByTestId("shop-switch-toggle-hint")).toHaveTextContent("Erst unten beim Printful-Zugang den Schlüssel hinterlegen.");
   expect(screen.getByTestId("shop-key-test")).toBeDisabled();
+});
+
+test("Schlüssel speichern ohne Token nennt, was fehlt", async () => {
+  apiMock.get.mockResolvedValue({ data: view({ rights: { can_edit_access: true } }) });
+  const user = userEvent.setup();
+  render(<AdminShopPage />);
+  await user.click(await screen.findByTestId("shop-key-save-submit"));
+  expect(apiMock.put).not.toHaveBeenCalled();
+  expect(screen.getByTestId("shop-key-save-hint")).toHaveTextContent("Erst den Printful-Token oben ins Schlüssel-Feld einfügen");
 });
 
 test("Preise in Euro werden als Cent gespeichert, leere Pauschale heißt keine", async () => {
@@ -142,7 +156,14 @@ test("der Superadmin gibt die Steuer frei - mit Grund", async () => {
   const user = userEvent.setup();
   render(<AdminShopPage />);
   const form = await screen.findByTestId("shop-tax-toggle-form");
+  // Kritisch: hier ist der Grund Pflicht. Ohne ihn sagt der Knopf, was fehlt, und setzt den Cursor ins Grund-Feld.
+  await user.click(within(form).getByTestId("shop-tax-toggle-submit"));
+  expect(apiMock.put).not.toHaveBeenCalled();
+  expect(within(form).getByTestId("shop-tax-toggle-hint")).toHaveTextContent("Bitte kurz einen Grund angeben");
+  expect(within(form).getByTestId("shop-tax-toggle-reason")).toHaveFocus();
+  expect(within(form).getByTestId("shop-tax-toggle-reason")).toHaveAttribute("aria-invalid", "true");
   await user.type(within(form).getByTestId("shop-tax-toggle-reason"), "Steuerberatung bestätigt");
+  expect(within(form).queryByTestId("shop-tax-toggle-hint")).toBeNull();
   await user.click(within(form).getByTestId("shop-tax-toggle-submit"));
   expect(apiMock.put).toHaveBeenCalledWith("/admin/shop/config/tax-clearance", { cleared: true, reason: "Steuerberatung bestätigt" });
   expect(await screen.findByTestId("shop-tax-state")).toHaveTextContent("Freigegeben von root");
