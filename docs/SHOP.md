@@ -656,6 +656,10 @@ der Rest ist transparent. Abgeglichen mit den offiziellen Vorlagen (Maße in `ma
   stabil. Ohne gespeicherten Stand fehlt das Paar ganz, bis Printful es vollständig liefert - eine fehlende Gruppe
   (etwa die 15-oz-Tasse) fällt nie auf die allgemeine Fläche. Ist Platzierung oder Technik einer übersprungenen Zeile
   nicht lesbar, werden keine neuen Maße übernommen (`last_error`, `skipped`, alter Stand bleibt).
+  Übernommene Paare stehen mit Datum in `carried` (`carried_since`, das erste Datum bleibt; eine vollständige Antwort
+  leert die Liste). Solange eines übernommen ist, warnt die Prüfung „Druckvorlage“ (gelb) und der Abgleich meldet eine
+  Warnung statt „ok“ (`catalog_sync.warning`, `sync_all` zählt `warnings`); nach `TEMPLATE_MAX_AGE_DAYS` (14 Tage)
+  wird die Prüfung rot wie bei einer veralteten Vorlage.
 - **Zu große Flächen** (über `MAX_FILE_PIXELS`) sind gültige Zeilen: das ganze Paar fällt weg und wird **nie** aus dem
   alten Stand übernommen - „Entfällt“ im Protokoll, betroffene Varianten gesperrt, statt Druckdateien in falscher Größe.
 - Ein Sicherheitsbereich als Zahl steht nicht in v2 (er ist ins Vorlagenbild gezeichnet) - dafür gibt es einen

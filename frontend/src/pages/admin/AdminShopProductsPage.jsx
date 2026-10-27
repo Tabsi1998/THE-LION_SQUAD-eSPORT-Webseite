@@ -137,6 +137,7 @@ function StatusBadge({ status, labels, testId }) {
 function CheckIcon({ state }) {
   if (state === "ok") return <CheckCircle2 className="w-4 h-4 text-ok shrink-0" aria-label="bestanden" />;
   if (state === "open") return <CircleDashed className="w-4 h-4 text-honor shrink-0" aria-label="offen" />;
+  if (state === "warn") return <AlertTriangle className="w-4 h-4 text-honor shrink-0" aria-label="Warnung" />;
   return <XOctagon className="w-4 h-4 text-warn shrink-0" aria-label="fehlt" />;
 }
 
@@ -550,7 +551,7 @@ function SyncLine({ view, busy, run }) {
   if (!view.product.printful) return null;
   return (
     <div className="flex flex-wrap items-center gap-3 text-xs" data-testid="shop-sync">
-      <span className={sync && !sync.ok ? "text-warn" : "text-white/60"}>
+      <span className={sync && !sync.ok ? "text-warn" : sync?.warning ? "text-honor" : "text-white/60"} data-state={sync?.warning ? "warn" : undefined}>
         {!sync ? "Noch nicht abgeglichen."
           : sync.ok ? `Abgleich ${viennaDateTime(sync.at)}: ${sync.detail}`
             : `Abgleich gescheitert (${viennaDateTime(sync.at)}): ${sync.detail} Stand vom ${sync.last_ok_at ? viennaDateTime(sync.last_ok_at) : "–"}.`}

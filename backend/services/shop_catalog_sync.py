@@ -111,7 +111,7 @@ async def _sync_product_unlocked(db, product_id: str, *, provider: FulfillmentPr
     # erzeugte Druckdateien ungültig (die Prüfung zeigt „veraltet“). Scheitert das, bleibt der letzte Stand.
     template = await shop_print_templates.refresh(db, printful["product_id"], provider=provider, actor_id=actor_id,
                                                   reason=reason)
-    template_state = {key: template[key] for key in ("ok", "changed", "changes", "detail")}
+    template_state = {key: template.get(key) for key in ("ok", "changed", "changes", "detail", "warning")}
     try:
         async with shop_catalog.product_lock(db, product_id, wait_seconds=5.0):
             current = await shop_catalog.get_product(db, product_id)
@@ -120,14 +120,14 @@ async def _sync_product_unlocked(db, product_id: str, *, provider: FulfillmentPr
                 return {**await _failed(db, product_id, previous, now, SKIPPED, skipped=True),
                         "template": template_state}
             result = await _write(db, current, by_id, set(item.value for item in price_for), now=now,
-                                  actor_id=actor_id, reason=reason)
+                                  actor_id=actor_id, reason=reason, template_warning=template_state["warning"])
             return {**result, "template": template_state}
     except ShopConflict:
         return {**await _failed(db, product_id, previous, now, SKIPPED, skipped=True), "template": template_state}
 
 
 async def _write(db, product: dict, by_id: dict, priced_ids: set[int], *, now: str, actor_id: str,
-                 reason: str) -> dict:
+                 reason: str, template_warning: str | None = None) -> dict:
     """Schreibt Lager, Einkauf, Sperren und Warnungen - nach frisch gelesenen Varianten, unter der Produkt-Sperre."""
     product_id = product["id"]
     variants = await shop_catalog.variants_of(db, product_id)
@@ -183,14 +183,16 @@ async def _write(db, product: dict, by_id: dict, priced_ids: set[int], *, now: s
         parts.append(f"{blocked_count} nicht bestellbar")
     if open_warnings:
         parts.append(f"{open_warnings} Preiswarnung{'en' if open_warnings != 1 else ''}")
-    state = {"at": now, "ok": True, "skipped": False, "detail": ", ".join(parts) + ".", "last_ok_at": now,
-             "blocked": blocked_count, "warnings": open_warnings}
+    # Übernommene Druckflächen (#2091, Review): kein glattes „ok“ - die Warnung steht im Stand und in der Zeile.
+    detail = ", ".join(parts) + "." + (f" Druckvorlage: {template_warning}" if template_warning else "")
+    state = {"at": now, "ok": True, "skipped": False, "detail": detail, "last_ok_at": now,
+             "blocked": blocked_count, "warnings": open_warnings, "warning": template_warning}
     await shop_catalog.record_catalog_sync(db, product_id, state)
     if blocked or unblocked or price_changes:
         await record_admin_action(db, "shop.catalog.sync", actor_id=actor_id, target_id=product_id, reason=reason,
                                   data={"blocked": blocked, "unblocked": unblocked, "price_changes": price_changes})
     return {"ok": True, "skipped": False, "detail": state["detail"], "at": now, "blocked": blocked,
-            "unblocked": unblocked, "price_changes": price_changes}
+            "unblocked": unblocked, "price_changes": price_changes, "warning": template_warning}
 
 
 async def sync_all(db, *, provider: FulfillmentProvider | None = None) -> dict:
@@ -204,7 +206,7 @@ async def sync_all(db, *, provider: FulfillmentProvider | None = None) -> dict:
 
         provider = PrintfulClient(key)
     query = {"printful.product_id": {"$exists": True}, "status": {"$ne": "archived"}}
-    total = failed = 0
+    total = failed = warned = 0
     try:
         async with mutation_lock(db, SYNC_RESOURCE, wait_seconds=0.0, lease_seconds=SYNC_LEASE_SECONDS):
             last = ""
@@ -221,9 +223,13 @@ async def sync_all(db, *, provider: FulfillmentProvider | None = None) -> dict:
                         failed += 1
                         continue
                     failed += 0 if result.get("ok") else 1
+                    # Druckflächen aus dem letzten vollständigen Stand: Warnung statt „ok“ (#2091, Review).
+                    warned += 1 if (result.get("template") or {}).get("warning") else 0
                 if len(page) < PAGE_SIZE:
                     break
                 last = page[-1]["id"]
     except MutationLockBusy:
-        return {"products": total, "failed": failed, "skipped": DAILY_BUSY}
-    return {"products": total, "failed": failed}
+        return {"products": total, "failed": failed, "warnings": warned, "skipped": DAILY_BUSY}
+    if warned:
+        logger.warning("[shop-sync] %d product(s) with carried print areas", warned)
+    return {"products": total, "failed": failed, "warnings": warned}

@@ -458,11 +458,19 @@ async def test_a_partial_answer_keeps_the_stored_area_without_flapping(db, provi
     assert stored["hash"] == good["hash"] and stored["entries"] == good["entries"]
     assert templates.entry_for_variant(stored, "dtg", "back", 4012)["height_px"] == 2400
     assert stored["skipped"] == [
-        "Druckvorgabe back (dtg): Feld dpi fehlt oder passt nicht (erwartet: ganze Zahl von 72 bis 1200).",
-        "Unvollständig geliefert, es gilt weiter der letzte vollständige Stand: Rückseite (dtg)."]
+        "Druckvorgabe back (dtg): Feld dpi fehlt oder passt nicht (erwartet: ganze Zahl von 72 bis 1200)."]
+    # Übernommen mit Datum, als Warnung - nicht als glattes „ok“ (Review #2091).
+    assert [(row["placement"], row["technique"], row["label"]) for row in stored["carried"]] == [
+        ("back", "dtg", "Rückseite (dtg)")]
+    since = stored["carried"][0]["carried_since"]
+    assert partial["warning"] == (f"Printful liefert unvollständig, es gilt weiter der letzte vollständige Stand (seit "
+                                  f"{since[:10]}): Rückseite (dtg).")
+    again = await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR)
+    assert again["template"]["carried"][0]["carried_since"] == since, "das erste Datum bleibt"
     back["dpi"] = 150
     full = await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR)
     assert full["changed"] is False and full["template"]["hash"] == good["hash"] and full["template"]["skipped"] == []
+    assert full["warning"] is None and full["template"]["carried"] == []
     assert await db.audit_logs.count_documents({"action": "shop.print_template.change"}) == 0
 
 

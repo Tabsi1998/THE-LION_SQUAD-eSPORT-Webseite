@@ -60,7 +60,7 @@ MODEL_FIELDS: dict[str, tuple[str, ...]] = {
                             "erase_pending_at", "file_deleted_at"),
     # Druckvorlagen von Printful (#2069, services/shop_print_templates.py): Maße je Fläche, Vorlagenbilder, Abgleich.
     "shop_print_templates": ("printful_product_id", "entries", "previews", "hash", "previous_hash", "fetched_at",
-                             "checked_at", "changed_at", "changes", "last_error", "skipped"),
+                             "checked_at", "changed_at", "changes", "last_error", "skipped", "carried"),
     # Erzeugte bzw. hochgeladene Druckdateien (#2069, services/shop_print_files.py). Bestelldateien mit Gamertag zeigen
     # den Namen: die Zeile gehört dann zu Konto, Bestellung und Position - nie der Name als Text.
     "shop_print_files": ("id", "origin", "purpose", "product_id", "placement", "printful_placement", "technique",

@@ -176,6 +176,28 @@ def _pair_label(pair: tuple[str, str]) -> str:
     return f"{placement_label(pair[0])} ({pair[1]})"
 
 
+def carried_pairs(entries: Sequence[dict], incomplete: set[tuple[str, str]]) -> set[tuple[str, str]]:
+    """Welche unvollständigen Paare aus dem alten Stand übernommen sind (für ``carried``)."""
+    return {(row["placement"], row["technique"]) for row in entries} & set(incomplete)
+
+
+def carried_state(pairs: set[tuple[str, str]], before: Sequence[dict] | None, now: str) -> list[dict]:
+    """Je übernommenem Paar seit wann (#2091, Review) - das erste Datum bleibt, solange das Paar übernommen ist. Eine
+    vollständige Antwort leert die Liste. Daran hängen die Warnung und nach ``TEMPLATE_MAX_AGE_DAYS`` die rote Prüfung."""
+    since = {(row.get("placement"), row.get("technique")): row.get("carried_since") for row in before or []
+             if isinstance(row, dict)}
+    return [{"placement": placement, "technique": technique, "label": _pair_label((placement, technique)),
+             "carried_since": since.get((placement, technique)) or now} for placement, technique in sorted(pairs)]
+
+
+def carried_warning(carried: Sequence[dict]) -> str | None:
+    if not carried:
+        return None
+    first = min(str(row.get("carried_since") or "") for row in carried)[:10]
+    return ("Printful liefert unvollständig, es gilt weiter der letzte vollständige Stand (seit " + first + "): "
+            + ", ".join(row["label"] for row in carried) + ".")
+
+
 def merge_incomplete(entries: list[dict], old_entries: Sequence[dict],
                      incomplete: set[tuple[str, str]]) -> tuple[list[dict], list[str]]:
     """Unvollständig gelesene Paare (Platzierung, Technik) nie halb übernehmen (#2091, Review): sonst fiele eine
@@ -186,12 +208,9 @@ def merge_incomplete(entries: list[dict], old_entries: Sequence[dict],
         return entries, []
     kept = [row for row in entries if (row["placement"], row["technique"]) not in incomplete]
     carried = [row for row in old_entries if (row["placement"], row["technique"]) in incomplete]
-    carried_pairs = {(row["placement"], row["technique"]) for row in carried}
+    # Übernommene Paare stehen nicht hier, sondern als Warnung mit Datum (``carried``, ``carried_warning``) - einmal.
     notes = []
-    if carried_pairs:
-        notes.append("Unvollständig geliefert, es gilt weiter der letzte vollständige Stand: "
-                     + ", ".join(_pair_label(pair) for pair in sorted(carried_pairs)) + ".")
-    missing = incomplete - carried_pairs
+    missing = incomplete - {(row["placement"], row["technique"]) for row in carried}
     if missing:
         notes.append("Unvollständig geliefert, nicht übernommen, bis Printful sie vollständig liefert: "
                      + ", ".join(_pair_label(pair) for pair in sorted(missing)) + ".")
@@ -321,8 +340,9 @@ async def refresh(db, printful_product_id: int, *, provider: FulfillmentProvider
         return {"ok": False, "changed": False, "changes": [], "detail": detail, "template": await get(db, printful_product_id)}
     new_hash = spec_hash(entries)
     changes = diff(current.get("entries") or [], entries) if current and current.get("entries") else []
+    carried = carried_state(carried_pairs(entries, incomplete), (current or {}).get("carried"), now)
     update: dict = {"printful_product_id": printful_product_id, "entries": entries, "previews": previews,
-                    "hash": new_hash, "checked_at": now, "last_error": None, "skipped": skipped}
+                    "hash": new_hash, "checked_at": now, "last_error": None, "skipped": skipped, "carried": carried}
     if not current or current.get("hash") != new_hash:
         update.update(fetched_at=now, changed_at=now if current and current.get("hash") else None,
                       changes=changes, previous_hash=(current or {}).get("hash"))
@@ -333,8 +353,9 @@ async def refresh(db, printful_product_id: int, *, provider: FulfillmentProvider
                                   target_id=str(printful_product_id), reason=reason,
                                   data={"changes": changes, "before_hash": current.get("hash"),
                                         "after_hash": new_hash})
+    # Übernommene Paare sind kein glattes „ok“: der Abgleich meldet sie als Warnung (#2091, Review).
     return {"ok": True, "changed": bool(changes), "changes": changes, "detail": None,
-            "template": await get(db, printful_product_id)}
+            "warning": carried_warning(carried), "template": await get(db, printful_product_id)}
 
 
 # Vorgabe, wenn weder das Produkt noch Printful eine Technik nennt (#2091): Direktdruck vor Transfer vor Stickerei - wie

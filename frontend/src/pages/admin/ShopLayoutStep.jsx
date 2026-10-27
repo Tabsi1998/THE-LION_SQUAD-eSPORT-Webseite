@@ -405,10 +405,11 @@ export function TemplateStatus({ view, busy, run }) {
         {template?.last_error ? ` Letzter Versuch gescheitert: ${template.last_error.detail}` : ""}
       </span>
       <button type="button" disabled={busy === "templates"} onClick={() => run("templates", () => api.post(`${BASE}/${view.product.id}/print-templates/refresh`, { reason: "" }),
-        (next) => (next.template_result?.changed ? `Printful hat Maße geändert: ${next.template_result.changes.length} Flächen.` : next.template_result?.ok ? "Druckvorlagen aktuell." : "Printful nicht erreichbar – letzter Stand bleibt."))}
+        (next) => (next.template_result?.changed ? `Printful hat Maße geändert: ${next.template_result.changes.length} Flächen.` : next.template_result?.warning ? "Druckvorlagen abgeglichen – mit Warnung, siehe oben." : next.template_result?.ok ? "Druckvorlagen aktuell." : "Printful nicht erreichbar – letzter Stand bleibt."))}
         className={SMALL_BTN} data-testid="shop-template-refresh">
         <RefreshCw className={`w-3.5 h-3.5 ${busy === "templates" ? "motion-safe:animate-spin" : ""}`} aria-hidden="true" /> Vorlagen neu laden
       </button>
+      {template?.warning && <p className="basis-full text-honor inline-flex items-center gap-1" role="status" data-testid="shop-template-carried"><AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> {template.warning}</p>}
       {template?.skipped?.length > 0 && (
         <ul className="basis-full text-warn space-y-0.5" data-testid="shop-template-skipped">{template.skipped.map((line) => <li key={line}>{line}</li>)}</ul>
       )}

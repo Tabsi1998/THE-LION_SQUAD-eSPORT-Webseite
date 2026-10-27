@@ -568,6 +568,26 @@ test("nicht abbildbare alte Platzierungen: rote Meldung, Produkt nicht bestellba
   expect(box.className).toContain("text-live");
 });
 
+test("ein übernommener alter Stand der Druckvorlage ist sichtbar eine Warnung (#2091)", async () => {
+  const warning = "Printful liefert unvollständig, es gilt weiter der letzte vollständige Stand (seit 2026-10-27): Rückseite (dtg).";
+  const base = view();
+  const items = checkItems();
+  items.splice(1, 0, { key: "template", label: "Druckvorlage von Printful", ok: true, state: "warn", detail: warning, for_review: true });
+  apiMock.get.mockResolvedValue({ data: view({ items, extra: {
+    print_template: { ...base.print_template, warning, carried: [{ placement: "back", technique: "dtg", label: "Rückseite (dtg)", carried_since: "2026-10-27T05:20:00+00:00" }] },
+    sync: { ...base.sync, detail: `4 Varianten abgeglichen. Druckvorlage: ${warning}`, warning },
+  } }) });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  expect(await screen.findByTestId("shop-sync")).toHaveTextContent("Druckvorlage: Printful liefert unvollständig");
+  expect(screen.getByTestId("shop-sync").querySelector("[data-state='warn']")).not.toBeNull();
+  await user.click(screen.getByTestId("shop-step-publish"));
+  expect(screen.getByTestId("shop-check-template")).toHaveAttribute("data-state", "warn");
+  expect(within(screen.getByTestId("shop-check-template")).getByLabelText("Warnung")).toBeInTheDocument();
+  await user.click(screen.getByTestId("shop-step-designs"));
+  expect(screen.getByTestId("shop-template-carried")).toHaveTextContent("Rückseite (dtg)");
+});
+
 test("ohne Vorlagenbild bleibt die Fläche wählbar, mit Hinweis; übersprungene Zeilen stehen darüber (#2091)", async () => {
   const skipped = "Vorlagenbild back (dtg): Feld image_url fehlt oder passt nicht (erwartet: https-Adresse des Vorlagenbilds; ohne sie bleibt die Vorschau ohne Bild).";
   const base = view();
