@@ -244,7 +244,9 @@ gewinnt, sucht über `@external_id` nach und sendet; ein zweiter Aufruf bekommt 
 **erst nach einer Nachsuche** über `@external_id` und per bedingtem Update übernommen – gibt es den Auftrag, kommt er
 zurück. Ein Claim `created`, dessen gespeicherte Nummer Printful nicht findet (404), wird nur übernommen, wenn
 **alles** zutrifft: Abruf der Nummer `not_found`, Nachsuche über `@external_id` leer, und das letzte erfolgreiche
-Lesen (`seen_at`) liegt mit gültiger Zeit, nicht in der Zukunft, mehr als **10 Minuten** zurück. Sonst
+Lesen (`seen_at`, kein Rückfall auf `claimed_at`) liegt mit gültiger Zeit, nicht in der Zukunft, mehr als
+**10 Minuten** zurück. Ein Claim `created` oder `deleting` ohne brauchbare Nummer wird nie übernommen:
+`FulfillmentPermanent` `draft_claim_broken` („Entwurfs-Merkposten beschädigt – bitte in Printful prüfen“). Sonst
 `FulfillmentTransient` `draft_unreadable` („Entwurf bei Printful gerade nicht lesbar – bitte gleich noch einmal“) –
 ein kurz nicht lesbarer Auftrag (eventual consistency) führt so nie zu einem zweiten Entwurf. `delete_draft` setzt den
 Claim erst auf `deleting`, löscht dann bei Printful und entfernt danach den Claim – die `external_id` ist sofort wieder
@@ -292,7 +294,7 @@ immer eine **Variante** (`catalog_variant_id`), nie ein Produkt.
 | Klasse | Wann | Was tun |
 | --- | --- | --- |
 | `FulfillmentTransient` | Zeitüberschreitung, Netz, 429, 5xx, Schätzung noch nicht fertig, Entwurf oder Bestätigung läuft schon | später erneut versuchen (`retry_after`) |
-| `FulfillmentPermanent` | 401, 403, 404, Weiterleitung, unerwartete Antwort, kein Schlüssel, Bestätigung unklar (`confirm_unclear`) | Admin informieren |
+| `FulfillmentPermanent` | 401, 403, 404, Weiterleitung, unerwartete Antwort, kein Schlüssel, Bestätigung unklar (`confirm_unclear`), Merkposten beschädigt (`draft_claim_broken`) | Admin informieren |
 | `FulfillmentInvalid` | 400, 409, 422, gescheiterte Schätzung, kein Entwurf mehr, Schlüssel gehört zu anderem Auftrag | Bestellung blockieren |
 
 Alle erben von `FulfillmentError` mit `kind`, `reason`, `status`, `retry_after` und `provider_detail`.
