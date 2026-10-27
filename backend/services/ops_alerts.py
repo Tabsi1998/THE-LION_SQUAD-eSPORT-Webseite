@@ -59,14 +59,38 @@ def alert_due(last_sent_at: str | None, now: datetime | None = None, window_seco
     return current - last >= timedelta(seconds=window_seconds)
 
 
-async def claim_alert(db, key: str, now: datetime | None = None, window_seconds: int = ALERT_WINDOW_SECONDS) -> bool:
-    """Reserviert den Schlüssel für die Sperrfrist; False, wenn schon gemeldet."""
+async def claim_alert(db, key: str, now: datetime | None = None, window_seconds: int = ALERT_WINDOW_SECONDS) -> dict | None:
+    """Reserviert den Schlüssel für die Sperrfrist; None, wenn schon gemeldet. Atomar (#2080, Codex): nur wer das
+    bedingte ``find_one_and_update`` gewinnt (``last_sent_at`` fehlt oder liegt vor der Frist), sendet - zwei Läufe
+    zugleich melden nie doppelt. Zurück kommt der Claim für ``release_alert``."""
+    from pymongo import ReturnDocument
+    from pymongo.errors import DuplicateKeyError
+
     current = now or now_utc()
-    state = await db.ops_alert_state.find_one({"key": key}, {"_id": 0, "last_sent_at": 1})
-    if state and not alert_due(state.get("last_sent_at"), current, window_seconds):
-        return False
-    await db.ops_alert_state.update_one({"key": key}, {"$set": {"key": key, "last_sent_at": current.isoformat()}}, upsert=True)
-    return True
+    stamp = current.isoformat()
+    limit = (current - timedelta(seconds=window_seconds)).isoformat()
+    try:
+        await db.ops_alert_state.update_one({"key": key}, {"$setOnInsert": {"key": key}}, upsert=True)
+    except DuplicateKeyError:
+        pass  # ein gleichzeitiger Lauf hat die Zeile eben angelegt
+    before = await db.ops_alert_state.find_one_and_update(
+        {"key": key, "$or": [{"last_sent_at": {"$exists": False}}, {"last_sent_at": None}, {"last_sent_at": {"$lte": limit}}]},
+        {"$set": {"last_sent_at": stamp}},
+        # ``key`` mit ausgeben: ein Dokument ohne ``last_sent_at`` käme sonst leer zurück und hieße „nicht geholt“.
+        projection={"_id": 0, "key": 1, "last_sent_at": 1}, return_document=ReturnDocument.BEFORE,
+    )
+    if before is None:
+        return None
+    return {"key": key, "stamp": stamp, "previous": before.get("last_sent_at")}
+
+
+async def release_alert(db, claim: dict | None) -> None:
+    """Einen Claim zurückgeben, wenn der Versand gescheitert ist - nur, solange er noch der eigene ist."""
+    if not claim:
+        return
+    previous = claim.get("previous")
+    change = {"$set": {"last_sent_at": previous}} if previous else {"$unset": {"last_sent_at": ""}}
+    await db.ops_alert_state.update_one({"key": claim["key"], "last_sent_at": claim["stamp"]}, change)
 
 
 # ---------------------------------------------------------------- Einstellungen (Betrieb → Alarme)
@@ -151,11 +175,14 @@ async def save_alert_settings(db, patch: dict) -> dict:
 
 # ---------------------------------------------------------------- Melden
 
-async def _send(title: str, description: str, fields: list[dict], event_key: str) -> bool:
+# Discord sagt „nicht eingerichtet“ (Schalter aus, Bot aus, kein Betriebskanal) - dann gibt es den Weg gar nicht.
+DISCORD_NOT_SET_UP = frozenset({"disabled", "bot_off", "ops_channel_missing", "channel_missing"})
+
+
+async def _send(title: str, description: str, fields: list[dict], event_key: str) -> dict:
     from discord_service import send_ops_discord
 
-    outcome = await send_ops_discord(title, description, color=RED, url="/admin/ops", fields=fields, event_key=event_key)
-    return bool(outcome.get("ok"))
+    return await send_ops_discord(title, description, color=RED, url="/admin/ops", fields=fields, event_key=event_key) or {}
 
 
 def _mail_html(title: str, description: str, fields: list[dict]) -> str:
@@ -167,24 +194,37 @@ def _mail_html(title: str, description: str, fields: list[dict]) -> str:
 
 
 async def notify(db, kind: str, title: str, description: str = "", fields: list[dict] | None = None, *, key: str | None = None,
-                 force: bool = False, event_key: str | None = None) -> dict:
+                 force: bool = False, event_key: str | None = None, log_failure: bool = True) -> dict:
     """Ein Ereignis melden - nach den Regeln unter Betrieb → Alarme, mit Sperrfrist je Schlüssel.
-    Liefert, welche Wege gegangen sind. Nie eine Ausnahme nach außen: ein Alarm darf nichts abbrechen."""
+    Liefert, welche Wege gegangen sind. Nie eine Ausnahme nach außen: ein Alarm darf nichts abbrechen.
+
+    Ging kein Weg (#2080, Codex): ``reason`` sagt, warum. ``undeliverable`` - kein Weg eingerichtet (Discord aus bzw.
+    ohne Betriebskanal, keine Mail): der Claim bleibt, der nächste Versuch kommt nach der Sperrfrist. ``failed`` - ein
+    eingerichteter Weg scheiterte: der Claim wird zurückgegeben, der nächste Anlass versucht es gleich. Mit
+    ``log_failure=False`` landet ein solcher Fehlversuch nicht im Alarm-Log (der Aufrufer hat ihn schon einmal vermerkt)."""
     spec = ALERT_KINDS.get(kind)
     settings = await load_alert_settings(db)
     rule = settings["rules"].get(kind, {"discord": True, "email": False}) if spec else {"discord": True, "email": bool(settings["emails"])}
     channels: list[str] = []
+    set_up = False
     alert_key = key or f"{kind}"
-    if not force and not await claim_alert(db, alert_key, window_seconds=settings["cooldown_minutes"] * 60):
-        return {"sent": False, "channels": [], "reason": "cooldown"}
+    claim = None
+    if not force:
+        claim = await claim_alert(db, alert_key, window_seconds=settings["cooldown_minutes"] * 60)
+        if claim is None:
+            return {"sent": False, "channels": [], "reason": "cooldown"}
     fields = fields or []
     if rule.get("discord"):
         try:
-            if await _send(title, description, fields, event_key or f"ops_{kind}"):
+            outcome = await _send(title, description, fields, event_key or f"ops_{kind}")
+            if outcome.get("ok"):
                 channels.append("discord")
+            set_up = set_up or outcome.get("reason") not in DISCORD_NOT_SET_UP
         except Exception:  # noqa: BLE001 - ein Alarm darf nichts abbrechen
+            set_up = True
             logger.warning("[ops] Discord-Alarm %s fehlgeschlagen", alert_key, exc_info=True)
     if rule.get("email") and settings["emails"] and (spec is None or spec.get("email_allowed") is not False):
+        set_up = True
         try:
             from services.mail_outbox import enqueue_mail
 
@@ -194,11 +234,15 @@ async def notify(db, kind: str, title: str, description: str = "", fields: list[
             channels.append("email")
         except Exception:  # noqa: BLE001
             logger.warning("[ops] E-Mail-Alarm %s fehlgeschlagen", alert_key, exc_info=True)
-    await db.ops_alert_log.insert_one({
-        "id": new_id(), "kind": kind, "key": alert_key, "title": title[:200], "description": (description or "")[:500],
-        "channels": channels, "at": now_utc().isoformat(),
-    })
-    return {"sent": bool(channels), "channels": channels}
+    reason = None if channels else ("failed" if set_up else "undeliverable")
+    if reason == "failed":
+        await release_alert(db, claim)
+    if channels or log_failure:
+        await db.ops_alert_log.insert_one({
+            "id": new_id(), "kind": kind, "key": alert_key, "title": title[:200], "description": (description or "")[:500],
+            "channels": channels, "at": now_utc().isoformat(),
+        })
+    return {"sent": True, "channels": channels} if channels else {"sent": False, "channels": [], "reason": reason}
 
 
 def schedule_notify(db, kind: str, title: str, description: str = "", fields: list[dict] | None = None, *, key: str | None = None) -> None:
@@ -225,7 +269,7 @@ async def send_test_alert(db) -> dict:
     fields = [{"name": "Zeit", "value": now_utc().strftime("%d.%m.%Y %H:%M UTC"), "inline": True}]
     if any_discord:
         try:
-            if await _send("Testalarm aus Betrieb → Alarme", "Wenn diese Meldung ankommt, passt der Betriebskanal.", fields, "ops_test"):
+            if (await _send("Testalarm aus Betrieb → Alarme", "Wenn diese Meldung ankommt, passt der Betriebskanal.", fields, "ops_test")).get("ok"):
                 channels.append("discord")
         except Exception:  # noqa: BLE001
             logger.warning("[ops] Test-Alarm Discord fehlgeschlagen", exc_info=True)
@@ -280,8 +324,10 @@ async def alert_red_checks(db, run: dict) -> list[str]:
     je Prüfung gegen Flackern.
 
     Der Stand je Prüfung steht bei ihrem Schlüssel in ``ops_alert_state``: ``check_status`` (crit erst, wenn die Meldung
-    wirklich raus ist - scheitert der Versand, versucht es der nächste rote Lauf nach der Sperrfrist erneut), ``red_since``
-    und ``red_alerted_at``. Gibt die gemeldeten Schlüssel zurück."""
+    wirklich raus ist - scheitert der Versand, versucht es der nächste rote Lauf erneut), ``red_since``, ``red_alerted_at``
+    und ``undeliverable_logged``: ein Fehlversuch (kein Weg eingerichtet oder Versand gescheitert) steht je Rot-Episode
+    höchstens einmal im Alarm-Log, danach bleibt es still, bis die Prüfung wechselt oder ein Weg trägt. Gibt die
+    gemeldeten Schlüssel zurück."""
     settings = await load_alert_settings(db)
     reminder_seconds = int(settings.get("red_reminder_hours") or 0) * 3600
     sent: list[str] = []
@@ -290,9 +336,10 @@ async def alert_red_checks(db, run: dict) -> list[str]:
         status = check.get("status")
         state = await db.ops_alert_state.find_one({"key": key}, {"_id": 0}) or {}
         if status != "crit":
-            if state.get("check_status") != status or state.get("red_since"):
+            if state.get("check_status") != status or state.get("red_since") or state.get("undeliverable_logged"):
                 await db.ops_alert_state.update_one({"key": key}, {"$set": {"key": key, "check_status": status},
-                                                                   "$unset": {"red_since": "", "red_alerted_at": ""}}, upsert=True)
+                                                                   "$unset": {"red_since": "", "red_alerted_at": "", "undeliverable_logged": ""}},
+                                                    upsert=True)
             continue
         red_since = state.get("red_since") or run.get("at") or now_utc().isoformat()
         if state.get("check_status") == "crit":
@@ -303,14 +350,19 @@ async def alert_red_checks(db, run: dict) -> list[str]:
             if not state.get("red_since"):
                 await db.ops_alert_state.update_one({"key": key}, {"$set": {"key": key, "red_since": red_since}}, upsert=True)
             message = check_red_message(check, run)
+        first_failure = not state.get("undeliverable_logged")
         try:
-            outcome = await notify(db, "check_red", message["title"], message["description"], message["fields"], key=key, event_key="ops_check")
+            outcome = await notify(db, "check_red", message["title"], message["description"], message["fields"], key=key,
+                                   event_key="ops_check", log_failure=first_failure)
         except Exception:  # noqa: BLE001 - ein Alarm darf den Lauf nicht abbrechen; der nächste versucht es erneut
             logger.warning("[ops] Alarm %s nicht gemeldet", key, exc_info=True)
             continue
         if outcome.get("sent"):
-            await db.ops_alert_state.update_one({"key": key}, {"$set": {"check_status": "crit", "red_alerted_at": now_utc().isoformat()}})
+            await db.ops_alert_state.update_one({"key": key}, {"$set": {"check_status": "crit", "red_alerted_at": now_utc().isoformat()},
+                                                               "$unset": {"undeliverable_logged": ""}})
             sent.append(key)
+        elif outcome.get("reason") in ("undeliverable", "failed") and first_failure:
+            await db.ops_alert_state.update_one({"key": key}, {"$set": {"undeliverable_logged": True}})
     return sent
 
 

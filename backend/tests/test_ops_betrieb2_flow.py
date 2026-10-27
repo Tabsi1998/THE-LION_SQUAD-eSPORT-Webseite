@@ -259,8 +259,8 @@ async def _shift_alert_state(db, hours, *fields):
 
 @pytest.mark.asyncio
 async def test_a_red_alert_that_could_not_be_sent_is_tried_again(flow, monkeypatch):
-    """#2080 (Codex): Scheitert der Versand, gilt Rot nicht als gemeldet - der nächste rote Lauf nach der Sperrfrist
-    versucht es erneut."""
+    """#2080 (Codex): Scheitert der Versand, gilt Rot nicht als gemeldet und der Claim der Sperrfrist wird
+    zurückgegeben - der nächste rote Lauf versucht es gleich erneut."""
     import discord_service
 
     calls = []
@@ -275,10 +275,96 @@ async def test_a_red_alert_that_could_not_be_sent_is_tried_again(flow, monkeypat
     assert await ops_alerts.alert_red_checks(flow.db, _mail_queue_run("crit")) == []
     state = await flow.db.ops_alert_state.find_one({"key": "check:mail_queue"})
     assert state.get("check_status") != "crit", "nicht als gemeldet vermerkt"
-    assert await ops_alerts.alert_red_checks(flow.db, _mail_queue_run("crit")) == [], "Sperrfrist gilt weiter"
-    await _shift_alert_state(flow.db, 2, "last_sent_at")
+    assert not state.get("last_sent_at"), "der Claim ist zurückgegeben"
     assert await ops_alerts.alert_red_checks(flow.db, _mail_queue_run("crit")) == ["check:mail_queue"]
     assert len(calls) == 2 and "Mail-Queue ist rot" in calls[1]
+
+
+@pytest.mark.asyncio
+async def test_without_any_way_a_red_check_logs_once_and_sends_once_a_way_exists(flow, monkeypatch):
+    """#2080 (Codex): Ist kein Weg eingerichtet (Discord aus, keine Mail), gilt der Alarm als nicht zustellbar - ein
+    Eintrag im Alarm-Log je Rot-Episode, danach still. Ist ein Weg da, geht der Alarm normal raus."""
+    for _ in range(5):
+        assert await ops_alerts.alert_red_checks(flow.db, _mail_queue_run("crit")) == []
+        await _shift_alert_state(flow.db, 2, "last_sent_at")
+    assert await flow.db.ops_alert_log.count_documents({"kind": "check_red"}) == 1
+
+    import discord_service
+
+    sent = []
+
+    async def ok(title, description="", **kwargs):
+        sent.append(title)
+        return {"ok": True, "status_code": 204}
+
+    monkeypatch.setattr(discord_service, "send_ops_discord", ok)
+    assert await ops_alerts.alert_red_checks(flow.db, _mail_queue_run("crit")) == ["check:mail_queue"]
+    assert len(sent) == 1
+
+    # Nach einem Wechsel ist es eine neue Rot-Episode: wieder höchstens ein Eintrag, falls kein Weg da ist.
+    monkeypatch.undo()
+    assert await ops_alerts.alert_red_checks(flow.db, _mail_queue_run("ok")) == []
+    await _shift_alert_state(flow.db, 2, "last_sent_at")
+    for _ in range(3):
+        await ops_alerts.alert_red_checks(flow.db, _mail_queue_run("crit"))
+        await _shift_alert_state(flow.db, 2, "last_sent_at")
+    assert await flow.db.ops_alert_log.count_documents({"kind": "check_red"}) == 3
+
+
+class _ClaimRace:
+    """Zwei Läufe zugleich (#2080, Codex): die ersten Lesezugriffe auf ``ops_alert_state`` warten paarweise aufeinander,
+    so wie zwei Worker auf echtem MongoDB. Wer atomar bedingt schreibt, merkt davon nichts."""
+
+    def __init__(self, db, gated=4):
+        import asyncio
+
+        self._db = db
+        self.barrier = asyncio.Barrier(2)
+        self.left = gated
+
+    def __getattr__(self, name):
+        target = getattr(self._db, name)
+        return _RacingState(target, self) if name == "ops_alert_state" else target
+
+
+class _RacingState:
+    def __init__(self, collection, race):
+        self._collection = collection
+        self._race = race
+
+    def __getattr__(self, name):
+        return getattr(self._collection, name)
+
+    async def find_one(self, *args, **kwargs):
+        import asyncio
+        import contextlib
+
+        found = await self._collection.find_one(*args, **kwargs)
+        if self._race.left > 0:
+            self._race.left -= 1
+            with contextlib.suppress(asyncio.TimeoutError, asyncio.BrokenBarrierError):
+                await asyncio.wait_for(self._race.barrier.wait(), 1)
+        return found
+
+
+@pytest.mark.asyncio
+async def test_two_runs_at_once_send_a_red_alert_only_once(flow, discord_recorder):
+    """#2080 (Codex): Der Claim der Sperrfrist ist atomar - zwei Läufe zugleich ergeben genau einen Versand, auch bei
+    der Erinnerung nach 24 h."""
+    import asyncio
+
+    await flow.db.ops_alert_state.create_index("key", unique=True)
+    race = _ClaimRace(flow.db)
+    results = await asyncio.gather(ops_alerts.alert_red_checks(race, _mail_queue_run("crit")),
+                                   ops_alerts.alert_red_checks(race, _mail_queue_run("crit")))
+    assert sorted(len(result) for result in results) == [0, 1]
+    assert len(discord_recorder) == 1
+
+    await _shift_alert_state(flow.db, 25, "last_sent_at", "red_alerted_at")
+    race = _ClaimRace(flow.db)
+    await asyncio.gather(ops_alerts.alert_red_checks(race, _mail_queue_run("crit")),
+                         ops_alerts.alert_red_checks(race, _mail_queue_run("crit")))
+    assert len(discord_recorder) == 2, "eine Erinnerung, nicht zwei"
 
 
 @pytest.mark.asyncio

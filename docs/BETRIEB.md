@@ -12,7 +12,7 @@ Was die Website über sich selbst festhält, wo es steht und wann sie sich melde
 | System → Betrieb & Logs → **Checks** | Auto-Checks alle fünf Minuten: Datenbank, Speicher, Mail-Queue, Twitch, Dolibarr, Fehlergruppen, Besucher-Adresse, eindeutige Indizes, Datei-Nacharbeit, Bild-Erkennung (Tesseract und zweiter Leser, #2018), Shop (Stufe, Notschalter, Printful-Schlüssel, Fehler des letzten Verbindungstests, #1706); darunter die Dateien, deren Löschung scheiterte, mit „Erneut versuchen“ | `ops_check_runs`, `ops_check_episodes`, `pending_file_cleanups` |
 | System → Betrieb & Logs → **Alarme** | Wer bei welchem Ereignis eine Meldung bekommt, Sperrfrist, Testalarm, Aufbewahrung, letzte Alarme | `settings/ops_alerts`, `ops_alert_log` |
 | System → Betrieb & Logs → **Überblick** | Je Quelle Zähler und Auffälligkeiten, die neuesten Probleme der letzten sieben Tage | Sammelsicht |
-| System → Betrieb & Logs → **Ereignisse** | Alle Quellen in einer Liste: Serverfehler, Auto-Checks, Alarme, App-Logs, E-Mail-Versand, Mail-Queue, Adminaktionen, Uploads, Dolibarr-Abgleich, Discord-Bot – Filter nach Quelle, Schwere, Zeitraum, Text; „Als CSV“. Auto-Checks stehen je **Zustand** darin, nicht je Lauf: ein Eintrag je Wechsel von Ampel oder betroffenen Prüfungen, mit „seit … · 92× geprüft · zuletzt …“ (#2080). Beim ersten Start nach diesem Update trägt der Server die gespeicherten Läufe der letzten 7 Tage einmal nach (Merker `settings/ops_check_episodes_backfill`; Rückweg: `ops_check_episodes` leeren und den Merker löschen) | `GET /api/admin/ops/events` |
+| System → Betrieb & Logs → **Ereignisse** | Alle Quellen in einer Liste: Serverfehler, Auto-Checks, Alarme, App-Logs, E-Mail-Versand, Mail-Queue, Adminaktionen, Uploads, Dolibarr-Abgleich, Discord-Bot – Filter nach Quelle, Schwere, Zeitraum, Text; „Als CSV“. Auto-Checks stehen je **Zustand** darin, nicht je Lauf: ein Eintrag je Wechsel von Ampel oder betroffenen Prüfungen, mit „seit … · 92× geprüft · zuletzt …“ (#2080). Beim ersten Start nach diesem Update trägt der Server die gespeicherten Läufe der letzten 7 Tage einmal nach (Merker `settings/ops_check_episodes_backfill`, zugleich Sperre: bleibt er nach einem Abbruch länger als 10 Minuten auf „running“, übernimmt ihn der nächste Start; Rückweg: `ops_check_episodes` leeren und den Merker löschen) | `GET /api/admin/ops/events` |
 | System → Betrieb & Logs → **App-Logs** | Fehler und Meldungen der LionsAPP und der Website (Gerät, Version, Stufe) mit Status und Notiz; die Suche findet auch die Kennung, die Admins auf der Fehlerseite der Website sehen (#1230) | `mobile_client_logs`, 90 Tage |
 | E-Mail → Mail-Queue | Wartende und fehlgeschlagene Sendungen, neu einreihen | `mail_jobs` |
 
@@ -132,8 +132,12 @@ und/oder per **E-Mail** an die eingetragenen Empfänger geht.
 Vorgabe: Discord an, E-Mail aus. **Sperrfrist:** je Schlüssel (eine Prüfung, eine Fehlergruppe, ein Job,
 ein App-Fingerabdruck) meldet die Website höchstens einmal je Frist (Vorgabe 60 Minuten) – ein
 Dauerfehler flutet keinen Kanal. **Erinnerung bei Dauer-Rot** (Stunden, Vorgabe 24, 0 = aus): so lange
-wartet ein roter Auto-Check, bis er sich mit „weiterhin rot seit …“ wieder meldet (#2080). Der **Testalarm** geht alle Wege, die irgendeine Regel nutzt, ohne
-Sperrfrist. Jede Meldung steht unter „Letzte Alarme“, auch wenn kein Weg eingerichtet war.
+wartet ein roter Auto-Check, bis er sich mit „weiterhin rot seit …“ wieder meldet (#2080). Die Sperrfrist wird
+atomar geholt – zwei Läufe zugleich melden nie doppelt; scheitert ein eingerichteter Weg, gibt der Lauf sie zurück, und
+der nächste Anlass versucht es gleich. Der **Testalarm** geht alle Wege, die irgendeine Regel nutzt, ohne
+Sperrfrist. Jede Meldung steht unter „Letzte Alarme“, auch wenn kein Weg eingerichtet war – bei einem roten Auto-Check
+ohne Weg (oder mit gescheitertem Versand) aber nur einmal je Rot-Phase; danach bleibt es still, bis die Prüfung wechselt
+oder ein Weg trägt.
 
 Alarme tragen nie Nutzdaten: keine Namen, keine vollständigen E-Mail-Adressen, keine Tokens – nur
 Ereignis, Route, Fehlerart und Zähler.
