@@ -187,16 +187,16 @@ export function SpamGuardSection() {
       )}
 
       <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-5">
-        <label className="flex items-start justify-between gap-4 cursor-pointer">
+        <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="font-heading font-bold uppercase text-sm">Spamschutz an</div>
+            <div className="font-heading font-bold uppercase text-sm" id="spam-guard-enabled-label">Spamschutz an</div>
             <p className="text-xs text-white/50 mt-1">Aus heißt: nur die Limits wirken. Vorgabe: an.</p>
           </div>
-          <button type="button" role="switch" aria-checked={!!draft.enabled} onClick={() => setField("enabled")(!draft.enabled)} data-testid="spam-guard-enabled"
+          <button type="button" role="switch" aria-checked={!!draft.enabled} aria-labelledby="spam-guard-enabled-label" onClick={() => setField("enabled")(!draft.enabled)} data-testid="spam-guard-enabled"
             className={`relative w-12 h-6 rounded-full shrink-0 transition-colors ${draft.enabled ? "bg-[#29B6E8]" : "bg-white/15"}`}>
             <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${draft.enabled ? "translate-x-6" : ""}`} />
           </button>
-        </label>
+        </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {NUMBER_FIELDS.map(([key, label]) => (
             <NumberField key={key} label={label} value={draft[key]} onChange={setField(key)} range={bounds.numbers?.[key]} testId={`spam-guard-${key}`} />
@@ -245,14 +245,14 @@ export function SpamGuardSection() {
             Datenschutzerklärung nennt das automatisch, sobald Turnstile an ist und für ein Formular gilt.
           </p>
         </div>
-        <label className="flex items-center justify-between gap-4 cursor-pointer">
-          <span className="text-sm">Turnstile an</span>
-          <button type="button" role="switch" aria-checked={!!turnstileDraft.enabled} data-testid="turnstile-enabled"
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-sm" id="turnstile-enabled-label">Turnstile an</span>
+          <button type="button" role="switch" aria-checked={!!turnstileDraft.enabled} aria-labelledby="turnstile-enabled-label" data-testid="turnstile-enabled"
             onClick={() => setTurnstileDraft((current) => ({ ...current, enabled: !current.enabled }))}
             className={`relative w-12 h-6 rounded-full shrink-0 transition-colors ${turnstileDraft.enabled ? "bg-[#29B6E8]" : "bg-white/15"}`}>
             <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${turnstileDraft.enabled ? "translate-x-6" : ""}`} />
           </button>
-        </label>
+        </div>
         <div className="grid sm:grid-cols-2 gap-3">
           <label className="block">
             <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Site Key (öffentlich)</div>
@@ -293,11 +293,11 @@ export function SpamGuardSection() {
             className="px-4 py-2 border border-white/15 text-xs font-bold uppercase rounded-sm disabled:opacity-50">Testen</button>
           {secretState !== "missing" && (
             <button type="button" onClick={removeSecret} disabled={saving} data-testid="turnstile-remove-secret"
-              className="px-4 py-2 border border-[#FF3B30]/30 text-[#FF3B30] text-xs font-bold uppercase rounded-sm disabled:opacity-50">Secret Key entfernen</button>
+              className="px-4 py-2 border border-live/30 text-live text-xs font-bold uppercase rounded-sm disabled:opacity-50">Secret Key entfernen</button>
           )}
         </div>
         {(testResult || view.turnstile.last_test) && (
-          <p className={`text-xs ${(testResult || view.turnstile.last_test).ok ? "text-[#00FF88]" : "text-[#FF8A80]"}`} data-testid="turnstile-test-result">
+          <p className={`text-xs ${(testResult || view.turnstile.last_test).ok ? "text-ok" : "text-[#FF8A80]"}`} data-testid="turnstile-test-result">
             Letzter Test: {(testResult || view.turnstile.last_test).detail}
           </p>
         )}

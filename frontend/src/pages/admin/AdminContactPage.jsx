@@ -35,7 +35,7 @@ function SpamCounter({ stats }) {
   return (
     <div className="mb-6 border border-white/10 bg-[#121212] rounded-sm p-4 flex flex-wrap items-start gap-x-8 gap-y-3" data-testid="contact-spam-counter">
       <div className="flex items-center gap-3">
-        <ShieldCheck className="w-5 h-5 text-[#00FF88] shrink-0" />
+        <ShieldCheck className="w-5 h-5 text-ok shrink-0" />
         <div>
           <div className="text-[10px] font-bold uppercase tracking-widest text-white/50">Spamschutz – abgefangen</div>
           <div className="text-sm text-white/85">
@@ -132,11 +132,11 @@ export default function AdminContactPage() {
           </div>
           <div className="space-y-3">
             {flagged && (
-              <div className="border border-[#FF3B30]/30 bg-[#FF3B30]/5 rounded-sm p-4" data-testid="contact-spam-box">
-                <div className="text-[11px] font-bold uppercase tracking-widest text-[#FF8A80] mb-2">Vom Spamschutz markiert</div>
+              <div className="border border-warn/30 bg-warn/5 rounded-sm p-4" data-testid="contact-spam-box">
+                <div className="text-[11px] font-bold uppercase tracking-widest text-warn mb-2">Vom Spamschutz markiert</div>
                 <p className="text-xs text-white/70 mb-2">Gründe: {active.spam.reasons.map((r) => reasonLabels[r] || r).join(", ")}. Bisher ging keine Mail hinaus – weder an den Absender noch an den Vorstand.</p>
                 <button type="button" onClick={() => notSpam(active.id)} disabled={releasing} data-testid="contact-not-spam"
-                  className="w-full px-4 py-2 border border-[#00FF88]/40 text-[#00FF88] font-bold uppercase tracking-wider text-xs rounded-sm hover:bg-[#00FF88]/10 disabled:opacity-50">
+                  className="w-full px-4 py-2 border border-ok/40 text-ok font-bold uppercase tracking-wider text-xs rounded-sm hover:bg-ok/10 disabled:opacity-50">
                   Kein Spam – einordnen und Mails nachholen
                 </button>
               </div>
