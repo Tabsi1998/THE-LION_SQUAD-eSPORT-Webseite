@@ -52,8 +52,8 @@ def test_path_is_cut_off_and_port_kept(tmp_path):
     result, conf = run(tmp_path, "https://api.example.at:8443/api/v1?x=1", "http://upload.example.at")
     assert result.returncode == 0, result.stderr
     sources = connect_sources(conf)
-    assert "https://api.example.at:8443" in sources
-    assert "http://upload.example.at" in sources
+    assert sources.count("https://api.example.at:8443") == 1
+    assert sources.count("http://upload.example.at") == 1
 
 
 def test_running_twice_adds_nothing_twice(tmp_path):
@@ -68,8 +68,8 @@ def test_similar_hosts_are_not_mistaken_for_each_other(tmp_path):
     result, conf = run(tmp_path, "https://api-example.com", "https://api.example.com")
     assert result.returncode == 0, result.stderr
     sources = connect_sources(conf)
-    assert "https://api-example.com" in sources
-    assert "https://api.example.com" in sources
+    assert sources.count("https://api-example.com") == 1
+    assert sources.count("https://api.example.com") == 1
 
 
 @pytest.mark.parametrize("bad", ["upload.lionsquad.at", "https://evil.example; script-src *", "javascript:alert(1)",
