@@ -170,7 +170,7 @@ test.describe("Adminmenü", () => {
     await expect(page.getByTestId("admin-nav-recent")).toBeVisible();
     const first = await page.evaluate(() => document.querySelector("nav.admin-scroll [data-testid^='admin-nav-group-']").dataset.testid);
     expect(first).toBe("admin-nav-group-Zuletzt");
-    expect((await navMetrics(page)).entries).toBe(84);
+    expect((await navMetrics(page)).entries).toBe(85);
     await page.getByTestId("admin-nav-recent-mobile-push").click();
     await expect(page).toHaveURL(/\/admin\/mobile-push$/);
   });
@@ -224,7 +224,7 @@ test.describe("Adminmenü", () => {
     await expect(page.getByTestId("admin-menu-open")).toBeHidden();
     const main = await page.locator("#main-content").boundingBox();
     expect(main.x).toBeGreaterThanOrEqual(255);
-    expect((await navMetrics(page)).entries).toBe(84);
+    expect((await navMetrics(page)).entries).toBe(85);
   });
 
   test("am Telefon wird „Zuletzt“ beim Nachführen zum aktiven Eintrag nie angeschnitten", async ({ page }) => {
