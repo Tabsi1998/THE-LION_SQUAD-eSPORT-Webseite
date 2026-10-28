@@ -332,12 +332,14 @@ höchstens einen **Captain** und einen **Vertreter**; beide stehen im Kader des 
   Änderung geht es). Wer das Hauptteam verlässt oder entfernt wird, verlässt auch jeden Kader seiner Co-Teams; Kader,
   Captain und Vertreter zählen nur, solange sie im Hauptteam sind. Übrige Mitglieder des Hauptteams bekommen zu
   Liga-Spielen ihres Teams keine Nachrichten.
-- **Löschen:** Ein Co-Team mit Anmeldung in einer Staffel, die nicht beendet ist, lässt sich nicht löschen und sein
-  Team nicht auflösen – auch wenn es ausgetreten oder disqualifiziert ist.
+- **Löschen:** Solange eine Staffel nicht beendet ist (auch vor dem Start, nicht nur während sie läuft), lässt sich
+  ein Co-Team mit Anmeldung darin nicht löschen und sein Team nicht auflösen – egal mit welchem Status, auch
+  ausgetreten oder disqualifiziert.
 - **Zuteilen** (Admin → Turnier → Teilnehmer → „Co-Team zuteilen“, `POST /api/tournaments/{tid}/squad-registrations`,
   Bereich Turniere): Co-Team gehört zum Hauptteam, ist aktiv und fürs Spiel der Staffel, Kader mindestens Mindestkader,
   alle im Hauptteam, Staffel nicht voll, zwei Co-Teams desselben Teams nie in derselben Staffel, ein Co-Team je Season
-  nur in einer Staffel. Die Anmeldung heißt „Team · Co-Team“; die Teamleitung meldet sie nicht selbst ab.
+  nur in einer Staffel (auch wenn eine abgelehnte, ausgetretene oder nicht erschienene Anmeldung wieder aktiv
+  gesetzt wird). Die Anmeldung heißt „Team · Co-Team“; die Teamleitung meldet sie nicht selbst ab.
 - **Protokoll:** `team.squad.roles` (vorher und nachher), `league.squad.assign`, `league.squad.remove`.
 - **Code:** Regel in `services/match_audience.py` (`responsible_ids`, `player_ids`, `responsible_registration`),
   Zuteilen in `services/squad_registration.py`, Rollen in `routes/team_routes.py`.

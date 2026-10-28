@@ -108,7 +108,7 @@ eindeutig, partiell.
 | `team_squads.vice_captain_id` | str | nein | Mitglied, ≠ `captain_id` |
 | `tournament_registrations.squad_id` | str | nein | Co-Team; fehlt = Anmeldung wie heute |
 | `tournament_registrations.squad_name` | str | nein | Schnappschuss des Co-Team-Namens |
-| `tournament_registrations.league_squad_key` | str | nein | `<season_id>:<squad_id>`, eindeutig (sparse) – ein Co-Team je Season nur in einer Staffel; nur mit `league_context`, fällt bei Austritt/Disqualifikation weg |
+| `tournament_registrations.league_squad_key` | str | nein | `<season_id>:<squad_id>`, eindeutig (sparse) – ein Co-Team je Season nur in einer Staffel; nur mit `league_context`; folgt jedem Statuswechsel: nicht aktiv (abgelehnt, nicht erschienen, Austritt, Disqualifikation) = weg, wieder aktiv = neu gesetzt, sonst 409 |
 
 Eine Co-Team-Anmeldung: `team_id` = Hauptteam, `squad_id`, `display_name` = „Lions · Lions B“,
 `registration_type="team"`, `registered_via="league_assign"`, `user_id=None`, `status="approved"`,
@@ -201,7 +201,7 @@ Anmeldungen auch über Co-Teams, deren Captain/Vertreter man ist. Aufrufer mit e
 | Ein Co-Team je Season nur in einer Staffel (`league_context.season_id`) | Zuteilen | B |
 | Staffel nicht voller als `max_participants` | Zuteilen | B |
 | Captain und Vertreter sind Mitglieder, verschieden; Entfernen aus Kader und Hauptteam erst nach Neuvergabe | Rollen, Kader, Team | B |
-| Co-Team mit aktiver Liga-Anmeldung nicht löschbar | Löschen | B |
+| Co-Team mit Anmeldung (jeder Status) in einer nicht beendeten Staffel nicht löschbar, sein Hauptteam nicht auflösbar | Löschen, Auflösen | B |
 | Runden ≤ aktive Wochen: `(n−1 bei gerader, n bei ungerader Zahl) × round_robin_legs ≤ weeks_total − Sperrwochen` | Staffel anlegen, Spielplan | A |
 | Heimrecht fair: Differenz Heim/Auswärts je Team ≤ 1 bei `round_robin_legs=1`; bei 2 Ausgabe unverändert | Spielplan | A |
 | Terminvorschlag nicht in einer Sperrzeit | Vorschlagen | B ruft A-Helfer |
