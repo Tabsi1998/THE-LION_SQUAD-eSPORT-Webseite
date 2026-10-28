@@ -255,7 +255,7 @@ async def _league_entries(db, registrations: list[dict], visible: dict[str, dict
         {"_id": 0}).to_list(50)}
     leagues = {row["id"]: row for row in await db.leagues.find(
         {"id": {"$in": sorted({c.get("league_id") for c in contexts if c.get("league_id")})}},
-        {"_id": 0, "id": 1, "name": 1, "slug": 1}).to_list(50)}
+        {"_id": 0, "id": 1, "name": 1, "slug": 1, "status": 1}).to_list(50)}
     divisions = {row["id"]: row for row in await db.league_divisions.find(
         {"id": {"$in": sorted({c.get("division_id") for c in contexts if c.get("division_id")})}},
         {"_id": 0, "id": 1, "level": 1, "nickname": 1}).to_list(50)}
@@ -268,8 +268,11 @@ async def _league_entries(db, registrations: list[dict], visible: dict[str, dict
             continue
         division = divisions.get(context.get("division_id")) or {"level": "?"}
         staffel = context.get("staffel")
+        # Die Ligaseite gibt es nur für aktive Ligen und nicht archivierte Seasons (sonst 404) - dann aufs Turnier.
+        page_exists = league.get("status") == "active" and season.get("status") != "archived"
         link = (f"/liga/{league['slug']}/{season['slug']}#staffel-{tournament.get('slug') or tournament['id']}"
-                if await can_see_season(viewer, season) else f"/tournaments/{tournament.get('slug') or tournament['id']}")
+                if page_exists and await can_see_season(viewer, season)
+                else f"/tournaments/{tournament.get('slug') or tournament['id']}")
         out.append({
             "registration_id": reg.get("id"),
             "display_name": reg.get("display_name") or reg.get("team_name"),

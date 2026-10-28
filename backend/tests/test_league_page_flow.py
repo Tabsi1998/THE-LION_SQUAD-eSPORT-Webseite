@@ -224,3 +224,16 @@ async def test_season_one_with_eight_teams_plays_matchday_seven_in_week_nine(flo
     assert (weeks[9]["kind"], weeks[9]["matchday"], len(weeks[9]["matches"])) == ("matchday", 7, 4)
     assert (weeks[9]["first_day"], weeks[9]["last_day"]) == ("2027-01-05", "2027-01-11")
     assert weeks[10]["kind"] == "reserve"
+
+
+@pytest.mark.asyncio
+async def test_the_team_page_links_to_the_tournament_when_the_league_page_does_not_exist(flow):
+    _admin, season, staffel, teams = await setup(flow)
+    flow.act_as(None)
+    url = f"/api/teams/{teams[0]}/overview"
+    assert (await flow.get(url)).json()["league"][0]["link"].startswith("/liga/probe-shooter/season-1")
+    await flow.db.league_seasons.update_one({"id": season["id"]}, {"$set": {"status": "archived"}})
+    assert (await flow.get(url)).json()["league"][0]["link"] == f"/tournaments/{staffel['slug']}"
+    await flow.db.league_seasons.update_one({"id": season["id"]}, {"$set": {"status": "active"}})
+    await flow.db.leagues.update_one({"id": season["league_id"]}, {"$set": {"status": "archived"}})
+    assert (await flow.get(url)).json()["league"][0]["link"] == f"/tournaments/{staffel['slug']}"
