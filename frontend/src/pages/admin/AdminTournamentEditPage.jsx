@@ -218,29 +218,21 @@ export default function AdminTournamentEditPage() {
   };
   // `keepStage` (Liga-Staffel, #2109): ohne Struktur im Aufruf baut der Server mit der vorhandenen Phase neu - die
   // Vorschau wird neu gemischt, Format und Einstellungen der Liga bleiben.
+  // Eine Vorschau ersetzt nie echte Spiele (#2120, TA12/TA17): steht der Baum, lehnt der Server ab und sagt warum;
+  // sonst fragt er mit der Zahl der Spiele nach, bevor er etwas ersetzt.
   const rebuildFromFormat = async ({ preview = true, force = false, structure = null, keepStage = false } = {}) => {
-    try {
+    const data = await runConfirmed(async (confirmed) => {
       const params = new URLSearchParams();
       if (preview) params.set("preview", "true");
-      if (force) params.set("force", "true");
+      if (force || confirmed) params.set("force", "true");
       const suffix = params.toString() ? `?${params.toString()}` : "";
-      const { data } = await api.post(`/tournaments/${id}/bracket/from-format${suffix}`, keepStage ? undefined : (structure || {}));
-      toast.success(keepStage
-        ? `Spielplan-Vorschau mit ${data.match_count} Spielen neu gemischt.`
-        : data.preview ? `Turnierbaum-Vorschau mit ${data.match_count} Spielen neu aufgebaut.` : `Turnierbaum mit ${data.match_count} Spielen neu aufgebaut.`);
-      load();
-    } catch (e) {
-      if (e.response?.status === 409 && !force) {
-        const ok = await confirm({
-          title: "Turnierbaum aus Format neu bauen?",
-          description: "Vorhandene Struktur-/Vorschau-Daten werden durch das gewählte Turnierformat ersetzt.",
-          confirmLabel: "Neu bauen",
-          tone: "danger",
-        });
-        if (ok) return rebuildFromFormat({ preview, force: true, structure, keepStage });
-      }
-      toast.error(formatRequestError(e, "Turnierbaum konnte nicht aus dem Format neu aufgebaut werden."));
-    }
+      return (await api.post(`/tournaments/${id}/bracket/from-format${suffix}`, keepStage ? undefined : (structure || {}))).data;
+    }, { title: "Turnierbaum aus dem Format neu bauen?", confirmLabel: "Neu bauen", failure: "Turnierbaum konnte nicht aus dem Format neu aufgebaut werden." });
+    if (!data) return;
+    toast.success(keepStage
+      ? `Spielplan-Vorschau mit ${data.match_count} Spielen neu gemischt.`
+      : data.preview ? `Turnierbaum-Vorschau mit ${data.match_count} Spielen neu aufgebaut.` : `Turnierbaum mit ${data.match_count} Spielen neu aufgebaut.`);
+    load();
   };
   const deleteParticipant = async (registration) => {
     if (!await confirm({
@@ -805,6 +797,7 @@ export default function AdminTournamentEditPage() {
           rightsForMatch={rightsForMatch}
           tournament={t}
           durationGame={bracket?.duration_game || null}
+          bracketFixed={structureFixed}
         />
       )}
       {activeTab === "matchplan" && (

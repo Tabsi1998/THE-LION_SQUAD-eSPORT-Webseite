@@ -266,3 +266,48 @@ async def test_without_a_round_there_is_nothing_to_take_back(flow):
 
     assert refused.status_code == 409
     assert "keine Runde" in refused.json()["detail"]
+
+
+# ---------------------------------------------------------------- TA12 / TA17 Vorschau über echten Spielen
+
+@pytest.mark.asyncio
+async def test_a_preview_never_replaces_real_matches(flow):
+    staff, tournament, _users, _regs = await fixed_bracket(flow)
+    stage = await flow.db.tournament_stages.find_one({"tournament_id": tournament["id"]}, {"_id": 0})
+    before = sorted(match["id"] for match in await flow.matches(tournament))
+
+    for url in (f"/api/tournaments/{tournament['id']}/stages/{stage['id']}/generate?preview=true&force=true",
+                f"/api/tournaments/{tournament['id']}/bracket/from-format?preview=true&force=true"):
+        refused = await flow.post(url, json={} if "from-format" in url else None)
+        assert refused.status_code == 409, (url, refused.text)
+        detail = refused.json()["detail"]
+        assert detail["code"] == "bracket_fixed"
+        assert "Eine Vorschau ersetzt keine echten Spiele" in detail["message"]
+
+    assert sorted(match["id"] for match in await flow.matches(tournament)) == before
+
+
+@pytest.mark.asyncio
+async def test_rebuilding_real_matches_names_the_numbers_before_force(flow):
+    staff, tournament, _users, _regs = await fixed_bracket(flow)
+    await play_first(flow, tournament)
+    stage = await flow.db.tournament_stages.find_one({"tournament_id": tournament["id"]}, {"_id": 0})
+
+    for url in (f"/api/tournaments/{tournament['id']}/stages/{stage['id']}/generate",
+                f"/api/tournaments/{tournament['id']}/bracket/from-format?preview=false"):
+        refused = await flow.post(url)
+        assert refused.status_code == 409, (url, refused.text)
+        detail = refused.json()["detail"]
+        assert detail["code"] == "confirm_destruction", url
+        assert detail["match_count"] == 3 and detail["played_count"] == 1, url
+
+
+@pytest.mark.asyncio
+async def test_after_the_end_the_structure_is_not_rebuilt(flow):
+    staff, tournament, _users, _regs = await fixed_bracket(flow)
+    await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"status": "completed"}})
+
+    refused = await flow.post(f"/api/tournaments/{tournament['id']}/bracket/from-format?preview=false&force=true")
+
+    assert refused.status_code == 409
+    assert "vorbei" in refused.json()["detail"]

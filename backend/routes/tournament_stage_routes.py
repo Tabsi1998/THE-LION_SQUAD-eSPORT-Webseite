@@ -33,6 +33,7 @@ from services.match_v2_results import (
     public_recalculation_error,
 )
 from models import TournamentStageCreate, TournamentStageUpdate, now_utc, new_id
+from services import tournament_guard
 from services.match_public_view import public_match_view, public_stage_view
 from services.round_labels import attach_round_labels
 from routes.tournament_common import (
@@ -309,15 +310,28 @@ async def generate_tournament_stage_matches(tid: str, stage_id: str, force: bool
     stage = await db.tournament_stages.find_one({"id": stage_id, "tournament_id": tid}, {"_id": 0})
     if not stage:
         raise HTTPException(status_code=404, detail="Stage nicht gefunden")
+    finished = tournament_guard.finished_problem(tournament)
+    if finished:
+        raise HTTPException(status_code=409, detail=finished)
     existing_matches = await db.matches_v2.find({"stage_id": stage_id}, {"_id": 0}).to_list(3000)
     match_plan = _collect_match_plan(existing_matches)
     existing = len(existing_matches)
-    can_replace_preview = bool(existing_matches) and all(m.get("is_preview") for m in existing_matches)
-    if existing and not force and not can_replace_preview:
-        raise HTTPException(
-            status_code=409,
-            detail="Stage hat bereits Matches. Mit force=true neu generieren.",
-        )
+    impact = tournament_guard.match_impact(existing_matches)
+    if impact["match_count"] and preview:
+        # „Vorschau“ an einer Phase mit echten Spielen (#2120, TA12): ersetzte nach einer Rückfrage alle Spiele durch
+        # eine leere Vorschau - das gibt es nicht mehr, auch nicht mit force.
+        raise HTTPException(status_code=409, detail=tournament_guard.confirm_detail(
+            "bracket_fixed",
+            tournament_guard.PREVIEW_OVER_REAL_REFUSED.format(impact=tournament_guard.impact_text(impact)),
+            impact,
+        ))
+    if impact["match_count"] and not force:
+        raise HTTPException(status_code=409, detail=tournament_guard.confirm_detail(
+            "confirm_destruction",
+            f"Neu generieren löscht {tournament_guard.impact_text(impact)} dieser Phase samt Ergebnissen und "
+            "Berichten.",
+            impact,
+        ))
     registrations = []
     if not preview:
         registrations = await db.tournament_registrations.find(

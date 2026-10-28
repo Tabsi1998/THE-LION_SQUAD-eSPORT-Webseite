@@ -148,6 +148,26 @@ test("Regeln dieser Phase: neuer Stand der Phase ersetzt das Formular, nichts ge
   });
 });
 
+// Vorschau über echten Spielen (#2120, TA12): steht der Baum, gibt es weder „Vorschau“ noch „Mit Teilnehmern
+// generieren“ - vorher ersetzte die Vorschau nach einer Rückfrage alle echten Spiele.
+test("fester Baum: keine Vorschau-Knöpfe an einer Phase mit Spielen", () => {
+  panel({ canManageStructure: true, tournament: {}, bracketFixed: true });
+  expect(screen.queryByTestId("stage-preview-s1")).toBeNull();
+  expect(screen.queryByTestId("stage-generate-s1")).toBeNull();
+});
+
+test("vor dem Check-in-Ende: Vorschau und Generieren bleiben", () => {
+  panel({ canManageStructure: true, tournament: {}, matches: [{ ...MATCH, is_preview: true }] });
+  expect(screen.getByTestId("stage-preview-s1")).toBeInTheDocument();
+  expect(screen.getByTestId("stage-generate-s1")).toBeInTheDocument();
+});
+
+test("fester Baum mit einer leeren neuen Phase: Generieren bleibt, die Vorschau nicht", () => {
+  panel({ canManageStructure: true, tournament: {}, bracketFixed: true, matches: [] });
+  expect(screen.queryByTestId("stage-preview-s1")).toBeNull();
+  expect(screen.getByTestId("stage-generate-s1")).toBeInTheDocument();
+});
+
 // Liga-Staffel (#2109, S23): keine „Regeln dieser Phase“ (Vor Ort schaltete die Spielwochen ab), kein Stations-Hinweis.
 test("Staffel: keine Regeln je Phase, der Hinweis spricht von Spielwochen statt Stationen", () => {
   const staffel = { league_context: { league_id: "l1", season_id: "s1", division_id: "d1", staffel: "A" }, format: "league" };

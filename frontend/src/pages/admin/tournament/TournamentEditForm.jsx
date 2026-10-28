@@ -299,9 +299,11 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
   const sendBilling = canFinance && billingDirty;
   const hasFormChanges = hasPayloadChanges(dirtyPayload) || sendBilling;
   // Staffel (#2109, S15): die Vorschau neu mischen mit der vorhandenen Phase - Struktur und Format gibt die Liga vor.
+  // Ohne force (#2120, TA17): im laufenden Turnier fragt der Server mit Zahlen nach, echte Spiele ersetzt eine
+  // Vorschau nie.
   const rebuild = () => onRebuildFromFormat?.(staffel
     ? { preview: true, force: true, keepStage: true }
-    : { preview: true, force: true, structure: structurePayload() });
+    : { preview: true, structure: structurePayload() });
   const save = async ({ rebuildPreview = false } = {}) => {
     try {
       const billingProblem = sendBilling ? billingFormError(billingForm) : "";
@@ -570,6 +572,9 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
           <button onClick={() => save({ rebuildPreview: true })} type="button" data-testid="tr-edit-staffel-remix" className="tls-btn tls-btn--secondary px-5 py-2.5 text-xs font-bold uppercase tracking-wider rounded-sm">
             Speichern & Vorschau neu mischen
           </button>
+        ) : structureFixed ? (
+          // Der Baum steht (#2120, TA17): „Struktur anwenden“ ersetzte hier alle echten Spiele samt Ergebnissen.
+          <span className="text-xs text-white/50 self-center" data-testid="tr-edit-structure-fixed">{FIXED_FIELD_HINT}</span>
         ) : (
           <button onClick={() => save({ rebuildPreview: true })} type="button" data-testid="tr-edit-save-rebuild" className="px-5 py-2.5 border border-[#FFD700]/50 text-[#FFD700] text-xs font-bold uppercase tracking-wider rounded-sm hover:bg-[#FFD700]/10">
             Speichern & Struktur anwenden
