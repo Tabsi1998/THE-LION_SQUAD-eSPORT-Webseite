@@ -321,6 +321,8 @@ höchstens einen **Captain** und einen **Vertreter**; beide stehen im Kader des 
 | Was | Turnierleitung (mit Zwei-Faktor) | Teamleitung, Co-Leitung des Hauptteams | Captain | Vertreter | Kader des Co-Teams |
 | --- | --- | --- | --- | --- | --- |
 | Co-Team einer Staffel zuteilen oder herausnehmen | ja | nein | nein | nein | nein |
+| Neue Spiel-ID freigeben, Stichtag für neue Spieler, Kaderübersicht mit IDs (#2108) | ja | nein | nein | nein | nein |
+| Spiel-IDs beider Seiten für die Lobby sehen (#2108) | ja | ja | ja | ja | ja |
 | Kader pflegen, Captain und Vertreter vergeben | ja (Team-Admin-Rollen) | ja | nein | nein | nein |
 | Die eigene Rolle abgeben („Rolle abgeben“, #2110) | – | – | ja | ja | nein |
 | Termin vorschlagen, annehmen; einchecken | ja | nur ohne Captain und Vertreter | ja | ja | nein |
@@ -342,7 +344,11 @@ höchstens einen **Captain** und einen **Vertreter**; beide stehen im Kader des 
   alle im Hauptteam, Staffel nicht voll, zwei Co-Teams desselben Teams nie in derselben Staffel, ein Co-Team je Season
   nur in einer Staffel (auch wenn eine abgelehnte, ausgetretene oder nicht erschienene Anmeldung wieder aktiv
   gesetzt wird). Die Anmeldung heißt „Team · Co-Team“; die Teamleitung meldet sie nicht selbst ab.
-- **Protokoll:** `team.squad.roles` (vorher und nachher), `league.squad.assign`, `league.squad.remove`.
+- **Protokoll:** `team.squad.roles` (vorher und nachher), `league.squad.assign`, `league.squad.remove`,
+  `league.roster.approve` (Grund, ohne die ID), `league.season.roster_deadline`.
+- **Spiel-ID je Season (#2108):** Die IDs der Spieler sehen nur die Person selbst (Profil), die Beteiligten des Spiels
+  (Matchseite, wie Aufstellungen) und die Turnierleitung (`/api/admin/leagues/seasons/{id}/roster`, Bereich Turniere).
+  Code: `services/league_roster.py`.
 - **Code:** Regel in `services/match_audience.py` (`responsible_ids`, `player_ids`, `responsible_registration`),
   Zuteilen in `services/squad_registration.py`, Rollen in `routes/team_routes.py`.
 

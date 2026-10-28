@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AlertTriangle, Trophy } from "lucide-react";
+import { AlertTriangle, ChevronDown, IdCard, Trophy } from "lucide-react";
 import { LazyImg } from "@/components/tls/LazyImg";
 import { viennaDateTime } from "@/lib/vienna";
 import { LineupPicker } from "./LeagueReportForm";
@@ -60,6 +60,43 @@ export function LeagueGamesView({ league }) {
         ))}
       </ol>
     </div>
+  );
+}
+
+/** Spiel-IDs beider Seiten für die Lobby (#2108): die ID, die in der Season gilt - nur für die Beteiligten des Spiels und
+ * die Turnierleitung (der Server schickt sie sonst nicht mit). Ein Tipp auf die ID markiert sie zum Kopieren. */
+export function LeagueLobbyIds({ league }) {
+  const sides = league?.lobby_ids || [];
+  if (!sides.length) return null;
+  const label = league.id_label || "Spiel-ID";
+  return (
+    <details className="group mt-5 rounded-sm border border-white/10 bg-[#0A0A0A]" data-testid="league-lobby-ids">
+      <summary className="tls-hit flex min-h-[44px] cursor-pointer list-none items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wider text-[#29B6E8] [&::-webkit-details-marker]:hidden">
+        <IdCard className="h-4 w-4 shrink-0" aria-hidden="true" />
+        <span className="min-w-0 flex-1">{label} für die Lobby</span>
+        <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-fast ease-tls group-open:rotate-180" aria-hidden="true" />
+      </summary>
+      <div className="grid gap-4 border-t border-white/10 px-4 py-3 sm:grid-cols-2">
+        {sides.map((side) => (
+          <div key={side.registration_id} className="min-w-0" data-testid={`league-lobby-ids-${side.registration_id}`}>
+            <p className="truncate text-sm font-bold text-white">{side.name}</p>
+            <ul className="mt-1 space-y-1">
+              {side.players.map((player) => (
+                <li key={player.id} className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 text-sm">
+                  <span className="min-w-0 truncate text-white/70">{player.name}</span>
+                  {player.text ? (
+                    <span className="min-w-0 select-all font-mono text-white [overflow-wrap:anywhere]">{player.text}</span>
+                  ) : (
+                    <span className="text-xs text-warn">{player.reason || `${label} fehlt`}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+      <p className="border-t border-white/10 px-4 py-2 text-[11px] text-white/45">Es gilt die für die Season gemeldete ID – nur ihr, euer Gegner und die Turnierleitung seht sie.</p>
+    </details>
   );
 }
 

@@ -1079,11 +1079,14 @@ async def submit_match_result(match_id: str, body: MatchV2ResultSubmit,
 async def _submit_staff_result(db, match: dict, body: MatchV2ResultSubmit, raw_results: list[dict], me: dict,
                                force: bool) -> dict:
     """Ergebnis der Turnierleitung schreiben - der Aufrufer hält Turnier- und (bei Liga) Season-Sperre."""
-    games, missing = await _staff_games(db, match, body, raw_results)
+    games, missing, league = await _staff_games(db, match, body, raw_results)
     if body.hold:
         # Ergebnis-Fenster (#1156): 10 Sekunden „Rückgängig“, erst danach Baum, TV und Nachrichten.
-        return await hold_result(db, match, raw_results, actor=me, note=body.note, proof_url=body.proof_url,
+        held = await hold_result(db, match, raw_results, actor=me, note=body.note, proof_url=body.proof_url,
                                  force=force, reason=body.reason, games=games, lineups_missing=missing)
+        if league and games:
+            await league_games.lock_lineup_ids(db, league, games, league.reg_ids)
+        return held
     ensure_no_hold(match)
     outcome = await submit_v2_result(
         db,
@@ -1103,27 +1106,32 @@ async def _submit_staff_result(db, match: dict, body: MatchV2ResultSubmit, raw_r
         await _audit_match_action(db, "match.games.correct", match, me.get("id"), {
             "games": len(games), **({"reason": body.reason.strip()} if (body.reason or "").strip() else {}),
         })
+    if league and games and not outcome.get("idempotent_replay"):
+        # Spiel-ID je Season (#2108): erst nach dem Speichern des Ergebnisses festhalten.
+        await league_games.lock_lineup_ids(db, league, games, league.reg_ids)
     return outcome
 
 
 async def _staff_games(db, match: dict, body: MatchV2ResultSubmit,
-                       raw_results: list[dict]) -> tuple[list[dict] | None, list[str] | None]:
+                       raw_results: list[dict]) -> tuple[list[dict] | None, list[str] | None,
+                                                         "league_games.LeagueSetup | None"]:
     """Liga (#1650): Maps der Turnierleitung prüfen. Ohne Maps bleiben die des Spiels - außer das neue Ergebnis passt
-    nicht mehr zu ihnen, dann fallen sie weg (eine Korrektur des Stands ohne Maps). Andere Turniere: nichts."""
+    nicht mehr zu ihnen, dann fallen sie weg (eine Korrektur des Stands ohne Maps). Andere Turniere: nichts. Dazu der
+    Liga-Aufbau, damit der Aufrufer nach dem Speichern die Spiel-IDs festhält (#2108)."""
     league = await league_games.setup(db, match)
     if not league:
-        return None, None
+        return None, None, None
     normalized = await checked_results(db, match, raw_results)
     if body.games:
         games, missing = league_games.admin_games(league, [game.model_dump() for game in body.games], normalized)
         await league_games.check_double_use(db, league, games, set(league.reg_ids))
-        return games, missing
+        return games, missing, league
     if match.get("games"):
         try:
             league_games.check_results(league, match["games"], normalized)
         except league_games.LeagueGamesError:
-            return [], []
-    return None, None
+            return [], [], league
+    return None, None, league
 
 
 @router.post("/{match_id}/result/undo")
@@ -1289,6 +1297,8 @@ async def _report_v2(db, match: dict, body: MatchScoreReport, me: dict, tourname
     if league:
         await league_games.remember_pool(db, league)
         await league_games.refresh_lineup_index(db, match["id"])
+        # Spiel-ID je Season (#2108): erst nach dem Speichern der Meldung festhalten.
+        await league_games.lock_lineup_ids(db, league, games, {my_registration["id"]})
     await _audit_match_action(db, "match.games.report" if games else "match.result.report", match, me.get("id"), {
         "result_count": len(results), **({"games": len(games)} if games else {}),
     })

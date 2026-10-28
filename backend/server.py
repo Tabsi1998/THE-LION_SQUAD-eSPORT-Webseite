@@ -42,6 +42,7 @@ from routes.game_routes import router as game_router
 from routes.game_map_routes import router as game_map_router
 from routes.map_pool_routes import router as map_pool_router
 from routes.league_routes import admin_router as league_admin_router, router as league_router
+from routes.league_roster_routes import admin_router as league_roster_admin_router, me_router as league_roster_me_router
 from routes.game_server_routes import router as game_server_router
 from routes.access_link_routes import router as access_link_router
 from routes.admin_picker_routes import router as admin_picker_router
@@ -345,6 +346,8 @@ app.include_router(game_map_router)  # Map-Bibliothek je Spiel (#1616)
 app.include_router(map_pool_router)  # Map-Pools je Wettbewerb (#1616)
 app.include_router(league_admin_router)  # Liga verwalten (docs/LIGA.md, #1622)
 app.include_router(league_router)  # Liga lesen nach Sichtbarkeit der Season (#1622)
+app.include_router(league_roster_admin_router)  # Liga-Kader mit Spiel-ID je Season (#2108)
+app.include_router(league_roster_me_router)  # eigene Spiel-ID je laufender Season (#2108)
 app.include_router(game_server_router)
 app.include_router(access_link_router)
 app.include_router(admin_picker_router)
