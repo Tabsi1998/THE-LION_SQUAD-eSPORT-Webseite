@@ -243,6 +243,7 @@ export default function AdminLeagueSeasonPage() {
     try {
       const { data: saved } = await api.patch(`/admin/leagues/seasons/${seasonId}`, seasonPayload(form));
       toast.success(saved.changed?.length ? "Season gespeichert." : "Keine Änderung.");
+      if (saved.visibility_applied) toast.success(`Sichtbarkeit für ${saved.visibility_applied === 1 ? "1 Staffel" : `${saved.visibility_applied} Staffeln`} geändert.`);
       setPendingSync(saved.staffeln_to_sync || 0);
       await load(true);
     } catch (err) {
@@ -370,7 +371,7 @@ export default function AdminLeagueSeasonPage() {
                 <TextAreaField label="Regeltext" rows={8} value={form.rules_text} onChange={(value) => set("rules_text", value)} placeholder="Markdown, z. B. Ablauf, Fairplay, Map-Veto" testId="season-form-rules" />
                 <FormGrid>
                   <SelectField label="Sichtbarkeit" value={form.visibility} onChange={(value) => set("visibility", value)} options={VISIBILITY_OPTIONS}
-                    hint="Steuert Ligaseite, Menüpunkt „Liga“ und die Staffel-Turniere." testId="season-form-visibility" />
+                    hint="Gilt beim Speichern sofort für Ligaseite, Menüpunkt „Liga“ und alle Staffel-Turniere – auch gesperrte." testId="season-form-visibility" />
                   <SelectField label="Stand" value={form.status} onChange={(value) => set("status", value)} options={SEASON_STATUS_OPTIONS} testId="season-form-status" />
                 </FormGrid>
               </FormSection>
@@ -380,7 +381,7 @@ export default function AdminLeagueSeasonPage() {
                   className="tls-btn tls-btn--primary px-5 py-2.5 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
                   {saving ? "Speichere …" : "Season speichern"}
                 </button>
-                {staffelCount ? <span className="text-xs text-white/50">Bestehende Staffeln übernehmen Änderungen erst beim Übertragen.</span> : null}
+                {staffelCount ? <span className="text-xs text-white/50">Die Sichtbarkeit gilt sofort; alle anderen Änderungen übernehmen bestehende Staffeln erst beim Übertragen.</span> : null}
               </div>
             </form>
 
@@ -433,7 +434,7 @@ export default function AdminLeagueSeasonPage() {
             </section>
 
             <FormSection title="Vorgaben auf Staffeln übertragen" testId="season-sync"
-              hint="Sichtbarkeit, Regeltext und Map-Pool immer; Termine und Kalender nur vor dem Start; Best of, Teamgröße, Punkte und Fristen nur vor dem ersten Ergebnis.">
+              hint="Regeltext und Map-Pool immer, auch bei gesperrten Staffeln; Termine und Kalender nur vor dem Start; Best of, Teamgröße, Punkte und Fristen nur vor dem ersten Ergebnis. Die Sichtbarkeit gilt schon beim Speichern.">
               <button type="button" onClick={sync} disabled={syncing || !staffelCount} data-testid="season-sync-run"
                 className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5 disabled:opacity-50">
                 <ArrowRightLeft className="w-3.5 h-3.5" aria-hidden="true" /> {syncing ? "Übertrage …" : "Vorgaben übertragen"}

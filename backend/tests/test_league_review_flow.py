@@ -94,3 +94,52 @@ async def test_league_context_queries_carry_the_partial_index_condition(flow, mo
     by_context = [query for query in recorder.filters if any(str(key).startswith("league_context.") for key in query)]
     assert len(by_context) >= 3
     assert all(query.get("league_context") == {"$type": "object"} for query in by_context), by_context
+
+
+# ---------------------------------------------------------------- 1. Sichtbarkeit sofort
+
+@pytest.mark.asyncio
+async def test_switching_the_season_off_hides_every_staffel_at_once_even_locked_ones(flow):
+    admin, season, division, staffel = await setup_staffel(flow, season={"visibility": "public"})
+    second = (await flow.post(f"{ADMIN}/divisions/{division['id']}/staffeln", json={})).json()
+    await flow.db.tournaments.update_many({}, {"$set": {"status": "live", "visibility": "public", "is_public": True}})
+    await flow.db.tournaments.update_one({"id": second["tournament_id"]}, {"$set": {"locked_at": "2026-12-01T10:00:00+00:00"}})
+    slugs = [staffel["slug"], second["slug"]]
+
+    flow.act_as(None)
+    assert (await flow.get(f"/api/tournaments/{staffel['slug']}")).status_code == 200
+    assert staffel["slug"] in (await flow.get("/api/sitemap.xml")).text
+
+    flow.act_as(admin)
+    changed = await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"visibility": "off"})
+    assert changed.status_code == 200, changed.text
+    assert changed.json()["visibility_applied"] == 2
+    assert changed.json()["staffeln_to_sync"] == 0  # nur die Sichtbarkeit - nichts mehr zu übertragen
+    for row in await flow.db.tournaments.find({}, {"_id": 0}).to_list(None):
+        assert (row["visibility"], row["is_public"]) == ("internal", False)
+
+    flow.act_as(None)
+    for slug in slugs:
+        assert (await flow.get(f"/api/tournaments/{slug}")).status_code == 404
+    listed = {row["slug"] for row in (await flow.get("/api/tournaments")).json()}
+    assert not listed & set(slugs)
+    found = (await flow.get("/api/search", params={"q": "Staffel"})).json()["items"]
+    assert not [row for row in found if row["kind"] == "tournament"]
+    sitemap = (await flow.get("/api/sitemap.xml")).text
+    assert all(slug not in sitemap for slug in slugs)
+    actions = [row["action"] for row in await flow.db.audit_logs.find({}, {"_id": 0}).to_list(None)]
+    assert actions.count("league.staffel.sync") == 1
+
+
+@pytest.mark.asyncio
+async def test_a_locked_staffel_still_takes_rules_text_but_keeps_its_calendar(flow):
+    admin, season, _division, staffel = await setup_staffel(flow)
+    await flow.db.tournaments.update_one({"id": staffel["id"]}, {"$set": {"locked_at": "2026-12-01T10:00:00+00:00"}})
+    await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"rules_text": "Neu", "weeks_total": 12})
+
+    result = (await flow.post(f"{ADMIN}/seasons/{season['id']}/sync")).json()["staffeln"][0]
+    assert "always" in result["applied"]
+    assert {item["group"]: item["reason"] for item in result["skipped"]} == {
+        "before_start": "Die Staffel ist gesperrt.", "before_result": "Die Staffel ist gesperrt."}
+    after = await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0})
+    assert after["rules"] == "Neu" and after["matchday_weeks_total"] == 10

@@ -647,8 +647,13 @@ class SyncResult:
                 "skipped": self.skipped, "changed": self.changed}
 
 
-async def sync_staffel(db, tournament: dict, league: dict, season: dict, division: dict, user: dict) -> SyncResult:
-    """Überträgt die Vorgaben auf eine Staffel - je Gruppe nur, wenn sie noch darf (docs/LIGA.md, Abschnitt 3)."""
+LOCKED_REASON = "Die Staffel ist gesperrt."
+
+
+async def sync_staffel(db, tournament: dict, league: dict, season: dict, division: dict, user: dict, *,
+                       locked: bool = False) -> SyncResult:
+    """Überträgt die Vorgaben auf eine Staffel - je Gruppe nur, wenn sie noch darf (docs/LIGA.md, Abschnitt 3).
+    Eine gesperrte Staffel (``locked_at``) bekommt nur noch, was immer gilt (Sichtbarkeit, Regeltext, Map-Pool)."""
     wanted = staffel_fields(league, season, division)
     applied: list[str] = []
     skipped: list[dict] = []
@@ -656,6 +661,9 @@ async def sync_staffel(db, tournament: dict, league: dict, season: dict, divisio
     started = tournament.get("status") not in PRE_START_STATUSES
     has_result = await _has_result(db, tournament["id"])
     for group, keys in SYNC_GROUPS.items():
+        if group != "always" and locked:
+            skipped.append({"group": group, "label": SYNC_GROUP_LABELS[group], "reason": LOCKED_REASON})
+            continue
         if group == "before_start" and started:
             skipped.append({"group": group, "label": SYNC_GROUP_LABELS[group],
                             "reason": "Die Staffel hat schon begonnen."})
@@ -690,6 +698,26 @@ async def sync_staffel(db, tournament: dict, league: dict, season: dict, divisio
         changed.append("map_pool")
     applied.append("map_pool")
     return SyncResult(tournament["id"], tournament.get("title") or "", applied, skipped, changed)
+
+
+# Season-Felder, die eine Staffel übernimmt (``staffel_fields``) - ändert sich eines, braucht es „Übertragen“. Die
+# Sichtbarkeit wirkt sofort (``apply_visibility``); Name, Stand und Meldeschluss liest niemand vom Turnier.
+STAFFEL_SOURCE_FIELDS = frozenset({
+    "start_date", "weeks_total", "blocked_periods", "matchday_days", "default_match_weekday", "default_match_time",
+    "round_robin_legs", "max_staffel_size", "best_of", "team_size", "min_squad_size", "game_mode_order",
+    "scoring_rules", "result_confirm_hours", "lineup_amend_hours", "rules_text",
+})
+
+
+async def apply_visibility(db, season: dict) -> int:
+    """Die Sichtbarkeit der Season sofort auf alle ihre Staffeln - auch gesperrte, auch nach dem Start: „aus“ heißt
+    sofort aus (docs/LIGA.md, Abschnitt 10). Gibt die Zahl der geänderten Staffeln zurück."""
+    visibility, is_public = staffel_visibility(season.get("visibility"))
+    result = await db.tournaments.update_many(
+        {"league_context.season_id": season["id"], **ONLY_LEAGUE,
+         "$or": [{"visibility": {"$ne": visibility}}, {"is_public": {"$ne": is_public}}]},
+        {"$set": {"visibility": visibility, "is_public": is_public, "updated_at": _now()}})
+    return int(getattr(result, "modified_count", 0) or 0)
 
 
 # ---------------------------------------------------------------- Sichtbarkeit (öffentliche Lese-API)

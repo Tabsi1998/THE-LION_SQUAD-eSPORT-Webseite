@@ -154,9 +154,18 @@ async def admin_update_season(season_id: str, body: LeagueSeasonUpdate, me: dict
     doc, changed = await _call(leagues.update_season(db, season, body.model_dump(exclude_unset=True)))
     if changed:
         await _audit(db, "league.season.update", me, season_id, {"fields": changed})
+    visibility_applied = 0
+    if "visibility" in changed:
+        # „Aus“ heißt sofort aus: die Sichtbarkeit geht ohne „Übertragen“ auf alle Staffeln, auch gesperrte.
+        visibility_applied = await leagues.apply_visibility(db, doc)
+        reset_scope_cache()
+        await _audit(db, "league.staffel.sync", me, season_id,
+                     {"season_id": season_id, "visibility": doc.get("visibility"), "staffeln": visibility_applied})
     staffeln = await db.tournaments.count_documents({"league_context.season_id": season_id, **ONLY_LEAGUE})
-    # Die Staffeln tragen ihre Werte selbst: Änderungen wirken erst über „Vorgaben auf Staffeln übertragen“.
-    return {**doc, "changed": changed, "staffeln_to_sync": staffeln if changed else 0}
+    # Alle übrigen Werte tragen die Staffeln selbst: sie wirken erst über „Vorgaben auf Staffeln übertragen“.
+    needs_sync = bool(set(changed) & leagues.STAFFEL_SOURCE_FIELDS)
+    return {**doc, "changed": changed, "staffeln_to_sync": staffeln if needs_sync else 0,
+            "visibility_applied": visibility_applied}
 
 
 async def _season_game(db, season: dict) -> dict | None:
@@ -200,14 +209,11 @@ async def admin_sync_season(season_id: str, me: dict = Depends(require_league_ad
         division = divisions.get(tournament["league_context"].get("division_id"))
         if not division:
             continue
-        if _is_tournament_locked(tournament):
-            results.append({"tournament_id": tournament["id"], "title": tournament.get("title"), "applied": [],
-                            "changed": [], "skipped": [{"group": "all", "label": "Alles",
-                                                        "reason": "Die Staffel ist gesperrt."}]})
-            continue
         try:
             async with mutation_lock(db, tournament_write_resource(tournament["id"])):
-                result = await leagues.sync_staffel(db, tournament, league, season, division, me)
+                # Gesperrt heißt: Termine, Kalender und Wertung bleiben - Sichtbarkeit und Regeltext gelten trotzdem.
+                result = await leagues.sync_staffel(db, tournament, league, season, division, me,
+                                                    locked=_is_tournament_locked(tournament))
         except MutationLockBusy:
             results.append({"tournament_id": tournament["id"], "title": tournament.get("title"), "applied": [],
                             "changed": [], "skipped": [{"group": "all", "label": "Alles",

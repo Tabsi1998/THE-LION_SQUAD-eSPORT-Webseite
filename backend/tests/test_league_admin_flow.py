@@ -214,7 +214,8 @@ async def test_sync_before_the_start_applies_everything(flow):
     assert changed.status_code == 200, changed.text
     assert changed.json()["staffeln_to_sync"] == 1
     untouched = await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0})
-    assert untouched["best_of"] == 3 and untouched["visibility"] == "internal"  # erst nach dem Übertragen
+    assert untouched["best_of"] == 3  # erst nach dem Übertragen
+    assert untouched["visibility"] == "public"  # die Sichtbarkeit gilt sofort
 
     await flow.put(f"{ADMIN}/seasons/{season['id']}/map-pool", json={"modes": [
         {"mode": "snd", "map_ids": [maps["Nebelwerk"]["id"]]}]})
