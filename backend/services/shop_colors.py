@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from collections import Counter
 from typing import Any, Iterable
 
 from services.shop_common import ShopError
@@ -117,19 +118,41 @@ def _overrides(product: dict | None) -> dict:
     return labels if isinstance(labels, dict) else {}
 
 
+def _own(product: dict | None, name: str) -> str | None:
+    own = _overrides(product).get(name)
+    return " ".join(own.split()) if isinstance(own, str) and own.strip() else None
+
+
+def _names(product: dict | None, extra: Iterable[str] = ()) -> list[str]:
+    names = [row.get("name") for row in ((product or {}).get("printful") or {}).get("colors") or []
+             if isinstance(row, dict)]
+    names += list(((product or {}).get("offer") or {}).get("colors") or []) + list(extra)
+    return [text for text in dict.fromkeys(_key(name) for name in names) if text]
+
+
+def _effective(product: dict | None, extra: Iterable[str] = ()) -> dict[str, str]:
+    """Printful-Name → Bezeichnung, eindeutig (#2105): ergeben zwei Farben dieselbe Bezeichnung („Royal“ und „Royal
+    Blue“ → „Königsblau“), bekommt jede automatische den Printful-Namen in Klammern. Eigene Bezeichnungen bleiben, wie
+    sie sind - doppelte lehnt ``clean_labels`` ab."""
+    base = {name: (_own(product, name), german(name)) for name in _names(product, extra)}
+    shown = {name: own or auto for name, (own, auto) in base.items()}
+    counts = Counter(text.casefold() for text in shown.values())
+    return {name: (f"{text} ({name})" if counts[text.casefold()] > 1 and base[name][0] is None and text != name
+                   else text)
+            for name, text in shown.items()}
+
+
 def label(product: dict | None, name: Any) -> str:
-    """Die Bezeichnung einer Farbe für dieses Produkt: eigene aus Schritt 2, sonst die Übersetzung."""
+    """Die Bezeichnung einer Farbe für dieses Produkt: eigene aus Schritt 2, sonst die Übersetzung - eindeutig unter
+    den Farben des Produkts."""
     text = _key(name)
-    own = _overrides(product).get(text)
-    return own if isinstance(own, str) and own.strip() else german(text)
+    found = _effective(product, (text,) if text else ()).get(text)
+    return found if found is not None else german(text)
 
 
 def labels_for(product: dict | None, extra: Iterable[str] = ()) -> dict[str, str]:
     """Printful-Name → Bezeichnung für alle Farben des Printful-Produkts und die angebotenen."""
-    names = [row.get("name") for row in ((product or {}).get("printful") or {}).get("colors") or []
-             if isinstance(row, dict)]
-    names += list(((product or {}).get("offer") or {}).get("colors") or []) + list(extra)
-    return {_key(name): label(product, name) for name in dict.fromkeys(names) if _key(name)}
+    return _effective(product, extra)
 
 
 def defaults_for(product: dict | None) -> dict[str, str]:
@@ -145,13 +168,17 @@ def variant_label(product: dict | None, variant: dict) -> str:
     return " / ".join(part for part in (label(product, color) if color else "", size_label(size)) if part)
 
 
-def stored_label(text: Any) -> str:
-    """Eine gespeicherte Bezeichnung „Farbe / Größe“ (etwa an einer Bestellposition) - dieselbe Übersetzung."""
+def stored_label(text: Any, product: dict | None = None) -> str:
+    """Eine gespeicherte Bezeichnung „Farbe / Größe“ (etwa an einer Bestellposition) - dieselbe Übersetzung wie im
+    Admin, mit ``product`` samt dessen eigenen Bezeichnungen (``offer.color_labels``)."""
     value = _key(text)
     if " / " not in value:
+        if product is not None and value in _names(product):
+            return label(product, value)
         return german(value) if is_translated(value) else value
     color, _sep, size = value.rpartition(" / ")
-    return f"{german(color)} / {size_label(size)}"
+    shown = label(product, color) if product is not None else german(color)
+    return f"{shown} / {size_label(size)}"
 
 
 def clean_labels(raw: Any, colors: list[str]) -> dict[str, str]:
@@ -176,6 +203,19 @@ def clean_labels(raw: Any, colors: list[str]) -> dict[str, str]:
             raise ShopError(f"Farbbezeichnung für {name}: höchstens {MAX_LABEL} Zeichen.")
         if text:
             out[name] = text
+    # Je angebotener Farbe eine eigene Bezeichnung (#2105): eine eigene darf weder doppelt vorkommen noch die
+    # Übersetzung einer anderen angebotenen Farbe sein - sonst sind Varianten im Shop nicht zu unterscheiden.
+    seen: dict[str, str] = {}
+    for color in colors:
+        if color in out:
+            continue
+        seen.setdefault(german(color).casefold(), color)
+    for name, text in out.items():
+        other = seen.get(text.casefold())
+        if other is not None and other != name:
+            raise ShopError(f"Farbbezeichnung „{text}“ gibt es schon für {other} - bitte je Farbe eine eigene "
+                            "Bezeichnung.")
+        seen[text.casefold()] = name
     return out
 
 

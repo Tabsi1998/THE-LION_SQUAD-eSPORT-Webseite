@@ -58,6 +58,31 @@ def test_overrides_are_checked_against_the_offered_colours():
             shop_colors.clean_labels(wrong, colors)
 
 
+def test_two_colours_never_share_a_label():
+    product = {"offer": {"colors": ["Royal", "Royal Blue", "Black"]},
+               "printful": {"colors": [{"name": "Royal"}, {"name": "Royal Blue"}, {"name": "Black"}]}}
+    assert shop_colors.labels_for(product) == {"Royal": "Königsblau (Royal)", "Royal Blue": "Königsblau (Royal Blue)",
+                                               "Black": "Schwarz"}
+    assert shop_colors.label(product, "Royal Blue") == "Königsblau (Royal Blue)"
+    # Eine eigene Bezeichnung macht die andere eindeutig - die automatische braucht die Klammer dann nicht mehr.
+    product["offer"]["color_labels"] = {"Royal": "Vereinsblau"}
+    assert shop_colors.labels_for(product)["Royal Blue"] == "Königsblau"
+    # Eine eigene Bezeichnung, die schon eine andere Farbe trägt (eigene oder Übersetzung), lehnt Schritt 2 ab.
+    colors = ["Black", "White", "Navy"]
+    with pytest.raises(ShopError, match="gibt es schon"):
+        shop_colors.clean_labels({"Black": "Dunkel", "White": "dunkel"}, colors)
+    with pytest.raises(ShopError, match="gibt es schon für Navy"):
+        shop_colors.clean_labels({"Black": "Marineblau"}, colors)
+    assert shop_colors.clean_labels({"Navy": "Marineblau"}, colors) == {"Navy": "Marineblau"}
+
+
+def test_stored_order_labels_use_the_own_labels_of_the_product():
+    product = {"offer": {"colors": ["Black"], "color_labels": {"Black": "Tiefschwarz"}},
+               "printful": {"colors": [{"name": "Black"}]}}
+    assert shop_colors.stored_label("Black / M", product) == "Tiefschwarz / M"
+    assert shop_colors.stored_label("Black / M") == "Schwarz / M"
+
+
 def test_only_stored_printful_codes_are_valid_colours():
     product = {"printful": {"colors": [{"name": "Black", "code": "#0C0C0C"}, {"name": "Odd", "code": "rot"}],
                             "variants": [{"color": "White", "color_code": "#ffffff"}]}}
@@ -118,7 +143,11 @@ async def test_orders_keep_the_printful_name_and_show_the_german_one(db, provide
         shipping_address=dict(SHIPPING), actor_id="konto-1")
     (item,) = await shop_orders.items_for(db, order["id"])
     assert item["variant_label"] == "White / M", "unverändert gespeichert"
-    assert shop_orders.item_view(item)["variant_display"] == "Weiß / M"
+    assert (await shop_orders.items_view(db, [item]))[0]["variant_display"] == "Weiß / M"
+    # Dieselbe Bezeichnung wie im Admin: eine eigene aus Schritt 2 gilt auch für die Bestellung (#2105).
+    await db.shop_products.update_one({"id": product["id"]}, {"$set": {"offer.color_labels": {"White": "Schneeweiß"}}})
+    (shown,) = await shop_orders.items_view(db, [item])
+    assert shown["variant_display"] == "Schneeweiß / M" and shown["variant_label"] == "White / M"
     files = await db.shop_print_files.find({"order_id": order["id"]}, {"_id": 0, "color": 1}).to_list(None)
     assert {row["color"] for row in files} == {"White"}
 
