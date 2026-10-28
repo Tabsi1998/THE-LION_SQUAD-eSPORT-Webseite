@@ -56,6 +56,7 @@ Kasten **Verteilen** am Beitrag ([Inhalte](inhalte.md)).
 2. Bei Resend unter „Domains“ die Vereinsdomain hinzufügen, die DNS-Einträge (SPF, DKIM) beim Domain-Anbieter anlegen und in
    Resend bestätigen. Ohne bestätigte Domain landen Mails im Spam oder werden abgelehnt.
 3. Hier **Absendername**, **Absender-E-Mail** (zum Beispiel `noreply@`, gefolgt von eurer Domain) und **Antworten an** (Vereinspostfach) eintragen.
+   Diese drei Felder und **Versand aktiv** gelten für beide Wege – unter SMTP steht dieselbe Einstellung, eine Änderung hier gilt auch dort.
 4. **Testmail senden**. Kommt sie an, **Versand aktiv** einschalten und speichern.
 
 ### 2.2 Oder: eigener Mailserver (SMTP)

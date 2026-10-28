@@ -117,6 +117,7 @@ export function SmtpSection({ smtp, setSmtp, smtpTestEmail, setSmtpTestEmail, sm
             <p className="mt-1 text-[11px] text-white/40">Reply-To für Rückfragen.</p>
           </div>
         </div>
+        <p className="text-xs text-white/55" data-testid="smtp-shared-hint">Absender, „Antworten an“ und „Versand aktiv“ gelten für SMTP und Resend gemeinsam – im Resend-Abschnitt ist es dieselbe Einstellung.</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Message-ID Domain</div>

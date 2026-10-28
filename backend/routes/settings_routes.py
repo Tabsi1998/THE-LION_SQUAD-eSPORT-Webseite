@@ -1109,6 +1109,37 @@ async def track_site_banner_click(body: SiteBannerStatBody, request: Request):
     return await _count_banner(request, body.banner_id, "clicks", "last_click_at", BANNER_CLICK_LIMIT)
 
 
+# Absender, Antworten-an und „Versand aktiv“ gelten für Resend und SMTP gleich (#2119 ML3). Sie stehen in `settings.mail`
+# - dort liest der Versand zuerst (services/mail_queue.get_mail_settings). Ältere Installationen haben sie nur in
+# `settings.email`; die gelten, bis jemand sie neu speichert. Beide Abschnitte zeigen den Wert, der wirklich gilt.
+SHARED_SENDER_FIELDS = ("sender_name", "sender_email", "reply_to_email", "enabled")
+
+
+async def _shared_sender(db) -> dict:
+    mail = await db.settings.find_one({"id": "mail"}, {"_id": 0}) or {}
+    legacy = await db.settings.find_one({"id": "email"}, {"_id": 0}) or {}
+    sender_email = mail.get("sender_email") or legacy.get("sender_email") or ""
+    return {
+        "sender_name": mail.get("sender_name") or legacy.get("sender_name") or "",
+        "sender_email": sender_email,
+        "reply_to_email": mail.get("reply_to_email") or legacy.get("reply_to_email") or sender_email,
+        "enabled": bool(mail["enabled"]) if "enabled" in mail else bool(legacy.get("enabled", True)),
+    }
+
+
+async def _save_shared_sender(db, updates: dict, actor_id: str) -> list[str]:
+    """Die gemeinsamen Absender-Felder nach `settings.mail` - gleich, aus welchem Abschnitt sie kommen."""
+    shared = {key: updates.pop(key) for key in SHARED_SENDER_FIELDS if key in updates}
+    if not shared:
+        return []
+    current = await db.settings.find_one({"id": "mail"}, {"_id": 0}) or {}
+    changed = _changed_setting_fields(current, shared)
+    if changed:
+        await db.settings.update_one({"id": "mail"}, {"$set": {**shared, "updated_at": now_utc().isoformat()}, "$setOnInsert": {"id": "mail"}}, upsert=True)
+        await _audit_settings_change(db, "settings.smtp.update", "mail", actor_id, changed)
+    return changed
+
+
 @settings_router.get("/email")
 async def get_email_settings(me: dict = Depends(require_club_admin())):
     db = get_db()
@@ -1117,6 +1148,7 @@ async def get_email_settings(me: dict = Depends(require_club_admin())):
     if s.get("resend_api_key"):
         s["resend_api_key_masked"] = "********"
         s.pop("resend_api_key", None)
+    s.update(await _shared_sender(db))
     return s
 
 
@@ -1124,6 +1156,7 @@ async def get_email_settings(me: dict = Depends(require_club_admin())):
 async def update_email_settings(body: EmailSettings, me: dict = Depends(require_club_admin())):
     db = get_db()
     updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    shared_changed = await _save_shared_sender(db, updates, me["id"])
     clear_secret = bool(updates.pop("clear_resend_api_key", False))
     unset = {"resend_api_key": ""} if clear_secret else {}
     # Only overwrite api_key if a non-empty value given
@@ -1134,7 +1167,7 @@ async def update_email_settings(body: EmailSettings, me: dict = Depends(require_
     current = await db.settings.find_one({"id": "email"}, {"_id": 0}) or {}
     changed_fields = _changed_setting_fields(current, updates, unset)
     if not changed_fields:
-        return {"ok": True, "changed": False}
+        return {"ok": True, "changed": bool(shared_changed)}
     updates["updated_at"] = now_utc().isoformat()
     operation = {"$set": updates, "$setOnInsert": {"id": "email"}}
     if unset:
@@ -1331,9 +1364,9 @@ async def get_smtp_settings(me: dict = Depends(require_club_admin())):
     s.setdefault("smtp_port", 587)
     s.setdefault("smtp_tls_verify", False)
     s.setdefault("smtp_helo_name", "")
-    s.setdefault("enabled", True)
-    s.setdefault("reply_to_email", s.get("sender_email") or "")
     s.setdefault("message_id_domain", "")
+    # Absender und Schalter: der Wert, der gilt - auch wenn er noch aus dem Resend-Teil stammt (#2119 ML3).
+    s.update(await _shared_sender(db))
     return s
 
 

@@ -49,8 +49,9 @@ export function ResendSection({ email, setEmail, testEmail, setTestEmail, saving
         <div>
           <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Antworten an</div>
           <input type="email" value={email.reply_to_email || ""} onChange={(e) => setEmail({ ...email, reply_to_email: e.target.value })} data-testid="email-reply-to" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" placeholder="office@lionsquad.at" />
-          <p className="text-xs text-white/40 mt-1">Reply-To für Rückfragen. Leer = sichtbare Absender-E-Mail.</p>
+          <p className="text-xs text-white/40 mt-1">Wohin Antworten auf eine Mail gehen. Leer = Absender-E-Mail.</p>
         </div>
+        <p className="text-xs text-white/55" data-testid="email-shared-hint">Absender, „Antworten an“ und „Versand aktiv“ gelten für Resend und SMTP gemeinsam – unter SMTP ist es dieselbe Einstellung.</p>
         <button onClick={saveEmail} disabled={savingEmail} data-testid="email-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">{savingEmail ? "Speichere..." : "Speichern"}</button>
       </div>
 
