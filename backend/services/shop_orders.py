@@ -61,7 +61,6 @@ NUMBER_MISSING = ("du hast noch keine Vereinsnummer. Such dir zuerst unter „Me
                   "dann geht die Bestellung.")
 NUMBER_NO_CONSENT = ("für den Druck deiner Vereinsnummer brauchen wir deine Einwilligung - bitte den Haken bei der "
                      "Position setzen.")
-NUMBER_NOT_PRINTED = "dieses Produkt druckt keine Vereinsnummer - die Einwilligung gehört hier nicht dazu."
 
 
 def number_consent_terms() -> dict:
@@ -163,8 +162,8 @@ async def _print_number(db, product: dict, line: dict, position: int, buyer_kind
     from services import jersey_numbers
 
     if not await shop_print_files.prints_number(db, product):
-        if line.get("number_consent"):
-            raise ShopError(f"Position {position}: {NUMBER_NOT_PRINTED}")
+        # Ein Haken bei einem Produkt ohne Nummer wird still übergangen und nicht gespeichert - etwa, wenn sich der
+        # Aufbau zwischen Warenkorb und Kasse geändert hat.
         return None
     if buyer_kind != "member" or not await jersey_numbers.is_eligible(db, user_id):
         raise ShopError(f"Position {position}: {NUMBER_MEMBERS_ONLY}")
