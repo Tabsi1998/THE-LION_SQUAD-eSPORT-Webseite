@@ -296,3 +296,179 @@ for (const [label, width, height] of WIDTHS) {
     });
   });
 }
+
+// ---------------------------------------------------------------- Präzise setzen (#2117)
+// Ziehen mit Einrasten und Hilfslinien (Alt = frei), Zahleneingabe mit Komma und „Groß bearbeiten“ mit Zoom - bei 390
+// und 1440 px im Desktop-Projekt (Maus) und im Handy-Projekt per Touch. Nur synthetische Bilder.
+
+const cmValue = (text) => Number(String(text).replace(",", "."));
+
+async function openDesigns(page, seen = []) {
+  await page.addInitScript(() => window.localStorage.removeItem("tls_shop_place_v1"));
+  await mockApi(page, seen);
+  await page.goto("/admin/shop/products/p1");
+  await page.getByTestId("shop-step-designs").click();
+  const area = page.getByTestId("shop-preview-front-area");
+  await expect(area).toBeVisible({ timeout: 20000 });
+  await expect(page.getByTestId("shop-layer-front-0-top")).toHaveValue("5");
+  await page.getByTestId("shop-preview-front").scrollIntoViewIfNeeded();
+  return area;
+}
+
+// Der Löwe wird oben im Rahmen gegriffen - in der Mitte läge später der Name darüber (er folgt dem Löwen).
+async function grip(locator) {
+  const box = await locator.boundingBox();
+  return { x: box.x + box.width / 2, y: box.y + box.height * 0.2 };
+}
+
+async function noSideScroll(page) {
+  const overflow = await page.evaluate(() => Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - document.documentElement.clientWidth);
+  expect(overflow, "kein seitliches Scrollen der Seite").toBeLessThanOrEqual(1);
+}
+
+for (const [label, width, height] of WIDTHS) {
+  test.describe(`Präzise setzen ${label} (${width} px)`, () => {
+    test.beforeEach(async ({ isMobile }) => {
+      test.skip(isMobile, "nur im Desktop-Projekt - die Breite wird hier selbst gesetzt");
+    });
+
+    test("Ziehen rastet an der Mitte ein, Alt zieht frei, Zahlen mit Komma, Groß bearbeiten mit Zoom (#2117)", async ({ page }, testInfo) => {
+      await page.setViewportSize({ width, height });
+      const area = await openDesigns(page);
+      const lion = page.getByTestId("shop-preview-front-layer-0");
+      await expect(page.getByTestId("shop-preview-front-help")).toContainText("Ziehen rastet ein (Alt = frei)");
+      // 1. Ziehen bis knapp neben die Mitte: rastet ein, die Hilfslinie und die Live-Anzeige in cm sind da.
+      const areaBox = await area.boundingBox();
+      const lionBox = await lion.boundingBox();
+      const from = await grip(lion);
+      const toX = from.x + (areaBox.x + areaBox.width / 2 - (lionBox.x + lionBox.width / 2)) + 2;
+      await page.mouse.move(from.x, from.y);
+      await page.mouse.down();
+      await page.mouse.move((from.x + toX) / 2, from.y + 6, { steps: 4 });
+      await page.mouse.move(toX, from.y + 6, { steps: 4 });
+      await expect(page.getByTestId("shop-preview-front-guide-x")).toBeVisible();
+      await expect(page.getByTestId("shop-preview-front-guide-x")).toHaveAttribute("data-kind", "center");
+      await expect(page.getByTestId("shop-preview-front-live")).toContainText("Mitte 0 cm");
+      await expect(lion).toHaveAttribute("data-dragging", "true");
+      const shot = testInfo.outputPath(`einrasten-${label}.png`);
+      await page.getByTestId("shop-preview-front").screenshot({ path: shot });
+      await testInfo.attach(`einrasten-${label}.png`, { path: shot, contentType: "image/png" });
+      await page.mouse.up();
+      await expect(page.getByTestId("shop-preview-front-guide-x")).toHaveCount(0);
+      await expect(page.getByTestId("shop-preview-front-live")).toHaveCount(0);
+      await expect(page.getByTestId("shop-layer-front-0-x")).toHaveValue("0");
+      // Senkrecht aufs 0,5-cm-Raster.
+      const top = cmValue(await page.getByTestId("shop-layer-front-0-top").inputValue());
+      expect(Math.abs(top * 2 - Math.round(top * 2))).toBeLessThan(0.011);
+      const centered = await lion.boundingBox();
+      expect(Math.abs(centered.x + centered.width / 2 - (areaBox.x + areaBox.width / 2))).toBeLessThanOrEqual(1);
+      // 2. Mit Alt: frei, ohne Hilfslinie.
+      const again = await grip(lion);
+      await page.mouse.move(again.x, again.y);
+      await page.mouse.down();
+      await page.keyboard.down("Alt");
+      await page.mouse.move(again.x + 4, again.y, { steps: 2 });
+      await page.mouse.move(again.x + 7, again.y, { steps: 2 });
+      await expect(page.getByTestId("shop-preview-front-live")).toBeVisible();
+      await expect(page.getByTestId("shop-preview-front-guide-x")).toHaveCount(0);
+      await page.mouse.up();
+      await page.keyboard.up("Alt");
+      const free = cmValue(await page.getByTestId("shop-layer-front-0-x").inputValue());
+      expect(free).toBeGreaterThan(0.5);
+      expect(free).toBeLessThan(3);
+      // 3. Zahl mit Komma: die Oberkante liegt genau dort.
+      await page.getByTestId("shop-layer-front-0-top").fill("12,5");
+      await expect(page.getByTestId("shop-layer-front-0-top")).toHaveValue("12,5");
+      await page.getByTestId("shop-layer-front-0-x").fill("-6");
+      await expect(page.getByTestId("shop-layer-front-0-offset")).toContainText("Feinjustiert");
+      await page.getByTestId("shop-preview-front").scrollIntoViewIfNeeded();
+      const [placed, nowArea] = [await lion.boundingBox(), await area.boundingBox()];
+      expect(placed.y - nowArea.y).toBeCloseTo((12.5 / 40.64) * areaBox.height, 0);
+      expect(placed.x + placed.width / 2 - (nowArea.x + nowArea.width / 2)).toBeCloseTo((-6 / 30.48) * areaBox.width, 0);
+      await noSideScroll(page);
+      // 4. Groß bearbeiten: nur die Fläche, fast bildschirmfüllend; Mausrad zoomt, Ziehen wird feiner.
+      await page.getByTestId("shop-preview-front-big").click();
+      const big = page.getByTestId("shop-big-front");
+      await expect(big).toBeVisible();
+      const canvas = page.getByTestId("shop-big-front-canvas");
+      const before = await canvas.boundingBox();
+      expect(before.width).toBeGreaterThan(areaBox.width * 1.5);
+      await expect(big.locator("img[src*='print-templates']")).toHaveCount(0);
+      const bigLion = page.getByTestId("shop-big-front-layer-0");
+      const lionCenter = await bigLion.boundingBox();
+      await page.mouse.move(lionCenter.x + lionCenter.width / 2, lionCenter.y + lionCenter.height / 2);
+      await page.mouse.wheel(0, -200);
+      await expect(page.getByTestId("shop-big-front-zoom")).not.toHaveText("100 %");
+      const zoomed = await canvas.boundingBox();
+      expect(zoomed.width).toBeGreaterThan(before.width * 1.2);
+      // Gleich viele Pixel, weniger cm: 10 px frei gezogen sind im großen Fenster feiner als in der kleinen Vorschau.
+      const startX = cmValue(await page.getByTestId("shop-layer-front-0-x").inputValue());
+      const hold = await grip(bigLion);
+      await page.mouse.move(hold.x, hold.y);
+      await page.mouse.down();
+      await page.keyboard.down("Alt");
+      await page.mouse.move(hold.x + 5, hold.y, { steps: 2 });
+      await page.mouse.move(hold.x + 10, hold.y, { steps: 2 });
+      await expect(page.getByTestId("shop-big-front-live")).toBeVisible();
+      await page.mouse.up();
+      await page.keyboard.up("Alt");
+      const moved = cmValue(await page.getByTestId("shop-layer-front-0-x").inputValue()) - startX;
+      expect(moved).toBeGreaterThan(0);
+      expect(moved).toBeLessThan((10 / areaBox.width) * 30.48 * 0.85);
+      await expect(page.getByTestId("shop-big-front-field-top")).toHaveValue("12,5");
+      await page.getByTestId("shop-big-front-zoom-in").click();
+      await page.getByTestId("shop-big-front-fit").click();
+      await expect(page.getByTestId("shop-big-front-zoom")).toHaveText("100 %");
+      const bigShot = testInfo.outputPath(`gross-${label}.png`);
+      await page.screenshot({ path: bigShot });
+      await testInfo.attach(`gross-${label}.png`, { path: bigShot, contentType: "image/png" });
+      await noSideScroll(page);
+      await page.keyboard.press("Escape");
+      await expect(big).toHaveCount(0);
+      await noSideScroll(page);
+    });
+  });
+}
+
+test.describe("Präzise setzen am Handy (Touch)", () => {
+  test.beforeEach(async ({ isMobile }) => {
+    test.skip(!isMobile, "nur im Handy-Projekt");
+  });
+
+  test("Ziehen per Finger rastet ein, die Zahlen sind der Hauptweg, kein seitliches Scrollen (#2117)", async ({ page }, testInfo) => {
+    const area = await openDesigns(page);
+    const lion = page.getByTestId("shop-preview-front-layer-0");
+    const areaBox = await area.boundingBox();
+    const lionBox = await lion.boundingBox();
+    const from = await grip(lion);
+    const toX = from.x + (areaBox.x + areaBox.width / 2 - (lionBox.x + lionBox.width / 2)) + 2;
+    const client = await page.context().newCDPSession(page);
+    const touch = (type, x, y) => client.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x, y }] });
+    await touch("touchStart", from.x, from.y);
+    for (let step = 1; step <= 6; step += 1) await touch("touchMove", from.x + ((toX - from.x) * step) / 6, from.y + step);
+    await expect(page.getByTestId("shop-preview-front-guide-x")).toBeVisible();
+    await touch("touchEnd");
+    await expect(page.getByTestId("shop-layer-front-0-x")).toHaveValue("0");
+    // Zahlen: mit − und + und Komma.
+    await page.getByTestId("shop-layer-front-0-top-plus").tap();
+    const top = page.getByTestId("shop-layer-front-0-top");
+    const now = cmValue(await top.inputValue());
+    await top.fill("8,5");
+    await expect(top).toHaveValue("8,5");
+    expect(now).toBeGreaterThan(0);
+    const card = await page.getByTestId("shop-area-front").boundingBox();
+    for (const id of ["shop-layer-front-0-top-plus", "shop-layer-front-0-x-plus", "shop-layer-front-0-mirror", "shop-layer-front-1-align-opposite", "shop-preview-front-settings-snap"]) {
+      const box = await page.getByTestId(id).boundingBox();
+      expect(box.x + box.width, id).toBeLessThanOrEqual(card.x + card.width + 1);
+    }
+    await noSideScroll(page);
+    await page.getByTestId("shop-preview-front-big").tap();
+    const canvas = page.getByTestId("shop-big-front-canvas");
+    await expect(canvas).toBeVisible();
+    expect((await canvas.boundingBox()).width).toBeGreaterThan(areaBox.width);
+    await noSideScroll(page);
+    const shot = testInfo.outputPath("gross-handy-touch.png");
+    await page.screenshot({ path: shot });
+    await testInfo.attach("gross-handy-touch.png", { path: shot, contentType: "image/png" });
+  });
+});
