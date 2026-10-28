@@ -70,7 +70,7 @@ export function LeagueDeleteSheet({ kind, target, name, onClose, onDeleted, onAr
 
   const blocked = plan && !plan.deletable;
   return (
-    <AdminSheet title={title} eyebrow="Löschen" accent={blocked ? "#29B6E8" : "#FF3B30"} onClose={onClose}
+    <AdminSheet title={title} eyebrow="Löschen" accent={blocked ? "#29B6E8" : "var(--tls-live)"} onClose={onClose}
       onSubmit={plan?.deletable ? submit : undefined} saving={saving} savingLabel="Lösche …" submitLabel="Endgültig löschen"
       submitDisabled={!reasonOk} submitTestId="league-delete-confirm" testId="league-delete-sheet" noValidate
       footer={blocked && onArchive ? (
