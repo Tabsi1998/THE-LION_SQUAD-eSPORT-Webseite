@@ -2,11 +2,14 @@
 // sichtbare Season steht ein freundlicher Hinweis da - der Menüpunkt „Liga“ erscheint dann ohnehin nicht.
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronRight, ListOrdered } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
+import { LazyImg } from "@/components/tls/LazyImg";
 import { StaggerIn } from "@/components/tls/motion";
+import { LeagueEmblem } from "@/components/tls/league/public/LeagueLook";
+import { accentStyle, bannerFocus } from "@/lib/leagueLook";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { seasonPath } from "@/lib/leaguePage";
 import { viennaDate } from "@/lib/vienna";
@@ -41,23 +44,36 @@ export default function LeagueIndexPage() {
         ) : null}
         <div className="mt-10 space-y-10">
           {(leagues || []).map((league) => (
-            <section key={league.id} aria-labelledby={`league-${league.slug}`} data-testid={`league-index-${league.slug}`}>
-              <h2 id={`league-${league.slug}`} className="flex items-center gap-2 font-heading text-2xl font-black uppercase">
-                <ListOrdered className="h-5 w-5 text-[#29B6E8]" aria-hidden="true" /> {league.name}
-              </h2>
-              {league.game?.name ? <p className="text-sm text-white/50">{league.game.name}</p> : null}
+            <section key={league.id} aria-labelledby={`league-${league.slug}`} data-testid={`league-index-${league.slug}`}
+              className="tls-league-look" style={accentStyle(league.accent_color)}>
+              {/* Emblem der Liga (#2107), ohne Bild das Liga-Zeichen in ihrer Farbe. */}
+              <div className="flex items-center gap-3">
+                <LeagueEmblem src={league.emblem_url} size={48} testId={`league-index-emblem-${league.slug}`} />
+                <div className="min-w-0">
+                  <h2 id={`league-${league.slug}`} className="font-heading text-2xl font-black uppercase break-words">{league.name}</h2>
+                  {league.game?.name ? <p className="text-sm text-white/50">{league.game.name}</p> : null}
+                </div>
+              </div>
               <StaggerIn as="ul" className="mt-4 grid gap-3 sm:grid-cols-2">
                 {league.seasons.map((season) => (
                   <li key={season.id}>
                     <Link to={seasonPath(league, season)} data-testid={`league-index-season-${season.slug}`}
-                      className="tls-card group flex items-center gap-4 border border-white/10 bg-[#121212] rounded-sm p-4">
-                      <span className="min-w-0 flex-1">
+                      className="tls-card tls-league-card group relative flex items-center gap-4 overflow-hidden border border-white/10 bg-[#121212] rounded-sm p-4">
+                      {/* Das Banner der Season als leiser Grund der Karte - der Text bleibt lesbar. */}
+                      {season.banner?.url ? (
+                        <LazyImg src={season.banner.url} alt="" sizes="(min-width: 640px) 440px, 100vw" className="tls-league-card__banner"
+                          style={{ objectPosition: bannerFocus(season.banner)["--league-focus-desktop"] }} />
+                      ) : null}
+                      {season.emblem_url && season.emblem_url !== league.emblem_url ? (
+                        <LeagueEmblem src={season.emblem_url} size={40} className="relative" testId={`league-index-season-emblem-${season.slug}`} />
+                      ) : null}
+                      <span className="relative min-w-0 flex-1">
                         <span className="block font-heading text-xl font-bold uppercase">{season.name}</span>
                         <span className="block text-xs text-white/55">
                           {STATUS[season.status] || ""}{season.start_date ? ` · ab ${viennaDate(season.start_date, { day: "numeric", month: "numeric", year: "numeric" })}` : ""}
                         </span>
                       </span>
-                      <ChevronRight className="tls-card__arrow h-4 w-4 shrink-0 text-white/35" aria-hidden="true" />
+                      <ChevronRight className="tls-card__arrow relative h-4 w-4 shrink-0 text-white/35" aria-hidden="true" />
                     </Link>
                   </li>
                 ))}

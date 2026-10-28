@@ -34,6 +34,7 @@ import { ResultUndoBar, useResultUndo } from "@/components/tls/results/ResultUnd
 import { isOwnProposal, proposalStatusLabel, waitingForOtherSide } from "@/lib/scheduleProposals";
 import { useLeagueTrail } from "@/hooks/useLeagueTrail";
 import { leagueCrumbs } from "@/lib/leagueTrail";
+import { LeagueEmblem } from "@/components/tls/league/public/LeagueLook";
 
 const DECISION_TOASTS = {
   accept: "Termin bestätigt.",
@@ -339,7 +340,11 @@ function MatchPageView() {
             vor dem Spiel der Termin, danach „Beendet“ mit dem Ergebnis. */}
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="min-w-0 flex-1">
-            <div className="text-[11px] uppercase tracking-[0.3em] text-[#29B6E8] font-bold">{data.matchday_label}</div>
+            <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.3em] text-[#29B6E8] font-bold">
+              {/* Liga-Spiel (#2107): das Emblem der Season bzw. Liga klein vor dem Spieltag. */}
+              {trail?.emblemUrl ? <LeagueEmblem src={trail.emblemUrl} size={24} testId="match-league-emblem" /> : null}
+              {data.matchday_label}
+            </div>
             <h1 className="mt-2 font-heading text-3xl md:text-5xl font-black uppercase [overflow-wrap:anywhere]" data-testid="match-headline">{headline}</h1>
             <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-white/55">
               <span className="text-[11px] uppercase tracking-widest text-white/40" data-testid="match-key">{formatMatchKind(match)} {match.match_key || ""}</span>
