@@ -16,7 +16,7 @@ const get = vi.fn(async (url) => (url === "/leagues" ? { data: { leagues: state.
 vi.mock("@/lib/api", () => ({ api: { get: (...args) => get(...args) } }));
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
 
-const { MainNav, MobileNav, navItemIs, resetLeagueVisibility, withLeagueEntry } = await import("./MainNav");
+const { MainNav, MobileNav, byNavOrder, navItemIs, resetLeagueVisibility, withLeagueEntry } = await import("./MainNav");
 
 beforeEach(() => {
   resetLeagueVisibility();
@@ -81,4 +81,10 @@ test("navItemIs: Schlüssel vor Name, ohne Schlüssel der Name aus der Vorgabe",
   expect(navItemIs({ key: "community", label: "Treffpunkt" }, "community")).toBe(true);
   expect(navItemIs({ key: "club", label: "Community" }, "community")).toBe(false);
   expect(navItemIs({ label: "Community" }, "community")).toBe(true);
+});
+
+test("byNavOrder: ohne Stelle zählt die Stelle in der Liste - wie auf dem Server", () => {
+  const entries = [{ key: "a", order: 2 }, { key: "neu" }, { key: "b", order: 0 }, { key: "c", order: 1 }];
+  // „neu“ steht an Stelle 1 der Liste und hat keine gespeicherte Stelle - Gleichstand mit c entscheidet die Liste.
+  expect(byNavOrder(entries).map((entry) => entry.key)).toEqual(["b", "neu", "c", "a"]);
 });

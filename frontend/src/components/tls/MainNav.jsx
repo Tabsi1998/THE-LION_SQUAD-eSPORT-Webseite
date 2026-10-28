@@ -80,15 +80,25 @@ function normalizeGermanNavLabel(label) {
   return typeof label === "string" ? (GERMAN_NAV_LABELS[label] || label) : label;
 }
 
+/**
+ * Nach der gespeicherten Stelle sortieren - wie der Server (#2122 NW6): ohne `order` zählt die Stelle in der Liste,
+ * bei Gleichstand bleibt die Reihenfolge der Liste.
+ */
+export function byNavOrder(entries) {
+  return entries
+    .map((entry, index) => ({ entry, index, order: typeof entry?.order === "number" ? entry.order : index }))
+    .sort((a, b) => a.order - b.order || a.index - b.index)
+    .map(({ entry }) => entry);
+}
+
 function normalizeNavItems(items) {
   if (!Array.isArray(items) || !items.length) return NAV_STRUCTURE;
-  return [...items]
-    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+  return byNavOrder(items)
     .map((item) => ({
       ...item,
       label: normalizeGermanNavLabel(item.label),
       children: item.children?.length
-        ? [...item.children].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+        ? byNavOrder(item.children)
             .map((child) => ({ ...child, label: normalizeGermanNavLabel(child.label) }))
         : item.children,
     }));

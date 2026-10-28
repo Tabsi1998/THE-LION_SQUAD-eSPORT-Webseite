@@ -8,16 +8,15 @@ import { AdminLayout } from "@/components/tls/AdminLayout";
 import { SkeletonList } from "@/components/tls/Skeleton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
+import { byNavOrder } from "@/components/tls/MainNav";
 import { toast } from "sonner";
 import {
   Save, Eye, EyeOff, ChevronUp, ChevronDown, RotateCcw, ChevronRight, ChevronDownIcon, Undo2,
 } from "lucide-react";
 
-const byOrder = (a, b) => (a.order ?? 0) - (b.order ?? 0);
-
-/** Haupt- und Unterpunkte nach ihrer gespeicherten Reihenfolge. */
+/** Haupt- und Unterpunkte nach ihrer gespeicherten Reihenfolge - dieselbe Regel wie Website und Server. */
 export function sortNavItems(items) {
-  return [...(items || [])].sort(byOrder).map((item) => (item.children?.length ? { ...item, children: [...item.children].sort(byOrder) } : item));
+  return byNavOrder(items || []).map((item) => (item.children?.length ? { ...item, children: byNavOrder(item.children) } : item));
 }
 
 /** Die Reihenfolge zum Speichern (#2122 NW6): je Hauptpunkt und je Unterpunkt die Stelle - sonst springt sie zurück. */
