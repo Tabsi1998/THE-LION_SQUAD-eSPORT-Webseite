@@ -93,14 +93,18 @@ export function TournamentStagesPanel({ tournamentId, stages, matches, registrat
     }
   };
   const removeStage = async (stage) => {
+    // Mit Zahl (#2120): wie viele Spiele der Phase mitgehen und wie viele davon schon begonnen oder gewertet sind.
+    const impact = matchImpact(matches.filter((match) => match.stage_id === stage.id));
     if (!await confirm({
       title: "Phase löschen?",
-      description: "Alle Spiele und Berichte dieser Phase werden gelöscht.",
+      description: impact.match_count
+        ? `Gelöscht werden ${impactText(impact)} – samt Ergebnissen und Berichten.`
+        : "Die Phase und ihre Vorschau-Spiele werden gelöscht.",
       confirmLabel: "Löschen",
       tone: "danger",
     })) return;
     try {
-      await api.delete(`/tournaments/${tournamentId}/stages/${stage.id}`);
+      await api.delete(`/tournaments/${tournamentId}/stages/${stage.id}${impact.match_count ? "?force=true" : ""}`);
       toast.success("Phase gelöscht.");
       onChanged();
     } catch (err) {

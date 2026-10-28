@@ -146,37 +146,50 @@ export default function AdminTournamentEditPage() {
   useEffect(() => { loadSafely(); }, [loadSafely]);
   useApiInvalidation(loadSafely, ["tournaments", "matches", "stations"]);
 
-  const reset = async () => {
-    if (!await confirm({
-      title: "Turnierbaum zurücksetzen?",
-      description: "Alle generierten Turnierbaum-Daten werden zurückgesetzt. Diese Aktion ist für laufende Turniere kritisch.",
-      confirmLabel: "Zurücksetzen",
-    })) return;
+  // Folgenschwere Aktionen (#2120): echte Spiele löscht der Server nur mit force - vorher nennt die Rückfrage, wie
+  // viele Spiele (und wie viele davon schon begonnen oder gewertet) verloren gehen. Weiß der Server mehr als die Seite
+  // (inzwischen gespielt), kommt seine Rückfrage mit seinen Zahlen.
+  const runConfirmed = async (send, { title, confirmLabel, failure }) => {
     try {
-      await api.post(`/tournaments/${id}/reset-bracket`);
-      toast.success("Turnierbaum zurückgesetzt.");
-      load();
+      return await send(false);
     } catch (e) {
-      if (e.response?.status === 409) {
-        const force = await confirm({
-          title: "Laufenden Turnierbaum wirklich zurücksetzen?",
-          description: "Das Turnier ist live oder bereits beendet. Beim Fortfahren werden alle Spiele endgültig gelöscht.",
-          confirmLabel: "Trotzdem zurücksetzen",
-          tone: "danger",
-        });
-        if (!force) return;
-        try {
-          await api.post(`/tournaments/${id}/reset-bracket?force=true`);
-          toast.success("Turnierbaum zurückgesetzt.");
-          load();
-          return;
-        } catch (inner) {
-          toast.error(formatRequestError(inner, "Turnierbaum konnte nicht zurückgesetzt werden."));
-          return;
-        }
+      const detail = guardDetail(e, "confirm_destruction");
+      if (!detail) {
+        toast.error(formatRequestError(e, failure));
+        return null;
       }
-      toast.error(formatRequestError(e, "Turnierbaum konnte nicht zurückgesetzt werden."));
+      const ok = await confirm({ title, description: detail.message, confirmLabel, tone: "danger" });
+      if (!ok) return null;
+      try {
+        return await send(true);
+      } catch (inner) {
+        toast.error(formatRequestError(inner, failure));
+        return null;
+      }
     }
+  };
+  const reset = async () => {
+    // Der Status bleibt (#2120, TA16) - nur die Spiele gehen.
+    const impact = matchImpact(matchesV2);
+    const ok = await confirm(impact.match_count ? {
+      title: "Turnierbaum zurücksetzen?",
+      description: `Gelöscht werden ${impactText(impact)} – samt Ergebnissen und Berichten. Der Status bleibt; Punkte, Pokale und Gewinne gibt es erst nach dem Ende.`,
+      confirmLabel: impact.match_count === 1 ? "1 Spiel löschen" : `${impact.match_count} Spiele löschen`,
+      tone: "danger",
+    } : {
+      title: "Turnierbaum zurücksetzen?",
+      description: "Die Vorschau wird gelöscht und baut sich mit der nächsten An- oder Abmeldung bzw. „Speichern & Struktur anwenden“ neu. Der Status bleibt.",
+      confirmLabel: "Zurücksetzen",
+      tone: "info",
+    });
+    if (!ok) return;
+    const data = await runConfirmed(
+      async (force) => (await api.post(`/tournaments/${id}/reset-bracket${force || impact.match_count ? "?force=true" : ""}`)).data,
+      { title: "Turnierbaum wirklich zurücksetzen?", confirmLabel: "Trotzdem zurücksetzen", failure: "Turnierbaum konnte nicht zurückgesetzt werden." },
+    );
+    if (!data) return;
+    toast.success("Turnierbaum zurückgesetzt.");
+    load();
   };
   const setRegStatus = async (rid, status) => {
     // Absage mit Grund (#1133): die Person bekommt eine Nachricht - der Grund steht nur darin, nicht an der Anmeldung.
@@ -496,7 +509,8 @@ export default function AdminTournamentEditPage() {
         {t.locked_at ? "Entsperren" : "Sperren"}
       </button>
     ),
-    t.can_manage_structure && !staffel && (
+    // Nach dem Ende bleibt der Baum (#2120): daran hängen Platzierungen, Punkte und Gewinne.
+    t.can_manage_structure && !staffel && !FINISHED_STATUSES.has(t.status) && (
       <button key="reset" type="button" onClick={reset} data-testid="admin-tr-reset" className="px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#FF3B30]/10 inline-flex items-center gap-2">
         <RefreshCw className="w-3.5 h-3.5" /> Zurücksetzen
       </button>

@@ -526,24 +526,33 @@ async def reset_bracket(tid: str, force: bool = False, me: dict = Depends(get_cu
     staffel_problem = await staffel_rebuild_problem(db, t)
     if staffel_problem:
         raise HTTPException(status_code=409, detail=staffel_problem)
-    if t.get("status") in ("live", "completed", "results_published") and not force:
-        raise HTTPException(
-            status_code=409,
-            detail="Bracket-Reset für laufende oder beendete Turniere braucht force=true",
-        )
-    v2_match_ids = await db.matches_v2.distinct("id", {"tournament_id": tid})
-    if not v2_match_ids and t.get("status") == "draft":
-        return {"ok": True, "idempotent_replay": True}
+    # Nach dem Ende bleibt der Baum (#2120, TA16): Platzierungen, Jahrespunkte, Pokale und Gewinne hängen daran.
+    finished = tournament_guard.finished_problem(t)
+    if finished:
+        raise HTTPException(status_code=409, detail=finished)
+    v2_matches = await db.matches_v2.find({"tournament_id": tid}, {"_id": 0}).to_list(5000)
+    if not v2_matches:
+        return {"ok": True, "idempotent_replay": True, "match_count": 0}
+    impact = tournament_guard.match_impact(v2_matches)
+    # Echte Spiele löscht nur eine Bestätigung mit Zahl (force) - in jedem Status, auch pausiert oder abgesagt.
+    if impact["match_count"] and not force:
+        raise HTTPException(status_code=409, detail=tournament_guard.confirm_detail(
+            "confirm_destruction",
+            f"Zurücksetzen löscht {tournament_guard.impact_text(impact)} samt Ergebnissen und Berichten.",
+            impact,
+        ))
+    v2_match_ids = [match["id"] for match in v2_matches if match.get("id")]
     await db.matches_v2.delete_many({"tournament_id": tid})
     if v2_match_ids:
         await db.match_reports_v2.delete_many({"match_id": {"$in": v2_match_ids}})
-    await db.tournaments.update_one({"id": tid}, {"$set": {"status": "draft", "updated_at": now_utc().isoformat()}})
+    # Der Status bleibt (#2120, TA16): früher fiel jedes Turnier auf „Entwurf“, und die öffentliche Seite war weg.
+    await db.tournaments.update_one({"id": tid}, {"$set": {"updated_at": now_utc().isoformat()}})
     reset_scope_cache()  # Live-Meldungen (#1801): Turnier und Event neu nachschlagen
     await _audit_tournament_action(
         db,
         "tournament.bracket.reset",
         me.get("id"),
         tid,
-        {"previous_status": t.get("status"), "v2_match_count": len(v2_match_ids), "force": force},
+        {"status": t.get("status"), "v2_match_count": len(v2_match_ids), "force": force, **impact},
     )
-    return {"ok": True, "idempotent_replay": False}
+    return {"ok": True, "idempotent_replay": False, "match_count": len(v2_match_ids)}

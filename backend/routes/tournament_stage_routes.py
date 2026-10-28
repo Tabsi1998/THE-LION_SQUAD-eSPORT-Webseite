@@ -173,15 +173,26 @@ async def update_tournament_stage(tid: str, stage_id: str, body: TournamentStage
 
 
 @router.delete("/{tid}/stages/{stage_id}")
-async def delete_tournament_stage(tid: str, stage_id: str, me: dict = Depends(get_current_user),
+async def delete_tournament_stage(tid: str, stage_id: str, force: bool = False, me: dict = Depends(get_current_user),
                                   _mutation_tid: str = Depends(_serialized_tournament_write)):
     db = get_db()
     tid = await _resolve_tid(tid)
-    await _ensure_tournament_unlocked(db, tid)
+    tournament = await _ensure_tournament_unlocked(db, tid)
     await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
     stage = await db.tournament_stages.find_one({"id": stage_id, "tournament_id": tid}, {"_id": 0})
     if not stage:
         raise HTTPException(status_code=404, detail="Stage nicht gefunden")
+    # Eine Phase mit echten Spielen (#2120): nach dem Ende gar nicht, sonst nur mit Bestätigung samt Zahl.
+    finished = tournament_guard.finished_problem(tournament)
+    if finished:
+        raise HTTPException(status_code=409, detail=finished)
+    impact = tournament_guard.match_impact(await tournament_guard.tournament_matches(db, {"stage_id": stage_id}))
+    if impact["match_count"] and not force:
+        raise HTTPException(status_code=409, detail=tournament_guard.confirm_detail(
+            "confirm_destruction",
+            f"Löschen nimmt {tournament_guard.impact_text(impact)} dieser Phase mit, samt Ergebnissen und Berichten.",
+            impact,
+        ))
     match_ids = await db.matches_v2.distinct("id", {"stage_id": stage_id})
     await db.tournament_stages.delete_one({"id": stage_id})
     await db.matches_v2.delete_many({"stage_id": stage_id})

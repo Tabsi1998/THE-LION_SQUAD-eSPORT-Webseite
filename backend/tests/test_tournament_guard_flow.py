@@ -363,3 +363,55 @@ async def test_before_the_check_in_ends_a_registration_still_leaves_the_preview(
     removed = await flow.delete(f"/api/tournaments/{tournament['id']}/registrations/{registrations[0]['id']}")
 
     assert removed.status_code == 200, removed.text
+
+
+# ---------------------------------------------------------------- TA16 Zurücksetzen
+
+@pytest.mark.asyncio
+async def test_reset_keeps_the_status_before_the_start(flow):
+    staff = await flow.add_staff()
+    flow.act_as(staff)
+    tournament, _users, _regs = await flow.with_participants(4)
+    await flow.post(f"/api/tournaments/{tournament['id']}/bracket/from-format?preview=true")
+
+    reset = await flow.post(f"/api/tournaments/{tournament['id']}/reset-bracket")
+
+    assert reset.status_code == 200, reset.text
+    assert (await stored(flow, tournament))["status"] == "registration_open"
+    assert await flow.matches(tournament) == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", ["live", "paused", "cancelled", "check_in"])
+async def test_reset_of_real_matches_needs_force_and_names_the_numbers(flow, status):
+    staff, tournament, _users, _regs = await fixed_bracket(flow)
+    if status == "live":
+        await play_first(flow, tournament)
+    await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"status": status}})
+
+    refused = await flow.post(f"/api/tournaments/{tournament['id']}/reset-bracket")
+
+    assert refused.status_code == 409, refused.text
+    detail = refused.json()["detail"]
+    assert detail["code"] == "confirm_destruction"
+    assert detail["match_count"] == 3
+    assert detail["played_count"] == (1 if status == "live" else 0)
+    assert len(await flow.matches(tournament)) == 3
+
+    confirmed = await flow.post(f"/api/tournaments/{tournament['id']}/reset-bracket?force=true")
+    assert confirmed.status_code == 200, confirmed.text
+    assert await flow.matches(tournament) == []
+    assert (await stored(flow, tournament))["status"] == status, "Zurücksetzen ändert den Status nicht mehr"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", ["completed", "results_published", "archived"])
+async def test_after_the_end_reset_is_refused_even_with_force(flow, status):
+    staff, tournament, _users, _regs = await fixed_bracket(flow)
+    await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"status": status}})
+
+    refused = await flow.post(f"/api/tournaments/{tournament['id']}/reset-bracket?force=true")
+
+    assert refused.status_code == 409
+    assert "vorbei" in refused.json()["detail"]
+    assert len(await flow.matches(tournament)) == 3
