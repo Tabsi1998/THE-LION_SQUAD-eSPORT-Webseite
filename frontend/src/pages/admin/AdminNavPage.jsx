@@ -12,6 +12,22 @@ import {
   Save, Eye, EyeOff, ChevronUp, ChevronDown, RotateCcw, ChevronRight, ChevronDownIcon,
 } from "lucide-react";
 
+const byOrder = (a, b) => (a.order ?? 0) - (b.order ?? 0);
+
+/** Haupt- und Unterpunkte nach ihrer gespeicherten Reihenfolge. */
+export function sortNavItems(items) {
+  return [...(items || [])].sort(byOrder).map((item) => (item.children?.length ? { ...item, children: [...item.children].sort(byOrder) } : item));
+}
+
+/** Die Reihenfolge zum Speichern (#2122 NW6): je Hauptpunkt und je Unterpunkt die Stelle - sonst springt sie zurück. */
+export function withOrder(items) {
+  return items.map((item, index) => ({
+    ...item,
+    order: index,
+    ...(item.children ? { children: item.children.map((child, childIndex) => ({ ...child, order: childIndex })) } : {}),
+  }));
+}
+
 export default function AdminNavPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -22,8 +38,7 @@ export default function AdminNavPage() {
     setLoading(true);
     try {
       const { data } = await api.get("/admin/nav");
-      const sorted = [...(data.items || [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-      setItems(sorted);
+      setItems(sortNavItems(data.items));
     } catch (e) {
       toast.error(formatApiError(e.response?.data?.detail) || "Fehler beim Laden");
     }
@@ -36,8 +51,7 @@ export default function AdminNavPage() {
   const save = async () => {
     setSaving(true);
     try {
-      const normalized = items.map((it, idx) => ({ ...it, order: idx }));
-      await api.put("/admin/nav", { items: normalized });
+      await api.put("/admin/nav", { items: withOrder(items) });
       toast.success("Navigation gespeichert");
       load();
     } catch (e) {
@@ -148,20 +162,21 @@ export default function AdminNavPage() {
                       onClick={() => move(idx, -1)}
                       disabled={idx === 0}
                       className="p-0.5 text-white/40 hover:text-white disabled:opacity-30"
-                      aria-label="Nach oben"
+                      aria-label={`${it.label || "Eintrag"} nach oben`}
                     ><ChevronUp className="w-3.5 h-3.5" /></button>
                     <button
                       onClick={() => move(idx, 1)}
                       disabled={idx === items.length - 1}
                       className="p-0.5 text-white/40 hover:text-white disabled:opacity-30"
-                      aria-label="Nach unten"
+                      aria-label={`${it.label || "Eintrag"} nach unten`}
                     ><ChevronDown className="w-3.5 h-3.5" /></button>
                   </div>
                   {hasChildren && (
                     <button
                       onClick={() => toggleExpand(it.key)}
                       className="text-white/50 hover:text-white"
-                      aria-label="Aufklappen"
+                      aria-label={`${it.label || "Eintrag"} ${isExpanded ? "zuklappen" : "aufklappen"}`}
+                      aria-expanded={Boolean(isExpanded)}
                     >
                       {isExpanded ? <ChevronDownIcon className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                     </button>
@@ -203,11 +218,13 @@ export default function AdminNavPage() {
                             <button
                               onClick={() => moveChild(idx, cIdx, -1)}
                               disabled={cIdx === 0}
+                              aria-label={`${c.label || "Unterpunkt"} nach oben`}
                               className="p-0.5 text-white/40 hover:text-white disabled:opacity-30"
                             ><ChevronUp className="w-3 h-3" /></button>
                             <button
                               onClick={() => moveChild(idx, cIdx, 1)}
                               disabled={cIdx === it.children.length - 1}
+                              aria-label={`${c.label || "Unterpunkt"} nach unten`}
                               className="p-0.5 text-white/40 hover:text-white disabled:opacity-30"
                             ><ChevronDown className="w-3 h-3" /></button>
                           </div>

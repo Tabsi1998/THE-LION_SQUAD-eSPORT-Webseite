@@ -504,6 +504,16 @@ def _filter_visible(items: list[dict]) -> list[dict]:
     return out
 
 
+def _sorted_children(children: list[dict]) -> list[dict]:
+    """Die gespeicherte Reihenfolge der Unterpunkte (#2122 NW6): je Kind ``order``. Ein Unterpunkt ohne gespeicherte
+    Stelle (neu dazugekommen) steht an seiner Stelle aus der Vorgabe."""
+    def key(pair):
+        index, child = pair
+        order = child.get("order")
+        return (order if isinstance(order, (int, float)) and not isinstance(order, bool) else index, index)
+    return [child for _, child in sorted(enumerate(children), key=key)]
+
+
 def _merge_nav_item(current: dict, default: dict) -> dict:
     merged = {**default, **current}
     if "label" in merged:
@@ -524,7 +534,7 @@ def _merge_nav_item(current: dict, default: dict) -> dict:
             _normalize_nav_item_labels(child) for key, child in current_by_key.items()
             if key not in retired
         )
-        merged["children"] = merged_children
+        merged["children"] = _sorted_children(merged_children)
     else:
         merged.pop("children", None)
     return merged
