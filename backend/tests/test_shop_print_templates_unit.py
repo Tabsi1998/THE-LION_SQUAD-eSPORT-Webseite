@@ -289,14 +289,312 @@ def test_the_contract_describes_the_new_paths():
     assert MANIFEST["print_templates"]["file_size"]["operation"] == "retrieveMockupStylesByProductId"
 
 
-def test_the_client_refuses_answers_that_do_not_fit(fake, provider):
+# ---------------------------------------------------------------- Zeilenweise lesen (#2091)
+# Echte Antworten weichen gelegentlich vom Vertrag ab - der Fake liefert sie hier bewusst so (``off_contract``).
+
+STYLES, TEMPLATES = "retrieveMockupStylesByProductId", "getMockupTemplatesByProductId"
+
+
+def row_of(rows: list[dict], placement: str) -> dict:
+    return next(row for row in rows if row["placement"] == placement)
+
+
+def no_values(lines, *values) -> bool:
+    """Kein Wert aus der Antwort in den Gründen - weder Text noch Adresse."""
+    return all(line.count(value) == 0 for line in lines for value in values)
+
+
+@pytest.mark.asyncio
+async def test_one_broken_row_costs_only_that_row_and_names_field_and_type(db, provider, fake, caplog):
+    fake.off_contract.update({STYLES, TEMPLATES})
+    row_of(fake.print_areas[SHIRT], "front")["dpi"] = "viel"
+    row_of(fake.print_areas[SHIRT], "back")["print_area_width"] = "12"  # Zahl als Text geht
+    row_of(fake.print_areas[SHIRT], "sleeve_left")["dpi"] = 150.0  # ganzzahliger float geht
+    with caplog.at_level("WARNING", logger="tls.printful"):
+        result = await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR)
+    assert result["ok"] is True
+    stored = result["template"]
+    assert sorted(sizes(stored)) == [("back", "all"), ("label_inside", "all"), ("sleeve_left", "all"),
+                                     ("sleeve_right", "all")]
+    assert sizes(stored)[("back", "all")] == (1800, 2400, 150)
+    assert stored["skipped"] == [
+        "Druckvorgabe front (dtg): Feld dpi fehlt oder passt nicht (erwartet: ganze Zahl von 72 bis 1200).",
+        "Unvollständig geliefert, nicht übernommen, bis Printful sie vollständig liefert: Vorderseite (dtg)."]
+    assert no_values(stored["skipped"], "viel")
+    logged = [record.getMessage() for record in caplog.records if "übersprungen" in record.getMessage()]
+    assert len(logged) == 1 and "1 von 5 Zeilen" in logged[0] and no_values(logged, "viel")
+
+
+@pytest.mark.asyncio
+async def test_float_pixels_are_rounded_and_the_background_colour_comes_as_int(db, provider, fake):
+    fake.off_contract.add(TEMPLATES)
+    front = row_of(fake.templates[SHIRT], "front")
+    front.update(template_width=1000.0, template_height=1000.0, print_area_left=199.6, print_area_top="200",
+                 background_color=0x0C0C0C)
+    stored = (await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR))["template"]
+    preview = templates.preview_for(stored, entry_of(stored, "front"))
+    assert (preview["template_width"], preview["area"]["left"], preview["area"]["top"]) == (1000, 200, 200)
+    assert preview["background_color"] == "#0c0c0c"
+    assert stored["skipped"] == []
+
+
+@pytest.mark.asyncio
+async def test_without_an_image_the_area_stays_selectable_and_only_the_preview_is_missing(db, provider, fake):
+    fake.off_contract.add(TEMPLATES)
+    del row_of(fake.templates[SHIRT], "front")["image_url"]
+    row_of(fake.templates[SHIRT], "back")["image_url"] = f"http://{TEMPLATE_HOST}/ohne-tls.png"
+    row_of(fake.templates[SHIRT], "sleeve_left")["background_url"] = ""  # nur der Hintergrund fehlt
+    result = await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR)
+    stored = result["template"]
+    assert result["ok"] is True and ("front", "all") in sizes(stored) and ("back", "all") in sizes(stored)
+    assert templates.preview_for(stored, entry_of(stored, "front")) is None
+    assert templates.preview_for(stored, entry_of(stored, "back")) is None
+    assert templates.preview_for(stored, entry_of(stored, "sleeve_left"))["background_url"] is None
+    assert len(stored["skipped"]) == 2
+    assert all("Feld image_url" in line and "Vorschau ohne Bild" in line for line in stored["skipped"])
+    assert no_values(stored["skipped"], TEMPLATE_HOST, "ohne-tls")
+
+
+@pytest.mark.asyncio
+async def test_extra_images_are_ignored_and_the_real_template_is_preferred(db, provider, fake):
+    fake.off_contract.add(TEMPLATES)
+    back = row_of(fake.templates[SHIRT], "back")
+    fake.templates[SHIRT][:0] = [
+        {**back, "role": "unknown", "image_url": f"https://{TEMPLATE_HOST}/upload/unknown.png"},
+        {"placement": "back", "technique": "dtg", "role": "extra", "template_type": "custom"},  # unvollständig, egal
+        {**back, "role": "advanced_template", "template_type": "advanced"},
+    ]
+    stored = (await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR))["template"]
+    assert stored["skipped"] == [], "Zusatzbilder sind kein Fehler"
+    assert [row["role"] for row in stored["previews"]].count("unknown") == 1
+    assert len(stored["previews"]) == len(fake.templates[SHIRT]) - 2
+    preview = templates.preview_for(stored, entry_of(stored, "back"))
+    assert preview["role"] == "template" and preview["image_url"] == back["image_url"]
+
+
+@pytest.mark.asyncio
+async def test_unexpected_types_cost_only_their_row_never_a_500(db, provider, fake):
+    """Review #2091: ``role`` als Liste ist nicht hashbar - das durfte den Abgleich nicht mit TypeError abbrechen."""
+    fake.off_contract.update({STYLES, TEMPLATES})
+    row_of(fake.templates[SHIRT], "front").update(role=["x"], template_type={"a": 1})
+    row_of(fake.templates[SHIRT], "back")["catalog_variant_ids"] = "alle"
+    row_of(fake.print_areas[SHIRT], "label_inside")["mockup_styles"] = [{"restricted_to_variants": [[1], {"a": 1}]}]
+    result = await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR)
+    stored = result["template"]
+    assert result["ok"] is True and ("label_inside", "all") in sizes(stored)
+    front = templates.preview_for(stored, entry_of(stored, "front"))
+    assert front is not None and front["role"] is None, "role ohne Text: Vorlage bleibt, nur ohne Rolle"
+    assert templates.preview_for(stored, entry_of(stored, "back"))["variant_ids"] == []
+    assert stored["skipped"] == []
+
+    def broken(_row):
+        raise TypeError("unerwartet")
+
+    from services.printful_client import _RowSkip
+
+    with pytest.raises(_RowSkip) as skip:
+        provider._read_row(broken, {})
+    assert skip.value.text == "Feld unbekannt fehlt oder passt nicht (erwartet: Felder mit den Typen laut Printful-Schema)."
+
+
+@pytest.mark.asyncio
+async def test_when_no_row_fits_the_fetch_fails_with_the_most_common_reason(db, provider, fake):
+    fake.off_contract.add(STYLES)
+    for row in fake.print_areas[SHIRT]:
+        row["dpi"] = 0
+    row_of(fake.print_areas[SHIRT], "label_inside").update(dpi=150, print_area_height=None)
+    result = await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR)
+    assert result["ok"] is False
+    detail = result["detail"]
+    assert detail == ("Der Anbieter liefert keine einzige brauchbare Zeile. Druckvorgaben (mockup-styles): keine der 5 "
+                      "Zeilen brauchbar. Häufigster Grund (4 von 5, z. B. front (dtg)): Feld dpi fehlt oder passt nicht "
+                      "(erwartet: ganze Zahl von 72 bis 1200).")
+    assert (await templates.get(db, SHIRT))["last_error"]["detail"] == detail
     from services.shop_fulfillment import FulfillmentPermanent
 
-    fake.print_areas[SHIRT][0]["dpi"] = 0
     with pytest.raises(FulfillmentPermanent) as refused:
-        asyncio.run(provider.print_areas(CatalogProductId(SHIRT)))
-    assert refused.value.reason == "invalid_response"
-    fake.print_areas[SHIRT][0]["dpi"] = 150
-    fake.templates[SHIRT][0]["image_url"] = "http://files.cdn.printful.com/ohne-tls.png"
-    with pytest.raises(FulfillmentPermanent):
-        asyncio.run(provider.mockup_templates(CatalogProductId(SHIRT)))
+        await provider.print_areas(CatalogProductId(SHIRT))
+    assert refused.value.reason == "no_usable_rows"
+
+
+@pytest.mark.asyncio
+async def test_rows_without_a_readable_placement_or_technique_never_change_the_measures(db, provider, fake):
+    """Review #2091: eine Zeile, die sich keinem Paar zuordnen lässt, könnte die Gruppe irgendeiner Fläche sein."""
+    fake.off_contract.add(STYLES)
+    for placement in ("sleeve_left", "sleeve_right"):
+        row_of(fake.print_areas[SHIRT], placement)["technique"] = "DTG mit Leerzeichen"
+    fresh = await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR)
+    assert fresh["ok"] is False and not fresh["template"].get("entries"), "ohne gespeicherten Stand: nichts übernehmen"
+    assert fresh["detail"] == ("Printful liefert Druckvorgaben ohne lesbare Platzierung oder Technik - neue Maße nicht "
+                               "übernommen.")
+    stored = fresh["template"]
+    assert stored["last_error"]["detail"] == fresh["detail"]
+    assert stored["skipped"][0] == ("Druckvorgabe sleeve_left (unbekannte Technik): Feld technique fehlt oder passt "
+                                    "nicht (erwartet: Technik-Kennung (a-z, 0-9, -)).")
+    assert stored["skipped"][1].startswith("Druckvorgabe sleeve_right (unbekannte Technik)")
+    assert no_values(stored["skipped"], "Leerzeichen")
+    for placement in ("sleeve_left", "sleeve_right"):
+        row_of(fake.print_areas[SHIRT], placement)["technique"] = "dtg"
+    good = (await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR))["template"]
+    row_of(fake.print_areas[SHIRT], "back")["placement"] = "Rücken!"
+    kept = await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR)
+    assert kept["ok"] is False and kept["detail"].endswith("neue Maße nicht übernommen, der letzte Stand bleibt.")
+    stored = await templates.get(db, SHIRT)
+    assert stored["entries"] == good["entries"] and stored["hash"] == good["hash"]
+    assert stored["skipped"] == ["Druckvorgabe unbekannte Platzierung (dtg): Feld placement fehlt oder passt nicht "
+                                 "(erwartet: Platzierungskennung (a-z, 0-9, _))."]
+
+
+@pytest.mark.asyncio
+async def test_a_partial_answer_keeps_the_stored_area_without_flapping(db, provider, fake):
+    """Review #2091: fällt eine Zeile weg, kein „Entfällt“ und beim nächsten vollständigen Abruf kein „Neu“."""
+    good = (await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR))["template"]
+    fake.off_contract.add(STYLES)
+    back = row_of(fake.print_areas[SHIRT], "back")
+    back["dpi"] = "kaputt"
+    partial = await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR)
+    assert partial["ok"] is True and partial["changed"] is False and partial["changes"] == []
+    stored = partial["template"]
+    assert stored["hash"] == good["hash"] and stored["entries"] == good["entries"]
+    assert templates.entry_for_variant(stored, "dtg", "back", 4012)["height_px"] == 2400
+    assert stored["skipped"] == [
+        "Druckvorgabe back (dtg): Feld dpi fehlt oder passt nicht (erwartet: ganze Zahl von 72 bis 1200)."]
+    # Übernommen mit Datum, als Warnung - nicht als glattes „ok“ (Review #2091).
+    assert [(row["placement"], row["technique"], row["label"]) for row in stored["carried"]] == [
+        ("back", "dtg", "Rückseite (dtg)")]
+    since = stored["carried"][0]["carried_since"]
+    assert partial["warning"] == (f"Printful liefert unvollständig, es gilt weiter der letzte vollständige Stand (seit "
+                                  f"{since[:10]}): Rückseite (dtg).")
+    again = await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR)
+    assert again["template"]["carried"][0]["carried_since"] == since, "das erste Datum bleibt"
+    back["dpi"] = 150
+    full = await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR)
+    assert full["changed"] is False and full["template"]["hash"] == good["hash"] and full["template"]["skipped"] == []
+    assert full["warning"] is None and full["template"]["carried"] == []
+    assert await db.audit_logs.count_documents({"action": "shop.print_template.change"}) == 0
+
+
+def mixed_mug(fake) -> dict:
+    """Tasse mit allgemeiner Fläche und einer eigenen für 15 oz - dazu eine zweite Fläche, damit etwas übrig bleibt."""
+    fake.print_areas[MUG] = [row for row in fake.print_areas[MUG]
+                             if row["mockup_styles"][0]["restricted_to_variants"] != [7011]]
+    fake.set_print_area(MUG, "default", 7.5, 3.0833, dpi=300, technique="sublimation")
+    fake.set_print_area(MUG, "back", 3, 3, dpi=300, technique="sublimation")
+    return next(row for row in fake.print_areas[MUG] if row["mockup_styles"][0]["restricted_to_variants"] == [7015])
+
+
+@pytest.mark.asyncio
+async def test_a_missing_variant_group_never_falls_back_to_the_general_area(db, provider, fake):
+    restricted = mixed_mug(fake)
+    fake.off_contract.add(STYLES)
+    restricted["dpi"] = None
+    result = await templates.refresh(db, MUG, provider=provider, actor_id=ACTOR)
+    stored = result["template"]
+    assert result["ok"] is True and sizes(stored) == {("back", "all"): (900, 900, 300)}
+    assert templates.entry_for_variant(stored, "sublimation", "default", 7015) is None, "nie die allgemeine Fläche"
+    assert templates.groups_for(stored, "sublimation", "default", [7011, 7015]) == []
+    assert stored["skipped"][-1] == ("Unvollständig geliefert, nicht übernommen, bis Printful sie vollständig liefert: "
+                                     "Druckfläche (sublimation).")
+
+
+@pytest.mark.asyncio
+async def test_a_missing_variant_group_keeps_the_stored_groups(db, provider, fake):
+    restricted = mixed_mug(fake)
+    good = (await templates.refresh(db, MUG, provider=provider, actor_id=ACTOR))["template"]
+    assert sizes(good)[("default", (7015,))] == (2253, 1084, 300) and sizes(good)[("default", "all")] == (2250, 925, 300)
+    fake.off_contract.add(STYLES)
+    restricted["dpi"] = None
+    stored = (await templates.refresh(db, MUG, provider=provider, actor_id=ACTOR))["template"]
+    assert stored["hash"] == good["hash"] and sizes(stored) == sizes(good)
+    assert templates.entry_for_variant(stored, "sublimation", "default", 7015)["height_px"] == 1084
+    assert await db.audit_logs.count_documents({"action": "shop.print_template.change"}) == 0
+
+
+@pytest.mark.asyncio
+async def test_an_area_grown_too_large_is_dropped_not_carried_over(db, provider, fake):
+    """Review #2091: eine gültige, aber zu große Fläche übernimmt nie den alten Stand - sonst falsche Dateigröße."""
+    good = (await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR))["template"]
+    fake.set_print_area(SHIRT, "back", 100, 100, display_name="Back print")  # 15000 × 15000 px = 225 Millionen Pixel
+    result = await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR)
+    stored = result["template"]
+    assert result["ok"] is True and result["changed"] is True
+    assert result["changes"] == ["Entfällt: Rückseite (dtg) (bisher 1800 × 2400 px bei 150 DPI)."]
+    assert ("back", "all") not in sizes(stored) and stored["hash"] != good["hash"]
+    assert templates.entry_for_variant(stored, "dtg", "back", 4012) is None
+    assert stored["skipped"][-1] == "Zu groß für eine Druckdatei, ganze Fläche nicht übernommen: Rückseite (dtg)."
+    assert not stored.get("carried")
+    assert await db.audit_logs.count_documents({"action": "shop.print_template.change"}) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_too_large_variant_group_takes_its_whole_pair_with_it(db, provider, fake):
+    restricted = mixed_mug(fake)
+    await templates.refresh(db, MUG, provider=provider, actor_id=ACTOR)
+    restricted["print_area_width"] = 300  # nur die 15-oz-Gruppe wird riesig
+    stored = (await templates.refresh(db, MUG, provider=provider, actor_id=ACTOR))["template"]
+    assert sizes(stored) == {("back", "all"): (900, 900, 300)}, "nie die 15 oz auf der allgemeinen Fläche"
+    assert templates.entry_for_variant(stored, "sublimation", "default", 7015) is None
+
+
+@pytest.mark.asyncio
+async def test_without_template_images_the_areas_stay(db, provider, fake):
+    fake.fail(404, operation=TEMPLATES)
+    result = await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR)
+    stored = result["template"]
+    assert result["ok"] is True and len(stored["entries"]) == 5 and stored["previews"] == []
+    assert stored["skipped"] == ["Vorlagenbilder nicht abrufbar (Beim Anbieter nicht gefunden (404)) - Vorschau ohne Bild."]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", [404, 401, 403])
+async def test_a_permanent_template_failure_keeps_the_stored_previews(db, provider, fake, status):
+    """Review #2091: ein dauerhafter Fehler bei mockup-templates schreibt keine leere Vorschau über einen guten Stand."""
+    good = (await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR))["template"]
+    assert good["previews"] and entry_of(good, "front")["preview_indexes"]
+    fake.fail(status, operation=TEMPLATES)
+    result = await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR)
+    stored = result["template"]
+    assert result["ok"] is True and stored["previews"] == good["previews"]
+    assert [row["preview_indexes"] for row in stored["entries"]] == [row["preview_indexes"] for row in good["entries"]]
+    assert stored["skipped"][-1].endswith("- die bisherigen bleiben.")
+
+
+@pytest.mark.asyncio
+async def test_a_temporary_template_failure_keeps_the_last_state(db, provider, fake):
+    good = (await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR))["template"]
+    fake.fail(503, operation=TEMPLATES, times=10)
+    failed = await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR)
+    assert failed["ok"] is False
+    assert (await templates.get(db, SHIRT))["previews"] == good["previews"]
+
+
+def test_an_empty_list_is_no_error_for_the_client(fake, provider):
+    fake.print_areas[SHIRT] = []
+    assert asyncio.run(provider.print_areas(CatalogProductId(SHIRT))) == ()
+
+
+@pytest.mark.parametrize("data", [{"placement": "front"}, "front", None])
+def test_the_client_still_refuses_a_response_without_a_list(data):
+    """Zeilenweise lesen gilt nur für Zeilen - ist ``data`` gar keine Liste, ist die ganze Antwort unbrauchbar."""
+    from services.shop_fulfillment import FulfillmentPermanent
+
+    def answer(_request):
+        return httpx.Response(200, json={"data": data, "paging": {"total": 1, "offset": 0, "limit": 100}})
+
+    client = PrintfulClient(API_KEY, transport=httpx.MockTransport(answer))
+    for read in (client.print_areas, client.mockup_templates):
+        with pytest.raises(FulfillmentPermanent) as refused:
+            asyncio.run(read(CatalogProductId(SHIRT)))
+        assert refused.value.reason == "invalid_response"
+
+
+def test_without_a_chosen_technique_direct_print_comes_first():
+    """#2091: ohne Technik am Produkt und ohne Standard von Printful nicht die alphabetisch erste (dtfilm)."""
+    entries = [{"technique": key, "placement": "front"} for key in ("dtfilm", "dtg", "embroidery")]
+    template = {"entries": entries}
+    assert {row["technique"] for row in templates.entries_for(template, None)} == {"dtg"}
+    assert {row["technique"] for row in templates.entries_for(template, "embroidery")} == {"embroidery"}
+    assert {row["technique"] for row in templates.entries_for(template, "laser")} == {"dtg"}
+    assert {row["technique"] for row in templates.entries_for({"entries": entries[::2]}, None)} == {"dtfilm"}
+    assert {row["technique"] for row in templates.entries_for({"entries": [{"technique": "uv", "placement": "default"}]},
+                                                              None)} == {"uv"}

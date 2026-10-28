@@ -29,10 +29,11 @@ import email.utils
 import hashlib
 import hmac
 import logging
+import math
 import re
 import secrets
 import time
-from collections import deque
+from collections import Counter, deque
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from urllib.parse import quote
@@ -46,7 +47,7 @@ from services.shop_fulfillment import (
     CatalogCategory, CatalogEntry, CatalogProduct, CatalogProductId, CatalogVariant, CatalogVariantId, Costs, DraftLine, DraftOrder,
     FulfillmentError, FulfillmentInvalid, FulfillmentOrder, FulfillmentPermanent, FulfillmentTransient, MockupImage,
     MockupTask, MockupTemplate, OrderItem, PLACEMENT_RE, PlacedFile, Placement, PrintArea, PrintFile, PrintfulOrderId,
-    ProductPlacementInfo, TECHNIQUE_RE, check_external_id, check_https_url, require)
+    ProductPlacementInfo, Rows, TECHNIQUE_RE, check_external_id, check_https_url, is_test_external_id, require)
 
 logger = logging.getLogger("tls.printful")
 
@@ -65,6 +66,8 @@ ESTIMATE_POLLS = 10
 ESTIMATE_PAUSE = 1.0
 CONFIRMATIONS = "shop_printful_confirmations"
 DRAFTS = "shop_printful_drafts"
+# Testentwürfe aus dem Admin (#2062, services/shop_test_drafts.py): ihre Aufträge bestätigt confirm_order nie.
+TEST_DRAFTS = "shop_test_drafts"
 # So lange gilt ein Claim im Zustand „sending“ als „läuft noch“; danach: Entwurf erst nachsuchen, Bestätigung unklar.
 CONFIRM_CLAIM_SECONDS = 300
 DRAFT_CLAIM_SECONDS = 60
@@ -79,6 +82,11 @@ IDEMPOTENCY_KEY_RE = re.compile(r"[A-Za-z0-9:_-]{8,128}")
 FILENAME_RE = re.compile(r"[A-Za-z0-9._-]{1,100}")
 CURRENCY_RE = re.compile(r"[A-Z]{3}")
 REGION_RE = re.compile(r"[a-z_]{2,32}")
+# Vorlagenbilder (#2091): Zusatzbilder braucht die Vorschau nicht - sie werden still ausgelassen, nicht als Fehler gezählt.
+IGNORED_TEMPLATE_ROLES = frozenset({"extra", "advanced_template"})
+PREVIEW_TEMPLATE_ROLES = frozenset({"primary", "template", "unknown"})
+# So viele verschiedene Gründe für übersprungene Zeilen stehen höchstens in der Liste (gleiche zusammengefasst).
+MAX_SKIP_REASONS = 12
 
 # Printful erlaubt 120 Aufrufe je Minute und Store (manifest.json). Ein Client bleibt mit Luft darunter - für andere
 # Aufrufe desselben Stores - und wartet, statt in 429 zu laufen. Gezählt wird je Client (ein Abgleich, ein Admin-Klick).
@@ -125,6 +133,19 @@ def _retry_after(response: httpx.Response) -> float | None:
     if moment.tzinfo is None:
         moment = moment.replace(tzinfo=timezone.utc)
     return max(0.0, (moment - datetime.now(timezone.utc)).total_seconds())
+
+
+class _RowSkip(Exception):
+    """Eine Zeile einer Liste passt nicht (#2091): Feldname und erwarteter Typ - nie der Wert aus der Antwort."""
+
+    def __init__(self, field: str, expected: str):
+        super().__init__(field)
+        self.field = field
+        self.expected = expected
+
+    @property
+    def text(self) -> str:
+        return f"Feld {self.field} fehlt oder passt nicht (erwartet: {self.expected})."
 
 
 def _dig(data, *path):
@@ -471,96 +492,204 @@ class PrintfulClient:
                                        title=str(row.get("title") or "")[:80]))
         return tuple(out)
 
-    # ------------------------------------------------ Druckvorgaben und Vorlagenbilder (#2069)
+    # ------------------------------------------------ Druckvorgaben und Vorlagenbilder (#2069, zeilenweise seit #2091)
+    # Eine Zeile, die nicht passt, wird übersprungen - nicht die ganze Antwort verworfen. Je Zeile ein kurzer Grund ohne
+    # Werte aus der Antwort (nur Platzierung und Technik, wenn lesbar, Feldname und erwarteter Typ): steht in
+    # ``Rows.skipped`` (Admin unter „übersprungen“) und einmal je Abruf im Log. Nur wenn mockup-styles gar keine
+    # brauchbare Zeile hat, scheitert der Abruf (``no_usable_rows`` mit dem häufigsten Grund).
     @staticmethod
-    def _inches(value, *, low: float = 0.1, high: float = 400.0) -> float:
-        if isinstance(value, bool) or not isinstance(value, (int, float)) or not low <= float(value) <= high:
-            raise FulfillmentPermanent("invalid_response")
+    def _number(value, field: str, expected: str) -> float:
+        """Zahl aus int, float oder Zahl-Text (``"12.0"``) - nie bool, nie unendlich."""
+        if isinstance(value, bool) or value is None:
+            raise _RowSkip(field, expected)
+        if isinstance(value, str):
+            try:
+                value = float(value.strip())
+            except ValueError as exc:
+                raise _RowSkip(field, expected) from exc
+        if not isinstance(value, (int, float)) or not math.isfinite(value):
+            raise _RowSkip(field, expected)
         return float(value)
 
+    @classmethod
+    def _inches(cls, value, field: str, *, low: float = 0.1, high: float = 400.0) -> float:
+        expected = f"Zahl in Zoll von {low:g} bis {high:g}"
+        number = cls._number(value, field, expected)
+        if not low <= number <= high:
+            raise _RowSkip(field, expected)
+        return number
+
+    @classmethod
+    def _pixels(cls, value, field: str, *, low: int = 0, high: int = 100_000) -> int:
+        """Pixel als ganze Zahl - ``150.0`` oder ``150.4`` (gerundet) gehen auch."""
+        expected = f"Pixel von {low} bis {high}"
+        number = int(round(cls._number(value, field, expected)))
+        if not low <= number <= high:
+            raise _RowSkip(field, expected)
+        return number
+
+    @classmethod
+    def _dpi(cls, value) -> int:
+        expected = "ganze Zahl von 72 bis 1200"
+        number = cls._number(value, "dpi", expected)
+        if number != int(number) or not 72 <= number <= 1200:
+            raise _RowSkip("dpi", expected)
+        return int(number)
+
     @staticmethod
-    def _pixels(value, *, low: int = 0, high: int = 100_000) -> int:
-        if type(value) is not int or not low <= value <= high:
-            raise FulfillmentPermanent("invalid_response")
+    def _row_key(value, pattern: re.Pattern, field: str, expected: str) -> str:
+        if not isinstance(value, str) or not pattern.fullmatch(value):
+            raise _RowSkip(field, expected)
         return value
 
     @staticmethod
-    def _placement_key(value) -> str:
-        if not isinstance(value, str) or not PLACEMENT_RE.fullmatch(value):
-            raise FulfillmentPermanent("invalid_response")
-        return value
+    def _readable(row: dict) -> tuple[str | None, str | None]:
+        """Platzierung und Technik einer Zeile - nur, wenn sie auf das Muster passen (keine fremden Werte), sonst None."""
+        placement, technique = row.get("placement"), row.get("technique")
+        return (placement if isinstance(placement, str) and PLACEMENT_RE.fullmatch(placement) else None,
+                technique if isinstance(technique, str) and TECHNIQUE_RE.fullmatch(technique) else None)
+
+    @classmethod
+    def _where(cls, row: dict) -> str:
+        """Platzierung und Technik einer Zeile für den Grund."""
+        placement, technique = cls._readable(row)
+        return f"{placement or 'unbekannte Platzierung'} ({technique or 'unbekannte Technik'})"
 
     @staticmethod
-    def _technique_key(value) -> str:
-        if not isinstance(value, str) or not TECHNIQUE_RE.fullmatch(value):
-            raise FulfillmentPermanent("invalid_response")
-        return value
+    def _read_row(read, row: dict):
+        """Eine Zeile lesen. Scheitert sie an einem Typ, den keine Prüfung erwartet hat (Liste statt Text …), gilt sie
+        ebenfalls als übersprungen - eine Zeile darf nie den ganzen Abruf mit einem Fehler 500 abbrechen."""
+        try:
+            return read(row)
+        except _RowSkip:
+            raise
+        except (TypeError, ValueError, KeyError, AttributeError, OverflowError) as exc:
+            raise _RowSkip("unbekannt", "Felder mit den Typen laut Printful-Schema") from exc
 
-    async def print_areas(self, product_id: CatalogProductId) -> tuple[PrintArea, ...]:
+    @staticmethod
+    def _skip_summary(kind: str, reasons: list[str], total: int, operation: str) -> tuple[str, ...]:
+        """Gleiche Gründe zusammengefasst (mit Anzahl), höchstens ``MAX_SKIP_REASONS`` - und ein Log-Eintrag je Abruf."""
+        if not reasons:
+            return ()
+        counted = Counter(reasons)
+        lines = [f"{kind} {reason}" + (f" ({count}×)" if count > 1 else "")
+                 for reason, count in counted.most_common(MAX_SKIP_REASONS)]
+        if len(counted) > MAX_SKIP_REASONS:
+            lines.append(f"{kind}: {len(counted) - MAX_SKIP_REASONS} weitere Gründe.")
+        logger.warning("[printful] %s: %d von %d Zeilen übersprungen: %s", log_safe(operation), len(reasons), total,
+                       log_safe(" | ".join(lines), 600))
+        return tuple(lines)
+
+    def _print_area(self, row: dict) -> PrintArea:
+        placement = self._row_key(row.get("placement"), PLACEMENT_RE, "placement", "Platzierungskennung (a-z, 0-9, _)")
+        technique = self._row_key(row.get("technique"), TECHNIQUE_RE, "technique", "Technik-Kennung (a-z, 0-9, -)")
+        dpi = self._dpi(row.get("dpi"))
+        width = self._inches(row.get("print_area_width"), "print_area_width")
+        height = self._inches(row.get("print_area_height"), "print_area_height")
+        styles = [item for item in row.get("mockup_styles") or [] if isinstance(item, dict)] \
+            if isinstance(row.get("mockup_styles"), list) else []
+        restricted = [item.get("restricted_to_variants") for item in styles]
+        variant_ids = None
+        if styles and all(isinstance(item, list) and item for item in restricted):
+            variant_ids = tuple(sorted({value for item in restricted for value in item if type(value) is int}))
+        area_type = row.get("print_area_type")
+        return PrintArea(placement=placement, technique=technique, display_name=str(row.get("display_name") or "")[:80],
+                         width_in=width, height_in=height, dpi=dpi,
+                         area_type=area_type if isinstance(area_type, str) else None, variant_ids=variant_ids or None)
+
+    async def print_areas(self, product_id: CatalogProductId) -> Rows:
         """Die Druckvorgaben je Platzierung und Technik: Druckbereich in Zoll und DPI
         (``GET /v2/catalog-products/{id}/mockup-styles``). Daraus folgt die exakte Pixelgröße der Druckdatei - die
         offiziellen Vorlagen von Printful sind genau so groß (Gildan 5000 vorne 12 × 16 Zoll bei 150 DPI = 1800 × 2400).
         Sind alle Ansichten einer Zeile auf Varianten beschränkt (``restricted_to_variants``), gilt die Vorgabe nur für
         diese - so kommen Größen mit eigener Fläche (Tasse 11 oz und 15 oz) zu ihrer eigenen Druckdatei."""
         require(product_id, CatalogProductId, "product_id")
-        rows = await self._pages(f"/v2/catalog-products/{product_id.value}/mockup-styles",
-                                 operation="retrieveMockupStylesByProductId")
-        out = []
+        operation = "retrieveMockupStylesByProductId"
+        rows = await self._pages(f"/v2/catalog-products/{product_id.value}/mockup-styles", operation=operation)
+        out, reasons, incomplete, unreadable = [], [], set(), 0
         for row in rows:
-            dpi = row.get("dpi")
-            if type(dpi) is not int or not 72 <= dpi <= 1200:
-                raise FulfillmentPermanent("invalid_response")
-            styles = [item for item in row.get("mockup_styles") or [] if isinstance(item, dict)]
-            restricted = [item.get("restricted_to_variants") for item in styles]
-            variant_ids = None
-            if styles and all(isinstance(item, list) and item for item in restricted):
-                variant_ids = tuple(sorted({value for item in restricted for value in item if type(value) is int}))
-            out.append(PrintArea(
-                placement=self._placement_key(row.get("placement")), technique=self._technique_key(row.get("technique")),
-                display_name=str(row.get("display_name") or "")[:80],
-                width_in=self._inches(row.get("print_area_width")), height_in=self._inches(row.get("print_area_height")),
-                dpi=dpi, area_type=row.get("print_area_type") if isinstance(row.get("print_area_type"), str) else None,
-                variant_ids=variant_ids or None))
-        return tuple(out)
-
-    async def mockup_templates(self, product_id: CatalogProductId) -> tuple[MockupTemplate, ...]:
-        """Vorlagenbilder je Platzierung mit der Lage des Druckbereichs darin
-        (``GET /v2/catalog-products/{id}/mockup-templates``) - für die Vorschau im Admin. Bilder nur über https."""
-        require(product_id, CatalogProductId, "product_id")
-        rows = await self._pages(f"/v2/catalog-products/{product_id.value}/mockup-templates",
-                                 operation="getMockupTemplatesByProductId")
-        out = []
-        for row in rows:
-            image = row.get("image_url")
-            background = row.get("background_url")
             try:
-                check_https_url(image)
-                if background is not None:
-                    check_https_url(background)
-            except ValueError as exc:
-                raise FulfillmentPermanent("invalid_response") from exc
-            color = row.get("background_color")
-            if type(color) is int and 0 <= color <= 0xFFFFFF:
-                color = f"#{color:06x}"
-            elif not (isinstance(color, str) and re.fullmatch(r"#?[0-9A-Fa-f]{6}", color)):
-                color = None
-            elif not color.startswith("#"):
-                color = f"#{color}"
-            variant_ids = tuple(sorted({value for value in row.get("catalog_variant_ids") or [] if type(value) is int}))
-            positioning = row.get("template_positioning")
-            orientation = row.get("orientation")
-            out.append(MockupTemplate(
-                variant_ids=variant_ids, placement=self._placement_key(row.get("placement")),
-                technique=self._technique_key(row.get("technique")), image_url=image, background_url=background,
-                background_color=color, template_width=self._pixels(row.get("template_width"), low=1),
-                template_height=self._pixels(row.get("template_height"), low=1),
-                area_left=self._pixels(row.get("print_area_left"), low=-100_000),
-                area_top=self._pixels(row.get("print_area_top"), low=-100_000),
-                area_width=self._pixels(row.get("print_area_width"), low=1),
-                area_height=self._pixels(row.get("print_area_height"), low=1),
-                positioning=positioning if positioning in ("overlay", "background") else "overlay",
-                orientation=orientation if orientation in ("horizontal", "vertical", "any") else "any"))
-        return tuple(out)
+                out.append(self._read_row(self._print_area, row))
+            except _RowSkip as skip:
+                reasons.append((self._where(row), skip.text))
+                # Wem die Zeile gehört: ein Paar (Platzierung, Technik) ist damit unvollständig (#2091, Review).
+                placement, technique = self._readable(row)
+                if placement and technique:
+                    incomplete.add((placement, technique))
+                else:
+                    unreadable += 1
+        skipped = self._skip_summary("Druckvorgabe", [f"{where}: {text}" for where, text in reasons], len(rows),
+                                     operation)
+        if rows and not out:
+            # Häufigster Grund über alle Platzierungen (gleiches Feld, gleicher Typ), mit einem Beispiel.
+            text, count = Counter(text for _where, text in reasons).most_common(1)[0]
+            example = next(where for where, item in reasons if item == text)
+            raise FulfillmentPermanent("no_usable_rows", provider_detail=(
+                f"Druckvorgaben (mockup-styles): keine der {len(rows)} Zeilen brauchbar. Häufigster Grund "
+                f"({count} von {len(rows)}, z. B. {example}): {text}"))
+        return Rows(out, skipped, incomplete, unreadable)
+
+    def _mockup_template(self, row: dict) -> MockupTemplate | None:
+        """Eine Zeile aus mockup-templates - ``None`` für Zusatzbilder (``extra``, ``advanced*``), die die Vorschau
+        nicht braucht. Fehlt das Bild oder ist es nicht https, taugt die Zeile nicht für die Vorschau (die Druckfläche
+        selbst kommt aus mockup-styles)."""
+        role, kind = row.get("role"), row.get("template_type")
+        role = role if isinstance(role, str) else None
+        kind = kind if isinstance(kind, str) else None
+        if role in IGNORED_TEMPLATE_ROLES or (isinstance(role, str) and role.startswith("advanced")) or kind == "advanced":
+            return None
+        placement = self._row_key(row.get("placement"), PLACEMENT_RE, "placement", "Platzierungskennung (a-z, 0-9, _)")
+        technique = self._row_key(row.get("technique"), TECHNIQUE_RE, "technique", "Technik-Kennung (a-z, 0-9, -)")
+        try:
+            image = check_https_url(row.get("image_url"))
+        except ValueError as exc:
+            raise _RowSkip("image_url", "https-Adresse des Vorlagenbilds; ohne sie bleibt die Vorschau ohne Bild") from exc
+        background = row.get("background_url")
+        try:
+            background = check_https_url(background) if background else None
+        except ValueError:
+            background = None  # nur der Hintergrund fehlt - das Vorlagenbild bleibt nutzbar
+        color = row.get("background_color")
+        if type(color) is int and 0 <= color <= 0xFFFFFF:
+            color = f"#{color:06x}"
+        elif not (isinstance(color, str) and re.fullmatch(r"#?[0-9A-Fa-f]{6}", color)):
+            color = None
+        elif not color.startswith("#"):
+            color = f"#{color}"
+        raw_ids = row.get("catalog_variant_ids")
+        variant_ids = tuple(sorted({value for value in raw_ids if type(value) is int})) if isinstance(raw_ids, list) else ()
+        positioning = row.get("template_positioning")
+        orientation = row.get("orientation")
+        return MockupTemplate(
+            variant_ids=variant_ids, placement=placement, technique=technique, image_url=image,
+            background_url=background, background_color=color,
+            template_width=self._pixels(row.get("template_width"), "template_width", low=1),
+            template_height=self._pixels(row.get("template_height"), "template_height", low=1),
+            area_left=self._pixels(row.get("print_area_left"), "print_area_left", low=-100_000),
+            area_top=self._pixels(row.get("print_area_top"), "print_area_top", low=-100_000),
+            area_width=self._pixels(row.get("print_area_width"), "print_area_width", low=1),
+            area_height=self._pixels(row.get("print_area_height"), "print_area_height", low=1),
+            positioning=positioning if positioning in ("overlay", "background") else "overlay",
+            orientation=orientation if orientation in ("horizontal", "vertical", "any") else "any",
+            role=role if role in PREVIEW_TEMPLATE_ROLES else None)
+
+    async def mockup_templates(self, product_id: CatalogProductId) -> Rows:
+        """Vorlagenbilder je Platzierung mit der Lage des Druckbereichs darin
+        (``GET /v2/catalog-products/{id}/mockup-templates``) - für die Vorschau im Admin. Bilder nur über https.
+        Eine unbrauchbare Zeile kostet nur ihre Vorschau; ganz ohne Vorlagenbild bleiben die Druckflächen wählbar."""
+        require(product_id, CatalogProductId, "product_id")
+        operation = "getMockupTemplatesByProductId"
+        rows = await self._pages(f"/v2/catalog-products/{product_id.value}/mockup-templates", operation=operation)
+        out, reasons = [], []
+        for row in rows:
+            try:
+                template = self._read_row(self._mockup_template, row)
+            except _RowSkip as skip:
+                reasons.append(f"{self._where(row)}: {skip.text}")
+                continue
+            if template is not None:
+                out.append(template)
+        return Rows(out, self._skip_summary("Vorlagenbild", reasons, len(rows), operation))
 
     # ------------------------------------------------ Kosten
     @staticmethod
@@ -764,12 +893,24 @@ class PrintfulClient:
                                                             "seen_at": datetime.now(timezone.utc).isoformat()}})
         return await self.get_order(order_id)
 
-    async def delete_draft(self, db, order_id: PrintfulOrderId) -> None:
+    async def delete_draft(self, db, order_id: PrintfulOrderId, *, test_draft: bool = False) -> None:
         """Einen Entwurf löschen. Was kein Entwurf mehr ist, bleibt unberührt (``not_draft``) - storniert wird ein
-        bestätigter Auftrag nur über einen eigenen Weg hinter dem Notschalter (#1721)."""
+        bestätigter Auftrag nur über einen eigenen Weg hinter dem Notschalter (#1721).
+
+        ``test_draft=True`` (#2062): Aufräumen eines Testentwurfs geht auch bei Stufe „Aus“, solange der Schlüssel
+        lesbar ist - aber nur für Aufträge, deren external_id mit ``lsw-testentwurf-`` beginnt (sonst
+        ``not_test_draft``).
+        Für echte Bestellungen gilt weiter ``require_printful_drafts``."""
         require(order_id, PrintfulOrderId, "order_id")
-        await shop_config.require_printful_drafts(db)
+        if type(test_draft) is not bool:
+            raise TypeError("test_draft ist True oder False")
+        if test_draft:
+            await shop_config.require_printful_key(db)
+        else:
+            await shop_config.require_printful_drafts(db)
         current = await self.get_order(order_id)
+        if test_draft and not is_test_external_id(current.external_id):
+            raise FulfillmentInvalid("not_test_draft")
         if current.status != "draft":
             raise FulfillmentInvalid("not_draft")
         # Erst den Claim auf „deleting“, dann DELETE, dann Claim weg. Bricht es dazwischen ab, prüft das nächste
@@ -802,6 +943,8 @@ class PrintfulClient:
         if state == "sending" and self._fresh(earlier.get("claimed_at"), CONFIRM_CLAIM_SECONDS, now):
             raise FulfillmentTransient("confirm_in_progress")
         current = await self.get_order(order_id)
+        if is_test_external_id(current.external_id):
+            raise FulfillmentInvalid("test_draft")
         if current.status != "draft":
             await store.update_one({"_id": earlier["_id"]}, {"$set": {"state": "confirmed", "status": current.status}})
             return None, current
@@ -841,6 +984,9 @@ class PrintfulClient:
         if type(force_after_review) is not bool:
             raise TypeError("force_after_review ist True oder False")
         await shop_config.require_printful_writes(db)
+        # Ein Testentwurf (#2062) wird nie bestätigt - auch nicht über einen anderen Weg als die Testansicht.
+        if await db[TEST_DRAFTS].find_one({"printful_order_id": order_id.value}, {"_id": 1}):
+            raise FulfillmentInvalid("test_draft")
         store = db[CONFIRMATIONS]
         try:
             inserted = await store.insert_one({"idempotency_key": idempotency_key, "order_id": order_id.value,
@@ -859,6 +1005,11 @@ class PrintfulClient:
                 # Nichts gesendet: Claim wieder frei.
                 await store.delete_one({"_id": claim_id, "state": "sending"})
                 raise
+            if is_test_external_id(current.external_id):
+                # Ein Testentwurf (#2062, external_id „lsw-testentwurf-…“) wird nie bestätigt - auch ohne
+                # Protokollzeile.
+                await store.delete_one({"_id": claim_id, "state": "sending"})
+                raise FulfillmentInvalid("test_draft")
             if current.status != "draft":
                 await store.update_one({"_id": claim_id}, {"$set": {"state": "confirmed", "status": current.status}})
                 return current

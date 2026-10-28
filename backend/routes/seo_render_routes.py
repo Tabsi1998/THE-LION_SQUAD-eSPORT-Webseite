@@ -13,6 +13,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from database import get_db
 from services import site_texts
+from services.league_scope import league_label
 from services.slug_utils import find_by_slug_or_history
 from services.svg_logo import raster_url
 from services.visibility import user_can_see
@@ -412,7 +413,8 @@ async def tournament_meta(db, slug: str, suffix: str, base: dict, origin: str) -
     title = tournament.get("title") or "Turnier"
     description = seo_description(
         tournament.get("description") or tournament.get("rules") or title,
-        prefix="eSports Turnier",
+        # Liga (docs/LIGA.md): eine Staffel heißt in der Vorschau „Liga · Staffel A“ statt „eSports Turnier“.
+        prefix=league_label(tournament) or "eSports Turnier",
         details=[
             tournament_game_label(tournament),
             format_date_label(tournament.get("start_date")),

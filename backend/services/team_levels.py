@@ -3,6 +3,7 @@ import logging
 from datetime import datetime, timezone
 
 from database import get_db
+from services.league_scope import NOT_LEAGUE, ONLY_LEAGUE
 
 logger = logging.getLogger(__name__)
 
@@ -74,15 +75,18 @@ async def compute_all_team_levels() -> dict[str, dict]:
     for r in regs:
         if r.get("team_id") and r.get("tournament_id"):
             team_tournaments.setdefault(r["team_id"], set()).add(r["tournament_id"])
+    # Liga-Staffeln zählen nicht für die Team-Stufe (docs/LIGA.md, Abschnitt 7) - weder Teilnahme noch Sieg.
     tournaments = {
-        t["id"]: t async for t in db.tournaments.find({}, {"_id": 0, "id": 1, "status": 1, "winner_team_id": 1})
+        t["id"]: t async for t in db.tournaments.find(dict(NOT_LEAGUE),
+                                                      {"_id": 0, "id": 1, "status": 1, "winner_team_id": 1})
     }
+    league_ids = {t["id"] async for t in db.tournaments.find(dict(ONLY_LEAGUE), {"_id": 0, "id": 1})}
 
     out: dict[str, dict] = {}
     for team in teams:
         member_ids = team.get("member_ids") or []
         member_points = sum(user_points.get(uid, 0) for uid in member_ids)
-        tids = team_tournaments.get(team["id"], set())
+        tids = team_tournaments.get(team["id"], set()) - league_ids
         tournament_points = len(tids) * PARTICIPATION_BONUS
         wins = sum(1 for t in tournaments.values() if t.get("winner_team_id") == team["id"])
         tournament_points += wins * WIN_BONUS

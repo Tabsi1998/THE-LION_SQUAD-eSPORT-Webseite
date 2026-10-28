@@ -13,6 +13,7 @@ from __future__ import annotations
 from models import new_id, now_utc
 from services.competition_read import load_competition_read_model, observe_structure_read
 from services.competition_standings import placements_for_structure, registration_match_summary, standings_for_structure
+from services.league_scope import NOT_LEAGUE, is_league_staffel
 from services.season_service import _active_season
 from services.visibility import user_can_see
 
@@ -96,7 +97,8 @@ def award_view(doc: dict, tournament_images: dict | None = None) -> dict:
 async def record_tournament_awards(db, tournament_id: str) -> int:
     """Beim Veröffentlichen der Ergebnisse: je Anmeldung ein Eintrag, alte werden überschrieben."""
     tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0})
-    if not tournament:
+    if not tournament or is_league_staffel(tournament):
+        # Liga-Staffeln bringen keine Turnier-Pokale - Liga-Titel kommen eigens (docs/LIGA.md, #1638 ff.).
         return 0
     regs = await db.tournament_registrations.find(
         {"tournament_id": tournament_id, "status": {"$in": list(REGISTRATION_STATUSES)}}, {"_id": 0},
@@ -161,7 +163,8 @@ async def record_tournament_awards(db, tournament_id: str) -> int:
 
 async def rebuild_all_awards(db) -> dict:
     """Für Turniere mit veröffentlichten Ergebnissen nachtragen - einmalig nach der Einführung, sonst bei Bedarf."""
-    ids = [row["id"] async for row in db.tournaments.find({"status": {"$in": list(AWARD_STATUSES)}}, {"_id": 0, "id": 1})]
+    ids = [row["id"] async for row in db.tournaments.find({"status": {"$in": list(AWARD_STATUSES)}, **NOT_LEAGUE},
+                                                          {"_id": 0, "id": 1})]
     total = 0
     for tournament_id in ids:
         total += await record_tournament_awards(db, tournament_id)
@@ -172,7 +175,7 @@ async def needs_backfill(db) -> bool:
     """Wahr, solange es Turniere mit Ergebnissen, aber noch keine einzige Auszeichnung gibt."""
     if await db.tournament_awards.count_documents({}, limit=1):
         return False
-    return bool(await db.tournaments.count_documents({"status": {"$in": list(AWARD_STATUSES)}}, limit=1))
+    return bool(await db.tournaments.count_documents({"status": {"$in": list(AWARD_STATUSES)}, **NOT_LEAGUE}, limit=1))
 
 
 async def backfill_awards(db) -> dict | None:

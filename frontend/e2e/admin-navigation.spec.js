@@ -109,7 +109,7 @@ test.describe("Adminmenü", () => {
     // 84 mit „TV & Beamer“ unter eSports (#1110), 85 mit „Serien“ unter Verein (#1741),
     // 84 ohne „Mitgliederprofile“ - jetzt der Reiter „Öffentliche Profile“ unter Mitglieder (#1365),
     // 85 mit „Shop“ unter Finanzen (#1706), 86 mit „Spamschutz“ unter den Einstellungen (#2067).
-    expect((await navMetrics(page)).entries).toBe(86);
+    expect((await navMetrics(page)).entries).toBe(87);
   });
 
   test("eine Gruppe lässt sich zuklappen und bleibt es nach dem Neuladen", async ({ page }) => {
@@ -170,7 +170,7 @@ test.describe("Adminmenü", () => {
     await expect(page.getByTestId("admin-nav-recent")).toBeVisible();
     const first = await page.evaluate(() => document.querySelector("nav.admin-scroll [data-testid^='admin-nav-group-']").dataset.testid);
     expect(first).toBe("admin-nav-group-Zuletzt");
-    expect((await navMetrics(page)).entries).toBe(86);
+    expect((await navMetrics(page)).entries).toBe(87);
     await page.getByTestId("admin-nav-recent-mobile-push").click();
     await expect(page).toHaveURL(/\/admin\/mobile-push$/);
   });
@@ -224,7 +224,7 @@ test.describe("Adminmenü", () => {
     await expect(page.getByTestId("admin-menu-open")).toBeHidden();
     const main = await page.locator("#main-content").boundingBox();
     expect(main.x).toBeGreaterThanOrEqual(255);
-    expect((await navMetrics(page)).entries).toBe(86);
+    expect((await navMetrics(page)).entries).toBe(87);
   });
 
   test("am Telefon wird „Zuletzt“ beim Nachführen zum aktiven Eintrag nie angeschnitten", async ({ page }) => {

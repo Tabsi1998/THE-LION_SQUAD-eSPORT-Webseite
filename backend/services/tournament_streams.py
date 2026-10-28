@@ -81,7 +81,9 @@ async def sync(db) -> dict:
     from services.discord_threads import deliver
 
     announced = 0
-    tournaments = await db.tournaments.find({"status": "live", "is_public": {"$ne": False}}, {"_id": 0}).to_list(200)
+    # Liga-Staffeln laufen zehn Wochen - keine Stream-Meldung je Staffel (docs/LIGA.md, Abschnitt 7).
+    tournaments = await db.tournaments.find({"status": "live", "is_public": {"$ne": False}, "league_context": None},
+                                            {"_id": 0}).to_list(200)
     for tournament in tournaments:
         if not discord_tournament(tournament):
             continue

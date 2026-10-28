@@ -28,6 +28,8 @@ Dynamische Sitemap-Routen sind auf veroeffentlichte/oeffentliche Datensaetze beg
 
 `backend/routes/setup_routes.py` verwaltet die statische Sitemap-Liste und wendet Veroeffentlichungs-/Sichtbarkeitsfilter auf dynamische Datensaetze an. Die Slug-Historie leitet auf den aktuellen kanonischen Slug weiter.
 
+Liga (docs/LIGA.md, #1622): Eine Staffel ist ein Turnier und folgt den Regeln von `/tournaments/<slug>` - in der Sitemap nur, solange sie oeffentlich und kein Entwurf ist (Season-Sichtbarkeit `public`). Die Liga selbst liest die Website ueber `GET /api/leagues` und `GET /api/leagues/<liga>/<season>`; beide liefern nur Seasons, die die Person nach `league_seasons.visibility` sehen darf (`off` antwortet 404). Die Ligaseite `/liga/<spiel>/<season>` folgt mit P5 und kommt dann hier dazu.
+
 ## Oeffentlich, aber bewusst nicht indexiert
 
 Diese Routen bleiben erreichbar, damit Menschen sie verwenden und Crawler `noindex, follow` lesen koennen. Sie stehen nicht in der Sitemap:

@@ -21,6 +21,7 @@ from services import founding
 from services.visibility import user_can_see
 from services.news_cards import attach_result_winners
 from services import event_days
+from services.league_scope import NOT_LEAGUE
 from services.public_phase import derive_public_phase
 
 router = APIRouter(prefix="/api/home", tags=["home"])
@@ -188,8 +189,9 @@ async def home_state(user: dict | None = Depends(get_optional_user)):
     now = datetime.now(timezone.utc)
 
     # ---------- LIVE ----------
+    # Liga-Staffeln (docs/LIGA.md, Abschnitt 7) laufen wochenlang - sie stehen nicht auf der Startseite.
     live_tournaments = await db.tournaments.find(
-        {"status": {"$in": list(LIVE_STATUSES)}}, {"_id": 0},
+        {"status": {"$in": list(LIVE_STATUSES)}, **NOT_LEAGUE}, {"_id": 0},
     ).sort("updated_at", -1).to_list(20)
     live_challenges = await db.f1_challenges.find(
         {"status": {"$in": list(LIVE_STATUSES)}}, {"_id": 0},
@@ -208,7 +210,8 @@ async def home_state(user: dict | None = Depends(get_optional_user)):
 
     # ---------- TODAY ----------
     today_t = await db.tournaments.find(
-        {"start_date": {"$exists": True, "$ne": None}, "status": {"$nin": list(HIDDEN_STATUSES)}}, {"_id": 0},
+        {"start_date": {"$exists": True, "$ne": None}, "status": {"$nin": list(HIDDEN_STATUSES)}, **NOT_LEAGUE},
+        {"_id": 0},
     ).sort("start_date", 1).to_list(100)
     today_e = await db.events.find(
         {"start_date": {"$exists": True, "$ne": None}, "status": {"$nin": list(HIDDEN_STATUSES)}}, {"_id": 0},
@@ -229,7 +232,8 @@ async def home_state(user: dict | None = Depends(get_optional_user)):
     # ---------- SOON (next 14 days, registration_open / scheduled / check_in) ----------
     horizon = now + timedelta(days=14)
     soon_t = await db.tournaments.find(
-        {"start_date": {"$exists": True, "$ne": None}, "status": {"$in": list(SOON_STATUSES)}}, {"_id": 0},
+        {"start_date": {"$exists": True, "$ne": None}, "status": {"$in": list(SOON_STATUSES)}, **NOT_LEAGUE},
+        {"_id": 0},
     ).sort("start_date", 1).to_list(50)
     soon_e = await db.events.find(
         {"start_date": {"$exists": True, "$ne": None}, "status": {"$in": list(EVENT_SOON_STATUSES | {"live"})}}, {"_id": 0},
@@ -254,7 +258,7 @@ async def home_state(user: dict | None = Depends(get_optional_user)):
 
     # ---------- UPCOMING (date-driven, finished content gone) ----------
     upcoming_t = await db.tournaments.find(
-        {"start_date": {"$exists": True, "$ne": None}, "status": {"$nin": list(HIDDEN_STATUSES)}},
+        {"start_date": {"$exists": True, "$ne": None}, "status": {"$nin": list(HIDDEN_STATUSES)}, **NOT_LEAGUE},
         {"_id": 0},
     ).sort("start_date", 1).to_list(50)
     upcoming_e = await db.events.find(
@@ -392,7 +396,8 @@ NUMBER_KEYS = ("prizes", "tournaments_completed", "members", "years_active", "to
 EURO_RE = re.compile(r"(?:€|eur)\s*(\d+(?:[.,]\d{1,2})?)|(\d+(?:[.,]\d{1,2})?)\s*(?:€|eur)", re.IGNORECASE)
 # Was „auch offline“ heißt: Termine, bei denen man sich trifft - keine Online-Events, keine internen Termine.
 OFFLINE_EVENT_TYPES = ("club_evening", "lan_party", "grill_evening", "expo", "community_evening", "public_event", "mario_kart_event", "tournament_finals", "sponsor_action")
-PUBLIC_TOURNAMENT_QUERY = {"status": {"$nin": ["draft", "cancelled"]}, "is_public": {"$ne": False}}
+# Vereinszahlen und Spiele auf „Über uns“ zählen Turniere - Liga-Staffeln nicht (docs/LIGA.md, Abschnitt 7).
+PUBLIC_TOURNAMENT_QUERY = {"status": {"$nin": ["draft", "cancelled"]}, "is_public": {"$ne": False}, **NOT_LEAGUE}
 
 
 class TimelineEntry(BaseModel):

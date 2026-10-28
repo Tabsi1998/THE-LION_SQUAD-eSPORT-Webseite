@@ -40,7 +40,7 @@ import storage
 from models import now_utc
 from services.shop_common import ShopError, clean_reason, record_admin_action
 from services.shop_fulfillment import (
-    CatalogProductId, FulfillmentError, FulfillmentProvider, MockupTemplate, PrintArea)
+    CatalogProductId, FulfillmentError, FulfillmentProvider, FulfillmentTransient, MockupTemplate, PrintArea)
 
 logger = logging.getLogger("tls-arena.shop-print-templates")
 
@@ -122,7 +122,15 @@ def _preview(index: int, row: MockupTemplate) -> dict:
             "background_color": row.background_color, "template_width": row.template_width,
             "template_height": row.template_height,
             "area": {"left": row.area_left, "top": row.area_top, "width": row.area_width, "height": row.area_height},
-            "positioning": row.positioning, "orientation": row.orientation}
+            "positioning": row.positioning, "orientation": row.orientation, "role": row.role}
+
+
+# Für die Vorschau zuerst die eigentliche Vorlage (#2091) - ``template``/``primary`` vor ``unknown``.
+ROLE_RANK = {"template": 0, "primary": 1}
+
+
+def _role_rank(item: dict) -> int:
+    return ROLE_RANK.get(item.get("role") or "", 2)
 
 
 def build(areas: Sequence[PrintArea], templates: Sequence[MockupTemplate]) -> tuple[list[dict], list[dict], list[str]]:
@@ -138,23 +146,75 @@ def build(areas: Sequence[PrintArea], templates: Sequence[MockupTemplate]) -> tu
                            f"{MAX_FILE_PIXELS // 1_000_000} Millionen Pixel, nicht übernommen.")
             continue
         variant_ids = sorted(area.variant_ids) if area.variant_ids else None
-        mine = [item for item in previews if item["placement"] == area.placement
-                and item["technique"] == area.technique
-                and (variant_ids is None or set(item["variant_ids"]) & set(variant_ids))]
-        ratio = area.height_px / area.width_px
-        aspect_ok = all(abs(item["area"]["height"] / item["area"]["width"] - ratio) <= ratio * ASPECT_TOLERANCE
-                        for item in mine)
-        entries.append({
+        entries.append(link_previews({
             "placement": area.placement, "technique": area.technique, "family": family(area.placement),
             "label": placement_label(area.placement, area.display_name), "display_name": area.display_name,
             "width_in": round(area.width_in, 4), "height_in": round(area.height_in, 4), "dpi": area.dpi,
             "width_px": area.width_px, "height_px": area.height_px,
             "width_cm": round(area.width_in * CM_PER_INCH, 2), "height_cm": round(area.height_in * CM_PER_INCH, 2),
             "area_type": area.area_type, "variant_ids": variant_ids, "group": group_key(variant_ids),
-            "preview_indexes": [item["index"] for item in mine], "aspect_ok": aspect_ok,
-        })
+        }, previews))
     entries.sort(key=lambda row: (row["technique"], row["placement"], row["group"]))
     return entries, previews, skipped
+
+
+def link_previews(entry: dict, previews: Sequence[dict]) -> dict:
+    """Welche Vorlagenbilder zu einem Eintrag gehören (``preview_indexes``, die eigentliche Vorlage zuerst) und ob ihr
+    Seitenverhältnis zur Druckfläche passt (``aspect_ok``). Auch für Einträge aus einem älteren Stand (#2091)."""
+    variant_ids = entry.get("variant_ids")
+    mine = sorted((item for item in previews if item["placement"] == entry["placement"]
+                   and item["technique"] == entry["technique"]
+                   and (variant_ids is None or set(item["variant_ids"]) & set(variant_ids))),
+                  key=lambda item: (_role_rank(item), item["index"]))
+    ratio = entry["height_px"] / entry["width_px"]
+    aspect_ok = all(abs(item["area"]["height"] / item["area"]["width"] - ratio) <= ratio * ASPECT_TOLERANCE
+                    for item in mine)
+    return {**entry, "preview_indexes": [item["index"] for item in mine], "aspect_ok": aspect_ok}
+
+
+def _pair_label(pair: tuple[str, str]) -> str:
+    return f"{placement_label(pair[0])} ({pair[1]})"
+
+
+def carried_pairs(entries: Sequence[dict], incomplete: set[tuple[str, str]]) -> set[tuple[str, str]]:
+    """Welche unvollständigen Paare aus dem alten Stand übernommen sind (für ``carried``)."""
+    return {(row["placement"], row["technique"]) for row in entries} & set(incomplete)
+
+
+def carried_state(pairs: set[tuple[str, str]], before: Sequence[dict] | None, now: str) -> list[dict]:
+    """Je übernommenem Paar seit wann (#2091, Review) - das erste Datum bleibt, solange das Paar übernommen ist. Eine
+    vollständige Antwort leert die Liste. Daran hängen die Warnung und nach ``TEMPLATE_MAX_AGE_DAYS`` die rote Prüfung."""
+    since = {(row.get("placement"), row.get("technique")): row.get("carried_since") for row in before or []
+             if isinstance(row, dict)}
+    return [{"placement": placement, "technique": technique, "label": _pair_label((placement, technique)),
+             "carried_since": since.get((placement, technique)) or now} for placement, technique in sorted(pairs)]
+
+
+def carried_warning(carried: Sequence[dict]) -> str | None:
+    if not carried:
+        return None
+    first = min(str(row.get("carried_since") or "") for row in carried)[:10]
+    return ("Printful liefert unvollständig, es gilt weiter der letzte vollständige Stand (seit " + first + "): "
+            + ", ".join(row["label"] for row in carried) + ".")
+
+
+def merge_incomplete(entries: list[dict], old_entries: Sequence[dict],
+                     incomplete: set[tuple[str, str]]) -> tuple[list[dict], list[str]]:
+    """Unvollständig gelesene Paare (Platzierung, Technik) nie halb übernehmen (#2091, Review): sonst fiele eine
+    fehlende Gruppe (etwa die 15-oz-Tasse) still auf die allgemeine Fläche und die Druckdatei hätte die falsche Größe.
+    Mit gespeichertem Stand gelten für diese Paare dessen Einträge weiter (kein „Entfällt“, kein Hin und Her im
+    Protokoll); ohne gespeicherten Stand fehlt das Paar ganz, bis Printful es vollständig liefert."""
+    if not incomplete:
+        return entries, []
+    kept = [row for row in entries if (row["placement"], row["technique"]) not in incomplete]
+    carried = [row for row in old_entries if (row["placement"], row["technique"]) in incomplete]
+    # Übernommene Paare stehen nicht hier, sondern als Warnung mit Datum (``carried``, ``carried_warning``) - einmal.
+    notes = []
+    missing = incomplete - {(row["placement"], row["technique"]) for row in carried}
+    if missing:
+        notes.append("Unvollständig geliefert, nicht übernommen, bis Printful sie vollständig liefert: "
+                     + ", ".join(_pair_label(pair) for pair in sorted(missing)) + ".")
+    return kept + carried, notes
 
 
 def _spec(entry: dict) -> dict:
@@ -216,17 +276,60 @@ async def refresh(db, printful_product_id: int, *, provider: FulfillmentProvider
     product_id = CatalogProductId(printful_product_id)
     current = await get(db, printful_product_id)
     now = now_utc().isoformat()
+    read_skipped: list[str] = []
+    templates_failed = False
     try:
         areas = await provider.print_areas(product_id)
-        templates = await provider.mockup_templates(product_id)
+        try:
+            templates = await provider.mockup_templates(product_id)
+        except FulfillmentTransient:
+            raise
+        except FulfillmentError as exc:
+            # Ohne Vorlagenbilder bleiben die Druckflächen wählbar - nur die Vorschau ist ohne Bild (#2091).
+            logger.warning("[shop-print-templates] mockup-templates failed: %s", exc.reason)
+            templates, templates_failed = (), True
+            kept = bool((current or {}).get("previews"))
+            read_skipped.append(f"Vorlagenbilder nicht abrufbar ({exc.text}) - "
+                                + ("die bisherigen bleiben." if kept else "Vorschau ohne Bild."))
     except FulfillmentError as exc:
         logger.warning("[shop-print-templates] refresh failed: %s", exc.reason)
+        # Bei „keine brauchbare Zeile“ sagt der Zusatz, woran es lag (nur Feld und erwarteter Typ, keine Werte).
+        detail = exc.text + (f". {exc.provider_detail}" if exc.reason == "no_usable_rows" and exc.provider_detail else "")
         await db.shop_print_templates.update_one(
             {"printful_product_id": printful_product_id},
-            {"$set": {"printful_product_id": printful_product_id, "last_error": {"at": now, "detail": exc.text}}},
+            {"$set": {"printful_product_id": printful_product_id, "last_error": {"at": now, "detail": detail}}},
             upsert=True)
-        return {"ok": False, "changed": False, "changes": [], "detail": exc.text, "template": await get(db, printful_product_id)}
+        return {"ok": False, "changed": False, "changes": [], "detail": detail, "template": await get(db, printful_product_id)}
+    read_skipped[:0] = [*getattr(areas, "skipped", ()), *getattr(templates, "skipped", ())]
+    old_entries = (current or {}).get("entries") or []
+    if getattr(areas, "unreadable", 0):
+        # Eine Zeile ohne lesbare Platzierung oder Technik lässt sich keinem Paar zuordnen - sie könnte die Gruppe
+        # irgendeiner Fläche sein. Dann keine neuen Maße übernehmen; der gespeicherte Stand bleibt (#2091, Review).
+        detail = ("Printful liefert Druckvorgaben ohne lesbare Platzierung oder Technik - neue Maße nicht übernommen"
+                  + (", der letzte Stand bleibt." if old_entries else "."))
+        await db.shop_print_templates.update_one(
+            {"printful_product_id": printful_product_id},
+            {"$set": {"printful_product_id": printful_product_id, "last_error": {"at": now, "detail": detail},
+                      "skipped": read_skipped}},
+            upsert=True)
+        return {"ok": False, "changed": False, "changes": [], "detail": detail, "template": await get(db, printful_product_id)}
     entries, previews, skipped = build(areas, templates)
+    # Zu große Flächen (``MAX_FILE_PIXELS``): die Zeile ist gültig, Printful hat die Fläche wirklich so groß gemacht. Das
+    # ganze Paar fällt weg (sonst fiele eine Gruppe auf „all“) und wird nie aus dem alten Stand übernommen - die
+    # Druckdateien liefen sonst dauerhaft in der falschen Größe. „Entfällt“, Protokoll und Sperre greifen (#2091, Review).
+    oversize = {(area.placement, area.technique) for area in areas if area.width_px * area.height_px > MAX_FILE_PIXELS}
+    entries = [row for row in entries if (row["placement"], row["technique"]) not in oversize]
+    incomplete = set(getattr(areas, "incomplete", ())) - oversize
+    entries, notes = merge_incomplete(entries, old_entries, incomplete)
+    if oversize:
+        notes.append("Zu groß für eine Druckdatei, ganze Fläche nicht übernommen: "
+                     + ", ".join(_pair_label(pair) for pair in sorted(oversize)) + ".")
+    if templates_failed and (current or {}).get("previews"):
+        # Ein dauerhafter Fehler bei den Vorlagenbildern (404, 401, 403) löscht keinen guten Stand (#2091, Review).
+        previews = current["previews"]
+    entries = sorted((link_previews(row, previews) for row in entries),
+                     key=lambda row: (row["technique"], row["placement"], row["group"]))
+    skipped = skipped + read_skipped + notes
     if not entries:
         detail = "Printful liefert für dieses Produkt keine Druckvorgaben (mockup-styles)." + (
             " " + " ".join(skipped) if skipped else "")
@@ -237,8 +340,9 @@ async def refresh(db, printful_product_id: int, *, provider: FulfillmentProvider
         return {"ok": False, "changed": False, "changes": [], "detail": detail, "template": await get(db, printful_product_id)}
     new_hash = spec_hash(entries)
     changes = diff(current.get("entries") or [], entries) if current and current.get("entries") else []
+    carried = carried_state(carried_pairs(entries, incomplete), (current or {}).get("carried"), now)
     update: dict = {"printful_product_id": printful_product_id, "entries": entries, "previews": previews,
-                    "hash": new_hash, "checked_at": now, "last_error": None, "skipped": skipped}
+                    "hash": new_hash, "checked_at": now, "last_error": None, "skipped": skipped, "carried": carried}
     if not current or current.get("hash") != new_hash:
         update.update(fetched_at=now, changed_at=now if current and current.get("hash") else None,
                       changes=changes, previous_hash=(current or {}).get("hash"))
@@ -249,17 +353,24 @@ async def refresh(db, printful_product_id: int, *, provider: FulfillmentProvider
                                   target_id=str(printful_product_id), reason=reason,
                                   data={"changes": changes, "before_hash": current.get("hash"),
                                         "after_hash": new_hash})
+    # Übernommene Paare sind kein glattes „ok“: der Abgleich meldet sie als Warnung (#2091, Review).
     return {"ok": True, "changed": bool(changes), "changes": changes, "detail": None,
-            "template": await get(db, printful_product_id)}
+            "warning": carried_warning(carried), "template": await get(db, printful_product_id)}
+
+
+# Vorgabe, wenn weder das Produkt noch Printful eine Technik nennt (#2091): Direktdruck vor Transfer vor Stickerei - wie
+# ``frontend/src/lib/shopTechniques.js`` (PREFERRED). Bisher galt die alphabetisch erste (``dtfilm``).
+TECHNIQUE_PREFERENCE = ("dtg", "dtfilm", "dtf", "embroidery")
 
 
 def entries_for(template: dict | None, technique: str | None) -> list[dict]:
-    """Die Einträge für eine Technik (ohne Technik: die erste, die es gibt)."""
+    """Die Einträge für eine Technik (ohne Technik: die bevorzugte aus ``TECHNIQUE_PREFERENCE``, sonst die erste)."""
     entries = list((template or {}).get("entries") or [])
     if not entries:
         return []
     techniques = list(dict.fromkeys(row["technique"] for row in entries))
-    chosen = technique if technique in techniques else techniques[0]
+    chosen = technique if technique in techniques else next(
+        (key for key in TECHNIQUE_PREFERENCE if key in techniques), techniques[0])
     return [row for row in entries if row["technique"] == chosen]
 
 

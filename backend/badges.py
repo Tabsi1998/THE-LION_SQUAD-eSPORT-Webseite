@@ -406,15 +406,25 @@ async def _xp(user_id: str | None, source: str, ref: str, **kwargs) -> None:
         logger.debug("xp grant failed", exc_info=True)
 
 
+async def _is_league_staffel(tournament_id: str) -> bool:
+    """Liga-Staffeln (docs/LIGA.md, Abschnitt 7) bringen keine XP für Teilnahme und Podest - Spiele zählen weiter."""
+    from services.league_scope import ONLY_LEAGUE
+
+    return bool(tournament_id) and bool(await get_db().tournaments.find_one({"id": tournament_id, **ONLY_LEAGUE},
+                                                                            {"_id": 1}))
+
+
 async def on_tournament_registered(user_id: str, tournament_id: str):
     """Nur die Zähler der Anmeldung, ohne den alten Block (#1871): am Einlass melden sich viele zugleich an. Alles
     andere (Spiele, Plätze, Profil, Mitgliedschaft) holt der volle Lauf nach - nächtlich oder ohne Quelle."""
-    await _xp(user_id, "tournament_registered", tournament_id)
+    if not await _is_league_staffel(tournament_id):
+        await _xp(user_id, "tournament_registered", tournament_id)
     await evaluate_user_progress(user_id, {"registration"}, legacy=False)
 
 
 async def on_checked_in(user_id: str, tournament_id: str):
-    await _xp(user_id, "checked_in", tournament_id)
+    if not await _is_league_staffel(tournament_id):
+        await _xp(user_id, "checked_in", tournament_id)
     await evaluate_user_progress(user_id, {"tournament"})
 
 
@@ -430,6 +440,8 @@ async def on_match_completed(winner_user_id: str, loser_user_id: str | None,
 
 
 async def on_tournament_completed(tournament_id: str, placements: list[dict]):
+    if await _is_league_staffel(tournament_id):
+        return  # Liga-Titel und Pokale kommen mit #1638 ff.
     for p in placements:
         uid = p.get("user_id")
         if uid:

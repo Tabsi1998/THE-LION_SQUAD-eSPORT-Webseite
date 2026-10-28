@@ -95,7 +95,9 @@ async def counted_numbers(db) -> dict[str, int]:
     async for row in db.events.find({"status": {"$nin": ["draft", "cancelled"]}, "visibility": {"$in": [None, "public"]}}, {"_id": 0, "start_date": 1}):
         events += in_last_year(row.get("start_date"))
     tournaments = 0
-    async for row in db.tournaments.find({"status": {"$nin": ["draft", "cancelled"]}, "is_public": {"$ne": False}}, {"_id": 0, "start_date": 1, "created_at": 1}):
+    # Liga-Staffeln zählen nicht als Turniere (docs/LIGA.md, Abschnitt 7).
+    async for row in db.tournaments.find({"status": {"$nin": ["draft", "cancelled"]}, "is_public": {"$ne": False}, "league_context": None},
+                                         {"_id": 0, "start_date": 1, "created_at": 1}):
         tournaments += in_last_year(row.get("start_date") or row.get("created_at"))
     return {
         "members": await db.memberships.count_documents({"member_status": {"$in": ["active", "honorary"]}}),

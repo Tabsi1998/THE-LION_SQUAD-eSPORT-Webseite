@@ -33,7 +33,9 @@ from models import GAME_MODES_MAX, new_id, now_utc
 from services import game_maps
 from services.game_maps import MapProblem
 
-SCOPES = ("tournament", "stage", "reference_series")
+# ``league_season``: Pool einer Liga-Season (docs/LIGA.md) - Vorlage; die Staffel bekommt beim Anlegen eine Kopie
+# als eigene Version im Scope ``tournament`` (``copy_version``), ``effective_pool`` bleibt unverändert.
+SCOPES = ("tournament", "stage", "reference_series", "league_season")
 # Grenze je Modus gegen unkontrollierte Datenmengen - keine feste Kartenzahl.
 POOL_MAPS_MAX = 50
 NO_MODE_LABEL = "Alle Maps"
@@ -230,6 +232,17 @@ async def save(db, *, scope: str, scope_id: str, game: dict | None, body: MapPoo
     groups = await _snapshot_groups(db, game, body)
     return await _write(db, previous=previous, scope=scope, scope_id=scope_id, game_id=game["id"], user=user,
                         groups=groups, cleared=False, note=body.note, tournament_id=tournament_id)
+
+
+async def copy_version(db, source: dict, *, scope: str, scope_id: str, user: dict,
+                       tournament_id: str | None = None, note: str | None = None) -> dict:
+    """Eine vorhandene Version als neue Version eines anderen Wettbewerbs - mit genau denselben Maps samt Namen und
+    Bildern von damals (Snapshot), ohne neue Prüfung gegen die Bibliothek. Für die Liga: Season → Staffel."""
+    previous = await latest(db, scope, scope_id)
+    groups = [{"mode": group.get("mode"), "label": group.get("label"),
+               "maps": [dict(item) for item in group.get("maps") or []]} for group in source.get("modes") or []]
+    return await _write(db, previous=previous, scope=scope, scope_id=scope_id, game_id=source.get("game_id"),
+                        user=user, groups=groups, cleared=False, note=note, tournament_id=tournament_id)
 
 
 async def clear(db, *, scope: str, scope_id: str, user: dict, tournament_id: str | None = None) -> dict | None:

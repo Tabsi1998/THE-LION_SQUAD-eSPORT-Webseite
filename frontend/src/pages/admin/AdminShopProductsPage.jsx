@@ -8,8 +8,9 @@ import { AdminLayout } from "@/components/tls/AdminLayout";
 import { api, formatRequestError } from "@/lib/api";
 import { formatCents, parseEuro } from "@/lib/billing";
 import { viennaDateTime } from "@/lib/vienna";
+import { defaultTechnique, techniqueHint, techniqueLabel, techniqueList } from "@/lib/shopTechniques";
 import ShopTabs from "./ShopTabs";
-import LayoutStep from "./ShopLayoutStep";
+import LayoutStep, { layoutKey } from "./ShopLayoutStep";
 import ProductSearch from "./ShopProductSearch";
 
 // Produktverwaltung (#1707) mit Katalogabgleich (#1709) - Verwaltung → Finanzen → Shop → Produkte. Geführt in fünf
@@ -136,6 +137,7 @@ function StatusBadge({ status, labels, testId }) {
 function CheckIcon({ state }) {
   if (state === "ok") return <CheckCircle2 className="w-4 h-4 text-ok shrink-0" aria-label="bestanden" />;
   if (state === "open") return <CircleDashed className="w-4 h-4 text-honor shrink-0" aria-label="offen" />;
+  if (state === "warn") return <AlertTriangle className="w-4 h-4 text-honor shrink-0" aria-label="Warnung" />;
   return <XOctagon className="w-4 h-4 text-warn shrink-0" aria-label="fehlt" />;
 }
 
@@ -327,10 +329,10 @@ function PrintfulStep({ view, busy, run }) {
           <div><dt className="text-white/50 text-xs">Produkt</dt><dd className="font-bold">{printful.name} <span className="text-white/50 font-normal tabular-nums">Nr. {printful.product_id}</span></dd></div>
           <div><dt className="text-white/50 text-xs">Geladen</dt><dd>{viennaDateTime(printful.loaded_at)}{printful.is_discontinued ? <span className="text-warn"> · bei Printful eingestellt</span> : ""}</dd></div>
           <div><dt className="text-white/50 text-xs">Farben · Größen · Varianten</dt><dd className="tabular-nums">{printful.colors.length} · {printful.sizes.length} · {printful.variants.length}</dd></div>
-          <div><dt className="text-white/50 text-xs">Techniken</dt><dd>{printful.techniques.join(", ") || "–"}</dd></div>
+          <div><dt className="text-white/50 text-xs">Techniken</dt><dd data-testid="shop-printful-techniques">{techniqueList(printful.techniques) || "–"}</dd></div>
           <div className="sm:col-span-2"><dt className="text-white/50 text-xs">Druckflächen</dt>
             <dd className="flex flex-wrap gap-2 mt-1">{printful.placements.map((row) => (
-              <span key={`${row.placement}-${row.technique}`} className="border border-white/15 rounded-sm px-2 py-0.5 text-xs">{row.placement} ({row.technique}) · {inches(row.width_in)} × {inches(row.height_in)}</span>
+              <span key={`${row.placement}-${row.technique}`} className="border border-white/15 rounded-sm px-2 py-0.5 text-xs">{row.placement} ({techniqueLabel(row.technique)}) · {inches(row.width_in)} × {inches(row.height_in)}</span>
             ))}</dd>
           </div>
         </dl>
@@ -341,14 +343,20 @@ function PrintfulStep({ view, busy, run }) {
 
 // ---------------------------------------------------------------- Schritt 2: Farben und Größen
 
+// Der gespeicherte Stand von Schritt 2 als Schlüssel (#2091): ändert er sich (Speichern, Neuladen, anderes
+// Printful-Produkt), beginnt der Schritt neu mit diesen Werten. Ein frisches Objekt je Rendern (Produkt ohne Angebot)
+// darf die Auswahl nicht zurücksetzen - deshalb Text statt Objekt-Identität.
+function offerKey(product) {
+  return JSON.stringify([product.id, product.printful?.product_id ?? null, product.technique ?? null,
+    product.offer?.colors ?? [], product.offer?.sizes ?? []]);
+}
+
 function OfferStep({ view, busy, run }) {
   const { product } = view;
   const printful = product.printful;
-  const offer = product.offer || { colors: [], sizes: [] };
-  const [colors, setColors] = useState(offer.colors);
-  const [sizes, setSizes] = useState(offer.sizes);
-  const [technique, setTechnique] = useState(product.technique || printful?.default_technique || printful?.techniques?.[0] || "");
-  useEffect(() => { setColors(offer.colors); setSizes(offer.sizes); }, [offer.colors, offer.sizes]);
+  const [colors, setColors] = useState(() => product.offer?.colors ?? []);
+  const [sizes, setSizes] = useState(() => product.offer?.sizes ?? []);
+  const [technique, setTechnique] = useState(() => defaultTechnique(printful, product.technique));
   if (!printful) return <p className="text-sm text-white/55" data-testid="shop-step-offer">Zuerst in Schritt 1 das Printful-Produkt laden.</p>;
   const toggle = (list, setList, value) => setList(list.includes(value) ? list.filter((item) => item !== value) : [...list, value]);
   const count = printful.variants.filter((row) => colors.includes(row.color) && sizes.includes(row.size)).length;
@@ -356,11 +364,14 @@ function OfferStep({ view, busy, run }) {
   const offered = view.variants.filter((row) => row.active);
   return (
     <div className="space-y-4" data-testid="shop-step-offer">
-      {printful.techniques.length > 1 && (
+      {printful.techniques.length > 0 && (
         <div className="space-y-1">
           <div className="text-sm text-white/70">Drucktechnik</div>
-          <ChoiceGroup label="Drucktechnik" testId="shop-offer-technique" value={technique} onChange={setTechnique}
-            options={printful.techniques.map((key) => ({ value: key, label: key }))} />
+          {printful.techniques.length > 1
+            ? <ChoiceGroup label="Drucktechnik" testId="shop-offer-technique" value={technique} onChange={setTechnique}
+              options={printful.techniques.map((key) => ({ value: key, label: techniqueLabel(key) }))} />
+            : <div className="text-sm font-bold" data-testid="shop-offer-technique-only">{techniqueLabel(technique)}</div>}
+          {techniqueHint(technique) && <p className="text-xs text-white/55" data-testid="shop-offer-technique-hint">{techniqueHint(technique)}</p>}
         </div>
       )}
       <div className="space-y-1">
@@ -531,7 +542,7 @@ function PublishStep({ view, busy, run }) {
 
 function stepState(step, view) {
   const items = view.check.items.filter((item) => step.checks.includes(item.key));
-  if (items.every((item) => item.ok)) return "ok";
+  if (items.every((item) => item.ok)) return items.some((item) => item.state === "warn") ? "warn" : "ok";
   return items.some((item) => item.state === "open") && items.every((item) => item.ok || item.state === "open") ? "open" : "failed";
 }
 
@@ -540,7 +551,7 @@ function SyncLine({ view, busy, run }) {
   if (!view.product.printful) return null;
   return (
     <div className="flex flex-wrap items-center gap-3 text-xs" data-testid="shop-sync">
-      <span className={sync && !sync.ok ? "text-warn" : "text-white/60"}>
+      <span className={sync && !sync.ok ? "text-warn" : sync?.warning ? "text-honor" : "text-white/60"} data-state={sync?.warning ? "warn" : undefined}>
         {!sync ? "Noch nicht abgeglichen."
           : sync.ok ? `Abgleich ${viennaDateTime(sync.at)}: ${sync.detail}`
             : `Abgleich gescheitert (${viennaDateTime(sync.at)}): ${sync.detail} Stand vom ${sync.last_ok_at ? viennaDateTime(sync.last_ok_at) : "–"}.`}
@@ -615,10 +626,10 @@ function ProductEditor({ productId }) {
           <Section title="Printful-Produkt" icon={ShoppingBag} testId="shop-section-printful"><PrintfulStep view={view} busy={busy} run={run} /></Section>
         </>
       )}
-      {step === "offer" && <Section title="Farben und Größen" testId="shop-section-offer"><OfferStep view={view} busy={busy} run={run} /></Section>}
+      {step === "offer" && <Section title="Farben und Größen" testId="shop-section-offer"><OfferStep key={offerKey(product)} view={view} busy={busy} run={run} /></Section>}
       {step === "designs" && (
         <>
-          <Section title="Druckflächen" testId="shop-section-layout"><LayoutStep view={view} busy={busy} run={run} ReasonedButton={ReasonedButton} ChoiceGroup={ChoiceGroup} /></Section>
+          <Section title="Druckflächen" testId="shop-section-layout"><LayoutStep key={layoutKey(view)} view={view} busy={busy} run={run} ReasonedButton={ReasonedButton} ChoiceGroup={ChoiceGroup} /></Section>
         </>
       )}
       {step === "prices" && <Section title="Preise" testId="shop-section-prices"><PricesStep view={view} busy={busy} run={run} /></Section>}

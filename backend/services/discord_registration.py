@@ -95,7 +95,8 @@ async def _open_tournaments(db, user: dict, games=None) -> list[dict]:
     """Offene Turniere, die die Person sehen darf - ``games`` ist der Spielfilter des Servers (#630, None = alle)."""
     from routes.tournament_registration_routes import _registration_error
 
-    query: dict = {"status": "registration_open"}
+    # Liga-Staffeln: Co-Teams teilt die Leitung zu, über Discord meldet sich niemand an (docs/LIGA.md).
+    query: dict = {"status": "registration_open", "league_context": None}
     if games is not None:
         query["game_id"] = {"$in": sorted(games)}
     rows = await db.tournaments.find(query, {"_id": 0}).sort("start_date", 1).to_list(200)

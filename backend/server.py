@@ -41,6 +41,7 @@ from routes.moderation_routes import router as moderation_router
 from routes.game_routes import router as game_router
 from routes.game_map_routes import router as game_map_router
 from routes.map_pool_routes import router as map_pool_router
+from routes.league_routes import admin_router as league_admin_router, router as league_router
 from routes.game_server_routes import router as game_server_router
 from routes.access_link_routes import router as access_link_router
 from routes.admin_picker_routes import router as admin_picker_router
@@ -84,6 +85,7 @@ from routes.shop_product_routes import router as shop_product_router
 from routes.shop_gamertag_routes import router as shop_gamertag_router
 from routes.shop_print_file_routes import router as shop_print_file_router
 from routes.shop_print_template_routes import router as shop_print_template_router
+from routes.shop_test_draft_routes import router as shop_test_draft_router
 from routes.platform_link_routes import router as platform_link_router
 from routes.discord_bot_routes import router as discord_bot_router
 from routes.discord_forward_routes import router as discord_forward_router
@@ -341,6 +343,8 @@ app.include_router(moderation_router)
 app.include_router(game_router)
 app.include_router(game_map_router)  # Map-Bibliothek je Spiel (#1616)
 app.include_router(map_pool_router)  # Map-Pools je Wettbewerb (#1616)
+app.include_router(league_admin_router)  # Liga verwalten (docs/LIGA.md, #1622)
+app.include_router(league_router)  # Liga lesen nach Sichtbarkeit der Season (#1622)
 app.include_router(game_server_router)
 app.include_router(access_link_router)
 app.include_router(admin_picker_router)
@@ -385,6 +389,7 @@ app.include_router(shop_design_router)  # Designs und Druckdateien (#1708): nur 
 app.include_router(shop_product_router)  # Produktverwaltung und Katalogabgleich (#1707, #1709): nur Finanzen
 app.include_router(shop_gamertag_router)  # Gamertag-Druckdatei (#1711): nur Finanzen
 app.include_router(shop_print_template_router)  # Druckvorlagen und Vorgaben (#2069): nur Finanzen
+app.include_router(shop_test_draft_router)  # Testentwurf an Printful (#2062): nur Finanzen, nie bestätigen
 app.include_router(shop_print_file_router)  # Druckdateien für Printful (#1708): bewusst öffentlich, Regel 3
 app.include_router(platform_link_router)
 app.include_router(discord_bot_router)

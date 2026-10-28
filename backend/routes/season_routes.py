@@ -14,6 +14,7 @@ from services.slug_utils import apply_slug_history, find_by_slug_or_history, slu
 from services.competition_read import load_competition_read_model, observe_structure_read
 from services.competition_standings import standings_for_structure
 from services.private_fields import private_projection
+from services.league_scope import NOT_LEAGUE, league_tournament_ids
 from models import now_utc, new_id
 
 season_router = APIRouter(prefix="/api/seasons", tags=["seasons"])
@@ -151,9 +152,15 @@ async def _resolve_season_sources(s: dict) -> tuple[list[str], list[str]]:
         date range yet.
     """
     db = get_db()
+    # Liga-Staffeln zählen nie für die Jahreswertung (docs/LIGA.md, Abschnitt 7) - auch nicht ausdrücklich gelistet.
+    # Wer Turniere ausdrücklich gewählt hat, bekommt nie den Automatik-Rückfall - auch nicht, wenn nach dem Herausnehmen
+    # der Staffeln keines übrig bleibt (sonst zählten auf einmal alle Turniere).
     explicit_t = list(s.get("tournament_ids") or [])
+    had_explicit_t = bool(explicit_t)
+    league = await league_tournament_ids(db, explicit_t)
+    explicit_t = [tid for tid in explicit_t if tid not in league]
     explicit_f = list(s.get("f1_challenge_ids") or [])
-    if explicit_t and explicit_f:
+    if had_explicit_t and explicit_f:
         return explicit_t, explicit_f
 
     # Build date filter (lenient: matches scheduled_at OR created_at fallback)
@@ -162,8 +169,9 @@ async def _resolve_season_sources(s: dict) -> tuple[list[str], list[str]]:
     relevant_status = {"live", "completed", "results_published", "check_in", "scheduled"}
 
     auto_t: list[str] = []
-    if not explicit_t:
-        async for t in db.tournaments.find({}, {"id": 1, "status": 1, "start_date": 1, "created_at": 1, "_id": 0}):
+    if not had_explicit_t:
+        async for t in db.tournaments.find(dict(NOT_LEAGUE), {"id": 1, "status": 1, "start_date": 1, "created_at": 1,
+                                                               "_id": 0}):
             if t.get("status") not in relevant_status:
                 continue
             ts = t.get("start_date") or t.get("created_at")
@@ -180,7 +188,7 @@ async def _resolve_season_sources(s: dict) -> tuple[list[str], list[str]]:
                 continue
             auto_f.append(f["id"])
 
-    return (explicit_t or auto_t), (explicit_f or auto_f)
+    return (explicit_t if had_explicit_t else auto_t), (explicit_f or auto_f)
 
 
 @season_router.get("/{slug_or_id}/standings")

@@ -224,12 +224,17 @@ CLUB_CONTENT = frozenset({
     # Maps je Spiel und Map-Pools je Wettbewerb (#1616) - nur die Kennung, wer angelegt bzw. gespeichert hat; dazu die
     # belegten Schreibweisen der Maps (ohne Person).
     "game_maps", "map_pools", "game_map_keys",
+    # Liga (docs/LIGA.md, #1622): Liga, Season und Liga N - Vereinsinhalt wie Turniere, nur die Kennung, wer angelegt hat.
+    "leagues", "league_seasons", "league_divisions",
     # Shop-Katalog (#1703): Produkte, Varianten, Druckdateien, Designs (#1708) und die Printful-Zuordnung - nur die
     # Kennung, wer angelegt bzw. geändert hat.
     "shop_products", "shop_variants", "shop_designs", "shop_design_profiles", "shop_design_colors",
     "shop_printful_variants",
     # Druckvorlagen von Printful (#2069): Maße und Vorlagenbilder je Printful-Produkt - ohne Person.
     "shop_print_templates",
+    # Testentwürfe an Printful (#2062): Vereinsadresse, Druckdateien, Antwort von Printful - nur die Kennung, wer
+    # gesendet bzw. gelöscht hat; nie ein Gamertag als Text (die Testdatei mit Namen hängt an shop_print_files).
+    "shop_test_drafts",
 })
 
 NO_PERSON = frozenset({
