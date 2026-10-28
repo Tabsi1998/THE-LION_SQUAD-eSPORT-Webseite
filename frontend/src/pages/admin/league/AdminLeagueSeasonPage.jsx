@@ -4,7 +4,7 @@
 // nach „Vorgaben auf Staffeln übertragen“; was dabei nicht mehr darf (Kalender nach dem Start, Wertung nach dem ersten
 // Ergebnis), meldet der Server je Staffel mit Grund.
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ArrowRightLeft, CalendarOff, ExternalLink, Pencil, Plus, Trash2 } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
@@ -14,9 +14,11 @@ import { SelectField, TextAreaField, TextField } from "@/components/tls/FormFiel
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { MapPoolEditor } from "@/pages/admin/maps/MapPoolEditor";
+import { LeagueDeleteSheet } from "./LeagueDeleteSheet";
 import { SeasonRosterPanel } from "./SeasonRosterPanel";
 import { dayNoon, viennaDate } from "@/lib/vienna";
 import {
+  ACTIVE_STATUS_OPTIONS,
   BEST_OF_OPTIONS,
   LEGS_OPTIONS,
   MAP_REPEAT_OPTIONS,
@@ -43,6 +45,7 @@ const STAFFEL_STATUS = {
 const SHORT_DAY = { day: "2-digit", month: "2-digit" };
 const LONG_DAY = { day: "2-digit", month: "2-digit", year: "numeric" };
 const ICON_BUTTON = "p-1.5 text-white/50 hover:text-[#29B6E8] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8] rounded-sm";
+const ICON_DANGER = ICON_BUTTON.replace("hover:text-[#29B6E8]", "hover:text-live");
 
 function dayText(day, options = SHORT_DAY) {
   return day ? viennaDate(dayNoon(day), options) : "";
@@ -81,7 +84,7 @@ function BlockedPeriods({ periods, onChange }) {
           <TextField label="Bezeichnung" maxLength={60} value={period.label} onChange={(value) => update(index, "label", value)} placeholder="z. B. Weihnachtspause"
             className="col-span-2 sm:col-span-1" testId={`blocked-label-${index}`} />
           <button type="button" onClick={() => onChange(periods.filter((_, at) => at !== index))} aria-label="Sperrzeit entfernen"
-            className={`${ICON_BUTTON.replace("hover:text-[#29B6E8]", "hover:text-live")} justify-self-start sm:mb-1.5`} data-testid={`blocked-remove-${index}`}>
+            className={`${ICON_DANGER} justify-self-start sm:mb-1.5`} data-testid={`blocked-remove-${index}`}>
             <Trash2 className="w-4 h-4" aria-hidden="true" />
           </button>
         </div>
@@ -142,6 +145,7 @@ function ModeOrder({ modes, bestOf, value, onChange }) {
 
 function DivisionSheet({ division, season, onClose, onSaved }) {
   const [nickname, setNickname] = useState(division?.nickname || "");
+  const [status, setStatus] = useState(division?.status || "active");
   const [form, setForm] = useState(() => overridesToForm(division?.overrides || {}));
   const [saving, setSaving] = useState(false);
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
@@ -149,7 +153,8 @@ function DivisionSheet({ division, season, onClose, onSaved }) {
     event.preventDefault();
     setSaving(true);
     try {
-      const body = { nickname: nickname.trim() || null, overrides: overridesPayload(form) };
+      // Der Stand (#2106): die API kannte ihn, das Formular schickt ihn jetzt mit - archiviert fällt aus der Ligaseite.
+      const body = { nickname: nickname.trim() || null, overrides: overridesPayload(form), ...(division ? { status } : {}) };
       if (division) await api.patch(`/admin/leagues/divisions/${division.id}`, body);
       else await api.post(`/admin/leagues/seasons/${season.id}/divisions`, body);
       toast.success(division ? "Liga gespeichert." : "Liga angelegt.");
@@ -165,6 +170,10 @@ function DivisionSheet({ division, season, onClose, onSaved }) {
       submitLabel={division ? "Speichern" : "Anlegen"} submitTestId="division-save" testId="division-sheet">
       <TextField label="Beiname" maxLength={40} value={nickname} onChange={setNickname} placeholder="freiwillig, z. B. Elite"
         hint={division ? `Anzeige „Liga ${division.level} · Beiname“.` : "Die Stufe zählt von selbst weiter: Liga 1, Liga 2 …"} testId="division-nickname" />
+      {division ? (
+        <SelectField label="Stand" value={status} onChange={setStatus} options={ACTIVE_STATUS_OPTIONS}
+          hint="Archiviert: nicht mehr auf der Ligaseite, Staffeln und Ergebnisse bleiben erhalten." testId="division-status" />
+      ) : null}
       <p className="text-xs text-white/55">Leer lassen heißt: wie die Season. Nur was diese Liga anders macht, eintragen.</p>
       <FormGrid>
         <SelectField label="Best of" value={form.best_of} onChange={(value) => set("best_of", value)}
@@ -175,6 +184,9 @@ function DivisionSheet({ division, season, onClose, onSaved }) {
           placeholder={`wie Season (${season.min_squad_size})`} testId="override-min-squad" />
         <TextField label="Teams je Staffel höchstens" type="number" min={2} max={20} value={form.max_staffel_size} onChange={(value) => set("max_staffel_size", value)}
           placeholder={`wie Season (${season.max_staffel_size})`} testId="override-staffel-size" />
+        <TextField label="Antwort auf Terminvorschlag (Stunden)" type="number" min={1} max={720} value={form.match_schedule_response_hours}
+          onChange={(value) => set("match_schedule_response_hours", value)} testId="override-response"
+          placeholder={season.match_schedule_response_hours ? `wie Season (${season.match_schedule_response_hours})` : "wie Season"} />
       </FormGrid>
       <FormGrid cols={3}>
         <TextField label="Punkte Sieg" type="number" step="any" value={form.points_win} onChange={(value) => set("points_win", value)} placeholder={String(points.win ?? 3)} testId="override-points-win" />
@@ -215,6 +227,8 @@ export default function AdminLeagueSeasonPage() {
   const [syncRows, setSyncRows] = useState(null);
   const [syncing, setSyncing] = useState(false);
   const [divisionSheet, setDivisionSheet] = useState(null);
+  const [deleting, setDeleting] = useState(null);
+  const navigate = useNavigate();
 
   const load = useCallback(async (resetForm = false) => {
     try {
@@ -284,6 +298,26 @@ export default function AdminLeagueSeasonPage() {
     }
   };
 
+  // Löschen und „Archivieren statt löschen“ (#2106): eine gelöschte Season führt zurück zur Übersicht.
+  const afterDelete = (kind) => {
+    setDeleting(null);
+    if (kind === "season") navigate("/admin/leagues");
+    else reload();
+  };
+  const archive = async ({ kind, target, name }) => {
+    try {
+      if (kind === "season") await api.patch(`/admin/leagues/seasons/${target.id}`, { status: "archived" });
+      else await api.patch(`/admin/leagues/divisions/${target.id}`, { status: "archived" });
+      toast.success(`${name} archiviert.`);
+      setDeleting(null);
+      await load(kind === "season");
+      return true;
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail));
+      return false;
+    }
+  };
+
   const savePool = async (body) => {
     try {
       await api.put(`/admin/leagues/seasons/${seasonId}/map-pool`, body);
@@ -315,11 +349,18 @@ export default function AdminLeagueSeasonPage() {
       {error ? <p className="mt-6 text-sm text-warn" role="alert" data-testid="season-error">{error}</p> : null}
       {data && form ? (
         <>
-          <div className="mt-3 mb-6 min-w-0">
-            <h1 className="font-heading text-3xl md:text-4xl font-black uppercase break-words">{data.league.name} · {season.name}</h1>
-            <p className="mt-1 text-sm text-white/60" data-testid="season-head">
-              {data.game?.name || "Spiel fehlt"} · ab {viennaDate(season.start_date, LONG_DAY)} · Sichtbarkeit: {VISIBILITY_SHORT[season.visibility]}
-            </p>
+          <div className="mt-3 mb-6 flex flex-wrap items-end justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="font-heading text-3xl md:text-4xl font-black uppercase break-words">{data.league.name} · {season.name}</h1>
+              <p className="mt-1 text-sm text-white/60" data-testid="season-head">
+                {data.game?.name || "Spiel fehlt"} · ab {viennaDate(season.start_date, LONG_DAY)} · Sichtbarkeit: {VISIBILITY_SHORT[season.visibility]}
+              </p>
+            </div>
+            {/* Löschen (#2106): nur als Entwurf ohne Staffel mit Co-Teams oder Spielen - sonst bietet das Blatt Archivieren an. */}
+            <button type="button" onClick={() => setDeleting({ kind: "season", target: season, name: season.name })} data-testid="season-delete"
+              className="tls-btn tls-btn--danger px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
+              <Trash2 className="w-3.5 h-3.5" aria-hidden="true" /> Season löschen
+            </button>
           </div>
 
           {pendingSync > 0 ? (
@@ -365,11 +406,15 @@ export default function AdminLeagueSeasonPage() {
                   <TextField label="Niederlage" type="number" step="any" value={form.points_loss} onChange={(value) => set("points_loss", value)} testId="season-form-points-loss" />
                 </FormGrid>
                 <Tiebreakers value={form.table_tiebreakers} onChange={(value) => set("table_tiebreakers", value)} />
-                <FormGrid>
+                <FormGrid cols={3}>
                   <TextField label="Ergebnis gilt nach (Stunden)" type="number" min={1} max={336} value={form.result_confirm_hours} onChange={(value) => set("result_confirm_hours", value)}
                     hint="ohne Antwort der Gegenseite" testId="season-form-confirm" />
                   <TextField label="Aufstellung nachtragen bis (Stunden)" type="number" min={1} max={336} value={form.lineup_amend_hours} onChange={(value) => set("lineup_amend_hours", value)}
                     hint="nach dem Ergebnis" testId="season-form-amend" />
+                  {/* Antwortfrist (#2106, F3): früher je Staffel; leer bei älteren Seasons - dann behält jede Staffel ihre. */}
+                  <TextField label="Antwort auf Terminvorschlag (Stunden)" type="number" min={1} max={720} value={form.match_schedule_response_hours}
+                    onChange={(value) => set("match_schedule_response_hours", value)} placeholder="leer: je Staffel wie bisher"
+                    hint="So lange hat die Gegenseite Zeit; gilt für neue Vorschläge" testId="season-form-response" />
                 </FormGrid>
               </FormSection>
 
@@ -407,13 +452,20 @@ export default function AdminLeagueSeasonPage() {
                 <div key={division.id} className="border-t border-white/10 pt-4 first:border-t-0 first:pt-0" data-testid={`division-${division.level}`}>
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <h3 className="font-bold text-white">{division.label}</h3>
+                      <h3 className="font-bold text-white">
+                        {division.label}
+                        {division.status === "archived" ? <span className="ml-2 rounded-sm bg-white/5 px-2 py-0.5 align-middle text-[10px] font-bold uppercase tracking-wider text-white/55" data-testid={`division-archived-${division.level}`}>Archiviert</span> : null}
+                      </h3>
                       <p className="text-xs text-white/55">{settingsLine(division.settings)}{Object.keys(division.overrides || {}).length ? " · weicht von der Season ab" : ""}</p>
                       <p className="text-xs text-white/55">{division.calendar.active_weeks} Spielwochen – höchstens {division.calendar.max_teams_per_staffel} Teams je Staffel</p>
                     </div>
                     <div className="flex items-center gap-1">
                       <button type="button" className={ICON_BUTTON} onClick={() => setDivisionSheet(division)} aria-label={`${division.label} bearbeiten`} data-testid={`division-edit-${division.level}`}>
                         <Pencil className="w-4 h-4" aria-hidden="true" />
+                      </button>
+                      <button type="button" className={ICON_DANGER} onClick={() => setDeleting({ kind: "division", target: division, name: division.label })}
+                        aria-label={`${division.label} löschen`} data-testid={`division-delete-${division.level}`}>
+                        <Trash2 className="w-4 h-4" aria-hidden="true" />
                       </button>
                       <button type="button" onClick={() => createStaffel(division)} data-testid={`staffel-add-${division.level}`}
                         className="tls-btn tls-btn--primary px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
@@ -427,10 +479,19 @@ export default function AdminLeagueSeasonPage() {
                         <li key={staffel.tournament_id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2" data-testid={`staffel-${division.level}-${staffel.staffel}`}>
                           <span className="font-semibold text-white">Staffel {staffel.staffel}</span>
                           <span className="text-xs text-white/55 tabular-nums">{staffel.participant_count} von {staffel.max_participants} Teams · {STAFFEL_STATUS[staffel.status] || staffel.status}</span>
-                          <Link to={`/admin/tournaments/${staffel.tournament_id}`} data-testid={`staffel-manage-${division.level}-${staffel.staffel}`}
-                            className="ml-auto inline-flex items-center gap-1 text-xs font-bold text-[#29B6E8] hover:text-white">
-                            Turnierverwaltung · Co-Teams zuteilen <ExternalLink className="w-3 h-3" aria-hidden="true" />
-                          </Link>
+                          <span className="ml-auto inline-flex items-center gap-2">
+                            <Link to={`/admin/tournaments/${staffel.tournament_id}`} data-testid={`staffel-manage-${division.level}-${staffel.staffel}`}
+                              className="inline-flex items-center gap-1 text-xs font-bold text-[#29B6E8] hover:text-white">
+                              Turnierverwaltung · Co-Teams zuteilen <ExternalLink className="w-3 h-3" aria-hidden="true" />
+                            </Link>
+                            {/* Staffel löschen (#2106) nur als Entwurf - dieselbe Sperre wie in der Turnierverwaltung prüft der Server. */}
+                            {staffel.status === "draft" ? (
+                              <button type="button" className={ICON_DANGER} onClick={() => setDeleting({ kind: "staffel", target: staffel, name: `${division.label} · Staffel ${staffel.staffel}` })}
+                                aria-label={`Staffel ${staffel.staffel} löschen`} data-testid={`staffel-delete-${division.level}-${staffel.staffel}`}>
+                                <Trash2 className="w-4 h-4" aria-hidden="true" />
+                              </button>
+                            ) : null}
+                          </span>
                         </li>
                       ))}
                     </ul>
@@ -442,7 +503,7 @@ export default function AdminLeagueSeasonPage() {
             <SeasonRosterPanel seasonId={seasonId} />
 
             <FormSection title="Vorgaben auf Staffeln übertragen" testId="season-sync"
-              hint="Regeltext und Map-Pool immer, auch bei gesperrten Staffeln; Termine und Kalender nur vor dem Start; Best of, Teamgröße, Mindestkader, Punkte und Fristen nur vor dem ersten Ergebnis. Die Sichtbarkeit gilt schon beim Speichern.">
+              hint="Regeltext und Map-Pool immer, auch bei gesperrten Staffeln; die Antwortfrist auf Terminvorschläge auch während der Season, nur nicht bei gesperrten; Termine und Kalender nur vor dem Start; Best of, Teamgröße, Mindestkader, Punkte und Fristen nur vor dem ersten Ergebnis. Die Sichtbarkeit gilt schon beim Speichern.">
               <button type="button" onClick={sync} disabled={syncing || !staffelCount} data-testid="season-sync-run"
                 className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5 disabled:opacity-50">
                 <ArrowRightLeft className="w-3.5 h-3.5" aria-hidden="true" /> {syncing ? "Übertrage …" : "Vorgaben übertragen"}
@@ -454,6 +515,10 @@ export default function AdminLeagueSeasonPage() {
           {divisionSheet ? (
             <DivisionSheet division={divisionSheet.id ? divisionSheet : null} season={season} onClose={() => setDivisionSheet(null)}
               onSaved={() => { setDivisionSheet(null); reload(); }} />
+          ) : null}
+          {deleting ? (
+            <LeagueDeleteSheet kind={deleting.kind} target={deleting.target} name={deleting.name} onClose={() => setDeleting(null)}
+              onDeleted={() => afterDelete(deleting.kind)} onArchive={deleting.kind === "staffel" ? undefined : () => archive(deleting)} />
           ) : null}
         </>
       ) : null}

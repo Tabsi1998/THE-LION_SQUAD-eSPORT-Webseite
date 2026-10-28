@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.48.0 (28.10.2026)
+
+### Neu
+
+* Event: bei neuem Termin oder Ort fragt die Verwaltung, ob die Angemeldeten eine Nachricht bekommen (#2118)
+
+### Fehlerbehebungen
+
+* Admin-Profiländerung eingeschränkt und protokolliert (#2118)
+* Event absagen informiert Angemeldete und Warteliste, storniert Anmeldungen und offene Rechnungsaufträge (#2118)
+* Event löschen nur ohne Anmeldungen, Rechnungen und Turniere mit Anmeldungen, mit ehrlichem Dialog und Protokoll (#2118)
+* Event-Absage benachrichtigt je Absage und Person genau einmal und storniert auch fehlgeschlagene Rechnungsaufträge (#2118)
+* Event: „Max. Teilnehmer“ lässt sich leeren, nur Zahlen ab 1 (#2118)
+* Eventseite zeigt „Event abgesagt“ statt „Du bist dabei“ (#2118)
+* Konto löschen entfernt jedes Profilfeld, auch bei früher gelöschten Konten (#2118)
+* Öffentliche Profile liefern nur freigegebene Felder (#2118)
+* Rückfragen beim Absagen und Löschen zählen alle bestehenden Anmeldungen und sagen, was danach bleibt (#2118)
+* Spielerliste, Mitgliederverzeichnis und Link-Vorschau zeigen Land, Spiele und Plattform nach der Sichtbarkeit je Betrachter (#2118)
+
 ## 1.47.0 (28.10.2026)
 
 ### Neu

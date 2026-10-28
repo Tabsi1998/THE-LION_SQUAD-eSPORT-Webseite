@@ -108,6 +108,15 @@ async def migrate_anonymized_profile_fields(db) -> str:
     return f"{result.modified_count} deleted accounts cleared"
 
 
+async def migrate_league_published_at(db) -> str:
+    """Liga (#2106): die Adresse einer Liga bleibt nach der ersten Veröffentlichung (``leagues.published_at``). Ligen,
+    deren Season schon sichtbar ist oder lief, bekommen den Zeitpunkt nachgetragen."""
+    from services import league_service
+
+    marked = await league_service.backfill_published_at(db)
+    return f"{marked} leagues marked as published"
+
+
 async def migrate_points_scheme_templates(db) -> str:
     """Externe Serien (#1741): die Punkteschema-Vorlagen als Daten in den Einstellungen (``points_schemes``). Angelegt
     wird nur, was fehlt - eine bearbeitete Vorlage bleibt; Serien, Termine oder Ergebnisse legt die Migration nie an."""
@@ -388,6 +397,8 @@ MIGRATIONS = (
     (14, "shop_motif_variants", migrate_motif_variants),
     # #2118: gelöschte Konten verlieren jedes Profilfeld (services/account_erasure.py).
     (15, "deleted_account_profile_fields", migrate_anonymized_profile_fields),
+    # #2106: die Adresse einer schon veröffentlichten Liga bleibt (services/league_service.py, slug_locked).
+    (16, "league_published_at", migrate_league_published_at),
 )
 
 

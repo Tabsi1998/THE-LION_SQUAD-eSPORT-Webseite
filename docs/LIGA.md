@@ -32,6 +32,7 @@ Jede Sammlung hat dazu `created_at`, `created_by`, `updated_at`.
 | `participant_kind` | `"team"` | ja | Stufe 1 nur `team`; `solo` folgt (#1629) |
 | `description` | str | nein | |
 | `status` | `"active"` \| `"archived"` | ja | `active` |
+| `published_at` | ISO | nein | erste Sichtbarkeit einer Season (#2106); ab dann bleibt `slug` |
 
 Indizes: `id` eindeutig, `slug` eindeutig, `game_id`.
 
@@ -57,6 +58,7 @@ Indizes: `id` eindeutig, `slug` eindeutig, `game_id`.
 | `scoring_rules` | dict | ja | `normalize_rules({})` aus `services/scoring_rules.py`; gelesen werden nur `match_points` (3/1/0) und `table_tiebreakers` |
 | `result_confirm_hours` | int 1–336 | ja | 48 |
 | `lineup_amend_hours` | int 1–336 | ja | 48 – Nachtragsfrist der eigenen Aufstellung nach dem Ergebnis |
+| `match_schedule_response_hours` | int 1–720 | nein | 72 – Antwortfrist auf Terminvorschläge (#2106, F3); fehlt (Seasons von vorher) = jede Staffel behält ihre |
 | `rules_text` | str (Markdown) | nein | Regeltext der Season (Textfeld, #1646 später) |
 | `registration_deadline` | Kalendertag | nein | Meldeschluss, nur Anzeige (Season 1: 6.11.) |
 | `visibility` | `"off"` \| `"admins"` \| `"members"` \| `"public"` | ja | **`off`** |
@@ -73,7 +75,7 @@ Indizes: `id` eindeutig, (`league_id`, `number`) eindeutig, (`league_id`, `slug`
 | `league_id`, `season_id` | str | ja | |
 | `level` | int ≥ 1 | ja | „Liga N“; (`league_id`, `level`) ist die dauerhafte Stufe über Seasons |
 | `nickname` | str ≤ 40 | nein | Beiname: Anzeige „Liga 1 · Elite“ |
-| `overrides` | dict | nein | Abweichung von der Season nur für `best_of`, `team_size`, `min_squad_size`, `max_staffel_size`, `scoring_rules` |
+| `overrides` | dict | nein | Abweichung von der Season nur für `best_of`, `team_size`, `min_squad_size`, `max_staffel_size`, `scoring_rules`, `match_schedule_response_hours` |
 | `status` | `"active"` \| `"archived"` | ja | `active` |
 
 Indizes: `id` eindeutig, (`season_id`, `level`) eindeutig.
@@ -198,8 +200,9 @@ Namen der Aufgestellten, Meldungen beider Seiten, `can_amend_lineup`, `amend_unt
 
 `league.create|update`, `league.season.create|update`, `league.season.map_pool.save|clear`,
 `league.division.create|update`, `league.staffel.create`, `league.staffel.sync` (A) · `team.squad.roles`, `league.squad.assign|remove` (B) · `match.games.report`,
-`match.lineup.amend`, `match.games.correct` (B) · `league.roster.approve` (neue Spiel-ID freigegeben, mit Grund, ohne
-die ID selbst), `league.season.roster_deadline` (#2108).
+`match.lineup.amend`, `match.games.correct` (B) · `league.delete`, `league.season.delete`, `league.division.delete`,
+`league.staffel.delete` (#2106, mit `reason` und den Kennungen dessen, was mitging) · `league.roster.approve` (neue
+Spiel-ID freigegeben, mit Grund, ohne die ID selbst), `league.season.roster_deadline` (#2108).
 
 ## 3. Einstellbar statt fest
 
@@ -211,6 +214,7 @@ die ID selbst), `league.season.roster_deadline` (#2108).
 | Punkte Sieg/Remis/Niederlage, Gleichstand | Season (`scoring_rules`), Liga N überschreibt | 3/1/0 · `score_diff`, `score_for` |
 | Modus je Position | Season | frei |
 | Bestätigungsfrist, Aufstellungs-Nachtrag | Season | 48 h · 48 h |
+| Antwortfrist auf Terminvorschläge (#2106) | Season, Liga N überschreibt | 72 h |
 | Map-Pool | Season (`league_season`) | keiner = keine Liga-Meldung möglich |
 | Regeltext, Meldeschluss, Sichtbarkeit | Season | leer · leer · aus |
 
@@ -221,6 +225,8 @@ Staffeln, auch gesperrte („aus“ heißt sofort aus).
 Genau (`services/league_service.SYNC_GROUPS`): **immer** (auch gesperrte Staffeln) `visibility`, `is_public`, `rules`
 und der Map-Pool (neue Version im Scope `tournament`, nur wenn er sich unterscheidet – Spiele mit festgehaltenem Pool
 behalten ihren; hat die Season keinen Pool mehr, wird die Kopie nur vor dem ersten Ergebnis entfernt);
+**laufend** (auch nach Start und Ergebnis, nicht bei gesperrten Staffeln) `match_schedule_response_hours` – sie gilt nur
+für neue Terminvorschläge; trägt weder Season noch Liga N den Wert (Seasons von vor #2106), bleibt der der Staffel;
 **vor dem Start** (Status `draft` bis `check_in`) `start_date`, `end_date`, `matchday_days`, `default_match_weekday`,
 `default_match_time`, `round_robin_legs`, `matchday_blocked_weeks`, `matchday_weeks_total`, `max_participants` – nur
 wenn die Prüfung „Runden ≤ aktive Wochen“ passt und nicht schon mehr Teams angemeldet sind; **vor dem ersten Ergebnis**
@@ -234,12 +240,27 @@ nur zum Lesen mit „kommt aus der Season“ und einem Link zur Season; was es i
 Discord, Preise, Jahreswertung, Seeding, Weiterkommen, Vor Ort), fehlt. `update_tournament` lehnt Änderungen daran ab
 (`services/staffel_guard.STAFFEL_LOCKED_FIELDS`, Meldung „Kommt aus der Season – dort ändern und übertragen.“ bzw.
 „Gibt es in einer Liga-Staffel nicht.“/„Steht bei einer Liga-Staffel fest.“; derselbe Wert stört nicht). Das
-Übertragen (`sync_staffel`, `apply_visibility`) schreibt direkt und bleibt davon unberührt. Änderbar bleibt die
-**Antwortfrist auf Terminvorschläge** (`match_schedule_response_hours`), bis sie mit #2106 in die Season wandert. Dazu:
+Übertragen (`sync_staffel`, `apply_visibility`) schreibt direkt und bleibt davon unberührt. Seit #2106 kommt auch die
+**Antwortfrist auf Terminvorschläge** (`match_schedule_response_hours`) aus der Season und ist in der Staffel gesperrt. Dazu:
 `POST /status` kennt für Staffeln nur Entwurf, Live, Pausiert, Beendet, Ergebnisse veröffentlicht, Archiviert und
 Abgesagt; `POST /registrations` (Turnierleitung) nimmt keine Teilnehmer an - nur „Co-Team zuteilen“; Löschen geht nur
 vor dem Start ohne festen Spielplan, danach „Abgesagt“ oder „Archiviert“. Für alle Turniere gilt: `status` per PATCH
 nur, wenn er sich nicht ändert - der Status wechselt über `POST /status` (Ablauf mit Prüfungen und Protokoll).
+
+**Korrigieren, archivieren, löschen (#2106):** Eine Liga ändert Name, Beschreibung und Stand jederzeit; das Spiel nur,
+solange keine Season eine Staffel hat (beim Wechsel leert der Server `game_mode_order` der Seasons, der Map-Pool gilt
+danach als „anderes Spiel“); die Adresse (`slug`) nur vor der ersten Veröffentlichung (`published_at` oder eine Season
+mit Sichtbarkeit ≠ `off`). Liga, Season und Liga N lassen sich löschen, wenn jede Staffel darunter eine **leere
+Entwurfs-Staffel** ist (`staffel_guard.staffel_cascade_problem`: die Löschsperre `staffel_delete_problem` und kein
+zugeteiltes Co-Team) und jede betroffene Season noch `draft` ist; die leeren Staffeln (samt Phasen, Vorschau-Spielen,
+Map-Pool-Kopien) gehen mit, ebenso der Map-Pool der Season. Sonst antwortet der Server 409 „Löschen geht nicht: … Archivieren
+statt löschen“; `GET …/delete-plan` liefert vorher Auflistung und Gründe. Eine Staffel allein löscht die Season-Seite mit
+derselben Sperre wie die Turnierverwaltung (`staffel_delete_problem`). Löschen verlangt einen Grund (mindestens fünf
+Zeichen), der im Protokoll steht. `delete_tree` arbeitet alles oder nichts: erst die Schreibsperren aller Staffeln
+(ist eine belegt: 409, nichts gelöscht), dann unter allen Sperren neu prüfen, dann löschen; jede Staffel steht einzeln
+als `league.staffel.delete` (mit `with`/`with_id`) im Protokoll. Kommt beim Löschen der Staffeln gleichzeitig eine
+Staffel, Liga N oder Season dazu, bricht es danach mit 409 ab und lässt alles darüber stehen. Migration 16
+(`league_published_at`) trägt `published_at` für Ligen nach, deren Season sichtbar ist oder nicht mehr Entwurf.
 
 ## 4. Rechte
 
@@ -387,7 +408,9 @@ gemeinsam, damit das Heimrecht fair bleibt.
 - **APIs (P1):** Verwaltung `/api/admin/leagues` (`require_area("tournaments")`): `GET ""` (Ligen mit Seasons, Spiele,
   Vorgaben), `POST ""`, `PATCH /{league_id}`, `POST /{league_id}/seasons`, `GET|PATCH /seasons/{id}` (mit Kalender,
   Map-Pool, Liga N samt Staffeln), `PUT|DELETE /seasons/{id}/map-pool`, `POST /seasons/{id}/sync`,
-  `POST /seasons/{id}/divisions`, `PATCH /divisions/{id}`, `POST /divisions/{id}/staffeln`. Öffentlich `GET /api/leagues`
+  `POST /seasons/{id}/divisions`, `PATCH /divisions/{id}`, `POST /divisions/{id}/staffeln`; seit #2106
+  `GET …/delete-plan` und `DELETE` (Body `{reason}`) für `/{league_id}`, `/seasons/{id}`, `/divisions/{id}` sowie
+  `DELETE /staffeln/{tournament_id}`. Öffentlich `GET /api/leagues`
   und `GET /api/leagues/{liga}/{season}` – auch die Turnierleitung bekommt dort bei `off` ein 404 (sie sieht die Season
   in der Verwaltung). Gelesene Turniere tragen bei Staffeln `league_label` („Liga · Staffel A“, Turnierliste, Profil,
   Teamseite).

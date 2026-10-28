@@ -32,6 +32,8 @@ STAFFEL_LOCKED_FIELDS: dict[str, tuple[str, str]] = {
     "default_match_weekday": ("Standardtag", FROM_SEASON),
     "default_match_time": ("Standarduhrzeit", FROM_SEASON),
     "result_confirm_hours_league": ("Ergebnis gilt in der Liga nach", FROM_SEASON),
+    # Seit #2106 (Entscheidung F3) ein Season-Wert, je Liga N überschreibbar.
+    "match_schedule_response_hours": ("Antwortfrist auf Terminvorschläge", FROM_SEASON),
     "rules": ("Regeln", FROM_SEASON),
     "visibility": ("Sichtbarkeit", FROM_SEASON),
     "is_public": ("Auf Public-Seiten sichtbar", FROM_SEASON),
@@ -157,6 +159,21 @@ async def staffel_delete_problem(db, tournament: dict) -> str | None:
     if not is_league_staffel(tournament):
         return None
     return STAFFEL_DELETE_REFUSED if await _staffel_started(db, tournament) else None
+
+
+STAFFEL_NOT_EMPTY = "hat schon Co-Teams zugeteilt"
+STAFFEL_STARTED = "hat schon begonnen oder Spiele"
+
+
+async def staffel_cascade_problem(db, tournament: dict) -> str | None:
+    """Darf die Staffel mit ihrer Liga, Season oder Liga N gelöscht werden (#2106)? Nur eine leere Entwurfs-Staffel:
+    dieselbe Löschsperre wie oben (vor dem Start, ohne festen Spielplan) und dazu noch kein zugeteiltes Co-Team - wer
+    eine Liga löscht, soll keine Teilnehmer still mitnehmen. Der Grund kommt als Satzteil („Staffel A …“)."""
+    if await staffel_delete_problem(db, tournament):
+        return STAFFEL_STARTED
+    if await db.tournament_registrations.count_documents({"tournament_id": tournament["id"]}):
+        return STAFFEL_NOT_EMPTY
+    return None
 
 
 async def staffel_rebuild_problem(db, tournament: dict) -> str | None:

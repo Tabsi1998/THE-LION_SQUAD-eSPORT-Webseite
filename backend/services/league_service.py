@@ -14,6 +14,7 @@ daraus die Antwort.
 """
 from __future__ import annotations
 
+from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -21,11 +22,14 @@ from zoneinfo import ZoneInfo
 from pymongo.errors import DuplicateKeyError
 
 from models import TournamentCreate, new_id, now_utc
-from services import game_maps, map_pools, pricing
+from services import game_maps, map_pools, pricing, staffel_guard
 from services.advancement_draw import sync_advancement_fields
 from services.bracket_fill_in import has_started, is_auto_bye
 from services.competition_versions import new_competition_version_fields
 from services.league_scope import ONLY_LEAGUE
+from services.log_safe import log_safe
+from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
+from services.tournament_purge import purge_tournament
 # Runden ≤ aktive Wochen steht im Blatt-Modul (auch für Spielplan und Turnierstart) und wird hier weitergereicht.
 from services.league_rounds import max_teams_for, rounds_needed, rounds_problem  # noqa: F401
 from services.scoring_rules import normalize_rules
@@ -52,13 +56,18 @@ SEASON_DEFAULTS: dict = {
     "scoring_rules": None,  # = normalize_rules({})
     "result_confirm_hours": 48,
     "lineup_amend_hours": 48,
+    # Antwortfrist auf Terminvorschläge (#2106, F3) - vorher je Staffel, Vorgabe wie bei jedem Turnier 72 h.
+    "match_schedule_response_hours": 72,
     "rules_text": None,
     "registration_deadline": None,
     "visibility": "off",
     "status": "draft",
 }
 SEASON_FIELDS = tuple(SEASON_DEFAULTS) + ("name", "slug", "number", "start_date")
-OVERRIDE_FIELDS = ("best_of", "team_size", "min_squad_size", "max_staffel_size", "scoring_rules")
+OVERRIDE_FIELDS = ("best_of", "team_size", "min_squad_size", "max_staffel_size", "scoring_rules",
+                   "match_schedule_response_hours")
+# Seasons von vor #2106 tragen keine Antwortfrist: dann behält jede Staffel ihre eigene (``staffel_fields``).
+RESPONSE_HOURS = "match_schedule_response_hours"
 # Ab hier hat eine Staffel begonnen: Termine und Kalender bleiben dann, wie sie sind.
 PRE_START_STATUSES = frozenset({"draft", "scheduled", "registration_open", "registration_closed", "check_in"})
 # Sichtbarkeit der Season → Sichtbarkeit der Staffel-Turniere (docs/LIGA.md, Abschnitt 10).
@@ -261,6 +270,9 @@ def effective_settings(season: dict, division: dict | None) -> dict:
         merged["min_squad_size"] = merged["team_size"]
     if not merged.get("scoring_rules"):
         merged["scoring_rules"] = normalize_rules({})
+    if season.get(RESPONSE_HOURS) is None and ((division or {}).get("overrides") or {}).get(RESPONSE_HOURS) is None:
+        # Seasons von vor #2106 tragen keine Antwortfrist: nicht die Vorgabe vortäuschen - „je Staffel wie bisher“.
+        merged[RESPONSE_HOURS] = None
     return merged
 
 
@@ -284,7 +296,7 @@ def staffel_fields(league: dict, season: dict, division: dict) -> dict:
     Übertragen nach Gruppen (``SYNC_GROUPS``)."""
     settings = effective_settings(season, division)
     visibility, is_public = staffel_visibility(season.get("visibility"))
-    return {
+    fields = {
         "game_id": league.get("game_id"),
         "team_size": settings["team_size"],
         # Mindestkader: das Zuteilen eines Co-Teams (B, P3) liest ihn am Turnier; fehlt er, gilt team_size.
@@ -310,11 +322,19 @@ def staffel_fields(league: dict, season: dict, division: dict) -> dict:
         "map_repeat": settings.get("map_repeat") or "other_mode",
         "lineup_amend_hours": settings["lineup_amend_hours"],
     }
+    # Antwortfrist (#2106, F3): nur, wenn Season oder Liga N sie wirklich tragen - eine ältere Season ohne den Wert
+    # überschreibt die Frist ihrer Staffeln nicht mit der Vorgabe.
+    if settings.get(RESPONSE_HOURS) is not None:
+        fields[RESPONSE_HOURS] = int(settings[RESPONSE_HOURS])
+    return fields
 
 
 # Was „Vorgaben auf Staffeln übertragen“ wann darf (docs/LIGA.md, Abschnitt 3).
 SYNC_GROUPS: dict[str, tuple[str, ...]] = {
     "always": ("visibility", "is_public", "rules"),
+    # Die Antwortfrist gilt nur für neue Terminvorschläge - sie darf auch während der Season wechseln, nur nicht in
+    # einer gesperrten Staffel.
+    "running": (RESPONSE_HOURS,),
     "before_start": ("start_date", "end_date", "matchday_days", "default_match_weekday", "default_match_time",
                      "round_robin_legs", "matchday_blocked_weeks", "blocked_periods", "matchday_weeks_total",
                      "max_participants"),
@@ -324,6 +344,7 @@ SYNC_GROUPS: dict[str, tuple[str, ...]] = {
 }
 SYNC_GROUP_LABELS = {
     "always": "Sichtbarkeit und Regeltext",
+    "running": "Antwortfrist auf Terminvorschläge",
     "before_start": "Termine und Kalender",
     "before_result": "Best of, Teamgröße, Mindestkader, Punkte und Fristen",
     "map_pool": "Map-Pool",
@@ -415,26 +436,77 @@ async def update_league(db, league: dict, body: dict) -> tuple[dict, list[str]]:
         updates["description"] = _text(body.get("description"))
     if body.get("status"):
         updates["status"] = body["status"]
+    clear_mode_order = False
     if body.get("game_id") and body["game_id"] != league.get("game_id"):
-        if await db.league_seasons.count_documents({"league_id": league["id"]}):
-            raise LeagueProblem("Das Spiel einer Liga mit Seasons bleibt - bitte eine neue Liga anlegen.", 409)
+        # #2106: das Spiel ist änderbar, solange keine Season eine Staffel hat - eine Staffel spielt es schon.
+        if await db.tournaments.count_documents({"league_context.league_id": league["id"], **ONLY_LEAGUE}):
+            raise LeagueProblem(GAME_LOCKED, 409)
         if not await _game(db, body["game_id"]):
             raise LeagueProblem("Spiel nicht gefunden.")
         updates["game_id"] = body["game_id"]
+        clear_mode_order = True
     if body.get("slug"):
         slug = slugify(body["slug"], fallback="liga", max_length=80)
         if slug in RESERVED_SLUGS:
             raise LeagueProblem("Diese Kurzadresse ist reserviert - bitte eine andere wählen.")
         if slug != league.get("slug"):
+            if await slug_locked(db, league):
+                raise LeagueProblem(SLUG_LOCKED, 409)
             updates["slug"] = await unique_slug(db.leagues, slug, current_id=league["id"], fallback="liga",
                                                 max_length=80)
-    if updates:
+    changed = sorted(key for key, value in updates.items() if league.get(key) != value)
+    if changed:
         updates["updated_at"] = _now()
         try:
             await db.leagues.update_one({"id": league["id"]}, {"$set": updates})
         except DuplicateKeyError:
             raise LeagueProblem("Diese Kurzadresse ist schon vergeben.", 409) from None
-    return {**league, **updates}, sorted(key for key in updates if key != "updated_at")
+    if clear_mode_order:
+        # Die Modi gehören zum alten Spiel; den Map-Pool zeigt die Season danach als „anderes Spiel“ (``stale``).
+        await db.league_seasons.update_many({"league_id": league["id"], "game_mode_order.0": {"$exists": True}},
+                                            {"$set": {"game_mode_order": [], "updated_at": _now()}})
+    return {**league, **updates}, changed
+
+
+GAME_LOCKED = "Das Spiel bleibt, sobald eine Season eine Staffel hat – bitte eine neue Liga anlegen."
+SLUG_LOCKED = ("Die Adresse bleibt, seit eine Season der Liga sichtbar war – Links darauf sollen weiter "
+               "funktionieren.")
+
+
+async def slug_locked(db, league: dict) -> bool:
+    """Die Adresse ``/liga/<slug>`` ändert sich nur vor der ersten Veröffentlichung (#2106): solange keine Season je
+    sichtbar war (``published_at``, gesetzt beim Speichern einer Sichtbarkeit) und keine es gerade ist."""
+    if league.get("published_at"):
+        return True
+    return bool(await db.league_seasons.count_documents({"league_id": league["id"], **PUBLISHED_SEASON}))
+
+
+# Eine Season, die sichtbar ist oder schon lief, hat die Adresse ihrer Liga veröffentlicht.
+PUBLISHED_SEASON = {"$or": [{"visibility": {"$nin": ["off", None]}}, {"status": {"$nin": ["draft", None]}}]}
+
+
+async def backfill_published_at(db) -> int:
+    """Migration (Review #2106): Ligen von vor ``published_at`` bekommen es, wenn eine ihrer Seasons sichtbar ist oder
+    nicht mehr Entwurf - sonst ließe sich ihre Adresse ändern, sobald alle Seasons wieder „aus“ sind."""
+    league_ids = await db.league_seasons.distinct("league_id", PUBLISHED_SEASON)
+    if not league_ids:
+        return 0
+    result = await db.leagues.update_many({"id": {"$in": league_ids}, "published_at": None},
+                                          {"$set": {"published_at": _now()}})
+    return int(getattr(result, "modified_count", 0) or 0)
+
+
+async def mark_published(db, league_id: str, visibility: str | None) -> None:
+    """Merkt sich die erste Veröffentlichung einer Liga - ab dann bleibt ihre Adresse."""
+    if visibility and visibility != "off":
+        await db.leagues.update_one({"id": league_id, "published_at": None}, {"$set": {"published_at": _now()}})
+
+
+async def league_admin_flags(db, league: dict) -> dict:
+    """Was die Verwaltung beim Bearbeiten wissen muss: Spiel und Adresse noch änderbar?"""
+    has_staffel = bool(await db.tournaments.count_documents({"league_context.league_id": league["id"],
+                                                             **ONLY_LEAGUE}))
+    return {"game_locked": has_staffel, "slug_locked": await slug_locked(db, league)}
 
 
 # ---------------------------------------------------------------- Season
@@ -478,7 +550,8 @@ async def update_season(db, season: dict, body: dict) -> tuple[dict, list[str]]:
     fields = clean_season(body, season, game)
     for key in ("name", "slug", "number", "start_date", "weeks_total", "matchday_days", "default_match_weekday",
                 "default_match_time", "round_robin_legs", "max_staffel_size", "best_of", "team_size",
-                "min_squad_size", "result_confirm_hours", "lineup_amend_hours", "visibility", "status", "map_repeat"):
+                "min_squad_size", "result_confirm_hours", "lineup_amend_hours", "visibility", "status", "map_repeat",
+                RESPONSE_HOURS):
         if key in fields and fields[key] is None:
             fields.pop(key)  # Pflichtfelder bleiben, wie sie sind
     if "scoring_rules" in fields and fields["scoring_rules"] is None:
@@ -531,6 +604,164 @@ async def update_division(db, division: dict, body: dict) -> tuple[dict, list[st
         updates["updated_at"] = _now()
         await db.league_divisions.update_one({"id": division["id"]}, {"$set": updates})
     return {**division, **updates}, changed
+
+
+# ---------------------------------------------------------------- Löschen (#2106)
+
+DELETE_REASON_MISSING = "Bitte einen Grund angeben (mindestens 5 Zeichen) – er steht im Protokoll."
+STAFFEL_BUSY = "Eine Staffel wird gerade bearbeitet – bitte gleich noch einmal."
+SEASON_STATUS_TEXT = {"draft": "Entwurf", "active": "läuft", "completed": "beendet", "archived": "archiviert"}
+DELETE_KINDS = ("league", "season", "division")
+
+
+def delete_reason(raw) -> str:
+    """Der Grund fürs Protokoll: Pflicht, mindestens 5 Zeichen, eine Zeile."""
+    text = _text(log_safe(raw, 500))
+    if not text or len(text) < 5:
+        raise LeagueProblem(DELETE_REASON_MISSING)
+    return text
+
+
+async def _delete_scope(db, kind: str, target: dict) -> tuple[list[dict], list[dict], dict]:
+    """Seasons, Liga N und der Filter der Staffeln, die mit ``target`` gingen."""
+    division_fields = {"_id": 0, "id": 1, "season_id": 1, "level": 1, "nickname": 1}
+    if kind == "league":
+        seasons = await db.league_seasons.find({"league_id": target["id"]},
+                                               {"_id": 0, "id": 1, "name": 1, "status": 1, "number": 1}
+                                               ).sort("number", 1).to_list(None)
+        divisions = await db.league_divisions.find({"league_id": target["id"]}, division_fields).to_list(None)
+        return seasons, divisions, {"league_context.league_id": target["id"]}
+    if kind == "season":
+        divisions = await db.league_divisions.find({"season_id": target["id"]}, division_fields).to_list(None)
+        return [target], divisions, {"league_context.season_id": target["id"]}
+    return [], [target], {"league_context.division_id": target["id"]}
+
+
+async def deletion_plan(db, kind: str, target: dict) -> dict:
+    """Was mit Liga, Season oder Liga N ginge - und ob es geht (#2106). Löschen geht nur, wenn darunter keine Staffel
+    Co-Teams, Spiele oder Ergebnisse hat (``staffel_guard.staffel_cascade_problem``; leere Entwurfs-Staffeln gehen mit)
+    und jede betroffene Season noch ein Entwurf ist. Sonst nennt ``blockers`` die Gründe: archivieren statt löschen."""
+    seasons, divisions, staffel_filter = await _delete_scope(db, kind, target)
+    blockers: list[str] = []
+    for season in seasons:
+        status = season.get("status") or "draft"
+        if status != "draft":
+            blockers.append(f"{season.get('name')} ist kein Entwurf mehr ({SEASON_STATUS_TEXT.get(status, status)})")
+    staffeln = await db.tournaments.find({**staffel_filter, **ONLY_LEAGUE},
+                                         {"_id": 0, "id": 1, "title": 1, "status": 1, "league_context": 1}
+                                         ).to_list(None)
+    staffeln.sort(key=lambda row: str(row.get("title") or ""))
+    for row in staffeln:
+        problem = await staffel_guard.staffel_cascade_problem(db, row)
+        if problem:
+            blockers.append(f"{row.get('title')} {problem}")
+    season_names = {season["id"]: season.get("name") for season in seasons}
+    if kind == "division":
+        season_names = {target["season_id"]: None}
+    divisions.sort(key=lambda row: (str(season_names.get(row.get("season_id")) or ""), int(row.get("level") or 0)))
+    name = division_label(target) if kind == "division" else target.get("name")
+    return {
+        "kind": kind, "id": target["id"], "name": name,
+        "deletable": not blockers, "blockers": blockers,
+        "archived": target.get("status") == "archived",
+        "seasons": [{"id": season["id"], "name": season.get("name")} for season in seasons] if kind == "league" else [],
+        "divisions": [{"id": row["id"], "label": " · ".join(filter(None, [
+            season_names.get(row.get("season_id")) if kind == "league" else None, division_label(row)]))}
+            for row in divisions] if kind != "division" else [],
+        "staffeln": [{"tournament_id": row["id"], "title": row.get("title"),
+                      "staffel": (row.get("league_context") or {}).get("staffel"), "status": row.get("status")}
+                     for row in staffeln],
+    }
+
+
+def blocked_message(plan: dict) -> str:
+    return f"Löschen geht nicht: {plan['blockers'][0]}. Archivieren statt löschen – dann bleibt alles erhalten."
+
+
+async def _purge_staffel(db, tournament_id: str) -> None:
+    await purge_tournament(db, tournament_id)
+    await db.map_pools.delete_many({"$or": [{"tournament_id": tournament_id},
+                                            {"scope": "tournament", "scope_id": tournament_id}]})
+
+
+CHANGED_MEANWHILE = "Inzwischen ist etwas dazugekommen – bitte die Seite neu laden und noch einmal prüfen."
+
+
+def _plan_ids(plan: dict, kind: str, target: dict) -> tuple[set, set, set]:
+    """Staffeln, Liga N und Seasons, die ein Plan löscht - samt ``target`` selbst."""
+    staffeln = {row["tournament_id"] for row in plan["staffeln"]}
+    divisions = {row["id"] for row in plan["divisions"]} | ({target["id"]} if kind == "division" else set())
+    seasons = {row["id"] for row in plan["seasons"]} | ({target["id"]} if kind == "season" else set())
+    return staffeln, divisions, seasons
+
+
+async def _added_meanwhile(db, kind: str, target: dict, staffel_filter: dict, divisions: set, seasons: set) -> bool:
+    """Kam unter dem Ziel etwas dazu, das der Plan nicht kennt - eine Staffel, eine Liga N oder eine Season?"""
+    if await db.tournaments.count_documents({**staffel_filter, **ONLY_LEAGUE}):
+        return True
+    if kind != "division":
+        scope = {"league_id": target["id"]} if kind == "league" else {"season_id": target["id"]}
+        if await db.league_divisions.count_documents({**scope, "id": {"$nin": sorted(divisions)}}):
+            return True
+    if kind == "league":
+        others = {"league_id": target["id"], "id": {"$nin": sorted(seasons)}}
+        return bool(await db.league_seasons.count_documents(others))
+    return False
+
+
+async def delete_tree(db, kind: str, target: dict, *, on_staffel_deleted=None) -> dict:
+    """Löscht Liga, Season oder Liga N samt leerer Entwurfs-Staffeln - alles oder nichts (Review #2106): erst die
+    Schreibsperren aller Staffeln, dann unter allen Sperren neu prüfen, dann löschen. Ist eine Staffel gerade in
+    Arbeit, wird nichts gelöscht. ``on_staffel_deleted(row)`` protokolliert jede gelöschte Staffel einzeln. Kam beim
+    Löschen der Staffeln gleichzeitig eine neue Staffel, Liga N oder Season dazu, bricht es danach ab (409) - die leeren
+    Staffeln sind dann schon weg und protokolliert, alles darüber bleibt. Gibt den ausgeführten Plan zurück."""
+    plan = await deletion_plan(db, kind, target)
+    if not plan["deletable"]:
+        raise LeagueProblem(blocked_message(plan), 409)
+    staffel_ids, division_ids, season_ids = _plan_ids(plan, kind, target)
+    _seasons, _divisions, staffel_filter = await _delete_scope(db, kind, target)
+    try:
+        async with AsyncExitStack() as locks:
+            # Feste Reihenfolge: zwei Löschungen sperren sich nicht gegenseitig.
+            for tournament_id in sorted(staffel_ids):
+                await locks.enter_async_context(mutation_lock(db, tournament_write_resource(tournament_id)))
+            fresh = await deletion_plan(db, kind, target)
+            if not fresh["deletable"]:
+                raise LeagueProblem(blocked_message(fresh), 409)
+            if _plan_ids(fresh, kind, target) != (staffel_ids, division_ids, season_ids):
+                raise LeagueProblem(CHANGED_MEANWHILE, 409)
+            for row in fresh["staffeln"]:
+                await _purge_staffel(db, row["tournament_id"])
+                if on_staffel_deleted:
+                    await on_staffel_deleted(row)
+    except MutationLockBusy:
+        raise LeagueProblem(STAFFEL_BUSY, 409) from None
+    if await _added_meanwhile(db, kind, target, staffel_filter, division_ids, season_ids):
+        raise LeagueProblem(CHANGED_MEANWHILE, 409)
+    if division_ids:
+        await db.league_divisions.delete_many({"id": {"$in": sorted(division_ids)}})
+    if season_ids:
+        await db.map_pools.delete_many({"scope": "league_season", "scope_id": {"$in": sorted(season_ids)}})
+        await db.league_seasons.delete_many({"id": {"$in": sorted(season_ids)}})
+    if kind == "league":
+        await db.leagues.delete_one({"id": target["id"]})
+    return fresh
+
+
+async def delete_staffel(db, tournament: dict) -> None:
+    """Eine Staffel auf der Season-Seite löschen (#2106): dieselbe Löschsperre wie in der Turnierverwaltung (#2109,
+    ``staffel_guard.staffel_delete_problem``) - vor dem Start ohne festen Spielplan, danach „Abgesagt“/„Archiviert“."""
+    try:
+        async with mutation_lock(db, tournament_write_resource(tournament["id"])):
+            row = await db.tournaments.find_one({"id": tournament["id"], **ONLY_LEAGUE}, {"_id": 0})
+            if not row:
+                raise LeagueProblem("Staffel nicht gefunden.", 404)
+            problem = await staffel_guard.staffel_delete_problem(db, row)
+            if problem:
+                raise LeagueProblem(problem, 409)
+            await _purge_staffel(db, row["id"])
+    except MutationLockBusy:
+        raise LeagueProblem(STAFFEL_BUSY, 409) from None
 
 
 # ---------------------------------------------------------------- Staffel anlegen
@@ -642,6 +873,8 @@ async def sync_staffel(db, tournament: dict, league: dict, season: dict, divisio
     started = tournament.get("status") not in PRE_START_STATUSES
     has_result = await _has_result(db, tournament["id"])
     for group, keys in SYNC_GROUPS.items():
+        if not any(key in wanted for key in keys):
+            continue  # eine ältere Season ohne Antwortfrist: die Staffel behält ihre
         if group != "always" and locked:
             skipped.append({"group": group, "label": SYNC_GROUP_LABELS[group], "reason": LOCKED_REASON})
             continue
@@ -665,7 +898,7 @@ async def sync_staffel(db, tournament: dict, league: dict, season: dict, divisio
             if problem:
                 skipped.append({"group": group, "label": SYNC_GROUP_LABELS[group], "reason": problem})
                 continue
-        updates.update({key: wanted[key] for key in keys})
+        updates.update({key: wanted[key] for key in keys if key in wanted})
         applied.append(group)
     changed = sorted(key for key, value in updates.items() if tournament.get(key) != value)
     if changed:
@@ -717,7 +950,7 @@ async def _sync_pool(db, tournament: dict, season: dict, user: dict, *, locked: 
 STAFFEL_SOURCE_FIELDS = frozenset({
     "start_date", "weeks_total", "blocked_periods", "matchday_days", "default_match_weekday", "default_match_time",
     "round_robin_legs", "max_staffel_size", "best_of", "team_size", "min_squad_size", "game_mode_order",
-    "map_repeat", "scoring_rules", "result_confirm_hours", "lineup_amend_hours", "rules_text",
+    "map_repeat", "scoring_rules", "result_confirm_hours", "lineup_amend_hours", "rules_text", RESPONSE_HOURS,
 })
 
 
@@ -752,7 +985,8 @@ async def can_see_season(user: dict | None, season: dict) -> bool:
 PUBLIC_SEASON_FIELDS = ("id", "number", "name", "slug", "status", "start_date", "weeks_total", "blocked_periods",
                         "matchday_days", "default_match_weekday", "default_match_time", "round_robin_legs",
                         "max_staffel_size", "best_of", "team_size", "min_squad_size", "game_mode_order",
-                        "map_repeat", "result_confirm_hours", "lineup_amend_hours", "rules_text", "registration_deadline")
+                        "map_repeat", "result_confirm_hours", "lineup_amend_hours", RESPONSE_HOURS, "rules_text",
+                        "registration_deadline")
 
 
 PUBLIC_SEASON_HEAD = ("id", "number", "name", "slug", "status", "start_date")
