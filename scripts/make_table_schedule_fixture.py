@@ -103,6 +103,8 @@ async def groups(flow, count, group_count, slug):
     await name_all(flow, regs, names)
     response = await flow.post(f"/api/tournaments/{tournament['id']}/groups/generate", json={"group_count": group_count})
     assert response.status_code == 200, response.text
+    # Gruppen generieren startet das Turnier nicht mehr (#2120) - das macht „Turnier starten“.
+    await flow.start(tournament)
     await play_round(flow, staff, tournament, 1)
     if count <= 16:
         await play_round(flow, staff, tournament, 2, first_wins=False)

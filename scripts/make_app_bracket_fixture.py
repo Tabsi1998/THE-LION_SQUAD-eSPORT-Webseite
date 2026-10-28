@@ -306,6 +306,8 @@ async def tables(out: dict) -> None:
         flow.act_as(staff)
         response = await flow.post(f"/api/tournaments/{tournament['id']}/groups/generate", json={"group_count": 2})
         assert response.status_code == 200, response.text
+        # Gruppen generieren startet das Turnier nicht mehr (#2120) - das macht „Turnier starten“.
+        await flow.start(tournament)
         matches = sorted(await flow.matches(tournament), key=lambda m: (m.get("round") or 0, m.get("order") or 0))
         for match in matches[:4]:
             await play(flow, staff, match)

@@ -296,6 +296,118 @@ export function applyStageType(current, stageType) {
   };
 }
 
+// Folgenschwere Aktionen (#2120): dieselben Regeln wie `services/tournament_guard.py` am Server - der Server prüft
+// selbst, die Seite zeigt nur vorher, was passiert.
+const PRE_START_STATUSES = new Set(["draft", "scheduled", "registration_open", "registration_closed", "check_in"]);
+export const FINISHED_STATUSES = new Set(["completed", "results_published", "archived"]);
+const REBUILDABLE_MATCH_STATUSES = new Set(["pending", "ready", "scheduled", "cancelled"]);
+const BYE_SOURCES = new Set(["auto_bye", "swiss_bye"]);
+
+const isBye = (match) => match?.status === "completed" && BYE_SOURCES.has(match?.result_meta?.source);
+
+/** Hat ein Spiel begonnen - aufgerufen, gestartet, gemeldet oder gewertet? Ein Freilos zählt nicht. */
+export function matchBegun(match) {
+  if (!match || match.is_preview || isBye(match)) return false;
+  return drawStarted(match);
+}
+
+/** Wie viele echte (nicht Vorschau-)Spiele es gibt und wie viele davon begonnen oder gewertet sind. */
+export function matchImpact(matches = []) {
+  const real = (matches || []).filter((match) => !match?.is_preview);
+  const played = real.filter((match) => {
+    const rebuildable = REBUILDABLE_MATCH_STATUSES.has(match.status || "pending")
+      || (match.status === "completed" && match.result_meta?.source === "auto_bye");
+    return !rebuildable || matchBegun(match);
+  });
+  return { match_count: real.length, played_count: played.length };
+}
+
+/** „12 Spiele, davon 3 begonnen oder gewertet“ - wie der Server es in seinen Rückfragen schreibt. */
+export function impactText(impact) {
+  const count = Number(impact?.match_count) || 0;
+  const played = Number(impact?.played_count) || 0;
+  const games = count === 1 ? "1 Spiel" : `${count} Spiele`;
+  return played ? `${games}, davon ${played} begonnen oder gewertet` : `${games}, keines davon begonnen`;
+}
+
+/** Steht der Turnierbaum? Ab dem Ende des Check-ins, nach dem Start oder sobald es echte Spiele gibt. */
+export function bracketFixed(tournament, matches = []) {
+  if (!tournament) return false;
+  if (tournament.check_in_closed_at || !PRE_START_STATUSES.has(tournament.status)) return true;
+  return (matches || []).some((match) => !match?.is_preview);
+}
+
+/** Anmeldungen, die in einem festen Spiel stehen - die lassen sich nicht einfach entfernen oder ablehnen. */
+export function fixedRegistrationIds(matches = []) {
+  const ids = new Set();
+  for (const match of matches || []) {
+    if (match?.is_preview) continue;
+    for (const slot of match?.slots || []) if (slot?.registration_id) ids.add(slot.registration_id);
+  }
+  return ids;
+}
+
+/** Die 409-Antwort des Servers vor einer Löschung (`confirm_destruction`) bzw. einer verweigerten Vorschau. */
+export function guardDetail(error, code) {
+  const detail = error?.response?.status === 409 ? error.response?.data?.detail : null;
+  return detail && typeof detail === "object" && detail.code === code ? detail : null;
+}
+
+/** Die letzte Schweizer Runde, solange keines ihrer Spiele begonnen hat - sonst `null`. */
+export function swissUndoInfo(matches = []) {
+  const rows = (matches || []).filter((match) => !match?.is_preview);
+  if (!rows.length) return null;
+  const round = Math.max(...rows.map((match) => Number(match.round) || 0));
+  const last = rows.filter((match) => (Number(match.round) || 0) === round);
+  if (last.some((match) => matchBegun(match) || match.station_id)) return null;
+  return { round, count: last.length };
+}
+
+/**
+ * Rückfrage vor einem Statuswechsel mit Folgen (#2120, TA24) - oder `null`, wenn der Status einfach wechselt. Live hat
+ * seine eigene Rückfrage (Planung prüfen). `askReason`: Abgesagt fragt nach einem freiwilligen Grund für die Nachricht.
+ */
+export function statusChangeNotice(status, tournament, { activeRegistrations = 0 } = {}) {
+  if (!tournament || status === tournament.status) return null;
+  if (status === "draft") {
+    return {
+      title: "Zurück auf Entwurf?",
+      description: "Die öffentliche Seite und die Anmeldung verschwinden, bis das Turnier wieder angekündigt wird. Angemeldete bekommen keine Nachricht.",
+      confirmLabel: "Auf Entwurf setzen",
+      tone: "danger",
+    };
+  }
+  if (status === "completed" && !FINISHED_STATUSES.has(tournament.status)) {
+    return {
+      title: "Turnier beenden?",
+      description: "Alle Beteiligten bekommen einmal die Nachricht „Turnier beendet“, die Erfolge werden ausgewertet. Die Turnierseite zeigt das Podest als vorläufig.",
+      confirmLabel: "Beenden",
+      tone: "info",
+    };
+  }
+  if (status === "results_published") {
+    return {
+      title: "Ergebnisse veröffentlichen?",
+      description: "Jetzt vergibt das System die Punkte für die Jahreswertung, Pokale und Auszeichnungen und legt die Gewinne an. Wer noch nicht Bescheid hat, bekommt „Turnier beendet“. Das lässt sich nicht mit einem Klick zurücknehmen.",
+      confirmLabel: "Veröffentlichen",
+      tone: "danger",
+    };
+  }
+  if (status === "cancelled") {
+    const count = Number(activeRegistrations) || 0;
+    const who = count === 1 ? "Die 1 Anmeldung bekommt" : count ? `Alle ${count} Anmeldungen bekommen` : "Angemeldete bekommen";
+    return {
+      title: "Turnier absagen?",
+      description: `${who} eine Nachricht (Postfach und Push). Ein Grund ist freiwillig und steht in dieser Nachricht.`,
+      confirmLabel: "Absagen",
+      tone: "danger",
+      askReason: true,
+      placeholder: "z. B. Halle nicht verfügbar",
+    };
+  }
+  return null;
+}
+
 export function primaryTournamentAction(status, tournament = null) {
   if (["draft", "scheduled", "registration_open", "registration_closed"].includes(status)) {
     // Liga-Staffel (docs/LIGA.md): die Co-Teams sind zugeteilt, niemand checkt ein - „Live“ macht den Spielplan fest.

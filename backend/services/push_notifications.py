@@ -44,6 +44,7 @@ PUSH_CHANNELS = {
     "tournament_checkin": "lion_tournaments",
     "tournament_registration": "lion_tournaments",
     "tournament_finished": "lion_tournaments",
+    "tournament_cancelled": "lion_tournaments",
     "match_result": "lion_tournaments",
     "match_report": "lion_tournaments",
     "match_dispute": "lion_tournaments",

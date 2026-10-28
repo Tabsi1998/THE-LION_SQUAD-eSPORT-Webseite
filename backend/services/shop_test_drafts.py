@@ -237,7 +237,8 @@ def _cents_view(costs) -> dict | None:
 
 def _not_sendable(check: dict) -> str:
     failed = [f"{item['label']}: {item['detail']}" for item in check["items"]
-              if item["for_review"] and not item["ok"] and item["key"] not in ("prices", "stock")]
+              if item["for_review"] and not item["ok"]
+              and item["key"] not in ("prices", "stock", "member_number_print")]
     if not failed:
         return ("Nicht sendbar: für diese Variante fehlt eine gültige Druckdatei oder Fläche. Details stehen im "
                 "Server-Log; die Vorab-Prüfung im Reiter Produkte hilft weiter.")

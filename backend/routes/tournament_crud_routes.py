@@ -12,7 +12,7 @@ from services.permissions import is_confirmed_tournament_lead
 from auth import require_admin, get_optional_user
 from services.visibility import user_can_see
 from services.visibility import hide_unseen_event_links, lead_can_see
-from services import partner_pages, staffel_guard
+from services import partner_pages, staffel_guard, tournament_guard
 from services.access_links import (
     public_access_link_payload,
     touch_access_link,
@@ -27,7 +27,9 @@ from services.tournament_permissions import (
 from services.competition_versions import (
     apply_competition_version_read_defaults,
     new_competition_version_fields,
+    persist_competition_versions,
 )
+from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
 from services.mutation_lock import MutationLockBusy, mutation_lock
 from services.slug_utils import (
     apply_slug_history,
@@ -40,13 +42,18 @@ from services import pricing, tournament_fees
 from services.advancement_draw import MODE_KEY, SETTING_KEY as LEGACY_MODE_KEY, advancement_mode_of, sync_advancement_fields
 from services.permissions import can_use_area, user_has_area
 from routes.tournament_common import (
+    _apply_match_plan,
+    _audit_tournament_action,
+    _collect_match_plan,
     _create_initial_stage_bracket_preview,
     _enrich_game_identity,
     _ensure_tournament_unlocked,
     _normalize_team_settings,
     _resolve_tid,
     _serialized_tournament_write,
+    _stage_defaults_for_tournament_format,
     _user_tournament_participation_ids,
+    _v2_plan_key,
     tournament_hidden_reason,
 )
 from services import onsite_access
@@ -382,6 +389,12 @@ async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends
         raw_updates, existing)
     if problem:
         raise HTTPException(status_code=400, detail=problem)
+    # Ab dem Ende des Check-ins steht der Baum (#2120, TA9): Format, Teilnahme, Teamgröße und Spiel bleiben, wie sie
+    # sind - sonst liefe das Turnier mit Anmeldungen und Spielen im alten Zustand weiter.
+    fixed_problem = await tournament_guard.structure_update_problem(db, raw_updates, existing)
+    if fixed_problem:
+        raise HTTPException(status_code=409, detail=fixed_problem)
+    preview_changed = tournament_guard.changed_fields(raw_updates, existing, tournament_guard.PREVIEW_FIELDS)
     raw_updates.pop("status", None)
     # Event als Klammer (#1371): verbunden wird nur im Event. Derselbe Wert stört nicht, ein anderer wird abgelehnt.
     if "event_id" in raw_updates:
@@ -439,10 +452,101 @@ async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends
     await db.tournaments.update_one({"id": tid}, {"$set": updates})
     reset_scope_cache()  # Live-Meldungen (#1801): Turnier und Event neu nachschlagen
     t = await db.tournaments.find_one({"id": tid}, {"_id": 0})
+    auto_preview = None
+    if preview_changed:
+        # Vor dem Ende des Check-ins (#2120, TA9): die Vorschau folgt dem neuen Format bzw. der Teilnahme - vorher
+        # baute das Auffrischen weiter aus der alten Phase, ein auf Doppel-K.-o. umgestelltes Turnier lief als K.-o.
+        auto_preview = await _rebuild_preview_after_structure_change(db, t, existing, me.get("id"), preview_changed)
     t.pop("creation_key", None)
     apply_competition_version_read_defaults(t)
     _expose_offer(t, await user_has_area(me, "finance"))
+    if auto_preview is not None:
+        t["auto_generated_bracket"] = auto_preview
     return t
+
+
+EMPTY_STAGE_SETTING = (None, "", False, [], {})
+
+
+def _is_default_stage(stage: dict, tournament: dict) -> bool:
+    """Ist die Phase noch genau die, die das Format von selbst anlegt (Name, Typ, Einstellungen)? Eine eigene Phase
+    (anderer Name, Best of, Schema, Renn-Einstellungen …) baut ein Formatwechsel nicht still mit Standardwerten neu."""
+    defaults = _stage_defaults_for_tournament_format(tournament, None)
+    if not defaults:
+        return False
+    if (stage.get("name") or "") != defaults["name"] or stage.get("stage_type") != defaults["stage_type"] \
+            or stage.get("match_type") != defaults["match_type"]:
+        return False
+    wanted = defaults["settings"]
+    for key, value in (stage.get("settings") or {}).items():
+        if key in wanted:
+            if value != wanted[key]:
+                return False
+        elif value not in EMPTY_STAGE_SETTING:
+            return False
+    return True
+
+
+async def _rebuild_preview_after_structure_change(db, tournament: dict, previous: dict, actor_id: str | None,
+                                                  fields: list[str]) -> dict | None:
+    """Die Vorschau neu bauen, wenn Format, Teilnahme oder Teamgröße sich vor dem Ende des Check-ins ändern.
+
+    Nur über einer reinen Vorschau (keine echten Spiele, höchstens eine Phase):
+    - Teilnahme oder Teamgröße: die Phase bleibt, wie sie ist (Name, Best of, Schema …); nur ihre Vorschau-Spiele
+      werden neu gebaut, geplante Zeiten und Stationen gehen mit (Review #2120).
+    - Format: neu angelegt wird nur die Standard-Phase des alten Formats. Eine eigene Phase bleibt stehen - dort baut
+      die Turnierleitung selbst mit „Speichern & Struktur anwenden“ neu (``custom_stages``)."""
+    tid = tournament["id"]
+    stages = await db.tournament_stages.find({"tournament_id": tid}, {"_id": 0}).sort("number", 1).to_list(200)
+    if len(stages) > 1:
+        return {"ok": False, "reason": "custom_stages", "preview": True}
+    matches = await db.matches_v2.find({"tournament_id": tid}, {"_id": 0}).to_list(5000)
+    if any(not match.get("is_preview") for match in matches):
+        return None
+    stage = stages[0] if stages else None
+    if stage and "format" in fields and not _is_default_stage(stage, previous):
+        return {"ok": False, "reason": "custom_stages", "preview": True}
+    match_plan = _collect_match_plan(matches)
+    match_ids = [match["id"] for match in matches if match.get("id")]
+    built = None
+    if stage and "format" not in fields:
+        registrations = await db.tournament_registrations.find(
+            {"tournament_id": tid, "status": {"$in": ["approved", "checked_in"]}}, {"_id": 0}).to_list(5000)
+        try:
+            rebuilt = build_matches_v2_from_schema(tournament, stage, registrations, preview=True)
+        except BracketSchemaError:
+            return {"ok": False, "reason": "schema_error", "preview": True}
+        _apply_match_plan(rebuilt, match_plan, _v2_plan_key)
+        await _drop_matches(db, match_ids)
+        if rebuilt:
+            await db.matches_v2.insert_many(rebuilt)
+        await persist_competition_versions(db, tournament, "graph")
+        built = {"ok": True, "engine": "stages", "stage_id": stage["id"], "match_count": len(rebuilt),
+                 "preview": True, "participant_count": len(registrations)}
+    else:
+        await _drop_matches(db, match_ids)
+        if stage:
+            await db.tournament_stages.delete_many({"tournament_id": tid})
+        built = await _create_initial_stage_bracket_preview(db, tournament, actor_id)
+        if built:
+            # Geplante Zeiten und Stationen, wo das neue Format dieselben Spiele hat.
+            fresh = await db.matches_v2.find({"tournament_id": tid}, {"_id": 0}).to_list(5000)
+            for match in fresh:
+                if match_plan.get(_v2_plan_key(match)):
+                    planned = _apply_match_plan([dict(match)], match_plan, _v2_plan_key)[0]
+                    await db.matches_v2.update_one({"id": match["id"]}, {"$set": {
+                        key: value for key, value in planned.items() if match.get(key) != value}})
+    await _audit_tournament_action(db, "tournament.structure.preview_rebuilt", actor_id, tid, {
+        "fields": fields, "removed_match_count": len(match_ids), "match_count": (built or {}).get("match_count", 0),
+        "stage_kept": bool(stage) and "format" not in fields,
+    })
+    return built or {"ok": True, "preview": True, "match_count": 0}
+
+
+async def _drop_matches(db, match_ids: list[str]) -> None:
+    if match_ids:
+        await db.match_reports_v2.delete_many({"match_id": {"$in": match_ids}})
+        await db.matches_v2.delete_many({"id": {"$in": match_ids}})
 
 
 @router.delete("/{tid}")

@@ -26,6 +26,7 @@ from services.competition_versions import persist_competition_versions
 from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
 from services.slug_utils import find_by_slug_or_history
 from services.league_scope import is_league_staffel
+from services.tournament_guard import match_can_be_rebuilt
 from models import now_utc, new_id
 from services.competition_usage import record_write
 
@@ -660,13 +661,9 @@ async def _create_initial_stage_bracket_preview(db, tournament: dict, actor_id: 
 
 
 
-def _v2_match_can_be_rebuilt(match: dict) -> bool:
-    status = match.get("status") or "pending"
-    if match.get("is_preview") or status in {"pending", "ready", "scheduled", "cancelled"}:
-        return True
-    if status == "completed" and (match.get("result_meta") or {}).get("source") == "auto_bye":
-        return True
-    return False
+# Wann ein Spiel beim Neubau verschwinden darf, steht seit #2120 in ``services/tournament_guard`` - dieselbe Regel
+# zählt dort die begonnenen Spiele für die Rückfragen.
+_v2_match_can_be_rebuilt = match_can_be_rebuilt
 
 
 async def _rebuild_checkin_bracket_after_staff_change(db, tournament: dict, actor_id: str | None) -> dict | None:
