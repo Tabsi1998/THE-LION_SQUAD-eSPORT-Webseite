@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.47.0 (28.10.2026)
+
+### Neu
+
+* Liga: Captain und Vertreter geben ihre Rolle selbst ab (#2110)
+* Liga: eigener Terminvorschlag zeigt „wartet auf die Gegenseite“ und lässt sich zurückziehen, Terminstatus auf Deutsch (#2110)
+* Liga: Hinweis nach Ablauf der Nachtragsfrist mit „[@leitung](https://github.com/leitung) im Matchchat“ (#2110)
+* Liga: Staffel- und Spielseite führen über „Liga · Season · Staffel“ zur Ligaseite (#2110)
+* Liga: Startseite zeigt „Terminvorschlag beantworten“ und „Aufstellung nachtragen“ (Website und App) (#2110)
+* Liga: Teamseite zeigt Co-Teams mit Captain und Vertreter und „Co-Teams verwalten“ (#2110)
+* Liga: Terminvorschlag, Gegenvorschlag, Annehmen, Ablehnen und Zurückziehen benachrichtigen die andere Seite (#2110)
+* Shop: „Bei Printful nachsehen“ gleicht einen gesendeten Testentwurf neu ab, mit technischen Details ohne Personendaten (#2138)
+* Termin-Nachrichten und die Aufgabe „Terminvorschlag beantworten“ gelten auch bei normalen Turnieren mit Terminabstimmung (#2110)
+
+### Fehlerbehebungen
+
+* Liga: Co-Team sieht „Austritt nur über die Turnierleitung“ statt „Vom Turnier abmelden“ (#2110)
+* Liga: Rollen-Meldungen beim Kader-Ändern nennen den Weg auf der Website (#2110)
+* Shop: Testentwurf an Printful wird nicht mehr wegen zu langer Kennung abgelehnt (#2133)
+* Shop: Testentwurf-Abgleich findet Flächen der echten Printful-Antwort und meldet Kosten in Berechnung (#2138)
+* weniger Kontodaten in öffentlichen Antworten der Matchseite (#2110)
+
+### Schneller
+
+* Liga: schnellere Aufgabe „Aufstellung nachtragen“ auf der Startseite (#2110)
+
 ## 1.46.0 (28.10.2026)
 
 ### Neu

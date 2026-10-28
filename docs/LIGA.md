@@ -224,6 +224,7 @@ Angelehnt an `services/match_audience.py` (Verantwortliche/Spieler) und `auth.re
 | Co-Team zuteilen/entfernen | ja | – | – | – | – |
 | Co-Team-Kader pflegen | ja (`_can_manage`) | ja | – | – | – |
 | Captain/Vertreter vergeben (mit Protokoll) | ja | ja | – | – | – |
+| Eigene Rolle abgeben (`PUT …/roles` nur mit dem eigenen Feld auf `null`, #2110) | – | – | ja | ja | – |
 | Termin vorschlagen/annehmen | ja | nur Fallback¹ | ja | ja | – |
 | Ergebnis melden, bestätigen, Einspruch | ja | nur Fallback¹ | ja | ja | – |
 | Eigene Aufstellung nachtragen (bis `lineup_amend_hours`) | jederzeit, mit Grund | nur Fallback¹ | ja | ja | – |
@@ -269,11 +270,11 @@ Anmeldungen auch über Co-Teams, deren Captain/Vertreter man ist. Aufrufer mit e
 | 2 Staffel anlegen | Leitung | Turnier mit `league_context` und Vorgaben, Status `draft`, Prüfung Runden ≤ Wochen |
 | 3 Co-Teams zuteilen (bis Meldeschluss) | Leitung | Anmeldung mit `squad_id` je Co-Team (Admin-Dialog „Co-Team zuteilen“) |
 | 4 Spielplan und Start (9./10.11.) | Leitung | vorhandenes Erzeugen der Phase (`_auto_league_schema` mit `round_robin_legs`), Status `live` |
-| 5 Termin | Captain/Vertreter | vorhandene Terminvorschläge; ohne Einigung Standardtermin der Woche (Sperrwochen übersprungen) |
+| 5 Termin | Captain/Vertreter | vorhandene Terminvorschläge; ohne Einigung Standardtermin der Woche (Sperrwochen übersprungen). Jede Aktion (vorschlagen, Gegenvorschlag, annehmen, ablehnen, zurückziehen – `action: "withdraw"` nur für die eigene Seite) erreicht die Verantwortlichen der anderen Seite (`match_notifications.notify_schedule_event`, Art `match_schedule`); offene Vorschläge der Gegenseite stehen als Aufgabe „Terminvorschlag beantworten“ auf der Startseite (#2110) |
 | 6 Melden | Captain/Vertreter Seite 1, **Web** | `POST /matches/{id}/report` mit `results` + `games` (Maps, Sieger, eigene Aufstellung) |
 | 7 Bestätigen + ergänzen | Captain/Vertreter Seite 2 | Web: gleiche `results`, eigene Aufstellung je Map → Konsens, `games` am Spiel. **App** (ohne neuen Build): gleiche `results` ohne `games` → Konsens zählt, Seite 2 landet in `lineups_missing` und bekommt die Nachricht „Bitte Aufstellung im Web nachtragen“ |
 | 8 48 h ohne Antwort | Fristen-Job | `match_deadline_sweep._auto_confirm` trägt Ergebnis und `games` der Erstmeldung ein; Gegenseite in `lineups_missing`. In einer Sperrzeit läuft keine Frist: `match_deadlines.auto_confirm_due` rechnet die 48 h und die 24 h Mindestzeit mit `response_deadline` (Pause zählt nicht) – ohne Sperrzeiten exakt wie bisher. Ebenso Antwortfrist und Eskalation offener Terminvorschläge |
-| 9 Aufstellung nachtragen | Captain/Vertreter | `PUT /matches/{id}/lineups`, bis `lineup_amend_hours` nach dem Ergebnis; danach nur Leitung |
+| 9 Aufstellung nachtragen | Captain/Vertreter | `PUT /matches/{id}/lineups`, bis `lineup_amend_hours` nach dem Ergebnis; danach nur Leitung. Bis zur Frist Aufgabe „Aufstellung nachtragen“ auf der Startseite (`match_overview.own_match_tasks`, Art `match_lineup`), danach auf der Matchseite der Hinweis auf @leitung im Matchchat (#2110) |
 | 10 Einspruch / Korrektur | Captain, Vertreter / Leitung | vorhandener `/dispute`; Korrektur über `/result` mit `force`, Grund und optional `games` |
 | 11 Tabelle | – | `round_robin_standings(matches, registrations, rules=tournament["scoring_rules"])` |
 

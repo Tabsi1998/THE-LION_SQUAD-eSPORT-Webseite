@@ -322,31 +322,10 @@ async def _anonymize_user_data(db, user_id: str, actor_id: str, action: str) -> 
     now = now_utc().isoformat()
     anonymous_email = f"deleted_{user_id[:12]}@deleted.invalid"
     anonymous_username = f"deleted_{user_id[:12]}"
-    await db.users.update_one({"id": user_id}, {
-        "$set": {
-            "email": anonymous_email, "username": anonymous_username, "display_name": "Gelöschter User",
-            "first_name": None, "last_name": None, "nickname": None, "birth_date": None, "gender": None,
-            "bio": None, "discord_name": None, "discord_id": None, "switch_code": None, "steam_id": None,
-            "epic_id": None, "psn_id": None, "xbox_id": None, "riot_id": None, "game_ids": {},
-            "faceit_handle": None, "startgg_handle": None, "roblox_handle": None, "osu_handle": None, "lichess_handle": None, "github_handle": None, "kick_handle": None, "reddit_handle": None, "spotify_handle": None,
-            "threads_handle": None, "facebook_handle": None, "linkedin_handle": None, "snapchat_handle": None, "pinterest_handle": None, "telegram_handle": None, "wargaming_handle": None, "bungie_handle": None, "mastodon_handle": None, "bluesky_handle": None,
-            "country": None, "state": None, "city": None, "avatar_url": None, "banner_url": None,
-            "twitch_handle": None, "youtube_handle": None, "instagram_handle": None,
-            "newsletter_consent": False, "notification_preferences": {}, "privacy_public_profile": False,
-            "google_linked": False, "password_login_available": False, "email_verified": False,
-            "is_active": False, "is_banned": True, "mfa_enabled": False,
-            "password_hash": "!disabled", "anonymized_at": now, "updated_at": now,
-        },
-        "$unset": {
-            "password_contract": "", "google_id": "", "google_email": "", "mfa_secret": "", "mfa_pending_secret": "",
-            "mfa_pending_created_at": "", "mfa_recovery_code_hashes": "", "mfa_totp_last_counter": "",
-            "platform_verified": "",
-            # Freunde beim Event (#1188): Wahl und Hinweis gehören zum Konto.
-            "privacy_friends_see_registrations": "", "friends_registrations_hint_seen_at": "",
-            # Abo-Hinweis „Mein Kalender“ (#1788).
-            "calendar_subscribe_hint_seen_at": "",
-        },
-    })
+    # Jedes Profilfeld geht (#2118) - die Liste leitet ``account_erasure`` aus dem Profilformular ab.
+    update = account_erasure.anonymized_account_update(now)
+    update["$set"].update({"email": anonymous_email, "username": anonymous_username})
+    await db.users.update_one({"id": user_id}, update)
     for collection in (db.refresh_tokens, db.auth_sessions, db.email_verification_tokens,
                        db.password_reset_tokens, db.mfa_login_challenges, db.mobile_push_tokens,
                        db.mobile_client_logs, db.notifications, db.user_socials,

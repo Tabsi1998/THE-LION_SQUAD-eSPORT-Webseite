@@ -69,6 +69,50 @@ RETAINED_COLLECTIONS = tuple(dict.fromkeys(name for name, _field in RETAINED)) +
 # Mitgliederverwaltung fasst ihn dann nicht mehr an).
 OPEN_APPLICATIONS = ("pending", "submitting", "failed")
 
+# Das Konto selbst (#2118): nach dem Löschen bekommen nur diese Felder einen festen, nichtssagenden Wert. Jedes andere
+# Profilfeld - alles aus dem Profilformular (``models.UserUpdate``) und jedes leerbare Feld
+# (``routes.user_routes.USER_NULLABLE_FIELDS``) - wird entfernt. Ein neues Profilfeld fällt so automatisch darunter;
+# ``tests/test_anonymize_profile_fields_flow.py`` füllt jedes Feld und verlangt, dass es danach leer ist.
+GONE_DISPLAY_NAME = "Gelöschter User"
+ANONYMIZED_USER_VALUES = {
+    "display_name": GONE_DISPLAY_NAME, "newsletter_consent": False, "notification_preferences": {},
+    "privacy_public_profile": False, "privacy_achievements_public": False,
+    "google_linked": False, "password_login_available": False, "email_verified": False,
+    "is_active": False, "is_banned": True, "mfa_enabled": False, "password_hash": "!disabled",
+}
+# Felder außerhalb des Profilformulars, die die Person beschreiben oder ihr Konto bei anderen Diensten verraten. Die
+# privaten Felder (Passwort, Zwei-Faktor, Google-Kennung) kommen dazu aus ``services/private_fields.py``.
+EXTRA_PERSONAL_USER_FIELDS = (
+    "google_email", "platform_verified",
+    # Freunde beim Event (#1188): Wahl und Hinweis gehören zum Konto.
+    "privacy_friends_see_registrations", "friends_registrations_hint_seen_at",
+    # Abo-Hinweis „Mein Kalender“ (#1788).
+    "calendar_subscribe_hint_seen_at",
+    # Discord (#626, #567, #2118): Kennung des begrüßten Kontos, Zustand der Direktnachrichten, letzte Aktivität.
+    "discord_servers_greeted_for", "discord_dm_blocked_at", "discord_last_message_at",
+    # Mitgliederakte (#2118): welche Netzwerke geteilt wurden; Erfolge und Auszeichnung, die oben stehen sollten.
+    "dolibarr_accounts_shared", "pinned_achievements", "featured_award_id", "last_twitch_live_at",
+)
+
+
+def profile_fields_to_clear() -> set[str]:
+    """Alle Profilfelder, die beim Löschen verschwinden - abgeleitet, nicht abgeschrieben."""
+    from models import UserUpdate
+    from services.private_fields import PRIVATE_USER_FIELDS
+    from services.profile_fields import USER_NULLABLE_FIELDS
+
+    fields = set(UserUpdate.model_fields) | set(USER_NULLABLE_FIELDS)
+    fields |= set(EXTRA_PERSONAL_USER_FIELDS) | set(PRIVATE_USER_FIELDS)
+    return fields - set(ANONYMIZED_USER_VALUES)
+
+
+def anonymized_account_update(now: str) -> dict:
+    """Das Update für das Konto selbst: feste Werte setzen, alle übrigen Profilfelder entfernen."""
+    return {
+        "$set": {**ANONYMIZED_USER_VALUES, "anonymized_at": now, "updated_at": now},
+        "$unset": {field: "" for field in sorted(profile_fields_to_clear())},
+    }
+
 
 async def _directory(db, user_id: str, now: str) -> list[str]:
     """Der selbst angelegte Eintrag verschwindet samt Text; alle anderen gehören dem Verein und verlieren die Verknüpfung."""

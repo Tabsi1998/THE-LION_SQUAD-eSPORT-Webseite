@@ -32,6 +32,8 @@ import { formatTeamMode, formatTournamentDisplay } from "@/lib/tournamentLabels"
 import { gameLabel } from "@/lib/gameLabels";
 import { formatCents, startFeeSummary } from "@/lib/pricing";
 import { TournamentTabs } from "@/components/tls/tournament/TournamentTabs";
+import { useLeagueTrail } from "@/hooks/useLeagueTrail";
+import { leagueCrumbs } from "@/lib/leagueTrail";
 import { TournamentTimeline, stepCountdown, timelineSteps } from "@/components/tls/tournament/TournamentTimeline";
 import { useCountdownDays } from "@/hooks/useCountdownDays";
 import { MyStandCard } from "@/components/tls/tournament/MyStandCard";
@@ -86,6 +88,8 @@ function TournamentDetailView() {
     canonical: t?.slug ? `${window.location.origin}/tournaments/${t.slug}` : undefined,
   });
   useCanonicalSlugRedirect(slug, t?.slug, "/tournaments");
+  // Liga-Staffel (#2110): Brotkrumen über die Ligaseite statt „Turniere“ - dort sind Staffeln ausgefiltert.
+  const trail = useLeagueTrail(t);
 
   const load = useCallback(async () => {
     const accessConfig = { params: accessToken ? { access: accessToken } : undefined };
@@ -290,7 +294,9 @@ function TournamentDetailView() {
   const eventBlocked = !!eventGate && !isTeamTournament && !eventGate.registered;
   const hasRegisterAccess = t.access_link?.grants?.includes("register");
   const canSelfRegister = (registration.canRegister || hasRegisterAccess) && !clubMemberBlocked && !eventBlocked;
-  const canSelfUnregister = !!myReg && (myReg.user_id === user?.id || myRegTeam?.can_manage || ["leader", "co_leader"].includes(myRegTeam?.my_role)) && !["checked_in", "no_show", "rejected"].includes(myReg.status) && !["live", "paused", "completed", "results_published", "archived"].includes(t.status);
+  // Ein zugeteiltes Co-Team (#1649, #2110) nimmt nur die Turnierleitung heraus - statt „Abmelden“ steht der Hinweis.
+  const leagueSquad = Boolean(myReg?.squad_id);
+  const canSelfUnregister = !leagueSquad && !!myReg && (myReg.user_id === user?.id || myRegTeam?.can_manage || ["leader", "co_leader"].includes(myRegTeam?.my_role)) && !["checked_in", "no_show", "rejected"].includes(myReg.status) && !["live", "paused", "completed", "results_published", "archived"].includes(t.status);
   const podiumRows = standings.filter((row) => row && !Array.isArray(row.standings) && Number(row.rank) >= 1 && Number(row.rank) <= 3);
   const nextStep = timelineSteps(t).find((step) => step.next) || null;
   const finished = ["completed", "results_published", "archived"].includes(t.status);
@@ -349,7 +355,7 @@ function TournamentDetailView() {
           </div>
         )}
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
-          <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "eSports", to: "/esports" }, { label: "Turniere", to: "/tournaments" }, { label: t.title }]} className="mb-4" />
+          <Breadcrumbs items={leagueCrumbs(t, trail) || [{ label: "Home", to: "/" }, { label: "eSports", to: "/esports" }, { label: "Turniere", to: "/tournaments" }, { label: t.title }]} className="mb-4" />
           <div className="flex flex-wrap items-center gap-2 mb-4">
             <PhaseBadge phase={t.public_phase} status={t.status} size="lg" />
             <span className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8] border border-[#29B6E8]/30 rounded-sm px-2 py-1">{formatTournamentDisplay(t)}</span>
@@ -434,7 +440,7 @@ function TournamentDetailView() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 grid lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8 min-w-0">
           <MyStandCard tournament={t} registration={myReg} team={myRegTeam} isTeamTournament={isTeamTournament} canCheckIn={false} staffOnlyCheckIn={staffOnlyCheckIn}
-            canUnregister={canSelfUnregister} onUnregister={handleUnregister} busy={loading} scheduleTo={subPage("matches")} />
+            canUnregister={canSelfUnregister} leagueSquad={leagueSquad} onUnregister={handleUnregister} busy={loading} scheduleTo={subPage("matches")} />
           {/* Nach dem Ende (#1221) kein Kalender-Knopf mehr. */}
           <TournamentTimeline tournament={t} calendarItem={tournamentIsOver(t) ? null : calendarItem} />
           {/* Freunde beim Turnier (#1188 Teil 2): nur mit Konto, nur bestätigte Freunde, die es erlauben. */}

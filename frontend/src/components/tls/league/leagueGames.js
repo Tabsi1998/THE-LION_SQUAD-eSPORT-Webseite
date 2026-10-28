@@ -31,6 +31,18 @@ export function sidesInSlotOrder(league, match) {
   return sides.every((side, index) => side === league.sides[index]) ? league : { ...league, sides };
 }
 
+/**
+ * Nachtragsfrist vorbei, die eigene Aufstellung fehlt noch (#2110, L-D9): dann trägt nur noch die Turnierleitung nach.
+ * Für Gäste und Spiele ohne Maps immer false; solange die Frist läuft, ebenfalls.
+ */
+export function lineupAmendClosed(league, now = Date.now()) {
+  const own = league?.own_registration_id;
+  if (!own || !(league.games || []).length || !(league.lineups_missing || []).includes(own)) return false;
+  if (league.can_amend_lineup) return false;
+  const until = Date.parse(league.amend_until || "");
+  return Number.isFinite(until) && until < now;
+}
+
 /** Die Modi des Pools (ohne „Alle Maps“ eines Spiels ohne Modi). */
 export function poolModes(pool) {
   return (pool?.modes || []).filter((group) => group.mode);

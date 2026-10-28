@@ -93,6 +93,21 @@ async def migrate_deleted_account_leftovers(db) -> str:
     return f"{accounts} deleted accounts cleaned, {images} images removed"
 
 
+async def migrate_anonymized_profile_fields(db) -> str:
+    """Konto löschen (#2118): früher gelöschte Konten behielten Profilfelder (Handles, Lieblingsspiele, Plattformen,
+    Datenschutz-Stufen). Einmal dasselbe Konto-Update wie beim Löschen nachziehen - Name und Ersatzadresse bleiben."""
+    from services import account_erasure
+
+    deleted = {"anonymized_at": {"$exists": True, "$ne": None}, "is_active": False,
+               "display_name": account_erasure.GONE_DISPLAY_NAME,
+               "email": {"$regex": r"^deleted_[^@]*@deleted\.(invalid|local)$"}}
+    update = account_erasure.anonymized_account_update(datetime.now(timezone.utc).isoformat())
+    # Der Zeitpunkt der Löschung bleibt der von damals.
+    update["$set"].pop("anonymized_at")
+    result = await db.users.update_many(deleted, update)
+    return f"{result.modified_count} deleted accounts cleared"
+
+
 async def migrate_points_scheme_templates(db) -> str:
     """Externe Serien (#1741): die Punkteschema-Vorlagen als Daten in den Einstellungen (``points_schemes``). Angelegt
     wird nur, was fehlt - eine bearbeitete Vorlage bleibt; Serien, Termine oder Ergebnisse legt die Migration nie an."""
@@ -371,6 +386,8 @@ MIGRATIONS = (
     # #2069: Designs werden Motive (Fassung für dunkle bzw. helle Shirts); Trockenlauf und Rückweg in
     # services/shop_motifs.py bzw. backend/scripts/shop_motifs.py
     (14, "shop_motif_variants", migrate_motif_variants),
+    # #2118: gelöschte Konten verlieren jedes Profilfeld (services/account_erasure.py).
+    (15, "deleted_account_profile_fields", migrate_anonymized_profile_fields),
 )
 
 

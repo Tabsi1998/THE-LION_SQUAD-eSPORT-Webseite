@@ -163,6 +163,53 @@ def _data(body, kind: type = dict):
     return value
 
 
+SHAPE_NAMES = re.compile(r"[a-z0-9_-]{1,40}")
+
+
+def _host(url) -> str | None:
+    try:
+        return httpx.URL(str(url)).host or None
+    except (httpx.InvalidURL, TypeError, ValueError):
+        return None
+
+
+def _name(value) -> str | None:
+    return value if isinstance(value, str) and SHAPE_NAMES.fullmatch(value) else None
+
+
+def _place_shape(place) -> dict:
+    """Eine Fläche ohne Werte: Kennung und Technik (nur, wenn sie wie Kennungen aussehen), Ebenen mit Art und Host."""
+    if not isinstance(place, dict):
+        return {"type": type(place).__name__}
+    name = _name
+    layers = place.get("layers")
+    return {"keys": sorted(place), "placement": name(place.get("placement")), "technique": name(place.get("technique")),
+            "status": name(place.get("status")),
+            "layers": [{"keys": sorted(layer), "type": name(layer.get("type")), "host": _host(layer.get("url"))}
+                       if isinstance(layer, dict) else {"type": type(layer).__name__}
+                       for layer in (layers if isinstance(layers, list) else [])][:10]}
+
+
+def _item_shape(row) -> dict:
+    if not isinstance(row, dict):
+        return {"type": type(row).__name__}
+    places = row.get("placements")
+    return {"keys": sorted(row), "placements": [_place_shape(place) for place in places][:10]
+            if isinstance(places, list) else type(places).__name__}
+
+
+def answer_shape(order: dict, rows: list) -> dict:
+    """Wie die Antwort von Printful zu einem Auftrag aufgebaut ist (#2138) - nur Schlüssel, Kennungen von Fläche und
+    Technik, Ebenen-Art, Host der Datei-Adresse und der Stand der Kostenberechnung. Keine Anschrift, keine Namen, keine
+    Beträge: das Ergebnis darf im Admin stehen und ins Protokoll."""
+    costs = order.get("costs")
+    return {"order_keys": sorted(order),
+            "costs": {"keys": sorted(costs), "calculation_status": str(costs.get("calculation_status") or "")[:20]}
+            if isinstance(costs, dict) else type(costs).__name__,
+            "order_items": [_item_shape(row) for row in order.get("order_items") or []][:10],
+            "item_rows": [_item_shape(row) for row in rows][:10]}
+
+
 def order_payload(draft: DraftOrder) -> dict:
     """Der Rumpf für ``POST /v2/orders`` - genau diese Felder, nichts aus einer Anfrage durchgereicht. Ein Feld zum
     Bestätigen gibt es nicht: v2 legt immer einen Entwurf an."""
@@ -746,25 +793,29 @@ class PrintfulClient:
         if type(data.get("id")) is not int:
             raise FulfillmentPermanent("invalid_response")
         order_id = PrintfulOrderId(data["id"])
-        prices = {row.get("id"): _cents(row.get("price")) for row in data.get("order_items") or [] if isinstance(row, dict)}
+        inline = {row.get("id"): row for row in data.get("order_items") or [] if isinstance(row, dict)}
+        prices = {key: _cents(row.get("price")) for key, row in inline.items()}
         rows = await self._pages(f"/v2/orders/{order_id.value}/order-items", operation="getItemsByOrderId")
         items = []
         for row in rows:
             if type(row.get("catalog_variant_id")) is not int or type(row.get("id")) is not int:
                 raise FulfillmentPermanent("invalid_response")
+            # Flächen aus der Positionsliste, sonst aus den Positionen im Auftrag selbst (#2138) - die echte Antwort
+            # weicht hier vom Vertrag ab.
+            raw_places = row.get("placements") or (inline.get(row["id"]) or {}).get("placements") or []
             placements = tuple(
                 PlacedFile(placement=str(place.get("placement")), technique=str(place.get("technique")),
                            file_urls=tuple(str(layer.get("url")) for layer in place.get("layers") or []
                                            if isinstance(layer, dict) and layer.get("url")),
                            status=str(place.get("status") or ""), status_explanation=str(place.get("status_explanation") or ""))
-                for place in row.get("placements") or [] if isinstance(place, dict))
+                for place in raw_places if isinstance(place, dict))
             items.append(OrderItem(id=row["id"], external_id=row.get("external_id"),
                                    variant_id=CatalogVariantId(row["catalog_variant_id"]),
                                    quantity=int(row.get("quantity") or 0), name=str(row.get("name") or ""),
                                    price_cents=prices.get(row["id"]), placements=placements))
         return FulfillmentOrder(id=order_id, external_id=data.get("external_id"), status=str(data.get("status") or ""),
                                 shipping=str(data.get("shipping") or ""), costs=self._costs(data.get("costs")),
-                                items=tuple(items))
+                                items=tuple(items), shape=answer_shape(data, rows))
 
     async def _find(self, external_id: str) -> FulfillmentOrder | None:
         try:

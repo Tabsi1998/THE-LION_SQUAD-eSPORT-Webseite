@@ -17,7 +17,7 @@ from services.permissions import is_confirmed_tournament_lead
 from models import new_id, now_utc
 from services.match_audience import acting_registration_ids
 from services.tournament_rules import self_checkin_allowed, tournament_event_mode
-from services.match_overview import operational_match_overviews, own_match_overviews
+from services.match_overview import operational_match_overviews, own_match_overviews, own_match_tasks
 from services.profile_references import personal_profile_references
 from services import event_days
 from services.public_phase import derive_public_phase
@@ -468,7 +468,37 @@ def _vienna_time(value) -> str:
     return f"{weekday} {local.strftime('%d.%m. %H:%M')}"
 
 
-def _dashboard_actions(tournaments: list[dict], events: list[dict], matches: list[dict]) -> list[dict]:
+def _match_task_actions(tasks: list[dict]) -> list[dict]:
+    """Terminvorschlag beantworten und Aufstellung nachtragen (#2110). Ältere Apps kennen die Arten nicht: sie zeigen
+    jede Aktion mit Text, Zeile und Symbol nach ``type`` (alles mit „match“ als Spiel-Symbol) und öffnen über
+    ``target_type: "match"`` die Matchseite - darum bleibt alles Nötige in ``label`` und ``detail``."""
+    actions = []
+    for task in tasks:
+        kind = task.get("task")
+        if kind not in {"schedule", "lineup"}:
+            continue
+        opponent = f"gegen {task['opponent_name']}" if task.get("opponent_name") else ""
+        if kind == "schedule":
+            when = _vienna_time(task.get("proposed_at"))
+            extra = f"Vorschlag {when}" if when else ""
+        else:
+            until = _vienna_time(task.get("until"))
+            extra = f"im Web bis {until}" if until else "im Web"
+        detail = " · ".join(part for part in (task.get("tournament_title"), opponent, extra) if part)
+        actions.append({
+            "id": f"match-{kind}-{task.get('match_id')}",
+            "type": "match_schedule" if kind == "schedule" else "match_lineup",
+            "label": "Terminvorschlag beantworten" if kind == "schedule" else "Aufstellung nachtragen",
+            "detail": detail or "Liga-Spiel",
+            "target_type": "match",
+            "target_id": task.get("match_id"),
+            "priority": 8 if kind == "schedule" else 6,
+        })
+    return actions
+
+
+def _dashboard_actions(tournaments: list[dict], events: list[dict], matches: list[dict],
+                       match_tasks: list[dict] | None = None) -> list[dict]:
     actions = []
     for tournament in tournaments:
         reg = tournament.get("my_registration") or {}
@@ -520,6 +550,7 @@ def _dashboard_actions(tournaments: list[dict], events: list[dict], matches: lis
             "target_id": match.get("id"),
             "priority": 9 if task == "confirm" else 7,
         })
+    actions.extend(_match_task_actions(match_tasks or []))
     actions.sort(key=lambda item: int(item.get("priority") or 0), reverse=True)
     return actions[:8]
 
@@ -574,14 +605,18 @@ async def mobile_dashboard(user: dict | None = Depends(get_optional_user)):
         my_events.sort(key=_date_key)
         my_events = my_events[:12]
 
-        my_matches, _match_registrations = await own_match_overviews(db, user)
+        my_matches, match_registrations = await own_match_overviews(db, user)
         staff_matches = await operational_match_overviews(
             db,
             user,
             exclude_match_ids={match.get("id") for match in my_matches if match.get("id")},
         )
+        # Termin beantworten, Aufstellung nachtragen (#2110) - nur die Verantwortlichen der eigenen Seite.
+        match_tasks = await own_match_tasks(db, user, match_registrations) if match_registrations else []
+    else:
+        match_tasks = []
 
-    actions = _dashboard_actions(my_tournaments, my_events, my_matches)
+    actions = _dashboard_actions(my_tournaments, my_events, my_matches, match_tasks)
     if user:
         # Rückmeldung (#1196): „Wie war …?“ als Zeile unter den offenen Aktionen - Website und App lesen dieselbe Liste.
         from services.feedback import dashboard_actions as feedback_actions
