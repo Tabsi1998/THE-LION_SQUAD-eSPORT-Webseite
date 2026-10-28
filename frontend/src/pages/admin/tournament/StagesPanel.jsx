@@ -35,6 +35,8 @@ const NO_MATCH_RIGHTS = () => ({ plan: false, results: false });
 export function TournamentStagesPanel({ tournamentId, stages, matches, registrations, stations = [], canEditSettings = false, canManageStructure = false, rightsForMatch = NO_MATCH_RIGHTS, onChanged, onOpenMatchplan = null, mode = "operations", tournament = null, durationGame = null }) {
   const showSettings = canEditSettings && mode === "settings";
   const showMatchList = mode !== "settings";
+  // Liga-Staffel (#2109, S23): „Regeln dieser Phase“ gibt es nicht - eine Phase „Vor Ort“ schaltete die Spielwochen ab.
+  const staffel = Boolean(tournament?.league_context);
   const [createOpen, setCreateOpen] = useState(stages.length === 0);
   const [form, setForm] = useState({
     name: "Phase 1",
@@ -117,7 +119,10 @@ export function TournamentStagesPanel({ tournamentId, stages, matches, registrat
       {mode !== "settings" && (
         // Der Matchplan ersetzt die alte Matchplanung je Karte (Praxis nach #1589): hier Phasen, Spiele und Ergebnisse.
         <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-white/70 border border-white/10 bg-[#0A0A0A] rounded-sm px-4 py-3" data-testid="stages-matchplan-hint">
-          <span>Zeiten und Stationen planst du im Matchplan: Zeitleiste je Station, Vorschau, Ziehen und je Spiel „ändern“.</span>
+          {/* Staffel (#2109, S23): online in Spielwochen - Stationen gibt es dort nicht. */}
+          <span>{staffel
+            ? "Den Spielplan mit Spielwochen und Terminen siehst du im Matchplan – vor dem Start als Vorschau."
+            : "Zeiten und Stationen planst du im Matchplan: Zeitleiste je Station, Vorschau, Ziehen und je Spiel „ändern“."}</span>
           {onOpenMatchplan && (
             <button type="button" onClick={onOpenMatchplan} className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">Zum Matchplan</button>
           )}
@@ -182,7 +187,7 @@ export function TournamentStagesPanel({ tournamentId, stages, matches, registrat
             canManageStructure={canManageStructure}
             rightsForMatch={rightsForMatch}
             showSettings={showSettings}
-            canEditRules={canEditSettings && mode !== "settings"}
+            canEditRules={canEditSettings && mode !== "settings" && !staffel}
             showMatchList={showMatchList}
             onChanged={onChanged}
             onDelete={() => removeStage(stage)}
