@@ -14,6 +14,7 @@ import { SelectField, TextAreaField, TextField } from "@/components/tls/FormFiel
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { MapPoolEditor } from "@/pages/admin/maps/MapPoolEditor";
+import { SeasonRosterPanel } from "./SeasonRosterPanel";
 import { dayNoon, viennaDate } from "@/lib/vienna";
 import {
   BEST_OF_OPTIONS,
@@ -437,6 +438,8 @@ export default function AdminLeagueSeasonPage() {
                 </div>
               ))}
             </section>
+
+            <SeasonRosterPanel seasonId={seasonId} />
 
             <FormSection title="Vorgaben auf Staffeln übertragen" testId="season-sync"
               hint="Regeltext und Map-Pool immer, auch bei gesperrten Staffeln; Termine und Kalender nur vor dem Start; Best of, Teamgröße, Mindestkader, Punkte und Fristen nur vor dem ersten Ergebnis. Die Sichtbarkeit gilt schon beim Speichern.">
