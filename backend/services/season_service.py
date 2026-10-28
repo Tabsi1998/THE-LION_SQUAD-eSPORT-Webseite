@@ -83,6 +83,26 @@ def participant_factor(num_participants: int) -> float:
     return 1.5
 
 
+TOURNAMENT_SEASON_WEIGHT_DEFAULT = 2.0   # wie ``Tournament.season_weight`` und das Admin-Formular
+CHALLENGE_SEASON_WEIGHT_DEFAULT = 1.0    # Fast-Lap-Challenge: wie ``F1Challenge.season_weight``
+
+
+def season_weight_of(source: dict | None, default: float = TOURNAMENT_SEASON_WEIGHT_DEFAULT) -> float:
+    """Jahreswertungs-Gewicht eines Turniers oder einer Challenge (#2095). Fehlt das Feld oder ist es leer, gilt die
+    Vorgabe; ``0`` bleibt ``0`` (= keine Jahreswertung); ungültige oder negative Werte fallen auf die Vorgabe zurück.
+    ``value or default`` ist falsch, weil es aus 0 wieder die Vorgabe macht."""
+    value = (source or {}).get("season_weight")
+    if value is None or isinstance(value, bool):
+        return default
+    try:
+        weight = float(value)
+    except (TypeError, ValueError):
+        return default
+    if weight != weight or weight in (float("inf"), float("-inf")) or weight < 0:
+        return default
+    return weight
+
+
 # Default weights by source category — admin can override per object
 DEFAULT_WEIGHT = {
     "major": 3.0, "tournament": 2.0, "mini": 1.25,

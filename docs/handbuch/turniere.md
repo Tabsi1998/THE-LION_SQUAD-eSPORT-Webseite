@@ -687,6 +687,28 @@ Staffeln zählen nicht für Jahreswertung, Turnier-Pokale, Löwen-Rang-XP für T
 gespielte und gewonnene Spiele zählen weiter. Auf Startseite, im öffentlichen Kalender und in der Turnierliste der
 Website stehen sie nicht, im Profil und auf der Teamseite gekennzeichnet als „Liga · Staffel A“.
 
+### 3.16 Liga: Ergebnis je Map melden (für Captains)
+
+In der Liga melden **Captain oder Vertreter** des Co-Teams (ohne beide die Teamleitung) – auf der Matchseite im Web:
+
+1. **Melden:** je gespielter Map den Modus (steht fest, wenn die Season eine Reihenfolge vorgibt), die **Map aus dem
+   Pool** antippen, den **Sieger** antippen, auf Wunsch die Punkte und die **eigene Aufstellung** (genau so viele
+   Spieler, wie die Staffel je Map vorsieht). Die nächste Map erscheint, sobald die letzte einen Sieger hat – bis die
+   Serie entschieden ist. Ein Map-Veto gibt es nicht im System; ihr tragt ein, was gespielt wurde.
+2. **Bestätigen:** die Gegenseite sieht die Maps in Worten, stellt je Map ihre eigene Aufstellung auf und tippt
+   **Stimmt**. Stimmen Maps oder Sieger nicht, bitte **Stimmt nicht** – das ist der Einspruch, die Turnierleitung
+   entscheidet. Aus der App geht nur das Bestätigen (ohne Aufstellung); eine erste Meldung lehnt die App mit „Bitte im
+   Web mit Maps und Aufstellung melden“ ab.
+3. **Ohne Antwort** gilt die Meldung nach 48 Stunden (spätestens am Ende der Spielwoche) mit ihren Maps.
+4. **Aufstellung nachtragen:** wer aus der App oder durch die Automatik ohne Aufstellung dasteht, sieht auf der
+   Matchseite „Aufstellung fehlt noch“ und trägt sie je Map nach – bis 48 Stunden nach dem Ergebnis, danach nur noch über
+   die Turnierleitung (mit Grund).
+
+Geprüft wird: Best of (keine Map nach der Entscheidung), Map im Pool und für den Modus freigegeben, Aufstellung nur
+aus dem eigenen Kader und **kein Doppel-Einsatz** – niemand spielt am selben Spieltag für zwei Teams derselben Season.
+Die Turnierleitung trägt Maps im Ergebnis-Fenster mit Aufstellungen beider Seiten ein oder korrigiert sie mit Grund;
+„Rückgängig“ nimmt die Maps mit dem Ergebnis zurück.
+
 ---
 
 ## 4. Wenn etwas nicht klappt

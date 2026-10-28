@@ -102,6 +102,18 @@ def _squad_members(squad: dict | None, team: dict) -> set[str]:
     return {user_id for user_id in (squad or {}).get("member_ids") or [] if user_id} & _team_people(team)
 
 
+def roster_ids(registration: dict | None, team: dict | None = None) -> set[str]:
+    """Wer für eine Anmeldung aufgestellt werden darf (Liga, #1650): bei einem Co-Team dessen Kader, soweit noch im
+    Hauptteam; bei einem Team ohne Co-Team jedes Mitglied; einzeln die Person selbst."""
+    if not registration:
+        return set()
+    if registration.get("team_id") and team:
+        if registration.get("squad_id"):
+            return _squad_members(_squad_of(registration, team), team)
+        return {user_id for user_id in team.get("member_ids") or [] if user_id}
+    return {registration["user_id"]} if registration.get("user_id") else set()
+
+
 def responsible_ids(registration: dict | None, team: dict | None = None) -> set[str]:
     """Die Verantwortlichen einer Anmeldung: wer angemeldet hat, bei Teams dazu Teamleitung und Co-Leitung - bei einem
     Co-Team (``squad_id``) Captain und Vertreter, ohne beide (oder ohne Co-Team-Eintrag) die Leitung des Hauptteams."""

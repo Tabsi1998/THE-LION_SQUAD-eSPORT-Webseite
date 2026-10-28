@@ -124,7 +124,7 @@ Indizes: `tournament_registrations.squad_id` (partiell), `team_squads.captain_id
 | --- | --- | --- |
 | `games` | `[MatchGame]` | geltende Maps des Spiels, geschrieben beim Bestätigen (Konsens, 48-h-Automatik) oder von der Turnierleitung |
 | `reports[].games` | `[MatchGame]` | Sicht der jeweiligen Meldung, bis zur Bestätigung |
-| `lineup_user_ids` | `[str]` | Vereinigung aller Aufstellungen – für die Doppel-Einsatz-Prüfung |
+| `lineup_user_ids` | `[str]` | Vereinigung aller Aufstellungen aus `games` und offenen `reports[].games` – für die Doppel-Einsatz-Prüfung |
 | `lineups_missing` | `[registration_id]` | Seiten ohne Aufstellung (App-Bestätigung, Automatik) |
 | `map_pool_id` | str | vorhanden (#1616); B setzt es beim ersten Melden mit Maps, wenn leer |
 
@@ -135,15 +135,19 @@ Indizes: `tournament_registrations.squad_id` (partiell), `team_squads.captain_id
 | `position` | int 1…`best_of` | ja | lückenlos ab 1 |
 | `mode` | str | wenn der Pool Modi hat | Modus des Spiels; bei `game_mode_order` genau der Modus dieser Position |
 | `map_id` | str | ja | aus dem geltenden Pool (`map_pools.effective_pool` + `map_pools.allowed(pool, mode, map_id)`) |
-| `map_name`, `map_image_url` | str | – | Schnappschuss, setzt der Server aus dem Pool, nie aus der Eingabe |
+| `map_name`, `map_image_url`, `mode_label` | str | – | Schnappschuss, setzt der Server aus dem Pool, nie aus der Eingabe |
 | `winner_registration_id` | str | ja | eine der beiden Anmeldungen des Spiels |
 | `scores` | `{registration_id: Zahl ≥ 0}` | nein | Punkte der Map (z. B. Hardpoint 250:180) |
-| `lineups` | `{registration_id: [user_id]}` | je Seite | genau `team_size` verschiedene Mitglieder des Co-Teams der Seite |
+| `lineups` | `{registration_id: [user_id]}` | je Seite | genau `team_size` verschiedene Mitglieder des Co-Teams der Seite (Kader laut `match_audience.roster_ids`, nur wer noch im Hauptteam ist) |
 
 Meldung (`models.py`, Abschnitt Matches): `MatchScoreReport.games: Optional[List[MatchGameReport]]` mit
 `{position, mode, map_id, winner_registration_id, scores, lineup}` – `lineup` ist die **eigene** Seite.
-Admin: `MatchV2ResultSubmit.games` (optional, mit `lineups` beider Seiten). Nachtrag: `PUT /api/matches/{id}/lineups`
-mit `{games: [{position, lineup}]}`. Index: `matches_v2.lineup_user_ids` (sparse, Mehrfachwert).
+Admin: `MatchV2ResultSubmit.games` (optional, mit `lineups` beider Seiten, je Seite freiwillig – fehlende Seiten landen
+in `lineups_missing`). Ohne `games` bleiben die Maps des Spiels; passt ein korrigierter Stand nicht mehr zu ihnen,
+fallen sie weg. Nachtrag: `PUT /api/matches/{id}/lineups` mit `{games: [{position, lineup}]}` für jede Map der eigenen
+Seite; die Turnierleitung nennt zusätzlich `registration_id` und `reason`. Index: `matches_v2.lineup_user_ids`
+(sparse, Mehrfachwert). Die Matchseite liefert dazu den Block `league` (Pool, Kader der eigenen Seite, Maps mit
+Namen der Aufgestellten, Meldungen beider Seiten, `can_amend_lineup`, `amend_until`).
 
 ### Protokoll (`audit_logs.action`)
 
