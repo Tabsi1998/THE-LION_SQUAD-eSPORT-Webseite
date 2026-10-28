@@ -251,3 +251,17 @@ async def test_a_sticker_keeps_its_picture_but_name_keywords_and_order_change(fl
     assert [(row["id"], row["name"], row["sort_order"]) for row in pack["stickers"]] == [(second["id"], "Pokal", -5), (first["id"], "Erster", 0)]
     assert pack["stickers"][0]["keywords"] == ["sieg", "gg"]
     assert pack["stickers"][0]["url"] == "/api/static/uploads/b.png"
+
+@pytest.mark.asyncio
+async def test_old_stickers_without_an_order_count_as_zero(flow):
+    """#2112: Sticker aus der Zeit vor der Reihenfolge stehen wie „0“ - nicht vor allen anderen."""
+    admin = await flow.add_user(role="club_admin", name="vorstand")
+    flow.act_as(admin)
+    pack_id = (await flow.post("/api/stickers/admin/packs", json={"name": "Alt und neu"})).json()["id"]
+    await flow.db.stickers.insert_many([
+        {"id": "alt", "pack_id": pack_id, "name": "Alt", "url": "/api/static/uploads/alt.png", "created_at": "2026-01-01T00:00:00+00:00"},
+        {"id": "vorn", "pack_id": pack_id, "name": "Vorn", "url": "/api/static/uploads/vorn.png", "sort_order": -5, "created_at": "2026-02-01T00:00:00+00:00"},
+        {"id": "hinten", "pack_id": pack_id, "name": "Hinten", "url": "/api/static/uploads/hinten.png", "sort_order": 3, "created_at": "2025-01-01T00:00:00+00:00"},
+    ])
+    pack = next(item for item in (await flow.get("/api/stickers/admin")).json()["packs"] if item["id"] == pack_id)
+    assert [(row["id"], row["sort_order"]) for row in pack["stickers"]] == [("vorn", -5), ("alt", 0), ("hinten", 3)]

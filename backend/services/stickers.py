@@ -98,6 +98,15 @@ async def builtin_pack_active(db, pack_id: str) -> bool:
     return (await _builtin_states(db)).get(pack_id, True)
 
 
+def _order_key(row: dict) -> tuple:
+    """Reihenfolge, dann Anlage-Zeitpunkt; ohne Reihenfolge (ältere Einträge) gilt 0 wie im Formular."""
+    try:
+        order = int(row.get("sort_order") or 0)
+    except (TypeError, ValueError):
+        order = 0
+    return order, str(row.get("created_at") or "")
+
+
 async def list_sticker_packs(db, *, include_inactive: bool = False, user_id: str | None = None) -> list[dict]:
     """Eigene Pakete zuerst - den eigenen Löwen sucht man im Vereinschat öfter als ein Emoji. Ein Saison-Paket
     zeigt der Chat nur mit den Stickern, die ``user_id`` geschenkt bekam; der Adminbereich (``include_inactive``)
@@ -106,11 +115,14 @@ async def list_sticker_packs(db, *, include_inactive: bool = False, user_id: str
     custom = await db.sticker_packs.find(query, {"_id": 0}).sort(
         [("sort_order", 1), ("created_at", 1)],
     ).to_list(MAX_CUSTOM_PACKS)
+    custom.sort(key=_order_key)
     by_pack: dict[str, list[dict]] = {}
     if custom:
         rows = await db.stickers.find(
             {"pack_id": {"$in": [pack["id"] for pack in custom]}}, {"_id": 0},
-        ).sort([("sort_order", 1), ("created_at", 1)]).to_list(MAX_CUSTOM_PACKS * MAX_STICKERS_PER_PACK)
+        ).to_list(MAX_CUSTOM_PACKS * MAX_STICKERS_PER_PACK)
+        # Altdaten ohne Reihenfolge (#2112) zählen als 0 - Mongo sortierte ein fehlendes Feld vor jede Zahl, auch vor -5.
+        rows.sort(key=_order_key)
         for row in rows:
             by_pack.setdefault(row["pack_id"], []).append(public_custom_sticker(row))
 
