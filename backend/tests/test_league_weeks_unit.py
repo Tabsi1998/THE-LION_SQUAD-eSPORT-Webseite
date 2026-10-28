@@ -98,3 +98,38 @@ def test_the_result_does_not_count_automatically_during_the_break():
     assert local(match_deadlines.auto_confirm_due(match, plain).isoformat()) == "22.12.2026 00:00"
     early = {**match, "round": 2, "reports": [{"registration_id": "a", "at": "2026-11-18T19:00:00+00:00"}]}
     assert match_deadlines.auto_confirm_due(early, SEASON_ONE) == match_deadlines.auto_confirm_due(early, plain)
+
+
+def test_open_proposals_are_not_escalated_during_the_break_but_afterwards(monkeypatch):
+    import asyncio
+
+    from mongomock_motor import AsyncMongoMockClient
+
+    db = AsyncMongoMockClient()["tls_league_weeks"]
+    match = {"id": "m6", "tournament_id": SEASON_ONE["id"], "status": "scheduled", "schedule_status": "proposed",
+             "schedule_deadline_at": "2026-12-20T12:00:00+00:00", "round": 6}
+
+    class Frozen(datetime):
+        moment = None
+
+        @classmethod
+        def now(cls, tz=None):
+            return cls.moment.astimezone(tz) if tz else cls.moment
+
+    async def run(moment: str) -> int:
+        Frozen.moment = datetime.fromisoformat(moment)
+        rows = await db.matches_v2.find({}, {"_id": 0}).to_list(None)
+        return await matchday_schedule.escalate_overdue_proposals(db, SEASON_ONE, rows)
+
+    async def scenario():
+        await db.matches_v2.insert_one(dict(match))
+        monkeypatch.setattr(matchday_schedule, "datetime", Frozen)
+        during = await run("2026-12-27T12:00:00+01:00")
+        still_open = (await db.matches_v2.find_one({"id": "m6"}))["schedule_status"]
+        after = await run("2027-01-05T09:00:00+01:00")
+        escalated = await db.matches_v2.find_one({"id": "m6"})
+        return during, still_open, after, escalated
+
+    during, still_open, after, escalated = asyncio.run(scenario())
+    assert (during, still_open) == (0, "proposed")
+    assert after == 1 and escalated["schedule_status"] == "escalated" and escalated["schedule_escalated_at"]
