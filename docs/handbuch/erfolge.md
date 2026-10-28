@@ -8,7 +8,7 @@ steht, was daraus wird.
 **Wo im Admin:**
 
 - **Admin → Content → Erfolge** (`/admin/achievements`) – neun Reiter: **Übersicht**, **Katalog**, **Vergeben**, **Saison**, **Jahresrückblick**, **XP**, **Vorschau**, **Negativ & Vorfälle**, **Statistik**
-- **Admin → eSports → Jahreswertung** (`/admin/seasons`) – Saisons anlegen, Quellen, Streichresultate, Status
+- **Admin → eSports → Jahreswertung** (`/admin/seasons`) – Saisons anlegen, Streichresultate, Status, Korrekturen, Abschließen
 
 Wer das sieht: **Erfolge** der Bereich **Redaktion**, **Jahreswertung** der Bereich **Turnierleitung**. Massenvergabe, Katalog-Import,
 XP-Korrekturen und das Zurücksetzen von Prestige dürfen nur der **Vorstand** (wer einen Posten hält) und die **Systemverwaltung**;
@@ -41,7 +41,7 @@ Mit „Saison“ ist hier die **Jahreswertung** gemeint.
 | **Von Hand vergeben** | Einzelne Person, mit Grund und Datum; zurücknehmen; Massenvergabe mit Vorschau | Erfolge → Vergeben |
 | **Level und Löwen-Rang** | XP für Tun, Level 1 bis 60, zwölf Ränge mit eigenem Rahmen, Prestige-Sterne | von selbst; Eingriffe unter Erfolge → XP |
 | **Jahreswertung** | Punkte aus Turnieren, Fast Laps und Event-Teilnahme, Rangliste je Saison | Admin → eSports → Jahreswertung |
-| **Saisonabschluss** | Rangliste festschreiben, Saison-Erfolge und XP vergeben, Saison-MVP | Jahreswertung (Status) und Erfolge → Saison |
+| **Saisonabschluss** | Rangliste festschreiben, Saison-Erfolge und XP vergeben, Saison-MVP | Jahreswertung (**Abschließen**) und Erfolge → Saison |
 | **Jahresrückblick „Dein Jahr“** | Durchtipp-Rückblick mit Zahlen und Teilen-Bild, zu eurem Zeitraum | Erfolge → Jahresrückblick |
 | **Negativ und Vorfälle** | Fun-Erfolge für kleine Missgeschicke, bis zur Freischaltung geheim | Erfolge → Negativ & Vorfälle |
 | **Vorschau** | Jede Zeremonie und jedes Abzeichen in jedem Material ansehen | Erfolge → Vorschau |
@@ -199,24 +199,31 @@ weg, XP bleiben, mit Rückfrage) gehen nur für Vorstand und Systemverwaltung.
 
 ### 3.5 Die Jahreswertung: Saison anlegen
 
-**Admin → eSports → Jahreswertung → Neue Jahreswertung.** Das Fenster hat drei Abschnitte:
+**Admin → eSports → Jahreswertung → Neue Jahreswertung.** Das Fenster hat diese Abschnitte:
 
-- **Jahreswertung:** **Name**, **Slug** (Adresse), **Typ** (**Jahreswertung** oder **Circuit**), bei bestehenden Saisons der **Status**,
-  **Banner**, **Start**, **Ende**, **Beschreibung**.
-- **Punkte:** **Streichresultate** (die schwächsten Wertungen je Person fallen aus der Gesamtwertung) und die
-  **Fallback-Punktetabelle** (nur für die einfache Ersatz-Rangliste, wenn es noch keine Punkte-Einträge gibt). Rechts erklärt die Regelübersicht
-  „So wird gewertet“.
-- **Quellen:** **Turniere einbeziehen** und **Fast-Lap Challenges einbeziehen**. Leer heißt: automatisch nach Zeitraum und Status
-  (Geplant, Check-in, Live, Abgeschlossen, Ergebnisse online). Die Listen bestimmen, was die öffentliche Seite als Quellen nennt
-  und was in der Ersatz-Rangliste zählt.
+- **Jahreswertung:** **Name**, **Slug** (Adresse), **Typ**, bei bestehenden Saisons der **Status**, **Banner**, **Start**, **Ende**,
+  **Beschreibung**. Typ **Turnierserie (Circuit)** rechnet genauso, heißt öffentlich „Lions Circuit“ und erscheint nicht im
+  Jahresrückblick „Dein Jahr“ – aktiv ist aber auch dann nur eine Wertung.
+- **Punkte:** **Streichresultate** (die schwächsten Wertungen je Person fallen aus der Gesamtwertung). Rechts erklärt die
+  Regelübersicht „So wird gewertet“.
+- **Punkte korrigieren** (bei Entwurf und Aktiv): Person wählen, Punkte (minus für einen Abzug) und **Grund** – etwa ein
+  Fair-Play-Bonus oder ein Regelverstoß. Die Korrektur steht als eigene Wertung „Korrekturen“ in der Rangliste und im Protokoll;
+  ein erneutes Veröffentlichen eines Turniers ändert sie nicht. Über den Papierkorb fällt sie wieder weg.
+- **Volle Saison (Pflichttermine):** Turniere und Fast-Lap-Challenges, bei denen man Punkte geholt haben muss, um beim Abschluss den
+  Erfolg **Volle Saison** zu bekommen. Für die Punkte selbst spielt die Liste keine Rolle.
+
+**Was zählt:** jedes Turnier und jede Fast-Lap-Challenge mit einem Gewicht über 0 und jede bestätigte Event-Teilnahme – immer in
+der aktiven Jahreswertung. Ausschließen heißt beim Turnier bzw. der Challenge „Keine Jahreswertung“.
 
 **Status:** **Entwurf** (so startet jede neue Saison), **Aktiv**, **Abgeschlossen**, **Archiv**. **Punkte werden immer in die Saison mit
-dem Status Aktiv geschrieben.** Ist keine Saison aktiv, bekommen Ergebnisse keine Jahrespunkte. Haltet darum genau eine Saison auf
-**Aktiv**. Ein Zeitraum am Ende (Ende-Datum) schaltet den Status nicht um.
+dem Status Aktiv geschrieben.** Aktiv kann nur eine sein – wer eine zweite aktiviert, bekommt den Hinweis, welche schon läuft. Ist keine
+Saison aktiv, bekommen Ergebnisse keine Jahrespunkte, und die Startseite zeigt keine Jahreswertung. Ein Zeitraum am Ende (Ende-Datum)
+schaltet den Status nicht um.
 
-Die Karte jeder Saison hat **Bearbeiten**, **Public** (öffnet die öffentliche Seite) und **Löschen** (Rückfrage). Die öffentliche Seite
-(`/seasons/<slug>`) zeigt **Rangliste**, **Top Teilnehmer**, die Quellen, „So funktioniert diese Jahreswertung“ und erklärt Platzierung,
-Teilnehmerfeld, Boni und Schutz.
+Die Karte jeder Saison hat **Bearbeiten**, **Öffentliche Seite**, bei der aktiven **Abschließen** (3.7) und beim Entwurf **Löschen**
+(Rückfrage). Gelöscht werden kann nur ein Entwurf ohne Punkte; eine laufende oder abgeschlossene Saison setzt ihr auf **Archiv**. Die
+öffentliche Seite (`/seasons/<slug>`) zeigt **Rangliste**, **Top Teilnehmer**, „So funktioniert diese Jahreswertung“ und erklärt
+Platzierung, Teilnehmerfeld, Boni und Schutz.
 
 ### 3.6 Wie Punkte entstehen
 
@@ -245,14 +252,18 @@ Für die Jahreswertung gilt: **Basispunkte × Gewicht × Teilnehmerfaktor + Bonu
 Jahreswertung** ×0,00 oder ein **eigener Faktor**. Die Punkte werden gutgeschrieben, wenn die Ergebnisse **veröffentlicht** sind
 ([Turniere](turniere.md), [Fast Lap](fastlap.md)).
 
-**Boni** können dazukommen (Check-in, Fair Play, Siege, Fast-Lap-Boni). **Schutz vor Punktesammeln:** Bei Fast Laps und Fun-Wertungen zählen
+Der **Teilnehmerfaktor** richtet sich nach den tatsächlich bestätigten bzw. eingecheckten Teilnehmern beim Veröffentlichen, nicht nach
+den Plätzen. Wird ein Ergebnis nach dem Veröffentlichen korrigiert und das Turnier wieder veröffentlicht, ziehen die Punkte nach
+([Turniere](turniere.md), 3.10).
+
+**Boni:** derzeit 5 Bonuspunkte für die bestätigte Event-Teilnahme; alles andere läuft über **Punkte korrigieren** (3.5). **Schutz vor Punktesammeln:** Bei Fast Laps und Fun-Wertungen zählen
 je Person und Kalendermonat die ersten **vier** Einträge voll, danach nur noch zur Hälfte. Turniere (Major, Normal, Mini) zählen immer voll.
 
 **Event-Teilnahme:** Checkt die Turnierleitung eine Person unter **Anmeldungen & Einlass** ein (**Da**), bekommt sie einen Jahreswertungs-Eintrag
 (Gewicht ×0,50 plus 5 Bonuspunkte), 60 XP und eine Erfolgs-Auswertung. Siehe [Events](events.md).
 
-**Achievements** sind Profilpunkte und fließen nicht still in die Jahreswertung. Reine Community-Aktivität zählt nur, wenn sie als
-Event, Challenge oder manuelle Admin-Wertung eingetragen ist.
+**Erfolge** sind Profilpunkte und fließen nicht still in die Jahreswertung. Reine Community-Aktivität zählt nicht – nur Turniere,
+Fast Laps, bestätigte Event-Teilnahmen und Korrekturen mit Grund.
 
 **Externe Wettbewerbe** (Referenzen und Serien, [Inhalte](inhalte.md) 3.8 und 3.9) bringen **keine Jahreswertungs-Punkte**, nur
 Abzeichen in der Kategorie **Verein (nur Mitglieder)**: **Podest extern** (Platz 1 bis 3 in einer Referenz, Team oder Einzel – jeder
@@ -262,7 +273,9 @@ ausgewertet, sonst spätestens in der nächtlichen Auswertung.
 
 ### 3.7 Saisonabschluss und Saison-MVP
 
-Ist die Saison vorbei, setzt ihr den **Status auf „Abgeschlossen“** (Jahreswertung → **Bearbeiten**). Dabei geschieht einmalig:
+Ist die Saison vorbei, klickt ihr auf der Karte der aktiven Saison **Abschließen** (Jahreswertung). Ein Fenster zeigt vorab die Rangliste und
+je Platz die Erfolge, die vergeben werden; erst **Endgültig abschließen** führt es aus (im Protokoll). Über den Status im Bearbeiten-Fenster
+geht das nicht. Dabei geschieht einmalig:
 
 - die **Rangliste wird festgeschrieben**,
 - jede platzierte Person bekommt XP („Saison abgeschlossen“),

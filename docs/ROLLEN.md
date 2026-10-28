@@ -263,6 +263,7 @@ Kontoliste mit E-Mail-Adressen bleibt bei „Alle Benutzer“ (Vereinsverwaltung
 | `board` | Vorstand besetzen | Vereinsverwaltung, System | nur Vereinsmitglieder (und gepflegte Mitgliederprofile ohne Konto) |
 | `invite` | Bewerbungen: zum Antrag einladen | Vereinsverwaltung | Konten ohne aktive Mitgliedschaft, mit „ist schon eingeladen“ |
 | `reference_series` | Serien: Captain einer Saison hinzufügen (#1749) | Redaktion | nur aktive Vereinsmitglieder |
+| `season` | Jahreswertung: Punkte korrigieren (#2123) | Turnierleitung | aktive Konten |
 
 Teams kommen als kleine Auswahl (`GET /api/admin/choices/teams?tournament_id=…`, wie `tournament`), Event-Sponsoren
 mit dem Haken „Events“ nur mit Name und Logo (`GET /api/admin/choices/sponsors`: Turnierleitung, Redaktion, System).

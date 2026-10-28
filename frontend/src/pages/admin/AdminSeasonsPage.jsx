@@ -10,11 +10,13 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { BarChart3, Calculator, Info, ListChecks, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { BarChart3, Calculator, Flag, Info, ListChecks, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { PersonPicker } from "@/components/tls/PersonPicker";
 import { asInstant, viennaDate } from "@/lib/vienna";
 
 const DEFAULT_POINTS = "25,18,15,12,10,8,6,4,2,1";
-const STATUS_OPTIONS = ["draft", "active", "completed", "archived"];
+// „Abgeschlossen“ setzt nur der Knopf „Abschließen“ mit Vorschau und Rückfrage (#2123, ER8).
+const STATUS_OPTIONS = ["draft", "active", "archived"];
 
 const STATUS_LABELS = {
   draft: "Entwurf",
@@ -28,10 +30,12 @@ const STATUS_LABELS = {
   cancelled: "Abgesagt",
 };
 
+// „Circuit“ (#2123, ER13): rechnet wie die Jahreswertung, zählt aber nicht für den Jahresrückblick „Dein Jahr“.
 const KIND_LABELS = {
   season: "Jahreswertung",
-  circuit: "Circuit",
+  circuit: "Turnierserie",
 };
+const KIND_HINT = "Eine Turnierserie (früher „Circuit“) rechnet genauso, heißt öffentlich „Lions Circuit“ und erscheint nicht im Jahresrückblick „Dein Jahr“. Aktiv ist immer nur eine Wertung – solange eine Turnierserie aktiv ist, landen die Punkte dort.";
 
 const V2_BASE_POINTS = [
   ["1. Platz", 100],
@@ -170,31 +174,22 @@ function weightLabel(item, fallback = 1) {
   return "Event";
 }
 
-function participantFactor(maxParticipants) {
-  const n = Number(maxParticipants || 0);
-  if (n <= 7) return 0.75;
-  if (n <= 15) return 1;
-  if (n <= 31) return 1.15;
-  if (n <= 63) return 1.3;
-  return 1.5;
-}
-
+// Der Teilnehmerfaktor richtet sich nach den tatsächlichen Teilnehmern beim Veröffentlichen (#2123, ER12) - nicht
+// nach den Plätzen. Darum nennt die Auswahl nur Status, Gewicht und Datum.
 function sourceMeta(item, fallbackWeight) {
   const weight = numericWeight(item?.season_weight, fallbackWeight);
-  const participants = item?.max_participants || item?.max_entries || item?.participants_count || 0;
-  const factor = participantFactor(participants);
   const date = item?.start_date || item?.created_at;
   const bits = [
     labelStatus(item?.status),
-    `${weightLabel(item, fallbackWeight)} x${weight.toFixed(2)}`,
+    `${weightLabel(item, fallbackWeight)} ×${weight.toFixed(2).replace(".", ",")}`,
   ];
-  if (participants) bits.push(`${participants} Plaetze -> Teilnehmerfaktor x${factor.toFixed(2)}`);
   if (date) bits.push(formatDateRange(date, null));
-  return bits.join(" - ");
+  return bits.join(" · ");
 }
 
-function selectionText(ids) {
-  return ids?.length ? `${ids.length} manuell gewählt` : "Auto nach Zeitraum/Status";
+function fullSeasonText(season) {
+  const count = (season.tournament_ids?.length || 0) + (season.f1_challenge_ids?.length || 0);
+  return count ? `${count} Pflichttermin${count === 1 ? "" : "e"}` : "keine";
 }
 
 export default function AdminSeasonsPage() {
@@ -203,6 +198,7 @@ export default function AdminSeasonsPage() {
   const [challenges, setChallenges] = useState([]);
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [completing, setCompleting] = useState(null);
   const confirm = useConfirm();
 
   const load = useCallback(async () => {
@@ -222,7 +218,7 @@ export default function AdminSeasonsPage() {
   const del = async (season) => {
     if (!await confirm({
       title: "Jahreswertung löschen?",
-      description: `Jahreswertung "${season.name}" wirklich löschen?`,
+      description: `Den Entwurf „${season.name}“ wirklich löschen? Das lässt sich nicht rückgängig machen.`,
       confirmLabel: "Löschen",
     })) return;
     try {
@@ -241,7 +237,8 @@ export default function AdminSeasonsPage() {
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">eSports</span>
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Jahreswertung</h1>
           <p className="text-sm text-white/45 mt-2 max-w-3xl">
-            Saison erstellen, Quellen festlegen und nachvollziehen, welche Punkte durch Platzierung, Teilnahme, Gewichtung und Teilnehmerfeld entstehen.
+            Saison anlegen, aktivieren und abschließen. Punkte entstehen von selbst aus Turnieren, Fast Laps und Event-Teilnahmen –
+            immer in der einen aktiven Jahreswertung. Korrekturen tragt ihr mit Grund von Hand ein.
           </p>
         </div>
         <button onClick={() => setCreating(true)} data-testid="season-new" className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2 text-xs">
@@ -251,7 +248,7 @@ export default function AdminSeasonsPage() {
 
       <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
         {list.map((s) => (
-          <SeasonCard key={s.id} season={s} onEdit={() => setEditing(s)} onDelete={() => del(s)} />
+          <SeasonCard key={s.id} season={s} onEdit={() => setEditing(s)} onDelete={() => del(s)} onComplete={() => setCompleting(s)} />
         ))}
         {list.length === 0 && (
           <div className="md:col-span-2 xl:col-span-3 text-center py-12 border border-dashed border-white/15 rounded-sm text-white/40 font-display tracking-widest">
@@ -269,12 +266,80 @@ export default function AdminSeasonsPage() {
           onSaved={load}
         />
       )}
+      {completing && (
+        <CompleteSheet season={completing} onClose={() => setCompleting(null)} onDone={load} />
+      )}
     </AdminLayout>
   );
 }
 
-function SeasonCard({ season, onEdit, onDelete }) {
-  const fallbackPoints = pointsToString(season.points_per_position);
+// Abschließen (#2123, ER8): Vorschau aus der Erfolge-Rechnung (wer was bekommt), dann Bestätigung.
+function CompleteSheet({ season, onClose, onDone }) {
+  const [preview, setPreview] = useState(null);
+  const [failed, setFailed] = useState("");
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    api.get(`/seasons/${season.id}/completion-preview`)
+      .then(({ data }) => { if (alive) setPreview(data); })
+      .catch((err) => { if (alive) setFailed(formatRequestError(err, "Vorschau konnte nicht geladen werden.")); });
+    return () => { alive = false; };
+  }, [season.id]);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await api.post(`/seasons/${season.id}/complete`);
+      toast.success(`„${season.name}“ ist abgeschlossen.`);
+      onDone();
+      onClose();
+    } catch (err) {
+      toast.error(formatRequestError(err, "Jahreswertung konnte nicht abgeschlossen werden."));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const rows = preview?.standings || [];
+  return (
+    <AdminSheet title={`„${season.name}“ abschließen`} eyebrow="Jahreswertung" size="lg" onClose={onClose} onSubmit={submit} saving={saving}
+      submitLabel="Endgültig abschließen" savingLabel="Schließe ab …" submitDisabled={!preview} submitTestId="season-complete-submit" testId="season-complete-sheet">
+      <div className="rounded-sm border border-honor/30 bg-honor/5 p-4 text-sm text-white/75 space-y-2">
+        <p className="font-bold text-honor">Das passiert einmalig und lässt sich nicht zurücknehmen:</p>
+        <ul className="list-disc pl-5 space-y-1">
+          <li>Die Rangliste wird festgeschrieben.</li>
+          <li>Jede platzierte Person bekommt XP („Saison abgeschlossen“).</li>
+          <li>Die Saison-Erfolge werden vergeben – so wie unten aufgelistet.</li>
+          <li>Neue Ergebnisse bekommen danach keine Jahrespunkte mehr, bis eine neue Jahreswertung aktiv ist.</li>
+        </ul>
+      </div>
+      {failed && <p className="text-sm text-live" role="alert">{failed}</p>}
+      {!preview && !failed && <p className="text-sm text-white/40">Lade Vorschau …</p>}
+      {preview && (
+        <div data-testid="season-complete-preview" className="space-y-3">
+          <p className="text-sm text-white/60">
+            {preview.ranked} {preview.ranked === 1 ? "Platz" : "Plätze"} · {preview.awards_total} {preview.awards_total === 1 ? "Erfolg" : "Erfolge"} beim Abschluss
+          </p>
+          <ol className="divide-y divide-white/5 border border-white/10 rounded-sm">
+            {rows.slice(0, 10).map((row) => (
+              <li key={row.user_id || row.rank} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-sm">
+                <span className="font-heading font-black w-6 tabular-nums">{row.rank}</span>
+                <span className="min-w-0 flex-1 truncate">{row.display_name || row.username || "—"}</span>
+                <span className="tabular-nums text-[#29B6E8]">{Number(row.points || 0).toLocaleString("de-DE")} P</span>
+                {row.awards?.length > 0 && <span className="w-full pl-9 text-[11px] text-white/45">{row.awards.map((a) => a.name).join(", ")}</span>}
+              </li>
+            ))}
+            {rows.length === 0 && <li className="px-3 py-4 text-sm text-white/40">Noch keine Punkte in dieser Jahreswertung.</li>}
+          </ol>
+          {rows.length > 10 && <p className="text-xs text-white/40">… und {rows.length - 10} weitere Plätze.</p>}
+        </div>
+      )}
+    </AdminSheet>
+  );
+}
+
+function SeasonCard({ season, onEdit, onDelete, onComplete }) {
   return (
     <div className="border border-white/10 bg-[#121212] rounded-sm overflow-hidden">
       <div className="aspect-[16/9] bg-[#0A0A0A] overflow-hidden">
@@ -294,22 +359,32 @@ function SeasonCard({ season, onEdit, onDelete }) {
           <div className="text-xs text-white/45 mt-1">{formatDateRange(season.start_date, season.end_date)}</div>
         </div>
         <div className="grid grid-cols-2 gap-2 text-xs">
-          <InfoPill label="Turniere" value={selectionText(season.tournament_ids)} />
-          <InfoPill label="Fast Laps" value={selectionText(season.f1_challenge_ids)} />
           <InfoPill label="Streichresultate" value={Number(season.drop_worst || 0)} />
-          <InfoPill label="Fallback" value={fallbackPoints} compact />
+          <InfoPill label="Volle Saison" value={fullSeasonText(season)} />
         </div>
         <div className="rounded-sm border border-[#29B6E8]/20 bg-[#29B6E8]/5 p-3 text-xs text-white/60">
-          Aktive Punkte: Basis nach Platzierung/Teilnahme x Gewicht x Teilnehmerfaktor + Bonus. Leere Quellenlisten bedeuten Auto-Auswahl nach Zeitraum und Status.
+          {season.status === "active"
+            ? "Aktiv: neue Ergebnisse aus Turnieren, Fast Laps und Event-Teilnahmen bekommen hier ihre Punkte."
+            : season.status === "draft"
+              ? "Entwurf: bekommt noch keine Punkte. Aktiv kann immer nur eine Jahreswertung sein."
+              : "Bekommt keine neuen Punkte mehr."}
         </div>
         <div className="flex gap-2 flex-wrap">
           <button onClick={onEdit} data-testid={`season-edit-${season.id}`} className="px-3 py-1.5 border border-[#29B6E8]/50 text-[#29B6E8] text-xs uppercase font-bold rounded-sm inline-flex items-center gap-1">
             <Pencil className="w-3 h-3" /> Bearbeiten
           </button>
-          <Link to={`/seasons/${season.slug}`} target="_blank" className="px-3 py-1.5 border border-white/15 text-white/70 text-xs uppercase font-bold rounded-sm hover:text-white">Public</Link>
-          <button onClick={onDelete} className="px-3 py-1.5 border border-[#FF3B30]/40 text-[#FF3B30] text-xs uppercase font-bold rounded-sm inline-flex items-center gap-1">
-            <Trash2 className="w-3 h-3" /> Löschen
-          </button>
+          <Link to={`/seasons/${season.slug}`} target="_blank" className="px-3 py-1.5 border border-white/15 text-white/70 text-xs uppercase font-bold rounded-sm hover:text-white">Öffentliche Seite</Link>
+          {season.status === "active" && (
+            <button onClick={onComplete} data-testid={`season-complete-${season.id}`} className="px-3 py-1.5 border border-honor/50 text-honor text-xs uppercase font-bold rounded-sm inline-flex items-center gap-1">
+              <Flag className="w-3 h-3" /> Abschließen
+            </button>
+          )}
+          {/* Löschen nur als Entwurf ohne Punkte (#2123, ER9) - sonst archivieren. */}
+          {season.status === "draft" && (
+            <button onClick={onDelete} data-testid={`season-delete-${season.id}`} className="px-3 py-1.5 border border-live/40 text-live text-xs uppercase font-bold rounded-sm inline-flex items-center gap-1">
+              <Trash2 className="w-3 h-3" /> Löschen
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -330,7 +405,7 @@ function SeasonModal({ season, tournaments, challenges, onClose, onSaved }) {
     () => challenges.filter((item) => form.f1_challenge_ids.includes(item.id)),
     [form.f1_challenge_ids, challenges],
   );
-  const fallbackPoints = useMemo(() => parsePointsString(form.points_per_position), [form.points_per_position]);
+  const statusOptions = (form.status === "completed" ? ["completed", ...STATUS_OPTIONS] : STATUS_OPTIONS).map((s) => [s, labelStatus(s)]);
 
   const toggle = (field, id) => {
     setForm((f) => ({
@@ -351,7 +426,9 @@ function SeasonModal({ season, tournaments, challenges, onClose, onSaved }) {
         const { status, ...createPayload } = payload;
         await api.post("/seasons", createPayload);
       } else {
-        await api.patch(`/seasons/${season.id}`, payload);
+        // Der Status geht nur mit, wenn er sich geändert hat - „Abgeschlossen“ setzt nur der eigene Knopf (#2123, ER8).
+        const { status, ...rest } = payload;
+        await api.patch(`/seasons/${season.id}`, status !== season.status ? { ...rest, status } : rest);
       }
       toast.success("Jahreswertung gespeichert.");
       onSaved();
@@ -371,9 +448,10 @@ function SeasonModal({ season, tournaments, challenges, onClose, onSaved }) {
         <FormGrid>
           <TextField label="Name" value={form.name} onChange={(v) => set("name", v)} required testId="season-name" />
           <TextField label="Slug" value={form.slug} onChange={(v) => set("slug", slugFrom(v))} required testId="season-slug" placeholder="jahreswertung-2026" />
-          <SelectField label="Typ" value={form.kind} onChange={(v) => set("kind", v)} options={[["season", "Jahreswertung"], ["circuit", "Circuit"]]} testId="season-kind" />
+          <SelectField label="Typ" value={form.kind} onChange={(v) => set("kind", v)} options={[["season", "Jahreswertung"], ["circuit", "Turnierserie (Circuit)"]]} hint={KIND_HINT} testId="season-kind" />
           {!isNew && (
-            <SelectField label="Status" value={form.status} onChange={(v) => set("status", v)} options={STATUS_OPTIONS.map((s) => [s, labelStatus(s)])} testId="season-status" />
+            <SelectField label="Status" value={form.status} onChange={(v) => set("status", v)} options={statusOptions} disabled={form.status === "completed"}
+              hint="Aktiv kann nur eine Jahreswertung sein. Abschließen geht über den Knopf „Abschließen“ auf der Karte – mit Vorschau." testId="season-status" />
           )}
         </FormGrid>
         <ImageUpload value={form.banner_url} onChange={(v) => set("banner_url", v)} label="Banner" testId="season-banner" variant="wide" allowLibrary />
@@ -385,22 +463,21 @@ function SeasonModal({ season, tournaments, challenges, onClose, onSaved }) {
       </FormSection>
 
       <FormSection title="Punkte">
+        {/* Die frühere „Fallback-Punktetabelle“ und die Quellenauswahl wirkten nicht auf die Punkte (#2123, ER6) - sie
+            sind weg bzw. heißen jetzt, was sie tun („Volle Saison“). Ausschließen: Gewicht „Keine Jahreswertung“. */}
         <FormGrid>
-          <TextField label="Fallback-Punktetabelle" value={form.points_per_position} onChange={(v) => set("points_per_position", v)} testId="season-points" placeholder={DEFAULT_POINTS} hint="Wird für alte Fallback-Standings und Championship-Logik genutzt. Neue V2-Einträge nutzen die feste Formel darunter." />
           <TextField label="Streichresultate" type="number" value={form.drop_worst} onChange={(v) => set("drop_worst", v)} testId="season-drop" hint="Die niedrigsten Wertungen pro Person werden aus dem Gesamtergebnis gestrichen." />
         </FormGrid>
-        <RuleSummary
-          form={form}
-          fallbackPoints={fallbackPoints}
-          selectedTournaments={selectedTournaments}
-          selectedChallenges={selectedChallenges}
-        />
+        <RuleSummary form={form} />
       </FormSection>
 
-      <FormSection title="Quellen" hint="Leer lassen = passende Turniere und Fast-Lap Challenges automatisch nach Zeitraum und Status einbeziehen.">
+      {!isNew && ["draft", "active"].includes(season.status) && <AdjustmentsSection season={season} />}
+
+      <FormSection title="Volle Saison (Pflichttermine)" collapsible
+        hint="Zählt nicht für die Punkte. Wer bei allen hier gewählten Turnieren und Fast-Lap-Challenges Punkte geholt hat, bekommt beim Abschluss den Erfolg „Volle Saison“. Leer = niemand bekommt ihn.">
         <SourcePicker
-          label="Turniere einbeziehen"
-          helper="Leer lassen = passende Turniere automatisch nach Zeitraum und Status einbeziehen."
+          label="Turniere"
+          helper={selectedTournaments.length ? `${selectedTournaments.length} gewählt` : "Noch keine gewählt."}
           items={tournaments}
           selected={form.tournament_ids}
           onToggle={(id) => toggle("tournament_ids", id)}
@@ -409,8 +486,8 @@ function SeasonModal({ season, tournaments, challenges, onClose, onSaved }) {
           getMeta={(t) => sourceMeta(t, 2)}
         />
         <SourcePicker
-          label="Fast-Lap Challenges einbeziehen"
-          helper="Leer lassen = passende Fast-Lap Challenges automatisch nach Zeitraum und Status einbeziehen."
+          label="Fast-Lap-Challenges"
+          helper={selectedChallenges.length ? `${selectedChallenges.length} gewählt` : "Noch keine gewählt."}
           items={challenges}
           selected={form.f1_challenge_ids}
           onToggle={(id) => toggle("f1_challenge_ids", id)}
@@ -423,12 +500,83 @@ function SeasonModal({ season, tournaments, challenges, onClose, onSaved }) {
   );
 }
 
-function RuleSummary({ form, fallbackPoints, selectedTournaments, selectedChallenges }) {
-  const selectedSources = selectedTournaments.length + selectedChallenges.length;
-  const selectedText = selectedSources
-    ? `${selectedTournaments.length} Turniere, ${selectedChallenges.length} Fast Laps`
-    : "Auto-Auswahl nach Zeitraum/Status";
+// Korrekturen (#2123, ER10): Bonus oder Abzug von Hand, immer mit Grund - eigener Eintrag „Korrektur“ in der Wertung.
+function AdjustmentsSection({ season }) {
+  const [rows, setRows] = useState([]);
+  const [person, setPerson] = useState(null);
+  const [points, setPoints] = useState("");
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const confirm = useConfirm();
+  const load = useCallback(() => {
+    api.get(`/seasons/${season.id}/adjustments`).then(({ data }) => setRows(Array.isArray(data) ? data : [])).catch(() => setRows([]));
+  }, [season.id]);
+  useEffect(() => { load(); }, [load]);
 
+  const value = Number(String(points).replace(",", "."));
+  const ready = Boolean(person) && Number.isFinite(value) && value !== 0 && reason.trim().length >= 3;
+  const add = async () => {
+    if (!ready) return;
+    setBusy(true);
+    try {
+      await api.post(`/seasons/${season.id}/adjustments`, { user_id: person.id, points: value, reason: reason.trim() });
+      toast.success(`${value > 0 ? "+" : ""}${formatPoints(value)} Punkte für ${person.name} eingetragen.`);
+      setPerson(null);
+      setPoints("");
+      setReason("");
+      load();
+    } catch (err) {
+      toast.error(formatRequestError(err, "Korrektur konnte nicht eingetragen werden."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const remove = async (row) => {
+    if (!await confirm({ title: "Korrektur entfernen?", description: `${formatPoints(row.total_points)} Punkte für ${row.recipient_label} („${row.bonus_reason}“) fallen weg.`, confirmLabel: "Entfernen" })) return;
+    try {
+      await api.delete(`/seasons/${season.id}/adjustments/${row.id}`);
+      toast.success("Korrektur entfernt.");
+      load();
+    } catch (err) {
+      toast.error(formatRequestError(err, "Korrektur konnte nicht entfernt werden."));
+    }
+  };
+
+  return (
+    <FormSection title="Punkte korrigieren" hint="Bonus oder Abzug von Hand – etwa für Fair Play oder einen Regelverstoß. Der Grund steht in der Wertung und im Protokoll; ein erneutes Veröffentlichen eines Turniers ändert daran nichts.">
+      <div className="space-y-3" data-testid="season-adjustments">
+        <PersonPicker purpose="season" value={person} onChange={setPerson} label="Person" testId="season-adjust-person" />
+        <FormGrid>
+          <TextField label="Punkte (minus für Abzug)" type="number" step="0.5" value={points} onChange={setPoints} placeholder="z. B. 10 oder -15" testId="season-adjust-points" />
+          <TextField label="Grund" value={reason} onChange={setReason} maxLength={200} placeholder="z. B. Fair-Play-Bonus Herbst-Cup" testId="season-adjust-reason" />
+        </FormGrid>
+        <button type="button" onClick={add} disabled={!ready || busy} data-testid="season-adjust-submit" className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] text-xs uppercase font-bold rounded-sm disabled:opacity-40">
+          Korrektur eintragen
+        </button>
+        {rows.length > 0 && (
+          <ul className="divide-y divide-white/5 border border-white/10 rounded-sm" data-testid="season-adjust-list">
+            {rows.map((row) => (
+              <li key={row.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-sm">
+                <span className={`tabular-nums font-bold ${row.total_points < 0 ? "text-live" : "text-ok"}`}>{row.total_points > 0 ? "+" : ""}{formatPoints(row.total_points)}</span>
+                <span className="min-w-0 flex-1 truncate">{row.recipient_label}</span>
+                <span className="w-full sm:w-auto text-xs text-white/50 break-words">{row.bonus_reason}</span>
+                <button type="button" onClick={() => remove(row)} aria-label={`Korrektur für ${row.recipient_label} entfernen`} className="p-1 text-live/80 hover:text-live">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </FormSection>
+  );
+}
+
+function formatPoints(value) {
+  return Number(value || 0).toLocaleString("de-DE", { maximumFractionDigits: 1 });
+}
+
+function RuleSummary({ form }) {
   return (
     <aside className="border border-[#29B6E8]/25 bg-[#06131A] rounded-sm p-4 space-y-4">
       <div>
@@ -437,10 +585,13 @@ function RuleSummary({ form, fallbackPoints, selectedTournaments, selectedChalle
         </div>
         <h3 className="font-heading text-xl font-black uppercase mt-1">So wird gewertet</h3>
         <p className="text-xs text-white/55 mt-2">
-          Neue Wertungen entstehen mit: Basispunkte x Quellen-Gewicht x Teilnehmerfaktor + Bonuspunkte.
+          Wertungen entstehen mit: Basispunkte × Gewicht × Teilnehmerfaktor + Bonuspunkte – beim Veröffentlichen der Ergebnisse,
+          immer in der aktiven Jahreswertung. Nach einer Korrektur und erneutem Veröffentlichen werden sie angeglichen.
         </p>
         <p className="text-xs text-white/45 mt-2">
-          Major, Normal, Mini usw. stellst du direkt beim jeweiligen Turnier oder bei der Fast-Lap Challenge ein. Diese Jahreswertung wählt nur aus, welche Quellen zählen.
+          Major, Normal, Mini usw. stellst du beim jeweiligen Turnier oder bei der Fast-Lap-Challenge ein. Es zählt alles mit einem
+          Gewicht über 0 – ausschließen heißt dort „Keine Jahreswertung“. Der Teilnehmerfaktor richtet sich nach den tatsächlich
+          bestätigten bzw. eingecheckten Teilnehmern, nicht nach den Plätzen. Bonuspunkte gibt es derzeit für die Event-Teilnahme (+5).
         </p>
       </div>
 
@@ -458,13 +609,8 @@ function RuleSummary({ form, fallbackPoints, selectedTournaments, selectedChalle
       <div className="rounded-sm border border-white/10 bg-black/20 p-3 space-y-2 text-xs text-white/55">
         <div className="flex items-start gap-2">
           <Info className="w-4 h-4 text-[#FFD700] shrink-0 mt-0.5" />
-          <div>
-            <div className="font-bold text-white/75">Aktuelle Auswahl</div>
-            <div>{selectedText}</div>
-          </div>
+          <div>Streichresultate: {Number(form.drop_worst || 0)}</div>
         </div>
-        <div>Streichresultate: {Number(form.drop_worst || 0)}</div>
-        <div>Fallback-Tabelle: {fallbackPoints.join(", ")}</div>
       </div>
     </aside>
   );
@@ -509,7 +655,7 @@ function SourcePicker({ label, helper, items, selected, onToggle, onSetSelected,
           <div className="text-[11px] text-white/35 mt-1">{helper}</div>
         </div>
         <span className="text-[10px] uppercase tracking-widest px-2 py-1 border border-white/10 bg-white/5 text-white/60 shrink-0">
-          {selected.length ? `${selected.length} aktiv` : "Auto"}
+          {selected.length ? `${selected.length} gewählt` : "keine"}
         </span>
       </div>
 
@@ -523,7 +669,7 @@ function SourcePicker({ label, helper, items, selected, onToggle, onSetSelected,
           Sichtbare wählen
         </button>
         <button type="button" onClick={() => onSetSelected(selected.filter((id) => !filtered.some((item) => item.id === id)))} className="px-2 py-1 border border-white/10 text-white/60 hover:text-white text-[10px] uppercase tracking-widest rounded-sm">
-          Sichtbare loesen
+          Sichtbare lösen
         </button>
         {selectedVisible > 0 && <span className="text-[10px] uppercase tracking-widest text-[#29B6E8] self-center">{selectedVisible} sichtbar gewählt</span>}
       </div>

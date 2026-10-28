@@ -104,7 +104,7 @@ export function SeasonTab() {
             accent="#29B6E8"
             hint={preview.finished
               ? "Die Saison ist abgeschlossen. Ein erneuter Abschluss schreibt die Rangliste neu und vergibt, was noch fehlt – doppelt wird nichts."
-              : "Die Saison läuft noch. Abgeschlossen wird sie in der Jahreswertung (Status „abgeschlossen“) – dabei werden genau diese Erfolge vergeben."}
+              : "Die Saison läuft noch. Abgeschlossen wird sie in der Jahreswertung mit dem Knopf „Abschließen“ – dabei werden genau diese Erfolge vergeben."}
             actions={preview.finished ? (
               <button type="button" onClick={awardSeason} disabled={busy} data-testid="season-award" className="px-3 py-1.5 bg-[#29B6E8] text-black text-[10px] font-bold uppercase tracking-widest rounded-sm disabled:opacity-40">Abschluss vergeben</button>
             ) : (

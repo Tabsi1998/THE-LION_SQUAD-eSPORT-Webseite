@@ -279,3 +279,14 @@ async def test_points_land_in_the_latest_active_season_when_old_data_has_two(flo
     ])
     entry = await season_service.award_points(user_id="anna", source_type="event", source_id="e-1", rank=None)
     assert entry["season_id"] == "neu"
+
+
+@pytest.mark.asyncio
+async def test_the_person_search_for_corrections_is_for_the_tournament_lead(flow):
+    await seasons(flow, {"id": "a", "status": "active"})
+    anna = await flow.add_user(name="anna-korrektur")
+    response = await flow.get("/api/admin/people/search", params={"purpose": "season", "q": "anna-korr"})
+    assert response.status_code == 200, response.text
+    assert [hit["id"] for hit in response.json()] == [anna["id"]]
+    flow.act_as(await flow.add_user(name="niemand"))
+    assert (await flow.get("/api/admin/people/search", params={"purpose": "season", "q": "anna"})).status_code == 403
