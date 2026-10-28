@@ -107,6 +107,8 @@ MODEL_FIELDS: dict[str, tuple[str, ...]] = {
                          "print_files",
                          # Vereinsnummer im Druck (#2150): die Nummer und die Einwilligung (Zeitpunkt, Textfassung)
                          "print_number", "number_consent",
+                         # Produktoptionen von Printful (#2158), eingefroren - etwa die Nahtfarbe
+                         "product_options",
                          # Bruttoanteil der Position an der Printful-Schätzung (#2135): netto, Steuer, brutto
                          "gross"),
     "shop_order_events": ("id", "order_id", "event_key", "kind", "at", "actor_id", "data"),
@@ -120,7 +122,9 @@ MODEL_FIELDS: dict[str, tuple[str, ...]] = {
                          "printful_status", "response", "deviations", "sent_at", "deleting_at", "deleted_at",
                          "deleted_by", "delete_note", "send_attempted_at", "deleting_from",
                          # Vereinsnummer (#2150): mit der Beispielnummer gedruckt - nie die Nummer eines Mitglieds
-                         "with_number"),
+                         "with_number",
+                         # Produktoptionen von Printful (#2158), etwa die Nahtfarbe
+                         "product_options"),
 }
 FORBIDDEN_FIELD_PARTS = ("iban", "bic", "bank", "account_number", "card", "cvv", "password", "passwort", "secret",
                          "token", "api_key", "apikey")

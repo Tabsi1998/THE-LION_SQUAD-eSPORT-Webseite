@@ -30,7 +30,8 @@ from typing import Any, NoReturn
 from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
-from services import shop_catalog, shop_colors, shop_common, shop_config, shop_motifs, shop_pricing, shop_print_files
+from services import shop_catalog, shop_colors, shop_common, shop_config, shop_motifs, shop_options, shop_pricing
+from services import shop_print_files
 from services.log_safe import log_safe
 from services.shop_common import ShopConflict, ShopError, assert_no_address
 from services.shop_fulfillment import FulfillmentProvider, short_external_id
@@ -211,6 +212,13 @@ async def _freeze_line(db, line: dict, position: int, buyer_kind: str, config: d
     if product.get("printful") and (not mapping or mapping.get("in_stock") is not True):
         # Fail-closed (#1709): nur, was Printful zuletzt ausdrücklich als lieferbar gemeldet hat.
         _not_orderable(position, product, variant, "bei Printful nicht als lieferbar gemeldet")
+    options: tuple = ()
+    if product.get("printful"):
+        # Pflichtoptionen von Printful (#2158), etwa die Nahtfarbe - ohne sie lehnt Printful den Auftrag ab.
+        try:
+            options = shop_options.line_options(product)
+        except ShopError:
+            _not_orderable(position, product, variant, "Produktoption von Printful fehlt (Schritt 2)")
     unit = variant["price_cents"] if variant.get("price_cents") is not None else product.get("base_price_cents")
     if unit is None:
         _not_orderable(position, product, variant, "kein Preis übernommen")
@@ -247,6 +255,8 @@ async def _freeze_line(db, line: dict, position: int, buyer_kind: str, config: d
         "print_number": number,
         "number_consent": ({"given_at": now or now_utc().isoformat(), **number_consent_terms()}
                            if number is not None else None),
+        # Produktoptionen (#2158) eingefroren - nur bei Produkten, die welche haben.
+        **({"product_options": shop_options.frozen(options)} if options else {}),
     }
 
 
