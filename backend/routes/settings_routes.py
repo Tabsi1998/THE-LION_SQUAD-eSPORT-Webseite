@@ -1109,6 +1109,37 @@ async def track_site_banner_click(body: SiteBannerStatBody, request: Request):
     return await _count_banner(request, body.banner_id, "clicks", "last_click_at", BANNER_CLICK_LIMIT)
 
 
+# Absender, Antworten-an und „Versand aktiv“ gelten für Resend und SMTP gleich (#2119 ML3). Sie stehen in `settings.mail`
+# - dort liest der Versand zuerst (services/mail_queue.get_mail_settings). Ältere Installationen haben sie nur in
+# `settings.email`; die gelten, bis jemand sie neu speichert. Beide Abschnitte zeigen den Wert, der wirklich gilt.
+SHARED_SENDER_FIELDS = ("sender_name", "sender_email", "reply_to_email", "enabled")
+
+
+async def _shared_sender(db) -> dict:
+    mail = await db.settings.find_one({"id": "mail"}, {"_id": 0}) or {}
+    legacy = await db.settings.find_one({"id": "email"}, {"_id": 0}) or {}
+    sender_email = mail.get("sender_email") or legacy.get("sender_email") or ""
+    return {
+        "sender_name": mail.get("sender_name") or legacy.get("sender_name") or "",
+        "sender_email": sender_email,
+        "reply_to_email": mail.get("reply_to_email") or legacy.get("reply_to_email") or sender_email,
+        "enabled": bool(mail["enabled"]) if "enabled" in mail else bool(legacy.get("enabled", True)),
+    }
+
+
+async def _save_shared_sender(db, updates: dict, actor_id: str) -> list[str]:
+    """Die gemeinsamen Absender-Felder nach `settings.mail` - gleich, aus welchem Abschnitt sie kommen."""
+    shared = {key: updates.pop(key) for key in SHARED_SENDER_FIELDS if key in updates}
+    if not shared:
+        return []
+    current = await db.settings.find_one({"id": "mail"}, {"_id": 0}) or {}
+    changed = _changed_setting_fields(current, shared)
+    if changed:
+        await db.settings.update_one({"id": "mail"}, {"$set": {**shared, "updated_at": now_utc().isoformat()}, "$setOnInsert": {"id": "mail"}}, upsert=True)
+        await _audit_settings_change(db, "settings.smtp.update", "mail", actor_id, changed)
+    return changed
+
+
 @settings_router.get("/email")
 async def get_email_settings(me: dict = Depends(require_club_admin())):
     db = get_db()
@@ -1117,6 +1148,7 @@ async def get_email_settings(me: dict = Depends(require_club_admin())):
     if s.get("resend_api_key"):
         s["resend_api_key_masked"] = "********"
         s.pop("resend_api_key", None)
+    s.update(await _shared_sender(db))
     return s
 
 
@@ -1124,6 +1156,7 @@ async def get_email_settings(me: dict = Depends(require_club_admin())):
 async def update_email_settings(body: EmailSettings, me: dict = Depends(require_club_admin())):
     db = get_db()
     updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    shared_changed = await _save_shared_sender(db, updates, me["id"])
     clear_secret = bool(updates.pop("clear_resend_api_key", False))
     unset = {"resend_api_key": ""} if clear_secret else {}
     # Only overwrite api_key if a non-empty value given
@@ -1134,7 +1167,7 @@ async def update_email_settings(body: EmailSettings, me: dict = Depends(require_
     current = await db.settings.find_one({"id": "email"}, {"_id": 0}) or {}
     changed_fields = _changed_setting_fields(current, updates, unset)
     if not changed_fields:
-        return {"ok": True, "changed": False}
+        return {"ok": True, "changed": bool(shared_changed)}
     updates["updated_at"] = now_utc().isoformat()
     operation = {"$set": updates, "$setOnInsert": {"id": "email"}}
     if unset:
@@ -1213,9 +1246,33 @@ async def newsletter_state(kind: Literal["news", "event"], id: str = Query(..., 
 
 @settings_router.post("/newsletter/preview")
 async def newsletter_preview(body: NewsletterTriggerBody, me: dict = Depends(get_current_user)):
+    """Stand des Kastens und die Mail, wie sie hinausginge (#2119 ML5) - Anrede mit dem eigenen Namen, nichts wird
+    eingereiht."""
+    from services.notification_preferences import preview_newsletter
+
     rights = await _require_newsletter_send(me, body.kind)
     item = await _newsletter_source(body.kind, body.id)
-    return await _newsletter_box(item, body.kind, rights)
+    box = await _newsletter_box(item, body.kind, rights)
+    box["mail"] = await preview_newsletter(body.kind, item, me.get("display_name") or me.get("username") or "")
+    return box
+
+
+@settings_router.post("/newsletter/unsubscribe")
+async def newsletter_unsubscribe(request: Request, token: str = Query("", max_length=200)):
+    """Newsletter mit einem Klick abbestellen (#2119 ML4) - ohne Login, nur mit dem Schlüssel aus der Mail. Mail-Programme
+    schicken dabei „List-Unsubscribe=One-Click“ als Formular (RFC 8058); der Inhalt spielt keine Rolle.
+
+    Gezählt werden nur ungültige Versuche je Adresse: gültige Klicks kommen bei großen Mail-Anbietern gesammelt von
+    wenigen Servern und dürfen nie an einer Grenze scheitern."""
+    from services.newsletter_unsubscribe import unsubscribe
+    from services.rate_limit import enforce_rate_limit
+
+    result = await unsubscribe(get_db(), token)
+    if result is None:
+        await enforce_rate_limit(request, "newsletter:unsubscribe:ip", limit=30, window_seconds=3600,
+                                 message="Zu viele ungültige Abmeldelinks. Bitte warte noch {wait}.")
+        raise HTTPException(400, "Der Abmeldelink ist ungültig. Den Newsletter kannst du auch im Profil unter Benachrichtigungen abbestellen.")
+    return result
 
 
 @settings_router.get("/newsletter/history")
@@ -1325,9 +1382,9 @@ async def get_smtp_settings(me: dict = Depends(require_club_admin())):
     s.setdefault("smtp_port", 587)
     s.setdefault("smtp_tls_verify", False)
     s.setdefault("smtp_helo_name", "")
-    s.setdefault("enabled", True)
-    s.setdefault("reply_to_email", s.get("sender_email") or "")
     s.setdefault("message_id_domain", "")
+    # Absender und Schalter: der Wert, der gilt - auch wenn er noch aus dem Resend-Teil stammt (#2119 ML3).
+    s.update(await _shared_sender(db))
     return s
 
 

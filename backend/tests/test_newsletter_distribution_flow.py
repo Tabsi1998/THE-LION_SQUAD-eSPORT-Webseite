@@ -102,6 +102,37 @@ async def test_the_tournament_lead_sends_an_events_newsletter_once_resending_sta
 
 
 @pytest.mark.asyncio
+async def test_the_preview_renders_the_real_mail_without_sending(flow):
+    """#2119 ML5: die Vorschau zeigt die Mail, wie sie hinausgeht - mit Titel, Auszug, Link und dem eigenen Namen als
+    Anrede; geschickt wird dabei nichts."""
+    await subscribers(flow, 2)
+    post_id = await news(flow, excerpt="Turnierplan, Sitzplätze & Anreise")
+    editor = await granted(flow, "redaktion", "content")
+    flow.act_as(editor)
+    preview = (await flow.post("/api/settings/newsletter/preview", json={"kind": "news", "id": post_id})).json()
+    assert preview["recipients"] == 2 and preview["state"] == "ready"
+    mail = preview["mail"]
+    assert mail["subject"] == "Neue Vereinsnews: Herbst-LAN: Plan steht"
+    assert "Turnierplan, Sitzplätze &amp; Anreise" in mail["html"] and f"/news/news-{post_id[:6]}" in mail["html"]
+    assert f"Hallo {editor['display_name']}" in mail["html"]
+    assert "leserin" not in str(preview), "keine Namen der Empfänger"
+    assert await flow.db.mail_jobs.count_documents({}) == 0
+
+    # Eine angepasste Vorlage gilt auch in der Vorschau.
+    await flow.db.email_templates.insert_one({"key": "newsletter_news", "override": True, "subject": "News: {{title}}", "html": "<p>{{title}} – {{excerpt}}</p>"})
+    custom = (await flow.post("/api/settings/newsletter/preview", json={"kind": "news", "id": post_id})).json()["mail"]
+    assert custom["subject"] == "News: Herbst-LAN: Plan steht" and "<p>Herbst-LAN: Plan steht – Turnierplan" in custom["html"]
+
+    event_id = await event(flow, location="Vereinsheim")
+    event_mail = (await flow.post("/api/settings/newsletter/preview", json={"kind": "event", "id": event_id})).json()["mail"]
+    assert event_mail["subject"] == "Neues Event: Herbst-LAN 2026" and "Vereinsheim" in event_mail["html"]
+
+    # „Nur intern“ geht nicht per Mail hinaus - also auch keine Mail-Vorschau.
+    internal_id = await news(flow, visibility="internal")
+    assert (await flow.post("/api/settings/newsletter/preview", json={"kind": "news", "id": internal_id})).json()["mail"] is None
+
+
+@pytest.mark.asyncio
 async def test_drafts_and_internal_posts_are_never_marked_as_sent(flow):
     await subscribers(flow, 2)
     draft_id = await news(flow, published=False)

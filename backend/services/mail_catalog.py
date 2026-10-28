@@ -38,6 +38,8 @@ CATALOG: dict[str, dict[str, str]] = {
     "registration_rejected": {"name": "Turnier: Anmeldung abgelehnt", "purpose": "Die Turnierleitung hat die Anmeldung abgelehnt – mit Grund, wenn einer angegeben ist.", "recipient": "die Verantwortlichen der Anmeldung (bei Teams Teamleitung und Co-Leitung)", "category": "tournament"},
     "checkin_closes_soon": {"name": "Turnier: Check-in schließt bald", "purpose": "Letzte Erinnerung vor dem Ende des Check-ins – mit „Jetzt einchecken“.", "recipient": "die Verantwortlichen jeder Anmeldung ohne Check-in", "category": "tournament"},
     "checkin_closes_soon_on_site": {"name": "Turnier vor Ort: Check-in schließt bald", "purpose": "Letzte Erinnerung bei Vor-Ort-Turnieren: bis wann man sich bei der Turnierleitung meldet – ohne Knopf zum Einchecken.", "recipient": "die Verantwortlichen jeder Anmeldung ohne Check-in", "category": "tournament"},
+    "tournament_cancelled": {"name": "Turnier abgesagt", "purpose": "Die Turnierleitung hat das Turnier abgesagt – mit Grund, wenn einer angegeben ist (#2120). Nur, wenn die Person Mails zu Turnier-Updates zulässt.", "recipient": "alle Spieler der Anmeldungen, die noch mitspielen wollten (ausstehend, bestätigt, eingecheckt, Warteliste)", "category": "tournament"},
+    "event_cancelled": {"name": "Event abgesagt", "purpose": "Das Event ist abgesagt; Anmeldung und Warteliste sind storniert (#2118). Nur, wenn die Person Mails zu Turnier-Updates zulässt.", "recipient": "die Angemeldeten und die Warteliste des Events (je Person einmal)", "category": "tournament"},
     "tournament_finished": {"name": "Turnier beendet", "purpose": "Das Turnier ist beendet – Platzierungen und Ergebnisse stehen auf der Turnierseite.", "recipient": "alle Spieler der bestätigten Anmeldungen", "category": "tournament"},
     "match_reminder": {"name": "Spiel startet jetzt", "purpose": "Die Turnierleitung hat das Spiel an der Station gestartet – mit Spiel und Station. Den Aufruf beim Reservieren gibt es im Postfach und per Push.", "recipient": "alle Spieler des Spiels (bei Teams jedes Mitglied)", "category": "match"},
     "match_lead_10m": {"name": "Spiel in 10 Minuten", "purpose": "Erinnerung zehn Minuten vor dem Spiel (nicht vor Ort mit festen Zeiten – dort ruft die Turnierleitung auf).", "recipient": "alle Spieler des Spiels", "category": "match"},
@@ -81,6 +83,7 @@ SAMPLES: dict[str, str] = {
     "excerpt": "Mario Kart Winter Cup und Smash Showdown – jetzt anmelden!", "preview": "Bist du am Samstag dabei?", "note": "Wir freuen uns auf dich!",
     "url": "{origin}/tournaments/mario-kart-winter-cup", "verification_url": "{origin}/verify-email?token=beispiel", "reset_url": "{origin}/reset-password?token=beispiel",
     "invite_url": "{origin}/register?invite=beispiel", "preferences_url": "{origin}/profile", "appeal_url": "{origin}/contact", "branding": "THE LION SQUAD",
+    "unsubscribe_url": "{origin}/newsletter/abbestellen?token=beispiel",
     # Rechnung ist da (#841)
     "source": "Weihnachtsfeier", "amount": "40,00 €", "due_on": "17.10.2026", "paid": "",
     # Wochenrückblick (#622)
@@ -99,6 +102,62 @@ def sample_value(var: str, origin: str) -> str:
     if value is None:
         value = "Beispiel"
     return value.replace("{origin}", origin)
+
+
+def placeholder(var: str) -> str:
+    """Der Platzhalter, den der Admin im Editor sieht und der beim Versand ersetzt wird."""
+    return "{{" + var + "}}"
+
+
+def _placeholder_kwargs(variables: list[str]) -> dict[str, str]:
+    # Optionale Teile einer festen Vorlage hängen an `if wert:`. Ein Platzhalter ist nie leer - nur wo das Beispiel
+    # bewusst leer ist (`paid`: offene Rechnung statt „schon bezahlt“), bleibt der Wert leer, damit der häufige Fall
+    # im Editor steht.
+    return {v: "" if SAMPLES.get(v) == "" else placeholder(v) for v in variables}
+
+
+def default_source(key: str, fn: Any | None, default_doc: dict | None) -> dict:
+    """Der Standard einer Vorlage mit `{{variable}}` statt Beispieldaten (#2119 ML1) - Ausgangspunkt im Editor."""
+    if fn is not None:
+        variables = template_vars(key, fn, None)
+        kwargs = {"branding": "THE LION SQUAD"} if key == "test" else _placeholder_kwargs(variables)
+        subject, html = fn(**kwargs)
+        return {"subject": subject, "html": html}
+    if default_doc:
+        return {"subject": default_doc.get("subject") or "", "html": default_doc.get("html") or ""}
+    return {"subject": "", "html": ""}
+
+
+def _sample_needles(variables: list[str], origin: str) -> list[str]:
+    """Beispielwerte, die in einer gespeicherten Vorlage nichts verloren haben. Zu kurze Werte und reine Zahlen
+    („12“, „240“) wären Zufallstreffer; der Ersatzwert „Beispiel“ für unbekannte Variablen steht in „zum Beispiel“."""
+    needles: list[str] = []
+    for var in variables:
+        raw = SAMPLES.get(var)
+        # Reine Links ({origin}/profile, /contact …) zählen nicht: die darf eine eigene Fassung mit Absicht enthalten -
+        # nur echte Beispiel-Inhalte wie Namen und Turniere.
+        if not raw or raw.startswith(("{origin}", "http")):
+            continue
+        for line in raw.replace("{origin}", origin).splitlines():
+            line = line.strip()
+            if len(line) >= 4 and not line.isdigit() and line not in needles:
+                needles.append(line)
+    return needles
+
+
+def sample_leaks(subject: str | None, html: str | None, variables: list[str], origin: str, default: dict | None = None) -> list[str]:
+    """Welche Beispielwerte der Vorschau im gespeicherten Text stehen (#2119 ML1). Werte, die schon der Standard
+    selbst enthält („Vorstand“, „Rudel“), zählen nicht - die stehen dort mit Absicht."""
+    import html as html_lib
+
+    text = f"{subject or ''}\n{html or ''}"
+    baseline = f"{(default or {}).get('subject') or ''}\n{(default or {}).get('html') or ''}"
+    found = []
+    for needle in _sample_needles(variables, origin):
+        forms = {needle, html_lib.escape(needle, quote=True)}
+        if any(form in text for form in forms) and not any(form in baseline for form in forms):
+            found.append(needle)
+    return found
 
 
 def code_templates() -> dict[str, Any]:
@@ -142,36 +201,78 @@ async def render(db, key: str, *, subject: str | None = None, html: str | None =
     return {"subject": "", "html": "", "vars": variables, "sample": sample, "source": "missing"}
 
 
+def _template_state(key: str, fn: Any | None, doc: dict | None, default_doc: dict | None, origin: str) -> dict:
+    """Stand einer Vorlage: Variablen, ob angepasst, der Text mit Platzhaltern und gespeicherte Beispielwerte."""
+    variables = [] if key == "ops_alert" else template_vars(key, fn, default_doc or doc)
+    stored = bool(doc and (fn is None or doc.get("override")))
+    if fn is not None:
+        custom = bool(stored and (doc.get("html") or "").strip())
+        source = "code"
+    else:
+        base = default_doc or {}
+        custom = bool(doc and base and ((doc.get("subject") != base.get("subject")) or (doc.get("html") != base.get("html"))))
+        source = "db"
+    default = default_source(key, fn, default_doc)
+    leaks = sample_leaks(doc.get("subject"), doc.get("html"), variables, origin, default) if stored else []
+    return {"vars": variables, "source": source, "custom": custom, "stored": stored, "default": default, "sample_leaks": leaks}
+
+
+async def _origin_of(db) -> str:
+    branding = await db.settings.find_one({"id": "branding"}, {"_id": 0, "domain": 1}) or {}
+    return _origin(branding)
+
+
 async def list_templates(db, defaults: list[dict]) -> list[dict]:
     """Alle Mails der Website mit Zweck, Empfänger, Variablen und Stand (Standard oder angepasst)."""
     fns = code_templates()
     docs = {d["key"]: d for d in await db.email_templates.find({}, {"_id": 0}).to_list(200)}
     default_by_key = {d["key"]: d for d in defaults}
+    origin = await _origin_of(db)
     rows = []
     for key, meta in CATALOG.items():
         fn = fns.get(key)
         doc = docs.get(key)
         if fn is None and doc is None and key not in default_by_key and key != "ops_alert":
             continue
-        variables = template_vars(key, fn, doc or default_by_key.get(key))
-        if key == "ops_alert":
-            variables = []
-        if fn is not None:
-            custom = bool(doc and doc.get("override") and (doc.get("html") or "").strip())
-            source = "code"
-        else:
-            base = default_by_key.get(key) or {}
-            custom = bool(doc and base and ((doc.get("subject") != base.get("subject")) or (doc.get("html") != base.get("html"))))
-            source = "db"
+        state = _template_state(key, fn, doc, default_by_key.get(key), origin)
         rows.append({
             "key": key, "name": meta["name"], "purpose": meta["purpose"], "recipient": meta["recipient"],
-            "category": meta["category"], "category_label": CATEGORIES[meta["category"]], "vars": variables,
-            "source": source, "custom": custom, "editable": key != "ops_alert",
-            "subject": (doc or {}).get("subject") if (doc and (fn is None or doc.get("override"))) else None,
-            "html": (doc or {}).get("html") if (doc and (fn is None or doc.get("override"))) else None,
+            "category": meta["category"], "category_label": CATEGORIES[meta["category"]], "vars": state["vars"],
+            "source": state["source"], "custom": state["custom"], "editable": key != "ops_alert",
+            "subject": (doc or {}).get("subject") if state["stored"] else None,
+            "html": (doc or {}).get("html") if state["stored"] else None,
             "updated_at": (doc or {}).get("updated_at"),
+            # Beispielwerte aus der Vorschau im gespeicherten Text (#2119 ML1) - gingen so an alle Empfänger.
+            "sample_leaks": state["sample_leaks"],
         })
     return rows
+
+
+async def editor_source(db, key: str, defaults: list[dict]) -> dict:
+    """Was der Editor lädt (#2119 ML1): der geltende Text mit `{{variable}}` - nie die Vorschau mit Beispieldaten."""
+    if key not in CATALOG or key == "ops_alert":
+        raise ValueError("Diese Vorlage gibt es nicht.")
+    fn = code_templates().get(key)
+    doc = await db.email_templates.find_one({"key": key}, {"_id": 0})
+    default_doc = next((d for d in defaults if d["key"] == key), None)
+    if fn is None and doc is None and default_doc is None:
+        raise ValueError("Diese Vorlage gibt es nicht.")
+    state = _template_state(key, fn, doc, default_doc, await _origin_of(db))
+    text = {"subject": doc.get("subject") or "", "html": doc.get("html") or ""} if state["stored"] and (fn is None or state["custom"]) else state["default"]
+    return {"key": key, "subject": text["subject"], "html": text["html"], "vars": state["vars"], "source": state["source"],
+            "custom": state["custom"], "sample_leaks": state["sample_leaks"]}
+
+
+async def check_samples(db, key: str, defaults: list[dict], *, subject: str | None, html: str | None) -> list[str]:
+    """Beispielwerte im Entwurf, der gespeichert werden soll - zusammen mit dem, was davon schon gespeichert ist."""
+    fn = code_templates().get(key)
+    doc = await db.email_templates.find_one({"key": key}, {"_id": 0}) or {}
+    default_doc = next((d for d in defaults if d["key"] == key), None)
+    stored = bool(doc) and (fn is None or doc.get("override"))
+    merged_subject = subject if subject is not None else (doc.get("subject") if stored else None)
+    merged_html = html if html is not None else (doc.get("html") if stored else None)
+    variables = template_vars(key, fn, default_doc or doc)
+    return sample_leaks(merged_subject, merged_html, variables, await _origin_of(db), default_source(key, fn, default_doc))
 
 
 async def save_override(db, key: str, defaults: list[dict], *, subject: str | None, html: str | None, name: str | None, actor_id: str | None) -> dict:

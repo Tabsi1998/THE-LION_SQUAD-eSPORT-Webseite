@@ -393,8 +393,8 @@ export default function AdminSettingsPage() {
     if (savingSmtp) return;
     const payload = smtpPayload(smtp);
     if (payload.provider === "smtp" && payload.smtp_auth === "login") {
-      if (!payload.smtp_user) return toast.error("SMTP User fehlt. Für einfachen Versand bitte office@... eintragen.");
-      if (!smtp.smtp_pass && !smtp.smtp_pass_masked) return toast.error("SMTP Passwort fehlt.");
+      if (!payload.smtp_user) return toast.error("Der Benutzer fehlt – meist ist das die Adresse des Postfachs, etwa office@…");
+      if (!smtp.smtp_pass && !smtp.smtp_pass_masked) return toast.error("Das Passwort des Postfachs fehlt.");
     }
     const patch = buildDirtyPayload(payload, originalSmtpRef.current);
     if (!hasPayloadChanges(patch)) return toast.info("Keine Änderungen zum Speichern.");
@@ -419,7 +419,7 @@ export default function AdminSettingsPage() {
       smtp_tls_verify: false,
       smtp_envelope_from: "",
     });
-    toast.success("Standard SMTP-Login gesetzt: 587, Auto-TLS, Benutzer/Passwort.");
+    toast.success("Standard eingetragen: Port 587, Verschlüsselung nach Port, Anmeldung mit Benutzer und Passwort.");
   };
   const applyLocalIpPreset = () => {
     setSmtp({
@@ -433,13 +433,13 @@ export default function AdminSettingsPage() {
       smtp_helo_name: "",
       message_id_domain: "",
     });
-    toast.success("Lokale IP vorbereitet: Auto-TLS, Login, ohne Host-Domain.");
+    toast.success("Für eine IP im eigenen Netz vorbereitet: Port 587, Anmeldung, ohne Domain-Felder.");
   };
   const sendSmtpTest = async () => {
     if (!smtpTestEmail) return toast.error("E-Mail-Adresse eingeben");
     try {
       const { data } = await api.post("/settings/smtp/test", { to: smtpTestEmail });
-      if (data.ok) toast.success(`SMTP-Testmail gesendet (ID: ${data.id || "—"})`);
+      if (data.ok) toast.success("Testmail ist raus – schau ins Postfach.");
       else toast.error(`Fehler: ${data.reason}`);
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
@@ -448,8 +448,8 @@ export default function AdminSettingsPage() {
     try {
       const { data } = await api.post("/settings/smtp/diagnose", { to: smtpTestEmail });
       setSmtpDiag(data);
-      if (data.ok) toast.success("SMTP Diagnose erfolgreich.");
-      else toast.error("SMTP Diagnose zeigt ein Problem.");
+      if (data.ok) toast.success("Die Verbindung zum Mailserver klappt.");
+      else toast.error("Die Diagnose zeigt ein Problem – Details stehen darunter.");
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
   const checkDeliverability = async () => {

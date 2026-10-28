@@ -87,7 +87,8 @@ Die Liste unter Content → News hat Suche, Filter nach Kategorie und Sichtbarke
 (nie Namen), die Meldung an Mitglieder oder Vorstand und die Discord-Vorschau.
 
 - Veröffentlicht ihr, geht der Newsletter von selbst an die Abonnenten: „Geht beim Veröffentlichen von selbst an …“. Mit
-  **Jetzt senden** schickt ihn die Redaktion von Hand. Danach steht dort „gesendet am … an …“.
+  **Jetzt senden** schickt ihn die Redaktion von Hand. Danach steht dort „gesendet am … an …“. **Mail ansehen** zeigt die Mail
+  vorher so, wie sie hinausgeht (mit eurem Namen als Anrede).
 - Ein **zweites Mal** senden nur Redaktion und System, immer mit Rückfrage.
 - **Entwürfe** und **Nur intern** gehen nicht als Newsletter hinaus.
 - Die Meldung „intern“ geht per Benachrichtigung nur an die, die den Inhalt sehen dürfen: bei **Nur Vereinsmitglieder** an aktive

@@ -3,7 +3,7 @@
 - **Absagen** (Status wechselt auf ``cancelled``): jede aktive Anmeldung und die Warteliste gelten als storniert
   (``cancelled_with_event``), offene Rechnungsaufträge werden storniert, ein schon angelegter Beleg wird zum Prüffall
   (``billing_orders.cancel_orders_for``). Alle Betroffenen bekommen eine Benachrichtigung (Postfach, Push, Discord nach
-  Einstellung) und die vorhandene Mail „Nachricht zum Event“ (``event_message``), wenn sie Mails zu Turnier-Updates
+  Einstellung) und die Mail „Event abgesagt“ (``event_cancelled``, #2119), wenn sie Mails zu Turnier-Updates
   zulassen. Protokoll ``event.cancel``.
 - **Verschieben**: neuer Termin oder Ort. Ob die Angemeldeten es erfahren, entscheidet die Verwaltung beim Speichern
   (``notify_registrants``); dieselben Wege, Protokoll ``event.change_notice``.
@@ -76,8 +76,10 @@ async def _recipients(db, user_ids: list[str]) -> list[dict]:
     return sorted(users, key=lambda user: user["id"])
 
 
-async def _inform(db, event: dict, users: list[dict], *, title: str, message: str, dedupe: str) -> dict:
-    """Benachrichtigung und Mail über die vorhandenen Wege; ein Fehler bei einer Person hält die anderen nicht auf."""
+async def _inform(db, event: dict, users: list[dict], *, title: str, message: str, dedupe: str,
+                  template: str = MESSAGE_TEMPLATE) -> dict:
+    """Benachrichtigung und Mail über die vorhandenen Wege; ein Fehler bei einer Person hält die anderen nicht auf.
+    Die Absage hat ihre eigene Mail ``event_cancelled`` (#2119), die Terminänderung bleibt bei ``event_message``."""
     from services.notification_preferences import send_user_template
     from services.user_notifications import build_public_url, create_user_notification
 
@@ -96,10 +98,11 @@ async def _inform(db, event: dict, users: list[dict], *, title: str, message: st
             logger.warning("Event %s: Benachrichtigung %s nicht angelegt", log_safe(event["id"]), log_safe(user["id"]),
                            exc_info=True)
         try:
+            values = {"display_name": user.get("display_name") or user.get("username") or "", "event_name": name, "url": url}
+            if template == MESSAGE_TEMPLATE:
+                values["message"] = message
             result = await send_user_template(
-                user, MESSAGE_TEMPLATE, MESSAGE_CATEGORY, dedupe_key=f"{dedupe}:{user['id']}",
-                display_name=user.get("display_name") or user.get("username") or "", event_name=name,
-                message=message, url=url,
+                user, template, MESSAGE_CATEGORY, dedupe_key=f"{dedupe}:{user['id']}", **values,
             )
             mails += 1 if result.get("ok") and not result.get("skipped") else 0
         except Exception:
@@ -138,7 +141,7 @@ async def cancel_event(db, event: dict, me: dict) -> dict:
     # doppelter Klick schickt nichts doppelt, wer sich nach dem Zurücknehmen neu anmeldet, erfährt die zweite Absage.
     round_no = int(event.get("cancel_round") or 1)
     sent = await _inform(db, event, users, title="abgesagt", message=message,
-                         dedupe=f"event-cancelled:{event['id']}:{round_no}")
+                         dedupe=f"event-cancelled:{event['id']}:{round_no}", template="event_cancelled")
     result = {"registrations": len(registrations), "notified": sent["notified"], "orders": orders}
     await db.audit_logs.insert_one({
         "id": new_id(), "action": "event.cancel", "actor_id": me["id"], "target_id": event["id"],

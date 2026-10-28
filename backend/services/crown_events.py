@@ -107,7 +107,7 @@ async def _persist_and_notify(rank_crowns: dict[str, str]) -> list[dict]:
                 body=f"Du bist jetzt Platz {place} der Punktewertung — die {CROWN_NAMES[ev['variant']]} gehört dir!",
                 url="/achievements",
                 kind="crown_gained",
-                meta={"variant": ev["variant"], "category": "achievement", "dedupe_key": dedupe},
+                meta={"variant": ev["variant"], "category": "achievements", "dedupe_key": dedupe},
             )
         elif ev["type"] == "changed":
             place = RANK_ORDER[ev["variant"]]
@@ -117,7 +117,7 @@ async def _persist_and_notify(rank_crowns: dict[str, str]) -> list[dict]:
                 body=f"Die {CROWN_NAMES[ev['prev']]} ging an einen anderen Spieler — du trägst jetzt die {CROWN_NAMES[ev['variant']]} (Platz {place}).",
                 url="/achievements",
                 kind="crown_changed",
-                meta={"variant": ev["variant"], "prev": ev["prev"], "category": "achievement", "dedupe_key": dedupe},
+                meta={"variant": ev["variant"], "prev": ev["prev"], "category": "achievements", "dedupe_key": dedupe},
             )
         else:
             await create_user_notification(
@@ -126,7 +126,7 @@ async def _persist_and_notify(rank_crowns: dict[str, str]) -> list[dict]:
                 body=f"Deine {CROWN_NAMES[ev['prev']]} wurde von einem anderen Spieler erobert. Sammle Punkte und hol sie dir zurück!",
                 url="/achievements",
                 kind="crown_lost",
-                meta={"prev": ev["prev"], "category": "achievement", "dedupe_key": dedupe},
+                meta={"prev": ev["prev"], "category": "achievements", "dedupe_key": dedupe},
             )
     return events
 
