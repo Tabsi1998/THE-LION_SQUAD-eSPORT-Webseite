@@ -160,8 +160,10 @@ Eine Benachrichtigung entsteht einmal und geht dann, je nach Einstellung der Per
   Nachricht vom Vereins-Bot (Titel, Text, Link). Nie darin: Chat-Texte anderer, Moderation, Zahlungsdaten. Discord stellt Direktnachrichten
   nur zu, wenn die Person mit dem Bot einen Server teilt und „Direktnachrichten von Servermitgliedern“ erlaubt. Lehnt Discord ab, bleibt es
   bei In-App und Push, und die Einstellungen zeigen den Klickweg. Bot aus: keine Nachricht, der Grund steht im Versand-Log.
-- **Push testen:** **Admin → System → Push-Tests**: Benutzer suchen, Testnachricht senden. Die Seite zeigt die Tokens des Kontos, den letzten Versand
-  und Fehler. „In-App erstellt, aber kein aktiver Push-Token gefunden“ heißt: Die Person hat die App nicht oder keine Push-Erlaubnis.
+- **Push testen:** **Admin → System → Push-Tests**: Benutzer suchen, Testnachricht senden. Der Test landet als „Test: …“ im Postfach der Person.
+  Die Seite zeigt die angemeldeten Handys, ob der Push-Dienst die Nachricht **angenommen** und ob Apple oder Google sie **zugestellt** haben, dazu
+  Fehler in Alltagssprache. „Im Postfach angelegt – aber auf keinem Handy ist die App mit Push angemeldet“ heißt: Die Person hat die App nicht oder
+  keine Push-Erlaubnis.
   In der Kommandozentrale steht die Zahl der aktiven Tokens und Fehler unter **Push-Monitoring**.
 
 ### 3.6 Was Mitglieder selbst abschalten können
@@ -190,7 +192,7 @@ Eine Benachrichtigung entsteht einmal und geht dann, je nach Einstellung der Per
 | Newsletter ging nicht hinaus | Entwurf, „Nur intern“ oder keine Zustimmungen | Kasten **Verteilen** ansehen ([Inhalte](inhalte.md)) |
 | Ein Mitglied bekommt keine Turnier-Mails | Thema oder Kanal E-Mail ist bei ihm aus | In Einstellungen → Benachrichtigungen prüfen |
 | Mitglied bekommt keine Push-Meldung | Keine App, keine Erlaubnis, Kanal am Handy stumm, oder Push in den Einstellungen aus | Push-Tests ausführen; Handy-Einstellungen prüfen |
-| „In-App erstellt, aber kein aktiver Push-Token gefunden“ | Das Konto hat kein registriertes Gerät | App öffnen, Push erlauben |
+| „Im Postfach angelegt – aber auf keinem Handy ist die App mit Push angemeldet“ | Das Konto hat kein registriertes Gerät | App öffnen, Push erlauben |
 | Discord-Kanal lässt sich nicht einschalten | Kein Discord-Konto verknüpft | Profil → Socials → Mit Discord verknüpfen |
 | Discord-Direktnachricht kommt nicht | Discord lehnt ab (kein gemeinsamer Server oder Nachrichten gesperrt), oder Bot aus | Hinweis in den Einstellungen folgen; Verbindungen → Discord prüfen |
 | Rechnung per Discord erwartet | Beträge gehen nie über Discord | Rechnungen kommen In-App, Push, Mail |
