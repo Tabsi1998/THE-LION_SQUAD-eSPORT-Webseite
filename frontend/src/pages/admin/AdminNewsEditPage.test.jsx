@@ -251,3 +251,24 @@ test("zurückgezogen: Hinweis und Wiederherstellen als Entwurf", async () => {
   fireEvent.click(screen.getByTestId("news-restore"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/news/n1/restore"));
 });
+
+// Alltagssprache und Suche in den Verknüpfungen (#2122 NW5).
+test("Verknüpfungen: Suchfeld filtert, Gewähltes bleibt, Entwürfe sind gekennzeichnet; keine Fachbegriffe", async () => {
+  const tournaments = Array.from({ length: 7 }, (_, index) => ({ id: `t${index}`, title: `Cup ${index}`, status: index === 3 ? "draft" : "registration_open" }));
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/news-meta") return { data: META };
+    if (url.startsWith("/admin/news/")) return adminPost(url, [{ ...POSTS[0], linked_tournament_ids: ["t1"] }]);
+    if (url.startsWith("/tournaments")) return { data: tournaments };
+    return { data: [] };
+  });
+  renderAt("/admin/news/n1");
+  const box = await screen.findByTestId("news-link-tournaments");
+  expect(box).toHaveTextContent("Entwurf");
+  fireEvent.change(screen.getByTestId("news-link-tournaments-search"), { target: { value: "Cup 5" } });
+  expect(box).toHaveTextContent("Cup 5");
+  expect(box).toHaveTextContent("Cup 1");
+  expect(box).not.toHaveTextContent("Cup 2");
+  const form = screen.getByTestId("news-form");
+  expect(form).not.toHaveTextContent(/Slug|kebab|Teaser|Embeds|noindex|Markdown/);
+  expect(screen.getByText("Adresse (Link)")).toBeInTheDocument();
+});

@@ -276,13 +276,14 @@ function NewsForm({ post, meta, onDone, onReload }) {
   const hasEmbedToken = /\[\[(fastlap|tournament|event):[^\]]+\]\]/i.test(form.content || "");
   const newsletterDone = Boolean(post.newsletter_sent_at);
   const editorialChecklist = [
-    { label: "Titel", done: Boolean(form.title.trim()), description: form.title.trim() ? "Sauber gesetzt." : "Pflichtfeld für Listen, SEO und Social Cards." },
-    { label: "Teaser", done: Boolean(form.excerpt.trim()), description: form.excerpt.trim() ? "Kurzbeschreibung vorhanden." : "Hilft auf News-Liste, Google und beim Teilen." },
-    { label: "Banner", done: Boolean(form.banner_url), description: form.banner_url ? "Social-Bild vorhanden." : "Eigenes Bild statt generischem Fallback wählen." },
-    { label: "Inhalt", done: Boolean(form.content.trim()), description: form.content.trim() ? "Beitragstext vorhanden." : "Markdown-Inhalt fehlt noch." },
-    { label: "Sichtbarkeit", done: Boolean(form.visibility && willPublish), description: seoIsIndexable ? "Öffentlich indexierbar." : "Entwurf, privat oder noindex." },
-    { label: "Embeds", done: linkedContentCount > 0 || hasEmbedToken, tone: linkedContentCount > 0 || hasEmbedToken ? undefined : "note", description: linkedContentCount > 0 || hasEmbedToken ? `${linkedContentCount || 1} Verknüpfung(en) erkannt.` : "Optional: Turnier, Event, Fast-Lap oder Personen verknüpfen." },
-    { label: "SEO", done: Boolean(form.slug && form.excerpt && form.banner_url), description: "Titel, Teaser, Canonical und Social Preview prüfen." },
+    // Alltagssprache statt Fachbegriffen (#2122 NW5).
+    { label: "Titel", done: Boolean(form.title.trim()), description: form.title.trim() ? "Sauber gesetzt." : "Pflicht – steht in Listen, bei Google und beim Teilen." },
+    { label: "Kurzbeschreibung", done: Boolean(form.excerpt.trim()), description: form.excerpt.trim() ? "Kurzbeschreibung vorhanden." : "Hilft in der News-Liste, bei Google und beim Teilen." },
+    { label: "Bild", done: Boolean(form.banner_url), description: form.banner_url ? "Bild für Liste und Teilen vorhanden." : "Ein eigenes Bild statt des Standardbilds wählen." },
+    { label: "Text", done: Boolean(form.content.trim()), description: form.content.trim() ? "Beitragstext vorhanden." : "Der Text fehlt noch." },
+    { label: "Sichtbarkeit", done: Boolean(form.visibility && willPublish), description: seoIsIndexable ? "Öffentlich – Suchmaschinen dürfen ihn finden." : "Entwurf oder nicht öffentlich – Suchmaschinen finden ihn nicht." },
+    { label: "Verknüpfungen", done: linkedContentCount > 0 || hasEmbedToken, tone: linkedContentCount > 0 || hasEmbedToken ? undefined : "note", description: linkedContentCount > 0 || hasEmbedToken ? `${linkedContentCount || 1} Verknüpfung(en) erkannt.` : "Optional: Turnier, Event, Fast Lap oder Personen verknüpfen." },
+    { label: "Google und Teilen", done: Boolean(form.slug && form.excerpt && form.banner_url), description: "Titel, Kurzbeschreibung und Bild prüfen – so erscheint der Beitrag bei Google und beim Teilen." },
     { label: "Newsletter/Discord", done: newsletterDone, tone: newsletterDone ? undefined : "note", description: newsletterDone ? "Newsletter wurde bereits versendet." : "Steht im Kasten „Verteilen“ – mit Empfängerzahl und „Jetzt senden“." },
   ];
 
@@ -342,7 +343,7 @@ function NewsForm({ post, meta, onDone, onReload }) {
       <FormSection title="Der Beitrag">
         <FormGrid>
           <TextField label="Titel" value={form.title} onChange={(v) => { set("title", v); if (isNew && !form.slug) set("slug", slugFrom(v)); }} testId="news-title" required />
-          <TextField label="Slug" value={form.slug} onChange={(v) => set("slug", slugFrom(v))} placeholder="kebab-case" testId="news-slug" required />
+          <TextField label="Adresse (Link)" value={form.slug} onChange={(v) => set("slug", slugFrom(v))} placeholder="z. B. herbst-lan-2026" hint={form.slug ? `Der Link: /news/${form.slug}` : "Entsteht aus dem Titel – nur Kleinbuchstaben, Zahlen und Bindestriche."} testId="news-slug" required />
         </FormGrid>
         <TextField label="Kurzbeschreibung" value={form.excerpt} onChange={(v) => set("excerpt", v)} testId="news-excerpt" />
         <FieldLabel label="Inhalt" required>
@@ -352,10 +353,10 @@ function NewsForm({ post, meta, onDone, onReload }) {
             rows={14}
             required
             testId="news-content"
-            helperText="Markdown plus Einbettungen: [[fastlap:slug]], [[tournament:slug]], [[event:slug]]. HTML wird nicht roh gerendert."
+            helperText="Formatieren mit den Knöpfen oben (fett, Überschrift, Liste, Link). Karten für Turniere, Events und Fast Lap fügst du unten unter „Personen und Verknüpfungen“ mit „Einbetten“ ein."
           />
         </FieldLabel>
-        <FieldLabel label="Banner">
+        <FieldLabel label="Bild">
           <ImageUpload value={form.banner_url} onChange={(v) => set("banner_url", v)} testId="news-banner" variant="wide" allowLibrary />
         </FieldLabel>
         <TextField label="Video (YouTube-Link)" value={form.video_url} onChange={(v) => set("video_url", v)} placeholder="https://www.youtube.com/watch?v=…" testId="news-video-url" hint="Steht oben auf der News-Seite als Player – erst nach Zustimmung zu externen Medien; statt des Banners." />
@@ -369,7 +370,7 @@ function NewsForm({ post, meta, onDone, onReload }) {
               <input
                 value={userQuery}
                 onChange={(e) => setUserQuery(e.target.value)}
-                placeholder="Username oder Anzeigename suchen"
+                placeholder="Name oder Benutzername suchen"
                 data-testid="news-mention-search"
                 className="w-full bg-[#121212] border border-white/10 pl-9 pr-3 py-2 rounded-sm text-sm focus:outline-none focus:border-[#29B6E8]"
               />
@@ -410,17 +411,17 @@ function NewsForm({ post, meta, onDone, onReload }) {
           <FormGrid cols={3}>
             {events.length > 0 && (
               <FieldLabel label="Verknüpfte Events">
-                <MultiSelect options={events} valueKey="id" labelKey="name" selected={linkedE} onChange={setLinkedE} onEmbed={(item) => insertEmbed("event", item)} />
+                <MultiSelect options={events} valueKey="id" labelKey="name" selected={linkedE} onChange={setLinkedE} onEmbed={(item) => insertEmbed("event", item)} testId="news-link-events" searchLabel="Event suchen" />
               </FieldLabel>
             )}
             {tournaments.length > 0 && (
               <FieldLabel label="Verknüpfte Turniere">
-                <MultiSelect options={tournaments} valueKey="id" labelKey="title" selected={linkedT} onChange={setLinkedT} onEmbed={(item) => insertEmbed("tournament", item)} />
+                <MultiSelect options={tournaments} valueKey="id" labelKey="title" selected={linkedT} onChange={setLinkedT} onEmbed={(item) => insertEmbed("tournament", item)} testId="news-link-tournaments" searchLabel="Turnier suchen" />
               </FieldLabel>
             )}
             {f1Challenges.length > 0 && (
               <FieldLabel label="Verknüpfte Fast-Lap Challenges">
-                <MultiSelect options={f1Challenges} valueKey="id" labelKey="title" selected={linkedF} onChange={setLinkedF} icon={Flag} onEmbed={(item) => insertEmbed("fastlap", item)} />
+                <MultiSelect options={f1Challenges} valueKey="id" labelKey="title" selected={linkedF} onChange={setLinkedF} icon={Flag} onEmbed={(item) => insertEmbed("fastlap", item)} testId="news-link-fastlaps" searchLabel="Fast Lap suchen" />
               </FieldLabel>
             )}
           </FormGrid>
@@ -483,16 +484,36 @@ export function NewsHistory({ rows }) {
   );
 }
 
-function MultiSelect({ options, valueKey, labelKey, selected, onChange, icon: Icon, onEmbed }) {
+// Verknüpfungen (#2122 NW5): mit Suchfeld, Gewähltes oben, Entwürfe gekennzeichnet - Besucher sehen deren Karte erst,
+// wenn sie veröffentlicht sind.
+export function filterLinkOptions(options, { query = "", labelKey, valueKey, selected = [] }) {
+  const needle = query.trim().toLowerCase();
+  const rows = needle ? options.filter((o) => String(o[labelKey] || "").toLowerCase().includes(needle) || selected.includes(o[valueKey])) : options;
+  return [...rows].sort((a, b) => Number(selected.includes(b[valueKey])) - Number(selected.includes(a[valueKey])));
+}
+
+function MultiSelect({ options, valueKey, labelKey, selected, onChange, icon: Icon, onEmbed, testId, searchLabel = "Suchen" }) {
+  const [query, setQuery] = useState("");
   const toggle = (v) => onChange(selected.includes(v) ? selected.filter((x) => x !== v) : [...selected, v]);
+  const rows = filterLinkOptions(options, { query, labelKey, valueKey, selected });
   return (
-    <div className="border border-white/10 rounded-sm bg-[#0A0A0A] p-2 max-h-40 overflow-y-auto space-y-1">
-      {options.map((o) => (
+    <div className="border border-white/10 rounded-sm bg-[#0A0A0A] p-2 space-y-2" data-testid={testId}>
+      {options.length > 5 && (
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/35" aria-hidden="true" />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={searchLabel} aria-label={searchLabel} data-testid={testId ? `${testId}-search` : undefined}
+            className="w-full bg-[#121212] border border-white/10 pl-8 pr-2 py-1.5 rounded-sm text-xs focus:outline-none focus:border-[#29B6E8]" />
+        </div>
+      )}
+      <div className="max-h-40 overflow-y-auto space-y-1">
+      {rows.length === 0 && <p className="px-2 py-1 text-xs text-white/45">Nichts gefunden.</p>}
+      {rows.map((o) => (
         <div key={o[valueKey]} className="flex items-center gap-2 text-sm hover:bg-white/5 px-2 py-1 rounded-sm">
           <label className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer">
             <input type="checkbox" checked={selected.includes(o[valueKey])} onChange={() => toggle(o[valueKey])} className="accent-[#29B6E8]" />
             {Icon && <Icon className="w-3 h-3 text-[#29B6E8] shrink-0" />}
             <span className="truncate">{o[labelKey]}</span>
+            {o.status === "draft" && <span className="shrink-0 rounded-sm border border-white/15 px-1.5 text-[10px] uppercase tracking-wider text-white/50" title="Besucher sehen die Karte erst, wenn es veröffentlicht ist.">Entwurf</span>}
           </label>
           {onEmbed && (
             <button type="button" onClick={() => onEmbed(o)} className="shrink-0 text-[10px] uppercase tracking-wider font-bold text-[#29B6E8] hover:text-white">
@@ -501,6 +522,7 @@ function MultiSelect({ options, valueKey, labelKey, selected, onChange, icon: Ic
           )}
         </div>
       ))}
+      </div>
     </div>
   );
 }
