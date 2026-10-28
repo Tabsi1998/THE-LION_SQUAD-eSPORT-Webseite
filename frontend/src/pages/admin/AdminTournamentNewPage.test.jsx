@@ -194,6 +194,25 @@ test("die Sichtbarkeit lässt sich gleich beim Anlegen wählen", async () => {
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments", expect.objectContaining({ visibility: "members" })));
 });
 
+// Ein Weg für den Stream (#2111, F5): Plattform und Kanal, ein Haken - gespeichert, wie die Turnierseite ihn liest.
+test("Stream beim Anlegen: Twitch-Kanal wird zur Adresse, der Haken zeigt ihn", async () => {
+  apiMock.get.mockImplementation(async (url) => (url === "/games" ? { data: [{ id: "g1", name: "Mario Kart 8" }] } : { data: [] }));
+  apiMock.post.mockResolvedValue({ data: { id: "t-new" } });
+  renderAt("");
+  fireEvent.change(await screen.findByTestId("new-tr-stream-platform"), { target: { value: "twitch" } });
+  fireEvent.change(screen.getByTestId("new-tr-stream-url"), { target: { value: "lion" } });
+  fireEvent.click(screen.getByTestId("new-tr-stream-embed"));
+  expect(screen.queryByTestId("new-tr-twitch")).toBeNull();
+  expect(screen.queryByTestId("new-tr-stream")).toBeNull();
+  fireEvent.change(screen.getByTestId("new-tr-title"), { target: { value: "Stream-Cup" } });
+  fireEvent.change(await screen.findByTestId("new-tr-game"), { target: { value: "g1" } });
+  fireEvent.submit(screen.getByTestId("new-tr-form"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments", expect.objectContaining({
+    stream_platform: "twitch", stream_url: "https://www.twitch.tv/lion", twitch_channel: "lion", has_live_stream: true, twitch_enabled: true,
+  })));
+  expect(apiMock.post.mock.calls.at(-1)[1]).not.toHaveProperty("stream_address");
+});
+
 // Preisgruppen (#2111, T5): Siegerrunde und Verliererrunde nur beim Doppel-K.-o.
 test("Siegerrunde und Verliererrunde nur beim Doppel-K.-o.", async () => {
   renderAt("");

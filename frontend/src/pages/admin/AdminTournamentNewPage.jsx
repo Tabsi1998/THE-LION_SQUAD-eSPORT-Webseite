@@ -9,8 +9,9 @@ import { EventMembershipLine } from "@/pages/admin/event/EventProgramPanel";
 import { CheckField, FieldLabel, SelectField, TextField } from "@/components/tls/FormFields";
 import { FormatHint } from "./tournament/FormatHint";
 import { prizeGroupOptions } from "./tournament/PrizeEditor";
+import { STREAM_ADDRESS_HINT, streamPayload } from "@/lib/tournamentStream";
 import { BEST_OF_RUNS_HINT, MATCHDAY_DRAW_HINT, matchdayDrawMode, matchdayDrawOn, tournamentFieldRules } from "@/lib/tournamentFormFields";
-import { ADVANCEMENT_MODE_OPTIONS, DRAW_SHOW_MINUTES_DEFAULT, DRAW_SHOW_MINUTES_HINT, GRAND_FINAL_FORMATS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, HEAT_REBUILD_FORMATS, HEAT_REBUILD_HINT, HEAT_REBUILD_OPTIONS, SEEDING_OPTIONS, VISIBILITY_OPTIONS, advancementModeHint, drawShowMinutesPayload } from "./tournament/shared";
+import { ADVANCEMENT_MODE_OPTIONS, DRAW_SHOW_MINUTES_DEFAULT, DRAW_SHOW_MINUTES_HINT, GRAND_FINAL_FORMATS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, HEAT_REBUILD_FORMATS, HEAT_REBUILD_HINT, HEAT_REBUILD_OPTIONS, SEEDING_OPTIONS, STREAM_PLATFORM_OPTIONS, VISIBILITY_OPTIONS, advancementModeHint, drawShowMinutesPayload } from "./tournament/shared";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
 import { normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
@@ -44,7 +45,7 @@ function buildPlanningWarnings(form, isTeam) {
   // Die Zeiten prüft dieselbe Regel wie beim Bearbeiten (#1938).
   warnings.push(...dateWarnings(form));
   if (form.status === "scheduled" && !form.start_date) warnings.push("Angekündigte Turniere sollten eine Startzeit haben.");
-  if (form.twitch_enabled && !String(form.twitch_channel || "").trim()) warnings.push("Twitch ist aktiv, aber kein Kanal ist eingetragen.");
+  if (form.stream_embed && !String(form.stream_address || "").trim()) warnings.push("Der Stream soll auf der Turnierseite stehen, aber Kanal oder Adresse fehlt.");
   return warnings;
 }
 
@@ -84,8 +85,8 @@ export default function AdminTournamentNewPage() {
       { group: "overall", place: 2, label: "2. Platz", value: "" },
       { group: "overall", place: 3, label: "3. Platz", value: "" },
     ],
-    twitch_channel: "", twitch_enabled: false, show_chat: false,
-    location: "", stream_link: "", discord_link: "",
+    stream_platform: "", stream_address: "", stream_embed: false, show_chat: false,
+    location: "", discord_link: "",
     ...(preset?.values || {}),
   }));
   const [saving, setSaving] = useState(false);
@@ -140,6 +141,9 @@ export default function AdminTournamentNewPage() {
     try {
       const payload = { ...form };
       payload.slug = autoSlug(payload.slug) || autoSlug(payload.title);
+      Object.assign(payload, streamPayload(payload));
+      delete payload.stream_address;
+      delete payload.stream_embed;
       payload.team_mode = payload.team_mode === "solo" ? "solo" : "team";
       payload.team_size = payload.team_mode === "solo" ? 1 : Number(payload.team_size || 2);
       payload.format_label = (payload.format_label || "").trim() || null;
@@ -358,7 +362,9 @@ export default function AdminTournamentNewPage() {
         {/* Streaming + Links */}
         <FormSection title="Streaming und externe Links" collapsible accent="#9146FF">
           <FormGrid>
-            <TextField label="Twitch-Kanal" value={form.twitch_channel} onChange={(v) => set("twitch_channel", v)} testId="new-tr-twitch" placeholder="the_lion_squad_esports" />
+            {/* Ein Weg für den Stream (#2111, F5): Plattform und Kanal oder Adresse, ein Haken zum Zeigen. */}
+            <SelectField label="Stream-Plattform" value={form.stream_platform} onChange={(v) => set("stream_platform", v)} options={STREAM_PLATFORM_OPTIONS} testId="new-tr-stream-platform" />
+            <TextField label="Kanal oder Adresse" value={form.stream_address} onChange={(v) => set("stream_address", v)} testId="new-tr-stream-url" placeholder={STREAM_ADDRESS_HINT[form.stream_platform] || STREAM_ADDRESS_HINT[""]} />
             {/* Ort (#1371): im Event kommt er vom Event; ein eigener Ort nur ohne Event. */}
             {event ? (
               <div className="text-sm text-white/70" data-testid="new-tr-location-event">Ort: {form.location || "wie beim Event"} <span className="text-white/45">(vom Event)</span></div>
@@ -366,10 +372,9 @@ export default function AdminTournamentNewPage() {
               <TextField label="Ort" value={form.location} onChange={(v) => set("location", v)} testId="new-tr-location" placeholder="z.B. Gamers Heaven · Bregenz" />
             )}
           </FormGrid>
-          <CheckField label="Twitch-Player auf Turnierseite einbetten" checked={form.twitch_enabled} onChange={(v) => set("twitch_enabled", v)} testId="new-tr-twitch-enabled" accent="#9146FF" />
+          <CheckField label="Stream auf der Turnierseite zeigen" checked={form.stream_embed} onChange={(v) => set("stream_embed", v)} testId="new-tr-stream-embed" accent="#9146FF" />
           <CheckField label="Turnier-Chat für Teilnehmer anzeigen" checked={form.show_chat} onChange={(v) => set("show_chat", v)} testId="new-tr-chat-enabled" accent="#9146FF" />
           <FormGrid>
-            <TextField label="Externer Stream-Verweis" value={form.stream_link} onChange={(v) => set("stream_link", v)} testId="new-tr-stream" placeholder="https://…" />
             <TextField label="Discord-Einladung" value={form.discord_link} onChange={(v) => set("discord_link", v)} testId="new-tr-discord" placeholder="https://discord.com/invite/…" />
           </FormGrid>
         </FormSection>

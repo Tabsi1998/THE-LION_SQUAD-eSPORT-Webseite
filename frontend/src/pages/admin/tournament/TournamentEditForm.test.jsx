@@ -57,6 +57,31 @@ test("Adresse statt Slug, Jahreswertung in richtigem Deutsch", async () => {
   expect(weights).not.toMatch(/grosses|regulaeres|Slug|Seeding/);
 });
 
+// Ein Weg für den Stream (#2111, F5): ein älteres Turnier mit Twitch-Kanal steht als „Twitch“ mit Kanal da und geht
+// unverändert nicht mit; „Alter Stream-Verweis“ nur, solange er befüllt ist.
+test("Stream: Plattform und Kanal statt drei Wege, alter Verweis nur wenn befüllt", async () => {
+  apiMock.patch.mockReset();
+  apiMock.patch.mockResolvedValue({ data: {} });
+  const legacy = { ...BASE, twitch_channel: "lion", twitch_enabled: true };
+  const { unmount } = render(<TournamentEditForm tournament={legacy} onSaved={() => {}} />);
+  expect(await screen.findByTestId("tr-edit-stream-platform")).toHaveValue("twitch");
+  expect(screen.getByTestId("tr-edit-stream-url")).toHaveValue("lion");
+  expect(screen.getByTestId("tr-edit-stream-embed")).toBeChecked();
+  expect(screen.queryByTestId("tr-edit-stream")).toBeNull();
+  expect(screen.queryByTestId("tr-edit-twitch")).toBeNull();
+  fireEvent.change(screen.getByTestId("tr-edit-title"), { target: { value: "Probe-Cup 2" } });
+  fireEvent.click(screen.getByTestId("tr-edit-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/tournaments/t-1", { title: "Probe-Cup 2" }));
+  fireEvent.change(screen.getByTestId("tr-edit-stream-url"), { target: { value: "lion_tv" } });
+  fireEvent.click(screen.getByTestId("tr-edit-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenLastCalledWith("/tournaments/t-1", expect.objectContaining({
+    stream_url: "https://www.twitch.tv/lion_tv", twitch_channel: "lion_tv",
+  })));
+  unmount();
+  render(<TournamentEditForm tournament={{ ...BASE, stream_link: "https://example.org/stream" }} onSaved={() => {}} />);
+  expect(await screen.findByTestId("tr-edit-stream")).toHaveValue("https://example.org/stream");
+});
+
 test("Staffel: Season-Werte nur lesend mit Weg zur Season, Liga-fremde Felder fehlen", async () => {
   renderStaffel();
   const values = await screen.findByTestId("tr-edit-season-values");

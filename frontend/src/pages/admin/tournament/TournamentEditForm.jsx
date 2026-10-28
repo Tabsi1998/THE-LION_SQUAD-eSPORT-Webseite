@@ -25,6 +25,7 @@ import { deadlineFormValues, deadlinePayload } from "@/lib/tournamentDeadlines";
 import { ADVANCEMENT_MODE_OPTIONS, BRONZE_FORMATS, DRAW_SHOW_MINUTES_DEFAULT, DRAW_SHOW_MINUTES_HINT, advancementModeHint, drawShowMinutesPayload, CUSTOM_BRACKET_FORMATS, EVENT_MODE_OPTIONS, GRAND_FINAL_FORMATS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, HEAT_REBUILD_FORMATS, HEAT_REBUILD_HINT, HEAT_REBUILD_OPTIONS, RESULT_ENTRY_MODE_OPTIONS, SCHEDULE_MODE_OPTIONS, SEEDING_OPTIONS, seedingModeOf, STREAM_PLATFORM_OPTIONS, TEAM_MODE_OPTIONS, TOURNAMENT_SEASON_WEIGHT_OPTIONS, VISIBILITY_OPTIONS, WEEKDAY_OPTIONS, advancementModeOf } from "./shared";
 import { StaffelSeasonValues, isStaffel, staffelBeforeStart } from "./StaffelParts";
 import { FormatHint } from "./FormatHint";
+import { STREAM_ADDRESS_HINT, streamFormValues, streamPayload } from "@/lib/tournamentStream";
 import { BEST_OF_RUNS_HINT, MATCHDAY_DRAW_HINT, NO_MATCH_FORMATS, matchdayDrawMode, matchdayDrawOn, tournamentFieldRules } from "@/lib/tournamentFormFields";
 
 // „Gewinne erzeugen“ erst ab dem Ende (#2123, TA23) - wie der Server (services/tournament_guard.py FINISHED_STATUSES).
@@ -105,11 +106,8 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
     default_match_time: source.default_match_time || "20:00",
     match_schedule_response_hours: source.match_schedule_response_hours ?? 72,
     match_break_minutes: source.match_break_minutes ?? 5,
-    twitch_channel: source.twitch_channel || "",
-    twitch_enabled: !!source.twitch_enabled,
-    has_live_stream: !!source.has_live_stream,
-    stream_platform: source.stream_platform || "",
-    stream_url: source.stream_url || "",
+    // Stream (#2111, F5): Plattform, Kanal oder Adresse, ein Haken - gespeichert in den bekannten Feldern.
+    ...streamFormValues(source),
     stream_title: source.stream_title || "",
     show_chat: !!source.show_chat,
     season_weight: source.season_weight ?? 2,
@@ -171,11 +169,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
     default_match_time: tournament.default_match_time || "20:00",
     match_schedule_response_hours: tournament.match_schedule_response_hours ?? 72,
     match_break_minutes: tournament.match_break_minutes ?? 5,
-    twitch_channel: tournament.twitch_channel || "",
-    twitch_enabled: !!tournament.twitch_enabled,
-    has_live_stream: !!tournament.has_live_stream,
-    stream_platform: tournament.stream_platform || "",
-    stream_url: tournament.stream_url || "",
+    ...streamFormValues(tournament),
     stream_title: tournament.stream_title || "",
     show_chat: !!tournament.show_chat,
     season_weight: tournament.season_weight ?? 2,
@@ -247,7 +241,9 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
       payload.event_id = null;
       payload.requires_event_registration = false;
     }
-    if (!payload.stream_platform) payload.stream_platform = null;
+    Object.assign(payload, streamPayload(payload));
+    delete payload.stream_address;
+    delete payload.stream_embed;
     if (!payload.result_entry_mode) payload.result_entry_mode = null;
     if (!payload.schedule_mode) payload.schedule_mode = null;
     payload.match_duration_minutes = ownDurationPayload(payload.match_duration_minutes);
@@ -569,16 +565,16 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
               <TextField label="Ort" value={f.location} onChange={(v)=>set("location",v)} testId="tr-edit-location"/>
             )}
             {show && <TextField label="Discord-Verweis" value={f.discord_link} onChange={(v)=>set("discord_link",v)} testId="tr-edit-discord"/>}
-            <TextField label="Alter Stream-Verweis" value={f.stream_link} onChange={(v)=>set("stream_link",v)} testId="tr-edit-stream"/>
-            <TextField label="Twitch-Kanal" value={f.twitch_channel} onChange={(v)=>set("twitch_channel",v)} testId="tr-edit-twitch"/>
-            <SelectInput label="Stream-Plattform" value={f.stream_platform} onChange={(v)=>set("stream_platform",v)} options={STREAM_PLATFORM_OPTIONS} />
-            <TextField label="Stream-URL" value={f.stream_url} onChange={(v)=>set("stream_url",v)} testId="tr-edit-stream-url"/>
-            <TextField label="Stream-Titel" value={f.stream_title} onChange={(v)=>set("stream_title",v)} testId="tr-edit-stream-title"/>
+            {/* Ein Weg für den Stream (#2111, F5): Plattform und Kanal oder Adresse. Der alte Stream-Verweis steht nur
+                noch da, solange er befüllt ist. */}
+            <SelectInput label="Stream-Plattform" value={f.stream_platform} onChange={(v)=>set("stream_platform",v)} options={STREAM_PLATFORM_OPTIONS} testId="tr-edit-stream-platform" />
+            <TextField label="Kanal oder Adresse" value={f.stream_address} onChange={(v)=>set("stream_address",v)} placeholder={STREAM_ADDRESS_HINT[f.stream_platform] || STREAM_ADDRESS_HINT[""]} testId="tr-edit-stream-url"/>
+            <TextField label="Stream-Titel" value={f.stream_title} onChange={(v)=>set("stream_title",v)} placeholder="Leer: LIVE STREAM" testId="tr-edit-stream-title"/>
+            {tournament.stream_link ? <TextField label="Alter Stream-Verweis" value={f.stream_link} onChange={(v)=>set("stream_link",v)} hint="Steht als Link „Stream“ auf der Turnierseite. Leeren, wenn der Stream oben eingetragen ist." testId="tr-edit-stream"/> : null}
           </FormGrid>
           <div className="flex flex-wrap gap-4">
-            <CheckField label="Twitch einbetten" checked={f.twitch_enabled} onChange={(v)=>set("twitch_enabled",v)} accent="#9146FF" />
-            <CheckField label="Live-Stream aktiv" checked={f.has_live_stream} onChange={(v)=>set("has_live_stream",v)} accent="#9146FF" />
-            <CheckField label="Chat anzeigen" checked={f.show_chat} onChange={(v)=>set("show_chat",v)} accent="#9146FF" />
+            <CheckField label="Stream auf der Turnierseite zeigen" checked={f.stream_embed} onChange={(v)=>set("stream_embed",v)} accent="#9146FF" testId="tr-edit-stream-embed" />
+            <CheckField label="Turnier-Chat für Teilnehmer anzeigen" checked={f.show_chat} onChange={(v)=>set("show_chat",v)} accent="#9146FF" testId="tr-edit-show-chat" />
           </div>
         </FormSection>
       </FormColumns>
