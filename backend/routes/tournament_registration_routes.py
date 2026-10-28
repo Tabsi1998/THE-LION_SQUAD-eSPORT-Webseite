@@ -6,10 +6,12 @@ import logging
 
 from fastapi import BackgroundTasks, HTTPException, Depends, Request
 from datetime import datetime, timezone
+from pydantic import BaseModel, Field
 from pymongo.errors import DuplicateKeyError
 from database import get_db
+from services import squad_registration
 from services.permissions import is_confirmed_tournament_lead
-from auth import get_current_user, get_optional_user
+from auth import get_current_user, get_optional_user, require_area
 from services.access_links import AccessLinkUsedUp, claim_access_link_use, release_access_link_use, validate_access_link
 from services.match_audience import responsible_registration
 from services.registration_notifications import notify_registration_status
@@ -69,6 +71,31 @@ def _log_safe(value, limit: int = 120) -> str:
     return str(value or "").replace("\r", " ").replace("\n", " ")[:limit]
 
 
+@contextlib.asynccontextmanager
+async def _season_squad_lock(db, tournament: dict | None):
+    """Sperre je Season für Co-Team-Schlüssel (#1649) - immer nach der Turnier-Sperre, nie umgekehrt."""
+    resource = squad_registration.season_lock_resource(tournament or {})
+    if not resource:
+        yield
+        return
+    async with mutation_lock(db, resource):
+        yield
+
+
+async def _sync_squad_key(db, registration: dict | None, new_status: str | None, tournament: dict | None) -> None:
+    """Jeder Statuswechsel einer Co-Team-Anmeldung zieht ``league_squad_key`` nach (``squad_registration``) - vor dem
+    Schreiben des Status aufrufen. Anmeldungen ohne Co-Team: nichts."""
+    if not (registration or {}).get("squad_id"):
+        return
+    try:
+        async with _season_squad_lock(db, tournament):
+            await squad_registration.sync_season_key(db, registration, new_status, tournament)
+    except squad_registration.SquadAssignError as refusal:
+        raise HTTPException(status_code=refusal.status_code, detail=refusal.detail)
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail=TOURNAMENT_BUSY_DETAIL)
+
+
 async def _notify_registration(db, tid: str, registration: dict, status: str, *, previous: str | None = None,
                                reason: str | None = None, actor_id: str | None = None) -> None:
     """Anmeldung eingegangen, bestätigt, abgelehnt oder nachgerückt (#1133): Nachricht an die Verantwortlichen der
@@ -115,6 +142,11 @@ async def _move_up_from_waitlist(db, tid: str, actor_id: str | None, *, exclude_
     moved: list[str] = []
     for reg in waiting:
         now_iso = now_utc().isoformat()
+        try:
+            # Co-Team einer Liga (#1649): rückt nicht nach, wenn es inzwischen in einer anderen Staffel spielt.
+            await _sync_squad_key(db, reg, "approved", tournament)
+        except HTTPException:
+            continue
         result = await db.tournament_registrations.update_one(
             {"id": reg["id"], "status": "waitlist"}, {"$set": {"status": "approved", "updated_at": now_iso}})
         if not getattr(result, "modified_count", 0):
@@ -437,7 +469,9 @@ async def list_registrations(tid: str, access: str | None = None, user=Depends(g
             r for r in regs
             if user and (r.get("user_id") == user.get("id") or r.get("team_id") in user_team_ids)
         ]
-    regs = [_public_registration(r, user, is_staff) for r in regs]
+    # Co-Team einer Liga (#1649): Kennung und Name des Co-Teams sind öffentlich wie das Team selbst.
+    regs = [{**_public_registration(r, user, is_staff), **{key: r[key] for key in ("squad_id", "squad_name") if r.get(key)}}
+            for r in regs]
     marks: dict = {}
     # enrich user + team
     user_ids = list({r["user_id"] for r in regs if r.get("user_id")})
@@ -888,6 +922,7 @@ async def admin_create_registration(tid: str, body: RegistrationAdminCreate,
 
     replacement = None
     if old_reg_id:
+        await _sync_squad_key(db, old, "no_show", tournament)
         await db.tournament_registrations.update_one(
             {"id": old_reg_id},
             {"$set": {"status": "no_show", "updated_at": now_utc().isoformat()}},
@@ -934,7 +969,7 @@ async def update_registration(tid: str, reg_id: str, body: RegistrationUpdate,
                                _mutation_tid: str = Depends(_serialized_tournament_write)):
     db = get_db()
     tid = await _resolve_tid(tid)
-    await _ensure_tournament_unlocked(db, tid)
+    tournament_doc = await _ensure_tournament_unlocked(db, tid)
     await require_tournament_staff_permission(me, tid, PARTICIPANT_STAFF_ROLES)
     updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
     if updates.get("status") in REMOVAL_KINDS:
@@ -952,6 +987,10 @@ async def update_registration(tid: str, reg_id: str, body: RegistrationUpdate,
     if updates and all(reg.get(key) == value for key, value in updates.items()):
         return {**reg, "idempotent_replay": True}
     previous_status = reg.get("status")
+    if updates.get("status") and updates["status"] != previous_status:
+        # Co-Team einer Liga (#1649): der Season-Schlüssel folgt dem Status - vor dem Schreiben, damit ein Co-Team, das
+        # inzwischen in einer anderen Staffel spielt, hier nicht wieder aktiv wird.
+        await _sync_squad_key(db, reg, updates["status"], tournament_doc)
     updates["updated_at"] = now_utc().isoformat()
     await db.tournament_registrations.update_one({"id": reg_id, "tournament_id": tid}, {"$set": updates})
     reg = await db.tournament_registrations.find_one({"id": reg_id, "tournament_id": tid}, {"_id": 0})
@@ -989,7 +1028,7 @@ async def staff_set_registration_checkin(tid: str, reg_id: str, body: dict,
     """
     db = get_db()
     tid = await _resolve_tid(tid)
-    await _ensure_tournament_unlocked(db, tid)
+    tournament_doc = await _ensure_tournament_unlocked(db, tid)
     await require_tournament_staff_permission(me, tid, CHECKIN_STAFF_ROLES)
     status = body.get("status")
     if status not in REGISTRATION_CHECKIN_STATUSES:
@@ -1003,6 +1042,7 @@ async def staff_set_registration_checkin(tid: str, reg_id: str, body: dict,
                 return {**reg, "idempotent_replay": True}
             if reg.get("status") in ("rejected", "waitlist") and status == "checked_in":
                 raise HTTPException(status_code=400, detail="Diese Anmeldung kann nicht eingecheckt werden")
+            await _sync_squad_key(db, reg, status, tournament_doc)
 
             await db.tournament_registrations.update_one(
                 {"id": reg_id},
@@ -1055,7 +1095,8 @@ async def _delete_registration_locked(db, tid: str, reg_id: str, me: dict) -> di
         raise HTTPException(status_code=404)
     is_own_registration = reg.get("user_id") == me["id"]
     is_team_manager = False
-    if reg.get("team_id"):
+    # Ein zugeteiltes Co-Team (#1649) nimmt nur die Turnierleitung wieder heraus - die Teamleitung meldet es nicht ab.
+    if reg.get("team_id") and not reg.get("squad_id"):
         team = await db.teams.find_one({"id": reg["team_id"]}, {"_id": 0})
         is_team_manager = bool(team and _can_register_team(team, me))
     is_staff = await has_tournament_staff_permission(me, tid, PARTICIPANT_STAFF_ROLES)
@@ -1140,3 +1181,92 @@ async def checkin_self(tid: str, me: dict = Depends(get_current_user)):
             return {"ok": True, "idempotent_replay": False}
     except MutationLockBusy:
         raise HTTPException(status_code=409, detail="Eine Turnieraktion wird bereits verarbeitet. Bitte erneut versuchen.")
+
+
+# --- Liga: Co-Team zuteilen (docs/LIGA.md, Abschnitte 2, 4 und 5; #1649) ---
+class SquadAssignBody(BaseModel):
+    team_id: str = Field(min_length=1, max_length=64)
+    squad_id: str = Field(min_length=1, max_length=64)
+
+
+@router.get("/{tid}/squad-candidates")
+async def list_squad_candidates(tid: str, me: dict = Depends(require_area("tournaments"))):
+    """Für den Dialog „Co-Team zuteilen“: Hauptteams mit ihren Co-Teams und was gegen eine Zuteilung spricht."""
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    if not squad_registration.is_league_tournament(tournament):
+        raise HTTPException(status_code=400, detail="Co-Teams teilt die Turnierleitung nur Team-Turnieren im Format Liga zu.")
+    return await squad_registration.candidates(db, tournament)
+
+
+SQUAD_SEASON_TAKEN = "Dieses Co-Team spielt in dieser Season schon in einer anderen Staffel."
+SQUAD_TEAM_TAKEN = ("Dieses Team hat schon ein Co-Team in dieser Staffel – zwei Co-Teams desselben Teams spielen nie "
+                    "in derselben Staffel.")
+
+
+async def _insert_squad_registration(db, tournament: dict, body: "SquadAssignBody", me: dict) -> dict:
+    try:
+        reg = await squad_registration.build_registration(db, tournament, body.team_id, body.squad_id, me)
+    except squad_registration.SquadAssignError as refusal:
+        raise HTTPException(status_code=refusal.status_code, detail=refusal.detail)
+    try:
+        await db.tournament_registrations.insert_one(reg)
+    except DuplicateKeyError:
+        # Welcher Index gegriffen hat: steht schon eine Anmeldung mit diesem Season-Schlüssel, war es die Season.
+        season_taken = reg.get("league_squad_key") and await db.tournament_registrations.find_one(
+            {"league_squad_key": reg["league_squad_key"]}, {"_id": 0, "id": 1})
+        raise HTTPException(status_code=409, detail=SQUAD_SEASON_TAKEN if season_taken else SQUAD_TEAM_TAKEN)
+    return reg
+
+
+@router.post("/{tid}/squad-registrations")
+async def assign_squad(tid: str, body: SquadAssignBody, me: dict = Depends(require_area("tournaments")),
+                       _mutation_tid: str = Depends(_serialized_tournament_write)):
+    """Die Turnierleitung teilt ein Co-Team der Staffel zu - als freigegebene Team-Anmeldung mit ``squad_id``."""
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    tournament = await _ensure_tournament_unlocked(db, tid)
+    # Staffeln derselben Season teilen dasselbe Co-Team nie gleichzeitig zu: Sperre je Season (die Turnier-Sperre
+    # hält nur diese Staffel), dazu der eindeutige Index auf ``league_squad_key``.
+    season_resource = squad_registration.season_lock_resource(tournament)
+    try:
+        async with (mutation_lock(db, season_resource) if season_resource else contextlib.nullcontext()):
+            reg = await _insert_squad_registration(db, tournament, body, me)
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail=TOURNAMENT_BUSY_DETAIL)
+    reg.pop("_id", None)
+    reg.pop("identity_key", None)
+    await _audit_tournament_action(db, "league.squad.assign", me.get("id"), tid, {
+        "registration_id": reg["id"], "team_id": reg["team_id"], "squad_id": reg["squad_id"], "squad_name": reg.get("squad_name"),
+    })
+    auto_bracket_update = await _refresh_tournament_previews_after_registration(db, tournament, me.get("id"))
+    # Wie beim Eintragen durch die Turnierleitung (#1133): die Verantwortlichen erfahren, dass ihr Co-Team dabei ist.
+    await _notify_registration(db, tid, reg, reg["status"], actor_id=me.get("id"))
+    return {"registration": reg, "auto_bracket_update": auto_bracket_update}
+
+
+@router.delete("/{tid}/squad-registrations/{reg_id}")
+async def remove_squad(tid: str, reg_id: str, me: dict = Depends(require_area("tournaments")),
+                       _mutation_tid: str = Depends(_serialized_tournament_write)):
+    """Zuteilung zurücknehmen - nur solange das Co-Team in keinem festen Spiel steht."""
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    tournament = await _ensure_tournament_unlocked(db, tid)
+    reg = await db.tournament_registrations.find_one({"id": reg_id, "tournament_id": tid}, {"_id": 0})
+    if not reg or not reg.get("squad_id"):
+        raise HTTPException(status_code=404, detail="Zuteilung nicht gefunden")
+    fixed = await db.matches_v2.count_documents({
+        "tournament_id": tid, "slots.registration_id": reg_id, "is_preview": {"$ne": True},
+    })
+    if fixed:
+        raise HTTPException(status_code=409, detail="Der Spielplan steht schon – das Co-Team bitte über „Austritt "
+                                                    "eintragen“ in der Teilnehmerliste herausnehmen.")
+    await db.tournament_registrations.delete_one({"id": reg_id, "tournament_id": tid})
+    await _audit_tournament_action(db, "league.squad.remove", me.get("id"), tid, {
+        "registration_id": reg_id, "team_id": reg.get("team_id"), "squad_id": reg.get("squad_id"), "squad_name": reg.get("squad_name"),
+    })
+    auto_bracket_update = await _refresh_tournament_previews_after_registration(db, tournament, me.get("id"))
+    return {"ok": True, "auto_bracket_update": auto_bracket_update}

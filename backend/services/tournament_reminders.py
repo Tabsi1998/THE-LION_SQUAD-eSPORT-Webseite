@@ -106,7 +106,7 @@ async def _unchecked_registration_users(tournament_id: str) -> list[dict]:
     db = get_db()
     regs = await db.tournament_registrations.find(
         {"tournament_id": tournament_id, "status": "approved"},
-        {"_id": 0, "id": 1, "user_id": 1, "team_id": 1},
+        {"_id": 0, "id": 1, "user_id": 1, "team_id": 1, "squad_id": 1},
     ).to_list(5000)
     if not regs:
         return []

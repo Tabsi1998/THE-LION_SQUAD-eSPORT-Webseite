@@ -580,6 +580,13 @@ async def _member_registration_for_match(db, match: dict, user_id: str | None) -
     return next((reg for reg in registrations if user_id in player_ids(reg, teams.get(reg.get("team_id") or ""))), None)
 
 
+async def _squad_player_of_match(db, match: dict, user: dict | None) -> bool:
+    """Liga (docs/LIGA.md, Abschnitt 4; #1649): im Matchchat schreibt der ganze Kader eines Co-Teams mit - bei
+    Anmeldungen ohne Co-Team bleibt es bei den Verantwortlichen."""
+    member_reg = await _member_registration_for_match(db, match, (user or {}).get("id"))
+    return bool(member_reg and member_reg.get("squad_id"))
+
+
 async def _match_page_payload(match: dict, collection: str, user: dict | None = None) -> dict:
     db = get_db()
     match = await _refresh_schedule_escalation(match, collection)
@@ -890,7 +897,7 @@ async def post_match_chat(match_id: str, body: MatchChatCreate, request: Request
     await moderation_standing.require_chat_allowed(db, me)
     match, collection = await _find_match_any(match_id)
     await _ensure_match_tournament_unlocked(db, match)
-    if not await _can_act_for_match(match, me):
+    if not await _can_act_for_match(match, me) and not await _squad_player_of_match(db, match, me):
         raise HTTPException(status_code=403, detail="Nur Teilnehmer, Team-Captains oder Turnierleitung duerfen im Matchchat schreiben")
     await enforce_rate_limit(
         request,

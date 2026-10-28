@@ -643,6 +643,10 @@ async def _apply(db, tournament: dict, registration: dict, fresh: dict, matches:
                 "status": registration.get("status"), "updated_at": now_iso}, "$unset": {"removal": ""}})
             raise TournamentEventError(STALE_DETAIL, 409)
         written.append(original[match["id"]])
+    # Liga (#1649): ein ausgeschiedenes Co-Team gibt seinen Platz in der Season frei (``league_squad_key``) - erst
+    # jetzt, wo der Umbau geschrieben ist; ein Abbruch oben muss so keinen Schlüssel zurückholen.
+    if registration.get("league_squad_key"):
+        await db.tournament_registrations.update_one({"id": registration["id"]}, {"$unset": {"league_squad_key": ""}})
     # Stationen und Aufrufe frei: jedes geänderte Spiel, das nicht mehr spielbereit ist oder entschieden wurde.
     for match in changed:
         before = original[match["id"]]

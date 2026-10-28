@@ -436,7 +436,16 @@ async def _my_tournament_registrations(user: dict) -> list[dict]:
     if team_ids:
         reg_query = {"$or": [{"user_id": user["id"]}, {"team_id": {"$in": team_ids}}]}
     regs = await db.tournament_registrations.find(reg_query, {"_id": 0}).sort("created_at", -1).to_list(250)
-    return [reg for reg in regs if (reg.get("status") or "pending") in ACTIVE_TOURNAMENT_REGISTRATION_STATUSES]
+    regs = [reg for reg in regs if (reg.get("status") or "pending") in ACTIVE_TOURNAMENT_REGISTRATION_STATUSES]
+    if not any(reg.get("squad_id") for reg in regs):
+        return regs
+    # Co-Team einer Liga (#1649): die Staffel gehört nur zu Kader, Captain, Vertreter und Hauptteam-Leitung - wie bei
+    # „Meine Matches“ (services/match_overview.py).
+    from services.match_audience import player_ids, teams_by_id
+
+    teams = await teams_by_id(db, regs)
+    return [reg for reg in regs
+            if not reg.get("squad_id") or user["id"] in player_ids(reg, teams.get(reg.get("team_id") or ""))]
 
 
 async def _my_event_registrations(user: dict) -> list[dict]:

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { Check, Pencil, Plus, Trash2, UserPlus, Users, X } from "lucide-react";
 import { TEAM_ROLE_LABELS } from "./constants";
+import { SQUAD_ROLES, isLocked, roleChoices, roleOf, rolesSummary } from "@/components/tls/league/squadRoles";
 
 const emptySquad = {
   name: "",
@@ -14,6 +15,8 @@ const emptySquad = {
   season_id: "",
   member_ids: [],
   status: "active",
+  captain_id: "",
+  vice_captain_id: "",
 };
 import { Field, Input, Row } from "./fields";
 
@@ -82,6 +85,15 @@ export function TeamsPanel() {
         season_id: editing.season_id || null,
         member_ids: editing.member_ids || [],
       };
+      delete payload.members;
+      // Captain und Vertreter (#1649): nur geänderte Rollen mitschicken - sonst überschriebe ein alter Stand eine
+      // Neuvergabe, die jemand anderes inzwischen gespeichert hat. Leer heißt „niemand“ (dann handelt die Teamleitung).
+      const original = editing.id ? squads.find((squad) => squad.id === editing.id) : null;
+      for (const role of SQUAD_ROLES) {
+        const next = editing[role.field] || null;
+        if (next === (original?.[role.field] || null)) delete payload[role.field];
+        else payload[role.field] = next;
+      }
       if (editing.id) await api.patch(`/teams/${activeTeam.id}/squads/${editing.id}`, payload);
       else await api.post(`/teams/${activeTeam.id}/squads`, payload);
       toast.success("Squad gespeichert.");
@@ -112,12 +124,16 @@ export function TeamsPanel() {
   };
 
   const toggleMember = (uid) => {
-    setEditing((f) => ({
-      ...f,
-      member_ids: f.member_ids?.includes(uid)
-        ? f.member_ids.filter((x) => x !== uid)
-        : [...(f.member_ids || []), uid],
-    }));
+    setEditing((f) => {
+      // Wer Captain oder Vertreter ist, bleibt im Kader, bis die Rolle neu vergeben ist (#1649).
+      if (f.member_ids?.includes(uid) && isLocked(f, uid)) return f;
+      return {
+        ...f,
+        member_ids: f.member_ids?.includes(uid)
+          ? f.member_ids.filter((x) => x !== uid)
+          : [...(f.member_ids || []), uid],
+      };
+    });
   };
 
   const actOnInvite = async (invite, action) => {
@@ -240,10 +256,17 @@ export function TeamsPanel() {
                         )}
                       </div>
                       {squad.description && <p className="text-sm text-white/55 mt-2">{squad.description}</p>}
+                      <p className="text-xs text-white/55 mt-2 break-words" data-testid={`team-squad-roles-${squad.id}`}>{rolesSummary(squad, squad.members)}</p>
                       <div className="mt-3 flex flex-wrap gap-1.5">
-                        {(squad.members || []).map((m) => (
-                          <span key={m.id} className="px-2 py-1 border border-white/10 rounded-sm text-[10px] text-white/70">{m.display_name || m.username}</span>
-                        ))}
+                        {(squad.members || []).map((m) => {
+                          const role = roleOf(squad, m.id);
+                          return (
+                            <span key={m.id} className={`px-2 py-1 border rounded-sm text-[10px] max-w-full truncate ${role ? "border-[#FFD700]/40 text-[#FFD700]" : "border-white/10 text-white/70"}`}>
+                              {role && <abbr title={role.label} className="no-underline font-bold mr-1">{role.short}</abbr>}
+                              {m.display_name || m.username}
+                            </span>
+                          );
+                        })}
                       </div>
                     </div>
                   ))}
@@ -280,14 +303,43 @@ export function TeamsPanel() {
               </Row>
               <Field label="Lineup / Mitspieler" group>
                 <div className="grid sm:grid-cols-2 gap-2">
-                  {(activeTeam.members || []).map((m) => (
-                    <label key={m.id} className="flex items-center gap-2 border border-white/10 bg-[#0A0A0A] rounded-sm p-2 text-sm">
-                      <input type="checkbox" checked={(editing.member_ids || []).includes(m.id)} onChange={() => toggleMember(m.id)} className="accent-[#29B6E8]" />
-                      <span>{m.display_name || m.username}</span>
-                    </label>
-                  ))}
+                  {(activeTeam.members || []).map((m) => {
+                    const checked = (editing.member_ids || []).includes(m.id);
+                    const role = checked ? roleOf(editing, m.id) : null;
+                    return (
+                      <label key={m.id} className="flex items-center gap-2 border border-white/10 bg-[#0A0A0A] rounded-sm p-2 text-sm min-w-0">
+                        <input type="checkbox" checked={checked} disabled={Boolean(role)} onChange={() => toggleMember(m.id)} className="accent-[#29B6E8]" data-testid={`team-squad-member-${m.id}`} />
+                        <span className="truncate">{m.display_name || m.username}</span>
+                        {role && <span className="ml-auto shrink-0 text-[10px] uppercase tracking-wider text-[#FFD700]">{role.label}</span>}
+                      </label>
+                    );
+                  })}
                 </div>
               </Field>
+              {/* Liga (#1649): Captain und Vertreter handeln für das Co-Team - Termin, Ergebnis, Einspruch. */}
+              <div className="space-y-2">
+                <Row>
+                  {SQUAD_ROLES.map((role) => (
+                    <Field key={role.field} label={role.label}>
+                      <select
+                        value={editing[role.field] || ""}
+                        onChange={(e) => setEditing({ ...editing, [role.field]: e.target.value })}
+                        data-testid={`team-squad-${role.field}`}
+                        className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm"
+                      >
+                        <option value="">Niemand</option>
+                        {roleChoices(editing.member_ids, activeTeam.members, role.field, editing).map((person) => (
+                          <option key={person.id} value={person.id}>{person.name}</option>
+                        ))}
+                      </select>
+                    </Field>
+                  ))}
+                </Row>
+                <p className="text-xs text-white/45">
+                  Captain und Vertreter vereinbaren in der Liga Termine, melden und bestätigen Ergebnisse. Ohne beide macht das die Teamleitung.
+                  Wer eine Rolle hat, bleibt im Kader, bis du die Rolle jemand anderem gibst.
+                </p>
+              </div>
               <Field label="Status">
                 <select value={editing.status || "active"} onChange={(e) => setEditing({ ...editing, status: e.target.value })} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
                   <option value="active">Aktiv</option>

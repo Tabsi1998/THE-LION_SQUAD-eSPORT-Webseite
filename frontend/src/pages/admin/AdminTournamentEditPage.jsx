@@ -28,6 +28,7 @@ import { ActionGroup, EmptyBracketNotice, TournamentEditForm } from "./tournamen
 import { OPERATIONAL_STATUS_VALUES, TOURNAMENT_STATUS_OPTIONS, normalizeSearch, primaryTournamentAction } from "./tournament/shared";
 import { MatchPlanPanel } from "./tournament/matchplan/MatchPlanPanel";
 import { MapPoolPanel } from "./tournament/MapPoolPanel";
+import { SquadAssignDialog, canAssignSquads } from "@/components/tls/league/SquadAssignDialog";
 
 export default function AdminTournamentEditPage() {
   // Globale Aktionen nur für die Turnierleitung mit Zwei-Faktor (#1028), Helfer sehen die ihres Einsatzes.
@@ -244,7 +245,10 @@ export default function AdminTournamentEditPage() {
       tone: "danger",
     })) return;
     try {
-      const { data } = await api.delete(`/tournaments/${id}/registrations/${registration.id}`);
+      // Ein zugeteiltes Co-Team (#1649) nimmt der eigene Weg heraus - mit Protokoll „league.squad.remove“.
+      const { data } = await api.delete(registration.squad_id
+        ? `/tournaments/${id}/squad-registrations/${registration.id}`
+        : `/tournaments/${id}/registrations/${registration.id}`);
       toast.success(data?.auto_bracket_update?.match_count
         ? `Teilnehmer entfernt. ${data.auto_bracket_update.preview === false ? "Turnierbaum" : "Vorschau"} neu gemischt.`
         : "Teilnehmer entfernt.");
@@ -578,6 +582,13 @@ export default function AdminTournamentEditPage() {
 
       {activeTab === "participants" && (
         <div className="space-y-4">
+        {/* Liga (#1649): Co-Teams teilt die Turnierleitung von Hand zu - Hauptteam, dann Co-Team, mit allen Prüfungen. */}
+        {isTournamentLead && canAssignSquads(t) && (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-white/10 bg-[#121212] p-4">
+            <p className="min-w-0 flex-1 text-sm text-white/60">Teilnehmer dieser Liga sind Co-Teams. Captain und Vertreter vergibt die Teamleitung im Profil.</p>
+            <SquadAssignDialog tournament={t} onAssigned={load} />
+          </div>
+        )}
         {t.can_manage_participants && (
           <ParticipantAddForm
             form={participantForm}

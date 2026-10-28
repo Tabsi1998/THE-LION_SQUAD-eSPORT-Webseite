@@ -70,10 +70,19 @@ async def _active_registrations_for_user(db, user: dict) -> list[dict]:
     identity_query: dict = {"user_id": user["id"]}
     if team_ids:
         identity_query = {"$or": [{"user_id": user["id"]}, {"team_id": {"$in": team_ids}}]}
-    return await db.tournament_registrations.find(
+    registrations = await db.tournament_registrations.find(
         {**identity_query, "status": {"$in": sorted(ACTIVE_REGISTRATION_STATUSES)}},
-        {"_id": 0, "id": 1, "tournament_id": 1, "user_id": 1, "team_id": 1},
+        {"_id": 0, "id": 1, "tournament_id": 1, "user_id": 1, "team_id": 1, "squad_id": 1},
     ).to_list(250)
+    if not any(reg.get("squad_id") for reg in registrations):
+        return registrations
+    # Co-Team einer Liga (#1649): dessen Spiele gehören nur zu Kader, Captain, Vertreter und Hauptteam-Leitung - nicht
+    # zu jedem Mitglied des Hauptteams.
+    from services.match_audience import player_ids, teams_by_id
+
+    teams = await teams_by_id(db, registrations)
+    return [reg for reg in registrations
+            if not reg.get("squad_id") or user["id"] in player_ids(reg, teams.get(reg.get("team_id") or ""))]
 
 
 async def _matches_for_query(db, query: dict, per_collection_limit: int = 240) -> list[dict]:

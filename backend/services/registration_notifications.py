@@ -123,7 +123,7 @@ async def notify_tournament_finished(db, tournament: dict) -> int:
     Postfach (ohne Push, die Ergebnisse kommen ohnehin) und, wenn die Person es zulässt, per Mail."""
     registrations = await db.tournament_registrations.find(
         {"tournament_id": tournament.get("id"), "status": {"$in": ["approved", "checked_in"]}},
-        {"_id": 0, "id": 1, "user_id": 1, "team_id": 1},
+        {"_id": 0, "id": 1, "user_id": 1, "team_id": 1, "squad_id": 1},
     ).to_list(5000)
     if not registrations:
         return 0
