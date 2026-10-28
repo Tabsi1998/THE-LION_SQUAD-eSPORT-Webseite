@@ -17,7 +17,7 @@ export const TIEBREAKER_LABELS = { score_diff: "Differenz", score_for: "Mehr gew
 export const SYNC_GROUP_TEXT = {
   always: "Sichtbarkeit und Regeltext",
   before_start: "Termine und Kalender",
-  before_result: "Best of, Teamgröße, Punkte und Fristen",
+  before_result: "Best of, Teamgröße, Mindestkader, Punkte und Fristen",
   map_pool: "Map-Pool",
 };
 

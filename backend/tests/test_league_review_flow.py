@@ -293,7 +293,21 @@ async def test_the_staffel_carries_its_minimum_squad_from_season_or_division(flo
     assert (await flow.db.tournaments.find_one({"id": staffel["id"]}))["min_squad_size"] == 7
     assert (await flow.db.tournaments.find_one({"id": own["tournament_id"]}))["min_squad_size"] == 3
 
+    # Nach dem Start, aber vor dem ersten Ergebnis: Teamgröße und Mindestkader gehen noch - gemeinsam.
     await flow.db.tournaments.update_one({"id": staffel["id"]}, {"$set": {"status": "live"}})
-    await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"min_squad_size": 8})
+    await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"team_size": 9})
     await flow.post(f"{ADMIN}/seasons/{season['id']}/sync")
-    assert (await flow.db.tournaments.find_one({"id": staffel["id"]}))["min_squad_size"] == 7  # nach dem Start nicht
+    after = await flow.db.tournaments.find_one({"id": staffel["id"]})
+    assert (after["team_size"], after["min_squad_size"]) == (9, 9)  # der Mindestkader wächst mit
+
+    # Nach dem ersten Ergebnis bleiben beide.
+    await flow.db.matches_v2.insert_one({"id": "m1", "tournament_id": staffel["id"], "status": "completed", "slots": []})
+    await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"team_size": 4, "min_squad_size": 5})
+    result = (await flow.post(f"{ADMIN}/seasons/{season['id']}/sync")).json()["staffeln"]
+    after = await flow.db.tournaments.find_one({"id": staffel["id"]})
+    assert (after["team_size"], after["min_squad_size"]) == (9, 9)
+    row = next(item for item in result if item["tournament_id"] == staffel["id"])
+    assert [item["label"] for item in row["skipped"] if item["group"] == "before_result"] == [
+        "Best of, Teamgröße, Mindestkader, Punkte und Fristen"]
+    for tournament in await flow.db.tournaments.find({}, {"_id": 0}).to_list(None):
+        assert tournament["min_squad_size"] >= tournament["team_size"]

@@ -339,15 +339,15 @@ def staffel_fields(league: dict, season: dict, division: dict) -> dict:
 SYNC_GROUPS: dict[str, tuple[str, ...]] = {
     "always": ("visibility", "is_public", "rules"),
     "before_start": ("start_date", "end_date", "matchday_days", "default_match_weekday", "default_match_time",
-                     "round_robin_legs", "matchday_blocked_weeks", "matchday_weeks_total", "max_participants",
-                     "min_squad_size"),
-    "before_result": ("best_of", "team_size", "scoring_rules", "game_mode_order", "result_confirm_hours_league",
-                      "lineup_amend_hours"),
+                     "round_robin_legs", "matchday_blocked_weeks", "matchday_weeks_total", "max_participants"),
+    # Teamgröße und Mindestkader gehen immer gemeinsam - so bleibt min_squad_size ≥ team_size am Turnier.
+    "before_result": ("best_of", "team_size", "min_squad_size", "scoring_rules", "game_mode_order",
+                      "result_confirm_hours_league", "lineup_amend_hours"),
 }
 SYNC_GROUP_LABELS = {
     "always": "Sichtbarkeit und Regeltext",
     "before_start": "Termine und Kalender",
-    "before_result": "Best of, Teamgröße, Punkte und Fristen",
+    "before_result": "Best of, Teamgröße, Mindestkader, Punkte und Fristen",
     "map_pool": "Map-Pool",
 }
 
