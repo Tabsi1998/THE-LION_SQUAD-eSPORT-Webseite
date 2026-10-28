@@ -525,7 +525,9 @@ function PricesStep({ view, busy, run }) {
   const offered = view.variants.filter((row) => row.active);
   const warnings = offered.filter((row) => row.price_warning);
   if (!offered.length) return <p className="text-sm text-white/55" data-testid="shop-step-prices">Erst Farben und Größen wählen (Schritt 2).</p>;
-  const estimated = offered.some((row) => hasCents(row.printful_gross_cents));
+  // Eine veraltete Schätzung zählt als „geschätzt“: der Server nimmt dann keinen Katalog netto mehr (#2135).
+  const estimated = offered.some((row) => hasCents(row.printful_gross_cents) || row.estimate_stale);
+  const stale = offered.some((row) => row.estimate_stale);
   return (
     <div className="space-y-4" data-testid="shop-step-prices">
       <p className="text-xs text-white/55" data-testid="shop-prices-explain">
@@ -533,6 +535,9 @@ function PricesStep({ view, busy, run }) {
       </p>
       {!estimated && (
         <p className="text-xs text-honor" data-testid="shop-prices-no-estimate">Noch keine Schätzung von Printful – bis dahin gilt der Katalog netto. Erst die Druckdateien erzeugen (Schritt 3), dann „Brutto bei Printful schätzen“.</p>
+      )}
+      {stale && (
+        <p className="text-xs text-warn" data-testid="shop-prices-stale">Schätzung veraltet – erst „Brutto bei Printful schätzen“, dann übernehmen.</p>
       )}
       {warnings.length > 0 && (
         <div className="border border-warn/40 bg-warn/10 rounded-sm p-3 text-sm" role="alert" data-testid="shop-price-warnings">
@@ -552,7 +557,8 @@ function PricesStep({ view, busy, run }) {
           </tr></thead>
           <tbody>
             {offered.map((row) => {
-              const expected = hasCents(row.member_price_cents) ? row.member_price_cents : row.cost_cents;
+              // Veraltet: der erwartete Preis ist unbekannt - nie still der Katalog netto.
+              const expected = row.estimate_stale ? null : hasCents(row.member_price_cents) ? row.member_price_cents : row.cost_cents;
               return (
                 <tr key={row.id} className="border-t border-white/10" data-testid={`shop-price-${row.sku}`}>
                   <td className="py-1.5 pr-3">{row.display_label || row.label}{row.blocked_reason && <span className="block text-xs text-warn">{row.blocked_reason}</span>}</td>

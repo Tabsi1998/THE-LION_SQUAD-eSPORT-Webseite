@@ -61,7 +61,15 @@ const CONFIG = {
   limits: { public_markup_cents: 10000, fallback_shipping_cents: 10000, min_price_cents: 10000, price_tolerance_cents: 10000 },
 };
 
-async function mockApi(page, posted) {
+// Veraltete Schätzung (#2135): Printful wurde teurer, die neue Schätzung fehlt noch - kein Netto-Vorschlag.
+const STALE = {
+  ...VIEW,
+  variants: [variant("Black", "M", "PF1", { member_price_cents: null, price_source: "stale", printful_gross_cents: null, printful_net_cents: null,
+    shipping_example_cents: null, estimate_stale: true, catalog_check: false,
+    price_warning: { before_cents: 1170, after_cents: null, stale: true, at: "2026-10-28T05:20:00+00:00" } })],
+};
+
+async function mockApi(page, posted, data = VIEW) {
   await page.addInitScript(() => {
     window.localStorage.setItem("tls_cookie_consent_v1", JSON.stringify({ essential: true, external_media: false, analytics: false, meta: false, tiktok: false, saved_at: Date.now(), expires_at: 4102444800000 }));
   });
@@ -79,7 +87,7 @@ async function mockApi(page, posted) {
     }
     if (url.pathname === "/api/auth/me") return json(FINANCE);
     if (url.pathname === "/api/settings/public") return json({ club_name: "THE LION SQUAD", domain: "lionsquad.at" });
-    if (url.pathname === "/api/admin/shop/products/p1") return json(VIEW);
+    if (url.pathname === "/api/admin/shop/products/p1") return json(data);
     if (url.pathname === "/api/admin/shop/config") return json(CONFIG);
     const list = /notifications|games$|nav$|site-banners|sponsors|partners/.test(url.pathname);
     return json(list ? [] : {});
@@ -115,6 +123,18 @@ for (const [label, width, height] of WIDTHS) {
       await page.getByTestId("shop-prices-estimate").click();
       await expect(page.getByText("2 von 2 Varianten brutto geschätzt.")).toBeVisible();
       expect(posted).toEqual(["/api/admin/shop/products/p1/prices/estimate"]);
+    });
+
+    test("Schritt 4: veraltete Schätzung – neu schätzen statt Katalog netto (#2135)", async ({ page }) => {
+      await page.setViewportSize({ width, height });
+      await mockApi(page, [], STALE);
+      await page.goto("/admin/shop/products/p1");
+      await page.getByTestId("shop-step-prices").click();
+      await expect(page.getByTestId("shop-prices-stale")).toContainText("erst „Brutto bei Printful schätzen“");
+      await expect(page.getByTestId("shop-prices-no-estimate")).toHaveCount(0);
+      await expect(page.getByTestId("shop-price-warnings")).toContainText("Schätzung veraltet – neu schätzen");
+      await expect(page.getByTestId("shop-price-PF1-gross")).toContainText("Schätzung veraltet");
+      expect(await overflow(page), "kein seitliches Scrollen der Seite").toBeLessThanOrEqual(1);
     });
 
     test("Einstellungen: Toleranz bei Preisänderung speichern (#2135)", async ({ page }) => {

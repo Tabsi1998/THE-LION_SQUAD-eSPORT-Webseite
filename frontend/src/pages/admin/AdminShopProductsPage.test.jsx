@@ -869,7 +869,7 @@ test("Preise (#2135): Printful brutto, Mitgliederpreis, Versandbeispiel AT, Kata
   const rows = [
     variant("Black / M", "PF1", { ...gross, catalog_check: true }),
     variant("White / M", "PF3", { ...gross, cost_cents: 1180, catalog_check: false }),
-    variant("White / L", "PF4", { printful_gross_cents: null, member_price_cents: 1500, shipping_example_cents: null, price_source: "catalog", estimate_stale: true }),
+    variant("White / L", "PF4", { printful_gross_cents: null, member_price_cents: null, shipping_example_cents: null, price_source: "stale", estimate_stale: true }),
   ];
   apiMock.get.mockResolvedValue({ data: view({ variants: rows, extra: { pricing: { ...view().pricing, note: "zzgl. Versand, genauer Betrag an der Kasse" } } }) });
   apiMock.post.mockResolvedValue({ data: { ...view({ variants: rows }), result: { estimated: 3, offered: 3, detail: "3 von 3 Varianten brutto geschätzt." } } });
@@ -903,6 +903,10 @@ test("Preise: eine veraltete Schätzung schlägt nie Netto vor, sondern „neu s
   expect(screen.getByTestId("shop-price-warnings")).toHaveTextContent("11,70 € → Schätzung veraltet – neu schätzen");
   expect(screen.getByTestId("shop-price-warnings")).not.toHaveTextContent("15,00");
   expect(screen.getByTestId("shop-price-PF1-gross")).toHaveTextContent("Schätzung veraltet");
+  // Kein „bis dahin gilt der Katalog netto“ - der Server nimmt ihn nicht mehr; stattdessen erst neu schätzen.
+  expect(screen.queryByTestId("shop-prices-no-estimate")).toBeNull();
+  expect(screen.getByTestId("shop-prices-stale")).toHaveTextContent("erst „Brutto bei Printful schätzen“, dann übernehmen");
+  expect(screen.getByTestId("shop-price-PF1-member")).toHaveClass("text-warn");
 });
 
 test("Preise ohne Schätzung: Hinweis, dass bis dahin der Katalog netto gilt", async () => {
