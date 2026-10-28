@@ -171,3 +171,20 @@ async def test_problem_before_the_result_goes_back_to_the_open_match(flow):
     assert stored["status"] not in {"disputed", "completed"} and not stored.get("results")
     decided = [row for row in await notes(flow, "match_result") if row["title"] == "Dispute entschieden"]
     assert decided and "Das Spiel geht weiter wie geplant." in decided[0]["body"]
+
+
+@pytest.mark.asyncio
+async def test_staff_enters_the_same_result_again_and_the_dispute_reads_keep(flow):
+    """Review O1 (#2124): dasselbe Ergebnis noch einmal eingetragen heißt „Ergebnis bleibt“, nicht „korrigiert“."""
+    staff, tournament, match, first, second, player, others = await bracket(flow)
+    await entered(flow, staff, match, second, first)
+    flow.act_as(player[first])
+    await flow.post(f"/api/matches/{match['id']}/dispute", json={"reason": "Stand vertauscht", "category": "wrong_result"})
+    flow.act_as(staff)
+    same = await flow.post(f"/api/matches/{match['id']}/result?force=true",
+                           json={**ranking(second, first), "hold": True, "reason": "Nachgezählt, stimmt"})
+    assert same.status_code == 200, same.text
+    assert await publish_due_holds(flow.db, now=now_utc() + timedelta(seconds=13)) == 1
+    stored = await flow.reload(match)
+    assert stored["status"] == "completed"
+    assert [row.get("decision") for row in stored["disputes"]] == ["keep"]
