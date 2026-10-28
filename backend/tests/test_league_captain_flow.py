@@ -250,3 +250,35 @@ async def test_dashboard_asks_for_a_missing_lineup_until_the_deadline(flow):
 
 def roles_url(world: dict) -> str:
     return f"/api/teams/{world['lions']['id']}/squads/{world['squad_a']['id']}/roles"
+
+
+@pytest.mark.asyncio
+async def test_captain_and_vice_give_up_their_own_role_only(flow):
+    world = await setup(flow)
+    users = world["users"]
+
+    # Der Captain kann weder die Rolle des Vertreters nehmen noch eine Rolle vergeben.
+    flow.act_as(users["Spieler1"])
+    for body in ({"vice_captain_id": None}, {"captain_id": users["Spieler3"]["id"]},
+                 {"captain_id": None, "vice_captain_id": None}):
+        refused = await flow.put(roles_url(world), json=body)
+        assert refused.status_code == 403, (body, refused.text)
+    # Ein Kader-Mitglied ohne Rolle gibt nichts ab.
+    flow.act_as(users["Spieler3"])
+    assert (await flow.put(roles_url(world), json={"captain_id": None})).status_code == 403
+
+    flow.act_as(users["Spieler1"])
+    resigned = await flow.put(roles_url(world), json={"captain_id": None})
+    assert resigned.status_code == 200, resigned.text
+    stored = await flow.db.team_squads.find_one({"id": world["squad_a"]["id"]}, {"_id": 0})
+    assert "captain_id" not in stored and stored["vice_captain_id"] == users["Spieler2"]["id"]
+    logged = await flow.db.audit_logs.find({"action": "team.squad.roles"}, {"_id": 0}).to_list(10)
+    assert logged[-1]["actor_id"] == users["Spieler1"]["id"]
+    told_leads = await flow.db.notifications.find({"kind": "team_role_changed", "meta.resigned": {"$exists": True}},
+                                                  {"_id": 0}).to_list(10)
+    assert {row["user_id"] for row in told_leads} == ids(users, "Leitung", "CoLeitung")
+    assert "neu vergeben" in told_leads[0]["body"]
+
+    # Ohne Rolle darf Spieler1 das Team jetzt verlassen.
+    left = await flow.post(f"/api/teams/{world['lions']['id']}/leave")
+    assert left.status_code == 200, left.text
