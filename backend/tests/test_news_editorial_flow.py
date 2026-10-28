@@ -256,3 +256,22 @@ async def test_withdrawn_member_post_stays_not_found_for_guests(flow):
     await news(flow, "intern-weg", visibility="members", published=False, withdrawn_at=now_utc().isoformat())
     flow.act_as(None)
     assert (await flow.get("/api/news/intern-weg")).status_code == 404, "erst die Sichtbarkeit, dann der Hinweis"
+
+
+INTERNAL = {"updated_by", "updated_by_name", "withdrawn_by_name", "newsletter_sent_at", "newsletter_sent_count",
+            "news_mention_notified_user_ids", "discord_outcome", "members_notified_at"}
+
+
+@pytest.mark.asyncio
+async def test_guests_never_see_internal_fields(flow):
+    await news(flow, "offen", updated_by="u-red", updated_by_name="Rita Redaktion", newsletter_sent_at="2026-10-01T10:00:00+00:00",
+               newsletter_sent_count=3, news_mention_notified_user_ids=["u-1"], discord_outcome="sent", members_notified_at="2026-10-01")
+    flow.act_as(None)
+    listed = (await flow.get("/api/news")).json()
+    detail = (await flow.get("/api/news/offen")).json()
+    home = (await flow.get("/api/home/state")).json()["news"]
+    for row in (listed[0], detail, home[0]):
+        assert not INTERNAL & set(row), f"interne Felder nach außen: {sorted(INTERNAL & set(row))}"
+    assert "Rita Redaktion" not in str(listed) + str(detail) + str(home)
+    flow.act_as(await flow.add_user(role="club_admin", name="vorstand"))
+    assert (await flow.get("/api/admin/news/n-offen")).json()["updated_by_name"] == "Rita Redaktion", "Admin → News behält sie"

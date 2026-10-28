@@ -13,6 +13,7 @@ from services.news_cards import attach_result_winners, event_signups, tournament
 from services.sponsor_utils import dedupe_public_sponsors, drop_legacy_logo_fields, public_sponsor_view
 from services import partner_pages, sponsor_images
 from services.notification_preferences import enqueue_newsletter_for_item
+from services.news_publish import public_news
 from services.user_notifications import create_user_notification
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from services import dolibarr_policy, reference_checks, reference_season_links, reference_series, season_close
@@ -491,7 +492,7 @@ async def list_news(
         compacted = [_compact_news(p) for p in rows]
         return {**page, "items": compacted} if paged else compacted
     await attach_result_winners(db, posts, user)
-    return posts
+    return [public_news(post) for post in posts]
 
 
 @router.get("/news/{slug_or_id}")
@@ -559,7 +560,8 @@ async def get_news(slug_or_id: str, user: dict | None = Depends(get_optional_use
         users.sort(key=lambda user: user_order.get(user["id"], 999))
         p["mentioned_users"] = users
     p["content_embeds"] = await resolve_content_embeds(db, p.get("content"), user)
-    return p
+    # Interne Felder der Redaktion (#2122) gehen nie nach außen - auch nicht in die App.
+    return public_news(p)
 
 
 async def _attach_mentioned_users(db, posts: list[dict]) -> None:

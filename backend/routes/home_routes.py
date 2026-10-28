@@ -20,6 +20,7 @@ from models import now_utc
 from services import founding
 from services.visibility import user_can_see
 from services.news_cards import attach_result_winners
+from services.news_publish import public_news
 from services import event_days
 from services.league_scope import NOT_LEAGUE
 from services.public_phase import derive_public_phase
@@ -288,7 +289,8 @@ async def home_state(user: dict | None = Depends(get_optional_user)):
         if published_at and published_at > now:
             continue
         if await user_can_see(user, n.get("visibility")):
-            visible_news.append(n)
+            # Ohne die internen Felder der Redaktion (#2122): wer geändert hat, Versandstand.
+            visible_news.append(public_news(n))
     visible_news.sort(
         key=lambda n: (_parse_dt(n.get("published_at") or n.get("created_at")) or datetime.min.replace(tzinfo=timezone.utc), bool(n.get("pinned"))),
         reverse=True,
