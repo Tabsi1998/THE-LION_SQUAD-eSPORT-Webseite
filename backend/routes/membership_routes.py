@@ -1311,6 +1311,8 @@ async def public_members_directory():
         private_projection("email"),
     ).to_list(2000)
     user_map = {u["id"]: u for u in users}
+    # Öffentlich (#2118): Land und Spiele nur mit der Stufe „öffentlich“ aus „Privatsphäre“, ohne interne Vereinsrolle.
+    from routes.user_routes import _field_visible
     out = []
     for m in memberships:
         u = user_map.get(m["user_id"])
@@ -1320,11 +1322,10 @@ async def public_members_directory():
             "username": u["username"],
             "display_name": u.get("display_name"),
             "avatar_url": u.get("avatar_url"),
-            "country": u.get("country"),
-            "favorite_games": u.get("favorite_games") or [],
+            "country": u.get("country") if _field_visible(u, "country", True) else None,
+            "favorite_games": (u.get("favorite_games") or []) if _field_visible(u, "favorite_games", True) else [],
             "membership_type": m.get("membership_type"),
             "member_since": m.get("member_since"),
-            "internal_role": m.get("internal_role"),
             "member_number": m.get("member_number") if m.get("show_member_number_publicly") else None,
         })
     out.sort(key=lambda x: (x.get("member_since") or ""))

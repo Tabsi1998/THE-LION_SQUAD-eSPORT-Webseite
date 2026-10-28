@@ -541,10 +541,12 @@ async def list_public_users(
     from badges import compute_profile_completeness, _level_name, _color_for_level
     xp_docs = {row["user_id"]: row async for row in db.user_xp.find({"user_id": {"$in": user_ids}}, {"_id": 0, "user_id": 1, "total": 1, "prestige": 1})}
 
+    from services.achievement_visibility import achievements_public
     out = []
     for u in users:
         score = compute_profile_completeness(u)
-        ua = by_user.get(u["id"], [])
+        # „Erfolge öffentlich“ aus (#2118): in der Liste weder Zahl noch Top-Erfolg.
+        ua = by_user.get(u["id"], []) if achievements_public(u) else []
         top = None
         if ua:
             ua_sorted = sorted(ua, key=lambda a: (a.get("level", 0), tiers.get(a["tier_code"], {}).get("points", 0)), reverse=True)
@@ -561,8 +563,9 @@ async def list_public_users(
                 }
         out.append({
             "id": u["id"], "username": u["username"], "display_name": u.get("display_name"),
-            "avatar_url": u.get("avatar_url"), "country": u.get("country"),
-            "favorite_games": u.get("favorite_games"),
+            # Die Liste sieht jede:r (#2118): Land und Spiele nur mit der Stufe „öffentlich“ aus „Privatsphäre“.
+            "avatar_url": u.get("avatar_url"), "country": _visible_field(u, "country", True),
+            "favorite_games": (u.get("favorite_games") or []) if _field_visible(u, "favorite_games", True) else [],
             "is_club_member": is_active_member(memberships.get(u["id"])),
             "user_type": derived_user_type(u, memberships.get(u["id"])),
             "created_at": u.get("created_at"),
@@ -598,10 +601,10 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
         raise HTTPException(status_code=404, detail="Spieler nicht gefunden")
     public_member = None
     if is_member:
+        # Die interne Vereinsrolle bleibt in der Verwaltung und im eigenen Mitgliederbereich (#2118).
         public_member = {
             "membership_type": membership.get("membership_type"),
             "member_since": membership.get("member_since"),
-            "internal_role": membership.get("internal_role"),
             "member_number": membership.get("member_number") if membership.get("show_member_number_publicly") else None,
         }
     from services.platform_links import PLATFORMS as LINK_PLATFORMS, verified_platforms
@@ -678,7 +681,11 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
     ).to_list(50)
     # Achievements v4 (group-aware) — flat list of awarded tiers
     user_id = u["id"]
-    ua = await db.user_achievements.find({"user_id": user_id}, {"_id": 0})\
+    # „Erfolge öffentlich“ aus (#619, #2118): Fremde sehen keine Erfolge und keine Zahl - die Person selbst und das
+    # Admin-Team schon (wie GET /api/achievements/user/{id}).
+    from services.achievement_visibility import achievements_public
+    achievements_hidden = not achievements_public(u) and not (ctx.get("self") or ctx.get("admin"))
+    ua = [] if achievements_hidden else await db.user_achievements.find({"user_id": user_id}, {"_id": 0})\
         .sort("earned_at", -1).to_list(500)
     tier_map = {t["code"]: t async for t in db.achievements.find({}, {"_id": 0})}
     group_map = {g["code"]: g async for g in db.achievement_groups.find({}, {"_id": 0})}
@@ -817,6 +824,7 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
     return {
         **base,
         "badges": badges,
+        "achievements_hidden": achievements_hidden,
         "stats": stats,
         "achievement_level": achievement_level,
         "tournaments": tournaments,
