@@ -179,11 +179,14 @@ async def team_overview(db, team: dict, viewer: dict | None, *, insider: bool, r
     games = await _game_names(db, (row.get("game_id") for row in visible.values()))
     events = await _event_names(db, (row.get("event_id") for row in visible.values()))
 
+    league = await _league_entries(db, registrations, visible, viewer)
     upcoming = []
     for reg in registrations:
         tournament = visible.get(reg.get("tournament_id"))
         if not tournament or tournament.get("status") in CLOSED_TOURNAMENT_STATUSES:
             continue
+        if is_league_staffel(tournament):
+            continue  # Liga-Staffeln stehen im Abschnitt „Liga“ - jede Info nur an einer Stelle
         if reg.get("status") not in ACTIVE_REGISTRATION_STATUSES:
             continue
         upcoming.append({
@@ -229,7 +232,54 @@ async def team_overview(db, team: dict, viewer: dict | None, *, insider: bool, r
                            **({"league_label": league_label(tournament)} if is_league_staffel(tournament) else {})},
             **line,
         })
-    return {"header": header, "upcoming": upcoming, "recent": recent}
+    return {"header": header, "upcoming": upcoming, "recent": recent, "league": league}
+
+
+ACTIVE_SEASON_STATUSES = ("draft", "active")
+
+
+async def _league_entries(db, registrations: list[dict], visible: dict[str, dict], viewer: dict | None) -> list[dict]:
+    """Abschnitt „Liga“ der Teamseite (P5, #1625): die Co-Teams des Teams und ihre Staffel in laufenden Seasons. Der
+    Link geht auf die Ligaseite, wenn die Person die Season sehen darf, sonst auf das Staffel-Turnier."""
+    from services.league_service import can_see_season, division_label
+
+    rows = [(reg, visible[reg["tournament_id"]]) for reg in registrations
+            if reg.get("tournament_id") in visible and is_league_staffel(visible[reg["tournament_id"]])
+            and reg.get("status") in ACTIVE_REGISTRATION_STATUSES]
+    if not rows:
+        return []
+    contexts = [tournament["league_context"] for _reg, tournament in rows]
+    seasons = {row["id"]: row for row in await db.league_seasons.find(
+        {"id": {"$in": sorted({c.get("season_id") for c in contexts if c.get("season_id")})},
+         "status": {"$in": list(ACTIVE_SEASON_STATUSES)}}, {"_id": 0}).to_list(50)}
+    leagues = {row["id"]: row for row in await db.leagues.find(
+        {"id": {"$in": sorted({c.get("league_id") for c in contexts if c.get("league_id")})}},
+        {"_id": 0, "id": 1, "name": 1, "slug": 1}).to_list(50)}
+    divisions = {row["id"]: row for row in await db.league_divisions.find(
+        {"id": {"$in": sorted({c.get("division_id") for c in contexts if c.get("division_id")})}},
+        {"_id": 0, "id": 1, "level": 1, "nickname": 1}).to_list(50)}
+    out = []
+    for reg, tournament in rows:
+        context = tournament["league_context"]
+        season = seasons.get(context.get("season_id"))
+        league = leagues.get(context.get("league_id"))
+        if not season or not league:
+            continue
+        division = divisions.get(context.get("division_id")) or {"level": "?"}
+        staffel = context.get("staffel")
+        link = (f"/liga/{league['slug']}/{season['slug']}#staffel-{tournament.get('slug') or tournament['id']}"
+                if await can_see_season(viewer, season) else f"/tournaments/{tournament.get('slug') or tournament['id']}")
+        out.append({
+            "registration_id": reg.get("id"),
+            "display_name": reg.get("display_name") or reg.get("team_name"),
+            "squad_name": reg.get("squad_name"),
+            "league": {"name": league.get("name"), "slug": league.get("slug")},
+            "season": {"name": season.get("name"), "slug": season.get("slug")},
+            "staffel_label": f"{division_label(division)} · Staffel {staffel}",
+            "tournament": {"id": tournament["id"], "slug": tournament.get("slug"), "status": tournament.get("status")},
+            "link": link,
+        })
+    return sorted(out, key=lambda row: (row["league"]["name"] or "", row["staffel_label"]))
 
 
 # ------------------------------------------------------------------ Einladungs-Link

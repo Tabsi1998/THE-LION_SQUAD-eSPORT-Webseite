@@ -300,3 +300,39 @@ async def public_season(league_slug: str, season_slug: str, user: dict | None = 
 
     return await _call(leagues.public_season_view(get_db(), league_slug, season_slug, user,
                                                   staffel_hidden=tournament_hidden_reason))
+
+
+@router.get("/{league_slug}/{season_slug}/staffeln/{staffel_ref}")
+async def public_staffel(league_slug: str, season_slug: str, staffel_ref: str,
+                         user: dict | None = Depends(get_optional_user)):
+    """Eine Staffel auf der Ligaseite (P5, #1625): Tabelle (Punkte der Season), Spielwochen mit Pause, Spiele mit
+    Ergebnis und Maps, Teams mit Teamseite. Sichtbar nur, was die Season und die Turnierseite der Person zeigen."""
+    from routes.tournament_common import tournament_hidden_reason
+    from routes.tournament_view_routes import standings as tournament_standings
+    from services import league_page
+
+    db = get_db()
+    view = await _call(leagues.public_season_view(db, league_slug, season_slug, user,
+                                                  staffel_hidden=tournament_hidden_reason))
+    shown = {staffel["tournament_id"]: (division, staffel) for division in view["divisions"]
+             for staffel in division["staffeln"]}
+    tournament = await db.tournaments.find_one({"$or": [{"id": staffel_ref}, {"slug": staffel_ref}], **ONLY_LEAGUE},
+                                               {"_id": 0})
+    if not tournament or tournament["id"] not in shown:
+        raise HTTPException(status_code=404, detail="Staffel nicht gefunden")
+    division, staffel = shown[tournament["id"]]
+    registrations = await db.tournament_registrations.find(
+        {"tournament_id": tournament["id"], "status": {"$in": list(league_page.PUBLIC_REGISTRATION_STATUSES)}},
+        {"_id": 0, "id": 1, "display_name": 1, "team_name": 1, "squad_name": 1, "team_id": 1}).to_list(200)
+    names = {row["id"]: league_page.registration_view(row) for row in registrations if row.get("id")}
+    matches = await db.matches_v2.find({"tournament_id": tournament["id"], "is_preview": {"$ne": True}},
+                                       {"_id": 0}).to_list(500)
+    proposals = await db.match_schedule_proposals.find({"tournament_id": tournament["id"]},
+                                                       {"_id": 0, "match_collection": 0}).to_list(2000)
+    table = await tournament_standings(tournament["id"], None, user)
+    return {
+        "staffel": {**staffel, "division_label": division["label"], "division_level": division["level"]},
+        "standings": table,
+        "teams": sorted(names.values(), key=lambda row: str(row["display_name"]).casefold()),
+        **league_page.staffel_weeks(tournament, matches, names, proposals),
+    }
