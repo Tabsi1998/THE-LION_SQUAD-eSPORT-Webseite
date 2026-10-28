@@ -109,7 +109,7 @@ test("Einrasten an der Mittellinie, an anderen Ebenen und sonst aufs Raster - mi
   expect(frame.top + grid.dy).toBeCloseTo(6.5, 6);
   expect(onGrid(frame.centerX + grid.dx - WIDTH / 2, 0.5)).toBe(true);
   // Raster vom linken Rand gemessen und ohne Raster.
-  const left = snapDrag({ frame, dx: 0.3, dy: 0, lines: { x: [], y: [] }, toleranceCm: 0, gridCm: 1, measure: "left", areaWidthCm: WIDTH });
+  const left = snapDrag({ frame, dx: 1.3, dy: 0, lines: { x: [], y: [] }, toleranceCm: 0, gridCm: 1, measure: "left", areaWidthCm: WIDTH });
   expect(onGrid(frame.left + left.dx, 1)).toBe(true);
   expect(snapDrag({ frame, dx: 0.3, dy: 0.2, lines: { x: [], y: [] }, toleranceCm: 0, gridCm: 0, areaWidthCm: WIDTH }).dx).toBe(0.3);
   // An der Kante einer anderen Ebene: Oberkante des Löwen an die Oberkante eines zweiten Motivs.
@@ -118,6 +118,25 @@ test("Einrasten an der Mittellinie, an anderen Ebenen und sonst aufs Raster - mi
   const top = snapDrag({ frame, dx: 0, dy: 3.08, lines: withOther, toleranceCm: 0.2, gridCm: 0.5, areaWidthCm: WIDTH });
   expect(frame.top + top.dy).toBeCloseTo(frameCm(SHIRT, other).top, 6);
   expect(top.guides[0]).toMatchObject({ axis: "y", kind: "layer", index: 2 });
+});
+
+test("waagrecht ziehen lässt ein genau gesetztes „Von oben“ stehen - erst ein Rasterschritt oder eine Hilfslinie bewegt es", () => {
+  // Oberkante genau 5,13 cm (per Zahl gesetzt), weit weg von jeder Linie.
+  const frame = { left: 3, right: 8, centerX: 5.5, top: 5.13, bottom: 10.13, middle: 7.63 };
+  const lines = { x: [], y: [{ at: 20, kind: "center" }] };
+  const base = { frame, lines, toleranceCm: 0.3, gridCm: 0.5, areaWidthCm: WIDTH, stillCm: 0.12 };
+  // Zittern (unter der Ziehschwelle) und weniger als ein Rasterschritt: senkrecht bleibt alles genau.
+  expect(snapDrag({ ...base, dx: 3, dy: 0.08 }).dy).toBe(0);
+  expect(snapDrag({ ...base, dx: 3, dy: 0.3 }).dy).toBe(0);
+  // Ein ganzer Schritt: aufs Raster (5,13 + 0,6 → 5,5).
+  expect(frame.top + snapDrag({ ...base, dx: 3, dy: 0.6 }).dy).toBeCloseTo(5.5, 6);
+  // Ohne Raster folgt die Achse frei, aber Zittern unter der Schwelle bleibt still.
+  expect(snapDrag({ ...base, gridCm: 0, dx: 3, dy: 0.3 }).dy).toBeCloseTo(0.3, 6);
+  expect(snapDrag({ ...base, gridCm: 0, dx: 3, dy: 0.05 }).dy).toBe(0);
+  // Eine Hilfslinie fängt auch unter einem Rasterschritt: Mitte 7,63 + 0,2 liegt neben einer Linie bei 7,8.
+  const near = snapDrag({ ...base, lines: { x: [], y: [{ at: 7.8, kind: "layer", index: 3 }] }, dx: 0, dy: 0.2 });
+  expect(frame.middle + near.dy).toBeCloseTo(7.8, 6);
+  expect(near.guides).toEqual([{ axis: "y", at: 7.8, kind: "layer", index: 3 }]);
 });
 
 test("Sicherheitsrand ist eine Hilfslinie", () => {

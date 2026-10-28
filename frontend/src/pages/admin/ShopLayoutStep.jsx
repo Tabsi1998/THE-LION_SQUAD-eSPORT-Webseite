@@ -266,7 +266,7 @@ function AreaCanvas({ area, layers, resolved, motifFor, sampleFor, onSampleProbl
     const moved = snapDrag({
       frame: now.frame, dx: screenToCm(dxPx, width, size.width), dy: screenToCm(dyPx, width, size.width), lines: now.lines,
       toleranceCm: screenToCm(SNAP_SCREEN_PX, width, size.width), gridCm: settings.grid, measure: settings.measure, areaWidthCm: size.width,
-      free: event.altKey || !settings.snap,
+      stillCm: screenToCm(DRAG_START_PX, width, size.width), free: event.altKey || !settings.snap,
     });
     onPlace(now.index, { offset_x_cm: round2(now.start.x + moved.dx), offset_y_cm: round2(now.start.y + moved.dy) });
     onLive({ index: now.index, guides: moved.guides });

@@ -172,7 +172,9 @@ export function snapLines(area, items, { marginCm = 0, skip = [] } = {}) {
   return { x, y };
 }
 
-function snapAxis(edges, delta, lines, tolerance, gridRef, grid) {
+function snapAxis(edges, delta, lines, tolerance, gridRef, grid, still) {
+  // Kaum bewegt (Zittern beim waagrechten Ziehen): die Achse bleibt genau, wo sie war - ein gesetztes „5,13“ springt nicht.
+  if (Math.abs(delta) < still) return { delta: 0, guide: null };
   let best = null;
   for (const edge of edges) {
     for (const line of lines) {
@@ -181,18 +183,21 @@ function snapAxis(edges, delta, lines, tolerance, gridRef, grid) {
     }
   }
   if (best) return { delta: best.delta, guide: best.line };
+  // Weniger als ein Rasterschritt ohne Hilfslinie: die Achse bleibt - erst ein ganzer Schritt setzt sie aufs Raster.
+  if (grid > 0 && Math.abs(delta) < grid) return { delta: 0, guide: null };
   if (grid > 0) return { delta: Math.round((gridRef + delta) / grid) * grid - gridRef, guide: null };
   return { delta, guide: null };
 }
 
-// Eine Bewegung beim Ziehen: `frame` ist der Rahmen beim Greifen (cm), `dx`/`dy` die Bewegung der Maus in cm. Liegt
-// eine Kante oder Mitte näher als `toleranceCm` an einer Hilfslinie, rastet sie dort ein (die Linie wird gezeigt);
-// sonst landet die angezeigte Position auf dem Raster. `free` (Alt gedrückt oder Einrasten aus): genau wie gezogen.
-export function snapDrag({ frame, dx, dy, lines, toleranceCm, gridCm = 0, measure = "center", areaWidthCm, free = false }) {
+// Eine Bewegung beim Ziehen: `frame` ist der Rahmen beim Greifen (cm), `dx`/`dy` die Bewegung der Maus in cm. Eine
+// Achse, die sich kaum bewegt hat (unter `stillCm`), bleibt genau; liegt eine Kante oder Mitte näher als `toleranceCm` an
+// einer Hilfslinie, rastet sie dort ein (die Linie wird gezeigt); sonst landet die angezeigte Position auf dem Raster -
+// unter einem Rasterschritt bleibt sie, wo sie war. `free` (Alt bzw. Strg gedrückt oder Einrasten aus): genau wie gezogen.
+export function snapDrag({ frame, dx, dy, lines, toleranceCm, gridCm = 0, measure = "center", areaWidthCm, free = false, stillCm = 0 }) {
   if (free || !frame) return { dx, dy, guides: [] };
   const gridX = measure === "left" ? frame.left : frame.centerX - areaWidthCm / 2;
-  const x = snapAxis([frame.left, frame.centerX, frame.right], dx, lines?.x || [], toleranceCm, gridX, gridCm);
-  const y = snapAxis([frame.top, frame.middle, frame.bottom], dy, lines?.y || [], toleranceCm, frame.top, gridCm);
+  const x = snapAxis([frame.left, frame.centerX, frame.right], dx, lines?.x || [], toleranceCm, gridX, gridCm, stillCm);
+  const y = snapAxis([frame.top, frame.middle, frame.bottom], dy, lines?.y || [], toleranceCm, frame.top, gridCm, stillCm);
   const guides = [];
   if (x.guide) guides.push({ axis: "x", ...x.guide });
   if (y.guide) guides.push({ axis: "y", ...y.guide });
