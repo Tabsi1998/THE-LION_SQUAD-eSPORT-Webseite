@@ -763,8 +763,6 @@ async def create_schedule_proposal(match_id: str, body: MatchScheduleProposalCre
     if not await _can_act_for_match(match, me):
         raise HTTPException(status_code=403, detail="Nur Teilnehmer, Team-Captains oder Turnierleitung dürfen Termine vorschlagen")
     _refuse_blocked_moment(tournament, body.scheduled_at)
-    # Nur in der Zukunft (#2124): einen Termin von gestern kann niemand mehr spielen.
-    refuse_past_proposal(body.scheduled_at)
     now_iso = now_utc().isoformat()
     normalized_note = (body.note or "").strip() or None
     existing = await db.match_schedule_proposals.find_one({
@@ -777,6 +775,9 @@ async def create_schedule_proposal(match_id: str, body: MatchScheduleProposalCre
     }, {"_id": 0, "match_collection": 0})
     if existing:
         return {**existing, "idempotent_replay": True}
+    # Nur in der Zukunft (#2124): einen Termin von gestern kann niemand mehr spielen. Erst nach der Wiederholung -
+    # ein doppelt gesendeter Vorschlag bekommt seine Antwort, auch wenn die 5 Minuten inzwischen knapp sind.
+    refuse_past_proposal(body.scheduled_at)
     doc = {
         "id": new_id(),
         "match_id": match_id,

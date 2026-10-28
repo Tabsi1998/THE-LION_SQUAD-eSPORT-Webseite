@@ -60,11 +60,8 @@ def test_dispute_exact_replay_skips_write_audit_and_badge(monkeypatch):
 
 
 def test_schedule_proposal_exact_replay_reuses_pending_record(monkeypatch):
-    import services.schedule_proposal_time as proposal_time
-
+    # Eine Wiederholung bekommt ihre Antwort, auch wenn der Termin inzwischen vorbei ist (#2124, Review O2).
     scheduled_at = datetime(2026, 8, 20, 18, 0, tzinfo=timezone.utc)
-    # Fester Termin: „nicht in der Vergangenheit“ (#2124) rechnet hier ab dem 1.8.2026.
-    monkeypatch.setattr(proposal_time, "now_utc", lambda: datetime(2026, 8, 1, tzinfo=timezone.utc))
     existing = {
         "id": "proposal-1",
         "match_id": "match-1",
