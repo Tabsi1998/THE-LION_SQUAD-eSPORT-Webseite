@@ -367,7 +367,7 @@ export default function AdminF1EditPage() {
           <a href={`${API}/f1/challenges/${challenge.id}/export.csv`} className="px-4 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40" target="_blank" rel="noreferrer">CSV</a>
           <a href={`${API}/exports/f1/${challenge.id}/leaderboard.pdf${activeTrack ? `?track_id=${activeTrack}` : ""}`} className="px-4 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40" target="_blank" rel="noreferrer">PDF</a>
           {isTournamentLead && challenge.status === "draft" && (
-            <button type="button" onClick={deleteChallenge} data-testid="f1-delete-challenge" className="inline-flex items-center gap-2 px-4 py-2 border border-[#FF3B30]/40 text-[#FF3B30] text-xs uppercase font-bold rounded-sm hover:bg-[#FF3B30]/10">
+            <button type="button" onClick={deleteChallenge} data-testid="f1-delete-challenge" className="inline-flex items-center gap-2 px-4 py-2 border border-live/40 text-live text-xs uppercase font-bold rounded-sm hover:bg-live/10">
               <Trash2 className="w-3.5 h-3.5" /> Entwurf löschen
             </button>
           )}

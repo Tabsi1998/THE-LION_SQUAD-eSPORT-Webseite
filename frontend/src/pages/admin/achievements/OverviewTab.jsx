@@ -107,10 +107,9 @@ export function OverviewTab() {
         <Panel
           title="Turnier-Pokale nachtragen"
           icon={Trophy}
-          accent="#FFD700"
           hint="Pokale und Banner für alle Turniere mit veröffentlichten Ergebnissen neu ableiten – etwa nach einer Korrektur alter Ergebnisse. Doppelt entsteht dabei nichts."
           actions={(
-            <button type="button" onClick={rebuildAwards} disabled={rebuilding} data-testid="ach-awards-rebuild" className="px-3 py-1.5 border border-[#FFD700]/50 text-[#FFD700] text-[10px] font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2 disabled:opacity-40">
+            <button type="button" onClick={rebuildAwards} disabled={rebuilding} data-testid="ach-awards-rebuild" className="px-3 py-1.5 border border-honor/50 text-honor text-[10px] font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2 disabled:opacity-40">
               <RefreshCw className={`w-3.5 h-3.5 ${rebuilding ? "animate-spin" : ""}`} /> Pokale nachtragen
             </button>
           )}

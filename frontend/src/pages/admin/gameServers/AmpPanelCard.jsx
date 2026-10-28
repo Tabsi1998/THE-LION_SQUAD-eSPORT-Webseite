@@ -98,7 +98,7 @@ export function AmpPanelCard() {
       </button>
       {open && (
         <form onSubmit={save} className="border-t border-white/10 p-4 space-y-3" data-testid="amp-panel-form">
-          {state?.error && <p className="text-sm text-[#FF6B6B]">{state.error}</p>}
+          {state?.error && <p className="text-sm text-warn">{state.error}</p>}
           <p className="text-xs text-white/50">Am besten ein eigener AMP-Benutzer nur mit Leserechten. Das Passwort wird verschlüsselt gespeichert und nie wieder angezeigt.</p>
           <div className="grid gap-3 md:grid-cols-2">
             <AmpField label="Adresse (https)" value={form.base_url} onChange={(v) => set("base_url", v)} placeholder="https://amp.example.org" testId="amp-base-url" />
@@ -120,11 +120,11 @@ export function AmpPanelCard() {
             <button type="submit" disabled={!!busy} data-testid="amp-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40">Speichern</button>
             <button type="button" disabled={!!busy || !configured} onClick={runTest} data-testid="amp-test" className="px-4 py-2 border border-white/20 text-white/80 font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40">Verbindung testen</button>
             {configured && (
-              <button type="button" disabled={!!busy} onClick={clearPassword} data-testid="amp-clear-password" className="px-4 py-2 border border-[#FF3B30]/40 text-[#FF6B6B] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#FF3B30]/10 disabled:opacity-40">Passwort entfernen</button>
+              <button type="button" disabled={!!busy} onClick={clearPassword} data-testid="amp-clear-password" className="px-4 py-2 border border-live/40 text-live font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-live/10 disabled:opacity-40">Passwort entfernen</button>
             )}
           </div>
           {test && (
-            <div className={`text-sm ${test.ok ? "text-[#00FF88]" : "text-[#FF6B6B]"}`} data-testid="amp-test-result">
+            <div className={`text-sm ${test.ok ? "text-ok" : "text-warn"}`} data-testid="amp-test-result">
               {test.ok
                 ? `Verbunden: ${test.instance_count} Instanz${test.instance_count === 1 ? "" : "en"}${test.instances?.length ? ` – ${test.instances.map((item) => item.name).filter(Boolean).join(", ")}` : ""}.`
                 : `Keine Verbindung: ${test.error}`}

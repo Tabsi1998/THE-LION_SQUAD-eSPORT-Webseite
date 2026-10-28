@@ -458,7 +458,7 @@ export default function AdminDolibarrPage() {
                   className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40">Speichern</button>
                 <button type="button" disabled={!!busy || !status?.api_key_configured} onClick={testConnection} data-testid="dolibarr-test" className="px-4 py-2 border border-white/20 text-white/80 font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40">Verbindung testen</button>
                 {status?.api_key_configured && (
-                  <button type="button" disabled={!!busy} onClick={() => removeKey("read")} data-testid="dolibarr-key-remove" className="px-4 py-2 border border-[#FF3B30]/40 text-[#FF6B6B] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#FF3B30]/10 disabled:opacity-40">Schlüssel entfernen</button>
+                  <button type="button" disabled={!!busy} onClick={() => removeKey("read")} data-testid="dolibarr-key-remove" className="px-4 py-2 border border-live/40 text-live font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-live/10 disabled:opacity-40">Schlüssel entfernen</button>
                 )}
               </div>
               {testResult && (
@@ -495,7 +495,7 @@ export default function AdminDolibarrPage() {
                     <button type="button" disabled={!!busy || !writeKey} data-testid="dolibarr-write-save" onClick={() => saveSettings({ write_api_key: writeKey }, "Schreib-Schlüssel gespeichert.").then(() => setWriteKey(""))}
                       className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40">Schlüssel speichern</button>
                     {status?.write_api_key_configured && (
-                      <button type="button" disabled={!!busy} onClick={() => removeKey("write")} data-testid="dolibarr-write-key-remove" className="ml-2 px-4 py-2 border border-[#FF3B30]/40 text-[#FF6B6B] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#FF3B30]/10 disabled:opacity-40">Schlüssel entfernen</button>
+                      <button type="button" disabled={!!busy} onClick={() => removeKey("write")} data-testid="dolibarr-write-key-remove" className="ml-2 px-4 py-2 border border-live/40 text-live font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-live/10 disabled:opacity-40">Schlüssel entfernen</button>
                     )}
                   </div>
                 </details>
