@@ -70,21 +70,18 @@ async def test_tournament_list_includes_by_default_and_filters_on_request(flow):
 @pytest.mark.asyncio
 async def test_publishing_results_of_a_staffel_awards_no_season_points_xp_or_trophies(flow, monkeypatch):
     import badges
-    from services import season_service
 
     normal, staffel = await pair(flow, status="completed")
     for tournament in (normal, staffel):
         for index in (1, 2):
             await flow.register(tournament, await flow.add_user(name=f"Spieler {index}"))
-    points, xp_calls = [], []
-
-    async def fake_award_points(**kwargs):
-        points.append(kwargs["source_id"])
+    xp_calls = []
+    # Seit #2123 gleicht sync_tournament_points die Jahrespunkte an - geprüft wird, was in der aktiven Saison steht.
+    await flow.db.seasons.insert_one({"id": "jw", "slug": "jw", "name": "Jahreswertung", "status": "active"})
 
     async def fake_xp(user_id, source, ref, **kwargs):
         xp_calls.append(ref)
 
-    monkeypatch.setattr(season_service, "award_points", fake_award_points)
     monkeypatch.setattr(badges, "_xp", fake_xp)
     flow.act_as(await flow.add_staff())
 
@@ -93,6 +90,7 @@ async def test_publishing_results_of_a_staffel_awards_no_season_points_xp_or_tro
                                     json={"status": "results_published", "force": True})
         assert published.status_code == 200, published.text
 
+    points = await flow.db.season_points.distinct("source_id")
     assert set(points) == {normal["id"]}
     assert staffel["id"] not in xp_calls
     assert await flow.db.tournament_awards.count_documents({"tournament_id": staffel["id"]}) == 0
