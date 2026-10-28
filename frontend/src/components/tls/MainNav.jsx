@@ -363,7 +363,46 @@ function MobileAccordion({ item, isClubMember, signedIn, onClose }) {
   );
 }
 
+// Liga (docs/LIGA.md, P5): „Liga“ steht unter eSports nur, wenn die Lese-API der Person mindestens eine Season zeigt.
+export const LEAGUE_NAV_ENTRY = { to: "/liga", label: "Liga" };
+
+/** Das Menü mit oder ohne „Liga“ - eingehängt unter eSports nach „Turniere“, nie doppelt, ohne Season nie da. */
+export function withLeagueEntry(items, show) {
+  return (items || []).map((item) => {
+    const isEsports = item.to === "/esports" || item.label === "eSports";
+    const children = (item.children || []).filter((child) => child.to !== LEAGUE_NAV_ENTRY.to);
+    if (!isEsports || !show) return item.children ? { ...item, children } : item;
+    const after = children.findIndex((child) => child.to === "/tournaments");
+    const position = after >= 0 ? after + 1 : children.length;
+    return { ...item, children: [...children.slice(0, position), LEAGUE_NAV_ENTRY, ...children.slice(position)] };
+  });
+}
+
+let leagueVisible = null;
+
+function useLeagueVisible() {
+  const [show, setShow] = useState(Boolean(leagueVisible));
+  const load = useCallback(async () => {
+    try {
+      const { data } = await api.get("/leagues");
+      leagueVisible = (data?.leagues || []).length > 0;
+    } catch {
+      leagueVisible = false;
+    }
+    setShow(leagueVisible);
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  useApiInvalidation(load, ["leagues", "auth"]);
+  return show;
+}
+
 function usePublicNavItems() {
+  const items = useCmsNavItems();
+  const showLeague = useLeagueVisible();
+  return withLeagueEntry(items, showLeague);
+}
+
+function useCmsNavItems() {
   const [items, setItems] = useState(cachedNavItems);
 
   const load = useCallback(async () => {
