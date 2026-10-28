@@ -108,7 +108,14 @@ und die Variablen, die ihr einsetzen dürft. Unter **Bearbeiten** ändert ihr **
 Beispieldaten** zeigt das Ergebnis, eine **Testmail** geht an euch selbst. Gespeichert gilt der Text sofort („ab jetzt geht dieser Text raus“).
 **Auf Standard zurücksetzen** verwirft eure Fassung und stellt den mitgelieferten Text wieder her.
 
-Einige Mails sind feste Vorlagen: Dort ist der gerenderte Standard der Ausgangspunkt.
+Im Formular steht die Vorlage immer mit **Platzhaltern** wie `{{display_name}}` – beim Versand kommt der echte Wert hinein. Nur die
+Vorschau rechts setzt Beispieldaten ein („Paula“, „Mario Kart Winter Cup“). Bei festen Vorlagen ist der Standard mit Platzhaltern der
+Ausgangspunkt; Teile, die der Standard nur bei Bedarf zeigt (etwa Grund oder Station), stehen in eurer Fassung immer drin. Wer den
+Standard unverändert speichert, speichert nichts – es bleibt beim Standard.
+
+Steht ein Beispielwert aus der Vorschau im Text, fragt **Speichern** nach: So bekäme jede Person „Hallo Paula“. Vorlagen, die schon so
+gespeichert sind, tragen in der Liste den Hinweis **Beispielwerte im Text**; im Editor steht, welche Werte es sind. Nichts wird von selbst
+überschrieben – Werte durch Variablen ersetzen oder **Auf Standard zurücksetzen**.
 
 ### 3.3 Die Mail-Queue
 
@@ -186,6 +193,7 @@ Eine Benachrichtigung entsteht einmal und geht dann, je nach Einstellung der Per
 | Discord-Direktnachricht kommt nicht | Discord lehnt ab (kein gemeinsamer Server oder Nachrichten gesperrt), oder Bot aus | Hinweis in den Einstellungen folgen; Verbindungen → Discord prüfen |
 | Rechnung per Discord erwartet | Beträge gehen nie über Discord | Rechnungen kommen In-App, Push, Mail |
 | Eine Vorlage zeigt „Vorschau hat nicht geklappt“ | Variable falsch gesetzt | Auf Standard zurücksetzen und neu anfangen |
+| Alle bekommen „Hallo Paula“ oder denselben Turniernamen | Beispielwerte der Vorschau wurden gespeichert (Hinweis **Beispielwerte im Text**) | Vorlage öffnen, Werte durch Variablen ersetzen oder **Auf Standard zurücksetzen** |
 
 ---
 

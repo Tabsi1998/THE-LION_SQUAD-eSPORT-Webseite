@@ -91,6 +91,93 @@ async def test_preview_override_test_and_reset(flow):
 
 
 @pytest.mark.asyncio
+async def test_editor_loads_the_template_with_placeholders_not_sample_values(flow):
+    """#2119 ML1: der Editor bekam die mit Beispieldaten gerenderte Fassung - wer einen Satz änderte und speicherte,
+    schickte ab dann allen „Hallo Paula“. Jetzt lädt er die Vorlage mit `{{variable}}`; die Vorschau rendert getrennt."""
+    from routes.phase_ef_routes import seed_email_templates
+    await seed_email_templates()
+    admin = await flow.add_user(role="club_admin", name="admin")
+    flow.act_as(admin)
+
+    source = (await flow.get("/api/admin/email-templates/registration")).json()
+    assert source["custom"] is False and source["source"] == "code"
+    assert source["subject"] == "Willkommen in der Community"
+    assert "{{display_name}}" in source["html"] and "Paula" not in source["html"]
+    assert source["sample_leaks"] == []
+
+    approved = (await flow.get("/api/admin/email-templates/registration_approved")).json()
+    assert approved["subject"] == "Du bist dabei: {{tournament_title}}"
+    assert "{{tournament_title}}" in approved["html"] and 'href="{{url}}"' in approved["html"]
+    assert "Mario Kart" not in approved["html"] + approved["subject"]
+
+    # Optionale Teile wählen den häufigen Fall: offene Rechnung mit Zahlungsziel, nicht „schon bezahlt“.
+    invoice = (await flow.get("/api/admin/email-templates/invoice_ready")).json()
+    assert "{{due_on}}" in invoice["html"] and "schon bezahlt" not in invoice["html"]
+
+    # Datenbank-Vorlage: der Text der Erstinstallation, mit Platzhaltern.
+    approve = (await flow.get("/api/admin/email-templates/membership_approve")).json()
+    assert approve["source"] == "db" and approve["html"].startswith("<p>Hallo {{display_name}},</p>")
+
+    # Die Vorschau rendert weiter mit Beispieldaten - nur eben nicht mehr ins Formular.
+    preview = (await flow.post("/api/admin/email-templates/registration/preview", json={"subject": source["subject"], "html": source["html"]})).json()
+    assert "Paula" in preview["html"] and "{{display_name}}" not in preview["html"]
+
+    assert (await flow.get("/api/admin/email-templates/gibt_es_nicht")).status_code == 404
+    assert (await flow.get("/api/admin/email-templates/ops_alert")).status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_saving_sample_values_needs_a_conscious_yes(flow):
+    from routes.phase_ef_routes import seed_email_templates
+    await seed_email_templates()
+    admin = await flow.add_user(role="club_admin", name="admin")
+    flow.act_as(admin)
+
+    refused = await flow.put("/api/admin/email-templates/registration_approved", json={
+        "subject": "Du bist dabei: Mario Kart Winter Cup", "html": "<p>Hallo Paula, dein Platz ist bestätigt.</p>"})
+    assert refused.status_code == 409
+    detail = refused.json()["detail"]
+    assert detail["code"] == "sample_values" and set(detail["sample_leaks"]) == {"Mario Kart Winter Cup"}
+    assert "Mario Kart Winter Cup" in detail["message"]
+    assert await flow.db.email_templates.find_one({"key": "registration_approved"}) is None
+
+    # Bewusst trotzdem: geht, wenn ausdrücklich bestätigt.
+    forced = await flow.put("/api/admin/email-templates/registration_approved", json={
+        "subject": "Du bist dabei: Mario Kart Winter Cup", "html": "<p>Fix für den Cup.</p>", "allow_samples": True})
+    assert forced.status_code == 200 and forced.json()["override"] is True
+
+    # Mit Platzhaltern kein Einwand; ein Name aus SAMPLES, der keine Variable dieser Vorlage ist, auch nicht.
+    clean = await flow.put("/api/admin/email-templates/registration", json={
+        "subject": "Servus {{display_name}}", "html": "<p>Willkommen, {{display_name}}. Grüße vom Vorstand.</p>"})
+    assert clean.status_code == 200
+    db_tpl = await flow.put("/api/admin/email-templates/membership_approve", json={"html": "<p>Hallo Paula,</p>"})
+    assert db_tpl.status_code == 409 and db_tpl.json()["detail"]["sample_leaks"] == ["Paula"]
+
+
+@pytest.mark.asyncio
+async def test_spoiled_saved_templates_are_flagged_not_overwritten(flow):
+    """Schon so gespeicherte Vorlagen: die Liste zeigt die Beispielwerte, nichts wird ohne Rückfrage überschrieben."""
+    from routes.phase_ef_routes import seed_email_templates
+    from services.mail_catalog import code_templates, SAMPLES
+    await seed_email_templates()
+    subject, html = code_templates()["registration_approved"](tournament_title=SAMPLES["tournament_title"], url="https://lionsquad.at/tournaments/mario-kart-winter-cup", detail="")
+    await flow.db.email_templates.insert_one({"key": "registration_approved", "id": "registration_approved", "override": True, "subject": subject, "html": html})
+    await flow.db.email_templates.update_one({"key": "contact_auto_reply"}, {"$set": {"html": "<p>Hallo Paula,</p><p>Danke!</p>"}})
+    admin = await flow.add_user(role="club_admin", name="admin")
+    flow.act_as(admin)
+
+    rows = {row["key"]: row for row in (await flow.get("/api/admin/email-templates")).json()}
+    assert "Mario Kart Winter Cup" in rows["registration_approved"]["sample_leaks"]
+    assert "https://lionsquad.at/tournaments/mario-kart-winter-cup" in rows["registration_approved"]["sample_leaks"]
+    assert rows["contact_auto_reply"]["sample_leaks"] == ["Paula"]
+    assert rows["registration"]["sample_leaks"] == [] and rows["membership_approve"]["sample_leaks"] == []
+    one = (await flow.get("/api/admin/email-templates/registration_approved")).json()
+    assert one["custom"] is True and one["html"] == html and "Mario Kart Winter Cup" in one["sample_leaks"]
+    # Nur gemeldet - der gespeicherte Text bleibt, bis der Admin zurücksetzt.
+    assert (await flow.db.email_templates.find_one({"key": "registration_approved"}))["html"] == html
+
+
+@pytest.mark.asyncio
 async def test_the_dead_cms_is_gone(flow):
     assert (await flow.get("/api/pages/about")).status_code == 404
     assert (await flow.get("/api/seo/page/about")).status_code == 404

@@ -216,6 +216,8 @@ class TemplatePatch(BaseModel):
     subject: Optional[str] = None
     html: Optional[str] = None
     name: Optional[str] = None
+    # Beispielwerte der Vorschau im Text (#2119 ML1): nur mit ausdrücklichem Ja speichern.
+    allow_samples: Optional[bool] = None
 
 
 class TemplateDraft(BaseModel):
@@ -230,13 +232,33 @@ async def admin_list_templates(me: dict = Depends(require_area("system"))):
     return await list_templates(get_db(), DEFAULT_EMAIL_TEMPLATES)
 
 
+@admin_emailt_router.get("/{key}")
+async def admin_template_source(key: str, me: dict = Depends(require_area("system"))):
+    """Was der Editor lädt (#2119 ML1): Betreff und Text mit `{{variable}}`, dazu gespeicherte Beispielwerte."""
+    from services.mail_catalog import editor_source
+    try:
+        return await editor_source(get_db(), key, DEFAULT_EMAIL_TEMPLATES)
+    except ValueError as exc:
+        raise HTTPException(404, str(exc))
+
+
 @admin_emailt_router.put("/{key}")
 @admin_emailt_router.patch("/{key}")
 async def admin_patch_template(key: str, body: TemplatePatch, me: dict = Depends(require_area("system"))):
-    from services.mail_catalog import save_override
+    from services.mail_catalog import CATALOG, check_samples, save_override
     raw = body.model_dump(exclude_unset=True)
+    allow_samples = bool(raw.pop("allow_samples", False))
     if not raw:
         raise HTTPException(400, "Keine Änderungen.")
+    if key in CATALOG and not allow_samples:
+        leaks = await check_samples(get_db(), key, DEFAULT_EMAIL_TEMPLATES, subject=raw.get("subject"), html=raw.get("html"))
+        if leaks:
+            quoted = ", ".join(f"„{value}“" for value in leaks[:5])
+            raise HTTPException(409, {
+                "code": "sample_values", "sample_leaks": leaks,
+                "message": f"Im Text stehen Beispielwerte aus der Vorschau: {quoted}. So bekäme sie jede Person. "
+                           "Setz stattdessen die passende Variable ein, etwa {{display_name}}.",
+            })
     try:
         return await save_override(get_db(), key, DEFAULT_EMAIL_TEMPLATES, subject=raw.get("subject"), html=raw.get("html"), name=raw.get("name"), actor_id=me.get("id"))
     except ValueError as exc:
