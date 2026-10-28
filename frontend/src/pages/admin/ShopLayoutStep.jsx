@@ -444,6 +444,12 @@ function PositionFields({ area, item, layer, measure, editable, onChange, testId
       <CmField label="Von oben (cm)" value={position.y} editable={editable} onValue={(value) => set("y", value)} testId={`${testId}-top`} />
       <CmField label={measure === "left" ? "Vom linken Rand (cm)" : "Von der Mitte (cm, minus = links)"} value={position.x} signed={measure !== "left"}
         editable={editable} onValue={(value) => set("x", value)} testId={`${testId}-x`} />
+      {/* Bei Text ist der linke Rand der Rahmen der Höchstbreite, nicht der erste Buchstabe - das sagen wir dazu. */}
+      {measure === "left" && item.kind !== "motif" && (
+        <p className="text-xs text-white/50 min-[440px]:col-span-2" data-testid={`${testId}-x-hint`}>
+          Bei Text zählt der Rahmen der Höchstbreite - der Name steht mittig darin. Für Text ist „Mitte der Fläche“ meist klarer.
+        </p>
+      )}
     </div>
   );
 }

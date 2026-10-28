@@ -606,6 +606,9 @@ test("Raster und Messart sind einstellbar und bleiben im Browser; „Groß bearb
   // Vom linken Rand: die linke Kante des Löwen (8,23 - 4,45 cm).
   expect(screen.getByText("Vom linken Rand (cm)", { selector: "label[for='shop-layer-front-0-x']" })).toBeInTheDocument();
   expect(screen.getByTestId("shop-layer-front-0-x")).toHaveValue("3,78");
+  // Beim Gamertag zählt der Rahmen der Höchstbreite - das steht dabei; beim Motiv nicht nötig.
+  expect(screen.getByTestId("shop-layer-front-1-x-hint")).toHaveTextContent("Rahmen der Höchstbreite");
+  expect(screen.queryByTestId("shop-layer-front-0-x-hint")).toBeNull();
   await user.click(screen.getByTestId("shop-preview-front-big"));
   const big = await screen.findByTestId("shop-big-front");
   expect(within(big).getByText("„Vorderseite“ groß bearbeiten")).toBeInTheDocument();
