@@ -46,7 +46,7 @@ export default function AdminEmailTemplatesPage() {
                     <div className="font-bold flex flex-wrap items-center gap-2">
                       {row.name}
                       {row.custom ? <span className="text-[10px] font-bold uppercase tracking-wider border border-[#FFD700]/50 text-[#FFD700] px-1.5 py-0.5 rounded-sm" data-testid={`tpl-custom-${row.key}`}>angepasst</span> : null}
-                      {row.sample_leaks?.length ? <span className="text-[10px] font-bold uppercase tracking-wider border border-[#FF3B30]/60 text-[#FF6B6B] px-1.5 py-0.5 rounded-sm" data-testid={`tpl-leaks-${row.key}`} title={row.sample_leaks.join(", ")}>Beispielwerte im Text</span> : null}
+                      {row.sample_leaks?.length ? <span className="text-[10px] font-bold uppercase tracking-wider border border-warn/60 text-warn px-1.5 py-0.5 rounded-sm" data-testid={`tpl-leaks-${row.key}`} title={row.sample_leaks.join(", ")}>Beispielwerte im Text</span> : null}
                     </div>
                     <div className="text-xs text-white/50">{row.purpose}</div>
                     <div className="text-[11px] text-white/40 mt-0.5">Empfänger: {row.recipient}{row.vars?.length ? ` · Variablen: ${row.vars.map((v) => `{{${v}}}`).join(", ")}` : ""}</div>
@@ -178,8 +178,8 @@ function TemplateEditor({ template, onClose, onSaved }) {
           <button type="button" onClick={onClose} aria-label="Schließen" className="text-white/50 hover:text-white"><X className="w-5 h-5" /></button>
         </div>
         {leaks.length ? (
-          <div className="mb-4 flex items-start gap-3 border border-[#FF3B30]/40 bg-[#FF3B30]/10 rounded-sm p-3 text-sm" data-testid="tpl-sample-warning" role="alert">
-            <AlertTriangle className="w-4 h-4 text-[#FF3B30] shrink-0 mt-0.5" />
+          <div className="mb-4 flex items-start gap-3 border border-warn/40 bg-warn/10 rounded-sm p-3 text-sm" data-testid="tpl-sample-warning" role="alert">
+            <AlertTriangle className="w-4 h-4 text-warn shrink-0 mt-0.5" />
             <div>
               <div className="font-bold">In der gespeicherten Fassung stehen Beispielwerte: {leaks.map((v) => `„${v}“`).join(", ")}</div>
               <p className="text-white/70 mt-1">
