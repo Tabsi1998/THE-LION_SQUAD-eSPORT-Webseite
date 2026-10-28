@@ -32,3 +32,16 @@ export function checkInLine(tournament, now = Date.now()) {
   const { from, until } = effectiveCheckIn(tournament, now);
   return [from ? `ab ${formatDateTime(from)}` : "", until ? `bis ${formatDateTime(until)}` : ""].filter(Boolean).join(" ");
 }
+
+/**
+ * Check-in offen oder vorbei (#2124, TP11) - dieselbe Regel wie der Server (`_check_in_over`) und die App
+ * (mobile/src/lib/tournamentView.ts `checkInState`): vorbei, sobald der Check-in geschlossen ist
+ * (`check_in_closed_at`) oder „Check-in endet“ um ist - auch bevor der Job den Baum gebaut hat.
+ */
+export function checkInState(tournament, now = Date.now()) {
+  const t = tournament || {};
+  const inCheckIn = t.status === "check_in";
+  const until = msOf(t.check_in_until);
+  const over = Boolean(t.check_in_closed_at) || (inCheckIn && Number.isFinite(until) && now > until);
+  return { open: Boolean(inCheckIn && !over), over };
+}

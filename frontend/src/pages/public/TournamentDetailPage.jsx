@@ -25,6 +25,7 @@ import { MentionText } from "@/components/tls/MentionText";
 import { ChatAttachButton, ChatAttachmentDrafts, ChatMessageAttachments, useChatAttachmentDrafts } from "@/components/tls/ChatAttachments";
 import { ChatMessageSticker, ChatStickerButton, ChatStickerPicker } from "@/components/tls/ChatStickers";
 import { formatWhen, getRegistrationState } from "@/lib/datetime";
+import { checkInState } from "@/lib/checkInTimes";
 import { tournamentIsOver } from "@/lib/afterEnd";
 import { renderMarkdownLite } from "@/lib/markdownLite";
 import { seoTextPreview } from "@/lib/textPreview";
@@ -301,7 +302,10 @@ function TournamentDetailView() {
   const nextStep = timelineSteps(t).find((step) => step.next) || null;
   const finished = ["completed", "results_published", "archived"].includes(t.status);
   const subPage = (part) => `/tournaments/${t.slug || t.id}/${part}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`;
-  const checkinNow = !!myReg && canCheckIn && myReg.status === "approved" && t.status === "check_in";
+  // Check-in-Ende (#2124): dieselbe Regel wie „Dein Stand“, die App und der Server - danach kein Knopf mehr.
+  const checkIn = checkInState(t);
+  const checkinNow = !!myReg && canCheckIn && myReg.status === "approved" && checkIn.open;
+  const checkinOver = !!myReg && myReg.status === "approved" && t.status === "check_in" && checkIn.over;
   // Die eine Hauptaktion je Phase (#401).
   let primaryKey;
   let primaryAction = null;
@@ -318,6 +322,9 @@ function TournamentDetailView() {
   } else if (checkinNow) {
     primaryKey = "checkin";
     primaryAction = <button onClick={handleCheckin} disabled={loading} data-testid="tournament-checkin-btn" className={`${primaryClass} tls-btn tls-btn--primary`}>Check-in</button>;
+  } else if (checkinOver) {
+    primaryKey = "checkin_over";
+    primaryAction = <button type="button" disabled data-testid="tournament-checkin-over" className={`${primaryClass} tls-btn tls-btn--quiet cursor-not-allowed`}>Check-in vorbei</button>;
   } else if (staffOnlyCheckIn && myReg?.status === "approved" && t.status === "check_in") {
     primaryKey = "checkin_local";
     primaryAction = <button type="button" disabled data-testid="tournament-checkin-local" className={`${primaryClass} tls-btn tls-btn--quiet cursor-not-allowed`}>Check-in vor Ort</button>;

@@ -611,3 +611,15 @@ test("#1939: ohne Netz: „Nochmal versuchen“ lädt erneut und zeigt dann das 
   expect(await screen.findByTestId("tournament-title")).toHaveTextContent("Herbst-Cup");
   expect(screen.queryByTestId("public-error-retry")).toBeNull();
 });
+
+test("Check-in-Ende vorbei (#2124): statt „Check-in“ steht „Check-in vorbei“, auch bevor der Baum gebaut ist", async () => {
+  for (const timing of [{ check_in_until: "2026-01-01T10:00:00+00:00" }, { check_in_until: "2099-10-04T17:45:00+00:00", check_in_closed_at: "2026-01-01T10:00:00+00:00" }]) {
+    mockApi({ ...base, ...DATES, ...timing, status: "check_in", public_phase: { state: "check_in", label: "Check-in" } }, [
+      { id: "r1", status: "approved", display_name: "Paula", user_id: "u1", is_mine: true },
+    ]);
+    const { unmount } = renderPage();
+    expect(await screen.findByTestId("tournament-checkin-over")).toBeDisabled();
+    expect(screen.queryByTestId("tournament-checkin-btn")).toBeNull();
+    unmount();
+  }
+});
