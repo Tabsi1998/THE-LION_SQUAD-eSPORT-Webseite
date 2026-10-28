@@ -32,6 +32,8 @@ import { ProblemReportForm } from "@/components/tls/results/ProblemReportForm";
 import { ResultWindow } from "@/components/tls/results/ResultWindow";
 import { ResultUndoBar, useResultUndo } from "@/components/tls/results/ResultUndoBar";
 import { isOwnProposal, proposalStatusLabel, waitingForOtherSide } from "@/lib/scheduleProposals";
+import { useLeagueTrail } from "@/hooks/useLeagueTrail";
+import { leagueCrumbs } from "@/lib/leagueTrail";
 
 const DECISION_TOASTS = {
   accept: "Termin bestätigt.",
@@ -165,6 +167,8 @@ function MatchPageView() {
   });
   // Match-Chat gelesen (#1148) - nur für die, die mitschreiben dürfen.
   useChatRead("match", id, chat, Boolean(user && data?.can_act));
+  // Liga-Staffel (#2110): Brotkrumen „Liga · Season · Staffel“ statt „Turniere“.
+  const trail = useLeagueTrail(data?.tournament);
 
   const headline = data ? matchHeadline(data.participants || [], data.match || {}) : "Match";
   const title = data?.tournament?.title ? `${data.matchday_label} · ${headline} - ${data.tournament.title}` : "Match";
@@ -323,7 +327,7 @@ function MatchPageView() {
     <PublicLayout>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
         <Breadcrumbs
-          items={[
+          items={leagueCrumbs(data.tournament, trail, { tournamentUrl, current: { label: `Match ${match.match_key || match.id}` } }) || [
             { label: "Home", to: "/" },
             { label: "Turniere", to: "/tournaments" },
             ...(data.tournament ? [{ label: data.tournament.title, to: tournamentUrl }] : []),

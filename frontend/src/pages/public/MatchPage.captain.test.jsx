@@ -82,6 +82,24 @@ test("den Vorschlag der Gegenseite beantwortet man - Zustand auf Deutsch, nie �
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/schedule-proposals/p-theirs/decision", { action: "accept", note: null }));
 });
 
+test("Staffel: Brotkrumen über Liga, Season und Staffel statt „Turniere“", async () => {
+  renderMatch({ ...BASE, schedule_proposals: [] });
+  const crumbs = await screen.findByTestId("breadcrumbs");
+  await waitFor(() => expect(within(crumbs).getByRole("link", { name: "Probe-Liga Season 1" })).toHaveAttribute("href", "/liga/probe-liga/season-1"));
+  expect(within(crumbs).getByRole("link", { name: "Liga" })).toHaveAttribute("href", "/liga");
+  expect(within(crumbs).getByRole("link", { name: "Staffel A" })).toHaveAttribute("href", "/tournaments/liga-a");
+  expect(within(crumbs).queryByText("Turniere")).toBeNull();
+});
+
+test("Staffel ohne sichtbare Season: „Liga · Staffel A“ ohne toten Link", async () => {
+  renderMatch({ ...BASE, schedule_proposals: [] }, []);
+  const crumbs = await screen.findByTestId("breadcrumbs");
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/leagues"));
+  expect(within(crumbs).queryByRole("link", { name: "Liga" })).toBeNull();
+  expect(within(crumbs).getByRole("link", { name: "Staffel A" })).toHaveAttribute("href", "/tournaments/liga-a");
+  expect(within(crumbs).queryByText("Turniere")).toBeNull();
+});
+
 test("nach der Nachtragsfrist: Hinweis auf die Turnierleitung und der Matchchat bleibt offen", async () => {
   const league = {
     best_of: 3, needed: 2, team_size: 2, mode_order: [], sides: [{ registration_id: "a", name: "Loewen · Rudel A" }, { registration_id: "b", name: "Falken · Horst" }],

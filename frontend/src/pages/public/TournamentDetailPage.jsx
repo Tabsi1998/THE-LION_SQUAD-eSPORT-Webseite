@@ -32,6 +32,8 @@ import { formatTeamMode, formatTournamentDisplay } from "@/lib/tournamentLabels"
 import { gameLabel } from "@/lib/gameLabels";
 import { formatCents, startFeeSummary } from "@/lib/pricing";
 import { TournamentTabs } from "@/components/tls/tournament/TournamentTabs";
+import { useLeagueTrail } from "@/hooks/useLeagueTrail";
+import { leagueCrumbs } from "@/lib/leagueTrail";
 import { TournamentTimeline, stepCountdown, timelineSteps } from "@/components/tls/tournament/TournamentTimeline";
 import { useCountdownDays } from "@/hooks/useCountdownDays";
 import { MyStandCard } from "@/components/tls/tournament/MyStandCard";
@@ -86,6 +88,8 @@ function TournamentDetailView() {
     canonical: t?.slug ? `${window.location.origin}/tournaments/${t.slug}` : undefined,
   });
   useCanonicalSlugRedirect(slug, t?.slug, "/tournaments");
+  // Liga-Staffel (#2110): Brotkrumen über die Ligaseite statt „Turniere“ - dort sind Staffeln ausgefiltert.
+  const trail = useLeagueTrail(t);
 
   const load = useCallback(async () => {
     const accessConfig = { params: accessToken ? { access: accessToken } : undefined };
@@ -351,7 +355,7 @@ function TournamentDetailView() {
           </div>
         )}
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
-          <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "eSports", to: "/esports" }, { label: "Turniere", to: "/tournaments" }, { label: t.title }]} className="mb-4" />
+          <Breadcrumbs items={leagueCrumbs(t, trail) || [{ label: "Home", to: "/" }, { label: "eSports", to: "/esports" }, { label: "Turniere", to: "/tournaments" }, { label: t.title }]} className="mb-4" />
           <div className="flex flex-wrap items-center gap-2 mb-4">
             <PhaseBadge phase={t.public_phase} status={t.status} size="lg" />
             <span className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8] border border-[#29B6E8]/30 rounded-sm px-2 py-1">{formatTournamentDisplay(t)}</span>
