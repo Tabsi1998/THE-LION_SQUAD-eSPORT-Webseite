@@ -168,7 +168,7 @@ ohne Änderung schreibt nichts.
 | `shop.print_template.change`, `shop.print.presets` | Printful hat Maße einer Fläche geändert; Positions-Vorgaben oder Regeln geändert (#2069) |
 | `shop.catalog.sync` | Abgleich mit Printful: gesperrte, freigegebene Varianten, Preisänderungen - nur wenn sich etwas ändert (#1709) |
 | `shop.gamertag.rules`, `shop.gamertag.file` | Regeln der Gamertag-Druckdatei (vorher/nachher) bzw. Testdatei mit Prüfsumme und Maßen - nie mit dem Namen (#1711) |
-| `shop.test_draft.send`, `shop.test_draft.delete` | Testentwurf an Printful gesendet bzw. gelöscht (#2062): `external_id`, Printful-Nummer, Produkt, Variante, Prüfsummen der Dateien, Zahl der Abweichungen - nie Anschrift oder Gamertag |
+| `shop.test_draft.send`, `shop.test_draft.delete`, `shop.test_draft.recheck` | Testentwurf an Printful gesendet, gelöscht bzw. nachgesehen (#2062, #2138 – beim Nachsehen auch der Aufbau der Antwort ohne Werte): `external_id`, Printful-Nummer, Produkt, Variante, Prüfsummen der Dateien, Zahl der Abweichungen - nie Anschrift oder Gamertag |
 | `shop.order.release`, `shop.order.printful_confirm`, `shop.order.cancel` | vorgesehen für #1718, #1721 |
 | `shop.order.club`, `shop.order.prize` | vorgesehen für #1724, #1726 |
 | `shop.config` | Einstellungen geändert (#1706): Stufe, Freigabe „Steuer geklärt“, Notschalter, Preise, Printful-Schlüssel – mit vorher und nachher, nie mit Schlüssel |

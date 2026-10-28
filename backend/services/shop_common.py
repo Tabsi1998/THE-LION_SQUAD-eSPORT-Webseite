@@ -230,6 +230,7 @@ ADMIN_ACTIONS: dict[str, str] = {
     "shop.print_file.add": "Druckdatei erzeugt oder hochgeladen",
     # Testentwurf an Printful (#2062): nie bestätigt, nie bezahlt
     "shop.test_draft.send": "Testentwurf an Printful gesendet",
+    "shop.test_draft.recheck": "Testentwurf bei Printful nachgesehen",
     "shop.test_draft.delete": "Testentwurf bei Printful gelöscht",
     "shop.order.release": "Bestellung freigegeben",
     "shop.order.printful_confirm": "Bei Printful bestätigt",

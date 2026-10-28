@@ -168,7 +168,7 @@ async def test_errors_carry_fixed_sentences_without_internals(flow, fake):
     # Die Seite holt danach den Stand: wieder Vorschau, mit Ursache (die Begründung von Printful nur hier, gekürzt).
     current = (await flow.get(f"{BASE}/{draft['id']}")).json()
     assert current["state"] == "preview" and current["last_error"]["reason"] == "bad_request"
-    assert "send_key" not in current and current["actions"] == {"resend": False, "delete": False}
+    assert "send_key" not in current and current["actions"] == {"resend": False, "delete": False, "recheck": False}
     fake.fail(503, operation="createOrder")
     answer = await flow.post(f"{BASE}/{draft['id']}/send", json={"idempotency_key": "klick-0003"})
     assert answer.status_code == 503 and "noch einmal" in answer.json()["detail"]

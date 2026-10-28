@@ -155,6 +155,34 @@ test("senden mit Idempotenzschlüssel, Ergebnis mit Nummer, Dashboard-Link und A
   expect(apiMock.post.mock.calls.some(([path]) => /confirm/.test(path))).toBe(false);
 });
 
+test("„Bei Printful nachsehen“ gleicht neu ab und zeigt den Aufbau der Antwort ohne Werte (#2138)", async () => {
+  const pending = {
+    ...SENT, actions: { resend: false, delete: true, recheck: true },
+    deviations: [{ label: "Preise bei Printful", sent: "Schätzung liegt vor", printful: "Printful rechnet noch (calculating)", level: "warn" }],
+    deviation_summary: { ok: 0, warn: 1, error: 0 },
+    response: { shape: { order_keys: ["costs", "id"], costs: { keys: ["calculation_status"], calculation_status: "calculating" } } },
+  };
+  const done = { ...pending, deviations: [{ label: "Preis: Gesamt (Schätzung → Auftrag)", sent: 2087, printful: 2087, level: "ok" }],
+    deviation_summary: { ok: 1, warn: 0, error: 0 } };
+  apiMock.post.mockImplementation(async (url) => {
+    if (url.endsWith("/preview")) return { data: PREVIEW };
+    if (url.endsWith("/send")) return { data: pending };
+    if (url.endsWith("/recheck")) return { data: done };
+    throw new Error(`unerwartet: ${url}`);
+  });
+  show();
+  await fillUntilPreview();
+  await userEvent.click(screen.getByTestId("shop-test-draft-preview-button"));
+  await userEvent.click(await screen.findByTestId("shop-test-draft-send"));
+  const sent = await screen.findByTestId("shop-test-draft-sent");
+  expect(within(sent).getByTestId("shop-test-draft-deviation")).toHaveTextContent("Printful rechnet noch");
+  expect(within(sent).getByTestId("shop-test-draft-result-shape")).toHaveTextContent("calculation_status");
+  await userEvent.click(within(sent).getByTestId("shop-test-draft-result-recheck"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/shop/test-drafts/td-1/recheck", {}));
+  await waitFor(() => expect(within(screen.getByTestId("shop-test-draft-sent")).getByTestId("shop-test-draft-deviation")).toHaveTextContent("20,87 €"));
+  expect(toastMock.success).toHaveBeenCalledWith("Bei Printful nachgesehen.");
+});
+
 test("eine Änderung an der Eingabe verwirft die Vorschau", async () => {
   apiMock.post.mockResolvedValue({ data: PREVIEW });
   show();

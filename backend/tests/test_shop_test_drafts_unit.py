@@ -320,12 +320,12 @@ async def test_a_timeout_after_creating_keeps_the_draft_traceable_and_deletable(
     assert await db.shop_test_drafts.count_documents({"id": shown["id"]}) == 1
     assert await db.shop_print_files.count_documents({"order_id": shown["id"]}) == 1, "die Datei mit Gamertag bleibt"
     (listed,) = [row for row in await shop_test_drafts.list_drafts(db) if row["id"] == shown["id"]]
-    assert listed["actions"] == {"resend": True, "delete": True}
+    assert listed["actions"] == {"resend": True, "delete": True, "recheck": False}
     # „Erneut senden / nachsehen“: derselbe Rumpf, der Claim findet den Auftrag über die external_id - kein zweiter.
     await age_claim(db, shown["external_id"])
     again = await shop_test_drafts.send(db, shown["id"], idempotency_key="klick-0021", actor_id=ACTOR, provider=provider)
     assert again["state"] == "sent" and len(fake.calls_to("createOrder")) == 1 and len(fake.orders) == 1
-    assert again["actions"] == {"resend": False, "delete": True}
+    assert again["actions"] == {"resend": False, "delete": True, "recheck": True}
     gone = await shop_test_drafts.delete(db, shown["id"], actor_id=ACTOR, provider=provider)
     assert gone["state"] == "deleted" and fake.orders == {}
 
