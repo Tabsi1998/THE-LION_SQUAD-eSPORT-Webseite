@@ -87,30 +87,41 @@ def _squad_of(registration: dict, team: dict | None) -> dict | None:
     return ((team or {}).get("squads") or {}).get(registration.get("squad_id") or "")
 
 
-def _squad_roles(squad: dict | None) -> set[str]:
-    return {user_id for user_id in ((squad or {}).get("captain_id"), (squad or {}).get("vice_captain_id")) if user_id}
+def _team_people(team: dict) -> set[str]:
+    """Wer zum Hauptteam gehört (Mitglieder samt Leitung) - nur sie zählen in einem Co-Team."""
+    return {user_id for user_id in (*(team.get("member_ids") or []), *_team_leads(team)) if user_id}
+
+
+def _squad_roles(squad: dict | None, team: dict) -> set[str]:
+    """Captain und Vertreter, soweit sie noch im Hauptteam sind - wer gegangen ist, gilt als fehlend (Altdaten, Rennen)."""
+    roles = {(squad or {}).get("captain_id"), (squad or {}).get("vice_captain_id")}
+    return {user_id for user_id in roles if user_id} & _team_people(team)
+
+
+def _squad_members(squad: dict | None, team: dict) -> set[str]:
+    return {user_id for user_id in (squad or {}).get("member_ids") or [] if user_id} & _team_people(team)
 
 
 def responsible_ids(registration: dict | None, team: dict | None = None) -> set[str]:
     """Die Verantwortlichen einer Anmeldung: wer angemeldet hat, bei Teams dazu Teamleitung und Co-Leitung - bei einem
-    Co-Team (``squad_id``) Captain und Vertreter, ohne beide die Leitung des Hauptteams."""
+    Co-Team (``squad_id``) Captain und Vertreter, ohne beide (oder ohne Co-Team-Eintrag) die Leitung des Hauptteams."""
     if not registration:
         return set()
     ids = {registration.get("user_id")}
     if registration.get("team_id") and team:
-        roles = _squad_roles(_squad_of(registration, team)) if registration.get("squad_id") else set()
+        roles = _squad_roles(_squad_of(registration, team), team) if registration.get("squad_id") else set()
         ids.update(roles or _team_leads(team))
     return {user_id for user_id in ids if user_id}
 
 
 def player_ids(registration: dict | None, team: dict | None = None) -> set[str]:
     """Alle Spieler einer Anmeldung: die Verantwortlichen und bei Teams jedes Mitglied - bei einem Co-Team dessen Kader
-    und die Leitung des Hauptteams, nicht die übrigen Mitglieder des Hauptteams."""
+    (soweit noch im Hauptteam) und die Leitung des Hauptteams, nie die übrigen Mitglieder des Hauptteams; fehlt der
+    Co-Team-Eintrag, nur die Leitung."""
     ids = responsible_ids(registration, team)
     if registration and registration.get("team_id") and team:
-        squad = _squad_of(registration, team) if registration.get("squad_id") else None
-        if squad is not None:
-            ids.update(user_id for user_id in squad.get("member_ids") or [] if user_id)
+        if registration.get("squad_id"):
+            ids.update(_squad_members(_squad_of(registration, team), team))
             ids.update(user_id for user_id in _team_leads(team) if user_id)
         else:
             ids.update(user_id for user_id in team.get("member_ids") or [] if user_id)

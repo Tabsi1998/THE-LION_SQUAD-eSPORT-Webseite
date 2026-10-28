@@ -344,17 +344,20 @@ def _validate_squad_members(team: dict, member_ids: list[str]) -> list[str]:
     return clean
 
 
-def _squad_roles(current: dict, requested: dict, member_ids: list[str]) -> dict:
+def _squad_roles(current: dict, requested: dict, member_ids: list[str], team: dict) -> dict:
     """Captain und Vertreter eines Co-Teams nach einer Änderung (docs/LIGA.md, Abschnitt 5; #1649).
 
-    Beide stehen im Kader und sind verschiedene Personen. Wer eine Rolle hat, verlässt den Kader erst, wenn die Rolle
-    neu vergeben ist - in derselben Änderung oder davor; sonst 409 mit dem Hinweis, was zu tun ist."""
+    Beide stehen im Kader und im Hauptteam und sind verschiedene Personen. Wer eine Rolle hat, verlässt den Kader erst,
+    wenn die Rolle neu vergeben ist - in derselben Änderung oder davor; sonst 409 mit dem Hinweis, was zu tun ist."""
     roles = {field: current.get(field) or None for field in SQUAD_ROLE_FIELDS}
     for field in SQUAD_ROLE_FIELDS:
         if field in requested:
             roles[field] = (requested.get(field) or "").strip() or None
     members = set(member_ids or [])
+    in_team = set(team.get("member_ids") or [])
     for field, user_id in roles.items():
+        if user_id and field in requested and user_id not in in_team:
+            raise HTTPException(status_code=400, detail=f"{SQUAD_ROLE_LABELS[field]} muss Mitglied des Teams sein.")
         if not user_id or user_id in members:
             continue
         label = SQUAD_ROLE_LABELS[field]
@@ -840,7 +843,14 @@ async def leave_team(team_id: str, me: dict = Depends(get_current_user)):
                                                     "bitte die Teamleitung, die Rolle erst neu zu vergeben.")
     await db.teams.update_one({"id": team_id}, {"$pull": {"member_ids": me["id"], "co_leader_ids": me["id"]}})
     await db.team_members.delete_one({"team_id": team_id, "user_id": me["id"]})
+    await _leave_squads(db, team_id, me["id"])
     return {"ok": True}
+
+
+async def _leave_squads(db, team_id: str, user_id: str) -> None:
+    """Wer das Team verlässt, verlässt auch jeden Kader seiner Co-Teams (#1649) - sonst bliebe er Liga-Spieler."""
+    await db.team_squads.update_many({"team_id": team_id, "member_ids": user_id},
+                                     {"$pull": {"member_ids": user_id}, "$set": {"updated_at": now_utc().isoformat()}})
 
 
 def _is_team_leader(team: dict, user_id: str) -> bool:
@@ -879,6 +889,7 @@ async def kick_member(team_id: str, user_id: str, me: dict = Depends(get_current
         {"$pull": {"member_ids": user_id, "co_leader_ids": user_id}, "$set": {"updated_at": now_utc().isoformat()}},
     )
     await db.team_members.delete_many({"team_id": team_id, "user_id": user_id})
+    await _leave_squads(db, team_id, user_id)
     await db.audit_logs.insert_one({
         "id": new_id(), "action": "team.kick", "target_id": team_id,
         "actor_id": me["id"], "data": {"kicked_user_id": user_id},
@@ -1031,7 +1042,7 @@ async def create_squad(team_id: str, body: TeamSquadCreate, me: dict = Depends(g
     doc = body.model_dump()
     doc["member_ids"] = _validate_squad_members(team, doc.get("member_ids") or [])
     requested_roles = {field: doc.pop(field) for field in SQUAD_ROLE_FIELDS}
-    roles = _squad_roles({}, requested_roles, doc["member_ids"])
+    roles = _squad_roles({}, requested_roles, doc["member_ids"], team)
     # Rollen nur, wenn vergeben - ein Co-Team ohne sie hat die Felder nicht (Index ``sparse``).
     doc.update({field: value for field, value in roles.items() if value})
     doc.update({
@@ -1065,7 +1076,7 @@ async def update_squad(team_id: str, squad_id: str, body: TeamSquadUpdate, me: d
     if "member_ids" in updates:
         updates["member_ids"] = _validate_squad_members(team, updates.get("member_ids") or [])
     requested_roles = {field: updates.pop(field) for field in SQUAD_ROLE_FIELDS if field in updates}
-    roles = _squad_roles(current, requested_roles, updates.get("member_ids", current.get("member_ids") or []))
+    roles = _squad_roles(current, requested_roles, updates.get("member_ids", current.get("member_ids") or []), team)
     unset = {field: "" for field, value in roles.items() if not value and current.get(field)}
     updates.update({field: value for field, value in roles.items() if value})
     updates["updated_at"] = now_utc().isoformat()
@@ -1092,7 +1103,7 @@ async def set_squad_roles(team_id: str, squad_id: str, body: TeamSquadRoles, me:
     if not current:
         raise HTTPException(status_code=404, detail="Squad nicht gefunden")
     requested = body.model_dump(exclude_unset=True)
-    roles = _squad_roles(current, requested, current.get("member_ids") or [])
+    roles = _squad_roles(current, requested, current.get("member_ids") or [], team)
     unset = {field: "" for field, value in roles.items() if not value and current.get(field)}
     change = {"$set": {**{field: value for field, value in roles.items() if value}, "updated_at": now_utc().isoformat()},
               **({"$unset": unset} if unset else {})}
