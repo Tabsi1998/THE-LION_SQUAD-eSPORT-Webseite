@@ -363,7 +363,7 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
         # Liga-Staffel (docs/LIGA.md, Abschnitt 5): Runden ≤ aktive Wochen auch beim Erzeugen des Spielplans - mit den
         # tatsächlich zugeteilten Teams. Sonst bliebe die Vorschau stehen, und die Staffel liefe ohne festen Plan los.
         from services.custom_bracket import league_legs
-        from services.league_service import rounds_problem
+        from services.league_rounds import rounds_problem
 
         teams = await db.tournament_registrations.count_documents(
             {"tournament_id": tid, "status": {"$in": list(BRACKET_STATUSES)}})

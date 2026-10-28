@@ -595,7 +595,7 @@ def _check_league_weeks(tournament: dict | None, teams: int, legs: int) -> None:
     total = (tournament or {}).get("matchday_weeks_total")
     if not total:
         return
-    from services.league_service import rounds_problem
+    from services.league_rounds import rounds_problem
 
     problem = rounds_problem(teams, legs, int(total), list((tournament or {}).get("matchday_blocked_weeks") or []))
     if problem:
