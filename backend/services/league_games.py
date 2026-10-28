@@ -562,7 +562,8 @@ async def amend_lineups(
 # ---------------------------------------------------------------- Matchseite
 
 
-def _games_view(games: list[dict] | None, people: dict[str, dict]) -> list[dict]:
+def _games_view(games: list[dict] | None, people: dict[str, dict], with_lineups: bool = True) -> list[dict]:
+    """Maps für die Matchseite - Aufstellungen nur mit Namen und nur für Beteiligte und Turnierleitung (#1650)."""
     out = []
     for game in games or []:
         out.append(
@@ -580,18 +581,25 @@ def _games_view(games: list[dict] | None, people: dict[str, dict]) -> list[dict]
                         "scores",
                     )
                 },
-                "lineups": {
-                    reg_id: [people.get(user_id) or {"id": user_id, "name": "Spieler"} for user_id in lineup or []]
-                    for reg_id, lineup in (game.get("lineups") or {}).items()
-                },
+                "lineups": (
+                    {
+                        reg_id: [people.get(user_id) or {"id": user_id, "name": "Spieler"} for user_id in lineup or []]
+                        for reg_id, lineup in (game.get("lineups") or {}).items()
+                    }
+                    if with_lineups
+                    else {}
+                ),
             }
         )
     return out
 
 
-async def page_block(db, setup: LeagueSetup, *, side_id: str | None, can_act: bool) -> dict:
+async def page_block(db, setup: LeagueSetup, *, side_id: str | None, can_act: bool, staff: bool = False) -> dict:
     """Was die Matchseite zum Melden, Bestätigen, Nachtragen und Anzeigen braucht. ``side_id``: die Anmeldung, zu der
-    die Person gehört (sonst ``None``); ``can_act``: sie darf für diese Seite handeln."""
+    die Person gehört (sonst ``None``); ``can_act``: sie darf für diese Seite handeln; ``staff``: Turnierleitung - sie
+    bekommt dazu die Kader beider Seiten fürs Ergebnis-Fenster. Aufstellungen sehen nur Beteiligte und die Leitung;
+    Gäste bekommen Maps, Sieger und Punkte wie in der Staffel-API."""
+    sees_lineups = bool(side_id) or staff
     from models import now_utc
     from services.v2_match_flows import latest_reports
 
@@ -601,6 +609,9 @@ async def page_block(db, setup: LeagueSetup, *, side_id: str | None, can_act: bo
     other_reports = [report for key, report in latest.items() if key != side_id]
     roster = sorted(setup.rosters.get(side_id) or set()) if side_id else []
     wanted = set(roster)
+    if staff:
+        for members in setup.rosters.values():
+            wanted.update(members)
     for games in [match.get("games") or []] + [report.get("games") or [] for report in latest.values()]:
         for game in games:
             for lineup in (game.get("lineups") or {}).values():
@@ -626,10 +637,20 @@ async def page_block(db, setup: LeagueSetup, *, side_id: str | None, can_act: bo
         "sides": [{"registration_id": reg_id, "name": setup.names.get(reg_id)} for reg_id in setup.reg_ids],
         "own_registration_id": side_id,
         "roster": [people.get(user_id) or {"id": user_id, "name": "Spieler"} for user_id in roster],
-        "games": _games_view(match.get("games"), people),
+        "rosters": (
+            {
+                reg_id: [people.get(user_id) or {"id": user_id, "name": "Spieler"} for user_id in sorted(members)]
+                for reg_id, members in setup.rosters.items()
+            }
+            if staff
+            else {}
+        ),
+        "games": _games_view(match.get("games"), people, sees_lineups),
         "lineups_missing": list(match.get("lineups_missing") or []),
-        "own_games": _games_view((own_report or {}).get("games"), people),
-        "proposal_games": _games_view((other_reports[-1] if other_reports else {}).get("games"), people),
+        "own_games": _games_view((own_report or {}).get("games"), people) if side_id else [],
+        "proposal_games": (
+            _games_view((other_reports[-1] if other_reports else {}).get("games"), people) if side_id or staff else []
+        ),
         "can_amend_lineup": bool(can_act and side_id and open_window),
         "amend_until": deadline.isoformat() if deadline else None,
         "app_detail": APP_DETAIL,
