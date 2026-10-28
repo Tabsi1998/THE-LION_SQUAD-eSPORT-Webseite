@@ -365,8 +365,13 @@ function LayoutPreview({ area, preview, colorCode, testId, stale = false, live, 
 function SnapSettings({ settings, onChange, testId }) {
   return (
     <div className="flex flex-wrap items-end gap-x-3 gap-y-2" data-testid={testId}>
-      <label className="block text-xs min-w-0"><span className="text-white/60">Raster beim Ziehen</span>
-        <select value={String(settings.grid)} onChange={(event) => onChange({ grid: Number(event.target.value) })}
+      <label className="inline-flex items-center gap-2 text-xs min-h-9 cursor-pointer">
+        <input type="checkbox" checked={settings.snap} onChange={(event) => onChange({ snap: event.target.checked })} className="w-4 h-4 accent-brand" data-testid={`${testId}-snap`} />
+        Einrasten (Hilfslinien und Raster)
+      </label>
+      {/* Ohne Einrasten wirkt auch das Raster nicht - darum dann ausgegraut. */}
+      <label className={`block text-xs min-w-0 transition-opacity duration-150 ${settings.snap ? "" : "opacity-50"}`}><span className="text-white/60">Raster beim Ziehen</span>
+        <select value={String(settings.grid)} disabled={!settings.snap} onChange={(event) => onChange({ grid: Number(event.target.value) })}
           className={`${SMALL_SELECT} w-28`} data-testid={`${testId}-grid`}>
           {GRID_CHOICES_CM.map((grid) => <option key={grid} value={String(grid)}>{grid ? `${formatCm(grid)} cm` : "ohne"}</option>)}
         </select>
@@ -377,10 +382,6 @@ function SnapSettings({ settings, onChange, testId }) {
           <option value="center">Mitte der Fläche</option>
           <option value="left">linkem Rand</option>
         </select>
-      </label>
-      <label className="inline-flex items-center gap-2 text-xs min-h-9 cursor-pointer">
-        <input type="checkbox" checked={settings.snap} onChange={(event) => onChange({ snap: event.target.checked })} className="w-4 h-4 accent-brand" data-testid={`${testId}-snap`} />
-        Einrasten an Hilfslinien
       </label>
     </div>
   );

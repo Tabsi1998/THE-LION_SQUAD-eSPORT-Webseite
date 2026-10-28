@@ -594,6 +594,12 @@ test("Raster und Messart sind einstellbar und bleiben im Browser; „Groß bearb
   await user.click(await screen.findByTestId("shop-step-designs"));
   expect(screen.getByTestId("shop-preview-front-settings-grid")).toHaveValue("0.5");
   expect(screen.getByTestId("shop-preview-front-settings-snap")).toBeChecked();
+  // Einrasten aus: auch das Raster wirkt nicht und ist ausgegraut.
+  await user.click(screen.getByTestId("shop-preview-front-settings-snap"));
+  expect(screen.getByTestId("shop-preview-front-settings-grid")).toBeDisabled();
+  expect(screen.getByText("Einrasten (Hilfslinien und Raster)", { selector: "label" })).toBeInTheDocument();
+  await user.click(screen.getByTestId("shop-preview-front-settings-snap"));
+  expect(screen.getByTestId("shop-preview-front-settings-grid")).toBeEnabled();
   await user.selectOptions(screen.getByTestId("shop-preview-front-settings-grid"), "1");
   await user.selectOptions(screen.getByTestId("shop-preview-front-settings-measure"), "left");
   expect(JSON.parse(window.localStorage.getItem("tls_shop_place_v1"))).toEqual({ grid: 1, snap: true, measure: "left" });
