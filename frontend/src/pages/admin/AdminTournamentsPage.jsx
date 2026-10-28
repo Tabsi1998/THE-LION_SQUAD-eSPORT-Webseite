@@ -15,6 +15,7 @@ import { effectiveRuleModes } from "@/lib/tournamentRulePresets";
 import { gameLabel } from "@/lib/gameLabels";
 import { downloadCsv, formatAdminDate, normalizeSearch } from "@/lib/adminListTools";
 import { sortByNearestDate } from "@/lib/contentSort";
+import { isStaffel, staffelBeforeStart } from "./tournament/StaffelParts";
 
 const EVENT_MODE_LABELS = {
   hybrid: "Hybrid",
@@ -44,6 +45,14 @@ const TOURNAMENT_STATUS_FILTERS = [
   ["archived", "Archiviert"],
   ["cancelled", "Abgesagt"],
 ];
+// Liga-Staffeln (#2109, S26): eigene Art in der Liste - leicht zu verwechseln, wenn sie zwischen den Turnieren stehen.
+const KIND_FILTERS = [
+  ["", "Turniere und Liga-Staffeln"],
+  ["tournament", "Nur Turniere"],
+  ["league", "Nur Liga-Staffeln"],
+];
+// Löschen einer Staffel nur vor dem Start (L-D3) - der Server prüft dazu, ob schon ein fester Spielplan steht.
+const canDelete = (tournament) => !isStaffel(tournament) || staffelBeforeStart(tournament);
 
 export default function AdminTournamentsPage() {
   // Globale Aktionen nur für die Turnierleitung mit Zwei-Faktor (#1028), Helfer sehen die ihres Einsatzes.
@@ -52,6 +61,7 @@ export default function AdminTournamentsPage() {
   const [list, setList] = useState([]);
   const [query, setQuery] = useState(searchParams.get("q") || "");
   const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "");
+  const [kindFilter, setKindFilter] = useState("");
   const confirm = useConfirm();
   const [denied, setDenied] = useState("");
   const load = useCallback(async () => {
@@ -101,14 +111,18 @@ export default function AdminTournamentsPage() {
     }
   };
 
-  const del = async (id) => {
-    if (!await confirm({
+  const del = async (tournament) => {
+    if (!await confirm(isStaffel(tournament) ? {
+      title: "Staffel löschen?",
+      description: "Die Staffel wird dauerhaft gelöscht und verschwindet aus ihrer Season – mit den zugeteilten Co-Teams und der Spielplan-Vorschau. Das geht nur vor dem Start.",
+      confirmLabel: "Löschen",
+    } : {
       title: "Turnier löschen?",
       description: "Das Turnier wird dauerhaft gelöscht. Teilnehmer, Turnierbaum und öffentliche Detailseite sind danach nicht mehr verfügbar.",
       confirmLabel: "Löschen",
     })) return;
     try {
-      await api.delete(`/tournaments/${id}`);
+      await api.delete(`/tournaments/${tournament.id}`);
       toast.success("Turnier gelöscht.");
       load();
     } catch (e) {
@@ -125,6 +139,8 @@ export default function AdminTournamentsPage() {
     const q = normalizeSearch(query);
     return sortedList.filter((tournament) => {
       if (statusFilter && tournament.status !== statusFilter) return false;
+      if (kindFilter === "league" && !isStaffel(tournament)) return false;
+      if (kindFilter === "tournament" && isStaffel(tournament)) return false;
       if (!q) return true;
       const haystack = normalizeSearch([
         tournament.title,
@@ -132,12 +148,13 @@ export default function AdminTournamentsPage() {
         tournament.platform,
         tournament.format,
         tournament.format_label,
+        tournament.league_label,
         tournament.game?.name,
         gameLabel(tournament.game),
       ].filter(Boolean).join(" "));
       return haystack.includes(q);
     });
-  }, [query, sortedList, statusFilter]);
+  }, [kindFilter, query, sortedList, statusFilter]);
 
   const exportCsv = () => {
     downloadCsv(
@@ -169,7 +186,7 @@ export default function AdminTournamentsPage() {
           </Link>
         )}
       </div>
-      <div className="mb-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_16rem_auto_auto]">
+      <div className="mb-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_16rem_16rem_auto_auto]">
         <label className="relative block">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
             <input
@@ -191,6 +208,15 @@ export default function AdminTournamentsPage() {
               {label} ({value ? statusCounts[value] || 0 : list.length})
             </option>
           ))}
+        </select>
+        <select
+          value={kindFilter}
+          onChange={(event) => setKindFilter(event.target.value)}
+          data-testid="admin-tournament-kind-filter"
+          aria-label="Art"
+          className="w-full rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2.5 text-sm text-white focus:border-[#29B6E8]/60 focus:outline-none"
+        >
+          {KIND_FILTERS.map(([value, label]) => <option key={value || "all"} value={value}>{label}</option>)}
         </select>
         <div className="flex items-center justify-end rounded-sm border border-white/10 bg-[#121212] px-3 py-2 text-xs font-bold uppercase tracking-wider text-white/55">
           {filteredList.length} / {list.length} sichtbar
@@ -223,6 +249,12 @@ export default function AdminTournamentsPage() {
               <tr key={t.id} data-testid={`admin-tr-${t.slug}`}>
                 <td className="px-4 py-3">
                   <Link to={`/admin/tournaments/${t.id}`} className="font-semibold hover:text-[#29B6E8]">{t.title}</Link>
+                  {/* Kennzeichen „Liga · Staffel A“ (#2109, S26) - der Server liefert es mit. */}
+                  {isStaffel(t) && (
+                    <span data-testid={`admin-tr-league-label-${t.slug}`} className="ml-2 inline-flex rounded-sm border border-[#29B6E8]/35 bg-[#29B6E8]/10 px-1.5 py-0.5 align-middle text-[10px] font-bold uppercase tracking-wider text-[#29B6E8]">
+                      {t.league_label || `Liga · Staffel ${t.league_context.staffel || ""}`.trim()}
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-white/70">{gameLabel(t.game) || "—"}</td>
                 <td className="px-4 py-3 text-white/70">{formatTournamentDisplay(t)}</td>
@@ -234,9 +266,10 @@ export default function AdminTournamentsPage() {
                 <td className="px-4 py-3 text-right">
                   <div className="flex items-center justify-end gap-1">
                     <Link to={`/admin/tournaments/${t.id}?tab=participants`} title="Teilnehmer" className="p-2 hover:text-[#29B6E8]"><Users className="w-3.5 h-3.5" /></Link>
-                    {isTournamentLead && t.status === "draft" && <button onClick={() => setStatus(t.id, "registration_open")} title="Anmeldung öffnen" className="p-2 hover:text-ok"><Play className="w-3.5 h-3.5" /></button>}
+                    {/* Eine Staffel hat keine Anmeldung (#2109) - sie startet in ihrer Verwaltung mit „Liga starten“. */}
+                    {isTournamentLead && t.status === "draft" && !isStaffel(t) && <button onClick={() => setStatus(t.id, "registration_open")} title="Anmeldung öffnen" className="p-2 hover:text-ok"><Play className="w-3.5 h-3.5" /></button>}
                     {isTournamentLead && t.status === "live" && <button onClick={() => setStatus(t.id, "paused")} title="Pause" className="p-2 hover:text-[#FFD700]"><Pause className="w-3.5 h-3.5" /></button>}
-                    {isTournamentLead && <button onClick={() => del(t.id)} className="p-2 hover:text-[#FF3B30]" title="Löschen"><Trash2 className="w-3.5 h-3.5" /></button>}
+                    {isTournamentLead && canDelete(t) && <button onClick={() => del(t)} className="p-2 hover:text-[#FF3B30]" title="Löschen"><Trash2 className="w-3.5 h-3.5" /></button>}
                   </div>
                 </td>
               </tr>

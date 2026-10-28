@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 // Verwaltungsliste der Turniere (#1028): die Seite fragt die Liste „zum Verwalten“ ab - der Server gibt der
@@ -47,4 +47,32 @@ test("globale Aktionen nur für die Turnierleitung mit Zwei-Faktor - nicht für 
   render(<MemoryRouter><AdminTournamentsPage /></MemoryRouter>);
   expect(await screen.findByTestId("admin-new-tournament")).toBeInTheDocument();
   expect(screen.getByTitle("Löschen")).toBeInTheDocument();
+});
+
+// Liga-Staffeln (#2109, S26, L-D3): gekennzeichnet, filterbar, gestartet nicht löschbar, kein „Anmeldung öffnen“.
+const STAFFEL = { ...OWN, id: "t-staffel", slug: "liga-a", title: "Probe-Liga Season 1 · Liga 1 · Staffel A", status: "draft",
+  league_context: { league_id: "l1", season_id: "s1", division_id: "d1", staffel: "A" }, league_label: "Liga · Staffel A" };
+
+test("Staffeln tragen ihr Kennzeichen und lassen sich filtern", async () => {
+  apiMock.get.mockResolvedValue({ data: [OWN, STAFFEL] });
+  authState.isTournamentLead = true;
+  render(<MemoryRouter><AdminTournamentsPage /></MemoryRouter>);
+  expect(await screen.findByText("Probe-Liga Season 1 · Liga 1 · Staffel A")).toBeInTheDocument();
+  expect(screen.getByTestId("admin-tr-league-label-liga-a")).toHaveTextContent("Liga · Staffel A");
+  fireEvent.change(screen.getByTestId("admin-tournament-kind-filter"), { target: { value: "league" } });
+  expect(screen.queryByText("Eigenes Turnier")).toBeNull();
+  expect(screen.getByText("Probe-Liga Season 1 · Liga 1 · Staffel A")).toBeInTheDocument();
+  fireEvent.change(screen.getByTestId("admin-tournament-kind-filter"), { target: { value: "tournament" } });
+  expect(screen.getByText("Eigenes Turnier")).toBeInTheDocument();
+  expect(screen.queryByText("Probe-Liga Season 1 · Liga 1 · Staffel A")).toBeNull();
+});
+
+test("eine Staffel: vor dem Start löschbar, danach nicht, und nie „Anmeldung öffnen“", async () => {
+  apiMock.get.mockResolvedValue({ data: [STAFFEL, { ...STAFFEL, id: "t-live", slug: "liga-b", title: "Laufende Staffel", status: "live" }] });
+  authState.isTournamentLead = true;
+  render(<MemoryRouter><AdminTournamentsPage /></MemoryRouter>);
+  await screen.findByText("Laufende Staffel");
+  expect(within(screen.getByTestId("admin-tr-liga-a")).getByTitle("Löschen")).toBeInTheDocument();
+  expect(within(screen.getByTestId("admin-tr-liga-b")).queryByTitle("Löschen")).toBeNull();
+  expect(screen.queryByTitle("Anmeldung öffnen")).toBeNull();
 });
