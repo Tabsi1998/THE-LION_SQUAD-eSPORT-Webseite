@@ -139,7 +139,8 @@ gespeichert sind, tragen in der Liste den Hinweis **Beispielwerte im Text**; im 
 ### 3.4 Newsletter
 
 News und Events gehen **beim Veröffentlichen von selbst** an alle mit Newsletter-Zustimmung. Gesendet wird im Kasten **Verteilen** am Beitrag
-(Empfängerzahl, **Jetzt senden**, ein zweites Mal nur Redaktion und System). Unter **Admin → E-Mail → Newsletter** steht für System der
+(Empfängerzahl, **Jetzt senden**, ein zweites Mal nur Redaktion und System). **Mail ansehen** zeigt die Mail, wie sie hinausgeht – Betreff,
+Text, Link, mit eurem eigenen Namen als Anrede; verschickt wird dabei nichts. Unter **Admin → E-Mail → Newsletter** steht für System der
 **Verlauf**: welche News und Events wann an wie viele Personen gingen – ohne Namen und Adressen. Entwürfe und „Nur intern“ gehen nicht hinaus.
 Die Einwilligung gibt jede Person getrennt im Profil (3.6); sie ist jederzeit widerrufbar.
 

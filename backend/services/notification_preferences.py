@@ -380,6 +380,40 @@ def _format_de_datetime(value: Any) -> str:
         return ""
 
 
+async def newsletter_mail_values(kind: str, item: dict) -> tuple[str, dict]:
+    """Vorlage und Werte des Newsletters zu einer News oder einem Event - für den Versand und die Vorschau (#2119 ML5)."""
+    base = await _site_base_url()
+    preferences_url = f"{base}/profile?tab=notifications"
+    slug_or_id = item.get("slug") or item.get("id")
+    if kind == "news":
+        return "newsletter_news", {
+            "title": item.get("title") or "Neue Vereinsnews",
+            "excerpt": item.get("excerpt") or "",
+            "url": f"{base}/news/{slug_or_id}",
+            "preferences_url": preferences_url,
+        }
+    return "newsletter_event", {
+        "title": item.get("name") or "Neues Event",
+        # Mehrtägig (#884): der Zeitraum und die Tage statt nur des Beginns.
+        "when": _event_when(item),
+        "location": item.get("location") or item.get("city") or "",
+        "url": f"{base}/events/{slug_or_id}",
+        "preferences_url": preferences_url,
+    }
+
+
+async def preview_newsletter(kind: str, item: dict, display_name: str) -> dict | None:
+    """Die Newsletter-Mail, wie sie hinausginge - mit dem Namen der ansehenden Person als Anrede. „Nur intern“ geht
+    nicht per Mail hinaus, dafür gibt es keine Vorschau."""
+    if (item.get("visibility") or "public") == "internal":
+        return None
+    from email_service import render_named
+
+    template_key, values = await newsletter_mail_values(kind, item)
+    subject, html = await render_named(template_key, display_name=display_name or "Löwe", **values)
+    return {"template_key": template_key, "subject": subject, "html": html}
+
+
 async def enqueue_newsletter_for_item(kind: str, item: dict, dedupe_suffix: str = "") -> dict:
     """Queue opt-in newsletter mails for a published news post or announced event."""
     if kind not in {"news", "event"}:
@@ -396,32 +430,7 @@ async def enqueue_newsletter_for_item(kind: str, item: dict, dedupe_suffix: str 
     if not users:
         return {"queued": 0, "reason": "no_recipients"}
 
-    base = await _site_base_url()
-    preferences_url = f"{base}/profile?tab=notifications"
-    slug_or_id = item.get("slug") or item.get("id")
-    if kind == "news":
-        template_key = "newsletter_news"
-        url = f"{base}/news/{slug_or_id}"
-        title = item.get("title") or "Neue Vereinsnews"
-        common_kwargs = {
-            "title": title,
-            "excerpt": item.get("excerpt") or "",
-            "url": url,
-            "preferences_url": preferences_url,
-        }
-    else:
-        template_key = "newsletter_event"
-        url = f"{base}/events/{slug_or_id}"
-        title = item.get("name") or "Neues Event"
-        common_kwargs = {
-            "title": title,
-            # Mehrtägig (#884): der Zeitraum und die Tage statt nur des Beginns.
-            "when": _event_when(item),
-            "location": item.get("location") or item.get("city") or "",
-            "url": url,
-            "preferences_url": preferences_url,
-        }
-
+    template_key, common_kwargs = await newsletter_mail_values(kind, item)
     queued = 0
     from email_service import send_template
     for user in users:

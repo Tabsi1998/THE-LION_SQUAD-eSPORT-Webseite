@@ -297,7 +297,7 @@ Rechts im Formular der Kasten **Verteilen** (am Handy zugeklappt):
 
 - **Newsletter:** Er zeigt, an wie viele Personen er geht („mit Newsletter-Zustimmung“) – nie Namen oder Adressen. Ein Event im
   Status Entwurf schickt ihn **beim Veröffentlichen von selbst**. Danach steht **Gesendet am … an …**. Steht der Kasten bei **Noch
-  nicht verschickt**, gibt es **Jetzt senden** (mit Rückfrage). **Nochmal senden …** gibt es nur für Redaktion und System. **Nur
+  nicht verschickt**, gibt es **Jetzt senden** (mit Rückfrage). **Mail ansehen** zeigt die Mail, wie sie hinausgeht. **Nochmal senden …** gibt es nur für Redaktion und System. **Nur
   intern** geht nie per Mail hinaus. Mehr dazu: [Mails und Benachrichtigungen](mails.md).
 - **Meldung:** Der Kasten sagt, wohin die Meldung geht (Mitglieder, Vorstand …) und wann sie ging.
 - **Discord-Vorschau** („So sieht die Meldung aus“) mit dem Haken **Ohne Discord veröffentlichen**. Wohin die Meldung geht, entscheidet

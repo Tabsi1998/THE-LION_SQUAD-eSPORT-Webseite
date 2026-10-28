@@ -1213,9 +1213,15 @@ async def newsletter_state(kind: Literal["news", "event"], id: str = Query(..., 
 
 @settings_router.post("/newsletter/preview")
 async def newsletter_preview(body: NewsletterTriggerBody, me: dict = Depends(get_current_user)):
+    """Stand des Kastens und die Mail, wie sie hinausginge (#2119 ML5) - Anrede mit dem eigenen Namen, nichts wird
+    eingereiht."""
+    from services.notification_preferences import preview_newsletter
+
     rights = await _require_newsletter_send(me, body.kind)
     item = await _newsletter_source(body.kind, body.id)
-    return await _newsletter_box(item, body.kind, rights)
+    box = await _newsletter_box(item, body.kind, rights)
+    box["mail"] = await preview_newsletter(body.kind, item, me.get("display_name") or me.get("username") or "")
+    return box
 
 
 @settings_router.get("/newsletter/history")

@@ -645,6 +645,26 @@ async def send_template(
     """Shortcut for named templates. By default the mail is queued via the new mail-queue.
     Set queue=False to use the old immediate-Resend path (e.g. test buttons).
     """
+    try:
+        rendered = await render_named(template_key, **kwargs)
+    except TypeError as e:
+        return {"ok": False, "reason": f"template args error: {e}"}
+    if rendered is None:
+        return {"ok": False, "reason": "unknown template"}
+    subject, html = rendered
+    if queue:
+        from services.mail_queue import enqueue_mail
+        return await enqueue_mail(
+            to=to, subject=subject, html=html,
+            template_key=template_key, scheduled_at=scheduled_at,
+            dedupe_key=dedupe_key, meta=mail_meta,
+        )
+    return await send_mail(to, subject, html, template_key=template_key)
+
+
+async def render_named(template_key: str, **kwargs) -> Optional[tuple[str, str]]:
+    """Betreff und HTML einer benannten Mail, genau wie sie hinausgeht: feste Vorlage, Fassung des Admins, Sponsoren.
+    Auch für Vorschauen mit echten Werten (Newsletter, #2119 ML5) - ohne etwas einzureihen."""
     templates = {
         "registration": tpl_registration,
         "email_verification": tpl_email_verification,
@@ -682,23 +702,12 @@ async def send_template(
     }
     fn = templates.get(template_key)
     if not fn:
-        return {"ok": False, "reason": "unknown template"}
-    try:
-        subject, html = fn(**kwargs)
-    except TypeError as e:
-        return {"ok": False, "reason": f"template args error: {e}"}
+        return None
+    subject, html = fn(**kwargs)
     # E-Mail-Vorlagen (#437 A): hat der Admin diese Vorlage überschrieben, gilt sein Betreff/HTML mit denselben Werten.
     from services.mail_overrides import apply_override
     subject, html = await apply_override(template_key, subject, html, kwargs)
-    html = await _with_email_sponsors(html)
-    if queue:
-        from services.mail_queue import enqueue_mail
-        return await enqueue_mail(
-            to=to, subject=subject, html=html,
-            template_key=template_key, scheduled_at=scheduled_at,
-            dedupe_key=dedupe_key, meta=mail_meta,
-        )
-    return await send_mail(to, subject, html, template_key=template_key)
+    return subject, await _with_email_sponsors(html)
 
 
 async def smtp_test(to: str) -> dict:
