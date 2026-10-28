@@ -127,9 +127,14 @@ Platzierung).
 Zu den Besonderheiten:
 
 - **Schweizer System:** Es gibt keine Vorschau. Teilnehmer bestätigen, dann oben im Turnier **Schweizer Runde**
-  klicken – jede Runde einzeln.
+  klicken – jede Runde einzeln. Die Runde startet das Turnier nicht: nach Runde 1 wie gewohnt **Turnier starten** (mit
+  Check-in-Ende und Planungsprüfung). Eine falsch erzeugte Runde nimmt **Runde N zurücknehmen** (neben **Schweizer
+  Runde**) wieder heraus, solange keines ihrer Spiele aufgerufen, gestartet oder gewertet ist und keines an einer
+  Station hängt; ein Freilos zählt nicht.
 - **Gruppenphase:** Oben **Gruppen generieren**, die Zahl der Gruppen eintippen (Vorschlag 4). Im Reiter **Gruppen**
-  stehen sie.
+  stehen sie. Der Status bleibt dabei, gestartet wird mit **Turnier starten**. Gibt es schon feste Gruppenspiele, fragt
+  die Seite vorher nach und nennt die Zahl („12 Spiele, davon 3 begonnen oder gewertet“) – neue Gruppen löschen sie
+  samt Ergebnissen. Nach dem Ende und bei gesperrtem Turnier gibt es keine neuen Gruppen.
 - **Liga, Jeder gegen jeden und Gruppen:** Unter **Bearbeiten → Spielweise** erscheint der Kasten **Spielwochen**:
   **Spieltag dauert (Tage)**, **Standardtag**, **Standarduhrzeit** (Wiener Zeit) und **Antwortfrist (Stunden)**. Ein
   Spieltag ist ein Zeitraum. Beide Seiten dürfen Termine vorschlagen, was die Gegenseite annimmt, gilt, sonst greift
@@ -150,6 +155,20 @@ Zu den Besonderheiten:
   Hinzufügen eines Teilnehmers.
 
 Ob der Baum Vorschau oder fix ist, siehst du im Reiter **Spiele** (Hinweis „Vorschau / Draft“).
+
+**Format ändern und was ab dem Check-in-Ende feststeht (seit #2120):**
+
+- Bis zum Ende des Check-ins darfst du **Turnierstruktur**, **Teilnahme** und **Spieler pro Team** ändern; beim
+  **Speichern** baut sich die Vorschau gleich neu (aus K.-o. wird wirklich Doppel-K.-o.). Eigene Phasen aus „Phase
+  anlegen“ bleiben stehen – die baust du mit **Speichern & Struktur anwenden** neu.
+- Ab dem Ende des Check-ins (oder sobald es feste Spiele gibt, etwa generierte Gruppen) stehen **Turnierstruktur**,
+  **Teilnahme**, **Spieler pro Team** und **Spiel** nur noch lesend da, und **Speichern & Struktur anwenden** fehlt.
+  Im Reiter **Spiele** fehlen dann **Vorschau** und **Mit Teilnehmern generieren** (bei einer neuen, leeren Phase bleibt
+  Generieren). Eine Vorschau ersetzt nie echte Spiele.
+- **Zurücksetzen** (Werkzeuge) löscht alle Spiele, der Status bleibt. Stehen schon feste Spiele, nennt die Rückfrage die
+  Zahl („12 Spiele, davon 3 begonnen oder gewertet“); erst **12 Spiele löschen** setzt zurück. Nach dem Ende (Beendet,
+  Ergebnisse veröffentlicht, Archiviert) gibt es kein Zurücksetzen mehr – Platzierungen, Punkte, Pokale und Gewinne
+  hängen am Baum.
 
 ### 3.2 Online, Vor Ort, Hybrid
 
@@ -207,6 +226,10 @@ verbindlichen Teilnahme: Warteliste kostet nichts. Alles Weitere steht in [Abrec
   älteste Anmeldung der Warteliste von selbst nach und bekommt eine Nachricht. Danach entscheidet ihr (3.4).
 - Die Knöpfe **Check-in**, **Auschecken**, **Nicht erschienen**, **Entfernen**. Rückt nach **Nicht erschienen**
   jemand von der Warteliste nach, nennt die Meldung den Namen („Nicht erschienen gesetzt – Nachrücker: …“).
+- Wer in einem festen Spiel steht, hat kein **Entfernen**, und **Ausstehend**, **Abgelehnt** und **Warteliste** sind in
+  der Status-Auswahl gesperrt – in jedem Status, auch pausiert oder nach dem Ende. Sonst stünden im Baum Spiele mit
+  einer Anmeldung, die es nicht mehr gibt. Vor dem Start: **Nicht erschienen** und ersetzen; im laufenden Turnier:
+  **Austritt eintragen** oder **Disqualifizieren**.
 - **Disqualifizieren** und **Austritt** (nur Strukturrollen, nur im laufenden Turnier): der erste Klick zeigt den
   Umbauplan in Worten („E: Lena kommt kampflos weiter.“), erst **Austritt eintragen** bzw. **Disqualifizieren** macht
   ihn wirksam; ein freiwilliger Grund geht in die Nachricht an die Person. Die Regeln: im K.-o. und Doppel-K.-o. kommt der Gegner kampflos weiter, ein
@@ -510,13 +533,17 @@ der TV zählt dann herunter. Im Reiter **Turnierbaum** setzt ihr „Runde präse
 
 ### 3.10 Abschluss
 
-1. **Beendet** (Status-Auswahl im Turnier): Die Spiele sind durch. Alle Beteiligten bekommen einmal die Nachricht
-   „Turnier beendet“; die Erfolge der Teilnehmer werden neu ausgewertet.
-2. **Ergebnisse veröffentlicht** (nur Turnierleitung, nicht Helfer): Jetzt vergibt das System die **Punkte für die
-   Jahreswertung** (Gewicht unter Spieloptionen: Major, Normal, Mini, Fun-Wertung … oder „Keine Jahreswertung“), die
-   Auszeichnungen und legt die **Gewinn-Einträge** an (zu sehen unter **Admin → eSports → Gewinne**). Im Bearbeiten-
-   Formular erzeugt **Gewinne erzeugen** (Abschnitt Preise) die Einträge bei Bedarf noch einmal.
-3. **Archiviert** oder **Abgesagt**: ebenfalls nur Turnierleitung.
+1. **Beendet** (Status-Auswahl im Turnier, mit Rückfrage): Die Spiele sind durch. Alle Beteiligten bekommen einmal die
+   Nachricht „Turnier beendet“; die Erfolge der Teilnehmer werden neu ausgewertet.
+2. **Ergebnisse veröffentlicht** (nur Turnierleitung, nicht Helfer; die Rückfrage nennt die Folgen): Jetzt vergibt das
+   System die **Punkte für die Jahreswertung** (Gewicht unter Spieloptionen: Major, Normal, Mini, Fun-Wertung … oder
+   „Keine Jahreswertung“), die Auszeichnungen und legt die **Gewinn-Einträge** an (zu sehen unter **Admin → eSports →
+   Gewinne**). Im Bearbeiten-Formular erzeugt **Gewinne erzeugen** (Abschnitt Preise) die Einträge bei Bedarf noch
+   einmal.
+3. **Archiviert** oder **Abgesagt**: ebenfalls nur Turnierleitung. **Abgesagt** fragt nach einem freiwilligen Grund;
+   alle, die angemeldet sind oder auf der Warteliste stehen (bei Teams jedes Mitglied), bekommen einmal „Turnier
+   abgesagt“ ins Postfach und per Push, mit dem Grund. Eine Mail dazu gibt es noch nicht. **Entwurf** fragt ebenfalls
+   nach: die öffentliche Seite verschwindet, Angemeldete bekommen keine Nachricht.
 4. **Sperren** (Werkzeuge, ab dem Status Beendet): Danach sind Ergebnisse, Teilnehmer, Spielzeiten und Stationen nur
    noch lesbar. Mit **Entsperren** geht es wieder. Löschen bleibt möglich.
 5. Der Reiter **Rückmeldungen** erscheint nach dem Ende und zeigt die Rückmeldungen ohne Namen.
@@ -728,6 +755,11 @@ Die Turnierleitung trägt Maps im Ergebnis-Fenster mit Aufstellungen beider Seit
 | Check-in-Knopf der Spieler ist grau („Check-in vor Ort“) | Das Turnier ist **Vor Ort** | Die Turnierleitung checkt ein |
 | „Bei Vor-Ort-Turnieren macht die Turnierleitung den Check-in.“ | Dasselbe | wie oben |
 | Teilnehmer lässt sich nach Check-in-Start nicht entfernen | Der Baum ist fix | **Nicht erschienen** setzen und mit „Ersetzt Nicht-Erschienen“ einen Ersatz hinzufügen |
+| „Die Anmeldung steht im festen Turnierbaum …“ | Entfernen, Ablehnen oder Warteliste für jemanden mit festen Spielen | Vor dem Start **Nicht erschienen** und ersetzen, im laufenden Turnier **Austritt eintragen** oder **Disqualifizieren** |
+| „Turnierstruktur: Der Turnierbaum steht seit dem Ende des Check-ins fest …“ (auch Teilnahme, Spieler pro Team, Spiel) | Der Check-in ist zu Ende oder es gibt feste Spiele | So weiterspielen; neu aufbauen nur über **Zurücksetzen** |
+| „Der Turnierbaum steht schon fest (…). Eine Vorschau ersetzt keine echten Spiele …“ | **Vorschau** oder **Struktur anwenden** über festen Spielen | Erst **Zurücksetzen**, dann neu aufbauen |
+| „Das Turnier ist vorbei – der Turnierbaum bleibt, wie er gespielt wurde …“ | Zurücksetzen, neu aufbauen, Gruppen oder Schweizer Runde nach dem Ende | Gewollt. Einzelne Ergebnisse mit **Ergebnis korrigieren** |
+| „In Runde N hat schon ein Spiel begonnen …“ | **Runde zurücknehmen**, obwohl ein Spiel läuft, gemeldet ist oder an einer Station hängt | Station freigeben bzw. Ergebnis korrigieren; die Runde bleibt |
 | „Turnier kann ohne spielbares Match nicht gestartet werden.“ | Es gibt keine Spiele | Struktur prüfen (Bearbeiten → Speichern & Struktur anwenden), Teilnehmer bestätigen |
 | „Turnierplanung enthält Konflikte“ beim Starten | Doppelte Stationen, Zeiten, … | Konflikte beheben oder in der Rückfrage „Trotzdem live“ |
 | Turnierbaum leer („Turnierbaum noch nicht erzeugt“) | Keine Struktur oder zu wenig Teilnehmer | Teilnehmer bestätigen, Struktur anwenden. Beim Schweizer System **Schweizer Runde** klicken |
@@ -752,7 +784,8 @@ Nein. Selbstanmeldungen sind sofort **Bestätigt**, solange Platz ist. Nur von H
 warten.
 
 **Wann wird der Turnierbaum fix?**
-Mit **Check-in starten**. Bis dahin ist er eine Vorschau, die bei jeder An- und Abmeldung neu gemischt wird.
+Mit dem Ende des Check-ins (3.4). Bis dahin ist er eine Vorschau, die bei jeder An- und Abmeldung neu gemischt wird;
+danach stehen auch Format, Teilnahme und Spiel fest (3.1).
 
 **Der Leitfaden sagt, ich erzeuge den Baum „mit den Anwesenden“ – stimmt das?**
 Nicht ganz: Der Baum entsteht beim Start des Check-ins aus allen Bestätigten und Eingecheckten. Wer nicht erscheint,
