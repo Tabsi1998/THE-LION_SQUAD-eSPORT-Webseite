@@ -11,6 +11,7 @@ Endpoints:
   GET    /sitemap.xml                           — search-engine sitemap
   GET    /robots.txt                            — search-engine robots
 """
+import copy
 import hashlib
 import logging
 import os
@@ -408,7 +409,7 @@ NAV_DOC_ID = "main_nav"
 DEFAULT_NAV = {
     "id": NAV_DOC_ID,
     "items": [
-        {"key": "home", "to": "/", "label": "Home", "visible": True, "order": 0},
+        {"key": "home", "to": "/", "label": "Start", "visible": True, "order": 0},
         {"key": "news", "to": "/news", "label": "News", "visible": True, "order": 1},
         {"key": "events", "to": "/events", "label": "Events", "visible": True, "order": 2},
         {"key": "club", "to": "/about", "label": "Verein", "visible": True, "order": 3, "children": [
@@ -424,6 +425,8 @@ DEFAULT_NAV = {
         {"key": "esports", "to": "/esports", "label": "eSports", "visible": True, "order": 4, "children": [
             {"key": "esports_overview", "to": "/esports", "label": "Übersicht", "visible": True},
             {"key": "tournaments", "to": "/tournaments", "label": "Turniere", "visible": True},
+            # Liga (#2122 NW7): im Editor aus- und umbenennbar; auf der Website nur, solange eine Season sichtbar ist.
+            {"key": "league", "to": "/liga", "label": "Liga", "visible": True},
             {"key": "fastlap", "to": "/fastlap", "label": "Fast Lap", "visible": True},
         ]},
         # Community (#1143): dieselbe Gruppe wie der Tab in der App - Chats (nur mit Konto), Teams, Spieler und die
@@ -450,7 +453,7 @@ RETIRED_NAV_CHILD_KEYS = {
 }
 
 # Alte Beschriftungen, die es nicht mehr gibt: ein Name für die Erfolge (#1143).
-NAV_RENAMED_LABELS = {"achievements": {"Achievements": "Erfolge"}}
+NAV_RENAMED_LABELS = {"achievements": {"Achievements": "Erfolge"}, "home": {"Home": "Start"}}
 
 NAV_LABEL_REPLACEMENTS = {
     "Ue" + "bersicht": "Übersicht",
@@ -520,6 +523,9 @@ def _merge_nav_item(current: dict, default: dict) -> dict:
         merged["label"] = _normalize_nav_label(merged.get("label"))
         key = default.get("key") or current.get("key")
         merged["label"] = NAV_RENAMED_LABELS.get(key, {}).get(merged["label"], merged["label"])
+        # Ein Menüpunkt braucht einen Namen (#2122 NW7): leer heißt der Name aus der Vorgabe.
+        if not str(merged["label"] or "").strip() and default.get("label"):
+            merged["label"] = default["label"]
     parent_key = default.get("key") or default.get("to") or default.get("label")
     default_children = default.get("children") or []
     current_children = current.get("children") or []
@@ -585,6 +591,21 @@ async def admin_put_nav(body: NavBody, me: dict = Depends(require_area("content"
     )
     doc = await db.cms_nav.find_one({"id": NAV_DOC_ID}, {"_id": 0})
     return _normalize_nav_doc(doc or DEFAULT_NAV)
+
+
+@admin_nav_router.post("/reset")
+async def admin_reset_nav(me: dict = Depends(require_area("content"))):
+    """Zurücksetzen (#2122 NW7): Reihenfolge, Namen und Sichtbarkeit wie in der Vorgabe."""
+    db = get_db()
+    stamp = now_utc().isoformat()
+    await db.cms_nav.update_one(
+        {"id": NAV_DOC_ID},
+        {"$set": {"id": NAV_DOC_ID, "items": copy.deepcopy(DEFAULT_NAV["items"]), "updated_at": stamp}},
+        upsert=True,
+    )
+    await db.audit_logs.insert_one({"id": new_id(), "action": "nav.reset", "actor_id": me.get("id"), "target_id": NAV_DOC_ID,
+                                    "data": {}, "created_at": stamp})
+    return _normalize_nav_doc(await db.cms_nav.find_one({"id": NAV_DOC_ID}, {"_id": 0}) or DEFAULT_NAV)
 
 
 # ============= SEO — robots.txt =============

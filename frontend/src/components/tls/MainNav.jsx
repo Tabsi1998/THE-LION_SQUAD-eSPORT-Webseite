@@ -15,11 +15,12 @@ import { api } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 
 export const NAV_STRUCTURE = [
-  { to: "/", label: "Home", end: true },
-  { to: "/news", label: "News" },
-  { to: "/events", label: "Events" },
+  { key: "home", to: "/", label: "Start", end: true },
+  { key: "news", to: "/news", label: "News" },
+  { key: "events", to: "/events", label: "Events" },
   { to: "/calendar", label: "Kalender" },
   {
+    key: "club",
     label: "Verein",
     children: [
       { to: "/about", label: "Über uns" },
@@ -33,17 +34,20 @@ export const NAV_STRUCTURE = [
     ],
   },
   {
+    key: "esports",
     to: "/esports",
     label: "eSports",
     children: [
       { to: "/esports", label: "Übersicht" },
       { to: "/tournaments", label: "Turniere" },
+      { key: "league", to: "/liga", label: "Liga" },
       { to: "/fastlap", label: "Fast Lap" },
     ],
   },
   // Community (#1143): dieselbe Gruppe wie der Tab in der App - Chats (mit Konto), Teams, Spieler und die Bestenlisten
   // Jahreswertung und Erfolge (ein Name: „Erfolge“, nicht „Achievements“).
   {
+    key: "community",
     label: "Community",
     children: [
       { to: "/community", label: "Übersicht" },
@@ -55,15 +59,15 @@ export const NAV_STRUCTURE = [
       { to: "/achievements", label: "Erfolge" },
     ],
   },
-  { to: "/contact", label: "Kontakt" },
+  { key: "contact", to: "/contact", label: "Kontakt" },
 ];
 
 function navTestId(label) {
   return label.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 }
 
-// v3 (#1143): Jahreswertung und Erfolge stehen unter Community - ein altes Menü aus dem Browser zählt nicht mehr.
-const NAV_CACHE_KEY = "tls-public-nav-v3";
+// v4 (#2122 NW7): „Liga“ kommt aus dem Menü-Editor, „Home“ heißt „Start“ - ein altes Menü aus dem Browser zählt nicht mehr.
+const NAV_CACHE_KEY = "tls-public-nav-v4";
 
 const GERMAN_NAV_LABELS = {
   ["Ue" + "bersicht"]: "Übersicht",
@@ -364,18 +368,25 @@ function MobileAccordion({ item, isClubMember, signedIn, onClose }) {
 }
 
 // Liga (docs/LIGA.md, P5): „Liga“ steht unter eSports nur, wenn die Lese-API der Person mindestens eine Season zeigt.
-export const LEAGUE_NAV_ENTRY = { to: "/liga", label: "Liga" };
+// Seit #2122 NW7 ist sie ein Eintrag des Menü-Editors (Schlüssel „league“) - Name, Stelle und Ausblenden kommen von dort.
+export const LEAGUE_NAV_ENTRY = { key: "league", to: "/liga", label: "Liga" };
 
-/** Das Menü mit oder ohne „Liga“ - eingehängt unter eSports nach „Turniere“, nie doppelt, ohne Season nie da. */
+function isLeagueEntry(child) {
+  return child?.key === LEAGUE_NAV_ENTRY.key || child?.to === LEAGUE_NAV_ENTRY.to;
+}
+
+/** Das Menü mit oder ohne „Liga“: ohne sichtbare Season fällt sie weg; im Editor ausgeblendet kommt sie nie dazu. */
 export function withLeagueEntry(items, show) {
   return (items || []).map((item) => {
-    const isEsports = item.to === "/esports" || item.label === "eSports";
-    const children = (item.children || []).filter((child) => child.to !== LEAGUE_NAV_ENTRY.to);
-    if (!isEsports || !show) return item.children ? { ...item, children } : item;
-    const after = children.findIndex((child) => child.to === "/tournaments");
-    const position = after >= 0 ? after + 1 : children.length;
-    return { ...item, children: [...children.slice(0, position), LEAGUE_NAV_ENTRY, ...children.slice(position)] };
+    if (!item.children || show) return item;
+    return { ...item, children: item.children.filter((child) => !isLeagueEntry(child)) };
   });
+}
+
+/** Ein Hauptpunkt über seinen Schlüssel - nicht über den Namen, den die Redaktion ändern kann (#2122 NW7). */
+export function navItemIs(item, key) {
+  if (item?.key) return item.key === key;
+  return (NAV_STRUCTURE.find((entry) => entry.key === key) || {}).label === item?.label;
 }
 
 // Ein gemeinsamer Abruf für Kopf- und Handymenü: beide fragen gleichzeitig, aber /leagues geht nur einmal raus. Nach
@@ -450,7 +461,7 @@ export function MainNav({ isClubMember = false, signedIn = false, badges = {} })
     <nav className="hidden lg:flex items-center gap-0.5">
       {items.map((item) => (
         item.children?.length ? (
-          <NavDropdown key={item.label} item={item} isClubMember={isClubMember} signedIn={signedIn} badge={item.label === "Community" ? Number(badges.community || 0) : 0} />
+          <NavDropdown key={item.label} item={item} isClubMember={isClubMember} signedIn={signedIn} badge={navItemIs(item, "community") ? Number(badges.community || 0) : 0} />
         ) : (
           <NavLink
             key={item.to}

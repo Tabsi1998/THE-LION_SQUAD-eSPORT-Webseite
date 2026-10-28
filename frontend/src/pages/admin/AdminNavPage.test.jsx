@@ -10,7 +10,7 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 const confirmMock = vi.fn(async () => true);
 vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => confirmMock }));
 
-const { default: AdminNavPage, sortNavItems, withOrder } = await import("./AdminNavPage");
+const { default: AdminNavPage, missingLabels, sortNavItems, withOrder } = await import("./AdminNavPage");
 
 const NAV = {
   items: [
@@ -44,4 +44,35 @@ test("Unterpunkt nach oben schieben und speichern: die neue Reihenfolge geht mit
   await waitFor(() => expect(apiMock.put).toHaveBeenCalled());
   const club = apiMock.put.mock.calls[0][1].items.find((item) => item.key === "club");
   expect(club.children.map((child) => [child.key, child.order])).toEqual([["board", 0], ["about", 1]]);
+});
+
+// Pflichtname, Zurücksetzen, Liga-Hinweis (#2122 NW7).
+test("leerer Name: Hinweis, Speichern gesperrt", async () => {
+  render(<AdminNavPage />);
+  fireEvent.change(await screen.findByTestId("nav-label-home"), { target: { value: "  " } });
+  expect(screen.getByTestId("nav-missing-label")).toHaveTextContent("braucht einen Namen");
+  expect(screen.getByTestId("nav-save")).toBeDisabled();
+  expect(missingLabels([{ key: "a", label: "A", children: [{ key: "b", label: "" }] }])).toEqual(["b"]);
+});
+
+test("Zurücksetzen fragt nach und lädt die Vorgabe", async () => {
+  apiMock.post.mockResolvedValue({ data: { items: [{ key: "home", to: "/", label: "Start", visible: true, order: 0 }] } });
+  confirmMock.mockClear();
+  render(<AdminNavPage />);
+  fireEvent.click(await screen.findByTestId("nav-reset"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/nav/reset"));
+  expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Navigation zurücksetzen?" }));
+  await waitFor(() => expect(screen.queryByTestId("nav-row-club")).toBeNull());
+});
+
+test("Liga steht mit Hinweis unter eSports, keine technischen Schlüssel", async () => {
+  apiMock.get.mockResolvedValue({ data: { items: [{ key: "esports", to: "/esports", label: "eSports", visible: true, order: 0, children: [
+    { key: "tournaments", to: "/tournaments", label: "Turniere", visible: true, order: 0 }, { key: "league", to: "/liga", label: "Liga", visible: true, order: 1 },
+  ] }] } });
+  render(<AdminNavPage />);
+  fireEvent.click(await screen.findByRole("button", { name: "eSports aufklappen" }));
+  expect(screen.getByTestId("nav-label-esports-league")).toHaveValue("Liga");
+  expect(screen.getByTestId("nav-note-league")).toHaveTextContent("solange eine Season sichtbar ist");
+  expect(screen.queryByText("esports_overview")).toBeNull();
+  expect(screen.queryByText("league")).toBeNull();
 });
