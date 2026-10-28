@@ -166,6 +166,8 @@ class ConfigUpdate(Reasoned):
     public_markup_cents: int | None = Field(None, ge=0, le=shop_config.MAX_PUBLIC_MARKUP_CENTS)
     fallback_shipping_cents: int | None = Field(None, ge=1, le=shop_config.MAX_FALLBACK_SHIPPING_CENTS)
     min_price_cents: int | None = Field(None, ge=1, le=shop_config.MAX_MIN_PRICE_CENTS)
+    # Toleranz bei Preisänderung vor dem Auslösen (#2135), 0 bis 100 €.
+    price_tolerance_cents: int | None = Field(None, ge=0, le=shop_config.MAX_PRICE_TOLERANCE_CENTS)
 
 
 class TaxClearance(Reasoned):

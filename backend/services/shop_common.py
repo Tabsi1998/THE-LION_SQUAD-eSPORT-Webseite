@@ -40,7 +40,9 @@ MODEL_FIELDS: dict[str, tuple[str, ...]] = {
                       "print_surface"),
     "shop_variants": ("id", "product_id", "sku", "label", "size", "color", "price_cents", "active", "version",
                       "created_at", "created_by", "updated_at", "updated_by",
-                      "color_code", "blocked_reason", "blocked_at"),
+                      "color_code", "blocked_reason", "blocked_at",
+                      # Herkunft des übernommenen Preises (#2135): ``estimate`` (brutto) oder ``catalog`` (netto)
+                      "price_source"),
     "shop_designs": ("id", "design_key", "version", "file_ref", "sha256", "placement", "created_at", "created_by",
                      # Druckdatei (#1708, services/shop_designs.py): Maße, Prüfung und öffentlicher Zufallsschlüssel
                      "public_id", "public_disabled_at", "content_type", "size_bytes", "width_px", "height_px",
@@ -89,11 +91,15 @@ MODEL_FIELDS: dict[str, tuple[str, ...]] = {
                                "updated_by",
                                # Einkauf und Lager aus dem Abgleich (#1709)
                                "technique", "currency", "base_cost_cents", "placement_costs", "availability",
-                               "in_stock", "synced_at", "price_warning"),
+                               "in_stock", "synced_at", "price_warning",
+                               # Bruttoschätzung je Variante (#2135): Ware, Steuer, Versandbeispiel AT, Stand
+                               "gross_estimate"),
     "shop_carts": ("user_id", "items", "updated_at"),
     "shop_orders": ("id", "user_id", "idempotency_key", "request_hash", "status", "frozen", "billing_address",
                     "shipping_address", "printful_external_id", "printful_order_id", "item_count", "created_at",
-                    "updated_at", "anonymized_at"),
+                    "updated_at", "anonymized_at",
+                    # Preisprüfung vor dem Auslösen (#2135): letzte Schätzung, Abweichung, Entscheidung, Prüfzähler
+                    "price_check", "price_check_rev"),
     "shop_order_items": ("id", "order_id", "user_id", "position", "product_id", "variant_id", "product_title",
                          "variant_label", "sku", "quantity", "unit_price_cents", "markup_cents", "line_total_cents",
                          "gamertag", "design", "printful", "tax_profile",
@@ -104,7 +110,9 @@ MODEL_FIELDS: dict[str, tuple[str, ...]] = {
                          # Vereinsnummer im Druck (#2150): die Nummer und die Einwilligung (Zeitpunkt, Textfassung)
                          "print_number", "number_consent",
                          # Produktoptionen von Printful (#2158), eingefroren - etwa die Nahtfarbe
-                         "product_options"),
+                         "product_options",
+                         # Bruttoanteil der Position an der Printful-Schätzung (#2135): netto, Steuer, brutto
+                         "gross"),
     "shop_order_events": ("id", "order_id", "event_key", "kind", "at", "actor_id", "data"),
     # Testentwürfe an Printful (#2062, services/shop_test_drafts.py): eigene Art „test_draft“, keine Bestellung - nur
     # die Vereinsadresse, nie ein Gamertag als Text. Was gesendet wurde, was Printful meldete, Abweichungen.
