@@ -79,7 +79,8 @@ async function mockBracketDisplay(page) {
     duration_minutes: 20,
   }));
 
-  await page.route("**/api/tournaments/t1/bracket/display", async (route) => {
+  // Mit Abfrage: der Turnierbaum-TV fragt `?table=1` (#2121) - wie in tvMock.js und tv-displays.spec.js.
+  await page.route("**/api/tournaments/t1/bracket/display**", async (route) => {
     await route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({
