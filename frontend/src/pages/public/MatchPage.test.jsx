@@ -66,7 +66,8 @@ test("Freilos: Überschrift mit Namen, „Beendet“ mit Satz, Station im Klarte
   expect(screen.queryByText("Terminstatus")).toBeNull();
   expect(screen.queryByText(/Station Station/)).toBeNull();
   expect(screen.queryByText("Offen")).toBeNull();
-  expect(screen.getAllByText("Freilos").length).toBeGreaterThan(0);
+  // Die Teilnehmer stehen nur noch einmal (#2124): beim Freilos in der Überschrift und im Satz darunter.
+  expect(screen.getByTestId("match-bye-line")).toHaveTextContent("Ein Freilos wird nicht gespielt – es zählt als Sieg für NeonFalke.");
 });
 
 test("beendetes Duell: Sieger mit Ergebnis", async () => {

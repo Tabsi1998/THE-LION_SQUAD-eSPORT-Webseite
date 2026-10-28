@@ -549,20 +549,8 @@ function MatchPageView() {
         {/* Eine Spalte, die nie breiter als der Bildschirm wird (#1155): mit großer Schrift brechen Namen um. */}
         <div className={`mt-6 grid grid-cols-1 gap-6 ${showChat ? "lg:grid-cols-[minmax(0,1fr)_24rem]" : ""}`}>
           <div className="space-y-6">
-            <div className="border border-white/10 bg-[#121212] rounded-sm p-5">
-              <h2 className="font-heading text-xl font-black uppercase">Teilnehmer</h2>
-              <div className="mt-4 grid md:grid-cols-2 gap-3">
-                {participants.map((p, index) => (
-                  <div key={p.registration_id || p.slot || `participant-${index}`} className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4">
-                    <div className="text-[10px] uppercase tracking-widest text-white/35">Slot {p.slot}</div>
-                    <div className="mt-1 font-heading text-lg font-bold uppercase">{slotName(p.display_name, p, match)}</div>
-                    {p.team && <div className="mt-1 text-xs text-[#29B6E8]">[{p.team.tag}] {p.team.name}</div>}
-                  </div>
-                ))}
-              </div>
-            </div>
-
             {!over && (
+          {/* Die Teilnehmer stehen genau einmal - in den Ergebnis-Kacheln oben (#2124, TP7). */}
             <div className="border border-white/10 bg-[#121212] rounded-sm p-5" data-testid="match-scheduling">
               <h2 className="font-heading text-xl font-black uppercase flex items-center gap-2"><CalendarClock className="w-5 h-5 text-[#29B6E8]" /> Terminabstimmung</h2>
               {canProposeSchedule ? (
