@@ -212,9 +212,17 @@
           "colors": {"type": "array", "items": {"type": "object", "required": ["name", "value"], "properties": {"name": {"type": "string"}, "value": {"type": "string"}}}},
           "techniques": {"type": "array", "items": {"$ref": "#/components/schemas/Technique"}},
           "placements": {"type": "array", "items": {"$ref": "#/components/schemas/ProductPlacement"}},
-          "product_options": {"type": "array", "items": {"type": "object"}},
+          "product_options": {"type": "array", "items": {"$ref": "#/components/schemas/CatalogOption"}},
           "_links": {"type": "object"}
         }
+      },
+      "CatalogOption": {
+        "type": "object", "required": ["name", "techniques", "type", "values"],
+        "properties": {"name": {"type": "string"}, "techniques": {"type": "array", "items": {"type": "string"}}, "type": {"type": "string"}, "values": {"type": "array"}}
+      },
+      "ProductOption": {
+        "type": "object", "required": ["name", "value"], "additionalProperties": false,
+        "properties": {"name": {"type": "string", "pattern": "^[a-z0-9_]{1,64}$"}, "value": {}}
       },
       "GetProductById": {"type": "object", "required": ["data"], "properties": {"data": {"$ref": "#/components/schemas/Product"}}},
       "Variant": {
@@ -333,7 +341,8 @@
           "quantity": {"type": "integer", "minimum": 1, "maximum": 20},
           "external_id": {"type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$"},
           "name": {"type": "string"},
-          "placements": {"type": "array", "items": {"$ref": "#/components/schemas/PlacementInput"}}
+          "placements": {"type": "array", "items": {"$ref": "#/components/schemas/PlacementInput"}},
+          "product_options": {"type": "array", "items": {"$ref": "#/components/schemas/ProductOption"}}
         }
       },
       "Address": {
@@ -435,7 +444,7 @@
           "source": {"type": "string", "enum": ["catalog"]}, "catalog_variant_id": {"type": "integer"}, "id": {"type": "integer"},
           "external_id": {"type": "string", "nullable": true}, "quantity": {"type": "integer"}, "retail_price": {"type": "string", "nullable": true},
           "name": {"type": "string"}, "placements": {"type": "array", "items": {"$ref": "#/components/schemas/PlacementReadonly"}},
-          "product_options": {"type": "array"}, "_links": {"type": "object"}
+          "product_options": {"type": "array", "items": {"$ref": "#/components/schemas/ProductOption"}}, "_links": {"type": "object"}
         }
       },
       "GetItemsByOrderId": {

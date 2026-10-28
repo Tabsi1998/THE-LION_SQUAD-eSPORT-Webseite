@@ -207,6 +207,9 @@ class FakePrintful:
         # Wie oft der Stand einer Aufgabe gelesen wird, bevor sie fertig ist (Kostenschätzung, Mockups).
         self.estimation_polls = 1
         self.mockup_polls = 1
+        # Produktoptionen, die Printful je Produkt verlangt (#2158) - die Katalogantwort sagt das nicht, Printful lehnt
+        # einen Auftrag oder eine Schätzung ohne sie mit 400 ab.
+        self.required_options: dict[int, set[str]] = {}
         self.shipping = Decimal("4.95")
         self.vat_rate = Decimal("0.20")
 
@@ -229,6 +232,26 @@ class FakePrintful:
             self.stock[variant_id] = stock
         self.use_profile(product_id, "testshirt")
         return self.products[product_id]
+
+    def set_product_options(self, product_id: int, options: list[dict], *, required: tuple[str, ...] = ()) -> None:
+        """Produktoptionen des Katalogs (#2158, ``CatalogOption``: name, techniques, type, values) und welche davon
+        Printful bei Schätzung und Auftrag verlangt - wie die Nahtfarbe bei Zuschnitt und Naht."""
+        self.products[product_id]["product_options"] = [dict(option) for option in options]
+        self.required_options[product_id] = set(required)
+
+    def _option_problem(self, items: list[dict]) -> str | None:
+        """Wie Printful: fehlt eine Pflichtoption oder ist ein Wert nicht im Katalog, ist das ein Datenfehler (400)."""
+        for item in items:
+            product_id = (self.variants.get(item["catalog_variant_id"]) or {}).get("catalog_product_id")
+            catalog = {row["name"]: row for row in (self.products.get(product_id) or {}).get("product_options") or []}
+            given = {row["name"]: row["value"] for row in item.get("product_options") or []}
+            for name in sorted(self.required_options.get(product_id) or ()):
+                if name not in given:
+                    return f"The required product option: `{name}` is missing."
+            for name, value in given.items():
+                if name not in catalog or value not in catalog[name]["values"]:
+                    return f"Invalid value for product option `{name}`."
+        return None
 
     def use_profile(self, product_id: int, profile: str) -> None:
         """Druckvorgaben und Vorlagenbilder eines echten Produkts (``PROFILES``) - ersetzt die bisherigen."""
@@ -431,6 +454,9 @@ class FakePrintful:
         return next((item["catalog_variant_id"] for item in items if item["catalog_variant_id"] not in self.variants), None)
 
     def _op_createOrderEstimationTask(self, args, params, body):
+        problem = self._option_problem(body["order_items"])
+        if problem:
+            return 400, problem
         task_id = f"est-{self._new_id()}"
         unknown = self._unknown_variant(body["order_items"])
         self.estimations[task_id] = {"items": body["order_items"], "polls": 0,
@@ -474,6 +500,9 @@ class FakePrintful:
         unknown = self._unknown_variant(body["order_items"])
         if unknown:
             return 400, f"Variant {unknown} not found"
+        problem = self._option_problem(body["order_items"])
+        if problem:
+            return 400, problem
         order_id = self._new_id()
         recipient = {field: body["recipient"].get(field) or "" for field in
                      ("name", "company", "address1", "address2", "city", "state_code", "country_code", "zip", "phone", "email")}
@@ -491,7 +520,8 @@ class FakePrintful:
              "placements": [{"placement": place["placement"], "technique": place["technique"], "print_area_type": "simple",
                              "layers": [{"type": layer["type"], "url": layer["url"]} for layer in place["layers"]],
                              "placement_options": [], "status": "ok", "status_explanation": ""}
-                            for place in item["placements"]]}
+                            for place in item["placements"]],
+             "product_options": [dict(row) for row in item.get("product_options") or []]}
             for item in body["order_items"]]
         return 200, {"data": self._order_view(order_id)}
 
@@ -505,7 +535,8 @@ class FakePrintful:
             return 404, "Order not found"
         rows = [{"source": "catalog", "catalog_variant_id": item["catalog_variant_id"], "id": item["id"],
                  "external_id": item["external_id"], "quantity": item["quantity"], "retail_price": None,
-                 "name": item["name"], "placements": item["placements"], "product_options": [], "_links": {"self": {}}}
+                 "name": item["name"], "placements": item["placements"],
+                 "product_options": item.get("product_options") or [], "_links": {"self": {}}}
                 for item in self.order_items[order_id]]
         rows, paging = self._paged(rows, params)
         return 200, {"data": rows, "paging": paging, "_links": {}}

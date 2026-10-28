@@ -24,6 +24,9 @@ from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
 
 PLACEMENT_RE = re.compile(r"[a-z0-9_]{1,64}")
+# Produktoptionen je Position (#2158), etwa die Nahtfarbe ``stitch_color`` bei Zuschnitt und Naht.
+OPTION_NAME_RE = re.compile(r"[a-z0-9_]{1,64}")
+MAX_OPTIONS = 20
 TECHNIQUE_RE = re.compile(r"[a-z0-9-]{1,32}")
 # Printful nimmt höchstens 32 Zeichen je external_id (#2133) - die Prüfung hier meldet es schon vor dem Senden.
 EXTERNAL_ID_MAX = 32
@@ -113,6 +116,11 @@ class Placement:
         check_https_url(self.file_url)
 
 
+def _option_value_ok(value) -> bool:
+    return (isinstance(value, bool) or (isinstance(value, str) and 0 < len(value) <= 200)
+            or (type(value) is int))
+
+
 @dataclass(frozen=True, slots=True)
 class DraftLine:
     variant: CatalogVariantId
@@ -120,8 +128,18 @@ class DraftLine:
     placements: tuple[Placement, ...]
     external_id: str | None = None
     name: str | None = None
+    # Produktoptionen (#2158) als Paare ``(name, wert)`` - nur Werte aus dem Katalog; leer bei den meisten Produkten.
+    options: tuple[tuple[str, str | bool | int], ...] = ()
 
     def __post_init__(self) -> None:
+        if not isinstance(self.options, tuple) or len(self.options) > MAX_OPTIONS:
+            raise ValueError("Produktoptionen als Tupel")
+        names = [pair[0] for pair in self.options if isinstance(pair, tuple) and len(pair) == 2]
+        if len(names) != len(self.options) or len(set(names)) != len(names):
+            raise ValueError("Produktoptionen: je Name ein Paar (name, wert)")
+        for name, value in self.options:
+            if not isinstance(name, str) or not OPTION_NAME_RE.fullmatch(name) or not _option_value_ok(value):
+                raise ValueError("Produktoption: Name aus Kleinbuchstaben, Ziffern und _, Wert Text, Zahl oder ja/nein")
         require(self.variant, CatalogVariantId, "variant")
         if type(self.quantity) is not int or not 1 <= self.quantity <= MAX_QUANTITY:
             raise ValueError(f"Menge 1 bis {MAX_QUANTITY}")
@@ -187,6 +205,16 @@ class ProductPlacementInfo:
 
 
 @dataclass(frozen=True, slots=True)
+class ProductOption:
+    """Eine Produktoption aus dem Katalog (#2158, Printful ``CatalogOption``): Name, Art des Werts, erlaubte Werte und
+    Techniken. Ob sie Pflicht ist, sagt Printful hier nicht."""
+    name: str
+    type: str
+    values: tuple
+    techniques: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class CatalogProduct:
     id: CatalogProductId
     name: str
@@ -199,6 +227,9 @@ class CatalogProduct:
     placements: tuple[ProductPlacementInfo, ...]
     sizes: tuple[str, ...]
     colors: tuple[tuple[str, str], ...]
+    # Produktoptionen (#2158) und kurze Gründe für übersprungene Zeilen (ohne Werte).
+    options: tuple[ProductOption, ...] = ()
+    options_skipped: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -346,6 +377,7 @@ class OrderItem:
     name: str
     price_cents: int | None
     placements: tuple[PlacedFile, ...]
+    options: tuple[tuple[str, object], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

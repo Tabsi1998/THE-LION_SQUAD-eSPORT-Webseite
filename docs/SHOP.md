@@ -627,6 +627,34 @@ Produkts.
 Offen für spätere Pakete: Mockups und ihre Prüfung (#1710), Fotos, Galerie und Größentabelle. Löwe und Gamertag sind
 seit #2069 **eine** Datei je Fläche, seit #2150 auch mit der Vereinsnummer - der Testentwurf (#2062) schickt genau sie.
 
+### Produktoptionen von Printful (#2158)
+
+Code: `backend/services/shop_options.py`, Adapter `printful_client.product_options` und `_line_payload`. Zuschnitt- und
+Nahtprodukte (cut & sew, etwa das Allover-Trikot) verlangen je Position **Produktoptionen** - ohne Nahtfarbe lehnt Printful
+schon die Kostenschätzung ab („The required product option: `stitch_color` is missing.“).
+
+- **Katalog:** Schritt 1 („Printful-Produkt laden“, `GET /v2/catalog-products/{id}`) liest `product_options` zeilenweise
+  (Printful `CatalogOption`: `name`, `techniques`, `type`, `values`) und speichert sie im Abzug (`printful.options`). Eine
+  unlesbare Zeile wird mit kurzem Grund übersprungen (`printful.options_skipped`, ohne Werte). Produkte, die vor #2158
+  geladen wurden, zeigen „Produktoptionen noch nicht geladen“ (gelb) - einmal Schritt 1 neu laden.
+- **Pflicht:** Printful sagt im Katalog nicht, welche Option Pflicht ist. Pflicht sind die Optionen in
+  `shop_options.REQUIRED` - bisher die Nahtfarbe `stitch_color` (aus der Fehlermeldung von Printful); weitere kommen dazu,
+  sobald Printful sie verlangt. Sie gehen immer mit, unabhängig von der Technik. Andere Optionen (etwa Innentasche) zeigt
+  Schritt 2 nur als Hinweis - sie werden nicht gesendet, es gilt die Vorgabe von Printful.
+- **Schritt 2:** je Pflichtoption eine Auswahl mit deutscher Bezeichnung („Nahtfarbe: Weiß / Schwarz“), Vorgabe der
+  erste erlaubte Wert. Gespeichert am Angebot (`offer.options`, Protokoll `shop.product.offer`); nur Werte aus dem
+  Katalog (`PUT …/offer` mit `product_options`). Fehlt eine Pflichtoption, ist der Prüfpunkt **Produktoptionen von
+  Printful** rot, und die Position ist nicht bestellbar.
+- **Senden:** `product_options: [{name, value}]` je Position in Kostenschätzung, Testentwurf und Auftrag
+  (`DraftLine.options`). Produkte ohne Pflichtoptionen senden das Feld nicht - ihr Rumpf bleibt unverändert.
+- **Bestellung:** `place_order` friert die Optionen je Position ein (`shop_order_items.product_options` mit Bezeichnung)
+  - eine spätere Änderung in Schritt 2 wirkt nicht zurück.
+- **Testentwurf:** die Vorschau nennt die Optionen; der Abgleich nach dem Senden vergleicht sie mit der Antwort von
+  Printful (Zeile „Produktoptionen“, falsch übernommen ist rot).
+- **Vertrag:** `tests/contracts/printful/openapi-v2-excerpt.json` (`CatalogOption`, `ProductOption`), Fake mit
+  `set_product_options(…, required=…)` - ohne Pflichtoption antwortet er wie Printful mit 400. Tests:
+  `backend/tests/test_shop_product_options_unit.py`, Vitest der Seiten, `frontend/e2e/shop-product-options.spec.js`.
+
 ## Druckvorlagen und Druckdateien (#2069)
 
 Code: `backend/services/shop_print_templates.py` (Vorlagen von Printful, Vorlagenbilder, Positions-Vorgaben),
