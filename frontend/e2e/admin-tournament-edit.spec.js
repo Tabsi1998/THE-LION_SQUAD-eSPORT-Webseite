@@ -126,7 +126,16 @@ test.describe("Turnierseite: Kopf und Werkzeuge", () => {
         { id: "r-2", status: "approved", display_name: "Spieler Zwei" },
       ]));
       const posts = [];
-      await page.route("**/api/tournaments/t-1/reset-bracket**", (route) => { posts.push(route.request().url()); return json({ ok: true })(route); });
+      // Erst ohne force (Review #2120): der Server antwortet mit seinen Zahlen, die Rückfrage zeigt sie.
+      await page.route("**/api/tournaments/t-1/reset-bracket**", (route) => {
+        const url = route.request().url();
+        posts.push(url);
+        if (url.includes("force=true")) return json({ ok: true })(route);
+        return route.fulfill({ status: 409, contentType: "application/json", body: JSON.stringify({ detail: {
+          code: "confirm_destruction", match_count: 2, played_count: 1,
+          message: "Zurücksetzen löscht alle Spiele (2 Spiele, davon 1 begonnen oder gewertet) samt Ergebnissen und Berichten. Der Status bleibt.",
+        } }) });
+      });
       await page.route("**/api/tournaments/t-1/status", (route) => { posts.push(route.request().postDataJSON()); return json({ ok: true, notified: 2 })(route); });
       await page.goto("/admin/tournaments/t-1");
       await expect(page.getByRole("heading", { name: "Winter Cup 2026" })).toBeVisible();
@@ -138,17 +147,18 @@ test.describe("Turnierseite: Kopf und Werkzeuge", () => {
       await expect(page.getByTestId("confirm-dialog-confirm")).toHaveText("2 Spiele löschen");
       await expect(page.getByTestId("confirm-dialog-confirm")).toBeInViewport();
       expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+      expect(posts[0]).not.toContain("force=true");
       await page.getByTestId("confirm-dialog-confirm").click();
-      await expect.poll(() => posts.length).toBe(1);
-      expect(posts[0]).toContain("reset-bracket?force=true");
+      await expect.poll(() => posts.length).toBe(2);
+      expect(posts[1]).toContain("reset-bracket?force=true");
 
       await page.getByTestId("admin-tr-status-select").selectOption("cancelled");
       await expect(dialog).toContainText("Alle 2 Anmeldungen bekommen eine Nachricht");
       await dialog.getByRole("textbox").fill("Halle nicht verfügbar");
       await expect(page.getByTestId("confirm-dialog-confirm")).toBeInViewport();
       await page.getByTestId("confirm-dialog-confirm").click();
-      await expect.poll(() => posts.length).toBe(2);
-      expect(posts[1]).toMatchObject({ status: "cancelled", reason: "Halle nicht verfügbar" });
+      await expect.poll(() => posts.length).toBe(3);
+      expect(posts[2]).toMatchObject({ status: "cancelled", reason: "Halle nicht verfügbar" });
     });
   }
 

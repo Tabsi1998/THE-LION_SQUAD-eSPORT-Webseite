@@ -25,7 +25,7 @@ import { PauseUntilControl, RoundSponsorsPanel } from "./tournament/TvTournament
 import { HeatRebuildBar } from "./tournament/HeatRebuildBar";
 import { ParticipantRemovalActions } from "./tournament/ParticipantRemovalActions";
 import { ActionGroup, EmptyBracketNotice, TournamentEditForm } from "./tournament/TournamentEditForm";
-import { FINISHED_STATUSES, OPERATIONAL_STATUS_VALUES, TOURNAMENT_STATUS_OPTIONS, bracketFixed, fixedRegistrationIds, guardDetail, impactText, matchImpact, normalizeSearch, primaryTournamentAction, statusChangeNotice, swissUndoInfo } from "./tournament/shared";
+import { FINISHED_STATUSES, OPERATIONAL_STATUS_VALUES, TOURNAMENT_STATUS_OPTIONS, bracketFixed, fixedRegistrationIds, guardDetail, matchImpact, normalizeSearch, primaryTournamentAction, statusChangeNotice, swissUndoInfo } from "./tournament/shared";
 import { MatchPlanPanel } from "./tournament/matchplan/MatchPlanPanel";
 import { MapPoolPanel } from "./tournament/MapPoolPanel";
 import { SquadAssignDialog, canAssignSquads } from "@/components/tls/league/SquadAssignDialog";
@@ -158,7 +158,8 @@ export default function AdminTournamentEditPage() {
         toast.error(formatRequestError(e, failure));
         return null;
       }
-      const ok = await confirm({ title, description: detail.message, confirmLabel, tone: "danger" });
+      const label = typeof confirmLabel === "function" ? confirmLabel(detail) : confirmLabel;
+      const ok = await confirm({ title, description: detail.message, confirmLabel: label, tone: "danger" });
       if (!ok) return null;
       try {
         return await send(true);
@@ -169,23 +170,21 @@ export default function AdminTournamentEditPage() {
     }
   };
   const reset = async () => {
-    // Der Status bleibt (#2120, TA16) - nur die Spiele gehen.
-    const impact = matchImpact(matchesV2);
-    const ok = await confirm(impact.match_count ? {
-      title: "Turnierbaum zurücksetzen?",
-      description: `Gelöscht werden ${impactText(impact)} – samt Ergebnissen und Berichten. Der Status bleibt; Punkte, Pokale und Gewinne gibt es erst nach dem Ende.`,
-      confirmLabel: impact.match_count === 1 ? "1 Spiel löschen" : `${impact.match_count} Spiele löschen`,
-      tone: "danger",
-    } : {
+    // Der Status bleibt (#2120, TA16) - nur die Spiele gehen. Erst ohne force: mit echten Spielen fragt der Server mit
+    // seinen Zahlen nach (Review #2120), die Seite rät nicht. Nur eine reine Vorschau fragt die Seite selbst.
+    if (!matchImpact(matchesV2).match_count && !await confirm({
       title: "Turnierbaum zurücksetzen?",
       description: "Die Vorschau wird gelöscht und baut sich mit der nächsten An- oder Abmeldung bzw. „Speichern & Struktur anwenden“ neu. Der Status bleibt.",
       confirmLabel: "Zurücksetzen",
       tone: "info",
-    });
-    if (!ok) return;
+    })) return;
     const data = await runConfirmed(
-      async (force) => (await api.post(`/tournaments/${id}/reset-bracket${force || impact.match_count ? "?force=true" : ""}`)).data,
-      { title: "Turnierbaum wirklich zurücksetzen?", confirmLabel: "Trotzdem zurücksetzen", failure: "Turnierbaum konnte nicht zurückgesetzt werden." },
+      async (force) => (await api.post(`/tournaments/${id}/reset-bracket${force ? "?force=true" : ""}`)).data,
+      {
+        title: "Turnierbaum zurücksetzen?",
+        confirmLabel: (detail) => (detail.match_count === 1 ? "1 Spiel löschen" : `${detail.match_count} Spiele löschen`),
+        failure: "Turnierbaum konnte nicht zurückgesetzt werden.",
+      },
     );
     if (!data) return;
     toast.success("Turnierbaum zurückgesetzt.");

@@ -946,17 +946,42 @@ function serveFixed(overrides = {}, matches = FIXED_MATCHES) {
   return renderPage();
 }
 
-test("Zurücksetzen nennt die Zahl der Spiele und schickt die Bestätigung mit", async () => {
+// Review #2120: erst ohne force - es gelten die Zahlen des Servers, nicht die der Seite.
+const RESET_REFUSAL = { response: { status: 409, data: { detail: {
+  code: "confirm_destruction", match_count: 5, played_count: 2,
+  message: "Zurücksetzen löscht alle Spiele (5 Spiele, davon 2 begonnen oder gewertet) samt Ergebnissen und Berichten. Der Status bleibt.",
+} } } };
+
+test("Zurücksetzen fragt mit den Zahlen des Servers und schickt erst dann force", async () => {
   const user = userEvent.setup();
   serveFixed();
   await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  apiMock.post.mockClear();
+  apiMock.post.mockImplementation((url) => (url === "/tournaments/t-1/reset-bracket"
+    ? Promise.reject(RESET_REFUSAL)
+    : Promise.resolve({ data: { ok: true } })));
   await user.click(screen.getByTestId("admin-tr-tools").querySelector("summary"));
   await user.click(screen.getByTestId("admin-tr-reset"));
-  expect(screen.getByTestId("confirm-dialog")).toHaveTextContent("2 Spiele, davon 1 begonnen oder gewertet");
-  expect(screen.getByTestId("confirm-dialog")).toHaveTextContent("Der Status bleibt");
-  apiMock.post.mockClear();
+  expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t-1/reset-bracket");
+  const dialog = await screen.findByTestId("confirm-dialog");
+  expect(dialog).toHaveTextContent("5 Spiele, davon 2 begonnen oder gewertet");
+  expect(dialog).toHaveTextContent("Der Status bleibt");
+  expect(screen.getByTestId("confirm-dialog-confirm")).toHaveTextContent("5 Spiele löschen");
   await user.click(screen.getByTestId("confirm-dialog-confirm"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t-1/reset-bracket?force=true"));
+});
+
+test("Zurücksetzen einer reinen Vorschau: Rückfrage der Seite, dann ohne force", async () => {
+  const user = userEvent.setup();
+  serveFixed({ status: "registration_open" }, [{ id: "p-1", is_preview: true, status: "pending", slots: [] }]);
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  apiMock.post.mockClear();
+  await user.click(screen.getByTestId("admin-tr-tools").querySelector("summary"));
+  await user.click(screen.getByTestId("admin-tr-reset"));
+  expect(screen.getByTestId("confirm-dialog")).toHaveTextContent("Die Vorschau wird gelöscht");
+  await user.click(screen.getByTestId("confirm-dialog-confirm"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t-1/reset-bracket"));
+  expect(apiMock.post.mock.calls.some(([url]) => String(url).includes("force=true"))).toBe(false);
 });
 
 test("nach dem Ende gibt es kein Zurücksetzen mehr", async () => {

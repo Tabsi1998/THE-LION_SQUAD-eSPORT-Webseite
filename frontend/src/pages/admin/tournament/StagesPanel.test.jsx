@@ -162,6 +162,18 @@ test("vor dem Check-in-Ende: Vorschau und Generieren bleiben", () => {
   expect(screen.getByTestId("stage-generate-s1")).toBeInTheDocument();
 });
 
+test("Phase löschen: erst ohne force, nach der Rückfrage mit den Zahlen des Servers mit force", async () => {
+  apiMock.delete.mockReset();
+  apiMock.delete
+    .mockRejectedValueOnce({ response: { status: 409, data: { detail: { code: "confirm_destruction", message: "Löschen nimmt alle Spiele dieser Phase mit (1 Spiel, keines davon begonnen), samt Ergebnissen und Berichten.", match_count: 1, played_count: 0 } } } })
+    .mockResolvedValueOnce({ data: { ok: true } });
+  panel({ mode: "settings", canEditSettings: true, tournament: {}, durationGame: GAME });
+  fireEvent.click(screen.getByRole("button", { name: "Löschen" }));
+  await waitFor(() => expect(apiMock.delete).toHaveBeenCalledTimes(2));
+  expect(apiMock.delete.mock.calls[0][0]).toBe("/tournaments/t1/stages/s1");
+  expect(apiMock.delete.mock.calls[1][0]).toBe("/tournaments/t1/stages/s1?force=true");
+});
+
 test("fester Baum mit einer leeren neuen Phase: Generieren bleibt, die Vorschau nicht", () => {
   panel({ canManageStructure: true, tournament: {}, bracketFixed: true, matches: [] });
   expect(screen.queryByTestId("stage-preview-s1")).toBeNull();

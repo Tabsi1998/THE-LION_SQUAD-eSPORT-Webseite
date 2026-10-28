@@ -540,7 +540,7 @@ async def reset_bracket(tid: str, force: bool = False, me: dict = Depends(get_cu
         raise HTTPException(status_code=409, detail=tournament_guard.confirm_detail(
             "confirm_destruction",
             f"Zurücksetzen löscht alle Spiele ({tournament_guard.impact_text(impact)}) samt Ergebnissen und "
-            "Berichten.",
+            "Berichten. Der Status bleibt.",
             impact,
         ))
     v2_match_ids = [match["id"] for match in v2_matches if match.get("id")]

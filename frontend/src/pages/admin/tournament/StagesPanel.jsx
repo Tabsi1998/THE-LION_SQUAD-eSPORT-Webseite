@@ -13,7 +13,7 @@ import { SelectField, modeLabel } from "./TournamentEditForm";
 import { DrawControls } from "./DrawControls";
 import { sourceLabel } from "@/lib/slotSource";
 import { durationSourceText, matchDurationSource, ownDurationInput, ownDurationPayload } from "@/lib/matchDuration";
-import { DEFAULT_FFA_SCHEMA, DRAW_SHOW_MINUTES_DEFAULT, DRAW_SHOW_MINUTES_HINT, EVENT_MODE_OPTIONS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, STAGE_ADVANCEMENT_OPTIONS, RESULT_ENTRY_MODE_OPTIONS, SCHEDULE_MODE_OPTIONS, advancementModeHint, applyStageType, drawShowMinutesPayload, guardDetail, impactText, matchImpact, matchSectionKey, sectionSortIndex, sortMatchesForPlan, stageAdvancementSettings, stageAdvancementValue, stageConfigFor, stationDisplay } from "./shared";
+import { DEFAULT_FFA_SCHEMA, DRAW_SHOW_MINUTES_DEFAULT, DRAW_SHOW_MINUTES_HINT, EVENT_MODE_OPTIONS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, STAGE_ADVANCEMENT_OPTIONS, RESULT_ENTRY_MODE_OPTIONS, SCHEDULE_MODE_OPTIONS, advancementModeHint, applyStageType, drawShowMinutesPayload, guardDetail, matchImpact, matchSectionKey, sectionSortIndex, sortMatchesForPlan, stageAdvancementSettings, stageAdvancementValue, stageConfigFor, stationDisplay } from "./shared";
 
 // Die Dauer-Kette (#1554): Turnier, Phasen und das Spiel (Modi), damit jedes Feld sagen kann, was ohne eigenen Wert gilt.
 const DurationContext = createContext({ tournament: null, game: null, stageById: new Map() });
@@ -92,22 +92,27 @@ export function TournamentStagesPanel({ tournamentId, stages, matches, registrat
       toast.error(formatRequestError(err, "Phase konnte nicht angelegt werden."));
     }
   };
-  const removeStage = async (stage) => {
-    // Mit Zahl (#2120): wie viele Spiele der Phase mitgehen und wie viele davon schon begonnen oder gewertet sind.
-    const impact = matchImpact(matches.filter((match) => match.stage_id === stage.id));
-    if (!await confirm({
+  const removeStage = async (stage, force = false) => {
+    // Mit Zahl (#2120): erst ohne force - mit echten Spielen nennt der Server, wie viele mitgehen und wie viele davon
+    // schon begonnen oder gewertet sind; nur eine reine Vorschau fragt die Seite selbst.
+    const real = matchImpact(matches.filter((match) => match.stage_id === stage.id)).match_count;
+    if (!force && !real && !await confirm({
       title: "Phase löschen?",
-      description: impact.match_count
-        ? `Gelöscht werden ${impactText(impact)} – samt Ergebnissen und Berichten.`
-        : "Die Phase und ihre Vorschau-Spiele werden gelöscht.",
+      description: "Die Phase und ihre Vorschau-Spiele werden gelöscht.",
       confirmLabel: "Löschen",
       tone: "danger",
     })) return;
     try {
-      await api.delete(`/tournaments/${tournamentId}/stages/${stage.id}${impact.match_count ? "?force=true" : ""}`);
+      await api.delete(`/tournaments/${tournamentId}/stages/${stage.id}${force ? "?force=true" : ""}`);
       toast.success("Phase gelöscht.");
       onChanged();
     } catch (err) {
+      const detail = guardDetail(err, "confirm_destruction");
+      if (detail && !force) {
+        const ok = await confirm({ title: "Phase löschen?", description: detail.message, confirmLabel: "Löschen", tone: "danger" });
+        if (ok) return removeStage(stage, true);
+        return;
+      }
       toast.error(formatRequestError(err, "Phase konnte nicht gelöscht werden."));
     }
   };
