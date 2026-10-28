@@ -284,7 +284,7 @@ export default function AdminTournamentNewPage() {
 
         <FormSection title="Darstellung und Regeln" collapsible>
           <FormGrid>
-            <TextField label="Slug (URL)" value={form.slug} onChange={(v) => { setSlugTouched(true); set("slug", slugInput(v)); }} required testId="new-tr-slug" />
+            <TextField label="Adresse (URL)" value={form.slug} onChange={(v) => { setSlugTouched(true); set("slug", slugInput(v)); }} required testId="new-tr-slug" />
             <TextField label="Plattform" value={form.platform} onChange={(v) => set("platform", v)} placeholder="z.B. Nintendo Switch" testId="new-tr-platform" />
           </FormGrid>
           <EventMembershipLine eventId={event?.id} events={event ? [event] : []} testId="new-tr-event" />
@@ -344,12 +344,12 @@ export default function AdminTournamentNewPage() {
                 {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => <option key={n} value={n}>{n}.</option>)}
                 <option value="last">Letzter</option>
               </select>
-              <input value={p.label || ""} onChange={(e) => updatePrize(i, { label: e.target.value })} data-testid={`new-tr-prize-label-${i}`} className="col-span-4 sm:col-span-3 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm" placeholder="Label (z.B. Champion)" />
+              <input value={p.label || ""} onChange={(e) => updatePrize(i, { label: e.target.value })} data-testid={`new-tr-prize-label-${i}`} className="col-span-4 sm:col-span-3 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm" placeholder="Bezeichnung (z.B. Champion)" />
               <input value={p.value || ""} onChange={(e) => updatePrize(i, { value: e.target.value })} data-testid={`new-tr-prize-value-${i}`} className="col-span-5 sm:col-span-3 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm" placeholder="Preis (z.B. 100 €)" />
               <button type="button" onClick={() => set("prize_places", form.prize_places.filter((_, j) => j !== i))} data-testid={`new-tr-prize-remove-${i}`} className="col-span-1 text-white/40 hover:text-[#FF3B30] text-center py-2">✕</button>
             </div>
           ))}
-          <MarkdownField label="Fallback Text (freier Preis-Text, falls nicht strukturiert)" value={form.prize_pool} onChange={(v) => set("prize_pool", v)} testId="new-tr-prizes" />
+          <MarkdownField label="Freier Preistext (wenn die Plätze oben nicht reichen)" value={form.prize_pool} onChange={(v) => set("prize_pool", v)} testId="new-tr-prizes" />
         </FormSection>
 
         {/* Streaming + Links */}

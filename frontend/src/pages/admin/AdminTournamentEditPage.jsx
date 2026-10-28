@@ -322,7 +322,7 @@ export default function AdminTournamentEditPage() {
       .map((item) => item.message)
       .join("\n");
     if (!silent) {
-      if (data.ok && !data.warning_count) toast.success(`Planung OK: ${data.checked_matches} Matches geprüft.`);
+      if (data.ok && !data.warning_count) toast.success(`Planung in Ordnung: ${data.checked_matches === 1 ? "1 Spiel" : `${data.checked_matches} Spiele`} geprüft.`);
       else toast[data.ok ? "warning" : "error"](`${data.error_count} Konflikte, ${data.warning_count} Hinweise${lines ? `\n${lines}` : ""}`);
     }
     return data;

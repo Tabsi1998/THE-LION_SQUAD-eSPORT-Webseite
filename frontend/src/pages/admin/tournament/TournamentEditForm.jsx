@@ -390,7 +390,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
         <FormSection title="Basis">
           <FormGrid>
             <TextField label="Titel" value={f.title} onChange={(v)=>set("title",v)} testId="tr-edit-title"/>
-            <TextField label="Slug / URL" value={f.slug} onChange={(v)=>set("slug", slugify(v, { typing: true }))} testId="tr-edit-slug"/>
+            <TextField label="Adresse (URL)" value={f.slug} onChange={(v)=>set("slug", slugify(v, { typing: true }))} testId="tr-edit-slug"/>
             {show && <SelectInput label="Spiel" value={f.game_id} onChange={setGame} disabled={structureFixed} hint={fixedHint} testId="tr-edit-game" options={[["", "— auswählen —"], ...games.map((g) => [g.id, gameOptionLabel(g)])]} />}
             <TextField label="Plattform" value={f.platform} onChange={(v)=>set("platform",v)} testId="tr-edit-platform"/>
             {/* Kein Statusfeld (#2109, S2): der Status wechselt nur oben über den Ablauf - mit Spielplan, Check-in und

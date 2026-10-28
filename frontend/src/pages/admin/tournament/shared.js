@@ -37,13 +37,13 @@ export const RESULT_ENTRY_MODE_OPTIONS = [["", "Automatisch (online melden Spiel
 export const SCHEDULE_MODE_OPTIONS = [["", "Automatisch (online abstimmen, vor Ort fix)"], ["fixed_by_staff", "Fix durch Turnierleitung"], ["player_proposal", "Teilnehmer schlagen vor"], ["hybrid", "Hybrid"]];
 
 export const TOURNAMENT_SEASON_WEIGHT_OPTIONS = [
-  ["3", "Major - grosses Turnier (x3.00)"],
-  ["2", "Normal - regulaeres Turnier (x2.00)"],
-  ["1.25", "Mini - kleines Turnier (x1.25)"],
-  ["1", "Kleine Challenge / Fast-Lap nah (x1.00)"],
-  ["0.75", "Fun-Wertung (x0.75)"],
-  ["0.5", "Event/Check-in Wertung (x0.50)"],
-  ["0", "Keine Jahreswertung (x0.00)"],
+  ["3", "Major – großes Turnier (×3)"],
+  ["2", "Normal – reguläres Turnier (×2)"],
+  ["1.25", "Mini – kleines Turnier (×1,25)"],
+  ["1", "Kleine Challenge, nah an Fast Lap (×1)"],
+  ["0.75", "Spaß-Wertung (×0,75)"],
+  ["0.5", "Event- oder Check-in-Wertung (×0,5)"],
+  ["0", "Keine Jahreswertung (×0)"],
 ];
 
 export const CUSTOM_STAGE_TYPES = new Set(["custom_bracket", "ffa_custom_bracket"]);

@@ -25,10 +25,10 @@ const EVENT_MODE_LABELS = {
 const RESULT_ENTRY_MODE_LABELS = {
   hybrid: "Ergebnis: Hybrid",
   player_confirmed: "Ergebnis: beide",
-  staff_only: "Ergebnis: Staff",
+  staff_only: "Ergebnis: Turnierleitung",
 };
 const SCHEDULE_MODE_LABELS = {
-  fixed_by_staff: "Termin: Staff",
+  fixed_by_staff: "Termin: Turnierleitung",
   hybrid: "Termin: Hybrid",
   player_proposal: "Termin: Vorschlag",
 };
@@ -165,7 +165,7 @@ export default function AdminTournamentsPage() {
   const exportCsv = () => {
     downloadCsv(
       `tls-turniere-${new Date().toISOString().slice(0, 10)}.csv`,
-      ["Titel", "Slug", "Spiel", "Format", "Status", "Start", "Teilnehmer", "Max. Teilnehmer"],
+      ["Titel", "Adresse", "Spiel", "Format", "Status", "Start", "Teilnehmer", "Max. Teilnehmer"],
       filteredList.map((tournament) => [
         tournament.title,
         tournament.slug,
@@ -200,7 +200,7 @@ export default function AdminTournamentsPage() {
             onChange={(event) => updateFilterParams({ q: event.target.value })}
             data-testid="admin-tournament-search"
             className="w-full rounded-sm border border-white/10 bg-[#0A0A0A] py-2.5 pl-10 pr-3 text-sm text-white placeholder:text-white/35 focus:border-[#29B6E8]/60 focus:outline-none"
-            placeholder="Turnier, Spiel, Slug oder Plattform suchen"
+            placeholder="Turnier, Spiel, Adresse oder Plattform suchen"
           />
         </label>
         <select

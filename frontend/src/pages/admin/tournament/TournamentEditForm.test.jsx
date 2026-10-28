@@ -48,6 +48,15 @@ test("kein Statusfeld mehr im Formular - der Status steht nur oben", async () =>
   expect(screen.queryByLabelText("Status")).toBeNull();
 });
 
+// Deutsch statt Technik (#2111, TA27): „Adresse“ statt „Slug“, Jahreswertung ohne „grosses/regulaeres“.
+test("Adresse statt Slug, Jahreswertung in richtigem Deutsch", async () => {
+  render(<TournamentEditForm tournament={BASE} onSaved={() => {}} />);
+  expect((await screen.findByTestId("tr-edit-slug")).closest("label")).toHaveTextContent("Adresse (URL)");
+  const weights = [...document.querySelectorAll("option")].map((option) => option.textContent).join(" | ");
+  expect(weights).toContain("Major – großes Turnier (×3)");
+  expect(weights).not.toMatch(/grosses|regulaeres|Slug|Seeding/);
+});
+
 test("Staffel: Season-Werte nur lesend mit Weg zur Season, Liga-fremde Felder fehlen", async () => {
   renderStaffel();
   const values = await screen.findByTestId("tr-edit-season-values");
