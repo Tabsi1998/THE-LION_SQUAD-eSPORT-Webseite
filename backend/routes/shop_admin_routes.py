@@ -278,5 +278,6 @@ async def order_detail(order_id: str, me: dict = Depends(require_area("finance")
         raise HTTPException(404, "Bestellung nicht gefunden.")
     for hidden in ("request_hash", "idempotency_key"):
         order.pop(hidden, None)
-    return {"order": order, "items": [shop_orders.item_view(item) for item in await shop_orders.items_for(db, order_id)],
+    items = [shop_orders.item_view(item) for item in await shop_orders.items_for(db, order_id)]
+    return {"order": order, "items": items,
             "events": await shop_orders.events_for(db, order_id)}

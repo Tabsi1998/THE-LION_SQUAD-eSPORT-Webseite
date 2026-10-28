@@ -10,7 +10,8 @@ from PIL import Image
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
-from services import shop_catalog, shop_designs, shop_gamertag, shop_orders, shop_print_files, shop_products  # noqa: E402
+from services import (  # noqa: E402
+    shop_catalog, shop_designs, shop_gamertag, shop_orders, shop_print_files, shop_products)
 from services.shop_common import ShopError  # noqa: E402
 from shop_testdata import publish_unchecked  # noqa: E402
 from test_shop_products_unit import (  # noqa: E402,F401 - Fixtures und Helfer
@@ -39,8 +40,8 @@ def test_layer_rules_take_the_global_rules_and_override_height_and_width():
 def test_the_canvas_grows_with_the_text_height():
     rules = shop_gamertag.clean_rules({})
     width, height = shop_gamertag.canvas(rules)
-    big_width, big_height = shop_gamertag.canvas(shop_gamertag.layer_rules(rules, {"text_height_cm": 2.54,
-                                                                                    "max_width_cm": 5.08}))
+    own = shop_gamertag.layer_rules(rules, {"text_height_cm": 2.54, "max_width_cm": 5.08})
+    big_width, big_height = shop_gamertag.canvas(own)
     assert big_width == round(2.0 * rules["dpi"]) and big_width < width
     assert big_height == pytest.approx(height * 2, rel=0.05)
 
@@ -100,9 +101,9 @@ async def test_the_order_file_renders_the_name_with_the_size_of_its_layer(db, pr
     await shop_products.generate_print_files(db, product["id"], **BY)
     await publish_unchecked(db, product["id"])
     white = await variant_for(db, product["id"], WHITE_M)
+    line = {"variant_id": white["id"], "quantity": 1, "gamertag": "Testlöwe"}
     order, _ = await shop_orders.place_order(
-        db, idempotency_key="bestellung-groesse-1", lines=[{"variant_id": white["id"], "quantity": 1,
-                                                             "gamertag": "Testlöwe"}],
+        db, idempotency_key="bestellung-groesse-1", lines=[line],
         user_id="konto-1", buyer_kind="member", shipping_estimate_cents=490, billing_address=dict(BILLING),
         shipping_address=dict(SHIPPING), actor_id="konto-1")
     (item,) = await shop_orders.items_for(db, order["id"])

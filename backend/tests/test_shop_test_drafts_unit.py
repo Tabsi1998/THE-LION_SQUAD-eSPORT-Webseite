@@ -566,7 +566,8 @@ async def test_a_failed_lookup_puts_the_draft_back_to_unclear(db, provider, fake
 
 def test_the_printful_order_status_reads_german():
     """#2105: der Stand bei Printful steht deutsch daneben - ein unbekannter bleibt, wie Printful ihn liefert."""
-    assert shop_test_drafts.view({"id": "t", "printful_status": "draft"})["printful_status_label"] == "Entwurf"
-    assert shop_test_drafts.view({"id": "t", "printful_status": "inprocess"})["printful_status_label"] == "in Produktion"
-    assert shop_test_drafts.view({"id": "t", "printful_status": "wormhole"})["printful_status_label"] == "wormhole"
-    assert shop_test_drafts.view({"id": "t"})["printful_status_label"] is None
+    def label(status):
+        return shop_test_drafts.view({"id": "t", "printful_status": status})["printful_status_label"]
+
+    assert (label("draft"), label("inprocess"), label("wormhole"), label(None)) == (
+        "Entwurf", "in Produktion", "wormhole", None)

@@ -229,7 +229,8 @@ async def test_step_three_gets_a_preview_per_offered_colour(db, provider, fake):
     from test_shop_products_unit import BLACK_L, BLACK_M, PRINTFUL_PRODUCT, configured
 
     # Printful liefert für Schwarz eine eigene Vorlage; die allgemeine gilt für alle Farben.
-    fake.templates[PRINTFUL_PRODUCT].append({**fake.templates[PRINTFUL_PRODUCT][0], "catalog_variant_ids": [BLACK_M, BLACK_L],
+    first = fake.templates[PRINTFUL_PRODUCT][0]
+    fake.templates[PRINTFUL_PRODUCT].append({**first, "catalog_variant_ids": [BLACK_M, BLACK_L],
                                              "image_url": "https://files.cdn.printful.com/upload/schwarz.png"})
     product = await configured(db, provider, accept=False, generate=False)
     view = await shop_products.admin_view(db, product["id"])

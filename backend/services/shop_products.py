@@ -829,7 +829,8 @@ def _gamertag_canvas(rules: dict) -> dict:
     # (``height_per_text``: Leinwandhöhe je Zoll Texthöhe), die Breite ist die Höchstbreite.
     return {"width_in": round(width / rules["dpi"], 4), "height_in": round(height / rules["dpi"], 4),
             "anchor_y_in": round(height / 2 / rules["dpi"], 4),
-            "text_height_cm": round(rules["text_height_in"] * cm, 2), "max_width_cm": round(rules["max_width_in"] * cm, 2),
+            "text_height_cm": round(rules["text_height_in"] * cm, 2),
+            "max_width_cm": round(rules["max_width_in"] * cm, 2),
             "height_per_text": round(height / rules["dpi"] / rules["text_height_in"], 4),
             "limits": {"min_text_height_cm": round(shop_gamertag.MIN_HEIGHT_IN * cm, 2),
                        "max_text_height_cm": round(shop_gamertag.MAX_HEIGHT_IN * cm, 2),

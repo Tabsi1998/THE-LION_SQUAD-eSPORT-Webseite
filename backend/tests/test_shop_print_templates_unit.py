@@ -108,7 +108,8 @@ async def test_the_stored_template_is_refreshed_and_a_change_is_reported(db, pro
     fake.set_print_area(SHIRT, "back", 12, 18, display_name="Back print")  # Printful vergrößert den Rücken
     changed = await templates.refresh(db, SHIRT, provider=provider, actor_id=ACTOR, reason="Täglicher Abgleich")
     assert changed["changed"] is True
-    assert changed["changes"] == ["Geändert: Rückseite (DTG-Direktdruck) - 1800 × 2400 px bei 150 DPI → 1800 × 2700 px bei 150 DPI."]
+    assert changed["changes"] == ["Geändert: Rückseite (DTG-Direktdruck) - 1800 × 2400 px bei 150 DPI → "
+                                  "1800 × 2700 px bei 150 DPI."]
     stored = await templates.get(db, SHIRT)
     assert stored["changes"] == changed["changes"] and stored["changed_at"] and stored["previous_hash"]
     entry = await db.audit_logs.find_one({"action": "shop.print_template.change"}, {"_id": 0})
@@ -319,7 +320,8 @@ async def test_one_broken_row_costs_only_that_row_and_names_field_and_type(db, p
     assert sizes(stored)[("back", "all")] == (1800, 2400, 150)
     assert stored["skipped"] == [
         "Druckvorgabe front (dtg): Feld dpi fehlt oder passt nicht (erwartet: ganze Zahl von 72 bis 1200).",
-        "Unvollständig geliefert, nicht übernommen, bis Printful sie vollständig liefert: Vorderseite (DTG-Direktdruck)."]
+        "Unvollständig geliefert, nicht übernommen, bis Printful sie vollständig liefert: "
+        "Vorderseite (DTG-Direktdruck)."]
     assert no_values(stored["skipped"], "viel")
     logged = [record.getMessage() for record in caplog.records if "übersprungen" in record.getMessage()]
     assert len(logged) == 1 and "1 von 5 Zeilen" in logged[0] and no_values(logged, "viel")
@@ -521,7 +523,8 @@ async def test_an_area_grown_too_large_is_dropped_not_carried_over(db, provider,
     assert result["changes"] == ["Entfällt: Rückseite (DTG-Direktdruck) (bisher 1800 × 2400 px bei 150 DPI)."]
     assert ("back", "all") not in sizes(stored) and stored["hash"] != good["hash"]
     assert templates.entry_for_variant(stored, "dtg", "back", 4012) is None
-    assert stored["skipped"][-1] == "Zu groß für eine Druckdatei, ganze Fläche nicht übernommen: Rückseite (DTG-Direktdruck)."
+    assert stored["skipped"][-1] == ("Zu groß für eine Druckdatei, ganze Fläche nicht übernommen: "
+                                     "Rückseite (DTG-Direktdruck).")
     assert not stored.get("carried")
     assert await db.audit_logs.count_documents({"action": "shop.print_template.change"}) == 1
 

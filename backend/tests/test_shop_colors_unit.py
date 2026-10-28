@@ -39,7 +39,8 @@ def test_a_product_can_override_the_label_but_the_key_stays():
     assert shop_colors.label(product, "Black") == "Tiefschwarz"
     assert shop_colors.label(product, "White") == "Weiß"
     assert shop_colors.labels_for(product) == {"Black": "Tiefschwarz", "White": "Weiß", "Navy": "Marineblau"}
-    assert shop_colors.variant_label(product, {"color": "Black", "size": "M", "label": "Black / M"}) == "Tiefschwarz / M"
+    black_m = {"color": "Black", "size": "M", "label": "Black / M"}
+    assert shop_colors.variant_label(product, black_m) == "Tiefschwarz / M"
     assert shop_colors.variant_label(None, {"color": "Navy", "size": "One size", "label": "Navy / One size"}) == \
         "Marineblau / Einheitsgröße"
     # Eine gespeicherte Bezeichnung einer Bestellung („Black / M“) ohne Variante: dieselbe Übersetzung.
@@ -99,8 +100,8 @@ async def test_the_check_and_the_print_files_speak_german(db, provider):
     files = check_item(view, "files")["detail"]
     assert "Vorderseite / Schwarz: fehlt" in files and "front / Black" not in files
     front = next(row for row in view["placements"] if row["key"] == "front")
-    assert {(state["color"], state["color_label"]) for state in front["files"]} == {("Black", "Schwarz"),
-                                                                                   ("White", "Weiß")}
+    shown = {(state["color"], state["color_label"]) for state in front["files"]}
+    assert shown == {("Black", "Schwarz"), ("White", "Weiß")}
     prices = check_item(view, "prices")["detail"]
     assert "Schwarz / M" in prices and "Black / M" not in prices
 
@@ -110,9 +111,9 @@ async def test_orders_keep_the_printful_name_and_show_the_german_one(db, provide
     product = await configured(db, provider)
     await publish_unchecked(db, product["id"])
     white = await variant_for(db, product["id"], WHITE_M)
+    line = {"variant_id": white["id"], "quantity": 1, "gamertag": "Testlöwe"}
     order, _ = await shop_orders.place_order(
-        db, idempotency_key="bestellung-farbe-1", lines=[{"variant_id": white["id"], "quantity": 1,
-                                                           "gamertag": "Testlöwe"}],
+        db, idempotency_key="bestellung-farbe-1", lines=[line],
         user_id="konto-1", buyer_kind="member", shipping_estimate_cents=490, billing_address=dict(BILLING),
         shipping_address=dict(SHIPPING), actor_id="konto-1")
     (item,) = await shop_orders.items_for(db, order["id"])

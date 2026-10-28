@@ -572,7 +572,8 @@ async def test_a_missing_template_area_keeps_internals_from_customers(db, provid
     assert await db.shop_orders.count_documents({}) == 0
     view = await shop_products.admin_view(db, product["id"])
     files = next(item for item in view["check"]["items"] if item["key"] == "files")
-    assert files["ok"] is False and files["state"] == "failed" and "Rückseite / Schwarz: Fläche fehlt" in files["detail"]
+    assert files["ok"] is False and files["state"] == "failed"
+    assert "Rückseite / Schwarz: Fläche fehlt" in files["detail"]
 
 @pytest.mark.asyncio
 async def test_customers_read_one_fixed_sentence_and_the_reason_goes_to_the_log(db, provider, fake, caplog,

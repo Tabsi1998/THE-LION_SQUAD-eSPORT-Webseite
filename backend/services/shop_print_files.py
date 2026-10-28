@@ -1099,7 +1099,7 @@ async def preview_png(db, product: dict, *, placement: str, color: str, sample: 
     plan = await plan_placement(db, row, entry, color=color, color_hex=context["codes"].get(color),
                                 presets_doc=context["presets"], gamertag_rules=context["gamertag_rules"])
     shirt = _hex_rgb(context["codes"].get(color))
-    # Die Vorlage dieser Farbe (#2105); ist sie nicht farbspezifisch, eingefärbt mit dem Farbcode aus den Printful-Daten.
+    # Die Vorlage dieser Farbe (#2105); nicht farbspezifisch: eingefärbt mit dem Farbcode aus den Printful-Daten.
     preview, specific = templates.preview_for_color(context["template"], entry,
                                                     shop_colors.variant_ids_by_color(product).get(color) or ())
     tint = None if specific else shop_colors.code_of(product, color)

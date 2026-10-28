@@ -99,7 +99,7 @@ def _translate_words(text: str | None) -> str | None:
         present.discard("back")
     parts = [text]
     if key not in ("front", "back"):
-        parts += ["vorne" for word in ("front",) if word in present] + ["hinten" for word in ("back",) if word in present]
+        parts += (["vorne"] if "front" in present else []) + (["hinten"] if "back" in present else [])
     parts += [PLACEMENT_SIDES[word] for word in words if word in PLACEMENT_SIDES]
     parts += [PLACEMENT_HEIGHTS[word] for word in words if word in PLACEMENT_HEIGHTS]
     parts += [PLACEMENT_SIZES[word] for word in words if word in PLACEMENT_SIZES]
@@ -500,13 +500,14 @@ def preview_for_color(template: dict | None, entry: dict, color_ids: Iterable[in
     """Das Vorlagenbild für eine Shirtfarbe (#2105) und ob es **farbspezifisch** ist. ``color_ids`` sind alle
     Printful-Varianten dieser Farbe. Gewählt wird unter den Bildern der Fläche (eigentliche Vorlage zuerst) das erste,
     dessen ``variant_ids`` eine Variante der Farbe enthalten (bei gleicher Rolle das farbspezifische) - sonst das
-    erste. Farbspezifisch heißt: das Bild gilt nur
-    für Varianten dieser einen Farbe. Gilt es für mehrere Farben oder für keine, färbt die Website es ein (``tint``)."""
+    erste. Farbspezifisch heißt: das Bild gilt nur für Varianten dieser einen Farbe. Gilt es für mehrere Farben oder für
+    keine, färbt die Website es ein (``tint``)."""
     previews = (template or {}).get("previews") or []
     wanted = set(color_ids or ())
     mine = [previews[index] for index in entry.get("preview_indexes") or [] if 0 <= index < len(previews)]
     if not mine:
         return None, False
+
     def specific(item: dict) -> bool:
         ids = set(item.get("variant_ids") or ())
         return bool(ids) and bool(wanted) and ids <= wanted
