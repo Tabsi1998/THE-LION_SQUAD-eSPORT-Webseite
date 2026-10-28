@@ -43,11 +43,10 @@ export default function AdminNewsEditPage() {
     let cancelled = false;
     setPost(null);
     setMissing(false);
-    // Dieselben Daten wie die Liste (inkl. Verknüpfungen und Newsletter-Stand).
-    api.get("/admin/news").then(({ data }) => {
+    // Der Beitrag einzeln (#2122 NW4) - inkl. Verknüpfungen und Newsletter-Stand; die Liste hört bei 500 auf.
+    api.get(`/admin/news/${encodeURIComponent(id)}`).then(({ data }) => {
       if (cancelled) return;
-      const found = (data || []).find((item) => item.id === id);
-      if (found) setPost(found);
+      if (data?.id) setPost(data);
       else setMissing(true);
     }).catch(() => { if (!cancelled) setMissing(true); });
     return () => { cancelled = true; };

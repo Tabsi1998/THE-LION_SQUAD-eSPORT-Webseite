@@ -521,21 +521,37 @@ async def get_news(slug_or_id: str, user: dict | None = Depends(get_optional_use
     return p
 
 
+async def _attach_mentioned_users(db, posts: list[dict]) -> None:
+    """Markierte Personen mit Namen (#1354): der Editor zeigt die Schilder, ohne die ganze Kontoliste zu laden."""
+    mentioned = sorted({user_id for post in posts for user_id in post.get("mentioned_user_ids") or [] if user_id})
+    if not mentioned:
+        return
+    names = {
+        user["id"]: user for user in await db.users.find(
+            {"id": {"$in": mentioned}}, {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1},
+        ).to_list(len(mentioned))
+    }
+    for post in posts:
+        post["mentioned_users"] = [names[user_id] for user_id in post.get("mentioned_user_ids") or [] if user_id in names]
+
+
 @router.get("/admin/news")
 async def admin_list_news(me: dict = Depends(require_area("content"))):
     db = get_db()
     posts = await db.news_posts.find({}, {"_id": 0}).sort([("pinned", -1), ("published_at", -1), ("created_at", -1)]).to_list(500)
-    # Markierte Personen mit Namen (#1354): der Editor zeigt die Schilder, ohne die ganze Kontoliste zu laden.
-    mentioned = sorted({user_id for post in posts for user_id in post.get("mentioned_user_ids") or [] if user_id})
-    if mentioned:
-        names = {
-            user["id"]: user for user in await db.users.find(
-                {"id": {"$in": mentioned}}, {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1},
-            ).to_list(len(mentioned))
-        }
-        for post in posts:
-            post["mentioned_users"] = [names[user_id] for user_id in post.get("mentioned_user_ids") or [] if user_id in names]
+    await _attach_mentioned_users(db, posts)
     return posts
+
+
+@router.get("/admin/news/{nid}")
+async def admin_get_news(nid: str, me: dict = Depends(require_area("content"))):
+    """Ein Beitrag für den Editor (#2122 NW4) - einzeln, damit auch der 501. Beitrag zu bearbeiten ist."""
+    db = get_db()
+    post = await db.news_posts.find_one({"id": nid}, {"_id": 0})
+    if not post:
+        raise HTTPException(404, "Beitrag nicht gefunden.")
+    await _attach_mentioned_users(db, [post])
+    return post
 
 
 @router.post("/news")

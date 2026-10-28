@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, formatRequestError } from "@/lib/api";
-import { newsCategoryLabel } from "@/lib/newsCategories";
+import { newsCategoryLabel, newsVisibilityLabel } from "@/lib/newsCategories";
 import { formatTimeUntil } from "@/lib/newsPublication";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
@@ -15,13 +15,13 @@ function csvCell(value) {
   return /[",;]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
-function exportNewsCsv(rows) {
-  const header = ["Titel", "Slug", "Kategorie", "Sichtbarkeit", "Status", "Datum"];
+export function exportNewsCsv(rows) {
+  const header = ["Titel", "Adresse", "Kategorie", "Sichtbarkeit", "Status", "Datum"];
   const lines = rows.map((item) => [
     item.title,
-    item.slug,
-    item.category,
-    item.visibility,
+    item.slug ? `/news/${item.slug}` : "",
+    newsCategoryLabel(item.category),
+    newsVisibilityLabel(item.visibility),
     item.status_label,
     item.date_label,
   ].map(csvCell).join(";"));
@@ -79,15 +79,21 @@ export default function AdminNewsPage() {
     const rows = (meta.categories || []).map((item) => [item.k, item.l || item.k]);
     const known = new Set(rows.map(([key]) => key));
     list.forEach((item) => {
-      if (item.category && !known.has(item.category)) rows.push([item.category, item.category]);
+      if (item.category && !known.has(item.category)) {
+        known.add(item.category);
+        rows.push([item.category, newsCategoryLabel(item.category)]);
+      }
     });
     return rows;
   }, [list, meta.categories]);
   const visibilityOptions = useMemo(() => {
-    const rows = (meta.visibilities || []).map((item) => [item.k, item.l || item.k]);
+    const rows = (meta.visibilities || []).map((item) => [item.k, item.l || newsVisibilityLabel(item.k)]);
     const known = new Set(rows.map(([key]) => key));
     list.forEach((item) => {
-      if (item.visibility && !known.has(item.visibility)) rows.push([item.visibility, item.visibility]);
+      if (item.visibility && !known.has(item.visibility)) {
+        known.add(item.visibility);
+        rows.push([item.visibility, newsVisibilityLabel(item.visibility)]);
+      }
     });
     return rows;
   }, [list, meta.visibilities]);
@@ -103,8 +109,8 @@ export default function AdminNewsPage() {
         item.title,
         item.slug,
         item.excerpt,
-        item.category,
-        item.visibility,
+        newsCategoryLabel(item.category),
+        newsVisibilityLabel(item.visibility),
         state.label,
       ].filter(Boolean).join(" ").toLowerCase().includes(needle);
     });
@@ -130,7 +136,7 @@ export default function AdminNewsPage() {
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Titel, Slug, Teaser oder Kategorie suchen"
+                placeholder="Titel, Kurzbeschreibung oder Kategorie suchen"
                 data-testid="news-admin-search"
                 className="w-full rounded-sm border border-white/10 bg-[#0A0A0A] py-2 pl-9 pr-3 text-sm focus:border-[#29B6E8] focus:outline-none"
               />
@@ -201,7 +207,7 @@ export default function AdminNewsPage() {
                       <div className="text-[11px] text-white/50">/{n.slug}</div>
                     </td>
                     <td className="px-4 py-3 text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">{newsCategoryLabel(n.category)}</td>
-                    <td className="px-4 py-3 text-[10px] uppercase tracking-widest text-white/60 font-bold">{n.visibility}</td>
+                    <td className="px-4 py-3 text-xs text-white/65" data-testid={`news-visibility-${n.id}`}>{newsVisibilityLabel(n.visibility)}</td>
                     <td className="px-4 py-3 text-xs">
                       <span className={`${state.className} font-bold uppercase`}>{state.label}</span>
                       {state.detail && <div className="mt-0.5 text-[11px] normal-case text-white/45">{state.detail}</div>}

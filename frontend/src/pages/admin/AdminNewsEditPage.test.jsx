@@ -29,6 +29,13 @@ const POSTS = [
   { id: "n1", title: "Cup abgesagt", slug: "cup-abgesagt", excerpt: "Zu wenige Anmeldungen.", content: "Text", category: "announcement", visibility: "public", published: true, linked_event_ids: ["ev-1"] },
 ];
 
+// Der Editor lädt den Beitrag einzeln (#2122 NW4); unbekannte Kennung = 404.
+function adminPost(url, posts) {
+  const found = posts.find((post) => url === `/admin/news/${post.id}`);
+  if (!found) throw Object.assign(new Error("nicht gefunden"), { response: { status: 404 } });
+  return { data: found };
+}
+
 function renderAt(path) {
   return render(
     <MemoryRouter initialEntries={[path]}>
@@ -44,7 +51,7 @@ function renderAt(path) {
 beforeEach(() => {
   apiMock.get.mockImplementation(async (url) => {
     if (url === "/news-meta") return { data: META };
-    if (url === "/admin/news") return { data: POSTS };
+    if (url.startsWith("/admin/news/")) return adminPost(url, POSTS);
     return { data: [] };
   });
   apiMock.post.mockReset();
@@ -93,7 +100,7 @@ test("unbekannte Kennung: Hinweis mit Weg zurück", async () => {
 test("Personen markieren über die Suche – die ganze Kontoliste wird nie geladen", async () => {
   apiMock.get.mockImplementation(async (url) => {
     if (url === "/news-meta") return { data: META };
-    if (url === "/admin/news") return { data: [{ ...POSTS[0], mentioned_user_ids: ["u-1"], mentioned_users: [{ id: "u-1", username: "erika", display_name: "Erika Beispiel" }] }] };
+    if (url.startsWith("/admin/news/")) return adminPost(url, [{ ...POSTS[0], mentioned_user_ids: ["u-1"], mentioned_users: [{ id: "u-1", username: "erika", display_name: "Erika Beispiel" }] }]);
     if (url === "/users/mention-search") return { data: [{ id: "u-2", username: "max", display_name: "Max Muster" }] };
     return { data: [] };
   });
@@ -113,7 +120,7 @@ const BOX = { kind: "news", source_id: "n1", title: "Cup abgesagt", visibility: 
 function mockWithBox(box) {
   apiMock.get.mockImplementation(async (url) => {
     if (url === "/news-meta") return { data: META };
-    if (url === "/admin/news") return { data: POSTS };
+    if (url.startsWith("/admin/news/")) return adminPost(url, POSTS);
     if (url === "/settings/newsletter/state") {
       if (box instanceof Error) throw box;
       return { data: box };
