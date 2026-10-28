@@ -86,3 +86,14 @@ test("Staffel nach dem Start: kein Neu-Mischen mehr", async () => {
   expect(screen.queryByTestId("tr-edit-staffel-remix")).toBeNull();
   expect(screen.queryByTestId("tr-edit-save-rebuild")).toBeNull();
 });
+// Gewinne erst nach dem Ergebnis (#2123, TA23): vor „Beendet“ ist der Knopf gesperrt und sagt warum.
+test("„Gewinne erzeugen“ erst ab Beendet", async () => {
+  const prizes = [{ group: "overall", place: 1, label: "1. Platz", value: "Pokal" }];
+  const { unmount } = render(<TournamentEditForm tournament={{ ...BASE, status: "live", prize_places: prizes }} onSaved={() => {}} />);
+  expect(await screen.findByTestId("tr-edit-create-prizes")).toBeDisabled();
+  expect(screen.getByTestId("tr-edit-create-prizes-hint")).toHaveTextContent("sobald das Turnier beendet ist");
+  unmount();
+  render(<TournamentEditForm tournament={{ ...BASE, status: "completed", prize_places: prizes }} onSaved={() => {}} />);
+  expect(await screen.findByTestId("tr-edit-create-prizes")).toBeEnabled();
+  expect(screen.getByTestId("tr-edit-create-prizes-hint")).toHaveTextContent("Sonderpreise vergebt ihr dort von Hand");
+});

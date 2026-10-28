@@ -652,6 +652,8 @@ AUDIT_UNIQUE_INDEXES: tuple[tuple[str, Any, str, dict], ...] = (
 )
 AUDIT_INDEXES: tuple[tuple[str, Any], ...] = (
     ("platform_links", "user_id"),
+    # Jahreswertung (#2123): je Turnier alle Einträge beim (erneuten) Veröffentlichen und in Migration 18.
+    ("season_points", [("source_id", 1), ("source_type", 1)]),
     ("moderation_sanctions", [("user_id", 1), ("status", 1)]),  # bei jeder Chat-Nachricht gelesen
     ("moderation_strikes", "user_id"),
     # Frist nach der Kontolöschung (#1029): der tägliche Job sucht danach.

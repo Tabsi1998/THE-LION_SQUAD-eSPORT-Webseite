@@ -365,7 +365,7 @@ async def _apply_event_checkin_rewards(event: dict, registration: dict) -> None:
             num_participants=max(int(summary.get("checked_in_count") or summary.get("registered_count") or 1), 1),
             weight=0.5,
             bonus=5,
-            bonus_reason="Teilnahme von Admin/Moderator bestaetigt",
+            bonus_reason="Teilnahme von Admin/Moderator bestätigt",
         )
     except Exception:
         import logging

@@ -20,23 +20,17 @@ async def flow():
 
 
 async def publish_tournament(flow, monkeypatch, **fields):
-    """Zwei Teilnehmer, Ergebnisse veroeffentlicht - gibt die Aufrufe von ``award_points`` zurueck."""
-    from services import season_service
-
+    """Zwei Teilnehmer, Ergebnisse veroeffentlicht - gibt die geschriebenen Jahrespunkte zurueck (seit #2123 gleicht
+    ``sync_tournament_points`` sie an, statt ``award_points`` je Person aufzurufen)."""
     tournament = await flow.create_tournament(title="Herbst-Cup", slug="herbst-cup", status="completed", **fields)
     for index in (1, 2):
         await flow.register(tournament, await flow.add_user(name=f"Spieler {index}"))
-    calls = []
-
-    async def fake_award_points(**kwargs):
-        calls.append(kwargs)
-
-    monkeypatch.setattr(season_service, "award_points", fake_award_points)
+    await flow.db.seasons.insert_one({"id": "s-1", "slug": "saison", "name": "Saison", "status": "active"})
     flow.act_as(await flow.add_staff())
     response = await flow.post(f"/api/tournaments/{tournament['id']}/status",
                                json={"status": "results_published", "force": True})
     assert response.status_code == 200, response.text
-    return calls
+    return await flow.db.season_points.find({"source_id": tournament["id"]}, {"_id": 0}).to_list(10)
 
 
 @pytest.mark.asyncio
