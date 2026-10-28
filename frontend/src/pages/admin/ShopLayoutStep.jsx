@@ -50,6 +50,8 @@ function cleanLayer(layer) {
       if (Number(layer[name]) > 0) out[name] = Math.round(Number(layer[name]) * 100) / 100;
     }
   }
+  // Fassung von Hand (#2141) - nur hell oder dunkel; „automatisch“ ist die Vorgabe und wird nicht mitgeschickt.
+  if (layer.variant === "light" || layer.variant === "dark") out.variant = layer.variant;
   return out;
 }
 
@@ -62,11 +64,13 @@ function cmNumber(text) {
   return String(text ?? "").trim() && Number.isFinite(value) && value > 0 ? value : null;
 }
 
-// Beispielname in echter Größe (#2105): der Server rendert ihn wie die Druckdatei - dieselben Regeln der Ebene.
-function nameSample(productId, kind, color, layer) {
+// Beispielname in echter Größe (#2105): der Server rendert ihn wie die Druckdatei - dieselben Regeln der Ebene, und
+// liegt der Name auf einem Hintergrund, dieselbe Farbe aus dem Untergrund (#2141, `ink` aus dem Plan).
+function nameSample(productId, kind, color, layer, ink) {
   const params = { kind, color };
   if (Number(layer?.text_height_cm) > 0) params.text_height_cm = String(layer.text_height_cm);
   if (Number(layer?.max_width_cm) > 0) params.max_width_cm = String(layer.max_width_cm);
+  if (ink) params.ink = ink;
   const path = `${BASE}/${productId}/name-sample`;
   return { path, params, url: resolveMediaUrl(`/api${path}?${new URLSearchParams(params).toString()}`) };
 }
@@ -124,9 +128,41 @@ function savedSources(view) {
   return out;
 }
 
+// Was der Server je Ebene und Farbe entschieden hat (#2141): Untergrund hell oder dunkel samt Herkunft („aus
+// Hintergrund“) und bei Namen die Farbe - und je Fläche und Farbe der hochgeladene Hintergrund.
+function planLayers(view) {
+  const out = {};
+  for (const row of view.placements || []) {
+    for (const state of row.files || []) {
+      for (const layer of state.plan?.layers || []) {
+        out[`${row.key}|${layer.index}|${state.color}`] = { surface: layer.surface || null, ink: layer.ink || null };
+      }
+    }
+  }
+  return out;
+}
+
+function backgroundsOf(view) {
+  const out = {};
+  for (const row of view.placements || []) {
+    for (const state of row.files || []) {
+      if (state.background?.id) out[`${row.key}|${state.color}`] = state.background;
+    }
+  }
+  return out;
+}
+
+function scrollToArea(key) {
+  const card = document.querySelector(`[data-testid="shop-area-${key}"]`);
+  if (!card) return;
+  const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+  card.scrollIntoView?.({ behavior: reduce ? "auto" : "smooth", block: "start" });
+  card.querySelector(`[data-testid="shop-area-use-${key}"]`)?.focus({ preventScroll: true });
+}
+
 // ---------------------------------------------------------------- Vorschau mit Vorlagenbild, Ziehen und Pfeiltasten
 
-function LayoutPreview({ area, preview, layers, resolved, colorCode, motifFor, sampleFor, onSampleProblem, selected, onSelect, onNudge, editable, testId, stale = false }) {
+function LayoutPreview({ area, preview, layers, resolved, colorCode, motifFor, sampleFor, onSampleProblem, selected, onSelect, onNudge, editable, testId, stale = false, backdrop = null }) {
   const areaRef = useRef(null);
   const drag = useRef(null);
   const templateW = preview?.template_width || area.width_px;
@@ -171,6 +207,8 @@ function LayoutPreview({ area, preview, layers, resolved, colorCode, motifFor, s
       {preview?.positioning === "background" && imagePath && <img src={imagePath} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full pointer-events-none" />}
       <div ref={areaRef} className="absolute outline outline-1 outline-dashed outline-white/40" style={{ left: pct(box.left, templateW), top: pct(box.top, templateH), width: pct(box.width, templateW), height: pct(box.height, templateH) }}
         onPointerMove={onPointerMove} onPointerUp={stop} onPointerCancel={stop} data-testid={`${testId}-area`}>
+        {/* Die fertige Datei dieser Farbe als Hintergrund (#2141) - genau die Druckfläche, unter den Ebenen. */}
+        {backdrop && <img src={backdrop} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full pointer-events-none" draggable={false} data-testid={`${testId}-backdrop`} />}
         {marginCm > 0 && (
           <div className="absolute border border-dashed border-honor/60 pointer-events-none" aria-hidden="true"
             style={{ inset: `${(marginCm / area.height_cm) * 100}% ${(marginCm / area.width_cm) * 100}%` }} />
@@ -328,6 +366,31 @@ function TextLayer({ layer, area, canvas, presets, kindLabel, editable, onChange
   );
 }
 
+// Fassung je Ebene (#2141): automatisch (Hintergrund unter der Ebene, sonst Vorgabe des Produkts, sonst Shirtfarbe)
+// oder von Hand hell bzw. dunkel - etwa bei gemischtem Hintergrund. Daneben, was der Server für die Vorschau-Farbe
+// entschieden hat, bei Namen samt Farbe.
+const VARIANT_HINTS = { light: "für hellen Untergrund", dark: "für dunklen Untergrund" };
+
+function SurfaceField({ layer, info, labels, editable, onChange, testId, stale }) {
+  const value = layer.variant === "light" || layer.variant === "dark" ? layer.variant : "auto";
+  const options = labels || { auto: "automatisch", light: "hell", dark: "dunkel" };
+  const surface = info?.surface;
+  const ink = surface?.variant && info?.ink?.label ? ` · Farbe: ${info.ink.label}` : "";
+  return (
+    <div className="grid gap-2 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)] sm:items-end border-t border-white/10 pt-2 mt-2">
+      <label className="block text-sm"><span className="text-white/70">Fassung</span>
+        <select value={value} disabled={!editable} onChange={(event) => onChange({ variant: event.target.value === "auto" ? null : event.target.value })}
+          className={SELECT} data-testid={`${testId}-variant`}>
+          {Object.entries(options).map(([key, label]) => <option key={key} value={key}>{VARIANT_HINTS[key] ? `${label} (${VARIANT_HINTS[key]})` : label}</option>)}
+        </select>
+      </label>
+      <p className={`text-xs sm:pb-2.5 ${stale ? "text-white/40" : "text-white/60"}`} role="status" data-testid={`${testId}-surface`}>
+        {surface?.text ? `${surface.text}${ink}` : "Fassung nach der Shirtfarbe."}
+      </p>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------- Dateien je Farbe
 
 function FileStates({ productId, row, mode, editable, busy, onUpload }) {
@@ -356,10 +419,15 @@ function FileStates({ productId, row, mode, editable, busy, onUpload }) {
                 Druckdatei <ExternalLink className="w-3 h-3" aria-hidden="true" />
               </a>
             )}
+            {state.background?.id && state.background.id !== state.file?.id && (
+              <a href={resolveMediaUrl(`/api${BASE}/${productId}/print-files/${state.background.id}`)} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1 text-brand hover:underline" data-testid={`shop-file-${row.key}-${state.color}-background`}>
+                Hintergrund{state.background.version ? ` v${state.background.version}` : ""} <ExternalLink className="w-3 h-3" aria-hidden="true" />
+              </a>
+            )}
             {mode === "upload" && editable && (
-              <span className="inline-flex items-center gap-2 basis-full">
-                <label className="sr-only" htmlFor={`shop-upload-${row.key}-${state.color}`}>Fertige Druckdatei für {state.color_label || state.color}</label>
-                <input id={`shop-upload-${row.key}-${state.color}`} type="file" accept="image/png,image/jpeg" className="text-xs max-w-[14rem]"
+              <span className="flex flex-wrap items-center gap-2 basis-full min-w-0">
+                <label className="sr-only" htmlFor={`shop-upload-${row.key}-${state.color}`}>Hintergrund für {state.color_label || state.color}</label>
+                <input id={`shop-upload-${row.key}-${state.color}`} type="file" accept="image/png,image/jpeg" className="text-xs min-w-0 max-w-full sm:max-w-[14rem]"
                   onChange={(event) => setChosen({ ...chosen, [key]: event.target.files?.[0] || null })} data-testid={`shop-upload-${row.key}-${state.color}`} />
                 <button type="button" disabled={!chosen[key] || busy === `upload-${key}`} className={SMALL_BTN}
                   onClick={() => onUpload(row.key, state.color, state.group, chosen[key], key)} data-testid={`shop-upload-${row.key}-${state.color}-submit`}>
@@ -376,7 +444,7 @@ function FileStates({ productId, row, mode, editable, busy, onUpload }) {
 
 // ---------------------------------------------------------------- Eine Fläche
 
-function PlacementCard({ view, available, state, savedRow, used, onToggle, onChange, colors, colorName, previewColor, codes, motifsByKey, sources, stale, editable, busy, onUpload }) {
+function PlacementCard({ view, available, state, savedRow, used, onToggle, onChange, colors, colorName, previewColor, codes, motifsByKey, sources, infos = {}, backgrounds = {}, problem = null, stale, editable, busy, onUpload }) {
   const area = areaOf(available);
   const presets = view.presets || [];
   const motifPresets = presets.filter((preset) => available.presets.motif.includes(preset.key));
@@ -402,8 +470,13 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
     }
     return motifsByKey[exception || layer.motif?.key];
   };
-  // Für Profis (fertige Datei) zählen nur die Platzhalter - die Motive bleiben gespeichert, falls es zurückgeht.
-  const visible = mode === "upload" ? layers.map((layer) => (layer.kind === "motif" ? null : layer)) : layers;
+  // Seit #2141 liegen Motive auch auf einer fertigen Datei (Hintergrund) - alle Ebenen zählen in beiden Arten.
+  const visible = layers;
+  const hiddenBefore = mode === "upload" && savedRow?.mode === "upload" && savedRow?.motifs_hidden && layers.some((layer) => layer.kind === "motif");
+  const saveFirst = mode === "upload" && savedRow?.mode !== "upload";
+  const background = mode === "upload" ? backgrounds[`${available.key}|${previewColor}`] : null;
+  const backdrop = background?.id ? resolveMediaUrl(`/api${BASE}/${view.product.id}/print-files/${background.id}?thumb=1`) : null;
+  const infoFor = (index) => infos[`${available.key}|${index}|${previewColor}`] || null;
   const resolved = resolveLayers(area, visible, {
     presets, motifFor, gamertagCanvas: view.gamertag_canvas, rules,
   });
@@ -428,7 +501,7 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
   const surcharge = savedRow && !savedRow.included && savedRow.surcharge_cents ? ` · Aufpreis ${(savedRow.surcharge_cents / 100).toFixed(2).replace(".", ",")} €` : "";
   const resolvedFor = (index) => resolved.find((item) => item.index === index);
   return (
-    <li className="border border-white/10 rounded-sm p-3 bg-black/20 space-y-3" data-testid={`shop-area-${available.key}`}>
+    <li className={`border rounded-sm p-3 bg-black/20 space-y-3 scroll-mt-24 transition-colors duration-150 ${problem ? "border-warn/70" : "border-white/10"}`} data-testid={`shop-area-${available.key}`} data-blocked={problem ? "true" : undefined}>
       <div className="flex flex-wrap items-center gap-3">
         <label className="inline-flex items-center gap-2 text-sm font-bold min-h-10 cursor-pointer">
           <input type="checkbox" checked={used} disabled={!editable} onChange={(event) => onToggle(event.target.checked)} className="w-4 h-4 accent-brand" data-testid={`shop-area-use-${available.key}`} />
@@ -438,30 +511,49 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
         <span className="text-xs text-white/50 tabular-nums" data-testid={`shop-area-size-${available.key}`}>Druckdatei {sizeText(available.file)}{surcharge}</span>
         {available.groups.length > 1 && <span className="text-xs text-honor">Je Größe eine eigene Fläche ({available.groups.length})</span>}
       </div>
+      {problem && <p className="text-xs text-warn inline-flex items-center gap-1" role="alert" data-testid={`shop-area-problem-${available.key}`}><AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> {problem}</p>}
       {used && (
         <>
-          <div role="radiogroup" aria-label={`Art von ${available.label}`} className="flex flex-wrap gap-2">
-            {Object.entries(view.labels.modes || {}).map(([key, label]) => (
-              <button key={key} type="button" role="radio" aria-checked={mode === key} disabled={!editable} onClick={() => onChange({ ...state, mode: key })}
-                className={`min-h-9 px-3 text-xs border rounded-sm transition-colors duration-150 ${mode === key ? "border-brand bg-brand/10" : "border-white/10 hover:border-white/30"}`}
-                data-testid={`shop-area-mode-${available.key}-${key}`}>{label}</button>
-            ))}
+          <div className="space-y-1.5">
+            <div role="radiogroup" aria-label={`Art von ${available.label}`} className="flex flex-wrap gap-2">
+              {Object.entries(view.labels.modes || {}).map(([key, label]) => (
+                <button key={key} type="button" role="radio" aria-checked={mode === key} disabled={!editable} onClick={() => onChange({ ...state, mode: key })}
+                  className={`min-h-9 px-3 text-xs border rounded-sm transition-colors duration-150 ${mode === key ? "border-brand bg-brand/10" : "border-white/10 hover:border-white/30"}`}
+                  data-testid={`shop-area-mode-${available.key}-${key}`}>{label}</button>
+              ))}
+            </div>
+            {view.labels.mode_hints?.[mode] && <p className="text-xs text-white/55 max-w-2xl" data-testid={`shop-area-mode-hint-${available.key}`}>{view.labels.mode_hints[mode]}</p>}
+            {saveFirst && (
+              <p className="text-xs text-honor inline-flex items-center gap-1" role="status" data-testid={`shop-area-save-first-${available.key}`}>
+                <Upload className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> Erst speichern, dann je Farbe hochladen.
+              </p>
+            )}
+            {hiddenBefore && (
+              <p className="text-xs text-honor" role="status" data-testid={`shop-area-motifs-hidden-${available.key}`}>
+                Diese Motive wurden bisher nicht gedruckt (gespeichert vor dem Hintergrund-Modus). Nach dem Speichern liegen sie auf dem Hintergrund.
+              </p>
+            )}
           </div>
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+          <div className="grid gap-4 grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
             <div className="space-y-1">
               <LayoutPreview stale={stale} area={{ ...area, safe_margin_cm: available.safe_margin_cm }} preview={preview} layers={visible}
                 resolved={resolved} colorCode={codes[previewColor]} motifFor={motifFor} selected={selected} onSelect={setSelected}
-                sampleFor={previewColor ? (kind, layer) => nameSample(view.product.id, kind, previewColor, layer) : null}
+                sampleFor={previewColor ? (kind, layer) => {
+                  // Die Farbe des Namens aus dem Plan, sobald der Untergrund entschieden ist (Hintergrund, Vorgabe, von Hand).
+                  const index = layers.indexOf(layer);
+                  const info = index >= 0 ? infoFor(index) : null;
+                  return nameSample(view.product.id, kind, previewColor, layer, info?.surface?.variant ? info?.ink?.key : null);
+                } : null}
                 onSampleProblem={onSampleProblem}
-                onNudge={nudge}
+                onNudge={nudge} backdrop={backdrop}
                 editable={editable} testId={`shop-preview-${available.key}`} />
               {!preview?.image_path && <p className="text-xs text-honor" data-testid={`shop-preview-${available.key}-no-image`}>Kein Vorlagenbild von Printful - die Vorschau zeigt nur die Druckfläche, Maße und Druckdatei stimmen trotzdem.</p>}
+              {mode === "upload" && !background && <p className="text-xs text-white/50" data-testid={`shop-preview-${available.key}-no-backdrop`}>Für {colorName(previewColor)} ist noch kein Hintergrund hochgeladen.</p>}
               <p className="text-xs text-white/45 inline-flex items-center gap-1"><Move className="w-3 h-3" aria-hidden="true" /> Ziehen oder Pfeiltasten zum Feinjustieren.</p>
             </div>
             <div className="space-y-3">
-              {mode === "upload" && <p className="text-xs text-white/60" data-testid={`shop-area-upload-hint-${available.key}`}>Je Farbe eine fertige Druckdatei: genau {available.file.width_px} × {available.file.height_px} px (oder größer im selben Seitenverhältnis). Platzhalter für Namen kommen trotzdem dazu.</p>}
+              {mode === "upload" && <p className="text-xs text-white/60" data-testid={`shop-area-upload-hint-${available.key}`}>Je Farbe eine fertige Datei der ganzen Fläche als Hintergrund: genau {available.file.width_px} × {available.file.height_px} px (oder größer im selben Seitenverhältnis). Motive, Gamertag und Vereinsnummer kommen als Ebenen darüber. Ob die Datei echte Details hat oder nur hochskaliert ist, misst keine Prüfung - am Muster prüfen.</p>}
               {layers.map((layer, index) => {
-                if (mode === "upload" && layer.kind === "motif") return null;
                 const found = resolvedFor(index);
                 const motif = motifsByKey[layer.motif?.key];
                 return (
@@ -477,12 +569,14 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
                         onChange={(patch) => update(index, patch)} onRemove={() => onChange({ ...state, layers: layers.filter((_, at) => at !== index) })}
                         testId={`shop-layer-${available.key}-${index}`} />
                     )}
+                    <SurfaceField layer={layer} info={infoFor(index)} labels={view.labels.layer_variants} editable={editable} stale={stale}
+                      onChange={(patch) => update(index, patch)} testId={`shop-layer-${available.key}-${index}`} />
                     {found?.outside?.length > 0 && <p className="text-xs text-warn mt-2" role="alert" data-testid={`shop-layer-${available.key}-${index}-outside`}>Ragt {found.outside.join(" und ")} aus der Fläche - kleiner setzen oder zurück auf die Vorgabe.</p>}
                   </div>
                 );
               })}
               <div className="flex flex-wrap gap-2">
-                {mode === "layout" && <button type="button" disabled={!editable || layers.length >= (view.limits?.max_layers || 6) || !motifPresets.length} onClick={() => add("motif")} className={SMALL_BTN} data-testid={`shop-area-add-motif-${available.key}`}><Plus className="w-3.5 h-3.5" aria-hidden="true" /> Motiv</button>}
+                <button type="button" disabled={!editable || layers.length >= (view.limits?.max_layers || 6) || !motifPresets.length} onClick={() => add("motif")} className={SMALL_BTN} data-testid={`shop-area-add-motif-${available.key}`}><Plus className="w-3.5 h-3.5" aria-hidden="true" /> Motiv</button>
                 {["gamertag", "both"].includes(personalization) && !layers.some((layer) => layer.kind === "gamertag") && <button type="button" disabled={!editable || !textPresets.length} onClick={() => add("gamertag")} className={SMALL_BTN} data-testid={`shop-area-add-gamertag-${available.key}`}><Plus className="w-3.5 h-3.5" aria-hidden="true" /> Gamertag</button>}
                 {["member_number", "both"].includes(personalization) && !layers.some((layer) => layer.kind === "member_number") && <button type="button" disabled={!editable || !textPresets.length} onClick={() => add("member_number")} className={SMALL_BTN} data-testid={`shop-area-add-member_number-${available.key}`}><Plus className="w-3.5 h-3.5" aria-hidden="true" /> Vereinsnummer</button>}
               </div>
@@ -534,7 +628,8 @@ export function TemplateStatus({ view, busy, run }) {
 // Druckdateien lässt ungespeicherte Flächen stehen.
 export function layoutKey(view) {
   return JSON.stringify([view.product.id, view.product.printful?.product_id ?? null, view.product.technique ?? null,
-    (view.placements || []).map((row) => [row.key, row.mode || "layout", row.layers || []]), view.included_placement || null]);
+    (view.placements || []).map((row) => [row.key, row.mode || "layout", row.layers || [], !!row.motifs_hidden]), view.included_placement || null,
+    view.product.print_surface || "garment"]);
 }
 
 export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGroup }) {
@@ -549,33 +644,48 @@ export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGrou
   const colorName = (color) => view.color_labels?.[color] || color;
   const motifsByKey = useMemo(() => Object.fromEntries((view.motif_options || []).map((motif) => [motif.key, motif])), [view.motif_options]);
   const sources = useMemo(() => savedSources(view), [view]);
+  const infos = useMemo(() => planLayers(view), [view]);
+  const backgrounds = useMemo(() => backgroundsOf(view), [view]);
+  const savedSurface = product.print_surface || "garment";
+  const [surface, setSurface] = useState(savedSurface);
   const savedRows = Object.fromEntries((view.placements || []).map((row) => [row.key, row]));
   const available = view.available_placements || [];
   const used = available.filter((row) => draft[row.key]);
   const payload = used.map((row) => ({ key: row.key, mode: draft[row.key].mode || "layout", layers: draft[row.key].layers.map(cleanLayer) }));
-  const missingMotif = payload.some((row) => row.mode === "layout" && row.layers.some((layer) => layer.kind === "motif" && !layer.motif.key));
-  const emptyArea = payload.some((row) => row.mode === "layout" && !row.layers.length);
+  // Was die Fläche blockiert - mit Namen der Flächen, damit klar ist, wo (Nachtrag #2141). Ein Motiv ohne Auswahl
+  // zählt in beiden Arten; leer darf nur eine fertige Datei sein.
+  const missingMotif = used.filter((row, at) => payload[at].layers.some((layer) => layer.kind === "motif" && !layer.motif.key));
+  const emptyArea = used.filter((row, at) => payload[at].mode === "layout" && !payload[at].layers.length);
   const usedKeys = used.map((row) => row.key);
   const includedValue = usedKeys.includes(included) ? included : (usedKeys.includes("front") ? "front" : usedKeys[0] || null);
-  const blocked = !payload.length ? "Mindestens eine Fläche wählen." : missingMotif ? "Für jedes Motiv bitte ein Motiv aus der Liste wählen." : emptyArea ? "Jede gewählte Fläche braucht ein Motiv oder einen Platzhalter." : null;
-  const payloadJson = JSON.stringify(payload);
-  const changed = payloadJson !== JSON.stringify((view.placements || []).map((row) => ({ key: row.key, mode: row.mode || "layout", layers: (row.layers || []).map(cleanLayer) }))) || includedValue !== (view.included_placement || null) || view.layout_converted;
+  const names = (rows) => rows.map((row) => `„${row.label}“`).join(", ");
+  const blockedAreas = missingMotif.length ? missingMotif : emptyArea;
+  const blocked = !payload.length ? "Mindestens eine Fläche wählen."
+    : missingMotif.length ? `Für jedes Motiv bitte ein Motiv aus der Liste wählen: ${names(missingMotif)}.`
+      : emptyArea.length ? `Jede gewählte Fläche braucht ein Motiv oder einen Platzhalter: ${names(emptyArea)}.` : null;
+  const areaProblem = (key) => (missingMotif.some((row) => row.key === key) ? "Hier fehlt die Auswahl eines Motivs."
+    : emptyArea.some((row) => row.key === key) ? "Hier fehlt ein Motiv oder ein Platzhalter - oder „Fertige Druckdatei als Hintergrund“ wählen." : null);
+  const payloadJson = JSON.stringify({ placements: payload, print_surface: surface });
+  const hiddenSaved = (view.placements || []).some((row) => row.motifs_hidden && (row.layers || []).some((layer) => layer.kind === "motif"));
+  const changed = JSON.stringify(payload) !== JSON.stringify((view.placements || []).map((row) => ({ key: row.key, mode: row.mode || "layout", layers: (row.layers || []).map(cleanLayer) })))
+    || includedValue !== (view.included_placement || null) || view.layout_converted || surface !== savedSurface || hiddenSaved;
   const failedFiles = (view.placements || []).flatMap((row) => row.files || []).filter((state) => ["missing", "outdated"].includes(state.state));
   // Ungespeicherter Stand: der Server rechnet die Pläne (Fassung je Shirtfarbe, Bild, Seitenverhältnis) - eine Wahrheit
   // für Vorschau und Druck. Gedrosselt; bis die Antwort da ist, ist die Vorschau ausgegraut.
-  const [draftPreview, setDraftPreview] = useState({ json: null, sources: null, error: "" });
+  const [draftPreview, setDraftPreview] = useState({ json: null, sources: null, infos: null, backgrounds: null, error: "" });
   const previewWanted = !!product.printful && available.length > 0 && changed && !blocked;
   useEffect(() => {
     if (!previewWanted) return undefined;
     let live = true;
     const timer = setTimeout(async () => {
-      const layers = Object.fromEntries(JSON.parse(payloadJson).map((row) => [row.key, row.layers]));
+      const body = JSON.parse(payloadJson);
+      const layers = Object.fromEntries(body.placements.map((row) => [row.key, row.layers]));
       try {
-        const { data } = await api.post(`${BASE}/${product.id}/layout/preview`, { placements: JSON.parse(payloadJson) });
+        const { data } = await api.post(`${BASE}/${product.id}/layout/preview`, body);
         const rows = (data?.placements || []).map((row) => ({ ...row, layers: layers[row.key] || [] }));
-        if (live) setDraftPreview({ json: payloadJson, sources: savedSources({ placements: rows }), error: "" });
+        if (live) setDraftPreview({ json: payloadJson, sources: savedSources({ placements: rows }), infos: planLayers({ placements: rows }), backgrounds: backgroundsOf({ placements: rows }), error: "" });
       } catch (failure) {
-        if (live) setDraftPreview({ json: payloadJson, sources: null, error: formatRequestError(failure, "Die Vorschau lässt sich gerade nicht berechnen.") });
+        if (live) setDraftPreview({ json: payloadJson, sources: null, infos: null, backgrounds: null, error: formatRequestError(failure, "Die Vorschau lässt sich gerade nicht berechnen.") });
       }
     }, DRAFT_PREVIEW_DELAY_MS);
     return () => { live = false; clearTimeout(timer); };
@@ -586,6 +696,9 @@ export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGrou
   const pending = changed && !draftReady;
   const stale = previewWanted && !draftReady;
   const shownSources = draftReady ? draftPreview.sources : sources;
+  const shownInfos = draftReady ? draftPreview.infos : infos;
+  // Hintergründe hängen an Fläche und Farbe, nicht am Aufbau - bis die Antwort da ist, gelten die gespeicherten.
+  const shownBackgrounds = draftReady ? { ...backgrounds, ...draftPreview.backgrounds } : backgrounds;
   if (!product.printful) return <p className="text-sm text-white/55" data-testid="shop-layout">Zuerst in Schritt 1 das Printful-Produkt laden.</p>;
   if (!available.length) return <div className="space-y-2" data-testid="shop-layout"><TemplateStatus view={view} busy={busy} run={run} /><p className="text-sm text-white/55">Ohne Druckvorlage von Printful lassen sich keine Flächen wählen.</p></div>;
 
@@ -597,8 +710,11 @@ export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGrou
     form.append("color", color);
     if (group && group !== "all") form.append("group", group);
     form.append("reason", "");
-    return run(`upload-${key}`, () => uploadApi.post("/admin/shop/print-files/upload", form), `Druckdatei für ${colorName(color)} geprüft und gespeichert.`);
+    // Die Hinweise des Servers mit dazu (verkleinert, mit den Ebenen erzeugt, am Muster prüfen).
+    return run(`upload-${key}`, () => uploadApi.post("/admin/shop/print-files/upload", form),
+      (next) => [`Datei für ${colorName(color)} geprüft und gespeichert.`, ...(next?.uploaded?.notes || [])].join(" "));
   };
+  const jump = () => { if (blockedAreas[0]) scrollToArea(blockedAreas[0].key); };
   return (
     <div className="space-y-4" data-testid="shop-layout">
       <TemplateStatus view={view} busy={busy} run={run} />
@@ -640,9 +756,28 @@ export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGrou
               return next;
             })}
             onChange={(next) => setDraft((now) => ({ ...now, [row.key]: next }))}
-            colors={colors} colorName={colorName} previewColor={previewColor} codes={codes} motifsByKey={motifsByKey} sources={shownSources} stale={stale} editable={view.editable} busy={busy} onUpload={onUpload} />
+            colors={colors} colorName={colorName} previewColor={previewColor} codes={codes} motifsByKey={motifsByKey} sources={shownSources}
+            infos={shownInfos || {}} backgrounds={shownBackgrounds} problem={areaProblem(row.key)} stale={stale} editable={view.editable} busy={busy} onUpload={onUpload} />
         ))}
       </ul>
+      <div className="space-y-1 max-w-xl">
+        <label className="block text-sm"><span className="text-white/70">Untergrund gilt als</span>
+          <select value={surface} disabled={!view.editable} onChange={(event) => setSurface(event.target.value)} className={SELECT} data-testid="shop-layout-surface">
+            {Object.entries(view.labels.surfaces || { garment: "wie Printful-Farbe", light: "hell", dark: "dunkel" }).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+          </select>
+        </label>
+        <p className="text-xs text-white/45">Entscheidet über die Fassung der Motive (hell oder dunkel) und die Farbe von Gamertag und Vereinsnummer, wo kein Hintergrund darunter liegt - etwa bei Allover mit Grundfarbe „weiß“. Liegt ein Hintergrund darunter, zählt dessen Helligkeit unter der Ebene.</p>
+      </div>
+      {blocked && blockedAreas.length > 0 && (
+        <div className="border border-warn/50 bg-warn/10 rounded-sm p-2 text-xs space-y-1.5" role="alert" data-testid="shop-layout-blocked-areas">
+          <p>{blocked}</p>
+          <div className="flex flex-wrap gap-2">
+            {blockedAreas.map((row) => (
+              <button key={row.key} type="button" onClick={() => scrollToArea(row.key)} className={QUIET_BTN} data-testid={`shop-layout-jump-${row.key}`}>Zu „{row.label}“</button>
+            ))}
+          </div>
+        </div>
+      )}
       {usedKeys.length > 1 && (
         <div className="space-y-1">
           <div className="text-sm text-white/70">Im Grundpreis von Printful enthalten</div>
@@ -653,7 +788,8 @@ export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGrou
       )}
       <ReasonedButton id="shop-layout" label="Druckflächen speichern" busy={busy === "layout"} disabled={!view.editable || !!blocked || !changed}
         blockedHint={!view.editable ? "Erst zurückziehen (Schritt 5), dann die Druckflächen ändern." : blocked || "Noch nichts geändert."}
-        onSubmit={(reason) => run("layout", () => api.put(`${BASE}/${product.id}/layout`, { placements: payload, included_placement: includedValue, reason }), "Druckflächen gespeichert.")} />
+        onBlocked={view.editable ? jump : undefined}
+        onSubmit={(reason) => run("layout", () => api.put(`${BASE}/${product.id}/layout`, { placements: payload, included_placement: includedValue, print_surface: surface, reason }), "Druckflächen gespeichert.")} />
       <div className="border-t border-white/10 pt-3 space-y-2" data-testid="shop-generate">
         <p className="text-xs text-white/55">{failedFiles.length ? `${failedFiles.length} Druckdatei${failedFiles.length === 1 ? "" : "en"} fehlen oder sind veraltet.` : "Alle Druckdateien sind aktuell."}</p>
         <ReasonedButton id="shop-generate" label="Druckdateien erzeugen" variant="secondary" busy={busy === "generate"} disabled={view.product.status === "archived" || changed}

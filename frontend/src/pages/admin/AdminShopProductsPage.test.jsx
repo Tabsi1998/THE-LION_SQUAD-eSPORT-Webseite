@@ -522,6 +522,109 @@ test("für Profis: fertige Druckdatei je Farbe hochladen", async () => {
   expect(form.get("file").name).toBe("vorne.png");
 });
 
+// Allover (#2141): fertige Datei als Hintergrund, Motive und Namen als Ebenen darüber, Fassung aus dem Hintergrund.
+function alloverView() {
+  const plan = (color, variant, text) => ({ layers: [
+    { index: 0, kind: "motif", source: { design_key: "ruecken-weiss", variant, version: 1 }, image_path: "/api/shop/print-files/k9/ruecken-weiss-v1.png", aspect: 1,
+      surface: { variant, source: "background", luminance: 0.01, text } },
+    { index: 1, kind: "gamertag", surface: { variant, source: "background", luminance: 0.01, text },
+      ink: { key: variant === "dark" ? "vereinsblau" : "tiefschwarz", label: variant === "dark" ? "Vereinsblau" : "Schwarz", hex: "#29B6E8" } },
+  ] });
+  return view({
+    placements: [{ key: "back", label: "Rückseite", mode: "upload", printful_placement: "back", included: true, motifs_hidden: false,
+      layers: [
+        { kind: "motif", preset: "back_large", width_cm: 20, offset_x_cm: 0, offset_y_cm: 0, motif: { key: "ruecken-weiss", by_color: {} } },
+        { kind: "gamertag", preset: "text_center", offset_x_cm: 0, offset_y_cm: 0 },
+      ],
+      files: [
+        { placement: "back", color: "Black", group: "all", state: "ok", detail: "", file: { id: "c1", version: 3, warnings: [] }, background: { id: "bg-black", version: 2 },
+          plan: plan("Black", "dark", "Fassung: dunkel (aus Hintergrund)") },
+        { placement: "back", color: "White", group: "all", state: "missing", detail: "Noch kein Hintergrund - je Farbe die fertige Datei hochladen (nach dem Speichern).", file: null, background: null,
+          plan: { layers: [] } },
+      ] }],
+    extra: {
+      included_placement: "back",
+      labels: { ...LABELS, modes: { layout: "Motiv und Position", upload: "Fertige Druckdatei als Hintergrund" },
+        mode_hints: { layout: "Die Website erzeugt die Druckdatei.", upload: "Für Allover: je Farbe eine fertige Datei als Hintergrund." },
+        surfaces: { garment: "wie Printful-Farbe", light: "hell", dark: "dunkel" }, layer_variants: { auto: "automatisch", light: "hell", dark: "dunkel" } },
+    },
+  });
+}
+
+test("Allover: Hintergrund in der Vorschau, Motive als Ebenen darüber, Fassung und Namensfarbe aus dem Hintergrund (#2141)", async () => {
+  const data = alloverView();
+  apiMock.get.mockResolvedValue({ data });
+  apiMock.put.mockResolvedValue({ data });
+  apiMock.post.mockResolvedValue({ data: { placements: [] } });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-designs"));
+  expect(screen.getByTestId("shop-area-mode-back-upload")).toHaveTextContent("Fertige Druckdatei als Hintergrund");
+  expect(screen.getByTestId("shop-area-mode-hint-back")).toHaveTextContent("Für Allover");
+  expect(screen.queryByTestId("shop-area-save-first-back")).toBeNull();
+  // Der Hintergrund der Vorschau-Farbe liegt in der Druckfläche, das Motiv als Ebene darüber.
+  const backdrop = screen.getByTestId("shop-preview-back-backdrop");
+  expect(backdrop.getAttribute("src")).toBe("/api/admin/shop/products/p1/print-files/bg-black?thumb=1");
+  expect(screen.getByTestId("shop-preview-back-area").firstElementChild).toBe(backdrop);
+  expect(screen.getByTestId("shop-preview-back-layer-0").querySelector("img")).not.toBeNull();
+  expect(screen.getByTestId("shop-area-add-motif-back")).toBeEnabled();
+  expect(screen.getByTestId("shop-layer-back-0-surface")).toHaveTextContent("Fassung: dunkel (aus Hintergrund)");
+  expect(screen.getByTestId("shop-layer-back-1-surface")).toHaveTextContent("Farbe: Vereinsblau");
+  expect(screen.getByTestId("shop-preview-back-layer-1-sample").getAttribute("src")).toContain("ink=vereinsblau");
+  // Weiß hat noch keinen Hintergrund: kein Bild, ein Hinweis.
+  await user.click(screen.getByTestId("shop-preview-color-White"));
+  expect(screen.queryByTestId("shop-preview-back-backdrop")).toBeNull();
+  expect(screen.getByTestId("shop-preview-back-no-backdrop")).toHaveTextContent("noch kein Hintergrund");
+  // Fassung von Hand und „Untergrund gilt als“ gehen mit dem Speichern hinaus.
+  await user.selectOptions(screen.getByTestId("shop-layer-back-0-variant"), "light");
+  await user.selectOptions(screen.getByTestId("shop-layout-surface"), "dark");
+  await user.click(screen.getByTestId("shop-layout-submit"));
+  const [, body] = apiMock.put.mock.calls[0];
+  expect(body.print_surface).toBe("dark");
+  expect(body.placements[0]).toEqual({ key: "back", mode: "upload", layers: [
+    { kind: "motif", preset: "back_large", offset_x_cm: 0, offset_y_cm: 0, width_cm: 20, motif: { key: "ruecken-weiss", by_color: {} }, variant: "light" },
+    { kind: "gamertag", preset: "text_center", offset_x_cm: 0, offset_y_cm: 0 }] });
+});
+
+test("beim Umschalten auf die fertige Datei: erst speichern, dann je Farbe hochladen (#2141)", async () => {
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-designs"));
+  expect(screen.queryByTestId("shop-area-save-first-front")).toBeNull();
+  await user.click(screen.getByTestId("shop-area-mode-front-upload"));
+  expect(screen.getByTestId("shop-area-save-first-front")).toHaveTextContent("Erst speichern, dann je Farbe hochladen.");
+  // Die Motive bleiben sichtbar und liegen auf dem Hintergrund.
+  expect(screen.getByTestId("shop-layer-front-0-motif")).toBeInTheDocument();
+  expect(screen.getByTestId("shop-preview-front-layer-0")).toBeInTheDocument();
+});
+
+test("die Blockiermeldung nennt die Fläche und springt hin (Nachtrag #2141)", async () => {
+  const scrolled = vi.fn();
+  window.Element.prototype.scrollIntoView = scrolled;
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-designs"));
+  await user.click(screen.getByTestId("shop-area-use-back"));
+  const alert = screen.getByTestId("shop-layout-blocked-areas");
+  expect(alert).toHaveTextContent("Jede gewählte Fläche braucht ein Motiv oder einen Platzhalter: „Rückseite“.");
+  expect(screen.getByTestId("shop-area-back")).toHaveAttribute("data-blocked", "true");
+  expect(screen.getByTestId("shop-area-problem-back")).toHaveTextContent("Hier fehlt ein Motiv oder ein Platzhalter");
+  expect(screen.getByTestId("shop-area-front")).not.toHaveAttribute("data-blocked");
+  await user.click(screen.getByTestId("shop-layout-jump-back"));
+  expect(scrolled).toHaveBeenCalledTimes(1);
+  expect(scrolled.mock.instances[0]).toBe(screen.getByTestId("shop-area-back"));
+  expect(screen.getByTestId("shop-area-use-back")).toHaveFocus();
+  // Speichern trotzdem: der Hinweis nennt die Fläche, und die Seite springt hin - gespeichert wird nichts.
+  await user.click(screen.getByTestId("shop-layout-submit"));
+  expect(screen.getByTestId("shop-layout-hint")).toHaveTextContent("„Rückseite“");
+  expect(scrolled).toHaveBeenCalledTimes(2);
+  expect(apiMock.put).not.toHaveBeenCalled();
+  // Eine fertige Datei darf ohne Ebene gespeichert werden.
+  await user.click(screen.getByTestId("shop-area-mode-back-upload"));
+  expect(screen.queryByTestId("shop-layout-blocked-areas")).toBeNull();
+  delete window.Element.prototype.scrollIntoView;
+});
+
 test("Preise: Warnung bei Preisänderung, Übernehmen und eigener Aufschlag nur mit Grund", async () => {
   const warned = view({ variants: [variant("Black / M", "PF1", { cost_cents: 1550, price_warning: { before_cents: 1500, after_cents: 1550, at: "2026-10-27T05:20:00+00:00" } })] });
   apiMock.get.mockResolvedValue({ data: warned });

@@ -70,7 +70,28 @@ const VIEW = {
   limits: { max_variants: 80, max_placements: 12, max_layers: 6, min_width_cm: 1, max_offset_cm: 300 },
 };
 
-async function mockApi(page, seen) {
+// Allover (#2141): die Rückseite als fertige Datei mit Hintergrund (synthetisch dunkel), Rückenmotiv und Gamertag als
+// Ebenen darüber, die Fassung aus dem Hintergrund.
+const SURFACE = { variant: "dark", source: "background", luminance: 0.01, text: "Fassung: dunkel (aus Hintergrund)" };
+const ALLOVER = {
+  ...VIEW,
+  labels: { ...LABELS, modes: { layout: "Motiv und Position", upload: "Fertige Druckdatei als Hintergrund" },
+    mode_hints: { layout: "Die Website erzeugt die Druckdatei.", upload: "Für Allover (etwa ein Trikot): je Farbe eine fertige Datei der ganzen Fläche als Hintergrund." },
+    surfaces: { garment: "wie Printful-Farbe", light: "hell", dark: "dunkel" }, layer_variants: { auto: "automatisch", light: "hell", dark: "dunkel" } },
+  placements: [{ key: "front", label: "Vorderseite", mode: "upload", printful_placement: "front", included: true, surcharge_cents: null, motifs_hidden: false,
+    layers: [
+      { kind: "motif", preset: "chest_right", width_cm: 8.9, offset_x_cm: 0, offset_y_cm: 0, motif: { key: "loewe", by_color: {} } },
+      { kind: "gamertag", preset: "text_opposite", offset_x_cm: 0, offset_y_cm: 0 },
+    ],
+    files: ["Black", "White"].map((color) => ({ placement: "front", color, color_label: color === "Black" ? "Schwarz" : "Weiß", group: "all", state: "ok", detail: "",
+      file: { id: `c-${color}`, version: 3, warnings: [] }, background: { id: `bg-${color}`, version: 2 },
+      plan: { layers: [
+        { index: 0, kind: "motif", source: { design_key: "loewe", variant: "dark", version: 1 }, image_path: "/api/shop/print-files/k1/loewe-v1.png", aspect: 1, surface: SURFACE },
+        { index: 1, kind: "gamertag", surface: SURFACE, ink: { key: "vereinsblau", label: "Vereinsblau", hex: "#29B6E8" } },
+      ] } })) }],
+};
+
+async function mockApi(page, seen, data = VIEW) {
   await page.addInitScript(() => {
     window.localStorage.setItem("tls_cookie_consent_v1", JSON.stringify({ essential: true, external_media: false, analytics: false, meta: false, tiktok: false, saved_at: Date.now(), expires_at: 4102444800000 }));
   });
@@ -87,12 +108,16 @@ async function mockApi(page, seen) {
       seen.push(url.pathname + url.search);
       return png(NAME);
     }
+    if (url.pathname.startsWith("/api/admin/shop/products/p1/print-files/") && url.searchParams.get("thumb")) {
+      seen.push(url.pathname + url.search);
+      return png(DARK);
+    }
     if (url.pathname.startsWith("/api/shop/print-files/")) return png(NAME);
-    if (url.pathname.endsWith("/layout/preview")) return json({ placements: VIEW.placements.map((row) => ({ key: row.key, files: row.files })) });
-    if (request.method() !== "GET") return json(VIEW);
+    if (url.pathname.endsWith("/layout/preview")) return json({ placements: data.placements.map((row) => ({ key: row.key, files: row.files })) });
+    if (request.method() !== "GET") return json(data);
     if (url.pathname === "/api/auth/me") return json(FINANCE);
     if (url.pathname === "/api/settings/public") return json({ club_name: "THE LION SQUAD", domain: "lionsquad.at" });
-    if (url.pathname === "/api/admin/shop/products/p1") return json(VIEW);
+    if (url.pathname === "/api/admin/shop/products/p1") return json(data);
     const list = /notifications|games$|nav$|site-banners|sponsors|partners/.test(url.pathname);
     return json(list ? [] : {});
   });
@@ -139,6 +164,51 @@ for (const [label, width, height] of WIDTHS) {
       const shot = testInfo.outputPath(`schritt3-${label}.png`);
       await page.getByTestId("shop-area-front").screenshot({ path: shot });
       await testInfo.attach(`schritt3-${label}.png`, { path: shot, contentType: "image/png" });
+    });
+
+    test("Allover: Hintergrund unter den Ebenen, Fassung aus dem Hintergrund, Blockiermeldung springt zur Fläche (#2141)", async ({ page }, testInfo) => {
+      const seen = [];
+      await page.setViewportSize({ width, height });
+      await mockApi(page, seen, ALLOVER);
+      await page.goto("/admin/shop/products/p1");
+      await page.getByTestId("shop-step-designs").click();
+      const area = page.getByTestId("shop-preview-front-area");
+      await expect(area).toBeVisible({ timeout: 20000 });
+      await expect(page.getByTestId("shop-area-mode-front-upload")).toHaveText("Fertige Druckdatei als Hintergrund");
+      await expect(page.getByTestId("shop-area-mode-hint-front")).toContainText("Für Allover");
+      // Der Hintergrund der Vorschau-Farbe füllt genau die Druckfläche - darüber Motiv und Gamertag.
+      const backdrop = page.getByTestId("shop-preview-front-backdrop");
+      await expect(backdrop).toHaveAttribute("src", /print-files\/bg-Black\?thumb=1/);
+      await expect.poll(() => backdrop.evaluate((node) => node.complete && node.naturalWidth > 0)).toBe(true);
+      const [areaBox, backBox] = [await area.boundingBox(), await backdrop.boundingBox()];
+      expect(Math.abs(areaBox.x - backBox.x) + Math.abs(areaBox.width - backBox.width)).toBeLessThanOrEqual(1);
+      await expect(page.getByTestId("shop-preview-front-layer-0").locator("img")).toBeVisible();
+      await expect(page.getByTestId("shop-layer-front-0-surface")).toHaveText("Fassung: dunkel (aus Hintergrund)");
+      await expect(page.getByTestId("shop-layer-front-1-surface")).toContainText("Farbe: Vereinsblau");
+      await expect(page.getByTestId("shop-preview-front-layer-1-sample")).toHaveAttribute("src", /ink=vereinsblau/);
+      await page.getByTestId("shop-preview-color-White").click();
+      await expect(backdrop).toHaveAttribute("src", /print-files\/bg-White\?thumb=1/);
+      expect(seen.some((path) => path.includes("bg-White"))).toBe(true);
+      const overflow = await page.evaluate(() => Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - document.documentElement.clientWidth);
+      expect(overflow, "kein seitliches Scrollen der Seite").toBeLessThanOrEqual(1);
+      // Auch innen nichts abgeschnitten: Hochladen, Ebenen-Knöpfe und die Fassung bleiben in der Karte.
+      const card = await page.getByTestId("shop-area-front").boundingBox();
+      for (const id of ["shop-upload-front-Black-submit", "shop-layer-front-0-remove", "shop-layer-front-1-variant"]) {
+        const box = await page.getByTestId(id).boundingBox();
+        expect(box.x + box.width, id).toBeLessThanOrEqual(card.x + card.width + 1);
+      }
+      await expect(page.getByTestId("shop-file-front-Black-background")).toHaveText(/Hintergrund v2/);
+      const shot = testInfo.outputPath(`allover-${label}.png`);
+      await page.getByTestId("shop-area-front").screenshot({ path: shot });
+      await testInfo.attach(`allover-${label}.png`, { path: shot, contentType: "image/png" });
+      // Auf „Motiv und Position“ ohne Ebene: die Meldung nennt die Fläche, der Knopf springt hin.
+      for (let index = 1; index >= 0; index -= 1) await page.getByTestId(`shop-layer-front-${index}-remove`).click();
+      await page.getByTestId("shop-area-mode-front-layout").click();
+      await expect(page.getByTestId("shop-layout-blocked-areas")).toContainText("„Vorderseite“");
+      await page.getByTestId("shop-step-designs").scrollIntoViewIfNeeded();
+      await page.getByTestId("shop-layout-jump-front").click();
+      await expect(page.getByTestId("shop-area-use-front")).toBeFocused();
+      await expect(page.getByTestId("shop-area-front")).toBeInViewport();
     });
   });
 }
