@@ -122,7 +122,9 @@ async def test_the_team_page_shows_its_co_teams_staffel_once(flow):
     _admin, _season, staffel, teams = await setup(flow)
     flow.act_as(None)
     overview = (await flow.get(f"/api/teams/{teams[0]}/overview")).json()
-    assert [row["tournament"]["id"] for row in overview["upcoming"]] == []  # nur im Abschnitt „Liga“
+    # „upcoming“ behält die Staffel für die App (gekennzeichnet), das Web blendet sie über in_league_section aus.
+    assert [(row["tournament"]["id"], row.get("in_league_section")) for row in overview["upcoming"]] == [
+        (staffel["id"], True)]
     entry = overview["league"][0]
     assert entry["staffel_label"] == "Liga 1 · Staffel A"
     assert entry["display_name"] == "Probe 1 · Probe 1 B" and entry["squad_name"] == "Probe 1 B"

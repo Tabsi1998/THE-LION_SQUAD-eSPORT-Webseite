@@ -25,3 +25,14 @@ test("ohne Liga kein Abschnitt", () => {
   const { container } = render(<MemoryRouter><TeamLeague overview={{ league: [] }} /></MemoryRouter>);
   expect(container).toBeEmptyDOMElement();
 });
+
+test("„Angemeldet für“ blendet aus, was schon im Abschnitt „Liga“ steht", async () => {
+  const { TeamSchedule } = await import("./TeamSchedule");
+  const overview = { recent: [], upcoming: [
+    { registration_id: "r1", in_league_section: true, status_label: "Angemeldet", tournament: { id: "t1", title: "Staffel A" } },
+    { registration_id: "r2", status_label: "Angemeldet", tournament: { id: "t2", title: "Herbst-Cup" } },
+  ] };
+  render(<MemoryRouter><TeamSchedule overview={overview} /></MemoryRouter>);
+  expect(screen.queryByTestId("team-upcoming-r1")).toBeNull();
+  expect(screen.getByTestId("team-upcoming-r2")).toHaveTextContent("Herbst-Cup");
+});

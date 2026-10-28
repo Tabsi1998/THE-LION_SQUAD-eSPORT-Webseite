@@ -180,13 +180,12 @@ async def team_overview(db, team: dict, viewer: dict | None, *, insider: bool, r
     events = await _event_names(db, (row.get("event_id") for row in visible.values()))
 
     league = await _league_entries(db, registrations, visible, viewer)
+    in_league = {row["registration_id"] for row in league}
     upcoming = []
     for reg in registrations:
         tournament = visible.get(reg.get("tournament_id"))
         if not tournament or tournament.get("status") in CLOSED_TOURNAMENT_STATUSES:
             continue
-        if is_league_staffel(tournament):
-            continue  # Liga-Staffeln stehen im Abschnitt „Liga“ - jede Info nur an einer Stelle
         if reg.get("status") not in ACTIVE_REGISTRATION_STATUSES:
             continue
         upcoming.append({
@@ -194,6 +193,9 @@ async def team_overview(db, team: dict, viewer: dict | None, *, insider: bool, r
             "status": reg.get("status"),
             "status_label": REGISTRATION_LABELS.get(reg.get("status"), "Angemeldet"),
             "tournament": _tournament_card(tournament, games, events),
+            # Liga (P5): die App ohne neuen Build zeigt die Staffel weiter hier (gekennzeichnet); das Web blendet aus,
+            # was schon im Abschnitt „Liga“ steht.
+            **({"in_league_section": True} if reg.get("id") in in_league else {}),
         })
     upcoming.sort(key=lambda row: (_parse_dt(row["tournament"].get("start_date")) or datetime.max.replace(tzinfo=timezone.utc)))
 
