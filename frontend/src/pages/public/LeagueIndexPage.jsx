@@ -33,7 +33,7 @@ export default function LeagueIndexPage() {
   return (
     <PublicLayout>
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "Liga" }]} className="mb-3" />
+        <Breadcrumbs items={[{ label: "Start", to: "/" }, { label: "Liga" }]} className="mb-3" />
         <h1 className="font-heading text-4xl md:text-6xl font-black uppercase">Liga</h1>
         <p className="mt-3 max-w-2xl text-white/65">Wochen statt Turniertag: Jede Woche ein Spieltag, Termin unter den Teams ausgemacht, Tabelle nach jeder Runde.</p>
         {leagues === null ? <div className="tls-league-skeleton mt-10" aria-busy="true" aria-label="Lade Ligen" /> : null}

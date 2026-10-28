@@ -52,11 +52,11 @@ export function TextField({ label, value, onChange, type = "text", required, pla
   );
 }
 
-export function TextAreaField({ label, value, onChange, rows = 3, required, placeholder, testId, hint, className = "" }) {
+export function TextAreaField({ label, value, onChange, rows = 3, required, placeholder, testId, hint, disabled, className = "" }) {
   return (
     <label className={`block min-w-0 ${className}`}>
       <div className={LABEL_CLASS}>{label}{required && <RequiredMark />}</div>
-      <textarea rows={rows} value={value ?? ""} onChange={(e) => onChange(e.target.value)} required={required} placeholder={placeholder} data-testid={testId} className={`${INPUT_CLASS} text-sm`} />
+      <textarea rows={rows} value={value ?? ""} onChange={(e) => onChange(e.target.value)} required={required} placeholder={placeholder} disabled={disabled} data-testid={testId} className={`${INPUT_CLASS} text-sm`} />
       {hint && <div className="mt-1 text-xs text-white/45">{hint}</div>}
     </label>
   );

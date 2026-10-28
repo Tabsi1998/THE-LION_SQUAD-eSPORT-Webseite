@@ -80,13 +80,18 @@ async def hunt_page(response: Response, viewer: dict | None = Depends(get_option
 
 @router.get("/admin/{year}")
 async def admin_year(year: int, response: Response, me: dict = Depends(require_editor)):
+    from services.permissions import can_use_area
+
     _private(response)
-    return await easter.admin_view(get_db(), year)
+    # Auswerten nur mit dem Recht dazu (#2122 NW11) - dieselbe Prüfung wie require_drawer.
+    return await easter.admin_view(get_db(), year, may_draw=await can_use_area(me, "club"))
 
 
 @router.put("/admin/{year}")
 async def admin_save_year(year: int, payload: HuntPayload, me: dict = Depends(require_editor)):
-    return await easter.save_hunt(get_db(), year, payload.model_dump(exclude_none=True), me)
+    from services.permissions import can_use_area
+
+    return await easter.save_hunt(get_db(), year, payload.model_dump(exclude_none=True), me, may_draw=await can_use_area(me, "club"))
 
 
 @router.post("/admin/{year}/preview")
@@ -99,7 +104,9 @@ async def admin_preview(year: int, me: dict = Depends(require_editor)):
 
 @router.put("/admin/{year}/eggs")
 async def admin_save_eggs(year: int, payload: EggsPayload, me: dict = Depends(require_editor)):
-    return await easter.save_eggs(get_db(), year, payload.eggs, me)
+    from services.permissions import can_use_area
+
+    return await easter.save_eggs(get_db(), year, payload.eggs, me, may_draw=await can_use_area(me, "club"))
 
 
 @router.post("/admin/{year}/propose")

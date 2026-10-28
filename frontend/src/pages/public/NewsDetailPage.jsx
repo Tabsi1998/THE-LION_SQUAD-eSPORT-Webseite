@@ -18,7 +18,7 @@ import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { seoTextPreview } from "@/lib/textPreview";
 import { Pin, ArrowLeft, ArrowRight, Calendar, Trophy, Users, Flag, Clock, Link2, Share2, MessageCircle, Newspaper, User } from "lucide-react";
-import { asInstant, viennaDate } from "@/lib/vienna";
+import { asInstant, viennaDate, viennaDateTime } from "@/lib/vienna";
 
 // News-Detail (Rückmeldung des Betreibers, 24.09.: „sieht am PC aus wie am Handy, nichts ist
 // ausgenutzt“): am PC und Tablet ein breites Raster - links der Artikel in Lesebreite mit großem
@@ -83,6 +83,32 @@ function formatDate(value, style = "long") {
   return Number.isNaN(date.getTime()) ? "" : viennaDate(date, { dateStyle: style });
 }
 
+// Vorschau für das Admin-Team (#2122 NW2): ein Beitrag, den Besucher nicht sehen, trägt ein deutliches Band - sonst
+// hält man einen Entwurf leicht für veröffentlicht.
+export function previewText(preview) {
+  if (!preview) return "";
+  if (preview.state === "withdrawn") {
+    const since = preview.since ? ` am ${formatDate(preview.since, "medium")}` : "";
+    return `Zurückgezogen${since}. Besucher sehen statt des Beitrags nur einen Hinweis.`;
+  }
+  if (preview.state === "scheduled") {
+    const when = asInstant(preview.published_at || 0);
+    const at = Number.isNaN(when.getTime()) ? "" : ` am ${viennaDateTime(when, { dateStyle: "medium", timeStyle: "short" })}`;
+    return `Geplant – erscheint${at} von selbst. Bis dahin sieht nur das Admin-Team diese Vorschau.`;
+  }
+  return "Entwurf – nur das Admin-Team sieht diese Vorschau.";
+}
+
+function PreviewBand({ preview, postId }) {
+  return (
+    <div role="status" data-testid="news-preview-band" data-state={preview.state} className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-sm border border-warn/50 bg-warn/10 px-4 py-3 text-sm">
+      <span className="font-heading font-black uppercase tracking-wider text-warn">Noch nicht öffentlich</span>
+      <span className="min-w-0 flex-1 text-white/80">{previewText(preview)}</span>
+      {postId && <Link to={`/admin/news/${encodeURIComponent(postId)}`} className="text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:underline">Im Editor öffnen</Link>}
+    </div>
+  );
+}
+
 export default function NewsDetailPage() {
   const { slug } = useParams();
   const [post, setPost] = useState(null);
@@ -105,7 +131,10 @@ export default function NewsDetailPage() {
       // Gelesen-Marker (#616): nur mit Anmeldung, nur die Zahl - still im Hintergrund.
       if (user?.id) api.post(`/news/${slug}/read`, null, { skipInvalidation: true }).catch(() => {});
     }).catch((e) => {
-      setError(e.response?.status === 403 ? "Dieser Beitrag ist nicht öffentlich." : "Nicht gefunden.");
+      const status = e.response?.status;
+      // Zurückgezogen (#2122 NW3): ein Link aus Newsletter oder Discord bekommt einen freundlichen Hinweis.
+      if (status === 410) setError({ title: "Beitrag zurückgezogen", text: typeof e.response?.data?.detail === "string" ? e.response.data.detail : "Dieser Beitrag wurde zurückgezogen." });
+      else setError({ title: status === 403 ? "Dieser Beitrag ist nicht öffentlich." : "Nicht gefunden." });
     });
     api.get("/news?limit=6").then(({ data }) => setMore(Array.isArray(data) ? data : data?.items || [])).catch(() => setMore([]));
   }, [slug, user?.id]);
@@ -118,9 +147,10 @@ export default function NewsDetailPage() {
 
   if (error) return (
     <PublicLayout>
-      <div className="max-w-2xl mx-auto px-6 py-20 text-center">
-        <h1 className="font-heading text-3xl font-black">{error}</h1>
-        <Link to="/news" className="mt-6 inline-flex items-center gap-2 text-[#29B6E8]"><ArrowLeft className="w-4 h-4" /> Zurück zu News</Link>
+      <div className="max-w-2xl mx-auto px-6 py-20 text-center" data-testid="news-error">
+        <h1 className="font-heading text-3xl font-black">{error.title}</h1>
+        {error.text && <p className="mt-3 text-white/65">{error.text}</p>}
+        <Link to="/news" className="mt-6 inline-flex items-center gap-2 text-[#29B6E8]"><ArrowLeft className="w-4 h-4" /> {error.text ? "Zu den aktuellen News" : "Zurück zu News"}</Link>
       </div>
     </PublicLayout>
   );
@@ -160,7 +190,8 @@ export default function NewsDetailPage() {
   return (
     <PublicLayout>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
-        <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "News", to: "/news" }, { label: post.title }]} className="mb-4" />
+        {post.preview && <PreviewBand preview={post.preview} postId={post.id} />}
+        <Breadcrumbs items={[{ label: "Start", to: "/" }, { label: "News", to: "/news" }, { label: post.title }]} className="mb-4" />
         <Link to="/news" data-testid="news-back" className="inline-flex items-center gap-2 text-xs uppercase tracking-wider text-white/50 hover:text-[#29B6E8]">
           <ArrowLeft className="w-3.5 h-3.5" /> Alle News
         </Link>

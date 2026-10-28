@@ -67,7 +67,9 @@ nicht** – es bleibt bei 30 Minuten nach dem Ergebnis (nach der 48-Stunden-Rege
 
 Staffeln zählen nicht für Jahreswertung, Turnier-Pokale, Löwen-Rang-XP für Teilnahme und Podest und die Team-Stufe;
 gespielte und gewonnene Spiele zählen weiter. Startseite, öffentlicher Kalender und Turnierliste zeigen sie nicht –
-dafür gibt es die Ligaseite und den Menüpunkt **Liga**.
+dafür gibt es die Ligaseite, den Menüpunkt **Liga** und die Kachel **Liga** auf der eSports-Übersicht (`/esports`, mit
+„Start am …“ oder „Läuft“). Menüpunkt und Kachel erscheinen nur, solange eine Season sichtbar ist. Name, Stelle und
+Ausblenden des Menüpunkts stellt die Redaktion unter **Admin → Content → Navigation** ein.
 
 ---
 

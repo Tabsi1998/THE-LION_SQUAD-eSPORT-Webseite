@@ -127,7 +127,8 @@ async def fill_contract(flow, user: dict) -> None:
                                           "message": "bleibt", "status": "new"})
     await db.mail_jobs.insert_one({"id": "mail-paula", "to": user["email"], "subject": "Erinnerung", "html": "<p>Hallo Paula P.</p>", "status": "failed"})
     await db.mail_jobs.insert_one({"id": "mail-gast", "to": "gast@example.test", "subject": "Erinnerung", "html": "<p>Hallo</p>", "status": "pending"})
-    await db.news_posts.insert_one({"id": "news-1", "title": "Saisonstart", "author_id": uid, "author_name": "Paula P.", "published": True})
+    await db.news_posts.insert_one({"id": "news-1", "title": "Saisonstart", "author_id": uid, "author_name": "Paula P.", "published": True,
+                                   "updated_by": uid, "updated_by_name": "Paula P.", "withdrawn_by": uid, "withdrawn_by_name": "Paula P."})
     await db.achievement_events.insert_one({"id": "erfolg-fuer", "kind": "grant", "user_id": uid, "username": "paula", "user_name": "Paula P.",
                                             "actor_id": "vorstand", "actor_name": "Vera V.", "tier_code": "helfer-1", "note": "danke"})
     await db.achievement_events.insert_one({"id": "erfolg-von", "kind": "grant", "user_id": "anderer", "username": "otto", "user_name": "Otto O.",
@@ -304,7 +305,8 @@ async def test_the_export_names_everything_and_deleting_leaves_no_personal_copy(
         assert _aware(row["erase_after"]) == erased_at.replace(year=erased_at.year + 3), name
     assert "erase_after" not in await db.contact_messages.find_one({"id": "kontakt-mail"}), "nicht zugeordnet, also ohne Frist"
     # Gespeicherte Namen: im News-Beitrag, im Protokoll der Erfolge und in den Daten des Adminprotokolls.
-    assert (await db.news_posts.find_one({"id": "news-1"}))["author_name"] == "Gelöschter User"
+    post = await db.news_posts.find_one({"id": "news-1"})
+    assert (post["author_name"], post["updated_by_name"], post["withdrawn_by_name"]) == ("Gelöschter User",) * 3
     granted, granted_by = await db.achievement_events.find_one({"id": "erfolg-fuer"}), await db.achievement_events.find_one({"id": "erfolg-von"})
     assert (granted["username"], granted["user_name"], granted["actor_name"]) == (None, "Gelöschter User", "Vera V.")
     assert (granted_by["actor_name"], granted_by["user_name"]) == ("Gelöschter User", "Otto O.")

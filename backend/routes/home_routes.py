@@ -20,6 +20,7 @@ from models import now_utc
 from services import founding
 from services.visibility import user_can_see
 from services.news_cards import attach_result_winners
+from services.news_publish import public_news
 from services import event_days
 from services.league_scope import NOT_LEAGUE
 from services.public_phase import derive_public_phase
@@ -288,7 +289,8 @@ async def home_state(user: dict | None = Depends(get_optional_user)):
         if published_at and published_at > now:
             continue
         if await user_can_see(user, n.get("visibility")):
-            visible_news.append(n)
+            # Ohne die internen Felder der Redaktion (#2122): wer geändert hat, Versandstand.
+            visible_news.append(public_news(n))
     visible_news.sort(
         key=lambda n: (_parse_dt(n.get("published_at") or n.get("created_at")) or datetime.min.replace(tzinfo=timezone.utc), bool(n.get("pinned"))),
         reverse=True,
@@ -309,7 +311,8 @@ async def home_state(user: dict | None = Depends(get_optional_user)):
     }
     # Der Verein in Zahlen (#407, #425): dieselben Zähler wie auf „Über den Verein“ (#406).
     club_numbers = await _club_numbers(db)
-    club_numbers_shown = (await _about_texts(db)).get("numbers_shown") or list(ABOUT_DEFAULTS["numbers_shown"])
+    about_texts = await _about_texts(db)
+    club_numbers_shown = about_texts.get("numbers_shown") or list(ABOUT_DEFAULTS["numbers_shown"])
 
     await _attach_live_counts(db, live, today, soon, upcoming)
     has_live = any(len(v) > 0 for v in live.values())
@@ -325,6 +328,7 @@ async def home_state(user: dict | None = Depends(get_optional_user)):
         "stats": stats,
         "club_numbers": club_numbers,
         "club_numbers_shown": club_numbers_shown,
+        "home_hero": {"title": about_texts["home_title"], "highlight": about_texts["home_highlight"], "text": about_texts["home_text"]},
     }
 
 
@@ -339,7 +343,11 @@ ABOUT_SETTINGS_ID = "about_page"
 ABOUT_TEXT_FIELDS = (
     "hero_eyebrow", "hero_title", "hero_text", "values_title", "values_text", "games_title", "games_text",
     "offline_title", "offline_text", "cta_title", "cta_text", "purpose",
+    "home_title", "home_highlight", "home_text",
 )
+# Kopf der Startseite (#2122 NW9): zwei Zeilen Überschrift (die zweite leuchtet) und der Satz darunter - gepflegt unter
+# Admin → Verein → Über uns. Leer heißt Vorgabe.
+HOME_HERO_KEYS = ("home_title", "home_highlight", "home_text")
 # Über uns erzählt die Geschichte (#1253): eigener Kopf statt des Startseiten-Satzes („Ein Rudel. Eine Familie.“ - ein so
 # gespeicherter Titel gilt als nicht gesetzt), ein Zeitstrahl, das Vereinsfoto und die Werte mit Satz und Beispiel samt den
 # Zielen von der früheren Seite „Werte & Ziele“ (/values leitet auf /about#werte weiter). Ein leerer Titel heißt: die Seite
@@ -390,6 +398,11 @@ ABOUT_DEFAULTS = {
     "timeline": [],
     # Das Vereinsfoto (#1253, #1327): eines für Über uns, später auch Anmelden und Startseite - mit Fokuspunkt in Prozent.
     "club_photo": None,
+    # Kopf der Startseite (#2122 NW9).
+    "home_title": "Ein Rudel.",
+    "home_highlight": "Eine Familie.",
+    "home_text": "Gaming- und eSports-Verein aus Tirol. Bei uns geht es um Gemeinschaft: gemeinsam zocken, Turniere spielen, "
+                 "Events erleben — auf Discord und vor Ort. Wer mitspielt und sich einbringt, gehört dazu.",
 }
 # Zähler, die der Betreiber zeigen kann. „achievements“ (vergebene Erfolge) bleibt im JSON, ist aber keine Wahl mehr (#621).
 NUMBER_KEYS = ("prizes", "tournaments_completed", "members", "years_active", "tournaments", "events", "participations")
@@ -443,6 +456,9 @@ class AboutTexts(BaseModel):
     values: Optional[List[ValueEntry]] = None
     goals: Optional[List[str]] = None
     club_photo: Optional[ClubPhoto] = None
+    home_title: Optional[str] = Field(None, max_length=60)
+    home_highlight: Optional[str] = Field(None, max_length=60)
+    home_text: Optional[str] = Field(None, max_length=400)
 
 
 def _clean_number_keys(values) -> list[str]:
@@ -678,7 +694,7 @@ async def about_page():
     now = datetime.now(timezone.utc)
     texts = await _about_texts(db)
     return {
-        "texts": {key: texts[key] for key in texts if key not in ("founded_year", "founded_on", "purpose", "nonprofit", "numbers_shown")},
+        "texts": {key: texts[key] for key in texts if key not in ("founded_year", "founded_on", "purpose", "nonprofit", "numbers_shown", *HOME_HERO_KEYS)},
         "organization": await _about_organization(db),
         "numbers": await _club_numbers(db),
         "numbers_shown": texts.get("numbers_shown") or list(ABOUT_DEFAULTS["numbers_shown"]),

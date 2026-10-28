@@ -100,7 +100,7 @@ export default function ContactPage() {
   return (
     <PublicLayout>
       <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "Kontakt" }]} className="mb-6" />
+        <Breadcrumbs items={[{ label: "Start", to: "/" }, { label: "Kontakt" }]} className="mb-6" />
         <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Kontakt</span>
         <h1 className="mt-2 font-heading text-4xl md:text-5xl font-black uppercase">Sag Hallo</h1>
         <p className="mt-4 text-white/70 max-w-2xl">

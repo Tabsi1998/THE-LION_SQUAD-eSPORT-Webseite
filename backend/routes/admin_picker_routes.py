@@ -32,6 +32,8 @@ PURPOSES = {
     "reference_series": "Captains externer Serien",
     # Korrekturen der Jahreswertung (#2123, ER10): Bonus oder Abzug für eine Person.
     "season": "Korrekturen der Jahreswertung",
+    # Autor eines News-Beitrags (#2122 NW3): wer News pflegt, darf den Autor ändern.
+    "news_author": "Autor eines News-Beitrags",
 }
 MISSING_RIGHT = "Dafür fehlt dir das Recht: {what}."
 
@@ -66,6 +68,8 @@ async def _allowed(purpose: str, me: dict, context_id: str | None) -> bool:
     if purpose == "season":
         # Wie die Jahreswertung selbst (require_admin): Bereich Turnierleitung mit Zwei-Faktor.
         return await user_has_area(me, "tournaments") and not needs_mfa(me)
+    if purpose == "news_author":
+        return await user_has_area(me, "content") and not needs_mfa(me)
     return False
 
 
@@ -170,6 +174,28 @@ async def _board_hits(db, q: str) -> list[dict]:
     return hits[:MAX_HITS]
 
 
+async def news_author_allowed(db, user: dict | None) -> bool:
+    """Autor eines News-Beitrags (#2122): ein aktives, nicht gesperrtes Konto, das News pflegen darf (Bereich Redaktion -
+    über Rolle, Freigabe oder Vorstandsposten). Dieselbe Regel für die Suche und fürs Speichern."""
+    from services.permissions import user_has_area
+
+    if not user or user.get("is_active") is False or user.get("is_banned"):
+        return False
+    return await user_has_area(user, "content", db=db)
+
+
+async def _news_author_hits(db, q: str) -> list[dict]:
+    query = {"is_active": {"$ne": False}, "is_banned": {"$ne": True}, **_name_filter(q)}
+    from services.private_fields import private_projection
+
+    users = await db.users.find(query, private_projection()).sort("display_name", 1).limit(MAX_HITS * 3).to_list(MAX_HITS * 3)
+    hits = []
+    for user in users:
+        if await news_author_allowed(db, user):
+            hits.append({"id": user["id"], "name": _name(user), "avatar_url": user.get("avatar_url"), "context": "Redaktion"})
+    return hits[:MAX_HITS]
+
+
 async def _invite_hits(db, q: str) -> list[dict]:
     """Einladungen (#1356): Konten ohne aktive Mitgliedschaft; wer schon eingeladen ist, steht mit dem Datum da."""
     member_ids = await db.memberships.distinct("user_id", {"member_status": {"$in": list(ACTIVE_MEMBER_STATUSES)}})
@@ -216,6 +242,8 @@ async def search_people(
         return await _invite_hits(db, needle)
     if purpose == "reference_series":
         return await _member_account_hits(db, needle)
+    if purpose == "news_author":
+        return await _news_author_hits(db, needle)
     return await _account_hits(db, needle)
 
 

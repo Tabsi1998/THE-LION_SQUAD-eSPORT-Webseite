@@ -24,12 +24,12 @@ test("leagueTrail findet Liga und Season nur, wenn die Person die Season sieht",
 test("leagueCrumbs: Liga · Season · Staffel, darunter das Spiel; ohne Season kein toter Link", () => {
   const trail = leagueTrail(LEAGUES, STAFFEL);
   expect(leagueCrumbs(STAFFEL, trail).map((item) => [item.label, item.to])).toEqual([
-    ["Home", "/"], ["Liga", "/liga"], ["Probe-Liga Season 1", "/liga/probe-liga/season-1"], ["Staffel A", undefined],
+    ["Start", "/"], ["Liga", "/liga"], ["Probe-Liga Season 1", "/liga/probe-liga/season-1"], ["Staffel A", undefined],
   ]);
   const match = leagueCrumbs(STAFFEL, trail, { tournamentUrl: "/tournaments/liga-a", current: { label: "Match L1" } });
   expect(match.map((item) => item.to)).toEqual(["/", "/liga", "/liga/probe-liga/season-1", "/tournaments/liga-a", undefined]);
   expect(leagueCrumbs(STAFFEL, null, { tournamentUrl: "/tournaments/liga-a", current: { label: "Match L1" } })
-    .map((item) => [item.label, item.to])).toEqual([["Home", "/"], ["Liga", undefined], ["Staffel A", "/tournaments/liga-a"], ["Match L1", undefined]]);
+    .map((item) => [item.label, item.to])).toEqual([["Start", "/"], ["Liga", undefined], ["Staffel A", "/tournaments/liga-a"], ["Match L1", undefined]]);
   expect(leagueCrumbs({ id: "cup" }, null)).toBeNull();
   expect(staffelLabel({ league_context: {} })).toBe("Staffel");
 });
@@ -44,12 +44,12 @@ test("tournamentTabs: der Reiter „Liga“ nur mit sichtbarer Season", () => {
 test("tournamentCrumbs (#2124): eine Kette für alle Turnierseiten - mit eSports, bei Staffeln der Liga-Weg", () => {
   const cup = { id: "t9", slug: "cup", title: "Herbst-Cup" };
   expect(tournamentCrumbs(cup, null).map((item) => [item.label, item.to])).toEqual([
-    ["Home", "/"], ["eSports", "/esports"], ["Turniere", "/tournaments"], ["Herbst-Cup", undefined],
+    ["Start", "/"], ["eSports", "/esports"], ["Turniere", "/tournaments"], ["Herbst-Cup", undefined],
   ]);
   expect(tournamentCrumbs(cup, null, { tournamentUrl: "/tournaments/cup", current: { label: "Spielplan" } }).map((item) => [item.label, item.to])).toEqual([
-    ["Home", "/"], ["eSports", "/esports"], ["Turniere", "/tournaments"], ["Herbst-Cup", "/tournaments/cup"], ["Spielplan", undefined],
+    ["Start", "/"], ["eSports", "/esports"], ["Turniere", "/tournaments"], ["Herbst-Cup", "/tournaments/cup"], ["Spielplan", undefined],
   ]);
   const trail = leagueTrail(LEAGUES, STAFFEL);
   expect(tournamentCrumbs(STAFFEL, trail, { tournamentUrl: "/tournaments/liga-a", current: { label: "Rangliste" } }).map((item) => item.label))
-    .toEqual(["Home", "Liga", "Probe-Liga Season 1", "Staffel A", "Rangliste"]);
+    .toEqual(["Start", "Liga", "Probe-Liga Season 1", "Staffel A", "Rangliste"]);
 });

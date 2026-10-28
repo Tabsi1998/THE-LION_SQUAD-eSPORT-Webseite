@@ -439,7 +439,7 @@ export default function AdminMediaPage() {
         <details className="mt-4 border border-white/10 bg-[#121212] rounded-sm p-4 group" data-testid="media-quality-checklist">
           <summary className="cursor-pointer list-none flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
             <div>
-              <div className="text-[11px] font-bold uppercase tracking-[0.25em] text-[#29B6E8]">Medien-Qualitaetscheck</div>
+              <div className="text-[11px] font-bold uppercase tracking-[0.25em] text-[#29B6E8]">Medien-Qualitätscheck</div>
               <p className="mt-1 max-w-3xl text-xs text-white/50">
                 Zeigt technische Medienprobleme sofort sichtbar. Alt-Texte werden am Einsatzort gepflegt, weil ein Bild je nach News, Event, Galerie oder Sponsor unterschiedliche Bedeutung haben kann.
               </p>

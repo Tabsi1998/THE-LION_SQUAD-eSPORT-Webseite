@@ -1244,6 +1244,26 @@ async def newsletter_state(kind: Literal["news", "event"], id: str = Query(..., 
     return await _newsletter_box(item, kind, rights)
 
 
+NEWSLETTER_AUDIENCES = {"public", "community", "members", "internal"}
+
+
+@settings_router.get("/newsletter/audience")
+async def newsletter_audience(kind: Literal["news", "event"], visibility: str = Query("public", max_length=20),
+                              me: dict = Depends(get_current_user)):
+    """Wie viele den Newsletter bei dieser Sichtbarkeit bekämen (#2122 NW1) - für die Rückfrage vor dem Veröffentlichen,
+    auch bevor der Beitrag gespeichert ist. Nur die Zahl, nie Namen oder Adressen."""
+    from services.notification_preferences import newsletter_recipients
+
+    await _require_newsletter_send(me, kind)
+    audience = visibility if visibility in NEWSLETTER_AUDIENCES else "public"
+    internal = audience == "internal"
+    return {
+        "kind": kind, "visibility": audience, "internal": internal,
+        "recipients": 0 if internal else len(await newsletter_recipients(audience)),
+        "announcement": NEWSLETTER_ANNOUNCEMENTS.get(audience, NEWSLETTER_NO_ANNOUNCEMENT),
+    }
+
+
 @settings_router.post("/newsletter/preview")
 async def newsletter_preview(body: NewsletterTriggerBody, me: dict = Depends(get_current_user)):
     """Stand des Kastens und die Mail, wie sie hinausginge (#2119 ML5) - Anrede mit dem eigenen Namen, nichts wird

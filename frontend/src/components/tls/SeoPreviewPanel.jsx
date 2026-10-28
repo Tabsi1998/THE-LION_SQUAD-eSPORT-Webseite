@@ -68,14 +68,16 @@ export function SeoPreviewPanel({ path, fallback = {}, className = "" }) {
   const robots = text(meta.robots, fallback.published === false ? "noindex, follow" : "index, follow");
   const image = resolveMediaUrl(meta.image || meta.banner_url || fallback.image);
   const urlLabel = canonical || absoluteUrl(path) || "https://lionsquad.at";
-  const statusLabel = loading ? "Lade echte Meta-Daten" : source === "live" ? "Live + Formular" : "Lokale Vorschau";
+  const statusLabel = loading ? "Lade die echte Seite" : source === "live" ? "Echte Seite + Formular" : "Aus dem Formular";
+  // Alltagssprache statt Fachbegriffen (#2122 NW5): ob Suchmaschinen den Beitrag finden dürfen.
+  const robotsLabel = /noindex/i.test(robots) ? "finden ihn nicht" : "dürfen ihn finden";
 
   return (
     <section className={`border border-white/10 bg-[#0A0A0A] rounded-sm p-4 space-y-4 ${className}`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">SEO-Vorschau</div>
-          <div className="mt-1 text-xs text-white/45">Google, Teilen-Karte, Canonical und Index-Status.</div>
+          <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">So erscheint der Beitrag</div>
+          <div className="mt-1 text-xs text-white/45">Bei Google und beim Teilen – mit Link und ob Suchmaschinen ihn finden dürfen.</div>
         </div>
         <span className="rounded-sm border border-white/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-white/45">
           {statusLabel}
@@ -106,7 +108,7 @@ export function SeoPreviewPanel({ path, fallback = {}, className = "" }) {
           <div className="space-y-1 p-3">
             <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-white/35">
               <Share2 className="h-3 w-3 text-[#29B6E8]" />
-              Social Preview
+              Beim Teilen
             </div>
             <div className="line-clamp-2 text-sm font-bold text-white">{title}</div>
             <p className="line-clamp-2 text-xs leading-relaxed text-white/50">{description}</p>
@@ -117,10 +119,10 @@ export function SeoPreviewPanel({ path, fallback = {}, className = "" }) {
       <div className="grid gap-2 text-xs text-white/50 sm:grid-cols-2">
         <div className="flex min-w-0 items-center gap-2 rounded-sm border border-white/10 bg-[#121212] px-3 py-2">
           <Link2 className="h-3.5 w-3.5 shrink-0 text-[#29B6E8]" />
-          <span className="truncate">{canonical || "Canonical wird nach dem Speichern gesetzt."}</span>
+          <span className="truncate">{canonical || "Der Link steht nach dem ersten Speichern fest."}</span>
         </div>
         <div className="rounded-sm border border-white/10 bg-[#121212] px-3 py-2">
-          <span className="text-white/35">Robots:</span> <span className="font-bold text-white/70">{robots}</span>
+          <span className="text-white/35">Suchmaschinen:</span> <span className="font-bold text-white/70" data-testid="seo-preview-robots">{robotsLabel}</span>
         </div>
       </div>
     </section>

@@ -107,7 +107,7 @@ export default function PartnerDetailPage() {
   return (
     <PublicLayout>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-16" data-testid="partner-page">
-        <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "Partner", to: "/partners" }, { label: partner.name }]} className="mb-6" />
+        <Breadcrumbs items={[{ label: "Start", to: "/" }, { label: "Partner", to: "/partners" }, { label: partner.name }]} className="mb-6" />
 
         <header className="grid gap-0 lg:grid-cols-[18rem_minmax(0,1fr)] border border-white/10 rounded-sm bg-[#101010] overflow-hidden" data-testid="partner-hero">
           <div className="min-h-48 lg:min-h-full bg-[#070707] flex items-center justify-center p-8 border-b lg:border-b-0 lg:border-r border-white/10">

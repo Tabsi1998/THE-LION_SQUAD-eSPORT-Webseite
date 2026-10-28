@@ -80,7 +80,7 @@ export default function ReferenceRoundPage() {
   return (
     <PublicLayout>
       <article className="tls-round max-w-[1160px] mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-16 flex flex-col gap-6" data-testid="round-page">
-        <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "Referenzen", to: "/references" }, { label: title || "Serie", to: seriesPath }, { label: roundName || "Runde" }]} />
+        <Breadcrumbs items={[{ label: "Start", to: "/" }, { label: "Referenzen", to: "/references" }, { label: title || "Serie", to: seriesPath }, { label: roundName || "Runde" }]} />
         {!current ? <SkeletonLines lines={6} /> : (
           <>
             <RoundHead page={current} lineageSlug={lineageSlug} seasonSlug={seasonSlug} />

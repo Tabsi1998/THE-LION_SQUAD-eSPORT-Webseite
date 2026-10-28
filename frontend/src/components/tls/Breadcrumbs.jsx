@@ -2,7 +2,7 @@
  * Phase D — Breadcrumbs.
  *
  * Usage:
- *   <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "eSports", to: "/tournaments" }, { label: t.title }]} />
+ *   <Breadcrumbs items={[{ label: "Start", to: "/" }, { label: "eSports", to: "/tournaments" }, { label: t.title }]} />
  *
  * Last item is rendered as text (current page).
  */
