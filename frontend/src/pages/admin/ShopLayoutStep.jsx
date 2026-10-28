@@ -1094,7 +1094,9 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
               {/* Die Bedienung sichtbar (#2117) - nicht nur im aria-label. */}
               <p className="text-xs text-white/50 flex items-start gap-1" data-testid={`shop-preview-${available.key}-help`}>
                 <Move className="w-3 h-3 mt-0.5 shrink-0" aria-hidden="true" />
-                <span>Ziehen rastet ein (Alt oder Strg = frei), Pfeiltasten 0,1 cm, Umschalt 1 cm. Genau geht es mit den Zahlen bei jeder Ebene.</span>
+                {/* Am Handy gibt es weder Alt noch Pfeiltasten - dort nur, was mit dem Finger geht. */}
+                <span className="sm:hidden">Ziehen rastet ein. Genau geht es mit den Zahlen bei jeder Ebene.</span>
+                <span className="hidden sm:inline">Ziehen rastet ein (Alt oder Strg = frei), Pfeiltasten 0,1 cm, Umschalt 1 cm. Genau geht es mit den Zahlen bei jeder Ebene.</span>
               </p>
               {resolved.some((item) => item.box) && (
                 <button type="button" onClick={() => setBig(true)} className={SMALL_BTN} data-testid={`shop-preview-${available.key}-big`}>

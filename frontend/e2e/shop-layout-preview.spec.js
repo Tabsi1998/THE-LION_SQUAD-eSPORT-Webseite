@@ -336,7 +336,14 @@ for (const [label, width, height] of WIDTHS) {
       await page.setViewportSize({ width, height });
       const area = await openDesigns(page);
       const lion = page.getByTestId("shop-preview-front-layer-0");
-      await expect(page.getByTestId("shop-preview-front-help")).toContainText("Ziehen rastet ein (Alt oder Strg = frei)");
+      // Die Hilfe nach Breite: am Handy ohne Alt und Pfeiltasten, am Rechner mit.
+      const help = page.getByTestId("shop-preview-front-help");
+      if (width < 640) {
+        await expect(help).toContainText("Ziehen rastet ein. Genau geht es mit den Zahlen", { useInnerText: true });
+        await expect(help).not.toContainText("Pfeiltasten", { useInnerText: true });
+      } else {
+        await expect(help).toContainText("Ziehen rastet ein (Alt oder Strg = frei), Pfeiltasten 0,1 cm", { useInnerText: true });
+      }
       // 1. Ziehen bis knapp neben die Mitte: rastet ein, die Hilfslinie und die Live-Anzeige in cm sind da.
       const areaBox = await area.boundingBox();
       const lionBox = await lion.boundingBox();
@@ -458,6 +465,7 @@ test.describe("Präzise setzen am Handy (Touch)", () => {
 
   test("Ziehen per Finger rastet ein, die Zahlen sind der Hauptweg, kein seitliches Scrollen (#2117)", async ({ page }, testInfo) => {
     const area = await openDesigns(page);
+    await expect(page.getByTestId("shop-preview-front-help")).not.toContainText("Alt", { useInnerText: true });
     const lion = page.getByTestId("shop-preview-front-layer-0");
     const areaBox = await area.boundingBox();
     const lionBox = await lion.boundingBox();
