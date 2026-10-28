@@ -186,7 +186,9 @@ async def news_author_allowed(db, user: dict | None) -> bool:
 
 async def _news_author_hits(db, q: str) -> list[dict]:
     query = {"is_active": {"$ne": False}, "is_banned": {"$ne": True}, **_name_filter(q)}
-    users = await db.users.find(query, {"_id": 0, "password_hash": 0}).sort("display_name", 1).limit(MAX_HITS * 3).to_list(MAX_HITS * 3)
+    from services.private_fields import private_projection
+
+    users = await db.users.find(query, private_projection()).sort("display_name", 1).limit(MAX_HITS * 3).to_list(MAX_HITS * 3)
     hits = []
     for user in users:
         if await news_author_allowed(db, user):

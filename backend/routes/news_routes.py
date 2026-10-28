@@ -724,8 +724,9 @@ async def update_news(nid: str, body: NewsUpdate, me: dict = Depends(require_are
     # Der Name kommt aus dem Konto.
     if "author_id" in update:
         from routes.admin_picker_routes import news_author_allowed
+        from services.private_fields import private_projection
 
-        author = await db.users.find_one({"id": update["author_id"]}, {"_id": 0, "password_hash": 0}) if update["author_id"] else None
+        author = await db.users.find_one({"id": update["author_id"]}, private_projection()) if update["author_id"] else None
         if not await news_author_allowed(db, author):
             raise HTTPException(400, "Als Autor geht nur ein aktives Konto aus der Redaktion - bitte eine andere Person wählen.")
         update["author_name"] = _actor_name(author)
