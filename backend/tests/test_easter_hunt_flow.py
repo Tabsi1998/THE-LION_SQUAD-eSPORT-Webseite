@@ -402,3 +402,15 @@ async def test_vorschau_ohne_angelegtes_jahr_legt_platzhalter_auf_jede_seite(flo
     empty = (await flow.get("/api/seasonal/easter/eggs", params={"route": unused, "channel": "web", "preview": token})).json()
     assert empty["active"] is True and empty["placeholder"] is False and empty["eggs"] == []
 
+
+
+@pytest.mark.asyncio
+async def test_auswerten_nur_fuer_die_vereinsleitung_2122(flow):
+    """#2122 NW11: wer nur Inhalte pflegt, bekommt kein „Auswerten“, das am Server scheitert."""
+    editor = await flow.add_user(role="player", name="redaktion")
+    await flow.db.users.update_one({"id": editor["id"]}, {"$set": {"areas": ["content"]}})
+    flow.act_as({**editor, "areas": ["content"]})
+    view = (await flow.get("/api/seasonal/easter/admin/2026")).json()
+    assert view["can_draw"] is False and view["may_draw"] is False
+    flow.act_as(await flow.add_staff("Vorstand"))
+    assert (await flow.get("/api/seasonal/easter/admin/2026")).json()["may_draw"] is True

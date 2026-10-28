@@ -333,8 +333,9 @@ async def redraw(db, raffle: dict, pickup_id: str, actor: dict) -> dict:
 
 # ------------------------------------------------------------------ Für die Verwaltung
 
-async def admin_state(db, raffle: dict | None, now: datetime | None = None) -> dict | None:
-    """Die Verlosung mit Protokoll - hier stehen Namen, weil die Verwaltung den Gewinn übergeben muss."""
+async def admin_state(db, raffle: dict | None, now: datetime | None = None, *, may_draw: bool = True) -> dict | None:
+    """Die Verlosung mit Protokoll - hier stehen Namen, weil die Verwaltung den Gewinn übergeben muss. ``may_draw``: darf
+    die ansehende Person ziehen (Vereinsleitung)? Sonst gibt es keinen Knopf, der am Server scheitert (#2122 NW11)."""
     if not raffle:
         return None
     now = seasons.to_vienna(now)
@@ -352,14 +353,15 @@ async def admin_state(db, raffle: dict | None, now: datetime | None = None) -> d
             "winners": [{
                 "user_id": winner["user_id"], "name": names.get(winner["user_id"]) or "Gelöschtes Konto", "pickup_id": winner.get("pickup_id"),
                 "pickup_status": pickups.get(winner.get("pickup_id")), "replaced": winner.get("pickup_id") in replaced,
-                "can_redraw": pickups.get(winner.get("pickup_id")) == "expired" and winner.get("pickup_id") not in replaced,
+                "can_redraw": may_draw and pickups.get(winner.get("pickup_id")) == "expired" and winner.get("pickup_id") not in replaced,
             } for winner in record.get("winners") or []],
         })
     state = phase(raffle, now)
     return {
         "id": raffle["id"], "label": raffle.get("prize_label"), "value": raffle.get("prize_value") or "", "winners": int(raffle.get("winners") or 1),
         "audience": raffle.get("audience") or "all", "staff_may_enter": bool(raffle.get("staff_may_enter")), "closes_at": raffle.get("closes_at"),
-        "status": state, "entries": await entry_count(db, raffle["id"]), "can_draw": state != "drawn", "needs_close_early": state == "open",
+        "status": state, "entries": await entry_count(db, raffle["id"]), "can_draw": may_draw and state != "drawn", "may_draw": may_draw,
+        "needs_close_early": state == "open",
         "terms": terms(raffle), "protocol": protocol,
     }
 
