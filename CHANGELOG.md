@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.46.0 (28.10.2026)
+
+### Neu
+
+* Liga: Kopf der Staffel-Verwaltung mit Liga N, Season öffnen und Ligaseite (#2109)
+* Shop: Farben heißen deutsch und sind je Produkt benennbar (#2105)
+* Shop: Gamertag in der Vorschau in echter Größe (#2105)
+* Shop: Texthöhe und Höchstbreite je Gamertag- und Vereinsnummer-Ebene einstellbar (#2105)
+
+### Fehlerbehebungen
+
+* Liga: deutsche Meldung, wenn die Teamleitung ein Co-Team abmelden will (#2109)
+* Liga: gestartete Staffel lässt sich weder löschen noch zurücksetzen oder neu aufbauen (#2109)
+* Liga: Reiter „Tabelle“ statt „Turnierbaum“ bei Format Liga (#2109)
+* Liga: Season-Werte stehen in der Staffel nur lesend mit Link zur Season, der Server lehnt Änderungen daran ab (#2109)
+* Liga: Staffel kennt keinen Status Anmeldung oder Check-in (#2109)
+* Liga: Staffel-Formular ohne Anmeldung, Check-in, Discord, Preise, Jahreswertung, Seeding und Weiterkommen – auch der Server lehnt sie ab (#2109)
+* Liga: Staffel-Werkzeuge mit „Vorschau neu mischen“ nur vor dem Start, ohne Check-in-Downloads, Map-Pool nur lesend (#2109)
+* Liga: Staffeln in der Turnierliste gekennzeichnet und filterbar (#2109)
+* Liga: Teilnehmer einer Staffel nur als Co-Teams, ohne Check-in-Knöpfe, Status „Zugeteilt“ (#2109)
+* Shop: Druckflächen von Printful heißen deutsch (#2105)
+* Shop: kein Grauschleier über der Vorschau bei ungespeicherten Änderungen (#2105)
+* Shop: restliche englische Printful-Texte im Shop-Admin eingedeutscht (#2105)
+* Shop: Vorschau zeigt das Shirt in der gewählten Farbe – passende Printful-Vorlage je Farbe, sonst eingefärbt (#2105)
+* Turniere: Ablauf-Leiste je Kontext und mit deutschen Begriffen (#2109)
+* Turniere: Status nur noch oben über den Ablauf, nicht mehr im Formular (#2109)
+
 ## 1.45.0 (28.10.2026)
 
 ### Neu

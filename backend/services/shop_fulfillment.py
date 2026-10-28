@@ -19,21 +19,34 @@ Die Meldung (``str``) ist ein fester deutscher Satz; was der Anbieter dazu sagt,
 from __future__ import annotations
 
 import re
+import secrets
 from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
 
 PLACEMENT_RE = re.compile(r"[a-z0-9_]{1,64}")
 TECHNIQUE_RE = re.compile(r"[a-z0-9-]{1,32}")
-EXTERNAL_ID_RE = re.compile(r"[A-Za-z0-9_-]{1,64}")
+# Printful nimmt höchstens 32 Zeichen je external_id (#2133) - die Prüfung hier meldet es schon vor dem Senden.
+EXTERNAL_ID_MAX = 32
+EXTERNAL_ID_RE = re.compile(r"[A-Za-z0-9_-]{1,%d}" % EXTERNAL_ID_MAX)
 HTTPS_URL_RE = re.compile(r"https://[^\s/?#]+\.[^\s/?#]+(/[^\s]*)?")
 MAX_QUANTITY = 20
 MAX_LINES = 20
-# Testentwürfe aus dem Admin (#2062) tragen diesen Anfang in der external_id - sie werden nie bestätigt.
-TEST_EXTERNAL_PREFIX = "lsw-testentwurf-"
+# Testentwürfe aus dem Admin (#2062) tragen diesen Anfang in der external_id - sie werden nie bestätigt. Der frühere,
+# zu lange Anfang (52 Zeichen mit UUID, #2133) gilt weiter als Testentwurf, damit kein alter je bestätigt wird.
+TEST_EXTERNAL_PREFIX = "lswtest-"
+LEGACY_TEST_EXTERNAL_PREFIX = "lsw-testentwurf-"
 
 
 def is_test_external_id(value) -> bool:
-    return isinstance(value, str) and value.startswith(TEST_EXTERNAL_PREFIX)
+    return isinstance(value, str) and value.startswith((TEST_EXTERNAL_PREFIX, LEGACY_TEST_EXTERNAL_PREFIX))
+
+
+def short_external_id(prefix: str = "") -> str:
+    """Eine neue external_id für Printful: ``prefix`` plus zufällige Hex-Zeichen, zusammen genau ``EXTERNAL_ID_MAX``."""
+    size = EXTERNAL_ID_MAX - len(prefix)
+    if size < 16:
+        raise ValueError("external_id: Anfang zu lang")
+    return prefix + secrets.token_hex(16)[:size]
 
 
 # ---------------------------------------------------------------- Nummern (eigene Typen)
@@ -343,6 +356,8 @@ class FulfillmentOrder:
     shipping: str
     costs: Costs
     items: tuple[OrderItem, ...]
+    # Aufbau der Antwort ohne Werte (#2138, ``printful_client.answer_shape``) - für den Abgleich im Testentwurf.
+    shape: dict = field(default_factory=dict, compare=False)
 
 
 @dataclass(frozen=True, slots=True)

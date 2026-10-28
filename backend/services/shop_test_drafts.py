@@ -32,6 +32,7 @@ import os
 import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
+from urllib.parse import urlsplit
 
 from models import new_id, now_utc
 from services import shop_catalog, shop_colors, shop_common, shop_config, shop_gamertag, shop_print_files, shop_products
@@ -41,7 +42,8 @@ from services.printful_client import order_payload
 from services.shop_common import ShopConflict, ShopError, record_admin_action
 from services.shop_fulfillment import (
     ERROR_TEXTS, TEST_EXTERNAL_PREFIX, CatalogVariantId, DraftLine, DraftOrder, FulfillmentError, FulfillmentInvalid,
-    FulfillmentOrder, FulfillmentPermanent, FulfillmentProvider, Placement, PrintfulOrderId, Recipient)
+    FulfillmentOrder, FulfillmentPermanent, FulfillmentProvider, Placement, PrintfulOrderId, Recipient,
+    short_external_id)
 
 COLLECTION = "shop_test_drafts"
 KIND = "test_draft"
@@ -334,8 +336,9 @@ async def preview(db, *, product_id: Any, variant_id: Any, gamertag: Any, addres
 
 async def _build(db, product: dict, variant: dict, mapping: dict, recipient: dict, name: str | None, *,
                  actor_id: str, provider: FulfillmentProvider) -> dict:
-    draft_id, item_id = new_id(), new_id()
-    external_id = f"{EXTERNAL_PREFIX}{draft_id}"
+    # Printful nimmt je external_id höchstens 32 Zeichen (#2133): Anfang plus Zufall, Position nur Zufall.
+    draft_id, item_id = new_id(), short_external_id()
+    external_id = short_external_id(EXTERNAL_PREFIX)
     try:
         # Derselbe Weg wie die Bestellung (#2069): je Fläche genau eine Datei, mit Gamertag eine eigene.
         files, _sources = await shop_print_files.freeze_line(
@@ -433,7 +436,36 @@ def _order_view(order: FulfillmentOrder) -> dict:
                                        "file_urls": list(place.file_urls), "status": place.status,
                                        "status_explanation": place.status_explanation}
                                       for place in item.placements]}
-                      for item in order.items]}
+                      for item in order.items],
+            "shape": order.shape or {}}
+
+
+# Endungen, mit denen Printful Flächen einer Technik kennzeichnet (``front_dtf``) - im Auftrag kann dieselbe Fläche ohne
+# Endung zurückkommen (#2138).
+TECHNIQUE_SUFFIXES = ("_dtf", "_dtfilm", "_dtg", "_embroidery", "_sublimation", "_large")
+
+
+def _base_placement(key: str) -> str:
+    for suffix in TECHNIQUE_SUFFIXES:
+        if key.endswith(suffix):
+            return key[: -len(suffix)]
+    return key
+
+
+def _match_placement(placed: dict, key: str) -> dict | None:
+    """Die Fläche aus der Antwort: genau dieselbe Kennung, sonst dieselbe ohne Technik-Endung."""
+    if key in placed:
+        return placed.pop(key)
+    base = _base_placement(key)
+    found = next((name for name in placed if _base_placement(name) == base), None)
+    return placed.pop(found) if found is not None else None
+
+
+def _host(url) -> str | None:
+    try:
+        return urlsplit(str(url)).hostname or None
+    except ValueError:
+        return None
 
 
 def _row(label: str, sent: Any, answer: Any, level: str) -> dict:
@@ -460,16 +492,30 @@ def compare(record: dict, order: dict) -> list[dict]:
         rows.append(_row(prefix + "Menge", sent["quantity"], got.get("quantity"),
                          "ok" if got.get("quantity") == sent["quantity"] else "error"))
         placed = {place["placement"]: place for place in got.get("placements") or []}
+        if got and not placed:
+            # Printful nennt zu dieser Position gar keine Flächen (#2138): das heißt nicht „falsch übergeben“ - der
+            # Aufbau der Antwort steht unter „Technische Details“.
+            rows.append(_row(f"{prefix}Flächen", len(sent["placements"]), None, "warn"))
+            continue
         for place in sent["placements"]:
-            answer = placed.pop(place["placement"], None)
+            answer = _match_placement(placed, place["placement"])
             url = place["layers"][0]["url"]
             if answer is None:
                 rows.append(_row(f"{prefix}Fläche {place['placement']}", url, None, "error"))
                 continue
-            same = answer.get("technique") == place["technique"] and answer.get("file_urls") == [url]
-            rows.append(_row(f"{prefix}Fläche {place['placement']} ({place['technique']})", url,
-                             (answer.get("file_urls") or [None])[0] if len(answer.get("file_urls") or []) <= 1
-                             else answer.get("file_urls"), "ok" if same else "error"))
+            urls = answer.get("file_urls") or []
+            shown = urls[0] if len(urls) == 1 else (urls or None)
+            label = f"{prefix}Fläche {place['placement']} ({place['technique']})"
+            if answer.get("technique") != place["technique"] or not urls:
+                level = "error"
+            elif urls == [url]:
+                level = "ok"
+            else:
+                # Printful legt eine eigene Kopie an (anderer Host bzw. andere Adresse): übernommen, nicht falsch.
+                level = "warn"
+                label += " – Printful-Kopie"
+                shown = _host(shown) if isinstance(shown, str) else shown
+            rows.append(_row(label, url, shown, level))
             status = answer.get("status") or ""
             if status and status != "ok":
                 explanation = answer.get("status_explanation")
@@ -478,6 +524,12 @@ def compare(record: dict, order: dict) -> list[dict]:
         for extra in placed:
             rows.append(_row(f"{prefix}Fläche {extra}", None, extra, "error"))
     estimate, costs = record.get("estimate") or {}, order.get("costs") or {}
+    status = str(costs.get("calculation_status") or "")
+    if status and status != "done":
+        # Direkt nach dem Anlegen rechnet Printful die Kosten noch (#2138) - später „Bei Printful nachsehen“.
+        rows.append(_row("Preise bei Printful", "Schätzung liegt vor", f"Printful rechnet noch ({status or 'offen'})",
+                         "warn"))
+        return rows
     for key, label in (("subtotal_cents", "Ware"), ("shipping_cents", "Versand"), ("vat_cents", "Umsatzsteuer"),
                        ("tax_cents", "Steuer"), ("total_cents", "Gesamt")):
         before, after = estimate.get(key), costs.get(key)
@@ -581,6 +633,28 @@ async def send(db, draft_id: str, *, idempotency_key: Any, actor_id: str, provid
     return view(await _get(db, draft_id))
 
 
+async def recheck(db, draft_id: str, *, actor_id: str, provider: FulfillmentProvider) -> dict:
+    """Einen gesendeten Testentwurf bei Printful neu lesen und neu abgleichen (#2138) - etwa wenn Printful die Kosten
+    beim Senden noch rechnete. Liest nur, ändert bei Printful nichts; geht auch bei Stufe „Aus“, solange der Schlüssel
+    lesbar ist."""
+    await shop_config.require_printful_key(db)
+    record = await _get(db, draft_id)
+    if record.get("state") != "sent" or not record.get("printful_order_id"):
+        raise ShopConflict("Nachsehen geht nur bei einem gesendeten Testentwurf.")
+    order = await provider.get_order(PrintfulOrderId(int(record["printful_order_id"])))
+    if order.external_id != record["external_id"]:
+        raise ShopConflict("Bei Printful steht unter dieser Nummer ein anderer Auftrag - bitte nicht weiter verwenden.")
+    answer = _order_view(order)
+    deviations = compare(record, answer)
+    await _collection(db).update_one({"id": record["id"], "state": "sent"}, {"$set": {
+        "printful_status": order.status, "response": answer, "deviations": deviations,
+        "rechecked_at": _now().isoformat()}})
+    await record_admin_action(db, "shop.test_draft.recheck", actor_id=actor_id, target_id=record["id"], reason="",
+                              data={"printful_order_id": order.id.value, "shape": answer["shape"],
+                                    "deviations": sum(1 for row in deviations if row["level"] != "ok")})
+    return view(await _get(db, draft_id))
+
+
 # ================================================================ Löschen
 
 async def delete(db, draft_id: str, *, actor_id: str, provider: FulfillmentProvider) -> dict:
@@ -589,7 +663,7 @@ async def delete(db, draft_id: str, *, actor_id: str, provider: FulfillmentProvi
 
     Aufräumen geht auch, wenn der Shop inzwischen wieder auf „Aus“ steht - es reicht ein lesbarer Schlüssel
     (``shop_config.require_printful_key``); der Adapter löscht dann nur Aufträge mit external_id
-    ``lsw-testentwurf-…``. Ein hängendes „wird gelöscht“ darf nach ``SHOP_TEST_DRAFT_DELETING_SECONDS`` übernommen
+    ``lswtest-…``. Ein hängendes „wird gelöscht“ darf nach ``SHOP_TEST_DRAFT_DELETING_SECONDS`` übernommen
     werden. Ein offener Ausgang (``unclear``, hängendes Senden) wird über ``_delete_unclear`` aufgeräumt - ohne erneutes
     Senden, also auch bei Stufe „Aus“ oder wenn eine Druckdatei schon weg ist."""
     await shop_config.require_printful_key(db)
@@ -767,7 +841,9 @@ def actions(record: dict, now: datetime | None = None) -> dict:
     open_outcome = state == "unclear" or stuck_sending
     return {"resend": open_outcome,
             # Auch ein offener Ausgang lässt sich aufräumen: der Server sieht bei Printful nach (#2062, N1/N2).
-            "delete": open_outcome or stuck_deleting or (state == "sent" and bool(record.get("printful_order_id")))}
+            "delete": open_outcome or stuck_deleting or (state == "sent" and bool(record.get("printful_order_id"))),
+            # Kosten und Dateien stehen bei Printful oft erst Minuten nach dem Anlegen fest (#2138).
+            "recheck": state == "sent" and bool(record.get("printful_order_id"))}
 
 
 async def get_view(db, draft_id: str) -> dict:
