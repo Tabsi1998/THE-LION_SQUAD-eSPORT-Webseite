@@ -231,7 +231,7 @@ function ProductList() {
   return (
     <Shell>
       <p className="text-sm text-white/60 max-w-2xl">
-        Ein Produkt entsteht in fünf Schritten: Printful-Produkt wählen, Farben und Größen, Druckflächen, Preise, Prüfen und Veröffentlichen. Mitglieder zahlen den Selbstkostenpreis.
+        Ein Produkt entsteht in fünf Schritten: Printful-Produkt wählen, Farben und Größen, Druckflächen, Preise, Prüfen und Veröffentlichen. Mitglieder zahlen, was der Verein an Printful zahlt – brutto.
       </p>
       <Section title="Produkte" icon={Package} testId="shop-products">
         {data.overview.length === 0 ? (
@@ -469,7 +469,7 @@ function MarkupForm({ view, busy, run }) {
       <ChoiceGroup label="Aufschlag" testId="shop-markup-source" value={own ? "product" : "general"} onChange={(value) => setOwn(value === "product")} disabled={!view.editable}
         options={[{ value: "general", label: `Allgemeiner Aufschlag (${money(pricing.general_markup_cents)})` }, { value: "product", label: "Eigener Aufschlag" }]} />
       {own && (
-        <Field label="Eigener Aufschlag je Artikel (Euro)" hint="Ersetzt den allgemeinen Aufschlag – er kommt nicht dazu. 0 heißt: öffentlich zum Selbstkostenpreis.">
+        <Field label="Eigener Aufschlag je Artikel (Euro)" hint="Ersetzt den allgemeinen Aufschlag – er kommt nicht dazu. 0 heißt: öffentlich zum Mitgliederpreis (Printful brutto).">
           <input value={amount} onChange={(event) => setAmount(event.target.value)} inputMode="decimal" className={`${INPUT} tabular-nums max-w-xs`} data-testid="shop-markup-amount" />
         </Field>
       )}
@@ -481,13 +481,25 @@ function MarkupForm({ view, busy, run }) {
   );
 }
 
+const PRICE_NOTE = "zzgl. Versand, genauer Betrag an der Kasse";
+
+function hasCents(value) {
+  return value !== null && value !== undefined;
+}
+
 function PricesStep({ view, busy, run }) {
   const offered = view.variants.filter((row) => row.active);
   const warnings = offered.filter((row) => row.price_warning);
   if (!offered.length) return <p className="text-sm text-white/55" data-testid="shop-step-prices">Erst Farben und Größen wählen (Schritt 2).</p>;
+  const estimated = offered.some((row) => hasCents(row.printful_gross_cents));
   return (
     <div className="space-y-4" data-testid="shop-step-prices">
-      <p className="text-xs text-white/55">Mitglieder zahlen den Selbstkostenpreis: Einkauf der Variante plus Aufpreis jeder weiteren Druckfläche, ohne Aufschlag. Der öffentliche Preis ist ein Vorschlag aus Einkauf plus Aufschlag – entscheiden tun die Finanzen. Versand kommt bei der Bestellung dazu.</p>
+      <p className="text-xs text-white/55" data-testid="shop-prices-explain">
+        Mitglieder zahlen, was der Verein an Printful zahlt – brutto: Ware, Versand und Steuer, ohne Aufschlag. Je Variante steht hier <b>Printful brutto</b> (Ware) aus der Kostenschätzung für ein Stück nach Österreich; daraus kommt der Mitgliederpreis. Der Versand gilt je Bestellung und wird an der Kasse für den ganzen Warenkorb geschätzt – im Shop steht beim Preis „{view.pricing?.note || PRICE_NOTE}“. Öffentlich: Printful brutto plus Aufschlag. <b>Katalog netto</b> ist nur ein Prüfwert.
+      </p>
+      {!estimated && (
+        <p className="text-xs text-honor" data-testid="shop-prices-no-estimate">Noch keine Schätzung von Printful – bis dahin gilt der Katalog netto. Erst die Druckdateien erzeugen (Schritt 3), dann „Brutto bei Printful schätzen“.</p>
+      )}
       {warnings.length > 0 && (
         <div className="border border-warn/40 bg-warn/10 rounded-sm p-3 text-sm" role="alert" data-testid="shop-price-warnings">
           <div className="font-bold inline-flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-warn" aria-hidden="true" /> Printful hat Preise geändert</div>
@@ -500,24 +512,47 @@ function PricesStep({ view, busy, run }) {
       <div className="tls-swipe">
         <table className="w-full text-sm tabular-nums" data-testid="shop-prices-table">
           <thead><tr className="text-left text-xs text-white/50">
-            <th className="py-1 pr-3 font-normal">Variante</th><th className="py-1 pr-3 font-normal text-right">Einkauf</th><th className="py-1 pr-3 font-normal text-right">Selbstkosten</th>
-            <th className="py-1 pr-3 font-normal text-right">Mitglieder</th><th className="py-1 font-normal text-right">Öffentlich</th>
+            <th className="py-1 pr-3 font-normal">Variante</th><th className="py-1 pr-3 font-normal text-right">Printful brutto (Ware)</th>
+            <th className="py-1 pr-3 font-normal text-right">Mitglieder</th><th className="py-1 pr-3 font-normal text-right">Versand AT (Beispiel)</th>
+            <th className="py-1 pr-3 font-normal text-right">Öffentlich</th><th className="py-1 font-normal text-right">Katalog netto (Prüfwert)</th>
           </tr></thead>
           <tbody>
-            {offered.map((row) => (
-              <tr key={row.id} className="border-t border-white/10" data-testid={`shop-price-${row.sku}`}>
-                <td className="py-1.5 pr-3">{row.display_label || row.label}{row.blocked_reason && <span className="block text-xs text-warn">{row.blocked_reason}</span>}</td>
-                <td className="py-1.5 pr-3 text-right text-white/60">{money(row.base_cost_cents)}</td>
-                <td className="py-1.5 pr-3 text-right">{money(row.cost_cents)}</td>
-                <td className={`py-1.5 pr-3 text-right font-bold ${row.price_cents !== row.cost_cents ? "text-warn" : ""}`}>{row.price_cents === null ? "nicht übernommen" : money(row.price_cents)}</td>
-                <td className="py-1.5 text-right">{money(row.price_cents === null ? row.suggested_public_cents : row.public_price_cents)}{row.price_cents === null ? " (Vorschlag)" : ""}</td>
-              </tr>
-            ))}
+            {offered.map((row) => {
+              const expected = hasCents(row.member_price_cents) ? row.member_price_cents : row.cost_cents;
+              return (
+                <tr key={row.id} className="border-t border-white/10" data-testid={`shop-price-${row.sku}`}>
+                  <td className="py-1.5 pr-3">{row.display_label || row.label}{row.blocked_reason && <span className="block text-xs text-warn">{row.blocked_reason}</span>}</td>
+                  <td className="py-1.5 pr-3 text-right" data-testid={`shop-price-${row.sku}-gross`}>
+                    {hasCents(row.printful_gross_cents) ? money(row.printful_gross_cents) : <span className="text-white/45">noch nicht geschätzt</span>}
+                    {row.estimate_stale && <span className="block text-xs text-warn">Schätzung veraltet</span>}
+                  </td>
+                  <td className={`py-1.5 pr-3 text-right font-bold ${row.price_cents !== expected ? "text-warn" : ""}`} data-testid={`shop-price-${row.sku}-member`}>{row.price_cents === null ? "nicht übernommen" : money(row.price_cents)}</td>
+                  <td className="py-1.5 pr-3 text-right text-white/70" data-testid={`shop-price-${row.sku}-shipping`}>{money(row.shipping_example_cents)}</td>
+                  <td className="py-1.5 pr-3 text-right">{money(row.price_cents === null ? row.suggested_public_cents : row.public_price_cents)}{row.price_cents === null ? " (Vorschlag)" : ""}</td>
+                  <td className="py-1.5 text-right text-white/60" data-testid={`shop-price-${row.sku}-catalog`}>
+                    {money(row.cost_cents)}
+                    {row.catalog_check && (
+                      <span className="ml-1.5 inline-flex items-center gap-1 text-xs text-warn" title="Katalog und Schätzung liegen stark auseinander (mehr als 10 % und 1 €) – Druckflächen und Fläche im Grundpreis prüfen." data-testid={`shop-price-${row.sku}-check`}>
+                        <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" /> prüfen
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="button" disabled={busy === "estimate" || view.product.status === "archived"}
+          onClick={() => run("estimate", () => api.post(`${BASE}/${view.product.id}/prices/estimate`, {}), (next) => next.result?.detail || "Brutto geschätzt.")}
+          className="tls-btn tls-btn--secondary min-h-10 px-4 text-xs font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-1.5 disabled:opacity-40" data-testid="shop-prices-estimate">
+          <RefreshCw className={`w-3.5 h-3.5 ${busy === "estimate" ? "motion-safe:animate-spin" : ""}`} aria-hidden="true" /> Brutto bei Printful schätzen
+        </button>
+        <span className="text-xs text-white/45">Ändert keinen Preis – übernommen wird erst mit „Preise übernehmen“.</span>
+      </div>
       <ReasonedButton id="shop-prices" label="Preise übernehmen" busy={busy === "prices"} disabled={view.product.status === "archived"} blockedHint="Archiviert: erst wieder als Entwurf öffnen."
-        hint="Übernimmt die Selbstkosten als Mitgliederpreis und beendet Preiswarnungen."
+        hint="Übernimmt Printful brutto als Mitgliederpreis (ohne Schätzung den Katalog netto) und beendet Preiswarnungen."
         onSubmit={(reason) => run("prices", () => api.post(`${BASE}/${view.product.id}/prices/accept`, { reason }), "Preise übernommen.")} />
       <MarkupForm key={`${view.pricing.source}-${view.pricing.product_markup_cents}`} view={view} busy={busy} run={run} />
     </div>

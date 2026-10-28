@@ -824,6 +824,45 @@ test("Preise: Warnung bei Preisänderung, Übernehmen und eigener Aufschlag nur 
   expect(apiMock.patch).toHaveBeenCalledWith("/admin/shop/products/p1", { markup_cents: 250, reason: "Eigener Aufschlag" });
 });
 
+test("Preise (#2135): Printful brutto, Mitgliederpreis, Versandbeispiel AT, Katalog netto nur als Prüfwert", async () => {
+  const gross = { printful_gross_cents: 1170, member_price_cents: 1170, shipping_example_cents: 594, price_source: "estimate",
+    price_cents: 1170, public_price_cents: 1470, estimated_at: "2026-10-28T05:20:00+00:00", estimate_stale: false };
+  const rows = [
+    variant("Black / M", "PF1", { ...gross, catalog_check: true }),
+    variant("White / M", "PF3", { ...gross, cost_cents: 1180, catalog_check: false }),
+    variant("White / L", "PF4", { printful_gross_cents: null, member_price_cents: 1500, shipping_example_cents: null, price_source: "catalog", estimate_stale: true }),
+  ];
+  apiMock.get.mockResolvedValue({ data: view({ variants: rows, extra: { pricing: { ...view().pricing, note: "zzgl. Versand, genauer Betrag an der Kasse" } } }) });
+  apiMock.post.mockResolvedValue({ data: { ...view({ variants: rows }), result: { estimated: 3, offered: 3, detail: "3 von 3 Varianten brutto geschätzt." } } });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-prices"));
+  expect(screen.getByTestId("shop-prices-explain")).toHaveTextContent("zzgl. Versand, genauer Betrag an der Kasse");
+  expect(screen.queryByTestId("shop-prices-no-estimate")).toBeNull();
+  expect(screen.getByTestId("shop-price-PF1-gross")).toHaveTextContent("11,70 €");
+  expect(screen.getByTestId("shop-price-PF1-member")).toHaveTextContent("11,70 €");
+  expect(screen.getByTestId("shop-price-PF1-member")).not.toHaveClass("text-warn");
+  expect(screen.getByTestId("shop-price-PF1-shipping")).toHaveTextContent("5,94 €");
+  expect(screen.getByTestId("shop-price-PF1-catalog")).toHaveTextContent("15,00 €");
+  // „prüfen“ nur bei starker Abweichung zwischen Katalog und Schätzung - der Server entscheidet.
+  expect(screen.getByTestId("shop-price-PF1-check")).toHaveTextContent("prüfen");
+  expect(screen.queryByTestId("shop-price-PF3-check")).toBeNull();
+  expect(screen.getByTestId("shop-price-PF4-gross")).toHaveTextContent("noch nicht geschätzt");
+  expect(screen.getByTestId("shop-price-PF4-gross")).toHaveTextContent("Schätzung veraltet");
+  await user.click(screen.getByTestId("shop-prices-estimate"));
+  expect(apiMock.post).toHaveBeenCalledWith("/admin/shop/products/p1/prices/estimate", {});
+  expect(toastMock.success).toHaveBeenCalledWith("3 von 3 Varianten brutto geschätzt.");
+});
+
+test("Preise ohne Schätzung: Hinweis, dass bis dahin der Katalog netto gilt", async () => {
+  apiMock.get.mockResolvedValue({ data: view() });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-prices"));
+  expect(screen.getByTestId("shop-prices-no-estimate")).toHaveTextContent("Katalog netto");
+  expect(screen.getByTestId("shop-price-PF1-gross")).toHaveTextContent("noch nicht geschätzt");
+});
+
 test("Veröffentlichen bleibt gesperrt, solange die Mockup-Prüfung offen ist; prüfen geht mit Grund", async () => {
   apiMock.get.mockResolvedValue({ data: view({ product: { status: "reviewed" }, extra: { transitions: ["active", "draft", "archived"] } }) });
   apiMock.post.mockResolvedValue({ data: view({ product: { status: "active" } }) });
