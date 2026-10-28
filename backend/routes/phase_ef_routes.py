@@ -177,6 +177,12 @@ DEFAULT_EMAIL_TEMPLATES = [
      "html": "<p>{{applicant}} hat eine Mitgliedsbewerbung eingereicht. Bitte im Admin-Bereich prüfen.</p>",
      "vars": ["applicant"]},
     # Wunschnummer (#2034): ein Mitglied möchte eine andere Nummer - die Nummer selbst steht nicht in der Mail.
+    # Einladung zum Mitgliedsantrag (#507): bisher nur als Ersatztext im Code - ohne Standard fehlte sie in der Liste
+    # der E-Mail-Vorlagen (#2119 ML6). Gleicher Text wie der Ersatz in services/membership_invitations.
+    {"key": "membership_invited", "name": "Einladung zum Mitgliedsantrag",
+     "subject": "Einladung: Werde Mitglied bei uns",
+     "html": "<p>Hallo {{name}},</p><p>der Vorstand lädt dich ein, Mitglied zu werden. Melde dich auf der Website an und fülle den Mitgliedsantrag aus – er ist für dich freigeschaltet.</p><p><em>{{note}}</em></p>",
+     "vars": ["name", "note"]},
     {"key": "jersey_number_request_admin", "name": "Antrag auf eine andere Nummer (Admin-Notify)",
      "subject": "Antrag auf eine andere Nummer",
      "html": "<p>{{member}} möchte eine andere Nummer. Du findest den Antrag im Admin unter Mitglieder → Nummern.</p>",

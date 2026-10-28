@@ -51,6 +51,9 @@ async def test_preview_override_test_and_reset(flow):
     # Vorschau der festen Vorlage mit Beispieldaten.
     preview = (await flow.post("/api/admin/email-templates/registration/preview", json={})).json()
     assert preview["source"] == "code" and "Paula" in preview["html"] and preview["subject"]
+    # #2119 ML6: die Einladung zum Mitgliedsantrag hat einen Standard und steht darum in der Liste.
+    assert by_key["membership_invited"]["source"] == "db" and by_key["membership_invited"]["vars"] == ["name", "note"]
+    assert by_key["membership_invited"]["custom"] is False
     # Vorschau eines Entwurfs, ungespeichert.
     draft = (await flow.post("/api/admin/email-templates/registration/preview", json={"subject": "Hallo {{display_name}}!", "html": "<p>Willkommen, {{display_name}} &lt;3</p>"})).json()
     assert draft["subject"] == "Hallo Paula!" and draft["html"] == "<p>Willkommen, Paula &lt;3</p>" and draft["source"] == "custom"
