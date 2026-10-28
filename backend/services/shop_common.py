@@ -89,11 +89,15 @@ MODEL_FIELDS: dict[str, tuple[str, ...]] = {
                                "updated_by",
                                # Einkauf und Lager aus dem Abgleich (#1709)
                                "technique", "currency", "base_cost_cents", "placement_costs", "availability",
-                               "in_stock", "synced_at", "price_warning"),
+                               "in_stock", "synced_at", "price_warning",
+                               # Bruttoschätzung je Variante (#2135): Ware, Steuer, Versandbeispiel AT, Stand
+                               "gross_estimate"),
     "shop_carts": ("user_id", "items", "updated_at"),
     "shop_orders": ("id", "user_id", "idempotency_key", "request_hash", "status", "frozen", "billing_address",
                     "shipping_address", "printful_external_id", "printful_order_id", "item_count", "created_at",
-                    "updated_at", "anonymized_at"),
+                    "updated_at", "anonymized_at",
+                    # Preisprüfung vor dem Auslösen (#2135): letzte Schätzung, Abweichung, Entscheidung
+                    "price_check"),
     "shop_order_items": ("id", "order_id", "user_id", "position", "product_id", "variant_id", "product_title",
                          "variant_label", "sku", "quantity", "unit_price_cents", "markup_cents", "line_total_cents",
                          "gamertag", "design", "printful", "tax_profile",
@@ -102,7 +106,9 @@ MODEL_FIELDS: dict[str, tuple[str, ...]] = {
                          # je Fläche genau eine Druckdatei (#2069): Grunddatei oder eigene mit Gamertag
                          "print_files",
                          # Vereinsnummer im Druck (#2150): die Nummer und die Einwilligung (Zeitpunkt, Textfassung)
-                         "print_number", "number_consent"),
+                         "print_number", "number_consent",
+                         # Bruttoanteil der Position an der Printful-Schätzung (#2135): netto, Steuer, brutto
+                         "gross"),
     "shop_order_events": ("id", "order_id", "event_key", "kind", "at", "actor_id", "data"),
     # Testentwürfe an Printful (#2062, services/shop_test_drafts.py): eigene Art „test_draft“, keine Bestellung - nur
     # die Vereinsadresse, nie ein Gamertag als Text. Was gesendet wurde, was Printful meldete, Abweichungen.

@@ -30,15 +30,16 @@ from typing import Any, NoReturn
 from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
-from services import shop_catalog, shop_colors, shop_common, shop_config, shop_motifs, shop_print_files
+from services import shop_catalog, shop_colors, shop_common, shop_config, shop_motifs, shop_pricing, shop_print_files
 from services.log_safe import log_safe
 from services.shop_common import ShopConflict, ShopError, assert_no_address
-from services.shop_fulfillment import short_external_id
+from services.shop_fulfillment import FulfillmentProvider, short_external_id
 
 logger = logging.getLogger("tls-arena.shop-orders")
 
 BUYER_KINDS = ("member", "public")
-STATUS_LABELS = {"placed": "bestellt"}  # die Statusmaschine folgt mit #1716
+STATUS_LABELS = {"placed": "bestellt",  # die Statusmaschine folgt mit #1716
+                 shop_pricing.STATUS_PRICE_CHANGED: "Preis geändert"}  # #2135: vor dem Auslösen teurer geschätzt
 MAX_LINES = 20
 MAX_QUANTITY = 20
 MAX_SHIPPING_CENTS = 10_000
@@ -260,12 +261,20 @@ async def _discard(db, order_id: str) -> None:
 
 async def place_order(db, *, user_id: str, idempotency_key: str, buyer_kind: str, lines: list,
                       shipping_estimate_cents: int | None, billing_address: dict, shipping_address: dict,
-                      actor_id: str, payment_rules: dict | None = None) -> tuple[dict, bool]:
+                      actor_id: str, payment_rules: dict | None = None,
+                      provider: FulfillmentProvider | None = None) -> tuple[dict, bool]:
     """Eine Bestellung anlegen und alles einfrieren. Liefert (Bestellung, neu angelegt).
 
-    Den Versand bestimmt die Bestellung selbst (``shop_config.shipping_cents``): der Aufrufer gibt nur die Schätzung
+    **Bruttopreis (#2135):** mit ``provider`` schätzt Printful den ganzen Warenkorb (``shop_pricing.order_prices``:
+    Ware, Versand, Steuer für das Lieferland, mit den eingefrorenen Druckdateien). Dann zahlen Mitglieder genau diesen
+    Betrag, öffentliche Käufe zusätzlich den Aufschlag je Artikel; eingefroren werden die Teile und je Position ihr
+    Anteil (``frozen.price_source = "printful_estimate"``). Die Schätzung zählt nicht zum Bestellschlüssel - derselbe
+    Aufruf noch einmal liefert die erste Bestellung, ohne Printful zu fragen.
+
+    **Rückfall** (ohne ``provider``, ohne Druckdateien, Printful nicht erreichbar): der übernommene Preis der Variante,
+    und den Versand bestimmt die Bestellung selbst (``shop_config.shipping_cents``): der Aufrufer gibt nur die Schätzung
     von Printful oder ``None``. Ohne Schätzung gilt die Ersatzpauschale, fehlt auch die, wird nicht bestellt. 0 € Versand
-    nur, wenn die Schätzung ausdrücklich 0 ist.
+    nur, wenn die Schätzung ausdrücklich 0 ist (``frozen.price_source = "fallback"``).
 
     Je Position und Druckfläche wird genau eine Druckdatei eingefroren (#2069) - mit Gamertag eine eigene. Kommt die
     Bestellung nicht zustande, sind diese eigenen Dateien wieder weg (``shop_print_files.discard_order_files``)."""
@@ -295,27 +304,37 @@ async def place_order(db, *, user_id: str, idempotency_key: str, buyer_kind: str
     # Die Einstellungen (Aufschlag, Ersatzpauschale) einmal lesen und mit einfrieren - eine spätere Änderung wirkt nicht
     # zurück.
     config = await shop_config.load(db)
-    shipping_cents = shop_config.shipping_cents(config, estimate)
-    shipping_source = "estimate" if estimate is not None else "fallback"
+    # Ohne Anbieter wie bisher: der Versand steht vor dem Einfrieren fest (keine Pauschale - keine Bestellung).
+    shipping_cents = shop_config.shipping_cents(config, estimate) if provider is None else None
     order_id, now = new_id(), now_utc().isoformat()
-    # Dateien erzeugen und Positionen schreiben gehören zusammen: scheitert eines davon (auch ein abgebrochenes, halb
-    # geschriebenes insert_many), räumt diese Bestellung ihre eigenen Positionen und Dateien wieder weg.
+    # Dateien erzeugen, schätzen und Positionen schreiben gehören zusammen: scheitert eines davon (auch ein
+    # abgebrochenes, halb geschriebenes insert_many), räumt diese Bestellung ihre eigenen Positionen und Dateien weg.
     try:
         items = [await _freeze_line(db, line, index, buyer_kind, config, user_id=user_id, order_id=order_id,
                                     item_id=new_id(), now=now)
                  for index, line in enumerate(clean_lines, start=1)]
+        priced = await shop_pricing.order_prices(db, items, provider=provider, shipping_address=shipping)
+        if priced is not None:
+            shop_pricing.apply_order_prices(items, priced)
+        elif shipping_cents is None:
+            shipping_cents = shop_config.shipping_cents(config, estimate)
         await db.shop_order_items.insert_many([{"order_id": order_id, "user_id": user_id, **item} for item in items])
     except BaseException:
         await _discard(db, order_id)
         raise
     tax_profiles = {item["tax_profile"] for item in items}
-    items_cents = sum(item["quantity"] * item["unit_price_cents"] for item in items)
     markup_cents = sum(item["quantity"] * item["markup_cents"] for item in items)
+    if priced is not None:
+        amounts = shop_pricing.frozen_prices(priced, markup_cents)
+    else:
+        items_cents = sum(item["quantity"] * item["unit_price_cents"] for item in items)
+        amounts = {"items_cents": items_cents, "shipping_cents": shipping_cents, "fees_cents": 0,
+                   "shipping_source": "estimate" if estimate is not None else "fallback",
+                   "total_cents": items_cents + markup_cents + shipping_cents,
+                   "price_source": shop_pricing.SOURCE_FALLBACK, "printful_costs": None, "tax_shares": None}
     order = {
         "id": order_id, "user_id": user_id, "idempotency_key": key, "request_hash": request_hash, "status": "placed",
-        "frozen": {"currency": "EUR", "items_cents": items_cents, "markup_cents": markup_cents,
-                   "shipping_cents": shipping_cents, "shipping_source": shipping_source,
-                   "total_cents": items_cents + markup_cents + shipping_cents,
+        "frozen": {"currency": "EUR", "markup_cents": markup_cents, **amounts,
                    # Ein Steuerprofil je Bestellung; mischen Positionen verschiedene, bleibt es offen (#1701).
                    "tax_profile": next(iter(tax_profiles)) if len(tax_profiles) == 1 else None,
                    "buyer_kind": buyer_kind, "payment_rules": rules},

@@ -13,10 +13,11 @@ Fünf Schritte, wie die Seite (Verwaltung → Finanzen → Shop → Produkte) si
    Ebenen: Motiv mit Vorgabe-Position und Größe in cm, dazu optional Gamertag bzw. Vereinsnummer als Platzhalter (ihre
    Datei entsteht je Bestellung, #1711). Die Website erzeugt daraus die Druckdateien je Farbe exakt in der Pixelgröße
    von Printful (``shop_print_files.generate``); für Profis geht auch eine fertige Datei je Fläche (``upload``).
-4. **Preise** - ``accept_prices``: Mitglieder zahlen den Selbstkostenpreis (Einkauf je Variante plus Aufpreise der
-   Druckflächen außer der im Grundpreis enthaltenen), ohne Aufschlag. Der öffentliche Preis ist Einkauf plus Aufschlag
-   (eigener des Produkts ersetzt den allgemeinen, ``shop_config.markup_cents``). Preise von Printful werden nie
-   ungeprüft übernommen - erst „Preise übernehmen“ mit Grund.
+4. **Preise** - ``accept_prices``: Mitglieder zahlen, was der Verein an Printful zahlt (#2135): je Variante Printful
+   brutto (Ware) aus der Kostenschätzung (``shop_pricing.member_price``), ohne Aufschlag; ohne Schätzung als Rückfall
+   der Katalog netto (Einkauf je Variante plus Aufpreise der Druckflächen außer der im Grundpreis enthaltenen). Der
+   öffentliche Preis ist das plus Aufschlag (eigener des Produkts ersetzt den allgemeinen,
+   ``shop_config.markup_cents``). Preise von Printful werden nie ungeprüft übernommen - erst „Preise übernehmen“.
 5. **Prüfen und veröffentlichen** - ``run_check`` und ``set_status``: Entwurf → geprüft → veröffentlicht → archiviert.
 
 Jeder Schritt braucht einen Grund und steht im Protokoll (Aktionen ``shop.product.*``). Ein veröffentlichtes Produkt
@@ -31,7 +32,8 @@ from typing import Any
 from datetime import datetime, timedelta, timezone
 
 from models import now_utc
-from services import shop_catalog, shop_catalog_sync, shop_colors, shop_config, shop_gamertag, shop_print_files
+from services import shop_catalog, shop_catalog_sync, shop_colors, shop_config, shop_gamertag, shop_pricing
+from services import shop_print_files
 from services import shop_print_templates as templates
 from services.shop_common import ShopConflict, ShopError, clean_reason, record_admin_action
 from services.shop_costs import cost_cents, euro, included_placement, technique_of
@@ -615,8 +617,9 @@ async def _offered(db, product: dict) -> list[tuple[dict, dict | None]]:
 
 @_locked
 async def accept_prices(db, product_id: str, *, actor_id: str, reason: Any) -> dict:
-    """Die Einkaufspreise als Mitgliederpreis übernehmen (Selbstkostenpreis) - nur so kommen Preise von Printful in
-    den Shop. Beendet offene Preiswarnungen des Abgleichs."""
+    """Den Mitgliederpreis übernehmen: Printful brutto aus der Schätzung je Variante (#2135), ohne Schätzung den
+    Katalog netto (Selbstkosten) - nur so kommen Preise von Printful in den Shop. Beendet offene Preiswarnungen des
+    Abgleichs."""
     reason = clean_reason(reason, required=False)
     product = await _product(db, product_id)
     if product.get("status") == "archived":
@@ -627,12 +630,13 @@ async def accept_prices(db, product_id: str, *, actor_id: str, reason: Any) -> d
     minimum = (await shop_config.load(db))["min_price_cents"]
     costs = []
     for variant, mapping in offered:  # erst alles prüfen, dann schreiben - nie halb übernommen
-        cost = cost_cents(product, mapping)
+        cost, source = shop_pricing.member_price(product, mapping)
         shown = shop_colors.variant_label(product, variant)
         if cost is None:
             raise ShopError(f"Für {shown} fehlt der Einkaufspreis von Printful - erst abgleichen.")
         if cost < minimum:
-            raise ShopError(f"{shown}: Selbstkosten {euro(cost)} liegen unter dem Mindestpreis "
+            what = "Printful brutto" if source == "estimate" else "Selbstkosten"
+            raise ShopError(f"{shown}: {what} {euro(cost)} liegen unter dem Mindestpreis "
                             f"{euro(minimum)} - Mindestpreis senken (Shop → Einstellungen) oder die Variante nicht "
                             "anbieten.")
         costs.append(cost)
@@ -776,8 +780,10 @@ async def run_check(db, product: dict) -> dict:
                        "Alle angebotenen Varianten sind bei Printful lieferbar." if offered else "Keine Varianten."))
     unpriced, too_cheap = [], []
     minimum = (await shop_config.load(db))["min_price_cents"]
+    estimated = 0
     for variant, mapping in offered:
-        cost = cost_cents(product, mapping)
+        cost, source = shop_pricing.member_price(product, mapping)
+        estimated += source == "estimate"
         if cost is None or variant.get("price_cents") != cost or (mapping or {}).get("price_warning"):
             unpriced.append(shop_colors.variant_label(product, variant))
         elif variant["price_cents"] < minimum:
@@ -787,9 +793,10 @@ async def run_check(db, product: dict) -> dict:
         problems.append("Preis fehlt oder weicht vom Einkauf ab: " + ", ".join(unpriced))
     if too_cheap:
         problems.append(f"Unter dem Mindestpreis ({euro(minimum)}): " + ", ".join(too_cheap))
+    done = ("Mitgliederpreis = Printful brutto, übernommen." if offered and estimated == len(offered) else
+            "Mitgliederpreis = Einkauf, übernommen." if offered else "Keine Varianten.")
     items.append(_item("prices", "Preis berechnet und übernommen", bool(offered) and not problems,
-                       ". ".join(problems) if problems else
-                       "Mitgliederpreis = Einkauf, übernommen." if offered else "Keine Varianten."))
+                       ". ".join(problems) if problems else done))
     mockup = await mockup_check(db, product)
     items.append({"key": "mockup", "label": "Mockup-Prüfung", "ok": bool(mockup.get("ok")),
                   "state": mockup.get("state") or ("ok" if mockup.get("ok") else "open"),
@@ -877,6 +884,8 @@ async def admin_view(db, product_id: str) -> dict:
     for variant in sorted(variants, key=lambda item: (not item.get("active"), item.get("label") or "")):
         mapping = mappings.get(variant["id"]) or {}
         cost = cost_cents(product, mapping) if mapping else None
+        member, source = shop_pricing.member_price(product, mapping) if mapping else (None, "catalog")
+        estimate = shop_pricing.current_estimate(product, mapping) if mapping else None
         price = variant.get("price_cents")
         variant_rows.append({
             "id": variant["id"], "sku": variant["sku"], "label": variant["label"],
@@ -888,8 +897,17 @@ async def admin_view(db, product_id: str) -> dict:
             "base_cost_cents": mapping.get("base_cost_cents"), "placement_costs": mapping.get("placement_costs") or {},
             "cost_cents": cost, "price_cents": price,
             "public_price_cents": price + effective if isinstance(price, int) else None,
-            "suggested_public_cents": cost + effective if isinstance(cost, int) else None,
-            "price_warning": mapping.get("price_warning"), "synced_at": mapping.get("synced_at")})
+            "suggested_public_cents": member + effective if isinstance(member, int) else None,
+            "price_warning": mapping.get("price_warning"), "synced_at": mapping.get("synced_at"),
+            # Bruttopreis aus der Schätzung (#2135): Printful brutto (Ware), daraus der Mitgliederpreis, Versand nach
+            # AT als Beispiel; der Katalog netto (``cost_cents``) bleibt nur als Prüfwert.
+            "member_price_cents": member, "price_source": source,
+            "printful_gross_cents": (estimate or {}).get("goods_gross_cents"),
+            "printful_net_cents": (estimate or {}).get("goods_net_cents"),
+            "shipping_example_cents": (estimate or {}).get("shipping_gross_cents"),
+            "estimated_at": (mapping.get("gross_estimate") or {}).get("estimated_at"),
+            "estimate_stale": bool(mapping.get("gross_estimate")) and estimate is None,
+            "catalog_check": shop_pricing.strong_deviation(cost, (estimate or {}).get("goods_net_cents"))})
     printful = product.get("printful") or {}
     template = await templates.get(db, printful.get("product_id")) if printful else None
     presets_doc = await templates.load_presets(db)
@@ -957,7 +975,8 @@ async def admin_view(db, product_id: str) -> dict:
         "name_inks": [{key: color[key] for key in ("key", "label", "hex")} for color in gamertag_rules["colors"]],
         "pricing": {"general_markup_cents": general, "product_markup_cents": own, "effective_markup_cents": effective,
                     "source": "product" if isinstance(own, int) else "general",
-                    "member_markup_cents": shop_config.MEMBER_MARKUP_CENTS},
+                    "member_markup_cents": shop_config.MEMBER_MARKUP_CENTS,
+                    "estimate_country": shop_pricing.SAMPLE_COUNTRY, "note": shop_pricing.PRICE_NOTE},
         "check": await run_check(db, product),
         "sync": product.get("catalog_sync"),
         "transitions": list(TRANSITIONS.get(current, ())),

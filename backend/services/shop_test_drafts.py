@@ -35,7 +35,8 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from models import new_id, now_utc
-from services import shop_catalog, shop_colors, shop_common, shop_config, shop_gamertag, shop_print_files, shop_products
+from services import shop_catalog, shop_colors, shop_common, shop_config, shop_costs, shop_gamertag, shop_pricing
+from services import shop_print_files, shop_products
 from services import shop_print_templates
 from services.mutation_lock import MutationLockBusy, mutation_lock
 from services.printful_client import order_payload
@@ -383,12 +384,7 @@ async def _build(db, product: dict, variant: dict, mapping: dict, recipient: dic
                         "Testentwurf geht trotzdem, bestellen können Mitglieder es noch nicht.")
     if variant.get("blocked_reason") or mapping.get("in_stock") is not True:
         warnings.append("Printful meldet die Variante nicht als lieferbar - Printful kann den Entwurf ablehnen.")
-    shop_cost = variant.get("price_cents")
-    price = {"shop_cents": shop_cost,
-             "printful_subtotal_cents": estimate.subtotal_cents if estimate else None}
-    price["level"] = ("open" if None in (price["shop_cents"], price["printful_subtotal_cents"]) else
-                      "ok" if abs(price["shop_cents"] - price["printful_subtotal_cents"]) <= PRICE_TOLERANCE_CENTS
-                      else "warn")
+    price = price_check(product, variant, mapping, estimate)
     now = _now()
     record = {
         "id": draft_id, "kind": KIND, "state": "preview", "external_id": external_id, "item_external_id": item_id,
@@ -410,6 +406,25 @@ async def _build(db, product: dict, variant: dict, mapping: dict, recipient: dic
         await shop_print_files.discard_order_files(db, draft_id)
         raise
     return view(record)
+
+
+def price_check(product: dict, variant: dict, mapping: dict, estimate) -> dict:
+    """„Preis im Shop“ gegen Printful (#2135): der Mitgliederpreis gegen Printful brutto (Ware, mit ihrem Anteil an der
+    Steuer) und der Katalog netto als Prüfwert gegen Printful netto. „prüfen“ nur bei starker Abweichung
+    (``shop_pricing.strong_deviation``) - eine Rundung oder ein paar Cent sind kein Fehler."""
+    gross = net = None
+    if estimate is not None:
+        try:
+            (line,) = shop_pricing.breakdown(shop_pricing.split(estimate), [1])["lines"]
+            gross, net = line["gross_cents"], line["net_cents"]
+        except shop_pricing.EstimateUnusable:
+            pass
+    shop = variant.get("price_cents")
+    catalog = shop_costs.cost_cents(product, mapping)
+    level = "open" if None in (shop, gross) else (
+        "warn" if shop_pricing.strong_deviation(shop, gross) or shop_pricing.strong_deviation(catalog, net) else "ok")
+    return {"shop_cents": shop, "printful_subtotal_cents": estimate.subtotal_cents if estimate else None,
+            "printful_gross_cents": gross, "printful_net_cents": net, "catalog_net_cents": catalog, "level": level}
 
 
 # ================================================================ Senden

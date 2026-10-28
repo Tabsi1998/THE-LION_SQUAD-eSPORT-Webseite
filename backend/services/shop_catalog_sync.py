@@ -9,6 +9,10 @@ Läuft auf Knopfdruck („Mit Printful abgleichen“ im Admin) und täglich als 
 - **Preisänderung**: der neue Einkauf steht an der Zuordnung, dazu eine Warnung (``price_warning``) für den Admin. Der
   Preis der Variante bleibt, bis die Finanzen „Preise übernehmen“ (``shop_products.accept_prices``). Bestehende
   Bestellungen haben ihre Preise eingefroren und bleiben unverändert.
+- **Bruttopreis** (#2135): je Preisgruppe der angebotenen Varianten eine Kostenschätzung von Printful (ein Stück nach
+  Österreich, ``shop_pricing.estimates_for``) - gefragt ohne Sperre, gespeichert mit dem übrigen Ergebnis
+  (``gross_estimate``). Der erwartete Mitgliederpreis ist dann Printful brutto (``shop_pricing.member_price``);
+  scheitert die Schätzung, bleibt die letzte, solange sie zum Einkauf passt.
 - **Ausfall**: nichts wird geändert; der Abgleich merkt sich Zeitpunkt und Ursache, ``last_ok_at`` bleibt der letzte
   erfolgreiche Stand - den zeigt der Admin mit Datum.
 - **Kein Schreiben mit altem Stand**: Printful wird ohne Sperre gefragt (das dauert). Geschrieben wird danach unter der
@@ -30,7 +34,7 @@ import logging
 from typing import Any
 
 from models import now_utc
-from services import shop_catalog, shop_config, shop_costs, shop_print_templates
+from services import shop_catalog, shop_config, shop_costs, shop_pricing, shop_print_templates
 from services.mutation_lock import MutationLockBusy, mutation_lock
 from services.shop_common import ShopConflict, ShopError, clean_reason, record_admin_action
 from services.shop_fulfillment import CatalogProductId, CatalogVariantId, FulfillmentError, FulfillmentProvider
@@ -119,6 +123,7 @@ async def _sync_product_unlocked(db, product_id: str, *, provider: FulfillmentPr
         logger.warning("[shop-sync] product failed: %s", exc.reason)
         return await _failed(db, product_id, previous, now, exc.text)
     by_id = {row.id.value: row for row in rows}
+    estimates = await _estimates(db, product, variants, mappings, by_id, provider=provider)
     # Druckvorlagen (#2069): Maße je Fläche und Vorlagenbilder gleich mit - eine Abweichung steht im Protokoll und macht
     # erzeugte Druckdateien ungültig (die Prüfung zeigt „veraltet“). Scheitert das, bleibt der letzte Stand.
     template = await shop_print_templates.refresh(db, printful["product_id"], provider=provider, actor_id=actor_id,
@@ -132,14 +137,38 @@ async def _sync_product_unlocked(db, product_id: str, *, provider: FulfillmentPr
                 return {**await _failed(db, product_id, previous, now, SKIPPED, skipped=True),
                         "template": template_state}
             result = await _write(db, current, by_id, set(item.value for item in price_for), now=now,
-                                  actor_id=actor_id, reason=reason, template_warning=template_state["warning"])
+                                  actor_id=actor_id, reason=reason, template_warning=template_state["warning"],
+                                  estimates=estimates)
             return {**result, "template": template_state}
     except ShopConflict:
         return {**await _failed(db, product_id, previous, now, SKIPPED, skipped=True), "template": template_state}
 
 
+def _fresh(product: dict, mapping: dict, row, technique: str | None) -> dict:
+    """Die Zuordnung mit dem frisch gelesenen Einkauf - so rechnet die Schätzung mit dem neuen Stand."""
+    if row is None or not row.priced:
+        return mapping
+    base = row.price_cents(technique)
+    return {**mapping, "technique": technique, "base_cost_cents": base if isinstance(base, int) and base > 0 else None,
+            "placement_costs": dict(row.placement_prices.get(technique) or {})}
+
+
+async def _estimates(db, product: dict, variants: list[dict], mappings: dict, by_id: dict, *,
+                     provider: FulfillmentProvider) -> dict[str, dict]:
+    """Bruttoschätzungen (#2135) vor der Sperre - Printful antwortet langsam. Scheitert etwas, gibt es für diese Gruppe
+    keine neue Schätzung; der Abgleich selbst läuft weiter."""
+    technique = shop_costs.technique_of(product)
+    fresh = {variant_id: _fresh(product, mapping, by_id.get(mapping.get("printful_variant_id")), technique)
+             for variant_id, mapping in mappings.items()}
+    try:
+        return await shop_pricing.estimates_for(db, product, variants, fresh, provider=provider)
+    except (ShopError, LookupError) as exc:
+        logger.warning("[shop-sync] estimates skipped: %s", type(exc).__name__)
+        return {}
+
+
 async def _write(db, product: dict, by_id: dict, priced_ids: set[int], *, now: str, actor_id: str,
-                 reason: str, template_warning: str | None = None) -> dict:
+                 reason: str, template_warning: str | None = None, estimates: dict | None = None) -> dict:
     """Schreibt Lager, Einkauf, Sperren und Warnungen - nach frisch gelesenen Varianten, unter der Produkt-Sperre."""
     product_id = product["id"]
     variants = await shop_catalog.variants_of(db, product_id)
@@ -161,8 +190,12 @@ async def _write(db, product: dict, by_id: dict, priced_ids: set[int], *, now: s
             update.update(technique=technique, currency=row.currency,
                           base_cost_cents=base if isinstance(base, int) and base > 0 else None,
                           placement_costs=dict(row.placement_prices.get(technique) or {}))
+        estimate = (estimates or {}).get(variant["id"])
+        if estimate and priced:
+            update["gross_estimate"] = estimate
         merged = {**mapping, **update}
-        cost = shop_costs.cost_cents(product, merged)
+        # Erwarteter Mitgliederpreis (#2135): Printful brutto aus der Schätzung, sonst der Katalog netto.
+        cost = shop_pricing.member_price(product, merged)[0]
         reason_now = _blocked_reason(row, active=bool(variant.get("active")), cost=cost, minimum=minimum)
         if reason_now and not variant.get("blocked_reason"):
             await shop_catalog.set_variant_state(db, variant["id"], {"blocked_reason": reason_now, "blocked_at": now},
