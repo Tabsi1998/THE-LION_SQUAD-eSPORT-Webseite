@@ -716,6 +716,11 @@ async def _sync_pool(db, tournament: dict, season: dict, user: dict, *, locked: 
             changed.append("map_pool")
         applied.append("map_pool")
         return
+    if pool:
+        # Die Staffel spielt ein anderes Spiel als die Season (jemand hat es am Turnier umgestellt): nichts löschen.
+        skipped.append({"group": "map_pool", "label": SYNC_GROUP_LABELS["map_pool"],
+                        "reason": "Die Staffel hat ein anderes Spiel als der Map-Pool der Season - ihr Pool bleibt."})
+        return
     if not own:
         applied.append("map_pool")
         return
