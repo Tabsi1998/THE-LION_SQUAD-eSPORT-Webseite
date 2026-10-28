@@ -4,11 +4,10 @@ import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormGrid } from "@/components/tls/AdminForm";
-import { CheckField, SelectField } from "@/components/tls/FormFields";
+import { CheckField } from "@/components/tls/FormFields";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
-import { TOURNAMENT_FORMAT_OPTIONS } from "@/lib/tournamentLabels";
 import { gameLabel } from "@/lib/gameLabels";
 import { gameMatchDataPayload, gameMatchDataProblem, gameMatchDataToForm } from "@/lib/gameMatchData";
 import { GameMatchDataFields } from "./GameMatchDataFields";
@@ -214,13 +213,6 @@ function toForm(game) {
     platforms: (game.platforms || []).join(", "),
     cover_url: game.cover_url || "",
     logo_url: game.logo_url || "",
-    supports_solo: game.supports_solo ?? true,
-    supports_teams: game.supports_teams ?? true,
-    supports_ffa: game.supports_ffa ?? false,
-    supports_time_trial: game.supports_time_trial ?? false,
-    supports_grand_prix: game.supports_grand_prix ?? false,
-    default_team_size: game.default_team_size ?? 1,
-    default_format: game.default_format || "single_elim",
     player_id_fields: game.player_id_fields || [],
     discord_guild_id: game.discord_guild_id || "",
     discord_role_name: game.discord_role_name || "",
@@ -251,7 +243,6 @@ function gamePayload(form) {
     identity_source_game_id: isEdition ? (form.identity_source_game_id || null) : null,
     inherit_player_ids: form.inherit_player_ids !== false,
     platforms: form.platforms ? form.platforms.split(",").map((s) => s.trim()).filter(Boolean) : [],
-    default_team_size: Number(form.default_team_size) || 1,
     player_id_fields: normalizePlayerIdFields(form.player_id_fields),
     discord_guild_id: form.discord_guild_id || null,
     discord_role_name: isEdition ? null : ((form.discord_role_name || "").trim() || null),
@@ -306,17 +297,6 @@ function EditGameModal({ game, games, servers = [], onClose, onSaved }) {
         <ImageUpload value={form.cover_url} onChange={(v) => set("cover_url", v)} label="Cover" testId="game-edit-cover" variant="wide" allowLibrary />
       </FormGrid>
       <PlayerIdFieldsEditor value={form.player_id_fields} onChange={(v) => set("player_id_fields", v)} />
-      <FormGrid cols={3}>
-        <CheckField label="Solo" checked={!!form.supports_solo} onChange={(v) => set("supports_solo", v)} />
-        <CheckField label="Teams" checked={!!form.supports_teams} onChange={(v) => set("supports_teams", v)} />
-        <CheckField label="Mehrspieler frei" checked={!!form.supports_ffa} onChange={(v) => set("supports_ffa", v)} />
-        <CheckField label="Zeitfahren" checked={!!form.supports_time_trial} onChange={(v) => set("supports_time_trial", v)} />
-        <CheckField label="Rennserie" checked={!!form.supports_grand_prix} onChange={(v) => set("supports_grand_prix", v)} />
-      </FormGrid>
-      <FormGrid>
-        <Input placeholder="Teamgröße Standard" value={form.default_team_size} onChange={(v) => set("default_team_size", v)} testId="game-edit-team-size" />
-        <SelectField label="Standardformat" value={form.default_format} onChange={(v) => set("default_format", v)} options={TOURNAMENT_FORMAT_OPTIONS} testId="game-edit-format" />
-      </FormGrid>
       <GameMatchDataFields value={form.match_data} onChange={(v) => set("match_data", v)} />
     </AdminSheet>
   );

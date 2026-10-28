@@ -429,6 +429,8 @@ class GameCreate(GameMatchData):
     cover_url: Optional[str] = None
     platforms: List[str] = []
     genre: Optional[str] = None
+    # Altfelder (#2111, W1): wirken nirgends und stehen nicht mehr in der Verwaltung - sie bleiben nur, damit ältere
+    # Aufrufe und gespeicherte Spiele unverändert durchgehen.
     supports_solo: bool = True
     supports_teams: bool = True
     supports_ffa: bool = False

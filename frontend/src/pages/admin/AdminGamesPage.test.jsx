@@ -75,12 +75,17 @@ test("Bearbeiten öffnet das Seitenblatt mit den Werten; Speichern schickt das S
   expect(screen.getByRole("dialog", { name: "Spiel bearbeiten" })).toBeInTheDocument();
   expect(screen.getByTestId("game-edit-name")).toHaveValue("Mario Kart 8 Deluxe");
   expect(screen.getByTestId("game-edit-platforms")).toHaveValue("Switch");
-  expect(screen.getByTestId("game-edit-format")).toHaveValue("single_elim");
+  // Standardformat, Teamgröße und die Haken Solo/Teams/… wirkten nirgends (#2111, W1) - sie sind weg und gehen nicht mit.
+  expect(screen.queryByTestId("game-edit-format")).toBeNull();
+  expect(screen.queryByTestId("game-edit-team-size")).toBeNull();
+  expect(screen.queryByText("Zeitfahren")).toBeNull();
   expect(screen.queryByTestId("game-edit-discord")).toBeNull();
 
   fireEvent.change(screen.getByTestId("game-edit-platforms"), { target: { value: "Switch, Switch 2" } });
   fireEvent.submit(screen.getByTestId("game-sheet"));
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/games/g1", expect.objectContaining({ slug: "mario-kart-8", platforms: ["Switch", "Switch 2"] })));
+  const body = apiMock.patch.mock.calls[0][1];
+  for (const key of ["supports_solo", "supports_teams", "default_team_size", "default_format"]) expect(body).not.toHaveProperty(key);
   await waitFor(() => expect(screen.queryByTestId("game-sheet")).toBeNull());
 });
 
