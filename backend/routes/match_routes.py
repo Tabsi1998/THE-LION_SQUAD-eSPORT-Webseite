@@ -1009,37 +1009,46 @@ async def submit_match_result(match_id: str, body: MatchV2ResultSubmit,
             await ensure_tournament_accepts_results(db, match["tournament_id"])
             await _require_result_permission(me, match)
             raw_results = [entry.model_dump() for entry in body.results]
-            games, missing = await _staff_games(db, match, body, raw_results)
-            if body.hold:
-                # Ergebnis-Fenster (#1156): 10 Sekunden „Rückgängig“, erst danach Baum, TV und Nachrichten.
-                return await hold_result(db, match, raw_results, actor=me, note=body.note, proof_url=body.proof_url,
-                                         force=force, reason=body.reason, games=games, lineups_missing=missing)
-            ensure_no_hold(match)
-            outcome = await submit_v2_result(
-                db,
-                match,
-                raw_results,
-                actor_id=me["id"],
-                proof_url=body.proof_url,
-                note=body.note,
-                force=force,
-                audit_action="match.result.submit",
-                reason=body.reason,
-                games=games,
-                lineups_missing=missing,
-            )
-            if games is not None and match.get("games") and not outcome.get("idempotent_replay"):
-                # Liga (#1650): Maps der Turnierleitung korrigiert - eigener Eintrag mit Grund im Protokoll.
-                await _audit_match_action(db, "match.games.correct", match, me.get("id"), {
-                    "games": len(games), **({"reason": body.reason.strip()} if (body.reason or "").strip() else {}),
-                })
-            return outcome
+            tournament = await db.tournaments.find_one({"id": match["tournament_id"]}, {"_id": 0, "league_context": 1})
+            # Liga (#1650): Doppel-Einsatz über Staffeln derselben Season - Prüfen und Schreiben unter der Season-Sperre.
+            async with league_games.season_lock(db, tournament):
+                return await _submit_staff_result(db, match, body, raw_results, me, force)
     except MutationLockBusy:
         raise HTTPException(status_code=409, detail="Eine Turnieraktion wird bereits verarbeitet. Bitte erneut versuchen.")
     except MatchV2ResultError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc))
     except league_games.LeagueGamesError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+
+
+async def _submit_staff_result(db, match: dict, body: MatchV2ResultSubmit, raw_results: list[dict], me: dict,
+                               force: bool) -> dict:
+    """Ergebnis der Turnierleitung schreiben - der Aufrufer hält Turnier- und (bei Liga) Season-Sperre."""
+    games, missing = await _staff_games(db, match, body, raw_results)
+    if body.hold:
+        # Ergebnis-Fenster (#1156): 10 Sekunden „Rückgängig“, erst danach Baum, TV und Nachrichten.
+        return await hold_result(db, match, raw_results, actor=me, note=body.note, proof_url=body.proof_url,
+                                 force=force, reason=body.reason, games=games, lineups_missing=missing)
+    ensure_no_hold(match)
+    outcome = await submit_v2_result(
+        db,
+        match,
+        raw_results,
+        actor_id=me["id"],
+        proof_url=body.proof_url,
+        note=body.note,
+        force=force,
+        audit_action="match.result.submit",
+        reason=body.reason,
+        games=games,
+        lineups_missing=missing,
+    )
+    if games is not None and match.get("games") and not outcome.get("idempotent_replay"):
+        # Liga (#1650): Maps der Turnierleitung korrigiert - eigener Eintrag mit Grund im Protokoll.
+        await _audit_match_action(db, "match.games.correct", match, me.get("id"), {
+            "games": len(games), **({"reason": body.reason.strip()} if (body.reason or "").strip() else {}),
+        })
+    return outcome
 
 
 async def _staff_games(db, match: dict, body: MatchV2ResultSubmit,
@@ -1284,7 +1293,12 @@ async def report_score(match_id: str, body: MatchScoreReport, me: dict = Depends
     policy = _match_policy(m, tournament, stage)
     if not _players_can_report(policy):
         raise HTTPException(status_code=403, detail="Ergebnisse werden für dieses Match durch die Turnierleitung eingetragen")
-    return await _report_v2(db, m, body, me, tournament, stage)
+    try:
+        # Liga (#1650): Doppel-Einsatz über Staffeln derselben Season - nach der Turnier-Sperre die Season-Sperre.
+        async with league_games.season_lock(db, tournament):
+            return await _report_v2(db, m, body, me, tournament, stage)
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail="Eine Turnieraktion wird bereits verarbeitet. Bitte erneut versuchen.")
 
 
 @router.put("/{match_id}/lineups")
@@ -1303,13 +1317,16 @@ async def amend_lineups(match_id: str, body: MatchLineupAmend, me: dict = Depend
     if not staff and not acting:
         raise HTTPException(status_code=403, detail="Die Aufstellung tragen Captain und Vertreter der eigenen Seite nach.")
     try:
-        updated = await league_games.amend_lineups(
-            db, league, [game.model_dump() for game in body.games],
-            registration_id=body.registration_id if staff else acting["id"], actor_id=me["id"], staff=staff,
-            reason=body.reason,
-        )
+        async with league_games.season_lock(db, league.tournament):
+            updated = await league_games.amend_lineups(
+                db, league, [game.model_dump() for game in body.games],
+                registration_id=body.registration_id if staff else acting["id"], actor_id=me["id"], staff=staff,
+                reason=body.reason,
+            )
     except league_games.LeagueGamesError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail="Eine Turnieraktion wird bereits verarbeitet. Bitte erneut versuchen.")
     return {**updated, "idempotent_replay": False}
 
 
