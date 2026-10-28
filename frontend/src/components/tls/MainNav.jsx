@@ -378,21 +378,40 @@ export function withLeagueEntry(items, show) {
   });
 }
 
-let leagueVisible = null;
+// Ein gemeinsamer Abruf für Kopf- und Handymenü: beide fragen gleichzeitig, aber /leagues geht nur einmal raus. Nach
+// einer Änderung („leagues“, Anmeldung) wird er verworfen und neu geholt.
+let leagueRequest = null;
+let leagueVisible = false;
+
+export function leagueVisibility({ fresh = false } = {}) {
+  if (fresh || !leagueRequest) {
+    leagueRequest = Promise.resolve()
+      .then(() => api.get("/leagues"))
+      .then(({ data }) => (data?.leagues || []).length > 0)
+      .catch(() => false)
+      .then((visible) => {
+        leagueVisible = visible;
+        return visible;
+      });
+  }
+  return leagueRequest;
+}
+
+export function resetLeagueVisibility() {
+  leagueRequest = null;
+  leagueVisible = false;
+}
 
 function useLeagueVisible() {
-  const [show, setShow] = useState(Boolean(leagueVisible));
-  const load = useCallback(async () => {
-    try {
-      const { data } = await api.get("/leagues");
-      leagueVisible = (data?.leagues || []).length > 0;
-    } catch {
-      leagueVisible = false;
-    }
-    setShow(leagueVisible);
+  const [show, setShow] = useState(leagueVisible);
+  const apply = useCallback((fresh) => {
+    let alive = true;
+    leagueVisibility({ fresh }).then((visible) => { if (alive) setShow(visible); });
+    return () => { alive = false; };
   }, []);
-  useEffect(() => { load(); }, [load]);
-  useApiInvalidation(load, ["leagues", "auth"]);
+  useEffect(() => apply(false), [apply]);
+  const refresh = useCallback(() => { apply(true); }, [apply]);
+  useApiInvalidation(refresh, ["leagues", "auth"]);
   return show;
 }
 
