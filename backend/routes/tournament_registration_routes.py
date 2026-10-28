@@ -873,7 +873,7 @@ async def admin_create_registration(tid: str, body: RegistrationAdminCreate,
         or ((user or {}).get("display_name") or (user or {}).get("username") or "").strip()
     )
     if not display_name:
-        raise HTTPException(status_code=400, detail="Display-Name oder Account ist erforderlich")
+        raise HTTPException(status_code=400, detail="Bitte ein Konto wählen oder einen Anzeigenamen eintragen.")
     old_reg_id = payload.get("replace_registration_id")
     old = None
     replace_targets: list[dict] | None = None

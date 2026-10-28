@@ -41,7 +41,7 @@ def test_admin_list_planning_warning_and_server_compute_the_same_default():
     # Eine Vor-Ort-Halle ohne eigene Angabe bleibt online, wie im Admin - der Ort allein macht kein Vor-Ort-Turnier.
     assert _match_policy({"id": "m1"}, {"location": "Vereinsheim"})["event_mode"] == "online"
     warnings = _planning_report([], {"event_mode": "online", "result_entry_mode": "staff_only"})["warnings"]
-    assert any("Online-Turnier ist auf Staff-Erfassung gesetzt" in row["message"] for row in warnings)
+    assert any("Ergebniserfassung: Nur Turnierleitung" in row["message"] for row in warnings)
     assert not _planning_report([], {"event_mode": "online"})["warnings"], "ohne Angabe melden online die Spieler - keine Warnung"
 
 

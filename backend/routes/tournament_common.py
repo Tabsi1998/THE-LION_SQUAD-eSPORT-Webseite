@@ -259,7 +259,7 @@ def _planning_report(
         warnings.append({
             "type": "rule_mode_conflict",
             "severity": "warning",
-            "message": "Online-Turnier ist auf Staff-Erfassung gesetzt. Teilnehmer können keine Ergebnisse melden.",
+            "message": "Online-Turnier mit „Ergebniserfassung: Nur Turnierleitung“ – Teilnehmer können keine Ergebnisse melden.",
         })
     planned_by_station: dict[str, list[dict]] = {}
     active_matches = [
