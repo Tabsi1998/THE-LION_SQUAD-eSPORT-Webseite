@@ -88,3 +88,12 @@ test("Nachladen: scheitert ein Teil, bleibt sein letzter Stand stehen", async ()
   expect(screen.getByTestId("my-prize-p1")).toBeInTheDocument();
   expect(screen.getByTestId("prizes-partial")).toHaveTextContent("Urkunden");
 });
+
+// Die Abholfrist läuft erst ab „Bereit“ (#2123, ER1): ein offener Gewinn nennt keine Frist, nur was als Nächstes kommt.
+test("offener Gewinn: keine Frist, sondern der Hinweis auf „abholbereit“", async () => {
+  render(<MemoryRouter><MyPrizesPage /></MemoryRouter>);
+  const raffle = await screen.findByTestId("my-prize-p2");
+  expect(raffle).not.toHaveTextContent("Abholbar bis");
+  expect(screen.getByTestId("my-prize-pending-p2")).toHaveTextContent("sobald er abholbereit ist");
+  expect(screen.getByTestId("my-prize-p1")).toHaveTextContent("Abholbar bis");
+});

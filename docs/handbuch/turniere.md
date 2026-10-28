@@ -541,7 +541,22 @@ der TV zählt dann herunter. Im Reiter **Turnierbaum** setzt ihr „Runde präse
    System die **Punkte für die Jahreswertung** (Gewicht unter Spieloptionen: Major, Normal, Mini, Fun-Wertung … oder
    „Keine Jahreswertung“), die Auszeichnungen und legt die **Gewinn-Einträge** an (zu sehen unter **Admin → eSports →
    Gewinne**). Im Bearbeiten-Formular erzeugt **Gewinne erzeugen** (Abschnitt Preise) die Einträge bei Bedarf noch
-   einmal.
+   einmal – erst ab **Beendet**, vorher ist der Knopf gesperrt (sonst gäbe es Gewinne für einen Zwischenstand).
+   **Sonderpreise** hängen an keinem Platz; die legt ihr unter **Gewinne** von Hand an.
+
+   **Korrektur nach dem Veröffentlichen:** Status zurück auf **Beendet**, Ergebnis korrigieren, wieder **Ergebnisse
+   veröffentlicht**. Die Jahreswertungs-Punkte des Turniers werden dabei an die neue Rangfolge angeglichen (in der
+   Jahreswertung, in der sie schon stehen; auch nach einem Wechsel Mini/Normal/Major gibt es je Person nur einen
+   Eintrag; „Keine Jahreswertung“ nimmt sie zurück), der Abgleich steht im Protokoll. Fehlende Gewinne kommen dazu;
+   ein Gewinn, dessen Platz nicht mehr stimmt, wird nie entzogen, sondern steht unter **Gewinne** mit **Nach Korrektur
+   prüfen**.
+
+   **Gewinne übergeben** (Admin → eSports → Gewinne): Ein neuer Gewinn ist **Offen** und hat noch keine Frist. Mit
+   **Bereit** liegt er zur Abholung bereit: ab jetzt laufen **90 Tage** Abholfrist (eine von Hand gesetzte Frist
+   bleibt), und der Gewinner bekommt Bescheid – in der Glocke, per Push und per Mail; bei Team-Gewinnen die
+   Teamleitung. **Abgeholt** vermerkt die Übergabe (mit Nachricht). **Zurück** holt einen versehentlich abgehakten
+   Gewinn auf „Bereit“ – ohne neue Nachricht. Nur „Bereit“ verfällt nach Ablauf der Frist (mit Nachricht); **Wieder
+   öffnen** gibt einem verfallenen Gewinn eine neue Frist. Jeder Schritt und jedes Löschen steht im Protokoll.
 3. **Archiviert** oder **Abgesagt**: ebenfalls nur Turnierleitung. **Abgesagt** fragt nach einem freiwilligen Grund;
    alle, die angemeldet sind oder auf der Warteliste stehen (bei Teams jedes Mitglied), bekommen einmal „Turnier
    abgesagt“ ins Postfach und per Push, mit dem Grund. Eine Mail dazu gibt es noch nicht. **Entwurf** fragt ebenfalls
