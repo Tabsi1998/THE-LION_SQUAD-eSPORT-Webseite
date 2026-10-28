@@ -35,7 +35,7 @@ import { ResultWindow } from "@/components/tls/results/ResultWindow";
 import { ResultUndoBar, useResultUndo } from "@/components/tls/results/ResultUndoBar";
 import { isOwnProposal, proposalStatusLabel, waitingForOtherSide } from "@/lib/scheduleProposals";
 import { useLeagueTrail } from "@/hooks/useLeagueTrail";
-import { leagueCrumbs } from "@/lib/leagueTrail";
+import { tournamentCrumbs } from "@/lib/leagueTrail";
 import { LeagueEmblem } from "@/components/tls/league/public/LeagueLook";
 
 const DECISION_TOASTS = {
@@ -347,15 +347,7 @@ function MatchPageView() {
   return (
     <PublicLayout>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
-        <Breadcrumbs
-          items={leagueCrumbs(data.tournament, trail, { tournamentUrl, current: { label: `Match ${match.match_key || match.id}` } }) || [
-            { label: "Home", to: "/" },
-            { label: "Turniere", to: "/tournaments" },
-            ...(data.tournament ? [{ label: data.tournament.title, to: tournamentUrl }] : []),
-            { label: `Match ${match.match_key || match.id}` },
-          ]}
-          className="mb-5"
-        />
+        <Breadcrumbs items={tournamentCrumbs(data.tournament, trail, { tournamentUrl, current: { label: `${formatMatchKind(match)} ${match.match_key || ""}`.trim() } })} className="mb-5" />
         {/* Kopf (#1220): Runde und Namen statt „Match A“ - der Schlüssel steht nur noch klein. Rechts der Zustand:
             vor dem Spiel der Termin, danach „Beendet“ mit dem Ergebnis. */}
         <div className="flex items-start justify-between gap-4 flex-wrap">

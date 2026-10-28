@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 // Matchseite für Spieler (#2124): Läufe nach Platz, Termin nur in der Zukunft, Entscheidung zur eigenen Meldung,
