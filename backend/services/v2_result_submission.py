@@ -95,9 +95,11 @@ async def _upsert_result_audit(
 
 async def _close_disputes(db, match: dict, actor_id: str, now_iso: str) -> None:
     """Die Turnierleitung hat ein Ergebnis zu einem Spiel in Klärung eingetragen - damit ist der Dispute entschieden
-    (#1134). Jeder offene Dispute bekommt „entschieden am/von“, das Spiel ebenso."""
+    (#1134). Jeder offene Dispute bekommt „entschieden am/von“, das Spiel ebenso - und die Entscheidung „change“
+    (Ergebnis geändert), die die meldende Seite auf der Matchseite sieht (#2124)."""
     disputes = [
-        {**row, "resolved_at": row.get("resolved_at") or now_iso, "resolved_by": row.get("resolved_by") or actor_id}
+        {**row, "resolved_at": row.get("resolved_at") or now_iso, "resolved_by": row.get("resolved_by") or actor_id,
+         **({} if row.get("resolved_at") else {"decision": "change"})}
         for row in match.get("disputes") or [] if isinstance(row, dict)
     ]
     await db.matches_v2.update_one({"id": match["id"]}, {"$set": {

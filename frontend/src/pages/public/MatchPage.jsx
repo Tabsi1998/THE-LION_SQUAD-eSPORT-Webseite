@@ -30,6 +30,7 @@ import { LeagueGamesView, LeagueLobbyIds, LineupAmendForm, StaffLineupAmend } fr
 import { LiveQueueStatus } from "@/components/tls/live/LiveQueueStatus";
 import { MatchCallBox } from "@/components/tls/tournament/MatchCallBox";
 import { ProblemReportForm } from "@/components/tls/results/ProblemReportForm";
+import { OwnDisputes } from "@/components/tls/results/OwnDisputes";
 import { ResultWindow } from "@/components/tls/results/ResultWindow";
 import { ResultUndoBar, useResultUndo } from "@/components/tls/results/ResultUndoBar";
 import { isOwnProposal, proposalStatusLabel, waitingForOtherSide } from "@/lib/scheduleProposals";
@@ -492,6 +493,8 @@ function MatchPageView() {
               ) : null}
             </p>
           )}
+          {/* Deine Meldung – Entscheidung (#2124): was die Turnierleitung zur eigenen Meldung entschieden hat. */}
+          <OwnDisputes match={match} userId={user?.id} />
 
           {hasResultActions ? (
             <div className="mt-5 border-t border-white/10 pt-5 space-y-5">

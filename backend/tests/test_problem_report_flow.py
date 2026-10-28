@@ -126,6 +126,13 @@ async def test_staff_keeps_the_result_with_one_tap_and_both_sides_hear_it(flow):
     assert len(mails) == 2
     audit = await flow.db.audit_logs.find({"action": "match.dispute.keep"}, {"_id": 0}).to_list(5)
     assert audit and audit[0]["actor_id"] == staff["id"]
+    # Die eigene Meldung mit Entscheidung (#2124, TP4): die Matchseite zeigt sie der meldenden Seite - nur ihr.
+    flow.act_as(player[first])
+    own = (await flow.get(f"/api/matches/{match['id']}/page")).json()["match"]["disputes"]
+    assert own[0]["decision"] == "keep" and own[0]["decision_note"] == "Lag war auf beiden Seiten" and own[0]["resolved_at"]
+    flow.act_as(player[second])
+    assert (await flow.get(f"/api/matches/{match['id']}/page")).json()["match"]["disputes"] == [{"at": own[0]["at"]}]
+    flow.act_as(staff)
     again = await flow.post(f"/api/matches/{match['id']}/dispute/decision", json={"decision": "keep"})
     assert again.status_code == 409, "kein Dispute mehr offen"
 
@@ -148,6 +155,7 @@ async def test_staff_changes_the_result_through_the_window_and_the_dispute_close
     decided = [row for row in await notes(flow, "match_result") if row["title"] == "Dispute entschieden"]
     assert {row["user_id"] for row in decided} == {player[first]["id"], player[second]["id"]}
     assert stored["result_meta"]["correction_reason"] == "Foto zeigt 2:1"
+    assert all(row.get("decision") == "change" for row in stored["disputes"]), "Korrektur entscheidet den Dispute (#2124)"
 
 
 @pytest.mark.asyncio

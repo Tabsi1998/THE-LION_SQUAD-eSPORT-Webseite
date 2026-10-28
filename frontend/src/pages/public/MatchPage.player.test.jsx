@@ -139,3 +139,42 @@ describe("„Login zum Ergebnis melden“ nur, wo Spieler selbst melden (TP6)", 
     expect(screen.queryByTestId("match-login-to-report")).toBeNull();
   });
 });
+describe("Deine Meldung – Entscheidung (TP4)", () => {
+  const decided = (disputes, extra = {}) => ({
+    ...BASE, can_act: true, acting_registration_id: "r1",
+    match: { id: "m1", match_key: "A", status: "completed", winner_id: "r2",
+      slots: DUEL.map(({ slot, registration_id }) => ({ slot, registration_id })),
+      results: [{ registration_id: "r1", rank: 2, score: 1 }, { registration_id: "r2", rank: 1, score: 2 }], disputes, ...extra },
+    participants: DUEL,
+  });
+
+  test("„Ergebnis bleibt“ mit Begründung der Turnierleitung", async () => {
+    authState.user = { id: "u1" };
+    renderMatch(decided([{ user_id: "u1", reason: "Lag im zweiten Spiel", category: "technical", at: "2026-05-19T18:00:00Z",
+      resolved_at: "2026-05-19T18:20:00Z", decision: "keep", decision_note: "Lag war auf beiden Seiten" }]));
+    const box = await screen.findByTestId("match-own-dispute");
+    expect(box).toHaveTextContent("Deine Meldung · Technik");
+    expect(box).toHaveTextContent("„Lag im zweiten Spiel“");
+    expect(within(box).getByTestId("match-own-dispute-decision")).toHaveTextContent("Entschieden: Das Ergebnis bleibt.");
+    expect(within(box).getByTestId("match-own-dispute-note")).toHaveTextContent("Begründung: Lag war auf beiden Seiten");
+  });
+
+  test("offen: „Die Turnierleitung prüft“; korrigiert: „Das Ergebnis wurde korrigiert“ - die neueste zuerst", async () => {
+    authState.user = { id: "u1" };
+    renderMatch(decided([
+      { user_id: "u1", reason: "Stand vertauscht", category: "wrong_result", at: "2026-05-19T18:00:00Z", resolved_at: "2026-05-19T18:10:00Z", decision: "change" },
+      { user_id: "u1", reason: "Noch einmal falsch", category: "wrong_result", at: "2026-05-19T19:00:00Z" },
+    ]));
+    const boxes = await screen.findAllByTestId("match-own-dispute");
+    expect(boxes.map((box) => box.getAttribute("data-state"))).toEqual(["open", "change"]);
+    expect(boxes[0]).toHaveTextContent("Die Turnierleitung prüft deine Meldung.");
+    expect(boxes[1]).toHaveTextContent("Entschieden: Das Ergebnis wurde korrigiert.");
+  });
+
+  test("Meldungen anderer (nur Zeitpunkt) und Gäste: kein Kasten", async () => {
+    authState.user = { id: "u9" };
+    renderMatch(decided([{ at: "2026-05-19T18:00:00Z" }]));
+    await screen.findByTestId("match-result-card");
+    expect(screen.queryByTestId("match-own-disputes")).toBeNull();
+  });
+});
