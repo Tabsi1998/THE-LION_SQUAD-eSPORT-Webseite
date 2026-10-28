@@ -39,6 +39,9 @@ class TeamSquadCreate(BaseModel):
     game_id: Optional[str] = None
     member_ids: list[str] = Field(default_factory=list)
     status: Literal["active", "archived"] = "active"
+    # Liga (docs/LIGA.md, #1649): Captain und Vertreter handeln für das Co-Team - beide aus dem Kader, verschieden.
+    captain_id: Optional[str] = Field(default=None, max_length=64)
+    vice_captain_id: Optional[str] = Field(default=None, max_length=64)
 
 
 class TeamSquadUpdate(BaseModel):
@@ -49,6 +52,17 @@ class TeamSquadUpdate(BaseModel):
     game_id: Optional[str] = None
     member_ids: Optional[list[str]] = None
     status: Optional[Literal["active", "archived"]] = None
+    captain_id: Optional[str] = Field(default=None, max_length=64)
+    vice_captain_id: Optional[str] = Field(default=None, max_length=64)
+
+
+class TeamSquadRoles(BaseModel):
+    captain_id: Optional[str] = Field(default=None, max_length=64)
+    vice_captain_id: Optional[str] = Field(default=None, max_length=64)
+
+
+SQUAD_ROLE_FIELDS = ("captain_id", "vice_captain_id")
+SQUAD_ROLE_LABELS = {"captain_id": "Captain", "vice_captain_id": "Vertreter"}
 
 
 class TeamInviteCreate(BaseModel):
@@ -328,6 +342,78 @@ def _validate_squad_members(team: dict, member_ids: list[str]) -> list[str]:
         if uid not in clean:
             clean.append(uid)
     return clean
+
+
+def _squad_roles(current: dict, requested: dict, member_ids: list[str]) -> dict:
+    """Captain und Vertreter eines Co-Teams nach einer Änderung (docs/LIGA.md, Abschnitt 5; #1649).
+
+    Beide stehen im Kader und sind verschiedene Personen. Wer eine Rolle hat, verlässt den Kader erst, wenn die Rolle
+    neu vergeben ist - in derselben Änderung oder davor; sonst 409 mit dem Hinweis, was zu tun ist."""
+    roles = {field: current.get(field) or None for field in SQUAD_ROLE_FIELDS}
+    for field in SQUAD_ROLE_FIELDS:
+        if field in requested:
+            roles[field] = (requested.get(field) or "").strip() or None
+    members = set(member_ids or [])
+    for field, user_id in roles.items():
+        if not user_id or user_id in members:
+            continue
+        label = SQUAD_ROLE_LABELS[field]
+        if field in requested:
+            raise HTTPException(status_code=400, detail=f"{label} muss im Kader des Co-Teams stehen.")
+        raise HTTPException(status_code=409, detail=f"Diese Person ist {label} des Co-Teams – bitte erst die Rolle neu "
+                                                    "vergeben, dann aus dem Kader nehmen.")
+    if roles["captain_id"] and roles["captain_id"] == roles["vice_captain_id"]:
+        raise HTTPException(status_code=400, detail="Captain und Vertreter müssen verschiedene Personen sein.")
+    return roles
+
+
+async def _after_squad_roles(db, team: dict, squad: dict, before: dict, after: dict, me: dict) -> None:
+    """Geänderte Rollen: Protokoll ``team.squad.roles`` und eine Nachricht an die, die eine Rolle neu bekommen."""
+    if all((before.get(field) or None) == (after.get(field) or None) for field in SQUAD_ROLE_FIELDS):
+        return
+    await db.audit_logs.insert_one({
+        "id": new_id(), "action": "team.squad.roles", "target_id": team["id"], "actor_id": me["id"],
+        "data": {"squad_id": squad.get("id"), "squad_name": squad.get("name"),
+                 "before": {field: before.get(field) or None for field in SQUAD_ROLE_FIELDS},
+                 "after": {field: after.get(field) or None for field in SQUAD_ROLE_FIELDS}},
+        "created_at": now_utc().isoformat(),
+    })
+    for field in SQUAD_ROLE_FIELDS:
+        user_id = after.get(field)
+        if not user_id or user_id == before.get(field) or user_id == me["id"]:
+            continue
+        await create_user_notification(
+            user_id,
+            title=f"Du bist jetzt {SQUAD_ROLE_LABELS[field]}: {squad.get('name') or 'Co-Team'}",
+            body=f"Im Co-Team {squad.get('name') or ''} von {team.get('name') or 'deinem Team'} vereinbarst du Termine, "
+                 "meldest und bestätigst Ergebnisse.",
+            url=f"/teams/{team['id']}",
+            kind="team_role_changed",
+            meta={"team_id": team["id"], "squad_id": squad.get("id"), "role": field.removesuffix("_id")},
+        )
+
+
+SQUAD_CHANGED_MEANWHILE = ("Das Co-Team wurde gerade von jemand anderem geändert – bitte neu laden und noch einmal "
+                           "speichern.")
+
+
+def _unchanged_squad(current: dict) -> dict:
+    """Schreiben nur, wenn Kader und Rollen noch so stehen wie gelesen - sonst könnten zwei gleichzeitige Änderungen
+    einen Captain außerhalb des Kaders hinterlassen. Ein fehlendes Feld trifft ``None``."""
+    return {
+        "id": current["id"],
+        "team_id": current["team_id"],
+        "member_ids": current.get("member_ids"),
+        **{field: current.get(field) for field in SQUAD_ROLE_FIELDS},
+    }
+
+
+async def _squad_role_holder(db, team_id: str, user_id: str) -> dict | None:
+    """Ein Co-Team dieses Teams, in dem die Person Captain oder Vertreter ist."""
+    return await db.team_squads.find_one(
+        {"team_id": team_id, "$or": [{"captain_id": user_id}, {"vice_captain_id": user_id}]},
+        {"_id": 0, "id": 1, "name": 1},
+    )
 
 
 @router.get("")
@@ -748,6 +834,10 @@ async def leave_team(team_id: str, me: dict = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
     if team["leader_id"] == me["id"]:
         raise HTTPException(status_code=400, detail="Leader kann Team nicht verlassen")
+    held = await _squad_role_holder(db, team_id, me["id"])
+    if held:
+        raise HTTPException(status_code=409, detail=f"Du bist Captain oder Vertreter im Co-Team {held.get('name') or ''} – "
+                                                    "bitte die Teamleitung, die Rolle erst neu zu vergeben.")
     await db.teams.update_one({"id": team_id}, {"$pull": {"member_ids": me["id"], "co_leader_ids": me["id"]}})
     await db.team_members.delete_one({"team_id": team_id, "user_id": me["id"]})
     return {"ok": True}
@@ -780,6 +870,10 @@ async def kick_member(team_id: str, user_id: str, me: dict = Depends(get_current
         raise HTTPException(status_code=400, detail="Du kannst dich nicht selbst kicken — nutze 'Verlassen'")
     if user_id not in (team.get("member_ids") or []):
         raise HTTPException(status_code=404, detail="Mitglied nicht im Team")
+    held = await _squad_role_holder(db, team_id, user_id)
+    if held:
+        raise HTTPException(status_code=409, detail=f"Diese Person ist Captain oder Vertreter im Co-Team "
+                                                    f"{held.get('name') or ''} – bitte erst die Rolle neu vergeben.")
     await db.teams.update_one(
         {"id": team_id},
         {"$pull": {"member_ids": user_id, "co_leader_ids": user_id}, "$set": {"updated_at": now_utc().isoformat()}},
@@ -936,6 +1030,10 @@ async def create_squad(team_id: str, body: TeamSquadCreate, me: dict = Depends(g
         _refuse(me, "Keine Berechtigung")
     doc = body.model_dump()
     doc["member_ids"] = _validate_squad_members(team, doc.get("member_ids") or [])
+    requested_roles = {field: doc.pop(field) for field in SQUAD_ROLE_FIELDS}
+    roles = _squad_roles({}, requested_roles, doc["member_ids"])
+    # Rollen nur, wenn vergeben - ein Co-Team ohne sie hat die Felder nicht (Index ``sparse``).
+    doc.update({field: value for field, value in roles.items() if value})
     doc.update({
         "id": new_id(),
         "team_id": team_id,
@@ -945,6 +1043,7 @@ async def create_squad(team_id: str, body: TeamSquadCreate, me: dict = Depends(g
     })
     await db.team_squads.insert_one(doc)
     doc.pop("_id", None)
+    await _after_squad_roles(db, team, doc, {}, roles, me)
     return doc
 
 
@@ -957,16 +1056,52 @@ async def update_squad(team_id: str, squad_id: str, body: TeamSquadUpdate, me: d
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
     if not _can_manage(team, me):
         _refuse(me, "Keine Berechtigung")
-    nullable_fields = {"description", "tournament_id", "season_id", "game_id", "member_ids"}
+    nullable_fields = {"description", "tournament_id", "season_id", "game_id", "member_ids", *SQUAD_ROLE_FIELDS}
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
+    current = await db.team_squads.find_one({"id": squad_id, "team_id": team_id}, {"_id": 0})
+    if not current:
+        raise HTTPException(status_code=404, detail="Squad nicht gefunden")
     if "member_ids" in updates:
         updates["member_ids"] = _validate_squad_members(team, updates.get("member_ids") or [])
+    requested_roles = {field: updates.pop(field) for field in SQUAD_ROLE_FIELDS if field in updates}
+    roles = _squad_roles(current, requested_roles, updates.get("member_ids", current.get("member_ids") or []))
+    unset = {field: "" for field, value in roles.items() if not value and current.get(field)}
+    updates.update({field: value for field, value in roles.items() if value})
     updates["updated_at"] = now_utc().isoformat()
-    res = await db.team_squads.update_one({"id": squad_id, "team_id": team_id}, {"$set": updates})
+    change = {"$set": updates, **({"$unset": unset} if unset else {})}
+    res = await db.team_squads.update_one(_unchanged_squad(current), change)
     if res.matched_count == 0:
+        raise HTTPException(status_code=409, detail=SQUAD_CHANGED_MEANWHILE)
+    fresh = await db.team_squads.find_one({"id": squad_id}, {"_id": 0})
+    await _after_squad_roles(db, team, fresh or current, current, roles, me)
+    return fresh
+
+
+@router.put("/{team_id}/squads/{squad_id}/roles")
+async def set_squad_roles(team_id: str, squad_id: str, body: TeamSquadRoles, me: dict = Depends(get_current_user)):
+    """Captain und Vertreter eines Co-Teams vergeben (#1649): Hauptteam-Leitung, Co-Leitung oder Admin - mit Protokoll.
+    Fehlt ein Feld, bleibt die Rolle; ``null`` nimmt sie weg."""
+    db = get_db()
+    team = await db.teams.find_one({"id": team_id}, {"_id": 0})
+    if not team:
+        raise HTTPException(status_code=404, detail="Team nicht gefunden")
+    if not _can_manage(team, me):
+        _refuse(me, "Captain und Vertreter vergeben Teamleitung und Co-Leitung.")
+    current = await db.team_squads.find_one({"id": squad_id, "team_id": team_id}, {"_id": 0})
+    if not current:
         raise HTTPException(status_code=404, detail="Squad nicht gefunden")
-    return await db.team_squads.find_one({"id": squad_id}, {"_id": 0})
+    requested = body.model_dump(exclude_unset=True)
+    roles = _squad_roles(current, requested, current.get("member_ids") or [])
+    unset = {field: "" for field, value in roles.items() if not value and current.get(field)}
+    change = {"$set": {**{field: value for field, value in roles.items() if value}, "updated_at": now_utc().isoformat()},
+              **({"$unset": unset} if unset else {})}
+    res = await db.team_squads.update_one(_unchanged_squad(current), change)
+    if res.matched_count == 0:
+        raise HTTPException(status_code=409, detail=SQUAD_CHANGED_MEANWHILE)
+    fresh = await db.team_squads.find_one({"id": squad_id}, {"_id": 0})
+    await _after_squad_roles(db, team, fresh or current, current, roles, me)
+    return fresh
 
 
 @router.delete("/{team_id}/squads/{squad_id}")
@@ -977,6 +1112,14 @@ async def delete_squad(team_id: str, squad_id: str, me: dict = Depends(get_curre
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
     if not _can_manage(team, me):
         _refuse(me, "Keine Berechtigung")
+    # Ein Co-Team, das in einer laufenden Liga-Staffel steht, bleibt (#1649) - erst die Zuteilung zurücknehmen.
+    from services.squad_registration import active_league_registration
+
+    active = await active_league_registration(db, squad_id)
+    if active:
+        title = active.get("tournament_title") or "einer Liga-Staffel"
+        raise HTTPException(status_code=409, detail=f"Das Co-Team spielt in {title} – löschen geht erst, wenn die "
+                                                    "Turnierleitung die Zuteilung zurückgenommen hat oder die Staffel beendet ist.")
     res = await db.team_squads.delete_one({"id": squad_id, "team_id": team_id})
     if res.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Squad nicht gefunden")

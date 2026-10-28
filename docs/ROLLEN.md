@@ -313,6 +313,32 @@ je Saison Captains eintragen, die nur für diese eine Saison Ergebnisse und Scor
 - **Code:** `services/reference_series_access.py` (`require_series_editor`, `SeriesAccess`), Verwaltung in
   `routes/reference_staff_routes.py`.
 
+## Liga: Co-Team mit Captain und Vertreter (#1649)
+
+In der Liga spielt ein **Co-Team** (Squad eines Vereinsteams) – Vertrag in [`LIGA.md`](LIGA.md). Jedes Co-Team hat
+höchstens einen **Captain** und einen **Vertreter**; beide stehen im Kader des Co-Teams und sind verschiedene Personen.
+
+| Was | Turnierleitung (mit Zwei-Faktor) | Teamleitung, Co-Leitung des Hauptteams | Captain | Vertreter | Kader des Co-Teams |
+| --- | --- | --- | --- | --- | --- |
+| Co-Team einer Staffel zuteilen oder herausnehmen | ja | nein | nein | nein | nein |
+| Kader pflegen, Captain und Vertreter vergeben | ja (Team-Admin-Rollen) | ja | nein | nein | nein |
+| Termin vorschlagen, annehmen; einchecken | ja | nur ohne Captain und Vertreter | ja | ja | nein |
+| Ergebnis melden, bestätigen, Einspruch | ja | nur ohne Captain und Vertreter | ja | ja | nein |
+| Matchchat schreiben, Spiel-Hinweise (Aufruf, Erinnerung, Ergebnis) | ja | ja | ja | ja | ja |
+
+- **Rückfall:** Hat ein Co-Team weder Captain noch Vertreter, handeln Leitung und Co-Leitung des Hauptteams – niemand
+  sperrt sich aus. Sobald eine Rolle vergeben ist, gilt sie ohne neue Anmeldung.
+- **Kader:** Wer Captain oder Vertreter ist, verlässt Kader und Team erst, wenn die Rolle neu vergeben ist (in derselben
+  Änderung geht es). Übrige Mitglieder des Hauptteams bekommen zu Liga-Spielen ihres Teams keine Nachrichten.
+- **Löschen:** Ein Co-Team mit Anmeldung in einer laufenden Staffel lässt sich nicht löschen.
+- **Zuteilen** (Admin → Turnier → Teilnehmer → „Co-Team zuteilen“, `POST /api/tournaments/{tid}/squad-registrations`,
+  Bereich Turniere): Co-Team gehört zum Hauptteam, ist aktiv und fürs Spiel der Staffel, Kader mindestens Mindestkader,
+  alle im Hauptteam, Staffel nicht voll, zwei Co-Teams desselben Teams nie in derselben Staffel, ein Co-Team je Season
+  nur in einer Staffel. Die Anmeldung heißt „Team · Co-Team“; die Teamleitung meldet sie nicht selbst ab.
+- **Protokoll:** `team.squad.roles` (vorher und nachher), `league.squad.assign`, `league.squad.remove`.
+- **Code:** Regel in `services/match_audience.py` (`responsible_ids`, `player_ids`, `responsible_registration`),
+  Zuteilen in `services/squad_registration.py`, Rollen in `routes/team_routes.py`.
+
 ## Zwei-Faktor und Anmeldung (#348)
 
 - **Pflicht** ist Zwei-Faktor für jeden Adminbereich außer Moderation – egal, ob der Bereich aus
