@@ -537,7 +537,8 @@ async def my_league_ids(db, user: dict) -> list[dict]:
     out = []
     for entry in entries:
         season = seasons.get(entry["season_id"])
-        if not season:
+        # Nur Seasons, in denen die Person gerade in einem zugeteilten Co-Team steht.
+        if not season or user["id"] not in await season_member_ids(db, season["id"]):
             continue
         ctx = await context_for_season(db, season, [user["id"]])
         if not ctx or not ctx.fields:
