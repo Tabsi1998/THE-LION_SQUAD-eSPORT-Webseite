@@ -1,5 +1,72 @@
 # Changelog
 
+## 1.45.0 (28.10.2026)
+
+### Neu
+
+* Liga: Captain und Vertreter handeln für ihr Co-Team im Spiel (#1649)
+* Liga: Captain und Vertreter je Co-Team vergeben (#1649)
+* Liga: Co-Team einer Staffel zuteilen - ein Co-Team je Season nur in einer Staffel (#1649)
+* Liga: Ergebnis je Map auf der Matchseite melden, bestätigen und nachtragen (#1650)
+* Liga: Ergebnis je Map mit Aufstellung melden, bestätigen und nachtragen (#1650)
+* Liga: kein Doppel-Einsatz eines Spielers am selben Spieltag (#1650)
+* Liga: Liga, Season, Liga N und Staffel in der Verwaltung anlegen (#1622)
+* Liga: Map-Pool je Season, jede Staffel bekommt eine Kopie (#1622)
+* Liga: Map-Wiederholung in einer Serie einstellbar (#2096)
+* Liga: Maps bei 48-h-Automatik, Korrektur und „Rückgängig“ (#1650)
+* Liga: Menüpunkt „Liga“ nur bei sichtbarer Season (#1625)
+* Liga: öffentliche Ligaseite mit Tabelle, Spielplan je Woche und Ergebnissen mit Maps (#1625)
+* Liga: Profil, Teamseite, Suche und Turnierkarte kennzeichnen Staffeln mit „Liga · Staffel A“ (#1622)
+* Liga: Runden-Prüfung auch beim Erzeugen und Starten des Spielplans (#1624)
+* Liga: SEO-Vorschau und Sitemap für die Ligaseite (#1625)
+* Liga: Sichtbarkeit je Season (aus, Turnierleitung, Mitglieder, öffentlich) gilt sofort für alle Staffeln (#1622)
+* Liga: Sperrwochen im Spielkalender überspringen, Spieltag 7 nach der Weihnachtspause (#1624)
+* Liga: Sperrzeiten wie die Weihnachtspause je Season (#1622)
+* Liga: Spielplan nur mit Hinrunde und fairem Heimrecht (#1624)
+* Liga: Staffel anlegen übernimmt alle Vorgaben der Season und prüft Runden gegen Spielwochen (#1622)
+* Liga: Staffeln nicht auf Startseite, im öffentlichen Kalender, in der App-Vorschau und in den Turnierlisten der Website (#1622)
+* Liga: Staffeln zählen nicht für Jahreswertung, Pokale, Löwen-Rang-Turnier-XP und Team-Stufe (#1622)
+* Liga: Tabelle rechnet mit den Punkten und dem Gleichstand der Season (#1625)
+* Liga: Teamseite zeigt Co-Teams und ihre Staffel (#1625)
+* Liga: Terminvorschläge respektieren Sperrzeiten (#1650)
+* Liga: Turnierleitung trägt Maps und Aufstellungen im Ergebnis-Fenster ein, wahlweise ohne Maps (#1650)
+* Liga: Vorgaben auf bestehende Staffeln übertragen, mit Grund für Gesperrtes (#1622)
+* Vereinsshop: Reiter „Testentwurf“ im Admin-Shop mit geführten Schritten (#2062)
+* Vereinsshop: Testentwurf an Printful mit Vorschau der gesendeten Daten, Kostenschätzung und Protokoll (#2062)
+* Vereinsshop: Testentwurf bei Printful löschen - Bestätigen bleibt gesperrt, auch bei unklarem Ausgang nachverfolgbar (#2062)
+
+### Fehlerbehebungen
+
+* Jahreswertung mit ausdrücklich gewählten Turnieren füllt nicht mehr automatisch auf, wenn nur Staffeln darunter sind (#1622)
+* Jahreswertung: Admin-Übersicht zeigt Gewicht 0 als „Keine Wertung“ (#2095)
+* Jahreswertung: Gewicht 0 in Turnieren und Fast-Lap-Challenges bedeutet jetzt wirklich keine Jahreswertung (#2095)
+* Liga: anderes Spiel der Staffel lässt ihren Map-Pool stehen (#1622)
+* Liga: Aufstellungen nur für Beteiligte und Turnierleitung (#1650)
+* Liga: Fristen (Ergebnis gilt, Antwortfrist, Eskalation) pausieren in der Sperrzeit (#1624)
+* Liga: Ligaseite zeigt den Sieger auch bei gemeldeten Ergebnissen (#2096)
+* Liga: Matchseite nennt den Standardtermin der Spielwoche (#2096)
+* Liga: Mindestkader wird gemeinsam mit der Teamgröße übertragen (#1622)
+* Liga: Nachtragsfrist der Aufstellung ruht in der Weihnachtspause (#2096)
+* Liga: Sieger-Knöpfe in der Reihenfolge Heim links, Gast rechts (#2096)
+* Liga: Spieler-Chips der Aufstellung springen nicht mehr (#2096)
+* Liga: Staffel ohne Kasten „Vor-Ort-Anmeldung über QR“ (#2096)
+* Liga: Staffel startet ohne Check-in mit „Liga starten“ (#2096)
+* Teams: wer das Hauptteam verlässt, fliegt aus allen Co-Team-Kadern (#1649)
+* Texte: Links mit fremder Adresse ohne Protokoll (//…) werden nicht mehr als Link angezeigt (#1625)
+* Vereinsshop: Abgleich verwirft keine ungespeicherten Druckflächen mehr (#2091)
+* Vereinsshop: Druckflächen bleiben ohne Vorlagenbild wählbar, gespeicherte Vorlagenbilder bleiben bei Fehlern (#2091)
+* Vereinsshop: Drucktechniken mit deutschem Namen, kurzer Erklärung und sinnvoller Vorgabe (#2091)
+* Vereinsshop: Druckvorlagen von Printful überspringen einzelne unpassende Zeilen und nennen den Grund (#2091)
+* Vereinsshop: eine Teilantwort von Printful ersetzt keinen guten Druckvorlagen-Stand - Warnung und nach 14 Tagen rot (#2091)
+* Vereinsshop: eine zu große Druckfläche übernimmt nie den alten Stand (#2091)
+* Vereinsshop: Farben und Größen lassen sich beim Einrichten wieder wählen (#2091)
+
+### Dokumentation
+
+* Liga Stufe 1 - Architektur-Papier (docs/LIGA.md) (#2094)
+* Liga: Handbuch „Liga leiten“ mit Checkliste für den Obmann (#2096)
+* Liga: Spickzettel für Captains (#2096)
+
 ## 1.44.0 (27.10.2026)
 
 ### Neu
