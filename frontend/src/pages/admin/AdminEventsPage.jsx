@@ -10,7 +10,7 @@ import { sortByNearestDate } from "@/lib/contentSort";
 import { toast } from "sonner";
 import { Plus, Trash2, Calendar, UserCheck, Search, Download, FileText } from "lucide-react";
 import { viennaDate } from "@/lib/vienna";
-import { eventIsOver, visibilityWord } from "@/lib/eventAdmin";
+import { affectedRegistrations, deleteConfirmText, eventIsOver, visibilityWord } from "@/lib/eventAdmin";
 
 // Event-Liste. Anlegen und Bearbeiten sind seit #434 eigene Seiten (`/admin/events/new`,
 // `/admin/events/:id`) statt eines Fensters über der Liste - mit Zurück im Browser und Links aus
@@ -72,13 +72,25 @@ export default function AdminEventsPage() {
     }, { replace: true });
   };
 
-  const remove = async (id) => {
+  // Löschen (#2118): mit Anmeldungen geht es erst nach der Absage - der Dialog sagt das und führt zum Formular.
+  // Der Server prüft dasselbe (auch Rechnungen und Turniere mit Anmeldungen) und antwortet sonst mit einem Satz.
+  const remove = async (event) => {
+    if (affectedRegistrations(event)) {
+      if (await confirm({
+        title: "Erst absagen",
+        description: deleteConfirmText(event),
+        confirmLabel: "Event bearbeiten",
+        cancelLabel: "Schließen",
+        tone: "info",
+      })) navigate(`/admin/events/${event.id}`);
+      return;
+    }
     if (!await confirm({
       title: "Event löschen?",
-      description: "Das Event wird aus der öffentlichen Event-Liste entfernt.",
-      confirmLabel: "Löschen",
+      description: deleteConfirmText(event),
+      confirmLabel: "Endgültig löschen",
     })) return;
-    try { await api.delete(`/events/${id}`); toast.success("Gelöscht."); load(); } catch (err) { toast.error(formatRequestError(err, "Event konnte nicht gelöscht werden.")); }
+    try { await api.delete(`/events/${event.id}`); toast.success("Gelöscht."); load(); } catch (err) { toast.error(formatRequestError(err, "Event konnte nicht gelöscht werden.")); }
   };
 
   const createRecapDraft = async (event) => {
@@ -285,7 +297,7 @@ export default function AdminEventsPage() {
                         </button>
                       )}
                       <Link to={`/admin/events/${e.id}`} data-testid={`event-edit-${e.id}`} className="inline-flex text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#9F7AEA]/40 text-[#9F7AEA] hover:bg-[#9F7AEA]/10">Bearbeiten</Link>
-                      <button onClick={() => remove(e.id)} data-testid={`event-delete-${e.id}`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10 inline-flex items-center"><Trash2 className="w-3 h-3" /></button>
+                      <button onClick={() => remove(e)} data-testid={`event-delete-${e.id}`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10 inline-flex items-center"><Trash2 className="w-3 h-3" /></button>
                       </div>
                     </td>
                   </tr>

@@ -167,6 +167,19 @@ function plain(text) {
     .toLowerCase();
 }
 
+/** Abgesagt (#2118): der Satz unter „Event abgesagt“ - für die Person, deren Anmeldung mit dem Event storniert wurde,
+ * mit dem Hinweis zum Kostenbeitrag. ``null``, solange das Event nicht abgesagt ist. */
+export function cancelledNotice(event) {
+  if (event?.status !== "cancelled") return null;
+  const own = event.own_registration;
+  if (own?.cancelled_with_event) {
+    return own.price
+      ? "Deine Anmeldung wurde mit der Absage storniert. Ein offener Kostenbeitrag wird nicht verrechnet; wurde schon eine Rechnung gestellt, meldet sich der Verein bei dir."
+      : "Deine Anmeldung wurde mit der Absage storniert.";
+  }
+  return "Dieses Event findet nicht statt.";
+}
+
 /** Warnung in der Verwaltung (#1273): die Beschreibung beginnt mit dem Titel (oft als Überschrift mit Emoji). */
 export function descriptionEchoesTitle(name, description) {
   const title = plain(name);

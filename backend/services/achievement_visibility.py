@@ -83,6 +83,19 @@ def achievements_public(user: dict | None) -> bool:
     return user.get("privacy_achievements_public") is not False
 
 
+# Wer Erfolge trotz „Erfolge öffentlich“ aus sieht: die Person selbst und diese Rollen (mit bestätigter Zwei-Faktor-
+# Anmeldung) - dieselbe Regel für GET /api/achievements/user/{id}, das öffentliche Profil und die Spielerliste (#2118).
+HIDDEN_ACHIEVEMENTS_STAFF_ROLES = frozenset({"tournament_admin", "club_admin", "superadmin"})
+
+
+def sees_hidden_achievements(viewer: dict | None, user_id: str) -> bool:
+    from services.permissions import is_confirmed_admin_role
+
+    if not viewer:
+        return False
+    return viewer.get("id") == user_id or is_confirmed_admin_role(viewer, HIDDEN_ACHIEVEMENTS_STAFF_ROLES)
+
+
 async def _bases(db) -> dict:
     """Wie viele Konten zählen als Grundlage: alle aktiven, und die aktiven Mitglieder."""
     users = await db.users.count_documents({"is_active": {"$ne": False}, "is_banned": {"$ne": True}})

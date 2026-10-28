@@ -1,4 +1,14 @@
-import { EVENT_SECTIONS, descriptionEchoesTitle, eventFacts, eventTabs, routeUrl, stripHeadingEmoji, visibilityChip, whatsOnRows } from "./eventPage";
+import { EVENT_SECTIONS, cancelledNotice, descriptionEchoesTitle, eventFacts, eventTabs, routeUrl, stripHeadingEmoji, visibilityChip, whatsOnRows } from "./eventPage";
+
+// Abgesagt (#2118): die Seite sagt es - und der Person, deren Anmeldung mit storniert wurde, was mit dem Beitrag ist.
+test("abgesagtes Event: Satz je nach eigener Anmeldung, sonst nichts", () => {
+  expect(cancelledNotice({ status: "registration_open" })).toBeNull();
+  expect(cancelledNotice({ status: "cancelled" })).toBe("Dieses Event findet nicht statt.");
+  expect(cancelledNotice({ status: "cancelled", own_registration: { status: "cancelled", cancelled_with_event: true } }))
+    .toBe("Deine Anmeldung wurde mit der Absage storniert.");
+  expect(cancelledNotice({ status: "cancelled", own_registration: { status: "cancelled", cancelled_with_event: true, price: { total_cents: 2000 } } }))
+    .toContain("Kostenbeitrag wird nicht verrechnet");
+});
 
 // Event-Seite als Startpunkt (#1183), Kopf (#1273) und Fakten-Kasten (#1346): Fakten ein- und mehrtägig, frei oder mit
 // Preis, ohne Ort; die Zeilen „Was läuft“ (angemeldet, Team, Gast, ein- und mehrtägig); Emoji-Zwischentitel; Warnung.
