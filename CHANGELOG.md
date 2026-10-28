@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.51.1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.51.0...v1.51.1) (2026-10-28)
+
+
+### Fehlerbehebungen
+
+* Shop: Allover-Trikot verlangt die Nahtfarbe auch, wenn der Printful-Katalog sie nicht nennt – Testentwurf und Schätzung gehen wieder ([#2158](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2158)) ([5842453](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/58424537f75d45cbbef3ded9475ea6e98e5446f6))
+
 ## 1.51.0 (28.10.2026)
 
 ### Neu
