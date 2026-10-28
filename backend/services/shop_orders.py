@@ -7,7 +7,8 @@ Einziger Weg, diese Sammlungen zu schreiben. Was eine Bestellung festhält, änd
 - ``billing_address`` und ``shipping_address`` getrennt, je mit Quelle und Zeitpunkt (``confirmed_at`` bzw.
   ``captured_at``). Eine spätere Änderung am Profil oder in Dolibarr erreicht die Bestellung nie.
 - je Position (``shop_order_items``): Produkt- und Variantenname, SKU, Preis, Aufschlag, Gamertag, Druckdatei-Fassung
-  mit Prüfsumme und die Printful-Nummern.
+  mit Prüfsumme und die Printful-Nummern; druckt das Produkt die Vereinsnummer (#2150), dazu die Nummer
+  (``print_number``, vom Server aus der Wunschnummer) und die Einwilligung mit Zeitpunkt und Textfassung.
 
 Idempotenz: der Schlüssel des Aufrufers gilt je Konto (``<konto>:<schlüssel>``, eindeutiger Index). Derselbe Aufruf
 noch einmal liefert dieselbe Bestellung, derselbe Schlüssel mit anderem Inhalt ist ein Konflikt.
@@ -48,13 +49,35 @@ PAYMENT_RULE_KEYS = ("dolibarr_payment_term_id", "reminder_days", "overdue_after
 LIST_FIELDS = {"_id": 0, "billing_address": 0, "shipping_address": 0, "request_hash": 0, "idempotency_key": 0}
 
 
-def _lines(raw: Any) -> list[dict]:
+# Vereinsnummer im Druck (#2150, #1727): der Haken je Position im Checkout. Die Fassung des Texts steht mit Zeitpunkt an
+# der Position (``number_consent``); ändert sich der Text, bekommt er eine neue Fassung - alte Bestellungen behalten
+# ihre.
+NUMBER_CONSENT_VERSION = "2026-10-28"
+NUMBER_CONSENT_TEXT = ("Ich willige ein, dass meine Vereinsnummer auf diesen Artikel gedruckt wird. Dafür geht sie als "
+                       "Teil der Druckdatei an den Druckdienstleister Printful. Auf dem Artikel ist sie für alle "
+                       "sichtbar.")
+NUMBER_MEMBERS_ONLY = "die Vereinsnummer gibt es nur für Vereinsmitglieder."
+NUMBER_MISSING = ("du hast noch keine Vereinsnummer. Such dir zuerst unter „Meine Mitgliedschaft“ deine Nummer aus - "
+                  "dann geht die Bestellung.")
+NUMBER_NO_CONSENT = ("für den Druck deiner Vereinsnummer brauchen wir deine Einwilligung - bitte den Haken bei der "
+                     "Position setzen.")
+
+
+def number_consent_terms() -> dict:
+    """Text und Fassung des Hakens für die Kasse (#1712) - dieselben Werte, die die Bestellung speichert."""
+    return {"version": NUMBER_CONSENT_VERSION, "text": NUMBER_CONSENT_TEXT}
+
+
+def _lines(raw: Any, *, consent: bool = True) -> list[dict]:
+    """Die Positionen geprüft. ``number_consent`` (#2150): der Haken für die Vereinsnummer - nur in der Bestellung
+    (``consent``), der Warenkorb lässt ihn weg. Nur ein gesetzter Haken steht in der Position, damit Schlüssel älterer
+    Aufrufe gleich bleiben."""
     if not isinstance(raw, list) or not 1 <= len(raw) <= MAX_LINES:
         raise ShopError(f"Eine Bestellung hat 1 bis {MAX_LINES} Positionen.")
     out = []
     for line in raw:
-        if not isinstance(line, dict) or set(line) - {"variant_id", "quantity", "gamertag"}:
-            raise ShopError("Position: nur Variante, Menge und Gamertag.")
+        if not isinstance(line, dict) or set(line) - {"variant_id", "quantity", "gamertag", "number_consent"}:
+            raise ShopError("Position: nur Variante, Menge, Gamertag und Einwilligung für die Vereinsnummer.")
         quantity = line.get("quantity")
         if isinstance(quantity, bool) or not isinstance(quantity, int) or not 1 <= quantity <= MAX_QUANTITY:
             raise ShopError(f"Menge: 1 bis {MAX_QUANTITY}.")
@@ -62,7 +85,13 @@ def _lines(raw: Any) -> list[dict]:
         if gamertag and not GAMERTAG.match(gamertag):
             raise ShopError("Gamertag: 2 bis 24 Zeichen - Buchstaben, Ziffern, Leerzeichen, Punkt, Binde- und "
                             "Unterstrich.")
-        out.append({"variant_id": str(line.get("variant_id") or ""), "quantity": quantity, "gamertag": gamertag})
+        agreed = line.get("number_consent", False)
+        if not isinstance(agreed, bool):
+            raise ShopError("Einwilligung: ja oder nein.")
+        clean = {"variant_id": str(line.get("variant_id") or ""), "quantity": quantity, "gamertag": gamertag}
+        if consent and agreed:
+            clean["number_consent"] = True
+        out.append(clean)
     return out
 
 
@@ -126,19 +155,40 @@ async def _freeze_legacy_designs(db, product: dict, variant: dict, line: dict, p
     return out
 
 
+async def _print_number(db, product: dict, line: dict, position: int, buyer_kind: str, user_id: str) -> str | None:
+    """Die Vereinsnummer einer Position (#2150): nur bei Produkten, die sie drucken, nur für berechtigte Mitglieder mit
+    vergebener Wunschnummer (``jersey_numbers.print_number`` - der Server liest sie, nie die Anfrage) und nur mit
+    Einwilligung. Sonst eine klare Ablehnung; die Nummer selbst steht in keiner Meldung und keinem Log."""
+    from services import jersey_numbers
+
+    if not await shop_print_files.prints_number(db, product):
+        # Ein Haken bei einem Produkt ohne Nummer wird still übergangen und nicht gespeichert - etwa, wenn sich der
+        # Aufbau zwischen Warenkorb und Kasse geändert hat.
+        return None
+    if buyer_kind != "member" or not await jersey_numbers.is_eligible(db, user_id):
+        raise ShopError(f"Position {position}: {NUMBER_MEMBERS_ONLY}")
+    number = await jersey_numbers.print_number(db, user_id)
+    if number is None:
+        raise ShopError(f"Position {position}: {NUMBER_MISSING}")
+    if not line.get("number_consent"):
+        raise ShopError(f"Position {position}: {NUMBER_NO_CONSENT}")
+    return number
+
+
 async def _freeze_designs(db, product: dict, variant: dict, line: dict, position: int, *, user_id: str,
-                          order_id: str, item_id: str, mapping: dict | None) -> tuple[list[dict], list[dict]]:
-    """Je Druckfläche des Produkts genau eine Druckdatei (#2069): die Grunddatei der Farbe oder - mit Gamertag - eine
-    eigene, zusammengesetzte Datei für diese Position. Dazu die Motiv-Fassungen darin (``designs``), damit ihre Adressen
-    für die Bestellung erhalten bleiben (``shop_designs.retention_plan``). So sendet der Auftrag an Printful (#2062,
-    #1718) genau, was beim Bestellen galt."""
+                          order_id: str, item_id: str, mapping: dict | None,
+                          number: str | None = None) -> tuple[list[dict], list[dict]]:
+    """Je Druckfläche des Produkts genau eine Druckdatei (#2069): die Grunddatei der Farbe oder - mit Gamertag bzw.
+    Vereinsnummer (#2150) - eine eigene, zusammengesetzte Datei für diese Position. Dazu die Motiv-Fassungen darin
+    (``designs``), damit ihre Adressen für die Bestellung erhalten bleiben (``shop_designs.retention_plan``). So sendet
+    der Auftrag an Printful (#2062, #1718) genau, was beim Bestellen galt."""
     if not product.get("placements"):
         return [], []
     if not product.get("printful") and not all(shop_print_files.is_layout(row) for row in product["placements"]):
         return [], await _freeze_legacy_designs(db, product, variant, line, position)
     files, sources = await shop_print_files.freeze_line(
         db, product, variant, gamertag=line["gamertag"], position=position, user_id=user_id, order_id=order_id,
-        item_id=item_id, printful_variant_id=(mapping or {}).get("printful_variant_id"))
+        item_id=item_id, printful_variant_id=(mapping or {}).get("printful_variant_id"), number=number)
     # Die Fassung des Motivs (hell oder dunkel) samt Version - so bleibt ihre Adresse für die Bestellung öffentlich.
     designs = [{"placement": source["placement"], "kind": "design", "design_key": source.get("design_key"),
                 "variant": source.get("variant") or "dark", "version": source.get("version"),
@@ -148,7 +198,7 @@ async def _freeze_designs(db, product: dict, variant: dict, line: dict, position
 
 
 async def _freeze_line(db, line: dict, position: int, buyer_kind: str, config: dict, *, user_id: str, order_id: str,
-                       item_id: str) -> dict:
+                       item_id: str, now: str | None = None) -> dict:
     variant = await shop_catalog.get_variant(db, line["variant_id"])
     product = await shop_catalog.get_product(db, variant["product_id"]) if variant else None
     if (not variant or not product or not variant.get("active") or variant.get("blocked_reason")
@@ -165,6 +215,7 @@ async def _freeze_line(db, line: dict, position: int, buyer_kind: str, config: d
         _not_orderable(position, product, variant, "kein Preis übernommen")
     if unit < config["min_price_cents"]:
         _not_orderable(position, product, variant, "Preis unter dem Mindestpreis")
+    number = await _print_number(db, product, line, position, buyer_kind, user_id)
     if not product.get("placements") and product.get("design_key"):
         # Auch hier die Fassung für die Shirtfarbe (#2069 Teil A) - nicht immer die Hauptdatei.
         latest = await shop_motifs.file_for_garment(db, product["design_key"], color=variant.get("color"),
@@ -174,9 +225,10 @@ async def _freeze_line(db, line: dict, position: int, buyer_kind: str, config: d
         design = {"design_key": latest["design_key"], "version": latest["version"], "sha256": latest["sha256"]}
         print_files, designs = [], []
     else:
-        # Zuletzt, weil hier Dateien entstehen können (Gamertag) - alles Billige ist vorher geprüft.
+        # Zuletzt, weil hier Dateien entstehen können (Gamertag, Vereinsnummer) - alles Billige ist vorher geprüft.
         print_files, designs = await _freeze_designs(db, product, variant, line, position, user_id=user_id,
-                                                     order_id=order_id, item_id=item_id, mapping=mapping)
+                                                     order_id=order_id, item_id=item_id, mapping=mapping,
+                                                     number=number)
         design = next(({key: row[key] for key in ("design_key", "version", "sha256")} for row in designs
                        if row["design_key"]), None)
     markup = shop_config.markup_cents(config, buyer_kind, product)
@@ -189,6 +241,11 @@ async def _freeze_line(db, line: dict, position: int, buyer_kind: str, config: d
         "printful": ({"variant_id": mapping["printful_variant_id"], "product_id": mapping.get("printful_product_id")}
                      if mapping else None),
         "tax_profile": product.get("tax_profile"),
+        # Vereinsnummer (#2150): die gedruckte Nummer und der Nachweis der Einwilligung (Zeitpunkt und Fassung des
+        # Texts). Sichtbar nur für das Mitglied und die Finanzen; nie in Ereignissen, Mails oder Logs.
+        "print_number": number,
+        "number_consent": ({"given_at": now or now_utc().isoformat(), **number_consent_terms()}
+                           if number is not None else None),
     }
 
 
@@ -245,7 +302,7 @@ async def place_order(db, *, user_id: str, idempotency_key: str, buyer_kind: str
     # geschriebenes insert_many), räumt diese Bestellung ihre eigenen Positionen und Dateien wieder weg.
     try:
         items = [await _freeze_line(db, line, index, buyer_kind, config, user_id=user_id, order_id=order_id,
-                                    item_id=new_id())
+                                    item_id=new_id(), now=now)
                  for index, line in enumerate(clean_lines, start=1)]
         await db.shop_order_items.insert_many([{"order_id": order_id, "user_id": user_id, **item} for item in items])
     except BaseException:
@@ -344,7 +401,7 @@ async def save_cart(db, user_id: str, items: list) -> dict:
     """Der Warenkorb eines Kontos - nur Variante, Menge und Gamertag; Preise rechnet erst die Bestellung (#1713)."""
     if not user_id:
         raise ShopError("Ohne Konto kein Warenkorb.")
-    clean = _lines(items) if items else []
+    clean = _lines(items, consent=False) if items else []  # die Einwilligung (#2150) gibt es nur im Checkout
     cart = {"user_id": user_id, "items": clean, "updated_at": now_utc().isoformat()}
     await db.shop_carts.update_one({"user_id": user_id}, {"$set": cart}, upsert=True)
     return cart
@@ -357,8 +414,9 @@ ERASED_ADDRESS = "Gelöschter User"
 
 async def anonymize_user(db, user_id: str) -> dict:
     """Kontolöschung (#1731 verfeinert das): Bestellungen behalten Beträge, Positionen und Verlauf für die Buchhaltung -
-    die Rechnung selbst liegt in Dolibarr. Anschriften werden bis auf das Land überschrieben, der Gamertag entfernt,
-    der Warenkorb gelöscht."""
+    die Rechnung selbst liegt in Dolibarr. Anschriften werden bis auf das Land überschrieben, Gamertag und
+    Vereinsnummer (#2150) entfernt, der Warenkorb gelöscht. Der Nachweis der Einwilligung (Zeitpunkt, Fassung) bleibt -
+    ohne Nummer."""
     now = now_utc().isoformat()
     orders = 0
     open_orders = {"user_id": user_id, "anonymized_at": {"$exists": False}}
@@ -371,7 +429,8 @@ async def anonymize_user(db, user_id: str) -> dict:
                              "anonymized": True}
         await db.shop_orders.update_one({"id": order["id"]}, {"$set": update})
         orders += 1
-    items = await db.shop_order_items.update_many({"user_id": user_id, "gamertag": {"$ne": None}},
-                                                  {"$set": {"gamertag": None}})
+    items = await db.shop_order_items.update_many(
+        {"user_id": user_id, "$or": [{"gamertag": {"$ne": None}}, {"print_number": {"$ne": None}}]},
+        {"$set": {"gamertag": None, "print_number": None}})
     carts = await db.shop_carts.delete_many({"user_id": user_id})
     return {"orders": orders, "items": int(items.modified_count), "carts": int(carts.deleted_count)}

@@ -512,6 +512,20 @@ test("beendet: Treppchen mit Platz 1 in der Mitte, der eigene Platz kommt einmal
   expect(ceremonyQueue.getCurrent()).toBeNull();
 });
 
+test("läuft noch: die Teilnehmerliste nennt keinen Endplatz (#2121)", async () => {
+  const generated = (await import("../../../e2e/fixtures/tableScheduleGenerated.json")).default;
+  const { tournament, standings, bracket } = generated.finished;
+  apiMock.get.mockImplementation((path) => {
+    if (path === "/tournaments/cup") return Promise.resolve({ data: { ...tournament, status: "live", slug: "cup", id: "t1" } });
+    if (path === "/tournaments/t1/registrations") return Promise.resolve({ data: bracket.registrations });
+    if (path === "/tournaments/t1/standings") return Promise.resolve({ data: standings });
+    return Promise.resolve({ data: [] });
+  });
+  renderPage();
+  await screen.findByTestId(`tournament-participant-${bracket.registrations[0].id}`);
+  expect(screen.queryAllByTestId(/^tournament-participant-rank-/)).toHaveLength(0);
+});
+
 test("beendet, aber noch nicht veröffentlicht: Podest als „vorläufig“, noch kein Sieger-Moment", async () => {
   const generated = (await import("../../../e2e/fixtures/tableScheduleGenerated.json")).default;
   const { ceremonyQueue } = await import("@/components/achievements/ceremony/queue");

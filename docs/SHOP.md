@@ -28,7 +28,7 @@ die Sammlungen direkt. Jede Katalogänderung ist eine Adminaktion mit Person und
 | `shop_variants` | Variante eines Produkts: SKU, Bezeichnung, Größe, Farbe (mit `color_code`), Preis (bei Printful-Produkten der übernommene Selbstkostenpreis), aktiv (= angeboten), Sperre aus dem Abgleich (`blocked_reason`, `blocked_at`), `version` | `sku` |
 | `shop_designs` | Druckdatei des Vereins je Fassung: `design_key`, `version` (zählt hoch), `file_ref`, `sha256`, Druckposition; seit #1708 dazu `public_id` (Zufallsschlüssel der öffentlichen Adresse), Pixel, DPI und Druckmaße in Zoll, mit denen sie geprüft wurde, Transparenz, Ausgangsformat und `public_disabled_at` (Aufbewahrung); seit #2069 die Fassung (`variant`: `dark` für dunkle, `light` für helle Shirts), Herkunft (`origin`: `upload` oder `auto_light`), bei SVG das bereinigte SVG (`svg_ref`, nie öffentlich), erkannte Farben (`colors`) und `view_box`, bei einer umgefärbten Fassung `derived_from` und `recolor`. Alte Fassungen bleiben | `design_key` + `version`; `public_id` |
 | `shop_design_profiles` | Design bzw. Motiv (#1708, #2069): Titel, Platzierung, feste **Shirtfarben** (`garment_colors`, freiwillig), Notiz, `version`; seit #2069 `light_mode` (`auto` oder `file`), `light_auto` (Stand der automatischen Fassung) und Ausnahmen je Shirtfarbe (`color_variants`) | `design_key` |
-| `shop_gamertag_files` | Gamertag-Druckdatei (#1711): Herkunft `gamertag`, Zweck (`test`, `order`), `sha256`, `file_ref`, `public_id`, Maße, Anker, Farbe, `rules_hash`; bei Bestelldateien Konto, Bestellung und Position (personenbezogen: das PNG zeigt den Namen) - nie der Name als Text | `purpose` + `sha256` (nur Testdateien); `public_id` |
+| `shop_gamertag_files` | Gamertag-Druckdatei (#1711): Herkunft `gamertag`, Zweck (`test`, `order`), `sha256`, `file_ref`, `public_id`, Maße, Anker, Farbe, `rules_hash`; bei Bestelldateien Konto, Bestellung und Position (personenbezogen: das PNG zeigt den Namen) - nie der Name als Text. Seit #2150 auch die Vereinsnummer einer Bestellung (`kind = "number"`, nur Zweck `order`) | `purpose` + `sha256` (nur Testdateien); `public_id` |
 | `shop_print_templates` | Druckvorlage je Printful-Produkt (#2069): Maße je Fläche, Technik und Gruppe (`entries`), Vorlagenbilder (`previews`), `hash` der Maße, `changes` mit `changed_at`, `checked_at`, `last_error`, übersprungene Zeilen mit Grund (`skipped`, #2091) | `printful_product_id` |
 | `shop_print_files` | Druckdatei je Produkt, Fläche, Farbe und Gruppe (#2069): Herkunft (`composed`, `upload`), Zweck (`base` mit `version`, `order` je Bestellposition), `sha256`, `file_ref`, `public_id`, Maße, `layout_hash`, `template_hash`, Quellen (seit #2141 bei „Hintergrund plus Ebenen“ zuerst der Hintergrund mit Kennung und Prüfsumme); bei Bestelldateien Konto, Bestellung und Position (personenbezogen) | `public_id`; Produkt + Fläche + Gruppe + Farbe + Version (nur `base`) |
 | `shop_printful_catalog` | Zwischenstand des Printful-Katalogs für die Produktsuche (#2069): Produkte, Kategorien, `fetched_at` - keine Person | `id` |
@@ -60,7 +60,9 @@ Variante, Druckdatei, Printful-Zuordnung, Profil oder Dolibarr wirkt nie zurück
   Seit #2069 je Druckfläche genau eine Druckdatei (`print_files`: Grunddatei oder eigene mit Gamertag, Abschnitt „Druckvorlagen und Druckdateien“), dazu die Motiv-Fassungen (`designs`). Bis #2069 je Platzierung (`designs`): Platzierung, Art, Printful-Druckfläche, Technik, Position in Zoll und die
   Fassung des Designs für die Farbe der Variante (`design_key`, `version`, `sha256`) - **alle** Platzierungen, nicht
   nur eine. Gamertag- und Vereinsnummer-Felder stehen als Platzhalter darin (Datei je Bestellung, #1711); ein Produkt
-  mit Gamertag-Feld verlangt einen Gamertag. `design` bleibt als Kurzform (erstes Design). Gesperrte Varianten und
+  mit Gamertag-Feld verlangt einen Gamertag. Druckt ein Produkt die Vereinsnummer (#2150), dazu `print_number` (die
+  Wunschnummer, vom Server gelesen) und `number_consent` (`given_at`, `version`, `text` der Einwilligung) - sonst
+  beide `null`. `design` bleibt als Kurzform (erstes Design). Gesperrte Varianten und
   Varianten ohne übernommenen Preis sind nicht bestellbar.
 - `billing_address`: bestätigte Rechnungsanschrift (Name, Firma, Straße, PLZ, Ort, Land, optional die Nummer des
   Dolibarr-Geschäftspartners) mit `source` (`dolibarr`, `account`, `checkout`) und `confirmed_at`.
@@ -113,16 +115,19 @@ selbst entfernt er nicht – leere Sammlungen ohne Index stören nicht.
 ### Datenschutz und Sicherheit
 
 - Personenbezogene Felder stehen in `shop_common.PERSONAL_FIELDS`: an Bestellungen Konto, Rechnungs- und
-  Lieferanschrift; an Positionen Konto und Gamertag; der Warenkorb. Die Einordnung für Auskunft und Löschung steht in
-  `services/personal_data.py`:
-  - **Auskunft:** `shop_orders` (ohne interne Schlüssel), `shop_order_items`, `shop_cart`.
+  Lieferanschrift; an Positionen Konto, Gamertag und gedruckte Vereinsnummer (#2150); der Warenkorb. Die Einordnung für
+  Auskunft und Löschung steht in `services/personal_data.py`:
+  - **Auskunft:** `shop_orders` (ohne interne Schlüssel), `shop_order_items` (mit Nummer und Einwilligung),
+    `shop_cart`, `shop_gamertag_files` (mit `kind`), `shop_print_files`.
   - **Kontolöschung:** Bestellungen und Positionen behalten Beträge und Verlauf für die Buchhaltung (die Rechnung
-    liegt in Dolibarr); Anschriften werden bis auf das Land überschrieben, der Gamertag entfernt, der Warenkorb
-    gelöscht. Ereignisse bleiben – sie tragen keine Anschrift. Fristen und offene Bestellungen regelt #1731.
+    liegt in Dolibarr); Anschriften werden bis auf das Land überschrieben, Gamertag und Vereinsnummer entfernt (der
+    Nachweis der Einwilligung bleibt ohne Nummer), der Warenkorb gelöscht. Ereignisse bleiben – sie tragen keine
+    Anschrift und nie eine Nummer. Fristen und offene Bestellungen regelt #1731.
 - **Keine Bank- und Zugangsdaten im Modell.** Bezahlt wird per Überweisung auf die Dolibarr-Rechnung; Schlüssel für
   Printful gehören in den verschlüsselten Speicher (#1705/#1706). `shop_common.FORBIDDEN_FIELD_PARTS` und
   `test_shop_model_unit` halten jedes Feld daran fest.
-- Preise bestimmt nur der Server. Die Bestellung nimmt Variante, Menge und Gamertag – nie einen Preis.
+- Preise bestimmt nur der Server. Die Bestellung nimmt Variante, Menge, Gamertag und den Haken für die Vereinsnummer
+  (`number_consent`) – nie einen Preis und nie eine Nummer.
 
 ## Rechte und Protokoll
 
@@ -619,8 +624,8 @@ Produkts.
 | `POST /api/admin/shop/products/{id}/sync` | Mit Printful abgleichen (Person im Protokoll) |
 | `POST /api/admin/shop/products/{id}/status` | Schritt 5: `reviewed`, `active` (Grund Pflicht), `draft`, `archived` |
 
-Offen für spätere Pakete: Mockups und ihre Prüfung (#1710), die Vereinsnummer-Datei (#1727), Fotos, Galerie und
-Größentabelle. Löwe und Gamertag sind seit #2069 **eine** Datei je Fläche - der Testentwurf (#2062) schickt genau sie.
+Offen für spätere Pakete: Mockups und ihre Prüfung (#1710), Fotos, Galerie und Größentabelle. Löwe und Gamertag sind
+seit #2069 **eine** Datei je Fläche, seit #2150 auch mit der Vereinsnummer - der Testentwurf (#2062) schickt genau sie.
 
 ## Druckvorlagen und Druckdateien (#2069)
 
@@ -964,10 +969,9 @@ Vereinsname; vorne das Logo und eine kleine Nummer. Schritt für Schritt (Verwal
 7. **Speichern**, bei Allover je Farbe den Hintergrund hochladen, „Druckdateien erzeugen“: der Vereinsname kommt in die
    Grunddatei, Name und Nummer je Bestellung. Danach Vorschau je Farbe und ein Testentwurf an Printful (#2062).
 
-Die Größen und Abstände der Vorlagen sind Positions-Vorgaben (Abschnitt oben) und lassen sich dort ändern. Die
-Vereinsnummer steht bis #1727 nur als Platzhalter in der Vorschau - gedruckt wird sie noch nicht. Darum ist der
-Prüfpunkt „Vereinsnummer im Druck“ rot, solange eine Fläche eine Vereinsnummer-Ebene hat: „geprüft“ und
-„veröffentlicht“ sind gesperrt, ein Testentwurf an Printful geht (dann ohne Nummer).
+Die Größen und Abstände der Vorlagen sind Positions-Vorgaben (Abschnitt oben) und lassen sich dort ändern. Seit #2150
+wird die Vereinsnummer je Bestellung gedruckt (Abschnitt „Bestellung“) - der Prüfpunkt „Vereinsnummer im Druck“ aus
+#2142 ist weg. Der Testentwurf druckt die Beispielnummer (höchste Wunschnummer, Vorgabe 99).
 
 ### Bestellung
 
@@ -976,21 +980,52 @@ Prüfpunkt „Vereinsnummer im Druck“ rot, solange eine Fläche eine Vereinsnu
 diese Position: Grunddatei plus Gamertag am Anker (`shop_gamertag.store` legt den Namen als Bestelldatei ab, Farbe aus
 dem Plan: nach `inks_for_garment`, bei entschiedenem Untergrund nach `ink_for_surface`, #2141). Die Motiv-Fassungen stehen weiter in `designs` (für die Aufbewahrung ihrer Adressen). Kommt die
 Bestellung nicht zustande (gleichzeitiger Aufruf, spätere Position nicht bestellbar), sind die eigenen Dateien wieder
-weg. Die Vereinsnummer bleibt Platzhalter bis #1727.
+weg.
 
-**Datenschutz:** Eine Bestelldatei mit Gamertag ist personenbezogen (das PNG zeigt den Namen) - `user_id`, Bestellung und
-Position an der Zeile, nie der Name als Text. Auskunft unter `shop_print_files` (ohne Schlüssel und Ablageort),
-Kontolöschung wie bei den Gamertag-Dateien (`shop_print_files.erase_for_user`, Abschluss im Job `ops_retention`).
-Grunddateien gehören zum Katalog.
+**Vereinsnummer (#2150, Teil von #1727).** Hat eine Fläche eine Vereinsnummer-Ebene (`shop_print_files.prints_number`),
+druckt die Bestellung die **Wunschnummer** (#2034) - nie die Mitgliedsnummer aus `memberships` („TLS-2026-0001“):
+
+1. **Datenquelle:** `jersey_numbers.print_number` liest den eigenen Spiegel - nur solange die Nummer vergeben ist
+   (`number_key`) und das Konto berechtigt ist (`ELIGIBLE_STATUSES`: aktiv, Ehrenmitglied, ruhend). Die Anfrage
+   bringt nie eine Nummer.
+2. **Einwilligung je Position:** `lines[].number_consent: true` (der Haken im Checkout). Gespeichert an der Position
+   als `number_consent` mit `given_at` (Zeitpunkt der Bestellung), `version` und `text`
+   (`shop_orders.NUMBER_CONSENT_VERSION`/`NUMBER_CONSENT_TEXT`; die Kasse holt beides über
+   `shop_orders.number_consent_terms()`). Ändert sich der Text, bekommt er eine neue Fassung. Der Warenkorb speichert
+   den Haken nicht.
+3. **Ablehnen** mit klarem Satz, bevor eine Datei entsteht: Nicht-Mitglied bzw. öffentlicher Kauf („die Vereinsnummer
+   gibt es nur für Vereinsmitglieder“), keine Nummer („du hast noch keine Vereinsnummer …“), kein Haken („… brauchen wir
+   deine Einwilligung …“). Ein Haken bei einem Produkt ohne Nummer wird still übergangen und nicht gespeichert (etwa,
+   wenn sich der Aufbau zwischen Warenkorb und Kasse geändert hat). Die Nummer steht in keiner Meldung, keinem Log,
+   keinem Ereignis und keiner Mail.
+4. **Datei:** wie beim Gamertag eine **eigene** Datei der Fläche (`kind = "personal"`), auch wenn die Fläche nur eine
+   Nummer hat. `_personal_file` setzt Gamertag **und** Nummer zusammen: je Ebene `shop_gamertag.store(…, kind="number")`
+   mit den Regeln der Ebene (Größe, Schrift, Kontur) und der Farbe aus dem Plan - genau wie Vorschau und Beispiel, ohne
+   Wortfilter. Die Nummerndatei liegt in `shop_gamertag_files` mit `kind = "number"`; die Bestelldatei nennt sie in
+   `number_file_id` (neben `gamertag_file_id`). Passt die Nummer nicht in die Ebene (etwa vier Stellen bei zu kleiner
+   Höchstbreite), ist die Position „nicht bestellbar“; der Grund ohne Nummer steht im Log.
+5. **Sichtbar** nur für das Mitglied (Auskunft; die eigene Bestellansicht kommt mit der Kasse, #1712) und die Finanzen
+   (`GET /api/admin/shop/orders/{id}`, Bereich Finanzen; die Oberfläche kommt mit #1723).
+
+**Datenschutz:** Eine Bestelldatei mit Gamertag bzw. Nummer ist personenbezogen (das PNG zeigt Name bzw. Nummer) -
+`user_id`, Bestellung und Position an der Zeile, nie Name oder Nummer als Text. Auskunft unter `shop_print_files` und
+`shop_gamertag_files` (ohne Schlüssel und Ablageort), Kontolöschung wie bei den Gamertag-Dateien
+(`shop_print_files.erase_for_user`, `shop_gamertag.erase_for_user`, ausstehende Löschungen im Job `ops_retention`);
+kommt eine Bestellung nicht zustande, sind beide sofort weg (`discard_order_files`). Grunddateien gehören zum Katalog.
+Mit der gelöschten Datei gehen auch alle Angaben, aus denen sich Name oder Nummer durch Durchprobieren zurückrechnen
+ließen (`render` ist deterministisch, es gibt höchstens 10.000 Nummern): an den Text-Dateien `CONTENT_FIELDS` aus
+`shop_gamertag` (Prüfsumme, Dateigröße, Textbreite, Texthöhe, „verkleinert“), an der Bestelldatei Prüfsumme,
+Dateigröße und Dateiname (`shop_print_files.CONTENT_FIELDS`) und an der Bestellposition `print_files[].sha256`. Die
+Zeilen bleiben nur als Nachweis „Datei war da, gelöscht am“. Kein Ablauf braucht diese Prüfsummen danach: solange ein
+offener Printful-Auftrag die Datei braucht, steht die Löschung noch aus und alles bleibt.
 
 ### Vorab-Prüfung
 
 Neu: **Druckvorlage von Printful** (geladen, höchstens 14 Tage alt, letzte Änderung mit Sätzen) und **Druckdateien je
 Farbe**: jede Fläche mit Motiv (bzw. fertiger Datei) hat für jede angebotene Farbe (und Gruppe) eine gültige Datei zum
 aktuellen Aufbau und zur aktuellen Vorlage; fehlt sie oder ist sie veraltet, nennt die Prüfung Fläche und Farbe.
-Seit #2142 **Vereinsnummer im Druck** (`member_number_print`): rot, solange eine Vereinsnummer-Ebene da ist - die
-Nummer wird erst mit #1727 je Bestellung gedruckt und fiele sonst still weg. Der Testentwurf (#2062) zählt diesen
-Punkt nicht.
+Der Prüfpunkt **Vereinsnummer im Druck** (`member_number_print`, #2142) ist mit #2150 weggefallen: die Nummer wird je
+Bestellung gedruckt.
 
 ### Produktsuche (Schritt 1)
 
@@ -1072,7 +1107,9 @@ Zufallsschlüssel (256 Bit), Maße, Anker, Farbe, `rules_hash`, `purpose` (`test
   Datei, ist die Adresse sofort aus (`public_disabled_at`, 404) und die Datei gelöscht (`file_deleted_at`). Braucht ein
   offener Auftrag (Bestellung mit `printful_order_id`, Stand nicht abgeschlossen - die endgültigen Stände liefert
   #1716) sie noch, bleibt sie nur dafür abrufbar (`erase_pending_at`); der Job `ops_retention` schaltet sie nach dem
-  Abschluss ab und löscht sie (`complete_pending_erasures`). Die Zeile bleibt ohne Konto mit Prüfsumme und Maßen.
+  Abschluss ab und löscht sie (`complete_pending_erasures`). Die Zeile bleibt ohne Konto mit den Maßen der Leinwand -
+  seit #2150 ohne Prüfsumme, Dateigröße, Textbreite und -höhe (`CONTENT_FIELDS`), aus denen sich der Name
+  zurückrechnen ließe.
 
 **Einfrieren (für #1712/#1713):** `store(db, name, purpose="order", user_id=…, order_id=…, order_item_id=…,
 color_key=…)` prüft, rendert und legt ab; `frozen_for_order(row, name)` liefert, was die Position einfriert: den
@@ -1157,7 +1194,9 @@ der richtigen Position, Anschrift, `external_id` und Preise sauber übergeben we
   `shop.test_draft.send`, `shop.test_draft.delete` (ohne Anschrift und Gamertag).
 - **Keine Mitgliederdaten:** nur die Vereinsadresse und Test-Gamertags. Der Gamertag steht nie als Text in der Zeile oder
   im Protokoll - nur in der Druckdatei; die Datei hängt am Konto der Person aus den Finanzen (wie eine Bestelldatei,
-  `shop_print_files` mit `purpose = "order"` und `order_id` = Testentwurf).
+  `shop_print_files` mit `purpose = "order"` und `order_id` = Testentwurf). Druckt das Produkt die Vereinsnummer
+  (#2150), kommt die **Beispielnummer** hinein (`shop_print_files.sample_number`: höchste Wunschnummer, Vorgabe 99) -
+  nie die Nummer eines Mitglieds; die Seite sagt das bei Schritt 3, die Zeile trägt `with_number`.
 - **Doppelklick und gleichzeitige Klicks:** die Seite schickt je Vorschau einen Idempotenzschlüssel. Derselbe Schlüssel
   noch einmal liefert dasselbe Ergebnis; der Stand wechselt nur bedingt von `preview` auf `sending` - ein zweiter Klick
   bekommt 409. Lehnt Printful eindeutig ab (der Claim des Adapters steht auf „failed“), steht der Testentwurf wieder auf

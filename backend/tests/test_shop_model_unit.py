@@ -296,7 +296,7 @@ async def test_design_versions_count_up_and_need_a_checksum(db):
 def test_personal_fields_are_marked_for_export_and_erasure():
     assert shop_common.PERSONAL_FIELDS == {
         "shop_orders": ("user_id", "billing_address", "shipping_address"),
-        "shop_order_items": ("user_id", "gamertag"),
+        "shop_order_items": ("user_id", "gamertag", "print_number"),
         "shop_carts": ("user_id", "items"),
         "shop_gamertag_files": ("user_id",),
         "shop_print_files": ("user_id",),

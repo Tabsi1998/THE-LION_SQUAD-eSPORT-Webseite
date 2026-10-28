@@ -104,6 +104,58 @@ test("Liga: Spiele, Differenz, Form und Pfeile seit dem vorigen Spieltag", async
   expect(screen.getAllByText("Du")).toHaveLength(1);
 });
 
+// #2121: K.-o. zählt Niederlagen und die erreichte Runde statt Punkte, der Kopf sagt „Team“ bei Teams; Urkunden nur mit
+// Endplatz, nie bei Gruppen.
+function mockWith(tr, standings) {
+  apiMock.get.mockImplementation((path) => {
+    if (path === "/tournaments/cup") return Promise.resolve({ data: { id: "t1", slug: "cup", title: "Herbst-Cup", ...tr } });
+    if (path === "/tournaments/t1/standings") return Promise.resolve({ data: standings });
+    return Promise.reject(new Error(path));
+  });
+}
+
+const knockoutRows = [
+  { registration_id: "r1", display_name: "Nordlicht", rank: 1, won: 2, lost: 0, points: 0, furthest_round: 2, reached: "Finale" },
+  { registration_id: "r2", display_name: "Wolkenfuchs", rank: 2, won: 1, lost: 1, points: 0, furthest_round: 2 },
+];
+
+test("K.-o.: Siege, Niederlagen und die erreichte Runde mit Namen - keine Punkte; Teams heißen Team", async () => {
+  mockWith({ format: "single_elim", team_mode: "team", status: "completed" }, knockoutRows);
+  renderPage();
+  const row = await screen.findByTestId("standing-row-r2");
+  expect(screen.getByRole("columnheader", { name: "Team" })).toBeInTheDocument();
+  expect(screen.getByRole("columnheader", { name: "Erreicht" })).toBeInTheDocument();
+  expect(screen.getByTestId("standing-row-r1")).toHaveTextContent("Finale");
+  expect(screen.queryByRole("columnheader", { name: /Pkt|Punkte/ })).toBeNull();
+  expect([...row.querySelectorAll("td")].map((cell) => cell.textContent)).toEqual(expect.arrayContaining(["1", "1", "2"]));
+  expect(screen.getByTestId("standings-certificates")).toBeInTheDocument();
+  expect(screen.getByTestId("standings-print-link")).toHaveAttribute("href", "/print/tournaments/cup?teile=tabelle&von=rangliste");
+});
+
+test("FFA: Läufe zählen Punkte und den Platz im Schnitt, keine Niederlagen", async () => {
+  mockWith({ format: "ffa", status: "live" }, [{ registration_id: "r1", display_name: "Nordlicht", rank: 1, played: 3, won: 2, lost: 1, avg_rank: 1.33, points: 28 }]);
+  renderPage();
+  await screen.findByTestId("standing-row-r1");
+  expect(screen.getByRole("columnheader", { name: "Name" })).toBeInTheDocument();
+  for (const header of ["Sp", "S", "Ø Pl.", "Pkt"]) expect(screen.getByRole("columnheader", { name: header })).toBeInTheDocument();
+  expect(screen.queryByRole("columnheader", { name: "N" })).toBeNull();
+});
+
+test("vor dem ersten Ergebnis: Noch keine Ergebnisse, keine Urkunden", async () => {
+  mockWith({ format: "single_elim", status: "completed" }, []);
+  renderPage();
+  expect(await screen.findByText("Noch keine Ergebnisse")).toBeInTheDocument();
+  expect(screen.queryByTestId("standings-certificates")).toBeNull();
+});
+
+test("Gruppen nach dem Ende: Ergebnis-PDF ja, Urkunden nein", async () => {
+  mockWith({ ...generated.groups.tournament, id: "t1", status: "completed" }, generated.groups.standings);
+  renderPage();
+  await screen.findByRole("heading", { name: /Gruppe A/ });
+  expect(screen.getByText("Ergebnis-PDF")).toBeInTheDocument();
+  expect(screen.queryByTestId("standings-certificates")).toBeNull();
+});
+
 // #1801: Die Rangliste lädt nur bei Änderungen ihres Turniers nach - bis es geladen ist, bei jeder.
 test("hört nach dem Laden nur noch auf das eigene Turnier", async () => {
   mockApi(rows(["Anna"]));

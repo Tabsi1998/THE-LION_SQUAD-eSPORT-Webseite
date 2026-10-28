@@ -80,6 +80,53 @@ test("mit Turnier-Recht: Check-in-Liste mit Kästchen und Live-Link zur Turnierl
   await waitFor(() => expect(screen.queryByTestId("print-sheet-baum")).not.toBeInTheDocument());
 });
 
+// #2121: Liga & Co. drucken eine Tabelle statt Spieltage als Baumspalten; „Zurück“ führt dorthin, wo gedruckt wurde.
+const league = {
+  tournament: { id: "t2", slug: "herbstliga" },
+  stages: [{ id: "l", number: 1, stage_type: "league" }],
+  registrations: [{ id: "a", display_name: "Anna" }, { id: "b", display_name: "Ben" }],
+  matches_v2: [
+    { id: "l1", stage_id: "l", stage_type: "league", section: "league", round: 1, order: 0, match_key: "A", status: "completed", slots: [{ slot: 1, registration_id: "a" }, { slot: 2, registration_id: "b" }] },
+  ],
+};
+const leagueStandings = [
+  { registration_id: "a", display_name: "Anna", rank: 1, played: 1, won: 1, drawn: 0, lost: 0, score_diff: 2, points: 3 },
+  { registration_id: "b", display_name: "Ben", rank: 2, played: 1, won: 0, drawn: 0, lost: 1, score_diff: -2, points: 0 },
+];
+
+function serveLeague() {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/tournaments/herbstliga") return { data: { id: "t2", slug: "herbstliga", title: "Herbstliga", format: "league", team_mode: "team" } };
+    if (url === "/tournaments/t2/bracket") return { data: league };
+    if (url === "/tournaments/t2/standings") return { data: leagueStandings };
+    throw Object.assign(new Error("unerwartet"), { response: { status: 404 } });
+  });
+}
+
+test("Liga: Tabelle und Spielplan statt Baum, „baum“ in der Adresse führt zur Tabelle, Zurück zur Rangliste", async () => {
+  serveLeague();
+  renderAt("/print/tournaments/herbstliga?teile=baum&von=rangliste&access=abc");
+  expect(await screen.findByTestId("print-sheet-tabelle")).toBeInTheDocument();
+  expect(screen.queryByTestId("print-sheet-baum")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("print-part-baum")).not.toBeInTheDocument();
+  expect(screen.getByTestId("print-part-tabelle")).toBeChecked();
+  const rows = screen.getAllByTestId("print-standing-row");
+  expect(rows.map((row) => row.textContent)).toEqual(["1Anna1100+23", "2Ben1001−20"]);
+  expect(screen.getByRole("columnheader", { name: "Team" })).toBeInTheDocument();
+  expect(screen.getByTestId("print-sheet-tabelle")).toHaveTextContent("THE LION SQUAD · Tabelle");
+  expect(screen.getByTestId("branded-qr-code").dataset.value).toBe(`${window.location.origin}/tournaments/herbstliga/standings`);
+  expect(screen.getByRole("link", { name: /Zurück/ })).toHaveAttribute("href", "/tournaments/herbstliga/standings?access=abc");
+});
+
+test("K.-o.: die Tabelle heißt Rangliste und ist nur auf Wunsch dabei; ohne Herkunft führt Zurück zur Turnierseite", async () => {
+  serve({ canCheckIn: false });
+  renderAt("/print/tournaments/herbst-cup");
+  expect(await screen.findByTestId("print-sheet-baum")).toBeInTheDocument();
+  expect(screen.queryByTestId("print-sheet-tabelle")).not.toBeInTheDocument();
+  expect(screen.getByTestId("print-part-tabelle").closest("label")).toHaveTextContent("Rangliste");
+  expect(screen.getByRole("link", { name: /Zurück/ })).toHaveAttribute("href", "/tournaments/herbst-cup");
+});
+
 test("Wechsel zu einem anderen Turnier: nichts vom vorigen bleibt stehen (keine Liste von A unter dem Kopf von B)", async () => {
   serve({ canCheckIn: true });
   const fallback = apiMock.get.getMockImplementation();

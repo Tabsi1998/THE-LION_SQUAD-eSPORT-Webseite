@@ -36,7 +36,7 @@ const LEVELS = {
   error: { label: "falsch übergeben", className: "text-red-400", icon: XCircle },
   open: { label: "offen", className: "text-white/50", icon: Info },
 };
-const KIND_LABELS = { personal: "mit Gamertag (eigene Datei)", base: "Grunddatei" };
+const KIND_LABELS = { personal: "eigene Datei mit Gamertag bzw. Nummer", base: "Grunddatei" };
 
 export function euro(cents) {
   if (cents === null || cents === undefined) return "–";
@@ -461,7 +461,7 @@ export default function AdminShopTestDraftPage() {
           )}
 
           {variant && (
-            <Section title="Test-Gamertag" step={3} testId="shop-test-draft-gamertag">
+            <Section title={product.member_number ? "Test-Gamertag und Nummer" : "Test-Gamertag"} step={3} testId="shop-test-draft-gamertag">
               {product.gamertag ? (
                 <label className="block text-sm">
                   <span className="text-white/70">Erfundener Name für die Gamertag-Datei</span>
@@ -469,7 +469,13 @@ export default function AdminShopTestDraftPage() {
                     placeholder="z. B. Testname" className={INPUT} data-testid="shop-test-draft-gamertag-input" />
                   <span className="block text-xs text-white/45 mt-1">Erlaubt: {data.gamertag.allowed_text}; {data.gamertag.min_length} bis {data.gamertag.max_length} Zeichen. Bitte keine echten Namen von Mitgliedern.</span>
                 </label>
-              ) : <p className="text-sm text-white/55">Dieses Produkt hat kein Gamertag-Feld - hier ist nichts zu tun.</p>}
+              ) : <p className="text-sm text-white/55">Dieses Produkt hat kein Gamertag-Feld{product.member_number ? "." : " - hier ist nichts zu tun."}</p>}
+              {product.member_number && (
+                <p className="text-sm text-white/70 flex gap-2" data-testid="shop-test-draft-number">
+                  <Info className="w-4 h-4 shrink-0 mt-0.5 text-white/50" aria-hidden="true" />
+                  <span>Vereinsnummer: gedruckt wird die Beispielnummer <strong className="tabular-nums">{product.sample_number}</strong> (die höchste Wunschnummer) - nie die Nummer eines Mitglieds. Bei echten Bestellungen kommt die Wunschnummer nur mit Einwilligung des Mitglieds in den Druck.</span>
+                </p>
+              )}
             </Section>
           )}
 

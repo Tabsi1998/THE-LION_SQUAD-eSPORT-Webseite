@@ -156,7 +156,8 @@ export function TvLiveBanner({ text, kind = "live", note = "", leaving = false }
 }
 
 function championSubline(champion, tournamentTitle) {
-  return [tournamentTitle, champion.viaLoser ? "über das Loser Bracket zurückgekommen" : ""].filter(Boolean).join(" · ");
+  // Aus der Tabelle (#2121): es gibt kein Finale - der Sieger steht auf Platz 1.
+  return [tournamentTitle, champion.viaLoser ? "über das Loser Bracket zurückgekommen" : "", champion.fromTable ? "Platz 1 der Tabelle" : ""].filter(Boolean).join(" · ");
 }
 
 /**
