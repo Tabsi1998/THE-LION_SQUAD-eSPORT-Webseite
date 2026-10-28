@@ -51,8 +51,10 @@ const KIND_FILTERS = [
   ["tournament", "Nur Turniere"],
   ["league", "Nur Liga-Staffeln"],
 ];
-// Löschen einer Staffel nur vor dem Start (L-D3) - der Server prüft dazu, ob schon ein fester Spielplan steht.
-const canDelete = (tournament) => !isStaffel(tournament) || staffelBeforeStart(tournament);
+// Löschen einer Staffel nur vor dem Start (L-D3) - der Server prüft dazu, ob schon ein fester Spielplan steht. Ein
+// Turnier nur als Entwurf (#2111, TA18); der Server prüft dazu, dass es keine Ergebnisse hat. Sonst: absagen oder
+// archivieren - über den Status in der Turnierverwaltung.
+const canDelete = (tournament) => (isStaffel(tournament) ? staffelBeforeStart(tournament) : tournament.status === "draft");
 
 export default function AdminTournamentsPage() {
   // Globale Aktionen nur für die Turnierleitung mit Zwei-Faktor (#1028), Helfer sehen die ihres Einsatzes.
@@ -118,10 +120,12 @@ export default function AdminTournamentsPage() {
       title: "Staffel löschen?",
       description: "Die Staffel wird dauerhaft gelöscht und verschwindet aus ihrer Season – mit den zugeteilten Co-Teams und der Spielplan-Vorschau. Das geht nur vor dem Start.",
       confirmLabel: "Löschen",
+      tone: "danger",
     } : {
-      title: "Turnier löschen?",
-      description: "Das Turnier wird dauerhaft gelöscht. Teilnehmer, Turnierbaum und öffentliche Detailseite sind danach nicht mehr verfügbar.",
+      title: "Entwurf löschen?",
+      description: "Das Turnier wird dauerhaft gelöscht – mit Anmeldungen, Vorschau, Gruppen, Map-Pool und Chat. Das lässt sich nicht zurücknehmen. Ein Turnier mit Ergebnissen sagst du stattdessen ab oder archivierst es.",
       confirmLabel: "Löschen",
+      tone: "danger",
     })) return;
     try {
       await api.delete(`/tournaments/${tournament.id}`);

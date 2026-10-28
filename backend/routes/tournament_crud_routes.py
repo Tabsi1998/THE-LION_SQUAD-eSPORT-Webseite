@@ -575,14 +575,24 @@ async def delete_tournament(tid: str, me: dict = Depends(require_admin()),
                             _mutation_tid: str = Depends(_serialized_tournament_write)):
     db = get_db()
     tid = await _resolve_tid(tid)
-    # Liga-Staffel (#2109): löschen nur vor dem Start - danach „Abgesagt“ oder „Archiviert“.
-    stored = await db.tournaments.find_one({"id": tid}, {"_id": 0}) or {}
-    problem = await staffel_guard.staffel_delete_problem(db, stored)
+    stored = await db.tournaments.find_one({"id": tid}, {"_id": 0})
+    if not stored:
+        raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    # Liga-Staffel (#2109): löschen nur vor dem Start - danach „Abgesagt“ oder „Archiviert“. Alle anderen Turniere nur
+    # als Entwurf ohne Ergebnisse (#2111, TA18).
+    if is_league_staffel(stored):
+        problem = await staffel_guard.staffel_delete_problem(db, stored)
+    else:
+        problem = await tournament_guard.delete_problem(db, stored)
     if problem:
         raise HTTPException(status_code=409, detail=problem)
     from services.tournament_purge import purge_tournament
     await purge_tournament(db, tid)
     reset_scope_cache()  # Live-Meldungen (#1801): Turnier und Event neu nachschlagen
+    await _audit_tournament_action(db, "tournament.delete", me.get("id"), tid, {
+        "title": stored.get("title"), "status": stored.get("status"), "format": stored.get("format"),
+        "staffel": is_league_staffel(stored),
+    })
     return {"ok": True}
 
 

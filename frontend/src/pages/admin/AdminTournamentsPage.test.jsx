@@ -67,6 +67,16 @@ test("Staffeln tragen ihr Kennzeichen und lassen sich filtern", async () => {
   expect(screen.queryByText("Probe-Liga Season 1 · Liga 1 · Staffel A")).toBeNull();
 });
 
+// Löschen nur für Entwürfe (#2111, TA18) - alles andere sagt man ab oder archiviert.
+test("ein Turnier lässt sich nur als Entwurf löschen", async () => {
+  apiMock.get.mockResolvedValue({ data: [{ ...OWN, status: "draft" }, { ...OWN, id: "t-open", slug: "offen", title: "Offenes Turnier", status: "registration_open" }] });
+  authState.isTournamentLead = true;
+  render(<MemoryRouter><AdminTournamentsPage /></MemoryRouter>);
+  await screen.findByText("Offenes Turnier");
+  expect(within(screen.getByTestId("admin-tr-eigenes")).getByTitle("Löschen")).toBeInTheDocument();
+  expect(within(screen.getByTestId("admin-tr-offen")).queryByTitle("Löschen")).toBeNull();
+});
+
 test("eine Staffel: vor dem Start löschbar, danach nicht, und nie „Anmeldung öffnen“", async () => {
   apiMock.get.mockResolvedValue({ data: [STAFFEL, { ...STAFFEL, id: "t-live", slug: "liga-b", title: "Laufende Staffel", status: "live" }] });
   authState.isTournamentLead = true;
