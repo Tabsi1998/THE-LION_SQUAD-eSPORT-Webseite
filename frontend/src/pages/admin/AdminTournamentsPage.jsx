@@ -10,7 +10,8 @@ import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
-import { formatTournamentDisplay } from "@/lib/tournamentLabels";
+import { formatTournamentDisplay, formatTournamentFormat } from "@/lib/tournamentLabels";
+import { TOURNAMENT_STATUS_OPTIONS } from "./tournament/shared";
 import { effectiveRuleModes } from "@/lib/tournamentRulePresets";
 import { gameLabel } from "@/lib/gameLabels";
 import { downloadCsv, formatAdminDate, normalizeSearch } from "@/lib/adminListTools";
@@ -32,19 +33,13 @@ const SCHEDULE_MODE_LABELS = {
   hybrid: "Termin: Hybrid",
   player_proposal: "Termin: Vorschlag",
 };
-const TOURNAMENT_STATUS_FILTERS = [
-  ["", "Alle Status"],
-  ["draft", "Entwurf"],
-  ["scheduled", "Angekündigt"],
-  ["registration_open", "Anmeldung offen"],
-  ["registration_closed", "Anmeldung geschlossen"],
-  ["live", "Live"],
-  ["paused", "Pausiert"],
-  ["completed", "Abgeschlossen"],
-  ["results_published", "Ergebnisse online"],
-  ["archived", "Archiviert"],
-  ["cancelled", "Abgesagt"],
-];
+// Dieselben Statuswörter wie im Kopf der Turnierseite (#2111, TA21) - mit „Check-in offen“. „Alle“ heißt ohne Archiv;
+// archivierte Turniere zeigt der Filter „Archiviert“.
+const TOURNAMENT_STATUS_FILTERS = [["", "Alle außer Archiv"], ...TOURNAMENT_STATUS_OPTIONS];
+const statusLabel = (status) => TOURNAMENT_STATUS_OPTIONS.find(([value]) => value === status)?.[1] || status || "—";
+// Die Verwaltungsliste fragt bis zu so viele Turniere ab (der Server liefert höchstens 500) - steht die Liste voll, sagt
+// die Seite es, statt still abzuschneiden.
+const LIST_LIMIT = 500;
 // Liga-Staffeln (#2109, S26): eigene Art in der Liste - leicht zu verwechseln, wenn sie zwischen den Turnieren stehen.
 const KIND_FILTERS = [
   ["", "Turniere und Liga-Staffeln"],
@@ -69,7 +64,7 @@ export default function AdminTournamentsPage() {
   const load = useCallback(async () => {
     // Verwaltungsliste (#1028): die Turnierleitung bekommt alle Turniere, Helfer nur die ihres Einsatzes.
     try {
-      const { data } = await api.get("/tournaments?include_drafts=true&managed=true");
+      const { data } = await api.get(`/tournaments?include_drafts=true&managed=true&limit=${LIST_LIMIT}`);
       setList(data);
       setDenied("");
     } catch (error) {
@@ -106,7 +101,7 @@ export default function AdminTournamentsPage() {
   const setStatus = async (id, status) => {
     try {
       const response = await api.post(`/tournaments/${id}/status`, { status });
-      toast.success(`Status: ${status}`);
+      toast.success(`Status: ${statusLabel(status)}`);
       // Punkte in einer abgeschlossenen Jahreswertung bleiben unverändert (#2123).
       if (response?.data?.season_points_note) toast.info(response.data.season_points_note, { duration: 10000 });
       load();
@@ -145,6 +140,7 @@ export default function AdminTournamentsPage() {
     const q = normalizeSearch(query);
     return sortedList.filter((tournament) => {
       if (statusFilter && tournament.status !== statusFilter) return false;
+      if (!statusFilter && tournament.status === "archived") return false;
       if (kindFilter === "league" && !isStaffel(tournament)) return false;
       if (kindFilter === "tournament" && isStaffel(tournament)) return false;
       if (!q) return true;
@@ -154,6 +150,9 @@ export default function AdminTournamentsPage() {
         tournament.platform,
         tournament.format,
         tournament.format_label,
+        // Deutsche Formatnamen (#2111, TA21): „K.-o.“ findet ein K.-o.-Turnier, nicht nur „single_elim“.
+        formatTournamentDisplay(tournament),
+        formatTournamentFormat(tournament.format),
         tournament.league_label,
         tournament.game?.name,
         gameLabel(tournament.game),
@@ -171,7 +170,7 @@ export default function AdminTournamentsPage() {
         tournament.slug,
         gameLabel(tournament.game),
         formatTournamentDisplay(tournament),
-        tournament.status,
+        statusLabel(tournament.status),
         formatAdminDate(tournament.start_date),
         tournament.participant_count,
         tournament.max_participants,
@@ -200,7 +199,7 @@ export default function AdminTournamentsPage() {
             onChange={(event) => updateFilterParams({ q: event.target.value })}
             data-testid="admin-tournament-search"
             className="w-full rounded-sm border border-white/10 bg-[#0A0A0A] py-2.5 pl-10 pr-3 text-sm text-white placeholder:text-white/35 focus:border-[#29B6E8]/60 focus:outline-none"
-            placeholder="Turnier, Spiel, Adresse oder Plattform suchen"
+            placeholder="Turnier, Spiel, Format, Adresse oder Plattform suchen"
           />
         </label>
         <select
@@ -211,7 +210,7 @@ export default function AdminTournamentsPage() {
         >
           {TOURNAMENT_STATUS_FILTERS.map(([value, label]) => (
             <option key={value || "all"} value={value}>
-              {label} ({value ? statusCounts[value] || 0 : list.length})
+              {label} ({value ? statusCounts[value] || 0 : list.length - (statusCounts.archived || 0)})
             </option>
           ))}
         </select>
@@ -236,6 +235,11 @@ export default function AdminTournamentsPage() {
           <Download className="h-3.5 w-3.5" /> CSV
         </button>
       </div>
+      {list.length >= LIST_LIMIT && (
+        <p className="mb-3 text-xs text-[#FFD700]" data-testid="admin-tournament-list-limit">
+          Die Liste zeigt die {LIST_LIMIT} zuletzt angelegten Turniere – ältere stehen hier nicht.
+        </p>
+      )}
       <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
         <div className="tls-swipe pb-0">
         <table className="w-full text-sm min-w-[860px]">
