@@ -45,7 +45,7 @@ Turniere. **Ohne 2FA** erscheint stattdessen der Hinweis **2FA einrichten**, sie
 | Funktion | Was passiert | Einstellen unter |
 | --- | --- | --- |
 | **Turnier anlegen** | Titel und Spiel genügen, das Turnier startet als **Entwurf** und ist nicht öffentlich | Neues Turnier |
-| **Formate** | K.-o. und Doppel-K.-o., Jeder gegen jeden, Schweizer System, Gruppenphase, Mehrspieler, Liga, freie Bäume und mehr | Neues Turnier / Reiter Bearbeiten, Abschnitt „Struktur“ |
+| **Formate** | K.-o. und Doppel-K.-o., Jeder gegen jeden (einfach oder mit Hin- und Rückrunde), Schweizer System, Gruppenphase, Mehrspieler, freie Bäume. Die Vereinsliga mit Seasons und Staffeln läuft über **Admin → eSports → Liga** (3.15) | Neues Turnier / Reiter Bearbeiten, Abschnitt „Struktur“ |
 | **Spielweise** | **Online**, **Vor Ort** oder **Hybrid**: wer Ergebnisse meldet, wer Termine macht, wer eincheckt | „Wie gespielt wird“ |
 | **Anmeldung** | Selbstanmeldung, Warteliste, Einladung, Speziallinks, Startgeld | Reiter Bearbeiten, Reiter Teilnehmer |
 | **Check-in** | Online selbst, vor Ort durch die Turnierleitung | Reiter Teilnehmer |
@@ -70,17 +70,19 @@ Turniere. **Ohne 2FA** erscheint stattdessen der Hinweis **2FA einrichten**, sie
 3. Kasten **Das Turnier**: **Titel**, **Spiel**, **Format**, **Teilnahme** (Einzelspieler oder Team), bei Teams
    **Spieler pro Team**, dazu **Max Spieler** / **Min Spieler** (bei Teams „Max Teams“ / „Min Teams“).
 4. Kasten **Wie gespielt wird**: **Online**, **Vor Ort** oder **Hybrid** wählen (3.2).
-5. Rechts im Kasten **Wann**: **Veröffentlichung** (**Entwurf** oder **Angekündigt**), **Start Event/Turnier**,
-   **Anmeldung endet**. Unter „Weitere Zeiten und Sonderfälle“: **Ende**, **Anmeldung öffnet**, **Check-in öffnet**,
+5. Rechts im Kasten **Wann**: **Veröffentlichung** (**Entwurf** oder **Angekündigt**), **Sichtbarkeit** (Öffentlich,
+   Community, Vereinsmitglieder, Intern), **Start Event/Turnier**, **Anmeldung endet**. Unter „Weitere Zeiten und Sonderfälle“: **Ende**, **Anmeldung öffnet**, **Check-in öffnet**,
    **Check-in endet**, **Nur Einladung**, **Anmeldung über Discord erlauben**, **Vereinsmitglieder von der Selbstanmeldung
    ausschließen** und, wenn das Turnier zu einem Event gehört, **Anmeldung nur mit Event-Anmeldung**. Unter dem Kasten warnt
    **Planung prüfen** bei widersprüchlichen Zeiten – beim Bearbeiten genauso, direkt unter **Check-in endet** (etwa „Der
    Check-in endet vor seiner Öffnung.“). Gespeichert wird trotzdem.
 
    <img src="../assets/turniere/planung-pruefen-bearbeiten-handy.png" alt="Turnier bearbeiten am Handy: Check-in endet liegt vor Check-in öffnet, darunter der gelbe Kasten Planung prüfen" width="300">
-6. Weiter unten, aufklappbar: **Darstellung und Regeln** (Slug, Plattform, Beschreibung, Banner, **Regeln**,
-   Partner), **Spieloptionen** (Best of, Seeding, Gegner der nächsten Runde, Spiel um Platz 3), **Preise**, **Streaming und
-   externe Links**. Schreibt die **Regeln** hinein, bevor die Anmeldung aufgeht – was ihr festlegt (Frist bis zum
+6. Weiter unten, aufklappbar: **Darstellung und Regeln** (**Adresse (URL)** – sie folgt dem Titel, bis du sie selbst
+   änderst –, Plattform, Beschreibung, Banner, **Regeln**, Partner), **Spieloptionen** (Best of, **Setzliste**,
+   Weiterkommen bzw. Spieltage auslosen, Spiel um Platz 3), **Preise**, **Streaming und externe Links** (Plattform,
+   **Kanal oder Adresse**, Haken **Stream auf der Turnierseite zeigen**). Das Formular zeigt nur, was zu Format und
+   Austragung passt (3.2). Schreibt die **Regeln** hinein, bevor die Anmeldung aufgeht – was ihr festlegt (Frist bis zum
    Forfeit, Streitfall-Ablauf, Beweise), steht dann für alle fest.
 7. **Turnier erstellen**. Du landest im Turnier.
 
@@ -119,18 +121,18 @@ Platzierung).
 | --- | --- |
 | **K.-o.** (früher „Single Elimination“) | Ein Abend, ein Sieger; wer verliert, ist raus. Mit Haken „Spiel um Platz 3“ möglich |
 | **Doppel-K.-o.** (früher „Double Elimination“) | Eine Niederlage ist nicht das Aus (Loser Bracket) |
-| **Jeder gegen jeden** | Kleines Feld, alle spielen gegeneinander, die Tabelle entscheidet |
+| **Jeder gegen jeden – einfach** | Kleines Feld, alle spielen einmal gegeneinander, die Tabelle entscheidet |
+| **Jeder gegen jeden – Hin- und Rückrunde** (früher „Liga“) | Über Wochen mit Spieltagen, jeder spielt zweimal gegen jeden. Unter dem Format steht der Weg zur Vereinsliga mit Seasons und Staffeln (**Admin → eSports → Liga**, 3.15) – die ist etwas anderes |
 | **Schweizer System** | Viele Teilnehmer, kein fester Baum; die Runden entstehen einzeln aus den Ergebnissen |
-| **Gruppenphase** | Teilnehmer in Gruppen, danach Turnierbaum |
-| **Liga** | Eine Saison über Wochen mit Spieltagen |
-| **Mehrspieler frei** | Alle gleichzeitig in einer Lobby |
-| **Überlebensmodus** | Für Battle-Royale-artige Spiele, gewertet nach Platzierung |
-| **Freier Turnierbaum** und **Mehrspieler freier Turnierbaum** | Ihr schreibt den Baum selbst (Schema) |
-| **Zeitfahren**, **Rennserie** | Wertung über Rundenzeiten, **kein Turnierbaum**. Für reines Zeitfahren ist die [Fast-Lap-Challenge](fastlap.md) gedacht |
+| **Gruppenphase** | Teilnehmer in Gruppen, jeder spielt mehrere Partien. Eine K.-o.-Runde danach gibt es im selben Turnier noch nicht – die Besten spielen sie als eigenes Turnier |
+| **Mehrspieler frei** | Alle gleichzeitig in einer Lobby, **ein** Spiel mit allen, gewertet nach Platzierung. Turniere im früheren „Überlebensmodus“ (verhielt sich genauso) heißen jetzt auch so |
+| **Freier Turnierbaum** und **Mehrspieler freier Turnierbaum** | Ihr schreibt den Baum selbst (Schema); im Mehrspieler-Baum gibt es Läufe über mehrere Ebenen |
+| **Zeitfahren**, **Rennserie** | Beim Anlegen **nicht mehr zur Wahl**: es entstehen keine Spiele und es gibt keine Zeiteingabe. Zeitfahren laufen über [Fast Lap](fastlap.md), Rennserien über **Serien**. Bestehende Turniere behalten ihr Format, mit diesem Hinweis darunter |
 
-Auf der Turnierseite gibt es den Reiter **Turnierbaum** nur bei Formaten mit Baum. Bei **Jeder gegen jeden**, **Liga**,
+Auf der Turnierseite gibt es den Reiter **Turnierbaum** nur bei Formaten mit Baum. Bei **Jeder gegen jeden** (beide),
 **Zeitfahren** und **Rennserie** fehlt er; im laufenden Turnier ist dort – und bei **Schweizer System** und
-**Gruppenphase** – die **Rangliste** der Hauptknopf. Der Hinweis im Baum sagt je Format, wie gespielt wird.
+**Gruppenphase** – die **Rangliste** der Hauptknopf. Der Hinweis im Baum sagt je Format, wie gespielt wird. Die
+Ablauf-Leiste über der Turnierverwaltung nennt den Schritt je Format („Spielplan“, „Runden“, „Gruppen“, „Läufe“).
 
 Zu den Besonderheiten:
 
@@ -143,12 +145,12 @@ Zu den Besonderheiten:
   stehen sie. Der Status bleibt dabei, gestartet wird mit **Turnier starten**. Gibt es schon feste Gruppenspiele, fragt
   die Seite vorher nach und nennt die Zahl („12 Spiele, davon 3 begonnen oder gewertet“) – neue Gruppen löschen sie
   samt Ergebnissen. Nach dem Ende und bei gesperrtem Turnier gibt es keine neuen Gruppen.
-- **Liga, Jeder gegen jeden und Gruppen:** Unter **Bearbeiten → Spielweise** erscheint der Kasten **Spielwochen**:
+- **Jeder gegen jeden und Gruppen (online oder hybrid):** Unter **Bearbeiten → Spielweise** erscheint der Kasten **Spielwochen**:
   **Spieltag dauert (Tage)**, **Standardtag**, **Standarduhrzeit** (Wiener Zeit) und **Antwortfrist (Stunden)**. Ein
   Spieltag ist ein Zeitraum. Beide Seiten dürfen Termine vorschlagen, was die Gegenseite annimmt, gilt, sonst greift
   die Standardzeit. Ein vereinbarter Termin bleibt, auch außerhalb der Woche. Antwortet die Gegenseite nicht in der
-  Frist, bekommt die Turnierleitung eine Meldung. Spielwochen gibt es nur online: eine Gruppenphase **vor Ort** plant
-  der Spielplaner auf Stationen (siehe 3.8).
+  Frist, bekommt die Turnierleitung eine Meldung. Spielwochen gibt es nur online und hybrid: vor Ort fehlt der Kasten,
+  eine Gruppenphase **vor Ort** plant der Spielplaner auf Stationen (siehe 3.8).
 - **Freier Turnierbaum:** Unter **Bearbeiten → Struktur** erscheint das Feld **Schema** (beim Mehrspieler-Baum dazu
   **Spielgröße** und **Qualifizierte**). Ein Beispiel-Schema steht als Vorgabe darin. Anschließend unten
   **Speichern & Struktur anwenden**, dann im Reiter **Turnierbaum** prüfen.
@@ -157,12 +159,17 @@ Zu den Besonderheiten:
   ist das Finale). Unter **Bearbeiten → Spieloptionen → Läufe umbauen** wählst du **Vorschlag** (Standard: der Vorschlag
   steht als Leiste oben in der Turnierverwaltung, du bestätigst oder lehnst ab) oder **Automatisch**. Auffüllen und
   Freilose laufen immer von selbst; laufende und aufgerufene Läufe werden nie umgebaut.
-- **Sehr viele Begegnungen:** Bei Jeder gegen jeden und Liga mit sehr vielen Teilnehmern zeichnet das System keinen
+- **Sehr viele Begegnungen:** Bei Jeder gegen jeden mit sehr vielen Teilnehmern zeichnet das System keinen
   Entwurf. Dann Teilnehmerzahl senken oder Gruppen nutzen.
-- **Seeding** (Zufall, Manuell, Ranking) und der **Setzplatz** pro Teilnehmer stehen unter Spieloptionen bzw. beim
-  Hinzufügen eines Teilnehmers.
+- **Setzliste** (Spieloptionen): **Zufall** oder **Manuell** – Manuell ordnet nach dem **Setzplatz**, ohne Setzplatz nach
+  der Anmeldereihenfolge. Die frühere Option „Ranking“ verhielt sich genauso; ein gespeichertes „Ranking“ steht als
+  Manuell da. Den Setzplatz trägst du beim Hinzufügen ein oder – bei „Manuell“ – bis zum Ende des Check-ins in der
+  Spalte **Setzplatz** der Teilnehmerliste (Feld verlassen oder Enter speichert, leer nimmt ihn weg; die Vorschau ordnet
+  sich neu). Danach steht der Baum, und die Spalte verschwindet.
 
-Ob der Baum Vorschau oder fix ist, siehst du im Reiter **Spiele** (Hinweis „Vorschau / Draft“).
+Ob der Baum Vorschau oder fix ist, siehst du im Reiter **Spiele** (Hinweis „Vorschau“). Phasen entstehen aus dem Format;
+anlegen, umbauen oder löschen lassen sie sich nicht von Hand. **Regeln dieser Phase** (Austragung, Ergebniserfassung,
+Terminplanung, Spieldauer, Weiterkommen) stellt die Turnierleitung je Phase unter der Phase ein.
 
 **Format ändern und was ab dem Check-in-Ende feststeht (seit #2120):**
 
@@ -173,6 +180,7 @@ Ob der Baum Vorschau oder fix ist, siehst du im Reiter **Spiele** (Hinweis „Vo
   die baust du mit **Speichern & Struktur anwenden** neu.
 - Ab dem Ende des Check-ins (oder sobald es feste Spiele gibt, etwa generierte Gruppen) stehen **Turnierstruktur**,
   **Teilnahme**, **Spieler pro Team** und **Spiel** nur noch lesend da, und **Speichern & Struktur anwenden** fehlt.
+  Beim Schweizer System, bei Zeitfahren und Rennserie gibt es den Knopf nie – dort gibt es keinen Baum zum Vorausbauen.
   Im Reiter **Spiele** fehlen dann **Vorschau** und **Mit Teilnehmern generieren** (bei einer neuen, leeren Phase bleibt
   Generieren). Eine Vorschau ersetzt nie echte Spiele.
 - **Zurücksetzen** (Werkzeuge) löscht alle Spiele, der Status bleibt. Stehen schon feste Spiele, nennt die Rückfrage die
@@ -197,7 +205,20 @@ Schilder an. Eine Warnung erscheint, wenn die Mischung nicht passt (zum Beispiel
 Spieler-Ergebnismeldung“).
 
 **Auto-Start:** Der Haken „Turnier anhand Start-/Endzeit automatisch live/beendet schalten“ ist nur für Online-Turniere
-gedacht. Für Vor-Ort-Turniere ausgeschaltet lassen, dort startet ihr selbst.
+gedacht. Beim Anlegen fehlt er vor Ort (und ist aus); beim Bearbeiten steht er vor Ort nur noch, solange er an ist – mit
+dem Hinweis, ihn auszuschalten. Vor Ort startet ihr selbst.
+
+**Was das Formular je Format und Austragung zeigt (seit #2111):** Felder, die nichts bewirken, fehlen.
+
+| Feld | Steht da |
+| --- | --- |
+| **Spielwochen** | Jeder gegen jeden und Gruppen, online oder hybrid |
+| **Fristen** | „Nicht erschienen vor Ort“ vor Ort und hybrid; „Nicht erschienen online“ online und hybrid; „Ergebnis gilt online nach“ online/hybrid ohne Spielwochen; „Ergebnis gilt in Spielwochen nach“ in Spielwochen |
+| **Weiterkommen** | K.-o., Doppel-K.-o. und freie Bäume; bei Jeder gegen jeden – Hin- und Rückrunde stattdessen **Spieltage auslosen** (Reihenfolge und Heimrecht) |
+| **Best of** | nicht bei Zeitfahren und Rennserie; bei Mehrspieler heißt es **Runden je Lauf** und zählt für die geplante Dauer |
+| **Mindestpause** | vor Ort und hybrid (nur der Stationsplaner hält sie ein) |
+| **Preise Siegerrunde/Verliererrunde** | nur Doppel-K.-o. |
+| **Vor-Ort-Anmeldung über QR** | vor Ort und hybrid |
 
 ### 3.3 Anmeldung, Startgeld und Teilnehmer
 
@@ -307,7 +328,8 @@ verbindlichen Teilnahme: Warteliste kostet nichts. Alles Weitere steht in [Abrec
   frei, sagt die Seite es. Gezielt ersetzt **Teilnehmer hinzufügen** mit **Ersetzt Nicht-Erschienen** – auch eine
   Person mit Freilos.
 - Teilnehmer im festen Baum lassen sich nicht einfach entfernen. Stattdessen **Nicht erschienen** setzen und ersetzen.
-- **Weiterkommen (Gegner der nächsten Runde)** (Spieloptionen, auch je Phase), vier Modi:
+- **Weiterkommen (Gegner der nächsten Runde)** (Spieloptionen, auch je Phase; nur bei K.-o., Doppel-K.-o. und freien
+  Bäumen – bei Jeder gegen jeden – Hin- und Rückrunde steht dafür der Schalter **Spieltage auslosen**), vier Modi:
   - **Fester Baum** (Standard): Die Zuordnung steht im Turnierbaum, Sieger aus A trifft Sieger aus B.
   - **Auslosung nach der Runde**: Erst wenn **alle** Spiele einer Runde fertig sind, kommen alle Weiterkommer in einen
     Topf und werden gleichmäßig auf die Spiele der nächsten Runde verteilt – echtes Los, auch zwei aus demselben Spiel
@@ -331,7 +353,7 @@ verbindlichen Teilnahme: Warteliste kostet nichts. Alles Weitere steht in [Abrec
   Runde aufgerufen oder gestartet ist – bei „Sofort zufällig“ nur für die Spiele, die noch nicht begonnen haben. Der
   Matchplan plant eine ausgeloste Runde erst nach **allen** Spielen davor („wartet auf Auslosung“); bei „Sofort
   zufällig“ gilt eine Prognose: Die Spiele der nächsten Runde füllen sich in ihrer Reihenfolge mit den Spielen davor in
-  deren Reihenfolge – das echte Los entscheidet. In der **Liga** werden Reihenfolge der Spieltage und Heimrecht
+  deren Reihenfolge – das echte Los entscheidet. Bei **Jeder gegen jeden – Hin- und Rückrunde** und in der **Liga** werden Reihenfolge der Spieltage und Heimrecht
   ausgelost (jeder spielt trotzdem genau einmal je Hin- und Rückrunde gegen jeden); **Spieltage neu auslosen** geht bis
   Spieltag 1 beginnt. Die Einstellung gilt, sobald der Turnierbaum neu gebaut wird (Vorschau oder Ende des Check-ins).
   Ältere Turniere mit dem früheren Haken „Zufällig mischen“ laufen als „Auslosung nach der Runde“ weiter.
@@ -592,7 +614,7 @@ Tabelle mit seiner Siegerkarte (bei Gruppen und bei Gleichstand auf Platz 1 nich
    abgesagt“ ins Postfach, per Push und – wenn sie Mails zu Turnier-Updates zulassen – per Mail, jeweils mit dem Grund. **Entwurf** fragt ebenfalls
    nach: die öffentliche Seite verschwindet, Angemeldete bekommen keine Nachricht.
 4. **Sperren** (Werkzeuge, ab dem Status Beendet): Danach sind Ergebnisse, Teilnehmer, Spielzeiten und Stationen nur
-   noch lesbar. Mit **Entsperren** geht es wieder. Löschen bleibt möglich.
+   noch lesbar. Mit **Entsperren** geht es wieder.
 5. Der Reiter **Rückmeldungen** erscheint nach dem Ende und zeigt die Rückmeldungen ohne Namen.
 6. Nach dem Ende zeigt die Turnierseite das **Podest** (Platz 1 in der Mitte, 2 links, 3 rechts) – bei **Beendet**
    mit dem Hinweis „Stand vorläufig“. Erst mit **Ergebnisse veröffentlicht** bekommt, wer Platz 1 bis 3 belegt hat,
@@ -625,7 +647,8 @@ Strafen stehen unter **Admin → eSports → Strafen**, die Jahreswertung unter 
 - **Vor Ort** als Spielweise wählen: Ihr tragt Ergebnisse und Termine selbst ein, niemand muss Spieler hinterherrufen.
 - **Helfer eintragen** unter **Turnier öffnen → Reiter „Team“ → Zuweisung hinzufügen**: Person, **Rolle**
   (Organisation, Schiedsrichter, Ergebnisdienst, Stationsleitung, Stream-Betreuung), **Bereich** (ganzes Turnier oder
-  Phase, Gruppe, Station, Spiel) und eine **Notiz**, zum Beispiel „Samstag Vormittag“. Der Helfer sieht nur dieses
+  Phase, Gruppe, Station, Spiel – unter **Welche** die Auswahl aus diesem Turnier oder „Alle …“) und eine **Notiz**, zum
+  Beispiel „Samstag Vormittag“. Der Helfer bekommt eine Nachricht mit dem Weg zu **Mein Dienst** und sieht nur dieses
   Turnier. Zwei Helfer reichen oft: einer am Check-in, einer mit dem Handy bei den Spielen („Ergebnisdienst“).
 - **Werkzeuge → Planen** statt jedes Spiel einzeln zuzuweisen; Vorschau prüfen, dann **Übernehmen**.
 - **Das Handy der Turnierleitung** (`/tournaments/<Name>/leitung`) trägt Ergebnisse ein, zeigt „Ergebnis fehlt“ und
@@ -827,7 +850,9 @@ Die Turnierleitung trägt Maps im Ergebnis-Fenster mit Aufstellungen beider Seit
 | „Turnier kann ohne spielbares Match nicht gestartet werden.“ | Es gibt keine Spiele | Struktur prüfen (Bearbeiten → Speichern & Struktur anwenden), Teilnehmer bestätigen |
 | „Turnierplanung enthält Konflikte“ beim Starten | Doppelte Stationen, Zeiten, … | Konflikte beheben oder in der Rückfrage „Trotzdem live“ |
 | Turnierbaum leer („Turnierbaum noch nicht erzeugt“) | Keine Struktur oder zu wenig Teilnehmer | Teilnehmer bestätigen, Struktur anwenden. Beim Schweizer System **Schweizer Runde** klicken |
-| Zeitfahren hat keinen Baum | Gewollt, wertet über Rundenzeiten | [Fast Lap](fastlap.md) nutzen |
+| Zeitfahren oder Rennserie ohne Spiele | Gewollt – diese Formate bekommen im Turnier keine Spiele | Zeitfahren über [Fast Lap](fastlap.md), Rennserien über Serien |
+| „Löschen geht nur bei Entwürfen …“ / „Das Turnier hat schon Ergebnisse …“ | Löschen eines angekündigten, laufenden oder beendeten Turniers bzw. eines mit Ergebnissen | Absagen (Status **Abgesagt**) oder archivieren |
+| „Min. Teilnehmer darf nicht größer als Max. Teilnehmer sein.“ | Min über Max eingetragen | Werte anpassen |
 | Unter Matchplan fehlt **Ergebnis eintragen** | Das Turnier ist nicht **Live**/**Pausiert**, oder eine Seite steht noch nicht fest | Status prüfen, Vorrunde beenden |
 | „Für dieses Spiel kannst du kein Ergebnis eintragen.“ | Dir fehlt das Ergebnis-Recht im Einsatz | Rolle im Reiter **Team** prüfen |
 | „Bitte kurz den Grund der Korrektur angeben“ | Ein vorhandenes Ergebnis lässt sich nur mit Grund ändern | Grund eintragen (mindestens fünf Zeichen) |
@@ -878,5 +903,8 @@ Unter **Bearbeiten → Erweiterte Spieloptionen → Jahreswertung**. Gutgeschrie
 veröffentlicht**.
 
 **Was passiert beim Löschen eines Turniers?**
-In der Liste das Papierkorb-Symbol; die Rückfrage warnt, dass Teilnehmer, Turnierbaum und öffentliche Seite danach
-weg sind. Gesperrte Turniere lassen sich trotzdem löschen.
+Löschen geht nur bei **Entwürfen ohne Ergebnisse** (keine gewerteten Spiele, Pokale, Jahrespunkte oder Gewinne) – in
+der Liste das rote Papierkorb-Symbol. Mit dem Turnier gehen Anmeldungen, Vorschau, Gruppen, Map-Pool, Chat und
+Ergebnisfotos; Stationen bleiben und verlieren nur die Zuordnung. Ein angekündigtes, laufendes oder beendetes Turnier
+sagt ihr ab (Status **Abgesagt**) oder archiviert es. Jede Löschung steht im Protokoll (Betrieb & Logs →
+Adminaktionen, Schnellfilter **Turniere**) – wie Anlegen, Speichern und jeder Wechsel des Anmeldestatus.
