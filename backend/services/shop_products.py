@@ -28,7 +28,7 @@ import functools
 import math
 from typing import Any
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from models import now_utc
 from services import shop_catalog, shop_catalog_sync, shop_config, shop_print_files
@@ -498,8 +498,6 @@ def _template_item(template: dict | None, now: datetime) -> dict:
     except ValueError:
         checked = None
     if checked is not None and checked.tzinfo is None:
-        from datetime import timezone
-
         checked = checked.replace(tzinfo=timezone.utc)
     fresh = checked is not None and now - checked <= timedelta(days=TEMPLATE_MAX_AGE_DAYS)
     places = len({row["placement"] for row in template["entries"]})
@@ -509,7 +507,26 @@ def _template_item(template: dict | None, now: datetime) -> dict:
     if not fresh:
         return _item("template", "Druckvorlage von Printful", False,
                      f"Die Vorlage ist älter als {TEMPLATE_MAX_AGE_DAYS} Tage - „Mit Printful abgleichen“. {detail}")
+    carried = [row for row in template.get("carried") or [] if isinstance(row, dict)]
+    if carried:
+        # Übernommene Paare (#2091, Review): Printful liefert sie unvollständig, es gilt der letzte vollständige Stand.
+        # Sichtbar als Warnung; nach TEMPLATE_MAX_AGE_DAYS rot wie eine veraltete Vorlage.
+        warning = templates.carried_warning(carried)
+        since = [_aware(row.get("carried_since")) for row in carried]
+        if any(moment is None or now - moment > timedelta(days=TEMPLATE_MAX_AGE_DAYS) for moment in since):
+            return _item("template", "Druckvorlage von Printful", False,
+                         f"Länger als {TEMPLATE_MAX_AGE_DAYS} Tage unvollständig von Printful - bitte in Printful "
+                         f"prüfen und „Mit Printful abgleichen“. {warning}")
+        return {**_item("template", "Druckvorlage von Printful", True, f"{warning} {detail}"), "state": "warn"}
     return _item("template", "Druckvorlage von Printful", True, detail)
+
+
+def _aware(value: Any) -> datetime | None:
+    try:
+        moment = datetime.fromisoformat(str(value))
+    except ValueError:
+        return None
+    return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
 
 
 STATE_TEXT = {"missing": "fehlt", "outdated": "veraltet", "invalid": "passt nicht", "no_area": "Fläche fehlt"}
@@ -666,7 +683,8 @@ def _template_view(template: dict | None) -> dict | None:
             "fetched_at": template.get("fetched_at"), "changed_at": template.get("changed_at"),
             "changes": template.get("changes") or [], "last_error": template.get("last_error"),
             "hash": (template.get("hash") or "")[:12], "loaded": bool(template.get("entries")),
-            "skipped": template.get("skipped") or []}
+            "skipped": template.get("skipped") or [], "carried": template.get("carried") or [],
+            "warning": templates.carried_warning(template.get("carried") or [])}
 
 
 async def admin_view(db, product_id: str) -> dict:

@@ -232,6 +232,9 @@ CLUB_CONTENT = frozenset({
     "shop_printful_variants",
     # Druckvorlagen von Printful (#2069): Maße und Vorlagenbilder je Printful-Produkt - ohne Person.
     "shop_print_templates",
+    # Testentwürfe an Printful (#2062): Vereinsadresse, Druckdateien, Antwort von Printful - nur die Kennung, wer
+    # gesendet bzw. gelöscht hat; nie ein Gamertag als Text (die Testdatei mit Namen hängt an shop_print_files).
+    "shop_test_drafts",
 })
 
 NO_PERSON = frozenset({

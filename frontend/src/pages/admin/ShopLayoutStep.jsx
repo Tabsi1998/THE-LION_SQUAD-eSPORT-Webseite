@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, ExternalLink, Image as ImageIcon, Move, Pl
 import { api, formatRequestError, resolveMediaUrl, uploadApi } from "@/lib/api";
 import { viennaDateTime } from "@/lib/vienna";
 import { cmText, maxWidthCm, resolveLayers } from "@/lib/shopLayout";
+import { techniqueLabel } from "@/lib/shopTechniques";
 
 // Schritt 3 der Produktverwaltung (#2069): Druckflächen direkt aus der Printful-Vorlage. Je Fläche wählt der Admin Motiv,
 // Vorgabe-Position und Größe in cm - die Website erzeugt daraus die Druckdatei in der exakten Pixelgröße von Printful.
@@ -349,6 +350,7 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
                 resolved={resolved} colorCode={codes[previewColor]} motifFor={motifFor} selected={selected} onSelect={setSelected}
                 onNudge={nudge}
                 editable={editable} testId={`shop-preview-${available.key}`} />
+              {!available.preview?.image_path && <p className="text-xs text-honor" data-testid={`shop-preview-${available.key}-no-image`}>Kein Vorlagenbild von Printful - die Vorschau zeigt nur die Druckfläche, Maße und Druckdatei stimmen trotzdem.</p>}
               <p className="text-xs text-white/45 inline-flex items-center gap-1"><Move className="w-3 h-3" aria-hidden="true" /> Ziehen oder Pfeiltasten zum Feinjustieren.</p>
             </div>
             <div className="space-y-3">
@@ -403,10 +405,11 @@ export function TemplateStatus({ view, busy, run }) {
         {template?.last_error ? ` Letzter Versuch gescheitert: ${template.last_error.detail}` : ""}
       </span>
       <button type="button" disabled={busy === "templates"} onClick={() => run("templates", () => api.post(`${BASE}/${view.product.id}/print-templates/refresh`, { reason: "" }),
-        (next) => (next.template_result?.changed ? `Printful hat Maße geändert: ${next.template_result.changes.length} Flächen.` : next.template_result?.ok ? "Druckvorlagen aktuell." : "Printful nicht erreichbar – letzter Stand bleibt."))}
+        (next) => (next.template_result?.changed ? `Printful hat Maße geändert: ${next.template_result.changes.length} Flächen.` : next.template_result?.warning ? "Druckvorlagen abgeglichen – mit Warnung, siehe oben." : next.template_result?.ok ? "Druckvorlagen aktuell." : "Printful nicht erreichbar – letzter Stand bleibt."))}
         className={SMALL_BTN} data-testid="shop-template-refresh">
         <RefreshCw className={`w-3.5 h-3.5 ${busy === "templates" ? "motion-safe:animate-spin" : ""}`} aria-hidden="true" /> Vorlagen neu laden
       </button>
+      {template?.warning && <p className="basis-full text-honor inline-flex items-center gap-1" role="status" data-testid="shop-template-carried"><AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> {template.warning}</p>}
       {template?.skipped?.length > 0 && (
         <ul className="basis-full text-warn space-y-0.5" data-testid="shop-template-skipped">{template.skipped.map((line) => <li key={line}>{line}</li>)}</ul>
       )}
@@ -421,13 +424,20 @@ export function TemplateStatus({ view, busy, run }) {
   );
 }
 
+// Der gespeicherte Aufbau von Schritt 3 als Schlüssel (#2091, Review): nur wenn er sich ändert (Speichern, anderes
+// Produkt oder Technik), beginnt der Schritt neu. Ein neuer `view` nach Abgleich, Motiv-Upload oder Erzeugen der
+// Druckdateien lässt ungespeicherte Flächen stehen.
+export function layoutKey(view) {
+  return JSON.stringify([view.product.id, view.product.printful?.product_id ?? null, view.product.technique ?? null,
+    (view.placements || []).map((row) => [row.key, row.mode || "layout", row.layers || []]), view.included_placement || null]);
+}
+
 export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGroup }) {
   const { product } = view;
   const [draft, setDraft] = useState(() => draftFrom(view));
   const [included, setIncluded] = useState(view.included_placement || "");
   const colors = useMemo(() => product.offer?.colors || [], [product.offer]);
   const [previewColor, setPreviewColor] = useState(colors[0] || "");
-  useEffect(() => { setDraft(draftFrom(view)); setIncluded(view.included_placement || ""); }, [view]);
   useEffect(() => { if (!colors.includes(previewColor)) setPreviewColor(colors[0] || ""); }, [colors, previewColor]);
   const codes = useMemo(() => Object.fromEntries((product.printful?.colors || []).map((color) => [color.name, color.code])), [product.printful]);
   const motifsByKey = useMemo(() => Object.fromEntries((view.motif_options || []).map((motif) => [motif.key, motif])), [view.motif_options]);
@@ -494,6 +504,7 @@ export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGrou
           {draftPreview.error && draftPreview.json === payloadJson ? `Vorschau: ${draftPreview.error}` : blocked ? "Vorschau nach dem Speichern." : "Vorschau wird berechnet …"}
         </p>
       )}
+      {available[0]?.technique && <p className="text-xs text-white/55" data-testid="shop-layout-technique">Flächen für {techniqueLabel(available[0].technique)} - die Technik wird in Schritt 2 gewählt.</p>}
       <p className="text-xs text-white/55 max-w-3xl">Je Fläche: Motiv, Position aus der Liste und Größe in cm. Die Website erzeugt die Druckdatei in der exakten Größe von Printful - das Motiv an seiner Stelle, der Rest durchsichtig. Positionen „vom Träger aus“: Brust rechts liegt von vorne gesehen links.</p>
       {colors.length > 0 && (
         <div className="space-y-1">

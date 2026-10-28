@@ -588,6 +588,45 @@ async def test_the_daily_sync_runs_over_all_products_with_printful_except_archiv
     assert (await shop_catalog.get_product(db, other["id"])).get("catalog_sync") is None
 
 
+@pytest.mark.asyncio
+async def test_carried_print_areas_warn_then_turn_red_and_clear_on_a_full_answer(db, provider, fake):
+    """Review #2091: ein übernommener alter Stand bleibt nicht unbegrenzt und unauffällig stehen."""
+    product = await configured(db, provider)
+    fake.off_contract.add("retrieveMockupStylesByProductId")
+    back = next(row for row in fake.print_areas[PRINTFUL_PRODUCT] if row["placement"] == "back")
+    back["dpi"] = "kaputt"
+
+    async def template_item():
+        check = await shop_products.run_check(db, await shop_catalog.get_product(db, product["id"]))
+        return next(item for item in check["items"] if item["key"] == "template")
+
+    result = await shop_catalog_sync.sync_product(db, product["id"], provider=provider, **BY)
+    assert result["ok"] is True and result["template"]["warning"].endswith("Rückseite (dtg).")
+    state = (await shop_catalog.get_product(db, product["id"]))["catalog_sync"]
+    assert state["warning"] == result["template"]["warning"] and "Druckvorlage: Printful liefert unvollständig" in state["detail"]
+    template = await shop_print_files.templates.get(db, PRINTFUL_PRODUCT)
+    since = template["carried"][0]["carried_since"]
+    assert [(row["placement"], row["technique"]) for row in template["carried"]] == [("back", "dtg")]
+    item = await template_item()
+    assert item["ok"] is True and item["state"] == "warn" and "letzte vollständige Stand" in item["detail"]
+    summary = await shop_catalog_sync.sync_all(db, provider=provider)
+    assert summary["failed"] == 0 and summary["warnings"] == 1
+    assert (await shop_print_files.templates.get(db, PRINTFUL_PRODUCT))["carried"][0]["carried_since"] == since
+    old = (now_utc() - timedelta(days=shop_products.TEMPLATE_MAX_AGE_DAYS + 1)).isoformat()
+    await db.shop_print_templates.update_one({"printful_product_id": PRINTFUL_PRODUCT},
+                                             {"$set": {"carried.0.carried_since": old}})
+    item = await template_item()
+    assert item["ok"] is False and item["state"] == "failed"
+    assert f"Länger als {shop_products.TEMPLATE_MAX_AGE_DAYS} Tage unvollständig" in item["detail"]
+    back["dpi"] = 150
+    result = await shop_catalog_sync.sync_product(db, product["id"], provider=provider, **BY)
+    assert result["template"]["warning"] is None
+    assert (await shop_print_files.templates.get(db, PRINTFUL_PRODUCT))["carried"] == []
+    item = await template_item()
+    assert item["ok"] is True and item["state"] == "ok"
+    assert (await shop_catalog_sync.sync_all(db, provider=provider))["warnings"] == 0
+
+
 # ---------------------------------------------------------------- Bestellung friert alle Platzierungen ein
 
 @pytest.mark.asyncio

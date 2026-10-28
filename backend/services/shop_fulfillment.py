@@ -10,7 +10,8 @@ Fehlerklassen - was der Aufrufer tut:
 
 - ``FulfillmentTransient`` (Zeitüberschreitung, Netz, 429, 5xx): später erneut versuchen; ``retry_after`` sagt, wann.
 - ``FulfillmentPermanent`` (401, 403, 404, Weiterleitung, unerwartete Antwort, kein Schlüssel): Admin informieren.
-- ``FulfillmentInvalid`` (400, 409, 422, gescheiterte Schätzung, kein Entwurf mehr): diese Bestellung blockieren.
+- ``FulfillmentInvalid`` (400, 409, 422, gescheiterte Schätzung, kein Entwurf mehr, Testentwurf bestätigen): diese
+  Bestellung blockieren.
 
 Die Meldung (``str``) ist ein fester deutscher Satz; was der Anbieter dazu sagt, steht gekürzt und maskiert in
 ``provider_detail`` (Mail-Adressen gekürzt, nie der Schlüssel).
@@ -27,6 +28,12 @@ EXTERNAL_ID_RE = re.compile(r"[A-Za-z0-9_-]{1,64}")
 HTTPS_URL_RE = re.compile(r"https://[^\s/?#]+\.[^\s/?#]+(/[^\s]*)?")
 MAX_QUANTITY = 20
 MAX_LINES = 20
+# Testentwürfe aus dem Admin (#2062) tragen diesen Anfang in der external_id - sie werden nie bestätigt.
+TEST_EXTERNAL_PREFIX = "lsw-testentwurf-"
+
+
+def is_test_external_id(value) -> bool:
+    return isinstance(value, str) and value.startswith(TEST_EXTERNAL_PREFIX)
 
 
 # ---------------------------------------------------------------- Nummern (eigene Typen)
@@ -273,6 +280,27 @@ class MockupTemplate:
     area_height: int
     positioning: str
     orientation: str
+    # ``template``/``primary`` sind die eigentlichen Vorlagen (für die Vorschau bevorzugt), ``unknown`` geht auch (#2091).
+    role: str | None = None
+
+
+class Rows(tuple):
+    """Gelesene Zeilen einer Liste vom Anbieter plus kurze Gründe, warum einzelne Zeilen übersprungen wurden (#2091) -
+    ohne Werte aus der Antwort, nur Platzierung, Technik, Feld und erwarteter Typ. Sonst ein gewöhnliches Tupel.
+
+    ``incomplete``: Paare (Platzierung, Technik), zu denen mindestens eine Zeile übersprungen wurde - deren gelesene
+    Zeilen sind unvollständig (etwa fehlt die Fläche einer Tassengröße). ``unreadable``: so viele übersprungene Zeilen,
+    deren Platzierung oder Technik nicht lesbar war - sie lassen sich keinem Paar zuordnen."""
+    skipped: tuple[str, ...]
+    incomplete: frozenset[tuple[str, str]]
+    unreadable: int
+
+    def __new__(cls, items=(), skipped=(), incomplete=(), unreadable=0):
+        rows = super().__new__(cls, items)
+        rows.skipped = tuple(skipped)
+        rows.incomplete = frozenset(incomplete)
+        rows.unreadable = int(unreadable)
+        return rows
 
 
 @dataclass(frozen=True, slots=True)
@@ -363,6 +391,7 @@ ERROR_TEXTS = {
     "not_found": "Beim Anbieter nicht gefunden",
     "redirect": "Der Anbieter leitet um - wird nicht verfolgt",
     "invalid_response": "Der Anbieter antwortet, aber nicht wie erwartet",
+    "no_usable_rows": "Der Anbieter liefert keine einzige brauchbare Zeile",
     "no_key": "Kein lesbarer Schlüssel für den Anbieter hinterlegt",
     "unexpected": "Unerwartete Antwort des Anbieters",
     "bad_request": "Der Anbieter lehnt die Daten ab",
@@ -370,6 +399,8 @@ ERROR_TEXTS = {
     "estimate_failed": "Die Kostenschätzung ist gescheitert",
     "not_draft": "Der Auftrag ist kein Entwurf mehr",
     "idempotency_conflict": "Dieser Schlüssel gehört schon zu einem anderen Auftrag",
+    "test_draft": "Ein Testentwurf wird nie bestätigt - nur angesehen und gelöscht",
+    "not_test_draft": "Der Auftrag ist kein Testentwurf",
 }
 
 
@@ -437,7 +468,7 @@ class FulfillmentProvider(Protocol):
 
     async def get_order(self, order: PrintfulOrderId | str) -> FulfillmentOrder: ...
 
-    async def delete_draft(self, db, order_id: PrintfulOrderId) -> None: ...
+    async def delete_draft(self, db, order_id: PrintfulOrderId, *, test_draft: bool = False) -> None: ...
 
     async def confirm_order(self, db, order_id: PrintfulOrderId, *, idempotency_key: str,
                             force_after_review: bool = False) -> FulfillmentOrder: ...

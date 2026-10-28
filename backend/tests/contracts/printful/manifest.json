@@ -27,7 +27,8 @@
     "preview": {
       "path": "GET /v2/catalog-products/{id}/mockup-templates",
       "operation": "getMockupTemplatesByProductId",
-      "fields": "catalog_variant_ids, placement, technique, image_url, background_url, background_color, template_width/height, print_area_left/top/width/height (Pixel des Vorlagenbilds), template_positioning, orientation"
+      "fields": "catalog_variant_ids, placement, technique, image_url, background_url, background_color (integer|null), template_width/height, print_area_left/top/width/height (Pixel des Vorlagenbilds), template_positioning, orientation, template_type (custom|native|color_group|advanced|null), role (primary|template|extra|unknown|advanced_template)",
+      "tolerance": "#2091: zeilenweise gelesen - eine unpassende Zeile wird mit Grund (Feld, erwarteter Typ, ohne Werte) übersprungen; extra/advanced* werden ausgelassen"
     },
     "checked_against_official_templates": {
       "Gildan 5000 vorne/hinten": "1800 × 2400 px bei 150 DPI (12 × 16 Zoll)",

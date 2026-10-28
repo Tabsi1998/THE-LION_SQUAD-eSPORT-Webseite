@@ -60,7 +60,7 @@ MODEL_FIELDS: dict[str, tuple[str, ...]] = {
                             "erase_pending_at", "file_deleted_at"),
     # Druckvorlagen von Printful (#2069, services/shop_print_templates.py): Maße je Fläche, Vorlagenbilder, Abgleich.
     "shop_print_templates": ("printful_product_id", "entries", "previews", "hash", "previous_hash", "fetched_at",
-                             "checked_at", "changed_at", "changes", "last_error", "skipped"),
+                             "checked_at", "changed_at", "changes", "last_error", "skipped", "carried"),
     # Erzeugte bzw. hochgeladene Druckdateien (#2069, services/shop_print_files.py). Bestelldateien mit Gamertag zeigen
     # den Namen: die Zeile gehört dann zu Konto, Bestellung und Position - nie der Name als Text.
     "shop_print_files": ("id", "origin", "purpose", "product_id", "placement", "printful_placement", "technique",
@@ -94,6 +94,15 @@ MODEL_FIELDS: dict[str, tuple[str, ...]] = {
                          # je Fläche genau eine Druckdatei (#2069): Grunddatei oder eigene mit Gamertag
                          "print_files"),
     "shop_order_events": ("id", "order_id", "event_key", "kind", "at", "actor_id", "data"),
+    # Testentwürfe an Printful (#2062, services/shop_test_drafts.py): eigene Art „test_draft“, keine Bestellung - nur
+    # die Vereinsadresse, nie ein Gamertag als Text. Was gesendet wurde, was Printful meldete, Abweichungen.
+    "shop_test_drafts": ("id", "kind", "state", "external_id", "item_external_id", "product_id", "variant_id",
+                         "product_title", "variant_label", "size", "color", "printful_product_id",
+                         "printful_variant_id", "with_gamertag", "files", "recipient", "payload", "estimate",
+                         "estimate_error", "price_check", "warnings", "mockup", "created_by", "created_at",
+                         "expires_at", "send_key", "sending_at", "sent_by", "last_error", "printful_order_id",
+                         "printful_status", "response", "deviations", "sent_at", "deleting_at", "deleted_at",
+                         "deleted_by", "delete_note", "send_attempted_at", "deleting_from"),
 }
 FORBIDDEN_FIELD_PARTS = ("iban", "bic", "bank", "account_number", "card", "cvv", "password", "passwort", "secret",
                          "token", "api_key", "apikey")
@@ -219,6 +228,9 @@ ADMIN_ACTIONS: dict[str, str] = {
     "shop.print_template.change": "Druckvorlage bei Printful geändert (Maße einer Fläche)",
     "shop.print.presets": "Positions-Vorgaben geändert",
     "shop.print_file.add": "Druckdatei erzeugt oder hochgeladen",
+    # Testentwurf an Printful (#2062): nie bestätigt, nie bezahlt
+    "shop.test_draft.send": "Testentwurf an Printful gesendet",
+    "shop.test_draft.delete": "Testentwurf bei Printful gelöscht",
     "shop.order.release": "Bestellung freigegeben",
     "shop.order.printful_confirm": "Bei Printful bestätigt",
     "shop.order.cancel": "Bestellung storniert",

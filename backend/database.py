@@ -632,6 +632,9 @@ AUDIT_UNIQUE_INDEXES: tuple[tuple[str, Any, str, dict], ...] = (
     ("shop_print_files", "public_id", "public_id", {}),
     ("shop_print_files", [("product_id", 1), ("placement", 1), ("group", 1), ("color_key", 1), ("version", 1)],
      "base_version", {"partialFilterExpression": {"purpose": "base"}}),
+    # Testentwürfe an Printful (#2062): je Kennung und je external_id genau ein Protokoll.
+    ("shop_test_drafts", "id", "id", {}),
+    ("shop_test_drafts", "external_id", "external_id", {}),
 )
 AUDIT_INDEXES: tuple[tuple[str, Any], ...] = (
     ("platform_links", "user_id"),

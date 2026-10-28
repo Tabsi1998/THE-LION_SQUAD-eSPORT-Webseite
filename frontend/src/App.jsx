@@ -139,6 +139,7 @@ const AdminShopPage = lazyPage(() => import("@/pages/admin/AdminShopPage"));
 const AdminShopDesignsPage = lazyPage(() => import("@/pages/admin/AdminShopDesignsPage"));
 const AdminShopProductsPage = lazyPage(() => import("@/pages/admin/AdminShopProductsPage"));
 const AdminShopGamertagPage = lazyPage(() => import("@/pages/admin/AdminShopGamertagPage"));
+const AdminShopTestDraftPage = lazyPage(() => import("@/pages/admin/AdminShopTestDraftPage"));
 const AdminModerationPage = lazyPage(() => import("@/pages/admin/AdminModerationPage"));
 const AdminSetupPage = lazyPage(() => import("@/pages/admin/AdminSetupPage"));
 const AdminIntegrationPage = lazyPage(() => import("@/pages/admin/AdminIntegrationPage"));
@@ -397,6 +398,7 @@ function App() {
           <Route path="/admin/shop/products" element={<ProtectedRoute requireArea={["finance"]}><AdminShopProductsPage /></ProtectedRoute>} />
           <Route path="/admin/shop/products/:productId" element={<ProtectedRoute requireArea={["finance"]}><AdminShopProductsPage /></ProtectedRoute>} />
           <Route path="/admin/shop/gamertag" element={<ProtectedRoute requireArea={["finance"]}><AdminShopGamertagPage /></ProtectedRoute>} />
+          <Route path="/admin/shop/test-draft" element={<ProtectedRoute requireArea={["finance"]}><AdminShopTestDraftPage /></ProtectedRoute>} />
           <Route path="/admin/audit" element={<Navigate to="/admin/ops?tab=events&source=audit" replace />} />
           <Route path="/admin/moderation" element={<ProtectedRoute requireArea="moderation"><AdminModerationPage /></ProtectedRoute>} />
           <Route path="/admin/setup" element={<ProtectedRoute requireArea={["system"]}><AdminSetupPage /></ProtectedRoute>} />
