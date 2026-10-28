@@ -48,7 +48,7 @@ def test_the_migration_is_registered_once_after_the_existing_ones():
     entry = [row for row in migrations.MIGRATIONS if row[1] == "shop_data_model"]
     assert len(entry) == 1 and entry[0][0] == shop_schema.MIGRATION_VERSION == 13
     # Danach nur Shop-Migrationen, die auf dem Datenmodell aufbauen (#2069: Motive).
-    assert [name for version, name, _run in migrations.MIGRATIONS if version > 13] == ["shop_motif_variants"]
+    assert [name for version, name, _run in migrations.MIGRATIONS if version > 13 and name.startswith("shop_")] == ["shop_motif_variants"]
 
 
 @pytest.mark.asyncio

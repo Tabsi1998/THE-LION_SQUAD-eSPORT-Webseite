@@ -504,7 +504,7 @@ async def test_settings_hide_the_secrets_and_export_and_anonymize_carry_the_link
     assert (await flow.post("/api/dsgvo/anonymize-me")).status_code == 200
     assert await flow.db.platform_links.count_documents({"user_id": paula["id"]}) == 0
     user = await flow.db.users.find_one({"id": paula["id"]}, {"_id": 0})
-    assert "platform_verified" not in user and user["discord_name"] is None
+    assert "platform_verified" not in user and "discord_name" not in user and "discord_id" not in user
 
 
 @pytest.mark.asyncio
