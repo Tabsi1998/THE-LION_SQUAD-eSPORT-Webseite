@@ -20,6 +20,18 @@ test("die drei Teile stehen auf der Seite", () => {
   expect(screen.getByTestId("guide-new-tournament")).toHaveAttribute("href", "/admin/tournaments/new");
 });
 
+// Texte wie im Formular (#2111, TA7/TA8/TA29): Gruppen fragen nach der Zahl der Gruppen und haben (noch) keine K.-o.-Runde
+// im selben Turnier, „Mehrspieler frei“ ist ein Spiel mit allen, und kein Entwicklertext mit Issue-Nummern.
+test("der Leitfaden verspricht nichts, was die Formulare nicht können", () => {
+  render(<MemoryRouter><AdminTournamentGuidePage /></MemoryRouter>);
+  expect(screen.getByTestId("guide-step-groups")).toHaveTextContent("Zahl der Gruppen");
+  expect(screen.getByTestId("guide-step-groups")).not.toHaveTextContent("Gruppengröße");
+  expect(screen.getByTestId("guide-format-ffa")).toHaveTextContent("Ein Spiel mit allen");
+  expect(screen.getByTestId("guide-game-battle-royale")).not.toHaveTextContent("3 bis 6 Runden");
+  expect(screen.getByTestId("guide-formats-note")).not.toHaveTextContent("#");
+  expect(document.body).not.toHaveTextContent("Spielwoche,");
+});
+
 test("jede Empfehlung nennt Felder, jede Turnierform ein bekanntes Format", () => {
   const formatKeys = new Set(GUIDE_FORMATS.map((format) => format.key));
   for (const step of GUIDE_STEPS) expect(step.fields.length, step.key).toBeGreaterThan(0);

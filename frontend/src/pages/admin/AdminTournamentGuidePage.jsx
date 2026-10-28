@@ -94,7 +94,7 @@ export default function AdminTournamentGuidePage() {
             </div>
           ))}
         </div>
-        <p className="mt-4 text-xs text-white/45">Bilder zu den Formaten kommen über die Medienverwaltung; der Knopf „Diese Voreinstellung übernehmen“ im Formular „Turnier anlegen“ ist Schritt 2 (#368).</p>
+        <p className="mt-4 text-xs text-white/45" data-testid="guide-formats-note">„Voreinstellung übernehmen“ in Teil 2 öffnet „Turnier anlegen“ mit Format, Teilnahme, Best of und Spielregel – alles bleibt änderbar. Die Vereinsliga mit Seasons und Staffeln läuft über Admin → Liga.</p>
       </section>
     </AdminLayout>
   );
