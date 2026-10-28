@@ -414,3 +414,19 @@ async def test_events_mask_url_encoded_addresses_and_guild_names(flow):
     assert "paula" not in (await flow.get("/api/admin/ops/events", params={"hours": 0, "q": "paula%40example.test"})).text
     hit = (await flow.get("/api/admin/ops/events", params={"hours": 0, "q": "p***@example.test"})).json()["items"]
     assert any(i["id"] == "m1" for i in hit)
+
+
+@pytest.mark.asyncio
+async def test_a_failed_discord_message_with_content_can_be_resent(flow):
+    """#2112: nur fehlgeschlagene Discord-Meldungen mit gespeichertem Inhalt tragen „Erneut senden“."""
+    fresh = now_utc().isoformat()
+    await flow.db.email_logs.insert_many([
+        {"id": "d-failed", "channel": "discord", "target": "community", "status": "failed", "event_key": "news", "payload": {"title": "News"}, "created_at": fresh},
+        {"id": "d-empty", "channel": "discord", "target": "community", "status": "failed", "event_key": "news", "created_at": fresh},
+        {"id": "d-sent", "channel": "discord", "target": "community", "status": "sent", "event_key": "news", "payload": {"title": "News"}, "created_at": fresh},
+        {"id": "mail", "to": "x@lionsquad-test.at", "template_key": "registration", "status": "failed", "created_at": fresh},
+    ])
+    flow.act_as(await flow.add_user(role="superadmin"))
+    items = (await flow.get("/api/admin/ops/events", params={"hours": 0, "source": "email"})).json()["items"]
+    flags = {item["id"]: item.get("resendable") for item in items}
+    assert flags == {"d-failed": True, "d-empty": False, "d-sent": False, "mail": None}

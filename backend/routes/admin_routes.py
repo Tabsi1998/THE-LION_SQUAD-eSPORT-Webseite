@@ -520,6 +520,8 @@ async def _log_sources(db, safe_limit: int, *, since_iso: str = "") -> list[dict
                          subtitle=subtitle, detail=row.get("error") or row.get("message_id") or "", time_keys=("created_at",))
         if discord:
             item["guild_id"] = str(row.get("guild_id") or "")
+            # „Erneut senden“ (#2112): nur fehlgeschlagene Meldungen mit gespeichertem Inhalt - wie die Route es prüft.
+            item["resendable"] = status == "failed" and bool(row.get("payload")) and bool(row.get("id"))
         email_items.append(item)
 
     queue_rows = await db.mail_jobs.find(since("created_at"), {"_id": 0, "html": 0}).sort("created_at", -1).limit(safe_limit).to_list(safe_limit)
