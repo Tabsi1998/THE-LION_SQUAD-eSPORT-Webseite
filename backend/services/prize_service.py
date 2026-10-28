@@ -401,7 +401,8 @@ async def revert_picked_up(pickup_id: str) -> Optional[dict]:
         return None
     now = now_utc()
     change = {"status": "ready", "picked_up_at": None, "picked_up_by": None, "updated_at": now.isoformat()}
-    if not p.get("pickup_deadline"):
+    if not p.get("pickup_deadline") or str(p["pickup_deadline"]) <= now.isoformat():
+        # Ohne oder mit abgelaufener Frist verfiele der Gewinn beim nächsten Lauf sofort - dann eine neue Frist.
         change["pickup_deadline"] = ready_deadline(p, now)
     if not p.get("ready_at"):
         change["ready_at"] = now.isoformat()
@@ -440,14 +441,16 @@ async def expire_overdue() -> int:
     }, {"_id": 0})
     expired = 0
     async for p in cursor:
-        await db.prize_pickups.update_one(
-            {"id": p["id"], "status": "ready"},
+        result = await db.prize_pickups.update_one(
+            {"id": p["id"], "status": "ready", "pickup_deadline": {"$lt": now_iso}},
             {"$set": {
                 "status": "expired",
                 "expired_at": now_iso,
                 "updated_at": now_iso,
             }},
         )
+        if getattr(result, "modified_count", 0) != 1:
+            continue  # inzwischen abgeholt, wieder geöffnet oder verlängert - kein Verfall, keine Meldung
         expired += 1
         await _notify_prize(db, p, template="prize_expired", title="Gewinn verfallen",
                             body=f"Die Abholfrist für {_prize_text(p)} ist abgelaufen. Melde dich bei der Turnierleitung, "

@@ -387,7 +387,8 @@ async def migrate_kind_templates(db) -> str:
 
 async def migrate_tournament_point_duplicates(db) -> str:
     """Jahreswertung (#2123, TA22): doppelte Jahrespunkte je Turnier, Person und Team (nach einem Wechsel von Mini,
-    Normal oder Major zwischen zwei Veröffentlichungen) bereinigen - einer bleibt, der Rest steht im Protokoll.
+    Normal oder Major zwischen zwei Veröffentlichungen) bereinigen - einer bleibt, der Rest steht vorher im Protokoll.
+    Doppel über mehrere oder in abgeschlossenen Wertungen werden nur gemeldet, nie gelöscht.
     Trockenlauf: ``backend/scripts/season_points_duplicates.py``."""
     from services import season_points_cleanup
 

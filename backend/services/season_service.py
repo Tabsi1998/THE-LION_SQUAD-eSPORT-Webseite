@@ -130,19 +130,28 @@ def _source_label(source_type: str | None) -> str:
     return SOURCE_LABELS.get(source_type, source_type.replace("_", " ").title())
 
 
+def is_correction(entry: dict) -> bool:
+    """Korrektur von Hand (#2123, ER10): zählt immer, wird nie gestrichen und ist keine Teilnahme (Wertung)."""
+    return entry.get("source_type") == "custom"
+
+
 def _round_points(value) -> float:
     return round(float(value or 0), 1)
 
 
 def _summarise_point_entries(entries: list[dict], drop_worst: int = 0) -> dict:
-    """Build an explainable per-source summary for already fetched rows."""
-    sorted_entries = sorted(entries, key=lambda item: float(item.get("total_points") or 0), reverse=True)
+    """Build an explainable per-source summary for already fetched rows. Korrekturen (``custom``, #2123) zählen immer
+    und nie als Streichresultat - ein Abzug von -15 ließe sich sonst einfach streichen."""
+    corrections = [item for item in entries if is_correction(item)]
+    sorted_entries = sorted((item for item in entries if not is_correction(item)),
+                            key=lambda item: float(item.get("total_points") or 0), reverse=True)
     if drop_worst and len(sorted_entries) > drop_worst:
         kept = sorted_entries[: len(sorted_entries) - drop_worst]
         dropped = sorted_entries[len(sorted_entries) - drop_worst:]
     else:
         kept = sorted_entries
         dropped = []
+    kept = kept + corrections
 
     by_source: dict[str, dict] = {}
     for item in kept:
@@ -273,8 +282,10 @@ async def _achievement_summaries(db, user_ids: list[str]) -> dict[str, dict]:
 # ---------- Award helpers ----------
 async def _active_season(db) -> dict | None:
     """Die aktive Jahreswertung. Aktiv ist höchstens eine (#2123, ER7: das Aktivieren einer zweiten lehnt der Server
-    ab); stehen aus der Zeit davor noch mehrere auf „Aktiv“, gilt fest die mit dem spätesten Start."""
-    return await db.seasons.find_one({"status": "active"}, {"_id": 0}, sort=[("start_date", -1), ("created_at", -1)])
+    ab). Stehen aus der Zeit davor noch mehrere auf „Aktiv“, bleibt die Auswahl bewusst wie bisher (die erste, die die
+    Datenbank liefert) - sonst wanderten neue Punkte nach dem Update in eine andere Saison. Die Verwaltung warnt dann
+    („mehrere aktive Wertungen“), bis eine abgeschlossen ist."""
+    return await db.seasons.find_one({"status": "active"}, {"_id": 0})
 
 
 async def _farming_count_this_month(db, user_id: str, source_type: str, season_id: str) -> int:
@@ -445,6 +456,8 @@ async def _resync_rows(db, *, season_id: str, source_type: str, source_id: str, 
 
 # Turniere zählen je nach Gewicht als Mini, Normal oder Major (#2123): dieselbe Quelle, drei mögliche Typen.
 TOURNAMENT_SOURCE_TYPES = ("mini", "tournament", "major")
+# Nur in diesen Wertungen ändert ein Abgleich noch etwas - abgeschlossene und archivierte bleiben (#2123).
+OPEN_SEASON_STATUSES = ("draft", "active")
 
 
 def tournament_source_type(weight: float) -> str:
@@ -461,19 +474,30 @@ async def sync_tournament_points(*, tournament_id: str, source_name: str | None,
     Jetzt gilt je Turnier genau ein Satz Einträge: in der Saison, in der seine Punkte schon stehen (sonst der aktiven),
     unter dem Typ des aktuellen Gewichts. Einträge desselben Turniers mit anderem Typ oder in einer anderen Saison fallen
     weg. ``wanted``: (Person, Team, Platz) - Platz ``None`` heißt Teilnahme. Leer (Gewicht 0, Liga-Staffel) entfernt alle
-    Einträge des Turniers. Gibt die Zahlen und die Saison zurück."""
+    Einträge des Turniers. Gibt die Zahlen und die Saison zurück.
+
+    Abgeschlossene Wertungen bleiben, wie sie sind: steht ein Eintrag des Turniers in einer Saison, die weder Entwurf
+    noch aktiv ist, ändert der Abgleich nichts und meldet ``skipped`` (Protokoll und Hinweis im Admin)."""
     db = get_db()
     previous = await db.season_points.find(
         {"source_id": tournament_id, "source_type": {"$in": list(TOURNAMENT_SOURCE_TYPES)}},
-        {"_id": 0, "id": 1, "season_id": 1, "source_type": 1}).to_list(None)
+        {"_id": 0, "id": 1, "season_id": 1, "source_type": 1, "created_at": 1}).to_list(None)
     if previous:
-        from collections import Counter
-        season_id = Counter(row.get("season_id") for row in previous).most_common(1)[0][0]
+        # Die ursprüngliche Saison: die des ältesten Eintrags.
+        season_id = min(previous, key=lambda row: str(row.get("created_at") or "")).get("season_id")
     else:
         season = await _active_season(db)
         season_id = season["id"] if season else None
-    counts = {"updated": 0, "added": 0, "removed": 0, "season_id": season_id, "republished": bool(previous)}
+    counts = {"updated": 0, "added": 0, "removed": 0, "season_id": season_id, "republished": bool(previous),
+              "skipped": False}
     if not season_id:
+        return counts
+    touched = {season_id} | {row.get("season_id") for row in previous}
+    closed = [s["id"] for s in await db.seasons.find(
+        {"id": {"$in": sorted(t for t in touched if t)}, "status": {"$nin": list(OPEN_SEASON_STATUSES)}},
+        {"_id": 0, "id": 1}).to_list(None)]
+    if closed:
+        counts.update(skipped=True, closed_seasons=sorted(closed))
         return counts
     source_type = tournament_source_type(weight)
     for row in previous:
@@ -534,7 +558,8 @@ async def aggregate_leaderboard(
         "_id": group_field,
         "total": {"$sum": "$total_points"},
         "raw": {"$sum": "$raw_points"},
-        "events": {"$sum": 1},
+        # Korrekturen von Hand (#2123) sind keine Wertung - sie zählen bei den Punkten, nicht bei den Teilnahmen.
+        "events": {"$sum": {"$cond": [{"$eq": ["$source_type", "custom"]}, 0, 1]}},
         "wins": {"$sum": {"$cond": [{"$eq": ["$rank", 1]}, 1, 0]}},
     }
     if drop_worst:
@@ -542,6 +567,7 @@ async def aggregate_leaderboard(
             "$push": {
                 "total": "$total_points",
                 "raw": "$raw_points",
+                "source_type": "$source_type",
             },
         }
 
@@ -559,11 +585,14 @@ async def aggregate_leaderboard(
 
     if drop_worst:
         for r in rows:
-            entries = r.get("entries") or []
+            # Gestrichen wird nur unter echten Wertungen - Korrekturen zählen immer (#2123).
+            entries = [item for item in r.get("entries") or [] if not is_correction(item)]
+            corrections = [item for item in r.get("entries") or [] if is_correction(item)]
             if len(entries) > drop_worst:
                 kept = sorted(entries, key=lambda item: float(item.get("total") or 0), reverse=True)[: len(entries) - drop_worst]
             else:
                 kept = entries
+            kept = kept + corrections
             r["total"] = sum(float(item.get("total") or 0) for item in kept)
             r["raw"] = sum(float(item.get("raw") or 0) for item in kept)
         rows.sort(key=lambda item: item.get("total", 0), reverse=True)

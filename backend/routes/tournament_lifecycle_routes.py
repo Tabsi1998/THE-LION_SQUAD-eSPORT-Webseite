@@ -42,6 +42,9 @@ from routes.tournament_router import router
 
 
 LOCKABLE_TOURNAMENT_STATUSES = {"completed", "results_published", "archived", "cancelled"}
+# Erneutes Veröffentlichen, dessen Punkte in einer abgeschlossenen Jahreswertung stehen (#2123): nichts geändert.
+SEASON_POINTS_SKIPPED = ("Die Jahrespunkte dieses Turniers stehen in einer abgeschlossenen Jahreswertung und bleiben "
+                         "unverändert – wie ihre festgeschriebene Rangliste. Gewinne und Auszeichnungen sind angeglichen.")
 
 
 def _live_start_blocker(report: dict, force: bool) -> dict | None:
@@ -433,6 +436,7 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
         await _save_pause(db, me, tid, pause_set, pause_unset)
 
     # ---------- Season Points + Badges on results_published ----------
+    season_points_note = None
     if prev != status and status == "results_published":
         try:
             from services.season_service import season_weight_of, sync_tournament_points
@@ -467,7 +471,13 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
             # einem Wechsel von Mini/Normal/Major bleibt je Person ein Eintrag.
             synced = await sync_tournament_points(tournament_id=tid, source_name=t.get("title"), weight=weight,
                                                   wanted=wanted, num_participants=num_participants)
-            if synced.get("republished") and (synced["updated"] or synced["added"] or synced["removed"]):
+            if synced.get("skipped"):
+                # Abgeschlossene Wertungen bleiben, wie sie sind (#2123) - die Leitung erfährt es beim Veröffentlichen.
+                season_points_note = SEASON_POINTS_SKIPPED
+                await _audit_tournament_action(db, "tournament.season_points.resync_skipped", me.get("id"), tid,
+                                               {"closed_seasons": synced.get("closed_seasons", []),
+                                                "season_id": synced.get("season_id")})
+            elif synced.get("republished") and (synced["updated"] or synced["added"] or synced["removed"]):
                 await _audit_tournament_action(db, "tournament.season_points.resync", me.get("id"), tid,
                                                {key: synced[key] for key in ("updated", "added", "removed", "season_id")})
             await on_tournament_completed(tid, placements)
@@ -535,4 +545,5 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
         "planning": planning,
         "idempotent_replay": prev == status,
         **({"notified": notified} if notified is not None else {}),
+        **({"season_points_note": season_points_note} if season_points_note else {}),
     }

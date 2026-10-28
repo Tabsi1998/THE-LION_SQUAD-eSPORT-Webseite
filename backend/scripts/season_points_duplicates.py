@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Doppelte Jahrespunkte je Turnier (#2123): Trockenlauf und Anwenden von Migration 18.
 
-Ohne Schalter liest das Werkzeug nur und nennt, wie viele Einträge Migration 18 entfernt: je Turnier, Person und Team
-bleibt ein Eintrag (der mit dem Typ des aktuellen Turniergewichts, sonst der jüngste). ``--anwenden`` führt das aus -
-dasselbe macht der nächste Start. Entfernte Einträge stehen je Turnier im Protokoll
-(``season_points.duplicates_removed``).
+Ohne Schalter liest das Werkzeug nur und nennt je Saison, wie viele Einträge Migration 18 entfernt: je Turnier, Person
+und Team bleibt ein Eintrag (der mit dem Typ des aktuellen Turniergewichts, bei gleichem Typ der älteste). Doppel über
+mehrere Wertungen oder in einer abgeschlossenen bzw. archivierten werden nie gelöscht, nur gemeldet. ``--anwenden``
+führt das aus - dasselbe macht der nächste Start. Das Protokoll (``season_points.duplicates_removed`` bzw.
+``season_points.duplicates_reported``) steht je Turnier vor dem Löschen.
 
 Am Server, im Backend-Container (vorher eine Sicherung ziehen, BACKUP_RESTORE.md):
     docker compose exec backend python scripts/season_points_duplicates.py

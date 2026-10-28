@@ -126,8 +126,14 @@ async def test_points_stay_in_their_season_when_another_one_is_active_by_now(flo
     await flow.db.seasons.update_one({"id": "s-1"}, {"$set": {"status": "completed"}})
     await flow.db.seasons.insert_one({"id": "s-2", "slug": "saison-2", "name": "Saison 2", "status": "active"})
     await set_status(flow, tournament, "completed")
-    await set_status(flow, tournament, "results_published")
+    # Korrektur nach dem Abschluss: die abgeschlossene Wertung bleibt unverändert, die Leitung bekommt den Hinweis.
+    placements.rows = []
+    response = await flow.post(f"/api/tournaments/{tournament['id']}/status", json={"status": "results_published", "force": True})
+    assert response.status_code == 200, response.text
+    assert "abgeschlossenen Jahreswertung" in response.json()["season_points_note"]
     assert await rows(flow, tournament["id"]) == [(anna["id"], "tournament", 1, "s-1")]
+    log = await flow.db.audit_logs.find_one({"action": "tournament.season_points.resync_skipped"}, {"_id": 0})
+    assert log["target_id"] == tournament["id"] and log["data"]["closed_seasons"] == ["s-1"]
 
 
 @pytest.mark.asyncio
@@ -167,19 +173,19 @@ async def test_the_migration_removes_duplicate_tournament_points_once(flow):
 
     entry = next(run for version, name, run in migrations.MIGRATIONS if version == 18)
     result = await entry(flow.db)
-    assert result == "1 duplicate season points removed in 1 tournaments"
+    assert result == "1 duplicate season points removed in 1 tournaments, 0 groups in 0 tournaments only reported"
     left = sorted(row["id"] for row in await flow.db.season_points.find({}, {"_id": 0}).to_list(10))
     assert left == ["p-bert", "p-major", "p-other"]
     log = await flow.db.audit_logs.find_one({"action": "season_points.duplicates_removed"}, {"_id": 0})
     assert log["target_id"] == "t-1" and [row["id"] for row in log["data"]["removed"]] == ["p-mini"]
     # wiederholbar
     result = await entry(flow.db)
-    assert result == "0 duplicate season points removed in 0 tournaments"
+    assert result == "0 duplicate season points removed in 0 tournaments, 0 groups in 0 tournaments only reported"
     assert (await season_points_cleanup.plan(flow.db))["rows_to_remove"] == 0
 
 
 @pytest.mark.asyncio
-async def test_without_the_tournament_the_newest_entry_stays(flow):
+async def test_without_the_tournament_the_original_entry_stays(flow):
     from services import season_points_cleanup
 
     base = {"season_id": "s-1", "source_id": "weg", "team_id": None, "user_id": "anna", "rank": 1}
@@ -188,7 +194,110 @@ async def test_without_the_tournament_the_newest_entry_stays(flow):
         {**base, "id": "neu", "source_type": "tournament", "total_points": 150.0, "created_at": "2026-09-05"},
     ])
     await season_points_cleanup.apply(flow.db)
-    assert [row["id"] for row in await flow.db.season_points.find({}, {"_id": 0}).to_list(5)] == ["neu"]
+    assert [row["id"] for row in await flow.db.season_points.find({}, {"_id": 0}).to_list(5)] == ["alt"]
+
+
+@pytest.mark.asyncio
+async def test_duplicates_over_two_seasons_or_in_a_closed_one_are_only_reported(flow):
+    """Repro (Review): Punkte in Saison A, nach Saisonwechsel erneut veröffentlicht mit anderem Gewicht - Eintrag in B.
+    Früher blieb der jüngste (B) und der ursprüngliche (A) verschwand. Jetzt wird nichts gelöscht, nur gemeldet."""
+    from scripts import season_points_duplicates
+    from services import season_points_cleanup
+
+    await flow.db.seasons.insert_many([
+        {"id": "s-a", "name": "Saison A", "status": "completed"},
+        {"id": "s-b", "name": "Saison B", "status": "active"},
+    ])
+    await flow.db.tournaments.insert_many([{"id": "t-1", "season_weight": 3.0}, {"id": "t-2", "season_weight": 2.0}])
+    await flow.db.season_points.insert_many([
+        # über zwei Saisons
+        {"id": "a-1", "season_id": "s-a", "source_id": "t-1", "user_id": "anna", "team_id": None, "source_type": "mini",
+         "total_points": 75.0, "created_at": "2026-03-01"},
+        {"id": "b-1", "season_id": "s-b", "source_id": "t-1", "user_id": "anna", "team_id": None, "source_type": "major",
+         "total_points": 225.0, "created_at": "2026-10-01"},
+        # beide in der abgeschlossenen Saison
+        {"id": "a-2", "season_id": "s-a", "source_id": "t-2", "user_id": "bert", "team_id": None, "source_type": "mini",
+         "total_points": 60.0, "created_at": "2026-03-01"},
+        {"id": "a-3", "season_id": "s-a", "source_id": "t-2", "user_id": "bert", "team_id": None, "source_type": "tournament",
+         "total_points": 120.0, "created_at": "2026-03-02"},
+    ])
+    out = io.StringIO()
+    await season_points_duplicates.main([], db=flow.db, out=out)
+    text = out.getvalue()
+    assert "0 Einträge zu entfernen" in text
+    assert "Nur gemeldet (mehrere oder abgeschlossene Wertungen, nichts gelöscht): 2 Personen/Teams in 2 Turnieren." in text
+    assert "Saison A (completed – abgeschlossen, bleibt unverändert): 0 zu entfernen (0.0 Punkte), 2 gemeldet" in text
+    assert "Saison B (active): 0 zu entfernen (0.0 Punkte), 1 gemeldet" in text
+
+    result = await season_points_cleanup.apply(flow.db)
+    assert result == "0 duplicate season points removed in 0 tournaments, 2 groups in 2 tournaments only reported"
+    assert await flow.db.season_points.count_documents({}) == 4
+    reported = await flow.db.audit_logs.find({"action": "season_points.duplicates_reported"}, {"_id": 0}).to_list(5)
+    assert sorted(row["target_id"] for row in reported) == ["t-1", "t-2"]
+
+
+@pytest.mark.asyncio
+async def test_the_protocol_is_written_before_deleting_and_a_rerun_finishes(flow, monkeypatch):
+    from services import season_points_cleanup
+
+    base = {"season_id": "s-1", "source_id": "t-1", "team_id": None, "rank": 1}
+    await flow.db.season_points.insert_many([
+        {**base, "id": "anna-1", "user_id": "anna", "source_type": "mini", "total_points": 75.0, "created_at": "2026-09-01"},
+        {**base, "id": "anna-2", "user_id": "anna", "source_type": "mini", "total_points": 75.0, "created_at": "2026-09-02"},
+        {**base, "id": "bert-1", "user_id": "bert", "source_type": "mini", "total_points": 60.0, "created_at": "2026-09-01"},
+        {**base, "id": "bert-2", "user_id": "bert", "source_type": "mini", "total_points": 60.0, "created_at": "2026-09-02"},
+    ])
+
+    class Abort(RuntimeError):
+        pass
+
+    real_db = flow.db
+    deleted = []
+
+    class Points:
+        def __getattr__(self, name):
+            return getattr(real_db.season_points, name)
+
+        async def delete_one(self, query):
+            if deleted:
+                raise Abort("Verbindung weg")
+            deleted.append(query["id"])
+            return await real_db.season_points.delete_one(query)
+
+    class Db:
+        season_points = Points()
+
+        def __getattr__(self, name):
+            return getattr(real_db, name)
+
+    with pytest.raises(Abort):
+        await season_points_cleanup.apply(Db())
+    log = await real_db.audit_logs.find_one({"action": "season_points.duplicates_removed"}, {"_id": 0})
+    assert sorted(row["id"] for row in log["data"]["removed"]) == ["anna-2", "bert-2"]  # stand vor dem Abbruch fest
+    assert await real_db.season_points.count_documents({}) == 3
+
+    await season_points_cleanup.apply(real_db)
+    assert sorted(row["id"] for row in await real_db.season_points.find({}, {"_id": 0}).to_list(5)) == ["anna-1", "bert-1"]
+
+
+@pytest.mark.asyncio
+async def test_corrections_are_never_dropped_and_no_rating(flow):
+    from services import season_service
+
+    await flow.db.seasons.insert_one({"id": "s-1", "slug": "s", "name": "S", "status": "active", "drop_worst": 1})
+    anna = await flow.add_user(name="anna")
+    base = {"season_id": "s-1", "user_id": anna["id"], "team_id": None}
+    await flow.db.season_points.insert_many([
+        {**base, "id": "t1", "source_type": "tournament", "source_id": "t-1", "rank": 1, "total_points": 100.0, "raw_points": 100.0},
+        {**base, "id": "t2", "source_type": "tournament", "source_id": "t-2", "rank": 3, "total_points": 50.0, "raw_points": 50.0},
+        {**base, "id": "k1", "source_type": "custom", "source_id": "adjustment:k1", "rank": None, "total_points": -15.0,
+         "raw_points": -15.0},
+    ])
+    (row,) = await season_service.aggregate_leaderboard(season_id="s-1")
+    # gestrichen wird die schwächste Wertung (50), nie der Abzug; der Abzug ist keine Wertung
+    assert row["total_points"] == 85.0 and row["events"] == 2
+    assert row["dropped_events"] == 1 and row["dropped_points"] == 50.0
+    assert {item["source_type"]: item["total_points"] for item in row["source_breakdown"]} == {"tournament": 100.0, "custom": -15.0}
 
 
 # ---------------------------------------------------------------- Jahreswertung verwalten (ER7–ER11)
@@ -283,7 +392,9 @@ async def test_the_start_page_shows_no_season_without_an_active_one(flow):
 
 
 @pytest.mark.asyncio
-async def test_points_land_in_the_latest_active_season_when_old_data_has_two(flow):
+async def test_with_two_active_seasons_points_keep_going_where_they_went_before(flow):
+    """Altbestand mit zwei aktiven Wertungen: dieselbe Auswahl wie vor #2123 (die erste, die die Datenbank liefert) -
+    nach dem Update wandern keine Punkte in eine andere Saison."""
     from services import season_service
 
     await flow.db.seasons.insert_many([
@@ -291,7 +402,7 @@ async def test_points_land_in_the_latest_active_season_when_old_data_has_two(flo
         {"id": "neu", "status": "active", "start_date": "2026-01-01"},
     ])
     entry = await season_service.award_points(user_id="anna", source_type="event", source_id="e-1", rank=None)
-    assert entry["season_id"] == "neu"
+    assert entry["season_id"] == "alt"
 
 
 @pytest.mark.asyncio

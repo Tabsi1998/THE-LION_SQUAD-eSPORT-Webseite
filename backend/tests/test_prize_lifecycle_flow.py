@@ -206,3 +206,55 @@ async def test_revoking_an_achievement_needs_a_reason_on_the_server(flow):
     response = await flow.client.request("DELETE", "/api/admin/achievements/award",
                                          json={"user_id": anna["id"], "tier_code": "matches_played_1", "note": "  "})
     assert response.status_code == 400 and response.json()["detail"] == "Bitte einen Grund angeben."
+
+@pytest.mark.asyncio
+async def test_undoing_picked_up_after_the_deadline_gives_a_new_one(flow, mails):
+    flow.act_as(await flow.add_staff())
+    past = (now_utc() - timedelta(days=3)).isoformat()
+    item = await pickup(flow, user_id=(await flow.add_user())["id"], status="picked_up", pickup_deadline=past,
+                        ready_at=past, picked_up_at=past)
+    response = await flow.patch(f"/api/prizes/{item['id']}", json={"status": "ready"})
+    assert response.status_code == 200, response.text
+    assert response.json()["pickup_deadline"] > (now_utc() + timedelta(days=89)).isoformat()
+    assert mails == []
+
+
+@pytest.mark.asyncio
+async def test_expiry_counts_and_reports_only_what_it_really_changed(flow, mails, monkeypatch):
+    """Zwischen Lesen und Schreiben holt jemand den Gewinn ab - dann kein Verfall und keine Meldung."""
+    from services import prize_service
+
+    anna = await flow.add_user(name="anna")
+    past = (now_utc() - timedelta(days=1)).isoformat()
+    raced = await pickup(flow, user_id=anna["id"], status="ready", pickup_deadline=past)
+    due = await pickup(flow, user_id=anna["id"], status="ready", pickup_deadline=past)
+    real_db = flow.db
+
+    class Pickups:
+        def __getattr__(self, name):
+            return getattr(real_db.prize_pickups, name)
+
+        async def update_one(self, query, change, *args, **kwargs):
+            if query.get("id") == raced["id"]:
+                await real_db.prize_pickups.update_one({"id": raced["id"]}, {"$set": {"status": "picked_up"}})
+            return await real_db.prize_pickups.update_one(query, change, *args, **kwargs)
+
+    class Db:
+        prize_pickups = Pickups()
+
+        def __getattr__(self, name):
+            return getattr(real_db, name)
+
+    monkeypatch.setattr(prize_service, "get_db", lambda: Db())
+    assert await prize_service.expire_overdue() == 1
+    assert (await real_db.prize_pickups.find_one({"id": raced["id"]}, {"_id": 0}))["status"] == "picked_up"
+    assert (await real_db.prize_pickups.find_one({"id": due["id"]}, {"_id": 0}))["status"] == "expired"
+    assert mails == [(anna["id"], "prize_expired")]
+
+
+def test_prize_status_has_its_category_and_discord_look():
+    from services import discord_dm
+    from services.notification_preferences import NOTIFICATION_KIND_CATEGORY
+
+    assert NOTIFICATION_KIND_CATEGORY["prize_status"] == "prize_updates"
+    assert discord_dm.BUTTON_LABELS["prize_status"] == "Zum Gewinn" and "prize_status" in discord_dm.COLORS
