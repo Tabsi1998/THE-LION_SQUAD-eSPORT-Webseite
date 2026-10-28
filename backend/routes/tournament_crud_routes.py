@@ -455,18 +455,9 @@ async def delete_tournament(tid: str, me: dict = Depends(require_admin()),
     problem = await staffel_guard.staffel_delete_problem(db, stored)
     if problem:
         raise HTTPException(status_code=409, detail=problem)
-    v2_match_ids = await db.matches_v2.distinct("id", {"tournament_id": tid})
-    await db.tournaments.delete_one({"id": tid})
+    from services.tournament_purge import purge_tournament
+    await purge_tournament(db, tid)
     reset_scope_cache()  # Live-Meldungen (#1801): Turnier und Event neu nachschlagen
-    await db.tournament_registrations.delete_many({"tournament_id": tid})
-    await db.tournament_staff_assignments.delete_many({"tournament_id": tid})
-    await db.tournament_stages.delete_many({"tournament_id": tid})
-    await db.matches_v2.delete_many({"tournament_id": tid})
-    if v2_match_ids:
-        await db.match_reports_v2.delete_many({"match_id": {"$in": v2_match_ids}})
-    # Fotos vom Ergebnis (#1157): persönlich - sie gehen mit dem Turnier.
-    from services.match_proofs import delete_for_tournament
-    await delete_for_tournament(db, tid)
     return {"ok": True}
 
 

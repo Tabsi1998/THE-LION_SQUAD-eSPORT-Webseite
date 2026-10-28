@@ -89,6 +89,8 @@ export function StaffelSeasonValues({ tournament, games = [] }) {
         <ReadOnlyValue label="Max Teams" value={tournament.max_participants} testId="tr-edit-season-max" />
         <ReadOnlyValue label="Best of" value={tournament.best_of ? `Best of ${tournament.best_of}` : ""} testId="tr-edit-season-bo" />
         <ReadOnlyValue label="Ergebnis gilt nach" value={tournament.result_confirm_hours_league ? `${tournament.result_confirm_hours_league} Std.` : "48 Std."} testId="tr-edit-season-confirm" />
+        {/* Seit #2106 (F3) ein Season-Wert, je Liga N überschreibbar. */}
+        <ReadOnlyValue label="Antwort auf Terminvorschlag" value={`${tournament.match_schedule_response_hours ?? 72} Std.`} testId="tr-edit-season-response" />
         <ReadOnlyValue label="Sichtbarkeit" value={optionLabel(VISIBILITY_OPTIONS, tournament.visibility || "internal")} testId="tr-edit-season-visibility" wide />
       </FormGrid>
       <div className="min-w-0">

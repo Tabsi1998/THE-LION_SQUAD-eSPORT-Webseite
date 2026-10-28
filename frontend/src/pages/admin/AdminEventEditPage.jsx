@@ -24,6 +24,8 @@ import { appendEmbedToken } from "@/components/tls/RichContent";
 import { normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { EventProgramPanel, useEventProgram } from "@/pages/admin/event/EventProgramPanel";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
+import { affectedRegistrations, cancelConfirmText, savedEventMessage, touchesScheduleOrPlace } from "@/lib/eventAdmin";
 import { toast } from "sonner";
 
 const ACCENT = "#9F7AEA";
@@ -104,6 +106,7 @@ function EventForm({ event, meta, partners = [], onDone }) {
   // und nur dann Teil des Speicherns - der Server lehnt es sonst mit 403 ab.
   const { can } = useAuth();
   const canFinance = can("finance");
+  const confirm = useConfirm();
   const [billingForm, setBillingForm] = useState(() => ({
     enabled: Boolean(event?.billing?.enabled),
     positions: positionsToForm(event?.billing),
@@ -259,7 +262,32 @@ function EventForm({ event, meta, partners = [], onDone }) {
           setSaving(false);
           return;
         }
-        await api.patch(`/events/${event.id}`, patch);
+        // Absagen und Verschieben (#2118): Rückfrage mit der Zahl der Betroffenen, bevor der Server sie informiert.
+        const affected = affectedRegistrations(event);
+        const cancelling = patch.status === "cancelled" && event.status !== "cancelled";
+        if (cancelling && !await confirm({
+          title: "Event absagen?",
+          description: cancelConfirmText(affected),
+          confirmLabel: "Absagen",
+          cancelLabel: "Zurück",
+        })) {
+          setSaving(false);
+          return;
+        }
+        if (!cancelling && affected && touchesScheduleOrPlace(patch) && !["draft", "archived", "cancelled"].includes(patch.status || event.status)) {
+          patch.notify_registrants = await confirm({
+            title: "Angemeldete informieren?",
+            description: `Termin oder Ort ändern sich. Sollen ${affected === 1 ? "die 1 angemeldete Person" : `die ${affected} Angemeldeten`} (samt Warteliste) eine Nachricht bekommen?`,
+            confirmLabel: "Informieren",
+            cancelLabel: "Ohne Nachricht speichern",
+            tone: "info",
+          });
+        }
+        const { data } = await api.patch(`/events/${event.id}`, patch);
+        toast.success(savedEventMessage(data));
+        onDone();
+        setSaving(false);
+        return;
       }
       toast.success("Gespeichert.");
       onDone();
@@ -295,7 +323,7 @@ function EventForm({ event, meta, partners = [], onDone }) {
               </>
             )}
             <EventDaysSection value={daysForm} onChange={changeDays} locations={locationsForm} startDate={form.start_date} endDate={form.end_date} accent={ACCENT} />
-            <TextField label="Max. Teilnehmer" type="number" value={form.max_participants} onChange={(v) => set("max_participants", v)} testId="event-max-participants" />
+            <TextField label="Max. Teilnehmer" type="number" min={1} value={form.max_participants} onChange={(v) => set("max_participants", v)} hint="Leer = unbegrenzt." testId="event-max-participants" />
           </FormSection>
           <DistributeBox kind="event" itemId={event?.id} title={event?.name}>
             <DiscordPreview kind="event" item={usesDays ? { ...form, days: formToDays(daysForm) } : form} skip={form.discord_skip} onSkipChange={(value) => set("discord_skip", value)} />

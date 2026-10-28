@@ -640,13 +640,17 @@ async def user_profile_meta(db, username: str, base: dict, origin: str) -> dict:
     label = user.get("display_name") or user.get("username")
     image = absolute_url(user.get("avatar_url") or user.get("banner_url") or base["image"], origin)
     canonical = f"{origin}/u/{user.get('username') or username}"
+    # Vorschau für Suchmaschinen und Link-Karten (#2118): Plattform und Spiele nur mit der Stufe „öffentlich“.
+    from routes.user_routes import _field_visible
+    platform = user.get("main_platform") if _field_visible(user, "main_platform", True) else None
+    games = (user.get("favorite_games") or []) if _field_visible(user, "favorite_games", True) else []
     meta = {
         **base,
         "title": f"{label} · Community · {base['site_name']}",
         "description": seo_description(
             user.get("bio") or f"Community-Profil von {label}.",
             prefix="Community-Profil",
-            details=[user.get("main_platform"), ", ".join(user.get("favorite_games") or [])],
+            details=[platform, ", ".join(games)],
         ),
         "image": image,
         "type": "profile",

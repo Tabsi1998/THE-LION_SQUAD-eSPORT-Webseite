@@ -1,5 +1,50 @@
 # Changelog
 
+## 1.48.0 (28.10.2026)
+
+### Neu
+
+* Event: bei neuem Termin oder Ort fragt die Verwaltung, ob die Angemeldeten eine Nachricht bekommen (#2118)
+
+### Fehlerbehebungen
+
+* Admin-Profiländerung eingeschränkt und protokolliert (#2118)
+* Event absagen informiert Angemeldete und Warteliste, storniert Anmeldungen und offene Rechnungsaufträge (#2118)
+* Event löschen nur ohne Anmeldungen, Rechnungen und Turniere mit Anmeldungen, mit ehrlichem Dialog und Protokoll (#2118)
+* Event-Absage benachrichtigt je Absage und Person genau einmal und storniert auch fehlgeschlagene Rechnungsaufträge (#2118)
+* Event: „Max. Teilnehmer“ lässt sich leeren, nur Zahlen ab 1 (#2118)
+* Eventseite zeigt „Event abgesagt“ statt „Du bist dabei“ (#2118)
+* Konto löschen entfernt jedes Profilfeld, auch bei früher gelöschten Konten (#2118)
+* Öffentliche Profile liefern nur freigegebene Felder (#2118)
+* Rückfragen beim Absagen und Löschen zählen alle bestehenden Anmeldungen und sagen, was danach bleibt (#2118)
+* Spielerliste, Mitgliederverzeichnis und Link-Vorschau zeigen Land, Spiele und Plattform nach der Sichtbarkeit je Betrachter (#2118)
+
+## 1.47.0 (28.10.2026)
+
+### Neu
+
+* Liga: Captain und Vertreter geben ihre Rolle selbst ab (#2110)
+* Liga: eigener Terminvorschlag zeigt „wartet auf die Gegenseite“ und lässt sich zurückziehen, Terminstatus auf Deutsch (#2110)
+* Liga: Hinweis nach Ablauf der Nachtragsfrist mit „[@leitung](https://github.com/leitung) im Matchchat“ (#2110)
+* Liga: Staffel- und Spielseite führen über „Liga · Season · Staffel“ zur Ligaseite (#2110)
+* Liga: Startseite zeigt „Terminvorschlag beantworten“ und „Aufstellung nachtragen“ (Website und App) (#2110)
+* Liga: Teamseite zeigt Co-Teams mit Captain und Vertreter und „Co-Teams verwalten“ (#2110)
+* Liga: Terminvorschlag, Gegenvorschlag, Annehmen, Ablehnen und Zurückziehen benachrichtigen die andere Seite (#2110)
+* Shop: „Bei Printful nachsehen“ gleicht einen gesendeten Testentwurf neu ab, mit technischen Details ohne Personendaten (#2138)
+* Termin-Nachrichten und die Aufgabe „Terminvorschlag beantworten“ gelten auch bei normalen Turnieren mit Terminabstimmung (#2110)
+
+### Fehlerbehebungen
+
+* Liga: Co-Team sieht „Austritt nur über die Turnierleitung“ statt „Vom Turnier abmelden“ (#2110)
+* Liga: Rollen-Meldungen beim Kader-Ändern nennen den Weg auf der Website (#2110)
+* Shop: Testentwurf an Printful wird nicht mehr wegen zu langer Kennung abgelehnt (#2133)
+* Shop: Testentwurf-Abgleich findet Flächen der echten Printful-Antwort und meldet Kosten in Berechnung (#2138)
+* weniger Kontodaten in öffentlichen Antworten der Matchseite (#2110)
+
+### Schneller
+
+* Liga: schnellere Aufgabe „Aufstellung nachtragen“ auf der Startseite (#2110)
+
 ## 1.46.0 (28.10.2026)
 
 ### Neu

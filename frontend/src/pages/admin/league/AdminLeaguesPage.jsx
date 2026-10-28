@@ -2,7 +2,7 @@
 // Season öffnet ihre eigene Seite mit Vorgaben, Sperrzeiten, Map-Pool, Liga N und Staffeln. Nur die Turnierleitung.
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ChevronRight, Plus } from "lucide-react";
+import { ChevronRight, Pencil, Plus, Trash2 } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminSheet } from "@/components/tls/AdminSheet";
@@ -10,10 +10,13 @@ import { FormGrid } from "@/components/tls/AdminForm";
 import { SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { fromViennaInput, viennaDate } from "@/lib/vienna";
-import { SEASON_STATUS_OPTIONS, VISIBILITY_SHORT, weekdayName } from "@/lib/league";
+import { ACTIVE_STATUS_OPTIONS, SEASON_STATUS_OPTIONS, VISIBILITY_SHORT, weekdayName } from "@/lib/league";
+import { LeagueDeleteSheet } from "./LeagueDeleteSheet";
 import { toast } from "sonner";
 
 const STATUS_TEXT = Object.fromEntries(SEASON_STATUS_OPTIONS);
+const ICON_BUTTON = "p-1.5 text-white/50 hover:text-[#29B6E8] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8] rounded-sm";
+const ICON_DANGER = ICON_BUTTON.replace("hover:text-[#29B6E8]", "hover:text-live");
 const STEPS = [
   "Liga je Spiel anlegen",
   "Season mit Beginn anlegen, dann Vorgaben, Sperrzeiten, Map-Pool, Regeltext und Sichtbarkeit festlegen",
@@ -21,16 +24,30 @@ const STEPS = [
   "Staffel anlegen und in der Turnierverwaltung der Staffel die Co-Teams zuteilen",
 ];
 
-function LeagueSheet({ games, onClose, onSaved }) {
-  const [form, setForm] = useState({ name: "", game_id: games[0]?.id || "", description: "" });
+// Anlegen oder bearbeiten (#2106): Name, Beschreibung und Stand immer; das Spiel nur, solange keine Season eine Staffel
+// hat, die Adresse nur vor der ersten Veröffentlichung - beides sagt der Server (`game_locked`, `slug_locked`).
+function LeagueSheet({ league, games, onClose, onSaved }) {
+  const editing = Boolean(league);
+  const [form, setForm] = useState(() => ({
+    name: league?.name || "", game_id: league?.game_id || games[0]?.id || "", description: league?.description || "",
+    slug: league?.slug || "", status: league?.status || "active",
+  }));
   const [saving, setSaving] = useState(false);
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   const submit = async (event) => {
     event.preventDefault();
     setSaving(true);
     try {
-      await api.post("/admin/leagues", { name: form.name, game_id: form.game_id, description: form.description || null });
-      toast.success("Liga angelegt.");
+      if (editing) {
+        const body = { name: form.name, description: form.description.trim() || null, status: form.status };
+        if (!league.game_locked && form.game_id !== league.game_id) body.game_id = form.game_id;
+        if (!league.slug_locked && form.slug.trim() && form.slug.trim() !== league.slug) body.slug = form.slug.trim();
+        const { data } = await api.patch(`/admin/leagues/${league.id}`, body);
+        toast.success(data.changed?.length ? "Liga gespeichert." : "Keine Änderung.");
+      } else {
+        await api.post("/admin/leagues", { name: form.name, game_id: form.game_id, description: form.description || null });
+        toast.success("Liga angelegt.");
+      }
       onSaved();
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail));
@@ -38,10 +55,22 @@ function LeagueSheet({ games, onClose, onSaved }) {
     }
   };
   return (
-    <AdminSheet title="Liga anlegen" onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Anlegen" submitTestId="league-create-save" testId="league-create-sheet">
+    <AdminSheet title={editing ? "Liga bearbeiten" : "Liga anlegen"} eyebrow={editing ? league.name : undefined} onClose={onClose} onSubmit={submit} saving={saving}
+      submitLabel={editing ? "Speichern" : "Anlegen"} submitTestId={editing ? "league-edit-save" : "league-create-save"} testId={editing ? "league-edit-sheet" : "league-create-sheet"}>
       <TextField label="Name" required maxLength={80} value={form.name} onChange={(value) => set("name", value)} placeholder="z. B. CoD-Liga" testId="league-name" />
-      <SelectField label="Spiel" required value={form.game_id} onChange={(value) => set("game_id", value)}
-        options={games.map((game) => [game.id, game.name])} hint="Die Adresse der Liga folgt dem Spiel, etwa /liga/call-of-duty." testId="league-game" />
+      <SelectField label="Spiel" required value={form.game_id} onChange={(value) => set("game_id", value)} disabled={editing && league.game_locked}
+        options={games.map((game) => [game.id, game.name])} testId="league-game"
+        hint={editing
+          ? (league.game_locked ? "Bleibt: eine Season hat schon eine Staffel. Für ein anderes Spiel eine neue Liga anlegen." : "Änderbar, solange keine Season eine Staffel hat. Die Modus-Reihenfolge der Seasons wird dabei geleert.")
+          : "Die Adresse der Liga folgt dem Spiel, etwa /liga/call-of-duty."} />
+      {editing ? (
+        <FormGrid>
+          <TextField label="Adresse" maxLength={80} value={form.slug} onChange={(value) => set("slug", value)} disabled={league.slug_locked} testId="league-slug"
+            hint={league.slug_locked ? `Bleibt /liga/${league.slug}: eine Season war schon sichtbar, Links darauf sollen weiter gehen.` : `/liga/${form.slug || "…"} – änderbar bis zur ersten Veröffentlichung.`} />
+          <SelectField label="Stand" value={form.status} onChange={(value) => set("status", value)} options={ACTIVE_STATUS_OPTIONS}
+            hint="Archiviert: aus Ligaseite und Menü genommen, alles bleibt erhalten." testId="league-status" />
+        </FormGrid>
+      ) : null}
       <TextAreaField label="Beschreibung" rows={2} value={form.description} onChange={(value) => set("description", value)} placeholder="freiwillig" testId="league-description" />
     </AdminSheet>
   );
@@ -102,6 +131,20 @@ export default function AdminLeaguesPage() {
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["leagues"]);
 
+  // „Archivieren statt löschen“ (#2106): der Stand der Liga, sonst bleibt alles.
+  const archive = async (league) => {
+    try {
+      await api.patch(`/admin/leagues/${league.id}`, { status: "archived" });
+      toast.success(`${league.name} archiviert.`);
+      setSheet(null);
+      await load();
+      return true;
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail));
+      return false;
+    }
+  };
+
   const leagues = data?.leagues || [];
   const games = data?.games || [];
   return (
@@ -143,11 +186,20 @@ export default function AdminLeaguesPage() {
               <div className="min-w-0">
                 <h2 className="font-heading text-xl font-bold uppercase break-words">{league.name}</h2>
                 <p className="text-xs text-white/55">{league.game_name || "Spiel fehlt"} · /liga/{league.slug}{league.status === "archived" ? " · archiviert" : ""}</p>
+                {league.description ? <p className="mt-1 text-xs text-white/60 break-words">{league.description}</p> : null}
               </div>
-              <button type="button" onClick={() => setSheet({ kind: "season", league })} data-testid={`season-add-${league.slug}`}
-                className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
-                <Plus className="w-3.5 h-3.5" aria-hidden="true" /> Season anlegen
-              </button>
+              <div className="flex items-center gap-1">
+                <button type="button" className={ICON_BUTTON} onClick={() => setSheet({ kind: "edit", league })} aria-label={`${league.name} bearbeiten`} data-testid={`league-edit-${league.slug}`}>
+                  <Pencil className="w-4 h-4" aria-hidden="true" />
+                </button>
+                <button type="button" className={ICON_DANGER} onClick={() => setSheet({ kind: "delete", league })} aria-label={`${league.name} löschen`} data-testid={`league-delete-${league.slug}`}>
+                  <Trash2 className="w-4 h-4" aria-hidden="true" />
+                </button>
+                <button type="button" onClick={() => setSheet({ kind: "season", league })} data-testid={`season-add-${league.slug}`}
+                  className="tls-btn tls-btn--quiet ml-1 px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
+                  <Plus className="w-3.5 h-3.5" aria-hidden="true" /> Season anlegen
+                </button>
+              </div>
             </header>
             {league.seasons.length ? (
               <ul className="divide-y divide-white/5">
@@ -177,6 +229,11 @@ export default function AdminLeaguesPage() {
       </div>
 
       {sheet?.kind === "league" ? <LeagueSheet games={games} onClose={() => setSheet(null)} onSaved={() => { setSheet(null); load(); }} /> : null}
+      {sheet?.kind === "edit" ? <LeagueSheet league={sheet.league} games={games} onClose={() => setSheet(null)} onSaved={() => { setSheet(null); load(); }} /> : null}
+      {sheet?.kind === "delete" ? (
+        <LeagueDeleteSheet kind="league" target={sheet.league} name={sheet.league.name} onClose={() => setSheet(null)}
+          onDeleted={() => { setSheet(null); load(); }} onArchive={() => archive(sheet.league)} />
+      ) : null}
       {sheet?.kind === "season" ? (
         <SeasonSheet league={sheet.league} defaults={data?.season_defaults || {}} onClose={() => setSheet(null)}
           onSaved={(season) => { setSheet(null); navigate(`/admin/leagues/seasons/${season.id}`); }} />

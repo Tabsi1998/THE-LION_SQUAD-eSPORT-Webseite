@@ -17,6 +17,7 @@ from services import xp
 from services.levels import level_view
 from services.profile_references import personal_profile_references
 from services.visibility import user_can_see
+from services.achievement_visibility import sees_hidden_achievements
 from services.notification_preferences import (
     DELIVERY_CHANNEL_PREFERENCES,
     OPTIONAL_EMAIL_PREFERENCES,
@@ -25,9 +26,11 @@ from services.notification_preferences import (
 )
 from services.query_filters import safe_regex
 from services.private_fields import private_projection, strip_private
+# Die leerbaren Profilfelder (#2118): ein Blatt-Modul - auch die Kontolöschung leitet ihre Liste daraus ab.
+from services.profile_fields import USER_NULLABLE_FIELDS
 from models import (
     AreasUpdate,
-    AdminUserCreate, UserUpdate, RoleUpdate, UserSocialCreate, UserSocialUpdate,
+    AdminProfileReset, AdminUserCreate, UserUpdate, RoleUpdate, UserSocialCreate, UserSocialUpdate,
     now_utc, new_id,
 )
 
@@ -40,21 +43,6 @@ def _clean(u: dict) -> dict:
 
 
 # Level (#617): eine Kurve für alles in services/levels.py, der Stand je Person in services/xp.py.
-
-
-USER_NULLABLE_FIELDS = {
-    "display_name", "avatar_url", "banner_url", "bio", "first_name", "last_name",
-    "nickname", "birth_date", "gender", "country", "state", "city", "favorite_games",
-    "main_platform", "main_platforms", "preferred_role", "input_device",
-    "input_devices", "gaming_subscriptions", "website", "game_ids", "discord_name",
-    "discord_id", "switch_code", "steam_id", "epic_id", "psn_id", "xbox_id",
-    "riot_id", "twitch_handle", "youtube_handle", "tiktok_handle",
-    "instagram_handle", "x_handle", "nintendo_fc", "ea_id", "battlenet_id",
-    "faceit_handle", "startgg_handle", "roblox_handle", "osu_handle", "lichess_handle", "github_handle", "kick_handle", "reddit_handle", "spotify_handle",
-    "threads_handle", "facebook_handle", "linkedin_handle", "snapchat_handle", "pinterest_handle", "telegram_handle", "wargaming_handle", "bungie_handle",
-    "mastodon_handle", "bluesky_handle",
-    "profile_visibility", "dm_privacy",
-}
 
 
 def _visibility_aliases(key: str) -> list[str]:
@@ -490,13 +478,16 @@ async def list_public_users(
     limit: int = 2000,
     offset: int = 0,
     paged: bool = False,
+    viewer: dict | None = Depends(get_optional_user),
 ):
     """Public listing of all users with public profile (community + members).
 
     Phase C: enriches each user with `profile_completeness`, `achievements_count`
     and `top_achievement` (highest tier earned, ignoring negatives).
+    Land und Spiele folgen der Stufe aus „Privatsphäre“ je Betrachter - wie das öffentliche Profil (#2118).
     """
     db = get_db()
+    ctx = await _viewer_context(db, viewer, "")
     query: dict = {"privacy_public_profile": True, "is_active": True, "is_banned": {"$ne": True}}
     needle = (q or "").strip()
     if needle:
@@ -541,10 +532,14 @@ async def list_public_users(
     from badges import compute_profile_completeness, _level_name, _color_for_level
     xp_docs = {row["user_id"]: row async for row in db.user_xp.find({"user_id": {"$in": user_ids}}, {"_id": 0, "user_id": 1, "total": 1, "prestige": 1})}
 
+    from services.achievement_visibility import achievements_public
     out = []
     for u in users:
         score = compute_profile_completeness(u)
-        ua = by_user.get(u["id"], [])
+        row_ctx = {**ctx, "self": bool(viewer and viewer.get("id") == u["id"])}
+        # „Erfolge öffentlich“ aus (#2118): in der Liste weder Zahl noch Top-Erfolg - außer für die Person und das Team.
+        shown = achievements_public(u) or sees_hidden_achievements(viewer, u["id"])
+        ua = by_user.get(u["id"], []) if shown else []
         top = None
         if ua:
             ua_sorted = sorted(ua, key=lambda a: (a.get("level", 0), tiers.get(a["tier_code"], {}).get("points", 0)), reverse=True)
@@ -561,8 +556,9 @@ async def list_public_users(
                 }
         out.append({
             "id": u["id"], "username": u["username"], "display_name": u.get("display_name"),
-            "avatar_url": u.get("avatar_url"), "country": u.get("country"),
-            "favorite_games": u.get("favorite_games"),
+            # Land und Spiele (#2118): die Stufe aus „Privatsphäre“ gegen den Betrachter.
+            "avatar_url": u.get("avatar_url"), "country": _visible_field(u, "country", True, row_ctx),
+            "favorite_games": (u.get("favorite_games") or []) if _field_visible(u, "favorite_games", True, row_ctx) else [],
             "is_club_member": is_active_member(memberships.get(u["id"])),
             "user_type": derived_user_type(u, memberships.get(u["id"])),
             "created_at": u.get("created_at"),
@@ -598,10 +594,10 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
         raise HTTPException(status_code=404, detail="Spieler nicht gefunden")
     public_member = None
     if is_member:
+        # Die interne Vereinsrolle bleibt in der Verwaltung und im eigenen Mitgliederbereich (#2118).
         public_member = {
             "membership_type": membership.get("membership_type"),
             "member_since": membership.get("member_since"),
-            "internal_role": membership.get("internal_role"),
             "member_number": membership.get("member_number") if membership.get("show_member_number_publicly") else None,
         }
     from services.platform_links import PLATFORMS as LINK_PLATFORMS, verified_platforms
@@ -678,7 +674,11 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
     ).to_list(50)
     # Achievements v4 (group-aware) — flat list of awarded tiers
     user_id = u["id"]
-    ua = await db.user_achievements.find({"user_id": user_id}, {"_id": 0})\
+    # „Erfolge öffentlich“ aus (#619, #2118): Fremde sehen keine Erfolge und keine Zahl - die Person selbst und das
+    # Admin-Team schon (wie GET /api/achievements/user/{id}).
+    from services.achievement_visibility import achievements_public
+    achievements_hidden = not achievements_public(u) and not sees_hidden_achievements(viewer, user_id)
+    ua = [] if achievements_hidden else await db.user_achievements.find({"user_id": user_id}, {"_id": 0})\
         .sort("earned_at", -1).to_list(500)
     tier_map = {t["code"]: t async for t in db.achievements.find({}, {"_id": 0})}
     group_map = {g["code"]: g async for g in db.achievement_groups.find({}, {"_id": 0})}
@@ -817,6 +817,7 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
     return {
         **base,
         "badges": badges,
+        "achievements_hidden": achievements_hidden,
         "stats": stats,
         "achievement_level": achievement_level,
         "tournaments": tournaments,
@@ -984,16 +985,26 @@ async def delete_my_social(social_id: str, me: dict = Depends(get_current_user))
 
 @router.put("/{user_id}")
 @router.patch("/{user_id}")
-async def admin_update_user(user_id: str, body: UserUpdate,
+async def admin_update_user(user_id: str, body: AdminProfileReset,
                              me: dict = Depends(require_area("club"))):
+    """Profil eines anderen Kontos (#2118): nur Anzeigename, Bio, Avatar und Banner zurücksetzen (Moderation), mit Grund
+    im Protokoll. Einwilligungen, Datenschutz-Schalter, Rollen und Sicherheitsfelder ändert nur die Person selbst;
+    Superadmin-Konten fasst nur ein Superadmin an."""
     db = get_db()
-    raw = body.model_dump(exclude_unset=True)
-    updates = {k: v for k, v in raw.items() if v is not None or k in USER_NULLABLE_FIELDS}
-    updates = _normalize_social_updates(updates)
-    if "notification_preferences" in updates:
-        updates["notification_preferences"] = _normalize_notification_preferences(updates.get("notification_preferences"))
-    updates["updated_at"] = now_utc().isoformat()
-    await db.users.update_one({"id": user_id}, {"$set": updates})
+    fields = sorted(set(body.reset))
+    target = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "role": 1})
+    if not target:
+        raise HTTPException(status_code=404, detail="Nutzer nicht gefunden")
+    if target.get("role") == "superadmin" and me.get("role") != "superadmin":
+        raise HTTPException(status_code=403, detail="Superadmin-Konten ändert nur ein Superadmin.")
+    now = now_utc().isoformat()
+    await db.users.update_one({"id": user_id}, {"$set": {**{field: None for field in fields}, "updated_at": now}})
+    await db.audit_logs.insert_one({
+        "id": new_id(), "action": "user.admin_profile_reset", "target_id": user_id, "actor_id": me["id"],
+        # Ohne die alten Werte: Name und Bio wären sonst eine Kopie, die beim Löschen des Kontos stehen bliebe.
+        "data": {"fields": fields, "reason": body.reason},
+        "created_at": now,
+    })
     u = await db.users.find_one({"id": user_id}, private_projection())
     return u
 

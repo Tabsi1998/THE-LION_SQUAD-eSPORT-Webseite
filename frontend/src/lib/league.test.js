@@ -1,4 +1,4 @@
-import { modeOrderProblem, overridesPayload, overridesToForm, seasonPayload, seasonToForm, settingsLine, syncSummary, weekdayName } from "./league";
+import { deletionGroups, modeOrderProblem, overridesPayload, overridesToForm, seasonPayload, seasonToForm, settingsLine, syncSummary, weekdayName } from "./league";
 
 // Liga verwalten (docs/LIGA.md, #1622): Formular ↔ Anfrage. Der Beginn ist ein Wiener Kalendertag (00:00 Wien).
 
@@ -54,4 +54,28 @@ test("Texte für Liga N und das Übertragen", () => {
   expect(summary.head).toBe("1 Wert übernommen");
   expect(summary.applied).toEqual(["Sichtbarkeit und Regeltext", "Map-Pool"]);
   expect(summary.skipped).toEqual(["Termine und Kalender: Die Staffel hat schon begonnen."]);
+});
+
+// #2106: Antwortfrist als Season-Wert (leer bei älteren Seasons) und die Auflistung beim Löschen.
+test("Antwortfrist auf Terminvorschläge: Season-Wert, leer bleibt leer, Liga N weicht ab", () => {
+  expect(seasonToForm(SEASON).match_schedule_response_hours).toBe("");
+  expect(seasonPayload(seasonToForm(SEASON)).match_schedule_response_hours).toBeNull();
+  const form = seasonToForm({ ...SEASON, match_schedule_response_hours: 48 });
+  expect(form.match_schedule_response_hours).toBe("48");
+  expect(seasonPayload(form).match_schedule_response_hours).toBe(48);
+  expect(overridesPayload({ ...overridesToForm({}), match_schedule_response_hours: "24" })).toEqual({ match_schedule_response_hours: 24 });
+  expect(overridesToForm({ match_schedule_response_hours: 12 }).match_schedule_response_hours).toBe("12");
+  expect(syncSummary({ applied: ["running"], changed: ["match_schedule_response_hours"] }).applied).toEqual(["Antwortfrist auf Terminvorschläge"]);
+});
+
+test("Löschen: was mitgeht, je Gruppe - leere Gruppen fallen weg", () => {
+  expect(deletionGroups(null)).toEqual([]);
+  expect(deletionGroups({ seasons: [{ name: "Season 1" }], divisions: [{ label: "Season 1 · Liga 1" }], staffeln: [{ staffel: "A" }] })).toEqual([
+    { label: "Seasons", items: ["Season 1"] },
+    { label: "Ligen", items: ["Season 1 · Liga 1"] },
+    { label: "Leere Staffeln (Entwurf)", items: ["Staffel A"] },
+  ]);
+  expect(deletionGroups({ seasons: [], divisions: [], staffeln: [{ title: "Probe-Liga · Staffel B" }] })).toEqual([
+    { label: "Leere Staffeln (Entwurf)", items: ["Probe-Liga · Staffel B"] },
+  ]);
 });

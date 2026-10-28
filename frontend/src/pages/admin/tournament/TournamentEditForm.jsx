@@ -395,19 +395,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
               <SelectInput label="Terminplanung" value={f.schedule_mode || ""} onChange={(v)=>set("schedule_mode",v || "")} options={SCHEDULE_MODE_OPTIONS} />
             </FormGrid>
           )}
-          {staffel && (
-            // Antwortfrist (#2109, Entscheidung F3): bleibt in der Staffel änderbar, bis sie mit #2106 in die Season wandert.
-            <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-4 space-y-3" data-testid="tr-edit-staffel-matchdays">
-              <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Spielwochen</div>
-              <p className="text-xs text-white/55">
-                Spieltag-Dauer, Standardtag und Standardzeit gibt die Season vor (rechts bzw. unten). Hier steht nur, wie
-                lange die Gegenseite auf einen Terminvorschlag antworten kann.
-              </p>
-              <FormGrid cols={3}>
-                <TextField label="Antwortfrist (Stunden)" type="number" min="1" max="720" value={f.match_schedule_response_hours} onChange={(v)=>set("match_schedule_response_hours", v)} hint="So lange hat die Gegenseite Zeit, auf einen Terminvorschlag zu antworten. Danach meldet es der Lauf der Turnierleitung." testId="tr-edit-response-hours" />
-              </FormGrid>
-            </div>
-          )}
+          {/* Antwortfrist einer Staffel (#2106, F3): kommt aus der Season und steht rechts unter „Aus der Season“. */}
           {show && MATCHDAY_FORMATS.has(f.format) && (
             <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-4 space-y-3" data-testid="tr-edit-matchdays">
               <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Spielwochen</div>

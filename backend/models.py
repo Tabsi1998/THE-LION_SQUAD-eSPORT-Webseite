@@ -152,6 +152,25 @@ class UserUpdate(BaseModel):
     notification_preferences: Optional[Dict[str, bool]] = None
 
 
+AdminResettableField = Literal["display_name", "bio", "avatar_url", "banner_url"]
+
+
+class AdminProfileReset(BaseModel):
+    """Profil eines anderen Kontos (#2118): die Vereinsverwaltung setzt nur sichtbare Profilangaben zurück (Moderation),
+    immer mit Grund. Alles andere - Einwilligungen, Datenschutz, Rollen - ändert nur die Person selbst."""
+    model_config = ConfigDict(extra="forbid")
+    reset: List[AdminResettableField] = Field(min_length=1, max_length=4)
+    reason: str = Field(min_length=5, max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def _reason_text(cls, value: str) -> str:
+        value = value.strip()
+        if len(value) < 5:
+            raise ValueError("Bitte einen Grund angeben (mindestens 5 Zeichen).")
+        return value
+
+
 class UserPublic(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str
@@ -558,7 +577,8 @@ class EventCreate(BaseModel):
     is_hybrid: bool = False
     banner_url: Optional[str] = None
     contact: Optional[str] = None
-    max_participants: Optional[int] = None
+    # Leer heißt unbegrenzt (#2118); 0 oder weniger schickte jede Anmeldung auf die Warteliste.
+    max_participants: Optional[int] = Field(default=None, ge=1)
     show_participants: bool = True
     program: Optional[str] = None  # markdown / freitext mit Tagesablauf
     has_live_stream: bool = False
@@ -612,7 +632,7 @@ class EventUpdate(BaseModel):
     is_hybrid: Optional[bool] = None
     banner_url: Optional[str] = None
     contact: Optional[str] = None
-    max_participants: Optional[int] = None
+    max_participants: Optional[int] = Field(default=None, ge=1)  # null leert das Feld: unbegrenzt (#2118)
     show_participants: Optional[bool] = None
     program: Optional[str] = None
     has_live_stream: Optional[bool] = None
@@ -630,9 +650,11 @@ class EventUpdate(BaseModel):
     banner_style: Optional[EventBannerStyle] = None
     banner_focus_x: Optional[int] = Field(default=None, ge=0, le=100)
     banner_focus_y: Optional[int] = Field(default=None, ge=0, le=100)
+    # Neuer Termin oder Ort (#2118): die Angemeldeten und die Warteliste informieren - wird nicht gespeichert.
+    notify_registrants: Optional[bool] = None
 
 
-EventRegistrationStatus = Literal["registered", "waitlist", "checked_in", "cancelled", "no_show"]
+EventRegistrationStatus =Literal["registered", "waitlist", "checked_in", "cancelled", "no_show"]
 
 
 class EventRegistrationCreate(BaseModel):
@@ -2324,6 +2346,8 @@ class LeagueSeasonFields(BaseModel):
     scoring_rules: Optional[dict] = None
     result_confirm_hours: Optional[int] = Field(default=None, ge=1, le=336)
     lineup_amend_hours: Optional[int] = Field(default=None, ge=1, le=336)
+    # Antwortfrist auf Terminvorschläge (#2106, F3) - wie ``TournamentCreate.match_schedule_response_hours``.
+    match_schedule_response_hours: Optional[int] = Field(default=None, ge=1, le=720)
     rules_text: Optional[str] = Field(default=None, max_length=20000)
     registration_deadline: Optional[str] = None
     visibility: Optional[LeagueVisibility] = None
@@ -2349,6 +2373,7 @@ class LeagueDivisionOverrides(BaseModel):
     min_squad_size: Optional[int] = Field(default=None, ge=1, le=40)
     max_staffel_size: Optional[int] = Field(default=None, ge=2, le=20)
     scoring_rules: Optional[dict] = None
+    match_schedule_response_hours: Optional[int] = Field(default=None, ge=1, le=720)
 
 
 class LeagueDivisionCreate(BaseModel):
@@ -2367,3 +2392,8 @@ class LeagueDivisionUpdate(BaseModel):
 class LeagueStaffelCreate(BaseModel):
     """Staffel anlegen: ohne Buchstaben die nächste freie (A, B, …)."""
     staffel: Optional[str] = Field(default=None, pattern=r"^[A-Za-z]$")
+
+
+class LeagueDelete(BaseModel):
+    """Liga, Season, Liga N oder Staffel löschen (#2106): der Grund kommt ins Protokoll (geprüft im Liga-Service)."""
+    reason: Optional[str] = Field(default=None, max_length=500)

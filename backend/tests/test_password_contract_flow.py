@@ -232,7 +232,7 @@ async def test_bootstrap_admin_is_marked(flow):
 
 
 def test_erasure_removes_the_marker():
-    from routes import dsgvo_routes
+    # Seit #2118 leitet die Löschung ihre Feldliste ab (services/account_erasure.py) - die Markierung gehört dazu.
+    from services import account_erasure
 
-    source = pathlib.Path(dsgvo_routes.__file__).read_text(encoding="utf-8")
-    assert '"password_contract": ""' in source
+    assert account_erasure.anonymized_account_update("2026-10-28T00:00:00+00:00")["$unset"]["password_contract"] == ""
