@@ -232,3 +232,22 @@ async def test_deleting_an_own_pack_removes_its_stickers(flow):
     assert await flow.db.stickers.count_documents({"pack_id": pack_id}) == 0
     removal = await flow.client.delete(f"/api/stickers/admin/stickers/{created.json()['id']}")
     assert removal.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_a_sticker_keeps_its_picture_but_name_keywords_and_order_change(flow):
+    """Bearbeiten (#2112): Name, Suchwörter und Reihenfolge; die Liste ordnet nach der Reihenfolge."""
+    admin = await flow.add_user(role="club_admin", name="vorstand")
+    flow.act_as(admin)
+    pack_id = (await flow.post("/api/stickers/admin/packs", json={"name": "Vereinsmomente"})).json()["id"]
+    first = (await flow.post(f"/api/stickers/admin/packs/{pack_id}/stickers", json={"name": "Erster", "url": "/api/static/uploads/a.png"})).json()
+    second = (await flow.post(f"/api/stickers/admin/packs/{pack_id}/stickers", json={"name": "Zweiter", "url": "/api/static/uploads/b.png"})).json()
+
+    changed = await flow.patch(f"/api/stickers/admin/stickers/{second['id']}",
+                               json={"name": " Pokal ", "keywords": ["Sieg", "GG"], "sort_order": -5, "url": "/api/static/uploads/x.png"})
+    assert changed.status_code == 200, changed.text
+
+    pack = next(item for item in (await flow.get("/api/stickers/admin")).json()["packs"] if item["id"] == pack_id)
+    assert [(row["id"], row["name"], row["sort_order"]) for row in pack["stickers"]] == [(second["id"], "Pokal", -5), (first["id"], "Erster", 0)]
+    assert pack["stickers"][0]["keywords"] == ["sieg", "gg"]
+    assert pack["stickers"][0]["url"] == "/api/static/uploads/b.png"

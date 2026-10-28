@@ -83,6 +83,8 @@ def public_custom_sticker(doc: dict) -> dict:
         "url": doc["url"],
         "width": doc.get("width"),
         "height": doc.get("height"),
+        # Reihenfolge im Paket (#2112): der Adminbereich zeigt und ändert sie.
+        "sort_order": doc.get("sort_order", 0),
     }
 
 
