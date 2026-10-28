@@ -17,7 +17,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from services import shop_catalog, shop_designs, shop_gamertag, shop_orders, shop_print_files, shop_products  # noqa: E402
 from services import shop_print_templates as templates  # noqa: E402
-from services.shop_common import ShopConflict, ShopError  # noqa: E402
+from services.shop_common import ShopError  # noqa: E402
 from shop_testdata import publish_unchecked  # noqa: E402
 from test_shop_allover_unit import NAVY, background, upload  # noqa: E402
 from test_shop_products_unit import (  # noqa: E402,F401 - Fixtures und Helfer der Produktverwaltung
@@ -414,7 +414,8 @@ async def test_the_sample_comes_in_preview_resolution_within_the_area(db, provid
 
 
 @pytest.mark.asyncio
-async def test_a_member_number_layer_blocks_the_review_until_it_is_printed(db, provider):
+async def test_a_member_number_layer_no_longer_blocks_the_review(db, provider):
+    """Seit #2150 wird die Nummer je Bestellung gedruckt - die Sperre aus #2142 ist weg."""
     product = await configured(db, provider, generate=False, personalization="both")
     await shop_products.set_layout(db, product["id"], [
         {"key": "front", "layers": [LION, {"kind": "gamertag", "preset": "text_opposite"}]},
@@ -422,11 +423,8 @@ async def test_a_member_number_layer_blocks_the_review_until_it_is_printed(db, p
         included_placement="front", **BY)
     await shop_products.generate_print_files(db, product["id"], **BY)
     check = await shop_products.run_check(db, await shop_catalog.get_product(db, product["id"]))
-    item = next(entry for entry in check["items"] if entry["key"] == "member_number_print")
-    assert not item["ok"] and item["for_review"] and "#1727" in item["detail"]
-    assert not check["review_ready"]
-    with pytest.raises(ShopConflict, match="Vereinsnummer im Druck"):
-        await shop_products.set_status(db, product["id"], "reviewed", **BY)
+    assert "member_number_print" not in {entry["key"] for entry in check["items"]}
+    assert all(entry["ok"] for entry in check["items"] if entry["key"] in ("personalization", "files"))
 
 
 @pytest.mark.asyncio
