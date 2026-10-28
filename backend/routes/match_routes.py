@@ -29,6 +29,7 @@ from models import (
     MatchScoreReport,
     MatchDispute,
     MatchDisputeDecision,
+    MatchLineupAmend,
     now_utc,
     new_id,
 )
@@ -67,6 +68,7 @@ from services.match_notifications import (
 from services.tournament_rules import match_policy, players_can_report, schedule_proposals_enabled
 from services.user_notifications import create_user_notification
 from services.v2_result_submission import submit_v2_result
+from services import league_games
 from services.v2_match_flows import (
     REPORT_CLOSED_STATUSES,
     dispute_entry,
@@ -628,6 +630,13 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         member_reg = await _member_registration_for_match(db, match, user.get("id"))
         if member_reg:
             report_view = await _report_view(db, match, member_reg, can_confirm=False)
+    # Liga (#1650): Maps, Sieger und Aufstellungen - zum Melden, Bestätigen, Nachtragen und Anzeigen.
+    league_block = None
+    league = await league_games.setup(db, match, tournament, stage)
+    if league:
+        side = acting_reg or (await _member_registration_for_match(db, match, user.get("id")) if user else None)
+        league_block = await league_games.page_block(db, league, side_id=(side or {}).get("id"),
+                                                     can_act=bool(acting_reg))
     # Dispute (#1134): jeder Teilnehmer in jedem Modus - vor dem Ergebnis immer, danach bis 30 Minuten nach dem
     # Ergebnis oder bis das nächste Spiel des Siegers beginnt. Website und App zeigen genau das.
     window = await dispute_window(db, match) if acting_reg else {"open": False, "until": None}
@@ -687,6 +696,7 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         "acting_registration_id": acting_reg.get("id") if acting_reg else None,
         "matchday": round_number,
         "matchday_label": matchday_label,
+        "league": league_block,
     }
 
 
@@ -973,12 +983,13 @@ async def submit_match_result(match_id: str, body: MatchV2ResultSubmit,
             await ensure_tournament_accepts_results(db, match["tournament_id"])
             await _require_result_permission(me, match)
             raw_results = [entry.model_dump() for entry in body.results]
+            games, missing = await _staff_games(db, match, body, raw_results)
             if body.hold:
                 # Ergebnis-Fenster (#1156): 10 Sekunden „Rückgängig“, erst danach Baum, TV und Nachrichten.
                 return await hold_result(db, match, raw_results, actor=me, note=body.note, proof_url=body.proof_url,
-                                         force=force, reason=body.reason)
+                                         force=force, reason=body.reason, games=games, lineups_missing=missing)
             ensure_no_hold(match)
-            return await submit_v2_result(
+            outcome = await submit_v2_result(
                 db,
                 match,
                 raw_results,
@@ -988,11 +999,41 @@ async def submit_match_result(match_id: str, body: MatchV2ResultSubmit,
                 force=force,
                 audit_action="match.result.submit",
                 reason=body.reason,
+                games=games,
+                lineups_missing=missing,
             )
+            if games is not None and match.get("games") and not outcome.get("idempotent_replay"):
+                # Liga (#1650): Maps der Turnierleitung korrigiert - eigener Eintrag mit Grund im Protokoll.
+                await _audit_match_action(db, "match.games.correct", match, me.get("id"), {
+                    "games": len(games), **({"reason": body.reason.strip()} if (body.reason or "").strip() else {}),
+                })
+            return outcome
     except MutationLockBusy:
         raise HTTPException(status_code=409, detail="Eine Turnieraktion wird bereits verarbeitet. Bitte erneut versuchen.")
     except MatchV2ResultError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc))
+    except league_games.LeagueGamesError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+
+
+async def _staff_games(db, match: dict, body: MatchV2ResultSubmit,
+                       raw_results: list[dict]) -> tuple[list[dict] | None, list[str] | None]:
+    """Liga (#1650): Maps der Turnierleitung prüfen. Ohne Maps bleiben die des Spiels - außer das neue Ergebnis passt
+    nicht mehr zu ihnen, dann fallen sie weg (eine Korrektur des Stands ohne Maps). Andere Turniere: nichts."""
+    league = await league_games.setup(db, match)
+    if not league:
+        return None, None
+    normalized = await checked_results(db, match, raw_results)
+    if body.games:
+        games, missing = league_games.admin_games(league, [game.model_dump() for game in body.games], normalized)
+        await league_games.check_double_use(db, league, games, set(league.reg_ids))
+        return games, missing
+    if match.get("games"):
+        try:
+            league_games.check_results(league, match["games"], normalized)
+        except league_games.LeagueGamesError:
+            return [], []
+    return None, None
 
 
 @router.post("/{match_id}/result/undo")
@@ -1093,7 +1134,14 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
     raise HTTPException(status_code=404, detail="Match nicht gefunden")
 
 
-async def _report_v2(db, match: dict, body: MatchScoreReport, me: dict) -> dict:
+def _latest_own_games(match: dict, registration_id: str) -> list[dict] | None:
+    """Die Maps der letzten eigenen Meldung - eine gleiche Meldung mit anderen Maps ist keine Wiederholung (#1650)."""
+    own = [report for report in match.get("reports") or [] if report.get("registration_id") == registration_id]
+    return (own[-1].get("games") or None) if own else None
+
+
+async def _report_v2(db, match: dict, body: MatchScoreReport, me: dict, tournament: dict | None = None,
+                     stage: dict | None = None) -> dict:
     """Take one participant's view of a graph match result.
 
     Nothing is decided by a single report. Only when two different participants
@@ -1123,7 +1171,17 @@ async def _report_v2(db, match: dict, body: MatchScoreReport, me: dict) -> dict:
         results = public_report_results(await checked_results(db, match, [entry.model_dump(exclude_none=True) for entry in body.results]))
     except MatchV2ResultError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
-    if is_duplicate_report(match, me["id"], results):
+    # Liga (docs/LIGA.md, #1650): Maps, Sieger und die eigene Aufstellung je Map - ohne Maps nur als Bestätigung.
+    league = await league_games.setup(db, match, tournament, stage)
+    games = None
+    if league:
+        try:
+            games = await league_games.prepare_report(
+                db, league, [game.model_dump() for game in body.games or []], my_registration["id"], results)
+        except league_games.LeagueGamesError as exc:
+            raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+    if is_duplicate_report(match, me["id"], results) and (
+            not league or _latest_own_games(match, my_registration["id"]) == games):
         match.pop("_id", None)
         match["idempotent_replay"] = True
         return match
@@ -1132,12 +1190,17 @@ async def _report_v2(db, match: dict, body: MatchScoreReport, me: dict) -> dict:
     photo = await claim_proof(db, body.photo_id, owner_id=me["id"], match_id=match["id"], kind="report")
     entry = report_entry(me["id"], my_registration["id"], results, proof_url=body.screenshot_url, note=body.note,
                          photo_id=(photo or {}).get("id"))
+    if games:
+        entry["games"] = games
     await getattr(db, "matches_v2").update_one(
         {"id": match["id"]},
         {"$push": {"reports": entry}, "$set": {"updated_at": now_utc().isoformat()}},
     )
-    await _audit_match_action(db, "match.result.report", match, me.get("id"), {
-        "result_count": len(results),
+    if league:
+        await league_games.remember_pool(db, league)
+        await league_games.refresh_lineup_index(db, match["id"])
+    await _audit_match_action(db, "match.games.report" if games else "match.result.report", match, me.get("id"), {
+        "result_count": len(results), **({"games": len(games)} if games else {}),
     })
 
     stored = await getattr(db, "matches_v2").find_one({"id": match["id"]}, {"_id": 0}) or match
@@ -1157,6 +1220,8 @@ async def _report_v2(db, match: dict, body: MatchScoreReport, me: dict) -> dict:
         stored["report_status"] = "conflict" if conflict else "waiting"
         return stored
 
+    final_games, missing = (league_games.consensus_games(stored.get("reports"), league.reg_ids) if league
+                            else (None, []))
     try:
         outcome = await submit_v2_result(
             db,
@@ -1167,9 +1232,14 @@ async def _report_v2(db, match: dict, body: MatchScoreReport, me: dict) -> dict:
             note=body.note,
             force=False,
             audit_action="match.result.auto_resolution",
+            games=final_games,
+            lineups_missing=missing if final_games is not None else None,
         )
     except MatchV2ResultError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
+    if missing and final_games is not None:
+        # Bestätigt ohne Aufstellung (App): die Seite trägt sie im Web nach (Schritt 7 in docs/LIGA.md).
+        await league_games.tell_missing_lineups(db, outcome.get("match") or stored, missing)
     confirmed = outcome.get("match") or stored
     confirmed["idempotent_replay"] = bool(outcome.get("idempotent_replay"))
     confirmed["awaiting_confirmation"] = False
@@ -1188,7 +1258,33 @@ async def report_score(match_id: str, body: MatchScoreReport, me: dict = Depends
     policy = _match_policy(m, tournament, stage)
     if not _players_can_report(policy):
         raise HTTPException(status_code=403, detail="Ergebnisse werden für dieses Match durch die Turnierleitung eingetragen")
-    return await _report_v2(db, m, body, me)
+    return await _report_v2(db, m, body, me, tournament, stage)
+
+
+@router.put("/{match_id}/lineups")
+async def amend_lineups(match_id: str, body: MatchLineupAmend, me: dict = Depends(get_current_user),
+                        _mutation: None = Depends(_serialized_match_write)):
+    """Aufstellung nachtragen (Liga, #1650): Captain oder Vertreter der eigenen Seite bis ``lineup_amend_hours`` nach
+    dem Ergebnis; die Turnierleitung jederzeit für eine genannte Seite, mit Grund."""
+    db = get_db()
+    match, _collection = await _find_match_any(match_id)
+    await _ensure_match_tournament_unlocked(db, match)
+    league = await league_games.setup(db, match)
+    if not league:
+        raise HTTPException(status_code=404, detail="Aufstellungen je Map gibt es nur bei Liga-Spielen.")
+    staff = bool(body.registration_id) and await has_match_result_permission(me, match)
+    acting = None if staff else await _acting_registration_for_match(match, me)
+    if not staff and not acting:
+        raise HTTPException(status_code=403, detail="Die Aufstellung tragen Captain und Vertreter der eigenen Seite nach.")
+    try:
+        updated = await league_games.amend_lineups(
+            db, league, [game.model_dump() for game in body.games],
+            registration_id=body.registration_id if staff else acting["id"], actor_id=me["id"], staff=staff,
+            reason=body.reason,
+        )
+    except league_games.LeagueGamesError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+    return {**updated, "idempotent_replay": False}
 
 
 @router.post("/{match_id}/dispute")

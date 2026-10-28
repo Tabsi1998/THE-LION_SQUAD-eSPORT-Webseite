@@ -30,6 +30,7 @@ def _submission_identity(
     proof_url: str | None,
     note: str | None,
     force: bool,
+    games: list[dict] | None = None,
 ) -> tuple[str, list[dict]]:
     normalized = normalize_v2_results(match, raw_results)
     parent_report_id = (match.get("result_meta") or {}).get("report_id")
@@ -41,6 +42,9 @@ def _submission_identity(
         "note": (note or "").strip() or None,
         "force": bool(force),
     }
+    if games is not None:
+        # Liga (#1650): eine Korrektur nur der Maps ist ein eigener Eintrag - Turniere ohne Maps rechnen wie bisher.
+        payload["games"] = games
     digest = hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
     ).hexdigest()
@@ -210,15 +214,21 @@ async def submit_v2_result(
     audit_action: str,
     reason: str | None = None,
     hold_id: str | None = None,
+    games: list[dict] | None = None,
+    lineups_missing: list[str] | None = None,
 ) -> dict:
     """Persist one v2 result while the caller owns the tournament write lease.
 
     ``reason``: warum die Turnierleitung ein fertiges Ergebnis korrigiert (#1156) - steht am Ergebnis und im Protokoll.
     ``hold_id``: das Ergebnis lag 10 Sekunden für „Rückgängig“ bereit (services/result_hold) - unter dieser Kennung.
+    ``games``/``lineups_missing``: Liga (#1650) - die geltenden Maps samt Aufstellungen, schon geprüft
+    (services/league_games); ``None`` lässt die Maps des Spiels, wie sie sind, ``[]`` nimmt sie weg.
 
     Jeder Weg schreibt hier und prüft hier denselben Vertrag (services/match_v2_results): die Werte samt Best-of und,
     hat das Spiel schon ein Ergebnis, Korrektur nur mit ``force`` und Grund."""
-    if is_v2_result_replay(match, raw_results, proof_url=proof_url, note=note):
+    same_games = games is None or (games == (match.get("games") or []) and
+                                   sorted(lineups_missing or []) == sorted(match.get("lineups_missing") or []))
+    if same_games and is_v2_result_replay(match, raw_results, proof_url=proof_url, note=note):
         meta = match.get("result_meta") or {}
         report_id = meta.get("report_id")
         advanced_match_ids = meta.get("advanced_match_ids") or []
@@ -249,7 +259,7 @@ async def submit_v2_result(
         {"_id": 0},
     ).to_list(3000)
     now_iso = now_utc().isoformat()
-    report_id, normalized_results = _submission_identity(match, raw_results, proof_url, note, force)
+    report_id, normalized_results = _submission_identity(match, raw_results, proof_url, note, force, games)
     # Die Paarung vor der Korrektur (#1553): der Anwender setzt die Plätze der Folgespiele direkt um; wer vorher
     # drinstand, soll trotzdem erfahren, dass sein Spiel neu gesetzt wurde.
     seats_before = {row["id"]: [dict(slot) for slot in row.get("slots") or []] for row in stage_matches if row.get("id")}
@@ -286,6 +296,9 @@ async def submit_v2_result(
         **({"hold_id": hold_id} if hold_id else {}),
         **({"correction_reason": reason.strip()} if (reason or "").strip() else {}),
     })
+    if games is not None:
+        # Liga (#1650): Maps und fehlende Aufstellungen gehören zum Ergebnis - eine Korrektur ersetzt sie mit.
+        application["match_set"].update({"games": games, "lineups_missing": sorted(lineups_missing or [])})
 
     await db.match_reports_v2.update_one(
         {"id": report_id},
@@ -306,6 +319,8 @@ async def submit_v2_result(
             **({"replaces_report_id": previous_report_id} if previous_report_id else {}),
             **({"previous_results": match.get("results")} if match.get("results") else {}),
             **({"reset_matches": reset_matches} if reset_matches else {}),
+            **({"games": games} if games is not None else {}),
+            **({"previous_games": match.get("games")} if games is not None and match.get("games") else {}),
         }},
         upsert=True,
     )
@@ -315,6 +330,9 @@ async def submit_v2_result(
     for target_id, update in application["target_sets"].items():
         await db.matches_v2.update_one({"id": target_id}, {"$set": update})
     await db.matches_v2.update_one({"id": match["id"]}, {"$set": application["match_set"]})
+    if games is not None:
+        from services.league_games import refresh_lineup_index
+        await refresh_lineup_index(db, match["id"])
     if marked_now:
         from services.heat_no_show import record_marks
         await record_marks(db, {**match, **application["match_set"]}, marked_now, actor_id=actor_id, source="result")

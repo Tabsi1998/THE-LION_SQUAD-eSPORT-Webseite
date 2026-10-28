@@ -961,6 +961,11 @@ MatchStatus = Literal[
 RESULT_MAX_ENTRIES = 256
 
 
+# Liga (docs/LIGA.md, #1650): höchstens Best of 9 Maps je Spiel, Aufstellungen in Teamgröße.
+MATCH_GAMES_MAX = 9
+MATCH_LINEUP_MAX = 20
+
+
 class MatchScoreReport(BaseModel):
     # Klassische Duelle melden zwei Punktstände. Graph-Matches können mehr als
     # zwei Teilnehmer haben und melden deshalb eine Platzierungsliste; welches
@@ -972,6 +977,41 @@ class MatchScoreReport(BaseModel):
     note: Optional[str] = Field(default=None, max_length=1000)
     # Foto vom Ergebnis (#1157): vorher über /matches/{id}/proof-photos hochgeladen.
     photo_id: Optional[str] = None
+    # Liga (docs/LIGA.md, #1650): je Map Modus, Map, Sieger, Punkte und die eigene Aufstellung - sonst unbeachtet.
+    games: Optional[List["MatchGameReport"]] = Field(default=None, max_length=MATCH_GAMES_MAX)
+
+
+class MatchGameReport(BaseModel):
+    """Eine Map einer Meldung - ``lineup`` ist die eigene Seite."""
+    position: int = Field(ge=1, le=MATCH_GAMES_MAX)
+    mode: Optional[str] = Field(default=None, max_length=40)
+    map_id: str = Field(min_length=1, max_length=100)
+    winner_registration_id: str = Field(min_length=1, max_length=100)
+    scores: Optional[Dict[str, Optional[float]]] = None
+    lineup: Optional[List[str]] = Field(default=None, max_length=MATCH_LINEUP_MAX)
+
+
+class MatchGameAdmin(BaseModel):
+    """Eine Map der Turnierleitung - Aufstellungen beider Seiten, je Seite freiwillig."""
+    position: int = Field(ge=1, le=MATCH_GAMES_MAX)
+    mode: Optional[str] = Field(default=None, max_length=40)
+    map_id: str = Field(min_length=1, max_length=100)
+    winner_registration_id: str = Field(min_length=1, max_length=100)
+    scores: Optional[Dict[str, Optional[float]]] = None
+    lineups: Optional[Dict[str, List[str]]] = None
+
+
+class MatchLineupAmendGame(BaseModel):
+    position: int = Field(ge=1, le=MATCH_GAMES_MAX)
+    lineup: List[str] = Field(min_length=1, max_length=MATCH_LINEUP_MAX)
+
+
+class MatchLineupAmend(BaseModel):
+    """Aufstellung nachtragen (``PUT /api/matches/{id}/lineups``): je Map die eigene Seite. Die Turnierleitung nennt
+    die Seite (``registration_id``) und einen Grund."""
+    games: List[MatchLineupAmendGame] = Field(min_length=1, max_length=MATCH_GAMES_MAX)
+    registration_id: Optional[str] = Field(default=None, max_length=100)
+    reason: Optional[str] = Field(default=None, max_length=500)
 
 
 class MatchV2ResultEntry(BaseModel):
@@ -992,6 +1032,8 @@ class MatchV2ResultSubmit(BaseModel):
     # Ergebnis-Fenster (#1156, #1370): 10 Sekunden „Rückgängig“, erst danach geht es raus; Korrektur nur mit Grund.
     hold: bool = False
     reason: Optional[str] = Field(default=None, max_length=500)
+    # Liga (#1650): Maps samt Aufstellungen beider Seiten - freiwillig, sonst bleiben die Maps des Spiels.
+    games: Optional[List[MatchGameAdmin]] = Field(default=None, max_length=MATCH_GAMES_MAX)
 
 
 class MatchResultUndo(BaseModel):
