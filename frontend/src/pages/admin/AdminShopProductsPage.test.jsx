@@ -559,6 +559,14 @@ test("Position als Zahl mit Komma, − und + und Pfeiltasten; „Auf die Vorgabe
   await user.click(screen.getByTestId("shop-layer-front-0-reset"));
   expect(top).toHaveValue("5");
   expect(screen.getByTestId("shop-layer-front-0-offset")).toHaveTextContent("wie die Vorgabe");
+  // Mehr als der Server erlaubt (±300 cm Versatz) wird gleich begrenzt - nicht erst beim Speichern abgelehnt.
+  await user.clear(top);
+  await user.type(top, "9999");
+  await user.tab();
+  expect(top).toHaveValue("305");
+  expect(screen.getByTestId("shop-layer-front-0-offset")).toHaveTextContent("Feinjustiert: 0 / 300 cm");
+  await user.click(screen.getByTestId("shop-layer-front-0-top-plus"));
+  expect(screen.getByTestId("shop-layer-front-0-offset")).toHaveTextContent("Feinjustiert: 0 / 300 cm");
 });
 
 test("Ausrichten mit einem Klick: Gamertag auf Höhe des Löwen, gegenüber, Motiv zur Gegenseite gespiegelt (#2117)", async () => {

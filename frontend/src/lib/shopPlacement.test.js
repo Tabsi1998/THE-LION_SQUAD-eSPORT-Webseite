@@ -1,6 +1,6 @@
 import { placeMotif, resolveLayers } from "./shopLayout";
 import {
-  alignToLayer, centerOnArea, cmToScreen, followersOf, formatCm, frameCm, mirrorOnArea, nextZoom, offsetsForPosition, parseCm,
+  alignToLayer, centerOnArea, clampOffsets, cmToScreen, followersOf, formatCm, frameCm, mirrorOnArea, nextZoom, offsetsForPosition, parseCm,
   positionCm, screenToCm, snapDrag, snapLines, wheelZoom,
 } from "./shopPlacement";
 
@@ -160,6 +160,14 @@ test("Mausrad und Trackpad zoomen höchstens einen Schritt je Raste und je 100 m
   // Zeilen (Firefox): 3 Zeilen sind 48 px - zwei Rasten ergeben einen Schritt; Richtungswechsel sammelt neu.
   expect(run([[-3, 0, 1], [-3, 10, 1], [3, 200, 1]])).toEqual([]);
   expect(run([[-3, 0, 1], [-4, 10, 1]])).toEqual([[10, 1]]);
+});
+
+test("der Versatz bleibt in den Grenzen des Servers (±300 cm), andere Felder unberührt", () => {
+  expect(clampOffsets({ offset_x_cm: 412.5, offset_y_cm: -999, width_cm: 9 })).toEqual({ offset_x_cm: 300, offset_y_cm: -300, width_cm: 9 });
+  expect(clampOffsets({ offset_y_cm: 12.345 }, 10)).toEqual({ offset_y_cm: 10 });
+  expect(clampOffsets({ offset_x_cm: -2.5 })).toEqual({ offset_x_cm: -2.5 });
+  expect(clampOffsets({ variant: "light" })).toEqual({ variant: "light" });
+  expect(clampOffsets(null)).toBeNull();
 });
 
 test("Sicherheitsrand ist eine Hilfslinie", () => {

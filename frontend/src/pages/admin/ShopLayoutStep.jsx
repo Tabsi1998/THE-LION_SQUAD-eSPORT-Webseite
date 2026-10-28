@@ -5,7 +5,7 @@ import { api, formatRequestError, resolveMediaUrl, uploadApi } from "@/lib/api";
 import { viennaDateTime } from "@/lib/vienna";
 import { cmText, gapCm, gapOffsetCm, layerAbove, layersFromSet, maxWidthCm, resolveLayers, textBoundsCm } from "@/lib/shopLayout";
 import {
-  alignToLayer, areaSizeCm, BIG_STEP_CM, centerOnArea, DEFAULT_GRID_CM, DRAG_START_PX, followersOf, formatCm, frameCm, GRID_CHOICES_CM, mirrorOnArea,
+  alignToLayer, areaSizeCm, BIG_STEP_CM, centerOnArea, clampOffsets, DEFAULT_GRID_CM, DRAG_START_PX, followersOf, formatCm, frameCm, GRID_CHOICES_CM, MAX_OFFSET_CM, mirrorOnArea,
   nextZoom, offsetsForPosition, parseCm, positionCm, round2, screenToCm, SNAP_SCREEN_PX, snapDrag, snapLines, STEP_CM, wheelZoom, ZOOM_LIMITS,
 } from "@/lib/shopPlacement";
 import { techniqueLabel } from "@/lib/shopTechniques";
@@ -413,8 +413,8 @@ function SnapSettings({ settings, onChange, testId }) {
 }
 
 // Eine Zahl in cm mit − und +: Komma erlaubt, Pfeiltasten im Feld 0,1 cm (mit Umschalt 1 cm). Gültige Eingaben wirken
-// sofort; beim Verlassen steht wieder der echte Wert da.
-function CmField({ label, value, editable, onValue, testId, signed = false }) {
+// sofort; beim Verlassen steht wieder der echte Wert da. `min`/`max` begrenzen (Grenze des Servers für den Versatz).
+function CmField({ label, value, editable, onValue, testId, signed = false, min = -Infinity, max = Infinity }) {
   const [typed, setTyped] = useState(formatCm(value));
   useEffect(() => {
     setTyped((now) => {
@@ -422,7 +422,8 @@ function CmField({ label, value, editable, onValue, testId, signed = false }) {
       return parsed !== null && Math.abs(parsed - value) < 0.005 ? now : formatCm(value);
     });
   }, [value]);
-  const step = (direction, big) => onValue(round2(value + direction * (big ? BIG_STEP_CM : STEP_CM)));
+  const send = (next) => onValue(round2(Math.max(min, Math.min(max, next))));
+  const step = (direction, big) => send(value + direction * (big ? BIG_STEP_CM : STEP_CM));
   const stepButton = (direction) => (
     <button type="button" disabled={!editable} onClick={(event) => step(direction, event.shiftKey)}
       aria-label={`${label}: ${direction > 0 ? "plus" : "minus"} 0,1 cm (mit Umschalt 1 cm)`}
@@ -441,7 +442,7 @@ function CmField({ label, value, editable, onValue, testId, signed = false }) {
           onChange={(event) => {
             setTyped(event.target.value);
             const parsed = parseCm(event.target.value);
-            if (parsed !== null) onValue(round2(parsed));
+            if (parsed !== null) send(parsed);
           }}
           onKeyDown={(event) => {
             if (event.key === "ArrowUp" || event.key === "ArrowDown") {
@@ -460,15 +461,18 @@ function CmField({ label, value, editable, onValue, testId, signed = false }) {
 
 // Position als Zahlen (#2117): Abstand der Oberkante von oben und die waagrechte Lage - ab Mitte (minus = links) oder
 // ab dem linken Rand. Beides setzt nur den Versatz; die Vorgabe bleibt verknüpft.
-function PositionFields({ area, item, layer, measure, editable, onChange, testId }) {
+function PositionFields({ area, item, layer, measure, editable, onChange, testId, maxOffset = MAX_OFFSET_CM }) {
   const position = positionCm(area, item, measure);
   if (!position) return null;
   const set = (axis, value) => onChange(offsetsForPosition(area, item, layer, { [axis]: value }, measure));
+  // Lage = Vorgabe + Versatz: die Grenze des Versatzes (±max_offset_cm) als Grenze der Position.
+  const bounds = (now, offset) => ({ min: now - Number(offset || 0) - maxOffset, max: now - Number(offset || 0) + maxOffset });
   return (
     <div className="grid gap-2 grid-cols-1 min-[440px]:grid-cols-2" data-testid={`${testId}-position`}>
-      <CmField label="Von oben (cm)" value={position.y} editable={editable} onValue={(value) => set("y", value)} testId={`${testId}-top`} />
+      <CmField label="Von oben (cm)" value={position.y} editable={editable} onValue={(value) => set("y", value)} testId={`${testId}-top`}
+        {...bounds(position.y, layer?.offset_y_cm)} />
       <CmField label={measure === "left" ? "Vom linken Rand (cm)" : "Von der Mitte (cm, minus = links)"} value={position.x} signed={measure !== "left"}
-        editable={editable} onValue={(value) => set("x", value)} testId={`${testId}-x`} />
+        editable={editable} onValue={(value) => set("x", value)} testId={`${testId}-x`} {...bounds(position.x, layer?.offset_x_cm)} />
       {/* Bei Text ist der linke Rand der Rahmen der Höchstbreite, nicht der erste Buchstabe - das sagen wir dazu. */}
       {measure === "left" && item.kind !== "motif" && (
         <p className="text-xs text-white/50 min-[440px]:col-span-2" data-testid={`${testId}-x-hint`}>
@@ -783,7 +787,7 @@ const ALIGN_BUTTONS = [
 // Position und Ausrichten je Ebene (#2142, #2117): Position als Zahlen, zurück auf die Vorgabe, mittig auf die Fläche,
 // gespiegelt zur Gegenseite, an einer anderen Ebene ausrichten (nicht an einer, die dieser folgt) und ein Abstand in cm
 // zur Ebene darüber (sichtbare Kanten: bei Text die Großbuchstaben bzw. Ziffern). Alles setzt nur den Versatz.
-function PlaceTools({ area, item, above, layer, others = [], measure, editable, onChange, testId }) {
+function PlaceTools({ area, item, above, layer, others = [], measure, maxOffset, editable, onChange, testId }) {
   const now = above ? gapCm(area, above, item) : null;
   const [wanted, setWanted] = useState("");
   const [target, setTarget] = useState(null);
@@ -802,7 +806,7 @@ function PlaceTools({ area, item, above, layer, others = [], measure, editable, 
           <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" /> Auf die Vorgabe
         </button>
       </div>
-      <PositionFields area={area} item={item} layer={layer} measure={measure} editable={editable} onChange={onChange} testId={testId} />
+      <PositionFields area={area} item={item} layer={layer} measure={measure} maxOffset={maxOffset} editable={editable} onChange={onChange} testId={testId} />
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" disabled={!editable} onClick={() => onChange(centerOnArea(area, item, layer))} className={QUIET_BTN} data-testid={`${testId}-center`}>
           <AlignCenterHorizontal className="w-3.5 h-3.5" aria-hidden="true" /> Mittig auf Fläche
@@ -977,9 +981,12 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
   const infoFor = (index) => infos[`${available.key}|${index}|${previewColor}`] || null;
   const resolveWith = (next) => resolveLayers(area, next, { presets, motifFor, gamertagCanvas: view.gamertag_canvas, rules });
   const resolved = resolveWith(visible);
+  // Jeder Versatz bleibt in der Grenze des Servers (Ziehen, Zahlen, Ausrichten) - sonst lehnte erst das Speichern ab.
+  const maxOffset = Number(view.limits?.max_offset_cm) > 0 ? Number(view.limits.max_offset_cm) : MAX_OFFSET_CM;
   const update = (index, patch) => {
     if (!patch) return;
-    onChange({ ...state, layers: layers.map((layer, at) => (at === index ? { ...layer, ...patch } : layer)) });
+    const clean = clampOffsets(patch, maxOffset);
+    onChange({ ...state, layers: layers.map((layer, at) => (at === index ? { ...layer, ...clean } : layer)) });
   };
   // Was mitwandert, wenn Ebene `index` sich bewegt (etwa der Name gegenüber dem Motiv) - daran rastet sie nicht ein.
   const followers = (index) => followersOf(resolveWith, visible, index);
@@ -1100,7 +1107,7 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
                 tools={selectedItem?.box ? (
                   <div className="space-y-1" data-testid={`shop-big-${available.key}-selected`}>
                     <div className="text-xs text-white/60">{layerLabel(selectedItem, selectedItem.kind === "motif" ? motifFor(layers[selected], selected) : null)}</div>
-                    <PositionFields area={area} item={selectedItem} layer={layers[selected]} measure={settings.measure} editable={editable}
+                    <PositionFields area={area} item={selectedItem} layer={layers[selected]} measure={settings.measure} maxOffset={maxOffset} editable={editable}
                       onChange={(patch) => update(selected, patch)} testId={`shop-big-${available.key}-field`} />
                   </div>
                 ) : <p className="text-xs text-white/50">Eine Ebene antippen, dann lässt sie sich ziehen oder als Zahl setzen.</p>} />
@@ -1125,7 +1132,7 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
                         onChange={(patch) => update(index, patch)} onRemove={() => onChange({ ...state, layers: layers.filter((_, at) => at !== index) })}
                         testId={`shop-layer-${available.key}-${index}`} />
                     )}
-                    <PlaceTools area={area} item={found} above={layerAbove(resolved, index)} layer={layer} others={alignTargets(index)} measure={settings.measure}
+                    <PlaceTools area={area} item={found} above={layerAbove(resolved, index)} layer={layer} others={alignTargets(index)} measure={settings.measure} maxOffset={maxOffset}
                       editable={editable} onChange={(patch) => update(index, patch)} testId={`shop-layer-${available.key}-${index}`} />
                     <SurfaceField layer={layer} info={infoFor(index)} labels={view.labels.layer_variants} editable={editable} stale={stale}
                       onChange={(patch) => update(index, patch)} testId={`shop-layer-${available.key}-${index}`} />

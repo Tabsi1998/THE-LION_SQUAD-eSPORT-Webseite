@@ -113,6 +113,19 @@ export function offsetsForPosition(area, item, layer, wanted, measure = "center"
   return out;
 }
 
+// Der Server nimmt einen Versatz nur bis ±`max_offset_cm` (300 cm) - mehr wird hier gleich begrenzt statt beim
+// Speichern abgelehnt. Andere Felder bleiben, wie sie sind.
+export const MAX_OFFSET_CM = 300;
+
+export function clampOffsets(patch, maxCm = MAX_OFFSET_CM) {
+  if (!patch) return patch;
+  const out = { ...patch };
+  for (const name of ["offset_x_cm", "offset_y_cm"]) {
+    if (Number.isFinite(out[name])) out[name] = round2(Math.max(-maxCm, Math.min(maxCm, out[name])));
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------- Ausrichten mit einem Klick
 
 function shifted(layer, dx, dy) {
