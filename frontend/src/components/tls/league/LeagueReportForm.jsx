@@ -10,6 +10,7 @@ import {
   mapsFor,
   modeLabel,
   poolModes,
+  repeatedMap,
   reportPayload,
   seriesSentence,
   settleGames,
@@ -46,7 +47,11 @@ export function LineupPicker({ roster = [], value = [], size = 1, onChange, labe
               className={`${chip(active)} disabled:opacity-40`}
               data-testid={testId ? `${testId}-${person.id}` : undefined}
             >
-              {active && <Check className="h-3.5 w-3.5 shrink-0" />}
+              {/* Platz fürs Häkchen immer reserviert (#2096): sonst wird der Chip beim Antippen breiter, die Reihe
+                  springt und der nächste Tipp landet daneben. */}
+              <span className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center" data-check-slot aria-hidden="true">
+                {active && <Check className="h-3.5 w-3.5" />}
+              </span>
               <span className="truncate">{person.name}</span>
             </button>
           );
@@ -56,7 +61,7 @@ export function LineupPicker({ roster = [], value = [], size = 1, onChange, labe
   );
 }
 
-export function GameEditor({ game, league, onChange, index, staff = false }) {
+export function GameEditor({ game, league, onChange, index, staff = false, games = [] }) {
   const modes = poolModes(league.pool);
   const fixedMode = (league.mode_order || []).length > 0 || modes.length <= 1;
   const maps = mapsFor(league.pool, game.mode);
@@ -81,9 +86,12 @@ export function GameEditor({ game, league, onChange, index, staff = false }) {
         <div role="group" aria-label={`Map ${game.position}`} className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {maps.map((item) => {
             const active = game.map_id === item.map_id;
+            // Schon gespielt (#2096): dieselbe Map im selben Modus (bzw. je nach Season überhaupt) nur einmal je Serie.
+            const earlier = active ? null : repeatedMap(games, game.position, game.mode, item.map_id, league);
             return (
-              <button key={item.map_id} type="button" aria-pressed={active} onClick={() => set({ map_id: item.map_id })}
-                className={`group relative min-w-0 overflow-hidden rounded-sm border text-left ${active ? "border-[#29B6E8] ring-1 ring-[#29B6E8]" : "border-white/10 hover:border-white/30"}`}
+              <button key={item.map_id} type="button" aria-pressed={active} disabled={Boolean(earlier)} onClick={() => set({ map_id: item.map_id })}
+                title={earlier ? `Lief schon als Map ${earlier.position}` : undefined}
+                className={`group relative min-w-0 overflow-hidden rounded-sm border text-left disabled:cursor-not-allowed disabled:opacity-35 ${active ? "border-[#29B6E8] ring-1 ring-[#29B6E8]" : "border-white/10 hover:border-white/30"}`}
                 data-testid={`league-game-${game.position}-map-${item.map_id}`}>
                 {item.image_url ? (
                   <LazyImg src={item.image_url} alt="" sizes="(min-width: 640px) 180px, 45vw" className={`h-16 w-full object-cover ${active ? "" : "opacity-70"}`} />
@@ -247,7 +255,7 @@ export function LeagueReportForm({ league, state = null, busy = false, readOnly 
           {!league.pool ? (
             <p className="text-sm text-warn" role="alert">Für diese Staffel ist noch kein Map-Pool hinterlegt – bitte die Turnierleitung fragen.</p>
           ) : (
-            games.map((game, index) => <GameEditor key={game.position} index={index} game={game} league={league} onChange={(next) => change(game.position, next)} />)
+            games.map((game, index) => <GameEditor key={game.position} index={index} game={game} games={games} league={league} onChange={(next) => change(game.position, next)} />)
           )}
           <input value={note} onChange={(event) => setNote(event.target.value)} className="input" placeholder="Notiz für die Turnierleitung (freiwillig)" data-testid="match-report-note" />
           <p className={`rounded-sm border px-3 py-2 text-sm font-bold ${sentence && !problem ? "border-[#29B6E8]/35 bg-[#29B6E8]/10 text-[#BFE9F8]" : "border-white/10 bg-white/5 text-white/45"}`} data-testid="match-report-sentence" aria-live="polite">

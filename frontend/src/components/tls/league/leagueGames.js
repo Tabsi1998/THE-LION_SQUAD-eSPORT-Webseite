@@ -1,5 +1,35 @@
 // Ergebnis je Map mit Aufstellung (docs/LIGA.md, #1650): was das Melde-Formular der Liga rechnet. Der Server prüft
 // alles noch einmal (services/league_games.py) - hier geht es darum, dass man gar nicht erst etwas Falsches eingibt.
+import { viennaDay, viennaTime } from "@/lib/vienna";
+
+const WEEKDAYS = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+
+/**
+ * Der Standardtermin der Spielwoche als Satz (#2096): „So 15.11., 20:00“ in Wiener Zeit - oder leer ohne Wert.
+ */
+export function defaultTimeText(value) {
+  const day = value ? viennaDay(value) : "";
+  if (!day) return "";
+  const [year, month, date] = day.split("-").map(Number);
+  const weekday = WEEKDAYS[new Date(Date.UTC(year, month - 1, date, 12)).getUTCDay()];
+  return `${weekday} ${date}.${month}., ${viennaTime(value, { hour: "2-digit", minute: "2-digit" })}`;
+}
+
+/**
+ * Die Seiten in der Reihenfolge der Plätze des Spiels (Heim links, wie Überschrift und Spielplan, #2096). Der Server
+ * liefert sie schon so - das hier hält Sieger-Knöpfe, Punkte und Aufstellungen auch bei einem älteren Stand richtig.
+ */
+export function sidesInSlotOrder(league, match) {
+  if (!league?.sides?.length) return league;
+  const slots = (match?.slots || []).map((slot) => slot?.registration_id).filter(Boolean);
+  if (!slots.length) return league;
+  const rank = (side) => {
+    const at = slots.indexOf(side.registration_id);
+    return at < 0 ? slots.length : at;
+  };
+  const sides = [...league.sides].sort((a, b) => rank(a) - rank(b));
+  return sides.every((side, index) => side === league.sides[index]) ? league : { ...league, sides };
+}
 
 /** Die Modi des Pools (ohne „Alle Maps“ eines Spiels ohne Modi). */
 export function poolModes(pool) {
@@ -73,6 +103,18 @@ function scoreValue(value) {
   return Number.isFinite(number) && number >= 0 ? number : undefined;
 }
 
+/**
+ * Darf diese Map an dieser Position noch gewählt werden (Season-Vorgabe „Map-Wiederholung in einer Serie“, #2096)?
+ * Gibt die frühere Map zurück, mit der sie sich beißt - sonst `null`. „other_mode“ (Vorgabe): dieselbe Map nur in
+ * einem anderen Modus; „never“: jede Map einmal; „always“: frei.
+ */
+export function repeatedMap(games, position, mode, mapId, league) {
+  const rule = league?.map_repeat || "other_mode";
+  if (rule === "always" || !mapId) return null;
+  return (games || []).find((game) => game.position < position && game.map_id === mapId
+    && (rule === "never" || (game.mode || "") === (mode || ""))) || null;
+}
+
 /** Was noch fehlt - der erste Satz für die Seite, sonst `null`. `withLineup`: die eigene Aufstellung ist Pflicht. */
 export function gamesProblem(games, league, { withLineup = true, needMaps = true } = {}) {
   for (const game of games) {
@@ -80,6 +122,12 @@ export function gamesProblem(games, league, { withLineup = true, needMaps = true
     if (needMaps) {
       if (poolModes(league?.pool).length && !game.mode) return `${label}: bitte den Modus wählen.`;
       if (!game.map_id) return `${label}: bitte die Map wählen.`;
+      const earlier = repeatedMap(games, game.position, game.mode, game.map_id, league);
+      if (earlier) {
+        return league?.map_repeat === "never"
+          ? `${label}: diese Map lief schon als Map ${earlier.position} – jede Map nur einmal je Serie.`
+          : `${label}: diese Map lief schon als Map ${earlier.position} im selben Modus – bitte eine andere wählen.`;
+      }
       if (!game.winner) return `${label}: bitte antippen, wer die Map gewonnen hat.`;
       for (const value of Object.values(game.scores || {})) {
         if (scoreValue(value) === undefined) return `${label}: Punkte bitte als Zahl ab 0.`;

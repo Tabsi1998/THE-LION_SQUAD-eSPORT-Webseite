@@ -809,3 +809,23 @@ test("Nicht erschienen mit Nachrücker: die Meldung nennt den Namen", async () =
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t-1/registrations/r-paul/checkin", { status: "no_show" }));
   await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Nicht erschienen gesetzt – Nachrücker: Begleitung Bea."));
 });
+
+// Liga-Staffel (#2096): keine Vor-Ort-Anmeldung über QR, der Startknopf heißt „Liga starten“.
+test("eine Liga-Staffel zeigt keine Vor-Ort-Anmeldung und startet mit „Liga starten“", async () => {
+  const staffel = { ...TOURNAMENT, status: "draft", format: "league", team_mode: "team",
+    league_context: { league_id: "l1", season_id: "s1", division_id: "d1", staffel: "A" } };
+  apiMock.get.mockImplementation((url) => Promise.resolve(String(url).includes("/onsite-access") ? { data: {} }
+    : String(url).match(/\/tournaments\/t-1(\?|$)/) ? { data: staffel } : routeFor(String(url))));
+  renderPage();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+
+  expect(screen.getByTestId("admin-tr-primary-action")).toHaveTextContent("Liga starten");
+  expect(apiMock.get.mock.calls.map(([url]) => String(url)).some((url) => url.includes("/onsite-access"))).toBe(false);
+  expect(screen.queryByTestId("onsite-access-panel")).toBeNull();
+});
+
+test("ein gewöhnliches Turnier fragt die Vor-Ort-Anmeldung weiter ab", async () => {
+  renderPage();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  await waitFor(() => expect(apiMock.get.mock.calls.map(([url]) => String(url)).some((url) => url.includes("/onsite-access"))).toBe(true));
+});

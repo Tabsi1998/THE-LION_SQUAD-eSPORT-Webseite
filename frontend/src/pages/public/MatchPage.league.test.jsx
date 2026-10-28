@@ -88,3 +88,16 @@ test("nach dem Ergebnis: Maps mit Aufstellungen und Nachtrag der fehlenden", asy
     games: [{ position: 1, lineup: ["f1", "f2"] }, { position: 2, lineup: ["f1", "f2"] }],
   }));
 });
+
+test("ohne Einigung nennt der Terminkasten den Standardtermin der Spielwoche (#2096)", async () => {
+  renderMatch({ ...BASE, league: { ...LEAGUE, default_time: "2026-11-15T19:00:00+00:00" }, report_state: { status: "open" } });
+  expect(await screen.findByTestId("match-when")).toHaveTextContent("Standardtermin So 15.11., 20:00 (ohne Einigung)");
+  expect(screen.getByTestId("match-schedule")).toHaveTextContent("Standardtermin");
+});
+
+test("die Sieger-Knöpfe folgen den Plätzen, auch wenn die Seiten anders herum kommen (#2096)", async () => {
+  renderMatch({ ...BASE, league: { ...LEAGUE, sides: [...SIDES].reverse() }, report_state: { status: "open" } });
+  const first = await screen.findByTestId("league-game-1");
+  const winners = [...first.querySelectorAll('[data-testid^="league-game-1-winner-"]')].map((button) => button.textContent);
+  expect(winners).toEqual(["Loewen · Rudel A", "Falken · Horst"]);
+});

@@ -18,6 +18,7 @@ from services.matchday_schedule import (
     matchday_settings,
     matchday_window,
 )
+from services.match_winner import match_winner_id
 
 PUBLIC_GAME_FIELDS = ("position", "mode", "map_id", "map_name", "map_image_url", "winner_registration_id", "scores")
 DONE_STATUSES = frozenset({"completed", "forfeit"})
@@ -48,7 +49,9 @@ def _side(match: dict, index: int, names: dict, results: dict) -> dict | None:
 def public_match(match: dict, names: dict, scheduled: dict | None = None) -> dict:
     """Ein Spiel für die Ligaseite: Heim/Auswärts, Termin, Ergebnis, Maps (sobald P4 sie liefert) - ohne Aufstellungen."""
     results = {row.get("registration_id"): row for row in match.get("results") or [] if row.get("registration_id")}
-    winner = next((key for key, row in results.items() if row.get("outcome") == "winner"), None)
+    # Gemeldete und eingetragene Ergebnisse tragen nur den Platz (``rank``), kein ``outcome`` - dieselbe Regel wie
+    # überall (#2096, im Durchlauf gefunden).
+    winner = match_winner_id(match)
     done = match.get("status") in DONE_STATUSES
     entry = scheduled or {}
     return {

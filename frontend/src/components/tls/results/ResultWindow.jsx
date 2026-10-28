@@ -4,6 +4,7 @@ import { api, formatApiError } from "@/lib/api";
 import { HEAT_MODES, HEAT_MODE_KEY, initialState, inputKind, resultSentence, resultsFor, tapGame } from "@/lib/resultEntry";
 import { BestOfInput, OrderInput, PointsInput, ScoreInput, WinnerInput } from "@/components/tls/results/ResultInputs";
 import { GameEditor } from "@/components/tls/league/LeagueReportForm";
+import { sidesInSlotOrder } from "@/components/tls/league/leagueGames";
 import { changeStaffGame, seriesSentence, settleStaffGames, staffPayload, staffProblem, staffStart } from "@/components/tls/league/leagueGames";
 
 // Das eine Ergebnis-Fenster (#1156, #1370): Turnierleitung am Handy, Matchplan, Stationen und Matchseite öffnen es -
@@ -165,7 +166,7 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
             <p className="text-xs text-white/55" data-testid="result-maps-off-hint">Für „Nicht erschienen“, „Aufgegeben“ oder einen Stand ohne gespielte Maps. Vorhandene Maps fallen weg, wenn der Stand nicht mehr zu ihnen passt.</p>
           ) : null}
           {withMaps && mapGames.map((game, index) => (
-            <GameEditor key={game.position} staff index={index} game={game} league={league}
+            <GameEditor key={game.position} staff index={index} game={game} games={mapGames} league={league}
               onChange={(next) => setMapGames((current) => settleStaffGames(changeStaffGame(current, game.position, next), league))} />
           ))}
           {kind === "score" && <ScoreInput entry={entry} state={state} onChange={setState} />}
@@ -222,7 +223,7 @@ export function ResultWindowLoader({ matchId, onClose, onSaved, testId = "result
     api.get(`/matches/${matchId}/page`)
       .then(({ data }) => {
         if (!alive) return;
-        setLeague(data?.league || null);
+        setLeague(sidesInSlotOrder(data?.league || null, data?.match));
         if (data?.result_entry) setEntry(data.result_entry);
         else setError("Für dieses Spiel kannst du kein Ergebnis eintragen.");
       })

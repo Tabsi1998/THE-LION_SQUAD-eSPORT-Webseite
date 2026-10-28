@@ -18,6 +18,7 @@ import { dayNoon, viennaDate } from "@/lib/vienna";
 import {
   BEST_OF_OPTIONS,
   LEGS_OPTIONS,
+  MAP_REPEAT_OPTIONS,
   SEASON_STATUS_OPTIONS,
   TIEBREAKER_LABELS,
   VISIBILITY_OPTIONS,
@@ -353,6 +354,10 @@ export default function AdminLeagueSeasonPage() {
                   <TextField label="Teams je Staffel höchstens" type="number" min={2} max={20} value={form.max_staffel_size} onChange={(value) => set("max_staffel_size", value)} testId="season-form-staffel-size" />
                 </FormGrid>
                 <ModeOrder modes={modes} bestOf={form.best_of} value={form.game_mode_order} onChange={(value) => set("game_mode_order", value)} />
+                <FormGrid>
+                  <SelectField label="Map-Wiederholung in einer Serie" value={form.map_repeat} onChange={(value) => set("map_repeat", value)} options={MAP_REPEAT_OPTIONS}
+                    hint="Ob dieselbe Map in einer Serie noch einmal gespielt werden darf. Die Meldung prüft es." testId="season-form-map-repeat" />
+                </FormGrid>
                 <FormGrid cols={3}>
                   <TextField label="Punkte Sieg" type="number" step="any" value={form.points_win} onChange={(value) => set("points_win", value)} testId="season-form-points-win" />
                   <TextField label="Remis" type="number" step="any" value={form.points_draw} onChange={(value) => set("points_draw", value)} testId="season-form-points-draw" />

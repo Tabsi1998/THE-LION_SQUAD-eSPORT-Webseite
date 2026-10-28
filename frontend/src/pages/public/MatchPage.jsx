@@ -24,6 +24,7 @@ import { matchIsOver } from "@/lib/afterEnd";
 import { rankingMode } from "@/lib/matchReport";
 import { MatchReportForm } from "@/components/tls/tournament/MatchReportForm";
 import { LeagueReportForm } from "@/components/tls/league/LeagueReportForm";
+import { defaultTimeText, sidesInSlotOrder } from "@/components/tls/league/leagueGames";
 import { LeagueGamesView, LineupAmendForm, StaffLineupAmend } from "@/components/tls/league/LeagueGamesView";
 import { LiveQueueStatus } from "@/components/tls/live/LiveQueueStatus";
 import { MatchCallBox } from "@/components/tls/tournament/MatchCallBox";
@@ -65,10 +66,18 @@ function formatDateTime(value) {
 const LIVE_MATCH_STATUSES = new Set(["in_progress", "running", "waiting_result", "disputed"]);
 
 /** Was im Terminkasten groß steht (#1220): „Noch offen“ nur vor dem Spiel ohne Termin. */
-function scheduleHeadline(match) {
+function scheduleHeadline(match, league = null) {
   if (LIVE_MATCH_STATUSES.has(String(match.status))) return formatMatchStatus(match.status);
   if (scheduleLabels[match.schedule_status]) return scheduleLabels[match.schedule_status];
+  if (!match.scheduled_at && league?.default_time) return "Standardtermin";
   return match.scheduled_at ? "Termin steht" : "Noch offen";
+}
+
+/** Der Termin in Worten. Liga ohne Einigung (#2096): der Standardtermin der Spielwoche statt „Noch kein Termin“. */
+function scheduleWhen(match, league = null) {
+  if (match.scheduled_at) return formatWhen(match.scheduled_at);
+  if (league?.default_time) return `Standardtermin ${defaultTimeText(league.default_time)} (ohne Einigung)`;
+  return "Noch kein Termin";
 }
 
 function toLocalInput(value) {
@@ -244,6 +253,8 @@ function MatchPageView() {
   }
 
   const match = data.match || {};
+  // Liga (#2096): Seiten in der Reihenfolge der Plätze - Heim links, wie in der Überschrift.
+  const league = sidesInSlotOrder(data.league, match);
   const latestProposal = (data.schedule_proposals || []).find((p) => p.status === "pending");
   const canProposeSchedule = Boolean(data.can_propose_schedule);
   const canManageSchedule = Boolean(data.can_manage_schedule);
@@ -330,8 +341,8 @@ function MatchPageView() {
           ) : (
             <div className="border border-white/10 bg-[#121212] rounded-sm px-4 py-3 w-full sm:w-auto sm:min-w-[16rem]" data-testid="match-schedule">
               <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold">Terminstatus</div>
-              <div className="mt-1 font-heading font-black uppercase text-[#FFD700]">{scheduleHeadline(match)}</div>
-              <div className="mt-1 text-sm text-white/65" data-testid="match-when">{match.scheduled_at ? formatWhen(match.scheduled_at) : "Noch kein Termin"}</div>
+              <div className="mt-1 font-heading font-black uppercase text-[#FFD700]">{scheduleHeadline(match, league)}</div>
+              <div className="mt-1 text-sm text-white/65" data-testid="match-when">{scheduleWhen(match, league)}</div>
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {eventModeLabels[data.event_mode] && <Pill>{eventModeLabels[data.event_mode]}</Pill>}
                 {resultModeLabels[data.result_entry_mode] && <Pill>{resultModeLabels[data.result_entry_mode]}</Pill>}
@@ -393,12 +404,12 @@ function MatchPageView() {
           )}
 
           {/* Liga (#1650): gespielte Maps mit Sieger und Aufstellungen; fehlt die eigene noch, hier nachtragen. */}
-          {data.league ? <LeagueGamesView league={data.league} /> : null}
+          {data.league ? <LeagueGamesView league={league} /> : null}
           {data.league ? (
-            <LineupAmendForm key={`${(data.league.lineups_missing || []).join(",")}-${match.updated_at || ""}`} league={data.league} busy={busy} onSave={saveLineups} />
+            <LineupAmendForm key={`${(data.league.lineups_missing || []).join(",")}-${match.updated_at || ""}`} league={league} busy={busy} onSave={saveLineups} />
           ) : null}
           {data.league && canStaffSubmit ? (
-            <StaffLineupAmend key={`staff-${match.updated_at || ""}`} league={data.league} busy={busy} onSave={saveLineups} />
+            <StaffLineupAmend key={`staff-${match.updated_at || ""}`} league={league} busy={busy} onSave={saveLineups} />
           ) : null}
 
           {/* Nur Turnierleitung (#1157): Spieler sehen keinen Melde-Knopf, sondern wer das Ergebnis einträgt. */}
@@ -426,7 +437,7 @@ function MatchPageView() {
             <div className="mt-5 border-t border-white/10 pt-5 space-y-5">
               {(canPlayerReport || showReportReadOnly) && data.league && (
                 <LeagueReportForm
-                  league={data.league}
+                  league={league}
                   readOnly={!canPlayerReport}
                   onWrongResult={wrongResult}
                   state={data.report_state}
@@ -591,7 +602,7 @@ function MatchPageView() {
           )}
         </div>
       </section>
-      {resultOpen && data.result_entry ? <ResultWindow entry={data.result_entry} league={data.league} onClose={() => setResultOpen(false)} onSaved={resultUndo.start} /> : null}
+      {resultOpen && data.result_entry ? <ResultWindow entry={data.result_entry} league={league} onClose={() => setResultOpen(false)} onSaved={resultUndo.start} /> : null}
       <ResultUndoBar undo={resultUndo} />
     </PublicLayout>
   );

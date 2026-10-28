@@ -57,6 +57,25 @@ Die Testzugänge stehen nur im Skript. Für die Browser-Tests schreibt es Kennun
 `.local-testing/abnahme/state.json` (nicht im Repo). Zum Anmelden von Hand: E-Mail und Passwort aus dem Skript,
 den Zwei-Faktor-Code erzeugt jede Authenticator-App aus dem Test-Geheimnis im Skript.
 
+### Liga (CoD-Liga, Season 1)
+
+```bash
+python scripts/seed_abnahme_liga.py
+```
+
+Eigener Seed mit eigenen Konten (`liga-…@abnahme.lionsquad.at`) für die Liga Stufe 1 ([LIGA.md](../LIGA.md), #2096):
+Spiel „Call of Duty“ (falls es fehlt) mit drei Modi und fünf erfundenen Test-Maps mit Platzhalterbild, Liga
+„CoD-Liga“, Season 1 (Start Di 10.11.2026, 10 Wochen, Weihnachtspause 21.12.–3.1., nur Hinrunde, Best of 3,
+Teamgröße 4, Modus je Map, Map-Pool, Regeltext-Platzhalter, Sichtbarkeit „Nur Turnierleitung“), Liga 1, Staffel A
+(Entwurf) und acht erfundene Hauptteams mit je einem Co-Team (4 bis 6 im Kader, Captain und Vertreter), zugeteilt.
+Den Spielplan erzeugt erst **Liga starten** in der Turnierverwaltung der Staffel – so lässt sich die
+[Checkliste für den Obmann](../handbuch/liga.md#6-checkliste-für-den-obmann-bis-911) am Stand durchspielen.
+
+Mehrfach aufrufbar: Was steht, bleibt; die Vorgaben der Season (auch die Sichtbarkeit) gehen zurück auf den Stand
+oben, eine gestartete Staffel bleibt gestartet. Passwort und Zwei-Faktor-Geheimnis entstehen bei jedem Lauf neu und
+stehen nur in `.local-testing/abnahme/state-liga.json` (anderer Ort über `ABNAHME_STATE`), dazu die Zugänge von
+Captain, Vertreter, einem Mitglied und der Teamleitung des ersten Co-Teams.
+
 ## 3. Durchklicken lassen
 
 ```bash
@@ -70,7 +89,10 @@ Turnierleitung) und Turnier (vor Ort mit Vorschau-Baum, vor Ort live, online, Li
 zwischen „Matchplan“ und „Spiele“ wechseln, die Ansicht bleibt stehen; „Spiele“ ohne die alte Planung; keine
 Konsolenfehler und keine Antwort 4xx/5xx. `tables-schedule-abnahme.spec.js`: Rangliste (Liga, Gruppen), Spielplan
 (nach Runden, nach Stationen, „Nur meine Spiele“), Podest und Sieger-Moment – nicht angemeldet, als Spieler und als
-Admin, bei 1440 und 375 px. Ohne `ABNAHME=1` überspringt der normale Testlauf diese Tests.
+Admin, bei 1440 und 375 px. `liga-abnahme.spec.js` (Stand aus `seed_abnahme_liga.py`, also
+`ABNAHME_STATE=…/state-liga.json`): Verwaltung „Liga“, Season mit Pause und Pool, Staffel A mit acht Co-Teams und
+dem Knopf „Liga starten“, die Ligaseite bei 390 und 1440 px und ohne Anmeldung „Liga nicht gefunden“ – nur lesend.
+Ohne `ABNAHME=1` überspringt der normale Testlauf diese Tests.
 `ABNAHME_SHOTS` legt Bilder ab (optional). Anmeldungen: Die Tests merken sich die Sitzung je Konto
 (`.local-testing/abnahme/sessions-…/`) und melden sich nur neu an, wenn sie nicht mehr gilt - nie zweimal mit einem
 Zwei-Faktor-Code aus demselben 30-Sekunden-Fenster. So läuft auch ein großer Lauf nicht in die Sperre gegen
@@ -143,7 +165,7 @@ Der Workflow [Nächtliche Abnahme](../../.github/workflows/nightly-abnahme.yml) 
 Wiener Sommerzeit, 02:23 Winterzeit) den Event-Abend auf GitHub durch (#1656): frischer Abnahme-Stand, dann **jede
 Abnahme-Spec der Reihe nach, vor jeder frisch geseedet**. Die Specs verbrauchen Testdaten (`advancement-modes` spielt
 die Show-Runde, die `tv-abnahme` danach noch braucht) - der Seed legt bei jedem Aufruf neue Turniere an. Specs, die
-`seed_abnahme_fastlap.py` nennen, bekommen diesen Seed und eine eigene Stand-Datei. Neue Specs in `e2e/abnahme/` laufen
+`seed_abnahme_fastlap.py` bzw. `seed_abnahme_liga.py` nennen, bekommen diesen Seed und eine eigene Stand-Datei. Neue Specs in `e2e/abnahme/` laufen
 von selbst mit, `readme-screenshots.spec.js` nicht (eigener Workflow).
 
 - **Bericht:** im Lauf unter *Summary* - je Spec grün oder rot, Zahl der Tests, Dauer, bei Rot Testname und erste

@@ -64,10 +64,17 @@ class LeagueSetup:
     registrations: list[dict]
     rosters: dict[str, set[str]] = field(default_factory=dict)
     names: dict[str, str] = field(default_factory=dict)
+    # Map-Wiederholung in einer Serie (#2096): "never", "other_mode" (Vorgabe) oder "always".
+    map_repeat: str = "other_mode"
 
     @property
     def reg_ids(self) -> list[str]:
-        return [reg["id"] for reg in self.registrations if reg.get("id")]
+        """Die Seiten in der Reihenfolge der Plätze (Heim zuerst) - wie Überschrift und Spielplan. Die Datenbank liefert
+        die Anmeldungen in beliebiger Reihenfolge; daraus kamen im Meldeformular vertauschte Sieger-Knöpfe (#2096)."""
+        known = [reg["id"] for reg in self.registrations if reg.get("id")]
+        slots = [slot.get("registration_id") for slot in self.match.get("slots") or [] if isinstance(slot, dict)]
+        ordered = [reg_id for reg_id in slots if reg_id in known]
+        return list(dict.fromkeys(ordered + known))
 
     @property
     def needed(self) -> int:
@@ -112,10 +119,37 @@ async def setup(db, match: dict, tournament: dict | None = None, stage: dict | N
             for reg in registrations
             if reg.get("id")
         },
+        map_repeat=map_repeat_of(tournament),
     )
 
 
 # ---------------------------------------------------------------- Prüfen
+
+MAP_REPEAT = ("never", "other_mode", "always")
+
+
+def map_repeat_of(tournament: dict | None) -> str:
+    """Wie oft eine Map in einer Serie vorkommen darf (Season-Vorgabe, an der Staffel) - fehlt sie, gilt
+    „gleiche Map nur in anderem Modus“."""
+    value = (tournament or {}).get("map_repeat")
+    return value if value in MAP_REPEAT else "other_mode"
+
+
+def _check_repeat(setup: LeagueSetup, games: list[dict], mode: str | None, map_id: str, label: str) -> None:
+    """Dieselbe Map im selben Modus nur einmal je Serie (Vorgabe); bei „nie“ jede Map nur einmal, bei „immer“ frei."""
+    if setup.map_repeat == "always":
+        return
+    for earlier in games:
+        if earlier["map_id"] != map_id:
+            continue
+        name = earlier.get("map_name") or "Diese Map"
+        if setup.map_repeat == "never":
+            raise LeagueGamesError(f"{label}: {name} lief schon als Map {earlier['position']} – in dieser Serie "
+                                   "kommt jede Map nur einmal vor.")
+        if earlier.get("mode") == mode:
+            where = f" ({earlier.get('mode_label')})" if earlier.get("mode_label") else ""
+            raise LeagueGamesError(f"{label}: {name}{where} lief schon als Map {earlier['position']} – dieselbe Map "
+                                   "im selben Modus nur einmal je Serie.")
 
 
 def _pool_modes(pool: dict | None) -> list[dict]:
@@ -201,6 +235,7 @@ def normalize_games(
         if not map_pools.allowed(setup.pool, mode, map_id):
             where = f" für {_mode_label(setup.pool, mode)}" if mode else ""
             raise LeagueGamesError(f"{label}: diese Map ist im Pool{where} nicht freigegeben.")
+        _check_repeat(setup, games, mode, map_id, label)
         winner = str(item.get("winner_registration_id") or "").strip()
         if winner not in sides:
             raise LeagueGamesError(f"{label}: bitte den Sieger der Map wählen.")
@@ -502,13 +537,16 @@ def _parse_moment(value):
 
 
 def amend_deadline(setup: LeagueSetup):
-    """Bis wann die Seiten ihre Aufstellung nachtragen: ``lineup_amend_hours`` nach dem Ergebnis (Vorgabe 48 h)."""
-    from datetime import timedelta
+    """Bis wann die Seiten ihre Aufstellung nachtragen: ``lineup_amend_hours`` nach dem Ergebnis (Vorgabe 48 h). Zeit in
+    einer Sperrzeit zählt nicht mit (#2096) - wie bei Termin- und Bestätigungsfristen; ohne Sperrzeiten genau
+    Ergebnis + Stunden."""
+    from services.matchday_schedule import response_deadline
 
     done = _parse_moment(setup.match.get("completed_at"))
     if not done:
         return None
-    return done + timedelta(hours=_positive_int(setup.tournament.get("lineup_amend_hours"), DEFAULT_AMEND_HOURS))
+    return response_deadline(setup.tournament, done,
+                             _positive_int(setup.tournament.get("lineup_amend_hours"), DEFAULT_AMEND_HOURS))
 
 
 async def amend_lineups(
@@ -609,6 +647,29 @@ def _games_view(games: list[dict] | None, people: dict[str, dict], with_lineups:
     return out
 
 
+def default_time(setup: LeagueSetup) -> str | None:
+    """Der Standardtermin der Spielwoche dieses Spiels (Season 1: Sonntag 20:00 Wien) - er gilt ohne Einigung, auch
+    solange ihn noch kein Lauf ins Spiel geschrieben hat (#2096). ``None``, wenn die Woche ihn nicht enthält."""
+    from services.matchday_schedule import (
+        MatchdayScheduleError,
+        default_time_in,
+        matchday_number_of,
+        matchday_settings,
+        tournament_matchday_window,
+    )
+
+    number = matchday_number_of(setup.match)
+    if not number or not setup.tournament.get("start_date"):
+        return None
+    settings = matchday_settings(setup.tournament)
+    try:
+        window = tournament_matchday_window(setup.tournament, number)
+        moment = default_time_in(window, weekday=settings["weekday"], hour=settings["hour"], minute=settings["minute"])
+    except (MatchdayScheduleError, TypeError, ValueError):
+        return None
+    return moment.isoformat() if moment else None
+
+
 async def page_block(db, setup: LeagueSetup, *, side_id: str | None, can_act: bool, staff: bool = False) -> dict:
     """Was die Matchseite zum Melden, Bestätigen, Nachtragen und Anzeigen braucht. ``side_id``: die Anmeldung, zu der
     die Person gehört (sonst ``None``); ``can_act``: sie darf für diese Seite handeln; ``staff``: Turnierleitung - sie
@@ -669,6 +730,8 @@ async def page_block(db, setup: LeagueSetup, *, side_id: str | None, can_act: bo
         "can_amend_lineup": bool(can_act and side_id and open_window),
         "amend_until": deadline.isoformat() if deadline else None,
         "app_detail": APP_DETAIL,
+        "default_time": default_time(setup),
+        "map_repeat": setup.map_repeat,
     }
 
 

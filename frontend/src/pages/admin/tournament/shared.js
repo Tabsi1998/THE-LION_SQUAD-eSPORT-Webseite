@@ -296,8 +296,11 @@ export function applyStageType(current, stageType) {
   };
 }
 
-export function primaryTournamentAction(status) {
+export function primaryTournamentAction(status, tournament = null) {
   if (["draft", "scheduled", "registration_open", "registration_closed"].includes(status)) {
+    // Liga-Staffel (docs/LIGA.md): die Co-Teams sind zugeteilt, niemand checkt ein - „Live“ macht den Spielplan fest.
+    // Ein Check-in ließe die Staffel ohne eingecheckte Teams und damit ohne Spiele zurück (#2096, im Durchlauf gefunden).
+    if (tournament?.league_context) return { status: "live", label: "Liga starten" };
     return { status: "check_in", label: "Check-in starten" };
   }
   if (status === "check_in") {
