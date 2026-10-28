@@ -29,6 +29,7 @@ import json
 import logging
 import math
 import re
+import uuid
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
@@ -716,10 +717,20 @@ async def allowed_tints(db, printful_product_id: int) -> set[str]:
 
 
 def _write_cache(path: Path, payload: bytes) -> None:
+    """In den Zwischenspeicher: je Schreibvorgang eine eigene Zwischendatei, dann umbenennen. Zwei gleiche Anfragen
+    gleichzeitig schreiben denselben Inhalt - scheitert das Umbenennen, weil die Zieldatei schon da ist (Windows sperrt
+    sie beim Lesen), gilt das als Erfolg. Die Zwischendatei bleibt nie liegen."""
     storage.ensure_directory(cache_dir())
-    temporary = path.with_suffix(".tmp")
-    temporary.write_bytes(payload)
-    temporary.replace(path)
+    temporary = path.with_name(f"{path.stem}.{uuid.uuid4().hex}.tmp")
+    try:
+        temporary.write_bytes(payload)
+        try:
+            temporary.replace(path)
+        except OSError:
+            if not path.is_file():
+                raise
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def _tinted_png(data: bytes, code: str, area: dict | None) -> bytes:
@@ -773,10 +784,7 @@ async def _template_image(db, printful_product_id: int, index: int, *, layer: st
     except httpx.HTTPError as exc:
         raise TemplateImageUnavailable("Printful ist gerade nicht erreichbar.") from exc
     payload = _reencode(data)
-    storage.ensure_directory(cache_dir())
-    temporary = path.with_suffix(".tmp")
-    temporary.write_bytes(payload)
-    temporary.replace(path)
+    _write_cache(path, payload)
     return payload
 
 

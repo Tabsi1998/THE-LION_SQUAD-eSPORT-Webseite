@@ -222,6 +222,39 @@ async def test_a_tinted_template_uses_only_stored_codes_and_is_cached(colour_db,
             await templates.template_image(db, 71, 0, tint=wrong)
 
 
+@pytest.mark.asyncio
+async def test_parallel_requests_for_the_same_image_never_fail(colour_db, monkeypatch, tmp_path):
+    """Review #2105: zwei gleiche Anfragen schreiben je eine eigene Zwischendatei; ist die Zieldatei beim Umbenennen
+    schon da (Windows sperrt sie dann), gilt das als Erfolg - kein 500, keine Zwischendatei bleibt liegen."""
+    import asyncio
+
+    import storage
+
+    monkeypatch.setattr(storage, "UPLOAD_DIR", tmp_path)
+    monkeypatch.setattr(templates, "IMAGE_TRANSPORT", httpx.MockTransport(
+        lambda request: httpx.Response(200, content=png_bytes(opaque_photo()), headers={"content-type": "image/png"})))
+    results = await asyncio.gather(*(templates.template_image(colour_db, 71, 0, tint="0c0c0c") for _ in range(4)),
+                                   *(templates.template_image(colour_db, 71, 0) for _ in range(4)))
+    assert len(set(results[:4])) == 1 and len(set(results[4:])) == 1
+    folder = tmp_path / templates.CACHE_FOLDER
+    assert not list(folder.glob("*.tmp")) and len(list(folder.glob("*.png"))) == 2
+    # Das Umbenennen scheitert, die Zieldatei gibt es aber schon: kein Fehler.
+    real_replace = type(folder).replace
+
+    def locked(self, target):
+        if pathlib.Path(target).is_file():
+            raise PermissionError("Zugriff verweigert (Datei in Benutzung)")
+        return real_replace(self, target)
+
+    monkeypatch.setattr(type(folder), "replace", locked)
+    templates._write_cache(folder / next(folder.glob("*.png")).name, b"neu")
+    assert not list(folder.glob("*.tmp"))
+    with pytest.raises(PermissionError):
+        monkeypatch.setattr(type(folder), "replace", lambda self, target: (_ for _ in ()).throw(PermissionError("x")))
+        templates._write_cache(folder / "gibt-es-nicht.png", b"neu")
+    assert not list(folder.glob("*.tmp"))
+
+
 # ---------------------------------------------------------------- Schritt 3 und die Vorschau-PNG je Farbe
 
 @pytest.mark.asyncio

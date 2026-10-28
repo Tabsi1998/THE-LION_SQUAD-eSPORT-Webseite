@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, ExternalLink, Image as ImageIcon, Move, Plus, RefreshCw, RotateCcw, Trash2, Upload, Wand2 } from "lucide-react";
 import { api, formatRequestError, resolveMediaUrl, uploadApi } from "@/lib/api";
 import { viennaDateTime } from "@/lib/vienna";
@@ -18,6 +18,7 @@ const STATE_TONES = { ok: "text-ok", not_needed: "text-white/55", missing: "text
 const STATE_TEXT = { ok: "aktuell", not_needed: "Platzhalter", missing: "fehlt", outdated: "veraltet", invalid: "passt nicht", no_area: "Fläche fehlt" };
 const NUDGE_CM = 0.1;
 const DRAFT_PREVIEW_DELAY_MS = 350;
+const SAMPLE_DELAY_MS = 300;
 
 function round1(value) {
   return Math.round(Number(value) * 10) / 10;
@@ -62,11 +63,45 @@ function cmNumber(text) {
 }
 
 // Beispielname in echter Größe (#2105): der Server rendert ihn wie die Druckdatei - dieselben Regeln der Ebene.
-function nameSampleUrl(productId, kind, color, layer) {
-  const params = new URLSearchParams({ kind, color });
-  if (Number(layer?.text_height_cm) > 0) params.set("text_height_cm", String(layer.text_height_cm));
-  if (Number(layer?.max_width_cm) > 0) params.set("max_width_cm", String(layer.max_width_cm));
-  return resolveMediaUrl(`/api${BASE}/${productId}/name-sample?${params.toString()}`);
+function nameSample(productId, kind, color, layer) {
+  const params = { kind, color };
+  if (Number(layer?.text_height_cm) > 0) params.text_height_cm = String(layer.text_height_cm);
+  if (Number(layer?.max_width_cm) > 0) params.max_width_cm = String(layer.max_width_cm);
+  const path = `${BASE}/${productId}/name-sample`;
+  return { path, params, url: resolveMediaUrl(`/api${path}?${new URLSearchParams(params).toString()}`) };
+}
+
+// Das Bild des Beispielnamens: gedrosselt (beim Tippen nicht jede Zwischengröße laden - ein neues Bild ersetzt das
+// alte), je Adresse neu (`key`) - und passt der Name so nicht (Server sagt 400), steht dessen Satz an der Ebene statt
+// eines stillen Lochs (Review #2105).
+function SampleImage({ sample, onProblem, testId }) {
+  const [shown, setShown] = useState(sample);
+  const [failed, setFailed] = useState(null);
+  const report = useRef(onProblem);
+  const latest = useRef(sample);
+  report.current = onProblem;
+  latest.current = sample;
+  useEffect(() => {
+    if (sample.url === shown.url) return undefined;
+    const timer = setTimeout(() => setShown(latest.current), SAMPLE_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [sample.url, shown.url]);
+  useEffect(() => {
+    let live = true;
+    if (failed !== shown.url) {
+      report.current(null);
+      return undefined;
+    }
+    api.get(shown.path, { params: shown.params }).then(() => {
+      if (live) report.current("Der Beispielname lässt sich gerade nicht anzeigen.");
+    }).catch((failure) => {
+      if (live) report.current(formatRequestError(failure, "Der Name passt mit dieser Größe nicht."));
+    });
+    return () => { live = false; };
+  }, [failed, shown]);
+  if (failed === shown.url) return null;
+  return <img key={shown.url} src={shown.url} alt="" aria-hidden="true" className="w-full h-full pointer-events-none" draggable={false}
+    onError={() => setFailed(shown.url)} data-testid={testId} />;
 }
 
 // Welche Fassung der Server für eine Farbe druckt (hell oder dunkel samt Version, #2069 Teil A) - aus den Plänen der
@@ -91,7 +126,7 @@ function savedSources(view) {
 
 // ---------------------------------------------------------------- Vorschau mit Vorlagenbild, Ziehen und Pfeiltasten
 
-function LayoutPreview({ area, preview, layers, resolved, colorCode, motifFor, sampleFor, selected, onSelect, onNudge, editable, testId, stale = false }) {
+function LayoutPreview({ area, preview, layers, resolved, colorCode, motifFor, sampleFor, onSampleProblem, selected, onSelect, onNudge, editable, testId, stale = false }) {
   const areaRef = useRef(null);
   const drag = useRef(null);
   const templateW = preview?.template_width || area.width_px;
@@ -157,8 +192,7 @@ function LayoutPreview({ area, preview, layers, resolved, colorCode, motifFor, s
                 ? <img src={resolveMediaUrl(motif.image_path)} alt="" aria-hidden="true" className="w-full h-full pointer-events-none" draggable={false} />
                 : item.kind !== "motif" && sampleFor
                   // Der Name in echter Texthöhe; die Leinwand (Höchstbreite) ist nur der feine Rahmen drumherum (#2105).
-                  ? <img src={sampleFor(item.kind, layer)} alt="" aria-hidden="true" className="w-full h-full pointer-events-none" draggable={false}
-                    onError={(event) => { event.currentTarget.style.visibility = "hidden"; }} data-testid={`${testId}-layer-${item.index}-sample`} />
+                  ? <SampleImage sample={sampleFor(item.kind, layer)} onProblem={(text) => onSampleProblem?.(item.index, text)} testId={`${testId}-layer-${item.index}-sample`} />
                   : <span className="flex items-center justify-center w-full h-full border border-dashed border-brand/70 bg-brand/10 text-[10px] font-bold uppercase tracking-wider text-brand pointer-events-none">{item.kind === "motif" ? "Motiv" : item.kind === "gamertag" ? "Gamertag" : "Nr."}</span>}
             </button>
           );
@@ -350,6 +384,11 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
   const rules = view.preset_rules || {};
   const personalization = view.product.personalization || "none";
   const [selected, setSelected] = useState(null);
+  // Was der Server zum Beispielnamen einer Ebene sagt, wenn er so nicht passt (Review #2105).
+  const [sampleProblems, setSampleProblems] = useState({});
+  const onSampleProblem = useCallback((index, text) => {
+    setSampleProblems((now) => ((now[index] || null) === (text || null) ? now : { ...now, [index]: text || null }));
+  }, []);
   const layers = state?.layers || [];
   const mode = state?.mode || "layout";
   // Das Motiv dieser Ebene für die Vorschau-Farbe: die gespeicherte Fassung (hell/dunkel, Version) samt Bild, solange
@@ -412,7 +451,8 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
             <div className="space-y-1">
               <LayoutPreview stale={stale} area={{ ...area, safe_margin_cm: available.safe_margin_cm }} preview={preview} layers={visible}
                 resolved={resolved} colorCode={codes[previewColor]} motifFor={motifFor} selected={selected} onSelect={setSelected}
-                sampleFor={previewColor ? (kind, layer) => nameSampleUrl(view.product.id, kind, previewColor, layer) : null}
+                sampleFor={previewColor ? (kind, layer) => nameSample(view.product.id, kind, previewColor, layer) : null}
+                onSampleProblem={onSampleProblem}
                 onNudge={nudge}
                 editable={editable} testId={`shop-preview-${available.key}`} />
               {!preview?.image_path && <p className="text-xs text-honor" data-testid={`shop-preview-${available.key}-no-image`}>Kein Vorlagenbild von Printful - die Vorschau zeigt nur die Druckfläche, Maße und Druckdatei stimmen trotzdem.</p>}
@@ -433,7 +473,7 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
                         onChange={(patch) => update(index, patch)} onRemove={() => onChange({ ...state, layers: layers.filter((_, at) => at !== index) })}
                         testId={`shop-layer-${available.key}-${index}`} />
                     ) : (
-                      <TextLayer layer={layer} area={area} canvas={view.gamertag_canvas} presets={textPresets} kindLabel={layer.kind === "gamertag" ? "Gamertag" : "Vereinsnummer"} editable={editable} problem={found?.problem}
+                      <TextLayer layer={layer} area={area} canvas={view.gamertag_canvas} presets={textPresets} kindLabel={layer.kind === "gamertag" ? "Gamertag" : "Vereinsnummer"} editable={editable} problem={found?.problem || sampleProblems[index]}
                         onChange={(patch) => update(index, patch)} onRemove={() => onChange({ ...state, layers: layers.filter((_, at) => at !== index) })}
                         testId={`shop-layer-${available.key}-${index}`} />
                     )}

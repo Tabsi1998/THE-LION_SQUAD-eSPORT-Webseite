@@ -1071,9 +1071,11 @@ async def sample_png(db, product: dict, *, kind: str, color: str, layer: dict | 
         raise LookupError("Diese Ebene hat keinen Namen.")
     if color not in ((product.get("offer") or {}).get("colors") or []):
         raise LookupError("Diese Farbe wird nicht angeboten.")
-    rules = await shop_gamertag.load_rules(db)
+    rules = shop_gamertag.layer_rules(await shop_gamertag.load_rules(db), layer)
     ink = shop_gamertag.inks_for_garment(rules, color)[0]["key"]
-    return shop_gamertag.render(SAMPLES[kind], shop_gamertag.layer_rules(rules, layer), color_key=ink).payload
+    # Rendern kostet Rechenzeit (große Leinwand) - nicht im Event-Loop.
+    rendered = await asyncio.to_thread(shop_gamertag.render, SAMPLES[kind], rules, color_key=ink)
+    return rendered.payload
 
 
 def _hex_rgb(value: str | None) -> tuple[int, int, int]:

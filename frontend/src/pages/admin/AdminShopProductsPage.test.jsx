@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
@@ -386,15 +386,40 @@ test("der Gamertag zeigt einen Beispielnamen in echter Größe; Texthöhe und H�
   expect(screen.getByTestId("shop-layer-front-1-text-height")).toHaveAttribute("placeholder", "Vorgabe 1,3");
   await user.type(screen.getByTestId("shop-layer-front-1-text-height"), "1,5");
   await user.type(screen.getByTestId("shop-layer-front-1-max-width"), "6");
-  expect(screen.getByTestId("shop-preview-front-layer-1-sample").getAttribute("src")).toBe(
-    "/api/admin/shop/products/p1/name-sample?kind=gamertag&color=Black&text_height_cm=1.5&max_width_cm=6");
+  // Gedrosselt: das Bild kommt erst, wenn die Eingabe kurz ruht.
+  await waitFor(() => expect(screen.getByTestId("shop-preview-front-layer-1-sample").getAttribute("src")).toBe(
+    "/api/admin/shop/products/p1/name-sample?kind=gamertag&color=Black&text_height_cm=1.5&max_width_cm=6"));
   expect(parseFloat(screen.getByTestId("shop-preview-front-layer-1").style.width)).toBeCloseTo(((6 / 2.54) * 150 / 1800) * 100, 1);
   await user.click(screen.getByTestId("shop-layout-submit"));
   expect(apiMock.put.mock.calls[0][1].placements[0].layers[1]).toEqual({
     kind: "gamertag", preset: "text_opposite", offset_x_cm: 0, offset_y_cm: 0, text_height_cm: 1.5, max_width_cm: 6 });
   // Leer heißt wieder Vorgabe.
   await user.clear(screen.getByTestId("shop-layer-front-1-max-width"));
-  expect(screen.getByTestId("shop-preview-front-layer-1-sample").getAttribute("src")).not.toContain("max_width_cm");
+  await waitFor(() => expect(screen.getByTestId("shop-preview-front-layer-1-sample").getAttribute("src")).not.toContain("max_width_cm"));
+});
+
+test("passt der Beispielname nicht, sagt die Ebene warum - und eine gültige Größe zeigt ihn wieder (Review #2105)", async () => {
+  const canvas = { width_in: 3.5, height_in: 0.75, anchor_y_in: 0.375, text_height_cm: 1.27, max_width_cm: 8.89, height_per_text: 1.5,
+    limits: { min_text_height_cm: 0.25, max_text_height_cm: 5.08, min_width_cm: 1.27, max_width_cm: 30.48 } };
+  const data = view({ extra: { gamertag_canvas: canvas } });
+  const tooWide = "Der Name ist zu breit: auch bei 0,4 Zoll Texthöhe wird er 1,9 Zoll breit, erlaubt sind 0,39 Zoll.";
+  apiMock.get.mockImplementation((url) => (url.endsWith("/name-sample")
+    ? Promise.reject({ response: { status: 400, data: { detail: tooWide } } })
+    : Promise.resolve({ data })));
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-designs"));
+  await user.type(screen.getByTestId("shop-layer-front-1-max-width"), "1");
+  await waitFor(() => expect(screen.getByTestId("shop-preview-front-layer-1-sample").getAttribute("src")).toContain("max_width_cm=1"));
+  fireEvent.error(screen.getByTestId("shop-preview-front-layer-1-sample"));
+  expect(await screen.findByText(tooWide)).toBeInTheDocument();
+  expect(screen.queryByTestId("shop-preview-front-layer-1-sample")).toBeNull();
+  expect(apiMock.get).toHaveBeenCalledWith("/admin/shop/products/p1/name-sample", { params: { kind: "gamertag", color: "Black", max_width_cm: "1" } });
+  // Weiter tippen (1 → 12): das neue Bild ist wieder da, der Hinweis weg.
+  await user.type(screen.getByTestId("shop-layer-front-1-max-width"), "2");
+  await waitFor(() => expect(screen.getByTestId("shop-preview-front-layer-1-sample").getAttribute("src")).toContain("max_width_cm=12"));
+  expect(screen.getByTestId("shop-preview-front-layer-1-sample")).toBeVisible();
+  await waitFor(() => expect(screen.queryByText(tooWide)).toBeNull());
 });
 
 test("Flächen heißen deutsch - eine englische Bezeichnung von Printful ist als Rückfall markiert (#2105)", async () => {
