@@ -166,7 +166,8 @@ async def test_deleting_with_active_registrations_is_refused(flow):
 async def test_deleting_after_an_invoice_is_refused(flow):
     kassier, event, _people, regs = await setup_event(flow)
     await flow.db.billing_orders.update_one({"registration_id": regs["paula"]["id"]}, {"$set": {"status": "invoiced", "invoice_ref": "RE-TEST-2"}})
-    assert (await patch(flow, kassier, event, {"status": "cancelled"})).status_code == 200
+    cancelled = await patch(flow, kassier, event, {"status": "cancelled"})
+    assert cancelled.status_code == 200
     flow.act_as(kassier)
     response = await flow.delete(f"/api/events/{event['id']}")
     assert response.status_code == 409 and "Rechnung" in response.json()["detail"]
@@ -189,7 +190,8 @@ async def test_deleting_with_a_linked_tournament_that_has_registrations_is_refus
 async def test_deleting_a_cancelled_event_removes_it_with_a_log(flow):
     kassier, event, _people, regs = await setup_event(flow)
     await flow.db.tournaments.insert_one({"id": "turnier-2", "title": "FC Cup", "event_id": event["id"], "status": "draft"})
-    assert (await patch(flow, kassier, event, {"status": "cancelled"})).status_code == 200
+    cancelled = await patch(flow, kassier, event, {"status": "cancelled"})
+    assert cancelled.status_code == 200
     flow.act_as(kassier)
     response = await flow.delete(f"/api/events/{event['id']}")
     assert response.status_code == 200, response.text
@@ -206,7 +208,8 @@ async def test_deleting_a_cancelled_event_removes_it_with_a_log(flow):
 async def test_deleting_an_unknown_event_is_404(flow):
     kassier = await person(flow, "kassier", role="tournament_admin")
     flow.act_as(kassier)
-    assert (await flow.delete("/api/events/gibt-es-nicht")).status_code == 404
+    missing = await flow.delete("/api/events/gibt-es-nicht")
+    assert missing.status_code == 404
 
 
 # --------------------------------------------------------------------------- Max. Teilnehmer
@@ -214,10 +217,12 @@ async def test_deleting_an_unknown_event_is_404(flow):
 async def test_max_participants_can_be_cleared_and_must_be_positive(flow):
     kassier = await person(flow, "kassier", role="tournament_admin")
     flow.act_as(kassier)
-    assert (await flow.post("/api/events", json={"name": "Stammtisch", "max_participants": 0})).status_code == 422
+    zero_on_create = await flow.post("/api/events", json={"name": "Stammtisch", "max_participants": 0})
+    assert zero_on_create.status_code == 422
     event = (await flow.post("/api/events", json={"name": "Stammtisch", "max_participants": 20})).json()
-    assert (await patch(flow, kassier, event, {"max_participants": -3})).status_code == 422
-    assert (await patch(flow, kassier, event, {"max_participants": 0})).status_code == 422
+    negative = await patch(flow, kassier, event, {"max_participants": -3})
+    zero = await patch(flow, kassier, event, {"max_participants": 0})
+    assert [negative.status_code, zero.status_code] == [422, 422]
     cleared = await patch(flow, kassier, event, {"max_participants": None})
     assert cleared.status_code == 200 and cleared.json()["max_participants"] is None
     assert (await flow.db.events.find_one({"id": event["id"]}))["max_participants"] is None

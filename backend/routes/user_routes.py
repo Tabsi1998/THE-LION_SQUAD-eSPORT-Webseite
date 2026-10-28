@@ -25,6 +25,8 @@ from services.notification_preferences import (
 )
 from services.query_filters import safe_regex
 from services.private_fields import private_projection, strip_private
+# Die leerbaren Profilfelder (#2118): ein Blatt-Modul - auch die Kontolöschung leitet ihre Liste daraus ab.
+from services.profile_fields import USER_NULLABLE_FIELDS
 from models import (
     AreasUpdate,
     AdminProfileReset, AdminUserCreate, UserUpdate, RoleUpdate, UserSocialCreate, UserSocialUpdate,
@@ -40,21 +42,6 @@ def _clean(u: dict) -> dict:
 
 
 # Level (#617): eine Kurve für alles in services/levels.py, der Stand je Person in services/xp.py.
-
-
-USER_NULLABLE_FIELDS = {
-    "display_name", "avatar_url", "banner_url", "bio", "first_name", "last_name",
-    "nickname", "birth_date", "gender", "country", "state", "city", "favorite_games",
-    "main_platform", "main_platforms", "preferred_role", "input_device",
-    "input_devices", "gaming_subscriptions", "website", "game_ids", "discord_name",
-    "discord_id", "switch_code", "steam_id", "epic_id", "psn_id", "xbox_id",
-    "riot_id", "twitch_handle", "youtube_handle", "tiktok_handle",
-    "instagram_handle", "x_handle", "nintendo_fc", "ea_id", "battlenet_id",
-    "faceit_handle", "startgg_handle", "roblox_handle", "osu_handle", "lichess_handle", "github_handle", "kick_handle", "reddit_handle", "spotify_handle",
-    "threads_handle", "facebook_handle", "linkedin_handle", "snapchat_handle", "pinterest_handle", "telegram_handle", "wargaming_handle", "bungie_handle",
-    "mastodon_handle", "bluesky_handle",
-    "profile_visibility", "dm_privacy",
-}
 
 
 def _visibility_aliases(key: str) -> list[str]:

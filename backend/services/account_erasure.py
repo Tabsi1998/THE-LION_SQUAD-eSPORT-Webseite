@@ -98,7 +98,7 @@ EXTRA_PERSONAL_USER_FIELDS = (
 def profile_fields_to_clear() -> set[str]:
     """Alle Profilfelder, die beim Löschen verschwinden - abgeleitet, nicht abgeschrieben."""
     from models import UserUpdate
-    from routes.user_routes import USER_NULLABLE_FIELDS
+    from services.profile_fields import USER_NULLABLE_FIELDS
 
     return (set(UserUpdate.model_fields) | set(USER_NULLABLE_FIELDS) | set(EXTRA_PERSONAL_USER_FIELDS)) - set(ANONYMIZED_USER_VALUES)
 

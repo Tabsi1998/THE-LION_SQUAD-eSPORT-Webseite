@@ -48,7 +48,8 @@ async def _recipients(db, user_ids: list[str]) -> list[dict]:
         return []
     users = await db.users.find(
         {"id": {"$in": ids}, "is_active": {"$ne": False}, "is_banned": {"$ne": True}, "anonymized_at": None},
-        {"_id": 0, "id": 1, "email": 1, "display_name": 1, "username": 1, "notification_preferences": 1, "newsletter_consent": 1},
+        {"_id": 0, "id": 1, "email": 1, "display_name": 1, "username": 1, "notification_preferences": 1,
+         "newsletter_consent": 1},
     ).to_list(len(ids))
     return sorted(users, key=lambda user: user["id"])
 
@@ -70,15 +71,18 @@ async def _inform(db, event: dict, users: list[dict], *, title: str, message: st
             )
             notified += 1 if doc else 0
         except Exception:
-            logger.warning("Event %s: Benachrichtigung %s nicht angelegt", log_safe(event["id"]), log_safe(user["id"]), exc_info=True)
+            logger.warning("Event %s: Benachrichtigung %s nicht angelegt", log_safe(event["id"]), log_safe(user["id"]),
+                           exc_info=True)
         try:
             result = await send_user_template(
                 user, MESSAGE_TEMPLATE, MESSAGE_CATEGORY, dedupe_key=f"{dedupe}:{user['id']}",
-                display_name=user.get("display_name") or user.get("username") or "", event_name=name, message=message, url=url,
+                display_name=user.get("display_name") or user.get("username") or "", event_name=name,
+                message=message, url=url,
             )
             mails += 1 if result.get("ok") and not result.get("skipped") else 0
         except Exception:
-            logger.warning("Event %s: Mail an %s nicht eingereiht", log_safe(event["id"]), log_safe(user["id"]), exc_info=True)
+            logger.warning("Event %s: Mail an %s nicht eingereiht", log_safe(event["id"]), log_safe(user["id"]),
+                           exc_info=True)
     return {"notified": notified, "mails": mails}
 
 
@@ -104,11 +108,13 @@ async def cancel_event(db, event: dict, me: dict) -> dict:
             {"$set": {"status": "cancelled", "cancelled_with_event": True, "updated_at": now,
                       **({"billing_status": "cancelled"} if registration.get("price_snapshot") else {})}},
         )
-        orders += await billing_orders.cancel_orders_for(db, kind="event", registration_id=registration["id"], reason="Event abgesagt")
+        orders += await billing_orders.cancel_orders_for(db, kind="event", registration_id=registration["id"],
+                                                         reason="Event abgesagt")
     users = await _recipients(db, [registration.get("user_id") for registration in registrations])
     message = ("Das Event wurde abgesagt. Deine Anmeldung ist damit storniert – ein offener Kostenbeitrag wird nicht "
                "verrechnet; wurde schon eine Rechnung gestellt, meldet sich der Verein bei dir.")
-    sent = await _inform(db, event, users, title="abgesagt", message=message, dedupe=f"event-cancelled:{event['id']}:{now}")
+    sent = await _inform(db, event, users, title="abgesagt", message=message,
+                         dedupe=f"event-cancelled:{event['id']}:{now}")
     result = {"registrations": len(registrations), "notified": sent["notified"], "orders": orders}
     await db.audit_logs.insert_one({
         "id": new_id(), "action": "event.cancel", "actor_id": me["id"], "target_id": event["id"],
@@ -129,9 +135,12 @@ async def announce_change(db, before: dict, after: dict, me: dict) -> dict | Non
     users = await _recipients(db, [registration.get("user_id") for registration in registrations])
     now = now_utc().isoformat()
     details = _when_and_where(after)
-    message = f"Termin oder Ort des Events haben sich geändert. {details}." if details else "Termin oder Ort des Events haben sich geändert."
+    message = "Termin oder Ort des Events haben sich geändert."
+    if details:
+        message += f" {details}."
     message += " Wenn du nicht mehr kannst, melde dich bitte auf der Event-Seite ab."
-    sent = await _inform(db, after, users, title="Termin oder Ort geändert", message=message, dedupe=f"event-changed:{after['id']}:{now}")
+    sent = await _inform(db, after, users, title="Termin oder Ort geändert", message=message,
+                         dedupe=f"event-changed:{after['id']}:{now}")
     result = {"recipients": len(users), "notified": sent["notified"], "mails": sent["mails"]}
     await db.audit_logs.insert_one({
         "id": new_id(), "action": "event.change_notice", "actor_id": me["id"], "target_id": after["id"],
@@ -142,19 +151,23 @@ async def announce_change(db, before: dict, after: dict, me: dict) -> dict | Non
 
 async def delete_block_reason(db, event: dict) -> str | None:
     """Warum das Event nicht gelöscht werden darf - ``None``, wenn nichts mehr daran hängt."""
-    active = await db.event_registrations.count_documents({"event_id": event["id"], "status": {"$in": list(AFFECTED_STATUSES)}})
+    active = await db.event_registrations.count_documents(
+        {"event_id": event["id"], "status": {"$in": list(AFFECTED_STATUSES)}})
     if active:
-        return (f"Für dieses Event gibt es noch {active} {'Anmeldung' if active == 1 else 'Anmeldungen'} (samt Warteliste). "
-                "Bitte das Event zuerst absagen – dann werden alle informiert und offene Rechnungsaufträge storniert.")
-    invoiced = await db.billing_orders.count_documents({"kind": "event", "source_id": event["id"], "status": "invoiced"})
+        word = "Anmeldung" if active == 1 else "Anmeldungen"
+        return (f"Für dieses Event gibt es noch {active} {word} (samt Warteliste). Bitte das Event zuerst absagen – "
+                "dann werden alle informiert und offene Rechnungsaufträge storniert.")
+    invoiced = await db.billing_orders.count_documents(
+        {"kind": "event", "source_id": event["id"], "status": "invoiced"})
     if invoiced:
-        return ("Zu diesem Event gibt es schon eine Rechnung. Die Anmeldungen bleiben dafür als Nachweis – bitte das Event "
-                "absagen bzw. archivieren statt löschen.")
+        return ("Zu diesem Event gibt es schon eine Rechnung. Die Anmeldungen bleiben dafür als Nachweis – bitte das "
+                "Event absagen bzw. archivieren statt löschen.")
     tournament_ids = [row["id"] async for row in db.tournaments.find({"event_id": event["id"]}, {"_id": 0, "id": 1})]
     if tournament_ids and await db.tournament_registrations.count_documents(
         {"tournament_id": {"$in": tournament_ids}, "status": {"$in": list(ACTIVE_TOURNAMENT_REGISTRATIONS)}}, limit=1,
     ):
-        return "Ein Turnier dieses Events hat noch Anmeldungen – bitte das Event absagen bzw. das Turnier zuerst im Programm klären."
+        return ("Ein Turnier dieses Events hat noch Anmeldungen – bitte das Event absagen bzw. das Turnier zuerst im "
+                "Programm klären.")
     return None
 
 
@@ -162,15 +175,19 @@ async def delete_event(db, event: dict, me: dict) -> dict:
     """Löschen, wenn nichts mehr daran hängt: Anmeldungen (alle storniert) gehen, Turniere, Fast Laps und Alben werden
     gelöst. Stornierte Aufträge bleiben als Beleg der Abrechnung."""
     now = now_utc().isoformat()
-    registrations = [row["id"] async for row in db.event_registrations.find({"event_id": event["id"]}, {"_id": 0, "id": 1})]
+    registrations = [row["id"] async for row in
+                     db.event_registrations.find({"event_id": event["id"]}, {"_id": 0, "id": 1})]
     for registration_id in registrations:
         # Sicherheitsnetz: ein noch offener Auftrag zu einer stornierten Anmeldung schriebe sonst später ins Leere.
-        await billing_orders.cancel_orders_for(db, kind="event", registration_id=registration_id, reason="Event gelöscht")
+        await billing_orders.cancel_orders_for(db, kind="event", registration_id=registration_id,
+                                               reason="Event gelöscht")
     await db.events.delete_one({"id": event["id"]})
     await db.event_registrations.delete_many({"event_id": event["id"]})
     unlinked = {}
-    for name, collection in (("tournaments", db.tournaments), ("fast_laps", db.f1_challenges), ("albums", db.gallery_albums)):
-        result = await collection.update_many({"event_id": event["id"]}, {"$set": {"event_id": None, "updated_at": now}})
+    linked = (("tournaments", db.tournaments), ("fast_laps", db.f1_challenges), ("albums", db.gallery_albums))
+    for name, collection in linked:
+        result = await collection.update_many({"event_id": event["id"]},
+                                              {"$set": {"event_id": None, "updated_at": now}})
         unlinked[name] = int(result.modified_count)
     await db.audit_logs.insert_one({
         "id": new_id(), "action": "event.delete", "actor_id": me["id"], "target_id": event["id"],

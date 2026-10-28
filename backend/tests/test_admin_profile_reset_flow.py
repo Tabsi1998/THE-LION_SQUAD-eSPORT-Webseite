@@ -81,9 +81,10 @@ async def test_a_reason_is_required(flow):
     chair = await granted(flow, "vorsitz", "club")
     person = await target(flow)
     flow.act_as(chair)
-    assert (await flow.patch(f"/api/users/{person['id']}", json={"reset": ["bio"]})).status_code == 422
-    assert (await flow.patch(f"/api/users/{person['id']}", json={"reset": ["bio"], "reason": "  x "})).status_code == 422
-    assert (await flow.put(f"/api/users/{person['id']}", json={"reset": [], "reason": "Leere Liste"})).status_code == 422
+    without = await flow.patch(f"/api/users/{person['id']}", json={"reset": ["bio"]})
+    blank = await flow.patch(f"/api/users/{person['id']}", json={"reset": ["bio"], "reason": "  x "})
+    nothing = await flow.put(f"/api/users/{person['id']}", json={"reset": [], "reason": "Leere Liste"})
+    assert [without.status_code, blank.status_code, nothing.status_code] == [422, 422, 422]
 
 
 @pytest.mark.asyncio
@@ -97,7 +98,8 @@ async def test_superadmin_accounts_only_by_a_superadmin(flow):
     assert refused.status_code == 403
     assert (await flow.db.users.find_one({"id": other_root["id"]}))["bio"] == "Unpassender Text"
     flow.act_as(root)
-    assert (await flow.patch(f"/api/users/{other_root['id']}", json=body)).status_code == 200
+    allowed = await flow.patch(f"/api/users/{other_root['id']}", json=body)
+    assert allowed.status_code == 200
 
 
 @pytest.mark.asyncio
@@ -105,7 +107,9 @@ async def test_players_and_unknown_accounts(flow):
     player = await flow.add_user(role="player", name="spieler")
     person = await target(flow)
     flow.act_as(player)
-    assert (await flow.patch(f"/api/users/{person['id']}", json={"reset": ["bio"], "reason": "Kein Recht dazu"})).status_code == 403
+    refused = await flow.patch(f"/api/users/{person['id']}", json={"reset": ["bio"], "reason": "Kein Recht dazu"})
+    assert refused.status_code == 403
     chair = await granted(flow, "vorsitz", "club")
     flow.act_as(chair)
-    assert (await flow.patch("/api/users/gibt-es-nicht", json={"reset": ["bio"], "reason": "Konto fehlt"})).status_code == 404
+    missing = await flow.patch("/api/users/gibt-es-nicht", json={"reset": ["bio"], "reason": "Konto fehlt"})
+    assert missing.status_code == 404
