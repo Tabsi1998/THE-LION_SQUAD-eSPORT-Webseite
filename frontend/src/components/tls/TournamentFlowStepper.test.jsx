@@ -31,3 +31,19 @@ test("eine laufende Staffel zählt die Spieltage", () => {
   expect(screen.getByTestId("flow-step-matchdays")).toHaveTextContent("1/2 Spiele");
   expect(screen.getByTestId("flow-step-matchdays")).toHaveAttribute("aria-current", "step");
 });
+
+// Je Format der passende Schritt (#2111, T6): ohne Baum der Spielplan, beim Schweizer System die Runden, bei
+// Mehrspieler die Läufe; Zeitfahren und Rennserie ohne Setzliste und Spiele.
+test("je Format: Spielplan, Runden, Läufe - Zeitfahren ohne Spiele", () => {
+  const { unmount } = render(<TournamentFlowStepper tournament={{ status: "draft", format: "league" }} registrations={[]} matchesV2={[]} />);
+  expect(labels()).toContain("Spielplan");
+  unmount();
+  const swiss = render(<TournamentFlowStepper tournament={{ status: "draft", format: "swiss" }} registrations={[]} matchesV2={[]} />);
+  expect(labels()).toContain("Runden");
+  swiss.unmount();
+  const ffa = render(<TournamentFlowStepper tournament={{ status: "draft", format: "ffa" }} registrations={[]} matchesV2={[]} />);
+  expect(labels()).toContain("Läufe");
+  ffa.unmount();
+  render(<TournamentFlowStepper tournament={{ status: "draft", format: "time_trial" }} registrations={[]} matchesV2={[]} />);
+  expect(labels()).toEqual(["Anmeldung", "Check-in", "Endstand"]);
+});

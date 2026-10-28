@@ -23,17 +23,27 @@ function rank(status) {
   return STATUS_RANK[status] ?? 0;
 }
 
+// Was der Schritt „Turnierbaum“ je Format ist (#2111, T6): ohne Baum der Spielplan, beim Schweizer System die Runden,
+// bei Gruppen die Gruppen, bei Mehrspieler die Läufe. Zeitfahren und Rennserie bekommen keine Spiele - dort gibt es
+// weder Setzliste noch Spiele im Ablauf.
+const BRACKET_STEP_LABELS = {
+  round_robin: "Spielplan", league: "Spielplan", swiss: "Runden", groups: "Gruppen",
+  ffa: "Läufe", battle_royale: "Läufe", ffa_custom_bracket: "Läufe",
+};
+const NO_MATCH_FORMATS = new Set(["time_trial", "grand_prix"]);
+
 // Ein gewöhnliches Turnier: Anmeldung → Check-in → Setzliste → Turnierbaum → Ergebnisse → Endstand.
-function tournamentSteps({ r, approved, checkedIn, totalMatches, completedMatches, published }) {
+function tournamentSteps({ r, approved, checkedIn, totalMatches, completedMatches, published, format }) {
   const hasBracket = totalMatches > 0;
-  return [
+  const steps = [
     { id: "registration", key: "participants", icon: ClipboardList, label: "Anmeldung", meta: `${approved} bestätigt`, done: r >= rank("check_in") },
     { id: "check-in", key: "participants", icon: UserCheck, label: "Check-in", meta: `${checkedIn} eingecheckt`, done: r >= rank("live") },
     { id: "seeding", key: "bracket", icon: Shuffle, label: "Setzliste", meta: hasBracket ? "gesetzt" : "offen", done: hasBracket },
-    { id: "bracket", key: "bracket", icon: Network, label: "Turnierbaum", meta: hasBracket ? `${totalMatches} Spiele` : "—", done: hasBracket },
+    { id: "bracket", key: "bracket", icon: Network, label: BRACKET_STEP_LABELS[format] || "Turnierbaum", meta: hasBracket ? `${totalMatches} Spiele` : "—", done: hasBracket },
     { id: "results", key: "stages", icon: Flag, label: "Ergebnisse", meta: hasBracket ? `${completedMatches}/${totalMatches}` : "—", done: hasBracket && completedMatches === totalMatches },
     { id: "standings", key: "bracket", icon: Trophy, label: "Endstand", meta: published ? "veröffentlicht" : "offen", done: published },
   ];
+  return NO_MATCH_FORMATS.has(format) ? steps.filter((step) => !["seeding", "bracket", "results"].includes(step.id)) : steps;
 }
 
 // Liga-Staffel (#2109, S17): keine Anmeldung, kein Check-in, kein Baum. Co-Teams zuteilen → Liga starten → Spieltage →
@@ -66,7 +76,7 @@ export function TournamentFlowStepper({ tournament, registrations = [], matchesV
 
   const steps = staffel
     ? staffelSteps({ r, approved, matches: allMatches, published })
-    : tournamentSteps({ r, approved, checkedIn, totalMatches, completedMatches, published });
+    : tournamentSteps({ r, approved, checkedIn, totalMatches, completedMatches, published, format: tournament?.format });
 
   // Current step = first not-done step, else the last one.
   let current = steps.findIndex((step) => !step.done);
