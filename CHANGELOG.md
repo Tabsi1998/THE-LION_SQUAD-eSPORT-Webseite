@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.50.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.49.0...v1.50.0) (2026-10-28)
+
+
+### Neu
+
+* Shop: Prüfung sperrt Produkte mit Vereinsnummer nicht mehr ([#2150](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2150)) ([0f3b973](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/0f3b973145bf006bb0f5c5aad4846a1d6a009446))
+* Shop: Testentwurf druckt die Beispielnummer statt keiner Nummer ([#2150](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2150)) ([0f3b973](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/0f3b973145bf006bb0f5c5aad4846a1d6a009446))
+* Shop: Vereinsnummer wird bei Bestellungen mit Einwilligung je Position gedruckt ([#2150](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2150)) ([0f3b973](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/0f3b973145bf006bb0f5c5aad4846a1d6a009446))
+
+
+### Fehlerbehebungen
+
+* Shop: Gelöschte Druckdateien verraten Gamertag und Vereinsnummer nicht mehr über Prüfsummen ([#2150](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2150)) ([0f3b973](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/0f3b973145bf006bb0f5c5aad4846a1d6a009446))
+* Turniere: „Zurück“ in der Druckansicht führt zur Seite, von der gedruckt wurde ([#2121](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2121)) ([9b642f1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9b642f1214c742c0c7c2f0d64f82be218753e4fb))
+* Turniere: Druckansicht druckt die Tabelle statt Spieltage als Baum, Rangliste mit Drucken-Knopf ([#2121](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2121)) ([9b642f1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9b642f1214c742c0c7c2f0d64f82be218753e4fb))
+* Turniere: Ergebnis-PDF heißt Rangliste und hat Spalten je Format und je Gruppe eine Tabelle ([#2121](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2121)) ([9b642f1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9b642f1214c742c0c7c2f0d64f82be218753e4fb))
+* Turniere: Ergebnis-PDF zeigt bei fehlenden Werten einen Strich und hält Gruppenüberschrift und Tabelle zusammen ([#2121](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2121)) ([9b642f1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9b642f1214c742c0c7c2f0d64f82be218753e4fb))
+* Turniere: Freilose vergeben in der Rangliste noch keine Plätze ([#2121](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2121)) ([9b642f1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9b642f1214c742c0c7c2f0d64f82be218753e4fb))
+* Turniere: K.-o.-Rangliste zählt Niederlagen und nennt die erreichte Runde mit Namen aus dem Baum ([#2121](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2121)) ([9b642f1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9b642f1214c742c0c7c2f0d64f82be218753e4fb))
+* Turniere: Rangliste bei Läufen mit Platz im Schnitt und Punkten, Namensspalte „Team“ bei Team-Turnieren ([#2121](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2121)) ([9b642f1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9b642f1214c742c0c7c2f0d64f82be218753e4fb))
+* Turniere: Rangliste zeigt nur Teilnehmende und vergibt Plätze erst ab dem ersten Ergebnis ([#2121](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2121)) ([9b642f1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9b642f1214c742c0c7c2f0d64f82be218753e4fb))
+* Turniere: Turnierseite nennt den Endplatz erst nach dem Ende ([#2121](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2121)) ([9b642f1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9b642f1214c742c0c7c2f0d64f82be218753e4fb))
+* Turniere: TV kürt bei Liga und Schweizer System den Sieger aus Platz 1 der Tabelle ([#2121](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2121)) ([9b642f1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9b642f1214c742c0c7c2f0d64f82be218753e4fb))
+* Turniere: TV zeigt bei Liga, Gruppen und Schweizer System die Folie Tabelle und nennt sie überall so ([#2121](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2121)) ([9b642f1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9b642f1214c742c0c7c2f0d64f82be218753e4fb))
+* Turniere: Urkunden zeigen im K.-o. die Runde und erscheinen nur mit Platz 1 bis 4, nie bei Gruppen ([#2121](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2121)) ([9b642f1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9b642f1214c742c0c7c2f0d64f82be218753e4fb))
+
 ## 1.49.0 (28.10.2026)
 
 ### Neu
