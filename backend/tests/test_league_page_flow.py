@@ -176,7 +176,8 @@ async def test_staffel_route_for_seasons_off_and_admins(flow):
 
     for visibility, allowed in (("admins", {"leitung"}), ("off", set())):
         flow.act_as(admin)
-        assert (await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"visibility": visibility})).status_code == 200
+        changed = await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"visibility": visibility})
+        assert changed.status_code == 200
         for name, person in (("anonym", None), ("gast", guest), ("mitglied", member), ("ohne-2fa", unconfirmed),
                              ("leitung", lead)):
             flow.act_as(person)
