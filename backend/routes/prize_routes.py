@@ -488,6 +488,12 @@ async def auto_create(tournament_id: str, me: dict = Depends(get_current_user)):
     await _ensure_prize_manager(me, tournament_id)
     """Manual trigger to (re)create pickups for a tournament — useful when
     results were corrected after publishing."""
+    db = get_db()
+    tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0, "status": 1})
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Turnier nicht gefunden.")
+    if tournament.get("status") not in RESULT_CERTIFICATE_STATUSES:
+        raise HTTPException(status_code=409, detail="Gewinne können erst nach veröffentlichten Ergebnissen erzeugt werden.")
     from services.prize_service import auto_create_for_tournament
     n = await auto_create_for_tournament(tournament_id)
     return {"created": n}
