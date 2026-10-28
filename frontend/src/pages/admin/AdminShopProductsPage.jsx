@@ -332,7 +332,7 @@ function PrintfulStep({ view, busy, run }) {
           <div><dt className="text-white/50 text-xs">Techniken</dt><dd data-testid="shop-printful-techniques">{techniqueList(printful.techniques) || "–"}</dd></div>
           <div className="sm:col-span-2"><dt className="text-white/50 text-xs">Druckflächen</dt>
             <dd className="flex flex-wrap gap-2 mt-1">{printful.placements.map((row) => (
-              <span key={`${row.placement}-${row.technique}`} className="border border-white/15 rounded-sm px-2 py-0.5 text-xs">{row.placement} ({techniqueLabel(row.technique)}) · {inches(row.width_in)} × {inches(row.height_in)}</span>
+              <span key={`${row.placement}-${row.technique}`} className="border border-white/15 rounded-sm px-2 py-0.5 text-xs" data-testid={`shop-printful-placement-${row.placement}`}>{view.labels.placements?.[row.placement] || row.placement} ({techniqueLabel(row.technique)}) · {inches(row.width_in)} × {inches(row.height_in)}</span>
             ))}</dd>
           </div>
         </dl>

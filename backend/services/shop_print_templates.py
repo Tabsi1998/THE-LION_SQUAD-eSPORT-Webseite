@@ -59,8 +59,68 @@ FAMILIES = {"front": "Vorderseite", "back": "Rückseite", "sleeve": "Ärmel", "l
             "other": "Sonstige Fläche (Tasse, Tuch …)"}
 
 
+# Wortweise Übersetzung der Printful-Kennungen und Anzeigenamen (#2105): „sleeve_left_short_dtf“ und „Short left sleeve“
+# werden zu „Ärmel links (kurz)“. Die Technik steht schon daneben, Füllwörter wie „print“ fallen weg.
+PLACEMENT_NOUNS = (  # Vorrang: das erste gefundene Wort ist das Hauptwort
+    ("label", "Etikett"), ("sleeve", "Ärmel"), ("pocket", "Tasche"), ("hood", "Kapuze"), ("wrist", "Handgelenk"),
+    ("neck", "Nacken"), ("collar", "Kragen"), ("leg", "Bein"), ("chest", "Brust"), ("front", "Vorderseite"),
+    ("back", "Rückseite"), ("side", "Seite"), ("wrap", "Rundum"), ("default", "Druckfläche"),
+)
+PLACEMENT_SIDES = {"left": "links", "right": "rechts", "center": "mittig", "centre": "mittig", "middle": "mittig"}
+PLACEMENT_HEIGHTS = {"top": "oben", "bottom": "unten", "upper": "oben", "lower": "unten"}
+PLACEMENT_SIZES = {"large": "groß", "big": "groß", "small": "klein", "mini": "klein"}
+PLACEMENT_LENGTHS = {"short": "kurz", "long": "lang"}
+PLACEMENT_FILLERS = {"print", "printing", "area", "placement", "dtf", "dtg", "dtfilm", "embroidered", "side", "around",
+                     "hat", "panel", "the", "of"}
+SYNONYMS = {"sleeves": "sleeve", "labels": "label", "hoodie": "hood", "pockets": "pocket", "legs": "leg",
+            "centered": "center", "inner": "inside", "outer": "outside", "rear": "back"}
+
+
+def _translate_words(text: str | None) -> str | None:
+    words = [SYNONYMS.get(word, word) for word in re.split(r"[^a-z0-9]+", str(text or "").lower()) if word]
+    if not words:
+        return None
+    known = ({noun for noun, _ in PLACEMENT_NOUNS} | set(PLACEMENT_SIDES) | set(PLACEMENT_HEIGHTS)
+             | set(PLACEMENT_SIZES) | set(PLACEMENT_LENGTHS) | PLACEMENT_FILLERS | {"inside", "outside", "embroidery"})
+    if any(word not in known for word in words):
+        return None
+    present = set(words)
+    noun = next(((key, german) for key, german in PLACEMENT_NOUNS if key in present), None)
+    if noun is None:
+        if not present & (set(PLACEMENT_SIDES) | set(PLACEMENT_HEIGHTS) | set(PLACEMENT_SIZES)):
+            return None
+        noun = ("default", "Druckfläche")
+    key, text = noun
+    if key == "label":
+        text = "Innenetikett" if "inside" in present else "Außenetikett" if "outside" in present else text
+    if key == "neck" and "back" in present:
+        present.discard("back")
+    parts = [text]
+    if key not in ("front", "back"):
+        parts += ["vorne" for word in ("front",) if word in present] + ["hinten" for word in ("back",) if word in present]
+    parts += [PLACEMENT_SIDES[word] for word in words if word in PLACEMENT_SIDES]
+    parts += [PLACEMENT_HEIGHTS[word] for word in words if word in PLACEMENT_HEIGHTS]
+    parts += [PLACEMENT_SIZES[word] for word in words if word in PLACEMENT_SIZES]
+    out = " ".join(dict.fromkeys(parts))
+    lengths = [PLACEMENT_LENGTHS[word] for word in words if word in PLACEMENT_LENGTHS]
+    if lengths:
+        out += f" ({lengths[0]})"
+    return f"Stickerei {out}" if "embroidery" in present else out
+
+
+def _german_placement(placement: str, display_name: str | None) -> str | None:
+    return PLACEMENT_LABELS.get(placement) or _translate_words(placement) or _translate_words(display_name)
+
+
 def placement_label(placement: str, display_name: str | None = None) -> str:
-    return PLACEMENT_LABELS.get(placement) or (display_name or placement.replace("_", " ").capitalize())
+    """Deutscher Name einer Printful-Fläche: bekannte Kennung, sonst wortweise aus Kennung bzw. Anzeigename - englisch
+    nur als letzter Rückfall (``placement_translated`` sagt dann ``False``, der Admin zeigt einen Hinweis)."""
+    return (_german_placement(placement, display_name)
+            or (display_name or str(placement or "").replace("_", " ").capitalize()))
+
+
+def placement_translated(placement: str, display_name: str | None = None) -> bool:
+    return _german_placement(placement, display_name) is not None
 
 
 def family(placement: str) -> str:
@@ -264,7 +324,12 @@ def diff(before: Sequence[dict], after: Sequence[dict]) -> list[str]:
 async def get(db, printful_product_id: int) -> dict | None:
     if type(printful_product_id) is not int:
         return None
-    return await db.shop_print_templates.find_one({"printful_product_id": printful_product_id}, {"_id": 0})
+    template = await db.shop_print_templates.find_one({"printful_product_id": printful_product_id}, {"_id": 0})
+    # Namen der Flächen beim Lesen deutsch (#2105) - auch für Vorlagen, die vor der Übersetzung gespeichert wurden.
+    for entry in (template or {}).get("entries") or []:
+        if isinstance(entry, dict) and entry.get("placement"):
+            entry["label"] = placement_label(entry["placement"], entry.get("display_name"))
+    return template
 
 
 async def refresh(db, printful_product_id: int, *, provider: FulfillmentProvider, actor_id: str,

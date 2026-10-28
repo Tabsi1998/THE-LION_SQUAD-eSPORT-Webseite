@@ -4,6 +4,7 @@ import { AlertTriangle, CheckCircle2, ExternalLink, FileImage, Info, PackageChec
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { StepBar } from "@/components/tls/StepBar";
 import { api, formatRequestError } from "@/lib/api";
+import { techniqueLabel } from "@/lib/shopTechniques";
 import { viennaDateTime } from "@/lib/vienna";
 import ShopTabs from "./ShopTabs";
 
@@ -146,8 +147,8 @@ function Files({ files }) {
       {files.map((file) => (
         <li key={file.placement} className="border border-white/10 rounded-sm p-2 text-xs text-white/75 space-y-1 min-w-0">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className="font-bold text-white uppercase tracking-wider">{file.placement}</span>
-            <span>{file.technique}</span>
+            <span className="font-bold text-white uppercase tracking-wider">{file.placement_label || file.placement}</span>
+            <span>{techniqueLabel(file.technique)}</span>
             <span>{KIND_LABELS[file.kind] || file.kind}{file.version ? ` · v${file.version}` : ""}</span>
             <span className="tabular-nums">{file.width_px} × {file.height_px} px · {file.dpi} DPI</span>
           </div>

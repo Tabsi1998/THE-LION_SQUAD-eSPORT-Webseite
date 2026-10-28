@@ -332,6 +332,7 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
           <input type="checkbox" checked={used} disabled={!editable} onChange={(event) => onToggle(event.target.checked)} className="w-4 h-4 accent-brand" data-testid={`shop-area-use-${available.key}`} />
           {available.label}
         </label>
+        {available.label_translated === false && <span className="text-xs text-honor" data-testid={`shop-area-label-english-${available.key}`}>Bezeichnung von Printful (englisch) - keine Übersetzung bekannt</span>}
         <span className="text-xs text-white/50 tabular-nums" data-testid={`shop-area-size-${available.key}`}>Druckdatei {sizeText(available.file)}{surcharge}</span>
         {available.groups.length > 1 && <span className="text-xs text-honor">Je Größe eine eigene Fläche ({available.groups.length})</span>}
       </div>

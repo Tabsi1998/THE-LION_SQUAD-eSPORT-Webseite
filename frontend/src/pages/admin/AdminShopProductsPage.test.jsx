@@ -343,6 +343,22 @@ test("Druckflächen: exakte Größe von Printful, Vorlagenbild, Motiv mit Vorgab
   ]);
 });
 
+test("Flächen heißen deutsch - eine englische Bezeichnung von Printful ist als Rückfall markiert (#2105)", async () => {
+  const base = view();
+  const english = { ...base.available_placements[1], key: "zz_odd", label: "Odd panel", label_translated: false };
+  apiMock.get.mockResolvedValue({ data: view({ extra: {
+    labels: { ...LABELS, placements: { front: "Vorderseite", back: "Rückseite" } },
+    available_placements: [{ ...base.available_placements[0], label_translated: true }, english],
+  } }) });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  expect(await screen.findByTestId("shop-printful-placement-front")).toHaveTextContent("Vorderseite (DTG-Direktdruck)");
+  expect(screen.getByTestId("shop-printful-placement-back")).toHaveTextContent("Rückseite");
+  await user.click(screen.getByTestId("shop-step-designs"));
+  expect(screen.queryByTestId("shop-area-label-english-front")).toBeNull();
+  expect(screen.getByTestId("shop-area-label-english-zz_odd")).toHaveTextContent("Bezeichnung von Printful (englisch)");
+});
+
 test("Feinjustieren mit Pfeiltasten; was aus der Fläche ragt, sagt die Vorschau", async () => {
   apiMock.put.mockResolvedValue({ data: view() });
   const user = userEvent.setup();

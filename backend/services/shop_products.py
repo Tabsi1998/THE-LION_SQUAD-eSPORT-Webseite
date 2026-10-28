@@ -265,6 +265,8 @@ async def available_placements(db, product: dict, *, template: dict | None = Non
         main = next((row for row in entries if not row["variant_ids"]), entries[0])
         out.append({
             "key": placement, "label": main["label"], "family": main["family"],
+            # Englisch nur als letzter Rückfall (#2105) - dann zeigt der Admin einen Hinweis.
+            "label_translated": templates.placement_translated(placement, main.get("display_name")),
             "family_label": templates.FAMILIES[main["family"]], "technique": main["technique"],
             "file": _entry_view(main), "groups": [_entry_view(row) for row in entries],
             "preview": _preview_view(template, main),
@@ -739,7 +741,7 @@ async def admin_view(db, product_id: str) -> dict:
         "labels": {"statuses": shop_catalog.STATUS_LABELS, "visibilities": shop_catalog.VISIBILITY_LABELS,
                    "personalizations": shop_catalog.PERSONALIZATION_LABELS, "kinds": KIND_LABELS,
                    "modes": shop_print_files.MODES, "families": templates.FAMILIES,
-                   "anchors": templates.ANCHORS},
+                   "anchors": templates.ANCHORS, "placements": _placement_names(printful, template)},
         "variants": variant_rows,
         "placements": placement_rows,
         "layout_converted": conversion["converted"],
@@ -763,6 +765,17 @@ async def admin_view(db, product_id: str) -> dict:
                    "max_layers": shop_print_files.MAX_LAYERS, "min_width_cm": presets_doc["rules"]["min_width_cm"],
                    "max_offset_cm": shop_print_files.MAX_OFFSET_CM},
     }
+
+
+def _placement_names(printful: dict, template: dict | None) -> dict[str, str]:
+    """Kennung → deutscher Name für alle Flächen des Printful-Produkts (Schritt 1) und der Vorlage (#2105)."""
+    names = {row["placement"]: row.get("label") or templates.placement_label(row["placement"])
+             for row in (template or {}).get("entries") or [] if isinstance(row, dict) and row.get("placement")}
+    for row in printful.get("placements") or []:
+        key = row.get("placement")
+        if key and key not in names:
+            names[key] = templates.placement_label(key)
+    return names
 
 
 def _gamertag_canvas(rules: dict) -> dict:

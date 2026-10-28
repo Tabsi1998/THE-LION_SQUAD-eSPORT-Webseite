@@ -34,7 +34,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from models import new_id, now_utc
-from services import shop_catalog, shop_common, shop_config, shop_gamertag, shop_print_files, shop_products
+from services import shop_catalog, shop_colors, shop_common, shop_config, shop_gamertag, shop_print_files, shop_products
+from services import shop_print_templates
 from services.mutation_lock import MutationLockBusy, mutation_lock
 from services.printful_client import order_payload
 from services.shop_common import ShopConflict, ShopError, record_admin_action
@@ -731,6 +732,10 @@ def view(record: dict) -> dict:
     out["deviation_summary"] = {level: sum(1 for row in deviations if row["level"] == level)
                                 for level in ("ok", "warn", "error")}
     out["actions"] = actions(record)
+    # Anzeige auf Deutsch (#2105) - Kennung und Printful-Farbe bleiben im Datensatz unverändert.
+    out["files"] = [{**item, "placement_label": shop_print_templates.placement_label(item.get("placement") or "")}
+                    for item in record.get("files") or []]
+    out["variant_display"] = record.get("variant_display") or shop_colors.stored_label(record.get("variant_label"))
     return out
 
 
