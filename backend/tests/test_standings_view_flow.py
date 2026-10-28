@@ -68,8 +68,11 @@ async def test_the_tv_gets_the_league_table_with_its_display_key_and_without_acc
     assert created.status_code == 200, created.text
     flow.act_as(None)
 
+    token = created.json()["token"]
+    plain = (await flow.get(f"/api/tournaments/{tournament['id']}/bracket/display", params={"key": token})).json()
+    assert "standings" not in plain, "Stations- und Hallen-TV fragen ohne Tabelle und bekommen keine"
     body = (await flow.get(f"/api/tournaments/{tournament['id']}/bracket/display",
-                           params={"key": created.json()["token"]})).json()
+                           params={"key": token, "table": 1})).json()
 
     assert {row["registration_id"] for row in body["standings"]} == {registration["id"] for registration in registrations}
     assert all(row["played"] == 0 and row["rank"] == 1 for row in body["standings"])
@@ -83,5 +86,27 @@ async def test_the_tv_gets_the_league_table_with_its_display_key_and_without_acc
 async def test_a_knockout_tv_gets_no_table(flow):
     staff, tournament, _users, _registrations = await drawn(flow, 4)
     flow.act_as(staff)
-    body = (await flow.get(f"/api/tournaments/{tournament['id']}/bracket/display")).json()
+    body = (await flow.get(f"/api/tournaments/{tournament['id']}/bracket/display", params={"table": 1})).json()
     assert "standings" not in body
+
+
+@pytest.mark.asyncio
+async def test_byes_with_six_players_are_no_result_yet(flow):
+    """Sechs Spieler: zwei Freilose sind beim Erzeugen schon „entschieden“ - die Rangliste bleibt trotzdem leer."""
+    _staff, tournament, _users, _registrations = await drawn(flow, 6)
+    byes = [m for m in await flow.matches(tournament)
+            if m.get("status") in ("completed", "forfeit") and len([s for s in m["slots"] if s.get("registration_id")]) < 2]
+    assert byes, "der Baum mit 6 Spielern hat Freilose"
+    flow.act_as(None)
+    assert await standings(flow, tournament) == []
+
+
+@pytest.mark.asyncio
+async def test_the_staff_tv_gets_the_table_only_on_request(flow):
+    staff, tournament, _users, registrations = await drawn(flow, 4, format="league")
+    flow.act_as(staff)
+    url = f"/api/tournaments/{tournament['id']}/bracket/display"
+    assert "standings" not in (await flow.get(url)).json()
+    rows = (await flow.get(url, params={"table": 1})).json()["standings"]
+    assert {row["registration_id"] for row in rows} == {registration["id"] for registration in registrations}
+    assert "user_id" not in json.dumps(rows)

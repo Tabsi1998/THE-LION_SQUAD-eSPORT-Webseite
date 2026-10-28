@@ -4,7 +4,7 @@ welche Spalten das PDF je Format hat. Alle Namen sind erfunden."""
 from pdf_service import _pdf_standings_tables, pdf_standings
 from routes.export_routes import _tournament_certificate_metrics
 from services.competition_snapshot import adapt_stage_matches, build_structure_snapshot
-from services.competition_standings import public_standings, stage_standings, standing_registrations
+from services.competition_standings import has_results, public_standings, reached_labels, stage_standings, standing_registrations
 
 
 def _duel(match_id, round_number, winner, loser, *, status="completed", section="main"):
@@ -93,8 +93,10 @@ def test_the_knockout_pdf_counts_rounds_not_points_and_names_teams():
     [solo] = _pdf_standings_tables({"format": "single_elim", "team_mode": "solo"}, rows)
     [team] = _pdf_standings_tables({"format": "double_elim", "team_mode": "team"}, rows)
 
-    assert solo["headers"] == ["Platz", "Name", "Siege", "Niederlagen", "Runde"]
+    assert solo["headers"] == ["Platz", "Name", "Siege", "Niederlagen", "Erreicht"]
     assert solo["rows"][1] == ["2", "Wolkenfuchs", "1", "1", "2"]
+    [named] = _pdf_standings_tables({"format": "double_elim"}, [{**rows[1], "reached": "Loser Runde 4", "lost": None}])
+    assert named["rows"][0][2:] == ["1", "–", "Loser Runde 4"], "ohne Wert ein Strich, nie eine erfundene 0"
     assert team["headers"][1] == "Team"
 
 
@@ -160,5 +162,52 @@ def test_certificates_show_the_round_in_a_knockout_and_points_in_a_table():
     league = {"rank": 1, "won": 2, "lost": 0, "points": 6, "score_diff": 3}
 
     assert _tournament_certificate_metrics(knockout, {"format": "single_elim"}) == [
-        {"label": "Siege", "value": 1}, {"label": "Niederlagen", "value": 1}, {"label": "Runde", "value": 2}]
+        {"label": "Siege", "value": 1}, {"label": "Niederlagen", "value": 1}, {"label": "Erreicht", "value": 2}]
+    assert _tournament_certificate_metrics({**knockout, "reached": "Halbfinale"}, {"format": "single_elim"})[-1] == {
+        "label": "Erreicht", "value": "Halbfinale"}
     assert _tournament_certificate_metrics(league, {"format": "league"})[-1] == {"label": "Punkte", "value": 6}
+
+
+def test_a_bye_is_no_result():
+    bye = {**_duel("bye", 1, "r1", "r2"), "slots": [
+        {"slot": 1, "registration_id": "r1", "status": "filled", "source": {"type": "seed", "seed": 1}},
+        {"slot": 2, "registration_id": None, "status": "bye"},
+    ], "results": [{"registration_id": "r1", "rank": 1, "outcome": "winner"}]}
+    snapshot = build_structure_snapshot("t1", stage_matches=[bye, _duel("a", 1, "r3", "r4", status="scheduled")])
+
+    assert not has_results(snapshot["matches"])
+    assert public_standings({"format": "single_elim"}, snapshot, REGS) == []
+
+
+def test_reached_names_the_round_from_the_tree_and_the_phase_with_several():
+    double = adapt_stage_matches([
+        {**_duel("w1", 1, "r1", "r2"), "round_name": "Winner Runde 1", "section": "WB"},
+        {**_duel("w2", 1, "r3", "r4"), "round_name": "Winner Runde 1", "section": "WB"},
+        {**_duel("l1", 2, "r2", "r4"), "round_name": "Loser Runde 2", "section": "LB"},
+        {**_duel("gf", 3, "r1", "r3", status="scheduled"), "section": "GF"},
+    ])
+    labels = reached_labels(double, [{"id": "s1", "name": "Doppel-K.-o.", "number": 1, "stage_type": "double_elimination"}])
+    assert labels["r1"] == "Grand Final" and labels["r3"] == "Grand Final"
+    assert labels["r2"].startswith("Loser") and labels["r4"].startswith("Loser")
+
+    phases = adapt_stage_matches([
+        {**_duel("g1", 1, "r1", "r2"), "stage_id": "s1", "stage_number": 1, "section": "group_a"},
+        {**_duel("f1", 1, "r1", "r3"), "stage_id": "s2", "stage_number": 2, "round_name": "Finale"},
+    ])
+    stages = [{"id": "s1", "name": "Gruppenphase", "number": 1}, {"id": "s2", "name": "Finalrunde", "number": 2}]
+    labels = reached_labels(phases, stages)
+    assert labels["r1"] == "Finalrunde · Finale"
+    assert labels["r2"].startswith("Gruppenphase · ")
+
+
+def test_the_knockout_standings_carry_how_far_everyone_got():
+    snapshot = build_structure_snapshot("t1", stage_matches=[
+        {**_duel("a", 1, "r1", "r2"), "round_name": "Halbfinale"},
+        {**_duel("b", 1, "r3", "r4"), "round_name": "Halbfinale"},
+        {**_duel("f", 2, "r1", "r3", status="scheduled"), "round_name": "Finale"},
+    ], stages=[{"id": "s1", "name": "K.-o.", "number": 1, "stage_type": "single_elimination"}])
+
+    rows = {row["registration_id"]: row for row in public_standings(
+        {"format": "single_elim"}, snapshot, REGS, stages=[{"id": "s1", "name": "K.-o.", "number": 1}])}
+
+    assert rows["r1"]["reached"] == "Finale" and rows["r2"]["reached"] == "Halbfinale"

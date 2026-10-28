@@ -127,7 +127,9 @@ def _mark_own_rows(rows: list[dict], own_ids: set[str]) -> None:
             row["is_mine"] = True
 
 
-async def _build_bracket_payload(db, t: dict, user: dict | None, is_staff: bool) -> dict:
+async def _build_bracket_payload(db, t: dict, user: dict | None, is_staff: bool, *, with_table: bool = False) -> dict:
+    """Die Baum-Antwort. `with_table` (nur der Turnierbaum-TV, #2121): bei Tabellenformaten dazu die Rangliste - aus
+    demselben Lesestand und denselben Anmeldungen, ohne zweites Laden."""
     t["public_phase"] = derive_public_phase(t, "tournament")
     read_model = await load_competition_read_model(db, t["id"])
     # Der klassische Speicher wird nicht mehr gelesen (#231); `matches` bleibt leer, damit Web und App
@@ -144,6 +146,7 @@ async def _build_bracket_payload(db, t: dict, user: dict | None, is_staff: bool)
         matches_v2 = [public_match_view(match, viewer_id) for match in matches_v2]
         stages = [public_stage_view(stage) for stage in stages]
     regs = await db.tournament_registrations.find({"tournament_id": t["id"]}, {"_id": 0}).to_list(500)
+    raw_regs = regs
     own_ids = await _own_registration_ids(db, regs, user)
     regs = [_public_registration(r, user, is_staff) for r in regs]
     # Dein Weg und „Nur meine Spiele“ (#1562): die eigene Anmeldung ist markiert, auch im Team.
@@ -167,7 +170,10 @@ async def _build_bracket_payload(db, t: dict, user: dict | None, is_staff: bool)
         await hide_unseen_event_links(db, user, [t])
     structure = read_model.structure_snapshot()
     observe_structure_read(structure, surface="bracket")
-    return {
+    table = None
+    if with_table and t.get("format") in TABLE_FORMATS:
+        table = await _standing_rows(db, t, user, is_staff, read_model=read_model, regs=raw_regs, own_ids=own_ids)
+    payload = {
         # Die Abrechnung (`billing`) braucht der Baum nie; die Turnierseite zeigt sie nur dem Bereich Finanzen.
         "tournament": public_tournament_view(t),
         "matches": matches,
@@ -179,6 +185,9 @@ async def _build_bracket_payload(db, t: dict, user: dict | None, is_staff: bool)
         # Die Spiel-Daten für die Dauer-Kette der Website (#1554, lib/matchDuration.js): Modi und Aufbauzeit des Games.
         "duration_game": duration_game,
     }
+    if table is not None:
+        payload["standings"] = table
+    return payload
 
 
 @router.get("/{tid}/bracket")
@@ -197,11 +206,14 @@ async def get_bracket(tid: str, access: str | None = None, user=Depends(get_opti
 
 
 @router.get("/{tid}/bracket/display")
-async def get_bracket_display(tid: str, key: str | None = None, me: dict | None = Depends(get_optional_user)):
+async def get_bracket_display(tid: str, key: str | None = None, table: bool = False,
+                              me: dict | None = Depends(get_optional_user)):
     """Der Turnierbaum-TV: mit Anzeige-Schlüssel (#1110) ohne Anmeldung, sonst für die Turnierleitung.
 
     Ein Schlüssel öffnet nur die TV-Daten genau dieses Turniers. Steht einer im Link, zählt nur er - auch für
-    Angemeldete; so sieht der Admin am TV dasselbe wie die Halle, auch nach dem Widerrufen.
+    Angemeldete; so sieht der Admin am TV dasselbe wie die Halle, auch nach dem Widerrufen. `table=1` (nur der
+    Turnierbaum-TV, #2121): bei Liga, Jeder gegen jeden, Schweizer System und Gruppen dazu die Tabelle - Stations- und
+    Hallen-TV fragen ohne und rechnen sie nicht mit.
     """
     db = get_db()
     tid = await _resolve_tid(tid)
@@ -215,25 +227,24 @@ async def get_bracket_display(tid: str, key: str | None = None, me: dict | None 
         if key_expired(t, now_utc()):
             raise HTTPException(status_code=403, detail=KEY_EXPIRED)
         await touch_access_link(db, link)
-        payload = display_bracket_payload(await _build_bracket_payload(db, t, None, False))
-        return await _with_onsite_path(db, t, await _with_table(db, t, payload, None, False))
+        full = await _build_bracket_payload(db, t, None, False, with_table=table)
+        return await _with_onsite_path(db, t, _with_table(display_bracket_payload(full), full))
     if not me:
         raise HTTPException(status_code=401, detail="Nicht angemeldet")
     await require_tournament_staff_permission(me, tid, READ_STAFF_ROLES)
     t = await db.tournaments.find_one({"id": tid}, {"_id": 0})
     if not t:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
-    payload = await _build_bracket_payload(db, t, me, True)
+    payload = await _build_bracket_payload(db, t, me, True, with_table=table)
     # Wie mit Schlüssel: die belegten Plätze für den Anmelde-Bildschirm (#1123).
     payload["seats"] = seat_summary(t, payload.get("registrations"))
-    return await _with_onsite_path(db, t, await _with_table(db, t, payload, me, True))
+    return await _with_onsite_path(db, t, _with_table(payload, payload))
 
 
-async def _with_table(db, t: dict, payload: dict, user: dict | None, is_staff: bool) -> dict:
-    """Die Tabelle für die Folie „Tabelle“ am TV (#2121) - nur bei Liga, Jeder gegen jeden, Schweizer System und Gruppen,
-    dieselbe Rangliste wie auf der Website."""
-    if t.get("format") in TABLE_FORMATS:
-        payload["standings"] = display_standings(await _standing_rows(db, t, user, is_staff))
+def _with_table(payload: dict, full: dict) -> dict:
+    """Die Tabelle für die Folie „Tabelle“ am TV (#2121), nur mit den Feldern, die der TV zeigt."""
+    if "standings" in full:
+        payload["standings"] = display_standings(full["standings"])
     return payload
 
 
@@ -289,13 +300,17 @@ async def standings(tid: str, access: str | None = None, user=Depends(get_option
     return await _standing_rows(db, t, user, is_staff)
 
 
-async def _standing_rows(db, t: dict, user: dict | None, is_staff: bool) -> list[dict]:
+async def _standing_rows(db, t: dict, user: dict | None, is_staff: bool, *, read_model=None,
+                        regs: list[dict] | None = None, own_ids: set[str] | None = None) -> list[dict]:
     """Die Rangliste eines Turniers (#2121: nur wer dazugehört, Plätze erst mit dem ersten Ergebnis) - für die Seite,
-    das Ergebnis-PDF und den TV."""
+    das Ergebnis-PDF und den TV. Der TV reicht Lesestand und Anmeldungen der Baum-Antwort weiter."""
     tid = t["id"]
-    read_model = await load_competition_read_model(db, tid)
-    regs = await db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0}).to_list(500)
-    own_ids = await _own_registration_ids(db, regs, user)
+    if read_model is None:
+        read_model = await load_competition_read_model(db, tid)
+    if regs is None:
+        regs = await db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0}).to_list(500)
+    if own_ids is None:
+        own_ids = await _own_registration_ids(db, regs, user)
     # Austritt/Disqualifikation mit annullierten Spielen (#1553, 50-Prozent-Regel): raus aus der Tabelle. Wer mit
     # kampflosen Niederlagen ausgeschieden ist, bleibt mit ihnen drin.
     regs = [r for r in regs if (r.get("removal") or {}).get("mode") != "annulled"]
@@ -317,6 +332,7 @@ async def _standing_rows(db, t: dict, user: dict | None, is_staff: bool) -> list
         structure,
         regs,
         groups=groups,
+        stages=read_model.stages,
     )
     # Die eigene Zeile ist markiert (#1179) - nur für den, der schaut.
     _mark_own_rows(rows, own_ids)

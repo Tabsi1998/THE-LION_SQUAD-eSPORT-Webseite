@@ -187,7 +187,8 @@ function BracketTv() {
     if (offline) outageRef.current = true;
     const quiet = catchUp || offline;
     try {
-      const { data: br } = await api.get(`/tournaments/${id}/bracket/display`, displayKey ? { params: { key: displayKey } } : undefined);
+      // `table: 1` (#2121): nur dieser TV zeigt die Folie „Tabelle“ - Stations- und Hallen-TV fragen ohne.
+      const { data: br } = await api.get(`/tournaments/${id}/bracket/display`, { params: displayKey ? { key: displayKey, table: 1 } : { table: 1 } });
       if (seq < appliedRef.current) return;
       appliedRef.current = seq;
       // Ruhig, wenn es Nachholen ist: nach einer echten Unterbrechung und während der Strom getrennt ist (Ersatz-Abfrage).

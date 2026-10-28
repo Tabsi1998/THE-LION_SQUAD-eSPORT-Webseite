@@ -507,8 +507,40 @@ def standing_registrations(registrations: list[dict], matches: list[dict]) -> li
 
 
 def has_results(matches: list[dict]) -> bool:
-    """Steht schon ein Ergebnis fest?"""
-    return any(match.get("status") in TERMINAL_MATCH_STATUSES and match.get("results") for match in matches)
+    """Steht schon ein echtes Ergebnis fest? Ein Freilos (ein Spiel mit nur einem Platz, beim Erzeugen gleich
+    entschieden) zählt nicht - sonst stünden bei 6 Spielern sofort Plätze 1 bis 6 da."""
+    def played(match: dict) -> bool:
+        filled = {slot.get("registration_id") for slot in match.get("slots") or [] if slot.get("registration_id")}
+        return len(filled) >= 2
+    return any(match.get("status") in TERMINAL_MATCH_STATUSES and match.get("results") and played(match) for match in matches)
+
+
+def reached_labels(matches: list[dict], stages: list[dict] = (), tournament: dict | None = None) -> dict[str, str]:
+    """Wie weit jemand im Baum kam (#2121), mit dem Namen der Runde wie im Baum: „Halbfinale“, „Winner Runde 3“,
+    „Loser Final“, „Grand Final“ - bei mehreren Phasen mit der Phase davor („Finalrunde · Halbfinale“). Zählt das
+    späteste Spiel (Phase, dann Runde), in dem die Anmeldung steht."""
+    from services.round_labels import attach_round_labels
+
+    playable = [dict(match) for match in matches
+                if match.get("status") != "cancelled" and match.get("source", {}).get("engine") == "stage"]
+    if not playable:
+        return {}
+    attach_round_labels(playable, list(stages or []), tournament)
+    stage_names = {stage.get("id"): stage.get("name") for stage in stages or [] if isinstance(stage, dict)}
+    multi = len({_safe_int(match.get("stage_number")) for match in playable}) > 1
+    furthest: dict[str, tuple[tuple[int, int], dict]] = {}
+    for match in playable:
+        position = (_safe_int(match.get("stage_number")), _safe_int(match.get("round")))
+        for slot in match.get("slots") or []:
+            registration_id = slot.get("registration_id")
+            if registration_id and (registration_id not in furthest or position > furthest[registration_id][0]):
+                furthest[registration_id] = (position, match)
+    labels = {}
+    for registration_id, (_position, match) in furthest.items():
+        label = match.get("round_label") or f"Runde {_safe_int(match.get('round'))}"
+        stage_name = stage_names.get(match.get("stage_id"))
+        labels[registration_id] = f"{stage_name} · {label}" if multi and stage_name else label
+    return labels
 
 
 def public_standings(
@@ -517,17 +549,26 @@ def public_standings(
     registrations: list[dict],
     *,
     groups: list[dict] = (),
+    stages: list[dict] = (),
 ) -> list[dict]:
     """Die Rangliste, wie Website, App, PDF und TV sie zeigen (#2121).
 
     Nur die Anmeldungen aus ``standing_registrations``. Ein K.-o.- oder FFA-Turnier vergibt Plätze erst mit dem ersten
-    Ergebnis - vorher ist die Liste leer („Noch keine Ergebnisse“) statt Platz 1 bis N nach der Anmeldung. Tabellen
-    (Liga, Jeder gegen jeden, Schweizer System, Gruppen) stehen von Anfang an mit allen Teilnehmern.
+    echten Ergebnis - vorher ist die Liste leer („Noch keine Ergebnisse“) statt Platz 1 bis N nach der Anmeldung; dort
+    sagt ``reached``, wie weit jemand kam. Tabellen (Liga, Jeder gegen jeden, Schweizer System, Gruppen) stehen von
+    Anfang an mit allen Teilnehmern.
     """
     matches = snapshot.get("matches") or []
-    if tournament.get("format") not in TABLE_FORMATS and not has_results(matches):
+    if tournament.get("format") in TABLE_FORMATS:
+        return standings_for_structure(tournament, snapshot, standing_registrations(registrations, matches), groups=groups)
+    if not has_results(matches):
         return []
-    return standings_for_structure(tournament, snapshot, standing_registrations(registrations, matches), groups=groups)
+    rows = standings_for_structure(tournament, snapshot, standing_registrations(registrations, matches), groups=groups)
+    labels = reached_labels(matches, stages, tournament)
+    for row in rows:
+        if row.get("registration_id") in labels:
+            row["reached"] = labels[row["registration_id"]]
+    return rows
 
 
 def _section_key(value) -> str:
