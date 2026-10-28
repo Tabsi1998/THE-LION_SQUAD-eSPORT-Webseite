@@ -332,7 +332,7 @@ function PrintfulStep({ view, busy, run }) {
           <div><dt className="text-white/50 text-xs">Techniken</dt><dd data-testid="shop-printful-techniques">{techniqueList(printful.techniques) || "–"}</dd></div>
           <div className="sm:col-span-2"><dt className="text-white/50 text-xs">Druckflächen</dt>
             <dd className="flex flex-wrap gap-2 mt-1">{printful.placements.map((row) => (
-              <span key={`${row.placement}-${row.technique}`} className="border border-white/15 rounded-sm px-2 py-0.5 text-xs">{row.placement} ({techniqueLabel(row.technique)}) · {inches(row.width_in)} × {inches(row.height_in)}</span>
+              <span key={`${row.placement}-${row.technique}`} className="border border-white/15 rounded-sm px-2 py-0.5 text-xs" data-testid={`shop-printful-placement-${row.placement}`}>{view.labels.placements?.[row.placement] || row.placement} ({techniqueLabel(row.technique)}) · {inches(row.width_in)} × {inches(row.height_in)}</span>
             ))}</dd>
           </div>
         </dl>
@@ -348,7 +348,13 @@ function PrintfulStep({ view, busy, run }) {
 // darf die Auswahl nicht zurücksetzen - deshalb Text statt Objekt-Identität.
 function offerKey(product) {
   return JSON.stringify([product.id, product.printful?.product_id ?? null, product.technique ?? null,
-    product.offer?.colors ?? [], product.offer?.sizes ?? []]);
+    product.offer?.colors ?? [], product.offer?.sizes ?? [], product.offer?.color_labels ?? {}]);
+}
+
+// Bezeichnung einer Printful-Farbe im Shop (#2105): eigene aus Schritt 2, sonst die Übersetzung des Servers. Der
+// Printful-Name bleibt Schlüssel (Varianten, Testkennungen).
+function colorLabel(view, name) {
+  return view.color_labels?.[name] || name;
 }
 
 function OfferStep({ view, busy, run }) {
@@ -357,11 +363,15 @@ function OfferStep({ view, busy, run }) {
   const [colors, setColors] = useState(() => product.offer?.colors ?? []);
   const [sizes, setSizes] = useState(() => product.offer?.sizes ?? []);
   const [technique, setTechnique] = useState(() => defaultTechnique(printful, product.technique));
+  const [ownLabels, setOwnLabels] = useState(() => ({ ...(product.offer?.color_labels || {}) }));
   if (!printful) return <p className="text-sm text-white/55" data-testid="shop-step-offer">Zuerst in Schritt 1 das Printful-Produkt laden.</p>;
   const toggle = (list, setList, value) => setList(list.includes(value) ? list.filter((item) => item !== value) : [...list, value]);
   const count = printful.variants.filter((row) => colors.includes(row.color) && sizes.includes(row.size)).length;
   const tooMany = count > view.limits.max_variants;
   const offered = view.variants.filter((row) => row.active);
+  const defaults = view.color_defaults || {};
+  const labelsTooLong = colors.some((name) => (ownLabels[name] || "").trim().length > 40);
+  const colorLabels = Object.fromEntries(colors.map((name) => [name, (ownLabels[name] || "").trim()]));
   return (
     <div className="space-y-4" data-testid="shop-step-offer">
       {printful.techniques.length > 0 && (
@@ -380,18 +390,34 @@ function OfferStep({ view, busy, run }) {
           {printful.colors.map((color) => (
             <button key={color.name} type="button" aria-pressed={colors.includes(color.name)} onClick={() => toggle(colors, setColors, color.name)}
               className={`${CHIP} ${colors.includes(color.name) ? "border-brand bg-brand/10" : "border-white/10 hover:border-white/30"}`} data-testid={`shop-offer-color-${color.name}`}>
-              <span className="w-4 h-4 rounded-sm border border-white/25" style={{ backgroundColor: color.code }} aria-hidden="true" /> {color.name}
+              <span className="w-4 h-4 rounded-sm border border-white/25" style={{ backgroundColor: color.code }} aria-hidden="true" /> {colorLabel(view, color.name)}
             </button>
           ))}
         </div>
       </div>
+      {colors.length > 0 && (
+        <div className="space-y-1" data-testid="shop-offer-color-labels">
+          <div className="text-sm text-white/70">Bezeichnung im Shop</div>
+          <p className="text-xs text-white/50">So heißt die Farbe überall im Shop, im Warenkorb und in Bestellungen. Leer lassen für den Vorschlag.</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {colors.map((name) => (
+              <label key={name} className="block text-sm min-w-0">
+                <span className="text-white/55 text-xs">Printful: {name}</span>
+                <input value={ownLabels[name] || ""} maxLength={40} placeholder={defaults[name] || name} disabled={!view.editable}
+                  onChange={(event) => setOwnLabels({ ...ownLabels, [name]: event.target.value })}
+                  className={INPUT} data-testid={`shop-offer-color-label-${name}`} />
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="space-y-1">
         <div className="text-sm text-white/70">Größen</div>
         <div className="flex flex-wrap gap-2">
           {printful.sizes.map((size) => (
             <button key={size} type="button" aria-pressed={sizes.includes(size)} onClick={() => toggle(sizes, setSizes, size)}
               className={`${CHIP} min-w-12 justify-center ${sizes.includes(size) ? "border-brand bg-brand/10" : "border-white/10 hover:border-white/30"}`} data-testid={`shop-offer-size-${size}`}>
-              {size}
+              {view.size_labels?.[size] || size}
             </button>
           ))}
         </div>
@@ -399,9 +425,9 @@ function OfferStep({ view, busy, run }) {
       <p className={`text-xs ${tooMany ? "text-warn" : "text-white/55"}`} data-testid="shop-offer-count">
         {count} Varianten{tooMany ? ` – höchstens ${view.limits.max_variants}` : ""}. Einkaufspreise holt die Website nur für diese – je Variante ein Aufruf bei Printful (höchstens 120 pro Minute).
       </p>
-      <ReasonedButton id="shop-offer" label="Speichern und Preise laden" busy={busy === "offer"} disabled={!count || tooMany || !technique || !view.editable}
-        blockedHint={!view.editable ? "Erst zurückziehen (Schritt 5), dann das Angebot ändern." : tooMany ? `Höchstens ${view.limits.max_variants} Varianten - bitte weniger Farben oder Größen.` : "Bitte mindestens eine Farbe und eine Größe wählen."}
-        onSubmit={(reason) => run("offer", () => api.put(`${BASE}/${product.id}/offer`, { technique, colors, sizes, reason }), "Farben und Größen gespeichert, Preise geladen.")} />
+      <ReasonedButton id="shop-offer" label="Speichern und Preise laden" busy={busy === "offer"} disabled={!count || tooMany || !technique || !view.editable || labelsTooLong}
+        blockedHint={!view.editable ? "Erst zurückziehen (Schritt 5), dann das Angebot ändern." : tooMany ? `Höchstens ${view.limits.max_variants} Varianten - bitte weniger Farben oder Größen.` : labelsTooLong ? "Bezeichnung einer Farbe: höchstens 40 Zeichen." : "Bitte mindestens eine Farbe und eine Größe wählen."}
+        onSubmit={(reason) => run("offer", () => api.put(`${BASE}/${product.id}/offer`, { technique, colors, sizes, color_labels: colorLabels, reason }), "Farben und Größen gespeichert, Preise geladen.")} />
       {offered.length > 0 && (
         <div className="tls-swipe">
           <table className="w-full text-sm" data-testid="shop-offer-variants">
@@ -409,7 +435,7 @@ function OfferStep({ view, busy, run }) {
             <tbody>
               {offered.map((row) => (
                 <tr key={row.id} className="border-t border-white/10" data-testid={`shop-variant-${row.sku}`}>
-                  <td className="py-1.5 pr-3">{row.label}</td>
+                  <td className="py-1.5 pr-3">{row.display_label || row.label}</td>
                   <td className="py-1.5 pr-3 tabular-nums text-white/60">{row.printful_variant_id ?? "–"}</td>
                   <td className={`py-1.5 pr-3 ${row.blocked_reason || row.in_stock === false ? "text-warn" : row.in_stock ? "text-ok" : "text-white/50"}`}>
                     {row.blocked_reason || (row.in_stock ? "lieferbar" : row.in_stock === false ? "nicht lieferbar" : "unbekannt")}
@@ -465,7 +491,7 @@ function PricesStep({ view, busy, run }) {
         <div className="border border-warn/40 bg-warn/10 rounded-sm p-3 text-sm" role="alert" data-testid="shop-price-warnings">
           <div className="font-bold inline-flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-warn" aria-hidden="true" /> Printful hat Preise geändert</div>
           <ul className="mt-1 text-xs space-y-0.5">
-            {warnings.map((row) => <li key={row.id}>{row.label}: {money(row.price_warning.before_cents)} → {money(row.price_warning.after_cents)} (seit {viennaDateTime(row.price_warning.at)})</li>)}
+            {warnings.map((row) => <li key={row.id}>{row.display_label || row.label}: {money(row.price_warning.before_cents)} → {money(row.price_warning.after_cents)} (seit {viennaDateTime(row.price_warning.at)})</li>)}
           </ul>
           <p className="text-xs text-white/60 mt-1">Bestehende Bestellungen bleiben unverändert. Neue Preise gelten erst nach „Preise übernehmen“.</p>
         </div>
@@ -479,7 +505,7 @@ function PricesStep({ view, busy, run }) {
           <tbody>
             {offered.map((row) => (
               <tr key={row.id} className="border-t border-white/10" data-testid={`shop-price-${row.sku}`}>
-                <td className="py-1.5 pr-3">{row.label}{row.blocked_reason && <span className="block text-xs text-warn">{row.blocked_reason}</span>}</td>
+                <td className="py-1.5 pr-3">{row.display_label || row.label}{row.blocked_reason && <span className="block text-xs text-warn">{row.blocked_reason}</span>}</td>
                 <td className="py-1.5 pr-3 text-right text-white/60">{money(row.base_cost_cents)}</td>
                 <td className="py-1.5 pr-3 text-right">{money(row.cost_cents)}</td>
                 <td className={`py-1.5 pr-3 text-right font-bold ${row.price_cents !== row.cost_cents ? "text-warn" : ""}`}>{row.price_cents === null ? "nicht übernommen" : money(row.price_cents)}</td>

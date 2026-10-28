@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
@@ -60,10 +60,12 @@ async def save_presets(body: PresetsUpdate, me: dict = Depends(require_area("fin
 
 @router.get("/print-templates/{printful_product_id}/images/{index}")
 async def template_image(printful_product_id: int, index: int, layer: Literal["image", "background"] = "image",
+                         tint: str | None = Query(None, pattern=r"^[0-9A-Fa-f]{6}$"),
                          me: dict = Depends(require_area("finance"))):
-    """Ein Vorlagenbild von Printful (mit Sicherheitslinien) für die Vorschau - aus dem Zwischenspeicher."""
+    """Ein Vorlagenbild von Printful (mit Sicherheitslinien) für die Vorschau - aus dem Zwischenspeicher. Mit ``tint``
+    in der Shirtfarbe eingefärbt (#2105) - nur ein Farbcode aus den gespeicherten Printful-Daten, sonst 404."""
     try:
-        payload = await templates.template_image(get_db(), printful_product_id, index, layer=layer)
+        payload = await templates.template_image(get_db(), printful_product_id, index, layer=layer, tint=tint)
     except LookupError as exc:
         raise HTTPException(404, str(exc)) from exc
     except templates.TemplateImageUnavailable as exc:

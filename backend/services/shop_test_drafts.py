@@ -34,7 +34,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from models import new_id, now_utc
-from services import shop_catalog, shop_common, shop_config, shop_gamertag, shop_print_files, shop_products
+from services import shop_catalog, shop_colors, shop_common, shop_config, shop_gamertag, shop_print_files, shop_products
+from services import shop_print_templates
 from services.mutation_lock import MutationLockBusy, mutation_lock
 from services.printful_client import order_payload
 from services.shop_common import ShopConflict, ShopError, record_admin_action
@@ -203,6 +204,10 @@ async def products(db) -> list[dict]:
             "gamertag": _has_gamertag(rows),
             "variants": [{"id": variant["id"], "label": variant.get("label"), "size": variant.get("size"),
                           "color": variant.get("color"), "color_code": variant.get("color_code"),
+                          # Anzeige auf Deutsch (#2105), Schlüssel bleibt die Printful-Farbe.
+                          "color_label": shop_colors.label(product, variant.get("color")),
+                          "size_label": shop_colors.size_label(variant.get("size")),
+                          "display_label": shop_colors.variant_label(product, variant),
                           "price_cents": variant.get("price_cents"),
                           "printful_variant_id": (mappings.get(variant["id"]) or {}).get("printful_variant_id"),
                           "in_stock": (mappings.get(variant["id"]) or {}).get("in_stock"),
@@ -374,7 +379,8 @@ async def _build(db, product: dict, variant: dict, mapping: dict, recipient: dic
     record = {
         "id": draft_id, "kind": KIND, "state": "preview", "external_id": external_id, "item_external_id": item_id,
         "product_id": product["id"], "variant_id": variant["id"], "product_title": product["title"],
-        "variant_label": variant.get("label"), "size": variant.get("size"), "color": variant.get("color"),
+        "variant_label": variant.get("label"), "variant_display": shop_colors.variant_label(product, variant),
+        "size": variant.get("size"), "color": variant.get("color"),
         "printful_product_id": product["printful"]["product_id"],
         "printful_variant_id": int(mapping["printful_variant_id"]), "with_gamertag": name is not None,
         "files": shown, "recipient": recipient, "payload": payload, "estimate": _cents_view(estimate),
@@ -731,7 +737,20 @@ def view(record: dict) -> dict:
     out["deviation_summary"] = {level: sum(1 for row in deviations if row["level"] == level)
                                 for level in ("ok", "warn", "error")}
     out["actions"] = actions(record)
+    # Anzeige auf Deutsch (#2105) - Kennung und Printful-Farbe bleiben im Datensatz unverändert.
+    out["files"] = [{**item, "placement_label": shop_print_templates.placement_label(item.get("placement") or "")}
+                    for item in record.get("files") or []]
+    out["variant_display"] = record.get("variant_display") or shop_colors.stored_label(record.get("variant_label"))
+    status = record.get("printful_status")
+    out["printful_status_label"] = PRINTFUL_STATUS_LABELS.get(status, status) if status else None
     return out
+
+
+# Stand eines Auftrags bei Printful auf Deutsch (#2105) - ein unbekannter bleibt, wie Printful ihn liefert.
+PRINTFUL_STATUS_LABELS = {"draft": "Entwurf", "pending": "wartet", "failed": "fehlgeschlagen", "canceled": "storniert",
+                          "cancelled": "storniert", "inreview": "in Prüfung", "inprocess": "in Produktion",
+                          "onhold": "angehalten", "partial": "teilweise versendet", "fulfilled": "versendet",
+                          "archived": "archiviert"}
 
 
 def actions(record: dict, now: datetime | None = None) -> dict:

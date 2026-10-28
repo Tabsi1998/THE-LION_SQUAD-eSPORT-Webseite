@@ -78,6 +78,16 @@ export function maxWidthCm(area, aspect, rules) {
   return Math.floor(pxToCm(Math.max(width, 0), area.dpi) * 10) / 10;
 }
 
+// Die Leinwand einer Namensebene in Zoll (#2105): Breite = Höchstbreite der Ebene (sonst global), Höhe wächst mit der
+// Texthöhe (`height_per_text` vom Server, wie `shop_gamertag.canvas`). Ohne Angabe die Leinwand der globalen Regeln.
+export function textCanvasIn(canvas, layer) {
+  const width = layer?.max_width_cm ? layer.max_width_cm / CM_PER_INCH : (canvas?.width_in || 3.5);
+  if (!layer?.text_height_cm) return { width, height: canvas?.height_in || 0.8 };
+  const heightIn = layer.text_height_cm / CM_PER_INCH;
+  const perText = canvas?.height_per_text || ((canvas?.height_in || 0.8) / ((canvas?.text_height_cm || 1.27) / CM_PER_INCH));
+  return { width, height: perText * heightIn };
+}
+
 // Alle Ebenen einer Fläche für eine Farbe: Motive zuerst (ein Name folgt dem ersten Motiv), Ergebnis in der Reihenfolge
 // der Ebenen. `motifFor(layer, index)` liefert das Motiv der Ebene für diese Farbe ({ width_px, height_px, … }); eine
 // leere Ebene (`null`) zählt nur für die Nummerierung.
@@ -103,10 +113,8 @@ export function resolveLayers(area, layers, { presets, motifFor, gamertagCanvas,
       if (!follow) follow = box;
       out.push({ index, kind: "motif", box, motif, outside: outside(area, box, rules) });
     } else {
-      const scale = area.dpi;
-      const box = placeText(area, preset, {
-        widthPx: (gamertagCanvas?.width_in || 3.5) * scale, heightPx: (gamertagCanvas?.height_in || 0.8) * scale, follow, ...offsets,
-      });
+      const size = textCanvasIn(gamertagCanvas, layer);
+      const box = placeText(area, preset, { widthPx: size.width * area.dpi, heightPx: size.height * area.dpi, follow, ...offsets });
       out.push(box ? { index, kind: layer.kind, box, outside: outside(area, box, rules) } : { index, kind: layer.kind, box: null, problem: "braucht ein Motiv auf dieser Fläche" });
     }
   }

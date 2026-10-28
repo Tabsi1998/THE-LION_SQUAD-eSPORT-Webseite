@@ -39,7 +39,8 @@ from PIL import Image
 from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
-from services import shop_catalog, shop_designs, shop_gamertag, shop_motifs, shop_print_templates as templates
+from services import shop_catalog, shop_colors, shop_designs, shop_gamertag, shop_motifs
+from services import shop_print_templates as templates
 from services.log_safe import log_safe, mask_addresses
 from services.mutation_lock import MutationLockBusy, mutation_lock
 from services.shop_common import ShopConflict, ShopError, clean_reason, record_admin_action
@@ -469,6 +470,8 @@ class Planned:
     label: str
     box: templates.Box
     source: MotifSource | None = None
+    # Texthöhe und Höchstbreite einer Namensebene (#2105) - für Rendern und Platzieren dieselben Werte.
+    sizes: dict | None = None
 
 
 @dataclass
@@ -494,16 +497,18 @@ class Plan:
         return self.mode == "upload" or bool(self.motifs)
 
 
-def text_canvas_px(entry: dict, gamertag_rules: dict) -> tuple[float, float]:
-    """Die Leinwand der Gamertag-Datei (für jeden Namen gleich groß) in Pixeln dieser Fläche."""
-    width, height = shop_gamertag.canvas(gamertag_rules)
+def text_canvas_px(entry: dict, gamertag_rules: dict, layer: dict | None = None) -> tuple[float, float]:
+    """Die Leinwand der Gamertag-Datei (für jeden Namen gleich groß) in Pixeln dieser Fläche - mit der Größe der Ebene
+    (``layer``: Texthöhe, Höchstbreite in cm, #2105), sonst nach den globalen Regeln."""
+    width, height = shop_gamertag.canvas(shop_gamertag.layer_rules(gamertag_rules, layer))
     scale = entry["dpi"] / gamertag_rules["dpi"]
     return width * scale, height * scale
 
 
 async def plan_placement(db, row: dict, entry: dict, *, color: str, color_hex: str | None, presets_doc: dict,
-                         gamertag_rules: dict) -> Plan:
-    """Eine Fläche für eine Shirtfarbe: Vorgaben umgerechnet, Rahmen geprüft, Prüfsumme des Aufbaus."""
+                         gamertag_rules: dict, color_label: str | None = None) -> Plan:
+    """Eine Fläche für eine Shirtfarbe: Vorgaben umgerechnet, Rahmen geprüft, Prüfsumme des Aufbaus. ``color_label``
+    ist nur die Bezeichnung in Meldungen (#2105) - gerechnet wird mit dem Printful-Namen."""
     by_key = {item["key"]: item for item in presets_doc["presets"]}
     rules = presets_doc["rules"]
     planned: list[Planned] = []
@@ -523,7 +528,7 @@ async def plan_placement(db, row: dict, entry: dict, *, color: str, color_hex: s
         if kind == "motif":
             source = await _motif_source(db, layer.get("motif") or {}, color, color_hex)
             if source is None:
-                found.append(f"{entry['label']}: für „{color}“ fehlt das Motiv.")
+                found.append(f"{entry['label']}: für „{color_label or shop_colors.german(color)}“ fehlt das Motiv.")
                 continue
             box = templates.place_motif(entry, preset, width_cm=float(layer.get("width_cm") or preset.get("width_cm")
                                                                        or 5.0),
@@ -531,7 +536,8 @@ async def plan_placement(db, row: dict, entry: dict, *, color: str, color_hex: s
             label = f"Motiv „{source.title}“ ({preset['label']})"
             planned.append(Planned(index, "motif", label, box, source))
         else:
-            width, height = text_canvas_px(entry, gamertag_rules)
+            sizes = shop_gamertag.clean_layer_sizes(layer) or None
+            width, height = text_canvas_px(entry, gamertag_rules, sizes)
             follow = next((item.box for item in planned if item.kind == "motif"), None)
             try:
                 box = templates.place_text(entry, preset, width_px=width, height_px=height, follow=follow,
@@ -540,7 +546,7 @@ async def plan_placement(db, row: dict, entry: dict, *, color: str, color_hex: s
                 found.append(f"{entry['label']}: {exc}")
                 continue
             label = f"{'Gamertag' if kind == 'gamertag' else 'Vereinsnummer'} ({preset['label']})"
-            planned.append(Planned(index, kind, label, box))
+            planned.append(Planned(index, kind, label, box, sizes=sizes))
         found += templates.problems(entry, box, label, rules)
     template_hash = templates.entry_hash(entry)
     payload = {"renderer": RENDERER_VERSION, "template": template_hash, "mode": mode,
@@ -662,7 +668,8 @@ async def _context(db, product: dict) -> dict:
             variants.setdefault(item["color"], []).append(item["id"])
     technique = product.get("technique") or printful.get("default_technique")
     return {"template": template, "presets": presets_doc, "gamertag_rules": rules, "rows": rows, "colors": colors,
-            "codes": codes, "variants": variants, "technique": technique}
+            "codes": codes, "variants": variants, "technique": technique,
+            "labels": {color: shop_colors.label(product, color) for color in colors}}
 
 
 async def plans_for(db, product: dict, context: dict | None = None):
@@ -679,7 +686,8 @@ async def plans_for(db, product: dict, context: dict | None = None):
                 continue
             for entry, ids in groups:
                 plan = await plan_placement(db, row, entry, color=color, color_hex=context["codes"].get(color),
-                                            presets_doc=context["presets"], gamertag_rules=context["gamertag_rules"])
+                                            presets_doc=context["presets"], gamertag_rules=context["gamertag_rules"],
+                                            color_label=context["labels"].get(color))
                 out.append((row, plan, color, ids or []))
     return out, context
 
@@ -705,7 +713,8 @@ async def states(db, product: dict, context: dict | None = None) -> list[dict]:
         base = {"placement": row["key"], "color": color, "variant_ids": ids, "mode": row.get("mode") or "layout"}
         if plan is None:
             out.append({**base, "group": None, "state": "no_area",
-                        "detail": f"Die Fläche {row['key']} hat bei Printful keine Druckvorgabe (mehr).", "file": None,
+                        "detail": f"Die Fläche {templates.placement_label(row['key'])} hat bei Printful keine "
+                                  "Druckvorgabe (mehr).", "file": None,
                         "plan": None})
             continue
         latest = await latest_base(db, product["id"], row["key"], plan.entry["group"], color)
@@ -770,7 +779,7 @@ async def _generate(db, product: dict, *, actor_id: str, reason: str) -> dict:
     for row, plan, color, ids in plans:
         if plan is None or plan.mode == "upload" or not plan.motifs:
             continue
-        name = f"{plan.entry['label']} / {color}"
+        name = f"{plan.entry['label']} / {context['labels'].get(color) or color}"
         if plan.problems:
             failed.append({"placement": row["key"], "color": color, "detail": " ".join(plan.problems)})
             continue
@@ -946,8 +955,10 @@ async def _personal_file(db, product: dict, plan: Plan, base_row: dict | None, *
                          position: int = 1) -> dict:
     rules = await shop_gamertag.load_rules(db)
     ink = shop_gamertag.inks_for_garment(rules, color)[0]["key"]
+    # Dieselbe Größe wie im Plan (#2105): die Leinwand der Ebene und der Rahmen passen zueinander.
+    sizes = next((item.sizes for item in plan.texts if item.kind == "gamertag"), None)
     stored = await shop_gamertag.store(db, gamertag, purpose="order", color_key=ink, user_id=user_id,
-                                       order_id=order_id, order_item_id=item_id)
+                                       order_id=order_id, order_item_id=item_id, layer=sizes)
     tag_row = stored["row"]
     tag_path = shop_designs._path_of(tag_row["file_ref"])
     if tag_path is None or not tag_path.is_file():
@@ -1048,6 +1059,23 @@ async def complete_pending_erasures(db) -> int:
 PREVIEW_WIDTH = 900
 PREVIEW_MAX_PIXELS = 30_000_000  # so groß darf ein Vorlagenbild höchstens sein (shop_print_templates)
 SAMPLE_NAME = "GAMERTAG"
+SAMPLE_NUMBER = "1234"
+SAMPLES = {"gamertag": SAMPLE_NAME, "member_number": SAMPLE_NUMBER}
+
+
+async def sample_png(db, product: dict, *, kind: str, color: str, layer: dict | None) -> bytes:
+    """Der Beispielname einer Namensebene in echter Größe (#2105) - gerendert wie die Druckdatei
+    (``shop_gamertag.render`` mit den Regeln der Ebene), als PNG der ganzen Leinwand. Die Vorschau in Schritt 3 legt es
+    in den Rahmen der Ebene; die Leinwand bleibt dort nur ein feiner Rahmen. Farbe des Namens wie bei der Bestellung."""
+    if kind not in SAMPLES:
+        raise LookupError("Diese Ebene hat keinen Namen.")
+    if color not in ((product.get("offer") or {}).get("colors") or []):
+        raise LookupError("Diese Farbe wird nicht angeboten.")
+    rules = shop_gamertag.layer_rules(await shop_gamertag.load_rules(db), layer)
+    ink = shop_gamertag.inks_for_garment(rules, color)[0]["key"]
+    # Rendern kostet Rechenzeit (große Leinwand) - nicht im Event-Loop.
+    rendered = await asyncio.to_thread(shop_gamertag.render, SAMPLES[kind], rules, color_key=ink)
+    return rendered.payload
 
 
 def _hex_rgb(value: str | None) -> tuple[int, int, int]:
@@ -1073,8 +1101,15 @@ async def preview_png(db, product: dict, *, placement: str, color: str, sample: 
     plan = await plan_placement(db, row, entry, color=color, color_hex=context["codes"].get(color),
                                 presets_doc=context["presets"], gamertag_rules=context["gamertag_rules"])
     shirt = _hex_rgb(context["codes"].get(color))
-    preview = templates.preview_for(context["template"], entry)
-    template_img = await templates.template_image_rgba(db, context["template"], preview) if preview else None
+    # Die Vorlage dieser Farbe (#2105); nicht farbspezifisch: eingefärbt mit dem Farbcode aus den Printful-Daten.
+    preview, specific = templates.preview_for_color(context["template"], entry,
+                                                    shop_colors.variant_ids_by_color(product).get(color) or ())
+    tint = None if specific else shop_colors.code_of(product, color)
+    template_img = await templates.template_image_rgba(db, context["template"], preview, tint=tint) if preview else None
+    if template_img is not None and template_img.size != (preview["template_width"], preview["template_height"]):
+        # Eingefärbt wird höchstens in TINT_MAX_SIDE - zurück auf die Größe, in der die Lage des Druckbereichs zählt.
+        template_img = template_img.resize((preview["template_width"], preview["template_height"]),
+                                           Image.Resampling.LANCZOS)
     # Gleich im Maßstab der Vorschau zeichnen - nie die volle Druckdatei im Speicher (die kann 80 Millionen Pixel haben).
     if preview and template_img is not None:
         target_w, target_h = max(1, preview["area"]["width"]), max(1, preview["area"]["height"])
@@ -1112,17 +1147,19 @@ async def preview_png(db, product: dict, *, placement: str, color: str, sample: 
     if sample and plan.texts:
         gamertag_rules = context["gamertag_rules"]
         ink = shop_gamertag.inks_for_garment(gamertag_rules, color)[0]["key"]
-        try:
-            name = shop_gamertag.render(SAMPLE_NAME, gamertag_rules, color_key=ink)
+        for item in plan.texts:
+            # Der Beispielname wie in der Druckdatei: dieselben Regeln der Ebene (#2105), dieselbe Leinwand.
+            try:
+                name = shop_gamertag.render(SAMPLES[item.kind], shop_gamertag.layer_rules(gamertag_rules, item.sizes),
+                                            color_key=ink)
+            except ShopError:
+                continue
             with Image.open(BytesIO(name.payload)) as img:
                 img.load()
                 tag = img.convert("RGBA")
-            for item in plan.texts:
-                left, top, box_w, box_h = scaled_box(item.box)
-                if 0 <= left and 0 <= top and left + box_w <= target_w and top + box_h <= target_h:
-                    print_img.alpha_composite(tag.resize((box_w, box_h), Image.Resampling.LANCZOS), (left, top))
-        except ShopError:
-            pass
+            left, top, box_w, box_h = scaled_box(item.box)
+            if 0 <= left and 0 <= top and left + box_w <= target_w and top + box_h <= target_h:
+                print_img.alpha_composite(tag.resize((box_w, box_h), Image.Resampling.LANCZOS), (left, top))
     if preview and template_img is not None:
         canvas = Image.new("RGBA", template_img.size, (*shirt, 255))
         area = preview["area"]

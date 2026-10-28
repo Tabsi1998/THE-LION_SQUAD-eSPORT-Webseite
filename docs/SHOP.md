@@ -535,7 +535,15 @@ Grund ist optional, **Pflicht nur beim Veröffentlichen** - dann geht das Produk
    (#2091, zentral in `frontend/src/lib/shopTechniques.js`: `dtg` DTG-Direktdruck, `dtfilm` DTF-Transfer (DTFlex),
    `embroidery` Stickerei …; unbekannte Schlüssel bleiben stehen). Vorgabe: gespeicherte Wahl, sonst der Standard von
    Printful (`default_technique`), sonst Direktdruck vor Transfer vor Stickerei - im Backend genauso
-   (`shop_print_templates.TECHNIQUE_PREFERENCE`).
+   (`shop_print_templates.TECHNIQUE_PREFERENCE`). **Farben heißen deutsch** (#2105, `services/shop_colors.py`):
+   Tabelle der gängigen Printful-Farben, dann wortweise („Dark Grey“ → „Dunkelgrau“, „Heather …“ → „… meliert“),
+   englisch nur als letzter Rückfall; „One size“ heißt „Einheitsgröße“. Je Farbe lässt sich in Schritt 2 eine eigene
+   **Bezeichnung im Shop** setzen (`offer.color_labels`, höchstens 40 Zeichen, leer = Vorschlag, Protokoll
+   `shop.product.offer`). Bezeichnungen sind eindeutig: zwei gleiche automatische bekommen den Printful-Namen in
+   Klammern („Königsblau (Royal Blue)“), eine eigene, die schon eine andere angebotene Farbe trägt, lehnt Schritt 2
+   ab. Der Printful-Name bleibt intern der Schlüssel (Varianten, Bestellungen, Druckdateien,
+   Ausnahmen je Farbe) - angezeigt wird überall die Bezeichnung; gespeicherte Bezeichnungen einer Bestellung („Black /
+   M“) zeigt die Bestellansicht über dieselbe Übersetzung (`variant_display`), ohne Datenänderung.
 3. **Druckflächen** (seit #2069, Abschnitt „Druckvorlagen und Druckdateien“): je Printful-Fläche aus der Druckvorlage
    Motiv, Vorgabe-Position aus der Liste und Größe in cm; Gamertag bzw. Vereinsnummer als Platzhalter (Datei je
    Bestellung) nur mit passender Personalisierung. „Druckdateien erzeugen“ baut je Farbe die Datei in der exakten
@@ -594,7 +602,7 @@ Produkts.
 | Route (alle `require_area("finance")`) | Zweck |
 | --- | --- |
 | `POST /api/admin/shop/products/{id}/printful` | Schritt 1: Printful-Produkt laden (`printful_product_id`) |
-| `PUT /api/admin/shop/products/{id}/offer` | Schritt 2: Technik, Farben, Größen - danach Preise |
+| `PUT /api/admin/shop/products/{id}/offer` | Schritt 2: Technik, Farben, Größen, eigene Farbbezeichnungen (`color_labels`, #2105) - danach Preise |
 | `GET /api/admin/shop/printful-catalog` | Schritt 1: Produktsuche (`q`, `category_id`, `link`, `refresh`, #2069) |
 | `PUT /api/admin/shop/products/{id}/layout` | Schritt 3: Druckflächen mit Motiv, Vorgabe, Größe und Platzhaltern, Fläche im Grundpreis (#2069) |
 | `POST /api/admin/shop/products/{id}/layout/preview` | Schritt 3: Pläne für den ungespeicherten Aufbau (Fassung je Farbe, Bild, Rahmen) - speichert nichts; je Konto höchstens `SHOP_LAYOUT_PREVIEW_LIMIT` Aufrufe (Vorgabe 60) je `SHOP_LAYOUT_PREVIEW_WINDOW_SECONDS` (Vorgabe 60 s), darüber 429 (#2069) |
@@ -604,7 +612,8 @@ Produkts.
 | `GET /api/admin/shop/products/{id}/print-files/{file_id}` | Grunddatei ansehen (#2069) |
 | `POST /api/admin/shop/print-files/upload` | Fertige Druckdatei für Profis (#2069) |
 | `GET`/`PUT /api/admin/shop/print-presets` | Positions-Vorgaben und Regeln (#2069) |
-| `GET /api/admin/shop/print-templates/{printful_product_id}/images/{index}` | Vorlagenbild über die Website (#2069) |
+| `GET /api/admin/shop/print-templates/{printful_product_id}/images/{index}` | Vorlagenbild über die Website (#2069), mit `tint=rrggbb` in der Shirtfarbe eingefärbt (#2105, nur Farbcodes aus den Printful-Daten) |
+| `GET /api/admin/shop/products/{id}/name-sample` | Beispielname einer Namensebene in echter Größe als PNG (`kind`, `color`, `text_height_cm`, `max_width_cm`, #2105) |
 | `POST /api/admin/shop/products/{id}/prices/accept` | Schritt 4: Selbstkosten als Mitgliederpreis übernehmen |
 | `POST /api/admin/shop/products/{id}/sync` | Mit Printful abgleichen (Person im Protokoll) |
 | `POST /api/admin/shop/products/{id}/status` | Schritt 5: `reviewed`, `active` (Grund Pflicht), `draft`, `archived` |
@@ -672,6 +681,25 @@ der Rest ist transparent. Abgeglichen mit den offiziellen Vorlagen (Maße in `ma
   Anmeldedaten), ohne Weiterleitung, höchstens 8 MB und 30 Millionen Pixel, neu kodiert als PNG ohne Metadaten,
   zwischengespeichert unter `UPLOAD_DIR/shop-templates/`. Eine Adresse aus der Anfrage gibt es nicht - keine offene
   Weiterleitung.
+- **Flächennamen deutsch (#2105):** `placement_label` übersetzt jede Printful-Platzierung - bekannte Kennungen aus der
+  Liste, sonst wortweise aus Kennung bzw. Anzeigename (Vorderseite, Rückseite, Ärmel links/rechts mit „(kurz)“/„(lang)“,
+  Innen-/Außenetikett, Brust, Tasche, Kapuze, Nacken, groß, Stickerei …; Füllwörter wie „print“ und die Technik fallen
+  weg). Englisch nur als letzter Rückfall - Schritt 3 zeigt dann „Bezeichnung von Printful (englisch)“. Gespeicherte
+  Vorlagen werden beim Lesen (`get`) übersetzt, ohne Datenänderung. Techniken stehen in Meldungen deutsch
+  (`TECHNIQUE_LABELS`, wie `shopTechniques.js`).
+- **Vorschau in der Shirtfarbe (#2105):** je Fläche und angebotener Farbe das Vorlagenbild, dessen `variant_ids` eine
+  Variante dieser Farbe enthalten (`preview_for_color`, ausgeliefert als `preview_by_color`; bei gleicher Rolle das
+  farbspezifische). Gilt das gewählte Bild nur für Varianten dieser einen Farbe, wird es so gezeigt. Gilt es für
+  mehrere Farben oder keine, färbt der Server es ein (`tint`, Bild-Adresse mit `?tint=rrggbb`): Hintergrund ist, was
+  vom Bildrand her zusammenhängt - bei überwiegend durchsichtigem Rand die Durchsicht, sonst die Randfarbe (Median) mit
+  einer Toleranz aus dem Rauschen des Rands (höchstens 24); fließt er in die Mitte des Druckbereichs (helles Shirt,
+  Lücke in der Kontur), noch einmal mit halber Toleranz. Die Kleidung bekommt den Farbcode, multipliziert mit ihrer
+  Schattierung (Helligkeit je Pixel durch die mittlere Helligkeit der Kleidung) - Falten bleiben, Schwarz bleibt
+  schwarz; Ränder weich übergeblendet. Ein deckender Hintergrund bleibt unverändert; hinter einem Ghost-PNG kommt außen
+  ein ruhiges Hellgrau, ein Loch für den Druckbereich bleibt durchsichtig. Unter 5 % Kleidung (nur Hilfslinien) bleibt
+  das Bild, wie es ist. Nur Farbcodes aus den gespeicherten Printful-Daten eines Produkts mit diesem Printful-Produkt
+  (`allowed_tints`), sonst 404; zwischengespeichert je Bild und Farbe (Name aus der Prüfsumme, `TINT_VERSION`), höchstens
+  1200 px Kantenlänge. Dasselbe gilt für die Vorschau-PNG je Farbe.
 
 ### Positions-Vorgaben (einstellbar)
 
@@ -708,7 +736,15 @@ Position; `upload` - fertige Datei für Profis) und `layers`:
   dem Farbwert von Printful; eine Ausnahme am Motiv geht vor).
 - `gamertag`, `member_number`: Platzhalter mit Vorgabe (etwa „Brust gegenüber dem Motiv“); ihre Datei entsteht je
   Bestellung. Höchstens einer je Fläche, nur mit passender Personalisierung. Die Größe ist die Leinwand der
-  Gamertag-Datei (`shop_gamertag.canvas`), ihr Anker (`anchor_y_in`) liegt auf der halben Höhe.
+  Gamertag-Datei (`shop_gamertag.canvas`), ihr Anker (`anchor_y_in`) liegt auf der halben Höhe. **Je Ebene
+  einstellbar (#2105):** `text_height_cm` (Texthöhe) und `max_width_cm` (Höchstbreite der Leinwand); ohne Angabe die
+  globalen Gamertag-Regeln, Grenzen wie dort (0,25 bis 5,08 cm bzw. 1,27 bis 30,48 cm), und die Fläche begrenzt
+  (ragt der Rahmen hinaus, lehnt die Prüfung ab). `shop_gamertag.layer_rules` macht daraus die Regeln der Ebene (die
+  Mindesthöhe der Verkleinerung bleibt im selben Verhältnis) - Platzieren (`text_canvas_px`), die Bestelldatei
+  (`shop_gamertag.store(…, layer=…)`, `rules_hash` der Ebene) und die Vorschau lesen dieselben Werte. Die Grunddateien
+  enthalten keinen Namen und werden davon nicht „veraltet“. In der Vorschau steht ein **Beispielname in echter
+  Texthöhe** (`GET …/products/{id}/name-sample`, gerendert wie die Druckdatei: `GAMERTAG` bzw. `1234`, Farbe des
+  Namens wie bei der Bestellung); die Leinwand bleibt nur ein feiner Rahmen.
 
 `PUT /api/admin/shop/products/{id}/layout` prüft für **jede angebotene Farbe und jede Größe mit eigener Fläche**, dass
 alles ganz in der Fläche liegt - sonst 400 mit px, cm und Zoll. Protokoll `shop.product.layout` mit vorher/nachher.
@@ -761,7 +797,9 @@ abgelehnt. Neu kodiert wie ein Design (#1708). Höchstens 50 MB am Eingang (`bod
 **Vorschau:** `GET /api/admin/shop/products/{id}/preview?placement=&color=` - die Druckdatei über dem Vorlagenbild
 (Sicherheitslinien) auf der Shirtfarbe von Printful, mit einem Beispielnamen im Platzhalter, als PNG (900 px breit).
 Im Admin rechnet die Seite dieselbe Lage live (`shopLayout.js`), Feinjustieren per Ziehen oder Pfeiltasten (Umschalt:
-1 cm). `GET /api/admin/shop/products/{id}/print-files/{file_id}` zeigt eine Grunddatei.
+1 cm). Bei ungespeicherten Änderungen sind nur die Ebenen gedimmt, solange der Server die Pläne rechnet - das Shirt
+nie; ohne Berechnung (nichts gewählt, blockiert) wird nichts gedimmt (#2105).
+`GET /api/admin/shop/products/{id}/print-files/{file_id}` zeigt eine Grunddatei.
 
 ### Bestellung
 

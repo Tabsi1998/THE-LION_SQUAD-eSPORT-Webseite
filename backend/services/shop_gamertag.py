@@ -206,6 +206,49 @@ def clean_rules(raw: Any) -> dict:
     return rules
 
 
+CM_PER_INCH = 2.54
+LAYER_SIZE_FIELDS = ("text_height_cm", "max_width_cm")
+
+
+def _layer_cm(value: Any, label: str, low_in: float, high_in: float) -> float:
+    low, high = round(low_in * CM_PER_INCH, 2), round(high_in * CM_PER_INCH, 2)
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) \
+            or not low <= value <= high:
+        raise ShopError(f"{label}: eine Zahl in cm von {str(low).replace('.', ',')} bis "
+                        f"{str(high).replace('.', ',')}.")
+    return round(float(value), 2)
+
+
+def clean_layer_sizes(layer: dict | None) -> dict:
+    """Texthöhe und Höchstbreite einer Gamertag- bzw. Vereinsnummer-Ebene in cm (#2105) - nur, was angegeben ist.
+    Grenzen wie bei den globalen Regeln (``MIN_HEIGHT_IN`` … ``MAX_WIDTH_IN``)."""
+    out = {}
+    layer = layer or {}
+    if layer.get("text_height_cm") is not None:
+        out["text_height_cm"] = _layer_cm(layer["text_height_cm"], "Texthöhe", MIN_HEIGHT_IN, MAX_HEIGHT_IN)
+    if layer.get("max_width_cm") is not None:
+        out["max_width_cm"] = _layer_cm(layer["max_width_cm"], "Höchstbreite", MIN_WIDTH_IN, MAX_WIDTH_IN)
+    return out
+
+
+def layer_rules(rules: dict, layer: dict | None) -> dict:
+    """Die Regeln für eine Ebene (#2105): Texthöhe und Höchstbreite der Ebene, wenn gesetzt, sonst die globalen. Die
+    Mindesthöhe der Verkleinerung bleibt im selben Verhältnis zur Texthöhe. Rendern (Vorschau, Bestelldatei) und
+    Platzieren (Leinwand) lesen genau diese Regeln - ohne Angabe ist alles wie bisher."""
+    sizes = clean_layer_sizes(layer)
+    if not sizes:
+        return rules
+    out = dict(rules)
+    if "text_height_cm" in sizes:
+        height = round(sizes["text_height_cm"] / CM_PER_INCH, 3)
+        out["text_height_in"] = height
+        out["min_text_height_in"] = round(min(height, rules["min_text_height_in"] * height / rules["text_height_in"]),
+                                          3)
+    if "max_width_cm" in sizes:
+        out["max_width_in"] = round(sizes["max_width_cm"] / CM_PER_INCH, 3)
+    return out
+
+
 def rules_hash(rules: dict) -> str:
     """Fingerabdruck dessen, was die Pixel bestimmt: Regeln, Schriftdatei und Renderer-Version."""
     font = FONTS[rules["font"]]
@@ -475,8 +518,8 @@ async def check_words(db, text: str, rules: dict) -> list[str]:
     return []
 
 
-async def _rendered(db, raw: Any, color_key: str | None) -> tuple[Rendered, list[str], dict]:
-    rules = await load_rules(db)
+async def _rendered(db, raw: Any, color_key: str | None, layer: dict | None = None) -> tuple[Rendered, list[str], dict]:
+    rules = layer_rules(await load_rules(db), layer)
     warnings = await check_words(db, clean_text(raw, rules), rules)
     return render(raw, rules, color_key=color_key), warnings, rules
 
@@ -508,13 +551,15 @@ async def _reuse_test_file(db, sha256: str) -> dict | None:
 
 async def store(db, raw: Any, *, purpose: str, color_key: str | None = None, actor_id: str | None = None,
                 reason: Any = None, user_id: str | None = None, order_id: str | None = None,
-                order_item_id: str | None = None) -> dict:
+                order_item_id: str | None = None, layer: dict | None = None) -> dict:
     """Prüfen, rendern, ablegen. ``purpose``:
 
     - ``test``: Admin, mit Person und Grund im Protokoll. Gleiche Testdatei = dieselbe Zeile und Adresse.
     - ``order`` (für #1712/#1713): **immer eine eigene Datei mit eigener Adresse**, auch bei gleichem Namen - nie
       geteilt, weder mit einer anderen Bestellung noch mit einer Testdatei. Sie gehört zu einem Konto (``user_id``)
-      und, sobald bekannt, zu Bestellung und Position; das PNG zeigt den Namen, die Zeile ist personenbezogen."""
+      und, sobald bekannt, zu Bestellung und Position; das PNG zeigt den Namen, die Zeile ist personenbezogen.
+
+    ``layer`` (#2105): Texthöhe und Höchstbreite der Ebene in cm (``layer_rules``) - ohne Angabe die globalen Regeln."""
     if purpose not in PURPOSES:
         raise ShopError("Unbekannter Zweck der Druckdatei.")
     if purpose == "test":
@@ -523,8 +568,10 @@ async def store(db, raw: Any, *, purpose: str, color_key: str | None = None, act
             raise ShopError("Ohne Person keine Testdatei.")
     elif not user_id:
         raise ShopError("Eine Bestelldatei gehört zu einem Konto.")
-    rendered, warnings, rules = await _rendered(db, raw, color_key)
-    problem = await _placement_problem(db, rules)
+    rendered, warnings, rules = await _rendered(db, raw, color_key, layer)
+    # Mit eigener Größe der Ebene (#2105) prüft der Plan der Druckfläche, ob der Name hineinpasst - nicht das alte
+    # Namensfeld aus #1708.
+    problem = None if clean_layer_sizes(layer) else await _placement_problem(db, rules)
     if problem:
         raise ShopError(problem)
     row = await _reuse_test_file(db, rendered.sha256) if purpose == "test" else None
