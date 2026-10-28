@@ -13,8 +13,10 @@ function sanitizeHref(rawHref) {
   const href = String(rawHref ?? "").trim();
   // eslint-disable-next-line no-control-regex -- rejecting control characters is the point here
   if (!href || /[\u0000-\u001F\u007F\s]/.test(href)) return null;
+  // Erst die protokoll-relativen Adressen („//evil.example“, auch „/\evil.example“ - Browser lesen den Backslash als
+  // Schrägstrich): die führen auf eine fremde Seite. Danach erst die eigenen Pfade „/…“ und Anker.
+  if (href.startsWith("//") || href.startsWith("/\\")) return null;
   if (href.startsWith("#") || href.startsWith("/")) return href;
-  if (href.startsWith("//")) return null;
 
   try {
     const url = new URL(href);

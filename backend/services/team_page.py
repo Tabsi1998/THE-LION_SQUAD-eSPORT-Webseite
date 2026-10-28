@@ -179,6 +179,8 @@ async def team_overview(db, team: dict, viewer: dict | None, *, insider: bool, r
     games = await _game_names(db, (row.get("game_id") for row in visible.values()))
     events = await _event_names(db, (row.get("event_id") for row in visible.values()))
 
+    league = await _league_entries(db, registrations, visible, viewer)
+    in_league = {row["registration_id"] for row in league}
     upcoming = []
     for reg in registrations:
         tournament = visible.get(reg.get("tournament_id"))
@@ -191,6 +193,9 @@ async def team_overview(db, team: dict, viewer: dict | None, *, insider: bool, r
             "status": reg.get("status"),
             "status_label": REGISTRATION_LABELS.get(reg.get("status"), "Angemeldet"),
             "tournament": _tournament_card(tournament, games, events),
+            # Liga (P5): die App ohne neuen Build zeigt die Staffel weiter hier (gekennzeichnet); das Web blendet aus,
+            # was schon im Abschnitt „Liga“ steht.
+            **({"in_league_section": True} if reg.get("id") in in_league else {}),
         })
     upcoming.sort(key=lambda row: (_parse_dt(row["tournament"].get("start_date")) or datetime.max.replace(tzinfo=timezone.utc)))
 
@@ -229,7 +234,56 @@ async def team_overview(db, team: dict, viewer: dict | None, *, insider: bool, r
                            **({"league_label": league_label(tournament)} if is_league_staffel(tournament) else {})},
             **line,
         })
-    return {"header": header, "upcoming": upcoming, "recent": recent}
+    return {"header": header, "upcoming": upcoming, "recent": recent, "league": league}
+
+
+async def _league_entries(db, registrations: list[dict], visible: dict[str, dict], viewer: dict | None) -> list[dict]:
+    """Abschnitt „Liga“ der Teamseite (P5, #1625): die Co-Teams des Teams und ihre Staffel, solange die Staffel läuft
+    (Turnierstatus, nicht der Stand der Season - wie „Angemeldet für“). Der Link geht auf die Ligaseite, wenn die
+    Person die Season sehen darf, sonst auf das Staffel-Turnier."""
+    from services.league_service import can_see_season, division_label
+
+    rows = [(reg, visible[reg["tournament_id"]]) for reg in registrations
+            if reg.get("tournament_id") in visible and is_league_staffel(visible[reg["tournament_id"]])
+            and visible[reg["tournament_id"]].get("status") not in CLOSED_TOURNAMENT_STATUSES
+            and reg.get("status") in ACTIVE_REGISTRATION_STATUSES]
+    if not rows:
+        return []
+    contexts = [tournament["league_context"] for _reg, tournament in rows]
+    seasons = {row["id"]: row for row in await db.league_seasons.find(
+        {"id": {"$in": sorted({c.get("season_id") for c in contexts if c.get("season_id")})}},
+        {"_id": 0}).to_list(50)}
+    leagues = {row["id"]: row for row in await db.leagues.find(
+        {"id": {"$in": sorted({c.get("league_id") for c in contexts if c.get("league_id")})}},
+        {"_id": 0, "id": 1, "name": 1, "slug": 1, "status": 1}).to_list(50)}
+    divisions = {row["id"]: row for row in await db.league_divisions.find(
+        {"id": {"$in": sorted({c.get("division_id") for c in contexts if c.get("division_id")})}},
+        {"_id": 0, "id": 1, "level": 1, "nickname": 1}).to_list(50)}
+    out = []
+    for reg, tournament in rows:
+        context = tournament["league_context"]
+        season = seasons.get(context.get("season_id"))
+        league = leagues.get(context.get("league_id"))
+        if not season or not league:
+            continue
+        division = divisions.get(context.get("division_id")) or {"level": "?"}
+        staffel = context.get("staffel")
+        # Die Ligaseite gibt es nur für aktive Ligen und nicht archivierte Seasons (sonst 404) - dann aufs Turnier.
+        page_exists = league.get("status") == "active" and season.get("status") != "archived"
+        link = (f"/liga/{league['slug']}/{season['slug']}#staffel-{tournament.get('slug') or tournament['id']}"
+                if page_exists and await can_see_season(viewer, season)
+                else f"/tournaments/{tournament.get('slug') or tournament['id']}")
+        out.append({
+            "registration_id": reg.get("id"),
+            "display_name": reg.get("display_name") or reg.get("team_name"),
+            "squad_name": reg.get("squad_name"),
+            "league": {"name": league.get("name"), "slug": league.get("slug")},
+            "season": {"name": season.get("name"), "slug": season.get("slug")},
+            "staffel_label": f"{division_label(division)} · Staffel {staffel}",
+            "tournament": {"id": tournament["id"], "slug": tournament.get("slug"), "status": tournament.get("status")},
+            "link": link,
+        })
+    return sorted(out, key=lambda row: (row["league"]["name"] or "", row["staffel_label"]))
 
 
 # ------------------------------------------------------------------ Einladungs-Link

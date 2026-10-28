@@ -55,6 +55,9 @@ class _SitemapDb:
     references = _Collection()
     gallery_albums = _Collection()
     partners = _Collection(rows=[{"slug": "pineapps-esports", "updated_at": "2026-09-24T09:00:00Z"}])
+    # Liga (P5): ohne öffentliche Season weder /liga noch eine Ligaseite in der Sitemap.
+    leagues = _Collection()
+    league_seasons = _Collection()
 
 
 def test_sitemap_lists_public_tournament_subpages(monkeypatch):
