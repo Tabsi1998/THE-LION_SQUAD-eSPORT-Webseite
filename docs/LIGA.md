@@ -84,6 +84,7 @@ Indizes: `id` eindeutig, (`season_id`, `level`) eindeutig.
 | `league_context` | `{league_id, season_id, division_id, staffel}` | nein | `staffel` = „A“, „B“ …; **fehlt bei allen anderen Turnieren** (nie `null` schreiben). Nur der Liga-Service setzt es, `TournamentUpdate` nimmt es nicht an |
 | `round_robin_legs` | 1 \| 2 | nein | fehlt = 2 (Hin- und Rückrunde wie heute) |
 | `matchday_blocked_weeks` | `[int]` | nein | gesperrte Kalenderwochen ab `start_date` (1-basiert); fehlt = `[]`. Gesperrt ist eine Woche, wenn mehr als die Hälfte ihrer Tage in einer Sperrzeit liegt (Season 1: Wochen 7 und 8; der Montag 21.12. allein sperrt Woche 6 nicht) |
+| `blocked_periods` | `[{start_date, end_date, label}]` | nein | Kopie der Sperrzeiten der Season (Wiener Kalendertage); für `blocked_period_at` und Fristen; fehlt = keine |
 | `matchday_weeks_total` | int | nein | Wochenbudget für „Runden ≤ aktive Wochen“; fehlt = keine Prüfung |
 | `scoring_rules` | dict | nein | normalisiert; fehlt = heute fest 3/1/0 mit Reihenfolge Punkte, Siege, Differenz |
 | `game_mode_order` | `[str]` | nein | fehlt = frei |
@@ -171,10 +172,10 @@ Genau (`services/league_service.SYNC_GROUPS`): **immer** (auch gesperrte Staffel
 und der Map-Pool (neue Version im Scope `tournament`, nur wenn er sich unterscheidet – Spiele mit festgehaltenem Pool
 behalten ihren; hat die Season keinen Pool mehr, wird die Kopie nur vor dem ersten Ergebnis entfernt);
 **vor dem Start** (Status `draft` bis `check_in`) `start_date`, `end_date`, `matchday_days`, `default_match_weekday`,
-`default_match_time`, `round_robin_legs`, `matchday_blocked_weeks`, `matchday_weeks_total`, `max_participants`,
-`min_squad_size` – nur wenn die Prüfung „Runden ≤ aktive Wochen“ passt und nicht schon mehr Teams angemeldet sind;
-**vor dem ersten Ergebnis** `best_of`, `team_size`, `scoring_rules`, `game_mode_order`, `result_confirm_hours_league`,
-`lineup_amend_hours`. `min_squad_size` steht damit am Turnier (Season bzw. Liga N, mindestens `team_size`); B liest es
+`default_match_time`, `round_robin_legs`, `matchday_blocked_weeks`, `matchday_weeks_total`, `max_participants` – nur
+wenn die Prüfung „Runden ≤ aktive Wochen“ passt und nicht schon mehr Teams angemeldet sind; **vor dem ersten Ergebnis**
+`best_of`, `team_size`, `min_squad_size` (immer gemeinsam mit `team_size`), `scoring_rules`, `game_mode_order`,
+`result_confirm_hours_league`, `lineup_amend_hours`. `min_squad_size` steht damit am Turnier (Season bzw. Liga N, mindestens `team_size`); B liest es
 beim Zuteilen dort.
 
 ## 4. Rechte
@@ -234,7 +235,7 @@ Anmeldungen auch über Co-Teams, deren Captain/Vertreter man ist. Aufrufer mit e
 | 5 Termin | Captain/Vertreter | vorhandene Terminvorschläge; ohne Einigung Standardtermin der Woche (Sperrwochen übersprungen) |
 | 6 Melden | Captain/Vertreter Seite 1, **Web** | `POST /matches/{id}/report` mit `results` + `games` (Maps, Sieger, eigene Aufstellung) |
 | 7 Bestätigen + ergänzen | Captain/Vertreter Seite 2 | Web: gleiche `results`, eigene Aufstellung je Map → Konsens, `games` am Spiel. **App** (ohne neuen Build): gleiche `results` ohne `games` → Konsens zählt, Seite 2 landet in `lineups_missing` und bekommt die Nachricht „Bitte Aufstellung im Web nachtragen“ |
-| 8 48 h ohne Antwort | Fristen-Job | `match_deadline_sweep._auto_confirm` trägt Ergebnis und `games` der Erstmeldung ein; Gegenseite in `lineups_missing` |
+| 8 48 h ohne Antwort | Fristen-Job | `match_deadline_sweep._auto_confirm` trägt Ergebnis und `games` der Erstmeldung ein; Gegenseite in `lineups_missing`. In einer Sperrzeit läuft keine Frist: `match_deadlines.auto_confirm_due` rechnet die 48 h und die 24 h Mindestzeit mit `response_deadline` (Pause zählt nicht) – ohne Sperrzeiten exakt wie bisher. Ebenso Antwortfrist und Eskalation offener Terminvorschläge |
 | 9 Aufstellung nachtragen | Captain/Vertreter | `PUT /matches/{id}/lineups`, bis `lineup_amend_hours` nach dem Ergebnis; danach nur Leitung |
 | 10 Einspruch / Korrektur | Captain, Vertreter / Leitung | vorhandener `/dispute`; Korrektur über `/result` mit `force`, Grund und optional `games` |
 | 11 Tabelle | – | `round_robin_standings(matches, registrations, rules=tournament["scoring_rules"])` |
@@ -288,7 +289,12 @@ Gemeinsamer Baustein `services/league_scope.py`: `NOT_LEAGUE = {"league_context"
 | `mobile/` | – | – (kein neuer Build) |
 
 Abhängigkeit: Der Sperrzeit-Aufruf in `match_routes.py` (B) nutzt `matchday_schedule.blocked_period_at(tournament,
-moment)` (A, P2). Bis P2 auf `main` ist, bleibt der Aufruf aus.
+moment)` (A, P2; liefert `{start_date, end_date, label}` oder `None` – Sperrzeit oder Tag einer Sperrwoche). Bis P2 auf
+`main` ist, bleibt der Aufruf aus. Ebenso für B: `matchday_schedule.response_deadline(tournament, start, hours)` statt
+`start + hours` in `match_routes._schedule_deadline` (Zeit in einer Sperrzeit zählt nicht). Fenster eines Spieltags
+mit Sperrwochen: `matchday_schedule.tournament_matchday_window(tournament, number)`. In `match_v2_results` (B) ruft
+`build_league_redraw_application` seit P2 `advancement_draw.league_home_swaps` – bei nur Hinrunde tauschen alle Seiten
+gemeinsam, damit das Heimrecht fair bleibt.
 
 ## 9. Nicht in Stufe 1
 
@@ -330,3 +336,9 @@ moment)` (A, P2). Bis P2 auf `main` ist, bleibt der Aufruf aus.
   verhalten sich Turniere, Anmeldungen, Co-Teams, Spiele und Tabellen genau wie vorher (Regressionstests:
   Liga-Turnier mit Hin/Rück, Gruppen, Team-Turnier mit Aufstellung #1192, App-Meldung ohne `games`).
 - **Rückweg:** Season auf `off` stellt alles unsichtbar; die Felder bleiben ungenutzt liegen.
+- **Teilnehmende sehen ihre Staffel auch bei `off` und `admins`** – die allgemeine Turnierregel
+  (`tournament_hidden_reason`: wer angemeldet ist, sieht sein Turnier; Entwurf bleibt 404). Bewusst so belassen: Die
+  Co-Teams müssen während der Season Spiele melden, Termine abstimmen und den Matchchat lesen können, auch wenn die
+  Leitung die Liga nach außen kurz ausblendet. Für Teilnehmende zu verbergen hieße, die gemeinsame Sichtbarkeitsregel
+  aller Turnier-, Spiel- und Chat-Routen um einen Liga-Sonderfall zu erweitern – viel Fläche für wenig Nutzen. Die
+  Ligaseite und die Lese-API bleiben bei `off` für alle 404.

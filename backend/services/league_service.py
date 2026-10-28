@@ -26,6 +26,8 @@ from services.advancement_draw import sync_advancement_fields
 from services.bracket_fill_in import has_started, is_auto_bye
 from services.competition_versions import new_competition_version_fields
 from services.league_scope import ONLY_LEAGUE
+# Runden ≤ aktive Wochen steht im Blatt-Modul (auch für Spielplan und Turnierstart) und wird hier weitergereicht.
+from services.league_rounds import max_teams_for, rounds_needed, rounds_problem  # noqa: F401
 from services.scoring_rules import normalize_rules
 from services.slug_utils import slugify, unique_slug
 
@@ -147,37 +149,6 @@ def season_end(season: dict) -> str | None:
     last = weeks[-1][1]
     local = datetime(last.year, last.month, last.day, 23, 59, 59, tzinfo=VIENNA)
     return local.astimezone(timezone.utc).isoformat()
-
-
-def rounds_needed(teams: int, legs: int) -> int:
-    """Spieltage jeder gegen jeden: n−1 bei gerader, n bei ungerader Zahl (ein Team hat spielfrei), je Runde."""
-    teams = max(int(teams or 0), 0)
-    if teams < 2:
-        return 0
-    return (teams - 1 if teams % 2 == 0 else teams) * max(int(legs or 1), 1)
-
-
-def max_teams_for(active_weeks: int, legs: int) -> int:
-    """Die größte Staffel, deren Spieltage in ``active_weeks`` passen."""
-    best = 0
-    for teams in range(2, 41):
-        if rounds_needed(teams, legs) <= active_weeks:
-            best = teams
-    return best
-
-
-def rounds_problem(teams: int, legs: int, weeks_total: int, blocked: list[int]) -> str | None:
-    """Prüfung „Runden ≤ aktive Wochen“ (docs/LIGA.md, Abschnitt 5) - ``None`` heißt passt, sonst die Meldung."""
-    active = int(weeks_total or 0) - len(blocked or [])
-    needed = rounds_needed(teams, legs)
-    if needed <= active:
-        return None
-    fits = max_teams_for(active, legs)
-    legs_text = "Hin- und Rückrunde" if int(legs or 1) == 2 else "nur Hinrunde"
-    hint = (f" Bitte die Staffelgröße auf höchstens {fits} senken und die übrigen Teams auf eine zweite Staffel "
-            f"verteilen - oder mehr Wochen einplanen." if fits >= 2 else " Bitte mehr Wochen einplanen.")
-    return (f"Mit bis zu {teams} Teams ({legs_text}) braucht die Staffel {needed} Spielwochen, die Season hat aber "
-            f"nur {active} aktive Wochen ({weeks_total} Wochen, davon {len(blocked or [])} gesperrt).{hint}")
 
 
 def calendar_summary(season: dict, settings: dict | None = None) -> dict:
@@ -328,6 +299,8 @@ def staffel_fields(league: dict, season: dict, division: dict) -> dict:
         "is_public": is_public,
         "round_robin_legs": settings["round_robin_legs"],
         "matchday_blocked_weeks": blocked_weeks(season),
+        # Die Sperrzeiten selbst (Wiener Kalendertage) - für matchday_schedule.blocked_period_at (Terminvorschläge, Fristen).
+        "blocked_periods": [dict(period) for period in season.get("blocked_periods") or []],
         "matchday_weeks_total": settings["weeks_total"],
         "scoring_rules": settings["scoring_rules"],
         "game_mode_order": list(settings.get("game_mode_order") or []),
@@ -339,15 +312,16 @@ def staffel_fields(league: dict, season: dict, division: dict) -> dict:
 SYNC_GROUPS: dict[str, tuple[str, ...]] = {
     "always": ("visibility", "is_public", "rules"),
     "before_start": ("start_date", "end_date", "matchday_days", "default_match_weekday", "default_match_time",
-                     "round_robin_legs", "matchday_blocked_weeks", "matchday_weeks_total", "max_participants",
-                     "min_squad_size"),
-    "before_result": ("best_of", "team_size", "scoring_rules", "game_mode_order", "result_confirm_hours_league",
-                      "lineup_amend_hours"),
+                     "round_robin_legs", "matchday_blocked_weeks", "blocked_periods", "matchday_weeks_total",
+                     "max_participants"),
+    # Teamgröße und Mindestkader gehen immer gemeinsam - so bleibt min_squad_size ≥ team_size am Turnier.
+    "before_result": ("best_of", "team_size", "min_squad_size", "scoring_rules", "game_mode_order",
+                      "result_confirm_hours_league", "lineup_amend_hours"),
 }
 SYNC_GROUP_LABELS = {
     "always": "Sichtbarkeit und Regeltext",
     "before_start": "Termine und Kalender",
-    "before_result": "Best of, Teamgröße, Punkte und Fristen",
+    "before_result": "Best of, Teamgröße, Mindestkader, Punkte und Fristen",
     "map_pool": "Map-Pool",
 }
 
@@ -716,6 +690,11 @@ async def _sync_pool(db, tournament: dict, season: dict, user: dict, *, locked: 
             changed.append("map_pool")
         applied.append("map_pool")
         return
+    if pool:
+        # Die Staffel spielt ein anderes Spiel als die Season (jemand hat es am Turnier umgestellt): nichts löschen.
+        skipped.append({"group": "map_pool", "label": SYNC_GROUP_LABELS["map_pool"],
+                        "reason": "Die Staffel hat ein anderes Spiel als der Map-Pool der Season - ihr Pool bleibt."})
+        return
     if not own:
         applied.append("map_pool")
         return
@@ -805,8 +784,11 @@ async def visible_leagues(db, user: dict | None) -> list[dict]:
     return out
 
 
-async def public_season_view(db, league_slug: str, season_slug: str, user: dict | None) -> dict:
-    """Liga → Season → Liga N → Staffeln mit Turnier-Kennungen. Unsichtbar heißt 404 - wie „gibt es nicht“."""
+async def public_season_view(db, league_slug: str, season_slug: str, user: dict | None, *,
+                             staffel_hidden=None) -> dict:
+    """Liga → Season → Liga N → Staffeln mit Turnier-Kennungen. Unsichtbar heißt 404 - wie „gibt es nicht“.
+    ``staffel_hidden(db, tournament, user)``: die Sichtbarkeitsregel der Turnierseite (die Route reicht
+    ``tournament_hidden_reason`` herein - ein Service importiert keine Route)."""
     league = await db.leagues.find_one({"slug": league_slug, "status": "active"}, {"_id": 0})
     season = await db.league_seasons.find_one({"league_id": league["id"], "slug": season_slug},
                                               {"_id": 0}) if league else None
@@ -816,9 +798,8 @@ async def public_season_view(db, league_slug: str, season_slug: str, user: dict 
                                                {"_id": 0}).sort("level", 1).to_list(50)
     # Nur Staffeln, die die Person auch als Turnier sähe - Entwurf und „intern“ bleiben bei der Leitung und den
     # Teilnehmenden (dieselbe Regel wie die Turnierseite).
-    from routes.tournament_common import tournament_hidden_reason
     staffeln = [row for row in await staffeln_of(db, season["id"])
-                if not await tournament_hidden_reason(db, row, user)]
+                if staffel_hidden is None or not await staffel_hidden(db, row, user)]
     game = await _game(db, league.get("game_id"))
     pool = map_pools.view(map_pools.valid_for(await map_pools.current(db, "league_season", season["id"]),
                                               league.get("game_id")), "league_season")

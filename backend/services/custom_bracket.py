@@ -536,7 +536,80 @@ def _auto_groups_schema(slot_count: int, group_count: int) -> str:
     return "\n".join(lines).strip()
 
 
-def _auto_league_schema(slot_count: int, rng=None) -> str:
+def balanced_home(rounds: list[list[tuple[int, int]]]) -> list[list[tuple[int, int]]]:
+    """Heimrecht fair für eine einfache Runde (Liga, nur Hinrunde - docs/LIGA.md, Abschnitt 5): jedes Team hat höchstens
+    ein Heimspiel mehr oder weniger als Auswärtsspiele.
+
+    Die Paarungen und ihre Spieltage bleiben; nur die Seiten werden gedreht. Rechnung über einen Euler-Kreis: Teams mit
+    ungerader Spielzahl bekommen paarweise eine Hilfskante, dann wird jeder Kreis in Laufrichtung orientiert - so hat
+    jedes Team gleich viele Heim- wie Auswärtsspiele, bis auf höchstens die eine Hilfskante. Gleiche Eingabe, gleiches
+    Ergebnis."""
+    edges: list[tuple[int, int]] = [pair for pairs in rounds for pair in pairs]
+    if not edges:
+        return [list(pairs) for pairs in rounds]
+    teams = sorted({team for pair in edges for team in pair})
+    degree = {team: 0 for team in teams}
+    for home, away in edges:
+        degree[home] += 1
+        degree[away] += 1
+    odd = [team for team in teams if degree[team] % 2]
+    all_edges = list(edges) + [(odd[index], odd[index + 1]) for index in range(0, len(odd) - 1, 2)]
+    adjacency: dict[int, list[tuple[int, int]]] = {team: [] for team in teams}
+    for edge_id, (left, right) in enumerate(all_edges):
+        adjacency[left].append((right, edge_id))
+        adjacency[right].append((left, edge_id))
+    used = [False] * len(all_edges)
+    oriented: dict[int, tuple[int, int]] = {}
+    pointer = {team: 0 for team in teams}
+    for start in teams:
+        stack: list[int] = [start]
+        while stack:
+            node = stack[-1]
+            moved = False
+            while pointer[node] < len(adjacency[node]):
+                other, edge_id = adjacency[node][pointer[node]]
+                pointer[node] += 1
+                if used[edge_id]:
+                    continue
+                used[edge_id] = True
+                oriented[edge_id] = (node, other)
+                stack.append(other)
+                moved = True
+                break
+            if not moved:
+                stack.pop()
+    out: list[list[tuple[int, int]]] = []
+    edge_id = 0
+    for pairs in rounds:
+        day = []
+        for _ in pairs:
+            day.append(oriented[edge_id])
+            edge_id += 1
+        out.append(day)
+    return out
+
+
+def _check_league_weeks(tournament: dict | None, teams: int, legs: int) -> None:
+    """Runden ≤ aktive Wochen (docs/LIGA.md, Abschnitt 5) auch beim Erzeugen und Neu-Auslosen - nur mit
+    ``matchday_weeks_total`` (Liga-Staffel); ohne das Feld keine Prüfung wie bisher."""
+    total = (tournament or {}).get("matchday_weeks_total")
+    if not total:
+        return
+    from services.league_rounds import rounds_problem
+
+    problem = rounds_problem(teams, legs, int(total), list((tournament or {}).get("matchday_blocked_weeks") or []))
+    if problem:
+        raise BracketSchemaError(problem)
+
+
+def league_legs(tournament: dict | None, stage: dict | None = None) -> int:
+    """Runden einer Liga: 1 = nur Hinrunde, 2 = Hin- und Rückrunde. Fehlt das Feld, 2 - wie bisher."""
+    settings = (stage or {}).get("settings") or {}
+    value = settings.get("round_robin_legs") or (tournament or {}).get("round_robin_legs")
+    return 1 if str(value) == "1" else 2
+
+
+def _auto_league_schema(slot_count: int, rng=None, legs: int = 2) -> str:
     """Build a league: everyone against everyone, home and away.
 
     The second half repeats the first with the sides swapped, which is what
@@ -545,12 +618,17 @@ def _auto_league_schema(slot_count: int, rng=None) -> str:
     fills slot two.
 
     Mit ``rng`` (gemischt, #1548) sind Reihenfolge der Spieltage und Heimrecht gelost; die Paarungen bleiben.
+    ``legs=1`` (Liga nur mit Hinrunde, docs/LIGA.md): keine Rückrunde, dafür Heimrecht fair verteilt
+    (``balanced_home``); gelost wird dann nur die Reihenfolge der Spieltage und alle Seiten gemeinsam.
     """
     seeds = list(range(1, max(2, int(slot_count or 2)) + 1))
     first_leg = _round_robin_rounds(seeds)
+    single = int(legs or 2) == 1
+    if single:
+        first_leg = balanced_home(first_leg)
     if rng is not None:
-        first_leg = shuffle_league_rounds(first_leg, rng)
-    return_leg = [[(away, home) for home, away in pairs] for pairs in first_leg]
+        first_leg = shuffle_league_rounds(first_leg, rng, balanced=single)
+    return_leg = [] if single else [[(away, home) for home, away in pairs] for pairs in first_leg]
 
     lines = ["[LIGA]"]
     key_index = 0
@@ -667,7 +745,9 @@ def _resolve_schema(tournament: dict, stage: dict, registrations: list[dict], pr
         return _auto_groups_schema(size, int(settings.get("group_count") or 2))
     if (stage.get("stage_type") or "") == "league":
         size = int(tournament.get("max_participants") or 2) if preview else max(2, len(registrations))
-        return _auto_league_schema(size, league_rng)
+        legs = league_legs(tournament, stage)
+        _check_league_weeks(tournament, size, legs)
+        return _auto_league_schema(size, league_rng, legs=legs)
     if (stage.get("stage_type") or "") == "simple":
         size = int(tournament.get("max_participants") or 2) if preview else max(2, len(registrations))
         return _auto_ffa_single_match_schema(size)

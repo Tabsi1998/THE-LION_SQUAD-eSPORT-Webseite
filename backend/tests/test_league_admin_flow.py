@@ -128,6 +128,7 @@ async def test_creating_a_staffel_copies_every_setting_into_the_tournament(flow)
         "discord_skip": True, "season_weight": 0, "visibility": "internal", "is_public": False, "status": "draft",
         "round_robin_legs": 1, "matchday_blocked_weeks": [7, 8], "matchday_weeks_total": 10,
         "scoring_rules": normalize_rules({}), "game_mode_order": [], "lineup_amend_hours": 48,
+        "blocked_periods": [{"start_date": "2026-12-21", "end_date": "2027-01-03", "label": "Weihnachtspause"}],
     }
     assert {key: tournament.get(key) for key in expected} == expected
 
@@ -350,3 +351,35 @@ async def test_league_context_cannot_be_set_through_the_tournament_routes(flow):
     await flow.patch(f"/api/tournaments/{staffel['id']}", json={"league_context": None, "title": "Umbenannt"})
     stored = await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0})
     assert stored["league_context"]["staffel"] == "A" and stored["title"] == "Umbenannt"
+
+
+@pytest.mark.asyncio
+async def test_the_first_preview_of_a_staffel_plays_only_the_first_leg(flow):
+    _admin, _game, _league, _season, division, _maps = await setup_league(flow)
+    staffel = await _staffel(flow, division)
+    preview = await flow.db.matches_v2.find({"tournament_id": staffel["id"]}, {"_id": 0}).to_list(None)
+    assert len(preview) == 28  # 8 Teams, nur Hinrunde: 7 Spieltage zu je 4 Spielen
+    assert max(match["round"] for match in preview) == 7
+
+
+@pytest.mark.asyncio
+async def test_starting_a_staffel_with_more_teams_than_weeks_is_refused(flow):
+    admin, _game, _league, season, division, _maps = await setup_league(flow, season={"max_staffel_size": 8})
+    staffel = await _staffel(flow, division)
+    await flow.db.tournaments.update_one({"id": staffel["id"]}, {"$set": {"max_participants": 9}})
+    for index in range(1, 10):
+        await flow.register(staffel, await flow.add_user(name=f"Team {index}"))
+    flow.act_as(admin)
+
+    refused = await flow.post(f"/api/tournaments/{staffel['id']}/status", json={"status": "live"})
+    assert refused.status_code == 400
+    assert "9 Spielwochen" in refused.json()["detail"] and "zweite Staffel" in refused.json()["detail"]
+    assert (await flow.db.tournaments.find_one({"id": staffel["id"]}))["status"] == "draft"
+
+    last = await flow.db.tournament_registrations.find_one({"tournament_id": staffel["id"]}, sort=[("_id", -1)])
+    await flow.db.tournament_registrations.update_one({"_id": last["_id"]}, {"$set": {"status": "withdrawn"}})
+    started = await flow.post(f"/api/tournaments/{staffel['id']}/status", json={"status": "live"})
+    assert started.status_code == 200, started.text
+    fixed = await flow.db.matches_v2.find({"tournament_id": staffel["id"], "is_preview": {"$ne": True}},
+                                          {"_id": 0}).to_list(None)
+    assert len(fixed) == 28

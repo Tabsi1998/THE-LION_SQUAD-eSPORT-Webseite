@@ -20,9 +20,9 @@ from datetime import datetime, timedelta, timezone
 from services.matchday_schedule import (
     MatchdayScheduleError,
     matchday_number_of,
-    matchday_settings,
-    matchday_window,
     plays_in_matchdays,
+    response_deadline,
+    tournament_matchday_window,
 )
 from services.v2_match_flows import latest_reports, no_show_keeps_heat_open
 
@@ -152,7 +152,8 @@ def _matchday_window(match: dict, tournament: dict | None):
     if not number or not start:
         return None
     try:
-        return matchday_window(start, number, days=matchday_settings(tournament)["days"])
+        # Sperrwochen (Liga, docs/LIGA.md): Spieltag N liegt in der N-ten aktiven Woche.
+        return tournament_matchday_window(tournament, number)
     except MatchdayScheduleError:
         return None
 
@@ -198,11 +199,13 @@ def auto_confirm_due(match: dict, tournament: dict | None, stage: dict | None = 
         # Fabian (14.10.2026): 48 Stunden, spätestens zum Ende der Spielwoche - aber der Gegner hat immer mindestens
         # 24 Stunden. Ein vereinbart außerhalb der Woche gespieltes Spiel hat das Wochenende nicht als Obergrenze.
         hours = setting("result_confirm_hours_league", tournament, stage)
-        due = reported + timedelta(hours=hours)
+        # Liga mit Sperrzeiten (docs/LIGA.md): in der Pause läuft keine Frist - auch nicht die 24 Stunden Mindestzeit.
+        # Ohne Sperrzeiten ist response_deadline genau ``reported + hours``.
+        due = response_deadline(tournament, reported, hours)
         week_end = None if agreed_outside_week(match, tournament) else matchday_end(match, tournament)
         if week_end and week_end < due:
             due = week_end
-        return max(due, reported + timedelta(hours=LEAGUE_MIN_OBJECTION_HOURS))
+        return max(due, response_deadline(tournament, reported, LEAGUE_MIN_OBJECTION_HOURS))
     return reported + timedelta(minutes=setting("result_confirm_minutes_online", tournament, stage))
 
 
