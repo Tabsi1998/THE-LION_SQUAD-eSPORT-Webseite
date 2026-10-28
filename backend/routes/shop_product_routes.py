@@ -73,6 +73,8 @@ class LayerIn(BaseModel):
     max_width_cm: float | None = None
     # Fassung von Hand (#2141): ohne Angabe bzw. „auto“ entscheidet der Untergrund (Hintergrund, Produkt, Shirtfarbe).
     variant: Literal["auto", "light", "dark"] | None = None
+    # Farbe von Gamertag bzw. Vereinsnummer fest (#2141): eine Farbe der Gamertag-Regeln, ohne Angabe automatisch.
+    ink: str | None = Field(None, max_length=30)
 
 
 class PlacementLayout(BaseModel):

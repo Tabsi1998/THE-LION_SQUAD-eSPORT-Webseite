@@ -27,13 +27,14 @@ transparentes PNG in der Pixelgröße der Printful-Vorlage (``shop_print_templat
 from __future__ import annotations
 
 import asyncio
+import base64
 import hashlib
 import hmac
 import json
 import logging
 import re
 import secrets
-from collections import OrderedDict
+import struct
 from dataclasses import dataclass, field
 from io import BytesIO
 from typing import Any, Sequence
@@ -499,8 +500,8 @@ SURFACES = {"garment": "wie Printful-Farbe", "light": "hell", "dark": "dunkel"}
 LAYER_VARIANTS = {"auto": "automatisch", "light": "hell", "dark": "dunkel"}
 SURFACE_SOURCES = {"layer": "von Hand", "background": "aus Hintergrund", "product": "Vorgabe des Produkts",
                    "garment": "aus Shirtfarbe"}
-LUMA_GRID_CELLS = 128  # so viele Zellen an der längeren Seite - bei 4950 × 6750 px je Zelle knapp 1 cm
-LUMA_CACHE_SIZE = 16
+LUMA_GRID_CELLS = 96  # so viele Zellen an der längeren Seite - bei 4950 × 6750 px je Zelle gut 1,2 cm
+LUMA_VERSION = 1      # ändert sich, wenn das gespeicherte Raster anders gerechnet wird - dann wird es neu gerechnet
 
 
 @dataclass(frozen=True)
@@ -566,32 +567,76 @@ def luma_grid(image: Image.Image) -> LumaGrid:
     return LumaGrid(width, height, cell, tuple(lit), tuple(cover), tuple(count))
 
 
+def grid_doc(grid: LumaGrid) -> dict:
+    """Das Raster klein für die Druckdatei-Zeile: je Zelle mittlere Luminanz × Deckkraft und mittlere Deckkraft als
+    16-Bit-Werte (Base64) - bei einer Allover-Fläche (96 × 71 Zellen) rund 37 KB."""
+    def packed(sums: tuple) -> str:
+        values = [min(65535, max(0, round(value / count * 65535))) if count else 0
+                  for row, counts in zip(sums, grid.count) for value, count in zip(row, counts)]
+        return base64.b64encode(struct.pack(f"<{len(values)}H", *values)).decode("ascii")
+
+    return {"version": LUMA_VERSION, "width_px": grid.width_px, "height_px": grid.height_px, "cell": grid.cell,
+            "lit": packed(grid.lit), "cover": packed(grid.cover)}
+
+
+def grid_from_doc(doc: Any) -> LumaGrid | None:
+    """Das gespeicherte Raster zurück - ``None``, wenn es fehlt, alt oder kaputt ist (dann wird neu gerechnet)."""
+    if not isinstance(doc, dict) or doc.get("version") != LUMA_VERSION:
+        return None
+    try:
+        width, height, cell = int(doc["width_px"]), int(doc["height_px"]), int(doc["cell"])
+        cols, rows = -(-width // cell), -(-height // cell)
+        lit = struct.unpack(f"<{cols * rows}H", base64.b64decode(doc["lit"]))
+        cover = struct.unpack(f"<{cols * rows}H", base64.b64decode(doc["cover"]))
+    except (KeyError, TypeError, ValueError, ZeroDivisionError, struct.error):
+        return None
+    counts = tuple(tuple(float((min(width, (col + 1) * cell) - col * cell)
+                               * (min(height, (row + 1) * cell) - row * cell)) for col in range(cols))
+                   for row in range(rows))
+    return LumaGrid(width, height, cell,
+                    tuple(tuple(lit[row * cols + col] / 65535 * counts[row][col] for col in range(cols))
+                          for row in range(rows)),
+                    tuple(tuple(cover[row * cols + col] / 65535 * counts[row][col] for col in range(cols))
+                          for row in range(rows)), counts)
+
+
 def _grid_of_file(path) -> LumaGrid:
     with Image.open(path) as img:
         img.load()
         return luma_grid(img)
 
 
-_GRIDS: OrderedDict[str, LumaGrid] = OrderedDict()
+_ROW_LOCKS: dict[str, asyncio.Lock] = {}
 
 
-async def background_grid(row: dict | None) -> LumaGrid | None:
-    """Die Helligkeits-Zellen einer Hintergrund-Datei - je Prüfsumme einmal gerechnet (außerhalb der Ereignisschleife)
-    und im Prozess gemerkt."""
+def _row_lock(key: str) -> asyncio.Lock:
+    """Eine Sperre je Prüfsumme und Zweck: zwei gleichzeitige Anfragen rechnen dasselbe nicht doppelt."""
+    lock = _ROW_LOCKS.get(key)
+    if lock is None:
+        lock = _ROW_LOCKS[key] = asyncio.Lock()
+    return lock
+
+
+async def background_grid(db, row: dict | None) -> LumaGrid | None:
+    """Die Helligkeits-Zellen einer Hintergrund-Datei - aus der Zeile (``luma``, beim Hochladen gerechnet). Nur eine
+    ältere Datei ohne Raster wird einmal geöffnet, gerechnet (außerhalb der Ereignisschleife) und nachgetragen."""
     if not row or not row.get("sha256"):
         return None
-    cached = _GRIDS.get(row["sha256"])
-    if cached is not None:
-        _GRIDS.move_to_end(row["sha256"])
-        return cached
-    path = shop_designs._path_of(row.get("file_ref"))
-    if path is None or not path.is_file():
-        return None
-    grid = await asyncio.to_thread(_grid_of_file, path)
-    _GRIDS[row["sha256"]] = grid
-    while len(_GRIDS) > LUMA_CACHE_SIZE:
-        _GRIDS.popitem(last=False)
-    return grid
+    grid = grid_from_doc(row.get("luma"))
+    if grid is not None:
+        return grid
+    async with _row_lock(f"luma:{row['sha256']}"):
+        stored = await db.shop_print_files.find_one({"id": row["id"]}, {"_id": 0, "luma": 1}) if row.get("id") else None
+        grid = grid_from_doc((stored or {}).get("luma"))
+        if grid is not None:
+            return grid
+        path = shop_designs._path_of(row.get("file_ref"))
+        if path is None or not path.is_file():
+            return None
+        grid = await asyncio.to_thread(_grid_of_file, path)
+        if row.get("id"):
+            await db.shop_print_files.update_one({"id": row["id"]}, {"$set": {"luma": grid_doc(grid)}})
+        return grid
 
 
 GARMENT = {"variant": None, "source": "garment", "luminance": None}
@@ -646,6 +691,7 @@ class Planned:
     # Untergrund hell/dunkel (#2141) und - bei Gamertag und Vereinsnummer - die Farbe daraus.
     surface: dict = field(default_factory=lambda: dict(GARMENT))
     ink: str | None = None
+    ink_fixed: bool = False  # Farbe des Namens von Hand gewählt statt nach Kontrast (#2141)
 
 
 @dataclass
@@ -733,7 +779,7 @@ async def plan_placement(db, row: dict, entry: dict, *, color: str, color_hex: s
         if layer.get("variant") not in SURFACE_LUMINANCE and not background_ok and product_surface is None:
             return dict(GARMENT)  # wie vor #2141 - ohne die Einstellungen der Motive zu lesen
         if "grid" not in lazy:
-            lazy["grid"] = await background_grid(background) if background_ok else None
+            lazy["grid"] = await background_grid(db, background) if background_ok else None
             lazy["threshold"] = (await shop_motifs.load_settings(db))["threshold"]
         return decide_surface(layer, box, grid=lazy["grid"], garment_hex=color_hex, product_surface=product_surface,
                               threshold=lazy["threshold"])
@@ -781,8 +827,10 @@ async def plan_placement(db, row: dict, entry: dict, *, color: str, color_hex: s
                 continue
             chosen = await decide(layer, box)
             label = f"{'Gamertag' if kind == 'gamertag' else 'Vereinsnummer'} ({preset['label']})"
+            # Farbe fest gewählt (#2141) - nur eine, die es in den Gamertag-Regeln (noch) gibt; sonst automatisch.
+            fixed = layer.get("ink") if layer.get("ink") in {item["key"] for item in gamertag_rules["colors"]} else None
             planned.append(Planned(index, kind, label, box, sizes=sizes, surface=chosen,
-                                   ink=ink_for(gamertag_rules, color, chosen)))
+                                   ink=fixed or ink_for(gamertag_rules, color, chosen), ink_fixed=bool(fixed)))
         found += templates.problems(entry, box, label, rules)
     payload = {"renderer": RENDERER_VERSION, "template": template_hash, "mode": mode,
                "motifs": [{"box": item.box.rounded(), "ref": item.source.ref} for item in planned
@@ -801,7 +849,8 @@ def _surface_view(item: Planned, rules: dict | None) -> dict:
     out = {"surface": {**item.surface, "text": surface_text(item.surface)}}
     if item.ink and rules:
         ink = next((color for color in rules["colors"] if color["key"] == item.ink), None)
-        out["ink"] = {"key": item.ink, "label": (ink or {}).get("label"), "hex": (ink or {}).get("hex")}
+        out["ink"] = {"key": item.ink, "label": (ink or {}).get("label"), "hex": (ink or {}).get("hex"),
+                      "fixed": item.ink_fixed}
     return out
 
 
@@ -865,10 +914,13 @@ async def latest_base(db, product_id: str, placement: str, group: str, color: st
 
 
 async def current_base(db, product_id: str, plan) -> dict | None:
-    """Die Grunddatei, die für einen Plan zählt: bei „Hintergrund plus Ebenen“ (#2141) die neueste erzeugte - ein neuer
-    Hintergrund allein ist noch keine Druckdatei -, sonst die neueste überhaupt."""
-    return await latest_base(db, product_id, plan.entry["placement"], plan.entry["group"], plan.color,
-                             origin="composed" if plan.on_background else None)
+    """Die Grunddatei, die für einen Plan zählt (#2141): bei „Hintergrund plus Ebenen“ die neueste erzeugte - ein neuer
+    Hintergrund allein ist noch keine Druckdatei; bei einer fertigen Datei ohne Motive die neueste hochgeladene - auch
+    wenn mit Motiven schon eine erzeugte entstand (Motive wieder entfernt); sonst die neueste überhaupt."""
+    origin = None
+    if plan.mode == "upload":
+        origin = "composed" if plan.on_background else "upload"
+    return await latest_base(db, product_id, plan.entry["placement"], plan.entry["group"], plan.color, origin=origin)
 
 
 async def _store(db, payload: bytes, values: dict) -> dict:
@@ -1167,18 +1219,25 @@ async def upload(db, product_id: str, *, placement: str, color: str, data: bytes
     payload = shop_designs.png_bytes(img, dpi)
     sha256 = hashlib.sha256(payload).hexdigest()
     template_hash = templates.entry_hash(entry)
-    latest = await latest_base(db, product_id, placement, entry["group"], color)
     background = await latest_background(db, product_id, placement, entry["group"], color)
-    for current in (latest, background):
-        if current and current.get("sha256") == sha256:
-            raise ShopConflict(f"Diese Datei ist schon die aktuelle Version (v{current['version']}).")
-    stored = await _store_base(db, payload, {
-        "origin": "upload", "product_id": product_id, "slug": product.get("slug") or "produkt",
-        "placement": placement, "printful_placement": placement, "technique": entry["technique"],
-        "group": entry["group"], "variant_ids": ids or [], "color": color, "color_key": _color_key(color),
-        "width_px": want_w, "height_px": want_h, "dpi": dpi, "layout_hash": "upload",
-        "template_hash": template_hash, "sources": [{"source": "upload", "format": source_format}],
-        "warnings": notes, "created_by": actor_id})
+    if (background and background.get("sha256") == sha256 and background.get("template_hash") == template_hash
+            and file_exists(background)):
+        raise ShopConflict(f"Diese Datei ist schon die aktuelle Version (v{background['version']}).")
+    # Einmal beim Hochladen (#2141): Helligkeits-Raster und Vorschaubild - Schritt 3, Vorschau und Bestellung öffnen
+    # die große Datei dafür nie wieder.
+    grid, thumb = await asyncio.to_thread(lambda: (luma_grid(img), _thumb_png(img)))
+    thumb_ref, thumb_path = shop_designs._store(thumb)
+    try:
+        stored = await _store_base(db, payload, {
+            "origin": "upload", "product_id": product_id, "slug": product.get("slug") or "produkt",
+            "placement": placement, "printful_placement": placement, "technique": entry["technique"],
+            "group": entry["group"], "variant_ids": ids or [], "color": color, "color_key": _color_key(color),
+            "width_px": want_w, "height_px": want_h, "dpi": dpi, "layout_hash": "upload",
+            "template_hash": template_hash, "sources": [{"source": "upload", "format": source_format}],
+            "warnings": notes, "created_by": actor_id, "luma": grid_doc(grid), "thumb_ref": thumb_ref})
+    except BaseException:
+        thumb_path.unlink(missing_ok=True)
+        raise
     await record_admin_action(db, "shop.print_file.add", actor_id=actor_id, target_id=product_id, reason=reason,
                               data={"created": [{"placement": placement, "color": color, "version": stored["version"],
                                                  "sha256": stored["sha256"]}], "origin": "upload"})
@@ -1445,10 +1504,16 @@ async def preview_png(db, product: dict, *, placement: str, color: str, sample: 
 
     print_img = Image.new("RGBA", (target_w, target_h), (0, 0, 0, 0))
     if plan.mode == "upload" and plan.background_ok:
-        # Die fertige Datei als Hintergrund (#2141) - darüber die Ebenen wie im Modus „Motiv und Position“.
-        with Image.open(shop_designs._path_of(plan.background["file_ref"])) as img:  # höchstens 80 MP (Prüfung)
-            img.draft("RGBA", (target_w, target_h))
-            print_img = img.convert("RGBA").resize((target_w, target_h), Image.Resampling.LANCZOS)
+        # Die fertige Datei als Hintergrund (#2141) - aus dem Vorschaubild (höchstens 1200 px, nie die volle Datei),
+        # darüber die Ebenen wie im Modus „Motiv und Position“. Dekodiert außerhalb der Ereignisschleife.
+        thumb = await thumb_bytes(db, plan.background)
+        if thumb is not None:
+            def scaled() -> Image.Image:
+                with Image.open(BytesIO(thumb)) as img:
+                    img.load()
+                    return img.convert("RGBA").resize((target_w, target_h), Image.Resampling.LANCZOS)
+
+            print_img = await asyncio.to_thread(scaled)
     if plan.motifs and not plan.problems:
         for item in plan.motifs:
             left, top, box_w, box_h = scaled_box(item.box)
@@ -1509,35 +1574,55 @@ async def admin_file(db, product_id: str, file_id: str):
 
 
 THUMB_SIDE = 1200
-_THUMBS: OrderedDict[str, bytes] = OrderedDict()
 
 
-def _thumb_of(path) -> bytes:
-    with Image.open(path) as img:
-        img.load()
-        part = img.convert("RGBA")
+def _thumb_png(image: Image.Image) -> bytes:
+    """Das Vorschaubild einer Druckdatei: höchstens ``THUMB_SIDE`` px, transparent, ohne Metadaten. Deterministisch."""
+    part = image.convert("RGBA")
     part.thumbnail((THUMB_SIDE, THUMB_SIDE), Image.Resampling.LANCZOS)
     out = BytesIO()
     part.save(out, format="PNG", compress_level=6)
     return out.getvalue()
 
 
+def _thumb_of(path) -> bytes:
+    with Image.open(path) as img:
+        img.load()
+        return _thumb_png(img)
+
+
+async def thumb_bytes(db, row: dict) -> bytes | None:
+    """Das Vorschaubild einer Grunddatei (#2141): beim Hochladen gespeichert (``thumb_ref``); fehlt es (ältere Datei,
+    erzeugte Grunddatei), wird es einmal gerechnet und nachgetragen - je Prüfsumme gesperrt, nie doppelt."""
+    path = shop_designs._path_of(row.get("thumb_ref"))
+    if path is not None and path.is_file():
+        return await asyncio.to_thread(path.read_bytes)
+    async with _row_lock(f"thumb:{row['sha256']}"):
+        stored = await db.shop_print_files.find_one({"id": row["id"]}, {"_id": 0, "thumb_ref": 1})
+        path = shop_designs._path_of((stored or {}).get("thumb_ref"))
+        if path is not None and path.is_file():
+            return await asyncio.to_thread(path.read_bytes)
+        source = shop_designs._path_of(row.get("file_ref"))
+        if source is None or not source.is_file():
+            return None
+        payload = await asyncio.to_thread(_thumb_of, source)
+        thumb_ref, thumb_path = shop_designs._store(payload)
+        try:
+            await db.shop_print_files.update_one({"id": row["id"]}, {"$set": {"thumb_ref": thumb_ref}})
+        except BaseException:
+            thumb_path.unlink(missing_ok=True)
+            raise
+        return payload
+
+
 async def admin_thumb(db, product_id: str, file_id: str) -> bytes:
     """Eine Grunddatei verkleinert (höchstens ``THUMB_SIDE`` px) - für die Vorschau des Hintergrunds in Schritt 3
-    (#2141). Je Prüfsumme einmal gerechnet und im Prozess gemerkt; Bestelldateien mit Namen nie."""
+    (#2141). Bestelldateien mit Namen nie."""
     row = await db.shop_print_files.find_one({"id": file_id, "product_id": product_id, "purpose": "base"}, {"_id": 0})
-    path = shop_designs._path_of((row or {}).get("file_ref"))
-    if row is None or path is None or not path.is_file():
+    payload = await thumb_bytes(db, row) if row else None
+    if payload is None:
         raise LookupError("Diese Druckdatei gibt es nicht.")
-    cached = _THUMBS.get(row["sha256"])
-    if cached is None:
-        cached = await asyncio.to_thread(_thumb_of, path)
-        _THUMBS[row["sha256"]] = cached
-        while len(_THUMBS) > LUMA_CACHE_SIZE:
-            _THUMBS.popitem(last=False)
-    else:
-        _THUMBS.move_to_end(row["sha256"])
-    return cached
+    return payload
 
 
 # ================================================================ Umstellung alter Produkte (Trockenlauf und Rückweg)

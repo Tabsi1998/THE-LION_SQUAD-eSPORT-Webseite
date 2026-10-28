@@ -26,7 +26,7 @@ from test_shop_products_unit import (  # noqa: E402,F401 - Fixtures und Helfer d
     BACK, BILLING, BLACK_M, BY, LION, PLACEMENTS, PRINTFUL_PRODUCT, SHIPPING, WHITE_M, configured, db, design_dir,
     fake, provider, variant_for)
 
-NAVY = (20, 20, 40)          # dunkler Hintergrund (Luminanz ≈ 0,007)
+NAVY = (20, 20, 40)          # dunkler Hintergrund (Luminanz ≈ 0,008)
 PALE = (240, 240, 240)       # heller Hintergrund (Luminanz ≈ 0,87)
 GAMERTAG_TOP = {"kind": "gamertag", "preset": "text_back_top"}
 
@@ -361,3 +361,126 @@ async def test_the_preview_shows_the_background_under_the_layers(db, provider, m
         assert max(img.size) == shop_print_files.THUMB_SIDE and img.getpixel((5, 5)) == (*NAVY, 255)
     with pytest.raises(LookupError):
         await shop_print_files.admin_thumb(db, "anderes-produkt", state["background"]["id"])
+
+
+# ---------------------------------------------------------------- Befunde aus dem Review (#2141)
+
+@pytest.mark.asyncio
+async def test_removing_the_motifs_makes_the_uploaded_file_the_print_file_again_and_back(db, provider):
+    """Motive weg: die hochgeladene Datei gilt wieder selbst (nicht die ältere erzeugte), bestellbar ohne neues
+    Hochladen. Motiv wieder dazu: die erzeugte Datei gilt wieder."""
+    product = await configured(db, provider, accept=False)
+    with_motif = [PLACEMENTS[0], {"key": "back", "mode": "upload", "layers": [BACK]}]
+    await shop_products.set_layout(db, product["id"], with_motif, included_placement="front", **BY)
+    stored = await upload(db, product["id"], "White", background())
+    composed = await shop_print_files.current_base(db, product["id"], await plan_of(db, product["id"], "White"))
+    assert composed["origin"] == "composed"
+    await shop_products.set_layout(db, product["id"], [PLACEMENTS[0], {"key": "back", "mode": "upload", "layers": []}],
+                                   included_placement="front", **BY)
+    state = await state_of(db, product["id"], "White")
+    plan = await plan_of(db, product["id"], "White")
+    assert state["state"] == "ok" and state["file"]["id"] == stored["id"]
+    assert (await shop_print_files.current_base(db, product["id"], plan))["id"] == stored["id"]
+    with pytest.raises(ShopConflict, match="schon die aktuelle"):
+        await upload(db, product["id"], "White", background())
+    await shop_products.set_layout(db, product["id"], with_motif, included_placement="front", **BY)
+    again = await state_of(db, product["id"], "White")
+    assert again["state"] == "ok" and again["file"]["id"] == composed["id"], "dieselben Pixel - die erzeugte gilt"
+    await shop_products.set_layout(db, product["id"], [PLACEMENTS[0], {"key": "back", "mode": "upload",
+                                                                         "layers": [{**BACK, "width_cm": 20.0}]}],
+                                   included_placement="front", **BY)
+    assert (await state_of(db, product["id"], "White"))["state"] == "outdated"
+    result = await shop_products.generate_print_files(db, product["id"], **BY)
+    assert [(item["placement"], item["color"]) for item in result["created"]] == [("back", "White")]
+    assert (await state_of(db, product["id"], "White"))["state"] == "ok"
+
+
+@pytest.mark.asyncio
+async def test_raster_and_thumbnail_are_made_once_at_upload_and_never_open_the_full_file_again(db, provider,
+                                                                                            monkeypatch):
+    product = await configured(db, provider, accept=False)
+    await shop_products.set_layout(db, product["id"], [PLACEMENTS[0], {"key": "back", "mode": "upload",
+                                                                         "layers": [BACK, GAMERTAG_TOP]}],
+                                   included_placement="front", **BY)
+    stored = await upload(db, product["id"], "White", background(top=NAVY, bottom=PALE))
+    row = await db.shop_print_files.find_one({"id": stored["id"]}, {"_id": 0})
+    assert row["luma"]["version"] == shop_print_files.LUMA_VERSION and len(json.dumps(row["luma"])) < 60_000
+    assert shop_designs._path_of(row["thumb_ref"]).is_file()
+    grid = shop_print_files.grid_from_doc(row["luma"])
+    assert grid.mean(templates.Box(0, 0, 1800, 1200), None) == pytest.approx(0.0080, abs=0.0005)
+    assert grid.mean(templates.Box(0, 1200, 1800, 1200), None) == pytest.approx(0.871, abs=0.002)
+
+    def never(*_args, **_kwargs):
+        raise AssertionError("die volle Datei darf dafür nicht geöffnet werden")
+
+    monkeypatch.setattr(shop_print_files, "_grid_of_file", never)
+    monkeypatch.setattr(shop_print_files, "_thumb_of", never)
+    plan = await plan_of(db, product["id"], "White")
+    assert plan.motifs[0].surface["source"] == "background"
+    assert await shop_print_files.admin_thumb(db, product["id"], stored["id"]) == \
+        shop_designs._path_of(row["thumb_ref"]).read_bytes()
+
+
+@pytest.mark.asyncio
+async def test_an_older_file_gets_raster_and_thumbnail_once_even_with_parallel_requests(db, provider, monkeypatch):
+    import asyncio
+
+    product = await configured(db, provider, accept=False)
+    await shop_products.set_layout(db, product["id"], [PLACEMENTS[0], {"key": "back", "mode": "upload",
+                                                                         "layers": [BACK]}],
+                                   included_placement="front", **BY)
+    stored = await upload(db, product["id"], "White", background())
+    await db.shop_print_files.update_one({"id": stored["id"]}, {"$unset": {"luma": "", "thumb_ref": ""}})
+    row = await db.shop_print_files.find_one({"id": stored["id"]}, {"_id": 0})
+    calls = {"grid": 0, "thumb": 0}
+    real_grid, real_thumb = shop_print_files._grid_of_file, shop_print_files._thumb_of
+
+    def counted_grid(path):
+        calls["grid"] += 1
+        return real_grid(path)
+
+    def counted_thumb(path):
+        calls["thumb"] += 1
+        return real_thumb(path)
+
+    monkeypatch.setattr(shop_print_files, "_grid_of_file", counted_grid)
+    monkeypatch.setattr(shop_print_files, "_thumb_of", counted_thumb)
+    grids = await asyncio.gather(*(shop_print_files.background_grid(db, row) for _ in range(3)))
+    thumbs = await asyncio.gather(*(shop_print_files.thumb_bytes(db, row) for _ in range(3)))
+    assert calls == {"grid": 1, "thumb": 1} and len({len(item) for item in thumbs}) == 1
+    assert grids[0].mean(templates.Box(0, 0, 100, 100), None) == pytest.approx(0.0080, abs=0.0005)
+    again = await db.shop_print_files.find_one({"id": stored["id"]}, {"_id": 0})
+    assert again["luma"] and again["thumb_ref"], "nachgetragen"
+
+
+@pytest.mark.asyncio
+async def test_the_name_colour_can_be_fixed_per_layer(db, provider):
+    product = await configured(db, provider)
+    fixed = {**GAMERTAG_TOP, "ink": "reinweiss"}
+    await shop_products.set_layout(db, product["id"], [{"key": "front", "layers": [LION]},
+                                                       {"key": "back", "mode": "upload", "layers": [BACK, fixed]}],
+                                   included_placement="front", **BY)
+    stored = await shop_catalog.get_product(db, product["id"])
+    assert stored["placements"][1]["layers"][1]["ink"] == "reinweiss"
+    await upload(db, product["id"], "White", background(top=PALE))
+    plan = await plan_of(db, product["id"], "White")
+    (name,) = plan.texts
+    assert (name.ink, name.ink_fixed) == ("reinweiss", True), "fest, auch wenn Weiß auf Hell kaum kontrastiert"
+    rules = await shop_gamertag.load_rules(db)
+    assert shop_print_files.plan_view(plan, rules)["layers"][1]["ink"]["fixed"] is True
+    await publish_unchecked(db, product["id"])
+    white = await variant_for(db, product["id"], WHITE_M)
+    order, _ = await shop_orders.place_order(
+        db, user_id="konto-1", idempotency_key="bestellung-2141-c", buyer_kind="member",
+        lines=[{"variant_id": white["id"], "quantity": 1, "gamertag": "Testlöwe"}], shipping_estimate_cents=490,
+        billing_address=dict(BILLING), shipping_address=dict(SHIPPING), actor_id="konto-1")
+    (item,) = await shop_orders.items_for(db, order["id"])
+    back = next(row for row in item["print_files"] if row["placement"] == "back")
+    tag = await db.shop_gamertag_files.find_one({"id": back["gamertag_file_id"]}, {"_id": 0})
+    assert tag["color_key"] == "reinweiss"
+    await db.shop_products.update_one({"id": product["id"]}, {"$set": {"status": "draft"}})
+    for wrong, text in (({**GAMERTAG_TOP, "ink": "lila"}, "gibt es in den Gamertag-Regeln nicht"),
+                        ({**BACK, "ink": "reinweiss"}, "nur für Gamertag")):
+        with pytest.raises(ShopError, match=text):
+            await shop_products.set_layout(db, product["id"], [{"key": "back", "mode": "upload", "layers": [wrong]}],
+                                           included_placement="back", **BY)

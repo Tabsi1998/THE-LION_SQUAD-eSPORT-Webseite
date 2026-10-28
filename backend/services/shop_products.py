@@ -300,7 +300,7 @@ async def available_placements(db, product: dict, *, template: dict | None = Non
     return out
 
 
-LAYER_FIELDS = {"kind", "preset", "width_cm", "offset_x_cm", "offset_y_cm", "motif", "variant",
+LAYER_FIELDS = {"kind", "preset", "width_cm", "offset_x_cm", "offset_y_cm", "motif", "variant", "ink",
                 *shop_gamertag.LAYER_SIZE_FIELDS}
 
 
@@ -331,6 +331,7 @@ async def _clean_layout(db, product: dict, raw_rows: Any, available: dict[str, d
     colors = (product.get("offer") or {}).get("colors") or []
     by_key = {item["key"]: item for item in presets_doc["presets"]}
     min_width = presets_doc["rules"]["min_width_cm"]
+    inks: set[str] | None = None  # Farben der Gamertag-Regeln - erst gelesen, wenn eine Ebene eine feste Farbe hat
     out: list[dict] = []
     for raw in raw_rows:
         if not isinstance(raw, dict) or set(raw) - {"key", "mode", "layers"}:
@@ -375,8 +376,9 @@ async def _clean_layout(db, product: dict, raw_rows: Any, available: dict[str, d
                     "offset_y_cm": _number(layer.get("offset_y_cm", 0.0), f"{label}: Versatz senkrecht (cm)",
                                            -shop_print_files.MAX_OFFSET_CM, shop_print_files.MAX_OFFSET_CM)}
             if kind == "motif":
-                if any(layer.get(name) is not None for name in shop_gamertag.LAYER_SIZE_FIELDS):
-                    raise ShopError(f"{label}: Texthöhe und Höchstbreite gibt es nur für Gamertag und Vereinsnummer.")
+                if any(layer.get(name) is not None for name in (*shop_gamertag.LAYER_SIZE_FIELDS, "ink")):
+                    raise ShopError(f"{label}: Texthöhe, Höchstbreite und Farbe gibt es nur für Gamertag und "
+                                    "Vereinsnummer.")
                 item["width_cm"] = _number(layer.get("width_cm", preset.get("width_cm")), f"{label}: Breite (cm)",
                                            min_width, MAX_WIDTH_CM)
                 item["motif"] = await _clean_motif(db, layer.get("motif"), colors, label)
@@ -386,6 +388,13 @@ async def _clean_layout(db, product: dict, raw_rows: Any, available: dict[str, d
                     item.update(shop_gamertag.clean_layer_sizes(layer))
                 except ShopError as exc:
                     raise ShopError(f"{label}: {exc}") from exc
+                # Farbe des Namens fest (#2141): eine Farbe der Gamertag-Regeln; ohne Angabe automatisch nach Kontrast.
+                if layer.get("ink") not in (None, "", "auto"):
+                    if inks is None:
+                        inks = {color["key"] for color in (await shop_gamertag.load_rules(db))["colors"]}
+                    if layer["ink"] not in inks:
+                        raise ShopError(f"{label}: diese Farbe gibt es in den Gamertag-Regeln nicht.")
+                    item["ink"] = layer["ink"]
             # Fassung von Hand (#2141): hell oder dunkel; „automatisch“ wird nicht gespeichert.
             variant = layer.get("variant")
             if variant not in (None, "auto", *shop_print_files.SURFACE_LUMINANCE):
@@ -412,7 +421,7 @@ def _clean_surface(value: Any) -> str:
 def _layout_summary(rows: list[dict]) -> list[dict]:
     return [{"key": row["key"], "mode": row.get("mode") or "layout",
              "layers": [{name: layer.get(name) for name in ("kind", "preset", "width_cm", "offset_x_cm", "offset_y_cm")}
-                        | {name: layer[name] for name in (*shop_gamertag.LAYER_SIZE_FIELDS, "variant")
+                        | {name: layer[name] for name in (*shop_gamertag.LAYER_SIZE_FIELDS, "variant", "ink")
                            if layer.get(name) is not None}
                         | ({"motif": (layer.get("motif") or {}).get("key")} if layer.get("kind") == "motif" else {})
                         for layer in row.get("layers") or []]}
@@ -804,6 +813,7 @@ async def admin_view(db, product_id: str) -> dict:
                       for state in states if state["placement"] == row["key"]],
         })
     current = product.get("status") or "draft"
+    gamertag_rules = await shop_gamertag.load_rules(db)
     conversion = await shop_print_files.layout_conversion(db, product) if printful else {"converted": False,
                                                                                           "notes": [], "blocked": []}
     return {
@@ -829,7 +839,9 @@ async def admin_view(db, product_id: str) -> dict:
         "presets": presets_doc["presets"],
         "preset_rules": presets_doc["rules"],
         "motif_options": await shop_print_files.motif_options(db),
-        "gamertag_canvas": _gamertag_canvas(await shop_print_files.shop_gamertag.load_rules(db)),
+        "gamertag_canvas": _gamertag_canvas(gamertag_rules),
+        # Farben für Gamertag und Vereinsnummer zur festen Wahl je Ebene (#2141) - Vorgabe ist automatisch (Kontrast).
+        "name_inks": [{key: color[key] for key in ("key", "label", "hex")} for color in gamertag_rules["colors"]],
         "pricing": {"general_markup_cents": general, "product_markup_cents": own, "effective_markup_cents": effective,
                     "source": "product" if isinstance(own, int) else "general",
                     "member_markup_cents": shop_config.MEMBER_MARKUP_CENTS},

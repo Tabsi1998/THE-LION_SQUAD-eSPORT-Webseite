@@ -806,7 +806,9 @@ Im Admin rechnet die Seite dieselbe Lage live (`shopLayout.js`), Feinjustieren p
 1 cm). Bei ungespeicherten Änderungen sind nur die Ebenen gedimmt, solange der Server die Pläne rechnet - das Shirt
 nie; ohne Berechnung (nichts gewählt, blockiert) wird nichts gedimmt (#2105).
 `GET /api/admin/shop/products/{id}/print-files/{file_id}` zeigt eine Grunddatei, mit `?thumb=1` verkleinert (höchstens
-1200 px, je Datei einmal gerechnet) - so zeigt Schritt 3 den Hintergrund der Vorschau-Farbe in der Druckfläche.
+1200 px) - so zeigt Schritt 3 den Hintergrund der Vorschau-Farbe in der Druckfläche. Das Vorschaubild entsteht beim
+Hochladen und liegt neben der Datei (`thumb_ref`); bei älteren bzw. erzeugten Dateien einmal beim ersten Abruf
+(Sperre je Prüfsumme, nie doppelt). Auch die Vorschau-PNG nimmt dieses Bild, nie die volle Datei.
 
 ### Allover: Hintergrund mit Ebenen (#2141)
 
@@ -821,8 +823,9 @@ ohne Schrift und Logo. Vereinslogo, Name und Nummer kommen als eigene Ebenen dar
   enthält die Prüfsumme des Hintergrunds: ein **neuer Hintergrund** oder eine geänderte Ebene macht die Grunddatei
   „veraltet“ (für die Bestellung zählt nur die neueste erzeugte Datei, `current_base`, nie der Hintergrund allein).
   Nach dem Hochladen wird sie gleich erzeugt; „Druckdateien erzeugen“ holt nach, was fehlt.
-- **Ohne Motive** bleibt alles wie vor #2141: die hochgeladene Datei ist selbst die Grunddatei, mit derselben Prüfsumme.
-  Vor #2141 blendete Schritt 3 Motive in dieser Art aus und druckte sie nicht; solche Zeilen (ohne
+- **Ohne Motive** bleibt alles wie vor #2141: die hochgeladene Datei ist selbst die Grunddatei, mit derselben Prüfsumme -
+  auch, wenn die Motive nachträglich entfernt werden (dann zählt die neueste hochgeladene, nicht die ältere erzeugte;
+  kommt ein Motiv zurück, wieder die erzeugte). Vor #2141 blendete Schritt 3 Motive in dieser Art aus und druckte sie nicht; solche Zeilen (ohne
   `background_layers`) bleiben so, bis Schritt 3 neu gespeichert wird - der Admin sagt das an der Fläche.
 
 **Fassung aus dem Hintergrund.** Ein Allover-Trikot hat bei Printful oft die Grundfarbe „weiß“, wird aber ganz dunkel
@@ -832,8 +835,10 @@ dieser Reihenfolge (`shop_print_files.decide_surface`):
 1. die Ebene selbst: „Fassung: hell/dunkel“ (`variant`), etwa bei gemischtem Hintergrund;
 2. der Hintergrund unter der Ebene: die **mittlere relative Luminanz** (WCAG, linear gemittelt) im Rahmen der Ebene,
    gegen die Schwelle der Motive (`shop_motifs` `threshold`, Vorgabe 0,18 - dieselbe wie bei Shirtfarben). Durchsichtige
-   Stellen zählen als Untergrund nach 3. bzw. 4. Gemessen wird über ein Raster (128 Zellen an der längeren Seite, je
-   Prüfsumme einmal gerechnet);
+   Stellen zählen als Untergrund nach 3. bzw. 4. Gemessen wird über ein Raster (96 Zellen an der längeren Seite, je
+   Zelle mittlere Luminanz × Deckkraft und Deckkraft als 16-Bit-Werte, rund 37 KB): es entsteht beim Hochladen und
+   steht an der Zeile (`luma`); einer älteren Datei ohne Raster wird es einmal nachgetragen (Sperre je Prüfsumme).
+   Planung, Vorschau und Bestellung öffnen die volle Datei dafür nie;
 3. die Vorgabe des Produkts: „Untergrund gilt als hell/dunkel“ (`print_surface`, Vorgabe „wie Printful-Farbe“);
 4. die Shirtfarbe wie bisher (Ausnahmen je Farbe am Motiv, `inks_for_garment`).
 
@@ -843,6 +848,11 @@ Farben der Shirtfarbe, dann die Vorgabefarbe, dann die übrigen - die erste mit 
 höchsten). Die Entscheidung steht im Plan (`surface`, `ink`); Vorschau, Planung, Grunddatei und Bestelldatei lesen sie
 dort. Schritt 3 zeigt sie je Ebene und Vorschau-Farbe, etwa „Fassung: dunkel (aus Hintergrund) · Farbe: Vereinsblau“;
 der Beispielname kommt in dieser Farbe (`name-sample?ink=`).
+
+**Farbe des Namens fest.** Je Gamertag- bzw. Vereinsnummer-Ebene „Farbe: automatisch (Kontrast)“ (Vorgabe) oder fest
+eine Farbe der Gamertag-Regeln (`ink`, Kennung der Farbe; eine andere lehnt das Speichern ab). Plan, Vorschau und
+Bestelldatei nehmen dieselbe Wahl; gibt es die Farbe in den Regeln nicht mehr, gilt wieder automatisch. Schritt 3 zeigt
+„Farbe: Weiß (fest)“.
 
 **Allover-Trikot einrichten** (Verwaltung → Finanzen → Shop → Produkte):
 

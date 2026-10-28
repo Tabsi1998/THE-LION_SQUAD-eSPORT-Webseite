@@ -70,7 +70,9 @@ MODEL_FIELDS: dict[str, tuple[str, ...]] = {
                          "public_id", "content_type", "size_bytes", "width_px", "height_px", "dpi", "layout_hash",
                          "template_hash", "sources", "warnings", "base_file_id", "gamertag_file_id", "user_id",
                          "order_id", "order_item_id", "created_at", "created_by", "public_disabled_at",
-                         "erase_pending_at", "file_deleted_at"),
+                         "erase_pending_at", "file_deleted_at",
+                         # Hintergrund (#2141): Helligkeits-Raster und Vorschaubild, einmal beim Hochladen gerechnet
+                         "luma", "thumb_ref"),
     "shop_design_profiles": ("design_key", "title", "placement", "garment_colors", "note", "version", "created_at",
                              "created_by", "updated_at", "updated_by",
                              # Motive (#2069): Hell-Variante automatisch oder eigene Datei, Ausnahmen je Shirtfarbe
