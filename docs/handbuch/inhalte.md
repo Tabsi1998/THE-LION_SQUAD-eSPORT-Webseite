@@ -14,6 +14,7 @@ und Partner, die Seite „Sponsor werden“, die Referenzen und die Serien (exte
 - **Admin → Verein → Partner** (`/admin/partners`) – befreundete Vereine, Veranstalter, Communitys
 - **Admin → Verein → Referenzen** (`/admin/references`) – Turnierteilnahmen des Vereins
 - **Admin → Verein → Serien** (`/admin/reference-series`) – Turnierserien, Rennligen und Team-Ligen über eine Saison
+- **Admin → Content → Navigation** (`/admin/nav`) – das Menü der Website (3.10)
 
 Öffentlich: **/news**, **/gallery**, **/about**, **/sponsors**, **/partners**, **/references**.
 
@@ -65,27 +66,51 @@ Turnierleitung. Die Turnierleitung allein darf keine News, Galerie, Sponsoren od
 
 ### 3.1 News schreiben
 
-1. **Admin → Content → News → Neuer Beitrag**.
-2. **Titel**, **Kurzbeschreibung** (steht in der Liste, in Suchmaschinen und beim Teilen), **Inhalt**. Der Text ist
-   Markdown; HTML wird nicht roh gezeigt. Mit `[[fastlap:name]]`, `[[tournament:name]]` und `[[event:name]]` setzt ihr Karten
-   hinein.
-3. **Banner** (das Bild oben und beim Teilen). Optional **Video (YouTube-Link)**: erscheint oben als Player, statt des
-   Banners, und erst nach Zustimmung zu externen Medien.
+1. **Admin → Content → News → Neuer Beitrag**. Ein neuer Beitrag ist immer ein **Entwurf** – beim ersten Speichern geht
+   nichts hinaus.
+2. **Titel**, **Adresse (Link)** (entsteht aus dem Titel, z. B. `/news/herbst-lan-2026`), **Kurzbeschreibung** (steht in der
+   Liste, in Suchmaschinen und beim Teilen), **Inhalt**. Formatiert wird mit den Knöpfen über dem Text; Karten für Turniere,
+   Events und Fast Laps setzt ihr unter **Personen und Verknüpfungen** mit **Einbetten** hinein.
+3. **Bild** (oben und beim Teilen). Optional **Video (YouTube-Link)**: erscheint oben als Player, statt des Bilds, und erst
+   nach Zustimmung zu externen Medien.
 4. **Kategorie**: Verein, Turniere, Events, Community, Sponsoren, Mitglieder, Teams, Ankündigung, Rückblick, Wartung.
 5. **Sichtbarkeit**: **Öffentlich**, **Nur registrierte Community**, **Nur Vereinsmitglieder**, **Nur intern (Admins)**.
-6. **Veröffentlicht** anhaken. Ohne **Veröffentlichungsdatum** erscheint der Beitrag sofort beim Speichern; mit einem Datum in der
-   Zukunft ist er **geplant** und geht dann online. **Anpinnen** hält ihn oben in der News-Liste und auf der Startseite.
+6. **Wann erscheint der Beitrag?** – eine von drei Möglichkeiten:
+   - **Entwurf**: nur das Admin-Team sieht ihn, nichts wird verschickt.
+   - **Jetzt veröffentlichen**: erscheint beim Speichern.
+   - **Geplant**: mit **Termin**; der Beitrag erscheint dann von selbst. Ein Termin in der Vergangenheit wird nicht gespeichert.
+
+   Vor dem Veröffentlichen oder Planen kommt eine **Rückfrage**, was hinausgeht: „Der Newsletter geht sofort an 214 Personen
+   mit Newsletter-Zustimmung. Discord bekommt eine Meldung.“ Abbrechen speichert nichts. Ein schon verschickter Newsletter geht
+   nie ein zweites Mal von selbst hinaus. **Anpinnen** hält den Beitrag oben in der News-Liste und auf der Startseite.
 7. **Personen und Verknüpfungen**: Benutzer markieren (nur aktive öffentliche Profile; ein Klick setzt den Profil-Link in den
-   Text) und **Verknüpfte Events**, **Turniere** und **Fast-Lap Challenges** – ein Klick setzt die Karte in den Text.
-8. Die **Checkliste** rechts zeigt, was noch fehlt (Titel, Kurzbeschreibung, Bild, Text, Sichtbarkeit, SEO). Ohne Banner nimmt
-   die Seite ein allgemeines Bild.
+   Text) und **Verknüpfte Events**, **Turniere** und **Fast-Lap Challenges** – mit Suchfeld, Gewähltes steht oben, Entwürfe
+   sind gekennzeichnet (deren Karte sehen Besucher erst, wenn sie veröffentlicht sind). **Einbetten** setzt die Karte in den Text.
+8. Die **Checkliste** zeigt, was noch fehlt (Titel, Kurzbeschreibung, Bild, Text, Sichtbarkeit, Google und Teilen). Darunter
+   **So erscheint der Beitrag**: bei Google, beim Teilen, mit Link und ob Suchmaschinen ihn finden dürfen. Ohne Bild nimmt die
+   Seite ein allgemeines Bild.
 9. Speichern.
 
-Die Liste unter Content → News hat Suche, Filter nach Kategorie und Sichtbarkeit; Löschen ist endgültig.
+**Autor und Verlauf** (rechts, bei bestehenden Beiträgen): Den **Autor** ändert ihr über die Personensuche – er steht auf der
+News-Seite unter „Von“. Darunter steht, wer den Beitrag **zuletzt geändert** hat, und der **Verlauf** (aufklappen): angelegt,
+geändert (mit den Feldern), zurückgezogen, wiederhergestellt – wer und wann.
+
+**Vorschau:** Öffentliche Listen (News-Seite, Startseite, Vereinsseite, Mitgliederbereich, Suche) zeigen auch dem Admin-Team nur,
+was Besucher sehen – nie Entwürfe oder geplante Beiträge. Die Vorschau gibt es über **Vorschau ansehen** im Editor oder
+**Vorschau** in der Liste: die echte Seite mit dem Band **„Noch nicht öffentlich“** und dem Weg zurück in den Editor.
+
+Die Liste unter Content → News hat Suche, Filter nach Stand (Veröffentlicht, Geplant, Entwurf, Zurückgezogen), Kategorie und
+Sichtbarkeit und eine CSV mit Begriffen statt Rohwerten.
+
+**Zurückziehen statt Löschen:** Was schon öffentlich war, wird **zurückgezogen**: Der Beitrag verschwindet aus allen Listen,
+seine Adresse bleibt – wer einem Link aus Newsletter oder Discord folgt, sieht „Beitrag zurückgezogen“ statt „nicht gefunden“.
+**Wiederherstellen** holt ihn als Entwurf zurück; veröffentlicht wird dann wieder bewusst im Editor. Nur Entwürfe, die nie
+hinausgingen, lassen sich **löschen** (endgültig, mit Rückfrage).
 
 **Verteilen** (Kasten am Beitrag; am Handy zugeklappt): Zeigt, was hinausgeht – den **Newsletter** mit der Zahl der Empfänger
 (nie Namen), die Meldung an Mitglieder oder Vorstand und die Discord-Vorschau.
 
+- Schon vor dem ersten Speichern steht dort, an wie viele Personen der Newsletter bei dieser Sichtbarkeit ginge.
 - Veröffentlicht ihr, geht der Newsletter von selbst an die Abonnenten: „Geht beim Veröffentlichen von selbst an …“. Mit
   **Jetzt senden** schickt ihn die Redaktion von Hand. Danach steht dort „gesendet am … an …“. **Mail ansehen** zeigt die Mail
   vorher so, wie sie hinausgeht (mit eurem Namen als Anrede).
@@ -171,7 +196,9 @@ die Alben.
 **Admin → Verein → Über uns.** Die Seite „Über den Verein“ besteht aus euren Texten und aus Daten, die sie selbst zieht
 (Zahlen, Spiele, Vorstand, Events, Vereinsdaten). Rechts im Formular steht „Was die Seite sonst zeigt“, damit niemand danach sucht.
 
-- **Texte:** Kopf, Spiele-Text, Aktivitäten (eine je Zeile) und der Aufruf.
+- **Kopf der Startseite:** die große Überschrift ganz oben auf der Startseite – **erste Zeile**, **zweite Zeile** (leuchtet)
+  und der **Satz darunter**. Leere Felder zeigen die Vorgabe („Ein Rudel. Eine Familie.“). **Startseite ansehen** öffnet sie.
+- **Texte:** Kopf von „Über uns“, Spiele-Text, Aktivitäten (eine je Zeile) und der Aufruf.
 - **Vereinsfoto:** Ein Foto für den ganzen Verein, steht im Kopf von „Über uns“. Nur eines, mit dem alle Abgebildeten einverstanden
   sind. Mit **Fokuspunkt setzen** (ins Bild klicken) legt ihr fest, welcher Punkt beim Zuschneiden immer sichtbar bleibt.
 - **Zeitstrahl „So sind wir gewachsen“:** je Eintrag Jahr, ein Satz und auf Wunsch ein Bild (Gründung, erste LAN, erster
@@ -181,7 +208,8 @@ die Alben.
 - **Der Verein in Zahlen:** Haken je Zähler mit dem echten Stand, die Pfeile bestimmen die Reihenfolge. Gezählt, nicht getippt;
   Zähler mit null bleiben weg.
 - **Gründung, Zweck, gemeinnützig:** kommen mit Dolibarr aus der Mitgliederverwaltung (Schalter **Vereinsdaten aus Dolibarr
-  übernehmen**). Die Felder hier sind nur der Rückfall. Mit dem **Gründungstag** feiern Web und App jedes Jahr den Vereinsgeburtstag.
+  übernehmen** unter Verein → Vereinsdaten). Dann sind die Felder hier gesperrt – sie wären nur der Rückfall. Mit dem
+  **Gründungstag** feiern Web und App jedes Jahr den Vereinsgeburtstag.
 
 ### 3.6 Sponsoren und „Sponsor werden“
 
@@ -1384,16 +1412,33 @@ Teilnehmer angelegt; beim Vorstand öffnet sich danach gleich **Unbekannte Namen
 er, Captains sehen nur „neu“). Hat inzwischen jemand anderes gespeichert, sagt das Blatt es: **Neu laden** holt den
 aktuellen Stand, eure Eingaben bleiben stehen, und die Vorschau prüft neu. Jede Änderung steht im Adminprotokoll.
 
+### 3.10 Navigation (Menü der Website)
+
+**Admin → Content → Navigation** (`/admin/nav`). Je Menüpunkt: **Name**, **Sichtbar/Versteckt** und die Pfeile für die
+Reihenfolge; ein Menü mit Unterpunkten klappt ihr auf und ordnet die Unterpunkte genauso. **Speichern** übernimmt alles,
+**Verwerfen** holt den gespeicherten Stand, **Zurücksetzen** (mit Rückfrage) stellt das Menü wie in der Vorgabe her.
+
+- Jeder Menüpunkt braucht einen **Namen** – mit einem leeren Feld lässt sich nicht speichern.
+- **Liga** steht unter eSports: umbenennen, verschieben und ausblenden wie jeder Unterpunkt. Auf der Website erscheint sie nur,
+  solange eine Season sichtbar ist.
+- **Community** darf anders heißen – die Zahl der ungelesenen Chats bleibt daran.
+- Der erste Punkt heißt **Start** (früher „Home“).
+- Versteckt heißt: nicht im Menü. Die Seiten selbst bleiben erreichbar. Eigene Menüpunkte gibt es bewusst nicht; jede Seite hat
+  ihren festen Platz.
+
 ---
 
 ## 4. Wenn etwas nicht klappt
 
 | Fehlerbild | Ursache | Lösung |
 | --- | --- | --- |
-| Beitrag ist gespeichert, aber nicht zu sehen | **Veröffentlicht** nicht gesetzt, Datum liegt in der Zukunft („geplant“) oder Sichtbarkeit zu eng | Haken, Datum und Sichtbarkeit prüfen |
+| Beitrag ist gespeichert, aber nicht zu sehen | Noch **Entwurf**, **Geplant** mit Termin in der Zukunft, zurückgezogen oder Sichtbarkeit zu eng | Unter **Wann erscheint der Beitrag?** und Sichtbarkeit prüfen; **Vorschau ansehen** zeigt das Band „Noch nicht öffentlich“ |
+| Ich sehe meinen Entwurf nicht in der News-Liste der Website | Gewollt: öffentliche Listen zeigen allen dasselbe | **Vorschau** in Admin → Content → News |
+| „Der Termin liegt in der Vergangenheit“ | Bei **Geplant** ist der Termin schon vorbei | **Jetzt veröffentlichen** wählen oder einen späteren Termin |
 | Newsletter ging nicht hinaus | Entwurf oder **Nur intern**, oder keine Abonnenten | Veröffentlichen, Kasten **Verteilen** ansehen |
 | „Newsletter ein zweites Mal senden?“ erscheint nicht für dich | Das dürfen nur Redaktion und System | Dort fragen |
-| Kein Banner beim Teilen | Kein Bild gesetzt | **Banner** wählen |
+| Löschen gibt es nicht, nur **Zurückziehen** | Der Beitrag war schon öffentlich; Links aus Newsletter und Discord zeigen auf ihn | **Zurückziehen** – Besucher sehen einen Hinweis |
+| Kein Bild beim Teilen | Kein Bild gesetzt | **Bild** wählen |
 | Video-Player zeigt nichts | Besucher haben externen Medien nicht zugestimmt | Gewollt |
 | Admin → Galerie zeigt nur Einsendungen | Du hast nur die Vereinsverwaltung | Gewollt, Alben pflegt die Redaktion |
 | **Freigeben** ist grau | Die Bildprüfung läuft noch | Warten |

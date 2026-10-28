@@ -142,7 +142,8 @@ async def test_published_posts_are_withdrawn_not_deleted_and_links_show_a_hint(f
 async def test_drafts_that_never_went_out_can_still_be_deleted(flow):
     draft = await news(flow, "notiz", published=False)
     flow.act_as(await flow.add_user(role="club_admin", name="Rita"))
-    assert (await flow.delete(f"/api/news/{draft['id']}")).status_code == 200
+    deleted = await flow.delete(f"/api/news/{draft['id']}")
+    assert deleted.status_code == 200
     assert await flow.db.news_posts.count_documents({"id": draft["id"]}) == 0
 
 
