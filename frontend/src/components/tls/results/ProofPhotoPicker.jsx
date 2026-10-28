@@ -4,7 +4,8 @@ import { api } from "@/lib/api";
 
 // Foto vom Ergebnis (#1157, #1158): ein Bild je Meldung - am Handy direkt mit der Kamera, sonst aus der Galerie oder
 // vom PC. Das Foto wird sofort hochgeladen (der Server speichert es neu, ohne Ort und Kamera-Daten) und geht mit der
-// Meldung mit. Sehen dürfen es nur die Gegenseite und die Turnierleitung - nach der Bildprüfung.
+// Meldung mit. Sehen dürfen es nur die Spieler dieses Spiels und die Turnierleitung - nach der Bildprüfung (#2124:
+// services/match_proofs.can_see). `label`: „Foto vom Ergebnis“ beim Melden, „Foto als Beleg“ bei „Problem melden“.
 
 const ACCEPT = "image/png,image/jpeg,image/webp";
 
@@ -15,7 +16,7 @@ function uploadErrorText(error) {
   return "Hochladen hat nicht geklappt.";
 }
 
-export function ProofPhotoPicker({ matchId, value = null, onChange, testId = "proof-photo" }) {
+export function ProofPhotoPicker({ matchId, value = null, onChange, testId = "proof-photo", label = "Foto vom Ergebnis" }) {
   const cameraRef = useRef(null);
   const galleryRef = useRef(null);
   const previewRef = useRef(value?.previewUrl || null);
@@ -49,16 +50,16 @@ export function ProofPhotoPicker({ matchId, value = null, onChange, testId = "pr
 
   return (
     <div className="space-y-2" data-testid={testId}>
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Foto vom Ergebnis (freiwillig)</div>
+      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60" data-testid={`${testId}-label`}>{label} (freiwillig)</div>
       {value ? (
         <div className="flex items-center gap-3 rounded-sm border border-white/10 bg-[#0A0A0A] p-2">
           <div className="relative h-14 w-20 shrink-0 overflow-hidden rounded-sm bg-white/5">
-            {value.previewUrl ? <img src={value.previewUrl} alt="Foto vom Ergebnis" className="h-full w-full object-cover" /> : null}
+            {value.previewUrl ? <img src={value.previewUrl} alt={label} className="h-full w-full object-cover" /> : null}
             {value.status === "uploading" ? <span className="absolute inset-0 flex items-center justify-center bg-black/50"><Loader2 className="w-5 h-5 animate-spin text-white" /></span> : null}
           </div>
           <div className="min-w-0 flex-1 text-xs" data-testid={`${testId}-state`}>
             {value.status === "error" ? <span className="text-[#FF6B60]">{value.error}</span> : value.status === "uploading" ? <span className="text-white/60">Wird hochgeladen …</span> : (
-              <span className="text-white/70">Foto angehängt – sehen nur die Gegenseite und die Turnierleitung.</span>
+              <span className="text-white/70">Foto angehängt – sehen nur die Spieler dieses Spiels und die Turnierleitung.</span>
             )}
           </div>
           <button type="button" onClick={clear} aria-label="Foto entfernen" className="shrink-0 p-2 text-white/50 hover:text-white" data-testid={`${testId}-remove`}>

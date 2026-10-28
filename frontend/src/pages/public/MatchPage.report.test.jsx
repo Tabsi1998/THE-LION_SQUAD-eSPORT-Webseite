@@ -6,7 +6,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 const apiMock = { get: vi.fn(), post: vi.fn(), patch: vi.fn() };
 const authState = { user: { id: "u1", username: "neon" } };
-vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (value) => value }));
+vi.mock("@/lib/api", () => ({ api: apiMock, API_BASE: "", formatApiError: (value) => value }));
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => authState }));
 vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <div>{children}</div> }));
 vi.mock("@/components/tls/Breadcrumbs", () => ({ Breadcrumbs: () => null }));
@@ -77,7 +77,7 @@ test("Foto vom Ergebnis: sofort hochgeladen, die Kennung geht mit der Meldung", 
   await screen.findByTestId("match-report-form");
   const file = new File(["bild"], "ergebnis.jpg", { type: "image/jpeg" });
   fireEvent.change(screen.getByTestId("proof-photo-input"), { target: { files: [file] } });
-  expect(await screen.findByText("Foto angehängt – sehen nur die Gegenseite und die Turnierleitung.")).toBeInTheDocument();
+  expect(await screen.findByText("Foto angehängt – sehen nur die Spieler dieses Spiels und die Turnierleitung.")).toBeInTheDocument();
   expect(apiMock.post.mock.calls[0][0]).toBe("/matches/m1/proof-photos");
   expect(apiMock.post.mock.calls[0][1]).toBeInstanceOf(FormData);
   fireEvent.click(screen.getByTestId("result-score-r1-plus"));
@@ -221,4 +221,12 @@ test("Dispute auch nach dem Ergebnis: mit Frist; in Klärung steht der Hinweis f
   expect(await screen.findByTestId("match-in-dispute")).toHaveTextContent("In Klärung – zu diesem Spiel liegt ein Dispute vor.");
   expect(screen.queryByTestId("match-dispute-form")).toBeNull();
   vi.useRealTimers();
+});
+
+test("eigenes Foto nach dem Senden sichtbar; „Problem melden“ heißt sein Foto „Foto als Beleg“ (#2124, TP5)", async () => {
+  renderMatch({ ...PAGE, can_dispute: true, acting_registration_id: "r1",
+    report_state: { status: "waiting", own_summary: "LunaByte gewinnt 3:1.", own_photo: { url: "/api/matches/m1/proof-photos/p1" }, proposal: null, proposal_summary: null } });
+  const photo = await screen.findByTestId("match-report-own-photo");
+  expect(photo.querySelector("img")).toHaveAttribute("alt", "Dein Foto zur Meldung");
+  expect(screen.getByTestId("dispute-photo-label")).toHaveTextContent("Foto als Beleg (freiwillig)");
 });

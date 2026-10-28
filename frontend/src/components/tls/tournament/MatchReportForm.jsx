@@ -99,6 +99,12 @@ export function MatchReportForm({ participants = [], match = {}, entry: serverEn
             </a>
           )}
           {status !== "confirm" && state?.own_summary && <p className="mt-1">Deine Meldung: <strong>{state.own_summary}</strong></p>}
+          {/* Das eigene Foto nach dem Senden (#2124, TP5) - erst nach der Bildprüfung liefert der Server es aus. */}
+          {status !== "confirm" && state?.own_photo?.url && (
+            <a href={chatAttachmentSrc(state.own_photo.url)} target="_blank" rel="noreferrer" className="mt-2 block w-32 overflow-hidden rounded-sm border border-white/15" data-testid="match-report-own-photo">
+              <img src={chatAttachmentSrc(state.own_photo.url, 400)} alt="Dein Foto zur Meldung" width={128} height={80} className="h-20 w-full object-cover" />
+            </a>
+          )}
           {status === "confirm" && (readOnly || state?.can_confirm === false ? (
             <p className="mt-2 text-xs opacity-80" data-testid="match-report-lead-confirms">Bestätigen kann die Teamleitung.</p>
           ) : (
