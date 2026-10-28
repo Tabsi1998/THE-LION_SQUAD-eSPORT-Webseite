@@ -204,29 +204,36 @@ async def admin_sync_season(season_id: str, me: dict = Depends(require_league_ad
     divisions = {row["id"]: row for row in await db.league_divisions.find({"season_id": season_id},
                                                                           {"_id": 0}).to_list(50)}
     results = []
-    for row in await leagues.staffeln_of(db, season_id):
-        tournament = await db.tournaments.find_one({"id": row["id"]}, {"_id": 0})
-        division = divisions.get(tournament["league_context"].get("division_id"))
-        if not division:
-            continue
-        try:
-            async with mutation_lock(db, tournament_write_resource(tournament["id"])):
-                # Gesperrt heißt: Termine, Kalender und Wertung bleiben - Sichtbarkeit und Regeltext gelten trotzdem.
-                result = await leagues.sync_staffel(db, tournament, league, season, division, me,
-                                                    locked=_is_tournament_locked(tournament))
-        except MutationLockBusy:
-            results.append({"tournament_id": tournament["id"], "title": tournament.get("title"), "applied": [],
-                            "changed": [], "skipped": [{"group": "all", "label": "Alles",
-                                                        "reason": "Die Staffel wird gerade bearbeitet - bitte "
-                                                                  "gleich noch einmal."}]})
-            continue
-        except (LeagueProblem, MapProblem) as problem:
-            raise _refuse(problem) from None
-        await _audit(db, "league.staffel.sync", me, tournament["id"],
-                     {"season_id": season_id, "applied": result.applied, "changed": result.changed,
-                      "skipped": [item["group"] for item in result.skipped]})
-        results.append(result.as_dict())
-    if results:
+
+    def nothing(row: dict, reason: str) -> dict:
+        return {"tournament_id": row["id"], "title": row.get("title"), "applied": [], "changed": [],
+                "skipped": [{"group": "all", "label": "Alles", "reason": reason}]}
+
+    try:
+        for row in await leagues.staffeln_of(db, season_id):
+            try:
+                async with mutation_lock(db, tournament_write_resource(row["id"])):
+                    # Erst unter der Sperre lesen: was gleichzeitig geändert wurde (Status, Sperre), zählt mit.
+                    tournament = await db.tournaments.find_one({"id": row["id"], **ONLY_LEAGUE}, {"_id": 0})
+                    division = divisions.get(((tournament or {}).get("league_context") or {}).get("division_id"))
+                    if not tournament or not division:
+                        continue
+                    # Gesperrt heißt: Termine, Kalender und Wertung bleiben - Regeltext und Map-Pool gelten trotzdem.
+                    result = await leagues.sync_staffel(db, tournament, league, season, division, me,
+                                                        locked=_is_tournament_locked(tournament))
+            except MutationLockBusy:
+                results.append(nothing(row, "Die Staffel wird gerade bearbeitet - bitte gleich noch einmal."))
+                continue
+            except (LeagueProblem, MapProblem) as problem:
+                # Eine Staffel, die nicht geht, hält die anderen nicht auf - ihr Grund steht im Ergebnis.
+                results.append(nothing(row, problem.message))
+                continue
+            await _audit(db, "league.staffel.sync", me, tournament["id"],
+                         {"season_id": season_id, "applied": result.applied, "changed": result.changed,
+                          "skipped": [item["group"] for item in result.skipped]})
+            results.append(result.as_dict())
+    finally:
+        # Auch nach einem Abbruch: was schon geschrieben ist, soll die Live-Meldung neu nachschlagen.
         reset_scope_cache()
     return {"staffeln": results}
 

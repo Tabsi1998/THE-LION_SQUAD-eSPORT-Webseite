@@ -690,8 +690,12 @@ async def sync_staffel(db, tournament: dict, league: dict, season: dict, divisio
     if changed:
         await db.tournaments.update_one({"id": tournament["id"]}, {"$set": {**{key: updates[key] for key in changed},
                                                                             "updated_at": _now()}})
-    await _sync_pool(db, tournament, season, user, locked=locked, has_result=has_result,
-                     applied=applied, skipped=skipped, changed=changed)
+    try:
+        await _sync_pool(db, tournament, season, user, locked=locked, has_result=has_result,
+                         applied=applied, skipped=skipped, changed=changed)
+    except map_pools.MapProblem as problem:
+        # Die Felder oben sind schon geschrieben - das Ergebnis sagt ehrlich, dass nur der Pool fehlt.
+        skipped.append({"group": "map_pool", "label": SYNC_GROUP_LABELS["map_pool"], "reason": problem.message})
     return SyncResult(tournament["id"], tournament.get("title") or "", applied, skipped, changed)
 
 

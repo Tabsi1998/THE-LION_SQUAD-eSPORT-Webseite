@@ -167,3 +167,63 @@ async def test_removing_the_season_pool_reaches_staffeln_without_a_result_only(f
     assert "map_pool" not in kept["applied"]
     assert [item["reason"] for item in kept["skipped"] if item["group"] == "map_pool"] == [
         "Die Season hat keinen Map-Pool mehr, die Staffel behält ihren: Es gibt schon ein Ergebnis."]
+
+
+# ---------------------------------------------------------------- 6. Übertragen unter der Sperre
+
+@pytest.mark.asyncio
+async def test_sync_reads_the_staffel_again_under_the_lock(flow, monkeypatch):
+    import contextlib
+
+    import routes.league_routes as league_routes
+
+    _admin, season, _division, staffel = await setup_staffel(flow)
+    await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"weeks_total": 12})
+    real_lock = league_routes.mutation_lock
+
+    @contextlib.asynccontextmanager
+    async def lock_after_a_start(db, resource, **kwargs):
+        # Während das Übertragen auf die Sperre wartet, startet jemand die Staffel.
+        await flow.db.tournaments.update_one({"id": staffel["id"]}, {"$set": {"status": "live"}})
+        async with real_lock(db, resource, **kwargs):
+            yield
+
+    monkeypatch.setattr(league_routes, "mutation_lock", lock_after_a_start)
+    result = (await flow.post(f"{ADMIN}/seasons/{season['id']}/sync")).json()["staffeln"][0]
+    assert [item["group"] for item in result["skipped"]] == ["before_start"]
+    after = await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0})
+    assert after["matchday_weeks_total"] == 10
+
+
+@pytest.mark.asyncio
+async def test_a_failing_pool_copy_is_reported_per_staffel_and_the_rest_goes_on(flow, monkeypatch):
+    import routes.league_routes as league_routes
+    from services import map_pools
+    from services.game_maps import MapProblem
+
+    _admin, season, division, first = await setup_staffel(flow, with_pool=True)
+    second = (await flow.post(f"{ADMIN}/divisions/{division['id']}/staffeln", json={})).json()
+    await map_pools.clear(flow.db, scope="tournament", scope_id=first["id"], user={"id": "x"}, tournament_id=first["id"])
+    await map_pools.clear(flow.db, scope="tournament", scope_id=second["tournament_id"], user={"id": "x"},
+                          tournament_id=second["tournament_id"])
+    await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"rules_text": "Neu"})
+    real_copy = map_pools.copy_version
+    resets = []
+
+    async def flaky_copy(db, source, *, scope_id, **kwargs):
+        if scope_id == first["id"]:
+            raise MapProblem("Der Map-Pool wurde inzwischen geändert - bitte neu laden.", 409)
+        return await real_copy(db, source, scope_id=scope_id, **kwargs)
+
+    monkeypatch.setattr(map_pools, "copy_version", flaky_copy)
+    monkeypatch.setattr(league_routes, "reset_scope_cache", lambda: resets.append(1))
+    synced = await flow.post(f"{ADMIN}/seasons/{season['id']}/sync")
+    assert synced.status_code == 200, synced.text
+    rows = {row["tournament_id"]: row for row in synced.json()["staffeln"]}
+
+    assert [item["reason"] for item in rows[first["id"]]["skipped"]] == [
+        "Der Map-Pool wurde inzwischen geändert - bitte neu laden."]
+    assert (await flow.db.tournaments.find_one({"id": first["id"]}))["rules"] == "Neu"
+    assert "map_pool" in rows[second["tournament_id"]]["changed"]
+    assert await map_pools.current(flow.db, "tournament", second["tournament_id"])
+    assert resets == [1]
