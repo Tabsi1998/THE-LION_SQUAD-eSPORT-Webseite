@@ -636,3 +636,10 @@ test("im laufenden Turnier ohne Baum oder mit Tabelle zuerst (#2124): „Ranglis
   expect(swiss.querySelector("a[data-testid='tournament-standings-link']")).toHaveClass("tls-btn--primary");
   expect(swiss.querySelector("a[data-testid='tournament-bracket-link']")).not.toHaveClass("tls-btn--primary");
 });
+test("Jeder gegen jeden mit Playoff-Phase (#2124, Review B1): der Link „Turnierbaum“ bleibt, Hauptaktion die Rangliste", async () => {
+  mockApi({ ...base, ...DATES, status: "live", started: true, format: "round_robin", has_bracket_tree: true, public_phase: { state: "live", label: "Live" } });
+  renderPage();
+  const actions = await screen.findByTestId("tournament-actions");
+  expect(actions.querySelector("a[data-testid='tournament-standings-link']")).toHaveClass("tls-btn--primary");
+  expect(actions.querySelector("a[data-testid='tournament-bracket-link']")).not.toBeNull();
+});

@@ -64,3 +64,32 @@ async def test_paged_list_loads_older_tournaments(flow):
     shown = [row["id"] for row in first["items"]] + [row["id"] for row in second["items"]]
     assert len(shown) == len(set(shown)) == 30, "jedes Turnier genau einmal - auch das älteste"
     assert "t-00" in shown
+
+
+@pytest.mark.asyncio
+async def test_has_bracket_tree_follows_format_and_playoff_stages(flow):
+    """Turnierbaum je Format (#2124, Review B1): Jeder gegen jeden ohne Baum - mit einer K.-o.-Phase (Playoffs) doch."""
+    await flow.create_tournament(id="t-rr", slug="rr-cup", format="round_robin")
+    await flow.create_tournament(id="t-rr-po", slug="rr-playoffs", format="round_robin")
+    await flow.create_tournament(id="t-se", slug="ko-cup", format="single_elim")
+    await flow.create_tournament(id="t-gp", slug="gp-serie", format="grand_prix")
+    await flow.db.tournament_stages.insert_many([
+        {"id": "st-rr", "tournament_id": "t-rr-po", "stage_type": "round_robin_groups", "number": 1},
+        {"id": "st-po", "tournament_id": "t-rr-po", "stage_type": "single_elimination", "number": 2},
+        {"id": "st-gp", "tournament_id": "t-gp", "stage_type": "ffa_league", "number": 1},
+    ])
+    flow.act_as(None)
+
+    detail = {slug: (await flow.get(f"/api/tournaments/{slug}")).json()["has_bracket_tree"]
+              for slug in ("rr-cup", "rr-playoffs", "ko-cup", "gp-serie")}
+    assert detail == {"rr-cup": False, "rr-playoffs": True, "ko-cup": True, "gp-serie": False}
+    listed = {row["id"]: row["has_bracket_tree"] for row in (await flow.get("/api/tournaments", params={"compact": "true"})).json()}
+    assert listed == {"t-rr": False, "t-rr-po": True, "t-se": True, "t-gp": False}
+
+
+def test_has_bracket_tree_with_known_stages():
+    from services.bracket_tree import has_bracket_tree
+
+    assert has_bracket_tree({"format": "league"}, [{"stage_type": "league"}]) is False
+    assert has_bracket_tree({"format": "league"}, [{"stage_type": "league"}, {"stage_type": "double_elimination"}]) is True
+    assert has_bracket_tree({"format": "swiss"}, []) is True

@@ -23,6 +23,7 @@ from services.competition_read import load_competition_read_model, observe_struc
 from services.competition_standings import public_standings
 from services.private_fields import private_projection
 from services.match_duration import load_duration_game, with_effective_durations
+from services.bracket_tree import has_bracket_tree
 from routes.tournament_common import (
     _collect_plan_matches,
     _get_visible_tournament,
@@ -165,6 +166,8 @@ async def _build_bracket_payload(db, t: dict, user: dict | None, is_staff: bool,
     duration_game = await load_duration_game(db, t)
     with_effective_durations(matches_v2, stages=read_model.stages, tournament=t, game=duration_game)
     t["can_view_display"] = bool(is_staff)
+    # Turnierbaum je Format (#2124): auch eine K.-o.-Phase nach Liga oder Gruppen zählt.
+    t["has_bracket_tree"] = has_bracket_tree(t, read_model.stages)
     if not is_staff:
         # Das Event am Turnier nur, wenn die Person es sehen darf (#1473) - auch Teilnehmende ohne Mitgliedschaft (#1592).
         await hide_unseen_event_links(db, user, [t])

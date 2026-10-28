@@ -101,3 +101,7 @@ test("ohne Turnierbaum (#2124): Jeder gegen jeden, Liga, Zeitfahren und Rennseri
     expect(tournamentTabs({ id: "t1", slug: "cup", format }).map((tab) => tab.key)).toContain("bracket");
   }
 });
+test("Turnierbaum vom Server (#2124, Review B1): Jeder gegen jeden mit Playoff-Phase hat den Reiter doch", () => {
+  expect(tournamentTabs({ id: "t1", slug: "cup", format: "round_robin", has_bracket_tree: true }).map((tab) => tab.key)).toContain("bracket");
+  expect(tournamentTabs({ id: "t1", slug: "cup", format: "single_elim", has_bracket_tree: false }).map((tab) => tab.key)).not.toContain("bracket");
+});
