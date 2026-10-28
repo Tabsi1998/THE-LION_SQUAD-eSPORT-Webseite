@@ -245,8 +245,10 @@ def _json_safe(value):
 @app.exception_handler(RequestValidationError)
 async def request_validation_error(_request: Request, exc: RequestValidationError):
     """Wie FastAPIs eigene Antwort (422 mit ``detail``), auch wenn die Anfrage NaN oder Infinity enthält (#1035):
-    solche Werte stehen in der Antwort als Text."""
-    return JSONResponse(status_code=422, content={"detail": _json_safe(jsonable_encoder(exc.errors()))})
+    solche Werte stehen in der Antwort als Text. ``msg`` steht auf Deutsch (#2119 X1) - die Oberfläche zeigt ihn 1:1."""
+    from services.validation_messages import germanize
+
+    return JSONResponse(status_code=422, content={"detail": _json_safe(jsonable_encoder(germanize(exc.errors())))})
 
 
 # Logos als SVG (#1952): ein SVG nur in Logo-Feldern, die PNG-Fassung eines SVG-Logos bleibt beim Speichern das SVG.
