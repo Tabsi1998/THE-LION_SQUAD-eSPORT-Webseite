@@ -67,6 +67,8 @@ SQUAD_ROLE_LABELS = {"captain_id": "Captain", "vice_captain_id": "Vertreter"}
 # auf der Website in jeder Meldung, die eine Rolle im Weg hat.
 ROLES_ON_WEBSITE = "Captain und Vertreter vergibst du auf der Website unter Teams → Deine Teams (Co-Team bearbeiten)."
 RESIGN_ON_WEBSITE = "Deine Rolle gibst du auf der Website unter Teams → Deine Teams mit „Rolle abgeben“ ab."
+LEADER_CANNOT_LEAVE = ("Als Kapitän kannst du das Team nicht verlassen. Übergib zuerst die Leitung (auf der Teamseite "
+                       "unter „Mitglieder verwalten“ → „Zum Kapitän machen“) oder löse das Team unter „Bearbeiten“ auf.")
 
 
 class TeamInviteCreate(BaseModel):
@@ -906,7 +908,8 @@ async def leave_team(team_id: str, me: dict = Depends(get_current_user)):
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
     if team["leader_id"] == me["id"]:
-        raise HTTPException(status_code=400, detail="Leader kann Team nicht verlassen")
+        # Geführt statt Sackgasse (#2113, L-C6): der Weg steht in der Meldung - auch für die App.
+        raise HTTPException(status_code=400, detail=LEADER_CANNOT_LEAVE)
     held = await _squad_role_holder(db, team_id, me["id"])
     if held:
         raise HTTPException(status_code=409, detail=f"Du bist Captain oder Vertreter im Co-Team {held.get('name') or ''} – "

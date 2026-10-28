@@ -112,3 +112,14 @@ async def test_declined_invite_is_reported_to_the_inviter(flow):
     assert "abgelehnt" in note["title"]
     assert note["url"] == f"/teams/{world['team_id']}"
     assert note["meta"]["invite_id"] == invite_id
+
+
+@pytest.mark.asyncio
+async def test_captain_who_wants_to_leave_is_told_the_way(flow):
+    """Kein stummes Nein (#2113, L-C6): die Meldung nennt „Leitung übergeben“ und „Team auflösen“ - auch für die App."""
+    world = await _team(flow)
+    flow.act_as(world["leader"])
+    response = await flow.post(f"/api/teams/{world['team_id']}/leave")
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert "Zum Kapitän machen" in detail and "löse das Team" in detail
