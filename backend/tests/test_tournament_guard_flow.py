@@ -125,3 +125,68 @@ async def test_a_closed_check_in_fixes_the_structure_before_the_start(flow):
     refused = await flow.patch(f"/api/tournaments/{tournament['id']}", json={"format": "round_robin"})
 
     assert refused.status_code == 409, refused.text
+
+
+# ---------------------------------------------------------------- TA10 Gruppen generieren
+
+@pytest.mark.asyncio
+async def test_generating_groups_keeps_the_status(flow):
+    staff = await flow.add_staff()
+    flow.act_as(staff)
+    tournament, _users, _regs = await flow.with_participants(8, format="groups")
+
+    generated = await flow.post(f"/api/tournaments/{tournament['id']}/groups/generate", json={"group_count": 2})
+
+    assert generated.status_code == 200, generated.text
+    assert (await stored(flow, tournament))["status"] == "registration_open"
+
+
+@pytest.mark.asyncio
+async def test_regenerating_groups_with_results_needs_a_confirmation_with_the_numbers(flow):
+    staff = await flow.add_staff()
+    flow.act_as(staff)
+    tournament, _users, _regs = await flow.with_participants(8, format="groups")
+    url = f"/api/tournaments/{tournament['id']}/groups/generate"
+    assert (await flow.post(url, json={"group_count": 2})).status_code == 200
+    await flow.start(tournament)
+    await play_first(flow, tournament)
+
+    refused = await flow.post(url, json={"group_count": 2})
+
+    assert refused.status_code == 409, refused.text
+    detail = refused.json()["detail"]
+    assert detail["code"] == "confirm_destruction"
+    assert detail["match_count"] == 12 and detail["played_count"] == 1
+    assert "12 Spiele, davon 1 begonnen oder gewertet" in detail["message"]
+    assert any(m.get("status") == "completed" for m in await flow.matches(tournament)), "nichts gelöscht"
+
+    confirmed = await flow.post(f"{url}?force=true", json={"group_count": 2})
+    assert confirmed.status_code == 200, confirmed.text
+    assert not any(m.get("status") == "completed" for m in await flow.matches(tournament))
+    assert (await stored(flow, tournament))["status"] == "live"
+
+
+@pytest.mark.asyncio
+async def test_groups_respect_the_lock_and_the_end(flow):
+    staff = await flow.add_staff()
+    flow.act_as(staff)
+    tournament, _users, _regs = await flow.with_participants(8, format="groups")
+    url = f"/api/tournaments/{tournament['id']}/groups/generate"
+
+    await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"locked_at": "2026-10-28T10:00:00+00:00"}})
+    assert (await flow.post(url, json={"group_count": 2})).status_code == 423
+
+    await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"status": "completed"}, "$unset": {"locked_at": ""}})
+    finished = await flow.post(f"{url}?force=true", json={"group_count": 2})
+    assert finished.status_code == 409
+    assert "vorbei" in finished.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_recalculating_the_advancement_respects_the_lock(flow):
+    staff, tournament, _users, _regs = await fixed_bracket(flow)
+    await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"locked_at": "2026-10-28T10:00:00+00:00"}})
+
+    refused = await flow.post(f"/api/tournaments/{tournament['id']}/matches-v2/recalculate-advancement")
+
+    assert refused.status_code == 423

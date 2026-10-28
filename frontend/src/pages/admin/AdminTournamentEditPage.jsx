@@ -381,13 +381,14 @@ export default function AdminTournamentEditPage() {
       toast.error("Bitte eine gültige Gruppenanzahl eingeben.");
       return;
     }
-    try {
-      const { data } = await api.post(`/tournaments/${id}/groups/generate`, { group_count: groupCount });
-      toast.success(`${data.group_count} Gruppen mit ${data.match_count} Spielen`);
-      load();
-    } catch (e) {
-      toast.error(formatRequestError(e, "Gruppen konnten nicht generiert werden."));
-    }
+    // Neue Gruppen löschen die Spiele der Gruppenphase (#2120, TA10) - mit Ergebnissen nur nach der Rückfrage mit Zahl.
+    const data = await runConfirmed(
+      async (force) => (await api.post(`/tournaments/${id}/groups/generate${force ? "?force=true" : ""}`, { group_count: groupCount })).data,
+      { title: "Gruppen neu generieren?", confirmLabel: "Neu generieren", failure: "Gruppen konnten nicht generiert werden." },
+    );
+    if (!data) return;
+    toast.success(`${data.group_count} Gruppen mit ${data.match_count} Spielen`);
+    load();
   };
   const generateSwissRound = async () => {
     try {

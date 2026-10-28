@@ -14,11 +14,12 @@ from services.graph_swiss import (
     swiss_round_documents,
 )
 from services.competition_versions import persist_competition_versions
-from services.change_events import reset_scope_cache
+from services import tournament_guard
 from models import now_utc, new_id
 from routes.tournament_common import (
     _audit_tournament_action,
     _default_group_count,
+    _ensure_tournament_unlocked,
     _get_visible_tournament,
     _resolve_tid,
     _serialized_tournament_write,
@@ -160,14 +161,12 @@ async def _groups_generate_graph(db, tournament: dict, group_count: int, actor_i
         {"$set": {"status": "ready", "updated_at": now_utc().isoformat()}},
     )
     await persist_competition_versions(db, tournament, "graph")
-    await db.tournaments.update_one({"id": tid}, {"$set": {"status": "live"}})
-    reset_scope_cache()  # Live-Meldungen (#1801): Turnier und Event neu nachschlagen
-    from services.discord_threads import status_written
-    await status_written(db, tid, tournament.get("status"))
+    # Der Status bleibt (#2120, TA10): vorher setzte „Gruppen generieren“ jedes Turnier hart auf „Live“, sogar ein
+    # beendetes. Gestartet wird über „Turnier starten“.
     await _audit_tournament_action(
         db, "tournament.groups.generate", actor_id, tid,
         {"engine": "graph", "stage_id": stage["id"], "group_count": len(groups),
-         "match_count": len(matches)},
+         "match_count": len(matches), "force": force},
     )
     return {
         "ok": True,
@@ -179,15 +178,21 @@ async def _groups_generate_graph(db, tournament: dict, group_count: int, actor_i
 
 
 @router.post("/{tid}/groups/generate")
-async def groups_generate(tid: str, body: dict, me: dict = Depends(require_admin()),
+async def groups_generate(tid: str, body: dict | None = None, force: bool = False,
+                          me: dict = Depends(require_admin()),
                           _mutation_tid: str = Depends(_serialized_tournament_write)):
     db = get_db()
     tid = await _resolve_tid(tid)
-    t = await db.tournaments.find_one({"id": tid})
+    t = await db.tournaments.find_one({"id": tid}, {"_id": 0})
     if not t or t.get("format") != "groups":
         raise HTTPException(status_code=400, detail="Nur für Group-Stage")
-    group_count = int(body.get("group_count", _default_group_count(t)))
-    return await _groups_generate_graph(db, t, group_count, me.get("id"))
+    # Sperre und Ende (#2120, TA10): ein gesperrtes oder beendetes Turnier bekommt keine neuen Gruppen.
+    await _ensure_tournament_unlocked(db, tid)
+    finished = tournament_guard.finished_problem(t)
+    if finished:
+        raise HTTPException(status_code=409, detail=finished)
+    group_count = int((body or {}).get("group_count", _default_group_count(t)))
+    return await _groups_generate_graph(db, t, group_count, me.get("id"), force=force)
 
 
 @router.get("/{tid}/groups")

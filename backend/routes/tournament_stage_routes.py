@@ -223,6 +223,8 @@ async def recalculate_tournament_matches_v2_advancement(tid: str, stage_id: str 
     db = get_db()
     tid = await _resolve_tid(tid)
     await require_tournament_staff_permission(me, tid, RESULT_STAFF_ROLES)
+    # Ein gesperrtes Turnier ändert auch das Weiterkommen nicht mehr (#2120, TA10).
+    await _ensure_tournament_unlocked(db, tid)
     q = {"tournament_id": tid}
     if stage_id:
         q["stage_id"] = stage_id
