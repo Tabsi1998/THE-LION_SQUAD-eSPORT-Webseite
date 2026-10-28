@@ -300,7 +300,7 @@ def _lineup_sources(match: dict) -> list[list[dict]]:
     gehaltenes Ergebnis (10 Sekunden „Rückgängig“) zählt mit seinen Maps schon dazu."""
     from services.v2_match_flows import latest_reports
 
-    if match.get("games"):
+    if match.get("games") or match.get("results") or str(match.get("status") or "") in DECIDED_STATUSES:
         sources = [match.get("games") or []]
     else:
         sources = [report.get("games") or [] for report in latest_reports(match.get("reports")).values()]

@@ -330,7 +330,8 @@ async def submit_v2_result(
     for target_id, update in application["target_sets"].items():
         await db.matches_v2.update_one({"id": target_id}, {"$set": update})
     await db.matches_v2.update_one({"id": match["id"]}, {"$set": application["match_set"]})
-    if games is not None:
+    if games is not None or match.get("lineup_user_ids"):
+        # Liga (#1650): mit dem Ergebnis gelten nur noch seine Maps - auch ohne Maps (etwa „Nicht erschienen“).
         from services.league_games import refresh_lineup_index
         await refresh_lineup_index(db, match["id"])
     if marked_now:
