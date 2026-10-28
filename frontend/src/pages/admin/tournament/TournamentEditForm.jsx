@@ -535,7 +535,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
         </FormSection>
 
         {show && <FormSection title="Preise" collapsible accent="#FFD700">
-          <PrizeEditor value={f.prize_places} onChange={(v)=>set("prize_places", v)} />
+          <PrizeEditor value={f.prize_places} onChange={(v)=>set("prize_places", v)} format={f.format} />
           <Txt label="Preise" value={f.prize_pool} onChange={(v)=>set("prize_pool",v)} testId="tr-edit-prizes"/>
           <div className="border border-[#FFD700]/20 bg-[#FFD700]/5 rounded-sm p-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             {/* Erst ab „Beendet“ (#2123, TA23): vorher gäbe es Gewinne und „Gewinn vorgemerkt“ für einen Zwischenstand. */}

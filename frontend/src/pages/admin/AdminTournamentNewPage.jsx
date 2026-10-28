@@ -8,6 +8,7 @@ import { PartnerPicker } from "@/components/tls/PartnerPicker";
 import { EventMembershipLine } from "@/pages/admin/event/EventProgramPanel";
 import { CheckField, FieldLabel, SelectField, TextField } from "@/components/tls/FormFields";
 import { FormatHint } from "./tournament/FormatHint";
+import { prizeGroupOptions } from "./tournament/PrizeEditor";
 import { MATCHDAY_DRAW_HINT, matchdayDrawMode, matchdayDrawOn, tournamentFieldRules } from "@/lib/tournamentFormFields";
 import { ADVANCEMENT_MODE_OPTIONS, DRAW_SHOW_MINUTES_DEFAULT, DRAW_SHOW_MINUTES_HINT, GRAND_FINAL_FORMATS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, HEAT_REBUILD_FORMATS, HEAT_REBUILD_HINT, HEAT_REBUILD_OPTIONS, advancementModeHint, drawShowMinutesPayload } from "./tournament/shared";
 import { ImageUpload } from "@/components/tls/ImageUpload";
@@ -30,12 +31,6 @@ const EVENT_MODE_OPTIONS = [["online", "Online"], ["local", "Vor Ort"], ["hybrid
 const RESULT_ENTRY_MODE_OPTIONS = [["", "Automatisch (online melden Spieler, vor Ort die Turnierleitung)"], ["staff_only", "Nur Turnierleitung"], ["player_confirmed", "Beide Parteien melden"], ["hybrid", "Hybrid"]];
 const SCHEDULE_MODE_OPTIONS = [["", "Automatisch (online abstimmen, vor Ort fix)"], ["fixed_by_staff", "Fix durch Turnierleitung"], ["player_proposal", "Teilnehmer schlagen vor"], ["hybrid", "Hybrid"]];
 
-const PRIZE_GROUP_OPTIONS = [
-  ["overall", "Gesamtwertung"],
-  ["winner", "Gewinner-Bracket"],
-  ["loser", "Loser-Bracket"],
-  ["special", "Sonderpreis"],
-];
 const BRONZE_FORMATS = new Set(["single_elim"]);
 
 function buildPlanningWarnings(form, isTeam) {
@@ -330,16 +325,17 @@ export default function AdminTournamentNewPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="text-xs text-white/50">Jede Zeile erscheint als eigene Preis-Karte auf der Turnierseite.</div>
             <div className="flex flex-wrap justify-end gap-3">
-              <button type="button" onClick={() => addPrizeTop3("winner")} className="text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">+ Gewinner Top 3</button>
-              <button type="button" onClick={() => addPrizeTop3("loser")} className="text-xs font-bold uppercase tracking-wider text-[#CD7F32] hover:text-white">+ Loser Top 3</button>
+              {/* Siegerrunde und Verliererrunde nur beim Doppel-K.-o. (#2111, T5). */}
+              {rules.loserBracketPrizes && <button type="button" onClick={() => addPrizeTop3("winner")} data-testid="new-tr-prize-winner-top3" className="text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">+ Siegerrunde Top 3</button>}
+              {rules.loserBracketPrizes && <button type="button" onClick={() => addPrizeTop3("loser")} data-testid="new-tr-prize-loser-top3" className="text-xs font-bold uppercase tracking-wider text-[#CD7F32] hover:text-white">+ Verliererrunde Top 3</button>}
               <button type="button" onClick={() => set("prize_places", [...form.prize_places, { group: "overall", place: form.prize_places.length + 1, label: `Platz ${form.prize_places.length + 1}`, value: "" }])} data-testid="new-tr-prize-add" className="text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">+ Platz hinzufügen</button>
               <button type="button" onClick={() => set("prize_places", [...form.prize_places, { group: "overall", place: "last", label: "Letzter Platz", value: "" }])} data-testid="new-tr-prize-last" className="text-xs font-bold uppercase tracking-wider text-[#FFD700] hover:text-white">+ Letzter Platz</button>
             </div>
           </div>
           {form.prize_places.map((p, i) => (
             <div key={i} className="grid grid-cols-12 gap-2 items-start">
-              <select value={p.group || "overall"} onChange={(e) => updatePrize(i, { group: e.target.value })} className="col-span-12 sm:col-span-3 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm">
-                {PRIZE_GROUP_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              <select value={p.group || "overall"} onChange={(e) => updatePrize(i, { group: e.target.value })} data-testid={`new-tr-prize-group-${i}`} className="col-span-12 sm:col-span-3 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm">
+                {prizeGroupOptions(form.format, p.group).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
               </select>
               <select value={p.place} onChange={(e) => updatePrize(i, { place: e.target.value === "last" ? "last" : Number(e.target.value) || 1 })} data-testid={`new-tr-prize-place-${i}`} className="col-span-2 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm">
                 {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => <option key={n} value={n}>{n}.</option>)}

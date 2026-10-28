@@ -166,6 +166,18 @@ test("die Adresse folgt dem getippten Titel, bis sie selbst geändert wird", asy
   expect(slug).toHaveValue("mein-cup-");
 });
 
+// Preisgruppen (#2111, T5): Siegerrunde und Verliererrunde nur beim Doppel-K.-o.
+test("Siegerrunde und Verliererrunde nur beim Doppel-K.-o.", async () => {
+  renderAt("");
+  const format = await screen.findByTestId("new-tr-format");
+  const groups = () => [...screen.getByTestId("new-tr-prize-group-0").querySelectorAll("option")].map((option) => option.value);
+  expect(screen.queryByTestId("new-tr-prize-loser-top3")).toBeNull();
+  expect(groups()).toEqual(["overall", "special"]);
+  fireEvent.change(format, { target: { value: "double_elim" } });
+  expect(screen.getByTestId("new-tr-prize-loser-top3")).toHaveTextContent("Verliererrunde");
+  expect(groups()).toEqual(["overall", "winner", "loser", "special"]);
+});
+
 // Weiterkommen (#2111, T4): nur bei Formaten mit Turnierbaum; Hin- und Rückrunde hat „Spieltage auslosen“.
 test("Weiterkommen nur mit Turnierbaum, bei Hin- und Rückrunde „Spieltage auslosen“", async () => {
   apiMock.get.mockImplementation(async (url) => (url === "/games" ? { data: [{ id: "g1", name: "Mario Kart 8" }] } : { data: [] }));
