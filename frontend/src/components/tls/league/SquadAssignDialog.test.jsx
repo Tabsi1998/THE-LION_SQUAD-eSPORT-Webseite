@@ -92,3 +92,17 @@ test("ein Fehler des Servers steht verständlich im Dialog, der bleibt offen", a
   fireEvent.keyDown(window, { key: "Escape" });
   expect(screen.queryByTestId("squad-assign-dialog")).not.toBeInTheDocument();
 });
+
+test("nach einem Ladefehler lädt „Erneut laden“ nach; beim Öffnen steht der Fokus im Dialog", async () => {
+  apiMock.get.mockRejectedValueOnce({ response: { status: 500, data: {} } });
+  render(<SquadAssignDialog tournament={TOURNAMENT} onAssigned={vi.fn()} />);
+  fireEvent.click(screen.getByTestId("squad-assign-open"));
+
+  expect(screen.getByTestId("squad-assign-dialog")).toHaveFocus();
+  await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Co-Teams lassen sich gerade nicht laden."));
+  fireEvent.click(screen.getByTestId("squad-assign-reload"));
+
+  await waitFor(() => expect(screen.getByTestId("squad-assign-team-t-loewen")).toBeInTheDocument());
+  expect(apiMock.get).toHaveBeenCalledTimes(2);
+  expect(screen.queryByTestId("squad-assign-reload")).not.toBeInTheDocument();
+});

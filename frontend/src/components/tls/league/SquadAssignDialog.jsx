@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Users } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatRequestError } from "@/lib/api";
@@ -29,6 +29,7 @@ function rolesLine(squad) {
 
 export function SquadAssignDialog({ tournament, onAssigned }) {
   const titleId = useId();
+  const dialogRef = useRef(null);
   const [open, setOpen] = useState(false);
   const [data, setData] = useState(null);
   const [loadError, setLoadError] = useState("");
@@ -52,6 +53,11 @@ export function SquadAssignDialog({ tournament, onAssigned }) {
   useEffect(() => {
     if (open) load();
   }, [open, load]);
+
+  // Beim Öffnen steht der Fokus im Dialog - Tastatur und Vorleser beginnen dort, nicht auf der Seite dahinter.
+  useEffect(() => {
+    if (open) dialogRef.current?.focus();
+  }, [open]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -111,7 +117,9 @@ export function SquadAssignDialog({ tournament, onAssigned }) {
             aria-modal="true"
             aria-labelledby={titleId}
             data-testid="squad-assign-dialog"
-            className="flex max-h-[90vh] w-full max-w-lg min-w-0 flex-col rounded-sm border border-white/10 bg-[#121212] shadow-xl"
+            ref={dialogRef}
+            tabIndex={-1}
+            className="outline-none flex max-h-[90vh] w-full max-w-lg min-w-0 flex-col rounded-sm border border-white/10 bg-[#121212] shadow-xl"
           >
             <div className="shrink-0 border-b border-white/10 p-4">
               <h2 id={titleId} className="font-heading text-base font-bold uppercase text-white">Co-Team zuteilen</h2>
@@ -122,7 +130,14 @@ export function SquadAssignDialog({ tournament, onAssigned }) {
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto p-4 text-sm text-white/85">
-              {loadError ? <p role="alert" className="text-warn">{loadError}</p> : null}
+              {loadError ? (
+                <div className="space-y-3">
+                  <p role="alert" className="text-warn">{loadError}</p>
+                  <button type="button" onClick={load} data-testid="squad-assign-reload" className="tls-btn tls-btn--secondary rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider">
+                    Erneut laden
+                  </button>
+                </div>
+              ) : null}
               {!data && !loadError ? <p className="text-white/50">Lade Co-Teams …</p> : null}
 
               {data && !team ? (
