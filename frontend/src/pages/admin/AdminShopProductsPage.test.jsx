@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
@@ -221,8 +221,36 @@ test("Farben und Größen wählen zählt die Varianten und schickt Technik, Farb
   await user.click(screen.getByTestId("shop-offer-submit"));
   expect(apiMock.put).toHaveBeenCalledWith("/admin/shop/products/p1/offer", {
     technique: "dtg", colors: ["Black", "White", "Navy"], sizes: ["M"], reason: "Navy dazu, L weg",
+    color_labels: { Black: "", White: "", Navy: "" },
   });
   expect(screen.getByTestId("shop-variant-PF1")).toHaveTextContent("lieferbar");
+});
+
+test("Farben heißen deutsch und lassen sich je Produkt anders benennen - der Printful-Name bleibt Schlüssel (#2105)", async () => {
+  const german = view({
+    product: { offer: { colors: ["Black", "White"], sizes: ["M", "L"], color_labels: { Black: "Tiefschwarz" } } },
+    variants: [variant("Black / M", "PF1", { display_label: "Tiefschwarz / M" }), variant("White / M", "PF3", { display_label: "Weiß / M" })],
+    extra: { color_labels: { Black: "Tiefschwarz", White: "Weiß", Navy: "Marineblau" }, color_defaults: { Black: "Schwarz", White: "Weiß", Navy: "Marineblau" } },
+  });
+  apiMock.get.mockImplementation((url) => Promise.resolve({ data: url === "/admin/shop/products" ? LIST : german }));
+  apiMock.put.mockResolvedValue({ data: german });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-offer"));
+  expect(screen.getByTestId("shop-offer-color-Black")).toHaveTextContent("Tiefschwarz");
+  expect(screen.getByTestId("shop-offer-color-Navy")).toHaveTextContent("Marineblau");
+  expect(screen.getByTestId("shop-variant-PF1")).toHaveTextContent("Tiefschwarz / M");
+  expect(screen.getByTestId("shop-offer-color-label-Black")).toHaveValue("Tiefschwarz");
+  expect(screen.getByTestId("shop-offer-color-label-White")).toHaveAttribute("placeholder", "Weiß");
+  await user.type(screen.getByTestId("shop-offer-color-label-White"), "Schneeweiß");
+  await user.clear(screen.getByTestId("shop-offer-color-label-Black"));
+  await user.click(screen.getByTestId("shop-offer-submit"));
+  expect(apiMock.put.mock.calls[0][1].color_labels).toEqual({ Black: "", White: "Schneeweiß" });
+  expect(apiMock.put.mock.calls[0][1].colors).toEqual(["Black", "White"]);
+  // Schritt 3: Vorschau-Farben und Dateien je Farbe mit deutscher Bezeichnung.
+  await user.click(screen.getByTestId("shop-step-designs"));
+  expect(screen.getByTestId("shop-preview-color-Black")).toHaveTextContent("Tiefschwarz");
+  expect(screen.getByTestId("shop-preview-color-White")).toHaveTextContent("Weiß");
 });
 
 test("Drucktechniken mit deutschem Namen und Erklärung, Vorgabe Direktdruck (#2091)", async () => {
@@ -341,6 +369,91 @@ test("Druckflächen: exakte Größe von Printful, Vorlagenbild, Motiv mit Vorgab
     { key: "back", mode: "layout", layers: [
       { kind: "motif", preset: "back_large", offset_x_cm: 0, offset_y_cm: 0, width_cm: 25, motif: { key: "ruecken-weiss", by_color: {} } }] },
   ]);
+});
+
+test("der Gamertag zeigt einen Beispielnamen in echter Größe; Texthöhe und Höchstbreite je Ebene (#2105)", async () => {
+  const canvas = { width_in: 3.5, height_in: 0.75, anchor_y_in: 0.375, text_height_cm: 1.27, max_width_cm: 8.89, height_per_text: 1.5,
+    limits: { min_text_height_cm: 0.25, max_text_height_cm: 5.08, min_width_cm: 1.27, max_width_cm: 30.48 } };
+  apiMock.get.mockResolvedValue({ data: view({ extra: { gamertag_canvas: canvas } }) });
+  apiMock.put.mockResolvedValue({ data: view({ extra: { gamertag_canvas: canvas } }) });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-designs"));
+  const sample = screen.getByTestId("shop-preview-front-layer-1-sample");
+  expect(sample.getAttribute("src")).toBe("/api/admin/shop/products/p1/name-sample?kind=gamertag&color=Black");
+  const before = parseFloat(screen.getByTestId("shop-preview-front-layer-1").style.width);
+  expect(before).toBeCloseTo((3.5 * 150 / 1800) * 100, 1);
+  expect(screen.getByTestId("shop-layer-front-1-text-height")).toHaveAttribute("placeholder", "Vorgabe 1,3");
+  await user.type(screen.getByTestId("shop-layer-front-1-text-height"), "1,5");
+  await user.type(screen.getByTestId("shop-layer-front-1-max-width"), "6");
+  // Gedrosselt: das Bild kommt erst, wenn die Eingabe kurz ruht.
+  await waitFor(() => expect(screen.getByTestId("shop-preview-front-layer-1-sample").getAttribute("src")).toBe(
+    "/api/admin/shop/products/p1/name-sample?kind=gamertag&color=Black&text_height_cm=1.5&max_width_cm=6"));
+  expect(parseFloat(screen.getByTestId("shop-preview-front-layer-1").style.width)).toBeCloseTo(((6 / 2.54) * 150 / 1800) * 100, 1);
+  await user.click(screen.getByTestId("shop-layout-submit"));
+  expect(apiMock.put.mock.calls[0][1].placements[0].layers[1]).toEqual({
+    kind: "gamertag", preset: "text_opposite", offset_x_cm: 0, offset_y_cm: 0, text_height_cm: 1.5, max_width_cm: 6 });
+  // Leer heißt wieder Vorgabe.
+  await user.clear(screen.getByTestId("shop-layer-front-1-max-width"));
+  await waitFor(() => expect(screen.getByTestId("shop-preview-front-layer-1-sample").getAttribute("src")).not.toContain("max_width_cm"));
+});
+
+test("passt der Beispielname nicht, sagt die Ebene warum - und eine gültige Größe zeigt ihn wieder (Review #2105)", async () => {
+  const canvas = { width_in: 3.5, height_in: 0.75, anchor_y_in: 0.375, text_height_cm: 1.27, max_width_cm: 8.89, height_per_text: 1.5,
+    limits: { min_text_height_cm: 0.25, max_text_height_cm: 5.08, min_width_cm: 1.27, max_width_cm: 30.48 } };
+  const data = view({ extra: { gamertag_canvas: canvas } });
+  const tooWide = "Der Name ist zu breit: auch bei 0,4 Zoll Texthöhe wird er 1,9 Zoll breit, erlaubt sind 0,39 Zoll.";
+  apiMock.get.mockImplementation((url) => (url.endsWith("/name-sample")
+    ? Promise.reject({ response: { status: 400, data: { detail: tooWide } } })
+    : Promise.resolve({ data })));
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-designs"));
+  await user.type(screen.getByTestId("shop-layer-front-1-max-width"), "1");
+  await waitFor(() => expect(screen.getByTestId("shop-preview-front-layer-1-sample").getAttribute("src")).toContain("max_width_cm=1"));
+  fireEvent.error(screen.getByTestId("shop-preview-front-layer-1-sample"));
+  expect(await screen.findByText(tooWide)).toBeInTheDocument();
+  expect(screen.queryByTestId("shop-preview-front-layer-1-sample")).toBeNull();
+  expect(apiMock.get).toHaveBeenCalledWith("/admin/shop/products/p1/name-sample", { params: { kind: "gamertag", color: "Black", max_width_cm: "1" } });
+  // Weiter tippen (1 → 12): das neue Bild ist wieder da, der Hinweis weg.
+  await user.type(screen.getByTestId("shop-layer-front-1-max-width"), "2");
+  await waitFor(() => expect(screen.getByTestId("shop-preview-front-layer-1-sample").getAttribute("src")).toContain("max_width_cm=12"));
+  expect(screen.getByTestId("shop-preview-front-layer-1-sample")).toBeVisible();
+  await waitFor(() => expect(screen.queryByText(tooWide)).toBeNull());
+});
+
+test("Flächen heißen deutsch - eine englische Bezeichnung von Printful ist als Rückfall markiert (#2105)", async () => {
+  const base = view();
+  const english = { ...base.available_placements[1], key: "zz_odd", label: "Odd panel", label_translated: false };
+  apiMock.get.mockResolvedValue({ data: view({ extra: {
+    labels: { ...LABELS, placements: { front: "Vorderseite", back: "Rückseite" } },
+    available_placements: [{ ...base.available_placements[0], label_translated: true }, english],
+  } }) });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  expect(await screen.findByTestId("shop-printful-placement-front")).toHaveTextContent("Vorderseite (DTG-Direktdruck)");
+  expect(screen.getByTestId("shop-printful-placement-back")).toHaveTextContent("Rückseite");
+  await user.click(screen.getByTestId("shop-step-designs"));
+  expect(screen.queryByTestId("shop-area-label-english-front")).toBeNull();
+  expect(screen.getByTestId("shop-area-label-english-zz_odd")).toHaveTextContent("Bezeichnung von Printful (englisch)");
+});
+
+test("die Vorschau nimmt je Farbe die passende Vorlage - sonst die vom Server eingefärbte (#2105)", async () => {
+  const base = view();
+  const front = base.available_placements[0];
+  const own = { ...front.preview, image_path: "/api/admin/shop/print-templates/71/images/3", tinted: false };
+  const tinted = { ...front.preview, image_path: "/api/admin/shop/print-templates/71/images/0?tint=ffffff", tinted: true };
+  apiMock.get.mockResolvedValue({ data: view({ extra: { available_placements: [
+    { ...front, preview_by_color: { Black: own, White: tinted } }, base.available_placements[1]] } }) });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-designs"));
+  const area = screen.getByTestId("shop-preview-front");
+  expect(area.querySelector("img[src='/api/admin/shop/print-templates/71/images/3']")).not.toBeNull();
+  expect(area).not.toHaveAttribute("data-tinted");
+  await user.click(screen.getByTestId("shop-preview-color-White"));
+  expect(area.querySelector("img[src='/api/admin/shop/print-templates/71/images/0?tint=ffffff']")).not.toBeNull();
+  expect(area).toHaveAttribute("data-tinted", "true");
 });
 
 test("Feinjustieren mit Pfeiltasten; was aus der Fläche ragt, sagt die Vorschau", async () => {
@@ -545,6 +658,9 @@ test("ungespeicherte Ausnahme: die Vorschau fragt den Server nach der Fassung un
   await user.click(screen.getByTestId("shop-layer-front-0-exceptions-toggle"));
   await user.selectOptions(screen.getByTestId("shop-layer-front-0-exception-White"), "loewe-schwarz");
   expect(screen.getByTestId("shop-preview-front")).toHaveAttribute("data-stale", "true");
+  // Nur die Ebenen sind gedimmt - das Shirt nie (#2105): Schwarz bleibt schwarz.
+  expect(screen.getByTestId("shop-preview-front").className).not.toContain("opacity-50");
+  expect(screen.getByTestId("shop-preview-front-layer-0").className).toContain("opacity-50");
   expect(screen.getByTestId("shop-layout-draft-preview")).toHaveTextContent("Vorschau wird berechnet");
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/shop/products/p1/layout/preview", expect.objectContaining({
     placements: expect.arrayContaining([expect.objectContaining({ key: "front", layers: expect.arrayContaining([expect.objectContaining({ motif: { key: "loewe-weiss", by_color: { White: "loewe-schwarz" } } })]) })]),
@@ -555,6 +671,17 @@ test("ungespeicherte Ausnahme: die Vorschau fragt den Server nach der Fassung un
   expect(image.querySelector("img").getAttribute("src")).toContain("loewe-schwarz-v3");
   // Seitenverhältnis der Fassung vom Server (1,25): der Rahmen ist höher als breit.
   expect(parseFloat(image.style.height) * 2400).toBeGreaterThan(parseFloat(image.style.width) * 1800);
+});
+
+test("ohne Berechnung (blockiert) wird nichts gedimmt, nur der Hinweis steht da (#2105)", async () => {
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-designs"));
+  await user.click(screen.getByTestId("shop-layer-front-1-remove"));
+  await user.click(screen.getByTestId("shop-layer-front-0-remove"));
+  expect(screen.getByTestId("shop-layout-draft-preview")).toHaveTextContent("Vorschau nach dem Speichern");
+  expect(screen.getByTestId("shop-preview-front")).not.toHaveAttribute("data-stale");
+  expect(apiMock.post).not.toHaveBeenCalled();
 });
 
 test("nicht abbildbare alte Platzierungen: rote Meldung, Produkt nicht bestellbar", async () => {

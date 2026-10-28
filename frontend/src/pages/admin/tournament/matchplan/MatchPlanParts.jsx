@@ -50,13 +50,15 @@ export function PlanSettings({ tournament, mode, duration, stations, canEdit, on
   }, [stamp]);
   const dirty = form.start !== initial.start || form.pause !== initial.pause || form.buffer !== initial.buffer;
   const local = mode === "local";
+  // Liga-Staffel (#2109): den Start gibt die Season vor - hier nur lesend, er geht beim Speichern nicht mit.
+  const staffel = Boolean(tournament.league_context);
 
   const save = async (event) => {
     event.preventDefault();
     setSaving(true);
     await onSave({
       // Turnierstart in Wiener Uhr - das Gerät kann woanders stehen (Zeitumstellung siehe lib/vienna).
-      ...(form.start && fromViennaInput(form.start) ? { start_date: fromViennaInput(form.start) } : {}),
+      ...(!staffel && form.start && fromViennaInput(form.start) ? { start_date: fromViennaInput(form.start) } : {}),
       match_break_minutes: number(form.pause) ?? 0,
       ...(local ? { match_buffer_minutes: number(form.buffer) ?? 0 } : {}),
     });
@@ -71,9 +73,17 @@ export function PlanSettings({ tournament, mode, duration, stations, canEdit, on
       </div>
       {canEdit ? (
         <div className="mp-settings__grid">
-          <Field label="Turnierstart" render={(props) => (
-            <input {...props} type="datetime-local" className="mp-input" value={form.start} onChange={(e) => setForm({ ...form, start: e.target.value })} />
-          )} />
+          {staffel ? (
+            <div className="mp-field" data-testid="mp-settings-season-start">
+              <span className="mp-field__label">Turnierstart</span>
+              <span>{when(tournament.start_date)}</span>
+              <span className="mp-field__hint">kommt aus der Season</span>
+            </div>
+          ) : (
+            <Field label="Turnierstart" render={(props) => (
+              <input {...props} type="datetime-local" className="mp-input" value={form.start} onChange={(e) => setForm({ ...form, start: e.target.value })} />
+            )} />
+          )}
           <Field label="Mindestpause zwischen zwei Spielen (Min.)" hint="So lange hat ein Spieler mindestens frei." render={(props) => (
             <input {...props} type="number" min="0" max="240" className="mp-input" value={form.pause} onChange={(e) => setForm({ ...form, pause: e.target.value })} />
           )} />

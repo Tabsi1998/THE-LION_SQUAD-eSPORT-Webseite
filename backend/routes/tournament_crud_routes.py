@@ -12,7 +12,7 @@ from services.permissions import is_confirmed_tournament_lead
 from auth import require_admin, get_optional_user
 from services.visibility import user_can_see
 from services.visibility import hide_unseen_event_links, lead_can_see
-from services import partner_pages
+from services import partner_pages, staffel_guard
 from services.access_links import (
     public_access_link_payload,
     touch_access_link,
@@ -245,6 +245,11 @@ async def get_tournament(slug_or_id: str, include_draft: bool = False, access: s
         return onsite_access.slim_view(t)
     # Was die Person hier darf (#1353): die Verwaltung zeigt Knöpfe nur nach diesen Feldern.
     t.update(await tournament_rights(user, t["id"]))
+    if is_league_staffel(t):
+        # Kopf der Staffel-Verwaltung (#2109): „Liga 1 · Staffel A – Season öffnen · Ligaseite“.
+        # Der Admin-Pfad der Season nur für die Verwaltung (Turnierleitung oder Strukturrechte).
+        t["league_links"] = await staffel_guard.staffel_links(
+            db, t, with_admin_path=is_admin or bool(t.get("can_manage_structure")))
     if not t.get("can_manage_structure"):
         # Der Umbau-Vorschlag für die Läufe (#1550) und der für Austritt/Disqualifikation (#1553) sieht nur, wer ihn
         # auch bestätigen darf (Strukturrollen).
@@ -371,6 +376,13 @@ async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends
         raise HTTPException(status_code=400, detail="Spiel nicht gefunden")
     existing = await _ensure_tournament_unlocked(db, tid)
     raw_updates = body.model_dump(exclude_unset=True)
+    # Status nur über den Ablauf (#2109): ``POST /status`` prüft Spielplan, Check-in und schreibt ins Protokoll - das
+    # Formular nicht. Derselbe Status stört nicht, ein anderer wird abgelehnt (alle Turniere).
+    problem = staffel_guard.status_problem(raw_updates, existing) or staffel_guard.staffel_update_problem(
+        raw_updates, existing)
+    if problem:
+        raise HTTPException(status_code=400, detail=problem)
+    raw_updates.pop("status", None)
     # Event als Klammer (#1371): verbunden wird nur im Event. Derselbe Wert stört nicht, ein anderer wird abgelehnt.
     if "event_id" in raw_updates:
         if (raw_updates.pop("event_id") or None) != (existing.get("event_id") or None):
@@ -426,10 +438,6 @@ async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends
     updates["updated_at"] = now_utc().isoformat()
     await db.tournaments.update_one({"id": tid}, {"$set": updates})
     reset_scope_cache()  # Live-Meldungen (#1801): Turnier und Event neu nachschlagen
-    if updates.get("status") and updates["status"] != existing.get("status"):
-        # Status im Formular geändert: im Discord wie über den Knopf der Turnierleitung (#572).
-        from services.discord_threads import status_written
-        await status_written(db, tid, existing.get("status"))
     t = await db.tournaments.find_one({"id": tid}, {"_id": 0})
     t.pop("creation_key", None)
     apply_competition_version_read_defaults(t)
@@ -442,6 +450,11 @@ async def delete_tournament(tid: str, me: dict = Depends(require_admin()),
                             _mutation_tid: str = Depends(_serialized_tournament_write)):
     db = get_db()
     tid = await _resolve_tid(tid)
+    # Liga-Staffel (#2109): löschen nur vor dem Start - danach „Abgesagt“ oder „Archiviert“.
+    stored = await db.tournaments.find_one({"id": tid}, {"_id": 0}) or {}
+    problem = await staffel_guard.staffel_delete_problem(db, stored)
+    if problem:
+        raise HTTPException(status_code=409, detail=problem)
     v2_match_ids = await db.matches_v2.distinct("id", {"tournament_id": tid})
     await db.tournaments.delete_one({"id": tid})
     reset_scope_cache()  # Live-Meldungen (#1801): Turnier und Event neu nachschlagen

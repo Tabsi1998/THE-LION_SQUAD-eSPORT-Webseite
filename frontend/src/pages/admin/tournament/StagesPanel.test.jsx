@@ -147,3 +147,13 @@ test("Regeln dieser Phase: neuer Stand der Phase ersetzt das Formular, nichts ge
     event_mode: "local", advancement_mode: "draw_show", randomize_advancement_rounds: true, draw_show_minutes: 7, grand_final: "single",
   });
 });
+
+// Liga-Staffel (#2109, S23): keine „Regeln dieser Phase“ (Vor Ort schaltete die Spielwochen ab), kein Stations-Hinweis.
+test("Staffel: keine Regeln je Phase, der Hinweis spricht von Spielwochen statt Stationen", () => {
+  const staffel = { league_context: { league_id: "l1", season_id: "s1", division_id: "d1", staffel: "A" }, format: "league" };
+  panel({ canEditSettings: true, tournament: staffel, durationGame: GAME, onOpenMatchplan: () => {} });
+  expect(screen.queryByTestId("stage-rules-toggle-s1")).toBeNull();
+  const hint = screen.getByTestId("stages-matchplan-hint");
+  expect(hint).toHaveTextContent("Spielwochen");
+  expect(hint).not.toHaveTextContent("Station");
+});

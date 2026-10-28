@@ -371,7 +371,8 @@ async def test_a_changed_layout_or_template_makes_the_files_outdated_until_they_
     await shop_products.set_layout(db, product["id"], moved, included_placement="front", **BY)
     view = await shop_products.admin_view(db, product["id"])
     files = check_item(view, "files")
-    assert files["ok"] is False and "front / Black: veraltet" in files["detail"] and "back" not in files["detail"]
+    assert files["ok"] is False and "Vorderseite / Schwarz: veraltet" in files["detail"]
+    assert "Rückseite" not in files["detail"]
     result = await shop_products.generate_print_files(db, product["id"], **BY)
     assert sorted((item["placement"], item["color"], item["version"]) for item in result["created"]) == [
         ("front", "Black", 2), ("front", "White", 2)]
@@ -381,7 +382,7 @@ async def test_a_changed_layout_or_template_makes_the_files_outdated_until_they_
     sync = await shop_catalog_sync.sync_product(db, product["id"], provider=provider, **BY)
     assert sync["template"]["changed"] is True and "Rückseite" in sync["template"]["changes"][0]
     files = check_item(await shop_products.admin_view(db, product["id"]), "files")
-    assert files["ok"] is False and "back / Black: veraltet" in files["detail"]
+    assert files["ok"] is False and "Rückseite / Schwarz: veraltet" in files["detail"]
     await shop_products.generate_print_files(db, product["id"], **BY)
     newest = await shop_print_files.latest_base(db, product["id"], "back", "all", "Black")
     assert (newest["width_px"], newest["height_px"], newest["version"]) == (1800, 2700, 2)
@@ -468,7 +469,7 @@ async def test_without_a_file_for_an_offered_color_the_product_cannot_be_reviewe
     product = await configured(db, provider, white_back=False, generate=False)
     view = await shop_products.admin_view(db, product["id"])
     files = check_item(view, "files")
-    assert files["ok"] is False and "back / White: fehlt" in files["detail"] and "erzeugen" in files["detail"]
+    assert files["ok"] is False and "Rückseite / Weiß: fehlt" in files["detail"] and "erzeugen" in files["detail"]
     with pytest.raises(ShopConflict, match="Prüfung"):
         await shop_products.set_status(db, product["id"], "reviewed", **BY)
     # Erzeugt, aber eine Datei verschwindet von der Platte: wieder „fehlt“ bzw. „veraltet“ - nie still weiter.
@@ -477,7 +478,7 @@ async def test_without_a_file_for_an_offered_color_the_product_cannot_be_reviewe
     gone = await shop_print_files.latest_base(db, product["id"], "back", "all", "White")
     shop_designs._path_of(gone["file_ref"]).unlink()
     files = check_item(await shop_products.admin_view(db, product["id"]), "files")
-    assert files["ok"] is False and "back / White" in files["detail"]
+    assert files["ok"] is False and "Rückseite / Weiß" in files["detail"]
 
 
 @pytest.mark.asyncio
@@ -490,7 +491,7 @@ async def test_unaccepted_prices_or_a_variant_out_of_stock_fail_the_check(db, pr
     await shop_catalog_sync.sync_product(db, product["id"], provider=provider, **BY)
     view = await shop_products.admin_view(db, product["id"])
     stock = check_item(view, "stock")
-    assert stock["ok"] is False and "White / L" in stock["detail"]
+    assert stock["ok"] is False and "Weiß / L" in stock["detail"]
 
 
 @pytest.mark.asyncio
@@ -524,7 +525,7 @@ async def test_the_sync_blocks_unavailable_variants_and_frees_them_again(db, pro
     result = await shop_catalog_sync.sync_product(db, product["id"], provider=provider, **BY)
     assert result["ok"] is True and result["blocked"] == ["Black / L"]
     large = await variant_for(db, product["id"], BLACK_L)
-    assert large["blocked_reason"] and "nicht lieferbar" in large["blocked_reason"]
+    assert large["blocked_reason"] == "Bei Printful nicht lieferbar (nicht auf Lager).", "Printful-Stand auf Deutsch"
     fake.stock[BLACK_L] = "in stock"
     result = await shop_catalog_sync.sync_product(db, product["id"], provider=provider, **BY)
     assert result["unblocked"] == ["Black / L"]
@@ -601,7 +602,7 @@ async def test_carried_print_areas_warn_then_turn_red_and_clear_on_a_full_answer
         return next(item for item in check["items"] if item["key"] == "template")
 
     result = await shop_catalog_sync.sync_product(db, product["id"], provider=provider, **BY)
-    assert result["ok"] is True and result["template"]["warning"].endswith("Rückseite (dtg).")
+    assert result["ok"] is True and result["template"]["warning"].endswith("Rückseite (DTG-Direktdruck).")
     state = (await shop_catalog.get_product(db, product["id"]))["catalog_sync"]
     assert state["warning"] == result["template"]["warning"] and "Druckvorlage: Printful liefert unvollständig" in state["detail"]
     template = await shop_print_files.templates.get(db, PRINTFUL_PRODUCT)

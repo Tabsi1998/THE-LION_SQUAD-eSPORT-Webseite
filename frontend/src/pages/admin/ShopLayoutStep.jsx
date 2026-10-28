@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, ExternalLink, Image as ImageIcon, Move, Plus, RefreshCw, RotateCcw, Trash2, Upload, Wand2 } from "lucide-react";
 import { api, formatRequestError, resolveMediaUrl, uploadApi } from "@/lib/api";
 import { viennaDateTime } from "@/lib/vienna";
@@ -18,6 +18,7 @@ const STATE_TONES = { ok: "text-ok", not_needed: "text-white/55", missing: "text
 const STATE_TEXT = { ok: "aktuell", not_needed: "Platzhalter", missing: "fehlt", outdated: "veraltet", invalid: "passt nicht", no_area: "Fläche fehlt" };
 const NUDGE_CM = 0.1;
 const DRAFT_PREVIEW_DELAY_MS = 350;
+const SAMPLE_DELAY_MS = 300;
 
 function round1(value) {
   return Math.round(Number(value) * 10) / 10;
@@ -43,8 +44,64 @@ function cleanLayer(layer) {
   if (layer.kind === "motif") {
     out.width_cm = round1(layer.width_cm);
     out.motif = { key: layer.motif?.key || "", by_color: Object.fromEntries(Object.entries(layer.motif?.by_color || {}).filter(([, key]) => key)) };
+  } else {
+    // Größe je Namensebene (#2105) - nur, wenn gesetzt; sonst gelten die globalen Gamertag-Regeln.
+    for (const name of ["text_height_cm", "max_width_cm"]) {
+      if (Number(layer[name]) > 0) out[name] = Math.round(Number(layer[name]) * 100) / 100;
+    }
   }
   return out;
+}
+
+function defaultCm(value) {
+  return Number(value) > 0 ? `Vorgabe ${String(round1(value)).replace(".", ",")}` : "Vorgabe";
+}
+
+function cmNumber(text) {
+  const value = Number(String(text ?? "").trim().replace(",", "."));
+  return String(text ?? "").trim() && Number.isFinite(value) && value > 0 ? value : null;
+}
+
+// Beispielname in echter Größe (#2105): der Server rendert ihn wie die Druckdatei - dieselben Regeln der Ebene.
+function nameSample(productId, kind, color, layer) {
+  const params = { kind, color };
+  if (Number(layer?.text_height_cm) > 0) params.text_height_cm = String(layer.text_height_cm);
+  if (Number(layer?.max_width_cm) > 0) params.max_width_cm = String(layer.max_width_cm);
+  const path = `${BASE}/${productId}/name-sample`;
+  return { path, params, url: resolveMediaUrl(`/api${path}?${new URLSearchParams(params).toString()}`) };
+}
+
+// Das Bild des Beispielnamens: gedrosselt (beim Tippen nicht jede Zwischengröße laden - ein neues Bild ersetzt das
+// alte), je Adresse neu (`key`) - und passt der Name so nicht (Server sagt 400), steht dessen Satz an der Ebene statt
+// eines stillen Lochs (Review #2105).
+function SampleImage({ sample, onProblem, testId }) {
+  const [shown, setShown] = useState(sample);
+  const [failed, setFailed] = useState(null);
+  const report = useRef(onProblem);
+  const latest = useRef(sample);
+  report.current = onProblem;
+  latest.current = sample;
+  useEffect(() => {
+    if (sample.url === shown.url) return undefined;
+    const timer = setTimeout(() => setShown(latest.current), SAMPLE_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [sample.url, shown.url]);
+  useEffect(() => {
+    let live = true;
+    if (failed !== shown.url) {
+      report.current(null);
+      return undefined;
+    }
+    api.get(shown.path, { params: shown.params }).then(() => {
+      if (live) report.current("Der Beispielname lässt sich gerade nicht anzeigen.");
+    }).catch((failure) => {
+      if (live) report.current(formatRequestError(failure, "Der Name passt mit dieser Größe nicht."));
+    });
+    return () => { live = false; };
+  }, [failed, shown]);
+  if (failed === shown.url) return null;
+  return <img key={shown.url} src={shown.url} alt="" aria-hidden="true" className="w-full h-full pointer-events-none" draggable={false}
+    onError={() => setFailed(shown.url)} data-testid={testId} />;
 }
 
 // Welche Fassung der Server für eine Farbe druckt (hell oder dunkel samt Version, #2069 Teil A) - aus den Plänen der
@@ -69,7 +126,7 @@ function savedSources(view) {
 
 // ---------------------------------------------------------------- Vorschau mit Vorlagenbild, Ziehen und Pfeiltasten
 
-function LayoutPreview({ area, preview, layers, resolved, colorCode, motifFor, selected, onSelect, onNudge, editable, testId, stale = false }) {
+function LayoutPreview({ area, preview, layers, resolved, colorCode, motifFor, sampleFor, onSampleProblem, selected, onSelect, onNudge, editable, testId, stale = false }) {
   const areaRef = useRef(null);
   const drag = useRef(null);
   const templateW = preview?.template_width || area.width_px;
@@ -109,7 +166,7 @@ function LayoutPreview({ area, preview, layers, resolved, colorCode, motifFor, s
   };
 
   return (
-    <div className={`relative w-full overflow-hidden rounded-sm border border-white/10 select-none transition-opacity duration-150 ${stale ? "opacity-50" : ""}`} style={{ aspectRatio: `${templateW} / ${templateH}`, backgroundColor: colorCode || "#808080" }} data-testid={testId} data-stale={stale ? "true" : undefined}>
+    <div className="relative w-full overflow-hidden rounded-sm border border-white/10 select-none" style={{ aspectRatio: `${templateW} / ${templateH}`, backgroundColor: colorCode || "#808080" }} data-testid={testId} data-stale={stale ? "true" : undefined} data-tinted={preview?.tinted ? "true" : undefined}>
       {background && <img src={background} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full pointer-events-none" />}
       {preview?.positioning === "background" && imagePath && <img src={imagePath} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full pointer-events-none" />}
       <div ref={areaRef} className="absolute outline outline-1 outline-dashed outline-white/40" style={{ left: pct(box.left, templateW), top: pct(box.top, templateH), width: pct(box.width, templateW), height: pct(box.height, templateH) }}
@@ -128,12 +185,15 @@ function LayoutPreview({ area, preview, layers, resolved, colorCode, motifFor, s
           return (
             <button key={item.index} type="button" aria-label={`${label} verschieben (Pfeiltasten, mit Umschalt 1 cm)`} aria-pressed={isSelected}
               onPointerDown={(event) => onPointerDown(event, item.index)} onKeyDown={(event) => onKeyDown(event, item.index)} onFocus={() => onSelect(item.index)}
-              className={`absolute p-0 m-0 bg-transparent touch-none outline-none transition-[box-shadow,opacity] duration-150 ${editable ? "cursor-move" : "cursor-default"} ${isSelected ? "ring-2 ring-brand" : "ring-1 ring-white/25"} ${bad ? "ring-2 ring-warn" : ""} focus-visible:ring-2 focus-visible:ring-brand`}
+              className={`absolute p-0 m-0 bg-transparent touch-none outline-none transition-[box-shadow,opacity] duration-150 ${stale ? "opacity-50" : ""} ${editable ? "cursor-move" : "cursor-default"} ${isSelected ? "ring-2 ring-brand" : "ring-1 ring-white/25"} ${bad ? "ring-2 ring-warn" : ""} focus-visible:ring-2 focus-visible:ring-brand`}
               style={{ left: pct(item.box.left, area.width_px), top: pct(item.box.top, area.height_px), width: pct(item.box.width, area.width_px), height: pct(item.box.height, area.height_px) }}
               data-testid={`${testId}-layer-${item.index}`} data-outside={bad ? item.outside.join(",") : undefined}>
               {item.kind === "motif" && motif?.image_path
                 ? <img src={resolveMediaUrl(motif.image_path)} alt="" aria-hidden="true" className="w-full h-full pointer-events-none" draggable={false} />
-                : <span className="flex items-center justify-center w-full h-full border border-dashed border-brand/70 bg-brand/10 text-[10px] font-bold uppercase tracking-wider text-brand pointer-events-none">{item.kind === "motif" ? "Motiv" : item.kind === "gamertag" ? "Gamertag" : "Nr."}</span>}
+                : item.kind !== "motif" && sampleFor
+                  // Der Name in echter Texthöhe; die Leinwand (Höchstbreite) ist nur der feine Rahmen drumherum (#2105).
+                  ? <SampleImage sample={sampleFor(item.kind, layer)} onProblem={(text) => onSampleProblem?.(item.index, text)} testId={`${testId}-layer-${item.index}-sample`} />
+                  : <span className="flex items-center justify-center w-full h-full border border-dashed border-brand/70 bg-brand/10 text-[10px] font-bold uppercase tracking-wider text-brand pointer-events-none">{item.kind === "motif" ? "Motiv" : item.kind === "gamertag" ? "Gamertag" : "Nr."}</span>}
             </button>
           );
         })}
@@ -145,7 +205,7 @@ function LayoutPreview({ area, preview, layers, resolved, colorCode, motifFor, s
 
 // ---------------------------------------------------------------- Ebenen bearbeiten
 
-function MotifLayer({ layer, area, presets, motifs, colors, minWidth, rules, aspect, editable, onChange, onRemove, testId }) {
+function MotifLayer({ layer, area, presets, motifs, colors, colorName, minWidth, rules, aspect, editable, onChange, onRemove, testId }) {
   const max = Math.max(minWidth, maxWidthCm(area, aspect || 1, rules));
   const width = Number(layer.width_cm || minWidth);
   const offset = Number(layer.offset_x_cm || 0) !== 0 || Number(layer.offset_y_cm || 0) !== 0;
@@ -200,7 +260,7 @@ function MotifLayer({ layer, area, presets, motifs, colors, minWidth, rules, asp
         <div className="grid gap-2 sm:grid-cols-2 border-t border-white/10 pt-2" data-testid={`${testId}-exceptions`}>
           <p className="sm:col-span-2 text-xs text-white/50">Ohne Ausnahme nimmt jede Farbe automatisch die passende Fassung (hell oder dunkel).</p>
           {colors.map((color) => (
-            <label key={color} className="block text-sm"><span className="text-white/70">{color}</span>
+            <label key={color} className="block text-sm"><span className="text-white/70">{colorName(color)}</span>
               <select value={layer.motif?.by_color?.[color] || ""} disabled={!editable}
                 onChange={(event) => onChange({ motif: { ...(layer.motif || {}), by_color: { ...(layer.motif?.by_color || {}), [color]: event.target.value } } })}
                 className={SELECT} data-testid={`${testId}-exception-${color}`}>
@@ -215,7 +275,33 @@ function MotifLayer({ layer, area, presets, motifs, colors, minWidth, rules, asp
   );
 }
 
-function TextLayer({ layer, presets, kindLabel, editable, onChange, onRemove, testId, problem }) {
+// Texthöhe und Höchstbreite einer Namensebene in cm (#2105): leer heißt Vorgabe aus den Gamertag-Regeln. Eingabe als
+// Text (Komma erlaubt), damit ein leeres Feld beim Tippen nicht „0 cm“ ist.
+function SizeField({ label, value, placeholder, editable, onChange, testId }) {
+  const [typed, setTyped] = useState(value ? String(value).replace(".", ",") : "");
+  useEffect(() => {
+    setTyped((now) => (cmNumber(now) === (value || null) ? now : (value ? String(value).replace(".", ",") : "")));
+  }, [value]);
+  return (
+    <label className="block text-sm min-w-0"><span className="text-white/70">{label}</span>
+      <input type="text" inputMode="decimal" value={typed} disabled={!editable} placeholder={placeholder}
+        onChange={(event) => {
+          setTyped(event.target.value);
+          if (!event.target.value.trim()) onChange(null);
+          else if (cmNumber(event.target.value) !== null) onChange(cmNumber(event.target.value));
+        }}
+        className={`${SELECT} tabular-nums`} data-testid={testId} />
+    </label>
+  );
+}
+
+function TextLayer({ layer, area, canvas, presets, kindLabel, editable, onChange, onRemove, testId, problem }) {
+  const limits = canvas?.limits || {};
+  const widest = Math.min(Number(limits.max_width_cm) || Infinity, Number(area.width_cm) || Infinity);
+  const height = Number(layer.text_height_cm) || null;
+  const width = Number(layer.max_width_cm) || null;
+  const bad = (height && (height < limits.min_text_height_cm || height > limits.max_text_height_cm))
+    || (width && (width < limits.min_width_cm || width > widest));
   return (
     <div className="space-y-2" data-testid={testId}>
       <label className="block text-sm"><span className="text-white/70">{kindLabel} - Position</span>
@@ -224,6 +310,15 @@ function TextLayer({ layer, presets, kindLabel, editable, onChange, onRemove, te
         </select>
       </label>
       <p className="text-xs text-white/50">{presets.find((preset) => preset.key === layer.preset)?.hint || "Die Datei mit dem Namen entsteht je Bestellung."}</p>
+      <div className="grid gap-2 grid-cols-2">
+        <SizeField label="Texthöhe (cm)" value={height} placeholder={defaultCm(canvas?.text_height_cm)} editable={editable}
+          onChange={(next) => onChange({ text_height_cm: next })} testId={`${testId}-text-height`} />
+        <SizeField label="Höchstbreite (cm)" value={width} placeholder={defaultCm(canvas?.max_width_cm)} editable={editable}
+          onChange={(next) => onChange({ max_width_cm: next })} testId={`${testId}-max-width`} />
+      </div>
+      <p className={`text-xs ${bad ? "text-warn" : "text-white/45"}`} data-testid={`${testId}-size-hint`}>
+        Leer = Vorgabe aus den Gamertag-Regeln. Texthöhe {cmText(limits.min_text_height_cm)} bis {cmText(limits.max_text_height_cm)}, Höchstbreite bis {cmText(widest)} - die Fläche begrenzt. Ein langer Name wird bis zur Mindesthöhe verkleinert.
+      </p>
       {problem && <p className="text-xs text-warn" role="alert">{problem}</p>}
       <div className="flex flex-wrap gap-2">
         {(Number(layer.offset_x_cm || 0) !== 0 || Number(layer.offset_y_cm || 0) !== 0) && <button type="button" disabled={!editable} onClick={() => onChange({ offset_x_cm: 0, offset_y_cm: 0 })} className={QUIET_BTN} data-testid={`${testId}-reset`}><RotateCcw className="w-3.5 h-3.5" aria-hidden="true" /> Auf die Vorgabe</button>}
@@ -245,7 +340,7 @@ function FileStates({ productId, row, mode, editable, busy, onUpload }) {
         const key = `${state.color}|${state.group || "all"}`;
         return (
           <li key={key} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" data-testid={`shop-file-${row.key}-${state.color}`} data-state={state.state}>
-            <span className="font-bold min-w-[5rem]">{state.color}</span>
+            <span className="font-bold min-w-[5rem]">{state.color_label || state.color}</span>
             <span className={`inline-flex items-center gap-1 ${STATE_TONES[state.state] || "text-white/60"}`}>
               {state.state === "ok" ? <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" /> : <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />}
               {STATE_TEXT[state.state] || state.state}{state.file?.version ? ` · v${state.file.version}` : ""}
@@ -263,7 +358,7 @@ function FileStates({ productId, row, mode, editable, busy, onUpload }) {
             )}
             {mode === "upload" && editable && (
               <span className="inline-flex items-center gap-2 basis-full">
-                <label className="sr-only" htmlFor={`shop-upload-${row.key}-${state.color}`}>Fertige Druckdatei für {state.color}</label>
+                <label className="sr-only" htmlFor={`shop-upload-${row.key}-${state.color}`}>Fertige Druckdatei für {state.color_label || state.color}</label>
                 <input id={`shop-upload-${row.key}-${state.color}`} type="file" accept="image/png,image/jpeg" className="text-xs max-w-[14rem]"
                   onChange={(event) => setChosen({ ...chosen, [key]: event.target.files?.[0] || null })} data-testid={`shop-upload-${row.key}-${state.color}`} />
                 <button type="button" disabled={!chosen[key] || busy === `upload-${key}`} className={SMALL_BTN}
@@ -281,7 +376,7 @@ function FileStates({ productId, row, mode, editable, busy, onUpload }) {
 
 // ---------------------------------------------------------------- Eine Fläche
 
-function PlacementCard({ view, available, state, savedRow, used, onToggle, onChange, colors, previewColor, codes, motifsByKey, sources, stale, editable, busy, onUpload }) {
+function PlacementCard({ view, available, state, savedRow, used, onToggle, onChange, colors, colorName, previewColor, codes, motifsByKey, sources, stale, editable, busy, onUpload }) {
   const area = areaOf(available);
   const presets = view.presets || [];
   const motifPresets = presets.filter((preset) => available.presets.motif.includes(preset.key));
@@ -289,6 +384,11 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
   const rules = view.preset_rules || {};
   const personalization = view.product.personalization || "none";
   const [selected, setSelected] = useState(null);
+  // Was der Server zum Beispielnamen einer Ebene sagt, wenn er so nicht passt (Review #2105).
+  const [sampleProblems, setSampleProblems] = useState({});
+  const onSampleProblem = useCallback((index, text) => {
+    setSampleProblems((now) => ((now[index] || null) === (text || null) ? now : { ...now, [index]: text || null }));
+  }, []);
   const layers = state?.layers || [];
   const mode = state?.mode || "layout";
   // Das Motiv dieser Ebene für die Vorschau-Farbe: die gespeicherte Fassung (hell/dunkel, Version) samt Bild, solange
@@ -322,6 +422,8 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
       : { kind, preset: preset.key, offset_x_cm: 0, offset_y_cm: 0 };
     onChange({ ...state, layers: [...layers, layer] });
   };
+  // Je Farbe die passende Printful-Vorlage, sonst vom Server eingefärbt (#2105) - nie das helle Foto unter Schwarz.
+  const preview = available.preview_by_color?.[previewColor] || available.preview;
   const kinds = view.labels.kinds || {};
   const surcharge = savedRow && !savedRow.included && savedRow.surcharge_cents ? ` · Aufpreis ${(savedRow.surcharge_cents / 100).toFixed(2).replace(".", ",")} €` : "";
   const resolvedFor = (index) => resolved.find((item) => item.index === index);
@@ -332,6 +434,7 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
           <input type="checkbox" checked={used} disabled={!editable} onChange={(event) => onToggle(event.target.checked)} className="w-4 h-4 accent-brand" data-testid={`shop-area-use-${available.key}`} />
           {available.label}
         </label>
+        {available.label_translated === false && <span className="text-xs text-honor" data-testid={`shop-area-label-english-${available.key}`}>Bezeichnung von Printful (englisch) - keine Übersetzung bekannt</span>}
         <span className="text-xs text-white/50 tabular-nums" data-testid={`shop-area-size-${available.key}`}>Druckdatei {sizeText(available.file)}{surcharge}</span>
         {available.groups.length > 1 && <span className="text-xs text-honor">Je Größe eine eigene Fläche ({available.groups.length})</span>}
       </div>
@@ -346,11 +449,13 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
           </div>
           <div className="grid gap-4 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
             <div className="space-y-1">
-              <LayoutPreview stale={stale} area={{ ...area, safe_margin_cm: available.safe_margin_cm }} preview={available.preview} layers={visible}
+              <LayoutPreview stale={stale} area={{ ...area, safe_margin_cm: available.safe_margin_cm }} preview={preview} layers={visible}
                 resolved={resolved} colorCode={codes[previewColor]} motifFor={motifFor} selected={selected} onSelect={setSelected}
+                sampleFor={previewColor ? (kind, layer) => nameSample(view.product.id, kind, previewColor, layer) : null}
+                onSampleProblem={onSampleProblem}
                 onNudge={nudge}
                 editable={editable} testId={`shop-preview-${available.key}`} />
-              {!available.preview?.image_path && <p className="text-xs text-honor" data-testid={`shop-preview-${available.key}-no-image`}>Kein Vorlagenbild von Printful - die Vorschau zeigt nur die Druckfläche, Maße und Druckdatei stimmen trotzdem.</p>}
+              {!preview?.image_path && <p className="text-xs text-honor" data-testid={`shop-preview-${available.key}-no-image`}>Kein Vorlagenbild von Printful - die Vorschau zeigt nur die Druckfläche, Maße und Druckdatei stimmen trotzdem.</p>}
               <p className="text-xs text-white/45 inline-flex items-center gap-1"><Move className="w-3 h-3" aria-hidden="true" /> Ziehen oder Pfeiltasten zum Feinjustieren.</p>
             </div>
             <div className="space-y-3">
@@ -363,12 +468,12 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
                   <div key={index} className={`border rounded-sm p-3 transition-colors duration-150 ${selected === index ? "border-brand/60" : "border-white/10"}`} onFocusCapture={() => setSelected(index)}>
                     <div className="text-xs font-bold uppercase tracking-wider text-white/60 mb-2">{kinds[layer.kind] || layer.kind}</div>
                     {layer.kind === "motif" ? (
-                      <MotifLayer layer={layer} area={area} presets={motifPresets} motifs={view.motif_options || []} colors={colors}
+                      <MotifLayer layer={layer} area={area} presets={motifPresets} motifs={view.motif_options || []} colors={colors} colorName={colorName}
                         minWidth={view.limits?.min_width_cm || 1} rules={rules} aspect={motif?.width_px ? motif.height_px / motif.width_px : 1} editable={editable}
                         onChange={(patch) => update(index, patch)} onRemove={() => onChange({ ...state, layers: layers.filter((_, at) => at !== index) })}
                         testId={`shop-layer-${available.key}-${index}`} />
                     ) : (
-                      <TextLayer layer={layer} presets={textPresets} kindLabel={layer.kind === "gamertag" ? "Gamertag" : "Vereinsnummer"} editable={editable} problem={found?.problem}
+                      <TextLayer layer={layer} area={area} canvas={view.gamertag_canvas} presets={textPresets} kindLabel={layer.kind === "gamertag" ? "Gamertag" : "Vereinsnummer"} editable={editable} problem={found?.problem || sampleProblems[index]}
                         onChange={(patch) => update(index, patch)} onRemove={() => onChange({ ...state, layers: layers.filter((_, at) => at !== index) })}
                         testId={`shop-layer-${available.key}-${index}`} />
                     )}
@@ -440,6 +545,8 @@ export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGrou
   const [previewColor, setPreviewColor] = useState(colors[0] || "");
   useEffect(() => { if (!colors.includes(previewColor)) setPreviewColor(colors[0] || ""); }, [colors, previewColor]);
   const codes = useMemo(() => Object.fromEntries((product.printful?.colors || []).map((color) => [color.name, color.code])), [product.printful]);
+  // Angezeigt wird die deutsche Bezeichnung (#2105); Schlüssel bleibt der Printful-Name.
+  const colorName = (color) => view.color_labels?.[color] || color;
   const motifsByKey = useMemo(() => Object.fromEntries((view.motif_options || []).map((motif) => [motif.key, motif])), [view.motif_options]);
   const sources = useMemo(() => savedSources(view), [view]);
   const savedRows = Object.fromEntries((view.placements || []).map((row) => [row.key, row]));
@@ -474,7 +581,10 @@ export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGrou
     return () => { live = false; clearTimeout(timer); };
   }, [previewWanted, payloadJson, product.id, product.printful]);
   const draftReady = previewWanted && draftPreview.json === payloadJson && !!draftPreview.sources;
-  const stale = changed && !draftReady;
+  // Ungespeichert und noch nicht vom Server bestätigt: nur die Ebenen gedimmt, nie das Shirt (#2105). Ohne Berechnung
+  // (nichts gewählt, blockiert) wird nichts gedimmt - es steht nur der Hinweis da.
+  const pending = changed && !draftReady;
+  const stale = previewWanted && !draftReady;
   const shownSources = draftReady ? draftPreview.sources : sources;
   if (!product.printful) return <p className="text-sm text-white/55" data-testid="shop-layout">Zuerst in Schritt 1 das Printful-Produkt laden.</p>;
   if (!available.length) return <div className="space-y-2" data-testid="shop-layout"><TemplateStatus view={view} busy={busy} run={run} /><p className="text-sm text-white/55">Ohne Druckvorlage von Printful lassen sich keine Flächen wählen.</p></div>;
@@ -487,7 +597,7 @@ export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGrou
     form.append("color", color);
     if (group && group !== "all") form.append("group", group);
     form.append("reason", "");
-    return run(`upload-${key}`, () => uploadApi.post("/admin/shop/print-files/upload", form), `Druckdatei für ${color} geprüft und gespeichert.`);
+    return run(`upload-${key}`, () => uploadApi.post("/admin/shop/print-files/upload", form), `Druckdatei für ${colorName(color)} geprüft und gespeichert.`);
   };
   return (
     <div className="space-y-4" data-testid="shop-layout">
@@ -499,7 +609,7 @@ export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGrou
           <ul className="mt-1 space-y-0.5">{view.layout_blocked.map((line) => <li key={line}>{line}</li>)}</ul>
         </div>
       )}
-      {stale && (
+      {pending && (
         <p className="text-xs text-honor" role="status" data-testid="shop-layout-draft-preview">
           {draftPreview.error && draftPreview.json === payloadJson ? `Vorschau: ${draftPreview.error}` : blocked ? "Vorschau nach dem Speichern." : "Vorschau wird berechnet …"}
         </p>
@@ -514,7 +624,7 @@ export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGrou
               <button key={color} type="button" role="radio" aria-checked={previewColor === color} onClick={() => setPreviewColor(color)}
                 className={`min-h-9 px-3 text-xs border rounded-sm inline-flex items-center gap-2 transition-colors duration-150 ${previewColor === color ? "border-brand bg-brand/10" : "border-white/10 hover:border-white/30"}`}
                 data-testid={`shop-preview-color-${color}`}>
-                <span className="w-3.5 h-3.5 rounded-sm border border-white/25" style={{ backgroundColor: codes[color] }} aria-hidden="true" /> {color}
+                <span className="w-3.5 h-3.5 rounded-sm border border-white/25" style={{ backgroundColor: codes[color] }} aria-hidden="true" /> {colorName(color)}
               </button>
             ))}
           </div>
@@ -530,7 +640,7 @@ export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGrou
               return next;
             })}
             onChange={(next) => setDraft((now) => ({ ...now, [row.key]: next }))}
-            colors={colors} previewColor={previewColor} codes={codes} motifsByKey={motifsByKey} sources={shownSources} stale={stale} editable={view.editable} busy={busy} onUpload={onUpload} />
+            colors={colors} colorName={colorName} previewColor={previewColor} codes={codes} motifsByKey={motifsByKey} sources={shownSources} stale={stale} editable={view.editable} busy={busy} onUpload={onUpload} />
         ))}
       </ul>
       {usedKeys.length > 1 && (

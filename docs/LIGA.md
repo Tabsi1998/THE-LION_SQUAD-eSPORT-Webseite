@@ -184,6 +184,19 @@ wenn die Prüfung „Runden ≤ aktive Wochen“ passt und nicht schon mehr Team
 `result_confirm_hours_league`, `lineup_amend_hours`. `min_squad_size` steht damit am Turnier (Season bzw. Liga N, mindestens `team_size`); B liest es
 beim Zuteilen dort.
 
+**In der Staffel nur lesend (#2109):** Die Turnierverwaltung einer Staffel zeigt die Season-Werte (Spiel, Start/Ende,
+Spielwoche und Standardtermin, Teamgröße, Staffelgröße, Best of, Bestätigungsfrist, Sichtbarkeit, Regeltext, Map-Pool)
+nur zum Lesen mit „kommt aus der Season“ und einem Link zur Season; was es in der Liga nicht gibt (Anmeldung, Check-in,
+Discord, Preise, Jahreswertung, Seeding, Weiterkommen, Vor Ort), fehlt. `update_tournament` lehnt Änderungen daran ab
+(`services/staffel_guard.STAFFEL_LOCKED_FIELDS`, Meldung „Kommt aus der Season – dort ändern und übertragen.“ bzw.
+„Gibt es in einer Liga-Staffel nicht.“/„Steht bei einer Liga-Staffel fest.“; derselbe Wert stört nicht). Das
+Übertragen (`sync_staffel`, `apply_visibility`) schreibt direkt und bleibt davon unberührt. Änderbar bleibt die
+**Antwortfrist auf Terminvorschläge** (`match_schedule_response_hours`), bis sie mit #2106 in die Season wandert. Dazu:
+`POST /status` kennt für Staffeln nur Entwurf, Live, Pausiert, Beendet, Ergebnisse veröffentlicht, Archiviert und
+Abgesagt; `POST /registrations` (Turnierleitung) nimmt keine Teilnehmer an - nur „Co-Team zuteilen“; Löschen geht nur
+vor dem Start ohne festen Spielplan, danach „Abgesagt“ oder „Archiviert“. Für alle Turniere gilt: `status` per PATCH
+nur, wenn er sich nicht ändert - der Status wechselt über `POST /status` (Ablauf mit Prüfungen und Protokoll).
+
 ## 4. Rechte
 
 Angelehnt an `services/match_audience.py` (Verantwortliche/Spieler) und `auth.require_area` (Bereiche).

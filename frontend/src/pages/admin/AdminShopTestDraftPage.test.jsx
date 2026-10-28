@@ -75,6 +75,23 @@ beforeEach(() => {
   apiMock.get.mockResolvedValue({ data: overview() });
 });
 
+test("Farben und Flächen deutsch, gewählt wird weiter über den Printful-Namen (#2105)", async () => {
+  const german = VARIANTS.map((item) => ({ ...item, color_label: item.color === "Black" ? "Schwarz" : "Weiß" }));
+  apiMock.get.mockResolvedValue({ data: overview({ products: [{ ...overview().products[0], variants: german }] }) });
+  apiMock.post.mockResolvedValue({ data: { ...PREVIEW, variant_label: "White / M", variant_display: "Weiß / M",
+    files: PREVIEW.files.map((file) => ({ ...file, placement_label: file.placement === "front" ? "Vorderseite" : "Rückseite" })) } });
+  show();
+  await fillUntilPreview();
+  expect(screen.getByTestId("shop-test-draft-color-Black")).toHaveTextContent("Schwarz");
+  expect(screen.getByTestId("shop-test-draft-color-White")).toHaveTextContent("Weiß");
+  await userEvent.click(screen.getByTestId("shop-test-draft-preview-button"));
+  const files = await screen.findByTestId("shop-test-draft-files");
+  expect(files).toHaveTextContent("Vorderseite");
+  expect(files).toHaveTextContent("DTG-Direktdruck");
+  expect(screen.getAllByText(/Weiß \/ M/).length).toBeGreaterThan(0);
+  expect(screen.queryByText(/White \/ M/)).toBeNull();
+});
+
 test("Beträge in Euro", () => {
   expect(euro(1995)).toBe("19,95 €");
   expect(euro(5)).toBe("0,05 €");

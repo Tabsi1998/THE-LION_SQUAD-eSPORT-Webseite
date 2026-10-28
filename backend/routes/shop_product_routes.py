@@ -48,6 +48,8 @@ class Offer(Reasoned):
     technique: str = Field(..., min_length=1, max_length=32)
     colors: list[str] = Field(..., min_length=1, max_length=40)
     sizes: list[str] = Field(..., min_length=1, max_length=20)
+    # Eigene Bezeichnung je Farbe (#2105) - ohne Angabe bleiben die bisherigen; leer heißt „Vorgabe“.
+    color_labels: dict[str, str | None] | None = Field(None, max_length=40)
 
 
 class MotifRef(BaseModel):
@@ -66,6 +68,9 @@ class LayerIn(BaseModel):
     offset_x_cm: float = 0.0
     offset_y_cm: float = 0.0
     motif: MotifRef | None = None
+    # Größe einer Gamertag- bzw. Vereinsnummer-Ebene (#2105) - ohne Angabe die globalen Gamertag-Regeln.
+    text_height_cm: float | None = None
+    max_width_cm: float | None = None
 
 
 class PlacementLayout(BaseModel):
@@ -158,7 +163,8 @@ async def set_offer(product_id: str, body: Offer, me: dict = Depends(require_are
     provider = await _provider(db)
     try:
         await shop_products.set_offer(db, product_id, technique=body.technique, colors=body.colors, sizes=body.sizes,
-                                      provider=provider, actor_id=me["id"], reason=body.reason)
+                                      color_labels=body.color_labels, provider=provider, actor_id=me["id"],
+                                      reason=body.reason)
     except (ShopError, LookupError) as exc:
         raise _refused(exc) from exc
     return await _view(product_id)
@@ -258,6 +264,23 @@ async def preview(product_id: str, placement: str = Query(..., max_length=64), c
     except (ShopError, LookupError) as exc:
         raise _refused(exc) from exc
     return Response(payload, media_type="image/png", headers=PNG_HEADERS)
+
+
+@router.get("/products/{product_id}/name-sample")
+async def name_sample(product_id: str, kind: Literal["gamertag", "member_number"] = "gamertag",
+                      color: str = Query(..., max_length=60), text_height_cm: float | None = Query(None),
+                      max_width_cm: float | None = Query(None), me: dict = Depends(require_area("finance"))):
+    """Beispielname einer Namensebene in echter Größe (#2105) - gerendert wie die Druckdatei, als PNG der Leinwand."""
+    db = get_db()
+    try:
+        product = await shop_products._product(db, product_id)
+        payload = await shop_print_files.sample_png(db, product, kind=kind, color=color,
+                                                    layer={"text_height_cm": text_height_cm,
+                                                           "max_width_cm": max_width_cm})
+    except (ShopError, LookupError) as exc:
+        raise _refused(exc) from exc
+    return Response(payload, media_type="image/png",
+                    headers={**PNG_HEADERS, "Cache-Control": "private, max-age=600"})
 
 
 @router.get("/products/{product_id}/print-files/{file_id}")

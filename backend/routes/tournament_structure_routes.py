@@ -11,6 +11,7 @@ from services.tournament_permissions import (
     require_tournament_staff_permission,
 )
 from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
+from services.staffel_guard import staffel_rebuild_problem
 from services.draw_records import record_build_draws
 from services.heat_rebuild import evaluate_after_write
 from services.match_v2_results import apply_deferred_draws
@@ -379,6 +380,10 @@ async def rebuild_bracket_from_tournament_format(tid: str, body: TournamentBrack
     await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
     if not _can_rebuild_bracket_from_format(tournament):
         raise HTTPException(status_code=400, detail="Für dieses Format gibt es keinen automatischen Format-Bracket-Generator.")
+    # Liga-Staffel (#2109): ein fester Spielplan wird nicht durch eine Vorschau ersetzt - auch nicht mit force.
+    staffel_problem = await staffel_rebuild_problem(db, tournament)
+    if staffel_problem:
+        raise HTTPException(status_code=409, detail=staffel_problem)
     if tournament.get("status") in ("live", "paused", "completed", "results_published", "archived") and not force:
         raise HTTPException(status_code=409, detail="Laufende oder beendete Turniere brauchen force=true.")
 
@@ -501,6 +506,10 @@ async def reset_bracket(tid: str, force: bool = False, me: dict = Depends(get_cu
     tid = await _resolve_tid(tid)
     t = await _ensure_tournament_unlocked(db, tid)
     await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
+    # Liga-Staffel (#2109): nach dem Start auch mit force nicht - sonst gingen alle Spiele samt Ergebnissen verloren.
+    staffel_problem = await staffel_rebuild_problem(db, t)
+    if staffel_problem:
+        raise HTTPException(status_code=409, detail=staffel_problem)
     if t.get("status") in ("live", "completed", "results_published") and not force:
         raise HTTPException(
             status_code=409,

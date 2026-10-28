@@ -4,6 +4,7 @@ import { AlertTriangle, CheckCircle2, ExternalLink, FileImage, Info, PackageChec
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { StepBar } from "@/components/tls/StepBar";
 import { api, formatRequestError } from "@/lib/api";
+import { techniqueLabel } from "@/lib/shopTechniques";
 import { viennaDateTime } from "@/lib/vienna";
 import ShopTabs from "./ShopTabs";
 
@@ -146,8 +147,8 @@ function Files({ files }) {
       {files.map((file) => (
         <li key={file.placement} className="border border-white/10 rounded-sm p-2 text-xs text-white/75 space-y-1 min-w-0">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className="font-bold text-white uppercase tracking-wider">{file.placement}</span>
-            <span>{file.technique}</span>
+            <span className="font-bold text-white uppercase tracking-wider">{file.placement_label || file.placement}</span>
+            <span>{techniqueLabel(file.technique)}</span>
             <span>{KIND_LABELS[file.kind] || file.kind}{file.version ? ` · v${file.version}` : ""}</span>
             <span className="tabular-nums">{file.width_px} × {file.height_px} px · {file.dpi} DPI</span>
           </div>
@@ -234,7 +235,7 @@ function Result({ draft, onDeleted, testId }) {
     <div className="space-y-3" data-testid={testId}>
       <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
         <div><dt className="text-white/50 text-xs">Printful-Auftrag</dt><dd className="tabular-nums font-bold" data-testid={`${testId}-order-id`}>{draft.printful_order_id ?? "–"}</dd></div>
-        <div><dt className="text-white/50 text-xs">Stand</dt><dd>{draft.state_label}{draft.printful_status ? ` (Printful: ${draft.printful_status})` : ""}</dd></div>
+        <div><dt className="text-white/50 text-xs">Stand</dt><dd>{draft.state_label}{draft.printful_status ? ` (Printful: ${draft.printful_status_label || draft.printful_status})` : ""}</dd></div>
         <div><dt className="text-white/50 text-xs">Gesendet</dt><dd>{draft.sent_at ? viennaDateTime(draft.sent_at) : "–"}</dd></div>
       </dl>
       {draft.dashboard_url && (
@@ -284,6 +285,8 @@ export default function AdminShopTestDraftPage() {
 
   const product = useMemo(() => data?.products.find((item) => item.id === productId) || null, [data, productId]);
   const colors = useMemo(() => [...new Set((product?.variants || []).map((item) => item.color))], [product]);
+  // Deutsche Bezeichnung je Printful-Farbe (#2105) - ausgewählt wird weiter über den Printful-Namen.
+  const colorNames = useMemo(() => Object.fromEntries((product?.variants || []).map((item) => [item.color, item.color_label || item.color])), [product]);
   const sizes = useMemo(() => (product?.variants || []).filter((item) => item.color === color), [product, color]);
   const variant = sizes.find((item) => item.id === variantId) || null;
 
@@ -400,7 +403,7 @@ export default function AdminShopTestDraftPage() {
               <div className="space-y-2">
                 <p className="text-xs text-white/55">Farbe</p>
                 <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Farbe">
-                  {colors.map((value) => <Choice key={value} active={color === value} onClick={() => chooseColor(value)} testId={`shop-test-draft-color-${value}`}>{value}</Choice>)}
+                  {colors.map((value) => <Choice key={value} active={color === value} onClick={() => chooseColor(value)} testId={`shop-test-draft-color-${value}`}>{colorNames[value] || value}</Choice>)}
                 </div>
               </div>
               {color && (
@@ -409,7 +412,7 @@ export default function AdminShopTestDraftPage() {
                   <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Größe">
                     {sizes.map((item) => (
                       <Choice key={item.id} active={variantId === item.id} onClick={() => chooseVariant(item.id)} testId={`shop-test-draft-size-${item.size}`}>
-                        {item.size}{item.in_stock !== true && <AlertTriangle className="w-3.5 h-3.5 text-warn" aria-label="nicht als lieferbar gemeldet" />}
+                        {item.size_label || item.size}{item.in_stock !== true && <AlertTriangle className="w-3.5 h-3.5 text-warn" aria-label="nicht als lieferbar gemeldet" />}
                       </Choice>
                     ))}
                   </div>
@@ -466,7 +469,7 @@ export default function AdminShopTestDraftPage() {
           <div className="tls-reveal">
             <Section title="Vorschau prüfen - genau das wird gesendet" step={5} testId="shop-test-draft-preview">
               <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
-                <div><dt className="text-white/50 text-xs">Position</dt><dd>1 × {preview.product_title} - {preview.variant_label} (Printful-Variante {preview.printful_variant_id})</dd></div>
+                <div><dt className="text-white/50 text-xs">Position</dt><dd>1 × {preview.product_title} - {preview.variant_display || preview.variant_label} (Printful-Variante {preview.printful_variant_id})</dd></div>
                 <div className="min-w-0"><dt className="text-white/50 text-xs">Externe Kennung</dt><dd className="font-mono text-xs break-all">{preview.external_id}</dd></div>
                 <div><dt className="text-white/50 text-xs">Anschrift</dt><dd>{preview.recipient.name}, {preview.recipient.street}{preview.recipient.street2 ? `, ${preview.recipient.street2}` : ""}, {preview.recipient.zip} {preview.recipient.city}, {preview.recipient.country}</dd></div>
                 <div><dt className="text-white/50 text-xs">Gültig bis</dt><dd>{viennaDateTime(preview.expires_at)}</dd></div>
@@ -506,7 +509,7 @@ export default function AdminShopTestDraftPage() {
               <ul className="space-y-3">
                 {others.map((item) => (
                   <li key={item.id} className="border border-white/10 rounded-sm p-3 space-y-2 min-w-0" data-testid={`shop-test-draft-item-${item.id}`}>
-                    <p className="text-sm font-bold">{item.product_title} - {item.variant_label}</p>
+                    <p className="text-sm font-bold">{item.product_title} - {item.variant_display || item.variant_label}</p>
                     <p className="text-xs text-white/55">{viennaDateTime(item.created_at)}</p>
                     <Result draft={item} onDeleted={deleted} testId={`shop-test-draft-item-${item.id}-result`} />
                   </li>

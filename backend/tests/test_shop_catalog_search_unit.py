@@ -105,8 +105,18 @@ async def test_search_by_name_brand_model_german_words_and_category(db, provider
     towel = shop_catalog_search.search(catalog, query="towel")["results"][0]
     assert towel["image"] is None, "Bilder nur von Printful-Hosts"
     tree = shop_catalog_search.category_tree(catalog)
-    assert [(row["title"], row["depth"]) for row in tree][:2] == [("Hats", 0), ("Home & living", 0)]
-    assert ("T-shirts", 1) in [(row["title"], row["depth"]) for row in tree]
+    # Kategorien deutsch (#2105), sortiert nach dem deutschen Namen; der Printful-Name steht daneben.
+    assert [(row["title"], row["depth"]) for row in tree][:3] == [("Herrenbekleidung", 0), ("T-Shirts", 1),
+                                                                  ("Kappen und Mützen", 0)]
+    assert ("Wohnen und Deko", 0) in [(row["title"], row["depth"]) for row in tree]
+    assert next(row for row in tree if row["id"] == 42)["title_printful"] == "Hats"
+
+
+def test_unknown_category_titles_stay_as_printful_names():
+    catalog = {"categories": [{"id": 5, "parent_id": None, "title": "Flux capacitors"},
+                              {"id": 6, "parent_id": None, "title": "Kids' & youth clothing"}]}
+    assert [row["title"] for row in shop_catalog_search.category_tree(catalog)] == [
+        "Flux capacitors", "Kinder- und Jugendbekleidung"]
 
 
 @pytest.mark.asyncio
