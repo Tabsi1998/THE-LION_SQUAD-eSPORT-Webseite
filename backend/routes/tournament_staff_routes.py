@@ -19,11 +19,11 @@ logger = logging.getLogger("tls.tournament_staff")
 
 # Bereiche eines Einsatzes (#2111, TA25): die Kennung muss zu diesem Turnier gehören - ein Tippfehler ergab vorher einen
 # Helfer ohne Rechte. Leer heißt weiter „jede Phase/Gruppe/Station/jedes Spiel“ (services/tournament_permissions).
-SCOPE_LOOKUPS = {
-    "stage": ("tournament_stages", "Diese Phase gibt es in diesem Turnier nicht."),
-    "group": ("tournament_groups", "Diese Gruppe gibt es in diesem Turnier nicht."),
-    "match": ("matches_v2", "Dieses Spiel gibt es in diesem Turnier nicht."),
-    "station": ("stations", "Diese Station gibt es nicht oder sie gehört zu einem anderen Turnier."),
+SCOPE_MISSING = {
+    "stage": "Diese Phase gibt es in diesem Turnier nicht.",
+    "group": "Diese Gruppe gibt es in diesem Turnier nicht.",
+    "match": "Dieses Spiel gibt es in diesem Turnier nicht.",
+    "station": "Diese Station gibt es nicht oder sie gehört zu einem anderen Turnier.",
 }
 ROLE_WORDS = {
     "organizer": "Organisation", "referee": "Schiedsrichter", "scorekeeper": "Ergebnisdienst",
@@ -32,16 +32,14 @@ ROLE_WORDS = {
 
 
 async def _scope_problem(db, tid: str, scope: str, scope_id: str | None) -> str | None:
-    if scope == "tournament" or not scope_id or scope not in SCOPE_LOOKUPS:
+    if scope == "tournament" or not scope_id or scope not in SCOPE_MISSING:
         return None
-    collection, message = SCOPE_LOOKUPS[scope]
-    query = {"id": scope_id}
-    if scope == "station":
-        # Stationen gehören einem Turnier oder sind frei (Event, Halle).
-        query["tournament_id"] = {"$in": [tid, None]}
-    else:
-        query["tournament_id"] = tid
-    return None if await getattr(db, collection).find_one(query, {"_id": 0, "id": 1}) else message
+    # Stationen gehören einem Turnier oder sind frei (Event, Halle).
+    owner = {"$in": [tid, None]} if scope == "station" else tid
+    collection = {"stage": db.tournament_stages, "group": db.tournament_groups, "match": db.matches_v2,
+                  "station": db.stations}[scope]
+    found = await collection.find_one({"id": scope_id, "tournament_id": owner}, {"_id": 0, "id": 1})
+    return None if found else SCOPE_MISSING[scope]
 
 
 async def _notify_helper(db, tid: str, assignment: dict) -> None:
