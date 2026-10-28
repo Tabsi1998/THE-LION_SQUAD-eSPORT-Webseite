@@ -359,3 +359,26 @@ async def test_the_first_preview_of_a_staffel_plays_only_the_first_leg(flow):
     preview = await flow.db.matches_v2.find({"tournament_id": staffel["id"]}, {"_id": 0}).to_list(None)
     assert len(preview) == 28  # 8 Teams, nur Hinrunde: 7 Spieltage zu je 4 Spielen
     assert max(match["round"] for match in preview) == 7
+
+
+@pytest.mark.asyncio
+async def test_starting_a_staffel_with_more_teams_than_weeks_is_refused(flow):
+    admin, _game, _league, season, division, _maps = await setup_league(flow, season={"max_staffel_size": 8})
+    staffel = await _staffel(flow, division)
+    await flow.db.tournaments.update_one({"id": staffel["id"]}, {"$set": {"max_participants": 9}})
+    for index in range(1, 10):
+        await flow.register(staffel, await flow.add_user(name=f"Team {index}"))
+    flow.act_as(admin)
+
+    refused = await flow.post(f"/api/tournaments/{staffel['id']}/status", json={"status": "live"})
+    assert refused.status_code == 400
+    assert "9 Spielwochen" in refused.json()["detail"] and "zweite Staffel" in refused.json()["detail"]
+    assert (await flow.db.tournaments.find_one({"id": staffel["id"]}))["status"] == "draft"
+
+    last = await flow.db.tournament_registrations.find_one({"tournament_id": staffel["id"]}, sort=[("_id", -1)])
+    await flow.db.tournament_registrations.update_one({"_id": last["_id"]}, {"$set": {"status": "withdrawn"}})
+    started = await flow.post(f"/api/tournaments/{staffel['id']}/status", json={"status": "live"})
+    assert started.status_code == 200, started.text
+    fixed = await flow.db.matches_v2.find({"tournament_id": staffel["id"], "is_preview": {"$ne": True}},
+                                          {"_id": 0}).to_list(None)
+    assert len(fixed) == 28

@@ -589,6 +589,19 @@ def balanced_home(rounds: list[list[tuple[int, int]]]) -> list[list[tuple[int, i
     return out
 
 
+def _check_league_weeks(tournament: dict | None, teams: int, legs: int) -> None:
+    """Runden ≤ aktive Wochen (docs/LIGA.md, Abschnitt 5) auch beim Erzeugen und Neu-Auslosen - nur mit
+    ``matchday_weeks_total`` (Liga-Staffel); ohne das Feld keine Prüfung wie bisher."""
+    total = (tournament or {}).get("matchday_weeks_total")
+    if not total:
+        return
+    from services.league_service import rounds_problem
+
+    problem = rounds_problem(teams, legs, int(total), list((tournament or {}).get("matchday_blocked_weeks") or []))
+    if problem:
+        raise BracketSchemaError(problem)
+
+
 def league_legs(tournament: dict | None, stage: dict | None = None) -> int:
     """Runden einer Liga: 1 = nur Hinrunde, 2 = Hin- und Rückrunde. Fehlt das Feld, 2 - wie bisher."""
     settings = (stage or {}).get("settings") or {}
@@ -733,6 +746,7 @@ def _resolve_schema(tournament: dict, stage: dict, registrations: list[dict], pr
     if (stage.get("stage_type") or "") == "league":
         size = int(tournament.get("max_participants") or 2) if preview else max(2, len(registrations))
         legs = league_legs(tournament, stage)
+        _check_league_weeks(tournament, size, legs)
         return _auto_league_schema(size, league_rng, legs=legs)
     if (stage.get("stage_type") or "") == "simple":
         size = int(tournament.get("max_participants") or 2) if preview else max(2, len(registrations))
