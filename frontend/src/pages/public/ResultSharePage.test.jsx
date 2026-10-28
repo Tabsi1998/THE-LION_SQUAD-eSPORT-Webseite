@@ -49,7 +49,9 @@ describe("ResultSharePage", () => {
     expect(screen.getByTestId("result-share-wide")).toHaveAttribute("download", "ergebnis-fc26-cup-neonfalke-wide.png");
     expect(screen.getByTestId("result-share-actions")).toBeInTheDocument();
     expect(screen.queryByTestId("result-share-actions-page")).toBeNull();
-    expect(screen.getByTestId("result-share-back")).toHaveAttribute("href", "/tournaments/fc26-cup");
+    // Brotkrumen wie auf den Turnierseiten (#2124): Home · eSports · Turniere · Turnier · Ergebnis.
+    expect(screen.getByRole("link", { name: "FC 26 Herbst-Cup" })).toHaveAttribute("href", "/tournaments/fc26-cup");
+    expect(screen.getByTestId("breadcrumbs")).toHaveTextContent("Ergebnis von Neonfalke");
   });
 
   it("beim Team steht der Teamname und wer geteilt hat", async () => {

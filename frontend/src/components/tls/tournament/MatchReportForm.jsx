@@ -99,6 +99,12 @@ export function MatchReportForm({ participants = [], match = {}, entry: serverEn
             </a>
           )}
           {status !== "confirm" && state?.own_summary && <p className="mt-1">Deine Meldung: <strong>{state.own_summary}</strong></p>}
+          {/* Das eigene Foto nach dem Senden (#2124, TP5) - erst nach der Bildprüfung liefert der Server es aus. */}
+          {status !== "confirm" && state?.own_photo?.url && (
+            <a href={chatAttachmentSrc(state.own_photo.url)} target="_blank" rel="noreferrer" className="mt-2 block w-32 overflow-hidden rounded-sm border border-white/15" data-testid="match-report-own-photo">
+              <img src={chatAttachmentSrc(state.own_photo.url, 400)} alt="Dein Foto zur Meldung" width={128} height={80} className="h-20 w-full object-cover" />
+            </a>
+          )}
           {status === "confirm" && (readOnly || state?.can_confirm === false ? (
             <p className="mt-2 text-xs opacity-80" data-testid="match-report-lead-confirms">Bestätigen kann die Teamleitung.</p>
           ) : (
@@ -133,7 +139,7 @@ export function MatchReportForm({ participants = [], match = {}, entry: serverEn
           {kind === "order" && <OrderInput entry={entry} state={form} onChange={setForm} showFlags={false} />}
 
           <ProofPhotoPicker matchId={match.id} value={photo} onChange={setPhoto} />
-          <input value={note} onChange={(e) => setNote(e.target.value)} className="input" placeholder="Notiz für die Turnierleitung (freiwillig)" data-testid="match-report-note" />
+          <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={1000} className="input" placeholder="Notiz für die Turnierleitung (freiwillig)" data-testid="match-report-note" />
           <p className={`rounded-sm border px-3 py-2 text-sm font-bold ${sentence ? "border-[#29B6E8]/35 bg-[#29B6E8]/10 text-[#BFE9F8]" : "border-white/10 bg-white/5 text-white/45"}`} data-testid="match-report-sentence">
             {sentence || outcome.error}
           </p>

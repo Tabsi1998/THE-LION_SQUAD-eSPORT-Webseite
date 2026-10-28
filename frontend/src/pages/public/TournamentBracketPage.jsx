@@ -6,6 +6,8 @@ import { TournamentTabs } from "@/components/tls/tournament/TournamentTabs";
 import { BracketTree } from "@/components/tls/BracketTree";
 import { PrintLink } from "@/components/tls/print/PrintLink";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
+import { useLeagueTrail } from "@/hooks/useLeagueTrail";
+import { tournamentCrumbs } from "@/lib/leagueTrail";
 import { SkeletonCards, SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
@@ -13,7 +15,7 @@ import { useChangedKeys } from "@/hooks/useLiveChanges";
 import { matchResultSignature } from "@/lib/liveChanges";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { formatTournamentDisplay } from "@/lib/tournamentLabels";
+import { formatTournamentDisplay, hasBracketTree } from "@/lib/tournamentLabels";
 import { seoTextPreview } from "@/lib/textPreview";
 import { Tv } from "lucide-react";
 
@@ -28,6 +30,7 @@ export default function TournamentBracketPage() {
   const [quietUpdate, setQuietUpdate] = useState(false);
   const catchUp = useRef(false);
   const tournament = data?.tournament;
+  const trail = useLeagueTrail(tournament);
   const seoDescription = seoTextPreview(tournament?.description, "Live-Turnierbaum von THE LION SQUAD eSports mit Runden, Matches und Ergebnissen.");
   useDocumentTitle(`${tournament?.title || "Turnier"} Turnierbaum`, seoDescription, {
     image: tournament?.banner_url,
@@ -71,22 +74,15 @@ export default function TournamentBracketPage() {
   }
   const t = data.tournament;
   const tournamentUrl = `/tournaments/${t.slug || t.id}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`;
+  const standingsUrl = `/tournaments/${t.slug || t.id}/standings${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`;
 
   return (
     <PublicLayout>
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
           <div>
-            <Breadcrumbs
-              items={[
-                { label: "Home", to: "/" },
-                { label: "Turniere", to: "/tournaments" },
-                { label: t.title, to: tournamentUrl },
-                { label: "Turnierbaum" },
-              ]}
-              className="mb-3"
-            />
-            <Link to={tournamentUrl} className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← Zurück zum Turnier</Link>
+            {/* Eine Brotkrumen-Kette (#2124): kein zusätzliches „← Zurück“ - die Reiter darunter führen weiter. */}
+            <Breadcrumbs items={tournamentCrumbs(t, trail, { tournamentUrl, current: { label: "Turnierbaum" } })} className="mb-3" />
             <h1 className="mt-2 font-heading text-3xl md:text-5xl font-black uppercase">{t.title}</h1>
             <div className="mt-2 flex gap-2 items-center">
               <PhaseBadge phase={t.public_phase} status={t.status} />
@@ -104,7 +100,13 @@ export default function TournamentBracketPage() {
           )}
           </div>
         </div>
-        {(data.matches_v2?.length || 0) === 0 ? (
+        {!hasBracketTree(t) && (data.matches_v2?.length || 0) === 0 ? (
+          // Ohne Turnierbaum (#2124): Zeitfahren und Rennserie bekommen nie einen - der Weg zur Rangliste.
+          <div className="border border-white/10 rounded-sm bg-surface-1 p-12 text-center" data-testid="bracket-no-tree">
+            <p className="text-muted-text">Bei diesem Format gibt es keinen Turnierbaum – den Stand zeigt die Rangliste.</p>
+            <Link to={standingsUrl} className="tls-btn tls-btn--secondary mt-4 inline-flex px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">Zur Rangliste</Link>
+          </div>
+        ) : (data.matches_v2?.length || 0) === 0 ? (
           <div className="border border-white/10 rounded-sm bg-surface-1 p-12 text-center">
             <div className="text-muted-text font-display tracking-widest">TURNIERBAUM WURDE NOCH NICHT GENERIERT</div>
           </div>

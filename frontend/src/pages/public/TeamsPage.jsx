@@ -395,7 +395,7 @@ function TeamDetail({ id }) {
           {canEdit && <section data-testid="team-manage-members">
             <div className="mb-4">
               <h2 className="font-heading text-2xl font-bold uppercase">Mitglieder verwalten</h2>
-              <p className="mt-1 text-xs text-white/45">Der Kapitän vergibt Rollen und kann die Leitung übergeben. Co-Kapitäne pflegen Teamdaten, laden ein und verwalten Squads.</p>
+              <p className="mt-1 text-xs text-white/45">Der Kapitän vergibt Rollen und kann die Leitung übergeben. Co-Kapitäne pflegen Teamdaten, laden ein und verwalten Co-Teams.</p>
             </div>
             <div className="grid sm:grid-cols-2 gap-3">
               {team.members?.map((m) => {

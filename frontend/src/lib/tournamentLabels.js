@@ -1,6 +1,7 @@
+// Glossar (#2124, TP10): K.-o., Doppel-K.-o. - die Wörter der Spieler- und Verwaltungsseiten stehen hier an einer Stelle.
 export const TOURNAMENT_FORMAT_LABELS = {
-  single_elim: "Single Elimination",
-  double_elim: "Double Elimination",
+  single_elim: "K.-o.",
+  double_elim: "Doppel-K.-o.",
   round_robin: "Jeder gegen jeden",
   swiss: "Schweizer System",
   groups: "Gruppenphase",
@@ -29,14 +30,14 @@ export const TOURNAMENT_FORMAT_OPTIONS = [
 ];
 
 export const STAGE_TYPE_LABELS = {
-  single_elimination: "Single Elimination",
-  double_elimination: "Double Elimination",
+  single_elimination: "K.-o.",
+  double_elimination: "Doppel-K.-o.",
   custom_bracket: "Freier Turnierbaum",
   round_robin_groups: "Jeder-gegen-jeden-Gruppen",
   swiss: "Schweizer System",
   league: "Liga",
   simple: "Einzelrunde",
-  ffa_single_elimination: "FFA Single Elimination",
+  ffa_single_elimination: "Mehrspieler-K.-o.",
   ffa_custom_bracket: "Mehrspieler freier Turnierbaum",
   ffa_league: "Mehrspieler-Liga",
 };
@@ -363,4 +364,44 @@ export function stationText(match) {
   const deviceName = device ? formatDeviceType(device) : "";
   const station = name.length <= 3 && !/\bstation\b/i.test(name) ? `Station ${name}` : name;
   return deviceName && !station.toLowerCase().includes(deviceName.toLowerCase()) ? `${station} · ${deviceName}` : station;
+}
+
+// ---------------------------------------------------------------- Turnierbaum je Format (#2124, TP14)
+// Jeder gegen jeden, Liga, Zeitfahren und Rennserie haben keinen Turnierbaum - dort gibt es den Reiter nicht, und im
+// laufenden Turnier ist die Rangliste die Hauptaktion. Schweizer System und Gruppen haben eine Tabelle zuerst (der Baum
+// kommt erst mit einer K.-o.-Phase danach). Bekommt ein Turnier ohne Baum über die Phasen Playoffs, sagt es der Server:
+// ``has_bracket_tree`` (services/bracket_tree.py) - das Format ist nur der Rückfall für ältere Antworten.
+const NO_TREE_FORMATS = new Set(["round_robin", "league", "time_trial", "grand_prix"]);
+const TABLE_FIRST_FORMATS = new Set(["swiss", "groups"]);
+
+/** Hat das Turnier einen Turnierbaum, den man ansehen kann? */
+export function hasBracketTree(tournament) {
+  if (typeof tournament?.has_bracket_tree === "boolean") return tournament.has_bracket_tree;
+  return !NO_TREE_FORMATS.has(String(tournament?.format || ""));
+}
+
+/** Die Hauptansicht im laufenden Turnier: „bracket“ (Turnierbaum) oder „standings“ (Rangliste bzw. Tabelle) - ohne
+ * Baum immer die Rangliste; wo die Tabelle zuerst kommt (auch Liga mit Playoffs), ebenso. */
+export function runningMainView(tournament) {
+  const format = String(tournament?.format || "");
+  if (!hasBracketTree(tournament)) return "standings";
+  return NO_TREE_FORMATS.has(format) || TABLE_FIRST_FORMATS.has(format) ? "standings" : "bracket";
+}
+// ---------------------------------------------------------------- Spielstatus vor Terminstatus (#2124, TP15)
+// Spielplan und Event-Live-Seite zeigten den Terminstatus („Accepted“) auch nach dem Spiel. Jetzt zuerst der Stand des
+// Spiels; der Terminstatus nur, solange das Spiel noch nicht begonnen hat - und auf Deutsch.
+export const SCHEDULE_STATUS_LABELS = {
+  proposed: "Terminvorschlag offen",
+  accepted: "Termin bestätigt",
+  declined: "Vorschlag abgelehnt",
+  escalated: "Turnierleitung nötig",
+};
+const BEFORE_PLAY_STATUSES = new Set(["", "preview", "pending", "scheduled", "ready"]);
+
+/** Was in der Status-Marke eines Spiels steht: der Spielstand, vor dem Spiel der Terminstatus. */
+export function matchScheduleStatusText(match) {
+  const status = String(match?.status || "");
+  const scheduleLabel = SCHEDULE_STATUS_LABELS[match?.schedule_status];
+  if (scheduleLabel && BEFORE_PLAY_STATUSES.has(status)) return scheduleLabel;
+  return status ? formatMatchStatus(status) : "Ausstehend";
 }

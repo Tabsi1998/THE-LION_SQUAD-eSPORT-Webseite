@@ -58,10 +58,17 @@ from routes.tournament_common import (
 )
 from services import onsite_access
 from services.change_events import reset_scope_cache
+from services.bracket_tree import attach_has_bracket_tree
 from routes.tournament_router import router
 
 
 EVENT_LINK_ONLY_IN_EVENT = "Zu welchem Event das gehört, änderst du im Event unter „Programm“."
+# Turnierliste (#2124, TP12): „Beendet“ heißt auch „Ergebnisse veröffentlicht“ und „Archiviert“ (der Normalfall),
+# „Live“ auch pausiert. Die Webseite fragt die Gruppe, die App weiter einzelne Status.
+LIST_STATUS_GROUPS = {
+    "finished": ("completed", "results_published", "archived"),
+    "running": ("live", "paused"),
+}
 
 
 def _page_items(items: list[dict], limit: int, offset: int, paged: bool):
@@ -98,6 +105,7 @@ def _compact_tournament(t: dict) -> dict:
         "registration_open_from": t.get("registration_open_from"),
         "registration_open_until": t.get("registration_open_until"),
         "is_invite_only": t.get("is_invite_only"),
+        "has_bracket_tree": t.get("has_bracket_tree", True),
         "engine_version": t.get("engine_version"),
         "ruleset_version": t.get("ruleset_version"),
         "version_inferred": bool(t.get("version_inferred")),
@@ -166,7 +174,8 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
     if status:
         if status == "draft" and not can_include_drafts:
             return []
-        q["status"] = status
+        # Status-Gruppen (#2124): „Beendet“ und „Live“ der Turnierliste - ein einzelner Status bleibt wie bisher.
+        q["status"] = {"$in": list(LIST_STATUS_GROUPS[status])} if status in LIST_STATUS_GROUPS else status
     elif include_drafts and is_admin:
         pass
     elif include_drafts and assigned_ids:
@@ -193,6 +202,8 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
             "platform": 1, "start_date": 1, "end_date": 1, "event_id": 1, "team_mode": 1, "max_participants": 1,
             "prize_pool": 1, "registration_enabled": 1, "online_registration_enabled": 1,
             "registration_open_from": 1, "registration_open_until": 1, "is_invite_only": 1,
+            # Turnierbaum je Format (#2124): ``has_bracket_tree`` braucht das Format.
+            "format": 1,
         }
     fetch_limit = max(safe_limit, min(safe_limit + max(int(offset or 0), 0) + 80, 500))
     tournaments = await db.tournaments.find(q, projection).sort("created_at", -1).to_list(fetch_limit)
@@ -208,6 +219,12 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
             elif t.get("is_public") is not False and await lead_can_see(user, t.get("visibility") or "public"):
                 visible.append(t)
         tournaments = visible
+    # Kurze Liste (#2124): erst die Seite schneiden, dann nur sie anreichern - gleiche Reihenfolge, gleiche Zahl.
+    total = len(tournaments)
+    page_limit = max(1, min(int(limit or 48), 200))
+    page_offset = max(0, int(offset or 0))
+    if compact:
+        tournaments = tournaments[page_offset:page_offset + page_limit]
     finance = await can_use_area(user, "finance")
     for t in tournaments:
         await _enrich_tournament(t, user)
@@ -219,9 +236,12 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
             t.pop("participant_removal_plan", None)
     # Das Event als Klammer (#1182): die Kennung des Events nur, wenn es für die Person sichtbar ist (#1473).
     await hide_unseen_event_links(db, user, tournaments)
+    await attach_has_bracket_tree(db, tournaments)
     if compact:
-        tournaments = [_compact_tournament(t) for t in tournaments]
-        return _page_items(tournaments, limit, offset, paged)
+        items = [_compact_tournament(t) for t in tournaments]
+        if not paged:
+            return items
+        return {"items": items, "total": total, "limit": page_limit, "offset": page_offset}
     return tournaments
 
 
@@ -245,6 +265,7 @@ async def get_tournament(slug_or_id: str, include_draft: bool = False, access: s
         suffix = f"?{urlencode({'access': access})}" if access else ""
         return RedirectResponse(url=f"/api/tournaments/{quote(str(t['slug']), safe='')}{suffix}", status_code=301)
     await _enrich_tournament(t, user)
+    await attach_has_bracket_tree(db, [t])
     # Wie lang die Warteliste ist (#1941): das Bestätigungs-Blatt nennt bei vollem Cup den Platz - nur die Zahl.
     t["waitlist_count"] = await db.tournament_registrations.count_documents({"tournament_id": t["id"], "status": "waitlist"})
     if onsite_only:

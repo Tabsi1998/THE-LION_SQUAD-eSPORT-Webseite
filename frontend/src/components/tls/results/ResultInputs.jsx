@@ -164,7 +164,7 @@ export function OrderInput({ entry, state, onChange, showFlags = true }) {
   };
   return (
     <div className="space-y-2" data-testid="result-order">
-      <p className="text-sm text-white/60">In Zielreihenfolge antippen – wer zuerst im Ziel war, zuerst. Noch ein Tipp nimmt es zurück.</p>
+      <p className="text-sm text-white/60">In der Reihenfolge der Plätze antippen – Platz 1 zuerst. Noch ein Tipp nimmt es zurück.</p>
       {(entry.participants || []).map((side) => {
         const place = order.indexOf(side.registration_id) + 1;
         const flag = state.flags[side.registration_id];

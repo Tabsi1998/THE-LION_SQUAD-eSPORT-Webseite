@@ -50,7 +50,7 @@ export function ProblemReportForm({ matchId, until = null, busy = false, initial
         ))}
       </div>
       <textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} maxLength={1000} className="input w-full min-h-[5rem] resize-y" placeholder="Kurz beschreiben, z. B. „Es stand 2:1 für mich, nicht 1:2.“" data-testid="match-dispute-input" />
-      <ProofPhotoPicker matchId={matchId} value={photo} onChange={setPhoto} testId="dispute-photo" />
+      <ProofPhotoPicker matchId={matchId} value={photo} onChange={setPhoto} testId="dispute-photo" label="Foto als Beleg" />
       <p className="text-xs text-white/50" data-testid="match-dispute-hint">
         Die Turnierleitung bekommt sofort Bescheid, prüft und entscheidet.
         {until ? ` Möglich bis ${formatWhen(until)}.` : ""}

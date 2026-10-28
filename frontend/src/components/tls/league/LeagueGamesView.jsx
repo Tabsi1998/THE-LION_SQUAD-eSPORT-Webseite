@@ -226,7 +226,7 @@ export function StaffLineupAmend({ league, busy = false, onSave }) {
       ))}
       <label className="block">
         <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-widest text-white/60">Grund (steht im Protokoll)</span>
-        <input value={reason} onChange={(event) => setReason(event.target.value)} className="input" placeholder="z. B. per Discord nachgereicht" data-testid="league-staff-amend-reason" />
+        <input value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} className="input" placeholder="z. B. per Discord nachgereicht" data-testid="league-staff-amend-reason" />
       </label>
       {error && <p className="text-sm text-warn" role="alert" data-testid="league-staff-amend-error">{error}</p>}
       <div className="flex flex-wrap gap-2">

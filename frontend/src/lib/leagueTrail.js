@@ -37,3 +37,15 @@ export function leagueCrumbs(tournament, trail, { tournamentUrl = "", current = 
     : [{ label: "Liga" }];
   return [{ label: "Home", to: "/" }, ...head, staffel, ...(current ? [current] : [])];
 }
+
+/**
+ * Die eine Brotkrumen-Kette der Turnierseiten (#2124, TP22): „Home · eSports · Turniere · Turnier · Seite“ - bei einer
+ * Liga-Staffel der Liga-Weg. Ohne ``current`` endet sie beim Turnier (die Turnierseite selbst).
+ */
+export function tournamentCrumbs(tournament, trail, { tournamentUrl = "", current = null } = {}) {
+  const league = leagueCrumbs(tournament, trail, { tournamentUrl, current });
+  if (league) return league;
+  const title = { label: tournament?.title || "Turnier", ...(current && tournamentUrl ? { to: tournamentUrl } : {}) };
+  return [{ label: "Home", to: "/" }, { label: "eSports", to: "/esports" }, { label: "Turniere", to: "/tournaments" }, title,
+    ...(current ? [current] : [])];
+}

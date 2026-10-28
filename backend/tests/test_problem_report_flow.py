@@ -126,6 +126,13 @@ async def test_staff_keeps_the_result_with_one_tap_and_both_sides_hear_it(flow):
     assert len(mails) == 2
     audit = await flow.db.audit_logs.find({"action": "match.dispute.keep"}, {"_id": 0}).to_list(5)
     assert audit and audit[0]["actor_id"] == staff["id"]
+    # Die eigene Meldung mit Entscheidung (#2124, TP4): die Matchseite zeigt sie der meldenden Seite - nur ihr.
+    flow.act_as(player[first])
+    own = (await flow.get(f"/api/matches/{match['id']}/page")).json()["match"]["disputes"]
+    assert own[0]["decision"] == "keep" and own[0]["decision_note"] == "Lag war auf beiden Seiten" and own[0]["resolved_at"]
+    flow.act_as(player[second])
+    assert (await flow.get(f"/api/matches/{match['id']}/page")).json()["match"]["disputes"] == [{"at": own[0]["at"]}]
+    flow.act_as(staff)
     again = await flow.post(f"/api/matches/{match['id']}/dispute/decision", json={"decision": "keep"})
     assert again.status_code == 409, "kein Dispute mehr offen"
 
@@ -148,6 +155,7 @@ async def test_staff_changes_the_result_through_the_window_and_the_dispute_close
     decided = [row for row in await notes(flow, "match_result") if row["title"] == "Dispute entschieden"]
     assert {row["user_id"] for row in decided} == {player[first]["id"], player[second]["id"]}
     assert stored["result_meta"]["correction_reason"] == "Foto zeigt 2:1"
+    assert all(row.get("decision") == "change" for row in stored["disputes"]), "Korrektur entscheidet den Dispute (#2124)"
 
 
 @pytest.mark.asyncio
@@ -163,3 +171,20 @@ async def test_problem_before_the_result_goes_back_to_the_open_match(flow):
     assert stored["status"] not in {"disputed", "completed"} and not stored.get("results")
     decided = [row for row in await notes(flow, "match_result") if row["title"] == "Dispute entschieden"]
     assert decided and "Das Spiel geht weiter wie geplant." in decided[0]["body"]
+
+
+@pytest.mark.asyncio
+async def test_staff_enters_the_same_result_again_and_the_dispute_reads_keep(flow):
+    """Review O1 (#2124): dasselbe Ergebnis noch einmal eingetragen heißt „Ergebnis bleibt“, nicht „korrigiert“."""
+    staff, tournament, match, first, second, player, others = await bracket(flow)
+    await entered(flow, staff, match, second, first)
+    flow.act_as(player[first])
+    await flow.post(f"/api/matches/{match['id']}/dispute", json={"reason": "Stand vertauscht", "category": "wrong_result"})
+    flow.act_as(staff)
+    same = await flow.post(f"/api/matches/{match['id']}/result?force=true",
+                           json={**ranking(second, first), "hold": True, "reason": "Nachgezählt, stimmt"})
+    assert same.status_code == 200, same.text
+    assert await publish_due_holds(flow.db, now=now_utc() + timedelta(seconds=13)) == 1
+    stored = await flow.reload(match)
+    assert stored["status"] == "completed"
+    assert [row.get("decision") for row in stored["disputes"]] == ["keep"]
