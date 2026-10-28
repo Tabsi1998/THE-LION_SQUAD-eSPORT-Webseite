@@ -562,3 +562,11 @@ async def test_a_failed_lookup_puts_the_draft_back_to_unclear(db, provider, fake
         await shop_test_drafts.delete(db, shown["id"], actor_id=ACTOR, provider=provider)
     record = await db.shop_test_drafts.find_one({"id": shown["id"]}, {"_id": 0})
     assert record["state"] == "unclear" and record["last_error"]["reason"] == "server" and len(fake.orders) == 1
+
+
+def test_the_printful_order_status_reads_german():
+    """#2105: der Stand bei Printful steht deutsch daneben - ein unbekannter bleibt, wie Printful ihn liefert."""
+    assert shop_test_drafts.view({"id": "t", "printful_status": "draft"})["printful_status_label"] == "Entwurf"
+    assert shop_test_drafts.view({"id": "t", "printful_status": "inprocess"})["printful_status_label"] == "in Produktion"
+    assert shop_test_drafts.view({"id": "t", "printful_status": "wormhole"})["printful_status_label"] == "wormhole"
+    assert shop_test_drafts.view({"id": "t"})["printful_status_label"] is None

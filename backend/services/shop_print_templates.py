@@ -203,7 +203,7 @@ def build(areas: Sequence[PrintArea], templates: Sequence[MockupTemplate]) -> tu
     entries, skipped = [], []
     for area in areas:
         if area.width_px * area.height_px > MAX_FILE_PIXELS:
-            skipped.append(f"{placement_label(area.placement, area.display_name)} ({area.technique}): "
+            skipped.append(f"{placement_label(area.placement, area.display_name)} ({technique_label(area.technique)}): "
                            f"{area.width_px} × {area.height_px} px bei {area.dpi} DPI - mehr als "
                            f"{MAX_FILE_PIXELS // 1_000_000} Millionen Pixel, nicht übernommen.")
             continue
@@ -234,8 +234,20 @@ def link_previews(entry: dict, previews: Sequence[dict]) -> dict:
     return {**entry, "preview_indexes": [item["index"] for item in mine], "aspect_ok": aspect_ok}
 
 
+# Deutsche Namen der Drucktechniken für Meldungen (#2105) - wie ``frontend/src/lib/shopTechniques.js`` (TECHNIQUES).
+TECHNIQUE_LABELS = {
+    "dtg": "DTG-Direktdruck", "dtfilm": "DTF-Transfer (DTFlex)", "dtf": "DTF-Transfer", "embroidery": "Stickerei",
+    "sublimation": "Sublimationsdruck", "cut-sew": "Rundumdruck (Zuschnitt und Naht)", "uv": "UV-Druck",
+    "digital": "Digitaldruck", "knitting": "Strickmuster",
+}
+
+
+def technique_label(technique: str | None) -> str:
+    return TECHNIQUE_LABELS.get(str(technique or ""), str(technique or ""))
+
+
 def _pair_label(pair: tuple[str, str]) -> str:
-    return f"{placement_label(pair[0])} ({pair[1]})"
+    return f"{placement_label(pair[0])} ({technique_label(pair[1])})"
 
 
 def carried_pairs(entries: Sequence[dict], incomplete: set[tuple[str, str]]) -> set[tuple[str, str]]:
@@ -309,7 +321,7 @@ def diff(before: Sequence[dict], after: Sequence[dict]) -> list[str]:
     new = {key(row): row for row in after}
     out = []
     for item in sorted(set(old) | set(new)):
-        name = f"{(new.get(item) or old.get(item))['label']} ({item[1]})"
+        name = f"{(new.get(item) or old.get(item))['label']} ({technique_label(item[1])})"
         if item[2] != GROUP_ALL:
             name += f", Varianten {', '.join(map(str, (new.get(item) or old.get(item))['variant_ids']))}"
         if item not in old:

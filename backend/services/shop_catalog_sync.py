@@ -50,6 +50,18 @@ STOCK_UNKNOWN = "Lager bei Printful unbekannt."
 PRICE_MISSING = "Preis fehlt bei Printful."
 
 
+# Lagerstände von Printful auf Deutsch (#2105) - ein unbekannter Stand bleibt stehen, wie Printful ihn liefert.
+AVAILABILITY_LABELS = {"in stock": "auf Lager", "out of stock": "nicht auf Lager", "discontinued": "eingestellt",
+                       "temporary out of stock": "vorübergehend nicht auf Lager",
+                       "temporarily out of stock": "vorübergehend nicht auf Lager",
+                       "stocked on demand": "auf Bestellung", "not fulfillable": "nicht lieferbar"}
+
+
+def availability_label(value: str | None) -> str:
+    text = " ".join(str(value or "").replace("_", " ").split())
+    return AVAILABILITY_LABELS.get(text.casefold(), text) if text else "kein Lagerstand"
+
+
 def _blocked_reason(row, *, active: bool, cost: int | None, minimum: int) -> str | None:
     """Warum diese Variante nicht bestellbar ist - oder ``None``. Unbekannt heißt nicht bestellbar."""
     if row is None:
@@ -57,7 +69,7 @@ def _blocked_reason(row, *, active: bool, cost: int | None, minimum: int) -> str
     if row.in_stock is None:
         return STOCK_UNKNOWN
     if row.in_stock is False:
-        return f"Bei Printful nicht lieferbar ({row.availability or 'kein Lagerstand'})."
+        return f"Bei Printful nicht lieferbar ({availability_label(row.availability)})."
     if active and cost is None:
         return PRICE_MISSING
     if active and cost < minimum:

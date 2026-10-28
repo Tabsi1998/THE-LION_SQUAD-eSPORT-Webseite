@@ -525,7 +525,7 @@ async def test_the_sync_blocks_unavailable_variants_and_frees_them_again(db, pro
     result = await shop_catalog_sync.sync_product(db, product["id"], provider=provider, **BY)
     assert result["ok"] is True and result["blocked"] == ["Black / L"]
     large = await variant_for(db, product["id"], BLACK_L)
-    assert large["blocked_reason"] and "nicht lieferbar" in large["blocked_reason"]
+    assert large["blocked_reason"] == "Bei Printful nicht lieferbar (nicht auf Lager).", "Printful-Stand auf Deutsch"
     fake.stock[BLACK_L] = "in stock"
     result = await shop_catalog_sync.sync_product(db, product["id"], provider=provider, **BY)
     assert result["unblocked"] == ["Black / L"]
@@ -602,7 +602,7 @@ async def test_carried_print_areas_warn_then_turn_red_and_clear_on_a_full_answer
         return next(item for item in check["items"] if item["key"] == "template")
 
     result = await shop_catalog_sync.sync_product(db, product["id"], provider=provider, **BY)
-    assert result["ok"] is True and result["template"]["warning"].endswith("Rückseite (dtg).")
+    assert result["ok"] is True and result["template"]["warning"].endswith("Rückseite (DTG-Direktdruck).")
     state = (await shop_catalog.get_product(db, product["id"]))["catalog_sync"]
     assert state["warning"] == result["template"]["warning"] and "Druckvorlage: Printful liefert unvollständig" in state["detail"]
     template = await shop_print_files.templates.get(db, PRINTFUL_PRODUCT)

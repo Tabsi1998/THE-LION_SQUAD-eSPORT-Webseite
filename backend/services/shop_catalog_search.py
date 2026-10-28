@@ -183,8 +183,37 @@ def search(catalog: dict, *, query: Any = "", category_id: int | None = None, li
     return {"results": hits[:MAX_RESULTS], "total": len(hits), "link": None}
 
 
+# Kategorien des Printful-Katalogs auf Deutsch (#2105) - eine unbekannte bleibt englisch, wie Printful sie nennt.
+CATEGORY_TITLES = {
+    "men's clothing": "Herrenbekleidung", "women's clothing": "Damenbekleidung",
+    "kids' & youth clothing": "Kinder- und Jugendbekleidung", "kids & youth clothing": "Kinder- und Jugendbekleidung",
+    "hats": "Kappen und Mützen", "accessories": "Accessoires", "home & living": "Wohnen und Deko",
+    "all products": "Alle Produkte", "all shirts": "Alle Shirts", "t-shirts": "T-Shirts", "shirts": "Shirts",
+    "hoodies": "Kapuzenpullover", "sweatshirts": "Sweatshirts", "jackets & vests": "Jacken und Westen",
+    "tank tops": "Tanktops", "polo shirts": "Poloshirts", "long sleeve shirts": "Langarmshirts",
+    "3/4 sleeve shirts": "3/4-Arm-Shirts", "embroidered shirts": "Bestickte Shirts", "all-over shirts": "Allover-Shirts",
+    "sportswear": "Sportbekleidung", "activewear": "Sportbekleidung", "leggings": "Leggings", "shorts": "Kurze Hosen",
+    "joggers": "Jogginghosen", "pants": "Hosen", "swimwear": "Bademode", "socks": "Socken", "underwear": "Unterwäsche",
+    "dresses": "Kleider", "skirts": "Röcke", "bags": "Taschen", "backpacks": "Rucksäcke", "tote bags": "Stofftaschen",
+    "phone cases": "Handyhüllen", "mugs": "Tassen", "drinkware": "Trinkgefäße", "bottles & tumblers": "Flaschen und Becher",
+    "towels": "Handtücher", "blankets": "Decken", "pillows & pillow cases": "Kissen und Kissenbezüge",
+    "pillows": "Kissen", "wall art": "Wandbilder", "posters": "Poster", "canvas prints": "Leinwanddrucke",
+    "framed posters": "Gerahmte Poster", "stickers": "Sticker", "stationery": "Schreibwaren",
+    "beanies": "Mützen", "dad hats": "Dad Caps", "snapbacks": "Snapbacks", "trucker hats": "Trucker Caps",
+    "bucket hats": "Fischerhüte", "visors": "Schirmmützen", "baseball caps": "Baseballkappen",
+    "aprons": "Schürzen", "mouse pads": "Mauspads", "jewelry": "Schmuck", "pets": "Haustiere",
+    "baby clothing": "Babykleidung", "youth clothing": "Jugendbekleidung", "kids clothing": "Kinderbekleidung",
+}
+
+
+def category_title(title: Any) -> str:
+    text = " ".join(str(title or "").split())
+    return CATEGORY_TITLES.get(text.casefold(), text)
+
+
 def category_tree(catalog: dict) -> list[dict]:
-    """Kategorien als flache Liste mit Ebene (für ein Auswahlfeld), Oberkategorien zuerst."""
+    """Kategorien als flache Liste mit Ebene (für ein Auswahlfeld), Oberkategorien zuerst - mit deutschem Namen
+    (``title``) und dem von Printful (``title_printful``)."""
     categories = list(catalog.get("categories") or [])
     by_parent: dict[int | None, list[dict]] = {}
     for row in categories:
@@ -192,8 +221,9 @@ def category_tree(catalog: dict) -> list[dict]:
     out: list[dict] = []
 
     def walk(parent, depth):
-        for row in sorted(by_parent.get(parent, []), key=lambda item: item["title"]):
-            out.append({"id": row["id"], "title": row["title"], "depth": depth})
+        for row in sorted(by_parent.get(parent, []), key=lambda item: category_title(item["title"])):
+            out.append({"id": row["id"], "title": category_title(row["title"]), "title_printful": row["title"],
+                        "depth": depth})
             if depth < 4:
                 walk(row["id"], depth + 1)
 

@@ -741,7 +741,16 @@ def view(record: dict) -> dict:
     out["files"] = [{**item, "placement_label": shop_print_templates.placement_label(item.get("placement") or "")}
                     for item in record.get("files") or []]
     out["variant_display"] = record.get("variant_display") or shop_colors.stored_label(record.get("variant_label"))
+    status = record.get("printful_status")
+    out["printful_status_label"] = PRINTFUL_STATUS_LABELS.get(status, status) if status else None
     return out
+
+
+# Stand eines Auftrags bei Printful auf Deutsch (#2105) - ein unbekannter bleibt, wie Printful ihn liefert.
+PRINTFUL_STATUS_LABELS = {"draft": "Entwurf", "pending": "wartet", "failed": "fehlgeschlagen", "canceled": "storniert",
+                          "cancelled": "storniert", "inreview": "in Prüfung", "inprocess": "in Produktion",
+                          "onhold": "angehalten", "partial": "teilweise versendet", "fulfilled": "versendet",
+                          "archived": "archiviert"}
 
 
 def actions(record: dict, now: datetime | None = None) -> dict:

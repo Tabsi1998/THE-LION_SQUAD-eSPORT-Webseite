@@ -235,7 +235,7 @@ function Result({ draft, onDeleted, testId }) {
     <div className="space-y-3" data-testid={testId}>
       <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
         <div><dt className="text-white/50 text-xs">Printful-Auftrag</dt><dd className="tabular-nums font-bold" data-testid={`${testId}-order-id`}>{draft.printful_order_id ?? "–"}</dd></div>
-        <div><dt className="text-white/50 text-xs">Stand</dt><dd>{draft.state_label}{draft.printful_status ? ` (Printful: ${draft.printful_status})` : ""}</dd></div>
+        <div><dt className="text-white/50 text-xs">Stand</dt><dd>{draft.state_label}{draft.printful_status ? ` (Printful: ${draft.printful_status_label || draft.printful_status})` : ""}</dd></div>
         <div><dt className="text-white/50 text-xs">Gesendet</dt><dd>{draft.sent_at ? viennaDateTime(draft.sent_at) : "–"}</dd></div>
       </dl>
       {draft.dashboard_url && (
