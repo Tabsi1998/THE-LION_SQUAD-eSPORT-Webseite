@@ -258,3 +258,22 @@ def test_prize_status_has_its_category_and_discord_look():
 
     assert NOTIFICATION_KIND_CATEGORY["prize_status"] == "prize_updates"
     assert discord_dm.BUTTON_LABELS["prize_status"] == "Zum Gewinn" and "prize_status" in discord_dm.COLORS
+
+
+@pytest.mark.asyncio
+async def test_a_prize_by_hand_does_not_swallow_the_structure_prize(flow, monkeypatch):
+    """#2112: Hand-Gewinne tragen ``source: manual``; der Strukturpreis für denselben Platz entsteht trotzdem."""
+    tournament, standing = await tournament_with_prizes(flow, monkeypatch, status="completed")
+    anna = await flow.add_user(name="anna")
+    manual = await flow.post("/api/prizes", json={"tournament_id": tournament["id"], "user_id": anna["id"], "place": 1,
+                                                  "prize_label": "Sonderpreis Teamgeist"})
+    assert manual.status_code == 200, manual.text
+    assert manual.json()["source"] == "manual"
+    standing.by_rank = {1: [{"user_id": anna["id"]}]}
+    response = await flow.post(f"/api/prizes/auto-create/{tournament['id']}")
+    assert response.json() == {"created": 1}
+    rows = await flow.db.prize_pickups.find({"tournament_id": tournament["id"], "user_id": anna["id"]}, {"_id": 0}).to_list(5)
+    assert sorted((row.get("source") or "", row["prize_label"]) for row in rows) == [("", "1. Platz"), ("manual", "Sonderpreis Teamgeist")]
+    again = await flow.post("/api/prizes", json={"tournament_id": tournament["id"], "user_id": anna["id"], "place": 1,
+                                                 "prize_label": "Noch ein Sonderpreis"})
+    assert again.status_code == 409

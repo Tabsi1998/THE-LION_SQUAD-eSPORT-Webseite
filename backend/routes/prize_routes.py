@@ -436,14 +436,17 @@ async def create_prize_manually(body: PrizeCreate, me: dict = Depends(get_curren
     user = await db.users.find_one({"id": body.user_id}, {"_id": 0, "id": 1})
     if not user:
         raise HTTPException(status_code=404, detail="Benutzer nicht gefunden")
+    # Doppelt wäre nur ein zweiter Hand-Gewinn (#2112): ein Strukturpreis aus dem Ergebnis (mit Preisgruppe) ist etwas
+    # anderes und bleibt daneben bestehen. Ältere Hand-Gewinne tragen noch kein ``source`` - die erkennt die fehlende Gruppe.
     existing = await db.prize_pickups.find_one({
         "tournament_id": body.tournament_id,
         "user_id": body.user_id,
         "team_id": None,
         "place": body.place,
+        "$or": [{"source": "manual"}, {"prize_group": {"$exists": False}}],
     })
     if existing:
-        raise HTTPException(status_code=409, detail="Für diesen Benutzer und Platz existiert bereits ein Gewinn")
+        raise HTTPException(status_code=409, detail="Für diese Person und diesen Platz gibt es schon einen Gewinn von Hand.")
     # Ohne eigene Frist läuft sie ab „Bereit“ (#2123, ER1).
     deadline = _deadline_value(body.pickup_deadline)
     doc = {
@@ -455,6 +458,7 @@ async def create_prize_manually(body: PrizeCreate, me: dict = Depends(get_curren
         "team_id": None,
         "place": body.place,
         "place_label": str(body.place),
+        "source": "manual",
         "prize_label": label,
         "prize_value": " ".join((body.prize_value or "").split()),
         "status": "pending",
