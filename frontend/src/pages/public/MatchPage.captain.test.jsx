@@ -81,3 +81,18 @@ test("den Vorschlag der Gegenseite beantwortet man - Zustand auf Deutsch, nie �
   fireEvent.click(within(card).getByLabelText("Termin annehmen"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/schedule-proposals/p-theirs/decision", { action: "accept", note: null }));
 });
+
+test("nach der Nachtragsfrist: Hinweis auf die Turnierleitung und der Matchchat bleibt offen", async () => {
+  const league = {
+    best_of: 3, needed: 2, team_size: 2, mode_order: [], sides: [{ registration_id: "a", name: "Loewen · Rudel A" }, { registration_id: "b", name: "Falken · Horst" }],
+    own_registration_id: "a", roster: [], own_games: [], proposal_games: [], pool: { modes: [] },
+    games: [{ position: 1, map_name: "Hafen", winner_registration_id: "b", scores: {}, lineups: {} }],
+    lineups_missing: ["a"], can_amend_lineup: false, amend_until: "2026-01-02T10:00:00+00:00",
+  };
+  renderMatch({ ...BASE, match: { ...BASE.match, status: "completed", schedule_status: "accepted", results: [] }, schedule_proposals: [], league, report_state: { status: "agreed" } });
+  const hint = await screen.findByTestId("league-lineup-closed");
+  expect(hint).toHaveTextContent("Frist zum Nachtragen ist vorbei");
+  expect(screen.queryByTestId("match-chat-closed")).toBeNull();
+  fireEvent.click(screen.getByTestId("league-lineup-closed-ask"));
+  await waitFor(() => expect(screen.getByTestId("chat-input")).toHaveValue("@leitung "));
+});

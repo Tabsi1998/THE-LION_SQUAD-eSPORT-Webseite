@@ -24,7 +24,7 @@ import { matchIsOver } from "@/lib/afterEnd";
 import { rankingMode } from "@/lib/matchReport";
 import { MatchReportForm } from "@/components/tls/tournament/MatchReportForm";
 import { LeagueReportForm } from "@/components/tls/league/LeagueReportForm";
-import { defaultTimeText, sidesInSlotOrder } from "@/components/tls/league/leagueGames";
+import { defaultTimeText, lineupAmendClosed, sidesInSlotOrder } from "@/components/tls/league/leagueGames";
 import { LeagueGamesView, LineupAmendForm, StaffLineupAmend } from "@/components/tls/league/LeagueGamesView";
 import { LiveQueueStatus } from "@/components/tls/live/LiveQueueStatus";
 import { MatchCallBox } from "@/components/tls/tournament/MatchCallBox";
@@ -281,7 +281,11 @@ function MatchPageView() {
   // Nach dem Ende (#1221): Ergebnis und Verlauf. Den Chat sehen dann nur noch Teilnehmer und Turnierleitung, und nur,
   // wenn darin etwas steht.
   const over = matchIsOver(match);
-  const showChat = !over || (Boolean(data.can_act) && chat.length > 0);
+  // Liga (#2110): fehlt die eigene Aufstellung nach der Nachtragsfrist, bleibt der Matchchat zum Schreiben offen - der
+  // Hinweis schickt die Seite mit @leitung dorthin.
+  const lineupLate = Boolean(data.league && lineupAmendClosed(league));
+  const showChat = !over || (Boolean(data.can_act) && (chat.length > 0 || lineupLate));
+  const chatClosed = over && !lineupLate;
   // Ergebnis (#1132): Spieler melden über das Meldeformular, die Turnierleitung trägt über /result ein. Wer beides
   // dürfte, bekommt das Formular der Turnierleitung.
   const canStaffSubmit = Boolean(data.can_staff_submit_result);
@@ -309,6 +313,10 @@ function MatchPageView() {
       const prefix = current.trim() ? `${current.trim()} ` : "";
       return `${prefix}@leitung `;
     });
+  };
+  const askStaff = () => {
+    addStaffMention();
+    window.setTimeout(() => document.querySelector("[data-testid='match-chat'] textarea")?.focus?.(), 0);
   };
 
   return (
@@ -416,7 +424,8 @@ function MatchPageView() {
           {/* Liga (#1650): gespielte Maps mit Sieger und Aufstellungen; fehlt die eigene noch, hier nachtragen. */}
           {data.league ? <LeagueGamesView league={league} /> : null}
           {data.league ? (
-            <LineupAmendForm key={`${(data.league.lineups_missing || []).join(",")}-${match.updated_at || ""}`} league={league} busy={busy} onSave={saveLineups} />
+            <LineupAmendForm key={`${(data.league.lineups_missing || []).join(",")}-${match.updated_at || ""}`} league={league} busy={busy} onSave={saveLineups}
+              onAskStaff={canUseChat && showChat && !chatClosed ? askStaff : null} />
           ) : null}
           {data.league && canStaffSubmit ? (
             <StaffLineupAmend key={`staff-${match.updated_at || ""}`} league={league} busy={busy} onSave={saveLineups} />
@@ -588,7 +597,7 @@ function MatchPageView() {
               ))}
               {chat.length === 0 && <div className="text-sm text-white/40">Noch keine Nachrichten.</div>}
             </div>
-            {over ? (
+            {chatClosed ? (
               <p className="mt-4 text-xs text-white/45" data-testid="match-chat-closed">Das Match ist beendet – der Chat bleibt zum Nachlesen.</p>
             ) : canUseChat ? (
               <form onSubmit={sendMessage} className="mt-4 space-y-2">
