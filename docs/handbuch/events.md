@@ -102,7 +102,7 @@ Mal senden nur Redaktion und System.
 - **Live-Stream (optional):** Plattform und Adresse.
 - **Absagen:** Status **Abgesagt** und speichern. Die Rückfrage nennt die Zahl der Anmeldungen (samt Warteliste). Danach gelten
   alle Anmeldungen als storniert, jede Person bekommt eine Benachrichtigung und – wenn sie Mails zu Turnier-Updates zulässt –
-  die Mail „Nachricht zum Event“ (je Person nur einmal). Offene und fehlgeschlagene Rechnungsaufträge werden storniert; eine
+  die Mail „Nachricht zum Event“ (je Absage und Person nur einmal). Offene und fehlgeschlagene Rechnungsaufträge werden storniert; eine
   schon gestellte Rechnung kommt als Prüffall in die Finanzübersicht. Die Event-Seite zeigt **Event abgesagt** statt der
   Anmeldung. Die Zahl zählt alle bestehenden Anmeldungen, auch wenn die Anmeldung inzwischen ausgeschaltet ist. Wird die Absage
   zurückgenommen, bleiben die Anmeldungen storniert.
