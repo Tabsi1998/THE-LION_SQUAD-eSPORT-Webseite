@@ -1298,9 +1298,12 @@ async def membership_count():
 
 # ---------- Public members directory ----------
 @router.get("/public")
-async def public_members_directory():
-    """Public: list of active club members (only those with public profile)."""
+async def public_members_directory(viewer: dict | None = Depends(get_optional_user)):
+    """Public: list of active club members (only those with public profile). Land und Spiele folgen der Stufe aus
+    „Privatsphäre“ je Betrachter - wie das öffentliche Profil (#2118)."""
+    from routes.user_routes import _field_visible, _viewer_context
     db = get_db()
+    ctx = await _viewer_context(db, viewer, "")
     memberships = await db.memberships.find(
         {"member_status": {"$in": ["active", "honorary"]}}, {"_id": 0}
     ).to_list(2000)
@@ -1311,19 +1314,19 @@ async def public_members_directory():
         private_projection("email"),
     ).to_list(2000)
     user_map = {u["id"]: u for u in users}
-    # Öffentlich (#2118): Land und Spiele nur mit der Stufe „öffentlich“ aus „Privatsphäre“, ohne interne Vereinsrolle.
-    from routes.user_routes import _field_visible
+    # Öffentlich (#2118): Land und Spiele nach der Stufe je Betrachter, ohne interne Vereinsrolle.
     out = []
     for m in memberships:
         u = user_map.get(m["user_id"])
         if not u:
             continue
+        row_ctx = {**ctx, "self": bool(viewer and viewer.get("id") == u["id"])}
         out.append({
             "username": u["username"],
             "display_name": u.get("display_name"),
             "avatar_url": u.get("avatar_url"),
-            "country": u.get("country") if _field_visible(u, "country", True) else None,
-            "favorite_games": (u.get("favorite_games") or []) if _field_visible(u, "favorite_games", True) else [],
+            "country": u.get("country") if _field_visible(u, "country", True, row_ctx) else None,
+            "favorite_games": (u.get("favorite_games") or []) if _field_visible(u, "favorite_games", True, row_ctx) else [],
             "membership_type": m.get("membership_type"),
             "member_since": m.get("member_since"),
             "member_number": m.get("member_number") if m.get("show_member_number_publicly") else None,

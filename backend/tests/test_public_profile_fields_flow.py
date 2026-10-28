@@ -1,9 +1,10 @@
 """Öffentliche Profile und Listen (#2118) liefern nur freigegebene Felder.
 
 - Die interne Vereinsrolle steht in keiner öffentlichen Antwort (Profil, Spielerliste, Mitgliederverzeichnis).
-- Land und Lieblingsspiele folgen in den öffentlichen Listen der Stufe aus „Privatsphäre“ - Listen sieht jede:r, also nur
-  bei der Stufe „öffentlich“.
-- „Erfolge öffentlich“ aus: Fremde sehen auf dem Profil keine Erfolge (auch keine Zahl); die Person selbst schon.
+- Land und Lieblingsspiele folgen in den öffentlichen Listen der Stufe aus „Privatsphäre“ je Betrachter - wie das
+  öffentliche Profil: „Community“ sehen Eingeloggte, „Verein“ Mitglieder und das Admin-Team, „Privat“ nur die Person.
+- „Erfolge öffentlich“ aus: Fremde sehen auf dem Profil keine Erfolge (auch keine Zahl); die Person selbst und das
+  Admin-Team (Rollen wie bei GET /api/achievements/user/{id}) schon.
 
 Namen und Werte sind erfunden.
 """
@@ -67,6 +68,31 @@ async def test_lists_follow_the_privacy_levels_and_never_show_the_internal_role(
     assert profile["membership"] and "internal_role" not in profile["membership"]
 
 
+async def _country_and_games(flow, viewer, username):
+    flow.act_as(viewer)
+    players = _row((await flow.get("/api/users/public-list")).json(), username)
+    directory = _row((await flow.get("/api/membership/public")).json(), username)
+    assert (players["country"], players["favorite_games"]) == (directory["country"], directory["favorite_games"])
+    return players["country"], players["favorite_games"]
+
+
+@pytest.mark.asyncio
+async def test_lists_apply_the_levels_per_viewer(flow):
+    await member(flow, "stufen", profile_visibility={"country": "community", "favorite_games": "members"})
+    gast_sieht = await _country_and_games(flow, None, "stufen")
+    assert gast_sieht == (None, [])
+
+    eingeloggt = await flow.add_user(role="player", name="eingeloggt")
+    assert await _country_and_games(flow, eingeloggt, "stufen") == ("AT", [])
+
+    mitglied = await member(flow, "mitglied")
+    assert await _country_and_games(flow, mitglied, "stufen") == ("AT", ["Rocket League"])
+
+    privat = await member(flow, "privat", profile_visibility={"country": "private", "favorite_games": "private"})
+    assert await _country_and_games(flow, mitglied, "privat") == (None, [])
+    assert await _country_and_games(flow, privat, "privat") == ("AT", ["Rocket League"])
+
+
 @pytest.mark.asyncio
 async def test_achievements_off_hides_them_from_others_but_not_from_the_person(flow):
     shy = await member(flow, "zurueckhaltend", privacy_achievements_public=False)
@@ -79,9 +105,33 @@ async def test_achievements_off_hides_them_from_others_but_not_from_the_person(f
     listed = _row((await flow.get("/api/users/public-list")).json(), "zurueckhaltend")
     assert listed["achievements_count"] == 0 and listed["top_achievement"] is None
 
+    # Ein Mitglied ohne Admin-Rolle sieht sie nicht - dieselbe Regel wie GET /api/achievements/user/{id}.
+    flow.act_as(await member(flow, "anderes-mitglied"))
+    assert (await flow.get("/api/users/public/zurueckhaltend")).json()["achievements_hidden"] is True
+
     flow.act_as(shy)
     own = (await flow.get("/api/users/public/zurueckhaltend")).json()
     assert [badge["code"] for badge in own["badges"]] == ["test-tier"] and own["achievements_hidden"] is False
+
+    flow.act_as(await flow.add_user(role="tournament_admin", name="leitung"))
+    staff = (await flow.get("/api/users/public/zurueckhaltend")).json()
+    assert staff["achievements_hidden"] is False
+    listed = _row((await flow.get("/api/users/public-list")).json(), "zurueckhaltend")
+    assert listed["achievements_count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_link_preview_names_platform_and_games_only_when_public(flow):
+    from routes import seo_render_routes
+
+    base = {"image": "/logo.png", "site_name": "THE LION SQUAD", "description": ""}
+    await member(flow, "vorschau-offen", main_platform="PC")
+    await member(flow, "vorschau-zu", main_platform="PC",
+                 profile_visibility={"main_platform": "community", "favorite_games": "members"})
+    open_meta = await seo_render_routes.user_profile_meta(flow.db, "vorschau-offen", base, "https://lionsquad.at")
+    closed_meta = await seo_render_routes.user_profile_meta(flow.db, "vorschau-zu", base, "https://lionsquad.at")
+    assert "PC" in open_meta["description"] and "Rocket League" in open_meta["description"]
+    assert "PC" not in str(closed_meta) and "Rocket League" not in str(closed_meta)
 
 
 @pytest.mark.asyncio

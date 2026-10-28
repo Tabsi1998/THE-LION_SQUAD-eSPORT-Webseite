@@ -17,6 +17,7 @@ from services import xp
 from services.levels import level_view
 from services.profile_references import personal_profile_references
 from services.visibility import user_can_see
+from services.achievement_visibility import sees_hidden_achievements
 from services.notification_preferences import (
     DELIVERY_CHANNEL_PREFERENCES,
     OPTIONAL_EMAIL_PREFERENCES,
@@ -477,13 +478,16 @@ async def list_public_users(
     limit: int = 2000,
     offset: int = 0,
     paged: bool = False,
+    viewer: dict | None = Depends(get_optional_user),
 ):
     """Public listing of all users with public profile (community + members).
 
     Phase C: enriches each user with `profile_completeness`, `achievements_count`
     and `top_achievement` (highest tier earned, ignoring negatives).
+    Land und Spiele folgen der Stufe aus „Privatsphäre“ je Betrachter - wie das öffentliche Profil (#2118).
     """
     db = get_db()
+    ctx = await _viewer_context(db, viewer, "")
     query: dict = {"privacy_public_profile": True, "is_active": True, "is_banned": {"$ne": True}}
     needle = (q or "").strip()
     if needle:
@@ -532,8 +536,10 @@ async def list_public_users(
     out = []
     for u in users:
         score = compute_profile_completeness(u)
-        # „Erfolge öffentlich“ aus (#2118): in der Liste weder Zahl noch Top-Erfolg.
-        ua = by_user.get(u["id"], []) if achievements_public(u) else []
+        row_ctx = {**ctx, "self": bool(viewer and viewer.get("id") == u["id"])}
+        # „Erfolge öffentlich“ aus (#2118): in der Liste weder Zahl noch Top-Erfolg - außer für die Person und das Team.
+        shown = achievements_public(u) or sees_hidden_achievements(viewer, u["id"])
+        ua = by_user.get(u["id"], []) if shown else []
         top = None
         if ua:
             ua_sorted = sorted(ua, key=lambda a: (a.get("level", 0), tiers.get(a["tier_code"], {}).get("points", 0)), reverse=True)
@@ -550,9 +556,9 @@ async def list_public_users(
                 }
         out.append({
             "id": u["id"], "username": u["username"], "display_name": u.get("display_name"),
-            # Die Liste sieht jede:r (#2118): Land und Spiele nur mit der Stufe „öffentlich“ aus „Privatsphäre“.
-            "avatar_url": u.get("avatar_url"), "country": _visible_field(u, "country", True),
-            "favorite_games": (u.get("favorite_games") or []) if _field_visible(u, "favorite_games", True) else [],
+            # Land und Spiele (#2118): die Stufe aus „Privatsphäre“ gegen den Betrachter.
+            "avatar_url": u.get("avatar_url"), "country": _visible_field(u, "country", True, row_ctx),
+            "favorite_games": (u.get("favorite_games") or []) if _field_visible(u, "favorite_games", True, row_ctx) else [],
             "is_club_member": is_active_member(memberships.get(u["id"])),
             "user_type": derived_user_type(u, memberships.get(u["id"])),
             "created_at": u.get("created_at"),
@@ -671,7 +677,7 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
     # „Erfolge öffentlich“ aus (#619, #2118): Fremde sehen keine Erfolge und keine Zahl - die Person selbst und das
     # Admin-Team schon (wie GET /api/achievements/user/{id}).
     from services.achievement_visibility import achievements_public
-    achievements_hidden = not achievements_public(u) and not (ctx.get("self") or ctx.get("admin"))
+    achievements_hidden = not achievements_public(u) and not sees_hidden_achievements(viewer, user_id)
     ua = [] if achievements_hidden else await db.user_achievements.find({"user_id": user_id}, {"_id": 0})\
         .sort("earned_at", -1).to_list(500)
     tier_map = {t["code"]: t async for t in db.achievements.find({}, {"_id": 0})}
