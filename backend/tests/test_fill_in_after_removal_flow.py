@@ -79,6 +79,30 @@ async def test_a_late_participant_takes_the_place_freed_by_a_withdrawal(flow):
 
 
 @pytest.mark.asyncio
+async def test_a_removal_comes_back_only_on_a_free_place(flow):
+    """#2111 (TA14): zurücknehmen über den Status geht wie ein Nachrücken - auf den frei gewordenen Platz. Steht die Person
+    noch in festen Spielen (schon gespielt), bleibt es beim Austritt; vorher setzte der Status sie am Umbau vorbei zurück."""
+    _staff, tournament, regs = await eight(flow)
+    first_round = sorted((m for m in await flow.matches(tournament) if m["round"] == 1), key=lambda m: m["order"])
+    url = f"/api/tournaments/{tournament['id']}/registrations"
+    back = next(reg for reg in regs if reg["id"] == filled(first_round[0])[0])
+    await remove(flow, tournament, back, kind="disqualified")
+    undone = await flow.patch(f"{url}/{back['id']}", json={"status": "approved"})
+    assert undone.status_code == 200, undone.text
+    assert undone.json()["placement"]["ok"] is True
+
+    played = next(reg for reg in regs if reg["id"] == filled(first_round[1])[0])
+    await remove(flow, tournament, played, kind="withdrawn")
+    # Wer schon gespielt hat, steht weiter in einem festen Spiel.
+    await flow.db.matches_v2.update_one({"id": first_round[2]["id"]}, {"$set": {"slots.0.registration_id": played["id"]}})
+    refused = await flow.patch(f"{url}/{played['id']}", json={"status": "approved"})
+    assert refused.status_code == 409, refused.text
+    assert "nicht zurücknehmen" in refused.json()["detail"]
+    stored = await flow.db.tournament_registrations.find_one({"id": played["id"]}, {"_id": 0})
+    assert stored["status"] == "withdrawn"
+
+
+@pytest.mark.asyncio
 async def test_no_no_show_proposal_for_a_removed_participant(flow):
     _staff, tournament, regs = await eight(flow, event_mode="online")
     first_round = sorted((m for m in await flow.matches(tournament) if m["round"] == 1), key=lambda m: m["order"])

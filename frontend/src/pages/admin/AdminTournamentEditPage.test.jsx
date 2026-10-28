@@ -1082,3 +1082,23 @@ test("ein Hinweis des Servers zur Jahreswertung erscheint als Meldung", async ()
   await user.selectOptions(screen.getByTestId("admin-tr-status-select"), "registration_closed");
   await waitFor(() => expect(toast.info).toHaveBeenCalledWith("Die Jahrespunkte bleiben unverändert.", { duration: 10000 }));
 });
+// Statuslisten je Zweck (#2111, TA14): der Filter kennt alle acht Status, die Zeile zeigt Austritt und Disqualifikation
+// als aktuellen Stand (vorher „Ausstehend“), „Hinzufügen“ bietet nur, was der Server beim Hinzufügen annimmt.
+test("Statuslisten: Filter mit allen acht, Zeile zeigt „Disqualifiziert“, Hinzufügen nur vier", async () => {
+  apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path.includes("/registrations")) return Promise.resolve({ data: [
+      { id: "r-1", status: "disqualified", display_name: "Max Muster" },
+      { id: "r-2", status: "rejected", display_name: "Erika Nein" },
+    ] });
+    return Promise.resolve(routeFor(path));
+  });
+  renderPage();
+  await screen.findAllByText("Max Muster");
+  const values = (select) => [...select.querySelectorAll("option")].map((option) => option.value);
+  expect(values(screen.getByTestId("admin-reg-status-filter"))).toEqual(["", "approved", "checked_in", "pending", "waitlist", "rejected", "no_show", "withdrawn", "disqualified"]);
+  const row = screen.getByTestId("admin-reg-status-r-1");
+  expect(row).toHaveValue("disqualified");
+  expect(row.querySelector("option[value='disqualified']")).toBeDisabled();
+  expect(values(screen.getByTestId("participant-add-status"))).toEqual(["approved", "checked_in", "pending", "waitlist"]);
+});

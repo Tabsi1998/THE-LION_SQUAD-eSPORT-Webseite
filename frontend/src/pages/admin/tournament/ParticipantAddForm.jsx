@@ -1,6 +1,6 @@
 // Turnier-Bearbeitung (#223): Teilnehmer von Hand hinzufügen. Konten kommen seit #1354 aus der Personensuche (Name und
 // Bild, keine E-Mail-Adressen), Teams aus einer eigenen kleinen Auswahl - fehlt dafür ein Recht, steht ein Satz da.
-import { REGISTRATION_STATUS_OPTIONS } from "@/lib/tournamentLabels";
+import { REGISTRATION_ADD_STATUS_OPTIONS } from "@/lib/tournamentLabels";
 import { PersonPicker } from "@/components/tls/PersonPicker";
 import { Fld } from "./PrizeEditor";
 import { SelectField } from "./TournamentEditForm";
@@ -40,7 +40,7 @@ export function ParticipantAddForm({ form, tournament, person = null, onPerson, 
         <Fld label="Anzeigename" value={form.display_name} onChange={(v)=>onChange("display_name", v)} testId="participant-add-display" />
         <Fld label="Spielname" value={form.ingame_name} onChange={(v)=>onChange("ingame_name", v)} testId="participant-add-ingame" />
         <Fld label="Discord" value={form.discord} onChange={(v)=>onChange("discord", v)} testId="participant-add-discord" />
-        <SelectField label="Status" value={form.status} onChange={(v)=>onChange("status", v)} options={REGISTRATION_STATUS_OPTIONS} />
+        <SelectField label="Status" value={form.status} onChange={(v)=>onChange("status", v)} options={REGISTRATION_ADD_STATUS_OPTIONS} testId="participant-add-status" />
         <Fld label="Setzplatz" type="number" value={form.seed} onChange={(v)=>onChange("seed", v)} testId="participant-add-seed" />
         <SelectField label="Ersetzt Nicht-Erschienen" value={form.replace_registration_id} onChange={(v)=>onChange("replace_registration_id", v)} options={replaceOptions} />
       </div>

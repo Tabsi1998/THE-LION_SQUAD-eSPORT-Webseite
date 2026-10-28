@@ -123,6 +123,8 @@ WAITLIST_MOVE_UP_STATUSES = {"scheduled", "registration_open", "registration_clo
 ACTIVE_REGISTRATION_STATUSES = ["pending", "approved", "checked_in"]
 # Status, mit denen eine Anmeldung nicht (mehr) spielt - im festen Baum nur über Austritt oder Nicht erschienen.
 LEAVES_BRACKET_STATUSES = {"rejected", "waitlist", "pending"}
+REMOVAL_FINAL = ("Austritt und Disqualifikation lassen sich hier nicht zurücknehmen – die Spiele der Person sind schon "
+                 "umgebaut. Bei einem Irrtum bitte die betroffenen Ergebnisse im Reiter „Spiele“ korrigieren.")
 
 
 async def _bracket_is_fixed(db, tid: str) -> bool:
@@ -980,6 +982,11 @@ async def update_registration(tid: str, reg_id: str, body: RegistrationUpdate,
     if updates and all(reg.get(key) == value for key, value in updates.items()):
         return {**reg, "idempotent_replay": True}
     previous_status = reg.get("status")
+    if (previous_status in REMOVAL_KINDS and updates.get("status") and updates["status"] != previous_status
+            and await tournament_guard.fixed_match_count(db, tid, reg_id)):
+        # Austritt und Disqualifikation (#1553) haben die Spiele schon umgebaut (#2111, TA14) - ein anderer Status
+        # setzte die Person am Umbau vorbei zurück, ihre Spiele blieben kampflos gewertet.
+        raise HTTPException(status_code=409, detail=REMOVAL_FINAL)
     if (updates.get("status") in LEAVES_BRACKET_STATUSES and updates["status"] != previous_status
             and await tournament_guard.fixed_match_count(db, tid, reg_id)):
         # Abgelehnt, Warteliste oder Ausstehend nimmt die Anmeldung aus dem Spiel (#2120, TA13) - im festen Baum

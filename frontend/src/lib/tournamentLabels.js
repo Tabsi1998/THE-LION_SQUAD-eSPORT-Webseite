@@ -93,13 +93,24 @@ export const REGISTRATION_STATUS_LABELS = {
   disqualified: "Disqualifiziert",
 };
 
-export const REGISTRATION_STATUS_OPTIONS = [
+// Je Zweck eine Liste (#2111, TA14): der Filter kennt alle acht Status, „Hinzufügen“ nur die vier, die der Server beim
+// Hinzufügen annimmt (models.RegistrationAdminCreate) - Austritt und Disqualifikation gehen nur über den Umbauplan.
+export const REGISTRATION_STATUS_FILTER_OPTIONS = [
   ["approved", REGISTRATION_STATUS_LABELS.approved],
   ["checked_in", REGISTRATION_STATUS_LABELS.checked_in],
   ["pending", REGISTRATION_STATUS_LABELS.pending],
   ["waitlist", REGISTRATION_STATUS_LABELS.waitlist],
+  ["rejected", REGISTRATION_STATUS_LABELS.rejected],
+  ["no_show", REGISTRATION_STATUS_LABELS.no_show],
   ["withdrawn", REGISTRATION_STATUS_LABELS.withdrawn],
   ["disqualified", REGISTRATION_STATUS_LABELS.disqualified],
+];
+
+export const REGISTRATION_ADD_STATUS_OPTIONS = [
+  ["approved", REGISTRATION_STATUS_LABELS.approved],
+  ["checked_in", REGISTRATION_STATUS_LABELS.checked_in],
+  ["pending", REGISTRATION_STATUS_LABELS.pending],
+  ["waitlist", REGISTRATION_STATUS_LABELS.waitlist],
 ];
 
 export const STAGE_STATUS_OPTIONS = [

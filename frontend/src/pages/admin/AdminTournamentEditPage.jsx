@@ -14,7 +14,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useConfirm, usePrompt } from "@/components/tls/ConfirmDialog";
 import { SkeletonDetailHeader } from "@/components/tls/Skeleton";
-import { REGISTRATION_STATUS_OPTIONS, formatRegistrationStatus, formatTournamentDisplay } from "@/lib/tournamentLabels";
+import { REGISTRATION_STATUS_FILTER_OPTIONS, formatRegistrationStatus, formatTournamentDisplay } from "@/lib/tournamentLabels";
 import { LineupMark, useTeamLineups } from "@/components/tls/tournament/LineupMark";
 import { FeedbackReport } from "@/pages/admin/feedback/FeedbackReport";
 import { ParticipantAddForm } from "./tournament/ParticipantAddForm";
@@ -703,7 +703,7 @@ export default function AdminTournamentEditPage() {
               className="w-full rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2.5 text-sm text-white focus:border-[#29B6E8]/60 focus:outline-none"
             >
               <option value="">Alle Status ({regs.length})</option>
-              {REGISTRATION_STATUS_OPTIONS.map(([value, label]) => (
+              {REGISTRATION_STATUS_FILTER_OPTIONS.map(([value, label]) => (
                 <option key={value} value={value}>{label} ({registrationCounts[value] || 0})</option>
               ))}
             </select>
@@ -894,10 +894,17 @@ export default function AdminTournamentEditPage() {
 // die sie behalten - das geht über „Nicht erschienen“, „Austritt eintragen“ oder „Disqualifizieren“.
 const REGISTRATION_ROW_STATUSES = ["pending", "approved", "rejected", "waitlist", "checked_in", "no_show"];
 const LEAVES_BRACKET = new Set(["pending", "rejected", "waitlist"]);
+// Austritt und Disqualifikation (#1553) setzt nur der Umbauplan - die Auswahl zeigt sie trotzdem als aktuellen Stand
+// (#2111, TA14; vorher stand dort „Ausstehend“). Zurück geht es wie beim Nachrücken auf einen freien Platz; steht die
+// Person noch in festen Spielen, lehnt der Server ab.
+const REMOVED_STATUSES = new Set(["withdrawn", "disqualified"]);
 function RegistrationStatusOptions({ fixed, current }) {
-  return REGISTRATION_ROW_STATUSES.map((s) => (
-    <option key={s} value={s} disabled={fixed && s !== current && LEAVES_BRACKET.has(s)}>{formatRegistrationStatus(s)}</option>
-  ));
+  return [
+    ...(REMOVED_STATUSES.has(current) ? [<option key={current} value={current} disabled>{formatRegistrationStatus(current)}</option>] : []),
+    ...REGISTRATION_ROW_STATUSES.map((s) => (
+      <option key={s} value={s} disabled={fixed && s !== current && LEAVES_BRACKET.has(s)}>{formatRegistrationStatus(s)}</option>
+    )),
+  ];
 }
 
 // Staffel (#2109, S18): ein Co-Team ist zugeteilt, nicht „angenommen“ oder „eingecheckt“ - Austritt und
