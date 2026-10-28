@@ -189,13 +189,51 @@ async def test_spoiled_saved_templates_are_flagged_not_overwritten(flow):
 
     rows = {row["key"]: row for row in (await flow.get("/api/admin/email-templates")).json()}
     assert "Mario Kart Winter Cup" in rows["registration_approved"]["sample_leaks"]
-    assert "https://lionsquad.at/tournaments/mario-kart-winter-cup" in rows["registration_approved"]["sample_leaks"]
+    # Reine Links zählen nicht - die darf eine eigene Fassung mit Absicht enthalten; der Turniername reicht als Hinweis.
+    assert rows["registration_approved"]["sample_leaks"] == ["Mario Kart Winter Cup"]
     assert rows["contact_auto_reply"]["sample_leaks"] == ["Paula"]
     assert rows["registration"]["sample_leaks"] == [] and rows["membership_approve"]["sample_leaks"] == []
     one = (await flow.get("/api/admin/email-templates/registration_approved")).json()
     assert one["custom"] is True and one["html"] == html and "Mario Kart Winter Cup" in one["sample_leaks"]
     # Nur gemeldet - der gespeicherte Text bleibt, bis der Admin zurücksetzt.
     assert (await flow.db.email_templates.find_one({"key": "registration_approved"}))["html"] == html
+
+
+@pytest.mark.asyncio
+async def test_plain_links_in_an_own_version_are_no_sample_values(flow):
+    """Ein Link auf Profil oder Kontakt in der eigenen Fassung ist Absicht, kein Beispielwert aus der Vorschau."""
+    admin = await flow.add_user(role="club_admin", name="admin")
+    flow.act_as(admin)
+    saved = await flow.put("/api/admin/email-templates/birthday_greeting", json={
+        "subject": "Alles Gute, {{display_name}}", "html": "<p>Alles Gute!</p><p><a href=\"https://lionsquad.at/profile\">Einstellungen</a></p>"})
+    assert saved.status_code == 200, saved.text
+
+
+@pytest.mark.asyncio
+async def test_an_own_newsletter_version_without_the_link_still_gets_it(flow):
+    from email_service import send_template
+
+    await flow.db.email_templates.insert_one({"key": "newsletter_news", "override": True, "subject": "News: {{title}}", "html": "<p>{{title}}</p>"})
+    await send_template("newsletter_news", "paula@example.test", display_name="Paula", title="Herbst-LAN",
+                        unsubscribe_url="https://lionsquad.at/newsletter/abbestellen?token=a.b&x=1")
+    job = await flow.db.mail_jobs.find_one({"to": "paula@example.test"}, {"_id": 0})
+    assert '<a href="https://lionsquad.at/newsletter/abbestellen?token=a.b&amp;x=1">Mit einem Klick abbestellen</a>' in job["html"]
+    # Mit der Variable bleibt es bei der eigenen Stelle - kein zweiter Link.
+    await flow.db.email_templates.update_one({"key": "newsletter_news"}, {"$set": {"html": "<p>{{title}} <a href=\"{{unsubscribe_url}}\">weg</a></p>"}})
+    await send_template("newsletter_news", "max@example.test", display_name="Max", title="Herbst-LAN", unsubscribe_url="https://lionsquad.at/x")
+    other = await flow.db.mail_jobs.find_one({"to": "max@example.test"}, {"_id": 0})
+    assert "Mit einem Klick abbestellen" not in other["html"] and 'href="https://lionsquad.at/x"' in other["html"]
+
+
+@pytest.mark.asyncio
+async def test_an_invitation_without_a_note_has_no_empty_paragraph(flow):
+    from routes.phase_ef_routes import seed_email_templates
+    from services.mail_templates import render_template
+    await seed_email_templates()
+    _subject, html = await render_template("membership_invited", {"name": "Paula", "note": ""})
+    assert "<p><em></em></p>" not in html and "Hallo Paula" in html
+    _subject, with_note = await render_template("membership_invited", {"name": "Paula", "note": "Bis bald"})
+    assert "<p><em>Bis bald</em></p>" in with_note
 
 
 @pytest.mark.asyncio

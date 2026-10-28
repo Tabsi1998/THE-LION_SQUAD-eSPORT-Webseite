@@ -134,7 +134,9 @@ def _sample_needles(variables: list[str], origin: str) -> list[str]:
     needles: list[str] = []
     for var in variables:
         raw = SAMPLES.get(var)
-        if not raw:
+        # Reine Links ({origin}/profile, /contact …) zählen nicht: die darf eine eigene Fassung mit Absicht enthalten -
+        # nur echte Beispiel-Inhalte wie Namen und Turniere.
+        if not raw or raw.startswith(("{origin}", "http")):
             continue
         for line in raw.replace("{origin}", origin).splitlines():
             line = line.strip()
