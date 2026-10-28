@@ -241,6 +241,8 @@ async def resolve_meta(raw_path: str, request: Request) -> dict:
         return await fastlap_meta(db, slug, meta, origin)
     if first == "seasons" and slug:
         return await season_meta(db, slug, meta, origin)
+    if first == "liga" and slug and len(parts) > 2:
+        return await league_season_meta(db, slug, unquote(parts[2]), meta, origin)
     if first in {"gallery", "galerie"} and slug:
         return await gallery_meta(db, slug, meta, origin)
     if first == "teams" and slug:
@@ -284,6 +286,7 @@ RESTRICTED_KINDS = {
     "news": ("News für Mitglieder", "Diese News ist nur für Mitglieder sichtbar. Melde dich an, um sie zu lesen."),
     "event": ("Vereinsevent", "Dieses Event ist nur für Mitglieder sichtbar. Melde dich an, um Details und Anmeldung zu sehen."),
     "tournament": ("Turnier für Mitglieder", "Dieses Turnier ist nicht öffentlich. Melde dich an, um es zu sehen."),
+    "league": ("Liga für Mitglieder", "Diese Liga ist nicht öffentlich. Melde dich an, um sie zu sehen."),
     "fastlap": ("Fast Lap für Mitglieder", "Diese Challenge ist nicht öffentlich. Melde dich an, um sie zu sehen."),
     "gallery": ("Galerie für Mitglieder", "Dieses Album ist nur für Mitglieder sichtbar. Melde dich an, um die Bilder zu sehen."),
 }
@@ -517,6 +520,31 @@ async def season_meta(db, slug: str, base: dict, origin: str) -> dict:
     }
     meta["json_ld"] = webpage_json_ld(meta)
     return add_breadcrumbs(meta, origin, [("Jahreswertung", "/seasons")], season.get("name"))
+
+
+async def league_season_meta(db, league_slug: str, season_slug: str, base: dict, origin: str) -> dict:
+    """Ligaseite (P5, #1625): öffentlich mit Titel und Zeitraum; „Nur Mitglieder“ bzw. „Nur Turnierleitung“ als neutrale
+    Karte ohne Index; „aus“ und Unbekanntes 404."""
+    from services.league_service import season_end
+
+    league = await db.leagues.find_one({"slug": league_slug, "status": "active"}, {"_id": 0})
+    season = await db.league_seasons.find_one({"league_id": league["id"], "slug": season_slug},
+                                              {"_id": 0}) if league else None
+    if not season or season.get("status") == "archived" or (season.get("visibility") or "off") == "off":
+        raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
+    canonical = f"{origin}/liga/{league['slug']}/{season['slug']}"
+    title = f"{league.get('name')} {season.get('name')}"
+    if season.get("visibility") != "public":
+        return restricted_meta("league", season, base, origin, canonical)
+    description = seo_description(
+        season.get("rules_text") or title,
+        prefix="Liga",
+        details=[format_date_label(season.get("start_date")), format_date_label(season_end(season))],
+    )
+    meta = {**base, "title": f"{title} · {base['site_name']}", "description": description, "url": canonical,
+            "canonical": canonical, "type": "website"}
+    meta["json_ld"] = webpage_json_ld(meta)
+    return add_breadcrumbs(meta, origin, [("Liga", "/liga")], title)
 
 
 async def gallery_meta(db, slug: str, base: dict, origin: str) -> dict:
@@ -803,6 +831,7 @@ def static_page_meta(slug: str, base: dict) -> dict | None:
         "esports": ("eSports", "Alle eSports-Aktivitäten von THE LION SQUAD: Turniere, Fast-Lap-Challenges, Jahreswertung, Live-Brackets und Leaderboards."),
         "news": ("News", "Aktuelle News, Ergebnisse, Ankündigungen, Events und Turnier-Updates von THE LION SQUAD eSports aus Tirol."),
         "events": ("Events", "Gaming Events, Vereinsabende, LAN-Partys, Messen und öffentliche Termine von THE LION SQUAD eSports in Tirol."),
+        "liga": ("Liga", "Die Ligen von THE LION SQUAD: Seasons, Staffeln, Tabellen, Spielpläne und Ergebnisse je Spieltag."),
         "tournaments": ("eSports Turniere", "Aktuelle eSports Turniere von THE LION SQUAD: Anmeldung, Check-in, Brackets, Spielpläne und Ranglisten für Gaming Events in Tirol."),
         "fastlap": ("F1 Fast Lap Challenges", "F1 und Racing Fast-Lap-Challenges von THE LION SQUAD mit Live-Leaderboards, Strecken, Zeiten und Championship-Wertung."),
         "f1": ("F1 Fast Lap Challenges", "Formel-1-Fast-Lap-Challenges, aktuelle Strecken, Bestenlisten und Racing Events von THE LION SQUAD eSports."),
