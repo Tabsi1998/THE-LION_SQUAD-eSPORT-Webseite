@@ -1149,3 +1149,31 @@ test("Statuslisten: Filter mit allen acht, Zeile zeigt „Disqualifiziert“, Hi
   expect(row.querySelector("option[value='disqualified']")).toBeDisabled();
   expect(values(screen.getByTestId("participant-add-status"))).toEqual(["approved", "checked_in", "pending", "waitlist"]);
 });
+
+// Setzplatz (#2111, TA15): bei „Manuell“ bis zum Ende des Check-ins in der Liste änderbar; leer nimmt ihn weg. Bei
+// „Zufall“ oder im festen Baum gibt es die Spalte nicht.
+test("Setzplatz: bei Manuell in der Liste änderbar, bei Zufall keine Spalte", async () => {
+  const user = userEvent.setup();
+  const serve = (tournament) => apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path.includes("/registrations")) return Promise.resolve({ data: [{ id: "r-1", status: "approved", display_name: "Max Muster", seed: 3 }] });
+    if (path.match(/\/tournaments\/t-1(\?|$)/)) return Promise.resolve({ data: { ...TOURNAMENT, ...tournament } });
+    return Promise.resolve(routeFor(path));
+  });
+  serve({ seeding_mode: "random" });
+  const first = renderPage();
+  await screen.findAllByText("Max Muster");
+  expect(screen.queryByTestId("admin-reg-seed-r-1")).toBeNull();
+  first.unmount();
+
+  serve({ seeding_mode: "manual" });
+  renderPage();
+  const seed = await screen.findByTestId("admin-reg-seed-r-1");
+  expect(seed).toHaveValue(3);
+  await user.clear(seed);
+  await user.type(seed, "1{Enter}");
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/tournaments/t-1/registrations/r-1", { seed: 1 }));
+  await user.clear(seed);
+  seed.blur();
+  await waitFor(() => expect(apiMock.patch).toHaveBeenLastCalledWith("/tournaments/t-1/registrations/r-1", { seed: null }));
+});

@@ -123,6 +123,7 @@ WAITLIST_MOVE_UP_STATUSES = {"scheduled", "registration_open", "registration_clo
 ACTIVE_REGISTRATION_STATUSES = ["pending", "approved", "checked_in"]
 # Status, mit denen eine Anmeldung nicht (mehr) spielt - im festen Baum nur über Austritt oder Nicht erschienen.
 LEAVES_BRACKET_STATUSES = {"rejected", "waitlist", "pending"}
+SEED_FIXED = "Der Turnierbaum steht schon – Setzplätze ändern sich nur bis zum Ende des Check-ins."
 REMOVAL_FINAL = ("Austritt und Disqualifikation lassen sich hier nicht zurücknehmen – die Spiele der Person sind schon "
                  "umgebaut. Bei einem Irrtum bitte die betroffenen Ergebnisse im Reiter „Spiele“ korrigieren.")
 
@@ -966,7 +967,11 @@ async def update_registration(tid: str, reg_id: str, body: RegistrationUpdate,
     tid = await _resolve_tid(tid)
     tournament_doc = await _ensure_tournament_unlocked(db, tid)
     await require_tournament_staff_permission(me, tid, PARTICIPANT_STAFF_ROLES)
-    updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    requested = body.model_dump(exclude_unset=True)
+    updates = {k: v for k, v in requested.items() if v is not None}
+    # Setzplatz (#2111, TA15): leer heißt „kein Setzplatz“ - deshalb darf er ausdrücklich null sein.
+    if "seed" in requested:
+        updates["seed"] = requested["seed"]
     if updates.get("status") in REMOVAL_KINDS:
         # Austritt und Disqualifikation (#1553) bauen den Baum um - das geht nur über den Umbauplan mit Bestätigung.
         raise HTTPException(
@@ -982,6 +987,11 @@ async def update_registration(tid: str, reg_id: str, body: RegistrationUpdate,
     if updates and all(reg.get(key) == value for key, value in updates.items()):
         return {**reg, "idempotent_replay": True}
     previous_status = reg.get("status")
+    previous_seed = reg.get("seed")
+    seed_changed = "seed" in updates and updates["seed"] != previous_seed
+    if seed_changed and await tournament_guard.structure_fixed(db, tournament_doc):
+        # Der Setzplatz ordnet die Vorschau (#2111, TA15) - steht der Baum, ändert er nichts mehr.
+        raise HTTPException(status_code=409, detail=SEED_FIXED)
     if (previous_status in REMOVAL_KINDS and updates.get("status") and updates["status"] != previous_status
             and await tournament_guard.fixed_match_count(db, tid, reg_id)):
         # Austritt und Disqualifikation (#1553) haben die Spiele schon umgebaut (#2111, TA14) - ein anderer Status
@@ -1008,19 +1018,22 @@ async def update_registration(tid: str, reg_id: str, body: RegistrationUpdate,
         reg["waitlist_moved_up"] = await _move_up_from_waitlist(db, tid, me.get("id"), exclude_id=reg_id)
     if updates.get("status") in {"approved", "checked_in"} and updates["status"] != previous_status:
         reg["placement"] = await _place_fill_in(db, tid, reg, me.get("id"))
-    if updates.get("status") in {"approved", "checked_in", "rejected", "waitlist", "no_show"}:
+    if seed_changed:
+        await _audit_tournament_action(db, "tournament.registration.seed", me.get("id"), tid, {
+            "registration_id": reg_id, "from_seed": previous_seed, "to_seed": updates["seed"]})
+    if updates.get("status") in {"approved", "checked_in", "rejected", "waitlist", "no_show"} or seed_changed:
         tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
         if tournament:
             reg["auto_bracket_update"] = await _refresh_tournament_previews_after_registration(db, tournament, me.get("id"))
             # Startgeld (#319): Freigabe friert den Preis ein (Zahlungspflichtig ist, wer angemeldet hat);
             # Ablehnung oder Nichterscheinen vor dem Beleg schließt den Auftrag.
-            if updates["status"] in tournament_fees.BILLABLE_STATUSES:
+            if updates.get("status") in tournament_fees.BILLABLE_STATUSES:
                 payer = await db.users.find_one({"id": reg.get("user_id")}, {"_id": 0, "id": 1, "display_name": 1, "username": 1, "email": 1})
                 if payer:
                     snapshot = await tournament_fees.freeze_price(db, reg, tournament, payer=payer)
                     if snapshot:
                         reg["price_snapshot"], reg["billing_status"] = snapshot, "pending"
-            elif updates["status"] in tournament_fees.CLOSED_STATUSES:
+            elif updates.get("status") in tournament_fees.CLOSED_STATUSES:
                 await tournament_fees.close_price(db, reg, f"Anmeldung: {updates['status']}")
     return {**reg, "idempotent_replay": False}
 

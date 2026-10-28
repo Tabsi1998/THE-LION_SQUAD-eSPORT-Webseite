@@ -217,6 +217,15 @@ export default function AdminTournamentEditPage() {
     const message = placementMessage(placement);
     if (message) toast[message.tone](message.text);
   };
+  const saveSeed = async (rid, seed) => {
+    try {
+      await api.patch(`/tournaments/${id}/registrations/${rid}`, { seed });
+      toast.success(seed == null ? "Setzplatz entfernt." : `Setzplatz ${seed} gespeichert.`);
+      load();
+    } catch (e) {
+      toast.error(formatRequestError(e, "Setzplatz konnte nicht gespeichert werden."));
+    }
+  };
   const setRegCheckinStatus = async (rid, status) => {
     try {
       const { data } = await api.post(`/tournaments/${id}/registrations/${rid}/checkin`, { status });
@@ -501,6 +510,8 @@ export default function AdminTournamentEditPage() {
   // Staffel (S18): kein Check-in, kein Auschecken, kein „Nicht erschienen“ - das löste sogar den Season-Schlüssel des
   // Co-Teams. Austritt und Disqualifikation gehen über ParticipantRemovalActions.
   const checkInTools = Boolean(t.can_check_in) && !staffel;
+  // Setzplatz (#2111, TA15): bei „Manuell“ ordnet er die Vorschau - änderbar, bis der Baum steht (Ende des Check-ins).
+  const seedEditable = Boolean(t.can_manage_participants) && !staffel && !structureFixed && ["manual", "ranking"].includes(t.seeding_mode);
   const canOperateTournament = isTournamentLead || !!t.can_manage_structure;
   const visibleStatusOptions = (isTournamentLead
     ? TOURNAMENT_STATUS_OPTIONS
@@ -733,6 +744,12 @@ export default function AdminTournamentEditPage() {
                       <RegistrationStatusOptions fixed={inFixedBracket.has(r.id)} current={r.status} />
                     </select>
                   )}
+                  {seedEditable && (
+                    <div className="col-span-2 flex items-center justify-between gap-2 text-[10px] font-bold uppercase tracking-wider text-white/50">
+                      <span aria-hidden="true">Setzplatz</span>
+                      <SeedField key={`${r.id}-${r.seed ?? ""}`} registration={r} onSave={(seed) => saveSeed(r.id, seed)} testId={`admin-reg-seed-mobile-${r.id}`} />
+                    </div>
+                  )}
                   {checkInTools && r.status !== "checked_in" && !["rejected", "waitlist"].includes(r.status) && (
                     <button type="button" onClick={() => setRegCheckinStatus(r.id, "checked_in")} className="px-2 py-2 border border-[#00FF88]/40 text-[#00FF88] rounded-sm text-[10px] font-bold uppercase">Check-in</button>
                   )}
@@ -758,6 +775,7 @@ export default function AdminTournamentEditPage() {
                 <th className="text-left px-4 py-3">#</th>
                 <th className="text-left px-4 py-3">Spieler</th>
                 <th className="text-left px-4 py-3">Status</th>
+                {seedEditable && <th className="text-left px-4 py-3">Setzplatz</th>}
                 <th className="text-left px-4 py-3">Discord</th>
                 <th className="text-right px-4 py-3">Aktion</th>
               </tr>
@@ -768,6 +786,11 @@ export default function AdminTournamentEditPage() {
                   <td className="px-4 py-3 text-white/50">{i + 1}</td>
                   <td className="px-4 py-3">{r.display_name || r.user?.display_name || r.ingame_name}<EventGateMark mark={r.event_gate} /><LineupMark info={lineups[r.id]} /><OnsiteMark via={r.registered_via} /></td>
                   <td className="px-4 py-3"><RegistrationBadge status={r.status} staffel={staffel} /></td>
+                  {seedEditable && (
+                    <td className="px-4 py-3">
+                      <SeedField key={`${r.id}-${r.seed ?? ""}`} registration={r} onSave={(seed) => saveSeed(r.id, seed)} testId={`admin-reg-seed-${r.id}`} />
+                    </td>
+                  )}
                   <td className="px-4 py-3 text-white/60">{r.discord || "—"}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex flex-wrap justify-end gap-2">
@@ -793,7 +816,7 @@ export default function AdminTournamentEditPage() {
                   </td>
                 </tr>
               ))}
-              {filteredRegistrations.length === 0 && <tr><td colSpan="5" className="text-center py-10 text-white/40">{regs.length === 0 ? "Keine Anmeldungen" : "Keine Anmeldungen für diesen Filter"}</td></tr>}
+              {filteredRegistrations.length === 0 && <tr><td colSpan={seedEditable ? 6 : 5} className="text-center py-10 text-white/40">{regs.length === 0 ? "Keine Anmeldungen" : "Keine Anmeldungen für diesen Filter"}</td></tr>}
             </tbody>
           </table>
           </div>
@@ -907,6 +930,36 @@ function RegistrationStatusOptions({ fixed, current }) {
       <option key={s} value={s} disabled={fixed && s !== current && LEAVES_BRACKET.has(s)}>{formatRegistrationStatus(s)}</option>
     )),
   ];
+}
+
+// Setzplatz je Anmeldung (#2111, TA15): gespeichert wird beim Verlassen des Felds oder mit Enter; leer nimmt ihn weg.
+function SeedField({ registration, onSave, testId }) {
+  const [value, setValue] = useState(registration.seed == null ? "" : String(registration.seed));
+  const commit = () => {
+    const next = String(value).trim();
+    const current = registration.seed == null ? "" : String(registration.seed);
+    if (next === current) return;
+    const number = Number.parseInt(next, 10);
+    if (next !== "" && !(Number.isInteger(number) && number >= 1)) {
+      setValue(current);
+      return;
+    }
+    onSave(next === "" ? null : number);
+  };
+  return (
+    <input
+      type="number"
+      min="1"
+      value={value}
+      onChange={(event) => setValue(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); commit(); } }}
+      aria-label="Setzplatz"
+      placeholder="–"
+      data-testid={testId}
+      className="w-16 rounded-sm border border-white/10 bg-[#0A0A0A] px-2 py-1 text-xs text-white"
+    />
+  );
 }
 
 // Staffel (#2109, S18): ein Co-Team ist zugeteilt, nicht „angenommen“ oder „eingecheckt“ - Austritt und

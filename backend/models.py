@@ -903,7 +903,8 @@ class RegistrationUpdate(BaseModel):
     # ``POST /registrations/{id}/removal`` - die Statusroute lehnt sie mit einem Hinweis ab.
     status: Optional[Literal["pending", "approved", "rejected", "waitlist", "checked_in", "no_show",
                              "withdrawn", "disqualified"]] = None
-    seed: Optional[int] = None
+    # Setzplatz (#2111, TA15): ab 1; null nimmt ihn weg.
+    seed: Optional[int] = Field(default=None, ge=1, le=9999)
     ingame_name: Optional[str] = None
     # Grund einer Absage (#1133): steht nur in der Nachricht an die Person, nicht an der Anmeldung.
     status_reason: Optional[str] = Field(default=None, max_length=300)
