@@ -222,6 +222,11 @@ ob sie frei ist (wer eine Nummer hat, steht nirgends). Mit
 mehr selbst, sondern stellst mit **Andere Nummer beantragen** einen Antrag – mit kurzer Begründung und, wenn du magst, einer
 Wunschnummer. Öffentlich ist die Nummer nicht: Sie sehen nur du und der Vorstand.
 
+**Trikotdruck (#2150):** Druckt ein Artikel im Shop die Vereinsnummer, nimmt die Bestellung deine Wunschnummer – aber nur,
+wenn du bei diesem Artikel den Haken zur Einwilligung setzt. Ohne Haken, ohne festgelegte Nummer oder ohne Mitgliedschaft
+geht die Bestellung nicht. Die Nummer gibst du dabei nicht ein: Die Website nimmt die hier festgelegte. Auf dem Artikel ist
+sie dann für alle sichtbar; in der Bestellung sehen sie nur du und die Finanzen.
+
 **Für den Vorstand – Admin → Mitglieder → Mitglieder → Reiter Nummern** (`/admin/members?tab=numbers`):
 
 - **Liste:** alle Mitglieder mit Nummer, wer sie gewählt hat, und ob sie schon in Dolibarr steht. **Verlauf** zeigt jede Änderung.

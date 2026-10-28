@@ -583,6 +583,22 @@ async def is_eligible(db, user_id: str) -> bool:
     return await _membership_status(db, user_id) in ELIGIBLE_STATUSES
 
 
+async def print_number(db, user_id: str) -> str | None:
+    """Die Nummer für den Trikotdruck (#2150) - nur solange sie vergeben ist (``number_key``) und das Konto berechtigt
+    ist (``ELIGIBLE_STATUSES``). Liest nur den eigenen Spiegel: nie Dolibarr, nie vom Client, nie die Mitgliedsnummer
+    aus ``memberships``. Ohne Nummer ``None``. Der Wert kommt nie ins Protokoll."""
+    if not user_id or not await is_eligible(db, user_id):
+        return None
+    doc = await db.jersey_numbers.find_one(
+        {"user_id": user_id, "number_key": {"$exists": True}},
+        {"_id": 0, "number": 1, "number_key": 1},
+    )
+    number = _as_number((doc or {}).get("number"))
+    if number is None or not 0 <= number <= HIGHEST or str(number) != str(doc.get("number_key")):
+        return None
+    return str(number)
+
+
 def _log(
     action: str, actor: str, before: int | None, after: int | None, note: str = ""
 ) -> dict:

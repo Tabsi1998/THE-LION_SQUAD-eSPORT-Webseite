@@ -133,18 +133,21 @@ PERSONAL: dict[str, Entry] = {
     # Shop (#1703, #1731 verfeinert): personenbezogene Felder stehen in services/shop_common.PERSONAL_FIELDS.
     "shop_orders": Entry(OVERWRITTEN, ("shop_orders",), "Beträge, Positionen und Verlauf bleiben für die Buchhaltung (die "
                          "Rechnung liegt in Dolibarr); Rechnungs- und Lieferanschrift bis auf das Land überschrieben"),
-    "shop_order_items": Entry(OVERWRITTEN, ("shop_order_items",), "Position einer Bestellung; der Gamertag wird entfernt"),
+    "shop_order_items": Entry(OVERWRITTEN, ("shop_order_items",), "Position einer Bestellung; Gamertag und gedruckte "
+                              "Vereinsnummer werden entfernt, der Nachweis der Einwilligung bleibt ohne Nummer"),
     "shop_carts": Entry(DELETED, ("shop_cart",)),
     # Gamertag-Druckdateien (#1711): das PNG einer Bestellung zeigt den Namen. Testdateien der Finanzen haben kein Konto.
     "shop_gamertag_files": Entry(OVERWRITTEN, ("shop_gamertag_files",),
-                                 "Druckdatei mit dem Gamertag einer Bestellung: Adresse abgeschaltet und Datei gelöscht - "
+                                 "Druckdatei mit dem Gamertag bzw. der Vereinsnummer einer Bestellung: Adresse "
+                                 "abgeschaltet und Datei gelöscht - "
                                  "braucht ein offener Printful-Auftrag sie noch, nur für ihn bis zum Abschluss (Job "
                                  "ops_retention); die Zeile bleibt ohne Konto mit Prüfsumme und Maßen"),
     "shop_order_events": Entry(KEPT, note="Verlauf einer Bestellung als Nachweis; nur Kennungen, Beträge und Stände, nie "
                                "eine Anschrift"),
     # Druckdateien (#2069): Grunddateien gehören zum Katalog (kein Konto); eine Bestelldatei mit Gamertag zeigt den Namen.
     "shop_print_files": Entry(OVERWRITTEN, ("shop_print_files",),
-                              "Druckdatei einer Bestellung mit Gamertag: Adresse abgeschaltet und Datei gelöscht - "
+                              "Druckdatei einer Bestellung mit Gamertag bzw. Vereinsnummer: Adresse abgeschaltet und "
+                              "Datei gelöscht - "
                               "braucht ein offener Printful-Auftrag sie noch, nur für ihn bis zum Abschluss (Job "
                               "ops_retention); die Zeile bleibt ohne Konto mit Prüfsumme und Maßen. Grunddateien des "
                               "Katalogs haben kein Konto"),

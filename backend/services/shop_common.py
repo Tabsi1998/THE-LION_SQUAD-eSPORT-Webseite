@@ -59,7 +59,9 @@ MODEL_FIELDS: dict[str, tuple[str, ...]] = {
                             "text_height_in", "text_width_in", "scaled", "font", "align", "color_key", "color_hex",
                             "anchor_x_in", "anchor_y_in", "anchor_y_px", "rules_hash", "user_id", "order_id",
                             "order_item_id", "created_at", "created_by", "last_used_at", "public_disabled_at",
-                            "erase_pending_at", "file_deleted_at"),
+                            "erase_pending_at", "file_deleted_at",
+                            # Vereinsnummer (#2150): „number“ - eine Bestelldatei mit der Nummer statt des Namens
+                            "kind"),
     # Druckvorlagen von Printful (#2069, services/shop_print_templates.py): Maße je Fläche, Vorlagenbilder, Abgleich.
     "shop_print_templates": ("printful_product_id", "entries", "previews", "hash", "previous_hash", "fetched_at",
                              "checked_at", "changed_at", "changes", "last_error", "skipped", "carried"),
@@ -69,7 +71,9 @@ MODEL_FIELDS: dict[str, tuple[str, ...]] = {
                          "group", "variant_ids", "color", "color_key", "version", "file_name", "sha256", "file_ref",
                          "public_id", "content_type", "size_bytes", "width_px", "height_px", "dpi", "layout_hash",
                          "template_hash", "sources", "warnings", "base_file_id", "gamertag_file_id", "user_id",
-                         "order_id", "order_item_id", "created_at", "created_by", "public_disabled_at",
+                         "order_id", "order_item_id",
+                         # Vereinsnummer (#2150): die Nummerndatei in der Bestelldatei, wie ``gamertag_file_id``
+                         "number_file_id", "created_at", "created_by", "public_disabled_at",
                          "erase_pending_at", "file_deleted_at",
                          # Hintergrund (#2141): Helligkeits-Raster und Vorschaubild, einmal beim Hochladen gerechnet
                          "luma", "thumb_ref"),
@@ -96,7 +100,9 @@ MODEL_FIELDS: dict[str, tuple[str, ...]] = {
                          # je Platzierung die Druckdatei-Fassung, Druckfläche und Position (#1707)
                          "designs",
                          # je Fläche genau eine Druckdatei (#2069): Grunddatei oder eigene mit Gamertag
-                         "print_files"),
+                         "print_files",
+                         # Vereinsnummer im Druck (#2150): die Nummer und die Einwilligung (Zeitpunkt, Textfassung)
+                         "print_number", "number_consent"),
     "shop_order_events": ("id", "order_id", "event_key", "kind", "at", "actor_id", "data"),
     # Testentwürfe an Printful (#2062, services/shop_test_drafts.py): eigene Art „test_draft“, keine Bestellung - nur
     # die Vereinsadresse, nie ein Gamertag als Text. Was gesendet wurde, was Printful meldete, Abweichungen.
@@ -106,7 +112,9 @@ MODEL_FIELDS: dict[str, tuple[str, ...]] = {
                          "estimate_error", "price_check", "warnings", "mockup", "created_by", "created_at",
                          "expires_at", "send_key", "sending_at", "sent_by", "last_error", "printful_order_id",
                          "printful_status", "response", "deviations", "sent_at", "deleting_at", "deleted_at",
-                         "deleted_by", "delete_note", "send_attempted_at", "deleting_from"),
+                         "deleted_by", "delete_note", "send_attempted_at", "deleting_from",
+                         # Vereinsnummer (#2150): mit der Beispielnummer gedruckt - nie die Nummer eines Mitglieds
+                         "with_number"),
 }
 FORBIDDEN_FIELD_PARTS = ("iban", "bic", "bank", "account_number", "card", "cvv", "password", "passwort", "secret",
                          "token", "api_key", "apikey")
@@ -115,10 +123,10 @@ FORBIDDEN_FIELD_PARTS = ("iban", "bic", "bank", "account_number", "card", "cvv",
 # in den Shop-Sammlungen ist Katalog, Betrag oder Kennung.
 PERSONAL_FIELDS: dict[str, tuple[str, ...]] = {
     "shop_orders": ("user_id", "billing_address", "shipping_address"),
-    "shop_order_items": ("user_id", "gamertag"),
+    "shop_order_items": ("user_id", "gamertag", "print_number"),
     "shop_carts": ("user_id", "items"),
-    "shop_gamertag_files": ("user_id",),  # und die Datei selbst (sie zeigt den Gamertag)
-    "shop_print_files": ("user_id",),  # Bestelldateien mit Gamertag (#2069) - und die Datei selbst
+    "shop_gamertag_files": ("user_id",),  # und die Datei selbst (sie zeigt den Gamertag bzw. die Nummer, #2150)
+    "shop_print_files": ("user_id",),  # Bestelldateien mit Gamertag bzw. Nummer (#2069, #2150) - und die Datei selbst
 }
 
 
