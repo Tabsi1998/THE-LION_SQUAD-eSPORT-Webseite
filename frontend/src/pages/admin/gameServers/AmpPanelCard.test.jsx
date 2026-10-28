@@ -61,3 +61,18 @@ test("ohne gespeichertes Passwort: kein Test, kein Entfernen", async () => {
   await waitFor(() => expect(screen.getByTestId("amp-test")).toBeDisabled());
   expect(screen.queryByTestId("amp-clear-password")).toBeNull();
 });
+
+test("neue Adresse ohne neues Passwort: Hinweis statt Speichern (#2112)", async () => {
+  render(<AmpPanelCard />);
+  fireEvent.click(screen.getByTestId("amp-panel-toggle"));
+  await screen.findByDisplayValue("https://amp.example.test");
+  expect(screen.queryByTestId("amp-password-needed")).toBeNull();
+  fireEvent.change(screen.getByTestId("amp-base-url"), { target: { value: "https://neu.example.test" } });
+  expect(screen.getByTestId("amp-password-needed")).toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("amp-save"));
+  await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Neue Adresse: bitte das Passwort neu eintragen."));
+  expect(apiMock.put).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByTestId("amp-password"), { target: { value: "platzhalter" } });
+  fireEvent.click(screen.getByTestId("amp-save"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/settings/amp", expect.objectContaining({ base_url: "https://neu.example.test", password: "platzhalter" })));
+});

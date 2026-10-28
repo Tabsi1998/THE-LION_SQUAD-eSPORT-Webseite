@@ -277,3 +277,26 @@ test("ohne gespeicherten Schlüssel gibt es nichts zu entfernen", async () => {
   expect(screen.queryByTestId("dolibarr-key-remove")).toBeNull();
   expect(screen.queryByTestId("dolibarr-write-key-remove")).toBeNull();
 });
+test("neue Adresse verlangt den API-Schlüssel neu; ein entfernter Schreib-Schlüssel wird gemeldet (#2112)", async () => {
+  authState.areas = ["system"];
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/admin/dolibarr/status") return { data: { ...STATUS, write_api_key_configured: true } };
+    if (url === "/admin/dolibarr/consent-texts") return { data: [] };
+    throw new Error(url);
+  });
+  apiMock.put.mockResolvedValue({ data: { ok: true, changed: ["api_key", "base_url", "write_api_key"], write_api_key_removed: true } });
+  const user = userEvent.setup();
+  renderPage();
+  await user.click(await screen.findByTestId("dolibarr-tab-connection"));
+  const address = await screen.findByTestId("dolibarr-base-url");
+  await user.clear(address);
+  await user.type(address, "https://neu.example.test");
+  expect(screen.getByTestId("dolibarr-key-needed")).toBeInTheDocument();
+  await user.click(screen.getByTestId("dolibarr-save"));
+  await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Neue Adresse: bitte den API-Schlüssel neu eintragen."));
+  expect(apiMock.put).not.toHaveBeenCalled();
+  await user.type(screen.getByTestId("dolibarr-api-key"), "platzhalter-neu");
+  await user.click(screen.getByTestId("dolibarr-save"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/admin/dolibarr/settings", expect.objectContaining({ base_url: "https://neu.example.test", api_key: "platzhalter-neu" })));
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Gespeichert. Der eigene Schreib-Schlüssel ist entfernt – er galt nur für die bisherige Adresse."));
+});

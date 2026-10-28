@@ -470,10 +470,26 @@ async def update_dolibarr_settings(body: DolibarrSettingsUpdate, me: dict = Depe
             clean_base_url(current["base_url"], environment=environment)
         except DolibarrError:
             raise HTTPException(400, "Die gespeicherte Adresse ist für diese Umgebung nicht zulässig (https nötig).")
+    target = updates.get("base_url") if "base_url" in updates else (current.get("base_url") if "environment" in updates else "")
+    if target:
+        from services.outbound_address import outbound_block_reason
+        # Eine Testumgebung darf auf dem eigenen Rechner laufen (http://localhost), die Produktion nicht (#2112).
+        reason = await outbound_block_reason(target, allow_local=environment == "test")
+        if reason:
+            raise HTTPException(400, reason)
     if data.get("api_key"):
         updates["api_key"] = encrypt_secret(data["api_key"].strip())
     if data.get("write_api_key"):
         updates["write_api_key"] = encrypt_secret(data["write_api_key"].strip())
+    # Neue Adresse (#2112): gespeicherte Schlüssel gehören zur bisherigen. Den API-Schlüssel braucht es neu; ein eigener
+    # Schreib-Schlüssel, der nicht neu mitkommt, wird entfernt (geschrieben wird dann mit dem API-Schlüssel).
+    write_key_removed = False
+    if "base_url" in updates and updates["base_url"] != (current.get("base_url") or ""):
+        if current.get("api_key") and not data.get("api_key"):
+            raise HTTPException(400, "Neue Adresse: bitte den API-Schlüssel neu eintragen. Der gespeicherte gilt nur für die bisherige Adresse.")
+        if current.get("write_api_key") and not data.get("write_api_key"):
+            updates["write_api_key"] = ""
+            write_key_removed = True
     if "write_enabled" in data:
         if data["write_enabled"] and not (data.get("write_api_key") or current.get("write_api_key") or data.get("api_key") or current.get("api_key")):
             raise HTTPException(400, "Schreibzugriff braucht einen API-Schlüssel (der des Website-Benutzers reicht).")
@@ -550,7 +566,7 @@ async def update_dolibarr_settings(body: DolibarrSettingsUpdate, me: dict = Depe
         await db.settings.update_one({"id": "dolibarr_sync_state"}, {"$unset": {"cursor": "", "last_full_at": ""}})
     changed = sorted(key for key in updates if key not in ("updated_at", "updated_by"))
     await _audit(me["id"], "dolibarr.settings", SETTINGS_ID, {"changed": changed, "mode": updates.get("mode")})
-    return {"ok": True, "changed": changed}
+    return {"ok": True, "changed": changed, **({"write_api_key_removed": True} if write_key_removed else {})}
 
 
 @admin_router.delete("/settings/api-key")

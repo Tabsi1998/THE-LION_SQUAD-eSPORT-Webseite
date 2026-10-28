@@ -120,6 +120,20 @@ export default function AdminDolibarrPage() {
     });
     if (ok) run("unlink", () => api.delete(`/admin/dolibarr/links/${link.user_id}`), "Zuordnung gelöst.");
   };
+  // Neue Adresse (#2112): gespeicherte Schlüssel gelten nur für die bisherige - der API-Schlüssel muss neu mit.
+  const addressChanged = !!status?.api_key_configured && form.base_url.trim() !== (status?.base_url || "");
+  const saveConnection = async () => {
+    if (addressChanged && !form.api_key.trim()) {
+      toast.error("Neue Adresse: bitte den API-Schlüssel neu eintragen.");
+      return;
+    }
+    const result = await saveSettings(
+      { base_url: form.base_url, instance: form.instance, environment: form.environment, ...(form.api_key ? { api_key: form.api_key } : {}) },
+      ({ data }) => (data?.write_api_key_removed ? "Gespeichert. Der eigene Schreib-Schlüssel ist entfernt – er galt nur für die bisherige Adresse." : "Gespeichert."),
+    );
+    if (result) setForm((current) => ({ ...current, api_key: "" }));
+  };
+
   // Schlüssel entfernen (#2112): mit Rückfrage; der Schlüssel selbst steht nie auf der Seite.
   const removeKey = async (which) => {
     const write = which === "write";
@@ -431,6 +445,11 @@ export default function AdminDolibarrPage() {
             <div className="space-y-3">
               <Field label="Adresse von Dolibarr (https)" value={form.base_url} onChange={(v) => setForm({ ...form, base_url: v })} placeholder="https://erp.example.org" testId="dolibarr-base-url" />
               <Field label={`API-Schlüssel des Website-Benutzers${status?.api_key_configured ? " (gespeichert – leer lassen, um ihn zu behalten)" : ""}`} value={form.api_key} onChange={(v) => setForm({ ...form, api_key: v })} type="password" testId="dolibarr-api-key" />
+              {addressChanged && (
+                <p className="text-xs text-warn" data-testid="dolibarr-key-needed">
+                  Neue Adresse: Gespeicherte Schlüssel gelten nur für die bisherige. Bitte den API-Schlüssel neu eintragen; ein eigener Schreib-Schlüssel wird entfernt.
+                </p>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Kennung der Installation" value={form.instance} onChange={(v) => setForm({ ...form, instance: v })} placeholder="verein" testId="dolibarr-instance" />
                 <label className="block">
@@ -454,7 +473,7 @@ export default function AdminDolibarrPage() {
               </details>
               <p className="text-xs text-white/40">Der Schlüssel wird verschlüsselt gespeichert und nie wieder angezeigt.</p>
               <div className="flex flex-wrap gap-2">
-                <button type="button" disabled={!!busy} data-testid="dolibarr-save" onClick={() => saveSettings({ base_url: form.base_url, instance: form.instance, environment: form.environment, ...(form.api_key ? { api_key: form.api_key } : {}) }).then(() => setForm((current) => ({ ...current, api_key: "" })))}
+                <button type="button" disabled={!!busy} data-testid="dolibarr-save" onClick={saveConnection}
                   className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40">Speichern</button>
                 <button type="button" disabled={!!busy || !status?.api_key_configured} onClick={testConnection} data-testid="dolibarr-test" className="px-4 py-2 border border-white/20 text-white/80 font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40">Verbindung testen</button>
                 {status?.api_key_configured && (

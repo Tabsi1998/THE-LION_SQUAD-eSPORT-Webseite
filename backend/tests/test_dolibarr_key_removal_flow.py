@@ -83,3 +83,60 @@ async def test_only_system_removes_keys(flow):
         assert refused.status_code == 403
     stored = await flow.db.settings.find_one({"id": "dolibarr"}, {"_id": 0})
     assert stored["api_key"] and stored["write_api_key"]
+
+
+RESOLVED = {"erp.example.test": ["93.184.216.34"], "neu.example.test": ["93.184.216.35"], "heim.example.test": ["192.168.2.100"],
+            "intern.example.test": ["127.0.0.1"]}
+
+
+@pytest.fixture
+def fake_dns(monkeypatch):
+    from services import outbound_address
+
+    def resolve(host):
+        if host not in RESOLVED:
+            raise OSError("unbekannt")
+        return RESOLVED[host]
+
+    monkeypatch.setattr(outbound_address, "_resolve", resolve)
+
+
+@pytest.mark.asyncio
+async def test_a_new_address_needs_the_key_again_and_drops_the_write_key(flow, fake_dns):
+    """#2112: gespeicherte Schlüssel gehen nie an eine neue Adresse."""
+    await admin_with_keys(flow, base_url="https://erp.example.test", api_key=READ_KEY, write_api_key=WRITE_KEY)
+    refused = await flow.put("/api/admin/dolibarr/settings", json={"base_url": "https://neu.example.test"})
+    assert refused.status_code == 400 and "API-Schlüssel neu" in refused.json()["detail"]
+    assert (await status(flow))["base_url"] == "https://erp.example.test"
+    same = await flow.put("/api/admin/dolibarr/settings", json={"base_url": "https://erp.example.test", "instance": "verein"})
+    assert same.status_code == 200 and "write_api_key_removed" not in same.json()
+    moved = await flow.put("/api/admin/dolibarr/settings", json={"base_url": "https://neu.example.test", "api_key": "platzhalter-neu"})
+    assert moved.status_code == 200, moved.text
+    assert moved.json()["write_api_key_removed"] is True
+    now = await status(flow)
+    assert now["base_url"] == "https://neu.example.test" and now["api_key_configured"] is True and now["write_api_key_configured"] is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("address", ["https://127.0.0.1", "https://localhost", "https://169.254.169.254", "https://192.168.2.100",
+                                     "https://intern.example.test"])
+async def test_production_refuses_local_and_metadata_addresses(flow, fake_dns, address):
+    admin = await flow.add_user(role="superadmin", name="admin")
+    flow.act_as(admin)
+    refused = await flow.put("/api/admin/dolibarr/settings", json={"base_url": address})
+    assert refused.status_code == 400, refused.text
+    assert await flow.db.settings.find_one({"id": "dolibarr"}) is None
+
+
+@pytest.mark.asyncio
+async def test_home_network_names_and_a_local_test_setup_stay_possible(flow, fake_dns):
+    admin = await flow.add_user(role="superadmin", name="admin")
+    flow.act_as(admin)
+    home = await flow.put("/api/admin/dolibarr/settings", json={"base_url": "https://heim.example.test"})
+    assert home.status_code == 200, home.text
+    local = await flow.put("/api/admin/dolibarr/settings", json={"environment": "test", "base_url": "http://localhost:18080"})
+    assert local.status_code == 200, local.text
+    back = await flow.put("/api/admin/dolibarr/settings", json={"environment": "production"})
+    assert back.status_code == 400
+    metadata = await flow.put("/api/admin/dolibarr/settings", json={"environment": "test", "base_url": "http://169.254.169.254"})
+    assert metadata.status_code == 400

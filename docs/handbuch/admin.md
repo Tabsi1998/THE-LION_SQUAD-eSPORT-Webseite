@@ -295,7 +295,10 @@ Jedes Thema hat genau **einen** Ort:
 Panel nach dem Stand der Instanz (Feld **AMP-Instanz**: Name oder ID wie im Panel). Den Zugang tragt ihr oben auf der
 Game-Server-Seite im aufklappbaren Bereich **AMP-Panel** ein: **Adresse** (nur `https://`), **Benutzer** (am besten
 ein eigener mit Leserechten), **Passwort** und **Panel abfragen**. Das Passwort wird verschlüsselt gespeichert und nie
-wieder gezeigt; leer lassen heißt „behalten“. **Verbindung testen** nennt die Instanzen, die das Panel kennt.
+wieder gezeigt; leer lassen heißt „behalten“ – außer bei einer **neuen Adresse**: Dann muss das Passwort neu mit, das
+gespeicherte gilt nur für die bisherige. Adressen der Plattform selbst (localhost, 127.x), Link-local-Adressen und
+Heimnetz-IPs als Zahl sind nicht erlaubt; ein Name, der ins Heimnetz zeigt, schon. **Verbindung testen** nennt die
+Instanzen, die das Panel kennt.
 **Passwort entfernen** (mit Rückfrage) beendet die Abfrage – Server auf „AMP-Panel“ bekommen dann einen Sync-Hinweis.
 
 **Shop-Preise (#2135):** Mitglieder zahlen genau, was der Verein an Printful zahlt – brutto, also Ware, Versand und

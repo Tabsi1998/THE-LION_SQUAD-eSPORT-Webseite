@@ -28,11 +28,19 @@ export function AmpPanelCard() {
 
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
 
+  const configured = !!state?.configured;
+  // Das gespeicherte Passwort gilt nur für die bisherige Adresse (#2112) - bei einer neuen muss es neu eingetragen werden.
+  const addressChanged = configured && form.base_url.trim() !== (state?.base_url || "");
+
   const save = async (event) => {
     event.preventDefault();
     const address = form.base_url.trim();
     if (address && !address.toLowerCase().startsWith("https://")) {
       toast.error("Die AMP-Adresse beginnt mit https://.");
+      return;
+    }
+    if (addressChanged && !form.password.trim()) {
+      toast.error("Neue Adresse: bitte das Passwort neu eintragen.");
       return;
     }
     setBusy("save");
@@ -85,7 +93,6 @@ export function AmpPanelCard() {
     }
   };
 
-  const configured = !!state?.configured;
   return (
     <section className="mb-6 border border-white/10 bg-[#121212] rounded-sm" data-testid="amp-panel-card">
       <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} data-testid="amp-panel-toggle" className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left">
@@ -111,6 +118,11 @@ export function AmpPanelCard() {
               testId="amp-password"
               autoComplete="new-password"
             />
+            {addressChanged && (
+              <p className="md:col-span-2 text-xs text-warn" data-testid="amp-password-needed">
+                Neue Adresse: Das gespeicherte Passwort gilt nur für die bisherige. Bitte das Passwort neu eintragen.
+              </p>
+            )}
             <label className="flex items-center gap-2 text-sm self-end pb-2">
               <input type="checkbox" checked={form.enabled} onChange={(e) => set("enabled", e.target.checked)} className="accent-[#29B6E8]" data-testid="amp-enabled" />
               Panel abfragen
