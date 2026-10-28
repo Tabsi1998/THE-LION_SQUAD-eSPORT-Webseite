@@ -88,7 +88,7 @@ from services.match_forfeit import apply_forfeit
 from services.match_lead import entry_info
 from services.result_hold import ensure_no_hold, hold_result, undo_result
 from services.match_proofs import claim_proof, visible_proofs
-from services.schedule_proposal_time import refuse_past_proposal
+from services.schedule_proposal_time import refuse_expired_proposal, refuse_past_proposal
 
 router = APIRouter(prefix="/api/matches", tags=["matches"])
 logger = logging.getLogger("tls.match")
@@ -904,6 +904,8 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
         raise HTTPException(status_code=409, detail="Über diesen Terminvorschlag wurde bereits entschieden")
     if body.action == "accept":
         scheduled_at = proposal.get("scheduled_at")
+        # Abgelaufen (#2124): ein Termin, der schon vorbei ist, lässt sich nicht mehr annehmen.
+        refuse_expired_proposal(scheduled_at)
         await db.match_schedule_proposals.update_one({"id": proposal_id}, {"$set": {
             "status": "accepted",
             "decision_user_id": me["id"],

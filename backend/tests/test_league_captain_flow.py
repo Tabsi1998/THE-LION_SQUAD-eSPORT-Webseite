@@ -408,3 +408,20 @@ async def test_a_proposal_or_counter_in_the_past_is_refused_in_german(flow):
                               json={"action": "counter", "scheduled_at": (now_utc() - timedelta(hours=3)).isoformat()})
     assert counter.status_code == 422
     assert (await flow.db.match_schedule_proposals.find_one({"id": proposed.json()["id"]}, {"_id": 0}))["status"] == "pending"
+
+@pytest.mark.asyncio
+async def test_an_expired_proposal_cannot_be_accepted(flow):
+    """Review O3 (#2124): ist der Termin eines offenen Vorschlags vorbei, geht „Annehmen“ nicht mehr - mit Satz."""
+    world = await setup(flow)
+    users = world["users"]
+    flow.act_as(users["Spieler2"])
+    proposed = await flow.post(proposals_url(world), json={"scheduled_at": when(2)})
+    assert proposed.status_code == 200, proposed.text
+    await flow.db.match_schedule_proposals.update_one(
+        {"id": proposed.json()["id"]}, {"$set": {"scheduled_at": (now_utc() - timedelta(hours=1)).isoformat()}})
+
+    flow.act_as(users["FalkenLeitung"])
+    accepted = await flow.post(f"{proposals_url(world)}/{proposed.json()['id']}/decision", json={"action": "accept"})
+    assert accepted.status_code == 409
+    assert "abgelaufen" in accepted.json()["detail"]
+    assert (await flow.db.match_schedule_proposals.find_one({"id": proposed.json()["id"]}, {"_id": 0}))["status"] == "pending"
