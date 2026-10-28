@@ -203,5 +203,50 @@ def kinds(rows: list[dict]) -> set[str]:
     return {row["type"] for row in rows}
 
 
+@pytest.mark.asyncio
+async def test_dashboard_asks_the_other_side_to_answer_a_proposal(flow):
+    world = await setup(flow)
+    users = world["users"]
+    flow.act_as(users["Spieler1"])
+    proposed = (await flow.post(proposals_url(world), json={"scheduled_at": when(2)})).json()
+
+    falcon_actions = await actions(flow, users["FalkenLeitung"])
+    task = next(row for row in falcon_actions if row["type"] == "match_schedule")
+    assert task["label"] == "Terminvorschlag beantworten"
+    assert task["target_type"] == "match" and task["target_id"] == world["match"]["id"]
+    assert "gegen Loewen · Rudel A" in task["detail"] and "Vorschlag" in task["detail"]
+    for name in ("Spieler1", "Spieler2", "Spieler3", "Falke1", "Leitung"):
+        assert "match_schedule" not in kinds(await actions(flow, users[name])), name
+
+    flow.act_as(users["FalkenLeitung"])
+    assert (await flow.post(f"{proposals_url(world)}/{proposed['id']}/decision",
+                            json={"action": "accept"})).status_code == 200
+    assert "match_schedule" not in kinds(await actions(flow, users["FalkenLeitung"])), "beantwortet - weg"
+
+
+@pytest.mark.asyncio
+async def test_dashboard_asks_for_a_missing_lineup_until_the_deadline(flow):
+    world = await setup(flow)
+    users = world["users"]
+    games = [{"position": 1, "mode": "stellung", "map_id": "map-hafen",
+              "winner_registration_id": world["lions_reg"]["id"], "lineups": {world["lions_reg"]["id"]: []}}]
+    await flow.db.matches_v2.update_one({"id": world["match"]["id"]}, {"$set": {
+        "status": "completed", "completed_at": (now_utc() - timedelta(hours=2)).isoformat(),
+        "games": games, "lineups_missing": [world["falcons_reg"]["id"]],
+    }})
+
+    falcon_actions = await actions(flow, users["FalkenLeitung"])
+    task = next(row for row in falcon_actions if row["type"] == "match_lineup")
+    assert task["label"] == "Aufstellung nachtragen"
+    assert "im Web bis" in task["detail"]
+    for name in ("Spieler1", "Falke1", "Fremd"):
+        assert "match_lineup" not in kinds(await actions(flow, users[name])), name
+
+    # Nach der Frist (48 Stunden) keine Aufgabe mehr - dann hilft nur die Turnierleitung.
+    await flow.db.matches_v2.update_one({"id": world["match"]["id"]},
+                                        {"$set": {"completed_at": (now_utc() - timedelta(days=3)).isoformat()}})
+    assert "match_lineup" not in kinds(await actions(flow, users["FalkenLeitung"]))
+
+
 def roles_url(world: dict) -> str:
     return f"/api/teams/{world['lions']['id']}/squads/{world['squad_a']['id']}/roles"

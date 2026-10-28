@@ -540,13 +540,18 @@ def amend_deadline(setup: LeagueSetup):
     """Bis wann die Seiten ihre Aufstellung nachtragen: ``lineup_amend_hours`` nach dem Ergebnis (Vorgabe 48 h). Zeit in
     einer Sperrzeit zählt nicht mit (#2096) - wie bei Termin- und Bestätigungsfristen; ohne Sperrzeiten genau
     Ergebnis + Stunden."""
+    return amend_deadline_for(setup.tournament, setup.match)
+
+
+def amend_deadline_for(tournament: dict | None, match: dict):
+    """Dieselbe Frist ohne vollen Aufbau - für die Aufgabe „Aufstellung nachtragen“ auf der Startseite (#2110)."""
     from services.matchday_schedule import response_deadline
 
-    done = _parse_moment(setup.match.get("completed_at"))
+    done = _parse_moment(match.get("completed_at"))
     if not done:
         return None
-    return response_deadline(setup.tournament, done,
-                             _positive_int(setup.tournament.get("lineup_amend_hours"), DEFAULT_AMEND_HOURS))
+    tournament = tournament or {}
+    return response_deadline(tournament, done, _positive_int(tournament.get("lineup_amend_hours"), DEFAULT_AMEND_HOURS))
 
 
 async def amend_lineups(
