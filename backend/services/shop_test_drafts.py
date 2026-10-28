@@ -35,7 +35,8 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from models import new_id, now_utc
-from services import shop_catalog, shop_colors, shop_common, shop_config, shop_gamertag, shop_print_files, shop_products
+from services import shop_catalog, shop_colors, shop_common, shop_config, shop_gamertag, shop_options
+from services import shop_print_files, shop_products
 from services import shop_print_templates
 from services.mutation_lock import MutationLockBusy, mutation_lock
 from services.printful_client import order_payload
@@ -320,6 +321,11 @@ async def preview(db, *, product_id: Any, variant_id: Any, gamertag: Any, addres
     mapping = await shop_catalog.printful_variant_for(db, variant["id"])
     if not mapping or not mapping.get("printful_variant_id"):
         raise ShopError("Diese Variante hat keine Printful-Variante - erst Farben und Größen wählen (Schritt 2).")
+    # Pflichtoptionen von Printful (#2158), etwa die Nahtfarbe - ohne sie lehnt Printful schon die Schätzung ab.
+    try:
+        options = shop_options.line_options(product)
+    except ShopError as exc:
+        raise ShopError(f"{exc} Bitte in Schritt 2 „Farben und Größen“ wählen und speichern.") from exc
     recipient = _clean_address(address)
     rows = await shop_print_files.layout_rows(db, product)
     name = None
@@ -340,13 +346,14 @@ async def preview(db, *, product_id: Any, variant_id: Any, gamertag: Any, addres
         async with mutation_lock(db, f"shop:test-draft:{actor_id}", wait_seconds=0.0, lease_seconds=120.0):
             await _sweep_previews(db, actor_id)
             return await _build(db, product, variant, mapping, recipient, name, actor_id=actor_id, provider=provider,
-                                number=number)
+                                number=number, options=options)
     except MutationLockBusy as exc:
         raise ShopConflict("Die Vorschau wird gerade erstellt - bitte kurz warten.") from exc
 
 
 async def _build(db, product: dict, variant: dict, mapping: dict, recipient: dict, name: str | None, *,
-                 actor_id: str, provider: FulfillmentProvider, number: str | None = None) -> dict:
+                 actor_id: str, provider: FulfillmentProvider, number: str | None = None,
+                 options: tuple = ()) -> dict:
     # Printful nimmt je external_id höchstens 32 Zeichen (#2133): Anfang plus Zufall, Position nur Zufall.
     draft_id, item_id = new_id(), short_external_id()
     external_id = short_external_id(EXTERNAL_PREFIX)
@@ -367,7 +374,8 @@ async def _build(db, product: dict, variant: dict, mapping: dict, recipient: dic
         await shop_print_files.discard_order_files(db, draft_id)
         raise
     line = DraftLine(variant=CatalogVariantId(int(mapping["printful_variant_id"])), quantity=1, placements=placements,
-                     external_id=item_id, name=f"{product['title']} - {variant.get('label') or ''}".strip(" -"))
+                     external_id=item_id, name=f"{product['title']} - {variant.get('label') or ''}".strip(" -"),
+                     options=options)
     draft = DraftOrder(external_id=external_id, lines=(line,), recipient=Recipient(
         name=recipient["name"], address1=recipient["street"], address2=recipient["street2"], city=recipient["city"],
         zip=recipient["zip"], country_code=recipient["country"]))
@@ -398,6 +406,7 @@ async def _build(db, product: dict, variant: dict, mapping: dict, recipient: dic
         "printful_product_id": product["printful"]["product_id"],
         "printful_variant_id": int(mapping["printful_variant_id"]), "with_gamertag": name is not None,
         "with_number": number is not None, "files": shown, "recipient": recipient, "payload": payload,
+        "product_options": shop_options.frozen(options),
         "estimate": _cents_view(estimate),
         "estimate_error": estimate_error, "price_check": price, "warnings": warnings,
         "mockup": {"state": "pending", "detail": MOCKUP_PENDING},
@@ -424,7 +433,9 @@ def draft_from_payload(payload: dict) -> DraftOrder:
                                 placements=tuple(Placement(placement=place["placement"], technique=place["technique"],
                                                            file_url=place["layers"][0]["url"])
                                                  for place in item["placements"]),
-                                external_id=item.get("external_id"), name=item.get("name"))
+                                external_id=item.get("external_id"), name=item.get("name"),
+                                options=tuple((option["name"], option["value"])
+                                              for option in item.get("product_options") or []))
                       for item in payload["order_items"])
         draft = DraftOrder(external_id=payload["external_id"], shipping=payload.get("shipping") or "STANDARD",
                            lines=lines,
@@ -447,7 +458,8 @@ def _order_view(order: FulfillmentOrder) -> dict:
                        "placements": [{"placement": place.placement, "technique": place.technique,
                                        "file_urls": list(place.file_urls), "status": place.status,
                                        "status_explanation": place.status_explanation}
-                                      for place in item.placements]}
+                                      for place in item.placements],
+                       "options": [{"name": name, "value": value} for name, value in item.options]}
                       for item in order.items],
             "shape": order.shape or {}}
 
@@ -503,6 +515,12 @@ def compare(record: dict, order: dict) -> list[dict]:
                          "ok" if got.get("variant_id") == sent["catalog_variant_id"] else "error"))
         rows.append(_row(prefix + "Menge", sent["quantity"], got.get("quantity"),
                          "ok" if got.get("quantity") == sent["quantity"] else "error"))
+        sent_options = {row["name"]: row["value"] for row in sent.get("product_options") or []}
+        got_options = {row["name"]: row["value"] for row in got.get("options") or []}
+        if sent_options or got_options:
+            # Produktoptionen (#2158), etwa die Nahtfarbe: Printful muss genau die gesendeten übernehmen.
+            rows.append(_row(prefix + "Produktoptionen", sent_options or None, got_options or None,
+                             "ok" if sent_options == got_options else "error"))
         placed = {place["placement"]: place for place in got.get("placements") or []}
         if got and not placed:
             # Printful nennt zu dieser Position gar keine Flächen (#2138): das heißt nicht „falsch übergeben“ - der

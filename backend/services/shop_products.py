@@ -31,7 +31,8 @@ from typing import Any
 from datetime import datetime, timedelta, timezone
 
 from models import now_utc
-from services import shop_catalog, shop_catalog_sync, shop_colors, shop_config, shop_gamertag, shop_print_files
+from services import shop_catalog, shop_catalog_sync, shop_colors, shop_config, shop_gamertag, shop_options
+from services import shop_print_files
 from services import shop_print_templates as templates
 from services.shop_common import ShopConflict, ShopError, clean_reason, record_admin_action
 from services.shop_costs import cost_cents, euro, included_placement, technique_of
@@ -147,6 +148,8 @@ async def load_printful_product(db, product_id: str, printful_product_id: Any, *
         "colors": [{"name": name, "code": code} for name, code in info.colors],
         "variants": [{"id": row.id.value, "color": row.color, "size": row.size, "color_code": row.color_code,
                       "availability": row.availability} for row in variants],
+        # Produktoptionen (#2158), etwa die Nahtfarbe - Pflicht wählt Schritt 2.
+        **shop_options.snapshot(info.options, info.options_skipped),
         "loaded_at": now_utc().isoformat(),
     }
     before = (product.get("printful") or {}).get("product_id")
@@ -176,16 +179,19 @@ def _list(raw: Any, label: str) -> list:
 
 
 async def set_offer(db, product_id: str, *, technique: Any, colors: Any, sizes: Any, provider: FulfillmentProvider,
-                    actor_id: str, reason: Any, color_labels: Any = None) -> dict:
+                    actor_id: str, reason: Any, color_labels: Any = None, product_options: Any = None) -> dict:
     """Schritt 2: welche Farben und Größen angeboten werden. Legt die Varianten an und holt danach die Einkaufspreise.
     Läuft gerade ein anderer Abgleich, bleiben die Preise offen (Prüfung „Preis“) - „Mit Printful abgleichen“ holt sie.
 
     ``color_labels`` (#2105): eigene Bezeichnung je angebotener Farbe statt der Übersetzung (leer = Vorgabe). Ohne
-    Angabe bleiben die eigenen Bezeichnungen der weiter angebotenen Farben. Der Printful-Name bleibt der Schlüssel."""
+    Angabe bleiben die eigenen Bezeichnungen der weiter angebotenen Farben. Der Printful-Name bleibt der Schlüssel.
+
+    ``product_options`` (#2158): je Pflichtoption des Printful-Produkts (etwa die Nahtfarbe) ein Wert aus dem Katalog;
+    ohne Angabe bleibt die bisherige Wahl, sonst der erste erlaubte Wert."""
     reason = clean_reason(reason, required=False)
     async with shop_catalog.product_lock(db, product_id):
         saved = await _save_offer(db, product_id, technique=technique, colors=colors, sizes=sizes, actor_id=actor_id,
-                                  reason=reason, color_labels=color_labels)
+                                  reason=reason, color_labels=color_labels, product_options=product_options)
     try:
         await shop_catalog_sync.sync_product(db, product_id, provider=provider, actor_id=actor_id, reason=reason,
                                              wait_seconds=5.0)
@@ -195,7 +201,7 @@ async def set_offer(db, product_id: str, *, technique: Any, colors: Any, sizes: 
 
 
 async def _save_offer(db, product_id: str, *, technique: Any, colors: Any, sizes: Any, actor_id: str,
-                      reason: str, color_labels: Any = None) -> dict:
+                      reason: str, color_labels: Any = None, product_options: Any = None) -> dict:
     product = await _product(db, product_id)
     _editable(product)
     printful = product.get("printful")
@@ -220,6 +226,10 @@ async def _save_offer(db, product_id: str, *, technique: Any, colors: Any, sizes
     else:
         labels = shop_colors.clean_labels(color_labels, chosen_colors)
     offer = {"colors": chosen_colors, "sizes": chosen_sizes, "color_labels": labels}
+    options = shop_options.clean_choice(product, product_options,
+                                        previous=(product.get("offer") or {}).get("options"))
+    if options:
+        offer["options"] = options
     saved = await _save_content(db, product, {"offer": offer, "technique": technique}, actor_id=actor_id,
                                 reason=reason, action="shop.product.offer",
                                 data={"technique": technique, **offer, "variants": len(rows)})
@@ -705,6 +715,24 @@ def _aware(value: Any) -> datetime | None:
 STATE_TEXT = {"missing": "fehlt", "outdated": "veraltet", "invalid": "passt nicht", "no_area": "Fläche fehlt"}
 
 
+def _options_item(product: dict) -> dict | None:
+    """Produktoptionen (#2158): rot, wenn eine Pflichtoption fehlt; gelb, wenn das Produkt vor #2158 geladen wurde (ob
+    es Optionen hat, ist dann unbekannt). Produkte ohne Pflichtoptionen bekommen keinen Prüfpunkt."""
+    if not product.get("printful"):
+        return None
+    if not shop_options.loaded(product):
+        return {**_item("options", "Produktoptionen von Printful", True, shop_options.MISSING), "state": "warn"}
+    needed = shop_options.required(product)
+    if not needed:
+        return None
+    missing = shop_options.problems(product)
+    chosen = (product.get("offer") or {}).get("options") or {}
+    return _item("options", "Produktoptionen von Printful", not missing,
+                 ("Fehlt: " + ", ".join(missing) + " - in Schritt 2 wählen.") if missing else
+                 ", ".join(f"{shop_options.label(row['name'])}: {shop_options.value_label(chosen[row['name']])}"
+                           for row in needed))
+
+
 async def run_check(db, product: dict) -> dict:
     """Die Vorab-Prüfung: alles, was vor „geprüft“ stimmen muss - und dazu die Mockups vor „veröffentlicht“."""
     items = []
@@ -722,6 +750,9 @@ async def run_check(db, product: dict) -> dict:
     items.append(_item("offer", "Farben und Größen", bool(offered),
                        f"{len(offered)} Varianten: {colors} in {sizes}" if offered
                        else "Noch keine Farben und Größen gewählt."))
+    options_item = _options_item(product)
+    if options_item:
+        items.append(options_item)
     personalization = product.get("personalization") or "none"
     rows = await shop_print_files.layout_rows(db, product, template=template) if printful else []
     kinds = {layer.get("kind") for row in rows for layer in row.get("layers") or []}
@@ -932,6 +963,8 @@ async def admin_view(db, product_id: str) -> dict:
         "variants": variant_rows,
         # Printful-Name → Bezeichnung (#2105): eigene aus Schritt 2, sonst die Übersetzung; dazu die Vorgabe.
         "color_labels": shop_colors.labels_for(product),
+        # Produktoptionen von Printful (#2158): Pflicht wählt Schritt 2, etwa die Nahtfarbe.
+        "product_options": shop_options.view(product),
         "color_defaults": shop_colors.defaults_for(product),
         "size_labels": {size: shop_colors.size_label(size) for size in printful.get("sizes") or []},
         "placements": placement_rows,
