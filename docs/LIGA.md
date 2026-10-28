@@ -168,10 +168,10 @@ Genau (`services/league_service.SYNC_GROUPS`): **immer** (auch gesperrte Staffel
 und der Map-Pool (neue Version im Scope `tournament`, nur wenn er sich unterscheidet – Spiele mit festgehaltenem Pool
 behalten ihren; hat die Season keinen Pool mehr, wird die Kopie nur vor dem ersten Ergebnis entfernt);
 **vor dem Start** (Status `draft` bis `check_in`) `start_date`, `end_date`, `matchday_days`, `default_match_weekday`,
-`default_match_time`, `round_robin_legs`, `matchday_blocked_weeks`, `matchday_weeks_total`, `max_participants`,
-`min_squad_size` – nur wenn die Prüfung „Runden ≤ aktive Wochen“ passt und nicht schon mehr Teams angemeldet sind;
-**vor dem ersten Ergebnis** `best_of`, `team_size`, `scoring_rules`, `game_mode_order`, `result_confirm_hours_league`,
-`lineup_amend_hours`. `min_squad_size` steht damit am Turnier (Season bzw. Liga N, mindestens `team_size`); B liest es
+`default_match_time`, `round_robin_legs`, `matchday_blocked_weeks`, `matchday_weeks_total`, `max_participants` – nur
+wenn die Prüfung „Runden ≤ aktive Wochen“ passt und nicht schon mehr Teams angemeldet sind; **vor dem ersten Ergebnis**
+`best_of`, `team_size`, `min_squad_size` (immer gemeinsam mit `team_size`), `scoring_rules`, `game_mode_order`,
+`result_confirm_hours_league`, `lineup_amend_hours`. `min_squad_size` steht damit am Turnier (Season bzw. Liga N, mindestens `team_size`); B liest es
 beim Zuteilen dort.
 
 ## 4. Rechte
@@ -324,3 +324,9 @@ moment)` (A, P2). Bis P2 auf `main` ist, bleibt der Aufruf aus.
   verhalten sich Turniere, Anmeldungen, Co-Teams, Spiele und Tabellen genau wie vorher (Regressionstests:
   Liga-Turnier mit Hin/Rück, Gruppen, Team-Turnier mit Aufstellung #1192, App-Meldung ohne `games`).
 - **Rückweg:** Season auf `off` stellt alles unsichtbar; die Felder bleiben ungenutzt liegen.
+- **Teilnehmende sehen ihre Staffel auch bei `off` und `admins`** – die allgemeine Turnierregel
+  (`tournament_hidden_reason`: wer angemeldet ist, sieht sein Turnier; Entwurf bleibt 404). Bewusst so belassen: Die
+  Co-Teams müssen während der Season Spiele melden, Termine abstimmen und den Matchchat lesen können, auch wenn die
+  Leitung die Liga nach außen kurz ausblendet. Für Teilnehmende zu verbergen hieße, die gemeinsame Sichtbarkeitsregel
+  aller Turnier-, Spiel- und Chat-Routen um einen Liga-Sonderfall zu erweitern – viel Fläche für wenig Nutzen. Die
+  Ligaseite und die Lese-API bleiben bei `off` für alle 404.
