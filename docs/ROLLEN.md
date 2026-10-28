@@ -329,8 +329,11 @@ höchstens einen **Captain** und einen **Vertreter**; beide stehen im Kader des 
 - **Rückfall:** Hat ein Co-Team weder Captain noch Vertreter, handeln Leitung und Co-Leitung des Hauptteams – niemand
   sperrt sich aus. Sobald eine Rolle vergeben ist, gilt sie ohne neue Anmeldung.
 - **Kader:** Wer Captain oder Vertreter ist, verlässt Kader und Team erst, wenn die Rolle neu vergeben ist (in derselben
-  Änderung geht es). Übrige Mitglieder des Hauptteams bekommen zu Liga-Spielen ihres Teams keine Nachrichten.
-- **Löschen:** Ein Co-Team mit Anmeldung in einer laufenden Staffel lässt sich nicht löschen.
+  Änderung geht es). Wer das Hauptteam verlässt oder entfernt wird, verlässt auch jeden Kader seiner Co-Teams; Kader,
+  Captain und Vertreter zählen nur, solange sie im Hauptteam sind. Übrige Mitglieder des Hauptteams bekommen zu
+  Liga-Spielen ihres Teams keine Nachrichten.
+- **Löschen:** Ein Co-Team mit Anmeldung in einer Staffel, die nicht beendet ist, lässt sich nicht löschen und sein
+  Team nicht auflösen – auch wenn es ausgetreten oder disqualifiziert ist.
 - **Zuteilen** (Admin → Turnier → Teilnehmer → „Co-Team zuteilen“, `POST /api/tournaments/{tid}/squad-registrations`,
   Bereich Turniere): Co-Team gehört zum Hauptteam, ist aktiv und fürs Spiel der Staffel, Kader mindestens Mindestkader,
   alle im Hauptteam, Staffel nicht voll, zwei Co-Teams desselben Teams nie in derselben Staffel, ein Co-Team je Season

@@ -108,6 +108,7 @@ eindeutig, partiell.
 | `team_squads.vice_captain_id` | str | nein | Mitglied, ≠ `captain_id` |
 | `tournament_registrations.squad_id` | str | nein | Co-Team; fehlt = Anmeldung wie heute |
 | `tournament_registrations.squad_name` | str | nein | Schnappschuss des Co-Team-Namens |
+| `tournament_registrations.league_squad_key` | str | nein | `<season_id>:<squad_id>`, eindeutig (sparse) – ein Co-Team je Season nur in einer Staffel; nur mit `league_context`, fällt bei Austritt/Disqualifikation weg |
 
 Eine Co-Team-Anmeldung: `team_id` = Hauptteam, `squad_id`, `display_name` = „Lions · Lions B“,
 `registration_type="team"`, `registered_via="league_assign"`, `user_id=None`, `status="approved"`,
