@@ -10,6 +10,13 @@ import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { sortByNearestDate } from "@/lib/contentSort";
 
+const PAGE_SIZE = 24;
+// Der Server gibt höchstens 200 je Abruf zurück (_page_items) - so weit lädt „Mehr laden“ nach.
+const MAX_SHOWN = 200;
+// Status-Gruppen (#2124, TP12): „Beendet“ sind auch veröffentlichte und archivierte Turniere, „Live“ auch pausierte. Die
+// Adresse behält die bisherigen Werte (?status=completed, ?status=live) - Links von früher bleiben gültig.
+const FILTER_QUERY = { completed: "finished", live: "running" };
+
 export default function TournamentsPage() {
   useDocumentTitle(
     "eSports Turniere",
@@ -21,26 +28,42 @@ export default function TournamentsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "all");
+  // „Mehr laden“ (#2124, TP13): Seiten zu 24 - die Live-Aktualisierung lädt so viele, wie schon zu sehen sind.
+  const [shown, setShown] = useState(PAGE_SIZE);
+  const [total, setTotal] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  const fetchPage = useCallback(async (count) => {
+    // Liga-Staffeln haben ihre eigene Seite (docs/LIGA.md) - die Turnierliste fragt ohne sie.
+    const params = new URLSearchParams({ compact: "true", paged: "true", limit: String(count), offset: "0", league: "exclude" });
+    if (statusFilter !== "all") params.set("status", FILTER_QUERY[statusFilter] || statusFilter);
+    const { data } = await api.get(`/tournaments?${params.toString()}`);
+    const items = Array.isArray(data) ? data : data?.items || [];
+    setList(sortByNearestDate(items));
+    setTotal(Array.isArray(data) ? items.length : Number(data?.total ?? items.length));
+  }, [statusFilter]);
 
   const load = useCallback(async () => {
     try {
-      // Liga-Staffeln haben ihre eigene Seite (docs/LIGA.md) - die Turnierliste fragt ohne sie.
-      const params = new URLSearchParams({ compact: "true", limit: "60", league: "exclude" });
-      if (statusFilter !== "all") params.set("status", statusFilter);
-      const { data } = await api.get(`/tournaments?${params.toString()}`);
-      setList(sortByNearestDate(Array.isArray(data) ? data : data?.items || []));
+      await fetchPage(shown);
       setError(false);
     } catch {
       setError(true);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
-  }, [statusFilter]);
+  }, [fetchPage, shown]);
 
   useEffect(() => {
-    setLoading(true);
     load();
   }, [load]);
+
+  const loadMore = () => {
+    setLoadingMore(true);
+    setShown((value) => Math.min(value + PAGE_SIZE, MAX_SHOWN));
+  };
+  const hasMore = total > list.length && shown < MAX_SHOWN;
 
   useLiveRefresh(load, ["tournaments"], { fallbackMs: 15000 });
 
@@ -50,6 +73,10 @@ export default function TournamentsPage() {
   }, [searchParams, statusFilter]);
 
   const selectStatusFilter = (value) => {
+    if (value !== statusFilter) {
+      setLoading(true);
+      setShown(PAGE_SIZE);
+    }
     setStatusFilter(value);
     setSearchParams((current) => {
       const params = new URLSearchParams(current);
@@ -115,6 +142,14 @@ export default function TournamentsPage() {
             )}
           </Reveal>
         )}
+        {!loading && !error && hasMore ? (
+          <div className="mt-10 flex justify-center">
+            <button type="button" onClick={loadMore} disabled={loadingMore} data-testid="tournaments-load-more"
+              className="tls-btn tls-btn--secondary min-h-11 px-6 py-2.5 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+              {loadingMore ? "Lädt …" : "Mehr laden"}
+            </button>
+          </div>
+        ) : null}
       </div>
     </PublicLayout>
   );
