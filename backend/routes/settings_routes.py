@@ -1258,13 +1258,19 @@ async def newsletter_preview(body: NewsletterTriggerBody, me: dict = Depends(get
 
 
 @settings_router.post("/newsletter/unsubscribe")
-async def newsletter_unsubscribe(token: str = Query("", max_length=200)):
+async def newsletter_unsubscribe(request: Request, token: str = Query("", max_length=200)):
     """Newsletter mit einem Klick abbestellen (#2119 ML4) - ohne Login, nur mit dem Schlüssel aus der Mail. Mail-Programme
-    schicken dabei „List-Unsubscribe=One-Click“ als Formular (RFC 8058); der Inhalt spielt keine Rolle."""
+    schicken dabei „List-Unsubscribe=One-Click“ als Formular (RFC 8058); der Inhalt spielt keine Rolle.
+
+    Gezählt werden nur ungültige Versuche je Adresse: gültige Klicks kommen bei großen Mail-Anbietern gesammelt von
+    wenigen Servern und dürfen nie an einer Grenze scheitern."""
     from services.newsletter_unsubscribe import unsubscribe
+    from services.rate_limit import enforce_rate_limit
 
     result = await unsubscribe(get_db(), token)
     if result is None:
+        await enforce_rate_limit(request, "newsletter:unsubscribe:ip", limit=30, window_seconds=3600,
+                                 message="Zu viele ungültige Abmeldelinks. Bitte warte noch {wait}.")
         raise HTTPException(400, "Der Abmeldelink ist ungültig. Den Newsletter kannst du auch im Profil unter Benachrichtigungen abbestellen.")
     return result
 

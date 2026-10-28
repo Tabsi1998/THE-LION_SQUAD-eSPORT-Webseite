@@ -27,7 +27,8 @@ logger = logging.getLogger("tls.mailqueue")
 
 # Felder, die die Liste der Warteschlange nie zeigt (#1418): die ganze Adresse, der Mailtext und der Schlüssel gegen
 # doppelten Versand. Die Adresse steht gekürzt in ``to_masked``; ganz nur über „Adresse zeigen“ (mit Protokoll).
-LIST_HIDDEN_FIELDS = ("to", "html", "dedupe_key")
+# `headers` (#2119): die Abmelde-Kopfzeile trägt den persönlichen Schlüssel des Empfängers - nie in die Liste.
+LIST_HIDDEN_FIELDS = ("to", "html", "dedupe_key", "headers")
 
 
 def masked_recipient(address) -> str:

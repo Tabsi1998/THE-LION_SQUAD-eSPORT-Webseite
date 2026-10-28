@@ -101,3 +101,78 @@ async def test_smtp_and_resend_send_the_headers(monkeypatch):
     await mail_queue._resend_send({**cfg, "resend_api_key": "re_test"}, "paula@example.test", "Betreff", "<p>Hallo</p>", headers=headers)
     assert sent["resend"]["headers"]["List-Unsubscribe"] == "<https://example.test/x>"
     assert "X-Evil" not in sent["resend"]["headers"]
+
+
+@pytest.mark.asyncio
+async def test_the_queue_list_never_shows_the_personal_key(flow):
+    from services.notification_preferences import enqueue_newsletter_for_item
+
+    await reader(flow)
+    await enqueue_newsletter_for_item("news", {"id": new_id(), "slug": "x", "title": "X", "visibility": "public", "published": True})
+    admin = await flow.add_user(role="club_admin", name="admin")
+    flow.act_as(admin)
+    rows = (await flow.get("/api/settings/mail-queue")).json()
+    assert rows and all("headers" not in row for row in rows)
+    assert "token=" not in str(rows)
+    stats = (await flow.get("/api/settings/mail-queue/stats")).json()
+    assert "token=" not in str(stats)
+
+
+@pytest.mark.asyncio
+async def test_odd_keys_are_simply_invalid(flow):
+    from services.newsletter_unsubscribe import token_for, user_id_from
+
+    paula = await reader(flow)
+    user_id = paula["id"]
+    assert user_id_from(f"{user_id}.äöü") is None
+    assert user_id_from(f"{user_id}.{token_for(user_id).split('.')[1]}ß") is None
+    assert user_id_from("") is None and user_id_from(".") is None
+    response = await flow.client.post("/api/settings/newsletter/unsubscribe", params={"token": f"{user_id}.äöü"})
+    assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_two_clicks_at_once_withdraw_and_log_only_once(flow):
+    import asyncio
+
+    from services.newsletter_unsubscribe import token_for
+
+    paula = await reader(flow)
+    url = f"/api/settings/newsletter/unsubscribe?token={token_for(paula['id'])}"
+    first, second = await asyncio.gather(flow.client.post(url), flow.client.post(url))
+    assert sorted(response.json()["already"] for response in (first, second)) == [False, True]
+    assert await flow.db.consent_records.count_documents({"user_id": paula["id"], "granted": False}) == 1
+    assert await flow.db.audit_logs.count_documents({"action": "newsletter.unsubscribe"}) == 1
+
+
+@pytest.mark.asyncio
+async def test_only_invalid_attempts_are_limited(flow):
+    from services.newsletter_unsubscribe import token_for
+
+    paula = await reader(flow)
+    for _ in range(30):
+        assert (await flow.client.post("/api/settings/newsletter/unsubscribe?token=x.y")).status_code == 400
+    assert (await flow.client.post("/api/settings/newsletter/unsubscribe?token=x.y")).status_code == 429
+    # Ein gültiger Link geht trotzdem durch.
+    valid = await flow.client.post(f"/api/settings/newsletter/unsubscribe?token={token_for(paula['id'])}")
+    assert valid.status_code == 200 and valid.json()["already"] is False
+
+
+def test_the_key_is_derived_and_masked_in_the_access_log(monkeypatch):
+    import hashlib
+    import hmac
+    import logging
+
+    from services import log_safe
+    from services.newsletter_unsubscribe import _secret
+
+    # Ein eigener Schlüssel nur für diese Links, abgeleitet - nie das Server-Geheimnis selbst.
+    monkeypatch.setenv("JWT_SECRET", "ein-test-geheimnis-mit-mindestens-32-zeichen")
+    assert _secret() == hmac.new(b"ein-test-geheimnis-mit-mindestens-32-zeichen", b"newsletter-unsubscribe-key-v1", hashlib.sha256).digest()
+    assert _secret() != b"ein-test-geheimnis-mit-mindestens-32-zeichen"
+    line = "POST /api/settings/newsletter/unsubscribe?token=u1.SIGNATUR HTTP/1.1"
+    assert log_safe.redact_secret_paths(line) == "POST /api/settings/newsletter/unsubscribe?token=*** HTTP/1.1"
+    assert log_safe.redact_secret_paths("GET /newsletter/abbestellen?x=1&token=u1.SIG&y=2") == "GET /newsletter/abbestellen?x=1&token=***&y=2"
+    record = logging.LogRecord("uvicorn.access", logging.INFO, "", 0, '%s - "%s %s HTTP/%s" %d', ("127.0.0.1", "POST", "/api/settings/newsletter/unsubscribe?token=u1.SIG", "1.1", 200), None)
+    log_safe.SecretPathFilter().filter(record)
+    assert "u1.SIG" not in record.getMessage()

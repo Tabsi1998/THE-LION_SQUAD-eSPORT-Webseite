@@ -22,14 +22,15 @@ PAGE_PATH = "/newsletter/abbestellen"
 
 
 def _secret() -> bytes:
-    """Das Server-Geheimnis (JWT_SECRET). Ohne gibt es in Produktion keinen Link - lokal und in Tests ein fester Ersatz,
-    wie beim Schlüsselspeicher (services/secret_store)."""
+    """Ein eigener, aus dem Server-Geheimnis (JWT_SECRET) abgeleiteter Schlüssel nur für diese Links - wie beim
+    Formular-Token (services/spam_guard). Ohne JWT_SECRET gibt es in Produktion keinen Link; lokal und in Tests gilt ein
+    fester Ersatz wie beim Schlüsselspeicher (services/secret_store)."""
     configured = os.environ.get("JWT_SECRET", "").strip()
-    if configured:
-        return configured.encode("utf-8")
-    if os.environ.get("APP_ENV", "development").strip().lower() in {"production", "prod"}:
-        raise RuntimeError("JWT_SECRET is required in production.")
-    return b"tls-local-development-newsletter-unsubscribe"
+    if not configured:
+        if os.environ.get("APP_ENV", "development").strip().lower() in {"production", "prod"}:
+            raise RuntimeError("JWT_SECRET is required in production.")
+        configured = "tls-local-development-newsletter-unsubscribe"
+    return hmac.new(configured.encode("utf-8"), b"newsletter-unsubscribe-key-v1", hashlib.sha256).digest()
 
 
 def _signature(user_id: str) -> str:
@@ -46,7 +47,8 @@ def user_id_from(token: str | None) -> str | None:
     user_id, _, signature = str(token or "").strip().rpartition(".")
     if not user_id or not signature or len(user_id) > 80:
         return None
-    return user_id if hmac.compare_digest(_signature(user_id), signature) else None
+    # Als Bytes vergleichen: ein Schlüssel mit Umlauten o. Ä. ist einfach ungültig, kein Serverfehler.
+    return user_id if hmac.compare_digest(_signature(user_id).encode("utf-8"), signature.encode("utf-8")) else None
 
 
 def links_for(base: str, user_id: str) -> dict:
@@ -64,13 +66,15 @@ async def unsubscribe(db, token: str | None) -> dict | None:
     user_id = user_id_from(token)
     if not user_id:
         return None
-    user = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "newsletter_consent": 1})
-    if not user:
+    if not await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1}):
         return None
-    if not user.get("newsletter_consent"):
-        return {"ok": True, "already": True}
     now = now_utc()
-    await db.users.update_one({"id": user_id}, {"$set": {"newsletter_consent": False, "updated_at": now.isoformat()}})
+    # Bedingt und in einem Schritt: zwei gleichzeitige Klicks (Mail-Programm und Seite) widerrufen und protokollieren
+    # nur einmal.
+    result = await db.users.update_one({"id": user_id, "newsletter_consent": True},
+                                       {"$set": {"newsletter_consent": False, "updated_at": now.isoformat()}})
+    if getattr(result, "modified_count", 0) != 1:
+        return {"ok": True, "already": True}
     # Wie bei der Registrierung: die Entscheidung steht als Einwilligungs-Eintrag, hier als Widerruf.
     await db.consent_records.insert_one({"id": new_id(), "user_id": user_id, "consent_type": "newsletter", "policy_version": "1",
                                          "granted": False, "source": "mail_unsubscribe", "created_at": now})
