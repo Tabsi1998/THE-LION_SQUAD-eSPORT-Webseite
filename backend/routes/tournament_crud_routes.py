@@ -219,6 +219,12 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
             elif t.get("is_public") is not False and await lead_can_see(user, t.get("visibility") or "public"):
                 visible.append(t)
         tournaments = visible
+    # Kurze Liste (#2124): erst die Seite schneiden, dann nur sie anreichern - gleiche Reihenfolge, gleiche Zahl.
+    total = len(tournaments)
+    page_limit = max(1, min(int(limit or 48), 200))
+    page_offset = max(0, int(offset or 0))
+    if compact:
+        tournaments = tournaments[page_offset:page_offset + page_limit]
     finance = await can_use_area(user, "finance")
     for t in tournaments:
         await _enrich_tournament(t, user)
@@ -232,8 +238,10 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
     await hide_unseen_event_links(db, user, tournaments)
     await attach_has_bracket_tree(db, tournaments)
     if compact:
-        tournaments = [_compact_tournament(t) for t in tournaments]
-        return _page_items(tournaments, limit, offset, paged)
+        items = [_compact_tournament(t) for t in tournaments]
+        if not paged:
+            return items
+        return {"items": items, "total": total, "limit": page_limit, "offset": page_offset}
     return tournaments
 
 

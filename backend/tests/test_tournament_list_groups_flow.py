@@ -93,3 +93,25 @@ def test_has_bracket_tree_with_known_stages():
     assert has_bracket_tree({"format": "league"}, [{"stage_type": "league"}]) is False
     assert has_bracket_tree({"format": "league"}, [{"stage_type": "league"}, {"stage_type": "double_elimination"}]) is True
     assert has_bracket_tree({"format": "swiss"}, []) is True
+
+
+@pytest.mark.asyncio
+async def test_compact_list_enriches_only_the_page(flow, monkeypatch):
+    """Review O5: die kurze Liste reichert nur die gezeigte Seite an - Reihenfolge und Zahl bleiben."""
+    import routes.tournament_crud_routes as crud
+
+    for number in range(30):
+        await flow.create_tournament(id=f"t-{number:02d}", slug=f"cup-{number:02d}", created_at=f"2026-01-01T10:{number:02d}:00+00:00")
+    flow.act_as(None)
+    enriched = []
+    original = crud._enrich_tournament
+
+    async def counting(t, user=None):
+        enriched.append(t["id"])
+        return await original(t, user)
+
+    monkeypatch.setattr(crud, "_enrich_tournament", counting)
+    page = (await flow.get("/api/tournaments", params={"compact": "true", "paged": "true", "limit": 10, "offset": 5})).json()
+    assert [row["id"] for row in page["items"]] == [f"t-{number:02d}" for number in range(24, 14, -1)]
+    assert page["total"] == 30 and page["offset"] == 5 and page["limit"] == 10
+    assert sorted(enriched) == sorted(row["id"] for row in page["items"])
