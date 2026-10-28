@@ -38,7 +38,7 @@ Co-Teams – hat ein Co-Team keinen von beiden, die Teamleitung.
 | --- | --- | --- |
 | **Liga** (je Spiel) | CoD-Liga | Name, Spiel, Adresse `/liga/call-of-duty` |
 | **Season** | Season 1 | alle Vorgaben: Kalender, Sperrzeiten, Best of, Teamgröße, Punkte, Fristen, Map-Pool, Regeltext, Sichtbarkeit |
-| **Liga N** | Liga 1 | Stufe der Liga; darf Best of, Teamgröße, Mindestkader, Staffelgröße und Punkte abweichend festlegen |
+| **Liga N** | Liga 1 | Stufe der Liga; darf Best of, Teamgröße, Mindestkader, Staffelgröße, Punkte und Antwortfrist abweichend festlegen |
 | **Staffel** | Staffel A | ein gewöhnliches Turnier im Format Liga mit den Werten der Season – Spiele, Termine, Ergebnisse, Tabelle |
 | **Co-Team** | Nebelwölfe · Rudel | Teilnehmer der Staffel: ein Kader eines Hauptteams mit Captain und Vertreter |
 
@@ -101,6 +101,7 @@ dafür gibt es die Ligaseite und den Menüpunkt **Liga**.
 | | **Map-Wiederholung in einer Serie** | Gleiche Map nur in anderem Modus (Vorgabe); auch „Aus – jede Map nur einmal“ oder „Immer erlaubt“ |
 | | **Punkte Sieg / Remis / Niederlage**, **Bei Punktgleichheit** | 3 / 1 / 0 · Differenz, Mehr gewonnene Maps |
 | | **Ergebnis gilt nach (Stunden)** · **Aufstellung nachtragen bis (Stunden)** | 48 · 48 |
+| | **Antwort auf Terminvorschlag (Stunden)** – so lange hat die Gegenseite Zeit; leer heißt bei älteren Seasons „je Staffel wie bisher“ | 72 |
 | Regeltext und Sichtbarkeit | **Regeltext** (Markdown) | Regelwerk der Liga |
 | | **Sichtbarkeit** | bis zum Start *Nur Turnierleitung* (siehe 2.8) |
 
@@ -149,15 +150,15 @@ Staffel steht auf **Live**. Ab jetzt können die Captains Termine vorschlagen un
 
 Die Turnierverwaltung einer Staffel zeigt nur, was die Liga braucht. Oben steht, wohin sie gehört („Liga 1 · Staffel
 A“) mit **Season öffnen** und **Ligaseite**. Im Reiter **Bearbeiten** stehen die Werte der Season (Spiel, Start und
-Ende, Spielwoche, Standardtermin, Teamgröße, Staffelgröße, Best of, Bestätigungsfrist, Sichtbarkeit, Regeltext) nur
-zum Lesen unter **Aus der Season** – ändern in der Season, dann **Vorgaben übertragen** (2.7). Auch den Map-Pool
-pflegt die Season. Anmeldung, Check-in, Discord, Preise, Jahreswertung, Seeding und Weiterkommen gibt es in der
-Staffel nicht. Änderbar bleiben Titel, Beschreibung, Banner, Partner, Streaming und die **Antwortfrist** auf
-Terminvorschläge.
+Ende, Spielwoche, Standardtermin, Teamgröße, Staffelgröße, Best of, Bestätigungsfrist, Antwortfrist auf
+Terminvorschläge, Sichtbarkeit, Regeltext) nur zum Lesen unter **Aus der Season** – ändern in der Season, dann
+**Vorgaben übertragen** (2.7). Auch den Map-Pool pflegt die Season. Anmeldung, Check-in, Discord, Preise, Jahreswertung,
+Seeding und Weiterkommen gibt es in der Staffel nicht. Änderbar bleiben Titel, Beschreibung, Banner, Partner und
+Streaming.
 
-Eine Staffel lässt sich in der Turnierliste nur **vor dem Start** löschen. Danach bleibt sie: Status **Abgesagt** oder
-**Archiviert**. In der Turnierliste tragen Staffeln das Kennzeichen „Liga · Staffel A“; der Filter **Nur
-Liga-Staffeln** zeigt nur sie.
+Eine Staffel lässt sich nur **vor dem Start** löschen – in der Turnierliste oder auf der Season-Seite (2.9). Danach
+bleibt sie: Status **Abgesagt** oder **Archiviert**. In der Turnierliste tragen Staffeln das Kennzeichen „Liga ·
+Staffel A“; der Filter **Nur Liga-Staffeln** zeigt nur sie.
 
 ### 2.7 Vorgaben später ändern und übertragen
 
@@ -168,6 +169,7 @@ mehr geht, steht je Staffel mit Grund da:
 | Was | Wird übertragen |
 | --- | --- |
 | Regeltext, Map-Pool | immer (ein entfernter Pool verschwindet nur vor dem ersten Ergebnis; Spiele mit festgehaltenem Pool behalten ihn) |
+| Antwortfrist auf Terminvorschläge | auch während der Season – gilt für neue Vorschläge; nicht bei gesperrten Staffeln. Ist das Feld der Season leer (ältere Seasons), behält jede Staffel ihre Frist |
 | Termine und Kalender (Beginn, Wochen, Sperrzeiten, Standardtermin, Runden, Staffelgröße) | nur vor dem Start |
 | Best of, Teamgröße, Mindestkader, Punkte, Modus je Map, Map-Wiederholung, Fristen | nur vor dem ersten Ergebnis |
 | Sichtbarkeit | sofort beim Speichern, ohne Übertragen |
@@ -183,6 +185,36 @@ mehr geht, steht je Staffel mit Grund da:
 
 Die Sichtbarkeit gilt beim **Season speichern** sofort für alle Staffeln. Wer in einer Staffel spielt, sieht seine
 Spiele, Termine und den Matchchat immer – auch bei *Aus*.
+
+### 2.9 Korrigieren, archivieren, löschen
+
+Falsch angelegt? So kommst du zurück – Löschen geht nur, solange nichts gespielt oder zugeteilt ist; danach
+**archivierst** du (ausgeblendet, aber alles bleibt erhalten).
+
+**Liga bearbeiten:** **Admin → eSports → Liga** → Stift in der Zeile der Liga. Name, Beschreibung und **Stand**
+(*Aktiv*/*Archiviert*) gehen immer. Das **Spiel** nur, solange keine Season eine Staffel hat (die Modus-Reihenfolge
+der Seasons wird dabei geleert, den Map-Pool neu wählen). Die **Adresse** (`/liga/…`) nur, bis eine Season zum ersten
+Mal sichtbar war – danach bleibt sie, damit geteilte Links weiter gehen.
+
+**Season bearbeiten:** auf der Season-Seite wie in 2.2; archivieren über **Stand → Archiviert**.
+**Liga N bearbeiten:** Stift bei der Liga → Beiname, Abweichungen und **Stand** (*Aktiv*/*Archiviert*). Eine
+archivierte Liga N verschwindet von der Ligaseite, ihre Staffeln bleiben.
+
+**Löschen:** Papierkorb bei der Liga (Übersicht), **Season löschen** (oben auf der Season-Seite) oder Papierkorb bei
+der Liga N. Es öffnet sich ein Blatt:
+
+| Was du siehst | Bedeutung |
+| --- | --- |
+| „Das wird endgültig gelöscht“ mit Liste (Seasons, Ligen, leere Staffeln) | Geht: darunter ist jede Staffel ein **Entwurf ohne Co-Teams und Spiele** – sie wird mitgelöscht. **Grund** eintragen (mindestens 5 Zeichen, steht im Protokoll) → **Endgültig löschen** |
+| „Archivieren statt löschen“ mit Gründen | Geht nicht: eine Staffel hat schon Co-Teams, einen festen Spielplan oder Ergebnisse, oder die Season ist kein **Entwurf** mehr. **Archivieren** blendet aus, alles bleibt; zurück über **Stand → Aktiv** |
+
+Eine Season lässt sich nur als **Entwurf** löschen. Eine Liga löschen heißt: mit allen Seasons, Ligen N und leeren
+Staffeln darunter.
+
+**Staffel löschen:** auf der Season-Seite der Papierkorb in der Zeile der Staffel – nur im **Entwurf** und vor dem
+festen Spielplan, wie in der Turnierverwaltung. Zugeteilte Co-Teams werden dabei aus der Staffel genommen (das Blatt
+sagt, wie viele); Grund eintragen → **Endgültig löschen**. Nach dem Start: Status **Abgesagt** oder **Archiviert** in
+der Turnierverwaltung.
 
 ---
 
@@ -250,10 +282,13 @@ mit Termin, Ergebnis, Sieger und den Maps – ohne Aufstellungen.
 | Co-Team lässt sich nicht entfernen („… Spielplan …“) | Die Staffel ist gestartet | Mit dem Co-Team klären; Spiele notfalls kampflos werten |
 | „Eine Liga-Staffel hat keine Anmeldung und keinen Check-in …“ | Status mit Anmeldung oder Check-in gewählt | **Liga starten** (oben) |
 | „Turnier kann ohne spielbares Match nicht gestartet werden.“ | Eine ältere Staffel steht noch im Check-in | Status oben auf **Entwurf**, dann **Liga starten** |
-| „Best of: Kommt aus der Season – dort ändern und übertragen.“ (ebenso andere Felder) | Wert gibt die Season vor | In der Season ändern, dann **Vorgaben übertragen** |
+| „Best of: Kommt aus der Season – dort ändern und übertragen.“ (ebenso andere Felder, auch die Antwortfrist) | Wert gibt die Season vor | In der Season ändern, dann **Vorgaben übertragen** |
 | „In einer Liga-Staffel spielen nur Co-Teams …“ | Teilnehmer ohne Co-Team eingetragen | **Co-Team zuteilen** |
 | „Diese Staffel hat schon begonnen oder Spiele – Löschen geht nur vor dem Start …“ | Gestartete Staffel löschen | Status **Abgesagt** oder **Archiviert** |
-| „Ein zugeteiltes Co-Team nimmt nur die Turnierleitung wieder aus der Staffel …“ | Teamleitung will ihr Co-Team abmelden | Bei der Turnierleitung melden |
+| „Löschen geht nicht: … hat schon Co-Teams zugeteilt / hat schon begonnen oder Spiele / ist kein Entwurf mehr. Archivieren statt löschen …“ | Liga, Season oder Liga N hängt schon etwas an | Im Blatt **Archivieren** (2.9) |
+| „Bitte einen Grund angeben (mindestens 5 Zeichen) …“ | Löschen ohne Grund | Grund eintragen |
+| „Das Spiel bleibt, sobald eine Season eine Staffel hat …“ | Spiel einer Liga mit Staffel ändern | Neue Liga anlegen, die alte archivieren |
+| „Die Adresse bleibt, seit eine Season der Liga sichtbar war …“ | Adresse nach der Veröffentlichung ändern | Adresse lassen; nur der Name ändert sich || „Ein zugeteiltes Co-Team nimmt nur die Turnierleitung wieder aus der Staffel …“ | Teamleitung will ihr Co-Team abmelden | Bei der Turnierleitung melden |
 | Ligaseite zeigt „Liga nicht gefunden“ | Sichtbarkeit *Aus* oder *Nur Turnierleitung* | Sichtbarkeit der Season ändern und speichern |
 | „Bitte im Web mit Maps und Aufstellung melden.“ | Erstmeldung oder abweichende Meldung aus der App | Im Web auf der Matchseite melden |
 | „In dieser Zeit wird nicht gespielt (Weihnachtspause, 21.12.2026 bis 3.1.2027) …“ | Termin in einer Sperrzeit | Anderen Termin vorschlagen |
