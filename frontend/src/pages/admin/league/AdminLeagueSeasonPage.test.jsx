@@ -138,6 +138,23 @@ test("Season löschen: Bestätigung in der Seite mit Auflistung und Grund, danac
   confirmSpy.mockRestore();
 });
 
+test("409 beim Löschen: das Blatt holt den Plan neu und bietet Archivieren an", async () => {
+  const deletable = { kind: "division", id: "d1", name: "Liga 1", deletable: true, blockers: [], archived: false, seasons: [], divisions: [],
+    staffeln: [{ tournament_id: "t1", title: "Staffel A", staffel: "A" }] };
+  const blockedPlan = { ...deletable, deletable: false, staffeln: [], blockers: ["Staffel A hat schon Co-Teams zugeteilt"] };
+  let plans = 0;
+  apiMock.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith("/delete-plan") ? (plans++ ? blockedPlan : deletable) : BODY }));
+  apiMock.delete.mockRejectedValue({ response: { status: 409, data: { detail: "Löschen geht nicht: Staffel A hat schon Co-Teams zugeteilt." } } });
+  renderPage();
+  fireEvent.click(await screen.findByTestId("division-delete-1"));
+  await screen.findByTestId("league-delete-list");
+  fireEvent.change(screen.getByTestId("league-delete-reason"), { target: { value: "Doppelt angelegt" } });
+  fireEvent.click(screen.getByTestId("league-delete-confirm"));
+  expect(await screen.findByTestId("league-delete-blocked")).toHaveTextContent("Staffel A hat schon Co-Teams zugeteilt");
+  expect(toastMock.error).toHaveBeenCalledWith("Löschen geht nicht: Staffel A hat schon Co-Teams zugeteilt.");
+  expect(screen.getByTestId("league-delete-archive")).toBeEnabled();
+});
+
 test("Liga N mit gespielter Staffel: Archivieren statt löschen, mit Knopf", async () => {
   withPlan({ kind: "division", id: "d1", name: "Liga 1", deletable: false, archived: false, seasons: [], divisions: [], staffeln: [],
     blockers: ["Probe-Liga Season 1 · Liga 1 · Staffel A hat schon begonnen oder Spiele"] });

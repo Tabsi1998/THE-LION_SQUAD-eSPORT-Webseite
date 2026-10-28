@@ -58,6 +58,15 @@ export function LeagueDeleteSheet({ kind, target, name, onClose, onDeleted, onAr
       onDeleted?.();
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail));
+      // 409: inzwischen hängt etwas dran - den Plan neu holen, damit „Archivieren statt löschen“ erscheint.
+      if (err.response?.status === 409 && kind !== "staffel") {
+        try {
+          const { data } = await api.get(`${base}/delete-plan`);
+          setPlan(data);
+        } catch (reloadErr) {
+          setError(formatApiError(reloadErr.response?.data?.detail));
+        }
+      }
       setSaving(false);
     }
   };
