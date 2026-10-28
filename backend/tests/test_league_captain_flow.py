@@ -282,3 +282,24 @@ async def test_captain_and_vice_give_up_their_own_role_only(flow):
     # Ohne Rolle darf Spieler1 das Team jetzt verlassen.
     left = await flow.post(f"/api/teams/{world['lions']['id']}/leave")
     assert left.status_code == 200, left.text
+
+
+@pytest.mark.asyncio
+async def test_role_conflicts_point_to_the_website(flow):
+    world = await setup(flow)
+    users = world["users"]
+
+    flow.act_as(users["Spieler2"])
+    leave = await flow.post(f"/api/teams/{world['lions']['id']}/leave")
+    assert leave.status_code == 409
+    assert "Website" in leave.json()["detail"] and "Rolle abgeben" in leave.json()["detail"]
+
+    # Kader ändern wie aus der App (ohne Rollen-Felder): der Captain fällt heraus -> 409 mit dem Weg.
+    flow.act_as(users["Leitung"])
+    squad_url = f"/api/teams/{world['lions']['id']}/squads/{world['squad_a']['id']}"
+    roster = [users[name]["id"] for name in ("Spieler2", "Spieler3", "Spieler4")]
+    refused = await flow.patch(squad_url, json={"name": "Rudel A", "member_ids": roster})
+    assert refused.status_code == 409
+    assert "Website" in refused.json()["detail"]
+    kick = await flow.delete(f"/api/teams/{world['lions']['id']}/members/{users['Spieler1']['id']}")
+    assert kick.status_code == 409 and "Website" in kick.json()["detail"]

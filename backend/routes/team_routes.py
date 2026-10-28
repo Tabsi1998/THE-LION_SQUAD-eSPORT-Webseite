@@ -63,6 +63,10 @@ class TeamSquadRoles(BaseModel):
 
 SQUAD_ROLE_FIELDS = ("captain_id", "vice_captain_id")
 SQUAD_ROLE_LABELS = {"captain_id": "Captain", "vice_captain_id": "Vertreter"}
+# Die App kennt Captain und Vertreter noch nicht (L-D12, #2110) und zeigt den Text des Servers - darum steht der Weg
+# auf der Website in jeder Meldung, die eine Rolle im Weg hat.
+ROLES_ON_WEBSITE = "Captain und Vertreter vergibst du auf der Website unter Teams → Deine Teams (Co-Team bearbeiten)."
+RESIGN_ON_WEBSITE = "Deine Rolle gibst du auf der Website unter Teams → Deine Teams mit „Rolle abgeben“ ab."
 
 
 class TeamInviteCreate(BaseModel):
@@ -364,7 +368,7 @@ def _squad_roles(current: dict, requested: dict, member_ids: list[str], team: di
         if field in requested:
             raise HTTPException(status_code=400, detail=f"{label} muss im Kader des Co-Teams stehen.")
         raise HTTPException(status_code=409, detail=f"Diese Person ist {label} des Co-Teams – bitte erst die Rolle neu "
-                                                    "vergeben, dann aus dem Kader nehmen.")
+                                                    f"vergeben, dann aus dem Kader nehmen. {ROLES_ON_WEBSITE}")
     if roles["captain_id"] and roles["captain_id"] == roles["vice_captain_id"]:
         raise HTTPException(status_code=400, detail="Captain und Vertreter müssen verschiedene Personen sein.")
     return roles
@@ -840,7 +844,7 @@ async def leave_team(team_id: str, me: dict = Depends(get_current_user)):
     held = await _squad_role_holder(db, team_id, me["id"])
     if held:
         raise HTTPException(status_code=409, detail=f"Du bist Captain oder Vertreter im Co-Team {held.get('name') or ''} – "
-                                                    "bitte die Teamleitung, die Rolle erst neu zu vergeben.")
+                                                    f"bitte erst die Rolle abgeben, dann das Team verlassen. {RESIGN_ON_WEBSITE}")
     await db.teams.update_one({"id": team_id}, {"$pull": {"member_ids": me["id"], "co_leader_ids": me["id"]}})
     await db.team_members.delete_one({"team_id": team_id, "user_id": me["id"]})
     await _leave_squads(db, team_id, me["id"])
@@ -883,7 +887,8 @@ async def kick_member(team_id: str, user_id: str, me: dict = Depends(get_current
     held = await _squad_role_holder(db, team_id, user_id)
     if held:
         raise HTTPException(status_code=409, detail=f"Diese Person ist Captain oder Vertreter im Co-Team "
-                                                    f"{held.get('name') or ''} – bitte erst die Rolle neu vergeben.")
+                                                    f"{held.get('name') or ''} – bitte erst die Rolle neu vergeben. "
+                                                    f"{ROLES_ON_WEBSITE}")
     await db.teams.update_one(
         {"id": team_id},
         {"$pull": {"member_ids": user_id, "co_leader_ids": user_id}, "$set": {"updated_at": now_utc().isoformat()}},
