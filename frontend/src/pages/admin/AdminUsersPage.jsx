@@ -59,7 +59,7 @@ function statusText(user) {
 }
 
 export default function AdminUsersPage() {
-  const { isSuperAdmin, user: me } = useAuth();
+  const { isSuperAdmin, user: me, can } = useAuth();
   const [list, setList] = useState([]);
   const [q, setQ] = useState("");
   const [creating, setCreating] = useState(false);
@@ -202,15 +202,17 @@ export default function AdminUsersPage() {
       </ul>
 
       {creating && <CreateUserModal onClose={() => setCreating(false)} onCreated={load} onSaved={() => { setCreating(false); load(); }} />}
-      {editing && <UserSheet key={editing.id} target={editing} me={me} isSuperAdmin={isSuperAdmin} onClose={closeSheet} onChanged={load} />}
+      {editing && <UserSheet key={editing.id} target={editing} me={me} isSuperAdmin={isSuperAdmin} canClub={Boolean(can?.("club"))} onClose={closeSheet} onChanged={load} />}
     </AdminLayout>
   );
 }
 
 // Das Blatt eines Kontos: Konto, Rolle und Freigaben, Sperren, Mehr. Ändern nur mit „Speichern“ und Rückfrage.
-function UserSheet({ target, me, isSuperAdmin, onClose, onChanged }) {
+function UserSheet({ target, me, isSuperAdmin, canClub, onClose, onChanged }) {
   const confirm = useConfirm();
   const name = displayName(target);
+  // Profil zurücksetzen (#2112): Vereinsverwaltung, fremde Konten; Superadmin-Konten nur durch den Superadmin.
+  const canResetProfile = canClub && target.id !== me?.id && (target.role !== "superadmin" || isSuperAdmin);
   const [role, setRole] = useState(target.role || "player");
   const [grants, setGrants] = useState(() => (Array.isArray(target.areas) ? target.areas.filter((area) => GRANTABLE_AREAS.includes(area)) : []));
   const [saving, setSaving] = useState(false);
@@ -343,6 +345,8 @@ function UserSheet({ target, me, isSuperAdmin, onClose, onChanged }) {
           )}
         </section>
 
+        {canResetProfile && <ProfileResetSection target={target} name={name} onChanged={onChanged} />}
+
         <section className="space-y-2 border-t border-white/10 pt-4" data-testid="user-sheet-ban">
           <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Sperren</div>
           {ban.canAct ? (
@@ -385,6 +389,76 @@ function UserSheet({ target, me, isSuperAdmin, onClose, onChanged }) {
       </AdminSheet>
       {banOpen && <BanDialog target={target} onCancel={() => setBanOpen(false)} onBanned={async () => { setBanOpen(false); await onChanged(); }} />}
     </>
+  );
+}
+
+// Profil zurücksetzen (#2112, Regeln #2118): nur Anzeigename, Bio, Profilbild und Banner - etwa ein anstößiger Name.
+// Immer mit Grund; er steht im Protokoll, und die Person bekommt eine Benachrichtigung mit Feldern und Grund.
+const PROFILE_RESET_FIELDS = [
+  ["display_name", "Anzeigename", "Danach steht der Benutzername da."],
+  ["bio", "Bio", ""],
+  ["avatar_url", "Profilbild", ""],
+  ["banner_url", "Banner", ""],
+];
+
+function ProfileResetSection({ target, name, onChanged }) {
+  const confirm = useConfirm();
+  const [fields, setFields] = useState([]);
+  const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
+  const trimmed = reason.trim();
+  const ready = fields.length > 0 && trimmed.length >= BAN_REASON_MIN;
+  const toggle = (field) => setFields((current) => (current.includes(field) ? current.filter((f) => f !== field) : [...current, field]));
+
+  const reset = async () => {
+    if (!ready || saving) return;
+    const labels = PROFILE_RESET_FIELDS.filter(([key]) => fields.includes(key)).map(([, label]) => label).join(", ");
+    if (!await confirm({
+      title: `Profil von ${name} zurücksetzen?`,
+      description: `Zurückgesetzt wird: ${labels}. ${name} bekommt eine Benachrichtigung mit dem Grund; er steht auch im Protokoll.`,
+      confirmLabel: "Zurücksetzen",
+      tone: "danger",
+    })) return;
+    setSaving(true);
+    try {
+      await api.patch(`/users/${target.id}`, { reset: fields, reason: trimmed });
+      toast.success(`Profil von ${name} zurückgesetzt.`);
+      setFields([]);
+      setReason("");
+      await onChanged();
+    } catch (error) {
+      toast.error(formatRequestError(error, "Das Profil konnte nicht zurückgesetzt werden."));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <section className="space-y-2 border-t border-white/10 pt-4" data-testid="user-sheet-profile-reset">
+      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Profil zurücksetzen</div>
+      <p className="text-xs text-white/50">Für unpassende Angaben. Die Person kann danach selbst neue eintragen.</p>
+      <div className="grid sm:grid-cols-2 gap-2">
+        {PROFILE_RESET_FIELDS.map(([key, label, hint]) => (
+          <label key={key} className="flex items-start gap-2 text-sm border border-white/10 rounded-sm px-3 py-2">
+            <input type="checkbox" className="mt-0.5 accent-[#29B6E8]" checked={fields.includes(key)} onChange={() => toggle(key)} data-testid={`user-sheet-reset-${key}`} />
+            <span><span className="font-semibold">{label}</span>{hint && <span className="block text-[11px] text-white/45">{hint}</span>}</span>
+          </label>
+        ))}
+      </div>
+      <label htmlFor="profile-reset-reason" className="block text-[11px] font-bold uppercase tracking-widest text-white/60">Grund (Pflicht)</label>
+      <textarea
+        id="profile-reset-reason"
+        value={reason}
+        onChange={(event) => setReason(event.target.value)}
+        maxLength={500}
+        placeholder={`Warum? Mindestens ${BAN_REASON_MIN} Zeichen - die Person liest ihn.`}
+        data-testid="user-sheet-reset-reason"
+        className="input min-h-20 resize-y"
+      />
+      <button type="button" onClick={reset} disabled={!ready || saving} data-testid="user-sheet-reset" className="tls-btn tls-btn--danger px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-40">
+        {saving ? "Setze zurück …" : "Zurücksetzen …"}
+      </button>
+    </section>
   );
 }
 
