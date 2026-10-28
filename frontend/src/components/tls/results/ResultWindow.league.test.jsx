@@ -106,3 +106,22 @@ test("Nachtrag der Turnierleitung: Seite wählen, Aufstellung je Map, Grund", as
     games: [{ position: 1, lineup: ["f1", "f2"] }], registration_id: "b", reason: "Per Discord gemeldet",
   }));
 });
+
+test("ohne Maps: „Nicht erschienen“ über die gewohnten Eingaben, ohne Maps im Aufruf", async () => {
+  render(<ResultWindow entry={ENTRY} league={LEAGUE} onClose={() => {}} onSaved={vi.fn()} />);
+  expect(screen.getByTestId("result-maps-on")).toHaveAttribute("aria-pressed", "true");
+  fireEvent.click(screen.getByTestId("result-maps-off"));
+  expect(screen.getByTestId("result-window")).not.toHaveAttribute("data-kind", "maps");
+  expect(screen.queryByTestId("league-game-1")).toBeNull();
+  expect(screen.getByTestId("result-maps-off-hint")).toHaveTextContent("Nicht erschienen");
+  fireEvent.click(screen.getByTestId("result-flag-b-no_show"));
+  fireEvent.click(screen.getByTestId("result-save"));
+
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalled());
+  const body = apiMock.post.mock.calls[0][1];
+  expect(body).not.toHaveProperty("games");
+  expect(body.results.find((row) => row.registration_id === "b")).toMatchObject({ forfeit: true });
+
+  fireEvent.click(screen.getByTestId("result-maps-on"));
+  expect(screen.getByTestId("league-game-1")).toBeInTheDocument();
+});

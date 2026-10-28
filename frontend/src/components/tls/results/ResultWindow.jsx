@@ -34,8 +34,11 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
   const [heatMode, setHeatMode] = useState(readHeatMode);
   const [state, setState] = useState(() => initialState(entry));
   // Liga (#1650): je Map Modus, Map, Sieger, Punkte und die Aufstellungen beider Seiten statt Plus/Minus.
-  const withMaps = Boolean(league?.sides?.length === 2 && league?.pool);
-  const [mapGames, setMapGames] = useState(() => (withMaps ? staffStart(league) : []));
+  const mapsPossible = Boolean(league?.sides?.length === 2 && league?.pool);
+  // „Ohne Maps“: nicht erschienen, aufgegeben oder ein Stand ohne gespielte Maps - die gewohnten Eingaben (#1650).
+  const [skipMaps, setSkipMaps] = useState(false);
+  const withMaps = mapsPossible && !skipMaps;
+  const [mapGames, setMapGames] = useState(() => (mapsPossible ? staffStart(league) : []));
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -55,7 +58,8 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
   if (seenEntryId !== entry?.id) {
     setSeenEntryId(entry?.id);
     setState(initialState(entry));
-    setMapGames(withMaps ? staffStart(league) : []);
+    setMapGames(mapsPossible ? staffStart(league) : []);
+    setSkipMaps(false);
     setReason("");
     setError("");
   }
@@ -146,6 +150,20 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
             </div>
           ) : null}
 
+          {mapsPossible ? (
+            <div className="grid grid-cols-2 gap-1 rounded-sm border border-white/10 bg-white/5 p-1" role="group" aria-label="Eingabe bei Liga-Spielen" data-testid="result-maps-mode">
+              {[[false, "Mit Maps"], [true, "Ohne Maps"]].map(([skip, label]) => (
+                <button key={label} type="button" aria-pressed={skipMaps === skip} onClick={() => { setSkipMaps(skip); setError(""); }}
+                  className={`min-h-[40px] rounded-sm text-xs font-bold uppercase tracking-wider ${skipMaps === skip ? "bg-[#29B6E8] text-black" : "text-white/60"}`}
+                  data-testid={`result-maps-${skip ? "off" : "on"}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          {mapsPossible && skipMaps ? (
+            <p className="text-xs text-white/55" data-testid="result-maps-off-hint">Für „Nicht erschienen“, „Aufgegeben“ oder einen Stand ohne gespielte Maps. Vorhandene Maps fallen weg, wenn der Stand nicht mehr zu ihnen passt.</p>
+          ) : null}
           {withMaps && mapGames.map((game, index) => (
             <GameEditor key={game.position} staff index={index} game={game} league={league}
               onChange={(next) => setMapGames((current) => settleStaffGames(changeStaffGame(current, game.position, next), league))} />
