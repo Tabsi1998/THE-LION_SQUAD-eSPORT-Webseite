@@ -955,16 +955,24 @@ async def _award_f1_season_points(challenge: dict):
 async def delete_challenge(cid: str, me: dict = Depends(require_admin())):
     cid = await _resolve_cid(cid)
     async with challenge_write(cid):
-        return await _delete_challenge_locked(cid)
+        return await _delete_challenge_locked(cid, me)
 
 
-async def _delete_challenge_locked(cid: str):
+async def _delete_challenge_locked(cid: str, me: dict):
     db = get_db()
     # Frisch unter der Schreib-Sperre: der Status kann sich gerade geändert haben.
-    current = await db.f1_challenges.find_one({"id": cid}, {"_id": 0, "status": 1}) or {}
+    current = await db.f1_challenges.find_one({"id": cid}, {"_id": 0, "status": 1, "slug": 1}) or {}
+    if not current:
+        raise HTTPException(status_code=404, detail="Challenge nicht gefunden")
+    has_times = await db.f1_lap_times.count_documents({"challenge_id": cid}) > 0
     # Veröffentlichte Ergebnisse verschwinden nicht mit der Challenge (#1584) - dafür gibt es „Archiviert“.
-    if current.get("status") in LOCKED_STATUSES and await db.f1_lap_times.count_documents({"challenge_id": cid}):
+    if current.get("status") in LOCKED_STATUSES and has_times:
         raise HTTPException(status_code=409, detail="Die Ergebnisse sind veröffentlicht - eine Challenge mit Zeiten wird archiviert, nicht gelöscht.")
+    # Löschen nur für Entwürfe ohne Zeiten (#2112): an allem anderen hängen Ranglisten, Gewinne oder Ankündigungen.
+    if current.get("status") != "draft":
+        raise HTTPException(status_code=409, detail="Löschen geht nur bei einem Entwurf. Eine Challenge, die schon angekündigt war, bitte absagen oder archivieren.")
+    if has_times:
+        raise HTTPException(status_code=409, detail="Die Challenge hat schon Zeiten - sie lässt sich nicht mehr löschen, nur archivieren.")
     await db.f1_challenges.delete_one({"id": cid})
     await db.f1_tracks.delete_many({"challenge_id": cid})
     await db.f1_lap_times.delete_many({"challenge_id": cid})
@@ -972,6 +980,9 @@ async def _delete_challenge_locked(cid: str):
     await db.f1_guests.delete_many({"challenge_id": cid})
     await db.f1_queue.delete_many({"challenge_id": cid})
     await db.prize_pickups.delete_many({"source_type": "fastlap", "fastlap_challenge_id": cid})
+    await db.audit_logs.insert_one({"id": new_id(), "action": "fastlap.challenge.delete", "actor_id": me.get("id"), "target_id": cid,
+                                    "data": {"slug": current.get("slug"), "status": current.get("status")},
+                                    "created_at": now_utc().isoformat()})
     return {"ok": True}
 
 
