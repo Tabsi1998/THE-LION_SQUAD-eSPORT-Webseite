@@ -1,8 +1,9 @@
 """Phase 9: PrizePickup admin + user routes."""
+from datetime import datetime, timezone
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, Literal
 
 from database import get_db
@@ -21,10 +22,30 @@ RESULT_CERTIFICATE_STATUSES = {"completed", "results_published", "archived"}
 
 class PrizeUpdate(BaseModel):
     status: Optional[PrizeStatus] = None
-    notes: Optional[str] = None
-    pickup_deadline: Optional[str] = None
-    prize_label: Optional[str] = None
-    prize_value: Optional[str] = None
+    notes: Optional[str] = Field(default=None, max_length=1000)
+    pickup_deadline: Optional[str] = Field(default=None, max_length=40)
+    prize_label: Optional[str] = Field(default=None, max_length=200)
+    prize_value: Optional[str] = Field(default=None, max_length=200)
+
+
+def _deadline_value(value: str | None) -> str | None:
+    """Eine von Hand gesetzte Abholfrist (#2112) als UTC-Zeitpunkt - so vergleicht sie der Ablauf-Job als Text richtig."""
+    if value in (None, ""):
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).strip())
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Die Abholfrist ist kein gültiges Datum.")
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc).isoformat()
+
+
+def _prize_label(value: str | None) -> str:
+    label = " ".join(str(value or "").split())
+    if not label:
+        raise HTTPException(status_code=400, detail="Bitte angeben, was es zu gewinnen gibt.")
+    return label
 
 
 async def _hydrate_pickups(pickups: list[dict]) -> list[dict]:
@@ -360,9 +381,19 @@ async def update_prize(pickup_id: str, body: PrizeUpdate, me: dict = Depends(get
     updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
     if not updates:
         return pickup
+    if "prize_label" in updates:
+        updates["prize_label"] = _prize_label(updates["prize_label"])
+    if "prize_value" in updates:
+        updates["prize_value"] = " ".join(updates["prize_value"].split())
     if "pickup_deadline" in updates:
-        # Von Hand gesetzte Frist (#2123, ER1): „Bereit“ überschreibt sie nicht mit den 90 Tagen.
-        updates["pickup_deadline_custom"] = True
+        updates["pickup_deadline"] = _deadline_value(updates["pickup_deadline"])
+        if updates["pickup_deadline"] is None:
+            updates.pop("pickup_deadline")
+        else:
+            # Von Hand gesetzte Frist (#2123, ER1): „Bereit“ überschreibt sie nicht mit den 90 Tagen.
+            updates["pickup_deadline_custom"] = True
+    if not updates:
+        return pickup
     updates["updated_at"] = now_utc().isoformat()
     await db.prize_pickups.update_one({"id": pickup_id}, {"$set": updates})
     await _audit_prize(db, me, "prizes.update", pickup, changes=updates)
@@ -385,19 +416,23 @@ async def delete_prize(pickup_id: str, me: dict = Depends(get_current_user)):
 
 
 class PrizeCreate(BaseModel):
-    tournament_id: str
-    user_id: str
-    place: int
-    prize_label: str
-    prize_value: Optional[str] = ""
-    pickup_deadline: Optional[str] = None
+    tournament_id: str = Field(max_length=80)
+    user_id: str = Field(max_length=80)
+    place: int = Field(ge=1, le=999)
+    prize_label: str = Field(max_length=200)
+    prize_value: Optional[str] = Field(default="", max_length=200)
+    pickup_deadline: Optional[str] = Field(default=None, max_length=40)
 
 
 @router.post("")
 async def create_prize_manually(body: PrizeCreate, me: dict = Depends(get_current_user)):
+    """Einen Gewinn von Hand anlegen (#2112) - etwa einen Sonderpreis, den die Preisstruktur nicht kennt."""
     await _ensure_prize_manager(me, body.tournament_id)
     db = get_db()
-    t = await db.tournaments.find_one({"id": body.tournament_id}, {"_id": 0}) or {}
+    t = await db.tournaments.find_one({"id": body.tournament_id}, {"_id": 0, "id": 1, "title": 1, "slug": 1})
+    if not t:
+        raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    label = _prize_label(body.prize_label)
     user = await db.users.find_one({"id": body.user_id}, {"_id": 0, "id": 1})
     if not user:
         raise HTTPException(status_code=404, detail="Benutzer nicht gefunden")
@@ -410,7 +445,7 @@ async def create_prize_manually(body: PrizeCreate, me: dict = Depends(get_curren
     if existing:
         raise HTTPException(status_code=409, detail="Für diesen Benutzer und Platz existiert bereits ein Gewinn")
     # Ohne eigene Frist läuft sie ab „Bereit“ (#2123, ER1).
-    deadline = body.pickup_deadline or None
+    deadline = _deadline_value(body.pickup_deadline)
     doc = {
         "id": new_id(),
         "tournament_id": body.tournament_id,
@@ -420,8 +455,8 @@ async def create_prize_manually(body: PrizeCreate, me: dict = Depends(get_curren
         "team_id": None,
         "place": body.place,
         "place_label": str(body.place),
-        "prize_label": body.prize_label,
-        "prize_value": body.prize_value or "",
+        "prize_label": label,
+        "prize_value": " ".join((body.prize_value or "").split()),
         "status": "pending",
         "pickup_deadline": deadline,
         "pickup_deadline_custom": bool(deadline),

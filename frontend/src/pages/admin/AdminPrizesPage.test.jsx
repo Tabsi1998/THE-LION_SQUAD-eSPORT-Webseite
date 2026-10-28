@@ -44,3 +44,17 @@ test("verfallene Gewinne lassen sich wieder öffnen, offene haben noch keine Fri
   fireEvent.click(screen.getByTestId("prize-revert-p-done"));
   await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Zurück auf „Bereit“ – ohne neue Nachricht an den Gewinner."));
 });
+
+// Gewinn von Hand (#2112): „Gewinn hinzufügen“ oben, „Bearbeiten“ in jeder Zeile und auf jeder Karte.
+test("Gewinn hinzufügen und Bearbeiten öffnen das Formular", async () => {
+  apiMock.get.mockImplementation(async (url) => (String(url).startsWith("/prizes") ? { data: [PRIZE] } : { data: [] }));
+  render(<MemoryRouter><AdminPrizesPage /></MemoryRouter>);
+  await screen.findByTestId("prize-row-p-1");
+  fireEvent.click(screen.getByTestId("prizes-add"));
+  expect(await screen.findByRole("heading", { name: "Gewinn hinzufügen" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Abbrechen" }));
+  fireEvent.click(screen.getByTestId("prize-edit-p-1"));
+  expect(await screen.findByRole("heading", { name: "Gewinn bearbeiten" })).toBeInTheDocument();
+  expect(screen.getByTestId("prize-form-label")).toHaveValue("1. Platz");
+  expect(screen.getByTestId("prize-mobile-edit-p-1")).toBeInTheDocument();
+});
