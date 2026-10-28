@@ -5,14 +5,15 @@ Stand: Fundament aus #1703 (Datenmodell) und #1704 (Rechte, Protokoll), dazu Stu
 der Printful-Adapter aus #1705 (Abschnitt „Printful-Adapter“), die Produktverwaltung aus #1707 mit dem Katalogabgleich
 aus #1709 (Abschnitt „Produktverwaltung und Katalogabgleich“) und die Druckvorlagen von Printful mit selbst erzeugten
 Druckdateien aus #2069 (Abschnitt „Druckvorlagen und Druckdateien“), Allover mit fertiger Datei als Hintergrund aus #2141
-(Abschnitt „Allover: Hintergrund mit Ebenen“) und der Testentwurf an Printful aus #2062 (Abschnitt
-„Testentwurf an Printful“), Teil des Epics #1699. Der Shop ist **von außen
+(Abschnitt „Allover: Hintergrund mit Ebenen“), der Testentwurf an Printful aus #2062 (Abschnitt
+„Testentwurf an Printful“) und der Bruttopreis aus der Kostenschätzung von Printful aus #2135 (Abschnitt
+[Bruttopreise](#bruttopreise-2135)), Teil des Epics #1699. Der Shop ist **von außen
 unsichtbar**: Es gibt keine Seiten für Mitglieder und nur eine öffentliche Route - die Druckdateien für Printful hinter
 einem Zufallsschlüssel; im Admin steht er unter Finanzen → Shop. Steuer (#1701) und die Shop-Seiten (#1712 ff.) folgen.
 
 Code: `backend/services/shop_common.py` (Fehler, Anschriften, Protokoll, personenbezogene Felder),
 `shop_catalog.py` (Katalog), `shop_designs.py` (Druckdateien, #1708), `shop_motifs.py` (Motive mit Fassung für dunkle
-und helle Shirts, #2069; SVG über den gemeinsamen Baustein `svg_safe.py`), `shop_orders.py` (Bestellungen, Ereignisse,
+und helle Shirts, #2069; SVG über den gemeinsamen Baustein `svg_safe.py`), `shop_pricing.py` (Bruttopreise aus der Printful-Schätzung, #2135), `shop_orders.py` (Bestellungen, Ereignisse,
 Warenkorb), `shop_schema.py` (Indizes, Migration 13), `backend/routes/shop_admin_routes.py` und
 `shop_design_routes.py` (Adminbereich), `shop_print_file_routes.py` (Druckdateien für Printful),
 `backend/scripts/shop_schema.py` (Werkzeug).
@@ -33,10 +34,10 @@ die Sammlungen direkt. Jede Katalogänderung ist eine Adminaktion mit Person und
 | `shop_print_files` | Druckdatei je Produkt, Fläche, Farbe und Gruppe (#2069): Herkunft (`composed`, `upload`), Zweck (`base` mit `version`, `order` je Bestellposition), `sha256`, `file_ref`, `public_id`, Maße, `layout_hash`, `template_hash`, Quellen (seit #2141 bei „Hintergrund plus Ebenen“ zuerst der Hintergrund mit Kennung und Prüfsumme); bei Bestelldateien Konto, Bestellung und Position (personenbezogen) | `public_id`; Produkt + Fläche + Gruppe + Farbe + Version (nur `base`) |
 | `shop_printful_catalog` | Zwischenstand des Printful-Katalogs für die Produktsuche (#2069): Produkte, Kategorien, `fetched_at` - keine Person | `id` |
 | `shop_design_colors` | Belegung einer Shirtfarbe je Platzierung durch ein Design (#1708): `placement`, `color_key` (kleingeschrieben), `color`, `design_key` - macht „eine Farbe, ein Design“ atomar | `placement` + `color_key` |
-| `shop_printful_variants` | Zuordnung Variante → Printful-Variante und -Produkt (Anbieter `printful`); seit #1709 Technik, Einkauf (`base_cost_cents`), Aufpreis je Druckfläche (`placement_costs`), Lager (`availability`, `in_stock`), `synced_at` und eine offene Preiswarnung (`price_warning`) | `provider` + `variant_id` |
+| `shop_printful_variants` | Zuordnung Variante → Printful-Variante und -Produkt (Anbieter `printful`); seit #1709 Technik, Einkauf (`base_cost_cents`), Aufpreis je Druckfläche (`placement_costs`), Lager (`availability`, `in_stock`), `synced_at` und eine offene Preiswarnung (`price_warning`); seit #2135 die Bruttoschätzung je Variante (`gross_estimate`: Ware netto, Steuer, brutto, Versandbeispiel AT, Katalog netto beim Schätzen, Zeitpunkt) | `provider` + `variant_id` |
 | `shop_carts` | Warenkorb je Konto: Variante, Menge, Gamertag – keine Preise | `user_id` |
-| `shop_orders` | Bestellung mit allem Eingefrorenen (unten), Stand, Rechnungs- und Lieferanschrift, `printful_external_id` | `idempotency_key`, `printful_external_id` |
-| `shop_order_items` | Position einer Bestellung, eingefroren | `order_id` + `position` |
+| `shop_orders` | Bestellung mit allem Eingefrorenen (unten), Stand (`placed`, seit #2135 `price_changed` „Preis geändert“), Rechnungs- und Lieferanschrift, `printful_external_id`; seit #2135 die letzte Preisprüfung vor dem Auslösen (`price_check`) | `idempotency_key`, `printful_external_id` |
+| `shop_order_items` | Position einer Bestellung, eingefroren; seit #2135 ihr Anteil an der Printful-Schätzung (`gross`: netto, Steuer, brutto) | `order_id` + `position` |
 | `shop_order_events` | Verlauf einer Bestellung, **nur angehängt** | `order_id` + `event_key` |
 | `shop_printful_drafts` | Claim vor dem Anlegen eines Printful-Entwurfs (#1705): `external_id`, Stand (`sending`, `created`, `failed`, `deleting`), Printful-Nummer – keine Person | `external_id` |
 | `shop_printful_confirmations` | Claim vor dem Bestätigen bei Printful (#1705): Idempotenzschlüssel, Auftragsnummer, Stand (`sending`, `confirmed`, `unclear`) – keine Person | `order_id`, `idempotency_key` |
@@ -52,10 +53,14 @@ Unbekannte Felder lehnen Service und Route ab.
 Variante, Druckdatei, Printful-Zuordnung, Profil oder Dolibarr wirkt nie zurück.
 
 - `frozen`: Währung, Summe der Artikel, Vereinsaufschlag (nur bei öffentlichem Kauf, `buyer_kind = public`),
-  Versand, Gesamtbetrag, **Steuerprofil** (nur die Referenz; mischen Positionen verschiedene, bleibt es `None`),
+  Versand, Zusatzkosten (`fees_cents`), Gesamtbetrag, Herkunft des Preises (`price_source`: `printful_estimate` oder
+  `fallback`, #2135), bei einer Schätzung die Teile von Printful (`printful_costs`: Ware netto, Versand netto,
+  Zusatzkosten, Steuer, Gesamt, Zeitpunkt, Land) und die Steuer je Teil (`tax_shares`), **Steuerprofil** (nur die
+  Referenz; mischen Positionen verschiedene, bleibt es `None`),
   Art des Kaufs, Zahlungsregeln der Bestellung (`payment_rules`, Felder für #1706: Dolibarr-Zahlungsbedingung,
   Erinnerungstage, Überfälligkeit, Stornoverfahren – ohne Vorgabe, ohne automatisches Storno).
-- je Position: Produkt- und Variantenname, SKU, Menge, Einzelpreis, Aufschlag, Zeilensumme, **Gamertag** (nur
+- je Position: Produkt- und Variantenname, SKU, Menge, Einzelpreis, Aufschlag, Zeilensumme (bei einer Schätzung
+  maßgeblich; der Einzelpreis ist dann gerundet), Anteil an der Schätzung (`gross`, #2135), **Gamertag** (nur
   Mitglieder bei Produkten mit Gamertag), **Druckdatei-Fassung** mit Prüfsumme, **Printful-Nummern**, Steuerprofil.
   Seit #2069 je Druckfläche genau eine Druckdatei (`print_files`: Grunddatei oder eigene mit Gamertag, Abschnitt „Druckvorlagen und Druckdateien“), dazu die Motiv-Fassungen (`designs`). Bis #2069 je Platzierung (`designs`): Platzierung, Art, Printful-Druckfläche, Technik, Position in Zoll und die
   Fassung des Designs für die Farbe der Variante (`design_key`, `version`, `sha256`) - **alle** Platzierungen, nicht
@@ -70,8 +75,10 @@ Variante, Druckdatei, Printful-Zuordnung, Profil oder Dolibarr wirkt nie zurück
   `captured_at`. Nur sie geht später an Printful (#1714, #1718).
 - `printful_external_id = lsw-<Bestellung>`: darüber erkennt Printful einen wiederholten Auftrag (#1705).
 
-Es wird **keine Steuer gerechnet**. Das Steuerprofil ist ein eingefrorenes Feld; die Rechenlogik kommt erst nach der
-Klärung in #1701.
+**Steuer** (#2135): Der Shop rechnet keine eigene Steuer - er übernimmt den Bruttobetrag von Printful (Ware, Versand
+und Steuer für das Lieferland) und friert die Teile ein. Ob der Verein selbst Umsatzsteuer ausweist, klärt #1701; bis
+dahin zeigt die Rechnung Bruttobeträge ohne eigenen Steuerausweis (Abschnitt [Bruttopreise](#bruttopreise-2135)). Das
+Steuerprofil bleibt ein eingefrorenes Feld.
 
 ### Idempotenz
 
@@ -82,6 +89,8 @@ Klärung in #1701.
   das Rennen verliert, entfernt seine eigenen Positionen und liefert die Bestellung des Gewinners.
 - Ereignisse mit festem `event_key` (etwa `placed`, später `payment.full`, `printful.confirmed`) gibt es je Bestellung
   höchstens einmal; wiederholbare Ereignisse bekommen einen neuen Schlüssel.
+- Die Schätzung von Printful (#2135) gehört **nicht** zum Schlüssel: derselbe Aufruf noch einmal liefert die erste
+  Bestellung, ohne Printful zu fragen - auch ohne Anbieter. Bestellungen von vor #2135 behalten ihre Beträge.
 
 ### Ereignisse
 
@@ -210,16 +219,21 @@ Shop), Verbindungstest über den Printful-Adapter (`printful_client.py`, unten).
   schaltet ihn mit aus. **Entwürfe** (anlegen, löschen, Druckdateien) kosten nichts und brauchen nur
   `shop_config.require_printful_drafts(db)`: Stufe ab „Nur Admins (Test)“ und lesbarer Schlüssel, sonst
   `PrintfulDraftsBlocked` - auch bei ausgeschaltetem Notschalter (#2062).
-- **Preise:** Mitglieder zahlen den Selbstkostenpreis (Einkauf plus Versand), ihr Aufschlag ist fest 0. Der
-  öffentliche Aufschlag ist ein fester Betrag je Artikel (Vorgabe 0, höchstens 100 €) und greift nur bei der Kaufart
-  `public`. Trägt ein Produkt einen eigenen Aufschlag, **ersetzt** er den allgemeinen (Entscheidung zu #1707, vorher
-  wurden beide addiert) - auch ein eigener Aufschlag von 0 €; leer heißt „der allgemeine gilt“. `place_order` friert
-  den Betrag ein.
-- **Versand:** nur nach Österreich (`SHIPPING_COUNTRIES = ("AT",)`, `place_order` lehnt andere Lieferländer ab).
-  Den Versand bestimmt `place_order` selbst: der Aufrufer gibt nur `shipping_estimate_cents` (die Schätzung von
-  Printful oder `None`), `shipping_cents(config, schätzung)` nimmt die Schätzung, sonst die **Ersatzpauschale**; fehlt
-  auch die (Vorgabe: keine), wird nicht bestellt – kein Versand zum Nulltarif. 0 € nur, wenn die Schätzung
-  ausdrücklich 0 ist. Eingefroren werden Betrag und Herkunft (`frozen.shipping_source`: `estimate` oder `fallback`).
+- **Preise:** Mitglieder zahlen, was der Verein an Printful zahlt - **brutto**: Ware, Versand und Steuer aus der
+  Kostenschätzung von Printful (#2135, Abschnitt [Bruttopreise](#bruttopreise-2135)); ihr Aufschlag ist fest 0. Der
+  öffentliche Preis ist dieser Bruttobetrag plus Aufschlag: ein fester Betrag je Artikel (Vorgabe 0, höchstens 100 €),
+  nur bei der Kaufart `public`. Trägt ein Produkt einen eigenen Aufschlag, **ersetzt** er den allgemeinen (Entscheidung
+  zu #1707, vorher wurden beide addiert) - auch ein eigener Aufschlag von 0 €; leer heißt „der allgemeine gilt“.
+  `place_order` friert den Betrag ein.
+- **Versand:** nur nach Österreich (`SHIPPING_COUNTRIES = ("AT",)`, `place_order` lehnt andere Lieferländer ab). Mit
+  Schätzung kommt der Versand von Printful (je Bestellung einmal, mehrere Artikel teilen ihn). Im **Rückfall**
+  bestimmt ihn `place_order` wie bisher: der Aufrufer gibt nur `shipping_estimate_cents` (die Schätzung von Printful
+  oder `None`), `shipping_cents(config, schätzung)` nimmt die Schätzung, sonst die **Ersatzpauschale**; fehlt auch die
+  (Vorgabe: keine), wird nicht bestellt – kein Versand zum Nulltarif. 0 € nur, wenn die Schätzung ausdrücklich 0 ist.
+  Eingefroren werden Betrag und Herkunft (`frozen.shipping_source`: `estimate` oder `fallback`).
+- **Toleranz bei Preisänderung** (`price_tolerance_cents`, #2135): Vorgabe 0,50 €, 0 bis 100 €. Schätzt Printful vor
+  dem Auslösen um mehr als diesen Betrag teurer, geht die Bestellung an die Leitung („Preis geändert“). 0 € heißt: jede
+  Verteuerung prüft die Leitung.
 - **Printful-Zugang:** Schlüssel verschlüsselt mit `SETTINGS_ENCRYPTION_KEY` (`secret_store`), nie wieder angezeigt –
   nur „hinterlegt seit … von …“. Hinterlegen und Entfernen braucht zusätzlich den Bereich System. „Verbindung testen“
   ruft über den Adapter genau einmal lesend `GET https://api.printful.com/v2/stores` auf und merkt sich Zeitpunkt,
@@ -230,7 +244,7 @@ Shop), Verbindungstest über den Printful-Adapter (`printful_client.py`, unten).
 | Route (alle `require_area("finance")`) | Zweck |
 | --- | --- |
 | `GET /api/admin/shop/config` | Einstellungen, Stufen mit Sperre, Rechte – ohne Schlüssel |
-| `PATCH /api/admin/shop/config` | Stufe, Notschalter, öffentlicher Aufschlag, Ersatzpauschale, Mindestpreis (mit Grund) |
+| `PATCH /api/admin/shop/config` | Stufe, Notschalter, öffentlicher Aufschlag, Ersatzpauschale, Mindestpreis, Toleranz bei Preisänderung (#2135) (mit Grund) |
 | `PUT /api/admin/shop/config/tax-clearance` | „Steuer geklärt“ setzen oder zurücknehmen (nur Superadmin, mit Grund) |
 | `PUT /api/admin/shop/config/printful-key` | Schlüssel hinterlegen (zusätzlich System, mit Grund) |
 | `POST /api/admin/shop/config/printful-key/remove` | Schlüssel entfernen (zusätzlich System, mit Grund) |
@@ -554,17 +568,20 @@ Grund ist optional, **Pflicht nur beim Veröffentlichen** - dann geht das Produk
    Motiv, Vorgabe-Position aus der Liste und Größe in cm; Gamertag bzw. Vereinsnummer als Platzhalter (Datei je
    Bestellung) nur mit passender Personalisierung. „Druckdateien erzeugen“ baut je Farbe die Datei in der exakten
    Pixelgröße von Printful. Die festen Zoll-Positionen von #1707 sind abgelöst.
-4. **Preise:** Mitgliederpreis = **Selbstkostenpreis**: Einkauf der Variante (Technik) plus Aufpreis jeder weiteren
-   Printful-Druckfläche; eine Fläche steckt im Grundpreis (`included_placement`, Vorgabe `front`). Ohne Aufschlag.
-   Öffentlicher Preis = Einkauf plus Aufschlag als Vorschlag; der eigene Aufschlag des Produkts ersetzt den
-   allgemeinen. „Preise übernehmen“ schreibt die Selbstkosten in die Varianten - nur so kommen Preise von Printful in
-   den Shop. Ob die Fläche im Grundpreis stimmt, zeigt die Kostenschätzung im Testentwurf (#2062).
+4. **Preise** (seit #2135): je Variante **Printful brutto** (Ware) aus der Kostenschätzung für ein Stück nach
+   Österreich, daraus der **Mitgliederpreis** (ohne Aufschlag), ein **Versandbeispiel AT** und der öffentliche Preis
+   (Printful brutto plus Aufschlag; der eigene Aufschlag des Produkts ersetzt den allgemeinen). Die frühere
+   Selbstkosten-Spalte heißt **Katalog netto (Prüfwert)**: Einkauf der Variante (Technik) plus Aufpreis jeder weiteren
+   Printful-Druckfläche, eine Fläche im Grundpreis (`included_placement`, Vorgabe `front`). Sie zeigt **„prüfen“** nur,
+   wenn Katalog und Schätzung (beide netto) stark auseinanderliegen - mehr als 10 % **und** mehr als 1 €. „Brutto bei
+   Printful schätzen“ holt die Schätzungen neu (ändert keinen Preis); „Preise übernehmen“ schreibt Printful brutto in
+   die Varianten - ohne Schätzung als Rückfall den Katalog netto. Nur so kommen Preise von Printful in den Shop.
 5. **Prüfen und veröffentlichen:** Entwurf → **geprüft** → **veröffentlicht** → archiviert.
 
 **Vorab-Prüfung** (`run_check`): Printful-Produkt geladen und nicht eingestellt; Farben und Größen gewählt;
 Druckvorlage geladen und aktuell; Sichtbarkeit und Personalisierung passen zu den Platzhaltern; mindestens eine Fläche
 mit Motiv; **jede angebotene Farbe hat an jeder Fläche eine gültige Druckdatei zum aktuellen Aufbau und zur aktuellen
-Vorlage** (sonst nennt die Prüfung Fläche und Farbe, #2069); alle angebotenen Varianten lieferbar; Preis berechnet und übernommen, ohne offene Preiswarnung und nicht
+Vorlage** (sonst nennt die Prüfung Fläche und Farbe, #2069); alle angebotenen Varianten lieferbar; Preis berechnet und übernommen (seit #2135 Printful brutto, ohne Schätzung der Katalog netto), ohne offene Preiswarnung und nicht
 unter dem **Mindestpreis** (Einstellung `min_price_cents`, Vorgabe 1 €, unter Shop → Einstellungen → Preise). Dazu die
 **Mockup-Prüfung**: bis #1710 „offen“. „Geprüft“ braucht alles außer den Mockups, „veröffentlicht“ alles - bis #1710
 lässt sich also nichts veröffentlichen.
@@ -596,6 +613,12 @@ Produkts.
   Printful-Produkten die Sperre **und** `in_stock is True` der Zuordnung.
 - Preisänderung: neuer Einkauf an der Zuordnung plus `price_warning` (vorher/nachher, seit) - der Preis der Variante
   bleibt, bis die Finanzen übernehmen. Bestehende Bestellungen haben ihre Preise eingefroren.
+- **Bruttoschätzung** (#2135): je Preisgruppe (gleicher Einkauf und gleiche Aufpreise laut Katalog, höchstens 20 je
+  Produkt) eine Kostenschätzung - ein Stück nach Österreich (PLZ 1010) mit den Grunddateien der Variante; eine reine
+  Platzhalter-Fläche (Gamertag, Nummer) nimmt für die Schätzung die Adresse einer anderen Grunddatei, für den Preis
+  zählen nur Fläche und Technik. Gefragt wird ohne Sperre, gespeichert mit dem übrigen Ergebnis (`gross_estimate`).
+  Die Preiswarnung vergleicht dann mit Printful brutto. Scheitert die Schätzung, bleibt die letzte - aber nur, solange
+  sie zum Einkauf laut Katalog passt; sonst gilt bis zur nächsten Schätzung der Katalog netto („Schätzung veraltet“).
 - Ausfall: nichts ändert sich; `catalog_sync` merkt Zeitpunkt, Ursache und `last_ok_at` - der Admin zeigt den letzten
   Stand mit Datum.
 - **Kein alter Stand:** Printful wird ohne Sperre gefragt; geschrieben wird danach unter der Produkt-Sperre und nur,
@@ -620,7 +643,8 @@ Produkts.
 | `GET`/`PUT /api/admin/shop/print-presets` | Positions-Vorgaben und Regeln (#2069) |
 | `GET /api/admin/shop/print-templates/{printful_product_id}/images/{index}` | Vorlagenbild über die Website (#2069), mit `tint=rrggbb` in der Shirtfarbe eingefärbt (#2105, nur Farbcodes aus den Printful-Daten) |
 | `GET /api/admin/shop/products/{id}/name-sample` | Beispielname einer Namensebene in echter Größe als PNG (`kind`, `color`, `text_height_cm`, `max_width_cm`, #2105) |
-| `POST /api/admin/shop/products/{id}/prices/accept` | Schritt 4: Selbstkosten als Mitgliederpreis übernehmen |
+| `POST /api/admin/shop/products/{id}/prices/estimate` | Schritt 4: Brutto bei Printful schätzen (#2135) - ändert keinen Preis; je Konto höchstens 10 Aufrufe je Minute, darüber 429 |
+| `POST /api/admin/shop/products/{id}/prices/accept` | Schritt 4: Printful brutto (ohne Schätzung den Katalog netto) als Mitgliederpreis übernehmen |
 | `POST /api/admin/shop/products/{id}/sync` | Mit Printful abgleichen (Person im Protokoll) |
 | `POST /api/admin/shop/products/{id}/status` | Schritt 5: `reviewed`, `active` (Grund Pflicht), `draft`, `archived` |
 
@@ -1161,8 +1185,10 @@ der richtigen Position, Anschrift, `external_id` und Preise sauber übergeben we
    nach der Kostenschätzung (nur Land und PLZ). Bei Printful wird dabei **nichts angelegt**. Die Seite zeigt genau, was
    gesendet wird: Position mit Printful-Variante, `external_id` (`lsw-testentwurf-<Kennung>`), je Fläche Technik, Art der Datei
    (Grunddatei mit Version oder eigene mit Gamertag), Pixel, DPI, SHA-256 und Adresse, die Anschrift, die Kosten (Ware,
-   Versand, Steuer, Gesamt), den Vergleich „Preis im Shop“ gegen „Ware laut Printful“ (Ampel; zeigt, ob die Fläche im
-   Grundpreis stimmt) und „Mockup folgt (#1710)“. Ist das Produkt nicht bestellbar (etwa veraltete Druckdatei), nennt die
+   Versand, Steuer, Gesamt), den Vergleich „Mitgliederpreis“ gegen „Printful brutto (Ware)“ samt „Katalog netto
+   (Prüfwert)“ (Ampel, seit #2135 „prüfen“ nur bei starker Abweichung - mehr als 10 % und mehr als 1 € - beim
+   Mitgliederpreis oder beim Katalog; zeigt etwa, ob die Fläche im Grundpreis stimmt) und „Mockup folgt (#1710)“. Ist
+   das Produkt nicht bestellbar (etwa veraltete Druckdatei), nennt die
    Vorschau die Punkte der Vorab-Prüfung. Jede Änderung an der Eingabe verwirft die Vorschau.
 6. **„Als Entwurf an Printful senden“** - sendet **genau den gespeicherten Rumpf** der Vorschau (`payload` =
    `printful_client.order_payload`; vor dem Senden wird er neu gebaut und muss gleich sein) über `create_draft` - also
@@ -1241,6 +1267,74 @@ prüfen und bei Bedarf anpassen).
 Tests: `backend/tests/test_shop_test_drafts_unit.py` und `test_shop_test_drafts_flow.py` gegen den Vertrags-Fake (nie
 echte Aufrufe), `frontend/src/pages/admin/AdminShopTestDraftPage.test.jsx`. Offen: die Mockups (#1710) - bis dahin zeigt
 die Vorschau „Mockup folgt (#1710)“.
+
+## Bruttopreise (#2135)
+
+Code: `backend/services/shop_pricing.py`, angebunden in `shop_orders.place_order`, `shop_catalog_sync` (Abgleich),
+`shop_products` (Schritt 4) und `shop_test_drafts` (Preisvergleich); Seiten `AdminShopProductsPage.jsx` (Schritt 4) und
+`AdminShopPage.jsx` (Toleranz). Entscheidung des Obmanns vom 28.10.2026: **Mitglieder zahlen genau, was der Verein an
+Printful zahlt** - und der Verein zahlt immer brutto. Abgerechnet wird über Dolibarr; bei Printful bestellt wird erst
+nach dem Zahlungseingang.
+
+**Quelle:** dieselbe wie beim Testentwurf - `estimate_costs` des Adapters (nur Land und PLZ, nie Name oder Straße).
+`split` teilt die Antwort in Ware (Zwischensumme minus Rabatt), Versand, Zusatzkosten (was Printful im Gesamt mehr
+rechnet, etwa Digitalisierung bei Stickerei), Steuer (`tax` plus `vat`) und Gesamt; der Gesamtbetrag von Printful zählt.
+Passt die Antwort nicht zusammen (andere Währung, negative Teile), wird sie nie verwendet. `breakdown` verteilt die
+Steuer auf Ware, Versand und Zusatzkosten und die Ware auf die Positionen (nach Menge × übernommenem Preis) - mit der
+Methode der größten Reste, die Teile ergeben immer genau den Gesamtbetrag. Beispiel aus #2135 (Testentwurf
+„Vereinsmitgliedershirt Schwarz“): Ware 12,90 €, Versand 4,49 €, Steuer 3,48 €, gesamt 20,87 € → Ware brutto 15,48 €
+(Steueranteil 2,58 €), Versand brutto 5,39 €.
+
+**Je Variante (Anzeige):** die Schätzung für ein Stück nach Österreich an der Printful-Zuordnung (`gross_estimate`,
+beim Abgleich erneuert, je Preisgruppe eine; Schritt 4 „Brutto bei Printful schätzen“). `display_price(config, product,
+variant, mapping, buyer_kind=…)` liefert für Produktseite und Warenkorb (#1712) den Preis je Stück (brutto, öffentlich
+plus Aufschlag), die Herkunft, das Versandbeispiel und den Hinweis **„zzgl. Versand, genauer Betrag an der Kasse“**.
+Ohne frische Schätzung gilt der übernommene Preis.
+
+**An der Kasse (Vertrag für #1712/#1714):** `quote_cart(db, lines, provider=…, country=…, zip_code=…,
+buyer_kind=…)` nimmt die Positionen wie der Warenkorb (Variante, Menge, Gamertag - nie einen Preis) und schätzt den
+ganzen Warenkorb mit den Grunddateien: `source`, je Position `line_total_cents`, `items_cents`, `shipping_cents`,
+`fees_cents`, `tax_cents`, `markup_cents`, `total_cents`. Es entstehen keine Dateien. Ein Gamertag ändert den Preis
+nicht - `place_order` friert danach denselben Betrag ein. Ohne Printful der Rückfall (übernommener Preis plus
+Ersatzpauschale; fehlt die, keine Zahl).
+
+**Bestellung:** `place_order(…, provider=PrintfulClient)` schätzt nach dem Einfrieren der Druckdateien den ganzen
+Warenkorb für die Lieferanschrift (mehrere Artikel teilen sich den Versand, wie Printful rechnet) und friert ein:
+`frozen.price_source = "printful_estimate"`, `printful_costs` (Ware, Versand, Zusatzkosten, Steuer, Gesamt,
+Zeitpunkt, Land), `tax_shares`, Ware, Versand und Zusatzkosten brutto; je Position `gross` (netto, Steuer, brutto)
+und die Zeilensumme. Gesamt = Printful gesamt plus Aufschlag (nur öffentlich). **Rückfall** (`price_source =
+"fallback"`): ohne `provider`, wenn eine Position keine Druckdatei mit https-Adresse hat (alte Produkte,
+`PUBLIC_BACKEND_URL` fehlt) oder Printful nicht antwortet - dann der übernommene Preis und der Versand wie bisher.
+Bestellungen ohne `price_source` sind älter als #2135 und behalten ihre Beträge.
+
+**Vor dem Auslösen (Vertrag für #1718):** Den Schritt „Zahlungseingang → bei Printful auslösen“ gibt es noch nicht
+(#1718, kein Dolibarr-Webhook für Shop-Bestellungen). Bereit steht das Tor davor:
+`recheck_before_release(db, order_id, provider=…, actor_id=…)` schätzt mit den eingefrorenen Druckdateien neu und
+vergleicht mit dem Betrag, den der Verein an Printful erwartet (`printful_amount`: `printful_costs.total_cents`, sonst
+Gesamt ohne Aufschlag).
+
+| Ergebnis | Wann | Was passiert |
+| --- | --- | --- |
+| `release` | gleich, günstiger oder höchstens um die Toleranz teurer | auslösen; günstiger: die Differenz bleibt beim Verein (`club_keeps_cents`, keine Rückbuchung - Empfehlung Obmann), teurer: der Verein trägt sie (`club_bears_cents`) |
+| `hold` | teurer als die Toleranz (`price_tolerance_cents`, Vorgabe 0,50 €) | Stand `price_changed` „Preis geändert“ - nichts geht hinaus, die Leitung entscheidet; eine weitere Prüfung fragt Printful nicht noch einmal |
+| `retry` | Printful nicht erreichbar, Schätzung unbrauchbar | nichts geändert, später erneut |
+| `blocked` | Druckdatei oder Printful-Variante fehlt, Printful lehnt die Daten ab | Stand bleibt - die Leitung muss nachsehen |
+
+Jede Prüfung steht an der Bestellung (`price_check`: Zeitpunkt, Entscheidung, eingefroren, geschätzt, Differenz,
+Toleranz, Teile) und als Ereignis (`order.price_checked` bzw. `order.price_changed`, ohne Anschrift). Die eingefrorenen
+Beträge ändern sich nie. Wie die Leitung eine angehaltene Bestellung freigibt oder storniert, kommt mit #1718/#1723.
+
+**Rechnung (Vertrag für #1717):** `invoice_lines(order, items, show_tax=False)` liefert die Positionen mit den
+eingefrorenen Beträgen: Ware je Artikel (Menge, Zeilensumme, Einzelpreis nur wenn glatt teilbar), Versand,
+Zusatzkosten (nur wenn größer 0). Bis #1701 „Steuer geklärt“ entschieden hat, **brutto ohne eigenen Steuerausweis**
+(`show_tax=False`). Mit `show_tax=True` stehen Ware, Versand und Zusatzkosten netto und eine Zeile „Steuer laut
+Printful“ dabei - nur bei Bestellungen mit Schätzung. Die Summe ist immer genau der eingefrorene Gesamtbetrag. Der
+öffentliche Aufschlag steckt in der Artikelzeile.
+
+Tests: `backend/tests/test_shop_pricing_unit.py` (gegen den Vertrags-Fake: Kasse mit Schätzung, Einfrieren,
+Idempotenz, Rückfall ohne Printful, Schätzung je Variante, Toleranz beim Auslösen, Rechnungspositionen),
+`test_shop_products_flow.py` (Route und Einstellung), `AdminShopProductsPage.test.jsx`, `AdminShopPage.test.jsx`,
+`AdminShopTestDraftPage.test.jsx` und `frontend/e2e/shop-prices-gross.spec.js` (390 und 1440 px).
 
 ## Printful-Adapter (#1705)
 
