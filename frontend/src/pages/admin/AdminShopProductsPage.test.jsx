@@ -625,6 +625,53 @@ test("die Blockiermeldung nennt die Fläche und springt hin (Nachtrag #2141)", a
   delete window.Element.prototype.scrollIntoView;
 });
 
+test("ein neues Motiv kommt vor die Namen - wie der Server sortiert (Review #2141)", async () => {
+  apiMock.put.mockResolvedValue({ data: view() });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-designs"));
+  await user.click(screen.getByTestId("shop-area-add-motif-front"));
+  // Ebene 1 ist das neue Motiv, der Gamertag rückt auf 2 - Nummern wie nach dem Speichern.
+  expect(screen.getByTestId("shop-layer-front-1-motif")).toBeInTheDocument();
+  expect(screen.getByTestId("shop-layer-front-2-text-height")).toBeInTheDocument();
+  expect(screen.getByTestId("shop-preview-front-layer-2-sample")).toBeInTheDocument();
+  await user.click(screen.getByTestId("shop-layout-submit"));
+  expect(apiMock.put.mock.calls[0][1].placements[0].layers.map((layer) => layer.kind)).toEqual(["motif", "motif", "gamertag"]);
+});
+
+test("die Farbe des Namens ist je Ebene fest wählbar, Vorgabe automatisch (#2141)", async () => {
+  const inks = [{ key: "vereinsblau", label: "Vereinsblau", hex: "#29B6E8" }, { key: "reinweiss", label: "Weiß", hex: "#FFFFFF" }];
+  const data = view({ extra: { name_inks: inks } });
+  apiMock.get.mockResolvedValue({ data });
+  apiMock.put.mockResolvedValue({ data });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-designs"));
+  const select = screen.getByTestId("shop-layer-front-1-ink");
+  expect(select).toHaveValue("");
+  expect(within(select).getByRole("option", { name: "automatisch (Kontrast)" })).toBeInTheDocument();
+  await user.selectOptions(select, "reinweiss");
+  await waitFor(() => expect(screen.getByTestId("shop-preview-front-layer-1-sample").getAttribute("src")).toContain("ink=reinweiss"));
+  await user.click(screen.getByTestId("shop-layout-submit"));
+  expect(apiMock.put.mock.calls[0][1].placements[0].layers[1]).toEqual({ kind: "gamertag", preset: "text_opposite", offset_x_cm: 0, offset_y_cm: 0, ink: "reinweiss" });
+});
+
+test("ausgeblendete Motive von vor #2141 sperren „Druckdateien erzeugen“ nicht (Review #2141)", async () => {
+  const data = alloverView();
+  data.placements[0].motifs_hidden = true;
+  data.product.status = "active";
+  data.editable = false;
+  apiMock.get.mockResolvedValue({ data });
+  apiMock.post.mockResolvedValue({ data: { ...data, result: { created: [], unchanged: 1, failed: [] } } });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-designs"));
+  expect(screen.getByTestId("shop-area-motifs-hidden-back")).toBeInTheDocument();
+  expect(screen.getByTestId("shop-generate-submit")).toHaveAttribute("aria-disabled", "false");
+  await user.click(screen.getByTestId("shop-generate-submit"));
+  expect(apiMock.post).toHaveBeenCalledWith("/admin/shop/products/p1/print-files", { reason: "" });
+});
+
 test("Preise: Warnung bei Preisänderung, Übernehmen und eigener Aufschlag nur mit Grund", async () => {
   const warned = view({ variants: [variant("Black / M", "PF1", { cost_cents: 1550, price_warning: { before_cents: 1500, after_cents: 1550, at: "2026-10-27T05:20:00+00:00" } })] });
   apiMock.get.mockResolvedValue({ data: warned });

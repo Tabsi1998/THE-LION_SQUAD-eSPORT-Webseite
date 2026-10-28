@@ -49,6 +49,8 @@ function cleanLayer(layer) {
     for (const name of ["text_height_cm", "max_width_cm"]) {
       if (Number(layer[name]) > 0) out[name] = Math.round(Number(layer[name]) * 100) / 100;
     }
+    // Feste Farbe des Namens (#2141) - nur, wenn gewählt; sonst automatisch nach Kontrast.
+    if (layer.ink) out.ink = layer.ink;
   }
   // Fassung von Hand (#2141) - nur hell oder dunkel; „automatisch“ ist die Vorgabe und wird nicht mitgeschickt.
   if (layer.variant === "light" || layer.variant === "dark") out.variant = layer.variant;
@@ -333,7 +335,7 @@ function SizeField({ label, value, placeholder, editable, onChange, testId }) {
   );
 }
 
-function TextLayer({ layer, area, canvas, presets, kindLabel, editable, onChange, onRemove, testId, problem }) {
+function TextLayer({ layer, area, canvas, presets, kindLabel, editable, onChange, onRemove, testId, problem, inks = [] }) {
   const limits = canvas?.limits || {};
   const widest = Math.min(Number(limits.max_width_cm) || Infinity, Number(area.width_cm) || Infinity);
   const height = Number(layer.text_height_cm) || null;
@@ -357,6 +359,15 @@ function TextLayer({ layer, area, canvas, presets, kindLabel, editable, onChange
       <p className={`text-xs ${bad ? "text-warn" : "text-white/45"}`} data-testid={`${testId}-size-hint`}>
         Leer = Vorgabe aus den Gamertag-Regeln. Texthöhe {cmText(limits.min_text_height_cm)} bis {cmText(limits.max_text_height_cm)}, Höchstbreite bis {cmText(widest)} - die Fläche begrenzt. Ein langer Name wird bis zur Mindesthöhe verkleinert.
       </p>
+      {inks.length > 0 && (
+        // Farbe des Namens (#2141): automatisch nach Kontrast zum Untergrund oder fest eine Farbe der Gamertag-Regeln.
+        <label className="block text-sm max-w-xs"><span className="text-white/70">Farbe</span>
+          <select value={layer.ink || ""} disabled={!editable} onChange={(event) => onChange({ ink: event.target.value || null })} className={SELECT} data-testid={`${testId}-ink`}>
+            <option value="">automatisch (Kontrast)</option>
+            {inks.map((ink) => <option key={ink.key} value={ink.key}>{ink.label}</option>)}
+          </select>
+        </label>
+      )}
       {problem && <p className="text-xs text-warn" role="alert">{problem}</p>}
       <div className="flex flex-wrap gap-2">
         {(Number(layer.offset_x_cm || 0) !== 0 || Number(layer.offset_y_cm || 0) !== 0) && <button type="button" disabled={!editable} onClick={() => onChange({ offset_x_cm: 0, offset_y_cm: 0 })} className={QUIET_BTN} data-testid={`${testId}-reset`}><RotateCcw className="w-3.5 h-3.5" aria-hidden="true" /> Auf die Vorgabe</button>}
@@ -375,7 +386,7 @@ function SurfaceField({ layer, info, labels, editable, onChange, testId, stale }
   const value = layer.variant === "light" || layer.variant === "dark" ? layer.variant : "auto";
   const options = labels || { auto: "automatisch", light: "hell", dark: "dunkel" };
   const surface = info?.surface;
-  const ink = surface?.variant && info?.ink?.label ? ` · Farbe: ${info.ink.label}` : "";
+  const ink = info?.ink?.label && (info.ink.fixed || surface?.variant) ? ` · Farbe: ${info.ink.label}${info.ink.fixed ? " (fest)" : ""}` : "";
   return (
     <div className="grid gap-2 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)] sm:items-end border-t border-white/10 pt-2 mt-2">
       <label className="block text-sm"><span className="text-white/70">Fassung</span>
@@ -385,7 +396,7 @@ function SurfaceField({ layer, info, labels, editable, onChange, testId, stale }
         </select>
       </label>
       <p className={`text-xs sm:pb-2.5 ${stale ? "text-white/40" : "text-white/60"}`} role="status" data-testid={`${testId}-surface`}>
-        {surface?.text ? `${surface.text}${ink}` : "Fassung nach der Shirtfarbe."}
+        {surface?.text ? `${surface.text}${ink}` : `Fassung nach der Shirtfarbe.${ink}`}
       </p>
     </div>
   );
@@ -493,7 +504,13 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
     const layer = kind === "motif"
       ? { kind, preset: preset.key, width_cm: Math.min(preset.width_cm, maxWidthCm(area, aspect, rules)), offset_x_cm: 0, offset_y_cm: 0, motif: { key: motif?.key || "", by_color: {} } }
       : { kind, preset: preset.key, offset_x_cm: 0, offset_y_cm: 0 };
-    onChange({ ...state, layers: [...layers, layer] });
+    // Motive vor die Namen - wie der Server beim Speichern sortiert (shop_products._clean_layout): so stimmen Nummern,
+    // Fassung und Farbe aus dem Plan schon im Entwurf (Review #2141).
+    const firstName = layers.findIndex((item) => item.kind !== "motif");
+    const at = kind === "motif" && firstName >= 0 ? firstName : layers.length;
+    onChange({ ...state, layers: [...layers.slice(0, at), layer, ...layers.slice(at)] });
+    setSelected(at);
+    setSampleProblems({});
   };
   // Je Farbe die passende Printful-Vorlage, sonst vom Server eingefärbt (#2105) - nie das helle Foto unter Schwarz.
   const preview = available.preview_by_color?.[previewColor] || available.preview;
@@ -542,7 +559,8 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
                   // Die Farbe des Namens aus dem Plan, sobald der Untergrund entschieden ist (Hintergrund, Vorgabe, von Hand).
                   const index = layers.indexOf(layer);
                   const info = index >= 0 ? infoFor(index) : null;
-                  return nameSample(view.product.id, kind, previewColor, layer, info?.surface?.variant ? info?.ink?.key : null);
+                  const planned = info?.ink && (info.ink.fixed || info.surface?.variant) ? info.ink.key : null;
+                  return nameSample(view.product.id, kind, previewColor, layer, layer.ink || planned);
                 } : null}
                 onSampleProblem={onSampleProblem}
                 onNudge={nudge} backdrop={backdrop}
@@ -565,7 +583,7 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
                         onChange={(patch) => update(index, patch)} onRemove={() => onChange({ ...state, layers: layers.filter((_, at) => at !== index) })}
                         testId={`shop-layer-${available.key}-${index}`} />
                     ) : (
-                      <TextLayer layer={layer} area={area} canvas={view.gamertag_canvas} presets={textPresets} kindLabel={layer.kind === "gamertag" ? "Gamertag" : "Vereinsnummer"} editable={editable} problem={found?.problem || sampleProblems[index]}
+                      <TextLayer layer={layer} area={area} canvas={view.gamertag_canvas} presets={textPresets} inks={view.name_inks || []} kindLabel={layer.kind === "gamertag" ? "Gamertag" : "Vereinsnummer"} editable={editable} problem={found?.problem || sampleProblems[index]}
                         onChange={(patch) => update(index, patch)} onRemove={() => onChange({ ...state, layers: layers.filter((_, at) => at !== index) })}
                         testId={`shop-layer-${available.key}-${index}`} />
                     )}
@@ -667,8 +685,11 @@ export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGrou
     : emptyArea.some((row) => row.key === key) ? "Hier fehlt ein Motiv oder ein Platzhalter - oder „Fertige Druckdatei als Hintergrund“ wählen." : null);
   const payloadJson = JSON.stringify({ placements: payload, print_surface: surface });
   const hiddenSaved = (view.placements || []).some((row) => row.motifs_hidden && (row.layers || []).some((layer) => layer.kind === "motif"));
-  const changed = JSON.stringify(payload) !== JSON.stringify((view.placements || []).map((row) => ({ key: row.key, mode: row.mode || "layout", layers: (row.layers || []).map(cleanLayer) })))
-    || includedValue !== (view.included_placement || null) || view.layout_converted || surface !== savedSurface || hiddenSaved;
+  // `edited`: wirklich ungespeicherte Änderungen - nur sie sperren „Druckdateien erzeugen“. Ausgeblendete Motive von
+  // vor #2141 machen nur das Speichern frei (ein veröffentlichtes Produkt kann nicht speichern, aber erzeugen).
+  const edited = JSON.stringify(payload) !== JSON.stringify((view.placements || []).map((row) => ({ key: row.key, mode: row.mode || "layout", layers: (row.layers || []).map(cleanLayer) })))
+    || includedValue !== (view.included_placement || null) || view.layout_converted || surface !== savedSurface;
+  const changed = edited || hiddenSaved;
   const failedFiles = (view.placements || []).flatMap((row) => row.files || []).filter((state) => ["missing", "outdated"].includes(state.state));
   // Ungespeicherter Stand: der Server rechnet die Pläne (Fassung je Shirtfarbe, Bild, Seitenverhältnis) - eine Wahrheit
   // für Vorschau und Druck. Gedrosselt; bis die Antwort da ist, ist die Vorschau ausgegraut.
@@ -792,8 +813,8 @@ export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGrou
         onSubmit={(reason) => run("layout", () => api.put(`${BASE}/${product.id}/layout`, { placements: payload, included_placement: includedValue, print_surface: surface, reason }), "Druckflächen gespeichert.")} />
       <div className="border-t border-white/10 pt-3 space-y-2" data-testid="shop-generate">
         <p className="text-xs text-white/55">{failedFiles.length ? `${failedFiles.length} Druckdatei${failedFiles.length === 1 ? "" : "en"} fehlen oder sind veraltet.` : "Alle Druckdateien sind aktuell."}</p>
-        <ReasonedButton id="shop-generate" label="Druckdateien erzeugen" variant="secondary" busy={busy === "generate"} disabled={view.product.status === "archived" || changed}
-          blockedHint={changed ? "Erst die Druckflächen speichern, dann erzeugen." : "Archiviert: erst wieder als Entwurf öffnen."}
+        <ReasonedButton id="shop-generate" label="Druckdateien erzeugen" variant="secondary" busy={busy === "generate"} disabled={view.product.status === "archived" || edited}
+          blockedHint={edited ? "Erst die Druckflächen speichern, dann erzeugen." : "Archiviert: erst wieder als Entwurf öffnen."}
           hint="Erzeugt je Fläche und Farbe nur, was fehlt oder veraltet ist - exakt in der Pixelgröße von Printful."
           onSubmit={(reason) => run("generate", () => api.post(`${BASE}/${product.id}/print-files`, { reason }), (next) => {
             const result = next.result || {};

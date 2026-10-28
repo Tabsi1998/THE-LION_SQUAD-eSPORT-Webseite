@@ -75,6 +75,7 @@ const VIEW = {
 const SURFACE = { variant: "dark", source: "background", luminance: 0.01, text: "Fassung: dunkel (aus Hintergrund)" };
 const ALLOVER = {
   ...VIEW,
+  name_inks: [{ key: "vereinsblau", label: "Vereinsblau", hex: "#29B6E8" }, { key: "reinweiss", label: "Weiß", hex: "#FFFFFF" }],
   labels: { ...LABELS, modes: { layout: "Motiv und Position", upload: "Fertige Druckdatei als Hintergrund" },
     mode_hints: { layout: "Die Website erzeugt die Druckdatei.", upload: "Für Allover (etwa ein Trikot): je Farbe eine fertige Datei der ganzen Fläche als Hintergrund." },
     surfaces: { garment: "wie Printful-Farbe", light: "hell", dark: "dunkel" }, layer_variants: { auto: "automatisch", light: "hell", dark: "dunkel" } },
@@ -193,11 +194,14 @@ for (const [label, width, height] of WIDTHS) {
       expect(overflow, "kein seitliches Scrollen der Seite").toBeLessThanOrEqual(1);
       // Auch innen nichts abgeschnitten: Hochladen, Ebenen-Knöpfe und die Fassung bleiben in der Karte.
       const card = await page.getByTestId("shop-area-front").boundingBox();
-      for (const id of ["shop-upload-front-Black-submit", "shop-layer-front-0-remove", "shop-layer-front-1-variant"]) {
+      for (const id of ["shop-upload-front-Black-submit", "shop-layer-front-0-remove", "shop-layer-front-1-variant", "shop-layer-front-1-ink"]) {
         const box = await page.getByTestId(id).boundingBox();
         expect(box.x + box.width, id).toBeLessThanOrEqual(card.x + card.width + 1);
       }
       await expect(page.getByTestId("shop-file-front-Black-background")).toHaveText(/Hintergrund v2/);
+      // Farbe des Namens fest gewählt: der Beispielname kommt in dieser Farbe.
+      await page.getByTestId("shop-layer-front-1-ink").selectOption("reinweiss");
+      await expect(page.getByTestId("shop-preview-front-layer-1-sample")).toHaveAttribute("src", /ink=reinweiss/);
       const shot = testInfo.outputPath(`allover-${label}.png`);
       await page.getByTestId("shop-area-front").screenshot({ path: shot });
       await testInfo.attach(`allover-${label}.png`, { path: shot, contentType: "image/png" });
