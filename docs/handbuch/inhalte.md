@@ -105,7 +105,14 @@ Sichtbarkeit und eine CSV mit Begriffen statt Rohwerten.
 **Zurückziehen statt Löschen:** Was schon öffentlich war, wird **zurückgezogen**: Der Beitrag verschwindet aus allen Listen,
 seine Adresse bleibt – wer einem Link aus Newsletter oder Discord folgt, sieht „Beitrag zurückgezogen“ statt „nicht gefunden“.
 **Wiederherstellen** holt ihn als Entwurf zurück; veröffentlicht wird dann wieder bewusst im Editor. Nur Entwürfe, die nie
-hinausgingen, lassen sich **löschen** (endgültig, mit Rückfrage).
+hinausgingen, lassen sich **löschen** (endgültig, mit Rückfrage). Zurückziehen geht in der Liste oder im Editor (bei einem
+schon öffentlichen Beitrag heißt die Wahl dort **Zurückziehen** statt „Entwurf“). **Eine schon gepostete Discord-Meldung bleibt
+stehen** – die Website löscht sie nicht; wer auf den Link tippt, sieht den Hinweis. Soll die Meldung weg, löscht ihr sie in
+Discord von Hand. Ein verschickter Newsletter lässt sich ohnehin nicht zurückholen.
+
+Die Vorschau sehen alle, die News pflegen – das Admin-Team und, wer den Bereich **Redaktion** über eine Freigabe oder einen
+Vorstandsposten hat. Als **Autor** lässt sich nur ein aktives Konto aus der Redaktion wählen. „Jetzt veröffentlichen“ nimmt die
+Uhr des Servers.
 
 **Verteilen** (Kasten am Beitrag; am Handy zugeklappt): Zeigt, was hinausgeht – den **Newsletter** mit der Zahl der Empfänger
 (nie Namen), die Meldung an Mitglieder oder Vorstand und die Discord-Vorschau.

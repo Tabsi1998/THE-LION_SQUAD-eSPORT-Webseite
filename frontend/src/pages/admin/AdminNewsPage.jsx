@@ -71,7 +71,7 @@ export default function AdminNewsPage() {
   const withdraw = async (post) => {
     if (!await confirm({
       title: "Beitrag zurückziehen?",
-      description: `„${post.title || "Ohne Titel"}“ verschwindet aus allen Listen. Wer einem Link aus Newsletter oder Discord folgt, sieht einen Hinweis. Wiederherstellen geht jederzeit.`,
+      description: `„${post.title || "Ohne Titel"}“ verschwindet aus allen Listen. Wer einem Link aus Newsletter oder Discord folgt, sieht einen Hinweis; eine schon gepostete Discord-Meldung bleibt stehen. Wiederherstellen geht jederzeit.`,
       confirmLabel: "Zurückziehen",
     })) return;
     try { await api.post(`/news/${post.id}/withdraw`); toast.success("Zurückgezogen."); load(); } catch (err) { toast.error(formatRequestError(err, "Beitrag konnte nicht zurückgezogen werden.")); }
