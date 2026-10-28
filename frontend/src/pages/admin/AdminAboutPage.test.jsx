@@ -120,3 +120,14 @@ test("Gründungsdatum (#644): leer löscht, ein Tag geht mit, das Jahr folgt dar
   fireEvent.change(screen.getByTestId("about-founded-on"), { target: { value: "" } });
   expect(screen.getByTestId("about-founded-year")).not.toBeDisabled();
 });
+
+// Kopf der Startseite (#2122 NW9): drei Felder auf dieser Seite, sie gehen beim Speichern mit.
+test("Kopf der Startseite wird hier gepflegt", async () => {
+  mockApi({ source: "manual" });
+  render(<MemoryRouter><AdminAboutPage /></MemoryRouter>);
+  fireEvent.change(await screen.findByTestId("about-home-title"), { target: { value: "Ein Verein." } });
+  fireEvent.change(screen.getByTestId("about-home-text"), { target: { value: "Komm vorbei." } });
+  fireEvent.submit(screen.getByTestId("about-form"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalled());
+  expect(apiMock.put.mock.calls.at(-1)[1]).toEqual(expect.objectContaining({ home_title: "Ein Verein.", home_text: "Komm vorbei." }));
+});
