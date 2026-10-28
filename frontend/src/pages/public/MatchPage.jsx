@@ -19,6 +19,7 @@ import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { CommendButton } from "@/components/tls/CommendButton";
 import { viennaDateTime } from "@/lib/vienna";
 import { formatWhen } from "@/lib/datetime";
+import { showLapTime } from "@/lib/laptime";
 import { finishedMatchText, formatMatchKind, formatMatchStatus, isByeSlot, isMatchFinished, matchHeadline, slotName, stationText } from "@/lib/tournamentLabels";
 import { matchIsOver } from "@/lib/afterEnd";
 import { rankingMode } from "@/lib/matchReport";
@@ -107,7 +108,6 @@ function fromLocalInput(value) {
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
-// Eigener Stand je Match und Konto (#1047): ein Wechsel des Matches oder ein echter Kontowechsel baut die Seite neu
 // Terminvorschläge nur in der Zukunft (#2124): frühestens 5 Minuten ab jetzt - wie der Server
 // (services/schedule_proposal_time.py).
 const PROPOSAL_LEAD_MS = 5 * 60 * 1000;
@@ -121,6 +121,7 @@ function tooEarly(iso, now = Date.now()) {
   return new Date(iso).getTime() < now + PROPOSAL_LEAD_MS;
 }
 
+// Eigener Stand je Match und Konto (#1047): ein Wechsel des Matches oder ein echter Kontowechsel baut die Seite neu
 // auf - Chat-Entwurf, Anhänge und Eingaben gehen weg, späte Antworten laufen ins Leere. Das erste Laden der
 // Anmeldung zählt nicht als Wechsel.
 export default function MatchPage() {
@@ -208,8 +209,8 @@ function MatchPageView() {
     e.preventDefault();
     const scheduled_at = fromLocalInput(proposalAt);
     if (!scheduled_at) return failAction("Bitte Datum und Uhrzeit wählen.");
-    await runAction(async () => {
     if (tooEarly(scheduled_at)) return failAction(PAST_PROPOSAL_TEXT);
+    await runAction(async () => {
       await api.post(`/matches/${id}/schedule-proposals`, { scheduled_at, note: proposalNote || null });
       toast.success("Terminvorschlag gesendet.");
       setProposalNote("");
@@ -222,8 +223,8 @@ function MatchPageView() {
     if (action === "counter") {
       const scheduled_at = fromLocalInput(counterAt);
       if (!scheduled_at) return failAction("Bitte Datum und Uhrzeit für den Gegenvorschlag wählen.");
-      payload.scheduled_at = scheduled_at;
       if (tooEarly(scheduled_at)) return failAction(PAST_PROPOSAL_TEXT);
+      payload.scheduled_at = scheduled_at;
     }
     await runAction(async () => {
       await api.post(`/matches/${id}/schedule-proposals/${proposal.id}/decision`, payload);
@@ -326,6 +327,7 @@ function MatchPageView() {
   const hasResultActions = Boolean(hasOtherResultActions || canDispute);
   const reports = Array.isArray(match.reports) ? match.reports : [];
   const resultParticipants = isV2 ? participants : duelParticipants;
+  const isHeat = Boolean(isV2 && (resultParticipants.length > 2 || match.match_type === "ffa"));
   const showFixedScheduleNotice = data.schedule_mode === "fixed_by_staff" && !canProposeSchedule;
   const tournamentUrl = data.tournament ? `/tournaments/${data.tournament.slug || data.tournament.id}` : "/tournaments";
   const addStaffMention = () => {
@@ -424,8 +426,19 @@ function MatchPageView() {
           {isBye && finished ? (
             <p className="mt-5 text-sm text-white/65" data-testid="match-bye-line">Ein Freilos wird nicht gespielt – es zählt als Sieg für {slotName(participants.find((participant) => participant.registration_id)?.display_name, {}, match)}.</p>
           ) : (
-          <div className={`mt-5 grid gap-3 items-stretch ${isV2 ? "sm:grid-cols-2 xl:grid-cols-4" : "md:grid-cols-[1fr_auto_1fr]"}`}>
-            {isV2 ? (
+          <div className={`mt-5 grid gap-3 items-stretch ${isV2 ? "sm:grid-cols-2 xl:grid-cols-4" : "md:grid-cols-[1fr_auto_1fr]"}`} data-testid="match-result-sides">
+            {isHeat ? (
+              // Lauf mit mehreren (#2124, TP1): der Platz groß, in Platzreihenfolge - Punkte oder Zeit klein darunter.
+              heatInPlaceOrder(resultParticipants, match).map((participant, index) => (
+                <HeatSide
+                  key={participant.registration_id || participant.slot || `result-${index}`}
+                  participant={participant}
+                  match={match}
+                  result={v2ResultForParticipant(match, participant)}
+                  mode={v2Mode}
+                />
+              ))
+            ) : isV2 ? (
               resultParticipants.map((participant, index) => (
                 <ResultSide
                   key={participant.registration_id || participant.slot || `result-${index}`}
@@ -669,8 +682,7 @@ function Pill({ children }) {
 function ResultSide({ participant, match, score, isWinner }) {
   return (
     <div className={`border rounded-sm bg-[#0A0A0A] p-4 ${isWinner ? "border-[#29B6E8]/70 shadow-[0_0_18px_rgba(41,182,232,0.18)]" : "border-white/10"}`}>
-      <div className="text-[10px] uppercase tracking-widest text-white/35">Slot {participant?.slot || "-"}</div>
-      <div className="mt-1 font-heading text-lg font-bold uppercase truncate">{slotName(participant?.display_name, participant, match)}</div>
+      <div className="font-heading text-lg font-bold uppercase truncate">{slotName(participant?.display_name, participant, match)}</div>
       {participant?.team && <div className="mt-1 text-xs text-[#29B6E8] truncate">[{participant.team.tag}] {participant.team.name}</div>}
       <div className={`mt-3 font-display text-5xl font-bold ${isWinner ? "text-[#29B6E8]" : "text-white/75"}`}>{score ?? 0}</div>
     </div>
@@ -694,12 +706,42 @@ function v2ResultRank(match, participant) {
   return Number(v2ResultForParticipant(match, participant)?.rank || 0);
 }
 
+/** Ein Lauf in Platzreihenfolge (#2124, TP1): wer einen Platz hat, nach Platz - der Rest nach Startplatz dahinter. */
+function heatInPlaceOrder(participants = [], match = {}) {
+  const place = (participant) => v2ResultRank(match, participant) || Number.POSITIVE_INFINITY;
+  return [...participants].sort((left, right) => (place(left) - place(right)) || (Number(left?.slot || 0) - Number(right?.slot || 0)));
+}
+
+/** Was unter dem Platz steht: Punkte, Stand oder Zeit - oder warum es keinen Platz gab. */
+function heatResultDetail(result, mode) {
+  if (!result) return "";
+  if (result.forfeit) return "Nicht erschienen";
+  if (result.dnf) return "Aufgegeben";
+  if (mode === "time") return result.time_ms != null ? showLapTime(result.time_ms) : "";
+  if (result.points != null) return `${result.points} ${Number(result.points) === 1 ? "Punkt" : "Punkte"}`;
+  if (result.score != null) return `Stand ${result.score}`;
+  return "";
+}
+
+function HeatSide({ participant, match, result, mode }) {
+  const place = Number(result?.rank || 0);
+  const detail = heatResultDetail(result, mode);
+  return (
+    <div className={`border rounded-sm bg-[#0A0A0A] p-4 ${place === 1 ? "border-[#29B6E8]/70 shadow-[0_0_18px_rgba(41,182,232,0.18)]" : "border-white/10"}`} data-testid="match-heat-side" data-place={place || ""}>
+      <div className={`font-display text-4xl font-bold ${place === 1 ? "text-[#29B6E8]" : place ? "text-white/80" : "text-white/35"}`} data-testid="match-heat-place">{place ? `Platz ${place}` : "–"}</div>
+      <div className="mt-2 font-heading text-lg font-bold uppercase truncate">{slotName(participant?.display_name, participant, match)}</div>
+      {participant?.team && <div className="mt-1 text-xs text-[#29B6E8] truncate">[{participant.team.tag}] {participant.team.name}</div>}
+      <div className="mt-1 text-xs text-white/50" data-testid="match-heat-detail">{[detail, participant?.slot ? `Startplatz ${participant.slot}` : ""].filter(Boolean).join(" · ")}</div>
+    </div>
+  );
+}
+
 function v2ResultDisplay(match, participant, mode) {
   const result = v2ResultForParticipant(match, participant);
   if (!result) return "-";
   if (result.forfeit) return "Nicht erschienen";
   if (result.dnf) return "Aufgegeben";
-  if (mode === "time") return result.time_ms != null ? `${result.time_ms} ms` : "-";
+  if (mode === "time") return result.time_ms != null ? showLapTime(result.time_ms) : "-";
   const score = result.score ?? result.points;
   return score != null ? score : "-";
 }
