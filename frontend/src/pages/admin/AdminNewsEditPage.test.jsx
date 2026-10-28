@@ -99,7 +99,8 @@ test("Neuer Beitrag „Jetzt veröffentlichen“: Rückfrage „geht an N Person
     confirmLabel: "Veröffentlichen",
   }));
   const payload = apiMock.post.mock.calls.find(([url]) => url === "/news")[1];
-  expect(Math.abs(new Date(payload.published_at).getTime() - Date.now())).toBeLessThan(60000);
+  expect(payload.publish_now).toBe(true);
+  expect(payload).not.toHaveProperty("published_at");
 });
 
 test("Abbrechen in der Rückfrage speichert nichts", async () => {

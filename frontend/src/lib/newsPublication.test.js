@@ -15,8 +15,8 @@ test("Stand beim Öffnen: neu und zurückgezogen sind Entwürfe, Termin in der Z
 
 test("was gespeichert wird: Entwurf behält ein altes Datum, „Jetzt“ setzt jetzt, ein Veröffentlichter behält seins", () => {
   expect(publishFields("draft", "", "draft", { published_at: "2026-11-01T11:00" }, NOW)).toEqual({ published: false, published_at: "2026-11-01T11:00" });
-  expect(publishFields("now", "", "draft", {}, NOW)).toEqual({ published: true, published_at: "2026-10-28T12:00:00.000Z" });
-  expect(publishFields("now", "", "scheduled", { published_at: "2026-11-01T11:00" }, NOW)).toEqual({ published: true, published_at: "2026-10-28T12:00:00.000Z" });
+  expect(publishFields("now", "", "draft", {}, NOW)).toEqual({ published: true, publish_now: true, published_at: "" });
+  expect(publishFields("now", "", "scheduled", { published_at: "2026-11-01T11:00" }, NOW)).toEqual({ published: true, publish_now: true, published_at: "2026-11-01T11:00" });
   expect(publishFields("now", "", "now", { published_at: "2026-09-01T11:00" }, NOW)).toEqual({ published: true, published_at: "2026-09-01T11:00" });
   expect(publishFields("scheduled", "2026-11-10T18:00:00Z", "draft", {}, NOW)).toEqual({ published: true, published_at: "2026-11-10T18:00:00Z" });
   expect(publishFields("scheduled", "", "draft", {}, NOW).error).toMatch(/Termin/);

@@ -29,15 +29,16 @@ export function initialPublishMode(post, now = Date.now()) {
 
 /**
  * Was gespeichert wird: `published` und `published_at` aus der Wahl. Ein schon veröffentlichter Beitrag behält sein
- * Datum; „Jetzt“ aus Entwurf oder Plan setzt den Zeitpunkt auf jetzt. Ein Termin in der Vergangenheit ist ein Fehler -
+ * Datum; „Jetzt“ aus Entwurf oder Plan bittet den Server, jetzt zu setzen. Ein Termin in der Vergangenheit ist ein Fehler -
  * sonst erschiene der Beitrag sofort, obwohl „Geplant“ gewählt war.
  */
 export function publishFields(mode, scheduledAt, initialMode, original = {}, now = Date.now()) {
   if (mode === "draft") return { published: false, published_at: original.published_at || "" };
   if (mode === "now") {
+    // Den Zeitpunkt von „Jetzt“ setzt der Server (#2122) - die Uhr des Browsers kann falsch gehen.
     return initialMode === "now"
       ? { published: true, published_at: original.published_at || "" }
-      : { published: true, published_at: new Date(now).toISOString() };
+      : { published: true, publish_now: true, published_at: original.published_at || "" };
   }
   const date = scheduledAt ? new Date(scheduledAt) : null;
   if (!date || Number.isNaN(date.getTime())) return { error: "Für „Geplant“ fehlt der Termin." };

@@ -653,9 +653,14 @@ def _ever_public(post: dict) -> bool:
 async def create_news(body: NewsCreate, me: dict = Depends(require_area("content"))):
     db = get_db()
     doc = body.model_dump()
+    publish_now = bool(doc.pop("publish_now", None))
     doc["slug"] = await unique_slug(db.news_posts, doc.get("slug") or doc.get("title"), fallback="news")
     if doc.get("published_at"):
         doc["published_at"] = doc["published_at"].isoformat()
+    if publish_now:
+        # „Jetzt veröffentlichen“ (#2122): der Zeitpunkt des Servers, nicht der des Browsers.
+        doc["published"] = True
+        doc["published_at"] = None
     doc["mentioned_user_ids"] = await _mentioned_user_ids_from_content(doc.get("content"), doc.get("mentioned_user_ids") or [])
     doc["id"] = new_id()
     created_at = now_utc().isoformat()
@@ -694,7 +699,8 @@ async def update_news(nid: str, body: NewsUpdate, me: dict = Depends(require_are
     if not existing:
         raise HTTPException(404, "Beitrag nicht gefunden.")
     update = body.model_dump(exclude_unset=True)
-    if not update:
+    publish_now = bool(update.pop("publish_now", None))
+    if not update and not publish_now:
         raise HTTPException(400, "Keine Änderungen.")
     slug_source = slug_source_for_update(update, existing, "title", fallback="news")
     if slug_source is not None:
@@ -708,7 +714,11 @@ async def update_news(nid: str, body: NewsUpdate, me: dict = Depends(require_are
             next_content,
             update.get("mentioned_user_ids", existing.get("mentioned_user_ids") or []),
         )
-    if update.get("published") is True and "published_at" not in update and not existing.get("published_at"):
+    if publish_now:
+        # „Jetzt veröffentlichen“ (#2122): der Zeitpunkt des Servers, nicht der des Browsers.
+        update["published"] = True
+        update["published_at"] = now_utc().isoformat()
+    elif update.get("published") is True and "published_at" not in update and not existing.get("published_at"):
         update["published_at"] = now_utc().isoformat()
     # Autor ändern (#2122 NW3): nur, wen die Personensuche anbietet - ein aktives, nicht gesperrtes Konto der Redaktion.
     # Der Name kommt aus dem Konto.

@@ -1344,6 +1344,8 @@ class NewsCreate(BaseModel):
     visibility: NewsVisibility = "public"
     published: bool = True
     published_at: Optional[datetime] = None
+    # „Jetzt veröffentlichen“ (#2122): den Zeitpunkt setzt der Server, nicht die Uhr des Browsers.
+    publish_now: Optional[bool] = None
     # „Ohne Discord veröffentlichen“ (#303)
     discord_skip: bool = False
     # Link-Vorschau beim Teilen (#347)
@@ -1367,6 +1369,7 @@ class NewsUpdate(BaseModel):
     visibility: Optional[NewsVisibility] = None
     published: Optional[bool] = None
     published_at: Optional[datetime] = None
+    publish_now: Optional[bool] = None
     discord_skip: Optional[bool] = None
     share_preview: Optional[bool] = None
     pinned: Optional[bool] = None

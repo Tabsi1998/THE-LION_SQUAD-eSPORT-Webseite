@@ -302,3 +302,14 @@ async def test_unpublishing_a_scheduled_post_that_never_went_out_is_just_a_draft
     flow.act_as(await flow.add_user(role="club_admin", name="Rita"))
     saved = (await flow.patch(f"/api/news/{post['id']}", json={"published": False})).json()
     assert saved["published"] is False and "withdrawn_at" not in saved
+
+
+@pytest.mark.asyncio
+async def test_publish_now_uses_the_server_clock(flow):
+    flow.act_as(await flow.add_user(role="club_admin", name="Rita"))
+    future = (now_utc() + timedelta(days=5)).isoformat()
+    created = (await flow.post("/api/news", json={"title": "Sofort", "content": "Text", "published": False, "published_at": future, "publish_now": True})).json()
+    assert created["published"] is True and created["published_at"] <= now_utc().isoformat() and "publish_now" not in created
+    draft = (await flow.post("/api/news", json={"title": "Später", "content": "Text", "published": False})).json()
+    saved = (await flow.patch(f"/api/news/{draft['id']}", json={"publish_now": True})).json()
+    assert saved["published"] is True and saved["published_at"] <= now_utc().isoformat() and "publish_now" not in saved
