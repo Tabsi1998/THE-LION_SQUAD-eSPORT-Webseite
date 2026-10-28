@@ -145,6 +145,11 @@ async def init_indexes():
     await db.tournament_registrations.create_index("id", unique=True)
     await db.tournament_registrations.create_index([("tournament_id", 1), ("user_id", 1)])
     await db.tournament_registrations.create_index("identity_key", unique=True, sparse=True)
+    # Liga Stufe 1 – Co-Teams und Spiele (B), docs/LIGA.md: Anmeldungen je Co-Team, Co-Teams je Captain/Vertreter.
+    await db.tournament_registrations.create_index(
+        "squad_id", partialFilterExpression={"squad_id": {"$exists": True}})
+    await db.team_squads.create_index("captain_id", sparse=True)
+    await db.team_squads.create_index("vice_captain_id", sparse=True)
     # Events
     await db.events.create_index("id", unique=True)
     await db.events.create_index("slug", unique=True)
