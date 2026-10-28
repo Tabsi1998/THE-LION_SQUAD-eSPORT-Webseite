@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { Activity, BarChart3, Moon, RefreshCw, Users } from "lucide-react";
+import { Activity, BarChart3, Moon, RefreshCw, Trophy, Users } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Bars, CATEGORIES, Panel, Stat, errorText, formatWhen, materialColor } from "./shared";
 
@@ -11,6 +12,9 @@ const LEVEL_BUCKETS = ["1-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60"]
 export function OverviewTab() {
   const [data, setData] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [rebuilding, setRebuilding] = useState(false);
+  const { can } = useAuth();
+  const canSystem = Boolean(can?.("system"));
   const load = useCallback(() => api.get("/admin/achievements/overview").then(({ data: next }) => setData(next)).catch((err) => toast.error(errorText(err))), []);
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["achievements"]);
@@ -26,6 +30,20 @@ export function OverviewTab() {
       toast.error(errorText(err));
     } finally {
       setBusy(false);
+    }
+  };
+
+  // Pokale alter Turniere nachtragen (#2112): ein Wartungsgriff, nur Bereich System.
+  const rebuildAwards = async () => {
+    if (rebuilding) return;
+    setRebuilding(true);
+    try {
+      const { data: result } = await api.post("/admin/awards/rebuild");
+      toast.success(`${result.tournaments} Turnier${result.tournaments === 1 ? "" : "e"} geprüft, ${result.awards} Pokal${result.awards === 1 ? "" : "e"} und Banner stehen.`);
+    } catch (err) {
+      toast.error(errorText(err));
+    } finally {
+      setRebuilding(false);
     }
   };
 
@@ -85,6 +103,22 @@ export function OverviewTab() {
           ) : <p className="text-xs text-white/45">Der Abgleich ist noch nicht gelaufen.</p>}
         </Panel>
       </div>
+      {canSystem && (
+        <Panel
+          title="Turnier-Pokale nachtragen"
+          icon={Trophy}
+          accent="#FFD700"
+          hint="Pokale und Banner für alle Turniere mit veröffentlichten Ergebnissen neu ableiten – etwa nach einer Korrektur alter Ergebnisse. Doppelt entsteht dabei nichts."
+          actions={(
+            <button type="button" onClick={rebuildAwards} disabled={rebuilding} data-testid="ach-awards-rebuild" className="px-3 py-1.5 border border-[#FFD700]/50 text-[#FFD700] text-[10px] font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2 disabled:opacity-40">
+              <RefreshCw className={`w-3.5 h-3.5 ${rebuilding ? "animate-spin" : ""}`} /> Pokale nachtragen
+            </button>
+          )}
+          testId="ach-awards"
+        >
+          <p className="text-xs text-white/45">Nur für System: der Lauf geht über alle Turniere und steht im Protokoll.</p>
+        </Panel>
+      )}
       <p className="text-[11px] text-white/35">Katalog: {data.catalog?.groups ?? 0} Gruppen · {data.catalog?.tiers ?? 0} Stufen</p>
     </div>
   );
