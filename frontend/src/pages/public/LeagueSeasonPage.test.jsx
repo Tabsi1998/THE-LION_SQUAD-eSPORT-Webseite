@@ -139,6 +139,17 @@ test("Gestaltung (#2107): Banner mit Fokuspunkt, Emblem, Akzentfarbe und „Um w
   expect(head).toHaveAttribute("data-banner", "false");
 });
 
+test("ohne Meldeschluss keine leere Zeile unter dem Titel; mit Akzent folgen die Reiter der Liga-Farbe", async () => {
+  const view = { ...SEASON_VIEW, look: { emblem_url: null, banner: null, accent_color: "#FFB020" },
+    season: { ...SEASON_VIEW.season, registration_deadline: null } };
+  apiMock.get.mockImplementation((url) => (url === "/leagues/probe-liga/season-1" ? Promise.resolve({ data: view }) : Promise.resolve({ data: STAFFEL("A") })));
+  renderPage();
+  await screen.findByTestId("league-head");
+  expect(screen.queryByTestId("league-subline")).toBeNull();
+  expect(screen.getByTestId("league-staffel-tab-A")).toHaveClass("tls-league-tab");
+  expect(screen.getByTestId("league-head").closest(".tls-league-look").getAttribute("style")).toContain("--tls-brand-rgb: 255 176 32");
+});
+
 test("Unsichtbare oder unbekannte Season: ein klarer Hinweis", async () => {
   apiMock.get.mockRejectedValue({ response: { status: 404 } });
   renderPage();

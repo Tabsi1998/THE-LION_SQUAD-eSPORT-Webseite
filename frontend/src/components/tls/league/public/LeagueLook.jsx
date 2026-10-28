@@ -23,8 +23,13 @@ export function LeagueEmblem({ src, size = 40, className = "", testId }) {
 
 /** Kopf der Ligaseite: Banner (Fokuspunkt je Zuschnitt), darauf Emblem und Titel. ``children`` steht unter dem Titel. */
 export function LeagueHead({ look, title, eyebrow, children, testId = "league-head" }) {
-  const [state, setState] = useState("loading");
-  const banner = look?.banner?.url && state !== "failed" ? look.banner : null;
+  // Ladezustand je Banner-Adresse: kommt ein anderes Banner (Live-Nachladen, andere Season), beginnt es wieder bei
+  // „lädt“ - ein früheres „kaputt“ oder „geladen“ gilt nicht für das neue Bild.
+  const url = look?.banner?.url || "";
+  const [loadState, setLoadState] = useState({ url, value: "loading" });
+  const state = loadState.url === url ? loadState.value : "loading";
+  const setState = (value) => setLoadState({ url, value });
+  const banner = url && state !== "failed" ? look.banner : null;
   return (
     <header className="tls-league-head" data-banner={banner ? "true" : "false"} style={accentStyle(look?.accent_color)} data-testid={testId}>
       {banner ? (

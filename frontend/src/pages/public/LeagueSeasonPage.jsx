@@ -59,7 +59,7 @@ function Division({ division, leagueSlug, seasonSlug, hash }) {
                   id={tabId(row)} aria-selected={selected} aria-controls={panelId} tabIndex={selected ? 0 : -1}
                   onClick={() => setActive(row.tournament_id)} onKeyDown={(event) => onTabKey(event, index)}
                   data-testid={`league-staffel-tab-${row.staffel}`}
-                  className={`tls-btn ${selected ? "tls-btn--secondary" : "tls-btn--quiet"} rounded-sm px-3 py-1.5 text-xs font-bold uppercase tracking-wider`}>
+                  className={`tls-btn tls-league-tab ${selected ? "tls-btn--secondary" : "tls-btn--quiet"} rounded-sm px-3 py-1.5 text-xs font-bold uppercase tracking-wider`}>
                   Staffel {row.staffel}
                 </button>
               );
@@ -126,16 +126,17 @@ export default function LeagueSeasonPage() {
   }
   return (
     <PublicLayout>
-      {/* Die Akzentfarbe der Liga gilt für die ganze Seite: Zeichen, Abzeichen, Reiter - ohne sie die Vereinsfarbe. */}
+      {/* Die Akzentfarbe der Liga gilt für die ganze Seite (#2107): Kopf, Zeichen, Reiter, Tabelle (eigene Zeile, „Du“),
+          Spielwochen, Ergebnisse und Links - sie setzt dafür auch die Markenfarbe; ohne sie gilt die Vereinsfarbe. */}
       <div className="tls-league-look max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12" style={accentStyle(data.look?.accent_color)}>
         <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "Liga", to: "/liga" }, { label: title }]} className="mb-3" />
         {/* Kopf (#2107): Banner und Emblem der Season bzw. Liga, Akzentfarbe der Liga - ohne alles ein ruhiger Kopf. */}
         <LeagueHead look={data.look} eyebrow={league.game?.name} title={<>{league.name} <span className="text-white/55">{season.name}</span></>}>
-          <p className="mt-3 text-sm text-white/60" data-testid="league-subline">
-            {[season.registration_deadline
-              ? `Meldeschluss ${viennaDate(dayNoon(season.registration_deadline), { day: "numeric", month: "numeric", year: "numeric" })}` : ""]
-              .filter(Boolean).join(" · ")}
-          </p>
+          {season.registration_deadline ? (
+            <p className="mt-3 text-sm text-white/60" data-testid="league-subline">
+              Meldeschluss {viennaDate(dayNoon(season.registration_deadline), { day: "numeric", month: "numeric", year: "numeric" })}
+            </p>
+          ) : null}
           <dl className="mt-8 grid grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-4" data-testid="league-facts">
             <Fact icon={CalendarClock} label="Zeitraum" testId="league-fact-period">{seasonPeriod(season)}</Fact>
             <Fact icon={Timer} label={weekSpan(season)} testId="league-fact-week">Ohne Einigung: {defaultSlot(season)}</Fact>

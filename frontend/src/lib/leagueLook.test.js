@@ -25,7 +25,11 @@ test("Akzentfarbe: leer ist erlaubt (Vereinsfarbe), zu dunkel oder kein Farbwert
 
 test("accentStyle setzt die Farbe als RGB-Kanäle und eine lesbare Schrift darauf - ohne Farbe nichts", () => {
   expect(accentStyle(null)).toEqual({});
-  expect(accentStyle("#FFB020")).toEqual({ "--league-accent-rgb": "255 176 32", "--league-on-accent": "#0A0A0A" });
+  expect(accentStyle("#FFB020")).toEqual({
+    "--league-accent-rgb": "255 176 32", "--league-on-accent": "#0A0A0A",
+    // Innerhalb der Liga folgt die Markenfarbe dem Akzent (Tabelle, Links, Reiter).
+    "--tls-brand-rgb": "255 176 32", "--tls-brand": "rgb(255 176 32)",
+  });
   expect(accentStyle("#3F51B5")["--league-on-accent"]).toBe("#FFFFFF");
 });
 

@@ -45,7 +45,10 @@ export function accentStyle(color) {
   if (!rgb) return {};
   // Schrift auf einer Fläche in der Akzentfarbe (Abzeichen): die besser lesbare von Weiß und Seitengrund.
   const onAccent = contrastRatio(color, "#FFFFFF") >= contrastRatio(color, PAGE_BACKGROUND) ? "#FFFFFF" : PAGE_BACKGROUND;
-  return { "--league-accent-rgb": rgb.join(" "), "--league-on-accent": onAccent };
+  const text = rgb.join(" ");
+  // Innerhalb der Liga folgt die Markenfarbe dem Akzent (Review #2107): Tabelle (eigene Zeile, „Du“), Links und alles
+  // mit text-brand/border-brand - außerhalb (Menü, Fuß) bleibt die Vereinsfarbe.
+  return { "--league-accent-rgb": text, "--league-on-accent": onAccent, "--tls-brand-rgb": text, "--tls-brand": `rgb(${text})` };
 }
 
 const percent = (value) => (Number.isFinite(Number(value)) ? Math.min(100, Math.max(0, Math.round(Number(value)))) : 50);

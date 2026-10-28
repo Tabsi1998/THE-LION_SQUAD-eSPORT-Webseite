@@ -97,6 +97,15 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     expect(eyebrow).toBe("rgb(255, 176, 32)");
     await noSideScroll(page);
     await settled(page);
+    // Review #2107: nur das Emblem steht auf der Bannerkante - Text in Akzentfarbe beginnt erst unter dem Bild.
+    const banner = await page.getByTestId("league-head-banner").boundingBox();
+    const text = await page.locator(".tls-league-head__eyebrow").boundingBox();
+    const emblem = await page.getByTestId("league-head-emblem").boundingBox();
+    expect(text.y).toBeGreaterThanOrEqual(banner.y + banner.height);
+    expect(emblem.y).toBeLessThan(banner.y + banner.height);
+    // Reiter, Tabelle und Links folgen der Akzentfarbe (die Markenfarbe ist innerhalb der Liga überschrieben).
+    const brand = await page.locator(".tls-league-look").evaluate((node) => getComputedStyle(node).getPropertyValue("--tls-brand-rgb").trim());
+    expect(brand).toBe("255 176 32");
     await page.screenshot({ path: `test-results/liga-gestaltung-${width}.png`, fullPage: false });
   });
 
