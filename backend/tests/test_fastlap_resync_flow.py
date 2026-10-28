@@ -326,3 +326,27 @@ async def test_after_publishing_scoring_rules_change_only_with_a_reason(flow):
     assert len(rows) == 1 and rows[0]["data"]["fields"] == ["season_weight"] and rows[0]["data"]["reason"] == REASON
     after = await flow.db.season_points.find_one({"user_id": anna["id"]}, {"_id": 0})
     assert after["weight"] == 2.0 and after["total_points"] > before["total_points"]
+
+
+@pytest.mark.asyncio
+async def test_a_challenge_with_weight_zero_awards_no_season_points(flow):
+    await published(flow, season_weight=0)
+    assert await flow.db.season_points.count_documents({}) == 0
+
+
+@pytest.mark.asyncio
+async def test_a_challenge_without_weight_uses_the_fast_lap_default(flow):
+    await published(flow)
+    rows = await flow.db.season_points.find({}, {"_id": 0}).to_list(10)
+    assert rows and {row["weight"] for row in rows} == {1.0}
+
+
+@pytest.mark.asyncio
+async def test_setting_the_weight_to_zero_after_publishing_removes_the_points(flow):
+    cid, tid, anna, bert, _laps = await published(flow, season_weight=1.5)
+    assert await flow.db.season_points.count_documents({"source_id": f"{cid}:{tid}"}) == 2
+    response = await flow.patch(f"/api/f1/challenges/{cid}", json={"season_weight": 0, "change_reason": REASON})
+    assert response.status_code == 200, response.text
+    assert await flow.db.season_points.count_documents({"source_id": f"{cid}:{tid}"}) == 0
+    stored = await flow.db.f1_challenges.find_one({"id": cid}, {"_id": 0})
+    assert stored["season_weight"] == 0

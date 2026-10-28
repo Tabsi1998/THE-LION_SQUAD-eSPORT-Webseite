@@ -428,7 +428,7 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
     # ---------- Season Points + Badges on results_published ----------
     if prev != status and status == "results_published":
         try:
-            from services.season_service import award_points
+            from services.season_service import award_points, season_weight_of
             from badges import on_tournament_completed
             # Build placements once through the canonical Legacy/Stage projection.
             regs = await db.tournament_registrations.find(
@@ -446,11 +446,11 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
                 if placement.get("registration_id")
             }
             # Source type by season weight: <=1.5 mini, <=2.5 normal, else major
-            weight = float(t.get("season_weight") or 2.0)
+            weight = season_weight_of(t)
             source_type = "mini" if weight < 1.5 else ("major" if weight >= 2.5 else "tournament")
             # Liga-Staffeln (docs/LIGA.md, Abschnitt 7) zählen nicht für die Jahreswertung - ausdrücklich, nicht über
-            # season_weight=0 (``or 2.0`` machte daraus sonst wieder 2).
-            league_staffel = is_league_staffel(t)
+            # season_weight=0. Gewicht 0 = "keine Jahreswertung" (#2095): ebenfalls keine Eintraege.
+            league_staffel = is_league_staffel(t) or weight <= 0
             for p in placements:
                 if league_staffel or not (p.get("user_id") or p.get("team_id")):
                     continue

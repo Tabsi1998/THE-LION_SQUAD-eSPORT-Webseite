@@ -900,7 +900,7 @@ async def _resync_f1_season_points(challenge: dict) -> dict:
     """Saisonpunkte je Strecke angleichen - in der Saison, in der sie beim Veröffentlichen vergeben wurden. Wurden keine
     vergeben (keine aktive Saison damals), bleibt es dabei."""
     from collections import Counter
-    from services.season_service import resync_source_points
+    from services.season_service import CHALLENGE_SEASON_WEIGHT_DEFAULT, resync_source_points, season_weight_of
 
     db = get_db()
     cid = challenge["id"]
@@ -913,10 +913,12 @@ async def _resync_f1_season_points(challenge: dict) -> dict:
         return dict(totals)
     season_by_source = {row["source_id"]: row["season_id"] for row in awarded}
     fallback = Counter(row["season_id"] for row in awarded).most_common(1)[0][0]
-    weight = float(challenge.get("season_weight") or 1.0)
+    weight = season_weight_of(challenge, CHALLENGE_SEASON_WEIGHT_DEFAULT)
     for track in tracks:
         source_id = f"{cid}:{track['id']}"
         ranked = track_ranking(await official_times(db, cid, track["id"]))
+        if weight <= 0:
+            ranked = []  # Gewicht 0 = keine Jahreswertung (#2095): vorhandene Punkte dieser Quelle fallen weg
         totals.update(await resync_source_points(
             season_id=season_by_source.get(source_id, fallback), source_type="fastlap", source_id=source_id,
             source_name=f"{challenge.get('title') or 'Fast Lap'} - {track.get('name') or 'Strecke'}",
@@ -927,11 +929,13 @@ async def _resync_f1_season_points(challenge: dict) -> dict:
 
 async def _award_f1_season_points(challenge: dict):
     db = get_db()
-    from services.season_service import award_points
+    from services.season_service import CHALLENGE_SEASON_WEIGHT_DEFAULT, award_points, season_weight_of
 
     cid = challenge["id"]
     tracks = await db.f1_tracks.find({"challenge_id": cid}, {"_id": 0}).sort("order_index", 1).to_list(100)
-    weight = float(challenge.get("season_weight") or 1.0)
+    weight = season_weight_of(challenge, CHALLENGE_SEASON_WEIGHT_DEFAULT)
+    if weight <= 0:
+        return  # Gewicht 0 = keine Jahreswertung (#2095): keine Punkte schreiben
     for track in tracks:
         ranked = track_ranking(await official_times(db, cid, track["id"]))
         num_participants = max(len(ranked), 1)
