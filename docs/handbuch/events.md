@@ -102,8 +102,10 @@ Mal senden nur Redaktion und System.
 - **Live-Stream (optional):** Plattform und Adresse.
 - **Absagen:** Status **Abgesagt** und speichern. Die Rückfrage nennt die Zahl der Anmeldungen (samt Warteliste). Danach gelten
   alle Anmeldungen als storniert, jede Person bekommt eine Benachrichtigung und – wenn sie Mails zu Turnier-Updates zulässt –
-  die Mail „Nachricht zum Event“. Offene Rechnungsaufträge werden storniert; eine schon gestellte Rechnung kommt als Prüffall in
-  die Finanzübersicht. Die Event-Seite zeigt **Event abgesagt** statt der Anmeldung.
+  die Mail „Nachricht zum Event“ (je Person nur einmal). Offene und fehlgeschlagene Rechnungsaufträge werden storniert; eine
+  schon gestellte Rechnung kommt als Prüffall in die Finanzübersicht. Die Event-Seite zeigt **Event abgesagt** statt der
+  Anmeldung. Die Zahl zählt alle bestehenden Anmeldungen, auch wenn die Anmeldung inzwischen ausgeschaltet ist. Wird die Absage
+  zurückgenommen, bleiben die Anmeldungen storniert.
 - **Termin oder Ort ändern:** Gibt es Anmeldungen, fragt das Formular beim Speichern **Angemeldete informieren?**.
   **Informieren** schickt allen (samt Warteliste) den neuen Termin und Ort, **Ohne Nachricht speichern** nur das Formular.
 - **Löschen:** in der Liste das Papierkorb-Symbol. Gelöscht wird endgültig und nur, wenn nichts mehr daran hängt: keine
@@ -382,7 +384,7 @@ Name, Bild und dem Ort: Event und Turniere, bei Teams mit Teamname. Wichtig für
 | Freunde-Abschnitt fehlt | Keine bestätigten Freunde angemeldet, oder sie teilen ihre Anmeldungen nicht | Gewollt; jede Person steuert es selbst |
 | „Für dieses Event gibt es noch … Anmeldungen“ beim Löschen | Löschen geht nur ohne Anmeldungen | Status **Abgesagt** speichern (alle werden informiert), dann löschen |
 | „Zu diesem Event gibt es schon eine Rechnung“ beim Löschen | Die Anmeldungen bleiben als Nachweis der Rechnung | Event absagen bzw. **Archiviert** setzen statt löschen |
-| „Ein Turnier dieses Events hat noch Anmeldungen“ beim Löschen | Ein verknüpftes Turnier läuft noch | Event absagen oder das Turnier zuerst im Programm klären |
+| „Ein Turnier dieses Events hat noch Anmeldungen“ beim Löschen | Ein verknüpftes Turnier hat noch Anmeldungen | Das Turnier aus dem Programm lösen oder dort die Anmeldungen klären |
 | Absage wieder zurückgenommen, Anmeldungen fehlen | Die Absage hat alle Anmeldungen storniert | Gewollt; die Personen melden sich neu an |
 | Max. Teilnehmer: Fehler beim Speichern | 0 oder eine negative Zahl | Feld leeren (unbegrenzt) oder eine Zahl ab 1 eintragen |
 

@@ -536,6 +536,12 @@ async def list_events(
     if compact:
         out = [_compact_event(ev) for ev in out]
         return _page_items(out, limit, offset, paged)
+    if include_drafts and is_admin:
+        # Verwaltung (#2118): alle bestehenden Anmeldungen samt Warteliste - auch bei ausgeschalteter Anmeldung - für
+        # die Rückfragen beim Absagen, Verschieben und Löschen.
+        counts = await event_changes.active_registration_counts(db, [ev["id"] for ev in out])
+        for ev in out:
+            ev["active_registration_count"] = counts.get(ev["id"], 0)
     return out
 
 
@@ -1042,12 +1048,20 @@ async def update_event(event_id: str, body: EventUpdate, me: dict = Depends(requ
         if updates.get(k) and hasattr(updates[k], "isoformat"):
             updates[k] = updates[k].isoformat()
     updates["updated_at"] = now_utc().isoformat()
+    # Absagen (#2118): der Wechsel auf „abgesagt“ ist ein eigener, bedingter Schritt - von zwei gleichzeitigen Absagen
+    # löst nur eine die Folgen aus.
+    cancelling = updates.get("status") == "cancelled"
+    if cancelling:
+        updates.pop("status")
     await db.events.update_one({"id": event_id}, {"$set": updates})
+    newly_cancelled = cancelling and (await db.events.update_one(
+        {"id": event_id, "status": {"$ne": "cancelled"}}, {"$set": {"status": "cancelled", "updated_at": updates["updated_at"]}},
+    )).modified_count == 1
     reset_scope_cache()  # Live-Meldungen (#1801): Turnier und Event neu nachschlagen
     event = await db.events.find_one({"id": event_id}, {"_id": 0})
     # Absagen und Verschieben (#2118): was daraus für Angemeldete, Warteliste und Rechnungen folgt.
     cancellation = change_notice = None
-    if event and event.get("status") == "cancelled" and existing.get("status") != "cancelled":
+    if event and newly_cancelled:
         cancellation = await event_changes.cancel_event(db, event, me)
     elif event and notify_registrants and event.get("status") not in {"draft", "archived", "cancelled"}:
         change_notice = await event_changes.announce_change(db, existing, event, me)

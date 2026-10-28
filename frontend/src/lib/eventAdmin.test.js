@@ -7,6 +7,9 @@ import {
 test("Betroffene: Angemeldete (samt Eingecheckten) und Warteliste", () => {
   expect(affectedRegistrations({ registration_summary: { registered_count: 4, waitlist_count: 2 } })).toBe(6);
   expect(affectedRegistrations({})).toBe(0);
+  // Die Verwaltungsliste zählt alle bestehenden Anmeldungen - auch bei ausgeschalteter Anmeldung (Zusammenfassung leer).
+  expect(affectedRegistrations({ active_registration_count: 3, registration_summary: { registered_count: 0 } })).toBe(3);
+  expect(affectedRegistrations({ active_registration_count: 0, registration_summary: { registered_count: 2 } })).toBe(0);
 });
 
 test("Rückfrage beim Absagen nennt die Zahl in Einzahl und Mehrzahl", () => {
@@ -14,6 +17,7 @@ test("Rückfrage beim Absagen nennt die Zahl in Einzahl und Mehrzahl", () => {
   expect(cancelConfirmText(1)).toContain("1 Anmeldung (samt Warteliste)");
   expect(cancelConfirmText(5)).toContain("5 Anmeldungen (samt Warteliste)");
   expect(cancelConfirmText(5)).toContain("storniert");
+  expect(cancelConfirmText(5)).toContain("neu anmelden");
 });
 
 test("Termin oder Ort geändert: nur diese Felder zählen", () => {

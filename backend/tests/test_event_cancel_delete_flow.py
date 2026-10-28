@@ -11,6 +11,7 @@
 
 Namen und Adressen sind erfunden.
 """
+import asyncio
 import pathlib
 import sys
 from datetime import timedelta
@@ -115,6 +116,51 @@ async def test_cancelling_informs_everyone_cancels_registrations_and_orders(flow
 
 
 @pytest.mark.asyncio
+async def test_cancelling_also_closes_failed_orders(flow):
+    """Ein fehlgeschlagener Auftrag bekäme sonst über „Erneut versuchen“ später eine Rechnung zum abgesagten Event."""
+    kassier, event, _people, regs = await setup_event(flow)
+    await flow.db.billing_orders.update_one({"registration_id": regs["paula"]["id"]}, {"$set": {"status": "failed"}})
+    response = await patch(flow, kassier, event, {"status": "cancelled"})
+    assert response.status_code == 200 and response.json()["cancellation"]["orders"] == 2
+    order = await flow.db.billing_orders.find_one({"registration_id": regs["paula"]["id"]}, {"_id": 0})
+    assert order["status"] == "cancelled" and order["cancel_reason"] == "Event abgesagt"
+
+
+@pytest.mark.asyncio
+async def test_cancelling_twice_at_once_informs_everyone_once(flow):
+    kassier, event, people, _regs = await setup_event(flow)
+    first, second = await asyncio.gather(patch(flow, kassier, event, {"status": "cancelled"}),
+                                         patch(flow, kassier, event, {"status": "cancelled"}))
+    assert [first.status_code, second.status_code] == [200, 200]
+    assert ["cancellation" in first.json(), "cancellation" in second.json()].count(True) == 1
+    assert await flow.db.audit_logs.count_documents({"action": "event.cancel"}) == 1
+    assert await flow.db.notifications.count_documents({"kind": "event_message"}) == 3
+
+    # Zurücknehmen und wieder absagen: niemand bekommt die Absage ein zweites Mal.
+    reopened = await patch(flow, kassier, event, {"status": "registration_open"})
+    assert reopened.status_code == 200
+    flow.act_as(people["paula"])
+    again = await flow.post(f"/api/events/{event['id']}/registrations", json={"companion_count": 0})
+    assert again.status_code == 200, again.text
+    repeated = await patch(flow, kassier, event, {"status": "cancelled"})
+    assert repeated.json()["cancellation"]["registrations"] == 1
+    assert await flow.db.notifications.count_documents({"kind": "event_message", "user_id": people["paula"]["id"]}) == 1
+
+
+@pytest.mark.asyncio
+async def test_admin_list_counts_registrations_even_with_registration_switched_off(flow):
+    kassier, event, _people, _regs = await setup_event(flow)
+    switched_off = await patch(flow, kassier, event, {"has_registration": False})
+    assert switched_off.status_code == 200
+    flow.act_as(kassier)
+    listed = next(ev for ev in (await flow.get("/api/events?include_drafts=true")).json() if ev["id"] == event["id"])
+    assert listed["active_registration_count"] == 3
+    flow.act_as(None)
+    public = next(ev for ev in (await flow.get("/api/events")).json() if ev["id"] == event["id"])
+    assert "active_registration_count" not in public
+
+
+@pytest.mark.asyncio
 async def test_cancelling_an_event_without_registrations_just_saves(flow):
     kassier = await person(flow, "kassier", role="tournament_admin")
     flow.act_as(kassier)
@@ -182,7 +228,7 @@ async def test_deleting_with_a_linked_tournament_that_has_registrations_is_refus
     await flow.db.tournaments.insert_one({"id": "turnier-1", "title": "FC Cup", "event_id": event["id"], "status": "registration_open"})
     await flow.db.tournament_registrations.insert_one({"id": "t-reg-1", "tournament_id": "turnier-1", "status": "approved"})
     response = await flow.delete(f"/api/events/{event['id']}")
-    assert response.status_code == 409 and "Turnier" in response.json()["detail"]
+    assert response.status_code == 409 and "aus dem Programm lösen" in response.json()["detail"]
     assert (await flow.db.tournaments.find_one({"id": "turnier-1"}))["event_id"] == event["id"]
 
 

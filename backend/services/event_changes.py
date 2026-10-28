@@ -34,6 +34,28 @@ def _path(event: dict) -> str:
     return f"/events/{event.get('slug') or event['id']}"
 
 
+async def active_registration_counts(db, event_ids: list[str]) -> dict[str, int]:
+    """Bestehende Anmeldungen samt Warteliste je Event - unabhängig davon, ob die Anmeldung gerade an ist."""
+    if not event_ids:
+        return {}
+    rows = await db.event_registrations.aggregate([
+        {"$match": {"event_id": {"$in": event_ids}, "status": {"$in": list(AFFECTED_STATUSES)}}},
+        {"$group": {"_id": "$event_id", "n": {"$sum": 1}}},
+    ]).to_list(len(event_ids))
+    return {row["_id"]: int(row["n"]) for row in rows}
+
+
+async def _cancel_orders(db, registration_id: str, reason: str) -> int:
+    """Offene, zurückgehaltene und fehlgeschlagene Aufträge zu (``failed`` dazu, sonst erzeugte „Erneut versuchen“
+    später eine Rechnung zum abgesagten Event); ein gestellter Beleg wird Prüffall (``cancel_orders_for``)."""
+    count = await billing_orders.cancel_orders_for(db, kind="event", registration_id=registration_id, reason=reason)
+    failed = await db.billing_orders.update_many(
+        {"kind": "event", "registration_id": registration_id, "status": "failed"},
+        {"$set": {"status": "cancelled", "cancel_reason": reason, "updated_at": now_utc().isoformat()}},
+    )
+    return count + int(failed.modified_count)
+
+
 async def _affected_registrations(db, event_id: str) -> list[dict]:
     return await db.event_registrations.find(
         {"event_id": event_id, "status": {"$in": list(AFFECTED_STATUSES)}},
@@ -108,13 +130,12 @@ async def cancel_event(db, event: dict, me: dict) -> dict:
             {"$set": {"status": "cancelled", "cancelled_with_event": True, "updated_at": now,
                       **({"billing_status": "cancelled"} if registration.get("price_snapshot") else {})}},
         )
-        orders += await billing_orders.cancel_orders_for(db, kind="event", registration_id=registration["id"],
-                                                         reason="Event abgesagt")
+        orders += await _cancel_orders(db, registration["id"], "Event abgesagt")
     users = await _recipients(db, [registration.get("user_id") for registration in registrations])
     message = ("Das Event wurde abgesagt. Deine Anmeldung ist damit storniert – ein offener Kostenbeitrag wird nicht "
                "verrechnet; wurde schon eine Rechnung gestellt, meldet sich der Verein bei dir.")
-    sent = await _inform(db, event, users, title="abgesagt", message=message,
-                         dedupe=f"event-cancelled:{event['id']}:{now}")
+    # Je Event und Person genau einmal - auch wenn die Absage zurückgenommen und wiederholt wird.
+    sent = await _inform(db, event, users, title="abgesagt", message=message, dedupe=f"event-cancelled:{event['id']}")
     result = {"registrations": len(registrations), "notified": sent["notified"], "orders": orders}
     await db.audit_logs.insert_one({
         "id": new_id(), "action": "event.cancel", "actor_id": me["id"], "target_id": event["id"],
@@ -166,8 +187,8 @@ async def delete_block_reason(db, event: dict) -> str | None:
     if tournament_ids and await db.tournament_registrations.count_documents(
         {"tournament_id": {"$in": tournament_ids}, "status": {"$in": list(ACTIVE_TOURNAMENT_REGISTRATIONS)}}, limit=1,
     ):
-        return ("Ein Turnier dieses Events hat noch Anmeldungen – bitte das Event absagen bzw. das Turnier zuerst im "
-                "Programm klären.")
+        return ("Ein Turnier dieses Events hat noch Anmeldungen – bitte das Turnier aus dem Programm lösen oder dort "
+                "die Anmeldungen klären.")
     return None
 
 
@@ -179,8 +200,7 @@ async def delete_event(db, event: dict, me: dict) -> dict:
                      db.event_registrations.find({"event_id": event["id"]}, {"_id": 0, "id": 1})]
     for registration_id in registrations:
         # Sicherheitsnetz: ein noch offener Auftrag zu einer stornierten Anmeldung schriebe sonst später ins Leere.
-        await billing_orders.cancel_orders_for(db, kind="event", registration_id=registration_id,
-                                               reason="Event gelöscht")
+        await _cancel_orders(db, registration_id, "Event gelöscht")
     await db.events.delete_one({"id": event["id"]})
     await db.event_registrations.delete_many({"event_id": event["id"]})
     unlinked = {}

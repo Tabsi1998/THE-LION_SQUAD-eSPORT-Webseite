@@ -24,8 +24,10 @@ const SCHEDULE_OR_PLACE_FIELDS = ["start_date", "end_date", "days", "location", 
 
 const plural = (count, one, many) => `${count} ${count === 1 ? one : many}`;
 
-/** Angemeldete (samt Eingecheckten) und Warteliste - wer bei Absage oder neuem Termin Nachricht bekommt. */
+/** Angemeldete (samt Eingecheckten) und Warteliste - wer bei Absage oder neuem Termin Nachricht bekommt. Die Verwaltungsliste
+ * zählt alle bestehenden Anmeldungen (`active_registration_count`), auch bei ausgeschalteter Anmeldung. */
 export function affectedRegistrations(event) {
+  if (event?.active_registration_count != null) return Number(event.active_registration_count) || 0;
   const summary = event?.registration_summary || {};
   return Number(summary.registered_count || 0) + Number(summary.waitlist_count || 0);
 }
@@ -34,7 +36,8 @@ export function cancelConfirmText(count) {
   if (!count) return "Niemand ist angemeldet. Das Event steht danach als „abgesagt“ auf der Seite.";
   return `${plural(count, "Anmeldung", "Anmeldungen")} (samt Warteliste) werden storniert und benachrichtigt, offene `
     + "Rechnungsaufträge storniert. Schon gestellte Rechnungen kommen als Prüffall in die Finanzübersicht. "
-    + "Das Event steht danach als „abgesagt“ auf der Seite.";
+    + "Das Event steht danach als „abgesagt“ auf der Seite. Wird die Absage zurückgenommen, bleiben die Anmeldungen "
+    + "storniert – die Personen müssen sich neu anmelden.";
 }
 
 /** Ob die Änderung Termin oder Ort betrifft - dann fragt die Verwaltung, ob die Angemeldeten es erfahren sollen. */
