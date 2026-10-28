@@ -21,6 +21,13 @@ class FakeCursor:
     async def to_list(self, _limit):
         return list(self.items)
 
+    def __aiter__(self):
+        # Abgleich nach einer Korrektur (#2123) liest die vorhandenen Gewinne mit ``async for``.
+        async def rows():
+            for item in self.items:
+                yield item
+        return rows()
+
 
 class FakeCollection:
     def __init__(self, items=None):
@@ -87,6 +94,7 @@ class FakeDb:
         self.matches_v2 = FakeCollection(matches_v2 or [])
         self.tournament_stages = FakeCollection(tournament_stages or [])
         self.prize_pickups = FakeCollection(prize_pickups or [])
+        self.teams = FakeCollection([])  # Team-Gewinne melden sich bei der Teamleitung (#2123)
 
 
 def test_auto_create_tournament_prizes_from_stage_standings(monkeypatch):
