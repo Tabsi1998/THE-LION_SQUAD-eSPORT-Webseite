@@ -17,6 +17,10 @@ Der Weg eines Turniers aus Sicht der Turnierleitung: anlegen, Anmeldung, Check-i
 - **Admin → eSports → Stationen** (`/admin/stations`) – Geräte und Plätze in der Halle, Spiele zuweisen
 - **Admin → eSports → Gewinne**, **Strafen**, **Jahreswertung** – was nach dem Turnier daraus wird
 - **Turnierleitung am Handy** (`/tournaments/<Name>/leitung`) – Ergebnisse eintragen und Streitfälle entscheiden, ohne die Verwaltung
+- **Öffentliche Turnierliste** (`/tournaments`) – Filter **Beendet** zeigt auch veröffentlichte und archivierte Turniere,
+  **Live** auch pausierte; je Seite 24 Turniere, ältere mit **Mehr laden**. Alle Turnierseiten tragen dieselben
+  Brotkrumen „Home · eSports · Turniere · Turnier · Seite“ (Staffeln den Liga-Weg).
+- **Terminvorschläge** auf der Matchseite gehen nur in die Zukunft – frühestens 5 Minuten ab jetzt.
 
 Wer was darf: Die **Turnierleitung** (Bereich „Turnierleitung“, mit bestätigter Zwei-Faktor-Anmeldung) verwaltet alle
 Turniere. **Ohne 2FA** erscheint stattdessen der Hinweis **2FA einrichten**, siehe [Erste Schritte im Admin](admin.md).
@@ -41,7 +45,7 @@ Turniere. **Ohne 2FA** erscheint stattdessen der Hinweis **2FA einrichten**, sie
 | Funktion | Was passiert | Einstellen unter |
 | --- | --- | --- |
 | **Turnier anlegen** | Titel und Spiel genügen, das Turnier startet als **Entwurf** und ist nicht öffentlich | Neues Turnier |
-| **Formate** | Single und Double Elimination, Jeder gegen jeden, Schweizer System, Gruppenphase, Mehrspieler, Liga, freie Bäume und mehr | Neues Turnier / Reiter Bearbeiten, Abschnitt „Struktur“ |
+| **Formate** | K.-o. und Doppel-K.-o., Jeder gegen jeden, Schweizer System, Gruppenphase, Mehrspieler, Liga, freie Bäume und mehr | Neues Turnier / Reiter Bearbeiten, Abschnitt „Struktur“ |
 | **Spielweise** | **Online**, **Vor Ort** oder **Hybrid**: wer Ergebnisse meldet, wer Termine macht, wer eincheckt | „Wie gespielt wird“ |
 | **Anmeldung** | Selbstanmeldung, Warteliste, Einladung, Speziallinks, Startgeld | Reiter Bearbeiten, Reiter Teilnehmer |
 | **Check-in** | Online selbst, vor Ort durch die Turnierleitung | Reiter Teilnehmer |
@@ -113,8 +117,8 @@ Platzierung).
 
 | Format | Wofür |
 | --- | --- |
-| **Single Elimination** | Ein Abend, ein Sieger; wer verliert, ist raus. Mit Haken „Spiel um Platz 3“ möglich |
-| **Double Elimination** | Eine Niederlage ist nicht das Aus (Loser Bracket) |
+| **K.-o.** (früher „Single Elimination“) | Ein Abend, ein Sieger; wer verliert, ist raus. Mit Haken „Spiel um Platz 3“ möglich |
+| **Doppel-K.-o.** (früher „Double Elimination“) | Eine Niederlage ist nicht das Aus (Loser Bracket) |
 | **Jeder gegen jeden** | Kleines Feld, alle spielen gegeneinander, die Tabelle entscheidet |
 | **Schweizer System** | Viele Teilnehmer, kein fester Baum; die Runden entstehen einzeln aus den Ergebnissen |
 | **Gruppenphase** | Teilnehmer in Gruppen, danach Turnierbaum |
@@ -123,6 +127,10 @@ Platzierung).
 | **Überlebensmodus** | Für Battle-Royale-artige Spiele, gewertet nach Platzierung |
 | **Freier Turnierbaum** und **Mehrspieler freier Turnierbaum** | Ihr schreibt den Baum selbst (Schema) |
 | **Zeitfahren**, **Rennserie** | Wertung über Rundenzeiten, **kein Turnierbaum**. Für reines Zeitfahren ist die [Fast-Lap-Challenge](fastlap.md) gedacht |
+
+Auf der Turnierseite gibt es den Reiter **Turnierbaum** nur bei Formaten mit Baum. Bei **Jeder gegen jeden**, **Liga**,
+**Zeitfahren** und **Rennserie** fehlt er; im laufenden Turnier ist dort – und bei **Schweizer System** und
+**Gruppenphase** – die **Rangliste** der Hauptknopf. Der Hinweis im Baum sagt je Format, wie gespielt wird.
 
 Zu den Besonderheiten:
 
@@ -286,7 +294,8 @@ verbindlichen Teilnahme: Warteliste kostet nichts. Alles Weitere steht in [Abrec
   eingestellten Zeit gestartet, steht **Check-in öffnet** danach auf dem wirklichen Beginn.
 - **Ende des Check-ins** (die Zeit **Check-in endet**, oder **Turnier starten**, wenn keine Zeit gesetzt ist): Der
   Turnierbaum entsteht **nur aus den Eingecheckten**. Der Status bleibt **Check-in offen**, bis das Turnier startet;
-  öffentlich steht „Anmeldung geschlossen“, und Spieler können nicht mehr selbst einchecken. Endet der Check-in früher
+  öffentlich steht „Anmeldung geschlossen“, und Spieler können nicht mehr selbst einchecken – statt des Knopfs steht
+  **Check-in vorbei**, sobald „Check-in endet“ um ist (auch bevor der Baum gebaut ist). Endet der Check-in früher
   als eingestellt (**Turnier starten**), steht **Check-in endet** auf diesem Zeitpunkt. Die Zeitleiste der Turnierseite
   folgt dem Stand: Erreichtes ist abgehakt, was läuft, steht als „Check-in läuft“ bzw. „Turnier läuft“, ein Countdown
   nur für Kommendes.
@@ -350,6 +359,13 @@ Zustimmung des Gegners außerhalb seiner Spielwoche stattfindet, gilt 48 Stunden
 bisher die Turnierleitung. Einspruch (3.7) bleibt
 danach möglich, in der Liga bis zum Ende der Spielwoche.
 
+Das **Foto** sehen nach der Bildprüfung alle Spieler des Spiels und die Turnierleitung; die eigene Seite sieht ihr Foto
+nach dem Senden unter „Deine Meldung“. Wo nur die Turnierleitung einträgt oder das Turnier vor Ort läuft, zeigt die
+Matchseite Gästen keinen Knopf „Login zum Ergebnis melden“.
+
+**Was die Matchseite zeigt:** Bei Duellen den Stand, bei Läufen mit mehreren Spielern den **Platz** groß und die
+Kacheln in Platzreihenfolge, darunter Punkte oder Zeit und den Startplatz. Jeder Teilnehmer steht dort genau einmal.
+
 **Die Turnierleitung trägt ein.** Dasselbe **Ergebnis-Fenster** öffnet sich an vier Orten, mit denselben Feldern und
 Wörtern:
 
@@ -366,7 +382,7 @@ Am Handy kommt das Fenster von unten, am PC steht es in der Mitte. Je nach Spiel
 - **Best of**: je Spiel den Sieger antippen (nur, wo der höhere Stand gewinnt; wo der niedrigste gewinnt, gibt es den
   Stand),
 - **Sieger** antippen (Spiele auf Zeit),
-- bei Mehrspieler-Spielen **Reihenfolge antippen** (wer zuerst im Ziel war, zuerst; ein zweiter Tipp nimmt zurück)
+- bei Mehrspieler-Spielen **Reihenfolge antippen** (Platz 1 zuerst; ein zweiter Tipp nimmt zurück)
   oder **Punkte eintragen**; die Wahl merkt sich der Browser,
 - die Schalter **Nicht erschienen** und **Aufgegeben** je Seite (nur eine Seite kann sie haben).
 
@@ -377,6 +393,11 @@ bekommen Bescheid.
 **Korrigieren:** Am Spiel steht dann **Ergebnis korrigieren**. Pflicht ist ein **Grund der Korrektur** (mindestens fünf
 Zeichen), er steht im Protokoll. In der Ansicht der Turnierleitung steht unter **Zuletzt eingetragen** der Knopf
 **Korrigieren**. Das gilt auch für ein Spiel in Klärung, das schon ein Ergebnis hat.
+
+**Inzwischen eingetragen:** Hat jemand anderes das Ergebnis eingetragen, während das Fenster offen war, fragt es
+„Inzwischen ist ein Ergebnis eingetragen – als Korrektur speichern?“. **Als Korrektur speichern** zeigt das Feld für
+den Grund. Die Meldungen des Servers sind deutsche Sätze ohne Kennungen; Notiz und Grund haben eine feste Länge
+(Notiz 1000, Grund 500 Zeichen).
 
 **Was der Server annimmt** (gleich für Ergebnis-Fenster, Meldung der Spieler und Wertung):
 
@@ -403,6 +424,8 @@ auf **In Klärung**.
 2. Entscheiden: **Ergebnis bleibt** (ohne Ergebnis: **Weiter wie bisher**) oder **Ergebnis ändern** (ohne Ergebnis:
    **Ergebnis eintragen**), das öffnet das Ergebnis-Fenster.
 3. Die **Begründung** ist freiwillig und geht an beide Seiten. Beide bekommen die Entscheidung als Benachrichtigung.
+4. Wer gemeldet hat, sieht auf der Matchseite den Kasten **Deine Meldung**: Grund, Text und Stand – „Die
+   Turnierleitung prüft“, „Das Ergebnis bleibt“ (mit Begründung) oder „Das Ergebnis wurde korrigiert“.
 
 Der Reiter zeigt auch andere Fälle, zum Beispiel ein fehlendes Ergebnis oder eine **defekte Station**: Dort legt
 **Umlegen** die wartenden Spiele auf eine freie Station. Erledigtes verschwindet von selbst.
