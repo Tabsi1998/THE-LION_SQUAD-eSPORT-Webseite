@@ -1,6 +1,7 @@
 // Turnier-Bearbeitung (#223): Optionen und reine Helfer, die mehrere Teile der Seite teilen.
 import { sideRoundLabel } from "@/lib/bracketNames";
 import { sectionKind } from "@/lib/bracketSections";
+import { WEEKLY_FORMATS } from "@/lib/tournamentFormFields";
 
 export const TOURNAMENT_STATUS_OPTIONS = [
   ["draft", "Entwurf"],
@@ -204,10 +205,9 @@ export const HEAT_REBUILD_OPTIONS = [
   ["auto", "Automatisch: Läufe werden ohne Rückfrage zusammengelegt, ausgeglichen und abgekürzt"],
 ];
 export const HEAT_REBUILD_HINT = "Ist das Turnier nicht voll oder fallen Fahrer aus, werden unterbesetzte Läufe zusammengelegt (2 + 2 wird ein Lauf mit 4). Laufende und aufgerufene Läufe bleiben unangetastet.";
-// Nur diese Formate spielen in Wochen; ein K.-o.-Baum hat Runden, keine Woche.
-// Muss zu MATCHDAY_FORMATS in services/matchday_schedule.py passen.
-
-export const MATCHDAY_FORMATS = new Set(["league", "round_robin", "groups"]);
+// Nur diese Formate spielen in Wochen; ein K.-o.-Baum hat Runden, keine Woche. Die Liste steht seit #2111 bei den
+// Feldregeln (lib/tournamentFormFields.js) und muss zu MATCHDAY_FORMATS in services/matchday_schedule.py passen.
+export const MATCHDAY_FORMATS = WEEKLY_FORMATS;
 
 export const WEEKDAY_OPTIONS = [
   ["0", "Montag"], ["1", "Dienstag"], ["2", "Mittwoch"], ["3", "Donnerstag"],

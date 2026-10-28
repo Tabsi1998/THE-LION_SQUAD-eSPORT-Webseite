@@ -22,10 +22,10 @@ import { gamePresets } from "@/lib/gameMatchData";
 import { PrizeEditor, Txt } from "./PrizeEditor";
 import { DeadlineFields } from "./DeadlineFields";
 import { deadlineFormValues, deadlinePayload } from "@/lib/tournamentDeadlines";
-import { ADVANCEMENT_MODE_OPTIONS, BRONZE_FORMATS, DRAW_SHOW_MINUTES_DEFAULT, DRAW_SHOW_MINUTES_HINT, advancementModeHint, drawShowMinutesPayload, CUSTOM_BRACKET_FORMATS, EVENT_MODE_OPTIONS, GRAND_FINAL_FORMATS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, HEAT_REBUILD_FORMATS, HEAT_REBUILD_HINT, HEAT_REBUILD_OPTIONS, MATCHDAY_FORMATS, RESULT_ENTRY_MODE_OPTIONS, SCHEDULE_MODE_OPTIONS, SEEDING_OPTIONS, STREAM_PLATFORM_OPTIONS, TEAM_MODE_OPTIONS, TOURNAMENT_SEASON_WEIGHT_OPTIONS, VISIBILITY_OPTIONS, WEEKDAY_OPTIONS, advancementModeOf } from "./shared";
+import { ADVANCEMENT_MODE_OPTIONS, BRONZE_FORMATS, DRAW_SHOW_MINUTES_DEFAULT, DRAW_SHOW_MINUTES_HINT, advancementModeHint, drawShowMinutesPayload, CUSTOM_BRACKET_FORMATS, EVENT_MODE_OPTIONS, GRAND_FINAL_FORMATS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, HEAT_REBUILD_FORMATS, HEAT_REBUILD_HINT, HEAT_REBUILD_OPTIONS, RESULT_ENTRY_MODE_OPTIONS, SCHEDULE_MODE_OPTIONS, SEEDING_OPTIONS, STREAM_PLATFORM_OPTIONS, TEAM_MODE_OPTIONS, TOURNAMENT_SEASON_WEIGHT_OPTIONS, VISIBILITY_OPTIONS, WEEKDAY_OPTIONS, advancementModeOf } from "./shared";
 import { StaffelSeasonValues, isStaffel, staffelBeforeStart } from "./StaffelParts";
 import { FormatHint } from "./FormatHint";
-import { NO_MATCH_FORMATS } from "@/lib/tournamentFormFields";
+import { NO_MATCH_FORMATS, tournamentFieldRules } from "@/lib/tournamentFormFields";
 
 // „Gewinne erzeugen“ erst ab dem Ende (#2123, TA23) - wie der Server (services/tournament_guard.py FINISHED_STATUSES).
 const PRIZE_READY_STATUSES = new Set(["completed", "results_published", "archived"]);
@@ -203,6 +203,8 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
   }, []);
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
   const timeWarnings = dateWarnings(f);
+  // Nur, was zu Format und Austragung passt (#2111): Spielwochen, Fristen, Weiterkommen, Best of, Mindestpause.
+  const rules = tournamentFieldRules(f);
   // Spiel-Daten (#1554): woher die Dauer kommt, und was das Spiel für Best-of und Laufgröße vorschlägt.
   const selectedGame = games.find((game) => game.id === f.game_id) || null;
   const modes = gameModes(selectedGame);
@@ -412,7 +414,8 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
             </FormGrid>
           )}
           {/* Antwortfrist einer Staffel (#2106, F3): kommt aus der Season und steht rechts unter „Aus der Season“. */}
-          {show && MATCHDAY_FORMATS.has(f.format) && (
+          {/* Spielwochen nur online und hybrid (#2111, T1) - vor Ort plant der Stationsplaner Runden an einem Tag. */}
+          {show && rules.matchdays && (
             <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-4 space-y-3" data-testid="tr-edit-matchdays">
               <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Spielwochen</div>
               <p className="text-xs text-white/55">

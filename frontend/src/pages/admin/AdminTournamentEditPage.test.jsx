@@ -397,6 +397,23 @@ test("die Spielwochen-Einstellungen erscheinen nur bei Wochenformaten", async ()
   expect(screen.getByLabelText("Standardtag")).toHaveValue("6");
 });
 
+// Spielwochen nur online und hybrid (#2111, T1): vor Ort plant der Stationsplaner Runden an einem Tag.
+test("vor Ort gibt es auch im Wochenformat keine Spielwochen", async () => {
+  const user = userEvent.setup();
+  apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path.match(/\/tournaments\/t-1(\?|$)/)) return Promise.resolve({ data: { ...TOURNAMENT, format: "league", event_mode: "local" } });
+    return Promise.resolve(routeFor(path));
+  });
+  renderPage();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  await user.click(screen.getByTestId("admin-tr-tab-edit"));
+  await screen.findByTestId("tr-edit-format");
+  expect(screen.queryByTestId("tr-edit-matchdays")).not.toBeInTheDocument();
+  await user.selectOptions(screen.getByLabelText("Austragung"), "hybrid");
+  expect(screen.getByTestId("tr-edit-matchdays")).toBeInTheDocument();
+});
+
 test("ein K.-o.-Turnier zeigt keine Spielwochen-Einstellungen", async () => {
   const user = userEvent.setup();
   renderPageWithFormat("single_elim");
