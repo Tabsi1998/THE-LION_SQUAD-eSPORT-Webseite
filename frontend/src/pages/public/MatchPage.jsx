@@ -23,6 +23,8 @@ import { finishedMatchText, formatMatchKind, formatMatchStatus, isByeSlot, isMat
 import { matchIsOver } from "@/lib/afterEnd";
 import { rankingMode } from "@/lib/matchReport";
 import { MatchReportForm } from "@/components/tls/tournament/MatchReportForm";
+import { LeagueReportForm } from "@/components/tls/league/LeagueReportForm";
+import { LeagueGamesView, LineupAmendForm, StaffLineupAmend } from "@/components/tls/league/LeagueGamesView";
 import { LiveQueueStatus } from "@/components/tls/live/LiveQueueStatus";
 import { MatchCallBox } from "@/components/tls/tournament/MatchCallBox";
 import { ProblemReportForm } from "@/components/tls/results/ProblemReportForm";
@@ -199,6 +201,13 @@ function MatchPageView() {
     toast.success(answer?.awaiting_confirmation === false ? "Ergebnis bestätigt – das Spiel ist entschieden." : "Ergebnis gemeldet.");
     await load({ preserveDrafts: false });
   }, "Ergebnis konnte nicht gemeldet werden.");
+
+  // Liga (#1650): die eigene Aufstellung je Map nachtragen - bis zur Frist, danach über die Turnierleitung.
+  const saveLineups = async (payload) => runAction(async () => {
+    await api.put(`/matches/${id}/lineups`, payload);
+    toast.success("Aufstellung gespeichert.");
+    await load({ preserveDrafts: false });
+  }, "Aufstellung konnte nicht gespeichert werden.");
 
   // Problem melden (#1158): Grund, Text und auf Wunsch ein Foto - die Turnierleitung entscheidet.
   const submitDispute = async (payload) => runAction(async () => {
@@ -383,6 +392,15 @@ function MatchPageView() {
           </div>
           )}
 
+          {/* Liga (#1650): gespielte Maps mit Sieger und Aufstellungen; fehlt die eigene noch, hier nachtragen. */}
+          {data.league ? <LeagueGamesView league={data.league} /> : null}
+          {data.league ? (
+            <LineupAmendForm key={`${(data.league.lineups_missing || []).join(",")}-${match.updated_at || ""}`} league={data.league} busy={busy} onSave={saveLineups} />
+          ) : null}
+          {data.league && canStaffSubmit ? (
+            <StaffLineupAmend key={`staff-${match.updated_at || ""}`} league={data.league} busy={busy} onSave={saveLineups} />
+          ) : null}
+
           {/* Nur Turnierleitung (#1157): Spieler sehen keinen Melde-Knopf, sondern wer das Ergebnis einträgt. */}
           {showStaffEnters ? (
             <div className="mt-5 flex items-start gap-3 rounded-sm border border-[#29B6E8]/30 bg-[#29B6E8]/5 px-4 py-3" data-testid="match-staff-enters">
@@ -406,7 +424,17 @@ function MatchPageView() {
 
           {hasResultActions ? (
             <div className="mt-5 border-t border-white/10 pt-5 space-y-5">
-              {(canPlayerReport || showReportReadOnly) && (
+              {(canPlayerReport || showReportReadOnly) && data.league && (
+                <LeagueReportForm
+                  league={data.league}
+                  readOnly={!canPlayerReport}
+                  onWrongResult={wrongResult}
+                  state={data.report_state}
+                  busy={busy}
+                  onReport={submitReport}
+                />
+              )}
+              {(canPlayerReport || showReportReadOnly) && !data.league && (
                 <MatchReportForm
                   readOnly={!canPlayerReport}
                   onWrongResult={wrongResult}
@@ -563,7 +591,7 @@ function MatchPageView() {
           )}
         </div>
       </section>
-      {resultOpen && data.result_entry ? <ResultWindow entry={data.result_entry} onClose={() => setResultOpen(false)} onSaved={resultUndo.start} /> : null}
+      {resultOpen && data.result_entry ? <ResultWindow entry={data.result_entry} league={data.league} onClose={() => setResultOpen(false)} onSaved={resultUndo.start} /> : null}
       <ResultUndoBar undo={resultUndo} />
     </PublicLayout>
   );

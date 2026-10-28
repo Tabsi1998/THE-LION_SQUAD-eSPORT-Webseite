@@ -94,7 +94,8 @@ def _no_show(match: dict, results: list[dict]) -> str | None:
 
 
 async def hold_result(db, match: dict, raw_results: list[dict], *, actor: dict, note: str | None,
-                      proof_url: str | None, force: bool, reason: str | None) -> dict:
+                      proof_url: str | None, force: bool, reason: str | None,
+                      games: list[dict] | None = None, lineups_missing: list[str] | None = None) -> dict:
     """Ein Ergebnis für 10 Sekunden bereitlegen. Prüft alles wie beim Speichern - Fehler kommen sofort zurück."""
     actor_id = actor["id"]
     normalized = await checked_results(db, match, raw_results)
@@ -128,6 +129,8 @@ async def hold_result(db, match: dict, raw_results: list[dict], *, actor: dict, 
         "actor_name": actor.get("display_name") or actor.get("username") or "Turnierleitung",
         "held_at": now.isoformat(),
         "publish_at": (now + timedelta(seconds=HOLD_SECONDS + GRACE_SECONDS)).isoformat(),
+        # Liga (#1650): geprüfte Maps samt Aufstellungen gehen mit dem Ergebnis raus.
+        **({"games": games, "lineups_missing": lineups_missing or []} if games is not None else {}),
     }
     stored = await db.matches_v2.update_one(
         {"id": match["id"], "pending_result": {"$exists": False}},
@@ -135,6 +138,10 @@ async def hold_result(db, match: dict, raw_results: list[dict], *, actor: dict, 
     )
     if not stored.modified_count:
         raise MatchV2ResultError(BUSY_DETAIL, 409)
+    if games:
+        # Liga (#1650): die Aufgestellten des gehaltenen Ergebnisses blockieren den Spieltag sofort.
+        from services.league_games import refresh_lineup_index
+        await refresh_lineup_index(db, match["id"])
     await _audit(db, "match.result.hold", match, actor_id, {
         "hold_id": hold["id"], "force": bool(force), **({"reason": reason_text} if reason_text else {}),
         **({"no_show_registration_id": forfeiting} if forfeiting else {}),
@@ -220,6 +227,8 @@ async def _publish_one(db, match_id: str, hold_id: str | None, moment: str) -> b
                 db, match, hold.get("results") or [], actor_id=hold.get("actor_id"), proof_url=hold.get("proof_url"),
                 note=hold.get("note"), force=bool(hold.get("force")), audit_action="match.result.submit",
                 reason=hold.get("reason"), hold_id=hold_id,
+                games=hold.get("games") if "games" in hold else None,
+                lineups_missing=hold.get("lineups_missing") if "games" in hold else None,
             )
     except MatchV2ResultError as exc:
         # Inzwischen hat sich etwas geändert (etwa ein Folgespiel läuft schon): nichts schreiben, Bescheid geben.
@@ -322,6 +331,9 @@ async def undo_result(db, match: dict, *, actor_id: str, hold_id: str | None = N
     if isinstance(hold, dict) and (not hold_id or hold.get("id") == hold_id):
         removed = await db.matches_v2.update_one({"id": match["id"], "pending_result.id": hold.get("id")}, {"$unset": {"pending_result": ""}})
         if removed.modified_count:
+            if hold.get("games"):
+                from services.league_games import refresh_lineup_index
+                await refresh_lineup_index(db, match["id"])
             await _audit(db, "match.result.undo", match, actor_id, {"hold_id": hold.get("id"), "held": True})
             return {"ok": True, "undone": True, "held": True}
         match = await db.matches_v2.find_one({"id": match["id"]}, {"_id": 0}) or match
@@ -374,7 +386,12 @@ async def _revert_published(db, match: dict, *, actor_id: str, hold_id: str | No
     await db.matches_v2.update_one({"id": match["id"]}, {
         "$set": {"results": [], "result_meta": None, "completed_at": None, "completed_by": None,
                  "status": _open_status(match), "updated_at": now_iso},
+        # Liga (#1650): die geltenden Maps gehören zum Ergebnis - offene Meldungen bleiben, der Index folgt ihnen.
+        **({"$unset": {"games": "", "lineups_missing": ""}} if "games" in match or "lineups_missing" in match else {}),
     })
+    if "games" in match or match.get("lineup_user_ids"):
+        from services.league_games import refresh_lineup_index
+        await refresh_lineup_index(db, match["id"])
     await _audit(db, "match.result.undo", match, actor_id, {
         "held": False, "report_id": meta.get("report_id"), "cleared_matches": cleared,
     })

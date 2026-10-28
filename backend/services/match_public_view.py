@@ -18,9 +18,21 @@ INTERNAL_KEYS = frozenset({"admin_note", "admin_decision_note", "admin_decision_
                            # Der Sperr-Schlüssel des Lauf-Umbaus (#1550) - Technik, kein Inhalt.
                            "rebuild_token",
                            # „Nicht erschienen“ im Lauf (#1823): wer markiert ist, ist öffentlich - die Begründung nicht.
-                           "no_show_notes"})
+                           "no_show_notes",
+                           # Liga (#1650): der Doppel-Einsatz-Index besteht aus Konto-Kennungen.
+                           "lineup_user_ids"})
 INTERNAL_META_KEYS = frozenset({"note", "correction_reason", "hold_id"})
 INTERNAL_RESULT_KEYS = frozenset({"user_id", "note"})
+# Liga (#1650): öffentlich je Map nur der Schnappschuss, Sieger und Punkte - Aufstellungen (Konto-Kennungen) bekommen
+# die Beteiligten mit Namen über den Block ``league`` der Matchseite. Gleich wie die Staffel-API (league_page).
+PUBLIC_GAME_FIELDS = ("position", "mode", "mode_label", "map_id", "map_name", "map_image_url", "winner_registration_id",
+                      "scores")
+
+
+def public_games(games: list | None) -> list:
+    """Die Maps eines Spiels ohne Aufstellungen."""
+    return [{key: game.get(key) for key in PUBLIC_GAME_FIELDS if key in game}
+            for game in games or [] if isinstance(game, dict)]
 
 
 def _public_keys(value: dict, internal: frozenset) -> dict:
@@ -37,9 +49,13 @@ def public_match_view(match: dict | None, viewer_id: str | None = None) -> dict 
         out["result_meta"] = _public_keys(match["result_meta"], INTERNAL_META_KEYS)
     if isinstance(match.get("results"), list):
         out["results"] = [_public_keys(row, INTERNAL_RESULT_KEYS) if isinstance(row, dict) else row for row in match["results"]]
+    if "games" in match:
+        out["games"] = public_games(match.get("games"))
     if "reports" in match:
         out["reports"] = [
-            row if viewer_id and row.get("user_id") == viewer_id else {"registration_id": row.get("registration_id"), "at": row.get("at")}
+            ({**row, **({"games": public_games(row["games"])} if "games" in row else {})}
+             if viewer_id and row.get("user_id") == viewer_id
+             else {"registration_id": row.get("registration_id"), "at": row.get("at")})
             for row in match.get("reports") or [] if isinstance(row, dict)
         ]
     if "disputes" in match:

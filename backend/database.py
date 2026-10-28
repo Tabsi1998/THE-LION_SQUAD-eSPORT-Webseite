@@ -152,6 +152,8 @@ async def init_indexes():
     await db.tournament_registrations.create_index("league_squad_key", unique=True, sparse=True)
     await db.team_squads.create_index("captain_id", sparse=True)
     await db.team_squads.create_index("vice_captain_id", sparse=True)
+    # Kein Doppel-Einsatz am selben Spieltag (#1650): Spiele je aufgestellter Person (Mehrfachwert).
+    await db.matches_v2.create_index("lineup_user_ids", sparse=True)
     # Events
     await db.events.create_index("id", unique=True)
     await db.events.create_index("slug", unique=True)
