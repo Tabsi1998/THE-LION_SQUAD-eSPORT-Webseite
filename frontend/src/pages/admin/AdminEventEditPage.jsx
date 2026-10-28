@@ -33,6 +33,7 @@ const CREATE_STATUS_OPTIONS = [
   ["draft", "Entwurf"],
   ["scheduled", "Angekündigt"],
 ];
+const EVENT_MODE_OPTIONS = [["local", "Vor Ort"], ["online", "Online"], ["hybrid", "Hybrid (vor Ort und online)"]];
 const STREAM_PLATFORM_OPTIONS = [["", "Plattform —"], ["twitch", "Twitch"], ["youtube", "YouTube"], ["kick", "Kick"], ["custom", "Eigenes Format"]];
 
 // Event anlegen und bearbeiten als eigene Seite (#434) - vorher ein Fenster über der Liste, das
@@ -186,6 +187,9 @@ function EventForm({ event, meta, partners = [], onDone }) {
   const eventTypes = (meta.types || []).filter((t) => !meta.primary_types || meta.primary_types.includes(t.k) || t.k === form.event_type);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  // Austragung (#2111, W2): gespeichert weiter als die beiden Schalter - Hybrid gewinnt wie bisher (event_program.py).
+  const eventMode = form.is_hybrid ? "hybrid" : form.is_online ? "online" : "local";
+  const setEventMode = (mode) => setForm((f) => ({ ...f, is_online: mode === "online", is_hybrid: mode === "hybrid" }));
   // Zurück auf einen Tag: Start und Ende aus dem ersten und letzten Tag übernehmen, damit nichts leer steht.
   const changeDays = (next) => {
     if (!next.length && daysForm.length) {
@@ -315,11 +319,14 @@ function EventForm({ event, meta, partners = [], onDone }) {
             <SelectField label={isNew ? "Veröffentlichung" : "Status"} value={form.status} onChange={(v) => set("status", v)} options={isNew ? CREATE_STATUS_OPTIONS : (meta.statuses || [])} testId="event-status" />
           </FormSection>
           <FormSection title="Zeiten und Plätze" accent={ACCENT}>
+            {/* Eine Auswahl statt zweier Haken (#2111, W2): „Nur Online“ und „Hybrid“ ließen sich gleichzeitig setzen. */}
+            <SelectField label="Austragung" value={eventMode} onChange={setEventMode} options={EVENT_MODE_OPTIONS} testId="event-mode" />
             {!usesDays && (
               <>
                 <TextField label="Start" type="datetime-local" value={form.start_date} onChange={(v) => set("start_date", v)} testId="event-start" />
                 <TextField label="Ende" type="datetime-local" value={form.end_date} onChange={(v) => set("end_date", v)} testId="event-end" />
-                <TextField label="Einlass / Türöffnung" type="datetime-local" value={form.door_time} onChange={(v) => set("door_time", v)} testId="event-door-time" />
+                {/* Online gibt es keinen Einlass (#2111, W3). */}
+                {eventMode !== "online" && <TextField label="Einlass / Türöffnung" type="datetime-local" value={form.door_time} onChange={(v) => set("door_time", v)} testId="event-door-time" />}
               </>
             )}
             <EventDaysSection value={daysForm} onChange={changeDays} locations={locationsForm} startDate={form.start_date} endDate={form.end_date} accent={ACCENT} />
@@ -360,16 +367,18 @@ function EventForm({ event, meta, partners = [], onDone }) {
         <EventFactsSection bringText={form.bring_along_text} onBringText={(v) => set("bring_along_text", v)} highlights={highlightsForm} onHighlights={setHighlightsForm} />
       </FormSection>
 
-      <FormSection title="Ort und Veranstalter" accent={ACCENT}>
-        <EventLocationsSection value={locationsForm} onChange={setLocationsForm} />
+      <FormSection title={eventMode === "online" ? "Veranstalter" : "Ort und Veranstalter"} accent={ACCENT}>
+        {/* Online braucht es weder Ort noch Adresse noch Karte (#2111, W3). */}
+        {eventMode === "online" && <p className="text-xs text-white/45" data-testid="event-online-no-place">Online-Event – Ort, Adresse und Karte entfallen.</p>}
+        {eventMode !== "online" && <EventLocationsSection value={locationsForm} onChange={setLocationsForm} />}
         {/* „Ort“ hieß bisher zweideutig; es ist der Name des Veranstaltungsorts. Die Karte sucht die Adresse (#204). */}
-        {!usesLocationList && (
+        {eventMode !== "online" && !usesLocationList && (
           <FormGrid>
             <TextField label="Veranstaltungsort (Name, optional)" value={form.location} onChange={(v) => set("location", v)} placeholder="Vereinsheim, Gemeindesaal Telfs" testId="event-location-name" />
             <TextField label="Adresse" value={form.address} onChange={(v) => set("address", v)} placeholder="Maria-Theresien-Str. 1" />
           </FormGrid>
         )}
-        {!usesLocationList && (
+        {eventMode !== "online" && !usesLocationList && (
           <FormGrid cols={3}>
             <TextField label="PLZ" value={form.postal_code} onChange={(v) => set("postal_code", v)} placeholder="6020" />
             <TextField label="Stadt" value={form.city} onChange={(v) => set("city", v)} placeholder="Innsbruck" />
@@ -381,7 +390,7 @@ function EventForm({ event, meta, partners = [], onDone }) {
           <TextField label="Veranstalter-Link" value={form.organizer_url} onChange={(v) => set("organizer_url", v)} placeholder="https://…" />
           <TextField label="Kontakt" value={form.contact} onChange={(v) => set("contact", v)} placeholder="Name oder E-Mail" />
         </FormGrid>
-        <CheckField label="Karte anzeigen" checked={form.show_map} onChange={(v) => set("show_map", v)} accent={ACCENT} />
+        {eventMode !== "online" && <CheckField label="Karte anzeigen" checked={form.show_map} onChange={(v) => set("show_map", v)} accent={ACCENT} />}
       </FormSection>
 
       <FormSection title="Anmeldung" accent={ACCENT}>
@@ -447,8 +456,6 @@ function EventForm({ event, meta, partners = [], onDone }) {
 
       <FormSection title="Darstellung und Sponsoren" accent={ACCENT}>
         <FormGrid cols={3}>
-          <CheckField label="Nur Online" checked={form.is_online} onChange={(v) => set("is_online", v)} accent={ACCENT} />
-          <CheckField label="Hybrid (offline + online)" checked={form.is_hybrid} onChange={(v) => set("is_hybrid", v)} accent={ACCENT} />
           <CheckField label="Teilnehmer öffentlich anzeigen" checked={form.show_participants} onChange={(v) => set("show_participants", v)} accent={ACCENT} />
           <CheckField label="Event von uns" checked={form.owned_by_club} onChange={(v) => set("owned_by_club", v)} accent={ACCENT} />
           <CheckField label="Sponsoren beim Event anzeigen" checked={form.show_sponsors} onChange={(v) => set("show_sponsors", v)} disabled={!form.owned_by_club} accent={ACCENT} />

@@ -341,3 +341,24 @@ test("Beschreibung mit dem Titel am Anfang: Hinweis im Formular und beim Speiche
   const [, patch] = apiMock.patch.mock.calls[0];
   expect(patch).toEqual({ banner_style: "logo", bring_along: ["eigener Controller", "Kopfhörer"], highlights: [{ icon: "vr", text: "VR-Ecke" }] });
 });
+
+// Austragung (#2111, W2/W3): eine Auswahl statt der Haken „Nur Online“ und „Hybrid“; online fehlen Einlass, Ort,
+// Adresse und Karte.
+test("Austragung: eine Auswahl, online ohne Einlass, Ort und Karte", async () => {
+  apiMock.patch.mockResolvedValue({ data: EVENTS[0] });
+  renderAt("/admin/events/ev-1");
+  const mode = await screen.findByTestId("event-mode");
+  expect(mode).toHaveValue("local");
+  expect(screen.queryByText("Nur Online")).toBeNull();
+  expect(screen.getByTestId("event-door-time")).toBeInTheDocument();
+  expect(screen.getByText("Karte anzeigen")).toBeInTheDocument();
+  fireEvent.change(mode, { target: { value: "online" } });
+  expect(screen.queryByTestId("event-door-time")).toBeNull();
+  expect(screen.queryByText("Karte anzeigen")).toBeNull();
+  expect(screen.queryByTestId("event-location-name")).toBeNull();
+  expect(screen.getByTestId("event-online-no-place")).toBeInTheDocument();
+  fireEvent.submit(screen.getByTestId("event-form"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1));
+  expect(apiMock.patch.mock.calls[0][1]).toMatchObject({ is_online: true });
+  expect(apiMock.patch.mock.calls[0][1]).not.toHaveProperty("is_hybrid");
+});

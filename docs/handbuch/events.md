@@ -94,7 +94,9 @@ Mal senden nur Redaktion und System.
   **Pausiert**, **Beendet**, **Ergebnisse veröffentlicht**, **Archiviert**, **Abgesagt**. Für neue Events reichen **Entwurf** und
   **Angekündigt**: Anmeldung offen, Läuft und Beendet rechnet die Seite aus den Datumsfeldern selbst. Von Hand wirken sofort
   Entwurf, Pausiert, Beendet, Ergebnisse veröffentlicht, Archiviert und Abgesagt; **Check-in offen** gilt bis zum Beginn.
-- **Darstellung und Sponsoren:** **Nur Online**, **Hybrid**, **Teilnehmer öffentlich anzeigen**, **Event von uns** (nur dann zeigt
+- **Austragung** (rechts unter „Zeiten und Plätze“): **Vor Ort**, **Online** oder **Hybrid (vor Ort und online)**. Bei Online
+  fehlen Einlass, Ort, Adresse und Karte – es gibt sie dort nicht.
+- **Darstellung und Sponsoren:** **Teilnehmer öffentlich anzeigen**, **Event von uns** (nur dann zeigt
   das Event Sponsoren), **Sponsoren beim Event anzeigen** und die Auswahl der Event-Sponsoren (es erscheinen nur Sponsoren mit
   Haken „Events“; leer heißt: alle Event-Sponsoren). Dazu die Partner, die auf der Partnerseite unter „Gemeinsam“ stehen.
 - **Vorschau beim Teilen:** Bei „Nur registrierte Community“ und „Nur Vereinsmitglieder“ erlaubt der Haken **Beim Teilen Titel und
