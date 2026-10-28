@@ -123,7 +123,7 @@ export function AccentField({ value, onChange, testId = "league-accent" }) {
         <span className="tls-league-accent font-bold uppercase tracking-[0.2em]">Spieltag 3</span>
         <span className="rounded-sm px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
           style={{ background: `rgb(${accentStyle(color)["--league-accent-rgb"]})`, color: accentStyle(color)["--league-on-accent"] }}>Abzeichen</span>
-        {ratio ? <span className={problem ? "text-warn" : "text-white/50"}>Kontrast {ratio.toFixed(1).replace(".", ",")} : 1</span> : null}
+        {ratio && !problem ? <span className="text-white/50" data-testid={`${testId}-ratio`}>Kontrast {ratio.toFixed(1).replace(".", ",")} : 1 – gut lesbar</span> : null}
       </div>
       {problem ? <p className="mt-1 text-xs text-warn" role="alert" data-testid={`${testId}-problem`}>{problem}</p> : null}
     </FieldLabel>
