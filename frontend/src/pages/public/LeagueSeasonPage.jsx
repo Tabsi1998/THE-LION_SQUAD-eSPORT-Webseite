@@ -1,7 +1,7 @@
 // Ligaseite (docs/LIGA.md, P5, #1625) unter /liga/<liga>/<season>: Kopf mit Zeitraum, Spielwoche, Standardtermin,
 // Sperrzeiten und Punkten, darunter je Liga N die Staffeln (Tabelle, Spielplan, Ergebnisse), dann Regeltext und Map-Pool.
 // Sichtbar nach der Season (Lese-API) - unsichtbar heißt wie „gibt es nicht“.
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { CalendarClock, Coffee, ListOrdered, Map as MapIcon, ScrollText, Timer } from "lucide-react";
 import { api } from "@/lib/api";
@@ -31,23 +31,44 @@ function Division({ division, leagueSlug, seasonSlug, hash }) {
   const fromHash = staffeln.find((row) => hash === `#staffel-${row.slug}` || hash === `#staffel-${row.tournament_id}`);
   const [active, setActive] = useState(() => (fromHash || staffeln[0])?.tournament_id || null);
   const current = staffeln.find((row) => row.tournament_id === active) || staffeln[0];
+  const tabs = useRef([]);
+  const tabbed = staffeln.length > 1;
+  const tabId = (row) => `liga-${division.level}-tab-${row.staffel}`;
+  const panelId = `liga-${division.level}-staffel`;
+  // Reiter wie üblich (WAI-ARIA): Pfeile links/rechts wechseln und setzen den Fokus mit, Pos1/Ende springen.
+  const onTabKey = (event, index) => {
+    const moves = { ArrowRight: index + 1, ArrowLeft: index - 1, Home: 0, End: staffeln.length - 1 };
+    if (!(event.key in moves)) return;
+    event.preventDefault();
+    const next = (moves[event.key] + staffeln.length) % staffeln.length;
+    setActive(staffeln[next].tournament_id);
+    tabs.current[next]?.focus();
+  };
   return (
     <section className="mt-14 scroll-mt-24" aria-labelledby={`liga-${division.level}`} data-testid={`league-division-${division.level}`}>
       <div className="flex flex-wrap items-end justify-between gap-3 border-b border-white/10 pb-3">
         <h2 id={`liga-${division.level}`} className="font-heading text-2xl md:text-3xl font-black uppercase">{division.label}</h2>
-        {staffeln.length > 1 ? (
+        {tabbed ? (
           <div className="flex flex-wrap gap-2" role="tablist" aria-label={`Staffeln in ${division.label}`}>
-            {staffeln.map((row) => (
-              <button key={row.tournament_id} type="button" role="tab" aria-selected={row.tournament_id === current?.tournament_id}
-                onClick={() => setActive(row.tournament_id)} data-testid={`league-staffel-tab-${row.staffel}`}
-                className={`tls-btn ${row.tournament_id === current?.tournament_id ? "tls-btn--secondary" : "tls-btn--quiet"} rounded-sm px-3 py-1.5 text-xs font-bold uppercase tracking-wider`}>
-                Staffel {row.staffel}
-              </button>
-            ))}
+            {staffeln.map((row, index) => {
+              const selected = row.tournament_id === current?.tournament_id;
+              return (
+                <button key={row.tournament_id} ref={(node) => { tabs.current[index] = node; }} type="button" role="tab"
+                  id={tabId(row)} aria-selected={selected} aria-controls={panelId} tabIndex={selected ? 0 : -1}
+                  onClick={() => setActive(row.tournament_id)} onKeyDown={(event) => onTabKey(event, index)}
+                  data-testid={`league-staffel-tab-${row.staffel}`}
+                  className={`tls-btn ${selected ? "tls-btn--secondary" : "tls-btn--quiet"} rounded-sm px-3 py-1.5 text-xs font-bold uppercase tracking-wider`}>
+                  Staffel {row.staffel}
+                </button>
+              );
+            })}
           </div>
         ) : current ? <span className="text-xs font-bold uppercase tracking-wider text-white/45">Staffel {current.staffel}</span> : null}
       </div>
-      <div className="mt-6" id={current ? `staffel-${current.slug || current.tournament_id}` : undefined}>
+      <div className="mt-6 scroll-mt-24" id={tabbed ? panelId : current ? `staffel-${current.slug || current.tournament_id}` : undefined}
+        {...(tabbed && current ? { role: "tabpanel", "aria-labelledby": tabId(current), tabIndex: 0 } : {})}>
+        {/* Sprungziele aus der Teamseite (#staffel-…): je Staffel eines, die Reiter wählen beim Laden die richtige. */}
+        {tabbed ? staffeln.map((row) => <span key={row.tournament_id} id={`staffel-${row.slug || row.tournament_id}`} className="block scroll-mt-24" />) : null}
         {current
           ? <StaffelPanel key={current.tournament_id} leagueSlug={leagueSlug} seasonSlug={seasonSlug} staffel={current} />
           : <p className="text-sm text-white/55">Die Staffeln werden gerade eingeteilt.</p>}

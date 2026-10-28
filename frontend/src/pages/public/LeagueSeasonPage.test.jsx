@@ -102,3 +102,25 @@ test("Unsichtbare oder unbekannte Season: ein klarer Hinweis", async () => {
   renderPage();
   expect(await screen.findByTestId("league-missing")).toHaveTextContent("Liga nicht gefunden");
 });
+
+test("Staffel-Reiter: Tabpanel, Pfeiltasten wechseln und setzen den Fokus", async () => {
+  renderPage();
+  const tabA = await screen.findByTestId("league-staffel-tab-A");
+  const tabB = screen.getByTestId("league-staffel-tab-B");
+  expect(tabA).toHaveAttribute("aria-selected", "true");
+  expect(tabA).toHaveAttribute("tabindex", "0");
+  expect(tabB).toHaveAttribute("tabindex", "-1");
+  const panel = screen.getByRole("tabpanel");
+  expect(panel).toHaveAttribute("aria-labelledby", tabA.id);
+  expect(tabA).toHaveAttribute("aria-controls", panel.id);
+  tabA.focus();
+  fireEvent.keyDown(tabA, { key: "ArrowRight" });
+  expect(tabB).toHaveAttribute("aria-selected", "true");
+  expect(tabB).toHaveFocus();
+  expect(await screen.findByTestId("league-staffel-B")).toBeInTheDocument();
+  fireEvent.keyDown(tabB, { key: "ArrowRight" });
+  expect(tabA).toHaveFocus();
+  fireEvent.keyDown(tabA, { key: "End" });
+  expect(tabB).toHaveAttribute("aria-selected", "true");
+  expect(document.getElementById("staffel-probe-a")).not.toBeNull();
+});
