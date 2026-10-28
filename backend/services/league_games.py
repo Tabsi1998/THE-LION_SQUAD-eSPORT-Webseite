@@ -67,8 +67,9 @@ class LeagueSetup:
     names: dict[str, str] = field(default_factory=dict)
     # Map-Wiederholung in einer Serie (#2096): "never", "other_mode" (Vorgabe) oder "always".
     map_repeat: str = "other_mode"
-    # Spiel-ID je Season (#2108): Stand je Person der Kader (``league_roster.status``) und der Kontext zum Festhalten.
-    id_status: dict[str, dict] = field(default_factory=dict)
+    # Spiel-ID je Season (#2108): Stand je Seite und Person (``league_roster.status`` mit dem Co-Team der Seite - der
+    # Stichtag gilt je Co-Team) und der Kontext zum Festhalten.
+    id_status: dict[str, dict[str, dict]] = field(default_factory=dict)
     roster: Any = None
 
     @property
@@ -126,7 +127,11 @@ async def setup(db, match: dict, tournament: dict | None = None, stage: dict | N
             if reg.get("id")
         },
         map_repeat=map_repeat_of(tournament),
-        id_status=league_roster.statuses(roster_ctx, everyone),
+        id_status={
+            reg["id"]: league_roster.statuses(roster_ctx, rosters.get(reg["id"]) or set(), reg.get("squad_id"))
+            for reg in registrations
+            if reg.get("id")
+        },
         roster=roster_ctx,
     )
 
@@ -190,7 +195,7 @@ def _score(value, label: str) -> int | float:
     return int(number) if number == int(number) else number
 
 
-def _lineup(setup: LeagueSetup, registration_id: str, raw, label: str) -> list[str]:
+def _lineup(setup: LeagueSetup, registration_id: str, raw, label: str, position: int | None = None) -> list[str]:
     side = setup.names.get(registration_id, "Team")
     ids = [str(item).strip() for item in raw or [] if str(item or "").strip()]
     if len(set(ids)) != len(ids):
@@ -200,16 +205,40 @@ def _lineup(setup: LeagueSetup, registration_id: str, raw, label: str) -> list[s
     roster = setup.rosters.get(registration_id) or set()
     if any(user_id not in roster for user_id in ids):
         raise LeagueGamesError(f"{label}: aufgestellt werden nur Spieler aus dem Kader von {side}.")
-    # Spiel-ID je Season (#2108): aufstellbar ist nur, wer eine gültige ID hat (festgehalten oder im Profil).
+    # Spiel-ID je Season (#2108): neu aufstellbar ist nur, wer eine gültige ID hat (festgehalten oder im Profil). Wer
+    # auf dieser Map schon in der gespeicherten Aufstellung der Seite steht, bleibt - sonst scheiterte jede Korrektur
+    # der Turnierleitung an einem Altbestand (das Ergebnis-Fenster schickt die vorhandenen Aufstellungen mit).
+    kept = _lined_up_before(setup, registration_id, position) if position else set()
+    states = setup.id_status.get(registration_id) or {}
     for user_id in ids:
-        state = setup.id_status.get(user_id)
-        if state and not state["ok"]:
+        state = states.get(user_id)
+        if state and not state["ok"] and user_id not in kept:
             raise LeagueGamesError(f"{label}: {state['name']} kann nicht aufgestellt werden – {state['reason']}")
     return ids
 
 
+def _lined_up_before(setup: LeagueSetup, registration_id: str, position: int) -> set[str]:
+    """Wer auf dieser Map schon für diese Seite aufgestellt ist: in den Maps des Spiels, in der letzten Meldung je
+    Seite und in einem gehaltenen Ergebnis."""
+    from services.v2_match_flows import latest_reports
+
+    match = setup.match
+    sources = [match.get("games") or []]
+    sources += [report.get("games") or [] for report in latest_reports(match.get("reports")).values()]
+    held = match.get("pending_result")
+    if isinstance(held, dict):
+        sources.append(held.get("games") or [])
+    out: set[str] = set()
+    for games in sources:
+        for game in games:
+            if int(game.get("position") or 0) == int(position):
+                out.update((game.get("lineups") or {}).get(registration_id) or [])
+    return out
+
+
 async def lock_lineup_ids(db, setup: LeagueSetup, games: list[dict] | None, registration_ids) -> None:
-    """Nach einer angenommenen Aufstellung: die ID der Aufgestellten für die Season festhalten (#2108)."""
+    """Nach einer **gespeicherten** Aufstellung (Meldung, Ergebnis, Nachtrag): die ID der Aufgestellten für die Season
+    festhalten, wo noch keine festgehalten ist (#2108). Die Aufrufer rufen es erst nach dem Schreiben auf."""
     wanted = set(registration_ids or [])
     people = {
         user_id
@@ -275,7 +304,7 @@ def normalize_games(
         lineups_raw = item.get("lineups") or {}
         if not isinstance(lineups_raw, dict) or any(key not in allowed_lineups for key in lineups_raw):
             raise LeagueGamesError(f"{label}: eine Aufstellung gibt nur die eigene Seite an.")
-        lineups = {key: _lineup(setup, key, value, label) for key, value in lineups_raw.items() if value}
+        lineups = {key: _lineup(setup, key, value, label, position) for key, value in lineups_raw.items() if value}
         for reg_id in required_lineups:
             if reg_id not in lineups:
                 raise LeagueGamesError(f"{label}: bitte die eigene Aufstellung angeben ({setup.team_size} Spieler).")
@@ -509,7 +538,6 @@ async def prepare_report(
         if other and other.get("games") and not same_outcome(other["games"], games):
             raise LeagueGamesError(CONFIRM_DIFFERENT_DETAIL, 409)
         await check_double_use(db, setup, games, {own_registration_id})
-        await lock_lineup_ids(db, setup, games, {own_registration_id})
         return games
     if not other or not other.get("games"):
         raise LeagueGamesError(APP_DETAIL)
@@ -612,7 +640,9 @@ async def amend_lineups(
             **game,
             "lineups": {
                 **(game.get("lineups") or {}),
-                registration_id: _lineup(setup, registration_id, wanted[game["position"]], f"Map {game['position']}"),
+                registration_id: _lineup(
+                    setup, registration_id, wanted[game["position"]], f"Map {game['position']}", game["position"]
+                ),
             },
         }
         for game in games
@@ -688,7 +718,7 @@ def _lobby_ids(setup: LeagueSetup) -> list[dict]:
     for reg_id in setup.reg_ids:
         players = []
         for user_id in setup.rosters.get(reg_id) or set():
-            state = setup.id_status.get(user_id) or {}
+            state = (setup.id_status.get(reg_id) or {}).get(user_id) or {}
             players.append({"id": user_id, "name": state.get("name") or "Spieler", "text": state.get("text"),
                             "ok": bool(state.get("ok", True)), "reason": state.get("reason")})
         players.sort(key=lambda row: row["name"].lower())
@@ -754,9 +784,9 @@ async def page_block(db, setup: LeagueSetup, *, side_id: str | None, can_act: bo
     deadline = amend_deadline(setup)
     open_window = bool(match.get("games")) and (deadline is None or now_utc() <= deadline)
 
-    def pickable(user_id: str) -> dict:
+    def pickable(user_id: str, reg_id: str | None) -> dict:
         """Ein Spieler zum Aufstellen - mit Spiel-ID der Season und, wenn nicht aufstellbar, dem Grund (#2108)."""
-        state = setup.id_status.get(user_id) or {}
+        state = (setup.id_status.get(reg_id or "") or {}).get(user_id) or {}
         return {
             **(people.get(user_id) or {"id": user_id, "name": "Spieler"}),
             "game_id_text": state.get("text"),
@@ -771,9 +801,12 @@ async def page_block(db, setup: LeagueSetup, *, side_id: str | None, can_act: bo
         "pool": setup.pool,
         "sides": [{"registration_id": reg_id, "name": setup.names.get(reg_id)} for reg_id in setup.reg_ids],
         "own_registration_id": side_id,
-        "roster": [pickable(user_id) for user_id in roster],
+        "roster": [pickable(user_id, side_id) for user_id in roster],
         "rosters": (
-            {reg_id: [pickable(user_id) for user_id in sorted(members)] for reg_id, members in setup.rosters.items()}
+            {
+                reg_id: [pickable(user_id, reg_id) for user_id in sorted(members)]
+                for reg_id, members in setup.rosters.items()
+            }
             if staff
             else {}
         ),
