@@ -59,6 +59,7 @@ from services.match_calls import CALL_OPEN_STATUSES, call_view
 from services.match_disputes import CATEGORIES as DISPUTE_CATEGORIES, CLOSED_DETAIL as DISPUTE_CLOSED_DETAIL, dispute_window
 from services.match_notifications import (
     proposal_sentence,
+    notify_schedule_event,
     notify_dispute_kept,
     notify_dispute_opened,
     notify_report_conflict,
@@ -796,7 +797,18 @@ async def create_schedule_proposal(match_id: str, body: MatchScheduleProposalCre
     doc.pop("_id", None)
     doc.pop("match_collection", None)
     doc["idempotent_replay"] = False
+    await _tell_schedule(db, match, "proposed", doc, me, doc["actor_registration_id"], normalized_note)
     return doc
+
+
+async def _tell_schedule(db, match: dict, event: str, proposal: dict, me: dict, actor_registration_id: str | None,
+                         note: str | None = None) -> None:
+    """Die andere Seite erfährt jede Terminaktion sofort (#2110). Eine Nachricht hält die Aktion nie auf."""
+    try:
+        await notify_schedule_event(db, match, event=event, proposal=proposal, actor_id=me.get("id"),
+                                    actor_registration_id=actor_registration_id, note=note)
+    except Exception:  # noqa: BLE001 - die Terminaktion ist schon gespeichert
+        logger.warning("[match] Terminnachricht für %s nicht verschickt", _log_safe(match.get("id")), exc_info=True)
 
 
 @router.post("/{match_id}/schedule-proposals/{proposal_id}/decision")
@@ -863,6 +875,7 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
             "status": "scheduled" if match.get("status") in {"pending", "ready", "preview"} else match.get("status"),
             "updated_at": now_iso,
         }})
+        await _tell_schedule(db, match, "accepted", proposal, me, (acting_reg or {}).get("id"), normalized_note)
         return {"ok": True, "status": "accepted", "scheduled_at": scheduled_at, "idempotent_replay": False}
     if body.action == "decline":
         await db.match_schedule_proposals.update_one({"id": proposal_id}, {"$set": {
@@ -873,6 +886,7 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
         }})
         await getattr(db, collection).update_one({"id": match_id}, {"$set": {"schedule_status": "declined", "updated_at": now_iso}})
         await _rewrite_matchday_schedule(db, match.get("tournament_id"))
+        await _tell_schedule(db, match, "declined", proposal, me, (acting_reg or {}).get("id"), normalized_note)
         return {"ok": True, "status": "declined", "idempotent_replay": False}
     if not body.scheduled_at:
         raise HTTPException(status_code=400, detail="Gegenvorschlag braucht Datum und Uhrzeit")
@@ -908,6 +922,7 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
     counter.pop("_id", None)
     counter.pop("match_collection", None)
     counter["idempotent_replay"] = False
+    await _tell_schedule(db, match, "countered", counter, me, counter["actor_registration_id"], normalized_note)
     return counter
 
 
