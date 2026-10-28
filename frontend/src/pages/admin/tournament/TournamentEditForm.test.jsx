@@ -27,8 +27,8 @@ test("stimmige Zeiten: keine Warnung - sie erscheint, sobald das Ende vor den Be
   expect(screen.getByTestId("tr-edit-planning-warnings")).toHaveTextContent("Der Check-in endet nach dem Turnierstart.");
 });
 
-// Liga-Staffel (#2109): was die Season vorgibt, steht nur lesend da; was es in der Liga nicht gibt, fehlt. Änderbar
-// bleibt die Antwortfrist auf Terminvorschläge. Das Feld „Status“ gibt es im Formular nicht mehr (alle Turniere).
+// Liga-Staffel (#2109): was die Season vorgibt, steht nur lesend da; was es in der Liga nicht gibt, fehlt. Seit #2106
+// gehört auch die Antwortfrist auf Terminvorschläge dazu. Das Feld „Status“ gibt es im Formular nicht mehr (alle Turniere).
 const STAFFEL = {
   id: "t-s", title: "Probe-Liga Season 1 · Liga 1 · Staffel A", status: "draft", format: "league", team_mode: "team",
   team_size: 4, best_of: 3, max_participants: 8, min_participants: 2, start_date: "2026-11-09T23:00:00+00:00",
@@ -69,13 +69,15 @@ test("Staffel: Season-Werte nur lesend mit Weg zur Season, Liga-fremde Felder fe
   expect(screen.getByTestId("tr-edit-staffel-remix")).toHaveTextContent("Vorschau neu mischen");
 });
 
-test("Staffel: die Antwortfrist auf Terminvorschläge bleibt änderbar und geht allein mit", async () => {
+test("Staffel: die Antwortfrist auf Terminvorschläge kommt seit #2106 aus der Season - nur lesend", async () => {
   apiMock.patch.mockResolvedValue({ data: {} });
-  renderStaffel();
-  const hours = await screen.findByTestId("tr-edit-response-hours");
-  fireEvent.change(hours, { target: { value: "24" } });
+  renderStaffel({ ...STAFFEL, match_schedule_response_hours: 24 });
+  expect(await screen.findByTestId("tr-edit-season-response")).toHaveTextContent("24 Std.");
+  expect(screen.queryByTestId("tr-edit-response-hours")).toBeNull();
+  expect(screen.queryByTestId("tr-edit-staffel-matchdays")).toBeNull();
+  fireEvent.change(screen.getByTestId("tr-edit-title"), { target: { value: "Staffel A (Probe)" } });
   fireEvent.click(screen.getByTestId("tr-edit-save"));
-  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/tournaments/t-s", { match_schedule_response_hours: 24 }));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/tournaments/t-s", { title: "Staffel A (Probe)" }));
 });
 
 test("Staffel nach dem Start: kein Neu-Mischen mehr", async () => {

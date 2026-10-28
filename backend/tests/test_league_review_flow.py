@@ -143,7 +143,9 @@ async def test_a_locked_staffel_still_takes_rules_text_but_keeps_its_calendar(fl
     result = (await flow.post(f"{ADMIN}/seasons/{season['id']}/sync")).json()["staffeln"][0]
     assert "always" in result["applied"]
     assert {item["group"]: item["reason"] for item in result["skipped"]} == {
-        "before_start": "Die Staffel ist gesperrt.", "before_result": "Die Staffel ist gesperrt."}
+        # Seit #2106 auch die Antwortfrist auf Terminvorschläge (läuft sonst auch nach dem Start).
+        "running": "Die Staffel ist gesperrt.", "before_start": "Die Staffel ist gesperrt.",
+        "before_result": "Die Staffel ist gesperrt."}
     after = await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0})
     assert after["rules"] == "Neu" and after["matchday_weeks_total"] == 10
 

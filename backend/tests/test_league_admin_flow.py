@@ -396,7 +396,9 @@ async def test_the_tournament_form_refuses_season_values_of_a_staffel_but_the_se
     for body, label in (({"best_of": 5}, "Best of"), ({"visibility": "public"}, "Sichtbarkeit"),
                         ({"rules": "Eigene Regeln"}, "Regeln"), ({"team_size": 5}, "Spieler pro Team"),
                         ({"start_date": "2026-11-17T00:00:00+00:00"}, "Start"),
-                        ({"default_match_time": "18:00"}, "Standarduhrzeit")):
+                        ({"default_match_time": "18:00"}, "Standarduhrzeit"),
+                        # Seit #2106 (F3) ein Season-Wert.
+                        ({"match_schedule_response_hours": 24}, "Antwortfrist auf Terminvorschläge")):
         refused = await flow.patch(url, json=body)
         assert refused.status_code == 400, body
         assert refused.json()["detail"] == f"{label}: Kommt aus der Season – dort ändern und übertragen.", body
@@ -414,10 +416,10 @@ async def test_the_tournament_form_refuses_season_values_of_a_staffel_but_the_se
     # Was die Staffel selbst trägt, bleibt änderbar - auch zusammen mit unveränderten Season-Werten (das Formular und
     # der Matchplan schicken sie mit).
     same = await flow.patch(url, json={"title": "Staffel A (Probe)", "best_of": 3, "start_date": stored["start_date"],
-                                       "match_schedule_response_hours": 24, "description": "Probe"})
+                                       "match_schedule_response_hours": 72, "description": "Probe"})
     assert same.status_code == 200, same.text
     stored = await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0})
-    assert (stored["title"], stored["match_schedule_response_hours"]) == ("Staffel A (Probe)", 24)
+    assert (stored["title"], stored["match_schedule_response_hours"]) == ("Staffel A (Probe)", 72)
 
     # Das Übertragen aus der Season läuft nicht über die Route und schreibt weiter.
     await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"best_of": 5, "rules_text": "Neu"})

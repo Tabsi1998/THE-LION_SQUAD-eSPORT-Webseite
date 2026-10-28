@@ -2346,6 +2346,8 @@ class LeagueSeasonFields(BaseModel):
     scoring_rules: Optional[dict] = None
     result_confirm_hours: Optional[int] = Field(default=None, ge=1, le=336)
     lineup_amend_hours: Optional[int] = Field(default=None, ge=1, le=336)
+    # Antwortfrist auf Terminvorschläge (#2106, F3) - wie ``TournamentCreate.match_schedule_response_hours``.
+    match_schedule_response_hours: Optional[int] = Field(default=None, ge=1, le=720)
     rules_text: Optional[str] = Field(default=None, max_length=20000)
     registration_deadline: Optional[str] = None
     visibility: Optional[LeagueVisibility] = None
@@ -2371,6 +2373,7 @@ class LeagueDivisionOverrides(BaseModel):
     min_squad_size: Optional[int] = Field(default=None, ge=1, le=40)
     max_staffel_size: Optional[int] = Field(default=None, ge=2, le=20)
     scoring_rules: Optional[dict] = None
+    match_schedule_response_hours: Optional[int] = Field(default=None, ge=1, le=720)
 
 
 class LeagueDivisionCreate(BaseModel):
@@ -2389,3 +2392,8 @@ class LeagueDivisionUpdate(BaseModel):
 class LeagueStaffelCreate(BaseModel):
     """Staffel anlegen: ohne Buchstaben die nächste freie (A, B, …)."""
     staffel: Optional[str] = Field(default=None, pattern=r"^[A-Za-z]$")
+
+
+class LeagueDelete(BaseModel):
+    """Liga, Season, Liga N oder Staffel löschen (#2106): der Grund kommt ins Protokoll (geprüft im Liga-Service)."""
+    reason: Optional[str] = Field(default=None, max_length=500)

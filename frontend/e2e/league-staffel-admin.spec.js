@@ -71,7 +71,7 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await noSideScroll(page);
   });
 
-  test(`Staffel bearbeiten (${width} px): Season-Werte nur lesend, Antwortfrist änderbar`, async ({ page }) => {
+  test(`Staffel bearbeiten (${width} px): Season-Werte samt Antwortfrist nur lesend`, async ({ page }) => {
     await page.setViewportSize({ width, height });
     await mockServer(page);
     await page.goto("/admin/tournaments/t1?tab=edit");
@@ -79,7 +79,9 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await expect(values).toContainText("Aus der Season");
     await expect(page.getByTestId("tr-edit-season-bo")).toHaveText("Best of 3");
     await expect(values.getByRole("link", { name: "Season öffnen" })).toHaveAttribute("href", "/admin/leagues/seasons/s1");
-    await expect(page.getByTestId("tr-edit-response-hours")).toHaveValue("72");
+    // Seit #2106 (F3) ein Season-Wert.
+    await expect(page.getByTestId("tr-edit-season-response")).toHaveText("72 Std.");
+    await expect(page.getByTestId("tr-edit-response-hours")).toHaveCount(0);
     await expect(page.getByTestId("tr-edit-start")).toHaveCount(0);
     await expect(page.getByTestId("tr-edit-discord-registration")).toHaveCount(0);
     await expect(page.getByTestId("tr-edit-staffel-remix")).toBeVisible();

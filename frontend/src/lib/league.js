@@ -16,8 +16,11 @@ export const LEGS_OPTIONS = [["1", "Nur Hinrunde"], ["2", "Hin- und Rückrunde"]
 // Map-Wiederholung in einer Serie (#2096): Vorgabe „gleiche Map nur in anderem Modus“.
 export const MAP_REPEAT_OPTIONS = [["other_mode", "Gleiche Map nur in anderem Modus"], ["never", "Aus – jede Map nur einmal"], ["always", "Immer erlaubt"]];
 export const TIEBREAKER_LABELS = { score_diff: "Differenz", score_for: "Mehr gewonnene Maps", wins: "Mehr Siege" };
+// Stand einer Liga und einer Liga N (#2106): archiviert heißt ausgeblendet, aber erhalten.
+export const ACTIVE_STATUS_OPTIONS = [["active", "Aktiv"], ["archived", "Archiviert"]];
 export const SYNC_GROUP_TEXT = {
   always: "Sichtbarkeit und Regeltext",
+  running: "Antwortfrist auf Terminvorschläge",
   before_start: "Termine und Kalender",
   before_result: "Best of, Teamgröße, Mindestkader, Punkte und Fristen",
   map_pool: "Map-Pool",
@@ -54,6 +57,8 @@ export function seasonToForm(season = {}) {
     map_repeat: season.map_repeat || "other_mode",
     result_confirm_hours: String(season.result_confirm_hours ?? 48),
     lineup_amend_hours: String(season.lineup_amend_hours ?? 48),
+    // Antwortfrist (#2106, F3): leer bei Seasons von vorher - dann behält jede Staffel ihre eigene.
+    match_schedule_response_hours: season.match_schedule_response_hours != null ? String(season.match_schedule_response_hours) : "",
     rules_text: season.rules_text || "",
     registration_deadline: season.registration_deadline || "",
     visibility: season.visibility || "off",
@@ -94,6 +99,7 @@ export function seasonPayload(form) {
     map_repeat: form.map_repeat || "other_mode",
     result_confirm_hours: number(form.result_confirm_hours),
     lineup_amend_hours: number(form.lineup_amend_hours),
+    match_schedule_response_hours: number(form.match_schedule_response_hours),
     rules_text: form.rules_text.trim() || null,
     registration_deadline: form.registration_deadline || null,
     visibility: form.visibility,
@@ -106,7 +112,7 @@ export function seasonPayload(form) {
 /** Welche Werte eine Liga N anders hat als ihre Season - nur geänderte Felder, leer heißt „wie die Season“. */
 export function overridesPayload(form) {
   const out = {};
-  for (const key of ["best_of", "team_size", "min_squad_size", "max_staffel_size"]) {
+  for (const key of ["best_of", "team_size", "min_squad_size", "max_staffel_size", "match_schedule_response_hours"]) {
     if (form[key] !== "" && form[key] != null) out[key] = Number(form[key]);
   }
   if (form.points_win !== "" || form.points_draw !== "" || form.points_loss !== "") {
@@ -122,6 +128,7 @@ export function overridesToForm(overrides = {}) {
     team_size: overrides.team_size != null ? String(overrides.team_size) : "",
     min_squad_size: overrides.min_squad_size != null ? String(overrides.min_squad_size) : "",
     max_staffel_size: overrides.max_staffel_size != null ? String(overrides.max_staffel_size) : "",
+    match_schedule_response_hours: overrides.match_schedule_response_hours != null ? String(overrides.match_schedule_response_hours) : "",
     points_win: points ? String(points.win) : "",
     points_draw: points ? String(points.draw) : "",
     points_loss: points ? String(points.loss) : "",
@@ -137,6 +144,18 @@ export function settingsLine(settings = {}) {
   const points = settings.scoring_rules?.match_points;
   if (points) parts.push(`Punkte ${points.win}/${points.draw}/${points.loss}`);
   return parts.join(" · ");
+}
+
+/** Was beim Löschen mitginge (#2106) - je Gruppe die Namen, leere Gruppen fallen weg. ``plan`` kommt von
+ *  `GET …/delete-plan`. */
+export function deletionGroups(plan) {
+  if (!plan) return [];
+  const groups = [
+    ["Seasons", (plan.seasons || []).map((row) => row.name)],
+    ["Ligen", (plan.divisions || []).map((row) => row.label)],
+    ["Leere Staffeln (Entwurf)", (plan.staffeln || []).map((row) => row.title || `Staffel ${row.staffel}`)],
+  ];
+  return groups.filter(([, items]) => items.length).map(([label, items]) => ({ label, items }));
 }
 
 /** Ergebnis von „Vorgaben auf Staffeln übertragen“ je Staffel als Satz. */
