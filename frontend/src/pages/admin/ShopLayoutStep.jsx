@@ -234,12 +234,33 @@ function positionText(position, measure) {
 
 // Gemeinsam für die kleine Vorschau und „Groß bearbeiten“. Ziehen folgt der Maus 1:1 ab der Stelle, an der gegriffen
 // wurde; die Bewegung in cm ergibt sich aus der Breite der Fläche auf dem Bildschirm - beim Zoom also feiner. Einrasten
-// an Mitte, Rändern, Sicherheitsrand und anderen Ebenen (nicht an denen, die mitwandern), sonst aufs Raster; mit Alt frei.
+// an Mitte, Rändern, Sicherheitsrand und anderen Ebenen (nicht an denen, die mitwandern), sonst aufs Raster; mit Alt oder Strg frei.
 function AreaCanvas({ area, layers, resolved, motifFor, sampleFor, onSampleProblem, selected, onSelect, onPlace, editable, testId, stale, backdrop, settings,
   followers, live, onLive, className, style }) {
   const areaRef = useRef(null);
   const drag = useRef(null);
+  const altGuard = useRef(null);
   const size = areaSizeCm(area);
+
+  // Alt beim Ziehen: Firefox öffnet beim Loslassen von Alt sonst die Menüleiste. Solange gezogen wird - und bis Alt
+  // nach dem Ziehen losgelassen ist - fangen wir die Taste ab.
+  const releaseAlt = () => {
+    if (!altGuard.current) return;
+    window.removeEventListener("keydown", altGuard.current, true);
+    window.removeEventListener("keyup", altGuard.current, true);
+    altGuard.current = null;
+  };
+  const guardAlt = () => {
+    if (altGuard.current) return;
+    altGuard.current = (event) => {
+      if (event.key !== "Alt") return;
+      event.preventDefault();
+      if (event.type === "keyup" && !drag.current) releaseAlt();
+    };
+    window.addEventListener("keydown", altGuard.current, true);
+    window.addEventListener("keyup", altGuard.current, true);
+  };
+  useEffect(() => releaseAlt, []);
   const pct = (value, whole) => `${(value / whole) * 100}%`;
   const marginCm = Number(area.safe_margin_cm || 0);
 
@@ -248,6 +269,7 @@ function AreaCanvas({ area, layers, resolved, motifFor, sampleFor, onSampleProbl
     if (!editable || drag.current || (event.pointerType === "mouse" && event.button !== 0)) return;
     onSelect(item.index);
     event.currentTarget.setPointerCapture?.(event.pointerId);
+    guardAlt();
     const layer = layers[item.index] || {};
     drag.current = {
       index: item.index, pointerId: event.pointerId, x: event.clientX, y: event.clientY, moving: false, frame: frameCm(area, item),
@@ -266,7 +288,8 @@ function AreaCanvas({ area, layers, resolved, motifFor, sampleFor, onSampleProbl
     const moved = snapDrag({
       frame: now.frame, dx: screenToCm(dxPx, width, size.width), dy: screenToCm(dyPx, width, size.width), lines: now.lines,
       toleranceCm: screenToCm(SNAP_SCREEN_PX, width, size.width), gridCm: settings.grid, measure: settings.measure, areaWidthCm: size.width,
-      stillCm: screenToCm(DRAG_START_PX, width, size.width), free: event.altKey || !settings.snap,
+      // Frei ziehen mit Alt oder Strg (Strg, falls Alt vom System belegt ist) - oder wenn Einrasten aus ist.
+      stillCm: screenToCm(DRAG_START_PX, width, size.width), free: event.altKey || event.ctrlKey || !settings.snap,
     });
     onPlace(now.index, { offset_x_cm: round2(now.start.x + moved.dx), offset_y_cm: round2(now.start.y + moved.dy) });
     onLive({ index: now.index, guides: moved.guides });
@@ -275,6 +298,8 @@ function AreaCanvas({ area, layers, resolved, motifFor, sampleFor, onSampleProbl
     if (!drag.current || (event && event.pointerId !== drag.current.pointerId)) return;
     drag.current = null;
     onLive(null);
+    // Alt noch gedrückt: der Schutz bleibt bis zum Loslassen, sonst gleich weg.
+    if (!event?.altKey) releaseAlt();
   };
   const onKeyDown = (event, index) => {
     const step = event.shiftKey ? BIG_STEP_CM : STEP_CM;
@@ -565,7 +590,7 @@ function BigEditor({ open, onOpenChange, title, area, colorCode, canvas, setting
           <div className="border-t border-white/10 px-3 py-2 space-y-2 max-h-[45vh] overflow-y-auto">
             <p id={`${testId}-help`} className="text-xs text-white/55" data-testid={`${testId}-help`}>
               <span className="sm:hidden">Ziehen rastet ein, + und − zoomen. Genau geht es mit den Zahlen.</span>
-              <span className="hidden sm:inline">Ziehen rastet ein (Alt = frei), Pfeiltasten 0,1 cm, Umschalt 1 cm. Mausrad zoomt, Umschalt + Mausrad oder Ziehen auf freier Fläche verschiebt die Ansicht.</span>
+              <span className="hidden sm:inline">Ziehen rastet ein (Alt oder Strg = frei), Pfeiltasten 0,1 cm, Umschalt 1 cm. Mausrad zoomt, Umschalt + Mausrad oder Ziehen auf freier Fläche verschiebt die Ansicht.</span>
             </p>
             {/* Am Handy zählt die Fläche: die Einstellungen stehen dort schon unter der Vorschau. */}
             <div className="hidden sm:block"><SnapSettings settings={settings} onChange={onSettings} testId={`${testId}-settings`} /></div>
@@ -1062,7 +1087,7 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
               {/* Die Bedienung sichtbar (#2117) - nicht nur im aria-label. */}
               <p className="text-xs text-white/50 flex items-start gap-1" data-testid={`shop-preview-${available.key}-help`}>
                 <Move className="w-3 h-3 mt-0.5 shrink-0" aria-hidden="true" />
-                <span>Ziehen rastet ein (Alt = frei), Pfeiltasten 0,1 cm, Umschalt 1 cm. Genau geht es mit den Zahlen bei jeder Ebene.</span>
+                <span>Ziehen rastet ein (Alt oder Strg = frei), Pfeiltasten 0,1 cm, Umschalt 1 cm. Genau geht es mit den Zahlen bei jeder Ebene.</span>
               </p>
               {resolved.some((item) => item.box) && (
                 <button type="button" onClick={() => setBig(true)} className={SMALL_BTN} data-testid={`shop-preview-${available.key}-big`}>

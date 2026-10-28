@@ -534,7 +534,7 @@ test("Position als Zahl mit Komma, − und + und Pfeiltasten; „Auf die Vorgabe
   show("/admin/shop/products/p1");
   await user.click(await screen.findByTestId("shop-step-designs"));
   // Die Bedienung steht sichtbar unter der Vorschau.
-  expect(screen.getByTestId("shop-preview-front-help")).toHaveTextContent("Ziehen rastet ein (Alt = frei), Pfeiltasten 0,1 cm, Umschalt 1 cm");
+  expect(screen.getByTestId("shop-preview-front-help")).toHaveTextContent("Ziehen rastet ein (Alt oder Strg = frei), Pfeiltasten 0,1 cm, Umschalt 1 cm");
   const top = screen.getByTestId("shop-layer-front-0-top");
   const x = screen.getByTestId("shop-layer-front-0-x");
   // Brust rechts: Oberkante 5 cm, Mitte bei 27 % - also 7,01 cm links der Mitte.

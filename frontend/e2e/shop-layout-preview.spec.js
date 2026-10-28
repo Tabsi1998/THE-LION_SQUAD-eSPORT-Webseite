@@ -298,7 +298,7 @@ for (const [label, width, height] of WIDTHS) {
 }
 
 // ---------------------------------------------------------------- Präzise setzen (#2117)
-// Ziehen mit Einrasten und Hilfslinien (Alt = frei), Zahleneingabe mit Komma und „Groß bearbeiten“ mit Zoom - bei 390
+// Ziehen mit Einrasten und Hilfslinien (Alt oder Strg = frei), Zahleneingabe mit Komma und „Groß bearbeiten“ mit Zoom - bei 390
 // und 1440 px im Desktop-Projekt (Maus) und im Handy-Projekt per Touch. Nur synthetische Bilder.
 
 const cmValue = (text) => Number(String(text).replace(",", "."));
@@ -336,7 +336,7 @@ for (const [label, width, height] of WIDTHS) {
       await page.setViewportSize({ width, height });
       const area = await openDesigns(page);
       const lion = page.getByTestId("shop-preview-front-layer-0");
-      await expect(page.getByTestId("shop-preview-front-help")).toContainText("Ziehen rastet ein (Alt = frei)");
+      await expect(page.getByTestId("shop-preview-front-help")).toContainText("Ziehen rastet ein (Alt oder Strg = frei)");
       // 1. Ziehen bis knapp neben die Mitte: rastet ein, die Hilfslinie und die Live-Anzeige in cm sind da.
       const areaBox = await area.boundingBox();
       const lionBox = await lion.boundingBox();
@@ -363,6 +363,11 @@ for (const [label, width, height] of WIDTHS) {
       const centered = await lion.boundingBox();
       expect(Math.abs(centered.x + centered.width / 2 - (areaBox.x + areaBox.width / 2))).toBeLessThanOrEqual(1);
       // 2. Mit Alt: frei, ohne Hilfslinie.
+      // Das Loslassen von Alt nach dem Ziehen wird abgefangen (Firefox öffnete sonst die Menüleiste).
+      await page.evaluate(() => {
+        window.__altUps = [];
+        window.addEventListener("keyup", (event) => { if (event.key === "Alt") window.__altUps.push(event.defaultPrevented); });
+      });
       const again = await grip(lion);
       await page.mouse.move(again.x, again.y);
       await page.mouse.down();
@@ -373,9 +378,25 @@ for (const [label, width, height] of WIDTHS) {
       await expect(page.getByTestId("shop-preview-front-guide-x")).toHaveCount(0);
       await page.mouse.up();
       await page.keyboard.up("Alt");
+      expect(await page.evaluate(() => window.__altUps)).toEqual([true]);
       const free = cmValue(await page.getByTestId("shop-layer-front-0-x").inputValue());
       expect(free).toBeGreaterThan(0.5);
       expect(free).toBeLessThan(3);
+      // Strg zieht ebenso frei - ohne Hilfslinie, nicht aufs Raster.
+      const ctrl = await grip(lion);
+      await page.mouse.move(ctrl.x, ctrl.y);
+      await page.mouse.down();
+      await page.keyboard.down("Control");
+      await page.mouse.move(ctrl.x + 3, ctrl.y, { steps: 2 });
+      await page.mouse.move(ctrl.x + 5, ctrl.y, { steps: 2 });
+      await expect(page.getByTestId("shop-preview-front-guide-x")).toHaveCount(0);
+      await page.mouse.up();
+      await page.keyboard.up("Control");
+      expect(cmValue(await page.getByTestId("shop-layer-front-0-x").inputValue())).toBeGreaterThan(free + 0.5);
+      // Bei normalem Ziehen bleibt Alt frei für das System.
+      await page.evaluate(() => { window.__altUps = []; });
+      await page.keyboard.press("Alt");
+      expect(await page.evaluate(() => window.__altUps)).toEqual([false]);
       // 3. Zahl mit Komma: die Oberkante liegt genau dort.
       await page.getByTestId("shop-layer-front-0-top").fill("12,5");
       await expect(page.getByTestId("shop-layer-front-0-top")).toHaveValue("12,5");
