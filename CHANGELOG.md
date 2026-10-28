@@ -1,5 +1,70 @@
 # Changelog
 
+## 1.49.0 (28.10.2026)
+
+### Neu
+
+* Datenschutz: Auskunft enthält die Liga-Spiel-ID, Konto löschen entfernt sie (#2108)
+* Liga: Akzentfarbe auch für Tabelle, Spielwochen, Ergebnisse, Reiter und Links der Ligaseite (#2107)
+* Liga: Akzentfarbe je Liga mit Kontrastprüfung, ohne Farbe die Vereinsfarbe (#2107)
+* Liga: Antwortfrist auf Terminvorschläge als Season-Wert, je Liga N einstellbar, in der Staffel nur lesend (#2106)
+* Liga: Aufstellung nur mit Spiel-ID der Season – ohne ID grau mit Grund, der Server lehnt ab (#2108)
+* Liga: Co-Team zuteilen zeigt die Spiel-ID je Spieler und warnt bei fehlender (#2108)
+* Liga: Emblem in Ligaübersicht, Teamseite und Spielseite der Staffel (#2107)
+* Liga: Emblem und Banner je Liga, je Season überschreibbar – Kopf der Ligaseite mit Fokuspunkt für Handy und Desktop (#2107)
+* Liga: Gestaltung und Gewinne in „Liga bearbeiten“ und auf der Season-Seite mit Vorschau (#2107)
+* Liga: Gewinne je Season und optional je Liga N – „Um was gespielt wird“ auf der Ligaseite (#2107)
+* Liga: Liga in der Verwaltung bearbeiten – Name, Beschreibung, Stand, Spiel nur ohne Staffel, Adresse nur vor der ersten Veröffentlichung (#2106)
+* Liga: Liga N archivieren (#2106)
+* Liga: Liga, Season und Liga N löschen, solange nichts dranhängt – mit Auflistung, Grund und Protokoll, sonst „Archivieren statt löschen“ (#2106)
+* Liga: Link-Vorschau und App-Turnierbild zeigen das Banner der Season (#2107)
+* Liga: Matchseite zeigt die Spiel-IDs beider Seiten für die Lobby (#2108)
+* Liga: Profil sagt, welche Spiel-ID in der laufenden Liga gilt (#2108)
+* Liga: Season-Seite mit Kader und Spiel-IDs, Freigabe neuer IDs mit Protokoll (#2108)
+* Liga: Staffel im Entwurf direkt auf der Season-Seite löschen (#2106)
+* Liga: Stichtag für neue Spieler je Co-Team (#2108)
+* Shop: „Fertige Druckdatei als Hintergrund“ mit Erklärung und Hinweis „Erst speichern, dann je Farbe hochladen“ (#2141)
+* Shop: Allover – fertige Druckdatei als Hintergrund, Motive, Gamertag und Vereinsnummer als Ebenen darüber (#2141)
+* Shop: Ebenen ausrichten – mittig auf der Fläche und Abstand zur Ebene darüber (#2142)
+* Shop: Farbe von Gamertag und Vereinsnummer je Ebene fest wählbar, Vorgabe automatisch nach Kontrast (#2141)
+* Shop: Fassung der Motive und Farbe von Gamertag/Vereinsnummer aus der Helligkeit des Hintergrunds, je Ebene und je Produkt einstellbar (#2141)
+* Shop: mehrere Motive je Fläche auch auf dem Hintergrund (#2141)
+* Shop: neue Ebene „Fester Text“ (etwa der Vereinsname) in der Grunddatei (#2142)
+* Shop: Sportschrift Saira Condensed Black und Kontur für Name, Nummer und Text (#2142)
+* Shop: Texthöhe und Höchstbreite von Gamertag und Vereinsnummer begrenzt die Druckfläche statt fester Werte, mit eigener Mindesthöhe je Ebene (#2142)
+* Shop: Trikot-Vorlagen „Trikot Rücken“ und „Trikot Brust“ mit einem Klick (#2142)
+* Shop: Vereinsnummer nur mit Ziffern, eigener Größe und Kontur (#2142)
+* Shop: Vorschau in Schritt 3 zeigt den hochgeladenen Hintergrund je Farbe unter den Ebenen (#2141)
+
+### Fehlerbehebungen
+
+* Liga: Adresse schon veröffentlichter Ligen bleibt fest (#2106)
+* Liga: Löschen geht ganz oder gar nicht, jede mitgelöschte Staffel steht einzeln im Protokoll (#2106)
+* Shop: Beispielnamen in Vorschau-Auflösung, gedrosselt und mit der Grenze der Fläche (#2142)
+* Shop: Blockiermeldung in Schritt 3 nennt die betroffenen Flächen und springt hin (#2141)
+* Shop: Textebenen zeigen nur die Farbe samt Herkunft, ein veralteter Hintergrund wird angesagt (#2142)
+* Shop: Upload-Zeile in Schritt 3 bleibt auf dem Handy in der Karte (#2141)
+* Shop: Vereinsnummer sperrt die Freigabe, bis sie gedruckt wird (#2142)
+* Turniere: „Gruppen generieren“ fragt mit Zahl nach und lässt den Status (#2120)
+* Turniere: „Schweizer Runde“ startet nicht mehr, die letzte Runde lässt sich zurücknehmen (#2120)
+* Turniere: „Zurücksetzen“ behält den Status und nennt vorher die Zahl der Spiele (#2120)
+* Turniere: Anmeldungen im festen Baum lassen sich nicht mehr entfernen oder ablehnen (#2120)
+* Turniere: aus festen Spielen (generierte Gruppen, Schweizer Runde) kann sich niemand mehr selbst abmelden (#2120)
+* Turniere: eine Vorschau ersetzt keine echten Spiele mehr, „Struktur anwenden“ nur bis zum Check-in-Ende (#2120)
+* Turniere: Formatwechsel baut die Vorschau neu (eigene Phasen bleiben), ab dem Check-in-Ende stehen Format, Teilnahme und Spiel fest (#2120)
+* Turniere: Rückfrage vor Status mit Folgen, Absage benachrichtigt die Angemeldeten mit Grund (#2120)
+
+### Schneller
+
+* Shop: Helligkeits-Raster und Vorschaubild des Hintergrunds einmal beim Hochladen statt bei jeder Vorschau (#2141)
+
+### Dokumentation
+
+* Liga: Handbuch „Korrigieren, archivieren, löschen“ (#2106)
+* Liga: Handbuch zur Gestaltung von Emblem, Banner, Farbe und Gewinnen (#2107)
+* Shop: Allover-Trikot einrichten (#2141)
+* Shop: Trikot einrichten Schritt für Schritt (#2142)
+
 ## 1.48.0 (28.10.2026)
 
 ### Neu
