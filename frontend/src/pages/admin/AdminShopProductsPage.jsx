@@ -538,7 +538,7 @@ function PricesStep({ view, busy, run }) {
         <div className="border border-warn/40 bg-warn/10 rounded-sm p-3 text-sm" role="alert" data-testid="shop-price-warnings">
           <div className="font-bold inline-flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-warn" aria-hidden="true" /> Printful hat Preise geändert</div>
           <ul className="mt-1 text-xs space-y-0.5">
-            {warnings.map((row) => <li key={row.id}>{row.display_label || row.label}: {money(row.price_warning.before_cents)} → {money(row.price_warning.after_cents)} (seit {viennaDateTime(row.price_warning.at)})</li>)}
+            {warnings.map((row) => <li key={row.id}>{row.display_label || row.label}: {money(row.price_warning.before_cents)} → {row.price_warning.stale ? "Schätzung veraltet – neu schätzen" : money(row.price_warning.after_cents)} (seit {viennaDateTime(row.price_warning.at)})</li>)}
           </ul>
           <p className="text-xs text-white/60 mt-1">Bestehende Bestellungen bleiben unverändert. Neue Preise gelten erst nach „Preise übernehmen“.</p>
         </div>

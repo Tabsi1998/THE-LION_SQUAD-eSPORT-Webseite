@@ -893,6 +893,18 @@ test("Preise (#2135): Printful brutto, Mitgliederpreis, Versandbeispiel AT, Kata
   expect(toastMock.success).toHaveBeenCalledWith("3 von 3 Varianten brutto geschätzt.");
 });
 
+test("Preise: eine veraltete Schätzung schlägt nie Netto vor, sondern „neu schätzen“ (#2135)", async () => {
+  const stale = variant("Black / M", "PF1", { price_cents: 1170, member_price_cents: null, price_source: "stale", estimate_stale: true,
+    printful_gross_cents: null, price_warning: { before_cents: 1170, after_cents: null, stale: true, at: "2026-10-28T05:20:00+00:00" } });
+  apiMock.get.mockResolvedValue({ data: view({ variants: [stale] }) });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-prices"));
+  expect(screen.getByTestId("shop-price-warnings")).toHaveTextContent("11,70 € → Schätzung veraltet – neu schätzen");
+  expect(screen.getByTestId("shop-price-warnings")).not.toHaveTextContent("15,00");
+  expect(screen.getByTestId("shop-price-PF1-gross")).toHaveTextContent("Schätzung veraltet");
+});
+
 test("Preise ohne Schätzung: Hinweis, dass bis dahin der Katalog netto gilt", async () => {
   apiMock.get.mockResolvedValue({ data: view() });
   const user = userEvent.setup();
