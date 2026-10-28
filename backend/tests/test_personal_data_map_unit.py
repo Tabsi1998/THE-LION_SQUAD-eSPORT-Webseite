@@ -34,6 +34,7 @@ DYNAMIC = {
     "routes/match_routes.py:decide_dispute:getattr(db, collection)": MATCHES,
     "routes/match_routes.py:decide_schedule_proposal:getattr(db, collection)": MATCHES,
     "routes/match_routes.py:dispute:getattr(db, collection)": MATCHES,
+    "routes/match_routes.py:_withdraw_proposal:getattr(db, collection)": MATCHES,
     "routes/phase_fg_routes.py:_clear_media_references:getattr(db, collection)": MEDIA,
     "routes/station_routes.py:_assign_match_to_station:db[collection_name]": MATCHES,
     "routes/station_routes.py:clear_station:db[collection_name]": MATCHES,

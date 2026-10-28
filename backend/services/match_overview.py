@@ -251,12 +251,12 @@ async def own_match_tasks(db, user: dict, registrations: list[dict]) -> list[dic
     mine = sorted(acting)
     sides = {"$or": [{"participant_a_id": {"$in": mine}}, {"participant_b_id": {"$in": mine}},
                      {"slots.registration_id": {"$in": mine}}]}
-    proposed = await db.matches_v2.find(
-        {**sides, "schedule_status": "proposed", "status": {"$nin": sorted(SCHEDULE_TASK_CLOSED)}}, {"_id": 0},
-    ).to_list(100)
-    missing = await db.matches_v2.find(
-        {"lineups_missing": {"$in": mine}, "status": {"$in": list(LINEUP_TASK_STATUSES)}}, {"_id": 0},
-    ).to_list(100)
+    proposed = await _matches_for_query(
+        db, {**sides, "schedule_status": "proposed", "status": {"$nin": sorted(SCHEDULE_TASK_CLOSED)}}, 100)
+    # Ohne Maps gibt es nichts nachzutragen - das prüft schon die Abfrage („games.0“).
+    missing = await _matches_for_query(
+        db, {"lineups_missing": {"$in": mine}, "status": {"$in": list(LINEUP_TASK_STATUSES)}, "games.0": {"$exists": True}},
+        100)
     open_by_match: dict[str, list[dict]] = {}
     if proposed:
         for row in await db.match_schedule_proposals.find(
@@ -275,8 +275,6 @@ async def own_match_tasks(db, user: dict, registrations: list[dict]) -> list[dic
         {"id": {"$in": tournament_ids}}, {"_id": 0}).to_list(len(tournament_ids) + 5)} if tournament_ids else {}
     now = datetime.now(timezone.utc)
     for match in missing:
-        if not match.get("games"):
-            continue
         deadline = amend_deadline_for(tournaments.get(match.get("tournament_id")), match)
         if deadline and deadline >= now:
             tasks.append(("lineup", match, deadline.isoformat()))
