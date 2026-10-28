@@ -340,6 +340,18 @@ async def sitemap():
     async for season in db.seasons.find({"status": {"$nin": SEO_HIDDEN_STATUSES}}, {"slug": 1, "updated_at": 1, "_id": 0}):
         if season.get("slug"):
             urls.append({"loc": f"{base}/seasons/{season['slug']}", "lastmod": season.get("updated_at"), "changefreq": "weekly", "priority": "0.65"})
+    # Liga (P5, #1625): nur Seasons mit Sichtbarkeit „öffentlich“ - und /liga nur, wenn es eine gibt.
+    league_slugs = {row["id"]: row.get("slug") async for row in db.leagues.find({"status": "active"}, {"_id": 0, "id": 1, "slug": 1})}
+    league_urls = []
+    async for league_season in db.league_seasons.find({"visibility": "public", "status": {"$ne": "archived"}},
+                                                      {"_id": 0, "league_id": 1, "slug": 1, "updated_at": 1}):
+        league_slug = league_slugs.get(league_season.get("league_id"))
+        if league_slug and league_season.get("slug"):
+            league_urls.append({"loc": f"{base}/liga/{league_slug}/{league_season['slug']}",
+                                "lastmod": league_season.get("updated_at"), "changefreq": "daily", "priority": "0.7"})
+    if league_urls:
+        urls.append({"loc": f"{base}/liga", "lastmod": None, "changefreq": "weekly", "priority": "0.7"})
+        urls.extend(league_urls)
     # events
     async for e in db.events.find({"status": {"$nin": SEO_HIDDEN_STATUSES}, **public_visibility}, {"slug": 1, "updated_at": 1, "_id": 0}):
         if e.get("slug"):

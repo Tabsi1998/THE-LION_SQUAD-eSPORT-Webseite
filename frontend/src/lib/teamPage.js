@@ -30,6 +30,11 @@ export function upcomingLine(row) {
   return [t.event_name, when ? when.replace(", ", " · ") : "", !t.event_name ? t.game_name : ""].filter(Boolean).join(" · ");
 }
 
+/** Liga (P5, #1625): unter dem Co-Team „CoD-Liga · Season 1“. */
+export function leagueLine(row) {
+  return [row?.league?.name, row?.season?.name].filter(Boolean).join(" · ");
+}
+
 /** Der Schlüssel aus der Adresse - oder leer. */
 export function inviteTokenFrom(search) {
   try {

@@ -784,16 +784,22 @@ async def visible_leagues(db, user: dict | None) -> list[dict]:
     return out
 
 
-async def public_season_view(db, league_slug: str, season_slug: str, user: dict | None, *,
-                             staffel_hidden=None) -> dict:
-    """Liga → Season → Liga N → Staffeln mit Turnier-Kennungen. Unsichtbar heißt 404 - wie „gibt es nicht“.
-    ``staffel_hidden(db, tournament, user)``: die Sichtbarkeitsregel der Turnierseite (die Route reicht
-    ``tournament_hidden_reason`` herein - ein Service importiert keine Route)."""
+async def visible_season(db, league_slug: str, season_slug: str, user: dict | None) -> tuple[dict, dict]:
+    """Liga und Season aus der Adresse - nur, wenn die Person die Season sehen darf; sonst 404 wie „gibt es nicht“."""
     league = await db.leagues.find_one({"slug": league_slug, "status": "active"}, {"_id": 0})
     season = await db.league_seasons.find_one({"league_id": league["id"], "slug": season_slug},
                                               {"_id": 0}) if league else None
     if not season or season.get("status") == "archived" or not await can_see_season(user, season):
         raise LeagueProblem("Season nicht gefunden.", 404)
+    return league, season
+
+
+async def public_season_view(db, league_slug: str, season_slug: str, user: dict | None, *,
+                             staffel_hidden=None) -> dict:
+    """Liga → Season → Liga N → Staffeln mit Turnier-Kennungen. Unsichtbar heißt 404 - wie „gibt es nicht“.
+    ``staffel_hidden(db, tournament, user)``: die Sichtbarkeitsregel der Turnierseite (die Route reicht
+    ``tournament_hidden_reason`` herein - ein Service importiert keine Route)."""
+    league, season = await visible_season(db, league_slug, season_slug, user)
     divisions = await db.league_divisions.find({"season_id": season["id"], "status": "active"},
                                                {"_id": 0}).sort("level", 1).to_list(50)
     # Nur Staffeln, die die Person auch als Turnier sähe - Entwurf und „intern“ bleiben bei der Leitung und den
