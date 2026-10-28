@@ -126,13 +126,21 @@ Name, **Lineup / Mitspieler** (mindestens so viele wie der Mindestkader, Season 
 (beide aus dem Kader, verschieden) → speichern. Captain und Vertreter vereinbaren Termine, melden und bestätigen
 Ergebnisse. Alle im Kader brauchen ein Konto und müssen Mitglied des Hauptteams sein.
 
+Jeder im Kader braucht außerdem die **Spiel-ID** des Spiels im Profil (**Einstellungen → Gaming → Spiel-IDs**, bei CoD
+die **Activision-ID** inklusive `#`). Die ID des Hauptspiels gilt für alle Versionen. Ohne ID kann jemand zugeteilt,
+aber nicht aufgestellt werden (3.7).
+
 ### 2.5 Co-Teams zuteilen
 
 1. Season-Seite → bei der Staffel **Turnierverwaltung · Co-Teams zuteilen** → Reiter **Teilnehmer**.
 2. **Co-Team zuteilen** → Schritt 1: das **Hauptteam** wählen → Schritt 2: das **Co-Team** → **Zuteilen**.
 3. Co-Teams, die nicht passen, stehen grau mit dem Grund da (Kader zu klein, Team schon in der Staffel, Staffel voll …).
+4. Bei jedem Co-Team steht je Spieler die **Spiel-ID** (Haken) bzw. **keine ID** (gelb), darunter „Ohne gültige
+   Activision-ID: …“ mit den Namen. Zuteilen geht trotzdem; diese Spieler können erst aufgestellt werden, wenn die ID
+   im Profil steht. Sie und die Verantwortlichen des Co-Teams bekommen eine Nachricht.
 
-Die Captains und Vertreter bekommen eine Benachrichtigung. **Entfernen** in der Teilnehmerliste geht nur bis zum
+Beim Zuteilen wird die ID jedes Spielers für die Season **festgehalten** (3.7). Die Captains und Vertreter bekommen
+eine Benachrichtigung. **Entfernen** in der Teilnehmerliste geht nur bis zum
 Start. Bis dahin ist der Spielplan eine Vorschau und wird bei jeder Änderung neu gemischt.
 
 ### 2.6 Spielplan und Start
@@ -259,6 +267,27 @@ Reiter **Liga** (nur, wenn die Person die Season sehen darf – sonst „Liga ·
 - **Abmelden:** Ein zugeteiltes Co-Team meldet sich nicht selbst ab – auf der Staffel steht „Austritt nur über die
   Turnierleitung“. Herausnehmen kann es nur die Turnierleitung.
 
+### 3.7 Spiel-IDs im Kader
+
+Je Season und Spieler gilt **eine** Spiel-ID: die beim Zuteilen festgehaltene, bei späteren Spielern die bei der
+Aufnahme ins Co-Team, und wer die ID erst später eingetragen hat, bekommt sie beim **ersten Aufstellen** festgehalten.
+Sie gilt die ganze Season – auf der Matchseite (Aufstellung, **Activision-ID für die Lobby**) und im Ergebnis-Fenster.
+Die IDs sehen nur die Beteiligten des Spiels und die Turnierleitung, nie Gäste.
+
+- **Übersicht:** Season-Seite → **Kader und Spiel-IDs**: je Co-Team die Spieler mit Stand – *festgehalten*, *im Profil*
+  (wird beim ersten Aufstellen festgehalten), *fehlt*, *wartet auf Freigabe*. Oben die Zahl ohne ID, wartend und mit
+  neuer ID im Profil.
+- **ID im Profil geändert:** In der Liga gilt weiter die festgehaltene; die Übersicht zeigt „Im Profil steht
+  inzwischen …“. Der Spieler sieht im Profil „In der laufenden Liga gilt weiter …“. Passt die neue ID (etwa
+  Kontowechsel): **Neue ID freigeben** → **Grund** (mindestens fünf Zeichen) → **Freigeben**. Ab dann gilt sie;
+  unter **Protokoll** steht wann, von wem, alt → neu und der Grund.
+- **Stichtag für neue Spieler:** in der Übersicht als Datum, Vorgabe **kein Stichtag**. Wer nach dem Stichtag ins
+  Co-Team kommt, steht als *wartet auf Freigabe* da und ist nicht aufstellbar, bis ihr seine ID mit **ID freigeben**
+  bestätigt.
+- **Aufstellung:** Spieler ohne gültige ID stehen beim Melden und Nachtragen grau mit Grund („Nicht aufstellbar: …“);
+  der Server lehnt sie ab – auch im Ergebnis-Fenster der Turnierleitung.
+- **Datenschutz:** Die Datenauskunft enthält die festgehaltene ID; löscht jemand sein Konto, verschwindet sie.
+
 ---
 
 ## 4. Wenn etwas nicht klappt
@@ -290,6 +319,9 @@ Reiter **Liga** (nur, wenn die Person die Season sehen darf – sonst „Liga ·
 | „Nach Map 2 stand der Sieger schon fest – keine weitere Map.“ / „Best of 3: eine Seite braucht 2 gewonnene Maps …“ | Serie passt nicht zum Best of | Maps korrigieren |
 | „… die Aufstellung von … braucht genau 4 Spieler.“ / „… nur Spieler aus dem Kader …“ | Aufstellung falsch | Genau die Teamgröße aus dem eigenen Kader wählen |
 | „… steht an diesem Spieltag schon in der Aufstellung eines anderen Teams …“ | Doppel-Einsatz | Andere Person aufstellen |
+| „Map 1: … kann nicht aufgestellt werden – Activision-ID fehlt im Profil.“ | Spieler ohne Spiel-ID | Spieler trägt die ID im Profil ein, danach geht es (3.7) |
+| „… kann nicht aufgestellt werden – Nach dem Stichtag ins Co-Team gekommen …“ | Neuer Spieler nach dem Stichtag | Season → **Kader und Spiel-IDs** → **ID freigeben** mit Grund |
+| „Im Profil fehlt noch: Activision-ID – erst eintragen, dann freigeben.“ | Freigabe ohne ID im Profil | Spieler trägt die ID zuerst ein |
 | „Die Frist zum Nachtragen ist vorbei …“ | 48 Stunden nach dem Ergebnis vorbei | Turnierleitung trägt mit Grund nach |
 | „Ein Dispute ist nur bis 30 Minuten nach dem Ergebnis möglich …“ | Einspruchsfrist vorbei | Matchchat mit **@leitung**; die Turnierleitung korrigiert |
 | „Bitte kurz den Grund der Korrektur angeben (mindestens 5 Zeichen).“ (Ergebnis-Fenster) bzw. „Bitte einen Grund für die Korrektur angeben (mindestens 5 Zeichen).“ | Korrektur ohne Grund | Grund mit mindestens fünf Zeichen |
@@ -312,6 +344,9 @@ Die Turnierleitung wertet das Spiel kampflos (Ergebnis-Fenster → **Nicht ersch
 **Zählt die Aufstellung für die Tabelle?**
 Nein, nur das Ergebnis. Die Aufstellung ist für Doppel-Einsatz und spätere Statistik da.
 
+**Ein Spieler hat eine neue Activision-ID – darf er damit spielen?**
+Erst nach eurer Freigabe (3.7). Bis dahin spielt er mit der gemeldeten ID; aufstellbar bleibt er.
+
 **Wie sieht ein Captain, was zu tun ist?**
 Über die Benachrichtigungen und den [Spickzettel für Captains](liga-captains.md).
 
@@ -329,6 +364,8 @@ Zum Abhaken in dieser Reihenfolge – jeder Punkt mit dem Klickweg von oben.
 - [ ] **Map-Pool der Season** gespeichert – 2.2
 - [ ] **Liga 1** und **Staffel A** angelegt (bei mehr als acht Teams auch Staffel B) – 2.3
 - [ ] Alle **Co-Teams** angelegt, jeder im Kader hat ein **Konto** und ist im Hauptteam – 2.4
+- [ ] Jeder im Kader hat die **Activision-ID** im Profil; Season → **Kader und Spiel-IDs** zeigt niemanden „ohne ID“,
+      Stichtag für neue Spieler entschieden – 3.7
 - [ ] Je Co-Team **Captain** und **Vertreter** vergeben – 2.4
 - [ ] Alle Co-Teams **zugeteilt** (Teilnehmer: 8 von 8) – 2.5
 - [ ] Season gespeichert und, falls nach dem Anlegen der Staffel etwas geändert wurde, **Vorgaben übertragen** – 2.7

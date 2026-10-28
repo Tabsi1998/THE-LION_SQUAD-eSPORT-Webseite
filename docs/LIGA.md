@@ -120,6 +120,49 @@ desselben Hauptteams nie in derselben Staffel“). `lineup`/`substitutes` (Team 
 „Team am Spieltag“ (`/api/team-day`) gilt für Co-Team-Anmeldungen nicht.
 Indizes: `tournament_registrations.squad_id` (partiell), `team_squads.captain_id` und `.vice_captain_id` (sparse).
 
+### Liga-Kader: Spiel-ID je Season (`league_rosters`, #2108)
+
+Liga-Spieler brauchen die Pflicht-IDs des Spiels aus dem Profil (z. B. Activision-ID inklusive `#`). Wie im Profil
+und bei der Turnieranmeldung gilt die ID des Hauptspiels für seine Versionen (`tournament_common._enrich_game_identity`,
+`_required_game_fields`, `_profile_player_ids`). Spiele ohne Pflicht-ID berühren nichts davon.
+
+| Feld | Typ | Bedeutung |
+| --- | --- | --- |
+| `season_id`, `user_id` | str | ein Eintrag je Person und Season (eindeutig); Index `user_id` |
+| `league_id`, `game_id` | str | zur Einordnung |
+| `player_ids` | `{key: Wert}` | nur die Pflicht-IDs, die in der Season gelten; leer = noch keine festgehalten |
+| `id_text` | str | Anzeige, z. B. „Testloewe#1234567“ |
+| `locked_at`, `locked_via`, `locked_by` | | wann und wodurch festgehalten: `assign`, `squad_join`, `lineup`, `approval` |
+| `added_at`, `added_via`, `added_by` | | wann die Person in den Kader kam |
+| `late` | bool | nach dem Stichtag ins Co-Team gekommen – wartet auf Freigabe |
+| `approvals` | `[{at, by, reason, old_text, new_text, was}]` | Protokoll der Freigaben durch die Liga-Leitung |
+
+Season-Feld `league_seasons.roster_deadline` (Wiener Kalendertag, optional, Vorgabe: keiner): Stichtag für neue
+Spieler. Gesetzt in der Kaderübersicht der Season (`PUT /api/admin/leagues/seasons/{id}/roster-settings`), nicht im
+Season-Formular; der Turnierkern liest es nicht.
+
+Ablauf (`services/league_roster.py`):
+
+- **Zuteilen** eines Co-Teams: jedes Mitglied bekommt einen Eintrag; mit vollständiger ID im Profil wird sie
+  festgehalten. Fehlt sie, steht der Eintrag leer, Spieler und Verantwortliche des Co-Teams bekommen eine Nachricht
+  (Art `tournament_registration`); der Dialog warnt vorab mit Namen. Zuteilen geht trotzdem.
+- **Aufnahme** in ein zugeteiltes Co-Team einer laufenden Staffel (`PATCH /api/teams/{id}/squads/{id}`): ebenso; nach
+  dem Stichtag mit `late`, die ID gilt erst nach Freigabe.
+- **Erstes Aufstellen**: wer die ID erst später eingetragen hat, bekommt sie beim ersten angenommenen Aufstellen
+  festgehalten (Melden, Nachtrag, Ergebnis der Turnierleitung).
+- Danach gilt die festgehaltene ID die ganze Season – Matchseite, Ergebnis-Fenster, Lobby. Eine **neue ID** gilt erst
+  nach der Freigabe der Liga-Leitung (`POST /api/admin/leagues/seasons/{id}/roster/{user_id}/approve` mit Grund ≥ 5
+  Zeichen; übernimmt die aktuelle ID aus dem Profil; Protokoll in `approvals` und `audit_logs`).
+- Stand je Person (`league_roster.status`): `locked` (festgehalten), `pending` (im Profil, wird beim ersten Aufstellen
+  festgehalten), `missing` (fehlt), `late` (wartet auf Freigabe), `free` (Spiel ohne Pflicht-ID). Aufstellbar sind
+  `locked`, `pending` und `free`.
+- **Sichtbarkeit:** die IDs der Spieler stehen im Block `league` der Matchseite (`roster[].game_id_text`,
+  `lobby_ids`) nur für Beteiligte des Spiels und die Turnierleitung – wie Aufstellungen. Die eigene ID je laufender
+  Season steht unter `GET /api/me/league-ids` (Hinweis im Profil). Die Kaderübersicht
+  (`GET /api/admin/leagues/seasons/{id}/roster`) sieht nur die Turnierleitung.
+- **Datenschutz:** Die Auskunft enthält `league_rosters`; das Löschen des Kontos löscht die Einträge
+  (`account_erasure.PURGED`) – Aufstellungen und Ergebnisse bleiben ohne sie.
+
 ### Ergebnis je Map am Spiel (`matches_v2`, Worker B)
 
 | Feld | Typ | Bedeutung |
@@ -155,7 +198,8 @@ Namen der Aufgestellten, Meldungen beider Seiten, `can_amend_lineup`, `amend_unt
 
 `league.create|update`, `league.season.create|update`, `league.season.map_pool.save|clear`,
 `league.division.create|update`, `league.staffel.create`, `league.staffel.sync` (A) · `team.squad.roles`, `league.squad.assign|remove` (B) · `match.games.report`,
-`match.lineup.amend`, `match.games.correct` (B).
+`match.lineup.amend`, `match.games.correct` (B) · `league.roster.approve` (neue Spiel-ID freigegeben, mit Grund, ohne
+die ID selbst), `league.season.roster_deadline` (#2108).
 
 ## 3. Einstellbar statt fest
 
@@ -205,6 +249,7 @@ Angelehnt an `services/match_audience.py` (Verantwortliche/Spieler) und `auth.re
 | --- | --- | --- | --- | --- | --- |
 | Liga, Season, Liga N, Staffel anlegen/ändern, Spielplan, Start | ja | – | – | – | – |
 | Co-Team zuteilen/entfernen | ja | – | – | – | – |
+| Spiel-ID freigeben, Stichtag für neue Spieler (#2108) | ja | – | – | – | – |
 | Co-Team-Kader pflegen | ja (`_can_manage`) | ja | – | – | – |
 | Captain/Vertreter vergeben (mit Protokoll) | ja | ja | – | – | – |
 | Eigene Rolle abgeben (`PUT …/roles` nur mit dem eigenen Feld auf `null`, #2110) | – | – | ja | ja | – |
@@ -242,6 +287,7 @@ Anmeldungen auch über Co-Teams, deren Captain/Vertreter man ist. Aufrufer mit e
 | Map im Pool und für den Modus freigegeben, Modus passt zu `game_mode_order` | Melden, Korrektur | B |
 | Map-Wiederholung nach `map_repeat` (Vorgabe: dieselbe Map im selben Modus nur einmal je Serie) | Melden, Korrektur | P6 |
 | Aufstellung: genau `team_size` verschiedene Mitglieder des eigenen Co-Teams je Map | Melden, Nachtrag | B |
+| Aufstellung: nur mit gültiger Spiel-ID der Season (festgehalten oder im Profil; nicht „wartet auf Freigabe“), sonst 422 „… kann nicht aufgestellt werden – …“ – auch für die Turnierleitung (#2108) | Melden, Nachtrag, Ergebnis | B |
 | Kein Doppel-Einsatz: dieselbe Person nicht in Aufstellungen zweier Anmeldungen am selben Spieltag (`matchday_number_of`) in Staffeln derselben `league_context.season_id` | Melden, Nachtrag | B |
 | Bestätigung mit anderen Maps/Modi/Siegern als die Erstmeldung → 409 mit Hinweis auf Einspruch | Bestätigen | B |
 
