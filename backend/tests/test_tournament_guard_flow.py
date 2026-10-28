@@ -190,3 +190,79 @@ async def test_recalculating_the_advancement_respects_the_lock(flow):
     refused = await flow.post(f"/api/tournaments/{tournament['id']}/matches-v2/recalculate-advancement")
 
     assert refused.status_code == 423
+
+
+# ---------------------------------------------------------------- TA11 Schweizer Runde
+
+@pytest.mark.asyncio
+async def test_a_swiss_round_does_not_start_the_tournament(flow):
+    staff = await flow.add_staff()
+    flow.act_as(staff)
+    tournament, _users, _regs = await flow.with_participants(4, format="swiss", status="draft")
+
+    created = await flow.post(f"/api/tournaments/{tournament['id']}/swiss/next-round")
+
+    assert created.status_code == 200, created.text
+    assert (await stored(flow, tournament))["status"] == "draft"
+
+
+@pytest.mark.asyncio
+async def test_a_swiss_round_respects_the_lock_and_the_end(flow):
+    staff = await flow.add_staff()
+    flow.act_as(staff)
+    tournament, _users, _regs = await flow.with_participants(4, format="swiss")
+    url = f"/api/tournaments/{tournament['id']}/swiss/next-round"
+    await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"locked_at": "2026-10-28T10:00:00+00:00"}})
+    assert (await flow.post(url)).status_code == 423
+    await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"status": "results_published"}, "$unset": {"locked_at": ""}})
+    assert (await flow.post(url)).status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_the_last_swiss_round_can_be_taken_back_until_a_match_begins(flow):
+    staff = await flow.add_staff()
+    flow.act_as(staff)
+    tournament, _users, _regs = await flow.with_participants(5, format="swiss")
+    await flow.start(tournament)
+    base = f"/api/tournaments/{tournament['id']}/swiss"
+    assert (await flow.post(f"{base}/next-round")).status_code == 200
+
+    undone = await flow.post(f"{base}/undo-round")
+
+    assert undone.status_code == 200, undone.text
+    assert undone.json()["round"] == 1 and undone.json()["match_count"] == 3
+    assert await flow.matches(tournament) == []
+
+    # Neu erzeugen geht wieder mit Runde 1; nach einem Ergebnis bleibt die Runde.
+    again = await flow.post(f"{base}/next-round")
+    assert again.status_code == 200 and again.json()["round"] == 1
+    await play_first(flow, tournament)
+    refused = await flow.post(f"{base}/undo-round")
+    assert refused.status_code == 409, refused.text
+    assert "begonnen" in refused.json()["detail"]
+    assert len(await flow.matches(tournament)) == 3
+
+
+@pytest.mark.asyncio
+async def test_a_called_swiss_match_holds_its_round(flow):
+    staff = await flow.add_staff()
+    flow.act_as(staff)
+    tournament, _users, _regs = await flow.with_participants(4, format="swiss")
+    base = f"/api/tournaments/{tournament['id']}/swiss"
+    assert (await flow.post(f"{base}/next-round")).status_code == 200
+    first = (await flow.matches(tournament))[0]
+    await flow.db.matches_v2.update_one({"id": first["id"]}, {"$set": {"called_at": "2026-10-28T10:00:00+00:00"}})
+
+    assert (await flow.post(f"{base}/undo-round")).status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_without_a_round_there_is_nothing_to_take_back(flow):
+    staff = await flow.add_staff()
+    flow.act_as(staff)
+    tournament, _users, _regs = await flow.with_participants(4, format="swiss")
+
+    refused = await flow.post(f"/api/tournaments/{tournament['id']}/swiss/undo-round")
+
+    assert refused.status_code == 409
+    assert "keine Runde" in refused.json()["detail"]

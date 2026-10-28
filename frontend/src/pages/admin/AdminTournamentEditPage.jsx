@@ -399,6 +399,23 @@ export default function AdminTournamentEditPage() {
       toast.error(formatRequestError(e, "Schweizer Runde konnte nicht generiert werden."));
     }
   };
+  // Letzte Schweizer Runde zurücknehmen (#2120, TA11): solange keines ihrer Spiele begonnen hat.
+  const undoSwissRound = async (info) => {
+    const ok = await confirm({
+      title: `Runde ${info.round} zurücknehmen?`,
+      description: `Die ${info.count === 1 ? "1 Paarung" : `${info.count} Paarungen`} von Runde ${info.round} werden gelöscht. Danach erzeugt „Schweizer Runde“ die Runde neu.`,
+      confirmLabel: "Runde zurücknehmen",
+      tone: "danger",
+    });
+    if (!ok) return;
+    try {
+      const { data } = await api.post(`/tournaments/${id}/swiss/undo-round`);
+      toast.success(`Runde ${data.round} zurückgenommen.`);
+      load();
+    } catch (e) {
+      toast.error(formatRequestError(e, "Die Runde konnte nicht zurückgenommen werden."));
+    }
+  };
 
   if (!t) return (
     <AdminLayout>
@@ -541,10 +558,13 @@ export default function AdminTournamentEditPage() {
                 <Zap className="w-3.5 h-3.5" /> {primaryAction.label}
               </button>
             )}
-            {isTournamentLead && t.format === "swiss" && (
+            {isTournamentLead && t.format === "swiss" && !tournamentOver && (
               <button type="button" onClick={generateSwissRound} data-testid="admin-tr-swiss-next" className="px-4 py-2 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#29B6E8]/10">Schweizer Runde</button>
             )}
-            {isTournamentLead && t.format === "groups" && (
+            {isTournamentLead && swissUndo && (
+              <button type="button" onClick={() => undoSwissRound(swissUndo)} data-testid="admin-tr-swiss-undo" className="tls-btn tls-btn--secondary px-4 py-2 font-bold uppercase tracking-wider rounded-sm text-sm">Runde {swissUndo.round} zurücknehmen</button>
+            )}
+            {isTournamentLead && t.format === "groups" && !tournamentOver && (
               <button type="button" onClick={generateGroups} data-testid="admin-tr-groups" className="px-4 py-2 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#29B6E8]/10">Gruppen generieren</button>
             )}
             {canOperateTournament && (
