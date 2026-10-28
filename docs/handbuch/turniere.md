@@ -653,6 +653,36 @@ der Editor nennt die geänderten Maps („Seit dem Speichern in der Bibliothek g
 der alte Pool nicht mehr und muss neu gewählt werden. Ein Turnier ohne Maps (etwa ein Solo-Cup) braucht nichts davon:
 ohne Spiel gibt es keinen Reiter **Maps**, ohne Pool keinen Abschnitt auf der Turnierseite.
 
+### 3.15 Liga anlegen
+
+Eine Liga läuft über Wochen: **Liga** (je Spiel) → **Season** → **Liga 1, Liga 2 …** → **Staffel A, B …**. Jede Staffel
+ist ein gewöhnliches Turnier im Format Liga – Spielwochen, Termine, Melden, Bestätigen und Tabelle laufen dort wie
+gewohnt. Den Rahmen legst du unter **Admin → eSports → Liga** an (nur Turnierleitung mit Zwei-Faktor):
+
+1. **Liga anlegen:** Name und Spiel, etwa „CoD-Liga“.
+2. **Season anlegen:** nur der Beginn der ersten Spielwoche (00:00 Uhr Wien). Danach auf der Seite der Season die
+   Vorgaben festlegen: Wochen gesamt (mit Sperrwochen), Spielwoche in Tagen, Standardtag und -zeit, Runden (nur Hinrunde
+   oder Hin- und Rückrunde), **Sperrzeiten** wie die Weihnachtspause, Meldeschluss, Best of, Teamgröße, Mindestkader,
+   Teams je Staffel, Modus je Map, Punkte und Gleichstand, Fristen, **Regeltext** und **Sichtbarkeit**. Der Kalender
+   darunter zeigt nach dem Speichern, welche Wochen gesperrt sind (mehr als die Hälfte ihrer Tage in einer Sperrzeit)
+   und wie viele Teams eine Staffel höchstens fassen kann.
+3. **Map-Pool der Season** wählen – jede neue Staffel bekommt eine Kopie.
+4. **Liga 1 anlegen**, bei Bedarf mit Beiname und eigenen Werten (Best of, Teamgröße, Mindestkader, Teams je Staffel,
+   Punkte); leer heißt „wie die Season“.
+5. **Staffel anlegen:** legt das Turnier als Entwurf mit allen Vorgaben an – ohne offene Anmeldung, ohne Discord, ohne
+   Jahreswertung. Passt die Staffelgröße nicht in die Spielwochen (Season 1: acht Teams mit nur Hinrunde in acht
+   Spielwochen), lehnt der Server ab und nennt die größte passende Staffel – die übrigen Teams kommen in eine zweite
+   Staffel. Über **Turnierverwaltung · Co-Teams zuteilen** geht es weiter in das Turnier.
+
+**Sichtbarkeit:** *Aus* (Vorgabe) zeigt nichts, *Nur Turnierleitung* nur euch, *Nur Mitglieder* und *Öffentlich* geben
+Liga und Staffel-Turniere frei. Ändert ihr später etwas an der Season, tragen bestehende Staffeln noch die alten Werte,
+bis ihr **Vorgaben übertragen** drückt: Sichtbarkeit, Regeltext und Map-Pool gehen immer, Termine und Kalender nur vor
+dem Start, Best of, Teamgröße, Punkte und Fristen nur vor dem ersten Ergebnis – was nicht mehr geht, steht mit Grund da.
+
+Staffeln zählen nicht für Jahreswertung, Turnier-Pokale, Löwen-Rang-XP für Teilnahme und Podest und die Team-Stufe;
+gespielte und gewonnene Spiele zählen weiter. Auf Startseite, im öffentlichen Kalender und in der Turnierliste der
+Website stehen sie nicht, im Profil und auf der Teamseite gekennzeichnet als „Liga · Staffel A“.
+
 ---
 
 ## 4. Wenn etwas nicht klappt

@@ -121,6 +121,8 @@ const AdminF1NewPage = lazyPage(() => import("@/pages/admin/AdminF1NewPage"));
 const AdminF1EditPage = lazyPage(() => import("@/pages/admin/AdminF1EditPage"));
 const AdminGamesPage = lazyPage(() => import("@/pages/admin/AdminGamesPage"));
 const AdminGameMapsPage = lazyPage(() => import("@/pages/admin/AdminGameMapsPage"));
+const AdminLeaguesPage = lazyPage(() => import("@/pages/admin/league/AdminLeaguesPage"));
+const AdminLeagueSeasonPage = lazyPage(() => import("@/pages/admin/league/AdminLeagueSeasonPage"));
 const AdminUsersPage = lazyPage(() => import("@/pages/admin/AdminUsersPage"));
 const AdminStationsPage = lazyPage(() => import("@/pages/admin/AdminStationsPage"));
 const AdminEventsPage = lazyPage(() => import("@/pages/admin/AdminEventsPage"));
@@ -369,6 +371,8 @@ function App() {
           <Route path="/admin/f1/:id" element={<ProtectedRoute requireTournamentStaff><AdminF1EditPage /></ProtectedRoute>} />
           <Route path="/admin/games" element={<ProtectedRoute requireArea="tournaments"><AdminGamesPage /></ProtectedRoute>} />
           <Route path="/admin/games/:gameId/maps" element={<ProtectedRoute requireArea="tournaments"><AdminGameMapsPage /></ProtectedRoute>} />
+          <Route path="/admin/leagues" element={<ProtectedRoute requireArea="tournaments"><AdminLeaguesPage /></ProtectedRoute>} />
+          <Route path="/admin/leagues/seasons/:seasonId" element={<ProtectedRoute requireArea="tournaments"><AdminLeagueSeasonPage /></ProtectedRoute>} />
           <Route path="/admin/users" element={<ProtectedRoute requireArea="club"><AdminUsersPage /></ProtectedRoute>} />
           <Route path="/admin/stations" element={<ProtectedRoute requireTournamentStaff><AdminStationsPage /></ProtectedRoute>} />
           <Route path="/admin/events" element={<ProtectedRoute requireArea="tournaments"><AdminEventsPage /></ProtectedRoute>} />
