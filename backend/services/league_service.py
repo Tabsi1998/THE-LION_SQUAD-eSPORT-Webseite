@@ -14,6 +14,7 @@ daraus die Antwort.
 """
 from __future__ import annotations
 
+from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -269,6 +270,9 @@ def effective_settings(season: dict, division: dict | None) -> dict:
         merged["min_squad_size"] = merged["team_size"]
     if not merged.get("scoring_rules"):
         merged["scoring_rules"] = normalize_rules({})
+    if season.get(RESPONSE_HOURS) is None and ((division or {}).get("overrides") or {}).get(RESPONSE_HOURS) is None:
+        # Seasons von vor #2106 tragen keine Antwortfrist: nicht die Vorgabe vortäuschen - „je Staffel wie bisher“.
+        merged[RESPONSE_HOURS] = None
     return merged
 
 
@@ -320,11 +324,8 @@ def staffel_fields(league: dict, season: dict, division: dict) -> dict:
     }
     # Antwortfrist (#2106, F3): nur, wenn Season oder Liga N sie wirklich tragen - eine ältere Season ohne den Wert
     # überschreibt die Frist ihrer Staffeln nicht mit der Vorgabe.
-    own = ((division or {}).get("overrides") or {}).get(RESPONSE_HOURS)
-    if own is None:
-        own = season.get(RESPONSE_HOURS)
-    if own is not None:
-        fields[RESPONSE_HOURS] = int(own)
+    if settings.get(RESPONSE_HOURS) is not None:
+        fields[RESPONSE_HOURS] = int(settings[RESPONSE_HOURS])
     return fields
 
 
@@ -477,7 +478,22 @@ async def slug_locked(db, league: dict) -> bool:
     sichtbar war (``published_at``, gesetzt beim Speichern einer Sichtbarkeit) und keine es gerade ist."""
     if league.get("published_at"):
         return True
-    return bool(await db.league_seasons.count_documents({"league_id": league["id"], "visibility": {"$ne": "off"}}))
+    return bool(await db.league_seasons.count_documents({"league_id": league["id"], **PUBLISHED_SEASON}))
+
+
+# Eine Season, die sichtbar ist oder schon lief, hat die Adresse ihrer Liga veröffentlicht.
+PUBLISHED_SEASON = {"$or": [{"visibility": {"$nin": ["off", None]}}, {"status": {"$nin": ["draft", None]}}]}
+
+
+async def backfill_published_at(db) -> int:
+    """Migration (Review #2106): Ligen von vor ``published_at`` bekommen es, wenn eine ihrer Seasons sichtbar ist oder
+    nicht mehr Entwurf - sonst ließe sich ihre Adresse ändern, sobald alle Seasons wieder „aus“ sind."""
+    league_ids = await db.league_seasons.distinct("league_id", PUBLISHED_SEASON)
+    if not league_ids:
+        return 0
+    result = await db.leagues.update_many({"id": {"$in": league_ids}, "published_at": None},
+                                          {"$set": {"published_at": _now()}})
+    return int(getattr(result, "modified_count", 0) or 0)
 
 
 async def mark_published(db, league_id: str, visibility: str | None) -> None:
@@ -668,35 +684,68 @@ async def _purge_staffel(db, tournament_id: str) -> None:
                                             {"scope": "tournament", "scope_id": tournament_id}]})
 
 
-async def delete_tree(db, kind: str, target: dict) -> dict:
-    """Löscht Liga, Season oder Liga N samt leerer Entwurfs-Staffeln - erst nach erneuter Prüfung, jede Staffel unter
-    ihrer Schreibsperre (gleichzeitig zugeteilt heißt: nicht mehr leer). Gibt den Plan zurück, der ausgeführt wurde."""
+CHANGED_MEANWHILE = "Inzwischen ist etwas dazugekommen – bitte die Seite neu laden und noch einmal prüfen."
+
+
+def _plan_ids(plan: dict, kind: str, target: dict) -> tuple[set, set, set]:
+    """Staffeln, Liga N und Seasons, die ein Plan löscht - samt ``target`` selbst."""
+    staffeln = {row["tournament_id"] for row in plan["staffeln"]}
+    divisions = {row["id"] for row in plan["divisions"]} | ({target["id"]} if kind == "division" else set())
+    seasons = {row["id"] for row in plan["seasons"]} | ({target["id"]} if kind == "season" else set())
+    return staffeln, divisions, seasons
+
+
+async def _added_meanwhile(db, kind: str, target: dict, staffel_filter: dict, divisions: set, seasons: set) -> bool:
+    """Kam unter dem Ziel etwas dazu, das der Plan nicht kennt - eine Staffel, eine Liga N oder eine Season?"""
+    if await db.tournaments.count_documents({**staffel_filter, **ONLY_LEAGUE}):
+        return True
+    if kind != "division":
+        scope = {"league_id": target["id"]} if kind == "league" else {"season_id": target["id"]}
+        if await db.league_divisions.count_documents({**scope, "id": {"$nin": sorted(divisions)}}):
+            return True
+    if kind == "league":
+        others = {"league_id": target["id"], "id": {"$nin": sorted(seasons)}}
+        return bool(await db.league_seasons.count_documents(others))
+    return False
+
+
+async def delete_tree(db, kind: str, target: dict, *, on_staffel_deleted=None) -> dict:
+    """Löscht Liga, Season oder Liga N samt leerer Entwurfs-Staffeln - alles oder nichts (Review #2106): erst die
+    Schreibsperren aller Staffeln, dann unter allen Sperren neu prüfen, dann löschen. Ist eine Staffel gerade in
+    Arbeit, wird nichts gelöscht. ``on_staffel_deleted(row)`` protokolliert jede gelöschte Staffel einzeln. Kam beim
+    Löschen der Staffeln gleichzeitig eine neue Staffel, Liga N oder Season dazu, bricht es danach ab (409) - die leeren
+    Staffeln sind dann schon weg und protokolliert, alles darüber bleibt. Gibt den ausgeführten Plan zurück."""
     plan = await deletion_plan(db, kind, target)
     if not plan["deletable"]:
         raise LeagueProblem(blocked_message(plan), 409)
-    for staffel in plan["staffeln"]:
-        try:
-            async with mutation_lock(db, tournament_write_resource(staffel["tournament_id"])):
-                row = await db.tournaments.find_one({"id": staffel["tournament_id"]}, {"_id": 0})
-                if not row:
-                    continue
-                problem = await staffel_guard.staffel_cascade_problem(db, row)
-                if problem:
-                    raise LeagueProblem(f"Löschen geht nicht: {row.get('title')} {problem}. Archivieren statt "
-                                        "löschen – dann bleibt alles erhalten.", 409)
-                await _purge_staffel(db, row["id"])
-        except MutationLockBusy:
-            raise LeagueProblem(STAFFEL_BUSY, 409) from None
-    division_ids = [row["id"] for row in plan["divisions"]] + ([target["id"]] if kind == "division" else [])
+    staffel_ids, division_ids, season_ids = _plan_ids(plan, kind, target)
+    _seasons, _divisions, staffel_filter = await _delete_scope(db, kind, target)
+    try:
+        async with AsyncExitStack() as locks:
+            # Feste Reihenfolge: zwei Löschungen sperren sich nicht gegenseitig.
+            for tournament_id in sorted(staffel_ids):
+                await locks.enter_async_context(mutation_lock(db, tournament_write_resource(tournament_id)))
+            fresh = await deletion_plan(db, kind, target)
+            if not fresh["deletable"]:
+                raise LeagueProblem(blocked_message(fresh), 409)
+            if _plan_ids(fresh, kind, target) != (staffel_ids, division_ids, season_ids):
+                raise LeagueProblem(CHANGED_MEANWHILE, 409)
+            for row in fresh["staffeln"]:
+                await _purge_staffel(db, row["tournament_id"])
+                if on_staffel_deleted:
+                    await on_staffel_deleted(row)
+    except MutationLockBusy:
+        raise LeagueProblem(STAFFEL_BUSY, 409) from None
+    if await _added_meanwhile(db, kind, target, staffel_filter, division_ids, season_ids):
+        raise LeagueProblem(CHANGED_MEANWHILE, 409)
     if division_ids:
-        await db.league_divisions.delete_many({"id": {"$in": division_ids}})
-    season_ids = [row["id"] for row in plan["seasons"]] + ([target["id"]] if kind == "season" else [])
+        await db.league_divisions.delete_many({"id": {"$in": sorted(division_ids)}})
     if season_ids:
-        await db.map_pools.delete_many({"scope": "league_season", "scope_id": {"$in": season_ids}})
-        await db.league_seasons.delete_many({"id": {"$in": season_ids}})
+        await db.map_pools.delete_many({"scope": "league_season", "scope_id": {"$in": sorted(season_ids)}})
+        await db.league_seasons.delete_many({"id": {"$in": sorted(season_ids)}})
     if kind == "league":
         await db.leagues.delete_one({"id": target["id"]})
-    return plan
+    return fresh
 
 
 async def delete_staffel(db, tournament: dict) -> None:

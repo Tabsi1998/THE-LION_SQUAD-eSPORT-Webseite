@@ -157,9 +157,18 @@ async def _delete(kind: str, target_id: str, body: LeagueDelete, me: dict) -> di
     db = get_db()
     reason = _reason(body)
     target = await _delete_target(db, kind, target_id)
-    plan = await _call(leagues.delete_tree(db, kind, target))
-    reset_scope_cache()
     action = {"league": "league.delete", "season": "league.season.delete", "division": "league.division.delete"}[kind]
+
+    async def staffel_deleted(row: dict) -> None:
+        # Jede Staffel einzeln (Review #2106) - auch wenn das Löschen darüber danach abbricht.
+        await _audit(db, "league.staffel.delete", me, row["tournament_id"], {
+            "reason": reason, "title": row.get("title"), "staffel": row.get("staffel"), "with": action,
+            "with_id": target_id})
+
+    try:
+        plan = await _call(leagues.delete_tree(db, kind, target, on_staffel_deleted=staffel_deleted))
+    finally:
+        reset_scope_cache()
     await _audit(db, action, me, target_id, {
         "reason": reason, "name": plan["name"],
         "seasons": [row["id"] for row in plan["seasons"]], "divisions": [row["id"] for row in plan["divisions"]],

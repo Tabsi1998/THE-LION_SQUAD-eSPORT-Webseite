@@ -212,7 +212,11 @@ zugeteiltes Co-Team) und jede betroffene Season noch `draft` ist; die leeren Sta
 Map-Pool-Kopien) gehen mit, ebenso der Map-Pool der Season. Sonst antwortet der Server 409 „Löschen geht nicht: … Archivieren
 statt löschen“; `GET …/delete-plan` liefert vorher Auflistung und Gründe. Eine Staffel allein löscht die Season-Seite mit
 derselben Sperre wie die Turnierverwaltung (`staffel_delete_problem`). Löschen verlangt einen Grund (mindestens fünf
-Zeichen), der im Protokoll steht.
+Zeichen), der im Protokoll steht. `delete_tree` arbeitet alles oder nichts: erst die Schreibsperren aller Staffeln
+(ist eine belegt: 409, nichts gelöscht), dann unter allen Sperren neu prüfen, dann löschen; jede Staffel steht einzeln
+als `league.staffel.delete` (mit `with`/`with_id`) im Protokoll. Kommt beim Löschen der Staffeln gleichzeitig eine
+Staffel, Liga N oder Season dazu, bricht es danach mit 409 ab und lässt alles darüber stehen. Migration 16
+(`league_published_at`) trägt `published_at` für Ligen nach, deren Season sichtbar ist oder nicht mehr Entwurf.
 
 ## 4. Rechte
 

@@ -322,3 +322,96 @@ async def test_an_older_season_without_a_response_time_leaves_the_staffel_value_
     assert "running" not in rows[0]["applied"]
     stored = await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0})
     assert (stored["match_schedule_response_hours"], stored["rules"]) == (36, "Neu")
+
+
+# ---------------------------------------------------------------- Review #2106: alles oder nichts
+
+@pytest.mark.asyncio
+async def test_a_busy_staffel_stops_the_whole_deletion_before_anything_is_gone(flow):
+    from services.mutation_lock import mutation_lock, tournament_write_resource
+
+    await flow.db.mutation_locks.create_index("resource", unique=True)
+    _admin, _game, _league, _season, division, _maps = await setup_league(flow)
+    first = await _staffel(flow, division)
+    second = await _staffel(flow, division)
+    async with mutation_lock(flow.db, tournament_write_resource(second["id"])):
+        refused = await _delete(flow, f"{ADMIN}/divisions/{division['id']}")
+    assert refused.status_code == 409
+    assert refused.json()["detail"] == league_service.STAFFEL_BUSY
+    assert await flow.db.tournaments.count_documents({"id": {"$in": [first["id"], second["id"]]}}) == 2
+    assert await flow.db.league_divisions.count_documents({"id": division["id"]}) == 1
+    assert await flow.db.audit_logs.count_documents({"action": {"$regex": r"\.delete$"}}) == 0
+
+
+@pytest.mark.asyncio
+async def test_each_deleted_staffel_is_logged_on_its_own(flow):
+    _admin, _game, league, season, division, _maps = await setup_league(flow)
+    first = await _staffel(flow, division)
+    second = await _staffel(flow, division)
+    assert (await _delete(flow, f"{ADMIN}/seasons/{season['id']}")).status_code == 200
+    rows = await _audit(flow, "league.staffel.delete")
+    assert sorted(row["target_id"] for row in rows) == sorted([first["id"], second["id"]])
+    assert {(row["data"]["with"], row["data"]["with_id"], row["data"]["reason"]) for row in rows} == {
+        ("league.season.delete", season["id"], REASON["reason"])}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["division", "season", "league"])
+async def test_something_added_meanwhile_stops_before_the_parents_go(flow, monkeypatch, kind):
+    _admin, _game, league, season, division, _maps = await setup_league(flow)
+    staffel = await _staffel(flow, division)
+    real_purge = league_service._purge_staffel
+
+    async def purge_while_someone_adds(db, tournament_id):
+        await real_purge(db, tournament_id)
+        # Gleichzeitig legt jemand etwas an - eine Staffel, eine Liga N oder eine Season.
+        if kind == "division":
+            await db.tournaments.insert_one({"id": "neu", "title": "Neu", "league_context": {
+                "league_id": league["id"], "season_id": season["id"], "division_id": division["id"], "staffel": "B"}})
+        elif kind == "season":
+            await db.league_divisions.insert_one({"id": "neu", "league_id": league["id"], "season_id": season["id"],
+                                                  "level": 2})
+        else:
+            await db.league_seasons.insert_one({"id": "neu", "league_id": league["id"], "number": 2,
+                                                "name": "Season 2", "status": "draft"})
+
+    monkeypatch.setattr(league_service, "_purge_staffel", purge_while_someone_adds)
+    url = {"division": f"{ADMIN}/divisions/{division['id']}", "season": f"{ADMIN}/seasons/{season['id']}",
+           "league": f"{ADMIN}/{league['id']}"}[kind]
+    refused = await _delete(flow, url)
+    assert refused.status_code == 409
+    assert refused.json()["detail"] == league_service.CHANGED_MEANWHILE
+    # Die leere Staffel ist weg und protokolliert, alles darüber bleibt.
+    assert await flow.db.tournaments.count_documents({"id": staffel["id"]}) == 0
+    assert [row["target_id"] for row in await _audit(flow, "league.staffel.delete")] == [staffel["id"]]
+    assert await flow.db.league_divisions.count_documents({"id": division["id"]}) == 1
+    assert await flow.db.league_seasons.count_documents({"id": season["id"]}) == 1
+    assert await flow.db.leagues.count_documents({"id": league["id"]}) == 1
+    parent_action = "league.delete" if kind == "league" else f"league.{kind}.delete"
+    assert await flow.db.audit_logs.count_documents({"action": parent_action}) == 0
+
+
+@pytest.mark.asyncio
+async def test_older_leagues_get_published_at_by_migration(flow):
+    from services import migrations
+
+    await flow.db.leagues.insert_many([{"id": "shown", "slug": "a"}, {"id": "ran", "slug": "b"},
+                                       {"id": "draft", "slug": "c"}, {"id": "known", "slug": "d", "published_at": "x"}])
+    await flow.db.league_seasons.insert_many([
+        {"id": "s1", "league_id": "shown", "visibility": "public", "status": "draft"},
+        {"id": "s2", "league_id": "ran", "visibility": "off", "status": "completed"},
+        {"id": "s3", "league_id": "draft", "visibility": "off", "status": "draft"},
+        {"id": "s4", "league_id": "known", "visibility": "public", "status": "active"}])
+    entry = next(run for version, name, run in migrations.MIGRATIONS if name == "league_published_at")
+    assert await entry(flow.db) == "2 leagues marked as published"
+    stored = {row["id"]: row.get("published_at") for row in await flow.db.leagues.find({}, {"_id": 0}).to_list(None)}
+    assert stored["shown"] and stored["ran"] and stored["draft"] is None and stored["known"] == "x"
+    assert await league_service.slug_locked(flow.db, {"id": "ran", "published_at": stored["ran"]})
+
+
+def test_an_older_season_does_not_pretend_the_default_response_time():
+    assert league_service.effective_settings({"best_of": 3}, None)["match_schedule_response_hours"] is None
+    assert league_service.effective_settings({"match_schedule_response_hours": 48}, None)[
+        "match_schedule_response_hours"] == 48
+    assert league_service.effective_settings({}, {"overrides": {"match_schedule_response_hours": 12}})[
+        "match_schedule_response_hours"] == 12
