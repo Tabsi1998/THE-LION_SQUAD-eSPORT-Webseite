@@ -83,3 +83,18 @@ def test_a_started_step_before_the_break_counts_only_its_free_part():
     due = matchday_schedule.response_deadline(shifted, week_seven.start.replace(minute=0) - timedelta(minutes=30), 1)
     after_break = matchday_schedule.tournament_matchday_window({**shifted, "matchday_blocked_weeks": []}, 9).start
     assert due == after_break + timedelta(minutes=30)
+
+
+def test_the_result_does_not_count_automatically_during_the_break():
+    """Meldung So 20.12. 22:00 (Spieltag 6, Woche endet 22.12. 00:00): Auto-Bestätigung erst nach der Pause."""
+    match = {"id": "m6", "round": 6, "status": "waiting_result",
+             "slots": [{"registration_id": "a"}, {"registration_id": "b"}],
+             "reports": [{"registration_id": "a", "at": "2026-12-20T21:00:00+00:00"}]}
+    due = match_deadlines.auto_confirm_due(match, SEASON_ONE)
+    assert local(due.isoformat()) == "05.01.2027 22:00"  # 2 h vor der Pause + 22 h danach = 24 h Mindestzeit
+    # Ohne Sperrzeiten genau wie bisher: Ende der Spielwoche (mindestens 24 h nach der Meldung).
+    plain = {key: value for key, value in SEASON_ONE.items()
+             if key not in ("matchday_blocked_weeks", "blocked_periods")}
+    assert local(match_deadlines.auto_confirm_due(match, plain).isoformat()) == "22.12.2026 00:00"
+    early = {**match, "round": 2, "reports": [{"registration_id": "a", "at": "2026-11-18T19:00:00+00:00"}]}
+    assert match_deadlines.auto_confirm_due(early, SEASON_ONE) == match_deadlines.auto_confirm_due(early, plain)
