@@ -233,6 +233,7 @@ async def own_match_overviews(db, user: dict, limit: int = 12) -> tuple[list[dic
 
 SCHEDULE_TASK_CLOSED = REPORT_CLOSED_STATUSES | {"in_progress", "waiting_result"}
 LINEUP_TASK_STATUSES = ("completed", "forfeit")
+LINEUP_TASK_LIMIT = 30
 
 
 async def own_match_tasks(db, user: dict, registrations: list[dict]) -> list[dict]:
@@ -254,9 +255,10 @@ async def own_match_tasks(db, user: dict, registrations: list[dict]) -> list[dic
     proposed = await _matches_for_query(
         db, {**sides, "schedule_status": "proposed", "status": {"$nin": sorted(SCHEDULE_TASK_CLOSED)}}, 100)
     # Ohne Maps gibt es nichts nachzutragen - das prüft schon die Abfrage („games.0“).
-    missing = await _matches_for_query(
+    # Index ``lineups_missing`` (database.py); die neuesten Spiele zuerst - ältere sind ohnehin über der Frist.
+    missing = await load_matches_by_query(
         db, {"lineups_missing": {"$in": mine}, "status": {"$in": list(LINEUP_TASK_STATUSES)}, "games.0": {"$exists": True}},
-        100)
+        per_store_limit=LINEUP_TASK_LIMIT, sort=[("completed_at", -1)])
     open_by_match: dict[str, list[dict]] = {}
     if proposed:
         for row in await db.match_schedule_proposals.find(
