@@ -255,7 +255,7 @@ async def _league_entries(db, registrations: list[dict], visible: dict[str, dict
         {"_id": 0}).to_list(50)}
     leagues = {row["id"]: row for row in await db.leagues.find(
         {"id": {"$in": sorted({c.get("league_id") for c in contexts if c.get("league_id")})}},
-        {"_id": 0, "id": 1, "name": 1, "slug": 1, "status": 1}).to_list(50)}
+        {"_id": 0, "id": 1, "name": 1, "slug": 1, "status": 1, "emblem_url": 1}).to_list(50)}
     divisions = {row["id"]: row for row in await db.league_divisions.find(
         {"id": {"$in": sorted({c.get("division_id") for c in contexts if c.get("division_id")})}},
         {"_id": 0, "id": 1, "level": 1, "nickname": 1}).to_list(50)}
@@ -280,6 +280,8 @@ async def _league_entries(db, registrations: list[dict], visible: dict[str, dict
             "league": {"name": league.get("name"), "slug": league.get("slug")},
             "season": {"name": season.get("name"), "slug": season.get("slug")},
             "staffel_label": f"{division_label(division)} · Staffel {staffel}",
+            # Emblem der Season bzw. Liga (#2107), klein vor der Staffel - ohne steht das Liga-Zeichen.
+            "emblem_url": (season.get("emblem_url") or league.get("emblem_url") or None),
             "tournament": {"id": tournament["id"], "slug": tournament.get("slug"), "status": tournament.get("status")},
             "link": link,
         })

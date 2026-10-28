@@ -22,7 +22,7 @@ from zoneinfo import ZoneInfo
 from pymongo.errors import DuplicateKeyError
 
 from models import TournamentCreate, new_id, now_utc
-from services import game_maps, map_pools, pricing, staffel_guard
+from services import game_maps, league_look, map_pools, pricing, staffel_guard
 from services.advancement_draw import sync_advancement_fields
 from services.bracket_fill_in import has_started, is_auto_bye
 from services.competition_versions import new_competition_version_fields
@@ -97,6 +97,16 @@ def _now() -> str:
 def _text(value) -> str | None:
     text = " ".join(str(value or "").split())
     return text or None
+
+
+async def _look(db, body: dict, fields: tuple[str, ...]) -> dict:
+    """Die Gestaltung (#2107) aus ``body`` geprüft - Bilder nur aus der eigenen Mediathek."""
+    try:
+        out = league_look.clean(body, fields)
+        await league_look.check_uploaded(db, out)
+    except league_look.LookProblem as problem:
+        raise LeagueProblem(problem.message) from None
+    return out
 
 
 # ---------------------------------------------------------------- Kalender
@@ -411,7 +421,9 @@ async def create_league(db, body: dict, user: dict) -> dict:
     slug_source = body.get("slug") or game.get("slug") or name
     if slugify(slug_source, fallback="liga") in RESERVED_SLUGS:
         raise LeagueProblem("Diese Kurzadresse ist reserviert - bitte eine andere wählen.")
+    look = await _look(db, {key: value for key, value in body.items() if value is not None}, league_look.LEAGUE_FIELDS)
     doc = {
+        **look,
         "id": new_id(), "name": name,
         "slug": await unique_slug(db.leagues, slug_source, fallback="liga", max_length=80),
         "game_id": game["id"], "participant_kind": "team", "description": _text(body.get("description")),
@@ -454,6 +466,7 @@ async def update_league(db, league: dict, body: dict) -> tuple[dict, list[str]]:
                 raise LeagueProblem(SLUG_LOCKED, 409)
             updates["slug"] = await unique_slug(db.leagues, slug, current_id=league["id"], fallback="liga",
                                                 max_length=80)
+    updates.update(await _look(db, body, league_look.LEAGUE_FIELDS))
     changed = sorted(key for key, value in updates.items() if league.get(key) != value)
     if changed:
         updates["updated_at"] = _now()
@@ -465,7 +478,11 @@ async def update_league(db, league: dict, body: dict) -> tuple[dict, list[str]]:
         # Die Modi gehören zum alten Spiel; den Map-Pool zeigt die Season danach als „anderes Spiel“ (``stale``).
         await db.league_seasons.update_many({"league_id": league["id"], "game_mode_order.0": {"$exists": True}},
                                             {"$set": {"game_mode_order": [], "updated_at": _now()}})
-    return {**league, **updates}, changed
+    doc = {**league, **updates}
+    if league_look.BANNER in changed:
+        for season in await db.league_seasons.find({"league_id": league["id"]}, {"_id": 0}).to_list(None):
+            await apply_banner(db, doc, season)
+    return doc, changed
 
 
 GAME_LOCKED = "Das Spiel bleibt, sobald eine Season eine Staffel hat – bitte eine neue Liga anlegen."
@@ -530,7 +547,8 @@ async def create_season(db, league: dict, body: dict, user: dict) -> dict:
     name = fields.pop("name", None) or f"Season {number}"
     slug = fields.pop("slug", None) or slugify(name, fallback=f"season-{number}", max_length=80)
     await _season_unique(db, league["id"], None, number, slug)
-    doc = {**SEASON_DEFAULTS, **fields}
+    look = await _look(db, {key: value for key, value in body.items() if value is not None}, league_look.SEASON_FIELDS)
+    doc = {**SEASON_DEFAULTS, **fields, **look}
     if doc.get("scoring_rules") is None:
         doc["scoring_rules"] = normalize_rules({})
     if doc.get("min_squad_size") is None:
@@ -557,6 +575,8 @@ async def update_season(db, season: dict, body: dict) -> tuple[dict, list[str]]:
     if "scoring_rules" in fields and fields["scoring_rules"] is None:
         fields["scoring_rules"] = normalize_rules({})
     await _season_unique(db, season["league_id"], season["id"], fields.get("number"), fields.get("slug"))
+    # Gestaltung (#2107): wirkt sofort, braucht kein Übertragen - das Banner geht gleich auf die Staffeln (App).
+    fields.update(await _look(db, body, league_look.SEASON_FIELDS))
     changed = sorted(key for key, value in fields.items() if season.get(key) != value)
     if changed:
         fields["updated_at"] = _now()
@@ -564,7 +584,10 @@ async def update_season(db, season: dict, body: dict) -> tuple[dict, list[str]]:
             await db.league_seasons.update_one({"id": season["id"]}, {"$set": fields})
         except DuplicateKeyError:
             raise LeagueProblem("Diese Season gibt es schon.", 409) from None
-    return {**season, **fields}, changed
+    doc = {**season, **fields}
+    if league_look.BANNER in changed:
+        await apply_banner(db, league, doc)
+    return doc, changed
 
 
 # ---------------------------------------------------------------- Liga N
@@ -581,6 +604,7 @@ async def create_division(db, season: dict, body: dict, user: dict) -> dict:
         "id": new_id(), "league_id": season["league_id"], "season_id": season["id"], "level": int(level),
         "nickname": _text(body.get("nickname")), "overrides": clean_overrides(body.get("overrides"), season),
         "status": body.get("status") or "active",
+        **await _look(db, {key: value for key, value in body.items() if value is not None}, (league_look.PRIZES,)),
         "created_at": _now(), "created_by": user["id"], "updated_at": _now(),
     }
     try:
@@ -599,6 +623,7 @@ async def update_division(db, division: dict, body: dict) -> tuple[dict, list[st
         updates["overrides"] = clean_overrides(body.get("overrides"), season)
     if body.get("status"):
         updates["status"] = body["status"]
+    updates.update(await _look(db, body, (league_look.PRIZES,)))
     changed = sorted(key for key, value in updates.items() if division.get(key) != value)
     if changed:
         updates["updated_at"] = _now()
@@ -819,6 +844,10 @@ async def create_staffel(db, division: dict, staffel: str | None, user: dict) ->
         "partner_ids": [],
         "created_at": _now(), "updated_at": _now(), "created_by": user["id"],
     }
+    banner = league_look.effective_banner_url(league, season)
+    if banner:
+        # Die App zeigt Turnierbanner (#2107): die Staffel trägt das Banner der Season bzw. Liga.
+        doc.update({"banner_url": banner, STAFFEL_BANNER_MARK: banner})
     sync_advancement_fields(doc)
     doc.update(new_competition_version_fields("league"))
     try:
@@ -965,6 +994,30 @@ async def apply_visibility(db, season: dict) -> int:
     return int(getattr(result, "modified_count", 0) or 0)
 
 
+# Woher das Banner einer Staffel kommt (#2107): steht hier dieselbe Adresse wie in ``banner_url``, hat die Liga es
+# gesetzt. Ein eigenes Turnierbanner (anders als die Marke) bleibt beim Wechsel der Gestaltung stehen.
+STAFFEL_BANNER_MARK = "league_banner_url"
+
+
+async def apply_banner(db, league: dict, season: dict) -> int:
+    """Das geltende Banner (Season → Liga) sofort auf die Staffeln der Season - die App zeigt eine Staffel als Turnier
+    mit ihrem Banner. Gibt die Zahl der geänderten Staffeln zurück."""
+    banner = league_look.effective_banner_url(league, season)
+    rows = await db.tournaments.find({"league_context.season_id": season["id"], **ONLY_LEAGUE},
+                                     {"_id": 0, "id": 1, "banner_url": 1, STAFFEL_BANNER_MARK: 1}).to_list(None)
+    changed = 0
+    for row in rows:
+        own = row.get("banner_url")
+        ours = not own or own == row.get(STAFFEL_BANNER_MARK)
+        if not ours or (own or None) == banner:
+            continue
+        update = ({"$set": {"banner_url": banner, STAFFEL_BANNER_MARK: banner, "updated_at": _now()}} if banner
+                  else {"$set": {"banner_url": None, "updated_at": _now()}, "$unset": {STAFFEL_BANNER_MARK: ""}})
+        await db.tournaments.update_one({"id": row["id"]}, update)
+        changed += 1
+    return changed
+
+
 # ---------------------------------------------------------------- Sichtbarkeit (öffentliche Lese-API)
 
 async def can_see_season(user: dict | None, season: dict) -> bool:
@@ -1003,7 +1056,15 @@ def public_season(season: dict) -> dict:
 
 
 def public_league(league: dict) -> dict:
-    return {key: league.get(key) for key in ("id", "slug", "name", "game_id", "participant_kind", "description")}
+    return {key: league.get(key) for key in ("id", "slug", "name", "game_id", "participant_kind", "description",
+                                             league_look.EMBLEM, league_look.ACCENT)}
+
+
+def public_season_head(league: dict, season: dict) -> dict:
+    """Eine Season in der Liste: Kopfdaten, dazu Emblem und Banner, wie sie gezeigt werden (Season → Liga)."""
+    look = league_look.effective(league, season)
+    return {**{key: season.get(key) for key in PUBLIC_SEASON_HEAD}, "emblem_url": look["emblem_url"],
+            "banner": look["banner"]}
 
 
 async def visible_leagues(db, user: dict | None) -> list[dict]:
@@ -1018,7 +1079,7 @@ async def visible_leagues(db, user: dict | None) -> list[dict]:
         if visible:
             game = await _game(db, league.get("game_id"))
             out.append({**public_league(league), "game": map_pools.game_summary(game),
-                        "seasons": [{key: season.get(key) for key in PUBLIC_SEASON_HEAD} for season in visible]})
+                        "seasons": [public_season_head(league, season) for season in visible]})
     return out
 
 
@@ -1050,10 +1111,15 @@ async def public_season_view(db, league_slug: str, season_slug: str, user: dict 
     return {
         "league": {**public_league(league), "game": map_pools.game_summary(game)},
         "season": public_season(season),
+        # Gestaltung (#2107): Emblem und Banner Season → Liga → nichts; Farbe der Liga (leer = Vereinsfarbe).
+        "look": league_look.effective(league, season),
+        # „Um was gespielt wird“ - die Gewinne der Season; eine Liga N mit eigenen trägt sie unter ``prizes``.
+        "prizes": list(season.get(league_look.PRIZES) or []),
         "map_pool": pool,
         "divisions": [{
             "id": division["id"], "level": division["level"], "nickname": division.get("nickname"),
             "label": division_label(division),
+            "prizes": league_look.division_prizes(division),
             "settings": {key: effective_settings(season, division)[key]
                          for key in ("best_of", "team_size", "min_squad_size", "max_staffel_size")},
             "staffeln": [staffel_summary(row) for row in staffeln

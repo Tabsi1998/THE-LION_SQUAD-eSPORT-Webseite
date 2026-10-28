@@ -525,6 +525,7 @@ async def season_meta(db, slug: str, base: dict, origin: str) -> dict:
 async def league_season_meta(db, league_slug: str, season_slug: str, base: dict, origin: str) -> dict:
     """Ligaseite (P5, #1625): öffentlich mit Titel und Zeitraum; „Nur Mitglieder“ als neutrale Karte ohne Index;
     „aus“, „Nur Turnierleitung“ und Unbekanntes 404."""
+    from services.league_look import effective_banner_url
     from services.league_service import season_end
 
     league = await db.leagues.find_one({"slug": league_slug, "status": "active"}, {"_id": 0})
@@ -544,6 +545,10 @@ async def league_season_meta(db, league_slug: str, season_slug: str, base: dict,
     )
     meta = {**base, "title": f"{title} · {base['site_name']}", "description": description, "url": canonical,
             "canonical": canonical, "type": "website"}
+    # Gestaltung (#2107): die Vorschaukarte zeigt das Banner der Season bzw. Liga, sonst das Bild der Seite.
+    banner = effective_banner_url(league, season)
+    if banner:
+        meta["image"] = absolute_url(banner, origin)
     meta["json_ld"] = webpage_json_ld(meta)
     return add_breadcrumbs(meta, origin, [("Liga", "/liga")], title)
 

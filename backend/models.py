@@ -2308,25 +2308,53 @@ class LeagueBlockedPeriod(BaseModel):
         return self
 
 
-class LeagueCreate(BaseModel):
+class LeagueBannerFocus(BaseModel):
+    """Fokuspunkt des Banners (#2107) in Prozent: ``x``/``y`` für den breiten Zuschnitt (Desktop), ``mobile_*`` für
+    den höheren am Handy - der Punkt bleibt beim Zuschneiden sichtbar."""
+    x: int = Field(default=50, ge=0, le=100)
+    y: int = Field(default=50, ge=0, le=100)
+    mobile_x: int = Field(default=50, ge=0, le=100)
+    mobile_y: int = Field(default=50, ge=0, le=100)
+
+
+class LeaguePrize(BaseModel):
+    """Ein Gewinn (#2107): Platz → Preis, optional mit Bild. Reine Anzeige - kein Bezug zu XP oder Pokalen."""
+    place: int = Field(ge=1, le=64)
+    text: str = Field(min_length=1, max_length=160)
+    image_url: Optional[str] = Field(default=None, max_length=300)
+
+
+class LeagueLookFields(BaseModel):
+    """Gestaltung (#2107): Emblem und Banner aus der eigenen Mediathek (geprüft in ``services/league_look.py``)."""
+    emblem_url: Optional[str] = Field(default=None, max_length=300)
+    banner_url: Optional[str] = Field(default=None, max_length=300)
+    banner_focus: Optional[LeagueBannerFocus] = None
+
+
+class LeagueCreate(LeagueLookFields):
     name: str = Field(min_length=2, max_length=80)
     slug: Optional[str] = Field(default=None, max_length=80)
     game_id: str
     participant_kind: Literal["team"] = "team"
     description: Optional[str] = Field(default=None, max_length=2000)
     status: LeagueStatus = "active"
+    accent_color: Optional[str] = Field(default=None, max_length=9)
 
 
-class LeagueUpdate(BaseModel):
+class LeagueUpdate(LeagueLookFields):
     name: Optional[str] = Field(default=None, min_length=2, max_length=80)
     slug: Optional[str] = Field(default=None, max_length=80)
     game_id: Optional[str] = None
     description: Optional[str] = Field(default=None, max_length=2000)
     status: Optional[LeagueStatus] = None
+    # Akzentfarbe je Liga (#2107): „#RRGGBB“, Kontrast prüft der Service; leer = Vereinsfarbe.
+    accent_color: Optional[str] = Field(default=None, max_length=9)
 
 
-class LeagueSeasonFields(BaseModel):
-    """Die Vorgaben einer Season (docs/LIGA.md, Abschnitt 2 und 3) - gemeinsam für Anlegen und Ändern."""
+class LeagueSeasonFields(LeagueLookFields):
+    """Die Vorgaben einer Season (docs/LIGA.md, Abschnitt 2 und 3) - gemeinsam für Anlegen und Ändern. Dazu die
+    Gestaltung (#2107): Emblem und Banner überschreiben die der Liga, ``prizes`` sind die Gewinne der Season."""
+    prizes: Optional[List[LeaguePrize]] = Field(default=None, max_length=20)
     name: Optional[str] = Field(default=None, max_length=80)
     slug: Optional[str] = Field(default=None, max_length=80)
     start_date: Optional[datetime] = None
@@ -2381,12 +2409,15 @@ class LeagueDivisionCreate(BaseModel):
     nickname: Optional[str] = Field(default=None, max_length=40)
     overrides: Optional[LeagueDivisionOverrides] = None
     status: Literal["active", "archived"] = "active"
+    # Eigene Gewinne der Liga N (#2107) - leer heißt: wie die Season.
+    prizes: Optional[List[LeaguePrize]] = Field(default=None, max_length=20)
 
 
 class LeagueDivisionUpdate(BaseModel):
     nickname: Optional[str] = Field(default=None, max_length=40)
     overrides: Optional[LeagueDivisionOverrides] = None
     status: Optional[Literal["active", "archived"]] = None
+    prizes: Optional[List[LeaguePrize]] = Field(default=None, max_length=20)
 
 
 class LeagueStaffelCreate(BaseModel):

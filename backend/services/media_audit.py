@@ -39,6 +39,9 @@ TARGETS: list[tuple[str, list[str]]] = [
     # Logo je Spur und Saison (#2014): bleibt verwendet, solange eine Spur oder Saison es trägt - auch archivierte.
     ("reference_lineages", ["logo_url"]),
     ("reference_series", ["logo_url"]),
+    # Gestaltung der Liga (#2107): Emblem und Banner je Liga und Season.
+    ("leagues", ["emblem_url", "banner_url"]),
+    ("league_seasons", ["emblem_url", "banner_url"]),
 ]
 
 TEXT_TARGETS: list[tuple[str, list[str]]] = [
@@ -66,6 +69,9 @@ USAGE_TARGETS: list[tuple[str, list[str]]] = [
     # Ergebnisblatt kommt immer aus einem Pool-Snapshot oder der Bibliothek - darum zählen diese beiden, die Blätter
     # selbst muss die Mediathek nicht durchsuchen. Eine Map aus einem Spiel lässt sich nicht löschen (``in_results``).
     ("game_maps", ["image_history"]),
+    # Gewinnbilder der Liga (#2107) je Season und Liga N.
+    ("league_seasons", ["prizes.image_url"]),
+    ("league_divisions", ["prizes.image_url"]),
     # Bilder aus der Mitgliederverwaltung je Hintergrund (``services.sponsor_images``).
     *((collection, [f"dolibarr_images.{kind}.{variant}.url" for kind in ("logo", "banner") for variant in ("dark", "light")])
       for collection in ("sponsors", "partners")),
@@ -84,6 +90,7 @@ COLLECTION_LABELS = {
     "club_member_profiles": "Vereinsprofil", "advent_doors": "Adventkalender", "stickers": "Sticker",
     "game_servers": "Spielserver", "game_maps": "Map", "map_pools": "Map-Pool",
     "reference_lineages": "Spur", "reference_series": "Saison",
+    "leagues": "Liga", "league_seasons": "Liga-Season", "league_divisions": "Liga N",
 }
 FIELD_LABELS = {
     "logo_url": "Logo", "logo_light_url": "Logo hell", "logo_dark_url": "Logo dunkel",
@@ -95,7 +102,7 @@ FIELD_LABELS = {
     **{f"award_images.{place}": f"Gewinnerbild Platz {place}" for place in ("1", "2", "3")},
     "tools.image_url": "Bild eines Werkzeugs", "media_url": "Bild oder Video", "url": "Bild",
     "original_url": "Original", "server_icon_url": "Server-Symbol", "modes.maps.image_url": "Bild einer Map",
-    "image_history": "früheres Bild",
+    "image_history": "früheres Bild", "emblem_url": "Emblem", "prizes.image_url": "Bild eines Gewinns",
     **{f"dolibarr_images.{kind}.{variant}.url":
        f"{kind.capitalize()} aus der Mitgliederverwaltung ({'dunkler' if variant == 'dark' else 'heller'} Hintergrund)"
        for kind in ("logo", "banner") for variant in ("dark", "light")},
@@ -130,6 +137,8 @@ SCOPE_TARGETS: list[tuple[str, list[str], str]] = [
     ("club_member_profiles", ["photo_url", "cover_url"], "admin"),
     ("reference_lineages", ["logo_url"], "branding"),
     ("reference_series", ["logo_url"], "branding"),
+    ("leagues", ["emblem_url"], "branding"),
+    ("league_seasons", ["emblem_url"], "branding"),
 ]
 
 TEXT_IMAGE_RE = re.compile(
