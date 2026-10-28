@@ -710,22 +710,110 @@ def pdf_matches(tournament: dict, matches: list, reg_map: dict, pdf_sponsors: li
     return buf.getvalue()
 
 
+def _pdf_number(value) -> str:
+    """Zahlen wie auf der Website: ganze ohne Komma, sonst mit deutschem Komma (Schweizer System: 2,5 Punkte)."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return "0"
+    if float(value).is_integer():
+        return str(int(value))
+    return f"{round(value, 2):g}".replace(".", ",")
+
+
+def _pdf_signed(value) -> str:
+    """Differenz mit Vorzeichen. Das Minus bleibt ein Bindestrich: die PDF-Schrift (Helvetica) kennt das Minuszeichen
+    der Website nicht."""
+    text = _pdf_number(value)
+    if isinstance(value, (int, float)) and value > 0:
+        return f"+{text}"
+    return text
+
+
+def _first(row: dict, *keys):
+    for key in keys:
+        if row.get(key) is not None:
+            return row.get(key)
+    return 0
+
+
+# Spalten der Rangliste je Art (#2121) - dieselben wie in der Tabelle der Website (lib/standingsTable.js).
+_STANDING_COLUMNS = {
+    "league": [("Sp", ("played",), _pdf_number), ("S", ("won",), _pdf_number), ("U", ("drawn",), _pdf_number),
+               ("N", ("lost",), _pdf_number), ("Diff", ("score_diff",), _pdf_signed), ("Pkt", ("points",), _pdf_number)],
+    "swiss": [("Sp", ("played",), _pdf_number), ("S", ("won",), _pdf_number), ("U", ("drawn",), _pdf_number),
+              ("N", ("lost",), _pdf_number), ("BHZ", ("buchholz",), _pdf_number), ("Pkt", ("points",), _pdf_number)],
+    "ffa": [("Sp", ("played",), _pdf_number), ("Siege", ("won", "wins"), _pdf_number),
+            ("Ø Platz", ("avg_rank",), _pdf_number), ("Punkte", ("points",), _pdf_number)],
+    "knockout": [("Siege", ("won", "wins"), _pdf_number), ("Niederlagen", ("lost", "losses"), _pdf_number),
+                 ("Runde", ("furthest_round",), _pdf_number)],
+    # Ohne Turnierbaum (Fast-Lap-Championship): Siege, Niederlagen und Punkte wie bisher.
+    "plain": [("Siege", ("won", "wins"), _pdf_number), ("Niederlagen", ("lost", "losses"), _pdf_number),
+              ("Punkte", ("points",), _pdf_number)],
+}
+
+
+def _standings_kind(tournament: dict, rows: list[dict]) -> str:
+    from services.round_labels import HEAT_FORMATS
+
+    if any("score_diff" in row for row in rows):
+        return "league"
+    if any("buchholz" in row for row in rows):
+        return "swiss"
+    if (tournament or {}).get("format") in HEAT_FORMATS:
+        return "ffa"
+    if any("furthest_round" in row for row in rows):
+        return "knockout"
+    return "plain"
+
+
+def _pdf_group_title(group: dict, index: int) -> str:
+    if group.get("name"):
+        return str(group["name"])
+    return f"Gruppe {str(group['group_key']).upper()}" if group.get("group_key") else f"Gruppe {index + 1}"
+
+
+def _pdf_standings_tables(tournament: dict, rows: list) -> list[dict]:
+    """Die Tabellen des Ergebnis-PDFs (#2121): je Gruppe eine (mit Namen), sonst eine; Spalten je Art der Tabelle, der
+    Namenskopf „Team“ bei Team-Turnieren."""
+    tournament = tournament or {}
+    name_head = "Team" if (tournament.get("team_mode") or "solo") != "solo" else "Name"
+    grouped = [entry for entry in rows or [] if isinstance(entry, dict) and isinstance(entry.get("standings"), list)]
+    sections = (
+        [(_pdf_group_title(entry.get("group") or {}, index), entry["standings"]) for index, entry in enumerate(grouped)]
+        if grouped else [("", [row for row in rows or [] if isinstance(row, dict)])]
+    )
+    tables = []
+    for title, section_rows in sections:
+        columns = _STANDING_COLUMNS[_standings_kind(tournament, section_rows)]
+        tables.append({
+            "title": title,
+            "headers": ["Platz", name_head, *[label for label, _keys, _fmt in columns]],
+            "rows": [
+                [str(row.get("rank", "")), str(row.get("display_name") or "Teilnehmer"),
+                 *[fmt(_first(row, *keys)) for _label, keys, fmt in columns]]
+                for row in section_rows
+            ],
+        })
+    return tables
+
+
 def pdf_standings(tournament: dict, rows: list, pdf_sponsors: list | None = None, pdf_branding: dict | None = None) -> bytes:
     buf = io.BytesIO()
-    doc = _doc(buf, f"Standings - {tournament.get('title','')}", sponsors=pdf_sponsors, branding=pdf_branding)
+    doc = _doc(buf, f"Rangliste - {tournament.get('title','')}", sponsors=pdf_sponsors, branding=pdf_branding)
     styles = _base_styles()
     story = []
-    _header(story, styles, "Standings", tournament.get("title", ""))
-    data = [["Rang", "Spieler", "Siege", "Niederlagen", "Punkte"]]
-    for r in rows:
-        data.append([str(r.get("rank", "")),
-                     r.get("display_name", "—"),
-                     str(r.get("won") or r.get("wins") or 0),
-                     str(r.get("lost") or r.get("losses") or 0),
-                     str(r.get("points") or r.get("furthest_round") or 0)])
-    t = Table(data, colWidths=[1.5 * cm, 8 * cm, 2.5 * cm, 3 * cm, 2.5 * cm], repeatRows=1)
-    t.setStyle(_table_style())
-    story.append(t)
+    _header(story, styles, "Rangliste", tournament.get("title", ""))
+    tables = _pdf_standings_tables(tournament, rows)
+    # A4 hoch: 18 cm Platz - Rang und Zahlen schmal, der Name nimmt den Rest.
+    for table in tables:
+        if table["title"]:
+            story.append(Paragraph(escape(_normalize_pdf_text(table["title"])), styles["TLSSection"]))
+        numbers = len(table["headers"]) - 2
+        number_width = 1.6 * cm if numbers > 3 else 2.6 * cm
+        widths = [1.5 * cm, 18 * cm - 1.5 * cm - numbers * number_width, *[number_width] * numbers]
+        body = table["rows"] or [["", "Noch keine Ergebnisse", *[""] * numbers]]
+        t = Table([table["headers"], *_fit_rows_to_columns(body, widths)], colWidths=widths, repeatRows=1)
+        t.setStyle(_table_style())
+        story.append(t)
     doc.build(story, onFirstPage=_page_bg, onLaterPages=_page_bg)
     return buf.getvalue()
 
