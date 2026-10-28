@@ -226,6 +226,45 @@ test("Farben und Größen wählen zählt die Varianten und schickt Technik, Farb
   expect(screen.getByTestId("shop-variant-PF1")).toHaveTextContent("lieferbar");
 });
 
+const STITCH_OPTIONS = {
+  loaded: true, missing: [], skipped: [],
+  options: [
+    { name: "stitch_color", label: "Nahtfarbe", type: "string", techniques: ["cut-sew"], required: true, selected: "White",
+      values: [{ value: "White", label: "Weiß" }, { value: "Black", label: "Schwarz" }] },
+    { name: "inside_pocket", label: "Innentasche", type: "boolean", techniques: ["cut-sew"], required: false, selected: null,
+      values: [{ value: true, label: "ja" }, { value: false, label: "nein" }] },
+  ],
+};
+
+test("Produktoptionen (#2158): Nahtfarbe in Schritt 2 wählen - gesendet wird der Katalogwert", async () => {
+  const withOptions = view({ extra: { product_options: STITCH_OPTIONS } });
+  apiMock.get.mockResolvedValue({ data: withOptions });
+  apiMock.put.mockResolvedValue({ data: withOptions });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-offer"));
+  const select = screen.getByTestId("shop-offer-option-stitch_color");
+  expect(screen.getByTestId("shop-offer-options")).toHaveTextContent("Nahtfarbe");
+  expect(select).toHaveDisplayValue("Weiß");
+  expect(screen.getByTestId("shop-offer-options-other")).toHaveTextContent("Innentasche");
+  expect(screen.queryByTestId("shop-offer-option-inside_pocket")).toBeNull();
+  await user.selectOptions(select, "Schwarz");
+  await user.click(screen.getByTestId("shop-offer-submit"));
+  expect(apiMock.put).toHaveBeenCalledWith("/admin/shop/products/p1/offer", {
+    technique: "dtg", colors: ["Black", "White"], sizes: ["M", "L"], color_labels: { Black: "", White: "" },
+    product_options: { stitch_color: "Black" }, reason: "",
+  });
+});
+
+test("Produktoptionen noch nicht geladen: Hinweis auf Schritt 1, ohne Auswahl", async () => {
+  apiMock.get.mockResolvedValue({ data: view({ extra: { product_options: { loaded: false, options: [], missing: [], skipped: [] } } }) });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-offer"));
+  expect(screen.getByTestId("shop-offer-options-unknown")).toHaveTextContent("Schritt 1");
+  expect(screen.queryByTestId("shop-offer-options")).toBeNull();
+});
+
 test("Farben heißen deutsch und lassen sich je Produkt anders benennen - der Printful-Name bleibt Schlüssel (#2105)", async () => {
   const german = view({
     product: { offer: { colors: ["Black", "White"], sizes: ["M", "L"], color_labels: { Black: "Tiefschwarz" } } },

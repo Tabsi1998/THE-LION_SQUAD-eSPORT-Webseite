@@ -208,6 +208,8 @@ function formatValue(label, value) {
   if (value === null || value === undefined) return "–";
   if (label.startsWith("Preis:")) return euro(value);
   if (Array.isArray(value)) return value.join(", ");
+  // Produktoptionen (#2158) kommen als Name → Wert, etwa „stitch_color: White“.
+  if (typeof value === "object") return Object.entries(value).map(([key, item]) => `${key}: ${item}`).join(", ");
   return String(value);
 }
 
@@ -531,6 +533,10 @@ export default function AdminShopTestDraftPage() {
                 <div className="min-w-0"><dt className="text-white/50 text-xs">Externe Kennung</dt><dd className="font-mono text-xs break-all">{preview.external_id}</dd></div>
                 <div><dt className="text-white/50 text-xs">Anschrift</dt><dd>{preview.recipient.name}, {preview.recipient.street}{preview.recipient.street2 ? `, ${preview.recipient.street2}` : ""}, {preview.recipient.zip} {preview.recipient.city}, {preview.recipient.country}</dd></div>
                 <div><dt className="text-white/50 text-xs">Gültig bis</dt><dd>{viennaDateTime(preview.expires_at)}</dd></div>
+                {preview.product_options?.length > 0 && (
+                  <div data-testid="shop-test-draft-options"><dt className="text-white/50 text-xs">Produktoptionen (an Printful)</dt>
+                    <dd>{preview.product_options.map((row) => `${row.label}: ${row.value_label}`).join(" · ")}</dd></div>
+                )}
               </dl>
               <h3 className="text-xs font-bold uppercase tracking-wider text-white/60">Druckdateien je Fläche</h3>
               <Files files={preview.files} />
