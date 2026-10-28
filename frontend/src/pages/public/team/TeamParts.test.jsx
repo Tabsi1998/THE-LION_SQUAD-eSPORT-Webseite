@@ -177,6 +177,35 @@ test("Einladen-Suche: Leeren nach einer laufenden Suche zeigt danach keine Treff
   expect(screen.queryByText("@pixelpanther")).toBeNull();
 });
 
+// Offene Einladungen (#2113, L-A1): die Teamleitung sieht, wen sie eingeladen hat, und zieht nach Rückfrage zurück.
+test("offene Einladungen stehen unter der Suche und lassen sich nach Rückfrage zurückziehen", async () => {
+  apiMock.delete = vi.fn().mockResolvedValue({ data: { ok: true } });
+  apiMock.get.mockImplementation((url) => (url === "/teams/t-1/invites"
+    ? Promise.resolve({ data: [{ id: "inv-1", created_at: "2026-10-20T10:00:00Z", user: { id: "u-5", username: "nachtfuchs", display_name: "Nachtfuchs" }, inviter: { id: "u-1", username: "neonfalke", display_name: "NeonFalke" } }] })
+    : Promise.resolve({ data: [] })));
+  render(<InviteMemberPanel team={{ id: "t-1" }} />);
+  const row = await screen.findByTestId("team-pending-invite-inv-1");
+  expect(row).toHaveTextContent("Nachtfuchs");
+  expect(row).toHaveTextContent("eingeladen von NeonFalke");
+
+  confirmMock.mockResolvedValueOnce(false);
+  fireEvent.click(screen.getByTestId("team-pending-invite-withdraw-inv-1"));
+  await waitFor(() => expect(confirmMock).toHaveBeenCalledTimes(1));
+  expect(apiMock.delete).not.toHaveBeenCalled();
+
+  confirmMock.mockResolvedValueOnce(true);
+  fireEvent.click(screen.getByTestId("team-pending-invite-withdraw-inv-1"));
+  await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith("/teams/t-1/invites/inv-1"));
+  await waitFor(() => expect(screen.queryByTestId("team-pending-invites")).toBeNull());
+});
+
+test("ohne offene Einladung kein Abschnitt", async () => {
+  apiMock.get.mockResolvedValue({ data: [] });
+  render(<InviteMemberPanel team={{ id: "t-1" }} />);
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/teams/t-1/invites", expect.anything()));
+  expect(screen.queryByTestId("team-pending-invites")).toBeNull();
+});
+
 test("Einladen-Suche: ein Fehler sagt das, statt „Keine passenden Benutzer“", async () => {
   apiMock.get.mockRejectedValue(Object.assign(new Error("boom"), { response: { status: 500, data: {} } }));
   render(<InviteMemberPanel team={{ id: "t-1" }} />);

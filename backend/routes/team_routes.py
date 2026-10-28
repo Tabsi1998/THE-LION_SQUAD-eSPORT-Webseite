@@ -737,6 +737,69 @@ async def decline_team_invite(invite_id: str, me: dict = Depends(get_current_use
         {"user_id": me["id"], "meta.invite_id": invite_id},
         {"$set": {"read": True}},
     )
+    # Abgelehnt (#2113, L-A1): wer eingeladen hat, erfährt es - sonst wartet die Teamleitung auf eine Antwort.
+    team = await db.teams.find_one({"id": invite.get("team_id")}, {"_id": 0, "id": 1, "name": 1, "tag": 1})
+    inviter_id = invite.get("invited_by")
+    if team and inviter_id and inviter_id != me["id"]:
+        await create_user_notification(
+            inviter_id,
+            title=f"Einladung abgelehnt: [{team.get('tag')}]",
+            body=f"{_user_label(me)} hat die Einladung in {team.get('name')} abgelehnt.",
+            url=f"/teams/{team['id']}",
+            kind="team_invite_declined",
+            meta={"invite_id": invite_id, "team_id": team["id"]},
+        )
+    return {"ok": True}
+
+
+@router.get("/{team_id}/invites")
+async def list_team_invites(team_id: str, me: dict = Depends(get_current_user)):
+    """Offene Einladungen des Teams (#2113, L-A1) - für Leitung und Co-Leitung, damit sie sie sehen und zurückziehen."""
+    db = get_db()
+    team = await db.teams.find_one({"id": team_id}, {"_id": 0})
+    if not team:
+        raise HTTPException(status_code=404, detail="Team nicht gefunden")
+    if not _can_manage(team, me):
+        _refuse(me, "Offene Einladungen sieht nur die Teamleitung.")
+    invites = await db.team_invites.find(
+        {"team_id": team_id, "status": "pending"}, {"_id": 0},
+    ).sort("created_at", -1).to_list(100)
+    people = {row["id"]: row for row in await db.users.find(
+        {"id": {"$in": list({i.get("user_id") for i in invites} | {i.get("invited_by") for i in invites})}},
+        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1},
+    ).to_list(200)}
+    return [{
+        "id": invite["id"],
+        "team_id": team_id,
+        "status": invite.get("status"),
+        "created_at": invite.get("created_at"),
+        "user": _public_user(people.get(invite.get("user_id"))),
+        "inviter": _public_user(people.get(invite.get("invited_by"))),
+    } for invite in invites]
+
+
+@router.delete("/{team_id}/invites/{invite_id}")
+async def withdraw_team_invite(team_id: str, invite_id: str, me: dict = Depends(get_current_user)):
+    """Einladung zurückziehen (#2113, L-A1): Leitung und Co-Leitung. Die Einladung verschwindet aus der Glocke der
+    eingeladenen Person; eine schon beantwortete bleibt, wie sie ist."""
+    db = get_db()
+    team = await db.teams.find_one({"id": team_id}, {"_id": 0})
+    if not team:
+        raise HTTPException(status_code=404, detail="Team nicht gefunden")
+    if not _can_manage(team, me):
+        _refuse(me, "Einladungen zieht nur die Teamleitung zurück.")
+    now = now_utc().isoformat()
+    result = await db.team_invites.update_one(
+        {"id": invite_id, "team_id": team_id, "status": "pending"},
+        {"$set": {"status": "withdrawn", "acted_at": now, "withdrawn_by": me["id"], "updated_at": now}},
+    )
+    if not getattr(result, "modified_count", 0):
+        raise HTTPException(status_code=404, detail="Diese Einladung ist nicht mehr offen.")
+    invite = await db.team_invites.find_one({"id": invite_id}, {"_id": 0, "user_id": 1})
+    await db.notifications.delete_many({"user_id": (invite or {}).get("user_id"), "kind": "team_invite",
+                                        "meta.invite_id": invite_id})
+    from services.change_events import publish_user_change
+    await publish_user_change([(invite or {}).get("user_id")], "teams")
     return {"ok": True}
 
 

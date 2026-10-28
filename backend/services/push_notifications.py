@@ -75,6 +75,7 @@ PUSH_CHANNELS = {
     "friend_accept": "lion_chats",
     "team_invite": "lion_chats",
     "team_invite_accepted": "lion_chats",
+    "team_invite_declined": "lion_chats",
     "team_role_changed": "lion_chats",
     "team_leader_transferred": "lion_chats",
     # Vereinsintern, News, Mitgliedschaft, Rechnungen, Helferdienste.
