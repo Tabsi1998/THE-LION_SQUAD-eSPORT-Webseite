@@ -739,12 +739,7 @@ async def run_check(db, product: dict) -> dict:
     items.append(_item("personalization", "Sichtbarkeit und Personalisierung", not problems,
                        " ".join(problems) or f"{shop_catalog.VISIBILITY_LABELS.get(product.get('visibility'))}, "
                                              f"Personalisierung: {shop_catalog.PERSONALIZATION_LABELS[personalization]}."))
-    if "member_number" in kinds:
-        # Bis die Nummer je Bestellung gedruckt wird (#1727), fiele sie still weg - darum rot: nicht freigeben. Ein
-        # Testentwurf an Printful geht trotzdem (dann ohne Nummer).
-        items.append(_item("member_number_print", "Vereinsnummer im Druck", False,
-                           "Die Vereinsnummer wird noch nicht gedruckt (#1727) – Produkt nicht freigeben. Ein "
-                           "Testentwurf an Printful geht trotzdem, dann ohne Nummer."))
+    # Die Vereinsnummer wird seit #2150 je Bestellung gedruckt (mit Einwilligung) - die Sperre aus #2142 entfällt.
     conversion = await shop_print_files.layout_conversion(db, product) if printful else {"blocked": []}
     if conversion["blocked"]:
         # Alte Platzierungen, die sich nicht abbilden lassen: das ganze Produkt ist nicht bestellbar (fail-closed).

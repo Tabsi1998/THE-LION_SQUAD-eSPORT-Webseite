@@ -33,6 +33,13 @@
   Speicher des Servers. Neue Namen werden wie beim Eintragen offene Teilnehmer der Saison (`reference_participants`,
   Dialog „Unbekannte Namen“); Fremde bleiben extern. Protokoll: `reference_series.partner_source`,
   `reference_partner.import`, je Blatt `reference_result.save` bzw. `.pending_draft` mit `source: "partner"`.
+- Vereinsnummer im Druck (#2150): Druckt ein Shop-Produkt die Vereinsnummer, nimmt die Bestellung die Wunschnummer
+  (#2034) nur mit Einwilligung je Position (Haken im Checkout) – gespeichert mit Zeitpunkt und Textfassung
+  (`shop_order_items.number_consent`). Die Nummer liest der Server aus dem eigenen Spiegel, nie aus der Anfrage und nie
+  die Mitgliedsnummer; nur berechtigte Mitglieder mit vergebener Nummer. Sie geht als Teil der Druckdatei an Printful und
+  ist auf dem Artikel sichtbar. Sehen können sie sonst nur das Mitglied (Auskunft) und die Finanzen (Bestellansicht); nie
+  im Server- oder Adminprotokoll, in Ereignissen oder Mails. Die Nummerndatei (`shop_gamertag_files`, `kind: "number"`)
+  und die Bestelldatei sind personenbezogen wie die Gamertag-Dateien.
 
 ## Konto löschen: was mit welchen Daten passiert
 
@@ -54,6 +61,7 @@ alle Sammlungen im Code und verlangt jede dort – eine neue Sammlung ohne Entsc
 | Einlass bei der Generalversammlung (Anwesenheit am Eingang) | bleibt beim Verein, verliert nur die Verknüpfung zum Konto; wer als Vorstand selbst eingelassen hat, steht dort danach ohne Namen |
 | Mitgliedsanträge | Motivation und Angaben zur Person gelöscht, ein laufender Antrag gilt als zurückgezogen; der Datensatz in der Mitgliederverwaltung bleibt Sache des Vereins |
 | Wunschnummer (#2034) samt Verlauf und Anträgen | gelöscht, die Nummer ist sofort wieder frei. In der Mitgliederverwaltung wird sie gleich mit gelöscht; ist die gerade nicht erreichbar, bleibt bis dahin nur die Mitglieds-ID ohne Konto, ohne Nummer und ohne Verlauf stehen |
+| Shop-Bestellungen: Gamertag und gedruckte Vereinsnummer an der Position, Druckdateien mit Name bzw. Nummer (#1711, #2150) | Gamertag und Nummer an der Position entfernt; der Nachweis der Einwilligung (Zeitpunkt, Textfassung) bleibt ohne Nummer. Druckdateien: Adresse abgeschaltet und Datei gelöscht – braucht ein offener Printful-Auftrag sie noch, erst nach dessen Abschluss (Job `ops_retention`). Mit der Datei gehen alle Angaben, aus denen sich Name oder Nummer durch Durchprobieren zurückrechnen ließen: Prüfsumme (auch an der Bestellposition), Dateigröße, Dateiname, Textbreite und -höhe. Die Zeile bleibt nur als Nachweis „Datei war da, gelöscht am“. Kommt eine Bestellung nicht zustande, sind ihre Dateien sofort weg |
 | Einladungen zur Mitgliedschaft und in Teams, Tokens der Mitgliedskarte, persönlicher Kalender-Link, Zugangslinks, Aufgaben im Turnier- und F1-Team, Captain einer externen Serie, Platz in der Liste „Am Start / Als Nächstes“ einer Fast Lap, Verbindung zur Mitgliederakte samt zwischengespeicherter Ehrungen, die festgehaltene Spiel-ID je Liga-Season samt Freigaben (#2108; Aufstellungen und Ergebnisse bleiben ohne sie) | gelöscht bzw. abgeschaltet |
 | Teilnahme an externen Serien (Turnierserie, Rennliga, Team-Liga), verknüpft mit dem selbst angelegten Eintrag im Mitgliederverzeichnis (#1741) | Ergebnis und Tabelle bleiben; der Teilnehmer gilt danach als extern, sein Name aus der Ergebnisliste des Veranstalters ist ausgeblendet, Aliase auf den Eintrag sind gelöscht. Zeigt die Teilnahme auf einen Eintrag aus der Mitgliederverwaltung oder der Redaktion, bleibt sie damit verknüpft – der Eintrag gehört dem Verein. In der Auskunft stehen Teilnahmen und Aliase an allen eigenen Profilen (`reference_participations`, `reference_aliases`) |
 | Teamzugehörigkeit | bleibt für Teamhistorie und Aufstellungen; das Konto heißt dort „Gelöschter User“ |

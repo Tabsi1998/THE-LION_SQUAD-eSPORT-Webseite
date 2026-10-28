@@ -116,11 +116,31 @@ test("führt Schritt für Schritt bis zur Vorschau - Vereinsadresse vorbelegt, D
   expect(preview).toHaveTextContent("lsw-test-td-1");
   expect(within(screen.getByTestId("shop-test-draft-files")).getAllByRole("listitem")).toHaveLength(2);
   expect(screen.getByTestId("shop-test-draft-files")).toHaveTextContent(`sha256 ${SHA}`);
-  expect(screen.getByTestId("shop-test-draft-files")).toHaveTextContent("mit Gamertag (eigene Datei)");
+  expect(screen.getByTestId("shop-test-draft-files")).toHaveTextContent("eigene Datei mit Gamertag bzw. Nummer");
+  expect(screen.queryByTestId("shop-test-draft-number")).toBeNull();
   expect(screen.getByTestId("shop-test-draft-estimate")).toHaveTextContent("23,94 €");
   expect(screen.getByTestId("shop-test-draft-mockup")).toHaveTextContent("Mockup folgt (#1710).");
   expect(screen.getByTestId("shop-test-draft-steps")).toHaveAttribute("aria-label", "Schritt 5 von 6: Vorschau");
   expect(screen.queryByText(/bestätigen$/i)).toBeNull();
+});
+
+test("ein Produkt mit Vereinsnummer druckt die Beispielnummer - ohne Eingabe, nie die eines Mitglieds (#2150)", async () => {
+  const product = { ...overview().products[0], gamertag: false, member_number: true, sample_number: "99" };
+  apiMock.get.mockResolvedValue({ data: overview({ products: [product] }) });
+  apiMock.post.mockResolvedValue({ data: { ...PREVIEW, with_number: true } });
+  show();
+  await userEvent.selectOptions(await screen.findByTestId("shop-test-draft-product-select"), "p1");
+  await userEvent.click(screen.getByTestId("shop-test-draft-color-White"));
+  await userEvent.click(screen.getByTestId("shop-test-draft-size-M"));
+  const step = screen.getByTestId("shop-test-draft-gamertag");
+  expect(step).toHaveTextContent("Test-Gamertag und Nummer");
+  expect(screen.getByTestId("shop-test-draft-number")).toHaveTextContent("Beispielnummer 99");
+  expect(screen.getByTestId("shop-test-draft-number")).toHaveTextContent("nie die Nummer eines Mitglieds");
+  expect(within(step).queryByRole("textbox")).toBeNull();
+  await userEvent.click(screen.getByTestId("shop-test-draft-preview-button"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/shop/test-drafts/preview", {
+    product_id: "p1", variant_id: "v-wm", gamertag: "", address: ADDRESS,
+  }));
 });
 
 test("senden mit Idempotenzschlüssel, Ergebnis mit Nummer, Dashboard-Link und Ampel, dann löschen mit Bestätigung", async () => {

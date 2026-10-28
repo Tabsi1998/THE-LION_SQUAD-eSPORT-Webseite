@@ -873,9 +873,12 @@ async def _reuse_test_file(db, sha256: str) -> dict | None:
     return {**row, "last_used_at": used}
 
 
+STORE_KINDS = ("gamertag", "number")
+
+
 async def store(db, raw: Any, *, purpose: str, color_key: str | None = None, actor_id: str | None = None,
                 reason: Any = None, user_id: str | None = None, order_id: str | None = None,
-                order_item_id: str | None = None, layer: dict | None = None) -> dict:
+                order_item_id: str | None = None, layer: dict | None = None, kind: str = "gamertag") -> dict:
     """Prüfen, rendern, ablegen. ``purpose``:
 
     - ``test``: Admin, mit Person und Grund im Protokoll. Gleiche Testdatei = dieselbe Zeile und Adresse.
@@ -883,19 +886,32 @@ async def store(db, raw: Any, *, purpose: str, color_key: str | None = None, act
       geteilt, weder mit einer anderen Bestellung noch mit einer Testdatei. Sie gehört zu einem Konto (``user_id``)
       und, sobald bekannt, zu Bestellung und Position; das PNG zeigt den Namen, die Zeile ist personenbezogen.
 
-    ``layer`` (#2105): Texthöhe und Höchstbreite der Ebene in cm (``layer_rules``) - ohne Angabe die globalen Regeln."""
+    ``layer`` (#2105): Texthöhe und Höchstbreite der Ebene in cm (``layer_rules``) - ohne Angabe die globalen Regeln.
+    ``kind = "number"`` (#2150): die Vereinsnummer - nur als Bestelldatei, nur Ziffern, ohne Wortfilter; die Zeile trägt
+    ``kind = "number"`` und ist personenbezogen wie eine Gamertag-Datei (Löschen, Auskunft)."""
     if purpose not in PURPOSES:
         raise ShopError("Unbekannter Zweck der Druckdatei.")
+    if kind not in STORE_KINDS:
+        raise ShopError("Unbekannte Art der Druckdatei.")
+    if kind == "number" and purpose != "order":
+        raise ShopError("Eine Nummerndatei gibt es nur für eine Bestellung.")
     if purpose == "test":
         reason = clean_reason(reason)
         if not actor_id:
             raise ShopError("Ohne Person keine Testdatei.")
     elif not user_id:
         raise ShopError("Eine Bestelldatei gehört zu einem Konto.")
-    rendered, warnings, rules = await _rendered(db, raw, color_key, layer)
+    if kind == "number":
+        # Eine Nummer kommt vom Server (Wunschnummer), nie aus einer Eingabe - kein Wortfilter; Größe und Lage prüft der
+        # Plan der Druckfläche.
+        rules = layer_rules(await load_rules(db), layer)
+        rendered, warnings = await render_async(raw, rules, color_key=color_key, kind="number"), []
+    else:
+        rendered, warnings, rules = await _rendered(db, raw, color_key, layer)
     # Mit eigener Größe, Schrift oder Kontur der Ebene (#2105, #2142) prüft der Plan der Druckfläche, ob der Name
     # hineinpasst - nicht das alte Namensfeld aus #1708.
-    problem = None if has_own_settings(layer, rules) else await _placement_problem(db, rules)
+    problem = (None if kind == "number" or has_own_settings(layer, rules)
+               else await _placement_problem(db, rules))
     if problem:
         raise ShopError(problem)
     row = await _reuse_test_file(db, rendered.sha256) if purpose == "test" else None
@@ -911,6 +927,8 @@ async def store(db, raw: Any, *, purpose: str, color_key: str | None = None, act
                "order_id": order_id if purpose == "order" else None,
                "order_item_id": order_item_id if purpose == "order" else None,
                "created_at": now, "created_by": actor_id if purpose == "test" else None, "last_used_at": now}
+        if kind == "number":
+            row["kind"] = "number"  # Gamertag-Zeilen bleiben ohne Feld - wie vor #2150
         try:
             await db.shop_gamertag_files.insert_one(dict(row))
         except DuplicateKeyError:  # gleichzeitig dieselbe Testdatei - die andere gilt
@@ -1043,15 +1061,23 @@ async def _needed_for_production(db, row: dict) -> bool:
     return bool(order and order.get("printful_order_id") and order.get("status") not in CLOSED_ORDER_STATES)
 
 
+# Was sich aus dem Inhalt der Datei ableiten lässt (#2150): ``render`` ist deterministisch - aus Prüfsumme, Dateigröße,
+# Textbreite oder (bei verkleinertem Text) Texthöhe ließe sich ein Name bzw. eine der höchstens 10.000 Nummern durch
+# Durchprobieren zurückrechnen. Nach dem Löschen bleibt nur: Datei war da (Kennung, Zweck, Art, Maße der Leinwand nach
+# den Regeln, Farbe, Bestellung) und wurde am … gelöscht.
+CONTENT_FIELDS = ("sha256", "size_bytes", "text_width_in", "text_height_in", "scaled")
+
+
 async def _take_off_line(db, row: dict, now: str) -> None:
-    """Adresse abschalten (404) und die Datei löschen; die Zeile bleibt als Nachweis ohne Konto."""
+    """Adresse abschalten (404) und die Datei löschen; die Zeile bleibt als Nachweis ohne Konto - ohne alles, was aus dem
+    Inhalt ableitbar ist (``CONTENT_FIELDS``, #2150)."""
     path = shop_designs._path_of(row.get("file_ref"))
     if path is not None:
         path.unlink(missing_ok=True)
     await db.shop_gamertag_files.update_one(
         {"id": row["id"]},
         {"$set": {"public_disabled_at": now, "file_deleted_at": now, "user_id": None},
-         "$unset": {"erase_pending_at": ""}})
+         "$unset": {"erase_pending_at": "", **{name: "" for name in CONTENT_FIELDS}}})
 
 
 async def erase_for_user(db, user_id: str) -> dict:

@@ -19,8 +19,8 @@ transparentes PNG in der Pixelgröße der Printful-Vorlage (``shop_print_templat
   wird abgelehnt bzw. gewarnt - mit Zahlen in px, cm und Zoll.
 - **Ablage** (``shop_print_files``): wie die Designs (#1708) - eigene Datei, SHA-256, Zufallsschlüssel (256 Bit) für die
   öffentliche Adresse ``/api/shop/print-files/<schlüssel>/<name>.png``. Grunddateien (``purpose = "base"``) je Produkt,
-  Fläche, Farbe (und Varianten-Gruppe) mit Versionen; Bestelldateien (``order``) je Bestellposition mit Gamertag -
-  personenbezogen wie in ``shop_gamertag`` (das PNG zeigt den Namen).
+  Fläche, Farbe (und Varianten-Gruppe) mit Versionen; Bestelldateien (``order``) je Bestellposition mit Gamertag bzw.
+  Vereinsnummer (#2150) - personenbezogen wie in ``shop_gamertag`` (das PNG zeigt Name bzw. Nummer).
 - **Motive**: der Zugriff steht an genau einer Stelle (``_motif_source``/``_motif_png``, Abschnitt „Motive“). Bis die
   Motiv-Bibliothek aus #2069 Teil A da ist, rastert sie die Design-Fassungen aus ``shop_designs``.
 """
@@ -943,7 +943,10 @@ def plan_view(plan: Plan, gamertag_rules: dict | None = None) -> dict:
 def file_name(row: dict) -> str:
     """Name unter der öffentlichen Adresse: Grunddatei mit Fläche, Farbe und Version (Printful lädt eine neue Version
     nicht aus dem Zwischenspeicher), Bestelldatei nur mit dem Anfang der Prüfsumme - nie ein Name."""
-    return row.get("file_name") or f"druck-{row['sha256'][:16]}.png"
+    if row.get("file_name"):
+        return row["file_name"]
+    # Eine gelöschte Bestelldatei hat keine Prüfsumme mehr (#2150) - ihre Adresse ist ohnehin abgeschaltet.
+    return f"druck-{row['sha256'][:16]}.png" if row.get("sha256") else "druck-entfernt.png"
 
 
 def public_path(row: dict) -> str | None:
@@ -1349,13 +1352,25 @@ def measure_pair(width_px: int, height_px: int, dpi: int) -> str:
 
 # ================================================================ Bestellung: Dateien je Position einfrieren
 
+async def prints_number(db, product: dict) -> bool:
+    """Druckt dieses Produkt die Vereinsnummer (#2150) - hat eine Fläche eine Vereinsnummer-Ebene? Nur Produkte mit
+    Druckvorlage bzw. neuem Aufbau; alte Platzierungen ohne Printful-Produkt kennen keine Nummer."""
+    rows = product.get("placements") or []
+    if not rows or (not product.get("printful") and not all(is_layout(row) for row in rows)):
+        return False
+    return any(layer.get("kind") == "member_number" for row in await layout_rows(db, product)
+               for layer in row.get("layers") or [])
+
+
 async def freeze_line(db, product: dict, variant: dict, *, gamertag: str | None, position: int, user_id: str,
-                      order_id: str, item_id: str, printful_variant_id: int | None) -> tuple[list[dict], list[dict]]:
+                      order_id: str, item_id: str, printful_variant_id: int | None,
+                      number: str | None = None) -> tuple[list[dict], list[dict]]:
     """Was eine Bestellposition an Druckdateien einfriert - je Fläche genau eine Datei:
 
-    - ohne Namen die geltende Grunddatei (Fassung mit Prüfsumme), die zum Aufbau und zur Vorlage passen muss;
-    - mit Gamertag eine **eigene** Datei für genau diese Position: Grunddatei plus Gamertag am Anker
-      (``shop_gamertag.store`` legt den Namen als Bestelldatei ab). Personenbezogen: Konto, Bestellung, Position.
+    - ohne Namen und Nummer die geltende Grunddatei (Fassung mit Prüfsumme), die zum Aufbau und zur Vorlage passen muss;
+    - mit Gamertag bzw. Vereinsnummer (#2150) eine **eigene** Datei für genau diese Position: Grunddatei plus Name und
+      Nummer an ihrem Platz (``shop_gamertag.store`` legt beide als Bestelldateien ab). Personenbezogen: Konto,
+      Bestellung, Position. Die Nummer gibt der Server (``jersey_numbers.print_number``), nie die Anfrage.
 
     Liefert (Druckdateien, Motiv-Fassungen). Fehlt etwas: ``ShopError`` - die Position ist dann nicht bestellbar."""
     context = await _context(db, product)
@@ -1386,47 +1401,71 @@ async def freeze_line(db, product: dict, variant: dict, *, gamertag: str | None,
                 _refuse(position, product, variant, area=row["key"],
                         reason="print file missing" if base_row is None else "print file outdated or not on disk")
             sources += [{"placement": row["key"], **item.source.ref} for item in plan.motifs]
-        gamertag_layers = [item for item in plan.texts if item.kind == "gamertag"]
-        if gamertag_layers and not gamertag:
+        if any(item.kind == "gamertag" for item in plan.texts) and not gamertag:
             raise ShopError(f"Position {position}: für dieses Produkt fehlt der Gamertag.")
+        if any(item.kind == "member_number" for item in plan.texts) and not number:
+            raise ShopError(f"Position {position}: für dieses Produkt fehlt die Vereinsnummer.")
         frozen = {"placement": row["key"], "printful_placement": row["key"], "technique": entry["technique"],
                   "group": entry["group"], "width_px": entry["width_px"], "height_px": entry["height_px"],
                   "dpi": entry["dpi"]}
-        if gamertag_layers:
-            personal = await _personal_file(db, product, plan, base_row, gamertag=gamertag, color=color,
-                                            user_id=user_id, order_id=order_id, item_id=item_id,
+        if plan.texts:
+            # Gamertag und Vereinsnummer (#2150) in einer eigenen Datei - auch, wenn die Fläche nur eine Nummer hat.
+            personal = await _personal_file(db, product, plan, base_row, gamertag=gamertag, number=number,
+                                            color=color, user_id=user_id, order_id=order_id, item_id=item_id,
                                             variant=variant, position=position)
             files.append({**frozen, "kind": "personal", "file_id": personal["id"], "version": None,
-                          "sha256": personal["sha256"], "gamertag_file_id": personal["gamertag_file_id"]})
+                          "sha256": personal["sha256"], "gamertag_file_id": personal["gamertag_file_id"],
+                          "number_file_id": personal["number_file_id"]})
         elif base_row is not None:
             files.append({**frozen, "kind": "base", "file_id": base_row["id"], "version": base_row["version"],
                           "sha256": base_row["sha256"]})
-        # Vereinsnummer (#1727): Platzhalter - die Datei kommt mit der Nummer; bis dahin geht nur die Grunddatei.
     return files, sources
 
 
-async def _personal_file(db, product: dict, plan: Plan, base_row: dict | None, *, gamertag: str, color: str,
-                         user_id: str, order_id: str, item_id: str, variant: dict | None = None,
-                         position: int = 1) -> dict:
-    # Farbe und Größe wie im Plan (#2105, #2141): Untergrund aus Hintergrund bzw. Shirtfarbe, die Leinwand der Ebene;
-    # dazu Schrift und Kontur der Ebene (#2142).
-    layer = next(item for item in plan.texts if item.kind == "gamertag")
-    ink = layer.ink or shop_gamertag.inks_for_garment(await shop_gamertag.load_rules(db), color)[0]["key"]
-    stored = await shop_gamertag.store(db, gamertag, purpose="order", color_key=ink, user_id=user_id,
-                                       order_id=order_id, order_item_id=item_id, layer=layer.spec)
-    tag_row = stored["row"]
-    tag_path = shop_designs._path_of(tag_row["file_ref"])
-    if tag_path is None or not tag_path.is_file():
-        # Nie der Gamertag selbst im Log - nur Produkt, Variante, Farbe und Fläche.
-        _refuse(position, product, variant, area=plan.entry["placement"], reason="gamertag file missing on disk")
-    tag_png = tag_path.read_bytes()
-    entry = plan.entry
+async def _personal_file(db, product: dict, plan: Plan, base_row: dict | None, *, gamertag: str | None,
+                         color: str, user_id: str, order_id: str, item_id: str, variant: dict | None = None,
+                         position: int = 1, number: str | None = None) -> dict:
+    """Die eigene Datei einer Fläche: Grunddatei plus jede Textebene der Bestellung - Gamertag und Vereinsnummer
+    (#2150). Je Ebene Farbe und Größe wie im Plan (#2105, #2141): Untergrund aus Hintergrund bzw. Shirtfarbe, die
+    Leinwand der Ebene; dazu Schrift und Kontur der Ebene (#2142) - genau wie die Vorschau. Ebenen mit gleichen Regeln
+    teilen sich eine Datei."""
+    texts = {"gamertag": gamertag, "member_number": number}
+    rendered: dict[str, tuple[dict, bytes]] = {}
+    first: dict[str, str] = {}
+    rules = None
     layers = []
     for item in plan.texts:
-        if item.kind != "gamertag":
-            continue
+        ink = item.ink
+        if ink is None:
+            rules = rules or await shop_gamertag.load_rules(db)
+            ink = shop_gamertag.inks_for_garment(rules, color)[0]["key"]
+        key = json.dumps([item.kind, item.spec, ink], sort_keys=True)
+        if key not in rendered:
+            try:
+                stored = await shop_gamertag.store(db, texts[item.kind], purpose="order", color_key=ink,
+                                                   user_id=user_id, order_id=order_id, order_item_id=item_id,
+                                                   layer=item.spec, kind=RENDER_KINDS[item.kind])
+            except shop_gamertag.RenderBusy:
+                raise
+            except ShopError as exc:
+                if item.kind == "gamertag":
+                    raise  # den Namen kann die Kundschaft ändern - die Meldung sagt, was nicht passt
+                # Die Nummer wählt niemand im Checkout: passt sie nicht in die Ebene, ist das ein Fehler im Aufbau -
+                # nicht bestellbar, der Grund (ohne Nummer) im Log und in der Vorab-Prüfung.
+                _refuse(position, product, variant, area=plan.entry["placement"],
+                        reason=f"member number does not fit: {exc}")
+            text_row = stored["row"]
+            text_path = shop_designs._path_of(text_row["file_ref"])
+            if text_path is None or not text_path.is_file():
+                # Nie Gamertag oder Nummer selbst im Log - nur Produkt, Variante, Farbe und Fläche.
+                _refuse(position, product, variant, area=plan.entry["placement"],
+                        reason=f"{item.kind} file missing on disk")
+            rendered[key] = (text_row, text_path.read_bytes())
+            first.setdefault(item.kind, text_row["id"])
         left, top, width, height = item.box.rounded()
-        layers.append(Layer(png=tag_png, left=left, top=top, width=width, height=height, label="Gamertag"))
+        layers.append(Layer(png=rendered[key][1], left=left, top=top, width=width, height=height,
+                            label=SHORT_LABELS[item.kind]))
+    entry = plan.entry
     base_png = None
     if base_row is not None:
         base_path = shop_designs._path_of(base_row["file_ref"])
@@ -1440,8 +1479,8 @@ async def _personal_file(db, product: dict, plan: Plan, base_row: dict | None, *
         "color": color, "color_key": _color_key(color), "width_px": composed.width_px,
         "height_px": composed.height_px, "dpi": composed.dpi, "layout_hash": plan.layout_hash,
         "template_hash": plan.template_hash, "base_file_id": (base_row or {}).get("id"),
-        "gamertag_file_id": tag_row["id"], "user_id": user_id, "order_id": order_id, "order_item_id": item_id,
-        "created_by": None, "file_name": None})
+        "gamertag_file_id": first.get("gamertag"), "number_file_id": first.get("member_number"), "user_id": user_id,
+        "order_id": order_id, "order_item_id": item_id, "created_by": None, "file_name": None})
     row["file_name"] = file_name(row)
     return row
 
@@ -1472,13 +1511,27 @@ async def discard_order_files(db, order_id: str) -> int:
 
 # ================================================================ Kontolöschung (Bestelldateien zeigen den Namen)
 
+# Aus dem Inhalt ableitbar (#2150): Prüfsumme, Dateigröße und der Name „druck-<prüfsumme>.png“ - wie bei
+# ``shop_gamertag.CONTENT_FIELDS`` ließen sich Name bzw. Nummer daraus durch Durchprobieren zurückrechnen.
+CONTENT_FIELDS = ("sha256", "size_bytes", "file_name")
+
+
 async def _take_off_line(db, row: dict, now: str) -> None:
+    """Adresse abschalten, Datei löschen; die Zeile bleibt als Nachweis ohne Konto und ohne ``CONTENT_FIELDS`` - auch
+    die Prüfsumme an der Bestellposition (``print_files[].sha256``) geht. Nach dem Löschen braucht sie kein Ablauf mehr:
+    die Datei ist weg, Printful hat den Auftrag abgeschlossen (sonst stünde die Löschung noch aus)."""
     path = shop_designs._path_of(row.get("file_ref"))
     if path is not None:
         path.unlink(missing_ok=True)
     await db.shop_print_files.update_one(
         {"id": row["id"]}, {"$set": {"public_disabled_at": now, "file_deleted_at": now, "user_id": None},
-                            "$unset": {"erase_pending_at": ""}})
+                            "$unset": {"erase_pending_at": "", **{name: "" for name in CONTENT_FIELDS}}})
+    if row.get("order_item_id"):
+        item = await db.shop_order_items.find_one({"id": row["order_item_id"]}, {"_id": 0, "print_files": 1})
+        files = (item or {}).get("print_files") or []
+        if any(entry.get("file_id") == row["id"] for entry in files):
+            cleared = [{**entry, "sha256": None} if entry.get("file_id") == row["id"] else entry for entry in files]
+            await db.shop_order_items.update_one({"id": row["order_item_id"]}, {"$set": {"print_files": cleared}})
 
 
 async def erase_for_user(db, user_id: str) -> dict:
