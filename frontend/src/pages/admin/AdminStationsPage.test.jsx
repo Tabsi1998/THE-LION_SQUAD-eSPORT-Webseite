@@ -24,7 +24,7 @@ vi.mock("@/components/tls/results/ResultWindow", () => ({ ResultWindowLoader: ()
 vi.mock("@/components/tls/results/ResultUndoBar", () => ({ ResultUndoBar: () => null, useResultUndo: () => ({ pending: null, show: () => {} }) }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), message: vi.fn() } }));
 
-const { default: AdminStationsPage } = await import("./AdminStationsPage");
+const { default: AdminStationsPage, preferredStationTournament, stationTournamentGroups } = await import("./AdminStationsPage");
 
 const MATCH = { id: "m1", match_key: "A1", status: "ready", station_id: null, round: 1, slots: [{ slot: 1, registration_id: "r1" }, { slot: 2, registration_id: "r2" }] };
 
@@ -124,4 +124,21 @@ test("Stationen und Spiele bleiben live: Änderungsstrom mit Ersatz-Takt", async
   await screen.findByTestId("stations-plan-schedule");
   const resources = liveRefresh.mock.calls.map(([, list, options]) => ({ list: list.join(","), fallback: options?.fallbackMs }));
   expect(resources).toContainEqual({ list: "stations,matches,tournaments", fallback: 15000 });
+});
+
+// Stationen-Seite (#2111, TA26): Turniere vor Ort und hybrid stehen oben, vorgewählt ist ein laufendes; Online- und
+// beendete Turniere folgen unter „Weitere Turniere“ statt vorgewählt zu sein.
+test("Stationen: vor Ort zuerst, ein laufendes vorgewählt, online und beendet dahinter", () => {
+  const rows = [
+    { id: "neu-online", event_mode: "online", status: "draft" },
+    { id: "vorbei", event_mode: "local", status: "completed" },
+    { id: "geplant", event_mode: "hybrid", status: "registration_open" },
+    { id: "laeuft", event_mode: "local", status: "live" },
+  ];
+  const { onsite, others } = stationTournamentGroups(rows);
+  expect(onsite.map((row) => row.id)).toEqual(["geplant", "laeuft"]);
+  expect(others.map((row) => row.id)).toEqual(["neu-online", "vorbei"]);
+  expect(preferredStationTournament(rows)).toBe("laeuft");
+  expect(preferredStationTournament(rows, "vorbei")).toBe("vorbei");
+  expect(preferredStationTournament([rows[0]])).toBe("neu-online");
 });
