@@ -29,7 +29,7 @@ import { checkInState } from "@/lib/checkInTimes";
 import { tournamentIsOver } from "@/lib/afterEnd";
 import { renderMarkdownLite } from "@/lib/markdownLite";
 import { seoTextPreview } from "@/lib/textPreview";
-import { formatTeamMode, formatTournamentDisplay } from "@/lib/tournamentLabels";
+import { formatTeamMode, formatTournamentDisplay, hasBracketTree, runningMainView } from "@/lib/tournamentLabels";
 import { gameLabel } from "@/lib/gameLabels";
 import { formatCents, startFeeSummary } from "@/lib/pricing";
 import { TournamentTabs } from "@/components/tls/tournament/TournamentTabs";
@@ -331,6 +331,10 @@ function TournamentDetailView() {
   } else if (finished) {
     primaryKey = "standings";
     primaryAction = <Link to={subPage("standings")} data-testid="tournament-standings-link" className={`${primaryClass} tls-btn tls-btn--primary`}>Rangliste</Link>;
+  } else if (t.started && runningMainView(t) === "standings") {
+    // Ohne Baum oder mit Tabelle zuerst (#2124): im laufenden Turnier ist die Rangliste die Hauptaktion.
+    primaryKey = "standings";
+    primaryAction = <Link to={subPage("standings")} data-testid="tournament-standings-link" className={`${primaryClass} tls-btn tls-btn--primary`}>Rangliste</Link>;
   } else if (t.started) {
     primaryKey = "bracket";
     primaryAction = <Link to={subPage("bracket")} data-testid="tournament-bracket-link" className={`${primaryClass} tls-btn tls-btn--primary`}>Turnierbaum</Link>;
@@ -430,7 +434,7 @@ function TournamentDetailView() {
           <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3" data-testid="tournament-actions">
             {primaryAction}
             <div className="flex flex-wrap items-center gap-4 text-xs font-bold uppercase tracking-wider">
-              {primaryKey !== "bracket" && <Link to={subPage("bracket")} data-testid="tournament-bracket-link" className="tls-hit text-white/70 hover:text-[#29B6E8]">Turnierbaum</Link>}
+              {primaryKey !== "bracket" && hasBracketTree(t) && <Link to={subPage("bracket")} data-testid="tournament-bracket-link" className="tls-hit text-white/70 hover:text-[#29B6E8]">Turnierbaum</Link>}
               {primaryKey !== "schedule" && <Link to={subPage("matches")} data-testid="tournament-schedule-link" className="tls-hit text-white/70 hover:text-[#29B6E8]">Spielplan</Link>}
               {primaryKey !== "standings" && <Link to={subPage("standings")} data-testid="tournament-standings-link" className="tls-hit text-white/70 hover:text-[#29B6E8]">Rangliste</Link>}
               {t.stream_link && <a href={t.stream_link} target="_blank" rel="noreferrer" data-testid="tournament-stream-link" className="inline-flex items-center gap-1 text-[#FF3B30] hover:text-white"><Radio className="w-3.5 h-3.5" /> Stream</a>}

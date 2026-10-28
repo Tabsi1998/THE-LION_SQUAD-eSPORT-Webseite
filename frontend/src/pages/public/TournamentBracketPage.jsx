@@ -13,7 +13,7 @@ import { useChangedKeys } from "@/hooks/useLiveChanges";
 import { matchResultSignature } from "@/lib/liveChanges";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { formatTournamentDisplay } from "@/lib/tournamentLabels";
+import { formatTournamentDisplay, hasBracketTree } from "@/lib/tournamentLabels";
 import { seoTextPreview } from "@/lib/textPreview";
 import { Tv } from "lucide-react";
 
@@ -71,6 +71,7 @@ export default function TournamentBracketPage() {
   }
   const t = data.tournament;
   const tournamentUrl = `/tournaments/${t.slug || t.id}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`;
+  const standingsUrl = `/tournaments/${t.slug || t.id}/standings${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`;
 
   return (
     <PublicLayout>
@@ -104,7 +105,13 @@ export default function TournamentBracketPage() {
           )}
           </div>
         </div>
-        {(data.matches_v2?.length || 0) === 0 ? (
+        {!hasBracketTree(t) && (data.matches_v2?.length || 0) === 0 ? (
+          // Ohne Turnierbaum (#2124): Zeitfahren und Rennserie bekommen nie einen - der Weg zur Rangliste.
+          <div className="border border-white/10 rounded-sm bg-surface-1 p-12 text-center" data-testid="bracket-no-tree">
+            <p className="text-muted-text">Bei diesem Format gibt es keinen Turnierbaum – den Stand zeigt die Rangliste.</p>
+            <Link to={standingsUrl} className="tls-btn tls-btn--secondary mt-4 inline-flex px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">Zur Rangliste</Link>
+          </div>
+        ) : (data.matches_v2?.length || 0) === 0 ? (
           <div className="border border-white/10 rounded-sm bg-surface-1 p-12 text-center">
             <div className="text-muted-text font-display tracking-widest">TURNIERBAUM WURDE NOCH NICHT GENERIERT</div>
           </div>

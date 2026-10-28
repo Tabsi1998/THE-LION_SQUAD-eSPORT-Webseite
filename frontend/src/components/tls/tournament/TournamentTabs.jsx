@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { GitBranch, LayoutList, ListOrdered, Shield, Trophy, Users } from "lucide-react";
 import { useLeagueTrail } from "@/hooks/useLeagueTrail";
+import { hasBracketTree } from "@/lib/tournamentLabels";
 
 // Turnierseite (#401): eine Reihe Reiter statt sechs gleich schwerer Knöpfe - Übersicht, Teilnehmer, Spielplan,
 // Rangliste, Turnierbaum. Die Unterseiten bleiben eigene Adressen; die Reiter stehen auf allen gleich.
@@ -14,7 +15,8 @@ export function tournamentTabs(t, accessToken = "", participantCount = null, tra
     { key: "participants", label: participantCount === null ? "Teilnehmer" : `Teilnehmer (${participantCount})`, to: `${base}${suffix}#teilnehmer`, icon: Users, match: () => false },
     { key: "schedule", label: "Spielplan", to: `${base}/matches${suffix}`, icon: ListOrdered, match: (path) => path.endsWith("/matches") },
     { key: "standings", label: "Rangliste", to: `${base}/standings${suffix}`, icon: Trophy, match: (path) => path.endsWith("/standings") },
-    { key: "bracket", label: "Turnierbaum", to: `${base}/bracket${suffix}`, icon: GitBranch, match: (path) => path.endsWith("/bracket") },
+    // Ohne Turnierbaum (#2124): Jeder gegen jeden, Liga, Zeitfahren, Rennserie - dort kein Reiter „Turnierbaum“.
+    ...(hasBracketTree(t) ? [{ key: "bracket", label: "Turnierbaum", to: `${base}/bracket${suffix}`, icon: GitBranch, match: (path) => path.endsWith("/bracket") }] : []),
   ];
   if (trail?.staffelHref) {
     tabs.push({ key: "league", label: "Liga", to: trail.staffelHref, icon: Shield, match: () => false });

@@ -364,3 +364,21 @@ export function stationText(match) {
   const station = name.length <= 3 && !/\bstation\b/i.test(name) ? `Station ${name}` : name;
   return deviceName && !station.toLowerCase().includes(deviceName.toLowerCase()) ? `${station} · ${deviceName}` : station;
 }
+
+// ---------------------------------------------------------------- Turnierbaum je Format (#2124, TP14)
+// Jeder gegen jeden, Liga, Zeitfahren und Rennserie haben keinen Turnierbaum - dort gibt es den Reiter nicht, und im
+// laufenden Turnier ist die Rangliste die Hauptaktion. Schweizer System und Gruppen haben eine Tabelle zuerst (der Baum
+// kommt erst mit einer K.-o.-Phase danach).
+const NO_TREE_FORMATS = new Set(["round_robin", "league", "time_trial", "grand_prix"]);
+const TABLE_FIRST_FORMATS = new Set(["swiss", "groups"]);
+
+/** Hat das Turnier einen Turnierbaum, den man ansehen kann? */
+export function hasBracketTree(tournament) {
+  return !NO_TREE_FORMATS.has(String(tournament?.format || ""));
+}
+
+/** Die Hauptansicht im laufenden Turnier: „bracket“ (Turnierbaum) oder „standings“ (Rangliste bzw. Tabelle). */
+export function runningMainView(tournament) {
+  const format = String(tournament?.format || "");
+  return NO_TREE_FORMATS.has(format) || TABLE_FIRST_FORMATS.has(format) ? "standings" : "bracket";
+}

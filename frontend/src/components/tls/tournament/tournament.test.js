@@ -92,3 +92,12 @@ test("tournamentTabs tragen den Zugangscode weiter und zählen Teilnehmer", () =
   expect(tabs.find((t) => t.key === "overview").match("/tournaments/cup/bracket")).toBe(false);
   expect(tournamentTabs({ id: "t1" })[0].to).toBe("/tournaments/t1");
 });
+
+test("ohne Turnierbaum (#2124): Jeder gegen jeden, Liga, Zeitfahren und Rennserie haben keinen Reiter „Turnierbaum“", () => {
+  for (const format of ["round_robin", "league", "time_trial", "grand_prix"]) {
+    expect(tournamentTabs({ id: "t1", slug: "cup", format }).map((tab) => tab.key)).not.toContain("bracket");
+  }
+  for (const format of ["single_elim", "double_elim", "swiss", "groups", "ffa", undefined]) {
+    expect(tournamentTabs({ id: "t1", slug: "cup", format }).map((tab) => tab.key)).toContain("bracket");
+  }
+});

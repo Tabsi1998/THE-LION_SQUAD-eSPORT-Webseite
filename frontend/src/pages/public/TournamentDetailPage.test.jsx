@@ -623,3 +623,16 @@ test("Check-in-Ende vorbei (#2124): statt „Check-in“ steht „Check-in vorbe
     unmount();
   }
 });
+test("im laufenden Turnier ohne Baum oder mit Tabelle zuerst (#2124): „Rangliste“ ist die Hauptaktion, kein Link „Turnierbaum“", async () => {
+  mockApi({ ...base, ...DATES, status: "live", started: true, format: "round_robin", public_phase: { state: "live", label: "Live" } });
+  const { unmount } = renderPage();
+  const actions = await screen.findByTestId("tournament-actions");
+  expect(actions.querySelector("a[data-testid='tournament-standings-link']")).toHaveClass("tls-btn--primary");
+  expect(screen.queryByTestId("tournament-bracket-link")).toBeNull();
+  unmount();
+  mockApi({ ...base, ...DATES, status: "live", started: true, format: "swiss", public_phase: { state: "live", label: "Live" } });
+  renderPage();
+  const swiss = await screen.findByTestId("tournament-actions");
+  expect(swiss.querySelector("a[data-testid='tournament-standings-link']")).toHaveClass("tls-btn--primary");
+  expect(swiss.querySelector("a[data-testid='tournament-bracket-link']")).not.toHaveClass("tls-btn--primary");
+});

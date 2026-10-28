@@ -203,6 +203,16 @@ describe("Runden, Freilos, Karten, Pokal", () => {
     expect(hint.querySelector("a[href='/tournaments/herbst-cup/standings']")).not.toBeNull();
     expect(hint.querySelector("a[href='/tournaments/herbst-cup/matches']")).not.toBeNull();
     expect(screen.queryByTestId("bracket-tree")).toBeNull();
+    expect(screen.getByTestId("bracket-table-hint-text")).toHaveTextContent("Hier spielt jeder gegen jeden");
+  });
+
+  it("Schweizer System (#2124): der Hinweis behauptet nicht „jeder gegen jeden“", () => {
+    const data = league(4);
+    data.matches_v2.forEach((match) => { match.stage_type = "swiss"; });
+    render(<BracketTree data={data} layout="tree" />);
+    expect(screen.getByTestId("bracket-table-hint")).toHaveTextContent("Schweizer System");
+    expect(screen.getByTestId("bracket-table-hint-text")).toHaveTextContent("gleich vielen Punkten");
+    expect(screen.getByTestId("bracket-table-hint-text")).not.toHaveTextContent("jeder gegen jeden");
   });
 });
 
