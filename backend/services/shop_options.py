@@ -33,6 +33,13 @@ LABELS = {
     "license_type": "Lizenz",
 }
 MISSING = "Produktoptionen von Printful noch nicht geladen - in Schritt 1 das Printful-Produkt neu laden."
+# Pflichtoptionen, die der Printful-Katalog nicht immer nennt: Das Allover-Trikot (Katalogprodukt 644, Zuschnitt und
+# Naht) liefert in ``product_options`` nur ``notes`` - Schätzung und Auftrag verlangen trotzdem ``stitch_color``. Fehlt
+# die Option im Katalog, gilt diese Vorgabe je Technik (Werte wie in der Printful-Doku: weiße oder schwarze Naht).
+FALLBACK = {
+    "stitch_color": {"name": "stitch_color", "type": "string", "values": ["white", "black"],
+                     "techniques": ["cut-sew"]},
+}
 
 
 def label(name: str) -> str:
@@ -48,28 +55,44 @@ def value_label(value: Any) -> str:
     return str(value)
 
 
-def catalog(product: dict) -> list[dict]:
+def _technique(product: dict) -> str | None:
+    printful = product.get("printful") or {}
+    return product.get("technique") or printful.get("default_technique")
+
+
+def catalog(product: dict, *, technique: str | None = None) -> list[dict]:
     """Die Optionen aus dem Abzug des Printful-Produkts - leer, wenn das Produkt keine hat oder vor #2158 geladen
-    wurde (``loaded`` sagt, welches von beiden)."""
+    wurde (``loaded`` sagt, welches von beiden). Dazu die Pflichtoptionen aus ``FALLBACK``, die der Katalog für die
+    Technik nicht nennt (``fallback: True``)."""
+    if not product.get("printful"):
+        return []
     rows = (product.get("printful") or {}).get("options")
-    return [row for row in rows or [] if isinstance(row, dict) and row.get("name") and row.get("values")]
+    found = [row for row in rows or [] if isinstance(row, dict) and row.get("name") and row.get("values")]
+    names = {row["name"] for row in found}
+    technique = technique or _technique(product)
+    for name in REQUIRED:
+        extra = FALLBACK.get(name)
+        if name not in names and extra and technique in extra["techniques"]:
+            found.append({**extra, "values": list(extra["values"]), "fallback": True})
+    return found
 
 
 def loaded(product: dict) -> bool:
     return isinstance((product.get("printful") or {}).get("options"), list)
 
 
-def required(product: dict) -> list[dict]:
-    return [row for row in catalog(product) if row["name"] in REQUIRED]
+def required(product: dict, *, technique: str | None = None) -> list[dict]:
+    return [row for row in catalog(product, technique=technique) if row["name"] in REQUIRED]
 
 
-def clean_choice(product: dict, raw: Any, *, previous: dict | None = None) -> dict:
+def clean_choice(product: dict, raw: Any, *, previous: dict | None = None, technique: str | None = None) -> dict:
     """Die Wahl in Schritt 2: je Pflichtoption ein Wert aus dem Katalog. Ohne Angabe bleibt die bisherige Wahl, sonst
-    der erste erlaubte Wert. Unbekannte Optionen oder Werte lehnt der Server ab."""
+    der erste erlaubte Wert. Unbekannte Optionen oder Werte lehnt der Server ab. ``technique`` ist die Technik, die
+    Schritt 2 gerade speichert (sonst die des Produkts)."""
     if raw is not None and not isinstance(raw, dict):
         raise ShopError("Produktoptionen: Name und Wert.")
     raw = dict(raw or {})
-    options = {row["name"]: row for row in required(product)}
+    options = {row["name"]: row for row in required(product, technique=technique)}
     unknown = sorted(set(raw) - set(options))
     if unknown:
         raise ShopError(f"Diese Produktoption kennt das Printful-Produkt nicht: {', '.join(unknown)}.")

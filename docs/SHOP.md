@@ -665,6 +665,10 @@ schon die Kostenschätzung ab („The required product option: `stitch_color` is
   `shop_options.REQUIRED` - bisher die Nahtfarbe `stitch_color` (aus der Fehlermeldung von Printful); weitere kommen dazu,
   sobald Printful sie verlangt. Sie gehen immer mit, unabhängig von der Technik. Andere Optionen (etwa Innentasche) zeigt
   Schritt 2 nur als Hinweis - sie werden nicht gesendet, es gilt die Vorgabe von Printful.
+- **Katalog ohne Nahtfarbe:** Der Katalog nennt die Pflichtoption nicht immer - das Allover-Trikot (Katalogprodukt 644)
+  liefert nur `notes`, die Schätzung verlangt trotzdem `stitch_color`. Für Zuschnitt und Naht (`cut-sew`) gilt dann die
+  Vorgabe `shop_options.FALLBACK` (`white` / `black`, wie in der Printful-Doku). Schritt 2 zeigt die Auswahl, ohne Wahl
+  ist die Position nicht bestellbar. Nach dem Deploy: Schritt 2 einmal speichern („Speichern und Preise laden“).
 - **Schritt 2:** je Pflichtoption eine Auswahl mit deutscher Bezeichnung („Nahtfarbe: Weiß / Schwarz“), Vorgabe der
   erste erlaubte Wert. Gespeichert am Angebot (`offer.options`, Protokoll `shop.product.offer`); nur Werte aus dem
   Katalog (`PUT …/offer` mit `product_options`). Fehlt eine Pflichtoption, ist der Prüfpunkt **Produktoptionen von

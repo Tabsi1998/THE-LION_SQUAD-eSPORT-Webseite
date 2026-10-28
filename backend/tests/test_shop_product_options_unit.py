@@ -11,7 +11,8 @@ import pytest
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from printful_fake import API_KEY  # noqa: E402
-from services import printful_client, shop_catalog, shop_orders, shop_products, shop_test_drafts  # noqa: E402
+from services import (  # noqa: E402
+    printful_client, shop_catalog, shop_options, shop_orders, shop_products, shop_test_drafts)
 from services.shop_common import ShopError  # noqa: E402
 from services.shop_fulfillment import (  # noqa: E402
     CatalogProductId, CatalogVariantId, DraftLine, FulfillmentInvalid, Placement)
@@ -188,6 +189,43 @@ async def test_the_test_draft_sends_shows_and_compares_the_options(db, provider,
     assert call["body"] == shown["payload"]
     row = next(row for row in sent["deviations"] if row["label"] == "Position 1: Produktoptionen")
     assert row["level"] == "ok" and row["printful"] == {"stitch_color": "White"}
+
+
+def allover(options=None, *, technique="cut-sew", chosen=None) -> dict:
+    """Wie das Allover-Trikot (Katalogprodukt 644): Printful nennt im Katalog nur ``notes``, keine Nahtfarbe."""
+    notes = {"name": "notes", "techniques": ["cut-sew"], "type": "string", "values": ["Hinweis"]}
+    return {"printful": {"options": [notes] if options is None else options, "techniques": ["cut-sew", "dtg"],
+                         "default_technique": "cut-sew"},
+            "technique": technique, "offer": {"options": chosen} if chosen else {}}
+
+
+def test_cut_and_sew_requires_the_stitch_colour_even_when_the_catalog_does_not_name_it():
+    product = allover()
+    assert [row["name"] for row in shop_options.required(product)] == ["stitch_color"]
+    assert shop_options.problems(product) == ["Nahtfarbe fehlt"]
+    with pytest.raises(ShopError, match="Nahtfarbe fehlt"):
+        shop_options.line_options(product)
+    assert shop_options.clean_choice(product, None) == {"stitch_color": "white"}, "Vorgabe: der erste Wert"
+    assert shop_options.clean_choice(product, {"stitch_color": "black"}) == {"stitch_color": "black"}
+    with pytest.raises(ShopError):
+        shop_options.clean_choice(product, {"stitch_color": "Rosa"})
+    chosen = allover(chosen={"stitch_color": "black"})
+    assert shop_options.line_options(chosen) == (("stitch_color", "black"),)
+    view = shop_options.view(chosen)
+    stitch = next(row for row in view["options"] if row["name"] == "stitch_color")
+    assert stitch["required"] is True and stitch["selected"] == "black" and view["missing"] == []
+    assert [row["label"] for row in stitch["values"]] == ["Weiß", "Schwarz"]
+
+
+def test_the_stitch_colour_fallback_only_applies_to_cut_and_sew_and_never_doubles_the_catalog():
+    assert shop_options.required(allover(technique="dtg")) == []
+    # Schritt 2 speichert gerade Zuschnitt und Naht - die Technik des Aufrufs zählt, nicht die gespeicherte.
+    assert [row["name"] for row in shop_options.required(allover(technique="dtg"), technique="cut-sew")] == [
+        "stitch_color"]
+    named = allover([STITCH])
+    (row,) = shop_options.required(named)
+    assert row["values"] == ["White", "Black"] and "fallback" not in row, "nennt Printful sie, gelten seine Werte"
+    assert shop_options.required({"technique": "cut-sew"}) == [], "ohne Printful-Produkt keine Optionen"
 
 
 @pytest.mark.asyncio
