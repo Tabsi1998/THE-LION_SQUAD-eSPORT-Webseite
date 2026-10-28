@@ -10,6 +10,8 @@ from pydantic import BaseModel, Field
 from pymongo.errors import DuplicateKeyError
 from database import get_db
 from services import squad_registration
+from services.league_scope import is_league_staffel
+from services.staffel_guard import SQUAD_UNREGISTER_REFUSED, STAFFEL_REGISTRATION_REFUSED
 from services.permissions import is_confirmed_tournament_lead
 from auth import get_current_user, get_optional_user, require_area
 from services.access_links import AccessLinkUsedUp, claim_access_link_use, release_access_link_use, validate_access_link
@@ -831,6 +833,10 @@ async def admin_create_registration(tid: str, body: RegistrationAdminCreate,
     tid = await _resolve_tid(tid)
     tournament = await _ensure_tournament_unlocked(db, tid)
     await require_tournament_staff_permission(me, tid, PARTICIPANT_STAFF_ROLES)
+    if is_league_staffel(tournament):
+        # Liga-Staffel (#2109): nur Co-Teams über „Co-Team zuteilen“ (mit Kader- und Season-Prüfung) - kein ganzes
+        # Hauptteam und kein Ersatz an diesen Prüfungen vorbei. Diese Route kennt kein ``squad_id``.
+        raise HTTPException(status_code=400, detail=STAFFEL_REGISTRATION_REFUSED)
 
     payload = body.model_dump()
     user = None
@@ -1101,7 +1107,8 @@ async def _delete_registration_locked(db, tid: str, reg_id: str, me: dict) -> di
         is_team_manager = bool(team and _can_register_team(team, me))
     is_staff = await has_tournament_staff_permission(me, tid, PARTICIPANT_STAFF_ROLES)
     if not is_own_registration and not is_team_manager and not is_staff:
-        raise HTTPException(status_code=403)
+        # Co-Team (#2109): eine deutsche Begründung statt eines nackten 403.
+        raise HTTPException(status_code=403, detail=SQUAD_UNREGISTER_REFUSED if reg.get("squad_id") else None)
     tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
     if is_staff and (tournament or {}).get("status") == "check_in":
         # Nur ein fester Baum hält die Person (#1551) - die Vorschau während des Check-ins wächst noch mit.

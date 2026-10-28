@@ -829,3 +829,97 @@ test("ein gewöhnliches Turnier fragt die Vor-Ort-Anmeldung weiter ab", async ()
   await screen.findByRole("heading", { name: "Winter Cup 2026" });
   await waitFor(() => expect(apiMock.get.mock.calls.map(([url]) => String(url)).some((url) => url.includes("/onsite-access"))).toBe(true));
 });
+
+// Liga-Staffel in der Turnierverwaltung (#2109): nur, was die Liga braucht.
+const STAFFEL = { ...TOURNAMENT, title: "Probe-Liga Season 1 · Liga 1 · Staffel A", status: "draft", format: "league", team_mode: "team",
+  game_id: "g-1", league_context: { league_id: "l1", season_id: "s1", division_id: "d1", staffel: "A" },
+  league_links: { league_name: "Probe-Liga", season_name: "Season 1", division_label: "Liga 1", staffel: "A",
+    season_admin_path: "/admin/leagues/seasons/s1", public_path: "/liga/probe-liga/season-1" } };
+
+function serveStaffel(overrides = {}, registrations = []) {
+  apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path.startsWith("/map-pools/")) return Promise.resolve({ data: { game: null, library: [], tournament: null, stages: [] } });
+    if (path.includes("/squad-candidates")) return Promise.resolve({ data: { teams: [] } });
+    if (path.includes("/registrations")) return Promise.resolve({ data: registrations });
+    if (path.match(/\/tournaments\/t-1(\?|$)/)) return Promise.resolve({ data: { ...STAFFEL, ...overrides } });
+    return Promise.resolve(routeFor(path));
+  });
+  return renderPage();
+}
+
+test("Staffel: Kopf mit „Liga 1 · Staffel A“, Season öffnen und Ligaseite", async () => {
+  serveStaffel();
+  await screen.findByRole("heading", { name: STAFFEL.title });
+  expect(screen.getByTestId("staffel-header")).toHaveTextContent("Liga 1 · Staffel A");
+  expect(screen.getByTestId("staffel-season-link")).toHaveAttribute("href", "/admin/leagues/seasons/s1");
+  expect(screen.getByTestId("staffel-public-link")).toHaveAttribute("href", "/liga/probe-liga/season-1");
+});
+
+test("Staffel: der Status kennt weder Anmeldung noch Check-in", async () => {
+  serveStaffel();
+  await screen.findByRole("heading", { name: STAFFEL.title });
+  const values = [...screen.getByTestId("admin-tr-status-select").querySelectorAll("option")].map((option) => option.value);
+  expect(values).toEqual(["draft", "live", "paused", "completed", "results_published", "archived", "cancelled"]);
+});
+
+test("ein gewöhnliches Turnier behält alle Status", async () => {
+  renderPage();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  const values = [...screen.getByTestId("admin-tr-status-select").querySelectorAll("option")].map((option) => option.value);
+  expect(values).toContain("check_in");
+  expect(values).toContain("registration_open");
+});
+
+test("Staffel: Teilnehmer nur als Co-Teams - kein Hinzufügen, kein Check-in, Status „Zugeteilt“", async () => {
+  serveStaffel({}, [{ id: "r-1", status: "approved", display_name: "Probeteam · Rudel", team_id: "tm-1", squad_id: "sq-1" }]);
+  await screen.findByRole("heading", { name: STAFFEL.title });
+  await screen.findAllByText("Probeteam · Rudel");
+  expect(screen.getByText(/Teilnehmer dieser Liga sind Co-Teams/)).toBeInTheDocument();
+  expect(screen.queryByTestId("participant-add-submit")).toBeNull();
+  expect(screen.queryByTestId("admin-reg-status-filter")).toBeNull();
+  expect(screen.queryByTestId("admin-reg-status-r-1")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Check-in" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Nicht erschienen" })).toBeNull();
+  expect(screen.getAllByTestId("status-assigned")[0]).toHaveTextContent("Zugeteilt");
+});
+
+test("Format Liga ohne Staffel: Co-Teams sind nur eine Möglichkeit", async () => {
+  apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path.match(/\/tournaments\/t-1(\?|$)/)) return Promise.resolve({ data: { ...TOURNAMENT, format: "league", team_mode: "team" } });
+    return Promise.resolve(routeFor(path));
+  });
+  renderPage();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  expect(screen.getByText(/Optional: Co-Team zuteilen/)).toBeInTheDocument();
+  expect(screen.queryByText(/Teilnehmer dieser Liga sind Co-Teams/)).toBeNull();
+  expect(screen.getByTestId("participant-add-submit")).toBeInTheDocument();
+  expect(screen.getByTestId("admin-tr-tab-bracket")).toHaveTextContent("Tabelle");
+});
+
+test("Staffel vor dem Start: Vorschau neu mischen statt Zurücksetzen, keine Check-in-Downloads, Reiter Tabelle", async () => {
+  serveStaffel();
+  await screen.findByRole("heading", { name: STAFFEL.title });
+  expect(screen.queryByTestId("admin-tr-reset")).toBeNull();
+  expect(screen.getByTestId("admin-tr-remix")).toHaveTextContent("Vorschau neu mischen");
+  expect(screen.queryByTestId("admin-tr-download-checkin")).toBeNull();
+  expect(screen.queryByTestId("admin-tr-download-registration-qr")).toBeNull();
+  expect(screen.getByTestId("admin-tr-download-matches")).toBeInTheDocument();
+  expect(screen.getByTestId("admin-tr-tab-bracket")).toHaveTextContent("Tabelle");
+});
+
+test("Staffel live: weder Zurücksetzen noch Neu mischen", async () => {
+  serveStaffel({ status: "live" });
+  await screen.findByRole("heading", { name: STAFFEL.title });
+  expect(screen.queryByTestId("admin-tr-reset")).toBeNull();
+  expect(screen.queryByTestId("admin-tr-remix")).toBeNull();
+});
+
+test("Staffel: der Map-Pool steht nur lesend da, gepflegt in der Season", async () => {
+  const user = userEvent.setup();
+  serveStaffel();
+  await screen.findByRole("heading", { name: STAFFEL.title });
+  await user.click(screen.getByTestId("admin-tr-tab-maps"));
+  expect(await screen.findByTestId("staffel-maps-note")).toHaveTextContent("Den Map-Pool pflegt die Season");
+});

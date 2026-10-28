@@ -383,3 +383,211 @@ async def test_starting_a_staffel_with_more_teams_than_weeks_is_refused(flow):
     fixed = await flow.db.matches_v2.find({"tournament_id": staffel["id"], "is_preview": {"$ne": True}},
                                           {"_id": 0}).to_list(None)
     assert len(fixed) == 28
+
+
+# ---------------------------------------------------------------- Staffel in der Turnierverwaltung (#2109)
+
+@pytest.mark.asyncio
+async def test_the_tournament_form_refuses_season_values_of_a_staffel_but_the_season_sync_still_writes(flow):
+    _admin, _game, _league, season, division, _maps = await setup_league(flow)
+    staffel = await _staffel(flow, division)
+    url = f"/api/tournaments/{staffel['id']}"
+
+    for body, label in (({"best_of": 5}, "Best of"), ({"visibility": "public"}, "Sichtbarkeit"),
+                        ({"rules": "Eigene Regeln"}, "Regeln"), ({"team_size": 5}, "Spieler pro Team"),
+                        ({"start_date": "2026-11-17T00:00:00+00:00"}, "Start"),
+                        ({"default_match_time": "18:00"}, "Standarduhrzeit")):
+        refused = await flow.patch(url, json=body)
+        assert refused.status_code == 400, body
+        assert refused.json()["detail"] == f"{label}: Kommt aus der Season – dort ändern und übertragen.", body
+    for body in ({"registration_enabled": True}, {"check_in_from": "2026-11-09T10:00:00+00:00"},
+                 {"discord_registration": True}, {"season_weight": 2}, {"format": "single_elim"},
+                 {"team_mode": "solo"}, {"event_mode": "local"}):
+        refused = await flow.patch(url, json=body)
+        assert refused.status_code == 400, body
+        assert "Liga-Staffel" in refused.json()["detail"], body
+    stored = await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0})
+    assert (stored["best_of"], stored["visibility"], stored["format"], stored["team_mode"]) == (3, "internal",
+                                                                                                "league", "team")
+    assert stored.get("registration_enabled") is False and stored["season_weight"] == 0
+
+    # Was die Staffel selbst trägt, bleibt änderbar - auch zusammen mit unveränderten Season-Werten (das Formular und
+    # der Matchplan schicken sie mit).
+    same = await flow.patch(url, json={"title": "Staffel A (Probe)", "best_of": 3, "start_date": stored["start_date"],
+                                       "match_schedule_response_hours": 24, "description": "Probe"})
+    assert same.status_code == 200, same.text
+    stored = await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0})
+    assert (stored["title"], stored["match_schedule_response_hours"]) == ("Staffel A (Probe)", 24)
+
+    # Das Übertragen aus der Season läuft nicht über die Route und schreibt weiter.
+    await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"best_of": 5, "rules_text": "Neu"})
+    synced = await flow.post(f"{ADMIN}/seasons/{season['id']}/sync")
+    assert synced.status_code == 200, synced.text
+    after = await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0})
+    assert (after["best_of"], after["rules"]) == (5, "Neu")
+
+
+@pytest.mark.asyncio
+async def test_a_staffel_knows_no_registration_or_check_in_status(flow):
+    _admin, _game, _league, _season, division, _maps = await setup_league(flow)
+    staffel = await _staffel(flow, division)
+    for status in ("scheduled", "registration_open", "registration_closed", "check_in"):
+        refused = await flow.post(f"/api/tournaments/{staffel['id']}/status", json={"status": status})
+        assert refused.status_code == 400, status
+        assert "keinen Check-in" in refused.json()["detail"]
+    assert (await flow.db.tournaments.find_one({"id": staffel["id"]}))["status"] == "draft"
+    cancelled = await flow.post(f"/api/tournaments/{staffel['id']}/status", json={"status": "cancelled"})
+    assert cancelled.status_code == 200, cancelled.text
+
+
+@pytest.mark.asyncio
+async def test_the_form_no_longer_changes_the_status_of_any_tournament(flow):
+    admin, game, _league, _season, _division, _maps = await setup_league(flow)
+    flow.act_as(admin)
+    created = await flow.post("/api/tournaments", json={"title": "Normaler Cup", "game_id": game["id"]})
+    assert created.status_code == 200, created.text
+    cup = created.json()
+
+    refused = await flow.patch(f"/api/tournaments/{cup['id']}", json={"status": "live"})
+    assert refused.status_code == 400
+    assert "Status" in refused.json()["detail"] and "oben" in refused.json()["detail"]
+    assert (await flow.db.tournaments.find_one({"id": cup["id"]}))["status"] == "draft"
+    same = await flow.patch(f"/api/tournaments/{cup['id']}", json={"status": "draft", "title": "Normaler Cup 2"})
+    assert same.status_code == 200, same.text
+    # Bei normalen Turnieren bleibt alles andere änderbar.
+    changed = await flow.patch(f"/api/tournaments/{cup['id']}", json={"best_of": 5, "registration_enabled": False,
+                                                                      "format": "double_elim"})
+    assert changed.status_code == 200, changed.text
+    assert (changed.json()["best_of"], changed.json()["format"]) == (5, "double_elim")
+
+
+@pytest.mark.asyncio
+async def test_a_started_staffel_cannot_be_deleted(flow):
+    admin, _game, _league, _season, division, _maps = await setup_league(flow)
+    early = await _staffel(flow, division)
+    deleted = await flow.delete(f"/api/tournaments/{early['id']}")
+    assert deleted.status_code == 200, deleted.text
+    assert await flow.db.tournaments.find_one({"id": early["id"]}) is None
+
+    staffel = await _staffel(flow, division)
+    for index in range(1, 5):
+        await flow.register(staffel, await flow.add_user(name=f"Probe {index}"))
+    flow.act_as(admin)
+    started = await flow.post(f"/api/tournaments/{staffel['id']}/status", json={"status": "live"})
+    assert started.status_code == 200, started.text
+    refused = await flow.delete(f"/api/tournaments/{staffel['id']}")
+    assert refused.status_code == 409
+    assert "Abgesagt" in refused.json()["detail"]
+    assert await flow.db.tournaments.find_one({"id": staffel["id"]}) is not None
+    assert await flow.db.matches_v2.count_documents({"tournament_id": staffel["id"]}) > 0
+
+
+@pytest.mark.asyncio
+async def test_a_started_staffel_keeps_its_plan_against_reset_and_rebuild(flow):
+    """Review #2109: „Zurücksetzen“ mit force löschte alle Spiele, setzte auf Entwurf - und danach ging Löschen."""
+    admin, _game, _league, _season, division, _maps = await setup_league(flow)
+    staffel = await _staffel(flow, division)
+    # Vor dem Start bleibt beides erlaubt (Vorschau neu mischen).
+    rebuilt = await flow.post(f"/api/tournaments/{staffel['id']}/bracket/from-format?preview=true&force=true")
+    assert rebuilt.status_code == 200, rebuilt.text
+    reset = await flow.post(f"/api/tournaments/{staffel['id']}/reset-bracket")
+    assert reset.status_code == 200, reset.text
+
+    for index in range(1, 5):
+        await flow.register(staffel, await flow.add_user(name=f"Probe {index}"))
+    flow.act_as(admin)
+    started = await flow.post(f"/api/tournaments/{staffel['id']}/status", json={"status": "live"})
+    assert started.status_code == 200, started.text
+    fixed = {"tournament_id": staffel["id"], "is_preview": {"$ne": True}}
+    fixed_before = await flow.db.matches_v2.count_documents(fixed)
+    assert fixed_before > 0
+
+    for url in (f"/api/tournaments/{staffel['id']}/reset-bracket?force=true",
+                f"/api/tournaments/{staffel['id']}/bracket/from-format?preview=true&force=true"):
+        refused = await flow.post(url)
+        assert refused.status_code == 409, url
+        assert "nur vor dem Start" in refused.json()["detail"], url
+    stored = await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0})
+    assert stored["status"] == "live"
+    assert await flow.db.matches_v2.count_documents(fixed) == fixed_before
+    deleted = await flow.delete(f"/api/tournaments/{staffel['id']}")
+    assert deleted.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_hidden_league_fields_are_refused_unchanged_values_pass(flow):
+    _admin, _game, _league, _season, division, _maps = await setup_league(flow)
+    staffel = await _staffel(flow, division)
+    url = f"/api/tournaments/{staffel['id']}"
+    for body in ({"seeding_mode": "manual"}, {"advancement_mode": "draw_show"}, {"draw_show_minutes": 7},
+                 {"bronze_match": True}, {"substitutes_allowed": True}, {"prize_pool": "Pokal"},
+                 {"prize_places": [{"place": 1, "value": "Pokal"}]}, {"award_images": {"1": "/bild.png"}},
+                 {"no_show_minutes_online": 20}, {"result_confirm_minutes_online": 30}, {"is_invite_only": True},
+                 {"requires_event_registration": True}, {"site_banner_enabled": True}, {"auto_start_enabled": True}):
+        refused = await flow.patch(url, json=body)
+        assert refused.status_code == 400, body
+        assert refused.json()["detail"].endswith("Gibt es in einer Liga-Staffel nicht."), body
+    unchanged = await flow.patch(url, json={"bronze_match": False, "substitutes_allowed": False, "award_images": {},
+                                            "prize_places": None, "draw_show_minutes": None,
+                                            "seeding_mode": staffel.get("seeding_mode"),
+                                            "advancement_mode": staffel.get("advancement_mode"),
+                                            "description": "Probe"})
+    assert unchanged.status_code == 200, unchanged.text
+
+
+@pytest.mark.asyncio
+async def test_the_season_admin_path_goes_only_to_the_management(flow):
+    _admin, _game, _league, _season, division, _maps = await setup_league(flow, season={"visibility": "public"})
+    staffel = await _staffel(flow, division)
+    await flow.db.tournaments.update_one({"id": staffel["id"]}, {"$set": {"status": "live"}})  # sichtbar, kein Entwurf
+    flow.act_as(await flow.add_user(name="Mitglied"))
+    view = await flow.get(f"/api/tournaments/{staffel['id']}")
+    assert view.status_code == 200, view.text
+    links = view.json()["league_links"]
+    assert "season_admin_path" not in links
+    assert links["division_label"] == "Liga 1" and links["public_path"].startswith("/liga/")
+
+
+@pytest.mark.asyncio
+async def test_a_staffel_takes_participants_only_as_co_teams(flow):
+    admin, _game, _league, _season, division, _maps = await setup_league(flow)
+    staffel = await _staffel(flow, division)
+    leader = await flow.add_user(name="Teamleitung")
+    team = {"id": "team-probe", "name": "Probeteam", "leader_id": leader["id"], "member_ids": [leader["id"]]}
+    await flow.db.teams.insert_one(dict(team))
+    flow.act_as(admin)
+
+    refused = await flow.post(f"/api/tournaments/{staffel['id']}/registrations", json={"team_id": team["id"]})
+    assert refused.status_code == 400
+    assert "Co-Team zuteilen" in refused.json()["detail"]
+    assert await flow.db.tournament_registrations.count_documents({"tournament_id": staffel["id"]}) == 0
+
+
+@pytest.mark.asyncio
+async def test_the_team_lead_gets_a_german_reason_when_unregistering_a_co_team(flow):
+    _admin, _game, _league, _season, division, _maps = await setup_league(flow)
+    staffel = await _staffel(flow, division)
+    leader = await flow.add_user(name="Teamleitung")
+    await flow.db.teams.insert_one({"id": "team-probe", "name": "Probeteam", "leader_id": leader["id"],
+                                    "member_ids": [leader["id"]]})
+    await flow.db.tournament_registrations.insert_one({
+        "id": "reg-co", "tournament_id": staffel["id"], "team_id": "team-probe", "squad_id": "squad-probe",
+        "user_id": None, "status": "approved", "display_name": "Probeteam · Rudel"})
+    flow.act_as(leader)
+
+    refused = await flow.delete(f"/api/tournaments/{staffel['id']}/registrations/reg-co")
+    assert refused.status_code == 403
+    assert "Turnierleitung" in refused.json()["detail"]
+    assert await flow.db.tournament_registrations.find_one({"id": "reg-co"}) is not None
+
+
+@pytest.mark.asyncio
+async def test_the_staffel_page_links_back_to_its_season(flow):
+    _admin, _game, league, season, division, _maps = await setup_league(flow)
+    staffel = await _staffel(flow, division)
+    view = (await flow.get(f"/api/tournaments/{staffel['id']}?include_draft=true")).json()
+    assert view["league_links"] == {
+        "league_name": "Probe-Liga", "season_name": "Season 1", "division_label": "Liga 1", "staffel": "A",
+        "season_admin_path": f"/admin/leagues/seasons/{season['id']}",
+        "public_path": f"/liga/{league['slug']}/{season['slug']}",
+    }

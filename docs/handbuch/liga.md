@@ -141,9 +141,23 @@ Oben in der Turnierverwaltung der Staffel: **Liga starten**. Damit wird der Spie
 sieben Spieltage zu je vier Spielen, Heimrecht ausgeglichen, Spieltag 7 nach der Weihnachtspause in Woche 9) und die
 Staffel steht auf **Live**. Ab jetzt können die Captains Termine vorschlagen und melden.
 
-- Kein **Check-in** – die Co-Teams sind zugeteilt, niemand checkt ein. Wurde trotzdem ein Check-in gestartet, im
-  Feld **Status** zurück auf **Entwurf** und dann **Liga starten**.
-- Den Spielplan vor dem Start ansehen: Reiter **Turnierbaum** bzw. **Matchplan** (Vorschau).
+- Kein **Check-in** und keine Anmeldung – die Co-Teams sind zugeteilt, niemand checkt ein. Die Status-Auswahl oben
+  bietet für eine Staffel nur Entwurf, Live, Pausiert, Beendet, Ergebnisse veröffentlicht, Archiviert und Abgesagt.
+- Den Spielplan vor dem Start ansehen: Reiter **Matchplan** (Vorschau mit Spielwochen) bzw. **Spiele**. Der Reiter
+  **Tabelle** führt zur Tabelle und zum Spielplan auf der öffentlichen Seite. Neu mischen: **Werkzeuge → Vorschau neu
+  mischen** – nur vor dem Start; danach steht der Spielplan.
+
+Die Turnierverwaltung einer Staffel zeigt nur, was die Liga braucht. Oben steht, wohin sie gehört („Liga 1 · Staffel
+A“) mit **Season öffnen** und **Ligaseite**. Im Reiter **Bearbeiten** stehen die Werte der Season (Spiel, Start und
+Ende, Spielwoche, Standardtermin, Teamgröße, Staffelgröße, Best of, Bestätigungsfrist, Sichtbarkeit, Regeltext) nur
+zum Lesen unter **Aus der Season** – ändern in der Season, dann **Vorgaben übertragen** (2.7). Auch den Map-Pool
+pflegt die Season. Anmeldung, Check-in, Discord, Preise, Jahreswertung, Seeding und Weiterkommen gibt es in der
+Staffel nicht. Änderbar bleiben Titel, Beschreibung, Banner, Partner, Streaming und die **Antwortfrist** auf
+Terminvorschläge.
+
+Eine Staffel lässt sich in der Turnierliste nur **vor dem Start** löschen. Danach bleibt sie: Status **Abgesagt** oder
+**Archiviert**. In der Turnierliste tragen Staffeln das Kennzeichen „Liga · Staffel A“; der Filter **Nur
+Liga-Staffeln** zeigt nur sie.
 
 ### 2.7 Vorgaben später ändern und übertragen
 
@@ -234,7 +248,12 @@ mit Termin, Ergebnis, Sieger und den Maps – ohne Aufstellungen.
 | „… ist für ein anderes Spiel eingetragen als diese Staffel.“ / „… ist archiviert …“ | Falsches oder altes Co-Team | Co-Team im Profil prüfen |
 | „Captain muss im Kader des Co-Teams stehen.“ / „Captain und Vertreter müssen verschiedene Personen sein.“ | Rollen falsch vergeben | Rollen im Profil neu wählen |
 | Co-Team lässt sich nicht entfernen („… Spielplan …“) | Die Staffel ist gestartet | Mit dem Co-Team klären; Spiele notfalls kampflos werten |
-| „Turnier kann ohne spielbares Match nicht gestartet werden.“ | Check-in gestartet statt **Liga starten** | **Status** auf **Entwurf**, dann **Liga starten** |
+| „Eine Liga-Staffel hat keine Anmeldung und keinen Check-in …“ | Status mit Anmeldung oder Check-in gewählt | **Liga starten** (oben) |
+| „Turnier kann ohne spielbares Match nicht gestartet werden.“ | Eine ältere Staffel steht noch im Check-in | Status oben auf **Entwurf**, dann **Liga starten** |
+| „Best of: Kommt aus der Season – dort ändern und übertragen.“ (ebenso andere Felder) | Wert gibt die Season vor | In der Season ändern, dann **Vorgaben übertragen** |
+| „In einer Liga-Staffel spielen nur Co-Teams …“ | Teilnehmer ohne Co-Team eingetragen | **Co-Team zuteilen** |
+| „Diese Staffel hat schon begonnen oder Spiele – Löschen geht nur vor dem Start …“ | Gestartete Staffel löschen | Status **Abgesagt** oder **Archiviert** |
+| „Ein zugeteiltes Co-Team nimmt nur die Turnierleitung wieder aus der Staffel …“ | Teamleitung will ihr Co-Team abmelden | Bei der Turnierleitung melden |
 | Ligaseite zeigt „Liga nicht gefunden“ | Sichtbarkeit *Aus* oder *Nur Turnierleitung* | Sichtbarkeit der Season ändern und speichern |
 | „Bitte im Web mit Maps und Aufstellung melden.“ | Erstmeldung oder abweichende Meldung aus der App | Im Web auf der Matchseite melden |
 | „In dieser Zeit wird nicht gespielt (Weihnachtspause, 21.12.2026 bis 3.1.2027) …“ | Termin in einer Sperrzeit | Anderen Termin vorschlagen |

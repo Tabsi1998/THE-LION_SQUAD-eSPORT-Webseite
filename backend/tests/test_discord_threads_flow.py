@@ -135,8 +135,8 @@ async def test_one_thread_per_tournament_from_every_status_source_with_the_final
     assert state["channel_id"] == EVENTS and state["message_id"] == "m1" and thread == "th-m1"
     assert discord.threads[thread] == {"parent": EVENTS, "starter": "m1", "name": "🏆 Sommer-Cup"}
 
-    # Formular: Check-in - kurz, im Thread.
-    response = await flow.patch("/api/tournaments/t1", json={"status": "check_in"})
+    # Check-in über den Ablauf (#2109: das Formular setzt keinen Status mehr) - kurz, im Thread.
+    response = await flow.post("/api/tournaments/t1/status", json={"status": "check_in"})
     assert response.status_code == 200, response.text
     checkin = discord.messages[thread][-1]["embed"]
     assert checkin["title"] == "🏆 Sommer-Cup · Check-in offen" and checkin["description"].startswith("Jetzt einchecken – bis 12.06.2027, 17:45 Uhr")
@@ -301,7 +301,7 @@ async def test_member_tournaments_post_in_the_members_channel_with_their_own_thr
     thread = stored["discord_thread_members"]["thread_id"]
     assert discord.threads[thread]["parent"] == MEMBERS and "discord_thread" not in stored and "discord_thread_by_guild" not in stored
 
-    assert (await flow.patch("/api/tournaments/t1", json={"status": "check_in"})).status_code == 200
+    assert (await flow.post("/api/tournaments/t1/status", json={"status": "check_in"})).status_code == 200
     await flow.db.tournaments.update_one({"id": "t1"}, {"$set": {"status": "live"}})
     await discord_threads.status_written(flow.db, "t1", "check_in")
     paula = await flow.add_user(role="player", name="paula")

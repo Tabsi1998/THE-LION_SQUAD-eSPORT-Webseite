@@ -22,6 +22,7 @@ from services.tv_display import ROUND_SPONSOR_MAX, pause_until_value, round_spon
 from models import now_utc
 from services.log_safe import log_safe
 from services.league_scope import is_league_staffel
+from services.staffel_guard import staffel_status_problem
 from services.change_events import reset_scope_cache
 from services.public_phase import parse_dt
 from routes.tournament_common import (
@@ -356,6 +357,10 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
         raise HTTPException(status_code=403, detail="Turnierleitung darf nur operative Status setzen")
     t = await db.tournaments.find_one({"id": tid}, {"_id": 0}) or {}
     prev = t.get("status")
+    # Liga-Staffel (#2109): keine Anmeldung, kein Check-in - ein Check-in ließe sie ohne eingecheckte Teams und Spiele.
+    staffel_problem = staffel_status_problem(t, status) if status != prev else None
+    if staffel_problem:
+        raise HTTPException(status_code=400, detail=staffel_problem)
     pause_set, pause_unset = _pause_change(t, prev, status, body)
     auto_generated_bracket = None
     planning = None
