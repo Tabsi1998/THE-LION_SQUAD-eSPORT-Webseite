@@ -124,6 +124,26 @@ test("führt Schritt für Schritt bis zur Vorschau - Vereinsadresse vorbelegt, D
   expect(screen.queryByText(/bestätigen$/i)).toBeNull();
 });
 
+test("Preisvergleich (#2135): Mitgliederpreis gegen Printful brutto, Katalog netto nur als Prüfwert", async () => {
+  const check = { shop_cents: 1548, printful_subtotal_cents: 1290, printful_gross_cents: 1548, printful_net_cents: 1290,
+    catalog_net_cents: 1500, level: "warn" };
+  apiMock.post.mockResolvedValue({ data: { ...PREVIEW, price_check: check } });
+  show();
+  await fillUntilPreview();
+  await userEvent.click(screen.getByTestId("shop-test-draft-preview-button"));
+  const line = await screen.findByTestId("shop-test-draft-price-check");
+  expect(line).toHaveTextContent("Mitgliederpreis 15,48 € · Printful brutto (Ware) 15,48 € · Katalog netto 15,00 € (Prüfwert)");
+  expect(line).toHaveTextContent("prüfen");
+});
+
+test("ältere Vorschauen ohne Bruttowerte zeigen weiter die Ware laut Printful", async () => {
+  apiMock.post.mockResolvedValue({ data: PREVIEW });
+  show();
+  await fillUntilPreview();
+  await userEvent.click(screen.getByTestId("shop-test-draft-preview-button"));
+  expect(await screen.findByTestId("shop-test-draft-price-check")).toHaveTextContent("Preis im Shop 15,00 € · Ware laut Printful 15,00 €");
+});
+
 test("Produktoptionen (#2158): die Vorschau nennt die Nahtfarbe, der Abgleich zeigt sie lesbar", async () => {
   const options = [{ name: "stitch_color", value: "White", label: "Nahtfarbe", value_label: "Weiß" }];
   apiMock.post.mockResolvedValueOnce({ data: { ...PREVIEW, product_options: options } });

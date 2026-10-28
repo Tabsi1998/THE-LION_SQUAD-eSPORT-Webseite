@@ -14,6 +14,8 @@ import ShopTabs from "./ShopTabs";
 
 const BASE = "/admin/shop/config";
 const KEY_STATES = { ok: "hinterlegt", missing: "kein Schlüssel", unreadable: "nicht lesbar" };
+// Toleranz bei Preisänderung vor dem Auslösen (#2135) - Vorgabe 0,50 €, falls der Server sie (noch) nicht liefert.
+const DEFAULT_TOLERANCE_CENTS = 50;
 
 // Leer → null (keine Angabe), sonst Cent; Unsinn → NaN (der Knopf bleibt dann gesperrt).
 function centsFromInput(text) {
@@ -102,6 +104,7 @@ export default function AdminShopPage() {
   const [markup, setMarkup] = useState("");
   const [fallback, setFallback] = useState("");
   const [minPrice, setMinPrice] = useState("");
+  const [tolerance, setTolerance] = useState("");
   const [apiKey, setApiKey] = useState("");
 
   const take = useCallback((next) => {
@@ -110,6 +113,7 @@ export default function AdminShopPage() {
     setMarkup(centsToInput(next.config.public_markup_cents));
     setFallback(centsToInput(next.config.fallback_shipping_cents));
     setMinPrice(centsToInput(next.config.min_price_cents));
+    setTolerance(centsToInput(next.config.price_tolerance_cents ?? DEFAULT_TOLERANCE_CENTS));
   }, []);
 
   useEffect(() => {
@@ -144,10 +148,14 @@ export default function AdminShopPage() {
   const fallbackCents = centsFromInput(fallback);
   const minPriceCents = centsFromInput(minPrice);
   const minPriceChanged = minPriceCents !== config.min_price_cents;
+  const toleranceCents = centsFromInput(tolerance);
+  const toleranceLimit = data.limits.price_tolerance_cents ?? 10000;
+  const toleranceChanged = toleranceCents !== (config.price_tolerance_cents ?? DEFAULT_TOLERANCE_CENTS);
   const pricesValid = Number.isInteger(markupCents) && markupCents <= data.limits.public_markup_cents
     && (fallbackCents === null || (Number.isInteger(fallbackCents) && fallbackCents >= 1 && fallbackCents <= data.limits.fallback_shipping_cents))
-    && Number.isInteger(minPriceCents) && minPriceCents >= 1 && minPriceCents <= data.limits.min_price_cents;
-  const pricesChanged = markupCents !== config.public_markup_cents || fallbackCents !== config.fallback_shipping_cents || minPriceChanged;
+    && Number.isInteger(minPriceCents) && minPriceCents >= 1 && minPriceCents <= data.limits.min_price_cents
+    && Number.isInteger(toleranceCents) && toleranceCents >= 0 && toleranceCents <= toleranceLimit;
+  const pricesChanged = markupCents !== config.public_markup_cents || fallbackCents !== config.fallback_shipping_cents || minPriceChanged || toleranceChanged;
   const stageOf = (value) => stages.find((item) => item.key === value);
 
   return (
@@ -229,7 +237,7 @@ export default function AdminShopPage() {
 
         <Section title="Preise und Versand" icon={Truck} testId="shop-prices">
           <dl className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
-            <div><dt className="text-white/50 text-xs">Mitglieder</dt><dd data-testid="shop-member-price">Selbstkostenpreis: Einkauf plus Versand, Aufschlag {formatCents(config.member_markup_cents)}</dd></div>
+            <div><dt className="text-white/50 text-xs">Mitglieder</dt><dd data-testid="shop-member-price">Printful brutto: was der Verein an Printful zahlt (Ware, Versand, Steuer), Aufschlag {formatCents(config.member_markup_cents)}</dd></div>
             <div><dt className="text-white/50 text-xs">Versandland</dt><dd data-testid="shop-countries">{config.shipping_countries.join(", ")} (Österreich) – weitere erst nach der Steuerklärung</dd></div>
           </dl>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -251,11 +259,17 @@ export default function AdminShopPage() {
                 className="mt-1 w-full min-h-10 bg-black/40 border border-white/15 rounded-sm px-3 tabular-nums focus:border-brand outline-none" data-testid="shop-min-price" />
               <span className="block text-xs text-white/45 mt-1">Kein Verkaufspreis darunter – auch nicht 0 €. Die Prüfung vor dem Veröffentlichen hält sich daran.</span>
             </label>
+            <label className="block text-sm">
+              <span className="text-white/70">Toleranz bei Preisänderung (€)</span>
+              <input value={tolerance} onChange={(event) => setTolerance(event.target.value)} inputMode="decimal" placeholder="0,50"
+                className="mt-1 w-full min-h-10 bg-black/40 border border-white/15 rounded-sm px-3 tabular-nums focus:border-brand outline-none" data-testid="shop-price-tolerance" />
+              <span className="block text-xs text-white/45 mt-1">Vor dem Auslösen schätzt Printful neu. Ist es um mehr als diesen Betrag teurer, geht die Bestellung nicht automatisch hinaus, sondern an die Leitung („Preis geändert“). Günstiger: Die Differenz bleibt beim Verein.</span>
+            </label>
           </div>
-          {!pricesValid && <p className="text-xs text-warn" data-testid="shop-prices-invalid">Beträge in Euro, z. B. 3,50 – Aufschlag bis {formatCents(data.limits.public_markup_cents)}, Pauschale 0,01 bis {formatCents(data.limits.fallback_shipping_cents)}, Mindestpreis 0,01 bis {formatCents(data.limits.min_price_cents)}.</p>}
+          {!pricesValid && <p className="text-xs text-warn" data-testid="shop-prices-invalid">Beträge in Euro, z. B. 3,50 – Aufschlag bis {formatCents(data.limits.public_markup_cents)}, Pauschale 0,01 bis {formatCents(data.limits.fallback_shipping_cents)}, Mindestpreis 0,01 bis {formatCents(data.limits.min_price_cents)}, Toleranz 0 bis {formatCents(toleranceLimit)}.</p>}
           <ReasonedButton id="shop-prices-save" label="Preise speichern" busy={busy === "prices"} disabled={!pricesValid || !pricesChanged}
             blockedHint={!pricesValid ? "Erst gültige Beträge eintragen (0 bis 100 €)." : "Es hat sich noch nichts geändert."}
-            onSubmit={(reason) => run("prices", () => api.patch(BASE, { public_markup_cents: markupCents, fallback_shipping_cents: fallbackCents, ...(minPriceChanged ? { min_price_cents: minPriceCents } : {}), reason }), "Preise gespeichert.")} />
+            onSubmit={(reason) => run("prices", () => api.patch(BASE, { public_markup_cents: markupCents, fallback_shipping_cents: fallbackCents, ...(minPriceChanged ? { min_price_cents: minPriceCents } : {}), ...(toleranceChanged ? { price_tolerance_cents: toleranceCents } : {}), reason }), "Preise gespeichert.")} />
         </Section>
 
         <Section title="Printful-Zugang" icon={KeyRound} testId="shop-access">

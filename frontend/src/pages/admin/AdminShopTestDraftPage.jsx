@@ -38,6 +38,20 @@ const LEVELS = {
 };
 const KIND_LABELS = { personal: "eigene Datei mit Gamertag bzw. Nummer", base: "Grunddatei" };
 
+// Preis im Shop gegen Printful (#2135): Mitgliederpreis gegen Printful brutto (Ware), der Katalog netto nur als Prüfwert.
+// „prüfen“ setzt der Server nur bei starker Abweichung. Ältere Vorschauen kennen nur die Ware netto laut Printful.
+function PriceCheck({ check }) {
+  const gross = check.printful_gross_cents !== undefined;
+  return (
+    <p className="text-sm flex flex-wrap items-center gap-x-3 gap-y-1" data-testid="shop-test-draft-price-check">
+      {gross
+        ? <>Mitgliederpreis {euro(check.shop_cents)} · Printful brutto (Ware) {euro(check.printful_gross_cents)}{check.catalog_net_cents !== null && check.catalog_net_cents !== undefined ? <> · Katalog netto {euro(check.catalog_net_cents)} (Prüfwert)</> : null}</>
+        : <>Preis im Shop {euro(check.shop_cents)} · Ware laut Printful {euro(check.printful_subtotal_cents)}</>}
+      <Level level={check.level} />
+    </p>
+  );
+}
+
 export function euro(cents) {
   if (cents === null || cents === undefined) return "–";
   const negative = cents < 0;
@@ -528,10 +542,7 @@ export default function AdminShopTestDraftPage() {
               <Files files={preview.files} />
               <h3 className="text-xs font-bold uppercase tracking-wider text-white/60">Kostenschätzung von Printful</h3>
               <Costs estimate={preview.estimate} error={preview.estimate_error} />
-              <p className="text-sm flex flex-wrap items-center gap-x-3 gap-y-1" data-testid="shop-test-draft-price-check">
-                Preis im Shop {euro(preview.price_check.shop_cents)} · Ware laut Printful {euro(preview.price_check.printful_subtotal_cents)}
-                <Level level={preview.price_check.level} />
-              </p>
+              <PriceCheck check={preview.price_check} />
               <p className="text-sm text-white/55" data-testid="shop-test-draft-mockup">Mockup: {preview.mockup.detail}</p>
               {preview.warnings.map((warning) => <p key={warning} className="text-xs text-warn" data-testid="shop-test-draft-warning">{warning}</p>)}
               {preview.last_error && <p className="text-xs text-warn" data-testid="shop-test-draft-preview-error">Letzter Versuch: {preview.last_error.text}{preview.last_error.provider_detail ? ` (Printful: ${preview.last_error.provider_detail})` : ""}</p>}

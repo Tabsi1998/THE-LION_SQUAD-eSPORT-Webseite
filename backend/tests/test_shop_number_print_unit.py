@@ -314,3 +314,29 @@ async def test_the_test_draft_prints_the_sample_number(db, provider, monkeypatch
     plan = await plan_of(db, product["id"], "White", "back")
     rules = shop_gamertag.layer_rules(await shop_gamertag.load_rules(db), plan.texts[0].spec)
     assert number_row["sha256"] == shop_gamertag.render("99", rules, color_key=plan.texts[0].ink, kind="number").sha256
+
+@pytest.mark.asyncio
+async def test_the_checkout_quote_checks_the_number_like_the_order(db, provider):
+    """#2135: Die Kasse (``quote_cart``) zeigt keinen Betrag, den die Bestellung dann wegen der Vereinsnummer ablehnt."""
+    await member(db)
+    await member(db, "konto-ohne-nummer", number=None)
+    product = await number_product(db, provider)
+    white = await variant_for(db, product["id"], WHITE_M)
+
+    async def quote(user_id=MEMBER, consent=True, buyer_kind="member"):
+        line = {"variant_id": white["id"], "quantity": 1, "gamertag": None}
+        if consent is not None:
+            line["number_consent"] = consent
+        return await shop_orders.quote_cart(db, [line], provider=provider, country="AT", zip_code="8010",
+                                            buyer_kind=buyer_kind, user_id=user_id, shipping_estimate_cents=490)
+
+    for kwargs, message in (({"consent": None}, "Einwilligung"), ({"user_id": "konto-ohne-nummer"},
+                                                                  "noch keine Vereinsnummer"),
+                            ({"user_id": None}, "nur für Vereinsmitglieder"),
+                            ({"buyer_kind": "public"}, "nur für Vereinsmitglieder")):
+        with pytest.raises(ShopError, match=message):
+            await quote(**kwargs)
+    shown = await quote()
+    assert shown["total_cents"] > 0 and await order_files(db) == (0, 0), "die Kasse legt keine Datei an"
+    placed, _ = await order(db, white, key="nummer-kasse-01")
+    assert placed["frozen"]["total_cents"] == shown["total_cents"]
