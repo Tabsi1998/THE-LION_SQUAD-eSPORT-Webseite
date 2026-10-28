@@ -228,7 +228,7 @@ async def test_the_sync_estimates_each_price_group_once_and_step_4_shows_gross_m
 
 
 @pytest.mark.asyncio
-async def test_a_changed_purchase_price_without_a_new_estimate_falls_back_and_warns(db, provider, fake):
+async def test_a_stale_estimate_never_falls_back_to_net_silently_and_blocks_accepting(db, provider, fake):
     product = await configured(db, provider, accept=False)
     await shop_catalog_sync.sync_product(db, product["id"], provider=provider, **BY)
     await shop_products.accept_prices(db, product["id"], **BY)
@@ -239,8 +239,48 @@ async def test_a_changed_purchase_price_without_a_new_estimate_falls_back_and_wa
     assert result["ok"] is True
     view = await shop_products.admin_view(db, product["id"])
     row = next(row for row in view["variants"] if row["printful_variant_id"] == BLACK_M)
-    assert row["estimate_stale"] is True and row["price_source"] == "catalog" and row["printful_gross_cents"] is None
-    assert row["price_warning"]["before_cents"] == 1170 and row["price_warning"]["after_cents"] == 1550
+    # Brutto war bekannt: kein Netto-Vorschlag, sondern „neu schätzen“ (#2135, Review B2).
+    assert row["estimate_stale"] is True and row["price_source"] == "stale" and row["member_price_cents"] is None
+    assert row["printful_gross_cents"] is None and row["price_warning"]["after_cents"] is None
+    assert row["price_warning"]["before_cents"] == 1170 and row["price_warning"]["stale"] is True
+    medium = await variant_for(db, product["id"], BLACK_M)
+    assert medium["blocked_reason"] is None, "veraltete Schätzung sperrt nicht - Katalogpreis ist da"
+    prices = next(item for item in view["check"]["items"] if item["key"] == "prices")
+    assert prices["ok"] is False
+    # Übernehmen geht erst nach einer neuen Schätzung - nie gemischt brutto und netto.
+    with pytest.raises(ShopError, match="erst „Brutto bei Printful schätzen“"):
+        await shop_products.accept_prices(db, product["id"], **BY)
+    assert (await variant_for(db, product["id"], BLACK_M))["price_cents"] == 1170
+    shown = shop_pricing.display_price(await shop_config.load(db), product, medium,
+                                       await shop_catalog.printful_variant_for(db, medium["id"]))
+    assert shown == {**shown, "price_cents": 1170, "basis": "brutto", "stale": True, "source": "accepted"}
+    fake.faults.clear()
+    await shop_pricing.refresh_estimates(db, product["id"], provider=provider, actor_id="finanzen-test")
+    await shop_products.accept_prices(db, product["id"], **BY)
+    medium = await variant_for(db, product["id"], BLACK_M)
+    assert medium["price_cents"] == 1230 and medium["price_source"] == "estimate"  # 10,25 € + 20 %
+
+
+@pytest.mark.asyncio
+async def test_without_any_estimate_the_catalog_net_is_shown_as_net_never_as_gross(db, provider, fake):
+    product = await configured(db, provider)  # nie geschätzt: Katalog netto übernommen
+    medium = await variant_for(db, product["id"], BLACK_M)
+    assert medium["price_source"] == "catalog"
+    shown = shop_pricing.display_price(await shop_config.load(db), product, medium,
+                                       await shop_catalog.printful_variant_for(db, medium["id"]))
+    assert shown["basis"] == "netto" and shown["stale"] is False and "ohne Steuer" in shown["note"]
+
+
+@pytest.mark.asyncio
+async def test_accepting_refuses_a_mix_of_estimated_and_unestimated_variants(db, provider, fake):
+    product = await configured(db, provider, accept=False)
+    await shop_pricing.refresh_estimates(db, product["id"], provider=provider, actor_id="finanzen-test")
+    # Eine Variante verliert ihre Schätzung (etwa neu angeboten): nicht still mit Netto auffüllen.
+    medium = await variant_for(db, product["id"], WHITE_M)
+    await db.shop_printful_variants.update_one({"variant_id": medium["id"]}, {"$unset": {"gross_estimate": ""}})
+    with pytest.raises(ShopError, match="Weiß / M"):
+        await shop_products.accept_prices(db, product["id"], **BY)
+    assert all(variant.get("price_cents") is None for variant in await shop_catalog.variants_of(db, product["id"]))
 
 
 @pytest.mark.asyncio
@@ -447,3 +487,134 @@ async def test_the_estimates_carry_the_required_product_options(db, provider, fa
     await shop_catalog_sync.sync_product(db, product["id"], provider=provider, **BY)
     medium = await variant_for(db, product["id"], BLACK_M)
     assert (await shop_catalog.printful_variant_for(db, medium["id"]))["gross_estimate"]["goods_gross_cents"] == 1170
+
+# ---------------------------------------------------------------- Review: atomar, gleiche Grundlage, Gewichte, Budget
+
+@pytest.mark.asyncio
+async def test_two_concurrent_rechecks_release_only_once(db, provider, fake, monkeypatch):
+    import asyncio
+
+    placed = await placed_order(db, provider)
+    real, arrived, both = shop_pricing.assess, [], asyncio.Event()
+
+    async def together(*args, **kwargs):
+        result = await real(*args, **kwargs)
+        arrived.append(1)
+        if len(arrived) == 2:
+            both.set()
+        await both.wait()  # beide haben gelesen und geschätzt, bevor einer schreibt
+        return result
+
+    monkeypatch.setattr(shop_pricing, "assess", together)
+    first, second = await asyncio.gather(
+        shop_orders.recheck_before_release(db, placed["id"], provider=provider, actor_id="system:a"),
+        shop_orders.recheck_before_release(db, placed["id"], provider=provider, actor_id="system:b"))
+    decisions = sorted([first["decision"], second["decision"]])
+    assert decisions == ["hold", "release"], "nur eine Prüfung darf auslösen"
+    lost = first if first["decision"] == "hold" else second
+    assert lost["reason"] == shop_orders.STATE_CHANGED
+    stored = await shop_orders.get_order(db, placed["id"])
+    assert stored["status"] == "placed" and stored["price_check_rev"] == 1
+    kinds = [event["kind"] for event in await shop_orders.events_for(db, placed["id"])]
+    assert kinds.count("order.price_checked") == 1
+
+
+@pytest.mark.asyncio
+async def test_retry_and_blocked_are_kept_at_the_order_and_as_events(db, provider, fake):
+    placed = await placed_order(db, provider)
+    fake.fail("timeout", operation="createOrderEstimationTask", times=1)
+    retry = await shop_orders.recheck_before_release(db, placed["id"], provider=provider, actor_id="system:test")
+    assert retry["decision"] == "retry"
+    stored = await shop_orders.get_order(db, placed["id"])
+    assert stored["status"] == "placed" and stored["price_check"]["decision"] == "retry"
+    # Eine Druckdatei ist vom Netz: so lässt sich nichts schätzen - die Leitung muss nachsehen.
+    (item,) = await shop_orders.items_for(db, placed["id"])
+    await db.shop_print_files.update_one({"id": item["print_files"][0]["file_id"]},
+                                         {"$set": {"public_disabled_at": "2026-10-28T10:00:00+00:00"}})
+    blocked = await shop_orders.recheck_before_release(db, placed["id"], provider=provider, actor_id="system:test")
+    assert blocked["decision"] == "blocked"
+    stored = await shop_orders.get_order(db, placed["id"])
+    assert stored["price_check"]["decision"] == "blocked" and stored["status"] == "placed"
+    events = {event["kind"]: event for event in await shop_orders.events_for(db, placed["id"])}
+    assert "order.price_check_retry" in events and events["order.price_check_blocked"]["data"]["reason"]
+    # Aus einem Stand, aus dem nicht ausgelöst wird, nie „release“ - und Printful wird gar nicht gefragt.
+    await db.shop_orders.update_one({"id": placed["id"]}, {"$set": {"status": "cancelled"}})
+    fake.calls.clear()
+    other = await shop_orders.recheck_before_release(db, placed["id"], provider=provider, actor_id="system:test")
+    assert other["decision"] == "hold" and fake.calls_to("createOrderEstimationTask") == []
+
+
+@pytest.mark.asyncio
+async def test_the_checkout_quote_refuses_what_the_order_refuses(db, provider, fake):
+    product = await ready_product(db, provider)
+    white = await variant_for(db, product["id"], WHITE_M)
+    cart = [{"variant_id": white["id"], "quantity": 1, "gamertag": NAME}]
+    mapping = await shop_catalog.printful_variant_for(db, white["id"])
+    await shop_catalog.set_catalog_mapping(db, white["id"], {"in_stock": False}, actor_id="test")
+    with pytest.raises(ShopError, match="nicht bestellbar"):
+        await shop_orders.quote_cart(db, cart, provider=provider, country="AT", zip_code="8010")
+    await shop_catalog.set_catalog_mapping(db, white["id"], {"in_stock": mapping["in_stock"]}, actor_id="test")
+    await db.settings.update_one({"id": "shop"}, {"$set": {"id": "shop", "min_price_cents": 5000}}, upsert=True)
+    with pytest.raises(ShopError, match="nicht bestellbar"):
+        await shop_orders.quote_cart(db, cart, provider=provider, country="AT", zip_code="8010")
+    await db.settings.update_one({"id": "shop"}, {"$set": {"min_price_cents": 100}})
+    with pytest.raises(ShopError, match="Gamertag"):
+        await shop_orders.quote_cart(db, cart, provider=provider, country="AT", zip_code="8010", buyer_kind="public")
+    quote = await shop_orders.quote_cart(db, cart, provider=provider, country="AT", zip_code="8010")
+    assert quote["source"] == "printful_estimate"
+
+
+@pytest.mark.asyncio
+async def test_the_goods_are_split_by_the_current_estimate_of_each_variant(db, provider, fake):
+    fake.prices[BLACK_L] = Decimal("12.00")
+    product = await ready_product(db, provider)  # beide übernommen mit 15,00 € bzw. 17,25 € Katalog netto
+    await shop_pricing.refresh_estimates(db, product["id"], provider=provider, actor_id="finanzen-test")
+    white = await variant_for(db, product["id"], WHITE_M)
+    black = await variant_for(db, product["id"], BLACK_L)
+    placed, _ = await order(db, provider, [{"variant_id": white["id"], "quantity": 1, "gamertag": NAME},
+                                           {"variant_id": black["id"], "quantity": 1, "gamertag": NAME}])
+    items = await shop_orders.items_for(db, placed["id"])
+    # Ware 9,75 € + 12,00 €: die Anteile folgen der Schätzung je Variante, nicht dem übernommenen Katalogpreis.
+    assert [item["gross"]["net_cents"] for item in items] == [975, 1200]
+    assert sum(item["line_total_cents"] for item in items) + placed["frozen"]["shipping_cents"] == \
+        placed["frozen"]["total_cents"]
+
+
+class SlowProvider:
+    """Der echte Adapter gegen den Fake, aber jede Schätzung dauert - und zählt, wie viele gleichzeitig laufen."""
+
+    def __init__(self, inner, seconds: float):
+        self.inner, self.seconds, self.running, self.most = inner, seconds, 0, 0
+
+    async def estimate_costs(self, *args, **kwargs):
+        import asyncio
+
+        self.running += 1
+        self.most = max(self.most, self.running)
+        try:
+            await asyncio.sleep(self.seconds)
+            return await self.inner.estimate_costs(*args, **kwargs)
+        finally:
+            self.running -= 1
+
+
+@pytest.mark.asyncio
+async def test_estimates_run_in_parallel_with_a_limit_and_stop_at_the_time_budget(db, provider, fake, monkeypatch):
+    for number, price in ((BLACK_M, "9.75"), (BLACK_L, "10.25"), (WHITE_M, "10.75"), (4015, "11.25")):
+        fake.prices[number] = Decimal(price)  # vier Preisgruppen
+    product = await configured(db, provider, accept=False)
+    variants = await shop_catalog.variants_of(db, product["id"])
+    mappings = await shop_catalog.printful_variants_for(db, [variant["id"] for variant in variants])
+    slow = SlowProvider(provider, 0.05)
+    done, open_groups = await shop_pricing.estimates_for(db, product, variants, mappings, provider=slow,
+                                                         budget={"concurrency": 2, "deadline_seconds": 5.0})
+    assert len(done) == 4 and open_groups == 0 and slow.most == 2
+    background = SlowProvider(provider, 0.01)
+    done, _ = await shop_pricing.estimates_for(db, product, variants, mappings, provider=background,
+                                               budget={**shop_pricing.BACKGROUND, "pause_seconds": 0.0})
+    assert len(done) == 4 and background.most == 1, "der Tagesjob schätzt nacheinander"
+    # Zeitbudget: was nicht fertig wird, bleibt offen - die Admin-Anfrage wartet nicht darauf.
+    monkeypatch.setitem(shop_pricing.INTERACTIVE, "deadline_seconds", 0.2)
+    result = await shop_pricing.refresh_estimates(db, product["id"], provider=SlowProvider(provider, 5.0),
+                                                  actor_id="finanzen-test")
+    assert result["estimated"] == 0 and result["open"] == 4 and "noch offen" in result["detail"]

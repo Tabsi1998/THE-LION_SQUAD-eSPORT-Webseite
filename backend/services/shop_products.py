@@ -637,9 +637,17 @@ async def accept_prices(db, product_id: str, *, actor_id: str, reason: Any) -> d
     if not offered:
         raise ShopError("Erst Farben und Größen wählen (Schritt 2).")
     minimum = (await shop_config.load(db))["min_price_cents"]
+    prices = [(variant, mapping, *shop_pricing.member_price(product, mapping)) for variant, mapping in offered]
+    # Nie gemischt brutto und netto (#2135, B2): hat das Produkt Schätzungen, braucht jede angebotene Variante eine
+    # aktuelle - sonst erst neu schätzen.
+    if any(source != "catalog" for *_rest, source in prices):
+        missing = [shop_colors.variant_label(product, variant) for variant, _mapping, _cost, source in prices
+                   if source != "estimate"]
+        if missing:
+            raise ShopError("Für " + ", ".join(missing[:6]) + (" …" if len(missing) > 6 else "") + " gibt es keine "
+                            "aktuelle Schätzung von Printful - erst „Brutto bei Printful schätzen“, dann übernehmen.")
     costs = []
-    for variant, mapping in offered:  # erst alles prüfen, dann schreiben - nie halb übernommen
-        cost, source = shop_pricing.member_price(product, mapping)
+    for variant, mapping, cost, source in prices:  # erst alles prüfen, dann schreiben - nie halb übernommen
         shown = shop_colors.variant_label(product, variant)
         if cost is None:
             raise ShopError(f"Für {shown} fehlt der Einkaufspreis von Printful - erst abgleichen.")
@@ -650,10 +658,15 @@ async def accept_prices(db, product_id: str, *, actor_id: str, reason: Any) -> d
                             "anbieten.")
         costs.append(cost)
     changes = []
-    for (variant, mapping), cost in zip(offered, costs):
-        if variant.get("price_cents") != cost:
-            changes.append({"label": variant["label"], "before_cents": variant.get("price_cents"), "after_cents": cost})
-            await shop_catalog.set_variant_state(db, variant["id"], {"price_cents": cost}, actor_id=actor_id)
+    for (variant, mapping, _cost, source), cost in zip(prices, costs):
+        # Herkunft des Preises (brutto aus der Schätzung oder Katalog netto) - für die Anzeige im Shop.
+        basis = "estimate" if source == "estimate" else "catalog"
+        if variant.get("price_cents") != cost or variant.get("price_source") != basis:
+            if variant.get("price_cents") != cost:
+                changes.append({"label": variant["label"], "before_cents": variant.get("price_cents"),
+                                "after_cents": cost})
+            await shop_catalog.set_variant_state(db, variant["id"], {"price_cents": cost, "price_source": basis},
+                                                 actor_id=actor_id)
         if (mapping or {}).get("price_warning"):
             await shop_catalog.set_catalog_mapping(db, variant["id"], {"price_warning": None}, actor_id=actor_id)
     if changes:

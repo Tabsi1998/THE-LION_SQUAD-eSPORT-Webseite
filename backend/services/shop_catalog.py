@@ -507,7 +507,7 @@ MAPPING_FIELDS = ("printful_variant_id", "printful_product_id", "technique", "cu
                   # Bruttoschätzung je Variante (#2135, ``services/shop_pricing.py``)
                   "gross_estimate")
 VARIANT_STATE_FIELDS = ("active", "price_cents", "blocked_reason", "blocked_at", "label", "size", "color",
-                        "color_code")
+                        "color_code", "price_source")
 
 
 def catalog_sku(product_id: str, printful_variant_id: int) -> str:

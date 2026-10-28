@@ -199,8 +199,11 @@ async def _freeze_designs(db, product: dict, variant: dict, line: dict, position
     return files, designs
 
 
-async def _freeze_line(db, line: dict, position: int, buyer_kind: str, config: dict, *, user_id: str, order_id: str,
-                       item_id: str, now: str | None = None) -> dict:
+async def _checked_line(db, line: dict, position: int, buyer_kind: str, config: dict) -> dict:
+    """Die Vorprüfung einer Position - dieselbe für Kasse (``quote_cart``) und Bestellung (``place_order``, #2135):
+    veröffentlicht, aktiv, nicht gesperrt, bei Printful lieferbar, Pflichtoptionen gewählt (#2158), Preis übernommen
+    und nicht unter dem Mindestpreis, Gamertag nur, wo er erlaubt ist. Liefert Variante, Produkt, Zuordnung, Preis,
+    Optionen und Aufschlag; es entsteht keine Datei."""
     variant = await shop_catalog.get_variant(db, line["variant_id"])
     product = await shop_catalog.get_product(db, variant["product_id"]) if variant else None
     if (not variant or not product or not variant.get("active") or variant.get("blocked_reason")
@@ -224,6 +227,17 @@ async def _freeze_line(db, line: dict, position: int, buyer_kind: str, config: d
         _not_orderable(position, product, variant, "kein Preis übernommen")
     if unit < config["min_price_cents"]:
         _not_orderable(position, product, variant, "Preis unter dem Mindestpreis")
+    return {"variant": variant, "product": product, "mapping": mapping or {}, "unit_price_cents": int(unit),
+            "options": options, "markup_cents": shop_config.markup_cents(config, buyer_kind, product),
+            "quantity": line["quantity"]}
+
+
+async def _freeze_line(db, line: dict, position: int, buyer_kind: str, config: dict, *, user_id: str, order_id: str,
+                       item_id: str, now: str | None = None) -> tuple[dict, dict]:
+    """Eine Position einfrieren. Liefert (Position, Vorprüfung) - die Vorprüfung braucht die Schätzung."""
+    checked = await _checked_line(db, line, position, buyer_kind, config)
+    variant, product, mapping = checked["variant"], checked["product"], checked["mapping"] or None
+    unit, options = checked["unit_price_cents"], checked["options"]
     number = await _print_number(db, product, line, position, buyer_kind, user_id)
     if not product.get("placements") and product.get("design_key"):
         # Auch hier die Fassung für die Shirtfarbe (#2069 Teil A) - nicht immer die Hauptdatei.
@@ -240,7 +254,7 @@ async def _freeze_line(db, line: dict, position: int, buyer_kind: str, config: d
                                                      number=number)
         design = next(({key: row[key] for key in ("design_key", "version", "sha256")} for row in designs
                        if row["design_key"]), None)
-    markup = shop_config.markup_cents(config, buyer_kind, product)
+    markup = checked["markup_cents"]
     return {
         "id": item_id, "position": position, "product_id": product["id"], "variant_id": variant["id"],
         "product_title": product["title"], "variant_label": variant["label"], "sku": variant["sku"],
@@ -257,7 +271,7 @@ async def _freeze_line(db, line: dict, position: int, buyer_kind: str, config: d
                            if number is not None else None),
         # Produktoptionen (#2158) eingefroren - nur bei Produkten, die welche haben.
         **({"product_options": shop_options.frozen(options)} if options else {}),
-    }
+    }, checked
 
 
 async def _discard(db, order_id: str) -> None:
@@ -320,10 +334,13 @@ async def place_order(db, *, user_id: str, idempotency_key: str, buyer_kind: str
     # Dateien erzeugen, schätzen und Positionen schreiben gehören zusammen: scheitert eines davon (auch ein
     # abgebrochenes, halb geschriebenes insert_many), räumt diese Bestellung ihre eigenen Positionen und Dateien weg.
     try:
-        items = [await _freeze_line(db, line, index, buyer_kind, config, user_id=user_id, order_id=order_id,
-                                    item_id=new_id(), now=now)
-                 for index, line in enumerate(clean_lines, start=1)]
-        priced = await shop_pricing.order_prices(db, items, provider=provider, shipping_address=shipping)
+        frozen_lines = [await _freeze_line(db, line, index, buyer_kind, config, user_id=user_id, order_id=order_id,
+                                           item_id=new_id(), now=now)
+                        for index, line in enumerate(clean_lines, start=1)]
+        items = [item for item, _checked in frozen_lines]
+        # Dieselbe Grundlage wie die Kasse (``quote_cart``): je Position die Grunddateien der Variante (#2135, B3).
+        priced = await shop_pricing.order_prices(db, [checked for _item, checked in frozen_lines], provider=provider,
+                                                 shipping_address=shipping)
         if priced is not None:
             shop_pricing.apply_order_prices(items, priced)
         elif shipping_cents is None:
@@ -368,41 +385,73 @@ async def place_order(db, *, user_id: str, idempotency_key: str, buyer_kind: str
 
 
 async def quote_cart(db, lines: list, *, provider: FulfillmentProvider | None, country: str, zip_code: str,
-                     buyer_kind: str = "member") -> dict:
+                     buyer_kind: str = "member", shipping_estimate_cents: int | None = None) -> dict:
     """Der Betrag an der Kasse vor dem Bestellen (#2135, Vertrag für #1712/#1714): Positionen wie im Warenkorb
-    (Variante, Menge, Gamertag - nie ein Preis), dann ``shop_pricing.quote_lines``: eine Schätzung von Printful für den
-    ganzen Warenkorb, ohne Printful der Rückfall. Es entstehen keine Dateien."""
-    return await shop_pricing.quote_lines(db, _lines(lines, consent=False), provider=provider, country=country,
-                                          zip_code=zip_code, buyer_kind=buyer_kind)
+    (Variante, Menge, Gamertag - nie ein Preis), **dieselbe Vorprüfung** wie ``place_order`` (``_checked_line``:
+    lieferbar, Mindestpreis, Pflichtoptionen …) und **dieselbe Grundlage** (``shop_pricing.quote_lines``: je Position
+    die Grunddateien der Variante; Rückfall mit derselben Versandregel). So zeigt die Kasse nie einen Betrag, den die
+    Bestellung anders einfriert oder ablehnt. Es entstehen keine Dateien."""
+    clean = _lines(lines, consent=False)
+    shop_config.check_shipping_country(country)
+    config = await shop_config.load(db)
+    rows = [await _checked_line(db, line, position, buyer_kind, config)
+            for position, line in enumerate(clean, start=1)]
+    return await shop_pricing.quote_lines(db, rows, provider=provider, country=country, zip_code=zip_code,
+                                          config=config, shipping_estimate_cents=shipping_estimate_cents)
+
+
+# Aus diesen Ständen darf eine Bestellung ausgelöst werden (``paid`` kommt mit #1716/#1718).
+RELEASABLE = ("placed", "paid")
+STATE_CHANGED = "Der Stand der Bestellung hat sich während der Prüfung geändert - bitte erneut prüfen."
+CHECK_EVENTS = {"release": "order.price_checked", "hold": "order.price_changed", "retry": "order.price_check_retry",
+                "blocked": "order.price_check_blocked"}
 
 
 async def recheck_before_release(db, order_id: str, *, provider: FulfillmentProvider, actor_id: str) -> dict:
     """Vor dem Auslösen nach dem Zahlungseingang (#2135, Vertrag für #1718): neu schätzen und mit dem eingefrorenen
-    Betrag vergleichen (``shop_pricing.assess``). ``release`` - auslösen (günstiger: die Differenz bleibt beim Verein),
-    ``hold`` - teurer als die Toleranz: Stand „Preis geändert“, die Leitung entscheidet, ``retry`` - Printful gerade
-    nicht erreichbar, ``blocked`` - so nicht schätzbar. Jede Prüfung steht an der Bestellung (``price_check``) und als
-    Ereignis (``order.price_checked`` bzw. ``order.price_changed``). Löst selbst nichts aus."""
+    Betrag vergleichen (``shop_pricing.assess``):
+
+    - ``release`` - auslösen (günstiger: die Differenz bleibt beim Verein),
+    - ``hold`` - teurer als die Toleranz: Stand „Preis geändert“, die Leitung entscheidet; ebenso, wenn sich der Stand
+      während der Prüfung geändert hat (``reason``) - dann nie ``release``,
+    - ``retry`` - Printful gerade nicht erreichbar, später erneut,
+    - ``blocked`` - so nicht schätzbar (Datei fehlt, Printful lehnt ab): die Leitung muss nachsehen.
+
+    **Atomar:** gelesen werden Stand und Prüfzähler (``price_check_rev``); geschrieben wird nur, wenn beide noch gelten
+    und der Stand in ``RELEASABLE`` liegt (``find_one_and_update``). Von zwei gleichzeitigen Prüfungen gibt nur eine
+    ``release`` zurück. Jede Prüfung steht an der Bestellung (``price_check``, auch ``retry``/``blocked``) und als
+    Ereignis (``CHECK_EVENTS``). Löst selbst nichts aus."""
     order = await get_order(db, order_id)
     if not order:
         raise LookupError("Bestellung nicht gefunden.")
     if order.get("status") == shop_pricing.STATUS_PRICE_CHANGED:
         return {"decision": "hold", "reason": "Die Bestellung wartet schon auf die Leitung (Preis geändert).",
                 **(order.get("price_check") or {})}
+    status, revision = order.get("status"), int(order.get("price_check_rev") or 0)
+    if status not in RELEASABLE:
+        return {"decision": "hold", "reason": f"Aus dem Stand „{STATUS_LABELS.get(status, status)}“ wird nicht "
+                                              "ausgelöst.", "status": status}
     check = await shop_pricing.assess(db, order, await items_for(db, order_id), provider=provider)
-    if check["decision"] not in ("release", "hold"):
-        return check
-    hold = check["decision"] == "hold"
+    check.setdefault("at", now_utc().isoformat())
     update: dict = {"price_check": check, "updated_at": check["at"]}
-    if hold:
+    if check["decision"] == "hold":
         update["status"] = shop_pricing.STATUS_PRICE_CHANGED
-    await db.shop_orders.update_one({"id": order_id, "status": {"$ne": shop_pricing.STATUS_PRICE_CHANGED}},
-                                    {"$set": update})
-    event = {key: check[key] for key in ("frozen_cents", "estimate_cents", "difference_cents", "tolerance_cents")}
-    await append_event(db, order_id, "order.price_changed" if hold else "order.price_checked", actor_id=actor_id,
-                       data=event)
-    if hold:
-        logger.warning("[shop-orders] order held for review: order=%s difference=%s", log_safe(order_id),
-                       log_safe(check["difference_cents"]))
+    rev_filter = {"price_check_rev": revision} if revision else {"price_check_rev": {"$in": [None, 0]}}
+    claimed = await db.shop_orders.find_one_and_update(
+        {"id": order_id, "status": status, **rev_filter},
+        {"$set": update, "$inc": {"price_check_rev": 1}}, projection={"_id": 0, "id": 1})
+    if not claimed:
+        # Eine andere Prüfung (oder ein anderer Schritt) war schneller: nie ``release`` auf altem Stand.
+        logger.warning("[shop-orders] price check lost the race: order=%s", log_safe(order_id))
+        return {"decision": "hold", "reason": STATE_CHANGED, "at": check["at"]}
+    event = {key: check[key] for key in ("frozen_cents", "estimate_cents", "difference_cents", "tolerance_cents")
+             if key in check}
+    if check["decision"] in ("retry", "blocked"):
+        event["reason"] = str(check.get("reason") or "")[:200]
+    await append_event(db, order_id, CHECK_EVENTS[check["decision"]], actor_id=actor_id, data=event)
+    if check["decision"] in ("hold", "blocked"):
+        logger.warning("[shop-orders] order needs the board: order=%s decision=%s", log_safe(order_id),
+                       log_safe(check["decision"]))
     return check
 
 

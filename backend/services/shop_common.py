@@ -40,7 +40,9 @@ MODEL_FIELDS: dict[str, tuple[str, ...]] = {
                       "print_surface"),
     "shop_variants": ("id", "product_id", "sku", "label", "size", "color", "price_cents", "active", "version",
                       "created_at", "created_by", "updated_at", "updated_by",
-                      "color_code", "blocked_reason", "blocked_at"),
+                      "color_code", "blocked_reason", "blocked_at",
+                      # Herkunft des übernommenen Preises (#2135): ``estimate`` (brutto) oder ``catalog`` (netto)
+                      "price_source"),
     "shop_designs": ("id", "design_key", "version", "file_ref", "sha256", "placement", "created_at", "created_by",
                      # Druckdatei (#1708, services/shop_designs.py): Maße, Prüfung und öffentlicher Zufallsschlüssel
                      "public_id", "public_disabled_at", "content_type", "size_bytes", "width_px", "height_px",
@@ -96,8 +98,8 @@ MODEL_FIELDS: dict[str, tuple[str, ...]] = {
     "shop_orders": ("id", "user_id", "idempotency_key", "request_hash", "status", "frozen", "billing_address",
                     "shipping_address", "printful_external_id", "printful_order_id", "item_count", "created_at",
                     "updated_at", "anonymized_at",
-                    # Preisprüfung vor dem Auslösen (#2135): letzte Schätzung, Abweichung, Entscheidung
-                    "price_check"),
+                    # Preisprüfung vor dem Auslösen (#2135): letzte Schätzung, Abweichung, Entscheidung, Prüfzähler
+                    "price_check", "price_check_rev"),
     "shop_order_items": ("id", "order_id", "user_id", "position", "product_id", "variant_id", "product_title",
                          "variant_label", "sku", "quantity", "unit_price_cents", "markup_cents", "line_total_cents",
                          "gamertag", "design", "printful", "tax_profile",
