@@ -675,9 +675,11 @@ gewohnt. Den Rahmen legst du unter **Admin → eSports → Liga** an (nur Turnie
    Staffel. Über **Turnierverwaltung · Co-Teams zuteilen** geht es weiter in das Turnier.
 
 **Sichtbarkeit:** *Aus* (Vorgabe) zeigt nichts, *Nur Turnierleitung* nur euch, *Nur Mitglieder* und *Öffentlich* geben
-Liga und Staffel-Turniere frei. Ändert ihr später etwas an der Season, tragen bestehende Staffeln noch die alten Werte,
-bis ihr **Vorgaben übertragen** drückt: Sichtbarkeit, Regeltext und Map-Pool gehen immer, Termine und Kalender nur vor
-dem Start, Best of, Teamgröße, Punkte und Fristen nur vor dem ersten Ergebnis – was nicht mehr geht, steht mit Grund da.
+Liga und Staffel-Turniere frei – die Sichtbarkeit gilt schon beim Speichern für alle Staffeln. Ändert ihr später etwas
+anderes an der Season, tragen bestehende Staffeln noch die alten Werte, bis ihr **Vorgaben übertragen** drückt:
+Regeltext und Map-Pool gehen immer (ein entfernter Pool verschwindet nur vor dem ersten Ergebnis), Termine, Kalender
+und Mindestkader nur vor dem Start, Best of, Teamgröße, Punkte und Fristen nur vor dem ersten Ergebnis – was nicht mehr
+geht, steht mit Grund da.
 
 Staffeln zählen nicht für Jahreswertung, Turnier-Pokale, Löwen-Rang-XP für Teilnahme und Podest und die Team-Stufe;
 gespielte und gewonnene Spiele zählen weiter. Auf Startseite, im öffentlichen Kalender und in der Turnierliste der
