@@ -32,9 +32,10 @@ export const TOURNAMENT_FORMAT_OPTIONS = [
   ["ffa_custom_bracket", TOURNAMENT_FORMAT_LABELS.ffa_custom_bracket],
 ];
 
-// Nicht mehr zur Wahl (#2111): „Überlebensmodus“ ist dasselbe wie „Mehrspieler frei“ (TA5). Ein bestehendes Turnier
-// behält sein Format und sieht es in der Auswahl.
-const RETIRED_FORMATS = new Set(["battle_royale"]);
+// Nicht mehr zur Wahl (#2111): „Überlebensmodus“ ist dasselbe wie „Mehrspieler frei“ (TA5), Zeitfahren und Rennserie
+// bekommen nie Spiele (TA6 - dafür gibt es Fast Lap und Serien). Ein bestehendes Turnier behält sein Format und sieht
+// es in der Auswahl.
+const RETIRED_FORMATS = new Set(["battle_royale", "time_trial", "grand_prix"]);
 
 /** Die Formate zur Auswahl: ohne die stillgelegten - außer dem, das das Turnier gerade hat. */
 export function tournamentFormatOptions(current = "") {

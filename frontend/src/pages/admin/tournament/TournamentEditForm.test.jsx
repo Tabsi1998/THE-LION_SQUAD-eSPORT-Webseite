@@ -97,3 +97,14 @@ test("„Gewinne erzeugen“ erst ab Beendet", async () => {
   expect(await screen.findByTestId("tr-edit-create-prizes")).toBeEnabled();
   expect(screen.getByTestId("tr-edit-create-prizes-hint")).toHaveTextContent("Sonderpreise vergebt ihr dort von Hand");
 });
+
+// Zeitfahren und Rennserie (#2111, TA6): ein bestehendes Turnier behält sein Format, darunter steht der Weg zu Fast Lap
+// und Serien - es bekommt im Turnier keine Spiele.
+test("Zeitfahren: das Format bleibt wählbar, mit Hinweis auf Fast Lap und Serien", async () => {
+  render(<MemoryRouter><TournamentEditForm tournament={{ ...BASE, status: "draft", format: "time_trial" }} onSaved={() => {}} /></MemoryRouter>);
+  const format = await screen.findByTestId("tr-edit-format");
+  expect(format).toHaveValue("time_trial");
+  expect(screen.getByTestId("tr-edit-format-hint")).toHaveTextContent("keine Spiele");
+  expect(screen.getByRole("link", { name: "Fast Lap" })).toHaveAttribute("href", "/admin/f1");
+  expect(screen.getByRole("link", { name: "Serien" })).toHaveAttribute("href", "/admin/reference-series");
+});

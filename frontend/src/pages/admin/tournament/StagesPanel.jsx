@@ -11,6 +11,7 @@ import { ResultWindowLoader } from "@/components/tls/results/ResultWindow";
 import { ResultUndoBar, useResultUndo } from "@/components/tls/results/ResultUndoBar";
 import { SelectField, modeLabel } from "./TournamentEditForm";
 import { DrawControls } from "./DrawControls";
+import { NO_MATCH_FORMATS } from "@/lib/tournamentFormFields";
 import { sourceLabel } from "@/lib/slotSource";
 import { durationSourceText, matchDurationSource, ownDurationInput, ownDurationPayload } from "@/lib/matchDuration";
 import { DEFAULT_FFA_SCHEMA, DRAW_SHOW_MINUTES_DEFAULT, DRAW_SHOW_MINUTES_HINT, EVENT_MODE_OPTIONS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, STAGE_ADVANCEMENT_OPTIONS, RESULT_ENTRY_MODE_OPTIONS, SCHEDULE_MODE_OPTIONS, advancementModeHint, applyStageType, drawShowMinutesPayload, guardDetail, matchImpact, matchSectionKey, sectionSortIndex, sortMatchesForPlan, stageAdvancementSettings, stageAdvancementValue, stageConfigFor, stationDisplay } from "./shared";
@@ -205,7 +206,10 @@ export function TournamentStagesPanel({ tournamentId, stages, matches, registrat
         ))}
         {stages.length === 0 && (
           <div className="border border-white/10 bg-[#121212] rounded-sm p-10 text-center text-white/40">
-            {mode === "settings" ? "Noch keine eigene Bracket-Phase." : "Noch keine Phasen. Sie entstehen mit der Format-Vorschau (Bearbeiten → Speichern & Struktur anwenden) oder mit dem Start des Check-ins."}
+            {mode === "settings" ? "Noch keine eigene Bracket-Phase." : NO_MATCH_FORMATS.has(tournament?.format)
+              // Zeitfahren und Rennserie (#2111, TA6): hier entstehen nie Phasen.
+              ? "Zeitfahren und Rennserie bekommen im Turnier keine Spiele – Zeitfahren laufen über Fast Lap, Rennserien über Serien."
+              : "Noch keine Phasen. Sie entstehen mit der Format-Vorschau (Bearbeiten → Speichern & Struktur anwenden) oder mit dem Start des Check-ins."}
           </div>
         )}
       </div>

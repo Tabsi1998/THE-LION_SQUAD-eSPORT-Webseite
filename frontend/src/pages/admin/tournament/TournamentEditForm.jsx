@@ -25,6 +25,7 @@ import { deadlineFormValues, deadlinePayload } from "@/lib/tournamentDeadlines";
 import { ADVANCEMENT_MODE_OPTIONS, BRONZE_FORMATS, DRAW_SHOW_MINUTES_DEFAULT, DRAW_SHOW_MINUTES_HINT, advancementModeHint, drawShowMinutesPayload, CUSTOM_BRACKET_FORMATS, EVENT_MODE_OPTIONS, GRAND_FINAL_FORMATS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, HEAT_REBUILD_FORMATS, HEAT_REBUILD_HINT, HEAT_REBUILD_OPTIONS, MATCHDAY_FORMATS, RESULT_ENTRY_MODE_OPTIONS, SCHEDULE_MODE_OPTIONS, SEEDING_OPTIONS, STREAM_PLATFORM_OPTIONS, TEAM_MODE_OPTIONS, TOURNAMENT_SEASON_WEIGHT_OPTIONS, VISIBILITY_OPTIONS, WEEKDAY_OPTIONS, advancementModeOf } from "./shared";
 import { StaffelSeasonValues, isStaffel, staffelBeforeStart } from "./StaffelParts";
 import { FormatHint } from "./FormatHint";
+import { NO_MATCH_FORMATS } from "@/lib/tournamentFormFields";
 
 // „Gewinne erzeugen“ erst ab dem Ende (#2123, TA23) - wie der Server (services/tournament_guard.py FINISHED_STATUSES).
 const PRIZE_READY_STATUSES = new Set(["completed", "results_published", "archived"]);
@@ -638,11 +639,13 @@ function emptyBracketReason(tournament) {
       action: "Teilnehmer bestätigen, dann „Schweizer Runde“ drücken.",
     };
   }
-  if (format === "time_trial" || format === "grand_prix") {
+  if (NO_MATCH_FORMATS.has(format)) {
+    // Zeitfahren und Rennserie (#2111, TA6): es gibt weder Spiele noch eine Zeiteingabe - vorher stand hier, das Format
+    // werde über Rundenzeiten gewertet.
     return {
-      title: "Kein Turnierbaum vorgesehen",
-      detail: "Dieses Format wird über Rundenzeiten gewertet, nicht über Spielpaarungen.",
-      action: null,
+      title: "Kein Turnierbaum, keine Spiele",
+      detail: "Zeitfahren und Rennserie bekommen im Turnier keine Spiele und keine Zeiteingabe.",
+      action: "Zeitfahren laufen über Fast Lap, Rennserien über Serien.",
     };
   }
   const pairings = format === "league" ? size * (size - 1)

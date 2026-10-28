@@ -20,3 +20,12 @@ test("Überlebensmodus heißt „Mehrspieler frei“ und steht nur bei bestehend
   expect(values("battle_royale")).toContain("battle_royale");
   expect(values("battle_royale")).not.toContain("ffa");
 });
+// Zeitfahren und Rennserie (#2111, TA6): ohne Generator entstehen nie Spiele - beim Anlegen nicht mehr zur Wahl,
+// bestehende Turniere behalten ihr Format.
+test("Zeitfahren und Rennserie stehen nur bei bestehenden Turnieren zur Wahl", () => {
+  const values = (current) => tournamentFormatOptions(current).map(([value]) => value);
+  expect(values("")).not.toContain("time_trial");
+  expect(values("")).not.toContain("grand_prix");
+  expect(values("time_trial")).toContain("time_trial");
+  expect(values("grand_prix")).toEqual(expect.arrayContaining(["grand_prix", "ffa", "league"]));
+});
