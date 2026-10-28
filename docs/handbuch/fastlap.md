@@ -300,8 +300,8 @@ Nach **90 Tagen** wird der Name von selbst zu „Gast 3“ (Datenschutz, siehe `
 Unten auf der Challenge-Seite steht die Liste **Gäste**: mit dem Stift **umbenennen** (etwa, wenn jemand nicht mehr
 mit Namen auftauchen will – dann z. B. „Gast 3“), mit dem Mülleimer einen Gast **löschen**, der noch **keine Zeiten**
 hat (doppelt angelegt, nie gefahren). Ein gelöschter Gast verschwindet auch aus „Am Start / Als Nächstes“. Gäste mit
-Zeiten lassen sich nur umbenennen. Nach **Ergebnisse veröffentlicht** benennt nur die Turnierleitung um, mit
-Begründung; Umbenennen und Löschen stehen im Protokoll. Die öffentliche Liste „Am Start / Als Nächstes“ zeigt nur
+Zeiten lassen sich nur umbenennen. Nach **Ergebnisse veröffentlicht** benennt und löscht nur die Turnierleitung,
+mit Begründung; Umbenennen und Löschen stehen im Protokoll. Die öffentliche Liste „Am Start / Als Nächstes“ zeigt nur
 Name, Station, Versuch und Platz.
 
 **Gast mit Konto verknüpfen:** Legt ein Gast später ein Konto an, klickt die **Turnierleitung** in der Liste der Zeiten

@@ -30,7 +30,7 @@ from services.laptime import format_lap_time, plausibility_warning, plausible_ra
 from models import (
     F1ChallengeCreate, F1ChallengeUpdate, F1TrackCreate, F1TrackUpdate,
     F1LapTimeCreate, F1LapTimeDelete, F1LapTimeUpdate,
-    F1GuestCreate, F1GuestLink, F1GuestRename, F1QueueCreate, F1QueueNext, F1QueueStart,
+    F1GuestCreate, F1GuestDelete, F1GuestLink, F1GuestRename, F1QueueCreate, F1QueueNext, F1QueueStart,
     now_utc, new_id,
 )
 
@@ -1436,23 +1436,26 @@ async def _rename_guest_locked(gid: str, body: F1GuestRename, me: dict):
 
 
 @router.delete("/guests/{gid}")
-async def delete_guest(gid: str, me: dict = Depends(get_current_user)):
+async def delete_guest(gid: str, body: F1GuestDelete | None = None, me: dict = Depends(get_current_user)):
     """Einen Gast ohne Zeiten löschen (#2112) - etwa doppelt angelegt oder nie gefahren. Mit Zeiten bleibt er stehen:
-    Rangliste, Urkunde und Verknüpfung hängen an ihm. Aus „Am Start / Als Nächstes“ verschwindet er mit."""
+    Rangliste, Urkunde und Verknüpfung hängen an ihm. Aus „Am Start / Als Nächstes“ verschwindet er mit. Nach der
+    Veröffentlichung dieselbe Regel wie beim Umbenennen: Helfer nicht, Leitung mit Begründung."""
     known = await get_db().f1_guests.find_one({"id": gid}, {"_id": 0, "challenge_id": 1})
     if not known:
         raise HTTPException(status_code=404, detail="Gast nicht gefunden")
     async with challenge_write(known["challenge_id"]):
-        return await _delete_guest_locked(gid, me)
+        return await _delete_guest_locked(gid, body, me)
 
 
-async def _delete_guest_locked(gid: str, me: dict):
+async def _delete_guest_locked(gid: str, body: F1GuestDelete | None, me: dict):
     db = get_db()
     guest = await db.f1_guests.find_one({"id": gid}, {"_id": 0})
     if not guest:
         raise HTTPException(status_code=404, detail="Gast nicht gefunden")
     cid = guest["challenge_id"]
     await _require_f1_result_permission(me, cid)
+    challenge = await db.f1_challenges.find_one({"id": cid}, {"_id": 0, "status": 1}) or {}
+    reason = _published_change_reason(challenge, me, body.change_reason if body else None)
     try:
         async with mutation_lock(db, guests_resource(cid), wait_seconds=LAP_WAIT_SECONDS):
             if await db.f1_lap_times.count_documents({"challenge_id": cid, "guest_id": gid}):
@@ -1462,7 +1465,8 @@ async def _delete_guest_locked(gid: str, me: dict):
     except MutationLockBusy:
         raise HTTPException(status_code=409, detail=GUESTS_BUSY)
     await db.audit_logs.insert_one({"id": new_id(), "action": "fastlap.guest.delete", "actor_id": me.get("id"), "target_id": gid,
-                                    "data": {"challenge_id": cid}, "created_at": now_utc().isoformat()})
+                                    "data": {"challenge_id": cid, "reason": reason, "after_publishing": reason is not None},
+                                    "created_at": now_utc().isoformat()})
     return {"ok": True}
 
 

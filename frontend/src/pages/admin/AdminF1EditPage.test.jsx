@@ -366,3 +366,14 @@ test("nach der Veröffentlichung braucht das Umbenennen eine Begründung", async
   fireEvent.click(await screen.findByTestId("f1-guest-rename-g-1"));
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/f1/guests/g-1", { display_name: "Gast 1", change_reason: "Gast will anonym bleiben" }));
 });
+test("nach der Veröffentlichung braucht das Löschen eines Gastes eine Begründung", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (String(url).startsWith("/f1/challenges/c-1?")) return { data: { ...CHALLENGE, status: "results_published" } };
+    if (url === "/f1/challenges/c-1/guests") return { data: [{ id: "g-2", display_name: "Ben", has_times: false }] };
+    return { data: [] };
+  });
+  promptMock.mockResolvedValueOnce("Doppelt angelegt, nie gefahren");
+  renderPage();
+  fireEvent.click(await screen.findByTestId("f1-guest-delete-g-2"));
+  await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith("/f1/guests/g-2", { data: { change_reason: "Doppelt angelegt, nie gefahren" } }));
+});

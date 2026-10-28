@@ -51,8 +51,22 @@ export function FastLapGuestsPanel({ guests, locked, onChanged }) {
       confirmLabel: "Gast löschen",
       tone: "danger",
     })) return;
+    // Nach der Veröffentlichung wie beim Umbenennen (#2112): nur mit Begründung, sie steht im Protokoll.
+    let reason = null;
+    if (locked) {
+      const text = await prompt({
+        title: "Begründung nötig",
+        description: "Die Ergebnisse sind veröffentlicht. Löschen geht nur mit Begründung (mind. 10 Zeichen) - sie steht im Protokoll.",
+        placeholder: "z. B. doppelt angelegt, nie gefahren",
+        confirmLabel: "Mit Begründung löschen",
+        required: true,
+      });
+      reason = typeof text === "string" ? text.trim() : "";
+      if (!reason) return;
+    }
     try {
-      await api.delete(`/f1/guests/${guest.id}`);
+      if (reason) await api.delete(`/f1/guests/${guest.id}`, { data: { change_reason: reason } });
+      else await api.delete(`/f1/guests/${guest.id}`);
       toast.success("Gast gelöscht.");
       onChanged?.();
     } catch (error) {

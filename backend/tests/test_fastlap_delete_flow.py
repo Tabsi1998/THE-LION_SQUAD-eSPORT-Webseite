@@ -101,7 +101,7 @@ async def test_a_guest_without_times_is_deleted_and_leaves_the_queue(flow):
     assert await flow.db.f1_guests.count_documents({"id": guest["id"]}) == 0
     assert await flow.db.f1_queue.count_documents({"guest_id": guest["id"]}) == 0
     rows = await audit(flow, "fastlap.guest.delete")
-    assert len(rows) == 1 and rows[0]["target_id"] == guest["id"] and rows[0]["data"] == {"challenge_id": cid}
+    assert len(rows) == 1 and rows[0]["target_id"] == guest["id"] and rows[0]["data"] == {"challenge_id": cid, "reason": None, "after_publishing": False}
 
 
 @pytest.mark.asyncio
@@ -126,3 +126,25 @@ async def test_deleting_a_guest_needs_fast_lap_rights(flow):
     response = await flow.delete(f"/api/f1/guests/{guest['id']}")
     assert response.status_code == 403
     assert await flow.db.f1_guests.count_documents({"id": guest["id"]}) == 1
+
+
+@pytest.mark.asyncio
+async def test_after_publishing_only_the_lead_deletes_a_guest_and_with_a_reason(flow):
+    """#2112: dieselbe Regel wie beim Umbenennen - Helfer nicht, Leitung nur mit Begründung (im Protokoll)."""
+    cid, _tid, lead = await challenge(flow, "live")
+    guest = await add_guest(flow, cid)
+    helper = await flow.add_user(name="zeitnehmer")
+    await flow.db.f1_staff_assignments.insert_one({"id": new_id(), "challenge_id": cid, "user_id": helper["id"], "role": "scorekeeper", "is_active": True})
+    await flow.db.f1_challenges.update_one({"id": cid}, {"$set": {"status": "results_published"}})
+    flow.act_as(helper)
+    refused = await flow.delete(f"/api/f1/guests/{guest['id']}")
+    assert refused.status_code == 409
+    flow.act_as(lead)
+    without = await flow.delete(f"/api/f1/guests/{guest['id']}")
+    assert without.status_code == 409
+    assert await flow.db.f1_guests.count_documents({"id": guest["id"]}) == 1
+    reason = "Doppelt angelegt, nie gefahren"
+    response = await flow.client.request("DELETE", f"/api/f1/guests/{guest['id']}", json={"change_reason": reason})
+    assert response.status_code == 200, response.text
+    rows = await audit(flow, "fastlap.guest.delete")
+    assert rows[0]["data"]["reason"] == reason and rows[0]["data"]["after_publishing"] is True
