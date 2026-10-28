@@ -385,6 +385,15 @@ async def migrate_kind_templates(db) -> str:
     return f"{added} points scheme templates added, formula 1 {'narrowed' if narrowed else 'kept'}"
 
 
+async def migrate_tournament_point_duplicates(db) -> str:
+    """Jahreswertung (#2123, TA22): doppelte Jahrespunkte je Turnier, Person und Team (nach einem Wechsel von Mini,
+    Normal oder Major zwischen zwei Veröffentlichungen) bereinigen - einer bleibt, der Rest steht im Protokoll.
+    Trockenlauf: ``backend/scripts/season_points_duplicates.py``."""
+    from services import season_points_cleanup
+
+    return await season_points_cleanup.apply(db)
+
+
 MIGRATIONS = (
     (1, "encrypt_legacy_integration_credentials", migrate_plaintext_secrets),
     (2, "team_leader_role_to_player", migrate_team_leader_role),
@@ -410,6 +419,9 @@ MIGRATIONS = (
     (16, "league_published_at", migrate_league_published_at),
     # #2108: Liga-Kader mit Spiel-ID je Season für schon zugeteilte Co-Teams nachziehen (services/league_roster.py).
     (17, "league_roster_backfill", migrate_league_roster_backfill),
+    # #2123: doppelte Jahrespunkte je Turnier entfernen (services/season_points_cleanup.py, Trockenlauf
+    # backend/scripts/season_points_duplicates.py).
+    (18, "season_points_tournament_duplicates", migrate_tournament_point_duplicates),
 )
 
 

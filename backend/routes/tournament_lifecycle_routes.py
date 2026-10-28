@@ -435,7 +435,7 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
     # ---------- Season Points + Badges on results_published ----------
     if prev != status and status == "results_published":
         try:
-            from services.season_service import award_points, season_weight_of
+            from services.season_service import season_weight_of, sync_tournament_points
             from badges import on_tournament_completed
             # Build placements once through the canonical Legacy/Stage projection.
             regs = await db.tournament_registrations.find(
@@ -452,35 +452,24 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
                 for placement in placements
                 if placement.get("registration_id")
             }
-            # Source type by season weight: <=1.5 mini, <=2.5 normal, else major
             weight = season_weight_of(t)
-            source_type = "mini" if weight < 1.5 else ("major" if weight >= 2.5 else "tournament")
             # Liga-Staffeln (docs/LIGA.md, Abschnitt 7) zählen nicht für die Jahreswertung - ausdrücklich, nicht über
             # season_weight=0. Gewicht 0 = "keine Jahreswertung" (#2095): ebenfalls keine Einträge.
             league_staffel = is_league_staffel(t) or weight <= 0
-            for p in placements:
-                if league_staffel or not (p.get("user_id") or p.get("team_id")):
-                    continue
-                await award_points(
-                    user_id=p.get("user_id"),
-                    team_id=p.get("team_id"),
-                    source_type=source_type,
-                    source_id=tid,
-                    source_name=t.get("title"),
-                    rank=p["rank"],
-                    num_participants=num_participants,
-                    weight=weight,
-                )
-            # Participation points for everyone else
-            for r in regs:
-                if league_staffel:
-                    break
-                if r.get("id") not in placed_reg_ids and (r.get("user_id") or r.get("team_id")):
-                    await award_points(
-                        user_id=r.get("user_id"), team_id=r.get("team_id"), source_type=source_type, source_id=tid,
-                        source_name=t.get("title"), rank=None,
-                        num_participants=num_participants, weight=weight,
-                    )
+            wanted: list[tuple] = []
+            if not league_staffel:
+                wanted = [(p.get("user_id"), p.get("team_id"), p["rank"]) for p in placements
+                          if p.get("user_id") or p.get("team_id")]
+                # Teilnahme-Punkte für alle ohne Platzierung
+                wanted += [(r.get("user_id"), r.get("team_id"), None) for r in regs
+                           if r.get("id") not in placed_reg_ids and (r.get("user_id") or r.get("team_id"))]
+            # Erneutes Veröffentlichen nach einer Korrektur (#2123, TA22): angleichen statt nur neu anlegen - auch nach
+            # einem Wechsel von Mini/Normal/Major bleibt je Person ein Eintrag.
+            synced = await sync_tournament_points(tournament_id=tid, source_name=t.get("title"), weight=weight,
+                                                  wanted=wanted, num_participants=num_participants)
+            if synced.get("republished") and (synced["updated"] or synced["added"] or synced["removed"]):
+                await _audit_tournament_action(db, "tournament.season_points.resync", me.get("id"), tid,
+                                               {key: synced[key] for key in ("updated", "added", "removed", "season_id")})
             await on_tournament_completed(tid, placements)
             # Auszeichnungen (#230): je Anmeldung Platz und Bilanz festhalten - bei erneutem Veröffentlichen neu.
             try:

@@ -117,7 +117,7 @@ SOURCE_LABELS = {
     "fastlap": "Fast Lap",
     "fun": "Fun-Challenges",
     "event": "Events",
-    "custom": "Admin-Wertungen",
+    "custom": "Korrekturen",
 }
 
 # Sources that count toward the 4-per-month farming cap
@@ -272,7 +272,9 @@ async def _achievement_summaries(db, user_ids: list[str]) -> dict[str, dict]:
 
 # ---------- Award helpers ----------
 async def _active_season(db) -> dict | None:
-    return await db.seasons.find_one({"status": "active"}, {"_id": 0})
+    """Die aktive Jahreswertung. Aktiv ist höchstens eine (#2123, ER7: das Aktivieren einer zweiten lehnt der Server
+    ab); stehen aus der Zeit davor noch mehrere auf „Aktiv“, gilt fest die mit dem spätesten Start."""
+    return await db.seasons.find_one({"status": "active"}, {"_id": 0}, sort=[("start_date", -1), ("created_at", -1)])
 
 
 async def _farming_count_this_month(db, user_id: str, source_type: str, season_id: str) -> int:
@@ -394,19 +396,34 @@ async def resync_source_points(*, season_id: str, source_type: SourceType, sourc
     Ergebnisse. Gerechnet wird in der Saison, in der die Punkte vergeben wurden, mit dem Gewicht der Quelle; Bonus und
     Farming-Faktor bestehender Einträge bleiben. Wer nicht mehr in der Rangfolge steht, verliert die Punkte dieser Quelle.
     ``ranking``: (Person, Platz), Platz 1 zuerst. Gibt die Zahl der geänderten, neuen und entfernten Einträge zurück."""
-    db = get_db()
-    num_participants = max(len(ranking), 1)
-    existing = {row.get("user_id"): row for row in await db.season_points.find(
+    counts = await _resync_rows(get_db(), season_id=season_id, source_type=source_type, source_id=source_id,
+                                source_name=source_name, wanted=[(user_id, None, rank) for user_id, rank in ranking],
+                                num_participants=max(len(ranking), 1), weight=weight)
+    if any(counts.values()):
+        from services.discord_embed_queue import request_refresh
+        request_refresh("ranking")
+    return counts
+
+
+async def _resync_rows(db, *, season_id: str, source_type: str, source_id: str, source_name: str | None,
+                       wanted: list[tuple[str | None, str | None, int | None]], num_participants: int, weight: float) -> dict:
+    """Die Einträge einer Quelle in einer Saison auf ``wanted`` (Person, Team, Platz) bringen: fehlende anlegen,
+    abweichende neu rechnen, übrige entfernen. Bonus und Farming-Faktor bestehender Einträge bleiben."""
+    existing = {(row.get("user_id"), row.get("team_id")): row for row in await db.season_points.find(
         {"season_id": season_id, "source_type": source_type, "source_id": source_id}, {"_id": 0}).to_list(None)}
     counts = {"updated": 0, "added": 0, "removed": 0}
     stamp = now_utc().isoformat()
-    for user_id, rank in ranking:
-        row = existing.pop(user_id, None)
+    seen: set[tuple] = set()
+    for user_id, team_id, rank in wanted:
+        if (user_id, team_id) in seen:
+            continue  # je Person bzw. Team nur ein Eintrag je Quelle - der erste (beste) Platz zählt
+        seen.add((user_id, team_id))
+        row = existing.pop((user_id, team_id), None)
         if row is None:
-            doc = await _points_doc(db, season_id=season_id, user_id=user_id, team_id=None, source_type=source_type,
+            doc = await _points_doc(db, season_id=season_id, user_id=user_id, team_id=team_id, source_type=source_type,
                                     source_id=source_id, source_name=source_name, rank=rank, num_participants=num_participants,
                                     weight=weight, bonus=0, bonus_reason=None, farming_exempt=False)
-            key = {"season_id": season_id, "source_type": source_type, "source_id": source_id, "user_id": user_id, "team_id": None}
+            key = {"season_id": season_id, "source_type": source_type, "source_id": source_id, "user_id": user_id, "team_id": team_id}
             written = await db.season_points.update_one(key, {"$setOnInsert": doc}, upsert=True)
             if getattr(written, "upserted_id", None) is not None:
                 counts["added"] += 1
@@ -414,14 +431,61 @@ async def resync_source_points(*, season_id: str, source_type: SourceType, sourc
         # Das Gewicht kommt aus der Quelle (Wertungsgewicht der Challenge) - es kann sich mit Begründung ändern.
         values = _points_values(rank, num_participants, weight, int(row.get("bonus_points") or 0), float(row.get("farming_multiplier") or 1.0))
         if (row.get("rank") != rank or row.get("num_participants") != num_participants or row.get("total_points") != values["total_points"]
-                or row.get("weight") != weight):
-            await db.season_points.update_one({"id": row["id"]}, {"$set": {"rank": rank, "num_participants": num_participants,
-                                                                         "weight": weight, **values, "updated_at": stamp}})
+                or row.get("weight") != weight or (source_name is not None and row.get("source_name") != source_name)):
+            change = {"rank": rank, "num_participants": num_participants, "weight": weight, **values, "updated_at": stamp}
+            if source_name is not None:
+                change["source_name"] = source_name
+            await db.season_points.update_one({"id": row["id"]}, {"$set": change})
             counts["updated"] += 1
     for row in existing.values():
         await db.season_points.delete_one({"id": row["id"]})
         counts["removed"] += 1
-    if any(counts.values()):
+    return counts
+
+
+# Turniere zählen je nach Gewicht als Mini, Normal oder Major (#2123): dieselbe Quelle, drei mögliche Typen.
+TOURNAMENT_SOURCE_TYPES = ("mini", "tournament", "major")
+
+
+def tournament_source_type(weight: float) -> str:
+    """Typ eines Turniers in der Jahreswertung nach seinem Gewicht: unter 1,5 Mini, ab 2,5 Major, sonst Normal."""
+    return "mini" if weight < 1.5 else ("major" if weight >= 2.5 else "tournament")
+
+
+async def sync_tournament_points(*, tournament_id: str, source_name: str | None, weight: float,
+                                 wanted: list[tuple[str | None, str | None, int | None]], num_participants: int) -> dict:
+    """Jahrespunkte eines Turniers beim (erneuten) Veröffentlichen an die aktuelle Rangfolge angleichen (#2123, TA22).
+
+    Bisher legte das Veröffentlichen nur neu an: nach einer Korrektur blieben die alten Plätze stehen, und wer zwischen
+    zwei Veröffentlichungen das Gewicht (Mini/Normal/Major) änderte, bekam einen zweiten Eintrag unter dem anderen Typ.
+    Jetzt gilt je Turnier genau ein Satz Einträge: in der Saison, in der seine Punkte schon stehen (sonst der aktiven),
+    unter dem Typ des aktuellen Gewichts. Einträge desselben Turniers mit anderem Typ oder in einer anderen Saison fallen
+    weg. ``wanted``: (Person, Team, Platz) - Platz ``None`` heißt Teilnahme. Leer (Gewicht 0, Liga-Staffel) entfernt alle
+    Einträge des Turniers. Gibt die Zahlen und die Saison zurück."""
+    db = get_db()
+    previous = await db.season_points.find(
+        {"source_id": tournament_id, "source_type": {"$in": list(TOURNAMENT_SOURCE_TYPES)}},
+        {"_id": 0, "id": 1, "season_id": 1, "source_type": 1}).to_list(None)
+    if previous:
+        from collections import Counter
+        season_id = Counter(row.get("season_id") for row in previous).most_common(1)[0][0]
+    else:
+        season = await _active_season(db)
+        season_id = season["id"] if season else None
+    counts = {"updated": 0, "added": 0, "removed": 0, "season_id": season_id, "republished": bool(previous)}
+    if not season_id:
+        return counts
+    source_type = tournament_source_type(weight)
+    for row in previous:
+        if row.get("season_id") != season_id or row.get("source_type") != source_type:
+            await db.season_points.delete_one({"id": row["id"]})
+            counts["removed"] += 1
+    changed = await _resync_rows(db, season_id=season_id, source_type=source_type, source_id=tournament_id,
+                                 source_name=source_name, wanted=list(wanted), num_participants=num_participants,
+                                 weight=weight)
+    for key in ("updated", "added", "removed"):
+        counts[key] += changed[key]
+    if counts["updated"] or counts["added"] or counts["removed"]:
         from services.discord_embed_queue import request_refresh
         request_refresh("ranking")
     return counts
