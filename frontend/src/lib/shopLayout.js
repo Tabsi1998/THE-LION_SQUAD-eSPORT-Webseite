@@ -165,11 +165,11 @@ export function resolveLayers(area, layers, { presets, motifFor, gamertagCanvas,
 
 // ---------------------------------------------------------------- Ausrichten (#2142)
 
-// Versatz waagrecht, damit die Ebene mittig auf der Fläche liegt.
+// Versatz waagrecht, damit die Ebene mittig auf der Fläche liegt - auf 0,01 cm, wie der Server speichert (#2117).
 export function centerOffsetCm(area, item, layer) {
   if (!item?.box) return null;
   const shift = area.width_px / 2 - (item.box.left + item.box.width / 2);
-  return Math.round((Number(layer?.offset_x_cm || 0) + pxToCm(shift, area.dpi)) * 10) / 10;
+  return Math.round((Number(layer?.offset_x_cm || 0) + pxToCm(shift, area.dpi)) * 100) / 100;
 }
 
 // Die Ebene direkt darüber: von allen, die sichtbar über dieser enden, die mit dem tiefsten unteren Rand.
@@ -197,7 +197,7 @@ export function gapCm(area, above, item) {
 export function gapOffsetCm(area, above, item, layer, wantedCm) {
   const now = gapCm(area, above, item);
   if (now === null || !Number.isFinite(Number(wantedCm))) return null;
-  return Math.round((Number(layer?.offset_y_cm || 0) + Number(wantedCm) - now) * 10) / 10;
+  return Math.round((Number(layer?.offset_y_cm || 0) + Number(wantedCm) - now) * 100) / 100;
 }
 
 // Wie groß eine Textebene auf dieser Fläche höchstens sein kann (#2142, wie `shop_products._text_bounds`): Breite der
