@@ -32,6 +32,8 @@ PURPOSES = {
     "reference_series": "Captains externer Serien",
     # Korrekturen der Jahreswertung (#2123, ER10): Bonus oder Abzug für eine Person.
     "season": "Korrekturen der Jahreswertung",
+    # Autor eines News-Beitrags (#2122 NW3): wer News pflegt, darf den Autor ändern.
+    "news_author": "Autor eines News-Beitrags",
 }
 MISSING_RIGHT = "Dafür fehlt dir das Recht: {what}."
 
@@ -66,6 +68,8 @@ async def _allowed(purpose: str, me: dict, context_id: str | None) -> bool:
     if purpose == "season":
         # Wie die Jahreswertung selbst (require_admin): Bereich Turnierleitung mit Zwei-Faktor.
         return await user_has_area(me, "tournaments") and not needs_mfa(me)
+    if purpose == "news_author":
+        return await user_has_area(me, "content") and not needs_mfa(me)
     return False
 
 

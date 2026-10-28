@@ -150,3 +150,40 @@ test("Verteilen: ohne Recht steht ein Satz statt des Knopfs", async () => {
   expect(await screen.findByTestId("distribute-error")).toHaveTextContent("Den Newsletter verschickt die Redaktion");
   expect(screen.queryByTestId("distribute-send")).toBeNull();
 });
+
+// Wer geändert hat, Verlauf, Autor (#2122 NW3).
+test("Autor und Verlauf: zuletzt geändert, Verlauf mit Feldern, neuer Autor geht mit", async () => {
+  const post = { ...POSTS[0], author_id: "u-a", author_name: "Rita Redaktion", updated_at: "2026-10-27T08:15:00+00:00", updated_by_name: "Moritz Muster",
+    history: [{ at: "2026-10-27T08:15:00+00:00", action: "news.update", label: "Geändert", by: "Moritz Muster", fields: ["Titel", "Kurzbeschreibung"] }] };
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/news-meta") return { data: META };
+    if (url.startsWith("/admin/news/")) return adminPost(url, [post]);
+    if (url === "/admin/people/search") return { data: [{ id: "u-b", name: "Gastautorin", context: "Mitglied" }] };
+    return { data: [] };
+  });
+  apiMock.patch.mockResolvedValue({ data: post });
+  renderAt("/admin/news/n1");
+  expect(await screen.findByTestId("news-last-change")).toHaveTextContent("Zuletzt geändert von Moritz Muster am 27.10.2026, 09:15.");
+  expect(screen.getByTestId("news-history")).toHaveTextContent("Geändert von Moritz Muster");
+  expect(screen.getByTestId("news-history")).toHaveTextContent("Titel, Kurzbeschreibung");
+  expect(screen.getByTestId("news-author-selected")).toHaveTextContent("Rita Redaktion");
+  fireEvent.click(screen.getByTestId("news-author-clear"));
+  fireEvent.change(screen.getByPlaceholderText("Name tippen …"), { target: { value: "Gast" } });
+  fireEvent.click(await screen.findByRole("option", { name: /Gastautorin/ }));
+  fireEvent.submit(screen.getByTestId("news-form"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/news/n1", { author_id: "u-b" }));
+});
+
+test("zurückgezogen: Hinweis und Wiederherstellen als Entwurf", async () => {
+  const post = { ...POSTS[0], published: false, withdrawn_at: "2026-10-20T10:00:00+00:00", withdrawn_by_name: "Rita Redaktion" };
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/news-meta") return { data: META };
+    if (url.startsWith("/admin/news/")) return adminPost(url, [post]);
+    return { data: [] };
+  });
+  apiMock.post.mockResolvedValue({ data: {} });
+  renderAt("/admin/news/n1");
+  expect(await screen.findByTestId("news-withdrawn")).toHaveTextContent("Zurückgezogen am 20.10.2026, 12:00 von Rita Redaktion.");
+  fireEvent.click(screen.getByTestId("news-restore"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/news/n1/restore"));
+});

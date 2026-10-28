@@ -134,3 +134,15 @@ test("previewText: geplant mit Termin, zurückgezogen mit Datum", () => {
   expect(previewText({ state: "scheduled", published_at: "2026-11-10T17:00:00Z" })).toMatch(/^Geplant – erscheint am 10\.11\.2026, 18:00 von selbst\./);
   expect(previewText({ state: "withdrawn", since: "2026-10-28T09:00:00Z" })).toBe("Zurückgezogen am 28.10.2026. Besucher sehen statt des Beitrags nur einen Hinweis.");
 });
+
+test("zurückgezogener Beitrag: freundlicher Hinweis statt „nicht gefunden“", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/news/mario-kart-abgesagt") throw Object.assign(new Error("weg"), { response: { status: 410, data: { detail: "Dieser Beitrag wurde zurückgezogen. Alle aktuellen News findest du auf der News-Seite." } } });
+    if (url.startsWith("/news?")) return { data: LIST };
+    throw new Error(`unbekannt: ${url}`);
+  });
+  renderPage();
+  expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("Beitrag zurückgezogen");
+  expect(screen.getByTestId("news-error")).toHaveTextContent("Alle aktuellen News findest du auf der News-Seite.");
+  expect(screen.getByRole("link", { name: /Zu den aktuellen News/ })).toHaveAttribute("href", "/news");
+});

@@ -1375,6 +1375,8 @@ class NewsUpdate(BaseModel):
     linked_f1_challenge_ids: Optional[List[str]] = None
     linked_team_ids: Optional[List[str]] = None
     mentioned_user_ids: Optional[List[str]] = None
+    # Autor ändern (#2122 NW3): Kennung eines Kontos, der Name kommt aus dem Konto.
+    author_id: Optional[str] = Field(default=None, max_length=80)
 
 
 SponsorTier = Literal["main", "platinum", "gold", "silver", "bronze"]

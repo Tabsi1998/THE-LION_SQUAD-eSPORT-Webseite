@@ -2,12 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, formatRequestError } from "@/lib/api";
 import { newsCategoryLabel, newsVisibilityLabel } from "@/lib/newsCategories";
-import { formatTimeUntil } from "@/lib/newsPublication";
+import { newsPublicationState } from "@/lib/newsPublication";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
-import { Download, Plus, Pin, Trash2, Search, Newspaper } from "lucide-react";
+import { Download, Plus, Pin, RotateCcw, Trash2, Search, Newspaper, Undo2 } from "lucide-react";
 import { viennaDate } from "@/lib/vienna";
 
 function csvCell(value) {
@@ -62,19 +62,25 @@ export default function AdminNewsPage() {
     if (editId) navigate(`/admin/news/${encodeURIComponent(editId)}`, { replace: true });
   }, [navigate, searchParams]);
 
-  const remove = async (id) => {
-    if (!await confirm({ title: "Beitrag löschen?", description: "Der News-Beitrag wird dauerhaft entfernt.", confirmLabel: "Löschen" })) return;
-    try { await api.delete(`/news/${id}`); toast.success("Gelöscht."); load(); } catch (err) { toast.error(formatRequestError(err, "Beitrag konnte nicht gelöscht werden.")); }
+  // Löschen nur für Entwürfe, die nie hinausgingen; alles andere wird zurückgezogen (#2122 NW3) - Links aus Newsletter
+  // und Discord zeigen dann einen Hinweis statt „nicht gefunden“.
+  const remove = async (post) => {
+    if (!await confirm({ title: "Entwurf löschen?", description: `„${post.title || "Ohne Titel"}“ war nie öffentlich und wird dauerhaft entfernt.`, confirmLabel: "Löschen" })) return;
+    try { await api.delete(`/news/${post.id}`); toast.success("Gelöscht."); load(); } catch (err) { toast.error(formatRequestError(err, "Beitrag konnte nicht gelöscht werden.")); }
+  };
+  const withdraw = async (post) => {
+    if (!await confirm({
+      title: "Beitrag zurückziehen?",
+      description: `„${post.title || "Ohne Titel"}“ verschwindet aus allen Listen. Wer einem Link aus Newsletter oder Discord folgt, sieht einen Hinweis. Wiederherstellen geht jederzeit.`,
+      confirmLabel: "Zurückziehen",
+    })) return;
+    try { await api.post(`/news/${post.id}/withdraw`); toast.success("Zurückgezogen."); load(); } catch (err) { toast.error(formatRequestError(err, "Beitrag konnte nicht zurückgezogen werden.")); }
+  };
+  const restore = async (post) => {
+    try { await api.post(`/news/${post.id}/restore`); toast.success("Wiederhergestellt – als Entwurf."); load(); } catch (err) { toast.error(formatRequestError(err, "Beitrag konnte nicht wiederhergestellt werden.")); }
   };
 
-  const publicationState = (post) => {
-    if (!post.published) return { key: "draft", label: "Entwurf", detail: "", className: "text-white/40" };
-    const date = post.published_at ? new Date(post.published_at) : null;
-    if (date && !Number.isNaN(date.getTime()) && date.getTime() > Date.now()) {
-      return { key: "scheduled", label: "Geplant", detail: `Wird ${formatTimeUntil(date)} veröffentlicht`, className: "text-[#29B6E8]" };
-    }
-    return { key: "published", label: "Veröffentlicht", detail: "", className: "text-[#10B981]" };
-  };
+  const publicationState = (post) => newsPublicationState(post);
   const categoryOptions = useMemo(() => {
     const rows = (meta.categories || []).map((item) => [item.k, item.l || item.k]);
     const known = new Set(rows.map(([key]) => key));
@@ -146,6 +152,7 @@ export default function AdminNewsPage() {
               <option value="published">Veröffentlicht</option>
               <option value="scheduled">Geplant</option>
               <option value="draft">Entwurf</option>
+              <option value="withdrawn">Zurückgezogen</option>
             </select>
             <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} data-testid="news-admin-category-filter" className="rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2 text-sm">
               <option value="">Alle Kategorien</option>
@@ -220,9 +227,19 @@ export default function AdminNewsPage() {
                           {state.key === "published" ? "Ansehen" : "Vorschau"}
                         </Link>
                       )}
-                      <button onClick={() => remove(n.id)} data-testid={`news-delete-${n.id}`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10 inline-flex items-center gap-1">
-                        <Trash2 className="w-3 h-3" />
-                      </button>
+                      {state.key === "withdrawn" ? (
+                        <button type="button" onClick={() => restore(n)} data-testid={`news-restore-${n.id}`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#10B981]/40 text-[#10B981] hover:bg-[#10B981]/10 inline-flex items-center gap-1">
+                          <RotateCcw className="w-3 h-3" /> Wiederherstellen
+                        </button>
+                      ) : n.can_delete ? (
+                        <button type="button" onClick={() => remove(n)} data-testid={`news-delete-${n.id}`} aria-label={`„${n.title || "Ohne Titel"}“ löschen`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10 inline-flex items-center gap-1">
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      ) : (
+                        <button type="button" onClick={() => withdraw(n)} data-testid={`news-withdraw-${n.id}`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10 inline-flex items-center gap-1">
+                          <Undo2 className="w-3 h-3" /> Zurückziehen
+                        </button>
+                      )}
                     </td>
                   </tr>
                   );

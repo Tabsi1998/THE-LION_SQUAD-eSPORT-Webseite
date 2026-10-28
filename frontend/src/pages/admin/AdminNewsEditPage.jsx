@@ -14,7 +14,9 @@ import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
 import { SeoPreviewPanel } from "@/components/tls/SeoPreviewPanel";
 import { SkeletonDetailHeader, SkeletonLines } from "@/components/tls/Skeleton";
 import { appendEmbedToken } from "@/components/tls/RichContent";
+import { PersonPicker } from "@/components/tls/PersonPicker";
 import { toDateTimeLocalInput } from "@/lib/datetime";
+import { viennaDateTime } from "@/lib/vienna";
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { toast } from "sonner";
 import { AtSign, ExternalLink, Flag, Search, X } from "lucide-react";
@@ -34,6 +36,7 @@ export default function AdminNewsEditPage() {
     api.get("/news-meta").then(({ data }) => setMeta(data)).catch(() => {});
   }, []);
 
+  const [version, setVersion] = useState(0);
   useEffect(() => {
     if (isNew) {
       setPost({});
@@ -50,7 +53,7 @@ export default function AdminNewsEditPage() {
       else setMissing(true);
     }).catch(() => { if (!cancelled) setMissing(true); });
     return () => { cancelled = true; };
-  }, [id, isNew]);
+  }, [id, isNew, version]);
 
   if (missing) {
     return (
@@ -71,12 +74,12 @@ export default function AdminNewsEditPage() {
   }
   return (
     <AdminLayout>
-      <NewsForm key={post.id || "new"} post={post} meta={meta} onDone={() => navigate("/admin/news")} />
+      <NewsForm key={`${post.id || "new"}-${version}`} post={post} meta={meta} onDone={() => navigate("/admin/news")} onReload={() => setVersion((value) => value + 1)} />
     </AdminLayout>
   );
 }
 
-function NewsForm({ post, meta, onDone }) {
+function NewsForm({ post, meta, onDone, onReload }) {
   const isNew = !post?.id;
   const formFromPost = (source = {}) => ({
     title: source.title || "",
@@ -106,6 +109,8 @@ function NewsForm({ post, meta, onDone }) {
   const [linkedE, setLinkedE] = useState(post.linked_event_ids || []);
   const [linkedF, setLinkedF] = useState(post.linked_f1_challenge_ids || []);
   const [mentionedUserIds, setMentionedUserIds] = useState(post.mentioned_user_ids || []);
+  // Autor (#2122 NW3): änderbar über die Personensuche; ohne neue Wahl bleibt der bisherige.
+  const [author, setAuthor] = useState(() => (post.author_id ? { id: post.author_id, name: post.author_name || "Unbekannt" } : null));
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -190,6 +195,7 @@ function NewsForm({ post, meta, onDone }) {
           mentioned_user_ids: post.mentioned_user_ids || [],
         });
         const patch = buildDirtyPayload(payload, originalPayload);
+        if (author?.id && author.id !== post.author_id) patch.author_id = author.id;
         if (!hasPayloadChanges(patch)) {
           toast.info("Keine Änderungen zum Speichern.");
           setSaving(false);
@@ -201,6 +207,18 @@ function NewsForm({ post, meta, onDone }) {
       onDone();
     } catch (err) {
       toast.error(formatRequestError(err, "Beitrag konnte nicht gespeichert werden.", { slug: form.slug, title: form.title }));
+    }
+    setSaving(false);
+  };
+
+  const restore = async () => {
+    setSaving(true);
+    try {
+      await api.post(`/news/${post.id}/restore`);
+      toast.success("Wiederhergestellt – als Entwurf.");
+      onReload?.();
+    } catch (err) {
+      toast.error(formatRequestError(err, "Beitrag konnte nicht wiederhergestellt werden."));
     }
     setSaving(false);
   };
@@ -254,6 +272,14 @@ function NewsForm({ post, meta, onDone }) {
       ) : undefined}
       aside={(
         <>
+          {post.withdrawn_at && (
+            <div role="status" className="border border-[#FF6B6B]/40 bg-[#FF6B6B]/10 rounded-sm p-4 space-y-3" data-testid="news-withdrawn">
+              <p className="text-sm text-white/85">
+                <strong className="text-[#FF6B6B]">Zurückgezogen</strong> am {viennaDateTime(post.withdrawn_at, { dateStyle: "medium", timeStyle: "short" })}{post.withdrawn_by_name ? ` von ${post.withdrawn_by_name}` : ""}. Besucher sehen statt des Beitrags nur einen Hinweis.
+              </p>
+              <button type="button" onClick={restore} disabled={saving} data-testid="news-restore" className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">Wiederherstellen (als Entwurf)</button>
+            </div>
+          )}
           <FormSection title="Veröffentlichung">
             <SelectField label="Kategorie" value={form.category} onChange={(v) => set("category", v)} options={meta.categories || []} testId="news-category" />
             <SelectField label="Sichtbarkeit" value={form.visibility} onChange={(v) => set("visibility", v)} options={meta.visibilities || []} testId="news-visibility" />
@@ -265,6 +291,17 @@ function NewsForm({ post, meta, onDone }) {
             <DiscordPreview kind="news" item={form} skip={form.discord_skip} onSkipChange={(value) => set("discord_skip", value)} />
           </DistributeBox>
           <SharePreviewToggle visibility={form.visibility} checked={form.share_preview} onChange={(value) => set("share_preview", value)} />
+          {!isNew && (
+            <FormSection title="Autor und Verlauf" testId="news-history-section">
+              <PersonPicker purpose="news_author" value={author} onChange={setAuthor} label="Autor" placeholder="Name tippen …" hint="Steht auf der News-Seite unter „Von“." testId="news-author" />
+              {post.updated_at && (
+                <p className="text-xs text-white/55" data-testid="news-last-change">
+                  Zuletzt geändert {post.updated_by_name ? <>von <strong className="text-white/80">{post.updated_by_name}</strong> </> : ""}am {viennaDateTime(post.updated_at, { dateStyle: "medium", timeStyle: "short" })}.
+                </p>
+              )}
+              <NewsHistory rows={post.history || []} />
+            </FormSection>
+          )}
         </>
       )}
       actions={<FormActions saving={saving} submitTestId="news-save" cancelTo="/admin/news" />}
@@ -360,6 +397,24 @@ function NewsForm({ post, meta, onDone }) {
       <EditorialChecklist items={editorialChecklist} />
       <SeoPreviewPanel path={publicPath} fallback={seoFallback} />
     </AdminFormPage>
+  );
+}
+
+// Verlauf (#2122 NW3): wer wann was gemacht hat - die neuesten oben, zugeklappt.
+export function NewsHistory({ rows }) {
+  if (!rows.length) return null;
+  return (
+    <details className="text-xs" data-testid="news-history">
+      <summary className="cursor-pointer select-none font-bold uppercase tracking-wider text-white/60 hover:text-white">Verlauf ({rows.length})</summary>
+      <ol className="mt-2 space-y-1.5">
+        {rows.map((row, index) => (
+          <li key={`${row.at}-${index}`} className="text-white/65">
+            <span className="text-white/85 font-semibold">{row.label}</span> von {row.by} · {viennaDateTime(row.at, { dateStyle: "medium", timeStyle: "short" })}
+            {row.fields?.length > 0 && <span className="block text-white/45">{row.fields.join(", ")}</span>}
+          </li>
+        ))}
+      </ol>
+    </details>
   );
 }
 

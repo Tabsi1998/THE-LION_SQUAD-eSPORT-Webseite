@@ -86,3 +86,91 @@ async def test_detail_page_shows_admins_a_marked_preview(flow):
     planned = (await flow.get("/api/news/geplant")).json()["preview"]
     assert planned["state"] == "scheduled" and planned["published_at"]
     assert "preview" not in (await flow.get("/api/news/live")).json()
+
+
+# ---------------------------------------------------------------- NW3 wer geändert hat, Verlauf, Autor, Zurückziehen
+
+@pytest.mark.asyncio
+async def test_edits_record_who_changed_what_and_show_a_history(flow):
+    rita = await flow.add_user(role="club_admin", name="Rita")
+    flow.act_as(rita)
+    created = (await flow.post("/api/news", json={"title": "Herbst-LAN", "content": "Text", "published": False})).json()
+    assert created["updated_by_name"] == "Rita"
+    moritz = await flow.add_user(role="club_admin", name="Moritz")
+    flow.act_as(moritz)
+    saved = (await flow.patch(f"/api/news/{created['id']}", json={"title": "Herbst-LAN 2026", "excerpt": "Alles dazu."})).json()
+    assert saved["updated_by"] == moritz["id"] and saved["updated_by_name"] == "Moritz"
+    history = (await flow.get(f"/api/admin/news/{created['id']}")).json()["history"]
+    assert [(row["label"], row["by"]) for row in history] == [("Geändert", "Moritz"), ("Angelegt", "Rita")]
+    assert history[0]["fields"] == ["Titel", "Adresse", "Kurzbeschreibung"]
+
+
+@pytest.mark.asyncio
+async def test_author_can_be_changed_to_an_existing_account(flow):
+    flow.act_as(await flow.add_user(role="club_admin", name="Rita"))
+    created = (await flow.post("/api/news", json={"title": "Bericht", "content": "Text", "published": False})).json()
+    writer = await flow.add_user(name="Gastautorin")
+    saved = (await flow.patch(f"/api/news/{created['id']}", json={"author_id": writer["id"]})).json()
+    assert saved["author_id"] == writer["id"] and saved["author_name"] == "Gastautorin"
+    assert (await flow.patch(f"/api/news/{created['id']}", json={"author_id": "gibt-es-nicht"})).status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_published_posts_are_withdrawn_not_deleted_and_links_show_a_hint(flow):
+    post = await news(flow, "abgesagt", newsletter_sent_at=now_utc().isoformat(), discord_checked_at=now_utc().isoformat())
+    flow.act_as(await flow.add_user(role="club_admin", name="Rita"))
+    refused = await flow.delete(f"/api/news/{post['id']}")
+    assert refused.status_code == 409 and "zurückziehen" in refused.json()["detail"]
+    withdrawn = (await flow.post(f"/api/news/{post['id']}/withdraw")).json()
+    assert withdrawn["published"] is False and withdrawn["withdrawn_at"] and withdrawn["withdrawn_by_name"] == "Rita"
+    assert (await flow.get("/api/news/abgesagt")).json()["preview"]["state"] == "withdrawn", "das Admin-Team sieht die Vorschau"
+
+    flow.act_as(None)
+    gone = await flow.get("/api/news/abgesagt")
+    assert gone.status_code == 410 and "zurückgezogen" in gone.json()["detail"]
+    assert (await flow.get("/api/news")).json() == []
+    assert await flow.db.news_posts.count_documents({"id": post["id"]}) == 1, "nichts wird gelöscht"
+
+    flow.act_as(await flow.add_user(role="club_admin", name="Moritz"))
+    restored = (await flow.post(f"/api/news/{post['id']}/restore")).json()
+    assert restored["published"] is False and "withdrawn_at" not in restored, "zurück als Entwurf"
+    labels = [row["label"] for row in (await flow.get(f"/api/admin/news/{post['id']}")).json()["history"]]
+    assert labels == ["Wiederhergestellt", "Zurückgezogen"]
+
+
+@pytest.mark.asyncio
+async def test_drafts_that_never_went_out_can_still_be_deleted(flow):
+    draft = await news(flow, "notiz", published=False)
+    flow.act_as(await flow.add_user(role="club_admin", name="Rita"))
+    assert (await flow.delete(f"/api/news/{draft['id']}")).status_code == 200
+    assert await flow.db.news_posts.count_documents({"id": draft["id"]}) == 0
+
+
+@pytest.mark.asyncio
+async def test_republishing_a_withdrawn_post_does_not_send_the_newsletter_again(flow, monkeypatch):
+    import routes.news_routes as news_routes
+
+    calls = []
+
+    async def fake_enqueue(kind, item, dedupe_suffix=""):
+        calls.append(item.get("id"))
+        return {"queued": 1}
+
+    monkeypatch.setattr(news_routes, "enqueue_newsletter_for_item", fake_enqueue)
+    post = await news(flow, "zurueck", newsletter_sent_at="2026-10-01T10:00:00+00:00", newsletter_sent_count=12)
+    flow.act_as(await flow.add_user(role="club_admin", name="Rita"))
+    await flow.post(f"/api/news/{post['id']}/withdraw")
+    saved = (await flow.patch(f"/api/news/{post['id']}", json={"published": True})).json()
+    assert saved["published"] is True and "withdrawn_at" not in saved
+    assert saved["newsletter_sent_at"] == "2026-10-01T10:00:00+00:00" and saved["newsletter_sent_count"] == 12
+    assert calls == [], "der Newsletter ging schon hinaus - kein zweites Mal"
+
+
+@pytest.mark.asyncio
+async def test_author_search_is_for_the_newsroom_only(flow):
+    await flow.add_user(name="Gastautorin")
+    flow.act_as(await flow.add_user(role="club_admin", name="Rita"))
+    hits = (await flow.get("/api/admin/people/search", params={"purpose": "news_author", "q": "Gast"})).json()
+    assert [hit["name"] for hit in hits] == ["Gastautorin"] and "email" not in hits[0]
+    flow.act_as(await flow.add_user(name="leser"))
+    assert (await flow.get("/api/admin/people/search", params={"purpose": "news_author", "q": "Gast"})).status_code == 403

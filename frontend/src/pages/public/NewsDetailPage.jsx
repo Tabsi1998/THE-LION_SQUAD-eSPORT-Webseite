@@ -131,7 +131,10 @@ export default function NewsDetailPage() {
       // Gelesen-Marker (#616): nur mit Anmeldung, nur die Zahl - still im Hintergrund.
       if (user?.id) api.post(`/news/${slug}/read`, null, { skipInvalidation: true }).catch(() => {});
     }).catch((e) => {
-      setError(e.response?.status === 403 ? "Dieser Beitrag ist nicht öffentlich." : "Nicht gefunden.");
+      const status = e.response?.status;
+      // Zurückgezogen (#2122 NW3): ein Link aus Newsletter oder Discord bekommt einen freundlichen Hinweis.
+      if (status === 410) setError({ title: "Beitrag zurückgezogen", text: typeof e.response?.data?.detail === "string" ? e.response.data.detail : "Dieser Beitrag wurde zurückgezogen." });
+      else setError({ title: status === 403 ? "Dieser Beitrag ist nicht öffentlich." : "Nicht gefunden." });
     });
     api.get("/news?limit=6").then(({ data }) => setMore(Array.isArray(data) ? data : data?.items || [])).catch(() => setMore([]));
   }, [slug, user?.id]);
@@ -144,9 +147,10 @@ export default function NewsDetailPage() {
 
   if (error) return (
     <PublicLayout>
-      <div className="max-w-2xl mx-auto px-6 py-20 text-center">
-        <h1 className="font-heading text-3xl font-black">{error}</h1>
-        <Link to="/news" className="mt-6 inline-flex items-center gap-2 text-[#29B6E8]"><ArrowLeft className="w-4 h-4" /> Zurück zu News</Link>
+      <div className="max-w-2xl mx-auto px-6 py-20 text-center" data-testid="news-error">
+        <h1 className="font-heading text-3xl font-black">{error.title}</h1>
+        {error.text && <p className="mt-3 text-white/65">{error.text}</p>}
+        <Link to="/news" className="mt-6 inline-flex items-center gap-2 text-[#29B6E8]"><ArrowLeft className="w-4 h-4" /> {error.text ? "Zu den aktuellen News" : "Zurück zu News"}</Link>
       </div>
     </PublicLayout>
   );

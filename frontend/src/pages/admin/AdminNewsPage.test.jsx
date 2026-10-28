@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 // News-Liste (#2122 NW4): Sichtbarkeit und Kategorie mit Namen statt Rohwert - in der Tabelle, den Filtern und der CSV.
@@ -49,4 +49,35 @@ test("CSV nennt Begriffe und die Adresse statt Rohwerten", async () => {
   }
   expect(written).toContain("Titel;Adresse;Kategorie;Sichtbarkeit;Status;Datum");
   expect(written).toContain("Sommerfest;/news/sommerfest;Rückblick;Nur Vereinsmitglieder;Veröffentlicht;01.08.2026");
+});
+
+// Zurückziehen statt Löschen (#2122 NW3): was schon hinausging, wird zurückgezogen; nur nie öffentliche Entwürfe lassen
+// sich löschen; Zurückgezogenes kommt mit „Wiederherstellen“ zurück.
+test("Knöpfe je Stand: Zurückziehen, Löschen nur für Entwürfe, Wiederherstellen", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/news-meta") return { data: META };
+    if (url === "/admin/news") return { data: [
+      { ...POSTS[0], can_delete: false },
+      { id: "n2", title: "Notiz", slug: "notiz", category: "club", visibility: "public", published: false, can_delete: true },
+      { id: "n3", title: "Abgesagt", slug: "abgesagt", category: "club", visibility: "public", published: false, withdrawn_at: "2026-10-20T10:00:00+00:00", can_delete: false },
+    ] };
+    return { data: [] };
+  });
+  apiMock.post.mockResolvedValue({ data: {} });
+  apiMock.delete.mockResolvedValue({ data: { ok: true } });
+  render(<MemoryRouter><AdminNewsPage /></MemoryRouter>);
+
+  fireEvent.click(await screen.findByTestId("news-withdraw-n1"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/news/n1/withdraw"));
+  expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Beitrag zurückziehen?", confirmLabel: "Zurückziehen" }));
+  expect(screen.queryByTestId("news-delete-n1")).toBeNull();
+
+  fireEvent.click(screen.getByTestId("news-delete-n2"));
+  await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith("/news/n2"));
+
+  expect(screen.getByText("Zurückgezogen", { selector: "span" })).toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("news-restore-n3"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/news/n3/restore"));
+  expect(screen.getByTestId("news-view-n2")).toHaveTextContent("Vorschau");
+  expect(screen.getByTestId("news-view-n1")).toHaveTextContent("Ansehen");
 });
