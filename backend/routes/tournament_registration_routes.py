@@ -39,7 +39,7 @@ from services.competition_versions import persist_competition_versions
 from services.heat_rebuild import evaluate_after_write
 from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
 from models import RegistrationCreate, RegistrationUpdate, RegistrationAdminCreate, now_utc, new_id
-from services import onsite_access, tournament_event_gate, tournament_fees
+from services import league_roster, onsite_access, tournament_event_gate, tournament_fees
 from services.query_filters import safe_regex
 from services.private_fields import private_projection
 from routes.tournament_common import (
@@ -55,6 +55,8 @@ from routes.tournament_common import (
     _is_staff,
     _is_tournament_locked,
     _is_tournament_staff,
+    _missing_game_fields,
+    _profile_player_ids,
     _public_registration,
     _resolve_tid,
     _serialized_tournament_write,
@@ -245,14 +247,6 @@ async def _is_active_club_member(db, user: dict) -> bool:
         {"_id": 0, "id": 1},
     )
     return bool(membership)
-
-
-def _required_game_fields(game: dict | None) -> list[dict]:
-    fields = []
-    for field in (game or {}).get("effective_player_id_fields") or (game or {}).get("player_id_fields") or []:
-        if isinstance(field, dict) and field.get("required") is not False and field.get("key"):
-            fields.append(field)
-    return fields
 
 
 async def _refresh_stage_previews_after_registration(db, tournament: dict, actor_id: str | None) -> dict | None:
@@ -556,17 +550,8 @@ async def _create_self_registration(db, tid: str, tournament: dict, body: Regist
         raise HTTPException(status_code=400, detail="Bitte bestätige, dass du das Startgeld übernimmst (Rechnung an dich).")
     game = await db.games.find_one({"id": tournament.get("game_id")}, {"_id": 0}) if tournament.get("game_id") else None
     game = await _enrich_game_identity(db, game)
-    submitted_ids = body.player_ids or {}
-    profile_ids = me.get("game_ids") or {}
-    source_slug = game.get("identity_game_slug") if game else None
-    profile_source_ids = (profile_ids.get(source_slug) if source_slug else {}) or {}
-    profile_game_ids = (profile_ids.get(game.get("slug")) if game else {}) or {}
-    player_ids = {**profile_source_ids, **profile_game_ids, **submitted_ids}
-    missing = [
-        field.get("label") or field.get("key")
-        for field in _required_game_fields(game)
-        if not str(player_ids.get(field.get("key"), "")).strip()
-    ]
+    player_ids = {**_profile_player_ids(me, game), **(body.player_ids or {})}
+    missing = _missing_game_fields(game, player_ids)
     if missing:
         raise HTTPException(status_code=400, detail=f"Für dieses Turnier fehlen Pflicht-IDs: {', '.join(missing)}")
     # Count approved
@@ -1252,7 +1237,11 @@ async def assign_squad(tid: str, body: SquadAssignBody, me: dict = Depends(requi
     auto_bracket_update = await _refresh_tournament_previews_after_registration(db, tournament, me.get("id"))
     # Wie beim Eintragen durch die Turnierleitung (#1133): die Verantwortlichen erfahren, dass ihr Co-Team dabei ist.
     await _notify_registration(db, tid, reg, reg["status"], actor_id=me.get("id"))
-    return {"registration": reg, "auto_bracket_update": auto_bracket_update}
+    # Liga-Kader (#2108): die Spiel-ID jedes Spielers für die Season festhalten; wem sie fehlt, bekommt einen Hinweis.
+    squad = await db.team_squads.find_one({"id": reg["squad_id"]}, {"_id": 0, "id": 1, "member_ids": 1}) or {}
+    ids = await league_roster.after_assign(db, tournament, reg, squad, me.get("id"))
+    missing = [row["name"] for row in ids.values() if not row["ok"]]
+    return {"registration": reg, "auto_bracket_update": auto_bracket_update, "ids_missing": sorted(missing)}
 
 
 @router.delete("/{tid}/squad-registrations/{reg_id}")

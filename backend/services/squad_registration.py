@@ -17,6 +17,7 @@ from __future__ import annotations
 from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
+from services import league_roster
 
 ACTIVE_REGISTRATION_STATUSES = ("pending", "approved", "checked_in", "waitlist")
 # Plätze einer Staffel belegen wie beim Nachrücken (#1551) nur diese - die Warteliste zählt nicht mit.
@@ -258,6 +259,10 @@ async def candidates(db, tournament: dict) -> dict:
         if role_ids
         else {}
     )
+    # Spiel-ID je Spieler (#2108): Stand in der Season - fehlt sie, warnt der Dialog; zuteilen geht trotzdem.
+    member_ids = {uid for squad in squads if squad.get("team_id") in teams for uid in squad.get("member_ids") or [] if uid}
+    roster_ctx = await league_roster.context_for_tournament(db, tournament, member_ids)
+    id_states = league_roster.statuses(roster_ctx, member_ids)
     out: dict[str, dict] = {}
     for squad in squads:
         team = teams.get(squad.get("team_id"))
@@ -294,13 +299,30 @@ async def candidates(db, tournament: dict) -> dict:
                 "captain": _public_user(people.get(squad.get("captain_id") or "")),
                 "vice_captain": _public_user(people.get(squad.get("vice_captain_id") or "")),
                 "problems": [text for _code, text in problems],
+                "players": _id_players(squad, id_states) if roster_ctx and roster_ctx.fields else [],
             }
         )
     rows = sorted(out.values(), key=lambda row: str(row.get("name") or "").lower())
     for row in rows:
         row["squads"].sort(key=lambda squad: str(squad.get("name") or "").lower())
     limit = _positive_int(tournament.get("max_participants"))
-    return {"min_squad_size": min_size, "max_participants": limit, "seats_taken": seats, "teams": rows}
+    return {
+        "min_squad_size": min_size,
+        "max_participants": limit,
+        "seats_taken": seats,
+        "teams": rows,
+        "id_label": league_roster.labels(roster_ctx.fields) if roster_ctx and roster_ctx.fields else None,
+    }
+
+
+def _id_players(squad: dict, id_states: dict[str, dict]) -> list[dict]:
+    """Je Spieler des Co-Teams: Name, Spiel-ID (festgehalten oder aus dem Profil) und ob er aufstellbar ist."""
+    rows = []
+    for uid in squad.get("member_ids") or []:
+        state = id_states.get(uid)
+        if state:
+            rows.append({key: state[key] for key in ("id", "name", "state", "ok", "text", "reason")})
+    return sorted(rows, key=lambda row: str(row["name"]).lower())
 
 
 async def build_registration(db, tournament: dict, team_id: str, squad_id: str, actor: dict) -> dict:
