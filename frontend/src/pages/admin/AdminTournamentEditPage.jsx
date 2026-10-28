@@ -557,7 +557,8 @@ export default function AdminTournamentEditPage() {
         </div>
       </div>
 
-      {isTournamentLead && <div className="mb-5"><OnsiteAccessPanel tournamentId={t.id} /></div>}
+      {/* Liga-Staffeln (#2096) haben keine Vor-Ort-Anmeldung - die Co-Teams teilt die Turnierleitung zu. */}
+      {isTournamentLead && !t.league_context && <div className="mb-5"><OnsiteAccessPanel tournamentId={t.id} /></div>}
       {isTournamentLead && <div className="mb-5"><AccessLinksPanel targetType="tournament" targetId={t.id} allowRegister collapsible /></div>}
 
       <TournamentFlowStepper
