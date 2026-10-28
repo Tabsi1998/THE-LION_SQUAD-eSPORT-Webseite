@@ -449,7 +449,7 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
             weight = season_weight_of(t)
             source_type = "mini" if weight < 1.5 else ("major" if weight >= 2.5 else "tournament")
             # Liga-Staffeln (docs/LIGA.md, Abschnitt 7) zählen nicht für die Jahreswertung - ausdrücklich, nicht über
-            # season_weight=0. Gewicht 0 = "keine Jahreswertung" (#2095): ebenfalls keine Eintraege.
+            # season_weight=0. Gewicht 0 = "keine Jahreswertung" (#2095): ebenfalls keine Einträge.
             league_staffel = is_league_staffel(t) or weight <= 0
             for p in placements:
                 if league_staffel or not (p.get("user_id") or p.get("team_id")):

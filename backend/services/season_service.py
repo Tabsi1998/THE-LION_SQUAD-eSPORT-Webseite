@@ -89,7 +89,7 @@ CHALLENGE_SEASON_WEIGHT_DEFAULT = 1.0    # Fast-Lap-Challenge: wie ``F1Challenge
 
 def season_weight_of(source: dict | None, default: float = TOURNAMENT_SEASON_WEIGHT_DEFAULT) -> float:
     """Jahreswertungs-Gewicht eines Turniers oder einer Challenge (#2095). Fehlt das Feld oder ist es leer, gilt die
-    Vorgabe; ``0`` bleibt ``0`` (= keine Jahreswertung); ungueltige oder negative Werte fallen auf die Vorgabe zurueck.
+    Vorgabe; ``0`` bleibt ``0`` (= keine Jahreswertung); ungültige oder negative Werte fallen auf die Vorgabe zurück.
     ``value or default`` ist falsch, weil es aus 0 wieder die Vorgabe macht."""
     value = (source or {}).get("season_weight")
     if value is None or isinstance(value, bool):
