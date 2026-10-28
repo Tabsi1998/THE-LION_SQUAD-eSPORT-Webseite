@@ -21,6 +21,24 @@ async def flow():
 
 
 @pytest.mark.asyncio
+async def test_contact_reply_names_every_variable_the_form_fills_in(flow):
+    """#2119 ML7: das Kontaktformular setzt auch {{subject}} und {{message}} ein - die Liste nennt sie jetzt, auch bei
+    einer Vorlage, die schon vor dieser Änderung gespeichert war."""
+    from routes.phase_ef_routes import seed_email_templates
+    await flow.db.email_templates.insert_one({"key": "contact_auto_reply", "id": "contact_auto_reply", "subject": "Danke",
+                                              "html": "<p>Eigener Text {{name}}</p>", "vars": ["name", "topic"]})
+    await seed_email_templates()
+    stored = await flow.db.email_templates.find_one({"key": "contact_auto_reply"}, {"_id": 0})
+    assert stored["vars"] == ["name", "topic", "subject", "message"] and stored["html"] == "<p>Eigener Text {{name}}</p>"
+    admin = await flow.add_user(role="club_admin", name="admin")
+    flow.act_as(admin)
+    rows = {row["key"]: row for row in (await flow.get("/api/admin/email-templates")).json()}
+    assert rows["contact_auto_reply"]["vars"] == ["name", "topic", "subject", "message"]
+    preview = (await flow.post("/api/admin/email-templates/contact_auto_reply/preview", json={"html": "<p>{{subject}}: {{message}}</p>"})).json()
+    assert "{{" not in preview["html"]
+
+
+@pytest.mark.asyncio
 async def test_catalog_lists_every_mail_with_purpose_recipient_and_vars(flow):
     from routes.phase_ef_routes import seed_email_templates
     await seed_email_templates()
@@ -33,6 +51,9 @@ async def test_catalog_lists_every_mail_with_purpose_recipient_and_vars(flow):
     assert by_key["membership_approve"]["source"] == "db" and by_key["membership_approve"]["custom"] is False
     assert all(row["purpose"] and row["recipient"] and row["category_label"] for row in rows)
     assert by_key["ops_alert"]["editable"] is False
+    # #2119 ML6: die Einladung zum Mitgliedsantrag hat einen Standard und steht darum in der Liste.
+    assert by_key["membership_invited"]["source"] == "db" and by_key["membership_invited"]["vars"] == ["name", "note"]
+    assert by_key["membership_invited"]["custom"] is False
 
     # Redaktion (content) darf nicht - das ist System.
     editor = await flow.add_user(role="player", name="redaktion")
@@ -51,9 +72,6 @@ async def test_preview_override_test_and_reset(flow):
     # Vorschau der festen Vorlage mit Beispieldaten.
     preview = (await flow.post("/api/admin/email-templates/registration/preview", json={})).json()
     assert preview["source"] == "code" and "Paula" in preview["html"] and preview["subject"]
-    # #2119 ML6: die Einladung zum Mitgliedsantrag hat einen Standard und steht darum in der Liste.
-    assert by_key["membership_invited"]["source"] == "db" and by_key["membership_invited"]["vars"] == ["name", "note"]
-    assert by_key["membership_invited"]["custom"] is False
     # Vorschau eines Entwurfs, ungespeichert.
     draft = (await flow.post("/api/admin/email-templates/registration/preview", json={"subject": "Hallo {{display_name}}!", "html": "<p>Willkommen, {{display_name}} &lt;3</p>"})).json()
     assert draft["subject"] == "Hallo Paula!" and draft["html"] == "<p>Willkommen, Paula &lt;3</p>" and draft["source"] == "custom"

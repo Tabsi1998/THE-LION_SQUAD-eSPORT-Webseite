@@ -200,7 +200,7 @@ async def render(db, key: str, *, subject: str | None = None, html: str | None =
 
 def _template_state(key: str, fn: Any | None, doc: dict | None, default_doc: dict | None, origin: str) -> dict:
     """Stand einer Vorlage: Variablen, ob angepasst, der Text mit Platzhaltern und gespeicherte Beispielwerte."""
-    variables = [] if key == "ops_alert" else template_vars(key, fn, doc or default_doc)
+    variables = [] if key == "ops_alert" else template_vars(key, fn, default_doc or doc)
     stored = bool(doc and (fn is None or doc.get("override")))
     if fn is not None:
         custom = bool(stored and (doc.get("html") or "").strip())
@@ -268,7 +268,7 @@ async def check_samples(db, key: str, defaults: list[dict], *, subject: str | No
     stored = bool(doc) and (fn is None or doc.get("override"))
     merged_subject = subject if subject is not None else (doc.get("subject") if stored else None)
     merged_html = html if html is not None else (doc.get("html") if stored else None)
-    variables = template_vars(key, fn, doc or default_doc)
+    variables = template_vars(key, fn, default_doc or doc)
     return sample_leaks(merged_subject, merged_html, variables, await _origin_of(db), default_source(key, fn, default_doc))
 
 

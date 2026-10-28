@@ -171,18 +171,19 @@ DEFAULT_EMAIL_TEMPLATES = [
     {"key": "contact_auto_reply", "name": "Kontakt-Auto-Reply",
      "subject": "Wir haben deine Nachricht erhalten",
      "html": "<p>Hallo {{name}},</p><p>Vielen Dank für deine Nachricht zum Thema <strong>{{topic}}</strong>. Wir melden uns zeitnah.</p>",
-     "vars": ["name", "topic"]},
+     # Das Kontaktformular setzt auch Betreff und Nachricht ein (#2119 ML7).
+     "vars": ["name", "topic", "subject", "message"]},
     {"key": "membership_application_admin", "name": "Neue Bewerbung (Admin-Notify)",
      "subject": "Neue Mitgliedsbewerbung",
      "html": "<p>{{applicant}} hat eine Mitgliedsbewerbung eingereicht. Bitte im Admin-Bereich prüfen.</p>",
      "vars": ["applicant"]},
-    # Wunschnummer (#2034): ein Mitglied möchte eine andere Nummer - die Nummer selbst steht nicht in der Mail.
     # Einladung zum Mitgliedsantrag (#507): bisher nur als Ersatztext im Code - ohne Standard fehlte sie in der Liste
     # der E-Mail-Vorlagen (#2119 ML6). Gleicher Text wie der Ersatz in services/membership_invitations.
     {"key": "membership_invited", "name": "Einladung zum Mitgliedsantrag",
      "subject": "Einladung: Werde Mitglied bei uns",
      "html": "<p>Hallo {{name}},</p><p>der Vorstand lädt dich ein, Mitglied zu werden. Melde dich auf der Website an und fülle den Mitgliedsantrag aus – er ist für dich freigeschaltet.</p><p><em>{{note}}</em></p>",
      "vars": ["name", "note"]},
+    # Wunschnummer (#2034): ein Mitglied möchte eine andere Nummer - die Nummer selbst steht nicht in der Mail.
     {"key": "jersey_number_request_admin", "name": "Antrag auf eine andere Nummer (Admin-Notify)",
      "subject": "Antrag auf eine andere Nummer",
      "html": "<p>{{member}} möchte eine andere Nummer. Du findest den Antrag im Admin unter Mitglieder → Nummern.</p>",
@@ -210,9 +211,12 @@ DEFAULT_EMAIL_TEMPLATES = [
 async def seed_email_templates():
     db = get_db()
     for t in DEFAULT_EMAIL_TEMPLATES:
+        # Die Variablen bestimmt der Code, der die Mail verschickt - sie gehen bei jedem Start mit (#2119 ML7), Betreff
+        # und Text des Admins bleiben.
         await db.email_templates.update_one(
             {"key": t["key"]},
-            {"$setOnInsert": {**t, "id": t["key"], "created_at": now_utc().isoformat(),
+            {"$set": {"vars": t["vars"]},
+             "$setOnInsert": {**{k: v for k, v in t.items() if k != "vars"}, "id": t["key"], "created_at": now_utc().isoformat(),
                               "updated_at": now_utc().isoformat()}},
             upsert=True,
         )
