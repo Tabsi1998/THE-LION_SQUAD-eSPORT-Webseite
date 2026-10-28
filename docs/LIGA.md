@@ -33,6 +33,7 @@ Jede Sammlung hat dazu `created_at`, `created_by`, `updated_at`.
 | `description` | str | nein | |
 | `status` | `"active"` \| `"archived"` | ja | `active` |
 | `published_at` | ISO | nein | erste Sichtbarkeit einer Season (#2106); ab dann bleibt `slug` |
+| `emblem_url`, `banner_url`, `banner_focus`, `accent_color` | str / dict / str | nein | Gestaltung (#2107, Abschnitt 11) |
 
 Indizes: `id` eindeutig, `slug` eindeutig, `game_id`.
 
@@ -63,6 +64,8 @@ Indizes: `id` eindeutig, `slug` eindeutig, `game_id`.
 | `registration_deadline` | Kalendertag | nein | Meldeschluss, nur Anzeige (Season 1: 6.11.) |
 | `visibility` | `"off"` \| `"admins"` \| `"members"` \| `"public"` | ja | **`off`** |
 | `status` | `"draft"` \| `"active"` \| `"completed"` \| `"archived"` | ja | `draft` |
+| `emblem_url`, `banner_url`, `banner_focus` | str / dict | nein | überschreiben die der Liga (#2107, Abschnitt 11) |
+| `prizes` | `[{place, text, image_url}]` | nein | Gewinne der Season (#2107) - reine Anzeige |
 
 Map-Pool der Season: in `map_pools` mit neuem Scope **`league_season`** (`scope_id` = Season-ID), gleiche Versionen
 und Prüfungen wie heute (`services/map_pools.py`, `SCOPES` um `league_season` ergänzen).
@@ -77,6 +80,7 @@ Indizes: `id` eindeutig, (`league_id`, `number`) eindeutig, (`league_id`, `slug`
 | `nickname` | str ≤ 40 | nein | Beiname: Anzeige „Liga 1 · Elite“ |
 | `overrides` | dict | nein | Abweichung von der Season nur für `best_of`, `team_size`, `min_squad_size`, `max_staffel_size`, `scoring_rules`, `match_schedule_response_hours` |
 | `status` | `"active"` \| `"archived"` | ja | `active` |
+| `prizes` | `[{place, text, image_url}]` | nein | eigene Gewinne (#2107); fehlt = die der Season |
 
 Indizes: `id` eindeutig, (`season_id`, `level`) eindeutig.
 
@@ -443,3 +447,28 @@ gemeinsam, damit das Heimrecht fair bleibt.
   Leitung die Liga nach außen kurz ausblendet. Für Teilnehmende zu verbergen hieße, die gemeinsame Sichtbarkeitsregel
   aller Turnier-, Spiel- und Chat-Routen um einen Liga-Sonderfall zu erweitern – viel Fläche für wenig Nutzen. Die
   Ligaseite und die Lese-API bleiben bei `off` für alle 404.
+
+## 11. Gestaltung (#2107)
+
+Logik in `services/league_look.py`, alles optional – ohne Felder sieht die Ligaseite aus wie vorher.
+
+| Feld | Ebene | Regel |
+| --- | --- | --- |
+| `emblem_url` | Liga, Season überschreibt | eigene Upload-Adresse (wie `series_logo.clean`, auch SVG über `/api/uploads/logo`), Datei muss in `media_uploads` stehen |
+| `banner_url` | Liga, Season überschreibt | eigene Upload-Adresse ohne SVG (`/api/uploads/image`), in `media_uploads` |
+| `banner_focus` | mit dem Banner | `{x, y, mobile_x, mobile_y}` in Prozent, Vorgabe 50; Ligaseite: Desktop 3 : 1 mit `x/y`, Handy 4 : 3 mit `mobile_*` |
+| `accent_color` | nur Liga | `#RRGGBB`, Kontrast ≥ 4,5 : 1 zu `#0A0A0A`, sonst 422; fehlt = Vereinsfarbe (`--tls-brand`) |
+| `prizes` | Season, Liga N überschreibt | `[{place 1–64, text ≤ 160, image_url?}]`, höchstens 20, jeder Platz einmal; Bild wie Banner |
+
+- **Rückfälle** (`league_look.effective`): Emblem und Banner Season → Liga → `None`; Gewinne Liga N → Season.
+- **Öffentlich:** `GET /api/leagues` trägt je Liga `emblem_url`, `accent_color` und je Season `emblem_url`, `banner`
+  (geltend); `GET /api/leagues/{liga}/{season}` trägt `look` (`emblem_url`, `banner`, `accent_color`), `prizes` und je
+  Liga N `prizes` (eigene oder `null`). Teamseite: `league[].emblem_url`. Link-Vorschau (`seo_render_routes`): Bild =
+  geltendes Banner der öffentlichen Season.
+- **Staffeln:** `create_staffel` und jede Änderung am Banner (Liga oder Season, `apply_banner`) setzen `banner_url` der
+  Staffeln auf das geltende Banner und merken es in `league_banner_url` – die App zeigt eine Staffel als Turnier mit
+  ihrem Banner. Ein eigenes Turnierbanner (≠ `league_banner_url`) bleibt stehen. Kein „Übertragen“ nötig.
+- **Gewinne** sind reine Anzeige: kein Feld am Turnier, keine XP, Pokale oder Jahreswertung (`NOT_LEAGUE` bleibt).
+- **Mediathek:** `media_audit` kennt `leagues`/`league_seasons` (`emblem_url`, `banner_url`) und `prizes.image_url`
+  an Season und Liga N – die Dateien gelten als verwendet.
+- Audit: Änderungen laufen über `league.update`, `league.season.update`, `league.division.update` (Feldnamen).

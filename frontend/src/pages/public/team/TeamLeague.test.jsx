@@ -21,6 +21,12 @@ test("zeigt Co-Team, Staffel und führt zur Ligaseite", () => {
   expect(leagueLine({ league: { name: "A" } })).toBe("A");
 });
 
+test("Emblem der Season bzw. Liga klein vor der Staffel (#2107), ohne Bild das Liga-Zeichen", () => {
+  render(<MemoryRouter><TeamLeague overview={{ league: [{ ...ROW, emblem_url: "/api/static/uploads/probe-emblem.png" }, { ...ROW, registration_id: "r2" }] }} /></MemoryRouter>);
+  expect(screen.getByTestId("team-league-emblem-r1").querySelector("img")).toHaveAttribute("src", expect.stringContaining("/api/static/uploads/probe-emblem.png"));
+  expect(screen.getByTestId("team-league-emblem-r2")).toHaveAttribute("data-empty", "true");
+});
+
 test("ohne Liga kein Abschnitt", () => {
   const { container } = render(<MemoryRouter><TeamLeague overview={{ league: [] }} /></MemoryRouter>);
   expect(container).toBeEmptyDOMElement();

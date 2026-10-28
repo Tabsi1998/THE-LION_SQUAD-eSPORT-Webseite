@@ -26,6 +26,7 @@ from models import (
     new_id,
     now_utc,
 )
+from services import league_look
 from services import league_service as leagues
 from services import map_pools
 from services.change_events import reset_scope_cache
@@ -112,6 +113,8 @@ async def admin_season(season_id: str, _me: dict = Depends(require_league_admin)
         })
     return {
         "league": league, "season": season, "game": map_pools.game_summary(game),
+        # Gestaltung (#2107): was die Ligaseite zeigt - für die Vorschau mit dem Erbe der Liga.
+        "look": league_look.effective(league, season),
         "calendar": leagues.calendar_summary(season),
         "library": await map_pools.library(db, game),
         "map_pool": await map_pools.admin_entry(db, pool, league.get("game_id"), "league_season"),

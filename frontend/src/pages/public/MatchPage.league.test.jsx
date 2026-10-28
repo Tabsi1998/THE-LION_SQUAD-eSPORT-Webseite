@@ -101,3 +101,24 @@ test("die Sieger-Knöpfe folgen den Plätzen, auch wenn die Seiten anders herum 
   const winners = [...first.querySelectorAll('[data-testid^="league-game-1-winner-"]')].map((button) => button.textContent);
   expect(winners).toEqual(["Loewen · Rudel A", "Falken · Horst"]);
 });
+
+test("Liga-Spiel (#2107): das Emblem der Season klein vor dem Spieltag", async () => {
+  const { resetLeagueTrail } = await import("@/hooks/useLeagueTrail");
+  resetLeagueTrail();
+  const tournament = { ...BASE.tournament, league_context: { league_id: "lg1", season_id: "s1", staffel: "A" } };
+  const leagues = [{ id: "lg1", slug: "probe-liga", name: "Probe-Liga", emblem_url: "/api/static/uploads/liga.png",
+    seasons: [{ id: "s1", slug: "season-1", name: "Season 1", emblem_url: "/api/static/uploads/season.png" }] }];
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/matches/m1/page") return { data: { ...BASE, tournament, league: LEAGUE } };
+    if (url === "/leagues") return { data: { leagues } };
+    return { data: [] };
+  });
+  render(
+    <MemoryRouter initialEntries={["/matches/m1"]}>
+      <Routes><Route path="/matches/:id" element={<MatchPage />} /></Routes>
+    </MemoryRouter>,
+  );
+  const emblem = await screen.findByTestId("match-league-emblem");
+  expect(emblem.querySelector("img")).toHaveAttribute("src", "/api/static/uploads/season.png");
+  resetLeagueTrail();
+});

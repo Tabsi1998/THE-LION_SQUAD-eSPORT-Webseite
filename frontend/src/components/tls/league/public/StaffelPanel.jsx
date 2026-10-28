@@ -1,6 +1,7 @@
 // Eine Staffel auf der Ligaseite (docs/LIGA.md, P5, #1625): links die Tabelle (Punkte der Season) und die Teams,
 // rechts der Spielplan in Kalenderwochen - Pausen sichtbar, die laufende Woche offen, Ergebnisse mit Maps. Daten aus
-// GET /api/leagues/<liga>/<season>/staffeln/<staffel>; Live-Änderungen laden leise nach.
+// GET /api/leagues/<liga>/<season>/staffeln/<staffel>; Live-Änderungen laden leise nach. Farben über die Marke (text-brand)
+// bzw. --league-accent-rgb - auf der Ligaseite ist das die Akzentfarbe der Liga (#2107), sonst die Vereinsfarbe.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { CalendarDays, ChevronDown, Coffee, ExternalLink, Users } from "lucide-react";
@@ -27,7 +28,7 @@ function TeamName({ side, won }) {
   const tone = won ? "text-white font-bold" : "text-white/75";
   return side.team_id ? (
     <Link to={`/teams/${side.team_id}`} title={side.name}
-      className={`tls-league-match__team ${tone} hover:text-[#29B6E8] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8] rounded-sm`}>
+      className={`tls-league-match__team ${tone} hover:text-brand focus-visible:outline focus-visible:outline-1 focus-visible:outline-brand rounded-sm`}>
       {side.name}
     </Link>
   ) : <span className={`tls-league-match__team ${tone}`} title={side.name}>{side.name}</span>;
@@ -74,7 +75,7 @@ function MatchRow({ match }) {
         {match.done
           ? <span>{match.forfeit ? "kampflos" : "gespielt"}</span>
           : <span>{matchWhen(match)}{match.scheduled_at && SOURCE_LABELS[match.schedule_source] ? ` · ${SOURCE_LABELS[match.schedule_source]}` : ""}</span>}
-        <Link to={`/matches/${match.id}`} className="inline-flex items-center gap-1 text-[#29B6E8] hover:text-white">
+        <Link to={`/matches/${match.id}`} className="inline-flex items-center gap-1 text-brand hover:text-white">
           Spiel <ExternalLink className="h-3 w-3" aria-hidden="true" />
         </Link>
       </div>
@@ -169,7 +170,7 @@ export function StaffelPanel({ leagueSlug, seasonSlug, staffel }) {
             {!data.teams.length ? <li className="text-sm text-white/50">Noch keine Teams zugeteilt.</li> : null}
           </ul>
         </section>
-        <Link to={`/tournaments/${staffel.slug || staffel.tournament_id}`} className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-white/55 hover:text-[#29B6E8]">
+        <Link to={`/tournaments/${staffel.slug || staffel.tournament_id}`} className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-white/55 hover:text-brand">
           Staffel als Turnier öffnen <ExternalLink className="h-3 w-3" aria-hidden="true" />
         </Link>
       </div>

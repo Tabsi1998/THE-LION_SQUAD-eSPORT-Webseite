@@ -9,8 +9,13 @@ const STAFFEL = { id: "t1", slug: "liga-a", title: "Staffel", league_context: { 
 test("leagueTrail findet Liga und Season nur, wenn die Person die Season sieht", () => {
   expect(leagueTrail(LEAGUES, STAFFEL)).toEqual({
     leagueName: "Probe-Liga", seasonName: "Season 1", seasonHref: "/liga/probe-liga/season-1",
-    staffelHref: "/liga/probe-liga/season-1#staffel-liga-a",
+    staffelHref: "/liga/probe-liga/season-1#staffel-liga-a", emblemUrl: null,
   });
+  // Emblem (#2107): das der Season, sonst das der Liga.
+  const emblems = [{ ...LEAGUES[0], emblem_url: "/api/static/uploads/liga.png" }];
+  expect(leagueTrail(emblems, STAFFEL).emblemUrl).toBe("/api/static/uploads/liga.png");
+  emblems[0].seasons = [{ ...LEAGUES[0].seasons[0], emblem_url: "/api/static/uploads/season.png" }];
+  expect(leagueTrail(emblems, STAFFEL).emblemUrl).toBe("/api/static/uploads/season.png");
   expect(leagueTrail([], STAFFEL)).toBeNull();
   expect(leagueTrail(LEAGUES, { id: "x" })).toBeNull();
   expect(leagueTrail(LEAGUES, { ...STAFFEL, league_context: { league_id: "lg1", season_id: "andere" } })).toBeNull();
