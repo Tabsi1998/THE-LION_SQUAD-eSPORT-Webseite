@@ -41,7 +41,7 @@ export function TeamSquads({ team, userId, canManage = false, enabled = false })
             <li key={squad.id} className="min-w-0 border border-white/10 bg-[#121212] rounded-sm p-4" data-testid={`team-squad-${squad.id}`}>
               <div className="flex min-w-0 items-start justify-between gap-2">
                 <div className="min-w-0 font-heading text-lg font-bold [overflow-wrap:anywhere]">{squad.name}</div>
-                {mine ? <span className="shrink-0 rounded-sm border border-[#FFD700]/40 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#FFD700]">Du: {mine.label}</span> : null}
+                {mine ? <span className="shrink-0 rounded-sm border border-honor/40 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-honor">Du: {mine.label}</span> : null}
               </div>
               <p className="mt-1 text-xs text-white/60 break-words" data-testid={`team-squad-roles-line-${squad.id}`}>{rolesSummary(squad, squad.members)}</p>
               <p className="mt-1 text-xs text-white/40">{(squad.members || []).length} im Kader</p>
