@@ -99,8 +99,12 @@ async def test_cancelling_informs_everyone_cancels_registrations_and_orders(flow
     notes = await flow.db.notifications.find({"kind": "event_message"}, {"_id": 0}).to_list(10)
     assert sorted(note["user_id"] for note in notes) == sorted(user["id"] for user in people.values())
     assert all("abgesagt" in note["title"] for note in notes)
-    mails = await flow.db.mail_jobs.find({"template_key": "event_message"}, {"_id": 0, "to": 1}).to_list(10)
+    # Eigene Mail „Event abgesagt“ (#2119) statt „Nachricht der Turnierleitung“.
+    assert await flow.db.mail_jobs.count_documents({"template_key": "event_message"}) == 0
+    mails = await flow.db.mail_jobs.find({"template_key": "event_cancelled"}, {"_id": 0, "to": 1, "subject": 1, "html": 1}).to_list(10)
     assert sorted(mail["to"] for mail in mails) == sorted(user["email"] for user in people.values())
+    assert all(mail["subject"] == f"Abgesagt: {event['name']}" for mail in mails)
+    assert all("storniert" in mail["html"] and "Nachricht der Turnierleitung" not in mail["subject"] for mail in mails)
     audit = await flow.db.audit_logs.find_one({"action": "event.cancel"}, {"_id": 0})
     assert audit["actor_id"] == kassier["id"] and audit["data"]["registrations"] == 3
 

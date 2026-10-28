@@ -56,6 +56,7 @@ Kasten **Verteilen** am Beitrag ([Inhalte](inhalte.md)).
 2. Bei Resend unter „Domains“ die Vereinsdomain hinzufügen, die DNS-Einträge (SPF, DKIM) beim Domain-Anbieter anlegen und in
    Resend bestätigen. Ohne bestätigte Domain landen Mails im Spam oder werden abgelehnt.
 3. Hier **Absendername**, **Absender-E-Mail** (zum Beispiel `noreply@`, gefolgt von eurer Domain) und **Antworten an** (Vereinspostfach) eintragen.
+   Diese drei Felder und **Versand aktiv** gelten für beide Wege – unter SMTP steht dieselbe Einstellung, eine Änderung hier gilt auch dort.
 4. **Testmail senden**. Kommt sie an, **Versand aktiv** einschalten und speichern.
 
 ### 2.2 Oder: eigener Mailserver (SMTP)
@@ -66,7 +67,7 @@ Kasten **Verteilen** am Beitrag ([Inhalte](inhalte.md)).
    **Mit Benutzer/Passwort**.
 3. **Absender E-Mail**, **Absendername**, **Antworten an**. Unter den technischen Feldern (Technischer SMTP-Absender, Message-ID Domain, HELO/EHLO)
    reichen meist die Vorgaben.
-4. **Port-Check** und **TLS Zertifikat** prüfen die Verbindung; **SMTP Testmail** schickt eine echte Mail. Die **DNS Checkliste gegen Spam**
+4. **Diagnose** prüft die Verbindung (auch andere Ports), **Zustellbarkeit** die DNS-Einträge der Domain; **Senden** unter **SMTP Testmail** schickt eine echte Mail. Die **DNS Checkliste gegen Spam**
    erinnert an SPF, DKIM, DMARC und rDNS – ohne sie landen Mails beim Empfänger leicht im Spam.
 5. **Versand aktiv** einschalten, speichern.
 
@@ -87,9 +88,9 @@ Alle anderen sind **Themen**, die jede Person selbst an- und abschalten kann (3.
 | Thema | Wofür |
 | --- | --- |
 | **Spiel-Erinnerungen** | Startzeiten, Spiel-Hub, Check-in-nahe Hinweise, Aufruf, Ergebnis-Meldungen, Disputes |
-| **Turnier-Updates** | Anmeldung (eingegangen, bestätigt, abgelehnt, Warteliste), Check-in, Ergebnisse, „Turnier beendet“, „Wie war …?“ am Tag danach, Fotos vom Event („Die Fotos sind da“), Nachricht der Turnierleitung an alle Angemeldeten eines Events |
+| **Turnier-Updates** | Anmeldung (eingegangen, bestätigt, abgelehnt, Warteliste), Check-in, Ergebnisse, „Turnier beendet“, „Turnier abgesagt“, „Event abgesagt“, „Wie war …?“ am Tag danach, Fotos vom Event („Die Fotos sind da“), Nachricht der Turnierleitung an alle Angemeldeten eines Events |
 | **Gewinne & Abholung** | Gewinn bereit, übergeben, Frist abgelaufen |
-| **Erfolge** | Freigeschaltete Erfolge – nur In-App, Push, Discord, keine Mail |
+| **Erfolge** | Freigeschaltete Erfolge, Kronen und neue Level – nur In-App, Push, Discord, keine Mail |
 | **Wochenrückblick** | Montags eine Mail mit XP und neuen Erfolgen, nur bei Aktivität, nur per Mail |
 | **Rechnungen** | „Deine Rechnung ist da“ – nur In-App, Push, Mail; Beträge gehen nie über Discord |
 | **Vereinsmitgliedschaft** | Bewerbung, Mitgliedsstatus, Vorteile |
@@ -108,7 +109,14 @@ und die Variablen, die ihr einsetzen dürft. Unter **Bearbeiten** ändert ihr **
 Beispieldaten** zeigt das Ergebnis, eine **Testmail** geht an euch selbst. Gespeichert gilt der Text sofort („ab jetzt geht dieser Text raus“).
 **Auf Standard zurücksetzen** verwirft eure Fassung und stellt den mitgelieferten Text wieder her.
 
-Einige Mails sind feste Vorlagen: Dort ist der gerenderte Standard der Ausgangspunkt.
+Im Formular steht die Vorlage immer mit **Platzhaltern** wie `{{display_name}}` – beim Versand kommt der echte Wert hinein. Nur die
+Vorschau rechts setzt Beispieldaten ein („Paula“, „Mario Kart Winter Cup“). Bei festen Vorlagen ist der Standard mit Platzhaltern der
+Ausgangspunkt; Teile, die der Standard nur bei Bedarf zeigt (etwa Grund oder Station), stehen in eurer Fassung immer drin. Wer den
+Standard unverändert speichert, speichert nichts – es bleibt beim Standard.
+
+Steht ein Beispielwert aus der Vorschau im Text, fragt **Speichern** nach: So bekäme jede Person „Hallo Paula“. Vorlagen, die schon so
+gespeichert sind, tragen in der Liste den Hinweis **Beispielwerte im Text**; im Editor steht, welche Werte es sind. Nichts wird von selbst
+überschrieben – Werte durch Variablen ersetzen oder **Auf Standard zurücksetzen**.
 
 ### 3.3 Die Mail-Queue
 
@@ -132,9 +140,13 @@ Einige Mails sind feste Vorlagen: Dort ist der gerenderte Standard der Ausgangsp
 ### 3.4 Newsletter
 
 News und Events gehen **beim Veröffentlichen von selbst** an alle mit Newsletter-Zustimmung. Gesendet wird im Kasten **Verteilen** am Beitrag
-(Empfängerzahl, **Jetzt senden**, ein zweites Mal nur Redaktion und System). Unter **Admin → E-Mail → Newsletter** steht für System der
+(Empfängerzahl, **Jetzt senden**, ein zweites Mal nur Redaktion und System). **Mail ansehen** zeigt die Mail, wie sie hinausgeht – Betreff,
+Text, Link, mit eurem eigenen Namen als Anrede; verschickt wird dabei nichts. Unter **Admin → E-Mail → Newsletter** steht für System der
 **Verlauf**: welche News und Events wann an wie viele Personen gingen – ohne Namen und Adressen. Entwürfe und „Nur intern“ gehen nicht hinaus.
-Die Einwilligung gibt jede Person getrennt im Profil (3.6); sie ist jederzeit widerrufbar.
+Die Einwilligung gibt jede Person getrennt im Profil (3.6); sie ist jederzeit widerrufbar. Jede Newsletter-Mail hat unten den Link
+**Mit einem Klick abbestellen** – er öffnet eine Seite ohne Anmeldung, dort meldet **Newsletter abbestellen** ab. Gmail, Yahoo und andere
+zeigen dazu ihren eigenen „Abbestellen“-Knopf (Kopfzeile `List-Unsubscribe`); der meldet sofort ab. Der Widerruf steht wie die Einwilligung
+im Protokoll.
 
 ### 3.5 Push, In-App und Discord
 
@@ -151,8 +163,10 @@ Eine Benachrichtigung entsteht einmal und geht dann, je nach Einstellung der Per
   Nachricht vom Vereins-Bot (Titel, Text, Link). Nie darin: Chat-Texte anderer, Moderation, Zahlungsdaten. Discord stellt Direktnachrichten
   nur zu, wenn die Person mit dem Bot einen Server teilt und „Direktnachrichten von Servermitgliedern“ erlaubt. Lehnt Discord ab, bleibt es
   bei In-App und Push, und die Einstellungen zeigen den Klickweg. Bot aus: keine Nachricht, der Grund steht im Versand-Log.
-- **Push testen:** **Admin → System → Push-Tests**: Benutzer suchen, Testnachricht senden. Die Seite zeigt die Tokens des Kontos, den letzten Versand
-  und Fehler. „In-App erstellt, aber kein aktiver Push-Token gefunden“ heißt: Die Person hat die App nicht oder keine Push-Erlaubnis.
+- **Push testen:** **Admin → System → Push-Tests**: Benutzer suchen, Testnachricht senden. Der Test landet als „Test: …“ im Postfach der Person.
+  Die Seite zeigt die angemeldeten Handys, ob der Push-Dienst die Nachricht **angenommen** und ob Apple oder Google sie **zugestellt** haben, dazu
+  Fehler in Alltagssprache. „Im Postfach angelegt – aber auf keinem Handy ist die App mit Push angemeldet“ heißt: Die Person hat die App nicht oder
+  keine Push-Erlaubnis.
   In der Kommandozentrale steht die Zahl der aktiven Tokens und Fehler unter **Push-Monitoring**.
 
 ### 3.6 Was Mitglieder selbst abschalten können
@@ -181,11 +195,12 @@ Eine Benachrichtigung entsteht einmal und geht dann, je nach Einstellung der Per
 | Newsletter ging nicht hinaus | Entwurf, „Nur intern“ oder keine Zustimmungen | Kasten **Verteilen** ansehen ([Inhalte](inhalte.md)) |
 | Ein Mitglied bekommt keine Turnier-Mails | Thema oder Kanal E-Mail ist bei ihm aus | In Einstellungen → Benachrichtigungen prüfen |
 | Mitglied bekommt keine Push-Meldung | Keine App, keine Erlaubnis, Kanal am Handy stumm, oder Push in den Einstellungen aus | Push-Tests ausführen; Handy-Einstellungen prüfen |
-| „In-App erstellt, aber kein aktiver Push-Token gefunden“ | Das Konto hat kein registriertes Gerät | App öffnen, Push erlauben |
+| „Im Postfach angelegt – aber auf keinem Handy ist die App mit Push angemeldet“ | Das Konto hat kein registriertes Gerät | App öffnen, Push erlauben |
 | Discord-Kanal lässt sich nicht einschalten | Kein Discord-Konto verknüpft | Profil → Socials → Mit Discord verknüpfen |
 | Discord-Direktnachricht kommt nicht | Discord lehnt ab (kein gemeinsamer Server oder Nachrichten gesperrt), oder Bot aus | Hinweis in den Einstellungen folgen; Verbindungen → Discord prüfen |
 | Rechnung per Discord erwartet | Beträge gehen nie über Discord | Rechnungen kommen In-App, Push, Mail |
 | Eine Vorlage zeigt „Vorschau hat nicht geklappt“ | Variable falsch gesetzt | Auf Standard zurücksetzen und neu anfangen |
+| Alle bekommen „Hallo Paula“ oder denselben Turniernamen | Beispielwerte der Vorschau wurden gespeichert (Hinweis **Beispielwerte im Text**) | Vorlage öffnen, Werte durch Variablen ersetzen oder **Auf Standard zurücksetzen** |
 
 ---
 

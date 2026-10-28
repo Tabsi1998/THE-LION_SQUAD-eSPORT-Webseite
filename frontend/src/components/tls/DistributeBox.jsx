@@ -51,6 +51,26 @@ export function DistributeBox({ kind, itemId, title = "", children }) {
   }, [kind, itemId]);
   useEffect(() => { load(); }, [load]);
 
+  // Vorschau (#2119 ML5): die Mail, wie sie hinausginge - mit deinem Namen als Anrede, nichts wird verschickt.
+  const [preview, setPreview] = useState(null);
+  const [previewBusy, setPreviewBusy] = useState(false);
+  const togglePreview = async () => {
+    if (preview) {
+      setPreview(null);
+      return;
+    }
+    setPreviewBusy(true);
+    try {
+      const { data } = await api.post("/settings/newsletter/preview", { kind, id: itemId });
+      if (data?.mail) setPreview(data.mail);
+      else toast.error("Für diesen Beitrag gibt es keine Newsletter-Mail.");
+    } catch (failure) {
+      toast.error(formatRequestError(failure, "Die Vorschau lässt sich gerade nicht laden."));
+    } finally {
+      setPreviewBusy(false);
+    }
+  };
+
   const send = async (force) => {
     const name = box?.title || title || (kind === "event" ? "dieses Event" : "diesen Beitrag");
     const approved = await confirm(force ? {
@@ -102,6 +122,20 @@ export function DistributeBox({ kind, itemId, title = "", children }) {
                   ) : (
                     <p className="text-xs text-white/45" data-testid="distribute-resend-locked">Ein zweites Mal senden nur Redaktion und System.</p>
                   ))}
+                  {box.state !== "internal" && (
+                    <div>
+                      <button type="button" disabled={previewBusy} onClick={togglePreview} aria-expanded={Boolean(preview)} data-testid="distribute-preview-toggle" className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+                        {preview ? "Vorschau schließen" : previewBusy ? "Lade Vorschau …" : "Mail ansehen"}
+                      </button>
+                      {preview && (
+                        <div className="mt-2 border border-white/10 rounded-sm bg-white" data-testid="distribute-preview">
+                          <div className="px-3 py-2 border-b border-black/10 text-sm text-black font-bold break-words" data-testid="distribute-preview-subject">{preview.subject}</div>
+                          <iframe title="Vorschau der Newsletter-Mail" sandbox="" srcDoc={preview.html} className="w-full h-[420px] bg-white" data-testid="distribute-preview-frame" />
+                          <p className="px-3 py-2 border-t border-black/10 text-[11px] text-black/60">So sieht die Mail aus – mit deinem Namen als Anrede. Jede Person bekommt ihren eigenen.</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </>
               )}
             </div>

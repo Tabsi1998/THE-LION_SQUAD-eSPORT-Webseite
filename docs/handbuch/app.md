@@ -163,8 +163,9 @@ Eine Benachrichtigung entsteht einmal und geht dann über die Kanäle, die die P
   - **Verein** – Vereinsintern, News, Mitgliedschaft, Rechnungen.
   - **Erfolge** – Erfolge, Level, Kronen.
   Wer die Chats stumm stellt, verpasst den Spielaufruf nicht.
-- **Push testen:** **Admin → System → Push-Tests**: Konto suchen, Titel und Text prüfen, senden. Die Seite zeigt Tokens und den letzten Versand. „In-App erstellt, aber kein aktiver
-  Push-Token gefunden“ heißt: Das Konto hat kein Gerät mit Push-Erlaubnis.
+- **Push testen:** **Admin → System → Push-Tests**: Konto suchen, Titel und Text prüfen, senden. Die Seite zeigt die angemeldeten Handys und den letzten Versand;
+  der Test steht als „Test: …“ im Postfach. „Im Postfach angelegt – aber auf keinem Handy ist die App mit Push angemeldet“ heißt: Das Konto hat
+  kein Gerät mit Push-Erlaubnis.
 - **Monitoring:** In der Kommandozentrale zeigt die Kachel **Push-Monitoring** aktive Tokens und Fehler. Pushes gehen nur an echte Geräte, nie an Emulatoren.
 - Mehr zu Mails, Vorlagen und Discord-Nachrichten im Kapitel **Mails und Benachrichtigungen**.
 

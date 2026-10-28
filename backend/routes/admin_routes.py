@@ -34,7 +34,7 @@ class MobileLogPatch(BaseModel):
 
 class MobilePushTestCreate(BaseModel):
     user_id: str | None = Field(default=None, max_length=80)
-    title: str = Field(default="LionsAPP Push-Test", max_length=120)
+    title: str = Field(default="Push an dein Handy", max_length=120)
     body: str = Field(default="Wenn du diese Nachricht am Handy siehst, funktionieren Push-Benachrichtigungen.", max_length=240)
 
 
@@ -770,9 +770,13 @@ async def mobile_push_status_for_user(user_id: str, me: dict = Depends(require_c
 @router.post("/mobile-push/test")
 async def mobile_push_test(body: MobilePushTestCreate, me: dict = Depends(require_club_admin())):
     target_id = body.user_id or me["id"]
+    # Der Test landet auch im Postfach der Person (#2119 ML8) - dort als Test erkennbar, nicht als normale Meldung.
+    title = body.title.strip() or "Push an dein Handy"
+    if not title.lower().startswith("test"):
+        title = f"Test: {title}"
     notification = await create_user_notification(
         target_id,
-        title=body.title.strip() or "LionsAPP Push-Test",
+        title=title,
         body=body.body.strip() or "Wenn du diese Nachricht am Handy siehst, funktionieren Push-Benachrichtigungen.",
         url="/profile?tab=inbox",
         kind="admin_push_test",

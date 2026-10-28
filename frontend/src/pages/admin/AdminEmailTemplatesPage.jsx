@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Eye, Mail, RotateCcw, Save, Send, X } from "lucide-react";
+import { AlertTriangle, Eye, Mail, RotateCcw, Save, Send, X } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
@@ -43,9 +43,10 @@ export default function AdminEmailTemplatesPage() {
               {group.rows.map((row) => (
                 <div key={row.key} className="px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-1" data-testid={`tpl-row-${row.key}`}>
                   <div className="min-w-0 flex-1">
-                    <div className="font-bold flex items-center gap-2">
+                    <div className="font-bold flex flex-wrap items-center gap-2">
                       {row.name}
                       {row.custom ? <span className="text-[10px] font-bold uppercase tracking-wider border border-[#FFD700]/50 text-[#FFD700] px-1.5 py-0.5 rounded-sm" data-testid={`tpl-custom-${row.key}`}>angepasst</span> : null}
+                      {row.sample_leaks?.length ? <span className="text-[10px] font-bold uppercase tracking-wider border border-warn/60 text-warn px-1.5 py-0.5 rounded-sm" data-testid={`tpl-leaks-${row.key}`} title={row.sample_leaks.join(", ")}>Beispielwerte im Text</span> : null}
                     </div>
                     <div className="text-xs text-white/50">{row.purpose}</div>
                     <div className="text-[11px] text-white/40 mt-0.5">Empfänger: {row.recipient}{row.vars?.length ? ` · Variablen: ${row.vars.map((v) => `{{${v}}}`).join(", ")}` : ""}</div>
@@ -66,32 +67,75 @@ export default function AdminEmailTemplatesPage() {
 
 function TemplateEditor({ template, onClose, onSaved }) {
   const confirm = useConfirm();
-  const [form, setForm] = useState({ subject: template.subject ?? "", html: template.html ?? "" });
+  // Der Editor lädt die Vorlage mit {{variable}} (#2119 ML1) - nie die Vorschau mit Beispieldaten. Sonst bekäme nach dem
+  // ersten Speichern jede Person „Hallo Paula“.
+  const [form, setForm] = useState(null);
+  const [loaded, setLoaded] = useState(null);
   const [preview, setPreview] = useState(null);
   const [busy, setBusy] = useState("");
-  const draft = () => ({ subject: form.subject, html: form.html });
+  const draft = () => ({ subject: form?.subject ?? "", html: form?.html ?? "" });
+  const leaks = loaded?.sample_leaks || template.sample_leaks || [];
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
 
   const loadPreview = useCallback(async (body) => {
     try {
       const { data } = await api.post(`/admin/email-templates/${template.key}/preview`, body);
       setPreview(data);
-      if (body && Object.keys(body).length === 0 && !template.custom) setForm({ subject: data.subject, html: data.html });
     } catch (e) {
       toast.error(formatApiError(e.response?.data?.detail) || "Vorschau hat nicht geklappt.");
     }
-  }, [template.key, template.custom]);
-  // Beim Öffnen: den geltenden Stand zeigen - für feste Vorlagen der gerenderte Standard als Ausgangspunkt.
-  useEffect(() => { loadPreview({}); }, [loadPreview]);
+  }, [template.key]);
+  useEffect(() => {
+    let alive = true;
+    api.get(`/admin/email-templates/${template.key}`)
+      .then(({ data }) => {
+        if (!alive) return;
+        setLoaded(data);
+        setForm({ subject: data.subject ?? "", html: data.html ?? "" });
+      })
+      .catch((e) => {
+        if (!alive) return;
+        toast.error(formatApiError(e.response?.data?.detail) || "Vorlage konnte nicht geladen werden.");
+        closeRef.current();
+      });
+    // Die Vorschau zeigt den geltenden Stand mit Beispieldaten - nur rechts, nie im Formular.
+    loadPreview({});
+    return () => { alive = false; };
+  }, [template.key, loadPreview]);
 
+  const put = (body) => api.put(`/admin/email-templates/${template.key}`, body);
+  const saved = () => {
+    toast.success("Vorlage gespeichert – ab jetzt geht dieser Text raus.");
+    onSaved();
+    onClose();
+  };
   const save = async () => {
+    const body = draft();
+    if (!template.custom && loaded && body.subject === loaded.subject && body.html === loaded.html) {
+      toast.success("Nichts geändert – es bleibt beim Standard.");
+      onClose();
+      return;
+    }
     setBusy("save");
     try {
-      await api.put(`/admin/email-templates/${template.key}`, draft());
-      toast.success("Vorlage gespeichert – ab jetzt geht dieser Text raus.");
-      onSaved();
-      onClose();
+      await put(body);
+      saved();
     } catch (e) {
-      toast.error(formatApiError(e.response?.data?.detail) || "Speichern hat nicht geklappt.");
+      const detail = e.response?.data?.detail;
+      if (e.response?.status === 409 && detail?.code === "sample_values") {
+        const ok = await confirm({ title: "Beispielwerte im Text", description: `${detail.message} Trotzdem so speichern?`, confirmLabel: "Trotzdem speichern" });
+        if (ok) {
+          try {
+            await put({ ...body, allow_samples: true });
+            saved();
+          } catch (again) {
+            toast.error(formatApiError(again.response?.data?.detail) || "Speichern hat nicht geklappt.");
+          }
+        }
+      } else {
+        toast.error(formatApiError(detail) || "Speichern hat nicht geklappt.");
+      }
     } finally {
       setBusy("");
     }
@@ -133,22 +177,41 @@ function TemplateEditor({ template, onClose, onSaved }) {
           </div>
           <button type="button" onClick={onClose} aria-label="Schließen" className="text-white/50 hover:text-white"><X className="w-5 h-5" /></button>
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          <div className="space-y-3">
-            <label className="block">
-              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Betreff</div>
-              <input value={form.subject} onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))} data-testid="tpl-subject" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-            </label>
-            <label className="block">
-              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Text (HTML)</div>
-              <textarea rows={16} value={form.html} onChange={(e) => setForm((f) => ({ ...f, html: e.target.value }))} data-testid="tpl-html" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-xs font-mono" />
-            </label>
-            {template.vars?.length ? (
-              <div className="text-xs text-white/50">Variablen: {template.vars.map((v) => (
-                <button key={v} type="button" onClick={() => setForm((f) => ({ ...f, html: `${f.html}{{${v}}}` }))} data-testid={`tpl-var-${v}`} className="inline-block mr-1 mb-1 px-1.5 py-0.5 border border-white/15 rounded-sm font-mono text-[11px] hover:border-[#29B6E8]">{`{{${v}}}`}</button>
-              ))}</div>
-            ) : null}
+        {leaks.length ? (
+          <div className="mb-4 flex items-start gap-3 border border-warn/40 bg-warn/10 rounded-sm p-3 text-sm" data-testid="tpl-sample-warning" role="alert">
+            <AlertTriangle className="w-4 h-4 text-warn shrink-0 mt-0.5" />
+            <div>
+              <div className="font-bold">In der gespeicherten Fassung stehen Beispielwerte: {leaks.map((v) => `„${v}“`).join(", ")}</div>
+              <p className="text-white/70 mt-1">
+                So bekommt sie jede Person, egal wie sie heißt oder zu welchem Turnier sie angemeldet ist. Ersetze die Werte durch Variablen
+                {template.custom ? " – oder setz die Vorlage auf den Standard zurück" : ""}.
+              </p>
+            </div>
           </div>
+        ) : null}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          {form === null ? <div className="text-sm text-white/45" data-testid="tpl-loading">Lade Vorlage …</div> : (
+            <div className="space-y-3">
+              <p className="text-xs text-white/50">
+                Platzhalter wie <span className="font-mono">{"{{display_name}}"}</span> bleiben im Text stehen – beim Versand kommt der echte Wert hinein.
+                Nur die Vorschau setzt Beispieldaten ein.
+                {template.source === "code" ? " Teile, die der Standard nur bei Bedarf zeigt (etwa Grund oder Station), stehen in deiner Fassung immer drin." : ""}
+              </p>
+              <label className="block">
+                <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Betreff</div>
+                <input value={form.subject} onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))} data-testid="tpl-subject" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+              </label>
+              <label className="block">
+                <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Text (HTML)</div>
+                <textarea rows={16} value={form.html} onChange={(e) => setForm((f) => ({ ...f, html: e.target.value }))} data-testid="tpl-html" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-xs font-mono" />
+              </label>
+              {template.vars?.length ? (
+                <div className="text-xs text-white/50">Variablen: {template.vars.map((v) => (
+                  <button key={v} type="button" onClick={() => setForm((f) => ({ ...f, html: `${f.html}{{${v}}}` }))} data-testid={`tpl-var-${v}`} className="inline-block mr-1 mb-1 px-1.5 py-0.5 border border-white/15 rounded-sm font-mono text-[11px] hover:border-[#29B6E8]">{`{{${v}}}`}</button>
+                ))}</div>
+              ) : null}
+            </div>
+          )}
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Vorschau mit Beispieldaten</div>
@@ -163,8 +226,8 @@ function TemplateEditor({ template, onClose, onSaved }) {
         <div className="flex flex-wrap justify-between gap-2 pt-4 mt-4 border-t border-white/10">
           <button type="button" onClick={reset} disabled={!!busy || !template.custom} data-testid="tpl-reset" className="inline-flex items-center gap-1 px-3 py-2 text-xs font-bold uppercase tracking-wider text-white/60 hover:text-[#FF3B30] disabled:opacity-40"><RotateCcw className="w-3.5 h-3.5" /> Auf Standard zurücksetzen</button>
           <div className="flex gap-2">
-            <button type="button" onClick={sendTest} disabled={!!busy} data-testid="tpl-test" className="inline-flex items-center gap-1 px-4 py-2 border border-[#29B6E8] text-[#29B6E8] text-xs font-bold uppercase tracking-wider rounded-sm disabled:opacity-50"><Send className="w-3.5 h-3.5" /> Testmail an mich</button>
-            <button type="button" onClick={save} disabled={!!busy} data-testid="tpl-save" className="inline-flex items-center gap-1 px-5 py-2 bg-[#FFD700] text-black text-xs font-bold uppercase tracking-wider rounded-sm disabled:opacity-50"><Save className="w-3.5 h-3.5" /> {busy === "save" ? "Speichere …" : "Speichern"}</button>
+            <button type="button" onClick={sendTest} disabled={!!busy || form === null} data-testid="tpl-test" className="inline-flex items-center gap-1 px-4 py-2 border border-[#29B6E8] text-[#29B6E8] text-xs font-bold uppercase tracking-wider rounded-sm disabled:opacity-50"><Send className="w-3.5 h-3.5" /> Testmail an mich</button>
+            <button type="button" onClick={save} disabled={!!busy || form === null} data-testid="tpl-save" className="inline-flex items-center gap-1 px-5 py-2 bg-[#FFD700] text-black text-xs font-bold uppercase tracking-wider rounded-sm disabled:opacity-50"><Save className="w-3.5 h-3.5" /> {busy === "save" ? "Speichere …" : "Speichern"}</button>
           </div>
         </div>
       </div>

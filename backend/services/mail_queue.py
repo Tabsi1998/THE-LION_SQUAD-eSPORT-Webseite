@@ -27,7 +27,8 @@ logger = logging.getLogger("tls.mailqueue")
 
 # Felder, die die Liste der Warteschlange nie zeigt (#1418): die ganze Adresse, der Mailtext und der Schlüssel gegen
 # doppelten Versand. Die Adresse steht gekürzt in ``to_masked``; ganz nur über „Adresse zeigen“ (mit Protokoll).
-LIST_HIDDEN_FIELDS = ("to", "html", "dedupe_key")
+# `headers` (#2119): die Abmelde-Kopfzeile trägt den persönlichen Schlüssel des Empfängers - nie in die Liste.
+LIST_HIDDEN_FIELDS = ("to", "html", "dedupe_key", "headers")
 
 
 def masked_recipient(address) -> str:
@@ -453,7 +454,15 @@ async def get_mail_settings() -> dict:
     }
 
 
-async def _smtp_send(cfg: dict, to: str, subject: str, html: str) -> str:
+# Zusätzliche Kopfzeilen aus der Warteschlange (#2119 ML4) - nur diese; alles andere setzt der Versand selbst.
+EXTRA_HEADERS = ("List-Unsubscribe", "List-Unsubscribe-Post")
+
+
+def _extra_headers(headers: dict | None) -> dict[str, str]:
+    return {name: str(headers[name]) for name in EXTRA_HEADERS if headers and headers.get(name)}
+
+
+async def _smtp_send(cfg: dict, to: str, subject: str, html: str, headers: dict | None = None) -> str:
     """Send via aiosmtplib. Returns message-id-like marker."""
     from email.mime.multipart import MIMEMultipart
     from email.mime.text import MIMEText
@@ -480,6 +489,8 @@ async def _smtp_send(cfg: dict, to: str, subject: str, html: str) -> str:
         msg["Reply-To"] = reply_to
     if envelope_from and envelope_from.lower() != cfg["sender_email"].lower():
         msg["Sender"] = envelope_from
+    for name, value in _extra_headers(headers).items():
+        msg[name] = value
     msg.attach(MIMEText(html_to_text(html), "plain", "utf-8"))
     msg.attach(MIMEText(html, "html", "utf-8"))
 
@@ -524,7 +535,7 @@ async def _smtp_send(cfg: dict, to: str, subject: str, html: str) -> str:
     return msg["Message-ID"]
 
 
-async def _resend_send(cfg: dict, to: str, subject: str, html: str) -> str:
+async def _resend_send(cfg: dict, to: str, subject: str, html: str, headers: dict | None = None) -> str:
     if not cfg["resend_api_key"]:
         raise RuntimeError("Resend API key not configured")
     resend.api_key = cfg["resend_api_key"]
@@ -537,6 +548,7 @@ async def _resend_send(cfg: dict, to: str, subject: str, html: str) -> str:
         "headers": {
             "Auto-Submitted": "auto-generated",
             "X-Auto-Response-Suppress": "All",
+            **_extra_headers(headers),
         },
     }
     if cfg.get("reply_to_email"):
@@ -545,14 +557,15 @@ async def _resend_send(cfg: dict, to: str, subject: str, html: str) -> str:
     return resp.get("id") if isinstance(resp, dict) else "ok"
 
 
-async def _dispatch(cfg: dict, to: str, subject: str, html: str) -> str:
+async def _dispatch(cfg: dict, to: str, subject: str, html: str, headers: dict | None = None) -> str:
     # Mail-Programme zeigen kein SVG: jedes hochgeladene SVG-Logo geht als seine PNG-Fassung raus (#1952).
     html = raster_urls_in_text(html)
+    extra = {"headers": headers} if _extra_headers(headers) else {}
     if cfg["provider"] == "smtp":
         if not cfg["smtp_host"]:
             raise RuntimeError("SMTP host not configured")
-        return await _smtp_send(cfg, to, subject, html)
-    return await _resend_send(cfg, to, subject, html)
+        return await _smtp_send(cfg, to, subject, html, **extra)
+    return await _resend_send(cfg, to, subject, html, **extra)
 
 
 async def recover_stale_sending_jobs() -> int:
@@ -644,7 +657,8 @@ async def _try_send_job(job: dict) -> None:
         )
         return
     try:
-        msg_id = await _dispatch(cfg, job["to"], job["subject"], job["html"])
+        extra = {"headers": job["headers"]} if job.get("headers") else {}
+        msg_id = await _dispatch(cfg, job["to"], job["subject"], job["html"], **extra)
         await db.mail_jobs.update_one(
             {"id": job["id"]},
             {"$set": {

@@ -122,7 +122,7 @@ export const EMAIL_PREFERENCES = [
   { k: "tournament_updates", l: "Turnier-Updates", d: "Anmeldung, Status, Ergebnisse und wichtige Turnierinfos.", defaultOn: true },
   { k: "prize_updates", l: "Gewinne & Abholung", d: "Gewinn bereit, übergeben oder Frist abgelaufen.", defaultOn: true },
   // Erfolge (#568): In-App, Push und Discord - eine Mail dafür gibt es nicht, die Spalte zeigt einen Strich.
-  { k: "achievements", l: "Erfolge", d: "Freigeschaltete Erfolge – als Gratulation.", defaultOn: true, channels: ["in_app", "push", "discord"] },
+  { k: "achievements", l: "Erfolge", d: "Freigeschaltete Erfolge, Kronen und neue Level – als Gratulation.", defaultOn: true, channels: ["in_app", "push", "discord"] },
   // Wochenrückblick (#622): montags eine Mail an dich selbst - nur bei Aktivität, nur per E-Mail.
   { k: "achievement_recap", l: "Wochenrückblick", d: "Montags eine kurze Mail mit deinen XP, deinem Level und neuen Erfolgen – nur, wenn du in der Woche etwas erreicht hast.", defaultOn: true, channels: ["email"] },
   // Rechnungen (#841): „Deine Rechnung ist da“ - Beträge gehen nie über Discord, die Spalte zeigt dort einen Strich.
