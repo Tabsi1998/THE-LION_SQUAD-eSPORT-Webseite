@@ -22,7 +22,7 @@ import { gamePresets } from "@/lib/gameMatchData";
 import { PrizeEditor, Txt } from "./PrizeEditor";
 import { DeadlineFields } from "./DeadlineFields";
 import { deadlineFormValues, deadlinePayload } from "@/lib/tournamentDeadlines";
-import { ADVANCEMENT_MODE_OPTIONS, BRONZE_FORMATS, DRAW_SHOW_MINUTES_DEFAULT, DRAW_SHOW_MINUTES_HINT, advancementModeHint, drawShowMinutesPayload, CUSTOM_BRACKET_FORMATS, EVENT_MODE_OPTIONS, GRAND_FINAL_FORMATS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, HEAT_REBUILD_FORMATS, HEAT_REBUILD_HINT, HEAT_REBUILD_OPTIONS, RESULT_ENTRY_MODE_OPTIONS, SCHEDULE_MODE_OPTIONS, SEEDING_OPTIONS, STREAM_PLATFORM_OPTIONS, TEAM_MODE_OPTIONS, TOURNAMENT_SEASON_WEIGHT_OPTIONS, VISIBILITY_OPTIONS, WEEKDAY_OPTIONS, advancementModeOf } from "./shared";
+import { ADVANCEMENT_MODE_OPTIONS, BRONZE_FORMATS, DRAW_SHOW_MINUTES_DEFAULT, DRAW_SHOW_MINUTES_HINT, advancementModeHint, drawShowMinutesPayload, CUSTOM_BRACKET_FORMATS, EVENT_MODE_OPTIONS, GRAND_FINAL_FORMATS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, HEAT_REBUILD_FORMATS, HEAT_REBUILD_HINT, HEAT_REBUILD_OPTIONS, RESULT_ENTRY_MODE_OPTIONS, SCHEDULE_MODE_OPTIONS, SEEDING_OPTIONS, seedingModeOf, STREAM_PLATFORM_OPTIONS, TEAM_MODE_OPTIONS, TOURNAMENT_SEASON_WEIGHT_OPTIONS, VISIBILITY_OPTIONS, WEEKDAY_OPTIONS, advancementModeOf } from "./shared";
 import { StaffelSeasonValues, isStaffel, staffelBeforeStart } from "./StaffelParts";
 import { FormatHint } from "./FormatHint";
 import { BEST_OF_RUNS_HINT, MATCHDAY_DRAW_HINT, NO_MATCH_FORMATS, matchdayDrawMode, matchdayDrawOn, tournamentFieldRules } from "@/lib/tournamentFormFields";
@@ -89,7 +89,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
     bronze_match: !!source.bronze_match,
     grand_final_mode: source.grand_final_mode || "reset",
     heat_rebuild_mode: source.heat_rebuild_mode || "suggest",
-    seeding_mode: source.seeding_mode || "random",
+    seeding_mode: seedingModeOf(source.seeding_mode),
     advancement_mode: advancementModeOf(source),
     draw_show_minutes: source.draw_show_minutes ?? "",
     is_public: source.is_public !== false,
@@ -155,7 +155,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
     bronze_match: !!tournament.bronze_match,
     grand_final_mode: tournament.grand_final_mode || "reset",
     heat_rebuild_mode: tournament.heat_rebuild_mode || "suggest",
-    seeding_mode: tournament.seeding_mode || "random",
+    seeding_mode: seedingModeOf(tournament.seeding_mode),
     advancement_mode: advancementModeOf(tournament),
     draw_show_minutes: tournament.draw_show_minutes ?? "",
     is_public: tournament.is_public !== false,
@@ -447,7 +447,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
           </FormGrid>
           <FormSection title="Erweiterte Spieloptionen" collapsible plain>
             <FormGrid cols={3}>
-              {show && <SelectInput label="Seeding" value={f.seeding_mode} onChange={(v)=>set("seeding_mode",v)} options={SEEDING_OPTIONS} />}
+              {show && <SelectInput label="Setzliste" value={f.seeding_mode} onChange={(v)=>set("seeding_mode",v)} options={SEEDING_OPTIONS} testId="tr-edit-seeding" />}
               {show && rules.advancement === "select" && (
                 <div className="md:col-span-2">
                   {/* Weiterkommen in vier Modi (#1548, #1590): fester Baum, Auslosung nach der Runde, Show, sofort zufällig.

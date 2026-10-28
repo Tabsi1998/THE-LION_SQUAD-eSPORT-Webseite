@@ -21,7 +21,10 @@ export const OPERATIONAL_STATUS_VALUES = new Set(["check_in", "live", "paused", 
 
 export const TEAM_MODE_OPTIONS = [["solo", "Einzelspieler"], ["team", "Team"]];
 
-export const SEEDING_OPTIONS = [["random", "Zufall"], ["manual", "Manuell"], ["ranking", "Ranking"]];
+// Setzliste (#2111, T3): „Ranking“ verhielt sich genau wie „Manuell“ - es gibt nur noch Zufall und Manuell; ein alter Wert
+// „ranking“ steht als „Manuell“ da (der Server kennt ihn weiter).
+export const SEEDING_OPTIONS = [["random", "Zufall"], ["manual", "Manuell (Setzplatz, sonst Anmeldereihenfolge)"]];
+export const seedingModeOf = (value) => (value === "manual" || value === "ranking" ? "manual" : "random");
 
 export const VISIBILITY_OPTIONS = [["public", "Öffentlich"], ["community", "Community"], ["members", "Vereinsmitglieder"], ["internal", "Intern"]];
 

@@ -131,6 +131,19 @@ test("Mindestpause nur vor Ort und hybrid, Runden je Lauf bei Mehrspieler, kein 
   expect(screen.getByTestId("tr-edit-bo").closest("label")).toHaveTextContent(/^Best of/);
 });
 
+// Setzliste (#2111, T3): „Ranking“ verhielt sich wie „Manuell“ - es steht als „Manuell“ da und geht unverändert nicht mit.
+test("Setzliste: ein altes „Ranking“ steht als „Manuell“ da, ohne Ranking zur Wahl", async () => {
+  apiMock.patch.mockReset();
+  apiMock.patch.mockResolvedValue({ data: {} });
+  render(<TournamentEditForm tournament={{ ...BASE, status: "draft", seeding_mode: "ranking" }} onSaved={() => {}} />);
+  const seeding = await screen.findByTestId("tr-edit-seeding");
+  expect(seeding).toHaveValue("manual");
+  expect([...seeding.querySelectorAll("option")].map((option) => option.value)).toEqual(["random", "manual"]);
+  fireEvent.change(screen.getByTestId("tr-edit-title"), { target: { value: "Probe-Cup 2" } });
+  fireEvent.click(screen.getByTestId("tr-edit-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/tournaments/t-1", { title: "Probe-Cup 2" }));
+});
+
 // Automatisch live (#2111, W4): vor Ort startet die Turnierleitung selbst - der Schalter steht dort nur, solange er an ist.
 test("Automatisch live/beendet: vor Ort nur, solange es an ist", async () => {
   const { unmount } = render(<TournamentEditForm tournament={{ ...BASE, event_mode: "local" }} onSaved={() => {}} />);

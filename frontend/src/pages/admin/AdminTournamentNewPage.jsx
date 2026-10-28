@@ -10,7 +10,7 @@ import { CheckField, FieldLabel, SelectField, TextField } from "@/components/tls
 import { FormatHint } from "./tournament/FormatHint";
 import { prizeGroupOptions } from "./tournament/PrizeEditor";
 import { BEST_OF_RUNS_HINT, MATCHDAY_DRAW_HINT, matchdayDrawMode, matchdayDrawOn, tournamentFieldRules } from "@/lib/tournamentFormFields";
-import { ADVANCEMENT_MODE_OPTIONS, DRAW_SHOW_MINUTES_DEFAULT, DRAW_SHOW_MINUTES_HINT, GRAND_FINAL_FORMATS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, HEAT_REBUILD_FORMATS, HEAT_REBUILD_HINT, HEAT_REBUILD_OPTIONS, advancementModeHint, drawShowMinutesPayload } from "./tournament/shared";
+import { ADVANCEMENT_MODE_OPTIONS, DRAW_SHOW_MINUTES_DEFAULT, DRAW_SHOW_MINUTES_HINT, GRAND_FINAL_FORMATS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, HEAT_REBUILD_FORMATS, HEAT_REBUILD_HINT, HEAT_REBUILD_OPTIONS, SEEDING_OPTIONS, advancementModeHint, drawShowMinutesPayload } from "./tournament/shared";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
 import { normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
@@ -299,7 +299,7 @@ export default function AdminTournamentNewPage() {
           <FormGrid>
             {/* Ohne Spiele kein Best of; in Läufen heißt es „Runden je Lauf“ (#2111, TA4). */}
             {rules.bestOf && <TextField label={rules.bestOfIsRuns ? "Runden je Lauf" : "Best of"} type="number" min="1" value={form.best_of} onChange={(v) => set("best_of", Number(v))} hint={rules.bestOfIsRuns ? BEST_OF_RUNS_HINT : undefined} testId="new-tr-bestof" />}
-            <SelectField label="Seeding" value={form.seeding_mode} onChange={(v) => set("seeding_mode", v)} options={[["random", "Zufall"], ["manual", "Manuell"], ["ranking", "Ranking"]]} testId="new-tr-seeding" />
+            <SelectField label="Setzliste" value={form.seeding_mode} onChange={(v) => set("seeding_mode", v)} options={SEEDING_OPTIONS} testId="new-tr-seeding" />
           </FormGrid>
           {/* Weiterkommen in vier Modi (#1548, #1590): fester Baum, Auslosung nach der Runde, Show, sofort zufällig - nur,
               wo Sieger in ein nächstes Spiel gehen; bei Hin- und Rückrunde nur „Spieltage auslosen“ (#2111, T4). */}
