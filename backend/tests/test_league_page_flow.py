@@ -159,3 +159,67 @@ async def test_the_staffel_route_checks_only_its_own_staffel(flow, monkeypatch):
     response = await flow.get(f"{PAGE}/staffeln/{staffel['slug']}")
     assert response.status_code == 200, response.text
     assert response.json()["staffel"]["staffel"] == "A" and response.json()["staffel"]["division_label"] == "Liga 1"
+
+
+# ---------------------------------------------------------------- Sichtbarkeit, fremde Staffel, Season 1
+
+@pytest.mark.asyncio
+async def test_staffel_route_for_seasons_off_and_admins(flow):
+    admin, season, staffel, _teams = await setup(flow)
+    url = f"{PAGE}/staffeln/{staffel['slug']}"
+    guest = await flow.add_user(name="gast")
+    member = await flow.add_user(name="mitglied")
+    member["is_club_member"] = True
+    unconfirmed = await flow.add_user(role="tournament_admin", name="ohne-2fa")
+    unconfirmed["auth_mfa_verified"] = False
+    lead = await flow.add_user(role="tournament_admin", name="leitung")
+
+    for visibility, allowed in (("admins", {"leitung"}), ("off", set())):
+        flow.act_as(admin)
+        assert (await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"visibility": visibility})).status_code == 200
+        for name, person in (("anonym", None), ("gast", guest), ("mitglied", member), ("ohne-2fa", unconfirmed),
+                             ("leitung", lead)):
+            flow.act_as(person)
+            response = await flow.get(url)
+            assert response.status_code == (200 if name in allowed else 404), (visibility, name)
+
+
+@pytest.mark.asyncio
+async def test_a_staffel_of_another_season_is_never_shown_under_this_one(flow):
+    admin, season, staffel, _teams = await setup(flow)
+    league_id = season["league_id"]
+    other = (await flow.post(f"{ADMIN}/{league_id}/seasons", json={**SEASON_ONE, "name": "Season 2"})).json()
+    division = (await flow.post(f"{ADMIN}/seasons/{other['id']}/divisions", json={})).json()
+    foreign = (await flow.post(f"{ADMIN}/divisions/{division['id']}/staffeln", json={})).json()
+    await flow.db.tournaments.update_one({"id": foreign["tournament_id"]}, {"$set": {"status": "live"}})
+    flow.act_as(None)
+    for ref in (foreign["tournament_id"], foreign["slug"]):
+        assert (await flow.get(f"{PAGE}/staffeln/{ref}")).status_code == 404
+    assert (await flow.get(f"/api/leagues/probe-shooter/season-2/staffeln/{foreign['slug']}")).status_code == 200
+    assert (await flow.get(f"/api/leagues/probe-shooter/season-2/staffeln/{staffel['slug']}")).status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_the_team_page_hides_a_staffel_of_a_season_that_is_off(flow):
+    admin, season, staffel, teams = await setup(flow)
+    flow.act_as(admin)
+    await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"visibility": "off"})
+    flow.act_as(None)
+    overview = (await flow.get(f"/api/teams/{teams[0]}/overview")).json()
+    assert overview["league"] == []
+    assert staffel["id"] not in {row["tournament"]["id"] for row in overview["upcoming"]}
+    assert staffel["slug"] not in str(overview)
+
+
+@pytest.mark.asyncio
+async def test_season_one_with_eight_teams_plays_matchday_seven_in_week_nine(flow):
+    _admin, _season, staffel, _teams = await setup(flow, teams=8)
+    flow.act_as(None)
+    page = (await flow.get(f"{PAGE}/staffeln/{staffel['slug']}")).json()
+    weeks = {week["week"]: week for week in page["weeks"]}
+    assert [weeks[number]["matchday"] for number in range(1, 7)] == [1, 2, 3, 4, 5, 6]
+    assert all(len(weeks[number]["matches"]) == 4 for number in range(1, 7))
+    assert (weeks[7]["kind"], weeks[8]["kind"]) == ("pause", "pause")
+    assert (weeks[9]["kind"], weeks[9]["matchday"], len(weeks[9]["matches"])) == ("matchday", 7, 4)
+    assert (weeks[9]["first_day"], weeks[9]["last_day"]) == ("2027-01-05", "2027-01-11")
+    assert weeks[10]["kind"] == "reserve"
