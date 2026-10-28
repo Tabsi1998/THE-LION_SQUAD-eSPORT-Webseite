@@ -37,7 +37,7 @@ from services.slug_utils import (
     slug_source_for_update,
     unique_slug,
 )
-from models import TournamentCreate, TournamentUpdate, now_utc, new_id
+from models import MIN_OVER_MAX, TournamentCreate, TournamentUpdate, now_utc, new_id
 from services import pricing, tournament_fees
 from services.advancement_draw import MODE_KEY, SETTING_KEY as LEGACY_MODE_KEY, advancement_mode_of, sync_advancement_fields
 from services.permissions import can_use_area, user_has_area
@@ -347,6 +347,10 @@ async def create_tournament_doc(body: TournamentCreate, me: dict) -> dict:
             if not await db.games.find_one({"id": body.game_id}):
                 raise HTTPException(status_code=400, detail="Spiel nicht gefunden")
             doc = body.model_dump()
+            # Teilnahme und Teamgröße wie beim Speichern prüfen (#2111, TA3): ein Team-Turnier ohne Größe hat 2.
+            if doc.get("team_mode") == "team" and "team_size" not in body.model_fields_set:
+                doc["team_size"] = 2
+            doc.update(_normalize_team_settings({"team_mode": doc.get("team_mode"), "team_size": doc.get("team_size")}))
             sync_advancement_fields(doc)
             doc["partner_ids"] = await partner_pages.clean_partner_ids(db, doc.get("partner_ids"))
             doc["creation_key"] = creation_key
@@ -422,6 +426,8 @@ async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends
         raise HTTPException(status_code=409, detail=fixed_problem)
     preview_changed = tournament_guard.changed_fields(raw_updates, existing, tournament_guard.PREVIEW_FIELDS)
     raw_updates.pop("status", None)
+    if _min_over_max(raw_updates, existing):
+        raise HTTPException(status_code=422, detail=MIN_OVER_MAX)
     # Event als Klammer (#1371): verbunden wird nur im Event. Derselbe Wert stört nicht, ein anderer wird abgelehnt.
     if "event_id" in raw_updates:
         if (raw_updates.pop("event_id") or None) != (existing.get("event_id") or None):
@@ -493,6 +499,18 @@ async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends
     if auto_preview is not None:
         t["auto_generated_bracket"] = auto_preview
     return t
+
+
+def _min_over_max(updates: dict, existing: dict) -> bool:
+    """Min. über Max. (#2111, TA3) - nur, wenn die Anfrage eines der beiden ändert; gespeicherte Altwerte stören nicht."""
+    if updates.get("min_participants") is None and updates.get("max_participants") is None:
+        return False
+    try:
+        low = int(updates.get("min_participants") or existing.get("min_participants") or 0)
+        high = int(updates.get("max_participants") or existing.get("max_participants") or 0)
+    except (TypeError, ValueError):
+        return False
+    return bool(low and high and low > high)
 
 
 EMPTY_STAGE_SETTING = (None, "", False, [], {})

@@ -33,9 +33,11 @@ async def flow():
      "Betreff: bitte ausfüllen."),
     ({"type": "missing", "loc": ("body", "email"), "msg": "Field required"}, "E-Mail: bitte ausfüllen."),
     ({"type": "missing", "loc": ("body", "score_a"), "msg": "Field required"}, "Pflichtangabe fehlt (score_a)."),
-    ({"type": "int_parsing", "loc": ("body", "max_participants"), "msg": "Input should be a valid integer"}, "Bitte eine ganze Zahl eingeben (max_participants)."),
+    ({"type": "int_parsing", "loc": ("body", "max_companions"), "msg": "Input should be a valid integer"}, "Bitte eine ganze Zahl eingeben (max_companions)."),
+    # Turnierzahlen haben seit #2111 (TA3) ein Wort: „Max. Teilnehmer: mindestens 1.“
+    ({"type": "greater_than_equal", "loc": ("body", "max_participants"), "msg": "x", "ctx": {"ge": 1}}, "Max. Teilnehmer: mindestens 1."),
     ({"type": "float_parsing", "loc": ("query", "amount"), "msg": "Input should be a valid number"}, "Bitte eine Zahl eingeben (amount)."),
-    ({"type": "greater_than_equal", "loc": ("body", "max_participants"), "msg": "x", "ctx": {"ge": 2}}, "Mindestens 2 (max_participants)."),
+    ({"type": "greater_than_equal", "loc": ("body", "max_companions"), "msg": "x", "ctx": {"ge": 2}}, "Mindestens 2 (max_companions)."),
     ({"type": "less_than_equal", "loc": ("body", "delta"), "msg": "x", "ctx": {"le": 10000}}, "Höchstens 10000 (delta)."),
     ({"type": "greater_than", "loc": ("body", "price"), "msg": "x", "ctx": {"gt": 0}}, "Muss größer als 0 sein (price)."),
     ({"type": "string_pattern_mismatch", "loc": ("body", "slug"), "msg": "x", "ctx": {"pattern": "^[a-z]+$"}}, "Format stimmt nicht (slug)."),
