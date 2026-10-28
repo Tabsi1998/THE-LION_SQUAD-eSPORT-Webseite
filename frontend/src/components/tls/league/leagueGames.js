@@ -103,6 +103,18 @@ function scoreValue(value) {
   return Number.isFinite(number) && number >= 0 ? number : undefined;
 }
 
+/**
+ * Darf diese Map an dieser Position noch gewählt werden (Season-Vorgabe „Map-Wiederholung in einer Serie“, #2096)?
+ * Gibt die frühere Map zurück, mit der sie sich beißt - sonst `null`. „other_mode“ (Vorgabe): dieselbe Map nur in
+ * einem anderen Modus; „never“: jede Map einmal; „always“: frei.
+ */
+export function repeatedMap(games, position, mode, mapId, league) {
+  const rule = league?.map_repeat || "other_mode";
+  if (rule === "always" || !mapId) return null;
+  return (games || []).find((game) => game.position < position && game.map_id === mapId
+    && (rule === "never" || (game.mode || "") === (mode || ""))) || null;
+}
+
 /** Was noch fehlt - der erste Satz für die Seite, sonst `null`. `withLineup`: die eigene Aufstellung ist Pflicht. */
 export function gamesProblem(games, league, { withLineup = true, needMaps = true } = {}) {
   for (const game of games) {
@@ -110,6 +122,12 @@ export function gamesProblem(games, league, { withLineup = true, needMaps = true
     if (needMaps) {
       if (poolModes(league?.pool).length && !game.mode) return `${label}: bitte den Modus wählen.`;
       if (!game.map_id) return `${label}: bitte die Map wählen.`;
+      const earlier = repeatedMap(games, game.position, game.mode, game.map_id, league);
+      if (earlier) {
+        return league?.map_repeat === "never"
+          ? `${label}: diese Map lief schon als Map ${earlier.position} – jede Map nur einmal je Serie.`
+          : `${label}: diese Map lief schon als Map ${earlier.position} im selben Modus – bitte eine andere wählen.`;
+      }
       if (!game.winner) return `${label}: bitte antippen, wer die Map gewonnen hat.`;
       for (const value of Object.values(game.scores || {})) {
         if (scoreValue(value) === undefined) return `${label}: Punkte bitte als Zahl ab 0.`;

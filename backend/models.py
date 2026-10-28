@@ -2318,6 +2318,8 @@ class LeagueSeasonFields(BaseModel):
     team_size: Optional[int] = Field(default=None, ge=1, le=20)
     min_squad_size: Optional[int] = Field(default=None, ge=1, le=40)
     game_mode_order: Optional[List[str]] = Field(default=None, max_length=7)
+    # Map-Wiederholung in einer Serie (#2096): nie, nur in anderem Modus (Vorgabe) oder immer.
+    map_repeat: Optional[Literal["never", "other_mode", "always"]] = None
     scoring_rules: Optional[dict] = None
     result_confirm_hours: Optional[int] = Field(default=None, ge=1, le=336)
     lineup_amend_hours: Optional[int] = Field(default=None, ge=1, le=336)

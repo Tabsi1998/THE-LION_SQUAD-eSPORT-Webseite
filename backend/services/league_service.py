@@ -46,6 +46,9 @@ SEASON_DEFAULTS: dict = {
     "team_size": 4,
     "min_squad_size": None,  # = team_size
     "game_mode_order": [],
+    # Map-Wiederholung in einer Serie (#2096): "never" jede Map einmal, "other_mode" dieselbe Map nur in anderem
+    # Modus, "always" frei.
+    "map_repeat": "other_mode",
     "scoring_rules": None,  # = normalize_rules({})
     "result_confirm_hours": 48,
     "lineup_amend_hours": 48,
@@ -304,6 +307,7 @@ def staffel_fields(league: dict, season: dict, division: dict) -> dict:
         "matchday_weeks_total": settings["weeks_total"],
         "scoring_rules": settings["scoring_rules"],
         "game_mode_order": list(settings.get("game_mode_order") or []),
+        "map_repeat": settings.get("map_repeat") or "other_mode",
         "lineup_amend_hours": settings["lineup_amend_hours"],
     }
 
@@ -315,7 +319,7 @@ SYNC_GROUPS: dict[str, tuple[str, ...]] = {
                      "round_robin_legs", "matchday_blocked_weeks", "blocked_periods", "matchday_weeks_total",
                      "max_participants"),
     # Teamgröße und Mindestkader gehen immer gemeinsam - so bleibt min_squad_size ≥ team_size am Turnier.
-    "before_result": ("best_of", "team_size", "min_squad_size", "scoring_rules", "game_mode_order",
+    "before_result": ("best_of", "team_size", "min_squad_size", "scoring_rules", "game_mode_order", "map_repeat",
                       "result_confirm_hours_league", "lineup_amend_hours"),
 }
 SYNC_GROUP_LABELS = {
@@ -474,7 +478,7 @@ async def update_season(db, season: dict, body: dict) -> tuple[dict, list[str]]:
     fields = clean_season(body, season, game)
     for key in ("name", "slug", "number", "start_date", "weeks_total", "matchday_days", "default_match_weekday",
                 "default_match_time", "round_robin_legs", "max_staffel_size", "best_of", "team_size",
-                "min_squad_size", "result_confirm_hours", "lineup_amend_hours", "visibility", "status"):
+                "min_squad_size", "result_confirm_hours", "lineup_amend_hours", "visibility", "status", "map_repeat"):
         if key in fields and fields[key] is None:
             fields.pop(key)  # Pflichtfelder bleiben, wie sie sind
     if "scoring_rules" in fields and fields["scoring_rules"] is None:
@@ -713,7 +717,7 @@ async def _sync_pool(db, tournament: dict, season: dict, user: dict, *, locked: 
 STAFFEL_SOURCE_FIELDS = frozenset({
     "start_date", "weeks_total", "blocked_periods", "matchday_days", "default_match_weekday", "default_match_time",
     "round_robin_legs", "max_staffel_size", "best_of", "team_size", "min_squad_size", "game_mode_order",
-    "scoring_rules", "result_confirm_hours", "lineup_amend_hours", "rules_text",
+    "map_repeat", "scoring_rules", "result_confirm_hours", "lineup_amend_hours", "rules_text",
 })
 
 
@@ -748,7 +752,7 @@ async def can_see_season(user: dict | None, season: dict) -> bool:
 PUBLIC_SEASON_FIELDS = ("id", "number", "name", "slug", "status", "start_date", "weeks_total", "blocked_periods",
                         "matchday_days", "default_match_weekday", "default_match_time", "round_robin_legs",
                         "max_staffel_size", "best_of", "team_size", "min_squad_size", "game_mode_order",
-                        "result_confirm_hours", "lineup_amend_hours", "rules_text", "registration_deadline")
+                        "map_repeat", "result_confirm_hours", "lineup_amend_hours", "rules_text", "registration_deadline")
 
 
 PUBLIC_SEASON_HEAD = ("id", "number", "name", "slug", "status", "start_date")

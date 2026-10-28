@@ -64,6 +64,8 @@ class LeagueSetup:
     registrations: list[dict]
     rosters: dict[str, set[str]] = field(default_factory=dict)
     names: dict[str, str] = field(default_factory=dict)
+    # Map-Wiederholung in einer Serie (#2096): "never", "other_mode" (Vorgabe) oder "always".
+    map_repeat: str = "other_mode"
 
     @property
     def reg_ids(self) -> list[str]:
@@ -117,10 +119,37 @@ async def setup(db, match: dict, tournament: dict | None = None, stage: dict | N
             for reg in registrations
             if reg.get("id")
         },
+        map_repeat=map_repeat_of(tournament),
     )
 
 
 # ---------------------------------------------------------------- Prüfen
+
+MAP_REPEAT = ("never", "other_mode", "always")
+
+
+def map_repeat_of(tournament: dict | None) -> str:
+    """Wie oft eine Map in einer Serie vorkommen darf (Season-Vorgabe, an der Staffel) - fehlt sie, gilt
+    „gleiche Map nur in anderem Modus“."""
+    value = (tournament or {}).get("map_repeat")
+    return value if value in MAP_REPEAT else "other_mode"
+
+
+def _check_repeat(setup: LeagueSetup, games: list[dict], mode: str | None, map_id: str, label: str) -> None:
+    """Dieselbe Map im selben Modus nur einmal je Serie (Vorgabe); bei „nie“ jede Map nur einmal, bei „immer“ frei."""
+    if setup.map_repeat == "always":
+        return
+    for earlier in games:
+        if earlier["map_id"] != map_id:
+            continue
+        name = earlier.get("map_name") or "Diese Map"
+        if setup.map_repeat == "never":
+            raise LeagueGamesError(f"{label}: {name} lief schon als Map {earlier['position']} – in dieser Serie "
+                                   "kommt jede Map nur einmal vor.")
+        if earlier.get("mode") == mode:
+            where = f" ({earlier.get('mode_label')})" if earlier.get("mode_label") else ""
+            raise LeagueGamesError(f"{label}: {name}{where} lief schon als Map {earlier['position']} – dieselbe Map "
+                                   "im selben Modus nur einmal je Serie.")
 
 
 def _pool_modes(pool: dict | None) -> list[dict]:
@@ -206,6 +235,7 @@ def normalize_games(
         if not map_pools.allowed(setup.pool, mode, map_id):
             where = f" für {_mode_label(setup.pool, mode)}" if mode else ""
             raise LeagueGamesError(f"{label}: diese Map ist im Pool{where} nicht freigegeben.")
+        _check_repeat(setup, games, mode, map_id, label)
         winner = str(item.get("winner_registration_id") or "").strip()
         if winner not in sides:
             raise LeagueGamesError(f"{label}: bitte den Sieger der Map wählen.")
@@ -701,6 +731,7 @@ async def page_block(db, setup: LeagueSetup, *, side_id: str | None, can_act: bo
         "amend_until": deadline.isoformat() if deadline else None,
         "app_detail": APP_DETAIL,
         "default_time": default_time(setup),
+        "map_repeat": setup.map_repeat,
     }
 
 

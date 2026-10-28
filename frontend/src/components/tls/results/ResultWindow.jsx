@@ -166,7 +166,7 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
             <p className="text-xs text-white/55" data-testid="result-maps-off-hint">Für „Nicht erschienen“, „Aufgegeben“ oder einen Stand ohne gespielte Maps. Vorhandene Maps fallen weg, wenn der Stand nicht mehr zu ihnen passt.</p>
           ) : null}
           {withMaps && mapGames.map((game, index) => (
-            <GameEditor key={game.position} staff index={index} game={game} league={league}
+            <GameEditor key={game.position} staff index={index} game={game} games={mapGames} league={league}
               onChange={(next) => setMapGames((current) => settleStaffGames(changeStaffGame(current, game.position, next), league))} />
           ))}
           {kind === "score" && <ScoreInput entry={entry} state={state} onChange={setState} />}

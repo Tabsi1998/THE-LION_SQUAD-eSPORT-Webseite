@@ -13,6 +13,8 @@ export const SEASON_STATUS_OPTIONS = [["draft", "Entwurf"], ["active", "Läuft"]
 export const WEEKDAY_OPTIONS = [["0", "Montag"], ["1", "Dienstag"], ["2", "Mittwoch"], ["3", "Donnerstag"], ["4", "Freitag"], ["5", "Samstag"], ["6", "Sonntag"]];
 export const BEST_OF_OPTIONS = [["1", "Best of 1"], ["3", "Best of 3"], ["5", "Best of 5"], ["7", "Best of 7"]];
 export const LEGS_OPTIONS = [["1", "Nur Hinrunde"], ["2", "Hin- und Rückrunde"]];
+// Map-Wiederholung in einer Serie (#2096): Vorgabe „gleiche Map nur in anderem Modus“.
+export const MAP_REPEAT_OPTIONS = [["other_mode", "Gleiche Map nur in anderem Modus"], ["never", "Aus – jede Map nur einmal"], ["always", "Immer erlaubt"]];
 export const TIEBREAKER_LABELS = { score_diff: "Differenz", score_for: "Mehr gewonnene Maps", wins: "Mehr Siege" };
 export const SYNC_GROUP_TEXT = {
   always: "Sichtbarkeit und Regeltext",
@@ -49,6 +51,7 @@ export function seasonToForm(season = {}) {
     points_loss: String(points.loss ?? 0),
     table_tiebreakers: rules.table_tiebreakers || ["score_diff", "score_for"],
     game_mode_order: season.game_mode_order || [],
+    map_repeat: season.map_repeat || "other_mode",
     result_confirm_hours: String(season.result_confirm_hours ?? 48),
     lineup_amend_hours: String(season.lineup_amend_hours ?? 48),
     rules_text: season.rules_text || "",
@@ -88,6 +91,7 @@ export function seasonPayload(form) {
       table_tiebreakers: form.table_tiebreakers,
     },
     game_mode_order: order.every(Boolean) ? order : [],
+    map_repeat: form.map_repeat || "other_mode",
     result_confirm_hours: number(form.result_confirm_hours),
     lineup_amend_hours: number(form.lineup_amend_hours),
     rules_text: form.rules_text.trim() || null,

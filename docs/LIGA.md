@@ -53,6 +53,7 @@ Indizes: `id` eindeutig, `slug` eindeutig, `game_id`.
 | `team_size` | int ≥ 1 | ja | 4 (Spieler je Map) |
 | `min_squad_size` | int ≥ `team_size` | ja | = `team_size` |
 | `game_mode_order` | `[str]` | nein | `[]` = Modus je Map frei; sonst Modus je Position (zyklisch) |
+| `map_repeat` | `"never"` \| `"other_mode"` \| `"always"` | ja | `"other_mode"`: dieselbe Map in einer Serie nur in einem anderen Modus (#2096); `"never"` jede Map einmal, `"always"` frei |
 | `scoring_rules` | dict | ja | `normalize_rules({})` aus `services/scoring_rules.py`; gelesen werden nur `match_points` (3/1/0) und `table_tiebreakers` |
 | `result_confirm_hours` | int 1–336 | ja | 48 |
 | `lineup_amend_hours` | int 1–336 | ja | 48 – Nachtragsfrist der eigenen Aufstellung nach dem Ergebnis |
@@ -88,6 +89,7 @@ Indizes: `id` eindeutig, (`season_id`, `level`) eindeutig.
 | `matchday_weeks_total` | int | nein | Wochenbudget für „Runden ≤ aktive Wochen“; fehlt = keine Prüfung |
 | `scoring_rules` | dict | nein | normalisiert; fehlt = heute fest 3/1/0 mit Reihenfolge Punkte, Siege, Differenz |
 | `game_mode_order` | `[str]` | nein | fehlt = frei |
+| `map_repeat` | str | nein | fehlt = `"other_mode"` |
 | `lineup_amend_hours` | int | nein | fehlt = 48 |
 | `min_squad_size` | int | nein | Mindestkader fürs Zuteilen (B); fehlt = `team_size` |
 
@@ -178,7 +180,7 @@ behalten ihren; hat die Season keinen Pool mehr, wird die Kopie nur vor dem erst
 **vor dem Start** (Status `draft` bis `check_in`) `start_date`, `end_date`, `matchday_days`, `default_match_weekday`,
 `default_match_time`, `round_robin_legs`, `matchday_blocked_weeks`, `matchday_weeks_total`, `max_participants` – nur
 wenn die Prüfung „Runden ≤ aktive Wochen“ passt und nicht schon mehr Teams angemeldet sind; **vor dem ersten Ergebnis**
-`best_of`, `team_size`, `min_squad_size` (immer gemeinsam mit `team_size`), `scoring_rules`, `game_mode_order`,
+`best_of`, `team_size`, `min_squad_size` (immer gemeinsam mit `team_size`), `scoring_rules`, `game_mode_order`, `map_repeat`,
 `result_confirm_hours_league`, `lineup_amend_hours`. `min_squad_size` steht damit am Turnier (Season bzw. Liga N, mindestens `team_size`); B liest es
 beim Zuteilen dort.
 
@@ -224,6 +226,7 @@ Anmeldungen auch über Co-Teams, deren Captain/Vertreter man ist. Aufrufer mit e
 | Liga-Spiel: Erstmeldung nur mit `games` und eigener Aufstellung, sonst 422 „Bitte im Web mit Maps und Aufstellung melden“ | Melden | B |
 | Best of: Sieger erreicht ⌊N/2⌋+1, keine Map nach Entscheidung, `results.score` = gewonnene Maps je Seite | Melden, Korrektur | B |
 | Map im Pool und für den Modus freigegeben, Modus passt zu `game_mode_order` | Melden, Korrektur | B |
+| Map-Wiederholung nach `map_repeat` (Vorgabe: dieselbe Map im selben Modus nur einmal je Serie) | Melden, Korrektur | P6 |
 | Aufstellung: genau `team_size` verschiedene Mitglieder des eigenen Co-Teams je Map | Melden, Nachtrag | B |
 | Kein Doppel-Einsatz: dieselbe Person nicht in Aufstellungen zweier Anmeldungen am selben Spieltag (`matchday_number_of`) in Staffeln derselben `league_context.season_id` | Melden, Nachtrag | B |
 | Bestätigung mit anderen Maps/Modi/Siegern als die Erstmeldung → 409 mit Hinweis auf Einspruch | Bestätigen | B |
