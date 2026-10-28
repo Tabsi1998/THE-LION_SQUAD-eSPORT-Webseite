@@ -16,6 +16,7 @@ from auth import get_optional_user, require_area
 from database import get_db
 from models import (
     LeagueCreate,
+    LeagueDelete,
     LeagueDivisionCreate,
     LeagueDivisionUpdate,
     LeagueSeasonCreate,
@@ -78,6 +79,8 @@ async def admin_list_leagues(_me: dict = Depends(require_league_admin)):
     names = {game["id"]: game.get("name") for game in games}
     return {
         "leagues": [{**row, "game_name": names.get(row.get("game_id")),
+                     # Bearbeiten (#2106): Spiel nur ohne Staffel, Adresse nur vor der ersten Veröffentlichung.
+                     **await leagues.league_admin_flags(db, row),
                      "seasons": [_season_head(season) for season in seasons if season["league_id"] == row["id"]]}
                     for row in rows],
         "games": games,
@@ -133,7 +136,55 @@ async def admin_update_league(league_id: str, body: LeagueUpdate, me: dict = Dep
     doc, changed = await _call(leagues.update_league(db, league, body.model_dump(exclude_unset=True)))
     if changed:
         await _audit(db, "league.update", me, league_id, {"fields": changed})
-    return doc
+    return {**doc, "changed": changed, **await leagues.league_admin_flags(db, doc)}
+
+
+# ---------------------------------------------------------------- Verwaltung: Löschen (#2106)
+
+async def _delete_target(db, kind: str, target_id: str) -> dict:
+    loader = {"league": leagues.get_league, "season": leagues.get_season, "division": leagues.get_division}[kind]
+    return await _call(loader(db, target_id))
+
+
+async def _delete_plan(kind: str, target_id: str) -> dict:
+    db = get_db()
+    return await _call(leagues.deletion_plan(db, kind, await _delete_target(db, kind, target_id)))
+
+
+async def _delete(kind: str, target_id: str, body: LeagueDelete, me: dict) -> dict:
+    """Löschen mit Grund: erst prüfen (sonst 409 „Archivieren statt löschen“), dann samt leerer Entwurfs-Staffeln
+    löschen und protokollieren - mit den Kennungen dessen, was mitging."""
+    db = get_db()
+    reason = _reason(body)
+    target = await _delete_target(db, kind, target_id)
+    plan = await _call(leagues.delete_tree(db, kind, target))
+    reset_scope_cache()
+    action = {"league": "league.delete", "season": "league.season.delete", "division": "league.division.delete"}[kind]
+    await _audit(db, action, me, target_id, {
+        "reason": reason, "name": plan["name"],
+        "seasons": [row["id"] for row in plan["seasons"]], "divisions": [row["id"] for row in plan["divisions"]],
+        "staffeln": [row["tournament_id"] for row in plan["staffeln"]],
+        **({"league_id": target.get("league_id")} if kind != "league" else {}),
+    })
+    return {"ok": True, "deleted": plan}
+
+
+def _reason(body: LeagueDelete) -> str:
+    try:
+        return leagues.delete_reason(body.reason)
+    except LeagueProblem as problem:
+        raise _refuse(problem) from None
+
+
+@admin_router.get("/{league_id}/delete-plan")
+async def admin_league_delete_plan(league_id: str, _me: dict = Depends(require_league_admin)):
+    """Was mit der Liga ginge - oder warum sie archiviert statt gelöscht wird."""
+    return await _delete_plan("league", league_id)
+
+
+@admin_router.delete("/{league_id}")
+async def admin_delete_league(league_id: str, body: LeagueDelete, me: dict = Depends(require_league_admin)):
+    return await _delete("league", league_id, body, me)
 
 
 # ---------------------------------------------------------------- Verwaltung: Season
@@ -144,6 +195,7 @@ async def admin_create_season(league_id: str, body: LeagueSeasonCreate, me: dict
     league = await _call(leagues.get_league(db, league_id))
     doc = await _call(leagues.create_season(db, league, body.model_dump(exclude_unset=True), me))
     await _audit(db, "league.season.create", me, doc["id"], {"league_id": league_id, "number": doc["number"]})
+    await leagues.mark_published(db, league_id, doc.get("visibility"))
     return doc
 
 
@@ -158,6 +210,7 @@ async def admin_update_season(season_id: str, body: LeagueSeasonUpdate, me: dict
     if "visibility" in changed:
         # „Aus“ heißt sofort aus: die Sichtbarkeit geht ohne „Übertragen“ auf alle Staffeln, auch gesperrte.
         visibility_applied = await leagues.apply_visibility(db, doc)
+        await leagues.mark_published(db, season["league_id"], doc.get("visibility"))
         reset_scope_cache()
         await _audit(db, "league.staffel.sync", me, season_id,
                      {"season_id": season_id, "visibility": doc.get("visibility"), "staffeln": visibility_applied})
@@ -166,6 +219,17 @@ async def admin_update_season(season_id: str, body: LeagueSeasonUpdate, me: dict
     needs_sync = bool(set(changed) & leagues.STAFFEL_SOURCE_FIELDS)
     return {**doc, "changed": changed, "staffeln_to_sync": staffeln if needs_sync else 0,
             "visibility_applied": visibility_applied}
+
+
+@admin_router.get("/seasons/{season_id}/delete-plan")
+async def admin_season_delete_plan(season_id: str, _me: dict = Depends(require_league_admin)):
+    return await _delete_plan("season", season_id)
+
+
+@admin_router.delete("/seasons/{season_id}")
+async def admin_delete_season(season_id: str, body: LeagueDelete, me: dict = Depends(require_league_admin)):
+    """Season löschen (#2106): nur als Entwurf, ohne Staffel mit Co-Teams oder Spielen - leere Entwürfe gehen mit."""
+    return await _delete("season", season_id, body, me)
 
 
 async def _season_game(db, season: dict) -> dict | None:
@@ -265,6 +329,35 @@ async def admin_update_division(division_id: str, body: LeagueDivisionUpdate,
     if changed:
         await _audit(db, "league.division.update", me, division_id, {"fields": changed})
     return doc
+
+
+@admin_router.get("/divisions/{division_id}/delete-plan")
+async def admin_division_delete_plan(division_id: str, _me: dict = Depends(require_league_admin)):
+    return await _delete_plan("division", division_id)
+
+
+@admin_router.delete("/divisions/{division_id}")
+async def admin_delete_division(division_id: str, body: LeagueDelete, me: dict = Depends(require_league_admin)):
+    """Liga N löschen (#2106): ohne Staffel mit Co-Teams oder Spielen - leere Entwurfs-Staffeln gehen mit."""
+    return await _delete("division", division_id, body, me)
+
+
+@admin_router.delete("/staffeln/{tournament_id}")
+async def admin_delete_staffel(tournament_id: str, body: LeagueDelete, me: dict = Depends(require_league_admin)):
+    """Staffel auf der Season-Seite löschen (#2106) - mit derselben Löschsperre wie in der Turnierverwaltung (#2109)
+    und mit Grund im Protokoll."""
+    db = get_db()
+    reason = _reason(body)
+    tournament = await db.tournaments.find_one({"id": tournament_id, **ONLY_LEAGUE}, {"_id": 0})
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Staffel nicht gefunden.")
+    await _call(leagues.delete_staffel(db, tournament))
+    reset_scope_cache()
+    context = tournament["league_context"]
+    await _audit(db, "league.staffel.delete", me, tournament_id, {
+        "reason": reason, "title": tournament.get("title"), "season_id": context.get("season_id"),
+        "division_id": context.get("division_id"), "staffel": context.get("staffel")})
+    return {"ok": True}
 
 
 @admin_router.post("/divisions/{division_id}/staffeln")
