@@ -31,7 +31,10 @@ function rememberHeatMode(mode) {
 }
 
 export function ResultWindow({ entry, league = null, onClose, onSaved, testId = "result-window" }) {
-  const correcting = Boolean(entry?.has_result);
+  // Inzwischen eingetragen (#2124, TP9): kam jemand zuvor, bietet das Fenster an, als Korrektur zu speichern.
+  const [forceCorrection, setForceCorrection] = useState(false);
+  const [offerCorrection, setOfferCorrection] = useState(false);
+  const correcting = Boolean(entry?.has_result) || forceCorrection;
   const [heatMode, setHeatMode] = useState(readHeatMode);
   const [state, setState] = useState(() => initialState(entry));
   // Liga (#1650): je Map Modus, Map, Sieger, Punkte und die Aufstellungen beider Seiten statt Plus/Minus.
@@ -63,6 +66,8 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
     setSkipMaps(false);
     setReason("");
     setError("");
+    setForceCorrection(false);
+    setOfferCorrection(false);
   }
 
   useEffect(() => {
@@ -105,6 +110,10 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
       onSaved?.({ matchId: entry.id, hold: data?.hold || null, sentence });
       onClose?.();
     } catch (err) {
+      if (!correcting && err.response?.status === 409 && await resultArrived(entry.id)) {
+        setOfferCorrection(true);
+        return;
+      }
       setError(formatApiError(err.response?.data?.detail) || "Ergebnis konnte nicht gespeichert werden.");
     } finally {
       setBusy(false);
@@ -142,7 +151,7 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
 
         <div className="space-y-4 px-4 py-4">
           {entry.kind !== "duel" && entry.ranking_mode !== "time" ? (
-            <div className="grid grid-cols-2 gap-1 rounded-sm border border-white/10 bg-white/5 p-1" role="group" aria-label="Eingabe bei Durchgängen" data-testid="result-heat-mode">
+            <div className="grid grid-cols-2 gap-1 rounded-sm border border-white/10 bg-white/5 p-1" role="group" aria-label="Eingabe bei Läufen" data-testid="result-heat-mode">
               {HEAT_MODES.map(([mode, label]) => (
                 <button key={mode} type="button" aria-pressed={heatMode === mode} onClick={() => chooseHeatMode(mode)} className={`min-h-[40px] rounded-sm text-xs font-bold uppercase tracking-wider ${heatMode === mode ? "bg-[#29B6E8] text-black" : "text-white/60"}`} data-testid={`result-heat-mode-${mode}`}>
                   {mode === "order" ? "Reihenfolge antippen" : `${label} eintragen`}
@@ -185,13 +194,21 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
           {correcting ? (
             <label className="block">
               <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Grund der Korrektur (steht im Protokoll)</span>
-              <input value={reason} onChange={(event) => setReason(event.target.value)} className="input" placeholder="z. B. Stand falsch abgelesen" data-testid="result-reason" />
+              <input value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} className="input" placeholder="z. B. Stand falsch abgelesen" data-testid="result-reason" />
             </label>
           ) : null}
 
           <p className={`rounded-sm border px-3 py-2 text-sm font-bold ${sentence ? "border-[#29B6E8]/35 bg-[#29B6E8]/10 text-[#BFE9F8]" : "border-white/10 bg-white/5 text-white/45"}`} data-testid="result-sentence" aria-live="polite">
             {sentence ? `${correcting ? "Neu: " : ""}${sentence}` : outcome.error || "Noch kein Ergebnis gewählt."}
           </p>
+          {offerCorrection ? (
+            <div className="rounded-sm border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-white" role="alert" data-testid="result-correction-offer">
+              <p className="font-bold">Inzwischen ist ein Ergebnis eingetragen – als Korrektur speichern?</p>
+              <button type="button" onClick={() => { setForceCorrection(true); setOfferCorrection(false); }} className="tls-btn tls-btn--secondary mt-2 min-h-[44px] px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid="result-correction-accept">
+                Als Korrektur speichern
+              </button>
+            </div>
+          ) : null}
           {error ? <p className="text-sm text-[#FF6B60]" role="alert" data-testid="result-error">{error}</p> : null}
         </div>
 
@@ -204,6 +221,16 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
       </div>
     </div>
   );
+}
+
+/** Hat das Spiel inzwischen ein Ergebnis (jemand anderes war schneller)? Fragt die Matchseite neu. */
+async function resultArrived(matchId) {
+  try {
+    const { data } = await api.get(`/matches/${matchId}/page`);
+    return Boolean(data?.result_entry?.has_result);
+  } catch {
+    return false;
+  }
 }
 
 /**

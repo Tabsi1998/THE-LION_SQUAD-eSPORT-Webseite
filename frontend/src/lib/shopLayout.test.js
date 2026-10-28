@@ -113,7 +113,7 @@ test("Ausrichten: mittig auf Fläche und Abstand zur Ebene darüber setzen nur d
   const above = { box: { left: 600, top: 300, width: 600, height: 300 }, band: 100 };
   const now = gapCm(BACK, above, item);
   expect(now).toBeCloseTo(((975 - 500) / 150) * 2.54);
-  expect(gapOffsetCm(BACK, above, item, { offset_y_cm: 0 }, 2)).toBeCloseTo(Math.round((2 - now) * 10) / 10);
+  expect(gapOffsetCm(BACK, above, item, { offset_y_cm: 0 }, 2)).toBeCloseTo(Math.round((2 - now) * 100) / 100);
   expect(placeText(BACK, NUMBER_BELOW, { widthPx: 100, heightPx: 50, follow: null })).toBeNull();
 });
 

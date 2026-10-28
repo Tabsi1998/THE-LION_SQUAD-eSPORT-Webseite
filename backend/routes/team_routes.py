@@ -342,7 +342,7 @@ def _validate_squad_members(team: dict, member_ids: list[str]) -> list[str]:
     clean = []
     for uid in member_ids or []:
         if uid not in allowed:
-            raise HTTPException(status_code=400, detail="Squad-Mitglieder müssen im Team sein")
+            raise HTTPException(status_code=400, detail="Mitglieder eines Co-Teams müssen im Team sein.")
         if uid not in clean:
             clean.append(uid)
     return clean
@@ -1080,7 +1080,7 @@ async def update_squad(team_id: str, squad_id: str, body: TeamSquadUpdate, me: d
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     current = await db.team_squads.find_one({"id": squad_id, "team_id": team_id}, {"_id": 0})
     if not current:
-        raise HTTPException(status_code=404, detail="Squad nicht gefunden")
+        raise HTTPException(status_code=404, detail="Co-Team nicht gefunden")
     if "member_ids" in updates:
         updates["member_ids"] = _validate_squad_members(team, updates.get("member_ids") or [])
     requested_roles = {field: updates.pop(field) for field in SQUAD_ROLE_FIELDS if field in updates}
@@ -1115,7 +1115,7 @@ async def set_squad_roles(team_id: str, squad_id: str, body: TeamSquadRoles, me:
     if not _can_manage(team, me) and not _resigns_own_role(current, requested, me):
         _refuse(me, "Captain und Vertreter vergeben Teamleitung und Co-Leitung.")
     if not current:
-        raise HTTPException(status_code=404, detail="Squad nicht gefunden")
+        raise HTTPException(status_code=404, detail="Co-Team nicht gefunden")
     roles = _squad_roles(current, requested, current.get("member_ids") or [], team)
     unset = {field: "" for field, value in roles.items() if not value and current.get(field)}
     change = {"$set": {**{field: value for field, value in roles.items() if value}, "updated_at": now_utc().isoformat()},
@@ -1176,5 +1176,5 @@ async def delete_squad(team_id: str, squad_id: str, me: dict = Depends(get_curre
                                                     "Turnierleitung die Zuteilung zurückgenommen hat oder die Staffel beendet ist.")
     res = await db.team_squads.delete_one({"id": squad_id, "team_id": team_id})
     if res.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Squad nicht gefunden")
+        raise HTTPException(status_code=404, detail="Co-Team nicht gefunden")
     return {"ok": True}

@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useParams, Link, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { API, api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { TournamentTabs } from "@/components/tls/tournament/TournamentTabs";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
+import { useLeagueTrail } from "@/hooks/useLeagueTrail";
+import { tournamentCrumbs } from "@/lib/leagueTrail";
 import { SkeletonDetailHeader, SkeletonTable } from "@/components/tls/Skeleton";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useChangedKeys, useFlipRows } from "@/hooks/useLiveChanges";
@@ -24,6 +26,7 @@ export default function TournamentStandingsPage() {
   const [searchParams] = useSearchParams();
   const accessToken = searchParams.get("access") || "";
   const [t, setT] = useState(null);
+  const trail = useLeagueTrail(t);
   const [rows, setRows] = useState([]);
   const seoDescription = seoTextPreview(t?.description, "Rangliste und Ergebnisse des eSports Turniers von THE LION SQUAD.");
   useDocumentTitle(`${t?.title || "Turnier"} Rangliste`, seoDescription, {
@@ -76,16 +79,8 @@ export default function TournamentStandingsPage() {
   return (
     <PublicLayout>
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <Breadcrumbs
-          items={[
-            { label: "Home", to: "/" },
-            { label: "Turniere", to: "/tournaments" },
-            { label: t.title, to: tournamentUrl },
-            { label: "Rangliste" },
-          ]}
-          className="mb-3"
-        />
-        <Link to={tournamentUrl} className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← {t.title}</Link>
+        {/* Eine Brotkrumen-Kette (#2124): kein zusätzliches „← Turnier“ - die Reiter darunter führen weiter. */}
+        <Breadcrumbs items={tournamentCrumbs(t, trail, { tournamentUrl, current: { label: "Rangliste" } })} className="mb-3" />
         <TournamentTabs tournament={t} accessToken={accessToken} className="mt-3 mb-4" />
         <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
           <h1 className="font-heading text-3xl md:text-5xl font-black uppercase">Rangliste</h1>

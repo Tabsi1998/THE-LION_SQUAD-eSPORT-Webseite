@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { CalendarClock, Users, Wallet } from "lucide-react";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { StepBar, tournamentStep, tournamentSteps } from "@/components/tls/StepBar";
-import { checkInLine } from "@/lib/checkInTimes";
+import { checkInLine, checkInState } from "@/lib/checkInTimes";
 import { formatCents } from "@/lib/pricing";
 import { TeamDayPanel } from "@/components/tls/tournament/TeamDayPanel";
 import { ResultShareButton } from "@/components/tls/ResultShareButton";
@@ -26,7 +26,7 @@ export function paymentLine(price) {
 export function MyStandCard({ tournament: t, registration: myReg, team = null, isTeamTournament = false, canCheckIn = false, staffOnlyCheckIn = false, canUnregister = false, leagueSquad = false, onCheckin, onUnregister, busy = false, scheduleTo = "" }) {
   if (!myReg) return null;
   // Nach dem Check-in-Ende (#1551) steht der Baum - der Status bleibt „Check-in“, der Knopf geht weg.
-  const checkinOpen = t.status === "check_in" && !t.check_in_closed_at;
+  const checkinOpen = checkInState(t).open;
   const line = paymentLine(myReg.price);
   const checkIn = checkInLine(t);
   // Wo die Anmeldung steht (#1081): Freigabe, Startgeld, Check-in, Turnier - immer aus dem echten Stand.

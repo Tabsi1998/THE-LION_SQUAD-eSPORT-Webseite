@@ -349,6 +349,13 @@ function tableTitle(names, sections) {
   return "Liga";
 }
 
+// Der Satz je Format (#2124, TP14): im Schweizer System spielt nicht jeder gegen jeden.
+const TABLE_HINT_TEXT = {
+  Liga: "Hier spielt jeder gegen jeden: Wer vorne liegt, steht in der Tabelle, wann wer spielt, im Spielplan.",
+  Gruppenphase: "In jeder Gruppe spielt jeder gegen jeden: Wer vorne liegt, steht in der Tabelle, wann wer spielt, im Spielplan.",
+  "Schweizer System": "Jede Runde treffen Teilnehmer mit gleich vielen Punkten aufeinander – die nächste Runde wird erst nach der vorigen ausgelost. Den Stand zeigt die Tabelle, die Paarungen der Spielplan.",
+};
+
 /** Gruppen, Liga, Swiss (#1561): kein Baum, sondern der Weg zu Tabelle und Spielplan (die Tabelle selbst: #1562). */
 function TableHint({ title, tournamentPath }) {
   const inRouter = useInRouterContext();
@@ -358,7 +365,7 @@ function TableHint({ title, tournamentPath }) {
   return (
     <div data-testid="bracket-table-hint" className="rounded-md border border-white/10 bg-surface-1 p-5 space-y-3">
       <h3 className="font-heading text-lg font-black uppercase">{title}</h3>
-      <p className="text-sm text-muted-text max-w-prose">Hier spielt jeder gegen jeden: Wer vorne liegt, steht in der Tabelle, wann wer spielt, im Spielplan.</p>
+      <p className="text-sm text-muted-text max-w-prose" data-testid="bracket-table-hint-text">{TABLE_HINT_TEXT[title] || TABLE_HINT_TEXT.Liga}</p>
       {tournamentPath ? (
         <div className="flex flex-wrap gap-2">
           <Anchor to={`${tournamentPath}/standings`}>Zur Tabelle</Anchor>

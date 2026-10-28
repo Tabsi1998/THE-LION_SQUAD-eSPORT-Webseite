@@ -868,7 +868,36 @@ Die Reihenfolge der Ebenen: Motive zuerst (ein Name folgt dem ersten Motiv), dan
 
 **Ausrichten (#2142):** je Ebene „Mittig auf Fläche“ (setzt den Versatz waagrecht) und „Abstand zur Ebene darüber“ in
 cm (die Ebene, deren sichtbare Unterkante am nächsten darüber liegt; setzt den Versatz senkrecht, gemessen wie bei
-„unter der Ebene davor“). Zahleneingabe für die Position, Einrasten und Zoom folgen mit #2117.
+„unter der Ebene davor“).
+
+**Präzise setzen (#2117):** Alles ändert nur den Versatz (`offset_x_cm`/`offset_y_cm`) - die Vorgabe bleibt verknüpft,
+„Auf die Vorgabe“ setzt den Versatz auf 0. Lage = Vorgabe + Versatz, darum lässt sich jede Lage als Versatz ausdrücken;
+`place_motif`/`place_text` und die Druckdatei bleiben unverändert (gleicher Versatz = byte-gleiche Datei). Der Browser
+rundet den Versatz jetzt auf 0,01 cm wie der Server (vorher 0,1 cm) - alte Produkte laden unverändert.
+- **Position als Zahl** je Ebene: „Von oben“ (sichtbare Oberkante, bei Text die Großbuchstaben bzw. Ziffern) und
+  waagrecht „Von der Mitte“ (minus = links, von vorne gesehen) oder „Vom linken Rand“. Komma oder Punkt, − und + bzw.
+  Pfeiltasten im Feld je 0,1 cm, mit Umschalt 1 cm. Begrenzt so, dass der Versatz höchstens ±`max_offset_cm`
+  (300 cm) beträgt - jede Änderung wird dort begrenzt statt erst beim Speichern abgelehnt. Bei Textebenen misst „Vom
+  linken Rand“ den Rahmen der Höchstbreite (der Name steht mittig darin); ein Hinweis sagt das.
+- **Ausrichten mit einem Klick:** „Mittig auf Fläche“, „Zur Gegenseite spiegeln“ (an der Flächenmitte) und „Ausrichten
+  an“ einer anderen Ebene: gleiche Höhe (senkrechte Mitten), gleiche Oberkante, gleiche Mitte waagrecht, gegenüber
+  (gespiegelt, auf gleicher Höhe). Ebenen, die der gewählten folgen (etwa der Name „gegenüber dem Motiv“), stehen nicht
+  zur Wahl - sie wandern mit.
+- **Ziehen mit Einrasten:** an Mittellinien, Rändern, Sicherheitsrand und Kanten bzw. Mitten anderer Ebenen (6
+  Bildschirm-Pixel, beim Zoom also feiner), mit Hilfslinie; sonst landet die angezeigte Position auf dem Raster
+  (Vorgabe 0,5 cm; einstellbar ohne, 0,1, 0,25, 0,5, 1 oder 2 cm). Eine Achse, die sich kaum bewegt (unter der
+  Ziehschwelle von 3 px) oder weniger als einen Rasterschritt ohne Hilfslinie, bleibt genau stehen - waagrechtes
+  Ziehen lässt ein gesetztes „Von oben“ wie 5,13 cm unverändert. Frei ziehen: Alt oder Strg gedrückt, oder
+  „Einrasten (Hilfslinien und Raster)“ aus (dann ist auch die Raster-Auswahl ausgegraut). Während des Ziehens fängt
+  die Seite die Alt-Taste ab (Firefox öffnete sonst die Menüleiste). Beim Ziehen zeigt eine Live-Anzeige die Position in cm. Raster, Einrasten und Messart merkt sich der Browser
+  (`tls_shop_place_v1`).
+- **„Groß bearbeiten“:** nur die Druckfläche, fast bildschirmfüllend; Zoom 100 bis 800 % per Mausrad (an der Maus;
+  gesammelt: ein Schritt je Raste, höchstens alle 100 ms - ein Trackpad springt nicht auf 800 %), + und − oder
+  „Einpassen“, verschieben mit Umschalt + Mausrad oder Ziehen auf freier Fläche. Je stärker der Zoom, desto
+  feiner das Ziehen. Unten die Zahlen der gewählten Ebene.
+- **Handy:** Ziehen per Finger geht, Hauptweg sind die Zahlen; kein seitliches Scrollen bei 390 px. Die Bedienhilfe
+  nennt dort weder Alt noch Pfeiltasten.
+Die Rechnungen stehen rein in `frontend/src/lib/shopPlacement.js` (Tests in `shopPlacement.test.js`).
 
 **Fassung und Farbe bei Textebenen (#2142):** Bei Gamertag, Vereinsnummer und festem Text steuert der Untergrund nur die
 Farbe - Schritt 3 zeigt dort darum nur „Farbe: Vereinsblau (aus Hintergrund)“ bzw. „(nach der Shirtfarbe)“, die Wahl
@@ -929,8 +958,8 @@ prüfen“. Liegen Motive auf der Fläche, wird die Grunddatei gleich danach erz
 **Vorschau:** `GET /api/admin/shop/products/{id}/preview?placement=&color=` - die Druckdatei über dem Vorlagenbild
 (Sicherheitslinien) auf der Shirtfarbe von Printful, mit einem Beispielnamen im Platzhalter, als PNG (900 px breit);
 bei einer fertigen Datei der Hintergrund dieser Farbe, darüber die Ebenen (#2141).
-Im Admin rechnet die Seite dieselbe Lage live (`shopLayout.js`), Feinjustieren per Ziehen oder Pfeiltasten (Umschalt:
-1 cm). Bei ungespeicherten Änderungen sind nur die Ebenen gedimmt, solange der Server die Pläne rechnet - das Shirt
+Im Admin rechnet die Seite dieselbe Lage live (`shopLayout.js`), Feinjustieren per Zahl, Ziehen mit Einrasten oder
+Pfeiltasten (Umschalt: 1 cm, siehe „Präzise setzen“). Bei ungespeicherten Änderungen sind nur die Ebenen gedimmt, solange der Server die Pläne rechnet - das Shirt
 nie; ohne Berechnung (nichts gewählt, blockiert) wird nichts gedimmt (#2105).
 `GET /api/admin/shop/products/{id}/print-files/{file_id}` zeigt eine Grunddatei, mit `?thumb=1` verkleinert (höchstens
 1200 px) - so zeigt Schritt 3 den Hintergrund der Vorschau-Farbe in der Druckfläche. Das Vorschaubild entsteht beim
@@ -1015,7 +1044,9 @@ Vereinsname; vorne das Logo und eine kleine Nummer. Schritt für Schritt (Verwal
 4. Wenn gewünscht eine **Kontur** (etwa 0,3 cm) - die Farbe wählt sich nach Kontrast zur Schrift, oder fest.
    **Farbe** der Schrift: automatisch nach dem Untergrund oder fest.
 5. **Ausrichten:** „Mittig auf Fläche“ setzt eine verschobene Ebene zurück in die Mitte; „Abstand zur Ebene darüber“
-   stellt den sichtbaren Abstand in cm ein (Grundlinie oben bis Oberkante unten).
+   stellt den sichtbaren Abstand in cm ein (Grundlinie oben bis Oberkante unten). Genau setzen geht mit den Zahlen
+   „Von oben“ und „Von der Mitte“ je Ebene, mit „Ausrichten an“ einer anderen Ebene oder in **„Groß bearbeiten“** mit
+   Zoom (Abschnitt „Präzise setzen“).
 6. Vorderseite: **„Trikot Brust“** - Logo links (von vorne gesehen), kleine Nummer rechts auf derselben Höhe. Das Motiv
    aus der Liste wählen.
 7. **Speichern**, bei Allover je Farbe den Hintergrund hochladen, „Druckdateien erzeugen“: der Vereinsname kommt in die
