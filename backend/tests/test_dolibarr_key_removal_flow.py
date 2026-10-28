@@ -79,6 +79,7 @@ async def test_only_system_removes_keys(flow):
     await admin_with_keys(flow, api_key=READ_KEY, write_api_key=WRITE_KEY)
     flow.act_as(await flow.add_user(role="tournament_admin", name="turnier"))
     for path in ("/api/admin/dolibarr/settings/api-key", "/api/admin/dolibarr/settings/write-api-key"):
-        assert (await flow.client.delete(path)).status_code == 403
+        refused = await flow.client.delete(path)
+        assert refused.status_code == 403
     stored = await flow.db.settings.find_one({"id": "dolibarr"}, {"_id": 0})
     assert stored["api_key"] and stored["write_api_key"]
