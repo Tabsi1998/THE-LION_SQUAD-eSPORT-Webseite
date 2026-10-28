@@ -698,7 +698,7 @@ export default function AdminTournamentEditPage() {
                 <div className="grid grid-cols-2 gap-2">
                   {isTournamentLead && !staffel && (
                     <select value={r.status} onChange={(e) => setRegStatus(r.id, e.target.value)} data-testid={`admin-reg-status-mobile-${r.id}`} className="col-span-2 bg-[#0A0A0A] border border-white/10 px-2 py-2 text-xs rounded-sm">
-                      {["pending", "approved", "rejected", "waitlist", "checked_in", "no_show"].map((s) => <option key={s} value={s}>{formatRegistrationStatus(s)}</option>)}
+                      <RegistrationStatusOptions fixed={inFixedBracket.has(r.id)} current={r.status} />
                     </select>
                   )}
                   {checkInTools && r.status !== "checked_in" && !["rejected", "waitlist"].includes(r.status) && (
@@ -711,7 +711,7 @@ export default function AdminTournamentEditPage() {
                     <button type="button" onClick={() => setRegCheckinStatus(r.id, "no_show")} className="px-2 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase">Nicht erschienen</button>
                   )}
                   <ParticipantRemovalActions tournament={t} registration={r} onDone={load} compact />
-                  {t.can_manage_participants && (
+                  {t.can_manage_participants && !inFixedBracket.has(r.id) && (
                     <button type="button" onClick={() => deleteParticipant(r)} className="px-2 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase hover:bg-[#FF3B30]/10">Entfernen</button>
                   )}
                 </div>
@@ -741,7 +741,7 @@ export default function AdminTournamentEditPage() {
                     <div className="flex flex-wrap justify-end gap-2">
                       {isTournamentLead && !staffel && (
                         <select value={r.status} onChange={(e) => setRegStatus(r.id, e.target.value)} data-testid={`admin-reg-status-${r.id}`} className="bg-[#0A0A0A] border border-white/10 px-2 py-1 text-xs rounded-sm">
-                          {["pending", "approved", "rejected", "waitlist", "checked_in", "no_show"].map((s) => <option key={s} value={s}>{formatRegistrationStatus(s)}</option>)}
+                          <RegistrationStatusOptions fixed={inFixedBracket.has(r.id)} current={r.status} />
                         </select>
                       )}
                       {checkInTools && r.status !== "checked_in" && !["rejected", "waitlist"].includes(r.status) && (
@@ -754,7 +754,7 @@ export default function AdminTournamentEditPage() {
                         <button type="button" onClick={() => setRegCheckinStatus(r.id, "no_show")} className="px-2 py-1 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase">Nicht erschienen</button>
                       )}
                       <ParticipantRemovalActions tournament={t} registration={r} onDone={load} />
-                      {t.can_manage_participants && (
+                      {t.can_manage_participants && !inFixedBracket.has(r.id) && (
                         <button type="button" onClick={() => deleteParticipant(r)} className="px-2 py-1 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase hover:bg-[#FF3B30]/10">Entfernen</button>
                       )}
                     </div>
@@ -857,6 +857,16 @@ export default function AdminTournamentEditPage() {
       )}
     </AdminLayout>
   );
+}
+
+// Status je Anmeldung. Im festen Baum (#2120, TA13) nehmen Ausstehend, Abgelehnt und Warteliste die Person aus Spielen,
+// die sie behalten - das geht über „Nicht erschienen“, „Austritt eintragen“ oder „Disqualifizieren“.
+const REGISTRATION_ROW_STATUSES = ["pending", "approved", "rejected", "waitlist", "checked_in", "no_show"];
+const LEAVES_BRACKET = new Set(["pending", "rejected", "waitlist"]);
+function RegistrationStatusOptions({ fixed, current }) {
+  return REGISTRATION_ROW_STATUSES.map((s) => (
+    <option key={s} value={s} disabled={fixed && s !== current && LEAVES_BRACKET.has(s)}>{formatRegistrationStatus(s)}</option>
+  ));
 }
 
 // Staffel (#2109, S18): ein Co-Team ist zugeteilt, nicht „angenommen“ oder „eingecheckt“ - Austritt und

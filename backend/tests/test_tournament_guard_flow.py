@@ -311,3 +311,55 @@ async def test_after_the_end_the_structure_is_not_rebuilt(flow):
 
     assert refused.status_code == 409
     assert "vorbei" in refused.json()["detail"]
+
+
+# ---------------------------------------------------------------- TA13 Anmeldung entfernen
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", ["live", "paused", "completed"])
+async def test_a_registration_in_the_fixed_bracket_is_not_deleted(flow, status):
+    staff, tournament, _users, registrations = await fixed_bracket(flow)
+    await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"status": status}})
+    target = registrations[0]["id"]
+
+    refused = await flow.delete(f"/api/tournaments/{tournament['id']}/registrations/{target}")
+
+    assert refused.status_code == 409, refused.text
+    assert await flow.db.tournament_registrations.find_one({"id": target})
+    if status in {"live", "paused"}:
+        assert "Austritt eintragen" in refused.json()["detail"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("new_status", ["rejected", "waitlist", "pending"])
+async def test_a_registration_in_the_fixed_bracket_keeps_its_place(flow, new_status):
+    staff, tournament, _users, registrations = await fixed_bracket(flow)
+    target = registrations[0]["id"]
+
+    refused = await flow.patch(f"/api/tournaments/{tournament['id']}/registrations/{target}", json={"status": new_status})
+
+    assert refused.status_code == 409, refused.text
+    assert (await flow.db.tournament_registrations.find_one({"id": target}))["status"] == "approved"
+
+
+@pytest.mark.asyncio
+async def test_a_registration_outside_the_bracket_can_still_go(flow):
+    staff, tournament, _users, _registrations = await fixed_bracket(flow)
+    late = await flow.register(tournament, await flow.add_user(name="Wartend"), status="waitlist")
+
+    removed = await flow.delete(f"/api/tournaments/{tournament['id']}/registrations/{late['id']}")
+
+    assert removed.status_code == 200, removed.text
+    assert not await flow.db.tournament_registrations.find_one({"id": late["id"]})
+
+
+@pytest.mark.asyncio
+async def test_before_the_check_in_ends_a_registration_still_leaves_the_preview(flow):
+    staff = await flow.add_staff()
+    flow.act_as(staff)
+    tournament, _users, registrations = await flow.with_participants(4)
+    await flow.post(f"/api/tournaments/{tournament['id']}/bracket/from-format?preview=true")
+
+    removed = await flow.delete(f"/api/tournaments/{tournament['id']}/registrations/{registrations[0]['id']}")
+
+    assert removed.status_code == 200, removed.text
