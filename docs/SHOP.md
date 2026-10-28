@@ -721,10 +721,35 @@ Flächen (Vorderseite, Rückseite, Ärmel, Etikett, Sonstige). Eine Vorgabe ist 
 | Tasse umlaufend, Tasse einseitig, Tuch mittig | sonstige | 50 % bzw. 25 % / mittig / ganze Fläche, 8 cm, 40 cm |
 | Brust gegenüber dem Motiv (Name) | vorne | gespiegelt zum ersten Motiv, senkrechte Mitte des Namens auf dessen Mitte |
 | Unter dem Motiv, Rücken oben (Name), Mittig (Name) | alle bzw. hinten | unter dem ersten Motiv (1 cm Abstand), oben 3 cm, mittig |
+| Trikot Rücken: Name oben, Vereinsname unten (#2142) | hinten | 50 % / oben 8 cm bzw. unten 8 cm |
+| Trikot Rücken: Nummer darunter (#2142) | hinten | unter der Ebene davor, 2 cm Abstand (`follow = "stack"`) |
+
+Abstand oben bzw. unten zählt bis zum Rahmen der Leinwand (bei Namen mit Luft für Akzente und Unterlängen). Der Bezug
+**„unter der Ebene davor“** (`stack`, #2142) misst dagegen an den sichtbaren Kanten: von der Grundlinie der Ebene davor
+(bei einem Motiv dessen Unterkante) bis zur Oberkante der Großbuchstaben bzw. Ziffern - „Ebene davor“ ist die zuletzt
+gesetzte (Motive zuerst, dann die Textebenen in ihrer Reihenfolge).
+
+**Vorlagen mit mehreren Ebenen** (#2142, `sets` im selben Dokument, `MAX_SETS` 20): je Vorlage Kennung, Bezeichnung,
+Hinweis, Arten der Fläche und bis zu sechs Ebenen mit Art (`motif`, `gamertag`, `member_number`, `text`),
+Positions-Vorgabe (passend zur Art und allen Flächen der Vorlage) und - wenn gewünscht - Breite, Texthöhe, Höchstbreite,
+Schrift, Kontur und festem Text. Eine Vorlage, deren Vorgabe es nicht mehr gibt, fällt beim Lesen weg (Log);
+beim Speichern wird sie abgelehnt. Vorgabe:
+
+| Vorlage | Fläche | Ebenen |
+| --- | --- | --- |
+| Trikot Rücken | hinten | Gamertag „Name oben“ 7 cm, Vereinsnummer „Nummer darunter“ 20 cm, fester Text „Vereinsname unten“ 3,5 cm („THE LION SQUAD“) - je höchstens 30 cm breit, Sportschrift |
+| Trikot Brust | vorne | Motiv „Brust rechts (vom Träger aus)“, Vereinsnummer „gegenüber“ 6 cm, Sportschrift |
+
+Die Größen passen zum Allover-Trikot (83,8 × 114,3 cm); auf einem T-Shirt-Rücken (30,5 × 40,6 cm) nach dem Setzen
+kleiner stellen - die Vorschau zeigt rot, was hinausragt. Gamertag und Vereinsnummer kommen nur mit passender
+Personalisierung dazu (sonst sagt Schritt 3, was ausgelassen ist). Kommt mit einer neuen Fassung eine neue Vorgabe dazu,
+erscheint sie auch in einer schon gespeicherten Liste - außer, sie war schon bekannt und wurde bewusst entfernt
+(`known_defaults` am Dokument). Eine eigene Seite zum Bearbeiten gibt es noch nicht; geändert wird über die Route.
 
 **Regeln** im selben Dokument: Sicherheitsrand je Art der Fläche (cm), Auflösung eines Rastermotivs als Anteil der DPI
 der Vorlage (darunter abgelehnt: Vorgabe 0,66 - also unter 100 DPI bei 150; darunter gewarnt: Vorgabe 1,0) und die
-kleinste Breite eines Motivs (Vorgabe 1 cm). Routen: `GET`/`PUT /api/admin/shop/print-presets`.
+kleinste Breite eines Motivs (Vorgabe 1 cm). Routen: `GET`/`PUT /api/admin/shop/print-presets` (`presets`, `rules`,
+`sets`; die Antwort nennt dazu `defaults` und `default_sets`).
 
 ### Aufbau je Produkt (Schritt 3)
 
@@ -741,13 +766,42 @@ haben (`variant`: `light` oder `dark`, #2141); ohne Angabe entscheidet der Unter
   Bestellung. Höchstens einer je Fläche, nur mit passender Personalisierung. Die Größe ist die Leinwand der
   Gamertag-Datei (`shop_gamertag.canvas`), ihr Anker (`anchor_y_in`) liegt auf der halben Höhe. **Je Ebene
   einstellbar (#2105):** `text_height_cm` (Texthöhe) und `max_width_cm` (Höchstbreite der Leinwand); ohne Angabe die
-  globalen Gamertag-Regeln, Grenzen wie dort (0,25 bis 5,08 cm bzw. 1,27 bis 30,48 cm), und die Fläche begrenzt
-  (ragt der Rahmen hinaus, lehnt die Prüfung ab). `shop_gamertag.layer_rules` macht daraus die Regeln der Ebene (die
-  Mindesthöhe der Verkleinerung bleibt im selben Verhältnis) - Platzieren (`text_canvas_px`), die Bestelldatei
-  (`shop_gamertag.store(…, layer=…)`, `rules_hash` der Ebene) und die Vorschau lesen dieselben Werte. Die Grunddateien
-  enthalten keinen Namen und werden davon nicht „veraltet“. In der Vorschau steht ein **Beispielname in echter
-  Texthöhe** (`GET …/products/{id}/name-sample`, gerendert wie die Druckdatei: `GAMERTAG` bzw. `1234`, Farbe des
-  Namens wie bei der Bestellung); die Leinwand bleibt nur ein feiner Rahmen.
+  globalen Gamertag-Regeln. **Seit #2142 begrenzt die Fläche** statt fester 2 bzw. 12 Zoll: Höchstbreite bis zur Breite
+  der Fläche ohne Sicherheitsrand, Texthöhe so, dass die Leinwand in deren Höhe passt (`shop_products._text_bounds`,
+  in Schritt 3 `textBoundsCm`); die Meldung nennt die Grenze in cm („so viel lässt die Fläche „Rückseite“ mit
+  Sicherheitsrand zu“), und ragt der Rahmen samt Versatz hinaus, lehnt die Prüfung ab. Untergrenzen 0,25 bzw. 1,27 cm;
+  ohne Fläche (Beispielname) nur die technische Grenze (200 cm, höchstens 60 Millionen Pixel je Leinwand). Die globalen
+  Gamertag-Regeln bleiben Vorgabe mit ihren Grenzen. Dazu je Ebene **Schrift** (`font`, eine der freigegebenen) und
+  **Kontur** (`outline_cm` 0,05 bis 2 cm, `outline_ink` fest oder automatisch die Farbe mit dem höchsten Kontrast zur
+  Schrift). `shop_gamertag.layer_rules` macht daraus die Regeln der Ebene (die Mindesthöhe der Verkleinerung bleibt
+  im selben Verhältnis; die Kontur zählt nur gesetzt zum `rules_hash`) - Platzieren (`text_canvas_px`), die
+  Bestelldatei (`shop_gamertag.store(…, layer=…)`, `rules_hash` der Ebene) und die Vorschau lesen dieselben Werte. Die
+  Grunddateien enthalten keinen Namen und werden davon nicht „veraltet“. In der Vorschau steht ein **Beispielname in
+  echter Texthöhe** (`GET …/products/{id}/name-sample`, gerendert wie die Druckdatei: `GAMERTAG` bzw. die höchste
+  Wunschnummer, Vorgabe `99`; Farbe wie bei der Bestellung, mit Schrift und Kontur); die Leinwand bleibt nur ein feiner
+  Rahmen. Die **Vereinsnummer** (#2142) hat nur Ziffern (höchstens vier wie die Wunschnummer) und eine Leinwand so hoch
+  wie die Ziffern - ohne Platz für Akzente und Unterlängen; ihre Texthöhe misst die Ziffern.
+- `text` (**Fester Text**, #2142), etwa der Vereinsname: `text` (bis 40 Zeichen: Buchstaben, Ziffern, die Zeichen der
+  Gamertag-Regeln und `. , - & ' ! ? : / # + ( )`, keine Emojis), Vorgabe, Texthöhe, Höchstbreite, Schrift, Farbe
+  (`ink` fest oder automatisch nach Untergrund wie bei den Namen, #2141) und Kontur. Mehrere je Fläche, ohne
+  Personalisierung. Er ist für alle Bestellungen gleich und liegt darum **in der Grunddatei** (`BASE_KINDS`):
+  `_render_base` rendert ihn wie einen Namen (`shop_gamertag.render(…, kind="text")`) in seinen Rahmen. Der
+  `layout_hash` bekommt dafür einen Eintrag `texts` (Rahmen, Text, Farbe samt Farbwert, `rules_hash`, Konturfarbe) - nur,
+  wenn es einen festen Text gibt: ein geänderter Text, eine andere Größe, Schrift oder Farbe macht die Grunddatei
+  „veraltet“, bestehende Produkte ohne festen Text behalten ihren Fingerabdruck.
+
+Die Reihenfolge der Ebenen: Motive zuerst (ein Name folgt dem ersten Motiv), danach die Textebenen in ihrer Reihenfolge
+- so bleibt bei „Trikot Rücken“ der Name vor der Nummer.
+
+**Ausrichten (#2142):** je Ebene „Mittig auf Fläche“ (setzt den Versatz waagrecht) und „Abstand zur Ebene darüber“ in
+cm (die Ebene, deren sichtbare Unterkante am nächsten darüber liegt; setzt den Versatz senkrecht, gemessen wie bei
+„unter der Ebene davor“). Zahleneingabe für die Position, Einrasten und Zoom folgen mit #2117.
+
+**Fassung und Farbe bei Textebenen (#2142):** Bei Gamertag, Vereinsnummer und festem Text steuert der Untergrund nur die
+Farbe - Schritt 3 zeigt dort darum nur „Farbe: Vereinsblau (aus Hintergrund)“ bzw. „(nach der Shirtfarbe)“, die Wahl
+„Fassung“ bleibt den Motiven (eine früher gesetzte bleibt zum Zurücksetzen sichtbar). Liegt ein Hintergrund in der
+Vorschau, der nicht mehr zur Vorlage passt (`background_ok` falsch, etwa nach einer Änderung bei Printful), entscheidet
+er nicht - die Vorschau sagt das unter dem Bild, bis er neu hochgeladen ist.
 
 `PUT /api/admin/shop/products/{id}/layout` prüft für **jede angebotene Farbe und jede Größe mit eigener Fläche**, dass
 alles ganz in der Fläche liegt - sonst 400 mit px, cm und Zoll. Protokoll `shop.product.layout` mit vorher/nachher.
@@ -867,7 +921,33 @@ Bestelldatei nehmen dieselbe Wahl; gibt es die Farbe in den Regeln nicht mehr, g
    Testentwurf an Printful (#2062). Ob die Datei echte Details hat oder nur hochskaliert ist, zeigt erst das Muster.
 
 Blockiert das Speichern, nennt die Meldung die betroffenen Flächen und springt hin (etwa eine Fläche in „Motiv und
-Position“ ohne Ebene).
+Position“ ohne Ebene oder ein fester Text ohne Text).
+
+### Trikot einrichten (#2142)
+
+Auf dem Rücken oben der Name, darunter groß die Nummer (Wunschnummer bzw. Vereinsnummer, #2034), ganz unten der
+Vereinsname; vorne das Logo und eine kleine Nummer. Schritt für Schritt (Verwaltung → Finanzen → Shop → Produkte):
+
+1. Schritt 1: Personalisierung „Gamertag und Vereinsnummer“ wählen (sonst lässt die Vorlage Name bzw. Nummer aus und
+   sagt das), das Trikot von Printful laden. Schritt 2: Farben und Größen.
+2. Schritt 3, Rückseite: bei einem Allover-Trikot „Fertige Druckdatei als Hintergrund“ (Abschnitt Allover), sonst
+   „Motiv und Position“. Dann unter den Ebenen **„Trikot Rücken“** klicken: Name, Nummer und Vereinsname stehen mittig
+   untereinander, in der Sportschrift Saira Condensed Black. Die Vorlage ersetzt die Ebenen dieser Fläche.
+3. Den **Vereinsnamen** im Feld „Text“ prüfen. Größen in cm anpassen: die Vorschau zeigt Beispielname und
+   Beispielnummer in echter Größe auf dem Hintergrund; was hinausragt, ist rot, und der Hinweis unter den Feldern nennt
+   die Grenze der Fläche in cm. Auf einem T-Shirt-Rücken die Vorgaben kleiner stellen (etwa Name 4 cm, Nummer 11 cm,
+   Vereinsname 2,5 cm).
+4. Wenn gewünscht eine **Kontur** (etwa 0,3 cm) - die Farbe wählt sich nach Kontrast zur Schrift, oder fest.
+   **Farbe** der Schrift: automatisch nach dem Untergrund oder fest.
+5. **Ausrichten:** „Mittig auf Fläche“ setzt eine verschobene Ebene zurück in die Mitte; „Abstand zur Ebene darüber“
+   stellt den sichtbaren Abstand in cm ein (Grundlinie oben bis Oberkante unten).
+6. Vorderseite: **„Trikot Brust“** - Logo links (von vorne gesehen), kleine Nummer rechts auf derselben Höhe. Das Motiv
+   aus der Liste wählen.
+7. **Speichern**, bei Allover je Farbe den Hintergrund hochladen, „Druckdateien erzeugen“: der Vereinsname kommt in die
+   Grunddatei, Name und Nummer je Bestellung. Danach Vorschau je Farbe und ein Testentwurf an Printful (#2062).
+
+Die Größen und Abstände der Vorlagen sind Positions-Vorgaben (Abschnitt oben) und lassen sich dort ändern. Die
+Vereinsnummer steht bis #1727 nur als Platzhalter in der Vorschau - gedruckt wird sie noch nicht.
 
 ### Bestellung
 
@@ -912,7 +992,10 @@ Testentwurf an Printful mit #2062.
 (`frontend/public/fonts`, lateinischer Zeichensatz mit Umlauten und ß), alle unter der **SIL Open Font License 1.1**
 (Lizenztexte `OFL-Rajdhani.txt`, `OFL-Outfit.txt`, `OFL-Unbounded.txt` daneben). Zur Wahl: Rajdhani Bold (Vorgabe,
 schmal - passt zum Richtwert „7 Zeichen ≈ 2,4 Zoll“), Outfit Bold/ExtraBold, Unbounded ExtraBold. Die Rajdhani-Datei
-hat gleich breite Ziffern (eigene Ableitung, `scripts/build_web_fonts.py`; die Lizenz erlaubt das).
+hat gleich breite Ziffern (eigene Ableitung, `scripts/build_web_fonts.py`; die Lizenz erlaubt das). Für Trikots (#2142)
+dazu **Saira Condensed Black** als Sport- und Blockschrift (`saira-condensed-latin-900.woff2`, Fontsource 5.3.0 wie
+die übrigen, Lizenz `OFL-SairaCondensed.txt` daneben; nur im Backend, die Vorschau rendert der Server) - je Textebene
+in Schritt 3 wählbar, auch als Schrift der Gamertag-Regeln.
 
 **Renderer** (Pillow, ohne Netz und ohne Dateizugriff - die Schrift wird einmal in den Speicher gelesen):
 

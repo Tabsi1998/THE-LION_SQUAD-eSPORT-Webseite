@@ -445,9 +445,9 @@ function AlignTools({ area, item, above, layer, editable, onChange, testId }) {
       </button>
       {above && (
         <>
-          <label className="block text-sm"><span className="text-white/70 text-xs">Abstand zur Ebene darüber (cm)</span>
+          <label className="block text-sm w-44 shrink-0"><span className="text-white/70 text-xs">Abstand zur Ebene darüber (cm)</span>
             <input type="text" inputMode="decimal" value={wanted} disabled={!editable} placeholder={now === null ? "" : String(Math.round(now * 10) / 10).replace(".", ",")}
-              onChange={(event) => setWanted(event.target.value)} className={`${SELECT} w-28 tabular-nums`} data-testid={`${testId}-gap`} />
+              onChange={(event) => setWanted(event.target.value)} className={`${SELECT} tabular-nums`} data-testid={`${testId}-gap`} />
           </label>
           <button type="button" disabled={!editable || value === null} className={QUIET_BTN} data-testid={`${testId}-gap-set`}
             onClick={() => { onChange({ offset_y_cm: gapOffsetCm(area, above, item, layer, value) }); setWanted(""); }}>

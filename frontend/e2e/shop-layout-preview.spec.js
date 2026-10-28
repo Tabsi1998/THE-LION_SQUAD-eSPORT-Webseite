@@ -92,6 +92,38 @@ const ALLOVER = {
       ] } })) }],
 };
 
+// Trikot (#2142): die Rückseite eines Allover-Trikots (synthetischer dunkler Hintergrund) - die Vorlage „Trikot Rücken“
+// setzt Name, große Nummer und Vereinsname untereinander, mittig, in der Sportschrift.
+const SPORT = "saira-condensed-900";
+const BACK_FILE = { ...AREA_FILE, width_px: 4950, height_px: 6750, width_in: 33, height_in: 45, width_cm: 83.82, height_cm: 114.3 };
+const JERSEY = {
+  ...ALLOVER,
+  product: { ...VIEW.product, personalization: "both" },
+  labels: { ...ALLOVER.labels, kinds: { ...LABELS.kinds, text: "Fester Text (in der Grunddatei, etwa der Vereinsname)" } },
+  placements: [],
+  available_placements: [
+    { key: "back", label: "Rückseite", label_translated: true, family: "back", family_label: "Rückseite", technique: "dtfilm", safe_margin_cm: 0,
+      file: BACK_FILE, groups: [BACK_FILE], preview: null, preview_by_color: {},
+      presets: { motif: [], text: ["jersey_back_name", "jersey_back_number", "jersey_back_club"] } },
+  ],
+  included_placement: "back",
+  presets: [
+    { key: "jersey_back_name", label: "Trikot Rücken: Name oben", hint: "", kind: "text", families: ["back"], follow: null, center_x: 0.5, anchor: "top", top_cm: 8 },
+    { key: "jersey_back_number", label: "Trikot Rücken: Nummer darunter", hint: "", kind: "text", families: ["back"], follow: "stack", gap_cm: 2, center_x: 0.5, anchor: "top", top_cm: 0 },
+    { key: "jersey_back_club", label: "Trikot Rücken: Vereinsname unten", hint: "", kind: "text", families: ["back"], follow: null, center_x: 0.5, anchor: "bottom", top_cm: 8 },
+  ],
+  preset_rules: { safe_margin_cm: { back: 0 }, min_dpi_ratio: 0.66, warn_dpi_ratio: 1, min_width_cm: 1 },
+  gamertag_canvas: { ...VIEW.gamertag_canvas, font: "rajdhani-700",
+    font_metrics: { "rajdhani-700": { name: 1.5, number: 1.02, band_name: 1, band_number: 1 }, [SPORT]: { name: 2.3, number: 1.05, band_name: 1, band_number: 1.01 } },
+    limits: { min_text_height_cm: 0.25, min_width_cm: 1.27, min_outline_cm: 0.05, max_outline_cm: 2 } },
+  fonts: [{ key: "rajdhani-700", label: "Rajdhani Bold" }, { key: SPORT, label: "Saira Condensed Black – Sport- und Blockschrift für Trikots" }],
+  print_sets: [{ key: "jersey_back", label: "Trikot Rücken", hint: "Name oben, Nummer darunter, Vereinsname unten.", families: ["back"], skipped: [],
+    layers: [
+      { kind: "gamertag", preset: "jersey_back_name", text_height_cm: 7, max_width_cm: 30, font: SPORT },
+      { kind: "member_number", preset: "jersey_back_number", text_height_cm: 20, max_width_cm: 30, font: SPORT },
+      { kind: "text", preset: "jersey_back_club", text: "TESTVEREIN", text_height_cm: 3.5, max_width_cm: 30, font: SPORT },
+    ] }],
+};
 async function mockApi(page, seen, data = VIEW) {
   await page.addInitScript(() => {
     window.localStorage.setItem("tls_cookie_consent_v1", JSON.stringify({ essential: true, external_media: false, analytics: false, meta: false, tiktok: false, saved_at: Date.now(), expires_at: 4102444800000 }));
@@ -185,7 +217,9 @@ for (const [label, width, height] of WIDTHS) {
       expect(Math.abs(areaBox.x - backBox.x) + Math.abs(areaBox.width - backBox.width)).toBeLessThanOrEqual(1);
       await expect(page.getByTestId("shop-preview-front-layer-0").locator("img")).toBeVisible();
       await expect(page.getByTestId("shop-layer-front-0-surface")).toHaveText("Fassung: dunkel (aus Hintergrund)");
-      await expect(page.getByTestId("shop-layer-front-1-surface")).toContainText("Farbe: Vereinsblau");
+      // Textebenen zeigen nur die Farbe samt Herkunft - die Fassung gehört zu den Motiven (#2142).
+      await expect(page.getByTestId("shop-layer-front-1-surface")).toHaveText("Farbe: Vereinsblau (aus Hintergrund)");
+      await expect(page.getByTestId("shop-layer-front-1-variant")).toHaveCount(0);
       await expect(page.getByTestId("shop-preview-front-layer-1-sample")).toHaveAttribute("src", /ink=vereinsblau/);
       await page.getByTestId("shop-preview-color-White").click();
       await expect(backdrop).toHaveAttribute("src", /print-files\/bg-White\?thumb=1/);
@@ -194,7 +228,7 @@ for (const [label, width, height] of WIDTHS) {
       expect(overflow, "kein seitliches Scrollen der Seite").toBeLessThanOrEqual(1);
       // Auch innen nichts abgeschnitten: Hochladen, Ebenen-Knöpfe und die Fassung bleiben in der Karte.
       const card = await page.getByTestId("shop-area-front").boundingBox();
-      for (const id of ["shop-upload-front-Black-submit", "shop-layer-front-0-remove", "shop-layer-front-1-variant", "shop-layer-front-1-ink"]) {
+      for (const id of ["shop-upload-front-Black-submit", "shop-layer-front-0-remove", "shop-layer-front-0-variant", "shop-layer-front-1-ink"]) {
         const box = await page.getByTestId(id).boundingBox();
         expect(box.x + box.width, id).toBeLessThanOrEqual(card.x + card.width + 1);
       }
@@ -213,6 +247,50 @@ for (const [label, width, height] of WIDTHS) {
       await page.getByTestId("shop-layout-jump-front").click();
       await expect(page.getByTestId("shop-area-use-front")).toBeFocused();
       await expect(page.getByTestId("shop-area-front")).toBeInViewport();
+    });
+
+    test("Trikot Rücken mit einem Klick: Name, große Nummer, Vereinsname untereinander und mittig (#2142)", async ({ page }, testInfo) => {
+      const seen = [];
+      await page.setViewportSize({ width, height });
+      await mockApi(page, seen, JERSEY);
+      await page.goto("/admin/shop/products/p1");
+      await page.getByTestId("shop-step-designs").click();
+      await page.getByTestId("shop-area-use-back").click();
+      await page.getByTestId("shop-area-set-back-jersey_back").click();
+      await expect(page.getByTestId("shop-area-set-notice-back")).toContainText("Vorlage „Trikot Rücken“ gesetzt: 3 Ebenen");
+      const boxes = [];
+      for (const index of [0, 1, 2]) {
+        await expect(page.getByTestId(`shop-preview-back-layer-${index}-sample`)).toBeVisible();
+        boxes.push(await page.getByTestId(`shop-preview-back-layer-${index}`).boundingBox());
+      }
+      const area = await page.getByTestId("shop-preview-back-area").boundingBox();
+      // Untereinander, mittig und ganz in der Fläche.
+      expect(boxes[0].y).toBeLessThan(boxes[1].y);
+      expect(boxes[1].y + boxes[1].height).toBeLessThan(boxes[2].y + boxes[2].height);
+      for (const box of boxes) {
+        expect(Math.abs(box.x + box.width / 2 - (area.x + area.width / 2))).toBeLessThanOrEqual(2);
+        expect(box.y + box.height).toBeLessThanOrEqual(area.y + area.height + 1);
+      }
+      await expect(page.getByTestId("shop-layer-back-1-gap-now")).toContainText("jetzt 2 cm");
+      await expect(page.getByTestId("shop-layer-back-1-size-hint")).toContainText("Höchstbreite bis 83,8 cm");
+      await expect(page.getByTestId("shop-preview-back-layer-1-sample")).toHaveAttribute("src", /kind=member_number.*text_height_cm=20.*font=saira-condensed-900/);
+      await expect(page.getByTestId("shop-preview-back-layer-2-sample")).toHaveAttribute("src", /kind=text.*text=TESTVEREIN/);
+      // Kontur an der Nummer, fester Text geändert - die Beispiele kommen so vom Server.
+      await page.getByTestId("shop-layer-back-1-outline").fill("0,4");
+      await expect(page.getByTestId("shop-preview-back-layer-1-sample")).toHaveAttribute("src", /outline_cm=0.4/);
+      await page.getByTestId("shop-layer-back-2-text").fill("TESTVEREIN LÖWEN");
+      await expect(page.getByTestId("shop-preview-back-layer-2-sample")).toHaveAttribute("src", /text=TESTVEREIN\+L%C3%96WEN/);
+      const overflow = await page.evaluate(() => Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - document.documentElement.clientWidth);
+      expect(overflow, "kein seitliches Scrollen der Seite").toBeLessThanOrEqual(1);
+      const card = await page.getByTestId("shop-area-back").boundingBox();
+      for (const id of ["shop-layer-back-1-font", "shop-layer-back-1-outline-ink", "shop-layer-back-1-gap-set", "shop-layer-back-2-center", "shop-area-add-text-back"]) {
+        const box = await page.getByTestId(id).boundingBox();
+        expect(box.x + box.width, id).toBeLessThanOrEqual(card.x + card.width + 1);
+      }
+      expect(seen.some((path) => path.includes("kind=text"))).toBe(true);
+      const shot = testInfo.outputPath(`trikot-${label}.png`);
+      await page.getByTestId("shop-area-back").screenshot({ path: shot });
+      await testInfo.attach(`trikot-${label}.png`, { path: shot, contentType: "image/png" });
     });
   });
 }
