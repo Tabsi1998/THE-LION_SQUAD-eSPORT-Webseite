@@ -68,6 +68,16 @@ async def test_seo_and_sitemap_only_for_public_seasons(flow):
     sitemap = (await flow.get("/api/sitemap.xml")).text
     assert "/liga" not in sitemap
 
-    await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"visibility": "off"})
-    with pytest.raises(Exception):
-        await league_season_meta(flow.db, "probe-shooter", "season-1", base, "https://example.test")
+    from fastapi import HTTPException
+
+    # „Nur Turnierleitung“ und „aus“: wie eine unbekannte Season - 404, damit sich nichts erraten lässt.
+    for visibility in ("admins", "off"):
+        await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"visibility": visibility})
+        with pytest.raises(HTTPException) as hidden:
+            await league_season_meta(flow.db, "probe-shooter", "season-1", base, "https://example.test")
+        assert hidden.value.status_code == 404
+        sitemap = (await flow.get("/api/sitemap.xml")).text
+        assert "/liga" not in sitemap
+    with pytest.raises(HTTPException) as unknown:
+        await league_season_meta(flow.db, "probe-shooter", "season-9", base, "https://example.test")
+    assert unknown.value.status_code == 404

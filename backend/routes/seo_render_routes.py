@@ -523,14 +523,15 @@ async def season_meta(db, slug: str, base: dict, origin: str) -> dict:
 
 
 async def league_season_meta(db, league_slug: str, season_slug: str, base: dict, origin: str) -> dict:
-    """Ligaseite (P5, #1625): öffentlich mit Titel und Zeitraum; „Nur Mitglieder“ bzw. „Nur Turnierleitung“ als neutrale
-    Karte ohne Index; „aus“ und Unbekanntes 404."""
+    """Ligaseite (P5, #1625): öffentlich mit Titel und Zeitraum; „Nur Mitglieder“ als neutrale Karte ohne Index;
+    „aus“, „Nur Turnierleitung“ und Unbekanntes 404."""
     from services.league_service import season_end
 
     league = await db.leagues.find_one({"slug": league_slug, "status": "active"}, {"_id": 0})
     season = await db.league_seasons.find_one({"league_id": league["id"], "slug": season_slug},
                                               {"_id": 0}) if league else None
-    if not season or season.get("status") == "archived" or (season.get("visibility") or "off") == "off":
+    # „aus“ und „Nur Turnierleitung“ wie „gibt es nicht“ - von außen lässt sich nicht erraten, ob es die Season gibt.
+    if not season or season.get("status") == "archived" or (season.get("visibility") or "off") in ("off", "admins"):
         raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
     canonical = f"{origin}/liga/{league['slug']}/{season['slug']}"
     title = f"{league.get('name')} {season.get('name')}"
