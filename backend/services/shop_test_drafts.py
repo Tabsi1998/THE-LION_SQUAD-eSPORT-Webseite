@@ -189,9 +189,15 @@ def _has_gamertag(rows: list[dict]) -> bool:
     return any(layer.get("kind") == "gamertag" for row in rows for layer in row.get("layers") or [])
 
 
+def _has_number(rows: list[dict]) -> bool:
+    return any(layer.get("kind") == "member_number" for row in rows for layer in row.get("layers") or [])
+
+
 async def products(db) -> list[dict]:
     """Produkte mit Printful-Produkt und angebotenen Varianten - auch Entwürfe (getestet wird vor dem
-    Veröffentlichen)."""
+    Veröffentlichen). Druckt ein Produkt die Vereinsnummer (#2150), geht im Testentwurf die Beispielnummer
+    (``sample_number``) - nie die Nummer eines Mitglieds."""
+    sample = await shop_print_files.sample_number(db)
     out = []
     for product in await shop_catalog.list_products(db):
         if product.get("status") == "archived" or not (product.get("printful") or {}).get("product_id"):
@@ -204,6 +210,7 @@ async def products(db) -> list[dict]:
             "status_label": shop_catalog.STATUS_LABELS.get(product.get("status"), product.get("status")),
             "printful_name": product["printful"].get("name"), "printful_product_id": product["printful"]["product_id"],
             "gamertag": _has_gamertag(rows),
+            "member_number": _has_number(rows), "sample_number": sample if _has_number(rows) else None,
             "variants": [{"id": variant["id"], "label": variant.get("label"), "size": variant.get("size"),
                           "color": variant.get("color"), "color_code": variant.get("color_code"),
                           # Anzeige auf Deutsch (#2105), Schlüssel bleibt die Printful-Farbe.
@@ -238,7 +245,7 @@ def _cents_view(costs) -> dict | None:
 def _not_sendable(check: dict) -> str:
     failed = [f"{item['label']}: {item['detail']}" for item in check["items"]
               if item["for_review"] and not item["ok"]
-              and item["key"] not in ("prices", "stock", "member_number_print")]
+              and item["key"] not in ("prices", "stock")]
     if not failed:
         return ("Nicht sendbar: für diese Variante fehlt eine gültige Druckdatei oder Fläche. Details stehen im "
                 "Server-Log; die Vorab-Prüfung im Reiter Produkte hilft weiter.")
@@ -326,17 +333,20 @@ async def preview(db, *, product_id: Any, variant_id: Any, gamertag: Any, addres
         await shop_gamertag.check_words(db, name, rules)
     elif raw_name:
         raise ShopError("Dieses Produkt hat kein Gamertag-Feld - bitte das Feld leer lassen.")
+    # Vereinsnummer (#2150): die Beispielnummer der Vorschau (höchste Wunschnummer) - keine Nummer eines Mitglieds.
+    number = await shop_print_files.sample_number(db) if _has_number(rows) else None
 
     try:
         async with mutation_lock(db, f"shop:test-draft:{actor_id}", wait_seconds=0.0, lease_seconds=120.0):
             await _sweep_previews(db, actor_id)
-            return await _build(db, product, variant, mapping, recipient, name, actor_id=actor_id, provider=provider)
+            return await _build(db, product, variant, mapping, recipient, name, actor_id=actor_id, provider=provider,
+                                number=number)
     except MutationLockBusy as exc:
         raise ShopConflict("Die Vorschau wird gerade erstellt - bitte kurz warten.") from exc
 
 
 async def _build(db, product: dict, variant: dict, mapping: dict, recipient: dict, name: str | None, *,
-                 actor_id: str, provider: FulfillmentProvider) -> dict:
+                 actor_id: str, provider: FulfillmentProvider, number: str | None = None) -> dict:
     # Printful nimmt je external_id höchstens 32 Zeichen (#2133): Anfang plus Zufall, Position nur Zufall.
     draft_id, item_id = new_id(), short_external_id()
     external_id = short_external_id(EXTERNAL_PREFIX)
@@ -344,7 +354,7 @@ async def _build(db, product: dict, variant: dict, mapping: dict, recipient: dic
         # Derselbe Weg wie die Bestellung (#2069): je Fläche genau eine Datei, mit Gamertag eine eigene.
         files, _sources = await shop_print_files.freeze_line(
             db, product, variant, gamertag=name, position=1, user_id=actor_id, order_id=draft_id, item_id=item_id,
-            printful_variant_id=mapping["printful_variant_id"])
+            printful_variant_id=mapping["printful_variant_id"], number=number)
         if not files:
             raise ShopError("Dieses Produkt hat keine Druckdatei - erst Druckflächen und Druckdateien anlegen.")
         placements, shown = await _placements(db, files)
@@ -387,7 +397,8 @@ async def _build(db, product: dict, variant: dict, mapping: dict, recipient: dic
         "size": variant.get("size"), "color": variant.get("color"),
         "printful_product_id": product["printful"]["product_id"],
         "printful_variant_id": int(mapping["printful_variant_id"]), "with_gamertag": name is not None,
-        "files": shown, "recipient": recipient, "payload": payload, "estimate": _cents_view(estimate),
+        "with_number": number is not None, "files": shown, "recipient": recipient, "payload": payload,
+        "estimate": _cents_view(estimate),
         "estimate_error": estimate_error, "price_check": price, "warnings": warnings,
         "mockup": {"state": "pending", "detail": MOCKUP_PENDING},
         "created_by": actor_id, "created_at": now.isoformat(),
