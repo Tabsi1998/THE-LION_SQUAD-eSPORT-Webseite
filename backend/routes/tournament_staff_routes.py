@@ -1,5 +1,7 @@
 """Turnier-Team: Rollen der Turnierleitung zuweisen.
 """
+import logging
+
 from fastapi import HTTPException, Depends
 from database import get_db
 from auth import get_current_user, require_admin
@@ -7,11 +9,56 @@ from services.tournament_permissions import READ_STAFF_ROLES, require_tournament
 from models import TournamentStaffAssignmentCreate, TournamentStaffAssignmentUpdate, now_utc, new_id
 from routes.tournament_common import (
     _audit_tournament_action,
-    _normalize_team_settings,
     _resolve_tid,
     _serialized_tournament_write,
 )
 from routes.tournament_router import router
+
+logger = logging.getLogger("tls.tournament_staff")
+
+
+# Bereiche eines Einsatzes (#2111, TA25): die Kennung muss zu diesem Turnier gehören - ein Tippfehler ergab vorher einen
+# Helfer ohne Rechte. Leer heißt weiter „jede Phase/Gruppe/Station/jedes Spiel“ (services/tournament_permissions).
+SCOPE_LOOKUPS = {
+    "stage": ("tournament_stages", "Diese Phase gibt es in diesem Turnier nicht."),
+    "group": ("tournament_groups", "Diese Gruppe gibt es in diesem Turnier nicht."),
+    "match": ("matches_v2", "Dieses Spiel gibt es in diesem Turnier nicht."),
+    "station": ("stations", "Diese Station gibt es nicht oder sie gehört zu einem anderen Turnier."),
+}
+ROLE_WORDS = {
+    "organizer": "Organisation", "referee": "Schiedsrichter", "scorekeeper": "Ergebnisdienst",
+    "station_manager": "Stationsleitung", "stream_operator": "Stream-Betreuung",
+}
+
+
+async def _scope_problem(db, tid: str, scope: str, scope_id: str | None) -> str | None:
+    if scope == "tournament" or not scope_id or scope not in SCOPE_LOOKUPS:
+        return None
+    collection, message = SCOPE_LOOKUPS[scope]
+    query = {"id": scope_id}
+    if scope == "station":
+        # Stationen gehören einem Turnier oder sind frei (Event, Halle).
+        query["tournament_id"] = {"$in": [tid, None]}
+    else:
+        query["tournament_id"] = tid
+    return None if await getattr(db, collection).find_one(query, {"_id": 0, "id": 1}) else message
+
+
+async def _notify_helper(db, tid: str, assignment: dict) -> None:
+    """Der Helfer bekommt Bescheid (#2111, TA25) - im Postfach und per Push, mit dem Weg zu „Mein Dienst“."""
+    from services.user_notifications import create_user_notification
+    tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0, "title": 1}) or {}
+    role = ROLE_WORDS.get(assignment.get("role"), "Helfer")
+    title = f"Einsatz: {tournament.get('title') or 'Turnier'}"
+    body = f"Du hilfst bei diesem Turnier als {role}. Unter „Mein Dienst“ siehst du, was du tun kannst."
+    try:
+        await create_user_notification(
+            assignment["user_id"], title, body, url="/admin/dienst", kind="tournament_staff",
+            meta={"category": "tournament_updates", "dedupe_key": f"tournament_staff:{assignment['id']}",
+                  "tournament_id": tid},
+        )
+    except Exception as exc:  # noqa: BLE001 - eine Nachricht hält keine Zuweisung auf
+        logger.warning("Staff notification failed type=%s", type(exc).__name__)
 
 
 # --- Tournament staff assignments ---
@@ -57,7 +104,10 @@ async def create_tournament_staff(tid: str, body: TournamentStaffAssignmentCreat
     if not await db.users.find_one({"id": body.user_id}, {"id": 1}):
         raise HTTPException(status_code=404, detail="Nutzer nicht gefunden")
     scope = body.scope or "tournament"
-    scope_id = body.scope_id if scope != "tournament" else None
+    scope_id = (body.scope_id or None) if scope != "tournament" else None
+    problem = await _scope_problem(db, tid, scope, scope_id)
+    if problem:
+        raise HTTPException(status_code=422, detail=problem)
     existing = await db.tournament_staff_assignments.find_one({
         "tournament_id": tid,
         "user_id": body.user_id,
@@ -69,7 +119,7 @@ async def create_tournament_staff(tid: str, body: TournamentStaffAssignmentCreat
         existing.pop("_id", None)
         enriched = (await _enrich_staff_assignments([existing]))[0]
         return {**enriched, "idempotent_replay": True}
-    doc = _normalize_team_settings(body.model_dump())
+    doc = body.model_dump()
     doc["id"] = new_id()
     doc["tournament_id"] = tid
     doc["scope"] = scope
@@ -85,6 +135,8 @@ async def create_tournament_staff(tid: str, body: TournamentStaffAssignmentCreat
         tid,
         {"assignment_id": doc["id"], "user_id": doc["user_id"], "role": doc["role"], "scope": doc["scope"], "scope_id": doc.get("scope_id")},
     )
+    if doc.get("is_active", True):
+        await _notify_helper(db, tid, doc)
     doc.pop("_id", None)
     enriched = (await _enrich_staff_assignments([doc]))[0]
     return {**enriched, "idempotent_replay": False}
@@ -105,6 +157,10 @@ async def update_tournament_staff(tid: str, assignment_id: str, body: Tournament
     if updates.get("scope") == "tournament":
         updates["scope_id"] = None
     proposed = {**current, **updates}
+    if "scope" in updates or "scope_id" in updates:
+        problem = await _scope_problem(db, tid, proposed.get("scope") or "tournament", proposed.get("scope_id"))
+        if problem:
+            raise HTTPException(status_code=422, detail=problem)
     duplicate = await db.tournament_staff_assignments.find_one({
         "id": {"$ne": assignment_id},
         "tournament_id": tid,

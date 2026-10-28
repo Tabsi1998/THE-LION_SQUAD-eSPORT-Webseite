@@ -891,7 +891,7 @@ export default function AdminTournamentEditPage() {
       )}
 
       {activeTab === "staff" && isTournamentLead && (
-        <TournamentStaffPanel tournamentId={t.id} staff={staff} staffError={staffError} onChanged={load} />
+        <TournamentStaffPanel tournamentId={t.id} staff={staff} staffError={staffError} onChanged={load} stages={stages} groups={groups} stations={stations} matches={matchesV2} />
       )}
       {activeTab === "groups" && (
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
