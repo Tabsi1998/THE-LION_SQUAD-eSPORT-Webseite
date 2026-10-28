@@ -39,7 +39,8 @@ from PIL import Image
 from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
-from services import shop_catalog, shop_designs, shop_gamertag, shop_motifs, shop_print_templates as templates
+from services import shop_catalog, shop_colors, shop_designs, shop_gamertag, shop_motifs
+from services import shop_print_templates as templates
 from services.log_safe import log_safe, mask_addresses
 from services.mutation_lock import MutationLockBusy, mutation_lock
 from services.shop_common import ShopConflict, ShopError, clean_reason, record_admin_action
@@ -1073,8 +1074,15 @@ async def preview_png(db, product: dict, *, placement: str, color: str, sample: 
     plan = await plan_placement(db, row, entry, color=color, color_hex=context["codes"].get(color),
                                 presets_doc=context["presets"], gamertag_rules=context["gamertag_rules"])
     shirt = _hex_rgb(context["codes"].get(color))
-    preview = templates.preview_for(context["template"], entry)
-    template_img = await templates.template_image_rgba(db, context["template"], preview) if preview else None
+    # Die Vorlage dieser Farbe (#2105); ist sie nicht farbspezifisch, eingefärbt mit dem Farbcode aus den Printful-Daten.
+    preview, specific = templates.preview_for_color(context["template"], entry,
+                                                    shop_colors.variant_ids_by_color(product).get(color) or ())
+    tint = None if specific else shop_colors.code_of(product, color)
+    template_img = await templates.template_image_rgba(db, context["template"], preview, tint=tint) if preview else None
+    if template_img is not None and template_img.size != (preview["template_width"], preview["template_height"]):
+        # Eingefärbt wird höchstens in TINT_MAX_SIDE - zurück auf die Größe, in der die Lage des Druckbereichs zählt.
+        template_img = template_img.resize((preview["template_width"], preview["template_height"]),
+                                           Image.Resampling.LANCZOS)
     # Gleich im Maßstab der Vorschau zeichnen - nie die volle Druckdatei im Speicher (die kann 80 Millionen Pixel haben).
     if preview and template_img is not None:
         target_w, target_h = max(1, preview["area"]["width"]), max(1, preview["area"]["height"])

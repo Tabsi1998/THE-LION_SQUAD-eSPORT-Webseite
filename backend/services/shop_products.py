@@ -31,7 +31,7 @@ from typing import Any
 from datetime import datetime, timedelta, timezone
 
 from models import now_utc
-from services import shop_catalog, shop_catalog_sync, shop_config, shop_print_files
+from services import shop_catalog, shop_catalog_sync, shop_colors, shop_config, shop_print_files
 from services import shop_print_templates as templates
 from services.shop_common import ShopConflict, ShopError, clean_reason, record_admin_action
 from services.shop_costs import cost_cents, euro, included_placement, technique_of
@@ -233,17 +233,30 @@ async def _save_offer(db, product_id: str, *, technique: Any, colors: Any, sizes
 
 # ---------------------------------------------------------------- 3. Druckflächen (#2069)
 
-def _preview_view(template: dict, entry: dict) -> dict | None:
-    preview = templates.preview_for(template, entry)
+def _preview_view(template: dict, entry: dict, preview: dict | None = None, tint: str | None = None) -> dict | None:
+    """Das Vorlagenbild für die Vorschau in Schritt 3 - mit ``tint`` (Farbcode aus den Printful-Daten) eingefärbt."""
+    preview = preview or templates.preview_for(template, entry)
     if not preview:
         return None
     base = f"{PREVIEW_BASE}/{template['printful_product_id']}/images/{preview['index']}"
-    return {"image_path": base if templates.allowed_image_url(preview["image_url"]) else None,
-            "background_path": (f"{base}?layer=background" if templates.allowed_image_url(preview.get("background_url"))
-                                else None),
+    image_query = f"?tint={tint}" if tint else ""
+    background_query = f"?layer=background&tint={tint}" if tint else "?layer=background"
+    return {"image_path": f"{base}{image_query}" if templates.allowed_image_url(preview["image_url"]) else None,
+            "background_path": (f"{base}{background_query}"
+                                if templates.allowed_image_url(preview.get("background_url")) else None),
             "background_color": preview.get("background_color"), "positioning": preview["positioning"],
             "template_width": preview["template_width"], "template_height": preview["template_height"],
-            "area": preview["area"], "orientation": preview["orientation"]}
+            "area": preview["area"], "orientation": preview["orientation"], "tinted": bool(tint)}
+
+
+def _previews_by_color(product: dict, template: dict, entry: dict) -> dict[str, dict | None]:
+    """Je angebotener Farbe das passende Vorlagenbild (#2105): die Vorlage der eigenen Varianten, sonst eingefärbt."""
+    ids = shop_colors.variant_ids_by_color(product)
+    out = {}
+    for color in (product.get("offer") or {}).get("colors") or []:
+        preview, specific = templates.preview_for_color(template, entry, ids.get(color) or ())
+        out[color] = _preview_view(template, entry, preview, None if specific else shop_colors.code_of(product, color))
+    return out
 
 
 def _entry_view(entry: dict) -> dict:
@@ -270,6 +283,7 @@ async def available_placements(db, product: dict, *, template: dict | None = Non
             "family_label": templates.FAMILIES[main["family"]], "technique": main["technique"],
             "file": _entry_view(main), "groups": [_entry_view(row) for row in entries],
             "preview": _preview_view(template, main),
+            "preview_by_color": _previews_by_color(product, template, main),
             "safe_margin_cm": presets_doc["rules"]["safe_margin_cm"].get(main["family"], 0.0),
             "presets": {kind: [item["key"] for item in templates.presets_for(presets_doc["presets"], main["family"],
                                                                              kind)]

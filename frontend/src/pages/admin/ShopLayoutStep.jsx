@@ -109,7 +109,7 @@ function LayoutPreview({ area, preview, layers, resolved, colorCode, motifFor, s
   };
 
   return (
-    <div className={`relative w-full overflow-hidden rounded-sm border border-white/10 select-none transition-opacity duration-150 ${stale ? "opacity-50" : ""}`} style={{ aspectRatio: `${templateW} / ${templateH}`, backgroundColor: colorCode || "#808080" }} data-testid={testId} data-stale={stale ? "true" : undefined}>
+    <div className={`relative w-full overflow-hidden rounded-sm border border-white/10 select-none transition-opacity duration-150 ${stale ? "opacity-50" : ""}`} style={{ aspectRatio: `${templateW} / ${templateH}`, backgroundColor: colorCode || "#808080" }} data-testid={testId} data-stale={stale ? "true" : undefined} data-tinted={preview?.tinted ? "true" : undefined}>
       {background && <img src={background} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full pointer-events-none" />}
       {preview?.positioning === "background" && imagePath && <img src={imagePath} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full pointer-events-none" />}
       <div ref={areaRef} className="absolute outline outline-1 outline-dashed outline-white/40" style={{ left: pct(box.left, templateW), top: pct(box.top, templateH), width: pct(box.width, templateW), height: pct(box.height, templateH) }}
@@ -322,6 +322,8 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
       : { kind, preset: preset.key, offset_x_cm: 0, offset_y_cm: 0 };
     onChange({ ...state, layers: [...layers, layer] });
   };
+  // Je Farbe die passende Printful-Vorlage, sonst vom Server eingefärbt (#2105) - nie das helle Foto unter Schwarz.
+  const preview = available.preview_by_color?.[previewColor] || available.preview;
   const kinds = view.labels.kinds || {};
   const surcharge = savedRow && !savedRow.included && savedRow.surcharge_cents ? ` · Aufpreis ${(savedRow.surcharge_cents / 100).toFixed(2).replace(".", ",")} €` : "";
   const resolvedFor = (index) => resolved.find((item) => item.index === index);
@@ -347,11 +349,11 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
           </div>
           <div className="grid gap-4 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
             <div className="space-y-1">
-              <LayoutPreview stale={stale} area={{ ...area, safe_margin_cm: available.safe_margin_cm }} preview={available.preview} layers={visible}
+              <LayoutPreview stale={stale} area={{ ...area, safe_margin_cm: available.safe_margin_cm }} preview={preview} layers={visible}
                 resolved={resolved} colorCode={codes[previewColor]} motifFor={motifFor} selected={selected} onSelect={setSelected}
                 onNudge={nudge}
                 editable={editable} testId={`shop-preview-${available.key}`} />
-              {!available.preview?.image_path && <p className="text-xs text-honor" data-testid={`shop-preview-${available.key}-no-image`}>Kein Vorlagenbild von Printful - die Vorschau zeigt nur die Druckfläche, Maße und Druckdatei stimmen trotzdem.</p>}
+              {!preview?.image_path && <p className="text-xs text-honor" data-testid={`shop-preview-${available.key}-no-image`}>Kein Vorlagenbild von Printful - die Vorschau zeigt nur die Druckfläche, Maße und Druckdatei stimmen trotzdem.</p>}
               <p className="text-xs text-white/45 inline-flex items-center gap-1"><Move className="w-3 h-3" aria-hidden="true" /> Ziehen oder Pfeiltasten zum Feinjustieren.</p>
             </div>
             <div className="space-y-3">

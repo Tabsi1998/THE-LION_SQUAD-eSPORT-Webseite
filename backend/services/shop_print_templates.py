@@ -23,6 +23,7 @@ Maße im Admin immer in cm und Zoll; Pixel gelten bei der DPI der Vorlage.
 """
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -38,6 +39,7 @@ from PIL import Image, UnidentifiedImageError
 
 import storage
 from models import now_utc
+from services import shop_colors
 from services.shop_common import ShopError, clean_reason, record_admin_action
 from services.shop_fulfillment import (
     CatalogProductId, FulfillmentError, FulfillmentProvider, FulfillmentTransient, MockupTemplate, PrintArea)
@@ -482,6 +484,142 @@ def preview_for(template: dict | None, entry: dict) -> dict | None:
     return None
 
 
+def preview_for_color(template: dict | None, entry: dict, color_ids: Iterable[int]) -> tuple[dict | None, bool]:
+    """Das Vorlagenbild für eine Shirtfarbe (#2105) und ob es **farbspezifisch** ist. ``color_ids`` sind alle
+    Printful-Varianten dieser Farbe. Gewählt wird unter den Bildern der Fläche (eigentliche Vorlage zuerst) das erste,
+    dessen ``variant_ids`` eine Variante der Farbe enthalten (bei gleicher Rolle das farbspezifische) - sonst das
+    erste. Farbspezifisch heißt: das Bild gilt nur
+    für Varianten dieser einen Farbe. Gilt es für mehrere Farben oder für keine, färbt die Website es ein (``tint``)."""
+    previews = (template or {}).get("previews") or []
+    wanted = set(color_ids or ())
+    mine = [previews[index] for index in entry.get("preview_indexes") or [] if 0 <= index < len(previews)]
+    if not mine:
+        return None, False
+    def specific(item: dict) -> bool:
+        ids = set(item.get("variant_ids") or ())
+        return bool(ids) and bool(wanted) and ids <= wanted
+
+    chosen = min(mine, key=lambda item: (not set(item.get("variant_ids") or ()) & wanted, _role_rank(item),
+                                         not specific(item), item["index"]))
+    return chosen, specific(chosen)
+
+
+# ---------------------------------------------------------------- Einfärben eines nicht farbspezifischen Vorlagenbilds
+
+# Ändert sich das Verfahren, entstehen neue Dateien im Zwischenspeicher (der Name enthält die Fassung).
+TINT_VERSION = 1
+TINT_MAX_SIDE = 1200  # größer braucht die Vorschau nicht - das Bild wird vorher verkleinert
+TINT_NEUTRAL = (236, 236, 236)  # ruhiger Hintergrund hinter einem durchsichtigen Ghost-Bild
+TINT_MIN_SHARE = 0.05  # unter 5 % Kleidungsfläche (nur Hilfslinien): nicht einfärben
+TINT_MAX_TOLERANCE = 24
+
+
+def _connected(passable, seeds):
+    """Alle Pixel von ``passable``, die mit einem Saatpixel zusammenhängen (4er-Nachbarschaft) - Flood-Fill."""
+    import numpy as np
+
+    try:
+        import cv2
+    except ImportError:  # pragma: no cover - im Container ist OpenCV da (requirements.txt)
+        reached = seeds & passable
+        while True:
+            grown = reached.copy()
+            grown[1:] |= reached[:-1]
+            grown[:-1] |= reached[1:]
+            grown[:, 1:] |= reached[:, :-1]
+            grown[:, :-1] |= reached[:, 1:]
+            grown &= passable
+            if np.array_equal(grown, reached):
+                return reached
+            reached = grown
+    _count, labels = cv2.connectedComponents(passable.astype(np.uint8), connectivity=4)
+    hit = np.unique(labels[seeds & passable])
+    return np.isin(labels, hit[hit != 0])
+
+
+def _leaks(background, transparent, area: dict | None) -> bool:
+    """Ist der Hintergrund in die Mitte des Druckbereichs geflossen? Dort liegt immer Kleidung (oder ein Loch)."""
+    if not area:
+        return False
+    height, width = background.shape
+    left, top = int(area["left"] + area["width"] / 4), int(area["top"] + area["height"] / 4)
+    right, bottom = int(area["left"] + area["width"] * 3 / 4), int(area["top"] + area["height"] * 3 / 4)
+    left, top, right, bottom = max(0, left), max(0, top), min(width, right), min(height, bottom)
+    if right <= left or bottom <= top:
+        return False
+    solid = ~transparent[top:bottom, left:right]
+    return bool(solid.sum()) and (background[top:bottom, left:right] & solid).sum() > solid.sum() / 2
+
+
+def tint(img: Image.Image, rgb: tuple[int, int, int], *, area: dict | None = None) -> Image.Image:
+    """Ein Vorlagenbild in der Shirtfarbe ``rgb`` (#2105) - für deckende Fotos eines hellen Shirts und für
+    durchsichtige Ghost-PNGs:
+
+    1. **Hintergrund finden:** was vom Bildrand her zusammenhängt. Ist der Rand überwiegend durchsichtig, ist der
+       Hintergrund die durchsichtige Fläche; sonst die Farbe des Rands (Median) mit einer Toleranz aus dem Rauschen des
+       Rands (höchstens 24). Fließt der Hintergrund in die Mitte des Druckbereichs (helles Shirt, Lücke in der Kontur),
+       noch einmal mit halber Toleranz.
+    2. **Kleidung einfärben:** Helligkeit je Pixel geteilt durch die mittlere Helligkeit der Kleidung ist die
+       Schattierung - die Shirtfarbe wird damit multipliziert (Falten und Schatten bleiben, Schwarz bleibt schwarz),
+       Glanzlichter heben nur wenig an. Ränder eines deckenden Fotos weich übergeblendet.
+    3. **Hintergrund:** bei einem deckenden Foto unverändert. Bei einem Ghost-PNG bleibt die Durchsicht innen (ein Loch
+       für den Druckbereich), außen kommt ein ruhiges Hellgrau dahinter - sonst verschwände ein schwarzes Shirt auf der
+       schwarzen Fläche dahinter.
+
+    Weniger als 5 % Kleidung (nur Hilfslinien): unverändert. Rein und deterministisch, ohne Datenbank."""
+    import numpy as np
+    from PIL import ImageFilter
+
+    source = img.convert("RGBA")
+    if max(source.size) > TINT_MAX_SIDE:
+        factor = TINT_MAX_SIDE / max(source.size)
+        source = source.resize((max(1, round(source.width * factor)), max(1, round(source.height * factor))),
+                               Image.Resampling.LANCZOS)
+        area = {key: value * factor for key, value in area.items()} if area else None
+    pixels = np.asarray(source).astype(np.float64)
+    colour, alpha = pixels[..., :3], pixels[..., 3]
+    height, width = alpha.shape
+    border = np.zeros((height, width), dtype=bool)
+    border[0, :] = border[-1, :] = border[:, 0] = border[:, -1] = True
+    transparent = alpha < 128
+    ghost = transparent[border].mean() > 0.5
+    if ghost:
+        background = _connected(transparent, border)
+    else:
+        solid_border = border & ~transparent
+        reference = np.median(colour[solid_border], axis=0)
+        distance = np.abs(colour - reference).max(axis=2)
+        tolerance = float(np.clip(np.percentile(distance[solid_border], 99) + 4, 4, TINT_MAX_TOLERANCE))
+        while True:
+            background = _connected(transparent | (distance <= tolerance), border)
+            if tolerance <= 1 or not _leaks(background, transparent, area):
+                break
+            tolerance = max(1.0, tolerance / 2)
+    garment = ~background & (alpha > 0)
+    if garment.mean() < TINT_MIN_SHARE:
+        return source.copy()
+    luminance = (colour @ np.array([0.2126, 0.7152, 0.0722])) / 255
+    body = garment & (alpha >= 128)
+    reference_light = max(float(np.median(luminance[body])) if body.any() else 1.0, 0.05)
+    shade = luminance / reference_light
+    target = np.array(rgb, dtype=np.float64)
+    tinted = (target * np.clip(shade, 0, 1)[..., None]
+              + (255 - target) * (np.clip(shade - 1, 0, 0.5) * 0.3)[..., None])
+    if ghost:
+        weight = (alpha > 0).astype(np.float64)
+    else:
+        mask = Image.fromarray((garment * 255).astype(np.uint8), "L").filter(ImageFilter.GaussianBlur(0.8))
+        weight = np.asarray(mask).astype(np.float64) / 255
+    out = colour * (1 - weight[..., None]) + tinted * weight[..., None]
+    out_alpha = alpha.copy()
+    if ghost:
+        share = alpha[background][..., None] / 255
+        out[background] = out[background] * share + np.array(TINT_NEUTRAL, dtype=np.float64) * (1 - share)
+        out_alpha[background] = 255
+    result = np.dstack([np.clip(np.rint(out), 0, 255), out_alpha]).astype(np.uint8)
+    return Image.fromarray(result, "RGBA")
+
+
 # ---------------------------------------------------------------- Vorlagenbilder über die Website (Proxy mit Cache)
 
 # Nur diese Hosts liefern Vorlagenbilder von Printful - eine Adresse aus der gespeicherten Vorlage mit anderem Host wird
@@ -555,9 +693,57 @@ def _reencode(data: bytes) -> bytes:
     return out.getvalue()
 
 
-async def template_image(db, printful_product_id: int, index: int, *, layer: str = "image") -> bytes:
+async def allowed_tints(db, printful_product_id: int) -> set[str]:
+    """Farbcodes, in denen ein Vorlagenbild eingefärbt werden darf: nur aus den gespeicherten Printful-Daten der
+    Produkte mit diesem Printful-Produkt - nie eine beliebige Farbe aus der Anfrage."""
+    codes: set[str] = set()
+    async for product in db.shop_products.find({"printful.product_id": printful_product_id}, {"_id": 0, "printful": 1}):
+        codes |= shop_colors.codes_of(product)
+    return codes
+
+
+def _write_cache(path: Path, payload: bytes) -> None:
+    storage.ensure_directory(cache_dir())
+    temporary = path.with_suffix(".tmp")
+    temporary.write_bytes(payload)
+    temporary.replace(path)
+
+
+def _tinted_png(data: bytes, code: str, area: dict | None) -> bytes:
+    with Image.open(BytesIO(data)) as img:
+        img.load()
+        result = tint(img, (int(code[0:2], 16), int(code[2:4], 16), int(code[4:6], 16)), area=area)
+    out = BytesIO()
+    result.save(out, format="PNG", compress_level=6)
+    return out.getvalue()
+
+
+async def template_image(db, printful_product_id: int, index: int, *, layer: str = "image",
+                         tint: str | None = None) -> bytes:
     """Das Vorlagenbild Nummer ``index`` einer gespeicherten Vorlage als PNG - aus dem Zwischenspeicher oder einmal
-    von Printful geholt. Nur Adressen aus der Vorlage, nur ``IMAGE_HOSTS``; sonst ``LookupError`` (404)."""
+    von Printful geholt. Nur Adressen aus der Vorlage, nur ``IMAGE_HOSTS``; sonst ``LookupError`` (404).
+
+    Mit ``tint`` (``rrggbb``) eingefärbt (#2105) - nur in einem Farbcode aus den gespeicherten Printful-Daten
+    (``allowed_tints``), zwischengespeichert je Bild und Farbe (Name aus der Prüfsumme)."""
+    code = None
+    if tint is not None:
+        code = shop_colors.hex_of(tint)
+        if code is None or len(str(tint).lstrip("#")) != 6 or code not in await allowed_tints(db, printful_product_id):
+            raise LookupError("Diese Farbe gibt es bei diesem Produkt nicht.")
+    data = await _template_image(db, printful_product_id, index, layer=layer)
+    if code is None:
+        return data
+    preview = ((await get(db, printful_product_id)) or {})["previews"][index]
+    url = preview.get("image_url" if layer == "image" else "background_url")
+    path = cache_dir() / (hashlib.sha256(f"tint-v{TINT_VERSION}|{url}|{code}".encode()).hexdigest() + ".png")
+    if path.is_file():
+        return path.read_bytes()
+    payload = await asyncio.to_thread(_tinted_png, data, code, preview.get("area"))
+    _write_cache(path, payload)
+    return payload
+
+
+async def _template_image(db, printful_product_id: int, index: int, *, layer: str = "image") -> bytes:
     template = await get(db, printful_product_id)
     previews = (template or {}).get("previews") or []
     if type(index) is not int or not 0 <= index < len(previews) or layer not in ("image", "background"):
@@ -581,10 +767,12 @@ async def template_image(db, printful_product_id: int, index: int, *, layer: str
     return payload
 
 
-async def template_image_rgba(db, template: dict, preview: dict, *, layer: str = "image") -> Image.Image | None:
-    """Für die Vorschau: das Vorlagenbild als Pillow-Bild - ``None``, wenn es gerade nicht zu haben ist."""
+async def template_image_rgba(db, template: dict, preview: dict, *, layer: str = "image",
+                              tint: str | None = None) -> Image.Image | None:
+    """Für die Vorschau: das Vorlagenbild als Pillow-Bild (mit ``tint`` eingefärbt) - ``None``, wenn es gerade nicht
+    zu haben ist."""
     try:
-        data = await template_image(db, template["printful_product_id"], preview["index"], layer=layer)
+        data = await template_image(db, template["printful_product_id"], preview["index"], layer=layer, tint=tint)
     except (LookupError, ShopError):
         return None
     with Image.open(BytesIO(data)) as img:

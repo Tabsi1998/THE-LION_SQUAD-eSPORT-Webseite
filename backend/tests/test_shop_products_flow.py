@@ -400,6 +400,12 @@ async def test_print_files_preview_presets_template_images_and_upload_through_th
     image = await flow.get(view["available_placements"][0]["preview"]["image_path"])
     assert image.status_code == 200 and image.headers["x-content-type-options"] == "nosniff"
     assert (await flow.get("/api/admin/shop/print-templates/71/images/99")).status_code == 404
+    # Je Farbe eingefärbt (#2105) - nur in einem Farbcode aus den Printful-Daten, nie eine beliebige Farbe.
+    white = view["available_placements"][0]["preview_by_color"]["White"]
+    assert white["image_path"].endswith("?tint=ffffff")
+    assert (await flow.get(white["image_path"])).status_code == 200
+    assert (await flow.get("/api/admin/shop/print-templates/71/images/0?tint=ff0000")).status_code == 404
+    assert (await flow.get("/api/admin/shop/print-templates/71/images/0?tint=rot")).status_code == 422
     # Vorgaben sind einstellbar (Grund optional, Protokoll).
     presets = (await flow.get("/api/admin/shop/print-presets")).json()
     assert presets["is_default"] is True and presets["labels"]["families"]["front"] == "Vorderseite"

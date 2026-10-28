@@ -185,6 +185,23 @@ def hex_of(value: Any) -> str | None:
     return match.group(1).lower() if match else None
 
 
+def variant_ids_by_color(product: dict | None) -> dict[str, set[int]]:
+    """Printful-Farbe → alle Printful-Varianten dieser Farbe (aus dem gespeicherten Abzug, alle Größen)."""
+    out: dict[str, set[int]] = {}
+    for row in ((product or {}).get("printful") or {}).get("variants") or []:
+        if isinstance(row, dict) and type(row.get("id")) is int and row.get("color"):
+            out.setdefault(row["color"], set()).add(row["id"])
+    return out
+
+
+def code_of(product: dict | None, name: Any) -> str | None:
+    """Der Farbcode (``rrggbb``) einer Printful-Farbe aus den gespeicherten Daten - sonst ``None``."""
+    for row in ((product or {}).get("printful") or {}).get("colors") or []:
+        if isinstance(row, dict) and row.get("name") == name:
+            return hex_of(row.get("code"))
+    return None
+
+
 def codes_of(product: dict | None) -> set[str]:
     """Alle Farbcodes aus den gespeicherten Printful-Daten eines Produkts (Farben und Varianten)."""
     printful = (product or {}).get("printful") or {}

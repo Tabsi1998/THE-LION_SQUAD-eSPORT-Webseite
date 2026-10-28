@@ -359,6 +359,24 @@ test("Flächen heißen deutsch - eine englische Bezeichnung von Printful ist als
   expect(screen.getByTestId("shop-area-label-english-zz_odd")).toHaveTextContent("Bezeichnung von Printful (englisch)");
 });
 
+test("die Vorschau nimmt je Farbe die passende Vorlage - sonst die vom Server eingefärbte (#2105)", async () => {
+  const base = view();
+  const front = base.available_placements[0];
+  const own = { ...front.preview, image_path: "/api/admin/shop/print-templates/71/images/3", tinted: false };
+  const tinted = { ...front.preview, image_path: "/api/admin/shop/print-templates/71/images/0?tint=ffffff", tinted: true };
+  apiMock.get.mockResolvedValue({ data: view({ extra: { available_placements: [
+    { ...front, preview_by_color: { Black: own, White: tinted } }, base.available_placements[1]] } }) });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-designs"));
+  const area = screen.getByTestId("shop-preview-front");
+  expect(area.querySelector("img[src='/api/admin/shop/print-templates/71/images/3']")).not.toBeNull();
+  expect(area).not.toHaveAttribute("data-tinted");
+  await user.click(screen.getByTestId("shop-preview-color-White"));
+  expect(area.querySelector("img[src='/api/admin/shop/print-templates/71/images/0?tint=ffffff']")).not.toBeNull();
+  expect(area).toHaveAttribute("data-tinted", "true");
+});
+
 test("Feinjustieren mit Pfeiltasten; was aus der Fläche ragt, sagt die Vorschau", async () => {
   apiMock.put.mockResolvedValue({ data: view() });
   const user = userEvent.setup();
