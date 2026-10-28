@@ -155,12 +155,14 @@ function formatDateRange(start, end) {
 }
 
 function numericWeight(value, fallback) {
+  if (value === null || value === undefined || value === "") return fallback;
   const n = Number(value);
-  return Number.isFinite(n) && n > 0 ? n : fallback;
+  return Number.isFinite(n) && n >= 0 ? n : fallback; // 0 = keine Jahreswertung (#2095)
 }
 
 function weightLabel(item, fallback = 1) {
   const weight = numericWeight(item?.season_weight, fallback);
+  if (weight === 0) return "Keine Wertung";
   if (weight >= 2.5) return "Major";
   if (weight >= 1.5) return "Normal";
   if (weight >= 1.0) return fallback === 1 ? "Fast Lap" : "Mini";
