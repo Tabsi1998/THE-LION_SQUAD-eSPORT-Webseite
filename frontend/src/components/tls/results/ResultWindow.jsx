@@ -202,7 +202,7 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
             {sentence ? `${correcting ? "Neu: " : ""}${sentence}` : outcome.error || "Noch kein Ergebnis gewählt."}
           </p>
           {offerCorrection ? (
-            <div className="rounded-sm border border-[#FFD700]/40 bg-[#FFD700]/10 px-3 py-2 text-sm text-[#FFF2B3]" role="alert" data-testid="result-correction-offer">
+            <div className="rounded-sm border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-white" role="alert" data-testid="result-correction-offer">
               <p className="font-bold">Inzwischen ist ein Ergebnis eingetragen – als Korrektur speichern?</p>
               <button type="button" onClick={() => { setForceCorrection(true); setOfferCorrection(false); }} className="tls-btn tls-btn--secondary mt-2 min-h-[44px] px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid="result-correction-accept">
                 Als Korrektur speichern
