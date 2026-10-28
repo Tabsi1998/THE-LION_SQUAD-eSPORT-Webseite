@@ -16,7 +16,7 @@ import { dateWarnings } from "@/lib/tournamentDateWarnings";
 import { useAuth } from "@/context/AuthContext";
 import { gameOptionLabel } from "@/lib/gameLabels";
 import { RULE_PRESETS, ruleModeSummary, rulePresetKey, rulePresetWarnings } from "@/lib/tournamentRulePresets";
-import { TOURNAMENT_FORMAT_OPTIONS } from "@/lib/tournamentLabels";
+import { tournamentFormatOptions } from "@/lib/tournamentLabels";
 import { durationSourceText, gameModes, matchDurationSource, ownDurationInput, ownDurationPayload } from "@/lib/matchDuration";
 import { gamePresets } from "@/lib/gameMatchData";
 import { PrizeEditor, Txt } from "./PrizeEditor";
@@ -432,7 +432,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
           ? "Eine Staffel spielt im Format Liga mit Co-Teams; Teamgröße und Staffelgröße gibt die Season vor."
           : "Teilnahme legt fest, wer sich anmelden darf: Einzelspieler melden sich selbst an, bei Team meldet ein Team-Leader oder Co-Leader das Team an."}>
           <FormGrid cols={3}>
-            {show && <SelectInput label="Turnierstruktur" value={f.format} onChange={setFormat} options={TOURNAMENT_FORMAT_OPTIONS} disabled={structureFixed} hint={fixedHint || <FormatHint format={f.format} testId="tr-edit-format-hint" />} testId="tr-edit-format" />}
+            {show && <SelectInput label="Turnierstruktur" value={f.format} onChange={setFormat} options={tournamentFormatOptions(tournament.format)} disabled={structureFixed} hint={fixedHint || <FormatHint format={f.format} testId="tr-edit-format-hint" />} testId="tr-edit-format" />}
             <TextField label="Format-Anzeigename" value={f.format_label} onChange={(v)=>set("format_label",v)} placeholder="z.B. Gamers Heaven F1 Heat" testId="tr-edit-format-label"/>
             {show && <SelectInput label="Teilnahme" value={f.team_mode} onChange={setTeamMode} options={TEAM_MODE_OPTIONS} disabled={structureFixed} testId="tr-edit-team-mode" />}
             {show && f.team_mode !== "solo" && <TextField label="Spieler pro Team" type="number" min="2" max="6" value={f.team_size} onChange={(v)=>set("team_size",v)} disabled={structureFixed} testId="tr-edit-team-size"/>}

@@ -13,7 +13,7 @@ import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
 import { normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { TOURNAMENT_FORMAT_OPTIONS } from "@/lib/tournamentLabels";
+import { tournamentFormatOptions } from "@/lib/tournamentLabels";
 import { gameOptionLabel } from "@/lib/gameLabels";
 import { RULE_PRESETS, ruleModeSummary, rulePresetKey, rulePresetWarnings } from "@/lib/tournamentRulePresets";
 import { dateWarnings } from "@/lib/tournamentDateWarnings";
@@ -238,7 +238,7 @@ export default function AdminTournamentNewPage() {
             <SelectField label="Spiel" value={form.game_id} onChange={(v) => set("game_id", v)} options={[["", "— auswählen —"], ...games.map((g) => [g.id, gameOptionLabel(g)])]} required testId="new-tr-game" />
           </FormGrid>
           <FormGrid>
-            <SelectField label="Format" value={form.format} onChange={setFormat} options={TOURNAMENT_FORMAT_OPTIONS} hint={<FormatHint format={form.format} testId="new-tr-format-hint" />} testId="new-tr-format" />
+            <SelectField label="Format" value={form.format} onChange={setFormat} options={tournamentFormatOptions()} hint={<FormatHint format={form.format} testId="new-tr-format-hint" />} testId="new-tr-format" />
             <SelectField label="Teilnahme" value={form.team_mode} onChange={setTeamMode} options={[["solo", "Einzelspieler"], ["team", "Team"]]} testId="new-tr-mode" />
           </FormGrid>
           <FormGrid cols={3}>

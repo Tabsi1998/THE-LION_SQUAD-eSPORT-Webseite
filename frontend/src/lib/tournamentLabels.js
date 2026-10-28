@@ -1,6 +1,7 @@
 // Glossar (#2124, TP10): K.-o., Doppel-K.-o. - die Wörter der Spieler- und Verwaltungsseiten stehen hier an einer Stelle.
 // #2111 (F1): „Liga“ heißt als Turnierformat „Jeder gegen jeden – Hin- und Rückrunde“ - die Vereinsliga mit Seasons
-// und Staffeln ist Admin → Liga. Der Schlüssel `league` bleibt.
+// und Staffeln ist Admin → Liga. Der Schlüssel `league` bleibt. „Überlebensmodus“ verhält sich genau wie „Mehrspieler
+// frei“ (TA5) und heißt deshalb auch so; gespeichert bleibt `battle_royale`.
 export const TOURNAMENT_FORMAT_LABELS = {
   single_elim: "K.-o.",
   double_elim: "Doppel-K.-o.",
@@ -8,7 +9,7 @@ export const TOURNAMENT_FORMAT_LABELS = {
   swiss: "Schweizer System",
   groups: "Gruppenphase",
   ffa: "Mehrspieler frei",
-  battle_royale: "Überlebensmodus",
+  battle_royale: "Mehrspieler frei",
   league: "Jeder gegen jeden – Hin- und Rückrunde",
   time_trial: "Zeitfahren",
   grand_prix: "Rennserie",
@@ -30,6 +31,17 @@ export const TOURNAMENT_FORMAT_OPTIONS = [
   ["custom_bracket", TOURNAMENT_FORMAT_LABELS.custom_bracket],
   ["ffa_custom_bracket", TOURNAMENT_FORMAT_LABELS.ffa_custom_bracket],
 ];
+
+// Nicht mehr zur Wahl (#2111): „Überlebensmodus“ ist dasselbe wie „Mehrspieler frei“ (TA5). Ein bestehendes Turnier
+// behält sein Format und sieht es in der Auswahl.
+const RETIRED_FORMATS = new Set(["battle_royale"]);
+
+/** Die Formate zur Auswahl: ohne die stillgelegten - außer dem, das das Turnier gerade hat. */
+export function tournamentFormatOptions(current = "") {
+  return TOURNAMENT_FORMAT_OPTIONS.filter(([value]) => (RETIRED_FORMATS.has(value) ? value === current : true)
+    // Ein Überlebensmodus-Turnier sieht „Mehrspieler frei“ genau einmal - als sein eigenes Format.
+    && !(value === "ffa" && current === "battle_royale"));
+}
 
 export const STAGE_TYPE_LABELS = {
   single_elimination: "K.-o.",
