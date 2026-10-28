@@ -126,3 +126,14 @@ test("ohne Recht oder nach der Frist kein Nachtrag", () => {
   const { container } = render(<LineupAmendForm league={{ ...PLAYED, can_amend_lineup: false }} onSave={vi.fn()} />);
   expect(container).toBeEmptyDOMElement();
 });
+
+test("bestätigen: Punkte der Erstmeldung stehen da, mit dem Hinweis auf den Einspruch", () => {
+  const league = { ...LEAGUE, proposal_games: [
+    { position: 1, map_id: "hafen", map_name: "Hafen", winner_registration_id: "a", scores: { a: 250, b: 180 } },
+    { position: 2, map_id: "turm", map_name: "Turm", winner_registration_id: "a", scores: {} },
+  ] };
+  render(<LeagueReportForm league={league} state={{ status: "confirm" }} onReport={vi.fn()} />);
+  expect(screen.getByTestId("league-games-summary-score-1")).toHaveTextContent("250:180");
+  expect(screen.queryByTestId("league-games-summary-score-2")).toBeNull();
+  expect(screen.getByTestId("league-confirm-scores-hint")).toHaveTextContent("Es zählen die Punkte der ersten Meldung");
+});

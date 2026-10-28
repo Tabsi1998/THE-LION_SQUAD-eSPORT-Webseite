@@ -142,11 +142,14 @@ export function GamesSummary({ games = [], league }) {
     <ol className="space-y-1.5" data-testid="league-games-summary">
       {games.map((game) => {
         const winner = league.sides.find((side) => side.registration_id === game.winner_registration_id)?.name;
+        const scores = league.sides.map((side) => game.scores?.[side.registration_id]);
+        const withScores = scores.some((value) => value !== undefined && value !== null && value !== "");
         return (
           <li key={game.position} className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-sm">
             <span className="font-bold text-white">Map {game.position}</span>
             <span className="text-white/75">{game.map_name || "Map"}{game.mode_label ? ` (${game.mode_label})` : ""}</span>
             <span className="text-honor">→ {winner || "?"}</span>
+            {withScores && <span className="text-white/60" data-testid={`league-games-summary-score-${game.position}`}>{scores.map((value) => value ?? "–").join(":")}</span>}
           </li>
         );
       })}
@@ -172,6 +175,9 @@ function ConfirmWithLineup({ league, state, busy, readOnly, onReport, onWrongRes
     <div className="mt-2 space-y-3">
       <GamesSummary games={proposal} league={league} />
       {state?.proposal_by && <p className="text-xs opacity-80">gemeldet von {state.proposal_by}</p>}
+      <p className="text-xs opacity-80" data-testid="league-confirm-scores-hint">
+        Es zählen die Punkte der ersten Meldung – stimmen sie nicht, bitte über „Stimmt nicht“ Einspruch einlegen.
+      </p>
       {readOnly ? (
         <p className="text-xs opacity-80" data-testid="match-report-lead-confirms">Bestätigen können Captain und Vertreter.</p>
       ) : (
