@@ -115,16 +115,17 @@ function mockWith(tr, standings) {
 }
 
 const knockoutRows = [
-  { registration_id: "r1", display_name: "Nordlicht", rank: 1, won: 2, lost: 0, points: 0, furthest_round: 2 },
+  { registration_id: "r1", display_name: "Nordlicht", rank: 1, won: 2, lost: 0, points: 0, furthest_round: 2, reached: "Finale" },
   { registration_id: "r2", display_name: "Wolkenfuchs", rank: 2, won: 1, lost: 1, points: 0, furthest_round: 2 },
 ];
 
-test("K.-o.: Siege, Niederlagen und Runde - keine Punkte; Teams heißen Team", async () => {
+test("K.-o.: Siege, Niederlagen und die erreichte Runde mit Namen - keine Punkte; Teams heißen Team", async () => {
   mockWith({ format: "single_elim", team_mode: "team", status: "completed" }, knockoutRows);
   renderPage();
   const row = await screen.findByTestId("standing-row-r2");
   expect(screen.getByRole("columnheader", { name: "Team" })).toBeInTheDocument();
-  expect(screen.getByRole("columnheader", { name: "Runde" })).toBeInTheDocument();
+  expect(screen.getByRole("columnheader", { name: "Erreicht" })).toBeInTheDocument();
+  expect(screen.getByTestId("standing-row-r1")).toHaveTextContent("Finale");
   expect(screen.queryByRole("columnheader", { name: /Pkt|Punkte/ })).toBeNull();
   expect([...row.querySelectorAll("td")].map((cell) => cell.textContent)).toEqual(expect.arrayContaining(["1", "1", "2"]));
   expect(screen.getByTestId("standings-certificates")).toBeInTheDocument();

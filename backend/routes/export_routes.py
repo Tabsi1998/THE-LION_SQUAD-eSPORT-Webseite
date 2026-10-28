@@ -213,7 +213,7 @@ def _top_certificate_rows(rows: list[dict], limit: int = 4) -> list[dict]:
 
 def _tournament_certificate_metrics(row: dict, tournament: dict | None = None) -> list[dict]:
     """Die Zahlen auf der Urkunde (#2121) - wie in der Rangliste: im K.-o. die erreichte Runde statt Punkte (die es dort
-    nicht gibt), in Tabelle und FFA die Punkte."""
+    nicht gibt), in Tabelle und FFA die Punkte. Die Urkunden-PDFs lesen ``/standings`` mit; ihr ``reached`` kommt mit."""
     from services.round_labels import HEAT_FORMATS, TABLE_FORMATS
 
     format_key = (tournament or {}).get("format")
@@ -225,7 +225,8 @@ def _tournament_certificate_metrics(row: dict, tournament: dict | None = None) -
         metrics.append({"label": "Niederlagen", "value": row.get("lost", row.get("losses", 0))})
     knockout = format_key not in TABLE_FORMATS | HEAT_FORMATS and row.get("furthest_round") is not None
     if knockout:
-        metrics.append({"label": "Runde", "value": row.get("furthest_round")})
+        # Wie weit es ging, mit dem Namen der Runde aus dem Baum („Halbfinale“, „Loser Runde 4“) - wie in der Rangliste.
+        metrics.append({"label": "Erreicht", "value": row.get("reached") or row.get("furthest_round")})
     elif row.get("points") is not None:
         metrics.append({"label": "Punkte", "value": row.get("points")})
     elif row.get("furthest_round") is not None:

@@ -18,7 +18,7 @@ from reportlab.graphics import renderPDF
 from reportlab.graphics.barcode import qr
 from reportlab.graphics.shapes import Drawing
 from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
+    KeepTogether, SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
 )
 from PIL import Image
 
@@ -711,7 +711,10 @@ def pdf_matches(tournament: dict, matches: list, reg_map: dict, pdf_sponsors: li
 
 
 def _pdf_number(value) -> str:
-    """Zahlen wie auf der Website: ganze ohne Komma, sonst mit deutschem Komma (Schweizer System: 2,5 Punkte)."""
+    """Zahlen wie auf der Website: ganze ohne Komma, sonst mit deutschem Komma (Schweizer System: 2,5 Punkte). Fehlt
+    der Wert, steht ein Strich - eine erfundene 0 wäre falsch."""
+    if value is None:
+        return "–"
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return "0"
     if float(value).is_integer():
@@ -728,11 +731,18 @@ def _pdf_signed(value) -> str:
     return text
 
 
+def _pdf_reached(value) -> str:
+    """Wie weit jemand kam: der Rundenname aus dem Baum („Halbfinale“, „Loser Runde 4“), sonst die Nummer der Runde."""
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return _pdf_number(value)
+
+
 def _first(row: dict, *keys):
     for key in keys:
         if row.get(key) is not None:
             return row.get(key)
-    return 0
+    return None
 
 
 # Spalten der Rangliste je Art (#2121) - dieselben wie in der Tabelle der Website (lib/standingsTable.js).
@@ -744,7 +754,7 @@ _STANDING_COLUMNS = {
     "ffa": [("Sp", ("played",), _pdf_number), ("Siege", ("won", "wins"), _pdf_number),
             ("Ø Platz", ("avg_rank",), _pdf_number), ("Punkte", ("points",), _pdf_number)],
     "knockout": [("Siege", ("won", "wins"), _pdf_number), ("Niederlagen", ("lost", "losses"), _pdf_number),
-                 ("Runde", ("furthest_round",), _pdf_number)],
+                 ("Erreicht", ("reached", "furthest_round"), _pdf_reached)],
     # Ohne Turnierbaum (Fast-Lap-Championship): Siege, Niederlagen und Punkte wie bisher.
     "plain": [("Siege", ("won", "wins"), _pdf_number), ("Niederlagen", ("lost", "losses"), _pdf_number),
               ("Punkte", ("points",), _pdf_number)],
@@ -786,6 +796,8 @@ def _pdf_standings_tables(tournament: dict, rows: list) -> list[dict]:
         columns = _STANDING_COLUMNS[_standings_kind(tournament, section_rows)]
         tables.append({
             "title": title,
+            # Der Rundenname braucht Platz, die Zahlen nicht.
+            "wide": [index for index, (label, _keys, _fmt) in enumerate(columns) if label == "Erreicht"],
             "headers": ["Platz", name_head, *[label for label, _keys, _fmt in columns]],
             "rows": [
                 [str(row.get("rank", "")), str(row.get("display_name") or "Teilnehmer"),
@@ -805,15 +817,18 @@ def pdf_standings(tournament: dict, rows: list, pdf_sponsors: list | None = None
     tables = _pdf_standings_tables(tournament, rows)
     # A4 hoch: 18 cm Platz - Rang und Zahlen schmal, der Name nimmt den Rest.
     for table in tables:
-        if table["title"]:
-            story.append(Paragraph(escape(_normalize_pdf_text(table["title"])), styles["TLSSection"]))
         numbers = len(table["headers"]) - 2
         number_width = 1.6 * cm if numbers > 3 else 2.6 * cm
-        widths = [1.5 * cm, 18 * cm - 1.5 * cm - numbers * number_width, *[number_width] * numbers]
+        columns = [5 * cm if index in table["wide"] else number_width for index in range(numbers)]
+        widths = [1.5 * cm, 18 * cm - 1.5 * cm - sum(columns), *columns]
         body = table["rows"] or [["", "Noch keine Ergebnisse", *[""] * numbers]]
         t = Table([table["headers"], *_fit_rows_to_columns(body, widths)], colWidths=widths, repeatRows=1)
         t.setStyle(_table_style())
-        story.append(t)
+        if table["title"]:
+            # Die Gruppenüberschrift bleibt bei ihrer Tabelle - nie allein unten auf einer Seite.
+            story.append(KeepTogether([Paragraph(escape(_normalize_pdf_text(table["title"])), styles["TLSSection"]), t]))
+        else:
+            story.append(t)
     doc.build(story, onFirstPage=_page_bg, onLaterPages=_page_bg)
     return buf.getvalue()
 

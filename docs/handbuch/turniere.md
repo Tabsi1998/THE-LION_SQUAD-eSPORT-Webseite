@@ -564,14 +564,15 @@ Tabelle mit seiner Siegerkarte (bei Gruppen und bei Gleichstand auf Platz 1 nich
 Die **Rangliste** zeigt bei Liga, Jeder gegen jeden und Schweizer System Spiele, Siege/Unentschieden/Niederlagen,
 Differenz (beim Schweizer System Buchholz), die Form der letzten fünf Spiele und Pfeile, wie sich der Platz seit dem
 vorigen Spieltag geändert hat. Bei der Gruppenphase steht je Gruppe eine eigene Tabelle. Im **K.-o.** stehen Siege,
-Niederlagen und die erreichte **Runde** (Punkte gibt es dort nicht), bei **Läufen (FFA)** Spiele, Siege, der Platz im
+Niederlagen und unter **Erreicht** die Runde aus dem Baum – etwa „Halbfinale“, „Loser Runde 4“ oder „Grand Final“, bei
+mehreren Phasen mit der Phase davor (Punkte gibt es dort nicht). Bei **Läufen (FFA)** stehen Spiele, Siege, der Platz im
 Schnitt und die Punkte. Die Namensspalte heißt bei Team-Turnieren „Team“. Die eigene Zeile ist markiert, bei
 Team-Turnieren für alle Mitglieder des Teams.
 
 In der Rangliste stehen nur **angenommene und eingecheckte** Anmeldungen – Warteliste, Ausstehend, Abgelehnt und Nicht
 erschienen nie; wer mit Spielen ausgeschieden ist (disqualifiziert, abgemeldet), bleibt mit diesen Spielen drin. Im K.-o.
-und bei Läufen gibt es Plätze erst mit dem **ersten Ergebnis** – vorher steht „Noch keine Ergebnisse“. Die Turnierseite
-nennt den **Endplatz** in der Teilnehmerliste erst nach dem Ende.
+und bei Läufen gibt es Plätze erst mit dem **ersten Ergebnis** (ein Freilos zählt nicht) – vorher steht „Noch keine
+Ergebnisse“. Die Turnierseite nennt den **Endplatz** in der Teilnehmerliste erst nach dem Ende.
 
 Nach dem Ende stehen über der Rangliste **Ergebnis-PDF** (heißt „Rangliste“, mit denselben Spalten wie die Seite und bei
 Gruppen je Gruppe einer Tabelle) und **Urkunden** (nur, wenn es Platz 1 bis 4 gibt – bei Gruppen nicht, dort fehlt noch

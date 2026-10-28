@@ -65,7 +65,9 @@ export const STANDING_COLUMNS = Object.freeze({
   knockout: [
     { key: "won", label: "S", title: "Siege", read: (row) => row.won ?? row.wins ?? 0 },
     { key: "lost", label: "N", title: "Niederlagen", read: (row) => row.lost ?? row.losses ?? 0 },
-    { key: "furthest_round", label: "Runde", title: "Erreichte Runde", strong: true, read: (row) => row.furthest_round ?? 0 },
+    // Wie weit es ging, mit dem Rundennamen aus dem Baum („Halbfinale“, „Loser Runde 4“, „Finalrunde · Finale“) - ohne
+    // ihn (ältere Antwort) die Nummer der Runde.
+    { key: "reached", label: "Erreicht", title: "Erreichte Runde", read: (row) => row.reached || formatNumber(row.furthest_round ?? 0) },
   ],
 });
 

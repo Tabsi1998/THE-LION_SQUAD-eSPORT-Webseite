@@ -124,7 +124,7 @@ describe("Tabelle (#2121)", () => {
     const groups = standingsSections([{ group: { id: "g1", group_key: "a" }, standings: [row("Nordlicht", 1)] }, { group: { id: "g2", group_key: "b" }, standings: [] }]);
     expect(groups.map((section) => section.title)).toEqual(["Gruppe A"]);
     const [knockout] = standingsSections([{ registration_id: "r1", display_name: "Nordlicht", rank: 1, won: 2, lost: 0, points: 0, furthest_round: 2 }]);
-    expect(knockout.heads.map((head) => head.label)).toEqual(["S", "N", "Runde"]);
+    expect(knockout.heads.map((head) => head.label)).toEqual(["S", "N", "Erreicht"]);
     expect(knockout.rows[0].cells).toEqual(["2", "0", "2"]);
   });
 

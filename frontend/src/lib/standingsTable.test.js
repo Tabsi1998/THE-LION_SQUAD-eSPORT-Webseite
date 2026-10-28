@@ -35,10 +35,11 @@ test("ein K.-o.-Turnier hat seine eigene, schmale Tabelle", () => {
 test("K.-o. zählt die Runde, Läufe die Punkte; der Kopf sagt Team bei Teams (#2121)", () => {
   expect(tableKind(fixture.finished.standings, { heats: true })).toBe("ffa");
   expect(tableKind(fixture.league.standings, { heats: true })).toBe("league");
-  expect(STANDING_COLUMNS.knockout.map((column) => column.label)).toEqual(["S", "N", "Runde"]);
+  expect(STANDING_COLUMNS.knockout.map((column) => column.label)).toEqual(["S", "N", "Erreicht"]);
   expect(STANDING_COLUMNS.ffa.map((column) => column.label)).toEqual(["Sp", "S", "Ø Pl.", "Pkt"]);
   const knockout = { won: 1, lost: 1, points: 0, furthest_round: 3 };
-  expect(STANDING_COLUMNS.knockout.map((column) => standingCell(column, knockout))).toEqual([1, 1, 3]);
+  expect(STANDING_COLUMNS.knockout.map((column) => standingCell(column, knockout))).toEqual([1, 1, "3"]);
+  expect(standingCell(STANDING_COLUMNS.knockout[2], { ...knockout, reached: "Loser Runde 4" })).toBe("Loser Runde 4");
   expect(standingCell(STANDING_COLUMNS.ffa[2], { avg_rank: 1.333 })).toBe("1,3");
   expect(standingCell(STANDING_COLUMNS.ffa[2], {})).toBe("–");
   expect(nameHead({ team_mode: "team" })).toBe("Team");
