@@ -13,7 +13,8 @@
 #   ABNAHME_PROJECT   Projektname (Vorgabe lsw-abnahme-nacht; den gemeinsamen Stand lsw-abnahme fasst das Skript nie an)
 #   FRONTEND_PORT     Web (Vorgabe 24500), BACKEND_PORT Backend (Vorgabe 29501)
 #   ABNAHME_SOURCE    Ordner, aus dem gebaut wird (Vorgabe: dieser Repo-Ordner; ohne frontend/node_modules)
-#   ABNAHME_STATE     Stand-Datei (Vorgabe .local-testing/abnahme/state-<Projekt>.json); Fast Lap bekommt eine eigene
+#   ABNAHME_STATE     Stand-Datei (Vorgabe .local-testing/abnahme/state-<Projekt>.json); Fast Lap und Liga bekommen
+#                     je eine eigene
 #   ABNAHME_RESULTS   Ergebnisse je Spec, runs.tsv und summary.md (Vorgabe .local-testing/abnahme/nacht-<Projekt>)
 #   ABNAHME_SHOTS     Bilder der Specs, je Spec ein Unterordner (optional)
 #   ABNAHME_SPECS     nur diese Specs, durch Leerzeichen getrennt (z. B. "tv-abnahme matchplan-abnahme")
@@ -37,6 +38,7 @@ WEB_URL="http://127.0.0.1:${FRONTEND_PORT}"
 export FRONTEND_URL="$WEB_URL" PUBLIC_BACKEND_URL="$WEB_URL" CORS_ORIGINS="$WEB_URL"
 STATE="${ABNAHME_STATE:-$ROOT/.local-testing/abnahme/state-${ABNAHME_PROJECT}.json}"
 STATE_FASTLAP="${STATE%.json}-fastlap.json"
+STATE_LIGA="${STATE%.json}-liga.json"
 RESULTS="${ABNAHME_RESULTS:-$ROOT/.local-testing/abnahme/nacht-${ABNAHME_PROJECT}}"
 PYTHON="${PYTHON:-python3}"
 
@@ -99,11 +101,14 @@ cmd_run() {
     name="$(basename "$spec" .spec.js)"
     out="$RESULTS/$name"
     mkdir -p "$out"
-    # Die Fast-Lap-Abnahme hat ihren eigenen Seed und eigene Konten - und deshalb eine eigene Stand-Datei (die
+    # Fast Lap und Liga haben ihren eigenen Seed und eigene Konten - und deshalb je eine eigene Stand-Datei (die
     # gespeicherten Sitzungen hängen am Namen der Stand-Datei).
     if grep -q 'seed_abnahme_fastlap.py' "$spec"; then
       seed="seed_abnahme_fastlap.py"
       state="$STATE_FASTLAP"
+    elif grep -q 'seed_abnahme_liga.py' "$spec"; then
+      seed="seed_abnahme_liga.py"
+      state="$STATE_LIGA"
     else
       seed="seed_abnahme.py"
       state="$STATE"
