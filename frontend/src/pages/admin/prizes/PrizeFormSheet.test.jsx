@@ -71,3 +71,14 @@ test("bearbeiten: nur Preis und Wert, die unveränderte Frist geht nicht mit", a
     pickup_deadline: fromViennaInput("2027-01-15T23:59"),
   })));
 });
+
+test("bearbeiten: die eigene Frist lässt sich auf den Standard zurücksetzen (#2112)", async () => {
+  const prize = { id: "p-2", tournament_title: "Winter-Cup", recipient_label: "Anna", place: 1, prize_label: "Gutschein",
+    prize_value: "", status: "pending", pickup_deadline: "2027-01-15T22:59:00+00:00", pickup_deadline_custom: true };
+  render(<PrizeFormSheet prize={prize} onClose={() => {}} onSaved={() => {}} />);
+  fireEvent.click(screen.getByTestId("prize-form-deadline-reset"));
+  expect(screen.getByTestId("prize-form-deadline")).toHaveValue("");
+  expect(screen.queryByTestId("prize-form-deadline-reset")).toBeNull();
+  fireEvent.click(screen.getByTestId("prize-form-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/prizes/p-2", { prize_label: "Gutschein", prize_value: "", reset_deadline: true }));
+});

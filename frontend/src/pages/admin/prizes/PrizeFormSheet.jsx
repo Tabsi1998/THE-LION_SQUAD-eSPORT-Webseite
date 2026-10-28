@@ -41,8 +41,10 @@ export function PrizeFormSheet({ prize, onClose, onSaved }) {
         await api.patch(`/prizes/${prize.id}`, {
           prize_label: label.trim(),
           prize_value: value.trim(),
-          // Nur eine geänderte Frist geht mit - sonst würde aus der Uhrzeit von „Bereit“ das Tagesende.
+          // Nur eine geänderte Frist geht mit - sonst würde aus der Uhrzeit von „Bereit“ das Tagesende. Ein geleertes
+          // Feld heißt „zurück auf den Standard“ (#2112): offen ohne Frist, bereit 90 Tage ab dem Bereitstellen.
           ...(deadline && deadline !== initialDeadline ? { pickup_deadline: deadlineIso(deadline) } : {}),
+          ...(!deadline && initialDeadline ? { reset_deadline: true } : {}),
         });
         toast.success("Gewinn gespeichert.");
       } else {
@@ -111,9 +113,14 @@ export function PrizeFormSheet({ prize, onClose, onSaved }) {
         onChange={setDeadline}
         testId="prize-form-deadline"
         hint={editing
-          ? "Ein Datum gilt bis zum Ende dieses Tages. Ohne Frist läuft sie 90 Tage ab „Bereit“."
+          ? "Ein Datum gilt bis zum Ende dieses Tages. Feld leeren heißt: wieder der Standard – 90 Tage ab „Bereit“."
           : "Leer lassen: 90 Tage ab „Bereit“. Ein Datum gilt bis zum Ende dieses Tages."}
       />
+      {editing && prize.pickup_deadline_custom && deadline && ["pending", "ready"].includes(prize.status) && (
+        <button type="button" onClick={() => setDeadline("")} data-testid="prize-form-deadline-reset" className="text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:underline">
+          Frist zurück auf 90 Tage ab „Bereit“
+        </button>
+      )}
     </AdminSheet>
   );
 }

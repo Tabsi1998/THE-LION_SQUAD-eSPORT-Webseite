@@ -90,3 +90,24 @@ async def test_only_prize_managers_add_prizes(flow):
                                                     "prize_label": "Alles für mich"})
     assert response.status_code == 403
     assert await flow.db.prize_pickups.count_documents({}) == 0
+
+
+@pytest.mark.asyncio
+async def test_the_deadline_goes_back_to_the_default(flow):
+    """#2112: „Offen“ wieder ohne Frist, „Bereit“ wieder 90 Tage ab dem Bereitstellen - und „Bereit“ setzt sie dann neu."""
+    tournament, winner = await setup(flow)
+    created = (await flow.post("/api/prizes", json={"tournament_id": tournament["id"], "user_id": winner["id"], "place": 1,
+                                                     "prize_label": "Gutschein", "pickup_deadline": "2027-01-15T22:59:00Z"})).json()
+    reset = await flow.patch(f"/api/prizes/{created['id']}", json={"reset_deadline": True})
+    assert reset.status_code == 200, reset.text
+    assert reset.json()["pickup_deadline"] is None and reset.json()["pickup_deadline_custom"] is False
+
+    await flow.db.prize_pickups.update_one({"id": created["id"]}, {"$set": {
+        "status": "ready", "ready_at": "2026-11-01T10:00:00+00:00", "pickup_deadline": "2027-03-01T22:59:00+00:00", "pickup_deadline_custom": True}})
+    reset = await flow.patch(f"/api/prizes/{created['id']}", json={"reset_deadline": True})
+    assert reset.json()["pickup_deadline"] == "2027-01-30T10:00:00+00:00" and reset.json()["pickup_deadline_custom"] is False
+    both = await flow.patch(f"/api/prizes/{created['id']}", json={"reset_deadline": True, "pickup_deadline": "2027-02-01T00:00:00Z"})
+    assert both.status_code == 400
+
+    await flow.db.prize_pickups.update_one({"id": created["id"]}, {"$set": {"status": "picked_up"}})
+    assert (await flow.patch(f"/api/prizes/{created['id']}", json={"reset_deadline": True})).status_code == 409

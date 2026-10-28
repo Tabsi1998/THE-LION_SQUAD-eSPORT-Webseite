@@ -1,5 +1,5 @@
 """Phase 9: PrizePickup admin + user routes."""
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -26,6 +26,8 @@ class PrizeUpdate(BaseModel):
     pickup_deadline: Optional[str] = Field(default=None, max_length=40)
     prize_label: Optional[str] = Field(default=None, max_length=200)
     prize_value: Optional[str] = Field(default=None, max_length=200)
+    # Frist zurück auf den Standard (#2112): „Offen“ ohne Frist, „Bereit“ 90 Tage ab dem Bereitstellen.
+    reset_deadline: Optional[bool] = None
 
 
 def _deadline_value(value: str | None) -> str | None:
@@ -39,6 +41,26 @@ def _deadline_value(value: str | None) -> str | None:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
     return parsed.astimezone(timezone.utc).isoformat()
+
+
+def _default_deadline(pickup: dict) -> dict:
+    """Die Standard-Frist (#2112): „Offen“ hat keine, „Bereit“ läuft 90 Tage ab dem Bereitstellen. Bei abgeholten oder
+    verfallenen Gewinnen gibt es nichts zurückzusetzen - dafür ist „Wieder öffnen“ da."""
+    from services.prize_service import DEFAULT_PICKUP_WINDOW_DAYS
+
+    status = pickup.get("status") or "pending"
+    if status == "pending":
+        return {"pickup_deadline": None, "pickup_deadline_custom": False}
+    if status != "ready":
+        raise HTTPException(status_code=409, detail="Die Frist lässt sich nur bei offenen oder bereiten Gewinnen zurücksetzen.")
+    try:
+        start = datetime.fromisoformat(str(pickup.get("ready_at")))
+        if start.tzinfo is None:
+            start = start.replace(tzinfo=timezone.utc)
+    except (TypeError, ValueError):
+        start = now_utc()
+    deadline = (start + timedelta(days=DEFAULT_PICKUP_WINDOW_DAYS)).astimezone(timezone.utc).isoformat()
+    return {"pickup_deadline": deadline, "pickup_deadline_custom": False}
 
 
 def _prize_label(value: str | None) -> str:
@@ -379,7 +401,12 @@ async def update_prize(pickup_id: str, body: PrizeUpdate, me: dict = Depends(get
         return result
     # generic patch
     updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
-    if not updates:
+    reset = {}
+    if updates.pop("reset_deadline", None):
+        if "pickup_deadline" in updates:
+            raise HTTPException(status_code=400, detail="Entweder eine Frist setzen oder auf den Standard zurück - nicht beides.")
+        reset = _default_deadline(pickup)
+    if not updates and not reset:
         return pickup
     if "prize_label" in updates:
         updates["prize_label"] = _prize_label(updates["prize_label"])
@@ -392,6 +419,7 @@ async def update_prize(pickup_id: str, body: PrizeUpdate, me: dict = Depends(get
         else:
             # Von Hand gesetzte Frist (#2123, ER1): „Bereit“ überschreibt sie nicht mit den 90 Tagen.
             updates["pickup_deadline_custom"] = True
+    updates.update(reset)
     if not updates:
         return pickup
     updates["updated_at"] = now_utc().isoformat()
