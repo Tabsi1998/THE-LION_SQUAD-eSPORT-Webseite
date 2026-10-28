@@ -210,3 +210,45 @@ async def test_team_page_and_seo_show_the_look(flow):
 
     overview = await team_overview(flow.db, {"id": "team-probe", "name": "Probe Löwen"}, None, insider=True)
     assert overview["league"][0]["emblem_url"] == EMBLEM_SEASON
+
+
+class _Cursor:
+    def __init__(self, rows):
+        self.rows = rows
+
+    async def to_list(self, _length=None):
+        return [dict(row) for row in self.rows]
+
+
+class _StaleTournaments:
+    """Liest einen alten Stand (Staffel ohne Banner), schreibt aber in die echte Sammlung - wie ein gleichzeitiges
+    Speichern in der Turnierverwaltung zwischen Lesen und Schreiben."""
+
+    def __init__(self, real, rows):
+        self.real, self.rows = real, rows
+
+    def find(self, *_args, **_kwargs):
+        return _Cursor(self.rows)
+
+    async def update_one(self, *args, **kwargs):
+        return await self.real.update_one(*args, **kwargs)
+
+
+@pytest.mark.asyncio
+async def test_apply_banner_keeps_an_own_banner_set_at_the_same_time(flow):
+    from services import league_service
+
+    _admin, league, season, division = await setup(flow)
+    created = (await flow.post(f"{ADMIN}/divisions/{division['id']}/staffeln", json={})).json()
+    stale = [{"id": created["tournament_id"], "banner_url": None}]
+    own = "/api/static/uploads/probe-eigenes-turnierbanner.webp"
+    await flow.db.tournaments.update_one({"id": created["tournament_id"]}, {"$set": {"banner_url": own}})
+
+    class StaleDb:
+        tournaments = _StaleTournaments(flow.db.tournaments, stale)
+
+    league_doc = {**(await flow.db.leagues.find_one({"id": league["id"]}, {"_id": 0})), "banner_url": BANNER_LEAGUE}
+    season_doc = await flow.db.league_seasons.find_one({"id": season["id"]}, {"_id": 0})
+    assert await league_service.apply_banner(StaleDb(), league_doc, season_doc) == 0
+    row = await flow.db.tournaments.find_one({"id": created["tournament_id"]}, {"_id": 0})
+    assert row["banner_url"] == own, "das gleichzeitig gesetzte eigene Banner bleibt"

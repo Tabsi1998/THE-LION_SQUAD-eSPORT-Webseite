@@ -856,6 +856,8 @@ async def create_staffel(db, division: dict, staffel: str | None, user: dict) ->
         await db.tournaments.insert_one(dict(doc))
     except DuplicateKeyError:
         raise LeagueProblem(f"Staffel {letter} gibt es in dieser Liga schon.", 409) from None
+    # Wurde das Banner von Liga oder Season geändert, während die Staffel entstand, gilt das neue (Review #2107).
+    await apply_banner(db, await get_league(db, league["id"]), await get_season(db, season["id"]))
     pool = await map_pools.current(db, "league_season", season["id"])
     if pool and pool.get("game_id") == game["id"]:
         await map_pools.copy_version(db, pool, scope="tournament", scope_id=doc["id"], user=user,
@@ -1015,8 +1017,11 @@ async def apply_banner(db, league: dict, season: dict) -> int:
             continue
         update = ({"$set": {"banner_url": banner, STAFFEL_BANNER_MARK: banner, "updated_at": _now()}} if banner
                   else {"$set": {"banner_url": None, "updated_at": _now()}, "$unset": {STAFFEL_BANNER_MARK: ""}})
-        await db.tournaments.update_one({"id": row["id"]}, update)
-        changed += 1
+        # Nur, wenn das Banner noch das gelesene ist (Review #2107): setzt jemand gleichzeitig in der Turnierverwaltung
+        # ein eigenes Staffelbanner, bleibt es stehen.
+        still = {"banner_url": own} if own else {"banner_url": {"$in": [None, ""]}}
+        result = await db.tournaments.update_one({"id": row["id"], **still}, update)
+        changed += int(getattr(result, "modified_count", 0) or 0)
     return changed
 
 
