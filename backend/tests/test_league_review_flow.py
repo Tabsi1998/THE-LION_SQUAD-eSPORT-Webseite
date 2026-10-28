@@ -143,3 +143,27 @@ async def test_a_locked_staffel_still_takes_rules_text_but_keeps_its_calendar(fl
         "before_start": "Die Staffel ist gesperrt.", "before_result": "Die Staffel ist gesperrt."}
     after = await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0})
     assert after["rules"] == "Neu" and after["matchday_weeks_total"] == 10
+
+
+# ---------------------------------------------------------------- 3. Map-Pool entfernen
+
+@pytest.mark.asyncio
+async def test_removing_the_season_pool_reaches_staffeln_without_a_result_only(flow):
+    from services import map_pools
+
+    admin, season, division, staffel = await setup_staffel(flow, with_pool=True)
+    played = (await flow.post(f"{ADMIN}/divisions/{division['id']}/staffeln", json={})).json()
+    await flow.db.matches_v2.insert_one({"id": "m1", "tournament_id": played["tournament_id"], "status": "completed",
+                                         "slots": []})
+    assert await map_pools.current(flow.db, "tournament", staffel["id"])
+
+    assert (await flow.delete(f"{ADMIN}/seasons/{season['id']}/map-pool")).status_code == 200
+    rows = {row["tournament_id"]: row for row in (await flow.post(f"{ADMIN}/seasons/{season['id']}/sync")).json()["staffeln"]}
+
+    assert await map_pools.current(flow.db, "tournament", staffel["id"]) is None
+    assert "map_pool" in rows[staffel["id"]]["applied"] and "map_pool" in rows[staffel["id"]]["changed"]
+    assert await map_pools.current(flow.db, "tournament", played["tournament_id"])
+    kept = rows[played["tournament_id"]]
+    assert "map_pool" not in kept["applied"]
+    assert [item["reason"] for item in kept["skipped"] if item["group"] == "map_pool"] == [
+        "Die Season hat keinen Map-Pool mehr, die Staffel behält ihren: Es gibt schon ein Ergebnis."]

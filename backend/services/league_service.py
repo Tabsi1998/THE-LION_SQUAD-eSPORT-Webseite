@@ -690,14 +690,36 @@ async def sync_staffel(db, tournament: dict, league: dict, season: dict, divisio
     if changed:
         await db.tournaments.update_one({"id": tournament["id"]}, {"$set": {**{key: updates[key] for key in changed},
                                                                             "updated_at": _now()}})
+    await _sync_pool(db, tournament, season, user, locked=locked, has_result=has_result,
+                     applied=applied, skipped=skipped, changed=changed)
+    return SyncResult(tournament["id"], tournament.get("title") or "", applied, skipped, changed)
+
+
+async def _sync_pool(db, tournament: dict, season: dict, user: dict, *, locked: bool, has_result: bool,
+                     applied: list, skipped: list, changed: list) -> None:
+    """Map-Pool der Season → Staffel. Ein neuer Pool geht immer (Spiele mit festgehaltenem Pool behalten ihren). Hat die
+    Season keinen Pool mehr, wird die Kopie der Staffel entfernt - nur vor dem ersten Ergebnis und nicht gesperrt, sonst
+    steht der Grund im Ergebnis."""
     pool = await map_pools.current(db, "league_season", season["id"])
     own = await map_pools.current(db, "tournament", tournament["id"])
-    if pool and pool.get("game_id") == tournament.get("game_id") and _pool_maps(pool) != _pool_maps(own):
-        await map_pools.copy_version(db, pool, scope="tournament", scope_id=tournament["id"], user=user,
-                                     tournament_id=tournament["id"], note=f"Aus {season.get('name')} übernommen")
-        changed.append("map_pool")
+    if pool and pool.get("game_id") == tournament.get("game_id"):
+        if _pool_maps(pool) != _pool_maps(own):
+            await map_pools.copy_version(db, pool, scope="tournament", scope_id=tournament["id"], user=user,
+                                         tournament_id=tournament["id"], note=f"Aus {season.get('name')} übernommen")
+            changed.append("map_pool")
+        applied.append("map_pool")
+        return
+    if not own:
+        applied.append("map_pool")
+        return
+    if locked or has_result:
+        reason = LOCKED_REASON if locked else "Es gibt schon ein Ergebnis."
+        skipped.append({"group": "map_pool", "label": SYNC_GROUP_LABELS["map_pool"],
+                        "reason": f"Die Season hat keinen Map-Pool mehr, die Staffel behält ihren: {reason}"})
+        return
+    await map_pools.clear(db, scope="tournament", scope_id=tournament["id"], user=user, tournament_id=tournament["id"])
+    changed.append("map_pool")
     applied.append("map_pool")
-    return SyncResult(tournament["id"], tournament.get("title") or "", applied, skipped, changed)
 
 
 # Season-Felder, die eine Staffel übernimmt (``staffel_fields``) - ändert sich eines, braucht es „Übertragen“. Die

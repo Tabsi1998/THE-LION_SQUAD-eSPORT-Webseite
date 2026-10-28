@@ -292,7 +292,7 @@ export default function AdminLeagueSeasonPage() {
     }
   };
   const clearPool = async () => {
-    if (!await confirm({ title: "Map-Pool entfernen?", description: "Ohne Pool kann in der Liga niemand mit Maps melden. Staffeln behalten ihre Kopie bis zum nächsten Übertragen.", confirmLabel: "Entfernen" })) return false;
+    if (!await confirm({ title: "Map-Pool entfernen?", description: "Ohne Pool kann in der Liga niemand mit Maps melden. Bestehende Staffeln verlieren ihre Kopie erst beim nächsten Übertragen – und nur, solange sie noch kein Ergebnis haben.", confirmLabel: "Entfernen" })) return false;
     try {
       await api.delete(`/admin/leagues/seasons/${seasonId}/map-pool`);
       toast.success("Map-Pool entfernt.");
@@ -386,7 +386,7 @@ export default function AdminLeagueSeasonPage() {
             </form>
 
             <MapPoolEditor key={data.map_pool?.id || "leer"} title="Map-Pool der Season" game={data.game} library={data.library} entry={data.map_pool}
-              hint="Jede neue Staffel bekommt eine Kopie. Ohne Pool kann niemand mit Maps melden." onSave={savePool} onClear={clearPool} libraryLink testId="season-pool" />
+              hint="Jede neue Staffel bekommt eine Kopie; Änderungen kommen beim Übertragen an. Ohne Pool kann niemand mit Maps melden." onSave={savePool} onClear={clearPool} libraryLink testId="season-pool" />
 
             <section className="border border-white/10 rounded-sm bg-[#121212] p-4 md:p-5 space-y-4" aria-label="Ligen und Staffeln" data-testid="season-divisions">
               <div className="flex flex-wrap items-center justify-between gap-3">
