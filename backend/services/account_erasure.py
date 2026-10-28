@@ -80,10 +80,10 @@ ANONYMIZED_USER_VALUES = {
     "google_linked": False, "password_login_available": False, "email_verified": False,
     "is_active": False, "is_banned": True, "mfa_enabled": False, "password_hash": "!disabled",
 }
-# Felder außerhalb des Profilformulars, die die Person beschreiben oder ihr Konto bei anderen Diensten verraten.
+# Felder außerhalb des Profilformulars, die die Person beschreiben oder ihr Konto bei anderen Diensten verraten. Die
+# privaten Felder (Passwort, Zwei-Faktor, Google-Kennung) kommen dazu aus ``services/private_fields.py``.
 EXTRA_PERSONAL_USER_FIELDS = (
-    "password_contract", "google_id", "google_email", "mfa_secret", "mfa_pending_secret", "mfa_pending_created_at",
-    "mfa_recovery_code_hashes", "mfa_totp_last_counter", "platform_verified",
+    "google_email", "platform_verified",
     # Freunde beim Event (#1188): Wahl und Hinweis gehören zum Konto.
     "privacy_friends_see_registrations", "friends_registrations_hint_seen_at",
     # Abo-Hinweis „Mein Kalender“ (#1788).
@@ -98,9 +98,12 @@ EXTRA_PERSONAL_USER_FIELDS = (
 def profile_fields_to_clear() -> set[str]:
     """Alle Profilfelder, die beim Löschen verschwinden - abgeleitet, nicht abgeschrieben."""
     from models import UserUpdate
+    from services.private_fields import PRIVATE_USER_FIELDS
     from services.profile_fields import USER_NULLABLE_FIELDS
 
-    return (set(UserUpdate.model_fields) | set(USER_NULLABLE_FIELDS) | set(EXTRA_PERSONAL_USER_FIELDS)) - set(ANONYMIZED_USER_VALUES)
+    fields = set(UserUpdate.model_fields) | set(USER_NULLABLE_FIELDS)
+    fields |= set(EXTRA_PERSONAL_USER_FIELDS) | set(PRIVATE_USER_FIELDS)
+    return fields - set(ANONYMIZED_USER_VALUES)
 
 
 def anonymized_account_update(now: str) -> dict:
