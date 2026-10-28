@@ -84,6 +84,7 @@ Indizes: `id` eindeutig, (`season_id`, `level`) eindeutig.
 | `league_context` | `{league_id, season_id, division_id, staffel}` | nein | `staffel` = „A“, „B“ …; **fehlt bei allen anderen Turnieren** (nie `null` schreiben). Nur der Liga-Service setzt es, `TournamentUpdate` nimmt es nicht an |
 | `round_robin_legs` | 1 \| 2 | nein | fehlt = 2 (Hin- und Rückrunde wie heute) |
 | `matchday_blocked_weeks` | `[int]` | nein | gesperrte Kalenderwochen ab `start_date` (1-basiert); fehlt = `[]`. Gesperrt ist eine Woche, wenn mehr als die Hälfte ihrer Tage in einer Sperrzeit liegt (Season 1: Wochen 7 und 8; der Montag 21.12. allein sperrt Woche 6 nicht) |
+| `blocked_periods` | `[{start_date, end_date, label}]` | nein | Kopie der Sperrzeiten der Season (Wiener Kalendertage); für `blocked_period_at` und Fristen; fehlt = keine |
 | `matchday_weeks_total` | int | nein | Wochenbudget für „Runden ≤ aktive Wochen“; fehlt = keine Prüfung |
 | `scoring_rules` | dict | nein | normalisiert; fehlt = heute fest 3/1/0 mit Reihenfolge Punkte, Siege, Differenz |
 | `game_mode_order` | `[str]` | nein | fehlt = frei |
@@ -282,7 +283,12 @@ Gemeinsamer Baustein `services/league_scope.py`: `NOT_LEAGUE = {"league_context"
 | `mobile/` | – | – (kein neuer Build) |
 
 Abhängigkeit: Der Sperrzeit-Aufruf in `match_routes.py` (B) nutzt `matchday_schedule.blocked_period_at(tournament,
-moment)` (A, P2). Bis P2 auf `main` ist, bleibt der Aufruf aus.
+moment)` (A, P2; liefert `{start_date, end_date, label}` oder `None` – Sperrzeit oder Tag einer Sperrwoche). Bis P2 auf
+`main` ist, bleibt der Aufruf aus. Ebenso für B: `matchday_schedule.response_deadline(tournament, start, hours)` statt
+`start + hours` in `match_routes._schedule_deadline` (Zeit in einer Sperrzeit zählt nicht). Fenster eines Spieltags
+mit Sperrwochen: `matchday_schedule.tournament_matchday_window(tournament, number)`. In `match_v2_results` (B) ruft
+`build_league_redraw_application` seit P2 `advancement_draw.league_home_swaps` – bei nur Hinrunde tauschen alle Seiten
+gemeinsam, damit das Heimrecht fair bleibt.
 
 ## 9. Nicht in Stufe 1
 
