@@ -19,6 +19,7 @@ import { F1StaffPanel } from "./f1/F1StaffPanel";
 import { FastLapQuickEntry } from "@/components/tls/fastlap/FastLapQuickEntry";
 import { FastLapQueuePanel } from "@/components/tls/fastlap/FastLapQueuePanel";
 import { FastLapGuestLinkDialog } from "@/components/tls/fastlap/FastLapGuestLinkDialog";
+import { FastLapGuestsPanel } from "@/components/tls/fastlap/FastLapGuestsPanel";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 
 // Nach „Ergebnisse veröffentlicht“ (#1584) ändert nur die Turnierleitung Zeiten - mit Begründung, die im Protokoll steht.
@@ -546,6 +547,8 @@ export default function AdminF1EditPage() {
           ) : <div className="text-white/40 text-sm">Bitte erst eine Strecke anlegen.</div>}
         </div>
       </div>
+
+      <FastLapGuestsPanel guests={guests} locked={locked} onChanged={() => { loadGuests(); loadTimes(); loadQueue(); }} />
 
       {linkGuest && (
         <FastLapGuestLinkDialog challengeId={challenge.id} guest={linkGuest} onClose={() => setLinkGuest(null)} onLinked={() => { loadTimes(); loadGuests(); loadQueue(); }} />
