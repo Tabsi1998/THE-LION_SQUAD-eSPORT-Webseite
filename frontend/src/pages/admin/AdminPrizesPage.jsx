@@ -16,6 +16,20 @@ const STATUS_LABEL = {
   expired: { label: "Verfallen", icon: XCircle, color: "text-[#FF3B30] bg-[#FF3B30]/10 border-[#FF3B30]/30" },
 };
 
+function statusToast(status, from) {
+  if (status === "ready" && from === "picked_up") return "Zurück auf „Bereit“ – ohne neue Nachricht an den Gewinner.";
+  if (status === "ready" && from === "expired") return "Wieder geöffnet – neue Abholfrist, der Gewinner bekommt Bescheid.";
+  if (status === "ready") return "Bereit zur Abholung – die Abholfrist läuft ab jetzt, der Gewinner bekommt Bescheid.";
+  if (status === "picked_up") return "Als abgeholt vermerkt – der Gewinner bekommt Bescheid.";
+  return "Aktualisiert.";
+}
+
+// Die Abholfrist läuft erst ab „Bereit“ (#2123, ER1) - offene Gewinne haben noch keine.
+function deadlineText(p) {
+  if (p.status === "pending") return "ab „Bereit“";
+  return formatDate(p.pickup_deadline);
+}
+
 function formatDate(value) {
   if (!value) return "—";
   const date = asInstant(value);
@@ -80,11 +94,11 @@ export default function AdminPrizesPage() {
     }, { replace: true });
   };
 
-  const updateStatus = async (id, status, notes = "") => {
+  // Bereit, Abgeholt, Zurück, Wieder öffnen (#2123): die Meldung sagt, was der Gewinner erfährt.
+  const updateStatus = async (id, status, notes = "", from = "") => {
     try {
       await api.patch(`/prizes/${id}`, { status, notes });
-      toast.success(status === "ready" ? "Markiert als bereit & E-Mail in Queue." :
-                    status === "picked_up" ? "Als abgeholt markiert & E-Mail in Queue." : "Aktualisiert.");
+      toast.success(statusToast(status, from));
       load();
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
@@ -148,7 +162,7 @@ export default function AdminPrizesPage() {
     acc[key] = (acc[key] || 0) + 1;
     return acc;
   }, {});
-  const dueSoon = allItems.filter((p) => ["pending", "ready"].includes(p.status) && daysUntil(p.pickup_deadline) !== null && daysUntil(p.pickup_deadline) <= 14).length;
+  const dueSoon = allItems.filter((p) => p.status === "ready" && daysUntil(p.pickup_deadline) !== null && daysUntil(p.pickup_deadline) <= 14).length;
 
   return (
     <AdminLayout>
@@ -157,7 +171,8 @@ export default function AdminPrizesPage() {
       <p className="text-white/60 text-sm mb-6 max-w-2xl">
         Bei jedem auf <em>Ergebnisse veröffentlicht</em> gesetzten Turnier oder Fast Lap werden Gewinne automatisch
         anhand der hinterlegten Preisstruktur erstellt. Markiere Preise als <strong>bereit</strong>,
-        sobald sie zur Abholung verfügbar sind — der Sieger bekommt automatisch eine E-Mail.
+        sobald sie zur Abholung verfügbar sind — der Gewinner bekommt Bescheid (Glocke, Push und E-Mail, bei Teams die
+        Teamleitung), und ab dann läuft die Abholfrist.
       </p>
 
       <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -262,7 +277,7 @@ export default function AdminPrizesPage() {
                 const Icn = s.icon;
                 const RecipientIcon = p.recipient_type === "team" ? Users : User;
                 const due = daysUntil(p.pickup_deadline);
-                const isUrgent = ["pending", "ready"].includes(p.status) && due !== null && due <= 14;
+                const isUrgent = p.status === "ready" && due !== null && due <= 14;
                 return (
                   <tr key={p.id} data-testid={`prize-row-${p.id}`}>
                     <td className="px-4 py-3">
@@ -290,7 +305,7 @@ export default function AdminPrizesPage() {
                     </td>
                     <td className="px-4 py-3 text-xs whitespace-nowrap">
                       <div className={`inline-flex items-center gap-1.5 ${isUrgent ? "text-[#FFD700]" : "text-white/50"}`}>
-                        <CalendarDays className="w-3 h-3" /> {formatDate(p.pickup_deadline)}
+                        <CalendarDays className="w-3 h-3" /> {deadlineText(p)}
                       </div>
                       {isUrgent && <div className="text-[10px] uppercase tracking-widest text-[#FFD700] mt-1">{due < 0 ? "überfällig" : `${due} Tage`}</div>}
                     </td>
@@ -302,7 +317,10 @@ export default function AdminPrizesPage() {
                         <button onClick={() => markPickedUp(p.id)} data-testid={`prize-pickup-${p.id}`} className="text-[#00FF88] hover:underline mr-3 text-xs font-semibold">Abgeholt ✓</button>
                       )}
                       {p.status === "picked_up" && (
-                        <button onClick={() => updateStatus(p.id, "ready")} data-testid={`prize-revert-${p.id}`} className="text-white/50 hover:text-white mr-3 text-xs"><RefreshCw className="w-3 h-3 inline mr-1" />Zurück</button>
+                        <button onClick={() => updateStatus(p.id, "ready", "", "picked_up")} data-testid={`prize-revert-${p.id}`} className="text-white/50 hover:text-white mr-3 text-xs"><RefreshCw className="w-3 h-3 inline mr-1" />Zurück</button>
+                      )}
+                      {p.status === "expired" && (
+                        <button onClick={() => updateStatus(p.id, "ready", "", "expired")} data-testid={`prize-reopen-${p.id}`} className="text-[#29B6E8] hover:underline mr-3 text-xs font-semibold"><RefreshCw className="w-3 h-3 inline mr-1" />Wieder öffnen</button>
                       )}
                       <button onClick={() => remove(p.id)} className="text-[#FF3B30] hover:underline text-xs">Löschen</button>
                     </td>
@@ -317,7 +335,9 @@ export default function AdminPrizesPage() {
       <div className="mt-6 border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-4 flex items-start gap-3">
         <AlertCircle className="w-5 h-5 text-[#29B6E8] shrink-0 mt-0.5" />
         <div className="text-sm text-white/80">
-          <strong>Hinweis:</strong> Die Abholfrist beträgt standardmäßig 90 Tage. Verfallene Gewinne werden automatisch markiert und eine E-Mail an den User gesendet.
+          <strong>Hinweis:</strong> Die Abholfrist beträgt standardmäßig 90 Tage ab „Bereit“ – offene Gewinne verfallen nie. Ist die Frist vorbei,
+          steht der Gewinn auf „Verfallen“ und der Gewinner bekommt Bescheid; mit <strong>Wieder öffnen</strong> läuft eine neue Frist.
+          „Zurück“ bei einem abgeholten Gewinn schickt keine neue Nachricht. Jeder Schritt steht im Protokoll.
         </div>
       </div>
     </AdminLayout>
@@ -339,7 +359,7 @@ function PrizeMobileCard({ p, updateStatus, markPickedUp, remove }) {
   const Icn = s.icon;
   const RecipientIcon = p.recipient_type === "team" ? Users : User;
   const due = daysUntil(p.pickup_deadline);
-  const isUrgent = ["pending", "ready"].includes(p.status) && due !== null && due <= 14;
+  const isUrgent = p.status === "ready" && due !== null && due <= 14;
 
   return (
     <article data-testid={`prize-mobile-${p.id}`} className="p-4">
@@ -378,7 +398,7 @@ function PrizeMobileCard({ p, updateStatus, markPickedUp, remove }) {
       </div>
 
       <div className={`mt-3 text-xs inline-flex items-center gap-1.5 ${isUrgent ? "text-[#FFD700]" : "text-white/50"}`}>
-        <CalendarDays className="w-3 h-3" /> Frist: {formatDate(p.pickup_deadline)}
+        <CalendarDays className="w-3 h-3" /> Frist: {deadlineText(p)}
         {isUrgent && <span className="font-bold uppercase tracking-widest">{due < 0 ? "überfällig" : `${due} Tage`}</span>}
       </div>
 
@@ -390,7 +410,10 @@ function PrizeMobileCard({ p, updateStatus, markPickedUp, remove }) {
           <button onClick={() => markPickedUp(p.id)} data-testid={`prize-mobile-pickup-${p.id}`} className="px-3 py-2 border border-[#00FF88]/40 text-[#00FF88] rounded-sm text-xs font-bold uppercase tracking-wider">Abgeholt</button>
         )}
         {p.status === "picked_up" && (
-          <button onClick={() => updateStatus(p.id, "ready")} data-testid={`prize-mobile-revert-${p.id}`} className="px-3 py-2 border border-white/15 text-white/70 rounded-sm text-xs font-bold uppercase tracking-wider">Zurück</button>
+          <button onClick={() => updateStatus(p.id, "ready", "", "picked_up")} data-testid={`prize-mobile-revert-${p.id}`} className="px-3 py-2 border border-white/15 text-white/70 rounded-sm text-xs font-bold uppercase tracking-wider">Zurück</button>
+        )}
+        {p.status === "expired" && (
+          <button onClick={() => updateStatus(p.id, "ready", "", "expired")} data-testid={`prize-mobile-reopen-${p.id}`} className="px-3 py-2 border border-[#29B6E8]/40 text-[#29B6E8] rounded-sm text-xs font-bold uppercase tracking-wider">Wieder öffnen</button>
         )}
         <button onClick={() => remove(p.id)} className="px-3 py-2 border border-[#FF3B30]/35 text-[#FF3B30] rounded-sm text-xs font-bold uppercase tracking-wider">Löschen</button>
       </div>

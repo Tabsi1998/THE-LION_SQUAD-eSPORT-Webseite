@@ -61,9 +61,10 @@ export function AchievementLevelHeader({ level, earnedPercent, onLevelChange, ch
           </div>
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#A855F7]">Account-Level & Achievements</div>
+          {/* Einheitlich „Erfolge“ (#2123, ER14) - wie im Reiter, in der Verwaltung und im Handbuch. */}
+          <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#A855F7]">Level & Erfolge</div>
           <h2 className="font-heading text-2xl md:text-3xl font-black uppercase mt-1 flex items-center gap-2 flex-wrap">
-            <span>Deine Achievements</span>
+            <span>Deine Erfolge</span>
             {lvl.title && (
               <span className="text-sm font-bold tracking-widest text-[#FFD700] inline-flex items-center gap-1" data-testid="achievement-level-title">
                 Level {lvl.level} · {lvl.title}

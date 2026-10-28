@@ -25,9 +25,11 @@ EXCLUDED_KINDS = {"moderation", "invoice_ready"}
 # Nachrichten anderer Personen: nur der Hinweis, nie der Text.
 PRIVATE_BODY_CATEGORIES = {"community_messages"}
 PRIVATE_BODY_TEXT = "Öffne die Website oder die App, um sie zu lesen."
-COLORS = {"achievement": 0xFFD700, "prize_pending": 0xFFD700, "f1_prize": 0xFFD700, "f1_prize_reminder": 0xFFD700}
+COLORS = {"achievement": 0xFFD700, "prize_pending": 0xFFD700, "prize_status": 0xFFD700, "f1_prize": 0xFFD700,
+          "f1_prize_reminder": 0xFFD700}
 # Der Knopf unter der Direktnachricht (#573) - je Thema ein Wort, sonst „Öffnen“.
 BUTTON_LABELS = {"achievement": "Profil", "match_reminder": "Zum Match", "tournament_checkin": "Zum Check-in", "prize_pending": "Zum Gewinn",
+                 "prize_status": "Zum Gewinn",
                  "f1_prize": "Zum Gewinn", "f1_prize_reminder": "Zum Gewinn", "membership_update": "Mitgliederbereich",
                  "direct_message": "Nachricht öffnen", "news_member": "Weiterlesen"}
 

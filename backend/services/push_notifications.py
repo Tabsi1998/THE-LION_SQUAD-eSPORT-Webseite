@@ -49,6 +49,8 @@ PUSH_CHANNELS = {
     "match_report": "lion_tournaments",
     "match_dispute": "lion_tournaments",
     "prize_pending": "lion_tournaments",
+    # Gewinn bereit, abgeholt, verfallen (#2123, ER3) - bisher nur per Mail.
+    "prize_status": "lion_tournaments",
     "f1_prize": "lion_tournaments",
     "f1_prize_reminder": "lion_tournaments",
     "event_member": "lion_tournaments",

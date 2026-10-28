@@ -25,6 +25,9 @@ import { deadlineFormValues, deadlinePayload } from "@/lib/tournamentDeadlines";
 import { ADVANCEMENT_MODE_OPTIONS, BRONZE_FORMATS, DRAW_SHOW_MINUTES_DEFAULT, DRAW_SHOW_MINUTES_HINT, advancementModeHint, drawShowMinutesPayload, CUSTOM_BRACKET_FORMATS, EVENT_MODE_OPTIONS, GRAND_FINAL_FORMATS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, HEAT_REBUILD_FORMATS, HEAT_REBUILD_HINT, HEAT_REBUILD_OPTIONS, MATCHDAY_FORMATS, RESULT_ENTRY_MODE_OPTIONS, SCHEDULE_MODE_OPTIONS, SEEDING_OPTIONS, STREAM_PLATFORM_OPTIONS, TEAM_MODE_OPTIONS, TOURNAMENT_SEASON_WEIGHT_OPTIONS, VISIBILITY_OPTIONS, WEEKDAY_OPTIONS, advancementModeOf } from "./shared";
 import { StaffelSeasonValues, isStaffel, staffelBeforeStart } from "./StaffelParts";
 
+// „Gewinne erzeugen“ erst ab dem Ende (#2123, TA23) - wie der Server (services/tournament_guard.py FINISHED_STATUSES).
+const PRIZE_READY_STATUSES = new Set(["completed", "results_published", "archived"]);
+
 export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFormat, structureFixed = false }) {
   const dt = toDateTimeLocalInput;
   // Liga-Staffel (#2109): Season-Werte nur lesend in der Seitenleiste, Liga-fremde Felder fehlen ganz.
@@ -330,6 +333,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
       }
     } catch (e) { toast.error(formatRequestError(e, "Turnier konnte nicht gespeichert werden.", { title: f.title })); }
   };
+  const prizesFinished = PRIZE_READY_STATUSES.has(tournament?.status);
   const createPrizePickups = async () => {
     try {
       const { data } = await api.post(`/prizes/auto-create/${tournament.id}`);
@@ -524,13 +528,16 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
           <PrizeEditor value={f.prize_places} onChange={(v)=>set("prize_places", v)} />
           <Txt label="Preise" value={f.prize_pool} onChange={(v)=>set("prize_pool",v)} testId="tr-edit-prizes"/>
           <div className="border border-[#FFD700]/20 bg-[#FFD700]/5 rounded-sm p-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs text-white/55">
-              Nach veröffentlichten Ergebnissen erzeugt dieser Button konkrete Einträge für die Gewinnabholung.
+            {/* Erst ab „Beendet“ (#2123, TA23): vorher gäbe es Gewinne und „Gewinn vorgemerkt“ für einen Zwischenstand. */}
+            <p className="text-xs text-white/55" data-testid="tr-edit-create-prizes-hint">
+              {prizesFinished
+                ? "Erzeugt die Einträge für die Gewinnabholung aus der Rangfolge. Nach einer Korrektur kommen fehlende dazu; Gewinne, deren Platz nicht mehr stimmt, stehen unter „Gewinne“ zum Prüfen. Sonderpreise vergebt ihr dort von Hand."
+                : "Gewinne entstehen, sobald das Turnier beendet ist – vorher stünde nur ein Zwischenstand fest."}
             </p>
             <button
               type="button"
               onClick={createPrizePickups}
-              disabled={!((f.prize_places || []).length)}
+              disabled={!prizesFinished || !((f.prize_places || []).length)}
               data-testid="tr-edit-create-prizes"
               className="inline-flex items-center justify-center gap-2 rounded-sm border border-[#FFD700]/40 px-4 py-2 text-xs font-bold uppercase tracking-wider text-[#FFD700] hover:bg-[#FFD700]/10 disabled:opacity-50"
             >

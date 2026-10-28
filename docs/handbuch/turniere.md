@@ -546,7 +546,24 @@ Tabelle mit seiner Siegerkarte (bei Gruppen und bei Gleichstand auf Platz 1 nich
    System die **Punkte für die Jahreswertung** (Gewicht unter Spieloptionen: Major, Normal, Mini, Fun-Wertung … oder
    „Keine Jahreswertung“), die Auszeichnungen und legt die **Gewinn-Einträge** an (zu sehen unter **Admin → eSports →
    Gewinne**). Im Bearbeiten-Formular erzeugt **Gewinne erzeugen** (Abschnitt Preise) die Einträge bei Bedarf noch
-   einmal.
+   einmal – erst ab **Beendet**, vorher ist der Knopf gesperrt (sonst gäbe es Gewinne für einen Zwischenstand).
+   **Sonderpreise** hängen an keinem Platz; die legt ihr unter **Gewinne** von Hand an.
+
+   **Korrektur nach dem Veröffentlichen:** Status zurück auf **Beendet**, Ergebnis korrigieren, wieder **Ergebnisse
+   veröffentlicht**. Die Jahreswertungs-Punkte des Turniers werden dabei an die neue Rangfolge angeglichen (in der
+   Jahreswertung, in der sie schon stehen; auch nach einem Wechsel Mini/Normal/Major gibt es je Person nur einen
+   Eintrag; „Keine Jahreswertung“ nimmt sie zurück), der Abgleich steht im Protokoll. Ist diese Jahreswertung schon
+   abgeschlossen oder archiviert, bleiben ihre Punkte unverändert – eine Meldung sagt das beim Veröffentlichen, das
+   Protokoll vermerkt „übersprungen“. Fehlende Gewinne kommen dazu;
+   ein Gewinn, dessen Platz nicht mehr stimmt, wird nie entzogen, sondern steht unter **Gewinne** mit **Nach Korrektur
+   prüfen**.
+
+   **Gewinne übergeben** (Admin → eSports → Gewinne): Ein neuer Gewinn ist **Offen** und hat noch keine Frist. Mit
+   **Bereit** liegt er zur Abholung bereit: ab jetzt laufen **90 Tage** Abholfrist (eine von Hand gesetzte Frist
+   bleibt), und der Gewinner bekommt Bescheid – in der Glocke, per Push und per Mail; bei Team-Gewinnen die
+   Teamleitung. **Abgeholt** vermerkt die Übergabe (mit Nachricht). **Zurück** holt einen versehentlich abgehakten
+   Gewinn auf „Bereit“ – ohne neue Nachricht. Nur „Bereit“ verfällt nach Ablauf der Frist (mit Nachricht); **Wieder
+   öffnen** gibt einem verfallenen Gewinn eine neue Frist. Jeder Schritt und jedes Löschen steht im Protokoll.
 3. **Archiviert** oder **Abgesagt**: ebenfalls nur Turnierleitung. **Abgesagt** fragt nach einem freiwilligen Grund;
    alle, die angemeldet sind oder auf der Warteliste stehen (bei Teams jedes Mitglied), bekommen einmal „Turnier
    abgesagt“ ins Postfach, per Push und – wenn sie Mails zu Turnier-Updates zulassen – per Mail, jeweils mit dem Grund. **Entwurf** fragt ebenfalls

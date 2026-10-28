@@ -53,7 +53,7 @@ const POINT_SOURCES = [
     icon: MessageCircle,
     title: "Community",
     tone: "white",
-    text: "Community-Aktivität zählt für die Jahreswertung nur dann, wenn sie als Event, Challenge oder manuelle Admin-Wertung eingetragen ist.",
+    text: "Community-Aktivität allein zählt nicht für die Jahreswertung – nur Turniere, Fast Laps und bestätigte Event-Teilnahmen. Korrekturen trägt die Turnierleitung mit Grund ein.",
   },
 ];
 
@@ -88,13 +88,10 @@ export default function SeasonPage() {
   const totalPoints = standings.reduce((sum, row) => sum + Number(row.points || 0), 0);
   const totalProfilePoints = standings.reduce((sum, row) => sum + Number(row.profile_points || row.achievement_points || 0), 0);
   const totalRatings = standings.reduce((sum, row) => sum + Number(row.events_count || 0), 0);
-  const tournamentCount = s.tournament_ids?.length || 0;
-  const fastLapCount = s.f1_challenge_ids?.length || 0;
-  const sourceCount = tournamentCount + fastLapCount;
   const overviewItems = [
     { icon: Trophy, label: "Platzierung", value: "Rang entscheidet", text: "Top-Plätze starten mit höheren Basispunkten.", tone: "gold" },
     { icon: Users, label: "Teilnehmerfeld", value: `${standings.length || 0} Spieler`, text: "Große Felder erhöhen den Faktor der Wertung.", tone: "blue" },
-    { icon: Zap, label: "Boni", value: "Extra Punkte", text: "Check-in, Fair Play, Siege und Fast-Lap-Boni können dazukommen.", tone: "green" },
+    { icon: Zap, label: "Boni", value: "Extra Punkte", text: "Für die bestätigte Event-Teilnahme gibt es 5 Bonuspunkte; dazu kommen Korrekturen der Turnierleitung, immer mit Grund.", tone: "green" },
     { icon: ShieldCheck, label: "Schutz", value: s.drop_worst ? `${s.drop_worst} Streichresultat(e)` : "Alles zählt", text: s.drop_worst ? "Die schwächsten Wertungen fallen aus der Gesamtwertung." : "Keine Wertung wird aktuell gestrichen.", tone: "violet" },
   ];
   return (
@@ -131,7 +128,7 @@ export default function SeasonPage() {
             </div>
             <div className="inline-flex items-center gap-2 text-xs text-white/50 border border-white/10 bg-[#101010] rounded-sm px-3 py-2">
               <CircleGauge className="w-4 h-4 text-[#29B6E8]" />
-              {sourceCount || "Alle"} Quellen in der Wertung
+              Alle gewerteten Turniere, Fast Laps und Events
             </div>
           </div>
           <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-3">
@@ -215,7 +212,7 @@ export default function SeasonPage() {
         </section>
 
         <section className="mt-8 grid lg:grid-cols-[1.15fr_0.85fr] gap-4">
-          <InfoPanel icon={Award} title="Punktewertung" text="Jahreswertungspunkte werden aus echten Wertungseinträgen berechnet: Turnier- und Fast-Lap-Ergebnisse, bestätigte Event-Teilnahme sowie manuelle Admin-Wertungen. Achievements bleiben als Profilpunkte sichtbar, damit die Rangliste nicht heimlich zwei Systeme vermischt." />
+          <InfoPanel icon={Award} title="Punktewertung" text="Jahreswertungspunkte werden aus echten Wertungseinträgen berechnet: Turnier- und Fast-Lap-Ergebnisse und bestätigte Event-Teilnahme. Wird ein Ergebnis korrigiert, ziehen die Punkte nach; Korrekturen von Hand stehen mit Grund als eigene Wertung da. Erfolge bleiben als Profilpunkte sichtbar, damit die Rangliste nicht heimlich zwei Systeme vermischt." />
           <InfoPanel icon={Medal} title="Streichresultate" text={s.drop_worst ? `${s.drop_worst} schlechteste Resultat(e) werden nicht in die Gesamtpunkte gerechnet.` : "Alle gewerteten Resultate zählen in die Gesamtwertung."} />
         </section>
       </div>
