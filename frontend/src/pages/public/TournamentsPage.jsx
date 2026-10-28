@@ -69,7 +69,12 @@ export default function TournamentsPage() {
 
   useEffect(() => {
     const nextStatus = searchParams.get("status") || "all";
-    if (nextStatus !== statusFilter) setStatusFilter(nextStatus);
+    // Filterwechsel über die Adresse (#2124, Review O7: Zurück im Browser) - wieder ab der ersten Seite.
+    if (nextStatus !== statusFilter) {
+      setLoading(true);
+      setShown(PAGE_SIZE);
+      setStatusFilter(nextStatus);
+    }
   }, [searchParams, statusFilter]);
 
   const selectStatusFilter = (value) => {

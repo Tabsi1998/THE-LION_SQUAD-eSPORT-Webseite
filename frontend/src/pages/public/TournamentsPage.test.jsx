@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useNavigate } from "react-router-dom";
 
 // Turnierliste (#2124): „Beendet“ und „Live“ fragen Status-Gruppen am Server, ältere Turniere kommen mit „Mehr laden“.
 
@@ -42,4 +42,18 @@ test("„Beendet“ fragt die Gruppe „finished“, „Live“ die Gruppe „ru
   expect(query(apiMock.get.mock.calls.at(-1)[0]).status).toBe("finished");
   fireEvent.click(screen.getByTestId("tournament-filter-live"));
   await waitFor(() => expect(query(apiMock.get.mock.calls.at(-1)[0]).status).toBe("running"));
+});
+
+function GoTo({ to }) {
+  const navigate = useNavigate();
+  return <button type="button" data-testid="go" onClick={() => navigate(to)}>los</button>;
+}
+
+test("Filterwechsel über die Adresse (Review O7, Zurück im Browser): wieder ab der ersten Seite mit 24", async () => {
+  render(<MemoryRouter initialEntries={["/tournaments"]}><GoTo to="/tournaments?status=completed" /><TournamentsPage /></MemoryRouter>);
+  await screen.findAllByTestId("tournament-card");
+  fireEvent.click(screen.getByTestId("tournaments-load-more"));
+  await waitFor(() => expect(screen.getAllByTestId("tournament-card")).toHaveLength(30));
+  fireEvent.click(screen.getByTestId("go"));
+  await waitFor(() => expect(query(apiMock.get.mock.calls.at(-1)[0])).toMatchObject({ status: "finished", limit: "24" }));
 });
