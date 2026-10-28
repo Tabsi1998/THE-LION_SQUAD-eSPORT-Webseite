@@ -30,6 +30,7 @@ from services.advancement_draw import (
     draw_group_of,
     group_sources,
     group_targets,
+    league_home_swaps,
     match_mode,
 )
 from services.match_result_errors import MatchResultError
@@ -1802,7 +1803,8 @@ def build_league_redraw_application(stage_matches: list[dict], *, now_iso: str, 
     for leg_index, leg in enumerate(legs):
         for position, old_index in enumerate(order):
             new_round[leg[old_index]] = numbers[0] + leg_index * len(leg) + position
-    swap = {pair: rng.random() < 0.5 for pair in {_pair(match) for match in matches}}
+    # Nur Hinrunde (docs/LIGA.md): alle Seiten gemeinsam, sonst ginge das faire Heimrecht verloren (Helfer von A).
+    swap = league_home_swaps({_pair(match) for match in matches}, mirrored=mirrored, rng=rng)
     draw = {"id": str(uuid.uuid4()), "group": str(matches[0].get("section") or "LIGA"), "kind": "league",
             "trigger": trigger, "drawn_at": now_iso}
     target_sets: dict[str, dict] = {}
