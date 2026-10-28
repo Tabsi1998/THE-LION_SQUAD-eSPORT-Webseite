@@ -380,7 +380,7 @@ test("der Gamertag zeigt einen Beispielnamen in echter Größe; Texthöhe und H�
   show("/admin/shop/products/p1");
   await user.click(await screen.findByTestId("shop-step-designs"));
   const sample = screen.getByTestId("shop-preview-front-layer-1-sample");
-  expect(sample.getAttribute("src")).toBe("/api/admin/shop/products/p1/name-sample?kind=gamertag&color=Black");
+  expect(sample.getAttribute("src")).toBe("/api/admin/shop/products/p1/name-sample?kind=gamertag&color=Black&placement=front");
   const before = parseFloat(screen.getByTestId("shop-preview-front-layer-1").style.width);
   expect(before).toBeCloseTo((3.5 * 150 / 1800) * 100, 1);
   expect(screen.getByTestId("shop-layer-front-1-text-height")).toHaveAttribute("placeholder", "Vorgabe 1,3");
@@ -388,7 +388,7 @@ test("der Gamertag zeigt einen Beispielnamen in echter Größe; Texthöhe und H�
   await user.type(screen.getByTestId("shop-layer-front-1-max-width"), "6");
   // Gedrosselt: das Bild kommt erst, wenn die Eingabe kurz ruht.
   await waitFor(() => expect(screen.getByTestId("shop-preview-front-layer-1-sample").getAttribute("src")).toBe(
-    "/api/admin/shop/products/p1/name-sample?kind=gamertag&color=Black&text_height_cm=1.5&max_width_cm=6"));
+    "/api/admin/shop/products/p1/name-sample?kind=gamertag&color=Black&placement=front&text_height_cm=1.5&max_width_cm=6"));
   expect(parseFloat(screen.getByTestId("shop-preview-front-layer-1").style.width)).toBeCloseTo(((6 / 2.54) * 150 / 1800) * 100, 1);
   await user.click(screen.getByTestId("shop-layout-submit"));
   expect(apiMock.put.mock.calls[0][1].placements[0].layers[1]).toEqual({
@@ -414,7 +414,7 @@ test("passt der Beispielname nicht, sagt die Ebene warum - und eine gültige Gr�
   fireEvent.error(screen.getByTestId("shop-preview-front-layer-1-sample"));
   expect(await screen.findByText(tooWide)).toBeInTheDocument();
   expect(screen.queryByTestId("shop-preview-front-layer-1-sample")).toBeNull();
-  expect(apiMock.get).toHaveBeenCalledWith("/admin/shop/products/p1/name-sample", { params: { kind: "gamertag", color: "Black", max_width_cm: "1" } });
+  expect(apiMock.get).toHaveBeenCalledWith("/admin/shop/products/p1/name-sample", { params: { kind: "gamertag", color: "Black", placement: "front", max_width_cm: "1" } });
   // Weiter tippen (1 → 12): das neue Bild ist wieder da, der Hinweis weg.
   await user.type(screen.getByTestId("shop-layer-front-1-max-width"), "2");
   await waitFor(() => expect(screen.getByTestId("shop-preview-front-layer-1-sample").getAttribute("src")).toContain("max_width_cm=12"));
@@ -526,7 +526,7 @@ test("für Profis: fertige Druckdatei je Farbe hochladen", async () => {
 // ---------------------------------------------------------------- Trikot (#2142)
 
 const SPORT = "saira-condensed-900";
-const METRICS = { name: 2.3, number: 1.05, band_name: 1, band_number: 1.01 };
+const METRICS = { name: 2.3, name_offset: 0.013, number: 1.05, number_offset: 0.013, band_name: 1, band_number: 1.01 };
 const JERSEY_PRESETS = [
   { key: "jersey_back_name", label: "Trikot Rücken: Name oben", hint: "", kind: "text", families: ["back"], follow: null, center_x: 0.5, anchor: "top", top_cm: 8 },
   { key: "jersey_back_number", label: "Trikot Rücken: Nummer darunter", hint: "", kind: "text", families: ["back"], follow: "stack", gap_cm: 2, center_x: 0.5, anchor: "top", top_cm: 0 },
@@ -590,7 +590,7 @@ test("Trikot Rücken mit einem Klick: Name oben, Nummer darunter, Vereinsname un
   await user.type(screen.getByTestId("shop-layer-back-1-outline"), "0,3");
   await user.selectOptions(screen.getByTestId("shop-layer-back-1-outline-ink"), "reinweiss");
   await waitFor(() => expect(screen.getByTestId("shop-preview-back-layer-1-sample").getAttribute("src")).toContain(
-    "kind=member_number&color=Black&text_height_cm=10&max_width_cm=28&font=saira-condensed-900&outline_cm=0.3&outline_ink=reinweiss"));
+    "kind=member_number&color=Black&placement=back&text_height_cm=10&max_width_cm=28&font=saira-condensed-900&outline_cm=0.3&outline_ink=reinweiss"));
   expect(screen.getByTestId("shop-preview-back-layer-2-sample").getAttribute("src")).toContain("kind=text");
   // Ausrichten: Abstand zur Ebene darüber in cm.
   await user.type(screen.getByTestId("shop-layer-back-1-gap"), "3");
@@ -637,6 +637,24 @@ test("Namen auf einem Hintergrund: Farbe „aus Hintergrund“ - passt er nicht 
   expect(screen.getByTestId("shop-preview-back-backdrop-outdated")).toHaveTextContent("passt nicht mehr zur Vorlage");
 });
 
+test("Mindesthöhe je Ebene und der Hinweis des Servers, wenn der längste Name nicht passt (Review #2142)", async () => {
+  const base = jerseyView();
+  const name = { kind: "gamertag", preset: "text_opposite", offset_x_cm: 0, offset_y_cm: 0, text_height_cm: 1, max_width_cm: 6 };
+  const data = { ...base, placements: base.placements.map((row) => (row.key === "front"
+    ? { ...row, layers: [row.layers[0], name], layer_hints: [null, "Hinweis: der längste erlaubte Name (16 × „W“) passt nicht."] } : row)) };
+  apiMock.get.mockResolvedValue({ data });
+  apiMock.put.mockResolvedValue({ data });
+  apiMock.post.mockResolvedValue({ data: { placements: [] } });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-designs"));
+  expect(screen.getByTestId("shop-layer-front-1-hint")).toHaveTextContent("16 × „W“");
+  await user.type(screen.getByTestId("shop-layer-front-1-min-height"), "0,5");
+  // Geändert: der Hinweis galt dem gespeicherten Stand.
+  expect(screen.queryByTestId("shop-layer-front-1-hint")).toBeNull();
+  await user.click(screen.getByTestId("shop-layout-submit"));
+  expect(apiMock.put.mock.calls[0][1].placements[0].layers[1]).toEqual({ ...name, min_text_height_cm: 0.5 });
+});
 function alloverView() {
   const plan = (color, variant, text) => ({ layers: [
     { index: 0, kind: "motif", source: { design_key: "ruecken-weiss", variant, version: 1 }, image_path: "/api/shop/print-files/k9/ruecken-weiss-v1.png", aspect: 1,

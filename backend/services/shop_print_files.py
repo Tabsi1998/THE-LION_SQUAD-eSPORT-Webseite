@@ -768,12 +768,17 @@ def _text_fingerprint(item: "Planned", gamertag_rules: dict) -> dict:
     return out
 
 
-def text_png(item: "Planned", gamertag_rules: dict, text: str | None = None) -> bytes:
+async def text_png(item: "Planned", gamertag_rules: dict, text: str | None = None, *, preview: bool = False) -> bytes:
     """Eine Textebene als PNG der ganzen Leinwand, gerendert wie die Druckdatei (#2142) - der feste Text bzw. ein
-    Beispiel (``text``) für Gamertag und Vereinsnummer."""
+    Beispiel (``text``) für Gamertag und Vereinsnummer. Mit ``preview`` in Vorschau-Auflösung (Maße in Zoll gleich).
+    Über die gemeinsamen Plätze (``shop_gamertag.render_async``), nie in der Ereignisschleife."""
     own = shop_gamertag.layer_rules(gamertag_rules, item.spec)
-    return shop_gamertag.render(item.text if text is None else text, own, color_key=item.ink,
-                                kind=RENDER_KINDS.get(item.kind, "gamertag")).payload
+    if preview:
+        own = shop_gamertag.preview_rules(own)
+    rendered = await shop_gamertag.render_async(item.text if text is None else text, own, color_key=item.ink,
+                                                kind=RENDER_KINDS.get(item.kind, "gamertag"),
+                                                wait=shop_gamertag.RENDER_WAIT_SECONDS if preview else None)
+    return rendered.payload
 
 
 def layer_spec(layer: dict) -> dict | None:
@@ -1169,7 +1174,7 @@ async def _render_base(db, plan: Plan, rules: dict, gamertag_rules: dict | None 
         left, top, width, height = item.box.rounded()
         if item.kind != "motif":
             rules_for_text = gamertag_rules or await shop_gamertag.load_rules(db)
-            png = await asyncio.to_thread(text_png, item, rules_for_text)
+            png = await text_png(item, rules_for_text)
             layers.append(Layer(png=png, left=left, top=top, width=width, height=height, label=item.label))
             continue
         png = await _motif_png(db, item.source, width_px=width, dpi=entry["dpi"])
@@ -1530,23 +1535,29 @@ async def _sample_text(db, kind: str) -> str:
 
 
 async def sample_png(db, product: dict, *, kind: str, color: str, layer: dict | None, ink: str | None = None,
-                     text: str | None = None) -> bytes:
+                     text: str | None = None, bounds: dict | None = None) -> bytes:
     """Der Beispielname einer Namensebene in echter Größe (#2105) - gerendert wie die Druckdatei
     (``shop_gamertag.render`` mit den Regeln der Ebene), als PNG der ganzen Leinwand. Die Vorschau in Schritt 3 legt es
     in den Rahmen der Ebene; die Leinwand bleibt dort nur ein feiner Rahmen. Farbe des Namens wie bei der Bestellung:
     ``ink`` ist die Farbe aus dem Plan (Untergrund aus dem Hintergrund, #2141), ohne Angabe nach der Shirtfarbe. Eine
-    Nummer zeigt die Beispielnummer, ein fester Text (#2142) seinen ``text`` - mit Schrift und Kontur der Ebene."""
+    Nummer zeigt die Beispielnummer, ein fester Text (#2142) seinen ``text`` - mit Schrift und Kontur der Ebene, in
+    Vorschau-Auflösung (``shop_gamertag.preview_rules``; die Maße in Zoll sind dieselben). ``bounds``: die Grenze der
+    Fläche wie beim Speichern (``shop_products.text_bounds_for``)."""
     if kind not in RENDER_KINDS:
         raise LookupError("Diese Ebene hat keinen Text.")
     if color not in ((product.get("offer") or {}).get("colors") or []):
         raise LookupError("Diese Farbe wird nicht angeboten.")
-    rules = shop_gamertag.layer_rules(await shop_gamertag.load_rules(db), layer)
+    rules = shop_gamertag.layer_rules(await shop_gamertag.load_rules(db), layer, bounds=bounds)
     if ink is not None and ink not in {item["key"] for item in rules["colors"]}:
         raise LookupError("Diese Farbe für den Namen gibt es nicht.")
     ink = ink or shop_gamertag.inks_for_garment(rules, color)[0]["key"]
     shown = text if kind == "text" else await _sample_text(db, kind)
-    # Rendern kostet Rechenzeit (große Leinwand) - nicht im Event-Loop.
-    rendered = await asyncio.to_thread(shop_gamertag.render, shown, rules, color_key=ink, kind=RENDER_KINDS[kind])
+    # Die Leinwand in Druckgröße darf nicht zu groß sein - dieselbe Grenze wie bei der Datei; gerendert wird kleiner.
+    too_big = shop_gamertag.canvas_problem(rules, RENDER_KINDS[kind])
+    if too_big:
+        raise ShopError(too_big)
+    rendered = await shop_gamertag.render_async(shown, shop_gamertag.preview_rules(rules), color_key=ink,
+                                                kind=RENDER_KINDS[kind], wait=shop_gamertag.RENDER_WAIT_SECONDS)
     return rendered.payload
 
 
@@ -1623,7 +1634,7 @@ async def preview_png(db, product: dict, *, placement: str, color: str, sample: 
             if item.kind != "motif":
                 # Fester Text (#2142) wie in der Grunddatei.
                 try:
-                    put_text(await asyncio.to_thread(text_png, item, gamertag_rules), item.box)
+                    put_text(await text_png(item, gamertag_rules, preview=True), item.box)
                 except ShopError:
                     pass
                 continue
@@ -1645,8 +1656,7 @@ async def preview_png(db, product: dict, *, placement: str, color: str, sample: 
             ink = item.ink or shop_gamertag.inks_for_garment(gamertag_rules, color)[0]["key"]
             try:
                 shown = await _sample_text(db, item.kind)
-                put_text(await asyncio.to_thread(text_png, replace(item, ink=ink), gamertag_rules,
-                                                 shown), item.box)
+                put_text(await text_png(replace(item, ink=ink), gamertag_rules, shown, preview=True), item.box)
             except ShopError:
                 continue
     if preview and template_img is not None:

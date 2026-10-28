@@ -124,3 +124,15 @@ test("eine Vorlage setzt die Ebenen der Fläche; ein Motiv behält das gewählte
     { kind: "member_number", preset: "text_opposite", text_height_cm: 6, offset_x_cm: 0, offset_y_cm: 0 },
   ]);
 });
+
+test("Steigung und fester Rest getrennt; die Grenze rechnet die Kontur ein; eine Vorlage wird auf die Fläche gekürzt (Review #2142)", () => {
+  const canvas = { ...SPORT_CANVAS, font_metrics: { saira: { name: 2, name_offset: 0.1, number: 1, number_offset: 0.1, band_name: 1, band_number: 1 } } };
+  const size = textCanvasIn(canvas, { kind: "gamertag", font: "saira", text_height_cm: 2.54, outline_cm: 0.254 });
+  expect(size.height).toBeCloseTo(2 + 0.1 + 0.2);
+  // 40,64 cm hoch: ohne Kontur (40,64 - 0,254) / 1, mit 1 cm Kontur 2 cm weniger.
+  expect(textBoundsCm(BACK, {}, canvas, { kind: "member_number", font: "saira" }).height).toBeCloseTo(40.38, 1);
+  expect(textBoundsCm(BACK, {}, canvas, { kind: "member_number", font: "saira", outline_cm: 1 }).height).toBeCloseTo(38.38, 1);
+  const set = { layers: [{ kind: "gamertag", preset: "jersey_back_name", text_height_cm: 7, min_text_height_cm: 2.4, max_width_cm: 45 }] };
+  const [name] = layersFromSet(set, { boundsFor: () => ({ width: 30.48, height: 5 }) });
+  expect(name).toMatchObject({ max_width_cm: 30.48, text_height_cm: 5, min_text_height_cm: 2.4 });
+});

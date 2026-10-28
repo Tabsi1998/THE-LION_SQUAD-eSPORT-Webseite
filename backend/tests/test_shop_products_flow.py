@@ -411,7 +411,7 @@ async def test_print_files_preview_presets_template_images_and_upload_through_th
                             params={"kind": "gamertag", "color": "Black", "text_height_cm": 1.0, "max_width_cm": 6.0})
     assert sample.status_code == 200 and sample.headers["content-type"] == "image/png"
     with Image.open(BytesIO(sample.content)) as img:
-        assert img.width == round(6.0 / 2.54 * 300)
+        assert img.width == round(6.0 / 2.54 * 100), "in Vorschau-Auflösung (#2142)"
     too_low = await flow.get(f"{BASE}/{product_id}/name-sample", params={"color": "Black", "text_height_cm": 0.1})
     assert too_low.status_code == 400 and "Texthöhe" in too_low.json()["detail"]
     # Trikot (#2142): Rückennummer groß in der Sportschrift mit Kontur, fester Text als Beispiel.
@@ -420,7 +420,11 @@ async def test_print_files_preview_presets_template_images_and_upload_through_th
         "font": "saira-condensed-900", "outline_cm": 0.3})
     assert number.status_code == 200, number.text
     with Image.open(BytesIO(number.content)) as img:
-        assert img.width == round(25 / 2.54 * 300) and img.height < round(20 / 2.54 * 300 * 1.2)
+        assert img.width == round(25 / 2.54 * 100) and img.height < round(20 / 2.54 * 100 * 1.2)
+    # Mit der Fläche: dieselbe Grenze wie beim Speichern (#2142, Review).
+    over = await flow.get(f"{BASE}/{product_id}/name-sample", params={
+        "kind": "member_number", "color": "Black", "placement": "back", "text_height_cm": 45, "max_width_cm": 25})
+    assert over.status_code == 400 and "Rückseite" in over.json()["detail"]
     club = await flow.get(f"{BASE}/{product_id}/name-sample", params={"kind": "text", "color": "Black",
                                                                        "text": "TESTVEREIN", "max_width_cm": 20})
     assert club.status_code == 200, club.text
@@ -437,6 +441,9 @@ async def test_print_files_preview_presets_template_images_and_upload_through_th
               "layers": [{"kind": "text", "preset": "gibt_es_nicht"}]}
     wrong_set = await flow.put("/api/admin/shop/print-presets", json={"sets": [broken]})
     assert wrong_set.status_code == 400 and "gibt_es_nicht" in wrong_set.json()["detail"]
+    typed = await flow.put("/api/admin/shop/print-presets", json={"sets": [
+        {"key": "kaputt", "label": "Kaputt", "families": [["back"]], "layers": [{"kind": ["text"], "preset": []}]}]})
+    assert typed.status_code == 400, "falsche Typen sind ein Fehler der Eingabe, kein Absturz"
     changed = await flow.put("/api/admin/shop/print-presets", json={"rules": {"min_width_cm": 2.0}})
     assert changed.status_code == 200 and changed.json()["rules"]["min_width_cm"] == 2.0
     refused = await flow.put("/api/admin/shop/print-presets", json={"presets": [{"key": "!"}]})
@@ -518,3 +525,19 @@ async def test_the_draft_preview_is_rate_limited_per_account(flow, monkeypatch):
     assert limited.status_code == 429 and "Zu viele Vorschau-Anfragen" in limited.json()["detail"]
     flow.act_as(who["club-admin"])
     assert (await flow.post(f"{BASE}/gibt-es-nicht/layout/preview", json=body)).status_code == 404, "je Konto"
+
+
+@pytest.mark.asyncio
+async def test_the_name_sample_is_rate_limited_per_account(flow, monkeypatch):
+    """#2142 (Review): Beispielnamen rendern kostet Rechenzeit - je Konto gedrosselt wie die Vorschau, darüber 429."""
+    monkeypatch.setenv("SHOP_NAME_SAMPLE_LIMIT", "3")
+    monkeypatch.setenv("SHOP_NAME_SAMPLE_WINDOW_SECONDS", "3600")
+    who = await people(flow)
+    flow.act_as(who["finanzen"])
+    for _ in range(3):
+        answer = await flow.get(f"{BASE}/gibt-es-nicht/name-sample", params={"color": "Black"})
+        assert answer.status_code == 404, answer.text
+    limited = await flow.get(f"{BASE}/gibt-es-nicht/name-sample", params={"color": "Black"})
+    assert limited.status_code == 429
+    flow.act_as(who["club-admin"])
+    assert (await flow.get(f"{BASE}/gibt-es-nicht/name-sample", params={"color": "Black"})).status_code == 404

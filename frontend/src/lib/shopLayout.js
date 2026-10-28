@@ -96,9 +96,11 @@ export function textCanvasIn(canvas, layer) {
     const number = layer?.kind === "member_number";
     const textIn = Number(layer?.text_height_cm || canvas?.text_height_cm || 1.27) / CM_PER_INCH;
     const outlineIn = Number(layer?.outline_cm || 0) / CM_PER_INCH;
+    // Steigung je Zoll Texthöhe plus fester Rest (der Rand `PAD_PX`), getrennt vom Server geliefert (Review #2142).
+    const offset = Number((number ? metrics.number_offset : metrics.name_offset) || 0);
     return {
       width,
-      height: (number ? metrics.number : metrics.name) * textIn + 2 * outlineIn,
+      height: (number ? metrics.number : metrics.name) * textIn + offset + 2 * outlineIn,
       band: (number ? metrics.band_number : metrics.band_name) * textIn,
     };
   }
@@ -199,20 +201,32 @@ export function gapOffsetCm(area, above, item, layer, wantedCm) {
 }
 
 // Wie groß eine Textebene auf dieser Fläche höchstens sein kann (#2142, wie `shop_products._text_bounds`): Breite der
-// Fläche ohne Sicherheitsrand; Texthöhe so, dass die Leinwand in die Höhe ohne Sicherheitsrand passt.
+// Fläche ohne Sicherheitsrand; Texthöhe so, dass die Leinwand samt Rand und Kontur in die Höhe ohne Sicherheitsrand passt.
 export function textBoundsCm(area, rules, canvas, layer) {
   const margin = Number(rules?.safe_margin_cm?.[area.family] ?? 0);
   const width = Math.max(0, Number(area.width_cm) - 2 * margin);
   const height = Math.max(0, Number(area.height_cm) - 2 * margin);
   const metrics = canvas?.font_metrics?.[layer?.font || canvas?.font];
-  const perText = metrics ? (layer?.kind === "member_number" ? metrics.number : metrics.name) : (canvas?.height_per_text || 1);
-  return { width: Math.floor(width * 100) / 100, height: Math.floor((height / perText) * 100) / 100 };
+  const number = layer?.kind === "member_number";
+  const perText = metrics ? (number ? metrics.number : metrics.name) : (canvas?.height_per_text || 1);
+  const offsetCm = metrics ? Number((number ? metrics.number_offset : metrics.name_offset) || 0) * CM_PER_INCH : 0;
+  const room = Math.max(0, height - 2 * Number(layer?.outline_cm || 0) - offsetCm);
+  return { width: Math.floor(width * 100) / 100, height: Math.floor((room / perText) * 100) / 100 };
 }
 
 // Eine Vorlage mit mehreren Ebenen (#2142) für eine Fläche: die Ebenen vom Server (Personalisierung schon beachtet),
-// Motive mit dem Motiv, das auf der Fläche schon liegt, sonst dem ersten der Bibliothek.
-export function layersFromSet(set, { motifKey = "" } = {}) {
-  return (set?.layers || []).map((layer) => (layer.kind === "motif"
-    ? { ...layer, offset_x_cm: 0, offset_y_cm: 0, width_cm: layer.width_cm ?? 8.9, motif: { key: layer.motif?.key || motifKey || "", by_color: {} } }
-    : { ...layer, offset_x_cm: 0, offset_y_cm: 0 }));
+// Motive mit dem Motiv, das auf der Fläche schon liegt, sonst dem ersten der Bibliothek. Mit `boundsFor(layer)` wird
+// eine Höchstbreite über der Fläche auf die Fläche gekürzt (etwa die 45 cm des Allover-Trikots auf einem T-Shirt).
+export function layersFromSet(set, { motifKey = "", boundsFor = null } = {}) {
+  return (set?.layers || []).map((layer) => {
+    if (layer.kind === "motif") {
+      return { ...layer, offset_x_cm: 0, offset_y_cm: 0, width_cm: layer.width_cm ?? 8.9, motif: { key: layer.motif?.key || motifKey || "", by_color: {} } };
+    }
+    const out = { ...layer, offset_x_cm: 0, offset_y_cm: 0 };
+    const bounds = boundsFor ? boundsFor(layer) : null;
+    if (bounds && Number(out.max_width_cm) > bounds.width) out.max_width_cm = bounds.width;
+    if (bounds && Number(out.text_height_cm) > bounds.height) out.text_height_cm = bounds.height;
+    if (Number(out.min_text_height_cm) > Number(out.text_height_cm)) out.min_text_height_cm = out.text_height_cm;
+    return out;
+  });
 }

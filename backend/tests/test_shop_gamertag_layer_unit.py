@@ -137,13 +137,14 @@ async def test_the_sample_name_is_rendered_like_the_print_file(db, provider):
     rules = shop_gamertag.layer_rules(await shop_gamertag.load_rules(db), {"text_height_cm": 1.0,
                                                                            "max_width_cm": 6.0})
     with Image.open(BytesIO(payload)) as img:
-        assert img.size == shop_gamertag.canvas(rules), "die ganze Leinwand - die Vorschau legt sie in den Rahmen"
+        # Die ganze Leinwand - die Vorschau legt sie in den Rahmen; seit #2142 in Vorschau-Auflösung (100 DPI).
+        assert img.size == shop_gamertag.canvas(shop_gamertag.preview_rules(rules))
         ink = img.getchannel("A").getbbox()
         assert ink is not None and ink[2] - ink[0] < img.width, "der Name selbst ist schmaler als die Leinwand"
     default = await shop_print_files.sample_png(db, product, kind="member_number", color="White", layer=None)
     with Image.open(BytesIO(default)) as img:
         # Eine Nummer (#2142) braucht nur die Höhe der Ziffern.
-        assert img.size == shop_gamertag.canvas(await shop_gamertag.load_rules(db), "number")
+        assert img.size == shop_gamertag.canvas(shop_gamertag.preview_rules(await shop_gamertag.load_rules(db)), "number")
     with pytest.raises(LookupError):
         await shop_print_files.sample_png(db, product, kind="gamertag", color="Pink", layer=None)
     with pytest.raises(ShopError):

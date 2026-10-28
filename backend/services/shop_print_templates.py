@@ -872,22 +872,24 @@ LEGACY_DEFAULT_KEYS = ("chest_right", "chest_left", "front_center", "front_large
 # Positions-Vorgabe (oben) und ihre Größe - beides einstellbar wie die Vorgaben selbst.
 SET_KINDS = {"motif": "Motiv", "gamertag": "Gamertag", "member_number": "Vereinsnummer", "text": "Fester Text"}
 SPORT_FONT = "saira-condensed-900"
+# Größen fürs Allover-Trikot (83,8 × 114,3 cm): der breiteste erlaubte Name (16 × „W“) passt bis zur Mindesthöhe in
+# 45 cm, eine vierstellige Nummer in 40 cm (``shop_products._widest_problem`` prüft das beim Speichern).
 DEFAULT_SETS: list[dict] = [
     {"key": "jersey_back", "label": "Trikot Rücken", "families": ["back"],
      "hint": "Name oben, die große Nummer darunter, der Vereinsname unten - mittig, in der Sportschrift.",
      "layers": [
-         {"kind": "gamertag", "preset": "jersey_back_name", "text_height_cm": 7.0, "max_width_cm": 30.0,
-          "font": SPORT_FONT},
-         {"kind": "member_number", "preset": "jersey_back_number", "text_height_cm": 20.0, "max_width_cm": 30.0,
-          "font": SPORT_FONT},
+         {"kind": "gamertag", "preset": "jersey_back_name", "text_height_cm": 7.0, "min_text_height_cm": 2.4,
+          "max_width_cm": 45.0, "font": SPORT_FONT},
+         {"kind": "member_number", "preset": "jersey_back_number", "text_height_cm": 20.0, "min_text_height_cm": 10.0,
+          "max_width_cm": 40.0, "font": SPORT_FONT},
          {"kind": "text", "preset": "jersey_back_club", "text": "THE LION SQUAD", "text_height_cm": 3.5,
-          "max_width_cm": 30.0, "font": SPORT_FONT}]},
+          "min_text_height_cm": 1.75, "max_width_cm": 45.0, "font": SPORT_FONT}]},
     {"key": "jersey_chest", "label": "Trikot Brust", "families": ["front"],
      "hint": "Logo links (von vorne gesehen), die kleine Nummer rechts auf derselben Höhe.",
      "layers": [
          {"kind": "motif", "preset": "chest_right", "width_cm": 8.9},
-         {"kind": "member_number", "preset": "text_opposite", "text_height_cm": 6.0, "max_width_cm": 10.0,
-          "font": SPORT_FONT}]},
+         {"kind": "member_number", "preset": "text_opposite", "text_height_cm": 6.0, "min_text_height_cm": 3.0,
+          "max_width_cm": 12.0, "font": SPORT_FONT}]},
 ]
 MAX_SETS = 20
 MAX_SET_LAYERS = 6  # wie shop_print_files.MAX_LAYERS
@@ -994,6 +996,18 @@ def _set_number(value: Any, label: str, low: float, high: float) -> float:
 
 
 def clean_set(raw: Any, presets: Sequence[dict]) -> dict:
+    """Eine Vorlage mit mehreren Ebenen (#2142) - falsche Typen (etwa eine Liste statt einer Kennung) sind ein Fehler
+    der Eingabe (400), nie ein Absturz."""
+    try:
+        return _clean_set(raw, presets)
+    except ShopError:
+        raise
+    except (TypeError, ValueError, AttributeError) as exc:
+        raise ShopError("Vorlage: ungültige Angaben - Kennung, Bezeichnung, Flächen und Ebenen als Text, Liste bzw. "
+                        "Zahl.") from exc
+
+
+def _clean_set(raw: Any, presets: Sequence[dict]) -> dict:
     """Eine Vorlage mit mehreren Ebenen (#2142) - jede Ebene mit Art, Positions-Vorgabe (passend zur Art und zur
     Fläche) und, wenn gewünscht, Größe, Schrift, Kontur und festem Text."""
     from services import shop_gamertag
@@ -1065,6 +1079,15 @@ def _with_new_defaults(presets: list[dict], known: Any) -> list[dict]:
     return presets + extra[:max(0, MAX_PRESETS - len(presets))]
 
 
+def _with_new_sets(raw: Any, known: Any) -> list:
+    """Neue Vorlagen aus einer späteren Fassung kommen zu einer gespeicherten Liste dazu - außer, sie war schon bekannt
+    und wurde bewusst entfernt (``known_default_sets`` am Dokument)."""
+    stored = list(raw) if isinstance(raw, list) else []
+    have = {item.get("key") for item in stored if isinstance(item, dict)}
+    known = set(known) if isinstance(known, list) else set(have)
+    return stored + [item for item in DEFAULT_SETS if item["key"] not in known | have]
+
+
 def _usable_sets(raw: Any, presets: Sequence[dict]) -> list[dict]:
     """Die Vorlagen, die zu den Vorgaben passen - eine, deren Vorgabe entfernt wurde, fällt still weg (laut im Log)."""
     out = []
@@ -1087,7 +1110,9 @@ async def load_presets(db) -> dict:
     except ShopError:
         logger.warning("[shop-print-templates] stored presets invalid - defaults apply")
         presets, rules = clean_presets(DEFAULT_PRESETS), clean_rules({})
-    sets = _usable_sets(doc["sets"] if isinstance(doc.get("sets"), list) else DEFAULT_SETS, presets)
+    raw_sets = (_with_new_sets(doc["sets"], doc.get("known_default_sets")) if isinstance(doc.get("sets"), list)
+                else DEFAULT_SETS)
+    sets = _usable_sets(raw_sets, presets)
     return {"presets": presets, "rules": rules, "sets": sets, "updated_at": doc.get("updated_at"),
             "is_default": not doc.get("presets")}
 
@@ -1108,6 +1133,7 @@ async def save_presets(db, *, presets: Any = None, rules: Any = None, sets: Any 
         {"id": SETTINGS_ID},
         {"$set": {"id": SETTINGS_ID, "presets": after_presets, "rules": after_rules, "sets": after_sets,
                   "known_defaults": [item["key"] for item in DEFAULT_PRESETS],
+                  "known_default_sets": [item["key"] for item in DEFAULT_SETS],
                   "updated_at": now_utc().isoformat(), "updated_by": actor_id}}, upsert=True)
     before_keys = {item["key"]: item for item in current["presets"]}
     after_keys = {item["key"]: item for item in after_presets}

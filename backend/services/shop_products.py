@@ -305,18 +305,83 @@ LAYER_FIELDS = {"kind", "preset", "width_cm", "offset_x_cm", "offset_y_cm", "mot
 TEXT_ONLY_FIELDS = ("ink", "text", *shop_gamertag.LAYER_SIZE_FIELDS, *shop_gamertag.LAYER_STYLE_FIELDS)
 
 
-def _text_bounds(area: dict, presets_doc: dict, gamertag_rules: dict, kind: str, font: str | None) -> dict:
+def _text_bounds(area: dict, presets_doc: dict, gamertag_rules: dict, kind: str, font: str | None,
+                 outline_cm: float | None = None) -> dict:
     """Wie groß eine Textebene auf dieser Fläche höchstens sein kann (#2142): die Höchstbreite ist die Breite der
     Fläche ohne Sicherheitsrand, die Texthöhe so groß, dass die Leinwand (Name mit Platz für Akzente und Unterlängen,
-    Nummer nur so hoch wie die Ziffern) in die Höhe ohne Sicherheitsrand passt."""
+    Nummer nur so hoch wie die Ziffern, dazu oben und unten die Kontur) in die Höhe ohne Sicherheitsrand passt."""
     margin = float(presets_doc["rules"]["safe_margin_cm"].get(area["family"], 0.0))
     width = float(area["file"]["width_cm"]) - 2 * margin
     height = float(area["file"]["height_cm"]) - 2 * margin
-    metrics = shop_gamertag.font_metrics(gamertag_rules)[font or gamertag_rules["font"]]
-    per_text = metrics["number" if kind == "member_number" else "name"]
-    return {"width_cm": max(0.0, width), "text_height_cm": max(0.0, height / per_text) if per_text else height,
-            "label": area["label"]}
+    metrics = shop_gamertag.font_metrics(gamertag_rules).get(font or "") or \
+        shop_gamertag.font_metrics(gamertag_rules)[gamertag_rules["font"]]
+    name = "number" if kind == "member_number" else "name"
+    room = height - 2 * float(outline_cm or 0.0) - metrics[f"{name}_offset"] * shop_gamertag.CM_PER_INCH
+    text_height = math.floor(room / metrics[name] * 100) / 100 if metrics[name] > 0 else room
+    return {"width_cm": max(0.0, width), "text_height_cm": max(0.0, text_height), "label": area["label"]}
 
+
+async def layer_hints(db, rows: list[dict]) -> dict[str, list[str | None]]:
+    """Hinweise je Fläche und Ebene für Schritt 3 (#2142): passt der längste erlaubte Name bis zur Mindesthöhe in die
+    Höchstbreite der Gamertag-Ebene? Nur für Ebenen mit eigenen Werten."""
+    out: dict[str, list[str | None]] = {}
+    rules = None
+    for row in rows:
+        hints: list[str | None] = []
+        for layer in row.get("layers") or []:
+            hint = None
+            if layer.get("kind") == "gamertag" and shop_print_files.layer_spec(layer):
+                rules = rules or await shop_gamertag.load_rules(db)
+                try:
+                    hint = _widest_problem("gamertag", layer, rules, 0)
+                except ShopError as exc:
+                    hint = str(exc)
+                if hint:
+                    hint = "Hinweis: " + hint + " Kürzere Namen gehen; einen zu langen lehnt die Bestellung ab."
+            hints.append(hint)
+        out[row["key"]] = hints
+    return out
+
+
+async def text_bounds_for(db, product: dict, placement: str, layer: dict) -> dict:
+    """Die Grenze einer Textebene auf einer Fläche des Produkts (#2142) - für den Beispielnamen dieselbe wie beim
+    Speichern. Eine Fläche, die es nicht gibt: ``LookupError``."""
+    template = await templates.get(db, (product.get("printful") or {}).get("product_id"))
+    presets_doc = await templates.load_presets(db)
+    area = next((row for row in await available_placements(db, product, template=template, presets_doc=presets_doc)
+                 if row["key"] == placement), None)
+    if area is None:
+        raise LookupError("Diese Fläche gibt es beim Produkt nicht.")
+    rules = await shop_gamertag.load_rules(db)
+    style = shop_gamertag.clean_layer_style(layer, rules, strict=False)
+    return _text_bounds(area, presets_doc, rules, layer.get("kind") or "gamertag", style.get("font"),
+                        style.get("outline_cm"))
+
+
+def _widest_problem(kind: str, item: dict, rules: dict, digits: int) -> str | None:
+    """Passt der breiteste erlaubte Text dieser Ebene (#2142)? Beim Namen ``W`` in Höchstlänge der Gamertag-Regeln, bei
+    der Vereinsnummer die höchste Wunschnummer (Stellen aus den Einstellungen), beim festen Text der Text selbst. Nur
+    für Ebenen mit eigenen Werten - ohne gelten die Gamertag-Regeln wie bisher. Für Nummer und festen Text lehnt das
+    Speichern ab; beim Namen ist es ein Hinweis (``layer_hints``): 16 × „W“ brauchen schon bei 0,8 cm Texthöhe rund
+    16 cm - jedes Namensfeld auf der Brust (#2105) wäre sonst nicht mehr speicherbar, und einen zu langen Namen lehnt
+    die Bestellung ohnehin mit Begründung ab."""
+    render_kind = shop_print_files.RENDER_KINDS[kind]
+    spec = shop_print_files.layer_spec(item)
+    if kind != "text" and spec is None:
+        return None
+    own = shop_gamertag.layer_rules(rules, spec)
+    text = item["text"] if kind == "text" else shop_gamertag.widest_text(own, render_kind, digits)
+    problem = shop_gamertag.fit_problem(own, text, render_kind)
+    if problem is None:
+        return None
+    if kind == "gamertag":
+        return (f"der längste erlaubte Name ({rules['max_length']} × „W“) passt nicht - {problem.split(' Bitte ')[0]} "
+                "Bitte die Höchstbreite größer, die Mindesthöhe kleiner oder die Höchstlänge in den Gamertag-Regeln "
+                "kürzer wählen.")
+    if kind == "member_number":
+        return (f"die höchste Wunschnummer ({digits} {'Stelle' if digits == 1 else 'Stellen'}) passt nicht - "
+                f"{problem.split(' Bitte ')[0]} Bitte die Höchstbreite größer oder die Mindesthöhe kleiner wählen.")
+    return problem
 
 async def _clean_motif(db, raw: Any, colors: list[str], label: str) -> dict:
     if not isinstance(raw, dict) or set(raw) - {"key", "by_color"}:
@@ -347,6 +412,7 @@ async def _clean_layout(db, product: dict, raw_rows: Any, available: dict[str, d
     min_width = presets_doc["rules"]["min_width_cm"]
     inks: set[str] | None = None  # Farben der Gamertag-Regeln - erst gelesen, wenn eine Ebene eine feste Farbe hat
     gamertag_rules: dict | None = None  # erst gelesen, wenn eine Textebene eigene Werte hat
+    digits: int | None = None  # Stellen der höchsten Wunschnummer (#2034) - erst gelesen, wenn es Textebenen gibt
     out: list[dict] = []
     for raw in raw_rows:
         if not isinstance(raw, dict) or set(raw) - {"key", "mode", "layers"}:
@@ -402,15 +468,22 @@ async def _clean_layout(db, product: dict, raw_rows: Any, available: dict[str, d
                 # begrenzt die Fläche (mit Sicherheitsrand), dazu Schrift, Kontur und beim festen Text der Text selbst.
                 if gamertag_rules is None:
                     gamertag_rules = await shop_gamertag.load_rules(db)
+                if digits is None:
+                    digits = len(await shop_print_files.sample_number(db))
                 try:
                     style = shop_gamertag.clean_layer_style(layer, gamertag_rules)
-                    bounds = _text_bounds(area, presets_doc, gamertag_rules, kind, style.get("font"))
+                    bounds = _text_bounds(area, presets_doc, gamertag_rules, kind, style.get("font"),
+                                          style.get("outline_cm"))
                     item.update(shop_gamertag.clean_layer_sizes(layer, bounds=bounds))
                     item.update(style)
                     if kind == "text":
-                        item["text"] = shop_gamertag.clean_fixed_text(layer.get("text"), gamertag_rules)
+                        item["text"] = shop_gamertag.clean_fixed_text(layer.get("text"))
                     elif layer.get("text") not in (None, ""):
                         raise ShopError("einen festen Text gibt es nur für die Art „Fester Text“.")
+                    # Die höchste Wunschnummer und der feste Text müssen hineinpassen (#2142); beim Namen ein Hinweis.
+                    problem = _widest_problem(kind, item, gamertag_rules, digits) if kind != "gamertag" else None
+                    if problem:
+                        raise ShopError(problem)
                 except ShopError as exc:
                     raise ShopError(f"{label}: {exc}") from exc
                 # Farbe des Namens fest (#2141): eine Farbe der Gamertag-Regeln; ohne Angabe automatisch nach Kontrast.
@@ -666,6 +739,12 @@ async def run_check(db, product: dict) -> dict:
     items.append(_item("personalization", "Sichtbarkeit und Personalisierung", not problems,
                        " ".join(problems) or f"{shop_catalog.VISIBILITY_LABELS.get(product.get('visibility'))}, "
                                              f"Personalisierung: {shop_catalog.PERSONALIZATION_LABELS[personalization]}."))
+    if "member_number" in kinds:
+        # Bis die Nummer je Bestellung gedruckt wird (#1727), fiele sie still weg - darum rot: nicht freigeben. Ein
+        # Testentwurf an Printful geht trotzdem (dann ohne Nummer).
+        items.append(_item("member_number_print", "Vereinsnummer im Druck", False,
+                           "Die Vereinsnummer wird noch nicht gedruckt (#1727) – Produkt nicht freigeben. Ein "
+                           "Testentwurf an Printful geht trotzdem, dann ohne Nummer."))
     conversion = await shop_print_files.layout_conversion(db, product) if printful else {"blocked": []}
     if conversion["blocked"]:
         # Alte Platzierungen, die sich nicht abbilden lassen: das ganze Produkt ist nicht bestellbar (fail-closed).
@@ -829,12 +908,15 @@ async def admin_view(db, product_id: str) -> dict:
         if printful else []
     labels = {row["key"]: row["label"] for row in available}
     placement_rows = []
+    hints = await layer_hints(db, rows)
     for row in rows:
         placement_rows.append({
             "key": row["key"], "label": labels.get(row["key"], row["key"]), "mode": row.get("mode") or "layout",
             "layers": row.get("layers") or [], "printful_placement": row["printful_placement"],
             # vor #2141 gespeichert: die Motive dieser fertigen Datei werden noch nicht gedruckt (bis zum Speichern)
             "motifs_hidden": not shop_print_files.motifs_on_background(row),
+            # Hinweis je Ebene, etwa wenn der längste erlaubte Name nicht hineinpasst (#2142)
+            "layer_hints": hints.get(row["key"]) or [],
             "included": row["printful_placement"] == included,
             "surcharge_cents": (sample.get("placement_costs") or {}).get(row["printful_placement"]),
             "files": [{**state, "color_label": shop_colors.label(product, state["color"])}

@@ -119,9 +119,9 @@ const JERSEY = {
   fonts: [{ key: "rajdhani-700", label: "Rajdhani Bold" }, { key: SPORT, label: "Saira Condensed Black – Sport- und Blockschrift für Trikots" }],
   print_sets: [{ key: "jersey_back", label: "Trikot Rücken", hint: "Name oben, Nummer darunter, Vereinsname unten.", families: ["back"], skipped: [],
     layers: [
-      { kind: "gamertag", preset: "jersey_back_name", text_height_cm: 7, max_width_cm: 30, font: SPORT },
-      { kind: "member_number", preset: "jersey_back_number", text_height_cm: 20, max_width_cm: 30, font: SPORT },
-      { kind: "text", preset: "jersey_back_club", text: "TESTVEREIN", text_height_cm: 3.5, max_width_cm: 30, font: SPORT },
+      { kind: "gamertag", preset: "jersey_back_name", text_height_cm: 7, min_text_height_cm: 2.4, max_width_cm: 45, font: SPORT },
+      { kind: "member_number", preset: "jersey_back_number", text_height_cm: 20, min_text_height_cm: 10, max_width_cm: 40, font: SPORT },
+      { kind: "text", preset: "jersey_back_club", text: "TESTVEREIN", text_height_cm: 3.5, min_text_height_cm: 1.75, max_width_cm: 45, font: SPORT },
     ] }],
 };
 async function mockApi(page, seen, data = VIEW) {
@@ -273,7 +273,9 @@ for (const [label, width, height] of WIDTHS) {
       }
       await expect(page.getByTestId("shop-layer-back-1-gap-now")).toContainText("jetzt 2 cm");
       await expect(page.getByTestId("shop-layer-back-1-size-hint")).toContainText("Höchstbreite bis 83,8 cm");
-      await expect(page.getByTestId("shop-preview-back-layer-1-sample")).toHaveAttribute("src", /kind=member_number.*text_height_cm=20.*font=saira-condensed-900/);
+      await expect(page.getByTestId("shop-preview-back-layer-1-sample")).toHaveAttribute("src", /kind=member_number.*placement=back.*text_height_cm=20.*min_text_height_cm=10.*font=saira-condensed-900/);
+      await expect(page.getByTestId("shop-layer-back-0-min-height")).toHaveValue("2,4");
+      await expect(page.getByTestId("shop-preview-back-layer-1-sample")).toHaveCSS("object-fit", "contain");
       await expect(page.getByTestId("shop-preview-back-layer-2-sample")).toHaveAttribute("src", /kind=text.*text=TESTVEREIN/);
       // Kontur an der Nummer, fester Text geändert - die Beispiele kommen so vom Server.
       await page.getByTestId("shop-layer-back-1-outline").fill("0,4");

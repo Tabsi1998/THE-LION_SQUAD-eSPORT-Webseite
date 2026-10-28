@@ -737,11 +737,14 @@ beim Speichern wird sie abgelehnt. Vorgabe:
 
 | Vorlage | Fläche | Ebenen |
 | --- | --- | --- |
-| Trikot Rücken | hinten | Gamertag „Name oben“ 7 cm, Vereinsnummer „Nummer darunter“ 20 cm, fester Text „Vereinsname unten“ 3,5 cm („THE LION SQUAD“) - je höchstens 30 cm breit, Sportschrift |
-| Trikot Brust | vorne | Motiv „Brust rechts (vom Träger aus)“, Vereinsnummer „gegenüber“ 6 cm, Sportschrift |
+| Trikot Rücken | hinten | Gamertag „Name oben“ 7 cm (verkleinert bis 2,4 cm, bis 45 cm breit), Vereinsnummer „Nummer darunter“ 20 cm (bis 10 cm, 40 cm breit), fester Text „Vereinsname unten“ 3,5 cm (bis 1,75 cm, 45 cm breit, „THE LION SQUAD“) - Sportschrift |
+| Trikot Brust | vorne | Motiv „Brust rechts (vom Träger aus)“, Vereinsnummer „gegenüber“ 6 cm (bis 3 cm, 12 cm breit), Sportschrift |
 
-Die Größen passen zum Allover-Trikot (83,8 × 114,3 cm); auf einem T-Shirt-Rücken (30,5 × 40,6 cm) nach dem Setzen
-kleiner stellen - die Vorschau zeigt rot, was hinausragt. Gamertag und Vereinsnummer kommen nur mit passender
+Die Größen passen zum Allover-Trikot (83,8 × 114,3 cm): „GAMERTAG“ steht in voller Höhe, 16 × „W“ und jede
+vierstellige Wunschnummer passen bis zur Mindesthöhe (Tests rendern das echt). Auf einer kleineren Fläche kürzt
+Schritt 3 Höchstbreite und Texthöhe der Vorlage auf die Fläche; danach die Größen prüfen - die Vorschau zeigt rot, was
+hinausragt. Neue Vorlagen kommen wie neue Vorgaben auch zu einer gespeicherten Liste dazu (`known_default_sets`), eine
+bewusst entfernte bleibt weg; falsche Typen in `sets` lehnt die Route mit 400 ab. Gamertag und Vereinsnummer kommen nur mit passender
 Personalisierung dazu (sonst sagt Schritt 3, was ausgelassen ist). Kommt mit einer neuen Fassung eine neue Vorgabe dazu,
 erscheint sie auch in einer schon gespeicherten Liste - außer, sie war schon bekannt und wurde bewusst entfernt
 (`known_defaults` am Dokument). Eine eigene Seite zum Bearbeiten gibt es noch nicht; geändert wird über die Route.
@@ -765,12 +768,13 @@ haben (`variant`: `light` oder `dark`, #2141); ohne Angabe entscheidet der Unter
 - `gamertag`, `member_number`: Platzhalter mit Vorgabe (etwa „Brust gegenüber dem Motiv“); ihre Datei entsteht je
   Bestellung. Höchstens einer je Fläche, nur mit passender Personalisierung. Die Größe ist die Leinwand der
   Gamertag-Datei (`shop_gamertag.canvas`), ihr Anker (`anchor_y_in`) liegt auf der halben Höhe. **Je Ebene
-  einstellbar (#2105):** `text_height_cm` (Texthöhe) und `max_width_cm` (Höchstbreite der Leinwand); ohne Angabe die
-  globalen Gamertag-Regeln. **Seit #2142 begrenzt die Fläche** statt fester 2 bzw. 12 Zoll: Höchstbreite bis zur Breite
-  der Fläche ohne Sicherheitsrand, Texthöhe so, dass die Leinwand in deren Höhe passt (`shop_products._text_bounds`,
+  einstellbar (#2105):** `text_height_cm` (Texthöhe), `max_width_cm` (Höchstbreite der Leinwand) und seit #2142
+  `min_text_height_cm` (bis dahin wird ein zu breiter Name verkleinert; ohne Angabe im Verhältnis der Gamertag-Regeln);
+  ohne Angabe die globalen Gamertag-Regeln. **Seit #2142 begrenzt die Fläche** statt fester 2 bzw. 12 Zoll: Höchstbreite bis zur Breite
+  der Fläche ohne Sicherheitsrand, Texthöhe so, dass die Leinwand samt Kontur in deren Höhe passt (`shop_products._text_bounds`,
   in Schritt 3 `textBoundsCm`); die Meldung nennt die Grenze in cm („so viel lässt die Fläche „Rückseite“ mit
   Sicherheitsrand zu“), und ragt der Rahmen samt Versatz hinaus, lehnt die Prüfung ab. Untergrenzen 0,25 bzw. 1,27 cm;
-  ohne Fläche (Beispielname) nur die technische Grenze (200 cm, höchstens 60 Millionen Pixel je Leinwand). Die globalen
+  ohne Fläche nur die technische Grenze (200 cm, höchstens 20 Millionen Pixel je Leinwand bei der DPI der Regeln). Die globalen
   Gamertag-Regeln bleiben Vorgabe mit ihren Grenzen. Dazu je Ebene **Schrift** (`font`, eine der freigegebenen) und
   **Kontur** (`outline_cm` 0,05 bis 2 cm, `outline_ink` fest oder automatisch die Farbe mit dem höchsten Kontrast zur
   Schrift). `shop_gamertag.layer_rules` macht daraus die Regeln der Ebene (die Mindesthöhe der Verkleinerung bleibt
@@ -779,10 +783,22 @@ haben (`variant`: `light` oder `dark`, #2141); ohne Angabe entscheidet der Unter
   Grunddateien enthalten keinen Namen und werden davon nicht „veraltet“. In der Vorschau steht ein **Beispielname in
   echter Texthöhe** (`GET …/products/{id}/name-sample`, gerendert wie die Druckdatei: `GAMERTAG` bzw. die höchste
   Wunschnummer, Vorgabe `99`; Farbe wie bei der Bestellung, mit Schrift und Kontur); die Leinwand bleibt nur ein feiner
-  Rahmen. Die **Vereinsnummer** (#2142) hat nur Ziffern (höchstens vier wie die Wunschnummer) und eine Leinwand so hoch
-  wie die Ziffern - ohne Platz für Akzente und Unterlängen; ihre Texthöhe misst die Ziffern.
-- `text` (**Fester Text**, #2142), etwa der Vereinsname: `text` (bis 40 Zeichen: Buchstaben, Ziffern, die Zeichen der
-  Gamertag-Regeln und `. , - & ' ! ? : / # + ( )`, keine Emojis), Vorgabe, Texthöhe, Höchstbreite, Schrift, Farbe
+  Rahmen. Der Beispielname kommt in **Vorschau-Auflösung** (100 DPI, Maße in Zoll gleich), mit `placement` gilt die
+  Grenze der Fläche wie beim Speichern; je Konto gedrosselt (`SHOP_NAME_SAMPLE_LIMIT`, Vorgabe 120 je
+  `SHOP_NAME_SAMPLE_WINDOW_SECONDS` = 60, darüber 429). Alle Text-Renderings - Bestelldatei, Grunddatei, Beispiel,
+  Vorschau-PNG - laufen in einem Thread und teilen sich zwei Plätze je Prozess (`shop_gamertag.render_async`, wie
+  `shop_motifs.pair_semaphore`; ein Beispiel wartet höchstens 20 s, dann 429). Die **Vereinsnummer** (#2142) hat nur
+  Ziffern (höchstens vier wie die Wunschnummer) und eine Leinwand so hoch wie die Ziffern - ohne Platz für Akzente und
+  Unterlängen; ihre Texthöhe misst die Ziffern.
+- **Breitester Text beim Speichern (#2142):** Hat eine Vereinsnummer-Ebene eigene Werte, muss die höchste Wunschnummer
+  (so viele Stellen wie die Einstellung „bis“, mit der breitesten Ziffer der Schrift) bis zur Mindesthöhe in die
+  Höchstbreite passen, ein fester Text mit seinem Text - sonst lehnt das Speichern mit Begründung ab. Beim Gamertag
+  (16 × „W“ in Höchstlänge der Gamertag-Regeln) ist es nur ein Hinweis an der Ebene (`layer_hints`): 16 × „W“ brauchen
+  schon bei 0,8 cm Texthöhe rund 16 cm, jedes Namensfeld auf der Brust wäre sonst unspeicherbar - einen zu langen
+  Namen lehnt die Bestellung ohnehin mit Begründung ab. Eine Konturfarbe oder Schrift, die es nicht mehr gibt, lehnt
+  das Speichern ab; beim Rendern gilt dafür wieder automatisch bzw. die Schrift der Regeln.
+- `text` (**Fester Text**, #2142), etwa der Vereinsname: `text` (bis 40 Zeichen: Buchstaben A–Z, Ziffern, Umlaute, ß und
+  `. , - _ & ' ! ? : / # + ( )` - eine eigene feste Liste, unabhängig von den Gamertag-Regeln; keine Emojis), Vorgabe, Texthöhe, Höchstbreite, Schrift, Farbe
   (`ink` fest oder automatisch nach Untergrund wie bei den Namen, #2141) und Kontur. Mehrere je Fläche, ohne
   Personalisierung. Er ist für alle Bestellungen gleich und liegt darum **in der Grunddatei** (`BASE_KINDS`):
   `_render_base` rendert ihn wie einen Namen (`shop_gamertag.render(…, kind="text")`) in seinen Rahmen. Der
@@ -935,8 +951,10 @@ Vereinsname; vorne das Logo und eine kleine Nummer. Schritt für Schritt (Verwal
    untereinander, in der Sportschrift Saira Condensed Black. Die Vorlage ersetzt die Ebenen dieser Fläche.
 3. Den **Vereinsnamen** im Feld „Text“ prüfen. Größen in cm anpassen: die Vorschau zeigt Beispielname und
    Beispielnummer in echter Größe auf dem Hintergrund; was hinausragt, ist rot, und der Hinweis unter den Feldern nennt
-   die Grenze der Fläche in cm. Auf einem T-Shirt-Rücken die Vorgaben kleiner stellen (etwa Name 4 cm, Nummer 11 cm,
-   Vereinsname 2,5 cm).
+   die Grenze der Fläche in cm. Auf einer kleineren Fläche kürzt die Vorlage Höchstbreite und Texthöhe auf die Fläche;
+   auf einem T-Shirt-Rücken trotzdem kleiner stellen (etwa Name 4 cm, Nummer 11 cm, Vereinsname 2,5 cm). „Mindesthöhe“
+   sagt, bis wohin ein langer Name bzw. eine vierstellige Nummer verkleinert wird - die höchste Wunschnummer muss so
+   hineinpassen, sonst lehnt das Speichern ab; passt der längste erlaubte Name nicht, steht ein Hinweis an der Ebene.
 4. Wenn gewünscht eine **Kontur** (etwa 0,3 cm) - die Farbe wählt sich nach Kontrast zur Schrift, oder fest.
    **Farbe** der Schrift: automatisch nach dem Untergrund oder fest.
 5. **Ausrichten:** „Mittig auf Fläche“ setzt eine verschobene Ebene zurück in die Mitte; „Abstand zur Ebene darüber“
@@ -947,7 +965,9 @@ Vereinsname; vorne das Logo und eine kleine Nummer. Schritt für Schritt (Verwal
    Grunddatei, Name und Nummer je Bestellung. Danach Vorschau je Farbe und ein Testentwurf an Printful (#2062).
 
 Die Größen und Abstände der Vorlagen sind Positions-Vorgaben (Abschnitt oben) und lassen sich dort ändern. Die
-Vereinsnummer steht bis #1727 nur als Platzhalter in der Vorschau - gedruckt wird sie noch nicht.
+Vereinsnummer steht bis #1727 nur als Platzhalter in der Vorschau - gedruckt wird sie noch nicht. Darum ist der
+Prüfpunkt „Vereinsnummer im Druck“ rot, solange eine Fläche eine Vereinsnummer-Ebene hat: „geprüft“ und
+„veröffentlicht“ sind gesperrt, ein Testentwurf an Printful geht (dann ohne Nummer).
 
 ### Bestellung
 
@@ -968,6 +988,9 @@ Grunddateien gehören zum Katalog.
 Neu: **Druckvorlage von Printful** (geladen, höchstens 14 Tage alt, letzte Änderung mit Sätzen) und **Druckdateien je
 Farbe**: jede Fläche mit Motiv (bzw. fertiger Datei) hat für jede angebotene Farbe (und Gruppe) eine gültige Datei zum
 aktuellen Aufbau und zur aktuellen Vorlage; fehlt sie oder ist sie veraltet, nennt die Prüfung Fläche und Farbe.
+Seit #2142 **Vereinsnummer im Druck** (`member_number_print`): rot, solange eine Vereinsnummer-Ebene da ist - die
+Nummer wird erst mit #1727 je Bestellung gedruckt und fiele sonst still weg. Der Testentwurf (#2062) zählt diesen
+Punkt nicht.
 
 ### Produktsuche (Schritt 1)
 
@@ -993,9 +1016,12 @@ Testentwurf an Printful mit #2062.
 (Lizenztexte `OFL-Rajdhani.txt`, `OFL-Outfit.txt`, `OFL-Unbounded.txt` daneben). Zur Wahl: Rajdhani Bold (Vorgabe,
 schmal - passt zum Richtwert „7 Zeichen ≈ 2,4 Zoll“), Outfit Bold/ExtraBold, Unbounded ExtraBold. Die Rajdhani-Datei
 hat gleich breite Ziffern (eigene Ableitung, `scripts/build_web_fonts.py`; die Lizenz erlaubt das). Für Trikots (#2142)
-dazu **Saira Condensed Black** als Sport- und Blockschrift (`saira-condensed-latin-900.woff2`, Fontsource 5.3.0 wie
-die übrigen, Lizenz `OFL-SairaCondensed.txt` daneben; nur im Backend, die Vorschau rendert der Server) - je Textebene
-in Schritt 3 wählbar, auch als Schrift der Gamertag-Regeln.
+dazu **Saira Condensed Black** als Sport- und Blockschrift (`saira-condensed-latin-900.woff2`) - unverändert aus dem
+npm-Paket `@fontsource/saira-condensed@5.3.0` (Datei `files/saira-condensed-latin-900-normal.woff2`, Quelle Google
+Fonts wie die übrigen), SHA-256 `28e7f85ac4b26a1b9f2070fa6867c073457412414def415e9bd6387e7f3228f8` (steht an
+`shop_gamertag.FONTS`, ein Test prüft sie), Lizenz `LICENSE` des Pakets als `OFL-SairaCondensed.txt` daneben. Nur im
+Backend, die Vorschau rendert der Server. Nachbauen: `npm pack @fontsource/saira-condensed@5.3.0`, die Datei kopieren
+und die Prüfsumme vergleichen. Je Textebene in Schritt 3 wählbar, auch als Schrift der Gamertag-Regeln.
 
 **Renderer** (Pillow, ohne Netz und ohne Dateizugriff - die Schrift wird einmal in den Speicher gelesen):
 

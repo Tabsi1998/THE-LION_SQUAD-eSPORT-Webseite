@@ -19,7 +19,8 @@ from pydantic import BaseModel, Field, StrictInt
 
 from auth import require_area
 from database import get_db
-from services import shop_catalog_search, shop_catalog_sync, shop_designs, shop_print_files, shop_products
+from services import (shop_catalog_search, shop_catalog_sync, shop_designs, shop_gamertag, shop_print_files,
+                      shop_products)
 from services import shop_print_templates as print_templates
 from services.image_upload import _read_upload_limited
 from services.rate_limit import enforce_rate_limit
@@ -71,6 +72,8 @@ class LayerIn(BaseModel):
     # Größe einer Gamertag- bzw. Vereinsnummer-Ebene (#2105) - ohne Angabe die globalen Gamertag-Regeln.
     text_height_cm: float | None = None
     max_width_cm: float | None = None
+    # Bis zu dieser Texthöhe wird ein zu breiter Name verkleinert (#2142) - ohne Angabe im Verhältnis der Gamertag-Regeln.
+    min_text_height_cm: float | None = None
     # Fassung von Hand (#2141): ohne Angabe bzw. „auto“ entscheidet der Untergrund (Hintergrund, Produkt, Shirtfarbe).
     variant: Literal["auto", "light", "dark"] | None = None
     # Farbe von Gamertag bzw. Vereinsnummer fest (#2141): eine Farbe der Gamertag-Regeln, ohne Angabe automatisch.
@@ -113,6 +116,8 @@ def _refused(exc: Exception) -> HTTPException:
         return HTTPException(404, str(exc))
     if isinstance(exc, ShopConflict):
         return HTTPException(409, str(exc))
+    if isinstance(exc, shop_gamertag.RenderBusy):
+        return HTTPException(429, str(exc))
     if isinstance(exc, shop_products.CatalogUnavailable):
         return HTTPException(502, str(exc))
     return HTTPException(400, str(exc))
@@ -278,28 +283,43 @@ async def preview(product_id: str, placement: str = Query(..., max_length=64), c
     return Response(payload, media_type="image/png", headers=PNG_HEADERS)
 
 
+def sample_limit() -> tuple[int, int]:
+    """Wie oft ein Beispielname je Konto gerendert wird (#2142): ``SHOP_NAME_SAMPLE_LIMIT`` (Vorgabe 120) Aufrufe je
+    ``SHOP_NAME_SAMPLE_WINDOW_SECONDS`` (Vorgabe 60) - Schritt 3 lädt beim Tippen gedrosselt nach."""
+    return (_env_int("SHOP_NAME_SAMPLE_LIMIT", 120, 1, 10_000),
+            _env_int("SHOP_NAME_SAMPLE_WINDOW_SECONDS", 60, 1, 86_400))
+
+
 @router.get("/products/{product_id}/name-sample")
-async def name_sample(product_id: str, kind: Literal["gamertag", "member_number", "text"] = "gamertag",
-                      color: str = Query(..., max_length=60), text_height_cm: float | None = Query(None),
-                      max_width_cm: float | None = Query(None), ink: str | None = Query(None, max_length=30),
+async def name_sample(product_id: str, request: Request,
+                      kind: Literal["gamertag", "member_number", "text"] = "gamertag",
+                      color: str = Query(..., max_length=60), placement: str | None = Query(None, max_length=64),
+                      text_height_cm: float | None = Query(None), max_width_cm: float | None = Query(None),
+                      min_text_height_cm: float | None = Query(None), ink: str | None = Query(None, max_length=30),
                       text: str | None = Query(None, max_length=80), font: str | None = Query(None, max_length=40),
                       outline_cm: float | None = Query(None), outline_ink: str | None = Query(None, max_length=30),
                       me: dict = Depends(require_area("finance"))):
-    """Beispielname einer Textebene in echter Größe (#2105) - gerendert wie die Druckdatei, als PNG der Leinwand.
-    ``ink`` ist die Farbe des Namens aus dem Plan (Untergrund aus dem Hintergrund, #2141). Seit #2142 auch mit Schrift
-    und Kontur der Ebene, die Vereinsnummer als Beispielnummer und der feste Text (``kind=text``) mit ``text``."""
+    """Beispielname einer Textebene in echter Größe (#2105) - gerendert wie die Druckdatei, als PNG der Leinwand, in
+    Vorschau-Auflösung. ``ink`` ist die Farbe des Namens aus dem Plan (Untergrund aus dem Hintergrund, #2141). Seit
+    #2142 auch mit Schrift und Kontur der Ebene, die Vereinsnummer als Beispielnummer und der feste Text
+    (``kind=text``) mit ``text``; mit ``placement`` gilt dieselbe Grenze der Fläche wie beim Speichern. Je Konto
+    gedrosselt (``sample_limit``), darüber 429."""
+    limit, window = sample_limit()
+    await enforce_rate_limit(request, "shop:name-sample", limit=limit, window_seconds=window, subject=me["id"],
+                             message=PREVIEW_BUSY)
     db = get_db()
     try:
         product = await shop_products._product(db, product_id)
-        layer = {"text_height_cm": text_height_cm, "max_width_cm": max_width_cm, "font": font,
-                 "outline_cm": outline_cm, "outline_ink": outline_ink}
+        layer = {"kind": kind, "text_height_cm": text_height_cm, "max_width_cm": max_width_cm,
+                 "min_text_height_cm": min_text_height_cm, "font": font, "outline_cm": outline_cm,
+                 "outline_ink": outline_ink}
+        bounds = await shop_products.text_bounds_for(db, product, placement, layer) if placement else None
         payload = await shop_print_files.sample_png(db, product, kind=kind, color=color, layer=layer, ink=ink,
-                                                    text=text)
+                                                    text=text, bounds=bounds)
     except (ShopError, LookupError) as exc:
         raise _refused(exc) from exc
     return Response(payload, media_type="image/png",
                     headers={**PNG_HEADERS, "Cache-Control": "private, max-age=600"})
-
 
 @router.get("/products/{product_id}/print-files/{file_id}")
 async def print_file(product_id: str, file_id: str, thumb: bool = False,

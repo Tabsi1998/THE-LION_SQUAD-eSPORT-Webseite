@@ -46,7 +46,7 @@ function cleanLayer(layer) {
     out.motif = { key: layer.motif?.key || "", by_color: Object.fromEntries(Object.entries(layer.motif?.by_color || {}).filter(([, key]) => key)) };
   } else {
     // Größe je Namensebene (#2105) - nur, wenn gesetzt; sonst gelten die globalen Gamertag-Regeln.
-    for (const name of ["text_height_cm", "max_width_cm"]) {
+    for (const name of ["text_height_cm", "max_width_cm", "min_text_height_cm"]) {
       if (Number(layer[name]) > 0) out[name] = Math.round(Number(layer[name]) * 100) / 100;
     }
     // Feste Farbe des Namens (#2141) - nur, wenn gewählt; sonst automatisch nach Kontrast.
@@ -75,10 +75,13 @@ function cmNumber(text) {
 
 // Beispielname in echter Größe (#2105): der Server rendert ihn wie die Druckdatei - dieselben Regeln der Ebene, und
 // liegt der Name auf einem Hintergrund, dieselbe Farbe aus dem Untergrund (#2141, `ink` aus dem Plan).
-function nameSample(productId, kind, color, layer, ink) {
+function nameSample(productId, kind, color, layer, ink, placement) {
   const params = { kind, color };
+  // Mit der Fläche prüft der Server dieselbe Grenze wie beim Speichern (#2142).
+  if (placement) params.placement = placement;
   if (Number(layer?.text_height_cm) > 0) params.text_height_cm = String(layer.text_height_cm);
   if (Number(layer?.max_width_cm) > 0) params.max_width_cm = String(layer.max_width_cm);
+  if (Number(layer?.min_text_height_cm) > 0) params.min_text_height_cm = String(layer.min_text_height_cm);
   if (ink) params.ink = ink;
   // Schrift, Kontur und fester Text (#2142) - der Server rendert genau das.
   if (layer?.font) params.font = layer.font;
@@ -120,7 +123,7 @@ function SampleImage({ sample, onProblem, testId }) {
     return () => { live = false; };
   }, [failed, shown]);
   if (failed === shown.url) return null;
-  return <img key={shown.url} src={shown.url} alt="" aria-hidden="true" className="w-full h-full pointer-events-none" draggable={false}
+  return <img key={shown.url} src={shown.url} alt="" aria-hidden="true" className="w-full h-full object-contain pointer-events-none" draggable={false}
     onError={() => setFailed(shown.url)} data-testid={testId} />;
 }
 
@@ -358,13 +361,14 @@ const TEXT_HINTS = {
   text: "Gleich für alle Bestellungen - der Text kommt in die Grunddatei.",
 };
 
-function TextLayer({ layer, area, rules, canvas, presets, kindLabel, editable, onChange, onRemove, testId, problem, inks = [], fonts = [] }) {
+function TextLayer({ layer, area, rules, canvas, presets, kindLabel, editable, onChange, onRemove, testId, problem, hint = null, inks = [], fonts = [] }) {
   const limits = canvas?.limits || {};
   // Seit #2142 begrenzt die Fläche (mit Sicherheitsrand) - nicht mehr 2 bzw. 12 Zoll.
   const bounds = textBoundsCm(area, rules, canvas, layer);
   const height = Number(layer.text_height_cm) || null;
   const width = Number(layer.max_width_cm) || null;
   const outline = Number(layer.outline_cm) || null;
+  const smallest = Number(layer.min_text_height_cm) || null;
   const bad = (height && (height < limits.min_text_height_cm || height > bounds.height))
     || (width && (width < limits.min_width_cm || width > bounds.width));
   const badOutline = outline && (outline < (limits.min_outline_cm ?? 0.05) || outline > (limits.max_outline_cm ?? 2));
@@ -388,6 +392,8 @@ function TextLayer({ layer, area, rules, canvas, presets, kindLabel, editable, o
           onChange={(next) => onChange({ text_height_cm: next })} testId={`${testId}-text-height`} />
         <SizeField label="Höchstbreite (cm)" value={width} placeholder={defaultCm(canvas?.max_width_cm)} editable={editable}
           onChange={(next) => onChange({ max_width_cm: next })} testId={`${testId}-max-width`} />
+        <SizeField label="Mindesthöhe (cm)" value={smallest} placeholder="Vorgabe" editable={editable}
+          onChange={(next) => onChange({ min_text_height_cm: next })} testId={`${testId}-min-height`} />
       </div>
       <p className={`text-xs ${bad ? "text-warn" : "text-white/45"}`} data-testid={`${testId}-size-hint`}>
         Leer = Vorgabe aus den Gamertag-Regeln. Auf dieser Fläche (mit Sicherheitsrand): Texthöhe {cmText(limits.min_text_height_cm)} bis {cmText(bounds.height)}, Höchstbreite bis {cmText(bounds.width)}. {layer.kind === "member_number" ? "Gemessen an den Ziffern." : "Was nicht in die Höchstbreite passt, wird bis zur Mindesthöhe verkleinert."}
@@ -423,6 +429,7 @@ function TextLayer({ layer, area, rules, canvas, presets, kindLabel, editable, o
       </div>
       {badOutline && <p className="text-xs text-warn" data-testid={`${testId}-outline-hint`}>Kontur {cmText(limits.min_outline_cm ?? 0.05)} bis {cmText(limits.max_outline_cm ?? 2)}.</p>}
       {problem && <p className="text-xs text-warn" role="alert">{problem}</p>}
+      {hint && <p className="text-xs text-honor" role="status" data-testid={`${testId}-hint`}>{hint}</p>}
       <div className="flex flex-wrap gap-2">
         {(Number(layer.offset_x_cm || 0) !== 0 || Number(layer.offset_y_cm || 0) !== 0) && <button type="button" disabled={!editable} onClick={() => onChange({ offset_x_cm: 0, offset_y_cm: 0 })} className={QUIET_BTN} data-testid={`${testId}-reset`}><RotateCcw className="w-3.5 h-3.5" aria-hidden="true" /> Auf die Vorgabe</button>}
         <button type="button" disabled={!editable} onClick={onRemove} className={`${QUIET_BTN} ml-auto`} data-testid={`${testId}-remove`}><Trash2 className="w-3.5 h-3.5" aria-hidden="true" /> {fixed ? "Ebene entfernen" : "Platzhalter entfernen"}</button>
@@ -628,7 +635,7 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
   const [setNotice, setSetNotice] = useState(null);
   const applySet = (set) => {
     const motifKey = layers.find((layer) => layer.kind === "motif")?.motif?.key || view.motif_options?.[0]?.key || "";
-    const next = layersFromSet(set, { motifKey });
+    const next = layersFromSet(set, { motifKey, boundsFor: (layer) => textBoundsCm({ ...area, safe_margin_cm: available.safe_margin_cm }, rules, view.gamertag_canvas, layer) });
     onChange({ ...state, layers: next });
     setSelected(null);
     setSampleProblems({});
@@ -682,7 +689,7 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
                   const index = layers.indexOf(layer);
                   const info = index >= 0 ? infoFor(index) : null;
                   const planned = info?.ink && (info.ink.fixed || info.surface?.variant) ? info.ink.key : null;
-                  return nameSample(view.product.id, kind, previewColor, layer, layer.ink || planned);
+                  return nameSample(view.product.id, kind, previewColor, layer, layer.ink || planned, available.key);
                 } : null}
                 onSampleProblem={onSampleProblem}
                 onNudge={nudge} backdrop={backdrop}
@@ -708,6 +715,7 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
                     ) : (
                       <TextLayer layer={layer} area={{ ...area, safe_margin_cm: available.safe_margin_cm }} rules={rules} canvas={view.gamertag_canvas} presets={textPresets} inks={view.name_inks || []} fonts={view.fonts || []}
                         kindLabel={KIND_SHORT[layer.kind] || layer.kind} editable={editable} problem={found?.problem || sampleProblems[index]}
+                        hint={savedRow?.layers?.[index] && JSON.stringify(cleanLayer(savedRow.layers[index])) === JSON.stringify(cleanLayer(layer)) ? savedRow.layer_hints?.[index] : null}
                         onChange={(patch) => update(index, patch)} onRemove={() => onChange({ ...state, layers: layers.filter((_, at) => at !== index) })}
                         testId={`shop-layer-${available.key}-${index}`} />
                     )}
