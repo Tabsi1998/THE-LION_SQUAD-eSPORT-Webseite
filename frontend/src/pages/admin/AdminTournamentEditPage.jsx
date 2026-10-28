@@ -443,7 +443,7 @@ export default function AdminTournamentEditPage() {
     ].filter(Boolean).join(" "));
     return haystack.includes(participantSearch);
   });
-  const primaryAction = primaryTournamentAction(t.status);
+  const primaryAction = primaryTournamentAction(t.status, t);
   const canOperateTournament = isTournamentLead || !!t.can_manage_structure;
   const visibleStatusOptions = isTournamentLead
     ? TOURNAMENT_STATUS_OPTIONS
