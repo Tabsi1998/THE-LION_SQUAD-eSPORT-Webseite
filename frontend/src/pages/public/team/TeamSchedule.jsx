@@ -13,7 +13,8 @@ const OUTCOME_TONES = {
 };
 
 export function TeamSchedule({ overview }) {
-  const upcoming = overview?.upcoming || [];
+  // Liga (P5): was schon im Abschnitt „Liga“ steht, nicht noch einmal - die App ohne neuen Build zeigt es hier.
+  const upcoming = (overview?.upcoming || []).filter((row) => !row.in_league_section);
   const recent = overview?.recent || [];
   if (!upcoming.length && !recent.length) return null;
   return (

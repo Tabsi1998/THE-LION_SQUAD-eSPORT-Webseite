@@ -1,0 +1,170 @@
+/* Ligaseite (docs/LIGA.md, P5, #1625): ruhig, im Stil der Turnier- und Tabellenseiten. Bewegung nur über die
+   gemeinsamen Werte (--tls-motion-*, --tls-ease, --tls-stagger-step) - „Bewegung reduzieren“ stellt sie auf 0. */
+
+.tls-league-staffel {
+  display: grid;
+  gap: 2rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 1024px) {
+  .tls-league-staffel { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); align-items: start; }
+}
+
+.tls-league-subhead {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+.tls-league-subhead svg { color: #29B6E8; }
+
+/* Tabelle: die Zeilen steigen beim ersten Sichtbarwerden nacheinander auf (nur die ersten zwölf). Der Rahmen selbst
+   bleibt stehen - nur die Zeilen bewegen sich. */
+.tls-league-table.tls-stagger > * { animation: none; opacity: 1; }
+.tls-league-table[data-stagger="wait"] .tls-standing-row:nth-child(-n+12) { opacity: 0; }
+.tls-league-table[data-stagger="run"] .tls-standing-row:nth-child(-n+12) {
+  animation: tls-stagger-in var(--tls-motion-slow) var(--tls-ease) both;
+  animation-delay: calc(var(--tls-stagger-i, 0) * var(--tls-stagger-step));
+}
+.tls-league-table .tls-standing-row:nth-child(2) { --tls-stagger-i: 1; }
+.tls-league-table .tls-standing-row:nth-child(3) { --tls-stagger-i: 2; }
+.tls-league-table .tls-standing-row:nth-child(4) { --tls-stagger-i: 3; }
+.tls-league-table .tls-standing-row:nth-child(5) { --tls-stagger-i: 4; }
+.tls-league-table .tls-standing-row:nth-child(6) { --tls-stagger-i: 5; }
+.tls-league-table .tls-standing-row:nth-child(7) { --tls-stagger-i: 6; }
+.tls-league-table .tls-standing-row:nth-child(8) { --tls-stagger-i: 7; }
+.tls-league-table .tls-standing-row:nth-child(9) { --tls-stagger-i: 8; }
+.tls-league-table .tls-standing-row:nth-child(10) { --tls-stagger-i: 9; }
+.tls-league-table .tls-standing-row:nth-child(11) { --tls-stagger-i: 10; }
+.tls-league-table .tls-standing-row:nth-child(12) { --tls-stagger-i: 11; }
+
+.tls-league-teams { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.tls-league-team {
+  display: inline-flex;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  background: var(--tls-surface-1, #121212);
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8125rem;
+  color: rgba(255, 255, 255, 0.82);
+  transition: border-color var(--tls-motion-fast) var(--tls-ease), color var(--tls-motion-fast) var(--tls-ease);
+}
+a.tls-league-team:hover, a.tls-league-team:focus-visible { border-color: rgba(41, 182, 232, 0.6); color: #fff; outline: none; }
+
+/* Spielwochen */
+.tls-league-weeks { border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 2px; background: var(--tls-surface-1, #121212); }
+.tls-league-week + .tls-league-week { border-top: 1px solid rgba(255, 255, 255, 0.06); }
+.tls-league-week__head {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+  padding: 0.75rem 1rem;
+  text-align: left;
+}
+.tls-league-week__toggle { cursor: pointer; transition: background-color var(--tls-motion-fast) var(--tls-ease); }
+.tls-league-week__toggle:hover { background: rgba(255, 255, 255, 0.025); }
+.tls-league-week__toggle:focus-visible { outline: 1px solid #29B6E8; outline-offset: -1px; }
+.tls-league-week__toggle:disabled { cursor: default; }
+.tls-league-week__chevron { transition: transform var(--tls-motion-mid) var(--tls-ease); }
+.tls-league-week[data-open="true"] .tls-league-week__chevron { transform: rotate(180deg); }
+.tls-league-week[data-open="true"] > .tls-league-week__head { background: rgba(41, 182, 232, 0.05); }
+.tls-league-week[data-kind="reserve"] .tls-league-week__head { opacity: 0.6; }
+.tls-league-week[data-kind="pause"] {
+  background-image: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.025) 0 8px, transparent 8px 16px);
+}
+.tls-league-week__body { padding: 0 0.75rem 0.75rem; display: grid; gap: 0.5rem; }
+
+.tls-league-match {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 0.625rem 0.75rem;
+}
+.tls-league-match__teams {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+}
+.tls-league-match__team { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tls-league-match__teams > :last-child { text-align: right; }
+.tls-league-match__score {
+  min-width: 3.25rem;
+  border-radius: 2px;
+  padding: 0.125rem 0.5rem;
+  text-align: center;
+  font-family: var(--font-display, inherit);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.04);
+  transition: color var(--tls-motion-fast) var(--tls-ease), background-color var(--tls-motion-fast) var(--tls-ease);
+}
+.tls-league-match[data-done="true"] .tls-league-match__score { color: #fff; background: rgba(41, 182, 232, 0.12); }
+.tls-league-match__score:hover, .tls-league-match__score:focus-visible { background: rgba(41, 182, 232, 0.22); color: #fff; outline: none; }
+.tls-league-match__meta {
+  margin-top: 0.375rem;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.25rem 0.75rem;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.tls-league-maps {
+  margin-top: 0.5rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+  gap: 0.375rem;
+}
+.tls-league-map {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 2px;
+  padding: 0.25rem;
+}
+.tls-league-map[data-side] { border-color: rgba(41, 182, 232, 0.3); }
+.tls-league-map__thumb {
+  position: relative;
+  display: block;
+  width: 2.75rem;
+  aspect-ratio: 16 / 9;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 2px;
+  background: linear-gradient(135deg, rgba(41, 182, 232, 0.18), rgba(255, 255, 255, 0.03));
+}
+
+.tls-league-skeleton {
+  height: 14rem;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.03));
+  background-size: 200% 100%;
+  animation: tls-league-shimmer calc(var(--tls-motion-slow) * 4) linear infinite;
+}
+@keyframes tls-league-shimmer { to { background-position: -200% 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .tls-league-table[data-stagger] .tls-standing-row { animation: none; opacity: 1; }
+  .tls-league-skeleton { animation: none; }
+}
+@media print {
+  .tls-league-table .tls-standing-row { animation: none !important; opacity: 1 !important; }
+}

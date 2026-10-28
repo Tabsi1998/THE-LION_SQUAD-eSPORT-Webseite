@@ -262,6 +262,7 @@ async def test_team_page_marks_the_staffel(flow):
                                                            "team_id": "team-1", "status": "approved"})
     overview = await team_overview(flow.db, team, None, insider=True)
     cards = {row["tournament"]["id"]: row["tournament"] for row in overview["upcoming"]}
+    # Die App ohne neuen Build liest „upcoming“ - die Staffel bleibt dort, gekennzeichnet.
     assert cards[staffel["id"]]["league_label"] == "Liga · Staffel A"
     assert "league_label" not in cards[normal["id"]]
 

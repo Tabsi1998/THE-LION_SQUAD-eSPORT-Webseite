@@ -363,7 +363,65 @@ function MobileAccordion({ item, isClubMember, signedIn, onClose }) {
   );
 }
 
+// Liga (docs/LIGA.md, P5): „Liga“ steht unter eSports nur, wenn die Lese-API der Person mindestens eine Season zeigt.
+export const LEAGUE_NAV_ENTRY = { to: "/liga", label: "Liga" };
+
+/** Das Menü mit oder ohne „Liga“ - eingehängt unter eSports nach „Turniere“, nie doppelt, ohne Season nie da. */
+export function withLeagueEntry(items, show) {
+  return (items || []).map((item) => {
+    const isEsports = item.to === "/esports" || item.label === "eSports";
+    const children = (item.children || []).filter((child) => child.to !== LEAGUE_NAV_ENTRY.to);
+    if (!isEsports || !show) return item.children ? { ...item, children } : item;
+    const after = children.findIndex((child) => child.to === "/tournaments");
+    const position = after >= 0 ? after + 1 : children.length;
+    return { ...item, children: [...children.slice(0, position), LEAGUE_NAV_ENTRY, ...children.slice(position)] };
+  });
+}
+
+// Ein gemeinsamer Abruf für Kopf- und Handymenü: beide fragen gleichzeitig, aber /leagues geht nur einmal raus. Nach
+// einer Änderung („leagues“, Anmeldung) wird er verworfen und neu geholt.
+let leagueRequest = null;
+let leagueVisible = false;
+
+export function leagueVisibility({ fresh = false } = {}) {
+  if (fresh || !leagueRequest) {
+    leagueRequest = Promise.resolve()
+      .then(() => api.get("/leagues"))
+      .then(({ data }) => (data?.leagues || []).length > 0)
+      .catch(() => false)
+      .then((visible) => {
+        leagueVisible = visible;
+        return visible;
+      });
+  }
+  return leagueRequest;
+}
+
+export function resetLeagueVisibility() {
+  leagueRequest = null;
+  leagueVisible = false;
+}
+
+function useLeagueVisible() {
+  const [show, setShow] = useState(leagueVisible);
+  const apply = useCallback((fresh) => {
+    let alive = true;
+    leagueVisibility({ fresh }).then((visible) => { if (alive) setShow(visible); });
+    return () => { alive = false; };
+  }, []);
+  useEffect(() => apply(false), [apply]);
+  const refresh = useCallback(() => { apply(true); }, [apply]);
+  useApiInvalidation(refresh, ["leagues", "auth"]);
+  return show;
+}
+
 function usePublicNavItems() {
+  const items = useCmsNavItems();
+  const showLeague = useLeagueVisible();
+  return withLeagueEntry(items, showLeague);
+}
+
+function useCmsNavItems() {
   const [items, setItems] = useState(cachedNavItems);
 
   const load = useCallback(async () => {

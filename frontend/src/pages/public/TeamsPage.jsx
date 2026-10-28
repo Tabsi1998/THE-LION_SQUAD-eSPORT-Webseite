@@ -28,6 +28,7 @@ import { viennaDateTime } from "@/lib/vienna";
 import { teamLogoUpload } from "@/lib/svgLogo";
 import { TeamsPanel } from "@/pages/user/profile/TeamsPanel";
 import { TeamSchedule } from "@/pages/public/team/TeamSchedule";
+import { TeamLeague } from "@/pages/public/team/TeamLeague";
 import { TeamInviteSheet } from "@/pages/public/team/TeamInviteSheet";
 import { TeamJoinCard } from "@/pages/public/team/TeamJoinCard";
 import { TeamDissolveSection } from "@/pages/public/team/TeamDissolveSection";
@@ -362,6 +363,7 @@ function TeamDetail({ id }) {
           {overviewLoad.status === "error" && overviewLoad.problem !== "notFound" && (
             <LoadNotice testId="team-overview-error" message="Termine und letzte Spiele konnten gerade nicht geladen werden." onRetry={overviewLoad.reload} />
           )}
+          <TeamLeague overview={overview} />
           <TeamSchedule overview={overview} />
           {(team.awards || []).length > 0 && (
             <section data-testid="team-awards">
