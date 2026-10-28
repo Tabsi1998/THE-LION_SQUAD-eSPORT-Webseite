@@ -181,7 +181,8 @@ async def _groups_generate_graph(db, tournament: dict, group_count: int, actor_i
         if impact["match_count"]:
             raise HTTPException(status_code=409, detail=tournament_guard.confirm_detail(
                 "confirm_destruction",
-                f"Neue Gruppen löschen {tournament_guard.impact_text(impact)} der Gruppenphase samt Ergebnissen.",
+                f"Neue Gruppen löschen alle Spiele der Gruppenphase ({tournament_guard.impact_text(impact)}) samt "
+                "Ergebnissen.",
                 impact,
             ))
     stage = await _dedicated_stage(

@@ -190,7 +190,8 @@ async def delete_tournament_stage(tid: str, stage_id: str, force: bool = False, 
     if impact["match_count"] and not force:
         raise HTTPException(status_code=409, detail=tournament_guard.confirm_detail(
             "confirm_destruction",
-            f"Löschen nimmt {tournament_guard.impact_text(impact)} dieser Phase mit, samt Ergebnissen und Berichten.",
+            f"Löschen nimmt alle Spiele dieser Phase mit ({tournament_guard.impact_text(impact)}), samt Ergebnissen "
+            "und Berichten.",
             impact,
         ))
     match_ids = await db.matches_v2.distinct("id", {"stage_id": stage_id})
@@ -339,8 +340,8 @@ async def generate_tournament_stage_matches(tid: str, stage_id: str, force: bool
     if impact["match_count"] and not force:
         raise HTTPException(status_code=409, detail=tournament_guard.confirm_detail(
             "confirm_destruction",
-            f"Neu generieren löscht {tournament_guard.impact_text(impact)} dieser Phase samt Ergebnissen und "
-            "Berichten.",
+            f"Neu generieren löscht alle Spiele dieser Phase ({tournament_guard.impact_text(impact)}) samt "
+            "Ergebnissen und Berichten.",
             impact,
         ))
     registrations = []

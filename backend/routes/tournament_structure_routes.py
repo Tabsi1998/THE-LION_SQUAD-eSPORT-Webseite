@@ -402,7 +402,8 @@ async def rebuild_bracket_from_tournament_format(tid: str, body: TournamentBrack
         ))
     running = tournament.get("status") in ("live", "paused", "cancelled")
     if (impact["match_count"] or running) and not force:
-        message = (f"Neu aufbauen löscht {tournament_guard.impact_text(impact)} samt Ergebnissen und Berichten."
+        message = (f"Neu aufbauen löscht alle Spiele ({tournament_guard.impact_text(impact)}) samt Ergebnissen und "
+                   "Berichten."
                    if impact["match_count"] else
                    "Das Turnier läuft schon – der Turnierbaum wird aus dem Format neu aufgebaut.")
         raise HTTPException(status_code=409, detail=tournament_guard.confirm_detail(
@@ -538,7 +539,8 @@ async def reset_bracket(tid: str, force: bool = False, me: dict = Depends(get_cu
     if impact["match_count"] and not force:
         raise HTTPException(status_code=409, detail=tournament_guard.confirm_detail(
             "confirm_destruction",
-            f"Zurücksetzen löscht {tournament_guard.impact_text(impact)} samt Ergebnissen und Berichten.",
+            f"Zurücksetzen löscht alle Spiele ({tournament_guard.impact_text(impact)}) samt Ergebnissen und "
+            "Berichten.",
             impact,
         ))
     v2_match_ids = [match["id"] for match in v2_matches if match.get("id")]
