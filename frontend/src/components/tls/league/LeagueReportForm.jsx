@@ -31,7 +31,7 @@ export function LineupPicker({ roster = [], value = [], size = 1, onChange, labe
     <div role="group" aria-label={label} data-testid={testId}>
       <div className="mb-1.5 flex items-center justify-between gap-2 text-[11px] font-bold uppercase tracking-widest text-white/55">
         <span className="inline-flex items-center gap-1.5"><Users className="h-3.5 w-3.5" /> {label}</span>
-        <span className={value.length === size ? "text-[#00FF88]" : "text-white/45"}>{value.length}/{size}</span>
+        <span className={value.length === size ? "text-ok" : "text-white/45"}>{value.length}/{size}</span>
       </div>
       <div className="flex flex-wrap gap-1.5">
         {roster.map((person) => {
@@ -99,7 +99,7 @@ function GameEditor({ game, league, onChange, index }) {
         {league.sides.map((side) => (
           <button key={side.registration_id} type="button" aria-pressed={game.winner === side.registration_id}
             onClick={() => set({ winner: side.registration_id })}
-            className={`min-h-[44px] min-w-0 rounded-sm border px-3 py-2 text-sm font-bold ${game.winner === side.registration_id ? "border-[#FFD700] bg-[#FFD700]/15 text-[#FFF2B3]" : "border-white/15 text-white/70 hover:border-white/35"}`}
+            className={`min-h-[44px] min-w-0 rounded-sm border px-3 py-2 text-sm font-bold ${game.winner === side.registration_id ? "border-honor bg-honor/15 text-honor" : "border-white/15 text-white/70 hover:border-white/35"}`}
             data-testid={`league-game-${game.position}-winner-${side.registration_id}`}>
             <span className="block truncate">{game.winner === side.registration_id ? "Sieger: " : ""}{side.name}</span>
           </button>
@@ -136,7 +136,7 @@ export function GamesSummary({ games = [], league }) {
           <li key={game.position} className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-sm">
             <span className="font-bold text-white">Map {game.position}</span>
             <span className="text-white/75">{game.map_name || "Map"}{game.mode_label ? ` (${game.mode_label})` : ""}</span>
-            <span className="text-[#FFD700]">→ {winner || "?"}</span>
+            <span className="text-honor">→ {winner || "?"}</span>
           </li>
         );
       })}
@@ -171,7 +171,7 @@ function ConfirmWithLineup({ league, state, busy, readOnly, onReport, onWrongRes
               label={`Deine Aufstellung Map ${game.position}`} testId={`league-confirm-lineup-${game.position}`}
               onChange={(lineup) => setLineups((current) => followLineups(current, game.position, lineup))} />
           ))}
-          {error && <p className="text-sm text-[#FF6B60]" role="alert" data-testid="league-confirm-error">{error}</p>}
+          {error && <p className="text-sm text-warn" role="alert" data-testid="league-confirm-error">{error}</p>}
           <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
             <button type="button" disabled={busy} onClick={confirm} className="tls-btn tls-btn--primary inline-flex min-h-[44px] items-center justify-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid="match-report-confirm">
               <Check className="w-3.5 h-3.5" /> Stimmt
@@ -217,7 +217,7 @@ export function LeagueReportForm({ league, state = null, busy = false, readOnly 
     <div className="space-y-4" data-testid="match-report" data-league="true">
       <div className="text-xs text-[#29B6E8] font-bold uppercase tracking-wider flex items-center gap-2"><ClipboardCheck className="w-3.5 h-3.5" /> Ergebnis melden · Best of {league.best_of}</div>
       {status !== "open" && status !== "agreed" && (
-        <div className={`rounded-sm border px-4 py-3 text-sm ${status === "confirm" ? "border-[#FFD700]/40 bg-[#FFD700]/10 text-[#FFF2B3]" : "border-[#29B6E8]/35 bg-[#29B6E8]/10 text-[#BFE9F8]"}`} data-testid="match-report-state" data-status={status}>
+        <div className={`rounded-sm border px-4 py-3 text-sm ${status === "confirm" ? "border-warn/40 bg-warn/10 text-white" : "border-[#29B6E8]/35 bg-[#29B6E8]/10 text-[#BFE9F8]"}`} data-testid="match-report-state" data-status={status}>
           <p className="font-bold">{REPORT_STATE_TEXT[status]}</p>
           {status === "confirm" && <ConfirmWithLineup league={league} state={state} busy={busy} readOnly={readOnly || state?.can_confirm === false} onReport={onReport} onWrongResult={onWrongResult} />}
           {status !== "confirm" && (league.own_games || []).length > 0 && <div className="mt-2"><GamesSummary games={league.own_games} league={league} /></div>}
@@ -229,7 +229,7 @@ export function LeagueReportForm({ league, state = null, busy = false, readOnly 
       {editing && !readOnly && (
         <form onSubmit={submit} className="space-y-4" data-testid="match-report-form" noValidate>
           {!league.pool ? (
-            <p className="text-sm text-[#FF6B60]" role="alert">Für diese Staffel ist noch kein Map-Pool hinterlegt – bitte die Turnierleitung fragen.</p>
+            <p className="text-sm text-warn" role="alert">Für diese Staffel ist noch kein Map-Pool hinterlegt – bitte die Turnierleitung fragen.</p>
           ) : (
             games.map((game, index) => <GameEditor key={game.position} index={index} game={game} league={league} onChange={(next) => change(game.position, next)} />)
           )}
@@ -237,7 +237,7 @@ export function LeagueReportForm({ league, state = null, busy = false, readOnly 
           <p className={`rounded-sm border px-3 py-2 text-sm font-bold ${sentence && !problem ? "border-[#29B6E8]/35 bg-[#29B6E8]/10 text-[#BFE9F8]" : "border-white/10 bg-white/5 text-white/45"}`} data-testid="match-report-sentence" aria-live="polite">
             {problem || sentence}
           </p>
-          {error && <p className="text-sm text-[#FF6B60]" role="alert" data-testid="match-report-error">{error}</p>}
+          {error && <p className="text-sm text-warn" role="alert" data-testid="match-report-error">{error}</p>}
           <div className="flex flex-wrap items-center gap-3">
             <button disabled={busy} className="tls-btn tls-btn--primary min-h-[44px] px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid="match-report-submit">Ergebnis melden</button>
             <p className="text-xs text-white/50">Die Gegenseite bestätigt und stellt dabei ihre Aufstellung auf. Ohne Antwort gilt dein Ergebnis nach 48 Stunden.</p>

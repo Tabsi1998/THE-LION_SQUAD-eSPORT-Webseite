@@ -43,14 +43,14 @@ export function LeagueGamesView({ league }) {
                 return (
                   <div key={side.registration_id} className="min-w-0">
                     <div className="flex min-w-0 items-center justify-between gap-2 text-sm">
-                      <span className={`inline-flex min-w-0 items-center gap-1.5 truncate font-bold ${won ? "text-[#FFD700]" : "text-white/70"}`}>
+                      <span className={`inline-flex min-w-0 items-center gap-1.5 truncate font-bold ${won ? "text-honor" : "text-white/70"}`}>
                         {won && <Trophy className="h-3.5 w-3.5 shrink-0" aria-label="Sieger" />}<span className="truncate">{side.name}</span>
                       </span>
                       {score !== undefined && score !== null && <span className="shrink-0 font-display text-white/80">{score}</span>}
                     </div>
                     <p className="text-xs text-white/50 [overflow-wrap:anywhere]">
                       {lineup.length ? lineup.map((person) => person.name).join(", ")
-                        : missing.has(side.registration_id) ? <span className="text-[#FFD700]">Aufstellung fehlt noch</span> : "–"}
+                        : missing.has(side.registration_id) ? <span className="text-warn">Aufstellung fehlt noch</span> : "–"}
                     </p>
                   </div>
                 );
@@ -83,9 +83,9 @@ export function LineupAmendForm({ league, busy = false, onSave }) {
     await onSave({ games: games.map((game) => ({ position: game.position, lineup: lineups[game.position] || [] })) });
   };
   return (
-    <form onSubmit={save} className={`mt-5 space-y-3 rounded-sm border px-4 py-3 ${missing ? "border-[#FFD700]/40 bg-[#FFD700]/5" : "border-white/10 bg-white/[0.02]"}`} data-testid="league-lineup-amend" noValidate>
+    <form onSubmit={save} className={`mt-5 space-y-3 rounded-sm border px-4 py-3 ${missing ? "border-warn/40 bg-warn/5" : "border-white/10 bg-white/[0.02]"}`} data-testid="league-lineup-amend" noValidate>
       <p className="flex items-start gap-2 text-sm font-bold text-white">
-        {missing && <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[#FFD700]" />}
+        {missing && <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warn" />}
         {missing ? "Eure Aufstellung fehlt noch – bitte je Map nachtragen." : "Aufstellung ändern"}
       </p>
       {league.amend_until && <p className="text-xs text-white/50">Möglich bis {until(league.amend_until)}, danach nur über die Turnierleitung.</p>}
@@ -94,7 +94,7 @@ export function LineupAmendForm({ league, busy = false, onSave }) {
           label={`Map ${game.position} · ${game.map_name || "Map"}`} testId={`league-amend-lineup-${game.position}`}
           onChange={(lineup) => setLineups((current) => followLineups(current, game.position, lineup))} />
       ))}
-      {error && <p className="text-sm text-[#FF6B60]" role="alert" data-testid="league-amend-error">{error}</p>}
+      {error && <p className="text-sm text-warn" role="alert" data-testid="league-amend-error">{error}</p>}
       <button disabled={busy} className="tls-btn tls-btn--primary min-h-[44px] px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid="league-amend-save">
         Aufstellung speichern
       </button>
