@@ -59,6 +59,7 @@ from services.match_calls import CALL_OPEN_STATUSES, call_view
 from services.match_disputes import CATEGORIES as DISPUTE_CATEGORIES, CLOSED_DETAIL as DISPUTE_CLOSED_DETAIL, dispute_window
 from services.match_notifications import (
     proposal_sentence,
+    notify_schedule_event,
     notify_dispute_kept,
     notify_dispute_opened,
     notify_report_conflict,
@@ -197,9 +198,10 @@ async def _registrations_for_match(match: dict) -> list[dict]:
 async def _public_user_map(user_ids: list[str]) -> dict[str, dict]:
     if not user_ids:
         return {}
+    # Nur was Matchseite und Matchchat zeigen - keine Kontorolle (#2110).
     users = await get_db().users.find(
         {"id": {"$in": user_ids}},
-        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1, "role": 1},
+        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1},
     ).to_list(500)
     return {u["id"]: u for u in users}
 
@@ -796,7 +798,54 @@ async def create_schedule_proposal(match_id: str, body: MatchScheduleProposalCre
     doc.pop("_id", None)
     doc.pop("match_collection", None)
     doc["idempotent_replay"] = False
+    await _tell_schedule(db, match, "proposed", doc, me, doc["actor_registration_id"], normalized_note)
     return doc
+
+
+async def _tell_schedule(db, match: dict, event: str, proposal: dict, me: dict, actor_registration_id: str | None,
+                         note: str | None = None) -> None:
+    """Die andere Seite erfährt jede Terminaktion sofort (#2110). Eine Nachricht hält die Aktion nie auf."""
+    try:
+        await notify_schedule_event(db, match, event=event, proposal=proposal, actor_id=me.get("id"),
+                                    actor_registration_id=actor_registration_id, note=note)
+    except Exception:  # noqa: BLE001 - die Terminaktion ist schon gespeichert
+        logger.warning("[match] Terminnachricht für %s nicht verschickt", _log_safe(match.get("id")), exc_info=True)
+
+
+async def _withdraw_proposal(db, match: dict, collection: str, proposal: dict, me: dict,
+                             acting_reg: dict | None) -> dict:
+    """Den eigenen, noch offenen Vorschlag zurückziehen (#2110) - die Seite, die vorgeschlagen hat, oder die
+    Turnierleitung. Bleibt danach nichts offen, ist die Partie wieder ohne Vorschlag (oder beim angenommenen Termin)."""
+    # Mit eigener Seite zählt die Seite; nur ohne Seite (etwa die Turnierleitung) die eigene Person.
+    if acting_reg:
+        own = bool(proposal.get("actor_registration_id") and proposal.get("actor_registration_id") == acting_reg.get("id"))
+    else:
+        own = proposal.get("actor_user_id") == me["id"]
+    if not (own or _is_staff(me)):
+        raise HTTPException(status_code=403, detail="Zurückziehen kann nur die Seite, die den Termin vorgeschlagen hat.")
+    if proposal.get("status") == "withdrawn" and proposal.get("decision_user_id") == me["id"]:
+        return {"ok": True, "status": "withdrawn", "idempotent_replay": True}
+    if proposal.get("status") != "pending":
+        raise HTTPException(status_code=409, detail="Über diesen Terminvorschlag wurde bereits entschieden")
+    now_iso = now_utc().isoformat()
+    await db.match_schedule_proposals.update_one({"id": proposal["id"], "status": "pending"}, {"$set": {
+        "status": "withdrawn",
+        "decision_user_id": me["id"],
+        "updated_at": now_iso,
+    }})
+    if not await db.match_schedule_proposals.count_documents({"match_id": match["id"], "status": "pending"}):
+        # Nichts mehr offen: keine Antwortfrist, keine Eskalation - der angenommene Termin gilt weiter, sonst Heimrecht
+        # oder Standardtermin (der Planer schreibt ihn gleich nach).
+        if await db.match_schedule_proposals.count_documents({"match_id": match["id"], "status": "accepted"}):
+            change = {"$set": {"schedule_status": "accepted", "updated_at": now_iso},
+                      "$unset": {"schedule_deadline_at": ""}}
+        else:
+            change = {"$set": {"updated_at": now_iso}, "$unset": {"schedule_status": "", "schedule_deadline_at": ""}}
+        await getattr(db, collection).update_one({"id": match["id"]}, change)
+        await _rewrite_matchday_schedule(db, match.get("tournament_id"))
+    # Wer handelt, ist die eigene Seite - oder die Turnierleitung ohne Seite: dann erfahren es beide Seiten.
+    await _tell_schedule(db, match, "withdrawn", proposal, me, (acting_reg or {}).get("id"))
+    return {"ok": True, "status": "withdrawn", "idempotent_replay": False}
 
 
 @router.post("/{match_id}/schedule-proposals/{proposal_id}/decision")
@@ -816,13 +865,16 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
     if not await _can_act_for_match(match, me):
         raise HTTPException(status_code=403, detail="Keine Berechtigung für diesen Termin")
     acting_reg = await _acting_registration_for_match(match, me)
+    if body.action == "withdraw":
+        return await _withdraw_proposal(db, match, collection, proposal, me, acting_reg)
     if (
         not _is_staff(me)
         and acting_reg
         and proposal.get("actor_registration_id") == acting_reg.get("id")
         and body.action in {"accept", "decline"}
     ):
-        raise HTTPException(status_code=400, detail="Der eigene Vorschlag muss von der Gegenseite bestaetigt werden")
+        raise HTTPException(status_code=400, detail="Der eigene Vorschlag muss von der Gegenseite bestätigt werden – "
+                                                    "zurückziehen geht mit „Zurückziehen“.")
     now_iso = now_utc().isoformat()
     normalized_note = (body.note or "").strip() or None
     completed_action = {"accept": "accepted", "decline": "declined", "counter": "countered"}[body.action]
@@ -863,6 +915,7 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
             "status": "scheduled" if match.get("status") in {"pending", "ready", "preview"} else match.get("status"),
             "updated_at": now_iso,
         }})
+        await _tell_schedule(db, match, "accepted", proposal, me, (acting_reg or {}).get("id"), normalized_note)
         return {"ok": True, "status": "accepted", "scheduled_at": scheduled_at, "idempotent_replay": False}
     if body.action == "decline":
         await db.match_schedule_proposals.update_one({"id": proposal_id}, {"$set": {
@@ -873,6 +926,7 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
         }})
         await getattr(db, collection).update_one({"id": match_id}, {"$set": {"schedule_status": "declined", "updated_at": now_iso}})
         await _rewrite_matchday_schedule(db, match.get("tournament_id"))
+        await _tell_schedule(db, match, "declined", proposal, me, (acting_reg or {}).get("id"), normalized_note)
         return {"ok": True, "status": "declined", "idempotent_replay": False}
     if not body.scheduled_at:
         raise HTTPException(status_code=400, detail="Gegenvorschlag braucht Datum und Uhrzeit")
@@ -908,6 +962,7 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
     counter.pop("_id", None)
     counter.pop("match_collection", None)
     counter["idempotent_replay"] = False
+    await _tell_schedule(db, match, "countered", counter, me, counter["actor_registration_id"], normalized_note)
     return counter
 
 

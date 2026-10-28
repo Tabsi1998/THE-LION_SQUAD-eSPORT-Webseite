@@ -1,24 +1,31 @@
 import { Link, useLocation } from "react-router-dom";
-import { GitBranch, LayoutList, ListOrdered, Trophy, Users } from "lucide-react";
+import { GitBranch, LayoutList, ListOrdered, Shield, Trophy, Users } from "lucide-react";
+import { useLeagueTrail } from "@/hooks/useLeagueTrail";
 
 // Turnierseite (#401): eine Reihe Reiter statt sechs gleich schwerer Knöpfe - Übersicht, Teilnehmer, Spielplan,
 // Rangliste, Turnierbaum. Die Unterseiten bleiben eigene Adressen; die Reiter stehen auf allen gleich.
+// Liga-Staffel (#2110): dazu der Reiter „Liga“ - zur Staffel auf der Ligaseite, wenn die Person die Season sieht.
 
-export function tournamentTabs(t, accessToken = "", participantCount = null) {
+export function tournamentTabs(t, accessToken = "", participantCount = null, trail = null) {
   const base = `/tournaments/${t.slug || t.id}`;
   const suffix = accessToken ? `?access=${encodeURIComponent(accessToken)}` : "";
-  return [
+  const tabs = [
     { key: "overview", label: "Übersicht", to: `${base}${suffix}`, icon: LayoutList, match: (path) => path === base },
     { key: "participants", label: participantCount === null ? "Teilnehmer" : `Teilnehmer (${participantCount})`, to: `${base}${suffix}#teilnehmer`, icon: Users, match: () => false },
     { key: "schedule", label: "Spielplan", to: `${base}/matches${suffix}`, icon: ListOrdered, match: (path) => path.endsWith("/matches") },
     { key: "standings", label: "Rangliste", to: `${base}/standings${suffix}`, icon: Trophy, match: (path) => path.endsWith("/standings") },
     { key: "bracket", label: "Turnierbaum", to: `${base}/bracket${suffix}`, icon: GitBranch, match: (path) => path.endsWith("/bracket") },
   ];
+  if (trail?.staffelHref) {
+    tabs.push({ key: "league", label: "Liga", to: trail.staffelHref, icon: Shield, match: () => false });
+  }
+  return tabs;
 }
 
 export function TournamentTabs({ tournament, accessToken = "", participantCount = null, className = "" }) {
   const { pathname } = useLocation();
-  const tabs = tournamentTabs(tournament, accessToken, participantCount);
+  const trail = useLeagueTrail(tournament);
+  const tabs = tournamentTabs(tournament, accessToken, participantCount, trail);
   return (
     <nav aria-label="Turnierseiten" className={`flex flex-wrap gap-1 border-b border-white/10 ${className}`} data-testid="tournament-tabs">
       {tabs.map((tab) => {

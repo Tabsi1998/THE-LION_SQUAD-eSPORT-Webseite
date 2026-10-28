@@ -195,6 +195,15 @@ an (Haken), lehnt ab (X) oder macht einen **Gegenvorschlag**. Ohne Einigung gilt
 Ein Vorschlag in einer Sperrzeit wird abgelehnt („In dieser Zeit wird nicht gespielt (Weihnachtspause, …)“). Termin-,
 Bestätigungs- und Nachtragsfristen ruhen in der Sperrzeit, das Einspruchsfenster nicht (siehe 1.).
 
+- **Nachrichten:** Jeder Vorschlag, Gegenvorschlag, jedes Annehmen, Ablehnen und Zurückziehen geht sofort an Captain
+  und Vertreter der anderen Seite (ohne beide an deren Teamleitung) – ins Postfach und per Push, Thema
+  „Match-Erinnerungen“. Trägt die Turnierleitung selbst einen Termin vor, erfahren es beide Seiten. Erinnerungen vor
+  Fristen kommen später (#1647).
+- **Eigener Vorschlag:** steht bei der eigenen Seite als „wartet auf die Gegenseite“ mit **Zurückziehen**; annehmen
+  kann ihn nur die Gegenseite. Zurückgezogen ist kein Vorschlag mehr offen – keine Antwortfrist, keine Eskalation.
+- **Startseite:** Offene Vorschläge der Gegenseite stehen bei Captain und Vertreter unter **Offene Aktionen** als
+  „Terminvorschlag beantworten“ – auf der Website und in der App.
+
 ### 3.2 Ergebnisse
 
 Melden mit Maps und eigener Aufstellung (nur im Web), Bestätigen im Web oder in der App, die 48-Stunden-Regel und
@@ -209,9 +218,12 @@ was dabei geprüft wird, steht für die Captains in
 
 ### 3.3 Aufstellung nachtragen
 
-Captain oder Vertreter tragen eine fehlende Aufstellung bis **48 Stunden nach dem Ergebnis** selbst nach (3.16).
-Danach nur noch die Turnierleitung: am Spiel **Ergebnis korrigieren** mit Maps und Aufstellungen und einem Grund. Für
-die Tabelle spielt die Aufstellung keine Rolle; sie zählt für den Doppel-Einsatz und spätere Statistiken.
+Captain oder Vertreter tragen eine fehlende Aufstellung bis **48 Stunden nach dem Ergebnis** selbst nach (3.16);
+bis dahin steht bei ihnen auf der Startseite die Aufgabe „Aufstellung nachtragen“. Danach nur noch die
+Turnierleitung: am Spiel **Ergebnis korrigieren** mit Maps und Aufstellungen und einem Grund. Die Matchseite sagt der
+Seite nach der Frist „die Frist zum Nachtragen ist vorbei“ und lässt den Matchchat für **@leitung** offen – so kommt
+die Bitte zur Turnierleitung. Für die Tabelle spielt die Aufstellung keine Rolle; sie zählt für den Doppel-Einsatz
+und spätere Statistiken.
 
 ### 3.4 Einspruch und Korrektur
 
@@ -231,6 +243,21 @@ die Tabelle spielt die Aufstellung keine Rolle; sie zählt für den Doppel-Einsa
 Die Tabelle steht auf der Ligaseite je Staffel (und in der Turnierverwaltung): Punkte, Spiele, Differenz, Form der
 letzten fünf Spiele, Bewegung seit dem letzten Spieltag. Darunter die Spielwochen mit Pause und Reserve, jedes Spiel
 mit Termin, Ergebnis, Sieger und den Maps – ohne Aufstellungen.
+
+Staffel- und Spielseite führen zurück zur Ligaseite: Brotkrumen **Liga · Season · Staffel** und auf der Staffel der
+Reiter **Liga** (nur, wenn die Person die Season sehen darf – sonst „Liga · Staffel A“ ohne Link).
+
+### 3.6 Captain und Vertreter während der Season
+
+- **Rolle abgeben:** Captain oder Vertreter geben die eigene Rolle unter **Teams → Deine Teams** mit **Rolle
+  abgeben** selbst ab. Leitung und Co-Leitung des Hauptteams bekommen eine Nachricht und vergeben neu (Squad
+  bearbeiten). Bis dahin handelt die andere Rolle, ohne beide die Teamleitung.
+- **Teamseite:** Mitglieder sehen dort die Co-Teams mit Captain und Vertreter; Teamleitung und Rollen-Inhaber kommen
+  über **Co-Teams verwalten** zur Verwaltung.
+- **App:** Captain und Vertreter lassen sich in der App noch nicht vergeben. Scheitert dort eine Kader-Änderung an
+  einer Rolle, nennt die Meldung den Weg auf der Website.
+- **Abmelden:** Ein zugeteiltes Co-Team meldet sich nicht selbst ab – auf der Staffel steht „Austritt nur über die
+  Turnierleitung“. Herausnehmen kann es nur die Turnierleitung.
 
 ---
 

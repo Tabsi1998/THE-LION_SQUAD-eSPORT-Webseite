@@ -116,10 +116,15 @@ async def load_matches_by_query(
     query: dict,
     *,
     per_store_limit: int = 5000,
+    sort: list[tuple[str, int]] | None = None,
 ) -> list[dict]:
-    """Run one filter against the graph store and return canonical matches."""
+    """Run one filter against the graph store and return canonical matches. ``sort`` decides which documents the
+    limit keeps (e.g. newest first); the canonical list keeps its own order."""
 
-    stage = await db.matches_v2.find(query, {"_id": 0}).to_list(per_store_limit)
+    cursor = db.matches_v2.find(query, {"_id": 0})
+    if sort:
+        cursor = cursor.sort(sort)
+    stage = await cursor.to_list(per_store_limit)
     return adapt_stage_matches(stage)
 
 

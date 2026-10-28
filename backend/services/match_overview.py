@@ -231,6 +231,66 @@ async def own_match_overviews(db, user: dict, limit: int = 12) -> tuple[list[dic
     return await compact_match_overviews(db, matches, registration_ids, acting_registration_ids=acting), registrations
 
 
+SCHEDULE_TASK_CLOSED = REPORT_CLOSED_STATUSES | {"in_progress", "waiting_result"}
+LINEUP_TASK_STATUSES = ("completed", "forfeit")
+LINEUP_TASK_LIMIT = 30
+
+
+async def own_match_tasks(db, user: dict, registrations: list[dict]) -> list[dict]:
+    """Was die eigene Seite außer dem Ergebnis zu tun hat (#2110) - nur für die Verantwortlichen (Captain und Vertreter
+    eines Co-Teams, sonst die Teamleitung), nie für Unbeteiligte:
+
+    - ``schedule``: ein offener Terminvorschlag der anderen Seite (oder der Turnierleitung) wartet auf Antwort,
+    - ``lineup``: nach dem Ergebnis fehlt die eigene Aufstellung und die Nachtragsfrist läuft noch.
+
+    Website und App lesen beides als Aufgabe auf der Startseite (``/api/mobile/dashboard``)."""
+    from services.league_games import amend_deadline_for
+
+    acting = await acting_ids_for(db, registrations, user.get("id"))
+    if not acting:
+        return []
+    mine = sorted(acting)
+    sides = {"$or": [{"participant_a_id": {"$in": mine}}, {"participant_b_id": {"$in": mine}},
+                     {"slots.registration_id": {"$in": mine}}]}
+    proposed = await _matches_for_query(
+        db, {**sides, "schedule_status": "proposed", "status": {"$nin": sorted(SCHEDULE_TASK_CLOSED)}}, 100)
+    # Ohne Maps gibt es nichts nachzutragen - das prüft schon die Abfrage („games.0“).
+    # Index ``lineups_missing`` (database.py); die neuesten Spiele zuerst - ältere sind ohnehin über der Frist.
+    missing = await load_matches_by_query(
+        db, {"lineups_missing": {"$in": mine}, "status": {"$in": list(LINEUP_TASK_STATUSES)}, "games.0": {"$exists": True}},
+        per_store_limit=LINEUP_TASK_LIMIT, sort=[("completed_at", -1)])
+    open_by_match: dict[str, list[dict]] = {}
+    if proposed:
+        for row in await db.match_schedule_proposals.find(
+            {"match_id": {"$in": [match["id"] for match in proposed]}, "status": "pending"},
+            {"_id": 0, "match_id": 1, "actor_registration_id": 1, "scheduled_at": 1},
+        ).to_list(500):
+            open_by_match.setdefault(row["match_id"], []).append(row)
+    tasks: list[tuple[str, dict, str | None]] = []
+    for match in proposed:
+        own = acting.intersection(match_registration_ids(match))
+        waiting = [row for row in open_by_match.get(match["id"], []) if row.get("actor_registration_id") not in own]
+        if waiting:
+            tasks.append(("schedule", match, min(str(row.get("scheduled_at") or "") for row in waiting) or None))
+    tournament_ids = sorted({match.get("tournament_id") for match in missing if match.get("tournament_id")})
+    tournaments = {row["id"]: row for row in await db.tournaments.find(
+        {"id": {"$in": tournament_ids}}, {"_id": 0}).to_list(len(tournament_ids) + 5)} if tournament_ids else {}
+    now = datetime.now(timezone.utc)
+    for match in missing:
+        deadline = amend_deadline_for(tournaments.get(match.get("tournament_id")), match)
+        if deadline and deadline >= now:
+            tasks.append(("lineup", match, deadline.isoformat()))
+    if not tasks:
+        return []
+    summaries = await compact_match_overviews(db, [match for _task, match, _when in tasks], acting)
+    return [
+        {"task": task, "match_id": match.get("id"), "until": when if task == "lineup" else None,
+         "proposed_at": when if task == "schedule" else None,
+         "tournament_title": summary.get("tournament_title"), "opponent_name": summary.get("opponent_name") or ""}
+        for (task, match, when), summary in zip(tasks, summaries)
+    ]
+
+
 def _assignment_matches(assignment: dict, match: dict) -> bool:
     scope = assignment.get("scope") or "tournament"
     scope_id = assignment.get("scope_id")

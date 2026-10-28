@@ -322,14 +322,16 @@ höchstens einen **Captain** und einen **Vertreter**; beide stehen im Kader des 
 | --- | --- | --- | --- | --- | --- |
 | Co-Team einer Staffel zuteilen oder herausnehmen | ja | nein | nein | nein | nein |
 | Kader pflegen, Captain und Vertreter vergeben | ja (Team-Admin-Rollen) | ja | nein | nein | nein |
+| Die eigene Rolle abgeben („Rolle abgeben“, #2110) | – | – | ja | ja | nein |
 | Termin vorschlagen, annehmen; einchecken | ja | nur ohne Captain und Vertreter | ja | ja | nein |
 | Ergebnis melden, bestätigen, Einspruch | ja | nur ohne Captain und Vertreter | ja | ja | nein |
 | Matchchat schreiben, Spiel-Hinweise (Aufruf, Erinnerung, Ergebnis) | ja | ja | ja | ja | ja |
 
 - **Rückfall:** Hat ein Co-Team weder Captain noch Vertreter, handeln Leitung und Co-Leitung des Hauptteams – niemand
   sperrt sich aus. Sobald eine Rolle vergeben ist, gilt sie ohne neue Anmeldung.
-- **Kader:** Wer Captain oder Vertreter ist, verlässt Kader und Team erst, wenn die Rolle neu vergeben ist (in derselben
-  Änderung geht es). Wer das Hauptteam verlässt oder entfernt wird, verlässt auch jeden Kader seiner Co-Teams; Kader,
+- **Kader:** Wer Captain oder Vertreter ist, verlässt Kader und Team erst, wenn die Rolle neu vergeben oder selbst
+  abgegeben ist (Neuvergabe geht auch in derselben Änderung; beim Abgeben bekommen Leitung und Co-Leitung eine
+  Nachricht). Wer das Hauptteam verlässt oder entfernt wird, verlässt auch jeden Kader seiner Co-Teams; Kader,
   Captain und Vertreter zählen nur, solange sie im Hauptteam sind. Übrige Mitglieder des Hauptteams bekommen zu
   Liga-Spielen ihres Teams keine Nachrichten.
 - **Löschen:** Solange eine Staffel nicht beendet ist (auch vor dem Start, nicht nur während sie läuft), lässt sich

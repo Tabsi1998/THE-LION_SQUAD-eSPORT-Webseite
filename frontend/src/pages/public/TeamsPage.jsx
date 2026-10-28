@@ -29,6 +29,7 @@ import { teamLogoUpload } from "@/lib/svgLogo";
 import { TeamsPanel } from "@/pages/user/profile/TeamsPanel";
 import { TeamSchedule } from "@/pages/public/team/TeamSchedule";
 import { TeamLeague } from "@/pages/public/team/TeamLeague";
+import { TeamSquads } from "@/pages/public/team/TeamSquads";
 import { TeamInviteSheet } from "@/pages/public/team/TeamInviteSheet";
 import { TeamJoinCard } from "@/pages/public/team/TeamJoinCard";
 import { TeamDissolveSection } from "@/pages/public/team/TeamDissolveSection";
@@ -364,6 +365,8 @@ function TeamDetail({ id }) {
             <LoadNotice testId="team-overview-error" message="Termine und letzte Spiele konnten gerade nicht geladen werden." onRetry={overviewLoad.reload} />
           )}
           <TeamLeague overview={overview} />
+          {/* Co-Teams mit Captain und Vertreter (#2110) - nur für Mitglieder und Teamleitung. */}
+          <TeamSquads key={team.id} team={team} userId={user?.id} canManage={canEdit} enabled={isMember || canEdit} />
           <TeamSchedule overview={overview} />
           {(team.awards || []).length > 0 && (
             <section data-testid="team-awards">

@@ -62,3 +62,12 @@ test("#1888: nach dem Ende keine Warteschlange mehr, auch wenn der Rohstatus noc
   renderCard({ status: "live", event_mode: "local", public_phase: { state: "live" } }, { status: "checked_in" });
   expect(screen.getByTestId("queue-stub")).toHaveTextContent("t1");
 });
+
+test("Co-Team einer Staffel (#2110): kein „Abmelden“, sondern „Austritt nur über die Turnierleitung“", () => {
+  const { unmount } = render(<MemoryRouter><MyStandCard tournament={{ id: "t1", status: "live" }} registration={{ id: "r1", status: "approved", squad_id: "s1" }} leagueSquad /></MemoryRouter>);
+  expect(screen.queryByTestId("tournament-unregister-btn")).toBeNull();
+  expect(screen.getByTestId("tournament-unregister-league")).toHaveTextContent("Austritt nur über die Turnierleitung");
+  unmount();
+  render(<MemoryRouter><MyStandCard tournament={{ id: "t1", status: "completed" }} registration={{ id: "r1", status: "approved", squad_id: "s1" }} leagueSquad /></MemoryRouter>);
+  expect(screen.queryByTestId("tournament-unregister-league")).toBeNull();
+});

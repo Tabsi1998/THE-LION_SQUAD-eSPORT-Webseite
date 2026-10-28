@@ -3,8 +3,9 @@ import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Check, Pencil, Plus, Trash2, UserPlus, Users, X } from "lucide-react";
+import { useOptionalAuth } from "@/context/AuthContext";
 import { TEAM_ROLE_LABELS } from "./constants";
 import { SQUAD_ROLES, isLocked, roleChoices, roleOf, rolesSummary } from "@/components/tls/league/squadRoles";
 
@@ -30,14 +31,19 @@ export function TeamsPanel() {
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
   const confirm = useConfirm();
+  const myId = useOptionalAuth()?.user?.id || "";
+  // „Co-Teams verwalten“ auf der Teamseite (#2110) öffnet hier genau dieses Team (?team=<id>).
+  const [searchParams] = useSearchParams();
+  const wantedTeam = searchParams.get("team") || "";
 
   const activeTeam = teams.find((t) => t.id === activeId);
 
   const loadTeams = useCallback(async () => {
     const { data } = await api.get("/teams/my");
     setTeams(data || []);
-    setActiveId((cur) => cur || data?.[0]?.id || "");
-  }, []);
+    const wanted = (data || []).some((team) => team.id === wantedTeam) ? wantedTeam : "";
+    setActiveId((cur) => cur || wanted || data?.[0]?.id || "");
+  }, [wantedTeam]);
 
   const loadInvites = useCallback(async () => {
     const { data } = await api.get("/teams/invites/my");
@@ -120,6 +126,22 @@ export function TeamsPanel() {
       loadTeams();
     } catch (err) {
       toast.error(formatRequestError(err, "Squad konnte nicht gelöscht werden."));
+    }
+  };
+
+  // Rolle abgeben (#2110): Captain oder Vertreter geben die eigene Rolle selbst ab; die Teamleitung vergibt neu.
+  const resignRole = async (squad, role) => {
+    if (!await confirm({
+      title: `${role.label} abgeben?`,
+      description: `Du bist danach nicht mehr ${role.label} von „${squad.name}“. Die Teamleitung bekommt Bescheid und vergibt die Rolle neu – bis dahin handelt ${role.field === "captain_id" ? "der Vertreter" : "der Captain"} oder, ohne beide, die Teamleitung.`,
+      confirmLabel: "Rolle abgeben",
+    })) return;
+    try {
+      await api.put(`/teams/${activeTeam.id}/squads/${squad.id}/roles`, { [role.field]: null });
+      toast.success(`Du bist nicht mehr ${role.label} von „${squad.name}“.`);
+      loadSquads();
+    } catch (err) {
+      toast.error(formatRequestError(err, "Rolle konnte nicht abgegeben werden."));
     }
   };
 
@@ -257,6 +279,12 @@ export function TeamsPanel() {
                       </div>
                       {squad.description && <p className="text-sm text-white/55 mt-2">{squad.description}</p>}
                       <p className="text-xs text-white/55 mt-2 break-words" data-testid={`team-squad-roles-${squad.id}`}>{rolesSummary(squad, squad.members)}</p>
+                      {roleOf(squad, myId) ? (
+                        <button type="button" onClick={() => resignRole(squad, roleOf(squad, myId))} data-testid={`team-squad-resign-${squad.id}`}
+                          className="tls-btn tls-btn--quiet mt-2 min-h-[44px] px-3 py-2 rounded-sm text-[10px] uppercase tracking-wider font-bold">
+                          Rolle abgeben ({roleOf(squad, myId).label})
+                        </button>
+                      ) : null}
                       <div className="mt-3 flex flex-wrap gap-1.5">
                         {(squad.members || []).map((m) => {
                           const role = roleOf(squad, m.id);

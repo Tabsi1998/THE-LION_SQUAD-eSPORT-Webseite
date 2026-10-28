@@ -154,6 +154,8 @@ async def init_indexes():
     await db.team_squads.create_index("vice_captain_id", sparse=True)
     # Kein Doppel-Einsatz am selben Spieltag (#1650): Spiele je aufgestellter Person (Mehrfachwert).
     await db.matches_v2.create_index("lineup_user_ids", sparse=True)
+    # Aufgabe „Aufstellung nachtragen“ auf der Startseite (#2110): Spiele je Seite ohne Aufstellung (Mehrfachwert).
+    await db.matches_v2.create_index("lineups_missing", sparse=True)
     # Events
     await db.events.create_index("id", unique=True)
     await db.events.create_index("slug", unique=True)
