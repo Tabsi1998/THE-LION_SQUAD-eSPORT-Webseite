@@ -157,12 +157,14 @@ def test_the_first_round_creates_its_stage_and_pairs_everyone():
     assert all(match["stage_id"] == response["stage_id"] for match in db.matches_v2.rows)
 
 
-def test_the_tournament_goes_live_with_its_first_round():
+def test_the_first_round_keeps_the_status():
+    # #2120 (TA11): live geht es über „Turnier starten“ mit Check-in-Ende und Planungsprüfung, nicht über die Runde.
     db, tournament = swiss_db(4)
+    before = db.tournaments.rows[0]["status"]
 
     run(_swiss_next_round_graph(db, tournament, "admin"))
 
-    assert db.tournaments.rows[0]["status"] == "live"
+    assert db.tournaments.rows[0]["status"] == before
 
 
 def test_the_write_model_is_pinned_to_the_graph():
@@ -285,7 +287,8 @@ def test_regenerating_replaces_instead_of_adding():
     db, tournament = groups_db(8)
     run(_groups_generate_graph(db, tournament, 2, "admin"))
 
-    run(_groups_generate_graph(db, tournament, 2, "admin"))
+    # Feste Gruppenspiele ersetzt nur die Bestätigung (#2120, TA10) - die Rückfrage davor prüft der Ablauf-Test.
+    run(_groups_generate_graph(db, tournament, 2, "admin", force=True))
 
     assert len(db.matches_v2.rows) == 12
     assert len(db.tournament_groups.rows) == 2

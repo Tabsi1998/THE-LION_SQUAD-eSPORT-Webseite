@@ -168,6 +168,8 @@ NOTIFICATION_KIND_CATEGORY = {
     # Turnier-Anmeldung (#1133): eingegangen, bestätigt, abgelehnt, nachgerückt - und „Turnier beendet“.
     "tournament_registration": "tournament_updates",
     "tournament_finished": "tournament_updates",
+    # Absage (#2120): „Turnier abgesagt“ an alle, die noch mitspielen wollten.
+    "tournament_cancelled": "tournament_updates",
     "match_chat_message": "community_messages",
     "match_chat_mention": "community_messages",
     "tournament_checkin": "tournament_updates",

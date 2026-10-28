@@ -118,6 +118,43 @@ async def notify_registration_status(db, tournament: dict, registration: dict, s
     return sent
 
 
+CANCEL_NOTIFIED_STATUSES = ["pending", "approved", "checked_in", "waitlist"]
+CANCEL_REASON_LIMIT = 300
+
+
+def cancellation_message(tournament: dict, reason: str | None = None) -> dict:
+    """Titel und Text der Absage (#2120, TA24) - der Grund ist freiwillig und steht nur in dieser Nachricht."""
+    title = tournament.get("title") or "Turnier"
+    clean = " ".join((reason or "").split())[:CANCEL_REASON_LIMIT]
+    body = "Die Turnierleitung hat das Turnier abgesagt. Deine Anmeldung ist damit hinfällig."
+    if clean:
+        body += f" Grund: {clean}"
+    return {"title": f"Turnier abgesagt: {title}", "body": body}
+
+
+async def notify_tournament_cancelled(db, tournament: dict, reason: str | None = None) -> int:
+    """„Abgesagt“ (#2120, TA24): einmal je Turnier und Person an alle Spieler der Anmeldungen, die noch mitspielen
+    wollten (ausstehend, bestätigt, eingecheckt, Warteliste) - im Postfach und per Push. Die Mail dazu kommt mit der
+    eigenen Vorlage (#2119); bis dahin gibt es keine."""
+    registrations = await db.tournament_registrations.find(
+        {"tournament_id": tournament.get("id"), "status": {"$in": CANCEL_NOTIFIED_STATUSES}},
+        {"_id": 0, "id": 1, "user_id": 1, "team_id": 1, "squad_id": 1},
+    ).to_list(5000)
+    if not registrations:
+        return 0
+    path = f"/tournaments/{tournament.get('slug') or tournament.get('id')}"
+    message = cancellation_message(tournament, reason)
+    sent = 0
+    for user in await users_for(db, await player_user_ids(db, registrations)):
+        dedupe = f"tournament_cancelled:{tournament.get('id')}:{user['id']}"
+        if await create_user_notification(
+            user["id"], message["title"], message["body"], url=path, kind="tournament_cancelled",
+            meta={"category": "tournament_updates", "dedupe_key": dedupe, "tournament_id": tournament.get("id")},
+        ):
+            sent += 1
+    return sent
+
+
 async def notify_tournament_finished(db, tournament: dict) -> int:
     """„Turnier beendet“ (#1133): einmal je Turnier und Person an alle Spieler der bestätigten Anmeldungen - im
     Postfach (ohne Push, die Ergebnisse kommen ohnehin) und, wenn die Person es zulässt, per Mail."""

@@ -12,6 +12,7 @@ from services.tournament_permissions import (
 )
 from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
 from services.staffel_guard import staffel_rebuild_problem
+from services import tournament_guard
 from services.draw_records import record_build_draws
 from services.heat_rebuild import evaluate_after_write
 from services.match_v2_results import apply_deferred_draws
@@ -384,10 +385,29 @@ async def rebuild_bracket_from_tournament_format(tid: str, body: TournamentBrack
     staffel_problem = await staffel_rebuild_problem(db, tournament)
     if staffel_problem:
         raise HTTPException(status_code=409, detail=staffel_problem)
-    if tournament.get("status") in ("live", "paused", "completed", "results_published", "archived") and not force:
-        raise HTTPException(status_code=409, detail="Laufende oder beendete Turniere brauchen force=true.")
+    # Nach dem Ende bleibt der Baum (#2120, TA17) - auch mit force.
+    finished = tournament_guard.finished_problem(tournament)
+    if finished:
+        raise HTTPException(status_code=409, detail=finished)
 
     v2_matches = await db.matches_v2.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
+    impact = tournament_guard.match_impact(v2_matches)
+    if impact["match_count"] and preview:
+        # Eine Vorschau ersetzt nie echte Spiele (#2120, TA12/TA17) - „Speichern & Struktur anwenden“ löschte so im
+        # laufenden Turnier alle Spiele samt Ergebnissen.
+        raise HTTPException(status_code=409, detail=tournament_guard.confirm_detail(
+            "bracket_fixed",
+            tournament_guard.PREVIEW_OVER_REAL_REFUSED.format(impact=tournament_guard.impact_text(impact)),
+            impact,
+        ))
+    running = tournament.get("status") in ("live", "paused", "cancelled")
+    if (impact["match_count"] or running) and not force:
+        message = (f"Neu aufbauen löscht alle Spiele ({tournament_guard.impact_text(impact)}) samt Ergebnissen und "
+                   "Berichten."
+                   if impact["match_count"] else
+                   "Das Turnier läuft schon – der Turnierbaum wird aus dem Format neu aufgebaut.")
+        raise HTTPException(status_code=409, detail=tournament_guard.confirm_detail(
+            "confirm_destruction", message, impact))
     match_plan = _collect_match_plan(v2_matches)
     existing_stage = await db.tournament_stages.find_one({"tournament_id": tid}, {"_id": 0}, sort=[("number", 1)])
     if body is None and existing_stage:
@@ -397,9 +417,6 @@ async def rebuild_bracket_from_tournament_format(tid: str, body: TournamentBrack
             match_type=existing_stage.get("match_type"),
             settings=existing_stage.get("settings") or {},
         )
-    has_real_v2 = any(not match.get("is_preview") for match in v2_matches)
-    if has_real_v2 and not force:
-        raise HTTPException(status_code=409, detail="Es gibt bereits echte Spiele. Mit force=true neu aufbauen.")
 
     v2_match_ids = [match["id"] for match in v2_matches if match.get("id")]
 
@@ -510,24 +527,34 @@ async def reset_bracket(tid: str, force: bool = False, me: dict = Depends(get_cu
     staffel_problem = await staffel_rebuild_problem(db, t)
     if staffel_problem:
         raise HTTPException(status_code=409, detail=staffel_problem)
-    if t.get("status") in ("live", "completed", "results_published") and not force:
-        raise HTTPException(
-            status_code=409,
-            detail="Bracket-Reset für laufende oder beendete Turniere braucht force=true",
-        )
-    v2_match_ids = await db.matches_v2.distinct("id", {"tournament_id": tid})
-    if not v2_match_ids and t.get("status") == "draft":
-        return {"ok": True, "idempotent_replay": True}
+    # Nach dem Ende bleibt der Baum (#2120, TA16): Platzierungen, Jahrespunkte, Pokale und Gewinne hängen daran.
+    finished = tournament_guard.finished_problem(t)
+    if finished:
+        raise HTTPException(status_code=409, detail=finished)
+    v2_matches = await db.matches_v2.find({"tournament_id": tid}, {"_id": 0}).to_list(5000)
+    if not v2_matches:
+        return {"ok": True, "idempotent_replay": True, "match_count": 0}
+    impact = tournament_guard.match_impact(v2_matches)
+    # Echte Spiele löscht nur eine Bestätigung mit Zahl (force) - in jedem Status, auch pausiert oder abgesagt.
+    if impact["match_count"] and not force:
+        raise HTTPException(status_code=409, detail=tournament_guard.confirm_detail(
+            "confirm_destruction",
+            f"Zurücksetzen löscht alle Spiele ({tournament_guard.impact_text(impact)}) samt Ergebnissen und "
+            "Berichten. Der Status bleibt.",
+            impact,
+        ))
+    v2_match_ids = [match["id"] for match in v2_matches if match.get("id")]
     await db.matches_v2.delete_many({"tournament_id": tid})
     if v2_match_ids:
         await db.match_reports_v2.delete_many({"match_id": {"$in": v2_match_ids}})
-    await db.tournaments.update_one({"id": tid}, {"$set": {"status": "draft", "updated_at": now_utc().isoformat()}})
+    # Der Status bleibt (#2120, TA16): früher fiel jedes Turnier auf „Entwurf“, und die öffentliche Seite war weg.
+    await db.tournaments.update_one({"id": tid}, {"$set": {"updated_at": now_utc().isoformat()}})
     reset_scope_cache()  # Live-Meldungen (#1801): Turnier und Event neu nachschlagen
     await _audit_tournament_action(
         db,
         "tournament.bracket.reset",
         me.get("id"),
         tid,
-        {"previous_status": t.get("status"), "v2_match_count": len(v2_match_ids), "force": force},
+        {"status": t.get("status"), "v2_match_count": len(v2_match_ids), "force": force, **impact},
     )
-    return {"ok": True, "idempotent_replay": False}
+    return {"ok": True, "idempotent_replay": False, "match_count": len(v2_match_ids)}

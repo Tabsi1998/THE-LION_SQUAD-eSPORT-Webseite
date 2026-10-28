@@ -13,7 +13,7 @@ import { SelectField, modeLabel } from "./TournamentEditForm";
 import { DrawControls } from "./DrawControls";
 import { sourceLabel } from "@/lib/slotSource";
 import { durationSourceText, matchDurationSource, ownDurationInput, ownDurationPayload } from "@/lib/matchDuration";
-import { DEFAULT_FFA_SCHEMA, DRAW_SHOW_MINUTES_DEFAULT, DRAW_SHOW_MINUTES_HINT, EVENT_MODE_OPTIONS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, STAGE_ADVANCEMENT_OPTIONS, RESULT_ENTRY_MODE_OPTIONS, SCHEDULE_MODE_OPTIONS, advancementModeHint, applyStageType, drawShowMinutesPayload, matchSectionKey, sectionSortIndex, sortMatchesForPlan, stageAdvancementSettings, stageAdvancementValue, stageConfigFor, stationDisplay } from "./shared";
+import { DEFAULT_FFA_SCHEMA, DRAW_SHOW_MINUTES_DEFAULT, DRAW_SHOW_MINUTES_HINT, EVENT_MODE_OPTIONS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, STAGE_ADVANCEMENT_OPTIONS, RESULT_ENTRY_MODE_OPTIONS, SCHEDULE_MODE_OPTIONS, advancementModeHint, applyStageType, drawShowMinutesPayload, guardDetail, matchImpact, matchSectionKey, sectionSortIndex, sortMatchesForPlan, stageAdvancementSettings, stageAdvancementValue, stageConfigFor, stationDisplay } from "./shared";
 
 // Die Dauer-Kette (#1554): Turnier, Phasen und das Spiel (Modi), damit jedes Feld sagen kann, was ohne eigenen Wert gilt.
 const DurationContext = createContext({ tournament: null, game: null, stageById: new Map() });
@@ -32,7 +32,7 @@ const NO_MATCH_RIGHTS = () => ({ plan: false, results: false });
 
 // Rechte je Turnier (#1353), wie sie der Server schickt: Regeln der Phasen (#1636) und Erzeugen mit dem Aufbau-Recht,
 // Termin und Station mit dem Check-in-Recht, Ergebnisse mit dem Ergebnis-Recht.
-export function TournamentStagesPanel({ tournamentId, stages, matches, registrations, stations = [], canEditSettings = false, canManageStructure = false, rightsForMatch = NO_MATCH_RIGHTS, onChanged, onOpenMatchplan = null, mode = "operations", tournament = null, durationGame = null }) {
+export function TournamentStagesPanel({ tournamentId, stages, matches, registrations, stations = [], canEditSettings = false, canManageStructure = false, rightsForMatch = NO_MATCH_RIGHTS, onChanged, onOpenMatchplan = null, mode = "operations", tournament = null, durationGame = null, bracketFixed = false }) {
   const showSettings = canEditSettings && mode === "settings";
   const showMatchList = mode !== "settings";
   // Liga-Staffel (#2109, S23): „Regeln dieser Phase“ gibt es nicht - eine Phase „Vor Ort“ schaltete die Spielwochen ab.
@@ -92,18 +92,27 @@ export function TournamentStagesPanel({ tournamentId, stages, matches, registrat
       toast.error(formatRequestError(err, "Phase konnte nicht angelegt werden."));
     }
   };
-  const removeStage = async (stage) => {
-    if (!await confirm({
+  const removeStage = async (stage, force = false) => {
+    // Mit Zahl (#2120): erst ohne force - mit echten Spielen nennt der Server, wie viele mitgehen und wie viele davon
+    // schon begonnen oder gewertet sind; nur eine reine Vorschau fragt die Seite selbst.
+    const real = matchImpact(matches.filter((match) => match.stage_id === stage.id)).match_count;
+    if (!force && !real && !await confirm({
       title: "Phase löschen?",
-      description: "Alle Spiele und Berichte dieser Phase werden gelöscht.",
+      description: "Die Phase und ihre Vorschau-Spiele werden gelöscht.",
       confirmLabel: "Löschen",
       tone: "danger",
     })) return;
     try {
-      await api.delete(`/tournaments/${tournamentId}/stages/${stage.id}`);
+      await api.delete(`/tournaments/${tournamentId}/stages/${stage.id}${force ? "?force=true" : ""}`);
       toast.success("Phase gelöscht.");
       onChanged();
     } catch (err) {
+      const detail = guardDetail(err, "confirm_destruction");
+      if (detail && !force) {
+        const ok = await confirm({ title: "Phase löschen?", description: detail.message, confirmLabel: "Löschen", tone: "danger" });
+        if (ok) return removeStage(stage, true);
+        return;
+      }
       toast.error(formatRequestError(err, "Phase konnte nicht gelöscht werden."));
     }
   };
@@ -189,6 +198,7 @@ export function TournamentStagesPanel({ tournamentId, stages, matches, registrat
             showSettings={showSettings}
             canEditRules={canEditSettings && mode !== "settings" && !staffel}
             showMatchList={showMatchList}
+            bracketFixed={bracketFixed}
             onChanged={onChanged}
             onDelete={() => removeStage(stage)}
           />
@@ -308,7 +318,7 @@ function GrandFinalField({ value, onChange, testId }) {
   );
 }
 
-function StageCard({ tournamentId, stage, matches, regById, stations = [], canManageStructure = false, rightsForMatch = NO_MATCH_RIGHTS, showSettings = false, canEditRules = false, showMatchList = true, onChanged, onDelete }) {
+function StageCard({ tournamentId, stage, matches, regById, stations = [], canManageStructure = false, rightsForMatch = NO_MATCH_RIGHTS, showSettings = false, canEditRules = false, showMatchList = true, bracketFixed = false, onChanged, onDelete }) {
   const settings = stage.settings || {};
   const durationContext = useContext(DurationContext);
   const [activeSection, setActiveSection] = useState("all");
@@ -397,18 +407,25 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], canMa
       toast.success(data.preview ? `${data.match_count} Vorschau-Spiele generiert.` : `${data.match_count} Spiele mit Teilnehmern generiert.`);
       onChanged();
     } catch (err) {
-      if (err.response?.status === 409 && !force) {
+      // Echte Spiele ersetzt der Server nur nach einer Rückfrage mit Zahl (#2120); eine Vorschau ersetzt sie nie.
+      const detail = guardDetail(err, "confirm_destruction");
+      if (detail && !force) {
         const ok = await confirm({
           title: "Phase neu generieren?",
-          description: "Vorhandene Spiele und Berichte dieser Phase werden ersetzt.",
+          description: detail.message,
           confirmLabel: "Neu generieren",
           tone: "danger",
         });
         if (ok) return generate({ preview, force: true });
+        return;
       }
       toast.error(formatRequestError(err, "Phase konnte nicht generiert werden."));
     }
   };
+  // Steht der Baum (#2120, TA12), gibt es keine Vorschau mehr und neu generieren nur für eine leere Phase.
+  const hasRealMatches = matches.some((match) => !match.is_preview);
+  const showPreviewButton = !bracketFixed && !hasRealMatches;
+  const showGenerateButton = !(bracketFixed && matches.length > 0);
   const statusCounts = matches.reduce((acc, m) => {
     acc[m.status || "pending"] = (acc[m.status || "pending"] || 0) + 1;
     return acc;
@@ -452,10 +469,10 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], canMa
         </div>
         {(canManageStructure || showSettings) && (
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => generate({ preview: true })} disabled={!config.canGenerate} className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm uppercase tracking-wider text-xs font-bold disabled:opacity-40">Vorschau</button>
-            <button type="button" onClick={() => generate({ preview: false })} disabled={!config.canGenerate} className="px-3 py-2 bg-[#29B6E8] text-black rounded-sm uppercase tracking-wider text-xs font-bold disabled:opacity-40">Mit Teilnehmern generieren</button>
+            {showPreviewButton && <button type="button" onClick={() => generate({ preview: true })} disabled={!config.canGenerate} data-testid={`stage-preview-${stage.id}`} className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm uppercase tracking-wider text-xs font-bold disabled:opacity-40">Vorschau</button>}
+            {showGenerateButton && <button type="button" onClick={() => generate({ preview: false })} disabled={!config.canGenerate} data-testid={`stage-generate-${stage.id}`} className="px-3 py-2 bg-[#29B6E8] text-black rounded-sm uppercase tracking-wider text-xs font-bold disabled:opacity-40">Mit Teilnehmern generieren</button>}
             {showSettings && <button type="button" onClick={save} data-testid={`stage-save-${stage.id}`} className="px-3 py-2 border border-white/20 text-white rounded-sm uppercase tracking-wider text-xs font-bold">Speichern</button>}
-            {showSettings && <button type="button" onClick={saveAndGeneratePreview} disabled={!config.canGenerate} className="px-3 py-2 border border-[#FFD700]/50 text-[#FFD700] rounded-sm uppercase tracking-wider text-xs font-bold disabled:opacity-40">Speichern & neu bauen</button>}
+            {showSettings && showPreviewButton && <button type="button" onClick={saveAndGeneratePreview} disabled={!config.canGenerate} className="px-3 py-2 border border-[#FFD700]/50 text-[#FFD700] rounded-sm uppercase tracking-wider text-xs font-bold disabled:opacity-40">Speichern & neu bauen</button>}
             {showSettings && <button type="button" onClick={onDelete} className="px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm uppercase tracking-wider text-xs font-bold">Löschen</button>}
           </div>
         )}

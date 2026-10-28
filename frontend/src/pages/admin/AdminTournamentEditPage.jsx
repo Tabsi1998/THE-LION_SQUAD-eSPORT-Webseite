@@ -25,7 +25,7 @@ import { PauseUntilControl, RoundSponsorsPanel } from "./tournament/TvTournament
 import { HeatRebuildBar } from "./tournament/HeatRebuildBar";
 import { ParticipantRemovalActions } from "./tournament/ParticipantRemovalActions";
 import { ActionGroup, EmptyBracketNotice, TournamentEditForm } from "./tournament/TournamentEditForm";
-import { OPERATIONAL_STATUS_VALUES, TOURNAMENT_STATUS_OPTIONS, normalizeSearch, primaryTournamentAction } from "./tournament/shared";
+import { FINISHED_STATUSES, OPERATIONAL_STATUS_VALUES, TOURNAMENT_STATUS_OPTIONS, bracketFixed, fixedRegistrationIds, guardDetail, matchImpact, normalizeSearch, primaryTournamentAction, statusChangeNotice, swissUndoInfo } from "./tournament/shared";
 import { MatchPlanPanel } from "./tournament/matchplan/MatchPlanPanel";
 import { MapPoolPanel } from "./tournament/MapPoolPanel";
 import { SquadAssignDialog, canAssignSquads } from "@/components/tls/league/SquadAssignDialog";
@@ -146,37 +146,49 @@ export default function AdminTournamentEditPage() {
   useEffect(() => { loadSafely(); }, [loadSafely]);
   useApiInvalidation(loadSafely, ["tournaments", "matches", "stations"]);
 
-  const reset = async () => {
-    if (!await confirm({
-      title: "Turnierbaum zurücksetzen?",
-      description: "Alle generierten Turnierbaum-Daten werden zurückgesetzt. Diese Aktion ist für laufende Turniere kritisch.",
-      confirmLabel: "Zurücksetzen",
-    })) return;
+  // Folgenschwere Aktionen (#2120): echte Spiele löscht der Server nur mit force - vorher nennt die Rückfrage, wie
+  // viele Spiele (und wie viele davon schon begonnen oder gewertet) verloren gehen. Weiß der Server mehr als die Seite
+  // (inzwischen gespielt), kommt seine Rückfrage mit seinen Zahlen.
+  const runConfirmed = async (send, { title, confirmLabel, failure }) => {
     try {
-      await api.post(`/tournaments/${id}/reset-bracket`);
-      toast.success("Turnierbaum zurückgesetzt.");
-      load();
+      return await send(false);
     } catch (e) {
-      if (e.response?.status === 409) {
-        const force = await confirm({
-          title: "Laufenden Turnierbaum wirklich zurücksetzen?",
-          description: "Das Turnier ist live oder bereits beendet. Beim Fortfahren werden alle Spiele endgültig gelöscht.",
-          confirmLabel: "Trotzdem zurücksetzen",
-          tone: "danger",
-        });
-        if (!force) return;
-        try {
-          await api.post(`/tournaments/${id}/reset-bracket?force=true`);
-          toast.success("Turnierbaum zurückgesetzt.");
-          load();
-          return;
-        } catch (inner) {
-          toast.error(formatRequestError(inner, "Turnierbaum konnte nicht zurückgesetzt werden."));
-          return;
-        }
+      const detail = guardDetail(e, "confirm_destruction");
+      if (!detail) {
+        toast.error(formatRequestError(e, failure));
+        return null;
       }
-      toast.error(formatRequestError(e, "Turnierbaum konnte nicht zurückgesetzt werden."));
+      const label = typeof confirmLabel === "function" ? confirmLabel(detail) : confirmLabel;
+      const ok = await confirm({ title, description: detail.message, confirmLabel: label, tone: "danger" });
+      if (!ok) return null;
+      try {
+        return await send(true);
+      } catch (inner) {
+        toast.error(formatRequestError(inner, failure));
+        return null;
+      }
     }
+  };
+  const reset = async () => {
+    // Der Status bleibt (#2120, TA16) - nur die Spiele gehen. Erst ohne force: mit echten Spielen fragt der Server mit
+    // seinen Zahlen nach (Review #2120), die Seite rät nicht. Nur eine reine Vorschau fragt die Seite selbst.
+    if (!matchImpact(matchesV2).match_count && !await confirm({
+      title: "Turnierbaum zurücksetzen?",
+      description: "Die Vorschau wird gelöscht und baut sich mit der nächsten An- oder Abmeldung bzw. „Speichern & Struktur anwenden“ neu. Der Status bleibt.",
+      confirmLabel: "Zurücksetzen",
+      tone: "info",
+    })) return;
+    const data = await runConfirmed(
+      async (force) => (await api.post(`/tournaments/${id}/reset-bracket${force ? "?force=true" : ""}`)).data,
+      {
+        title: "Turnierbaum zurücksetzen?",
+        confirmLabel: (detail) => (detail.match_count === 1 ? "1 Spiel löschen" : `${detail.match_count} Spiele löschen`),
+        failure: "Turnierbaum konnte nicht zurückgesetzt werden.",
+      },
+    );
+    if (!data) return;
+    toast.success("Turnierbaum zurückgesetzt.");
+    load();
   };
   const setRegStatus = async (rid, status) => {
     // Absage mit Grund (#1133): die Person bekommt eine Nachricht - der Grund steht nur darin, nicht an der Anmeldung.
@@ -218,29 +230,21 @@ export default function AdminTournamentEditPage() {
   };
   // `keepStage` (Liga-Staffel, #2109): ohne Struktur im Aufruf baut der Server mit der vorhandenen Phase neu - die
   // Vorschau wird neu gemischt, Format und Einstellungen der Liga bleiben.
+  // Eine Vorschau ersetzt nie echte Spiele (#2120, TA12/TA17): steht der Baum, lehnt der Server ab und sagt warum;
+  // sonst fragt er mit der Zahl der Spiele nach, bevor er etwas ersetzt.
   const rebuildFromFormat = async ({ preview = true, force = false, structure = null, keepStage = false } = {}) => {
-    try {
+    const data = await runConfirmed(async (confirmed) => {
       const params = new URLSearchParams();
       if (preview) params.set("preview", "true");
-      if (force) params.set("force", "true");
+      if (force || confirmed) params.set("force", "true");
       const suffix = params.toString() ? `?${params.toString()}` : "";
-      const { data } = await api.post(`/tournaments/${id}/bracket/from-format${suffix}`, keepStage ? undefined : (structure || {}));
-      toast.success(keepStage
-        ? `Spielplan-Vorschau mit ${data.match_count} Spielen neu gemischt.`
-        : data.preview ? `Turnierbaum-Vorschau mit ${data.match_count} Spielen neu aufgebaut.` : `Turnierbaum mit ${data.match_count} Spielen neu aufgebaut.`);
-      load();
-    } catch (e) {
-      if (e.response?.status === 409 && !force) {
-        const ok = await confirm({
-          title: "Turnierbaum aus Format neu bauen?",
-          description: "Vorhandene Struktur-/Vorschau-Daten werden durch das gewählte Turnierformat ersetzt.",
-          confirmLabel: "Neu bauen",
-          tone: "danger",
-        });
-        if (ok) return rebuildFromFormat({ preview, force: true, structure, keepStage });
-      }
-      toast.error(formatRequestError(e, "Turnierbaum konnte nicht aus dem Format neu aufgebaut werden."));
-    }
+      return (await api.post(`/tournaments/${id}/bracket/from-format${suffix}`, keepStage ? undefined : (structure || {}))).data;
+    }, { title: "Turnierbaum aus dem Format neu bauen?", confirmLabel: "Neu bauen", failure: "Turnierbaum konnte nicht aus dem Format neu aufgebaut werden." });
+    if (!data) return;
+    toast.success(keepStage
+      ? `Spielplan-Vorschau mit ${data.match_count} Spielen neu gemischt.`
+      : data.preview ? `Turnierbaum-Vorschau mit ${data.match_count} Spielen neu aufgebaut.` : `Turnierbaum mit ${data.match_count} Spielen neu aufgebaut.`);
+    load();
   };
   const deleteParticipant = async (registration) => {
     if (!await confirm({
@@ -316,6 +320,19 @@ export default function AdminTournamentEditPage() {
   };
   const setTournStatus = async (status) => {
     let forceStart = false;
+    let reason = null;
+    // Status mit Folgen (#2120, TA24): Entwurf nimmt die Seite weg, Beendet und Veröffentlicht verschicken und
+    // vergeben, Abgesagt benachrichtigt alle Angemeldeten - mit freiwilligem Grund.
+    const notice = statusChangeNotice(status, t, {
+      activeRegistrations: regs.filter((r) => ["pending", "approved", "checked_in", "waitlist"].includes(r.status)).length,
+    });
+    if (notice?.askReason) {
+      const answer = await prompt({ ...notice, multiline: false });
+      if (answer === false || answer === null || answer === undefined) return;
+      reason = String(answer).trim() || null;
+    } else if (notice && !await confirm(notice)) {
+      return;
+    }
     try {
       if (status === "live") {
         const report = await runPlanningCheck({ silent: true });
@@ -334,8 +351,11 @@ export default function AdminTournamentEditPage() {
           forceStart = !report.ok;
         }
       }
-      await api.post(`/tournaments/${id}/status`, { status, force: forceStart });
-      toast.success(`Status: ${TOURNAMENT_STATUS_OPTIONS.find(([value]) => value === status)?.[1] || status}`);
+      const { data } = await api.post(`/tournaments/${id}/status`, reason ? { status, force: forceStart, reason } : { status, force: forceStart });
+      const label = TOURNAMENT_STATUS_OPTIONS.find(([value]) => value === status)?.[1] || status;
+      toast.success(status === "cancelled" && Number.isFinite(data?.notified)
+        ? `Status: ${label} – ${data.notified === 1 ? "1 Person benachrichtigt" : `${data.notified} Personen benachrichtigt`}.`
+        : `Status: ${label}`);
       load();
     } catch (e) {
       const statusDetail = e.response?.data?.detail;
@@ -381,13 +401,14 @@ export default function AdminTournamentEditPage() {
       toast.error("Bitte eine gültige Gruppenanzahl eingeben.");
       return;
     }
-    try {
-      const { data } = await api.post(`/tournaments/${id}/groups/generate`, { group_count: groupCount });
-      toast.success(`${data.group_count} Gruppen mit ${data.match_count} Spielen`);
-      load();
-    } catch (e) {
-      toast.error(formatRequestError(e, "Gruppen konnten nicht generiert werden."));
-    }
+    // Neue Gruppen löschen die Spiele der Gruppenphase (#2120, TA10) - mit Ergebnissen nur nach der Rückfrage mit Zahl.
+    const data = await runConfirmed(
+      async (force) => (await api.post(`/tournaments/${id}/groups/generate${force ? "?force=true" : ""}`, { group_count: groupCount })).data,
+      { title: "Gruppen neu generieren?", confirmLabel: "Neu generieren", failure: "Gruppen konnten nicht generiert werden." },
+    );
+    if (!data) return;
+    toast.success(`${data.group_count} Gruppen mit ${data.match_count} Spielen`);
+    load();
   };
   const generateSwissRound = async () => {
     try {
@@ -396,6 +417,23 @@ export default function AdminTournamentEditPage() {
       load();
     } catch (e) {
       toast.error(formatRequestError(e, "Schweizer Runde konnte nicht generiert werden."));
+    }
+  };
+  // Letzte Schweizer Runde zurücknehmen (#2120, TA11): solange keines ihrer Spiele begonnen hat.
+  const undoSwissRound = async (info) => {
+    const ok = await confirm({
+      title: `Runde ${info.round} zurücknehmen?`,
+      description: `Die ${info.count === 1 ? "1 Paarung" : `${info.count} Paarungen`} von Runde ${info.round} werden gelöscht. Danach erzeugt „Schweizer Runde“ die Runde neu.`,
+      confirmLabel: "Runde zurücknehmen",
+      tone: "danger",
+    });
+    if (!ok) return;
+    try {
+      const { data } = await api.post(`/tournaments/${id}/swiss/undo-round`);
+      toast.success(`Runde ${data.round} zurückgenommen.`);
+      load();
+    } catch (e) {
+      toast.error(formatRequestError(e, "Die Runde konnte nicht zurückgenommen werden."));
     }
   };
 
@@ -452,6 +490,12 @@ export default function AdminTournamentEditPage() {
     return haystack.includes(participantSearch);
   });
   const primaryAction = primaryTournamentAction(t.status, t);
+  // Steht der Baum (#2120)? Dann bleiben Format und Teilnahme, Vorschau-Knöpfe und das Entfernen von Teilnehmern im
+  // festen Baum weg - der Server lehnt es ohnehin ab.
+  const structureFixed = bracketFixed(t, matchesV2);
+  const inFixedBracket = fixedRegistrationIds(matchesV2);
+  const tournamentOver = FINISHED_STATUSES.has(t.status) || t.status === "cancelled";
+  const swissUndo = t.format === "swiss" && !tournamentOver && !t.locked_at ? swissUndoInfo(matchesV2) : null;
   // Staffel (S18): kein Check-in, kein Auschecken, kein „Nicht erschienen“ - das löste sogar den Season-Schlüssel des
   // Co-Teams. Austritt und Disqualifikation gehen über ParticipantRemovalActions.
   const checkInTools = Boolean(t.can_check_in) && !staffel;
@@ -480,7 +524,8 @@ export default function AdminTournamentEditPage() {
         {t.locked_at ? "Entsperren" : "Sperren"}
       </button>
     ),
-    t.can_manage_structure && !staffel && (
+    // Nach dem Ende bleibt der Baum (#2120): daran hängen Platzierungen, Punkte und Gewinne.
+    t.can_manage_structure && !staffel && !FINISHED_STATUSES.has(t.status) && (
       <button key="reset" type="button" onClick={reset} data-testid="admin-tr-reset" className="px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#FF3B30]/10 inline-flex items-center gap-2">
         <RefreshCw className="w-3.5 h-3.5" /> Zurücksetzen
       </button>
@@ -534,10 +579,13 @@ export default function AdminTournamentEditPage() {
                 <Zap className="w-3.5 h-3.5" /> {primaryAction.label}
               </button>
             )}
-            {isTournamentLead && t.format === "swiss" && (
+            {isTournamentLead && t.format === "swiss" && !tournamentOver && (
               <button type="button" onClick={generateSwissRound} data-testid="admin-tr-swiss-next" className="px-4 py-2 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#29B6E8]/10">Schweizer Runde</button>
             )}
-            {isTournamentLead && t.format === "groups" && (
+            {isTournamentLead && swissUndo && (
+              <button type="button" onClick={() => undoSwissRound(swissUndo)} data-testid="admin-tr-swiss-undo" className="tls-btn tls-btn--secondary px-4 py-2 font-bold uppercase tracking-wider rounded-sm text-sm">Runde {swissUndo.round} zurücknehmen</button>
+            )}
+            {isTournamentLead && t.format === "groups" && !tournamentOver && (
               <button type="button" onClick={generateGroups} data-testid="admin-tr-groups" className="px-4 py-2 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#29B6E8]/10">Gruppen generieren</button>
             )}
             {canOperateTournament && (
@@ -679,7 +727,7 @@ export default function AdminTournamentEditPage() {
                 <div className="grid grid-cols-2 gap-2">
                   {isTournamentLead && !staffel && (
                     <select value={r.status} onChange={(e) => setRegStatus(r.id, e.target.value)} data-testid={`admin-reg-status-mobile-${r.id}`} className="col-span-2 bg-[#0A0A0A] border border-white/10 px-2 py-2 text-xs rounded-sm">
-                      {["pending", "approved", "rejected", "waitlist", "checked_in", "no_show"].map((s) => <option key={s} value={s}>{formatRegistrationStatus(s)}</option>)}
+                      <RegistrationStatusOptions fixed={inFixedBracket.has(r.id)} current={r.status} />
                     </select>
                   )}
                   {checkInTools && r.status !== "checked_in" && !["rejected", "waitlist"].includes(r.status) && (
@@ -692,7 +740,7 @@ export default function AdminTournamentEditPage() {
                     <button type="button" onClick={() => setRegCheckinStatus(r.id, "no_show")} className="px-2 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase">Nicht erschienen</button>
                   )}
                   <ParticipantRemovalActions tournament={t} registration={r} onDone={load} compact />
-                  {t.can_manage_participants && (
+                  {t.can_manage_participants && !inFixedBracket.has(r.id) && (
                     <button type="button" onClick={() => deleteParticipant(r)} className="px-2 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase hover:bg-[#FF3B30]/10">Entfernen</button>
                   )}
                 </div>
@@ -722,7 +770,7 @@ export default function AdminTournamentEditPage() {
                     <div className="flex flex-wrap justify-end gap-2">
                       {isTournamentLead && !staffel && (
                         <select value={r.status} onChange={(e) => setRegStatus(r.id, e.target.value)} data-testid={`admin-reg-status-${r.id}`} className="bg-[#0A0A0A] border border-white/10 px-2 py-1 text-xs rounded-sm">
-                          {["pending", "approved", "rejected", "waitlist", "checked_in", "no_show"].map((s) => <option key={s} value={s}>{formatRegistrationStatus(s)}</option>)}
+                          <RegistrationStatusOptions fixed={inFixedBracket.has(r.id)} current={r.status} />
                         </select>
                       )}
                       {checkInTools && r.status !== "checked_in" && !["rejected", "waitlist"].includes(r.status) && (
@@ -735,7 +783,7 @@ export default function AdminTournamentEditPage() {
                         <button type="button" onClick={() => setRegCheckinStatus(r.id, "no_show")} className="px-2 py-1 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase">Nicht erschienen</button>
                       )}
                       <ParticipantRemovalActions tournament={t} registration={r} onDone={load} />
-                      {t.can_manage_participants && (
+                      {t.can_manage_participants && !inFixedBracket.has(r.id) && (
                         <button type="button" onClick={() => deleteParticipant(r)} className="px-2 py-1 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase hover:bg-[#FF3B30]/10">Entfernen</button>
                       )}
                     </div>
@@ -778,6 +826,7 @@ export default function AdminTournamentEditPage() {
           rightsForMatch={rightsForMatch}
           tournament={t}
           durationGame={bracket?.duration_game || null}
+          bracketFixed={structureFixed}
         />
       )}
       {activeTab === "matchplan" && (
@@ -806,6 +855,7 @@ export default function AdminTournamentEditPage() {
           stages={stages}
           onSaved={load}
           onRebuildFromFormat={rebuildFromFormat}
+          structureFixed={structureFixed}
         />
       )}
       {activeTab === "feedback" && (
@@ -836,6 +886,16 @@ export default function AdminTournamentEditPage() {
       )}
     </AdminLayout>
   );
+}
+
+// Status je Anmeldung. Im festen Baum (#2120, TA13) nehmen Ausstehend, Abgelehnt und Warteliste die Person aus Spielen,
+// die sie behalten - das geht über „Nicht erschienen“, „Austritt eintragen“ oder „Disqualifizieren“.
+const REGISTRATION_ROW_STATUSES = ["pending", "approved", "rejected", "waitlist", "checked_in", "no_show"];
+const LEAVES_BRACKET = new Set(["pending", "rejected", "waitlist"]);
+function RegistrationStatusOptions({ fixed, current }) {
+  return REGISTRATION_ROW_STATUSES.map((s) => (
+    <option key={s} value={s} disabled={fixed && s !== current && LEAVES_BRACKET.has(s)}>{formatRegistrationStatus(s)}</option>
+  ));
 }
 
 // Staffel (#2109, S18): ein Co-Team ist zugeteilt, nicht „angenommen“ oder „eingecheckt“ - Austritt und
