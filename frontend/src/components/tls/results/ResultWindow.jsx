@@ -3,6 +3,8 @@ import { X } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
 import { HEAT_MODES, HEAT_MODE_KEY, initialState, inputKind, resultSentence, resultsFor, tapGame } from "@/lib/resultEntry";
 import { BestOfInput, OrderInput, PointsInput, ScoreInput, WinnerInput } from "@/components/tls/results/ResultInputs";
+import { GameEditor } from "@/components/tls/league/LeagueReportForm";
+import { changeStaffGame, seriesSentence, settleStaffGames, staffPayload, staffProblem, staffStart } from "@/components/tls/league/leagueGames";
 
 // Das eine Ergebnis-Fenster (#1156, #1370): Turnierleitung am Handy, Matchplan, Stationen und Matchseite öffnen es -
 // dieselben Felder, dieselben Wörter („Nicht erschienen“, „Aufgegeben“), derselbe Satz vor dem Speichern und danach
@@ -27,17 +29,25 @@ function rememberHeatMode(mode) {
   }
 }
 
-export function ResultWindow({ entry, onClose, onSaved, testId = "result-window" }) {
+export function ResultWindow({ entry, league = null, onClose, onSaved, testId = "result-window" }) {
   const correcting = Boolean(entry?.has_result);
   const [heatMode, setHeatMode] = useState(readHeatMode);
   const [state, setState] = useState(() => initialState(entry));
+  // Liga (#1650): je Map Modus, Map, Sieger, Punkte und die Aufstellungen beider Seiten statt Plus/Minus.
+  const withMaps = Boolean(league?.sides?.length === 2 && league?.pool);
+  const [mapGames, setMapGames] = useState(() => (withMaps ? staffStart(league) : []));
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const panelRef = useRef(null);
-  const kind = inputKind(entry, heatMode);
-  const outcome = useMemo(() => resultsFor(entry, kind, state), [entry, kind, state]);
-  const sentence = outcome.results ? resultSentence(entry, outcome.results) : "";
+  const kind = withMaps ? "maps" : inputKind(entry, heatMode);
+  const outcome = useMemo(() => {
+    if (!withMaps) return resultsFor(entry, kind, state);
+    const problem = staffProblem(mapGames, league);
+    return problem ? { error: problem } : staffPayload(mapGames, league);
+  }, [entry, kind, state, withMaps, mapGames, league]);
+  const sentence = withMaps ? (outcome.results ? seriesSentence(mapGames, league) : "")
+    : outcome.results ? resultSentence(entry, outcome.results) : "";
 
   // Ein anderes Spiel beginnt leer. Abgeleitet beim Rendern statt in einem Effekt: der Effekt lief auch beim ersten
   // Aufbau und konnte, wenn er spät kam, die ersten Tipps auf Plus und Minus wieder wegwischen (aus 3:1 wurde 2:1).
@@ -45,6 +55,7 @@ export function ResultWindow({ entry, onClose, onSaved, testId = "result-window"
   if (seenEntryId !== entry?.id) {
     setSeenEntryId(entry?.id);
     setState(initialState(entry));
+    setMapGames(withMaps ? staffStart(league) : []);
     setReason("");
     setError("");
   }
@@ -82,6 +93,7 @@ export function ResultWindow({ entry, onClose, onSaved, testId = "result-window"
     try {
       const { data } = await api.post(`/matches/${entry.id}/result${correcting ? "?force=true" : ""}`, {
         results: outcome.results,
+        ...(withMaps ? { games: outcome.games } : {}),
         hold: true,
         reason: correcting ? reason.trim() : null,
       });
@@ -134,6 +146,10 @@ export function ResultWindow({ entry, onClose, onSaved, testId = "result-window"
             </div>
           ) : null}
 
+          {withMaps && mapGames.map((game, index) => (
+            <GameEditor key={game.position} staff index={index} game={game} league={league}
+              onChange={(next) => setMapGames((current) => settleStaffGames(changeStaffGame(current, game.position, next), league))} />
+          ))}
           {kind === "score" && <ScoreInput entry={entry} state={state} onChange={setState} />}
           {kind === "bestof" && (
             <BestOfInput
@@ -178,6 +194,7 @@ export function ResultWindow({ entry, onClose, onSaved, testId = "result-window"
  */
 export function ResultWindowLoader({ matchId, onClose, onSaved, testId = "result-window" }) {
   const [entry, setEntry] = useState(null);
+  const [league, setLeague] = useState(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -187,6 +204,7 @@ export function ResultWindowLoader({ matchId, onClose, onSaved, testId = "result
     api.get(`/matches/${matchId}/page`)
       .then(({ data }) => {
         if (!alive) return;
+        setLeague(data?.league || null);
         if (data?.result_entry) setEntry(data.result_entry);
         else setError("Für dieses Spiel kannst du kein Ergebnis eintragen.");
       })
@@ -194,7 +212,7 @@ export function ResultWindowLoader({ matchId, onClose, onSaved, testId = "result
     return () => { alive = false; };
   }, [matchId]);
 
-  if (entry) return <ResultWindow entry={entry} onClose={onClose} onSaved={onSaved} testId={testId} />;
+  if (entry) return <ResultWindow entry={entry} league={league} onClose={onClose} onSaved={onSaved} testId={testId} />;
   return (
     <div role="presentation" className="fixed inset-0 z-50 flex items-end xl:items-center justify-center bg-black/70" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose?.(); }} data-testid={`${testId}-loading`}>
       <div className="w-full xl:max-w-xl rounded-t-xl xl:rounded-xl border border-white/10 bg-[#0F0F10] p-6 text-center text-sm text-white/60">

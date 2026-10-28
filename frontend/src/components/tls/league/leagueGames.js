@@ -169,3 +169,66 @@ export function changeGame(games, position, game) {
   const lineups = followLineups(Object.fromEntries(games.map((row) => [row.position, row.lineup || []])), position, game.lineup || []);
   return games.map((row) => (row.position === position ? game : { ...row, lineup: lineups[row.position] }));
 }
+// ---------------------------------------------------------------- Turnierleitung (Ergebnis-Fenster)
+
+function lineupIds(people) {
+  return (people || []).map((person) => (typeof person === "string" ? person : person.id)).filter(Boolean);
+}
+
+/** Startstand des Ergebnis-Fensters: die geltenden Maps, sonst die Meldung einer Seite, sonst leer. */
+export function staffStart(league) {
+  const source = (league?.games?.length ? league.games : league?.proposal_games) || [];
+  if (!source.length) return settleStaffGames([], league);
+  return source.map((game) => ({
+    position: game.position,
+    mode: game.mode || "",
+    map_id: game.map_id,
+    winner: game.winner_registration_id,
+    scores: Object.fromEntries(Object.entries(game.scores || {}).map(([side, value]) => [side, String(value)])),
+    lineup: [],
+    lineups: Object.fromEntries(Object.entries(game.lineups || {}).map(([side, people]) => [side, lineupIds(people)])),
+  }));
+}
+
+/** Wie `settleGames` - eine neue Map übernimmt die Aufstellungen beider Seiten aus der Map davor. */
+export function settleStaffGames(games, league) {
+  const settled = settleGames(games, league);
+  return settled.map((game, index) => (game.lineups ? game : { ...game, lineups: { ...(settled[index - 1]?.lineups || {}) } }));
+}
+
+/** Was fehlt: wie beim Melden, Aufstellungen je Seite aber freiwillig - wenn, dann vollständig. */
+export function staffProblem(games, league) {
+  const problem = gamesProblem(games, league, { withLineup: false });
+  if (problem) return problem;
+  for (const game of games) {
+    for (const side of league.sides) {
+      const count = (game.lineups?.[side.registration_id] || []).length;
+      if (count && count !== league.team_size) {
+        return `Map ${game.position}: Aufstellung ${side.name} – genau ${league.team_size} Spieler oder keine.`;
+      }
+    }
+  }
+  return null;
+}
+
+/** Ergebnis und Maps für POST /matches/{id}/result - mit den vollständigen Aufstellungen beider Seiten. */
+export function staffPayload(games, league) {
+  const payload = reportPayload(games, league);
+  return {
+    results: payload.results,
+    games: payload.games.map(({ lineup: _ignored, ...game }, index) => {
+      const lineups = Object.fromEntries(Object.entries(games[index].lineups || {})
+        .filter(([, ids]) => (ids || []).length === league.team_size));
+      return Object.keys(lineups).length ? { ...game, lineups } : game;
+    }),
+  };
+}
+/** Wie `changeGame` für die Turnierleitung: je Seite ziehen spätere Maps mit gleicher (oder leerer) Aufstellung mit. */
+export function changeStaffGame(games, position, game) {
+  let rows = games.map((row) => (row.position === position ? { ...game, lineups: row.lineups || {} } : row));
+  for (const [side, lineup] of Object.entries(game.lineups || {})) {
+    const followed = followLineups(Object.fromEntries(rows.map((row) => [row.position, row.lineups?.[side] || []])), position, lineup);
+    rows = rows.map((row) => ({ ...row, lineups: { ...(row.lineups || {}), [side]: followed[row.position] } }));
+  }
+  return rows.map((row) => (row.position === position ? { ...game, lineups: { ...row.lineups } } : row));
+}

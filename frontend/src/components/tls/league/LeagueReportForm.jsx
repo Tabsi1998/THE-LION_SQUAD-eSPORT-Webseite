@@ -56,7 +56,7 @@ export function LineupPicker({ roster = [], value = [], size = 1, onChange, labe
   );
 }
 
-function GameEditor({ game, league, onChange, index }) {
+export function GameEditor({ game, league, onChange, index, staff = false }) {
   const modes = poolModes(league.pool);
   const fixedMode = (league.mode_order || []).length > 0 || modes.length <= 1;
   const maps = mapsFor(league.pool, game.mode);
@@ -120,8 +120,18 @@ function GameEditor({ game, league, onChange, index }) {
           Punkte eintragen (freiwillig)
         </button>
       )}
-      <LineupPicker roster={league.roster} value={game.lineup} size={league.team_size} onChange={(lineup) => set({ lineup })}
-        label={index === 0 ? "Deine Aufstellung" : "Deine Aufstellung (wie Map davor übernommen)"} testId={`league-game-${game.position}-lineup`} />
+      {staff ? (
+        // Turnierleitung (#1650): Aufstellungen beider Seiten, je Seite freiwillig.
+        league.sides.map((side) => (
+          <LineupPicker key={side.registration_id} roster={league.rosters?.[side.registration_id] || []}
+            value={game.lineups?.[side.registration_id] || []} size={league.team_size}
+            onChange={(lineup) => set({ lineups: { ...(game.lineups || {}), [side.registration_id]: lineup } })}
+            label={`Aufstellung ${side.name}`} testId={`league-game-${game.position}-lineup-${side.registration_id}`} />
+        ))
+      ) : (
+        <LineupPicker roster={league.roster} value={game.lineup} size={league.team_size} onChange={(lineup) => set({ lineup })}
+          label={index === 0 ? "Deine Aufstellung" : "Deine Aufstellung (wie Map davor übernommen)"} testId={`league-game-${game.position}-lineup`} />
+      )}
     </fieldset>
   );
 }

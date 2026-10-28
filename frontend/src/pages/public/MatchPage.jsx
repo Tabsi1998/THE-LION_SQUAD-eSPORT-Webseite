@@ -24,7 +24,7 @@ import { matchIsOver } from "@/lib/afterEnd";
 import { rankingMode } from "@/lib/matchReport";
 import { MatchReportForm } from "@/components/tls/tournament/MatchReportForm";
 import { LeagueReportForm } from "@/components/tls/league/LeagueReportForm";
-import { LeagueGamesView, LineupAmendForm } from "@/components/tls/league/LeagueGamesView";
+import { LeagueGamesView, LineupAmendForm, StaffLineupAmend } from "@/components/tls/league/LeagueGamesView";
 import { LiveQueueStatus } from "@/components/tls/live/LiveQueueStatus";
 import { MatchCallBox } from "@/components/tls/tournament/MatchCallBox";
 import { ProblemReportForm } from "@/components/tls/results/ProblemReportForm";
@@ -397,6 +397,9 @@ function MatchPageView() {
           {data.league ? (
             <LineupAmendForm key={`${(data.league.lineups_missing || []).join(",")}-${match.updated_at || ""}`} league={data.league} busy={busy} onSave={saveLineups} />
           ) : null}
+          {data.league && canStaffSubmit ? (
+            <StaffLineupAmend key={`staff-${match.updated_at || ""}`} league={data.league} busy={busy} onSave={saveLineups} />
+          ) : null}
 
           {/* Nur Turnierleitung (#1157): Spieler sehen keinen Melde-Knopf, sondern wer das Ergebnis einträgt. */}
           {showStaffEnters ? (
@@ -588,7 +591,7 @@ function MatchPageView() {
           )}
         </div>
       </section>
-      {resultOpen && data.result_entry ? <ResultWindow entry={data.result_entry} onClose={() => setResultOpen(false)} onSaved={resultUndo.start} /> : null}
+      {resultOpen && data.result_entry ? <ResultWindow entry={data.result_entry} league={data.league} onClose={() => setResultOpen(false)} onSaved={resultUndo.start} /> : null}
       <ResultUndoBar undo={resultUndo} />
     </PublicLayout>
   );
