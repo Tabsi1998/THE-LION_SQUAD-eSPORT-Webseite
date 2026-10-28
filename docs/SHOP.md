@@ -995,8 +995,9 @@ druckt die Bestellung die **Wunschnummer** (#2034) - nie die Mitgliedsnummer aus
    den Haken nicht.
 3. **Ablehnen** mit klarem Satz, bevor eine Datei entsteht: Nicht-Mitglied bzw. öffentlicher Kauf („die Vereinsnummer
    gibt es nur für Vereinsmitglieder“), keine Nummer („du hast noch keine Vereinsnummer …“), kein Haken („… brauchen wir
-   deine Einwilligung …“), Haken bei einem Produkt ohne Nummer. Die Nummer steht in keiner Meldung, keinem Log, keinem
-   Ereignis und keiner Mail.
+   deine Einwilligung …“). Ein Haken bei einem Produkt ohne Nummer wird still übergangen und nicht gespeichert (etwa,
+   wenn sich der Aufbau zwischen Warenkorb und Kasse geändert hat). Die Nummer steht in keiner Meldung, keinem Log,
+   keinem Ereignis und keiner Mail.
 4. **Datei:** wie beim Gamertag eine **eigene** Datei der Fläche (`kind = "personal"`), auch wenn die Fläche nur eine
    Nummer hat. `_personal_file` setzt Gamertag **und** Nummer zusammen: je Ebene `shop_gamertag.store(…, kind="number")`
    mit den Regeln der Ebene (Größe, Schrift, Kontur) und der Farbe aus dem Plan - genau wie Vorschau und Beispiel, ohne
@@ -1011,6 +1012,12 @@ druckt die Bestellung die **Wunschnummer** (#2034) - nie die Mitgliedsnummer aus
 `shop_gamertag_files` (ohne Schlüssel und Ablageort), Kontolöschung wie bei den Gamertag-Dateien
 (`shop_print_files.erase_for_user`, `shop_gamertag.erase_for_user`, ausstehende Löschungen im Job `ops_retention`);
 kommt eine Bestellung nicht zustande, sind beide sofort weg (`discard_order_files`). Grunddateien gehören zum Katalog.
+Mit der gelöschten Datei gehen auch alle Angaben, aus denen sich Name oder Nummer durch Durchprobieren zurückrechnen
+ließen (`render` ist deterministisch, es gibt höchstens 10.000 Nummern): an den Text-Dateien `CONTENT_FIELDS` aus
+`shop_gamertag` (Prüfsumme, Dateigröße, Textbreite, Texthöhe, „verkleinert“), an der Bestelldatei Prüfsumme,
+Dateigröße und Dateiname (`shop_print_files.CONTENT_FIELDS`) und an der Bestellposition `print_files[].sha256`. Die
+Zeilen bleiben nur als Nachweis „Datei war da, gelöscht am“. Kein Ablauf braucht diese Prüfsummen danach: solange ein
+offener Printful-Auftrag die Datei braucht, steht die Löschung noch aus und alles bleibt.
 
 ### Vorab-Prüfung
 
@@ -1100,7 +1107,9 @@ Zufallsschlüssel (256 Bit), Maße, Anker, Farbe, `rules_hash`, `purpose` (`test
   Datei, ist die Adresse sofort aus (`public_disabled_at`, 404) und die Datei gelöscht (`file_deleted_at`). Braucht ein
   offener Auftrag (Bestellung mit `printful_order_id`, Stand nicht abgeschlossen - die endgültigen Stände liefert
   #1716) sie noch, bleibt sie nur dafür abrufbar (`erase_pending_at`); der Job `ops_retention` schaltet sie nach dem
-  Abschluss ab und löscht sie (`complete_pending_erasures`). Die Zeile bleibt ohne Konto mit Prüfsumme und Maßen.
+  Abschluss ab und löscht sie (`complete_pending_erasures`). Die Zeile bleibt ohne Konto mit den Maßen der Leinwand -
+  seit #2150 ohne Prüfsumme, Dateigröße, Textbreite und -höhe (`CONTENT_FIELDS`), aus denen sich der Name
+  zurückrechnen ließe.
 
 **Einfrieren (für #1712/#1713):** `store(db, name, purpose="order", user_id=…, order_id=…, order_item_id=…,
 color_key=…)` prüft, rendert und legt ab; `frozen_for_order(row, name)` liefert, was die Position einfriert: den

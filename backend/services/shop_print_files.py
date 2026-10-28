@@ -943,7 +943,10 @@ def plan_view(plan: Plan, gamertag_rules: dict | None = None) -> dict:
 def file_name(row: dict) -> str:
     """Name unter der öffentlichen Adresse: Grunddatei mit Fläche, Farbe und Version (Printful lädt eine neue Version
     nicht aus dem Zwischenspeicher), Bestelldatei nur mit dem Anfang der Prüfsumme - nie ein Name."""
-    return row.get("file_name") or f"druck-{row['sha256'][:16]}.png"
+    if row.get("file_name"):
+        return row["file_name"]
+    # Eine gelöschte Bestelldatei hat keine Prüfsumme mehr (#2150) - ihre Adresse ist ohnehin abgeschaltet.
+    return f"druck-{row['sha256'][:16]}.png" if row.get("sha256") else "druck-entfernt.png"
 
 
 def public_path(row: dict) -> str | None:
@@ -1508,13 +1511,27 @@ async def discard_order_files(db, order_id: str) -> int:
 
 # ================================================================ Kontolöschung (Bestelldateien zeigen den Namen)
 
+# Aus dem Inhalt ableitbar (#2150): Prüfsumme, Dateigröße und der Name „druck-<prüfsumme>.png“ - wie bei
+# ``shop_gamertag.CONTENT_FIELDS`` ließen sich Name bzw. Nummer daraus durch Durchprobieren zurückrechnen.
+CONTENT_FIELDS = ("sha256", "size_bytes", "file_name")
+
+
 async def _take_off_line(db, row: dict, now: str) -> None:
+    """Adresse abschalten, Datei löschen; die Zeile bleibt als Nachweis ohne Konto und ohne ``CONTENT_FIELDS`` - auch
+    die Prüfsumme an der Bestellposition (``print_files[].sha256``) geht. Nach dem Löschen braucht sie kein Ablauf mehr:
+    die Datei ist weg, Printful hat den Auftrag abgeschlossen (sonst stünde die Löschung noch aus)."""
     path = shop_designs._path_of(row.get("file_ref"))
     if path is not None:
         path.unlink(missing_ok=True)
     await db.shop_print_files.update_one(
         {"id": row["id"]}, {"$set": {"public_disabled_at": now, "file_deleted_at": now, "user_id": None},
-                            "$unset": {"erase_pending_at": ""}})
+                            "$unset": {"erase_pending_at": "", **{name: "" for name in CONTENT_FIELDS}}})
+    if row.get("order_item_id"):
+        item = await db.shop_order_items.find_one({"id": row["order_item_id"]}, {"_id": 0, "print_files": 1})
+        files = (item or {}).get("print_files") or []
+        if any(entry.get("file_id") == row["id"] for entry in files):
+            cleared = [{**entry, "sha256": None} if entry.get("file_id") == row["id"] else entry for entry in files]
+            await db.shop_order_items.update_one({"id": row["order_item_id"]}, {"$set": {"print_files": cleared}})
 
 
 async def erase_for_user(db, user_id: str) -> dict:

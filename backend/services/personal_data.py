@@ -141,7 +141,9 @@ PERSONAL: dict[str, Entry] = {
                                  "Druckdatei mit dem Gamertag bzw. der Vereinsnummer einer Bestellung: Adresse "
                                  "abgeschaltet und Datei gelöscht - "
                                  "braucht ein offener Printful-Auftrag sie noch, nur für ihn bis zum Abschluss (Job "
-                                 "ops_retention); die Zeile bleibt ohne Konto mit Prüfsumme und Maßen"),
+                                 "ops_retention); die Zeile bleibt ohne Konto als Nachweis (Datei war da, gelöscht am) "
+                                 "- ohne Prüfsumme, Dateigröße, Textbreite und -höhe, aus denen sich Name oder "
+                                 "Nummer zurückrechnen ließen (#2150)"),
     "shop_order_events": Entry(KEPT, note="Verlauf einer Bestellung als Nachweis; nur Kennungen, Beträge und Stände, nie "
                                "eine Anschrift"),
     # Druckdateien (#2069): Grunddateien gehören zum Katalog (kein Konto); eine Bestelldatei mit Gamertag zeigt den Namen.
@@ -149,8 +151,9 @@ PERSONAL: dict[str, Entry] = {
                               "Druckdatei einer Bestellung mit Gamertag bzw. Vereinsnummer: Adresse abgeschaltet und "
                               "Datei gelöscht - "
                               "braucht ein offener Printful-Auftrag sie noch, nur für ihn bis zum Abschluss (Job "
-                              "ops_retention); die Zeile bleibt ohne Konto mit Prüfsumme und Maßen. Grunddateien des "
-                              "Katalogs haben kein Konto"),
+                              "ops_retention); die Zeile bleibt ohne Konto als Nachweis (Datei war da, gelöscht am) - "
+                              "ohne Prüfsumme, Dateigröße und Dateinamen, auch die Prüfsumme an der Bestellposition "
+                              "geht (#2150). Grunddateien des Katalogs haben kein Konto"),
     # Teams, Turniere, Events, F1, Saison
     "teams": Entry(KEPT, ("teams",), "gehört dem Team; das Konto heißt in der Liste „Gelöschter User“"),
     "team_members": Entry(KEPT, ("team_memberships",), "Teamhistorie und Aufstellungen; das Konto heißt „Gelöschter User“"),

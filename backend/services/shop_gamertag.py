@@ -1061,15 +1061,23 @@ async def _needed_for_production(db, row: dict) -> bool:
     return bool(order and order.get("printful_order_id") and order.get("status") not in CLOSED_ORDER_STATES)
 
 
+# Was sich aus dem Inhalt der Datei ableiten lässt (#2150): ``render`` ist deterministisch - aus Prüfsumme, Dateigröße,
+# Textbreite oder (bei verkleinertem Text) Texthöhe ließe sich ein Name bzw. eine der höchstens 10.000 Nummern durch
+# Durchprobieren zurückrechnen. Nach dem Löschen bleibt nur: Datei war da (Kennung, Zweck, Art, Maße der Leinwand nach
+# den Regeln, Farbe, Bestellung) und wurde am … gelöscht.
+CONTENT_FIELDS = ("sha256", "size_bytes", "text_width_in", "text_height_in", "scaled")
+
+
 async def _take_off_line(db, row: dict, now: str) -> None:
-    """Adresse abschalten (404) und die Datei löschen; die Zeile bleibt als Nachweis ohne Konto."""
+    """Adresse abschalten (404) und die Datei löschen; die Zeile bleibt als Nachweis ohne Konto - ohne alles, was aus dem
+    Inhalt ableitbar ist (``CONTENT_FIELDS``, #2150)."""
     path = shop_designs._path_of(row.get("file_ref"))
     if path is not None:
         path.unlink(missing_ok=True)
     await db.shop_gamertag_files.update_one(
         {"id": row["id"]},
         {"$set": {"public_disabled_at": now, "file_deleted_at": now, "user_id": None},
-         "$unset": {"erase_pending_at": ""}})
+         "$unset": {"erase_pending_at": "", **{name: "" for name in CONTENT_FIELDS}}})
 
 
 async def erase_for_user(db, user_id: str) -> dict:

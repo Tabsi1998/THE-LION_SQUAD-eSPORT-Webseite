@@ -175,11 +175,15 @@ async def test_missing_consent_or_number_blocks_and_non_members_are_refused(db, 
         with pytest.raises(ShopError, match=message):
             await order(db, white, key=f"abgelehnt-{index:04d}", **kwargs)
     assert await db.shop_orders.count_documents({}) == 0 and await order_files(db) == (0, 0)
-    # Einwilligung für ein Produkt ohne Nummer: klar abgelehnt.
+    # Einwilligung für ein Produkt ohne Nummer (etwa, weil sich der Aufbau seit dem Warenkorb geändert hat): still
+    # übergangen und nicht gespeichert.
     plain = await configured(db, provider, title="Shirt ohne Nummer")
     await publish_unchecked(db, plain["id"])
-    with pytest.raises(ShopError, match="druckt keine Vereinsnummer"):
-        await order(db, await variant_for(db, plain["id"], WHITE_M), key="ohne-nummer-01", gamertag="TELL")
+    without, _ = await order(db, await variant_for(db, plain["id"], WHITE_M), key="ohne-nummer-01", gamertag="TELL")
+    (item,) = await shop_orders.items_for(db, without["id"])
+    assert item["print_number"] is None and item["number_consent"] is None
+    await db.shop_orders.delete_many({})
+    await shop_print_files.discard_order_files(db, without["id"])
     # Eine spätere Position scheitert: die Nummerndatei der ersten ist wieder weg.
     with pytest.raises(ShopError):
         await order(db, white, key="zwei-positionen", extra=[{"variant_id": "gibt-es-nicht", "quantity": 1}])
@@ -218,10 +222,11 @@ async def test_erasure_export_and_pending_deletion_cover_the_number_files(db, pr
 
     await db.users.insert_one({"id": MEMBER, "username": "testmitglied", "email": "testmitglied@example.invalid"})
     await member(db)
-    product = await number_product(db, provider)
+    name = {"kind": "gamertag", "preset": "text_back_top", "text_height_cm": 5.0, "max_width_cm": 25.0}
+    product = await number_product(db, provider, back=[BACK, name, BIG_NUMBER])
     white = await variant_for(db, product["id"], WHITE_M)
-    done, _ = await order(db, white, key="nummer-fertig")
-    running, _ = await order(db, white, key="nummer-laeuft")
+    done, _ = await order(db, white, key="nummer-fertig", gamertag="TELL")
+    running, _ = await order(db, white, key="nummer-laeuft", gamertag="TELL")
     await db.shop_orders.update_one({"id": running["id"]}, {"$set": {"printful_order_id": 4711}})
 
     export = await dsgvo_routes._user_data_export(db, MEMBER)
@@ -243,12 +248,35 @@ async def test_erasure_export_and_pending_deletion_cover_the_number_files(db, pr
     assert await db.shop_print_files.count_documents({"purpose": "order", "file_deleted_at": {"$exists": True}}) == 1
     pending = await db.shop_gamertag_files.find_one({"order_id": running["id"], "kind": "number"}, {"_id": 0})
     assert pending["erase_pending_at"] and pending["user_id"] is None
+    assert pending["sha256"], "solange Printful die Datei braucht, bleibt sie samt Prüfsumme"
+    erased_content(await db.shop_gamertag_files.find({"order_id": done["id"]}, {"_id": 0}).to_list(None),
+                   await db.shop_print_files.find({"order_id": done["id"]}, {"_id": 0}).to_list(None),
+                   await shop_orders.items_for(db, done["id"]))
     await db.shop_orders.update_one({"id": running["id"]}, {"$set": {"status": "shipped"}})
-    assert await shop_gamertag.complete_pending_erasures(db) == 1
+    assert await shop_gamertag.complete_pending_erasures(db) == 2  # Name und Nummer
     assert await shop_print_files.complete_pending_erasures(db) == 1
-    for row in await db.shop_gamertag_files.find({"kind": "number"}, {"_id": 0}).to_list(None):
+    rows = await db.shop_gamertag_files.find({"purpose": "order"}, {"_id": 0}).to_list(None)
+    assert sorted(row.get("kind", "gamertag") for row in rows) == ["gamertag", "gamertag", "number", "number"]
+    for row in rows:
         assert row["file_deleted_at"] and row["public_disabled_at"] and row["user_id"] is None
         assert not shop_designs._path_of(row["file_ref"]).exists()
+    erased_content(rows, await db.shop_print_files.find({"purpose": "order"}, {"_id": 0}).to_list(None),
+                   await shop_orders.items_for(db, done["id"]) + await shop_orders.items_for(db, running["id"]))
+
+
+def erased_content(text_rows: list[dict], print_rows: list[dict], items: list[dict]) -> None:
+    """Nach dem Löschen nichts mehr, woraus sich Name oder Nummer per Durchprobieren zurückrechnen ließen (#2150)."""
+    assert text_rows and print_rows and items
+    for row in text_rows:
+        assert not set(row) & set(shop_gamertag.CONTENT_FIELDS), row
+        assert row["file_deleted_at"] and row["width_px"] and row["rules_hash"], "Nachweis: Datei war da, gelöscht am"
+    for row in print_rows:
+        assert not set(row) & set(shop_print_files.CONTENT_FIELDS), row
+        assert row["file_deleted_at"] and shop_print_files.file_name(row) == "druck-entfernt.png"
+    for item in items:
+        personal = [entry for entry in item["print_files"] if entry["kind"] == "personal"]
+        assert personal and all(entry["sha256"] is None for entry in personal)
+        assert all(entry["sha256"] for entry in item["print_files"] if entry["kind"] == "base"), "Grunddatei bleibt"
 
 
 @pytest.mark.asyncio
