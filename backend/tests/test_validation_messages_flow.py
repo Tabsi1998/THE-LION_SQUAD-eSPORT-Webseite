@@ -47,7 +47,8 @@ async def flow():
      "Status: dieser Wert ist nicht erlaubt."),
     ({"type": "too_long", "loc": ("body", "tags"), "msg": "List should have at most 5 items", "ctx": {"max_length": 5}}, "Höchstens 5 Einträge (tags)."),
     ({"type": "bool_parsing", "loc": ("body", "enabled"), "msg": "Input should be a valid boolean"}, "Bitte ja oder nein angeben (enabled)."),
-    ({"type": "something_new", "loc": ("body", "x"), "msg": "Some English text"}, "Eingabe ungültig (x)."),
+    ({"type": "string_type", "loc": ("body", "x"), "msg": "Input should be a valid string"}, "Eingabe ungültig (x)."),
+    ({"type": "password_policy", "loc": ("body", "password"), "msg": "Höchstens 72 Byte."}, "Höchstens 72 Byte."),
 ])
 def test_common_validation_errors_read_in_german(error, expected):
     assert german_message(error) == expected

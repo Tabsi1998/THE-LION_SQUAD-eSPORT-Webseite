@@ -81,11 +81,16 @@ def _text(error: dict) -> tuple[str, str | None]:
     if kind == "assertion_error" and msg.startswith("Assertion failed, "):
         own = msg.split("Assertion failed, ", 1)[1]
         return own, own
-    return "Eingabe ungültig", None
+    if kind in {"string_type", "int_type", "bool_type", "dict_type", "list_type", "model_type", "model_attributes_type", "none_required"}:
+        return "Eingabe ungültig", None
+    # Eigene Fehlerarten (etwa „password_policy“) melden schon deutsch und bleiben, wie sie sind.
+    return "", msg
 
 
 def german_message(error: dict) -> str:
     text, own = _text(error)
+    if not text:
+        return own
     field = _field(error.get("loc"))
     label = FIELD_LABELS.get(field)
     if label:
