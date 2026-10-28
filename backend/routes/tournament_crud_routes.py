@@ -62,6 +62,12 @@ from routes.tournament_router import router
 
 
 EVENT_LINK_ONLY_IN_EVENT = "Zu welchem Event das gehört, änderst du im Event unter „Programm“."
+# Turnierliste (#2124, TP12): „Beendet“ heißt auch „Ergebnisse veröffentlicht“ und „Archiviert“ (der Normalfall),
+# „Live“ auch pausiert. Die Webseite fragt die Gruppe, die App weiter einzelne Status.
+LIST_STATUS_GROUPS = {
+    "finished": ("completed", "results_published", "archived"),
+    "running": ("live", "paused"),
+}
 
 
 def _page_items(items: list[dict], limit: int, offset: int, paged: bool):
@@ -166,7 +172,8 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
     if status:
         if status == "draft" and not can_include_drafts:
             return []
-        q["status"] = status
+        # Status-Gruppen (#2124): „Beendet“ und „Live“ der Turnierliste - ein einzelner Status bleibt wie bisher.
+        q["status"] = {"$in": list(LIST_STATUS_GROUPS[status])} if status in LIST_STATUS_GROUPS else status
     elif include_drafts and is_admin:
         pass
     elif include_drafts and assigned_ids:
