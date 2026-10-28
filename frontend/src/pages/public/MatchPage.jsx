@@ -24,6 +24,7 @@ import { matchIsOver } from "@/lib/afterEnd";
 import { rankingMode } from "@/lib/matchReport";
 import { MatchReportForm } from "@/components/tls/tournament/MatchReportForm";
 import { LeagueReportForm } from "@/components/tls/league/LeagueReportForm";
+import { sidesInSlotOrder } from "@/components/tls/league/leagueGames";
 import { LeagueGamesView, LineupAmendForm, StaffLineupAmend } from "@/components/tls/league/LeagueGamesView";
 import { LiveQueueStatus } from "@/components/tls/live/LiveQueueStatus";
 import { MatchCallBox } from "@/components/tls/tournament/MatchCallBox";
@@ -244,6 +245,8 @@ function MatchPageView() {
   }
 
   const match = data.match || {};
+  // Liga (#2096): Seiten in der Reihenfolge der Plätze - Heim links, wie in der Überschrift.
+  const league = sidesInSlotOrder(data.league, match);
   const latestProposal = (data.schedule_proposals || []).find((p) => p.status === "pending");
   const canProposeSchedule = Boolean(data.can_propose_schedule);
   const canManageSchedule = Boolean(data.can_manage_schedule);
@@ -393,12 +396,12 @@ function MatchPageView() {
           )}
 
           {/* Liga (#1650): gespielte Maps mit Sieger und Aufstellungen; fehlt die eigene noch, hier nachtragen. */}
-          {data.league ? <LeagueGamesView league={data.league} /> : null}
+          {data.league ? <LeagueGamesView league={league} /> : null}
           {data.league ? (
-            <LineupAmendForm key={`${(data.league.lineups_missing || []).join(",")}-${match.updated_at || ""}`} league={data.league} busy={busy} onSave={saveLineups} />
+            <LineupAmendForm key={`${(data.league.lineups_missing || []).join(",")}-${match.updated_at || ""}`} league={league} busy={busy} onSave={saveLineups} />
           ) : null}
           {data.league && canStaffSubmit ? (
-            <StaffLineupAmend key={`staff-${match.updated_at || ""}`} league={data.league} busy={busy} onSave={saveLineups} />
+            <StaffLineupAmend key={`staff-${match.updated_at || ""}`} league={league} busy={busy} onSave={saveLineups} />
           ) : null}
 
           {/* Nur Turnierleitung (#1157): Spieler sehen keinen Melde-Knopf, sondern wer das Ergebnis einträgt. */}
@@ -426,7 +429,7 @@ function MatchPageView() {
             <div className="mt-5 border-t border-white/10 pt-5 space-y-5">
               {(canPlayerReport || showReportReadOnly) && data.league && (
                 <LeagueReportForm
-                  league={data.league}
+                  league={league}
                   readOnly={!canPlayerReport}
                   onWrongResult={wrongResult}
                   state={data.report_state}
@@ -591,7 +594,7 @@ function MatchPageView() {
           )}
         </div>
       </section>
-      {resultOpen && data.result_entry ? <ResultWindow entry={data.result_entry} league={data.league} onClose={() => setResultOpen(false)} onSaved={resultUndo.start} /> : null}
+      {resultOpen && data.result_entry ? <ResultWindow entry={data.result_entry} league={league} onClose={() => setResultOpen(false)} onSaved={resultUndo.start} /> : null}
       <ResultUndoBar undo={resultUndo} />
     </PublicLayout>
   );

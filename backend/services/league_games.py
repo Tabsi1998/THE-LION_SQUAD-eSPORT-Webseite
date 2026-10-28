@@ -67,7 +67,12 @@ class LeagueSetup:
 
     @property
     def reg_ids(self) -> list[str]:
-        return [reg["id"] for reg in self.registrations if reg.get("id")]
+        """Die Seiten in der Reihenfolge der Plätze (Heim zuerst) - wie Überschrift und Spielplan. Die Datenbank liefert
+        die Anmeldungen in beliebiger Reihenfolge; daraus kamen im Meldeformular vertauschte Sieger-Knöpfe (#2096)."""
+        known = [reg["id"] for reg in self.registrations if reg.get("id")]
+        slots = [slot.get("registration_id") for slot in self.match.get("slots") or [] if isinstance(slot, dict)]
+        ordered = [reg_id for reg_id in slots if reg_id in known]
+        return list(dict.fromkeys(ordered + known))
 
     @property
     def needed(self) -> int:

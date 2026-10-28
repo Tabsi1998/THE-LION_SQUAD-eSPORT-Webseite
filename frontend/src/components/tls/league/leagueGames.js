@@ -1,6 +1,22 @@
 // Ergebnis je Map mit Aufstellung (docs/LIGA.md, #1650): was das Melde-Formular der Liga rechnet. Der Server prüft
 // alles noch einmal (services/league_games.py) - hier geht es darum, dass man gar nicht erst etwas Falsches eingibt.
 
+/**
+ * Die Seiten in der Reihenfolge der Plätze des Spiels (Heim links, wie Überschrift und Spielplan, #2096). Der Server
+ * liefert sie schon so - das hier hält Sieger-Knöpfe, Punkte und Aufstellungen auch bei einem älteren Stand richtig.
+ */
+export function sidesInSlotOrder(league, match) {
+  if (!league?.sides?.length) return league;
+  const slots = (match?.slots || []).map((slot) => slot?.registration_id).filter(Boolean);
+  if (!slots.length) return league;
+  const rank = (side) => {
+    const at = slots.indexOf(side.registration_id);
+    return at < 0 ? slots.length : at;
+  };
+  const sides = [...league.sides].sort((a, b) => rank(a) - rank(b));
+  return sides.every((side, index) => side === league.sides[index]) ? league : { ...league, sides };
+}
+
 /** Die Modi des Pools (ohne „Alle Maps“ eines Spiels ohne Modi). */
 export function poolModes(pool) {
   return (pool?.modes || []).filter((group) => group.mode);
