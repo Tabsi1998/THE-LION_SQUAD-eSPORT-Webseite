@@ -134,6 +134,19 @@ async def send(draft_id: str, body: SendRequest, request: Request, me: dict = De
         raise _refused(exc) from exc
 
 
+@router.post("/{draft_id}/recheck")
+async def recheck(draft_id: str, request: Request, me: dict = Depends(require_area("finance"))):
+    """„Bei Printful nachsehen“ (#2138): den gesendeten Entwurf neu lesen und neu abgleichen - ändert bei Printful
+    nichts."""
+    await _limit(request, me, "preview", "preview_limit")
+    db = get_db()
+    try:
+        provider = await _provider(db)
+        return await shop_test_drafts.recheck(db, draft_id, actor_id=me["id"], provider=provider)
+    except (ShopError, LookupError, FulfillmentError) as exc:
+        raise _refused(exc) from exc
+
+
 @router.post("/{draft_id}/delete")
 async def delete(draft_id: str, request: Request, me: dict = Depends(require_area("finance"))):
     """„Entwurf bei Printful löschen“ - nur, solange er ein Entwurf ist."""

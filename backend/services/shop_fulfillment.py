@@ -356,6 +356,8 @@ class FulfillmentOrder:
     shipping: str
     costs: Costs
     items: tuple[OrderItem, ...]
+    # Aufbau der Antwort ohne Werte (#2138, ``printful_client.answer_shape``) - für den Abgleich im Testentwurf.
+    shape: dict = field(default_factory=dict, compare=False)
 
 
 @dataclass(frozen=True, slots=True)

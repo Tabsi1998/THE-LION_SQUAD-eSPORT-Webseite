@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { AlertTriangle, CheckCircle2, ExternalLink, FileImage, Info, PackageCheck, Send, ShoppingBag, Trash2, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ExternalLink, FileImage, Info, PackageCheck, RefreshCw, Send, ShoppingBag, Trash2, XCircle } from "lucide-react";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { StepBar } from "@/components/tls/StepBar";
 import { api, formatRequestError } from "@/lib/api";
@@ -230,6 +230,42 @@ function Resend({ draft, onUpdated, testId }) {
   );
 }
 
+// Kosten und Dateien stehen bei Printful oft erst Minuten nach dem Anlegen fest (#2138): neu lesen und neu abgleichen.
+function Recheck({ draft, onUpdated, testId }) {
+  const [busy, setBusy] = useState(false);
+  const recheck = async () => {
+    setBusy(true);
+    try {
+      const { data } = await api.post(`${BASE}/${draft.id}/recheck`, {});
+      toast.success("Bei Printful nachgesehen.");
+      onUpdated(data);
+    } catch (failure) {
+      toast.error(formatRequestError(failure, "Nachsehen hat nicht geklappt."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <button type="button" onClick={recheck} disabled={busy} data-testid={`${testId}-recheck`}
+      className="tls-btn tls-btn--secondary min-h-10 px-3 text-xs font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-1.5 disabled:opacity-40">
+      <RefreshCw className={`w-3.5 h-3.5 ${busy ? "motion-safe:animate-spin" : ""}`} aria-hidden="true" /> {busy ? "Sieht nach …" : "Bei Printful nachsehen"}
+    </button>
+  );
+}
+
+// Wie die Antwort von Printful aufgebaut ist - ohne Werte, nur Schlüssel und Kennungen (#2138). Zum Weitergeben, wenn
+// der Abgleich etwas nicht findet.
+function AnswerShape({ draft, testId }) {
+  const shape = draft.response?.shape;
+  if (!shape || !Object.keys(shape).length) return null;
+  return (
+    <details className="text-xs" data-testid={`${testId}-shape`}>
+      <summary className="cursor-pointer text-white/60 hover:text-white">Technische Details (Aufbau der Printful-Antwort, ohne Personendaten)</summary>
+      <pre className="mt-2 max-h-80 overflow-auto rounded-sm border border-white/10 bg-black/40 p-2 text-[11px] leading-relaxed text-white/70 whitespace-pre-wrap break-all">{JSON.stringify(shape, null, 2)}</pre>
+    </details>
+  );
+}
+
 function Result({ draft, onDeleted, testId }) {
   return (
     <div className="space-y-3" data-testid={testId}>
@@ -251,6 +287,8 @@ function Result({ draft, onDeleted, testId }) {
         </p>
       )}
       {draft.deviations && <Deviations draft={draft} />}
+      {draft.actions?.recheck && <Recheck draft={draft} onUpdated={onDeleted} testId={testId} />}
+      <AnswerShape draft={draft} testId={testId} />
       {draft.actions?.resend && <Resend draft={draft} onUpdated={onDeleted} testId={testId} />}
       {(draft.actions ? draft.actions.delete : draft.state === "sent") && <ConfirmDelete draft={draft} onDeleted={onDeleted} testId={testId} />}
     </div>
