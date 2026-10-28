@@ -101,8 +101,8 @@ export function previewText(preview) {
 
 function PreviewBand({ preview, postId }) {
   return (
-    <div role="status" data-testid="news-preview-band" data-state={preview.state} className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-sm border border-[#FFD700]/50 bg-[#FFD700]/10 px-4 py-3 text-sm">
-      <span className="font-heading font-black uppercase tracking-wider text-[#FFD700]">Noch nicht öffentlich</span>
+    <div role="status" data-testid="news-preview-band" data-state={preview.state} className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-sm border border-warn/50 bg-warn/10 px-4 py-3 text-sm">
+      <span className="font-heading font-black uppercase tracking-wider text-warn">Noch nicht öffentlich</span>
       <span className="min-w-0 flex-1 text-white/80">{previewText(preview)}</span>
       {postId && <Link to={`/admin/news/${encodeURIComponent(postId)}`} className="text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:underline">Im Editor öffnen</Link>}
     </div>

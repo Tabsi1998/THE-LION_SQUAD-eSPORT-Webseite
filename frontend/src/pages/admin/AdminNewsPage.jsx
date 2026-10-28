@@ -236,7 +236,7 @@ export default function AdminNewsPage() {
                           <Trash2 className="w-3 h-3" />
                         </button>
                       ) : (
-                        <button type="button" onClick={() => withdraw(n)} data-testid={`news-withdraw-${n.id}`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10 inline-flex items-center gap-1">
+                        <button type="button" onClick={() => withdraw(n)} data-testid={`news-withdraw-${n.id}`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-live/40 text-live hover:bg-live/10 inline-flex items-center gap-1">
                           <Undo2 className="w-3 h-3" /> Zurückziehen
                         </button>
                       )}
