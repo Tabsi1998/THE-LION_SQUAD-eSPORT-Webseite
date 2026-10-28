@@ -174,6 +174,26 @@ async def _board_hits(db, q: str) -> list[dict]:
     return hits[:MAX_HITS]
 
 
+async def news_author_allowed(db, user: dict | None) -> bool:
+    """Autor eines News-Beitrags (#2122): ein aktives, nicht gesperrtes Konto, das News pflegen darf (Bereich Redaktion -
+    über Rolle, Freigabe oder Vorstandsposten). Dieselbe Regel für die Suche und fürs Speichern."""
+    from services.permissions import user_has_area
+
+    if not user or user.get("is_active") is False or user.get("is_banned"):
+        return False
+    return await user_has_area(user, "content", db=db)
+
+
+async def _news_author_hits(db, q: str) -> list[dict]:
+    query = {"is_active": {"$ne": False}, "is_banned": {"$ne": True}, **_name_filter(q)}
+    users = await db.users.find(query, {"_id": 0, "password_hash": 0}).sort("display_name", 1).limit(MAX_HITS * 3).to_list(MAX_HITS * 3)
+    hits = []
+    for user in users:
+        if await news_author_allowed(db, user):
+            hits.append({"id": user["id"], "name": _name(user), "avatar_url": user.get("avatar_url"), "context": "Redaktion"})
+    return hits[:MAX_HITS]
+
+
 async def _invite_hits(db, q: str) -> list[dict]:
     """Einladungen (#1356): Konten ohne aktive Mitgliedschaft; wer schon eingeladen ist, steht mit dem Datum da."""
     member_ids = await db.memberships.distinct("user_id", {"member_status": {"$in": list(ACTIVE_MEMBER_STATUSES)}})
@@ -220,6 +240,8 @@ async def search_people(
         return await _invite_hits(db, needle)
     if purpose == "reference_series":
         return await _member_account_hits(db, needle)
+    if purpose == "news_author":
+        return await _news_author_hits(db, needle)
     return await _account_hits(db, needle)
 
 

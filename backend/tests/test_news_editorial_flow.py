@@ -106,13 +106,19 @@ async def test_edits_record_who_changed_what_and_show_a_history(flow):
 
 
 @pytest.mark.asyncio
-async def test_author_can_be_changed_to_an_existing_account(flow):
+async def test_author_can_be_changed_to_an_account_of_the_newsroom(flow):
     flow.act_as(await flow.add_user(role="club_admin", name="Rita"))
     created = (await flow.post("/api/news", json={"title": "Bericht", "content": "Text", "published": False})).json()
     writer = await flow.add_user(name="Gastautorin")
+    await flow.db.users.update_one({"id": writer["id"]}, {"$set": {"areas": ["content"]}})
     saved = (await flow.patch(f"/api/news/{created['id']}", json={"author_id": writer["id"]})).json()
     assert saved["author_id"] == writer["id"] and saved["author_name"] == "Gastautorin"
-    assert (await flow.patch(f"/api/news/{created['id']}", json={"author_id": "gibt-es-nicht"})).status_code == 400
+    reader = await flow.add_user(name="Leserin")
+    banned = await flow.add_user(name="Gesperrt")
+    await flow.db.users.update_one({"id": banned["id"]}, {"$set": {"areas": ["content"], "is_banned": True}})
+    for wrong in ("gibt-es-nicht", reader["id"], banned["id"]):
+        refused = await flow.patch(f"/api/news/{created['id']}", json={"author_id": wrong})
+        assert refused.status_code == 400, wrong
 
 
 @pytest.mark.asyncio
@@ -169,10 +175,12 @@ async def test_republishing_a_withdrawn_post_does_not_send_the_newsletter_again(
 
 @pytest.mark.asyncio
 async def test_author_search_is_for_the_newsroom_only(flow):
-    await flow.add_user(name="Gastautorin")
+    writer = await flow.add_user(name="Gastautorin")
+    await flow.db.users.update_one({"id": writer["id"]}, {"$set": {"areas": ["content"]}})
+    await flow.add_user(name="Gastleserin")
     flow.act_as(await flow.add_user(role="club_admin", name="Rita"))
     hits = (await flow.get("/api/admin/people/search", params={"purpose": "news_author", "q": "Gast"})).json()
-    assert [hit["name"] for hit in hits] == ["Gastautorin"] and "email" not in hits[0]
+    assert [hit["name"] for hit in hits] == ["Gastautorin"] and "email" not in hits[0], "nur, wer News pflegen darf"
     flow.act_as(await flow.add_user(name="leser"))
     assert (await flow.get("/api/admin/people/search", params={"purpose": "news_author", "q": "Gast"})).status_code == 403
 

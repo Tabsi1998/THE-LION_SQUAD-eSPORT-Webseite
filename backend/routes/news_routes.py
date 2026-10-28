@@ -710,11 +710,14 @@ async def update_news(nid: str, body: NewsUpdate, me: dict = Depends(require_are
         )
     if update.get("published") is True and "published_at" not in update and not existing.get("published_at"):
         update["published_at"] = now_utc().isoformat()
-    # Autor ändern (#2122 NW3): ein bestehendes Konto, der Name kommt aus dem Konto.
+    # Autor ändern (#2122 NW3): nur, wen die Personensuche anbietet - ein aktives, nicht gesperrtes Konto der Redaktion.
+    # Der Name kommt aus dem Konto.
     if "author_id" in update:
-        author = await db.users.find_one({"id": update["author_id"]}, {"_id": 0, "id": 1, "display_name": 1, "username": 1}) if update["author_id"] else None
-        if not author:
-            raise HTTPException(400, "Diese Person gibt es nicht - bitte eine andere als Autor wählen.")
+        from routes.admin_picker_routes import news_author_allowed
+
+        author = await db.users.find_one({"id": update["author_id"]}, {"_id": 0, "password_hash": 0}) if update["author_id"] else None
+        if not await news_author_allowed(db, author):
+            raise HTTPException(400, "Als Autor geht nur ein aktives Konto aus der Redaktion - bitte eine andere Person wählen.")
         update["author_name"] = _actor_name(author)
     fields = _changed_fields(existing, update)
     stamp = now_utc().isoformat()
