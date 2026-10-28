@@ -223,6 +223,11 @@ async def test_from_the_league_to_a_started_schedule_with_the_christmas_break(fl
     flow.act_as(world["lead"])
     assert ok(await flow.get(season_page(world)))["season"]["name"] == "Season 1"
 
+    # Vor „Liga starten“ prüft die Verwaltung die Planung: ohne Startzeit ist in der Liga normal (Spielwochen) - kein
+    # Hinweis, kein Rückfrage-Dialog (#2096).
+    check = ok(await flow.get(f"/api/tournaments/{tid}/planning-check"))
+    assert check["ok"] is True and check["warning_count"] == 0, check["warnings"][:3]
+
     # Spielplan fest und starten: nur Hinrunde - 7 Spieltage zu je 4 Spielen.
     matches = await start_staffel(flow, world)
     assert len(matches) == 28

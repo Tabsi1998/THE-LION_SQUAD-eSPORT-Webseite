@@ -25,6 +25,7 @@ from services.competition_formats import find_format_capability
 from services.competition_versions import persist_competition_versions
 from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
 from services.slug_utils import find_by_slug_or_history
+from services.league_scope import is_league_staffel
 from models import now_utc, new_id
 from services.competition_usage import record_write
 
@@ -280,7 +281,9 @@ def _planning_report(
                 "message": f"{label}: zu wenige Teilnehmer für einen sicheren Start.",
             })
             continue
-        if not match.get("scheduled_at"):
+        # Liga-Staffel (#2096): Termine kommen aus den Spielwochen (Einigung oder Standardtermin) - ohne Startzeit ist
+        # dort der Normalfall, kein Hinweis.
+        if not match.get("scheduled_at") and not is_league_staffel(tournament):
             warnings.append({"type": "missing_time", "severity": "warning", "match_id": match.get("id"), "label": label, "message": f"{label}: keine Startzeit geplant."})
         # Stationen gibt es nur vor Ort (#1552): online und Liga bekommen keine und auch keine Warnung dazu.
         if not match.get("station_id") and match_policy(match, tournament)["event_mode"] == "local":
