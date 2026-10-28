@@ -109,3 +109,33 @@ test("Terminvorschlag: das Feld beginnt bei jetzt + 5 Minuten, ein Termin von ge
   expect(await screen.findByText(/liegt in der Vergangenheit/)).toBeInTheDocument();
   expect(apiMock.post).not.toHaveBeenCalled();
 });
+
+test("Teilnehmer stehen nur einmal - in den Ergebnis-Kacheln, kein eigener Kasten „Teilnehmer“ mit „Slot“ (TP7)", async () => {
+  renderMatch({
+    ...BASE,
+    match: { id: "m1", match_key: "A", status: "ready", slots: DUEL.map(({ slot, registration_id }) => ({ slot, registration_id })) },
+    participants: DUEL,
+  });
+  expect(await screen.findByTestId("match-result-sides")).toHaveTextContent("NeonFalke");
+  expect(screen.getAllByText("NeonFalke")).toHaveLength(1);
+  expect(screen.queryByRole("heading", { name: "Teilnehmer" })).toBeNull();
+  expect(screen.queryByText(/^Slot/)).toBeNull();
+});
+
+describe("„Login zum Ergebnis melden“ nur, wo Spieler selbst melden (TP6)", () => {
+  const open = { id: "m1", match_key: "A", status: "ready", slots: DUEL.map(({ slot, registration_id }) => ({ slot, registration_id })) };
+
+  test("online mit Spieler-Meldung: Gäste sehen den Weg zum Login", async () => {
+    renderMatch({ ...BASE, match: open, participants: DUEL });
+    expect(await screen.findByTestId("match-login-to-report")).toHaveAttribute("href", "/login?next=/matches/m1");
+  });
+
+  test.each([
+    ["Nur Turnierleitung", { result_entry_mode: "staff_only" }],
+    ["vor Ort", { event_mode: "local", result_entry_mode: "hybrid" }],
+  ])("%s: kein Login-Knopf, sondern wer das Ergebnis einträgt", async (_label, mode) => {
+    renderMatch({ ...BASE, ...mode, match: open, participants: DUEL });
+    await screen.findByTestId("match-result-card");
+    expect(screen.queryByTestId("match-login-to-report")).toBeNull();
+  });
+});

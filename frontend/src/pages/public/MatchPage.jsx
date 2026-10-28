@@ -323,6 +323,8 @@ function MatchPageView() {
   const canDispute = Boolean(data.can_dispute);
   // Nur Turnierleitung (#1157): wer mitspielt, sieht statt eines Melde-Knopfs, wer das Ergebnis einträgt.
   const showStaffEnters = Boolean(data.acting_registration_id && !canPlayerReport && !canStaffSubmit && !finished && data.result_entry_mode === "staff_only" && !data.in_dispute);
+  // „Login zum Ergebnis melden“ (#2124, TP6) nur, wo Spieler selbst melden - nicht bei „Nur Turnierleitung“ oder vor Ort.
+  const guestsCouldReport = data.result_entry_mode !== "staff_only" && data.event_mode !== "local";
   const hasOtherResultActions = Boolean(canPlayerReport || canSubmitV2Result || showReportReadOnly);
   const hasResultActions = Boolean(hasOtherResultActions || canDispute);
   const reports = Array.isArray(match.reports) ? match.reports : [];
@@ -534,8 +536,8 @@ function MatchPageView() {
               )}
 
             </div>
-          ) : !user && !isCompleted ? (
-            <Link to={`/login?next=/matches/${id}`} className="tls-btn tls-btn--secondary mt-5 inline-flex min-h-11 items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">
+          ) : !user && !isCompleted && guestsCouldReport ? (
+            <Link to={`/login?next=/matches/${id}`} data-testid="match-login-to-report" className="tls-btn tls-btn--secondary mt-5 inline-flex min-h-11 items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">
               Login zum Ergebnis melden
             </Link>
           ) : showStaffEnters ? null : (
@@ -548,9 +550,9 @@ function MatchPageView() {
             Teilnehmer und Turnierleitung zum Nachlesen, ein leerer Chat verschwindet. */}
         {/* Eine Spalte, die nie breiter als der Bildschirm wird (#1155): mit großer Schrift brechen Namen um. */}
         <div className={`mt-6 grid grid-cols-1 gap-6 ${showChat ? "lg:grid-cols-[minmax(0,1fr)_24rem]" : ""}`}>
+          {/* Die Teilnehmer stehen genau einmal - in den Ergebnis-Kacheln oben (#2124, TP7). */}
           <div className="space-y-6">
             {!over && (
-          {/* Die Teilnehmer stehen genau einmal - in den Ergebnis-Kacheln oben (#2124, TP7). */}
             <div className="border border-white/10 bg-[#121212] rounded-sm p-5" data-testid="match-scheduling">
               <h2 className="font-heading text-xl font-black uppercase flex items-center gap-2"><CalendarClock className="w-5 h-5 text-[#29B6E8]" /> Terminabstimmung</h2>
               {canProposeSchedule ? (
