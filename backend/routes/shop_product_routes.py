@@ -71,6 +71,10 @@ class LayerIn(BaseModel):
     # Größe einer Gamertag- bzw. Vereinsnummer-Ebene (#2105) - ohne Angabe die globalen Gamertag-Regeln.
     text_height_cm: float | None = None
     max_width_cm: float | None = None
+    # Fassung von Hand (#2141): ohne Angabe bzw. „auto“ entscheidet der Untergrund (Hintergrund, Produkt, Shirtfarbe).
+    variant: Literal["auto", "light", "dark"] | None = None
+    # Farbe von Gamertag bzw. Vereinsnummer fest (#2141): eine Farbe der Gamertag-Regeln, ohne Angabe automatisch.
+    ink: str | None = Field(None, max_length=30)
 
 
 class PlacementLayout(BaseModel):
@@ -84,6 +88,8 @@ class PlacementLayout(BaseModel):
 class Layout(Reasoned):
     placements: list[PlacementLayout] = Field(..., min_length=1, max_length=shop_products.MAX_PLACEMENTS)
     included_placement: str | None = Field(None, max_length=64)
+    # „Untergrund gilt als“ (#2141) - ohne Angabe bleibt die gespeicherte Vorgabe.
+    print_surface: Literal["garment", "light", "dark"] | None = None
 
 
 class StatusChange(Reasoned):
@@ -180,7 +186,7 @@ async def set_layout(product_id: str, body: Layout, me: dict = Depends(require_a
         placements.append(row)
     try:
         await shop_products.set_layout(get_db(), product_id, placements, included_placement=body.included_placement,
-                                       actor_id=me["id"], reason=body.reason)
+                                       print_surface=body.print_surface, actor_id=me["id"], reason=body.reason)
     except (ShopError, LookupError) as exc:
         raise _refused(exc) from exc
     return await _view(product_id)
@@ -218,7 +224,7 @@ async def preview_layout(product_id: str, body: Layout, request: Request, me: di
         row["layers"] = [layer.model_dump(exclude_none=True) for layer in item.layers]
         placements.append(row)
     try:
-        return await shop_products.plan_layout(get_db(), product_id, placements)
+        return await shop_products.plan_layout(get_db(), product_id, placements, print_surface=body.print_surface)
     except (ShopError, LookupError) as exc:
         raise _refused(exc) from exc
 
@@ -269,14 +275,16 @@ async def preview(product_id: str, placement: str = Query(..., max_length=64), c
 @router.get("/products/{product_id}/name-sample")
 async def name_sample(product_id: str, kind: Literal["gamertag", "member_number"] = "gamertag",
                       color: str = Query(..., max_length=60), text_height_cm: float | None = Query(None),
-                      max_width_cm: float | None = Query(None), me: dict = Depends(require_area("finance"))):
-    """Beispielname einer Namensebene in echter Größe (#2105) - gerendert wie die Druckdatei, als PNG der Leinwand."""
+                      max_width_cm: float | None = Query(None), ink: str | None = Query(None, max_length=30),
+                      me: dict = Depends(require_area("finance"))):
+    """Beispielname einer Namensebene in echter Größe (#2105) - gerendert wie die Druckdatei, als PNG der Leinwand.
+    ``ink`` ist die Farbe des Namens aus dem Plan (Untergrund aus dem Hintergrund, #2141)."""
     db = get_db()
     try:
         product = await shop_products._product(db, product_id)
         payload = await shop_print_files.sample_png(db, product, kind=kind, color=color,
                                                     layer={"text_height_cm": text_height_cm,
-                                                           "max_width_cm": max_width_cm})
+                                                           "max_width_cm": max_width_cm}, ink=ink)
     except (ShopError, LookupError) as exc:
         raise _refused(exc) from exc
     return Response(payload, media_type="image/png",
@@ -284,9 +292,14 @@ async def name_sample(product_id: str, kind: Literal["gamertag", "member_number"
 
 
 @router.get("/products/{product_id}/print-files/{file_id}")
-async def print_file(product_id: str, file_id: str, me: dict = Depends(require_area("finance"))):
-    """Eine erzeugte Grunddatei ansehen oder herunterladen (Bestelldateien mit Namen nicht)."""
+async def print_file(product_id: str, file_id: str, thumb: bool = False,
+                     me: dict = Depends(require_area("finance"))):
+    """Eine erzeugte Grunddatei ansehen oder herunterladen (Bestelldateien mit Namen nicht). Mit ``thumb`` verkleinert -
+    der Hintergrund in der Vorschau von Schritt 3 (#2141), einmal je Datei gerechnet und im Prozess gemerkt."""
     try:
+        if thumb:
+            payload = await shop_print_files.admin_thumb(get_db(), product_id, file_id)
+            return Response(payload, media_type="image/png", headers=PNG_HEADERS)
         path, name = await shop_print_files.admin_file(get_db(), product_id, file_id)
     except LookupError as exc:
         raise HTTPException(404, str(exc)) from exc

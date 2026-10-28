@@ -87,7 +87,7 @@ const REASON_HINT = "Bitte kurz einen Grund angeben – er kommt ins Protokoll."
 // Grund und Knopf gehören zusammen - wie `ReasonedButton` in AdminShopPage.jsx (#2072). Der Grund ist optional
 // (Entscheidung Obmann 27.10.2026); Pflicht (`required`) nur beim Veröffentlichen, weil es dann live geht. Der Knopf
 // bleibt klickbar und sagt, was fehlt (`blockedHint`), statt still nichts zu tun.
-function ReasonedButton({ id, label, busy, disabled, blockedHint, onSubmit, required = false, variant = "primary", hint }) {
+function ReasonedButton({ id, label, busy, disabled, blockedHint, onBlocked, onSubmit, required = false, variant = "primary", hint }) {
   const [reason, setReason] = useState("");
   const [message, setMessage] = useState("");
   const input = useRef(null);
@@ -98,6 +98,7 @@ function ReasonedButton({ id, label, busy, disabled, blockedHint, onSubmit, requ
       if (busy) return;
       if (disabled) {
         setMessage(blockedHint || "Oben fehlt noch etwas.");
+        onBlocked?.();  // etwa: zur Fläche springen, die fehlt (#2141)
         return;
       }
       if (required && reason.trim().length < 3) {

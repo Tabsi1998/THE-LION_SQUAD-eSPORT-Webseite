@@ -4,7 +4,8 @@ Stand: Fundament aus #1703 (Datenmodell) und #1704 (Rechte, Protokoll), dazu Stu
 #1706 (Abschnitt „Einstellungen“ unten), Designs/Druckdateien aus #1708 (Abschnitt „Designs und Druckdateien“) und
 der Printful-Adapter aus #1705 (Abschnitt „Printful-Adapter“), die Produktverwaltung aus #1707 mit dem Katalogabgleich
 aus #1709 (Abschnitt „Produktverwaltung und Katalogabgleich“) und die Druckvorlagen von Printful mit selbst erzeugten
-Druckdateien aus #2069 (Abschnitt „Druckvorlagen und Druckdateien“) und der Testentwurf an Printful aus #2062 (Abschnitt
+Druckdateien aus #2069 (Abschnitt „Druckvorlagen und Druckdateien“), Allover mit fertiger Datei als Hintergrund aus #2141
+(Abschnitt „Allover: Hintergrund mit Ebenen“) und der Testentwurf an Printful aus #2062 (Abschnitt
 „Testentwurf an Printful“), Teil des Epics #1699. Der Shop ist **von außen
 unsichtbar**: Es gibt keine Seiten für Mitglieder und nur eine öffentliche Route - die Druckdateien für Printful hinter
 einem Zufallsschlüssel; im Admin steht er unter Finanzen → Shop. Steuer (#1701) und die Shop-Seiten (#1712 ff.) folgen.
@@ -23,13 +24,13 @@ die Sammlungen direkt. Jede Katalogänderung ist eine Adminaktion mit Person und
 
 | Sammlung | Inhalt | Eindeutig |
 | --- | --- | --- |
-| `shop_products` | Produkt: Slug, Titel, Beschreibung, Stand (`draft` Entwurf, `reviewed` geprüft, `active` veröffentlicht, `archived`), Sichtbarkeit (`hidden` nur intern, `members` nur Mitglieder, `public` öffentlich mit Konto), Personalisierung (`none`, `gamertag`, `member_number`, `both`; daraus `gamertag_allowed`), Grundpreis (ohne Printful, sonst leer) und eigener Aufschlag in Cent (leer = allgemeiner gilt), Steuerprofil (Referenz), ältere Einzel-Druckdatei (`design_key`), `version`; seit #1707 der Aufbau: Printful-Abzug (`printful`), Technik, Angebot (`offer`: Farben, Größen), Platzierungen (`placements`), Fläche im Grundpreis (`included_placement`), Prüfung (`review`), `published_at`, `archived_at` und der Stand des Abgleichs (`catalog_sync`) | `slug` |
+| `shop_products` | Produkt: Slug, Titel, Beschreibung, Stand (`draft` Entwurf, `reviewed` geprüft, `active` veröffentlicht, `archived`), Sichtbarkeit (`hidden` nur intern, `members` nur Mitglieder, `public` öffentlich mit Konto), Personalisierung (`none`, `gamertag`, `member_number`, `both`; daraus `gamertag_allowed`), Grundpreis (ohne Printful, sonst leer) und eigener Aufschlag in Cent (leer = allgemeiner gilt), Steuerprofil (Referenz), ältere Einzel-Druckdatei (`design_key`), `version`; seit #1707 der Aufbau: Printful-Abzug (`printful`), Technik, Angebot (`offer`: Farben, Größen), Platzierungen (`placements`), Fläche im Grundpreis (`included_placement`), Prüfung (`review`), `published_at`, `archived_at` und der Stand des Abgleichs (`catalog_sync`); seit #2141 „Untergrund gilt als“ (`print_surface`: `garment`, `light`, `dark`) | `slug` |
 | `shop_variants` | Variante eines Produkts: SKU, Bezeichnung, Größe, Farbe (mit `color_code`), Preis (bei Printful-Produkten der übernommene Selbstkostenpreis), aktiv (= angeboten), Sperre aus dem Abgleich (`blocked_reason`, `blocked_at`), `version` | `sku` |
 | `shop_designs` | Druckdatei des Vereins je Fassung: `design_key`, `version` (zählt hoch), `file_ref`, `sha256`, Druckposition; seit #1708 dazu `public_id` (Zufallsschlüssel der öffentlichen Adresse), Pixel, DPI und Druckmaße in Zoll, mit denen sie geprüft wurde, Transparenz, Ausgangsformat und `public_disabled_at` (Aufbewahrung); seit #2069 die Fassung (`variant`: `dark` für dunkle, `light` für helle Shirts), Herkunft (`origin`: `upload` oder `auto_light`), bei SVG das bereinigte SVG (`svg_ref`, nie öffentlich), erkannte Farben (`colors`) und `view_box`, bei einer umgefärbten Fassung `derived_from` und `recolor`. Alte Fassungen bleiben | `design_key` + `version`; `public_id` |
 | `shop_design_profiles` | Design bzw. Motiv (#1708, #2069): Titel, Platzierung, feste **Shirtfarben** (`garment_colors`, freiwillig), Notiz, `version`; seit #2069 `light_mode` (`auto` oder `file`), `light_auto` (Stand der automatischen Fassung) und Ausnahmen je Shirtfarbe (`color_variants`) | `design_key` |
 | `shop_gamertag_files` | Gamertag-Druckdatei (#1711): Herkunft `gamertag`, Zweck (`test`, `order`), `sha256`, `file_ref`, `public_id`, Maße, Anker, Farbe, `rules_hash`; bei Bestelldateien Konto, Bestellung und Position (personenbezogen: das PNG zeigt den Namen) - nie der Name als Text | `purpose` + `sha256` (nur Testdateien); `public_id` |
 | `shop_print_templates` | Druckvorlage je Printful-Produkt (#2069): Maße je Fläche, Technik und Gruppe (`entries`), Vorlagenbilder (`previews`), `hash` der Maße, `changes` mit `changed_at`, `checked_at`, `last_error`, übersprungene Zeilen mit Grund (`skipped`, #2091) | `printful_product_id` |
-| `shop_print_files` | Druckdatei je Produkt, Fläche, Farbe und Gruppe (#2069): Herkunft (`composed`, `upload`), Zweck (`base` mit `version`, `order` je Bestellposition), `sha256`, `file_ref`, `public_id`, Maße, `layout_hash`, `template_hash`, Quellen; bei Bestelldateien Konto, Bestellung und Position (personenbezogen) | `public_id`; Produkt + Fläche + Gruppe + Farbe + Version (nur `base`) |
+| `shop_print_files` | Druckdatei je Produkt, Fläche, Farbe und Gruppe (#2069): Herkunft (`composed`, `upload`), Zweck (`base` mit `version`, `order` je Bestellposition), `sha256`, `file_ref`, `public_id`, Maße, `layout_hash`, `template_hash`, Quellen (seit #2141 bei „Hintergrund plus Ebenen“ zuerst der Hintergrund mit Kennung und Prüfsumme); bei Bestelldateien Konto, Bestellung und Position (personenbezogen) | `public_id`; Produkt + Fläche + Gruppe + Farbe + Version (nur `base`) |
 | `shop_printful_catalog` | Zwischenstand des Printful-Katalogs für die Produktsuche (#2069): Produkte, Kategorien, `fetched_at` - keine Person | `id` |
 | `shop_design_colors` | Belegung einer Shirtfarbe je Platzierung durch ein Design (#1708): `placement`, `color_key` (kleingeschrieben), `color`, `design_key` - macht „eine Farbe, ein Design“ atomar | `placement` + `color_key` |
 | `shop_printful_variants` | Zuordnung Variante → Printful-Variante und -Produkt (Anbieter `printful`); seit #1709 Technik, Einkauf (`base_cost_cents`), Aufpreis je Druckfläche (`placement_costs`), Lager (`availability`, `in_stock`), `synced_at` und eine offene Preiswarnung (`price_warning`) | `provider` + `variant_id` |
@@ -728,7 +729,9 @@ kleinste Breite eines Motivs (Vorgabe 1 cm). Routen: `GET`/`PUT /api/admin/shop/
 ### Aufbau je Produkt (Schritt 3)
 
 `product.placements` je Printful-Fläche: `key` (= Printful-Platzierung), `technique`, `mode` (`layout` - Motiv und
-Position; `upload` - fertige Datei für Profis) und `layers`:
+Position; `upload` - fertige Druckdatei als Hintergrund, Abschnitt [Allover](#allover-hintergrund-mit-ebenen-2141)) und
+`layers` - bis zu sechs je Fläche (`MAX_LAYERS`), auch mehrere Motive. Jede Ebene darf eine **Fassung von Hand**
+haben (`variant`: `light` oder `dark`, #2141); ohne Angabe entscheidet der Untergrund (Abschnitt Allover). Die Arten:
 
 - `motif`: Vorgabe, Breite in cm (der Regler endet an der Fläche), Versatz in cm, Motiv (`motif.key`) und - nur wenn
   nötig - eine **Ausnahme je Farbe** (`motif.by_color`: für diese Farbe ein anderes Motiv). Sonst gilt je Shirtfarbe
@@ -789,24 +792,89 @@ Pixel ergeben keine neue Version. Eine Sperre je Produkt verhindert doppeltes Er
 `<produkt>-<fläche>-<farbe>-v<version>.png`, einer Bestelldatei: `druck-<prüfsumme16>.png` - nie ein Name).
 Grunddateien (`purpose = "base"`) zählen je Produkt, Fläche, Gruppe und Farbe hoch (eindeutiger Index).
 
-**Für Profis:** `POST /api/admin/shop/print-files/upload` (Formular `file`, `product_id`, `placement`, `color`, optional
-`group`) - wird **exakt** gegen die Vorlage geprüft: genau die Pixel der Vorlage, oder dasselbe Seitenverhältnis mit
-mehr Pixeln (dann auf die exakte Größe verkleinert); kleiner oder anderes Seitenverhältnis wird mit px, cm und Zoll
-abgelehnt. Neu kodiert wie ein Design (#1708). Höchstens 50 MB am Eingang (`body_limits`, nginx 51 MB).
+**Fertige Datei (Hintergrund):** `POST /api/admin/shop/print-files/upload` (Formular `file`, `product_id`, `placement`,
+`color`, optional `group`) - wird **exakt** gegen die Vorlage geprüft: genau die Pixel der Vorlage, oder dasselbe
+Seitenverhältnis mit mehr Pixeln (dann auf die exakte Größe verkleinert); kleiner oder anderes Seitenverhältnis wird
+mit px, cm und Zoll abgelehnt. Neu kodiert wie ein Design (#1708). Höchstens 50 MB am Eingang (`body_limits`, nginx
+51 MB). Ob eine Datei echte Details hat oder nur hochskaliert ist, misst keine Prüfung - die Antwort sagt „am Muster
+prüfen“. Liegen Motive auf der Fläche, wird die Grunddatei gleich danach erzeugt (#2141).
 
 **Vorschau:** `GET /api/admin/shop/products/{id}/preview?placement=&color=` - die Druckdatei über dem Vorlagenbild
-(Sicherheitslinien) auf der Shirtfarbe von Printful, mit einem Beispielnamen im Platzhalter, als PNG (900 px breit).
+(Sicherheitslinien) auf der Shirtfarbe von Printful, mit einem Beispielnamen im Platzhalter, als PNG (900 px breit);
+bei einer fertigen Datei der Hintergrund dieser Farbe, darüber die Ebenen (#2141).
 Im Admin rechnet die Seite dieselbe Lage live (`shopLayout.js`), Feinjustieren per Ziehen oder Pfeiltasten (Umschalt:
 1 cm). Bei ungespeicherten Änderungen sind nur die Ebenen gedimmt, solange der Server die Pläne rechnet - das Shirt
 nie; ohne Berechnung (nichts gewählt, blockiert) wird nichts gedimmt (#2105).
-`GET /api/admin/shop/products/{id}/print-files/{file_id}` zeigt eine Grunddatei.
+`GET /api/admin/shop/products/{id}/print-files/{file_id}` zeigt eine Grunddatei, mit `?thumb=1` verkleinert (höchstens
+1200 px) - so zeigt Schritt 3 den Hintergrund der Vorschau-Farbe in der Druckfläche. Das Vorschaubild entsteht beim
+Hochladen und liegt neben der Datei (`thumb_ref`); bei älteren bzw. erzeugten Dateien einmal beim ersten Abruf
+(Sperre je Prüfsumme, nie doppelt). Auch die Vorschau-PNG nimmt dieses Bild, nie die volle Datei.
+
+### Allover: Hintergrund mit Ebenen (#2141)
+
+Für ein Allover-Trikot gibt es fertige Hintergründe je Fläche (vorne und hinten 4950 × 6750 px, Ärmel 4950 × 2250 px),
+ohne Schrift und Logo. Vereinslogo, Name und Nummer kommen als eigene Ebenen darauf.
+
+- **Art „Fertige Druckdatei als Hintergrund“** (`mode = "upload"`): je Fläche und Farbe eine hochgeladene Datei der
+  ganzen Fläche. Darüber liegen Ebenen wie bei „Motiv und Position“ - Motive aus dem Reiter Motive (mehrere je Fläche,
+  bis `MAX_LAYERS`), Gamertag und Vereinsnummer, mit Vorgabe, Größe, Feinjustieren und Vorschau.
+- **Grunddatei** je Fläche und Farbe = Hintergrund plus Motive (`compose_print_file(…, base=Hintergrund)`, Herkunft
+  `composed`, in `sources` zuerst der Hintergrund). Gamertag und Nummer kommen je Bestellung darüber. Der `layout_hash`
+  enthält die Prüfsumme des Hintergrunds: ein **neuer Hintergrund** oder eine geänderte Ebene macht die Grunddatei
+  „veraltet“ (für die Bestellung zählt nur die neueste erzeugte Datei, `current_base`, nie der Hintergrund allein).
+  Nach dem Hochladen wird sie gleich erzeugt; „Druckdateien erzeugen“ holt nach, was fehlt.
+- **Ohne Motive** bleibt alles wie vor #2141: die hochgeladene Datei ist selbst die Grunddatei, mit derselben Prüfsumme -
+  auch, wenn die Motive nachträglich entfernt werden (dann zählt die neueste hochgeladene, nicht die ältere erzeugte;
+  kommt ein Motiv zurück, wieder die erzeugte). Vor #2141 blendete Schritt 3 Motive in dieser Art aus und druckte sie nicht; solche Zeilen (ohne
+  `background_layers`) bleiben so, bis Schritt 3 neu gespeichert wird - der Admin sagt das an der Fläche.
+
+**Fassung aus dem Hintergrund.** Ein Allover-Trikot hat bei Printful oft die Grundfarbe „weiß“, wird aber ganz dunkel
+bedruckt - nach der Shirtfarbe käme die Fassung für helle Shirts, also das falsche Logo. Darum entscheidet je Ebene, in
+dieser Reihenfolge (`shop_print_files.decide_surface`):
+
+1. die Ebene selbst: „Fassung: hell/dunkel“ (`variant`), etwa bei gemischtem Hintergrund;
+2. der Hintergrund unter der Ebene: die **mittlere relative Luminanz** (WCAG, linear gemittelt) im Rahmen der Ebene,
+   gegen die Schwelle der Motive (`shop_motifs` `threshold`, Vorgabe 0,18 - dieselbe wie bei Shirtfarben). Durchsichtige
+   Stellen zählen als Untergrund nach 3. bzw. 4. Gemessen wird über ein Raster (96 Zellen an der längeren Seite, je
+   Zelle mittlere Luminanz × Deckkraft und Deckkraft als 16-Bit-Werte, rund 37 KB): es entsteht beim Hochladen und
+   steht an der Zeile (`luma`); einer älteren Datei ohne Raster wird es einmal nachgetragen (Sperre je Prüfsumme).
+   Planung, Vorschau und Bestellung öffnen die volle Datei dafür nie;
+3. die Vorgabe des Produkts: „Untergrund gilt als hell/dunkel“ (`print_surface`, Vorgabe „wie Printful-Farbe“);
+4. die Shirtfarbe wie bisher (Ausnahmen je Farbe am Motiv, `inks_for_garment`).
+
+Hell bzw. dunkel wählt die **Fassung des Motivs** (`shop_motifs.file_for_surface`; ein Motiv ohne Fassung für helle
+Shirts druckt die Hauptdatei) und die **Farbe von Gamertag und Vereinsnummer** (`shop_gamertag.ink_for_surface`: die
+Farben der Shirtfarbe, dann die Vorgabefarbe, dann die übrigen - die erste mit Kontrast ab 3 gewinnt, sonst die mit dem
+höchsten). Die Entscheidung steht im Plan (`surface`, `ink`); Vorschau, Planung, Grunddatei und Bestelldatei lesen sie
+dort. Schritt 3 zeigt sie je Ebene und Vorschau-Farbe, etwa „Fassung: dunkel (aus Hintergrund) · Farbe: Vereinsblau“;
+der Beispielname kommt in dieser Farbe (`name-sample?ink=`).
+
+**Farbe des Namens fest.** Je Gamertag- bzw. Vereinsnummer-Ebene „Farbe: automatisch (Kontrast)“ (Vorgabe) oder fest
+eine Farbe der Gamertag-Regeln (`ink`, Kennung der Farbe; eine andere lehnt das Speichern ab). Plan, Vorschau und
+Bestelldatei nehmen dieselbe Wahl; gibt es die Farbe in den Regeln nicht mehr, gilt wieder automatisch. Schritt 3 zeigt
+„Farbe: Weiß (fest)“.
+
+**Allover-Trikot einrichten** (Verwaltung → Finanzen → Shop → Produkte):
+
+1. Schritt 1 und 2: das Trikot von Printful wählen, Farben und Größen anbieten.
+2. Schritt 3: je Fläche (Vorderseite, Rückseite, Ärmel) „Fertige Druckdatei als Hintergrund“ wählen. Logo, Gamertag und
+   Vereinsnummer als Ebenen dazu, Position und Größe setzen. Wo der Hintergrund gemischt hell und dunkel ist, die
+   Fassung je Ebene von Hand wählen. „Untergrund gilt als“ nur ändern, wenn eine Fläche ohne Hintergrunddatei bleibt.
+3. **Speichern** - erst danach erscheint je Farbe das Hochladen („Erst speichern, dann je Farbe hochladen“).
+4. Je Farbe und Fläche den Hintergrund hochladen: genau die Pixel der Vorlage (oder größer im selben Seitenverhältnis).
+   Die Grunddatei mit den Motiven entsteht dabei gleich; die Vorschau zeigt den Hintergrund unter den Ebenen.
+5. Vorschau je Farbe prüfen (Fassung, Namensfarbe, Lage), dann Schritt 4 und 5 wie bei jedem Produkt - und ein
+   Testentwurf an Printful (#2062). Ob die Datei echte Details hat oder nur hochskaliert ist, zeigt erst das Muster.
+
+Blockiert das Speichern, nennt die Meldung die betroffenen Flächen und springt hin (etwa eine Fläche in „Motiv und
+Position“ ohne Ebene).
 
 ### Bestellung
 
 `place_order` friert je Position **je Fläche genau eine Datei** ein (`print_files`): ohne Namen die geltende Grunddatei
 (die zum Aufbau und zur Vorlage passen muss, sonst „nicht bestellbar“); mit Gamertag eine **eigene** Datei für genau
-diese Position: Grunddatei plus Gamertag am Anker (`shop_gamertag.store` legt den Namen als Bestelldatei ab, Farbe nach
-`inks_for_garment`). Die Motiv-Fassungen stehen weiter in `designs` (für die Aufbewahrung ihrer Adressen). Kommt die
+diese Position: Grunddatei plus Gamertag am Anker (`shop_gamertag.store` legt den Namen als Bestelldatei ab, Farbe aus
+dem Plan: nach `inks_for_garment`, bei entschiedenem Untergrund nach `ink_for_surface`, #2141). Die Motiv-Fassungen stehen weiter in `designs` (für die Aufbewahrung ihrer Adressen). Kommt die
 Bestellung nicht zustande (gleichzeitiger Aufruf, spätere Position nicht bestellbar), sind die eigenen Dateien wieder
 weg. Die Vereinsnummer bleibt Platzhalter bis #1727.
 

@@ -344,6 +344,18 @@ async def file_for_garment(db, motif_key: str, *, color: Any, color_hex: Any) ->
     return await resolve(db, motif_key, variant)
 
 
+async def file_for_surface(db, motif_key: str, variant: str) -> dict | None:
+    """Die Fassung eines Motivs für einen Untergrund, der schon entschieden ist (#2141): ``"dark"`` oder ``"light"`` -
+    etwa aus dem Hintergrund einer Allover-Fläche, der Vorgabe des Produkts oder von Hand an der Ebene. Ausnahmen je
+    Shirtfarbe gelten hier nicht (sie hängen am Farbnamen, nicht am Untergrund). Wie ``file_for_garment``: ein Motiv,
+    das noch nie eine Fassung für helle Shirts hatte, druckt die Hauptdatei."""
+    if variant not in VARIANTS:
+        raise ValueError("variant: 'dark' oder 'light'")
+    if variant == "light" and _never_had_light(await shop_designs.get_profile(db, motif_key)):
+        variant = "dark"
+    return await resolve(db, motif_key, variant)
+
+
 def _never_had_light(profile: dict | None) -> bool:
     profile = profile or {}
     return profile.get("light_mode") != "file" and not profile.get("light_auto")
