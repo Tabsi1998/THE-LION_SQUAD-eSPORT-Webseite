@@ -643,3 +643,11 @@ test("Jeder gegen jeden mit Playoff-Phase (#2124, Review B1): der Link „Turnie
   expect(actions.querySelector("a[data-testid='tournament-standings-link']")).toHaveClass("tls-btn--primary");
   expect(actions.querySelector("a[data-testid='tournament-bracket-link']")).not.toBeNull();
 });
+test("vor Ort (#2124, Review O4): nach dem Check-in-Ende bleibt bis zum Start „Check-in vor Ort“ statt „Check-in vorbei“", async () => {
+  mockApi({ ...base, ...DATES, event_mode: "local", check_in_until: "2026-01-01T10:00:00+00:00", status: "check_in", public_phase: { state: "check_in", label: "Check-in" } }, [
+    { id: "r1", status: "approved", display_name: "Paula", user_id: "u1", is_mine: true },
+  ]);
+  renderPage();
+  expect(await screen.findByTestId("tournament-checkin-local")).toBeDisabled();
+  expect(screen.queryByTestId("tournament-checkin-over")).toBeNull();
+});

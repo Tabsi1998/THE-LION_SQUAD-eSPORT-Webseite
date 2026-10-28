@@ -305,7 +305,8 @@ function TournamentDetailView() {
   // Check-in-Ende (#2124): dieselbe Regel wie „Dein Stand“, die App und der Server - danach kein Knopf mehr.
   const checkIn = checkInState(t);
   const checkinNow = !!myReg && canCheckIn && myReg.status === "approved" && checkIn.open;
-  const checkinOver = !!myReg && myReg.status === "approved" && t.status === "check_in" && checkIn.over;
+  // Vor Ort checkt die Turnierleitung ein (#2124, Review O4): bis zum Start bleibt dort „Check-in vor Ort“ stehen.
+  const checkinOver = !!myReg && myReg.status === "approved" && t.status === "check_in" && checkIn.over && !(staffOnlyCheckIn && !t.started);
   // Die eine Hauptaktion je Phase (#401).
   let primaryKey;
   let primaryAction = null;
