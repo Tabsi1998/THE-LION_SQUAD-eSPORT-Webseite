@@ -31,7 +31,7 @@ from typing import Any
 from datetime import datetime, timedelta, timezone
 
 from models import now_utc
-from services import shop_catalog, shop_catalog_sync, shop_colors, shop_config, shop_print_files
+from services import shop_catalog, shop_catalog_sync, shop_colors, shop_config, shop_gamertag, shop_print_files
 from services import shop_print_templates as templates
 from services.shop_common import ShopConflict, ShopError, clean_reason, record_admin_action
 from services.shop_costs import cost_cents, euro, included_placement, technique_of
@@ -300,7 +300,7 @@ async def available_placements(db, product: dict, *, template: dict | None = Non
     return out
 
 
-LAYER_FIELDS = {"kind", "preset", "width_cm", "offset_x_cm", "offset_y_cm", "motif"}
+LAYER_FIELDS = {"kind", "preset", "width_cm", "offset_x_cm", "offset_y_cm", "motif", *shop_gamertag.LAYER_SIZE_FIELDS}
 
 
 async def _clean_motif(db, raw: Any, colors: list[str], label: str) -> dict:
@@ -374,9 +374,17 @@ async def _clean_layout(db, product: dict, raw_rows: Any, available: dict[str, d
                     "offset_y_cm": _number(layer.get("offset_y_cm", 0.0), f"{label}: Versatz senkrecht (cm)",
                                            -shop_print_files.MAX_OFFSET_CM, shop_print_files.MAX_OFFSET_CM)}
             if kind == "motif":
+                if any(layer.get(name) is not None for name in shop_gamertag.LAYER_SIZE_FIELDS):
+                    raise ShopError(f"{label}: Texthöhe und Höchstbreite gibt es nur für Gamertag und Vereinsnummer.")
                 item["width_cm"] = _number(layer.get("width_cm", preset.get("width_cm")), f"{label}: Breite (cm)",
                                            min_width, MAX_WIDTH_CM)
                 item["motif"] = await _clean_motif(db, layer.get("motif"), colors, label)
+            else:
+                # Größe je Namensebene (#2105) - ohne Angabe gelten die globalen Gamertag-Regeln wie bisher.
+                try:
+                    item.update(shop_gamertag.clean_layer_sizes(layer))
+                except ShopError as exc:
+                    raise ShopError(f"{label}: {exc}") from exc
             clean_layers.append(item)
         clean_layers.sort(key=lambda layer: layer["kind"] != "motif")
         out.append({"key": key, "printful_placement": key, "technique": area["technique"], "mode": mode,
@@ -387,6 +395,7 @@ async def _clean_layout(db, product: dict, raw_rows: Any, available: dict[str, d
 def _layout_summary(rows: list[dict]) -> list[dict]:
     return [{"key": row["key"], "mode": row.get("mode") or "layout",
              "layers": [{name: layer.get(name) for name in ("kind", "preset", "width_cm", "offset_x_cm", "offset_y_cm")}
+                        | {name: layer[name] for name in shop_gamertag.LAYER_SIZE_FIELDS if layer.get(name) is not None}
                         | ({"motif": (layer.get("motif") or {}).get("key")} if layer.get("kind") == "motif" else {})
                         for layer in row.get("layers") or []]}
             for row in rows]
@@ -814,9 +823,18 @@ def _placement_names(printful: dict, template: dict | None) -> dict[str, str]:
 
 def _gamertag_canvas(rules: dict) -> dict:
     """Die Leinwand der Gamertag-Datei in Zoll - die Vorschau rechnet sie auf jede Fläche um."""
-    width, height = shop_print_files.shop_gamertag.canvas(rules)
+    width, height = shop_gamertag.canvas(rules)
+    cm = shop_gamertag.CM_PER_INCH
+    # Je Ebene einstellbar (#2105): die Vorgabe sind die globalen Regeln; die Leinwand wächst mit der Texthöhe
+    # (``height_per_text``: Leinwandhöhe je Zoll Texthöhe), die Breite ist die Höchstbreite.
     return {"width_in": round(width / rules["dpi"], 4), "height_in": round(height / rules["dpi"], 4),
-            "anchor_y_in": round(height / 2 / rules["dpi"], 4)}
+            "anchor_y_in": round(height / 2 / rules["dpi"], 4),
+            "text_height_cm": round(rules["text_height_in"] * cm, 2), "max_width_cm": round(rules["max_width_in"] * cm, 2),
+            "height_per_text": round(height / rules["dpi"] / rules["text_height_in"], 4),
+            "limits": {"min_text_height_cm": round(shop_gamertag.MIN_HEIGHT_IN * cm, 2),
+                       "max_text_height_cm": round(shop_gamertag.MAX_HEIGHT_IN * cm, 2),
+                       "min_width_cm": round(shop_gamertag.MIN_WIDTH_IN * cm, 2),
+                       "max_width_cm": round(shop_gamertag.MAX_WIDTH_IN * cm, 2)}}
 
 
 async def list_view(db) -> list[dict]:

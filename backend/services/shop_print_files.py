@@ -470,6 +470,8 @@ class Planned:
     label: str
     box: templates.Box
     source: MotifSource | None = None
+    # Texthöhe und Höchstbreite einer Namensebene (#2105) - für Rendern und Platzieren dieselben Werte.
+    sizes: dict | None = None
 
 
 @dataclass
@@ -495,9 +497,10 @@ class Plan:
         return self.mode == "upload" or bool(self.motifs)
 
 
-def text_canvas_px(entry: dict, gamertag_rules: dict) -> tuple[float, float]:
-    """Die Leinwand der Gamertag-Datei (für jeden Namen gleich groß) in Pixeln dieser Fläche."""
-    width, height = shop_gamertag.canvas(gamertag_rules)
+def text_canvas_px(entry: dict, gamertag_rules: dict, layer: dict | None = None) -> tuple[float, float]:
+    """Die Leinwand der Gamertag-Datei (für jeden Namen gleich groß) in Pixeln dieser Fläche - mit der Größe der Ebene
+    (``layer``: Texthöhe, Höchstbreite in cm, #2105), sonst nach den globalen Regeln."""
+    width, height = shop_gamertag.canvas(shop_gamertag.layer_rules(gamertag_rules, layer))
     scale = entry["dpi"] / gamertag_rules["dpi"]
     return width * scale, height * scale
 
@@ -533,7 +536,8 @@ async def plan_placement(db, row: dict, entry: dict, *, color: str, color_hex: s
             label = f"Motiv „{source.title}“ ({preset['label']})"
             planned.append(Planned(index, "motif", label, box, source))
         else:
-            width, height = text_canvas_px(entry, gamertag_rules)
+            sizes = shop_gamertag.clean_layer_sizes(layer) or None
+            width, height = text_canvas_px(entry, gamertag_rules, sizes)
             follow = next((item.box for item in planned if item.kind == "motif"), None)
             try:
                 box = templates.place_text(entry, preset, width_px=width, height_px=height, follow=follow,
@@ -542,7 +546,7 @@ async def plan_placement(db, row: dict, entry: dict, *, color: str, color_hex: s
                 found.append(f"{entry['label']}: {exc}")
                 continue
             label = f"{'Gamertag' if kind == 'gamertag' else 'Vereinsnummer'} ({preset['label']})"
-            planned.append(Planned(index, kind, label, box))
+            planned.append(Planned(index, kind, label, box, sizes=sizes))
         found += templates.problems(entry, box, label, rules)
     template_hash = templates.entry_hash(entry)
     payload = {"renderer": RENDERER_VERSION, "template": template_hash, "mode": mode,
@@ -951,8 +955,10 @@ async def _personal_file(db, product: dict, plan: Plan, base_row: dict | None, *
                          position: int = 1) -> dict:
     rules = await shop_gamertag.load_rules(db)
     ink = shop_gamertag.inks_for_garment(rules, color)[0]["key"]
+    # Dieselbe Größe wie im Plan (#2105): die Leinwand der Ebene und der Rahmen passen zueinander.
+    sizes = next((item.sizes for item in plan.texts if item.kind == "gamertag"), None)
     stored = await shop_gamertag.store(db, gamertag, purpose="order", color_key=ink, user_id=user_id,
-                                       order_id=order_id, order_item_id=item_id)
+                                       order_id=order_id, order_item_id=item_id, layer=sizes)
     tag_row = stored["row"]
     tag_path = shop_designs._path_of(tag_row["file_ref"])
     if tag_path is None or not tag_path.is_file():
@@ -1053,6 +1059,21 @@ async def complete_pending_erasures(db) -> int:
 PREVIEW_WIDTH = 900
 PREVIEW_MAX_PIXELS = 30_000_000  # so groß darf ein Vorlagenbild höchstens sein (shop_print_templates)
 SAMPLE_NAME = "GAMERTAG"
+SAMPLE_NUMBER = "1234"
+SAMPLES = {"gamertag": SAMPLE_NAME, "member_number": SAMPLE_NUMBER}
+
+
+async def sample_png(db, product: dict, *, kind: str, color: str, layer: dict | None) -> bytes:
+    """Der Beispielname einer Namensebene in echter Größe (#2105) - gerendert wie die Druckdatei
+    (``shop_gamertag.render`` mit den Regeln der Ebene), als PNG der ganzen Leinwand. Die Vorschau in Schritt 3 legt es
+    in den Rahmen der Ebene; die Leinwand bleibt dort nur ein feiner Rahmen. Farbe des Namens wie bei der Bestellung."""
+    if kind not in SAMPLES:
+        raise LookupError("Diese Ebene hat keinen Namen.")
+    if color not in ((product.get("offer") or {}).get("colors") or []):
+        raise LookupError("Diese Farbe wird nicht angeboten.")
+    rules = await shop_gamertag.load_rules(db)
+    ink = shop_gamertag.inks_for_garment(rules, color)[0]["key"]
+    return shop_gamertag.render(SAMPLES[kind], shop_gamertag.layer_rules(rules, layer), color_key=ink).payload
 
 
 def _hex_rgb(value: str | None) -> tuple[int, int, int]:
@@ -1124,17 +1145,19 @@ async def preview_png(db, product: dict, *, placement: str, color: str, sample: 
     if sample and plan.texts:
         gamertag_rules = context["gamertag_rules"]
         ink = shop_gamertag.inks_for_garment(gamertag_rules, color)[0]["key"]
-        try:
-            name = shop_gamertag.render(SAMPLE_NAME, gamertag_rules, color_key=ink)
+        for item in plan.texts:
+            # Der Beispielname wie in der Druckdatei: dieselben Regeln der Ebene (#2105), dieselbe Leinwand.
+            try:
+                name = shop_gamertag.render(SAMPLES[item.kind], shop_gamertag.layer_rules(gamertag_rules, item.sizes),
+                                            color_key=ink)
+            except ShopError:
+                continue
             with Image.open(BytesIO(name.payload)) as img:
                 img.load()
                 tag = img.convert("RGBA")
-            for item in plan.texts:
-                left, top, box_w, box_h = scaled_box(item.box)
-                if 0 <= left and 0 <= top and left + box_w <= target_w and top + box_h <= target_h:
-                    print_img.alpha_composite(tag.resize((box_w, box_h), Image.Resampling.LANCZOS), (left, top))
-        except ShopError:
-            pass
+            left, top, box_w, box_h = scaled_box(item.box)
+            if 0 <= left and 0 <= top and left + box_w <= target_w and top + box_h <= target_h:
+                print_img.alpha_composite(tag.resize((box_w, box_h), Image.Resampling.LANCZOS), (left, top))
     if preview and template_img is not None:
         canvas = Image.new("RGBA", template_img.size, (*shirt, 255))
         area = preview["area"]

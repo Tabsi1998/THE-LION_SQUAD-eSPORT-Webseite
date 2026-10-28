@@ -406,6 +406,15 @@ async def test_print_files_preview_presets_template_images_and_upload_through_th
     assert (await flow.get(white["image_path"])).status_code == 200
     assert (await flow.get("/api/admin/shop/print-templates/71/images/0?tint=ff0000")).status_code == 404
     assert (await flow.get("/api/admin/shop/print-templates/71/images/0?tint=rot")).status_code == 422
+    # Beispielname in echter Größe je Ebene (#2105).
+    sample = await flow.get(f"{BASE}/{product_id}/name-sample",
+                            params={"kind": "gamertag", "color": "Black", "text_height_cm": 1.0, "max_width_cm": 6.0})
+    assert sample.status_code == 200 and sample.headers["content-type"] == "image/png"
+    with Image.open(BytesIO(sample.content)) as img:
+        assert img.width == round(6.0 / 2.54 * 300)
+    too_high = await flow.get(f"{BASE}/{product_id}/name-sample", params={"color": "Black", "text_height_cm": 9})
+    assert too_high.status_code == 400 and "Texthöhe" in too_high.json()["detail"]
+    assert (await flow.get(f"{BASE}/{product_id}/name-sample", params={"color": "Pink"})).status_code == 404
     # Vorgaben sind einstellbar (Grund optional, Protokoll).
     presets = (await flow.get("/api/admin/shop/print-presets")).json()
     assert presets["is_default"] is True and presets["labels"]["families"]["front"] == "Vorderseite"

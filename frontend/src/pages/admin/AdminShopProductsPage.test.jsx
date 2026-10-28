@@ -371,6 +371,32 @@ test("Druckflächen: exakte Größe von Printful, Vorlagenbild, Motiv mit Vorgab
   ]);
 });
 
+test("der Gamertag zeigt einen Beispielnamen in echter Größe; Texthöhe und Höchstbreite je Ebene (#2105)", async () => {
+  const canvas = { width_in: 3.5, height_in: 0.75, anchor_y_in: 0.375, text_height_cm: 1.27, max_width_cm: 8.89, height_per_text: 1.5,
+    limits: { min_text_height_cm: 0.25, max_text_height_cm: 5.08, min_width_cm: 1.27, max_width_cm: 30.48 } };
+  apiMock.get.mockResolvedValue({ data: view({ extra: { gamertag_canvas: canvas } }) });
+  apiMock.put.mockResolvedValue({ data: view({ extra: { gamertag_canvas: canvas } }) });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-designs"));
+  const sample = screen.getByTestId("shop-preview-front-layer-1-sample");
+  expect(sample.getAttribute("src")).toBe("/api/admin/shop/products/p1/name-sample?kind=gamertag&color=Black");
+  const before = parseFloat(screen.getByTestId("shop-preview-front-layer-1").style.width);
+  expect(before).toBeCloseTo((3.5 * 150 / 1800) * 100, 1);
+  expect(screen.getByTestId("shop-layer-front-1-text-height")).toHaveAttribute("placeholder", "Vorgabe 1,3");
+  await user.type(screen.getByTestId("shop-layer-front-1-text-height"), "1,5");
+  await user.type(screen.getByTestId("shop-layer-front-1-max-width"), "6");
+  expect(screen.getByTestId("shop-preview-front-layer-1-sample").getAttribute("src")).toBe(
+    "/api/admin/shop/products/p1/name-sample?kind=gamertag&color=Black&text_height_cm=1.5&max_width_cm=6");
+  expect(parseFloat(screen.getByTestId("shop-preview-front-layer-1").style.width)).toBeCloseTo(((6 / 2.54) * 150 / 1800) * 100, 1);
+  await user.click(screen.getByTestId("shop-layout-submit"));
+  expect(apiMock.put.mock.calls[0][1].placements[0].layers[1]).toEqual({
+    kind: "gamertag", preset: "text_opposite", offset_x_cm: 0, offset_y_cm: 0, text_height_cm: 1.5, max_width_cm: 6 });
+  // Leer heißt wieder Vorgabe.
+  await user.clear(screen.getByTestId("shop-layer-front-1-max-width"));
+  expect(screen.getByTestId("shop-preview-front-layer-1-sample").getAttribute("src")).not.toContain("max_width_cm");
+});
+
 test("Flächen heißen deutsch - eine englische Bezeichnung von Printful ist als Rückfall markiert (#2105)", async () => {
   const base = view();
   const english = { ...base.available_placements[1], key: "zz_odd", label: "Odd panel", label_translated: false };

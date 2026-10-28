@@ -43,8 +43,30 @@ function cleanLayer(layer) {
   if (layer.kind === "motif") {
     out.width_cm = round1(layer.width_cm);
     out.motif = { key: layer.motif?.key || "", by_color: Object.fromEntries(Object.entries(layer.motif?.by_color || {}).filter(([, key]) => key)) };
+  } else {
+    // Größe je Namensebene (#2105) - nur, wenn gesetzt; sonst gelten die globalen Gamertag-Regeln.
+    for (const name of ["text_height_cm", "max_width_cm"]) {
+      if (Number(layer[name]) > 0) out[name] = Math.round(Number(layer[name]) * 100) / 100;
+    }
   }
   return out;
+}
+
+function defaultCm(value) {
+  return Number(value) > 0 ? `Vorgabe ${String(round1(value)).replace(".", ",")}` : "Vorgabe";
+}
+
+function cmNumber(text) {
+  const value = Number(String(text ?? "").trim().replace(",", "."));
+  return String(text ?? "").trim() && Number.isFinite(value) && value > 0 ? value : null;
+}
+
+// Beispielname in echter Größe (#2105): der Server rendert ihn wie die Druckdatei - dieselben Regeln der Ebene.
+function nameSampleUrl(productId, kind, color, layer) {
+  const params = new URLSearchParams({ kind, color });
+  if (Number(layer?.text_height_cm) > 0) params.set("text_height_cm", String(layer.text_height_cm));
+  if (Number(layer?.max_width_cm) > 0) params.set("max_width_cm", String(layer.max_width_cm));
+  return resolveMediaUrl(`/api${BASE}/${productId}/name-sample?${params.toString()}`);
 }
 
 // Welche Fassung der Server für eine Farbe druckt (hell oder dunkel samt Version, #2069 Teil A) - aus den Plänen der
@@ -69,7 +91,7 @@ function savedSources(view) {
 
 // ---------------------------------------------------------------- Vorschau mit Vorlagenbild, Ziehen und Pfeiltasten
 
-function LayoutPreview({ area, preview, layers, resolved, colorCode, motifFor, selected, onSelect, onNudge, editable, testId, stale = false }) {
+function LayoutPreview({ area, preview, layers, resolved, colorCode, motifFor, sampleFor, selected, onSelect, onNudge, editable, testId, stale = false }) {
   const areaRef = useRef(null);
   const drag = useRef(null);
   const templateW = preview?.template_width || area.width_px;
@@ -133,7 +155,11 @@ function LayoutPreview({ area, preview, layers, resolved, colorCode, motifFor, s
               data-testid={`${testId}-layer-${item.index}`} data-outside={bad ? item.outside.join(",") : undefined}>
               {item.kind === "motif" && motif?.image_path
                 ? <img src={resolveMediaUrl(motif.image_path)} alt="" aria-hidden="true" className="w-full h-full pointer-events-none" draggable={false} />
-                : <span className="flex items-center justify-center w-full h-full border border-dashed border-brand/70 bg-brand/10 text-[10px] font-bold uppercase tracking-wider text-brand pointer-events-none">{item.kind === "motif" ? "Motiv" : item.kind === "gamertag" ? "Gamertag" : "Nr."}</span>}
+                : item.kind !== "motif" && sampleFor
+                  // Der Name in echter Texthöhe; die Leinwand (Höchstbreite) ist nur der feine Rahmen drumherum (#2105).
+                  ? <img src={sampleFor(item.kind, layer)} alt="" aria-hidden="true" className="w-full h-full pointer-events-none" draggable={false}
+                    onError={(event) => { event.currentTarget.style.visibility = "hidden"; }} data-testid={`${testId}-layer-${item.index}-sample`} />
+                  : <span className="flex items-center justify-center w-full h-full border border-dashed border-brand/70 bg-brand/10 text-[10px] font-bold uppercase tracking-wider text-brand pointer-events-none">{item.kind === "motif" ? "Motiv" : item.kind === "gamertag" ? "Gamertag" : "Nr."}</span>}
             </button>
           );
         })}
@@ -215,7 +241,33 @@ function MotifLayer({ layer, area, presets, motifs, colors, colorName, minWidth,
   );
 }
 
-function TextLayer({ layer, presets, kindLabel, editable, onChange, onRemove, testId, problem }) {
+// Texthöhe und Höchstbreite einer Namensebene in cm (#2105): leer heißt Vorgabe aus den Gamertag-Regeln. Eingabe als
+// Text (Komma erlaubt), damit ein leeres Feld beim Tippen nicht „0 cm“ ist.
+function SizeField({ label, value, placeholder, editable, onChange, testId }) {
+  const [typed, setTyped] = useState(value ? String(value).replace(".", ",") : "");
+  useEffect(() => {
+    setTyped((now) => (cmNumber(now) === (value || null) ? now : (value ? String(value).replace(".", ",") : "")));
+  }, [value]);
+  return (
+    <label className="block text-sm min-w-0"><span className="text-white/70">{label}</span>
+      <input type="text" inputMode="decimal" value={typed} disabled={!editable} placeholder={placeholder}
+        onChange={(event) => {
+          setTyped(event.target.value);
+          if (!event.target.value.trim()) onChange(null);
+          else if (cmNumber(event.target.value) !== null) onChange(cmNumber(event.target.value));
+        }}
+        className={`${SELECT} tabular-nums`} data-testid={testId} />
+    </label>
+  );
+}
+
+function TextLayer({ layer, area, canvas, presets, kindLabel, editable, onChange, onRemove, testId, problem }) {
+  const limits = canvas?.limits || {};
+  const widest = Math.min(Number(limits.max_width_cm) || Infinity, Number(area.width_cm) || Infinity);
+  const height = Number(layer.text_height_cm) || null;
+  const width = Number(layer.max_width_cm) || null;
+  const bad = (height && (height < limits.min_text_height_cm || height > limits.max_text_height_cm))
+    || (width && (width < limits.min_width_cm || width > widest));
   return (
     <div className="space-y-2" data-testid={testId}>
       <label className="block text-sm"><span className="text-white/70">{kindLabel} - Position</span>
@@ -224,6 +276,15 @@ function TextLayer({ layer, presets, kindLabel, editable, onChange, onRemove, te
         </select>
       </label>
       <p className="text-xs text-white/50">{presets.find((preset) => preset.key === layer.preset)?.hint || "Die Datei mit dem Namen entsteht je Bestellung."}</p>
+      <div className="grid gap-2 grid-cols-2">
+        <SizeField label="Texthöhe (cm)" value={height} placeholder={defaultCm(canvas?.text_height_cm)} editable={editable}
+          onChange={(next) => onChange({ text_height_cm: next })} testId={`${testId}-text-height`} />
+        <SizeField label="Höchstbreite (cm)" value={width} placeholder={defaultCm(canvas?.max_width_cm)} editable={editable}
+          onChange={(next) => onChange({ max_width_cm: next })} testId={`${testId}-max-width`} />
+      </div>
+      <p className={`text-xs ${bad ? "text-warn" : "text-white/45"}`} data-testid={`${testId}-size-hint`}>
+        Leer = Vorgabe aus den Gamertag-Regeln. Texthöhe {cmText(limits.min_text_height_cm)} bis {cmText(limits.max_text_height_cm)}, Höchstbreite bis {cmText(widest)} - die Fläche begrenzt. Ein langer Name wird bis zur Mindesthöhe verkleinert.
+      </p>
       {problem && <p className="text-xs text-warn" role="alert">{problem}</p>}
       <div className="flex flex-wrap gap-2">
         {(Number(layer.offset_x_cm || 0) !== 0 || Number(layer.offset_y_cm || 0) !== 0) && <button type="button" disabled={!editable} onClick={() => onChange({ offset_x_cm: 0, offset_y_cm: 0 })} className={QUIET_BTN} data-testid={`${testId}-reset`}><RotateCcw className="w-3.5 h-3.5" aria-hidden="true" /> Auf die Vorgabe</button>}
@@ -351,6 +412,7 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
             <div className="space-y-1">
               <LayoutPreview stale={stale} area={{ ...area, safe_margin_cm: available.safe_margin_cm }} preview={preview} layers={visible}
                 resolved={resolved} colorCode={codes[previewColor]} motifFor={motifFor} selected={selected} onSelect={setSelected}
+                sampleFor={previewColor ? (kind, layer) => nameSampleUrl(view.product.id, kind, previewColor, layer) : null}
                 onNudge={nudge}
                 editable={editable} testId={`shop-preview-${available.key}`} />
               {!preview?.image_path && <p className="text-xs text-honor" data-testid={`shop-preview-${available.key}-no-image`}>Kein Vorlagenbild von Printful - die Vorschau zeigt nur die Druckfläche, Maße und Druckdatei stimmen trotzdem.</p>}
@@ -371,7 +433,7 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
                         onChange={(patch) => update(index, patch)} onRemove={() => onChange({ ...state, layers: layers.filter((_, at) => at !== index) })}
                         testId={`shop-layer-${available.key}-${index}`} />
                     ) : (
-                      <TextLayer layer={layer} presets={textPresets} kindLabel={layer.kind === "gamertag" ? "Gamertag" : "Vereinsnummer"} editable={editable} problem={found?.problem}
+                      <TextLayer layer={layer} area={area} canvas={view.gamertag_canvas} presets={textPresets} kindLabel={layer.kind === "gamertag" ? "Gamertag" : "Vereinsnummer"} editable={editable} problem={found?.problem}
                         onChange={(patch) => update(index, patch)} onRemove={() => onChange({ ...state, layers: layers.filter((_, at) => at !== index) })}
                         testId={`shop-layer-${available.key}-${index}`} />
                     )}

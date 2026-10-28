@@ -1,4 +1,4 @@
-import { cmText, maxWidthCm, outside, placeMotif, placeText, resolveLayers } from "./shopLayout";
+import { cmText, maxWidthCm, outside, placeMotif, placeText, resolveLayers, textCanvasIn } from "./shopLayout";
 
 // Dieselben Zahlen wie backend/tests/test_shop_print_templates_unit.py - die Vorschau zeigt, was der Server erzeugt.
 const SHIRT = { placement: "front", family: "front", width_px: 1800, height_px: 2400, dpi: 150 };
@@ -49,4 +49,18 @@ test("alle Ebenen einer Fläche: Motiv zuerst, Name folgt, fehlende Motive werde
   expect(resolved[1].outside).toEqual([]);
   const missing = resolveLayers(SHIRT, [layers[1]], { presets: [CHEST_RIGHT], motifFor: () => null, rules: {} });
   expect(missing[0].problem).toBe("Motiv fehlt");
+});
+
+test("die Größe je Namensebene: Höchstbreite ist die Breite, die Höhe wächst mit der Texthöhe (#2105)", () => {
+  const canvas = { width_in: 3.5, height_in: 0.75, text_height_cm: 1.27, max_width_cm: 8.89, height_per_text: 1.5 };
+  expect(textCanvasIn(canvas, {})).toEqual({ width: 3.5, height: 0.75 });
+  const own = textCanvasIn(canvas, { text_height_cm: 2.54, max_width_cm: 5.08 });
+  expect(own.width).toBeCloseTo(2);
+  expect(own.height).toBeCloseTo(1.5);
+  const layers = [{ kind: "motif", preset: "chest_right", width_cm: 8.9 }, { kind: "gamertag", preset: "text_opposite", max_width_cm: 6 }];
+  const [, name] = resolveLayers(SHIRT, layers, {
+    presets: [CHEST_RIGHT, OPPOSITE], motifFor: () => ({ width_px: 1000, height_px: 1000 }), gamertagCanvas: canvas, rules: {},
+  });
+  expect(name.box.width).toBeCloseTo((6 / 2.54) * 150);
+  expect(name.box.height).toBeCloseTo(0.75 * 150);
 });
