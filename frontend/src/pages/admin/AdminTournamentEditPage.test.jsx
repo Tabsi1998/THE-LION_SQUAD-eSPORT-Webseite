@@ -41,7 +41,7 @@ vi.mock("@/components/tls/MarkdownEditor", () => ({ MarkdownEditor: () => <div d
 vi.mock("@/components/tls/AccessLinksPanel", () => ({ AccessLinksPanel: () => <div data-testid="access-links" /> }));
 vi.mock("@/components/tls/TournamentFlowStepper", () => ({ TournamentFlowStepper: () => <div data-testid="flow-stepper" /> }));
 
-vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), message: vi.fn() } }));
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), message: vi.fn(), info: vi.fn() } }));
 
 const { AdminTournamentEditPage } = await import("./AdminTournamentEditPage").then((module) => ({
   AdminTournamentEditPage: module.default || module.AdminTournamentEditPage,
@@ -1070,4 +1070,15 @@ test("Schweizer System: die letzte Runde lässt sich zurücknehmen, solange kein
   expect(screen.getByTestId("confirm-dialog")).toHaveTextContent("Runde 3 zurücknehmen?");
   await user.click(screen.getByTestId("confirm-dialog-confirm"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t-1/swiss/undo-round"));
+});
+
+// Abgeschlossene Jahreswertung (#2123): der Server sagt beim Veröffentlichen, dass die Punkte bleiben - die Seite zeigt es.
+test("ein Hinweis des Servers zur Jahreswertung erscheint als Meldung", async () => {
+  const { toast } = await import("sonner");
+  const user = userEvent.setup();
+  renderPage();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  apiMock.post.mockResolvedValueOnce({ data: { ok: true, season_points_note: "Die Jahrespunkte bleiben unverändert." } });
+  await user.selectOptions(screen.getByTestId("admin-tr-status-select"), "registration_closed");
+  await waitFor(() => expect(toast.info).toHaveBeenCalledWith("Die Jahrespunkte bleiben unverändert.", { duration: 10000 }));
 });

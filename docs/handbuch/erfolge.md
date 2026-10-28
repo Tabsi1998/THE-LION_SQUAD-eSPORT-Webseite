@@ -208,7 +208,8 @@ weg, XP bleiben, mit Rückfrage) gehen nur für Vorstand und Systemverwaltung.
   Regelübersicht „So wird gewertet“.
 - **Punkte korrigieren** (bei Entwurf und Aktiv): Person wählen, Punkte (minus für einen Abzug) und **Grund** – etwa ein
   Fair-Play-Bonus oder ein Regelverstoß. Die Korrektur steht als eigene Wertung „Korrekturen“ in der Rangliste und im Protokoll;
-  ein erneutes Veröffentlichen eines Turniers ändert sie nicht. Über den Papierkorb fällt sie wieder weg.
+  ein erneutes Veröffentlichen eines Turniers ändert sie nicht. Sie zählt immer (auch bei Streichresultaten wird sie nie
+  gestrichen) und gilt nicht als Wertung bzw. Teilnahme. Über den Papierkorb fällt sie wieder weg.
 - **Volle Saison (Pflichttermine):** Turniere und Fast-Lap-Challenges, bei denen man Punkte geholt haben muss, um beim Abschluss den
   Erfolg **Volle Saison** zu bekommen. Für die Punkte selbst spielt die Liste keine Rolle.
 
@@ -218,7 +219,9 @@ der aktiven Jahreswertung. Ausschließen heißt beim Turnier bzw. der Challenge 
 **Status:** **Entwurf** (so startet jede neue Saison), **Aktiv**, **Abgeschlossen**, **Archiv**. **Punkte werden immer in die Saison mit
 dem Status Aktiv geschrieben.** Aktiv kann nur eine sein – wer eine zweite aktiviert, bekommt den Hinweis, welche schon läuft. Ist keine
 Saison aktiv, bekommen Ergebnisse keine Jahrespunkte, und die Startseite zeigt keine Jahreswertung. Ein Zeitraum am Ende (Ende-Datum)
-schaltet den Status nicht um.
+schaltet den Status nicht um. Stehen aus der Zeit davor noch mehrere auf **Aktiv**, warnt die Seite rot („Mehrere aktive Wertungen“);
+die Punkte gehen weiter dorthin, wo sie bisher hingingen – schließt alle bis auf eine ab. Abgeschlossene und archivierte Wertungen
+ändert nichts mehr: weder ein erneutes Veröffentlichen noch die Bereinigung doppelter Einträge (die meldet solche Fälle nur).
 
 Die Karte jeder Saison hat **Bearbeiten**, **Öffentliche Seite**, bei der aktiven **Abschließen** (3.7) und beim Entwurf **Löschen**
 (Rückfrage). Gelöscht werden kann nur ein Entwurf ohne Punkte; eine laufende oder abgeschlossene Saison setzt ihr auf **Archiv**. Die

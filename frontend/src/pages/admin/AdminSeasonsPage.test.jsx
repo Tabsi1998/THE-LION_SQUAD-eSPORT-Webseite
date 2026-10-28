@@ -64,3 +64,20 @@ test("Bearbeiten: kein „Abgeschlossen“ im Status, keine Fallback-Tabelle, Ko
   expect(await screen.findByTestId("season-adjust-list")).toHaveTextContent("Regelverstoß");
   expect(screen.getByTestId("season-adjust-submit")).toBeDisabled();
 });
+
+test("mehrere aktive Wertungen (Altbestand): deutliche Warnung", async () => {
+  apiMock.get.mockImplementation(async (url) => (url === "/seasons"
+    ? { data: [...SEASONS, { id: "s-b", slug: "alt", name: "Jahreswertung 2025", status: "active", kind: "season" }] }
+    : { data: [] }));
+  render(<MemoryRouter><AdminSeasonsPage /></MemoryRouter>);
+  const warning = await screen.findByTestId("season-multiple-active");
+  expect(warning).toHaveTextContent("Mehrere aktive Wertungen");
+  expect(warning).toHaveTextContent("„Jahreswertung 2026“, „Jahreswertung 2025“");
+});
+
+test("eine aktive Wertung: keine Warnung", async () => {
+  seasonsApi();
+  render(<MemoryRouter><AdminSeasonsPage /></MemoryRouter>);
+  await screen.findByTestId("season-complete-s-a");
+  expect(screen.queryByTestId("season-multiple-active")).toBeNull();
+});

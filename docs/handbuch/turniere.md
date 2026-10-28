@@ -552,7 +552,9 @@ Tabelle mit seiner Siegerkarte (bei Gruppen und bei Gleichstand auf Platz 1 nich
    **Korrektur nach dem Veröffentlichen:** Status zurück auf **Beendet**, Ergebnis korrigieren, wieder **Ergebnisse
    veröffentlicht**. Die Jahreswertungs-Punkte des Turniers werden dabei an die neue Rangfolge angeglichen (in der
    Jahreswertung, in der sie schon stehen; auch nach einem Wechsel Mini/Normal/Major gibt es je Person nur einen
-   Eintrag; „Keine Jahreswertung“ nimmt sie zurück), der Abgleich steht im Protokoll. Fehlende Gewinne kommen dazu;
+   Eintrag; „Keine Jahreswertung“ nimmt sie zurück), der Abgleich steht im Protokoll. Ist diese Jahreswertung schon
+   abgeschlossen oder archiviert, bleiben ihre Punkte unverändert – eine Meldung sagt das beim Veröffentlichen, das
+   Protokoll vermerkt „übersprungen“. Fehlende Gewinne kommen dazu;
    ein Gewinn, dessen Platz nicht mehr stimmt, wird nie entzogen, sondern steht unter **Gewinne** mit **Nach Korrektur
    prüfen**.
 

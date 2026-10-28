@@ -246,6 +246,15 @@ export default function AdminSeasonsPage() {
         </button>
       </div>
 
+      {/* Altbestand (#2123): früher ließen sich mehrere Wertungen aktivieren - Punkte landen dann nur in einer. */}
+      {list.filter((s) => s.status === "active").length > 1 && (
+        <div role="alert" data-testid="season-multiple-active" className="mb-4 rounded-sm border border-live/40 bg-live/10 p-4 text-sm text-white/85">
+          <strong className="text-live">Mehrere aktive Wertungen:</strong>{" "}
+          {list.filter((s) => s.status === "active").map((s) => `„${s.name}“`).join(", ")}. Neue Punkte landen nur in einer davon –
+          bitte alle bis auf eine abschließen oder auf „Entwurf“ setzen.
+        </div>
+      )}
+
       <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
         {list.map((s) => (
           <SeasonCard key={s.id} season={s} onEdit={() => setEditing(s)} onDelete={() => del(s)} onComplete={() => setCompleting(s)} />
