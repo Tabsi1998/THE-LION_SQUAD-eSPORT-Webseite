@@ -60,6 +60,15 @@ TEAMS = [("Nebelwölfe", "Rudel"), ("Sturmvögel", "Schwarm"), ("Glutfüchse", "
          ("Donnerdachse", "Höhle"), ("Schattenraben", "Horst"), ("Steinböcke", "Grat"), ("Blitzmarder", "Funke")]
 
 
+@pytest.fixture(autouse=True)
+def _fixed_proposal_clock(monkeypatch):
+    """Feste Termine in diesen Tests: „nicht in der Vergangenheit“ (#2124) rechnet ab dem 1.9.2026 statt ab heute."""
+    import services.schedule_proposal_time as proposal_time
+    from datetime import timezone as _tz
+
+    monkeypatch.setattr(proposal_time, "now_utc", lambda: datetime(2026, 9, 1, tzinfo=_tz.utc))
+
+
 @pytest_asyncio.fixture
 async def flow():
     instance, shutdown = make_flow()

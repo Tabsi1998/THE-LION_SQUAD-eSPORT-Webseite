@@ -385,3 +385,26 @@ async def test_role_changes_stay_saved_when_a_message_fails(flow, monkeypatch):
     assert given.status_code == 200, given.text
     stored = await flow.db.team_squads.find_one({"id": world["squad_a"]["id"]}, {"_id": 0})
     assert stored["captain_id"] == users["Spieler3"]["id"]
+
+
+@pytest.mark.asyncio
+async def test_a_proposal_or_counter_in_the_past_is_refused_in_german(flow):
+    """Terminvorschlag nur in der Zukunft (#2124, TP8): vorbei oder in weniger als 5 Minuten geht nicht."""
+    world = await setup(flow)
+    users = world["users"]
+    flow.act_as(users["Spieler2"])
+
+    yesterday = await flow.post(proposals_url(world), json={"scheduled_at": (now_utc() - timedelta(days=1)).isoformat()})
+    assert yesterday.status_code == 422
+    assert "Vergangenheit" in yesterday.json()["detail"]
+    too_soon = await flow.post(proposals_url(world), json={"scheduled_at": (now_utc() + timedelta(minutes=2)).isoformat()})
+    assert too_soon.status_code == 422
+    assert await flow.db.match_schedule_proposals.count_documents({}) == 0
+
+    proposed = await flow.post(proposals_url(world), json={"scheduled_at": when(2)})
+    assert proposed.status_code == 200, proposed.text
+    flow.act_as(users["FalkenLeitung"])
+    counter = await flow.post(f"{proposals_url(world)}/{proposed.json()['id']}/decision",
+                              json={"action": "counter", "scheduled_at": (now_utc() - timedelta(hours=3)).isoformat()})
+    assert counter.status_code == 422
+    assert (await flow.db.match_schedule_proposals.find_one({"id": proposed.json()["id"]}, {"_id": 0}))["status"] == "pending"

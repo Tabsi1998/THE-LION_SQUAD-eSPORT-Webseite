@@ -88,6 +88,7 @@ from services.match_forfeit import apply_forfeit
 from services.match_lead import entry_info
 from services.result_hold import ensure_no_hold, hold_result, undo_result
 from services.match_proofs import claim_proof, visible_proofs
+from services.schedule_proposal_time import refuse_past_proposal
 
 router = APIRouter(prefix="/api/matches", tags=["matches"])
 logger = logging.getLogger("tls.match")
@@ -760,8 +761,10 @@ async def create_schedule_proposal(match_id: str, body: MatchScheduleProposalCre
     if not _schedule_proposals_enabled(policy):
         raise HTTPException(status_code=403, detail="Terminvorschläge sind für dieses Match nicht aktiviert")
     if not await _can_act_for_match(match, me):
-        raise HTTPException(status_code=403, detail="Nur Teilnehmer, Team-Captains oder Turnierleitung duerfen Termine vorschlagen")
+        raise HTTPException(status_code=403, detail="Nur Teilnehmer, Team-Captains oder Turnierleitung dürfen Termine vorschlagen")
     _refuse_blocked_moment(tournament, body.scheduled_at)
+    # Nur in der Zukunft (#2124): einen Termin von gestern kann niemand mehr spielen.
+    refuse_past_proposal(body.scheduled_at)
     now_iso = now_utc().isoformat()
     normalized_note = (body.note or "").strip() or None
     existing = await db.match_schedule_proposals.find_one({
@@ -931,6 +934,7 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
     if not body.scheduled_at:
         raise HTTPException(status_code=400, detail="Gegenvorschlag braucht Datum und Uhrzeit")
     _refuse_blocked_moment(tournament, body.scheduled_at)
+    refuse_past_proposal(body.scheduled_at)
     await db.match_schedule_proposals.update_one({"id": proposal_id}, {"$set": {
         "status": "countered",
         "decision_user_id": me["id"],
@@ -989,7 +993,7 @@ async def post_match_chat(match_id: str, body: MatchChatCreate, request: Request
     match, collection = await _find_match_any(match_id)
     await _ensure_match_tournament_unlocked(db, match)
     if not await _can_act_for_match(match, me) and not await _squad_player_of_match(db, match, me):
-        raise HTTPException(status_code=403, detail="Nur Teilnehmer, Team-Captains oder Turnierleitung duerfen im Matchchat schreiben")
+        raise HTTPException(status_code=403, detail="Nur Teilnehmer, Team-Captains oder Turnierleitung dürfen im Matchchat schreiben")
     await enforce_rate_limit(
         request,
         "matches:chat:user-match",

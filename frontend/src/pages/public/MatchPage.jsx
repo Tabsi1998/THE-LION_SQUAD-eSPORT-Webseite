@@ -108,6 +108,19 @@ function fromLocalInput(value) {
 }
 
 // Eigener Stand je Match und Konto (#1047): ein Wechsel des Matches oder ein echter Kontowechsel baut die Seite neu
+// Terminvorschläge nur in der Zukunft (#2124): frühestens 5 Minuten ab jetzt - wie der Server
+// (services/schedule_proposal_time.py).
+const PROPOSAL_LEAD_MS = 5 * 60 * 1000;
+const PAST_PROPOSAL_TEXT = "Der Termin liegt in der Vergangenheit – bitte einen Zeitpunkt frühestens 5 Minuten ab jetzt wählen.";
+
+function earliestProposalInput(now = Date.now()) {
+  return toLocalInput(new Date(now + PROPOSAL_LEAD_MS).toISOString());
+}
+
+function tooEarly(iso, now = Date.now()) {
+  return new Date(iso).getTime() < now + PROPOSAL_LEAD_MS;
+}
+
 // auf - Chat-Entwurf, Anhänge und Eingaben gehen weg, späte Antworten laufen ins Leere. Das erste Laden der
 // Anmeldung zählt nicht als Wechsel.
 export default function MatchPage() {
@@ -196,6 +209,7 @@ function MatchPageView() {
     const scheduled_at = fromLocalInput(proposalAt);
     if (!scheduled_at) return failAction("Bitte Datum und Uhrzeit wählen.");
     await runAction(async () => {
+    if (tooEarly(scheduled_at)) return failAction(PAST_PROPOSAL_TEXT);
       await api.post(`/matches/${id}/schedule-proposals`, { scheduled_at, note: proposalNote || null });
       toast.success("Terminvorschlag gesendet.");
       setProposalNote("");
@@ -209,6 +223,7 @@ function MatchPageView() {
       const scheduled_at = fromLocalInput(counterAt);
       if (!scheduled_at) return failAction("Bitte Datum und Uhrzeit für den Gegenvorschlag wählen.");
       payload.scheduled_at = scheduled_at;
+      if (tooEarly(scheduled_at)) return failAction(PAST_PROPOSAL_TEXT);
     }
     await runAction(async () => {
       await api.post(`/matches/${id}/schedule-proposals/${proposal.id}/decision`, payload);
@@ -540,7 +555,7 @@ function MatchPageView() {
               {canProposeSchedule ? (
                 <form onSubmit={propose} className="mt-4 grid md:grid-cols-[1fr_1fr_auto] gap-3 items-end">
                   <Field label="Vorschlag">
-                    <input type="datetime-local" value={proposalAt} onChange={(e) => setProposalAt(e.target.value)} className="input" />
+                    <input type="datetime-local" min={earliestProposalInput()} value={proposalAt} onChange={(e) => setProposalAt(e.target.value)} className="input" data-testid="match-proposal-at" />
                   </Field>
                   <Field label="Notiz">
                     <input value={proposalNote} onChange={(e) => setProposalNote(e.target.value)} className="input" placeholder="z.B. nach 20:00 Uhr möglich" />
@@ -579,7 +594,7 @@ function MatchPageView() {
                     </div>
                     {answer && (
                       <div className="mt-3 grid md:grid-cols-[1fr_1fr_auto] gap-2 items-end">
-                        <input type="datetime-local" aria-label="Gegenvorschlag: Datum und Uhrzeit" value={counterAt} onChange={(e) => setCounterAt(e.target.value)} className="input" />
+                        <input type="datetime-local" min={earliestProposalInput()} aria-label="Gegenvorschlag: Datum und Uhrzeit" value={counterAt} onChange={(e) => setCounterAt(e.target.value)} className="input" />
                         <input aria-label="Antwort oder Grund" value={decisionNote} onChange={(e) => setDecisionNote(e.target.value)} className="input" placeholder="Antwort / Grund" />
                         <button type="button" disabled={busy} onClick={() => decide(p, "counter")} className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-[10px] uppercase tracking-wider font-bold disabled:opacity-50">Gegenvorschlag</button>
                       </div>
