@@ -17,11 +17,11 @@ export function SmtpSection({ smtp, setSmtp, smtpTestEmail, setSmtpTestEmail, sm
           </label>
         </div>
         <div className="border border-[#29B6E8]/25 bg-[#29B6E8]/5 rounded-sm p-4 text-xs text-white/65">
-          <div className="font-bold uppercase tracking-widest text-[#29B6E8] mb-2">Einfacher Versand ohne Relay</div>
-          <p>Wie beim OmniFM-Server: Host/IP, Port, User, Passwort, Absender. TLS steht auf Auto: 465 = SSL/TLS, 25 = ohne TLS, alles andere = STARTTLS. Die lokale IP als Host ist okay.</p>
+          <div className="font-bold uppercase tracking-widest text-[#29B6E8] mb-2">So geht es am einfachsten</div>
+          <p>Du brauchst den Mailserver (Name oder IP), Port, Benutzer, Passwort und die Absender-Adresse. Die Verschlüsselung richtet sich nach dem Port: 465 = SSL/TLS, 25 = ohne, sonst STARTTLS. Eine IP aus dem eigenen Netz als Server geht auch.</p>
           <div className="mt-3 flex flex-col sm:flex-row gap-2">
             <button type="button" onClick={applySubmissionPreset} data-testid="smtp-preset-submission" className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm">
-              Standard Auto Login
+              Standard: Port 587 mit Anmeldung
             </button>
             <button type="button" onClick={applyLocalIpPreset} data-testid="smtp-preset-local-ip" className="px-3 py-2 border border-[#FFD700]/50 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm">
               Lokale IP vorbereiten
@@ -164,31 +164,31 @@ export function SmtpSection({ smtp, setSmtp, smtpTestEmail, setSmtpTestEmail, sm
           <div data-testid="smtp-diagnose-result" className={`border rounded-sm p-4 text-xs space-y-3 ${smtpDiag.ok ? "border-[#00FF88]/25 bg-[#00FF88]/5" : "border-[#FF3B30]/25 bg-[#FF3B30]/5"}`}>
             <div className="flex items-center gap-2 font-bold uppercase tracking-widest">
               {smtpDiag.ok ? <CheckCircle2 className="w-4 h-4 text-[#00FF88]" /> : <XCircle className="w-4 h-4 text-[#FF3B30]" />}
-              SMTP Diagnose: {smtpDiag.ok ? "OK" : "Problem gefunden"}
+              Verbindung: {smtpDiag.ok ? "in Ordnung" : "Problem gefunden"}
             </div>
             <div className="grid sm:grid-cols-2 gap-2 text-white/55">
-              <div>Host: <span className="font-mono text-white/75">{smtpDiag.host || "-"}</span></div>
+              <div>Server: <span className="font-mono text-white/75">{smtpDiag.host || "-"}</span></div>
               <div>Port: <span className="font-mono text-white/75">{smtpDiag.port || "-"}</span></div>
-              <div>Security: <span className="font-mono text-white/75">{smtpDiag.security || "-"}</span></div>
-              <div>AUTH: <span className="font-mono text-white/75">{smtpDiag.auth_supported ? "angeboten" : "nicht angeboten"}</span></div>
+              <div>Verschlüsselung: <span className="font-mono text-white/75">{smtpDiag.security || "-"}</span></div>
+              <div>Anmeldung: <span className="font-mono text-white/75">{smtpDiag.auth_supported ? "angeboten" : "nicht angeboten"}</span></div>
             </div>
             <div className="space-y-1">
               {(smtpDiag.steps || []).map((s, i) => (
                 <div key={i} className="flex gap-2 text-white/70">
-                  <span className={s.ok ? "text-[#00FF88]" : "text-[#FF3B30]"}>{s.ok ? "OK" : "NO"}</span>
+                  <span className={s.ok ? "text-[#00FF88]" : "text-[#FF3B30]"}>{s.ok ? "klappt" : "Fehler"}</span>
                   <span className="break-words">{s.label}</span>
                 </div>
               ))}
             </div>
             {(smtpDiag.port_checks || []).length > 0 && (
               <div className="border-t border-white/10 pt-3">
-                <div className="font-bold uppercase tracking-widest text-white/55 mb-2">Port-Check</div>
+                <div className="font-bold uppercase tracking-widest text-white/55 mb-2">Andere Ports geprüft</div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {(smtpDiag.port_checks || []).map((c, i) => (
                     <div key={`${c.port}-${c.security}-${i}`} className="border border-white/10 bg-black/20 rounded-sm p-2 text-white/65">
                       <div className="font-mono text-white/80">{c.port} / {String(c.security || "").toUpperCase()}</div>
-                      <div>Verbindung: {c.connect_ok ? "OK" : "NO"}</div>
-                      <div>AUTH: {c.auth_supported ? "ja" : "nein"}</div>
+                      <div>Verbindung: {c.connect_ok ? "klappt" : "keine"}</div>
+                      <div>Anmeldung: {c.auth_supported ? "angeboten" : "nicht angeboten"}</div>
                       {c.error && <div className="text-[#FF3B30] break-words">{c.error}</div>}
                     </div>
                   ))}
@@ -206,17 +206,17 @@ export function SmtpSection({ smtp, setSmtp, smtpTestEmail, setSmtpTestEmail, sm
           <div data-testid="smtp-deliverability-result" className={`border rounded-sm p-4 text-xs space-y-3 ${smtpDeliverability.ok ? "border-[#00FF88]/25 bg-[#00FF88]/5" : "border-[#FFD700]/25 bg-[#FFD700]/5"}`}>
             <div className="flex items-center gap-2 font-bold uppercase tracking-widest">
               {smtpDeliverability.ok ? <CheckCircle2 className="w-4 h-4 text-[#00FF88]" /> : <AlertTriangle className="w-4 h-4 text-[#FFD700]" />}
-              Gmail Zustellbarkeit: {smtpDeliverability.ok ? "Basis OK" : "Prüfen"}
+              Zustellbarkeit: {smtpDeliverability.ok ? "die Grundlagen passen" : "bitte prüfen"}
             </div>
             <div className="grid sm:grid-cols-3 gap-2 text-white/55">
-              <div>From: <span className="font-mono text-white/75">{smtpDeliverability.from_domain || "-"}</span></div>
-              <div>Envelope: <span className="font-mono text-white/75">{smtpDeliverability.envelope_domain || "-"}</span></div>
+              <div>Absender-Domain: <span className="font-mono text-white/75">{smtpDeliverability.from_domain || "-"}</span></div>
+              <div>Technischer Absender: <span className="font-mono text-white/75">{smtpDeliverability.envelope_domain || "-"}</span></div>
               <div>Message-ID: <span className="font-mono text-white/75">{smtpDeliverability.message_id_domain || "-"}</span></div>
             </div>
             <div className="space-y-1">
               {(smtpDeliverability.checks || []).map((c, i) => (
                 <div key={i} className="flex gap-2 text-white/70">
-                  <span className={c.ok ? "text-[#00FF88]" : c.severity === "error" ? "text-[#FF3B30]" : "text-[#FFD700]"}>{c.ok ? "OK" : c.severity === "error" ? "NO" : "INFO"}</span>
+                  <span className={c.ok ? "text-[#00FF88]" : c.severity === "error" ? "text-[#FF3B30]" : "text-[#FFD700]"}>{c.ok ? "passt" : c.severity === "error" ? "Fehler" : "Hinweis"}</span>
                   <span className="break-words"><strong>{c.label}:</strong> {c.detail}</span>
                 </div>
               ))}
@@ -228,8 +228,8 @@ export function SmtpSection({ smtp, setSmtp, smtpTestEmail, setSmtpTestEmail, sm
             )}
           </div>
         )}
-        <p className="text-xs text-white/50">Testet die SMTP-Verbindung direkt. Auto-TLS verhält sich wie beim OmniFM-Bot: Port 465 SSL/TLS, Port 25 plain, sonst STARTTLS.</p>
-        <p className="text-xs text-white/50">Bei self-signed Zertifikat kann "TLS Zertifikat prüfen" deaktiviert werden; besser ist ein vertrauenswürdiges Zertifikat am Mailserver.</p>
+        <p className="text-xs text-white/50">„Senden“ schickt eine echte Testmail direkt über den Server, ohne Warteschlange. „Diagnose“ prüft nur die Verbindung, „Zustellbarkeit“ die DNS-Einträge eurer Domain.</p>
+        <p className="text-xs text-white/50">Hat der Mailserver ein selbst ausgestelltes Zertifikat, schalte bei „TLS Zertifikat“ das Prüfen aus. Besser ist ein gültiges Zertifikat am Mailserver.</p>
       </div>
     </div>
   );

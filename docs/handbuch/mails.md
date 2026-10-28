@@ -67,7 +67,7 @@ Kasten **Verteilen** am Beitrag ([Inhalte](inhalte.md)).
    **Mit Benutzer/Passwort**.
 3. **Absender E-Mail**, **Absendername**, **Antworten an**. Unter den technischen Feldern (Technischer SMTP-Absender, Message-ID Domain, HELO/EHLO)
    reichen meist die Vorgaben.
-4. **Port-Check** und **TLS Zertifikat** prüfen die Verbindung; **SMTP Testmail** schickt eine echte Mail. Die **DNS Checkliste gegen Spam**
+4. **Diagnose** prüft die Verbindung (auch andere Ports), **Zustellbarkeit** die DNS-Einträge der Domain; **Senden** unter **SMTP Testmail** schickt eine echte Mail. Die **DNS Checkliste gegen Spam**
    erinnert an SPF, DKIM, DMARC und rDNS – ohne sie landen Mails beim Empfänger leicht im Spam.
 5. **Versand aktiv** einschalten, speichern.
 
