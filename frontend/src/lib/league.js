@@ -1,6 +1,7 @@
 // Liga verwalten (docs/LIGA.md, #1622): Formularwerte einer Season ↔ Anfrage an /api/admin/leagues. Die Regeln prüft der
 // Server noch einmal (services/league_service.py); hier steht nur, was die Oberfläche selbst wissen muss.
 import { fromViennaInput, viennaDay } from "@/lib/vienna";
+import { prizesPayload, prizesToForm } from "@/lib/leagueLook";
 
 export const VISIBILITY_OPTIONS = [
   ["off", "Aus – niemand sieht die Liga"],
@@ -65,6 +66,11 @@ export function seasonToForm(season = {}) {
     status: season.status || "draft",
     blocked_periods: (season.blocked_periods || []).map((period) => ({ ...period })),
     scoring_rules: rules,
+    // Gestaltung (#2107): leer heißt „wie die Liga“; Gewinne der Season.
+    emblem_url: season.emblem_url || "",
+    banner_url: season.banner_url || "",
+    banner_focus: season.banner_focus || null,
+    prizes: prizesToForm(season.prizes),
   };
 }
 
@@ -106,7 +112,39 @@ export function seasonPayload(form) {
     status: form.status,
     blocked_periods: (form.blocked_periods || []).filter((period) => period.start_date && period.end_date)
       .map((period) => ({ start_date: period.start_date, end_date: period.end_date, label: (period.label || "").trim() })),
+    emblem_url: form.emblem_url || null,
+    banner_url: form.banner_url || null,
+    banner_focus: form.banner_url ? form.banner_focus || null : null,
+    prizes: prizesPayload(form.prizes),
   };
+}
+
+// Gestaltung (#2107): Emblem, Banner mit Fokuspunkt, Akzentfarbe. Leer heißt entfernen (``null`` an den Server).
+const LOOK_KEYS = ["emblem_url", "banner_url", "banner_focus", "accent_color"];
+
+/** Die Gestaltung einer Liga als Formular - Bilder und Farbe als Text, der Fokuspunkt als Objekt oder null. */
+export function leagueLookToForm(league) {
+  return {
+    emblem_url: league?.emblem_url || "",
+    banner_url: league?.banner_url || "",
+    banner_focus: league?.banner_focus || null,
+    accent_color: league?.accent_color || "",
+  };
+}
+
+/** Nur die geänderten Gestaltungs-Felder als Anfrage (beim Anlegen: ``saved = {}``, also nur die gesetzten). */
+export function leagueLookChanges(form, saved = {}) {
+  const out = {};
+  const value = (key) => {
+    if (key === "banner_focus") return form.banner_url ? form.banner_focus || null : null;
+    return String(form[key] || "").trim() || null;
+  };
+  for (const key of LOOK_KEYS) {
+    const next = value(key);
+    const before = saved?.[key] ?? null;
+    if (JSON.stringify(next) !== JSON.stringify(before)) out[key] = next;
+  }
+  return out;
 }
 
 /** Welche Werte eine Liga N anders hat als ihre Season - nur geänderte Felder, leer heißt „wie die Season“. */

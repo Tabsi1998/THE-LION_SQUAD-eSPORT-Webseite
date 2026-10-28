@@ -15,6 +15,9 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { MapPoolEditor } from "@/pages/admin/maps/MapPoolEditor";
 import { LeagueDeleteSheet } from "./LeagueDeleteSheet";
+import { BannerField, EmblemField, PrizeEditor } from "./LeagueLookFields";
+import { accentStyle, prizesPayload, prizesToForm } from "@/lib/leagueLook";
+import { LeagueEmblem } from "@/components/tls/league/public/LeagueLook";
 import { SeasonRosterPanel } from "./SeasonRosterPanel";
 import { dayNoon, viennaDate } from "@/lib/vienna";
 import {
@@ -147,6 +150,7 @@ function DivisionSheet({ division, season, onClose, onSaved }) {
   const [nickname, setNickname] = useState(division?.nickname || "");
   const [status, setStatus] = useState(division?.status || "active");
   const [form, setForm] = useState(() => overridesToForm(division?.overrides || {}));
+  const [prizes, setPrizes] = useState(() => prizesToForm(division?.prizes));
   const [saving, setSaving] = useState(false);
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   const submit = async (event) => {
@@ -155,6 +159,9 @@ function DivisionSheet({ division, season, onClose, onSaved }) {
     try {
       // Der Stand (#2106): die API kannte ihn, das Formular schickt ihn jetzt mit - archiviert fällt aus der Ligaseite.
       const body = { nickname: nickname.trim() || null, overrides: overridesPayload(form), ...(division ? { status } : {}) };
+      // Eigene Gewinne (#2107) nur, wenn sie sich ändern - leer heißt wieder „wie die Season“.
+      const ownPrizes = prizesPayload(prizes);
+      if (JSON.stringify(ownPrizes) !== JSON.stringify(prizesPayload(prizesToForm(division?.prizes)))) body.prizes = ownPrizes;
       if (division) await api.patch(`/admin/leagues/divisions/${division.id}`, body);
       else await api.post(`/admin/leagues/seasons/${season.id}/divisions`, body);
       toast.success(division ? "Liga gespeichert." : "Liga angelegt.");
@@ -193,6 +200,8 @@ function DivisionSheet({ division, season, onClose, onSaved }) {
         <TextField label="Remis" type="number" step="any" value={form.points_draw} onChange={(value) => set("points_draw", value)} placeholder={String(points.draw ?? 1)} testId="override-points-draw" />
         <TextField label="Niederlage" type="number" step="any" value={form.points_loss} onChange={(value) => set("points_loss", value)} placeholder={String(points.loss ?? 0)} testId="override-points-loss" />
       </FormGrid>
+      <PrizeEditor rows={prizes} onChange={setPrizes} testId="division-prizes"
+        emptyHint={season.prizes?.length ? `Wie die Season: ${season.prizes.map((row) => `${row.place}. ${row.text}`).join(" · ")}` : "Wie die Season – dort sind noch keine Gewinne eingetragen."} />
     </AdminSheet>
   );
 }
@@ -350,11 +359,14 @@ export default function AdminLeagueSeasonPage() {
       {data && form ? (
         <>
           <div className="mt-3 mb-6 flex flex-wrap items-end justify-between gap-3">
-            <div className="min-w-0">
-              <h1 className="font-heading text-3xl md:text-4xl font-black uppercase break-words">{data.league.name} · {season.name}</h1>
-              <p className="mt-1 text-sm text-white/60" data-testid="season-head">
-                {data.game?.name || "Spiel fehlt"} · ab {viennaDate(season.start_date, LONG_DAY)} · Sichtbarkeit: {VISIBILITY_SHORT[season.visibility]}
-              </p>
+            <div className="flex min-w-0 items-center gap-3" style={accentStyle(data.league.accent_color)}>
+              <LeagueEmblem src={data.look?.emblem_url} size={48} testId="season-head-emblem" />
+              <div className="min-w-0">
+                <h1 className="font-heading text-3xl md:text-4xl font-black uppercase break-words">{data.league.name} · {season.name}</h1>
+                <p className="mt-1 text-sm text-white/60" data-testid="season-head">
+                  {data.game?.name || "Spiel fehlt"} · ab {viennaDate(season.start_date, LONG_DAY)} · Sichtbarkeit: {VISIBILITY_SHORT[season.visibility]}
+                </p>
+              </div>
             </div>
             {/* Löschen (#2106): nur als Entwurf ohne Staffel mit Co-Teams oder Spielen - sonst bietet das Blatt Archivieren an. */}
             <button type="button" onClick={() => setDeleting({ kind: "season", target: season, name: season.name })} data-testid="season-delete"
@@ -425,6 +437,21 @@ export default function AdminLeagueSeasonPage() {
                     hint="Gilt beim Speichern sofort für Ligaseite, Menüpunkt „Liga“ und alle Staffel-Turniere – auch gesperrte." testId="season-form-visibility" />
                   <SelectField label="Stand" value={form.status} onChange={(value) => set("status", value)} options={SEASON_STATUS_OPTIONS} testId="season-form-status" />
                 </FormGrid>
+              </FormSection>
+
+              {/* Gestaltung (#2107): Emblem und Banner überschreiben die der Liga, leer heißt „wie die Liga“. Die Farbe
+                  gehört der Liga (Stift in der Ligaübersicht). Gewinne sind reine Anzeige - kein Bezug zu XP oder Pokalen. */}
+              <FormSection title="Gestaltung und Gewinne" testId="season-look"
+                hint="Wirkt beim Speichern sofort auf Ligaseite, Übersicht, Teamseite und Link-Vorschau – ohne Übertragen. Das Banner bekommen auch die Staffeln (die App zeigt es beim Turnier).">
+                <FormGrid>
+                  <EmblemField value={form.emblem_url} onChange={(value) => set("emblem_url", value || "")} inherited={data.league.emblem_url}
+                    inheritedLabel="Leer: das Emblem der Liga (Vorschau)." accent={data.league.accent_color} testId="season-emblem" />
+                  <BannerField url={form.banner_url} focus={form.banner_focus} inherited={data.league.banner_url ? { url: data.league.banner_url, ...(data.league.banner_focus || {}) } : null}
+                    inheritedLabel="Leer: das Banner der Liga (Vorschau)." emblem={form.emblem_url || data.league.emblem_url} accent={data.league.accent_color} testId="season-banner"
+                    onChange={(url, focus) => setForm((current) => ({ ...current, banner_url: url || "", banner_focus: focus }))} />
+                </FormGrid>
+                <PrizeEditor rows={form.prizes} onChange={(value) => set("prizes", value)} testId="season-prizes"
+                  emptyHint="Noch keine Gewinne – die Ligaseite zeigt dann keinen Block „Um was gespielt wird“." />
               </FormSection>
 
               <div className="flex flex-wrap items-center gap-3">

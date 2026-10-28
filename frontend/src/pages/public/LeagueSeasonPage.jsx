@@ -10,6 +10,8 @@ import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { MapPoolView } from "@/components/tls/maps/MapPoolView";
 import { StaffelPanel } from "@/components/tls/league/public/StaffelPanel";
+import { LeagueHead, LeaguePrizes } from "@/components/tls/league/public/LeagueLook";
+import { accentStyle } from "@/lib/leagueLook";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { renderMarkdownLite } from "@/lib/markdownLite";
 import { blockedLines, defaultSlot, pointsLine, seasonPeriod, weekSpan } from "@/lib/leaguePage";
@@ -19,7 +21,7 @@ function Fact({ icon: Icon, label, children, testId }) {
   return (
     <div className="min-w-0" data-testid={testId}>
       <dt className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-white/45">
-        <Icon className="h-3.5 w-3.5 text-[#29B6E8]" aria-hidden="true" /> {label}
+        <Icon className="h-3.5 w-3.5 tls-league-accent" aria-hidden="true" /> {label}
       </dt>
       <dd className="mt-1 text-sm text-white/85">{children}</dd>
     </div>
@@ -57,7 +59,7 @@ function Division({ division, leagueSlug, seasonSlug, hash }) {
                   id={tabId(row)} aria-selected={selected} aria-controls={panelId} tabIndex={selected ? 0 : -1}
                   onClick={() => setActive(row.tournament_id)} onKeyDown={(event) => onTabKey(event, index)}
                   data-testid={`league-staffel-tab-${row.staffel}`}
-                  className={`tls-btn ${selected ? "tls-btn--secondary" : "tls-btn--quiet"} rounded-sm px-3 py-1.5 text-xs font-bold uppercase tracking-wider`}>
+                  className={`tls-btn tls-league-tab ${selected ? "tls-btn--secondary" : "tls-btn--quiet"} rounded-sm px-3 py-1.5 text-xs font-bold uppercase tracking-wider`}>
                   Staffel {row.staffel}
                 </button>
               );
@@ -65,6 +67,8 @@ function Division({ division, leagueSlug, seasonSlug, hash }) {
           </div>
         ) : current ? <span className="text-xs font-bold uppercase tracking-wider text-white/45">Staffel {current.staffel}</span> : null}
       </div>
+      {/* Eigene Gewinne dieser Liga N (#2107) - sonst gilt, was oben für die Season steht. */}
+      <LeaguePrizes prizes={division.prizes} title={`Um was ${division.label} spielt`} compact testId={`league-prizes-${division.level}`} />
       <div className="mt-6 scroll-mt-24" id={tabbed ? panelId : current ? `staffel-${current.slug || current.tournament_id}` : undefined}
         {...(tabbed && current ? { role: "tabpanel", "aria-labelledby": tabId(current), tabIndex: 0 } : {})}>
         {/* Sprungziele aus der Teamseite (#staffel-…): je Staffel eines, die Reiter wählen beim Laden die richtige. */}
@@ -122,17 +126,17 @@ export default function LeagueSeasonPage() {
   }
   return (
     <PublicLayout>
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      {/* Die Akzentfarbe der Liga gilt für die ganze Seite (#2107): Kopf, Zeichen, Reiter, Tabelle (eigene Zeile, „Du“),
+          Spielwochen, Ergebnisse und Links - sie setzt dafür auch die Markenfarbe; ohne sie gilt die Vereinsfarbe. */}
+      <div className="tls-league-look max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12" style={accentStyle(data.look?.accent_color)}>
         <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "Liga", to: "/liga" }, { label: title }]} className="mb-3" />
-        <header className="tls-reveal-item">
-          <h1 className="font-heading text-4xl md:text-6xl font-black uppercase leading-[0.95] break-words">
-            {league.name} <span className="text-white/55">{season.name}</span>
-          </h1>
-          <p className="mt-3 text-sm text-white/60" data-testid="league-subline">
-            {[league.game?.name, season.registration_deadline
-              ? `Meldeschluss ${viennaDate(dayNoon(season.registration_deadline), { day: "numeric", month: "numeric", year: "numeric" })}` : ""]
-              .filter(Boolean).join(" · ")}
-          </p>
+        {/* Kopf (#2107): Banner und Emblem der Season bzw. Liga, Akzentfarbe der Liga - ohne alles ein ruhiger Kopf. */}
+        <LeagueHead look={data.look} eyebrow={league.game?.name} title={<>{league.name} <span className="text-white/55">{season.name}</span></>}>
+          {season.registration_deadline ? (
+            <p className="mt-3 text-sm text-white/60" data-testid="league-subline">
+              Meldeschluss {viennaDate(dayNoon(season.registration_deadline), { day: "numeric", month: "numeric", year: "numeric" })}
+            </p>
+          ) : null}
           <dl className="mt-8 grid grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-4" data-testid="league-facts">
             <Fact icon={CalendarClock} label="Zeitraum" testId="league-fact-period">{seasonPeriod(season)}</Fact>
             <Fact icon={Timer} label={weekSpan(season)} testId="league-fact-week">Ohne Einigung: {defaultSlot(season)}</Fact>
@@ -143,7 +147,10 @@ export default function LeagueSeasonPage() {
               {blocked.length ? blocked.map((row) => <span key={row.key} className="block">{row.label} {row.range}</span>) : "keine"}
             </Fact>
           </dl>
-        </header>
+        </LeagueHead>
+
+        <LeaguePrizes prizes={data.prizes}
+          hint={(data.divisions || []).some((division) => division.prizes?.length) ? "Ligen mit eigenen Gewinnen nennen sie bei ihrer Tabelle." : undefined} />
 
         {data.divisions.length
           ? data.divisions.map((division) => (
@@ -154,7 +161,7 @@ export default function LeagueSeasonPage() {
         {rules ? (
           <details className="tls-league-rules mt-14 border border-white/10 bg-[#121212] rounded-sm" data-testid="league-rules">
             <summary className="flex cursor-pointer items-center gap-2 px-4 py-3 font-heading text-lg font-bold uppercase">
-              <ScrollText className="h-4 w-4 text-[#29B6E8]" aria-hidden="true" /> Regeln
+              <ScrollText className="h-4 w-4 tls-league-accent" aria-hidden="true" /> Regeln
             </summary>
             {/* renderMarkdownLite maskiert HTML und baut nur sichere Elemente - wie Turnier- und Eventtexte. */}
             <div className="prose-cms px-4 pb-5 text-sm" dangerouslySetInnerHTML={{ __html: rules }} />
