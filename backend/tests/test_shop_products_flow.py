@@ -412,12 +412,31 @@ async def test_print_files_preview_presets_template_images_and_upload_through_th
     assert sample.status_code == 200 and sample.headers["content-type"] == "image/png"
     with Image.open(BytesIO(sample.content)) as img:
         assert img.width == round(6.0 / 2.54 * 300)
-    too_high = await flow.get(f"{BASE}/{product_id}/name-sample", params={"color": "Black", "text_height_cm": 9})
-    assert too_high.status_code == 400 and "Texthöhe" in too_high.json()["detail"]
+    too_low = await flow.get(f"{BASE}/{product_id}/name-sample", params={"color": "Black", "text_height_cm": 0.1})
+    assert too_low.status_code == 400 and "Texthöhe" in too_low.json()["detail"]
+    # Trikot (#2142): Rückennummer groß in der Sportschrift mit Kontur, fester Text als Beispiel.
+    number = await flow.get(f"{BASE}/{product_id}/name-sample", params={
+        "kind": "member_number", "color": "Black", "text_height_cm": 20, "max_width_cm": 25,
+        "font": "saira-condensed-900", "outline_cm": 0.3})
+    assert number.status_code == 200, number.text
+    with Image.open(BytesIO(number.content)) as img:
+        assert img.width == round(25 / 2.54 * 300) and img.height < round(20 / 2.54 * 300 * 1.2)
+    club = await flow.get(f"{BASE}/{product_id}/name-sample", params={"kind": "text", "color": "Black",
+                                                                       "text": "TESTVEREIN", "max_width_cm": 20})
+    assert club.status_code == 200, club.text
+    emoji = await flow.get(f"{BASE}/{product_id}/name-sample", params={"kind": "text", "color": "Black",
+                                                                        "text": "Löwen 🦁"})
+    assert emoji.status_code == 400
     assert (await flow.get(f"{BASE}/{product_id}/name-sample", params={"color": "Pink"})).status_code == 404
     # Vorgaben sind einstellbar (Grund optional, Protokoll).
     presets = (await flow.get("/api/admin/shop/print-presets")).json()
     assert presets["is_default"] is True and presets["labels"]["families"]["front"] == "Vorderseite"
+    assert [item["key"] for item in presets["sets"]] == ["jersey_back", "jersey_chest"], "Trikot-Vorlagen (#2142)"
+    assert presets["default_sets"] == presets["sets"]
+    broken = {"key": "kaputt", "label": "Kaputt", "families": ["back"],
+              "layers": [{"kind": "text", "preset": "gibt_es_nicht"}]}
+    wrong_set = await flow.put("/api/admin/shop/print-presets", json={"sets": [broken]})
+    assert wrong_set.status_code == 400 and "gibt_es_nicht" in wrong_set.json()["detail"]
     changed = await flow.put("/api/admin/shop/print-presets", json={"rules": {"min_width_cm": 2.0}})
     assert changed.status_code == 200 and changed.json()["rules"]["min_width_cm"] == 2.0
     refused = await flow.put("/api/admin/shop/print-presets", json={"presets": [{"key": "!"}]})

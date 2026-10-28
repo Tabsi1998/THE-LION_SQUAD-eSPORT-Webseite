@@ -803,9 +803,12 @@ async def template_image_rgba(db, template: dict, preview: dict, *, layer: str =
 
 # ---------------------------------------------------------------- Positions-Vorgaben (einstellbar)
 
-PRESET_KINDS = {"motif": "Motiv", "text": "Gamertag oder Vereinsnummer"}
+PRESET_KINDS = {"motif": "Motiv", "text": "Gamertag, Vereinsnummer oder fester Text"}
 ANCHORS = {"top": "oben", "middle": "mittig", "bottom": "unten"}
-FOLLOWS = {"opposite": "gespiegelt zum ersten Motiv, senkrecht auf dessen Mitte", "below": "unter dem ersten Motiv"}
+FOLLOWS = {"opposite": "gespiegelt zum ersten Motiv, senkrecht auf dessen Mitte", "below": "unter dem ersten Motiv",
+           # #2142: unter der Ebene davor, gemessen vom sichtbaren Rand (Grundlinie bzw. Großbuchstaben) - etwa die
+           # Rückennummer unter dem Namen.
+           "stack": "unter der Ebene davor (Abstand in cm)"}
 ALL_FAMILIES = list(FAMILIES)
 DEFAULT_PRESETS: list[dict] = [
     {"key": "chest_right", "label": "Brust rechts (vom Träger aus)", "kind": "motif", "families": ["front"],
@@ -848,7 +851,46 @@ DEFAULT_PRESETS: list[dict] = [
      "hint": "Name oben am Rücken.", "center_x": 0.5, "anchor": "top", "top_cm": 3.0},
     {"key": "text_center", "label": "Mittig (Name)", "kind": "text", "families": ALL_FAMILIES,
      "hint": "Mittig in der Fläche.", "center_x": 0.5, "anchor": "middle", "top_cm": 0.0},
+    # Trikot (#2142): Name oben, die große Nummer darunter, der Vereinsname unten - mittig, Abstände in cm.
+    {"key": "jersey_back_name", "label": "Trikot Rücken: Name oben", "kind": "text", "families": ["back"],
+     "hint": "Name oben am Rücken, mittig - Abstand vom oberen Rand der Fläche in cm.", "center_x": 0.5,
+     "anchor": "top", "top_cm": 8.0},
+    {"key": "jersey_back_number", "label": "Trikot Rücken: Nummer darunter", "kind": "text", "families": ["back"],
+     "hint": "Mittig unter der Ebene davor (etwa dem Namen) - Abstand zwischen den Buchstaben und den Ziffern in cm.",
+     "follow": "stack", "gap_cm": 2.0, "center_x": 0.5, "anchor": "top", "top_cm": 0.0},
+    {"key": "jersey_back_club", "label": "Trikot Rücken: Vereinsname unten", "kind": "text", "families": ["back"],
+     "hint": "Unten am Rücken, mittig - Abstand vom unteren Rand der Fläche in cm.", "center_x": 0.5,
+     "anchor": "bottom", "top_cm": 8.0},
 ]
+# Die Vorgaben vor #2142: wer die Liste schon gespeichert hat, bekommt neue Vorgaben dazu (``load_presets``) - eine
+# danach bewusst entfernte bleibt weg (``known_defaults`` am Dokument).
+LEGACY_DEFAULT_KEYS = ("chest_right", "chest_left", "front_center", "front_large", "back_large", "back_top", "neck",
+                       "sleeve", "label", "cap_front", "mug_wrap", "mug_side", "towel_center", "text_opposite",
+                       "text_below", "text_back_top", "text_center")
+
+# Vorlagen mit mehreren Ebenen (#2142): ein Klick in Schritt 3 setzt alle Ebenen einer Fläche. Jede Ebene nennt eine
+# Positions-Vorgabe (oben) und ihre Größe - beides einstellbar wie die Vorgaben selbst.
+SET_KINDS = {"motif": "Motiv", "gamertag": "Gamertag", "member_number": "Vereinsnummer", "text": "Fester Text"}
+SPORT_FONT = "saira-condensed-900"
+DEFAULT_SETS: list[dict] = [
+    {"key": "jersey_back", "label": "Trikot Rücken", "families": ["back"],
+     "hint": "Name oben, die große Nummer darunter, der Vereinsname unten - mittig, in der Sportschrift.",
+     "layers": [
+         {"kind": "gamertag", "preset": "jersey_back_name", "text_height_cm": 7.0, "max_width_cm": 30.0,
+          "font": SPORT_FONT},
+         {"kind": "member_number", "preset": "jersey_back_number", "text_height_cm": 20.0, "max_width_cm": 30.0,
+          "font": SPORT_FONT},
+         {"kind": "text", "preset": "jersey_back_club", "text": "THE LION SQUAD", "text_height_cm": 3.5,
+          "max_width_cm": 30.0, "font": SPORT_FONT}]},
+    {"key": "jersey_chest", "label": "Trikot Brust", "families": ["front"],
+     "hint": "Logo links (von vorne gesehen), die kleine Nummer rechts auf derselben Höhe.",
+     "layers": [
+         {"kind": "motif", "preset": "chest_right", "width_cm": 8.9},
+         {"kind": "member_number", "preset": "text_opposite", "text_height_cm": 6.0, "max_width_cm": 10.0,
+          "font": SPORT_FONT}]},
+]
+MAX_SETS = 20
+MAX_SET_LAYERS = 6  # wie shop_print_files.MAX_LAYERS
 DEFAULT_RULES: dict[str, Any] = {
     # Sicherheitsrand je Art der Fläche in cm: ein Motiv muss so weit vom Rand der Druckfläche bleiben (Allover-Trikot:
     # die Sicherheitslinie im Vorlagenbild). Vorgabe 0 - Printful druckt bei Shirts die ganze Fläche.
@@ -909,9 +951,9 @@ def clean_preset(raw: Any) -> dict:
     else:
         follow = raw.get("follow")
         if follow not in (None, *FOLLOWS):
-            raise ShopError(f"{label}: Bezug „gegenüber“, „unter dem Motiv“ oder keiner.")
+            raise ShopError(f"{label}: Bezug „gegenüber“, „unter dem Motiv“, „unter der Ebene davor“ oder keiner.")
         preset["follow"] = follow
-        if follow == "below":
+        if follow in ("below", "stack"):
             preset["gap_cm"] = _float(raw.get("gap_cm", 1.0), f"{label}: Abstand (cm)", 0.0, 50.0)
     return preset
 
@@ -944,45 +986,166 @@ def clean_presets(raw: Any) -> list[dict]:
     return presets
 
 
+def _set_number(value: Any, label: str, low: float, high: float) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) \
+            or not low <= value <= high:
+        raise ShopError(f"{label}: eine Zahl von {_number(low, 2)} bis {_number(high, 2)} cm.")
+    return round(float(value), 2)
+
+
+def clean_set(raw: Any, presets: Sequence[dict]) -> dict:
+    """Eine Vorlage mit mehreren Ebenen (#2142) - jede Ebene mit Art, Positions-Vorgabe (passend zur Art und zur
+    Fläche) und, wenn gewünscht, Größe, Schrift, Kontur und festem Text."""
+    from services import shop_gamertag
+
+    if not isinstance(raw, dict):
+        raise ShopError("Vorlage: als Objekt angeben.")
+    unknown = sorted(set(raw) - {"key", "label", "hint", "families", "layers"})
+    if unknown:
+        raise ShopError(f"Vorlage: unbekannte Felder {', '.join(unknown)}.")
+    key = str(raw.get("key") or "")
+    if not PRESET_KEY.match(key):
+        raise ShopError("Kennung einer Vorlage: Kleinbuchstaben, Ziffern und _ (z. B. jersey_back).")
+    label = _text(raw.get("label"), "Bezeichnung", 60)
+    families = raw.get("families")
+    if not isinstance(families, list) or not families or set(families) - set(FAMILIES):
+        raise ShopError(f"{label}: mindestens eine Art Fläche ({', '.join(FAMILIES)}).")
+    layers = raw.get("layers")
+    if not isinstance(layers, list) or not 1 <= len(layers) <= MAX_SET_LAYERS:
+        raise ShopError(f"{label}: 1 bis {MAX_SET_LAYERS} Ebenen.")
+    by_key = {item["key"]: item for item in presets}
+    rules = shop_gamertag.default_rules()
+    clean_layers = []
+    for layer in layers:
+        known = {"kind", "preset", "width_cm", "text", *shop_gamertag.LAYER_SIZE_FIELDS, "font", "outline_cm"}
+        if not isinstance(layer, dict) or set(layer) - known:
+            raise ShopError(f"{label}: Ebene mit Art, Vorgabe, Größe, Schrift, Kontur und Text.")
+        kind = layer.get("kind")
+        if kind not in SET_KINDS:
+            raise ShopError(f"{label}: Art der Ebene Motiv, Gamertag, Vereinsnummer oder fester Text.")
+        preset = by_key.get(layer.get("preset"))
+        if preset is None or preset["kind"] != ("motif" if kind == "motif" else "text"):
+            raise ShopError(f"{label}: die Vorgabe „{layer.get('preset')}“ gibt es nicht (für {SET_KINDS[kind]}).")
+        if not set(families) <= set(preset["families"]):
+            raise ShopError(f"{label}: „{preset['label']}“ passt nicht zu allen Flächen der Vorlage.")
+        item: dict = {"kind": kind, "preset": preset["key"]}
+        if kind == "motif":
+            if set(layer) - {"kind", "preset", "width_cm"}:
+                raise ShopError(f"{label}: ein Motiv hat nur Vorgabe und Breite.")
+            if layer.get("width_cm") is not None:
+                item["width_cm"] = _set_number(layer["width_cm"], f"{label}: Breite", 0.5, 400.0)
+        else:
+            item.update(shop_gamertag.clean_layer_sizes(layer))
+            item.update(shop_gamertag.clean_layer_style(layer, rules))
+            if kind == "text":
+                item["text"] = shop_gamertag.clean_fixed_text(layer.get("text"), rules)
+            elif layer.get("text") is not None:
+                raise ShopError(f"{label}: einen festen Text gibt es nur für die Art „Fester Text“.")
+        clean_layers.append(item)
+    return {"key": key, "label": label, "hint": _text(raw.get("hint"), "Hinweis", 240, required=False),
+            "families": [name for name in FAMILIES if name in families], "layers": clean_layers}
+
+
+def clean_sets(raw: Any, presets: Sequence[dict]) -> list[dict]:
+    if not isinstance(raw, list) or len(raw) > MAX_SETS:
+        raise ShopError(f"Höchstens {MAX_SETS} Vorlagen.")
+    sets = [clean_set(item, presets) for item in raw]
+    keys = [item["key"] for item in sets]
+    if len(set(keys)) != len(keys):
+        raise ShopError("Jede Kennung einer Vorlage nur einmal.")
+    return sets
+
+
+def _with_new_defaults(presets: list[dict], known: Any) -> list[dict]:
+    """Neue Vorgaben aus einer späteren Fassung kommen zu einer gespeicherten Liste dazu - außer, sie war schon bekannt
+    und wurde bewusst entfernt."""
+    known = set(known) if isinstance(known, list) else set(LEGACY_DEFAULT_KEYS)
+    have = {item["key"] for item in presets}
+    extra = [item for item in clean_presets(DEFAULT_PRESETS) if item["key"] not in known | have]
+    return presets + extra[:max(0, MAX_PRESETS - len(presets))]
+
+
+def _usable_sets(raw: Any, presets: Sequence[dict]) -> list[dict]:
+    """Die Vorlagen, die zu den Vorgaben passen - eine, deren Vorgabe entfernt wurde, fällt still weg (laut im Log)."""
+    out = []
+    for item in raw if isinstance(raw, list) else []:
+        try:
+            out.append(clean_set(item, presets))
+        except ShopError:
+            logger.warning("[shop-print-templates] stored set skipped - preset missing or invalid")
+    return out
+
+
 async def load_presets(db) -> dict:
-    """Die geltenden Vorgaben und Regeln - gespeichert oder Vorgabe. Unsinn in der Datenbank gilt als Vorgabe."""
+    """Die geltenden Vorgaben, Vorlagen und Regeln - gespeichert oder Vorgabe. Unsinn in der Datenbank gilt als
+    Vorgabe."""
     doc = await db.settings.find_one({"id": SETTINGS_ID}, {"_id": 0}) or {}
     try:
-        presets = clean_presets(doc["presets"]) if doc.get("presets") else clean_presets(DEFAULT_PRESETS)
+        presets = (_with_new_defaults(clean_presets(doc["presets"]), doc.get("known_defaults")) if doc.get("presets")
+                   else clean_presets(DEFAULT_PRESETS))
         rules = clean_rules(doc.get("rules") or {})
     except ShopError:
         logger.warning("[shop-print-templates] stored presets invalid - defaults apply")
         presets, rules = clean_presets(DEFAULT_PRESETS), clean_rules({})
-    return {"presets": presets, "rules": rules, "updated_at": doc.get("updated_at"),
+    sets = _usable_sets(doc["sets"] if isinstance(doc.get("sets"), list) else DEFAULT_SETS, presets)
+    return {"presets": presets, "rules": rules, "sets": sets, "updated_at": doc.get("updated_at"),
             "is_default": not doc.get("presets")}
 
 
-async def save_presets(db, *, presets: Any = None, rules: Any = None, actor_id: str, reason: Any) -> dict:
-    """Vorgaben bzw. Regeln ändern (Grund optional), vorher/nachher im Protokoll ``shop.print.presets``. Eine Vorgabe,
-    die ein Produkt benutzt, bleibt dort gültig, solange es ihre Kennung gibt - entfernte Kennungen meldet die Prüfung
-    des Produkts."""
+async def save_presets(db, *, presets: Any = None, rules: Any = None, sets: Any = None, actor_id: str,
+                       reason: Any) -> dict:
+    """Vorgaben, Vorlagen bzw. Regeln ändern (Grund optional), vorher/nachher im Protokoll ``shop.print.presets``. Eine
+    Vorgabe, die ein Produkt benutzt, bleibt dort gültig, solange es ihre Kennung gibt - entfernte Kennungen meldet die
+    Prüfung des Produkts. Eine Vorlage muss auf bestehende Vorgaben zeigen."""
     reason = clean_reason(reason, required=False)
     current = await load_presets(db)
     after_presets = clean_presets(presets) if presets is not None else current["presets"]
     after_rules = clean_rules({**current["rules"], **rules}) if isinstance(rules, dict) else current["rules"]
-    if after_presets == current["presets"] and after_rules == current["rules"]:
+    after_sets = clean_sets(sets, after_presets) if sets is not None else _usable_sets(current["sets"], after_presets)
+    if after_presets == current["presets"] and after_rules == current["rules"] and after_sets == current["sets"]:
         return current
     await db.settings.update_one(
         {"id": SETTINGS_ID},
-        {"$set": {"id": SETTINGS_ID, "presets": after_presets, "rules": after_rules,
+        {"$set": {"id": SETTINGS_ID, "presets": after_presets, "rules": after_rules, "sets": after_sets,
+                  "known_defaults": [item["key"] for item in DEFAULT_PRESETS],
                   "updated_at": now_utc().isoformat(), "updated_by": actor_id}}, upsert=True)
     before_keys = {item["key"]: item for item in current["presets"]}
     after_keys = {item["key"]: item for item in after_presets}
-    await record_admin_action(db, "shop.print.presets", actor_id=actor_id, target_id=SETTINGS_ID, reason=reason, data={
+    data = {
         "added": sorted(set(after_keys) - set(before_keys)), "removed": sorted(set(before_keys) - set(after_keys)),
         "changed": sorted(key for key in set(before_keys) & set(after_keys) if before_keys[key] != after_keys[key]),
         "rules_before": current["rules"] if after_rules != current["rules"] else None,
-        "rules_after": after_rules if after_rules != current["rules"] else None})
+        "rules_after": after_rules if after_rules != current["rules"] else None}
+    if after_sets != current["sets"]:
+        data["sets"] = {"before": [item["key"] for item in current["sets"]],
+                        "after": [item["key"] for item in after_sets]}
+    await record_admin_action(db, "shop.print.presets", actor_id=actor_id, target_id=SETTINGS_ID, reason=reason,
+                              data=data)
     return await load_presets(db)
 
 
 def presets_for(presets: Sequence[dict], placement_family: str, kind: str | None = None) -> list[dict]:
     return [item for item in presets if placement_family in item["families"] and (kind is None or item["kind"] == kind)]
+
+
+PERSONAL_KINDS = {"gamertag": ("gamertag", "both"), "member_number": ("member_number", "both")}
+
+
+def set_layers(item: dict, *, personalization: str, motif_key: str | None = None) -> tuple[list[dict], list[str]]:
+    """Die Ebenen einer Vorlage (#2142) für ein Produkt: Gamertag bzw. Vereinsnummer nur mit passender
+    Personalisierung (sonst ein Satz, was fehlt), Motive mit ``motif_key`` (sonst leer - die Auswahl kommt in Schritt
+    3). Versatz 0; Größe, Schrift, Kontur und Text aus der Vorlage."""
+    layers, skipped = [], []
+    for layer in item["layers"]:
+        kind = layer["kind"]
+        if kind in PERSONAL_KINDS and personalization not in PERSONAL_KINDS[kind]:
+            skipped.append(f"{SET_KINDS[kind]} ausgelassen - braucht die Personalisierung „{SET_KINDS[kind]}“.")
+            continue
+        out = {**layer, "offset_x_cm": 0.0, "offset_y_cm": 0.0}
+        if kind == "motif":
+            out["motif"] = {"key": motif_key or "", "by_color": {}}
+        layers.append(out)
+    return layers, skipped
 
 
 # ---------------------------------------------------------------- Umrechnen auf eine Fläche
@@ -1060,13 +1223,23 @@ def place_motif(entry: dict, preset: dict, *, width_cm: float, aspect: float, of
 
 
 def place_text(entry: dict, preset: dict, *, width_px: float, height_px: float, follow: Box | None,
-               offset_x_cm: float = 0.0, offset_y_cm: float = 0.0, rules: dict | None = None) -> Box:
-    """Rahmen eines Namens (Gamertag, Vereinsnummer): die Leinwand der Gamertag-Datei hat für jeden Namen dieselbe
-    Größe, ihre senkrechte Mitte ist der Anker (``shop_gamertag.canvas``). „Gegenüber“ spiegelt die Mitte des ersten
-    Motivs an der Mitte der Fläche und legt den Anker auf dessen senkrechte Mitte; „unter dem Motiv“ setzt den Namen
-    mittig darunter."""
+               offset_x_cm: float = 0.0, offset_y_cm: float = 0.0, rules: dict | None = None,
+               above: tuple[float, float] | None = None, band_top: float = 0.0) -> Box:
+    """Rahmen eines Namens (Gamertag, Vereinsnummer, fester Text): die Leinwand der Gamertag-Datei hat für jeden Namen
+    dieselbe Größe, ihre senkrechte Mitte ist der Anker (``shop_gamertag.canvas``). „Gegenüber“ spiegelt die Mitte des
+    ersten Motivs an der Mitte der Fläche und legt den Anker auf dessen senkrechte Mitte; „unter dem Motiv“ setzt den
+    Namen mittig darunter. „Unter der Ebene davor“ (#2142) setzt den sichtbaren oberen Rand (``band_top`` Pixel unter
+    dem Rand der Leinwand) ``gap_cm`` unter den sichtbaren unteren Rand der Ebene davor (``above``: deren waagrechte
+    Mitte und unterer Rand)."""
     rules = rules or DEFAULT_RULES
     dpi = entry["dpi"]
+    if preset.get("follow") == "stack":
+        if above is None:
+            raise ShopError(f"„{preset['label']}“ braucht eine Ebene davor auf derselben Fläche.")
+        center_x, bottom = above
+        box = Box(center_x - width_px / 2, bottom + cm_to_px(preset.get("gap_cm", 1.0), dpi) - band_top, width_px,
+                  height_px)
+        return Box(box.left + cm_to_px(offset_x_cm, dpi), box.top + cm_to_px(offset_y_cm, dpi), width_px, height_px)
     if preset.get("follow") and follow is None:
         raise ShopError(f"„{preset['label']}“ braucht ein Motiv auf derselben Fläche.")
     if preset.get("follow") == "opposite":

@@ -31,10 +31,18 @@ def test_layer_rules_take_the_global_rules_and_override_height_and_width():
     # Die Verkleinerung bleibt im selben Verhältnis wie global (0,4 zu 0,5 Zoll).
     assert own["min_text_height_in"] == pytest.approx(0.8)
     assert shop_gamertag.rules_hash(own) != shop_gamertag.rules_hash(rules)
-    for wrong in ({"text_height_cm": 0.1}, {"text_height_cm": 6.0}, {"max_width_cm": 1.0}, {"max_width_cm": 31},
-                  {"text_height_cm": "2"}, {"max_width_cm": float("nan")}):
+    for wrong in ({"text_height_cm": 0.1}, {"max_width_cm": 1.0}, {"text_height_cm": "2"},
+                  {"max_width_cm": float("nan")}, {"text_height_cm": 250.0}):
         with pytest.raises(ShopError):
             shop_gamertag.layer_rules(rules, wrong)
+    # Seit #2142 begrenzt die Fläche, nicht mehr 2 bzw. 12 Zoll: eine Rückennummer mit 22 cm geht.
+    big = shop_gamertag.layer_rules(rules, {"text_height_cm": 22.0, "max_width_cm": 31})
+    assert big["text_height_in"] == pytest.approx(22.0 / CM, abs=0.001)
+    bounds = {"text_height_cm": 20.0, "width_cm": 30.0, "label": "Rückseite"}
+    with pytest.raises(ShopError, match="von 0,25 bis 20 - so viel lässt die Fläche „Rückseite“"):
+        shop_gamertag.layer_rules(rules, {"text_height_cm": 22.0}, bounds=bounds)
+    with pytest.raises(ShopError, match="Höchstbreite: eine Zahl in cm von 1,27 bis 30"):
+        shop_gamertag.layer_rules(rules, {"max_width_cm": 31}, bounds=bounds)
 
 
 def test_the_canvas_grows_with_the_text_height():
@@ -134,8 +142,9 @@ async def test_the_sample_name_is_rendered_like_the_print_file(db, provider):
         assert ink is not None and ink[2] - ink[0] < img.width, "der Name selbst ist schmaler als die Leinwand"
     default = await shop_print_files.sample_png(db, product, kind="member_number", color="White", layer=None)
     with Image.open(BytesIO(default)) as img:
-        assert img.size == shop_gamertag.canvas(await shop_gamertag.load_rules(db))
+        # Eine Nummer (#2142) braucht nur die Höhe der Ziffern.
+        assert img.size == shop_gamertag.canvas(await shop_gamertag.load_rules(db), "number")
     with pytest.raises(LookupError):
         await shop_print_files.sample_png(db, product, kind="gamertag", color="Pink", layer=None)
     with pytest.raises(ShopError):
-        await shop_print_files.sample_png(db, product, kind="gamertag", color="Black", layer={"text_height_cm": 9})
+        await shop_print_files.sample_png(db, product, kind="gamertag", color="Black", layer={"text_height_cm": 0.1})

@@ -35,7 +35,7 @@ import logging
 import re
 import secrets
 import struct
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from io import BytesIO
 from typing import Any, Sequence
 
@@ -54,11 +54,15 @@ logger = logging.getLogger("tls-arena.shop-print-files")
 RENDERER_VERSION = 1  # ändert sich, wenn der Generator andere Pixel liefert - dann gelten erzeugte Dateien nicht mehr
 NOT_ORDERABLE = "Dieses Produkt ist gerade nicht bestellbar."
 LAYER_KINDS = {"motif": "Motiv", "gamertag": "Gamertag (Datei je Bestellung)",
-               "member_number": "Vereinsnummer (Datei je Bestellung, #1727)"}
-# Was in die Grunddatei kommt (gleich für alle Bestellungen) und was erst je Bestellung (#2141). Neue Ebenenarten
-# (etwa ein fester Text, #2142) reihen sich hier ein.
-BASE_KINDS = ("motif",)
+               "member_number": "Vereinsnummer (Datei je Bestellung, #1727)",
+               "text": "Fester Text (in der Grunddatei, etwa der Vereinsname)"}
+# Was in die Grunddatei kommt (gleich für alle Bestellungen) und was erst je Bestellung (#2141). Der feste Text (#2142)
+# ist für alle Bestellungen gleich - er gehört in die Grunddatei.
+BASE_KINDS = ("motif", "text")
 TEXT_KINDS = ("gamertag", "member_number")
+# Wie ``shop_gamertag.render`` eine Textebene rendert (#2142): Name, Nummer (nur Ziffern) oder fester Text.
+RENDER_KINDS = {"gamertag": "gamertag", "member_number": "number", "text": "text"}
+SHORT_LABELS = {"gamertag": "Gamertag", "member_number": "Vereinsnummer", "text": "Fester Text"}
 MODES = {"layout": "Motiv und Position", "upload": "Fertige Druckdatei als Hintergrund"}
 MODE_HINTS = {
     "layout": "Die Website erzeugt die Druckdatei: Motive an ihrer Stelle, der Rest durchsichtig.",
@@ -404,7 +408,7 @@ def _check_group(entry: dict, row: dict, targets: list, by_key: dict, rules: dic
                 if layer["kind"] not in TEXT_KINDS:
                     continue
                 name = LAYER_KINDS[layer["kind"]] + (f" ({color})" if color else "")
-                width, height = text_canvas_px(entry, gamertag_rules)
+                width, height = text_canvas_px(entry, gamertag_rules, None, layer["kind"])
                 try:
                     box = templates.place_text(entry, by_key[layer["preset"]], width_px=width, height_px=height,
                                                follow=boxes[0] if boxes else None, rules=rules)
@@ -686,12 +690,23 @@ class Planned:
     label: str
     box: templates.Box
     source: MotifSource | None = None
-    # Texthöhe und Höchstbreite einer Namensebene (#2105) - für Rendern und Platzieren dieselben Werte.
-    sizes: dict | None = None
-    # Untergrund hell/dunkel (#2141) und - bei Gamertag und Vereinsnummer - die Farbe daraus.
+    # Texthöhe und Höchstbreite (#2105), Schrift und Kontur (#2142) einer Textebene - für Rendern und Platzieren
+    # dieselben Werte (``shop_gamertag.layer_rules``). ``None``: die globalen Gamertag-Regeln.
+    spec: dict | None = None
+    # Untergrund hell/dunkel (#2141) und - bei Gamertag, Vereinsnummer und festem Text - die Farbe daraus.
     surface: dict = field(default_factory=lambda: dict(GARMENT))
     ink: str | None = None
     ink_fixed: bool = False  # Farbe des Namens von Hand gewählt statt nach Kontrast (#2141)
+    text: str | None = None  # der feste Text (#2142)
+    band: float = 0.0  # Höhe des sichtbaren Bands einer Textebene in Pixeln der Fläche (#2142)
+
+    @property
+    def visual(self) -> tuple[float, float]:
+        """Oberer und unterer sichtbarer Rand: bei Motiven der Rahmen, bei Text die Großbuchstaben bzw. Ziffern."""
+        if self.kind == "motif" or not self.band:
+            return self.box.top, self.box.bottom
+        middle = self.box.top + self.box.height / 2
+        return middle - self.band / 2, middle + self.band / 2
 
 
 @dataclass
@@ -731,12 +746,41 @@ class Plan:
         return self.mode == "upload" and bool(self.base_layers)
 
 
-def text_canvas_px(entry: dict, gamertag_rules: dict, layer: dict | None = None) -> tuple[float, float]:
+def text_canvas_px(entry: dict, gamertag_rules: dict, layer: dict | None = None,
+                   kind: str = "gamertag") -> tuple[float, float]:
     """Die Leinwand der Gamertag-Datei (für jeden Namen gleich groß) in Pixeln dieser Fläche - mit der Größe der Ebene
-    (``layer``: Texthöhe, Höchstbreite in cm, #2105), sonst nach den globalen Regeln."""
-    width, height = shop_gamertag.canvas(shop_gamertag.layer_rules(gamertag_rules, layer))
+    (``layer``: Texthöhe, Höchstbreite in cm, #2105; Schrift und Kontur, #2142), sonst nach den globalen Regeln. Eine
+    Vereinsnummer (``kind``) ist nur so hoch wie ihre Ziffern."""
+    width, height = shop_gamertag.canvas(shop_gamertag.layer_rules(gamertag_rules, layer), RENDER_KINDS.get(kind, kind))
     scale = entry["dpi"] / gamertag_rules["dpi"]
     return width * scale, height * scale
+
+
+def _text_fingerprint(item: "Planned", gamertag_rules: dict) -> dict:
+    """Was die Pixel eines festen Texts bestimmt (#2142) - für den ``layout_hash`` der Grunddatei: ein anderer Text,
+    eine andere Größe, Schrift, Kontur oder Farbe macht sie „veraltet“."""
+    own = shop_gamertag.layer_rules(gamertag_rules, item.spec)
+    fill = shop_gamertag.color_of(own, item.ink)
+    out = {"box": item.box.rounded(), "text": item.text, "ink": item.ink, "hex": fill["hex"],
+           "rules": shop_gamertag.rules_hash(own)}
+    if own.get("outline_in"):
+        out["outline_hex"] = shop_gamertag.outline_color(own, fill)["hex"]
+    return out
+
+
+def text_png(item: "Planned", gamertag_rules: dict, text: str | None = None) -> bytes:
+    """Eine Textebene als PNG der ganzen Leinwand, gerendert wie die Druckdatei (#2142) - der feste Text bzw. ein
+    Beispiel (``text``) für Gamertag und Vereinsnummer."""
+    own = shop_gamertag.layer_rules(gamertag_rules, item.spec)
+    return shop_gamertag.render(item.text if text is None else text, own, color_key=item.ink,
+                                kind=RENDER_KINDS.get(item.kind, "gamertag")).payload
+
+
+def layer_spec(layer: dict) -> dict | None:
+    """Was eine Textebene selbst festlegt (#2105, #2142): Größe, Schrift, Kontur - ``None`` heißt globale Regeln."""
+    spec = {name: layer[name] for name in (*shop_gamertag.LAYER_SIZE_FIELDS, *shop_gamertag.LAYER_STYLE_FIELDS)
+            if layer.get(name) not in (None, "")}
+    return spec or None
 
 
 def motifs_on_background(row: dict) -> bool:
@@ -785,9 +829,11 @@ async def plan_placement(db, row: dict, entry: dict, *, color: str, color_hex: s
                               threshold=lazy["threshold"])
 
     layers = list(enumerate(row.get("layers") or []))
-    for index, layer in sorted(layers, key=lambda item: item[1].get("kind") not in BASE_KINDS):
+    # Motive zuerst (ein Name folgt dem ersten Motiv), danach die Textebenen in ihrer Reihenfolge - „unter der Ebene
+    # davor“ (#2142) meint die zuletzt geplante.
+    for index, layer in sorted(layers, key=lambda item: item[1].get("kind") != "motif"):
         kind = layer.get("kind")
-        if kind == "motif" and not motifs_on_background(row):
+        if kind in BASE_KINDS and not motifs_on_background(row):
             continue
         preset = by_key.get(layer.get("preset"))
         if preset is None:
@@ -816,25 +862,46 @@ async def plan_placement(db, row: dict, entry: dict, *, color: str, color_hex: s
             label = f"Motiv „{source.title}“ ({preset['label']})"
             planned.append(Planned(index, "motif", label, box, source, surface=chosen))
         else:
-            sizes = shop_gamertag.clean_layer_sizes(layer) or None
-            width, height = text_canvas_px(entry, gamertag_rules, sizes)
+            render_kind = RENDER_KINDS.get(kind, "gamertag")
+            spec = layer_spec(layer)
+            text = None
+            try:
+                own_rules = shop_gamertag.layer_rules(gamertag_rules, spec)
+                if kind == "text":
+                    text = shop_gamertag.clean_fixed_text(layer.get("text"), gamertag_rules)
+                too_big = shop_gamertag.canvas_problem(own_rules, render_kind)
+                if too_big:
+                    raise ShopError(too_big)
+            except ShopError as exc:
+                found.append(f"{entry['label']}, {SHORT_LABELS.get(kind, kind)}: {exc}")
+                continue
+            width, height = text_canvas_px(entry, gamertag_rules, spec, kind)
+            band = shop_gamertag.band_px(own_rules, render_kind) * entry["dpi"] / gamertag_rules["dpi"]
             follow = next((item.box for item in planned if item.kind == "motif"), None)
+            previous = planned[-1] if planned else None
+            above = ((previous.box.left + previous.box.width / 2, previous.visual[1]) if previous else None)
             try:
                 box = templates.place_text(entry, preset, width_px=width, height_px=height, follow=follow,
-                                           rules=rules, **offsets)
+                                           rules=rules, above=above, band_top=(height - band) / 2, **offsets)
             except ShopError as exc:
                 found.append(f"{entry['label']}: {exc}")
                 continue
             chosen = await decide(layer, box)
-            label = f"{'Gamertag' if kind == 'gamertag' else 'Vereinsnummer'} ({preset['label']})"
+            label = f"{SHORT_LABELS.get(kind, kind)} ({preset['label']})"
             # Farbe fest gewählt (#2141) - nur eine, die es in den Gamertag-Regeln (noch) gibt; sonst automatisch.
             fixed = layer.get("ink") if layer.get("ink") in {item["key"] for item in gamertag_rules["colors"]} else None
-            planned.append(Planned(index, kind, label, box, sizes=sizes, surface=chosen,
-                                   ink=fixed or ink_for(gamertag_rules, color, chosen), ink_fixed=bool(fixed)))
+            planned.append(Planned(index, kind, label, box, spec=spec, surface=chosen,
+                                   ink=fixed or ink_for(gamertag_rules, color, chosen), ink_fixed=bool(fixed),
+                                   text=text, band=band))
         found += templates.problems(entry, box, label, rules)
     payload = {"renderer": RENDERER_VERSION, "template": template_hash, "mode": mode,
                "motifs": [{"box": item.box.rounded(), "ref": item.source.ref} for item in planned
                           if item.kind == "motif"]}
+    texts = [_text_fingerprint(item, gamertag_rules) for item in planned if item.kind == "text"]
+    if texts:
+        # Fester Text in der Grunddatei (#2142): Rahmen, Text, Farbe und alles, was die Pixel bestimmt. Ohne festen
+        # Text bleibt der Fingerabdruck wie vor #2142 - bestehende Dateien bleiben gültig.
+        payload["texts"] = texts
     if mode == "upload" and any(item.kind in BASE_KINDS for item in planned):
         # Hintergrund plus Ebenen (#2141): ein neuer Hintergrund macht die Grunddatei veraltet. Ohne Motive bleibt der
         # Fingerabdruck wie vor #2141 - die hochgeladene Datei ist dann selbst die Grunddatei.
@@ -1067,7 +1134,9 @@ async def states(db, product: dict, context: dict | None = None) -> list[dict]:
         out.append({**base, "group": plan.entry["group"], "state": state, "detail": detail,
                     "file": file_view(latest), "plan": plan_view(plan, context["gamertag_rules"]),
                     # der Hintergrund dieser Farbe für die Vorschau in Schritt 3 (#2141)
-                    "background": file_view(plan.background) if plan.mode == "upload" else None})
+                    "background": file_view(plan.background) if plan.mode == "upload" else None,
+                    # passt der Hintergrund zur Vorlage? Sonst entscheidet nicht er über Fassung und Farbe (#2142)
+                    "background_ok": plan.background_ok})
     return out
 
 
@@ -1091,12 +1160,18 @@ async def generate(db, product_id: str, *, actor_id: str, reason: Any = None) ->
         raise ShopConflict("Die Druckdateien werden gerade erzeugt - bitte gleich noch einmal.") from exc
 
 
-async def _render_base(db, plan: Plan, rules: dict) -> Composed:
-    """Die Grunddatei: die Motive auf einer durchsichtigen Fläche - bzw. auf dem Hintergrund (#2141)."""
+async def _render_base(db, plan: Plan, rules: dict, gamertag_rules: dict | None = None) -> Composed:
+    """Die Grunddatei: die Motive und festen Texte (#2142) auf einer durchsichtigen Fläche - bzw. auf dem Hintergrund
+    (#2141). Reihenfolge wie die Ebenen."""
     entry = plan.entry
     layers = []
-    for item in plan.motifs:
+    for item in plan.base_layers:
         left, top, width, height = item.box.rounded()
+        if item.kind != "motif":
+            rules_for_text = gamertag_rules or await shop_gamertag.load_rules(db)
+            png = await asyncio.to_thread(text_png, item, rules_for_text)
+            layers.append(Layer(png=png, left=left, top=top, width=width, height=height, label=item.label))
+            continue
         png = await _motif_png(db, item.source, width_px=width, dpi=entry["dpi"])
         layers.append(Layer(png=png, left=left, top=top, width=width, height=height, label=item.source.title,
                             native_width_px=None if item.source.vector else item.source.width_px))
@@ -1135,7 +1210,7 @@ async def _generate(db, product: dict, *, actor_id: str, reason: str) -> dict:
             unchanged += 1
             continue
         try:
-            composed = await _render_base(db, plan, rules)
+            composed = await _render_base(db, plan, rules, context["gamertag_rules"])
         except ShopError as exc:
             failed.append({"placement": row["key"], "color": color, "detail": f"{name}: {exc}"})
             continue
@@ -1328,12 +1403,12 @@ async def freeze_line(db, product: dict, variant: dict, *, gamertag: str | None,
 async def _personal_file(db, product: dict, plan: Plan, base_row: dict | None, *, gamertag: str, color: str,
                          user_id: str, order_id: str, item_id: str, variant: dict | None = None,
                          position: int = 1) -> dict:
-    # Farbe und Größe wie im Plan (#2105, #2141): Untergrund aus Hintergrund bzw. Shirtfarbe, die Leinwand der Ebene.
+    # Farbe und Größe wie im Plan (#2105, #2141): Untergrund aus Hintergrund bzw. Shirtfarbe, die Leinwand der Ebene;
+    # dazu Schrift und Kontur der Ebene (#2142).
     layer = next(item for item in plan.texts if item.kind == "gamertag")
     ink = layer.ink or shop_gamertag.inks_for_garment(await shop_gamertag.load_rules(db), color)[0]["key"]
-    sizes = layer.sizes
     stored = await shop_gamertag.store(db, gamertag, purpose="order", color_key=ink, user_id=user_id,
-                                       order_id=order_id, order_item_id=item_id, layer=sizes)
+                                       order_id=order_id, order_item_id=item_id, layer=layer.spec)
     tag_row = stored["row"]
     tag_path = shop_designs._path_of(tag_row["file_ref"])
     if tag_path is None or not tag_path.is_file():
@@ -1434,25 +1509,44 @@ async def complete_pending_erasures(db) -> int:
 PREVIEW_WIDTH = 900
 PREVIEW_MAX_PIXELS = 30_000_000  # so groß darf ein Vorlagenbild höchstens sein (shop_print_templates)
 SAMPLE_NAME = "GAMERTAG"
-SAMPLE_NUMBER = "1234"
+SAMPLE_NUMBER = "99"  # Rückfall - sonst die höchste Wunschnummer aus den Einstellungen (``sample_number``)
 SAMPLES = {"gamertag": SAMPLE_NAME, "member_number": SAMPLE_NUMBER}
 
 
-async def sample_png(db, product: dict, *, kind: str, color: str, layer: dict | None, ink: str | None = None) -> bytes:
+async def sample_number(db) -> str:
+    """Die Beispielnummer der Vorschau (#2142): die höchste Wunschnummer (#2034, Einstellung „bis“, Vorgabe 99) - so
+    breit wird die breiteste Nummer. Nur gelesen."""
+    from services import jersey_numbers
+
+    highest = (await jersey_numbers.load_settings(db)).get("max")
+    limit = 10 ** shop_gamertag.MAX_NUMBER_DIGITS
+    if isinstance(highest, int) and not isinstance(highest, bool) and 0 <= highest < limit:
+        return str(highest)
+    return SAMPLE_NUMBER
+
+
+async def _sample_text(db, kind: str) -> str:
+    return await sample_number(db) if kind == "member_number" else SAMPLES[kind]
+
+
+async def sample_png(db, product: dict, *, kind: str, color: str, layer: dict | None, ink: str | None = None,
+                     text: str | None = None) -> bytes:
     """Der Beispielname einer Namensebene in echter Größe (#2105) - gerendert wie die Druckdatei
     (``shop_gamertag.render`` mit den Regeln der Ebene), als PNG der ganzen Leinwand. Die Vorschau in Schritt 3 legt es
     in den Rahmen der Ebene; die Leinwand bleibt dort nur ein feiner Rahmen. Farbe des Namens wie bei der Bestellung:
-    ``ink`` ist die Farbe aus dem Plan (Untergrund aus dem Hintergrund, #2141), ohne Angabe nach der Shirtfarbe."""
-    if kind not in SAMPLES:
-        raise LookupError("Diese Ebene hat keinen Namen.")
+    ``ink`` ist die Farbe aus dem Plan (Untergrund aus dem Hintergrund, #2141), ohne Angabe nach der Shirtfarbe. Eine
+    Nummer zeigt die Beispielnummer, ein fester Text (#2142) seinen ``text`` - mit Schrift und Kontur der Ebene."""
+    if kind not in RENDER_KINDS:
+        raise LookupError("Diese Ebene hat keinen Text.")
     if color not in ((product.get("offer") or {}).get("colors") or []):
         raise LookupError("Diese Farbe wird nicht angeboten.")
     rules = shop_gamertag.layer_rules(await shop_gamertag.load_rules(db), layer)
     if ink is not None and ink not in {item["key"] for item in rules["colors"]}:
         raise LookupError("Diese Farbe für den Namen gibt es nicht.")
     ink = ink or shop_gamertag.inks_for_garment(rules, color)[0]["key"]
+    shown = text if kind == "text" else await _sample_text(db, kind)
     # Rendern kostet Rechenzeit (große Leinwand) - nicht im Event-Loop.
-    rendered = await asyncio.to_thread(shop_gamertag.render, SAMPLES[kind], rules, color_key=ink)
+    rendered = await asyncio.to_thread(shop_gamertag.render, shown, rules, color_key=ink, kind=RENDER_KINDS[kind])
     return rendered.payload
 
 
@@ -1514,8 +1608,25 @@ async def preview_png(db, product: dict, *, placement: str, color: str, sample: 
                     return img.convert("RGBA").resize((target_w, target_h), Image.Resampling.LANCZOS)
 
             print_img = await asyncio.to_thread(scaled)
-    if plan.motifs and not plan.problems:
-        for item in plan.motifs:
+    gamertag_rules = context["gamertag_rules"]
+
+    def put_text(png: bytes, box: templates.Box) -> None:
+        with Image.open(BytesIO(png)) as img:
+            img.load()
+            tag = img.convert("RGBA")
+        left, top, box_w, box_h = scaled_box(box)
+        if 0 <= left and 0 <= top and left + box_w <= target_w and top + box_h <= target_h:
+            print_img.alpha_composite(tag.resize((box_w, box_h), Image.Resampling.LANCZOS), (left, top))
+
+    if plan.base_layers and not plan.problems:
+        for item in plan.base_layers:
+            if item.kind != "motif":
+                # Fester Text (#2142) wie in der Grunddatei.
+                try:
+                    put_text(await asyncio.to_thread(text_png, item, gamertag_rules), item.box)
+                except ShopError:
+                    pass
+                continue
             left, top, box_w, box_h = scaled_box(item.box)
             try:
                 png = await _motif_png(db, item.source, width_px=box_w, dpi=entry["dpi"])
@@ -1528,22 +1639,16 @@ async def preview_png(db, product: dict, *, placement: str, color: str, sample: 
                 part = part.resize((box_w, box_h), Image.Resampling.LANCZOS)
             print_img.alpha_composite(part, (max(0, left), max(0, top)))
     if sample and plan.texts:
-        gamertag_rules = context["gamertag_rules"]
         for item in plan.texts:
-            # Der Beispielname wie in der Druckdatei: dieselben Regeln der Ebene (#2105), dieselbe Leinwand, dieselbe
-            # Farbe aus dem Untergrund (#2141).
+            # Der Beispielname wie in der Druckdatei: dieselben Regeln der Ebene (#2105, Schrift und Kontur #2142),
+            # dieselbe Leinwand, dieselbe Farbe aus dem Untergrund (#2141).
             ink = item.ink or shop_gamertag.inks_for_garment(gamertag_rules, color)[0]["key"]
             try:
-                name = shop_gamertag.render(SAMPLES[item.kind], shop_gamertag.layer_rules(gamertag_rules, item.sizes),
-                                            color_key=ink)
+                shown = await _sample_text(db, item.kind)
+                put_text(await asyncio.to_thread(text_png, replace(item, ink=ink), gamertag_rules,
+                                                 shown), item.box)
             except ShopError:
                 continue
-            with Image.open(BytesIO(name.payload)) as img:
-                img.load()
-                tag = img.convert("RGBA")
-            left, top, box_w, box_h = scaled_box(item.box)
-            if 0 <= left and 0 <= top and left + box_w <= target_w and top + box_h <= target_h:
-                print_img.alpha_composite(tag.resize((box_w, box_h), Image.Resampling.LANCZOS), (left, top))
     if preview and template_img is not None:
         canvas = Image.new("RGBA", template_img.size, (*shirt, 255))
         area = preview["area"]

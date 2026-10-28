@@ -300,8 +300,22 @@ async def available_placements(db, product: dict, *, template: dict | None = Non
     return out
 
 
-LAYER_FIELDS = {"kind", "preset", "width_cm", "offset_x_cm", "offset_y_cm", "motif", "variant", "ink",
-                *shop_gamertag.LAYER_SIZE_FIELDS}
+LAYER_FIELDS = {"kind", "preset", "width_cm", "offset_x_cm", "offset_y_cm", "motif", "variant", "ink", "text",
+                *shop_gamertag.LAYER_SIZE_FIELDS, *shop_gamertag.LAYER_STYLE_FIELDS}
+TEXT_ONLY_FIELDS = ("ink", "text", *shop_gamertag.LAYER_SIZE_FIELDS, *shop_gamertag.LAYER_STYLE_FIELDS)
+
+
+def _text_bounds(area: dict, presets_doc: dict, gamertag_rules: dict, kind: str, font: str | None) -> dict:
+    """Wie groß eine Textebene auf dieser Fläche höchstens sein kann (#2142): die Höchstbreite ist die Breite der
+    Fläche ohne Sicherheitsrand, die Texthöhe so groß, dass die Leinwand (Name mit Platz für Akzente und Unterlängen,
+    Nummer nur so hoch wie die Ziffern) in die Höhe ohne Sicherheitsrand passt."""
+    margin = float(presets_doc["rules"]["safe_margin_cm"].get(area["family"], 0.0))
+    width = float(area["file"]["width_cm"]) - 2 * margin
+    height = float(area["file"]["height_cm"]) - 2 * margin
+    metrics = shop_gamertag.font_metrics(gamertag_rules)[font or gamertag_rules["font"]]
+    per_text = metrics["number" if kind == "member_number" else "name"]
+    return {"width_cm": max(0.0, width), "text_height_cm": max(0.0, height / per_text) if per_text else height,
+            "label": area["label"]}
 
 
 async def _clean_motif(db, raw: Any, colors: list[str], label: str) -> dict:
@@ -332,6 +346,7 @@ async def _clean_layout(db, product: dict, raw_rows: Any, available: dict[str, d
     by_key = {item["key"]: item for item in presets_doc["presets"]}
     min_width = presets_doc["rules"]["min_width_cm"]
     inks: set[str] | None = None  # Farben der Gamertag-Regeln - erst gelesen, wenn eine Ebene eine feste Farbe hat
+    gamertag_rules: dict | None = None  # erst gelesen, wenn eine Textebene eigene Werte hat
     out: list[dict] = []
     for raw in raw_rows:
         if not isinstance(raw, dict) or set(raw) - {"key", "mode", "layers"}:
@@ -362,7 +377,7 @@ async def _clean_layout(db, product: dict, raw_rows: Any, available: dict[str, d
                 raise ShopError(f"{label}: ein Gamertag braucht die Personalisierung „Gamertag“.")
             if kind == "member_number" and personalization not in ("member_number", "both"):
                 raise ShopError(f"{label}: die Vereinsnummer braucht die Personalisierung „Vereinsnummer“.")
-            if kind != "motif" and any(item["kind"] == kind for item in clean_layers):
+            if kind in shop_print_files.TEXT_KINDS and any(item["kind"] == kind for item in clean_layers):
                 raise ShopError(f"{label}: höchstens einmal je Fläche.")
             preset = by_key.get(layer.get("preset"))
             wanted = "motif" if kind == "motif" else "text"
@@ -376,16 +391,26 @@ async def _clean_layout(db, product: dict, raw_rows: Any, available: dict[str, d
                     "offset_y_cm": _number(layer.get("offset_y_cm", 0.0), f"{label}: Versatz senkrecht (cm)",
                                            -shop_print_files.MAX_OFFSET_CM, shop_print_files.MAX_OFFSET_CM)}
             if kind == "motif":
-                if any(layer.get(name) is not None for name in (*shop_gamertag.LAYER_SIZE_FIELDS, "ink")):
-                    raise ShopError(f"{label}: Texthöhe, Höchstbreite und Farbe gibt es nur für Gamertag und "
-                                    "Vereinsnummer.")
+                if any(layer.get(name) not in (None, "") for name in TEXT_ONLY_FIELDS):
+                    raise ShopError(f"{label}: Texthöhe, Höchstbreite, Schrift, Kontur, Farbe und Text gibt es nur für "
+                                    "Gamertag, Vereinsnummer und festen Text.")
                 item["width_cm"] = _number(layer.get("width_cm", preset.get("width_cm")), f"{label}: Breite (cm)",
                                            min_width, MAX_WIDTH_CM)
                 item["motif"] = await _clean_motif(db, layer.get("motif"), colors, label)
             else:
-                # Größe je Namensebene (#2105) - ohne Angabe gelten die globalen Gamertag-Regeln wie bisher.
+                # Größe je Textebene (#2105) - ohne Angabe gelten die globalen Gamertag-Regeln wie bisher. Seit #2142
+                # begrenzt die Fläche (mit Sicherheitsrand), dazu Schrift, Kontur und beim festen Text der Text selbst.
+                if gamertag_rules is None:
+                    gamertag_rules = await shop_gamertag.load_rules(db)
                 try:
-                    item.update(shop_gamertag.clean_layer_sizes(layer))
+                    style = shop_gamertag.clean_layer_style(layer, gamertag_rules)
+                    bounds = _text_bounds(area, presets_doc, gamertag_rules, kind, style.get("font"))
+                    item.update(shop_gamertag.clean_layer_sizes(layer, bounds=bounds))
+                    item.update(style)
+                    if kind == "text":
+                        item["text"] = shop_gamertag.clean_fixed_text(layer.get("text"), gamertag_rules)
+                    elif layer.get("text") not in (None, ""):
+                        raise ShopError("einen festen Text gibt es nur für die Art „Fester Text“.")
                 except ShopError as exc:
                     raise ShopError(f"{label}: {exc}") from exc
                 # Farbe des Namens fest (#2141): eine Farbe der Gamertag-Regeln; ohne Angabe automatisch nach Kontrast.
@@ -402,7 +427,8 @@ async def _clean_layout(db, product: dict, raw_rows: Any, available: dict[str, d
             if variant in shop_print_files.SURFACE_LUMINANCE:
                 item["variant"] = variant
             clean_layers.append(item)
-        clean_layers.sort(key=lambda layer: layer["kind"] not in shop_print_files.BASE_KINDS)
+        # Motive zuerst (ein Name folgt dem ersten Motiv), Textebenen in ihrer Reihenfolge (#2142: Name, Nummer darunter).
+        clean_layers.sort(key=lambda layer: layer["kind"] != "motif")
         row = {"key": key, "printful_placement": key, "technique": area["technique"], "mode": mode,
                "layers": clean_layers}
         if mode == "upload":
@@ -421,7 +447,8 @@ def _clean_surface(value: Any) -> str:
 def _layout_summary(rows: list[dict]) -> list[dict]:
     return [{"key": row["key"], "mode": row.get("mode") or "layout",
              "layers": [{name: layer.get(name) for name in ("kind", "preset", "width_cm", "offset_x_cm", "offset_y_cm")}
-                        | {name: layer[name] for name in (*shop_gamertag.LAYER_SIZE_FIELDS, "variant", "ink")
+                        | {name: layer[name] for name in (*shop_gamertag.LAYER_SIZE_FIELDS, "variant", "ink", "text",
+                                                          *shop_gamertag.LAYER_STYLE_FIELDS)
                            if layer.get(name) is not None}
                         | ({"motif": (layer.get("motif") or {}).get("key")} if layer.get("kind") == "motif" else {})
                         for layer in row.get("layers") or []]}
@@ -491,7 +518,8 @@ async def plan_layout(db, product_id: str, placements: Any, *, print_surface: st
     states = await shop_print_files.states(db, {**product, "placements": rows})
     return {"placements": [{"key": row["key"], "files": [{key: state[key] for key in ("placement", "color", "group",
                                                                                          "state", "detail", "plan",
-                                                                                         "background")}
+                                                                                         "background",
+                                                                                         "background_ok")}
                                                          for state in states if state["placement"] == row["key"]]}
                            for row in rows]}
 
@@ -645,7 +673,7 @@ async def run_check(db, product: dict) -> dict:
                            "Nicht bestellbar - nicht abbildbar: " + " ".join(conversion["blocked"])
                            + " Bitte in Schritt 3 neu setzen und speichern."))
     printed = [row for row in rows if row.get("mode") == "upload"
-               or any(layer.get("kind") == "motif" for layer in row.get("layers") or [])]
+               or any(layer.get("kind") in shop_print_files.BASE_KINDS for layer in row.get("layers") or [])]
     items.append(_item("placements", "Druckflächen", bool(printed),
                        f"{len(rows)} Flächen, davon {len(printed)} mit Motiv oder fertiger Datei." if printed
                        else "Mindestens eine Fläche mit einem Motiv des Vereins."))
@@ -840,6 +868,14 @@ async def admin_view(db, product_id: str) -> dict:
         "preset_rules": presets_doc["rules"],
         "motif_options": await shop_print_files.motif_options(db),
         "gamertag_canvas": _gamertag_canvas(gamertag_rules),
+        # Trikot-Vorlagen (#2142): je Vorlage die Ebenen für dieses Produkt (Personalisierung beachtet) und was fehlt.
+        "print_sets": [{**{key: item[key] for key in ("key", "label", "hint", "families")},
+                        **dict(zip(("layers", "skipped"), templates.set_layers(
+                            item, personalization=product.get("personalization") or "none")))}
+                       for item in presets_doc["sets"]],
+        # Schriften für Textebenen (#2142) - dieselben wie in den Gamertag-Regeln, alle unter der SIL Open Font License.
+        "fonts": [{"key": key, "label": font["label"]} for key, font in shop_gamertag.FONTS.items()],
+        "sample_number": await shop_print_files.sample_number(db),
         # Farben für Gamertag und Vereinsnummer zur festen Wahl je Ebene (#2141) - Vorgabe ist automatisch (Kontrast).
         "name_inks": [{key: color[key] for key in ("key", "label", "hex")} for color in gamertag_rules["colors"]],
         "pricing": {"general_markup_cents": general, "product_markup_cents": own, "effective_markup_cents": effective,
@@ -872,15 +908,18 @@ def _gamertag_canvas(rules: dict) -> dict:
     cm = shop_gamertag.CM_PER_INCH
     # Je Ebene einstellbar (#2105): die Vorgabe sind die globalen Regeln; die Leinwand wächst mit der Texthöhe
     # (``height_per_text``: Leinwandhöhe je Zoll Texthöhe), die Breite ist die Höchstbreite.
+    # Seit #2142 begrenzt die Fläche die Größe nach oben (die Vorschau rechnet sie je Fläche, ``font_metrics``); die
+    # Untergrenzen bleiben die der Gamertag-Regeln.
     return {"width_in": round(width / rules["dpi"], 4), "height_in": round(height / rules["dpi"], 4),
             "anchor_y_in": round(height / 2 / rules["dpi"], 4),
             "text_height_cm": round(rules["text_height_in"] * cm, 2),
             "max_width_cm": round(rules["max_width_in"] * cm, 2),
             "height_per_text": round(height / rules["dpi"] / rules["text_height_in"], 4),
+            "font": rules["font"], "font_metrics": shop_gamertag.font_metrics(rules),
             "limits": {"min_text_height_cm": round(shop_gamertag.MIN_HEIGHT_IN * cm, 2),
-                       "max_text_height_cm": round(shop_gamertag.MAX_HEIGHT_IN * cm, 2),
                        "min_width_cm": round(shop_gamertag.MIN_WIDTH_IN * cm, 2),
-                       "max_width_cm": round(shop_gamertag.MAX_WIDTH_IN * cm, 2)}}
+                       "min_outline_cm": shop_gamertag.MIN_OUTLINE_CM,
+                       "max_outline_cm": shop_gamertag.MAX_OUTLINE_CM}}
 
 
 async def list_view(db) -> list[dict]:

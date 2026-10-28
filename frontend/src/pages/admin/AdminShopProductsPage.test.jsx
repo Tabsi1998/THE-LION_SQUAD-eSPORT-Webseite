@@ -523,6 +523,120 @@ test("für Profis: fertige Druckdatei je Farbe hochladen", async () => {
 });
 
 // Allover (#2141): fertige Datei als Hintergrund, Motive und Namen als Ebenen darüber, Fassung aus dem Hintergrund.
+// ---------------------------------------------------------------- Trikot (#2142)
+
+const SPORT = "saira-condensed-900";
+const METRICS = { name: 2.3, number: 1.05, band_name: 1, band_number: 1.01 };
+const JERSEY_PRESETS = [
+  { key: "jersey_back_name", label: "Trikot Rücken: Name oben", hint: "", kind: "text", families: ["back"], follow: null, center_x: 0.5, anchor: "top", top_cm: 8 },
+  { key: "jersey_back_number", label: "Trikot Rücken: Nummer darunter", hint: "", kind: "text", families: ["back"], follow: "stack", gap_cm: 2, center_x: 0.5, anchor: "top", top_cm: 0 },
+  { key: "jersey_back_club", label: "Trikot Rücken: Vereinsname unten", hint: "", kind: "text", families: ["back"], follow: null, center_x: 0.5, anchor: "bottom", top_cm: 8 },
+];
+const JERSEY_BACK = {
+  key: "jersey_back", label: "Trikot Rücken", hint: "Name oben, Nummer darunter, Vereinsname unten.", families: ["back"], skipped: [],
+  layers: [
+    { kind: "gamertag", preset: "jersey_back_name", text_height_cm: 4, max_width_cm: 28, font: SPORT },
+    { kind: "member_number", preset: "jersey_back_number", text_height_cm: 10, max_width_cm: 28, font: SPORT },
+    { kind: "text", preset: "jersey_back_club", text: "TESTVEREIN", text_height_cm: 2.5, max_width_cm: 28, font: SPORT },
+  ],
+};
+
+function jerseyView(overrides = {}) {
+  const base = view({ product: { personalization: "both" }, ...overrides });
+  return {
+    ...base,
+    presets: [...PRESETS, ...JERSEY_PRESETS],
+    available_placements: base.available_placements.map((area) => (area.key === "back"
+      ? { ...area, presets: { motif: ["back_large"], text: ["text_center", ...JERSEY_PRESETS.map((preset) => preset.key)] } } : area)),
+    gamertag_canvas: { width_in: 3.5, height_in: 0.75, anchor_y_in: 0.375, text_height_cm: 1.27, max_width_cm: 8.89, height_per_text: 1.5,
+      font: "rajdhani-700", font_metrics: { "rajdhani-700": { name: 1.5, number: 1.02, band_name: 1, band_number: 1 }, [SPORT]: METRICS },
+      limits: { min_text_height_cm: 0.25, min_width_cm: 1.27, min_outline_cm: 0.05, max_outline_cm: 2 } },
+    fonts: [{ key: "rajdhani-700", label: "Rajdhani Bold" }, { key: SPORT, label: "Saira Condensed Black – Sport- und Blockschrift für Trikots" }],
+    name_inks: [{ key: "vereinsblau", label: "Vereinsblau", hex: "#29B6E8" }, { key: "reinweiss", label: "Weiß", hex: "#FFFFFF" }],
+    print_sets: [JERSEY_BACK],
+    labels: { ...LABELS, kinds: { ...LABELS.kinds, text: "Fester Text (in der Grunddatei, etwa der Vereinsname)" } },
+  };
+}
+
+test("Trikot Rücken mit einem Klick: Name oben, Nummer darunter, Vereinsname unten - mit Text, Schrift und Kontur (#2142)", async () => {
+  const data = jerseyView();
+  apiMock.get.mockResolvedValue({ data });
+  apiMock.put.mockResolvedValue({ data });
+  apiMock.post.mockResolvedValue({ data: { placements: [] } });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-designs"));
+  await user.click(screen.getByTestId("shop-area-use-back"));
+  await user.click(screen.getByTestId("shop-area-set-back-jersey_back"));
+  expect(screen.getByTestId("shop-area-set-notice-back")).toHaveTextContent("Vorlage „Trikot Rücken“ gesetzt: 3 Ebenen");
+  // Untereinander und mittig: der Name oben, die Nummer 2 cm unter den Großbuchstaben, der Vereinsname unten.
+  const top = (index) => parseFloat(screen.getByTestId(`shop-preview-back-layer-${index}`).style.top);
+  expect(top(0)).toBeLessThan(top(1));
+  expect(top(1)).toBeLessThan(top(2));
+  for (const index of [0, 1, 2]) {
+    const box = screen.getByTestId(`shop-preview-back-layer-${index}`).style;
+    expect(parseFloat(box.left) + parseFloat(box.width) / 2).toBeCloseTo(50, 1);
+  }
+  expect(screen.getByTestId("shop-layer-back-1-gap-now")).toHaveTextContent("jetzt 2 cm");
+  // Grenzen je Fläche statt fest (30,48 × 40,64 cm): eine Nummer mit 10 cm ist kein Fehler.
+  expect(screen.getByTestId("shop-layer-back-1-size-hint")).not.toHaveClass("text-warn");
+  expect(screen.getByTestId("shop-layer-back-1-size-hint")).toHaveTextContent("Höchstbreite bis 30,5 cm");
+  // Fester Text: Text ändern; Textebenen zeigen nur die Farbe, keine Fassung.
+  const text = screen.getByTestId("shop-layer-back-2-text");
+  await user.clear(text);
+  await user.type(text, "TESTVEREIN LÖWEN");
+  expect(screen.queryByTestId("shop-layer-back-2-variant")).toBeNull();
+  expect(screen.getByTestId("shop-layer-back-2-surface")).toHaveTextContent("Farbe nach der Shirtfarbe.");
+  await user.type(screen.getByTestId("shop-layer-back-1-outline"), "0,3");
+  await user.selectOptions(screen.getByTestId("shop-layer-back-1-outline-ink"), "reinweiss");
+  await waitFor(() => expect(screen.getByTestId("shop-preview-back-layer-1-sample").getAttribute("src")).toContain(
+    "kind=member_number&color=Black&text_height_cm=10&max_width_cm=28&font=saira-condensed-900&outline_cm=0.3&outline_ink=reinweiss"));
+  expect(screen.getByTestId("shop-preview-back-layer-2-sample").getAttribute("src")).toContain("kind=text");
+  // Ausrichten: Abstand zur Ebene darüber in cm.
+  await user.type(screen.getByTestId("shop-layer-back-1-gap"), "3");
+  await user.click(screen.getByTestId("shop-layer-back-1-gap-set"));
+  expect(screen.getByTestId("shop-layer-back-1-gap-now")).toHaveTextContent("jetzt 3 cm");
+  await user.click(screen.getByTestId("shop-layout-submit"));
+  const back = apiMock.put.mock.calls[0][1].placements.find((row) => row.key === "back");
+  expect(back.layers).toEqual([
+    { kind: "gamertag", preset: "jersey_back_name", offset_x_cm: 0, offset_y_cm: 0, text_height_cm: 4, max_width_cm: 28, font: SPORT },
+    { kind: "member_number", preset: "jersey_back_number", offset_x_cm: 0, offset_y_cm: 1, text_height_cm: 10, max_width_cm: 28, font: SPORT, outline_cm: 0.3, outline_ink: "reinweiss" },
+    { kind: "text", preset: "jersey_back_club", offset_x_cm: 0, offset_y_cm: 0, text_height_cm: 2.5, max_width_cm: 28, font: SPORT, text: "TESTVEREIN LÖWEN" },
+  ]);
+});
+
+test("Fester Text von Hand, mittig ausrichten; ohne Text blockiert das Speichern (#2142)", async () => {
+  apiMock.get.mockResolvedValue({ data: jerseyView() });
+  apiMock.post.mockResolvedValue({ data: { placements: [] } });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-designs"));
+  await user.click(screen.getByTestId("shop-area-add-text-front"));
+  const text = screen.getByTestId("shop-layer-front-2-text");
+  expect(text).toHaveValue("TESTVEREIN");
+  await user.click(screen.getByTestId("shop-preview-front-layer-2"));
+  await user.keyboard("{Shift>}{ArrowRight}{ArrowRight}{/Shift}");
+  const box = () => screen.getByTestId("shop-preview-front-layer-2").style;
+  expect(parseFloat(box().left) + parseFloat(box().width) / 2).not.toBeCloseTo(50, 1);
+  await user.click(screen.getByTestId("shop-layer-front-2-center"));
+  expect(parseFloat(box().left) + parseFloat(box().width) / 2).toBeCloseTo(50, 1);
+  await user.clear(text);
+  expect(screen.getByTestId("shop-area-problem-front")).toHaveTextContent("Hier fehlt der Text eines festen Texts.");
+  expect(screen.getByTestId("shop-layout-submit")).toHaveAttribute("aria-disabled", "true");
+});
+
+test("Namen auf einem Hintergrund: Farbe „aus Hintergrund“ - passt er nicht mehr zur Vorlage, sagt die Vorschau es (#2142)", async () => {
+  const data = alloverView();
+  const outdated = { ...data, placements: data.placements.map((row) => ({ ...row, files: row.files.map((state) => (state.color === "Black" ? { ...state, background_ok: false } : state)) })) };
+  apiMock.get.mockResolvedValue({ data: outdated });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-designs"));
+  expect(screen.getByTestId("shop-layer-back-1-surface")).toHaveTextContent("Farbe: Vereinsblau (aus Hintergrund)");
+  expect(screen.queryByTestId("shop-layer-back-1-variant")).toBeNull();
+  expect(screen.getByTestId("shop-preview-back-backdrop-outdated")).toHaveTextContent("passt nicht mehr zur Vorlage");
+});
+
 function alloverView() {
   const plan = (color, variant, text) => ({ layers: [
     { index: 0, kind: "motif", source: { design_key: "ruecken-weiss", variant, version: 1 }, image_path: "/api/shop/print-files/k9/ruecken-weiss-v1.png", aspect: 1,

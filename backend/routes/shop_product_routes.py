@@ -62,7 +62,7 @@ class MotifRef(BaseModel):
 class LayerIn(BaseModel):
     model_config = {"extra": "forbid"}
 
-    kind: Literal["motif", "gamertag", "member_number"]
+    kind: Literal["motif", "gamertag", "member_number", "text"]
     preset: str = Field(..., min_length=1, max_length=40)
     width_cm: float | None = None
     offset_x_cm: float = 0.0
@@ -75,6 +75,12 @@ class LayerIn(BaseModel):
     variant: Literal["auto", "light", "dark"] | None = None
     # Farbe von Gamertag bzw. Vereinsnummer fest (#2141): eine Farbe der Gamertag-Regeln, ohne Angabe automatisch.
     ink: str | None = Field(None, max_length=30)
+    # Fester Text (#2142), etwa der Vereinsname - nur bei der Art „text“.
+    text: str | None = Field(None, max_length=80)
+    # Schrift und Kontur einer Textebene (#2142) - ohne Angabe die Schrift der Gamertag-Regeln, keine Kontur.
+    font: str | None = Field(None, max_length=40)
+    outline_cm: float | None = None
+    outline_ink: str | None = Field(None, max_length=30)
 
 
 class PlacementLayout(BaseModel):
@@ -273,18 +279,22 @@ async def preview(product_id: str, placement: str = Query(..., max_length=64), c
 
 
 @router.get("/products/{product_id}/name-sample")
-async def name_sample(product_id: str, kind: Literal["gamertag", "member_number"] = "gamertag",
+async def name_sample(product_id: str, kind: Literal["gamertag", "member_number", "text"] = "gamertag",
                       color: str = Query(..., max_length=60), text_height_cm: float | None = Query(None),
                       max_width_cm: float | None = Query(None), ink: str | None = Query(None, max_length=30),
+                      text: str | None = Query(None, max_length=80), font: str | None = Query(None, max_length=40),
+                      outline_cm: float | None = Query(None), outline_ink: str | None = Query(None, max_length=30),
                       me: dict = Depends(require_area("finance"))):
-    """Beispielname einer Namensebene in echter Größe (#2105) - gerendert wie die Druckdatei, als PNG der Leinwand.
-    ``ink`` ist die Farbe des Namens aus dem Plan (Untergrund aus dem Hintergrund, #2141)."""
+    """Beispielname einer Textebene in echter Größe (#2105) - gerendert wie die Druckdatei, als PNG der Leinwand.
+    ``ink`` ist die Farbe des Namens aus dem Plan (Untergrund aus dem Hintergrund, #2141). Seit #2142 auch mit Schrift
+    und Kontur der Ebene, die Vereinsnummer als Beispielnummer und der feste Text (``kind=text``) mit ``text``."""
     db = get_db()
     try:
         product = await shop_products._product(db, product_id)
-        payload = await shop_print_files.sample_png(db, product, kind=kind, color=color,
-                                                    layer={"text_height_cm": text_height_cm,
-                                                           "max_width_cm": max_width_cm}, ink=ink)
+        layer = {"text_height_cm": text_height_cm, "max_width_cm": max_width_cm, "font": font,
+                 "outline_cm": outline_cm, "outline_ink": outline_ink}
+        payload = await shop_print_files.sample_png(db, product, kind=kind, color=color, layer=layer, ink=ink,
+                                                    text=text)
     except (ShopError, LookupError) as exc:
         raise _refused(exc) from exc
     return Response(payload, media_type="image/png",

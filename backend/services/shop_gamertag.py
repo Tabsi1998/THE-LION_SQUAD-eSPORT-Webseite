@@ -59,6 +59,11 @@ FONTS: dict[str, dict[str, Any]] = {
                    "license": "OFL-Outfit.txt", "weight": 700},
     "unbounded-800": {"label": "Unbounded ExtraBold – Überschriften, sehr breit", "file": "unbounded-latin-800.woff2",
                       "license": "OFL-Unbounded.txt", "weight": None},
+    # Sport- und Blockschrift für Trikots (#2142): Name, Rückennummer und Vereinsname. Fontsource 5.3.0 wie die übrigen
+    # Schriften (scripts/build_web_fonts.py), lateinischer Zeichensatz.
+    "saira-condensed-900": {"label": "Saira Condensed Black – Sport- und Blockschrift für Trikots",
+                            "file": "saira-condensed-latin-900.woff2", "license": "OFL-SairaCondensed.txt",
+                            "weight": None},
 }
 HEIGHT_MODES = {"cap": "Höhe der Großbuchstaben", "font": "Schriftgröße (wie im Printful-Designer)"}
 ALIGNS = {"center": "mittig", "left": "links", "right": "rechts"}
@@ -208,35 +213,80 @@ def clean_rules(raw: Any) -> dict:
 
 CM_PER_INCH = 2.54
 LAYER_SIZE_FIELDS = ("text_height_cm", "max_width_cm")
+# Schrift und Kontur je Ebene (#2142) - ohne Angabe die Schrift der Gamertag-Regeln und keine Kontur.
+LAYER_STYLE_FIELDS = ("font", "outline_cm", "outline_ink")
+# Seit #2142 begrenzt die Druckfläche (mit Sicherheitsrand) Texthöhe und Höchstbreite einer Ebene - nicht mehr die
+# festen 2 bzw. 12 Zoll der globalen Regeln. Ohne Fläche (Beispielname in der Vorschau) gilt nur diese technische
+# Obergrenze; die Leinwand darf höchstens ``MAX_CANVAS_PIXELS`` haben (bei 300 DPI etwa ein 40 cm hoher Name auf 30 cm).
+LAYER_MAX_CM = 200.0
+MAX_CANVAS_PIXELS = 60_000_000
+MIN_OUTLINE_CM, MAX_OUTLINE_CM = 0.05, 2.0
+# Optional in den Regeln einer Ebene - nur dann im Fingerabdruck, damit sich bestehende Dateien nicht ändern.
+OPTIONAL_RENDER_FIELDS = ("outline_in", "outline_color")
 
 
-def _layer_cm(value: Any, label: str, low_in: float, high_in: float) -> float:
-    low, high = round(low_in * CM_PER_INCH, 2), round(high_in * CM_PER_INCH, 2)
+def _cm_text(value: float) -> str:
+    return f"{value:.2f}".rstrip("0").rstrip(".").replace(".", ",")
+
+
+def _layer_cm(value: Any, label: str, low: float, high: float, where: str = "") -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) \
             or not low <= value <= high:
-        raise ShopError(f"{label}: eine Zahl in cm von {str(low).replace('.', ',')} bis "
-                        f"{str(high).replace('.', ',')}.")
+        raise ShopError(f"{label}: eine Zahl in cm von {_cm_text(low)} bis {_cm_text(high)}{where}.")
     return round(float(value), 2)
 
 
-def clean_layer_sizes(layer: dict | None) -> dict:
-    """Texthöhe und Höchstbreite einer Gamertag- bzw. Vereinsnummer-Ebene in cm (#2105) - nur, was angegeben ist.
-    Grenzen wie bei den globalen Regeln (``MIN_HEIGHT_IN`` … ``MAX_WIDTH_IN``)."""
+def clean_layer_sizes(layer: dict | None, *, bounds: dict | None = None) -> dict:
+    """Texthöhe und Höchstbreite einer Namensebene in cm (#2105) - nur, was angegeben ist. Untergrenzen wie bei den
+    globalen Regeln; die Obergrenze ist seit #2142 die Fläche: ``bounds`` mit ``text_height_cm``, ``width_cm`` (Fläche
+    ohne Sicherheitsrand) und ``label`` - die Meldung nennt sie in cm. Ohne Fläche nur ``LAYER_MAX_CM``."""
     out = {}
     layer = layer or {}
+    where = f" - so viel lässt die Fläche „{bounds['label']}“ mit Sicherheitsrand zu" if bounds else ""
     if layer.get("text_height_cm") is not None:
-        out["text_height_cm"] = _layer_cm(layer["text_height_cm"], "Texthöhe", MIN_HEIGHT_IN, MAX_HEIGHT_IN)
+        high = round(bounds["text_height_cm"], 2) if bounds else LAYER_MAX_CM
+        out["text_height_cm"] = _layer_cm(layer["text_height_cm"], "Texthöhe", round(MIN_HEIGHT_IN * CM_PER_INCH, 2),
+                                          max(high, round(MIN_HEIGHT_IN * CM_PER_INCH, 2)), where)
     if layer.get("max_width_cm") is not None:
-        out["max_width_cm"] = _layer_cm(layer["max_width_cm"], "Höchstbreite", MIN_WIDTH_IN, MAX_WIDTH_IN)
+        high = round(bounds["width_cm"], 2) if bounds else LAYER_MAX_CM
+        out["max_width_cm"] = _layer_cm(layer["max_width_cm"], "Höchstbreite", round(MIN_WIDTH_IN * CM_PER_INCH, 2),
+                                        max(high, round(MIN_WIDTH_IN * CM_PER_INCH, 2)), where)
     return out
 
 
-def layer_rules(rules: dict, layer: dict | None) -> dict:
-    """Die Regeln für eine Ebene (#2105): Texthöhe und Höchstbreite der Ebene, wenn gesetzt, sonst die globalen. Die
-    Mindesthöhe der Verkleinerung bleibt im selben Verhältnis zur Texthöhe. Rendern (Vorschau, Bestelldatei) und
-    Platzieren (Leinwand) lesen genau diese Regeln - ohne Angabe ist alles wie bisher."""
-    sizes = clean_layer_sizes(layer)
-    if not sizes:
+def clean_layer_style(layer: dict | None, rules: dict) -> dict:
+    """Schrift und Kontur einer Namens- bzw. Textebene (#2142) - nur, was angegeben ist: ``font`` (eine der
+    freigegebenen Schriften), ``outline_cm`` (Stärke der Kontur) und ``outline_ink`` (Farbe der Kontur aus den
+    Gamertag-Regeln; ohne Angabe die Farbe mit dem höchsten Kontrast zur Schrift)."""
+    out: dict = {}
+    layer = layer or {}
+    if layer.get("font") not in (None, ""):
+        if layer["font"] not in FONTS:
+            raise ShopError("Unbekannte Schrift.")
+        out["font"] = layer["font"]
+    if layer.get("outline_cm") not in (None, 0, 0.0):
+        out["outline_cm"] = _layer_cm(layer["outline_cm"], "Kontur", MIN_OUTLINE_CM, MAX_OUTLINE_CM)
+    if layer.get("outline_ink") not in (None, "", "auto"):
+        if "outline_cm" not in out:
+            raise ShopError("Eine Konturfarbe braucht eine Konturstärke.")
+        if layer["outline_ink"] not in {color["key"] for color in rules["colors"]}:
+            raise ShopError("Kontur: diese Farbe gibt es in den Gamertag-Regeln nicht.")
+        out["outline_ink"] = layer["outline_ink"]
+    return out
+
+
+def has_own_settings(layer: dict | None, rules: dict) -> bool:
+    """Hat die Ebene eigene Größe, Schrift oder Kontur? Dann prüft der Plan der Druckfläche, ob sie hineinpasst."""
+    return bool(clean_layer_sizes(layer) or clean_layer_style(layer, rules))
+
+
+def layer_rules(rules: dict, layer: dict | None, *, bounds: dict | None = None) -> dict:
+    """Die Regeln für eine Ebene (#2105, #2142): Texthöhe, Höchstbreite, Schrift und Kontur der Ebene, wenn gesetzt,
+    sonst die globalen. Die Mindesthöhe der Verkleinerung bleibt im selben Verhältnis zur Texthöhe. Rendern (Vorschau,
+    Grund- und Bestelldatei) und Platzieren (Leinwand) lesen genau diese Regeln - ohne Angabe ist alles wie bisher."""
+    sizes = clean_layer_sizes(layer, bounds=bounds)
+    style = clean_layer_style(layer, rules)
+    if not sizes and not style:
         return rules
     out = dict(rules)
     if "text_height_cm" in sizes:
@@ -246,14 +296,21 @@ def layer_rules(rules: dict, layer: dict | None) -> dict:
                                           3)
     if "max_width_cm" in sizes:
         out["max_width_in"] = round(sizes["max_width_cm"] / CM_PER_INCH, 3)
+    if "font" in style:
+        out["font"] = style["font"]
+    if "outline_cm" in style:
+        out["outline_in"] = round(style["outline_cm"] / CM_PER_INCH, 4)
+        out["outline_color"] = style.get("outline_ink")  # ohne Angabe: höchster Kontrast zur Schrift
     return out
 
 
 def rules_hash(rules: dict) -> str:
-    """Fingerabdruck dessen, was die Pixel bestimmt: Regeln, Schriftdatei und Renderer-Version."""
+    """Fingerabdruck dessen, was die Pixel bestimmt: Regeln, Schriftdatei und Renderer-Version. Die Kontur (#2142)
+    zählt nur, wenn sie gesetzt ist - so bleibt der Fingerabdruck bestehender Dateien gleich."""
     font = FONTS[rules["font"]]
     payload = {"renderer": RENDERER_VERSION, "font_sha256": hashlib.sha256(_font_bytes(font["file"])).hexdigest(),
-               **{name: rules[name] for name in RENDER_FIELDS}}
+               **{name: rules[name] for name in RENDER_FIELDS},
+               **{name: rules[name] for name in OPTIONAL_RENDER_FIELDS if name in rules}}
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
 
 
@@ -343,6 +400,67 @@ def clean_text(raw: Any, rules: dict) -> str:
     return text
 
 
+# Vereinsnummer (#2142): nur Ziffern, höchstens so viele wie die größte Wunschnummer (``jersey_numbers.HIGHEST``, 9999).
+DIGITS = "0123456789"
+MAX_NUMBER_DIGITS = 4
+# Fester Text (#2142), etwa der Vereinsname: dieselben Zeichen wie ein Gamertag und ein paar Satzzeichen.
+MAX_FIXED_TEXT = 40
+FIXED_TEXT_EXTRA = " .,-&'!?:/#+()"
+# Was gerendert wird: ein Name (Gamertag), eine Nummer (nur Ziffern, Leinwand so hoch wie die Ziffern) oder ein fester
+# Text der Grunddatei.
+RENDER_KINDS = ("gamertag", "number", "text")
+
+
+def clean_number(raw: Any) -> str:
+    """Eine Vereinsnummer, wie sie gedruckt wird: nur Ziffern 0–9."""
+    text = unicodedata.normalize("NFC", "" if raw is None else str(raw)).strip()
+    if not text:
+        raise ShopError("Die Nummer ist leer.")
+    if any(char not in DIGITS for char in text):
+        raise ShopError("Die Nummer: nur Ziffern 0–9.")
+    if len(text) > MAX_NUMBER_DIGITS:
+        raise ShopError(f"Die Nummer hat höchstens {MAX_NUMBER_DIGITS} Ziffern.")
+    return text
+
+
+def fixed_text_chars(rules: dict) -> str:
+    return "".join(sorted(set(rules["allowed_chars"] + FIXED_TEXT_EXTRA), key=ord))
+
+
+def clean_fixed_text(raw: Any, rules: dict) -> str:
+    """Ein fester Text (#2142) wie der Vereinsname - geprüft wie ein Name, aber ohne Wortfilter und Mindestlänge (er
+    kommt von den Finanzen, nicht aus der Bestellung). Nennt nur die störenden Zeichen."""
+    text = unicodedata.normalize("NFC", "" if raw is None else str(raw))
+    if any(_is_emoji(char) for char in text):
+        raise ShopError("Fester Text: Emojis und Symbole gehen im Druck nicht.")
+    if any(unicodedata.category(char).startswith("C") for char in text):
+        raise ShopError("Fester Text: bitte ohne Steuerzeichen (etwa Tabulator oder Zeilenumbruch).")
+    text = re.sub(" {2,}", " ", text.strip(" "))
+    if not text:
+        raise ShopError("Der feste Text ist leer.")
+    extras = fixed_text_chars(rules)
+    bad: list[str] = []
+    for char in text:
+        if not ((char.isascii() and char.isalnum()) or char in extras) and char not in bad:
+            bad.append(char)
+    if bad:
+        shown = ", ".join(f"„{char}“" for char in bad[:5]) + (" …" if len(bad) > 5 else "")
+        rest = " ".join(char for char in extras if char != " ")
+        raise ShopError(f"Fester Text: diese Zeichen gehen nicht: {shown}. Erlaubt sind Buchstaben A–Z, Ziffern 0–9, "
+                        f"Leerzeichen und {rest}")
+    if len(text) > MAX_FIXED_TEXT:
+        raise ShopError(f"Fester Text: höchstens {MAX_FIXED_TEXT} Zeichen.")
+    return text
+
+
+def _clean_for(kind: str, raw: Any, rules: dict) -> str:
+    if kind == "number":
+        return clean_number(raw)
+    if kind == "text":
+        return clean_fixed_text(raw, rules)
+    return clean_text(raw, rules)
+
+
 # ---------------------------------------------------------------- Renderer
 
 @lru_cache(maxsize=8)
@@ -394,60 +512,136 @@ class Rendered:
     meta: dict
 
 
-def canvas(rules: dict) -> tuple[int, int]:
-    """Breite und Höhe der Leinwand in Pixeln - für jeden Namen gleich (Höchstbreite × Höhe bei voller Texthöhe)."""
+def _stroke_px(rules: dict) -> int:
+    """Stärke der Kontur in Pixeln der Datei (#2142) - 0 ohne Kontur."""
+    return int(round(rules["outline_in"] * rules["dpi"])) if rules.get("outline_in") else 0
+
+
+def _digit_band(font: ImageFont.FreeTypeFont) -> tuple[int, int]:
+    """Wie weit die Ziffern über und unter die Grundlinie reichen - die Leinwand einer Nummer ist nur so hoch."""
+    _left, top, _right, bottom = font.getbbox(DIGITS, anchor="ls")
+    return -top, max(0, bottom)
+
+
+def canvas(rules: dict, kind: str = "gamertag") -> tuple[int, int]:
+    """Breite und Höhe der Leinwand in Pixeln - für jeden Namen gleich (Höchstbreite × Höhe bei voller Texthöhe). Eine
+    Nummer (#2142, nur Ziffern) braucht keinen Platz für Akzente und Unterlängen: ihre Leinwand ist so hoch wie die
+    Ziffern. Eine Kontur kommt oben und unten dazu."""
     size = _font_px(rules, rules["text_height_in"])
     font = _font(rules["font"], size)
-    ascent, descent = font.getmetrics()
-    cap = _cap_px(font)
-    half = math.ceil(max(ascent - cap / 2, descent + cap / 2)) + PAD_PX
+    stroke = _stroke_px(rules)
+    if kind == "number":
+        up, down = _digit_band(font)
+        half = math.ceil((up + down) / 2) + PAD_PX + stroke
+    else:
+        ascent, descent = font.getmetrics()
+        cap = _cap_px(font)
+        half = math.ceil(max(ascent - cap / 2, descent + cap / 2)) + PAD_PX + stroke
     return round(rules["max_width_in"] * rules["dpi"]), 2 * half
 
 
-def _too_wide(rules: dict, width_px: int) -> str:
-    return (f"Der Name ist zu breit: auch bei {shop_designs.inches(rules['min_text_height_in'])} Texthöhe wird er "
-            f"{shop_designs.inches(math.ceil(width_px / rules['dpi'] * 100) / 100)} breit, erlaubt sind "
-            f"{shop_designs.inches(rules['max_width_in'])}. Bitte einen kürzeren Namen wählen.")
+def canvas_problem(rules: dict, kind: str = "gamertag") -> str | None:
+    """Zu viele Pixel für eine Datei? Die Fläche begrenzt die Größe, aber eine 300-DPI-Leinwand wächst schnell."""
+    width, height = canvas(rules, kind)
+    if width * height <= MAX_CANVAS_PIXELS:
+        return None
+    return (f"Die Datei dieser Ebene hätte {width} × {height} px ({rules['dpi']} DPI) - mehr als "
+            f"{MAX_CANVAS_PIXELS // 1_000_000} Millionen Pixel. Bitte Texthöhe oder Höchstbreite kleiner wählen.")
 
 
-def render(raw: Any, rules: dict, *, color_key: str | None = None) -> Rendered:
+NOUNS = {"gamertag": ("Der Name", "er", "einen kürzeren Namen"),
+         "number": ("Die Nummer", "sie", "eine kleinere Texthöhe"),
+         "text": ("Der Text", "er", "einen kürzeren Text oder eine größere Höchstbreite")}
+
+
+def _too_wide(rules: dict, width_px: int, kind: str = "gamertag") -> str:
+    noun, pronoun, advice = NOUNS.get(kind, NOUNS["gamertag"])
+    return (f"{noun} ist zu breit: auch bei {shop_designs.inches(rules['min_text_height_in'])} Texthöhe wird "
+            f"{pronoun} {shop_designs.inches(math.ceil(width_px / rules['dpi'] * 100) / 100)} breit, erlaubt sind "
+            f"{shop_designs.inches(rules['max_width_in'])}. Bitte {advice} wählen.")
+
+
+def outline_color(rules: dict, fill: dict) -> dict:
+    """Die Farbe der Kontur: fest gewählt (``outline_color``), sonst die Farbe der Regeln mit dem höchsten Kontrast zur
+    Schrift - bei gleichem Kontrast die erste. Gibt es die feste Farbe nicht mehr, gilt wieder automatisch."""
+    from services.shop_motifs import relative_luminance
+
+    wanted = rules.get("outline_color")
+    for color in rules["colors"]:
+        if color["key"] == wanted:
+            return color
+    fill_luminance = relative_luminance(fill["hex"]) or 0.0
+    return max(rules["colors"],
+               key=lambda color: contrast_ratio(relative_luminance(color["hex"]) or 0.0, fill_luminance))
+
+
+def _rgb(hex_value: str) -> tuple[int, int, int]:
+    red, green, blue = (int(hex_value[index:index + 2], 16) for index in (1, 3, 5))
+    return red, green, blue
+
+
+def render(raw: Any, rules: dict, *, color_key: str | None = None, kind: str = "gamertag") -> Rendered:
     """Prüft den Text und liefert das fertige PNG mit Maßen - **ohne Wortfilter** (der braucht die Datenbank). Von
-    außen deshalb nie direkt aufrufen, sondern ``preview`` oder ``store``: die prüfen beides."""
-    text = clean_text(raw, rules)
+    außen deshalb nie direkt aufrufen, sondern ``preview`` oder ``store``: die prüfen beides. ``kind`` (#2142):
+    ``gamertag`` (Name), ``number`` (Vereinsnummer, nur Ziffern) oder ``text`` (fester Text der Grunddatei)."""
+    if kind not in RENDER_KINDS:
+        raise ShopError("Unbekannte Art des Texts.")
+    text = _clean_for(kind, raw, rules)
     color = color_of(rules, color_key)
+    problem = canvas_problem(rules, kind)
+    if problem:
+        raise ShopError(problem)
     key, dpi = rules["font"], rules["dpi"]
-    width_px, height_px = canvas(rules)
+    width_px, height_px = canvas(rules, kind)
+    stroke = _stroke_px(rules)
+    room = width_px - 2 * stroke  # die Kontur liegt außen um die Schrift - sie muss mit in die Höchstbreite
     full = _font_px(rules, rules["text_height_in"])
     smallest = min(full, _font_px(rules, rules["min_text_height_in"]))
     size = full
     ink, left = _text_width(key, size, text)
-    if ink > width_px:
-        size = min(full - 1, int(full * width_px / ink))
+    if ink > room:
+        size = min(full - 1, int(full * room / ink))
         while size >= smallest:
             ink, left = _text_width(key, size, text)
-            if ink <= width_px:
+            if ink <= room:
                 break
             size -= 1
         if size < smallest:
-            raise ShopError(_too_wide(rules, _text_width(key, smallest, text)[0]))
+            raise ShopError(_too_wide(rules, _text_width(key, smallest, text)[0] + 2 * stroke, kind))
     font = _font(key, size)
     anchor_y = height_px / 2
-    baseline = anchor_y + _cap_px(font) / 2
+    if kind == "number":
+        up, down = _digit_band(font)
+        baseline = anchor_y + (up - down) / 2
+    else:
+        baseline = anchor_y + _cap_px(font) / 2
     if rules["align"] == "left":
-        x = -left
+        x = -left + stroke
     elif rules["align"] == "right":
-        x = width_px - ink - left
+        x = width_px - ink - left - stroke
     else:
         x = (width_px - ink) / 2 - left
     mask = Image.new("L", (width_px, height_px), 0)
     ImageDraw.Draw(mask).text((x, baseline), text, font=font, fill=255, anchor="ls")
-    box = mask.getbbox()
+    outline = None
+    if stroke:
+        outline = Image.new("L", (width_px, height_px), 0)
+        ImageDraw.Draw(outline).text((x, baseline), text, font=font, fill=255, anchor="ls", stroke_width=stroke,
+                                     stroke_fill=255)
+    box = (outline or mask).getbbox()
     if box and (box[1] <= 0 or box[3] >= height_px):  # pragma: no cover - Schutz, falls eine Schrift ausreißt
         raise ShopError("Ein Zeichen ragt über die Druckdatei hinaus - bitte eine andere Schrift wählen.")
-    red, green, blue = (int(color["hex"][index:index + 2], 16) for index in (1, 3, 5))
+    red, green, blue = _rgb(color["hex"])
     # Farbe überall, Deckkraft aus der Maske: so entstehen keine dunklen Ränder an den Kanten.
     img = Image.new("RGBA", (width_px, height_px), (red, green, blue, 0))
     img.putalpha(mask)
+    stroke_color = None
+    if outline is not None:
+        # Die Kontur darunter, die Schrift darüber - beide mit Farbe überall und Deckkraft aus ihrer Maske.
+        stroke_color = outline_color(rules, color)
+        under = Image.new("RGBA", (width_px, height_px), (*_rgb(stroke_color["hex"]), 0))
+        under.putalpha(outline)
+        img = Image.alpha_composite(under, img)
     payload = shop_designs.png_bytes(img, dpi)
     height_in = _height_in(rules, size)
     scaled = size < full
@@ -457,7 +651,8 @@ def render(raw: Any, rules: dict, *, color_key: str | None = None) -> Rendered:
         "max_width": shop_designs.inches(rules["max_width_in"]),
         "canvas": f"{shop_designs.inches(width_px / dpi)} × {shop_designs.inches(height_px / dpi)}",
     }
-    notice = (f"Auf {measures['text_height']} Texthöhe verkleinert, damit der Name in "
+    noun = NOUNS[kind][0]
+    notice = (f"Auf {measures['text_height']} Texthöhe verkleinert, damit {noun[0].lower() + noun[1:]} in "
               f"{measures['max_width']} passt." if scaled else None)
     meta = {
         "width_px": width_px, "height_px": height_px, "dpi": dpi,
@@ -469,6 +664,10 @@ def render(raw: Any, rules: dict, *, color_key: str | None = None) -> Rendered:
         "anchor_x_in": round(width_px / 2 / dpi, 3), "anchor_y_in": round(anchor_y / dpi, 3),
         "length": len(text), "rules_hash": rules_hash(rules), "measures": measures,
     }
+    if kind != "gamertag":
+        meta["kind"] = kind
+    if stroke_color is not None:
+        meta.update(outline_px=stroke, outline_key=stroke_color["key"], outline_hex=stroke_color["hex"])
     return Rendered(text=text, payload=payload, sha256=hashlib.sha256(payload).hexdigest(), meta=meta)
 
 
@@ -594,9 +793,9 @@ async def store(db, raw: Any, *, purpose: str, color_key: str | None = None, act
     elif not user_id:
         raise ShopError("Eine Bestelldatei gehört zu einem Konto.")
     rendered, warnings, rules = await _rendered(db, raw, color_key, layer)
-    # Mit eigener Größe der Ebene (#2105) prüft der Plan der Druckfläche, ob der Name hineinpasst - nicht das alte
-    # Namensfeld aus #1708.
-    problem = None if clean_layer_sizes(layer) else await _placement_problem(db, rules)
+    # Mit eigener Größe, Schrift oder Kontur der Ebene (#2105, #2142) prüft der Plan der Druckfläche, ob der Name
+    # hineinpasst - nicht das alte Namensfeld aus #1708.
+    problem = None if has_own_settings(layer, rules) else await _placement_problem(db, rules)
     if problem:
         raise ShopError(problem)
     row = await _reuse_test_file(db, rendered.sha256) if purpose == "test" else None
@@ -653,6 +852,29 @@ def file_view(row: dict) -> dict:
                         "canvas": f"{shop_designs.inches(row['print_width_in'])} × "
                                   f"{shop_designs.inches(row['print_height_in'])}"}
     return view
+
+
+def band_px(rules: dict, kind: str = "gamertag") -> float:
+    """Das sichtbare Band bei voller Texthöhe in Pixeln der Datei (#2142): bei Namen und Texten die Großbuchstaben, bei
+    einer Nummer die Ziffern - mittig in der Leinwand. Daran misst „Abstand zur Ebene darüber“."""
+    font = _font(rules["font"], _font_px(rules, rules["text_height_in"]))
+    if kind == "number":
+        up, down = _digit_band(font)
+        return float(up + down)
+    return float(_cap_px(font))
+
+
+def font_metrics(rules: dict) -> dict:
+    """Je Schrift (#2142), je Zoll Texthöhe: Höhe der Leinwand für Namen und Texte (``name``) bzw. Nummern
+    (``number``) und das sichtbare Band (``band_name``, ``band_number``) - damit rechnet die Vorschau in Schritt 3 die
+    Rahmen live. Exakt rechnet der Server (``canvas``, ``band_px``)."""
+    out = {}
+    for key in FONTS:
+        own = {**rules, "font": key}
+        per = own["dpi"] * own["text_height_in"]
+        out[key] = {"name": round(canvas(own)[1] / per, 4), "number": round(canvas(own, "number")[1] / per, 4),
+                    "band_name": round(band_px(own) / per, 4), "band_number": round(band_px(own, "number") / per, 4)}
+    return out
 
 
 async def admin_view(db) -> dict:
