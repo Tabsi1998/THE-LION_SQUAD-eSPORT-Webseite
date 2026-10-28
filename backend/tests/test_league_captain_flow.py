@@ -193,6 +193,44 @@ async def test_withdrawing_keeps_an_agreed_time(flow):
 
 
 @pytest.mark.asyncio
+async def test_staff_withdrawing_tells_both_sides_as_the_tournament_lead(flow):
+    world = await setup(flow)
+    users = world["users"]
+    flow.act_as(users["Spieler1"])
+    proposed = (await flow.post(proposals_url(world), json={"scheduled_at": when(2)})).json()
+
+    flow.act_as(world["staff"])
+    withdrawn = await flow.post(f"{proposals_url(world)}/{proposed['id']}/decision", json={"action": "withdraw"})
+    assert withdrawn.status_code == 200, withdrawn.text
+    rows = (await told(flow))["schedule_withdrawn"]
+    assert receivers(rows) == ids(users, "Spieler1", "Spieler2", "FalkenLeitung"), "beide Seiten erfahren es"
+    assert all(row["body"].count("Die Turnierleitung hat den Vorschlag") == 1 for row in rows)
+
+
+@pytest.mark.asyncio
+async def test_with_an_own_side_only_that_side_withdraws_not_the_former_proposer(flow):
+    """Grenzfall: die Person hat den Vorschlag einst gemacht, handelt jetzt aber für die andere Seite - die Seite
+    entscheidet, nicht die Person."""
+    world = await setup(flow)
+    users = world["users"]
+    proposal = {
+        "id": new_id(), "match_id": world["match"]["id"], "match_collection": "matches_v2",
+        "tournament_id": world["tournament"]["id"], "actor_user_id": users["FalkenLeitung"]["id"],
+        "actor_registration_id": world["lions_reg"]["id"], "scheduled_at": when(2), "note": None,
+        "status": "pending", "kind": "proposal", "created_at": now_utc().isoformat(), "updated_at": now_utc().isoformat(),
+    }
+    await flow.db.match_schedule_proposals.insert_one(dict(proposal))
+    await flow.db.matches_v2.update_one({"id": world["match"]["id"]}, {"$set": {"schedule_status": "proposed"}})
+
+    flow.act_as(users["FalkenLeitung"])
+    refused = await flow.post(f"{proposals_url(world)}/{proposal['id']}/decision", json={"action": "withdraw"})
+    assert refused.status_code == 403, refused.text
+    flow.act_as(users["Spieler2"])
+    allowed = await flow.post(f"{proposals_url(world)}/{proposal['id']}/decision", json={"action": "withdraw"})
+    assert allowed.status_code == 200, allowed.text
+
+
+@pytest.mark.asyncio
 async def test_match_page_and_chat_carry_no_account_role(flow):
     """Matchseite und Matchchat nennen Personen nur mit Namen und Bild - keine Kontorolle, auch nicht für Gäste."""
     world = await setup(flow)
@@ -326,3 +364,24 @@ async def test_role_conflicts_point_to_the_website(flow):
     assert "Website" in refused.json()["detail"]
     kick = await flow.delete(f"/api/teams/{world['lions']['id']}/members/{users['Spieler1']['id']}")
     assert kick.status_code == 409 and "Website" in kick.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_role_changes_stay_saved_when_a_message_fails(flow, monkeypatch):
+    import routes.team_routes as team_routes
+
+    async def broken(*_args, **_kwargs):
+        raise RuntimeError("Postfach nicht erreichbar")
+
+    world = await setup(flow)
+    users = world["users"]
+    monkeypatch.setattr(team_routes, "create_user_notification", broken)
+
+    flow.act_as(users["Spieler1"])
+    resigned = await flow.put(roles_url(world), json={"captain_id": None})
+    assert resigned.status_code == 200, resigned.text
+    flow.act_as(users["Leitung"])
+    given = await flow.put(roles_url(world), json={"captain_id": users["Spieler3"]["id"]})
+    assert given.status_code == 200, given.text
+    stored = await flow.db.team_squads.find_one({"id": world["squad_a"]["id"]}, {"_id": 0})
+    assert stored["captain_id"] == users["Spieler3"]["id"]

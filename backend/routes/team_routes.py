@@ -389,15 +389,18 @@ async def _after_squad_roles(db, team: dict, squad: dict, before: dict, after: d
         user_id = after.get(field)
         if not user_id or user_id == before.get(field) or user_id == me["id"]:
             continue
-        await create_user_notification(
-            user_id,
-            title=f"Du bist jetzt {SQUAD_ROLE_LABELS[field]}: {squad.get('name') or 'Co-Team'}",
-            body=f"Im Co-Team {squad.get('name') or ''} von {team.get('name') or 'deinem Team'} vereinbarst du Termine, "
-                 "meldest und bestätigst Ergebnisse.",
-            url=f"/teams/{team['id']}",
-            kind="team_role_changed",
-            meta={"team_id": team["id"], "squad_id": squad.get("id"), "role": field.removesuffix("_id")},
-        )
+        try:
+            await create_user_notification(
+                user_id,
+                title=f"Du bist jetzt {SQUAD_ROLE_LABELS[field]}: {squad.get('name') or 'Co-Team'}",
+                body=f"Im Co-Team {squad.get('name') or ''} von {team.get('name') or 'deinem Team'} vereinbarst du "
+                     "Termine, meldest und bestätigst Ergebnisse.",
+                url=f"/teams/{team['id']}",
+                kind="team_role_changed",
+                meta={"team_id": team["id"], "squad_id": squad.get("id"), "role": field.removesuffix("_id")},
+            )
+        except Exception:  # noqa: BLE001 - die Rolle ist schon gespeichert; eine Nachricht hält das nicht auf (#2110)
+            logger.warning("[teams] Rollen-Nachricht an %s nicht verschickt", log_safe(user_id), exc_info=True)
 
 
 SQUAD_CHANGED_MEANWHILE = ("Das Co-Team wurde gerade von jemand anderem geändert – bitte neu laden und noch einmal "
@@ -1137,15 +1140,18 @@ async def _tell_role_resigned(db, team: dict, squad: dict, requested: dict, me: 
     labels = " und ".join(SQUAD_ROLE_LABELS[field] for field in SQUAD_ROLE_FIELDS if field in requested)
     leads = {team.get("leader_id"), *(team.get("co_leader_ids") or [])} - {me["id"], None}
     for user_id in sorted(leads):
-        await create_user_notification(
-            user_id,
-            title=f"Rolle abgegeben: {squad.get('name') or 'Co-Team'}",
-            body=f"{_user_label(me)} ist nicht mehr {labels} im Co-Team {squad.get('name') or ''} – bitte die Rolle "
-                 "neu vergeben.",
-            url=f"/teams/{team['id']}",
-            kind="team_role_changed",
-            meta={"team_id": team["id"], "squad_id": squad.get("id"), "resigned": sorted(requested)},
-        )
+        try:
+            await create_user_notification(
+                user_id,
+                title=f"Rolle abgegeben: {squad.get('name') or 'Co-Team'}",
+                body=f"{_user_label(me)} ist nicht mehr {labels} im Co-Team {squad.get('name') or ''} – bitte die "
+                     "Rolle neu vergeben.",
+                url=f"/teams/{team['id']}",
+                kind="team_role_changed",
+                meta={"team_id": team["id"], "squad_id": squad.get("id"), "resigned": sorted(requested)},
+            )
+        except Exception:  # noqa: BLE001 - die Rolle ist schon abgegeben; eine Nachricht hält das nicht auf
+            logger.warning("[teams] Nachricht „Rolle abgegeben“ an %s nicht verschickt", log_safe(user_id), exc_info=True)
 
 
 @router.delete("/{team_id}/squads/{squad_id}")

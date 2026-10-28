@@ -816,9 +816,12 @@ async def _withdraw_proposal(db, match: dict, collection: str, proposal: dict, m
                              acting_reg: dict | None) -> dict:
     """Den eigenen, noch offenen Vorschlag zurückziehen (#2110) - die Seite, die vorgeschlagen hat, oder die
     Turnierleitung. Bleibt danach nichts offen, ist die Partie wieder ohne Vorschlag (oder beim angenommenen Termin)."""
-    own_side = bool(acting_reg and proposal.get("actor_registration_id")
-                    and proposal.get("actor_registration_id") == acting_reg.get("id"))
-    if not (own_side or proposal.get("actor_user_id") == me["id"] or _is_staff(me)):
+    # Mit eigener Seite zählt die Seite; nur ohne Seite (etwa die Turnierleitung) die eigene Person.
+    if acting_reg:
+        own = bool(proposal.get("actor_registration_id") and proposal.get("actor_registration_id") == acting_reg.get("id"))
+    else:
+        own = proposal.get("actor_user_id") == me["id"]
+    if not (own or _is_staff(me)):
         raise HTTPException(status_code=403, detail="Zurückziehen kann nur die Seite, die den Termin vorgeschlagen hat.")
     if proposal.get("status") == "withdrawn" and proposal.get("decision_user_id") == me["id"]:
         return {"ok": True, "status": "withdrawn", "idempotent_replay": True}
@@ -840,7 +843,8 @@ async def _withdraw_proposal(db, match: dict, collection: str, proposal: dict, m
             change = {"$set": {"updated_at": now_iso}, "$unset": {"schedule_status": "", "schedule_deadline_at": ""}}
         await getattr(db, collection).update_one({"id": match["id"]}, change)
         await _rewrite_matchday_schedule(db, match.get("tournament_id"))
-    await _tell_schedule(db, match, "withdrawn", proposal, me, proposal.get("actor_registration_id"))
+    # Wer handelt, ist die eigene Seite - oder die Turnierleitung ohne Seite: dann erfahren es beide Seiten.
+    await _tell_schedule(db, match, "withdrawn", proposal, me, (acting_reg or {}).get("id"))
     return {"ok": True, "status": "withdrawn", "idempotent_replay": False}
 
 
