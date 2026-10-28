@@ -18,6 +18,7 @@ vi.mock("@/hooks/useChats", () => ({ useChatRead: () => {} }));
 vi.mock("@/hooks/useDocumentTitle", () => ({ useDocumentTitle: () => {} }));
 
 const MatchPage = (await import("./MatchPage")).default;
+const { resetLeagueTrail } = await import("@/hooks/useLeagueTrail");
 
 const LEAGUES = [{
   id: "lg1", slug: "probe-liga", name: "Probe-Liga",
@@ -53,6 +54,7 @@ function renderMatch(page, leagues = LEAGUES) {
 }
 
 beforeEach(() => {
+  resetLeagueTrail();
   apiMock.get.mockReset();
   apiMock.post.mockReset();
   apiMock.post.mockResolvedValue({ data: { ok: true } });
@@ -113,4 +115,30 @@ test("nach der Nachtragsfrist: Hinweis auf die Turnierleitung und der Matchchat 
   expect(screen.queryByTestId("match-chat-closed")).toBeNull();
   fireEvent.click(screen.getByTestId("league-lineup-closed-ask"));
   await waitFor(() => expect(screen.getByTestId("chat-input")).toHaveValue("@leitung "));
+});
+
+test("Kader ohne Rolle: nach der Frist der Hinweis ohne Matchchat-Verweis", async () => {
+  const league = {
+    best_of: 3, needed: 2, team_size: 2, mode_order: [], sides: [{ registration_id: "a", name: "Loewen · Rudel A" }, { registration_id: "b", name: "Falken · Horst" }],
+    own_registration_id: "a", roster: [], own_games: [], proposal_games: [], pool: { modes: [] },
+    games: [{ position: 1, map_name: "Hafen", winner_registration_id: "b", scores: {}, lineups: {} }],
+    lineups_missing: ["a"], can_amend_lineup: false, amend_until: "2026-01-02T10:00:00+00:00",
+  };
+  renderMatch({ ...BASE, can_act: false, can_propose_schedule: false, can_manage_schedule: false, acting_registration_id: null,
+    match: { ...BASE.match, status: "completed", schedule_status: "accepted", results: [] }, schedule_proposals: [], league, report_state: { status: "agreed" } });
+  const hint = await screen.findByTestId("league-lineup-closed");
+  expect(hint).toHaveTextContent("Captain oder Vertreter");
+  expect(hint).not.toHaveTextContent("Matchchat");
+  expect(screen.queryByTestId("league-lineup-closed-ask")).toBeNull();
+});
+
+test("Seite und Reiter derselben Staffel teilen sich einen Abruf von /leagues", async () => {
+  const { renderHook } = await import("@testing-library/react");
+  const { useLeagueTrail } = await import("@/hooks/useLeagueTrail");
+  apiMock.get.mockImplementation(async () => ({ data: { leagues: LEAGUES } }));
+  const first = renderHook(() => useLeagueTrail(TOURNAMENT));
+  const second = renderHook(() => useLeagueTrail(TOURNAMENT));
+  await waitFor(() => expect(first.result.current?.seasonHref).toBe("/liga/probe-liga/season-1"));
+  await waitFor(() => expect(second.result.current?.seasonHref).toBe("/liga/probe-liga/season-1"));
+  expect(apiMock.get.mock.calls.filter(([url]) => url === "/leagues")).toHaveLength(1);
 });

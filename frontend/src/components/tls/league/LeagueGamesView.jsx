@@ -73,7 +73,10 @@ export function LineupAmendClosed({ league, onAskStaff = null }) {
         <p className="text-sm font-bold text-white">Eure Aufstellung fehlt noch – die Frist zum Nachtragen ist vorbei.</p>
         <p className="mt-0.5 text-xs text-white/60">
           {league.amend_until ? `Nachtragen ging bis ${until(league.amend_until)}. ` : ""}
-          Jetzt trägt sie nur noch die Turnierleitung nach – schreib ihr im Matchchat mit @leitung, wer je Map gespielt hat.
+          {/* Den Matchchat schreiben Captain, Vertreter und Teamleitung - der übrige Kader bekommt keinen Verweis darauf. */}
+          {onAskStaff
+            ? "Jetzt trägt sie nur noch die Turnierleitung nach – schreib ihr im Matchchat mit @leitung, wer je Map gespielt hat."
+            : "Jetzt trägt sie nur noch die Turnierleitung nach – das klären Captain oder Vertreter eures Teams mit ihr."}
         </p>
         {onAskStaff ? (
           <button type="button" onClick={onAskStaff} className="tls-btn tls-btn--secondary mt-2 min-h-[44px] px-3 py-2 rounded-sm text-[10px] uppercase tracking-wider font-bold" data-testid="league-lineup-closed-ask">
