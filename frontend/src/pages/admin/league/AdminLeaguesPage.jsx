@@ -10,8 +10,11 @@ import { FormGrid } from "@/components/tls/AdminForm";
 import { SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { fromViennaInput, viennaDate } from "@/lib/vienna";
-import { ACTIVE_STATUS_OPTIONS, SEASON_STATUS_OPTIONS, VISIBILITY_SHORT, weekdayName } from "@/lib/league";
+import { ACTIVE_STATUS_OPTIONS, SEASON_STATUS_OPTIONS, VISIBILITY_SHORT, leagueLookChanges, leagueLookToForm, weekdayName } from "@/lib/league";
+import { accentProblem, accentStyle } from "@/lib/leagueLook";
+import { LeagueEmblem } from "@/components/tls/league/public/LeagueLook";
 import { LeagueDeleteSheet } from "./LeagueDeleteSheet";
+import { AccentField, BannerField, EmblemField } from "./LeagueLookFields";
 import { toast } from "sonner";
 
 const STATUS_TEXT = Object.fromEntries(SEASON_STATUS_OPTIONS);
@@ -31,21 +34,29 @@ function LeagueSheet({ league, games, onClose, onSaved }) {
   const [form, setForm] = useState(() => ({
     name: league?.name || "", game_id: league?.game_id || games[0]?.id || "", description: league?.description || "",
     slug: league?.slug || "", status: league?.status || "active",
+    ...leagueLookToForm(league),
   }));
   const [saving, setSaving] = useState(false);
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   const submit = async (event) => {
     event.preventDefault();
+    const problem = accentProblem(form.accent_color);
+    if (problem) {
+      toast.error(problem);
+      return;
+    }
     setSaving(true);
     try {
       if (editing) {
         const body = { name: form.name, description: form.description.trim() || null, status: form.status };
         if (!league.game_locked && form.game_id !== league.game_id) body.game_id = form.game_id;
         if (!league.slug_locked && form.slug.trim() && form.slug.trim() !== league.slug) body.slug = form.slug.trim();
+        // Gestaltung (#2107): nur was sich geändert hat - leer entfernt das Bild bzw. die Farbe.
+        Object.assign(body, leagueLookChanges(form, league));
         const { data } = await api.patch(`/admin/leagues/${league.id}`, body);
         toast.success(data.changed?.length ? "Liga gespeichert." : "Keine Änderung.");
       } else {
-        await api.post("/admin/leagues", { name: form.name, game_id: form.game_id, description: form.description || null });
+        await api.post("/admin/leagues", { name: form.name, game_id: form.game_id, description: form.description || null, ...leagueLookChanges(form, {}) });
         toast.success("Liga angelegt.");
       }
       onSaved();
@@ -72,6 +83,17 @@ function LeagueSheet({ league, games, onClose, onSaved }) {
         </FormGrid>
       ) : null}
       <TextAreaField label="Beschreibung" rows={2} value={form.description} onChange={(value) => set("description", value)} placeholder="freiwillig" testId="league-description" />
+      {/* Gestaltung (#2107): gilt für alle Seasons, jede Season kann Emblem und Banner überschreiben. */}
+      <div className="space-y-4 border-t border-white/10 pt-4" data-testid="league-look">
+        <div>
+          <h3 className="font-heading text-lg font-bold uppercase">Gestaltung</h3>
+          <p className="text-xs text-white/55">Gilt für alle Seasons; eine Season kann Emblem und Banner eigens festlegen. Wirkt beim Speichern sofort.</p>
+        </div>
+        <AccentField value={form.accent_color} onChange={(value) => set("accent_color", value)} />
+        <EmblemField value={form.emblem_url} onChange={(value) => set("emblem_url", value || "")} accent={form.accent_color} testId="league-emblem" />
+        <BannerField url={form.banner_url} focus={form.banner_focus} emblem={form.emblem_url} accent={form.accent_color} testId="league-banner"
+          onChange={(url, focus) => setForm((current) => ({ ...current, banner_url: url || "", banner_focus: focus }))} />
+      </div>
     </AdminSheet>
   );
 }
@@ -182,8 +204,9 @@ export default function AdminLeaguesPage() {
       <div className="space-y-6">
         {leagues.map((league) => (
           <section key={league.id} className="border border-white/10 rounded-sm bg-[#121212]" data-testid={`league-${league.slug}`} aria-label={league.name}>
-            <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
-              <div className="min-w-0">
+            <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3" style={accentStyle(league.accent_color)}>
+              <LeagueEmblem src={league.emblem_url} size={40} testId={`league-emblem-${league.slug}`} />
+              <div className="min-w-0 flex-1">
                 <h2 className="font-heading text-xl font-bold uppercase break-words">{league.name}</h2>
                 <p className="text-xs text-white/55">{league.game_name || "Spiel fehlt"} · /liga/{league.slug}{league.status === "archived" ? " · archiviert" : ""}</p>
                 {league.description ? <p className="mt-1 text-xs text-white/60 break-words">{league.description}</p> : null}

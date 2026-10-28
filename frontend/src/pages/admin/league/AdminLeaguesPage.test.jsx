@@ -116,3 +116,45 @@ test("ohne Liga: ein Hinweis statt einer leeren Seite", async () => {
   renderPage();
   expect(await screen.findByTestId("league-empty")).toHaveTextContent("Noch keine Liga");
 });
+
+// Gestaltung (#2107): Akzentfarbe mit Kontrastprüfung, Emblem und Banner - nur Geändertes geht an den Server.
+test("Gestaltung: zu dunkle Akzentfarbe wird vor dem Speichern abgewiesen, eine helle geht als einzige Änderung mit", async () => {
+  apiMock.patch.mockResolvedValue({ data: { changed: ["accent_color"] } });
+  const { toast } = await import("sonner");
+  renderPage();
+  fireEvent.click(await screen.findByTestId("league-edit-probe-shooter"));
+  expect(screen.getByTestId("league-look")).toHaveTextContent("Gestaltung");
+  fireEvent.change(screen.getByTestId("league-accent"), { target: { value: "#1A1A40" } });
+  expect(screen.getByTestId("league-accent-problem")).toHaveTextContent("Kontrast");
+  fireEvent.click(screen.getByTestId("league-edit-save"));
+  expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("Kontrast"));
+  expect(apiMock.patch).not.toHaveBeenCalled();
+
+  fireEvent.change(screen.getByTestId("league-accent"), { target: { value: "#FFB020" } });
+  expect(screen.queryByTestId("league-accent-problem")).toBeNull();
+  fireEvent.click(screen.getByTestId("league-edit-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/admin/leagues/l1",
+    { name: "Probe-Liga", description: null, status: "active", accent_color: "#FFB020" }));
+});
+
+test("Gestaltung: vorhandenes Emblem und Banner stehen in der Vorschau, Entfernen schickt null", async () => {
+  const league = { ...BODY.leagues[0], emblem_url: "/api/static/uploads/probe-emblem.png", banner_url: "/api/static/uploads/probe-banner.webp",
+    banner_focus: { x: 20, y: 70, mobile_x: 80, mobile_y: 30 } };
+  apiMock.get.mockResolvedValue({ data: { ...BODY, leagues: [league] } });
+  apiMock.patch.mockResolvedValue({ data: { changed: ["banner_url"] } });
+  renderPage();
+  expect((await screen.findByTestId("league-emblem-probe-shooter")).querySelector("img")).toHaveAttribute("src", expect.stringContaining("probe-emblem.png"));
+  fireEvent.click(screen.getByTestId("league-edit-probe-shooter"));
+  const preview = screen.getByTestId("league-banner-crops");
+  expect(preview.querySelectorAll("img")[0].style.objectPosition).toBe("20% 70%");
+  expect(preview.querySelectorAll("img")[preview.querySelectorAll("img").length - 2].style.objectPosition).toBe("80% 30%");
+  // Fokuspunkt für das Handy setzen: Klick in die Mitte des Bildes.
+  fireEvent.click(screen.getByTestId("league-banner-target-mobile"));
+  const pick = screen.getByTestId("league-banner-pick");
+  pick.getBoundingClientRect = () => ({ left: 0, top: 0, width: 200, height: 100 });
+  fireEvent.click(pick, { clientX: 50, clientY: 50 });
+  fireEvent.click(screen.getByTestId("league-edit-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/admin/leagues/l1", expect.objectContaining({
+    banner_focus: { x: 20, y: 70, mobile_x: 25, mobile_y: 50 } })));
+  expect(apiMock.patch.mock.calls[0][1]).not.toHaveProperty("emblem_url");
+});
