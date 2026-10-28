@@ -1234,16 +1234,19 @@
 
 /* ------------------------------------------ Tabelle (#2121) */
 /* Liga, Jeder gegen jeden, Schweizer System und Gruppen: die Tabelle der Website ohne Form. Die Zeilen teilen sich die
-   Höhe (nie abgeschnitten), Zahlen stehen rechtsbündig in gleich breiten Ziffern; Platz 1-3 in Gold erst nach dem Ende. */
+   Höhe der Folie (TvStandings rechnet sie aus, höchstens 7,5 Einheiten), Zahlen stehen rechtsbündig in gleich breiten
+   Ziffern; Platz 1-3 in Gold erst nach dem Ende. */
 .tv-standings {
   height: 100%;
   min-height: 0;
   display: grid;
   grid-template-columns: repeat(var(--tv-cols, 1), minmax(0, 1fr));
+  align-content: start;
+  align-items: start;
   gap: calc(var(--tv-u) * 2.4);
   padding-top: calc(var(--tv-u) * 1.2);
 }
-.tv-standings--groups { grid-auto-rows: minmax(0, 1fr); gap: calc(var(--tv-u) * 1.8); }
+.tv-standings--groups { gap: calc(var(--tv-u) * 1.8); }
 .tv-standings--empty { align-content: center; justify-items: center; text-align: center; }
 .tv-standings__block {
   display: flex;
@@ -1254,13 +1257,14 @@
   border: var(--tv-line-w) solid var(--tv-line-strong);
   border-radius: 6px;
   background: var(--tv-card);
+  overflow: hidden;
   animation: tv-rise var(--tls-motion-slow) var(--tls-ease) both;
 }
 .tv-standings__block:nth-child(2) { animation-delay: 0.09s; }
 .tv-standings__block:nth-child(3) { animation-delay: 0.18s; }
 .tv-standings__block:nth-child(n+4) { animation-delay: 0.27s; }
 .tv-standings__title { color: var(--tv-accent); }
-.tv-standings__table { flex: 1 1 auto; width: 100%; min-height: 0; border-collapse: collapse; table-layout: fixed; font-variant-numeric: tabular-nums; }
+.tv-standings__table { flex: none; width: 100%; border-collapse: collapse; table-layout: fixed; font-variant-numeric: tabular-nums; }
 .tv-standings__table thead th {
   padding: 0 calc(var(--tv-u) * 0.6) calc(var(--tv-u) * 0.5);
   border-bottom: var(--tv-line-w) solid var(--tv-line-strong);
@@ -1269,12 +1273,16 @@
   text-transform: uppercase;
   letter-spacing: 0.12em;
 }
-.tv-standings__row { height: calc(100% / var(--tv-rows, 8)); }
+.tv-standings__row { height: var(--tv-row-h, calc(var(--tv-u) * 6)); }
 .tv-standings__row td { padding: calc(var(--tv-u) * 0.35) calc(var(--tv-u) * 0.6); border-bottom: var(--tv-line-w) solid var(--tv-line); vertical-align: middle; }
 .tv-standings__row:last-child td { border-bottom: 0; }
 .tv-standings__rank { width: calc(var(--tv-u) * 6); text-align: right; }
 td.tv-standings__rank { font-weight: 800; color: var(--tv-muted); }
-.tv-standings__name { text-align: left; overflow: hidden; text-overflow: clip; overflow-wrap: anywhere; font-weight: 600; }
+/* Ein Name, eine Zeile: sonst schiebt ein langer Name die Zeilen aus der Tabelle (64 Spieler in acht Gruppen). */
+.tv-standings__name { text-align: left; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 600; }
+.tv-standings--groups[data-compact="1"] .tv-standings__row { font-size: var(--tv-fs-name-min); }
+.tv-standings--groups[data-compact="1"] .tv-standings__title { font-size: var(--tv-fs-name); line-height: var(--tv-lh-name); }
+.tv-standings--groups[data-compact="1"] .tv-standings__block { padding: calc(var(--tv-u) * 0.9) calc(var(--tv-u) * 1.2); gap: calc(var(--tv-u) * 0.4); }
 .tv-standings__num { width: calc(var(--tv-u) * 7.5); text-align: right; color: var(--tv-muted); }
 .tv-standings--groups[data-compact="1"] .tv-standings__num { width: calc(var(--tv-u) * 6); }
 td.tv-standings__num--strong { color: #ffffff; font-weight: 800; }

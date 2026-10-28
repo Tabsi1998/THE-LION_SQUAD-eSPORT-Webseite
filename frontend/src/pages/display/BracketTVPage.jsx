@@ -548,7 +548,7 @@ function BracketTv() {
               ) : null}
               {active === TABLE_SLIDE && hasTable ? (
                 <div className="tv-slide" key={`table-${playing.runId}`}>
-                  <TvStandingsSlide standings={standings} nameLabel={nameHead(t)} final={FINISHED.has(String(t?.status || ""))} />
+                  <TvStandingsSlide standings={standings} nameLabel={nameHead(t)} final={FINISHED.has(String(t?.status || ""))} turn={playing.turn} />
                 </div>
               ) : null}
               {active === "live" ? (
