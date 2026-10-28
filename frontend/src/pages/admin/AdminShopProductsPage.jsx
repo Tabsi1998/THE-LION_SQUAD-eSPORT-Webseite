@@ -522,14 +522,14 @@ function PricesStep({ view, busy, run }) {
               return (
                 <tr key={row.id} className="border-t border-white/10" data-testid={`shop-price-${row.sku}`}>
                   <td className="py-1.5 pr-3">{row.display_label || row.label}{row.blocked_reason && <span className="block text-xs text-warn">{row.blocked_reason}</span>}</td>
-                  <td className="py-1.5 pr-3 text-right" data-testid={`shop-price-${row.sku}-gross`}>
+                  <td className="py-1.5 pr-3 text-right whitespace-nowrap" data-testid={`shop-price-${row.sku}-gross`}>
                     {hasCents(row.printful_gross_cents) ? money(row.printful_gross_cents) : <span className="text-white/45">noch nicht geschätzt</span>}
                     {row.estimate_stale && <span className="block text-xs text-warn">Schätzung veraltet</span>}
                   </td>
-                  <td className={`py-1.5 pr-3 text-right font-bold ${row.price_cents !== expected ? "text-warn" : ""}`} data-testid={`shop-price-${row.sku}-member`}>{row.price_cents === null ? "nicht übernommen" : money(row.price_cents)}</td>
-                  <td className="py-1.5 pr-3 text-right text-white/70" data-testid={`shop-price-${row.sku}-shipping`}>{money(row.shipping_example_cents)}</td>
-                  <td className="py-1.5 pr-3 text-right">{money(row.price_cents === null ? row.suggested_public_cents : row.public_price_cents)}{row.price_cents === null ? " (Vorschlag)" : ""}</td>
-                  <td className="py-1.5 text-right text-white/60" data-testid={`shop-price-${row.sku}-catalog`}>
+                  <td className={`py-1.5 pr-3 text-right whitespace-nowrap font-bold ${row.price_cents !== expected ? "text-warn" : ""}`} data-testid={`shop-price-${row.sku}-member`}>{row.price_cents === null ? "nicht übernommen" : money(row.price_cents)}</td>
+                  <td className="py-1.5 pr-3 text-right whitespace-nowrap text-white/70" data-testid={`shop-price-${row.sku}-shipping`}>{money(row.shipping_example_cents)}</td>
+                  <td className="py-1.5 pr-3 text-right whitespace-nowrap">{money(row.price_cents === null ? row.suggested_public_cents : row.public_price_cents)}{row.price_cents === null ? " (Vorschlag)" : ""}</td>
+                  <td className="py-1.5 text-right whitespace-nowrap text-white/60" data-testid={`shop-price-${row.sku}-catalog`}>
                     {money(row.cost_cents)}
                     {row.catalog_check && (
                       <span className="ml-1.5 inline-flex items-center gap-1 text-xs text-warn" title="Katalog und Schätzung liegen stark auseinander (mehr als 10 % und 1 €) – Druckflächen und Fläche im Grundpreis prüfen." data-testid={`shop-price-${row.sku}-check`}>
