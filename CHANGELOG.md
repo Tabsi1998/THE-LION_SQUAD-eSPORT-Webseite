@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.51.1 (28.10.2026)
+
+### Fehlerbehebungen
+
+* Shop: Allover-Trikot verlangt die Nahtfarbe auch, wenn der Printful-Katalog sie nicht nennt – Testentwurf und Schätzung gehen wieder (#2158)
+
 ## 1.51.0 (28.10.2026)
 
 ### Neu
