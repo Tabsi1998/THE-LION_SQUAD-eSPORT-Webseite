@@ -9,8 +9,10 @@ Turnierleitung: [Liga leiten](liga.md).
 ## Die Woche
 
 - Eine **Spielwoche** geht von **Dienstag bis Montag**, je Woche ein Spiel.
-- **Weihnachtspause 21.12.–3.1.:** keine Spiele, keine Termine, keine Fristen. Spieltag 6 endet am So 20.12.,
-  Spieltag 7 ist in der Woche ab Di 5.1.
+- **Weihnachtspause 21.12.–3.1.:** keine Spiele und keine Termine. Spieltag 6 endet am So 20.12., Spieltag 7 ist in
+  der Woche ab Di 5.1. Der **Mo 4.1.** gehört noch zur gesperrten Woche – Terminvorschläge erst ab **Di 5.1.**
+- In der Pause **ruhen Termin-, Bestätigungs- und Nachtragsfristen**, das **Einspruchsfenster nicht**: Einspruch
+  also gleich einlegen, auch kurz vor oder in der Pause.
 
 ## Was ihr tut
 
