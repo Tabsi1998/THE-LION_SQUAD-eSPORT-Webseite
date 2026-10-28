@@ -104,6 +104,14 @@ async def _propose_no_show(db, tournament: dict, match: dict, info: dict, now: d
     return 1
 
 
+def league_missing(match: dict, games: list[dict] | None) -> list[str]:
+    """Seiten des Spiels ohne Aufstellung in den Maps der Erstmeldung."""
+    from services.league_games import missing_lineups
+
+    sides = [slot["registration_id"] for slot in match.get("slots") or [] if slot.get("registration_id")]
+    return missing_lineups(games or [], sides)
+
+
 async def _auto_confirm(db, tournament: dict, match_id: str, stage: dict | None, now: datetime) -> int:
     """Die eine Meldung eintragen - unter der Turniersperre mit Turnier, Phase und Spiel, wie sie jetzt sind: eine
     inzwischen geänderte Frist oder Austragung (vor Ort) gilt."""
@@ -114,14 +122,21 @@ async def _auto_confirm(db, tournament: dict, match_id: str, stage: dict | None,
             report = single_report(match or {})
             if not match or not due or due > now or not report:
                 return 0
+            # Liga (#1650): die Maps der Erstmeldung gelten mit; die Gegenseite trägt ihre Aufstellung nach.
+            games = [dict(game) for game in report.get("games") or []] or None
+            missing = league_missing(match, games)
             try:
                 await submit_v2_result(
                     db, match, report.get("results") or [], actor_id=report.get("user_id"),
                     proof_url=report.get("proof_url"), note=None, force=False, audit_action="match.result.auto_confirm",
+                    games=games, lineups_missing=missing if games else None,
                 )
             except MatchV2ResultError as exc:
                 await _audit(db, "match.result.auto_confirm_failed", match, {"detail": str(exc)[:200]})
                 return 0
+            if games and missing:
+                from services.league_games import tell_missing_lineups
+                await tell_missing_lineups(db, match, missing)
             await db.matches_v2.update_one({"id": match_id}, {"$set": {
                 "result_meta.auto_confirmed": True, "result_meta.auto_confirmed_at": now.isoformat(),
             }})
