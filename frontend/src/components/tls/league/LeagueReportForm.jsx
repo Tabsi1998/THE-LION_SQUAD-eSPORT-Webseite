@@ -1,7 +1,8 @@
-import { useState } from "react";
-import { Check, ClipboardCheck, Users, X } from "lucide-react";
+import { useId, useState } from "react";
+import { Check, ClipboardCheck, IdCard, Users, X } from "lucide-react";
 import { LazyImg } from "@/components/tls/LazyImg";
 import { REPORT_STATE_TEXT } from "@/lib/matchReport";
+import { blockedPlayers } from "@/lib/leagueIds";
 import {
   changeGame,
   confirmPayload,
@@ -25,9 +26,12 @@ import {
 const chip = (active) => `inline-flex min-h-[40px] max-w-full items-center gap-1.5 rounded-sm border px-3 py-1.5 text-sm ${
   active ? "border-[#29B6E8] bg-[#29B6E8]/15 text-white" : "border-white/15 bg-[#0A0A0A] text-white/70 hover:border-white/35"}`;
 
-/** Spieler-Chips: genau `size` aus dem Kader antippen. */
+/** Spieler-Chips: genau `size` aus dem Kader antippen. Wer ohne gültige Spiel-ID nicht aufgestellt werden kann
+ * (#2108), steht grau mit Grund darunter; ein schon Aufgestellter bleibt abwählbar. */
 export function LineupPicker({ roster = [], value = [], size = 1, onChange, label = "Aufstellung", testId }) {
   const full = value.length >= size;
+  const blocked = blockedPlayers(roster);
+  const reasonId = useId();
   return (
     <div role="group" aria-label={label} data-testid={testId}>
       <div className="mb-1.5 flex items-center justify-between gap-2 text-[11px] font-bold uppercase tracking-widest text-white/55">
@@ -37,26 +41,38 @@ export function LineupPicker({ roster = [], value = [], size = 1, onChange, labe
       <div className="flex flex-wrap gap-1.5">
         {roster.map((person) => {
           const active = value.includes(person.id);
+          const locked = Boolean(person.lineup_blocked) && !active;
           return (
             <button
               key={person.id}
               type="button"
               aria-pressed={active}
-              disabled={!active && full}
+              disabled={locked || (!active && full)}
+              aria-describedby={locked ? reasonId : undefined}
+              title={locked ? person.lineup_blocked : person.game_id_text || undefined}
               onClick={() => onChange(toggleLineup(value, person.id, size))}
-              className={`${chip(active)} disabled:opacity-40`}
+              className={`${chip(active)} disabled:opacity-40 ${locked ? "cursor-not-allowed border-dashed" : ""}`}
               data-testid={testId ? `${testId}-${person.id}` : undefined}
+              data-blocked={locked ? "true" : undefined}
             >
               {/* Platz fürs Häkchen immer reserviert (#2096): sonst wird der Chip beim Antippen breiter, die Reihe
                   springt und der nächste Tipp landet daneben. */}
               <span className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center" data-check-slot aria-hidden="true">
                 {active && <Check className="h-3.5 w-3.5" />}
+                {locked && <IdCard className="h-3.5 w-3.5" />}
               </span>
               <span className="truncate">{person.name}</span>
             </button>
           );
         })}
       </div>
+      {blocked.length > 0 && (
+        <ul id={reasonId} className="mt-1.5 space-y-0.5 text-xs text-warn" data-testid={testId ? `${testId}-blocked` : undefined}>
+          {blocked.map((person) => (
+            <li key={person.id} className="break-words [overflow-wrap:anywhere]">Nicht aufstellbar: {person.name} – {person.reason}</li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

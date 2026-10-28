@@ -1117,6 +1117,7 @@ async def _staff_games(db, match: dict, body: MatchV2ResultSubmit,
     if body.games:
         games, missing = league_games.admin_games(league, [game.model_dump() for game in body.games], normalized)
         await league_games.check_double_use(db, league, games, set(league.reg_ids))
+        await league_games.lock_lineup_ids(db, league, games, league.reg_ids)
         return games, missing
     if match.get("games"):
         try:

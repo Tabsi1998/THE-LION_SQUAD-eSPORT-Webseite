@@ -156,6 +156,9 @@ async def init_indexes():
     await db.matches_v2.create_index("lineup_user_ids", sparse=True)
     # Aufgabe „Aufstellung nachtragen“ auf der Startseite (#2110): Spiele je Seite ohne Aufstellung (Mehrfachwert).
     await db.matches_v2.create_index("lineups_missing", sparse=True)
+    # Liga-Kader (#2108): die Spiel-ID je Season und Spieler - ein Eintrag je Person und Season.
+    await db.league_rosters.create_index([("season_id", 1), ("user_id", 1)], unique=True)
+    await db.league_rosters.create_index("user_id")
     # Events
     await db.events.create_index("id", unique=True)
     await db.events.create_index("slug", unique=True)
