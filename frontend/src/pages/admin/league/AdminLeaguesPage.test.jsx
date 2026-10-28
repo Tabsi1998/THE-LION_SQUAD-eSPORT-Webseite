@@ -16,7 +16,7 @@ const DEFAULTS = { weeks_total: 10, matchday_days: 7, default_match_weekday: 6, 
 const BODY = {
   games: [{ id: "g1", name: "Probe Shooter", slug: "probe-shooter" }],
   season_defaults: DEFAULTS,
-  leagues: [{ id: "l1", name: "Probe-Liga", slug: "probe-shooter", game_name: "Probe Shooter", status: "active",
+  leagues: [{ id: "l1", name: "Probe-Liga", slug: "probe-shooter", game_id: "g1", game_name: "Probe Shooter", status: "active",
     seasons: [{ id: "s1", number: 1, name: "Season 1", slug: "season-1", status: "draft", visibility: "off", start_date: "2026-11-09T23:00:00+00:00", weeks_total: 10 }] }],
 };
 
@@ -65,6 +65,50 @@ test("legt eine Season mit Beginn an und öffnet ihre Seite", async () => {
   fireEvent.click(screen.getByTestId("season-create-save"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/leagues/l1/seasons", { start_date: "2027-02-01T23:00:00.000Z" }));
   expect(await screen.findByTestId("season-page")).toBeInTheDocument();
+});
+
+// Korrigieren, archivieren, löschen (#2106).
+test("bearbeitet Name, Beschreibung und Stand; Spiel und Adresse stehen fest, sobald der Server es sagt", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...BODY, leagues: [{ ...BODY.leagues[0], game_locked: true, slug_locked: true }] } });
+  apiMock.patch.mockResolvedValue({ data: { changed: ["name"] } });
+  renderPage();
+  fireEvent.click(await screen.findByTestId("league-edit-probe-shooter"));
+  const sheet = screen.getByTestId("league-edit-sheet");
+  expect(screen.getByTestId("league-game")).toBeDisabled();
+  expect(screen.getByTestId("league-slug")).toBeDisabled();
+  expect(sheet).toHaveTextContent("Bleibt /liga/probe-shooter");
+  fireEvent.change(screen.getByTestId("league-name"), { target: { value: "Probe-Liga Nord" } });
+  fireEvent.change(screen.getByTestId("league-description"), { target: { value: "Nur zum Testen" } });
+  fireEvent.change(screen.getByTestId("league-status"), { target: { value: "archived" } });
+  fireEvent.click(screen.getByTestId("league-edit-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/admin/leagues/l1", { name: "Probe-Liga Nord", description: "Nur zum Testen", status: "archived" }));
+});
+
+test("vor der ersten Veröffentlichung ändern sich Spiel und Adresse mit", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...BODY, games: [...BODY.games, { id: "g2", name: "Probe Rennen" }],
+    leagues: [{ ...BODY.leagues[0], game_locked: false, slug_locked: false }] } });
+  apiMock.patch.mockResolvedValue({ data: { changed: ["game_id", "slug"] } });
+  renderPage();
+  fireEvent.click(await screen.findByTestId("league-edit-probe-shooter"));
+  fireEvent.change(screen.getByTestId("league-game"), { target: { value: "g2" } });
+  fireEvent.change(screen.getByTestId("league-slug"), { target: { value: "probe-rennen" } });
+  fireEvent.click(screen.getByTestId("league-edit-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/admin/leagues/l1",
+    { name: "Probe-Liga", description: null, status: "active", game_id: "g2", slug: "probe-rennen" }));
+});
+
+test("löschen fragt in der Seite nach und listet, was mitgeht", async () => {
+  apiMock.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith("/delete-plan")
+    ? { kind: "league", id: "l1", name: "Probe-Liga", deletable: true, blockers: [], archived: false,
+      seasons: [{ id: "s1", name: "Season 1" }], divisions: [], staffeln: [] }
+    : BODY }));
+  apiMock.delete.mockResolvedValue({ data: { ok: true } });
+  renderPage();
+  fireEvent.click(await screen.findByTestId("league-delete-probe-shooter"));
+  expect(await screen.findByTestId("league-delete-list")).toHaveTextContent("Season 1");
+  fireEvent.change(screen.getByTestId("league-delete-reason"), { target: { value: "Falsches Spiel gewählt" } });
+  fireEvent.click(screen.getByTestId("league-delete-confirm"));
+  await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith("/admin/leagues/l1", { data: { reason: "Falsches Spiel gewählt" } }));
 });
 
 test("ohne Liga: ein Hinweis statt einer leeren Seite", async () => {
