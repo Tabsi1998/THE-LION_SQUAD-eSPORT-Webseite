@@ -502,13 +502,16 @@ def _parse_moment(value):
 
 
 def amend_deadline(setup: LeagueSetup):
-    """Bis wann die Seiten ihre Aufstellung nachtragen: ``lineup_amend_hours`` nach dem Ergebnis (Vorgabe 48 h)."""
-    from datetime import timedelta
+    """Bis wann die Seiten ihre Aufstellung nachtragen: ``lineup_amend_hours`` nach dem Ergebnis (Vorgabe 48 h). Zeit in
+    einer Sperrzeit zählt nicht mit (#2096) - wie bei Termin- und Bestätigungsfristen; ohne Sperrzeiten genau
+    Ergebnis + Stunden."""
+    from services.matchday_schedule import response_deadline
 
     done = _parse_moment(setup.match.get("completed_at"))
     if not done:
         return None
-    return done + timedelta(hours=_positive_int(setup.tournament.get("lineup_amend_hours"), DEFAULT_AMEND_HOURS))
+    return response_deadline(setup.tournament, done,
+                             _positive_int(setup.tournament.get("lineup_amend_hours"), DEFAULT_AMEND_HOURS))
 
 
 async def amend_lineups(
