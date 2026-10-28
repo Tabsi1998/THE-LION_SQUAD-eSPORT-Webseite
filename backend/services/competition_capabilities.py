@@ -174,6 +174,10 @@ CAPABILITIES: tuple[Capability, ...] = (
        ["POST /api/matches/{match_id}/report"], [CLASSIC, GRAPH],
        note="Block 3: auch im Graph-System. Zwei übereinstimmende Meldungen entscheiden; eine einzelne erst, "
             "wenn die Gegenseite bis zur Frist nicht widerspricht (#1551: online 15 Min., Liga 48 h)."),
+    _c("result.lineups", "Aufstellung je Map nachtragen (Liga)",
+       ["PUT /api/matches/{match_id}/lineups"], [GRAPH],
+       note="#1650 (docs/LIGA.md): Captain oder Vertreter bis lineup_amend_hours nach dem Ergebnis, danach die "
+            "Turnierleitung mit Grund."),
     _c("result.dispute", "Ergebnis anfechten",
        ["POST /api/matches/{match_id}/dispute"], [CLASSIC, GRAPH],
        note="Block 3: derselbe Endpunkt bedient beide Speicher."),
