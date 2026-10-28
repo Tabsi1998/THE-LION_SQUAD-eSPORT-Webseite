@@ -46,18 +46,6 @@ export const TOURNAMENT_SEASON_WEIGHT_OPTIONS = [
   ["0", "Keine Jahreswertung (x0.00)"],
 ];
 
-export const DEFAULT_FFA_SCHEMA = `[WB]
-# Runde 1
-A=[1,2,3,4]
-B=[5,6,7,8]
-
-# Runde 2
-C=[W:A:1,W:A:2,W:B:1,W:B:2]
-
-[LB]
-# Runde 1
-LA=[L:A:1,L:A:2,L:B:1,L:B:2]`;
-
 export const CUSTOM_STAGE_TYPES = new Set(["custom_bracket", "ffa_custom_bracket"]);
 // Die beiden Turnierformate, bei denen die Turnierleitung den Baum selbst
 // schreibt. Nur hier hat das Bearbeiten-Formular überhaupt Strukturfelder.
@@ -285,19 +273,6 @@ export function stageConfigFor(form) {
   };
 }
 
-export function applyStageType(current, stageType) {
-  const matchType = matchTypeForStage(stageType);
-  const custom = CUSTOM_STAGE_TYPES.has(stageType);
-  return {
-    ...current,
-    stage_type: stageType,
-    match_type: matchType,
-    match_size: matchType === "ffa" ? (current.match_size || 4) : 2,
-    min_players: matchType === "ffa" ? (current.min_players || 2) : 2,
-    qualifiers_per_match: matchType === "ffa" ? (current.qualifiers_per_match || 2) : 1,
-    schema: custom ? current.schema : "",
-  };
-}
 
 // Folgenschwere Aktionen (#2120): dieselben Regeln wie `services/tournament_guard.py` am Server - der Server prüft
 // selbst, die Seite zeigt nur vorher, was passiert.

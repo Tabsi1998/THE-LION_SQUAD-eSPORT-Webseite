@@ -43,7 +43,7 @@ beforeEach(() => {
 // Station und Dauer je Spiel - nur der Hinweis und der Weg in den Matchplan. Die Felder prüft MatchPlanPanel.test.jsx.
 test("Spiele: keine Planungsfelder mehr, Hinweis und Weg in den Matchplan", () => {
   const onOpenMatchplan = vi.fn();
-  panel({ tournament: { match_duration_minutes: 45 }, durationGame: GAME, onOpenMatchplan });
+  panel({ tournament: { match_duration_minutes: 45, event_mode: "local" }, durationGame: GAME, onOpenMatchplan });
   expect(screen.queryByLabelText("Dauer in Minuten")).toBeNull();
   expect(screen.queryByLabelText("Station")).toBeNull();
   expect(screen.queryByText("Planung speichern")).toBeNull();
@@ -54,42 +54,56 @@ test("Spiele: keine Planungsfelder mehr, Hinweis und Weg in den Matchplan", () =
   expect(screen.getByText(/Termin offen|31\.10\./)).toBeInTheDocument();
 });
 
-// Weiterkommen je Phase (#1590): leer erbt; ein Modus geht mit Schalter-Spiegel mit, die Show-Minuten nur bei der Show.
+// Online gibt es keine Stationen (#2111, T7): der Hinweis spricht von Terminen und Fristen.
+test("Spiele online: der Hinweis nennt Termine und Fristen statt Stationen", () => {
+  panel({ tournament: { event_mode: "online" }, durationGame: GAME, onOpenMatchplan: () => {} });
+  const hint = screen.getByTestId("stages-matchplan-hint");
+  expect(hint).toHaveTextContent("Termine und Fristen");
+  expect(hint).not.toHaveTextContent("Station");
+});
+
+// Weiterkommen je Phase (#1590) in „Regeln dieser Phase“: leer erbt; ein Modus geht mit Schalter-Spiegel mit, die
+// Show-Minuten nur bei der Show. Seit #2111 (TA8) gibt es nur noch diesen Weg - der Einstellungs-Modus war unerreichbar.
+function openRules(stages = [STAGE]) {
+  panel({ canEditSettings: true, tournament: {}, durationGame: GAME, stages });
+  fireEvent.click(screen.getByTestId("stage-rules-toggle-s1"));
+}
+
 test("Phase: Weiterkommen mit vier Modi, Show-Minuten nur bei der Show-Auslosung", async () => {
-  panel({ mode: "settings", canEditSettings: true, tournament: {}, durationGame: GAME });
-  const select = screen.getByTestId("stage-advancement-s1");
+  openRules();
+  const select = screen.getByTestId("stage-rules-advancement-s1");
   expect(select).toHaveValue("");
-  expect(screen.queryByTestId("stage-advancement-s1-hint")).toBeNull();
-  fireEvent.click(screen.getByTestId("stage-save-s1"));
+  expect(screen.queryByTestId("stage-rules-advancement-s1-hint")).toBeNull();
+  fireEvent.click(screen.getByTestId("stage-rules-save-s1"));
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalled());
   expect(apiMock.patch.mock.calls[0][1].settings).toMatchObject({ advancement_mode: null, randomize_advancement_rounds: null, draw_show_minutes: null });
 
   fireEvent.change(select, { target: { value: "instant" } });
-  expect(screen.getByTestId("stage-advancement-s1-hint")).toHaveTextContent(/sofort auf einen zufälligen freien Platz/);
-  expect(screen.queryByTestId("stage-advancement-s1-minutes")).toBeNull();
+  expect(screen.getByTestId("stage-rules-advancement-s1-hint")).toHaveTextContent(/sofort auf einen zufälligen freien Platz/);
+  expect(screen.queryByTestId("stage-rules-advancement-s1-minutes")).toBeNull();
   fireEvent.change(select, { target: { value: "draw_show" } });
-  fireEvent.change(screen.getByTestId("stage-advancement-s1-minutes"), { target: { value: "7" } });
-  fireEvent.click(screen.getByTestId("stage-save-s1"));
+  fireEvent.change(screen.getByTestId("stage-rules-advancement-s1-minutes"), { target: { value: "7" } });
+  fireEvent.click(screen.getByTestId("stage-rules-save-s1"));
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(2));
   expect(apiMock.patch.mock.calls[1][1].settings).toMatchObject({ advancement_mode: "draw_show", randomize_advancement_rounds: true, draw_show_minutes: 7 });
 });
 
 test("Phase: der alte Schalter wird als Modus vorbelegt", () => {
-  panel({ mode: "settings", canEditSettings: true, tournament: {}, durationGame: GAME, stages: [{ ...STAGE, settings: { match_size: 4, randomize_advancement_rounds: true } }] });
-  expect(screen.getByTestId("stage-advancement-s1")).toHaveValue("draw_round");
+  openRules([{ ...STAGE, settings: { match_size: 4, randomize_advancement_rounds: true } }]);
+  expect(screen.getByTestId("stage-rules-advancement-s1")).toHaveValue("draw_round");
 });
 
 test("Phase: leere Spieldauer erbt und geht als null an den Server", async () => {
-  panel({ mode: "settings", canEditSettings: true, tournament: {}, durationGame: GAME });
-  const duration = screen.getByTestId("stage-duration-s1");
+  openRules();
+  const duration = screen.getByTestId("stage-rules-duration-s1");
   expect(duration).toHaveValue(null);
-  expect(screen.getByTestId("stage-duration-source-s1")).toHaveTextContent("vom Spiel: 15 Min.");
-  fireEvent.click(screen.getByTestId("stage-save-s1"));
+  expect(screen.getByTestId("stage-rules-duration-source-s1")).toHaveTextContent("vom Spiel: 15 Min.");
+  fireEvent.click(screen.getByTestId("stage-rules-save-s1"));
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalled());
   expect(apiMock.patch.mock.calls[0][1].settings.duration_minutes).toBeNull();
 
   fireEvent.change(duration, { target: { value: "25" } });
-  fireEvent.click(screen.getByTestId("stage-save-s1"));
+  fireEvent.click(screen.getByTestId("stage-rules-save-s1"));
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(2));
   expect(apiMock.patch.mock.calls[1][1].settings.duration_minutes).toBe(25);
 });
@@ -162,16 +176,13 @@ test("vor dem Check-in-Ende: Vorschau und Generieren bleiben", () => {
   expect(screen.getByTestId("stage-generate-s1")).toBeInTheDocument();
 });
 
-test("Phase löschen: erst ohne force, nach der Rückfrage mit den Zahlen des Servers mit force", async () => {
-  apiMock.delete.mockReset();
-  apiMock.delete
-    .mockRejectedValueOnce({ response: { status: 409, data: { detail: { code: "confirm_destruction", message: "Löschen nimmt alle Spiele dieser Phase mit (1 Spiel, keines davon begonnen), samt Ergebnissen und Berichten.", match_count: 1, played_count: 0 } } } })
-    .mockResolvedValueOnce({ data: { ok: true } });
-  panel({ mode: "settings", canEditSettings: true, tournament: {}, durationGame: GAME });
-  fireEvent.click(screen.getByRole("button", { name: "Löschen" }));
-  await waitFor(() => expect(apiMock.delete).toHaveBeenCalledTimes(2));
-  expect(apiMock.delete.mock.calls[0][0]).toBe("/tournaments/t1/stages/s1");
-  expect(apiMock.delete.mock.calls[1][0]).toBe("/tournaments/t1/stages/s1?force=true");
+// Phasen anlegen, umbauen und löschen stand hinter einem Modus, den kein Aufrufer setzte (#2111, TA8) - es gibt sie nicht
+// mehr; die Phasen entstehen aus dem Format.
+test("keine Knöpfe zum Anlegen, Umbauen oder Löschen einer Phase", () => {
+  panel({ canEditSettings: true, canManageStructure: true, tournament: {}, durationGame: GAME });
+  expect(screen.queryByText("Phase anlegen")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Löschen" })).toBeNull();
+  expect(screen.queryByTestId("stage-save-s1")).toBeNull();
 });
 
 test("fester Baum mit einer leeren neuen Phase: Generieren bleibt, die Vorschau nicht", () => {

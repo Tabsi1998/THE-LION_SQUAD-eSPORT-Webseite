@@ -5,7 +5,7 @@ import { StatusBadge } from "@/components/tls/StatusBadge";
 import { formatDateTime } from "@/lib/datetime";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
-import { STAGE_TYPE_OPTIONS, STAGE_STATUS_OPTIONS, formatBracketSection, formatMatchStatus, formatMatchType, formatStageType } from "@/lib/tournamentLabels";
+import { formatBracketSection, formatMatchStatus, formatMatchType, formatStageType } from "@/lib/tournamentLabels";
 import { Fld } from "./PrizeEditor";
 import { ResultWindowLoader } from "@/components/tls/results/ResultWindow";
 import { ResultUndoBar, useResultUndo } from "@/components/tls/results/ResultUndoBar";
@@ -14,7 +14,7 @@ import { DrawControls } from "./DrawControls";
 import { NO_MATCH_FORMATS } from "@/lib/tournamentFormFields";
 import { sourceLabel } from "@/lib/slotSource";
 import { durationSourceText, matchDurationSource, ownDurationInput, ownDurationPayload } from "@/lib/matchDuration";
-import { DEFAULT_FFA_SCHEMA, DRAW_SHOW_MINUTES_DEFAULT, DRAW_SHOW_MINUTES_HINT, EVENT_MODE_OPTIONS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, STAGE_ADVANCEMENT_OPTIONS, RESULT_ENTRY_MODE_OPTIONS, SCHEDULE_MODE_OPTIONS, advancementModeHint, applyStageType, drawShowMinutesPayload, guardDetail, matchImpact, matchSectionKey, sectionSortIndex, sortMatchesForPlan, stageAdvancementSettings, stageAdvancementValue, stageConfigFor, stationDisplay } from "./shared";
+import { DRAW_SHOW_MINUTES_DEFAULT, DRAW_SHOW_MINUTES_HINT, EVENT_MODE_OPTIONS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, STAGE_ADVANCEMENT_OPTIONS, RESULT_ENTRY_MODE_OPTIONS, SCHEDULE_MODE_OPTIONS, advancementModeHint, drawShowMinutesPayload, guardDetail, matchSectionKey, sectionSortIndex, sortMatchesForPlan, stageAdvancementSettings, stageAdvancementValue, stageConfigFor, stationDisplay } from "./shared";
 
 // Die Dauer-Kette (#1554): Turnier, Phasen und das Spiel (Modi), damit jedes Feld sagen kann, was ohne eigenen Wert gilt.
 const DurationContext = createContext({ tournament: null, game: null, stageById: new Map() });
@@ -32,158 +32,33 @@ function DurationSource({ own, inherited, testId }) {
 const NO_MATCH_RIGHTS = () => ({ plan: false, results: false });
 
 // Rechte je Turnier (#1353), wie sie der Server schickt: Regeln der Phasen (#1636) und Erzeugen mit dem Aufbau-Recht,
-// Termin und Station mit dem Check-in-Recht, Ergebnisse mit dem Ergebnis-Recht.
-export function TournamentStagesPanel({ tournamentId, stages, matches, registrations, stations = [], canEditSettings = false, canManageStructure = false, rightsForMatch = NO_MATCH_RIGHTS, onChanged, onOpenMatchplan = null, mode = "operations", tournament = null, durationGame = null, bracketFixed = false }) {
-  const showSettings = canEditSettings && mode === "settings";
-  const showMatchList = mode !== "settings";
+// Termin und Station mit dem Check-in-Recht, Ergebnisse mit dem Ergebnis-Recht. Phasen anlegen, umbauen und löschen
+// stand hier hinter einem Modus, den kein Aufrufer setzte (#2111, TA8) - das ist weg; Phasen entstehen aus dem Format.
+export function TournamentStagesPanel({ tournamentId, stages, matches, registrations, stations = [], canEditSettings = false, canManageStructure = false, rightsForMatch = NO_MATCH_RIGHTS, onChanged, onOpenMatchplan = null, tournament = null, durationGame = null, bracketFixed = false }) {
   // Liga-Staffel (#2109, S23): „Regeln dieser Phase“ gibt es nicht - eine Phase „Vor Ort“ schaltete die Spielwochen ab.
   const staffel = Boolean(tournament?.league_context);
-  const [createOpen, setCreateOpen] = useState(stages.length === 0);
-  const [form, setForm] = useState({
-    name: "Phase 1",
-    match_type: "ffa",
-    stage_type: "ffa_custom_bracket",
-    match_size: 4,
-    min_players: 2,
-    qualifiers_per_match: 2,
-    duration_minutes: "",
-    event_mode: "",
-    result_entry_mode: "",
-    schedule_mode: "",
-    grand_final: "",
-    advancement: "",
-    draw_show_minutes: "",
-    schema: DEFAULT_FFA_SCHEMA,
-  });
-  const confirm = useConfirm();
+  // Stationen gibt es nur vor Ort und hybrid (#2111, T7) - online plant der Matchplan Termine und Fristen.
+  const onsite = ["local", "hybrid"].includes(tournament?.event_mode);
   const durationContext = useMemo(() => ({
     tournament, game: durationGame, stageById: new Map((stages || []).map((stage) => [stage.id, stage])),
   }), [tournament, durationGame, stages]);
   const regById = Object.fromEntries((registrations || []).map((r) => [r.id, r]));
-  const config = stageConfigFor(form);
-  const set = (k, v) => setForm((x) => ({ ...x, [k]: v }));
-  const setStageType = (stageType) => setForm((current) => applyStageType(current, stageType));
-  const createStage = async (e) => {
-    e.preventDefault();
-    try {
-      await api.post(`/tournaments/${tournamentId}/stages`, {
-        name: form.name || "Phase",
-        match_type: form.match_type,
-        stage_type: form.stage_type,
-        settings: {
-          match_size: Number(form.match_size) || 4,
-          min_players: Number(form.min_players) || 2,
-          qualifiers_per_match: Number(form.qualifiers_per_match) || 1,
-          duration_minutes: ownDurationPayload(form.duration_minutes),
-          event_mode: form.event_mode || null,
-          result_entry_mode: form.result_entry_mode || null,
-          schedule_mode: form.schedule_mode || null,
-          grand_final: form.grand_final || null,
-          ...stageAdvancementSettings(form.advancement),
-          draw_show_minutes: form.advancement === "draw_show" ? drawShowMinutesPayload(form.draw_show_minutes) : null,
-          schema: form.schema || "",
-          score_type: "points",
-          calculation: "points",
-        },
-      });
-      toast.success("Phase angelegt.");
-      setCreateOpen(false);
-      onChanged();
-    } catch (err) {
-      toast.error(formatRequestError(err, "Phase konnte nicht angelegt werden."));
-    }
-  };
-  const removeStage = async (stage, force = false) => {
-    // Mit Zahl (#2120): erst ohne force - mit echten Spielen nennt der Server, wie viele mitgehen und wie viele davon
-    // schon begonnen oder gewertet sind; nur eine reine Vorschau fragt die Seite selbst.
-    const real = matchImpact(matches.filter((match) => match.stage_id === stage.id)).match_count;
-    if (!force && !real && !await confirm({
-      title: "Phase löschen?",
-      description: "Die Phase und ihre Vorschau-Spiele werden gelöscht.",
-      confirmLabel: "Löschen",
-      tone: "danger",
-    })) return;
-    try {
-      await api.delete(`/tournaments/${tournamentId}/stages/${stage.id}${force ? "?force=true" : ""}`);
-      toast.success("Phase gelöscht.");
-      onChanged();
-    } catch (err) {
-      const detail = guardDetail(err, "confirm_destruction");
-      if (detail && !force) {
-        const ok = await confirm({ title: "Phase löschen?", description: detail.message, confirmLabel: "Löschen", tone: "danger" });
-        if (ok) return removeStage(stage, true);
-        return;
-      }
-      toast.error(formatRequestError(err, "Phase konnte nicht gelöscht werden."));
-    }
-  };
 
   return (
     <DurationContext.Provider value={durationContext}>
     <div className="space-y-5">
-      {mode === "settings" && (
-        <div className="text-xs text-white/50 border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
-          Erweiterte Bracket-Phasen sind nur für eigene Schemas oder Spezial-Brackets nötig. Zeiten und Stationen gehören in den Matchplan, Ergebnisse in den Reiter „Spiele“.
-        </div>
-      )}
-      {mode !== "settings" && (
-        // Der Matchplan ersetzt die alte Matchplanung je Karte (Praxis nach #1589): hier Phasen, Spiele und Ergebnisse.
-        <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-white/70 border border-white/10 bg-[#0A0A0A] rounded-sm px-4 py-3" data-testid="stages-matchplan-hint">
-          {/* Staffel (#2109, S23): online in Spielwochen - Stationen gibt es dort nicht. */}
-          <span>{staffel
-            ? "Den Spielplan mit Spielwochen und Terminen siehst du im Matchplan – vor dem Start als Vorschau."
-            : "Zeiten und Stationen planst du im Matchplan: Zeitleiste je Station, Vorschau, Ziehen und je Spiel „ändern“."}</span>
-          {onOpenMatchplan && (
-            <button type="button" onClick={onOpenMatchplan} className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">Zum Matchplan</button>
-          )}
-        </div>
-      )}
-      {showSettings && (
-        <div className="border border-white/10 bg-[#121212] rounded-sm">
-          <button type="button" onClick={() => setCreateOpen((v) => !v)} className="w-full flex items-center justify-between px-5 py-4 text-left">
-            <span className="font-heading font-bold uppercase">Phase anlegen</span>
-            <span className="text-[#29B6E8] text-xl leading-none">{createOpen ? "−" : "+"}</span>
-          </button>
-          {createOpen && (
-            <form onSubmit={createStage} className="border-t border-white/10 p-5 grid md:grid-cols-3 gap-3">
-              <Fld label="Name" value={form.name} onChange={(v)=>set("name", v)} testId="stage-new-name" />
-              <SelectField label="Struktur-Typ" value={form.stage_type} onChange={setStageType} options={STAGE_TYPE_OPTIONS} />
-              <div className="block">
-                <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Spieltyp</div>
-                <div className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-white/70">{formatMatchType(form.match_type)}</div>
-              </div>
-              {config.showMatchSize && <Fld label="Spielgröße" type="number" value={form.match_size} onChange={(v)=>set("match_size", v)} testId="stage-new-size" />}
-              {config.showMinPlayers && <Fld label="Min Spieler" type="number" value={form.min_players} onChange={(v)=>set("min_players", v)} testId="stage-new-min" />}
-              {config.showQualifiers && <Fld label="Qualifizierte" type="number" value={form.qualifiers_per_match} onChange={(v)=>set("qualifiers_per_match", v)} testId="stage-new-qualifiers" />}
-              <div>
-                <Fld label="Spieldauer Min." type="number" min="1" value={form.duration_minutes} onChange={(v)=>set("duration_minutes", v)} placeholder={String(inheritedDuration(durationContext).minutes)} testId="stage-new-duration" />
-                <DurationSource own={form.duration_minutes} inherited={inheritedDuration(durationContext)} testId="stage-new-duration-source" />
-              </div>
-              <SelectField label="Austragung" value={form.event_mode} onChange={(v)=>set("event_mode", v)} options={[["", "Vom Turnier erben"], ...EVENT_MODE_OPTIONS]} />
-              <SelectField label="Ergebniserfassung" value={form.result_entry_mode} onChange={(v)=>set("result_entry_mode", v)} options={[["", "Vom Turnier erben"], ...RESULT_ENTRY_MODE_OPTIONS.filter(([value]) => value)]} />
-              <SelectField label="Terminplanung" value={form.schedule_mode} onChange={(v)=>set("schedule_mode", v)} options={[["", "Vom Turnier erben"], ...SCHEDULE_MODE_OPTIONS.filter(([value]) => value)]} />
-              {form.stage_type === "double_elimination" && <GrandFinalField value={form.grand_final} onChange={(v)=>set("grand_final", v)} testId="stage-new-grand-final" />}
-              <AdvancementField value={form.advancement} minutes={form.draw_show_minutes} onChange={(v)=>set("advancement", v)} onMinutes={(v)=>set("draw_show_minutes", v)} testId="stage-new-advancement" />
-              <div className="md:col-span-3 text-xs text-white/45 border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
-                Leer lassen, wenn diese Phase die Turnier-Regeln nutzt. Overrides sind sinnvoll, wenn z.B. Gruppen online gespielt werden, das Finale aber vor Ort mit Staff-Erfassung läuft.
-              </div>
-              {config.showSchema ? (
-                <label className="md:col-span-3 block">
-                  <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Schema</div>
-                  <textarea value={form.schema} onChange={(e)=>set("schema", e.target.value)} rows={8} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" data-testid="stage-new-schema" />
-                </label>
-              ) : (
-                <div className="md:col-span-3 text-xs text-white/45 border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
-                  Dieser Struktur-Typ braucht hier keine freie Schema-Eingabe. Für komplett freie Turnierbäume nutze einen freien Turnierbaum.
-                </div>
-              )}
-              <div className="md:col-span-3">
-                <button className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm">Phase speichern</button>
-              </div>
-            </form>
-          )}
-        </div>
-      )}
+      {/* Der Matchplan ersetzt die alte Matchplanung je Karte (Praxis nach #1589): hier Phasen, Spiele und Ergebnisse. */}
+      <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-white/70 border border-white/10 bg-[#0A0A0A] rounded-sm px-4 py-3" data-testid="stages-matchplan-hint">
+        {/* Staffel (#2109, S23): online in Spielwochen - Stationen gibt es dort nicht. */}
+        <span>{staffel
+          ? "Den Spielplan mit Spielwochen und Terminen siehst du im Matchplan – vor dem Start als Vorschau."
+          : onsite
+            ? "Zeiten und Stationen planst du im Matchplan: Zeitleiste je Station, Vorschau, Ziehen und je Spiel „ändern“."
+            : "Termine und Fristen siehst du im Matchplan – je Spiel „ändern“."}</span>
+        {onOpenMatchplan && (
+          <button type="button" onClick={onOpenMatchplan} className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">Zum Matchplan</button>
+        )}
+      </div>
 
       <div className="space-y-4">
         {stages.map((stage) => (
@@ -196,17 +71,14 @@ export function TournamentStagesPanel({ tournamentId, stages, matches, registrat
             stations={stations}
             canManageStructure={canManageStructure}
             rightsForMatch={rightsForMatch}
-            showSettings={showSettings}
-            canEditRules={canEditSettings && mode !== "settings" && !staffel}
-            showMatchList={showMatchList}
+            canEditRules={canEditSettings && !staffel}
             bracketFixed={bracketFixed}
             onChanged={onChanged}
-            onDelete={() => removeStage(stage)}
           />
         ))}
         {stages.length === 0 && (
           <div className="border border-white/10 bg-[#121212] rounded-sm p-10 text-center text-white/40">
-            {mode === "settings" ? "Noch keine eigene Bracket-Phase." : NO_MATCH_FORMATS.has(tournament?.format)
+            {NO_MATCH_FORMATS.has(tournament?.format)
               // Zeitfahren und Rennserie (#2111, TA6): hier entstehen nie Phasen.
               ? "Zeitfahren und Rennserie bekommen im Turnier keine Spiele – Zeitfahren laufen über Fast Lap, Rennserien über Serien."
               : "Noch keine Phasen. Sie entstehen mit der Format-Vorschau (Bearbeiten → Speichern & Struktur anwenden) oder mit dem Start des Check-ins."}
@@ -322,7 +194,7 @@ function GrandFinalField({ value, onChange, testId }) {
   );
 }
 
-function StageCard({ tournamentId, stage, matches, regById, stations = [], canManageStructure = false, rightsForMatch = NO_MATCH_RIGHTS, showSettings = false, canEditRules = false, showMatchList = true, bracketFixed = false, onChanged, onDelete }) {
+function StageCard({ tournamentId, stage, matches, regById, stations = [], canManageStructure = false, rightsForMatch = NO_MATCH_RIGHTS, canEditRules = false, bracketFixed = false, onChanged }) {
   const settings = stage.settings || {};
   const durationContext = useContext(DurationContext);
   const [activeSection, setActiveSection] = useState("all");
@@ -336,7 +208,6 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], canMa
   const confirm = useConfirm();
   const config = stageConfigFor(form);
   const set = (k, v) => setForm((x) => ({ ...x, [k]: v }));
-  const setStageType = (stageType) => setForm((current) => applyStageType(current, stageType));
   const stagePayload = () => ({
     name: form.name || "Phase",
     match_type: form.match_type,
@@ -374,32 +245,9 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], canMa
       toast.error(formatRequestError(err, "Regeln der Phase konnten nicht gespeichert werden."));
     }
   };
-  const save = async () => {
-    try {
-      await api.patch(`/tournaments/${tournamentId}/stages/${stage.id}`, stagePayload());
-      toast.success("Phase gespeichert.");
-      onChanged();
-    } catch (err) {
-      toast.error(formatRequestError(err, "Phase konnte nicht gespeichert werden."));
-    }
-  };
-  const saveAndGeneratePreview = async () => {
-    if (!config.canGenerate) {
-      toast.error("Für diesen Struktur-Typ ist aktuell noch kein automatischer Generator aktiv.");
-      return;
-    }
-    try {
-      await api.patch(`/tournaments/${tournamentId}/stages/${stage.id}`, stagePayload());
-      const { data } = await api.post(`/tournaments/${tournamentId}/stages/${stage.id}/generate?preview=true&force=true`);
-      toast.success(`Phase gespeichert und ${data.match_count} Vorschau-Spiele neu gebaut.`);
-      onChanged();
-    } catch (err) {
-      toast.error(formatRequestError(err, "Phase konnte nicht gespeichert und neu gebaut werden."));
-    }
-  };
   const generate = async ({ preview = false, force = false } = {}) => {
     if (!config.canGenerate) {
-      toast.error("Für diesen Struktur-Typ ist aktuell noch kein automatischer Generator aktiv.");
+      toast.error("Für diese Phase gibt es keinen automatischen Aufbau.");
       return;
     }
     try {
@@ -467,106 +315,61 @@ function StageCard({ tournamentId, stage, matches, regById, stations = [], canMa
             {settings.event_mode && <span>· {modeLabel(EVENT_MODE_OPTIONS, settings.event_mode)}</span>}
             {settings.result_entry_mode && <span>· {modeLabel(RESULT_ENTRY_MODE_OPTIONS, settings.result_entry_mode)}</span>}
             {settings.schedule_mode && <span>· {modeLabel(SCHEDULE_MODE_OPTIONS, settings.schedule_mode)}</span>}
-            {matches.some((m) => m.is_preview) && <span>· Vorschau / Draft</span>}
+            {matches.some((m) => m.is_preview) && <span>· Vorschau</span>}
             {Object.entries(statusCounts).map(([status, count]) => <span key={status}>· {count} {formatMatchStatus(status)}</span>)}
           </div>
         </div>
-        {(canManageStructure || showSettings) && (
+        {canManageStructure && (
           <div className="flex flex-wrap gap-2">
             {showPreviewButton && <button type="button" onClick={() => generate({ preview: true })} disabled={!config.canGenerate} data-testid={`stage-preview-${stage.id}`} className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm uppercase tracking-wider text-xs font-bold disabled:opacity-40">Vorschau</button>}
             {showGenerateButton && <button type="button" onClick={() => generate({ preview: false })} disabled={!config.canGenerate} data-testid={`stage-generate-${stage.id}`} className="px-3 py-2 bg-[#29B6E8] text-black rounded-sm uppercase tracking-wider text-xs font-bold disabled:opacity-40">Mit Teilnehmern generieren</button>}
-            {showSettings && <button type="button" onClick={save} data-testid={`stage-save-${stage.id}`} className="px-3 py-2 border border-white/20 text-white rounded-sm uppercase tracking-wider text-xs font-bold">Speichern</button>}
-            {showSettings && showPreviewButton && <button type="button" onClick={saveAndGeneratePreview} disabled={!config.canGenerate} className="px-3 py-2 border border-[#FFD700]/50 text-[#FFD700] rounded-sm uppercase tracking-wider text-xs font-bold disabled:opacity-40">Speichern & neu bauen</button>}
-            {showSettings && <button type="button" onClick={onDelete} className="px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm uppercase tracking-wider text-xs font-bold">Löschen</button>}
           </div>
         )}
       </div>
-      {canEditRules && !showSettings && (
+      {canEditRules && (
         <StageRules stage={stage} form={form} set={set} durationContext={durationContext} onSave={saveRules} />
       )}
-      <div className={`${showSettings && showMatchList ? "grid lg:grid-cols-2 gap-5" : "space-y-3"} p-5`}>
-        {showSettings && (
-          <div className="space-y-3">
-            <div className="grid sm:grid-cols-2 gap-3">
-              <Fld label="Name" value={form.name} onChange={(v)=>set("name", v)} testId={`stage-name-${stage.id}`} />
-              <SelectField label="Status" value={form.status} onChange={(v)=>set("status", v)} options={STAGE_STATUS_OPTIONS} />
-              <SelectField label="Struktur-Typ" value={form.stage_type} onChange={setStageType} options={STAGE_TYPE_OPTIONS} />
-              <div className="block">
-                <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Spieltyp</div>
-                <div className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-white/70">{formatMatchType(form.match_type)}</div>
-              </div>
-              {config.showMatchSize && <Fld label="Spielgröße" type="number" value={form.match_size} onChange={(v)=>set("match_size", v)} testId={`stage-size-${stage.id}`} />}
-              {config.showMinPlayers && <Fld label="Min Spieler" type="number" value={form.min_players} onChange={(v)=>set("min_players", v)} testId={`stage-min-${stage.id}`} />}
-              {config.showQualifiers && <Fld label="Qualifizierte" type="number" value={form.qualifiers_per_match} onChange={(v)=>set("qualifiers_per_match", v)} testId={`stage-qualifiers-${stage.id}`} />}
-              <div>
-                <Fld label="Spieldauer Min." type="number" min="1" value={form.duration_minutes} onChange={(v)=>set("duration_minutes", v)} placeholder={String(inheritedDuration(durationContext).minutes)} testId={`stage-duration-${stage.id}`} />
-                <DurationSource own={form.duration_minutes} inherited={inheritedDuration(durationContext)} testId={`stage-duration-source-${stage.id}`} />
-              </div>
-              <SelectField label="Austragung" value={form.event_mode} onChange={(v)=>set("event_mode", v)} options={[["", "Vom Turnier erben"], ...EVENT_MODE_OPTIONS]} />
-              <SelectField label="Ergebniserfassung" value={form.result_entry_mode} onChange={(v)=>set("result_entry_mode", v)} options={[["", "Vom Turnier erben"], ...RESULT_ENTRY_MODE_OPTIONS.filter(([value]) => value)]} />
-              <SelectField label="Terminplanung" value={form.schedule_mode} onChange={(v)=>set("schedule_mode", v)} options={[["", "Vom Turnier erben"], ...SCHEDULE_MODE_OPTIONS.filter(([value]) => value)]} />
-              {form.stage_type === "double_elimination" && <GrandFinalField value={form.grand_final} onChange={(v)=>set("grand_final", v)} testId={`stage-grand-final-${stage.id}`} />}
-              <AdvancementField value={form.advancement} minutes={form.draw_show_minutes} onChange={(v)=>set("advancement", v)} onMinutes={(v)=>set("draw_show_minutes", v)} testId={`stage-advancement-${stage.id}`} />
-            </div>
-            <div className="text-xs text-white/45 border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
-              Leer bedeutet: diese Phase erbt die Turnier-Regeln. Overrides gelten für Match-Hub, Terminabstimmung und Ergebnisfluss dieser Phase.
-            </div>
-            {config.showSchema ? (
-              <label className="block">
-                <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Schema</div>
-                <textarea value={form.schema} onChange={(e)=>set("schema", e.target.value)} rows={12} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" data-testid={`stage-schema-${stage.id}`} />
-              </label>
-            ) : (
-              <div className="text-xs text-white/45 border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
-                Für diesen Struktur-Typ sind keine freien Schema-Felder nötig. Nutze eine freie Turnierbaum-Struktur, wenn du den Baum komplett selbst definieren willst.
-              </div>
-            )}
+      <div className="space-y-3 p-5">
+        {/* Gegner mischen (#1548): Auslosungen dieser Phase und „Neu auslosen“ mit dem Aufbau-Recht. */}
+        {canManageStructure && <DrawControls tournamentId={tournamentId} stage={stage} matches={matches} onChanged={onChanged} />}
+        {sectionTabs.length > 1 && (
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setActiveSection("all")}
+              className={`px-3 py-2 rounded-sm border text-[10px] font-bold uppercase tracking-wider ${activeSection === "all" ? "border-[#29B6E8] bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 text-white/55 hover:text-white"}`}
+            >
+              Alle <span className="ml-1 text-white/40">{sortedMatches.length}</span>
+            </button>
+            {sectionTabs.map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveSection(tab.key)}
+                className={`px-3 py-2 rounded-sm border text-[10px] font-bold uppercase tracking-wider ${activeSection === tab.key ? "border-[#29B6E8] bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 text-white/55 hover:text-white"}`}
+              >
+                {tab.label} <span className="ml-1 text-white/40">{tab.count}</span>
+              </button>
+            ))}
           </div>
         )}
-        {showMatchList && (
-          <div className="space-y-3">
-            {/* Gegner mischen (#1548): Auslosungen dieser Phase und „Neu auslosen“ mit dem Aufbau-Recht. */}
-            {canManageStructure && <DrawControls tournamentId={tournamentId} stage={stage} matches={matches} onChanged={onChanged} />}
-            {sectionTabs.length > 1 && (
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => setActiveSection("all")}
-                  className={`px-3 py-2 rounded-sm border text-[10px] font-bold uppercase tracking-wider ${activeSection === "all" ? "border-[#29B6E8] bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 text-white/55 hover:text-white"}`}
-                >
-                  Alle <span className="ml-1 text-white/40">{sortedMatches.length}</span>
-                </button>
-                {sectionTabs.map((tab) => (
-                  <button
-                    key={tab.key}
-                    type="button"
-                    onClick={() => setActiveSection(tab.key)}
-                    className={`px-3 py-2 rounded-sm border text-[10px] font-bold uppercase tracking-wider ${activeSection === tab.key ? "border-[#29B6E8] bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 text-white/55 hover:text-white"}`}
-                  >
-                    {tab.label} <span className="ml-1 text-white/40">{tab.count}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-            <div className="grid gap-3 xl:grid-cols-2 2xl:grid-cols-3 items-start">
-              {visibleMatches.map((match) => (
-                <MatchV2Card
-                  key={match.id}
-                  match={match}
-                  regById={regById}
-                  stations={stations}
-                  canRecordResults={rightsForMatch(match).results}
-                  onChanged={onChanged}
-                />
-              ))}
-              {visibleMatches.length === 0 && (
-                <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-8 text-center text-white/40">
-                  Keine Spiele generiert.
-                </div>
-              )}
+        <div className="grid gap-3 xl:grid-cols-2 2xl:grid-cols-3 items-start">
+          {visibleMatches.map((match) => (
+            <MatchV2Card
+              key={match.id}
+              match={match}
+              regById={regById}
+              stations={stations}
+              canRecordResults={rightsForMatch(match).results}
+              onChanged={onChanged}
+            />
+          ))}
+          {visibleMatches.length === 0 && (
+            <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-8 text-center text-white/40">
+              Keine Spiele generiert.
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

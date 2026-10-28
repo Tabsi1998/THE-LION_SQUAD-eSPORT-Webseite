@@ -57,19 +57,6 @@ export const STAGE_TYPE_LABELS = {
   ffa_league: "Mehrspieler-Liga",
 };
 
-export const STAGE_TYPE_OPTIONS = [
-  ["single_elimination", STAGE_TYPE_LABELS.single_elimination],
-  ["double_elimination", STAGE_TYPE_LABELS.double_elimination],
-  ["custom_bracket", STAGE_TYPE_LABELS.custom_bracket],
-  ["round_robin_groups", STAGE_TYPE_LABELS.round_robin_groups],
-  ["swiss", STAGE_TYPE_LABELS.swiss],
-  ["league", STAGE_TYPE_LABELS.league],
-  ["simple", STAGE_TYPE_LABELS.simple],
-  ["ffa_single_elimination", STAGE_TYPE_LABELS.ffa_single_elimination],
-  ["ffa_custom_bracket", STAGE_TYPE_LABELS.ffa_custom_bracket],
-  ["ffa_league", STAGE_TYPE_LABELS.ffa_league],
-];
-
 export const MATCH_TYPE_LABELS = {
   duel: "Duell",
   ffa: "Mehrspieler",
@@ -126,14 +113,6 @@ export const REGISTRATION_ADD_STATUS_OPTIONS = [
   ["checked_in", REGISTRATION_STATUS_LABELS.checked_in],
   ["pending", REGISTRATION_STATUS_LABELS.pending],
   ["waitlist", REGISTRATION_STATUS_LABELS.waitlist],
-];
-
-export const STAGE_STATUS_OPTIONS = [
-  ["pending", MATCH_STATUS_LABELS.pending],
-  ["ready", MATCH_STATUS_LABELS.ready],
-  ["running", MATCH_STATUS_LABELS.running],
-  ["completed", MATCH_STATUS_LABELS.completed],
-  ["archived", MATCH_STATUS_LABELS.archived],
 ];
 
 export const STAFF_ROLE_LABELS = {
