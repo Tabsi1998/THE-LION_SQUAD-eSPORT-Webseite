@@ -4,6 +4,14 @@ import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { viennaDateTime } from "@/lib/vienna";
+import { pushErrorLabel, pushStateLabel } from "@/lib/pushStatus";
+
+// Push-Tests (#2119 ML8): in Alltagssprache - „angenommen“ (der Push-Dienst hat die Nachricht genommen) und „zugestellt“
+// (Apple oder Google haben sie ans Handy gegeben) statt Ticket und Receipt.
+function devices(count) {
+  const value = Number(count) || 0;
+  return value === 1 ? "1 Gerät" : `${value} Geräte`;
+}
 
 function formatTime(value) {
   if (!value) return "-";
@@ -26,7 +34,7 @@ export default function AdminMobilePushPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({
-    title: "LionsAPP Push-Test",
+    title: "Push an dein Handy",
     body: "Wenn du diese Nachricht am Handy siehst, funktionieren Push-Benachrichtigungen.",
   });
 
@@ -73,7 +81,7 @@ export default function AdminMobilePushPage() {
     try {
       const { data } = await api.post("/admin/mobile-push/test", { user_id: selected, ...form });
       const count = Number(data?.notification?.push_sent_count || 0);
-      toast.success(count > 0 ? `Push-Test gesendet (${count} Token).` : "In-App erstellt, aber kein aktiver Push-Token gefunden.");
+      toast.success(count > 0 ? `Test an ${devices(count)} geschickt.` : "Im Postfach angelegt – aber auf keinem Handy ist die App mit Push angemeldet.");
       await loadStatus(selected);
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail));
@@ -87,7 +95,7 @@ export default function AdminMobilePushPage() {
     setBusy(true);
     try {
       const { data } = await api.post(`/admin/mobile-push/receipts/${selected}`);
-      toast.success(`${Number(data?.checked || 0)} Receipt(s) geprüft.`);
+      toast.success(`Zustellung für ${devices(data?.checked)} nachgefragt.`);
       await loadStatus(selected);
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail));
@@ -101,7 +109,7 @@ export default function AdminMobilePushPage() {
     setBusy(true);
     try {
       const { data } = await api.post("/admin/mobile-push/receipts");
-      toast.success(`${Number(data?.checked || 0)} Receipt(s) geprüft, ${Number(data?.disabled || 0)} Token deaktiviert.`);
+      toast.success(`Zustellung für ${devices(data?.checked)} nachgefragt, ${devices(data?.disabled)} abgemeldet.`);
       await loadUsers();
       await loadStatus(selected);
     } catch (err) {
@@ -124,7 +132,7 @@ export default function AdminMobilePushPage() {
             disabled={busy}
             className="inline-flex items-center gap-2 border border-white/10 bg-[#121212] px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider hover:border-[#29B6E8]/50 disabled:opacity-50"
           >
-            <BellRing className="w-4 h-4" /> Alle Receipts
+            <BellRing className="w-4 h-4" /> Zustellung für alle prüfen
           </button>
           <button
             onClick={() => { loadUsers(); loadStatus(); }}
@@ -160,17 +168,17 @@ export default function AdminMobilePushPage() {
                   <Smartphone className={`w-5 h-5 mt-0.5 ${user.has_enabled_token ? "text-[#29B6E8]" : "text-white/25"}`} />
                   <div className="min-w-0 flex-1">
                     <div className="font-bold truncate">{userLabel(user)}</div>
-                    <div className="text-xs text-white/45 truncate">@{user.username || "-"} · {user.enabled_token_count}/{user.token_count} aktiv</div>
-                    <div className="text-[11px] text-white/35 mt-1">Letztes Update: {formatTime(user.latest_updated_at)}</div>
+                    <div className="text-xs text-white/45 truncate">@{user.username || "-"} · {user.enabled_token_count} von {devices(user.token_count)} aktiv</div>
+                    <div className="text-[11px] text-white/35 mt-1">Zuletzt angemeldet: {formatTime(user.latest_updated_at)}</div>
                     {user.last_receipt_error || user.last_ticket_error ? (
-                      <div className="text-[11px] text-[#FF6B61] mt-1 truncate">{user.last_receipt_error || user.last_ticket_error}</div>
+                      <div className="text-[11px] text-[#FF6B61] mt-1 truncate" title={user.last_receipt_error || user.last_ticket_error}>{pushErrorLabel(user.last_receipt_error || user.last_ticket_error)}</div>
                     ) : null}
                   </div>
                 </div>
               </button>
             ))}
             {!users.length && (
-              <div className="p-8 text-center text-white/40">{loading ? "Lade Tokens..." : "Keine Push-Tokens gefunden"}</div>
+              <div className="p-8 text-center text-white/40">{loading ? "Lade Geräte …" : "Kein Konto mit angemeldetem Handy gefunden"}</div>
             )}
           </div>
         </section>
@@ -219,14 +227,16 @@ export default function AdminMobilePushPage() {
                 disabled={!selected || busy}
                 className="inline-flex items-center gap-2 border border-white/10 px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider text-white/70 disabled:opacity-50"
               >
-                <BellRing className="w-4 h-4" /> Receipts prüfen
+                <BellRing className="w-4 h-4" /> Zustellung prüfen
               </button>
             </div>
+            <p className="mt-3 text-xs text-white/45">Der Test landet als „Test: …“ im Postfach der Person und geht als Push an ihre Handys.</p>
           </div>
 
           <div className="border border-white/10 bg-[#121212] rounded-sm overflow-hidden">
             <div className="p-4 border-b border-white/10">
-              <h3 className="font-bold uppercase tracking-wider text-sm">Token-Status</h3>
+              <h3 className="font-bold uppercase tracking-wider text-sm">Angemeldete Handys</h3>
+              <p className="text-xs text-white/45 mt-1">„Angenommen“: der Push-Dienst hat die Nachricht genommen. „Zugestellt“: Apple oder Google haben sie ans Handy gegeben.</p>
             </div>
             <div className="md:hidden divide-y divide-white/5">
               {(status?.tokens || []).map((token, index) => (
@@ -242,32 +252,32 @@ export default function AdminMobilePushPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-2">
-                      <div className="text-white/35 uppercase tracking-wider text-[10px]">Ticket</div>
-                      <div>{token.last_ticket_status || "-"}</div>
-                      {token.last_ticket_error ? <div className="text-[#FF6B61] break-words">{token.last_ticket_error}</div> : null}
+                      <div className="text-white/35 uppercase tracking-wider text-[10px]">Angenommen</div>
+                      <div>{pushStateLabel(token.last_ticket_status)}</div>
+                      {token.last_ticket_error ? <div className="text-[#FF6B61] break-words" title={token.last_ticket_error}>{pushErrorLabel(token.last_ticket_error)}</div> : null}
                     </div>
                     <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-2">
-                      <div className="text-white/35 uppercase tracking-wider text-[10px]">Receipt</div>
-                      <div>{token.last_receipt_status || "-"}</div>
-                      {token.last_receipt_error ? <div className="text-[#FF6B61] break-words">{token.last_receipt_error}</div> : null}
+                      <div className="text-white/35 uppercase tracking-wider text-[10px]">Zugestellt</div>
+                      <div>{pushStateLabel(token.last_receipt_status)}</div>
+                      {token.last_receipt_error ? <div className="text-[#FF6B61] break-words" title={token.last_receipt_error}>{pushErrorLabel(token.last_receipt_error)}</div> : null}
                     </div>
                   </div>
                   <div className="text-[11px] text-white/40">Letzter Versand: {formatTime(token.last_sent_at)}</div>
                 </article>
               ))}
               {!(status?.tokens || []).length && (
-                <div className="text-center py-10 text-white/40">Keine Tokens für diesen Benutzer</div>
+                <div className="text-center py-10 text-white/40">Auf keinem Handy dieser Person ist die App mit Push angemeldet</div>
               )}
             </div>
             <div className="hidden md:block tls-swipe pb-0">
               <table className="w-full text-sm min-w-[760px]">
                 <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
                   <tr>
-                    <th className="text-left px-4 py-3">Token</th>
-                    <th className="text-left px-4 py-3">Plattform</th>
+                    <th className="text-left px-4 py-3">Gerät (Kennung)</th>
+                    <th className="text-left px-4 py-3">System</th>
                     <th className="text-left px-4 py-3">Aktiv</th>
-                    <th className="text-left px-4 py-3">Ticket</th>
-                    <th className="text-left px-4 py-3">Receipt</th>
+                    <th className="text-left px-4 py-3">Angenommen</th>
+                    <th className="text-left px-4 py-3">Zugestellt</th>
                     <th className="text-left px-4 py-3">Letzter Versand</th>
                   </tr>
                 </thead>
@@ -278,19 +288,19 @@ export default function AdminMobilePushPage() {
                       <td className="px-4 py-3">{token.platform || "-"}</td>
                       <td className="px-4 py-3">{token.enabled === false ? "Nein" : "Ja"}</td>
                       <td className="px-4 py-3 text-xs">
-                        <div>{token.last_ticket_status || "-"}</div>
-                        {token.last_ticket_error ? <div className="text-[#FF6B61]">{token.last_ticket_error}</div> : null}
+                        <div>{pushStateLabel(token.last_ticket_status)}</div>
+                        {token.last_ticket_error ? <div className="text-[#FF6B61]" title={token.last_ticket_error}>{pushErrorLabel(token.last_ticket_error)}</div> : null}
                       </td>
                       <td className="px-4 py-3 text-xs">
-                        <div>{token.last_receipt_status || "-"}</div>
-                        {token.last_receipt_error ? <div className="text-[#FF6B61]">{token.last_receipt_error}</div> : null}
+                        <div>{pushStateLabel(token.last_receipt_status)}</div>
+                        {token.last_receipt_error ? <div className="text-[#FF6B61]" title={token.last_receipt_error}>{pushErrorLabel(token.last_receipt_error)}</div> : null}
                       </td>
                       <td className="px-4 py-3 text-white/50 text-xs">{formatTime(token.last_sent_at)}</td>
                     </tr>
                   ))}
                   {!(status?.tokens || []).length && (
                     <tr>
-                      <td colSpan="6" className="text-center py-10 text-white/40">Keine Tokens für diesen Benutzer</td>
+                      <td colSpan="6" className="text-center py-10 text-white/40">Auf keinem Handy dieser Person ist die App mit Push angemeldet</td>
                     </tr>
                   )}
                 </tbody>

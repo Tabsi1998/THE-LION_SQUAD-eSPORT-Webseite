@@ -29,7 +29,7 @@ OPTIONAL_EMAIL_PREFERENCES = {
     # Erfolge (#568): in der App, per Push und als Gratulation vom Discord-Bot - eine E-Mail dafür gibt es nicht.
     "achievements": {
         "label": "Erfolge",
-        "description": "Freigeschaltete Erfolge – als Gratulation.",
+        "description": "Freigeschaltete Erfolge, Kronen und neue Level – als Gratulation.",
         "default": True,
         "channels": ["in_app", "push", "discord"],
     },
@@ -124,6 +124,8 @@ TEMPLATE_CATEGORY = {
     "checkin_closes_soon_on_site": "tournament_updates",
     "tournament_finished": "tournament_updates",
     "event_message": "tournament_updates",
+    "event_cancelled": "tournament_updates",
+    "tournament_cancelled": "tournament_updates",
     "match_reminder": "match_reminders",
     "match_lead_10m": "match_reminders",
     "score_reported": "match_reminders",
@@ -195,6 +197,11 @@ NOTIFICATION_KIND_CATEGORY = {
     "achievement_revoked": "achievements",
     # Jahresrückblick (#1195): „Dein Jahr ist da“ einmal im Dezember - unter „Erfolge“.
     "year_review": "achievements",
+    # Kronen und Level (#2119 ML2): gehören zu „Erfolge“ - wer das ausschaltet, bekommt sie auch nicht.
+    "crown_gained": "achievements",
+    "crown_changed": "achievements",
+    "crown_lost": "achievements",
+    "level": "achievements",
     "news_mention": "news_events",
     # Interne Inhalte nur an Berechtigte (#342): Mitglieder bzw. Vorstand.
     "news_member": "club_internal",
@@ -378,6 +385,44 @@ def _format_de_datetime(value: Any) -> str:
         return ""
 
 
+async def newsletter_mail_values(kind: str, item: dict) -> tuple[str, dict]:
+    """Vorlage und Werte des Newsletters zu einer News oder einem Event - für den Versand und die Vorschau (#2119 ML5)."""
+    base = await _site_base_url()
+    preferences_url = f"{base}/profile?tab=notifications"
+    slug_or_id = item.get("slug") or item.get("id")
+    if kind == "news":
+        return "newsletter_news", {
+            "title": item.get("title") or "Neue Vereinsnews",
+            "excerpt": item.get("excerpt") or "",
+            "url": f"{base}/news/{slug_or_id}",
+            "preferences_url": preferences_url,
+        }
+    return "newsletter_event", {
+        "title": item.get("name") or "Neues Event",
+        # Mehrtägig (#884): der Zeitraum und die Tage statt nur des Beginns.
+        "when": _event_when(item),
+        "location": item.get("location") or item.get("city") or "",
+        "url": f"{base}/events/{slug_or_id}",
+        "preferences_url": preferences_url,
+    }
+
+
+async def preview_newsletter(kind: str, item: dict, display_name: str) -> dict | None:
+    """Die Newsletter-Mail, wie sie hinausginge - mit dem Namen der ansehenden Person als Anrede. „Nur intern“ geht
+    nicht per Mail hinaus, dafür gibt es keine Vorschau."""
+    if (item.get("visibility") or "public") == "internal":
+        return None
+    from email_service import render_named
+
+    from services.newsletter_unsubscribe import PAGE_PATH
+
+    template_key, values = await newsletter_mail_values(kind, item)
+    # Der Abmeldelink der Vorschau führt ins Leere - ein echter würde die ansehende Person abmelden.
+    values["unsubscribe_url"] = f"{await _site_base_url()}{PAGE_PATH}?token=vorschau"
+    subject, html = await render_named(template_key, display_name=display_name or "Löwe", **values)
+    return {"template_key": template_key, "subject": subject, "html": html}
+
+
 async def enqueue_newsletter_for_item(kind: str, item: dict, dedupe_suffix: str = "") -> dict:
     """Queue opt-in newsletter mails for a published news post or announced event."""
     if kind not in {"news", "event"}:
@@ -394,42 +439,23 @@ async def enqueue_newsletter_for_item(kind: str, item: dict, dedupe_suffix: str 
     if not users:
         return {"queued": 0, "reason": "no_recipients"}
 
+    template_key, common_kwargs = await newsletter_mail_values(kind, item)
     base = await _site_base_url()
-    preferences_url = f"{base}/profile?tab=notifications"
-    slug_or_id = item.get("slug") or item.get("id")
-    if kind == "news":
-        template_key = "newsletter_news"
-        url = f"{base}/news/{slug_or_id}"
-        title = item.get("title") or "Neue Vereinsnews"
-        common_kwargs = {
-            "title": title,
-            "excerpt": item.get("excerpt") or "",
-            "url": url,
-            "preferences_url": preferences_url,
-        }
-    else:
-        template_key = "newsletter_event"
-        url = f"{base}/events/{slug_or_id}"
-        title = item.get("name") or "Neues Event"
-        common_kwargs = {
-            "title": title,
-            # Mehrtägig (#884): der Zeitraum und die Tage statt nur des Beginns.
-            "when": _event_when(item),
-            "location": item.get("location") or item.get("city") or "",
-            "url": url,
-            "preferences_url": preferences_url,
-        }
-
     queued = 0
     from email_service import send_template
+    from services.newsletter_unsubscribe import links_for, mail_headers
     for user in users:
         if not email_allowed(user, template_key, "news_events"):
             continue
         display_name = user.get("display_name") or user.get("username") or "Löwe"
+        # Abbestellen mit einem Klick (#2119 ML4): Link im Text und Kopfzeilen für Gmail/Yahoo, je Person signiert.
+        unsubscribe = links_for(base, user["id"])
         result = await send_template(
             template_key,
             user["email"],
             display_name=display_name,
+            unsubscribe_url=unsubscribe["page"],
+            mail_headers=mail_headers(unsubscribe["api"]),
             dedupe_key=f"{template_key}:{item.get('id')}:{user['id']}{dedupe_suffix}",
             mail_meta={
                 "kind": "newsletter",

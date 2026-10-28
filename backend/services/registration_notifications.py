@@ -134,8 +134,8 @@ def cancellation_message(tournament: dict, reason: str | None = None) -> dict:
 
 async def notify_tournament_cancelled(db, tournament: dict, reason: str | None = None) -> int:
     """„Abgesagt“ (#2120, TA24): einmal je Turnier und Person an alle Spieler der Anmeldungen, die noch mitspielen
-    wollten (ausstehend, bestätigt, eingecheckt, Warteliste) - im Postfach und per Push. Die Mail dazu kommt mit der
-    eigenen Vorlage (#2119); bis dahin gibt es keine."""
+    wollten (ausstehend, bestätigt, eingecheckt, Warteliste) - im Postfach, per Push und mit der Mail „Turnier
+    abgesagt“ (#2119), wenn die Person Mails zu Turnier-Updates zulässt."""
     registrations = await db.tournament_registrations.find(
         {"tournament_id": tournament.get("id"), "status": {"$in": CANCEL_NOTIFIED_STATUSES}},
         {"_id": 0, "id": 1, "user_id": 1, "team_id": 1, "squad_id": 1},
@@ -143,7 +143,9 @@ async def notify_tournament_cancelled(db, tournament: dict, reason: str | None =
     if not registrations:
         return 0
     path = f"/tournaments/{tournament.get('slug') or tournament.get('id')}"
+    absolute_url = await build_public_url(path)
     message = cancellation_message(tournament, reason)
+    clean_reason = " ".join((reason or "").split())[:CANCEL_REASON_LIMIT]
     sent = 0
     for user in await users_for(db, await player_user_ids(db, registrations)):
         dedupe = f"tournament_cancelled:{tournament.get('id')}:{user['id']}"
@@ -152,6 +154,15 @@ async def notify_tournament_cancelled(db, tournament: dict, reason: str | None =
             meta={"category": "tournament_updates", "dedupe_key": dedupe, "tournament_id": tournament.get("id")},
         ):
             sent += 1
+        try:
+            await send_user_template(
+                user, "tournament_cancelled", dedupe_key=f"{dedupe}:mail",
+                mail_meta={"kind": "tournament_cancelled", "tournament_id": tournament.get("id"), "user_id": user["id"]},
+                display_name=user.get("display_name") or user.get("username") or "",
+                tournament_title=tournament.get("title") or "Turnier", reason=clean_reason, url=absolute_url,
+            )
+        except Exception as exc:  # noqa: BLE001 - eine Mail hält keine Absage auf
+            logger.warning("Cancel mail failed for tournament=%s type=%s", _log_safe(tournament.get("id")), type(exc).__name__)
     return sent
 
 

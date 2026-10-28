@@ -95,6 +95,7 @@ const RegisterPage = lazyPage(() => import("@/pages/public/RegisterPage"));
 const ForgotPasswordPage = lazyPage(() => import("@/pages/public/PasswordRecoveryPage").then((m) => ({ default: m.ForgotPasswordPage })));
 const ResetPasswordPage = lazyPage(() => import("@/pages/public/PasswordRecoveryPage").then((m) => ({ default: m.ResetPasswordPage })));
 const EmailVerificationPage = lazyPage(() => import("@/pages/public/EmailVerificationPage"));
+const NewsletterUnsubscribePage = lazyPage(() => import("@/pages/public/NewsletterUnsubscribePage"));
 const PrivacyPage = lazyPage(() => import("@/pages/public/LegalPages").then((m) => ({ default: m.PrivacyPage })));
 const ImprintPage = lazyPage(() => import("@/pages/public/LegalPages").then((m) => ({ default: m.ImprintPage })));
 const TermsPage = lazyPage(() => import("@/pages/public/LegalPages").then((m) => ({ default: m.TermsPage })));
@@ -327,6 +328,7 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/verify-email" element={<EmailVerificationPage />} />
+          <Route path="/newsletter/abbestellen" element={<NewsletterUnsubscribePage />} />
 
           {/* User */}
           <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />

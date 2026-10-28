@@ -428,26 +428,36 @@ def tpl_membership_blocked(display_name: str) -> tuple[str, str]:
     )
 
 
+def _newsletter_footer(unsubscribe_url: str = "", preferences_url: str = "") -> str:
+    """Abbestellen mit einem Klick (#2119 ML4) und der Weg zu den Einstellungen - Teil einer Vorlage, die Werte kommen
+    schon als Text geschützt an (mail_template)."""
+    parts = []
+    if unsubscribe_url:
+        parts.append(f'Keine Newsletter mehr? <a href="{unsubscribe_url}">Mit einem Klick abbestellen</a>.')
+    if preferences_url:
+        parts.append(f'Themen ändern: <a href="{preferences_url}">E-Mail-Einstellungen öffnen</a>.')
+    return f'<p style="font-size:12px;color:#6b7280">{" ".join(parts)}</p>' if parts else ""
+
+
 @mail_template
-def tpl_newsletter_news(display_name: str, title: str, excerpt: str = "", url: str = "", preferences_url: str = "") -> tuple[str, str]:
+def tpl_newsletter_news(display_name: str, title: str, excerpt: str = "", url: str = "", preferences_url: str = "", unsubscribe_url: str = "") -> tuple[str, str]:
     body = f"<p>Hallo {display_name or 'Löwe'},</p><p>es gibt neue Vereinsnews:</p><p><strong>{title}</strong></p>"
     if excerpt:
         body += f"<p>{excerpt}</p>"
-    if preferences_url:
-        body += f'<p style="font-size:12px;color:#6b7280">Newsletter abbestellen oder Kategorien ändern: <a href="{preferences_url}">E-Mail-Einstellungen öffnen</a>.</p>'
+    body += _newsletter_footer(unsubscribe_url, preferences_url)
     return f"Neue Vereinsnews: {title}", _wrap("Neue Vereinsnews", body, "News lesen", url)
 
 
 @mail_template
-def tpl_newsletter_event(display_name: str, title: str, when: str = "", location: str = "", url: str = "", preferences_url: str = "") -> tuple[str, str]:
+def tpl_newsletter_event(display_name: str, title: str, when: str = "", location: str = "", url: str = "", preferences_url: str = "",
+                         unsubscribe_url: str = "") -> tuple[str, str]:
     facts = ""
     if when:
         facts += f"<p><strong>Datum:</strong> {when}</p>"
     if location:
         facts += f"<p><strong>Ort:</strong> {location}</p>"
     body = f"<p>Hallo {display_name or 'Löwe'},</p><p>ein neues Event wurde veröffentlicht:</p><p><strong>{title}</strong></p>{facts}"
-    if preferences_url:
-        body += f'<p style="font-size:12px;color:#6b7280">Newsletter abbestellen oder Kategorien ändern: <a href="{preferences_url}">E-Mail-Einstellungen öffnen</a>.</p>'
+    body += _newsletter_footer(unsubscribe_url, preferences_url)
     return f"Neues Event: {title}", _wrap("Neues Event", body, "Event ansehen", url)
 
 
@@ -460,6 +470,27 @@ def tpl_event_message(display_name: str, event_name: str, message: str, url: str
         f'<p style="border-left:3px solid {BRAND_CYAN};padding-left:12px;color:#374151;white-space:pre-line">{message}</p>'
     )
     return f"{event_name}: Nachricht der Turnierleitung", _wrap("Nachricht zum Event", body, "Zum Event", url)
+
+
+# Absage (#2119): eigene Mails statt „Nachricht der Turnierleitung“ (Event, #2118) bzw. nur Glocke und Push (Turnier, #2120).
+@mail_template
+def tpl_event_cancelled(display_name: str, event_name: str, url: str = "") -> tuple[str, str]:
+    body = (
+        f"<p>Hallo {display_name or 'Löwe'},</p>"
+        f"<p><strong>{event_name}</strong> ist abgesagt. Deine Anmeldung ist damit storniert, auch ein Platz auf der Warteliste.</p>"
+        "<p>Einen offenen Kostenbeitrag verrechnen wir nicht. Hast du schon eine Rechnung bekommen, meldet sich der Verein bei dir.</p>"
+    )
+    return f"Abgesagt: {event_name}", _wrap("Event abgesagt", body, "Zum Event" if url else None, url or None)
+
+
+@mail_template
+def tpl_tournament_cancelled(display_name: str, tournament_title: str, reason: str = "", url: str = "") -> tuple[str, str]:
+    body = (
+        f"<p>Hallo {display_name or 'Löwe'},</p>"
+        f"<p>die Turnierleitung hat <strong>{tournament_title}</strong> abgesagt. Deine Anmeldung ist damit hinfällig.</p>"
+        + (f"<p><strong>Grund:</strong> {reason}</p>" if reason else "")
+    )
+    return f"Turnier abgesagt: {tournament_title}", _wrap("Turnier abgesagt", body, "Zum Turnier" if url else None, url or None)
 
 
 @mail_template
@@ -619,11 +650,33 @@ async def send_template(
     scheduled_at=None,
     dedupe_key: Optional[str] = None,
     mail_meta: Optional[dict] = None,
+    mail_headers: Optional[dict] = None,
     **kwargs,
 ) -> dict:
     """Shortcut for named templates. By default the mail is queued via the new mail-queue.
     Set queue=False to use the old immediate-Resend path (e.g. test buttons).
     """
+    try:
+        rendered = await render_named(template_key, **kwargs)
+    except TypeError as e:
+        return {"ok": False, "reason": f"template args error: {e}"}
+    if rendered is None:
+        return {"ok": False, "reason": "unknown template"}
+    subject, html = rendered
+    if queue:
+        from services.mail_queue import enqueue_mail
+        return await enqueue_mail(
+            to=to, subject=subject, html=html,
+            template_key=template_key, scheduled_at=scheduled_at,
+            dedupe_key=dedupe_key, meta=mail_meta,
+            **({"headers": mail_headers} if mail_headers else {}),
+        )
+    return await send_mail(to, subject, html, template_key=template_key)
+
+
+async def render_named(template_key: str, **kwargs) -> Optional[tuple[str, str]]:
+    """Betreff und HTML einer benannten Mail, genau wie sie hinausgeht: feste Vorlage, Fassung des Admins, Sponsoren.
+    Auch für Vorschauen mit echten Werten (Newsletter, #2119 ML5) - ohne etwas einzureihen."""
     templates = {
         "registration": tpl_registration,
         "email_verification": tpl_email_verification,
@@ -656,26 +709,17 @@ async def send_template(
         "newsletter_news": tpl_newsletter_news,
         "newsletter_event": tpl_newsletter_event,
         "event_message": tpl_event_message,
+        "event_cancelled": tpl_event_cancelled,
+        "tournament_cancelled": tpl_tournament_cancelled,
     }
     fn = templates.get(template_key)
     if not fn:
-        return {"ok": False, "reason": "unknown template"}
-    try:
-        subject, html = fn(**kwargs)
-    except TypeError as e:
-        return {"ok": False, "reason": f"template args error: {e}"}
+        return None
+    subject, html = fn(**kwargs)
     # E-Mail-Vorlagen (#437 A): hat der Admin diese Vorlage überschrieben, gilt sein Betreff/HTML mit denselben Werten.
     from services.mail_overrides import apply_override
     subject, html = await apply_override(template_key, subject, html, kwargs)
-    html = await _with_email_sponsors(html)
-    if queue:
-        from services.mail_queue import enqueue_mail
-        return await enqueue_mail(
-            to=to, subject=subject, html=html,
-            template_key=template_key, scheduled_at=scheduled_at,
-            dedupe_key=dedupe_key, meta=mail_meta,
-        )
-    return await send_mail(to, subject, html, template_key=template_key)
+    return subject, await _with_email_sponsors(html)
 
 
 async def smtp_test(to: str) -> dict:
