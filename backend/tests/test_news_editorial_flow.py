@@ -228,3 +228,31 @@ async def test_scheduled_post_waits_for_its_time(flow, monkeypatch):
     later = (now_utc() + timedelta(days=3)).isoformat()
     planned = (await flow.post("/api/news", json={"title": "Liga-Start", "content": "Text", "published": True, "published_at": later})).json()
     assert calls == [] and not planned.get("newsletter_sent_at"), "geplant: der Newsletter geht erst zum Termin"
+
+
+# ---------------------------------------------------------------- Nachbesserung aus dem Review
+
+async def content_editor(flow, name="bereichsredaktion"):
+    """Redaktion über den Bereich (Freigabe/Vorstandsposten), ohne Admin-Rolle."""
+    editor = await flow.add_user(role="player", name=name)
+    await flow.db.users.update_one({"id": editor["id"]}, {"$set": {"areas": ["content"]}})
+    return {**editor, "areas": ["content"]}
+
+
+@pytest.mark.asyncio
+async def test_preview_works_for_editors_with_the_content_area(flow):
+    await news(flow, "entwurf", published=False)
+    await news(flow, "zurueck", published=False, withdrawn_at=now_utc().isoformat())
+    flow.act_as(await content_editor(flow))
+    draft = await flow.get("/api/news/entwurf")
+    assert draft.status_code == 200 and draft.json()["preview"] == {"state": "draft"}
+    assert (await flow.get("/api/news/zurueck")).json()["preview"]["state"] == "withdrawn"
+    flow.act_as(await flow.add_user(name="leser"))
+    assert (await flow.get("/api/news/entwurf")).status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_withdrawn_member_post_stays_not_found_for_guests(flow):
+    await news(flow, "intern-weg", visibility="members", published=False, withdrawn_at=now_utc().isoformat())
+    flow.act_as(None)
+    assert (await flow.get("/api/news/intern-weg")).status_code == 404, "erst die Sichtbarkeit, dann der Hinweis"

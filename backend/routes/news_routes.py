@@ -6,7 +6,7 @@ from typing import Optional
 from datetime import datetime, timezone
 from database import get_db
 from auth import get_optional_user, require_area
-from services.permissions import is_confirmed_admin_role
+from services.permissions import can_use_area, is_confirmed_admin_role
 from services.visibility import user_can_see, filter_visible
 from services.content_embed_service import resolve_content_embeds
 from services.news_cards import attach_result_winners, event_signups, tournament_signups
@@ -178,8 +178,6 @@ async def _without_empty_albums(albums: list[dict], user: dict | None) -> list[d
     Hinweis ``is_empty``, damit die Verwaltung weiß, dass Besucher es nicht sehen. Sobald Medien da sind, erscheint es
     von selbst. Erwartet die Zähler aus ``_attach_gallery_counts``. Der Bereich zählt wie jeder Adminbereich nur mit
     bestätigter Zwei-Faktor-Anmeldung (#1479)."""
-    from services.permissions import can_use_area
-
     if await can_use_area(user, "content"):
         for album in albums:
             album["is_empty"] = not album.get("media_count")
@@ -503,12 +501,18 @@ async def get_news(slug_or_id: str, user: dict | None = Depends(get_optional_use
     if not p:
         raise HTTPException(status_code=404, detail="Beitrag nicht gefunden.")
     is_staff = _is_staff(user)
-    # Zurückgezogen (#2122 NW3): Links aus Newsletter und Discord landen bei einem freundlichen Hinweis statt bei 404.
-    if p.get("withdrawn_at") and not is_staff:
-        raise HTTPException(status_code=410, detail=WITHDRAWN_MESSAGE)
-    if p.get("published") is False and not is_staff:
+    # Die Vorschau sieht, wer News pflegt (#2122): das Admin-Team und jede Person mit dem Bereich „Redaktion“ - auch über
+    # Freigabe oder Vorstandsposten, wie Admin → News selbst. Verknüpfte Entwürfe bleiben beim Admin-Team.
+    can_preview = is_staff or await can_use_area(user, "content")
+    # Zurückgezogen (#2122 NW3): Links aus Newsletter und Discord landen bei einem freundlichen Hinweis statt bei 404 -
+    # aber nur, wer den Beitrag nach seiner Sichtbarkeit sehen dürfte; sonst bleibt es „nicht gefunden“.
+    if p.get("withdrawn_at") and not can_preview:
+        if await _user_can_see(user, p.get("visibility") or "public"):
+            raise HTTPException(status_code=410, detail=WITHDRAWN_MESSAGE)
         raise HTTPException(status_code=404, detail="Beitrag nicht gefunden.")
-    if not is_staff and not _published_now(p):
+    if p.get("published") is False and not can_preview:
+        raise HTTPException(status_code=404, detail="Beitrag nicht gefunden.")
+    if not can_preview and not _published_now(p):
         raise HTTPException(status_code=404, detail="Beitrag nicht gefunden.")
     if not await _user_can_see(user, p.get("visibility") or "public"):
         raise HTTPException(status_code=403, detail="Nicht sichtbar.")
