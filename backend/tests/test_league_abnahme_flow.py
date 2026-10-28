@@ -2,14 +2,10 @@
 
 Über die echten Routen, wie Turnierleitung, Teamleitung und Captains sie im Browser benutzen: Spiel mit Map-Bibliothek,
 Liga, Season 1 (Start Di 10.11.2026, 10 Wochen, Weihnachtspause 21.12.-3.1., nur Hinrunde, Best of 3, Teamgröße 4),
-Map-Pool, Liga 1, Staffel A, acht Hauptteams mit je einem Co-Team (Captain und Vertreter), zuteilen, Spielplan fest
-(Check-in starten) und starten, Terminvorschlag, Melden und Bestätigen, 48-h-Automatik, Tabelle mit Punkten, Einspruch,
-Korrektur der Turnierleitung, Ligaseite.
-
-Ergebnis je Map mit Aufstellung kommt mit P4 (#1650): Solange ``MatchScoreReport`` kein Feld ``games`` kennt, melden die
-Captains nur den Stand, und die Tests mit Maps, Aufstellung, Nachtrag und Sperrzeit beim Terminvorschlag sind
-übersprungen. Ist P4 in main, melden dieselben Wege mit Maps und eigener Aufstellung (``report_body``), und die
-übersprungenen Tests laufen mit.
+Map-Pool, Liga 1, Staffel A, acht Hauptteams mit je einem Co-Team (Captain und Vertreter), zuteilen, „Liga starten“
+(Spielplan fest), Terminvorschlag (in der Weihnachtspause abgelehnt), Melden mit Maps und eigener Aufstellung,
+Bestätigen im Web und aus der App, Aufstellung nachtragen, 48-h-Automatik, Tabelle mit Punkten, Einspruch, Korrektur
+der Turnierleitung, Ligaseite. Ergebnis je Map mit Aufstellung kommt aus P4 (#1650).
 """
 from __future__ import annotations
 
@@ -24,13 +20,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
-from models import MatchScoreReport  # noqa: E402
 from squad_world import make_team  # noqa: E402
-
-# P4 (#1650) liefert Maps samt Aufstellung je Meldung - bis dahin melden die Captains nur den Stand.
-P4 = "games" in MatchScoreReport.model_fields
-needs_p4 = pytest.mark.skipif(
-    not P4, reason="P4 (#1650, Ergebnis je Map mit Aufstellung) ist noch nicht in main - läuft nach dem Merge mit")
 
 ADMIN = "/api/admin/leagues"
 GAME = {
@@ -181,18 +171,14 @@ def games(world: dict, winner: str, loser: str, score: tuple[int, int], *, side:
 
 
 def report_body(world: dict, winner: str, loser: str, score: tuple[int, int], *, side: str) -> dict:
-    """Was eine Seite im Web meldet: vor P4 der Stand, mit P4 dazu Maps und die eigene Aufstellung."""
-    body = {"results": results(winner, loser, score)}
-    if P4:
-        body["games"] = games(world, winner, loser, score, side=side)
-    return body
+    """Was eine Seite im Web meldet: Stand, Maps und die eigene Aufstellung."""
+    return {"results": results(winner, loser, score), "games": games(world, winner, loser, score, side=side)}
 
 
 def correction_body(world: dict, winner: str, loser: str, score: tuple[int, int], reason: str) -> dict:
-    body = {"results": results(winner, loser, score), "reason": reason}
-    if P4:
-        body["games"] = games(world, winner, loser, score, both=True)
-    return body
+    """Korrektur der Turnierleitung: Stand, Maps und die Aufstellungen beider Seiten, mit Grund."""
+    return {"results": results(winner, loser, score), "reason": reason,
+            "games": games(world, winner, loser, score, both=True)}
 
 
 async def table(flow, world: dict) -> dict:
@@ -330,7 +316,7 @@ async def test_results_reach_the_table_and_a_correction_after_a_dispute_moves_th
     # 4) Die Turnierleitung trägt ein Ergebnis selbst ein (etwa nach Absprache im Discord).
     e_home, e_away = sides(entered)
     ok(await flow.post(f"/api/matches/{entered['id']}/result", json={
-        "results": results(e_home, e_away, (2, 1)), **({"games": games(world, e_home, e_away, (2, 1), both=True)} if P4 else {})}))
+        "results": results(e_home, e_away, (2, 1)), "games": games(world, e_home, e_away, (2, 1), both=True)}))
 
     # Tabelle: Sieg 3 Punkte, Niederlage 0 - nach der Korrektur zählt der Sieg der Gäste.
     rows = await table(flow, world)
@@ -352,9 +338,8 @@ async def test_results_reach_the_table_and_a_correction_after_a_dispute_moves_th
     assert "lineups" not in str(page)
 
 
-# ---------------------------------------------------------------- P4: Maps, Aufstellung, Nachtrag, Sperrzeit
+# ---------------------------------------------------------------- Maps, Aufstellung, Nachtrag, Sperrzeit (P4)
 
-@needs_p4
 @pytest.mark.asyncio
 async def test_a_proposal_in_the_christmas_break_is_refused(flow):
     world = await build_league(flow)
@@ -368,12 +353,15 @@ async def test_a_proposal_in_the_christmas_break_is_refused(flow):
 
     assert refused.status_code == 409
     assert "Weihnachtspause" in refused.json()["detail"]
+    # Die Sperrzeit gilt tageweise: der Montag 21.12. gehört noch zu Woche 6, ist aber schon Pause.
+    monday = await flow.post(f"/api/matches/{match['id']}/schedule-proposals",
+                             json={"scheduled_at": "2026-12-21T19:00:00+00:00"})
+    assert monday.status_code == 409
     allowed = await flow.post(f"/api/matches/{match['id']}/schedule-proposals",
                               json={"scheduled_at": "2026-12-17T19:00:00+00:00"})
     assert allowed.status_code == 200, allowed.text
 
 
-@needs_p4
 @pytest.mark.asyncio
 async def test_maps_and_lineups_from_report_to_app_confirmation_amendment_and_league_page(flow):
     from services.match_deadline_sweep import sweep
