@@ -264,6 +264,25 @@ def seat_summary(tournament: dict | None, registrations: list[dict] | None) -> d
     return {"taken": taken, "capacity": capacity}
 
 
+# Die Tabelle am TV (#2121): Liga, Jeder gegen jeden, Schweizer System und Gruppen - Platz, Name und die Zahlen der
+# Tabelle, nie Konto (user_id) oder Team-Kennung.
+STANDING_FIELDS = ("registration_id", "display_name", "rank", "previous_rank", "played", "won", "drawn", "lost",
+                   "score_for", "score_against", "score_diff", "buchholz", "points", "form")
+STANDING_GROUP_FIELDS = ("id", "group_key", "name")
+
+
+def display_standings(rows: list[dict] | None) -> list[dict]:
+    """Die Rangliste für den TV - Gruppen bleiben ``[{group, standings}]`` wie auf der Website."""
+    out = []
+    for row in rows or []:
+        if isinstance(row.get("standings"), list):
+            out.append({"group": _pick(row.get("group") or {}, STANDING_GROUP_FIELDS),
+                        "standings": [_pick(entry, STANDING_FIELDS) for entry in row["standings"]]})
+        else:
+            out.append(_pick(row, STANDING_FIELDS))
+    return out
+
+
 def display_bracket_payload(payload: dict) -> dict:
     """Die Turnierbaum-Antwort für einen Anzeige-Schlüssel: Turnier, Phasen, Spiele, die Namen der Anmeldungen, die in
     einem Spiel stehen oder zum Check-in zählen, und die Zahl der belegten Plätze - mehr braucht der TV nicht."""

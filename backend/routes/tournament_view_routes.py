@@ -10,15 +10,17 @@ from auth import get_current_user, get_optional_user
 from services import onsite_access
 from services.access_links import touch_access_link, validate_access_link
 from services.visibility import hide_unseen_event_links
-from services.tv_display import DISPLAY_GRANT, KEY_EXPIRED, KEY_INVALID, display_bracket_payload, key_expired, seat_summary
+from services.tv_display import (
+    DISPLAY_GRANT, KEY_EXPIRED, KEY_INVALID, display_bracket_payload, display_standings, key_expired, seat_summary,
+)
 from services.public_phase import derive_public_phase
 from services.station_labels import attach_station_info
-from services.round_labels import attach_round_labels
+from services.round_labels import TABLE_FORMATS, attach_round_labels
 from services.match_public_view import public_match_view, public_stage_view, public_tournament_view
 from services.tournament_permissions import READ_STAFF_ROLES, require_tournament_staff_permission
 from services.matchday_schedule import build_matchday_plan, current_matchday_number
 from services.competition_read import load_competition_read_model, observe_structure_read
-from services.competition_standings import standings_for_structure
+from services.competition_standings import public_standings
 from services.private_fields import private_projection
 from services.match_duration import load_duration_game, with_effective_durations
 from routes.tournament_common import (
@@ -213,7 +215,8 @@ async def get_bracket_display(tid: str, key: str | None = None, me: dict | None 
         if key_expired(t, now_utc()):
             raise HTTPException(status_code=403, detail=KEY_EXPIRED)
         await touch_access_link(db, link)
-        return await _with_onsite_path(db, t, display_bracket_payload(await _build_bracket_payload(db, t, None, False)))
+        payload = display_bracket_payload(await _build_bracket_payload(db, t, None, False))
+        return await _with_onsite_path(db, t, await _with_table(db, t, payload, None, False))
     if not me:
         raise HTTPException(status_code=401, detail="Nicht angemeldet")
     await require_tournament_staff_permission(me, tid, READ_STAFF_ROLES)
@@ -223,7 +226,15 @@ async def get_bracket_display(tid: str, key: str | None = None, me: dict | None 
     payload = await _build_bracket_payload(db, t, me, True)
     # Wie mit Schlüssel: die belegten Plätze für den Anmelde-Bildschirm (#1123).
     payload["seats"] = seat_summary(t, payload.get("registrations"))
-    return await _with_onsite_path(db, t, payload)
+    return await _with_onsite_path(db, t, await _with_table(db, t, payload, me, True))
+
+
+async def _with_table(db, t: dict, payload: dict, user: dict | None, is_staff: bool) -> dict:
+    """Die Tabelle für die Folie „Tabelle“ am TV (#2121) - nur bei Liga, Jeder gegen jeden, Schweizer System und Gruppen,
+    dieselbe Rangliste wie auf der Website."""
+    if t.get("format") in TABLE_FORMATS:
+        payload["standings"] = display_standings(await _standing_rows(db, t, user, is_staff))
+    return payload
 
 
 async def _with_onsite_path(db, t: dict, payload: dict) -> dict:
@@ -275,6 +286,13 @@ async def standings(tid: str, access: str | None = None, user=Depends(get_option
     else:
         t = await _get_visible_tournament(tid, user)
     is_staff = _is_staff(user) or await _is_tournament_staff(tid, user)
+    return await _standing_rows(db, t, user, is_staff)
+
+
+async def _standing_rows(db, t: dict, user: dict | None, is_staff: bool) -> list[dict]:
+    """Die Rangliste eines Turniers (#2121: nur wer dazugehört, Plätze erst mit dem ersten Ergebnis) - für die Seite,
+    das Ergebnis-PDF und den TV."""
+    tid = t["id"]
     read_model = await load_competition_read_model(db, tid)
     regs = await db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0}).to_list(500)
     own_ids = await _own_registration_ids(db, regs, user)
@@ -294,7 +312,7 @@ async def standings(tid: str, access: str | None = None, user=Depends(get_option
         groups = await db.tournament_groups.find({"tournament_id": tid}, {"_id": 0}).to_list(50)
     structure = read_model.structure_snapshot()
     observe_structure_read(structure, surface="standings")
-    rows = standings_for_structure(
+    rows = public_standings(
         t,
         structure,
         regs,
