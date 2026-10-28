@@ -23,7 +23,7 @@ export function paymentLine(price) {
   return `${amount} · die Rechnung kommt unter „Meine Rechnungen“`;
 }
 
-export function MyStandCard({ tournament: t, registration: myReg, team = null, isTeamTournament = false, canCheckIn = false, staffOnlyCheckIn = false, canUnregister = false, onCheckin, onUnregister, busy = false, scheduleTo = "" }) {
+export function MyStandCard({ tournament: t, registration: myReg, team = null, isTeamTournament = false, canCheckIn = false, staffOnlyCheckIn = false, canUnregister = false, leagueSquad = false, onCheckin, onUnregister, busy = false, scheduleTo = "" }) {
   if (!myReg) return null;
   // Nach dem Check-in-Ende (#1551) steht der Baum - der Status bleibt „Check-in“, der Knopf geht weg.
   const checkinOpen = t.status === "check_in" && !t.check_in_closed_at;
@@ -67,6 +67,9 @@ export function MyStandCard({ tournament: t, registration: myReg, team = null, i
         {scheduleTo ? <Link to={scheduleTo} className="text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">Zum Spielplan</Link> : null}
         {canUnregister ? (
           <button type="button" onClick={onUnregister} disabled={busy} data-testid="tournament-unregister-btn" className="ml-auto text-xs text-white/45 hover:text-[#FF3B30] underline underline-offset-2 disabled:opacity-50">Vom Turnier abmelden</button>
+        ) : leagueSquad && !FINISHED.has(t.status) ? (
+          // Liga-Staffel (#2110): ein Co-Team ist zugeteilt - abmelden kann es nur die Turnierleitung.
+          <span className="ml-auto text-xs text-white/45" data-testid="tournament-unregister-league">Austritt nur über die Turnierleitung</span>
         ) : null}
       </div>
     </section>

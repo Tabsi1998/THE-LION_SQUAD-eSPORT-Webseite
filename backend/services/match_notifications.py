@@ -329,6 +329,66 @@ async def notify_report_conflict(db, match: dict, actor_registration_id: str | N
     return sent
 
 
+# ---------------------------------------------------------------- Termin (#2110)
+
+_WEEKDAYS = ("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So")
+
+
+def _when_text(value) -> str:
+    """„So 15.11. 20:00 Uhr“ in Wiener Zeit - wie der Termin auf der Matchseite."""
+    from datetime import datetime, timezone
+    from zoneinfo import ZoneInfo
+
+    try:
+        moment = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return "einen neuen Termin"
+    moment = moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
+    local = moment.astimezone(ZoneInfo("Europe/Vienna"))
+    return f"{_WEEKDAYS[local.weekday()]} {local.strftime('%d.%m. %H:%M')} Uhr"
+
+
+# Was die andere Seite liest - je Ereignis Titel und Satz. ``{who}`` handelt, ``{when}`` ist der vorgeschlagene Termin.
+SCHEDULE_EVENTS = {
+    "proposed": ("Neuer Terminvorschlag", "{who} schlägt {when} vor. Bitte annehmen, ablehnen oder einen "
+                                          "Gegenvorschlag machen."),
+    "countered": ("Gegenvorschlag zum Termin", "{who} schlägt stattdessen {when} vor. Bitte annehmen, ablehnen oder "
+                                               "einen Gegenvorschlag machen."),
+    "accepted": ("Termin bestätigt", "{who} hat {when} angenommen – der Termin steht."),
+    "declined": ("Terminvorschlag abgelehnt", "{who} hat {when} abgelehnt. Bitte einen anderen Termin vorschlagen."),
+    "withdrawn": ("Terminvorschlag zurückgezogen", "{who} hat den Vorschlag für {when} zurückgezogen."),
+}
+
+
+async def notify_schedule_event(db, match: dict, *, event: str, proposal: dict, actor_id: str | None,
+                                actor_registration_id: str | None, note: str | None = None) -> int:
+    """Termin vorgeschlagen, Gegenvorschlag, angenommen, abgelehnt oder zurückgezogen (#2110): die Verantwortlichen
+    der anderen Seite (Captain und Vertreter eines Co-Teams, sonst die Teamleitung - ``responsible_user_ids``) bekommen
+    es sofort ins Postfach und per Push. Ein Ereignis, keine Erinnerung; wer gehandelt hat, bekommt nichts. Handelt die
+    Turnierleitung (ohne eigene Seite), erfahren es beide Seiten."""
+    if event not in SCHEDULE_EVENTS:
+        return 0
+    tournament, registrations, regs_by_id = await _match_context(db, match)
+    others = [reg for reg in registrations if reg.get("id") != actor_registration_id]
+    recipient_ids = await responsible_user_ids(db, others) - {actor_id}
+    if not recipient_ids:
+        return 0
+    who = _name(regs_by_id.get(actor_registration_id), "Die Gegenseite") if actor_registration_id else "Die Turnierleitung"
+    title, sentence = SCHEDULE_EVENTS[event]
+    text = sentence.format(who=who, when=_when_text(proposal.get("scheduled_at")))
+    if (note or "").strip():
+        text = f"{text} Notiz: „{_short(note or '', 120)}“"
+    body = f"{tournament.get('title') or 'Turnier'} · {match_title(match, regs_by_id)}: {text}"
+    meta = {"category": "match_reminders", "dedupe_key": f"match-schedule:{proposal.get('id')}:{event}",
+            "match_id": match.get("id"), "tournament_id": match.get("tournament_id"), "reason": f"schedule_{event}"}
+    sent = 0
+    for user in await users_for(db, recipient_ids):
+        if await create_user_notification(user["id"], title, body, url=f"/matches/{match.get('id')}",
+                                          kind="match_schedule", meta=meta):
+            sent += 1
+    return sent
+
+
 # ---------------------------------------------------------------- Dispute (#1134)
 
 def _short(text: str, limit: int = 120) -> str:

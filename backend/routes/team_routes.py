@@ -63,6 +63,10 @@ class TeamSquadRoles(BaseModel):
 
 SQUAD_ROLE_FIELDS = ("captain_id", "vice_captain_id")
 SQUAD_ROLE_LABELS = {"captain_id": "Captain", "vice_captain_id": "Vertreter"}
+# Die App kennt Captain und Vertreter noch nicht (L-D12, #2110) und zeigt den Text des Servers - darum steht der Weg
+# auf der Website in jeder Meldung, die eine Rolle im Weg hat.
+ROLES_ON_WEBSITE = "Captain und Vertreter vergibst du auf der Website unter Teams → Deine Teams (Co-Team bearbeiten)."
+RESIGN_ON_WEBSITE = "Deine Rolle gibst du auf der Website unter Teams → Deine Teams mit „Rolle abgeben“ ab."
 
 
 class TeamInviteCreate(BaseModel):
@@ -364,7 +368,7 @@ def _squad_roles(current: dict, requested: dict, member_ids: list[str], team: di
         if field in requested:
             raise HTTPException(status_code=400, detail=f"{label} muss im Kader des Co-Teams stehen.")
         raise HTTPException(status_code=409, detail=f"Diese Person ist {label} des Co-Teams – bitte erst die Rolle neu "
-                                                    "vergeben, dann aus dem Kader nehmen.")
+                                                    f"vergeben, dann aus dem Kader nehmen. {ROLES_ON_WEBSITE}")
     if roles["captain_id"] and roles["captain_id"] == roles["vice_captain_id"]:
         raise HTTPException(status_code=400, detail="Captain und Vertreter müssen verschiedene Personen sein.")
     return roles
@@ -385,15 +389,18 @@ async def _after_squad_roles(db, team: dict, squad: dict, before: dict, after: d
         user_id = after.get(field)
         if not user_id or user_id == before.get(field) or user_id == me["id"]:
             continue
-        await create_user_notification(
-            user_id,
-            title=f"Du bist jetzt {SQUAD_ROLE_LABELS[field]}: {squad.get('name') or 'Co-Team'}",
-            body=f"Im Co-Team {squad.get('name') or ''} von {team.get('name') or 'deinem Team'} vereinbarst du Termine, "
-                 "meldest und bestätigst Ergebnisse.",
-            url=f"/teams/{team['id']}",
-            kind="team_role_changed",
-            meta={"team_id": team["id"], "squad_id": squad.get("id"), "role": field.removesuffix("_id")},
-        )
+        try:
+            await create_user_notification(
+                user_id,
+                title=f"Du bist jetzt {SQUAD_ROLE_LABELS[field]}: {squad.get('name') or 'Co-Team'}",
+                body=f"Im Co-Team {squad.get('name') or ''} von {team.get('name') or 'deinem Team'} vereinbarst du "
+                     "Termine, meldest und bestätigst Ergebnisse.",
+                url=f"/teams/{team['id']}",
+                kind="team_role_changed",
+                meta={"team_id": team["id"], "squad_id": squad.get("id"), "role": field.removesuffix("_id")},
+            )
+        except Exception:  # noqa: BLE001 - die Rolle ist schon gespeichert; eine Nachricht hält das nicht auf (#2110)
+            logger.warning("[teams] Rollen-Nachricht an %s nicht verschickt", log_safe(user_id), exc_info=True)
 
 
 SQUAD_CHANGED_MEANWHILE = ("Das Co-Team wurde gerade von jemand anderem geändert – bitte neu laden und noch einmal "
@@ -840,7 +847,7 @@ async def leave_team(team_id: str, me: dict = Depends(get_current_user)):
     held = await _squad_role_holder(db, team_id, me["id"])
     if held:
         raise HTTPException(status_code=409, detail=f"Du bist Captain oder Vertreter im Co-Team {held.get('name') or ''} – "
-                                                    "bitte die Teamleitung, die Rolle erst neu zu vergeben.")
+                                                    f"bitte erst die Rolle abgeben, dann das Team verlassen. {RESIGN_ON_WEBSITE}")
     await db.teams.update_one({"id": team_id}, {"$pull": {"member_ids": me["id"], "co_leader_ids": me["id"]}})
     await db.team_members.delete_one({"team_id": team_id, "user_id": me["id"]})
     await _leave_squads(db, team_id, me["id"])
@@ -883,7 +890,8 @@ async def kick_member(team_id: str, user_id: str, me: dict = Depends(get_current
     held = await _squad_role_holder(db, team_id, user_id)
     if held:
         raise HTTPException(status_code=409, detail=f"Diese Person ist Captain oder Vertreter im Co-Team "
-                                                    f"{held.get('name') or ''} – bitte erst die Rolle neu vergeben.")
+                                                    f"{held.get('name') or ''} – bitte erst die Rolle neu vergeben. "
+                                                    f"{ROLES_ON_WEBSITE}")
     await db.teams.update_one(
         {"id": team_id},
         {"$pull": {"member_ids": user_id, "co_leader_ids": user_id}, "$set": {"updated_at": now_utc().isoformat()}},
@@ -1092,17 +1100,18 @@ async def update_squad(team_id: str, squad_id: str, body: TeamSquadUpdate, me: d
 @router.put("/{team_id}/squads/{squad_id}/roles")
 async def set_squad_roles(team_id: str, squad_id: str, body: TeamSquadRoles, me: dict = Depends(get_current_user)):
     """Captain und Vertreter eines Co-Teams vergeben (#1649): Hauptteam-Leitung, Co-Leitung oder Admin - mit Protokoll.
-    Fehlt ein Feld, bleibt die Rolle; ``null`` nimmt sie weg."""
+    Fehlt ein Feld, bleibt die Rolle; ``null`` nimmt sie weg. Captain und Vertreter geben die **eigene** Rolle selbst ab
+    (#2110): nur ihr Feld, nur auf ``null`` - danach vergibt die Teamleitung neu."""
     db = get_db()
     team = await db.teams.find_one({"id": team_id}, {"_id": 0})
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
-    if not _can_manage(team, me):
-        _refuse(me, "Captain und Vertreter vergeben Teamleitung und Co-Leitung.")
     current = await db.team_squads.find_one({"id": squad_id, "team_id": team_id}, {"_id": 0})
+    requested = body.model_dump(exclude_unset=True)
+    if not _can_manage(team, me) and not _resigns_own_role(current, requested, me):
+        _refuse(me, "Captain und Vertreter vergeben Teamleitung und Co-Leitung.")
     if not current:
         raise HTTPException(status_code=404, detail="Squad nicht gefunden")
-    requested = body.model_dump(exclude_unset=True)
     roles = _squad_roles(current, requested, current.get("member_ids") or [], team)
     unset = {field: "" for field, value in roles.items() if not value and current.get(field)}
     change = {"$set": {**{field: value for field, value in roles.items() if value}, "updated_at": now_utc().isoformat()},
@@ -1112,7 +1121,37 @@ async def set_squad_roles(team_id: str, squad_id: str, body: TeamSquadRoles, me:
         raise HTTPException(status_code=409, detail=SQUAD_CHANGED_MEANWHILE)
     fresh = await db.team_squads.find_one({"id": squad_id}, {"_id": 0})
     await _after_squad_roles(db, team, fresh or current, current, roles, me)
+    if not _can_manage(team, me):
+        await _tell_role_resigned(db, team, fresh or current, requested, me)
     return fresh
+
+
+def _resigns_own_role(squad: dict | None, requested: dict, me: dict) -> bool:
+    """Gibt die Person nur ihre eigene Rolle ab - jedes geschickte Feld ist ihres und wird leer?"""
+    if not squad or not requested:
+        return False
+    return all(field in SQUAD_ROLE_FIELDS and squad.get(field) == me["id"] and not (value or "").strip()
+               for field, value in requested.items())
+
+
+async def _tell_role_resigned(db, team: dict, squad: dict, requested: dict, me: dict) -> None:
+    """Rolle abgegeben (#2110): Leitung und Co-Leitung des Hauptteams erfahren es und vergeben neu - bis dahin handelt
+    der verbliebene Captain bzw. Vertreter, ohne beide die Teamleitung."""
+    labels = " und ".join(SQUAD_ROLE_LABELS[field] for field in SQUAD_ROLE_FIELDS if field in requested)
+    leads = {team.get("leader_id"), *(team.get("co_leader_ids") or [])} - {me["id"], None}
+    for user_id in sorted(leads):
+        try:
+            await create_user_notification(
+                user_id,
+                title=f"Rolle abgegeben: {squad.get('name') or 'Co-Team'}",
+                body=f"{_user_label(me)} ist nicht mehr {labels} im Co-Team {squad.get('name') or ''} – bitte die "
+                     "Rolle neu vergeben.",
+                url=f"/teams/{team['id']}",
+                kind="team_role_changed",
+                meta={"team_id": team["id"], "squad_id": squad.get("id"), "resigned": sorted(requested)},
+            )
+        except Exception:  # noqa: BLE001 - die Rolle ist schon abgegeben; eine Nachricht hält das nicht auf
+            logger.warning("[teams] Nachricht „Rolle abgegeben“ an %s nicht verschickt", log_safe(user_id), exc_info=True)
 
 
 @router.delete("/{team_id}/squads/{squad_id}")

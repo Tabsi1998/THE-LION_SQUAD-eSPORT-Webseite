@@ -1065,7 +1065,8 @@ class MatchResultUndo(BaseModel):
 
 MatchScoreReport.model_rebuild()
 
-ScheduleProposalAction = Literal["accept", "decline", "counter"]
+# „withdraw“ (#2110): wer vorgeschlagen hat, zieht den eigenen, noch offenen Vorschlag zurück.
+ScheduleProposalAction = Literal["accept", "decline", "counter", "withdraw"]
 
 
 class MatchScheduleProposalCreate(BaseModel):

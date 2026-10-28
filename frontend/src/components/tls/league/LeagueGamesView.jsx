@@ -3,7 +3,7 @@ import { AlertTriangle, Trophy } from "lucide-react";
 import { LazyImg } from "@/components/tls/LazyImg";
 import { viennaDateTime } from "@/lib/vienna";
 import { LineupPicker } from "./LeagueReportForm";
-import { followLineups, gamesProblem } from "./leagueGames";
+import { followLineups, gamesProblem, lineupAmendClosed } from "./leagueGames";
 
 // Die gespielten Maps eines Liga-Spiels (docs/LIGA.md, #1650): je Map Bild, Name, Modus, Sieger, Punkte und die
 // Aufstellungen beider Seiten - fehlt eine noch, steht es da. Wer darf, trägt die eigene Aufstellung hier nach.
@@ -63,14 +63,39 @@ export function LeagueGamesView({ league }) {
   );
 }
 
+/** Nach der Frist (#2110, L-D9): statt eines verschwundenen Formulars der Weg über die Turnierleitung. */
+export function LineupAmendClosed({ league, onAskStaff = null }) {
+  if (!lineupAmendClosed(league)) return null;
+  return (
+    <div className="mt-5 flex items-start gap-3 rounded-sm border border-warn/40 bg-warn/5 px-4 py-3" role="status" data-testid="league-lineup-closed">
+      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warn" aria-hidden="true" />
+      <div className="min-w-0">
+        <p className="text-sm font-bold text-white">Eure Aufstellung fehlt noch – die Frist zum Nachtragen ist vorbei.</p>
+        <p className="mt-0.5 text-xs text-white/60">
+          {league.amend_until ? `Nachtragen ging bis ${until(league.amend_until)}. ` : ""}
+          {/* Den Matchchat schreiben Captain, Vertreter und Teamleitung - der übrige Kader bekommt keinen Verweis darauf. */}
+          {onAskStaff
+            ? "Jetzt trägt sie nur noch die Turnierleitung nach – schreib ihr im Matchchat mit @leitung, wer je Map gespielt hat."
+            : "Jetzt trägt sie nur noch die Turnierleitung nach – das klären Captain oder Vertreter eures Teams mit ihr."}
+        </p>
+        {onAskStaff ? (
+          <button type="button" onClick={onAskStaff} className="tls-btn tls-btn--secondary mt-2 min-h-[44px] px-3 py-2 rounded-sm text-[10px] uppercase tracking-wider font-bold" data-testid="league-lineup-closed-ask">
+            @leitung im Matchchat
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 /** Aufstellung nachtragen oder ändern - je Map die eigene Seite, bis zur Frist. */
-export function LineupAmendForm({ league, busy = false, onSave }) {
+export function LineupAmendForm({ league, busy = false, onSave, onAskStaff = null }) {
   const own = league?.own_registration_id;
   const games = league?.games || [];
   const [lineups, setLineups] = useState(() => Object.fromEntries(
     games.map((game) => [game.position, (game.lineups?.[own] || []).map((person) => person.id)])));
   const [error, setError] = useState("");
-  if (!league?.can_amend_lineup || !own || !games.length) return null;
+  if (!league?.can_amend_lineup || !own || !games.length) return <LineupAmendClosed league={league} onAskStaff={onAskStaff} />;
   const missing = (league.lineups_missing || []).includes(own);
   const save = async (event) => {
     event.preventDefault();
