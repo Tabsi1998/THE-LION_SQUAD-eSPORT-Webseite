@@ -34,7 +34,8 @@ def test_season_one_puts_matchday_seven_into_week_nine():
     assert (local(seven.start.isoformat()), local(seven.end.isoformat())) == ("05.01.2027 00:00", "12.01.2027 00:00")
     assert seven.number == 7
     # Ohne Sperrwochen: Spieltag N ist Woche N wie bisher.
-    plain = {key: value for key, value in SEASON_ONE.items() if key not in ("matchday_blocked_weeks", "blocked_periods")}
+    plain = {key: value for key, value in SEASON_ONE.items()
+             if key not in ("matchday_blocked_weeks", "blocked_periods")}
     assert local(matchday_schedule.tournament_matchday_window(plain, 7).start.isoformat()) == "22.12.2026 00:00"
 
 
