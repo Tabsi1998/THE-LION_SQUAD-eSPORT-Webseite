@@ -71,6 +71,31 @@ def _log_safe(value, limit: int = 120) -> str:
     return str(value or "").replace("\r", " ").replace("\n", " ")[:limit]
 
 
+@contextlib.asynccontextmanager
+async def _season_squad_lock(db, tournament: dict | None):
+    """Sperre je Season für Co-Team-Schlüssel (#1649) - immer nach der Turnier-Sperre, nie umgekehrt."""
+    resource = squad_registration.season_lock_resource(tournament or {})
+    if not resource:
+        yield
+        return
+    async with mutation_lock(db, resource):
+        yield
+
+
+async def _sync_squad_key(db, registration: dict | None, new_status: str | None, tournament: dict | None) -> None:
+    """Jeder Statuswechsel einer Co-Team-Anmeldung zieht ``league_squad_key`` nach (``squad_registration``) - vor dem
+    Schreiben des Status aufrufen. Anmeldungen ohne Co-Team: nichts."""
+    if not (registration or {}).get("squad_id"):
+        return
+    try:
+        async with _season_squad_lock(db, tournament):
+            await squad_registration.sync_season_key(db, registration, new_status, tournament)
+    except squad_registration.SquadAssignError as refusal:
+        raise HTTPException(status_code=refusal.status_code, detail=refusal.detail)
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail=TOURNAMENT_BUSY_DETAIL)
+
+
 async def _notify_registration(db, tid: str, registration: dict, status: str, *, previous: str | None = None,
                                reason: str | None = None, actor_id: str | None = None) -> None:
     """Anmeldung eingegangen, bestätigt, abgelehnt oder nachgerückt (#1133): Nachricht an die Verantwortlichen der
@@ -117,6 +142,11 @@ async def _move_up_from_waitlist(db, tid: str, actor_id: str | None, *, exclude_
     moved: list[str] = []
     for reg in waiting:
         now_iso = now_utc().isoformat()
+        try:
+            # Co-Team einer Liga (#1649): rückt nicht nach, wenn es inzwischen in einer anderen Staffel spielt.
+            await _sync_squad_key(db, reg, "approved", tournament)
+        except HTTPException:
+            continue
         result = await db.tournament_registrations.update_one(
             {"id": reg["id"], "status": "waitlist"}, {"$set": {"status": "approved", "updated_at": now_iso}})
         if not getattr(result, "modified_count", 0):
@@ -892,6 +922,7 @@ async def admin_create_registration(tid: str, body: RegistrationAdminCreate,
 
     replacement = None
     if old_reg_id:
+        await _sync_squad_key(db, old, "no_show", tournament)
         await db.tournament_registrations.update_one(
             {"id": old_reg_id},
             {"$set": {"status": "no_show", "updated_at": now_utc().isoformat()}},
@@ -938,7 +969,7 @@ async def update_registration(tid: str, reg_id: str, body: RegistrationUpdate,
                                _mutation_tid: str = Depends(_serialized_tournament_write)):
     db = get_db()
     tid = await _resolve_tid(tid)
-    await _ensure_tournament_unlocked(db, tid)
+    tournament_doc = await _ensure_tournament_unlocked(db, tid)
     await require_tournament_staff_permission(me, tid, PARTICIPANT_STAFF_ROLES)
     updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
     if updates.get("status") in REMOVAL_KINDS:
@@ -956,6 +987,10 @@ async def update_registration(tid: str, reg_id: str, body: RegistrationUpdate,
     if updates and all(reg.get(key) == value for key, value in updates.items()):
         return {**reg, "idempotent_replay": True}
     previous_status = reg.get("status")
+    if updates.get("status") and updates["status"] != previous_status:
+        # Co-Team einer Liga (#1649): der Season-Schlüssel folgt dem Status - vor dem Schreiben, damit ein Co-Team, das
+        # inzwischen in einer anderen Staffel spielt, hier nicht wieder aktiv wird.
+        await _sync_squad_key(db, reg, updates["status"], tournament_doc)
     updates["updated_at"] = now_utc().isoformat()
     await db.tournament_registrations.update_one({"id": reg_id, "tournament_id": tid}, {"$set": updates})
     reg = await db.tournament_registrations.find_one({"id": reg_id, "tournament_id": tid}, {"_id": 0})
@@ -993,7 +1028,7 @@ async def staff_set_registration_checkin(tid: str, reg_id: str, body: dict,
     """
     db = get_db()
     tid = await _resolve_tid(tid)
-    await _ensure_tournament_unlocked(db, tid)
+    tournament_doc = await _ensure_tournament_unlocked(db, tid)
     await require_tournament_staff_permission(me, tid, CHECKIN_STAFF_ROLES)
     status = body.get("status")
     if status not in REGISTRATION_CHECKIN_STATUSES:
@@ -1007,6 +1042,7 @@ async def staff_set_registration_checkin(tid: str, reg_id: str, body: dict,
                 return {**reg, "idempotent_replay": True}
             if reg.get("status") in ("rejected", "waitlist") and status == "checked_in":
                 raise HTTPException(status_code=400, detail="Diese Anmeldung kann nicht eingecheckt werden")
+            await _sync_squad_key(db, reg, status, tournament_doc)
 
             await db.tournament_registrations.update_one(
                 {"id": reg_id},

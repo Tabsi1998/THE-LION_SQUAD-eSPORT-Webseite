@@ -14,6 +14,8 @@ Alle Prüfungen stehen hier an einer Stelle: das Zuteilen nutzt sie, der Dialog 
 
 from __future__ import annotations
 
+from pymongo.errors import DuplicateKeyError
+
 from models import new_id, now_utc
 
 ACTIVE_REGISTRATION_STATUSES = ("pending", "approved", "checked_in", "waitlist")
@@ -39,6 +41,33 @@ def league_squad_key(tournament: dict, squad_id: str) -> str | None:
 def season_lock_resource(tournament: dict) -> str | None:
     season_id = (tournament.get("league_context") or {}).get("season_id")
     return f"league_season:{season_id}:squads" if season_id else None
+
+
+SEASON_TAKEN = "Dieses Co-Team spielt in dieser Season schon in einer anderen Staffel."
+
+
+async def sync_season_key(db, registration: dict | None, new_status: str | None, tournament: dict | None) -> None:
+    """``league_squad_key`` folgt dem Status einer Co-Team-Anmeldung: nicht aktiv (abgelehnt, nicht erschienen,
+    ausgetreten …) → Schlüssel weg, das Co-Team ist in der Season wieder frei; wieder aktiv → Schlüssel neu setzen,
+    außer das Co-Team spielt inzwischen in einer anderen Staffel (``SquadAssignError`` 409 - deshalb vor dem
+    Statuswechsel aufrufen). Anmeldungen ohne Co-Team oder ohne Liga-Rahmen bleiben unberührt. Aufrufer halten die
+    Season-Sperre (``season_lock_resource``)."""
+    if not registration or not registration.get("squad_id") or not registration.get("id"):
+        return
+    key = league_squad_key(tournament or {}, registration["squad_id"])
+    if not key:
+        return
+    if new_status not in ACTIVE_REGISTRATION_STATUSES:
+        await db.tournament_registrations.update_one({"id": registration["id"]}, {"$unset": {"league_squad_key": ""}})
+        return
+    if await db.tournament_registrations.find_one(
+        {"league_squad_key": key, "id": {"$ne": registration["id"]}}, {"_id": 0, "id": 1}
+    ):
+        raise SquadAssignError(409, SEASON_TAKEN)
+    try:
+        await db.tournament_registrations.update_one({"id": registration["id"]}, {"$set": {"league_squad_key": key}})
+    except DuplicateKeyError:
+        raise SquadAssignError(409, SEASON_TAKEN)
 
 
 class SquadAssignError(Exception):
