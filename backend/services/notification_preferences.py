@@ -29,7 +29,7 @@ OPTIONAL_EMAIL_PREFERENCES = {
     # Erfolge (#568): in der App, per Push und als Gratulation vom Discord-Bot - eine E-Mail dafür gibt es nicht.
     "achievements": {
         "label": "Erfolge",
-        "description": "Freigeschaltete Erfolge – als Gratulation.",
+        "description": "Freigeschaltete Erfolge, Kronen und neue Level – als Gratulation.",
         "default": True,
         "channels": ["in_app", "push", "discord"],
     },
@@ -197,6 +197,11 @@ NOTIFICATION_KIND_CATEGORY = {
     "achievement_revoked": "achievements",
     # Jahresrückblick (#1195): „Dein Jahr ist da“ einmal im Dezember - unter „Erfolge“.
     "year_review": "achievements",
+    # Kronen und Level (#2119 ML2): gehören zu „Erfolge“ - wer das ausschaltet, bekommt sie auch nicht.
+    "crown_gained": "achievements",
+    "crown_changed": "achievements",
+    "crown_lost": "achievements",
+    "level": "achievements",
     "news_mention": "news_events",
     # Interne Inhalte nur an Berechtigte (#342): Mitglieder bzw. Vorstand.
     "news_member": "club_internal",

@@ -89,7 +89,7 @@ Alle anderen sind **Themen**, die jede Person selbst an- und abschalten kann (3.
 | **Spiel-Erinnerungen** | Startzeiten, Spiel-Hub, Check-in-nahe Hinweise, Aufruf, Ergebnis-Meldungen, Disputes |
 | **Turnier-Updates** | Anmeldung (eingegangen, bestätigt, abgelehnt, Warteliste), Check-in, Ergebnisse, „Turnier beendet“, „Turnier abgesagt“, „Event abgesagt“, „Wie war …?“ am Tag danach, Fotos vom Event („Die Fotos sind da“), Nachricht der Turnierleitung an alle Angemeldeten eines Events |
 | **Gewinne & Abholung** | Gewinn bereit, übergeben, Frist abgelaufen |
-| **Erfolge** | Freigeschaltete Erfolge – nur In-App, Push, Discord, keine Mail |
+| **Erfolge** | Freigeschaltete Erfolge, Kronen und neue Level – nur In-App, Push, Discord, keine Mail |
 | **Wochenrückblick** | Montags eine Mail mit XP und neuen Erfolgen, nur bei Aktivität, nur per Mail |
 | **Rechnungen** | „Deine Rechnung ist da“ – nur In-App, Push, Mail; Beträge gehen nie über Discord |
 | **Vereinsmitgliedschaft** | Bewerbung, Mitgliedsstatus, Vorteile |
