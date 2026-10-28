@@ -142,3 +142,20 @@ async def test_the_league_section_follows_the_staffel_not_the_season_status(flow
     # Staffel abgeschlossen: weg - wie bei „Angemeldet für“.
     await flow.db.tournaments.update_one({"id": staffel["id"]}, {"$set": {"status": "completed"}})
     assert (await flow.get(f"/api/teams/{teams[0]}/overview")).json()["league"] == []
+
+
+@pytest.mark.asyncio
+async def test_the_staffel_route_checks_only_its_own_staffel(flow, monkeypatch):
+    """Keine Liste aller Staffeln und keine Teilnehmerzählung je Staffel - nur die eine Staffel wird geprüft."""
+    from services import league_service
+
+    _admin, _season, staffel, _teams = await setup(flow)
+
+    async def no_listing(*args, **kwargs):
+        raise AssertionError("staffeln_of darf hier nicht laufen")
+
+    monkeypatch.setattr(league_service, "staffeln_of", no_listing)
+    flow.act_as(None)
+    response = await flow.get(f"{PAGE}/staffeln/{staffel['slug']}")
+    assert response.status_code == 200, response.text
+    assert response.json()["staffel"]["staffel"] == "A" and response.json()["staffel"]["division_label"] == "Liga 1"

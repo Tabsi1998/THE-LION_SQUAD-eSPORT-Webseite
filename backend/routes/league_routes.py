@@ -312,15 +312,21 @@ async def public_staffel(league_slug: str, season_slug: str, staffel_ref: str,
     from services import league_page
 
     db = get_db()
-    view = await _call(leagues.public_season_view(db, league_slug, season_slug, user,
-                                                  staffel_hidden=tournament_hidden_reason))
-    shown = {staffel["tournament_id"]: (division, staffel) for division in view["divisions"]
-             for staffel in division["staffeln"]}
-    tournament = await db.tournaments.find_one({"$or": [{"id": staffel_ref}, {"slug": staffel_ref}], **ONLY_LEAGUE},
-                                               {"_id": 0})
-    if not tournament or tournament["id"] not in shown:
+    _league, season = await _call(leagues.visible_season(db, league_slug, season_slug, user))
+    # Nur genau diese Staffel prüfen: gehört sie zu dieser Season (nie eine aus einer anderen), sieht die Person sie
+    # als Turnier, und ihre Liga N ist aktiv.
+    tournament = await db.tournaments.find_one(
+        {"$or": [{"id": staffel_ref}, {"slug": staffel_ref}], "league_context.season_id": season["id"], **ONLY_LEAGUE},
+        {"_id": 0})
+    division = await db.league_divisions.find_one(
+        {"id": tournament["league_context"].get("division_id"), "season_id": season["id"], "status": "active"},
+        {"_id": 0}) if tournament else None
+    if not tournament or not division or await tournament_hidden_reason(db, tournament, user):
         raise HTTPException(status_code=404, detail="Staffel nicht gefunden")
-    division, staffel = shown[tournament["id"]]
+    staffel = {"tournament_id": tournament["id"], "slug": tournament.get("slug"), "title": tournament.get("title"),
+               "staffel": tournament["league_context"].get("staffel"), "status": tournament.get("status"),
+               "max_participants": tournament.get("max_participants")}
+    division = {**division, "label": leagues.division_label(division)}
     registrations = await db.tournament_registrations.find(
         {"tournament_id": tournament["id"], "status": {"$in": list(league_page.PUBLIC_REGISTRATION_STATUSES)}},
         {"_id": 0, "id": 1, "display_name": 1, "team_name": 1, "squad_name": 1, "team_id": 1}).to_list(200)
