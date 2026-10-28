@@ -194,7 +194,7 @@ function TemplateEditor({ template, onClose, onSaved }) {
             <div className="space-y-3">
               <p className="text-xs text-white/50">
                 Platzhalter wie <span className="font-mono">{"{{display_name}}"}</span> bleiben im Text stehen – beim Versand kommt der echte Wert hinein.
-                Die Vorschau rechts setzt Beispieldaten ein.
+                Nur die Vorschau setzt Beispieldaten ein.
                 {template.source === "code" ? " Teile, die der Standard nur bei Bedarf zeigt (etwa Grund oder Station), stehen in deiner Fassung immer drin." : ""}
               </p>
               <label className="block">
