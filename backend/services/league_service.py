@@ -313,6 +313,8 @@ def staffel_fields(league: dict, season: dict, division: dict) -> dict:
     return {
         "game_id": league.get("game_id"),
         "team_size": settings["team_size"],
+        # Mindestkader: das Zuteilen eines Co-Teams (B, P3) liest ihn am Turnier; fehlt er, gilt team_size.
+        "min_squad_size": settings["min_squad_size"],
         "best_of": settings["best_of"],
         "max_participants": settings["max_staffel_size"],
         "start_date": season.get("start_date"),
@@ -337,7 +339,8 @@ def staffel_fields(league: dict, season: dict, division: dict) -> dict:
 SYNC_GROUPS: dict[str, tuple[str, ...]] = {
     "always": ("visibility", "is_public", "rules"),
     "before_start": ("start_date", "end_date", "matchday_days", "default_match_weekday", "default_match_time",
-                     "round_robin_legs", "matchday_blocked_weeks", "matchday_weeks_total", "max_participants"),
+                     "round_robin_legs", "matchday_blocked_weeks", "matchday_weeks_total", "max_participants",
+                     "min_squad_size"),
     "before_result": ("best_of", "team_size", "scoring_rules", "game_mode_order", "result_confirm_hours_league",
                       "lineup_amend_hours"),
 }

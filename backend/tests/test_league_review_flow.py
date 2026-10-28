@@ -264,3 +264,29 @@ async def test_the_public_season_lists_only_staffeln_the_person_could_open(flow)
     flow.act_as(admin)
     assert shown((await flow.get("/api/leagues/probe-shooter/season-1")).json()) == {
         draft["id"], running["tournament_id"], hidden["tournament_id"]}
+
+
+# ---------------------------------------------------------------- Mindestkader am Turnier (für B, P3)
+
+@pytest.mark.asyncio
+async def test_the_staffel_carries_its_minimum_squad_from_season_or_division(flow):
+    admin, season, division, staffel = await setup_staffel(flow, season={"team_size": 4, "min_squad_size": 6})
+    assert staffel["min_squad_size"] == 6
+    elite = (await flow.post(f"{ADMIN}/seasons/{season['id']}/divisions", json={"overrides": {"team_size": 5}})).json()
+    grown = (await flow.post(f"{ADMIN}/divisions/{elite['id']}/staffeln", json={})).json()
+    assert (await flow.db.tournaments.find_one({"id": grown["tournament_id"]}))["min_squad_size"] == 6
+    small = (await flow.post(f"{ADMIN}/seasons/{season['id']}/divisions",
+                             json={"overrides": {"team_size": 3, "min_squad_size": 3}})).json()
+    own = (await flow.post(f"{ADMIN}/divisions/{small['id']}/staffeln", json={})).json()
+    assert (await flow.db.tournaments.find_one({"id": own["tournament_id"]}))["min_squad_size"] == 3
+
+    changed = await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"min_squad_size": 7})
+    assert changed.json()["staffeln_to_sync"] == 3
+    await flow.post(f"{ADMIN}/seasons/{season['id']}/sync")
+    assert (await flow.db.tournaments.find_one({"id": staffel["id"]}))["min_squad_size"] == 7
+    assert (await flow.db.tournaments.find_one({"id": own["tournament_id"]}))["min_squad_size"] == 3
+
+    await flow.db.tournaments.update_one({"id": staffel["id"]}, {"$set": {"status": "live"}})
+    await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"min_squad_size": 8})
+    await flow.post(f"{ADMIN}/seasons/{season['id']}/sync")
+    assert (await flow.db.tournaments.find_one({"id": staffel["id"]}))["min_squad_size"] == 7  # nach dem Start nicht
