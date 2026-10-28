@@ -249,3 +249,16 @@ test("Öffentliche Profile: kein eigener Menüpunkt, die Suche findet den Reiter
   const content = { role: "player", areas: ["content"], mfa_enabled: true, auth_mfa_verified: true };
   expect(navGroupsFor(content, "profile").flatMap((entry) => entry.items).map((item) => item.to)).not.toContain("/admin/members?tab=profiles");
 });
+
+// Events unter eSports (#2111, F6) - sie brauchen den Bereich Turniere; Liga, Jahreswertung und Serien mit eigenem
+// Symbol und Untertitel für die Suche (N1).
+test("Events stehen unter eSports, die drei „Saison“-Einträge haben eigene Symbole und Untertitel", () => {
+  expect(group("eSports").items.map((item) => item.to)).toContain("/admin/events");
+  expect(group("Content").items.map((item) => item.to)).not.toContain("/admin/events");
+  const byTo = Object.fromEntries(ADMIN_GROUPS.flatMap((entry) => entry.items).map((item) => [item.to, item]));
+  const icons = ["/admin/leagues", "/admin/seasons", "/admin/reference-series", "/admin/tournaments"].map((to) => byTo[to].icon);
+  expect(new Set(icons).size).toBe(4);
+  expect(byTo["/admin/leagues"].hint).toContain("Seasons");
+  expect(byTo["/admin/seasons"].hint).toContain("Jahres");
+  expect(byTo["/admin/reference-series"].hint).toContain("Externe");
+});

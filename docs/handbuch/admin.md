@@ -110,8 +110,8 @@ die Zwei-Faktor-Anmeldung bestätigt ist (Moderation ausgenommen).
 | **Verein** | Vereinsdaten (System) · Über uns, Sponsoren, Partner, Referenzen, Serien (Redaktion) · Vorstand, Kontakt-Inbox (Vereinsverwaltung) |
 | **Mitglieder** | Mitglieder (mit dem Reiter Öffentliche Profile), Bewerbungen, Mitgliedervorteile, Dokumente, Einlass (Versammlung), Alle Benutzer (Vereinsverwaltung) · Dolibarr (Vereinsverwaltung, System) |
 | **Finanzen** | Finanzübersicht (Finanzen) |
-| **eSports** | Turniere, Fast Lap, Stationen (Turnierleitung und Helfer mit Einsatz) · Turnier-Leitfaden, Jahreswertung, Spiele, TV & Beamer, Gewinne, Strafen (Turnierleitung) · Game-Server (System) |
-| **Content** | Events (Turnierleitung) · News, Medien, Navigation, Erfolge, Sticker (Redaktion) · Galerie, Adventkalender, Ostereiersuche (Redaktion, Vereinsverwaltung) · Downloads & QR (Turnierleitung, Redaktion, Vereinsverwaltung, System) |
+| **eSports** | Turniere, Fast Lap, Stationen (Turnierleitung und Helfer mit Einsatz) · Liga, Events, Turnier-Leitfaden, Jahreswertung, Spiele, TV & Beamer, Gewinne, Strafen (Turnierleitung) · Game-Server (System) |
+| **Content** | News, Medien, Navigation, Erfolge, Sticker (Redaktion) · Galerie, Adventkalender, Ostereiersuche (Redaktion, Vereinsverwaltung) · Downloads & QR (Turnierleitung, Redaktion, Vereinsverwaltung, System) |
 | **Verbindungen** | Alle Verbindungen, dazu eine Seite je Dienst (System) |
 | **E-Mail** | Newsletter, Mail-Queue, E-Mail-Vorlagen (System) |
 | **Auftritt** | Branding, Socials, SEO & Analytics, Jahreszeiten (System) |
@@ -270,7 +270,7 @@ Jedes Thema hat genau **einen** Ort:
 | Welches Turnierformat passt? | Admin → eSports → Turnier-Leitfaden | [Turniere](turniere.md) |
 | Fernseher und Beamer | Admin → eSports → TV & Beamer | [TV und Beamer](tv.md) |
 | Fast-Lap-Challenge | Admin → eSports → Fast Lap | [Fast Lap](fastlap.md) |
-| Event anlegen, Anmeldung, Kalender | Admin → Content → Events | [Events](events.md) |
+| Event anlegen, Anmeldung, Kalender | Admin → eSports → Events | [Events](events.md) |
 | Erfolge vergeben, Level, Jahresrückblick | Admin → Content → Erfolge | [Erfolge, Level und Jahreswertung](erfolge.md) |
 | Jahreswertung (Saison, Punkte) | Admin → eSports → Jahreswertung | [Erfolge, Level und Jahreswertung](erfolge.md) |
 | Logo, Farbe, Hinweisleisten | Admin → Auftritt → Branding | [Auftritt](auftritt.md) |
@@ -349,5 +349,5 @@ Das Symbol oben links (drei Striche, „Admin-Menü öffnen“).
 Noch nicht. Hilfe gibt es unter Admin → System → Einrichtung & FAQ und in diesem Handbuch.
 
 **Wo verbinde ich ein Turnier mit einem Event?**
-Nur im Event: Admin → Content → Events → Event öffnen → **Programm** (**+ Turnier in diesem Event**, **+ Fast Lap**,
+Nur im Event: Admin → eSports → Events → Event öffnen → **Programm** (**+ Turnier in diesem Event**, **+ Fast Lap**,
 **Bestehendes hinzufügen**, **Lösen**). In der Eventliste erscheint **Rückblick schreiben** erst, wenn das Event vorbei ist.

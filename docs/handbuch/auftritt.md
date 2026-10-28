@@ -283,7 +283,7 @@ Die Startseite hat keinen eigenen Editor. Sie setzt sich aus Inhalten zusammen, 
 | Live-Banner, wenn gerade ein Turnier, Event oder Stream läuft | entsteht von selbst |
 | **Heute im Einsatz** über dem Kopf, nur an Tagen mit einem Termin einer laufenden Serie (Runde, Uhrzeit, gemeldete Vereinsfahrer/-spieler, Link zur Serienseite) | Admin → Verein → Serien: Saison auf **Läuft**, Termine und Teilnehmer der Saison |
 | Der große Kopf mit „Ein Rudel. Eine Familie.“ | fester Text, nicht im Admin änderbar |
-| **Angeheftete oder neueste News** und die **nächsten Termine** mit Countdown (der große Countdown nur, wenn ein Termin in den nächsten 14 Tagen liegt) | Admin → Content → News (Haken **Anpinnen**), Admin → Content → Events; ab wann gezählt wird: Admin → Auftritt → Branding, **Countdown ab … Tagen vorher** |
+| **Angeheftete oder neueste News** und die **nächsten Termine** mit Countdown (der große Countdown nur, wenn ein Termin in den nächsten 14 Tagen liegt) | Admin → Content → News (Haken **Anpinnen**), Admin → eSports → Events; ab wann gezählt wird: Admin → Auftritt → Branding, **Countdown ab … Tagen vorher** |
 | **Jahreswertung** | Admin → eSports → Jahreswertung (die aktive Saison) |
 | **Aktuelle News** | Admin → Content → News |
 | **Zahlen** (Mitglieder, Spiele …) | Admin → Verein → Über uns: Häkchen bei den Kacheln |
