@@ -177,25 +177,21 @@ Sperrzeit läuft auch keine Antwortfrist weiter.
 
 ### 3.2 Ergebnisse
 
-- **Melden** (Captain/Vertreter, im Web): je Map Modus, Map aus dem Pool, Sieger, auf Wunsch Punkte und die **eigene
-  Aufstellung** (genau so viele Spieler wie die Teamgröße). Die Erstmeldung geht nur im Web – die App lehnt sie ab.
-- **Bestätigen**: die Gegenseite stellt im Web ihre Aufstellung je Map auf und tippt **Stimmt**. In der App geht nur
-  das Bestätigen (ohne Aufstellung) – die Aufstellung trägt die Seite danach im Web nach.
-- **Ohne Antwort** gilt die Meldung nach 48 Stunden (spätestens am Ende der Spielwoche); die stumme Seite steht dann
-  ohne Aufstellung da.
-- **Die Turnierleitung trägt ein**: Reiter **Spiele** → **Ergebnis eintragen** – Stand, auf Wunsch Maps mit den
-  Aufstellungen beider Seiten (fehlende Seiten tragen nach). Siehe [Turniere, 3.6](turniere.md#36-ergebnisse-melden-eintragen-korrigieren).
+Melden mit Maps und eigener Aufstellung (nur im Web), Bestätigen im Web oder in der App, die 48-Stunden-Regel und
+was dabei geprüft wird, steht für die Captains in
+[Turniere, 3.16](turniere.md#316-liga-ergebnis-je-map-melden-für-captains) – zum Weitergeben gibt es den
+[Spickzettel](liga-captains.md). Für die Turnierleitung dazu:
 
-Geprüft wird beim Melden: Best of (nach der Entscheidung keine weitere Map), Map im Pool und für den Modus
-freigegeben, Modus passend zur Reihenfolge der Season, Aufstellung nur aus dem eigenen Kader und **kein
-Doppel-Einsatz** (niemand spielt am selben Spieltag für zwei Teams derselben Season).
+- **Selbst eintragen**: Reiter **Spiele** → **Ergebnis eintragen** – Stand, auf Wunsch Maps mit den Aufstellungen
+  beider Seiten; eine fehlende Seite trägt ihre Aufstellung danach selbst nach. Siehe
+  [Turniere, 3.6](turniere.md#36-ergebnisse-melden-eintragen-korrigieren).
+- **Kampflos**: im Ergebnis-Fenster **Nicht erschienen** auf der fehlenden Seite.
 
 ### 3.3 Aufstellung nachtragen
 
-Wer aus der App oder durch die 48-Stunden-Automatik ohne Aufstellung dasteht, sieht auf der Matchseite **Aufstellung
-fehlt noch** und trägt sie je Map nach – Captain oder Vertreter, bis **48 Stunden nach dem Ergebnis**. Danach nur
-noch die Turnierleitung, mit Grund. Für die Tabelle spielt die Aufstellung keine Rolle; sie zählt für spätere
-Statistiken und den Doppel-Einsatz.
+Captain oder Vertreter tragen eine fehlende Aufstellung bis **48 Stunden nach dem Ergebnis** selbst nach (3.16).
+Danach nur noch die Turnierleitung: am Spiel **Ergebnis korrigieren** mit Maps und Aufstellungen und einem Grund. Für
+die Tabelle spielt die Aufstellung keine Rolle; sie zählt für den Doppel-Einsatz und spätere Statistiken.
 
 ### 3.4 Einspruch und Korrektur
 
