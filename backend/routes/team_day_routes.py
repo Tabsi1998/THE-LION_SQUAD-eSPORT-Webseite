@@ -52,7 +52,8 @@ async def _my_team_registration(db, tid: str, me: dict) -> tuple[dict, dict | No
     reg = await db.tournament_registrations.find_one(
         {"tournament_id": tid, "team_id": {"$in": sorted(team_ids)}, "status": {"$nin": ["rejected"]}}, {"_id": 0, "identity_key": 0},
     )
-    if not reg:
+    # Co-Team einer Liga (#1649): Aufstellung je Map statt Team am Spieltag - ``lineup`` bleibt leer (docs/LIGA.md).
+    if not reg or reg.get("squad_id"):
         return tournament, None, None
     team = await db.teams.find_one({"id": reg["team_id"]}, {"_id": 0})
     if not team or me["id"] not in (team.get("member_ids") or []):
@@ -248,7 +249,7 @@ async def staff_lineups(tid: str, me: dict = Depends(get_current_user)):
     out = {}
     for reg in regs:
         team = teams.get(reg.get("team_id"))
-        if not team:
+        if not team or reg.get("squad_id"):
             continue
         counted = team_lineup.counted_members(team, reg)
         present = reg.get("presence") or {}

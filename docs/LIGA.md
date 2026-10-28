@@ -89,9 +89,10 @@ Indizes: `id` eindeutig, (`season_id`, `level`) eindeutig.
 | `scoring_rules` | dict | nein | normalisiert; fehlt = heute fest 3/1/0 mit Reihenfolge Punkte, Siege, Differenz |
 | `game_mode_order` | `[str]` | nein | fehlt = frei |
 | `lineup_amend_hours` | int | nein | fehlt = 48 |
+| `min_squad_size` | int | nein | Mindestkader fürs Zuteilen (B); fehlt = `team_size` |
 
 Beim Anlegen kopiert A aus Season (und `overrides`) in vorhandene Felder: `game_id`, `format="league"`,
-`team_mode="team"`, `team_size`, `best_of`, `max_participants=max_staffel_size`, `min_participants=2`,
+`team_mode="team"`, `team_size`, `min_squad_size`, `best_of`, `max_participants=max_staffel_size`, `min_participants=2`,
 `start_date`, `end_date` (Ende der letzten Woche), `matchday_days`, `default_match_weekday`, `default_match_time`,
 `result_confirm_hours_league`, `rules`, `result_entry_mode="player_confirmed"`, `registration_enabled=false`,
 `discord_registration=false`, `discord_skip=true`, `season_weight=0`, Sichtbarkeit (Abschnitt 10). Den Pool speichert
@@ -108,11 +109,13 @@ eindeutig, partiell.
 | `team_squads.vice_captain_id` | str | nein | Mitglied, ≠ `captain_id` |
 | `tournament_registrations.squad_id` | str | nein | Co-Team; fehlt = Anmeldung wie heute |
 | `tournament_registrations.squad_name` | str | nein | Schnappschuss des Co-Team-Namens |
+| `tournament_registrations.league_squad_key` | str | nein | `<season_id>:<squad_id>`, eindeutig (sparse) – ein Co-Team je Season nur in einer Staffel; nur mit `league_context`; folgt jedem Statuswechsel: nicht aktiv (abgelehnt, nicht erschienen, Austritt, Disqualifikation) = weg, wieder aktiv = neu gesetzt, sonst 409 |
 
 Eine Co-Team-Anmeldung: `team_id` = Hauptteam, `squad_id`, `display_name` = „Lions · Lions B“,
 `registration_type="team"`, `registered_via="league_assign"`, `user_id=None`, `status="approved"`,
 `identity_key = "<tid>:team:<team_id>"` (unverändert – damit erzwingt der vorhandene eindeutige Index „zwei Co-Teams
-desselben Hauptteams nie in derselben Staffel“). `lineup`/`substitutes` (Team am Spieltag, #1192) bleiben leer.
+desselben Hauptteams nie in derselben Staffel“). `lineup`/`substitutes` (Team am Spieltag, #1192) bleiben leer;
+„Team am Spieltag“ (`/api/team-day`) gilt für Co-Team-Anmeldungen nicht.
 Indizes: `tournament_registrations.squad_id` (partiell), `team_squads.captain_id` und `.vice_captain_id` (sparse).
 
 ### Ergebnis je Map am Spiel (`matches_v2`, Worker B)
@@ -195,19 +198,22 @@ Angelehnt an `services/match_audience.py` (Verantwortliche/Spieler) und `auth.re
 ¹ Hat ein Co-Team weder Captain noch Vertreter, handelt die Hauptteam-Leitung (niemand sperrt sich aus).
 Umsetzung B: Für Anmeldungen mit `squad_id` gilt in `match_audience` – Verantwortliche = `captain_id`,
 `vice_captain_id` (sonst Leitung und Co-Leitung des Hauptteams); Spieler = `member_ids` des Co-Teams plus
-Verantwortliche; `responsible_registration` findet Anmeldungen auch über Co-Teams, deren Captain/Vertreter man ist.
-Anmeldungen ohne `squad_id` behalten exakt das heutige Verhalten (Regressionstests Pflicht).
+Verantwortliche plus Leitung und Co-Leitung des Hauptteams (Zeile „Matchchat, Spiel-Hinweise“), nicht die übrigen
+Mitglieder des Hauptteams; im Matchchat schreibt der ganze Kader des Co-Teams; `responsible_registration` findet
+Anmeldungen auch über Co-Teams, deren Captain/Vertreter man ist. Aufrufer mit eigener Projektion der Anmeldung lesen
+`squad_id` mit. Anmeldungen ohne `squad_id` behalten exakt das heutige Verhalten (Regressionstests Pflicht).
 
 ## 5. Regeln und Prüfungen (Server, mit deutscher Meldung)
 
 | Regel | Wann | Wer |
 | --- | --- | --- |
-| Co-Team gehört zum Hauptteam (`team_squads.team_id`), ist `active`, `game_id` = Spiel der Liga | Zuteilen | B |
-| Kader ≥ `min_squad_size`, alle Mitglieder im Hauptteam (`_validate_squad_members`) | Zuteilen | B |
+| Co-Team gehört zum Hauptteam (`team_squads.team_id`), ist `active`, `game_id` = Spiel der Liga (ohne `game_id` am Co-Team: passt) | Zuteilen | B |
+| Kader ≥ `min_squad_size` der Staffel (fehlt = `team_size`; nie kleiner als `team_size`), alle Mitglieder im Hauptteam | Zuteilen | B |
 | Zwei Co-Teams desselben Hauptteams nie in derselben Staffel | Zuteilen (Index `identity_key`) | B |
+| Ein Co-Team je Season nur in einer Staffel (`league_context.season_id`) | Zuteilen | B |
 | Staffel nicht voller als `max_participants` | Zuteilen | B |
-| Captain und Vertreter sind Mitglieder, verschieden; Entfernen aus dem Kader erst nach Neuvergabe | Rollen, Kader | B |
-| Co-Team mit aktiver Liga-Anmeldung nicht löschbar | Löschen | B |
+| Captain und Vertreter sind Mitglieder, verschieden; Entfernen aus Kader und Hauptteam erst nach Neuvergabe | Rollen, Kader, Team | B |
+| Co-Team mit Anmeldung (jeder Status) in einer nicht beendeten Staffel nicht löschbar, sein Hauptteam nicht auflösbar | Löschen, Auflösen | B |
 | Runden ≤ aktive Wochen: `(n−1 bei gerader, n bei ungerader Zahl) × round_robin_legs ≤ weeks_total − Sperrwochen` | Staffel anlegen, Spielplan | A |
 | Heimrecht fair: Differenz Heim/Auswärts je Team ≤ 1 bei `round_robin_legs=1`; bei 2 Ausgabe unverändert | Spielplan | A |
 | Terminvorschlag nicht in einer Sperrzeit | Vorschlagen | B ruft A-Helfer |

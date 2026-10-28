@@ -24,6 +24,7 @@ NOT_STARTED = {"draft", "scheduled", "registration_open", "registration_closed"}
 FINISHED = {"completed", "results_published", "archived", "cancelled"}
 ACTIVE_REGISTRATIONS = ("pending", "approved", "checked_in", "waitlist")
 OPEN_MATCH_STATUSES = ["preview", "pending", "ready", "scheduled", "cancelled"]
+LEAGUE_SQUAD_REASON = "Ein Co-Team des Teams ist dieser Liga-Staffel zugeteilt – das klärt die Turnierleitung."
 
 
 def same_name(team: dict, typed: str | None) -> bool:
@@ -49,6 +50,10 @@ async def dissolve_preview(db, team: dict) -> dict:
             continue
         card = {"registration_id": reg["id"], "tournament_id": tournament["id"], "slug": tournament.get("slug"),
                 "title": tournament.get("title") or "Turnier", "start_date": tournament.get("start_date")}
+        if reg.get("squad_id"):
+            # Zugeteiltes Co-Team einer Liga (#1649): herausnehmen kann nur die Turnierleitung.
+            blocked.append({**card, "reason": LEAGUE_SQUAD_REASON})
+            continue
         played = await db.matches_v2.count_documents({
             "tournament_id": tournament["id"], "slots.registration_id": reg["id"], "status": {"$nin": OPEN_MATCH_STATUSES},
         })
@@ -58,6 +63,17 @@ async def dissolve_preview(db, team: dict) -> dict:
             blocked.append({**card, "reason": "Das Team ist schon eingecheckt oder hat Spiele – das klärt die Turnierleitung."})
         else:
             withdraw.append(card)
+    # Auch ausgetretene oder disqualifizierte Co-Teams stehen bis zum Ende der Staffel in Tabelle und Spielplan.
+    from services.squad_registration import active_league_registration
+
+    listed = {row["registration_id"] for row in blocked}
+    for squad in await db.team_squads.find({"team_id": team["id"]}, {"_id": 0, "id": 1}).to_list(200):
+        active = await active_league_registration(db, squad["id"])
+        if active and active["id"] not in listed:
+            listed.add(active["id"])
+            blocked.append({"registration_id": active["id"], "tournament_id": active.get("tournament_id"), "slug": active.get("tournament_slug"),
+                            "title": active.get("tournament_title") or "Liga-Staffel", "start_date": None,
+                            "reason": LEAGUE_SQUAD_REASON})
     chat = await db.team_chat_messages.count_documents({"team_id": team["id"], "deleted_at": {"$exists": False}})
     return {
         "member_count": len(team.get("member_ids") or []),
