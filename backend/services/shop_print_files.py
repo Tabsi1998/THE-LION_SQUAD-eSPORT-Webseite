@@ -503,8 +503,9 @@ def text_canvas_px(entry: dict, gamertag_rules: dict) -> tuple[float, float]:
 
 
 async def plan_placement(db, row: dict, entry: dict, *, color: str, color_hex: str | None, presets_doc: dict,
-                         gamertag_rules: dict) -> Plan:
-    """Eine Fläche für eine Shirtfarbe: Vorgaben umgerechnet, Rahmen geprüft, Prüfsumme des Aufbaus."""
+                         gamertag_rules: dict, color_label: str | None = None) -> Plan:
+    """Eine Fläche für eine Shirtfarbe: Vorgaben umgerechnet, Rahmen geprüft, Prüfsumme des Aufbaus. ``color_label``
+    ist nur die Bezeichnung in Meldungen (#2105) - gerechnet wird mit dem Printful-Namen."""
     by_key = {item["key"]: item for item in presets_doc["presets"]}
     rules = presets_doc["rules"]
     planned: list[Planned] = []
@@ -524,7 +525,7 @@ async def plan_placement(db, row: dict, entry: dict, *, color: str, color_hex: s
         if kind == "motif":
             source = await _motif_source(db, layer.get("motif") or {}, color, color_hex)
             if source is None:
-                found.append(f"{entry['label']}: für „{color}“ fehlt das Motiv.")
+                found.append(f"{entry['label']}: für „{color_label or shop_colors.german(color)}“ fehlt das Motiv.")
                 continue
             box = templates.place_motif(entry, preset, width_cm=float(layer.get("width_cm") or preset.get("width_cm")
                                                                        or 5.0),
@@ -663,7 +664,8 @@ async def _context(db, product: dict) -> dict:
             variants.setdefault(item["color"], []).append(item["id"])
     technique = product.get("technique") or printful.get("default_technique")
     return {"template": template, "presets": presets_doc, "gamertag_rules": rules, "rows": rows, "colors": colors,
-            "codes": codes, "variants": variants, "technique": technique}
+            "codes": codes, "variants": variants, "technique": technique,
+            "labels": {color: shop_colors.label(product, color) for color in colors}}
 
 
 async def plans_for(db, product: dict, context: dict | None = None):
@@ -680,7 +682,8 @@ async def plans_for(db, product: dict, context: dict | None = None):
                 continue
             for entry, ids in groups:
                 plan = await plan_placement(db, row, entry, color=color, color_hex=context["codes"].get(color),
-                                            presets_doc=context["presets"], gamertag_rules=context["gamertag_rules"])
+                                            presets_doc=context["presets"], gamertag_rules=context["gamertag_rules"],
+                                            color_label=context["labels"].get(color))
                 out.append((row, plan, color, ids or []))
     return out, context
 
@@ -706,7 +709,8 @@ async def states(db, product: dict, context: dict | None = None) -> list[dict]:
         base = {"placement": row["key"], "color": color, "variant_ids": ids, "mode": row.get("mode") or "layout"}
         if plan is None:
             out.append({**base, "group": None, "state": "no_area",
-                        "detail": f"Die Fläche {row['key']} hat bei Printful keine Druckvorgabe (mehr).", "file": None,
+                        "detail": f"Die Fläche {templates.placement_label(row['key'])} hat bei Printful keine "
+                                  "Druckvorgabe (mehr).", "file": None,
                         "plan": None})
             continue
         latest = await latest_base(db, product["id"], row["key"], plan.entry["group"], color)
@@ -771,7 +775,7 @@ async def _generate(db, product: dict, *, actor_id: str, reason: str) -> dict:
     for row, plan, color, ids in plans:
         if plan is None or plan.mode == "upload" or not plan.motifs:
             continue
-        name = f"{plan.entry['label']} / {color}"
+        name = f"{plan.entry['label']} / {context['labels'].get(color) or color}"
         if plan.problems:
             failed.append({"placement": row["key"], "color": color, "detail": " ".join(plan.problems)})
             continue

@@ -221,8 +221,36 @@ test("Farben und Größen wählen zählt die Varianten und schickt Technik, Farb
   await user.click(screen.getByTestId("shop-offer-submit"));
   expect(apiMock.put).toHaveBeenCalledWith("/admin/shop/products/p1/offer", {
     technique: "dtg", colors: ["Black", "White", "Navy"], sizes: ["M"], reason: "Navy dazu, L weg",
+    color_labels: { Black: "", White: "", Navy: "" },
   });
   expect(screen.getByTestId("shop-variant-PF1")).toHaveTextContent("lieferbar");
+});
+
+test("Farben heißen deutsch und lassen sich je Produkt anders benennen - der Printful-Name bleibt Schlüssel (#2105)", async () => {
+  const german = view({
+    product: { offer: { colors: ["Black", "White"], sizes: ["M", "L"], color_labels: { Black: "Tiefschwarz" } } },
+    variants: [variant("Black / M", "PF1", { display_label: "Tiefschwarz / M" }), variant("White / M", "PF3", { display_label: "Weiß / M" })],
+    extra: { color_labels: { Black: "Tiefschwarz", White: "Weiß", Navy: "Marineblau" }, color_defaults: { Black: "Schwarz", White: "Weiß", Navy: "Marineblau" } },
+  });
+  apiMock.get.mockImplementation((url) => Promise.resolve({ data: url === "/admin/shop/products" ? LIST : german }));
+  apiMock.put.mockResolvedValue({ data: german });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-offer"));
+  expect(screen.getByTestId("shop-offer-color-Black")).toHaveTextContent("Tiefschwarz");
+  expect(screen.getByTestId("shop-offer-color-Navy")).toHaveTextContent("Marineblau");
+  expect(screen.getByTestId("shop-variant-PF1")).toHaveTextContent("Tiefschwarz / M");
+  expect(screen.getByTestId("shop-offer-color-label-Black")).toHaveValue("Tiefschwarz");
+  expect(screen.getByTestId("shop-offer-color-label-White")).toHaveAttribute("placeholder", "Weiß");
+  await user.type(screen.getByTestId("shop-offer-color-label-White"), "Schneeweiß");
+  await user.clear(screen.getByTestId("shop-offer-color-label-Black"));
+  await user.click(screen.getByTestId("shop-offer-submit"));
+  expect(apiMock.put.mock.calls[0][1].color_labels).toEqual({ Black: "", White: "Schneeweiß" });
+  expect(apiMock.put.mock.calls[0][1].colors).toEqual(["Black", "White"]);
+  // Schritt 3: Vorschau-Farben und Dateien je Farbe mit deutscher Bezeichnung.
+  await user.click(screen.getByTestId("shop-step-designs"));
+  expect(screen.getByTestId("shop-preview-color-Black")).toHaveTextContent("Tiefschwarz");
+  expect(screen.getByTestId("shop-preview-color-White")).toHaveTextContent("Weiß");
 });
 
 test("Drucktechniken mit deutschem Namen und Erklärung, Vorgabe Direktdruck (#2091)", async () => {

@@ -176,13 +176,16 @@ def _list(raw: Any, label: str) -> list:
 
 
 async def set_offer(db, product_id: str, *, technique: Any, colors: Any, sizes: Any, provider: FulfillmentProvider,
-                    actor_id: str, reason: Any) -> dict:
+                    actor_id: str, reason: Any, color_labels: Any = None) -> dict:
     """Schritt 2: welche Farben und Größen angeboten werden. Legt die Varianten an und holt danach die Einkaufspreise.
-    Läuft gerade ein anderer Abgleich, bleiben die Preise offen (Prüfung „Preis“) - „Mit Printful abgleichen“ holt sie."""
+    Läuft gerade ein anderer Abgleich, bleiben die Preise offen (Prüfung „Preis“) - „Mit Printful abgleichen“ holt sie.
+
+    ``color_labels`` (#2105): eigene Bezeichnung je angebotener Farbe statt der Übersetzung (leer = Vorgabe). Ohne
+    Angabe bleiben die eigenen Bezeichnungen der weiter angebotenen Farben. Der Printful-Name bleibt der Schlüssel."""
     reason = clean_reason(reason, required=False)
     async with shop_catalog.product_lock(db, product_id):
         saved = await _save_offer(db, product_id, technique=technique, colors=colors, sizes=sizes, actor_id=actor_id,
-                                  reason=reason)
+                                  reason=reason, color_labels=color_labels)
     try:
         await shop_catalog_sync.sync_product(db, product_id, provider=provider, actor_id=actor_id, reason=reason,
                                              wait_seconds=5.0)
@@ -192,7 +195,7 @@ async def set_offer(db, product_id: str, *, technique: Any, colors: Any, sizes: 
 
 
 async def _save_offer(db, product_id: str, *, technique: Any, colors: Any, sizes: Any, actor_id: str,
-                      reason: str) -> dict:
+                      reason: str, color_labels: Any = None) -> dict:
     product = await _product(db, product_id)
     _editable(product)
     printful = product.get("printful")
@@ -211,7 +214,12 @@ async def _save_offer(db, product_id: str, *, technique: Any, colors: Any, sizes
     if len(rows) > MAX_OFFERED_VARIANTS:
         raise ShopError(f"Höchstens {MAX_OFFERED_VARIANTS} Varianten je Produkt (gewählt: {len(rows)}) - je Variante "
                         "fragt der Abgleich Printful einmal nach dem Preis.")
-    offer = {"colors": chosen_colors, "sizes": chosen_sizes}
+    if color_labels is None:
+        kept = ((product.get("offer") or {}).get("color_labels") or {})
+        labels = {name: text for name, text in kept.items() if name in chosen_colors}
+    else:
+        labels = shop_colors.clean_labels(color_labels, chosen_colors)
+    offer = {"colors": chosen_colors, "sizes": chosen_sizes, "color_labels": labels}
     saved = await _save_content(db, product, {"offer": offer, "technique": technique}, actor_id=actor_id,
                                 reason=reason, action="shop.product.offer",
                                 data={"technique": technique, **offer, "variants": len(rows)})
@@ -472,10 +480,11 @@ async def accept_prices(db, product_id: str, *, actor_id: str, reason: Any) -> d
     costs = []
     for variant, mapping in offered:  # erst alles prüfen, dann schreiben - nie halb übernommen
         cost = cost_cents(product, mapping)
+        shown = shop_colors.variant_label(product, variant)
         if cost is None:
-            raise ShopError(f"Für {variant['label']} fehlt der Einkaufspreis von Printful - erst abgleichen.")
+            raise ShopError(f"Für {shown} fehlt der Einkaufspreis von Printful - erst abgleichen.")
         if cost < minimum:
-            raise ShopError(f"{variant['label']}: Selbstkosten {euro(cost)} liegen unter dem Mindestpreis "
+            raise ShopError(f"{shown}: Selbstkosten {euro(cost)} liegen unter dem Mindestpreis "
                             f"{euro(minimum)} - Mindestpreis senken (Shop → Einstellungen) oder die Variante nicht "
                             "anbieten.")
         costs.append(cost)
@@ -560,9 +569,11 @@ async def run_check(db, product: dict) -> dict:
     items.append(_template_item(template, now_utc()))
     offered = await _offered(db, product)
     offer = product.get("offer") or {}
+    colors = ", ".join(shop_colors.label(product, color) for color in offer.get("colors") or [])
+    sizes = ", ".join(shop_colors.size_label(size) for size in offer.get("sizes") or [])
     items.append(_item("offer", "Farben und Größen", bool(offered),
-                       f"{len(offered)} Varianten: {', '.join(offer.get('colors') or [])} in "
-                       f"{', '.join(offer.get('sizes') or [])}" if offered else "Noch keine Farben und Größen gewählt."))
+                       f"{len(offered)} Varianten: {colors} in {sizes}" if offered
+                       else "Noch keine Farben und Größen gewählt."))
     personalization = product.get("personalization") or "none"
     rows = await shop_print_files.layout_rows(db, product, template=template) if printful else []
     kinds = {layer.get("kind") for row in rows for layer in row.get("layers") or []}
@@ -600,14 +611,16 @@ async def run_check(db, product: dict) -> dict:
         if warned:
             detail += " Hinweise: " + " ".join(warned[:2])
     elif bad:
-        detail = "; ".join(f"{state['placement']} / {state['color']}: {STATE_TEXT.get(state['state'], state['state'])}"
+        detail = "; ".join(f"{templates.placement_label(state['placement'])} / "
+                           f"{shop_colors.label(product, state['color'])}: "
+                           f"{STATE_TEXT.get(state['state'], state['state'])}"
                            f"{(' - ' + state['detail']) if state['state'] in ('invalid', 'no_area') else ''}"
                            for state in bad[:8]) + (f" (und {len(bad) - 8} weitere)" if len(bad) > 8 else "")
         detail = "Ohne gültige Druckdatei: " + detail + ". „Druckdateien erzeugen“ in Schritt 3."
     else:
         detail = "Noch keine Druckfläche mit Motiv."
     items.append(_item("files", "Druckdateien je Farbe", files_ok, detail))
-    unavailable = [variant["label"] for variant, mapping in offered
+    unavailable = [shop_colors.variant_label(product, variant) for variant, mapping in offered
                    if variant.get("blocked_reason") or (mapping or {}).get("in_stock") is not True]
     items.append(_item("stock", "Lieferbar", bool(offered) and not unavailable,
                        ("Nicht lieferbar oder Lager unbekannt: " + ", ".join(unavailable)) if unavailable else
@@ -617,9 +630,9 @@ async def run_check(db, product: dict) -> dict:
     for variant, mapping in offered:
         cost = cost_cents(product, mapping)
         if cost is None or variant.get("price_cents") != cost or (mapping or {}).get("price_warning"):
-            unpriced.append(variant["label"])
+            unpriced.append(shop_colors.variant_label(product, variant))
         elif variant["price_cents"] < minimum:
-            too_cheap.append(variant["label"])
+            too_cheap.append(shop_colors.variant_label(product, variant))
     problems = []
     if unpriced:
         problems.append("Preis fehlt oder weicht vom Einkauf ab: " + ", ".join(unpriced))
@@ -717,7 +730,9 @@ async def admin_view(db, product_id: str) -> dict:
         cost = cost_cents(product, mapping) if mapping else None
         price = variant.get("price_cents")
         variant_rows.append({
-            "id": variant["id"], "sku": variant["sku"], "label": variant["label"], "color": variant.get("color"),
+            "id": variant["id"], "sku": variant["sku"], "label": variant["label"],
+            "display_label": shop_colors.variant_label(product, variant), "color": variant.get("color"),
+            "color_label": shop_colors.label(product, variant.get("color")) if variant.get("color") else None,
             "size": variant.get("size"), "color_code": variant.get("color_code"), "active": bool(variant.get("active")),
             "blocked_reason": variant.get("blocked_reason"), "printful_variant_id": mapping.get("printful_variant_id"),
             "availability": mapping.get("availability"), "in_stock": mapping.get("in_stock"),
@@ -745,7 +760,8 @@ async def admin_view(db, product_id: str) -> dict:
             "layers": row.get("layers") or [], "printful_placement": row["printful_placement"],
             "included": row["printful_placement"] == included,
             "surcharge_cents": (sample.get("placement_costs") or {}).get(row["printful_placement"]),
-            "files": [state for state in states if state["placement"] == row["key"]],
+            "files": [{**state, "color_label": shop_colors.label(product, state["color"])}
+                      for state in states if state["placement"] == row["key"]],
         })
     current = product.get("status") or "draft"
     conversion = await shop_print_files.layout_conversion(db, product) if printful else {"converted": False,
@@ -757,6 +773,10 @@ async def admin_view(db, product_id: str) -> dict:
                    "modes": shop_print_files.MODES, "families": templates.FAMILIES,
                    "anchors": templates.ANCHORS, "placements": _placement_names(printful, template)},
         "variants": variant_rows,
+        # Printful-Name → Bezeichnung (#2105): eigene aus Schritt 2, sonst die Übersetzung; dazu die Vorgabe.
+        "color_labels": shop_colors.labels_for(product),
+        "color_defaults": shop_colors.defaults_for(product),
+        "size_labels": {size: shop_colors.size_label(size) for size in printful.get("sizes") or []},
         "placements": placement_rows,
         "layout_converted": conversion["converted"],
         "layout_notes": conversion["notes"],

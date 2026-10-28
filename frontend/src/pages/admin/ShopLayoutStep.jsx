@@ -145,7 +145,7 @@ function LayoutPreview({ area, preview, layers, resolved, colorCode, motifFor, s
 
 // ---------------------------------------------------------------- Ebenen bearbeiten
 
-function MotifLayer({ layer, area, presets, motifs, colors, minWidth, rules, aspect, editable, onChange, onRemove, testId }) {
+function MotifLayer({ layer, area, presets, motifs, colors, colorName, minWidth, rules, aspect, editable, onChange, onRemove, testId }) {
   const max = Math.max(minWidth, maxWidthCm(area, aspect || 1, rules));
   const width = Number(layer.width_cm || minWidth);
   const offset = Number(layer.offset_x_cm || 0) !== 0 || Number(layer.offset_y_cm || 0) !== 0;
@@ -200,7 +200,7 @@ function MotifLayer({ layer, area, presets, motifs, colors, minWidth, rules, asp
         <div className="grid gap-2 sm:grid-cols-2 border-t border-white/10 pt-2" data-testid={`${testId}-exceptions`}>
           <p className="sm:col-span-2 text-xs text-white/50">Ohne Ausnahme nimmt jede Farbe automatisch die passende Fassung (hell oder dunkel).</p>
           {colors.map((color) => (
-            <label key={color} className="block text-sm"><span className="text-white/70">{color}</span>
+            <label key={color} className="block text-sm"><span className="text-white/70">{colorName(color)}</span>
               <select value={layer.motif?.by_color?.[color] || ""} disabled={!editable}
                 onChange={(event) => onChange({ motif: { ...(layer.motif || {}), by_color: { ...(layer.motif?.by_color || {}), [color]: event.target.value } } })}
                 className={SELECT} data-testid={`${testId}-exception-${color}`}>
@@ -245,7 +245,7 @@ function FileStates({ productId, row, mode, editable, busy, onUpload }) {
         const key = `${state.color}|${state.group || "all"}`;
         return (
           <li key={key} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" data-testid={`shop-file-${row.key}-${state.color}`} data-state={state.state}>
-            <span className="font-bold min-w-[5rem]">{state.color}</span>
+            <span className="font-bold min-w-[5rem]">{state.color_label || state.color}</span>
             <span className={`inline-flex items-center gap-1 ${STATE_TONES[state.state] || "text-white/60"}`}>
               {state.state === "ok" ? <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" /> : <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />}
               {STATE_TEXT[state.state] || state.state}{state.file?.version ? ` · v${state.file.version}` : ""}
@@ -263,7 +263,7 @@ function FileStates({ productId, row, mode, editable, busy, onUpload }) {
             )}
             {mode === "upload" && editable && (
               <span className="inline-flex items-center gap-2 basis-full">
-                <label className="sr-only" htmlFor={`shop-upload-${row.key}-${state.color}`}>Fertige Druckdatei für {state.color}</label>
+                <label className="sr-only" htmlFor={`shop-upload-${row.key}-${state.color}`}>Fertige Druckdatei für {state.color_label || state.color}</label>
                 <input id={`shop-upload-${row.key}-${state.color}`} type="file" accept="image/png,image/jpeg" className="text-xs max-w-[14rem]"
                   onChange={(event) => setChosen({ ...chosen, [key]: event.target.files?.[0] || null })} data-testid={`shop-upload-${row.key}-${state.color}`} />
                 <button type="button" disabled={!chosen[key] || busy === `upload-${key}`} className={SMALL_BTN}
@@ -281,7 +281,7 @@ function FileStates({ productId, row, mode, editable, busy, onUpload }) {
 
 // ---------------------------------------------------------------- Eine Fläche
 
-function PlacementCard({ view, available, state, savedRow, used, onToggle, onChange, colors, previewColor, codes, motifsByKey, sources, stale, editable, busy, onUpload }) {
+function PlacementCard({ view, available, state, savedRow, used, onToggle, onChange, colors, colorName, previewColor, codes, motifsByKey, sources, stale, editable, busy, onUpload }) {
   const area = areaOf(available);
   const presets = view.presets || [];
   const motifPresets = presets.filter((preset) => available.presets.motif.includes(preset.key));
@@ -366,7 +366,7 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
                   <div key={index} className={`border rounded-sm p-3 transition-colors duration-150 ${selected === index ? "border-brand/60" : "border-white/10"}`} onFocusCapture={() => setSelected(index)}>
                     <div className="text-xs font-bold uppercase tracking-wider text-white/60 mb-2">{kinds[layer.kind] || layer.kind}</div>
                     {layer.kind === "motif" ? (
-                      <MotifLayer layer={layer} area={area} presets={motifPresets} motifs={view.motif_options || []} colors={colors}
+                      <MotifLayer layer={layer} area={area} presets={motifPresets} motifs={view.motif_options || []} colors={colors} colorName={colorName}
                         minWidth={view.limits?.min_width_cm || 1} rules={rules} aspect={motif?.width_px ? motif.height_px / motif.width_px : 1} editable={editable}
                         onChange={(patch) => update(index, patch)} onRemove={() => onChange({ ...state, layers: layers.filter((_, at) => at !== index) })}
                         testId={`shop-layer-${available.key}-${index}`} />
@@ -443,6 +443,8 @@ export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGrou
   const [previewColor, setPreviewColor] = useState(colors[0] || "");
   useEffect(() => { if (!colors.includes(previewColor)) setPreviewColor(colors[0] || ""); }, [colors, previewColor]);
   const codes = useMemo(() => Object.fromEntries((product.printful?.colors || []).map((color) => [color.name, color.code])), [product.printful]);
+  // Angezeigt wird die deutsche Bezeichnung (#2105); Schlüssel bleibt der Printful-Name.
+  const colorName = (color) => view.color_labels?.[color] || color;
   const motifsByKey = useMemo(() => Object.fromEntries((view.motif_options || []).map((motif) => [motif.key, motif])), [view.motif_options]);
   const sources = useMemo(() => savedSources(view), [view]);
   const savedRows = Object.fromEntries((view.placements || []).map((row) => [row.key, row]));
@@ -493,7 +495,7 @@ export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGrou
     form.append("color", color);
     if (group && group !== "all") form.append("group", group);
     form.append("reason", "");
-    return run(`upload-${key}`, () => uploadApi.post("/admin/shop/print-files/upload", form), `Druckdatei für ${color} geprüft und gespeichert.`);
+    return run(`upload-${key}`, () => uploadApi.post("/admin/shop/print-files/upload", form), `Druckdatei für ${colorName(color)} geprüft und gespeichert.`);
   };
   return (
     <div className="space-y-4" data-testid="shop-layout">
@@ -520,7 +522,7 @@ export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGrou
               <button key={color} type="button" role="radio" aria-checked={previewColor === color} onClick={() => setPreviewColor(color)}
                 className={`min-h-9 px-3 text-xs border rounded-sm inline-flex items-center gap-2 transition-colors duration-150 ${previewColor === color ? "border-brand bg-brand/10" : "border-white/10 hover:border-white/30"}`}
                 data-testid={`shop-preview-color-${color}`}>
-                <span className="w-3.5 h-3.5 rounded-sm border border-white/25" style={{ backgroundColor: codes[color] }} aria-hidden="true" /> {color}
+                <span className="w-3.5 h-3.5 rounded-sm border border-white/25" style={{ backgroundColor: codes[color] }} aria-hidden="true" /> {colorName(color)}
               </button>
             ))}
           </div>
@@ -536,7 +538,7 @@ export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGrou
               return next;
             })}
             onChange={(next) => setDraft((now) => ({ ...now, [row.key]: next }))}
-            colors={colors} previewColor={previewColor} codes={codes} motifsByKey={motifsByKey} sources={shownSources} stale={stale} editable={view.editable} busy={busy} onUpload={onUpload} />
+            colors={colors} colorName={colorName} previewColor={previewColor} codes={codes} motifsByKey={motifsByKey} sources={shownSources} stale={stale} editable={view.editable} busy={busy} onUpload={onUpload} />
         ))}
       </ul>
       {usedKeys.length > 1 && (

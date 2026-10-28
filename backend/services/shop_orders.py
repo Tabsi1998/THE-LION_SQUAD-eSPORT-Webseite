@@ -28,7 +28,7 @@ from typing import Any, NoReturn
 from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
-from services import shop_catalog, shop_common, shop_config, shop_motifs, shop_print_files
+from services import shop_catalog, shop_colors, shop_common, shop_config, shop_motifs, shop_print_files
 from services.log_safe import log_safe
 from services.shop_common import ShopConflict, ShopError, assert_no_address
 
@@ -285,6 +285,12 @@ async def get_order(db, order_id: str) -> dict | None:
 
 async def items_for(db, order_id: str) -> list[dict]:
     return await db.shop_order_items.find({"order_id": order_id}, {"_id": 0}).sort("position", 1).to_list(MAX_LINES)
+
+
+def item_view(item: dict) -> dict:
+    """Eine Position zum Anzeigen (#2105): die gespeicherte Bezeichnung („Black / M“) bleibt, dazu die deutsche über
+    dieselbe Übersetzung wie im Shop („Schwarz / M“). Keine Änderung an der Bestellung."""
+    return {**item, "variant_display": shop_colors.stored_label(item.get("variant_label"))}
 
 
 async def list_orders(db, *, status: str | None = None, limit: int = 200) -> list[dict]:

@@ -1,10 +1,17 @@
 """Farbnamen im Shop auf Deutsch (#2105): eine Stelle übersetzt die Printful-Farben, je Produkt überschreibbar -
 englisch nur als letzter Rückfall. Intern bleibt der Printful-Name der Schlüssel."""
+import pathlib
+import sys
+
 import pytest
 
-from services import shop_colors
-from services.shop_common import ShopError
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
+from services import shop_colors, shop_orders, shop_products, shop_test_drafts  # noqa: E402
+from services.shop_common import ShopError  # noqa: E402
+from shop_testdata import publish_unchecked  # noqa: E402
+from test_shop_products_unit import (  # noqa: E402,F401 - Fixtures und Helfer
+    BILLING, BY, SHIPPING, WHITE_M, check_item, configured, db, design_dir, fake, provider, variant_for)
 
 
 @pytest.mark.parametrize("name, german", [
@@ -56,3 +63,71 @@ def test_only_stored_printful_codes_are_valid_colours():
     assert shop_colors.codes_of(product) == {"0c0c0c", "ffffff"}
     assert shop_colors.hex_of("#0C0C0C") == "0c0c0c" and shop_colors.hex_of("rot") is None
     assert shop_colors.hex_of("#12345") is None and shop_colors.hex_of(None) is None
+
+
+# ---------------------------------------------------------------- In der Produktverwaltung
+
+@pytest.mark.asyncio
+async def test_step_two_takes_own_colour_labels_with_log_and_keeps_the_printful_key(db, provider):
+    product = await configured(db, provider, accept=False, generate=False)
+    await shop_products.set_offer(db, product["id"], technique="dtg", colors=["Black", "White"], sizes=["M", "L"],
+                                  color_labels={"black": "Tiefschwarz", "White": ""}, provider=provider, **BY)
+    view = await shop_products.admin_view(db, product["id"])
+    assert view["product"]["offer"]["color_labels"] == {"Black": "Tiefschwarz"}
+    assert view["product"]["offer"]["colors"] == ["Black", "White"], "der Schlüssel bleibt der Printful-Name"
+    assert view["color_labels"] == {"Black": "Tiefschwarz", "White": "Weiß"}
+    assert view["color_defaults"] == {"Black": "Schwarz", "White": "Weiß"}
+    labels = {row["label"]: row["display_label"] for row in view["variants"]}
+    assert labels["Black / M"] == "Tiefschwarz / M" and labels["White / L"] == "Weiß / L"
+    entry = await db.audit_logs.find_one({"action": "shop.product.offer"}, sort=[("_id", -1)])
+    assert entry["data"]["color_labels"] == {"Black": "Tiefschwarz"}
+    # Ohne Angabe bleiben die eigenen Bezeichnungen der weiter angebotenen Farben.
+    await shop_products.set_offer(db, product["id"], technique="dtg", colors=["Black"], sizes=["M"],
+                                  provider=provider, **BY)
+    assert (await shop_products.admin_view(db, product["id"]))["product"]["offer"]["color_labels"] == {
+        "Black": "Tiefschwarz"}
+    with pytest.raises(ShopError):
+        await shop_products.set_offer(db, product["id"], technique="dtg", colors=["Black"], sizes=["M"],
+                                      color_labels={"White": "Weiß"}, provider=provider, **BY)
+
+
+@pytest.mark.asyncio
+async def test_the_check_and_the_print_files_speak_german(db, provider):
+    product = await configured(db, provider, accept=False, generate=False)
+    view = await shop_products.admin_view(db, product["id"])
+    assert "Schwarz, Weiß in M, L" in check_item(view, "offer")["detail"]
+    files = check_item(view, "files")["detail"]
+    assert "Vorderseite / Schwarz: fehlt" in files and "front / Black" not in files
+    front = next(row for row in view["placements"] if row["key"] == "front")
+    assert {(state["color"], state["color_label"]) for state in front["files"]} == {("Black", "Schwarz"),
+                                                                                   ("White", "Weiß")}
+    prices = check_item(view, "prices")["detail"]
+    assert "Schwarz / M" in prices and "Black / M" not in prices
+
+
+@pytest.mark.asyncio
+async def test_orders_keep_the_printful_name_and_show_the_german_one(db, provider):
+    product = await configured(db, provider)
+    await publish_unchecked(db, product["id"])
+    white = await variant_for(db, product["id"], WHITE_M)
+    order, _ = await shop_orders.place_order(
+        db, idempotency_key="bestellung-farbe-1", lines=[{"variant_id": white["id"], "quantity": 1,
+                                                           "gamertag": "Testlöwe"}],
+        user_id="konto-1", buyer_kind="member", shipping_estimate_cents=490, billing_address=dict(BILLING),
+        shipping_address=dict(SHIPPING), actor_id="konto-1")
+    (item,) = await shop_orders.items_for(db, order["id"])
+    assert item["variant_label"] == "White / M", "unverändert gespeichert"
+    assert shop_orders.item_view(item)["variant_display"] == "Weiß / M"
+    files = await db.shop_print_files.find({"order_id": order["id"]}, {"_id": 0, "color": 1}).to_list(None)
+    assert {row["color"] for row in files} == {"White"}
+
+
+@pytest.mark.asyncio
+async def test_the_test_draft_offers_german_colour_names(db, provider):
+    await configured(db, provider)
+    (product,) = await shop_test_drafts.products(db)
+    assert {(row["color"], row["color_label"]) for row in product["variants"]} == {("Black", "Schwarz"),
+                                                                                   ("White", "Weiß")}
+    assert {row["display_label"] for row in product["variants"]} == {"Schwarz / M", "Schwarz / L", "Weiß / M",
+                                                                     "Weiß / L"}
+    assert shop_test_drafts.view({"id": "t", "variant_label": "Black / M"})["variant_display"] == "Schwarz / M"

@@ -51,7 +51,7 @@ async def test_a_dark_shirt_gets_the_main_file_a_light_one_the_light_version_and
                                       **BY)
     files = next(item for item in (await shop_products.admin_view(db, product["id"]))["check"]["items"]
                  if item["key"] == "files")
-    assert files["ok"] is False and "front / White: veraltet" in files["detail"]
+    assert files["ok"] is False and "Vorderseite / Weiß: veraltet" in files["detail"]
     await shop_products.generate_print_files(db, product["id"], **BY)
     assert (await sources_of(db, product["id"], "front"))["White"]["variant"] == "dark"
     # Ausnahme am Produkt: für Weiß ein ganz anderes Motiv.

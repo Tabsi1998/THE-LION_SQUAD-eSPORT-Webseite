@@ -281,6 +281,8 @@ async def test_the_order_list_shows_no_addresses_and_the_detail_its_events(flow)
     detail = (await flow.get(f"{BASE}/orders/{order['id']}")).json()
     assert detail["order"]["frozen"]["total_cents"] == 2000 + 590
     assert [item["sku"] for item in detail["items"]] == ["B-1"]
+    # Angezeigt deutsch über dieselbe Übersetzung (#2105), gespeichert bleibt die Bezeichnung von damals.
+    assert [(item["variant_label"], item["variant_display"]) for item in detail["items"]] == [("M", "M")]
     assert [event["kind"] for event in detail["events"]] == ["order.placed"]
     # Lesen ist keine Adminaktion.
     assert await flow.db.audit_logs.count_documents({}) == logged

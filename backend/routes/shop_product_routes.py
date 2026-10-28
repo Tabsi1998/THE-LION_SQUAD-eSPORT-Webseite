@@ -48,6 +48,8 @@ class Offer(Reasoned):
     technique: str = Field(..., min_length=1, max_length=32)
     colors: list[str] = Field(..., min_length=1, max_length=40)
     sizes: list[str] = Field(..., min_length=1, max_length=20)
+    # Eigene Bezeichnung je Farbe (#2105) - ohne Angabe bleiben die bisherigen; leer heißt „Vorgabe“.
+    color_labels: dict[str, str | None] | None = Field(None, max_length=40)
 
 
 class MotifRef(BaseModel):
@@ -158,7 +160,8 @@ async def set_offer(product_id: str, body: Offer, me: dict = Depends(require_are
     provider = await _provider(db)
     try:
         await shop_products.set_offer(db, product_id, technique=body.technique, colors=body.colors, sizes=body.sizes,
-                                      provider=provider, actor_id=me["id"], reason=body.reason)
+                                      color_labels=body.color_labels, provider=provider, actor_id=me["id"],
+                                      reason=body.reason)
     except (ShopError, LookupError) as exc:
         raise _refused(exc) from exc
     return await _view(product_id)
