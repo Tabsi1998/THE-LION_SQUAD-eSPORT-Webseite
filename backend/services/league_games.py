@@ -19,6 +19,7 @@ berührt nichts davon - dort bleibt ``games`` unbeachtet.
 
 from __future__ import annotations
 
+import contextlib
 import math
 from dataclasses import dataclass, field
 
@@ -291,13 +292,20 @@ def missing_lineups(games: list[dict], registration_ids: list[str]) -> list[str]
     ]
 
 
+def _lineup_sources(match: dict) -> list[list[dict]]:
+    """Welche Aufstellungen gerade gelten: steht ein Ergebnis mit Maps fest, nur ``games`` des Spiels; sonst je Seite
+    nur ihre letzte Meldung - ältere Meldungen und überholte Stände zählen nicht."""
+    from services.v2_match_flows import latest_reports
+
+    if match.get("games"):
+        return [match["games"]]
+    return [report.get("games") or [] for report in latest_reports(match.get("reports")).values()]
+
+
 def lineup_union(match: dict) -> list[str]:
-    """Alle Aufgestellten aus den geltenden Maps und offenen Meldungen - der Index für den Doppel-Einsatz."""
+    """Alle geltenden Aufgestellten (``_lineup_sources``) - der Index für den Doppel-Einsatz."""
     ids: set[str] = set()
-    sources = [match.get("games") or []] + [
-        report.get("games") or [] for report in match.get("reports") or [] if isinstance(report, dict)
-    ]
-    for games in sources:
+    for games in _lineup_sources(match):
         for game in games:
             for lineup in (game.get("lineups") or {}).values():
                 ids.update(user_id for user_id in lineup or [] if user_id)
@@ -306,10 +314,7 @@ def lineup_union(match: dict) -> list[str]:
 
 def _sides_of(match: dict, user_id: str) -> set[str]:
     sides: set[str] = set()
-    sources = [match.get("games") or []] + [
-        report.get("games") or [] for report in match.get("reports") or [] if isinstance(report, dict)
-    ]
-    for games in sources:
+    for games in _lineup_sources(match):
         for game in games:
             for reg_id, lineup in (game.get("lineups") or {}).items():
                 if user_id in (lineup or []):
@@ -655,3 +660,17 @@ async def page_block(db, setup: LeagueSetup, *, side_id: str | None, can_act: bo
         "amend_until": deadline.isoformat() if deadline else None,
         "app_detail": APP_DETAIL,
     }
+
+
+@contextlib.asynccontextmanager
+async def season_lock(db, tournament: dict | None):
+    """Sperre je Season für den Doppel-Einsatz (#1650): Prüfung, Schreiben und Index laufen über Staffeln derselben
+    Season nacheinander. Immer nach der Turnier-Sperre nehmen, nie umgekehrt. Ohne Liga-Rahmen: keine Sperre."""
+    from services.mutation_lock import mutation_lock
+
+    season_id = ((tournament or {}).get("league_context") or {}).get("season_id")
+    if not season_id:
+        yield
+        return
+    async with mutation_lock(db, f"league_season:{season_id}:lineups", wait_seconds=5.0):
+        yield
