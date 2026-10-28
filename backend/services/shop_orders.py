@@ -12,6 +12,7 @@ Einziger Weg, diese Sammlungen zu schreiben. Was eine Bestellung festhält, änd
 Idempotenz: der Schlüssel des Aufrufers gilt je Konto (``<konto>:<schlüssel>``, eindeutiger Index). Derselbe Aufruf
 noch einmal liefert dieselbe Bestellung, derselbe Schlüssel mit anderem Inhalt ist ein Konflikt.
 ``printful_external_id`` ist je Bestellung eindeutig - darüber erkennt Printful einen wiederholten Auftrag (#1705).
+Höchstens 32 Zeichen, so viele nimmt Printful (#2133).
 
 Ereignisse (``shop_order_events``) werden nur angehängt; es gibt keine Funktion zum Ändern oder Löschen. Ein
 einmaliges Ereignis trägt einen festen ``event_key`` (eindeutig je Bestellung), wiederholbare bekommen einen neuen.
@@ -31,6 +32,7 @@ from models import new_id, now_utc
 from services import shop_catalog, shop_colors, shop_common, shop_config, shop_motifs, shop_print_files
 from services.log_safe import log_safe
 from services.shop_common import ShopConflict, ShopError, assert_no_address
+from services.shop_fulfillment import short_external_id
 
 logger = logging.getLogger("tls-arena.shop-orders")
 
@@ -261,7 +263,7 @@ async def place_order(db, *, user_id: str, idempotency_key: str, buyer_kind: str
                    "tax_profile": next(iter(tax_profiles)) if len(tax_profiles) == 1 else None,
                    "buyer_kind": buyer_kind, "payment_rules": rules},
         "billing_address": billing, "shipping_address": shipping,
-        "printful_external_id": f"lsw-{order_id}", "printful_order_id": None,
+        "printful_external_id": short_external_id(), "printful_order_id": None,
         "item_count": len(items), "created_at": now, "updated_at": now,
     }
     # Erst die Positionen (oben), dann die Bestellung: gewinnt eine gleichzeitige Anfrage das Rennen um den Schlüssel,

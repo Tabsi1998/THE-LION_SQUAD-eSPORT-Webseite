@@ -61,7 +61,10 @@ async def test_the_preview_is_exactly_what_is_sent_and_printful_saves_nothing_be
     assert fake.calls_to("createOrder") == [] and fake.orders == {}, "die Vorschau legt bei Printful nichts an"
     assert len(fake.calls_to("createOrderEstimationTask")) == 1
     assert shown["state"] == "preview" and shown["kind"] == "test_draft"
-    assert shown["external_id"].startswith("lsw-testentwurf-") and shown["payload"]["external_id"] == shown["external_id"]
+    assert shown["external_id"].startswith("lswtest-") and shown["payload"]["external_id"] == shown["external_id"]
+    # Printful nimmt höchstens 32 Zeichen je external_id (#2133) - Auftrag und Position.
+    assert len(shown["external_id"]) <= 32
+    assert all(len(item["external_id"]) <= 32 for item in shown["payload"]["order_items"])
     assert set(shown["payload"]) == {"external_id", "shipping", "recipient", "order_items"}, "kein Feld zum Bestätigen"
     assert shown["payload"]["recipient"] == {"name": "Testverein Löwen", "address1": "Vereinsgasse 1", "city": "Innsbruck",
                                              "zip": "6020", "country_code": "AT"}

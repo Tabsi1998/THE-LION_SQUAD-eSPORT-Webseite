@@ -72,7 +72,7 @@ async def test_an_order_freezes_prices_markup_shipping_tax_profile_gamertag_desi
     assert item["design"] == {"design_key": "loewe-vorne", "version": 1, "sha256": "a" * 64}
     assert item["printful"] == {"variant_id": 4012, "product_id": 71}
     assert item["tax_profile"] == "standard"
-    assert order["printful_external_id"] == f"lsw-{order['id']}"
+    assert 1 <= len(order["printful_external_id"]) <= 32  # Printful-Grenze (#2133)
 
 
 @pytest.mark.asyncio

@@ -898,7 +898,7 @@ class PrintfulClient:
         bestätigter Auftrag nur über einen eigenen Weg hinter dem Notschalter (#1721).
 
         ``test_draft=True`` (#2062): Aufräumen eines Testentwurfs geht auch bei Stufe „Aus“, solange der Schlüssel
-        lesbar ist - aber nur für Aufträge, deren external_id mit ``lsw-testentwurf-`` beginnt (sonst
+        lesbar ist - aber nur für Aufträge, deren external_id mit ``lswtest-`` (früher ``lsw-testentwurf-``) beginnt (sonst
         ``not_test_draft``).
         Für echte Bestellungen gilt weiter ``require_printful_drafts``."""
         require(order_id, PrintfulOrderId, "order_id")
@@ -1006,7 +1006,7 @@ class PrintfulClient:
                 await store.delete_one({"_id": claim_id, "state": "sending"})
                 raise
             if is_test_external_id(current.external_id):
-                # Ein Testentwurf (#2062, external_id „lsw-testentwurf-…“) wird nie bestätigt - auch ohne
+                # Ein Testentwurf (#2062, external_id „lswtest-…“) wird nie bestätigt - auch ohne
                 # Protokollzeile.
                 await store.delete_one({"_id": claim_id, "state": "sending"})
                 raise FulfillmentInvalid("test_draft")
