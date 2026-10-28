@@ -300,7 +300,8 @@ async def available_placements(db, product: dict, *, template: dict | None = Non
     return out
 
 
-LAYER_FIELDS = {"kind", "preset", "width_cm", "offset_x_cm", "offset_y_cm", "motif", *shop_gamertag.LAYER_SIZE_FIELDS}
+LAYER_FIELDS = {"kind", "preset", "width_cm", "offset_x_cm", "offset_y_cm", "motif", "variant",
+                *shop_gamertag.LAYER_SIZE_FIELDS}
 
 
 async def _clean_motif(db, raw: Any, colors: list[str], label: str) -> dict:
@@ -385,17 +386,34 @@ async def _clean_layout(db, product: dict, raw_rows: Any, available: dict[str, d
                     item.update(shop_gamertag.clean_layer_sizes(layer))
                 except ShopError as exc:
                     raise ShopError(f"{label}: {exc}") from exc
+            # Fassung von Hand (#2141): hell oder dunkel; „automatisch“ wird nicht gespeichert.
+            variant = layer.get("variant")
+            if variant not in (None, "auto", *shop_print_files.SURFACE_LUMINANCE):
+                raise ShopError(f"{label}: Fassung automatisch, hell oder dunkel.")
+            if variant in shop_print_files.SURFACE_LUMINANCE:
+                item["variant"] = variant
             clean_layers.append(item)
-        clean_layers.sort(key=lambda layer: layer["kind"] != "motif")
-        out.append({"key": key, "printful_placement": key, "technique": area["technique"], "mode": mode,
-                    "layers": clean_layers})
+        clean_layers.sort(key=lambda layer: layer["kind"] not in shop_print_files.BASE_KINDS)
+        row = {"key": key, "printful_placement": key, "technique": area["technique"], "mode": mode,
+               "layers": clean_layers}
+        if mode == "upload":
+            # Seit #2141 liegen die Motive auf der fertigen Datei (``shop_print_files.motifs_on_background``).
+            row["background_layers"] = True
+        out.append(row)
     return out
+
+
+def _clean_surface(value: Any) -> str:
+    if value not in shop_print_files.SURFACES:
+        raise ShopError("Untergrund: wie Printful-Farbe, hell oder dunkel.")
+    return value
 
 
 def _layout_summary(rows: list[dict]) -> list[dict]:
     return [{"key": row["key"], "mode": row.get("mode") or "layout",
              "layers": [{name: layer.get(name) for name in ("kind", "preset", "width_cm", "offset_x_cm", "offset_y_cm")}
-                        | {name: layer[name] for name in shop_gamertag.LAYER_SIZE_FIELDS if layer.get(name) is not None}
+                        | {name: layer[name] for name in (*shop_gamertag.LAYER_SIZE_FIELDS, "variant")
+                           if layer.get(name) is not None}
                         | ({"motif": (layer.get("motif") or {}).get("key")} if layer.get("kind") == "motif" else {})
                         for layer in row.get("layers") or []]}
             for row in rows]
@@ -403,12 +421,15 @@ def _layout_summary(rows: list[dict]) -> list[dict]:
 
 @_locked
 async def set_layout(db, product_id: str, placements: Any, *, included_placement: str | None, actor_id: str,
-                     reason: Any) -> dict:
+                     reason: Any, print_surface: str | None = None) -> dict:
     """Schritt 3: je Druckfläche Motiv, Vorgabe-Position und Größe in cm, dazu die Platzhalter für Gamertag und
-    Vereinsnummer. Geprüft für jede angebotene Farbe (und Größe mit eigener Fläche): alles liegt in der Fläche."""
+    Vereinsnummer. Geprüft für jede angebotene Farbe (und Größe mit eigener Fläche): alles liegt in der Fläche.
+    ``print_surface`` („Untergrund gilt als“, #2141) - ohne Angabe bleibt die gespeicherte Vorgabe."""
     reason = clean_reason(reason, required=False)
     product = await _product(db, product_id)
     _editable(product)
+    surface_before = product.get("print_surface") or "garment"
+    surface = surface_before if print_surface is None else _clean_surface(print_surface)
     if not product.get("printful"):
         raise ShopError("Erst das Printful-Produkt laden (Schritt 1).")
     template = await templates.get(db, product["printful"]["product_id"])
@@ -421,7 +442,7 @@ async def set_layout(db, product_id: str, placements: Any, *, included_placement
     used = [row["key"] for row in rows]
     if included_placement is not None and included_placement not in used:
         raise ShopError("Die Fläche im Grundpreis muss eine der gewählten Druckflächen sein.")
-    trial = {**product, "placements": rows}
+    trial = {**product, "placements": rows, "print_surface": surface}
     found = [state for state in await shop_print_files.states(db, trial) if state["state"] in ("invalid", "no_area")]
     if found:
         lines = list(dict.fromkeys(state["detail"] for state in found))
@@ -431,17 +452,24 @@ async def set_layout(db, product_id: str, placements: Any, *, included_placement
     after = _layout_summary(rows)
     stored_is_layout = all(shop_print_files.is_layout(row) for row in product.get("placements") or [])
     if (stored_is_layout and before == after and product.get("placements") == rows
-            and product.get("included_placement") == included_placement):
+            and product.get("included_placement") == included_placement and surface == surface_before):
         return product
-    return await _save_content(db, product, {"placements": rows, "included_placement": included_placement},
-                               actor_id=actor_id, reason=reason, action="shop.product.layout",
-                               data={"before": before, "after": after, "included_placement": included_placement})
+    update = {"placements": rows, "included_placement": included_placement}
+    data = {"before": before, "after": after, "included_placement": included_placement}
+    if surface != surface_before:
+        update["print_surface"] = surface
+        data["print_surface"] = {"before": surface_before, "after": surface}
+    return await _save_content(db, product, update, actor_id=actor_id, reason=reason, action="shop.product.layout",
+                               data=data)
 
 
-async def plan_layout(db, product_id: str, placements: Any) -> dict:
+async def plan_layout(db, product_id: str, placements: Any, *, print_surface: str | None = None) -> dict:
     """Vorschau für einen noch nicht gespeicherten Aufbau: dieselbe Prüfung und dieselben Pläne wie beim Speichern - je
-    Fläche und Farbe die Fassung des Motivs, die gedruckt würde (Bild, Seitenverhältnis, Rahmen). Speichert nichts."""
+    Fläche und Farbe die Fassung des Motivs, die gedruckt würde (Bild, Seitenverhältnis, Rahmen), der Untergrund je
+    Ebene und der Hintergrund (#2141). Speichert nichts."""
     product = await _product(db, product_id)
+    if print_surface is not None:
+        product = {**product, "print_surface": _clean_surface(print_surface)}
     if not product.get("printful"):
         raise ShopError("Erst das Printful-Produkt laden (Schritt 1).")
     template = await templates.get(db, product["printful"]["product_id"])
@@ -453,7 +481,8 @@ async def plan_layout(db, product_id: str, placements: Any) -> dict:
     rows = await _clean_layout(db, product, placements, available, presets_doc)
     states = await shop_print_files.states(db, {**product, "placements": rows})
     return {"placements": [{"key": row["key"], "files": [{key: state[key] for key in ("placement", "color", "group",
-                                                                                         "state", "detail", "plan")}
+                                                                                         "state", "detail", "plan",
+                                                                                         "background")}
                                                          for state in states if state["placement"] == row["key"]]}
                            for row in rows]}
 
@@ -767,6 +796,8 @@ async def admin_view(db, product_id: str) -> dict:
         placement_rows.append({
             "key": row["key"], "label": labels.get(row["key"], row["key"]), "mode": row.get("mode") or "layout",
             "layers": row.get("layers") or [], "printful_placement": row["printful_placement"],
+            # vor #2141 gespeichert: die Motive dieser fertigen Datei werden noch nicht gedruckt (bis zum Speichern)
+            "motifs_hidden": not shop_print_files.motifs_on_background(row),
             "included": row["printful_placement"] == included,
             "surcharge_cents": (sample.get("placement_costs") or {}).get(row["printful_placement"]),
             "files": [{**state, "color_label": shop_colors.label(product, state["color"])}
@@ -779,7 +810,9 @@ async def admin_view(db, product_id: str) -> dict:
         "product": product,
         "labels": {"statuses": shop_catalog.STATUS_LABELS, "visibilities": shop_catalog.VISIBILITY_LABELS,
                    "personalizations": shop_catalog.PERSONALIZATION_LABELS, "kinds": KIND_LABELS,
-                   "modes": shop_print_files.MODES, "families": templates.FAMILIES,
+                   "modes": shop_print_files.MODES, "mode_hints": shop_print_files.MODE_HINTS,
+                   "surfaces": shop_print_files.SURFACES, "layer_variants": shop_print_files.LAYER_VARIANTS,
+                   "families": templates.FAMILIES,
                    "anchors": templates.ANCHORS, "placements": _placement_names(printful, template)},
         "variants": variant_rows,
         # Printful-Name → Bezeichnung (#2105): eigene aus Schritt 2, sonst die Übersetzung; dazu die Vorgabe.

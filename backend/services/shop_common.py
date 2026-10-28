@@ -35,7 +35,9 @@ MODEL_FIELDS: dict[str, tuple[str, ...]] = {
                       "personalization", "printful", "technique", "offer", "placements", "included_placement",
                       "review", "published_at", "archived_at", "catalog_sync",
                       # Druckvorlagen (#2069): die alten Platzierungen nach der Umstellung, für den Rückweg
-                      "placements_legacy"),
+                      "placements_legacy",
+                      # Allover (#2141): „Untergrund gilt als“ (wie Printful-Farbe, hell, dunkel)
+                      "print_surface"),
     "shop_variants": ("id", "product_id", "sku", "label", "size", "color", "price_cents", "active", "version",
                       "created_at", "created_by", "updated_at", "updated_by",
                       "color_code", "blocked_reason", "blocked_at"),

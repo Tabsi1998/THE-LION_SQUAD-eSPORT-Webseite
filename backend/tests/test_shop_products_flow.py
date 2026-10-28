@@ -434,6 +434,39 @@ async def test_print_files_preview_presets_template_images_and_upload_through_th
                             files={"file": ("ruecken.png", png(1800, 2400), "image/png")})
     assert right.status_code == 200, right.text
     assert right.json()["uploaded"]["width_px"] == 1800
+    # Allover (#2141): die fertige Datei als Hintergrund, das Rückenlogo als Ebene darüber, Fassung von Hand und
+    # „Untergrund gilt als“ über die Routen; der Hintergrund verkleinert für die Vorschau; die Namensfarbe aus dem Plan.
+    back = {**PLACEMENTS[1]["layers"][0], "variant": "dark"}
+    layout = {"placements": [PLACEMENTS[0], {"key": "back", "mode": "upload", "layers": [back]}],
+              "included_placement": "front", "print_surface": "dark"}
+    planned = await flow.post(f"{BASE}/{product_id}/layout/preview", json=layout)
+    assert planned.status_code == 200, planned.text
+    draft = next(state for row in planned.json()["placements"] if row["key"] == "back" for state in row["files"]
+                 if state["color"] == "Black")
+    assert draft["background"]["id"] == right.json()["uploaded"]["id"]
+    assert draft["plan"]["layers"][0]["surface"]["text"] == "Fassung: dunkel (von Hand)"
+    saved = await flow.put(f"{BASE}/{product_id}/layout", json=layout)
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["product"]["print_surface"] == "dark"
+    assert saved.json()["labels"]["modes"]["upload"] == "Fertige Druckdatei als Hintergrund"
+    assert (await flow.put(f"{BASE}/{product_id}/layout", json={**layout, "print_surface": "grau"})).status_code == 422
+    navy = BytesIO()
+    Image.new("RGBA", (1800, 2400), (20, 20, 40, 255)).save(navy, format="PNG")
+    white = await flow.post("/api/admin/shop/print-files/upload", data={**form, "color": "White"},
+                            files={"file": ("ruecken.png", navy.getvalue(), "image/png")})
+    assert white.status_code == 200, white.text
+    assert any("Mit den Ebenen zur Druckdatei" in note for note in white.json()["uploaded"]["notes"])
+    files = next(row for row in white.json()["placements"] if row["key"] == "back")["files"]
+    white_state = next(state for state in files if state["color"] == "White")
+    assert white_state["state"] == "ok" and white_state["file"]["id"] != white_state["background"]["id"]
+    thumb = await flow.get(f"{BASE}/{product_id}/print-files/{white_state['background']['id']}", params={"thumb": 1})
+    assert thumb.status_code == 200 and thumb.headers["content-type"] == "image/png"
+    with Image.open(BytesIO(thumb.content)) as img:
+        assert max(img.size) == shop_print_files.THUMB_SIDE and img.getpixel((5, 5)) == (20, 20, 40, 255)
+    inked = await flow.get(f"{BASE}/{product_id}/name-sample", params={"color": "Black", "ink": "tiefschwarz"})
+    assert inked.status_code == 200
+    assert (await flow.get(f"{BASE}/{product_id}/name-sample", params={"color": "Black", "ink": "lila"})).status_code \
+        == 404
 
 @pytest.mark.asyncio
 async def test_the_product_search_finds_the_printful_number_without_typing_it(flow, fake):
