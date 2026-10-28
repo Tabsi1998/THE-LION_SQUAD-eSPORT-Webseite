@@ -1422,7 +1422,8 @@ Reihenfolge; ein Menü mit Unterpunkten klappt ihr auf und ordnet die Unterpunkt
 - **Liga** steht unter eSports: umbenennen, verschieben und ausblenden wie jeder Unterpunkt. Auf der Website erscheint sie nur,
   solange eine Season sichtbar ist.
 - **Community** darf anders heißen – die Zahl der ungelesenen Chats bleibt daran.
-- Der erste Punkt heißt **Start** (früher „Home“).
+- Der erste Punkt heißt **Start** (früher „Home“) – ebenso in der Leiste unten am Handy und in den Brotkrumen. In der App
+  heißt der Tab weiter „Home“.
 - Versteckt heißt: nicht im Menü. Die Seiten selbst bleiben erreichbar. Eigene Menüpunkte gibt es bewusst nicht; jede Seite hat
   ihren festen Platz.
 

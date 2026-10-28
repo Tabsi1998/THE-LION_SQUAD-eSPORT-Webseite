@@ -191,7 +191,7 @@ export default function NewsDetailPage() {
     <PublicLayout>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
         {post.preview && <PreviewBand preview={post.preview} postId={post.id} />}
-        <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "News", to: "/news" }, { label: post.title }]} className="mb-4" />
+        <Breadcrumbs items={[{ label: "Start", to: "/" }, { label: "News", to: "/news" }, { label: post.title }]} className="mb-4" />
         <Link to="/news" data-testid="news-back" className="inline-flex items-center gap-2 text-xs uppercase tracking-wider text-white/50 hover:text-[#29B6E8]">
           <ArrowLeft className="w-3.5 h-3.5" /> Alle News
         </Link>
