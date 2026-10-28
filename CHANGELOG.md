@@ -1,33 +1,30 @@
 # Changelog
 
-## [1.47.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.46.0...v1.47.0) (2026-10-28)
-
+## 1.47.0 (28.10.2026)
 
 ### Neu
 
-* Liga: Captain und Vertreter geben ihre Rolle selbst ab ([#2110](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2110)) ([9fbabda](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9fbabda1ed2b0f12e873a1fcc45eb3b45c575abb))
-* Liga: eigener Terminvorschlag zeigt „wartet auf die Gegenseite“ und lässt sich zurückziehen, Terminstatus auf Deutsch ([#2110](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2110)) ([9fbabda](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9fbabda1ed2b0f12e873a1fcc45eb3b45c575abb))
-* Liga: Hinweis nach Ablauf der Nachtragsfrist mit „[@leitung](https://github.com/leitung) im Matchchat“ ([#2110](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2110)) ([9fbabda](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9fbabda1ed2b0f12e873a1fcc45eb3b45c575abb))
-* Liga: Staffel- und Spielseite führen über „Liga · Season · Staffel“ zur Ligaseite ([#2110](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2110)) ([9fbabda](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9fbabda1ed2b0f12e873a1fcc45eb3b45c575abb))
-* Liga: Startseite zeigt „Terminvorschlag beantworten“ und „Aufstellung nachtragen“ (Website und App) ([#2110](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2110)) ([9fbabda](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9fbabda1ed2b0f12e873a1fcc45eb3b45c575abb))
-* Liga: Teamseite zeigt Co-Teams mit Captain und Vertreter und „Co-Teams verwalten“ ([#2110](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2110)) ([9fbabda](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9fbabda1ed2b0f12e873a1fcc45eb3b45c575abb))
-* Liga: Terminvorschlag, Gegenvorschlag, Annehmen, Ablehnen und Zurückziehen benachrichtigen die andere Seite ([#2110](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2110)) ([9fbabda](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9fbabda1ed2b0f12e873a1fcc45eb3b45c575abb))
-* Shop: „Bei Printful nachsehen“ gleicht einen gesendeten Testentwurf neu ab, mit technischen Details ohne Personendaten ([#2138](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2138)) ([7f4532c](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/7f4532caae88c1bd961437d6e1e190ddf449e84a))
-* Termin-Nachrichten und die Aufgabe „Terminvorschlag beantworten“ gelten auch bei normalen Turnieren mit Terminabstimmung ([#2110](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2110)) ([9fbabda](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9fbabda1ed2b0f12e873a1fcc45eb3b45c575abb))
-
+* Liga: Captain und Vertreter geben ihre Rolle selbst ab (#2110)
+* Liga: eigener Terminvorschlag zeigt „wartet auf die Gegenseite“ und lässt sich zurückziehen, Terminstatus auf Deutsch (#2110)
+* Liga: Hinweis nach Ablauf der Nachtragsfrist mit „[@leitung](https://github.com/leitung) im Matchchat“ (#2110)
+* Liga: Staffel- und Spielseite führen über „Liga · Season · Staffel“ zur Ligaseite (#2110)
+* Liga: Startseite zeigt „Terminvorschlag beantworten“ und „Aufstellung nachtragen“ (Website und App) (#2110)
+* Liga: Teamseite zeigt Co-Teams mit Captain und Vertreter und „Co-Teams verwalten“ (#2110)
+* Liga: Terminvorschlag, Gegenvorschlag, Annehmen, Ablehnen und Zurückziehen benachrichtigen die andere Seite (#2110)
+* Shop: „Bei Printful nachsehen“ gleicht einen gesendeten Testentwurf neu ab, mit technischen Details ohne Personendaten (#2138)
+* Termin-Nachrichten und die Aufgabe „Terminvorschlag beantworten“ gelten auch bei normalen Turnieren mit Terminabstimmung (#2110)
 
 ### Fehlerbehebungen
 
-* Liga: Co-Team sieht „Austritt nur über die Turnierleitung“ statt „Vom Turnier abmelden“ ([#2110](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2110)) ([9fbabda](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9fbabda1ed2b0f12e873a1fcc45eb3b45c575abb))
-* Liga: Rollen-Meldungen beim Kader-Ändern nennen den Weg auf der Website ([#2110](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2110)) ([9fbabda](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9fbabda1ed2b0f12e873a1fcc45eb3b45c575abb))
-* Shop: Testentwurf an Printful wird nicht mehr wegen zu langer Kennung abgelehnt ([#2133](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2133)) ([ecdc6c1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/ecdc6c13fa8dd22c43b084c4f8fcf945428d930c))
-* Shop: Testentwurf-Abgleich findet Flächen der echten Printful-Antwort und meldet Kosten in Berechnung ([#2138](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2138)) ([7f4532c](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/7f4532caae88c1bd961437d6e1e190ddf449e84a))
-* weniger Kontodaten in öffentlichen Antworten der Matchseite ([#2110](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2110)) ([9fbabda](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9fbabda1ed2b0f12e873a1fcc45eb3b45c575abb))
-
+* Liga: Co-Team sieht „Austritt nur über die Turnierleitung“ statt „Vom Turnier abmelden“ (#2110)
+* Liga: Rollen-Meldungen beim Kader-Ändern nennen den Weg auf der Website (#2110)
+* Shop: Testentwurf an Printful wird nicht mehr wegen zu langer Kennung abgelehnt (#2133)
+* Shop: Testentwurf-Abgleich findet Flächen der echten Printful-Antwort und meldet Kosten in Berechnung (#2138)
+* weniger Kontodaten in öffentlichen Antworten der Matchseite (#2110)
 
 ### Schneller
 
-* Liga: schnellere Aufgabe „Aufstellung nachtragen“ auf der Startseite ([#2110](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2110)) ([9fbabda](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9fbabda1ed2b0f12e873a1fcc45eb3b45c575abb))
+* Liga: schnellere Aufgabe „Aufstellung nachtragen“ auf der Startseite (#2110)
 
 ## 1.46.0 (28.10.2026)
 
