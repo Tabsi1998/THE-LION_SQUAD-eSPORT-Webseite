@@ -275,3 +275,22 @@ async def test_guests_never_see_internal_fields(flow):
     assert "Rita Redaktion" not in str(listed) + str(detail) + str(home)
     flow.act_as(await flow.add_user(role="club_admin", name="vorstand"))
     assert (await flow.get("/api/admin/news/n-offen")).json()["updated_by_name"] == "Rita Redaktion", "Admin → News behält sie"
+
+
+@pytest.mark.asyncio
+async def test_back_to_draft_on_a_public_post_is_a_withdrawal(flow):
+    post = await news(flow, "war-offen", newsletter_sent_at=now_utc().isoformat())
+    flow.act_as(await flow.add_user(role="club_admin", name="Rita"))
+    saved = (await flow.patch(f"/api/news/{post['id']}", json={"published": False})).json()
+    assert saved["withdrawn_at"] and saved["withdrawn_by_name"] == "Rita"
+    assert [row["label"] for row in (await flow.get(f"/api/admin/news/{post['id']}")).json()["history"]] == ["Zurückgezogen"]
+    flow.act_as(None)
+    assert (await flow.get("/api/news/war-offen")).status_code == 410, "Hinweis statt „nicht gefunden“"
+
+
+@pytest.mark.asyncio
+async def test_unpublishing_a_scheduled_post_that_never_went_out_is_just_a_draft(flow):
+    post = await news(flow, "geplant-weg", days_ago=-3)
+    flow.act_as(await flow.add_user(role="club_admin", name="Rita"))
+    saved = (await flow.patch(f"/api/news/{post['id']}", json={"published": False})).json()
+    assert saved["published"] is False and "withdrawn_at" not in saved

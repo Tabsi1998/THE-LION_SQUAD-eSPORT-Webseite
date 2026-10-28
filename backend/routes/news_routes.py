@@ -722,13 +722,21 @@ async def update_news(nid: str, body: NewsUpdate, me: dict = Depends(require_are
     update["updated_by"] = me["id"]
     update["updated_by_name"] = _actor_name(me)
     unset: dict = {}
+    action = "news.update"
     # Wieder veröffentlichen hebt ein Zurückziehen auf.
     if update.get("published") is True and existing.get("withdrawn_at"):
-        unset = {"withdrawn_at": "", "withdrawn_by": "", "withdrawn_by_name": ""}
+        unset = {"withdrawn_at": "", "withdrawn_by": "", "withdrawn_by_name": "", "withdrawn_was_published": ""}
+        action = "news.restore"
+    # Ein schon öffentlicher Beitrag wird nicht still zum Entwurf (#2122): das ist ein Zurückziehen - die Adresse zeigt
+    # Besuchern dann den Hinweis statt „nicht gefunden“, und es steht so im Verlauf.
+    elif update.get("published") is False and not existing.get("withdrawn_at") and _ever_public(existing):
+        update.update({"pinned": False, "withdrawn_at": stamp, "withdrawn_by": me["id"], "withdrawn_by_name": _actor_name(me),
+                       "withdrawn_was_published": existing.get("published") is not False})
+        action = "news.withdraw"
     res = await db.news_posts.update_one({"id": nid}, {"$set": update, **({"$unset": unset} if unset else {})})
     if res.matched_count == 0:
         raise HTTPException(404, "Beitrag nicht gefunden.")
-    await _audit_news(db, me, "news.restore" if unset else "news.update", nid, {"fields": fields})
+    await _audit_news(db, me, action, nid, {"fields": fields})
     saved = await db.news_posts.find_one({"id": nid}, {"_id": 0})
     if saved and saved.get("published") and _published_now(saved) and not saved.get("newsletter_sent_at"):
         result = await enqueue_newsletter_for_item("news", saved)

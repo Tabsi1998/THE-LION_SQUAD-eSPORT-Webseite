@@ -272,3 +272,22 @@ test("Verknüpfungen: Suchfeld filtert, Gewähltes bleibt, Entwürfe sind gekenn
   expect(form).not.toHaveTextContent(/Slug|kebab|Teaser|Embeds|noindex|Markdown/);
   expect(screen.getByText("Adresse (Link)")).toBeInTheDocument();
 });
+
+// Zurückziehen statt „Zurück zum Entwurf“ (#2122): ein schon öffentlicher Beitrag wird zurückgezogen, mit Rückfrage.
+test("schon öffentlicher Beitrag: „Zurückziehen“ statt „Zurück zum Entwurf“, mit Rückfrage", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/news-meta") return { data: META };
+    if (url.startsWith("/admin/news/")) return adminPost(url, [{ ...POSTS[0], can_delete: false }]);
+    return { data: [] };
+  });
+  apiMock.patch.mockResolvedValue({ data: {} });
+  confirmMock.mockClear();
+  renderAt("/admin/news/n1");
+  const choice = await screen.findByTestId("news-publish-choice");
+  expect(choice).toHaveTextContent("Zurückziehen");
+  expect(choice).not.toHaveTextContent("Zurück zum Entwurf");
+  fireEvent.click(screen.getByTestId("news-publish-draft"));
+  fireEvent.submit(screen.getByTestId("news-form"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/news/n1", expect.objectContaining({ published: false })));
+  expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Beitrag zurückziehen?" }));
+});

@@ -100,6 +100,8 @@ function NewsForm({ post, meta, onDone, onReload }) {
   });
   const [form, setForm] = useState(() => formFromPost(post));
   const [initialMode] = useState(() => initialPublishMode(post));
+  // Schon hinausgegangen (Server: can_delete false): „Entwurf“ heißt dann „Zurückziehen“ (#2122).
+  const withdrawInstead = !isNew && post.can_delete === false && !post.withdrawn_at;
   const [mode, setMode] = useState(initialMode);
   const [scheduleAt, setScheduleAt] = useState(() => (initialMode === "scheduled" ? toDateTimeLocalInput(post.published_at) : ""));
   const confirm = useConfirm();
@@ -212,6 +214,9 @@ function NewsForm({ post, meta, onDone, onReload }) {
       return;
     }
     if (needsPublishQuestion(mode, initialMode) && !await askBeforePublishing()) return;
+    // Ein schon öffentlicher Beitrag wird zurückgezogen, nicht still zum Entwurf (#2122) - mit Rückfrage.
+    const withdrawing = mode === "draft" && initialMode !== "draft" && withdrawInstead;
+    if (withdrawing && !await confirm(WITHDRAW_QUESTION(form.title))) return;
     setSaving(true);
     try {
       const payload = normalizePayload({ ...form, ...timing, linked_tournament_ids: linkedT, linked_event_ids: linkedE, linked_f1_challenge_ids: linkedF, mentioned_user_ids: mentionedUserIds });
@@ -233,7 +238,7 @@ function NewsForm({ post, meta, onDone, onReload }) {
         }
         await api.patch(`/news/${post.id}`, patch);
       }
-      toast.success(mode === initialMode ? "Gespeichert." : { draft: "Als Entwurf gespeichert.", now: "Veröffentlicht.", scheduled: "Geplant." }[mode]);
+      toast.success(withdrawing ? "Zurückgezogen." : mode === initialMode ? "Gespeichert." : { draft: "Als Entwurf gespeichert.", now: "Veröffentlicht.", scheduled: "Geplant." }[mode]);
       onDone();
     } catch (err) {
       toast.error(formatRequestError(err, "Beitrag konnte nicht gespeichert werden.", { slug: form.slug, title: form.title }));
@@ -315,7 +320,7 @@ function NewsForm({ post, meta, onDone, onReload }) {
           <FormSection title="Veröffentlichung">
             <SelectField label="Kategorie" value={form.category} onChange={(v) => set("category", v)} options={meta.categories || []} testId="news-category" />
             <SelectField label="Sichtbarkeit" value={form.visibility} onChange={(v) => set("visibility", v)} options={meta.visibilities || []} testId="news-visibility" />
-            <PublishChoice mode={mode} initialMode={initialMode} onChange={setMode} />
+            <PublishChoice mode={mode} initialMode={initialMode} onChange={setMode} withdrawInstead={withdrawInstead} />
             {mode === "scheduled" && (
               <TextField label="Termin" type="datetime-local" value={scheduleAt} onChange={setScheduleAt} testId="news-published-at" required hint={plannedDetail} />
             )}
@@ -436,21 +441,29 @@ function NewsForm({ post, meta, onDone, onReload }) {
 
 // Wann erscheint der Beitrag? (#2122 NW1) - drei klare Wege statt Häkchen und Datum, die sich widersprechen konnten.
 const PUBLISH_CHOICES = {
-  draft: (initialMode) => (initialMode === "draft"
-    ? ["Entwurf", "Nur das Admin-Team sieht ihn. Nichts wird verschickt."]
-    : ["Zurück zum Entwurf", "Verschwindet aus allen Listen. Schon Verschicktes bleibt verschickt."]),
+  draft: (initialMode, withdrawInstead) => {
+    if (initialMode === "draft") return ["Entwurf", "Nur das Admin-Team sieht ihn. Nichts wird verschickt."];
+    if (withdrawInstead) return ["Zurückziehen", "Verschwindet aus allen Listen; Links aus Newsletter und Discord zeigen einen Hinweis. Eine Discord-Meldung bleibt stehen."];
+    return ["Zurück zum Entwurf", "Verschwindet aus allen Listen. Schon Verschicktes bleibt verschickt."];
+  },
   now: (initialMode) => (initialMode === "now"
     ? ["Veröffentlicht", "Für alle sichtbar, die die Sichtbarkeit erlaubt."]
     : ["Jetzt veröffentlichen", "Erscheint beim Speichern – vorher kommt eine Rückfrage, was hinausgeht."]),
   scheduled: () => ["Geplant", "Erscheint zum Termin von selbst – mit Newsletter und Discord."],
 };
 
-export function PublishChoice({ mode, initialMode, onChange }) {
+export const WITHDRAW_QUESTION = (title) => ({
+  title: "Beitrag zurückziehen?",
+  description: `„${title || "Ohne Titel"}“ verschwindet aus allen Listen. Wer einem Link aus Newsletter oder Discord folgt, sieht einen Hinweis; eine schon gepostete Discord-Meldung bleibt stehen. Wiederherstellen geht jederzeit.`,
+  confirmLabel: "Zurückziehen",
+});
+
+export function PublishChoice({ mode, initialMode, onChange, withdrawInstead = false }) {
   return (
     <fieldset className="space-y-1.5" data-testid="news-publish-choice">
       <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Wann erscheint der Beitrag?</legend>
       {PUBLISH_MODES.map((key) => {
-        const [label, hint] = PUBLISH_CHOICES[key](initialMode);
+        const [label, hint] = PUBLISH_CHOICES[key](initialMode, withdrawInstead);
         const active = mode === key;
         return (
           <label key={key} className={`flex items-start gap-3 rounded-sm border px-3 py-2.5 cursor-pointer transition-colors duration-150 ${active ? "border-[#29B6E8]/60 bg-[#29B6E8]/[0.07]" : "border-white/10 hover:border-white/25"}`}>
