@@ -139,6 +139,9 @@ Die Liste unter Content → News hat Suche, Filter nach Kategorie und Sichtbarke
   Event**, **Sichtbarkeit** (Öffentlich, Community, Nur Mitglieder), **Sortierung** und den Haken **Veröffentlicht**.
 - Im Album: Bilder aus der **Medienbibliothek** wählen (**Auswahl hinzufügen**) oder hochladen; **Videos** als Link (YouTube,
   Twitch, Kick, Vimeo oder direkte MP4/WebM-Adresse) mit **Vorschaubild**; **Titel / Caption** je Medium.
+- **Nachträglich ändern:** Der Stift auf einer Kachel (am Handy immer sichtbar, am PC beim Darüberfahren) öffnet
+  **Medium bearbeiten** mit **Beschriftung** und **Reihenfolge** – eine kleinere Zahl steht im Abschnitt weiter vorn.
+  Beim Hochladen wird der Dateiname zur Beschriftung; hier macht ihr daraus etwa „Siegerehrung“.
 - **Abschnitte** gliedern ein Album (zum Beispiel „Aufbau, Tag 1, Tag 2“). Löscht ihr einen Abschnitt, bleiben die Medien im
   Album unter „Ohne Abschnitt“.
 - Ein Album, das an ein Event hängt, zeigt dort seine Kachel; das Album verweist mit „Vom Event: …“ zurück.

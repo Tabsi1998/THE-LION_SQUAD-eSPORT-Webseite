@@ -53,6 +53,11 @@ folgen mit „Dolibarr II“, Abrechnung mit „Abrechnung I/II“.
 5. Adresse von Dolibarr (nur `https://`), API-Schlüssel, eine Kennung der
    Installation (z. B. `verein`) eintragen, *Speichern*, dann *Verbindung
    testen*. Der Schlüssel wird verschlüsselt gespeichert und nie wieder gezeigt.
+   Leeres Feld beim Speichern heißt „behalten“. Weg muss er mit **Schlüssel
+   entfernen** (mit Rückfrage): Danach ist die Anbindung aus (Modus *Aus*). Den
+   optionalen Schreib-Schlüssel entfernt der gleichnamige Knopf unter
+   *Schreibzugriff für Rechnungen*; dann schreibt die Website mit dem Lese-Schlüssel,
+   gibt es keinen, geht der Schreibzugriff aus. Beides steht im Protokoll.
 6. Modus **Vorschau** wählen. Jetzt wird gelesen, aber nichts übernommen.
 
 ## Umstellen

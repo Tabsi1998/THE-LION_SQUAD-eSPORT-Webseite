@@ -99,6 +99,10 @@ geprüft sind: Erst dann entstehen die Gewinn-Einträge, mit **Ergebnisse veröf
 Öffentlich steht nach dem **Ende** trotzdem schon „Beendet“, und auf der Challenge-Seite im Admin erinnert ein Hinweis
 daran, den Status zu setzen.
 
+**Entwurf löschen:** Solange die Challenge ein **Entwurf** ohne Zeiten ist, steht oben **Entwurf löschen** (mit
+Rückfrage, im Protokoll). Strecken, Gäste und Team-Einteilung gehen mit. Eine Challenge, die schon angekündigt war oder
+Zeiten hat, wird nicht gelöscht – setzt sie auf **Abgesagt** oder **Archiviert**.
+
 ---
 
 ## 3. Die Funktionen einzeln
@@ -293,9 +297,12 @@ Im Reiter **Gast** einen Namen eintragen und **Anlegen** – fertig. Den Namen v
 auftauchen möchte, bekommt einen Spitznamen oder Initialen. Zwei Gäste mit demselben Namen gehen nicht (z. B. „Max B.“
 und „Max K.“). Gäste stehen in Rangliste, TV und Urkunde, aber nicht in Gewinnen, Jahreswertung und Erfolgen (3.2).
 Nach **90 Tagen** wird der Name von selbst zu „Gast 3“ (Datenschutz, siehe `DATA_PROTECTION.md`); die Zeit bleibt.
-Umbenannt wird ein Gast über die Schnittstelle der Verwaltung; nach **Ergebnisse veröffentlicht** nur durch die
-Turnierleitung mit Begründung, jedes Umbenennen steht im Protokoll. Die öffentliche Liste „Am Start / Als Nächstes“
-zeigt nur Name, Station, Versuch und Platz.
+Unten auf der Challenge-Seite steht die Liste **Gäste**: mit dem Stift **umbenennen** (etwa, wenn jemand nicht mehr
+mit Namen auftauchen will – dann z. B. „Gast 3“), mit dem Mülleimer einen Gast **löschen**, der noch **keine Zeiten**
+hat (doppelt angelegt, nie gefahren). Ein gelöschter Gast verschwindet auch aus „Am Start / Als Nächstes“. Gäste mit
+Zeiten lassen sich nur umbenennen. Nach **Ergebnisse veröffentlicht** benennt nur die Turnierleitung um, mit
+Begründung; Umbenennen und Löschen stehen im Protokoll. Die öffentliche Liste „Am Start / Als Nächstes“ zeigt nur
+Name, Station, Versuch und Platz.
 
 **Gast mit Konto verknüpfen:** Legt ein Gast später ein Konto an, klickt die **Turnierleitung** in der Liste der Zeiten
 beim Gast auf das Ketten-Symbol (**Mit Konto verknüpfen**), sucht das Konto und sieht vorher, was passiert („3 Zeiten von
