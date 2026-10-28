@@ -3,7 +3,7 @@ import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Check, Pencil, Plus, Trash2, UserPlus, Users, X } from "lucide-react";
 import { TEAM_ROLE_LABELS } from "./constants";
 import { SQUAD_ROLES, isLocked, roleChoices, roleOf, rolesSummary } from "@/components/tls/league/squadRoles";
@@ -30,14 +30,18 @@ export function TeamsPanel() {
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
   const confirm = useConfirm();
+  // „Co-Teams verwalten“ auf der Teamseite (#2110) öffnet hier genau dieses Team (?team=<id>).
+  const [searchParams] = useSearchParams();
+  const wantedTeam = searchParams.get("team") || "";
 
   const activeTeam = teams.find((t) => t.id === activeId);
 
   const loadTeams = useCallback(async () => {
     const { data } = await api.get("/teams/my");
     setTeams(data || []);
-    setActiveId((cur) => cur || data?.[0]?.id || "");
-  }, []);
+    const wanted = (data || []).some((team) => team.id === wantedTeam) ? wantedTeam : "";
+    setActiveId((cur) => cur || wanted || data?.[0]?.id || "");
+  }, [wantedTeam]);
 
   const loadInvites = useCallback(async () => {
     const { data } = await api.get("/teams/invites/my");
