@@ -378,6 +378,11 @@ async def create_tournament_doc(body: TournamentCreate, me: dict) -> dict:
                 existing.pop("creation_key", None)
                 apply_competition_version_read_defaults(existing)
                 return {**existing, "auto_generated_bracket": None, "idempotent_replay": True}
+            # Protokoll (#2111, TA19): wer welches Turnier angelegt hat.
+            await _audit_tournament_action(db, "tournament.create", me.get("id"), doc["id"], {
+                "title": doc.get("title"), "format": doc.get("format"), "status": doc.get("status"),
+                "event_id": doc.get("event_id"),
+            })
             auto_preview = await _create_initial_bracket_preview(db, doc, me.get("id"))
             if doc.get("status") != "draft":
                 # Gleich mit „Anmeldung offen“ angelegt: angekündigt wie ein Statuswechsel (#572).
@@ -472,6 +477,10 @@ async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends
     updates["updated_at"] = now_utc().isoformat()
     await db.tournaments.update_one({"id": tid}, {"$set": updates})
     reset_scope_cache()  # Live-Meldungen (#1801): Turnier und Event neu nachschlagen
+    # Protokoll (#2111, TA19): welche Felder sich geändert haben - nur die Namen, keine Inhalte (Regeln, Abrechnung).
+    changed = sorted(key for key, value in updates.items() if key != "updated_at" and existing.get(key) != value)
+    if changed:
+        await _audit_tournament_action(db, "tournament.update", me.get("id"), tid, {"fields": changed})
     t = await db.tournaments.find_one({"id": tid}, {"_id": 0})
     auto_preview = None
     if preview_changed:

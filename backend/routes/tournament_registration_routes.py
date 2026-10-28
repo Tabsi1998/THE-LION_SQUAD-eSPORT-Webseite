@@ -1001,6 +1001,9 @@ async def update_registration(tid: str, reg_id: str, body: RegistrationUpdate,
     reg = await db.tournament_registrations.find_one({"id": reg_id, "tournament_id": tid}, {"_id": 0})
     if updates.get("status") and updates["status"] != previous_status:
         await _notify_registration(db, tid, reg, updates["status"], previous=previous_status, reason=status_reason, actor_id=me.get("id"))
+        # Protokoll (#2111, TA19): wer welchen Anmeldestatus gesetzt hat - der Grund steht nur in der Nachricht.
+        await _audit_tournament_action(db, "tournament.registration.status", me.get("id"), tid, {
+            "registration_id": reg_id, "from_status": previous_status, "to_status": updates["status"]})
     if updates.get("status") in {"rejected", "waitlist", "no_show"}:
         reg["waitlist_moved_up"] = await _move_up_from_waitlist(db, tid, me.get("id"), exclude_id=reg_id)
     if updates.get("status") in {"approved", "checked_in"} and updates["status"] != previous_status:

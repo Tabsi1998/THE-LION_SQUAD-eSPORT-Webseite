@@ -14,7 +14,8 @@ const SOURCE_ICONS = { uploads: UploadCloud, client: Bug, audit: ShieldCheck, em
 const SEVERITY_LABELS = { success: "OK", info: "Info", warn: "Warnung", error: "Fehler" };
 const RANGES = [["24", "24 Stunden"], ["168", "7 Tage"], ["720", "30 Tage"], ["0", "Alles"]];
 // Adminaktionen lassen sich wie früher auf der Audit-Seite nach Aktion eingrenzen.
-const AUDIT_QUICK = [["", "Alle Aktionen"], ["user.role", "Rollen"], ["tournament.staff", "Turnier-Staff"], ["f1.staff", "Fast-Lap-Staff"], ["match.", "Matches"], ["prize.", "Gewinne"], ["settings.", "Settings"]];
+// „Turniere“ (#2111, TA19): Anlegen, Speichern, Löschen und Anmeldestatus stehen jetzt auch im Protokoll.
+const AUDIT_QUICK = [["", "Alle Aktionen"], ["user.role", "Rollen"], ["tournament.", "Turniere"], ["tournament.staff", "Turnier-Staff"], ["f1.staff", "Fast-Lap-Staff"], ["match.", "Matches"], ["prize.", "Gewinne"], ["settings.", "Settings"]];
 
 export function formatEventTime(value) {
   if (!value) return "-";
