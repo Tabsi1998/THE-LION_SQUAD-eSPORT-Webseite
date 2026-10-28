@@ -166,13 +166,15 @@ async def test_the_migration_removes_duplicate_tournament_points_once(flow):
     assert await flow.db.season_points.count_documents({}) == 4  # Trockenlauf schreibt nichts
 
     entry = next(run for version, name, run in migrations.MIGRATIONS if version == 18)
-    assert await entry(flow.db) == "1 duplicate season points removed in 1 tournaments"
+    result = await entry(flow.db)
+    assert result == "1 duplicate season points removed in 1 tournaments"
     left = sorted(row["id"] for row in await flow.db.season_points.find({}, {"_id": 0}).to_list(10))
     assert left == ["p-bert", "p-major", "p-other"]
     log = await flow.db.audit_logs.find_one({"action": "season_points.duplicates_removed"}, {"_id": 0})
     assert log["target_id"] == "t-1" and [row["id"] for row in log["data"]["removed"]] == ["p-mini"]
     # wiederholbar
-    assert await entry(flow.db) == "0 duplicate season points removed in 0 tournaments"
+    result = await entry(flow.db)
+    assert result == "0 duplicate season points removed in 0 tournaments"
     assert (await season_points_cleanup.plan(flow.db))["rows_to_remove"] == 0
 
 
@@ -203,7 +205,8 @@ async def test_only_one_season_can_be_active(flow):
     response = await flow.patch("/api/seasons/b", json={"status": "active"})
     assert response.status_code == 409 and "schon aktiv" in response.json()["detail"]
     await flow.patch("/api/seasons/a", json={"status": "draft"})
-    assert (await flow.patch("/api/seasons/b", json={"status": "active"})).status_code == 200
+    response = await flow.patch("/api/seasons/b", json={"status": "active"})
+    assert response.status_code == 200
     log = await flow.db.audit_logs.find({"action": "season.status.change"}, {"_id": 0}).to_list(5)
     assert [(row["target_id"], row["data"]["status"]) for row in log] == [("a", "draft"), ("b", "active")]
 
@@ -219,15 +222,18 @@ async def test_completing_needs_its_own_button_with_preview(flow, monkeypatch):
 
     monkeypatch.setattr(badges, "on_season_completed", on_season_completed)
     await seasons(flow, {"id": "a", "status": "active"}, {"id": "d", "status": "draft"})
-    assert (await flow.patch("/api/seasons/a", json={"status": "completed"})).status_code == 409
+    response = await flow.patch("/api/seasons/a", json={"status": "completed"})
+    assert response.status_code == 409
     preview = await flow.get("/api/seasons/a/completion-preview")
     assert preview.status_code == 200, preview.text
     assert preview.json()["season"]["id"] == "a" and preview.json()["finished"] is False
-    assert (await flow.post("/api/seasons/d/complete")).status_code == 409
+    response = await flow.post("/api/seasons/d/complete")
+    assert response.status_code == 409
     response = await flow.post("/api/seasons/a/complete")
     assert response.status_code == 200 and response.json()["status"] == "completed"
     assert done == ["a"]
-    assert (await flow.post("/api/seasons/a/complete")).status_code == 409
+    response = await flow.post("/api/seasons/a/complete")
+    assert response.status_code == 409
     assert await flow.db.audit_logs.count_documents({"action": "season.complete", "target_id": "a"}) == 1
 
 
@@ -235,9 +241,12 @@ async def test_completing_needs_its_own_button_with_preview(flow, monkeypatch):
 async def test_only_an_empty_draft_can_be_deleted(flow):
     await seasons(flow, {"id": "a", "status": "active"}, {"id": "d", "status": "draft"}, {"id": "e", "status": "draft"})
     await flow.db.season_points.insert_one({"id": "p", "season_id": "d", "user_id": "u", "total_points": 10})
-    assert (await flow.delete("/api/seasons/a")).status_code == 409
-    assert (await flow.delete("/api/seasons/d")).status_code == 409
-    assert (await flow.delete("/api/seasons/e")).status_code == 200
+    response = await flow.delete("/api/seasons/a")
+    assert response.status_code == 409
+    response = await flow.delete("/api/seasons/d")
+    assert response.status_code == 409
+    response = await flow.delete("/api/seasons/e")
+    assert response.status_code == 200
     assert sorted(s["id"] for s in await flow.db.seasons.find({}, {"_id": 0}).to_list(5)) == ["a", "d"]
     assert await flow.db.audit_logs.count_documents({"action": "season.delete", "target_id": "e"}) == 1
 
@@ -246,9 +255,12 @@ async def test_only_an_empty_draft_can_be_deleted(flow):
 async def test_points_can_be_corrected_by_hand_with_a_reason(flow):
     await seasons(flow, {"id": "a", "status": "active"}, {"id": "c", "status": "completed"})
     anna = await flow.add_user(name="anna")
-    assert (await flow.post("/api/seasons/a/adjustments", json={"user_id": anna["id"], "points": 15, "reason": ""})).status_code == 400
-    assert (await flow.post("/api/seasons/a/adjustments", json={"user_id": anna["id"], "points": 0, "reason": "Fair Play"})).status_code == 400
-    assert (await flow.post("/api/seasons/c/adjustments", json={"user_id": anna["id"], "points": 5, "reason": "zu spät"})).status_code == 409
+    response = await flow.post("/api/seasons/a/adjustments", json={"user_id": anna["id"], "points": 15, "reason": ""})
+    assert response.status_code == 400
+    response = await flow.post("/api/seasons/a/adjustments", json={"user_id": anna["id"], "points": 0, "reason": "Fair Play"})
+    assert response.status_code == 400
+    response = await flow.post("/api/seasons/c/adjustments", json={"user_id": anna["id"], "points": 5, "reason": "zu spät"})
+    assert response.status_code == 409
     response = await flow.post("/api/seasons/a/adjustments", json={"user_id": anna["id"], "points": -12.5, "reason": "Regelverstoß beim Cup"})
     assert response.status_code == 200, response.text
     entry = response.json()
@@ -257,7 +269,8 @@ async def test_points_can_be_corrected_by_hand_with_a_reason(flow):
     assert [(row["recipient_label"], row["total_points"]) for row in listed] == [("anna", -12.5)]
     standings = (await flow.get("/api/seasons/a/standings")).json()["standings"]
     assert [(row["user_id"], row["points"]) for row in standings] == [(anna["id"], -12.5)]
-    assert (await flow.delete(f"/api/seasons/a/adjustments/{entry['id']}")).status_code == 200
+    response = await flow.delete(f"/api/seasons/a/adjustments/{entry['id']}")
+    assert response.status_code == 200
     assert await flow.db.season_points.count_documents({}) == 0
     actions = [row["action"] for row in await flow.db.audit_logs.find({}, {"_id": 0}).to_list(5)]
     assert actions == ["season.points.adjust", "season.points.adjust_delete"]

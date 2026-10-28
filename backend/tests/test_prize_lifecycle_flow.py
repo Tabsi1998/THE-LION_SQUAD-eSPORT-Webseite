@@ -80,7 +80,8 @@ async def test_prizes_come_only_after_the_end_and_stale_ones_are_marked(flow, mo
     assert await flow.db.notifications.count_documents({}) == 0
 
     await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"status": "completed"}})
-    assert (await flow.post(f"/api/prizes/auto-create/{tournament['id']}")).json() == {"created": 1}
+    response = await flow.post(f"/api/prizes/auto-create/{tournament['id']}")
+    assert response.json() == {"created": 1}
     pickup = await flow.db.prize_pickups.find_one({"user_id": anna["id"]}, {"_id": 0})
     assert pickup["pickup_deadline"] is None and pickup["prize_value"] == "Pokal"
     # Sonderpreis von Hand - die Korrektur fasst ihn nicht an.
@@ -90,7 +91,8 @@ async def test_prizes_come_only_after_the_end_and_stale_ones_are_marked(flow, mo
     assert manual.json()["pickup_deadline"] is None
 
     standing.by_rank = {1: [{"user_id": bert["id"]}]}
-    assert (await flow.post(f"/api/prizes/auto-create/{tournament['id']}")).json() == {"created": 1}
+    response = await flow.post(f"/api/prizes/auto-create/{tournament['id']}")
+    assert response.json() == {"created": 1}
     assert await pickups(flow, tournament["id"]) == sorted([(1, anna["id"], True), (1, bert["id"], False), (7, bert["id"], False)])
     assert await flow.db.notifications.count_documents({"kind": "prize_pending"}) == 2
 
@@ -159,7 +161,8 @@ async def test_a_custom_deadline_survives_ready(flow, mails):
     flow.act_as(await flow.add_staff())
     later = (now_utc() + timedelta(days=10)).isoformat()
     item = await pickup(flow, user_id=(await flow.add_user())["id"])
-    assert (await flow.patch(f"/api/prizes/{item['id']}", json={"pickup_deadline": later})).status_code == 200
+    response = await flow.patch(f"/api/prizes/{item['id']}", json={"pickup_deadline": later})
+    assert response.status_code == 200
     response = await flow.patch(f"/api/prizes/{item['id']}", json={"status": "ready"})
     assert response.json()["pickup_deadline"] == later
 
@@ -178,7 +181,8 @@ async def test_undoing_picked_up_sends_nothing_and_everything_is_logged(flow, ma
     assert response.json()["status"] == "ready" and response.json()["picked_up_at"] is None
     assert len(mails) == 2 and await flow.db.notifications.count_documents({"user_id": anna["id"]}) == bells
 
-    assert (await flow.delete(f"/api/prizes/{item['id']}")).status_code == 200
+    response = await flow.delete(f"/api/prizes/{item['id']}")
+    assert response.status_code == 200
     log = await flow.db.audit_logs.find({}, {"_id": 0}).to_list(10)
     assert [row["action"] for row in log] == ["prizes.ready", "prizes.picked_up", "prizes.revert_picked_up", "prizes.delete"]
     assert log[-1]["target_id"] == item["id"] and log[-1]["data"]["prize_value"] == "Pokal"
