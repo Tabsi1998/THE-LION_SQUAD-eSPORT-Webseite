@@ -1,6 +1,7 @@
+// Glossar (#2124, TP10): K.-o., Doppel-K.-o. - die Wörter der Spieler- und Verwaltungsseiten stehen hier an einer Stelle.
 export const TOURNAMENT_FORMAT_LABELS = {
-  single_elim: "Single Elimination",
-  double_elim: "Double Elimination",
+  single_elim: "K.-o.",
+  double_elim: "Doppel-K.-o.",
   round_robin: "Jeder gegen jeden",
   swiss: "Schweizer System",
   groups: "Gruppenphase",
@@ -29,14 +30,14 @@ export const TOURNAMENT_FORMAT_OPTIONS = [
 ];
 
 export const STAGE_TYPE_LABELS = {
-  single_elimination: "Single Elimination",
-  double_elimination: "Double Elimination",
+  single_elimination: "K.-o.",
+  double_elimination: "Doppel-K.-o.",
   custom_bracket: "Freier Turnierbaum",
   round_robin_groups: "Jeder-gegen-jeden-Gruppen",
   swiss: "Schweizer System",
   league: "Liga",
   simple: "Einzelrunde",
-  ffa_single_elimination: "FFA Single Elimination",
+  ffa_single_elimination: "Mehrspieler-K.-o.",
   ffa_custom_bracket: "Mehrspieler freier Turnierbaum",
   ffa_league: "Mehrspieler-Liga",
 };

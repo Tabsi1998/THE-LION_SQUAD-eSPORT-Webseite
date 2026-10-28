@@ -61,13 +61,13 @@ const eventModeLabels = {
 const resultModeLabels = {
   staff_only: "Ergebnis durch Turnierleitung",
   player_confirmed: "Spieler bestätigen Ergebnis",
-  hybrid: "Spieler + Staff",
+  hybrid: "Spieler + Turnierleitung",
 };
 
 const scheduleModeLabels = {
   fixed_by_staff: "Termin durch Turnierleitung",
   player_proposal: "Terminabstimmung",
-  hybrid: "Terminabstimmung + Staff",
+  hybrid: "Terminabstimmung + Turnierleitung",
 };
 
 function formatDateTime(value) {
@@ -412,7 +412,7 @@ function MatchPageView() {
               {/* Nach dem Ende (#1221) aktualisiert sich nichts mehr - der Hinweis fällt weg. */}
               {!over && (
                 <div className="inline-flex items-center gap-2 rounded-sm border border-[#29B6E8]/25 bg-[#29B6E8]/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[#29B6E8]" data-testid="match-live-refresh">
-                  <RefreshCw className="w-3.5 h-3.5" /> Live-Refresh
+                  <RefreshCw className="w-3.5 h-3.5" /> Live
                 </div>
               )}
             </div>
@@ -478,7 +478,7 @@ function MatchPageView() {
 
           {data.in_dispute && (
             <p className="mt-5 rounded-sm border border-[#FF3B30]/40 bg-[#FF3B30]/10 px-4 py-3 text-sm text-[#FFD2CF]" data-testid="match-in-dispute">
-              <strong>In Klärung</strong> – zu diesem Spiel liegt ein Dispute vor. Die Turnierleitung prüft und entscheidet.
+              <strong>In Klärung</strong> – zu diesem Spiel wurde ein Problem gemeldet. Die Turnierleitung prüft und entscheidet.
               {/* Die Turnierleitung entscheidet in ihrer Ansicht (#1158) - mit Meldung, Foto und Ergebnis. */}
               {canStaffSubmit && data.tournament ? (
                 <Link to={`/tournaments/${data.tournament.slug || data.tournament.id}/leitung?fall=ds-${id}`} className="ml-2 font-bold text-white underline underline-offset-2" data-testid="match-dispute-decide">Streitfall entscheiden</Link>

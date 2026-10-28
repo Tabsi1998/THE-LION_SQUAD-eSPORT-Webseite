@@ -218,7 +218,7 @@ test("Dispute auch nach dem Ergebnis: mit Frist; in Klärung steht der Hinweis f
   unmount();
 
   renderMatch({ ...done, can_dispute: false, in_dispute: true, match: { ...done.match, status: "disputed" } });
-  expect(await screen.findByTestId("match-in-dispute")).toHaveTextContent("In Klärung – zu diesem Spiel liegt ein Dispute vor.");
+  expect(await screen.findByTestId("match-in-dispute")).toHaveTextContent("In Klärung – zu diesem Spiel wurde ein Problem gemeldet.");
   expect(screen.queryByTestId("match-dispute-form")).toBeNull();
   vi.useRealTimers();
 });

@@ -151,7 +151,7 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
 
         <div className="space-y-4 px-4 py-4">
           {entry.kind !== "duel" && entry.ranking_mode !== "time" ? (
-            <div className="grid grid-cols-2 gap-1 rounded-sm border border-white/10 bg-white/5 p-1" role="group" aria-label="Eingabe bei Durchgängen" data-testid="result-heat-mode">
+            <div className="grid grid-cols-2 gap-1 rounded-sm border border-white/10 bg-white/5 p-1" role="group" aria-label="Eingabe bei Läufen" data-testid="result-heat-mode">
               {HEAT_MODES.map(([mode, label]) => (
                 <button key={mode} type="button" aria-pressed={heatMode === mode} onClick={() => chooseHeatMode(mode)} className={`min-h-[40px] rounded-sm text-xs font-bold uppercase tracking-wider ${heatMode === mode ? "bg-[#29B6E8] text-black" : "text-white/60"}`} data-testid={`result-heat-mode-${mode}`}>
                   {mode === "order" ? "Reihenfolge antippen" : `${label} eintragen`}
