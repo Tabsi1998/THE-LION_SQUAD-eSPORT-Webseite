@@ -321,6 +321,19 @@ export default function AdminTournamentEditPage() {
   };
   const setTournStatus = async (status) => {
     let forceStart = false;
+    let reason = null;
+    // Status mit Folgen (#2120, TA24): Entwurf nimmt die Seite weg, Beendet und Veröffentlicht verschicken und
+    // vergeben, Abgesagt benachrichtigt alle Angemeldeten - mit freiwilligem Grund.
+    const notice = statusChangeNotice(status, t, {
+      activeRegistrations: regs.filter((r) => ["pending", "approved", "checked_in", "waitlist"].includes(r.status)).length,
+    });
+    if (notice?.askReason) {
+      const answer = await prompt({ ...notice, multiline: false });
+      if (answer === false || answer === null || answer === undefined) return;
+      reason = String(answer).trim() || null;
+    } else if (notice && !await confirm(notice)) {
+      return;
+    }
     try {
       if (status === "live") {
         const report = await runPlanningCheck({ silent: true });
@@ -339,8 +352,11 @@ export default function AdminTournamentEditPage() {
           forceStart = !report.ok;
         }
       }
-      await api.post(`/tournaments/${id}/status`, { status, force: forceStart });
-      toast.success(`Status: ${TOURNAMENT_STATUS_OPTIONS.find(([value]) => value === status)?.[1] || status}`);
+      const { data } = await api.post(`/tournaments/${id}/status`, reason ? { status, force: forceStart, reason } : { status, force: forceStart });
+      const label = TOURNAMENT_STATUS_OPTIONS.find(([value]) => value === status)?.[1] || status;
+      toast.success(status === "cancelled" && Number.isFinite(data?.notified)
+        ? `Status: ${label} – ${data.notified === 1 ? "1 Person benachrichtigt" : `${data.notified} Personen benachrichtigt`}.`
+        : `Status: ${label}`);
       load();
     } catch (e) {
       const statusDetail = e.response?.data?.detail;

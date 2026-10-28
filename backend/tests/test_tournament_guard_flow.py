@@ -415,3 +415,45 @@ async def test_after_the_end_reset_is_refused_even_with_force(flow, status):
     assert refused.status_code == 409
     assert "vorbei" in refused.json()["detail"]
     assert len(await flow.matches(tournament)) == 3
+
+
+# ---------------------------------------------------------------- TA24 Absage mit Nachricht
+
+@pytest.mark.asyncio
+async def test_a_cancellation_tells_everyone_registered_with_the_reason(flow):
+    staff = await flow.add_staff()
+    flow.act_as(staff)
+    tournament, users, _regs = await flow.with_participants(3)
+    waiting = await flow.add_user(name="Warteliste")
+    await flow.register(tournament, waiting, status="waitlist")
+    rejected = await flow.add_user(name="Abgelehnt")
+    await flow.register(tournament, rejected, status="rejected")
+
+    cancelled = await flow.post(f"/api/tournaments/{tournament['id']}/status",
+                                json={"status": "cancelled", "reason": "Halle nicht verfügbar"})
+
+    assert cancelled.status_code == 200, cancelled.text
+    assert cancelled.json()["notified"] == 4
+    notes = await flow.db.notifications.find({"kind": "tournament_cancelled"}, {"_id": 0}).to_list(20)
+    assert {note["user_id"] for note in notes} == {user["id"] for user in users} | {waiting["id"]}
+    assert all("Halle nicht verfügbar" in note["body"] for note in notes)
+    assert all("Testturnier" in note["title"] for note in notes)
+
+    # Ein zweites „Abgesagt“ schickt nichts noch einmal.
+    again = await flow.post(f"/api/tournaments/{tournament['id']}/status", json={"status": "cancelled"})
+    assert again.status_code == 200
+    assert await flow.db.notifications.count_documents({"kind": "tournament_cancelled"}) == 4
+
+
+@pytest.mark.asyncio
+async def test_a_cancellation_without_reason_still_tells_them(flow):
+    staff = await flow.add_staff()
+    flow.act_as(staff)
+    tournament, users, _regs = await flow.with_participants(2)
+
+    cancelled = await flow.post(f"/api/tournaments/{tournament['id']}/status", json={"status": "cancelled"})
+
+    assert cancelled.status_code == 200, cancelled.text
+    notes = await flow.db.notifications.find({"kind": "tournament_cancelled"}, {"_id": 0}).to_list(20)
+    assert len(notes) == 2
+    assert all("Grund" not in note["body"] for note in notes)
