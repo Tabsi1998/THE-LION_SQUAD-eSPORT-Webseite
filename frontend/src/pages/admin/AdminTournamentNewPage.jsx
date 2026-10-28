@@ -92,6 +92,9 @@ export default function AdminTournamentNewPage() {
     ...(preset?.values || {}),
   }));
   const [saving, setSaving] = useState(false);
+  // Die Adresse folgt dem Titel, bis jemand sie selbst ändert (#2111, TA1) - vorher las die Abfrage den alten Stand,
+  // und die Adresse bestand nur aus dem ersten Buchstaben des Titels („/tournaments/h“).
+  const [slugTouched, setSlugTouched] = useState(false);
   const isTeam = form.team_mode === "team";
   const planningWarnings = buildPlanningWarnings(form, isTeam);
 
@@ -137,6 +140,7 @@ export default function AdminTournamentNewPage() {
     setSaving(true);
     try {
       const payload = { ...form };
+      payload.slug = autoSlug(payload.slug) || autoSlug(payload.title);
       payload.team_mode = payload.team_mode === "solo" ? "solo" : "team";
       payload.team_size = payload.team_mode === "solo" ? 1 : Number(payload.team_size || 2);
       payload.format_label = (payload.format_label || "").trim() || null;
@@ -174,6 +178,16 @@ export default function AdminTournamentNewPage() {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "")
+    .slice(0, 80);
+  // Beim Tippen der Adresse bleibt ein Bindestrich am Ende stehen - sonst ließe sich „herbst-cup“ nicht eintippen.
+  // Abgeschnitten wird beim Anlegen.
+  const slugInput = (value) => (value || "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/ß/g, "ss")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-/, "")
     .slice(0, 80);
 
   return (
@@ -234,7 +248,7 @@ export default function AdminTournamentNewPage() {
       >
         <FormSection title="Das Turnier" hint="Mehr als das braucht es nicht zum Anlegen — alles Weitere lässt sich danach in Ruhe einstellen.">
           <FormGrid>
-            <TextField label="Titel" value={form.title} onChange={(v) => { set("title", v); if (!form.slug) set("slug", autoSlug(v)); }} required testId="new-tr-title" />
+            <TextField label="Titel" value={form.title} onChange={(v) => setForm((f) => ({ ...f, title: v, slug: slugTouched ? f.slug : autoSlug(v) }))} required testId="new-tr-title" />
             <SelectField label="Spiel" value={form.game_id} onChange={(v) => set("game_id", v)} options={[["", "— auswählen —"], ...games.map((g) => [g.id, gameOptionLabel(g)])]} required testId="new-tr-game" />
           </FormGrid>
           <FormGrid>
@@ -270,7 +284,7 @@ export default function AdminTournamentNewPage() {
 
         <FormSection title="Darstellung und Regeln" collapsible>
           <FormGrid>
-            <TextField label="Slug (URL)" value={form.slug} onChange={(v) => set("slug", autoSlug(v))} required testId="new-tr-slug" />
+            <TextField label="Slug (URL)" value={form.slug} onChange={(v) => { setSlugTouched(true); set("slug", slugInput(v)); }} required testId="new-tr-slug" />
             <TextField label="Plattform" value={form.platform} onChange={(v) => set("platform", v)} placeholder="z.B. Nintendo Switch" testId="new-tr-platform" />
           </FormGrid>
           <EventMembershipLine eventId={event?.id} events={event ? [event] : []} testId="new-tr-event" />

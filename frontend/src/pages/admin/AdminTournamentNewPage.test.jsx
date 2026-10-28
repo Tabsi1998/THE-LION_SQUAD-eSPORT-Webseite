@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 // „Turnier anlegen“ mit Voreinstellung aus dem Leitfaden (#368): Format, Teilnahme, Teamgröße,
@@ -147,4 +148,19 @@ test("Jeder gegen jeden: unter dem Format steht der Weg zur Vereinsliga", async 
   fireEvent.change(format, { target: { value: "league" } });
   expect(screen.getByTestId("new-tr-format-hint")).toHaveTextContent("Seasons, Ligen und Staffeln");
   expect(screen.getByRole("link", { name: "Admin → eSports → Liga" })).toHaveAttribute("href", "/admin/leagues");
+});
+// Adresse (#2111, TA1): sie folgt dem Titel Buchstabe für Buchstabe, bis jemand sie selbst ändert - vorher blieb nur der
+// erste Buchstabe stehen („/tournaments/h“). Der Test tippt wirklich, statt das Feld in einem Zug zu füllen.
+test("die Adresse folgt dem getippten Titel, bis sie selbst geändert wird", async () => {
+  const user = userEvent.setup();
+  renderAt("");
+  const title = await screen.findByTestId("new-tr-title");
+  await user.type(title, "Herbst Cup");
+  const slug = screen.getByTestId("new-tr-slug");
+  expect(slug).toHaveValue("herbst-cup");
+  await user.clear(slug);
+  await user.type(slug, "mein-cup ");
+  expect(slug).toHaveValue("mein-cup-");
+  await user.type(title, " 2026");
+  expect(slug).toHaveValue("mein-cup-");
 });

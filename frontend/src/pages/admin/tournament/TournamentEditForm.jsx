@@ -240,6 +240,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
   };
   const normalizeTournamentPayload = (source) => {
     const payload = { ...source };
+    payload.slug = slugify(payload.slug);
     if (!payload.event_id) {
       payload.event_id = null;
       payload.requires_event_registration = false;
@@ -386,7 +387,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
         <FormSection title="Basis">
           <FormGrid>
             <TextField label="Titel" value={f.title} onChange={(v)=>set("title",v)} testId="tr-edit-title"/>
-            <TextField label="Slug / URL" value={f.slug} onChange={(v)=>set("slug", slugify(v))} testId="tr-edit-slug"/>
+            <TextField label="Slug / URL" value={f.slug} onChange={(v)=>set("slug", slugify(v, { typing: true }))} testId="tr-edit-slug"/>
             {show && <SelectInput label="Spiel" value={f.game_id} onChange={setGame} disabled={structureFixed} hint={fixedHint} testId="tr-edit-game" options={[["", "— auswählen —"], ...games.map((g) => [g.id, gameOptionLabel(g)])]} />}
             <TextField label="Plattform" value={f.platform} onChange={(v)=>set("platform",v)} testId="tr-edit-platform"/>
             {/* Kein Statusfeld (#2109, S2): der Status wechselt nur oben über den Ablauf - mit Spielplan, Check-in und
@@ -596,14 +597,16 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
 
 const FIXED_FIELD_HINT = "Der Turnierbaum steht seit dem Ende des Check-ins fest – Format, Teilnahme und Spiel bleiben. Neu aufbauen geht nur über „Zurücksetzen“.";
 
-function slugify(value) {
+// Beim Tippen bleibt ein Bindestrich am Ende stehen (#2111) - sonst ließe sich „herbst-cup“ nicht eintippen; beim
+// Speichern wird er abgeschnitten.
+function slugify(value, { typing = false } = {}) {
   return (value || "")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/ß/g, "ss")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "")
+    .replace(typing ? /^-/ : /(^-|-$)/g, "")
     .slice(0, 80);
 }
 
