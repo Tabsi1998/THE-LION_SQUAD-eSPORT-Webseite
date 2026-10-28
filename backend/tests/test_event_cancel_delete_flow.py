@@ -135,16 +135,30 @@ async def test_cancelling_twice_at_once_informs_everyone_once(flow):
     assert ["cancellation" in first.json(), "cancellation" in second.json()].count(True) == 1
     assert await flow.db.audit_logs.count_documents({"action": "event.cancel"}) == 1
     assert await flow.db.notifications.count_documents({"kind": "event_message"}) == 3
+    assert (await flow.db.events.find_one({"id": event["id"]}))["cancel_round"] == 1
 
-    # Zurücknehmen und wieder absagen: niemand bekommt die Absage ein zweites Mal.
+
+@pytest.mark.asyncio
+async def test_a_second_cancellation_informs_those_who_registered_again(flow):
+    """Absage, Zurücknehmen, Neuanmeldung, zweite Absage: wer jetzt angemeldet ist, erfährt auch die zweite Absage."""
+    kassier, event, people, _regs = await setup_event(flow)
+    first = await patch(flow, kassier, event, {"status": "cancelled"})
+    assert first.json()["cancellation"]["notified"] == 3
+
     reopened = await patch(flow, kassier, event, {"status": "registration_open"})
     assert reopened.status_code == 200
-    flow.act_as(people["paula"])
-    again = await flow.post(f"/api/events/{event['id']}/registrations", json={"companion_count": 0})
-    assert again.status_code == 200, again.text
-    repeated = await patch(flow, kassier, event, {"status": "cancelled"})
-    assert repeated.json()["cancellation"]["registrations"] == 1
-    assert await flow.db.notifications.count_documents({"kind": "event_message", "user_id": people["paula"]["id"]}) == 1
+    newcomer = await person(flow, "neu")
+    await register(flow, event, people["paula"])
+    await register(flow, event, newcomer)
+
+    second = await patch(flow, kassier, event, {"status": "cancelled"})
+    assert second.json()["cancellation"] == {"registrations": 2, "notified": 2, "orders": 2}
+    assert (await flow.db.events.find_one({"id": event["id"]}))["cancel_round"] == 2
+
+    async def notes(user):
+        return await flow.db.notifications.count_documents({"kind": "event_message", "user_id": user["id"]})
+    assert [await notes(people["paula"]), await notes(newcomer), await notes(people["max"])] == [2, 1, 1]
+    assert await flow.db.audit_logs.count_documents({"action": "event.cancel"}) == 2
 
 
 @pytest.mark.asyncio

@@ -1049,13 +1049,16 @@ async def update_event(event_id: str, body: EventUpdate, me: dict = Depends(requ
             updates[k] = updates[k].isoformat()
     updates["updated_at"] = now_utc().isoformat()
     # Absagen (#2118): der Wechsel auf „abgesagt“ ist ein eigener, bedingter Schritt - von zwei gleichzeitigen Absagen
-    # löst nur eine die Folgen aus.
+    # löst nur eine die Folgen aus. Nur sie zählt den Absage-Durchgang (``cancel_round``) weiter - daraus entsteht der
+    # Schlüssel, unter dem jede Person je Absage genau eine Nachricht bekommt.
     cancelling = updates.get("status") == "cancelled"
     if cancelling:
         updates.pop("status")
     await db.events.update_one({"id": event_id}, {"$set": updates})
     newly_cancelled = cancelling and (await db.events.update_one(
-        {"id": event_id, "status": {"$ne": "cancelled"}}, {"$set": {"status": "cancelled", "updated_at": updates["updated_at"]}},
+        {"id": event_id, "status": {"$ne": "cancelled"}},
+        {"$set": {"status": "cancelled", "cancelled_at": updates["updated_at"], "updated_at": updates["updated_at"]},
+         "$inc": {"cancel_round": 1}},
     )).modified_count == 1
     reset_scope_cache()  # Live-Meldungen (#1801): Turnier und Event neu nachschlagen
     event = await db.events.find_one({"id": event_id}, {"_id": 0})

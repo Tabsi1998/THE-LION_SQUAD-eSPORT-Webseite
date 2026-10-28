@@ -134,8 +134,11 @@ async def cancel_event(db, event: dict, me: dict) -> dict:
     users = await _recipients(db, [registration.get("user_id") for registration in registrations])
     message = ("Das Event wurde abgesagt. Deine Anmeldung ist damit storniert – ein offener Kostenbeitrag wird nicht "
                "verrechnet; wurde schon eine Rechnung gestellt, meldet sich der Verein bei dir.")
-    # Je Event und Person genau einmal - auch wenn die Absage zurückgenommen und wiederholt wird.
-    sent = await _inform(db, event, users, title="abgesagt", message=message, dedupe=f"event-cancelled:{event['id']}")
+    # Je Absage-Durchgang und Person genau einmal (``cancel_round`` zählt nur der bedingte Statuswechsel weiter): ein
+    # doppelter Klick schickt nichts doppelt, wer sich nach dem Zurücknehmen neu anmeldet, erfährt die zweite Absage.
+    round_no = int(event.get("cancel_round") or 1)
+    sent = await _inform(db, event, users, title="abgesagt", message=message,
+                         dedupe=f"event-cancelled:{event['id']}:{round_no}")
     result = {"registrations": len(registrations), "notified": sent["notified"], "orders": orders}
     await db.audit_logs.insert_one({
         "id": new_id(), "action": "event.cancel", "actor_id": me["id"], "target_id": event["id"],
