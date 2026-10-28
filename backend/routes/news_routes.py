@@ -6,13 +6,14 @@ from typing import Optional
 from datetime import datetime, timezone
 from database import get_db
 from auth import get_optional_user, require_area
-from services.permissions import is_confirmed_admin_role
+from services.permissions import can_use_area, is_confirmed_admin_role
 from services.visibility import user_can_see, filter_visible
 from services.content_embed_service import resolve_content_embeds
 from services.news_cards import attach_result_winners, event_signups, tournament_signups
 from services.sponsor_utils import dedupe_public_sponsors, drop_legacy_logo_fields, public_sponsor_view
 from services import partner_pages, sponsor_images
 from services.notification_preferences import enqueue_newsletter_for_item
+from services.news_publish import public_news
 from services.user_notifications import create_user_notification
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from services import dolibarr_policy, reference_checks, reference_season_links, reference_series, season_close
@@ -41,6 +42,23 @@ def _is_staff(user: dict | None) -> bool:
 # Kurzform verknüpfter Turniere und Events im Beitrag - wie bisher, dazu `signup` (#1266).
 LINKED_EVENT_FIELDS = ("id", "name", "slug", "start_date", "status", "visibility")
 LINKED_TOURNAMENT_FIELDS = ("id", "title", "slug", "start_date", "status", "visibility", "is_public")
+
+WITHDRAWN_MESSAGE = "Dieser Beitrag wurde zurückgezogen. Alle aktuellen News findest du auf der News-Seite."
+
+# Verlauf im Editor (#2122 NW3): was sich geändert hat, in Worten statt Feldnamen. Felder ohne Eintrag zählen nicht.
+NEWS_FIELD_LABELS = {
+    "title": "Titel", "slug": "Adresse", "excerpt": "Kurzbeschreibung", "content": "Text", "banner_url": "Bild",
+    "video_url": "Video", "category": "Kategorie", "visibility": "Sichtbarkeit", "published": "Veröffentlichung",
+    "published_at": "Termin", "pinned": "Anpinnen", "discord_skip": "Discord", "share_preview": "Link-Vorschau",
+    "linked_event_ids": "Verknüpfungen", "linked_tournament_ids": "Verknüpfungen",
+    "linked_f1_challenge_ids": "Verknüpfungen", "linked_team_ids": "Verknüpfungen",
+    "mentioned_user_ids": "Markierte Personen", "author_id": "Autor",
+}
+NEWS_ACTION_LABELS = {
+    "news.create": "Angelegt", "news.update": "Geändert", "news.withdraw": "Zurückgezogen",
+    "news.restore": "Wiederhergestellt", "news.delete": "Gelöscht",
+}
+HISTORY_LIMIT = 30
 
 MENTION_RE = re.compile(r"@([A-Za-z0-9_.-]{2,32})")
 PROFILE_LINK_RE = re.compile(r"/u/([A-Za-z0-9_.-]{2,32})")
@@ -101,6 +119,17 @@ def _published_now(post: dict) -> bool:
     return not published_at or published_at <= now_utc()
 
 
+def _preview_state(post: dict) -> dict | None:
+    """Warum ein Beitrag noch nicht öffentlich ist - oder None, wenn ihn alle sehen dürfen (#2122 NW2)."""
+    if post.get("withdrawn_at"):
+        return {"state": "withdrawn", "since": post.get("withdrawn_at")}
+    if post.get("published") is False:
+        return {"state": "draft"}
+    if not _published_now(post):
+        return {"state": "scheduled", "published_at": post.get("published_at")}
+    return None
+
+
 def _page_items(items: list[dict], limit: int, offset: int, paged: bool):
     safe_limit = max(1, min(int(limit or 48), 200))
     safe_offset = max(0, int(offset or 0))
@@ -150,8 +179,6 @@ async def _without_empty_albums(albums: list[dict], user: dict | None) -> list[d
     Hinweis ``is_empty``, damit die Verwaltung weiß, dass Besucher es nicht sehen. Sobald Medien da sind, erscheint es
     von selbst. Erwartet die Zähler aus ``_attach_gallery_counts``. Der Bereich zählt wie jeder Adminbereich nur mit
     bestätigter Zwei-Faktor-Anmeldung (#1479)."""
-    from services.permissions import can_use_area
-
     if await can_use_area(user, "content"):
         for album in albums:
             album["is_empty"] = not album.get("media_count")
@@ -425,8 +452,10 @@ async def list_news(
     user: dict | None = Depends(get_optional_user),
 ):
     db = get_db()
-    is_admin = _is_staff(user)
-    q: dict = {} if is_admin else {"published": True}
+    # Öffentliche Listen immer wie für Gäste (#2122 NW2): Entwürfe und geplante Beiträge stehen nie darin - auch nicht
+    # für das Admin-Team, sonst hält der Vorstand einen Entwurf für veröffentlicht. Die Vorschau gibt es auf der
+    # Detailseite (mit Band „Noch nicht öffentlich“) und in Admin → News.
+    q: dict = {"published": True}
     if category:
         q["category"] = category
     search_term = (search or "").strip()
@@ -444,8 +473,7 @@ async def list_news(
         }
     fetch_limit = max(200, min(max(int(limit or 48), 1) + max(int(offset or 0), 0) + 80, 500))
     posts = await db.news_posts.find(q, projection).sort([("published_at", -1), ("created_at", -1)]).to_list(fetch_limit)
-    if not is_admin:
-        posts = [p for p in posts if _published_now(p)]
+    posts = [p for p in posts if _published_now(p)]
     posts = await _filter_visible(posts, user)
     if sort == "latest":
         posts.sort(
@@ -464,7 +492,7 @@ async def list_news(
         compacted = [_compact_news(p) for p in rows]
         return {**page, "items": compacted} if paged else compacted
     await attach_result_winners(db, posts, user)
-    return posts
+    return [public_news(post) for post in posts]
 
 
 @router.get("/news/{slug_or_id}")
@@ -474,14 +502,28 @@ async def get_news(slug_or_id: str, user: dict | None = Depends(get_optional_use
     if not p:
         raise HTTPException(status_code=404, detail="Beitrag nicht gefunden.")
     is_staff = _is_staff(user)
-    if p.get("published") is False and not is_staff:
+    # Die Vorschau sieht, wer News pflegt (#2122): das Admin-Team und jede Person mit dem Bereich „Redaktion“ - auch über
+    # Freigabe oder Vorstandsposten, wie Admin → News selbst. Verknüpfte Entwürfe bleiben beim Admin-Team.
+    can_preview = is_staff or await can_use_area(user, "content")
+    # Zurückgezogen (#2122 NW3): Links aus Newsletter und Discord landen bei einem freundlichen Hinweis statt bei 404 -
+    # aber nur, wer den Beitrag nach seiner Sichtbarkeit sehen dürfte; sonst bleibt es „nicht gefunden“.
+    if p.get("withdrawn_at") and not can_preview:
+        if await _user_can_see(user, p.get("visibility") or "public"):
+            raise HTTPException(status_code=410, detail=WITHDRAWN_MESSAGE)
         raise HTTPException(status_code=404, detail="Beitrag nicht gefunden.")
-    if not is_staff and not _published_now(p):
+    if p.get("published") is False and not can_preview:
+        raise HTTPException(status_code=404, detail="Beitrag nicht gefunden.")
+    if not can_preview and not _published_now(p):
         raise HTTPException(status_code=404, detail="Beitrag nicht gefunden.")
     if not await _user_can_see(user, p.get("visibility") or "public"):
         raise HTTPException(status_code=403, detail="Nicht sichtbar.")
     if was_old_slug and p.get("slug"):
         return RedirectResponse(url=f"/api/news/{p['slug']}", status_code=301)
+    # Vorschau für das Admin-Team (#2122 NW2): ein nicht öffentlicher Beitrag trägt sein Kennzeichen, die Seite zeigt
+    # das Band „Noch nicht öffentlich“.
+    preview = _preview_state(p)
+    if preview:
+        p["preview"] = preview
     # Resolve linked entities
     db = get_db()
     if p.get("linked_event_ids"):
@@ -518,33 +560,107 @@ async def get_news(slug_or_id: str, user: dict | None = Depends(get_optional_use
         users.sort(key=lambda user: user_order.get(user["id"], 999))
         p["mentioned_users"] = users
     p["content_embeds"] = await resolve_content_embeds(db, p.get("content"), user)
-    return p
+    # Interne Felder der Redaktion (#2122) gehen nie nach außen - auch nicht in die App.
+    return public_news(p)
+
+
+async def _attach_mentioned_users(db, posts: list[dict]) -> None:
+    """Markierte Personen mit Namen (#1354): der Editor zeigt die Schilder, ohne die ganze Kontoliste zu laden."""
+    mentioned = sorted({user_id for post in posts for user_id in post.get("mentioned_user_ids") or [] if user_id})
+    if not mentioned:
+        return
+    names = {
+        user["id"]: user for user in await db.users.find(
+            {"id": {"$in": mentioned}}, {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1},
+        ).to_list(len(mentioned))
+    }
+    for post in posts:
+        post["mentioned_users"] = [names[user_id] for user_id in post.get("mentioned_user_ids") or [] if user_id in names]
 
 
 @router.get("/admin/news")
 async def admin_list_news(me: dict = Depends(require_area("content"))):
     db = get_db()
     posts = await db.news_posts.find({}, {"_id": 0}).sort([("pinned", -1), ("published_at", -1), ("created_at", -1)]).to_list(500)
-    # Markierte Personen mit Namen (#1354): der Editor zeigt die Schilder, ohne die ganze Kontoliste zu laden.
-    mentioned = sorted({user_id for post in posts for user_id in post.get("mentioned_user_ids") or [] if user_id})
-    if mentioned:
-        names = {
-            user["id"]: user for user in await db.users.find(
-                {"id": {"$in": mentioned}}, {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1},
-            ).to_list(len(mentioned))
-        }
-        for post in posts:
-            post["mentioned_users"] = [names[user_id] for user_id in post.get("mentioned_user_ids") or [] if user_id in names]
+    await _attach_mentioned_users(db, posts)
+    for post in posts:
+        # Löschen nur, was nie hinausging (#2122 NW3) - sonst „Zurückziehen“.
+        post["can_delete"] = not _ever_public(post)
     return posts
+
+
+@router.get("/admin/news/{nid}")
+async def admin_get_news(nid: str, me: dict = Depends(require_area("content"))):
+    """Ein Beitrag für den Editor (#2122 NW4) - einzeln, damit auch der 501. Beitrag zu bearbeiten ist."""
+    db = get_db()
+    post = await db.news_posts.find_one({"id": nid}, {"_id": 0})
+    if not post:
+        raise HTTPException(404, "Beitrag nicht gefunden.")
+    await _attach_mentioned_users(db, [post])
+    post["history"] = await _news_history(db, nid)
+    post["can_delete"] = not _ever_public(post)
+    return post
+
+
+def _actor_name(user: dict | None) -> str:
+    return (user or {}).get("display_name") or (user or {}).get("username") or "Unbekannt"
+
+
+async def _audit_news(db, me: dict, action: str, post_id: str, data: dict | None = None) -> None:
+    """Protokoll je Beitrag (#2122 NW3): wer wann angelegt, geändert, zurückgezogen hat - und welche Felder."""
+    await db.audit_logs.insert_one({
+        "id": new_id(), "action": action, "actor_id": me.get("id"), "target_id": post_id,
+        "data": data or {}, "created_at": now_utc().isoformat(),
+    })
+
+
+def _changed_fields(existing: dict, update: dict) -> list[str]:
+    """Die Felder, die sich wirklich ändern - als Wörter, jedes einmal, in fester Reihenfolge."""
+    keys = {key for key, value in update.items() if key in NEWS_FIELD_LABELS and existing.get(key) != value}
+    seen: list[str] = []
+    for key, label in NEWS_FIELD_LABELS.items():
+        if key in keys and label not in seen:
+            seen.append(label)
+    return seen
+
+
+async def _news_history(db, post_id: str) -> list[dict]:
+    rows = await db.audit_logs.find(
+        {"target_id": post_id, "action": {"$in": list(NEWS_ACTION_LABELS)}}, {"_id": 0},
+    ).sort("created_at", -1).to_list(HISTORY_LIMIT)
+    actor_ids = sorted({row.get("actor_id") for row in rows if row.get("actor_id")})
+    names = {}
+    if actor_ids:
+        names = {user["id"]: _actor_name(user) for user in await db.users.find(
+            {"id": {"$in": actor_ids}}, {"_id": 0, "id": 1, "display_name": 1, "username": 1},
+        ).to_list(len(actor_ids))}
+    return [{
+        "at": row.get("created_at"), "action": row.get("action"), "label": NEWS_ACTION_LABELS.get(row.get("action"), "Geändert"),
+        "by": names.get(row.get("actor_id")) or "Unbekannt", "fields": (row.get("data") or {}).get("fields") or [],
+    } for row in rows]
+
+
+def _ever_public(post: dict) -> bool:
+    """Ging der Beitrag schon hinaus? Dann zeigen Links aus Newsletter, Discord oder Meldungen auf ihn."""
+    if post.get("withdrawn_at") or (post.get("published") and _published_now(post)):
+        return True
+    return any(post.get(key) for key in (
+        "newsletter_sent_at", "newsletter_skipped_reason", "discord_checked_at", "members_notified_at", "news_mentions_processed_at",
+    ))
 
 
 @router.post("/news")
 async def create_news(body: NewsCreate, me: dict = Depends(require_area("content"))):
     db = get_db()
     doc = body.model_dump()
+    publish_now = bool(doc.pop("publish_now", None))
     doc["slug"] = await unique_slug(db.news_posts, doc.get("slug") or doc.get("title"), fallback="news")
     if doc.get("published_at"):
         doc["published_at"] = doc["published_at"].isoformat()
+    if publish_now:
+        # „Jetzt veröffentlichen“ (#2122): der Zeitpunkt des Servers, nicht der des Browsers.
+        doc["published"] = True
+        doc["published_at"] = None
     doc["mentioned_user_ids"] = await _mentioned_user_ids_from_content(doc.get("content"), doc.get("mentioned_user_ids") or [])
     doc["id"] = new_id()
     created_at = now_utc().isoformat()
@@ -554,7 +670,10 @@ async def create_news(body: NewsCreate, me: dict = Depends(require_area("content
         doc["published_at"] = created_at
     doc["author_id"] = me["id"]
     doc["author_name"] = me.get("display_name") or me.get("username")
+    doc["updated_by"] = me["id"]
+    doc["updated_by_name"] = doc["author_name"]
     await db.news_posts.insert_one(doc)
+    await _audit_news(db, me, "news.create", doc["id"], {"published": bool(doc.get("published")), "published_at": doc.get("published_at")})
     if doc.get("published") and _published_now(doc):
         result = await enqueue_newsletter_for_item("news", doc)
         if result.get("reason") not in {"internal_visibility", "not_published"}:
@@ -580,7 +699,8 @@ async def update_news(nid: str, body: NewsUpdate, me: dict = Depends(require_are
     if not existing:
         raise HTTPException(404, "Beitrag nicht gefunden.")
     update = body.model_dump(exclude_unset=True)
-    if not update:
+    publish_now = bool(update.pop("publish_now", None))
+    if not update and not publish_now:
         raise HTTPException(400, "Keine Änderungen.")
     slug_source = slug_source_for_update(update, existing, "title", fallback="news")
     if slug_source is not None:
@@ -594,14 +714,43 @@ async def update_news(nid: str, body: NewsUpdate, me: dict = Depends(require_are
             next_content,
             update.get("mentioned_user_ids", existing.get("mentioned_user_ids") or []),
         )
-    if update.get("published") is True and "published_at" not in update:
-        existing = await db.news_posts.find_one({"id": nid}, {"_id": 0, "published_at": 1})
-        if existing and not existing.get("published_at"):
-            update["published_at"] = now_utc().isoformat()
-    update["updated_at"] = now_utc().isoformat()
-    res = await db.news_posts.update_one({"id": nid}, {"$set": update})
+    if publish_now:
+        # „Jetzt veröffentlichen“ (#2122): der Zeitpunkt des Servers, nicht der des Browsers.
+        update["published"] = True
+        update["published_at"] = now_utc().isoformat()
+    elif update.get("published") is True and "published_at" not in update and not existing.get("published_at"):
+        update["published_at"] = now_utc().isoformat()
+    # Autor ändern (#2122 NW3): nur, wen die Personensuche anbietet - ein aktives, nicht gesperrtes Konto der Redaktion.
+    # Der Name kommt aus dem Konto.
+    if "author_id" in update:
+        from routes.admin_picker_routes import news_author_allowed
+        from services.private_fields import private_projection
+
+        author = await db.users.find_one({"id": update["author_id"]}, private_projection()) if update["author_id"] else None
+        if not await news_author_allowed(db, author):
+            raise HTTPException(400, "Als Autor geht nur ein aktives Konto aus der Redaktion - bitte eine andere Person wählen.")
+        update["author_name"] = _actor_name(author)
+    fields = _changed_fields(existing, update)
+    stamp = now_utc().isoformat()
+    update["updated_at"] = stamp
+    update["updated_by"] = me["id"]
+    update["updated_by_name"] = _actor_name(me)
+    unset: dict = {}
+    action = "news.update"
+    # Wieder veröffentlichen hebt ein Zurückziehen auf.
+    if update.get("published") is True and existing.get("withdrawn_at"):
+        unset = {"withdrawn_at": "", "withdrawn_by": "", "withdrawn_by_name": "", "withdrawn_was_published": ""}
+        action = "news.restore"
+    # Ein schon öffentlicher Beitrag wird nicht still zum Entwurf (#2122): das ist ein Zurückziehen - die Adresse zeigt
+    # Besuchern dann den Hinweis statt „nicht gefunden“, und es steht so im Verlauf.
+    elif update.get("published") is False and not existing.get("withdrawn_at") and _ever_public(existing):
+        update.update({"pinned": False, "withdrawn_at": stamp, "withdrawn_by": me["id"], "withdrawn_by_name": _actor_name(me),
+                       "withdrawn_was_published": existing.get("published") is not False})
+        action = "news.withdraw"
+    res = await db.news_posts.update_one({"id": nid}, {"$set": update, **({"$unset": unset} if unset else {})})
     if res.matched_count == 0:
         raise HTTPException(404, "Beitrag nicht gefunden.")
+    await _audit_news(db, me, action, nid, {"fields": fields})
     saved = await db.news_posts.find_one({"id": nid}, {"_id": 0})
     if saved and saved.get("published") and _published_now(saved) and not saved.get("newsletter_sent_at"):
         result = await enqueue_newsletter_for_item("news", saved)
@@ -622,9 +771,55 @@ async def update_news(nid: str, body: NewsUpdate, me: dict = Depends(require_are
 
 @router.delete("/news/{nid}")
 async def delete_news(nid: str, me: dict = Depends(require_area("content"))):
+    """Löschen nur für Entwürfe, die nie hinausgingen (#2122 NW3). Was schon öffentlich war, wird zurückgezogen - sonst
+    führen Links aus Newsletter, Discord und Meldungen ins Leere."""
     db = get_db()
+    post = await db.news_posts.find_one({"id": nid}, {"_id": 0})
+    if not post:
+        return {"ok": True}
+    if _ever_public(post):
+        raise HTTPException(409, "Dieser Beitrag war schon öffentlich – bitte zurückziehen statt löschen. Links aus Newsletter und Discord zeigen dann einen Hinweis.")
     await db.news_posts.delete_one({"id": nid})
+    await _audit_news(db, me, "news.delete", nid, {"title": post.get("title")})
     return {"ok": True}
+
+
+@router.post("/news/{nid}/withdraw")
+async def withdraw_news(nid: str, me: dict = Depends(require_area("content"))):
+    """Zurückziehen (#2122 NW3): der Beitrag verschwindet aus allen Listen, seine Adresse bleibt und zeigt Besuchern einen
+    Hinweis. Nichts wird gelöscht, „Wiederherstellen“ holt ihn zurück."""
+    db = get_db()
+    post = await db.news_posts.find_one({"id": nid}, {"_id": 0})
+    if not post:
+        raise HTTPException(404, "Beitrag nicht gefunden.")
+    if post.get("withdrawn_at"):
+        return post
+    stamp = now_utc().isoformat()
+    await db.news_posts.update_one({"id": nid}, {"$set": {
+        "published": False, "pinned": False, "withdrawn_at": stamp, "withdrawn_by": me["id"], "withdrawn_by_name": _actor_name(me),
+        "withdrawn_was_published": post.get("published") is not False,
+        "updated_at": stamp, "updated_by": me["id"], "updated_by_name": _actor_name(me),
+    }})
+    await _audit_news(db, me, "news.withdraw", nid, {"was_published": post.get("published") is not False})
+    return await db.news_posts.find_one({"id": nid}, {"_id": 0})
+
+
+@router.post("/news/{nid}/restore")
+async def restore_news(nid: str, me: dict = Depends(require_area("content"))):
+    """Wiederherstellen: als Entwurf zurück in die Redaktion - veröffentlicht wird bewusst im Editor (mit Rückfrage)."""
+    db = get_db()
+    post = await db.news_posts.find_one({"id": nid}, {"_id": 0})
+    if not post:
+        raise HTTPException(404, "Beitrag nicht gefunden.")
+    if not post.get("withdrawn_at"):
+        return post
+    stamp = now_utc().isoformat()
+    await db.news_posts.update_one({"id": nid}, {
+        "$set": {"published": False, "updated_at": stamp, "updated_by": me["id"], "updated_by_name": _actor_name(me)},
+        "$unset": {"withdrawn_at": "", "withdrawn_by": "", "withdrawn_by_name": "", "withdrawn_was_published": ""},
+    })
+    await _audit_news(db, me, "news.restore", nid, {})
+    return await db.news_posts.find_one({"id": nid}, {"_id": 0})
 
 
 NEWS_CATEGORIES = [
@@ -645,13 +840,10 @@ EXTRA_CATEGORY_LABELS = {"video": "Video"}
 
 async def _categories_in_use(user: dict | None) -> list[dict]:
     """Kategorien mit mindestens einem Beitrag, den dieser Besucher in der Liste sieht (#1249) - mit Anzahl. Dieselben
-    Regeln wie ``GET /news``: veröffentlicht, schon fällig und sichtbar; das Admin-Team zählt Entwürfe mit."""
+    Regeln wie ``GET /news``: veröffentlicht, schon fällig und sichtbar - auch für das Admin-Team (#2122 NW2)."""
     db = get_db()
-    is_admin = _is_staff(user)
-    q: dict = {} if is_admin else {"published": True}
-    posts = await db.news_posts.find(q, {"_id": 0, "category": 1, "visibility": 1, "published_at": 1}).to_list(5000)
-    if not is_admin:
-        posts = [p for p in posts if _published_now(p)]
+    posts = await db.news_posts.find({"published": True}, {"_id": 0, "category": 1, "visibility": 1, "published_at": 1}).to_list(5000)
+    posts = [p for p in posts if _published_now(p)]
     posts = await _filter_visible(posts, user)
     counts: dict[str, int] = {}
     for post in posts:

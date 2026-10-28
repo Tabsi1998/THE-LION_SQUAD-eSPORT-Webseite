@@ -105,3 +105,12 @@ test("Schalter oben auf der Seite: Ostereiersuche ist aus, mit dem Zeitraum", as
   expect(screen.getByTestId("season-switch-window")).toHaveTextContent("Eingeschaltet zu sehen von 26. März 2027");
   expect(screen.queryByRole("link", { name: "Auftritt → Jahreszeiten" })).toBeNull();
 });
+
+// #2122 NW11: wer nur Inhalte pflegt, sieht einen Satz statt „Auswerten“ und keinen CSV-Link.
+test("ohne Recht der Vereinsleitung: kein Auswerten, keine Teilnehmerliste", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...BASE, status: "live", phase: "ended", can_draw: false, may_draw: false, eggs: PROPOSAL.map((egg) => ({ ...egg, found: 2 })), completed: 2 } });
+  renderPage();
+  expect(await screen.findByTestId("easter-admin-no-draw")).toHaveTextContent("Ausgewertet wird von der Vereinsleitung.");
+  expect(screen.queryByTestId("easter-admin-run-draw")).toBeNull();
+  expect(screen.queryByTestId("easter-admin-csv")).toBeNull();
+});

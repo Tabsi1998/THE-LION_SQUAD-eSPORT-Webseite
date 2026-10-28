@@ -1,6 +1,7 @@
 /**
- * Die untere Leiste am Handy (#1143) - dieselben fünf Einträge wie die App: Home · Events · Community · Verein · Profil.
- * Für alle gleich, damit Hilfe am Telefon funktioniert („tipp unten auf Verein“). Angemeldet führt Home zum Dashboard
+ * Die untere Leiste am Handy (#1143) - dieselben fünf Einträge wie die App: Start · Events · Community · Verein · Profil
+ * (in der App heißt der erste noch „Home“, #2122). Für alle gleich, damit Hilfe am Telefon funktioniert („tipp unten auf
+ * Verein“). Angemeldet führt Start zum Dashboard
  * und Profil zum eigenen Profil; Gäste kommen über Profil zur Anmeldung. Die Zahl an Community zählt ungelesene Chats.
  * Ein Tipp auf den aktiven Eintrag (#1144) bringt zur Übersicht - steht man schon dort, ganz nach oben.
  */
@@ -21,7 +22,7 @@ export const BOTTOM_SECTIONS = {
 
 export function bottomNavItems(user) {
   return [
-    { key: "home", to: user ? "/dashboard" : "/", label: "Home", icon: user ? LayoutDashboard : Home },
+    { key: "home", to: user ? "/dashboard" : "/", label: "Start", icon: user ? LayoutDashboard : Home },
     { key: "events", to: "/events", label: "Events", icon: Calendar },
     { key: "community", to: "/community", label: "Community", icon: MessageSquare },
     { key: "verein", to: "/verein", label: "Verein", icon: Shield },

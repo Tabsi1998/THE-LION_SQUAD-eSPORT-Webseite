@@ -41,6 +41,10 @@ export function RafflePanel({ day, raffle, isOpen, busy = false, onDraw, onRedra
         {raffle.status !== "drawn" && <span>Teilnahme bis {opensLabel(raffle.closes_at)}</span>}
       </div>
 
+      {/* Ziehen macht die Vereinsleitung (#2122 NW11) - ohne das Recht ein Satz statt eines Knopfs, der scheitert. */}
+      {raffle.may_draw === false && raffle.status !== "drawn" && (
+        <p className="mt-3 text-xs text-white/50" data-testid={`advent-raffle-no-draw-${day}`}>Gezogen wird von der Vereinsleitung.</p>
+      )}
       {raffle.can_draw && (
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <button type="button" disabled={busy || !isOpen || raffle.entries === 0} onClick={() => onDraw(day, raffle)} data-testid={`advent-raffle-draw-${day}`} className="inline-flex items-center gap-2 rounded-sm bg-[#e9c46a] px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-black transition hover:opacity-90 disabled:opacity-40">

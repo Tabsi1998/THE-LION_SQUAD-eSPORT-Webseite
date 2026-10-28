@@ -131,7 +131,7 @@ export default function ReferenceSeriesPage() {
   return (
     <PublicLayout>
       <article className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12" data-testid="series-page">
-        <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "Referenzen", to: "/references" }, { label: title || "Serie" }]} className="mb-6" />
+        <Breadcrumbs items={[{ label: "Start", to: "/" }, { label: "Referenzen", to: "/references" }, { label: title || "Serie" }]} className="mb-6" />
         {!data ? <SkeletonLines lines={5} /> : (
           <>
             {/* #2014: Logo der Saison bzw. Spur im Kopf - wie hochgeladen; ohne Logo wie bisher nur der Text. */}

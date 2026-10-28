@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, formatRequestError } from "@/lib/api";
-import { newsCategoryLabel } from "@/lib/newsCategories";
-import { formatTimeUntil } from "@/lib/newsPublication";
+import { newsCategoryLabel, newsVisibilityLabel } from "@/lib/newsCategories";
+import { newsPublicationState } from "@/lib/newsPublication";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
-import { Download, Plus, Pin, Trash2, Search, Newspaper } from "lucide-react";
+import { Download, Plus, Pin, RotateCcw, Trash2, Search, Newspaper, Undo2 } from "lucide-react";
 import { viennaDate } from "@/lib/vienna";
 
 function csvCell(value) {
@@ -15,13 +15,13 @@ function csvCell(value) {
   return /[",;]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
-function exportNewsCsv(rows) {
-  const header = ["Titel", "Slug", "Kategorie", "Sichtbarkeit", "Status", "Datum"];
+export function exportNewsCsv(rows) {
+  const header = ["Titel", "Adresse", "Kategorie", "Sichtbarkeit", "Status", "Datum"];
   const lines = rows.map((item) => [
     item.title,
-    item.slug,
-    item.category,
-    item.visibility,
+    item.slug ? `/news/${item.slug}` : "",
+    newsCategoryLabel(item.category),
+    newsVisibilityLabel(item.visibility),
     item.status_label,
     item.date_label,
   ].map(csvCell).join(";"));
@@ -62,32 +62,44 @@ export default function AdminNewsPage() {
     if (editId) navigate(`/admin/news/${encodeURIComponent(editId)}`, { replace: true });
   }, [navigate, searchParams]);
 
-  const remove = async (id) => {
-    if (!await confirm({ title: "Beitrag löschen?", description: "Der News-Beitrag wird dauerhaft entfernt.", confirmLabel: "Löschen" })) return;
-    try { await api.delete(`/news/${id}`); toast.success("Gelöscht."); load(); } catch (err) { toast.error(formatRequestError(err, "Beitrag konnte nicht gelöscht werden.")); }
+  // Löschen nur für Entwürfe, die nie hinausgingen; alles andere wird zurückgezogen (#2122 NW3) - Links aus Newsletter
+  // und Discord zeigen dann einen Hinweis statt „nicht gefunden“.
+  const remove = async (post) => {
+    if (!await confirm({ title: "Entwurf löschen?", description: `„${post.title || "Ohne Titel"}“ war nie öffentlich und wird dauerhaft entfernt.`, confirmLabel: "Löschen" })) return;
+    try { await api.delete(`/news/${post.id}`); toast.success("Gelöscht."); load(); } catch (err) { toast.error(formatRequestError(err, "Beitrag konnte nicht gelöscht werden.")); }
+  };
+  const withdraw = async (post) => {
+    if (!await confirm({
+      title: "Beitrag zurückziehen?",
+      description: `„${post.title || "Ohne Titel"}“ verschwindet aus allen Listen. Wer einem Link aus Newsletter oder Discord folgt, sieht einen Hinweis; eine schon gepostete Discord-Meldung bleibt stehen. Wiederherstellen geht jederzeit.`,
+      confirmLabel: "Zurückziehen",
+    })) return;
+    try { await api.post(`/news/${post.id}/withdraw`); toast.success("Zurückgezogen."); load(); } catch (err) { toast.error(formatRequestError(err, "Beitrag konnte nicht zurückgezogen werden.")); }
+  };
+  const restore = async (post) => {
+    try { await api.post(`/news/${post.id}/restore`); toast.success("Wiederhergestellt – als Entwurf."); load(); } catch (err) { toast.error(formatRequestError(err, "Beitrag konnte nicht wiederhergestellt werden.")); }
   };
 
-  const publicationState = (post) => {
-    if (!post.published) return { key: "draft", label: "Entwurf", detail: "", className: "text-white/40" };
-    const date = post.published_at ? new Date(post.published_at) : null;
-    if (date && !Number.isNaN(date.getTime()) && date.getTime() > Date.now()) {
-      return { key: "scheduled", label: "Geplant", detail: `Wird ${formatTimeUntil(date)} veröffentlicht`, className: "text-[#29B6E8]" };
-    }
-    return { key: "published", label: "Veröffentlicht", detail: "", className: "text-[#10B981]" };
-  };
+  const publicationState = (post) => newsPublicationState(post);
   const categoryOptions = useMemo(() => {
     const rows = (meta.categories || []).map((item) => [item.k, item.l || item.k]);
     const known = new Set(rows.map(([key]) => key));
     list.forEach((item) => {
-      if (item.category && !known.has(item.category)) rows.push([item.category, item.category]);
+      if (item.category && !known.has(item.category)) {
+        known.add(item.category);
+        rows.push([item.category, newsCategoryLabel(item.category)]);
+      }
     });
     return rows;
   }, [list, meta.categories]);
   const visibilityOptions = useMemo(() => {
-    const rows = (meta.visibilities || []).map((item) => [item.k, item.l || item.k]);
+    const rows = (meta.visibilities || []).map((item) => [item.k, item.l || newsVisibilityLabel(item.k)]);
     const known = new Set(rows.map(([key]) => key));
     list.forEach((item) => {
-      if (item.visibility && !known.has(item.visibility)) rows.push([item.visibility, item.visibility]);
+      if (item.visibility && !known.has(item.visibility)) {
+        known.add(item.visibility);
+        rows.push([item.visibility, newsVisibilityLabel(item.visibility)]);
+      }
     });
     return rows;
   }, [list, meta.visibilities]);
@@ -103,8 +115,8 @@ export default function AdminNewsPage() {
         item.title,
         item.slug,
         item.excerpt,
-        item.category,
-        item.visibility,
+        newsCategoryLabel(item.category),
+        newsVisibilityLabel(item.visibility),
         state.label,
       ].filter(Boolean).join(" ").toLowerCase().includes(needle);
     });
@@ -130,7 +142,7 @@ export default function AdminNewsPage() {
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Titel, Slug, Teaser oder Kategorie suchen"
+                placeholder="Titel, Kurzbeschreibung oder Kategorie suchen"
                 data-testid="news-admin-search"
                 className="w-full rounded-sm border border-white/10 bg-[#0A0A0A] py-2 pl-9 pr-3 text-sm focus:border-[#29B6E8] focus:outline-none"
               />
@@ -140,6 +152,7 @@ export default function AdminNewsPage() {
               <option value="published">Veröffentlicht</option>
               <option value="scheduled">Geplant</option>
               <option value="draft">Entwurf</option>
+              <option value="withdrawn">Zurückgezogen</option>
             </select>
             <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} data-testid="news-admin-category-filter" className="rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2 text-sm">
               <option value="">Alle Kategorien</option>
@@ -201,7 +214,7 @@ export default function AdminNewsPage() {
                       <div className="text-[11px] text-white/50">/{n.slug}</div>
                     </td>
                     <td className="px-4 py-3 text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">{newsCategoryLabel(n.category)}</td>
-                    <td className="px-4 py-3 text-[10px] uppercase tracking-widest text-white/60 font-bold">{n.visibility}</td>
+                    <td className="px-4 py-3 text-xs text-white/65" data-testid={`news-visibility-${n.id}`}>{newsVisibilityLabel(n.visibility)}</td>
                     <td className="px-4 py-3 text-xs">
                       <span className={`${state.className} font-bold uppercase`}>{state.label}</span>
                       {state.detail && <div className="mt-0.5 text-[11px] normal-case text-white/45">{state.detail}</div>}
@@ -209,9 +222,24 @@ export default function AdminNewsPage() {
                     <td className="px-4 py-3 text-xs text-white/55">{viennaDate(n.published_at || n.created_at)}</td>
                     <td className="px-4 py-3 text-center space-x-2 whitespace-nowrap">
                       <Link to={`/admin/news/${n.id}`} data-testid={`news-edit-${n.id}`} className="inline-flex text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#29B6E8]/40 text-[#29B6E8] hover:bg-[#29B6E8]/10">Bearbeiten</Link>
-                      <button onClick={() => remove(n.id)} data-testid={`news-delete-${n.id}`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10 inline-flex items-center gap-1">
-                        <Trash2 className="w-3 h-3" />
-                      </button>
+                      {n.slug && (
+                        <Link to={`/news/${n.slug}`} target="_blank" rel="noreferrer" data-testid={`news-view-${n.id}`} className="inline-flex text-xs font-bold uppercase px-3 py-1 rounded-sm border border-white/15 text-white/65 hover:text-white hover:border-white/35">
+                          {state.key === "published" ? "Ansehen" : "Vorschau"}
+                        </Link>
+                      )}
+                      {state.key === "withdrawn" ? (
+                        <button type="button" onClick={() => restore(n)} data-testid={`news-restore-${n.id}`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#10B981]/40 text-[#10B981] hover:bg-[#10B981]/10 inline-flex items-center gap-1">
+                          <RotateCcw className="w-3 h-3" /> Wiederherstellen
+                        </button>
+                      ) : n.can_delete ? (
+                        <button type="button" onClick={() => remove(n)} data-testid={`news-delete-${n.id}`} aria-label={`„${n.title || "Ohne Titel"}“ löschen`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10 inline-flex items-center gap-1">
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      ) : (
+                        <button type="button" onClick={() => withdraw(n)} data-testid={`news-withdraw-${n.id}`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-live/40 text-live hover:bg-live/10 inline-flex items-center gap-1">
+                          <Undo2 className="w-3 h-3" /> Zurückziehen
+                        </button>
+                      )}
                     </td>
                   </tr>
                   );

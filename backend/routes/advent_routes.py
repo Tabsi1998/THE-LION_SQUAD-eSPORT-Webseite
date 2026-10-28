@@ -156,8 +156,11 @@ async def admin_options(response: Response, me: dict = Depends(require_editor)):
 
 @router.get("/admin/{year}")
 async def admin_calendar(year: int, response: Response, me: dict = Depends(require_editor)):
+    from services.permissions import can_use_area
+
     _private(response)
-    return await advent.admin_view(get_db(), year)
+    # Ziehen nur mit dem Recht der Ziehung (#2122 NW11) - dieselbe Prüfung wie require_drawer.
+    return await advent.admin_view(get_db(), year, may_draw=await can_use_area(me, "club"))
 
 
 @router.get("/admin/{year}/preview")

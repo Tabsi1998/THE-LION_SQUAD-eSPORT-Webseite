@@ -143,7 +143,8 @@ async def test_news_drafts_need_the_second_factor(flow):
         return {item["title"] for item in response.json()}
 
     flow.act_as(lead)
-    assert draft["title"] in titles(await flow.get("/api/news"))
+    # Die öffentliche Liste zeigt Entwürfe niemandem (#2122 NW2) - die Vorschau gibt es auf der Detailseite.
+    assert titles(await flow.get("/api/news")) == {live["title"]}
     assert (await flow.get(f"/api/news/{draft['slug']}")).status_code == 200
 
     flow.act_as(without_second_factor(lead))
@@ -158,9 +159,10 @@ async def test_news_drafts_need_the_second_factor(flow):
 
 
 @pytest.mark.asyncio
-async def test_search_finds_news_drafts_only_with_the_second_factor(flow):
+async def test_search_never_finds_news_drafts(flow):
+    """Die Suche ist eine öffentliche Liste (#2122 NW2): Entwürfe stehen in Admin → News, nicht in der Suche."""
     lead = await flow.add_user(role="tournament_admin", name="turnierleitung")
-    draft = await make_news(flow, "Herbstplan Entwurf", published=False)
+    await make_news(flow, "Herbstplan Entwurf", published=False)
     live = await make_news(flow, "Herbstplan Termine", published=True)
 
     async def news_titles():
@@ -169,7 +171,7 @@ async def test_search_finds_news_drafts_only_with_the_second_factor(flow):
         return {item["title"] for item in response.json()["items"] if item.get("kind") == "news"}
 
     flow.act_as(lead)
-    assert await news_titles() == {draft["title"], live["title"]}
+    assert await news_titles() == {live["title"]}
     flow.act_as(without_second_factor(lead))
     assert await news_titles() == {live["title"]}
     flow.act_as(None)

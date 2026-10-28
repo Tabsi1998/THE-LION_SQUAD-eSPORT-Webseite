@@ -19,7 +19,7 @@ vi.mock("@/components/tls/LazyImg", () => ({ LazyImg: () => null }));
 const authState = { user: null, isClubMember: false };
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => authState }));
 
-const { default: HomePage, glowOffset, newsCardSpan } = await import("./HomePage");
+const { default: HomePage, HOME_HERO_DEFAULT, glowOffset, homeHero, newsCardSpan } = await import("./HomePage");
 
 const NEWS = [
   { id: "n1", slug: "cup-abgesagt", title: "Cup abgesagt", category: "announcement", excerpt: "Zu wenige Anmeldungen.", published_at: "2026-09-20T10:00:00Z" },
@@ -262,4 +262,16 @@ test("Heute im Einsatz: Streifen über dem Kopf nur mit heutigem Termin", async 
   render(<MemoryRouter><HomePage /></MemoryRouter>);
   await screen.findByTestId("home-next-tournament-cup");
   expect(screen.queryByTestId("home-today")).toBeNull();
+});
+
+// Kopf der Startseite (#2122 NW9): pflegbar, leere Felder und der erste Moment zeigen die Vorgabe.
+test("Kopf aus dem Stand, sonst die Vorgabe", async () => {
+  apiMock.get.mockImplementation(async (url) => (url === "/home/state"
+    ? { data: { ...stateWith(1), home_hero: { title: "Ein Verein.", highlight: "", text: "Komm vorbei." } } }
+    : { data: [] }));
+  render(<MemoryRouter><HomePage /></MemoryRouter>);
+  await waitFor(() => expect(screen.getByTestId("hero-title")).toHaveTextContent("Ein Verein."));
+  expect(screen.getByTestId("hero-title")).toHaveTextContent("Eine Familie.");
+  expect(screen.getByTestId("hero-text")).toHaveTextContent("Komm vorbei.");
+  expect(homeHero(null)).toEqual(HOME_HERO_DEFAULT);
 });

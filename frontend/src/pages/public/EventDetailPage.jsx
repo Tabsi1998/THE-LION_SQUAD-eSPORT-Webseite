@@ -267,7 +267,7 @@ function EventHeader({ e }) {
   return (
     <header className="border-b border-white/10 bg-[#0A0A0A]" data-testid="event-header">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-8 lg:pt-10 lg:pb-12 min-w-0">
-        <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "Events", to: "/events" }, { label: e.name }]} className="mb-4" />
+        <Breadcrumbs items={[{ label: "Start", to: "/" }, { label: "Events", to: "/events" }, { label: e.name }]} className="mb-4" />
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] xl:grid-cols-[minmax(0,1fr)_minmax(0,30rem)] lg:items-center min-w-0">
           <EventBanner event={e} eager className="w-full lg:order-2" />
           <div className="min-w-0 lg:order-1">

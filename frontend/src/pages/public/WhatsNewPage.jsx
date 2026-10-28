@@ -22,7 +22,7 @@ export default function WhatsNewPage({ data = whatsNew }) {
   return (
     <PublicLayout>
       <article className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "Neu" }]} />
+        <Breadcrumbs items={[{ label: "Start", to: "/" }, { label: "Neu" }]} />
         <p className="mt-4 text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Website</p>
         <h1 className="font-heading text-4xl md:text-5xl font-black uppercase mt-2">Neu auf der Website</h1>
         <p className="mt-3 text-white/60 max-w-2xl">Die letzten Neuerungen, je in einem Satz.</p>

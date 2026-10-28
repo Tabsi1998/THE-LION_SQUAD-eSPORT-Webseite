@@ -1,4 +1,5 @@
 // Einstellungen (#223): Abschnitt „Marke und Hinweisleisten“ – nur Darstellung; Zustand und Handler bleiben in AdminSettingsPage.
+import { Link } from "react-router-dom";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { BrandField, BrandSelect, LegalTextArea } from "../fields";
 import { SetupGuide } from "@/components/tls/SetupGuide";
@@ -167,7 +168,7 @@ export function BrandSection({ brand, siteBanners, bannerForm, editingBannerId, 
             </div>
           </div>
         </div>
-        <p className="text-xs text-white/45">Impressum, Datenschutz und Vereinsdaten liegen im Tab Rechtliches.</p>
+        <p className="text-xs text-white/45" data-testid="brand-legal-hint">Impressum, Datenschutz und Vereinsdaten liegen unter <Link to="/admin/club" className="text-[#29B6E8] hover:underline">Verein → Vereinsdaten</Link>.</p>
         <button onClick={saveBrand} disabled={imageUploadBusy || savingBrand} data-testid="brand-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">{savingBrand ? "Speichere..." : "Speichern"}</button>
       </div>
     </div>

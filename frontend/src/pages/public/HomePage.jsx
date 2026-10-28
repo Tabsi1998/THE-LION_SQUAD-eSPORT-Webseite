@@ -47,6 +47,19 @@ const HOME_DESCRIPTION = "THE LION SQUAD eSports ist ein Gaming und eSports Vere
 // über Schatten statt Verschieben, der Countdown tickt weich, das Licht hinter dem Löwen folgt dem
 // Zeiger. Mit „Bewegung reduzieren“ steht alles still und ist sofort da.
 
+// Kopf der Startseite (#2122 NW9): gepflegt unter Admin → Verein → Über uns; bis der Stand da ist und für leere Felder
+// gilt die Vorgabe - dieselbe wie auf dem Server.
+export const HOME_HERO_DEFAULT = {
+  title: "Ein Rudel.",
+  highlight: "Eine Familie.",
+  text: "Gaming- und eSports-Verein aus Tirol. Bei uns geht es um Gemeinschaft: gemeinsam zocken, Turniere spielen, Events erleben — auf Discord und vor Ort. Wer mitspielt und sich einbringt, gehört dazu.",
+};
+
+export function homeHero(value) {
+  const pick = (key) => (typeof value?.[key] === "string" && value[key].trim() ? value[key].trim() : HOME_HERO_DEFAULT[key]);
+  return { title: pick("title"), highlight: pick("highlight"), text: pick("text") };
+}
+
 export default function HomePage() {
   const [board, setBoard] = useState([]);
   const [heroRef, glowRef] = useHeroGlow();
@@ -67,6 +80,7 @@ export default function HomePage() {
   // Ein Stand, eine Liste: sonst sähe der Änderungsvergleich in NextUp bei jedem Tick neue Objekte.
   // Ein Event mit seinen Turnieren und Fast Laps ist eine Zeile (#1182) - aus drei Karten wird eine.
   const timeline = useMemo(() => (state ? nestUnderEvents(buildHomeTimeline(state)).slice(0, 5) : []), [state]);
+  const hero = homeHero(state?.home_hero);
   const leadNews = state?.featured_news?.[0] || state?.news?.[0] || null;
   // Dasselbe Bild nie zweimal nebeneinander (#1343): die Wiederholung bekommt die Text-Karte.
   const [primaryNews = null, ...newsItems] = withoutRepeatedBanners(leadNews ? [leadNews, ...homeNews(state, leadNews.id).slice(0, 3)] : []);
@@ -97,12 +111,12 @@ export default function HomePage() {
                 <span className="w-2 h-2 rounded-full bg-[#29B6E8] animate-pulse" />
                 <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">THE LION SQUAD · eSPORTS</span>
               </div>
-              <h1 className="font-heading text-4xl sm:text-5xl lg:text-7xl font-black uppercase tracking-tighter leading-[0.95] text-white">
-                Ein Rudel.<br /><span className="tls-gradient-text">Eine Familie.</span>
+              <h1 className="font-heading text-4xl sm:text-5xl lg:text-7xl font-black uppercase tracking-tighter leading-[0.95] text-white break-words" data-testid="hero-title">
+                {hero.title}{hero.highlight && <><br /><span className="tls-gradient-text">{hero.highlight}</span></>}
               </h1>
-              <p className="mt-6 text-base md:text-lg text-white/70 max-w-xl leading-relaxed" data-testid="hero-text">
-                Gaming- und eSports-Verein aus Tirol. Bei uns geht es um Gemeinschaft: gemeinsam zocken, Turniere spielen, Events erleben — auf Discord und vor Ort. Wer mitspielt und sich einbringt, gehört dazu.
-              </p>
+              {hero.text && (
+                <p className="mt-6 text-base md:text-lg text-white/70 max-w-xl leading-relaxed" data-testid="hero-text">{hero.text}</p>
+              )}
               {/* Keine Knöpfe im Hero (#425) und keine Extrazeile mehr (#947): der Weg zum Mitglied steht an
                   einer Stelle - „Mitglied werden“ in der Kopfzeile; Mitglieder finden ihren Bereich im Benutzermenü. */}
             </div>

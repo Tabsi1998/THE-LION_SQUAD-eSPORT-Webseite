@@ -53,7 +53,7 @@ test("das Benutzermenü führt keinen zweiten Weg zu einem der Themen", () => {
 });
 
 test("die Handy-Leiste hat die fünf Einträge der App und kennt jedes Thema", () => {
-  expect(bottomNavItems(null).map((item) => item.label)).toEqual(["Home", "Events", "Community", "Verein", "Profil"]);
+  expect(bottomNavItems(null).map((item) => item.label)).toEqual(["Start", "Events", "Community", "Verein", "Profil"]);
   expect(activeSection("/messages")).toBe("community");
   expect(activeSection("/achievements")).toBe("community");
   expect(activeSection("/galerie/sommer")).toBe("verein");

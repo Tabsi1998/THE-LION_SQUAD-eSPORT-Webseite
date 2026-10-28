@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query
 
 from auth import get_optional_user
 from database import get_db
-from services.permissions import is_confirmed_admin_role, is_confirmed_tournament_lead
+from services.permissions import is_confirmed_tournament_lead
 from models import now_utc
 from services.public_phase import derive_public_phase
 from services.league_scope import league_label
@@ -14,8 +14,7 @@ from services.query_filters import safe_regex
 
 router = APIRouter(prefix="/api/search", tags=["search"])
 # Entwürfe und nicht öffentliche Turniere findet nur, wer sie auch verwaltet - mit bestätigter Zwei-Faktor-Anmeldung
-# (#291, #1469).
-STAFF_ROLES = {"tournament_admin", "club_admin", "superadmin"}
+# (#291, #1469). News-Entwürfe findet niemand über die Suche (#2122 NW2).
 
 
 def _parse_dt(value):
@@ -125,9 +124,10 @@ async def _search_news(db, pattern: str, user: dict | None, limit: int) -> list[
         {"_id": 0, "id": 1, "title": 1, "slug": 1, "excerpt": 1, "published": 1, "published_at": 1, "created_at": 1, "visibility": 1, "banner_url": 1, "category": 1},
     ).sort([("published_at", -1), ("created_at", -1)]).to_list(limit * 3)
     out = []
-    is_staff = is_confirmed_admin_role(user, STAFF_ROLES)
     for row in rows:
-        if not is_staff and (row.get("published") is False or not _published_now(row)):
+        # Die Suche ist eine öffentliche Liste (#2122 NW2): Entwürfe und geplante Beiträge findet auch das Admin-Team
+        # hier nicht - die stehen in Admin → News.
+        if row.get("published") is False or not _published_now(row):
             continue
         if not await user_can_see(user, row.get("visibility") or "public"):
             continue

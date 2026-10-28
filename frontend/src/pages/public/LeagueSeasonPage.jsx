@@ -129,7 +129,7 @@ export default function LeagueSeasonPage() {
       {/* Die Akzentfarbe der Liga gilt für die ganze Seite (#2107): Kopf, Zeichen, Reiter, Tabelle (eigene Zeile, „Du“),
           Spielwochen, Ergebnisse und Links - sie setzt dafür auch die Markenfarbe; ohne sie gilt die Vereinsfarbe. */}
       <div className="tls-league-look max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12" style={accentStyle(data.look?.accent_color)}>
-        <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "Liga", to: "/liga" }, { label: title }]} className="mb-3" />
+        <Breadcrumbs items={[{ label: "Start", to: "/" }, { label: "Liga", to: "/liga" }, { label: title }]} className="mb-3" />
         {/* Kopf (#2107): Banner und Emblem der Season bzw. Liga, Akzentfarbe der Liga - ohne alles ein ruhiger Kopf. */}
         <LeagueHead look={data.look} eyebrow={league.game?.name} title={<>{league.name} <span className="text-white/55">{season.name}</span></>}>
           {season.registration_deadline ? (
