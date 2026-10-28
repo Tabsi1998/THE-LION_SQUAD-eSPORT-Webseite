@@ -382,3 +382,21 @@ export function runningMainView(tournament) {
   const format = String(tournament?.format || "");
   return NO_TREE_FORMATS.has(format) || TABLE_FIRST_FORMATS.has(format) ? "standings" : "bracket";
 }
+// ---------------------------------------------------------------- Spielstatus vor Terminstatus (#2124, TP15)
+// Spielplan und Event-Live-Seite zeigten den Terminstatus („Accepted“) auch nach dem Spiel. Jetzt zuerst der Stand des
+// Spiels; der Terminstatus nur, solange das Spiel noch nicht begonnen hat - und auf Deutsch.
+export const SCHEDULE_STATUS_LABELS = {
+  proposed: "Terminvorschlag offen",
+  accepted: "Termin bestätigt",
+  declined: "Vorschlag abgelehnt",
+  escalated: "Turnierleitung nötig",
+};
+const BEFORE_PLAY_STATUSES = new Set(["", "preview", "pending", "scheduled", "ready"]);
+
+/** Was in der Status-Marke eines Spiels steht: der Spielstand, vor dem Spiel der Terminstatus. */
+export function matchScheduleStatusText(match) {
+  const status = String(match?.status || "");
+  const scheduleLabel = SCHEDULE_STATUS_LABELS[match?.schedule_status];
+  if (scheduleLabel && BEFORE_PLAY_STATUSES.has(status)) return scheduleLabel;
+  return status ? formatMatchStatus(status) : "Ausstehend";
+}

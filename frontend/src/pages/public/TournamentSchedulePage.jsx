@@ -17,7 +17,7 @@ import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useChangedKeys } from "@/hooks/useLiveChanges";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { formatMatchStatus } from "@/lib/tournamentLabels";
+import { matchScheduleStatusText } from "@/lib/tournamentLabels";
 import { formatWhen } from "@/lib/datetime";
 import { seoTextPreview } from "@/lib/textPreview";
 import { viennaDate } from "@/lib/vienna";
@@ -284,7 +284,7 @@ export default function TournamentSchedulePage() {
 /** Wie es steht - nur ein laufendes Spiel trägt die Live-Farbe, mit Spielzeit seit dem Start. */
 function StatusLabel({ entry, compact = false }) {
   const { match, tone } = entry;
-  const label = tone === "live" ? "Läuft" : formatMatchStatus(match.schedule_status || match.status);
+  const label = tone === "live" ? "Läuft" : matchScheduleStatusText(match);
   return (
     <span className="tls-sched-status" data-tone={tone} data-testid={`schedule-status-${match.id}`}>
       {tone === "live" && <span className="tls-sched-status__dot" aria-hidden="true" />}
