@@ -428,26 +428,36 @@ def tpl_membership_blocked(display_name: str) -> tuple[str, str]:
     )
 
 
+def _newsletter_footer(unsubscribe_url: str = "", preferences_url: str = "") -> str:
+    """Abbestellen mit einem Klick (#2119 ML4) und der Weg zu den Einstellungen - Teil einer Vorlage, die Werte kommen
+    schon als Text geschützt an (mail_template)."""
+    parts = []
+    if unsubscribe_url:
+        parts.append(f'Keine Newsletter mehr? <a href="{unsubscribe_url}">Mit einem Klick abbestellen</a>.')
+    if preferences_url:
+        parts.append(f'Themen ändern: <a href="{preferences_url}">E-Mail-Einstellungen öffnen</a>.')
+    return f'<p style="font-size:12px;color:#6b7280">{" ".join(parts)}</p>' if parts else ""
+
+
 @mail_template
-def tpl_newsletter_news(display_name: str, title: str, excerpt: str = "", url: str = "", preferences_url: str = "") -> tuple[str, str]:
+def tpl_newsletter_news(display_name: str, title: str, excerpt: str = "", url: str = "", preferences_url: str = "", unsubscribe_url: str = "") -> tuple[str, str]:
     body = f"<p>Hallo {display_name or 'Löwe'},</p><p>es gibt neue Vereinsnews:</p><p><strong>{title}</strong></p>"
     if excerpt:
         body += f"<p>{excerpt}</p>"
-    if preferences_url:
-        body += f'<p style="font-size:12px;color:#6b7280">Newsletter abbestellen oder Kategorien ändern: <a href="{preferences_url}">E-Mail-Einstellungen öffnen</a>.</p>'
+    body += _newsletter_footer(unsubscribe_url, preferences_url)
     return f"Neue Vereinsnews: {title}", _wrap("Neue Vereinsnews", body, "News lesen", url)
 
 
 @mail_template
-def tpl_newsletter_event(display_name: str, title: str, when: str = "", location: str = "", url: str = "", preferences_url: str = "") -> tuple[str, str]:
+def tpl_newsletter_event(display_name: str, title: str, when: str = "", location: str = "", url: str = "", preferences_url: str = "",
+                         unsubscribe_url: str = "") -> tuple[str, str]:
     facts = ""
     if when:
         facts += f"<p><strong>Datum:</strong> {when}</p>"
     if location:
         facts += f"<p><strong>Ort:</strong> {location}</p>"
     body = f"<p>Hallo {display_name or 'Löwe'},</p><p>ein neues Event wurde veröffentlicht:</p><p><strong>{title}</strong></p>{facts}"
-    if preferences_url:
-        body += f'<p style="font-size:12px;color:#6b7280">Newsletter abbestellen oder Kategorien ändern: <a href="{preferences_url}">E-Mail-Einstellungen öffnen</a>.</p>'
+    body += _newsletter_footer(unsubscribe_url, preferences_url)
     return f"Neues Event: {title}", _wrap("Neues Event", body, "Event ansehen", url)
 
 
@@ -640,6 +650,7 @@ async def send_template(
     scheduled_at=None,
     dedupe_key: Optional[str] = None,
     mail_meta: Optional[dict] = None,
+    mail_headers: Optional[dict] = None,
     **kwargs,
 ) -> dict:
     """Shortcut for named templates. By default the mail is queued via the new mail-queue.
@@ -658,6 +669,7 @@ async def send_template(
             to=to, subject=subject, html=html,
             template_key=template_key, scheduled_at=scheduled_at,
             dedupe_key=dedupe_key, meta=mail_meta,
+            **({"headers": mail_headers} if mail_headers else {}),
         )
     return await send_mail(to, subject, html, template_key=template_key)
 

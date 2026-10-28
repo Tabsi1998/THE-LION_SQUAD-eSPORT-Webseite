@@ -83,6 +83,7 @@ SAMPLES: dict[str, str] = {
     "excerpt": "Mario Kart Winter Cup und Smash Showdown – jetzt anmelden!", "preview": "Bist du am Samstag dabei?", "note": "Wir freuen uns auf dich!",
     "url": "{origin}/tournaments/mario-kart-winter-cup", "verification_url": "{origin}/verify-email?token=beispiel", "reset_url": "{origin}/reset-password?token=beispiel",
     "invite_url": "{origin}/register?invite=beispiel", "preferences_url": "{origin}/profile", "appeal_url": "{origin}/contact", "branding": "THE LION SQUAD",
+    "unsubscribe_url": "{origin}/newsletter/abbestellen?token=beispiel",
     # Rechnung ist da (#841)
     "source": "Weihnachtsfeier", "amount": "40,00 €", "due_on": "17.10.2026", "paid": "",
     # Wochenrückblick (#622)

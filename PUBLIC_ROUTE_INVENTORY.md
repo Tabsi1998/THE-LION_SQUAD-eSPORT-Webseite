@@ -42,6 +42,7 @@ Diese Routen bleiben erreichbar, damit Menschen sie verwenden und Crawler `noind
 - `/references/series/<spur>/<saison>` (Serienseite mit Tabellen, #1745: fremde Namen nur in Tabellen, nie in der Sitemap)
 - `/references/series/<spur>/<saison>/runde/<nr>` (Ergebnistabelle je Runde einer Rennliga, #1950; Reiter je Lauf als `?lauf=…`)
 - Login-, Registrierungs- und Passwort-Routen
+- `/newsletter/abbestellen?token=…` (Abmeldelink aus dem Newsletter, #2119; `noindex, nofollow`, abgemeldet wird erst per Knopf - `POST /api/settings/newsletter/unsubscribe`, auch als One-Click aus `List-Unsubscribe`)
 - Fehleransichten `/403`, `/500` und der SPA-404-Fallback; sie setzen `noindex, nofollow`
 
 ## Private und betriebliche Routen

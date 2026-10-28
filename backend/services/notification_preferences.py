@@ -414,7 +414,11 @@ async def preview_newsletter(kind: str, item: dict, display_name: str) -> dict |
         return None
     from email_service import render_named
 
+    from services.newsletter_unsubscribe import PAGE_PATH
+
     template_key, values = await newsletter_mail_values(kind, item)
+    # Der Abmeldelink der Vorschau führt ins Leere - ein echter würde die ansehende Person abmelden.
+    values["unsubscribe_url"] = f"{await _site_base_url()}{PAGE_PATH}?token=vorschau"
     subject, html = await render_named(template_key, display_name=display_name or "Löwe", **values)
     return {"template_key": template_key, "subject": subject, "html": html}
 
@@ -436,16 +440,22 @@ async def enqueue_newsletter_for_item(kind: str, item: dict, dedupe_suffix: str 
         return {"queued": 0, "reason": "no_recipients"}
 
     template_key, common_kwargs = await newsletter_mail_values(kind, item)
+    base = await _site_base_url()
     queued = 0
     from email_service import send_template
+    from services.newsletter_unsubscribe import links_for, mail_headers
     for user in users:
         if not email_allowed(user, template_key, "news_events"):
             continue
         display_name = user.get("display_name") or user.get("username") or "Löwe"
+        # Abbestellen mit einem Klick (#2119 ML4): Link im Text und Kopfzeilen für Gmail/Yahoo, je Person signiert.
+        unsubscribe = links_for(base, user["id"])
         result = await send_template(
             template_key,
             user["email"],
             display_name=display_name,
+            unsubscribe_url=unsubscribe["page"],
+            mail_headers=mail_headers(unsubscribe["api"]),
             dedupe_key=f"{template_key}:{item.get('id')}:{user['id']}{dedupe_suffix}",
             mail_meta={
                 "kind": "newsletter",

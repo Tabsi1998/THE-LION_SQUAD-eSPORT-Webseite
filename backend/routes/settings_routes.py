@@ -1257,6 +1257,18 @@ async def newsletter_preview(body: NewsletterTriggerBody, me: dict = Depends(get
     return box
 
 
+@settings_router.post("/newsletter/unsubscribe")
+async def newsletter_unsubscribe(token: str = Query("", max_length=200)):
+    """Newsletter mit einem Klick abbestellen (#2119 ML4) - ohne Login, nur mit dem Schlüssel aus der Mail. Mail-Programme
+    schicken dabei „List-Unsubscribe=One-Click“ als Formular (RFC 8058); der Inhalt spielt keine Rolle."""
+    from services.newsletter_unsubscribe import unsubscribe
+
+    result = await unsubscribe(get_db(), token)
+    if result is None:
+        raise HTTPException(400, "Der Abmeldelink ist ungültig. Den Newsletter kannst du auch im Profil unter Benachrichtigungen abbestellen.")
+    return result
+
+
 @settings_router.get("/newsletter/history")
 async def newsletter_history(me: dict = Depends(require_club_admin())):
     """Verlauf für System (#1359): welche News und Events wann an wie viele gingen - ohne Rohwerte, ohne Empfänger."""

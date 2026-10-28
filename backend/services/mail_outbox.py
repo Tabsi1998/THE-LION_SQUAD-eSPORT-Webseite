@@ -22,6 +22,7 @@ async def enqueue_mail(
     scheduled_at: Optional[datetime] = None,
     meta: Optional[dict] = None,
     dedupe_key: Optional[str] = None,
+    headers: Optional[dict] = None,
 ) -> dict:
     """Enqueue a mail. If dedupe_key is set, will not re-queue if already exists.
 
@@ -46,6 +47,8 @@ async def enqueue_mail(
         "last_error": None,
         "message_id": None,
         "meta": meta or {},
+        # Zusätzliche Kopfzeilen (#2119 ML4: List-Unsubscribe) - der Versand lässt nur bekannte durch.
+        **({"headers": {str(k): header_text(v) for k, v in headers.items()}} if headers else {}),
         "dedupe_key": dedupe_key,
         "created_at": now_utc().isoformat(),
         "updated_at": now_utc().isoformat(),
