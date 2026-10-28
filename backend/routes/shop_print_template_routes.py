@@ -32,13 +32,16 @@ class PresetsUpdate(BaseModel):
 
     presets: list[dict[str, Any]] | None = Field(None, max_length=templates.MAX_PRESETS)
     rules: dict[str, Any] | None = None
+    # Vorlagen mit mehreren Ebenen (#2142), etwa „Trikot Rücken“.
+    sets: list[dict[str, Any]] | None = Field(None, max_length=templates.MAX_SETS)
     reason: str = Field("", max_length=500)
 
 
 def _presets_view(doc: dict) -> dict:
-    return {**doc, "defaults": templates.clean_presets(templates.DEFAULT_PRESETS),
+    presets = templates.clean_presets(templates.DEFAULT_PRESETS)
+    return {**doc, "defaults": presets, "default_sets": templates.clean_sets(templates.DEFAULT_SETS, presets),
             "labels": {"families": templates.FAMILIES, "kinds": templates.PRESET_KINDS,
-                       "anchors": templates.ANCHORS, "follows": templates.FOLLOWS}}
+                       "anchors": templates.ANCHORS, "follows": templates.FOLLOWS, "set_kinds": templates.SET_KINDS}}
 
 
 @router.get("/print-presets")
@@ -51,7 +54,8 @@ async def read_presets(me: dict = Depends(require_area("finance"))):
 async def save_presets(body: PresetsUpdate, me: dict = Depends(require_area("finance"))):
     """Vorgaben bzw. Regeln ändern (Grund optional, Protokoll mit vorher/nachher)."""
     try:
-        doc = await templates.save_presets(get_db(), presets=body.presets, rules=body.rules, actor_id=me["id"],
+        doc = await templates.save_presets(get_db(), presets=body.presets, rules=body.rules, sets=body.sets,
+                                           actor_id=me["id"],
                                            reason=body.reason)
     except ShopError as exc:
         raise HTTPException(400, str(exc)) from exc
