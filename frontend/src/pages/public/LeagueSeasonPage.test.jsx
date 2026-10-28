@@ -1,0 +1,104 @@
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
+
+// Ligaseite (docs/LIGA.md, P5, #1625): Kopf mit Pausen, Liga N mit Staffel-Reitern, Tabelle, Spielwochen mit Pause,
+// Ergebnis mit Maps, Teams mit Teamseite, Regeln aufklappbar. Nur erfundene Namen.
+const apiMock = { get: vi.fn() };
+vi.mock("@/lib/api", () => ({ api: apiMock, API: "/api", resolveMediaUrl: (url) => url || "", formatApiError: (d) => String(d || "Fehler") }));
+vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <div>{children}</div> }));
+vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: () => {} }));
+vi.mock("@/hooks/useDocumentTitle", () => ({ useDocumentTitle: () => {} }));
+
+const { default: LeagueSeasonPage } = await import("./LeagueSeasonPage");
+
+const SEASON_VIEW = {
+  league: { id: "l1", slug: "probe-liga", name: "Probe-Liga", game: { name: "Probe Shooter" } },
+  season: {
+    name: "Season 1", slug: "season-1", start_date: "2026-11-09T23:00:00+00:00", end_date: "2027-01-18T22:59:59+00:00",
+    matchday_days: 7, default_match_weekday: 6, default_match_time: "20:00", best_of: 3, team_size: 4,
+    match_points: { win: 3, draw: 1, loss: 0 }, rules_text: "## Fairplay\nKein Cheaten.", registration_deadline: "2026-11-06",
+    blocked_periods: [{ start_date: "2026-12-21", end_date: "2027-01-03", label: "Weihnachtspause" }],
+  },
+  map_pool: { id: "p1", modes: [{ mode: "snd", label: "Suchen & Zerstören", maps: [{ map_id: "m1", name: "Hafenkante", image_url: null }] }] },
+  divisions: [{ id: "d1", level: 1, label: "Liga 1", staffeln: [
+    { tournament_id: "t1", slug: "probe-a", staffel: "A" }, { tournament_id: "t2", slug: "probe-b", staffel: "B" }] }],
+};
+const done = {
+  id: "m1", matchday: 1, done: true, status: "completed", home: { registration_id: "r1", name: "Probe · Probe B", team_id: "team-1", score: 2 },
+  away: { registration_id: "r2", name: "Falken · Falken A", team_id: "team-2", score: 1 }, winner_registration_id: "r1",
+  games: [{ position: 1, map_name: "Hafenkante", winner_registration_id: "r1" }, { position: 2, map_name: "Nebelwerk", winner_registration_id: "r2" }],
+};
+const open = { id: "m2", matchday: 2, done: false, status: "scheduled", scheduled_at: "2026-11-22T19:00:00+00:00", schedule_source: "default",
+  home: { registration_id: "r2", name: "Falken · Falken A", team_id: "team-2" }, away: { registration_id: "r1", name: "Probe · Probe B", team_id: "team-1" }, games: [] };
+const STAFFEL = (letter) => ({
+  staffel: { staffel: letter, division_label: "Liga 1" },
+  standings: [{ registration_id: "r1", rank: 1, display_name: "Probe · Probe B", played: 1, won: 1, points: 3, form: ["W"], score_for: 2, score_against: 1, score_diff: 1 }],
+  teams: [{ id: "r1", display_name: "Probe · Probe B", team_id: "team-1" }, { id: "r2", display_name: "Falken · Falken A", team_id: "team-2" }],
+  current: 2,
+  weeks: [
+    { week: 1, kind: "matchday", matchday: 1, label: "Spieltag 1", first_day: "2026-11-10", last_day: "2026-11-16", matches: [done] },
+    { week: 2, kind: "matchday", matchday: 2, label: "Spieltag 2", first_day: "2026-11-17", last_day: "2026-11-23", matches: [open] },
+    { week: 7, kind: "pause", label: "Weihnachtspause", first_day: "2026-12-22", last_day: "2026-12-28", matches: [] },
+  ],
+});
+
+beforeEach(() => {
+  apiMock.get.mockReset();
+  apiMock.get.mockImplementation((url) => {
+    if (url === "/leagues/probe-liga/season-1") return Promise.resolve({ data: SEASON_VIEW });
+    if (url.endsWith("/staffeln/t1")) return Promise.resolve({ data: STAFFEL("A") });
+    if (url.endsWith("/staffeln/t2")) return Promise.resolve({ data: { ...STAFFEL("B"), standings: [], weeks: [] } });
+    return Promise.reject(new Error(url));
+  });
+});
+
+function renderPage(path = "/liga/probe-liga/season-1") {
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <Routes><Route path="/liga/:league/:season" element={<LeagueSeasonPage />} /></Routes>
+    </MemoryRouter>,
+  );
+}
+
+test("Kopf mit Zeitraum, Spielwoche, Punkten und Pausen", async () => {
+  renderPage();
+  expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("Probe-Liga Season 1");
+  expect(screen.getByTestId("league-fact-period")).toHaveTextContent("10.11.2026 – 18.1.2027");
+  expect(screen.getByTestId("league-fact-week")).toHaveTextContent("Spielwoche Di–Mo");
+  expect(screen.getByTestId("league-fact-week")).toHaveTextContent("Sonntag, 20:00 Uhr");
+  expect(screen.getByTestId("league-fact-points")).toHaveTextContent("3 / 1 / 0");
+  expect(screen.getByTestId("league-fact-breaks")).toHaveTextContent("Weihnachtspause 21.12.–3.1.");
+  expect(screen.getByTestId("league-rules")).toHaveTextContent("Kein Cheaten");
+  expect(screen.getByTestId("league-map-pool")).toHaveTextContent("Hafenkante");
+});
+
+test("Staffel: Tabelle, laufende Woche offen, Pause sichtbar, Ergebnis mit Maps und Teamseiten", async () => {
+  renderPage();
+  const staffel = await screen.findByTestId("league-staffel-A");
+  expect(within(staffel).getByTestId("standing-row-r1")).toHaveTextContent("Probe · Probe B");
+  expect(within(staffel).getByTestId("league-week-7")).toHaveTextContent("Weihnachtspause");
+  // Die laufende Woche (2) ist offen, die erste zu.
+  expect(within(staffel).getByTestId("league-match-m2")).toHaveTextContent("Standardtermin");
+  expect(within(staffel).queryByTestId("league-match-m1")).toBeNull();
+  fireEvent.click(within(within(staffel).getByTestId("league-week-1")).getByRole("button"));
+  const result = within(staffel).getByTestId("league-match-m1");
+  expect(result).toHaveTextContent("2 : 1");
+  expect(result).toHaveTextContent("Hafenkante");
+  expect(result).toHaveTextContent("Nebelwerk");
+  expect(within(result).getAllByRole("link", { name: /Probe · Probe B/ })[0]).toHaveAttribute("href", "/teams/team-1");
+  expect(within(result).getByRole("link", { name: /Zum Spiel/ })).toHaveAttribute("href", "/matches/m1");
+  expect(within(staffel).getByTestId("league-team-r2")).toHaveAttribute("href", "/teams/team-2");
+});
+
+test("Staffel-Reiter und Sprung aus der Teamseite (#staffel-…)", async () => {
+  renderPage("/liga/probe-liga/season-1#staffel-probe-b");
+  expect(await screen.findByTestId("league-staffel-B")).toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("league-staffel-tab-A"));
+  expect(await screen.findByTestId("league-staffel-A")).toBeInTheDocument();
+});
+
+test("Unsichtbare oder unbekannte Season: ein klarer Hinweis", async () => {
+  apiMock.get.mockRejectedValue({ response: { status: 404 } });
+  renderPage();
+  expect(await screen.findByTestId("league-missing")).toHaveTextContent("Liga nicht gefunden");
+});
