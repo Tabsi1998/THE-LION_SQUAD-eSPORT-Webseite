@@ -24,7 +24,7 @@ import { matchIsOver } from "@/lib/afterEnd";
 import { rankingMode } from "@/lib/matchReport";
 import { MatchReportForm } from "@/components/tls/tournament/MatchReportForm";
 import { LeagueReportForm } from "@/components/tls/league/LeagueReportForm";
-import { sidesInSlotOrder } from "@/components/tls/league/leagueGames";
+import { defaultTimeText, sidesInSlotOrder } from "@/components/tls/league/leagueGames";
 import { LeagueGamesView, LineupAmendForm, StaffLineupAmend } from "@/components/tls/league/LeagueGamesView";
 import { LiveQueueStatus } from "@/components/tls/live/LiveQueueStatus";
 import { MatchCallBox } from "@/components/tls/tournament/MatchCallBox";
@@ -66,10 +66,18 @@ function formatDateTime(value) {
 const LIVE_MATCH_STATUSES = new Set(["in_progress", "running", "waiting_result", "disputed"]);
 
 /** Was im Terminkasten groß steht (#1220): „Noch offen“ nur vor dem Spiel ohne Termin. */
-function scheduleHeadline(match) {
+function scheduleHeadline(match, league = null) {
   if (LIVE_MATCH_STATUSES.has(String(match.status))) return formatMatchStatus(match.status);
   if (scheduleLabels[match.schedule_status]) return scheduleLabels[match.schedule_status];
+  if (!match.scheduled_at && league?.default_time) return "Standardtermin";
   return match.scheduled_at ? "Termin steht" : "Noch offen";
+}
+
+/** Der Termin in Worten. Liga ohne Einigung (#2096): der Standardtermin der Spielwoche statt „Noch kein Termin“. */
+function scheduleWhen(match, league = null) {
+  if (match.scheduled_at) return formatWhen(match.scheduled_at);
+  if (league?.default_time) return `Standardtermin ${defaultTimeText(league.default_time)} (ohne Einigung)`;
+  return "Noch kein Termin";
 }
 
 function toLocalInput(value) {
@@ -333,8 +341,8 @@ function MatchPageView() {
           ) : (
             <div className="border border-white/10 bg-[#121212] rounded-sm px-4 py-3 w-full sm:w-auto sm:min-w-[16rem]" data-testid="match-schedule">
               <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold">Terminstatus</div>
-              <div className="mt-1 font-heading font-black uppercase text-[#FFD700]">{scheduleHeadline(match)}</div>
-              <div className="mt-1 text-sm text-white/65" data-testid="match-when">{match.scheduled_at ? formatWhen(match.scheduled_at) : "Noch kein Termin"}</div>
+              <div className="mt-1 font-heading font-black uppercase text-[#FFD700]">{scheduleHeadline(match, league)}</div>
+              <div className="mt-1 text-sm text-white/65" data-testid="match-when">{scheduleWhen(match, league)}</div>
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {eventModeLabels[data.event_mode] && <Pill>{eventModeLabels[data.event_mode]}</Pill>}
                 {resultModeLabels[data.result_entry_mode] && <Pill>{resultModeLabels[data.result_entry_mode]}</Pill>}

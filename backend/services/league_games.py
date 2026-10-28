@@ -617,6 +617,29 @@ def _games_view(games: list[dict] | None, people: dict[str, dict], with_lineups:
     return out
 
 
+def default_time(setup: LeagueSetup) -> str | None:
+    """Der Standardtermin der Spielwoche dieses Spiels (Season 1: Sonntag 20:00 Wien) - er gilt ohne Einigung, auch
+    solange ihn noch kein Lauf ins Spiel geschrieben hat (#2096). ``None``, wenn die Woche ihn nicht enthält."""
+    from services.matchday_schedule import (
+        MatchdayScheduleError,
+        default_time_in,
+        matchday_number_of,
+        matchday_settings,
+        tournament_matchday_window,
+    )
+
+    number = matchday_number_of(setup.match)
+    if not number or not setup.tournament.get("start_date"):
+        return None
+    settings = matchday_settings(setup.tournament)
+    try:
+        window = tournament_matchday_window(setup.tournament, number)
+        moment = default_time_in(window, weekday=settings["weekday"], hour=settings["hour"], minute=settings["minute"])
+    except (MatchdayScheduleError, TypeError, ValueError):
+        return None
+    return moment.isoformat() if moment else None
+
+
 async def page_block(db, setup: LeagueSetup, *, side_id: str | None, can_act: bool, staff: bool = False) -> dict:
     """Was die Matchseite zum Melden, Bestätigen, Nachtragen und Anzeigen braucht. ``side_id``: die Anmeldung, zu der
     die Person gehört (sonst ``None``); ``can_act``: sie darf für diese Seite handeln; ``staff``: Turnierleitung - sie
@@ -677,6 +700,7 @@ async def page_block(db, setup: LeagueSetup, *, side_id: str | None, can_act: bo
         "can_amend_lineup": bool(can_act and side_id and open_window),
         "amend_until": deadline.isoformat() if deadline else None,
         "app_detail": APP_DETAIL,
+        "default_time": default_time(setup),
     }
 
 
