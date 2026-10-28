@@ -6,7 +6,9 @@ transparentes PNG in der Pixelgröße der Printful-Vorlage (``shop_print_templat
 - **Aufbau je Produkt** (``product.placements``, neu seit #2069): je Printful-Platzierung eine Zeile mit Ebenen
   (``layers``): Motive (``kind = "motif"``: Vorgabe, Breite in cm, Feinjustierung) und Platzhalter für den Gamertag
   bzw. die Vereinsnummer (``gamertag``, ``member_number``), deren Datei erst je Bestellung entsteht. ``mode = "upload"``
-  heißt: für diese Fläche lädt ein Profi eine fertige Druckdatei hoch (``upload``), exakt gegen die Vorlage geprüft.
+  heißt: je Farbe eine fertige Datei der ganzen Fläche (``upload``), exakt gegen die Vorlage geprüft - seit #2141 als
+  Hintergrund, auf den die Motive kommen (Allover); ohne Motive ist sie selbst die Grunddatei. Hell oder dunkel je
+  Ebene entscheidet der Abschnitt „Untergrund“.
   Ältere Produkte mit festen Zoll-Positionen (#1707) rechnet ``layout_rows`` beim Lesen um; ``scripts/shop_print_layout.py``
   speichert das mit Trockenlauf und Rückweg (``migrate``/``rollback_migration``).
 - **Plan** (``plan_placement``): Vorgabe auf die Fläche umgerechnet, Rahmen in Pixeln, geprüft (ganz in der Fläche bzw.
@@ -25,12 +27,14 @@ transparentes PNG in der Pixelgröße der Printful-Vorlage (``shop_print_templat
 from __future__ import annotations
 
 import asyncio
+import base64
 import hashlib
 import hmac
 import json
 import logging
 import re
 import secrets
+import struct
 from dataclasses import dataclass, field
 from io import BytesIO
 from typing import Any, Sequence
@@ -51,8 +55,16 @@ RENDERER_VERSION = 1  # ändert sich, wenn der Generator andere Pixel liefert - 
 NOT_ORDERABLE = "Dieses Produkt ist gerade nicht bestellbar."
 LAYER_KINDS = {"motif": "Motiv", "gamertag": "Gamertag (Datei je Bestellung)",
                "member_number": "Vereinsnummer (Datei je Bestellung, #1727)"}
+# Was in die Grunddatei kommt (gleich für alle Bestellungen) und was erst je Bestellung (#2141). Neue Ebenenarten
+# (etwa ein fester Text, #2142) reihen sich hier ein.
+BASE_KINDS = ("motif",)
 TEXT_KINDS = ("gamertag", "member_number")
-MODES = {"layout": "Motiv und Position", "upload": "Fertige Druckdatei (für Profis)"}
+MODES = {"layout": "Motiv und Position", "upload": "Fertige Druckdatei als Hintergrund"}
+MODE_HINTS = {
+    "layout": "Die Website erzeugt die Druckdatei: Motive an ihrer Stelle, der Rest durchsichtig.",
+    "upload": "Für Allover (etwa ein Trikot): je Farbe eine fertige Datei der ganzen Fläche als Hintergrund. Motive, "
+              "Gamertag und Vereinsnummer liegen als Ebenen darüber - mit Position, Größe und Vorschau.",
+}
 MAX_LAYERS = 6
 MAX_OFFSET_CM = 300.0
 # 80 Millionen Pixel: das größte Badetuch (11100 × 5700) passt, RGBA braucht dann gut 250 MB.
@@ -92,11 +104,18 @@ def _design_key_for(motif: dict, color: str) -> str | None:
     return (motif.get("by_color") or {}).get(color) or motif.get("key") or None
 
 
-async def _motif_source(db, motif: dict, color: str, color_hex: str | None) -> MotifSource | None:
+async def _motif_source(db, motif: dict, color: str, color_hex: str | None,
+                        variant: str | None = None) -> MotifSource | None:
     """Das Motiv einer Ebene für eine Shirtfarbe (Fassung hell oder dunkel samt Version) - oder ``None``, wenn es
-    dafür keine Fassung gibt (etwa ein PNG, das sich nicht für helle Shirts umfärben ließ)."""
+    dafür keine Fassung gibt (etwa ein PNG, das sich nicht für helle Shirts umfärben ließ). Mit ``variant`` ist der
+    Untergrund schon entschieden (Hintergrund, Vorgabe des Produkts oder von Hand, #2141)."""
     key = _design_key_for(motif or {}, color)
-    row = await shop_motifs.file_for_garment(db, key, color=color, color_hex=color_hex) if key else None
+    if not key:
+        row = None
+    elif variant:
+        row = await shop_motifs.file_for_surface(db, key, variant)
+    else:
+        row = await shop_motifs.file_for_garment(db, key, color=color, color_hex=color_hex)
     if not row:
         return None
     view_box = row.get("view_box")
@@ -461,6 +480,203 @@ async def layout_conversion(db, product: dict) -> dict:
     return {"converted": True, "notes": notes, "blocked": blocked}
 
 
+# ================================================================ Untergrund: hell oder dunkel (#2141)
+#
+# Welche Fassung ein Motiv bekommt (für dunkle oder helle Untergründe) und welche Farbe Gamertag und Vereinsnummer: bis
+# #2141 allein nach der Shirtfarbe von Printful. Ein Allover-Trikot hat aber die Grundfarbe „weiß“ und wird oft ganz
+# dunkel bedruckt. Darum gilt je Ebene, in dieser Reihenfolge:
+#
+# 1. die Ebene selbst („Fassung: hell/dunkel“, ``layer.variant``) - etwa bei gemischtem Hintergrund;
+# 2. der Hintergrund unter der Ebene: die mittlere relative Luminanz (WCAG) im Rahmen der Ebene gegen die Schwelle der
+#    Motive (``shop_motifs`` ``threshold``, Vorgabe 0,18 - dieselbe wie für Shirtfarben); durchsichtige Stellen zählen
+#    als Untergrund nach 3. bzw. 4.;
+# 3. die Vorgabe des Produkts („Untergrund gilt als hell/dunkel“, ``product.print_surface``);
+# 4. die Shirtfarbe wie bisher (``variant = None``: ``file_for_garment`` mit Ausnahmen, ``inks_for_garment``).
+#
+# Die Entscheidung steht im Plan (``Planned.surface``, ``Planned.ink``) - Vorschau, Planung, Grunddatei und Bestelldatei
+# lesen sie dort und nirgends sonst.
+
+SURFACES = {"garment": "wie Printful-Farbe", "light": "hell", "dark": "dunkel"}
+LAYER_VARIANTS = {"auto": "automatisch", "light": "hell", "dark": "dunkel"}
+SURFACE_SOURCES = {"layer": "von Hand", "background": "aus Hintergrund", "product": "Vorgabe des Produkts",
+                   "garment": "aus Shirtfarbe"}
+LUMA_GRID_CELLS = 96  # so viele Zellen an der längeren Seite - bei 4950 × 6750 px je Zelle gut 1,2 cm
+LUMA_VERSION = 1      # ändert sich, wenn das gespeicherte Raster anders gerechnet wird - dann wird es neu gerechnet
+
+
+@dataclass(frozen=True)
+class LumaGrid:
+    """Helligkeit einer Hintergrund-Datei in Zellen: je Zelle die Summe aus Luminanz × Deckkraft, die Summe der
+    Deckkraft und die Zahl der Pixel. Der Mittelwert in einem Rahmen gewichtet angeschnittene Zellen nach Fläche."""
+    width_px: int
+    height_px: int
+    cell: int
+    lit: tuple[tuple[float, ...], ...]
+    cover: tuple[tuple[float, ...], ...]
+    count: tuple[tuple[float, ...], ...]
+
+    def mean(self, box: templates.Box, under: float | None) -> float | None:
+        """Mittlere Luminanz im Rahmen; durchsichtige Stellen zählen mit ``under`` (ohne: nur die deckenden)."""
+        left, top = max(0.0, box.left), max(0.0, box.top)
+        right, bottom = min(float(self.width_px), box.right), min(float(self.height_px), box.bottom)
+        if right <= left or bottom <= top:
+            return None
+        lit = cover = pixels = 0.0
+        for row in range(int(top // self.cell), min(len(self.lit), int(-(-bottom // self.cell)))):
+            y0, y1 = row * self.cell, min(self.height_px, (row + 1) * self.cell)
+            share_y = (min(bottom, y1) - max(top, y0)) / (y1 - y0)
+            if share_y <= 0:
+                continue
+            for col in range(int(left // self.cell), min(len(self.lit[row]), int(-(-right // self.cell)))):
+                x0, x1 = col * self.cell, min(self.width_px, (col + 1) * self.cell)
+                share = share_y * (min(right, x1) - max(left, x0)) / (x1 - x0)
+                if share <= 0:
+                    continue
+                lit += self.lit[row][col] * share
+                cover += self.cover[row][col] * share
+                pixels += self.count[row][col] * share
+        if pixels <= 0:
+            return None
+        if under is None:
+            return lit / cover if cover > 1e-9 else None
+        return (lit + under * (pixels - cover)) / pixels
+
+
+def luma_grid(image: Image.Image) -> LumaGrid:
+    """Die Helligkeits-Zellen eines Bilds - streifenweise, damit eine Allover-Datei nicht dreifach im Speicher liegt.
+    Rein und deterministisch."""
+    import numpy as np
+
+    channel = np.arange(256, dtype=np.float64) / 255.0
+    linear = np.where(channel <= 0.04045, channel / 12.92, ((channel + 0.055) / 1.055) ** 2.4)
+    rgba = image.convert("RGBA")
+    width, height = rgba.size
+    cell = max(1, -(-max(width, height) // LUMA_GRID_CELLS))
+    starts = np.arange(0, width, cell)
+    widths = np.diff(np.append(starts, width))
+    lit, cover, count = [], [], []
+    for y0 in range(0, height, cell):
+        y1 = min(height, y0 + cell)
+        strip = np.asarray(rgba.crop((0, y0, width, y1)))
+        alpha = strip[..., 3].astype(np.float64) / 255.0
+        luminance = (0.2126 * linear[strip[..., 0]] + 0.7152 * linear[strip[..., 1]]
+                     + 0.0722 * linear[strip[..., 2]])
+        lit.append(tuple(float(value) for value in np.add.reduceat((luminance * alpha).sum(axis=0), starts)))
+        cover.append(tuple(float(value) for value in np.add.reduceat(alpha.sum(axis=0), starts)))
+        count.append(tuple(float(value * (y1 - y0)) for value in widths))
+    return LumaGrid(width, height, cell, tuple(lit), tuple(cover), tuple(count))
+
+
+def grid_doc(grid: LumaGrid) -> dict:
+    """Das Raster klein für die Druckdatei-Zeile: je Zelle mittlere Luminanz × Deckkraft und mittlere Deckkraft als
+    16-Bit-Werte (Base64) - bei einer Allover-Fläche (96 × 71 Zellen) rund 37 KB."""
+    def packed(sums: tuple) -> str:
+        values = [min(65535, max(0, round(value / count * 65535))) if count else 0
+                  for row, counts in zip(sums, grid.count) for value, count in zip(row, counts)]
+        return base64.b64encode(struct.pack(f"<{len(values)}H", *values)).decode("ascii")
+
+    return {"version": LUMA_VERSION, "width_px": grid.width_px, "height_px": grid.height_px, "cell": grid.cell,
+            "lit": packed(grid.lit), "cover": packed(grid.cover)}
+
+
+def grid_from_doc(doc: Any) -> LumaGrid | None:
+    """Das gespeicherte Raster zurück - ``None``, wenn es fehlt, alt oder kaputt ist (dann wird neu gerechnet)."""
+    if not isinstance(doc, dict) or doc.get("version") != LUMA_VERSION:
+        return None
+    try:
+        width, height, cell = int(doc["width_px"]), int(doc["height_px"]), int(doc["cell"])
+        cols, rows = -(-width // cell), -(-height // cell)
+        lit = struct.unpack(f"<{cols * rows}H", base64.b64decode(doc["lit"]))
+        cover = struct.unpack(f"<{cols * rows}H", base64.b64decode(doc["cover"]))
+    except (KeyError, TypeError, ValueError, ZeroDivisionError, struct.error):
+        return None
+    counts = tuple(tuple(float((min(width, (col + 1) * cell) - col * cell)
+                               * (min(height, (row + 1) * cell) - row * cell)) for col in range(cols))
+                   for row in range(rows))
+    return LumaGrid(width, height, cell,
+                    tuple(tuple(lit[row * cols + col] / 65535 * counts[row][col] for col in range(cols))
+                          for row in range(rows)),
+                    tuple(tuple(cover[row * cols + col] / 65535 * counts[row][col] for col in range(cols))
+                          for row in range(rows)), counts)
+
+
+def _grid_of_file(path) -> LumaGrid:
+    with Image.open(path) as img:
+        img.load()
+        return luma_grid(img)
+
+
+_ROW_LOCKS: dict[str, asyncio.Lock] = {}
+
+
+def _row_lock(key: str) -> asyncio.Lock:
+    """Eine Sperre je Prüfsumme und Zweck: zwei gleichzeitige Anfragen rechnen dasselbe nicht doppelt."""
+    lock = _ROW_LOCKS.get(key)
+    if lock is None:
+        lock = _ROW_LOCKS[key] = asyncio.Lock()
+    return lock
+
+
+async def background_grid(db, row: dict | None) -> LumaGrid | None:
+    """Die Helligkeits-Zellen einer Hintergrund-Datei - aus der Zeile (``luma``, beim Hochladen gerechnet). Nur eine
+    ältere Datei ohne Raster wird einmal geöffnet, gerechnet (außerhalb der Ereignisschleife) und nachgetragen."""
+    if not row or not row.get("sha256"):
+        return None
+    grid = grid_from_doc(row.get("luma"))
+    if grid is not None:
+        return grid
+    async with _row_lock(f"luma:{row['sha256']}"):
+        stored = await db.shop_print_files.find_one({"id": row["id"]}, {"_id": 0, "luma": 1}) if row.get("id") else None
+        grid = grid_from_doc((stored or {}).get("luma"))
+        if grid is not None:
+            return grid
+        path = shop_designs._path_of(row.get("file_ref"))
+        if path is None or not path.is_file():
+            return None
+        grid = await asyncio.to_thread(_grid_of_file, path)
+        if row.get("id"):
+            await db.shop_print_files.update_one({"id": row["id"]}, {"$set": {"luma": grid_doc(grid)}})
+        return grid
+
+
+GARMENT = {"variant": None, "source": "garment", "luminance": None}
+SURFACE_LUMINANCE = {"dark": 0.0, "light": 1.0}
+
+
+def decide_surface(layer: dict, box: templates.Box | None, *, grid: LumaGrid | None, garment_hex: str | None,
+                   product_surface: str | None, threshold: float) -> dict:
+    """Hell oder dunkel für eine Ebene (Reihenfolge im Kopf dieses Abschnitts). ``variant`` ``None`` heißt: wie bisher
+    nach der Shirtfarbe. ``luminance`` ist der gemessene Wert (aus dem Hintergrund) bzw. 0 oder 1 bei einer Vorgabe."""
+    wanted = layer.get("variant")
+    if wanted in SURFACE_LUMINANCE:
+        return {"variant": wanted, "source": "layer", "luminance": SURFACE_LUMINANCE[wanted]}
+    if grid is not None and box is not None:
+        under = (SURFACE_LUMINANCE[product_surface] if product_surface in SURFACE_LUMINANCE
+                 else shop_motifs.relative_luminance(garment_hex))
+        measured = grid.mean(box, under)
+        if measured is not None:
+            return {"variant": "light" if measured >= threshold else "dark", "source": "background",
+                    "luminance": round(measured, 4)}
+    if product_surface in SURFACE_LUMINANCE:
+        return {"variant": product_surface, "source": "product", "luminance": SURFACE_LUMINANCE[product_surface]}
+    return dict(GARMENT)
+
+
+def ink_for(rules: dict, color: str, surface: dict) -> str:
+    """Die Farbe von Gamertag bzw. Vereinsnummer: ohne Entscheidung wie bisher nach der Shirtfarbe, sonst die erste
+    Farbe der Regeln mit genug Kontrast zum Untergrund (``shop_gamertag.ink_for_surface``)."""
+    if surface.get("variant") is None:
+        return shop_gamertag.inks_for_garment(rules, color)[0]["key"]
+    return shop_gamertag.ink_for_surface(rules, color, float(surface["luminance"]))["key"]
+
+
+def surface_text(surface: dict | None) -> str | None:
+    """„Fassung: dunkel (aus Hintergrund)“ - für die Vorschau in Schritt 3."""
+    if not surface or surface.get("variant") is None:
+        return None
+    return f"Fassung: {LAYER_VARIANTS[surface['variant']]} ({SURFACE_SOURCES[surface['source']]})"
+
+
 # ================================================================ Plan je Fläche und Farbe
 
 @dataclass
@@ -472,6 +688,10 @@ class Planned:
     source: MotifSource | None = None
     # Texthöhe und Höchstbreite einer Namensebene (#2105) - für Rendern und Platzieren dieselben Werte.
     sizes: dict | None = None
+    # Untergrund hell/dunkel (#2141) und - bei Gamertag und Vereinsnummer - die Farbe daraus.
+    surface: dict = field(default_factory=lambda: dict(GARMENT))
+    ink: str | None = None
+    ink_fixed: bool = False  # Farbe des Namens von Hand gewählt statt nach Kontrast (#2141)
 
 
 @dataclass
@@ -483,10 +703,18 @@ class Plan:
     layout_hash: str
     template_hash: str
     mode: str = "layout"
+    # Fertige Datei als Hintergrund (#2141): die neueste hochgeladene Datei dieser Fläche und Farbe; ``background_ok``,
+    # wenn sie zur aktuellen Vorlage passt und auf der Platte liegt.
+    background: dict | None = None
+    background_ok: bool = False
 
     @property
     def motifs(self) -> list[Planned]:
         return [layer for layer in self.layers if layer.kind == "motif"]
+
+    @property
+    def base_layers(self) -> list[Planned]:
+        return [layer for layer in self.layers if layer.kind in BASE_KINDS]
 
     @property
     def texts(self) -> list[Planned]:
@@ -494,7 +722,13 @@ class Plan:
 
     @property
     def needs_base(self) -> bool:
-        return self.mode == "upload" or bool(self.motifs)
+        return self.mode == "upload" or bool(self.base_layers)
+
+    @property
+    def on_background(self) -> bool:
+        """Hintergrund plus Ebenen: die Grunddatei wird aus der hochgeladenen Datei und den Motiven erzeugt. Ohne
+        Motive ist die hochgeladene Datei selbst die Grunddatei - wie vor #2141."""
+        return self.mode == "upload" and bool(self.base_layers)
 
 
 def text_canvas_px(entry: dict, gamertag_rules: dict, layer: dict | None = None) -> tuple[float, float]:
@@ -505,19 +739,55 @@ def text_canvas_px(entry: dict, gamertag_rules: dict, layer: dict | None = None)
     return width * scale, height * scale
 
 
+def motifs_on_background(row: dict) -> bool:
+    """Liegen die Motive dieser Fläche auf der fertigen Datei (#2141)? Im Modus „Motiv und Position“ immer. Im Modus
+    „Fertige Druckdatei“ nur bei Zeilen, die seit #2141 gespeichert sind (``background_layers``): davor blendete Schritt
+    3 die Motive dort aus und druckte sie nicht - ein älteres Produkt behält so genau seine Dateien, bis es neu
+    gespeichert wird."""
+    return (row.get("mode") or "layout") != "upload" or bool(row.get("background_layers"))
+
+
+async def latest_background(db, product_id: str, placement: str, group: str, color: str) -> dict | None:
+    """Die neueste hochgeladene Datei einer Fläche und Farbe - der Hintergrund (#2141)."""
+    rows = await db.shop_print_files.find(
+        {"product_id": product_id, "placement": placement, "group": group, "color_key": _color_key(color),
+         "purpose": "base", "origin": "upload"}, {"_id": 0}).sort("version", -1).to_list(1)
+    return rows[0] if rows else None
+
+
 async def plan_placement(db, row: dict, entry: dict, *, color: str, color_hex: str | None, presets_doc: dict,
-                         gamertag_rules: dict, color_label: str | None = None) -> Plan:
-    """Eine Fläche für eine Shirtfarbe: Vorgaben umgerechnet, Rahmen geprüft, Prüfsumme des Aufbaus. ``color_label``
-    ist nur die Bezeichnung in Meldungen (#2105) - gerechnet wird mit dem Printful-Namen."""
+                         gamertag_rules: dict, color_label: str | None = None, product_id: str | None = None,
+                         surface: str | None = None) -> Plan:
+    """Eine Fläche für eine Shirtfarbe: Vorgaben umgerechnet, Rahmen geprüft, Untergrund je Ebene entschieden,
+    Prüfsumme des Aufbaus. ``color_label`` ist nur die Bezeichnung in Meldungen (#2105) - gerechnet wird mit dem
+    Printful-Namen. Mit ``product_id`` sucht der Plan im Modus „Fertige Druckdatei“ den Hintergrund dieser Farbe
+    (#2141); ``surface`` ist die Vorgabe des Produkts („Untergrund gilt als“)."""
     by_key = {item["key"]: item for item in presets_doc["presets"]}
     rules = presets_doc["rules"]
     planned: list[Planned] = []
     found: list[str] = []
     mode = row.get("mode") or "layout"
+    template_hash = templates.entry_hash(entry)
+    background = None
+    if mode == "upload" and product_id:
+        background = await latest_background(db, product_id, row["key"], entry["group"], color)
+    background_ok = bool(background and background.get("template_hash") == template_hash and file_exists(background))
+    product_surface = surface if surface in SURFACE_LUMINANCE else None
+    lazy: dict = {}
+
+    async def decide(layer: dict, box: templates.Box | None) -> dict:
+        if layer.get("variant") not in SURFACE_LUMINANCE and not background_ok and product_surface is None:
+            return dict(GARMENT)  # wie vor #2141 - ohne die Einstellungen der Motive zu lesen
+        if "grid" not in lazy:
+            lazy["grid"] = await background_grid(db, background) if background_ok else None
+            lazy["threshold"] = (await shop_motifs.load_settings(db))["threshold"]
+        return decide_surface(layer, box, grid=lazy["grid"], garment_hex=color_hex, product_surface=product_surface,
+                              threshold=lazy["threshold"])
+
     layers = list(enumerate(row.get("layers") or []))
-    for index, layer in sorted(layers, key=lambda item: item[1].get("kind") != "motif"):
+    for index, layer in sorted(layers, key=lambda item: item[1].get("kind") not in BASE_KINDS):
         kind = layer.get("kind")
-        if mode == "upload" and kind == "motif":
+        if kind == "motif" and not motifs_on_background(row):
             continue
         preset = by_key.get(layer.get("preset"))
         if preset is None:
@@ -526,15 +796,25 @@ async def plan_placement(db, row: dict, entry: dict, *, color: str, color_hex: s
         offsets = {"offset_x_cm": float(layer.get("offset_x_cm") or 0.0),
                    "offset_y_cm": float(layer.get("offset_y_cm") or 0.0)}
         if kind == "motif":
-            source = await _motif_source(db, layer.get("motif") or {}, color, color_hex)
+            motif = layer.get("motif") or {}
+            width_cm = float(layer.get("width_cm") or preset.get("width_cm") or 5.0)
+            source = await _motif_source(db, motif, color, color_hex)
+            chosen = dict(GARMENT)
+            if layer.get("variant") in SURFACE_LUMINANCE or background_ok or product_surface:
+                # Erst mit der Fassung nach Shirtfarbe (bzw. der Hauptdatei) setzen, unter diesem Rahmen messen, dann
+                # die passende Fassung nehmen - beide Fassungen eines Paars haben dasselbe Seitenverhältnis (#2084).
+                probe = source or await _motif_source(db, motif, color, color_hex, "dark")
+                if probe is not None:
+                    chosen = await decide(layer, templates.place_motif(entry, preset, width_cm=width_cm,
+                                                                       aspect=probe.aspect, rules=rules, **offsets))
+                if chosen["variant"]:
+                    source = await _motif_source(db, motif, color, color_hex, chosen["variant"])
             if source is None:
                 found.append(f"{entry['label']}: für „{color_label or shop_colors.german(color)}“ fehlt das Motiv.")
                 continue
-            box = templates.place_motif(entry, preset, width_cm=float(layer.get("width_cm") or preset.get("width_cm")
-                                                                       or 5.0),
-                                        aspect=source.aspect, rules=rules, **offsets)
+            box = templates.place_motif(entry, preset, width_cm=width_cm, aspect=source.aspect, rules=rules, **offsets)
             label = f"Motiv „{source.title}“ ({preset['label']})"
-            planned.append(Planned(index, "motif", label, box, source))
+            planned.append(Planned(index, "motif", label, box, source, surface=chosen))
         else:
             sizes = shop_gamertag.clean_layer_sizes(layer) or None
             width, height = text_canvas_px(entry, gamertag_rules, sizes)
@@ -545,20 +825,36 @@ async def plan_placement(db, row: dict, entry: dict, *, color: str, color_hex: s
             except ShopError as exc:
                 found.append(f"{entry['label']}: {exc}")
                 continue
+            chosen = await decide(layer, box)
             label = f"{'Gamertag' if kind == 'gamertag' else 'Vereinsnummer'} ({preset['label']})"
-            planned.append(Planned(index, kind, label, box, sizes=sizes))
+            # Farbe fest gewählt (#2141) - nur eine, die es in den Gamertag-Regeln (noch) gibt; sonst automatisch.
+            fixed = layer.get("ink") if layer.get("ink") in {item["key"] for item in gamertag_rules["colors"]} else None
+            planned.append(Planned(index, kind, label, box, sizes=sizes, surface=chosen,
+                                   ink=fixed or ink_for(gamertag_rules, color, chosen), ink_fixed=bool(fixed)))
         found += templates.problems(entry, box, label, rules)
-    template_hash = templates.entry_hash(entry)
     payload = {"renderer": RENDERER_VERSION, "template": template_hash, "mode": mode,
                "motifs": [{"box": item.box.rounded(), "ref": item.source.ref} for item in planned
                           if item.kind == "motif"]}
+    if mode == "upload" and any(item.kind in BASE_KINDS for item in planned):
+        # Hintergrund plus Ebenen (#2141): ein neuer Hintergrund macht die Grunddatei veraltet. Ohne Motive bleibt der
+        # Fingerabdruck wie vor #2141 - die hochgeladene Datei ist dann selbst die Grunddatei.
+        payload["background"] = (background or {}).get("sha256") if background_ok else None
     layout_hash = hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     planned.sort(key=lambda item: item.index)
     return Plan(entry=entry, color=color, layers=planned, problems=found, layout_hash=layout_hash,
-                template_hash=template_hash, mode=mode)
+                template_hash=template_hash, mode=mode, background=background, background_ok=background_ok)
 
 
-def plan_view(plan: Plan) -> dict:
+def _surface_view(item: Planned, rules: dict | None) -> dict:
+    out = {"surface": {**item.surface, "text": surface_text(item.surface)}}
+    if item.ink and rules:
+        ink = next((color for color in rules["colors"] if color["key"] == item.ink), None)
+        out["ink"] = {"key": item.ink, "label": (ink or {}).get("label"), "hex": (ink or {}).get("hex"),
+                      "fixed": item.ink_fixed}
+    return out
+
+
+def plan_view(plan: Plan, gamertag_rules: dict | None = None) -> dict:
     dpi = plan.entry["dpi"]
     return {"placement": plan.entry["placement"], "group": plan.entry["group"], "color": plan.color,
             "problems": plan.problems, "layout_hash": plan.layout_hash,
@@ -566,7 +862,8 @@ def plan_view(plan: Plan) -> dict:
                         "source": item.source.ref if item.source else None,
                         # das Bild genau der Fassung, die gedruckt wird - für die Vorschau in Schritt 3
                         "image_path": item.source.image_path if item.source else None,
-                        "aspect": round(item.source.aspect, 6) if item.source else None} for item in plan.layers]}
+                        "aspect": round(item.source.aspect, 6) if item.source else None,
+                        **_surface_view(item, gamertag_rules)} for item in plan.layers]}
 
 
 # ================================================================ Ablage der Druckdateien
@@ -606,11 +903,24 @@ def file_exists(row: dict | None) -> bool:
     return path is not None and path.is_file()
 
 
-async def latest_base(db, product_id: str, placement: str, group: str, color: str) -> dict | None:
-    rows = await db.shop_print_files.find(
-        {"product_id": product_id, "placement": placement, "group": group, "color_key": _color_key(color),
-         "purpose": "base"}, {"_id": 0}).sort("version", -1).to_list(1)
+async def latest_base(db, product_id: str, placement: str, group: str, color: str,
+                      origin: str | None = None) -> dict | None:
+    query = {"product_id": product_id, "placement": placement, "group": group, "color_key": _color_key(color),
+             "purpose": "base"}
+    if origin:
+        query["origin"] = origin
+    rows = await db.shop_print_files.find(query, {"_id": 0}).sort("version", -1).to_list(1)
     return rows[0] if rows else None
+
+
+async def current_base(db, product_id: str, plan) -> dict | None:
+    """Die Grunddatei, die für einen Plan zählt (#2141): bei „Hintergrund plus Ebenen“ die neueste erzeugte - ein neuer
+    Hintergrund allein ist noch keine Druckdatei; bei einer fertigen Datei ohne Motive die neueste hochgeladene - auch
+    wenn mit Motiven schon eine erzeugte entstand (Motive wieder entfernt); sonst die neueste überhaupt."""
+    origin = None
+    if plan.mode == "upload":
+        origin = "composed" if plan.on_background else "upload"
+    return await latest_base(db, product_id, plan.entry["placement"], plan.entry["group"], plan.color, origin=origin)
 
 
 async def _store(db, payload: bytes, values: dict) -> dict:
@@ -669,7 +979,16 @@ async def _context(db, product: dict) -> dict:
     technique = product.get("technique") or printful.get("default_technique")
     return {"template": template, "presets": presets_doc, "gamertag_rules": rules, "rows": rows, "colors": colors,
             "codes": codes, "variants": variants, "technique": technique,
-            "labels": {color: shop_colors.label(product, color) for color in colors}}
+            "labels": {color: shop_colors.label(product, color) for color in colors},
+            "product_id": product.get("id"), "surface": product.get("print_surface") or "garment"}
+
+
+async def _plan(db, context: dict, row: dict, entry: dict, color: str, color_hex: str | None = None) -> Plan:
+    """Ein Plan mit allem aus dem Kontext - derselbe Weg für Prüfung, Erzeugen, Bestellung und Vorschau."""
+    return await plan_placement(db, row, entry, color=color, color_hex=color_hex or context["codes"].get(color),
+                                presets_doc=context["presets"], gamertag_rules=context["gamertag_rules"],
+                                color_label=context["labels"].get(color), product_id=context["product_id"],
+                                surface=context["surface"])
 
 
 async def plans_for(db, product: dict, context: dict | None = None):
@@ -685,9 +1004,7 @@ async def plans_for(db, product: dict, context: dict | None = None):
                 out.append((row, None, color, []))
                 continue
             for entry, ids in groups:
-                plan = await plan_placement(db, row, entry, color=color, color_hex=context["codes"].get(color),
-                                            presets_doc=context["presets"], gamertag_rules=context["gamertag_rules"],
-                                            color_label=context["labels"].get(color))
+                plan = await _plan(db, context, row, entry, color)
                 out.append((row, plan, color, ids or []))
     return out, context
 
@@ -698,9 +1015,23 @@ def _upload_valid(row: dict | None, plan: Plan) -> bool:
 
 
 def _base_valid(row: dict | None, plan: Plan) -> bool:
-    if plan.mode == "upload":
+    if plan.mode == "upload" and not plan.on_background:
         return _upload_valid(row, plan)
+    if plan.on_background and (row or {}).get("origin") != "composed":
+        return False  # Hintergrund plus Ebenen: erst die erzeugte Datei gilt, nie der Hintergrund allein
     return bool(row and row.get("layout_hash") == plan.layout_hash and file_exists(row))
+
+
+def _background_state(plan: Plan, latest: dict | None) -> tuple[str, str]:
+    """Stand einer Fläche „Hintergrund plus Ebenen“ (#2141), wenn die Grunddatei nicht gilt. ``latest`` ist die
+    neueste erzeugte Grunddatei (``current_base``)."""
+    if plan.background is None:
+        return "missing", "Noch kein Hintergrund - je Farbe die fertige Datei hochladen (nach dem Speichern)."
+    if not plan.background_ok:
+        return "outdated", "Vorlage von Printful geändert - den Hintergrund neu hochladen."
+    if latest is None:
+        return "missing", "Hintergrund da - noch nicht mit den Ebenen erzeugt („Druckdateien erzeugen“)."
+    return "outdated", "Neuer Hintergrund, Motiv oder Position geändert - neu erzeugen."
 
 
 async def states(db, product: dict, context: dict | None = None) -> list[dict]:
@@ -717,7 +1048,7 @@ async def states(db, product: dict, context: dict | None = None) -> list[dict]:
                                   "Druckvorgabe (mehr).", "file": None,
                         "plan": None})
             continue
-        latest = await latest_base(db, product["id"], row["key"], plan.entry["group"], color)
+        latest = await current_base(db, product["id"], plan)
         state, detail = "ok", ""
         if plan.problems:
             state, detail = "invalid", " ".join(plan.problems)
@@ -725,6 +1056,8 @@ async def states(db, product: dict, context: dict | None = None) -> list[dict]:
             state, detail = "not_needed", "Nur Platzhalter - die Datei entsteht je Bestellung."
         elif _base_valid(latest, plan):
             state = "ok"
+        elif plan.on_background:
+            state, detail = _background_state(plan, latest)
         elif latest is None or (plan.mode == "upload" and latest.get("origin") != "upload"):
             state, detail = "missing", ("Noch keine fertige Druckdatei hochgeladen." if plan.mode == "upload"
                                         else "Noch nicht erzeugt.")
@@ -732,7 +1065,9 @@ async def states(db, product: dict, context: dict | None = None) -> list[dict]:
             state, detail = "outdated", ("Vorlage von Printful geändert - neu hochladen." if plan.mode == "upload"
                                          else "Aufbau, Motiv oder Vorlage geändert - neu erzeugen.")
         out.append({**base, "group": plan.entry["group"], "state": state, "detail": detail,
-                    "file": file_view(latest), "plan": plan_view(plan)})
+                    "file": file_view(latest), "plan": plan_view(plan, context["gamertag_rules"]),
+                    # der Hintergrund dieser Farbe für die Vorschau in Schritt 3 (#2141)
+                    "background": file_view(plan.background) if plan.mode == "upload" else None})
     return out
 
 
@@ -757,6 +1092,7 @@ async def generate(db, product_id: str, *, actor_id: str, reason: Any = None) ->
 
 
 async def _render_base(db, plan: Plan, rules: dict) -> Composed:
+    """Die Grunddatei: die Motive auf einer durchsichtigen Fläche - bzw. auf dem Hintergrund (#2141)."""
     entry = plan.entry
     layers = []
     for item in plan.motifs:
@@ -764,10 +1100,16 @@ async def _render_base(db, plan: Plan, rules: dict) -> Composed:
         png = await _motif_png(db, item.source, width_px=width, dpi=entry["dpi"])
         layers.append(Layer(png=png, left=left, top=top, width=width, height=height, label=item.source.title,
                             native_width_px=None if item.source.vector else item.source.width_px))
+    base = None
+    if plan.on_background:
+        path = shop_designs._path_of((plan.background or {}).get("file_ref"))
+        if not plan.background_ok or path is None:
+            raise ShopError("Der Hintergrund fehlt oder passt nicht mehr zur Vorlage - bitte neu hochladen.")
+        base = await asyncio.to_thread(path.read_bytes)
     return await asyncio.to_thread(
         compose_print_file, entry["width_px"], entry["height_px"], entry["dpi"], layers,
         min_dpi_ratio=rules["min_dpi_ratio"], warn_dpi_ratio=rules["warn_dpi_ratio"],
-        safe_margin_px=templates.margin_px(entry, rules))
+        safe_margin_px=templates.margin_px(entry, rules), base=base)
 
 
 async def _generate(db, product: dict, *, actor_id: str, reason: str) -> dict:
@@ -777,13 +1119,18 @@ async def _generate(db, product: dict, *, actor_id: str, reason: str) -> dict:
     rules = context["presets"]["rules"]
     created, failed, unchanged = [], [], 0
     for row, plan, color, ids in plans:
-        if plan is None or plan.mode == "upload" or not plan.motifs:
+        # Erzeugt wird, wo Motive in die Grunddatei kommen; eine fertige Datei ohne Motive ist selbst die Grunddatei.
+        if plan is None or not plan.base_layers or (plan.mode == "upload" and not plan.on_background):
             continue
         name = f"{plan.entry['label']} / {context['labels'].get(color) or color}"
         if plan.problems:
             failed.append({"placement": row["key"], "color": color, "detail": " ".join(plan.problems)})
             continue
-        latest = await latest_base(db, product["id"], row["key"], plan.entry["group"], color)
+        if plan.on_background and not plan.background_ok:
+            failed.append({"placement": row["key"], "color": color,
+                           "detail": f"{name}: {_background_state(plan, None)[1]}"})
+            continue
+        latest = await current_base(db, product["id"], plan)
         if _base_valid(latest, plan):
             unchanged += 1
             continue
@@ -804,7 +1151,9 @@ async def _generate(db, product: dict, *, actor_id: str, reason: str) -> dict:
             "group": plan.entry["group"], "variant_ids": ids, "color": color, "color_key": _color_key(color),
             "width_px": composed.width_px, "height_px": composed.height_px, "dpi": composed.dpi,
             "layout_hash": plan.layout_hash, "template_hash": plan.template_hash,
-            "sources": [item.source.ref for item in plan.motifs], "warnings": list(composed.warnings),
+            "sources": ([{"source": "background", "file_id": plan.background["id"],
+                          "sha256": plan.background["sha256"]}] if plan.on_background else [])
+            + [item.source.ref for item in plan.motifs], "warnings": list(composed.warnings),
             "created_by": actor_id})
         created.append({"placement": row["key"], "color": color, "group": plan.entry["group"],
                         "version": stored["version"], "sha256": stored["sha256"], "warnings": list(composed.warnings)})
@@ -868,22 +1217,49 @@ async def upload(db, product_id: str, *, placement: str, color: str, data: bytes
     if not shop_designs.has_transparency(img):
         notes.append("Kein durchsichtiger Hintergrund: die ganze Fläche wird bedruckt.")
     payload = shop_designs.png_bytes(img, dpi)
-    plan = await plan_placement(db, row, entry, color=color, color_hex=context["codes"].get(color),
-                                presets_doc=context["presets"], gamertag_rules=context["gamertag_rules"])
-    latest = await latest_base(db, product_id, placement, entry["group"], color)
-    if latest and latest.get("sha256") == hashlib.sha256(payload).hexdigest():
-        raise ShopConflict(f"Diese Datei ist schon die aktuelle Version (v{latest['version']}).")
-    stored = await _store_base(db, payload, {
-        "origin": "upload", "product_id": product_id, "slug": product.get("slug") or "produkt",
-        "placement": placement, "printful_placement": placement, "technique": entry["technique"],
-        "group": entry["group"], "variant_ids": ids or [], "color": color, "color_key": _color_key(color),
-        "width_px": want_w, "height_px": want_h, "dpi": dpi, "layout_hash": "upload",
-        "template_hash": plan.template_hash, "sources": [{"source": "upload", "format": source_format}],
-        "warnings": notes, "created_by": actor_id})
+    sha256 = hashlib.sha256(payload).hexdigest()
+    template_hash = templates.entry_hash(entry)
+    background = await latest_background(db, product_id, placement, entry["group"], color)
+    if (background and background.get("sha256") == sha256 and background.get("template_hash") == template_hash
+            and file_exists(background)):
+        raise ShopConflict(f"Diese Datei ist schon die aktuelle Version (v{background['version']}).")
+    # Einmal beim Hochladen (#2141): Helligkeits-Raster und Vorschaubild - Schritt 3, Vorschau und Bestellung öffnen
+    # die große Datei dafür nie wieder.
+    grid, thumb = await asyncio.to_thread(lambda: (luma_grid(img), _thumb_png(img)))
+    thumb_ref, thumb_path = shop_designs._store(thumb)
+    try:
+        stored = await _store_base(db, payload, {
+            "origin": "upload", "product_id": product_id, "slug": product.get("slug") or "produkt",
+            "placement": placement, "printful_placement": placement, "technique": entry["technique"],
+            "group": entry["group"], "variant_ids": ids or [], "color": color, "color_key": _color_key(color),
+            "width_px": want_w, "height_px": want_h, "dpi": dpi, "layout_hash": "upload",
+            "template_hash": template_hash, "sources": [{"source": "upload", "format": source_format}],
+            "warnings": notes, "created_by": actor_id, "luma": grid_doc(grid), "thumb_ref": thumb_ref})
+    except BaseException:
+        thumb_path.unlink(missing_ok=True)
+        raise
     await record_admin_action(db, "shop.print_file.add", actor_id=actor_id, target_id=product_id, reason=reason,
                               data={"created": [{"placement": placement, "color": color, "version": stored["version"],
                                                  "sha256": stored["sha256"]}], "origin": "upload"})
-    return {**file_view(stored), "notes": notes}
+    # Die Pixel der Vorlage sind da - ob die Datei echte Details hat oder nur hochgerechnet ist, misst keine Prüfung.
+    out_notes = [*notes, "Ob die Datei echte Details in dieser Auflösung hat (nicht nur hochskaliert), lässt sich "
+                         "nicht messen - bitte am Muster prüfen."]
+    if motifs_on_background(row) and any(layer.get("kind") in BASE_KINDS for layer in row.get("layers") or []):
+        # Hintergrund plus Ebenen (#2141): gleich die Grunddatei mit den Motiven erzeugen.
+        try:
+            result = await generate(db, product_id, actor_id=actor_id, reason=reason)
+        except ShopError as exc:
+            out_notes.append(f"Mit den Ebenen noch nicht erzeugt: {exc}")
+        else:
+            mine = [item for item in result["created"] if item["placement"] == placement and item["color"] == color]
+            failed = [item["detail"] for item in result["failed"]
+                      if item["placement"] == placement and item["color"] == color]
+            if mine:
+                out_notes.append(f"Mit den Ebenen zur Druckdatei v{mine[0]['version']} erzeugt.")
+            elif not failed:
+                out_notes.append("Mit den Ebenen: die Druckdatei hat dieselben Pixel wie bisher - sie bleibt.")
+            out_notes += failed
+    return {**file_view(stored), "notes": out_notes}
 
 
 def measure_pair(width_px: int, height_px: int, dpi: int) -> str:
@@ -920,13 +1296,12 @@ async def freeze_line(db, product: dict, variant: dict, *, gamertag: str | None,
             # Die Kundschaft liest nur den festen Satz; Fläche und Grund stehen im Log und rot in der Vorab-Prüfung
             # („Druckdateien je Farbe“: Fläche fehlt).
             _refuse(position, product, variant, area=row["key"], reason="no template for this area and variant")
-        plan = await plan_placement(db, row, entry, color=color, color_hex=color_hex, presets_doc=context["presets"],
-                                    gamertag_rules=context["gamertag_rules"])
+        plan = await _plan(db, context, row, entry, color, color_hex)
         if plan.problems:
             _refuse(position, product, variant, area=row["key"], reason="layout does not fit: " + " ".join(plan.problems))
         base_row = None
         if plan.needs_base:
-            base_row = await latest_base(db, product["id"], row["key"], entry["group"], color)
+            base_row = await current_base(db, product["id"], plan)
             if not _base_valid(base_row, plan):
                 _refuse(position, product, variant, area=row["key"],
                         reason="print file missing" if base_row is None else "print file outdated or not on disk")
@@ -953,10 +1328,10 @@ async def freeze_line(db, product: dict, variant: dict, *, gamertag: str | None,
 async def _personal_file(db, product: dict, plan: Plan, base_row: dict | None, *, gamertag: str, color: str,
                          user_id: str, order_id: str, item_id: str, variant: dict | None = None,
                          position: int = 1) -> dict:
-    rules = await shop_gamertag.load_rules(db)
-    ink = shop_gamertag.inks_for_garment(rules, color)[0]["key"]
-    # Dieselbe Größe wie im Plan (#2105): die Leinwand der Ebene und der Rahmen passen zueinander.
-    sizes = next((item.sizes for item in plan.texts if item.kind == "gamertag"), None)
+    # Farbe und Größe wie im Plan (#2105, #2141): Untergrund aus Hintergrund bzw. Shirtfarbe, die Leinwand der Ebene.
+    layer = next(item for item in plan.texts if item.kind == "gamertag")
+    ink = layer.ink or shop_gamertag.inks_for_garment(await shop_gamertag.load_rules(db), color)[0]["key"]
+    sizes = layer.sizes
     stored = await shop_gamertag.store(db, gamertag, purpose="order", color_key=ink, user_id=user_id,
                                        order_id=order_id, order_item_id=item_id, layer=sizes)
     tag_row = stored["row"]
@@ -1063,16 +1438,19 @@ SAMPLE_NUMBER = "1234"
 SAMPLES = {"gamertag": SAMPLE_NAME, "member_number": SAMPLE_NUMBER}
 
 
-async def sample_png(db, product: dict, *, kind: str, color: str, layer: dict | None) -> bytes:
+async def sample_png(db, product: dict, *, kind: str, color: str, layer: dict | None, ink: str | None = None) -> bytes:
     """Der Beispielname einer Namensebene in echter Größe (#2105) - gerendert wie die Druckdatei
     (``shop_gamertag.render`` mit den Regeln der Ebene), als PNG der ganzen Leinwand. Die Vorschau in Schritt 3 legt es
-    in den Rahmen der Ebene; die Leinwand bleibt dort nur ein feiner Rahmen. Farbe des Namens wie bei der Bestellung."""
+    in den Rahmen der Ebene; die Leinwand bleibt dort nur ein feiner Rahmen. Farbe des Namens wie bei der Bestellung:
+    ``ink`` ist die Farbe aus dem Plan (Untergrund aus dem Hintergrund, #2141), ohne Angabe nach der Shirtfarbe."""
     if kind not in SAMPLES:
         raise LookupError("Diese Ebene hat keinen Namen.")
     if color not in ((product.get("offer") or {}).get("colors") or []):
         raise LookupError("Diese Farbe wird nicht angeboten.")
     rules = shop_gamertag.layer_rules(await shop_gamertag.load_rules(db), layer)
-    ink = shop_gamertag.inks_for_garment(rules, color)[0]["key"]
+    if ink is not None and ink not in {item["key"] for item in rules["colors"]}:
+        raise LookupError("Diese Farbe für den Namen gibt es nicht.")
+    ink = ink or shop_gamertag.inks_for_garment(rules, color)[0]["key"]
     # Rendern kostet Rechenzeit (große Leinwand) - nicht im Event-Loop.
     rendered = await asyncio.to_thread(shop_gamertag.render, SAMPLES[kind], rules, color_key=ink)
     return rendered.payload
@@ -1098,8 +1476,7 @@ async def preview_png(db, product: dict, *, placement: str, color: str, sample: 
                                         variant_ids[0] if variant_ids else None)
     if row is None or entry is None:
         raise LookupError("Diese Fläche gibt es beim Produkt nicht.")
-    plan = await plan_placement(db, row, entry, color=color, color_hex=context["codes"].get(color),
-                                presets_doc=context["presets"], gamertag_rules=context["gamertag_rules"])
+    plan = await _plan(db, context, row, entry, color)
     shirt = _hex_rgb(context["codes"].get(color))
     # Die Vorlage dieser Farbe (#2105); nicht farbspezifisch: eingefärbt mit dem Farbcode aus den Printful-Daten.
     preview, specific = templates.preview_for_color(context["template"], entry,
@@ -1126,12 +1503,18 @@ async def preview_png(db, product: dict, *, placement: str, color: str, sample: 
                 max(1, int(round(box.bottom * scale_y)) - top))
 
     print_img = Image.new("RGBA", (target_w, target_h), (0, 0, 0, 0))
-    latest = await latest_base(db, product["id"], placement, entry["group"], color) if plan.mode == "upload" else None
-    if latest and _base_valid(latest, plan):
-        with Image.open(shop_designs._path_of(latest["file_ref"])) as img:  # fertige Datei: höchstens 80 MP (Prüfung)
-            img.draft("RGBA", (target_w, target_h))
-            print_img = img.convert("RGBA").resize((target_w, target_h), Image.Resampling.LANCZOS)
-    elif plan.motifs and not plan.problems:
+    if plan.mode == "upload" and plan.background_ok:
+        # Die fertige Datei als Hintergrund (#2141) - aus dem Vorschaubild (höchstens 1200 px, nie die volle Datei),
+        # darüber die Ebenen wie im Modus „Motiv und Position“. Dekodiert außerhalb der Ereignisschleife.
+        thumb = await thumb_bytes(db, plan.background)
+        if thumb is not None:
+            def scaled() -> Image.Image:
+                with Image.open(BytesIO(thumb)) as img:
+                    img.load()
+                    return img.convert("RGBA").resize((target_w, target_h), Image.Resampling.LANCZOS)
+
+            print_img = await asyncio.to_thread(scaled)
+    if plan.motifs and not plan.problems:
         for item in plan.motifs:
             left, top, box_w, box_h = scaled_box(item.box)
             try:
@@ -1146,9 +1529,10 @@ async def preview_png(db, product: dict, *, placement: str, color: str, sample: 
             print_img.alpha_composite(part, (max(0, left), max(0, top)))
     if sample and plan.texts:
         gamertag_rules = context["gamertag_rules"]
-        ink = shop_gamertag.inks_for_garment(gamertag_rules, color)[0]["key"]
         for item in plan.texts:
-            # Der Beispielname wie in der Druckdatei: dieselben Regeln der Ebene (#2105), dieselbe Leinwand.
+            # Der Beispielname wie in der Druckdatei: dieselben Regeln der Ebene (#2105), dieselbe Leinwand, dieselbe
+            # Farbe aus dem Untergrund (#2141).
+            ink = item.ink or shop_gamertag.inks_for_garment(gamertag_rules, color)[0]["key"]
             try:
                 name = shop_gamertag.render(SAMPLES[item.kind], shop_gamertag.layer_rules(gamertag_rules, item.sizes),
                                             color_key=ink)
@@ -1187,6 +1571,58 @@ async def admin_file(db, product_id: str, file_id: str):
     if row is None or path is None or not path.is_file():
         raise LookupError("Diese Druckdatei gibt es nicht.")
     return path, file_name(row)
+
+
+THUMB_SIDE = 1200
+
+
+def _thumb_png(image: Image.Image) -> bytes:
+    """Das Vorschaubild einer Druckdatei: höchstens ``THUMB_SIDE`` px, transparent, ohne Metadaten. Deterministisch."""
+    part = image.convert("RGBA")
+    part.thumbnail((THUMB_SIDE, THUMB_SIDE), Image.Resampling.LANCZOS)
+    out = BytesIO()
+    part.save(out, format="PNG", compress_level=6)
+    return out.getvalue()
+
+
+def _thumb_of(path) -> bytes:
+    with Image.open(path) as img:
+        img.load()
+        return _thumb_png(img)
+
+
+async def thumb_bytes(db, row: dict) -> bytes | None:
+    """Das Vorschaubild einer Grunddatei (#2141): beim Hochladen gespeichert (``thumb_ref``); fehlt es (ältere Datei,
+    erzeugte Grunddatei), wird es einmal gerechnet und nachgetragen - je Prüfsumme gesperrt, nie doppelt."""
+    path = shop_designs._path_of(row.get("thumb_ref"))
+    if path is not None and path.is_file():
+        return await asyncio.to_thread(path.read_bytes)
+    async with _row_lock(f"thumb:{row['sha256']}"):
+        stored = await db.shop_print_files.find_one({"id": row["id"]}, {"_id": 0, "thumb_ref": 1})
+        path = shop_designs._path_of((stored or {}).get("thumb_ref"))
+        if path is not None and path.is_file():
+            return await asyncio.to_thread(path.read_bytes)
+        source = shop_designs._path_of(row.get("file_ref"))
+        if source is None or not source.is_file():
+            return None
+        payload = await asyncio.to_thread(_thumb_of, source)
+        thumb_ref, thumb_path = shop_designs._store(payload)
+        try:
+            await db.shop_print_files.update_one({"id": row["id"]}, {"$set": {"thumb_ref": thumb_ref}})
+        except BaseException:
+            thumb_path.unlink(missing_ok=True)
+            raise
+        return payload
+
+
+async def admin_thumb(db, product_id: str, file_id: str) -> bytes:
+    """Eine Grunddatei verkleinert (höchstens ``THUMB_SIDE`` px) - für die Vorschau des Hintergrunds in Schritt 3
+    (#2141). Bestelldateien mit Namen nie."""
+    row = await db.shop_print_files.find_one({"id": file_id, "product_id": product_id, "purpose": "base"}, {"_id": 0})
+    payload = await thumb_bytes(db, row) if row else None
+    if payload is None:
+        raise LookupError("Diese Druckdatei gibt es nicht.")
+    return payload
 
 
 # ================================================================ Umstellung alter Produkte (Trockenlauf und Rückweg)

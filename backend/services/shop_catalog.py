@@ -48,7 +48,7 @@ VARIANT_FIELDS = ("sku", "label", "size", "color", "price_cents", "active")
 PRICE_FIELDS = ("base_price_cents", "markup_cents", "price_cents")
 # Was der Produktaufbau (``services/shop_products.py``) schreibt - nur über ``save_setup``.
 SETUP_FIELDS = ("printful", "technique", "offer", "placements", "included_placement", "status", "review",
-                "published_at", "archived_at", "placements_legacy")
+                "published_at", "archived_at", "placements_legacy", "print_surface")
 _UMLAUTS = str.maketrans({"ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss", "Ä": "ae", "Ö": "oe", "Ü": "ue"})
 
 

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { Users } from "lucide-react";
+import { AlertTriangle, Check, Users } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatRequestError } from "@/lib/api";
+import { missingIdsLine } from "@/lib/leagueIds";
 import { personName } from "./squadRoles";
 
 // „Co-Team zuteilen“ (docs/LIGA.md, #1649, Teil von #1623): die Turnierleitung wählt erst das Hauptteam, dann eines
@@ -25,6 +26,27 @@ function rolesLine(squad) {
   if (squad.captain) parts.push(`Captain ${personName(squad.captain)}`);
   if (squad.vice_captain) parts.push(`Vertreter ${personName(squad.vice_captain)}`);
   return parts.length ? parts.join(" · ") : "ohne Captain – die Teamleitung handelt";
+}
+
+/** Spiel-ID je Spieler (#2108): wer sie hat, wem sie fehlt - eine fehlende ID warnt, hält das Zuteilen aber nicht auf. */
+function SquadIds({ players = [], label, squadId }) {
+  if (!players.length) return null;
+  const warning = missingIdsLine(players, label || "Spiel-ID");
+  return (
+    <span className="mt-1.5 block" data-testid={`squad-assign-ids-${squadId}`}>
+      <span className="flex flex-wrap gap-1">
+        {players.map((player) => (
+          <span key={player.id} className={`inline-flex max-w-full items-center gap-1 rounded-sm border px-1.5 py-0.5 text-[11px] ${player.ok ? "border-white/10 text-white/70" : "border-warn/40 text-warn"}`}
+            data-state={player.state}>
+            {player.ok ? <Check className="h-3 w-3 shrink-0 text-ok" aria-hidden="true" /> : <AlertTriangle className="h-3 w-3 shrink-0" aria-hidden="true" />}
+            <span className="truncate">{player.name}</span>
+            <span className="truncate font-mono text-white/45">{player.ok ? player.text : "keine ID"}</span>
+          </span>
+        ))}
+      </span>
+      {warning ? <span className="mt-1 block text-xs text-warn break-words [overflow-wrap:anywhere]" data-testid={`squad-assign-ids-warning-${squadId}`}>{warning}</span> : null}
+    </span>
+  );
 }
 
 export function SquadAssignDialog({ tournament, onAssigned }) {
@@ -93,8 +115,12 @@ export function SquadAssignDialog({ tournament, onAssigned }) {
     setBusy(true);
     setError("");
     try {
-      await api.post(`/tournaments/${tournament.id}/squad-registrations`, { team_id: team.id, squad_id: squad.id });
+      const { data: done } = await api.post(`/tournaments/${tournament.id}/squad-registrations`, { team_id: team.id, squad_id: squad.id });
       toast.success(`${squad.display_name} ist in der Staffel.`);
+      const missing = done?.ids_missing || [];
+      if (missing.length) {
+        toast.warning(`${data?.id_label || "Spiel-ID"} fehlt: ${missing.join(", ")} – sie und die Teamleitung haben einen Hinweis bekommen.`, { duration: 9000 });
+      }
       setOpen(false);
       onAssigned?.();
     } catch (err) {
@@ -184,6 +210,7 @@ export function SquadAssignDialog({ tournament, onAssigned }) {
                         <span className="min-w-0 flex-1">
                           <span className="block font-bold text-white break-words [overflow-wrap:anywhere]">{row.display_name}</span>
                           <span className="block text-xs text-white/55">{row.member_count} im Kader · {rolesLine(row)}</span>
+                          <SquadIds players={row.players} label={data.id_label} squadId={row.id} />
                           {row.problems.map((text) => (
                             <span key={text} className="mt-1 block text-xs text-warn break-words [overflow-wrap:anywhere]">{text}</span>
                           ))}

@@ -18,6 +18,7 @@ import { LeagueDeleteSheet } from "./LeagueDeleteSheet";
 import { BannerField, EmblemField, PrizeEditor } from "./LeagueLookFields";
 import { accentStyle, prizesPayload, prizesToForm } from "@/lib/leagueLook";
 import { LeagueEmblem } from "@/components/tls/league/public/LeagueLook";
+import { SeasonRosterPanel } from "./SeasonRosterPanel";
 import { dayNoon, viennaDate } from "@/lib/vienna";
 import {
   ACTIVE_STATUS_OPTIONS,
@@ -525,6 +526,8 @@ export default function AdminLeagueSeasonPage() {
                 </div>
               ))}
             </section>
+
+            <SeasonRosterPanel seasonId={seasonId} />
 
             <FormSection title="Vorgaben auf Staffeln übertragen" testId="season-sync"
               hint="Regeltext und Map-Pool immer, auch bei gesperrten Staffeln; die Antwortfrist auf Terminvorschläge auch während der Season, nur nicht bei gesperrten; Termine und Kalender nur vor dem Start; Best of, Teamgröße, Mindestkader, Punkte und Fristen nur vor dem ersten Ergebnis. Die Sichtbarkeit gilt schon beim Speichern.">

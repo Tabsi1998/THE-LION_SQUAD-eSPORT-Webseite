@@ -551,6 +551,36 @@ async def _enrich_game_identity(db, game: dict | None) -> dict | None:
     return game
 
 
+def _required_game_fields(game: dict | None) -> list[dict]:
+    """Die Pflicht-IDs eines Spiels (nach ``_enrich_game_identity`` samt denen des Hauptspiels)."""
+    fields = []
+    for field in (game or {}).get("effective_player_id_fields") or (game or {}).get("player_id_fields") or []:
+        if isinstance(field, dict) and field.get("required") is not False and field.get("key"):
+            fields.append(field)
+    return fields
+
+
+def _profile_player_ids(user: dict | None, game: dict | None) -> dict:
+    """Die Spiel-IDs aus dem Profil für dieses Spiel: die des Hauptspiels gelten für seine Versionen (wie im Profil
+    gruppiert), eigene Werte der Version gehen vor."""
+    if not game:
+        return {}
+    profile_ids = (user or {}).get("game_ids") or {}
+    source_slug = game.get("identity_game_slug")
+    source_ids = (profile_ids.get(source_slug) if source_slug else {}) or {}
+    own_ids = profile_ids.get(game.get("slug")) or {}
+    return {**source_ids, **own_ids}
+
+
+def _missing_game_fields(game: dict | None, player_ids: dict | None) -> list[str]:
+    """Namen der Pflicht-IDs, die in ``player_ids`` fehlen oder leer sind."""
+    return [
+        field.get("label") or field.get("key")
+        for field in _required_game_fields(game)
+        if not str((player_ids or {}).get(field.get("key"), "")).strip()
+    ]
+
+
 async def _audit_tournament_action(db, action: str, actor_id: str | None,
                                    target_id: str, data: dict | None = None) -> None:
     # Strukturarbeit ist der zweite Schreibweg neben den Ergebnissen; welche

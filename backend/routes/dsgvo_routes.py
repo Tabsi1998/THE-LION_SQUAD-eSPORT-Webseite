@@ -169,6 +169,8 @@ async def _user_data_sections(db, user_id: str) -> list[tuple[str, tuple]]:
         ("social_accounts", _rows(db.user_socials, me)),
         ("platform_links", _rows(db.platform_links, me)),
         ("tournament_registrations", _rows(db.tournament_registrations, me)),
+        # Liga-Kader (#2108): die festgehaltene Spiel-ID je Season samt Freigaben.
+        ("league_rosters", _rows(db.league_rosters, me)),
         ("competition_matches", _value(matches)),
         ("event_registrations", _rows(db.event_registrations, me)),
         ("f1_lap_times", _rows(db.f1_lap_times, me)),

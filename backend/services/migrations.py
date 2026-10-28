@@ -117,6 +117,15 @@ async def migrate_league_published_at(db) -> str:
     return f"{marked} leagues marked as published"
 
 
+async def migrate_league_roster_backfill(db) -> str:
+    """Liga-Kader (#2108): Co-Teams, die vor dem Kader zugeteilt wurden, bekommen ihre Einträge mit Co-Team und - wo
+    sie im Profil steht - festgehaltener Spiel-ID. Idempotent (``league_roster.backfill``)."""
+    from services import league_roster
+
+    recorded = await league_roster.backfill(db)
+    return f"{recorded} league roster rows checked"
+
+
 async def migrate_points_scheme_templates(db) -> str:
     """Externe Serien (#1741): die Punkteschema-Vorlagen als Daten in den Einstellungen (``points_schemes``). Angelegt
     wird nur, was fehlt - eine bearbeitete Vorlage bleibt; Serien, Termine oder Ergebnisse legt die Migration nie an."""
@@ -399,6 +408,8 @@ MIGRATIONS = (
     (15, "deleted_account_profile_fields", migrate_anonymized_profile_fields),
     # #2106: die Adresse einer schon veröffentlichten Liga bleibt (services/league_service.py, slug_locked).
     (16, "league_published_at", migrate_league_published_at),
+    # #2108: Liga-Kader mit Spiel-ID je Season für schon zugeteilte Co-Teams nachziehen (services/league_roster.py).
+    (17, "league_roster_backfill", migrate_league_roster_backfill),
 )
 
 

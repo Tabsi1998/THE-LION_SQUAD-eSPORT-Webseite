@@ -274,6 +274,31 @@ def inks_for_garment(rules: dict, garment_color: str) -> list[dict]:
     return found or [color_of(rules)]
 
 
+# Kontrast nach WCAG (1 bis 21) - ab 3 gilt großer Text als lesbar. Ein Name auf dem Trikot ist großer Text.
+MIN_INK_CONTRAST = 3.0
+
+
+def contrast_ratio(first: float, second: float) -> float:
+    high, low = max(first, second), min(first, second)
+    return (high + 0.05) / (low + 0.05)
+
+
+def ink_for_surface(rules: dict, garment_color: str, luminance: float) -> dict:
+    """Die Farbe des Namens auf einem Untergrund mit dieser relativen Luminanz (#2141) - etwa dem Hintergrund einer
+    Allover-Fläche unter der Ebene. Reihenfolge wie bisher: die Farben der Shirtfarbe (``inks_for_garment``), dann die
+    Vorgabefarbe, dann die übrigen Farben der Regeln; die erste mit mindestens ``MIN_INK_CONTRAST`` gewinnt. Reicht
+    keine, die mit dem höchsten Kontrast. Gleiche Eingaben, gleiche Farbe."""
+    from services.shop_motifs import relative_luminance
+
+    order = [*inks_for_garment(rules, garment_color), color_of(rules), *rules["colors"]]
+    candidates = list({color["key"]: color for color in order}.values())
+    measured = [(color, contrast_ratio(relative_luminance(color["hex"]) or 0.0, luminance)) for color in candidates]
+    for color, ratio in measured:
+        if ratio >= MIN_INK_CONTRAST:
+            return color
+    return max(measured, key=lambda item: item[1])[0]
+
+
 # ---------------------------------------------------------------- Text prüfen
 
 def _is_emoji(char: str) -> bool:

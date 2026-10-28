@@ -767,6 +767,8 @@ async def delete_tree(db, kind: str, target: dict, *, on_staffel_deleted=None) -
         await db.league_divisions.delete_many({"id": {"$in": sorted(division_ids)}})
     if season_ids:
         await db.map_pools.delete_many({"scope": "league_season", "scope_id": {"$in": sorted(season_ids)}})
+        # Liga-Kader (#2108): die festgehaltenen Spiel-IDs gehören zur Season und gehen mit ihr.
+        await db.league_rosters.delete_many({"season_id": {"$in": sorted(season_ids)}})
         await db.league_seasons.delete_many({"id": {"$in": sorted(season_ids)}})
     if kind == "league":
         await db.leagues.delete_one({"id": target["id"]})
