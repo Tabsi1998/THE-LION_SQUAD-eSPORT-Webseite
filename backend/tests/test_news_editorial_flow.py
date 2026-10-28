@@ -174,3 +174,56 @@ async def test_author_search_is_for_the_newsroom_only(flow):
     assert [hit["name"] for hit in hits] == ["Gastautorin"] and "email" not in hits[0]
     flow.act_as(await flow.add_user(name="leser"))
     assert (await flow.get("/api/admin/people/search", params={"purpose": "news_author", "q": "Gast"})).status_code == 403
+
+
+# ---------------------------------------------------------------- NW1 Rückfrage „geht an N Personen“
+
+@pytest.mark.asyncio
+async def test_audience_counts_newsletter_recipients_before_the_first_save(flow):
+    for name in ("Anna", "Bernd"):
+        reader = await flow.add_user(name=name)
+        await flow.db.users.update_one({"id": reader["id"]}, {"$set": {"newsletter_consent": True, "email": f"{name.lower()}@example.org"}})
+    flow.act_as(await flow.add_user(role="club_admin", name="Rita"))
+    body = (await flow.get("/api/settings/newsletter/audience", params={"kind": "news", "visibility": "public"})).json()
+    assert body["recipients"] == 2 and body["internal"] is False
+    internal = (await flow.get("/api/settings/newsletter/audience", params={"kind": "news", "visibility": "internal"})).json()
+    assert internal["recipients"] == 0 and internal["internal"] is True and "Vereinsverwaltung" in internal["announcement"]
+    flow.act_as(await flow.add_user(name="leser"))
+    assert (await flow.get("/api/settings/newsletter/audience", params={"kind": "news"})).status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_new_draft_sends_nothing_and_publishing_sends_once(flow, monkeypatch):
+    import routes.news_routes as news_routes
+
+    calls = []
+
+    async def fake_enqueue(kind, item, dedupe_suffix=""):
+        calls.append(item.get("id"))
+        return {"queued": 3}
+
+    monkeypatch.setattr(news_routes, "enqueue_newsletter_for_item", fake_enqueue)
+    flow.act_as(await flow.add_user(role="club_admin", name="Rita"))
+    draft = (await flow.post("/api/news", json={"title": "Plan", "content": "Text", "published": False})).json()
+    assert calls == [] and not draft.get("newsletter_sent_at")
+    published = (await flow.patch(f"/api/news/{draft['id']}", json={"published": True, "published_at": now_utc().isoformat()})).json()
+    assert calls == [draft["id"]] and published["newsletter_sent_count"] == 3
+    await flow.patch(f"/api/news/{draft['id']}", json={"excerpt": "Nachtrag"})
+    assert calls == [draft["id"]], "eine spätere Änderung verschickt nichts ein zweites Mal"
+
+
+@pytest.mark.asyncio
+async def test_scheduled_post_waits_for_its_time(flow, monkeypatch):
+    import routes.news_routes as news_routes
+
+    calls = []
+
+    async def fake_enqueue(kind, item, dedupe_suffix=""):
+        calls.append(item.get("id"))
+        return {"queued": 1}
+
+    monkeypatch.setattr(news_routes, "enqueue_newsletter_for_item", fake_enqueue)
+    flow.act_as(await flow.add_user(role="club_admin", name="Rita"))
+    later = (now_utc() + timedelta(days=3)).isoformat()
+    planned = (await flow.post("/api/news", json={"title": "Liga-Start", "content": "Text", "published": True, "published_at": later})).json()
+    assert calls == [] and not planned.get("newsletter_sent_at"), "geplant: der Newsletter geht erst zum Termin"

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, formatRequestError } from "@/lib/api";
-import { formatTimeUntil } from "@/lib/newsPublication";
+import { PUBLISH_MODES, formatTimeUntil, initialPublishMode, needsPublishQuestion, publishFields, publishQuestion } from "@/lib/newsPublication";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminFormPage, FormActions, FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { CheckField, FieldLabel, SelectField, TextField } from "@/components/tls/FormFields";
@@ -90,13 +91,18 @@ function NewsForm({ post, meta, onDone, onReload }) {
     video_url: source.video_url || "",
     category: source.category || "club",
     visibility: source.visibility || "public",
-    published: source.published ?? true,
+    // Neu ist ein Entwurf (#2122 NW1) - veröffentlicht wird bewusst über „Wann erscheint der Beitrag?“.
+    published: source.published ?? false,
     pinned: source.pinned ?? false,
     published_at: toDateTimeLocalInput(source.published_at),
     discord_skip: source.discord_skip ?? false,
     share_preview: source.share_preview ?? false,
   });
   const [form, setForm] = useState(() => formFromPost(post));
+  const [initialMode] = useState(() => initialPublishMode(post));
+  const [mode, setMode] = useState(initialMode);
+  const [scheduleAt, setScheduleAt] = useState(() => (initialMode === "scheduled" ? toDateTimeLocalInput(post.published_at) : ""));
+  const confirm = useConfirm();
   const [tournaments, setTournaments] = useState([]);
   const [events, setEvents] = useState([]);
   const [f1Challenges, setF1Challenges] = useState([]);
@@ -180,11 +186,35 @@ function NewsForm({ post, meta, onDone, onReload }) {
     return next;
   };
 
+  // Die Rückfrage vor dem Veröffentlichen (#2122 NW1): wie viele den Newsletter bekämen und ob Discord meldet - beides
+  // nach bestem Wissen; fehlt ein Recht oder geht ein Abruf schief, steht der allgemeine Satz da.
+  const askBeforePublishing = async () => {
+    const [audience, discord] = await Promise.allSettled([
+      api.get("/settings/newsletter/audience", { params: { kind: "news", visibility: form.visibility } }),
+      api.post("/settings/discord/preview", { kind: "news", item: { ...form, discord_skip: !!form.discord_skip } }, { skipInvalidation: true }),
+    ]);
+    const when = mode === "scheduled" ? new Date(scheduleAt) : null;
+    return confirm(publishQuestion({
+      mode,
+      whenText: when && !Number.isNaN(when.getTime()) ? viennaDateTime(when, { dateStyle: "medium", timeStyle: "short" }) : "",
+      audience: audience.status === "fulfilled" && audience.value?.data && typeof audience.value.data === "object" ? audience.value.data : null,
+      sentAt: post.newsletter_sent_at || "",
+      sentText: post.newsletter_sent_at ? viennaDateTime(post.newsletter_sent_at, { dateStyle: "medium" }) : "",
+      discord: discord.status === "fulfilled" && typeof discord.value?.data?.would_send === "boolean" ? discord.value.data.would_send : null,
+    }));
+  };
+
   const submit = async (ev) => {
     ev.preventDefault();
+    const timing = publishFields(mode, scheduleAt, initialMode, { published_at: form.published_at });
+    if (timing.error) {
+      toast.error(timing.error);
+      return;
+    }
+    if (needsPublishQuestion(mode, initialMode) && !await askBeforePublishing()) return;
     setSaving(true);
     try {
-      const payload = normalizePayload({ ...form, linked_tournament_ids: linkedT, linked_event_ids: linkedE, linked_f1_challenge_ids: linkedF, mentioned_user_ids: mentionedUserIds });
+      const payload = normalizePayload({ ...form, ...timing, linked_tournament_ids: linkedT, linked_event_ids: linkedE, linked_f1_challenge_ids: linkedF, mentioned_user_ids: mentionedUserIds });
       if (isNew) await api.post("/news", payload);
       else {
         const originalPayload = normalizePayload({
@@ -203,7 +233,7 @@ function NewsForm({ post, meta, onDone, onReload }) {
         }
         await api.patch(`/news/${post.id}`, patch);
       }
-      toast.success("Gespeichert.");
+      toast.success(mode === initialMode ? "Gespeichert." : { draft: "Als Entwurf gespeichert.", now: "Veröffentlicht.", scheduled: "Geplant." }[mode]);
       onDone();
     } catch (err) {
       toast.error(formatRequestError(err, "Beitrag konnte nicht gespeichert werden.", { slug: form.slug, title: form.title }));
@@ -225,13 +255,14 @@ function NewsForm({ post, meta, onDone, onReload }) {
 
   const selectedUsers = mentionedUserIds.map((id) => knownUsers[id]).filter(Boolean);
   const userMatches = userHits.filter((user) => !mentionedUserIds.includes(user.id)).slice(0, 8);
-  const plannedDate = form.published && form.published_at ? new Date(form.published_at) : null;
-  const plannedDetail = plannedDate && !Number.isNaN(plannedDate.getTime()) && plannedDate.getTime() > Date.now()
-    ? `Dieser Beitrag ist geplant und wird ${formatTimeUntil(plannedDate)} öffentlich angezeigt.`
-    : "";
+  const plannedDate = mode === "scheduled" && scheduleAt ? new Date(scheduleAt) : null;
+  const plannedDetail = plannedDate && !Number.isNaN(plannedDate.getTime())
+    ? (plannedDate.getTime() > Date.now() ? `Erscheint ${formatTimeUntil(plannedDate)} von selbst – mit Newsletter und Discord.` : "Dieser Termin liegt in der Vergangenheit.")
+    : "Wann soll der Beitrag erscheinen?";
+  const willPublish = mode !== "draft";
   const origin = typeof window !== "undefined" ? window.location.origin : "https://lionsquad.at";
   const publicPath = form.slug ? `/news/${form.slug}` : "";
-  const seoIsIndexable = Boolean(form.published && form.visibility === "public");
+  const seoIsIndexable = Boolean(willPublish && form.visibility === "public");
   const seoFallback = {
     title: form.title || "News-Beitrag",
     description: form.excerpt || "Kurzbeschreibung fehlt noch.",
@@ -249,7 +280,7 @@ function NewsForm({ post, meta, onDone, onReload }) {
     { label: "Teaser", done: Boolean(form.excerpt.trim()), description: form.excerpt.trim() ? "Kurzbeschreibung vorhanden." : "Hilft auf News-Liste, Google und beim Teilen." },
     { label: "Banner", done: Boolean(form.banner_url), description: form.banner_url ? "Social-Bild vorhanden." : "Eigenes Bild statt generischem Fallback wählen." },
     { label: "Inhalt", done: Boolean(form.content.trim()), description: form.content.trim() ? "Beitragstext vorhanden." : "Markdown-Inhalt fehlt noch." },
-    { label: "Sichtbarkeit", done: Boolean(form.visibility && form.published), description: seoIsIndexable ? "Öffentlich indexierbar." : "Entwurf, privat oder noindex." },
+    { label: "Sichtbarkeit", done: Boolean(form.visibility && willPublish), description: seoIsIndexable ? "Öffentlich indexierbar." : "Entwurf, privat oder noindex." },
     { label: "Embeds", done: linkedContentCount > 0 || hasEmbedToken, tone: linkedContentCount > 0 || hasEmbedToken ? undefined : "note", description: linkedContentCount > 0 || hasEmbedToken ? `${linkedContentCount || 1} Verknüpfung(en) erkannt.` : "Optional: Turnier, Event, Fast-Lap oder Personen verknüpfen." },
     { label: "SEO", done: Boolean(form.slug && form.excerpt && form.banner_url), description: "Titel, Teaser, Canonical und Social Preview prüfen." },
     { label: "Newsletter/Discord", done: newsletterDone, tone: newsletterDone ? undefined : "note", description: newsletterDone ? "Newsletter wurde bereits versendet." : "Steht im Kasten „Verteilen“ – mit Empfängerzahl und „Jetzt senden“." },
@@ -259,7 +290,7 @@ function NewsForm({ post, meta, onDone, onReload }) {
     <AdminFormPage
       eyebrow="News"
       title={isNew ? "Neuer Beitrag" : "Beitrag bearbeiten"}
-      intro={isNew ? "Titel, Teaser und Text — der Rest ist Feinschliff. Ohne Datum erscheint der Beitrag sofort nach dem Speichern, wenn „Veröffentlicht“ gesetzt ist." : post.title}
+      intro={isNew ? "Titel, Kurzbeschreibung und Text – der Rest ist Feinschliff. Ein neuer Beitrag ist ein Entwurf, bis du „Jetzt veröffentlichen“ oder „Geplant“ wählst." : post.title}
       backTo="/admin/news"
       backLabel="News"
       onSubmit={submit}
@@ -283,11 +314,13 @@ function NewsForm({ post, meta, onDone, onReload }) {
           <FormSection title="Veröffentlichung">
             <SelectField label="Kategorie" value={form.category} onChange={(v) => set("category", v)} options={meta.categories || []} testId="news-category" />
             <SelectField label="Sichtbarkeit" value={form.visibility} onChange={(v) => set("visibility", v)} options={meta.visibilities || []} testId="news-visibility" />
-            <TextField label="Veröffentlichungsdatum (optional, sonst jetzt)" type="datetime-local" value={form.published_at || ""} onChange={(v) => set("published_at", v)} testId="news-published-at" hint={plannedDetail || undefined} />
-            <CheckField label="Veröffentlicht" checked={form.published} onChange={(v) => set("published", v)} testId="news-published" />
+            <PublishChoice mode={mode} initialMode={initialMode} onChange={setMode} />
+            {mode === "scheduled" && (
+              <TextField label="Termin" type="datetime-local" value={scheduleAt} onChange={setScheduleAt} testId="news-published-at" required hint={plannedDetail} />
+            )}
             <CheckField label="Anpinnen" hint="Bleibt oben in der News-Liste und auf der Startseite." checked={form.pinned} onChange={(v) => set("pinned", v)} testId="news-pinned" accent="#FFD700" />
           </FormSection>
-          <DistributeBox kind="news" itemId={post.id} title={post.title}>
+          <DistributeBox kind="news" itemId={post.id} title={post.title} visibility={form.visibility}>
             <DiscordPreview kind="news" item={form} skip={form.discord_skip} onSkipChange={(value) => set("discord_skip", value)} />
           </DistributeBox>
           <SharePreviewToggle visibility={form.visibility} checked={form.share_preview} onChange={(value) => set("share_preview", value)} />
@@ -397,6 +430,38 @@ function NewsForm({ post, meta, onDone, onReload }) {
       <EditorialChecklist items={editorialChecklist} />
       <SeoPreviewPanel path={publicPath} fallback={seoFallback} />
     </AdminFormPage>
+  );
+}
+
+// Wann erscheint der Beitrag? (#2122 NW1) - drei klare Wege statt Häkchen und Datum, die sich widersprechen konnten.
+const PUBLISH_CHOICES = {
+  draft: (initialMode) => (initialMode === "draft"
+    ? ["Entwurf", "Nur das Admin-Team sieht ihn. Nichts wird verschickt."]
+    : ["Zurück zum Entwurf", "Verschwindet aus allen Listen. Schon Verschicktes bleibt verschickt."]),
+  now: (initialMode) => (initialMode === "now"
+    ? ["Veröffentlicht", "Für alle sichtbar, die die Sichtbarkeit erlaubt."]
+    : ["Jetzt veröffentlichen", "Erscheint beim Speichern – vorher kommt eine Rückfrage, was hinausgeht."]),
+  scheduled: () => ["Geplant", "Erscheint zum Termin von selbst – mit Newsletter und Discord."],
+};
+
+export function PublishChoice({ mode, initialMode, onChange }) {
+  return (
+    <fieldset className="space-y-1.5" data-testid="news-publish-choice">
+      <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Wann erscheint der Beitrag?</legend>
+      {PUBLISH_MODES.map((key) => {
+        const [label, hint] = PUBLISH_CHOICES[key](initialMode);
+        const active = mode === key;
+        return (
+          <label key={key} className={`flex items-start gap-3 rounded-sm border px-3 py-2.5 cursor-pointer transition-colors duration-150 ${active ? "border-[#29B6E8]/60 bg-[#29B6E8]/[0.07]" : "border-white/10 hover:border-white/25"}`}>
+            <input type="radio" name="news-publish-mode" value={key} checked={active} onChange={() => onChange(key)} className="mt-1 accent-[#29B6E8]" data-testid={`news-publish-${key}`} />
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold text-white">{label}</span>
+              <span className="block text-xs text-white/50">{hint}</span>
+            </span>
+          </label>
+        );
+      })}
+    </fieldset>
   );
 }
 

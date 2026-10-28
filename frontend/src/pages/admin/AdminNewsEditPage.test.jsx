@@ -68,9 +68,73 @@ test("Neuer Beitrag: Seite mit Veröffentlichung rechts, Slug aus dem Titel, Spe
 
   fireEvent.change(screen.getByTestId("news-title"), { target: { value: "Weihnachtsfeier: Anmeldung offen" } });
   expect(screen.getByTestId("news-slug")).toHaveValue("weihnachtsfeier-anmeldung-offen");
+  // Neu ist ein Entwurf (#2122 NW1): Speichern verschickt nichts und fragt deshalb nicht nach.
+  expect(screen.getByTestId("news-publish-draft")).toBeChecked();
+  confirmMock.mockClear();
   fireEvent.submit(screen.getByTestId("news-form"));
-  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/news", expect.objectContaining({ title: "Weihnachtsfeier: Anmeldung offen", slug: "weihnachtsfeier-anmeldung-offen", published: true, linked_event_ids: [] })));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/news", expect.objectContaining({ title: "Weihnachtsfeier: Anmeldung offen", slug: "weihnachtsfeier-anmeldung-offen", published: false, linked_event_ids: [] })));
+  expect(apiMock.post.mock.calls[0][1]).not.toHaveProperty("published_at");
+  expect(confirmMock).not.toHaveBeenCalled();
   expect(await screen.findByTestId("news-list")).toBeInTheDocument();
+});
+
+// Jetzt veröffentlichen (#2122 NW1): vorher eine Rückfrage mit der Zahl der Empfänger und ob Discord meldet.
+test("Neuer Beitrag „Jetzt veröffentlichen“: Rückfrage „geht an N Personen“, dann veröffentlicht", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/news-meta") return { data: META };
+    if (url === "/settings/newsletter/audience") return { data: { kind: "news", visibility: "public", internal: false, recipients: 214, announcement: "Keine eigene Meldung" } };
+    return { data: [] };
+  });
+  apiMock.post.mockImplementation(async (url) => (url === "/settings/discord/preview" ? { data: { would_send: true } } : { data: { id: "n2" } }));
+  confirmMock.mockClear();
+  renderAt("/admin/news/new");
+  fireEvent.change(await screen.findByTestId("news-title"), { target: { value: "Liga startet" } });
+  expect(await screen.findByTestId("distribute-audience-line")).toHaveTextContent("Geht beim Veröffentlichen an 214 Personen");
+  fireEvent.click(screen.getByTestId("news-publish-now"));
+  fireEvent.submit(screen.getByTestId("news-form"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/news", expect.objectContaining({ title: "Liga startet", published: true })));
+  expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({
+    title: "Beitrag jetzt veröffentlichen?",
+    description: "Der Newsletter geht sofort an 214 Personen mit Newsletter-Zustimmung. Discord bekommt eine Meldung.",
+    confirmLabel: "Veröffentlichen",
+  }));
+  const payload = apiMock.post.mock.calls.find(([url]) => url === "/news")[1];
+  expect(Math.abs(new Date(payload.published_at).getTime() - Date.now())).toBeLessThan(60000);
+});
+
+test("Abbrechen in der Rückfrage speichert nichts", async () => {
+  apiMock.post.mockResolvedValue({ data: {} });
+  confirmMock.mockResolvedValueOnce(false);
+  renderAt("/admin/news/new");
+  fireEvent.change(await screen.findByTestId("news-title"), { target: { value: "Doch nicht" } });
+  fireEvent.click(screen.getByTestId("news-publish-now"));
+  fireEvent.submit(screen.getByTestId("news-form"));
+  await waitFor(() => expect(confirmMock).toHaveBeenCalled());
+  expect(apiMock.post.mock.calls.map(([url]) => url)).not.toContain("/news");
+});
+
+test("Geplant: Termin in der Vergangenheit wird nicht gespeichert", async () => {
+  const { toast } = await import("sonner");
+  apiMock.post.mockResolvedValue({ data: {} });
+  renderAt("/admin/news/new");
+  fireEvent.change(await screen.findByTestId("news-title"), { target: { value: "Zu spät" } });
+  fireEvent.click(screen.getByTestId("news-publish-scheduled"));
+  fireEvent.change(screen.getByTestId("news-published-at"), { target: { value: "2020-01-01T10:00" } });
+  fireEvent.submit(screen.getByTestId("news-form"));
+  await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("Vergangenheit")));
+  expect(apiMock.post.mock.calls.map(([url]) => url)).not.toContain("/news");
+});
+
+test("ein veröffentlichter Beitrag: Änderungen ohne Rückfrage, Datum bleibt", async () => {
+  apiMock.patch.mockResolvedValue({ data: POSTS[0] });
+  confirmMock.mockClear();
+  renderAt("/admin/news/n1");
+  expect(await screen.findByTestId("news-publish-now")).toBeChecked();
+  expect(screen.getByText("Veröffentlicht")).toBeInTheDocument();
+  fireEvent.change(screen.getByTestId("news-excerpt"), { target: { value: "Neu." } });
+  fireEvent.submit(screen.getByTestId("news-form"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/news/n1", { excerpt: "Neu." }));
+  expect(confirmMock).not.toHaveBeenCalled();
 });
 
 test("Bearbeiten lädt den Beitrag aus der Admin-Liste und schickt nur die Änderung", async () => {
