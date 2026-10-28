@@ -35,6 +35,8 @@ CONFIRM_DIFFERENT_DETAIL = (
 LINEUP_MISSING_TEXT = "Bitte Aufstellung im Web nachtragen."
 NO_POOL_DETAIL = "Für diese Staffel ist noch kein Map-Pool hinterlegt – bitte die Turnierleitung fragen."
 DEFAULT_AMEND_HOURS = 48
+# Ein Spiel mit festem Ergebnis: seine Maps gelten, offene Meldungen nicht mehr (Doppel-Einsatz-Index).
+DECIDED_STATUSES = {"completed", "forfeit"}
 MAX_SCORE = 1_000_000
 
 
@@ -293,13 +295,19 @@ def missing_lineups(games: list[dict], registration_ids: list[str]) -> list[str]
 
 
 def _lineup_sources(match: dict) -> list[list[dict]]:
-    """Welche Aufstellungen gerade gelten: steht ein Ergebnis mit Maps fest, nur ``games`` des Spiels; sonst je Seite
-    nur ihre letzte Meldung - ältere Meldungen und überholte Stände zählen nicht."""
+    """Welche Aufstellungen gerade gelten: steht ein Ergebnis fest (``results`` oder Status entschieden), nur ``games``
+    des Spiels - auch leer, etwa nach „Nicht erschienen“ ohne Maps; sonst je Seite nur ihre letzte Meldung. Ein
+    gehaltenes Ergebnis (10 Sekunden „Rückgängig“) zählt mit seinen Maps schon dazu."""
     from services.v2_match_flows import latest_reports
 
     if match.get("games"):
-        return [match["games"]]
-    return [report.get("games") or [] for report in latest_reports(match.get("reports")).values()]
+        sources = [match.get("games") or []]
+    else:
+        sources = [report.get("games") or [] for report in latest_reports(match.get("reports")).values()]
+    held = match.get("pending_result")
+    if isinstance(held, dict) and held.get("games"):
+        sources.append(held["games"])
+    return sources
 
 
 def lineup_union(match: dict) -> list[str]:
@@ -368,7 +376,9 @@ async def check_double_use(db, setup: LeagueSetup, games: list[dict], registrati
 
 async def refresh_lineup_index(db, match_id: str) -> None:
     """``lineup_user_ids`` nach dem Stand am Spiel neu setzen (nach Meldung, Ergebnis, Nachtrag, Rückgängig)."""
-    match = await db.matches_v2.find_one({"id": match_id}, {"_id": 0, "games": 1, "reports": 1})
+    match = await db.matches_v2.find_one(
+        {"id": match_id}, {"_id": 0, "games": 1, "reports": 1, "results": 1, "status": 1, "pending_result": 1}
+    )
     if not match:
         return
     ids = lineup_union(match)

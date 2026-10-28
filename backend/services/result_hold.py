@@ -138,6 +138,10 @@ async def hold_result(db, match: dict, raw_results: list[dict], *, actor: dict, 
     )
     if not stored.modified_count:
         raise MatchV2ResultError(BUSY_DETAIL, 409)
+    if games:
+        # Liga (#1650): die Aufgestellten des gehaltenen Ergebnisses blockieren den Spieltag sofort.
+        from services.league_games import refresh_lineup_index
+        await refresh_lineup_index(db, match["id"])
     await _audit(db, "match.result.hold", match, actor_id, {
         "hold_id": hold["id"], "force": bool(force), **({"reason": reason_text} if reason_text else {}),
         **({"no_show_registration_id": forfeiting} if forfeiting else {}),
@@ -327,6 +331,9 @@ async def undo_result(db, match: dict, *, actor_id: str, hold_id: str | None = N
     if isinstance(hold, dict) and (not hold_id or hold.get("id") == hold_id):
         removed = await db.matches_v2.update_one({"id": match["id"], "pending_result.id": hold.get("id")}, {"$unset": {"pending_result": ""}})
         if removed.modified_count:
+            if hold.get("games"):
+                from services.league_games import refresh_lineup_index
+                await refresh_lineup_index(db, match["id"])
             await _audit(db, "match.result.undo", match, actor_id, {"hold_id": hold.get("id"), "held": True})
             return {"ok": True, "undone": True, "held": True}
         match = await db.matches_v2.find_one({"id": match["id"]}, {"_id": 0}) or match
