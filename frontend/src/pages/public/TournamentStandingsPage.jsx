@@ -13,7 +13,9 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { seoTextPreview } from "@/lib/textPreview";
 import { Award, FileDown } from "lucide-react";
 import { StandingsTable, standingKey } from "@/components/tls/tournament/StandingsTable";
-import { standingSections, tableKind } from "@/lib/standingsTable";
+import { nameHead, standingSections, tableKind } from "@/lib/standingsTable";
+import { isHeatSchedule } from "@/lib/tournamentLabels";
+import { PrintLink } from "@/components/tls/print/PrintLink";
 
 const PUBLIC_RESULT_STATUSES = new Set(["completed", "results_published", "archived"]);
 
@@ -53,6 +55,11 @@ export default function TournamentStandingsPage() {
   const tournamentUrl = t ? `/tournaments/${t.slug || t.id}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}` : "/tournaments";
   const resultPdfUrl = t ? `${API}/exports/tournaments/${t.slug || t.id}/standings.pdf${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}` : "";
   const certificatePdfUrl = t ? `${API}/exports/tournaments/${t.slug || t.id}/certificates.pdf${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}` : "";
+  // Urkunden gibt es für die ersten vier Plätze einer Rangliste (#2121) - Gruppen haben keinen Endstand, ohne Platz 1-4
+  // führte der Knopf auf eine rohe Fehlermeldung.
+  const grouped = sections.some((section) => section.label);
+  const hasCertificates = !grouped && flatRows.some((row) => Number(row?.rank) >= 1 && Number(row?.rank) <= 4);
+  const heats = isHeatSchedule(t);
   const certificateHref = (row) => `${API}/exports/tournaments/${t.slug || t.id}/certificates/${row.registration_id}.pdf${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`;
 
   if (!t) {
@@ -82,16 +89,21 @@ export default function TournamentStandingsPage() {
         <TournamentTabs tournament={t} accessToken={accessToken} className="mt-3 mb-4" />
         <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
           <h1 className="font-heading text-3xl md:text-5xl font-black uppercase">Rangliste</h1>
-          {PUBLIC_RESULT_STATUSES.has(t.status) && (
-            <div className="flex flex-wrap gap-2">
-              <a href={resultPdfUrl} target="_blank" rel="noreferrer" className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
-                <FileDown className="w-3.5 h-3.5" /> Ergebnis-PDF
-              </a>
-              <a href={certificatePdfUrl} target="_blank" rel="noreferrer" className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
-                <Award className="w-3.5 h-3.5" /> Urkunden
-              </a>
-            </div>
-          )}
+          <div className="flex flex-wrap gap-2">
+            <PrintLink slug={t.slug || t.id} parts="tabelle" from="rangliste" accessToken={accessToken} testId="standings-print-link" className="!text-xs !py-2" />
+            {PUBLIC_RESULT_STATUSES.has(t.status) && (
+              <>
+                <a href={resultPdfUrl} target="_blank" rel="noreferrer" className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+                  <FileDown className="w-3.5 h-3.5" /> Ergebnis-PDF
+                </a>
+                {hasCertificates && (
+                  <a href={certificatePdfUrl} target="_blank" rel="noreferrer" data-testid="standings-certificates" className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+                    <Award className="w-3.5 h-3.5" /> Urkunden
+                  </a>
+                )}
+              </>
+            )}
+          </div>
         </div>
         {sections.length > 2 && (
           <nav className="mt-6 flex flex-wrap gap-2" aria-label="Gruppen" data-testid="standings-group-nav">
@@ -113,11 +125,12 @@ export default function TournamentStandingsPage() {
               )}
               <StandingsTable
                 rows={section.rows}
-                kind={tableKind(section.rows)}
+                kind={tableKind(section.rows, { heats })}
+                nameLabel={nameHead(t)}
                 changed={changed}
                 registerRow={registerRow}
                 label={section.label ? `Tabelle ${section.label}` : "Rangliste"}
-                certificateHref={PUBLIC_RESULT_STATUSES.has(t.status) && !section.label ? certificateHref : null}
+                certificateHref={PUBLIC_RESULT_STATUSES.has(t.status) && hasCertificates ? certificateHref : null}
               />
             </section>
           ))}

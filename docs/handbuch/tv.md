@@ -145,6 +145,11 @@ Turnier, wechselt er durch die **Wiedergabeliste**:
 
 - In der Liste ändert ihr mit den Pfeilen die **Reihenfolge**, bei jeder Folie die **Sekunden** (3 bis 120).
 - Folien **ohne Inhalt** werden übersprungen (keine Aufrufe, kein laufendes Spiel).
+- **Liga, Jeder gegen jeden, Schweizer System und Gruppen** haben keinen Baum: Die Folie „Turnierbaum“ heißt dort
+  **Spieltage**, danach kommt von selbst die Folie **Tabelle** (gleich lang, bei Gruppen je Gruppe eine Tabelle). Sie
+  steht nicht in der Liste und muss nicht eingestellt werden. Passen nicht alle Gruppen lesbar auf ein Bild (viele
+  Gruppen, große Schrift), zeigt die Folie bei jedem Durchgang die nächsten. Nach dem Ende kommt der Sieger aus Platz 1 der Tabelle;
+  Kopfzeile und QR-Code nennen die Tabelle statt des Turnierbaums.
 - Kommt ein **Ergebnis**, hält die Liste an, der Baum zeigt es groß, danach läuft die Folie zu Ende.
 - **Show-Auslosung:** Ist die Runde fertig und der Topf steht, zeigt der Baum oben „**Auslosung bereit · 8 Namen**“,
   die Spiele der nächsten Runde leuchten ruhig in Gold. Der Hinweis bleibt stehen, bis ihr lost – dann kommen die

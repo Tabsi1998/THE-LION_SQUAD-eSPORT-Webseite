@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from services.match_winner import won_by
-from services.round_labels import section_kind
+from services.round_labels import TABLE_FORMATS, section_kind
 from services.scoring_rules import rank_with_ties
 
 
 TERMINAL_MATCH_STATUSES = {"completed", "forfeit"}
+# Wer in der Rangliste steht (#2121): angenommen oder eingecheckt - Warteliste, Ausstehend und Abgelehnt nie.
+STANDING_REGISTRATION_STATUSES = {"approved", "checked_in"}
 
 
 def _safe_int(value, default: int = 0) -> int:
@@ -147,10 +149,11 @@ def stage_standings(matches: list[dict], registrations: list[dict]) -> list[dict
             row["best_rank"] = rank if row["best_rank"] is None else min(row["best_rank"], rank)
             if rank == 1:
                 row["won"] += 1
+            else:
+                # Jeder Platz hinter dem ersten ist eine Niederlage (#2121) - sonst stand im K.-o. bei „N“ immer 0.
+                row["lost"] += 1
             if rank <= 2:
                 row["top2"] += 1
-            else:
-                row["lost"] += 1
             score = result.get("points")
             if score is None:
                 score = result.get("score")
@@ -480,6 +483,92 @@ def standings_for_structure(
     if format_key == "groups":
         return group_standings(legacy_matches, registrations, list(groups))
     return elimination_standings(legacy_matches, registrations)
+
+
+def standing_registrations(registrations: list[dict], matches: list[dict]) -> list[dict]:
+    """Die Anmeldungen der Rangliste (#2121): angenommen oder eingecheckt - und wer schon in einem Spiel steht.
+
+    So bleibt, wer mit Spielen ausgeschieden ist (disqualifiziert, abgemeldet, nicht erschienen), mit ihnen in der
+    Tabelle; Warteliste, Ausstehend, Abgelehnt und Nicht erschienen ohne Spiel stehen nie darin. Ohne Status gilt eine
+    Anmeldung als angenommen (Altbestand).
+    """
+    in_matches = {
+        entry.get("registration_id")
+        for match in matches
+        for entry in [*(match.get("slots") or []), *(match.get("results") or [])]
+        if entry.get("registration_id")
+    }
+    return [
+        registration
+        for registration in registrations
+        if (registration.get("status") or "approved") in STANDING_REGISTRATION_STATUSES
+        or registration.get("id") in in_matches
+    ]
+
+
+def has_results(matches: list[dict]) -> bool:
+    """Steht schon ein echtes Ergebnis fest? Ein Freilos (ein Spiel mit nur einem Platz, beim Erzeugen gleich
+    entschieden) zählt nicht - sonst stünden bei 6 Spielern sofort Plätze 1 bis 6 da."""
+    def played(match: dict) -> bool:
+        filled = {slot.get("registration_id") for slot in match.get("slots") or [] if slot.get("registration_id")}
+        return len(filled) >= 2
+    return any(match.get("status") in TERMINAL_MATCH_STATUSES and match.get("results") and played(match) for match in matches)
+
+
+def reached_labels(matches: list[dict], stages: list[dict] = (), tournament: dict | None = None) -> dict[str, str]:
+    """Wie weit jemand im Baum kam (#2121), mit dem Namen der Runde wie im Baum: „Halbfinale“, „Winner Runde 3“,
+    „Loser Final“, „Grand Final“ - bei mehreren Phasen mit der Phase davor („Finalrunde · Halbfinale“). Zählt das
+    späteste Spiel (Phase, dann Runde), in dem die Anmeldung steht."""
+    from services.round_labels import attach_round_labels
+
+    playable = [dict(match) for match in matches
+                if match.get("status") != "cancelled" and match.get("source", {}).get("engine") == "stage"]
+    if not playable:
+        return {}
+    attach_round_labels(playable, list(stages or []), tournament)
+    stage_names = {stage.get("id"): stage.get("name") for stage in stages or [] if isinstance(stage, dict)}
+    multi = len({_safe_int(match.get("stage_number")) for match in playable}) > 1
+    furthest: dict[str, tuple[tuple[int, int], dict]] = {}
+    for match in playable:
+        position = (_safe_int(match.get("stage_number")), _safe_int(match.get("round")))
+        for slot in match.get("slots") or []:
+            registration_id = slot.get("registration_id")
+            if registration_id and (registration_id not in furthest or position > furthest[registration_id][0]):
+                furthest[registration_id] = (position, match)
+    labels = {}
+    for registration_id, (_position, match) in furthest.items():
+        label = match.get("round_label") or f"Runde {_safe_int(match.get('round'))}"
+        stage_name = stage_names.get(match.get("stage_id"))
+        labels[registration_id] = f"{stage_name} · {label}" if multi and stage_name else label
+    return labels
+
+
+def public_standings(
+    tournament: dict,
+    snapshot: dict,
+    registrations: list[dict],
+    *,
+    groups: list[dict] = (),
+    stages: list[dict] = (),
+) -> list[dict]:
+    """Die Rangliste, wie Website, App, PDF und TV sie zeigen (#2121).
+
+    Nur die Anmeldungen aus ``standing_registrations``. Ein K.-o.- oder FFA-Turnier vergibt Plätze erst mit dem ersten
+    echten Ergebnis - vorher ist die Liste leer („Noch keine Ergebnisse“) statt Platz 1 bis N nach der Anmeldung; dort
+    sagt ``reached``, wie weit jemand kam. Tabellen (Liga, Jeder gegen jeden, Schweizer System, Gruppen) stehen von
+    Anfang an mit allen Teilnehmern.
+    """
+    matches = snapshot.get("matches") or []
+    if tournament.get("format") in TABLE_FORMATS:
+        return standings_for_structure(tournament, snapshot, standing_registrations(registrations, matches), groups=groups)
+    if not has_results(matches):
+        return []
+    rows = standings_for_structure(tournament, snapshot, standing_registrations(registrations, matches), groups=groups)
+    labels = reached_labels(matches, stages, tournament)
+    for row in rows:
+        if row.get("registration_id") in labels:
+            row["reached"] = labels[row["registration_id"]]
+    return rows
 
 
 def _section_key(value) -> str:

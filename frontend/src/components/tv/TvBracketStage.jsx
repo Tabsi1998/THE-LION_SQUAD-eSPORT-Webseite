@@ -880,7 +880,8 @@ export function TvBracketStage({ data, moment = null, onMomentDone, hiddenSlots 
         const zoom = viewRef.current.zoom;
         if (!inside(rect, frameOf(viewRef.current, area()))) await moveTo(viewForRect(rect, size(), area(), { minZoom: zoom, maxZoom: zoom, fill: 1 }), ms);
       };
-      if (motionRef.current) {
+      // Ein Sieger aus der Tabelle (#2121) hat keinen Weg durch einen Baum - dann gleich die Siegerkarte.
+      if (motionRef.current && winner.path.length) {
         await focus([winner.path[0]], 1200);
         for (let index = 0; index < winner.segments.length; index += 1) {
           if (session.cancelled) return;
