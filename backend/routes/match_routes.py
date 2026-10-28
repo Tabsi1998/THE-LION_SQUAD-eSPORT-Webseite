@@ -198,9 +198,10 @@ async def _registrations_for_match(match: dict) -> list[dict]:
 async def _public_user_map(user_ids: list[str]) -> dict[str, dict]:
     if not user_ids:
         return {}
+    # Nur was Matchseite und Matchchat zeigen - keine Kontorolle (#2110).
     users = await get_db().users.find(
         {"id": {"$in": user_ids}},
-        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1, "role": 1},
+        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1},
     ).to_list(500)
     return {u["id"]: u for u in users}
 

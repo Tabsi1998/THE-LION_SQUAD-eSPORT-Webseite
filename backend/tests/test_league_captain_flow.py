@@ -192,6 +192,29 @@ async def test_withdrawing_keeps_an_agreed_time(flow):
     assert match["schedule_status"] == "accepted"
 
 
+@pytest.mark.asyncio
+async def test_match_page_and_chat_carry_no_account_role(flow):
+    """Matchseite und Matchchat nennen Personen nur mit Namen und Bild - keine Kontorolle, auch nicht für Gäste."""
+    world = await setup(flow)
+    users = world["users"]
+    await flow.db.users.update_one({"id": users["Spieler1"]["id"]}, {"$set": {"role": "club_admin"}})
+    flow.act_as(users["Spieler1"])
+    assert (await flow.post(proposals_url(world), json={"scheduled_at": when(2)})).status_code == 200
+    assert (await flow.post(f"/api/matches/{world['match']['id']}/chat", json={"message": "Hallo"})).status_code == 200
+
+    for viewer in (None, users["FalkenLeitung"]):
+        flow.act_as(viewer)
+        page = await flow.get(f"/api/matches/{world['match']['id']}/page")
+        assert page.status_code == 200, page.text
+        actors = [proposal["actor"] for proposal in page.json()["schedule_proposals"]]
+        assert actors and all(actor and "role" not in actor for actor in actors)
+        chat = await flow.get(f"/api/matches/{world['match']['id']}/chat")
+        assert chat.status_code == 200, chat.text
+        assert chat.json() and all("role" not in (message.get("author") or {}) for message in chat.json())
+        for participant in page.json()["participants"]:
+            assert "role" not in (participant.get("user") or {})
+
+
 async def actions(flow, user: dict) -> list[dict]:
     flow.act_as(user)
     response = await flow.get("/api/mobile/dashboard")
