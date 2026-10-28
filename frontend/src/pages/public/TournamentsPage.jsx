@@ -24,7 +24,8 @@ export default function TournamentsPage() {
 
   const load = useCallback(async () => {
     try {
-      const params = new URLSearchParams({ compact: "true", limit: "60" });
+      // Liga-Staffeln haben ihre eigene Seite (docs/LIGA.md) - die Turnierliste fragt ohne sie.
+      const params = new URLSearchParams({ compact: "true", limit: "60", league: "exclude" });
       if (statusFilter !== "all") params.set("status", statusFilter);
       const { data } = await api.get(`/tournaments?${params.toString()}`);
       setList(sortByNearestDate(Array.isArray(data) ? data : data?.items || []));

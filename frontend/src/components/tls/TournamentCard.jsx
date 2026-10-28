@@ -24,7 +24,8 @@ export function TournamentCard({ tournament, index = 0 }) {
   const t = tournament;
   const registration = getRegistrationState(t, "Anmeldung");
   const finished = FINISHED.has(t.status);
-  const formatLabel = formatTournamentDisplay(t);
+  // Liga-Staffel (docs/LIGA.md): die Karte sagt „Liga · Staffel A“ statt des Formats.
+  const formatLabel = t.league_label || formatTournamentDisplay(t);
   const line = gameLine(t);
   const bg = t.banner_url || t.game?.cover_url ||
     "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=1200";

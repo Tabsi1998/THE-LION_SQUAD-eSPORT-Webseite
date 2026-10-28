@@ -65,7 +65,7 @@ export default function EventsPage() {
     if (tab === "upcoming") params.set("upcoming", "true");
     Promise.all([
       api.get(`/events?${params.toString()}`).then(({ data: body }) => asList(body)).catch(() => []),
-      api.get("/tournaments?compact=true&limit=200").then(({ data: body }) => asList(body)).catch(() => []),
+      api.get("/tournaments?compact=true&limit=200&league=exclude").then(({ data: body }) => asList(body)).catch(() => []),
       api.get("/f1/challenges?compact=true&limit=200").then(({ data: body }) => asList(body)).catch(() => []),
     ])
       .then(([events, tournaments, fastlaps]) => setData({ events, tournaments, fastlaps }))

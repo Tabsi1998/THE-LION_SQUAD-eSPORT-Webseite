@@ -48,3 +48,9 @@ test("live: die Karte trägt den laufenden Rahmen, sonst nicht", () => {
   expect(screen.getByTestId("tournament-card-cup")).not.toHaveClass("tls-live-frame");
   expect(screen.getByTestId("tournament-card-cup")).not.toHaveAttribute("data-live");
 });
+
+// Liga (docs/LIGA.md, #1622): eine Staffel ist ein Turnier - die Karte kennzeichnet sie statt des Formats.
+test("Liga-Staffel: „Liga · Staffel A“ statt des Formats", () => {
+  card({ ...BASE, status: "live", format: "league", league_label: "Liga · Staffel A" });
+  expect(screen.getByTestId("tournament-card-format")).toHaveTextContent("Liga · Staffel A");
+});
