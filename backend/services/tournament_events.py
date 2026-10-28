@@ -643,8 +643,8 @@ async def _apply(db, tournament: dict, registration: dict, fresh: dict, matches:
             restore = {"status": registration.get("status"), "updated_at": now_iso}
             if registration.get("league_squad_key"):
                 restore["league_squad_key"] = registration["league_squad_key"]
-            await db.tournament_registrations.update_one({"id": registration["id"]}, {"$set": restore,
-                                                                                     "$unset": {"removal": ""}})
+            await db.tournament_registrations.update_one(
+                {"id": registration["id"]}, {"$set": restore, "$unset": {"removal": ""}})
             raise TournamentEventError(STALE_DETAIL, 409)
         written.append(original[match["id"]])
     # Stationen und Aufrufe frei: jedes geänderte Spiel, das nicht mehr spielbereit ist oder entschieden wurde.
