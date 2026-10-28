@@ -34,7 +34,7 @@ Die Turnierleitung entscheidet einen Einspruch und korrigiert das Ergebnis; beid
   Profil, gilt in der Liga weiter die gemeldete – das Profil sagt das. Eine neue ID gibt nur die **Liga-Leitung** frei;
   bis dahin spielt er mit der alten.
 - Neue Spieler im Co-Team: Gibt es einen **Stichtag** der Season, braucht jeder, der danach dazukommt, die Freigabe
-  der Liga-Leitung.
+  der Liga-Leitung – auch wer aus einem anderen Co-Team wechselt. Wer nur kurz draußen war und zurückkommt, nicht.
 - **Lobby:** Auf der Matchseite steht unter **Activision-ID für die Lobby** die ID jedes Spielers beider Seiten – nur
   für euch, den Gegner und die Turnierleitung.
 
