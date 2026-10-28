@@ -159,8 +159,10 @@ Ob der Baum Vorschau oder fix ist, siehst du im Reiter **Spiele** (Hinweis „Vo
 **Format ändern und was ab dem Check-in-Ende feststeht (seit #2120):**
 
 - Bis zum Ende des Check-ins darfst du **Turnierstruktur**, **Teilnahme** und **Spieler pro Team** ändern; beim
-  **Speichern** baut sich die Vorschau gleich neu (aus K.-o. wird wirklich Doppel-K.-o.). Eigene Phasen aus „Phase
-  anlegen“ bleiben stehen – die baust du mit **Speichern & Struktur anwenden** neu.
+  **Speichern** baut sich die Vorschau gleich neu (aus K.-o. wird wirklich Doppel-K.-o.). Bei **Teilnahme** und
+  **Spieler pro Team** bleibt die Phase, wie sie ist (Name, Best of, Schema), samt geplanter Zeiten und Stationen.
+  Eine eigene Phase (anderer Name, eigene Einstellungen oder mehrere Phasen) baut ein Formatwechsel nicht still um –
+  die baust du mit **Speichern & Struktur anwenden** neu.
 - Ab dem Ende des Check-ins (oder sobald es feste Spiele gibt, etwa generierte Gruppen) stehen **Turnierstruktur**,
   **Teilnahme**, **Spieler pro Team** und **Spiel** nur noch lesend da, und **Speichern & Struktur anwenden** fehlt.
   Im Reiter **Spiele** fehlen dann **Vorschau** und **Mit Teilnehmern generieren** (bei einer neuen, leeren Phase bleibt

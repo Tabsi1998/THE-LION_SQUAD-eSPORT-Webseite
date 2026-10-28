@@ -98,6 +98,49 @@ async def test_a_team_change_before_the_check_in_ends_rebuilds_the_preview_too(f
 
 
 @pytest.mark.asyncio
+async def test_a_team_change_keeps_an_own_stage_and_its_planned_times(flow):
+    """Review #2120: die eigene Phase (Name, Best of) bleibt, nur ihre Vorschau-Spiele werden neu gebaut."""
+    staff = await flow.add_staff()
+    flow.act_as(staff)
+    tournament, _users, _regs = await flow.with_participants(4, team_mode="team", team_size=2)
+    built = await flow.post(f"/api/tournaments/{tournament['id']}/bracket/from-format?preview=true",
+                            json={"name": "Hauptrunde", "settings": {"best_of": 3}})
+    assert built.status_code == 200, built.text
+    stage_before = await flow.db.tournament_stages.find_one({"tournament_id": tournament["id"]}, {"_id": 0})
+    planned = "2026-11-01T10:00:00+00:00"
+    await flow.db.matches_v2.update_many({"tournament_id": tournament["id"]}, {"$set": {"scheduled_at": planned}})
+
+    changed = await flow.patch(f"/api/tournaments/{tournament['id']}", json={"team_size": 3})
+
+    assert changed.status_code == 200, changed.text
+    stage = await flow.db.tournament_stages.find_one({"tournament_id": tournament["id"]}, {"_id": 0})
+    assert stage["id"] == stage_before["id"] and stage["name"] == "Hauptrunde"
+    assert stage["settings"].get("best_of") == 3
+    matches = await flow.matches(tournament)
+    assert matches and all(match.get("is_preview") for match in matches)
+    assert all(match.get("scheduled_at") == planned for match in matches)
+
+
+@pytest.mark.asyncio
+async def test_a_format_change_leaves_an_own_stage_alone(flow):
+    staff = await flow.add_staff()
+    flow.act_as(staff)
+    tournament, _users, _regs = await flow.with_participants(4)
+    built = await flow.post(f"/api/tournaments/{tournament['id']}/bracket/from-format?preview=true",
+                            json={"name": "Hauptrunde", "settings": {"best_of": 3}})
+    assert built.status_code == 200, built.text
+    before = sorted(match["id"] for match in await flow.matches(tournament))
+
+    changed = await flow.patch(f"/api/tournaments/{tournament['id']}", json={"format": "double_elim"})
+
+    assert changed.status_code == 200, changed.text
+    assert changed.json()["auto_generated_bracket"]["reason"] == "custom_stages"
+    stage = await flow.db.tournament_stages.find_one({"tournament_id": tournament["id"]}, {"_id": 0})
+    assert stage["name"] == "Hauptrunde" and stage["stage_type"] == "single_elimination"
+    assert sorted(match["id"] for match in await flow.matches(tournament)) == before
+
+
+@pytest.mark.asyncio
 async def test_after_the_check_in_ends_format_team_and_game_stay_fixed(flow):
     staff, tournament, _users, _regs = await fixed_bracket(flow)
     game_id = "spiel-neu"
