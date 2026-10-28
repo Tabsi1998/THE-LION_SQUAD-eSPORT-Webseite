@@ -19,8 +19,8 @@ from pydantic import BaseModel, Field, StrictInt
 
 from auth import require_area
 from database import get_db
-from services import (shop_catalog_search, shop_catalog_sync, shop_designs, shop_gamertag, shop_print_files,
-                      shop_products)
+from services import (shop_catalog_search, shop_catalog_sync, shop_designs, shop_gamertag, shop_pricing,
+                      shop_print_files, shop_products)
 from services import shop_print_templates as print_templates
 from services.image_upload import _read_upload_limited
 from services.rate_limit import enforce_rate_limit
@@ -357,9 +357,30 @@ async def upload_print_file(file: UploadFile = File(...), product_id: str = Form
     return await _view(product_id, uploaded=uploaded)
 
 
+ESTIMATE_BUSY = "Zu viele Schätzungen bei Printful. Bitte warte noch {wait}."
+
+
+@router.post("/products/{product_id}/prices/estimate")
+async def estimate_prices(product_id: str, body: Reasoned, request: Request,
+                          me: dict = Depends(require_area("finance"))):
+    """Schritt 4: „Brutto bei Printful schätzen“ (#2135) - je Preisgruppe ein Stück nach Österreich (Ware, Versand,
+    Steuer). Ändert keinen Preis; übernommen wird erst mit „Preise übernehmen“. Je Konto höchstens 10 Aufrufe in der
+    Minute (jede Schätzung sind mehrere Aufrufe bei Printful)."""
+    await enforce_rate_limit(request, "shop:price-estimate", limit=10, window_seconds=60, subject=me["id"],
+                             message=ESTIMATE_BUSY)
+    db = get_db()
+    provider = await _provider(db)
+    try:
+        result = await shop_pricing.refresh_estimates(db, product_id, provider=provider, actor_id=me["id"])
+    except (ShopError, LookupError) as exc:
+        raise _refused(exc) from exc
+    return await _view(product_id, result=result)
+
+
 @router.post("/products/{product_id}/prices/accept")
 async def accept_prices(product_id: str, body: Reasoned, me: dict = Depends(require_area("finance"))):
-    """Schritt 4: Einkauf als Mitgliederpreis übernehmen (beendet Preiswarnungen)."""
+    """Schritt 4: Mitgliederpreis übernehmen - Printful brutto aus der Schätzung, sonst der Katalog netto (#2135).
+    Beendet Preiswarnungen."""
     try:
         await shop_products.accept_prices(get_db(), product_id, actor_id=me["id"], reason=body.reason)
     except (ShopError, LookupError) as exc:

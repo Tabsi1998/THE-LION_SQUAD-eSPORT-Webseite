@@ -278,10 +278,19 @@ Jedes Thema hat genau **einen** Ort:
 | Jahreszeiten, Adventkalender, Ostereiersuche | Auftritt → Jahreszeiten, Content → Adventkalender / Ostereiersuche | [Auftritt](auftritt.md) |
 | Mitglieder, Dolibarr | Admin → Mitglieder | [Dolibarr](../DOLIBARR.md) |
 | Rechnungen, Startgeld, Kosten | Admin → Finanzen → Finanzübersicht | [Abrechnung](../ABRECHNUNG.md) |
+| Vereinsshop: Produkte, Preise, Printful | Admin → Finanzen → Shop | [Vereinsshop](../SHOP.md) |
 | Meldungen, Sperren, Wortfilter | Admin → System → Moderation | [Moderation](../MODERATION.md) |
 | Rollen und Freigaben | Admin → Mitglieder → Alle Benutzer | dieses Kapitel, [Rollen](../ROLLEN.md) |
 | Server, Updates, Sicherungen | Admin → System → Betrieb & Logs, Status | [Betrieb](../BETRIEB.md) |
 | App-Versionen, Play Store | Admin → System → App-Versionen | [Play Store](../PLAY_STORE.md) |
+
+**Shop-Preise (#2135):** Mitglieder zahlen genau, was der Verein an Printful zahlt – brutto, also Ware, Versand und
+Steuer. Im Produkt unter **Schritt 4 Preise** steht je Variante *Printful brutto*, daraus der *Mitgliederpreis*, ein
+*Versandbeispiel nach Österreich* und *Katalog netto* nur als Prüfwert („prüfen“ erscheint nur bei starker Abweichung).
+**Brutto bei Printful schätzen** holt die Zahlen neu, **Preise übernehmen** setzt sie. Den genauen Betrag rechnet Printful
+an der Kasse für den ganzen Warenkorb; er wird mit der Bestellung eingefroren. Wird Printful bis zum Auslösen um mehr
+als die **Toleranz bei Preisänderung** (Shop → Einstellungen, Vorgabe 0,50 €) teurer, wartet die Bestellung mit „Preis
+geändert“ auf die Leitung; wird es günstiger, bleibt die Differenz beim Verein.
 
 ---
 

@@ -1422,6 +1422,36 @@ async def freeze_line(db, product: dict, variant: dict, *, gamertag: str | None,
     return files, sources
 
 
+async def base_placements(db, product: dict, variant: dict, *, printful_variant_id: int | None) -> list[dict] | None:
+    """Fläche, Technik und Adresse der geltenden Grunddatei je Fläche einer Variante - für die Kostenschätzung je
+    Variante (#2135), ohne eine Datei anzulegen. Eine reine Platzhalter-Fläche (nur Gamertag bzw. Nummer) hat keine
+    Grunddatei: ``url`` ist dann ``None``. ``None`` insgesamt, wenn das Produkt so nicht bestellbar wäre (Fläche fehlt,
+    Plan passt nicht, Grunddatei fehlt oder veraltet) - dann gibt es keine Schätzung, nie eine geratene."""
+    if not product.get("placements") or not product.get("printful"):
+        return None
+    context = await _context(db, product)
+    if not context["rows"] or not all(is_layout(row) for row in product["placements"]):
+        return None
+    color = " ".join(str(variant.get("color") or "").split())
+    color_hex = context["codes"].get(color) or variant.get("color_code")
+    out = []
+    for row in context["rows"]:
+        entry = templates.entry_for_variant(context["template"], context["technique"], row["key"], printful_variant_id)
+        if entry is None:
+            return None
+        plan = await _plan(db, context, row, entry, color, color_hex)
+        if plan.problems:
+            return None
+        url = None
+        if plan.needs_base:
+            base_row = await current_base(db, product["id"], plan)
+            if not _base_valid(base_row, plan) or base_row.get("public_disabled_at"):
+                return None
+            url = public_url(base_row)
+        out.append({"placement": row["key"], "technique": entry["technique"], "url": url})
+    return out
+
+
 async def _personal_file(db, product: dict, plan: Plan, base_row: dict | None, *, gamertag: str | None,
                          color: str, user_id: str, order_id: str, item_id: str, variant: dict | None = None,
                          position: int = 1, number: str | None = None) -> dict:

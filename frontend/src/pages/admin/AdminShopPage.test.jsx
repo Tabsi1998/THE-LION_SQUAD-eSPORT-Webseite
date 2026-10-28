@@ -47,7 +47,8 @@ test("zeigt den Status und sperrt „Öffentlich“ mit Hinweis, solange die Ste
   expect(screen.getByTestId("shop-status-key")).toHaveTextContent("kein Schlüssel");
   expect(screen.getByTestId("shop-stage-public")).toBeDisabled();
   expect(screen.getByTestId("shop-stage-public-lock")).toHaveTextContent("Steuer geklärt ist");
-  expect(screen.getByTestId("shop-member-price")).toHaveTextContent("Selbstkostenpreis");
+  expect(screen.getByTestId("shop-member-price")).toHaveTextContent("Printful brutto");
+  expect(screen.getByTestId("shop-member-price")).toHaveTextContent("Ware, Versand, Steuer");
   expect(screen.getByTestId("shop-countries")).toHaveTextContent("AT");
   // Ohne Superadmin keine Steuer-Freigabe, ohne System kein Zugang - nur der Hinweis.
   expect(screen.queryByTestId("shop-tax-toggle-form")).toBeNull();
@@ -125,6 +126,23 @@ test("der Mindestpreis je Artikel ist einstellbar und 0 € geht nicht", async (
   await user.click(screen.getByTestId("shop-prices-save-submit"));
   expect(apiMock.patch).toHaveBeenCalledWith("/admin/shop/config", {
     public_markup_cents: 0, fallback_shipping_cents: null, min_price_cents: 500, reason: "Mindestens 5 Euro",
+  });
+});
+
+test("die Toleranz bei Preisänderung (#2135) ist einstellbar - Vorgabe 0,50 €, 0 € heißt jede Verteuerung prüfen", async () => {
+  apiMock.get.mockResolvedValue({ data: view({ config: { price_tolerance_cents: 50 } }) });
+  apiMock.patch.mockResolvedValue({ data: view({ config: { price_tolerance_cents: 0 } }) });
+  const user = userEvent.setup();
+  render(<AdminShopPage />);
+  const tolerance = await screen.findByTestId("shop-price-tolerance");
+  expect(tolerance).toHaveValue("0,50");
+  await user.clear(tolerance);
+  expect(screen.getByTestId("shop-prices-invalid")).toHaveTextContent("Toleranz 0 bis");
+  await user.type(tolerance, "0");
+  expect(screen.queryByTestId("shop-prices-invalid")).toBeNull();
+  await user.click(screen.getByTestId("shop-prices-save-submit"));
+  expect(apiMock.patch).toHaveBeenCalledWith("/admin/shop/config", {
+    public_markup_cents: 0, fallback_shipping_cents: null, price_tolerance_cents: 0, reason: "",
   });
 });
 

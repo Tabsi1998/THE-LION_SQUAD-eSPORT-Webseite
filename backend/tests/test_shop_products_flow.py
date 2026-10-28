@@ -122,6 +122,7 @@ def new_routes(product_id: str) -> list[tuple[str, str, dict]]:
         ("put", "/api/admin/shop/print-presets", {"rules": {"min_width_cm": 2.0}, "reason": "Test"}),
         ("get", "/api/admin/shop/print-templates/71/images/0", None),
         ("get", "/api/admin/shop/printful-catalog?q=gildan", None),
+        ("post", f"{BASE}/{product_id}/prices/estimate", {"reason": "Test"}),
         ("post", f"{BASE}/{product_id}/prices/accept", {"reason": "Test"}),
         ("post", f"{BASE}/{product_id}/sync", {}),
         ("post", f"{BASE}/{product_id}/status", {"status": "reviewed", "reason": "Test"}),
@@ -338,6 +339,45 @@ async def test_the_minimum_price_is_a_setting_with_reason(flow):
     assert changed.status_code == 200 and changed.json()["config"]["min_price_cents"] == 500
     refused = await flow.patch("/api/admin/shop/config", json={"min_price_cents": 0, "reason": "Gratis"})
     assert refused.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_the_price_tolerance_before_release_is_a_setting(flow):
+    """#2135: Vorgabe 0,50 €; 0 heißt „jede Verteuerung an die Leitung“, mehr als 100 € gibt es nicht."""
+    who = await people(flow)
+    flow.act_as(who["finanzen"])
+    shown = await flow.get("/api/admin/shop/config")
+    assert shown.json()["config"]["price_tolerance_cents"] == 50
+    assert shown.json()["limits"]["price_tolerance_cents"] == 10_000
+    changed = await flow.patch("/api/admin/shop/config", json={"price_tolerance_cents": 0, "reason": "Streng"})
+    assert changed.status_code == 200 and changed.json()["config"]["price_tolerance_cents"] == 0
+    assert changed.json()["changed"] == ["price_tolerance_cents"]
+    for value in (-1, 10_001):
+        refused = await flow.patch("/api/admin/shop/config", json={"price_tolerance_cents": value, "reason": "Test"})
+        assert refused.status_code == 422
+    log = await flow.db.audit_logs.find_one({"action": "shop.config"}, {"_id": 0})
+    assert log["data"]["before"] == {"price_tolerance_cents": 50} and log["data"]["after"] == {
+        "price_tolerance_cents": 0}
+
+
+@pytest.mark.asyncio
+async def test_step_4_estimates_the_gross_price_through_the_route_without_changing_a_price(flow, fake, monkeypatch):
+    monkeypatch.setenv("PUBLIC_BACKEND_URL", "https://lsw.example.test")
+    await with_key(flow)
+    await club_designs(flow)
+    who = await people(flow)
+    flow.act_as(who["finanzen"])
+    product_id = await build(flow)
+    answer = await flow.post(f"{BASE}/{product_id}/prices/estimate", json={})
+    assert answer.status_code == 200, answer.text
+    view = answer.json()
+    assert view["result"]["estimated"] == 4
+    row = next(row for row in view["variants"] if row["printful_variant_id"] == 4012)
+    # Printful brutto 11,70 € (9,75 € + 20 %), Versandbeispiel AT 5,94 €; übernommen bleibt der Katalog netto.
+    assert (row["printful_gross_cents"], row["shipping_example_cents"], row["price_cents"]) == (1170, 594, 1500)
+    assert row["member_price_cents"] == 1170 and row["catalog_check"] is True
+    accepted = await flow.post(f"{BASE}/{product_id}/prices/accept", json={})
+    assert next(row for row in accepted.json()["variants"] if row["printful_variant_id"] == 4012)["price_cents"] == 1170
 
 
 @pytest.mark.asyncio

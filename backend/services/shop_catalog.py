@@ -503,9 +503,11 @@ async def printful_variants_for(db, variant_ids: list[str]) -> dict[str, dict]:
 # (Abgleich). Sie protokollieren je Schritt einen Eintrag mit Grund - nicht je Variante.
 
 MAPPING_FIELDS = ("printful_variant_id", "printful_product_id", "technique", "currency", "base_cost_cents",
-                  "placement_costs", "availability", "in_stock", "synced_at", "price_warning")
+                  "placement_costs", "availability", "in_stock", "synced_at", "price_warning",
+                  # Bruttoschätzung je Variante (#2135, ``services/shop_pricing.py``)
+                  "gross_estimate")
 VARIANT_STATE_FIELDS = ("active", "price_cents", "blocked_reason", "blocked_at", "label", "size", "color",
-                        "color_code")
+                        "color_code", "price_source")
 
 
 def catalog_sku(product_id: str, printful_variant_id: int) -> str:

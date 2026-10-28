@@ -37,7 +37,7 @@ STAGE_HINTS = {
 }
 # Zum Start nur Österreich; die EU-Öffnung folgt erst nach der steuerlichen Klärung (#1699, #1701).
 SHIPPING_COUNTRIES = ("AT",)
-# Mitglieder zahlen den Selbstkostenpreis (Einkauf plus Versand) - der Verein macht kein Geschäft.
+# Mitglieder zahlen, was der Verein an Printful zahlt (#2135: brutto aus Ware, Versand und Steuer) - ohne Aufschlag.
 MEMBER_MARKUP_CENTS = 0
 MAX_PUBLIC_MARKUP_CENTS = 10_000
 MAX_FALLBACK_SHIPPING_CENTS = 10_000
@@ -49,7 +49,12 @@ MAX_KEY_LENGTH = 300
 UNREADABLE_KEY = "gespeichert, aber nicht lesbar – SETTINGS_ENCRYPTION_KEY in der .env prüfen"
 NO_TAX_CLEARANCE = "Erst wenn die Steuer geklärt ist (#1701) – die Freigabe setzt der Superadmin."
 ONLY_SUPERADMIN = "„Öffentlich“ schaltet nur der Superadmin ein."
-UPDATE_FIELDS = ("stage", "orders_to_printful", "public_markup_cents", "fallback_shipping_cents", "min_price_cents")
+# Preisänderung vor dem Auslösen (#2135): schätzt Printful nach dem Zahlungseingang um mehr als diesen Betrag teurer, geht
+# die Bestellung nicht automatisch hinaus, sondern an die Leitung („Preis geändert“). Vorgabe 0,50 €.
+DEFAULT_PRICE_TOLERANCE_CENTS = 50
+MAX_PRICE_TOLERANCE_CENTS = 10_000
+UPDATE_FIELDS = ("stage", "orders_to_printful", "public_markup_cents", "fallback_shipping_cents", "min_price_cents",
+                 "price_tolerance_cents")
 
 
 class ShopForbidden(ShopError):
@@ -70,6 +75,12 @@ def _cents(value: Any, *, maximum: int, minimum: int = 0) -> int | None:
     return value
 
 
+def _tolerance(value: Any) -> int:
+    """Toleranz in Cent - 0 ist erlaubt (jede Verteuerung geht an die Leitung), Unsinn fällt auf die Vorgabe."""
+    usable = _cents(value, maximum=MAX_PRICE_TOLERANCE_CENTS)
+    return DEFAULT_PRICE_TOLERANCE_CENTS if usable is None else usable
+
+
 def _tax_cleared(value: Any) -> dict | None:
     if not isinstance(value, dict) or not value.get("at"):
         return None
@@ -88,6 +99,7 @@ def normalized(raw: dict | None) -> dict:
                                           maximum=MAX_FALLBACK_SHIPPING_CENTS),
         "min_price_cents": _cents(raw.get("min_price_cents"), minimum=1, maximum=MAX_MIN_PRICE_CENTS)
         or DEFAULT_MIN_PRICE_CENTS,
+        "price_tolerance_cents": _tolerance(raw.get("price_tolerance_cents")),
         "tax_cleared": _tax_cleared(raw.get("tax_cleared")),
         "printful_api_key": raw.get("printful_api_key") or "",
         "printful_key_saved_at": raw.get("printful_key_saved_at"),
@@ -250,6 +262,8 @@ async def update(db, changes: dict, *, actor: dict, is_superadmin: bool, reason:
             raise ShopError("Ersatzpauschale: ganze Cent, 0,01 bis 100 € - oder leer für keine.")
         if field == "min_price_cents" and _cents(value, minimum=1, maximum=MAX_MIN_PRICE_CENTS) is None:
             raise ShopError("Mindestpreis: ganze Cent, 0,01 bis 100 €.")
+        if field == "price_tolerance_cents" and _cents(value, maximum=MAX_PRICE_TOLERANCE_CENTS) is None:
+            raise ShopError("Toleranz bei Preisänderung: ganze Cent, 0 bis 100 €.")
         if current[field] != value:
             after[field] = value
     if not after:
@@ -368,6 +382,7 @@ async def admin_view(db, config: dict, *, is_superadmin: bool, can_edit_access: 
             "public_markup_cents": config["public_markup_cents"], "member_markup_cents": MEMBER_MARKUP_CENTS,
             "fallback_shipping_cents": config["fallback_shipping_cents"],
             "min_price_cents": config["min_price_cents"],
+            "price_tolerance_cents": config["price_tolerance_cents"],
             "shipping_countries": list(SHIPPING_COUNTRIES),
             "tax_cleared": ({"at": tax["at"], "by": names.get(tax.get("by"), "unbekannt"), "reason": tax.get("reason")}
                             if tax else None),
@@ -382,5 +397,5 @@ async def admin_view(db, config: dict, *, is_superadmin: bool, can_edit_access: 
         "rights": {"can_set_public": bool(is_superadmin and tax), "can_set_tax": is_superadmin,
                    "can_edit_access": can_edit_access},
         "limits": {"public_markup_cents": MAX_PUBLIC_MARKUP_CENTS, "fallback_shipping_cents": MAX_FALLBACK_SHIPPING_CENTS,
-                   "min_price_cents": MAX_MIN_PRICE_CENTS},
+                   "min_price_cents": MAX_MIN_PRICE_CENTS, "price_tolerance_cents": MAX_PRICE_TOLERANCE_CENTS},
     }
