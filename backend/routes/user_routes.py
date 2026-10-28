@@ -27,7 +27,7 @@ from services.query_filters import safe_regex
 from services.private_fields import private_projection, strip_private
 from models import (
     AreasUpdate,
-    AdminUserCreate, UserUpdate, RoleUpdate, UserSocialCreate, UserSocialUpdate,
+    AdminProfileReset, AdminUserCreate, UserUpdate, RoleUpdate, UserSocialCreate, UserSocialUpdate,
     now_utc, new_id,
 )
 
@@ -984,16 +984,26 @@ async def delete_my_social(social_id: str, me: dict = Depends(get_current_user))
 
 @router.put("/{user_id}")
 @router.patch("/{user_id}")
-async def admin_update_user(user_id: str, body: UserUpdate,
+async def admin_update_user(user_id: str, body: AdminProfileReset,
                              me: dict = Depends(require_area("club"))):
+    """Profil eines anderen Kontos (#2118): nur Anzeigename, Bio, Avatar und Banner zurücksetzen (Moderation), mit Grund
+    im Protokoll. Einwilligungen, Datenschutz-Schalter, Rollen und Sicherheitsfelder ändert nur die Person selbst;
+    Superadmin-Konten fasst nur ein Superadmin an."""
     db = get_db()
-    raw = body.model_dump(exclude_unset=True)
-    updates = {k: v for k, v in raw.items() if v is not None or k in USER_NULLABLE_FIELDS}
-    updates = _normalize_social_updates(updates)
-    if "notification_preferences" in updates:
-        updates["notification_preferences"] = _normalize_notification_preferences(updates.get("notification_preferences"))
-    updates["updated_at"] = now_utc().isoformat()
-    await db.users.update_one({"id": user_id}, {"$set": updates})
+    fields = sorted(set(body.reset))
+    target = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "role": 1})
+    if not target:
+        raise HTTPException(status_code=404, detail="Nutzer nicht gefunden")
+    if target.get("role") == "superadmin" and me.get("role") != "superadmin":
+        raise HTTPException(status_code=403, detail="Superadmin-Konten ändert nur ein Superadmin.")
+    now = now_utc().isoformat()
+    await db.users.update_one({"id": user_id}, {"$set": {**{field: None for field in fields}, "updated_at": now}})
+    await db.audit_logs.insert_one({
+        "id": new_id(), "action": "user.admin_profile_reset", "target_id": user_id, "actor_id": me["id"],
+        # Ohne die alten Werte: Name und Bio wären sonst eine Kopie, die beim Löschen des Kontos stehen bliebe.
+        "data": {"fields": fields, "reason": body.reason},
+        "created_at": now,
+    })
     u = await db.users.find_one({"id": user_id}, private_projection())
     return u
 

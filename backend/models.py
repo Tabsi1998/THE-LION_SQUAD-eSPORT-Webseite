@@ -152,6 +152,25 @@ class UserUpdate(BaseModel):
     notification_preferences: Optional[Dict[str, bool]] = None
 
 
+AdminResettableField = Literal["display_name", "bio", "avatar_url", "banner_url"]
+
+
+class AdminProfileReset(BaseModel):
+    """Profil eines anderen Kontos (#2118): die Vereinsverwaltung setzt nur sichtbare Profilangaben zurück (Moderation),
+    immer mit Grund. Alles andere - Einwilligungen, Datenschutz, Rollen - ändert nur die Person selbst."""
+    model_config = ConfigDict(extra="forbid")
+    reset: List[AdminResettableField] = Field(min_length=1, max_length=4)
+    reason: str = Field(min_length=5, max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def _reason_text(cls, value: str) -> str:
+        value = value.strip()
+        if len(value) < 5:
+            raise ValueError("Bitte einen Grund angeben (mindestens 5 Zeichen).")
+        return value
+
+
 class UserPublic(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str
