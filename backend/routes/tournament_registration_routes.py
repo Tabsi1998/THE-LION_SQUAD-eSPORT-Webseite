@@ -1166,13 +1166,12 @@ async def list_squad_candidates(tid: str, me: dict = Depends(require_area("tourn
     return await squad_registration.candidates(db, tournament)
 
 
-@router.post("/{tid}/squad-registrations")
-async def assign_squad(tid: str, body: SquadAssignBody, me: dict = Depends(require_area("tournaments")),
-                       _mutation_tid: str = Depends(_serialized_tournament_write)):
-    """Die Turnierleitung teilt ein Co-Team der Staffel zu - als freigegebene Team-Anmeldung mit ``squad_id``."""
-    db = get_db()
-    tid = await _resolve_tid(tid)
-    tournament = await _ensure_tournament_unlocked(db, tid)
+SQUAD_SEASON_TAKEN = "Dieses Co-Team spielt in dieser Season schon in einer anderen Staffel."
+SQUAD_TEAM_TAKEN = ("Dieses Team hat schon ein Co-Team in dieser Staffel – zwei Co-Teams desselben Teams spielen nie "
+                    "in derselben Staffel.")
+
+
+async def _insert_squad_registration(db, tournament: dict, body: "SquadAssignBody", me: dict) -> dict:
     try:
         reg = await squad_registration.build_registration(db, tournament, body.team_id, body.squad_id, me)
     except squad_registration.SquadAssignError as refusal:
@@ -1180,8 +1179,28 @@ async def assign_squad(tid: str, body: SquadAssignBody, me: dict = Depends(requi
     try:
         await db.tournament_registrations.insert_one(reg)
     except DuplicateKeyError:
-        raise HTTPException(status_code=409, detail="Dieses Team hat schon ein Co-Team in dieser Staffel – zwei Co-Teams "
-                                                    "desselben Teams spielen nie in derselben Staffel.")
+        # Welcher Index gegriffen hat: steht schon eine Anmeldung mit diesem Season-Schlüssel, war es die Season.
+        season_taken = reg.get("league_squad_key") and await db.tournament_registrations.find_one(
+            {"league_squad_key": reg["league_squad_key"]}, {"_id": 0, "id": 1})
+        raise HTTPException(status_code=409, detail=SQUAD_SEASON_TAKEN if season_taken else SQUAD_TEAM_TAKEN)
+    return reg
+
+
+@router.post("/{tid}/squad-registrations")
+async def assign_squad(tid: str, body: SquadAssignBody, me: dict = Depends(require_area("tournaments")),
+                       _mutation_tid: str = Depends(_serialized_tournament_write)):
+    """Die Turnierleitung teilt ein Co-Team der Staffel zu - als freigegebene Team-Anmeldung mit ``squad_id``."""
+    db = get_db()
+    tid = await _resolve_tid(tid)
+    tournament = await _ensure_tournament_unlocked(db, tid)
+    # Staffeln derselben Season teilen dasselbe Co-Team nie gleichzeitig zu: Sperre je Season (die Turnier-Sperre
+    # hält nur diese Staffel), dazu der eindeutige Index auf ``league_squad_key``.
+    season_resource = squad_registration.season_lock_resource(tournament)
+    try:
+        async with (mutation_lock(db, season_resource) if season_resource else contextlib.nullcontext()):
+            reg = await _insert_squad_registration(db, tournament, body, me)
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail=TOURNAMENT_BUSY_DETAIL)
     reg.pop("_id", None)
     reg.pop("identity_key", None)
     await _audit_tournament_action(db, "league.squad.assign", me.get("id"), tid, {

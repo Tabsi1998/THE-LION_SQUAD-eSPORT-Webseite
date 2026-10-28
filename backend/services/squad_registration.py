@@ -21,6 +21,24 @@ ACTIVE_REGISTRATION_STATUSES = ("pending", "approved", "checked_in", "waitlist")
 SEAT_STATUSES = ("pending", "approved", "checked_in")
 FINISHED_TOURNAMENT_STATUSES = {"completed", "results_published", "archived", "cancelled"}
 NAME_SEPARATOR = " · "
+STATUS_LABELS = {
+    "withdrawn": "ausgetreten",
+    "disqualified": "disqualifiziert",
+    "rejected": "abgelehnt",
+    "no_show": "nicht erschienen",
+}
+
+
+def league_squad_key(tournament: dict, squad_id: str) -> str | None:
+    """``<season_id>:<squad_id>`` - ein eindeutiger Index hält „ein Co-Team je Season nur in einer Staffel“ auch bei
+    gleichzeitigem Zuteilen. Ohne Liga-Rahmen (``league_context``) gibt es keinen Schlüssel."""
+    season_id = (tournament.get("league_context") or {}).get("season_id")
+    return f"{season_id}:{squad_id}" if season_id and squad_id else None
+
+
+def season_lock_resource(tournament: dict) -> str | None:
+    season_id = (tournament.get("league_context") or {}).get("season_id")
+    return f"league_season:{season_id}:squads" if season_id else None
 
 
 class SquadAssignError(Exception):
@@ -77,7 +95,7 @@ def squad_problems(
     *,
     min_size: int,
     team_member_ids: set[str],
-    taken_team_ids: set[str],
+    taken_teams: dict[str, str | None],
     seats_taken: int,
     other_staffel_squad_ids: set[str],
 ) -> list[tuple[int, str]]:
@@ -107,29 +125,39 @@ def squad_problems(
         )
     if squad.get("id") in other_staffel_squad_ids:
         problems.append((409, f"{name} spielt in dieser Season schon in einer anderen Staffel."))
-    if team.get("id") in taken_team_ids:
-        problems.append(
-            (
-                409,
-                f"{team.get('name') or 'Dieses Team'} hat schon ein Co-Team in dieser Staffel – "
-                "zwei Co-Teams desselben Teams spielen nie in derselben Staffel.",
+    if team.get("id") in taken_teams:
+        status = taken_teams[team["id"]]
+        team_name = team.get("name") or "Dieses Team"
+        if status in ACTIVE_REGISTRATION_STATUSES:
+            text = (
+                f"{team_name} hat schon ein Co-Team in dieser Staffel – "
+                "zwei Co-Teams desselben Teams spielen nie in derselben Staffel."
             )
-        )
+        else:
+            text = (
+                f"{team_name} stand schon in dieser Staffel ({STATUS_LABELS.get(status, status or 'ohne Status')}) – "
+                "ein Team tritt je Staffel nur einmal an."
+            )
+        problems.append((409, text))
     limit = _positive_int(tournament.get("max_participants"))
     if limit and seats_taken >= limit:
         problems.append((409, f"Die Staffel ist voll ({seats_taken} von {limit} Plätzen)."))
     return problems
 
 
-async def _staffel_state(db, tournament: dict) -> tuple[set[str], int, set[str]]:
-    """Welche Hauptteams schon in der Staffel sind, wie viele Plätze belegt sind und welche Co-Teams in einer anderen
+async def _staffel_state(db, tournament: dict) -> tuple[dict[str, str | None], int, set[str]]:
+    """Welche Hauptteams schon in der Staffel stehen (mit Status - jede Anmeldung eines Teams belegt den
+    ``identity_key``, auch eine ausgetretene), wie viele Plätze belegt sind und welche Co-Teams in einer anderen
     Staffel derselben Season stehen."""
     tid = tournament["id"]
     regs = await db.tournament_registrations.find(
-        {"tournament_id": tid, "status": {"$in": list(ACTIVE_REGISTRATION_STATUSES)}},
+        {"tournament_id": tid},
         {"_id": 0, "team_id": 1, "status": 1},
-    ).to_list(1000)
-    taken_team_ids = {reg["team_id"] for reg in regs if reg.get("team_id")}
+    ).to_list(2000)
+    taken_teams: dict[str, str | None] = {}
+    for reg in regs:
+        if reg.get("team_id") and taken_teams.get(reg["team_id"]) not in ACTIVE_REGISTRATION_STATUSES:
+            taken_teams[reg["team_id"]] = reg.get("status")
     seats = len([reg for reg in regs if reg.get("status") in SEAT_STATUSES])
     other: set[str] = set()
     season_id = (tournament.get("league_context") or {}).get("season_id")
@@ -149,13 +177,16 @@ async def _staffel_state(db, tournament: dict) -> tuple[set[str], int, set[str]]
                     {
                         "tournament_id": {"$in": sibling_ids},
                         "squad_id": {"$exists": True},
-                        "status": {"$in": list(ACTIVE_REGISTRATION_STATUSES)},
+                        "$or": [
+                            {"status": {"$in": list(ACTIVE_REGISTRATION_STATUSES)}},
+                            {"league_squad_key": {"$exists": True}},
+                        ],
                     },
                     {"_id": 0, "squad_id": 1},
                 ).to_list(2000)
                 if row.get("squad_id")
             }
-    return taken_team_ids, seats, other
+    return taken_teams, seats, other
 
 
 def _public_user(user: dict | None) -> dict | None:
@@ -168,7 +199,7 @@ async def candidates(db, tournament: dict) -> dict:
     """Für den Dialog „Co-Team zuteilen“: je Hauptteam die aktiven Co-Teams mit Kader, Captain, Vertreter und den
     Gründen, warum eines (noch) nicht geht."""
     min_size = min_squad_size(tournament)
-    taken_team_ids, seats, other = await _staffel_state(db, tournament)
+    taken_teams, seats, other = await _staffel_state(db, tournament)
     squads = await db.team_squads.find({"status": {"$ne": "archived"}}, {"_id": 0}).to_list(1000)
     team_ids = sorted({squad.get("team_id") for squad in squads if squad.get("team_id")})
     teams = {
@@ -209,7 +240,7 @@ async def candidates(db, tournament: dict) -> dict:
             tournament,
             min_size=min_size,
             team_member_ids=_team_member_ids(team, memberships.get(team["id"])),
-            taken_team_ids=taken_team_ids,
+            taken_teams=taken_teams,
             seats_taken=seats,
             other_staffel_squad_ids=other,
         )
@@ -220,7 +251,7 @@ async def candidates(db, tournament: dict) -> dict:
                 "name": team.get("name"),
                 "tag": team.get("tag"),
                 "logo_url": team.get("logo_url"),
-                "in_staffel": team["id"] in taken_team_ids,
+                "in_staffel": team["id"] in taken_teams,
                 "squads": [],
             },
         )
@@ -256,14 +287,14 @@ async def build_registration(db, tournament: dict, team_id: str, squad_id: str, 
     if not squad:
         raise SquadAssignError(404, "Co-Team nicht gefunden.")
     memberships = await db.team_members.find({"team_id": team_id}, {"_id": 0, "user_id": 1}).to_list(500)
-    taken_team_ids, seats, other = await _staffel_state(db, tournament)
+    taken_teams, seats, other = await _staffel_state(db, tournament)
     problems = squad_problems(
         team,
         squad,
         tournament,
         min_size=min_squad_size(tournament),
         team_member_ids=_team_member_ids(team, memberships),
-        taken_team_ids=taken_team_ids,
+        taken_teams=taken_teams,
         seats_taken=seats,
         other_staffel_squad_ids=other,
     )
@@ -293,6 +324,7 @@ async def build_registration(db, tournament: dict, team_id: str, squad_id: str, 
         "source": "staff_add",
         "is_guest": False,
         "identity_key": f"{tid}:team:{team_id}",
+        **({"league_squad_key": key} if (key := league_squad_key(tournament, squad_id)) else {}),
         "created_by": actor.get("id"),
         "created_at": now_iso,
         "updated_at": now_iso,
@@ -300,22 +332,23 @@ async def build_registration(db, tournament: dict, team_id: str, squad_id: str, 
 
 
 async def active_league_registration(db, squad_id: str) -> dict | None:
-    """Eine Anmeldung dieses Co-Teams in einer Staffel, die noch läuft - dann darf es nicht gelöscht werden."""
+    """Eine Anmeldung dieses Co-Teams in einer Staffel, die noch nicht beendet ist - egal mit welchem Status (auch
+    ausgetreten oder disqualifiziert steht es in Tabelle und Spielplan). Dann darf es nicht gelöscht werden."""
     regs = await db.tournament_registrations.find(
-        {"squad_id": squad_id, "status": {"$in": list(ACTIVE_REGISTRATION_STATUSES)}},
+        {"squad_id": squad_id},
         {"_id": 0, "id": 1, "tournament_id": 1},
-    ).to_list(50)
+    ).to_list(500)
     if not regs:
         return None
     tournaments = {
         row["id"]: row
         for row in await db.tournaments.find(
             {"id": {"$in": sorted({reg["tournament_id"] for reg in regs if reg.get("tournament_id")})}},
-            {"_id": 0, "id": 1, "title": 1, "status": 1},
-        ).to_list(60)
+            {"_id": 0, "id": 1, "title": 1, "slug": 1, "status": 1},
+        ).to_list(510)
     }
     for reg in regs:
         tournament = tournaments.get(reg.get("tournament_id") or "")
         if tournament and tournament.get("status") not in FINISHED_TOURNAMENT_STATUSES:
-            return {**reg, "tournament_title": tournament.get("title")}
+            return {**reg, "tournament_title": tournament.get("title"), "tournament_slug": tournament.get("slug")}
     return None

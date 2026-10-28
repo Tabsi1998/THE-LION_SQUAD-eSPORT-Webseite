@@ -148,6 +148,8 @@ async def init_indexes():
     # Liga Stufe 1 – Co-Teams und Spiele (B), docs/LIGA.md: Anmeldungen je Co-Team, Co-Teams je Captain/Vertreter.
     await db.tournament_registrations.create_index(
         "squad_id", partialFilterExpression={"squad_id": {"$exists": True}})
+    # Ein Co-Team je Season nur in einer Staffel - ``<season_id>:<squad_id>``, nur an aktiven Liga-Anmeldungen.
+    await db.tournament_registrations.create_index("league_squad_key", unique=True, sparse=True)
     await db.team_squads.create_index("captain_id", sparse=True)
     await db.team_squads.create_index("vice_captain_id", sparse=True)
     # Events
