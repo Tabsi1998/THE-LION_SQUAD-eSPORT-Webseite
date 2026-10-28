@@ -1,47 +1,10 @@
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { FORM_LETTERS, formLabel, formatDiff, formatNumber, rankMove } from "@/lib/standingsTable";
+import { FORM_LETTERS, STANDING_COLUMNS, formLabel, rankMove, standingCell } from "@/lib/standingsTable";
 import { CountUp } from "@/components/tls/motion/CountUp";
 
 // Eine Tabelle der Rangliste (#1562, #1179): Liga und Gruppen mit Spielen, Bilanz, Differenz, Form und Punkten; die
 // Pfeile zeigen den Weg seit dem vorigen Spieltag (vom Server), die eigene Zeile ist markiert. Sieg hell in Cyan,
 // Niederlage grau - Rot bleibt Live, Gold dem Podest (LSW-Farbregel). Am Handy fallen S/U/N weg, Form bleibt.
-
-const COLUMNS = {
-  league: [
-    { key: "played", label: "Sp", title: "Spiele" },
-    { key: "won", label: "S", title: "Siege", wide: true },
-    { key: "drawn", label: "U", title: "Unentschieden", wide: true },
-    { key: "lost", label: "N", title: "Niederlagen", wide: true },
-    { key: "score_diff", label: "Diff", title: "Differenz", format: formatDiff },
-    { key: "form", label: "Form", title: "Die letzten fünf Spiele" },
-    { key: "points", label: "Pkt", title: "Punkte", strong: true },
-  ],
-  swiss: [
-    { key: "played", label: "Sp", title: "Spiele" },
-    { key: "won", label: "S", title: "Siege", wide: true },
-    { key: "drawn", label: "U", title: "Unentschieden", wide: true },
-    { key: "lost", label: "N", title: "Niederlagen", wide: true },
-    { key: "buchholz", label: "BHZ", title: "Buchholz: Punkte der Gegner" },
-    { key: "form", label: "Form", title: "Die letzten fünf Spiele" },
-    { key: "points", label: "Pkt", title: "Punkte", strong: true },
-  ],
-  // Team-Liga externer Serien (#1747): wie die Liga, dazu die Maps (gewonnen:verloren).
-  team_league: [
-    { key: "played", label: "Sp", title: "Spiele" },
-    { key: "won", label: "S", title: "Siege", wide: true },
-    { key: "drawn", label: "U", title: "Unentschieden", wide: true },
-    { key: "lost", label: "N", title: "Niederlagen", wide: true },
-    { key: "maps", label: "Maps", title: "Maps gewonnen : verloren", wide: true, read: (row) => `${formatNumber(row.score_for ?? 0)}:${formatNumber(row.score_against ?? 0)}` },
-    { key: "score_diff", label: "Diff", title: "Differenz", format: formatDiff },
-    { key: "form", label: "Form", title: "Die letzten fünf Spiele" },
-    { key: "points", label: "Pkt", title: "Punkte", strong: true },
-  ],
-  knockout: [
-    { key: "won", label: "S", title: "Siege", read: (row) => row.won ?? row.wins ?? 0 },
-    { key: "lost", label: "N", title: "Niederlagen", read: (row) => row.lost ?? row.losses ?? 0 },
-    { key: "points", label: "Punkte", title: "Punkte", strong: true, read: (row) => row.points ?? row.furthest_round ?? 0 },
-  ],
-};
 
 export function standingKey(row) {
   return row.registration_id || row.id || row.display_name;
@@ -77,19 +40,14 @@ function Form({ form }) {
   );
 }
 
-function cellValue(column, row) {
-  if (column.read) return column.read(row);
-  if (column.format) return column.format(row[column.key]);
-  return formatNumber(row[column.key] ?? 0);
-}
-
 /**
- * `rows`: Zeilen einer Tabelle; `kind`: league, swiss oder knockout (lib/standingsTable.tableKind); `changed`: Schlüssel
+ * `rows`: Zeilen einer Tabelle; `kind`: league, swiss, ffa oder knockout (lib/standingsTable.tableKind); `changed`: Schlüssel
  * frisch geänderter Zeilen; `registerRow`: useFlipRows - Zeilen gleiten an ihren neuen Platz; `certificateHref`: Link
- * zur Urkunde (nur nach dem Ende); `mineLabel`: Marke an der eigenen Zeile.
+ * zur Urkunde (nur nach dem Ende); `mineLabel`: Marke an der eigenen Zeile; `nameLabel`: Kopf der Namensspalte („Team“
+ * bei Team-Turnieren, lib/standingsTable.nameHead).
  */
-export function StandingsTable({ rows, kind = "league", changed, registerRow, certificateHref = null, label = "Rangliste", mineLabel = "Du" }) {
-  const columns = COLUMNS[kind] || COLUMNS.league;
+export function StandingsTable({ rows, kind = "league", changed, registerRow, certificateHref = null, label = "Rangliste", mineLabel = "Du", nameLabel = "Name" }) {
+  const columns = STANDING_COLUMNS[kind] || STANDING_COLUMNS.league;
   const span = columns.length + 2 + (certificateHref ? 1 : 0);
   return (
     // Bei großer Schrift (200 %) am Handy schiebt sich die Tabelle seitlich, statt die Punkte abzuschneiden.
@@ -99,7 +57,7 @@ export function StandingsTable({ rows, kind = "league", changed, registerRow, ce
         <thead className="text-[11px] uppercase tracking-[0.12em] text-white/50">
           <tr className="border-b border-white/10">
             <th scope="col" className="text-left pl-3 sm:pl-4 pr-1 py-2.5 w-12 sm:w-16 font-semibold">#</th>
-            <th scope="col" className="text-left px-2 py-2.5 font-semibold">{kind === "knockout" ? "Spieler" : "Name"}</th>
+            <th scope="col" className="text-left px-2 py-2.5 font-semibold">{nameLabel}</th>
             {columns.map((column) => (
               <th key={column.key} scope="col" title={column.title} className={`px-1.5 sm:px-2.5 py-2.5 font-semibold ${column.key === "form" ? "text-left" : "text-right"} ${column.wide ? "hidden sm:table-cell" : ""} ${column.strong ? "pr-3 sm:pr-4" : ""}`}>
                 {column.label}
@@ -137,7 +95,7 @@ export function StandingsTable({ rows, kind = "league", changed, registerRow, ce
                   <td key={column.key} className={`px-1.5 sm:px-2.5 py-2.5 align-middle ${column.key === "form" ? "text-left" : "text-right"} ${column.wide ? "hidden sm:table-cell" : ""} ${column.strong ? "pr-3 sm:pr-4 font-display text-base font-bold text-white" : "text-white/70"}`}>
                     {/* Punkte zählen beim ersten Sichtbarwerden hoch (#1969); beim Nachladen steht der neue Wert sofort da -
                         die Zeile selbst leuchtet schon auf (tls-changed-row), ein zweites Aufleuchten wäre zu viel. */}
-                    {column.key === "form" ? <Form form={row.form} /> : column.strong ? <CountUp value={cellValue(column, row)} flash={false} /> : cellValue(column, row)}
+                    {column.key === "form" ? <Form form={row.form} /> : column.strong ? <CountUp value={standingCell(column, row)} flash={false} /> : standingCell(column, row)}
                   </td>
                 ))}
                 {certificateHref && (

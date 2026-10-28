@@ -211,12 +211,23 @@ def _top_certificate_rows(rows: list[dict], limit: int = 4) -> list[dict]:
     return sorted(result, key=lambda row: int(row.get("rank") or 999))
 
 
-def _tournament_certificate_metrics(row: dict) -> list[dict]:
-    metrics = [
-        {"label": "Siege", "value": row.get("won", row.get("wins", 0))},
-        {"label": "Niederlagen", "value": row.get("lost", row.get("losses", 0))},
-    ]
-    if row.get("points") is not None:
+def _tournament_certificate_metrics(row: dict, tournament: dict | None = None) -> list[dict]:
+    """Die Zahlen auf der Urkunde (#2121) - wie in der Rangliste: im K.-o. die erreichte Runde statt Punkte (die es dort
+    nicht gibt), in Tabelle und FFA die Punkte. Die Urkunden-PDFs lesen ``/standings`` mit; ihr ``reached`` kommt mit."""
+    from services.round_labels import HEAT_FORMATS, TABLE_FORMATS
+
+    format_key = (tournament or {}).get("format")
+    metrics = [{"label": "Siege", "value": row.get("won", row.get("wins", 0))}]
+    if format_key in HEAT_FORMATS:
+        # Ein Lauf mit vielen kennt keine Niederlage - zählt, wie oft gespielt wurde.
+        metrics.append({"label": "Läufe", "value": row.get("played", 0)})
+    else:
+        metrics.append({"label": "Niederlagen", "value": row.get("lost", row.get("losses", 0))})
+    knockout = format_key not in TABLE_FORMATS | HEAT_FORMATS and row.get("furthest_round") is not None
+    if knockout:
+        # Wie weit es ging, mit dem Namen der Runde aus dem Baum („Halbfinale“, „Loser Runde 4“) - wie in der Rangliste.
+        metrics.append({"label": "Erreicht", "value": row.get("reached") or row.get("furthest_round")})
+    elif row.get("points") is not None:
         metrics.append({"label": "Punkte", "value": row.get("points")})
     elif row.get("furthest_round") is not None:
         metrics.append({"label": "Runde", "value": row.get("furthest_round")})
@@ -362,7 +373,7 @@ async def pdf_tournament_standings(
     sponsors = await _pdf_sponsors(db)
     branding = await _pdf_branding(db)
     file_id = _pdf_filename_part(t.get("slug"), t.get("id"), slug_or_id, fallback="turnier")
-    return _pdf_response(pdf_standings(t, rows, pdf_sponsors=sponsors, pdf_branding=branding), f"standings_{file_id}.pdf")
+    return _pdf_response(pdf_standings(t, rows, pdf_sponsors=sponsors, pdf_branding=branding), f"rangliste_{file_id}.pdf")
 
 
 @pdf_router.get("/tournaments/{slug_or_id}/certificates.pdf")
@@ -389,7 +400,7 @@ async def pdf_tournament_certificates(
             "source": source,
             "row": row,
             "category": "Gesamtwertung",
-            "metrics": _tournament_certificate_metrics(row),
+            "metrics": _tournament_certificate_metrics(row, t),
         }
         for row in rows
     ]
@@ -429,7 +440,7 @@ async def pdf_tournament_certificate(
             _certificate_source_from_item(t, "Turnier"),
             row,
             category="Gesamtwertung",
-            metrics=_tournament_certificate_metrics(row),
+            metrics=_tournament_certificate_metrics(row, t),
             pdf_sponsors=sponsors,
             pdf_branding=branding,
         ),

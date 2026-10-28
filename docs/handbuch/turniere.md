@@ -533,6 +533,11 @@ Den Turnierbaum für Fernseher oder Beamer erstellt ihr im Turnier mit dem Link 
 Seite“), Einrichtung und Grundwerte stehen in [TV und Beamer](tv.md). Beim Status **Pausiert** gibt es **Pause bis**,
 der TV zählt dann herunter. Im Reiter **Turnierbaum** setzt ihr „Runde präsentiert von“.
 
+Bei **Liga, Jeder gegen jeden, Schweizer System und Gruppen** zeigt der TV nach den Spieltagen die Folie **Tabelle**
+(gleich lang wie der Spielplan, bei Gruppen je Gruppe eine Tabelle) – ohne dass ihr die Wiedergabeliste ändert. Kopfzeile
+und QR-Code sagen dort „Tabelle“ und führen zur Rangliste. Ist das Turnier beendet, kommt der **Sieger aus Platz 1** der
+Tabelle mit seiner Siegerkarte (bei Gruppen und bei Gleichstand auf Platz 1 nicht).
+
 ### 3.10 Abschluss
 
 1. **Beendet** (Status-Auswahl im Turnier, mit Rückfrage): Die Spiele sind durch. Alle Beteiligten bekommen einmal die
@@ -573,8 +578,20 @@ der TV zählt dann herunter. Im Reiter **Turnierbaum** setzt ihr „Runde präse
 
 Die **Rangliste** zeigt bei Liga, Jeder gegen jeden und Schweizer System Spiele, Siege/Unentschieden/Niederlagen,
 Differenz (beim Schweizer System Buchholz), die Form der letzten fünf Spiele und Pfeile, wie sich der Platz seit dem
-vorigen Spieltag geändert hat. Bei der Gruppenphase steht je Gruppe eine eigene Tabelle. Die eigene Zeile ist markiert,
-bei Team-Turnieren für alle Mitglieder des Teams.
+vorigen Spieltag geändert hat. Bei der Gruppenphase steht je Gruppe eine eigene Tabelle. Im **K.-o.** stehen Siege,
+Niederlagen und unter **Erreicht** die Runde aus dem Baum – etwa „Halbfinale“, „Loser Runde 4“ oder „Grand Final“, bei
+mehreren Phasen mit der Phase davor (Punkte gibt es dort nicht). Bei **Läufen (FFA)** stehen Spiele, Siege, der Platz im
+Schnitt und die Punkte. Die Namensspalte heißt bei Team-Turnieren „Team“. Die eigene Zeile ist markiert, bei
+Team-Turnieren für alle Mitglieder des Teams.
+
+In der Rangliste stehen nur **angenommene und eingecheckte** Anmeldungen – Warteliste, Ausstehend, Abgelehnt und Nicht
+erschienen nie; wer mit Spielen ausgeschieden ist (disqualifiziert, abgemeldet), bleibt mit diesen Spielen drin. Im K.-o.
+und bei Läufen gibt es Plätze erst mit dem **ersten Ergebnis** (ein Freilos zählt nicht) – vorher steht „Noch keine
+Ergebnisse“. Die Turnierseite nennt den **Endplatz** in der Teilnehmerliste erst nach dem Ende.
+
+Nach dem Ende stehen über der Rangliste **Ergebnis-PDF** (heißt „Rangliste“, mit denselben Spalten wie die Seite und bei
+Gruppen je Gruppe einer Tabelle) und **Urkunden** (nur, wenn es Platz 1 bis 4 gibt – bei Gruppen nicht, dort fehlt noch
+ein Endstand). **Drucken** öffnet die Tabelle in der Druckansicht ([3.13](#313-plan-b-auf-papier)).
 
 Strafen stehen unter **Admin → eSports → Strafen**, die Jahreswertung unter **Admin → eSports → Jahreswertung**.
 
@@ -590,7 +607,7 @@ Strafen stehen unter **Admin → eSports → Strafen**, die Jahreswertung unter 
   gibt Benachrichtigungen bei Problemen.
 - **TV** aufstellen und aufrufen lassen, damit Spieler selbst sehen, wo sie hinmüssen.
 - **Check-in** vorher: Online-Spieler checken selbst ein, vor Ort druckt **PDF Check-in** die Liste zum Abhaken.
-- **Plan B auf Papier** am Vorabend drucken: Baum, Spielplan und Check-in-Liste ([3.13](#313-plan-b-auf-papier)).
+- **Plan B auf Papier** am Vorabend drucken: Baum bzw. Tabelle, Spielplan und Check-in-Liste ([3.13](#313-plan-b-auf-papier)).
 - **Nicht erschienen** früh setzen, Ersatz einsetzen, und die Frist vorher in den Regeln nennen.
 
 ### 3.12 Spieldauer und Spiel-Daten
@@ -643,14 +660,19 @@ Im Turnier dann **Matchdauer** leer lassen: dort steht „vom Spiel: 15 Min. (Gr
 
 Fällt am Event Netz oder Server aus, läuft das Turnier auf Papier weiter. Darum am **Vorabend** drucken:
 
-- Auf **Turnierbaum**, **Spielplan**, **Teilnehmer** (nur mit Check-in-Recht) und beim Event (**Was läuft** bzw.
-  **Anmeldungen & Einlass**) steht der Knopf **Drucken**. Er öffnet die Druckansicht – hell, ohne Menü – mit dem passenden
-  Teil vorgewählt. Oben lassen sich die Teile an- und abhaken (Turnierbaum, Spielplan, Check-in-Liste bzw. Tagesplan),
+- Auf **Turnierbaum**, **Rangliste**, **Spielplan**, **Teilnehmer** (nur mit Check-in-Recht) und beim Event (**Was läuft**
+  bzw. **Anmeldungen & Einlass**) steht der Knopf **Drucken**. Er öffnet die Druckansicht – hell, ohne Menü – mit dem
+  passenden Teil vorgewählt; **Zurück** führt wieder dorthin (sonst zur Turnierseite). Oben lassen sich die Teile an- und
+  abhaken (Turnierbaum, Tabelle bzw. Rangliste, Spielplan, Check-in-Liste bzw. Tagesplan),
   Baum und Listen **quer** oder **hoch** stellen und der Spielplan **nach Zeit** oder **nach Station** ordnen. Erst
   **Drucken** dort schickt es an den Drucker; am Handy öffnet es das Druck- bzw. Teilen-Menü (als PDF sichern).
 - **Baum:** A4 quer, Runde für Runde nebeneinander. Passt ein großer Baum nicht auf ein Blatt, geht er auf mehreren
   Seiten weiter – jede Spalte trägt ihren Rundennamen (wie im Web-Baum) und „1/2“, „2/2“. Winner Bracket, Loser Bracket,
-  Grand Final, Gruppen und Läufe (FFA) haben je ihren Block; leere Kästchen rechts sind für das Ergebnis bzw. den Platz.
+  Grand Final und Läufe (FFA) haben je ihren Block; leere Kästchen rechts sind für das Ergebnis bzw. den Platz.
+- **Tabelle:** bei Liga, Jeder gegen jeden, Schweizer System und Gruppen statt des Baums (deren Spieltage stehen im
+  Spielplan) – Platz, Name und die Spalten der Rangliste, bei Gruppen je Gruppe ein Abschnitt. Diese Formate haben keinen
+  Teil „Turnierbaum“; der Druck-Knopf am Baum öffnet die Tabelle. Beim K.-o. heißt der Teil **Rangliste** und ist nur
+  auf Wunsch dabei.
 - **Spielplan:** Zeit, Station, Spiel, Teilnehmer und ein leeres Feld zum Eintragen des Ergebnisses.
 - **Check-in-Liste:** Kästchen zum Abhaken, Setzplatz, beim Event die Begleitpersonen, darunter die Warteliste. Nur mit
   Turnier-Recht – andere sehen den Teil gar nicht, und der Server gibt die Liste nur der Turnierleitung.

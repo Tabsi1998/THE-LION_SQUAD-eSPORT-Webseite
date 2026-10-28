@@ -2,8 +2,8 @@
 import { describe, expect, test } from "vitest";
 import { displayRoundLabels, roundName } from "@/lib/bracketNames";
 import {
-  CHECKIN, PRINT_DEFAULTS, bracketBlocks, bracketPages, cardHeight, checkinPages, columnHeight, dayPlanPages, eventCheckinSections, listCapacity,
-  TITLE_MAX, paginate, parseParts, scheduleRowHeight, schedulePages, sheetBody, splitBands, stampText, titleTier, tournamentCheckinSections, treeColumnCapacity, treeColumns,
+  CHECKIN, PRINT_DEFAULTS, STANDINGS, bracketBlocks, bracketPages, cardHeight, checkinPages, columnHeight, dayPlanPages, eventCheckinSections, listCapacity,
+  TITLE_MAX, paginate, parseParts, partLabel, printParts, scheduleRowHeight, standingsPages, standingsSections, tableMode, schedulePages, sheetBody, splitBands, stampText, titleTier, tournamentCheckinSections, treeColumnCapacity, treeColumns,
 } from "@/lib/printView";
 
 let next = 0;
@@ -100,6 +100,46 @@ describe("Teile und Rechte", () => {
     expect(parseParts("baum", "event", { staff: true })).toEqual(["tagesplan"]);
     expect(parseParts("none", "tournament", { staff: true })).toEqual([]);
   });
+
+  test("Tabelle (#2121): ohne Baum kein Teil Turnierbaum - „baum“ führt zur Tabelle; beim K.-o. heißt sie Rangliste", () => {
+    expect(parseParts("", "tournament", { mode: "pure" })).toEqual(["tabelle", "spielplan"]);
+    expect(parseParts("baum", "tournament", { mode: "pure" })).toEqual(["tabelle"]);
+    expect(parseParts("", "tournament", { mode: "mixed" })).toEqual(["baum", "tabelle", "spielplan"]);
+    expect(parseParts("tabelle", "tournament")).toEqual(["tabelle"]);
+    expect(printParts("tournament", { mode: "pure" }).map((part) => part.key)).toEqual(["tabelle", "spielplan"]);
+    expect(partLabel("tabelle", "none")).toBe("Rangliste");
+    expect(partLabel("tabelle", "pure")).toBe("Tabelle");
+    expect(partLabel("baum")).toBe("Turnierbaum");
+  });
+});
+
+describe("Tabelle (#2121)", () => {
+  const row = (id, rank, extra = {}) => ({ registration_id: id, display_name: id, rank, played: 2, won: 1, drawn: 0, lost: 1, score_diff: rank === 1 ? 3 : -3, points: 3, form: ["W", "L"], ...extra });
+
+  test("dieselben Spalten wie die Website, ohne Form; Gruppen mit Namen", () => {
+    const [league] = standingsSections([row("Nordlicht", 1), row("Steinbock", 2)]);
+    expect(league.title).toBe("");
+    expect(league.heads.map((head) => head.label)).toEqual(["Sp", "S", "U", "N", "Diff", "Pkt"]);
+    expect(league.rows[1]).toMatchObject({ rank: 2, name: "Steinbock", cells: ["2", "1", "0", "1", "−3", "3"] });
+    const groups = standingsSections([{ group: { id: "g1", group_key: "a" }, standings: [row("Nordlicht", 1)] }, { group: { id: "g2", group_key: "b" }, standings: [] }]);
+    expect(groups.map((section) => section.title)).toEqual(["Gruppe A"]);
+    const [knockout] = standingsSections([{ registration_id: "r1", display_name: "Nordlicht", rank: 1, won: 2, lost: 0, points: 0, furthest_round: 2 }]);
+    expect(knockout.heads.map((head) => head.label)).toEqual(["S", "N", "Erreicht"]);
+    expect(knockout.rows[0].cells).toEqual(["2", "0", "2"]);
+  });
+
+  test("lange Tabellen gehen auf der nächsten Seite weiter, nichts über den Rand", () => {
+    const rows = Array.from({ length: 60 }, (_, index) => row(`Spieler ${index + 1}`, index + 1));
+    const pages = standingsPages(rows, { orientation: "portrait" });
+    expect(pages.length).toBeGreaterThan(1);
+    expect(pages.every((page) => page.kind === "tabelle")).toBe(true);
+    expect(pages.flatMap((page) => page.sections.flatMap((section) => section.rows))).toHaveLength(60);
+    for (const page of pages) {
+      const used = page.sections.reduce((sum, section) => sum + section.rows.length * STANDINGS.row, STANDINGS.tableHead);
+      expect(used).toBeLessThanOrEqual(listCapacity("portrait"));
+    }
+    expect(standingsPages([])).toEqual([]);
+  });
 });
 
 describe("Baum", () => {
@@ -182,7 +222,7 @@ describe("Baum", () => {
     expect(all.every((item) => item.heat && item.slots.length === 8)).toBe(true);
   });
 
-  test("Gruppen: je Gruppe ein Block mit ihren Runden", () => {
+  test("Gruppen sind kein Baum (#2121): der Baum druckt nur die Finalrunde, die Gruppen kommen in die Tabelle", () => {
     const bracket = {
       stages: [{ id: "g", number: 1, name: "Gruppenphase" }, { id: "k", number: 2, name: "Finalrunde" }],
       matches_v2: [
@@ -194,8 +234,12 @@ describe("Baum", () => {
       registrations: [],
     };
     const blocks = bracketBlocks(bracket);
-    expect(blocks.map((block) => block.title)).toEqual(["Gruppenphase · Gruppe A", "Gruppenphase · Gruppe B", "Finalrunde · Winner Bracket"]);
-    expect(blocks[0].columns.map((column) => column.title)).toEqual(["Spieltag 1", "Spieltag 2"]);
+    expect(blocks.map((block) => block.title)).toEqual(["Finalrunde · Winner Bracket"]);
+    expect(tableMode({ format: "groups" }, bracket)).toBe("mixed");
+    expect(tableMode({ format: "league" }, { matches_v2: bracket.matches_v2.slice(0, 3) })).toBe("pure");
+    expect(tableMode({ format: "league" }, { matches_v2: [] })).toBe("pure");
+    expect(tableMode({ format: "single_elim" }, singleElim(4))).toBe("none");
+    expect(bracketPages({ ...bracket, matches_v2: bracket.matches_v2.slice(0, 3) })).toEqual([]);
   });
 
   test("Bänder: jede Spalte gibt ihren Anteil ab, eine zu hohe Einzelkarte meldet overflow", () => {

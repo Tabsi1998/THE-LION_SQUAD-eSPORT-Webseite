@@ -6,25 +6,29 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { gameLabel } from "@/lib/gameLabels";
 import { viennaDateTime } from "@/lib/vienna";
 import {
-  PAPER, PRINT_DEFAULTS, PRINT_PARTS, bracketPages, checkinPages, dayPlanPages, eventCheckinSections, parseParts, schedulePages, stampText,
-  tournamentCheckinSections,
+  PAPER, PRINT_DEFAULTS, PRINT_PARTS, bracketPages, checkinPages, dayPlanPages, eventCheckinSections, parseParts, partLabel, printParts,
+  schedulePages, stampText, standingsPages, tableMode, tournamentCheckinSections,
 } from "@/lib/printView";
-import { CheckinBody, DayPlanBody, PrintSheet, ScheduleBody, TreeBody } from "@/components/tls/print/PrintSheets";
+import { nameHead } from "@/lib/standingsTable";
+import { isHeatSchedule } from "@/lib/tournamentLabels";
+import { CheckinBody, DayPlanBody, PrintSheet, ScheduleBody, StandingsBody, TreeBody } from "@/components/tls/print/PrintSheets";
 
 // Druckansicht (#1283): Plan B auf Papier. Am Vorabend Baum, Spielplan, Check-in-Liste und Tagesplan drucken - fällt am
 // Event Netz oder Server aus, läuft das Turnier auf dem Ausdruck weiter. Eigene Adresse ohne Menü und Deko:
 // /print/tournaments/<slug> und /print/events/<slug>, Auswahl in der Adresse (?teile=baum,liste&baum=quer&listen=hoch
 // &plan=zeit), damit ein Link genau diesen Druck wieder öffnet. Gedruckt wird erst auf Knopfdruck (am Handy über das
 // Teilen- bzw. Druckmenü als PDF). Die Check-in-Liste gibt es nur mit Turnier-Recht - der Server prüft es selbst.
+// Seit #2121 die Tabelle (beim K.-o. „Rangliste“): Liga, Jeder gegen jeden, Schweizer System und Gruppen drucken sie
+// statt ihrer Spieltage als Baumspalten; „Zurück“ führt dorthin, wo der Druck-Knopf war, sonst zur Turnierseite.
 
 const START = { weekday: "short", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" };
 const ORIENTATION = { quer: "landscape", hoch: "portrait" };
 const ORIENTATION_PARAM = { landscape: "quer", portrait: "hoch" };
 const MM_TO_PX = 96 / 25.4;
 
-const KICKER = { baum: "Turnierbaum", spielplan: "Spielplan", liste: "Check-in-Liste", tagesplan: "Tagesplan" };
 const EMPTY_TEXT = {
   baum: "Der Turnierbaum steht noch nicht – er erscheint nach der Auslosung.",
+  tabelle: "Noch keine Ergebnisse.",
   spielplan: "Es gibt noch keine Spiele.",
   tagesplan: "Für dieses Event steht noch nichts mit Uhrzeit fest.",
   liste: "Noch niemand angemeldet.",
@@ -76,7 +80,9 @@ function PrintView({ scope }) {
   const available = useAvailableWidth();
 
   const staff = Boolean(data?.subject?.can_check_in);
-  const parts = parseParts(params.get("teile"), scope, { staff: data ? staff : true });
+  // Ohne Baum (Liga & Co., #2121) gibt es keinen Teil „Turnierbaum“, dafür die Tabelle.
+  const mode = scope === "tournament" && data ? tableMode(data.subject, data.bracket) : "none";
+  const parts = parseParts(params.get("teile"), scope, { staff: data ? staff : true, mode });
   const treeOrientation = ORIENTATION[params.get("baum")] || PRINT_DEFAULTS.treeOrientation;
   const listOrientation = ORIENTATION[params.get("listen")] || PRINT_DEFAULTS.listOrientation;
   const scheduleOrder = params.get("plan") === "station" ? "station" : PRINT_DEFAULTS.scheduleOrder;
@@ -92,8 +98,12 @@ function PrintView({ scope }) {
     const load = scope === "event"
       ? api.get(`/events/${encodeURIComponent(slug)}`, config).then(({ data: event }) => ({ subject: event, bracket: null }))
       : api.get(`/tournaments/${encodeURIComponent(slug)}`, config).then(async ({ data: tournament }) => {
-        const { data: bracket } = await api.get(`/tournaments/${tournament.id}/bracket`, config);
-        return { subject: tournament, bracket };
+        // Die Rangliste gehört zur Druckansicht (#2121) - fehlt sie, bleibt der Rest druckbar.
+        const [{ data: bracket }, standings] = await Promise.all([
+          api.get(`/tournaments/${tournament.id}/bracket`, config),
+          api.get(`/tournaments/${tournament.id}/standings`, config).then(({ data: rows }) => rows, () => []),
+        ]);
+        return { subject: tournament, bracket, standings: Array.isArray(standings) ? standings : [] };
       });
     load
       .then((next) => { if (!cancelled) setData(next); })
@@ -129,13 +139,17 @@ function PrintView({ scope }) {
     const set = new Set(parts);
     if (set.has(key)) set.delete(key);
     else set.add(key);
-    const ordered = PRINT_PARTS.map((part) => part.key).filter((item) => set.has(item));
+    const ordered = PRINT_PARTS.map((part) => part.key).filter((item) => set.has(item) && (item !== "baum" || mode !== "pure"));
     update({ teile: ordered.join(",") || "none" });
   };
 
   const origin = typeof window === "undefined" ? "" : window.location.origin;
   const base = scope === "event" ? `/events/${subject?.slug || slug}` : `/tournaments/${subject?.slug || slug}`;
-  const backTo = scope === "event" ? base : `${base}${params.get("von") === "spielplan" ? "/matches" : params.get("von") === "teilnehmer" ? "" : "/bracket"}`;
+  // Zurück dorthin, wo der Druck-Knopf war - sonst zur Turnierseite (#2121: nicht immer zum Baum, den Liga & Co. nicht
+  // haben); ein Zugangslink geht mit.
+  const BACK = { spielplan: "/matches", baum: "/bracket", rangliste: "/standings" };
+  const backQuery = accessToken ? `?access=${encodeURIComponent(accessToken)}` : "";
+  const backTo = `${base}${scope === "event" ? "" : BACK[params.get("von")] || ""}${backQuery}`;
   const meta = subject
     ? [subject.start_date ? viennaDateTime(subject.start_date, START) : null, subject.game ? gameLabel(subject.game) : null, subject.location || subject.venue_name || null].filter(Boolean).join(" · ")
     : "";
@@ -153,17 +167,18 @@ function PrintView({ scope }) {
     const avail = new Set(parts);
     if (scope === "tournament") {
       if (avail.has("baum")) push("baum", bracketPages(data.bracket, { orientation: treeOrientation }), treeOrientation, `${base}/bracket`, "Live-Turnierbaum");
+      if (avail.has("tabelle")) push("tabelle", standingsPages(data.standings, { orientation: listOrientation, heats: isHeatSchedule(data.subject) }), listOrientation, `${base}/standings`, `Live-${partLabel("tabelle", mode)}`);
       if (avail.has("spielplan")) push("spielplan", schedulePages(data.bracket, { orientation: listOrientation, order: scheduleOrder }), listOrientation, `${base}/matches`, "Live-Spielplan");
     } else if (avail.has("tagesplan")) {
       push("tagesplan", dayPlanPages(data.subject, { orientation: listOrientation }), listOrientation, `${base}/live`, "Live beim Event");
     }
     if (avail.has("liste") && staff && list) push("liste", checkinPages(list, { orientation: listOrientation }), listOrientation, `${base}/leitung`, "Einlass in der Turnierleitung");
     return out;
-  }, [data, parts, scope, treeOrientation, listOrientation, scheduleOrder, base, staff, list]);
+  }, [data, parts, scope, treeOrientation, listOrientation, scheduleOrder, base, staff, list, mode]);
 
   const stamp = stampText(now);
   const printable = sheets.length > 0;
-  const partOptions = PRINT_PARTS.filter((part) => (part.scope === scope || part.scope === "both") && (!part.staff || staff));
+  const partOptions = printParts(scope, { staff, mode });
 
   return (
     <div className="tls-print-page min-h-screen bg-[#0A0A0A] text-white">
@@ -190,11 +205,11 @@ function PrintView({ scope }) {
               {partOptions.map((part) => (
                 <label key={part.key} className="inline-flex min-h-11 items-center gap-2 text-sm text-white/85 cursor-pointer">
                   <input type="checkbox" checked={parts.includes(part.key)} onChange={() => togglePart(part.key)} data-testid={`print-part-${part.key}`} className="h-4 w-4 accent-[var(--tls-cyan)]" />
-                  {part.label}
+                  {partLabel(part.key, mode)}
                 </label>
               ))}
             </fieldset>
-            {scope === "tournament" ? (
+            {scope === "tournament" && mode !== "pure" ? (
               <Choice legend="Baum" name="baum" value={ORIENTATION_PARAM[treeOrientation]} options={[["quer", "Quer"], ["hoch", "Hoch"]]} onChange={(value) => update({ baum: value })} />
             ) : null}
             <Choice legend="Listen" name="listen" value={ORIENTATION_PARAM[listOrientation]} options={[["hoch", "Hoch"], ["quer", "Quer"]]} onChange={(value) => update({ listen: value })} />
@@ -224,7 +239,7 @@ function PrintView({ scope }) {
                 key={`${sheet.kind}-${index}`}
                 zoom={zoom}
                 orientation={sheet.orientation}
-                kicker={KICKER[sheet.kind]}
+                kicker={partLabel(sheet.kind, mode)}
                 title={name}
                 meta={meta}
                 stamp={stamp}
@@ -236,6 +251,7 @@ function PrintView({ scope }) {
               >
                 {sheet.empty ? <p className="tls-print-empty">{EMPTY_TEXT[sheet.kind]}</p> : null}
                 {!sheet.empty && sheet.kind === "baum" ? <TreeBody page={sheet.page} /> : null}
+                {!sheet.empty && sheet.kind === "tabelle" ? <StandingsBody page={sheet.page} nameLabel={nameHead(subject)} /> : null}
                 {!sheet.empty && sheet.kind === "spielplan" ? <ScheduleBody page={sheet.page} /> : null}
                 {!sheet.empty && sheet.kind === "liste" ? <CheckinBody page={sheet.page} extraLabel={scope === "event" ? "Begleitung" : "Station"} /> : null}
                 {!sheet.empty && sheet.kind === "tagesplan" ? <DayPlanBody page={sheet.page} /> : null}

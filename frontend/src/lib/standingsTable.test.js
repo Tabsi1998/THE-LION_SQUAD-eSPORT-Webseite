@@ -1,5 +1,5 @@
 import fixture from "../../e2e/fixtures/tableScheduleGenerated.json";
-import { formLabel, formatDiff, rankMove, standingSections, tableKind } from "./standingsTable";
+import { STANDING_COLUMNS, formLabel, formatDiff, nameHead, rankMove, standingCell, standingSections, tableKind } from "./standingsTable";
 
 // Tabellen (#1562, #1179): die Daten kommen aus scripts/make_table_schedule_fixture.py - echte Liga, echte Gruppen.
 
@@ -30,6 +30,21 @@ test("64 Teilnehmer in acht Gruppen bleiben acht Tabellen mit eindeutigen Schlü
 test("ein K.-o.-Turnier hat seine eigene, schmale Tabelle", () => {
   expect(tableKind(fixture.finished.standings)).toBe("knockout");
   expect(tableKind([])).toBe("knockout");
+});
+
+test("K.-o. zählt die Runde, Läufe die Punkte; der Kopf sagt Team bei Teams (#2121)", () => {
+  expect(tableKind(fixture.finished.standings, { heats: true })).toBe("ffa");
+  expect(tableKind(fixture.league.standings, { heats: true })).toBe("league");
+  expect(STANDING_COLUMNS.knockout.map((column) => column.label)).toEqual(["S", "N", "Erreicht"]);
+  expect(STANDING_COLUMNS.ffa.map((column) => column.label)).toEqual(["Sp", "S", "Ø Pl.", "Pkt"]);
+  const knockout = { won: 1, lost: 1, points: 0, furthest_round: 3 };
+  expect(STANDING_COLUMNS.knockout.map((column) => standingCell(column, knockout))).toEqual([1, 1, "3"]);
+  expect(standingCell(STANDING_COLUMNS.knockout[2], { ...knockout, reached: "Loser Runde 4" })).toBe("Loser Runde 4");
+  expect(standingCell(STANDING_COLUMNS.ffa[2], { avg_rank: 1.333 })).toBe("1,3");
+  expect(standingCell(STANDING_COLUMNS.ffa[2], {})).toBe("–");
+  expect(nameHead({ team_mode: "team" })).toBe("Team");
+  expect(nameHead({ team_mode: "solo" })).toBe("Name");
+  expect(nameHead(null)).toBe("Name");
 });
 
 test("Pfeile: hinauf, hinunter, gleich - und keiner ohne vorigen Spieltag", () => {

@@ -337,7 +337,8 @@ function TournamentDetailView() {
   const STATUS_ORDER = { checked_in: 0, approved: 1, pending: 2, waitlist: 3, rejected: 4, no_show: 5 };
   // Nach dem Ende stehen die Teilnehmer nach ihrem Endplatz (geteilte Plätze gleich), sonst nach Status und Setzplatz -
   // nie nach der Reihenfolge der Anmeldung, die man mit dem Podest verwechseln könnte (Abnahme #1593).
-  const finalRank = new Map(standings.filter((row) => row && !Array.isArray(row.standings) && row.registration_id && Number(row.rank) > 0).map((row) => [row.registration_id, Number(row.rank)]));
+  // Ein Endplatz erst nach dem Ende (#2121) - solange es läuft, ist ein Zwischenstand kein Endplatz.
+  const finalRank = new Map(finished ? standings.filter((row) => row && !Array.isArray(row.standings) && row.registration_id && Number(row.rank) > 0).map((row) => [row.registration_id, Number(row.rank)]) : []);
   const sortedRegs = [...regs].sort((a, b) => ((finalRank.get(a.id) ?? 9999) - (finalRank.get(b.id) ?? 9999)) || ((STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9)) || ((a.seed ?? 999) - (b.seed ?? 999)));
   const calendarItem = {
     id: t.id, slug: t.slug, kind: "tournament", title: t.title, start: t.start_date, end: t.end_date,

@@ -2,7 +2,9 @@
 liefert Byte für Byte dieselben Grund- und Bestelldateien wie vor #2142 - gleicher ``layout_hash`` (sonst würden alle
 erzeugten Dateien „veraltet“), gleicher ``rules_hash`` der Gamertag-Datei und dieselben Pixel.
 
-Die Prüfsummen unten sind vor #2142 mit genau diesem Ablauf gerechnet. Die Pixel-Prüfsumme nimmt die dekodierten Pixel
+Die Prüfsummen unten sind vor #2142 mit genau diesem Ablauf gerechnet - außer der Rückseite der Bestellung: seit #2150
+druckt sie die Vereinsnummer in einer eigenen Datei (die Grunddatei darunter bleibt gleich, ebenso Gamertag-Datei und
+Bestelldatei vorne). Die Pixel-Prüfsumme nimmt die dekodierten Pixel
 (Größe, Modus, DPI, RGBA) statt der PNG-Bytes - so hängt sie nicht an der zlib-Fassung der Plattform. Nur synthetische
 Bilder und erfundene Namen."""
 import hashlib
@@ -34,7 +36,10 @@ GOLDEN: dict[str, str] = {
     "base front|Black": "f84cff8a7d5627d76534636da369b4463ebd8c10b093320b8c92a773f9b26575",
     "layout front|White": "420bd19fadf1c50f8d032a0dcca9830daae0bd5e741af7d0aca168cd1749698a",
     "base front|White": "1b2a4c1dcb4f3b0bc73f279ed7bff6bea465b512705b092a0251f2865496fab7",
-    "order back base": "d8fc90871086809e0873219be645c15bf0a6ef010112a712a7f0e8024e628b19",
+    # Seit #2150 hat die Rückseite eine eigene Datei mit der Vereinsnummer (mit #2150 gerechnet, Nummer erfunden).
+    "order back personal": "0954de3055a82272169604fbaba727b1542bc7573eb56b4307327a9b1b2da348",
+    "number back rules": "e0e2fad2a21e6ed474c55fef49ff147e1f43872d16520e9a62b00a5d5833da1b",
+    "number back pixels": "e71b1c1b2654ee1856b3136c977dc8ac94293a458cc7882f6c6ebeeea477e507",
     "order front personal": "7ace80b58c2a99dccd949e2dddb0847cb97f67120db1c142992057c912ccc932",
     "gamertag front rules": "8259b1fcbafa1b1289aed2778dda528337bcf7dfb79aaf52e7eb376fd0ea8525",
     "gamertag front pixels": "758b90b3ec2bb1e5bca4918b17c7619558c3beb1cc686c7ed9608036665af3bc",
@@ -70,8 +75,12 @@ async def test_existing_products_keep_layout_hash_rules_hash_and_pixels(db, prov
         seen[f"base {key}"] = pixels(shop_designs._path_of(base["file_ref"]))
     await publish_unchecked(db, product["id"])
     white = await variant_for(db, product["id"], WHITE_M)
+    # Die Vereinsnummer wird seit #2150 gedruckt: Mitglied mit erfundener Wunschnummer und Einwilligung.
+    await db.memberships.insert_one({"user_id": "konto-1", "member_status": "active"})
+    await db.jersey_numbers.insert_one({"user_id": "konto-1", "number": 7, "number_key": "7", "can_choose": False})
     order, _ = await shop_orders.place_order(
-        db, idempotency_key="bestand-2142", lines=[{"variant_id": white["id"], "quantity": 1, "gamertag": "Testlöwe"}],
+        db, idempotency_key="bestand-2142", lines=[{"variant_id": white["id"], "quantity": 1, "gamertag": "Testlöwe",
+                                                    "number_consent": True}],
         user_id="konto-1", buyer_kind="member", shipping_estimate_cents=490, billing_address=dict(BILLING),
         shipping_address=dict(SHIPPING), actor_id="konto-1")
     (item,) = await shop_orders.items_for(db, order["id"])
@@ -82,6 +91,10 @@ async def test_existing_products_keep_layout_hash_rules_hash_and_pixels(db, prov
             tag = await db.shop_gamertag_files.find_one({"id": row["gamertag_file_id"]}, {"_id": 0})
             seen[f"gamertag {row['placement']} rules"] = tag["rules_hash"]
             seen[f"gamertag {row['placement']} pixels"] = pixels(shop_designs._path_of(tag["file_ref"]))
+        if row.get("number_file_id"):
+            tag = await db.shop_gamertag_files.find_one({"id": row["number_file_id"]}, {"_id": 0})
+            seen[f"number {row['placement']} rules"] = tag["rules_hash"]
+            seen[f"number {row['placement']} pixels"] = pixels(shop_designs._path_of(tag["file_ref"]))
     # 2. Allover (#2141): Hintergrund, Rückenmotiv und Gamertag oben.
     other = await configured(db, provider, generate=False, title="Trikot Bestand")
     await shop_products.set_layout(db, other["id"], [{"key": "front", "layers": [LION]},
@@ -100,7 +113,8 @@ async def test_existing_products_keep_layout_hash_rules_hash_and_pixels(db, prov
     # Grunddateien und Gamertag-Regeln sind auf jeder Plattform gleich. ``layout_hash``, Bestell- und Gamertag-Pixel
     # hängen an der Schriftdarstellung (FreeType) bzw. an Motivdateien, die je Plattform anders kodiert werden - sie
     # sind unter Windows gerechnet (Stand origin/main) und werden nur dort verglichen; die CI läuft unter Linux.
-    portable = {key for key in GOLDEN if key.startswith(("base ", "allover base ", "order back base", "gamertag front rules"))}
+    portable = {key for key in GOLDEN if key.startswith(("base ", "allover base ", "gamertag front rules",
+                                                         "number back rules"))}
     assert {key: seen[key] for key in portable} == {key: GOLDEN[key] for key in portable}
     if sys.platform == "win32":
         assert seen == GOLDEN

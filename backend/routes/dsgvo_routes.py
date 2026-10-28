@@ -258,16 +258,18 @@ async def _user_data_sections(db, user_id: str) -> list[tuple[str, tuple]]:
         ("jersey_number_requests", _rows(db.jersey_number_requests, me, lambda row: _clean(row, "decided_by"))),
         ("billing_orders", _rows(db.billing_orders, me)),
         ("billing_customers", _rows(db.billing_customers, me)),
-        # Shop (#1703): Bestellungen mit Anschriften und Beträgen, Positionen mit Gamertag, der Warenkorb - ohne die
+        # Shop (#1703): Bestellungen mit Anschriften und Beträgen, Positionen mit Gamertag sowie gedruckter
+        # Vereinsnummer samt Einwilligung (#2150), der Warenkorb - ohne die
         # internen Schlüssel gegen Doppelbestellungen.
         ("shop_orders", _rows(db.shop_orders, me, lambda row: _clean(row, "idempotency_key", "request_hash"))),
         ("shop_order_items", _rows(db.shop_order_items, me)),
         ("shop_cart", _rows(db.shop_carts, me)),
-        # Gamertag-Druckdateien der eigenen Bestellungen (#1711) - ohne Zufallsschlüssel und Ablageort.
+        # Gamertag- und Nummerndateien der eigenen Bestellungen (#1711, #2150: ``kind`` „number“) - ohne
+        # Zufallsschlüssel und Ablageort.
         ("shop_gamertag_files", _rows(db.shop_gamertag_files, me, _pick(
-            "id", "purpose", "order_id", "order_item_id", "sha256", "width_px", "height_px", "dpi", "text_height_in",
-            "color_key", "created_at", "public_disabled_at", "erase_pending_at", "file_deleted_at"))),
-        # Druckdateien der eigenen Bestellungen mit Gamertag (#2069) - ohne Zufallsschlüssel und Ablageort.
+            "id", "kind", "purpose", "order_id", "order_item_id", "sha256", "width_px", "height_px", "dpi",
+            "text_height_in", "color_key", "created_at", "public_disabled_at", "erase_pending_at", "file_deleted_at"))),
+        # Druckdateien der eigenen Bestellungen mit Gamertag bzw. Nummer (#2069) - ohne Zufallsschlüssel und Ablageort.
         ("shop_print_files", _rows(db.shop_print_files, me, _pick(
             "id", "purpose", "order_id", "order_item_id", "placement", "color", "sha256", "width_px", "height_px",
             "dpi", "created_at", "public_disabled_at", "erase_pending_at", "file_deleted_at"))),
