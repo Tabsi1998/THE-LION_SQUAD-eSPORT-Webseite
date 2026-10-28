@@ -1319,7 +1319,7 @@ variant, mapping, buyer_kind=…)` liefert für Produktseite und Warenkorb (#171
 plus Aufschlag), die Herkunft, das Versandbeispiel und den Hinweis **„zzgl. Versand, genauer Betrag an der Kasse“**.
 Ohne frische Schätzung gilt der übernommene Preis.
 
-**An der Kasse (Vertrag für #1712/#1714):** `quote_cart(db, lines, provider=…, country=…, zip_code=…,
+**An der Kasse (Vertrag für #1712/#1714):** `shop_orders.quote_cart(db, lines, provider=…, country=…, zip_code=…,
 buyer_kind=…)` nimmt die Positionen wie der Warenkorb (Variante, Menge, Gamertag - nie einen Preis) und schätzt den
 ganzen Warenkorb mit den Grunddateien: `source`, je Position `line_total_cents`, `items_cents`, `shipping_cents`,
 `fees_cents`, `tax_cents`, `markup_cents`, `total_cents`. Es entstehen keine Dateien. Ein Gamertag ändert den Preis
@@ -1337,7 +1337,7 @@ Bestellungen ohne `price_source` sind älter als #2135 und behalten ihre Beträg
 
 **Vor dem Auslösen (Vertrag für #1718):** Den Schritt „Zahlungseingang → bei Printful auslösen“ gibt es noch nicht
 (#1718, kein Dolibarr-Webhook für Shop-Bestellungen). Bereit steht das Tor davor:
-`recheck_before_release(db, order_id, provider=…, actor_id=…)` schätzt mit den eingefrorenen Druckdateien neu und
+`shop_orders.recheck_before_release(db, order_id, provider=…, actor_id=…)` (Rechnung in `shop_pricing.assess`) schätzt mit den eingefrorenen Druckdateien neu und
 vergleicht mit dem Betrag, den der Verein an Printful erwartet (`printful_amount`: `printful_costs.total_cents`, sonst
 Gesamt ohne Aufschlag).
 
@@ -1352,7 +1352,7 @@ Jede Prüfung steht an der Bestellung (`price_check`: Zeitpunkt, Entscheidung, e
 Toleranz, Teile) und als Ereignis (`order.price_checked` bzw. `order.price_changed`, ohne Anschrift). Die eingefrorenen
 Beträge ändern sich nie. Wie die Leitung eine angehaltene Bestellung freigibt oder storniert, kommt mit #1718/#1723.
 
-**Rechnung (Vertrag für #1717):** `invoice_lines(order, items, show_tax=False)` liefert die Positionen mit den
+**Rechnung (Vertrag für #1717):** `shop_pricing.invoice_lines(order, items, show_tax=False)` liefert die Positionen mit den
 eingefrorenen Beträgen: Ware je Artikel (Menge, Zeilensumme, Einzelpreis nur wenn glatt teilbar), Versand,
 Zusatzkosten (nur wenn größer 0). Bis #1701 „Steuer geklärt“ entschieden hat, **brutto ohne eigenen Steuerausweis**
 (`show_tax=False`). Mit `show_tax=True` stehen Ware, Versand und Zusatzkosten netto und eine Zeile „Steuer laut

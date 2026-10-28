@@ -273,10 +273,10 @@ async def placed_order(db, provider, key="bestellung-2135-r"):
 @pytest.mark.asyncio
 async def test_an_unchanged_or_cheaper_price_is_released_and_the_difference_stays_with_the_club(db, provider, fake):
     placed = await placed_order(db, provider)
-    same = await shop_pricing.recheck_before_release(db, placed["id"], provider=provider, actor_id="system:test")
+    same = await shop_orders.recheck_before_release(db, placed["id"], provider=provider, actor_id="system:test")
     assert same["decision"] == "release" and same["difference_cents"] == 0
     fake.shipping = Decimal("4.45")  # Printful wird günstiger: 0,50 € Versand plus Steuer weniger
-    cheaper = await shop_pricing.recheck_before_release(db, placed["id"], provider=provider, actor_id="system:test")
+    cheaper = await shop_orders.recheck_before_release(db, placed["id"], provider=provider, actor_id="system:test")
     assert cheaper["decision"] == "release" and cheaper["difference_cents"] == -60
     assert cheaper["club_keeps_cents"] == 60 and cheaper["club_bears_cents"] == 0
     stored = await shop_orders.get_order(db, placed["id"])
@@ -291,10 +291,10 @@ async def test_a_price_rise_within_the_tolerance_is_released_above_it_the_order_
         db, provider, fake):
     placed = await placed_order(db, provider)
     fake.shipping = Decimal("5.25")  # +0,30 € Versand, mit Steuer +0,36 € - unter 0,50 €
-    within = await shop_pricing.recheck_before_release(db, placed["id"], provider=provider, actor_id="system:test")
+    within = await shop_orders.recheck_before_release(db, placed["id"], provider=provider, actor_id="system:test")
     assert within["decision"] == "release" and within["difference_cents"] == 36 and within["club_bears_cents"] == 36
     fake.shipping = Decimal("5.45")  # +0,50 € Versand, mit Steuer +0,60 € - über 0,50 €
-    held = await shop_pricing.recheck_before_release(db, placed["id"], provider=provider, actor_id="system:test")
+    held = await shop_orders.recheck_before_release(db, placed["id"], provider=provider, actor_id="system:test")
     assert held["decision"] == "hold" and held["difference_cents"] == 60 and held["tolerance_cents"] == 50
     stored = await shop_orders.get_order(db, placed["id"])
     assert stored["status"] == "price_changed" and shop_orders.STATUS_LABELS["price_changed"] == "Preis geändert"
@@ -305,7 +305,7 @@ async def test_a_price_rise_within_the_tolerance_is_released_above_it_the_order_
                                                         "difference_cents": 60, "tolerance_cents": 50}
     # Wartet sie schon auf die Leitung, fragt eine weitere Prüfung Printful nicht noch einmal.
     fake.calls.clear()
-    again = await shop_pricing.recheck_before_release(db, placed["id"], provider=provider, actor_id="system:test")
+    again = await shop_orders.recheck_before_release(db, placed["id"], provider=provider, actor_id="system:test")
     assert again["decision"] == "hold" and fake.calls_to("createOrderEstimationTask") == []
 
 
@@ -316,11 +316,11 @@ async def test_the_tolerance_is_a_setting_and_printful_being_down_changes_nothin
                                                is_superadmin=False, reason="Jede Verteuerung prüfen")
     assert changed == ["price_tolerance_cents"] and config["price_tolerance_cents"] == 0
     fake.fail("timeout", operation="createOrderEstimationTask", times=1)
-    down = await shop_pricing.recheck_before_release(db, placed["id"], provider=provider, actor_id="system:test")
+    down = await shop_orders.recheck_before_release(db, placed["id"], provider=provider, actor_id="system:test")
     assert down["decision"] == "retry"
     assert (await shop_orders.get_order(db, placed["id"]))["status"] == "placed"
     fake.shipping = Decimal("4.96")
-    held = await shop_pricing.recheck_before_release(db, placed["id"], provider=provider, actor_id="system:test")
+    held = await shop_orders.recheck_before_release(db, placed["id"], provider=provider, actor_id="system:test")
     assert held["decision"] == "hold" and held["difference_cents"] == 1
 
 
@@ -411,7 +411,7 @@ async def test_the_checkout_quote_is_the_amount_the_order_then_freezes(db, provi
     black = await variant_for(db, product["id"], BLACK_L)
     cart = [{"variant_id": white["id"], "quantity": 2, "gamertag": NAME},
             {"variant_id": black["id"], "quantity": 1, "gamertag": NAME}]
-    quote = await shop_pricing.quote_cart(db, cart, provider=provider, country="AT", zip_code="8010")
+    quote = await shop_orders.quote_cart(db, cart, provider=provider, country="AT", zip_code="8010")
     assert quote["source"] == "printful_estimate" and quote["total_cents"] == 4104
     assert [line["line_total_cents"] for line in quote["lines"]] == [2340, 1170]
     assert (quote["shipping_cents"], quote["tax_cents"]) == (594, 684)
@@ -420,9 +420,30 @@ async def test_the_checkout_quote_is_the_amount_the_order_then_freezes(db, provi
     assert placed["frozen"]["total_cents"] == quote["total_cents"]
     # Ohne Printful: der übernommene Preis plus Ersatzpauschale - fehlt die, kein Betrag.
     with pytest.raises(ShopError, match="Versand"):
-        await shop_pricing.quote_cart(db, cart, provider=None, country="AT", zip_code="8010")
+        await shop_orders.quote_cart(db, cart, provider=None, country="AT", zip_code="8010")
     await db.settings.update_one({"id": "shop"}, {"$set": {"id": "shop", "fallback_shipping_cents": 690}}, upsert=True)
-    fallback = await shop_pricing.quote_cart(db, cart, provider=None, country="AT", zip_code="8010")
+    fallback = await shop_orders.quote_cart(db, cart, provider=None, country="AT", zip_code="8010")
     assert fallback["source"] == "fallback" and fallback["total_cents"] == 3 * white["price_cents"] + 690
     with pytest.raises(ShopError, match="Österreich"):
-        await shop_pricing.quote_cart(db, cart, provider=provider, country="DE", zip_code="10115")
+        await shop_orders.quote_cart(db, cart, provider=provider, country="DE", zip_code="10115")
+
+@pytest.mark.asyncio
+async def test_the_estimates_carry_the_required_product_options(db, provider, fake):
+    """#2158: ein Produkt mit Nahtfarbe - ohne sie lehnte Printful die Schätzung ab, dann gäbe es nur den Rückfall."""
+    from test_shop_products_unit import PRINTFUL_PRODUCT
+
+    fake.set_product_options(PRINTFUL_PRODUCT, [{"name": "stitch_color", "techniques": ["cut-sew"], "type": "string",
+                                                 "values": ["White", "Black"]}], required=("stitch_color",))
+    product = await ready_product(db, provider)
+    white = await variant_for(db, product["id"], WHITE_M)
+    cart = [{"variant_id": white["id"], "quantity": 1, "gamertag": NAME}]
+    quote = await shop_orders.quote_cart(db, cart, provider=provider, country="AT", zip_code="8010")
+    placed, _ = await order(db, provider, cart)
+    assert quote["source"] == placed["frozen"]["price_source"] == "printful_estimate"
+    for call in fake.calls_to("createOrderEstimationTask"):
+        assert call["body"]["order_items"][0]["product_options"] == [{"name": "stitch_color", "value": "White"}]
+    checked = await shop_orders.recheck_before_release(db, placed["id"], provider=provider, actor_id="system:test")
+    assert checked["decision"] == "release"
+    await shop_catalog_sync.sync_product(db, product["id"], provider=provider, **BY)
+    medium = await variant_for(db, product["id"], BLACK_M)
+    assert (await shop_catalog.printful_variant_for(db, medium["id"]))["gross_estimate"]["goods_gross_cents"] == 1170

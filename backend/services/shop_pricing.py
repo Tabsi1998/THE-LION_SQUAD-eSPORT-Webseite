@@ -12,7 +12,9 @@ Käufe zahlen ihn plus den Vereinsaufschlag je Artikel. Die Quelle ist dieselbe 
   den eingefrorenen Druckdateien - mehrere Artikel teilen sich den Versand, wie Printful es rechnet. Eingefroren werden
   Ware, Versand, Zusatzkosten, Steuer und Gesamt (``frozen.printful_costs``) und je Position ihr Anteil
   (``gross``: netto, Steuer, brutto).
-- **Vor dem Auslösen** (``recheck_before_release``, für #1718): nach dem Zahlungseingang neu schätzen. Teurer um mehr
+- **An der Kasse** (``shop_orders.quote_cart`` → ``quote_lines``, für #1712/#1714): derselbe Betrag vor dem Bestellen.
+- **Vor dem Auslösen** (``shop_orders.recheck_before_release`` → ``assess``, für #1718): nach dem Zahlungseingang neu
+  schätzen. Teurer um mehr
   als die Toleranz (Einstellung ``price_tolerance_cents``, Vorgabe 0,50 €): nicht auslösen, Stand „Preis geändert“
   für die Leitung. Günstiger: auslösen - die Differenz bleibt beim Verein (Entscheidung Obmann, keine Rückbuchung).
 - **Rechnung** (``invoice_lines``, für #1717): Positionen mit den eingefrorenen Bruttobeträgen. Bis #1701 „Steuer
@@ -31,7 +33,7 @@ import logging
 from typing import Any
 
 from models import now_utc
-from services import shop_catalog, shop_config, shop_costs, shop_designs, shop_print_files
+from services import shop_catalog, shop_config, shop_costs, shop_designs, shop_options, shop_print_files
 from services.log_safe import log_safe
 from services.shop_common import ShopError
 from services.shop_fulfillment import (
@@ -172,11 +174,17 @@ async def _variant_line(db, product: dict, variant: dict, mapping: dict, quantit
                                                     printful_variant_id=mapping.get("printful_variant_id"))
     if not places:
         return None
+    try:
+        # Pflichtoptionen von Printful (#2158), etwa die Nahtfarbe - ohne sie lehnt Printful die Schätzung ab.
+        options = shop_options.line_options(product)
+    except ShopError:
+        return None
     spare = next((place["url"] for place in places if place["url"]), None)
     try:
         return DraftLine(variant=CatalogVariantId(int(mapping["printful_variant_id"])), quantity=quantity,
                          placements=tuple(Placement(placement=place["placement"], technique=place["technique"],
-                                                    file_url=place["url"] or spare) for place in places))
+                                                    file_url=place["url"] or spare) for place in places),
+                         options=options)
     except (KeyError, TypeError, ValueError):
         return None  # keine öffentliche https-Adresse (PUBLIC_BACKEND_URL) - dann keine Schätzung
 
@@ -269,15 +277,12 @@ async def refresh_estimates(db, product_id: str, *, provider: FulfillmentProvide
 
 # ---------------------------------------------------------------- An der Kasse (#1712, #1714)
 
-async def quote_cart(db, lines: list, *, provider: FulfillmentProvider | None, country: str, zip_code: str,
-                     buyer_kind: str = "member") -> dict:
-    """Der Betrag an der Kasse vor dem Bestellen: eine Schätzung für den ganzen Warenkorb (Grunddateien je Fläche,
-    ein Gamertag ändert den Preis nicht) - derselbe Betrag, den ``place_order`` danach mit den eigenen Dateien
-    einfriert. Ohne Printful der Rückfall wie in der Bestellung (übernommener Preis plus Ersatzpauschale; fehlt die,
-    ``ShopError``). Nimmt nur Variante und Menge (wie der Warenkorb), nie einen Preis."""
-    from services import shop_orders
-
-    clean = shop_orders._lines(lines, consent=False)
+async def quote_lines(db, clean: list[dict], *, provider: FulfillmentProvider | None, country: str, zip_code: str,
+                      buyer_kind: str = "member") -> dict:
+    """Der Betrag an der Kasse vor dem Bestellen (Aufruf über ``shop_orders.quote_cart``, das die Positionen prüft):
+    eine Schätzung für den ganzen Warenkorb (Grunddateien je Fläche, ein Gamertag ändert den Preis nicht) - derselbe
+    Betrag, den ``place_order`` danach mit den eigenen Dateien einfriert. Ohne Printful der Rückfall wie in der
+    Bestellung (übernommener Preis plus Ersatzpauschale; fehlt die, ``ShopError``)."""
     shop_config.check_shipping_country(country)
     config = await shop_config.load(db)
     rows, drafts = [], []
@@ -343,9 +348,10 @@ async def order_lines(db, items: list[dict]) -> tuple[DraftLine, ...] | None:
             except (KeyError, TypeError, ValueError):
                 return None
         try:
+            options = tuple((row["name"], row["value"]) for row in item.get("product_options") or [])
             lines.append(DraftLine(variant=CatalogVariantId(int(printful["variant_id"])),
-                                   quantity=int(item["quantity"]), placements=tuple(places)))
-        except (TypeError, ValueError):
+                                   quantity=int(item["quantity"]), placements=tuple(places), options=options))
+        except (KeyError, TypeError, ValueError):
             return None
     return tuple(lines) or None
 
@@ -420,9 +426,10 @@ def printful_amount(order: dict) -> int:
 
 # ---------------------------------------------------------------- Vor dem Auslösen (#1718)
 
-async def recheck_before_release(db, order_id: str, *, provider: FulfillmentProvider, actor_id: str) -> dict:
+async def assess(db, order: dict, items: list[dict], *, provider: FulfillmentProvider) -> dict:
     """Nach dem Zahlungseingang, vor dem Auslösen bei Printful: neu schätzen und mit dem eingefrorenen Betrag
-    vergleichen. Liefert die Entscheidung:
+    vergleichen (Aufruf über ``shop_orders.recheck_before_release``, das Stand und Ereignis schreibt). Liefert die
+    Entscheidung:
 
     - ``release``: auslösen. Höchstens um die Toleranz teurer (der Verein trägt das) oder günstiger (die Differenz
       bleibt beim Verein - keine Rückbuchung).
@@ -431,19 +438,9 @@ async def recheck_before_release(db, order_id: str, *, provider: FulfillmentProv
     - ``blocked``: die Bestellung lässt sich so nicht schätzen (Druckdatei fehlt, Printful lehnt die Daten ab) - die
       Leitung muss nachsehen; der Stand bleibt.
 
-    Jede Prüfung steht als Ereignis an der Bestellung (``order.price_checked`` bzw. ``order.price_changed``) und als
-    ``price_check`` an der Bestellung. Diese Funktion löst nichts aus - sie ist das Tor davor."""
-    from services import shop_orders
-
-    order = await shop_orders.get_order(db, order_id)
-    if not order:
-        raise LookupError("Bestellung nicht gefunden.")
-    if order.get("status") == STATUS_PRICE_CHANGED:
-        return {"decision": "hold", "reason": "Die Bestellung wartet schon auf die Leitung (Preis geändert).",
-                **(order.get("price_check") or {})}
+    Schreibt nichts und löst nichts aus - es ist das Tor davor."""
     tolerance = (await shop_config.load(db))["price_tolerance_cents"]
     frozen_cents = printful_amount(order)
-    items = await shop_orders.items_for(db, order_id)
     lines = await order_lines(db, items)
     if lines is None:
         return {"decision": "blocked", "reason": "Die Bestellung lässt sich nicht schätzen: Druckdatei oder "
@@ -457,20 +454,9 @@ async def recheck_before_release(db, order_id: str, *, provider: FulfillmentProv
                 "frozen_cents": frozen_cents}
     difference = parts["total_cents"] - frozen_cents
     hold = difference > tolerance
-    check = {"at": now_utc().isoformat(), "decision": "hold" if hold else "release", "frozen_cents": frozen_cents,
-             "estimate_cents": parts["total_cents"], "difference_cents": difference, "tolerance_cents": tolerance,
-             "estimate": parts, "club_keeps_cents": max(0, -difference), "club_bears_cents": max(0, difference)}
-    update: dict = {"price_check": check, "updated_at": check["at"]}
-    if hold:
-        update["status"] = STATUS_PRICE_CHANGED
-    await db.shop_orders.update_one({"id": order_id, "status": {"$ne": STATUS_PRICE_CHANGED}}, {"$set": update})
-    event = {key: check[key] for key in ("frozen_cents", "estimate_cents", "difference_cents", "tolerance_cents")}
-    await shop_orders.append_event(db, order_id, "order.price_changed" if hold else "order.price_checked",
-                                   actor_id=actor_id, data=event)
-    if hold:
-        logger.warning("[shop-pricing] order held for review: order=%s difference=%s", log_safe(order_id),
-                       log_safe(difference))
-    return check
+    return {"at": now_utc().isoformat(), "decision": "hold" if hold else "release", "frozen_cents": frozen_cents,
+            "estimate_cents": parts["total_cents"], "difference_cents": difference, "tolerance_cents": tolerance,
+            "estimate": parts, "club_keeps_cents": max(0, -difference), "club_bears_cents": max(0, difference)}
 
 
 # ---------------------------------------------------------------- Rechnung (#1717)

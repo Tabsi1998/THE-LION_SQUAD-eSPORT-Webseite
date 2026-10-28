@@ -367,6 +367,45 @@ async def place_order(db, *, user_id: str, idempotency_key: str, buyer_kind: str
     return order, True
 
 
+async def quote_cart(db, lines: list, *, provider: FulfillmentProvider | None, country: str, zip_code: str,
+                     buyer_kind: str = "member") -> dict:
+    """Der Betrag an der Kasse vor dem Bestellen (#2135, Vertrag für #1712/#1714): Positionen wie im Warenkorb
+    (Variante, Menge, Gamertag - nie ein Preis), dann ``shop_pricing.quote_lines``: eine Schätzung von Printful für den
+    ganzen Warenkorb, ohne Printful der Rückfall. Es entstehen keine Dateien."""
+    return await shop_pricing.quote_lines(db, _lines(lines, consent=False), provider=provider, country=country,
+                                          zip_code=zip_code, buyer_kind=buyer_kind)
+
+
+async def recheck_before_release(db, order_id: str, *, provider: FulfillmentProvider, actor_id: str) -> dict:
+    """Vor dem Auslösen nach dem Zahlungseingang (#2135, Vertrag für #1718): neu schätzen und mit dem eingefrorenen
+    Betrag vergleichen (``shop_pricing.assess``). ``release`` - auslösen (günstiger: die Differenz bleibt beim Verein),
+    ``hold`` - teurer als die Toleranz: Stand „Preis geändert“, die Leitung entscheidet, ``retry`` - Printful gerade
+    nicht erreichbar, ``blocked`` - so nicht schätzbar. Jede Prüfung steht an der Bestellung (``price_check``) und als
+    Ereignis (``order.price_checked`` bzw. ``order.price_changed``). Löst selbst nichts aus."""
+    order = await get_order(db, order_id)
+    if not order:
+        raise LookupError("Bestellung nicht gefunden.")
+    if order.get("status") == shop_pricing.STATUS_PRICE_CHANGED:
+        return {"decision": "hold", "reason": "Die Bestellung wartet schon auf die Leitung (Preis geändert).",
+                **(order.get("price_check") or {})}
+    check = await shop_pricing.assess(db, order, await items_for(db, order_id), provider=provider)
+    if check["decision"] not in ("release", "hold"):
+        return check
+    hold = check["decision"] == "hold"
+    update: dict = {"price_check": check, "updated_at": check["at"]}
+    if hold:
+        update["status"] = shop_pricing.STATUS_PRICE_CHANGED
+    await db.shop_orders.update_one({"id": order_id, "status": {"$ne": shop_pricing.STATUS_PRICE_CHANGED}},
+                                    {"$set": update})
+    event = {key: check[key] for key in ("frozen_cents", "estimate_cents", "difference_cents", "tolerance_cents")}
+    await append_event(db, order_id, "order.price_changed" if hold else "order.price_checked", actor_id=actor_id,
+                       data=event)
+    if hold:
+        logger.warning("[shop-orders] order held for review: order=%s difference=%s", log_safe(order_id),
+                       log_safe(check["difference_cents"]))
+    return check
+
+
 async def get_order(db, order_id: str) -> dict | None:
     return await db.shop_orders.find_one({"id": order_id}, {"_id": 0})
 
