@@ -109,7 +109,7 @@ function LayoutPreview({ area, preview, layers, resolved, colorCode, motifFor, s
   };
 
   return (
-    <div className={`relative w-full overflow-hidden rounded-sm border border-white/10 select-none transition-opacity duration-150 ${stale ? "opacity-50" : ""}`} style={{ aspectRatio: `${templateW} / ${templateH}`, backgroundColor: colorCode || "#808080" }} data-testid={testId} data-stale={stale ? "true" : undefined} data-tinted={preview?.tinted ? "true" : undefined}>
+    <div className="relative w-full overflow-hidden rounded-sm border border-white/10 select-none" style={{ aspectRatio: `${templateW} / ${templateH}`, backgroundColor: colorCode || "#808080" }} data-testid={testId} data-stale={stale ? "true" : undefined} data-tinted={preview?.tinted ? "true" : undefined}>
       {background && <img src={background} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full pointer-events-none" />}
       {preview?.positioning === "background" && imagePath && <img src={imagePath} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full pointer-events-none" />}
       <div ref={areaRef} className="absolute outline outline-1 outline-dashed outline-white/40" style={{ left: pct(box.left, templateW), top: pct(box.top, templateH), width: pct(box.width, templateW), height: pct(box.height, templateH) }}
@@ -128,7 +128,7 @@ function LayoutPreview({ area, preview, layers, resolved, colorCode, motifFor, s
           return (
             <button key={item.index} type="button" aria-label={`${label} verschieben (Pfeiltasten, mit Umschalt 1 cm)`} aria-pressed={isSelected}
               onPointerDown={(event) => onPointerDown(event, item.index)} onKeyDown={(event) => onKeyDown(event, item.index)} onFocus={() => onSelect(item.index)}
-              className={`absolute p-0 m-0 bg-transparent touch-none outline-none transition-[box-shadow,opacity] duration-150 ${editable ? "cursor-move" : "cursor-default"} ${isSelected ? "ring-2 ring-brand" : "ring-1 ring-white/25"} ${bad ? "ring-2 ring-warn" : ""} focus-visible:ring-2 focus-visible:ring-brand`}
+              className={`absolute p-0 m-0 bg-transparent touch-none outline-none transition-[box-shadow,opacity] duration-150 ${stale ? "opacity-50" : ""} ${editable ? "cursor-move" : "cursor-default"} ${isSelected ? "ring-2 ring-brand" : "ring-1 ring-white/25"} ${bad ? "ring-2 ring-warn" : ""} focus-visible:ring-2 focus-visible:ring-brand`}
               style={{ left: pct(item.box.left, area.width_px), top: pct(item.box.top, area.height_px), width: pct(item.box.width, area.width_px), height: pct(item.box.height, area.height_px) }}
               data-testid={`${testId}-layer-${item.index}`} data-outside={bad ? item.outside.join(",") : undefined}>
               {item.kind === "motif" && motif?.image_path
@@ -477,7 +477,10 @@ export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGrou
     return () => { live = false; clearTimeout(timer); };
   }, [previewWanted, payloadJson, product.id, product.printful]);
   const draftReady = previewWanted && draftPreview.json === payloadJson && !!draftPreview.sources;
-  const stale = changed && !draftReady;
+  // Ungespeichert und noch nicht vom Server bestätigt: nur die Ebenen gedimmt, nie das Shirt (#2105). Ohne Berechnung
+  // (nichts gewählt, blockiert) wird nichts gedimmt - es steht nur der Hinweis da.
+  const pending = changed && !draftReady;
+  const stale = previewWanted && !draftReady;
   const shownSources = draftReady ? draftPreview.sources : sources;
   if (!product.printful) return <p className="text-sm text-white/55" data-testid="shop-layout">Zuerst in Schritt 1 das Printful-Produkt laden.</p>;
   if (!available.length) return <div className="space-y-2" data-testid="shop-layout"><TemplateStatus view={view} busy={busy} run={run} /><p className="text-sm text-white/55">Ohne Druckvorlage von Printful lassen sich keine Flächen wählen.</p></div>;
@@ -502,7 +505,7 @@ export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGrou
           <ul className="mt-1 space-y-0.5">{view.layout_blocked.map((line) => <li key={line}>{line}</li>)}</ul>
         </div>
       )}
-      {stale && (
+      {pending && (
         <p className="text-xs text-honor" role="status" data-testid="shop-layout-draft-preview">
           {draftPreview.error && draftPreview.json === payloadJson ? `Vorschau: ${draftPreview.error}` : blocked ? "Vorschau nach dem Speichern." : "Vorschau wird berechnet …"}
         </p>

@@ -579,6 +579,9 @@ test("ungespeicherte Ausnahme: die Vorschau fragt den Server nach der Fassung un
   await user.click(screen.getByTestId("shop-layer-front-0-exceptions-toggle"));
   await user.selectOptions(screen.getByTestId("shop-layer-front-0-exception-White"), "loewe-schwarz");
   expect(screen.getByTestId("shop-preview-front")).toHaveAttribute("data-stale", "true");
+  // Nur die Ebenen sind gedimmt - das Shirt nie (#2105): Schwarz bleibt schwarz.
+  expect(screen.getByTestId("shop-preview-front").className).not.toContain("opacity-50");
+  expect(screen.getByTestId("shop-preview-front-layer-0").className).toContain("opacity-50");
   expect(screen.getByTestId("shop-layout-draft-preview")).toHaveTextContent("Vorschau wird berechnet");
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/shop/products/p1/layout/preview", expect.objectContaining({
     placements: expect.arrayContaining([expect.objectContaining({ key: "front", layers: expect.arrayContaining([expect.objectContaining({ motif: { key: "loewe-weiss", by_color: { White: "loewe-schwarz" } } })]) })]),
@@ -589,6 +592,17 @@ test("ungespeicherte Ausnahme: die Vorschau fragt den Server nach der Fassung un
   expect(image.querySelector("img").getAttribute("src")).toContain("loewe-schwarz-v3");
   // Seitenverhältnis der Fassung vom Server (1,25): der Rahmen ist höher als breit.
   expect(parseFloat(image.style.height) * 2400).toBeGreaterThan(parseFloat(image.style.width) * 1800);
+});
+
+test("ohne Berechnung (blockiert) wird nichts gedimmt, nur der Hinweis steht da (#2105)", async () => {
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-designs"));
+  await user.click(screen.getByTestId("shop-layer-front-1-remove"));
+  await user.click(screen.getByTestId("shop-layer-front-0-remove"));
+  expect(screen.getByTestId("shop-layout-draft-preview")).toHaveTextContent("Vorschau nach dem Speichern");
+  expect(screen.getByTestId("shop-preview-front")).not.toHaveAttribute("data-stale");
+  expect(apiMock.post).not.toHaveBeenCalled();
 });
 
 test("nicht abbildbare alte Platzierungen: rote Meldung, Produkt nicht bestellbar", async () => {
