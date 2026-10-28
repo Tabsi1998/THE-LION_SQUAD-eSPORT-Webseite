@@ -1308,8 +1308,10 @@ nach dem Zahlungseingang.
 `split` teilt die Antwort in Ware (Zwischensumme minus Rabatt), Versand, Zusatzkosten (was Printful im Gesamt mehr
 rechnet, etwa Digitalisierung bei Stickerei), Steuer (`tax` plus `vat`) und Gesamt; der Gesamtbetrag von Printful zählt.
 Passt die Antwort nicht zusammen (andere Währung, negative Teile), wird sie nie verwendet. `breakdown` verteilt die
-Steuer auf Ware, Versand und Zusatzkosten und die Ware auf die Positionen (nach Menge × übernommenem Preis) - mit der
-Methode der größten Reste, die Teile ergeben immer genau den Gesamtbetrag. Beispiel aus #2135 (Testentwurf
+Steuer auf Ware, Versand und Zusatzkosten und die Ware auf die Positionen - nach Menge × Ware netto aus der aktuellen
+Schätzung der Variante, ohne Schätzung nach Menge × übernommenem Preis - mit der Methode der größten Reste, die Teile
+ergeben immer genau den Gesamtbetrag. Maßgeblich für Zahlung und Rechnung (#1717) ist die **Zeilensumme** der Position;
+der Einzelpreis ist gerundet. Beispiel aus #2135 (Testentwurf
 „Vereinsmitgliedershirt Schwarz“): Ware 12,90 €, Versand 4,49 €, Steuer 3,48 €, gesamt 20,87 € → Ware brutto 15,48 €
 (Steueranteil 2,58 €), Versand brutto 5,39 €.
 
@@ -1317,21 +1319,39 @@ Methode der größten Reste, die Teile ergeben immer genau den Gesamtbetrag. Bei
 beim Abgleich erneuert, je Preisgruppe eine; Schritt 4 „Brutto bei Printful schätzen“). `display_price(config, product,
 variant, mapping, buyer_kind=…)` liefert für Produktseite und Warenkorb (#1712) den Preis je Stück (brutto, öffentlich
 plus Aufschlag), die Herkunft, das Versandbeispiel und den Hinweis **„zzgl. Versand, genauer Betrag an der Kasse“**.
-Ohne frische Schätzung gilt der übernommene Preis.
+Ohne aktuelle Schätzung gilt der übernommene Preis - gekennzeichnet: `stale` (es gab eine Schätzung, sie passt nicht mehr)
+und `basis` (`brutto` oder `netto`, aus der Herkunft beim Übernehmen, `shop_variants.price_source`). Ein Katalogpreis
+netto heißt nie brutto, sondern „Katalogpreis ohne Steuer - genauer Betrag an der Kasse“.
+
+**Nie gemischt brutto und netto (Review):** War Brutto für eine Variante bekannt und die Schätzung passt nicht mehr zum
+Einkauf, ist der erwartete Mitgliederpreis **unbekannt** (`stale`) - der Abgleich warnt mit „Schätzung veraltet - neu
+schätzen“ statt still den Katalog netto vorzuschlagen, die Prüfung „Preis“ ist rot. „Preise übernehmen“ lehnt ab, sobald
+das Produkt Schätzungen hat, aber eine angebotene Variante keine aktuelle: „erst Brutto bei Printful schätzen“. Nur ein
+nie geschätztes Produkt übernimmt den Katalog netto.
+
+**Dauer (Review):** Je Preisgruppe eine Schätzung (Aufgabe anlegen, Stand abfragen). Im Admin („Brutto bei Printful
+schätzen“, „Mit Printful abgleichen“, Schritt 2) laufen höchstens vier gleichzeitig mit einem Zeitbudget von 40 s
+(`shop_pricing.INTERACTIVE`) - so bleibt die Anfrage unter der Zeitgrenze des Proxys; was nicht fertig wird, bleibt
+„offen“ und kommt beim nächsten Klick. Der tägliche Abgleich schätzt nacheinander mit 1 s Pause (`BACKGROUND`); das
+gemeinsame Rate-Limit des Adapters (100 von 120 Aufrufen je Minute) lässt Luft für Schätzungen an der Kasse.
 
 **An der Kasse (Vertrag für #1712/#1714):** `shop_orders.quote_cart(db, lines, provider=…, country=…, zip_code=…,
-buyer_kind=…)` nimmt die Positionen wie der Warenkorb (Variante, Menge, Gamertag - nie einen Preis) und schätzt den
-ganzen Warenkorb mit den Grunddateien: `source`, je Position `line_total_cents`, `items_cents`, `shipping_cents`,
-`fees_cents`, `tax_cents`, `markup_cents`, `total_cents`. Es entstehen keine Dateien. Ein Gamertag ändert den Preis
-nicht - `place_order` friert danach denselben Betrag ein. Ohne Printful der Rückfall (übernommener Preis plus
-Ersatzpauschale; fehlt die, keine Zahl).
+buyer_kind=…, shipping_estimate_cents=None)` nimmt die Positionen wie der Warenkorb (Variante, Menge, Gamertag - nie
+einen Preis), prüft sie **wie die Bestellung** (`_checked_line`: veröffentlicht, aktiv, nicht gesperrt, lieferbar,
+Pflichtoptionen, Preis nicht unter dem Mindestpreis, Gamertag nur, wo erlaubt) und schätzt den ganzen Warenkorb auf
+**derselben Grundlage** (`shop_pricing.estimate_rows`: je Position die Grunddateien der Variante): `source`, je
+Position `line_total_cents`, `items_cents`, `shipping_cents`, `fees_cents`, `tax_cents`, `markup_cents`,
+`total_cents`. Es entstehen keine Dateien. Ein Gamertag ändert den Preis nicht - `place_order` friert danach denselben
+Betrag ein oder lehnt genauso ab. Ohne Printful derselbe Rückfall (übernommener Preis plus Versandschätzung bzw.
+Ersatzpauschale; fehlt beides, keine Zahl).
 
-**Bestellung:** `place_order(…, provider=PrintfulClient)` schätzt nach dem Einfrieren der Druckdateien den ganzen
-Warenkorb für die Lieferanschrift (mehrere Artikel teilen sich den Versand, wie Printful rechnet) und friert ein:
+**Bestellung:** `place_order(…, provider=PrintfulClient)` schätzt den ganzen Warenkorb für die Lieferanschrift auf
+derselben Grundlage wie die Kasse (mehrere Artikel teilen sich den Versand, wie Printful rechnet) und friert ein:
 `frozen.price_source = "printful_estimate"`, `printful_costs` (Ware, Versand, Zusatzkosten, Steuer, Gesamt,
 Zeitpunkt, Land), `tax_shares`, Ware, Versand und Zusatzkosten brutto; je Position `gross` (netto, Steuer, brutto)
 und die Zeilensumme. Gesamt = Printful gesamt plus Aufschlag (nur öffentlich). **Rückfall** (`price_source =
-"fallback"`): ohne `provider`, wenn eine Position keine Druckdatei mit https-Adresse hat (alte Produkte,
+"fallback"`): ohne `provider`, wenn eine Position keine Grunddatei mit https-Adresse hat (alte Produkte, Produkte
+nur mit Platzhaltern,
 `PUBLIC_BACKEND_URL` fehlt) oder Printful nicht antwortet - dann der übernommene Preis und der Versand wie bisher.
 Bestellungen ohne `price_source` sind älter als #2135 und behalten ihre Beträge.
 
@@ -1345,12 +1365,19 @@ Gesamt ohne Aufschlag).
 | --- | --- | --- |
 | `release` | gleich, günstiger oder höchstens um die Toleranz teurer | auslösen; günstiger: die Differenz bleibt beim Verein (`club_keeps_cents`, keine Rückbuchung - Empfehlung Obmann), teurer: der Verein trägt sie (`club_bears_cents`) |
 | `hold` | teurer als die Toleranz (`price_tolerance_cents`, Vorgabe 0,50 €) | Stand `price_changed` „Preis geändert“ - nichts geht hinaus, die Leitung entscheidet; eine weitere Prüfung fragt Printful nicht noch einmal |
-| `retry` | Printful nicht erreichbar, Schätzung unbrauchbar | nichts geändert, später erneut |
-| `blocked` | Druckdatei oder Printful-Variante fehlt, Printful lehnt die Daten ab | Stand bleibt - die Leitung muss nachsehen |
+| `retry` | Printful nicht erreichbar, Schätzung unbrauchbar | Stand bleibt, später erneut; an der Bestellung und als Ereignis `order.price_check_retry` |
+| `blocked` | Druckdatei oder Printful-Variante fehlt, Printful lehnt die Daten ab | Stand bleibt - die Leitung muss nachsehen: an der Bestellung (`price_check.decision = blocked`) und als Ereignis `order.price_check_blocked` mit Grund |
+
+**Atomar (Review):** Ausgelöst wird nur aus `placed` bzw. `paid` (`RELEASABLE`, `paid` kommt mit #1716/#1718).
+Gelesen werden Stand und Prüfzähler (`price_check_rev`); geschrieben wird mit `find_one_and_update` nur, wenn beide noch
+gelten. Trifft das Update nichts (eine zweite Prüfung oder ein anderer Schritt war schneller), ist das Ergebnis nie
+`release`, sondern `hold` mit „Der Stand der Bestellung hat sich während der Prüfung geändert“ - von zwei gleichzeitigen
+Prüfungen löst höchstens eine aus.
 
 Jede Prüfung steht an der Bestellung (`price_check`: Zeitpunkt, Entscheidung, eingefroren, geschätzt, Differenz,
-Toleranz, Teile) und als Ereignis (`order.price_checked` bzw. `order.price_changed`, ohne Anschrift). Die eingefrorenen
-Beträge ändern sich nie. Wie die Leitung eine angehaltene Bestellung freigibt oder storniert, kommt mit #1718/#1723.
+Toleranz, Teile) und als Ereignis (`order.price_checked`, `order.price_changed`, `order.price_check_retry`,
+`order.price_check_blocked`, ohne Anschrift). Die eingefrorenen Beträge ändern sich nie. Wie die Leitung eine
+angehaltene Bestellung freigibt oder storniert, kommt mit #1718/#1723.
 
 **Rechnung (Vertrag für #1717):** `shop_pricing.invoice_lines(order, items, show_tax=False)` liefert die Positionen mit den
 eingefrorenen Beträgen: Ware je Artikel (Menge, Zeilensumme, Einzelpreis nur wenn glatt teilbar), Versand,
