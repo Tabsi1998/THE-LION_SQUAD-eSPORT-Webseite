@@ -300,6 +300,21 @@ async def test_a_called_swiss_match_holds_its_round(flow):
 
 
 @pytest.mark.asyncio
+async def test_a_planned_station_holds_the_swiss_round_too(flow):
+    """Review #2120: wie die Seite - eine eingeplante Station hält die Runde."""
+    staff = await flow.add_staff()
+    flow.act_as(staff)
+    tournament, _users, _regs = await flow.with_participants(4, format="swiss")
+    base = f"/api/tournaments/{tournament['id']}/swiss"
+    assert (await flow.post(f"{base}/next-round")).status_code == 200
+    first = (await flow.matches(tournament))[0]
+    await flow.db.matches_v2.update_one({"id": first["id"]}, {"$set": {"station_id": "station-1"}})
+
+    assert (await flow.post(f"{base}/undo-round")).status_code == 409
+    assert len(await flow.matches(tournament)) == 2
+
+
+@pytest.mark.asyncio
 async def test_without_a_round_there_is_nothing_to_take_back(flow):
     staff = await flow.add_staff()
     flow.act_as(staff)

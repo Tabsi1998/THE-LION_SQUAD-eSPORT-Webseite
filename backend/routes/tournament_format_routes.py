@@ -147,7 +147,8 @@ async def swiss_undo_round(tid: str, me: dict = Depends(require_admin()),
     round_number = max(int(match.get("round") or 0) for match in matches)
     last_round = [match for match in matches if int(match.get("round") or 0) == round_number]
     match_ids = [match["id"] for match in last_round if match.get("id")]
-    begun = [match for match in last_round if tournament_guard.match_begun(match)]
+    # Eine eingeplante Station (station_id) hält die Runde wie ein Aufruf - genau wie die Seite (Review #2120).
+    begun = [match for match in last_round if tournament_guard.match_begun(match) or match.get("station_id")]
     reported = await db.match_reports_v2.count_documents({"match_id": {"$in": match_ids}})
     at_station = await db.stations.count_documents({"current_match_id": {"$in": match_ids}})
     if begun or reported or at_station:
