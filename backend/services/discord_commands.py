@@ -14,6 +14,7 @@ from __future__ import annotations
 from datetime import date
 
 from models import now_utc
+from services.league_scope import NOT_LEAGUE
 from services.discord_texts import LINK_PATH, NOT_LINKED, answer  # noqa: F401 - Bausteine, auch für andere Module
 
 RUNNING_STATUSES = ("live", "paused")
@@ -243,7 +244,8 @@ async def answer_turniere(db, guild_id=None, spiel: str | None = None, alle: boo
     problem = _scope_problem(scope)
     if problem:
         return problem
-    query: dict = {"status": "registration_open", "is_public": {"$ne": False}, "visibility": "public"}
+    # Liga-Staffeln haben keine offene Anmeldung - die Leitung teilt Co-Teams zu (docs/LIGA.md).
+    query: dict = {"status": "registration_open", "is_public": {"$ne": False}, "visibility": "public", **NOT_LEAGUE}
     if scope["games"] is not None:
         query["game_id"] = {"$in": sorted(scope["games"])}
     rows = await db.tournaments.find(query, {"_id": 0, "title": 1, "slug": 1, "start_date": 1, "status": 1}).to_list(20)

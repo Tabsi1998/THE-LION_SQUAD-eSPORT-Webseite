@@ -76,6 +76,8 @@ export const ADMIN_GROUPS = [
     items: [
       // Turniere, Fast Lap, Stationen: Turnierleitung und Helfer mit Einsatz (`staff`); Moderation allein nicht.
       { to: "/admin/tournaments", label: "Turniere", icon: Trophy, areas: ["tournaments"], staff: true },
+      // Liga (docs/LIGA.md, #1622): Liga → Season → Liga N → Staffel; die Staffel selbst ist ein Turnier.
+      { to: "/admin/leagues", label: "Liga", icon: ListOrdered, areas: ["tournaments"] },
       { to: "/admin/tournament-guide", label: "Turnier-Leitfaden", icon: BookOpen, areas: ["tournaments"] },
       { to: "/admin/f1", label: "Fast Lap", icon: Flag, areas: ["tournaments"], staff: true },
       { to: "/admin/seasons", label: "Jahreswertung", icon: Trophy, areas: ["tournaments"] },
@@ -163,6 +165,7 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/einlass": ["einlass", "anwesenheit", "präsenz", "praesenz", "generalversammlung", "versammlung", "scannen", "mitgliedskarte"],
   "/admin/about": ["über uns", "verein", "leitbild", "werte", "texte", "about", "gruendung", "gründung", "zweck", "gemeinnuetzig", "gemeinnützig", "zahlen", "dolibarr"],
   "/admin/tournaments": ["bracket", "turnierbaum", "matches", "anmeldungen", "registrierungen"],
+  "/admin/leagues": ["liga", "ligen", "season", "staffel", "spielwoche", "sperrzeit", "co-team"],
   "/admin/tournament-guide": ["leitfaden", "anleitung", "voreinstellung", "format", "check-in", "best of"],
   "/admin/f1": ["fastlap", "racing", "challenge", "challenges"],
   "/admin/seasons": ["wertung", "jahreswertung", "circuit", "saisons", "saison"],

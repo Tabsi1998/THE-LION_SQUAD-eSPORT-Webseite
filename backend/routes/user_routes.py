@@ -11,6 +11,7 @@ from auth import get_current_user, get_optional_user, require_super, hash_token,
 from email_service import send_template
 from services.competition_privacy import registration_match_snapshot
 from services.competition_standings import registration_match_summary
+from services.league_scope import is_league_staffel, league_label
 from services.membership_service import get_membership, derived_user_type, is_active_member
 from services import xp
 from services.levels import level_view
@@ -721,7 +722,8 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
         t_ids = list({r["tournament_id"] for r in regs})
         tournaments_raw = await db.tournaments.find(
             {"id": {"$in": t_ids}}, {"_id": 0, "title": 1, "slug": 1, "game_id": 1, "format": 1,
-             "status": 1, "start_date": 1, "id": 1, "visibility": 1, "is_public": 1}).to_list(200)
+             "status": 1, "start_date": 1, "id": 1, "visibility": 1, "is_public": 1,
+             "league_context": 1}).to_list(200)
         t_map = {t["id"]: t for t in tournaments_raw if await _is_public_tournament(t)}
         game_ids = list({t.get("game_id") for t in t_map.values() if t.get("game_id")})
         games = await db.games.find(
@@ -751,7 +753,10 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
                 "status": t.get("status"), "start_date": t.get("start_date"),
                 "game": g_map.get(t.get("game_id")),
                 "final_position": final_pos, "registration_status": r.get("status"),
+                **({"league_label": league_label(t)} if is_league_staffel(t) else {}),
             })
+            if is_league_staffel(t):
+                continue  # Liga (docs/LIGA.md): gelistet und gekennzeichnet, aber nicht bei Turnieren/Siegen/Top 3
             stats["tournaments"] += 1
             if final_pos == 1:
                 stats["wins"] += 1

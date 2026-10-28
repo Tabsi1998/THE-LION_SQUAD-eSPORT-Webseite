@@ -22,7 +22,8 @@ import {
 import "@/components/tls/maps/maps.css";
 
 const keyOf = (mode) => mode ?? "";
-const ORIGIN_TEXT = { tournament: "Pool des Turniers", stage: "eigener Pool der Phase", reference_series: "Pool der Saison" };
+const ORIGIN_TEXT = { tournament: "Pool des Turniers", stage: "eigener Pool der Phase", reference_series: "Pool der Saison",
+  league_season: "Pool der Liga-Season" };
 
 /** Die Auswahl eines gespeicherten Pools, beschränkt auf das, was heute noch wählbar ist (aktiv, im Modus frei). */
 function startSelection(entry, library, modes) {

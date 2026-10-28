@@ -116,7 +116,8 @@ def year_of(value) -> int | None:
 # ------------------------------------------------------------------ Wer war aktiv
 
 async def _year_tournaments(db, year: int) -> dict[str, dict]:
-    docs = await db.tournaments.find({"status": {"$in": sorted(FINISHED)}}, {"_id": 0, "id": 1, "start_date": 1, "created_at": 1}).to_list(10000)
+    docs = await db.tournaments.find({"status": {"$in": sorted(FINISHED)}, "league_context": None},
+                                     {"_id": 0, "id": 1, "start_date": 1, "created_at": 1}).to_list(10000)
     return {doc["id"]: doc for doc in docs if year_of(doc.get("start_date") or doc.get("created_at")) == year}
 
 
@@ -252,7 +253,9 @@ async def build_review(db, user: dict, year: int) -> dict | None:
 
     refs = await personal_profile_references(user, public_only=False)
     items = refs.get("items") or []
-    tournaments = [i for i in items if i.get("kind") == "tournament" and year_of(i.get("date")) == year]
+    # Liga-Staffeln (gekennzeichnet mit league_label) zählen im Jahresrückblick nicht als Turnier (docs/LIGA.md, 7).
+    tournaments = [i for i in items if i.get("kind") == "tournament" and year_of(i.get("date")) == year
+                   and not i.get("league_label")]
     fastlaps = [i for i in items if i.get("kind") == "fastlap" and year_of(i.get("date")) == year]
     events = await _events(db, user["id"], year)
     if not tournaments and not fastlaps and not events:

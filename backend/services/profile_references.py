@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from database import get_db
 from services.competition_read import load_competition_read_model, observe_structure_read
 from services.competition_standings import placements_for_structure, standings_for_structure
+from services.league_scope import is_league_staffel, league_label
 from services.visibility import user_can_see
 
 RESULT_TOURNAMENT_STATUSES = {"completed", "results_published", "archived"}
@@ -194,7 +195,8 @@ async def personal_profile_references(user: dict, public_only: bool = False) -> 
     reg_tournament_ids = list({reg.get("tournament_id") for reg in regs if reg.get("tournament_id")})
     extra_rows = await db.tournaments.find(
         {"id": {"$in": reg_tournament_ids}, "status": {"$in": list(RESULT_TOURNAMENT_STATUSES)}},
-        {"_id": 0, "id": 1, "slug": 1, "title": 1, "start_date": 1, "status": 1, "banner_url": 1, "game_name": 1, "visibility": 1, "is_public": 1},
+        {"_id": 0, "id": 1, "slug": 1, "title": 1, "start_date": 1, "status": 1, "banner_url": 1, "game_name": 1, "visibility": 1, "is_public": 1,
+         "league_context": 1},
     ).to_list(250)
     if public_only:
         extra_tournaments = {}
@@ -224,6 +226,8 @@ async def personal_profile_references(user: dict, public_only: bool = False) -> 
             "target_id": tournament.get("slug") or tournament.get("id"),
             "banner_url": tournament.get("banner_url"),
             "participant_count": participant_count,
+            # Liga (docs/LIGA.md): eine Staffel steht gekennzeichnet in der Liste („Liga · Staffel A“).
+            **({"league_label": league_label(tournament)} if is_league_staffel(tournament) else {}),
         })
 
     lap_query = {"user_id": user_id, "is_invalid": {"$ne": True}}

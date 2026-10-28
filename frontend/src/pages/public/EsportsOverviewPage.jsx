@@ -32,7 +32,7 @@ export default function EsportsOverviewPage() {
     setLoading(true);
     try {
       const [tournamentRes, fastlapRes] = await Promise.all([
-        api.get("/tournaments?compact=true&limit=48"),
+        api.get("/tournaments?compact=true&limit=48&league=exclude"),
         api.get("/f1/challenges?compact=true&limit=48"),
       ]);
       setTournaments(sortByNearestDate(Array.isArray(tournamentRes.data) ? tournamentRes.data : tournamentRes.data?.items || []));

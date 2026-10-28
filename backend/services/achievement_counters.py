@@ -22,6 +22,7 @@ from database import get_db
 from models import now_utc
 from services import achievement_progress
 from services.achievement_core import SIGNAL_RULES, SIGNALS, STATS, VIENNA, evaluator  # noqa: F401 - umgezogen (#1420)
+from services.league_scope import NOT_LEAGUE, league_tournament_ids
 from services.match_winner import is_duel, match_winner_id, participant_ids, won_by
 from services.private_fields import private_projection
 
@@ -101,11 +102,21 @@ class Context:
         return {r["id"] for r in await self.registrations() if r.get("id")}
 
     async def tournaments(self) -> dict[str, dict]:
+        """Die Turniere der eigenen Anmeldungen - ohne Liga-Staffeln (docs/LIGA.md, Abschnitt 7): eine Staffel ist kein
+        Turnier für die Turnierzähler; ihre Spiele zählen über ``matches`` weiter."""
         async def load():
             ids = list({r.get("tournament_id") for r in await self.registrations() if r.get("tournament_id")})
-            rows = await self.db.tournaments.find({"id": {"$in": ids}}, {"_id": 0, "id": 1, "status": 1, "registration_opens_at": 1, "registration_open_from": 1, "is_public": 1, "game_id": 1, "season_id": 1, "stream_url": 1, "format": 1}).to_list(2000) if ids else []
+            rows = await self.db.tournaments.find({"id": {"$in": ids}, **NOT_LEAGUE}, {"_id": 0, "id": 1, "status": 1, "registration_opens_at": 1, "registration_open_from": 1, "is_public": 1, "game_id": 1, "season_id": 1, "stream_url": 1, "format": 1}).to_list(2000) if ids else []
             return {row["id"]: row for row in rows}
         return await self._memo("tournaments", load)
+
+    async def tournament_registrations(self) -> list[dict]:
+        """Eigene Anmeldungen ohne die in Liga-Staffeln - für die Turnierzähler."""
+        async def load():
+            regs = await self.registrations()
+            league = await league_tournament_ids(self.db, [r.get("tournament_id") for r in regs])
+            return [r for r in regs if r.get("tournament_id") not in league]
+        return await self._memo("tournament_registrations", load)
 
     async def matches(self) -> list[dict]:
         """Rohe Matches aus ``matches_v2`` - mit Zeitstempeln, die der kanonische Umbau nicht mitnimmt."""
@@ -547,7 +558,7 @@ async def _categories(ctx):
 # (achievement_progress.compute_user_progress), damit Anmeldung und voller Lauf dieselben Werte schreiben.
 @counter("tournaments_registered", "registration")
 async def _tournaments_registered(ctx):
-    return len(await ctx.registrations())
+    return len(await ctx.tournament_registrations())
 
 
 @counter("distinct_games_registered", "registration")
@@ -570,13 +581,13 @@ async def _staffed(ctx):
     ids = {row.get("tournament_id") async for row in ctx.db.tournament_staff_assignments.find({"user_id": ctx.user_id}, {"_id": 0, "tournament_id": 1}) if row.get("tournament_id")}
     if not ids:
         return 0
-    return await ctx.db.tournaments.count_documents({"id": {"$in": list(ids)}, "status": {"$in": ["completed", "results_published", "archived"]}})
+    return await ctx.db.tournaments.count_documents({"id": {"$in": list(ids)}, "status": {"$in": ["completed", "results_published", "archived"]}, **NOT_LEAGUE})
 
 
 @counter("seed_one_count", "tournament")
 async def _seed_one(ctx):
     """Topgesetzt: je Turnier einmal, egal wie viele Anmeldungen dort auf Platz 1 gesetzt waren."""
-    return len({r.get("tournament_id") for r in await ctx.registrations() if r.get("seed") == 1 and r.get("tournament_id")})
+    return len({r.get("tournament_id") for r in await ctx.tournament_registrations() if r.get("seed") == 1 and r.get("tournament_id")})
 
 
 @counter("tournaments_completed", "tournament")
@@ -602,7 +613,7 @@ async def _fast_registrations(ctx):
 @counter("first_checkins", "tournament")
 async def _first_checkins(ctx):
     """Erster Check-in eines Turniers: der eigene Check-in-Zeitpunkt liegt vor allen anderen."""
-    mine = [r for r in await ctx.registrations() if r.get("status") == "checked_in" and r.get("tournament_id")]
+    mine = [r for r in await ctx.tournament_registrations() if r.get("status") == "checked_in" and r.get("tournament_id")]
     count = 0
     for reg in mine:
         stamp = str(reg.get("checked_in_at") or reg.get("updated_at") or "")
@@ -741,7 +752,8 @@ async def _team_tournaments(ctx):
     ids = [team["id"] for team in await ctx.teams() if team.get("id")]
     if not ids:
         return 0
-    return len(await ctx.db.tournament_registrations.distinct("tournament_id", {"team_id": {"$in": ids}}))
+    played = await ctx.db.tournament_registrations.distinct("tournament_id", {"team_id": {"$in": ids}})
+    return len(set(played) - await league_tournament_ids(ctx.db, played))
 
 
 # ------------------------------------------------------------------ Events, Saison, Community
@@ -1098,7 +1110,7 @@ async def _completed_no_forfeit(ctx):
 @counter("checkin_streak", "tournament")
 async def _checkin_streak(ctx):
     """Turnier für Turnier eingecheckt, in der Reihenfolge der Anmeldungen - die längste Folge zählt."""
-    rows = sorted((r for r in await ctx.registrations() if r.get("tournament_id")), key=lambda r: str(r.get("created_at") or ""))
+    rows = sorted((r for r in await ctx.tournament_registrations() if r.get("tournament_id")), key=lambda r: str(r.get("created_at") or ""))
     best = streak = 0
     for reg in rows:
         if reg.get("status") in ("checked_in", "ready") or reg.get("checked_in_at"):

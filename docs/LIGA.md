@@ -83,7 +83,7 @@ Indizes: `id` eindeutig, (`season_id`, `level`) eindeutig.
 | --- | --- | --- | --- |
 | `league_context` | `{league_id, season_id, division_id, staffel}` | nein | `staffel` = „A“, „B“ …; **fehlt bei allen anderen Turnieren** (nie `null` schreiben). Nur der Liga-Service setzt es, `TournamentUpdate` nimmt es nicht an |
 | `round_robin_legs` | 1 \| 2 | nein | fehlt = 2 (Hin- und Rückrunde wie heute) |
-| `matchday_blocked_weeks` | `[int]` | nein | gesperrte Kalenderwochen ab `start_date` (1-basiert); fehlt = `[]` |
+| `matchday_blocked_weeks` | `[int]` | nein | gesperrte Kalenderwochen ab `start_date` (1-basiert); fehlt = `[]`. Gesperrt ist eine Woche, wenn mehr als die Hälfte ihrer Tage in einer Sperrzeit liegt (Season 1: Wochen 7 und 8; der Montag 21.12. allein sperrt Woche 6 nicht) |
 | `matchday_weeks_total` | int | nein | Wochenbudget für „Runden ≤ aktive Wochen“; fehlt = keine Prüfung |
 | `scoring_rules` | dict | nein | normalisiert; fehlt = heute fest 3/1/0 mit Reihenfolge Punkte, Siege, Differenz |
 | `game_mode_order` | `[str]` | nein | fehlt = frei |
@@ -143,8 +143,8 @@ mit `{games: [{position, lineup}]}`. Index: `matches_v2.lineup_user_ids` (sparse
 
 ### Protokoll (`audit_logs.action`)
 
-`league.create`, `league.season.create|update`, `league.division.create|update`, `league.staffel.create`,
-`league.staffel.sync` (A) · `team.squad.roles`, `league.squad.assign|remove` (B) · `match.games.report`,
+`league.create|update`, `league.season.create|update`, `league.season.map_pool.save|clear`,
+`league.division.create|update`, `league.staffel.create`, `league.staffel.sync` (A) · `team.squad.roles`, `league.squad.assign|remove` (B) · `match.games.report`,
 `match.lineup.amend`, `match.games.correct` (B).
 
 ## 3. Einstellbar statt fest
@@ -162,6 +162,17 @@ mit `{games: [{position, lineup}]}`. Index: `matches_v2.lineup_user_ids` (sparse
 
 Season-Änderungen wirken erst über „Vorgaben auf Staffeln übertragen“ (`league.staffel.sync`, A): Termine und
 Kalender nur vor dem Start, Best of/Teamgröße/Punkte nur vor dem ersten Ergebnis, Sichtbarkeit und Regeltext immer.
+Ausnahme: die **Sichtbarkeit** (`visibility`, `is_public`) schreibt schon das Speichern der Season auf alle ihre
+Staffeln, auch gesperrte („aus“ heißt sofort aus).
+Genau (`services/league_service.SYNC_GROUPS`): **immer** (auch gesperrte Staffeln) `visibility`, `is_public`, `rules`
+und der Map-Pool (neue Version im Scope `tournament`, nur wenn er sich unterscheidet – Spiele mit festgehaltenem Pool
+behalten ihren; hat die Season keinen Pool mehr, wird die Kopie nur vor dem ersten Ergebnis entfernt);
+**vor dem Start** (Status `draft` bis `check_in`) `start_date`, `end_date`, `matchday_days`, `default_match_weekday`,
+`default_match_time`, `round_robin_legs`, `matchday_blocked_weeks`, `matchday_weeks_total`, `max_participants`,
+`min_squad_size` – nur wenn die Prüfung „Runden ≤ aktive Wochen“ passt und nicht schon mehr Teams angemeldet sind;
+**vor dem ersten Ergebnis** `best_of`, `team_size`, `scoring_rules`, `game_mode_order`, `result_confirm_hours_league`,
+`lineup_amend_hours`. `min_squad_size` steht damit am Turnier (Season bzw. Liga N, mindestens `team_size`); B liest es
+beim Zuteilen dort.
 
 ## 4. Rechte
 
@@ -241,6 +252,7 @@ Gemeinsamer Baustein `services/league_scope.py`: `NOT_LEAGUE = {"league_context"
 | Löwen-Rang/XP | `badges.py` (`on_tournament_completed`, `on_tournament_registered`, `on_checked_in`), `services/xp.py` | ausnehmen (Teilnahme, Podest); Spiele zählen weiter |
 | Team-Stufe | `services/team_levels.py` (`compute_all_team_levels`) | ausnehmen |
 | Discord | `discord_skip=true` beim Anlegen (wirkt in `discord_threads`, `discord_bracket`, `discord_scheduled`, `discord_commands`); `/turniere` sieht keine offene Anmeldung | über vorhandenen Schalter aus |
+| Discord-Anmeldung, `/turniere` | `services/discord_registration.py` (`_open_tournaments`), `discord_commands.py` (`answer_turniere`) | zusätzlich ausnehmen (falls jemand eine Staffel auf „Anmeldung offen“ stellt) |
 | Stream-Meldung | `services/tournament_streams.py` (`sync`) | ausnehmen |
 | Startseite | `routes/home_routes.py` (`home_state` live/heute/bald/demnächst, `_club_numbers`, `_about_games`) | ausnehmen |
 | Kalender öffentlich + Discord-Termine | `services/calendar_items.py` (`collect`) | ausnehmen; persönlicher Kalender (`personal_calendar.py`) behalten |
@@ -293,6 +305,13 @@ moment)` (A, P2). Bis P2 auf `main` ist, bleibt der Aufruf aus.
 
 - **Schalter ist die Season-Sichtbarkeit** (Vorgabe `off`), kein globaler Schalter. Die Navigation zeigt „Liga“ nur,
   wenn die öffentliche Lese-API für die Person mindestens eine Season liefert.
+- **APIs (P1):** Verwaltung `/api/admin/leagues` (`require_area("tournaments")`): `GET ""` (Ligen mit Seasons, Spiele,
+  Vorgaben), `POST ""`, `PATCH /{league_id}`, `POST /{league_id}/seasons`, `GET|PATCH /seasons/{id}` (mit Kalender,
+  Map-Pool, Liga N samt Staffeln), `PUT|DELETE /seasons/{id}/map-pool`, `POST /seasons/{id}/sync`,
+  `POST /seasons/{id}/divisions`, `PATCH /divisions/{id}`, `POST /divisions/{id}/staffeln`. Öffentlich `GET /api/leagues`
+  und `GET /api/leagues/{liga}/{season}` – auch die Turnierleitung bekommt dort bei `off` ein 404 (sie sieht die Season
+  in der Verwaltung). Gelesene Turniere tragen bei Staffeln `league_label` („Liga · Staffel A“, Turnierliste, Profil,
+  Teamseite).
 
 | `league_seasons.visibility` | Ligaseite | Staffel-Turniere (`visibility`, `is_public`) |
 | --- | --- | --- |

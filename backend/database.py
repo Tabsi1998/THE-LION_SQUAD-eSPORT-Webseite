@@ -513,6 +513,20 @@ async def init_indexes():
     await db.season_raffles.create_index("source_key", unique=True)
     await db.season_raffle_entries.create_index([("raffle_id", 1), ("user_id", 1)], unique=True)
     await db.season_raffle_entries.create_index("user_id")
+    # Liga Stufe 1 – Rahmen (A) (docs/LIGA.md): Liga → Season → Liga N; die Staffel ist ein Turnier mit league_context.
+    await db.leagues.create_index("id", unique=True)
+    await unique_index(db.leagues, "slug", "league_slug")
+    await db.leagues.create_index("game_id")
+    await db.league_seasons.create_index("id", unique=True)
+    await unique_index(db.league_seasons, [("league_id", 1), ("number", 1)], "league_season_number")
+    await unique_index(db.league_seasons, [("league_id", 1), ("slug", 1)], "league_season_slug")
+    await db.league_seasons.create_index("status")
+    await db.league_divisions.create_index("id", unique=True)
+    await unique_index(db.league_divisions, [("season_id", 1), ("level", 1)], "league_division_level")
+    await db.tournaments.create_index("league_context.season_id", name="league_context_season",
+                                      partialFilterExpression={"league_context": {"$type": "object"}})
+    await unique_index(db.tournaments, [("league_context.division_id", 1), ("league_context.staffel", 1)],
+                       "league_staffel", partialFilterExpression={"league_context": {"$type": "object"}})
     await init_audit_indexes(db)
 
 

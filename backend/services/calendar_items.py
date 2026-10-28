@@ -16,6 +16,7 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from services import event_days, event_facts
+from services.league_scope import is_league_staffel
 from services.public_phase import derive_public_phase
 from services.visibility import lead_can_see
 
@@ -31,7 +32,8 @@ VIENNA = ZoneInfo("Europe/Vienna")
 _EVENT_FIELDS = {"_id": 0, "id": 1, "slug": 1, "name": 1, "start_date": 1, "end_date": 1, "status": 1,
                  "visibility": 1, "location": 1, "city": 1, "event_type": 1, "days": 1, "locations": 1}
 _TOURNAMENT_FIELDS = {"_id": 0, "id": 1, "slug": 1, "title": 1, "start_date": 1, "end_date": 1, "status": 1,
-                      "visibility": 1, "is_public": 1, "registration_open_until": 1, "game_name": 1}
+                      "visibility": 1, "is_public": 1, "registration_open_until": 1, "game_name": 1,
+                      "league_context": 1}
 _FASTLAP_FIELDS = {"_id": 0, "id": 1, "slug": 1, "title": 1, "start_date": 1, "end_date": 1, "status": 1,
                    "visibility": 1, "event_mode": 1}
 
@@ -183,6 +185,10 @@ async def collect(db, user: dict | None, own: dict[str, dict[str, dict]] | None 
             continue
         items.extend(event_items(ev, mine=ev.get("id") in my_events))
     for t in tournaments:
+        # Liga-Staffeln (docs/LIGA.md, Abschnitt 7): ein zehnwöchiger Balken hilft keinem Kalender - nur im persönlichen
+        # Kalender (``include_own``) bleibt die eigene Staffel.
+        if is_league_staffel(t) and not (include_own and t.get("id") in my_tournaments):
+            continue
         if not await visible(t, my_tournaments):
             continue
         path = f"/tournaments/{t.get('slug') or t.get('id')}"

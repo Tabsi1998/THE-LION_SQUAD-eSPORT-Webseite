@@ -18,6 +18,7 @@ from services.competition_read import load_competition_read_model, load_registra
 from services.round_labels import round_label, rounds_by_section, stage_kind
 from services.team_colors import effective_color
 from services.visibility import user_can_see
+from services.league_scope import is_league_staffel, league_label
 
 INVITE_PARAM = "einladung"
 ACTIVE_REGISTRATION_STATUSES = ("pending", "approved", "checked_in", "waitlist")
@@ -30,7 +31,8 @@ REGISTRATION_LABELS = {
     "waitlist": "Warteliste",
 }
 TOURNAMENT_FIELDS = {"_id": 0, "id": 1, "slug": 1, "title": 1, "start_date": 1, "end_date": 1, "status": 1, "visibility": 1,
-                     "is_public": 1, "game_id": 1, "game_name": 1, "event_id": 1, "format": 1, "banner_url": 1, "team_size": 1}
+                     "is_public": 1, "game_id": 1, "game_name": 1, "event_id": 1, "format": 1, "banner_url": 1, "team_size": 1,
+                     "league_context": 1}
 
 
 def _parse_dt(value) -> datetime | None:
@@ -98,6 +100,8 @@ def _tournament_card(tournament: dict, games: dict[str, dict], events: dict[str,
         "game_name": tournament.get("game_name") or game.get("name"),
         "event_name": events.get(tournament.get("event_id")) or None,
         "banner_url": tournament.get("banner_url"),
+        # Liga (docs/LIGA.md): eine Staffel gekennzeichnet („Liga · Staffel A“); das Co-Team zeigt P5.
+        **({"league_label": league_label(tournament)} if is_league_staffel(tournament) else {}),
     }
 
 
@@ -221,7 +225,8 @@ async def team_overview(db, team: dict, viewer: dict | None, *, insider: bool, r
             "match_id": match.get("id"),
             "round_label": labels.get(match.get("id")) or "Runde",
             "date": _iso(match.get("scheduled_at") or match.get("updated_at")),
-            "tournament": {"id": tournament.get("id"), "slug": tournament.get("slug"), "title": tournament.get("title") or "Turnier"},
+            "tournament": {"id": tournament.get("id"), "slug": tournament.get("slug"), "title": tournament.get("title") or "Turnier",
+                           **({"league_label": league_label(tournament)} if is_league_staffel(tournament) else {})},
             **line,
         })
     return {"header": header, "upcoming": upcoming, "recent": recent}

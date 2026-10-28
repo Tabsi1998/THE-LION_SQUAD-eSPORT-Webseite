@@ -2,6 +2,7 @@
 """
 import hashlib
 import json
+from typing import Literal
 from fastapi import HTTPException, Depends, Request
 from fastapi.responses import RedirectResponse
 from urllib.parse import quote, urlencode
@@ -18,6 +19,7 @@ from services.access_links import (
     validate_access_link,
 )
 from services.public_phase import derive_public_phase
+from services.league_scope import is_league_staffel, league_filter, league_label
 from services.tournament_permissions import (
     assigned_tournament_ids,
     tournament_rights,
@@ -92,6 +94,8 @@ def _compact_tournament(t: dict) -> dict:
         "engine_version": t.get("engine_version"),
         "ruleset_version": t.get("ruleset_version"),
         "version_inferred": bool(t.get("version_inferred")),
+        # Liga (docs/LIGA.md): die Karte kennzeichnet eine Staffel („Liga · Staffel A“).
+        **({"league_context": t["league_context"], "league_label": league_label(t)} if is_league_staffel(t) else {}),
         "game": {
             "id": game.get("id"),
             "name": game.get("name"),
@@ -122,6 +126,8 @@ async def _enrich_tournament(t: dict, user: dict | None = None) -> dict:
     # Weiterkommen (#1590): ältere Turniere kennen nur den Schalter - gelesen wird immer der Modus.
     t[MODE_KEY] = advancement_mode_of(t, None)
     t["public_phase"] = derive_public_phase(t, "tournament")
+    if is_league_staffel(t):
+        t["league_label"] = league_label(t)  # Kennzeichnung „Liga · Staffel A“ (docs/LIGA.md)
     if t.get("game_id"):
         g = await db.games.find_one({"id": t["game_id"]}, {"_id": 0})
         t["game"] = await _enrich_game_identity(db, g)
@@ -141,7 +147,10 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
                            event_id: str | None = None, limit: int = 100,
                            offset: int = 0, paged: bool = False, compact: bool = False,
                            include_drafts: bool = False, managed: bool = False,
+                           league: Literal["include", "exclude", "only"] = "include",
                            user=Depends(get_optional_user)):
+    """``league`` (docs/LIGA.md): ``include`` (Vorgabe - die App ohne neuen Build sieht Staffeln als Turniere),
+    ``exclude`` (Web-Listen) oder ``only``."""
     db = get_db()
     is_admin = is_confirmed_tournament_lead(user)
     assigned_ids = await assigned_tournament_ids(user)
@@ -167,11 +176,12 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
         q["game_id"] = game_id
     if event_id:
         q["event_id"] = event_id
+    q.update(league_filter(league))
     safe_limit = max(1, min(int(limit or 100), 500))
     projection = {"_id": 0}
     if compact:
         projection = {
-            "_id": 0, "id": 1, "title": 1, "slug": 1, "banner_url": 1,
+            "_id": 0, "id": 1, "title": 1, "slug": 1, "banner_url": 1, "league_context": 1,
             "status": 1, "visibility": 1, "is_public": 1, "game_id": 1,
             "platform": 1, "start_date": 1, "end_date": 1, "event_id": 1, "team_mode": 1, "max_participants": 1,
             "prize_pool": 1, "registration_enabled": 1, "online_registration_enabled": 1,
