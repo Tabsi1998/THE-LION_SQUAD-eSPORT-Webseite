@@ -227,12 +227,13 @@ async def _write(db, product: dict, by_id: dict, priced_ids: set[int], *, now: s
                     warning = {"before_cents": price, "after_cents": None, "at": now, "stale": True}
                     price_changes.append({"label": variant["label"], "before_cents": price, "after_cents": None})
                 update["price_warning"] = warning
-            elif cost is not None and cost != price:
+            elif cost is not None and not shop_pricing.same_price(cost, price):
                 if not warning or warning.get("after_cents") != cost:
                     warning = {"before_cents": price, "after_cents": cost, "at": now}
                     price_changes.append({"label": variant["label"], "before_cents": price, "after_cents": cost})
                 update["price_warning"] = warning
-            elif cost == price:
+            elif cost is not None:
+                # Gleich oder nur ±1 Cent aus der anteiligen Steuerverteilung: keine Warnung.
                 warning = update["price_warning"] = None
         if variant.get("active") and warning:
             open_warnings += 1

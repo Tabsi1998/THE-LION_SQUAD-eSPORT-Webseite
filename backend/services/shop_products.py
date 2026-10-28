@@ -827,7 +827,8 @@ async def run_check(db, product: dict) -> dict:
     for variant, mapping in offered:
         cost, source = shop_pricing.member_price(product, mapping)
         estimated += source == "estimate"
-        if cost is None or variant.get("price_cents") != cost or (mapping or {}).get("price_warning"):
+        if (cost is None or not shop_pricing.same_price(cost, variant.get("price_cents"))
+                or (mapping or {}).get("price_warning")):
             unpriced.append(shop_colors.variant_label(product, variant))
         elif variant["price_cents"] < minimum:
             too_cheap.append(shop_colors.variant_label(product, variant))

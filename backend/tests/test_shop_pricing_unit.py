@@ -618,3 +618,21 @@ async def test_estimates_run_in_parallel_with_a_limit_and_stop_at_the_time_budge
     result = await shop_pricing.refresh_estimates(db, product["id"], provider=SlowProvider(provider, 5.0),
                                                   actor_id="finanzen-test")
     assert result["estimated"] == 0 and result["open"] == 4 and "noch offen" in result["detail"]
+
+@pytest.mark.asyncio
+async def test_a_one_cent_jitter_from_the_tax_split_is_no_price_change(db, provider, fake):
+    """±1 Cent aus der anteiligen Steuerverteilung (etwa bei geändertem Versand) ist keine Preisänderung (#2135)."""
+    product = await configured(db, provider, accept=False)
+    await shop_catalog_sync.sync_product(db, product["id"], provider=provider, **BY)
+    await shop_products.accept_prices(db, product["id"], **BY)
+    medium = await variant_for(db, product["id"], BLACK_M)
+    for accepted, warned in ((1171, False), (1169, False), (1172, True)):
+        await shop_catalog.set_variant_state(db, medium["id"], {"price_cents": accepted}, actor_id="test")
+        await shop_catalog.set_catalog_mapping(db, medium["id"], {"price_warning": None}, actor_id="test")
+        await shop_catalog_sync.sync_product(db, product["id"], provider=provider, **BY)
+        mapping = await shop_catalog.printful_variant_for(db, medium["id"])
+        assert bool(mapping.get("price_warning")) is warned, accepted
+        view = await shop_products.admin_view(db, product["id"])
+        prices = next(item for item in view["check"]["items"] if item["key"] == "prices")
+        assert prices["ok"] is not warned, accepted
+    assert shop_pricing.same_price(1170, 1171) and not shop_pricing.same_price(1170, None)

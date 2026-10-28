@@ -121,6 +121,18 @@ def breakdown(parts: dict, weights: list[int]) -> dict:
             "tax_cents": parts["tax_cents"], "total_cents": parts["total_cents"]}
 
 
+# Der Mitgliederpreis kommt aus der anteiligen Steuerverteilung einer Schätzung: ändert sich etwa der Versand, kann er um
+# einen Cent springen, ohne dass Printful die Ware anders rechnet. So viel ist keine Preisänderung.
+PRICE_JITTER_CENTS = 1
+
+
+def same_price(expected: int | None, accepted: int | None) -> bool:
+    """Gleicher Preis bis auf ``PRICE_JITTER_CENTS`` - für Preiswarnung und Prüfung „Preis übernommen“."""
+    if not _amount(expected) or not _amount(accepted):
+        return False
+    return abs(expected - accepted) <= PRICE_JITTER_CENTS
+
+
 def strong_deviation(catalog_cents: int | None, estimate_cents: int | None) -> bool:
     """Liegen Katalog und Schätzung (beide netto) stark auseinander? Nur dann zeigt der Admin „prüfen“."""
     if not _amount(catalog_cents) or not _amount(estimate_cents):
