@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Download, Lock, Trophy } from "lucide-react";
+import { Download, Lock, Trophy } from "lucide-react";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
+import { tournamentCrumbs } from "@/lib/leagueTrail";
 import { ResultShareButton } from "@/components/tls/ResultShareButton";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { resultFileName } from "@/lib/resultShare";
@@ -68,9 +70,11 @@ export default function ResultSharePage() {
   return (
     <PublicLayout>
       <div className="max-w-5xl mx-auto px-4 md:px-6 py-10 md:py-14">
-        <Link to={`/tournaments/${encodeURIComponent(data?.tournament?.slug || slug)}`} className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-white/50 hover:text-white" data-testid="result-share-back">
-          <ArrowLeft className="w-3 h-3" /> Zum Turnier
-        </Link>
+        {/* Dieselbe Brotkrumen-Kette wie die Turnierseiten (#2124) statt eines einzelnen „Zum Turnier“. */}
+        <Breadcrumbs items={tournamentCrumbs(data?.tournament || { title: "Turnier" }, null, {
+          tournamentUrl: `/tournaments/${encodeURIComponent(data?.tournament?.slug || slug)}`,
+          current: { label: person ? `Ergebnis von ${person}` : "Ergebnis" },
+        })} />
 
         {state === "loading" && <div className="py-20 text-center font-display tracking-widest text-white/40" data-testid="result-share-loading">LADE ERGEBNIS …</div>}
 

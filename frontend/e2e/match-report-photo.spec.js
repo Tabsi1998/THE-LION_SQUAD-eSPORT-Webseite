@@ -59,7 +59,7 @@ test.describe("Ergebnis melden mit Foto", () => {
     await page.getByTestId("result-score-r2-plus").click();
     await expect(page.getByTestId("match-report-sentence")).toHaveText("NeonFalke gewinnt 2:1");
     await page.getByTestId("proof-photo-input").setInputFiles({ name: "ergebnis.png", mimeType: "image/png", buffer: PNG });
-    await expect(page.getByTestId("proof-photo-state")).toHaveText("Foto angehängt – sehen nur die Gegenseite und die Turnierleitung.");
+    await expect(page.getByTestId("proof-photo-state")).toHaveText("Foto angehängt – sehen nur die Spieler dieses Spiels und die Turnierleitung.");
     expect(uploads).toBe(1);
     await testInfo.attach("melden-mit-foto-390.png", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
     await page.getByTestId("match-report-submit").click();

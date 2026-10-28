@@ -4,7 +4,7 @@ import { Activity, CalendarClock, CheckCircle2, Flag, Monitor, Radio, RotateCw, 
 import { api } from "@/lib/api";
 import { formatWhen } from "@/lib/datetime";
 import { sortByNearestDate } from "@/lib/contentSort";
-import { formatMatchKind, formatMatchStatus, formatScheduleGroupLabel, slotName, stationText } from "@/lib/tournamentLabels";
+import { formatMatchKind, formatMatchStatus, formatScheduleGroupLabel, matchScheduleStatusText, slotName, stationText } from "@/lib/tournamentLabels";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { viennaTime } from "@/lib/vienna";
 import { finderFor, sourceLabel } from "@/lib/slotSource";
@@ -226,7 +226,7 @@ function MatchCard({ match, stationMap, featured = false }) {
           </div>
           <h2 className="mt-2 font-heading text-lg font-black uppercase leading-tight break-words">{match.labels.join(" vs. ") || "Teilnehmer offen"}</h2>
         </div>
-        <span className="shrink-0 rounded-sm border border-[#29B6E8]/35 px-2 py-1 text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]">{formatMatchStatus(match.schedule_status || match.status)}</span>
+        <span className="shrink-0 rounded-sm border border-[#29B6E8]/35 px-2 py-1 text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]">{matchScheduleStatusText(match)}</span>
       </div>
       <div className="mt-4 flex flex-wrap gap-3 text-xs text-white/55">
         <span className="inline-flex items-center gap-1.5"><CalendarClock className="w-3.5 h-3.5" />{formatWhen(match.scheduled_at, { fallback: "Termin offen" })}</span>

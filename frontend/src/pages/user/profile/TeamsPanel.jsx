@@ -102,12 +102,12 @@ export function TeamsPanel() {
       }
       if (editing.id) await api.patch(`/teams/${activeTeam.id}/squads/${editing.id}`, payload);
       else await api.post(`/teams/${activeTeam.id}/squads`, payload);
-      toast.success("Squad gespeichert.");
+      toast.success("Co-Team gespeichert.");
       setEditing(null);
       loadSquads();
       loadTeams();
     } catch (err) {
-      toast.error(formatRequestError(err, "Squad konnte nicht gespeichert werden.", { name: editing.name }));
+      toast.error(formatRequestError(err, "Co-Team konnte nicht gespeichert werden.", { name: editing.name }));
     } finally {
       setSaving(false);
     }
@@ -115,17 +115,17 @@ export function TeamsPanel() {
 
   const deleteSquad = async (squad) => {
     if (!await confirm({
-      title: "Squad löschen?",
-      description: `Squad "${squad.name}" wirklich löschen?`,
+      title: "Co-Team löschen?",
+      description: `Co-Team „${squad.name}“ wirklich löschen?`,
       confirmLabel: "Löschen",
     })) return;
     try {
       await api.delete(`/teams/${activeTeam.id}/squads/${squad.id}`);
-      toast.success("Squad gelöscht.");
+      toast.success("Co-Team gelöscht.");
       setSquads((rows) => rows.filter((s) => s.id !== squad.id));
       loadTeams();
     } catch (err) {
-      toast.error(formatRequestError(err, "Squad konnte nicht gelöscht werden."));
+      toast.error(formatRequestError(err, "Co-Team konnte nicht gelöscht werden."));
     }
   };
 
@@ -175,7 +175,7 @@ export function TeamsPanel() {
         <div>
           <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Team-Verwaltung</div>
           <h2 className="font-heading text-2xl md:text-3xl font-black uppercase mt-1">Meine Teams</h2>
-          <p className="text-sm text-white/55 mt-1">Teams sind deine Organisation, Squads sind konkrete Lineups für Seasons oder Turniere.</p>
+          <p className="text-sm text-white/55 mt-1">Teams sind deine Organisation, Co-Teams die feste Aufstellung für eine Season oder ein Turnier.</p>
         </div>
         <Link to="/teams" className="inline-flex items-center gap-2 px-4 py-2 border border-[#29B6E8]/40 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#29B6E8]/10">
           <Plus className="w-3.5 h-3.5" /> Team erstellen
@@ -230,7 +230,7 @@ export function TeamsPanel() {
                 </div>
                 <div className="min-w-0">
                   <div className="font-heading font-bold truncate">{team.name}</div>
-                  <div className="text-[10px] uppercase tracking-widest text-white/45">{TEAM_ROLE_LABELS[team.my_role] || team.my_role}{team.squad_count ? ` · ${team.squad_count} ${team.squad_count === 1 ? "Squad" : "Squads"}` : ""}</div>
+                  <div className="text-[10px] uppercase tracking-widest text-white/45">{TEAM_ROLE_LABELS[team.my_role] || team.my_role}{team.squad_count ? ` · ${team.squad_count} ${team.squad_count === 1 ? "Co-Team" : "Co-Teams"}` : ""}</div>
                 </div>
               </button>
             ))}
@@ -250,13 +250,13 @@ export function TeamsPanel() {
                     <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">[{activeTeam.tag}]</div>
                     <h3 className="font-heading text-2xl font-black uppercase">{activeTeam.name}</h3>
                     <div className="text-xs text-white/50 mt-1">{activeTeam.members?.length || 0} Mitglieder · Deine Rolle: {TEAM_ROLE_LABELS[activeTeam.my_role] || activeTeam.my_role}</div>
-                    {activeTeam.can_manage && <div className="mt-2 text-xs text-[#29B6E8]">Du kannst für dieses Team Squads/Subteams erstellen und bearbeiten.</div>}
+                    {activeTeam.can_manage && <div className="mt-2 text-xs text-[#29B6E8]">Du kannst für dieses Team Co-Teams erstellen und bearbeiten.</div>}
                   </div>
                   <div className="flex gap-2">
                     <Link to={`/teams/${activeTeam.id}`} className="px-3 py-2 border border-white/15 text-white/70 hover:text-white rounded-sm text-xs uppercase font-bold">Teamseite</Link>
                     {activeTeam.can_manage && (
                       <button type="button" onClick={() => setEditing({ ...emptySquad, member_ids: activeTeam.member_ids || [] })} className="tls-btn tls-btn--primary px-3 py-2 rounded-sm text-xs uppercase font-bold inline-flex items-center gap-1">
-                        <Plus className="w-3.5 h-3.5" /> Squad
+                        <Plus className="w-3.5 h-3.5" /> Co-Team
                       </button>
                     )}
                   </div>
@@ -298,7 +298,7 @@ export function TeamsPanel() {
                       </div>
                     </div>
                   ))}
-                  {squads.length === 0 && <div className="sm:col-span-2 text-center py-10 text-white/35 border border-dashed border-white/10 rounded-sm">Noch keine Squads für dieses Team.</div>}
+                  {squads.length === 0 && <div className="sm:col-span-2 text-center py-10 text-white/35 border border-dashed border-white/10 rounded-sm">Noch keine Co-Teams für dieses Team.</div>}
                 </div>
               </>
             )}
@@ -310,7 +310,7 @@ export function TeamsPanel() {
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm p-4 overflow-y-auto">
           <form onSubmit={saveSquad} className="bg-[#121212] border border-white/10 rounded-sm w-full max-w-2xl mx-auto my-8">
             <div className="p-5 border-b border-white/10">
-              <h3 className="font-heading text-2xl font-black uppercase">{editing.id ? "Squad bearbeiten" : "Squad erstellen"}</h3>
+              <h3 className="font-heading text-2xl font-black uppercase">{editing.id ? "Co-Team bearbeiten" : "Co-Team erstellen"}</h3>
             </div>
             <div className="p-5 space-y-4">
               <Field label="Name"><Input value={editing.name} onChange={(v) => setEditing({ ...editing, name: v })} required testId="team-squad-name" /></Field>

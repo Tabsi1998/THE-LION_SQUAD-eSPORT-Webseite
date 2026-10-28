@@ -54,7 +54,17 @@ def _unfulfillable(slot: dict) -> bool:
     return (slot.get("source_result") or {}).get("reason") == SOURCE_UNFULFILLABLE
 CORRECTION_REASON_MIN_LENGTH = 5
 CORRECTION_REASON_DETAIL = f"Bitte einen Grund für die Korrektur angeben (mindestens {CORRECTION_REASON_MIN_LENGTH} Zeichen)."
-CORRECTION_FORCE_DETAIL = "Dieses Spiel hat schon ein Ergebnis. Zum Korrigieren bitte einen Grund angeben."
+CORRECTION_FORCE_DETAIL = "Dieses Spiel hat inzwischen ein Ergebnis. Zum Ändern als Korrektur mit Grund speichern."
+# Ergebnis-Fenster (#2124, TP9): keine Technik („force=true“, „Rank“, „Slot“, Kennungen) in den Sätzen - die Leitung
+# liest sie am Handy. Bei 409 bietet das Fenster „Als Korrektur speichern“ an.
+NO_SIDES_DETAIL = "In diesem Spiel steht noch niemand – ein Ergebnis geht erst, wenn die Teilnehmer feststehen."
+CANCELLED_DETAIL = "Dieses Spiel ist abgesagt – es bekommt kein Ergebnis."
+
+
+def target_taken_detail(target: dict, target_slot: dict) -> str:
+    """Im Folgespiel sitzt schon jemand anderes - ändern geht nur als Korrektur."""
+    return (f"Im Folgespiel {target.get('match_key')} sitzt auf Platz {target_slot.get('slot')} schon jemand "
+            "anderes. Zum Ändern als Korrektur mit Grund speichern.")
 
 
 def has_result(match: dict) -> bool:
@@ -389,10 +399,10 @@ def normalize_v2_results(match: dict, raw_results: list[dict], *, best_of: int |
     rechnet das Neuberechnen gespeicherter Ergebnisse weiter wie bisher."""
     participants = _slot_participant_map(match)
     if not participants:
-        raise MatchV2ResultError("Match hat keine belegten Slots")
+        raise MatchV2ResultError(NO_SIDES_DETAIL)
     raw_results = _with_marked_no_shows(match, raw_results, participants)
     if len(raw_results) != len(participants):
-        raise MatchV2ResultError("Ergebnisliste muss alle belegten Teilnehmer enthalten")
+        raise MatchV2ResultError("Bitte für alle Teilnehmer dieses Spiels ein Ergebnis angeben.")
     raw_results = _auto_rank_results(match, raw_results)
 
     allow_draw = match_allows_draw(match)
@@ -402,20 +412,20 @@ def normalize_v2_results(match: dict, raw_results: list[dict], *, best_of: int |
     for entry in raw_results:
         registration_id = (entry.get("registration_id") or "").strip()
         if not registration_id:
-            raise MatchV2ResultError("registration_id fehlt in einem Ergebnis")
+            raise MatchV2ResultError("Bei einem Ergebnis fehlt, für wen es gilt.")
         if registration_id not in participants:
-            raise MatchV2ResultError(f"Teilnehmer {registration_id} ist kein Slot dieses Matches")
+            raise MatchV2ResultError("Ein Teilnehmer im Ergebnis spielt in diesem Spiel nicht mit – bitte die Seite neu laden.")
         if registration_id in seen_regs:
-            raise MatchV2ResultError(f"Teilnehmer {registration_id} kommt mehrfach im Ergebnis vor")
+            raise MatchV2ResultError("Ein Teilnehmer steht zweimal im Ergebnis.")
         seen_regs.add(registration_id)
         try:
             rank = int(entry.get("rank"))
         except (TypeError, ValueError):
-            raise MatchV2ResultError("Rank muss eine Zahl sein")
+            raise MatchV2ResultError("Der Platz muss eine Zahl sein.")
         if rank < 1:
-            raise MatchV2ResultError("Rank muss größer 0 sein")
+            raise MatchV2ResultError("Der Platz muss mindestens 1 sein.")
         if rank in seen_ranks and not allow_draw:
-            raise MatchV2ResultError(f"Rank {rank} ist mehrfach vergeben")
+            raise MatchV2ResultError(f"Platz {rank} ist doppelt vergeben – Gleichstand gibt es in diesem Spiel nicht.")
         seen_ranks.append(rank)
         time_ms = _as_time_ms(entry.get("time_ms"))
         normalized.append({
@@ -471,7 +481,7 @@ def _validate_placements(ranks: list[int], participant_count: int, allow_draw: b
         missing = ", ".join(str(rank) for rank in sorted(expected - set(ranks)))
         if set(ranks) != expected:
             raise MatchV2ResultError(
-                f"Ranks müssen fortlaufend 1-{participant_count} sein; fehlt: {missing}")
+                f"Die Plätze 1 bis {participant_count} müssen alle vergeben sein – es fehlt Platz {missing}.")
         return
 
     previous = None
@@ -1427,9 +1437,9 @@ def build_v2_result_application(
     ist (``forfeit``), kommt auf dem Sieger-Weg ebenfalls nicht weiter (ein Lauf mit zwei Fahrern und Quote zwei
     schickte ihn sonst weiter); der Verlierer-Weg (Doppel-K.-o., Spiel um Platz 3) bleibt ihm offen."""
     if match.get("status") in {"cancelled"}:
-        raise MatchV2ResultError("Abgebrochene Matches können kein Ergebnis erhalten")
+        raise MatchV2ResultError(CANCELLED_DETAIL)
     if match.get("status") in {"completed", "forfeit"} and not force:
-        raise MatchV2ResultError("Match ist bereits abgeschlossen. Für Korrektur force=true nutzen.", 409)
+        raise MatchV2ResultError(CORRECTION_FORCE_DETAIL, 409)
 
     results = normalize_v2_results(match, raw_results)
     eliminated = set(eliminated or ())
@@ -1459,7 +1469,8 @@ def build_v2_result_application(
     for advancement in match.get("advancement") or []:
         target = by_id.get(advancement.get("to_match_id")) or by_key.get(advancement.get("to_match_key"))
         if not target:
-            raise MatchV2ResultError(f"Zielmatch {advancement.get('to_match_key')} nicht gefunden")
+            raise MatchV2ResultError(f"Das Folgespiel {advancement.get('to_match_key')} gibt es im Turnierbaum nicht – "
+                                     "bitte den Baum prüfen.")
         result_rank = _advancement_result_rank(match, advancement)
         flow = advancement.get("flow")
         result = (winner_path if flow == "W" else loser_path).get(result_rank)
@@ -1469,11 +1480,11 @@ def build_v2_result_application(
         elif result and flow == "W" and result.get("forfeit"):
             skip_reason = "forfeit"
         if not result and not skip_reason and not _rank_can_be_missing_because_of_bye(match, result_rank, flow):
-            raise MatchV2ResultError(f"Rank {result_rank} fehlt für Advancement")
+            raise MatchV2ResultError(f"Platz {result_rank} fehlt im Ergebnis – er rückt ins nächste Spiel weiter.")
         if result and not skip_reason:
             if result["registration_id"] in advanced_registration_ids:
                 raise MatchV2ResultError(
-                    "Teilnehmer darf aus demselben Match nicht mehrfach weitergeleitet werden",
+                    "Ein Teilnehmer kann aus einem Spiel nur einmal weiterrücken.",
                     409,
                 )
             advanced_registration_ids.add(result["registration_id"])
@@ -1487,7 +1498,8 @@ def build_v2_result_application(
                 waiting_groups.append(waiting)
             continue
         if not target_slot:
-            raise MatchV2ResultError(f"Zielslot {advancement.get('to_slot')} in {target.get('match_key')} nicht gefunden")
+            raise MatchV2ResultError(f"Im Folgespiel {target.get('match_key')} fehlt Platz {advancement.get('to_slot')} – "
+                                     "bitte den Baum prüfen.")
         taken.add(id(target_slot))
         draw_id = (target_slot.get("source_result") or {}).get("draw_id")
         if skip_reason:
@@ -1495,7 +1507,7 @@ def build_v2_result_application(
             if existing_reg and existing_reg != result["registration_id"]:
                 if not force:
                     raise MatchV2ResultError(
-                        f"Zielslot {target.get('match_key')}:{target_slot.get('slot')} ist bereits belegt. Für Korrektur force=true nutzen.",
+                        target_taken_detail(target, target_slot),
                         409,
                     )
                 _ensure_no_pending_result(target)
@@ -1536,7 +1548,7 @@ def build_v2_result_application(
         if existing_reg and existing_reg != result["registration_id"]:
             if not force:
                 raise MatchV2ResultError(
-                    f"Zielslot {target.get('match_key')}:{target_slot.get('slot')} ist bereits belegt. Für Korrektur force=true nutzen.",
+                    target_taken_detail(target, target_slot),
                     409,
                 )
             _ensure_no_pending_result(target)

@@ -25,15 +25,16 @@ import { MentionText } from "@/components/tls/MentionText";
 import { ChatAttachButton, ChatAttachmentDrafts, ChatMessageAttachments, useChatAttachmentDrafts } from "@/components/tls/ChatAttachments";
 import { ChatMessageSticker, ChatStickerButton, ChatStickerPicker } from "@/components/tls/ChatStickers";
 import { formatWhen, getRegistrationState } from "@/lib/datetime";
+import { checkInState } from "@/lib/checkInTimes";
 import { tournamentIsOver } from "@/lib/afterEnd";
 import { renderMarkdownLite } from "@/lib/markdownLite";
 import { seoTextPreview } from "@/lib/textPreview";
-import { formatTeamMode, formatTournamentDisplay } from "@/lib/tournamentLabels";
+import { formatTeamMode, formatTournamentDisplay, hasBracketTree, runningMainView } from "@/lib/tournamentLabels";
 import { gameLabel } from "@/lib/gameLabels";
 import { formatCents, startFeeSummary } from "@/lib/pricing";
 import { TournamentTabs } from "@/components/tls/tournament/TournamentTabs";
 import { useLeagueTrail } from "@/hooks/useLeagueTrail";
-import { leagueCrumbs } from "@/lib/leagueTrail";
+import { tournamentCrumbs } from "@/lib/leagueTrail";
 import { TournamentTimeline, stepCountdown, timelineSteps } from "@/components/tls/tournament/TournamentTimeline";
 import { useCountdownDays } from "@/hooks/useCountdownDays";
 import { MyStandCard } from "@/components/tls/tournament/MyStandCard";
@@ -301,7 +302,11 @@ function TournamentDetailView() {
   const nextStep = timelineSteps(t).find((step) => step.next) || null;
   const finished = ["completed", "results_published", "archived"].includes(t.status);
   const subPage = (part) => `/tournaments/${t.slug || t.id}/${part}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`;
-  const checkinNow = !!myReg && canCheckIn && myReg.status === "approved" && t.status === "check_in";
+  // Check-in-Ende (#2124): dieselbe Regel wie „Dein Stand“, die App und der Server - danach kein Knopf mehr.
+  const checkIn = checkInState(t);
+  const checkinNow = !!myReg && canCheckIn && myReg.status === "approved" && checkIn.open;
+  // Vor Ort checkt die Turnierleitung ein (#2124, Review O4): bis zum Start bleibt dort „Check-in vor Ort“ stehen.
+  const checkinOver = !!myReg && myReg.status === "approved" && t.status === "check_in" && checkIn.over && !(staffOnlyCheckIn && !t.started);
   // Die eine Hauptaktion je Phase (#401).
   let primaryKey;
   let primaryAction = null;
@@ -318,10 +323,17 @@ function TournamentDetailView() {
   } else if (checkinNow) {
     primaryKey = "checkin";
     primaryAction = <button onClick={handleCheckin} disabled={loading} data-testid="tournament-checkin-btn" className={`${primaryClass} tls-btn tls-btn--primary`}>Check-in</button>;
+  } else if (checkinOver) {
+    primaryKey = "checkin_over";
+    primaryAction = <button type="button" disabled data-testid="tournament-checkin-over" className={`${primaryClass} tls-btn tls-btn--quiet cursor-not-allowed`}>Check-in vorbei</button>;
   } else if (staffOnlyCheckIn && myReg?.status === "approved" && t.status === "check_in") {
     primaryKey = "checkin_local";
     primaryAction = <button type="button" disabled data-testid="tournament-checkin-local" className={`${primaryClass} tls-btn tls-btn--quiet cursor-not-allowed`}>Check-in vor Ort</button>;
   } else if (finished) {
+    primaryKey = "standings";
+    primaryAction = <Link to={subPage("standings")} data-testid="tournament-standings-link" className={`${primaryClass} tls-btn tls-btn--primary`}>Rangliste</Link>;
+  } else if (t.started && runningMainView(t) === "standings") {
+    // Ohne Baum oder mit Tabelle zuerst (#2124): im laufenden Turnier ist die Rangliste die Hauptaktion.
     primaryKey = "standings";
     primaryAction = <Link to={subPage("standings")} data-testid="tournament-standings-link" className={`${primaryClass} tls-btn tls-btn--primary`}>Rangliste</Link>;
   } else if (t.started) {
@@ -356,7 +368,7 @@ function TournamentDetailView() {
           </div>
         )}
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
-          <Breadcrumbs items={leagueCrumbs(t, trail) || [{ label: "Home", to: "/" }, { label: "eSports", to: "/esports" }, { label: "Turniere", to: "/tournaments" }, { label: t.title }]} className="mb-4" />
+          <Breadcrumbs items={tournamentCrumbs(t, trail)} className="mb-4" />
           <div className="flex flex-wrap items-center gap-2 mb-4">
             <PhaseBadge phase={t.public_phase} status={t.status} size="lg" />
             <span className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8] border border-[#29B6E8]/30 rounded-sm px-2 py-1">{formatTournamentDisplay(t)}</span>
@@ -423,7 +435,7 @@ function TournamentDetailView() {
           <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3" data-testid="tournament-actions">
             {primaryAction}
             <div className="flex flex-wrap items-center gap-4 text-xs font-bold uppercase tracking-wider">
-              {primaryKey !== "bracket" && <Link to={subPage("bracket")} data-testid="tournament-bracket-link" className="tls-hit text-white/70 hover:text-[#29B6E8]">Turnierbaum</Link>}
+              {primaryKey !== "bracket" && hasBracketTree(t) && <Link to={subPage("bracket")} data-testid="tournament-bracket-link" className="tls-hit text-white/70 hover:text-[#29B6E8]">Turnierbaum</Link>}
               {primaryKey !== "schedule" && <Link to={subPage("matches")} data-testid="tournament-schedule-link" className="tls-hit text-white/70 hover:text-[#29B6E8]">Spielplan</Link>}
               {primaryKey !== "standings" && <Link to={subPage("standings")} data-testid="tournament-standings-link" className="tls-hit text-white/70 hover:text-[#29B6E8]">Rangliste</Link>}
               {t.stream_link && <a href={t.stream_link} target="_blank" rel="noreferrer" data-testid="tournament-stream-link" className="inline-flex items-center gap-1 text-[#FF3B30] hover:text-white"><Radio className="w-3.5 h-3.5" /> Stream</a>}

@@ -9,6 +9,8 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { TournamentTabs } from "@/components/tls/tournament/TournamentTabs";
 import { PrintLink } from "@/components/tls/print/PrintLink";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
+import { useLeagueTrail } from "@/hooks/useLeagueTrail";
+import { tournamentCrumbs } from "@/lib/leagueTrail";
 import { SkeletonCards, SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { LiveClock } from "@/components/tls/bracket/BracketCards";
 import { api } from "@/lib/api";
@@ -17,7 +19,7 @@ import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useChangedKeys } from "@/hooks/useLiveChanges";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { formatMatchStatus } from "@/lib/tournamentLabels";
+import { matchScheduleStatusText } from "@/lib/tournamentLabels";
 import { formatWhen } from "@/lib/datetime";
 import { seoTextPreview } from "@/lib/textPreview";
 import { viennaDate } from "@/lib/vienna";
@@ -146,6 +148,7 @@ export default function TournamentSchedulePage() {
   }, [currentWeek, filtered]);
 
   const tournament = data?.tournament || {};
+  const trail = useLeagueTrail(data?.tournament);
   const tournamentUrl = `/tournaments/${tournament.slug || tournament.id}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`;
   const seoDescription = seoTextPreview(tournament.description, "Spielplan des eSports Turniers mit Runden, Heats, Zeiten und Matchseiten.");
   useDocumentTitle(`${tournament.title || "Turnier"} Spielplan`, seoDescription, {
@@ -170,16 +173,8 @@ export default function TournamentSchedulePage() {
   return (
     <PublicLayout>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <Breadcrumbs
-          items={[
-            { label: "Home", to: "/" },
-            { label: "Turniere", to: "/tournaments" },
-            { label: tournament.title, to: tournamentUrl },
-            { label: "Spielplan" },
-          ]}
-          className="mb-3"
-        />
-        <Link to={tournamentUrl} className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← Zurück zum Turnier</Link>
+        {/* Eine Brotkrumen-Kette (#2124): kein zusätzliches „← Zurück“ - die Reiter darunter führen weiter. */}
+        <Breadcrumbs items={tournamentCrumbs(tournament, trail, { tournamentUrl, current: { label: "Spielplan" } })} className="mb-3" />
         <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="font-heading text-4xl md:text-6xl font-black uppercase">Spielplan</h1>
@@ -284,7 +279,7 @@ export default function TournamentSchedulePage() {
 /** Wie es steht - nur ein laufendes Spiel trägt die Live-Farbe, mit Spielzeit seit dem Start. */
 function StatusLabel({ entry, compact = false }) {
   const { match, tone } = entry;
-  const label = tone === "live" ? "Läuft" : formatMatchStatus(match.schedule_status || match.status);
+  const label = tone === "live" ? "Läuft" : matchScheduleStatusText(match);
   return (
     <span className="tls-sched-status" data-tone={tone} data-testid={`schedule-status-${match.id}`}>
       {tone === "live" && <span className="tls-sched-status__dot" aria-hidden="true" />}

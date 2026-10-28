@@ -20,7 +20,7 @@ import logging
 
 from models import now_utc
 from services.heat_no_show import marking_fields, record_marks
-from services.match_v2_results import MatchV2ResultError
+from services.match_v2_results import CANCELLED_DETAIL, MatchV2ResultError
 from services.v2_match_flows import no_show_keeps_heat_open, results_for_forfeit
 from services.v2_result_submission import submit_v2_result
 from services.walkover_incidents import record_walkover_incident  # noqa: F401 - umgezogen (#1420)
@@ -32,7 +32,7 @@ async def mark_heat_no_show(db, match: dict, registration_id: str, *, note: str,
     """Eine Person im Lauf als nicht erschienen markieren - der Lauf bleibt offen, niemand rückt weiter (#1823).
     Ein zweites Mal für dieselbe Person ändert nichts."""
     if str(match.get("status") or "") == "cancelled":
-        raise MatchV2ResultError("Abgebrochene Matches können kein Ergebnis erhalten")
+        raise MatchV2ResultError(CANCELLED_DETAIL)
     if registration_id in (match.get("no_show_registration_ids") or []):
         return {**match, "idempotent_replay": True}
     fields = marking_fields(match, {registration_id: note})

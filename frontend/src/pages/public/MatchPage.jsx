@@ -19,6 +19,7 @@ import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { CommendButton } from "@/components/tls/CommendButton";
 import { viennaDateTime } from "@/lib/vienna";
 import { formatWhen } from "@/lib/datetime";
+import { showLapTime } from "@/lib/laptime";
 import { finishedMatchText, formatMatchKind, formatMatchStatus, isByeSlot, isMatchFinished, matchHeadline, slotName, stationText } from "@/lib/tournamentLabels";
 import { matchIsOver } from "@/lib/afterEnd";
 import { rankingMode } from "@/lib/matchReport";
@@ -29,11 +30,12 @@ import { LeagueGamesView, LeagueLobbyIds, LineupAmendForm, StaffLineupAmend } fr
 import { LiveQueueStatus } from "@/components/tls/live/LiveQueueStatus";
 import { MatchCallBox } from "@/components/tls/tournament/MatchCallBox";
 import { ProblemReportForm } from "@/components/tls/results/ProblemReportForm";
+import { OwnDisputes } from "@/components/tls/results/OwnDisputes";
 import { ResultWindow } from "@/components/tls/results/ResultWindow";
 import { ResultUndoBar, useResultUndo } from "@/components/tls/results/ResultUndoBar";
 import { isOwnProposal, proposalStatusLabel, waitingForOtherSide } from "@/lib/scheduleProposals";
 import { useLeagueTrail } from "@/hooks/useLeagueTrail";
-import { leagueCrumbs } from "@/lib/leagueTrail";
+import { tournamentCrumbs } from "@/lib/leagueTrail";
 import { LeagueEmblem } from "@/components/tls/league/public/LeagueLook";
 
 const DECISION_TOASTS = {
@@ -59,13 +61,13 @@ const eventModeLabels = {
 const resultModeLabels = {
   staff_only: "Ergebnis durch Turnierleitung",
   player_confirmed: "Spieler bestätigen Ergebnis",
-  hybrid: "Spieler + Staff",
+  hybrid: "Spieler + Turnierleitung",
 };
 
 const scheduleModeLabels = {
   fixed_by_staff: "Termin durch Turnierleitung",
   player_proposal: "Terminabstimmung",
-  hybrid: "Terminabstimmung + Staff",
+  hybrid: "Terminabstimmung + Turnierleitung",
 };
 
 function formatDateTime(value) {
@@ -105,6 +107,19 @@ function fromLocalInput(value) {
   if (!value) return null;
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+// Terminvorschläge nur in der Zukunft (#2124): frühestens 5 Minuten ab jetzt - wie der Server
+// (services/schedule_proposal_time.py).
+const PROPOSAL_LEAD_MS = 5 * 60 * 1000;
+const PAST_PROPOSAL_TEXT = "Der Termin liegt in der Vergangenheit – bitte einen Zeitpunkt frühestens 5 Minuten ab jetzt wählen.";
+
+function earliestProposalInput(now = Date.now()) {
+  return toLocalInput(new Date(now + PROPOSAL_LEAD_MS).toISOString());
+}
+
+function tooEarly(iso, now = Date.now()) {
+  return new Date(iso).getTime() < now + PROPOSAL_LEAD_MS;
 }
 
 // Eigener Stand je Match und Konto (#1047): ein Wechsel des Matches oder ein echter Kontowechsel baut die Seite neu
@@ -195,6 +210,7 @@ function MatchPageView() {
     e.preventDefault();
     const scheduled_at = fromLocalInput(proposalAt);
     if (!scheduled_at) return failAction("Bitte Datum und Uhrzeit wählen.");
+    if (tooEarly(scheduled_at)) return failAction(PAST_PROPOSAL_TEXT);
     await runAction(async () => {
       await api.post(`/matches/${id}/schedule-proposals`, { scheduled_at, note: proposalNote || null });
       toast.success("Terminvorschlag gesendet.");
@@ -208,6 +224,7 @@ function MatchPageView() {
     if (action === "counter") {
       const scheduled_at = fromLocalInput(counterAt);
       if (!scheduled_at) return failAction("Bitte Datum und Uhrzeit für den Gegenvorschlag wählen.");
+      if (tooEarly(scheduled_at)) return failAction(PAST_PROPOSAL_TEXT);
       payload.scheduled_at = scheduled_at;
     }
     await runAction(async () => {
@@ -307,10 +324,13 @@ function MatchPageView() {
   const canDispute = Boolean(data.can_dispute);
   // Nur Turnierleitung (#1157): wer mitspielt, sieht statt eines Melde-Knopfs, wer das Ergebnis einträgt.
   const showStaffEnters = Boolean(data.acting_registration_id && !canPlayerReport && !canStaffSubmit && !finished && data.result_entry_mode === "staff_only" && !data.in_dispute);
+  // „Login zum Ergebnis melden“ (#2124, TP6) nur, wo Spieler selbst melden - nicht bei „Nur Turnierleitung“ oder vor Ort.
+  const guestsCouldReport = data.result_entry_mode !== "staff_only" && data.event_mode !== "local";
   const hasOtherResultActions = Boolean(canPlayerReport || canSubmitV2Result || showReportReadOnly);
   const hasResultActions = Boolean(hasOtherResultActions || canDispute);
   const reports = Array.isArray(match.reports) ? match.reports : [];
   const resultParticipants = isV2 ? participants : duelParticipants;
+  const isHeat = Boolean(isV2 && (resultParticipants.length > 2 || match.match_type === "ffa"));
   const showFixedScheduleNotice = data.schedule_mode === "fixed_by_staff" && !canProposeSchedule;
   const tournamentUrl = data.tournament ? `/tournaments/${data.tournament.slug || data.tournament.id}` : "/tournaments";
   const addStaffMention = () => {
@@ -327,15 +347,7 @@ function MatchPageView() {
   return (
     <PublicLayout>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
-        <Breadcrumbs
-          items={leagueCrumbs(data.tournament, trail, { tournamentUrl, current: { label: `Match ${match.match_key || match.id}` } }) || [
-            { label: "Home", to: "/" },
-            { label: "Turniere", to: "/tournaments" },
-            ...(data.tournament ? [{ label: data.tournament.title, to: tournamentUrl }] : []),
-            { label: `Match ${match.match_key || match.id}` },
-          ]}
-          className="mb-5"
-        />
+        <Breadcrumbs items={tournamentCrumbs(data.tournament, trail, { tournamentUrl, current: { label: `${formatMatchKind(match)} ${match.match_key || ""}`.trim() } })} className="mb-5" />
         {/* Kopf (#1220): Runde und Namen statt „Match A“ - der Schlüssel steht nur noch klein. Rechts der Zustand:
             vor dem Spiel der Termin, danach „Beendet“ mit dem Ergebnis. */}
         <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -400,7 +412,7 @@ function MatchPageView() {
               {/* Nach dem Ende (#1221) aktualisiert sich nichts mehr - der Hinweis fällt weg. */}
               {!over && (
                 <div className="inline-flex items-center gap-2 rounded-sm border border-[#29B6E8]/25 bg-[#29B6E8]/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[#29B6E8]" data-testid="match-live-refresh">
-                  <RefreshCw className="w-3.5 h-3.5" /> Live-Refresh
+                  <RefreshCw className="w-3.5 h-3.5" /> Live
                 </div>
               )}
             </div>
@@ -409,8 +421,19 @@ function MatchPageView() {
           {isBye && finished ? (
             <p className="mt-5 text-sm text-white/65" data-testid="match-bye-line">Ein Freilos wird nicht gespielt – es zählt als Sieg für {slotName(participants.find((participant) => participant.registration_id)?.display_name, {}, match)}.</p>
           ) : (
-          <div className={`mt-5 grid gap-3 items-stretch ${isV2 ? "sm:grid-cols-2 xl:grid-cols-4" : "md:grid-cols-[1fr_auto_1fr]"}`}>
-            {isV2 ? (
+          <div className={`mt-5 grid gap-3 items-stretch ${isV2 ? "sm:grid-cols-2 xl:grid-cols-4" : "md:grid-cols-[1fr_auto_1fr]"}`} data-testid="match-result-sides">
+            {isHeat ? (
+              // Lauf mit mehreren (#2124, TP1): der Platz groß, in Platzreihenfolge - Punkte oder Zeit klein darunter.
+              heatInPlaceOrder(resultParticipants, match).map((participant, index) => (
+                <HeatSide
+                  key={participant.registration_id || participant.slot || `result-${index}`}
+                  participant={participant}
+                  match={match}
+                  result={v2ResultForParticipant(match, participant)}
+                  mode={v2Mode}
+                />
+              ))
+            ) : isV2 ? (
               resultParticipants.map((participant, index) => (
                 <ResultSide
                   key={participant.registration_id || participant.slot || `result-${index}`}
@@ -455,13 +478,15 @@ function MatchPageView() {
 
           {data.in_dispute && (
             <p className="mt-5 rounded-sm border border-[#FF3B30]/40 bg-[#FF3B30]/10 px-4 py-3 text-sm text-[#FFD2CF]" data-testid="match-in-dispute">
-              <strong>In Klärung</strong> – zu diesem Spiel liegt ein Dispute vor. Die Turnierleitung prüft und entscheidet.
+              <strong>In Klärung</strong> – zu diesem Spiel wurde ein Problem gemeldet. Die Turnierleitung prüft und entscheidet.
               {/* Die Turnierleitung entscheidet in ihrer Ansicht (#1158) - mit Meldung, Foto und Ergebnis. */}
               {canStaffSubmit && data.tournament ? (
                 <Link to={`/tournaments/${data.tournament.slug || data.tournament.id}/leitung?fall=ds-${id}`} className="ml-2 font-bold text-white underline underline-offset-2" data-testid="match-dispute-decide">Streitfall entscheiden</Link>
               ) : null}
             </p>
           )}
+          {/* Deine Meldung – Entscheidung (#2124): was die Turnierleitung zur eigenen Meldung entschieden hat. */}
+          <OwnDisputes match={match} userId={user?.id} />
 
           {hasResultActions ? (
             <div className="mt-5 border-t border-white/10 pt-5 space-y-5">
@@ -506,8 +531,8 @@ function MatchPageView() {
               )}
 
             </div>
-          ) : !user && !isCompleted ? (
-            <Link to={`/login?next=/matches/${id}`} className="tls-btn tls-btn--secondary mt-5 inline-flex min-h-11 items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">
+          ) : !user && !isCompleted && guestsCouldReport ? (
+            <Link to={`/login?next=/matches/${id}`} data-testid="match-login-to-report" className="tls-btn tls-btn--secondary mt-5 inline-flex min-h-11 items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">
               Login zum Ergebnis melden
             </Link>
           ) : showStaffEnters ? null : (
@@ -520,27 +545,15 @@ function MatchPageView() {
             Teilnehmer und Turnierleitung zum Nachlesen, ein leerer Chat verschwindet. */}
         {/* Eine Spalte, die nie breiter als der Bildschirm wird (#1155): mit großer Schrift brechen Namen um. */}
         <div className={`mt-6 grid grid-cols-1 gap-6 ${showChat ? "lg:grid-cols-[minmax(0,1fr)_24rem]" : ""}`}>
+          {/* Die Teilnehmer stehen genau einmal - in den Ergebnis-Kacheln oben (#2124, TP7). */}
           <div className="space-y-6">
-            <div className="border border-white/10 bg-[#121212] rounded-sm p-5">
-              <h2 className="font-heading text-xl font-black uppercase">Teilnehmer</h2>
-              <div className="mt-4 grid md:grid-cols-2 gap-3">
-                {participants.map((p, index) => (
-                  <div key={p.registration_id || p.slot || `participant-${index}`} className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4">
-                    <div className="text-[10px] uppercase tracking-widest text-white/35">Slot {p.slot}</div>
-                    <div className="mt-1 font-heading text-lg font-bold uppercase">{slotName(p.display_name, p, match)}</div>
-                    {p.team && <div className="mt-1 text-xs text-[#29B6E8]">[{p.team.tag}] {p.team.name}</div>}
-                  </div>
-                ))}
-              </div>
-            </div>
-
             {!over && (
             <div className="border border-white/10 bg-[#121212] rounded-sm p-5" data-testid="match-scheduling">
               <h2 className="font-heading text-xl font-black uppercase flex items-center gap-2"><CalendarClock className="w-5 h-5 text-[#29B6E8]" /> Terminabstimmung</h2>
               {canProposeSchedule ? (
                 <form onSubmit={propose} className="mt-4 grid md:grid-cols-[1fr_1fr_auto] gap-3 items-end">
                   <Field label="Vorschlag">
-                    <input type="datetime-local" value={proposalAt} onChange={(e) => setProposalAt(e.target.value)} className="input" />
+                    <input type="datetime-local" min={earliestProposalInput()} value={proposalAt} onChange={(e) => setProposalAt(e.target.value)} className="input" data-testid="match-proposal-at" />
                   </Field>
                   <Field label="Notiz">
                     <input value={proposalNote} onChange={(e) => setProposalNote(e.target.value)} className="input" placeholder="z.B. nach 20:00 Uhr möglich" />
@@ -579,7 +592,7 @@ function MatchPageView() {
                     </div>
                     {answer && (
                       <div className="mt-3 grid md:grid-cols-[1fr_1fr_auto] gap-2 items-end">
-                        <input type="datetime-local" aria-label="Gegenvorschlag: Datum und Uhrzeit" value={counterAt} onChange={(e) => setCounterAt(e.target.value)} className="input" />
+                        <input type="datetime-local" min={earliestProposalInput()} aria-label="Gegenvorschlag: Datum und Uhrzeit" value={counterAt} onChange={(e) => setCounterAt(e.target.value)} className="input" />
                         <input aria-label="Antwort oder Grund" value={decisionNote} onChange={(e) => setDecisionNote(e.target.value)} className="input" placeholder="Antwort / Grund" />
                         <button type="button" disabled={busy} onClick={() => decide(p, "counter")} className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-[10px] uppercase tracking-wider font-bold disabled:opacity-50">Gegenvorschlag</button>
                       </div>
@@ -654,8 +667,7 @@ function Pill({ children }) {
 function ResultSide({ participant, match, score, isWinner }) {
   return (
     <div className={`border rounded-sm bg-[#0A0A0A] p-4 ${isWinner ? "border-[#29B6E8]/70 shadow-[0_0_18px_rgba(41,182,232,0.18)]" : "border-white/10"}`}>
-      <div className="text-[10px] uppercase tracking-widest text-white/35">Slot {participant?.slot || "-"}</div>
-      <div className="mt-1 font-heading text-lg font-bold uppercase truncate">{slotName(participant?.display_name, participant, match)}</div>
+      <div className="font-heading text-lg font-bold uppercase truncate">{slotName(participant?.display_name, participant, match)}</div>
       {participant?.team && <div className="mt-1 text-xs text-[#29B6E8] truncate">[{participant.team.tag}] {participant.team.name}</div>}
       <div className={`mt-3 font-display text-5xl font-bold ${isWinner ? "text-[#29B6E8]" : "text-white/75"}`}>{score ?? 0}</div>
     </div>
@@ -679,12 +691,42 @@ function v2ResultRank(match, participant) {
   return Number(v2ResultForParticipant(match, participant)?.rank || 0);
 }
 
+/** Ein Lauf in Platzreihenfolge (#2124, TP1): wer einen Platz hat, nach Platz - der Rest nach Startplatz dahinter. */
+function heatInPlaceOrder(participants = [], match = {}) {
+  const place = (participant) => v2ResultRank(match, participant) || Number.POSITIVE_INFINITY;
+  return [...participants].sort((left, right) => (place(left) - place(right)) || (Number(left?.slot || 0) - Number(right?.slot || 0)));
+}
+
+/** Was unter dem Platz steht: Punkte, Stand oder Zeit - oder warum es keinen Platz gab. */
+function heatResultDetail(result, mode) {
+  if (!result) return "";
+  if (result.forfeit) return "Nicht erschienen";
+  if (result.dnf) return "Aufgegeben";
+  if (mode === "time") return result.time_ms != null ? showLapTime(result.time_ms) : "";
+  if (result.points != null) return `${result.points} ${Number(result.points) === 1 ? "Punkt" : "Punkte"}`;
+  if (result.score != null) return `Stand ${result.score}`;
+  return "";
+}
+
+function HeatSide({ participant, match, result, mode }) {
+  const place = Number(result?.rank || 0);
+  const detail = heatResultDetail(result, mode);
+  return (
+    <div className={`border rounded-sm bg-[#0A0A0A] p-4 ${place === 1 ? "border-[#29B6E8]/70 shadow-[0_0_18px_rgba(41,182,232,0.18)]" : "border-white/10"}`} data-testid="match-heat-side" data-place={place || ""}>
+      <div className={`font-display text-4xl font-bold ${place === 1 ? "text-[#29B6E8]" : place ? "text-white/80" : "text-white/35"}`} data-testid="match-heat-place">{place ? `Platz ${place}` : "–"}</div>
+      <div className="mt-2 font-heading text-lg font-bold uppercase truncate">{slotName(participant?.display_name, participant, match)}</div>
+      {participant?.team && <div className="mt-1 text-xs text-[#29B6E8] truncate">[{participant.team.tag}] {participant.team.name}</div>}
+      <div className="mt-1 text-xs text-white/50" data-testid="match-heat-detail">{[detail, participant?.slot ? `Startplatz ${participant.slot}` : ""].filter(Boolean).join(" · ")}</div>
+    </div>
+  );
+}
+
 function v2ResultDisplay(match, participant, mode) {
   const result = v2ResultForParticipant(match, participant);
   if (!result) return "-";
   if (result.forfeit) return "Nicht erschienen";
   if (result.dnf) return "Aufgegeben";
-  if (mode === "time") return result.time_ms != null ? `${result.time_ms} ms` : "-";
+  if (mode === "time") return result.time_ms != null ? showLapTime(result.time_ms) : "-";
   const score = result.score ?? result.points;
   return score != null ? score : "-";
 }

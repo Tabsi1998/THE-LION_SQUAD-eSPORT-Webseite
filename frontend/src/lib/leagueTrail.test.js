@@ -1,4 +1,4 @@
-import { leagueCrumbs, leagueTrail, staffelLabel } from "./leagueTrail";
+import { leagueCrumbs, leagueTrail, staffelLabel, tournamentCrumbs } from "./leagueTrail";
 import { tournamentTabs } from "@/components/tls/tournament/TournamentTabs";
 
 // Liga-Weg einer Staffel (#2110, L-C2). Erfundene Namen.
@@ -39,4 +39,17 @@ test("tournamentTabs: der Reiter „Liga“ nur mit sichtbarer Season", () => {
   const tabs = tournamentTabs(STAFFEL, "", null, trail);
   expect(tabs.at(-1)).toMatchObject({ key: "league", label: "Liga", to: "/liga/probe-liga/season-1#staffel-liga-a" });
   expect(tournamentTabs(STAFFEL).map((tab) => tab.key)).not.toContain("league");
+});
+
+test("tournamentCrumbs (#2124): eine Kette für alle Turnierseiten - mit eSports, bei Staffeln der Liga-Weg", () => {
+  const cup = { id: "t9", slug: "cup", title: "Herbst-Cup" };
+  expect(tournamentCrumbs(cup, null).map((item) => [item.label, item.to])).toEqual([
+    ["Home", "/"], ["eSports", "/esports"], ["Turniere", "/tournaments"], ["Herbst-Cup", undefined],
+  ]);
+  expect(tournamentCrumbs(cup, null, { tournamentUrl: "/tournaments/cup", current: { label: "Spielplan" } }).map((item) => [item.label, item.to])).toEqual([
+    ["Home", "/"], ["eSports", "/esports"], ["Turniere", "/tournaments"], ["Herbst-Cup", "/tournaments/cup"], ["Spielplan", undefined],
+  ]);
+  const trail = leagueTrail(LEAGUES, STAFFEL);
+  expect(tournamentCrumbs(STAFFEL, trail, { tournamentUrl: "/tournaments/liga-a", current: { label: "Rangliste" } }).map((item) => item.label))
+    .toEqual(["Home", "Liga", "Probe-Liga Season 1", "Staffel A", "Rangliste"]);
 });

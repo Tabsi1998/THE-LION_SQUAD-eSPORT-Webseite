@@ -1,4 +1,4 @@
-import { checkInLine, effectiveCheckIn } from "./checkInTimes";
+import { checkInLine, checkInState, effectiveCheckIn } from "./checkInTimes";
 
 // Wirksame Check-in-Zeiten (#1938): was wirklich galt, auch bei Turnieren, deren Zeiten nach einem Check-in von Hand
 // nicht nachgezogen sind - nie „ab 10:56 bis 10:48“.
@@ -32,4 +32,12 @@ test("checkInLine: „ab … bis …“, nur „bis …“ oder nur „ab …“
   expect(checkInLine({ status: "live", check_in_from: at(6), check_in_until: "2026-10-21T08:48:00+00:00" }, NOW)).toBe("bis 21.10.2026, 10:48");
   expect(checkInLine({ status: "registration_open", check_in_from: "2026-10-21T09:00:00+00:00" }, NOW)).toBe("ab 21.10.2026, 11:00");
   expect(checkInLine({}, NOW)).toBe("");
+});
+
+test("checkInState (#2124): vorbei nach „Check-in endet“ oder dem Schließen - wie Server und App", () => {
+  const NOW = Date.parse("2026-10-21T09:00:00Z");
+  expect(checkInState({ status: "check_in", check_in_until: "2026-10-21T09:30:00Z" }, NOW)).toEqual({ open: true, over: false });
+  expect(checkInState({ status: "check_in", check_in_until: "2026-10-21T08:30:00Z" }, NOW)).toEqual({ open: false, over: true });
+  expect(checkInState({ status: "check_in", check_in_closed_at: "2026-10-21T08:50:00Z" }, NOW)).toEqual({ open: false, over: true });
+  expect(checkInState({ status: "registration_closed", check_in_until: "2026-10-21T09:30:00Z" }, NOW)).toEqual({ open: false, over: false });
 });

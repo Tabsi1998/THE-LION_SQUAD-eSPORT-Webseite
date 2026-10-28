@@ -93,11 +93,25 @@ async def _upsert_result_audit(
     )
 
 
-async def _close_disputes(db, match: dict, actor_id: str, now_iso: str) -> None:
+OUTCOME_KEYS = ("rank", "score", "points", "time_ms", "dnf", "forfeit")
+
+
+def same_outcome(before: list | None, after: list | None) -> bool:
+    """Dasselbe Ergebnis wie vorher - je Seite Platz, Stand, Punkte, Zeit und Wertung (#2124)."""
+    def key(rows):
+        return {row.get("registration_id"): tuple(row.get(name) or None for name in OUTCOME_KEYS)
+                for row in rows or [] if isinstance(row, dict)}
+    return bool(before) and key(before) == key(after)
+
+
+async def _close_disputes(db, match: dict, actor_id: str, now_iso: str, decision: str = "change") -> None:
     """Die Turnierleitung hat ein Ergebnis zu einem Spiel in Klärung eingetragen - damit ist der Dispute entschieden
-    (#1134). Jeder offene Dispute bekommt „entschieden am/von“, das Spiel ebenso."""
+    (#1134). Jeder offene Dispute bekommt „entschieden am/von“, das Spiel ebenso - und die Entscheidung „change“
+    (Ergebnis geändert) bzw. „keep“, wenn dasselbe Ergebnis noch einmal eingetragen wurde - die meldende Seite sieht
+    sie auf der Matchseite (#2124)."""
     disputes = [
-        {**row, "resolved_at": row.get("resolved_at") or now_iso, "resolved_by": row.get("resolved_by") or actor_id}
+        {**row, "resolved_at": row.get("resolved_at") or now_iso, "resolved_by": row.get("resolved_by") or actor_id,
+         **({} if row.get("resolved_at") else {"decision": decision})}
         for row in match.get("disputes") or [] if isinstance(row, dict)
     ]
     await db.matches_v2.update_one({"id": match["id"]}, {"$set": {
@@ -362,7 +376,9 @@ async def submit_v2_result(
         await record_draws(db, application["draws"], actor_id=actor_id, tournament_id=match.get("tournament_id"))
     dispute_resolved = match.get("status") == "disputed"
     if dispute_resolved:
-        await _close_disputes(db, match, actor_id, now_iso)
+        unchanged = same_outcome(match.get("results"), application["results"]) and (
+            games is None or games == (match.get("games") or []))
+        await _close_disputes(db, match, actor_id, now_iso, decision="keep" if unchanged else "change")
     updated = await db.matches_v2.find_one({"id": match["id"]}, {"_id": 0})
     await _finish_result_side_effects(db, updated, force, dispute_resolved=dispute_resolved)
     if reset_docs:

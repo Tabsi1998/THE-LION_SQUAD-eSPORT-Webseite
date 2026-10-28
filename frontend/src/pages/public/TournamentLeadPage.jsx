@@ -4,6 +4,8 @@ import { AlertTriangle, ClipboardCheck, Clock, MonitorPlay, Radio, Shuffle } fro
 import { toast } from "sonner";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
+import { useLeagueTrail } from "@/hooks/useLeagueTrail";
+import { tournamentCrumbs } from "@/lib/leagueTrail";
 import { api, formatApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
@@ -35,6 +37,7 @@ export default function TournamentLeadPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const [data, setData] = useState(null);
+  const trail = useLeagueTrail(data?.tournament);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState("all");
   const [openId, setOpenId] = useState(searchParams.get("spiel") || "");
@@ -208,7 +211,7 @@ export default function TournamentLeadPage() {
   return (
     <PublicLayout>
       <section className="max-w-3xl mx-auto px-4 sm:px-6 py-8 pb-28" data-testid="lead-page">
-        <Breadcrumbs items={[{ label: "Turniere", to: "/tournaments" }, { label: data?.tournament?.title || "Turnier", to: tournamentUrl }, { label: "Turnierleitung" }]} className="mb-4" />
+        <Breadcrumbs items={tournamentCrumbs(data?.tournament, trail, { tournamentUrl, current: { label: "Turnierleitung" } })} className="mb-4" />
         <div className="text-[11px] uppercase tracking-[0.3em] text-[#FFD700] font-bold">Turnierleitung</div>
         <h1 className="mt-1 font-heading text-2xl md:text-4xl font-black uppercase [overflow-wrap:anywhere]">{data?.tournament?.title || "…"}</h1>
 

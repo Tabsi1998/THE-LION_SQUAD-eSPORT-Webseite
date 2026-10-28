@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { BYE_LABEL, OPEN_SLOT_LABEL, finishedMatchText, formatBracketSection, isByeSlot, matchHeadline, matchRoundLabel, slotName, stationText } from "./tournamentLabels";
+import { BYE_LABEL, OPEN_SLOT_LABEL, finishedMatchText, formatBracketSection, isByeSlot, matchHeadline, hasBracketTree, matchRoundLabel, matchScheduleStatusText, runningMainView, slotName, stationText } from "./tournamentLabels";
 import TVG from "../../e2e/fixtures/tvGenerated.json";
 
 describe("formatBracketSection", () => {
@@ -105,4 +105,21 @@ describe("matchRoundLabel (#1564)", () => {
     expect(matchRoundLabel({ round: 3 })).toBe("Runde 3");
     expect(matchRoundLabel(null)).toBe("Runde");
   });
+});
+
+test("Status-Marke (#2124): Spielstand zuerst, der Terminstatus nur vor dem Spiel und auf Deutsch", () => {
+  expect(matchScheduleStatusText({ status: "completed", schedule_status: "accepted" })).toBe("Beendet");
+  expect(matchScheduleStatusText({ status: "disputed", schedule_status: "accepted" })).toBe("In Klärung");
+  expect(matchScheduleStatusText({ status: "scheduled", schedule_status: "accepted" })).toBe("Termin bestätigt");
+  expect(matchScheduleStatusText({ status: "ready", schedule_status: "proposed" })).toBe("Terminvorschlag offen");
+  expect(matchScheduleStatusText({ status: "ready" })).toBe("Bereit");
+  expect(matchScheduleStatusText({ status: "pending", schedule_status: "escalated" })).toBe("Turnierleitung nötig");
+});
+test("hasBracketTree/runningMainView (#2124): das Feld des Servers zuerst, das Format als Rückfall", () => {
+  expect(hasBracketTree({ format: "round_robin" })).toBe(false);
+  expect(hasBracketTree({ format: "round_robin", has_bracket_tree: true })).toBe(true);
+  expect(hasBracketTree({ format: "double_elim" })).toBe(true);
+  expect(runningMainView({ format: "round_robin", has_bracket_tree: true })).toBe("standings");
+  expect(runningMainView({ format: "double_elim", has_bracket_tree: false })).toBe("standings");
+  expect(runningMainView({ format: "double_elim" })).toBe("bracket");
 });
