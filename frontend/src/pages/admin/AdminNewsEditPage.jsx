@@ -455,9 +455,9 @@ export function PublishChoice({ mode, initialMode, onChange }) {
         return (
           <label key={key} className={`flex items-start gap-3 rounded-sm border px-3 py-2.5 cursor-pointer transition-colors duration-150 ${active ? "border-[#29B6E8]/60 bg-[#29B6E8]/[0.07]" : "border-white/10 hover:border-white/25"}`}>
             <input type="radio" name="news-publish-mode" value={key} checked={active} onChange={() => onChange(key)} className="mt-1 accent-[#29B6E8]" data-testid={`news-publish-${key}`} />
-            <span className="min-w-0">
-              <span className="block text-sm font-semibold text-white">{label}</span>
-              <span className="block text-xs text-white/50">{hint}</span>
+            <span className="min-w-0 block text-sm font-semibold text-white">
+              {label}
+              <span className="block text-xs font-normal text-white/50">{hint}</span>
             </span>
           </label>
         );
