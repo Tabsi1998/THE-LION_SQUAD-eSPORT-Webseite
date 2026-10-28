@@ -107,4 +107,37 @@ test("Zeitfahren: das Format bleibt wählbar, mit Hinweis auf Fast Lap und Serie
   expect(screen.getByTestId("tr-edit-format-hint")).toHaveTextContent("keine Spiele");
   expect(screen.getByRole("link", { name: "Fast Lap" })).toHaveAttribute("href", "/admin/f1");
   expect(screen.getByRole("link", { name: "Serien" })).toHaveAttribute("href", "/admin/reference-series");
+  // Ohne Spiele kein Best of, keine Matchdauer und kein „Struktur anwenden“ (TA4).
+  expect(screen.queryByTestId("tr-edit-bo")).toBeNull();
+  expect(screen.queryByTestId("tr-edit-duration")).toBeNull();
+  expect(screen.queryByTestId("tr-edit-save-rebuild")).toBeNull();
+});
+
+// Nur, was wirkt (#2111, TA4): Mindestpause nur, wo der Stationsplaner plant; in Läufen heißt „Best of“ „Runden je Lauf“;
+// beim Schweizer System gibt es keinen Turnierbaum zum Vorausbauen.
+test("Mindestpause nur vor Ort und hybrid, Runden je Lauf bei Mehrspieler, kein Struktur-Knopf beim Schweizer System", async () => {
+  const { unmount } = render(<TournamentEditForm tournament={{ ...BASE, status: "draft", event_mode: "online" }} onSaved={() => {}} />);
+  await screen.findByTestId("tr-edit-title");
+  expect(screen.queryByTestId("tr-edit-break")).toBeNull();
+  expect(screen.getByTestId("tr-edit-save-rebuild")).toBeInTheDocument();
+  unmount();
+  const second = render(<TournamentEditForm tournament={{ ...BASE, status: "draft", event_mode: "local", format: "ffa" }} onSaved={() => {}} />);
+  expect(await screen.findByTestId("tr-edit-break")).toBeInTheDocument();
+  expect(screen.getByTestId("tr-edit-bo").closest("label")).toHaveTextContent("Runden je Lauf");
+  second.unmount();
+  render(<TournamentEditForm tournament={{ ...BASE, status: "draft", format: "swiss" }} onSaved={() => {}} />);
+  await screen.findByTestId("tr-edit-title");
+  expect(screen.queryByTestId("tr-edit-save-rebuild")).toBeNull();
+  expect(screen.getByTestId("tr-edit-bo").closest("label")).toHaveTextContent(/^Best of/);
+});
+
+// Automatisch live (#2111, W4): vor Ort startet die Turnierleitung selbst - der Schalter steht dort nur, solange er an ist.
+test("Automatisch live/beendet: vor Ort nur, solange es an ist", async () => {
+  const { unmount } = render(<TournamentEditForm tournament={{ ...BASE, event_mode: "local" }} onSaved={() => {}} />);
+  await screen.findByTestId("tr-edit-title");
+  expect(screen.queryByTestId("tr-edit-auto-start")).toBeNull();
+  unmount();
+  render(<TournamentEditForm tournament={{ ...BASE, event_mode: "local", auto_start_enabled: true }} onSaved={() => {}} />);
+  expect(await screen.findByTestId("tr-edit-auto-start")).toBeChecked();
+  expect(screen.getByTestId("tr-edit-auto-start").closest("label")).toHaveTextContent("besser ausschalten");
 });

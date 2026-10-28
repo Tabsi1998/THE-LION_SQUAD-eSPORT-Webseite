@@ -859,10 +859,22 @@ test("eine Liga-Staffel zeigt keine Vor-Ort-Anmeldung und startet mit „Liga st
   expect(screen.queryByTestId("onsite-access-panel")).toBeNull();
 });
 
-test("ein gewöhnliches Turnier fragt die Vor-Ort-Anmeldung weiter ab", async () => {
+// Die Vor-Ort-Anmeldung per QR gibt es nur vor Ort und hybrid (#2111, TA4) - ein Online-Turnier fragt sie nicht ab.
+test("ein Turnier vor Ort fragt die Vor-Ort-Anmeldung weiter ab, ein Online-Turnier nicht", async () => {
+  const onsiteCalls = () => apiMock.get.mock.calls.map(([url]) => String(url)).filter((url) => url.includes("/onsite-access"));
   renderPage();
   await screen.findByRole("heading", { name: "Winter Cup 2026" });
-  await waitFor(() => expect(apiMock.get.mock.calls.map(([url]) => String(url)).some((url) => url.includes("/onsite-access"))).toBe(true));
+  expect(onsiteCalls()).toEqual([]);
+  cleanup();
+  apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path.includes("/onsite-access")) return Promise.resolve({ data: {} });
+    if (path.match(/\/tournaments\/t-1(\?|$)/)) return Promise.resolve({ data: { ...TOURNAMENT, event_mode: "hybrid" } });
+    return Promise.resolve(routeFor(path));
+  });
+  renderPage();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  await waitFor(() => expect(onsiteCalls().length).toBeGreaterThan(0));
 });
 
 // Liga-Staffel in der Turnierverwaltung (#2109): nur, was die Liga braucht.

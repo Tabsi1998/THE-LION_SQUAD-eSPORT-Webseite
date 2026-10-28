@@ -9,7 +9,7 @@ import { EventMembershipLine } from "@/pages/admin/event/EventProgramPanel";
 import { CheckField, FieldLabel, SelectField, TextField } from "@/components/tls/FormFields";
 import { FormatHint } from "./tournament/FormatHint";
 import { prizeGroupOptions } from "./tournament/PrizeEditor";
-import { MATCHDAY_DRAW_HINT, matchdayDrawMode, matchdayDrawOn, tournamentFieldRules } from "@/lib/tournamentFormFields";
+import { BEST_OF_RUNS_HINT, MATCHDAY_DRAW_HINT, matchdayDrawMode, matchdayDrawOn, tournamentFieldRules } from "@/lib/tournamentFormFields";
 import { ADVANCEMENT_MODE_OPTIONS, DRAW_SHOW_MINUTES_DEFAULT, DRAW_SHOW_MINUTES_HINT, GRAND_FINAL_FORMATS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, HEAT_REBUILD_FORMATS, HEAT_REBUILD_HINT, HEAT_REBUILD_OPTIONS, advancementModeHint, drawShowMinutesPayload } from "./tournament/shared";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
@@ -146,6 +146,7 @@ export default function AdminTournamentNewPage() {
       if (!payload.schedule_mode) payload.schedule_mode = null;
       if (!BRONZE_FORMATS.has(payload.format)) payload.bronze_match = false;
       if (!event) payload.requires_event_registration = false;
+      if (payload.event_mode === "local") payload.auto_start_enabled = false;
       // Show-Auslosung (#1590): leer heißt Vorgabe; die Minuten zählen nur in diesem Modus.
       payload.draw_show_minutes = payload.advancement_mode === "draw_show" ? drawShowMinutesPayload(payload.draw_show_minutes) : null;
       normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "check_in_from", "check_in_until", "start_date", "end_date"]);
@@ -276,7 +277,8 @@ export default function AdminTournamentNewPage() {
             <CheckField label="Öffentliche Anmeldung grundsätzlich erlauben" checked={form.registration_enabled} onChange={(v) => set("registration_enabled", v)} testId="new-tr-reg-enabled" />
             <CheckField label="Automatisches Turnier-Hinweisbanner für dieses Turnier anzeigen" checked={form.site_banner_enabled} onChange={(v) => set("site_banner_enabled", v)} testId="new-tr-site-banner" accent="#FFD700" />
             <CheckField label="Ohne Discord" hint="Keine Meldung, kein Thread, kein Bracket und kein Termin im Discord – etwa für Probe- oder interne Turniere." checked={form.discord_skip} onChange={(v) => set("discord_skip", v)} testId="new-tr-discord-skip" accent="#5865F2" />
-            <CheckField label="Turnier anhand Start-/Endzeit automatisch live/beendet schalten. Für Vor-Ort-Turniere ausgeschaltet lassen." checked={form.auto_start_enabled} onChange={(v) => set("auto_start_enabled", v)} testId="new-tr-auto-start" className="md:col-span-2" />
+            {/* Vor Ort startet die Turnierleitung selbst (#2111, W4) - der Schalter fehlt dort und geht aus. */}
+            {form.event_mode !== "local" && <CheckField label="Turnier anhand Start-/Endzeit automatisch live/beendet schalten" checked={form.auto_start_enabled} onChange={(v) => set("auto_start_enabled", v)} testId="new-tr-auto-start" className="md:col-span-2" />}
           </FormGrid>
         </FormSection>
 
@@ -295,7 +297,8 @@ export default function AdminTournamentNewPage() {
 
         <FormSection title="Spieloptionen" collapsible>
           <FormGrid>
-            <TextField label="Best of" type="number" value={form.best_of} onChange={(v) => set("best_of", Number(v))} testId="new-tr-bestof" />
+            {/* Ohne Spiele kein Best of; in Läufen heißt es „Runden je Lauf“ (#2111, TA4). */}
+            {rules.bestOf && <TextField label={rules.bestOfIsRuns ? "Runden je Lauf" : "Best of"} type="number" min="1" value={form.best_of} onChange={(v) => set("best_of", Number(v))} hint={rules.bestOfIsRuns ? BEST_OF_RUNS_HINT : undefined} testId="new-tr-bestof" />}
             <SelectField label="Seeding" value={form.seeding_mode} onChange={(v) => set("seeding_mode", v)} options={[["random", "Zufall"], ["manual", "Manuell"], ["ranking", "Ranking"]]} testId="new-tr-seeding" />
           </FormGrid>
           {/* Weiterkommen in vier Modi (#1548, #1590): fester Baum, Auslosung nach der Runde, Show, sofort zufällig - nur,

@@ -166,6 +166,20 @@ test("die Adresse folgt dem getippten Titel, bis sie selbst geändert wird", asy
   expect(slug).toHaveValue("mein-cup-");
 });
 
+// Automatisch live (#2111, W4): vor Ort startet die Turnierleitung selbst - der Schalter fehlt und geht aus.
+test("vor Ort kein Schalter „automatisch live/beendet“, mitgeschickt wird aus", async () => {
+  apiMock.get.mockImplementation(async (url) => (url === "/games" ? { data: [{ id: "g1", name: "Mario Kart 8" }] } : { data: [] }));
+  apiMock.post.mockResolvedValue({ data: { id: "t-new" } });
+  renderAt("");
+  fireEvent.click(await screen.findByTestId("new-tr-auto-start"));
+  fireEvent.change(screen.getByTestId("new-tr-event-mode"), { target: { value: "local" } });
+  expect(screen.queryByTestId("new-tr-auto-start")).toBeNull();
+  fireEvent.change(screen.getByTestId("new-tr-title"), { target: { value: "Hallen-Cup" } });
+  fireEvent.change(await screen.findByTestId("new-tr-game"), { target: { value: "g1" } });
+  fireEvent.submit(screen.getByTestId("new-tr-form"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments", expect.objectContaining({ event_mode: "local", auto_start_enabled: false })));
+});
+
 // Preisgruppen (#2111, T5): Siegerrunde und Verliererrunde nur beim Doppel-K.-o.
 test("Siegerrunde und Verliererrunde nur beim Doppel-K.-o.", async () => {
   renderAt("");

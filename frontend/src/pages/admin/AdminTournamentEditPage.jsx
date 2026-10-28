@@ -630,8 +630,9 @@ export default function AdminTournamentEditPage() {
         </div>
       </div>
 
-      {/* Liga-Staffeln (#2096) haben keine Vor-Ort-Anmeldung - die Co-Teams teilt die Turnierleitung zu. */}
-      {isTournamentLead && !t.league_context && <div className="mb-5"><OnsiteAccessPanel tournamentId={t.id} /></div>}
+      {/* Liga-Staffeln (#2096) haben keine Vor-Ort-Anmeldung - die Co-Teams teilt die Turnierleitung zu. Online-Turniere
+          auch nicht (#2111, TA4): der QR-Code gilt für die Halle. */}
+      {isTournamentLead && !t.league_context && ONSITE_EVENT_MODES.has(t.event_mode) && <div className="mb-5"><OnsiteAccessPanel tournamentId={t.id} /></div>}
       {/* Staffel (S21): Zugangslinks nur zum Ansehen - angemeldet wird nicht, Co-Teams werden zugeteilt. */}
       {isTournamentLead && <div className="mb-5"><AccessLinksPanel targetType="tournament" targetId={t.id} allowRegister={!staffel} collapsible /></div>}
 
@@ -892,7 +893,8 @@ export default function AdminTournamentEditPage() {
 
 // Status je Anmeldung. Im festen Baum (#2120, TA13) nehmen Ausstehend, Abgelehnt und Warteliste die Person aus Spielen,
 // die sie behalten - das geht über „Nicht erschienen“, „Austritt eintragen“ oder „Disqualifizieren“.
-const REGISTRATION_ROW_STATUSES = ["pending", "approved", "rejected", "waitlist", "checked_in", "no_show"];
+const ONSITE_EVENT_MODES = new Set(["local", "hybrid"]);
+const REGISTRATION_ROW_STATUSES =["pending", "approved", "rejected", "waitlist", "checked_in", "no_show"];
 const LEAVES_BRACKET = new Set(["pending", "rejected", "waitlist"]);
 // Austritt und Disqualifikation (#1553) setzt nur der Umbauplan - die Auswahl zeigt sie trotzdem als aktuellen Stand
 // (#2111, TA14; vorher stand dort „Ausstehend“). Zurück geht es wie beim Nachrücken auf einen freien Platz; steht die

@@ -25,7 +25,7 @@ import { deadlineFormValues, deadlinePayload } from "@/lib/tournamentDeadlines";
 import { ADVANCEMENT_MODE_OPTIONS, BRONZE_FORMATS, DRAW_SHOW_MINUTES_DEFAULT, DRAW_SHOW_MINUTES_HINT, advancementModeHint, drawShowMinutesPayload, CUSTOM_BRACKET_FORMATS, EVENT_MODE_OPTIONS, GRAND_FINAL_FORMATS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, HEAT_REBUILD_FORMATS, HEAT_REBUILD_HINT, HEAT_REBUILD_OPTIONS, RESULT_ENTRY_MODE_OPTIONS, SCHEDULE_MODE_OPTIONS, SEEDING_OPTIONS, STREAM_PLATFORM_OPTIONS, TEAM_MODE_OPTIONS, TOURNAMENT_SEASON_WEIGHT_OPTIONS, VISIBILITY_OPTIONS, WEEKDAY_OPTIONS, advancementModeOf } from "./shared";
 import { StaffelSeasonValues, isStaffel, staffelBeforeStart } from "./StaffelParts";
 import { FormatHint } from "./FormatHint";
-import { MATCHDAY_DRAW_HINT, NO_MATCH_FORMATS, matchdayDrawMode, matchdayDrawOn, tournamentFieldRules } from "@/lib/tournamentFormFields";
+import { BEST_OF_RUNS_HINT, MATCHDAY_DRAW_HINT, NO_MATCH_FORMATS, matchdayDrawMode, matchdayDrawOn, tournamentFieldRules } from "@/lib/tournamentFormFields";
 
 // „Gewinne erzeugen“ erst ab dem Ende (#2123, TA23) - wie der Server (services/tournament_guard.py FINISHED_STATUSES).
 const PRIZE_READY_STATUSES = new Set(["completed", "results_published", "archived"]);
@@ -379,7 +379,8 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
             <CheckField label="Anmeldung über Discord erlauben" hint="Mit verknüpftem Konto über /anmelden oder den Knopf „Anmelden“ – privat, mit denselben Regeln; Teams meldet der Kapitän an." checked={f.discord_registration} onChange={(v)=>set("discord_registration",v)} accent="#5865F2" testId="tr-edit-discord-registration" />
             <CheckField label="Nur Einladung/manuelle Teilnehmer" checked={f.is_invite_only} onChange={(v)=>set("is_invite_only",v)} />
             <CheckField label="Automatisches Turnier-Hinweisbanner anzeigen" checked={f.site_banner_enabled} onChange={(v)=>set("site_banner_enabled",v)} accent="#FFD700" />
-            <CheckField label="Start-/Endzeit darf Turnier automatisch live/beendet schalten" checked={f.auto_start_enabled} onChange={(v)=>set("auto_start_enabled",v)} testId="tr-edit-auto-start" />
+            {/* Vor Ort startet die Turnierleitung selbst (#2111, W4): der Schalter steht dort nur noch, solange er an ist. */}
+            {(f.event_mode !== "local" || f.auto_start_enabled) && <CheckField label="Start-/Endzeit darf Turnier automatisch live/beendet schalten" hint={f.event_mode === "local" ? "Vor Ort startet die Turnierleitung selbst – besser ausschalten." : undefined} checked={f.auto_start_enabled} onChange={(v)=>set("auto_start_enabled",v)} testId="tr-edit-auto-start" />}
             <CheckField label="Vereinsmitglieder von der Selbstanmeldung ausschließen, z.B. wenn wir das Turnier für externe Teilnehmer veranstalten" checked={f.block_club_member_registration} onChange={(v)=>set("block_club_member_registration",v)} accent="#FFD700" />
             {/* Turnier nur mit Event-Anmeldung (#875): nur sinnvoll, wenn das Turnier zu einem Event gehört. */}
             {f.event_id && <CheckField label="Anmeldung nur mit Event-Anmeldung – wer nicht beim Event angemeldet ist, kann sich nicht anmelden (Teams: so viele Spieler wie die Teamgröße)" checked={f.requires_event_registration} onChange={(v)=>set("requires_event_registration",v)} accent="#29B6E8" testId="tr-edit-event-gate" />}
@@ -465,12 +466,15 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
                   options={[["", `Erster Modus (${modes[0].label || "ohne Namen"})`], ...modes.map((mode) => [mode.mode, `${mode.label || mode.mode}${mode.minutes ? ` · ${mode.minutes} Min.${mode.per_game ? " je Spiel" : ""}` : ""}`])]}
                   hint="Bestimmt die Dauer, wenn unten keine eigene steht." />
               )}
-              {show && <TextField label="Best of" type="number" min="1" value={f.best_of} onChange={(v)=>set("best_of",v)} testId="tr-edit-bo"
-                hint={presets.bestOf ? <span data-testid="tr-edit-bo-source">vom Spiel: Best of {presets.bestOf}</span> : null}/>}
-              <TextField label="Matchdauer Min." type="number" min="1" value={f.match_duration_minutes} onChange={(v)=>set("match_duration_minutes",v)} testId="tr-edit-duration"
+              {/* Ohne Spiele kein Best of und keine Dauer (#2111, TA4); in Läufen heißt es „Runden je Lauf“ und zählt nur für
+                  die geplante Dauer. */}
+              {show && rules.bestOf && <TextField label={rules.bestOfIsRuns ? "Runden je Lauf" : "Best of"} type="number" min="1" value={f.best_of} onChange={(v)=>set("best_of",v)} testId="tr-edit-bo"
+                hint={presets.bestOf ? <span data-testid="tr-edit-bo-source">vom Spiel: Best of {presets.bestOf}</span> : rules.bestOfIsRuns ? BEST_OF_RUNS_HINT : null}/>}
+              {rules.bestOf && <TextField label="Matchdauer Min." type="number" min="1" value={f.match_duration_minutes} onChange={(v)=>set("match_duration_minutes",v)} testId="tr-edit-duration"
                 placeholder={String(inherited.minutes)}
-                hint={<span data-testid="tr-edit-duration-source">{f.match_duration_minutes === "" ? durationSourceText(inherited) : `Leer lassen: ${durationSourceText(inherited)}`}</span>}/>
-              <TextField label="Mindestpause Min." type="number" min="0" max="240" value={f.match_break_minutes} onChange={(v)=>set("match_break_minutes",v)} hint="So lange hat ein Spieler zwischen zwei Spielen mindestens frei; der Planer hält das ein." testId="tr-edit-break"/>
+                hint={<span data-testid="tr-edit-duration-source">{f.match_duration_minutes === "" ? durationSourceText(inherited) : `Leer lassen: ${durationSourceText(inherited)}`}</span>}/>}
+              {/* Die Mindestpause hält nur der Stationsplaner ein - vor Ort und hybrid (#2111, TA4). */}
+              {rules.matchBreak && <TextField label="Mindestpause Min." type="number" min="0" max="240" value={f.match_break_minutes} onChange={(v)=>set("match_break_minutes",v)} hint="So lange hat ein Spieler zwischen zwei Spielen mindestens frei; der Stationsplaner hält das ein." testId="tr-edit-break"/>}
               {/* Staffeln zählen nie für die Jahreswertung (docs/LIGA.md, Abschnitt 7). */}
               {show && <SeasonWeightField value={f.season_weight} onChange={(v)=>set("season_weight",v)} />}
             </FormGrid>
@@ -592,11 +596,13 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
         ) : structureFixed ? (
           // Der Baum steht (#2120, TA17): „Struktur anwenden“ ersetzte hier alle echten Spiele samt Ergebnissen.
           <span className="text-xs text-white/50 self-center" data-testid="tr-edit-structure-fixed">{FIXED_FIELD_HINT}</span>
-        ) : (
+        ) : rules.structureRebuild ? (
+          // Ohne Turnierbaum zum Vorausbauen (Schweizer System, Zeitfahren, Rennserie) endete der Knopf mit einem Fehler
+          // (#2111, TA4).
           <button onClick={() => save({ rebuildPreview: true })} type="button" data-testid="tr-edit-save-rebuild" className="px-5 py-2.5 border border-[#FFD700]/50 text-[#FFD700] text-xs font-bold uppercase tracking-wider rounded-sm hover:bg-[#FFD700]/10">
             Speichern & Struktur anwenden
           </button>
-        )}
+        ) : null}
       </FormActions>
     </div>
   );

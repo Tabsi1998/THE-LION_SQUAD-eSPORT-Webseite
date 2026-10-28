@@ -46,6 +46,8 @@ export function tournamentFieldRules(form = {}) {
   };
 }
 
+export const BEST_OF_RUNS_HINT = "So viele Runden spielt ein Lauf – zählt für die geplante Dauer, wenn der Spielmodus je Runde rechnet.";
+
 export const MATCHDAY_DRAW_HINT = "An: Reihenfolge der Spieltage und Heimrecht werden ausgelost, sobald der Spielplan feststeht – neu auslosen geht, solange kein Spiel begonnen hat. Aus: feste Reihenfolge nach der Setzliste.";
 
 /** Der Schalter „Spieltage auslosen“: an heißt gemischt (Auslosung nach der Runde), aus heißt fester Plan. */
