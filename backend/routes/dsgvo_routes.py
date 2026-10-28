@@ -392,10 +392,24 @@ async def export_my_data(me: dict = Depends(get_current_user)):
     return StreamingResponse(_stream(sections), media_type="application/json")
 
 
+@dsgvo_router.get("/anonymize-me/check")
+async def anonymize_me_check(me: dict = Depends(get_current_user)):
+    """Was das eigene Löschen aufhält (#2113, L-C5): Rollen in Teams und Co-Teams, je mit dem Weg - die Seite zeigt sie
+    vor der Rückfrage. Leer heißt: Löschen geht."""
+    from services import erasure_blockers
+    rows = await erasure_blockers.team_roles(get_db(), me["id"])
+    return {"can_erase": not rows, "blockers": rows, "message": erasure_blockers.message(rows)}
+
+
 @dsgvo_router.post("/anonymize-me")
 async def anonymize_me(me: dict = Depends(get_current_user)):
     """Anonymize own account but keep tournament history for statistical integrity."""
     db = get_db()
+    # Erst die Rollen in Teams abgeben (#2113, L-C5) - sonst stünde ein gelöschtes Konto als Kapitän da.
+    from services import erasure_blockers
+    blocked = erasure_blockers.message(await erasure_blockers.team_roles(db, me["id"]))
+    if blocked:
+        raise HTTPException(409, blocked)
     await _anonymize_user_data(db, me["id"], me["id"], "user.self_anonymize")
     return {"ok": True}
 
