@@ -48,5 +48,12 @@
     "categories": "GET /v2/catalog-categories (getCategories)",
     "text_filter": "keiner in v2 (nur category_ids, colors, placements, techniques, new) - gesucht wird lokal über Name, Marke und Modell",
     "dashboard_link": "kein Slug in der API; der letzte Teil der Dashboard-Adresse (unisex-classic-tee-gildan-5000) wird mit dem Namen in Kleinbuchstaben und Bindestrichen verglichen - nur ein eindeutiger Treffer zählt"
+  },
+  "product_options": {
+    "issue": "#2158",
+    "retrieved": "2026-10-28",
+    "catalog": "GET /v2/catalog-products/{id} - product_options[] als CatalogOption: name, techniques[], type, values[] (Beispiel der Spec: stitch_color, techniques cut-sew, type string, values White/Black)",
+    "order_item": "product_options[] je Position als {name, value} (ProductOptions, etwa StitchColorOption) - in POST /v2/orders, POST /v2/order-estimation-tasks und in den gelesenen Positionen",
+    "required": "die Katalogantwort sagt nicht, welche Option Pflicht ist - Printful meldet sonst 400 „The required product option: `stitch_color` is missing.“ (Testentwurf Allover-Trikot, Variante 16261)"
   }
 }

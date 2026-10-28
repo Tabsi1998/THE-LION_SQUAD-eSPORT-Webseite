@@ -37,7 +37,7 @@ const STATUS_TONES = {
 };
 const STEPS = [
   { key: "product", label: "Produkt wählen", checks: ["printful"] },
-  { key: "offer", label: "Farben und Größen", checks: ["offer", "stock"] },
+  { key: "offer", label: "Farben und Größen", checks: ["offer", "stock", "options"] },
   { key: "designs", label: "Druckflächen", checks: ["template", "layout", "placements", "files", "personalization"] },
   { key: "prices", label: "Preise", checks: ["prices"] },
   { key: "publish", label: "Prüfen und veröffentlichen", checks: ["mockup"] },
@@ -365,6 +365,12 @@ function OfferStep({ view, busy, run }) {
   const [sizes, setSizes] = useState(() => product.offer?.sizes ?? []);
   const [technique, setTechnique] = useState(() => defaultTechnique(printful, product.technique));
   const [ownLabels, setOwnLabels] = useState(() => ({ ...(product.offer?.color_labels || {}) }));
+  // Produktoptionen von Printful (#2158): je Pflichtoption ein Wert aus dem Katalog, Vorgabe der erste.
+  const catalogOptions = view.product_options?.options || [];
+  const requiredOptions = catalogOptions.filter((row) => row.required);
+  const [chosenOptions, setChosenOptions] = useState(() => Object.fromEntries(requiredOptions.map((row) => [
+    row.name, Math.max(0, row.values.findIndex((item) => item.value === row.selected)),
+  ])));
   if (!printful) return <p className="text-sm text-white/55" data-testid="shop-step-offer">Zuerst in Schritt 1 das Printful-Produkt laden.</p>;
   const toggle = (list, setList, value) => setList(list.includes(value) ? list.filter((item) => item !== value) : [...list, value]);
   const count = printful.variants.filter((row) => colors.includes(row.color) && sizes.includes(row.size)).length;
@@ -423,12 +429,40 @@ function OfferStep({ view, busy, run }) {
           ))}
         </div>
       </div>
+      {requiredOptions.length > 0 && (
+        <div className="space-y-1" data-testid="shop-offer-options">
+          <div className="text-sm text-white/70">Produktoptionen von Printful</div>
+          <p className="text-xs text-white/50">Printful verlangt sie bei diesem Produkt – ohne sie lehnt Printful Schätzung und Auftrag ab.</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {requiredOptions.map((row) => (
+              <label key={row.name} className="block text-sm min-w-0">
+                <span className="text-white/70">{row.label}</span>
+                <select value={chosenOptions[row.name] ?? 0} disabled={!view.editable}
+                  onChange={(event) => setChosenOptions({ ...chosenOptions, [row.name]: Number(event.target.value) })}
+                  className={INPUT} data-testid={`shop-offer-option-${row.name}`}>
+                  {row.values.map((item, index) => <option key={String(item.value)} value={index}>{item.label}</option>)}
+                </select>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+      {view.product_options && !view.product_options.loaded && (
+        <p className="text-xs text-honor" data-testid="shop-offer-options-unknown">Produktoptionen von Printful noch nicht geladen – in Schritt 1 das Printful-Produkt neu laden.</p>
+      )}
+      {catalogOptions.some((row) => !row.required) && (
+        <p className="text-xs text-white/45" data-testid="shop-offer-options-other">Weitere Optionen bei Printful (nicht gesendet, Printful-Vorgabe): {catalogOptions.filter((row) => !row.required).map((row) => row.label).join(", ")}.</p>
+      )}
       <p className={`text-xs ${tooMany ? "text-warn" : "text-white/55"}`} data-testid="shop-offer-count">
         {count} Varianten{tooMany ? ` – höchstens ${view.limits.max_variants}` : ""}. Einkaufspreise holt die Website nur für diese – je Variante ein Aufruf bei Printful (höchstens 120 pro Minute).
       </p>
       <ReasonedButton id="shop-offer" label="Speichern und Preise laden" busy={busy === "offer"} disabled={!count || tooMany || !technique || !view.editable || labelsTooLong}
         blockedHint={!view.editable ? "Erst zurückziehen (Schritt 5), dann das Angebot ändern." : tooMany ? `Höchstens ${view.limits.max_variants} Varianten - bitte weniger Farben oder Größen.` : labelsTooLong ? "Bezeichnung einer Farbe: höchstens 40 Zeichen." : "Bitte mindestens eine Farbe und eine Größe wählen."}
-        onSubmit={(reason) => run("offer", () => api.put(`${BASE}/${product.id}/offer`, { technique, colors, sizes, color_labels: colorLabels, reason }), "Farben und Größen gespeichert, Preise geladen.")} />
+        onSubmit={(reason) => run("offer", () => api.put(`${BASE}/${product.id}/offer`, {
+          technique, colors, sizes, color_labels: colorLabels,
+          ...(requiredOptions.length ? { product_options: Object.fromEntries(requiredOptions.map((row) => [row.name, row.values[chosenOptions[row.name] ?? 0].value])) } : {}),
+          reason,
+        }), "Farben und Größen gespeichert, Preise geladen.")} />
       {offered.length > 0 && (
         <div className="tls-swipe">
           <table className="w-full text-sm" data-testid="shop-offer-variants">

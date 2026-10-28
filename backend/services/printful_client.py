@@ -46,8 +46,9 @@ from services.log_safe import log_safe, mask_addresses
 from services.shop_fulfillment import (
     CatalogCategory, CatalogEntry, CatalogProduct, CatalogProductId, CatalogVariant, CatalogVariantId, Costs, DraftLine, DraftOrder,
     FulfillmentError, FulfillmentInvalid, FulfillmentOrder, FulfillmentPermanent, FulfillmentTransient, MockupImage,
-    MockupTask, MockupTemplate, OrderItem, PLACEMENT_RE, PlacedFile, Placement, PrintArea, PrintFile, PrintfulOrderId,
-    ProductPlacementInfo, Rows, TECHNIQUE_RE, check_external_id, check_https_url, is_test_external_id, require)
+    MockupTask, MockupTemplate, OPTION_NAME_RE, OrderItem, PLACEMENT_RE, PlacedFile, Placement, PrintArea, PrintFile,
+    PrintfulOrderId, ProductOption, ProductPlacementInfo, Rows, TECHNIQUE_RE, check_external_id, check_https_url,
+    is_test_external_id, require)
 
 logger = logging.getLogger("tls.printful")
 
@@ -237,7 +238,43 @@ def _line_payload(line: DraftLine) -> dict:
         item["external_id"] = line.external_id
     if line.name:
         item["name"] = line.name[:200]
+    if line.options:
+        # Produktoptionen (#2158), etwa die Nahtfarbe - nur, wenn das Produkt welche hat: der Rumpf aller anderen
+        # Produkte bleibt, wie er war.
+        item["product_options"] = [{"name": name, "value": value} for name, value in line.options]
     return item
+
+
+MAX_OPTION_VALUES = 100
+
+
+def product_options(raw) -> tuple[tuple[ProductOption, ...], tuple[str, ...]]:
+    """Die Produktoptionen aus ``GET /v2/catalog-products/{id}`` (#2158, ``CatalogOption``: name, techniques, type,
+    values) - zeilenweise: eine unbrauchbare Zeile wird mit kurzem Grund (ohne Werte) übersprungen, statt das Produkt
+    zu verwerfen. Erlaubte Werte nur als Text, Zahl oder ja/nein."""
+    if not isinstance(raw, list):
+        return (), (("product_options: Liste erwartet",) if raw is not None else ())
+    options, skipped = [], []
+    for index, row in enumerate(raw):
+        if not isinstance(row, dict):
+            skipped.append(f"Option {index + 1}: kein Objekt")
+            continue
+        name, values = row.get("name"), row.get("values")
+        if not isinstance(name, str) or not OPTION_NAME_RE.fullmatch(name):
+            skipped.append(f"Option {index + 1}: name fehlt oder unlesbar")
+            continue
+        if not isinstance(values, list) or not values:
+            skipped.append(f"Option {name}: values ist keine Liste mit Werten")
+            continue
+        usable = tuple(value for value in values[:MAX_OPTION_VALUES]
+                       if isinstance(value, bool) or type(value) is int
+                       or (isinstance(value, str) and 0 < len(value) <= 200))
+        if len(usable) != len(values[:MAX_OPTION_VALUES]):
+            skipped.append(f"Option {name}: Werte nicht als Text, Zahl oder ja/nein")
+            continue
+        techniques = tuple(str(item) for item in row.get("techniques") or [] if isinstance(item, str))
+        options.append(ProductOption(name=name, type=str(row.get("type") or ""), values=usable, techniques=techniques))
+    return tuple(options), tuple(skipped)
 
 
 def verify_webhook_signature(body: bytes, signature: str | None, secret_hex: str | None) -> bool:
@@ -433,6 +470,9 @@ class PrintfulClient:
                                  width=row.get("print_area_width"), height=row.get("print_area_height"),
                                  conflicts=tuple(str(item) for item in row.get("conflicting_placements") or []))
             for row in data.get("placements") or [] if isinstance(row, dict) and row.get("placement"))
+        options, skipped = product_options(data.get("product_options"))
+        if skipped:
+            logger.warning("[printful] product options skipped: %d", len(skipped))
         return CatalogProduct(
             id=product_id, name=str(data.get("name") or ""), type=str(data.get("type") or ""), brand=data.get("brand"),
             model=data.get("model"), is_discontinued=data.get("is_discontinued") is True,
@@ -440,7 +480,8 @@ class PrintfulClient:
             default_technique=next((str(row["key"]) for row in techniques if row.get("is_default")), None),
             placements=placements, sizes=tuple(str(size) for size in data.get("sizes") or []),
             colors=tuple((str(row.get("name")), str(row.get("value"))) for row in data.get("colors") or []
-                         if isinstance(row, dict)))
+                         if isinstance(row, dict)),
+            options=options, options_skipped=skipped)
 
     async def catalog_variants(self, product_id: CatalogProductId, *, currency: str = "EUR", region: str = "europe",
                                price_for: tuple[CatalogVariantId, ...] | None = None) -> tuple[CatalogVariant, ...]:
@@ -809,10 +850,13 @@ class PrintfulClient:
                                            if isinstance(layer, dict) and layer.get("url")),
                            status=str(place.get("status") or ""), status_explanation=str(place.get("status_explanation") or ""))
                 for place in raw_places if isinstance(place, dict))
+            options = tuple((str(option.get("name")), option.get("value"))
+                            for option in row.get("product_options") or []
+                            if isinstance(option, dict) and isinstance(option.get("name"), str))
             items.append(OrderItem(id=row["id"], external_id=row.get("external_id"),
                                    variant_id=CatalogVariantId(row["catalog_variant_id"]),
                                    quantity=int(row.get("quantity") or 0), name=str(row.get("name") or ""),
-                                   price_cents=prices.get(row["id"]), placements=placements))
+                                   price_cents=prices.get(row["id"]), placements=placements, options=options))
         return FulfillmentOrder(id=order_id, external_id=data.get("external_id"), status=str(data.get("status") or ""),
                                 shipping=str(data.get("shipping") or ""), costs=self._costs(data.get("costs")),
                                 items=tuple(items), shape=answer_shape(data, rows))

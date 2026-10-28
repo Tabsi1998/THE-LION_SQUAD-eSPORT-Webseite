@@ -124,6 +124,24 @@ test("führt Schritt für Schritt bis zur Vorschau - Vereinsadresse vorbelegt, D
   expect(screen.queryByText(/bestätigen$/i)).toBeNull();
 });
 
+test("Produktoptionen (#2158): die Vorschau nennt die Nahtfarbe, der Abgleich zeigt sie lesbar", async () => {
+  const options = [{ name: "stitch_color", value: "White", label: "Nahtfarbe", value_label: "Weiß" }];
+  apiMock.post.mockResolvedValueOnce({ data: { ...PREVIEW, product_options: options } });
+  show();
+  await fillUntilPreview();
+  await userEvent.click(screen.getByTestId("shop-test-draft-preview-button"));
+  expect(await screen.findByTestId("shop-test-draft-options")).toHaveTextContent("Nahtfarbe: Weiß");
+});
+
+test("ohne Produktoptionen keine Zeile dafür", async () => {
+  apiMock.post.mockResolvedValue({ data: { ...PREVIEW, product_options: [] } });
+  show();
+  await fillUntilPreview();
+  await userEvent.click(screen.getByTestId("shop-test-draft-preview-button"));
+  await screen.findByTestId("shop-test-draft-preview");
+  expect(screen.queryByTestId("shop-test-draft-options")).toBeNull();
+});
+
 test("ein Produkt mit Vereinsnummer druckt die Beispielnummer - ohne Eingabe, nie die eines Mitglieds (#2150)", async () => {
   const product = { ...overview().products[0], gamertag: false, member_number: true, sample_number: "99" };
   apiMock.get.mockResolvedValue({ data: overview({ products: [product] }) });
