@@ -137,3 +137,14 @@ test("Weiterkommen: Vorgabe fester Baum, der gewählte Modus wird mitgeschickt",
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments", expect.objectContaining({ advancement_mode: "draw_show", draw_show_minutes: 15 })));
   expect(apiMock.post.mock.calls[0][1]).not.toHaveProperty("randomize_advancement_rounds");
 });
+
+// Format „Liga“ (#2111, F1): heißt „Jeder gegen jeden – Hin- und Rückrunde“, und darunter steht der Weg zur Vereinsliga.
+test("Jeder gegen jeden: unter dem Format steht der Weg zur Vereinsliga", async () => {
+  renderAt("");
+  const format = await screen.findByTestId("new-tr-format");
+  expect(screen.queryByTestId("new-tr-format-hint")).toBeNull();
+  expect(format.querySelector("option[value='league']")).toHaveTextContent("Jeder gegen jeden – Hin- und Rückrunde");
+  fireEvent.change(format, { target: { value: "league" } });
+  expect(screen.getByTestId("new-tr-format-hint")).toHaveTextContent("Seasons, Ligen und Staffeln");
+  expect(screen.getByRole("link", { name: "Admin → eSports → Liga" })).toHaveAttribute("href", "/admin/leagues");
+});

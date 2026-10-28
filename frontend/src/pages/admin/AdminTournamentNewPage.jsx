@@ -7,6 +7,7 @@ import { AdminFormPage, FormActions, FormGrid, FormSection } from "@/components/
 import { PartnerPicker } from "@/components/tls/PartnerPicker";
 import { EventMembershipLine } from "@/pages/admin/event/EventProgramPanel";
 import { CheckField, FieldLabel, SelectField, TextField } from "@/components/tls/FormFields";
+import { FormatHint } from "./tournament/FormatHint";
 import { ADVANCEMENT_MODE_OPTIONS, DRAW_SHOW_MINUTES_DEFAULT, DRAW_SHOW_MINUTES_HINT, GRAND_FINAL_FORMATS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, HEAT_REBUILD_FORMATS, HEAT_REBUILD_HINT, HEAT_REBUILD_OPTIONS, advancementModeHint, drawShowMinutesPayload } from "./tournament/shared";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
@@ -237,7 +238,7 @@ export default function AdminTournamentNewPage() {
             <SelectField label="Spiel" value={form.game_id} onChange={(v) => set("game_id", v)} options={[["", "— auswählen —"], ...games.map((g) => [g.id, gameOptionLabel(g)])]} required testId="new-tr-game" />
           </FormGrid>
           <FormGrid>
-            <SelectField label="Format" value={form.format} onChange={setFormat} options={TOURNAMENT_FORMAT_OPTIONS} testId="new-tr-format" />
+            <SelectField label="Format" value={form.format} onChange={setFormat} options={TOURNAMENT_FORMAT_OPTIONS} hint={<FormatHint format={form.format} testId="new-tr-format-hint" />} testId="new-tr-format" />
             <SelectField label="Teilnahme" value={form.team_mode} onChange={setTeamMode} options={[["solo", "Einzelspieler"], ["team", "Team"]]} testId="new-tr-mode" />
           </FormGrid>
           <FormGrid cols={3}>

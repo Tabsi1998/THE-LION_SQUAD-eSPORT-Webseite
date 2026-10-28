@@ -1,13 +1,15 @@
 // Glossar (#2124, TP10): K.-o., Doppel-K.-o. - die Wörter der Spieler- und Verwaltungsseiten stehen hier an einer Stelle.
+// #2111 (F1): „Liga“ heißt als Turnierformat „Jeder gegen jeden – Hin- und Rückrunde“ - die Vereinsliga mit Seasons
+// und Staffeln ist Admin → Liga. Der Schlüssel `league` bleibt.
 export const TOURNAMENT_FORMAT_LABELS = {
   single_elim: "K.-o.",
   double_elim: "Doppel-K.-o.",
-  round_robin: "Jeder gegen jeden",
+  round_robin: "Jeder gegen jeden – einfach",
   swiss: "Schweizer System",
   groups: "Gruppenphase",
   ffa: "Mehrspieler frei",
   battle_royale: "Überlebensmodus",
-  league: "Liga",
+  league: "Jeder gegen jeden – Hin- und Rückrunde",
   time_trial: "Zeitfahren",
   grand_prix: "Rennserie",
   custom_bracket: "Freier Turnierbaum",
@@ -212,6 +214,8 @@ export function formatTournamentDisplay(tournamentOrFormat) {
   if (tournamentOrFormat && typeof tournamentOrFormat === "object") {
     const customLabel = String(tournamentOrFormat.format_label || tournamentOrFormat.format_display_name || "").trim();
     if (customLabel) return customLabel;
+    // Eine Liga-Staffel (docs/LIGA.md) heißt weiter „Liga“ - der lange Formatname gilt nur für Turniere (#2111, F1).
+    if (tournamentOrFormat.league_context) return "Liga";
     return formatTournamentFormat(tournamentOrFormat.format);
   }
   return formatTournamentFormat(tournamentOrFormat);
