@@ -191,6 +191,8 @@ NOTIFICATION_KIND_CATEGORY = {
     "f1_prize": "prize_updates",
     "f1_prize_reminder": "prize_updates",
     "prize_pending": "prize_updates",
+    # Gewinn bereit, abgeholt, verfallen (#2123) - Glocke und Push neben der Mail.
+    "prize_status": "prize_updates",
     "achievement": "achievements",
     # Erfolge II (#622): Prestige und Rücknahme stehen im Postfach unter „Erfolge“.
     "prestige": "achievements",

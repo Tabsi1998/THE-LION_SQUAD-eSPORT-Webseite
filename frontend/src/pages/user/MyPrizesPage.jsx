@@ -179,7 +179,7 @@ function PrizeCard({ p, highlight }) {
   const s = STATUS[p.status] || STATUS.pending;
   const Icn = s.icon;
   const due = daysUntil(p.pickup_deadline);
-  const urgent = ["pending", "ready"].includes(p.status) && due !== null && due <= 14;
+  const urgent = p.status === "ready" && due !== null && due <= 14;
   return (
     <div data-testid={`my-prize-${p.id}`} className={`border rounded-sm p-5 ${highlight ? "border-[#29B6E8]/40 bg-gradient-to-br from-[#29B6E8]/5 to-transparent" : "border-white/10 bg-[#121212]"}`}>
       <div className="flex items-start justify-between mb-3">
@@ -211,7 +211,14 @@ function PrizeCard({ p, highlight }) {
           <MapPin className="w-3 h-3" /> Hol dir deinen Preis beim nächsten Vereinsabend!
         </div>
       )}
-      {p.pickup_deadline && p.status !== "picked_up" && p.status !== "expired" && (
+      {/* Die Abholfrist läuft ab „Bereit“ (#2123, ER1) - vorher bereitet der Verein den Gewinn noch vor. */}
+      {p.status === "pending" && (
+        <div className="mt-3 text-[11px] flex items-center gap-1.5 text-white/40" data-testid={`my-prize-pending-${p.id}`}>
+          <CalendarDays className="w-3 h-3" />
+          Wir melden uns, sobald er abholbereit ist – ab dann hast du 90 Tage Zeit.
+        </div>
+      )}
+      {p.pickup_deadline && p.status === "ready" && (
         <div className={`mt-3 text-[11px] flex items-center gap-1.5 ${urgent ? "text-[#FFD700]" : "text-white/40"}`}>
           <CalendarDays className="w-3 h-3" />
           Abholbar bis: {formatDate(p.pickup_deadline)}

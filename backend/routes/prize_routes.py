@@ -1,5 +1,4 @@
 """Phase 9: PrizePickup admin + user routes."""
-from datetime import timedelta
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -9,12 +8,14 @@ from typing import Optional, Literal
 from database import get_db
 from auth import get_current_user
 from models import now_utc, new_id
-from services.prize_service import DEFAULT_PICKUP_WINDOW_DAYS, mark_ready, mark_picked_up
+from services.prize_service import mark_ready, mark_picked_up, revert_picked_up
 from services.visibility import user_can_see
 
 router = APIRouter(prefix="/api/prizes", tags=["prizes"])
 
 PrizeStatus = Literal["pending", "ready", "picked_up", "expired"]
+PRIZES_TOO_EARLY = ("Gewinne entstehen erst, wenn das Turnier beendet ist – vorher stünde nur ein Zwischenstand fest. "
+                    "Setze das Turnier auf „Beendet“ oder veröffentliche die Ergebnisse.")
 RESULT_CERTIFICATE_STATUSES = {"completed", "results_published", "archived"}
 
 
@@ -319,6 +320,19 @@ async def my_open_prize_count(me: dict = Depends(get_current_user)):
     return {"count": count}
 
 
+async def _audit_prize(db, me: dict, action: str, pickup: dict, **data) -> None:
+    """Protokoll je Gewinn (#2123, ER4): Bereit, Abgeholt, Zurück, Wieder öffnen, Löschen und Bearbeiten."""
+    await db.audit_logs.insert_one({
+        "id": new_id(), "actor_id": me["id"], "action": action, "target_id": pickup.get("id"),
+        # entity_id: wie die älteren Einträge „prizes.update“/„prizes.create“
+        "entity_id": pickup.get("id"),
+        "data": {"tournament_id": pickup.get("tournament_id"), "fastlap_challenge_id": pickup.get("fastlap_challenge_id"),
+                 "user_id": pickup.get("user_id"), "team_id": pickup.get("team_id"), "place": pickup.get("place"),
+                 "previous_status": pickup.get("status"), **data},
+        "created_at": now_utc().isoformat(),
+    })
+
+
 @router.put("/{pickup_id}")
 @router.patch("/{pickup_id}")
 async def update_prize(pickup_id: str, body: PrizeUpdate, me: dict = Depends(get_current_user)):
@@ -328,34 +342,45 @@ async def update_prize(pickup_id: str, body: PrizeUpdate, me: dict = Depends(get
         raise HTTPException(status_code=404, detail="Gewinn nicht gefunden")
     await _ensure_prize_manager(me, pickup.get("tournament_id"))
     new_status = body.status
+    if new_status == "ready" and pickup.get("status") == "picked_up":
+        # „Zurück“ (#2123, ER2): versehentlich abgehakt - ohne erneute „abholbereit“-Meldung.
+        result = await revert_picked_up(pickup_id) or pickup
+        await _audit_prize(db, me, "prizes.revert_picked_up", pickup)
+        return result
     if new_status == "ready":
-        return await mark_ready(pickup_id, me["id"]) or pickup
+        result = await mark_ready(pickup_id, me["id"]) or pickup
+        await _audit_prize(db, me, "prizes.reopen" if pickup.get("status") == "expired" else "prizes.ready", pickup,
+                           pickup_deadline=result.get("pickup_deadline"))
+        return result
     if new_status == "picked_up":
-        return await mark_picked_up(pickup_id, me["id"], body.notes or "") or pickup
+        result = await mark_picked_up(pickup_id, me["id"], body.notes or "") or pickup
+        await _audit_prize(db, me, "prizes.picked_up", pickup, notes=body.notes or "")
+        return result
     # generic patch
     updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
     if not updates:
         return pickup
+    if "pickup_deadline" in updates:
+        # Von Hand gesetzte Frist (#2123, ER1): „Bereit“ überschreibt sie nicht mit den 90 Tagen.
+        updates["pickup_deadline_custom"] = True
     updates["updated_at"] = now_utc().isoformat()
     await db.prize_pickups.update_one({"id": pickup_id}, {"$set": updates})
-    await db.audit_logs.insert_one({
-        "id": new_id(), "actor_id": me["id"], "action": "prizes.update",
-        "entity_id": pickup_id, "details": updates,
-        "created_at": now_utc().isoformat(),
-    })
+    await _audit_prize(db, me, "prizes.update", pickup, changes=updates)
     return await db.prize_pickups.find_one({"id": pickup_id}, {"_id": 0})
 
 
 @router.delete("/{pickup_id}")
 async def delete_prize(pickup_id: str, me: dict = Depends(get_current_user)):
     db = get_db()
-    pickup = await db.prize_pickups.find_one({"id": pickup_id}, {"_id": 0, "tournament_id": 1})
+    pickup = await db.prize_pickups.find_one({"id": pickup_id}, {"_id": 0})
     if not pickup:
         raise HTTPException(status_code=404, detail="Gewinn nicht gefunden")
     await _ensure_prize_manager(me, pickup.get("tournament_id"))
     res = await db.prize_pickups.delete_one({"id": pickup_id})
     if res.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Gewinn nicht gefunden")
+    await _audit_prize(db, me, "prizes.delete", pickup, prize_label=pickup.get("prize_label"),
+                       prize_value=pickup.get("prize_value"))
     return {"ok": True}
 
 
@@ -384,7 +409,8 @@ async def create_prize_manually(body: PrizeCreate, me: dict = Depends(get_curren
     })
     if existing:
         raise HTTPException(status_code=409, detail="Für diesen Benutzer und Platz existiert bereits ein Gewinn")
-    deadline = body.pickup_deadline or (now_utc() + timedelta(days=DEFAULT_PICKUP_WINDOW_DAYS)).isoformat()
+    # Ohne eigene Frist läuft sie ab „Bereit“ (#2123, ER1).
+    deadline = body.pickup_deadline or None
     doc = {
         "id": new_id(),
         "tournament_id": body.tournament_id,
@@ -398,6 +424,7 @@ async def create_prize_manually(body: PrizeCreate, me: dict = Depends(get_curren
         "prize_value": body.prize_value or "",
         "status": "pending",
         "pickup_deadline": deadline,
+        "pickup_deadline_custom": bool(deadline),
         "ready_at": None,
         "picked_up_at": None,
         "picked_up_by": None,
@@ -485,9 +512,16 @@ async def auto_create_fastlap(challenge_id: str, me: dict = Depends(get_current_
 
 @router.post("/auto-create/{tournament_id}")
 async def auto_create(tournament_id: str, me: dict = Depends(get_current_user)):
+    """Gewinne eines Turniers von Hand (nach)erzeugen - etwa nach einer Korrektur der Ergebnisse. Erst ab „Beendet“
+    (#2123, TA23): vorher gäbe es Gewinne und die Meldung „Gewinn vorgemerkt“ für einen Zwischenstand."""
     await _ensure_prize_manager(me, tournament_id)
-    """Manual trigger to (re)create pickups for a tournament — useful when
-    results were corrected after publishing."""
     from services.prize_service import auto_create_for_tournament
+    from services.tournament_guard import FINISHED_STATUSES
+
+    tournament = await get_db().tournaments.find_one({"id": tournament_id}, {"_id": 0, "status": 1})
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    if tournament.get("status") not in FINISHED_STATUSES:
+        raise HTTPException(status_code=409, detail=PRIZES_TOO_EARLY)
     n = await auto_create_for_tournament(tournament_id)
     return {"created": n}

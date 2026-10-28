@@ -356,6 +356,8 @@ export default function AdminTournamentEditPage() {
       toast.success(status === "cancelled" && Number.isFinite(data?.notified)
         ? `Status: ${label} – ${data.notified === 1 ? "1 Person benachrichtigt" : `${data.notified} Personen benachrichtigt`}.`
         : `Status: ${label}`);
+      // Punkte in einer abgeschlossenen Jahreswertung bleiben unverändert (#2123) - das sagt der Server dazu.
+      if (data?.season_points_note) toast.info(data.season_points_note, { duration: 10000 });
       load();
     } catch (e) {
       const statusDetail = e.response?.data?.detail;

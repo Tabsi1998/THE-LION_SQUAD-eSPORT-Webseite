@@ -199,7 +199,7 @@ async def test_saisonabschluss_ueber_die_route_und_nur_einmal(flow):
     await season_world(flow.db, me, other)
     await flow.db.seasons.update_one({"id": "s1"}, {"$set": {"status": "active"}})
     flow.act_as(admin)
-    response = await flow.put("/api/seasons/s1", json={"status": "completed"})
+    response = await flow.post("/api/seasons/s1/complete")  # #2123: Abschließen über den eigenen Endpunkt
     assert response.status_code == 200, response.text
     assert await flow.db.season_standings.count_documents({"season_id": "s1"}) == 2
     values = await counters.compute(me["id"], {"season_wins"})

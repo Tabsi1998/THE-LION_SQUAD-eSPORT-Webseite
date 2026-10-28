@@ -103,8 +103,10 @@ export default function AdminTournamentsPage() {
 
   const setStatus = async (id, status) => {
     try {
-      await api.post(`/tournaments/${id}/status`, { status });
+      const response = await api.post(`/tournaments/${id}/status`, { status });
       toast.success(`Status: ${status}`);
+      // Punkte in einer abgeschlossenen Jahreswertung bleiben unverändert (#2123).
+      if (response?.data?.season_points_note) toast.info(response.data.season_points_note, { duration: 10000 });
       load();
     } catch (e) {
       toast.error(formatRequestError(e, "Status konnte nicht geändert werden."));

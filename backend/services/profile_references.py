@@ -307,7 +307,7 @@ async def personal_profile_references(user: dict, public_only: bool = False) -> 
                     "id": f"season:{season['id']}",
                     "kind": "season",
                     "title": season.get("name") or "Jahreswertung",
-                    "subtitle": "Jahreswertung" if season.get("kind") != "circuit" else "Circuit",
+                    "subtitle": "Jahreswertung" if season.get("kind") != "circuit" else "Turnierserie",  # #2123, ER13
                     "rank": index,
                     "points": row.get("total_points"),
                     "status": season.get("status"),

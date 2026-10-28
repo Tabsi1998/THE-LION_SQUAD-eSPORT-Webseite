@@ -50,7 +50,7 @@ EXPECTED = {
     "discord_guild_active": {"guild_day_user_unique", "user_id_1", "day_1"},
     # Fast Lap (#1584): ein Gewinn je Platz und Person, eine Punktezeile je Saison, Strecke und Person.
     "prize_pickups": {"fastlap_place_user_unique"},
-    "season_points": {"fastlap_source_user_unique"},
+    "season_points": {"fastlap_source_user_unique", "source_id_1_source_type_1"},  # #2123: je Turnier
     # Shop (#1703): Idempotenz je Bestellung und Printful-Auftrag, einmalige Ereignisse, eindeutiger Katalog.
     "shop_orders": {"idempotency_key_unique", "printful_external_id_unique", "id_1", "user_id_1", "status_1_created_at_-1"},
     "shop_order_items": {"order_position_unique", "user_id_1"},

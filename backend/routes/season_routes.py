@@ -60,10 +60,9 @@ async def list_seasons():
 async def featured_season():
     """Returns the most relevant active season + top 5 standings for public widgets."""
     db = get_db()
+    # Nur die aktive (#2123, ER11): ohne aktive Jahreswertung zeigt die Startseite keine - nie einen Entwurf.
     s = await db.seasons.find_one({"status": "active"}, {"_id": 0},
-                                    sort=[("start_date", -1)])
-    if not s:
-        s = await db.seasons.find_one({}, {"_id": 0}, sort=[("start_date", -1)])
+                                    sort=[("start_date", -1), ("created_at", -1)])
     if not s:
         return {"season": None, "standings": []}
     # Reuse standings logic (season_standings defined below in this module)
@@ -114,6 +113,16 @@ async def update_season(sid: str, body: SeasonUpdate, me: dict = Depends(require
     nullable_fields = {"description", "banner_url", "start_date", "end_date"}
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
+    new_status = updates.get("status")
+    if new_status == current.get("status"):
+        updates.pop("status", None)
+        new_status = None
+    if new_status == "completed":
+        # Abschließen (#2123, ER8) schreibt die Rangliste fest und vergibt Erfolge und XP - nur über den eigenen Knopf
+        # mit Vorschau und Rückfrage, nicht nebenbei beim Speichern.
+        raise HTTPException(409, "Abschließen geht über den Knopf „Abschließen“ – mit Vorschau und Rückfrage.")
+    if new_status == "active":
+        await _ensure_no_other_active(db, current["id"])
     slug_source = slug_source_for_update(raw, current, "name", fallback="season")
     if slug_source is not None:
         updates["slug"] = await unique_slug(db.seasons, slug_source, current_id=current["id"], fallback="season")
@@ -123,21 +132,160 @@ async def update_season(sid: str, body: SeasonUpdate, me: dict = Depends(require
             updates[k] = updates[k].isoformat() if updates[k] else None
     updates["updated_at"] = now_utc().isoformat()
     await db.seasons.update_one({"id": current["id"]}, {"$set": updates})
-    # Abschluss (#613): die Rangliste wird festgeschrieben, XP und Saison-Erfolge (Saisonspitze, Saisonmeister,
-    # Volle Saison) folgen daraus - einmal, beim Wechsel auf „abgeschlossen“.
-    if updates.get("status") == "completed" and current.get("status") != "completed":
-        try:
-            from badges import on_season_completed
-            await on_season_completed(current["id"])
-        except Exception:  # noqa: BLE001 - der Abschluss darf nicht an den Erfolgen scheitern
-            logging.getLogger("seasons").warning("season completion hook failed for %s", current["id"], exc_info=True)
+    if new_status:
+        await _audit(db, me, "season.status.change", current["id"],
+                     {"previous_status": current.get("status"), "status": new_status})
     return await db.seasons.find_one({"id": current["id"]}, {"_id": 0})
+
+
+async def _audit(db, me: dict, action: str, season_id: str, data: dict) -> None:
+    await db.audit_logs.insert_one({"id": new_id(), "action": action, "actor_id": me.get("id"), "target_id": season_id,
+                                    "data": data, "created_at": now_utc().isoformat()})
+
+
+async def _ensure_no_other_active(db, season_id: str) -> None:
+    """Aktiv ist höchstens eine Jahreswertung (#2123, ER7) - sonst landeten Punkte in einer beliebigen."""
+    other = await db.seasons.find_one({"status": "active", "id": {"$ne": season_id}}, {"_id": 0, "name": 1})
+    if other:
+        raise HTTPException(409, f"„{other.get('name') or 'Eine andere Jahreswertung'}“ ist schon aktiv. Es kann nur eine "
+                                 "aktiv sein – schließe sie zuerst ab oder setze sie zurück auf Entwurf.")
+
+
+async def _season_or_404(db, sid: str) -> dict:
+    season = await db.seasons.find_one({"$or": [{"id": sid}, {"slug": sid}]}, {"_id": 0})
+    if not season:
+        raise HTTPException(404, "Saison nicht gefunden")
+    return season
+
+
+@season_router.get("/{sid}/completion-preview")
+async def completion_preview(sid: str, me: dict = Depends(require_admin())):
+    """Was „Abschließen“ bewirkt (#2123, ER8): Rangliste und je Platz die Erfolge - ohne etwas zu schreiben."""
+    from services.achievement_admin import season_preview
+
+    db = get_db()
+    season = await _season_or_404(db, sid)
+    return await season_preview(db, season["id"])
+
+
+@season_router.post("/{sid}/complete")
+async def complete_season(sid: str, me: dict = Depends(require_admin())):
+    """Jahreswertung abschließen (#2123, ER8; Abschluss #613): die Rangliste wird festgeschrieben, XP und Saison-Erfolge
+    (Saisonspitze, Saisonmeister, Volle Saison) folgen daraus - einmal, beim Wechsel auf „abgeschlossen“."""
+    db = get_db()
+    season = await _season_or_404(db, sid)
+    if season.get("status") != "active":
+        raise HTTPException(409, "Abschließen lässt sich nur eine aktive Jahreswertung.")
+    stamp = now_utc().isoformat()
+    result = await db.seasons.update_one({"id": season["id"], "status": "active"},
+                                         {"$set": {"status": "completed", "completed_at": stamp, "updated_at": stamp}})
+    if getattr(result, "modified_count", 1) == 0:
+        raise HTTPException(409, "Die Jahreswertung wurde gerade schon abgeschlossen.")
+    try:
+        from badges import on_season_completed
+        await on_season_completed(season["id"])
+    except Exception:  # noqa: BLE001 - der Abschluss darf nicht an den Erfolgen scheitern
+        logging.getLogger("seasons").warning("season completion hook failed for %s", season["id"], exc_info=True)
+    await _audit(db, me, "season.complete", season["id"], {"previous_status": "active", "status": "completed"})
+    return await db.seasons.find_one({"id": season["id"]}, {"_id": 0})
 
 
 @season_router.delete("/{sid}")
 async def delete_season(sid: str, me: dict = Depends(require_admin())):
+    """Löschen nur als Entwurf ohne Punkte (#2123, ER9) - eine aktive oder abgeschlossene Jahreswertung bleibt,
+    sonst verwaisten ihre Punkte. Archivieren statt löschen."""
     db = get_db()
-    await db.seasons.delete_one({"$or": [{"id": sid}, {"slug": sid}]})
+    season = await _season_or_404(db, sid)
+    if season.get("status") != "draft":
+        raise HTTPException(409, "Nur ein Entwurf lässt sich löschen. Eine laufende oder abgeschlossene Jahreswertung "
+                                 "bleibt – setze sie auf „Archiv“.")
+    if await db.season_points.count_documents({"season_id": season["id"]}):
+        raise HTTPException(409, "Diese Jahreswertung hat schon Punkte und lässt sich darum nicht löschen.")
+    await db.seasons.delete_one({"id": season["id"]})
+    await _audit(db, me, "season.delete", season["id"], {"name": season.get("name"), "slug": season.get("slug")})
+    return {"ok": True}
+
+
+class PointAdjustment(BaseModel):
+    user_id: Optional[str] = None
+    team_id: Optional[str] = None
+    points: float
+    reason: str
+
+
+@season_router.get("/{sid}/adjustments")
+async def list_adjustments(sid: str, me: dict = Depends(require_admin())):
+    """Korrekturen der Jahreswertung (#2123, ER10): Bonus oder Abzug von Hand, immer mit Grund."""
+    db = get_db()
+    season = await _season_or_404(db, sid)
+    rows = await db.season_points.find({"season_id": season["id"], "source_type": "custom"}, {"_id": 0}).sort(
+        "created_at", -1).to_list(500)
+    user_ids = [row["user_id"] for row in rows if row.get("user_id")]
+    users = {u["id"]: u for u in await db.users.find({"id": {"$in": user_ids}},
+                                                     {"_id": 0, "id": 1, "display_name": 1, "username": 1}).to_list(500)}
+    team_ids = [row["team_id"] for row in rows if row.get("team_id")]
+    teams = {t["id"]: t for t in await db.teams.find({"id": {"$in": team_ids}}, {"_id": 0, "id": 1, "name": 1}).to_list(500)}
+    for row in rows:
+        person = users.get(row.get("user_id")) or {}
+        row["recipient_label"] = (person.get("display_name") or person.get("username")
+                                  or (teams.get(row.get("team_id")) or {}).get("name") or "Unbekannt")
+    return rows
+
+
+@season_router.post("/{sid}/adjustments")
+async def add_adjustment(sid: str, body: PointAdjustment, me: dict = Depends(require_admin())):
+    """Punkte von Hand korrigieren (#2123, ER10): ein eigener Eintrag „Korrektur“ mit Grund, der Formel-Einträge der
+    Turniere bleiben unberührt - ein erneutes Veröffentlichen überschreibt die Korrektur also nicht."""
+    db = get_db()
+    season = await _season_or_404(db, sid)
+    if season.get("status") not in ("draft", "active"):
+        raise HTTPException(409, "Eine abgeschlossene Jahreswertung lässt sich nicht mehr korrigieren.")
+    reason = " ".join((body.reason or "").split())
+    if len(reason) < 3:
+        raise HTTPException(400, "Bitte einen Grund angeben.")
+    if bool(body.user_id) == bool(body.team_id):
+        raise HTTPException(400, "Bitte genau eine Person oder ein Team wählen.")
+    points = round(float(body.points), 1)
+    if points == 0 or abs(points) > 1000 or points != points:
+        raise HTTPException(400, "Die Korrektur muss zwischen -1000 und 1000 Punkten liegen und darf nicht 0 sein.")
+    if body.user_id and not await db.users.find_one({"id": body.user_id}, {"_id": 1}):
+        raise HTTPException(404, "Person nicht gefunden")
+    if body.team_id and not await db.teams.find_one({"id": body.team_id}, {"_id": 1}):
+        raise HTTPException(404, "Team nicht gefunden")
+    stamp = now_utc().isoformat()
+    row_id = new_id()
+    doc = {
+        "id": row_id, "season_id": season["id"], "user_id": body.user_id, "team_id": body.team_id,
+        "source_type": "custom", "source_id": f"adjustment:{row_id}", "source_name": "Korrektur", "rank": None,
+        "num_participants": 1, "base_points": 0, "weight": 1.0, "participant_factor": 1.0,
+        "bonus_points": points, "bonus_reason": reason, "farming_multiplier": 1.0, "farming_capped": False,
+        "farming_exempt": True, "raw_points": points, "total_points": points, "created_at": stamp,
+        "created_by": me.get("id"),
+    }
+    await db.season_points.insert_one(doc)
+    doc.pop("_id", None)
+    await _audit(db, me, "season.points.adjust", season["id"],
+                 {"user_id": body.user_id, "team_id": body.team_id, "points": points, "reason": reason, "entry_id": row_id})
+    from services.discord_embed_queue import request_refresh
+    request_refresh("ranking")
+    return doc
+
+
+@season_router.delete("/{sid}/adjustments/{entry_id}")
+async def delete_adjustment(sid: str, entry_id: str, me: dict = Depends(require_admin())):
+    db = get_db()
+    season = await _season_or_404(db, sid)
+    if season.get("status") not in ("draft", "active"):
+        raise HTTPException(409, "Eine abgeschlossene Jahreswertung lässt sich nicht mehr korrigieren.")
+    row = await db.season_points.find_one({"id": entry_id, "season_id": season["id"], "source_type": "custom"}, {"_id": 0})
+    if not row:
+        raise HTTPException(404, "Korrektur nicht gefunden")
+    await db.season_points.delete_one({"id": entry_id})
+    await _audit(db, me, "season.points.adjust_delete", season["id"],
+                 {"user_id": row.get("user_id"), "team_id": row.get("team_id"), "points": row.get("total_points"),
+                  "reason": row.get("bonus_reason"), "entry_id": entry_id})
+    from services.discord_embed_queue import request_refresh
+    request_refresh("ranking")
     return {"ok": True}
 
 

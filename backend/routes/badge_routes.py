@@ -548,6 +548,9 @@ async def admin_award(body: AwardBody, me: dict = Depends(require_area("content"
 async def admin_revoke(body: AwardBody, me: dict = Depends(require_area("content"))):
     from services import achievement_admin
     db = get_db()
+    # Grund ist Pflicht (#2123, ER15) - auch am Server, nicht nur im Browser.
+    if len(" ".join((body.note or "").split())) < 3:
+        raise HTTPException(400, "Bitte einen Grund angeben.")
     try:
         await achievement_admin.revoke_with_reason(db, me, body.user_id, body.tier_code, note=body.note)
     except LookupError as exc:

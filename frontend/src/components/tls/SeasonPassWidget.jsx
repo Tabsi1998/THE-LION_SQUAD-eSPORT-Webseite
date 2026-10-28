@@ -55,14 +55,15 @@ export function SeasonPassWidget() {
             <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#FFD700]/10 border border-[#FFD700]/30 rounded-sm mb-4">
               <span className="w-2 h-2 rounded-full bg-[#FFD700] animate-pulse" />
               <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">
-                {s.kind === "circuit" ? "Lions Circuit" : "TLS Jahreswertung"} · {s.status}
+                {/* Nur die aktive Wertung kommt hierher (#2123, ER11) - der Status steht nicht roh daneben. */}
+                {s.kind === "circuit" ? "Lions Circuit" : "TLS Jahreswertung"} · läuft
               </span>
             </div>
             <h2 className="font-heading text-4xl md:text-5xl font-black uppercase leading-[0.95]">
               <span className="text-white">{s.name}</span>
             </h2>
             <p className="mt-4 text-white/70 text-base max-w-md">
-              {s.description || "Die Vereinswertung bündelt bestätigte Jahrespunkte aus Turnieren, Challenges, Events und Admin-Wertungen."}
+              {s.description || "Die Vereinswertung bündelt Jahrespunkte aus Turnieren, Fast-Lap-Challenges und bestätigten Event-Teilnahmen."}
             </p>
             <div className="mt-4 grid grid-cols-2 gap-2 max-w-md">
               {pointHints.map(({ icon: Icon, label }) => (
