@@ -346,6 +346,8 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
     await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES, "tournament")
     status = body.get("status")
     force = body.get("force") is True
+    # Grund der Absage (#2120, TA24): freiwillig, nur für die Nachricht an die Angemeldeten.
+    cancel_reason = body.get("reason") if isinstance(body.get("reason"), str) else None
     allowed = {
         "draft", "scheduled", "registration_open", "registration_closed",
         "check_in", "live", "paused", "completed", "results_published",
@@ -507,6 +509,17 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
             import logging
             logging.getLogger("tls.tournament").warning("„Turnier beendet“ für %s nicht verschickt type=%s", log_safe(tid), type(exc).__name__)
 
+    # „Abgesagt“ (#2120, TA24): wer angemeldet ist oder auf der Warteliste steht, erfährt es - mit dem freiwilligen
+    # Grund aus der Rückfrage. Einmal je Turnier und Person.
+    notified = None
+    if prev != status and status == "cancelled":
+        try:
+            from services.registration_notifications import notify_tournament_cancelled
+            notified = await notify_tournament_cancelled(db, {**t, "id": tid}, cancel_reason)
+        except Exception as exc:  # noqa: BLE001 - eine Nachricht hält keinen Statuswechsel auf
+            import logging
+            logging.getLogger("tls.tournament").warning("Absage für %s nicht verschickt type=%s", log_safe(tid), type(exc).__name__)
+
     # Turnierabschluss: alle Angemeldeten neu auswerten (#301) - nicht erst beim Profilbesuch.
     if prev != status and status in ("completed", "results_published"):
         try:
@@ -532,4 +545,5 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
         "auto_generated_bracket": auto_generated_bracket,
         "planning": planning,
         "idempotent_replay": prev == status,
+        **({"notified": notified} if notified is not None else {}),
     }

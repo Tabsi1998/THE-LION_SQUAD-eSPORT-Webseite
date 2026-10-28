@@ -39,7 +39,7 @@ from services.competition_versions import persist_competition_versions
 from services.heat_rebuild import evaluate_after_write
 from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
 from models import RegistrationCreate, RegistrationUpdate, RegistrationAdminCreate, now_utc, new_id
-from services import league_roster, onsite_access, tournament_event_gate, tournament_fees
+from services import league_roster, onsite_access, tournament_event_gate, tournament_fees, tournament_guard
 from services.query_filters import safe_regex
 from services.private_fields import private_projection
 from routes.tournament_common import (
@@ -121,6 +121,8 @@ BRACKET_REFRESH_LOCKED_STATUSES = {"live", "paused", "completed", "results_publi
 # Solange der Baum nicht steht, rücken Wartende von selbst nach (#1551).
 WAITLIST_MOVE_UP_STATUSES = {"scheduled", "registration_open", "registration_closed", "check_in"}
 ACTIVE_REGISTRATION_STATUSES = ["pending", "approved", "checked_in"]
+# Status, mit denen eine Anmeldung nicht (mehr) spielt - im festen Baum nur über Austritt oder Nicht erschienen.
+LEAVES_BRACKET_STATUSES = {"rejected", "waitlist", "pending"}
 
 
 async def _bracket_is_fixed(db, tid: str) -> bool:
@@ -978,6 +980,11 @@ async def update_registration(tid: str, reg_id: str, body: RegistrationUpdate,
     if updates and all(reg.get(key) == value for key, value in updates.items()):
         return {**reg, "idempotent_replay": True}
     previous_status = reg.get("status")
+    if (updates.get("status") in LEAVES_BRACKET_STATUSES and updates["status"] != previous_status
+            and await tournament_guard.fixed_match_count(db, tid, reg_id)):
+        # Abgelehnt, Warteliste oder Ausstehend nimmt die Anmeldung aus dem Spiel (#2120, TA13) - im festen Baum
+        # blieben ihre Spiele mit einer Anmeldung stehen, die nicht mehr mitspielt.
+        raise HTTPException(status_code=409, detail=tournament_guard.registration_removal_refused(tournament_doc))
     if updates.get("status") and updates["status"] != previous_status:
         # Co-Team einer Liga (#1649): der Season-Schlüssel folgt dem Status - vor dem Schreiben, damit ein Co-Team, das
         # inzwischen in einer anderen Staffel spielt, hier nicht wieder aktiv wird.
@@ -1095,18 +1102,11 @@ async def _delete_registration_locked(db, tid: str, reg_id: str, me: dict) -> di
         # Co-Team (#2109): eine deutsche Begründung statt eines nackten 403.
         raise HTTPException(status_code=403, detail=SQUAD_UNREGISTER_REFUSED if reg.get("squad_id") else None)
     tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
-    if is_staff and (tournament or {}).get("status") == "check_in":
-        # Nur ein fester Baum hält die Person (#1551) - die Vorschau während des Check-ins wächst noch mit.
-        v2_slots = await db.matches_v2.count_documents({
-            "tournament_id": tid,
-            "slots.registration_id": reg_id,
-            "is_preview": {"$ne": True},
-        })
-        if v2_slots:
-            raise HTTPException(
-                status_code=409,
-                detail="Nach dem Check-in-Ende bleibt der Turnierbaum fix. Teilnehmer als 'Nicht erschienen' markieren und per Ersatzspieler ersetzen.",
-            )
+    if is_staff and await tournament_guard.fixed_match_count(db, tid, reg_id):
+        # Nur ein fester Baum hält die Person (#1551) - die Vorschau während des Check-ins wächst noch mit. Seit #2120
+        # (TA13) in jedem Status: vorher ging Entfernen im laufenden, pausierten oder beendeten Turnier, und die Spiele
+        # behielten die Anmeldung, die es nicht mehr gab.
+        raise HTTPException(status_code=409, detail=tournament_guard.registration_removal_refused(tournament or {}))
     if (is_own_registration or is_team_manager) and not is_staff:
         if reg.get("status") == "checked_in" or (tournament or {}).get("status") in {"live", "paused", "completed", "results_published", "archived"}:
             raise HTTPException(status_code=409, detail="Abmeldung ist nach Check-in oder Turnierstart nur über die Turnierleitung möglich.")
@@ -1117,6 +1117,10 @@ async def _delete_registration_locked(db, tid: str, reg_id: str, me: dict) -> di
         })
         if v2_blocked:
             raise HTTPException(status_code=409, detail="Abmeldung ist nicht mehr möglich, weil bereits Spiele aktiv oder gewertet sind.")
+        if await tournament_guard.fixed_match_count(db, tid, reg_id):
+            # Feste Spiele schon vor dem Start (Gruppen generiert, Schweizer Runde, Review #2120): die Abmeldung ließe
+            # sie mit einer Anmeldung zurück, die es nicht mehr gibt.
+            raise HTTPException(status_code=409, detail=tournament_guard.SELF_UNREGISTER_FIXED)
     await tournament_fees.close_price(db, reg, "Abmeldung")
     await db.tournament_registrations.delete_one({"id": reg_id})
     await _move_up_from_waitlist(db, tid, me.get("id"))
@@ -1254,10 +1258,7 @@ async def remove_squad(tid: str, reg_id: str, me: dict = Depends(require_area("t
     reg = await db.tournament_registrations.find_one({"id": reg_id, "tournament_id": tid}, {"_id": 0})
     if not reg or not reg.get("squad_id"):
         raise HTTPException(status_code=404, detail="Zuteilung nicht gefunden")
-    fixed = await db.matches_v2.count_documents({
-        "tournament_id": tid, "slots.registration_id": reg_id, "is_preview": {"$ne": True},
-    })
-    if fixed:
+    if await tournament_guard.fixed_match_count(db, tid, reg_id):
         raise HTTPException(status_code=409, detail="Der Spielplan steht schon – das Co-Team bitte über „Austritt "
                                                     "eintragen“ in der Teilnehmerliste herausnehmen.")
     await db.tournament_registrations.delete_one({"id": reg_id, "tournament_id": tid})

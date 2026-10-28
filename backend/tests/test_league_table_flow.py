@@ -195,6 +195,8 @@ async def test_each_group_table_has_form_movement_and_the_own_row(flow):
     tournament, users, registrations = await flow.with_participants(8, format="groups")
     response = await flow.post(f"/api/tournaments/{tournament['id']}/groups/generate", json={"group_count": 2})
     assert response.status_code == 200, response.text
+    # Gruppen generieren startet das Turnier nicht mehr (#2120) - das macht „Turnier starten“.
+    await flow.start(tournament)
     await play_round(flow, staff, tournament, 1)
 
     flow.act_as(users[0])

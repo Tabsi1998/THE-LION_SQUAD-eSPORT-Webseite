@@ -113,7 +113,8 @@ CAPABILITIES: tuple[Capability, ...] = (
         "DELETE /api/tournaments/{tid}/stages/{stage_id}",
         "POST /api/tournaments/{tid}/stages/{stage_id}/generate"], [GRAPH]),
     _c("structure.swiss", "Schweizer Runde erzeugen",
-       ["POST /api/tournaments/{tid}/swiss/next-round"], [CLASSIC, GRAPH],
+       ["POST /api/tournaments/{tid}/swiss/next-round", "POST /api/tournaments/{tid}/swiss/undo-round"],
+       [CLASSIC, GRAPH],
        note="Block 3: bewusst ohne Schema. Wer in Runde 3 gegen wen spielt, hängt an Runde 2 - "
             "die Struktur wächst also Runde für Runde. Ein Freilos wird als entschiedenes Match "
             "mit einem Teilnehmer geschrieben, damit der Punkt dafür in der Tabelle ankommt."),
