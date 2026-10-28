@@ -217,3 +217,33 @@ test("Fehler beim Anlegen der Staffel steht als Meldung da", async () => {
   fireEvent.click(await screen.findByTestId("staffel-add-1"));
   await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Mit bis zu 9 Teams braucht die Staffel 9 Spielwochen"));
 });
+
+// Gestaltung und Gewinne (#2107): Season-Gewinne im Formular, eigene Gewinne je Liga N, Emblem/Banner der Liga als Erbe.
+test("Gewinne der Season gehen mit dem Speichern mit, leere Zeilen fallen weg", async () => {
+  apiMock.patch.mockResolvedValue({ data: { ...SEASON, changed: ["prizes"], staffeln_to_sync: 0 } });
+  apiMock.get.mockResolvedValue({ data: { ...BODY, league: { ...BODY.league, emblem_url: "/api/static/uploads/liga.png" },
+    look: { emblem_url: "/api/static/uploads/liga.png", banner: null, accent_color: null } } });
+  renderPage();
+  const look = await screen.findByTestId("season-look");
+  expect(within(look).getByTestId("season-emblem-sizes").querySelector("img")).toHaveAttribute("src", expect.stringContaining("liga.png"));
+  fireEvent.click(within(look).getByTestId("season-prizes-add"));
+  fireEvent.change(within(look).getByTestId("season-prizes-text-0"), { target: { value: "Pokal und Trikot" } });
+  fireEvent.click(within(look).getByTestId("season-prizes-add"));
+  fireEvent.click(screen.getByTestId("season-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/admin/leagues/seasons/s1", expect.objectContaining({
+    prizes: [{ place: 1, text: "Pokal und Trikot", image_url: null }], emblem_url: null, banner_url: null })));
+});
+
+test("Liga N: eigene Gewinne nur, wenn sie sich ändern; leer heißt wie die Season", async () => {
+  apiMock.patch.mockResolvedValue({ data: {} });
+  apiMock.get.mockResolvedValue({ data: { ...BODY, season: { ...SEASON, prizes: [{ place: 1, text: "Pokal" }] } } });
+  renderPage();
+  fireEvent.click(await screen.findByTestId("division-edit-1"));
+  const sheet = screen.getByTestId("division-sheet");
+  expect(within(sheet).getByTestId("division-prizes")).toHaveTextContent("Wie die Season: 1. Pokal");
+  fireEvent.click(within(sheet).getByTestId("division-prizes-add"));
+  fireEvent.change(within(sheet).getByTestId("division-prizes-text-0"), { target: { value: "Aufstieg" } });
+  fireEvent.click(within(sheet).getByTestId("division-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/admin/leagues/divisions/d1",
+    { nickname: null, overrides: {}, status: "active", prizes: [{ place: 1, text: "Aufstieg", image_url: null }] }));
+});

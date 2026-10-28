@@ -15,6 +15,8 @@ export function leagueTrail(leagues, tournament) {
     seasonName: season.name || "Season",
     seasonHref,
     staffelHref: `${seasonHref}#staffel-${tournament.slug || tournament.id}`,
+    // Gestaltung (#2107): Emblem der Season bzw. Liga - klein auf der Spielseite der Staffel.
+    emblemUrl: season.emblem_url || league.emblem_url || null,
   };
 }
 

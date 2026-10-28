@@ -97,6 +97,59 @@ test("Staffel-Reiter und Sprung aus der Teamseite (#staffel-…)", async () => {
   expect(await screen.findByTestId("league-staffel-A")).toBeInTheDocument();
 });
 
+test("Gestaltung (#2107): Kopf ohne Banner mit Liga-Zeichen, Vereinsfarbe - keine Gewinne, kein Block", async () => {
+  renderPage();
+  const head = await screen.findByTestId("league-head");
+  expect(head).toHaveAttribute("data-banner", "false");
+  expect(screen.getByTestId("league-head-emblem")).toHaveAttribute("data-empty", "true");
+  expect(head.getAttribute("style") || "").not.toContain("--league-accent-rgb");
+  expect(screen.queryByTestId("league-prizes")).toBeNull();
+});
+
+test("Gestaltung (#2107): Banner mit Fokuspunkt, Emblem, Akzentfarbe und „Um was gespielt wird“", async () => {
+  const look = {
+    emblem_url: "/api/static/uploads/probe-emblem.png", accent_color: "#FFB020",
+    banner: { url: "/api/static/uploads/probe-banner.webp", x: 20, y: 70, mobile_x: 80, mobile_y: 30 },
+  };
+  const view = {
+    ...SEASON_VIEW, look,
+    prizes: [{ place: 1, text: "Pokal und Trikot", image_url: "/api/static/uploads/probe-pokal.png" }, { place: 2, text: "Gutschein" }],
+    divisions: [{ ...SEASON_VIEW.divisions[0], prizes: [{ place: 1, text: "Aufstieg" }] }],
+  };
+  apiMock.get.mockImplementation((url) => (url === "/leagues/probe-liga/season-1" ? Promise.resolve({ data: view }) : Promise.resolve({ data: STAFFEL("A") })));
+  renderPage();
+  const head = await screen.findByTestId("league-head");
+  expect(head).toHaveAttribute("data-banner", "true");
+  expect(head.getAttribute("style")).toContain("--league-accent-rgb: 255 176 32");
+  const banner = screen.getByTestId("league-head-banner");
+  expect(banner.getAttribute("style")).toContain("--league-focus-desktop: 20% 70%");
+  expect(banner.getAttribute("style")).toContain("--league-focus-mobile: 80% 30%");
+  const image = banner.querySelector("img");
+  expect(image).toHaveAttribute("data-loaded", "false");
+  fireEvent.load(image);
+  expect(image).toHaveAttribute("data-loaded", "true");
+  expect(screen.getByTestId("league-head-emblem").querySelector("img")).toHaveAttribute("src", look.emblem_url);
+  const prizes = screen.getByTestId("league-prizes");
+  expect(within(prizes).getByTestId("league-prize-1")).toHaveTextContent("1. Platz");
+  expect(within(prizes).getByTestId("league-prize-1")).toHaveAttribute("data-tone", "gold");
+  expect(within(prizes).getByTestId("league-prize-2")).toHaveTextContent("Gutschein");
+  expect(screen.getByTestId("league-prizes-1")).toHaveTextContent("Aufstieg");
+  // Bild lädt nicht: kein leerer Kasten, der Kopf fällt auf „ohne Banner“ zurück.
+  fireEvent.error(image);
+  expect(head).toHaveAttribute("data-banner", "false");
+});
+
+test("ohne Meldeschluss keine leere Zeile unter dem Titel; mit Akzent folgen die Reiter der Liga-Farbe", async () => {
+  const view = { ...SEASON_VIEW, look: { emblem_url: null, banner: null, accent_color: "#FFB020" },
+    season: { ...SEASON_VIEW.season, registration_deadline: null } };
+  apiMock.get.mockImplementation((url) => (url === "/leagues/probe-liga/season-1" ? Promise.resolve({ data: view }) : Promise.resolve({ data: STAFFEL("A") })));
+  renderPage();
+  await screen.findByTestId("league-head");
+  expect(screen.queryByTestId("league-subline")).toBeNull();
+  expect(screen.getByTestId("league-staffel-tab-A")).toHaveClass("tls-league-tab");
+  expect(screen.getByTestId("league-head").closest(".tls-league-look").getAttribute("style")).toContain("--tls-brand-rgb: 255 176 32");
+});
+
 test("Unsichtbare oder unbekannte Season: ein klarer Hinweis", async () => {
   apiMock.get.mockRejectedValue({ response: { status: 404 } });
   renderPage();
