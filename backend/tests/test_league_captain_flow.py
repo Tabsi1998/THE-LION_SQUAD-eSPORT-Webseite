@@ -136,6 +136,62 @@ async def test_every_schedule_action_tells_the_other_side_only(flow):
             assert row["meta"]["category"] == "match_reminders"
 
 
+@pytest.mark.asyncio
+async def test_the_proposing_side_withdraws_its_own_proposal(flow):
+    world = await setup(flow)
+    users = world["users"]
+    flow.act_as(users["Spieler1"])
+    proposed = (await flow.post(proposals_url(world), json={"scheduled_at": when(2)})).json()
+    decision = f"{proposals_url(world)}/{proposed['id']}/decision"
+
+    # Die eigene Seite kann nicht annehmen - der Text nennt das Zurückziehen.
+    own_accept = await flow.post(decision, json={"action": "accept"})
+    assert own_accept.status_code == 400
+    assert "Zurückziehen" in own_accept.json()["detail"]
+
+    # Die andere Seite kann nicht zurückziehen.
+    flow.act_as(users["FalkenLeitung"])
+    refused = await flow.post(decision, json={"action": "withdraw"})
+    assert refused.status_code == 403, refused.text
+
+    # Der Vertreter derselben Seite schon.
+    flow.act_as(users["Spieler2"])
+    withdrawn = await flow.post(decision, json={"action": "withdraw"})
+    assert withdrawn.status_code == 200, withdrawn.text
+    assert withdrawn.json()["status"] == "withdrawn"
+    replay = await flow.post(decision, json={"action": "withdraw"})
+    assert replay.status_code == 200 and replay.json()["idempotent_replay"] is True
+
+    stored = await flow.db.match_schedule_proposals.find_one({"id": proposed["id"]}, {"_id": 0})
+    assert stored["status"] == "withdrawn"
+    match = await flow.db.matches_v2.find_one({"id": world["match"]["id"]}, {"_id": 0})
+    assert match.get("schedule_status") is None, "nichts mehr offen - keine Antwortfrist, keine Eskalation"
+    assert match.get("schedule_deadline_at") is None
+    events = await told(flow)
+    assert receivers(events["schedule_withdrawn"]) == ids(users, "FalkenLeitung")
+
+    # Ein zurückgezogener Vorschlag lässt sich nicht mehr annehmen.
+    flow.act_as(users["FalkenLeitung"])
+    late = await flow.post(decision, json={"action": "accept"})
+    assert late.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_withdrawing_keeps_an_agreed_time(flow):
+    world = await setup(flow)
+    users = world["users"]
+    flow.act_as(users["Spieler1"])
+    first = (await flow.post(proposals_url(world), json={"scheduled_at": when(2)})).json()
+    flow.act_as(users["FalkenLeitung"])
+    assert (await flow.post(f"{proposals_url(world)}/{first['id']}/decision", json={"action": "accept"})).status_code == 200
+    flow.act_as(users["Spieler1"])
+    second = (await flow.post(proposals_url(world), json={"scheduled_at": when(3)})).json()
+    withdrawn = await flow.post(f"{proposals_url(world)}/{second['id']}/decision", json={"action": "withdraw"})
+    assert withdrawn.status_code == 200, withdrawn.text
+    match = await flow.db.matches_v2.find_one({"id": world["match"]["id"]}, {"_id": 0})
+    assert match["schedule_status"] == "accepted"
+
+
 async def actions(flow, user: dict) -> list[dict]:
     flow.act_as(user)
     response = await flow.get("/api/mobile/dashboard")

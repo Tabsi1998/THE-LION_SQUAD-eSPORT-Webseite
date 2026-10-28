@@ -31,6 +31,14 @@ import { MatchCallBox } from "@/components/tls/tournament/MatchCallBox";
 import { ProblemReportForm } from "@/components/tls/results/ProblemReportForm";
 import { ResultWindow } from "@/components/tls/results/ResultWindow";
 import { ResultUndoBar, useResultUndo } from "@/components/tls/results/ResultUndoBar";
+import { isOwnProposal, proposalStatusLabel, waitingForOtherSide } from "@/lib/scheduleProposals";
+
+const DECISION_TOASTS = {
+  accept: "Termin bestätigt.",
+  decline: "Vorschlag abgelehnt.",
+  counter: "Gegenvorschlag gesendet.",
+  withdraw: "Vorschlag zurückgezogen.",
+};
 
 const scheduleLabels = {
   proposed: "Terminvorschlag offen",
@@ -65,9 +73,11 @@ function formatDateTime(value) {
 // Ein laufendes Spiel nennt im Kopf seinen Zustand statt des Termins.
 const LIVE_MATCH_STATUSES = new Set(["in_progress", "running", "waiting_result", "disputed"]);
 
-/** Was im Terminkasten groß steht (#1220): „Noch offen“ nur vor dem Spiel ohne Termin. */
-function scheduleHeadline(match, league = null) {
+/** Was im Terminkasten groß steht (#1220): „Noch offen“ nur vor dem Spiel ohne Termin. Liegt nur der eigene Vorschlag
+ * offen, wartet die Seite auf die Gegenseite (#2110). */
+function scheduleHeadline(match, league = null, waiting = false) {
   if (LIVE_MATCH_STATUSES.has(String(match.status))) return formatMatchStatus(match.status);
+  if (waiting && match.schedule_status === "proposed") return "Wartet auf Gegenseite";
   if (scheduleLabels[match.schedule_status]) return scheduleLabels[match.schedule_status];
   if (!match.scheduled_at && league?.default_time) return "Standardtermin";
   return match.scheduled_at ? "Termin steht" : "Noch offen";
@@ -197,7 +207,7 @@ function MatchPageView() {
     }
     await runAction(async () => {
       await api.post(`/matches/${id}/schedule-proposals/${proposal.id}/decision`, payload);
-      toast.success(action === "accept" ? "Termin bestätigt." : action === "counter" ? "Gegenvorschlag gesendet." : "Vorschlag abgelehnt.");
+      toast.success(DECISION_TOASTS[action] || "Gespeichert.");
       setDecisionNote("");
       setCounterAt("");
       await load();
@@ -341,7 +351,7 @@ function MatchPageView() {
           ) : (
             <div className="border border-white/10 bg-[#121212] rounded-sm px-4 py-3 w-full sm:w-auto sm:min-w-[16rem]" data-testid="match-schedule">
               <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold">Terminstatus</div>
-              <div className="mt-1 font-heading font-black uppercase text-[#FFD700]">{scheduleHeadline(match, league)}</div>
+              <div className="mt-1 font-heading font-black uppercase text-[#FFD700]" data-testid="match-schedule-headline">{scheduleHeadline(match, league, waitingForOtherSide(data.schedule_proposals, data, user?.id))}</div>
               <div className="mt-1 text-sm text-white/65" data-testid="match-when">{scheduleWhen(match, league)}</div>
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {eventModeLabels[data.event_mode] && <Pill>{eventModeLabels[data.event_mode]}</Pill>}
@@ -524,30 +534,39 @@ function MatchPageView() {
               )}
 
               <div className="mt-5 space-y-3">
-                {(data.schedule_proposals || []).map((p) => (
-                  <div key={p.id} className="border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
+                {(data.schedule_proposals || []).map((p) => {
+                  const open = p.status === "pending";
+                  // Der eigene Vorschlag (#2110): annehmen oder ablehnen kann nur die Gegenseite - hier „Zurückziehen“.
+                  const own = open && isOwnProposal(p, data, user?.id);
+                  const answer = canManageSchedule && open && !own;
+                  return (
+                  <div key={p.id} className="border border-white/10 bg-[#0A0A0A] rounded-sm p-3" data-testid={`match-proposal-${p.id}`}>
                     <div className="flex items-start justify-between gap-3">
-                      <div>
+                      <div className="min-w-0">
                         <div className="text-sm font-bold">{formatDateTime(p.scheduled_at)}</div>
-                        <div className="text-xs text-white/45 mt-1">{p.actor?.display_name || p.actor?.username || "Teilnehmer"} · {p.status}</div>
-                        {p.note && <div className="text-xs text-white/60 mt-2">{p.note}</div>}
+                        <div className="text-xs text-white/45 mt-1 [overflow-wrap:anywhere]" data-testid={`match-proposal-status-${p.id}`}>{p.actor?.display_name || p.actor?.username || "Teilnehmer"} · {own ? "wartet auf die Gegenseite" : proposalStatusLabel(p)}</div>
+                        {p.note && <div className="text-xs text-white/60 mt-2 [overflow-wrap:anywhere]">{p.note}</div>}
                       </div>
-                      {canManageSchedule && p.status === "pending" && (
+                      {answer && (
                         <div className="flex gap-1 shrink-0">
-                          <button type="button" disabled={busy} onClick={() => decide(p, "accept")} className="p-2 border border-[#00D26A]/40 text-[#00D26A] rounded-sm disabled:opacity-50"><Check className="w-3.5 h-3.5" /></button>
-                          <button type="button" disabled={busy} onClick={() => decide(p, "decline")} className="p-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm disabled:opacity-50"><X className="w-3.5 h-3.5" /></button>
+                          <button type="button" disabled={busy} onClick={() => decide(p, "accept")} aria-label="Termin annehmen" title="Annehmen" data-testid={`match-proposal-accept-${p.id}`} className="tls-btn tls-btn--quiet min-h-11 min-w-11 inline-flex items-center justify-center border border-[#00D26A]/40 text-[#00D26A] rounded-sm disabled:opacity-50"><Check className="w-3.5 h-3.5" /></button>
+                          <button type="button" disabled={busy} onClick={() => decide(p, "decline")} aria-label="Termin ablehnen" title="Ablehnen" data-testid={`match-proposal-decline-${p.id}`} className="tls-btn tls-btn--quiet min-h-11 min-w-11 inline-flex items-center justify-center border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm disabled:opacity-50"><X className="w-3.5 h-3.5" /></button>
                         </div>
                       )}
+                      {own && canManageSchedule && (
+                        <button type="button" disabled={busy} onClick={() => decide(p, "withdraw")} data-testid={`match-proposal-withdraw-${p.id}`} className="tls-btn tls-btn--quiet shrink-0 min-h-11 px-3 py-2 rounded-sm text-[10px] uppercase tracking-wider font-bold disabled:opacity-50">Zurückziehen</button>
+                      )}
                     </div>
-                    {canManageSchedule && p.status === "pending" && (
+                    {answer && (
                       <div className="mt-3 grid md:grid-cols-[1fr_1fr_auto] gap-2 items-end">
-                        <input type="datetime-local" value={counterAt} onChange={(e) => setCounterAt(e.target.value)} className="input" />
-                        <input value={decisionNote} onChange={(e) => setDecisionNote(e.target.value)} className="input" placeholder="Antwort / Grund" />
+                        <input type="datetime-local" aria-label="Gegenvorschlag: Datum und Uhrzeit" value={counterAt} onChange={(e) => setCounterAt(e.target.value)} className="input" />
+                        <input aria-label="Antwort oder Grund" value={decisionNote} onChange={(e) => setDecisionNote(e.target.value)} className="input" placeholder="Antwort / Grund" />
                         <button type="button" disabled={busy} onClick={() => decide(p, "counter")} className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-[10px] uppercase tracking-wider font-bold disabled:opacity-50">Gegenvorschlag</button>
                       </div>
                     )}
                   </div>
-                ))}
+                  );
+                })}
                 {!latestProposal && (data.schedule_proposals || []).length === 0 && <div className="text-sm text-white/40">Noch kein Terminvorschlag vorhanden.</div>}
               </div>
             </div>
