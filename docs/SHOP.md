@@ -539,7 +539,9 @@ Grund ist optional, **Pflicht nur beim Veröffentlichen** - dann geht das Produk
    Tabelle der gängigen Printful-Farben, dann wortweise („Dark Grey“ → „Dunkelgrau“, „Heather …“ → „… meliert“),
    englisch nur als letzter Rückfall; „One size“ heißt „Einheitsgröße“. Je Farbe lässt sich in Schritt 2 eine eigene
    **Bezeichnung im Shop** setzen (`offer.color_labels`, höchstens 40 Zeichen, leer = Vorschlag, Protokoll
-   `shop.product.offer`). Der Printful-Name bleibt intern der Schlüssel (Varianten, Bestellungen, Druckdateien,
+   `shop.product.offer`). Bezeichnungen sind eindeutig: zwei gleiche automatische bekommen den Printful-Namen in
+   Klammern („Königsblau (Royal Blue)“), eine eigene, die schon eine andere angebotene Farbe trägt, lehnt Schritt 2
+   ab. Der Printful-Name bleibt intern der Schlüssel (Varianten, Bestellungen, Druckdateien,
    Ausnahmen je Farbe) - angezeigt wird überall die Bezeichnung; gespeicherte Bezeichnungen einer Bestellung („Black /
    M“) zeigt die Bestellansicht über dieselbe Übersetzung (`variant_display`), ohne Datenänderung.
 3. **Druckflächen** (seit #2069, Abschnitt „Druckvorlagen und Druckdateien“): je Printful-Fläche aus der Druckvorlage
