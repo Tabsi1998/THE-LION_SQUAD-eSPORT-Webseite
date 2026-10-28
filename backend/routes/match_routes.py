@@ -445,7 +445,31 @@ def _schedule_deadline(match: dict, tournament: dict | None = None) -> str:
     if value:
         return value
     hours = int((tournament or {}).get("match_schedule_response_hours") or (match.get("settings") or {}).get("schedule_response_hours") or 72)
-    return (now_utc() + timedelta(hours=hours)).isoformat()
+    # Liga (P2, docs/LIGA.md): Zeit in einer Sperrzeit zählt nicht mit - ohne Sperrzeiten genau „jetzt + Stunden“.
+    from services.matchday_schedule import response_deadline
+
+    due = response_deadline(tournament, now_utc(), hours)
+    return (due or now_utc() + timedelta(hours=hours)).isoformat()
+
+
+def _refuse_blocked_moment(tournament: dict | None, moment) -> None:
+    """Liga (docs/LIGA.md, Abschnitt 5): ein Terminvorschlag in einer Sperrzeit oder Sperrwoche geht nicht."""
+    from services.matchday_schedule import blocked_period_at
+
+    blocked = blocked_period_at(tournament, moment)
+    if not blocked:
+        return
+    first, last = blocked.get("start_date"), blocked.get("end_date")
+
+    def day(value):
+        try:
+            year, month, date_ = str(value).split("-")
+            return f"{int(date_)}.{int(month)}.{year}"
+        except ValueError:
+            return str(value)
+    span = day(first) if first == last else f"{day(first)} bis {day(last)}"
+    raise HTTPException(status_code=409, detail=f"In dieser Zeit wird nicht gespielt ({blocked.get('label') or 'Sperrzeit'}, "
+                                                f"{span}) – bitte einen anderen Termin vorschlagen.")
 
 
 async def _refresh_schedule_escalation(match: dict, collection: str) -> dict:
@@ -735,6 +759,7 @@ async def create_schedule_proposal(match_id: str, body: MatchScheduleProposalCre
         raise HTTPException(status_code=403, detail="Terminvorschläge sind für dieses Match nicht aktiviert")
     if not await _can_act_for_match(match, me):
         raise HTTPException(status_code=403, detail="Nur Teilnehmer, Team-Captains oder Turnierleitung duerfen Termine vorschlagen")
+    _refuse_blocked_moment(tournament, body.scheduled_at)
     now_iso = now_utc().isoformat()
     normalized_note = (body.note or "").strip() or None
     existing = await db.match_schedule_proposals.find_one({
@@ -851,6 +876,7 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
         return {"ok": True, "status": "declined", "idempotent_replay": False}
     if not body.scheduled_at:
         raise HTTPException(status_code=400, detail="Gegenvorschlag braucht Datum und Uhrzeit")
+    _refuse_blocked_moment(tournament, body.scheduled_at)
     await db.match_schedule_proposals.update_one({"id": proposal_id}, {"$set": {
         "status": "countered",
         "decision_user_id": me["id"],
