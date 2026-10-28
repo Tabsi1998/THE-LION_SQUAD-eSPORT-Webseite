@@ -227,3 +227,19 @@ async def test_a_failing_pool_copy_is_reported_per_staffel_and_the_rest_goes_on(
     assert "map_pool" in rows[second["tournament_id"]]["changed"]
     assert await map_pools.current(flow.db, "tournament", second["tournament_id"])
     assert resets == [1]
+
+
+# ---------------------------------------------------------------- 2. Jahreswertung mit nur Staffeln
+
+@pytest.mark.asyncio
+async def test_a_season_listing_only_staffeln_does_not_fall_back_to_every_tournament(flow):
+    from routes.season_routes import _resolve_season_sources
+
+    _admin, _season, _division, staffel = await setup_staffel(flow)
+    await flow.create_tournament(title="Herbst-Cup", status="completed")
+    only_staffeln, _ = await _resolve_season_sources({"tournament_ids": [staffel["id"]]})
+    assert only_staffeln == []
+    with_fastlap, fastlaps = await _resolve_season_sources({"tournament_ids": [staffel["id"]], "f1_challenge_ids": ["f1"]})
+    assert with_fastlap == [] and fastlaps == ["f1"]
+    automatic, _ = await _resolve_season_sources({})
+    assert len(automatic) == 1  # ohne Auswahl bleibt die Automatik - das normale Turnier

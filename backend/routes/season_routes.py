@@ -153,11 +153,14 @@ async def _resolve_season_sources(s: dict) -> tuple[list[str], list[str]]:
     """
     db = get_db()
     # Liga-Staffeln zählen nie für die Jahreswertung (docs/LIGA.md, Abschnitt 7) - auch nicht ausdrücklich gelistet.
+    # Wer Turniere ausdrücklich gewählt hat, bekommt nie den Automatik-Rückfall - auch nicht, wenn nach dem Herausnehmen
+    # der Staffeln keines übrig bleibt (sonst zählten auf einmal alle Turniere).
     explicit_t = list(s.get("tournament_ids") or [])
+    had_explicit_t = bool(explicit_t)
     league = await league_tournament_ids(db, explicit_t)
     explicit_t = [tid for tid in explicit_t if tid not in league]
     explicit_f = list(s.get("f1_challenge_ids") or [])
-    if explicit_t and explicit_f:
+    if had_explicit_t and explicit_f:
         return explicit_t, explicit_f
 
     # Build date filter (lenient: matches scheduled_at OR created_at fallback)
@@ -166,7 +169,7 @@ async def _resolve_season_sources(s: dict) -> tuple[list[str], list[str]]:
     relevant_status = {"live", "completed", "results_published", "check_in", "scheduled"}
 
     auto_t: list[str] = []
-    if not explicit_t:
+    if not had_explicit_t:
         async for t in db.tournaments.find(dict(NOT_LEAGUE), {"id": 1, "status": 1, "start_date": 1, "created_at": 1,
                                                                "_id": 0}):
             if t.get("status") not in relevant_status:
@@ -185,7 +188,7 @@ async def _resolve_season_sources(s: dict) -> tuple[list[str], list[str]]:
                 continue
             auto_f.append(f["id"])
 
-    return (explicit_t or auto_t), (explicit_f or auto_f)
+    return (explicit_t if had_explicit_t else auto_t), (explicit_f or auto_f)
 
 
 @season_router.get("/{slug_or_id}/standings")
