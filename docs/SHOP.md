@@ -1336,9 +1336,11 @@ schätzen“, „Mit Printful abgleichen“, Schritt 2) laufen höchstens vier g
 gemeinsame Rate-Limit des Adapters (100 von 120 Aufrufen je Minute) lässt Luft für Schätzungen an der Kasse.
 
 **An der Kasse (Vertrag für #1712/#1714):** `shop_orders.quote_cart(db, lines, provider=…, country=…, zip_code=…,
-buyer_kind=…, shipping_estimate_cents=None)` nimmt die Positionen wie der Warenkorb (Variante, Menge, Gamertag - nie
-einen Preis), prüft sie **wie die Bestellung** (`_checked_line`: veröffentlicht, aktiv, nicht gesperrt, lieferbar,
-Pflichtoptionen, Preis nicht unter dem Mindestpreis, Gamertag nur, wo erlaubt) und schätzt den ganzen Warenkorb auf
+buyer_kind=…, user_id=…, shipping_estimate_cents=None)` nimmt die Positionen wie die Bestellung (Variante, Menge,
+Gamertag, Haken `number_consent` - nie einen Preis), prüft sie **wie die Bestellung** (`_checked_line`: veröffentlicht,
+aktiv, nicht gesperrt, lieferbar, Pflichtoptionen, Preis nicht unter dem Mindestpreis, Gamertag nur, wo erlaubt,
+Vereinsnummer nur mit Berechtigung, vergebener Nummer und Einwilligung des Kontos `user_id`) und schätzt den ganzen
+Warenkorb auf
 **derselben Grundlage** (`shop_pricing.estimate_rows`: je Position die Grunddateien der Variante): `source`, je
 Position `line_total_cents`, `items_cents`, `shipping_cents`, `fees_cents`, `tax_cents`, `markup_cents`,
 `total_cents`. Es entstehen keine Dateien. Ein Gamertag ändert den Preis nicht - `place_order` friert danach denselben

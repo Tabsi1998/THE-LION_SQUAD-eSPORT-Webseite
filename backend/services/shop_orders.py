@@ -199,11 +199,13 @@ async def _freeze_designs(db, product: dict, variant: dict, line: dict, position
     return files, designs
 
 
-async def _checked_line(db, line: dict, position: int, buyer_kind: str, config: dict) -> dict:
+async def _checked_line(db, line: dict, position: int, buyer_kind: str, config: dict, *,
+                        user_id: str | None) -> dict:
     """Die Vorprüfung einer Position - dieselbe für Kasse (``quote_cart``) und Bestellung (``place_order``, #2135):
     veröffentlicht, aktiv, nicht gesperrt, bei Printful lieferbar, Pflichtoptionen gewählt (#2158), Preis übernommen
-    und nicht unter dem Mindestpreis, Gamertag nur, wo er erlaubt ist. Liefert Variante, Produkt, Zuordnung, Preis,
-    Optionen und Aufschlag; es entsteht keine Datei."""
+    und nicht unter dem Mindestpreis, Gamertag nur, wo er erlaubt ist, Vereinsnummer nur mit Berechtigung, Nummer und
+    Einwilligung (#2150). Liefert Variante, Produkt, Zuordnung, Preis, Optionen, Aufschlag und die Nummer; es entsteht
+    keine Datei."""
     variant = await shop_catalog.get_variant(db, line["variant_id"])
     product = await shop_catalog.get_product(db, variant["product_id"]) if variant else None
     if (not variant or not product or not variant.get("active") or variant.get("blocked_reason")
@@ -227,18 +229,18 @@ async def _checked_line(db, line: dict, position: int, buyer_kind: str, config: 
         _not_orderable(position, product, variant, "kein Preis übernommen")
     if unit < config["min_price_cents"]:
         _not_orderable(position, product, variant, "Preis unter dem Mindestpreis")
+    number = await _print_number(db, product, line, position, buyer_kind, user_id)
     return {"variant": variant, "product": product, "mapping": mapping or {}, "unit_price_cents": int(unit),
             "options": options, "markup_cents": shop_config.markup_cents(config, buyer_kind, product),
-            "quantity": line["quantity"]}
+            "quantity": line["quantity"], "number": number}
 
 
 async def _freeze_line(db, line: dict, position: int, buyer_kind: str, config: dict, *, user_id: str, order_id: str,
                        item_id: str, now: str | None = None) -> tuple[dict, dict]:
     """Eine Position einfrieren. Liefert (Position, Vorprüfung) - die Vorprüfung braucht die Schätzung."""
-    checked = await _checked_line(db, line, position, buyer_kind, config)
+    checked = await _checked_line(db, line, position, buyer_kind, config, user_id=user_id)
     variant, product, mapping = checked["variant"], checked["product"], checked["mapping"] or None
-    unit, options = checked["unit_price_cents"], checked["options"]
-    number = await _print_number(db, product, line, position, buyer_kind, user_id)
+    unit, options, number = checked["unit_price_cents"], checked["options"], checked["number"]
     if not product.get("placements") and product.get("design_key"):
         # Auch hier die Fassung für die Shirtfarbe (#2069 Teil A) - nicht immer die Hauptdatei.
         latest = await shop_motifs.file_for_garment(db, product["design_key"], color=variant.get("color"),
@@ -385,16 +387,19 @@ async def place_order(db, *, user_id: str, idempotency_key: str, buyer_kind: str
 
 
 async def quote_cart(db, lines: list, *, provider: FulfillmentProvider | None, country: str, zip_code: str,
-                     buyer_kind: str = "member", shipping_estimate_cents: int | None = None) -> dict:
+                     buyer_kind: str = "member", user_id: str | None = None,
+                     shipping_estimate_cents: int | None = None) -> dict:
     """Der Betrag an der Kasse vor dem Bestellen (#2135, Vertrag für #1712/#1714): Positionen wie im Warenkorb
     (Variante, Menge, Gamertag - nie ein Preis), **dieselbe Vorprüfung** wie ``place_order`` (``_checked_line``:
     lieferbar, Mindestpreis, Pflichtoptionen …) und **dieselbe Grundlage** (``shop_pricing.quote_lines``: je Position
     die Grunddateien der Variante; Rückfall mit derselben Versandregel). So zeigt die Kasse nie einen Betrag, den die
-    Bestellung anders einfriert oder ablehnt. Es entstehen keine Dateien."""
-    clean = _lines(lines, consent=False)
+    Bestellung anders einfriert oder ablehnt. Mit ``user_id`` (das Konto an der Kasse) und dem Haken
+    ``number_consent`` je Position wie in der Bestellung - auch die Vereinsnummer (#2150) wird gleich geprüft. Es
+    entstehen keine Dateien."""
+    clean = _lines(lines)
     shop_config.check_shipping_country(country)
     config = await shop_config.load(db)
-    rows = [await _checked_line(db, line, position, buyer_kind, config)
+    rows = [await _checked_line(db, line, position, buyer_kind, config, user_id=user_id)
             for position, line in enumerate(clean, start=1)]
     return await shop_pricing.quote_lines(db, rows, provider=provider, country=country, zip_code=zip_code,
                                           config=config, shipping_estimate_cents=shipping_estimate_cents)
