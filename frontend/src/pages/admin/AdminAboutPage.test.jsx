@@ -84,6 +84,10 @@ test("mit Vereinsdaten aus Dolibarr sind Gründung und gemeinnützig gesperrt", 
   expect(await screen.findByTestId("about-organization-dolibarr")).toHaveTextContent("gegründet 2021");
   expect(screen.getByTestId("about-founded-year")).toBeDisabled();
   expect(screen.getByTestId("about-nonprofit")).toBeDisabled();
+  // Der Vereinszweck kommt dann auch aus Dolibarr (#2122 NW8) - ein Feld, das nicht wirkt, bleibt gesperrt.
+  expect(screen.getByTestId("about-purpose")).toBeDisabled();
+  expect(screen.getByRole("link", { name: "Verein → Vereinsdaten" })).toHaveAttribute("href", "/admin/club");
+  expect(screen.getByTestId("about-legal-hint")).not.toHaveTextContent("Rechtliches");
 });
 
 test("Formular-Umwandlung", () => {

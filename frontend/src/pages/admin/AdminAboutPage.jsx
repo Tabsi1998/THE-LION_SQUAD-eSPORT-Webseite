@@ -182,7 +182,7 @@ export default function AdminAboutPage() {
         headerExtra={<Link to="/about" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider font-bold text-white/60 hover:text-[#29B6E8] transition" data-testid="about-preview-link">Seite ansehen <ExternalLink className="w-3.5 h-3.5" /></Link>}
         aside={(
           <>
-            <FormSection title="Vereinsdaten" accent={ACCENT} hint={fromDolibarr ? "Gründung, Zweck und gemeinnützig kommen aus Dolibarr (Schalter „Vereinsdaten aus Dolibarr“ in den Einstellungen). Die Felder hier sind nur der Rückfall." : "Solange die Vereinsdaten nicht aus Dolibarr kommen, gelten diese Felder."} testId="about-organization">
+            <FormSection title="Vereinsdaten" accent={ACCENT} hint={fromDolibarr ? "Gründung, Zweck und gemeinnützig kommen aus Dolibarr (Schalter „Vereinsdaten aus Dolibarr“ unter Verein → Vereinsdaten). Die Felder hier sind nur der Rückfall." : "Solange die Vereinsdaten nicht aus Dolibarr kommen, gelten diese Felder."} testId="about-organization">
               {fromDolibarr && (
                 <p className="text-xs text-[#29B6E8]" data-testid="about-organization-dolibarr">
                   Aus Dolibarr: {data.organization.founded_on ? `gegründet am ${foundedLabel(data.organization.founded_on)}` : data.organization.founded_year ? `gegründet ${data.organization.founded_year}` : "kein Gründungsdatum"}{data.organization.nonprofit ? ", gemeinnützig" : ""}{data.organization.purpose ? ` – „${data.organization.purpose}“` : ""}
@@ -193,8 +193,9 @@ export default function AdminAboutPage() {
                 <TextField label="Gründungsjahr" value={form.founded_on ? form.founded_on.slice(0, 4) : form.founded_year} onChange={(v) => set("founded_year", v)} placeholder="2019" maxLength={4} testId="about-founded-year" disabled={fromDolibarr || Boolean(form.founded_on)} hint={fromDolibarr ? "aus Dolibarr" : form.founded_on ? "aus dem Gründungsdatum" : "Reicht für „Jahre aktiv“ – für den Vereinsgeburtstag braucht es den Tag."} />
                 <CheckField label="Gemeinnützig" checked={form.nonprofit} onChange={(v) => set("nonprofit", v)} testId="about-nonprofit" disabled={fromDolibarr} hint={fromDolibarr ? "aus Dolibarr" : undefined} className="mt-6" />
               </FormGrid>
-              <TextAreaField label="Vereinszweck" value={form.purpose} onChange={(v) => set("purpose", v)} rows={3} testId="about-purpose" hint={fromDolibarr ? "aus Dolibarr – wird dort gepflegt" : "Ein Satz, wie er in den Statuten steht."} />
-              <p className="text-xs text-white/45">ZVR und Sitz kommen aus den Vereinsdaten (Einstellungen → Rechtliches).</p>
+              {/* Aus Dolibarr gesperrt wie Gründung und Gemeinnützig (#2122 NW8) - eine Änderung hier würde nicht wirken. */}
+              <TextAreaField label="Vereinszweck" value={form.purpose} onChange={(v) => set("purpose", v)} rows={3} testId="about-purpose" disabled={fromDolibarr} hint={fromDolibarr ? "aus Dolibarr – wird dort gepflegt" : "Ein Satz, wie er in den Statuten steht."} />
+              <p className="text-xs text-white/45" data-testid="about-legal-hint">ZVR und Sitz kommen aus <Link to="/admin/club" className="text-[#29B6E8] hover:underline">Verein → Vereinsdaten</Link>.</p>
             </FormSection>
             <FormSection title="Der Verein in Zahlen" accent={ACCENT} testId="about-numbers">
               <p className="text-xs text-white/50">Gezählt, nicht getippt. Häkchen zeigen die Kachel auf „Über uns“ und der Startseite, die Pfeile bestimmen die Reihenfolge. Zähler mit null bleiben von selbst weg.</p>
