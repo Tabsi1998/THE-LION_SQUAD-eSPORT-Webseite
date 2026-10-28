@@ -631,9 +631,11 @@ class EventUpdate(BaseModel):
     banner_style: Optional[EventBannerStyle] = None
     banner_focus_x: Optional[int] = Field(default=None, ge=0, le=100)
     banner_focus_y: Optional[int] = Field(default=None, ge=0, le=100)
+    # Neuer Termin oder Ort (#2118): die Angemeldeten und die Warteliste informieren - wird nicht gespeichert.
+    notify_registrants: Optional[bool] = None
 
 
-EventRegistrationStatus = Literal["registered", "waitlist", "checked_in", "cancelled", "no_show"]
+EventRegistrationStatus =Literal["registered", "waitlist", "checked_in", "cancelled", "no_show"]
 
 
 class EventRegistrationCreate(BaseModel):

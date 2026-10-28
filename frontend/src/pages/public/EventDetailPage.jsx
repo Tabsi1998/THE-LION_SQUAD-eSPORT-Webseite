@@ -28,7 +28,7 @@ import { seoTextPreview } from "@/lib/textPreview";
 import { formatWhen } from "@/lib/datetime";
 import { eventIsOver, photosComingWindow } from "@/lib/afterEnd";
 import { countText, ownSeatsSentence, seatsLabel } from "@/lib/eventSeats";
-import { eventFacts, eventTabs, stripHeadingEmoji, visibilityChip, whatsOnRows } from "@/lib/eventPage";
+import { cancelledNotice, eventFacts, eventTabs, stripHeadingEmoji, visibilityChip, whatsOnRows } from "@/lib/eventPage";
 import { RETURN_PARAM, offersPlayAlong, returnTournamentPath } from "@/lib/playAlong";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { hasArea } from "@/lib/permissions";
@@ -320,7 +320,8 @@ function EventFactsBox({ e, user, over, onRegister }) {
   const own = e.own_registration;
   const recap = over && e.status !== "cancelled";
   // Nach dem Event (#1187): „Du warst dabei“ führt zum Rückblick; eine Warteliste von damals steht nicht mehr da.
-  const activeOwn = own && !["cancelled", "no_show"].includes(own.status) && !(recap && own.status === "waitlist");
+  // Abgesagt (#2118): kein „Du bist dabei“ mehr - auch nicht für Anmeldungen aus der Zeit vor der Absage-Automatik.
+  const activeOwn = own && !["cancelled", "no_show"].includes(own.status) && !(recap && own.status === "waitlist") && e.status !== "cancelled";
   const phaseState = e.public_phase?.state || e.event_phase?.state || e.status;
   const canRegister = e.has_registration && !e.registration_url && !activeOwn && !over
     && (phaseState === "registration_open" || e.access_link?.grants?.includes("register"));
@@ -364,9 +365,20 @@ function EventOverview({ e, user, over, accessToken, hasConsent, onChanged, regi
   const rows = whatsOnRows(e);
   // Rückblick (#1187): nach dem letzten Event-Tag (nicht bei Absage) statt Anmeldung und „Was läuft“.
   const recap = over && e.status !== "cancelled";
+  const cancelled = cancelledNotice(e);
   const singleMap = (e.locations?.length || 0) <= 1 && e.show_map && mapEmbedUrl(e);
   return (
     <div className="space-y-12" data-testid="event-overview">
+      {/* Abgesagt (#2118): oben und deutlich - statt Anmeldung oder „Du bist dabei“. */}
+      {cancelled && (
+        <div role="status" className="border border-[#FF6B6B]/35 bg-[#FF6B6B]/10 rounded-sm px-4 py-3 min-w-0" data-testid="event-cancelled">
+          <div className="inline-flex items-center gap-2 text-sm font-black uppercase tracking-wider text-[#FF6B6B]">
+            <XCircle className="w-4 h-4 shrink-0" aria-hidden="true" /> Event abgesagt
+          </div>
+          <p className="mt-1 text-sm text-white/80 break-words">{cancelled}</p>
+        </div>
+      )}
+
       {/* Nach dem Ende (#1221): kein Kalender, kein „Live verfolgen“, kein „Display“. Der Rückblick (#1187) steht oben;
           solange seine Daten fehlen, der Satz, wo die Ergebnisse stehen. */}
       {recap && (
@@ -387,7 +399,7 @@ function EventOverview({ e, user, over, accessToken, hasConsent, onChanged, regi
       )}
 
       {/* 1. Dein Event: der eigene Stand (später mit Ticket) - oder die Anmeldung, solange sie offen ist. */}
-      {e.has_registration && !recap && (
+      {e.has_registration && !recap && !cancelled && (
         <section id="dein-event" ref={yoursRef} className="scroll-mt-24" data-section="yours" data-testid="event-yours">
           <EventRegistrationPanel event={e} user={user} accessToken={accessToken} onChanged={onChanged} open={registerOpen} onRegistered={onRegistered} />
         </section>

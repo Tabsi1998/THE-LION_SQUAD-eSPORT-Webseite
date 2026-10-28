@@ -1,4 +1,39 @@
-import { eventIsOver, eventLastDay, visibilityWord } from "@/lib/eventAdmin";
+import {
+  affectedRegistrations, cancelConfirmText, deleteConfirmText, eventIsOver, eventLastDay, savedEventMessage,
+  touchesScheduleOrPlace, visibilityWord,
+} from "@/lib/eventAdmin";
+
+// Absagen, Verschieben, Löschen (#2118): Rückfragen mit Zahl und ehrliche Texte.
+test("Betroffene: Angemeldete (samt Eingecheckten) und Warteliste", () => {
+  expect(affectedRegistrations({ registration_summary: { registered_count: 4, waitlist_count: 2 } })).toBe(6);
+  expect(affectedRegistrations({})).toBe(0);
+});
+
+test("Rückfrage beim Absagen nennt die Zahl in Einzahl und Mehrzahl", () => {
+  expect(cancelConfirmText(0)).toContain("Niemand ist angemeldet");
+  expect(cancelConfirmText(1)).toContain("1 Anmeldung (samt Warteliste)");
+  expect(cancelConfirmText(5)).toContain("5 Anmeldungen (samt Warteliste)");
+  expect(cancelConfirmText(5)).toContain("storniert");
+});
+
+test("Termin oder Ort geändert: nur diese Felder zählen", () => {
+  expect(touchesScheduleOrPlace({ start_date: "2026-11-14T10:00" })).toBe(true);
+  expect(touchesScheduleOrPlace({ locations: [] })).toBe(true);
+  expect(touchesScheduleOrPlace({ city: "Innsbruck" })).toBe(true);
+  expect(touchesScheduleOrPlace({ description: "neu", max_participants: 10 })).toBe(false);
+});
+
+test("Rückmeldung nach dem Speichern: Absage mit Zahlen, sonst schlicht", () => {
+  expect(savedEventMessage({ cancellation: { registrations: 3, notified: 2, orders: 1 } }))
+    .toBe("Event abgesagt: 3 Anmeldungen storniert, 2 Personen benachrichtigt, 1 Rechnungsauftrag storniert.");
+  expect(savedEventMessage({ change_notice: { notified: 1 } })).toBe("Gespeichert. 1 Person benachrichtigt.");
+  expect(savedEventMessage({})).toBe("Gespeichert.");
+});
+
+test("Löschen sagt ehrlich, was passiert", () => {
+  expect(deleteConfirmText({ name: "Herbst-LAN" })).toContain("endgültig");
+  expect(deleteConfirmText({ name: "Herbst-LAN", registration_summary: { registered_count: 2 } })).toContain("zuerst absagen");
+});
 
 // Eventliste (#1373): „Rückblick schreiben“ erst nach dem letzten Tag in Wien - wie der Server (event_recap.is_over).
 

@@ -100,7 +100,15 @@ Mal senden nur Redaktion und System.
 - **Vorschau beim Teilen:** Bei „Nur registrierte Community“ und „Nur Vereinsmitglieder“ erlaubt der Haken **Beim Teilen Titel und
   Bild zeigen**, dass WhatsApp & Co. mehr als eine neutrale Karte zeigen. Bei „Nur intern“ gibt es immer nur die neutrale Karte.
 - **Live-Stream (optional):** Plattform und Adresse.
-- **Löschen:** in der Liste das Papierkorb-Symbol, mit Rückfrage. Das Event verschwindet aus der öffentlichen Liste.
+- **Absagen:** Status **Abgesagt** und speichern. Die Rückfrage nennt die Zahl der Anmeldungen (samt Warteliste). Danach gelten
+  alle Anmeldungen als storniert, jede Person bekommt eine Benachrichtigung und – wenn sie Mails zu Turnier-Updates zulässt –
+  die Mail „Nachricht zum Event“. Offene Rechnungsaufträge werden storniert; eine schon gestellte Rechnung kommt als Prüffall in
+  die Finanzübersicht. Die Event-Seite zeigt **Event abgesagt** statt der Anmeldung.
+- **Termin oder Ort ändern:** Gibt es Anmeldungen, fragt das Formular beim Speichern **Angemeldete informieren?**.
+  **Informieren** schickt allen (samt Warteliste) den neuen Termin und Ort, **Ohne Nachricht speichern** nur das Formular.
+- **Löschen:** in der Liste das Papierkorb-Symbol. Gelöscht wird endgültig und nur, wenn nichts mehr daran hängt: keine
+  Anmeldung (sonst zuerst absagen), keine gestellte Rechnung (dann archivieren) und kein verknüpftes Turnier mit Anmeldungen.
+  Turniere, Fast Laps und Alben bleiben, sind danach aber keinem Event mehr zugeordnet. Das Löschen steht im Protokoll.
 
 Die **Liste** hat Suche, Filter für Status, Typ und Sichtbarkeit, die Zahl der Plätze und einen **CSV**-Export der gefilterten Zeilen.
 
@@ -156,7 +164,8 @@ Was die Besucher davon sehen:
 
 Im Kasten **Anmeldung** den Haken **Registrierung/Anmeldung für dieses Event anzeigen** setzen. Dann stehen da:
 
-- **Anmeldung öffnet** und **Anmeldung schließt** (beide leer: sofort offen). Dazu **Max. Teilnehmer** unter „Zeiten und Plätze“.
+- **Anmeldung öffnet** und **Anmeldung schließt** (beide leer: sofort offen). Dazu **Max. Teilnehmer** unter „Zeiten und Plätze“
+  (leer = unbegrenzt, sonst mindestens 1).
 - **Externer Anmeldelink:** Wer die Anmeldung woanders führt, trägt die Adresse ein; dann zeigt die Seite nur einen Knopf
   **Anmelden** dorthin, und Kosten, Warteliste und Discord entfallen.
 - **Begleitpersonen erlauben** und **Max. Begleitpersonen pro Anmeldung** (bis 20). Jede Begleitperson braucht einen Platz.
@@ -371,6 +380,11 @@ Name, Bild und dem Ort: Event und Turniere, bei Teams mit Teamname. Wichtig für
 | Termin fehlt in „Mein Kalender“ | Abgemeldet, abgesagt oder „Nur intern“ | Gewollt; Abgesagtes und Internes stehen nie darin |
 | Der Abo-Hinweis kommt nicht mehr | Er erscheint je Konto nur einmal und nie mit aktivem Abo | Abo über **Mein Kalender** einrichten |
 | Freunde-Abschnitt fehlt | Keine bestätigten Freunde angemeldet, oder sie teilen ihre Anmeldungen nicht | Gewollt; jede Person steuert es selbst |
+| „Für dieses Event gibt es noch … Anmeldungen“ beim Löschen | Löschen geht nur ohne Anmeldungen | Status **Abgesagt** speichern (alle werden informiert), dann löschen |
+| „Zu diesem Event gibt es schon eine Rechnung“ beim Löschen | Die Anmeldungen bleiben als Nachweis der Rechnung | Event absagen bzw. **Archiviert** setzen statt löschen |
+| „Ein Turnier dieses Events hat noch Anmeldungen“ beim Löschen | Ein verknüpftes Turnier läuft noch | Event absagen oder das Turnier zuerst im Programm klären |
+| Absage wieder zurückgenommen, Anmeldungen fehlen | Die Absage hat alle Anmeldungen storniert | Gewollt; die Personen melden sich neu an |
+| Max. Teilnehmer: Fehler beim Speichern | 0 oder eine negative Zahl | Feld leeren (unbegrenzt) oder eine Zahl ab 1 eintragen |
 
 ---
 

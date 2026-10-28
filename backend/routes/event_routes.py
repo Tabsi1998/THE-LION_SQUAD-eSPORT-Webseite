@@ -17,7 +17,7 @@ from services.sponsor_utils import dedupe_public_sponsors
 from services import partner_pages
 from services.notification_preferences import enqueue_newsletter_for_item
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
-from services import billing_orders, event_days, event_facts, event_locations, event_play_along, event_registration, pricing
+from services import billing_orders, event_changes, event_days, event_facts, event_locations, event_play_along, event_registration, pricing
 from services.event_registration import RegistrationError
 from services.mutation_lock import MutationLockBusy, mutation_lock
 from services.change_events import reset_scope_cache
@@ -198,6 +198,9 @@ def _public_event_registration(registration: dict, is_staff: bool = False, with_
         "created_at": registration.get("created_at"),
         "updated_at": registration.get("updated_at"),
     }
+    if registration.get("cancelled_with_event"):
+        # Mit dem Event abgesagt (#2118): die Seite sagt „abgesagt“ statt „Du bist dabei“.
+        payload["cancelled_with_event"] = True
     snapshot = registration.get("price_snapshot")
     if snapshot and (is_staff if with_price is None else with_price):
         # Nur die eigene Anmeldung (is_staff=True in own_registration) und die Verwaltung sehen den
@@ -1017,6 +1020,8 @@ async def update_event(event_id: str, body: EventUpdate, me: dict = Depends(requ
         "max_participants",
     }
     raw = body.model_dump(exclude_unset=True)
+    # Neuer Termin oder Ort (#2118): nur eine Frage an diesen Aufruf, kein Feld des Events.
+    notify_registrants = bool(raw.pop("notify_registrants", None))
     _refuse_event_sponsor_choice(raw)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     if "partner_ids" in updates:
@@ -1040,6 +1045,12 @@ async def update_event(event_id: str, body: EventUpdate, me: dict = Depends(requ
     await db.events.update_one({"id": event_id}, {"$set": updates})
     reset_scope_cache()  # Live-Meldungen (#1801): Turnier und Event neu nachschlagen
     event = await db.events.find_one({"id": event_id}, {"_id": 0})
+    # Absagen und Verschieben (#2118): was daraus für Angemeldete, Warteliste und Rechnungen folgt.
+    cancellation = change_notice = None
+    if event and event.get("status") == "cancelled" and existing.get("status") != "cancelled":
+        cancellation = await event_changes.cancel_event(db, event, me)
+    elif event and notify_registrants and event.get("status") not in {"draft", "archived", "cancelled"}:
+        change_notice = await event_changes.announce_change(db, existing, event, me)
     if event and event.get("status") not in {"draft", "archived", "cancelled"} and not event.get("newsletter_sent_at"):
         result = await enqueue_newsletter_for_item("event", event)
         if result.get("reason") not in {"internal_visibility", "not_announced"}:
@@ -1053,16 +1064,23 @@ async def update_event(event_id: str, body: EventUpdate, me: dict = Depends(requ
             event = await db.events.find_one({"id": event_id}, {"_id": 0})
     if event:
         event["schedule"] = event_days.schedule_view(event)
+        if cancellation is not None:
+            event["cancellation"] = cancellation
+        if change_notice is not None:
+            event["change_notice"] = change_notice
     return event
 
 
 @router.delete("/{event_id}")
 async def delete_event(event_id: str, me: dict = Depends(require_admin())):
+    """Löschen nur, wenn nichts mehr daran hängt (#2118) - sonst 409 mit dem Weg „Absagen“ (services/event_changes)."""
     db = get_db()
-    await db.events.delete_one({"id": event_id})
-    await db.event_registrations.delete_many({"event_id": event_id})
-    await db.tournaments.update_many({"event_id": event_id}, {"$set": {"event_id": None, "updated_at": now_utc().isoformat()}})
+    event = await db.events.find_one({"id": event_id}, {"_id": 0, "id": 1, "name": 1, "slug": 1})
+    if not event:
+        raise HTTPException(404, "Event nicht gefunden.")
+    blocked = await event_changes.delete_block_reason(db, event)
+    if blocked:
+        raise HTTPException(409, blocked)
+    result = await event_changes.delete_event(db, event, me)
     reset_scope_cache()  # Live-Meldungen (#1801): Turnier und Event neu nachschlagen
-    await db.f1_challenges.update_many({"event_id": event_id}, {"$set": {"event_id": None, "updated_at": now_utc().isoformat()}})
-    await db.gallery_albums.update_many({"event_id": event_id}, {"$set": {"event_id": None, "updated_at": now_utc().isoformat()}})
-    return {"ok": True}
+    return result
