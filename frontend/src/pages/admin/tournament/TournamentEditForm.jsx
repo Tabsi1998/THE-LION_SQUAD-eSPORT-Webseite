@@ -25,7 +25,7 @@ import { deadlineFormValues, deadlinePayload } from "@/lib/tournamentDeadlines";
 import { ADVANCEMENT_MODE_OPTIONS, BRONZE_FORMATS, DRAW_SHOW_MINUTES_DEFAULT, DRAW_SHOW_MINUTES_HINT, advancementModeHint, drawShowMinutesPayload, CUSTOM_BRACKET_FORMATS, EVENT_MODE_OPTIONS, GRAND_FINAL_FORMATS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, HEAT_REBUILD_FORMATS, HEAT_REBUILD_HINT, HEAT_REBUILD_OPTIONS, RESULT_ENTRY_MODE_OPTIONS, SCHEDULE_MODE_OPTIONS, SEEDING_OPTIONS, STREAM_PLATFORM_OPTIONS, TEAM_MODE_OPTIONS, TOURNAMENT_SEASON_WEIGHT_OPTIONS, VISIBILITY_OPTIONS, WEEKDAY_OPTIONS, advancementModeOf } from "./shared";
 import { StaffelSeasonValues, isStaffel, staffelBeforeStart } from "./StaffelParts";
 import { FormatHint } from "./FormatHint";
-import { NO_MATCH_FORMATS, tournamentFieldRules } from "@/lib/tournamentFormFields";
+import { MATCHDAY_DRAW_HINT, NO_MATCH_FORMATS, matchdayDrawMode, matchdayDrawOn, tournamentFieldRules } from "@/lib/tournamentFormFields";
 
 // „Gewinne erzeugen“ erst ab dem Ende (#2123, TA23) - wie der Server (services/tournament_guard.py FINISHED_STATUSES).
 const PRIZE_READY_STATUSES = new Set(["completed", "results_published", "archived"]);
@@ -447,13 +447,17 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
           <FormSection title="Erweiterte Spieloptionen" collapsible plain>
             <FormGrid cols={3}>
               {show && <SelectInput label="Seeding" value={f.seeding_mode} onChange={(v)=>set("seeding_mode",v)} options={SEEDING_OPTIONS} />}
-              {show && (
+              {show && rules.advancement === "select" && (
                 <div className="md:col-span-2">
-                  {/* Weiterkommen in vier Modi (#1548, #1590): fester Baum, Auslosung nach der Runde, Show, sofort zufällig. */}
+                  {/* Weiterkommen in vier Modi (#1548, #1590): fester Baum, Auslosung nach der Runde, Show, sofort zufällig.
+                      Nur, wo Sieger in ein nächstes Spiel gehen (#2111, T4). */}
                   <SelectInput label="Weiterkommen (Gegner der nächsten Runde)" value={f.advancement_mode} onChange={(v)=>set("advancement_mode", v)} options={ADVANCEMENT_MODE_OPTIONS} hint={<span data-testid="tr-edit-advancement-hint">{advancementModeHint(f.advancement_mode)}</span>} testId="tr-edit-advancement" />
                 </div>
               )}
-              {show && f.advancement_mode === "draw_show" && (
+              {show && rules.advancement === "matchday_draw" && (
+                <CheckField label="Spieltage auslosen" hint={MATCHDAY_DRAW_HINT} checked={matchdayDrawOn(f.advancement_mode)} onChange={(v)=>set("advancement_mode", matchdayDrawMode(v))} testId="tr-edit-matchday-draw" className="md:col-span-2 self-end pb-2" />
+              )}
+              {show && rules.advancement === "select" && f.advancement_mode === "draw_show" && (
                 <TextField label="Show-Auslosung: Erinnerung nach Minuten" type="number" min="1" max="240" value={f.draw_show_minutes} onChange={(v)=>set("draw_show_minutes", v)} placeholder={String(DRAW_SHOW_MINUTES_DEFAULT)} hint={DRAW_SHOW_MINUTES_HINT} testId="tr-edit-draw-show-minutes" />
               )}
               {modes.length > 0 && (

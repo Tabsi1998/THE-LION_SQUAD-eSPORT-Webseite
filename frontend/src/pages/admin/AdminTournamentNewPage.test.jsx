@@ -149,6 +149,7 @@ test("Jeder gegen jeden: unter dem Format steht der Weg zur Vereinsliga", async 
   expect(screen.getByTestId("new-tr-format-hint")).toHaveTextContent("Seasons, Ligen und Staffeln");
   expect(screen.getByRole("link", { name: "Admin → eSports → Liga" })).toHaveAttribute("href", "/admin/leagues");
 });
+
 // Adresse (#2111, TA1): sie folgt dem Titel Buchstabe für Buchstabe, bis jemand sie selbst ändert - vorher blieb nur der
 // erste Buchstabe stehen („/tournaments/h“). Der Test tippt wirklich, statt das Feld in einem Zug zu füllen.
 test("die Adresse folgt dem getippten Titel, bis sie selbst geändert wird", async () => {
@@ -163,4 +164,21 @@ test("die Adresse folgt dem getippten Titel, bis sie selbst geändert wird", asy
   expect(slug).toHaveValue("mein-cup-");
   await user.type(title, " 2026");
   expect(slug).toHaveValue("mein-cup-");
+});
+
+// Weiterkommen (#2111, T4): nur bei Formaten mit Turnierbaum; Hin- und Rückrunde hat „Spieltage auslosen“.
+test("Weiterkommen nur mit Turnierbaum, bei Hin- und Rückrunde „Spieltage auslosen“", async () => {
+  apiMock.get.mockImplementation(async (url) => (url === "/games" ? { data: [{ id: "g1", name: "Mario Kart 8" }] } : { data: [] }));
+  apiMock.post.mockResolvedValue({ data: { id: "t-new" } });
+  renderAt("");
+  const format = await screen.findByTestId("new-tr-format");
+  fireEvent.change(format, { target: { value: "swiss" } });
+  expect(screen.queryByTestId("new-tr-advancement")).toBeNull();
+  expect(screen.queryByTestId("new-tr-matchday-draw")).toBeNull();
+  fireEvent.change(format, { target: { value: "league" } });
+  fireEvent.click(screen.getByTestId("new-tr-matchday-draw"));
+  fireEvent.change(screen.getByTestId("new-tr-title"), { target: { value: "Liga-Cup" } });
+  fireEvent.change(await screen.findByTestId("new-tr-game"), { target: { value: "g1" } });
+  fireEvent.submit(screen.getByTestId("new-tr-form"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments", expect.objectContaining({ format: "league", advancement_mode: "draw_round" })));
 });

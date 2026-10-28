@@ -46,6 +46,8 @@ export function tournamentFieldRules(form = {}) {
   };
 }
 
+export const MATCHDAY_DRAW_HINT = "An: Reihenfolge der Spieltage und Heimrecht werden ausgelost, sobald der Spielplan feststeht – neu auslosen geht, solange kein Spiel begonnen hat. Aus: feste Reihenfolge nach der Setzliste.";
+
 /** Der Schalter „Spieltage auslosen“: an heißt gemischt (Auslosung nach der Runde), aus heißt fester Plan. */
 export const matchdayDrawOn = (advancementMode) => Boolean(advancementMode) && advancementMode !== "fixed";
 export const matchdayDrawMode = (on) => (on ? "draw_round" : "fixed");

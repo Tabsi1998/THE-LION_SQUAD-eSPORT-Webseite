@@ -53,7 +53,7 @@ const TOURNAMENT = {
   title: "Winter Cup 2026",
   status: "registration_open",
   game: "rocket_league",
-  format: "single_elimination",
+  format: "single_elim",
   team_size: 3,
   max_teams: 16,
   registration_enabled: true,
@@ -766,6 +766,24 @@ test("Bearbeiten: Weiterkommen – vier Modi mit Erklärtext, Show-Minuten nur b
   await user.click(screen.getByTestId("tr-edit-save"));
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/tournaments/t-1", expect.objectContaining({ advancement_mode: "draw_show" })));
   expect(apiMock.patch.mock.calls[0][1]).not.toHaveProperty("randomize_advancement_rounds");
+});
+
+// Weiterkommen nur, wo Sieger in ein nächstes Spiel gehen (#2111, T4): Hin- und Rückrunde hat dafür „Spieltage
+// auslosen“, Jeder gegen jeden einfach, Gruppen und Schweizer System haben keins.
+test("Bearbeiten: bei Hin- und Rückrunde nur „Spieltage auslosen“, bei Jeder gegen jeden einfach nichts", async () => {
+  const user = userEvent.setup();
+  renderPageWithFormat("league");
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  await user.click(screen.getByTestId("admin-tr-tab-edit"));
+  const draw = await screen.findByTestId("tr-edit-matchday-draw");
+  expect(screen.queryByTestId("tr-edit-advancement")).toBeNull();
+  expect(draw).not.toBeChecked();
+  await user.click(draw);
+  await user.click(screen.getByTestId("tr-edit-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/tournaments/t-1", expect.objectContaining({ advancement_mode: "draw_round" })));
+  await user.selectOptions(screen.getByTestId("tr-edit-format"), "round_robin");
+  expect(screen.queryByTestId("tr-edit-matchday-draw")).toBeNull();
+  expect(screen.queryByTestId("tr-edit-advancement")).toBeNull();
 });
 
 test("Bearbeiten: der alte Schalter wird als „Auslosung nach der Runde“ vorbelegt", async () => {

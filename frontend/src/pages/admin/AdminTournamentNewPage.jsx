@@ -8,6 +8,7 @@ import { PartnerPicker } from "@/components/tls/PartnerPicker";
 import { EventMembershipLine } from "@/pages/admin/event/EventProgramPanel";
 import { CheckField, FieldLabel, SelectField, TextField } from "@/components/tls/FormFields";
 import { FormatHint } from "./tournament/FormatHint";
+import { MATCHDAY_DRAW_HINT, matchdayDrawMode, matchdayDrawOn, tournamentFieldRules } from "@/lib/tournamentFormFields";
 import { ADVANCEMENT_MODE_OPTIONS, DRAW_SHOW_MINUTES_DEFAULT, DRAW_SHOW_MINUTES_HINT, GRAND_FINAL_FORMATS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, HEAT_REBUILD_FORMATS, HEAT_REBUILD_HINT, HEAT_REBUILD_OPTIONS, advancementModeHint, drawShowMinutesPayload } from "./tournament/shared";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
@@ -96,6 +97,8 @@ export default function AdminTournamentNewPage() {
   // und die Adresse bestand nur aus dem ersten Buchstaben des Titels („/tournaments/h“).
   const [slugTouched, setSlugTouched] = useState(false);
   const isTeam = form.team_mode === "team";
+  // Nur, was zu Format und Austragung passt (#2111).
+  const rules = tournamentFieldRules(form);
   const planningWarnings = buildPlanningWarnings(form, isTeam);
 
   const loadSources = useCallback(() => {
@@ -300,9 +303,15 @@ export default function AdminTournamentNewPage() {
             <TextField label="Best of" type="number" value={form.best_of} onChange={(v) => set("best_of", Number(v))} testId="new-tr-bestof" />
             <SelectField label="Seeding" value={form.seeding_mode} onChange={(v) => set("seeding_mode", v)} options={[["random", "Zufall"], ["manual", "Manuell"], ["ranking", "Ranking"]]} testId="new-tr-seeding" />
           </FormGrid>
-          {/* Weiterkommen in vier Modi (#1548, #1590): fester Baum, Auslosung nach der Runde, Show, sofort zufällig. */}
-          <SelectField label="Weiterkommen (Gegner der nächsten Runde)" value={form.advancement_mode} onChange={(v) => set("advancement_mode", v)} options={ADVANCEMENT_MODE_OPTIONS} hint={<span data-testid="new-tr-advancement-hint">{advancementModeHint(form.advancement_mode)}</span>} testId="new-tr-advancement" />
-          {form.advancement_mode === "draw_show" && (
+          {/* Weiterkommen in vier Modi (#1548, #1590): fester Baum, Auslosung nach der Runde, Show, sofort zufällig - nur,
+              wo Sieger in ein nächstes Spiel gehen; bei Hin- und Rückrunde nur „Spieltage auslosen“ (#2111, T4). */}
+          {rules.advancement === "select" && (
+            <SelectField label="Weiterkommen (Gegner der nächsten Runde)" value={form.advancement_mode} onChange={(v) => set("advancement_mode", v)} options={ADVANCEMENT_MODE_OPTIONS} hint={<span data-testid="new-tr-advancement-hint">{advancementModeHint(form.advancement_mode)}</span>} testId="new-tr-advancement" />
+          )}
+          {rules.advancement === "matchday_draw" && (
+            <CheckField label="Spieltage auslosen" hint={MATCHDAY_DRAW_HINT} checked={matchdayDrawOn(form.advancement_mode)} onChange={(v) => set("advancement_mode", matchdayDrawMode(v))} testId="new-tr-matchday-draw" />
+          )}
+          {rules.advancement === "select" && form.advancement_mode === "draw_show" && (
             <TextField label="Show-Auslosung: Erinnerung nach Minuten" type="number" min="1" max="240" value={form.draw_show_minutes} onChange={(v) => set("draw_show_minutes", v)} placeholder={String(DRAW_SHOW_MINUTES_DEFAULT)} hint={DRAW_SHOW_MINUTES_HINT} testId="new-tr-draw-show-minutes" />
           )}
           {BRONZE_FORMATS.has(form.format) && (
