@@ -10,7 +10,7 @@ import { CheckField, FieldLabel, SelectField, TextField } from "@/components/tls
 import { FormatHint } from "./tournament/FormatHint";
 import { prizeGroupOptions } from "./tournament/PrizeEditor";
 import { BEST_OF_RUNS_HINT, MATCHDAY_DRAW_HINT, matchdayDrawMode, matchdayDrawOn, tournamentFieldRules } from "@/lib/tournamentFormFields";
-import { ADVANCEMENT_MODE_OPTIONS, DRAW_SHOW_MINUTES_DEFAULT, DRAW_SHOW_MINUTES_HINT, GRAND_FINAL_FORMATS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, HEAT_REBUILD_FORMATS, HEAT_REBUILD_HINT, HEAT_REBUILD_OPTIONS, SEEDING_OPTIONS, advancementModeHint, drawShowMinutesPayload } from "./tournament/shared";
+import { ADVANCEMENT_MODE_OPTIONS, DRAW_SHOW_MINUTES_DEFAULT, DRAW_SHOW_MINUTES_HINT, GRAND_FINAL_FORMATS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, HEAT_REBUILD_FORMATS, HEAT_REBUILD_HINT, HEAT_REBUILD_OPTIONS, SEEDING_OPTIONS, VISIBILITY_OPTIONS, advancementModeHint, drawShowMinutesPayload } from "./tournament/shared";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
 import { normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
@@ -71,6 +71,7 @@ export default function AdminTournamentNewPage() {
     check_in_from: "", check_in_until: "",
     start_date: "", end_date: "",
     status: "draft",
+    visibility: "public",
     site_banner_enabled: false,
     discord_skip: false,
     auto_start_enabled: false,
@@ -217,6 +218,8 @@ export default function AdminTournamentNewPage() {
           <>
             <FormSection title="Wann" hint="Anmeldung und Check-in wechseln zeitgesteuert. Der Live-Start bleibt bei der Turnierleitung, solange du unten nichts anderes einstellst.">
               <SelectField label="Veröffentlichung" value={form.status} onChange={(v) => set("status", v)} options={CREATE_STATUS_OPTIONS} testId="new-tr-status" />
+              {/* Sichtbarkeit gleich beim Anlegen (#2111, TA2) - vorher war jedes neue Turnier öffentlich. */}
+              <SelectField label="Sichtbarkeit" value={form.visibility} onChange={(v) => set("visibility", v)} options={VISIBILITY_OPTIONS} testId="new-tr-visibility" />
               <TextField label="Start Event/Turnier" type="datetime-local" value={form.start_date} onChange={(v) => set("start_date", v)} testId="new-tr-start" />
               <TextField label="Anmeldung endet" type="datetime-local" value={form.registration_open_until} onChange={(v) => set("registration_open_until", v)} testId="new-tr-reg-until" />
               <FormSection title="Weitere Zeiten und Sonderfälle" collapsible plain>

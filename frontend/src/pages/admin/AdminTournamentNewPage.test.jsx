@@ -180,6 +180,20 @@ test("vor Ort kein Schalter „automatisch live/beendet“, mitgeschickt wird au
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments", expect.objectContaining({ event_mode: "local", auto_start_enabled: false })));
 });
 
+// Sichtbarkeit beim Anlegen (#2111, TA2): vorher war jedes neue Turnier öffentlich.
+test("die Sichtbarkeit lässt sich gleich beim Anlegen wählen", async () => {
+  apiMock.get.mockImplementation(async (url) => (url === "/games" ? { data: [{ id: "g1", name: "Mario Kart 8" }] } : { data: [] }));
+  apiMock.post.mockResolvedValue({ data: { id: "t-new" } });
+  renderAt("");
+  const visibility = await screen.findByTestId("new-tr-visibility");
+  expect(visibility).toHaveValue("public");
+  fireEvent.change(visibility, { target: { value: "members" } });
+  fireEvent.change(screen.getByTestId("new-tr-title"), { target: { value: "Vereins-Cup" } });
+  fireEvent.change(await screen.findByTestId("new-tr-game"), { target: { value: "g1" } });
+  fireEvent.submit(screen.getByTestId("new-tr-form"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments", expect.objectContaining({ visibility: "members" })));
+});
+
 // Preisgruppen (#2111, T5): Siegerrunde und Verliererrunde nur beim Doppel-K.-o.
 test("Siegerrunde und Verliererrunde nur beim Doppel-K.-o.", async () => {
   renderAt("");
