@@ -130,3 +130,15 @@ async def test_the_team_page_shows_its_co_teams_staffel_once(flow):
     assert entry["display_name"] == "Probe 1 · Probe 1 B" and entry["squad_name"] == "Probe 1 B"
     assert entry["link"] == f"/liga/probe-shooter/season-1#staffel-{staffel['slug']}"
     assert (entry["league"]["name"], entry["season"]["name"]) == ("Probe-Liga", "Season 1")
+
+
+@pytest.mark.asyncio
+async def test_the_league_section_follows_the_staffel_not_the_season_status(flow):
+    admin, season, staffel, teams = await setup(flow)
+    # Season schon „beendet“ markiert, die Staffel läuft aber noch: der Abschnitt bleibt.
+    await flow.db.league_seasons.update_one({"id": season["id"]}, {"$set": {"status": "completed"}})
+    flow.act_as(None)
+    assert len((await flow.get(f"/api/teams/{teams[0]}/overview")).json()["league"]) == 1
+    # Staffel abgeschlossen: weg - wie bei „Angemeldet für“.
+    await flow.db.tournaments.update_one({"id": staffel["id"]}, {"$set": {"status": "completed"}})
+    assert (await flow.get(f"/api/teams/{teams[0]}/overview")).json()["league"] == []

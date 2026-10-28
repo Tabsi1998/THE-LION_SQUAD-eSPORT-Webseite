@@ -237,23 +237,22 @@ async def team_overview(db, team: dict, viewer: dict | None, *, insider: bool, r
     return {"header": header, "upcoming": upcoming, "recent": recent, "league": league}
 
 
-ACTIVE_SEASON_STATUSES = ("draft", "active")
-
-
 async def _league_entries(db, registrations: list[dict], visible: dict[str, dict], viewer: dict | None) -> list[dict]:
-    """Abschnitt „Liga“ der Teamseite (P5, #1625): die Co-Teams des Teams und ihre Staffel in laufenden Seasons. Der
-    Link geht auf die Ligaseite, wenn die Person die Season sehen darf, sonst auf das Staffel-Turnier."""
+    """Abschnitt „Liga“ der Teamseite (P5, #1625): die Co-Teams des Teams und ihre Staffel, solange die Staffel läuft
+    (Turnierstatus, nicht der Stand der Season - wie „Angemeldet für“). Der Link geht auf die Ligaseite, wenn die
+    Person die Season sehen darf, sonst auf das Staffel-Turnier."""
     from services.league_service import can_see_season, division_label
 
     rows = [(reg, visible[reg["tournament_id"]]) for reg in registrations
             if reg.get("tournament_id") in visible and is_league_staffel(visible[reg["tournament_id"]])
+            and visible[reg["tournament_id"]].get("status") not in CLOSED_TOURNAMENT_STATUSES
             and reg.get("status") in ACTIVE_REGISTRATION_STATUSES]
     if not rows:
         return []
     contexts = [tournament["league_context"] for _reg, tournament in rows]
     seasons = {row["id"]: row for row in await db.league_seasons.find(
-        {"id": {"$in": sorted({c.get("season_id") for c in contexts if c.get("season_id")})},
-         "status": {"$in": list(ACTIVE_SEASON_STATUSES)}}, {"_id": 0}).to_list(50)}
+        {"id": {"$in": sorted({c.get("season_id") for c in contexts if c.get("season_id")})}},
+        {"_id": 0}).to_list(50)}
     leagues = {row["id"]: row for row in await db.leagues.find(
         {"id": {"$in": sorted({c.get("league_id") for c in contexts if c.get("league_id")})}},
         {"_id": 0, "id": 1, "name": 1, "slug": 1}).to_list(50)}
