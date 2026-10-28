@@ -162,14 +162,17 @@ mit `{games: [{position, lineup}]}`. Index: `matches_v2.lineup_user_ids` (sparse
 
 Season-Änderungen wirken erst über „Vorgaben auf Staffeln übertragen“ (`league.staffel.sync`, A): Termine und
 Kalender nur vor dem Start, Best of/Teamgröße/Punkte nur vor dem ersten Ergebnis, Sichtbarkeit und Regeltext immer.
-Genau (`services/league_service.SYNC_GROUPS`): **immer** `visibility`, `is_public`, `rules` und der Map-Pool (neue
-Version im Scope `tournament`, nur wenn er sich unterscheidet – Spiele mit festgehaltenem Pool behalten ihren);
+Ausnahme: die **Sichtbarkeit** (`visibility`, `is_public`) schreibt schon das Speichern der Season auf alle ihre
+Staffeln, auch gesperrte („aus“ heißt sofort aus).
+Genau (`services/league_service.SYNC_GROUPS`): **immer** (auch gesperrte Staffeln) `visibility`, `is_public`, `rules`
+und der Map-Pool (neue Version im Scope `tournament`, nur wenn er sich unterscheidet – Spiele mit festgehaltenem Pool
+behalten ihren; hat die Season keinen Pool mehr, wird die Kopie nur vor dem ersten Ergebnis entfernt);
 **vor dem Start** (Status `draft` bis `check_in`) `start_date`, `end_date`, `matchday_days`, `default_match_weekday`,
-`default_match_time`, `round_robin_legs`, `matchday_blocked_weeks`, `matchday_weeks_total`, `max_participants` – nur
-wenn die Prüfung „Runden ≤ aktive Wochen“ passt und nicht schon mehr Teams angemeldet sind; **vor dem ersten
-Ergebnis** `best_of`, `team_size`, `scoring_rules`, `game_mode_order`, `result_confirm_hours_league`,
-`lineup_amend_hours`. `min_squad_size` steht nicht am Turnier: B liest es beim Zuteilen über
-`league_service.staffel_settings(db, tournament)` (Season + Liga N).
+`default_match_time`, `round_robin_legs`, `matchday_blocked_weeks`, `matchday_weeks_total`, `max_participants`,
+`min_squad_size` – nur wenn die Prüfung „Runden ≤ aktive Wochen“ passt und nicht schon mehr Teams angemeldet sind;
+**vor dem ersten Ergebnis** `best_of`, `team_size`, `scoring_rules`, `game_mode_order`, `result_confirm_hours_league`,
+`lineup_amend_hours`. `min_squad_size` steht damit am Turnier (Season bzw. Liga N, mindestens `team_size`); B liest es
+beim Zuteilen dort.
 
 ## 4. Rechte
 
