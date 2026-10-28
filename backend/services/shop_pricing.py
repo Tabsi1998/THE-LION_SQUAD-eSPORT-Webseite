@@ -31,7 +31,7 @@ import logging
 from typing import Any
 
 from models import now_utc
-from services import shop_catalog, shop_config, shop_costs, shop_print_files
+from services import shop_catalog, shop_config, shop_costs, shop_designs, shop_print_files
 from services.log_safe import log_safe
 from services.shop_common import ShopError
 from services.shop_fulfillment import (
@@ -203,6 +203,11 @@ async def estimate_variant(db, product: dict, variant: dict, mapping: dict, *, p
             "catalog_net_cents": shop_costs.cost_cents(product, mapping), "estimated_at": now_utc().isoformat()}
 
 
+def public_https() -> bool:
+    """Hat die Website eine öffentliche https-Adresse (``PUBLIC_BACKEND_URL`` …)? Sonst kann Printful nichts schätzen."""
+    return shop_designs._public_base_url().startswith("https://")
+
+
 def _group_key(mapping: dict) -> tuple | None:
     base = mapping.get("base_cost_cents")
     if not _amount(base) or not base:
@@ -213,7 +218,10 @@ def _group_key(mapping: dict) -> tuple | None:
 async def estimates_for(db, product: dict, variants: list[dict], mappings: dict[str, dict], *,
                         provider: FulfillmentProvider) -> dict[str, dict]:
     """Schätzungen für die angebotenen Varianten - je Preisgruppe (gleicher Einkauf und gleiche Aufpreise laut
-    Katalog) eine, höchstens ``MAX_ESTIMATE_GROUPS``. Liefert nur, was geklappt hat (Variante → Schätzung)."""
+    Katalog) eine, höchstens ``MAX_ESTIMATE_GROUPS``. Liefert nur, was geklappt hat (Variante → Schätzung). Ohne
+    öffentliche https-Adresse der Website holt Printful keine Druckdatei - dann gar nicht erst rechnen."""
+    if not public_https():
+        return {}
     groups: dict[tuple, list[dict]] = {}
     for variant in variants:
         mapping = mappings.get(variant["id"])
