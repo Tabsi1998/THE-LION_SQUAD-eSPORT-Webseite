@@ -462,6 +462,27 @@ def tpl_event_message(display_name: str, event_name: str, message: str, url: str
     return f"{event_name}: Nachricht der Turnierleitung", _wrap("Nachricht zum Event", body, "Zum Event", url)
 
 
+# Absage (#2119): eigene Mails statt „Nachricht der Turnierleitung“ (Event, #2118) bzw. nur Glocke und Push (Turnier, #2120).
+@mail_template
+def tpl_event_cancelled(display_name: str, event_name: str, url: str = "") -> tuple[str, str]:
+    body = (
+        f"<p>Hallo {display_name or 'Löwe'},</p>"
+        f"<p><strong>{event_name}</strong> ist abgesagt. Deine Anmeldung ist damit storniert, auch ein Platz auf der Warteliste.</p>"
+        "<p>Einen offenen Kostenbeitrag verrechnen wir nicht. Hast du schon eine Rechnung bekommen, meldet sich der Verein bei dir.</p>"
+    )
+    return f"Abgesagt: {event_name}", _wrap("Event abgesagt", body, "Zum Event" if url else None, url or None)
+
+
+@mail_template
+def tpl_tournament_cancelled(display_name: str, tournament_title: str, reason: str = "", url: str = "") -> tuple[str, str]:
+    body = (
+        f"<p>Hallo {display_name or 'Löwe'},</p>"
+        f"<p>die Turnierleitung hat <strong>{tournament_title}</strong> abgesagt. Deine Anmeldung ist damit hinfällig.</p>"
+        + (f"<p><strong>Grund:</strong> {reason}</p>" if reason else "")
+    )
+    return f"Turnier abgesagt: {tournament_title}", _wrap("Turnier abgesagt", body, "Zum Turnier" if url else None, url or None)
+
+
 @mail_template
 def tpl_birthday_greeting(display_name: str, preferences_url: str = "") -> tuple[str, str]:
     body = (
@@ -656,6 +677,8 @@ async def send_template(
         "newsletter_news": tpl_newsletter_news,
         "newsletter_event": tpl_newsletter_event,
         "event_message": tpl_event_message,
+        "event_cancelled": tpl_event_cancelled,
+        "tournament_cancelled": tpl_tournament_cancelled,
     }
     fn = templates.get(template_key)
     if not fn:

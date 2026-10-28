@@ -124,6 +124,8 @@ TEMPLATE_CATEGORY = {
     "checkin_closes_soon_on_site": "tournament_updates",
     "tournament_finished": "tournament_updates",
     "event_message": "tournament_updates",
+    "event_cancelled": "tournament_updates",
+    "tournament_cancelled": "tournament_updates",
     "match_reminder": "match_reminders",
     "match_lead_10m": "match_reminders",
     "score_reported": "match_reminders",

@@ -544,7 +544,7 @@ der TV zählt dann herunter. Im Reiter **Turnierbaum** setzt ihr „Runde präse
    einmal.
 3. **Archiviert** oder **Abgesagt**: ebenfalls nur Turnierleitung. **Abgesagt** fragt nach einem freiwilligen Grund;
    alle, die angemeldet sind oder auf der Warteliste stehen (bei Teams jedes Mitglied), bekommen einmal „Turnier
-   abgesagt“ ins Postfach und per Push, mit dem Grund. Eine Mail dazu gibt es noch nicht. **Entwurf** fragt ebenfalls
+   abgesagt“ ins Postfach, per Push und – wenn sie Mails zu Turnier-Updates zulassen – per Mail, jeweils mit dem Grund. **Entwurf** fragt ebenfalls
    nach: die öffentliche Seite verschwindet, Angemeldete bekommen keine Nachricht.
 4. **Sperren** (Werkzeuge, ab dem Status Beendet): Danach sind Ergebnisse, Teilnehmer, Spielzeiten und Stationen nur
    noch lesbar. Mit **Entsperren** geht es wieder. Löschen bleibt möglich.

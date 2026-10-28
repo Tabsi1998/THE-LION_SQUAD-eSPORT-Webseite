@@ -87,7 +87,7 @@ Alle anderen sind **Themen**, die jede Person selbst an- und abschalten kann (3.
 | Thema | Wofür |
 | --- | --- |
 | **Spiel-Erinnerungen** | Startzeiten, Spiel-Hub, Check-in-nahe Hinweise, Aufruf, Ergebnis-Meldungen, Disputes |
-| **Turnier-Updates** | Anmeldung (eingegangen, bestätigt, abgelehnt, Warteliste), Check-in, Ergebnisse, „Turnier beendet“, „Wie war …?“ am Tag danach, Fotos vom Event („Die Fotos sind da“), Nachricht der Turnierleitung an alle Angemeldeten eines Events |
+| **Turnier-Updates** | Anmeldung (eingegangen, bestätigt, abgelehnt, Warteliste), Check-in, Ergebnisse, „Turnier beendet“, „Turnier abgesagt“, „Event abgesagt“, „Wie war …?“ am Tag danach, Fotos vom Event („Die Fotos sind da“), Nachricht der Turnierleitung an alle Angemeldeten eines Events |
 | **Gewinne & Abholung** | Gewinn bereit, übergeben, Frist abgelaufen |
 | **Erfolge** | Freigeschaltete Erfolge – nur In-App, Push, Discord, keine Mail |
 | **Wochenrückblick** | Montags eine Mail mit XP und neuen Erfolgen, nur bei Aktivität, nur per Mail |
