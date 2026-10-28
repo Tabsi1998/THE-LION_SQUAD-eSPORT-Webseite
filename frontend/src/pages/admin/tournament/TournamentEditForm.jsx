@@ -25,11 +25,14 @@ import { deadlineFormValues, deadlinePayload } from "@/lib/tournamentDeadlines";
 import { ADVANCEMENT_MODE_OPTIONS, BRONZE_FORMATS, DRAW_SHOW_MINUTES_DEFAULT, DRAW_SHOW_MINUTES_HINT, advancementModeHint, drawShowMinutesPayload, CUSTOM_BRACKET_FORMATS, EVENT_MODE_OPTIONS, GRAND_FINAL_FORMATS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, HEAT_REBUILD_FORMATS, HEAT_REBUILD_HINT, HEAT_REBUILD_OPTIONS, MATCHDAY_FORMATS, RESULT_ENTRY_MODE_OPTIONS, SCHEDULE_MODE_OPTIONS, SEEDING_OPTIONS, STREAM_PLATFORM_OPTIONS, TEAM_MODE_OPTIONS, TOURNAMENT_SEASON_WEIGHT_OPTIONS, VISIBILITY_OPTIONS, WEEKDAY_OPTIONS, advancementModeOf } from "./shared";
 import { StaffelSeasonValues, isStaffel, staffelBeforeStart } from "./StaffelParts";
 
-export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFormat }) {
+export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFormat, structureFixed = false }) {
   const dt = toDateTimeLocalInput;
   // Liga-Staffel (#2109): Season-Werte nur lesend in der Seitenleiste, Liga-fremde Felder fehlen ganz.
   const staffel = isStaffel(tournament);
   const show = !staffel;
+  // Ab dem Ende des Check-ins steht der Baum (#2120, TA9): Format, Teilnahme, Teamgröße und Spiel nur lesend - der
+  // Server lehnt Änderungen daran ab.
+  const fixedHint = structureFixed ? FIXED_FIELD_HINT : undefined;
   const [games, setGames] = useState([]);
   const [partners, setPartners] = useState([]);
   const [events, setEvents] = useState([]);
@@ -312,8 +315,12 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
         toast.info("Keine Änderungen zum Speichern.");
         return;
       }
-      await api.patch(`/tournaments/${tournament.id}`, patch);
-      toast.success("Gespeichert.");
+      const response = await api.patch(`/tournaments/${tournament.id}`, patch);
+      // Format oder Teilnahme geändert (#2120, TA9): der Server baut die Vorschau gleich mit.
+      const rebuilt = response?.data?.auto_generated_bracket;
+      toast.success(rebuilt?.preview && !rebuildPreview
+        ? (rebuilt.match_count ? `Gespeichert. Vorschau mit ${rebuilt.match_count} Spielen neu gebaut.` : "Gespeichert. Die Vorschau entsteht mit den Anmeldungen.")
+        : "Gespeichert.");
       if (rebuildPreview) {
         await rebuild();
       } else {
@@ -372,7 +379,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
           <FormGrid>
             <TextField label="Titel" value={f.title} onChange={(v)=>set("title",v)} testId="tr-edit-title"/>
             <TextField label="Slug / URL" value={f.slug} onChange={(v)=>set("slug", slugify(v))} testId="tr-edit-slug"/>
-            {show && <SelectInput label="Spiel" value={f.game_id} onChange={setGame} options={[["", "— auswählen —"], ...games.map((g) => [g.id, gameOptionLabel(g)])]} />}
+            {show && <SelectInput label="Spiel" value={f.game_id} onChange={setGame} disabled={structureFixed} hint={fixedHint} testId="tr-edit-game" options={[["", "— auswählen —"], ...games.map((g) => [g.id, gameOptionLabel(g)])]} />}
             <TextField label="Plattform" value={f.platform} onChange={(v)=>set("platform",v)} testId="tr-edit-platform"/>
             {/* Kein Statusfeld (#2109, S2): der Status wechselt nur oben über den Ablauf - mit Spielplan, Check-in und
                 Protokoll. Das Formular schrieb ihn am Ablauf vorbei. */}
@@ -418,10 +425,10 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
           ? "Eine Staffel spielt im Format Liga mit Co-Teams; Teamgröße und Staffelgröße gibt die Season vor."
           : "Teilnahme legt fest, wer sich anmelden darf: Einzelspieler melden sich selbst an, bei Team meldet ein Team-Leader oder Co-Leader das Team an."}>
           <FormGrid cols={3}>
-            {show && <SelectInput label="Turnierstruktur" value={f.format} onChange={setFormat} options={TOURNAMENT_FORMAT_OPTIONS} />}
+            {show && <SelectInput label="Turnierstruktur" value={f.format} onChange={setFormat} options={TOURNAMENT_FORMAT_OPTIONS} disabled={structureFixed} hint={fixedHint} testId="tr-edit-format" />}
             <TextField label="Format-Anzeigename" value={f.format_label} onChange={(v)=>set("format_label",v)} placeholder="z.B. Gamers Heaven F1 Heat" testId="tr-edit-format-label"/>
-            {show && <SelectInput label="Teilnahme" value={f.team_mode} onChange={setTeamMode} options={TEAM_MODE_OPTIONS} />}
-            {show && f.team_mode !== "solo" && <TextField label="Spieler pro Team" type="number" min="2" max="6" value={f.team_size} onChange={(v)=>set("team_size",v)} testId="tr-edit-team-size"/>}
+            {show && <SelectInput label="Teilnahme" value={f.team_mode} onChange={setTeamMode} options={TEAM_MODE_OPTIONS} disabled={structureFixed} testId="tr-edit-team-mode" />}
+            {show && f.team_mode !== "solo" && <TextField label="Spieler pro Team" type="number" min="2" max="6" value={f.team_size} onChange={(v)=>set("team_size",v)} disabled={structureFixed} testId="tr-edit-team-size"/>}
             {show && <TextField label={f.team_mode === "solo" ? "Min Spieler" : "Min Teams"} type="number" value={f.min_participants} onChange={(v)=>set("min_participants",v)} testId="tr-edit-min"/>}
             {show && <TextField label={f.team_mode === "solo" ? "Max Spieler" : "Max Teams"} type="number" value={f.max_participants} onChange={(v)=>set("max_participants",v)} testId="tr-edit-max"/>}
           </FormGrid>
@@ -572,6 +579,8 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
     </div>
   );
 }
+
+const FIXED_FIELD_HINT = "Der Turnierbaum steht seit dem Ende des Check-ins fest – Format, Teilnahme und Spiel bleiben. Neu aufbauen geht nur über „Zurücksetzen“.";
 
 function slugify(value) {
   return (value || "")

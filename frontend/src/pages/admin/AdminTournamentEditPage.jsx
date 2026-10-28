@@ -25,7 +25,7 @@ import { PauseUntilControl, RoundSponsorsPanel } from "./tournament/TvTournament
 import { HeatRebuildBar } from "./tournament/HeatRebuildBar";
 import { ParticipantRemovalActions } from "./tournament/ParticipantRemovalActions";
 import { ActionGroup, EmptyBracketNotice, TournamentEditForm } from "./tournament/TournamentEditForm";
-import { OPERATIONAL_STATUS_VALUES, TOURNAMENT_STATUS_OPTIONS, normalizeSearch, primaryTournamentAction } from "./tournament/shared";
+import { FINISHED_STATUSES, OPERATIONAL_STATUS_VALUES, TOURNAMENT_STATUS_OPTIONS, bracketFixed, fixedRegistrationIds, guardDetail, impactText, matchImpact, normalizeSearch, primaryTournamentAction, statusChangeNotice, swissUndoInfo } from "./tournament/shared";
 import { MatchPlanPanel } from "./tournament/matchplan/MatchPlanPanel";
 import { MapPoolPanel } from "./tournament/MapPoolPanel";
 import { SquadAssignDialog, canAssignSquads } from "@/components/tls/league/SquadAssignDialog";
@@ -452,6 +452,12 @@ export default function AdminTournamentEditPage() {
     return haystack.includes(participantSearch);
   });
   const primaryAction = primaryTournamentAction(t.status, t);
+  // Steht der Baum (#2120)? Dann bleiben Format und Teilnahme, Vorschau-Knöpfe und das Entfernen von Teilnehmern im
+  // festen Baum weg - der Server lehnt es ohnehin ab.
+  const structureFixed = bracketFixed(t, matchesV2);
+  const inFixedBracket = fixedRegistrationIds(matchesV2);
+  const tournamentOver = FINISHED_STATUSES.has(t.status) || t.status === "cancelled";
+  const swissUndo = t.format === "swiss" && !tournamentOver && !t.locked_at ? swissUndoInfo(matchesV2) : null;
   // Staffel (S18): kein Check-in, kein Auschecken, kein „Nicht erschienen“ - das löste sogar den Season-Schlüssel des
   // Co-Teams. Austritt und Disqualifikation gehen über ParticipantRemovalActions.
   const checkInTools = Boolean(t.can_check_in) && !staffel;
@@ -806,6 +812,7 @@ export default function AdminTournamentEditPage() {
           stages={stages}
           onSaved={load}
           onRebuildFromFormat={rebuildFromFormat}
+          structureFixed={structureFixed}
         />
       )}
       {activeTab === "feedback" && (

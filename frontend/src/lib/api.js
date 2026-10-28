@@ -201,6 +201,8 @@ export function formatApiError(detail) {
       .filter(Boolean)
       .join(" | ");
   else if (detail && typeof detail.msg === "string") message = detail.msg;
+  // Antworten mit Code und Text (etwa die Rückfragen vor dem Löschen, #2120): der Text statt „[object Object]“.
+  else if (detail && typeof detail.message === "string") message = detail.message;
   else message = String(detail);
   if (/valid email/i.test(message)) return "Bitte gib eine gültige E-Mail-Adresse ein.";
   return message;
