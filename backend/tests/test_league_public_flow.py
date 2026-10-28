@@ -74,6 +74,7 @@ async def test_visibility_off_admins_members_public(flow):
 async def test_the_season_page_lists_divisions_and_staffeln_with_tournament_ids(flow):
     admin, league, season, staffel, _member, _guest = await setup(flow)
     await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"visibility": "public"})
+    await flow.db.tournaments.update_one({"id": staffel["tournament_id"]}, {"$set": {"status": "registration_closed"}})
     flow.act_as(None)
 
     listing = (await flow.get("/api/leagues")).json()["leagues"]

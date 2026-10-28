@@ -811,7 +811,11 @@ async def public_season_view(db, league_slug: str, season_slug: str, user: dict 
         raise LeagueProblem("Season nicht gefunden.", 404)
     divisions = await db.league_divisions.find({"season_id": season["id"], "status": "active"},
                                                {"_id": 0}).sort("level", 1).to_list(50)
-    staffeln = await staffeln_of(db, season["id"])
+    # Nur Staffeln, die die Person auch als Turnier sähe - Entwurf und „intern“ bleiben bei der Leitung und den
+    # Teilnehmenden (dieselbe Regel wie die Turnierseite).
+    from routes.tournament_common import tournament_hidden_reason
+    staffeln = [row for row in await staffeln_of(db, season["id"])
+                if not await tournament_hidden_reason(db, row, user)]
     game = await _game(db, league.get("game_id"))
     pool = map_pools.view(map_pools.valid_for(await map_pools.current(db, "league_season", season["id"]),
                                               league.get("game_id")), "league_season")

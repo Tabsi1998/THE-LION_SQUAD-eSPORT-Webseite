@@ -243,3 +243,24 @@ async def test_a_season_listing_only_staffeln_does_not_fall_back_to_every_tourna
     assert with_fastlap == [] and fastlaps == ["f1"]
     automatic, _ = await _resolve_season_sources({})
     assert len(automatic) == 1  # ohne Auswahl bleibt die Automatik - das normale Turnier
+
+
+# ---------------------------------------------------------------- 4. Öffentliche Season-Ansicht
+
+@pytest.mark.asyncio
+async def test_the_public_season_lists_only_staffeln_the_person_could_open(flow):
+    admin, season, division, draft = await setup_staffel(flow, season={"visibility": "public"})
+    running = (await flow.post(f"{ADMIN}/divisions/{division['id']}/staffeln", json={})).json()
+    hidden = (await flow.post(f"{ADMIN}/divisions/{division['id']}/staffeln", json={})).json()
+    await flow.db.tournaments.update_one({"id": running["tournament_id"]}, {"$set": {"status": "live"}})
+    await flow.db.tournaments.update_one({"id": hidden["tournament_id"]},
+                                         {"$set": {"status": "live", "visibility": "internal", "is_public": False}})
+
+    def shown(page):
+        return {row["tournament_id"] for row in page["divisions"][0]["staffeln"]}
+
+    flow.act_as(None)
+    assert shown((await flow.get("/api/leagues/probe-shooter/season-1")).json()) == {running["tournament_id"]}
+    flow.act_as(admin)
+    assert shown((await flow.get("/api/leagues/probe-shooter/season-1")).json()) == {
+        draft["id"], running["tournament_id"], hidden["tournament_id"]}
