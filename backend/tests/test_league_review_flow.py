@@ -293,7 +293,36 @@ async def test_the_staffel_carries_its_minimum_squad_from_season_or_division(flo
     assert (await flow.db.tournaments.find_one({"id": staffel["id"]}))["min_squad_size"] == 7
     assert (await flow.db.tournaments.find_one({"id": own["tournament_id"]}))["min_squad_size"] == 3
 
+    # Nach dem Start, aber vor dem ersten Ergebnis: Teamgröße und Mindestkader gehen noch - gemeinsam.
     await flow.db.tournaments.update_one({"id": staffel["id"]}, {"$set": {"status": "live"}})
-    await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"min_squad_size": 8})
+    await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"team_size": 9})
     await flow.post(f"{ADMIN}/seasons/{season['id']}/sync")
-    assert (await flow.db.tournaments.find_one({"id": staffel["id"]}))["min_squad_size"] == 7  # nach dem Start nicht
+    after = await flow.db.tournaments.find_one({"id": staffel["id"]})
+    assert (after["team_size"], after["min_squad_size"]) == (9, 9)  # der Mindestkader wächst mit
+
+    # Nach dem ersten Ergebnis bleiben beide.
+    await flow.db.matches_v2.insert_one({"id": "m1", "tournament_id": staffel["id"], "status": "completed", "slots": []})
+    await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"team_size": 4, "min_squad_size": 5})
+    result = (await flow.post(f"{ADMIN}/seasons/{season['id']}/sync")).json()["staffeln"]
+    after = await flow.db.tournaments.find_one({"id": staffel["id"]})
+    assert (after["team_size"], after["min_squad_size"]) == (9, 9)
+    row = next(item for item in result if item["tournament_id"] == staffel["id"])
+    assert [item["label"] for item in row["skipped"] if item["group"] == "before_result"] == [
+        "Best of, Teamgröße, Mindestkader, Punkte und Fristen"]
+    for tournament in await flow.db.tournaments.find({}, {"_id": 0}).to_list(None):
+        assert tournament["min_squad_size"] >= tournament["team_size"]
+
+
+@pytest.mark.asyncio
+async def test_a_staffel_with_another_game_keeps_its_pool_and_says_why(flow):
+    from services import map_pools
+
+    _admin, season, _division, staffel = await setup_staffel(flow, with_pool=True)
+    await flow.db.tournaments.update_one({"id": staffel["id"]}, {"$set": {"game_id": "anderes-spiel"}})
+    synced = await flow.post(f"{ADMIN}/seasons/{season['id']}/sync")
+    row = synced.json()["staffeln"][0]
+
+    assert await map_pools.current(flow.db, "tournament", staffel["id"])
+    assert "map_pool" not in row["applied"] and "map_pool" not in row["changed"]
+    assert [item["reason"] for item in row["skipped"] if item["group"] == "map_pool"] == [
+        "Die Staffel hat ein anderes Spiel als der Map-Pool der Season - ihr Pool bleibt."]

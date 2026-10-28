@@ -86,9 +86,13 @@ def _stage_of(match: dict, stages_by_id: dict[str, dict]) -> dict:
     return stages_by_id.get(match.get("stage_id")) or {}
 
 
-def bracket_fields(matches: list[dict], stages: list[dict], registrations: list[dict], names: dict[str, str]) -> list[dict]:
-    """Runden als Felder: die aktuelle und die nächste Runde je Abschnitt vollständig, der Rest als Zeile."""
-    from services.competition_standings import round_robin_standings, stage_standings, swiss_standings
+def bracket_fields(matches: list[dict], stages: list[dict], registrations: list[dict], names: dict[str, str], *,
+                   tournament: dict | None = None) -> list[dict]:
+    """Runden als Felder: die aktuelle und die nächste Runde je Abschnitt vollständig, der Rest als Zeile. Die Tabelle
+    rechnet mit den Punkten des Turniers (``scoring_rules``, Liga) - dieselbe wie auf der Website."""
+    from services.competition_standings import round_robin_standings, stage_standings, swiss_standings, table_rules
+
+    rules = table_rules(tournament)
 
     stages_by_id = {stage.get("id"): stage for stage in stages if stage.get("id")}
     fields: list[dict] = []
@@ -98,7 +102,7 @@ def bracket_fields(matches: list[dict], stages: list[dict], registrations: list[
         stage = stages_by_id[stage_id]
         stage_matches = [match for match in matches if match.get("stage_id") == stage_id]
         kind = str(stage.get("stage_type") or "")
-        rows = swiss_standings(stage_matches, registrations) if kind == "swiss" else round_robin_standings(stage_matches, registrations) if kind in ("round_robin_groups", "round_robin", "league") else stage_standings(stage_matches, registrations)
+        rows = swiss_standings(stage_matches, registrations) if kind == "swiss" else round_robin_standings(stage_matches, registrations, rules) if kind in ("round_robin_groups", "round_robin", "league") else stage_standings(stage_matches, registrations)
         lines = []
         for index, row in enumerate(rows[:TOP_TABLE], start=1):
             points = row.get("points", 0)
@@ -168,7 +172,7 @@ def bracket_embed(tournament: dict, matches: list[dict], stages: list[dict], reg
         lines = [f"{done} von {len(matches)} Partien gespielt – Bracket ansehen: {link}"] if matches else [f"Noch keine Partien – Bracket ansehen: {link}"]
     stamp = (now or now_utc()).astimezone(VIENNA).strftime("%d.%m.%Y, %H:%M")
     return {"title": title[:256], "description": "\n".join(lines)[:4000], "color": 0xFFD700 if final else 0x29B6E8, "url": link,
-            "fields": bracket_fields(matches, stages, registrations, names), "image_url": None,
+            "fields": bracket_fields(matches, stages, registrations, names, tournament=tournament), "image_url": None,
             "footer": f"{'Endstand' if final else 'Stand'}: {stamp} Uhr"}
 
 

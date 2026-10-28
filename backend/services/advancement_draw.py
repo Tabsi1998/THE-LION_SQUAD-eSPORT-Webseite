@@ -263,9 +263,27 @@ def assign_balanced(entries: list[Any], targets: list[tuple[str, list[int]]], rn
     return placed
 
 
-def shuffle_league_rounds(first_leg: list[list[tuple[int, int]]], rng=None) -> list[list[tuple[int, int]]]:
-    """Liga (#1548): die Kreismethode bleibt, gelost werden nur die Reihenfolge der Spieltage und das Heimrecht."""
+def shuffle_league_rounds(first_leg: list[list[tuple[int, int]]], rng=None, *,
+                          balanced: bool = False) -> list[list[tuple[int, int]]]:
+    """Liga (#1548): die Kreismethode bleibt, gelost werden nur die Reihenfolge der Spieltage und das Heimrecht.
+    ``balanced`` (Liga nur mit Hinrunde, docs/LIGA.md): das faire Heimrecht bleibt - statt je Paarung wird für alle
+    Paarungen gemeinsam gelost, ob die Seiten getauscht werden."""
     rng = rng or DRAW_RNG
-    rounds = [[(home, away) if rng.random() < 0.5 else (away, home) for home, away in pairs] for pairs in first_leg]
+    if balanced:
+        swap_all = rng.random() < 0.5
+        rounds = [[(away, home) if swap_all else (home, away) for home, away in pairs] for pairs in first_leg]
+    else:
+        rounds = [[(home, away) if rng.random() < 0.5 else (away, home) for home, away in pairs] for pairs in first_leg]
     rng.shuffle(rounds)
     return rounds
+
+
+def league_home_swaps(pairs, *, mirrored: bool, rng=None) -> dict:
+    """Welche Paarungen beim Liga-Los die Seiten tauschen (#1548). Mit Rückrunde (``mirrored``) je Paarung einzeln - beide
+    Spiele tauschen mit, das Heimrecht bleibt fair. Nur Hinrunde: alle gemeinsam oder keine, sonst ginge das faire
+    Heimrecht (Differenz ≤ 1, docs/LIGA.md Abschnitt 5) verloren."""
+    rng = rng or DRAW_RNG
+    if mirrored:
+        return {pair: rng.random() < 0.5 for pair in pairs}
+    swap_all = rng.random() < 0.5
+    return {pair: swap_all for pair in pairs}

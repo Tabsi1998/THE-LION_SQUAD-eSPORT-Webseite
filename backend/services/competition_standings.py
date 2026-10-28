@@ -216,7 +216,26 @@ def elimination_standings(matches: list[dict], registrations: list[dict]) -> lis
     return rows
 
 
-def _round_robin_rows(matches: list[dict], registrations: list[dict]) -> list[dict]:
+TABLE_TIEBREAK_FIELDS = {"wins": "won", "score_diff": "score_diff", "score_for": "score_for"}
+
+
+def table_rules(tournament: dict | None) -> dict | None:
+    """Punkte und Gleichstand einer Liga aus ``tournament.scoring_rules`` (docs/LIGA.md), normalisiert. ``None`` ohne
+    Feld - dann gilt die Tabelle wie bisher (3/1/0, Punkte → Siege → Differenz)."""
+    raw = (tournament or {}).get("scoring_rules")
+    if not isinstance(raw, dict):
+        return None
+    from services.scoring_rules import normalize_rules
+
+    try:
+        return normalize_rules(raw)
+    except ValueError:
+        return None
+
+
+def _round_robin_rows(matches: list[dict], registrations: list[dict], rules: dict | None = None) -> list[dict]:
+    points = (rules or {}).get("match_points") or {"win": 3, "draw": 1, "loss": 0}
+    win_points, draw_points, loss_points = points.get("win", 3), points.get("draw", 1), points.get("loss", 0)
     stats = {
         registration["id"]: {
             "registration_id": registration["id"],
@@ -255,31 +274,41 @@ def _round_robin_rows(matches: list[dict], registrations: list[dict]) -> list[di
         winner_id = _sole_winner(match)
         if winner_id == registration_a and registration_a in stats:
             stats[registration_a]["won"] += 1
-            stats[registration_a]["points"] += 3
+            stats[registration_a]["points"] += win_points
             if registration_b in stats:
                 stats[registration_b]["lost"] += 1
+                stats[registration_b]["points"] += loss_points
         elif winner_id == registration_b and registration_b in stats:
             stats[registration_b]["won"] += 1
-            stats[registration_b]["points"] += 3
+            stats[registration_b]["points"] += win_points
             if registration_a in stats:
                 stats[registration_a]["lost"] += 1
+                stats[registration_a]["points"] += loss_points
         else:
             if registration_a in stats:
                 stats[registration_a]["drawn"] += 1
-                stats[registration_a]["points"] += 1
+                stats[registration_a]["points"] += draw_points
             if registration_b in stats:
                 stats[registration_b]["drawn"] += 1
-                stats[registration_b]["points"] += 1
+                stats[registration_b]["points"] += draw_points
     rows = list(stats.values())
     for row in rows:
         row["score_diff"] = row["score_for"] - row["score_against"]
-    _rank_with_ties(rows, lambda row: (row["points"], row["won"], row["score_diff"]))
+    if rules is None:
+        _rank_with_ties(rows, lambda row: (row["points"], row["won"], row["score_diff"]))
+    else:
+        # Liga (docs/LIGA.md): Punkte, dann die Gleichstands-Reihenfolge der Season (z. B. Differenz, mehr Maps).
+        order = [TABLE_TIEBREAK_FIELDS[key] for key in rules.get("table_tiebreakers") or [] if key in TABLE_TIEBREAK_FIELDS]
+        _rank_with_ties(rows, lambda row: (row["points"], *(row[field] for field in order)))
     return rows
 
 
-def round_robin_standings(matches: list[dict], registrations: list[dict]) -> list[dict]:
-    """Liga, Round Robin und jede Gruppe: Punkte, Differenz, Form und Bewegung seit dem letzten Spieltag."""
-    return _with_form_and_movement(_round_robin_rows, matches, registrations)
+def round_robin_standings(matches: list[dict], registrations: list[dict], rules: dict | None = None) -> list[dict]:
+    """Liga, Round Robin und jede Gruppe: Punkte, Differenz, Form und Bewegung seit dem letzten Spieltag. ``rules``
+    (``table_rules(tournament)``): Punkte je Sieg/Remis/Niederlage und Gleichstand einer Liga - ohne wie bisher."""
+    def compute(rows_matches, rows_registrations):
+        return _round_robin_rows(rows_matches, rows_registrations, rules)
+    return _with_form_and_movement(compute, matches, registrations)
 
 
 def swiss_standings(matches: list[dict], registrations: list[dict]) -> list[dict]:
@@ -441,11 +470,11 @@ def standings_for_structure(
         if format_key == "groups":
             return group_standings(stage_matches, registrations, list(groups))
         if format_key in {"round_robin", "league"}:
-            return round_robin_standings(stage_matches, registrations)
+            return round_robin_standings(stage_matches, registrations, table_rules(tournament))
         return stage_standings(stage_matches, registrations)
     legacy_matches = [match for match in matches if match.get("source", {}).get("engine") == "legacy"]
     if format_key in {"round_robin", "league"}:
-        return round_robin_standings(legacy_matches, registrations)
+        return round_robin_standings(legacy_matches, registrations, table_rules(tournament))
     if format_key == "swiss":
         return swiss_standings(legacy_matches, registrations)
     if format_key == "groups":
@@ -531,7 +560,7 @@ def placements_for_structure(
     ]
     format_key = (tournament or {}).get("format")
     if not wanted_sections and format_key in {"round_robin", "league"}:
-        rows = round_robin_standings(stage_matches, registrations)
+        rows = round_robin_standings(stage_matches, registrations, table_rules(tournament))
     elif not wanted_sections and format_key == "swiss":
         rows = swiss_standings(stage_matches, registrations)
     else:

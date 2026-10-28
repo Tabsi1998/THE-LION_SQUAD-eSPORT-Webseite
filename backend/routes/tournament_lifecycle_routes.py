@@ -359,6 +359,18 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
     pause_set, pause_unset = _pause_change(t, prev, status, body)
     auto_generated_bracket = None
     planning = None
+    if prev != status and status == "live" and t.get("matchday_weeks_total"):
+        # Liga-Staffel (docs/LIGA.md, Abschnitt 5): Runden ≤ aktive Wochen auch beim Erzeugen des Spielplans - mit den
+        # tatsächlich zugeteilten Teams. Sonst bliebe die Vorschau stehen, und die Staffel liefe ohne festen Plan los.
+        from services.custom_bracket import league_legs
+        from services.league_rounds import rounds_problem
+
+        teams = await db.tournament_registrations.count_documents(
+            {"tournament_id": tid, "status": {"$in": list(BRACKET_STATUSES)}})
+        problem = rounds_problem(teams, league_legs(t), int(t["matchday_weeks_total"]),
+                                 list(t.get("matchday_blocked_weeks") or []))
+        if problem:
+            raise HTTPException(status_code=400, detail=problem)
     # Der Baum steht erst mit dem Ende des Check-ins (#1551): beim Öffnen bleibt die Vorschau.
     if prev != status and status == "live":
         try:

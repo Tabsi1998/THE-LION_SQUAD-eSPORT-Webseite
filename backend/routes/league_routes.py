@@ -296,4 +296,7 @@ async def public_leagues(user: dict | None = Depends(get_optional_user)):
 @router.get("/{league_slug}/{season_slug}")
 async def public_season(league_slug: str, season_slug: str, user: dict | None = Depends(get_optional_user)):
     """Eine Season: Vorgaben, Map-Pool, Liga N mit ihren Staffeln (Turnier-Kennungen für Tabelle und Spielplan)."""
-    return await _call(leagues.public_season_view(get_db(), league_slug, season_slug, user))
+    from routes.tournament_common import tournament_hidden_reason
+
+    return await _call(leagues.public_season_view(get_db(), league_slug, season_slug, user,
+                                                  staffel_hidden=tournament_hidden_reason))

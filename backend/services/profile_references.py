@@ -151,7 +151,7 @@ async def _tournament_rank_for_user(tournament_id: str, user_id: str, team_ids: 
     if not read_model.stage_matches:
         return None, participant_count
 
-    tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0, "format": 1}) or {}
+    tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0, "format": 1, "scoring_rules": 1}) or {}
     groups = []
     if tournament.get("format") == "groups":
         groups = await db.tournament_groups.find({"tournament_id": tournament_id}, {"_id": 0}).to_list(100)

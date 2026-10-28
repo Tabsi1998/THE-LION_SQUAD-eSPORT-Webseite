@@ -434,7 +434,7 @@ export default function AdminLeagueSeasonPage() {
             </section>
 
             <FormSection title="Vorgaben auf Staffeln übertragen" testId="season-sync"
-              hint="Regeltext und Map-Pool immer, auch bei gesperrten Staffeln; Termine und Kalender nur vor dem Start; Best of, Teamgröße, Punkte und Fristen nur vor dem ersten Ergebnis. Die Sichtbarkeit gilt schon beim Speichern.">
+              hint="Regeltext und Map-Pool immer, auch bei gesperrten Staffeln; Termine und Kalender nur vor dem Start; Best of, Teamgröße, Mindestkader, Punkte und Fristen nur vor dem ersten Ergebnis. Die Sichtbarkeit gilt schon beim Speichern.">
               <button type="button" onClick={sync} disabled={syncing || !staffelCount} data-testid="season-sync-run"
                 className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5 disabled:opacity-50">
                 <ArrowRightLeft className="w-3.5 h-3.5" aria-hidden="true" /> {syncing ? "Übertrage …" : "Vorgaben übertragen"}
