@@ -129,3 +129,14 @@ async def test_the_person_is_told_what_was_reset_and_why(flow):
     assert "Profilbild" in notes[0]["body"] and "Anzeigename" in notes[0]["body"] and "Beleidigender Anzeigename" in notes[0]["body"]
     assert "Unpassender" not in str(notes[0])
     assert await flow.db.notifications.count_documents({"user_id": chair["id"]}) == 0
+
+@pytest.mark.asyncio
+async def test_the_own_account_is_refused(flow):
+    """#2112: das eigene Profil setzt man hier nicht zurück - auch nicht am Server vorbei an der Oberfläche."""
+    chair = await granted(flow, "vorsitz", "club")
+    await flow.db.users.update_one({"id": chair["id"]}, {"$set": {"bio": "Meine Bio"}})
+    flow.act_as(chair)
+    response = await flow.patch(f"/api/users/{chair['id']}", json={"reset": ["bio"], "reason": "Selbst zurücksetzen"})
+    assert response.status_code == 403
+    assert (await flow.db.users.find_one({"id": chair["id"]}))["bio"] == "Meine Bio"
+    assert await flow.db.audit_logs.count_documents({"action": "user.admin_profile_reset"}) == 0

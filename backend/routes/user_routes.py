@@ -994,6 +994,9 @@ async def admin_update_user(user_id: str, body: AdminProfileReset,
     Superadmin-Konten fasst nur ein Superadmin an."""
     db = get_db()
     fields = sorted(set(body.reset))
+    # Das eigene Profil ändert man im eigenen Profil (#2112) - hier nur fremde Konten.
+    if user_id == me.get("id"):
+        raise HTTPException(status_code=403, detail="Das eigene Profil änderst du unter „Einstellungen“, nicht hier.")
     target = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "role": 1})
     if not target:
         raise HTTPException(status_code=404, detail="Nutzer nicht gefunden")
