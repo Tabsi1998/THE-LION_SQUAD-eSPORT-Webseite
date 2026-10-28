@@ -194,7 +194,8 @@ async def test_nine_teams_do_not_fit_season_one_and_the_message_points_to_a_seco
 
     # Hin- und Rückrunde mit 8 Teams braucht 14 Wochen - ebenfalls abgelehnt.
     await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"max_staffel_size": 8, "round_robin_legs": 2})
-    assert (await flow.post(f"{ADMIN}/divisions/{division['id']}/staffeln", json={})).status_code == 422
+    response = await flow.post(f"{ADMIN}/divisions/{division['id']}/staffeln", json={})
+    assert response.status_code == 422
 
 
 # ---------------------------------------------------------------- Vorgaben übertragen
@@ -269,14 +270,20 @@ async def test_sync_refuses_a_calendar_that_no_longer_fits(flow):
 async def test_season_input_is_checked(flow):
     _admin, _game, league, season, _division, _maps = await setup_league(flow)
     url = f"{ADMIN}/seasons/{season['id']}"
-    assert (await flow.patch(url, json={"best_of": 4})).status_code == 422
-    assert (await flow.patch(url, json={"weeks_total": 0})).status_code == 422
-    assert (await flow.patch(url, json={"visibility": "secret"})).status_code == 422
-    assert (await flow.patch(url, json={"default_match_time": "25:00"})).status_code == 422
-    assert (await flow.patch(url, json={"min_squad_size": 3})).status_code == 422
-    assert (await flow.patch(url, json={"game_mode_order": ["unbekannt"]})).status_code == 422
-    assert (await flow.patch(url, json={"blocked_periods": [
-        {"start_date": "2027-01-03", "end_date": "2026-12-21"}]})).status_code == 422
+    response = await flow.patch(url, json={"best_of": 4})
+    assert response.status_code == 422
+    response = await flow.patch(url, json={"weeks_total": 0})
+    assert response.status_code == 422
+    response = await flow.patch(url, json={"visibility": "secret"})
+    assert response.status_code == 422
+    response = await flow.patch(url, json={"default_match_time": "25:00"})
+    assert response.status_code == 422
+    response = await flow.patch(url, json={"min_squad_size": 3})
+    assert response.status_code == 422
+    response = await flow.patch(url, json={"game_mode_order": ["unbekannt"]})
+    assert response.status_code == 422
+    response = await flow.patch(url, json={"blocked_periods": [{"start_date": "2027-01-03", "end_date": "2026-12-21"}]})
+    assert response.status_code == 422
     bad_points = await flow.patch(url, json={"scoring_rules": {"table_tiebreakers": ["los"]}})
     assert bad_points.status_code == 422 and "Gleichstand" in bad_points.json()["detail"]
     ok = await flow.patch(url, json={"game_mode_order": ["snd", "stellung"], "team_size": 5})

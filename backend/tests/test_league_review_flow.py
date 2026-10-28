@@ -30,7 +30,7 @@ async def setup_staffel(flow, *, season: dict | None = None, with_pool: bool = F
     admin = await flow.add_staff()
     flow.act_as(admin)
     game = (await flow.post("/api/games", json={"name": "Probe Shooter", "slug": "probe-shooter",
-                                                "match_modes": [{"mode": "snd", "label": "Suchen & Zerstören"}]})).json()
+                                                "match_modes": [{"mode": "snd", "label": "Stellung"}]})).json()
     league = (await flow.post(ADMIN, json={"name": "Probe-Liga", "game_id": game["id"]})).json()
     season_doc = (await flow.post(f"{ADMIN}/{league['id']}/seasons", json={**SEASON_ONE, **(season or {})})).json()
     if with_pool:
@@ -88,8 +88,10 @@ async def test_league_context_queries_carry_the_partial_index_condition(flow, mo
     recorder = RecordingTournaments(flow.db)
     monkeypatch.setattr(league_routes, "get_db", lambda: recorder)
 
-    assert (await flow.post(f"{ADMIN}/divisions/{division['id']}/staffeln", json={})).status_code == 200
-    assert (await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"weeks_total": 11})).status_code == 200
+    response = await flow.post(f"{ADMIN}/divisions/{division['id']}/staffeln", json={})
+    assert response.status_code == 200
+    response = await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"weeks_total": 11})
+    assert response.status_code == 200
 
     by_context = [query for query in recorder.filters if any(str(key).startswith("league_context.") for key in query)]
     assert len(by_context) >= 3
@@ -103,7 +105,8 @@ async def test_switching_the_season_off_hides_every_staffel_at_once_even_locked_
     admin, season, division, staffel = await setup_staffel(flow, season={"visibility": "public"})
     second = (await flow.post(f"{ADMIN}/divisions/{division['id']}/staffeln", json={})).json()
     await flow.db.tournaments.update_many({}, {"$set": {"status": "live", "visibility": "public", "is_public": True}})
-    await flow.db.tournaments.update_one({"id": second["tournament_id"]}, {"$set": {"locked_at": "2026-12-01T10:00:00+00:00"}})
+    await flow.db.tournaments.update_one({"id": second["tournament_id"]},
+                                         {"$set": {"locked_at": "2026-12-01T10:00:00+00:00"}})
     slugs = [staffel["slug"], second["slug"]]
 
     flow.act_as(None)
@@ -157,8 +160,10 @@ async def test_removing_the_season_pool_reaches_staffeln_without_a_result_only(f
                                          "slots": []})
     assert await map_pools.current(flow.db, "tournament", staffel["id"])
 
-    assert (await flow.delete(f"{ADMIN}/seasons/{season['id']}/map-pool")).status_code == 200
-    rows = {row["tournament_id"]: row for row in (await flow.post(f"{ADMIN}/seasons/{season['id']}/sync")).json()["staffeln"]}
+    response = await flow.delete(f"{ADMIN}/seasons/{season['id']}/map-pool")
+    assert response.status_code == 200
+    synced = (await flow.post(f"{ADMIN}/seasons/{season['id']}/sync")).json()["staffeln"]
+    rows = {row["tournament_id"]: row for row in synced}
 
     assert await map_pools.current(flow.db, "tournament", staffel["id"]) is None
     assert "map_pool" in rows[staffel["id"]]["applied"] and "map_pool" in rows[staffel["id"]]["changed"]
@@ -203,7 +208,8 @@ async def test_a_failing_pool_copy_is_reported_per_staffel_and_the_rest_goes_on(
 
     _admin, season, division, first = await setup_staffel(flow, with_pool=True)
     second = (await flow.post(f"{ADMIN}/divisions/{division['id']}/staffeln", json={})).json()
-    await map_pools.clear(flow.db, scope="tournament", scope_id=first["id"], user={"id": "x"}, tournament_id=first["id"])
+    await map_pools.clear(flow.db, scope="tournament", scope_id=first["id"], user={"id": "x"},
+                          tournament_id=first["id"])
     await map_pools.clear(flow.db, scope="tournament", scope_id=second["tournament_id"], user={"id": "x"},
                           tournament_id=second["tournament_id"])
     await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"rules_text": "Neu"})
@@ -239,7 +245,8 @@ async def test_a_season_listing_only_staffeln_does_not_fall_back_to_every_tourna
     await flow.create_tournament(title="Herbst-Cup", status="completed")
     only_staffeln, _ = await _resolve_season_sources({"tournament_ids": [staffel["id"]]})
     assert only_staffeln == []
-    with_fastlap, fastlaps = await _resolve_season_sources({"tournament_ids": [staffel["id"]], "f1_challenge_ids": ["f1"]})
+    with_fastlap, fastlaps = await _resolve_season_sources({"tournament_ids": [staffel["id"]],
+                                                            "f1_challenge_ids": ["f1"]})
     assert with_fastlap == [] and fastlaps == ["f1"]
     automatic, _ = await _resolve_season_sources({})
     assert len(automatic) == 1  # ohne Auswahl bleibt die Automatik - das normale Turnier

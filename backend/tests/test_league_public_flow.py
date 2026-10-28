@@ -66,7 +66,8 @@ async def test_visibility_off_admins_members_public(flow):
         ("public", {"anonym": (1, 200), "gast": (1, 200), "mitglied": (1, 200), "leitung": (1, 200)}),
     ):
         flow.act_as(admin)
-        assert (await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"visibility": visibility})).status_code == 200
+        response = await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"visibility": visibility})
+        assert response.status_code == 200
         assert await matrix() == expected, visibility
 
 
