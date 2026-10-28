@@ -1,22 +1,28 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, AlignCenterHorizontal, CheckCircle2, ExternalLink, Image as ImageIcon, LayoutTemplate, Move, Plus, RefreshCw, RotateCcw, Trash2, Upload, Wand2 } from "lucide-react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { AlertTriangle, AlignCenterHorizontal, CheckCircle2, ExternalLink, FlipHorizontal2, Image as ImageIcon, LayoutTemplate, Maximize2, Minus, Move, Plus, RefreshCw, RotateCcw, Scan, Trash2, Upload, Wand2, X, ZoomIn, ZoomOut } from "lucide-react";
 import { api, formatRequestError, resolveMediaUrl, uploadApi } from "@/lib/api";
 import { viennaDateTime } from "@/lib/vienna";
-import { centerOffsetCm, cmText, gapCm, gapOffsetCm, layerAbove, layersFromSet, maxWidthCm, resolveLayers, textBoundsCm } from "@/lib/shopLayout";
+import { cmText, gapCm, gapOffsetCm, layerAbove, layersFromSet, maxWidthCm, resolveLayers, textBoundsCm } from "@/lib/shopLayout";
+import {
+  alignToLayer, areaSizeCm, BIG_STEP_CM, centerOnArea, DEFAULT_GRID_CM, DRAG_START_PX, followersOf, formatCm, frameCm, GRID_CHOICES_CM, mirrorOnArea,
+  nextZoom, offsetsForPosition, parseCm, positionCm, round2, screenToCm, SNAP_SCREEN_PX, snapDrag, snapLines, STEP_CM, ZOOM_LIMITS,
+} from "@/lib/shopPlacement";
 import { techniqueLabel } from "@/lib/shopTechniques";
 
 // Schritt 3 der Produktverwaltung (#2069): Druckflächen direkt aus der Printful-Vorlage. Je Fläche wählt der Admin Motiv,
 // Vorgabe-Position und Größe in cm - die Website erzeugt daraus die Druckdatei in der exakten Pixelgröße von Printful.
-// Feinjustieren geht per Ziehen oder Pfeiltasten in der Vorschau; der Hauptweg bleibt Vorgabe plus Regler. Gamertag und
-// Vereinsnummer sind Platzhalter: ihre Datei entsteht je Bestellung. Prüfen und Erzeugen tut der Server.
+// Genau setzen (#2117): Position je Ebene als Zahl in cm, Ausrichten mit einem Klick, Ziehen mit Einrasten und
+// Hilfslinien, „Groß bearbeiten“ mit Zoom. Alles ändert nur den Versatz zur Vorgabe. Gamertag und Vereinsnummer sind
+// Platzhalter: ihre Datei entsteht je Bestellung. Prüfen und Erzeugen tut der Server.
 
 const BASE = "/admin/shop/products";
 const SELECT = "mt-1 w-full min-h-10 bg-black/40 border border-white/15 rounded-sm px-2 text-sm focus:border-brand outline-none disabled:opacity-50";
+const SMALL_SELECT = "mt-0.5 block min-h-9 bg-black/40 border border-white/15 rounded-sm px-2 text-xs focus:border-brand outline-none disabled:opacity-50";
 const SMALL_BTN = "tls-btn tls-btn--secondary min-h-9 px-3 text-xs font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-1.5 disabled:opacity-40";
 const QUIET_BTN = "tls-btn tls-btn--quiet min-h-9 px-2 text-xs rounded-sm inline-flex items-center gap-1.5 disabled:opacity-40";
 const STATE_TONES = { ok: "text-ok", not_needed: "text-white/55", missing: "text-warn", outdated: "text-honor", invalid: "text-warn", no_area: "text-warn" };
 const STATE_TEXT = { ok: "aktuell", not_needed: "Platzhalter", missing: "fehlt", outdated: "veraltet", invalid: "passt nicht", no_area: "Fläche fehlt" };
-const NUDGE_CM = 0.1;
 const DRAFT_PREVIEW_DELAY_MS = 350;
 const SAMPLE_DELAY_MS = 300;
 
@@ -40,7 +46,8 @@ function draftFrom(view) {
 }
 
 function cleanLayer(layer) {
-  const out = { kind: layer.kind, preset: layer.preset, offset_x_cm: round1(layer.offset_x_cm || 0), offset_y_cm: round1(layer.offset_y_cm || 0) };
+  // Versatz auf 0,01 cm wie der Server (#2117) - so liegt „mittig“ oder „5 cm von oben“ wirklich dort.
+  const out = { kind: layer.kind, preset: layer.preset, offset_x_cm: round2(layer.offset_x_cm || 0), offset_y_cm: round2(layer.offset_y_cm || 0) };
   if (layer.kind === "motif") {
     out.width_cm = round1(layer.width_cm);
     out.motif = { key: layer.motif?.key || "", by_color: Object.fromEntries(Object.entries(layer.motif?.by_color || {}).filter(([, key]) => key)) };
@@ -184,82 +191,378 @@ function scrollToArea(key) {
 
 // ---------------------------------------------------------------- Vorschau mit Vorlagenbild, Ziehen und Pfeiltasten
 
-function LayoutPreview({ area, preview, layers, resolved, colorCode, motifFor, sampleFor, onSampleProblem, selected, onSelect, onNudge, editable, testId, stale = false, backdrop = null }) {
+// Wie gezogen wird (#2117): Raster (Vorgabe 0,5 cm), Einrasten an Hilfslinien, waagrecht gemessen ab Mitte oder
+// linkem Rand. Eine Vorliebe je Browser - fehlt der Speicher (privates Fenster), gelten die Vorgaben.
+const PLACE_SETTINGS_KEY = "tls_shop_place_v1";
+const PLACE_DEFAULTS = { grid: DEFAULT_GRID_CM, snap: true, measure: "center" };
+
+function loadPlaceSettings() {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(PLACE_SETTINGS_KEY) || "null") || {};
+    return {
+      grid: GRID_CHOICES_CM.includes(saved.grid) ? saved.grid : PLACE_DEFAULTS.grid,
+      snap: typeof saved.snap === "boolean" ? saved.snap : PLACE_DEFAULTS.snap,
+      measure: saved.measure === "left" ? "left" : PLACE_DEFAULTS.measure,
+    };
+  } catch {
+    return { ...PLACE_DEFAULTS };
+  }
+}
+
+function usePlaceSettings() {
+  const [settings, setSettings] = useState(loadPlaceSettings);
+  const change = useCallback((patch) => setSettings((now) => {
+    const next = { ...now, ...patch };
+    try { window.localStorage.setItem(PLACE_SETTINGS_KEY, JSON.stringify(next)); } catch { /* nur eine Vorliebe */ }
+    return next;
+  }), []);
+  return [settings, change];
+}
+
+function layerLabel(item, motif) {
+  return item.kind === "motif" ? `Motiv ${motif?.title || ""}`.trim() : KIND_SHORT[item.kind] || item.kind;
+}
+
+// Die Position einer Ebene als kurzer Text - für die Live-Anzeige beim Ziehen.
+function positionText(position, measure) {
+  if (!position) return "";
+  const x = measure === "left" ? `links ${formatCm(position.x)}` : `Mitte ${position.x > 0.004 ? "+" : ""}${formatCm(position.x)}`;
+  return `oben ${formatCm(position.y)} · ${x} cm`;
+}
+
+// ---------------------------------------------------------------- Die Druckfläche: Ebenen, Ziehen, Hilfslinien
+
+// Gemeinsam für die kleine Vorschau und „Groß bearbeiten“. Ziehen folgt der Maus 1:1 ab der Stelle, an der gegriffen
+// wurde; die Bewegung in cm ergibt sich aus der Breite der Fläche auf dem Bildschirm - beim Zoom also feiner. Einrasten
+// an Mitte, Rändern, Sicherheitsrand und anderen Ebenen (nicht an denen, die mitwandern), sonst aufs Raster; mit Alt frei.
+function AreaCanvas({ area, layers, resolved, motifFor, sampleFor, onSampleProblem, selected, onSelect, onPlace, editable, testId, stale, backdrop, settings,
+  followers, live, onLive, className, style }) {
   const areaRef = useRef(null);
   const drag = useRef(null);
+  const size = areaSizeCm(area);
+  const pct = (value, whole) => `${(value / whole) * 100}%`;
+  const marginCm = Number(area.safe_margin_cm || 0);
+
+  const onPointerDown = (event, item) => {
+    // Ein zweiter Finger übernimmt nicht (sonst springt die Ebene); nur die linke Maustaste zieht.
+    if (!editable || drag.current || (event.pointerType === "mouse" && event.button !== 0)) return;
+    onSelect(item.index);
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    const layer = layers[item.index] || {};
+    drag.current = {
+      index: item.index, pointerId: event.pointerId, x: event.clientX, y: event.clientY, moving: false, frame: frameCm(area, item),
+      start: { x: Number(layer.offset_x_cm || 0), y: Number(layer.offset_y_cm || 0) },
+      lines: snapLines(area, resolved, { marginCm, skip: [item.index, ...followers(item.index)] }),
+    };
+  };
+  const onPointerMove = (event) => {
+    const now = drag.current;
+    if (!now || event.pointerId !== now.pointerId) return;
+    const dxPx = event.clientX - now.x;
+    const dyPx = event.clientY - now.y;
+    if (!now.moving && Math.hypot(dxPx, dyPx) < DRAG_START_PX) return;
+    now.moving = true;
+    const width = areaRef.current?.getBoundingClientRect().width || 0;
+    const moved = snapDrag({
+      frame: now.frame, dx: screenToCm(dxPx, width, size.width), dy: screenToCm(dyPx, width, size.width), lines: now.lines,
+      toleranceCm: screenToCm(SNAP_SCREEN_PX, width, size.width), gridCm: settings.grid, measure: settings.measure, areaWidthCm: size.width,
+      free: event.altKey || !settings.snap,
+    });
+    onPlace(now.index, { offset_x_cm: round2(now.start.x + moved.dx), offset_y_cm: round2(now.start.y + moved.dy) });
+    onLive({ index: now.index, guides: moved.guides });
+  };
+  const stop = (event) => {
+    if (!drag.current || (event && event.pointerId !== drag.current.pointerId)) return;
+    drag.current = null;
+    onLive(null);
+  };
+  const onKeyDown = (event, index) => {
+    const step = event.shiftKey ? BIG_STEP_CM : STEP_CM;
+    const moves = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
+    if (!editable || !moves[event.key]) return;
+    event.preventDefault();
+    const layer = layers[index] || {};
+    const [dx, dy] = moves[event.key];
+    onPlace(index, { offset_x_cm: round2(Number(layer.offset_x_cm || 0) + dx), offset_y_cm: round2(Number(layer.offset_y_cm || 0) + dy) });
+  };
+
+  return (
+    <div ref={areaRef} className={className} style={style} onPointerMove={onPointerMove} onPointerUp={stop} onPointerCancel={stop} onLostPointerCapture={stop}
+      data-testid={`${testId}-area`} data-dragging={live ? "true" : undefined}>
+      {/* Die fertige Datei dieser Farbe als Hintergrund (#2141) - genau die Druckfläche, unter den Ebenen. */}
+      {backdrop && <img src={backdrop} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full pointer-events-none" draggable={false} data-testid={`${testId}-backdrop`} />}
+      {marginCm > 0 && (
+        <div className="absolute border border-dashed border-honor/60 pointer-events-none" aria-hidden="true"
+          style={{ inset: `${(marginCm / size.height) * 100}% ${(marginCm / size.width) * 100}%` }} />
+      )}
+      {resolved.map((item) => {
+        if (!item.box) return null;
+        const layer = layers[item.index];
+        const motif = item.kind === "motif" ? motifFor(layer, item.index) : null;
+        const bad = item.outside?.length > 0;
+        const isSelected = selected === item.index;
+        const dragging = live?.index === item.index;
+        return (
+          <button key={item.index} type="button" aria-label={`${layerLabel(item, motif)} verschieben (Pfeiltasten 0,1 cm, mit Umschalt 1 cm)`} aria-pressed={isSelected}
+            onPointerDown={(event) => onPointerDown(event, item)} onKeyDown={(event) => onKeyDown(event, item.index)} onFocus={() => onSelect(item.index)}
+            className={`absolute p-0 m-0 bg-transparent touch-none outline-none transition-[box-shadow,opacity] duration-150 ease-out ${stale && !dragging ? "opacity-50" : ""} ${editable ? (dragging ? "cursor-grabbing" : "cursor-grab") : "cursor-default"} ${isSelected ? "ring-2 ring-brand" : "ring-1 ring-white/25"} ${bad ? "ring-2 ring-warn" : ""} ${dragging ? "z-10 shadow-[0_8px_22px_rgba(0,0,0,0.55)]" : ""} focus-visible:ring-2 focus-visible:ring-brand`}
+            style={{ left: pct(item.box.left, area.width_px), top: pct(item.box.top, area.height_px), width: pct(item.box.width, area.width_px), height: pct(item.box.height, area.height_px) }}
+            data-testid={`${testId}-layer-${item.index}`} data-outside={bad ? item.outside.join(",") : undefined} data-dragging={dragging ? "true" : undefined}>
+            {item.kind === "motif" && motif?.image_path
+              ? <img src={resolveMediaUrl(motif.image_path)} alt="" aria-hidden="true" className="w-full h-full pointer-events-none" draggable={false} />
+              : item.kind !== "motif" && sampleFor
+                // Der Name in echter Texthöhe; die Leinwand (Höchstbreite) ist nur der feine Rahmen drumherum (#2105).
+                ? <SampleImage sample={sampleFor(item.kind, layer)} onProblem={(text) => onSampleProblem?.(item.index, text)} testId={`${testId}-layer-${item.index}-sample`} />
+                : <span className="flex items-center justify-center w-full h-full border border-dashed border-brand/70 bg-brand/10 text-[10px] font-bold uppercase tracking-wider text-brand pointer-events-none">{item.kind === "motif" ? "Motiv" : item.kind === "gamertag" ? "Gamertag" : item.kind === "text" ? "Text" : "Nr."}</span>}
+          </button>
+        );
+      })}
+      {/* Hilfslinien beim Ziehen: über die ganze Fläche, eingerastet an Mitte bzw. Rand durchgezogen, an Ebenen gestrichelt. */}
+      {(live?.guides || []).map((guide) => (
+        <span key={`${guide.axis}-${guide.at}`} aria-hidden="true" data-testid={`${testId}-guide-${guide.axis}`} data-kind={guide.kind}
+          className={`absolute pointer-events-none z-20 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-100 ${guide.axis === "x" ? "top-0 bottom-0 w-0 border-l" : "left-0 right-0 h-0 border-t"} ${guide.kind === "layer" ? "border-dashed border-honor" : "border-brand"}`}
+          style={guide.axis === "x" ? { left: pct(guide.at, size.width) } : { top: pct(guide.at, size.height) }} />
+      ))}
+    </div>
+  );
+}
+
+// Die Live-Anzeige beim Ziehen: wo die Oberkante und die Mitte bzw. der linke Rand gerade liegen.
+function LiveReadout({ area, resolved, live, measure, testId, className = "" }) {
+  const item = live ? resolved.find((entry) => entry.index === live.index) : null;
+  if (!item?.box) return null;
+  return (
+    <span role="status" className={`pointer-events-none z-30 whitespace-nowrap rounded-sm border border-white/15 bg-black/85 px-2 py-0.5 text-[11px] font-bold tabular-nums text-white shadow-lg motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-150 ${className}`}
+      data-testid={`${testId}-live`}>
+      {positionText(positionCm(area, item, measure), measure)}
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------- Vorschau mit Vorlagenbild
+
+function LayoutPreview({ area, preview, colorCode, testId, stale = false, live, canvas }) {
   const templateW = preview?.template_width || area.width_px;
   const templateH = preview?.template_height || area.height_px;
   const box = preview?.area || { left: 0, top: 0, width: area.width_px, height: area.height_px };
   const pct = (value, whole) => `${(value / whole) * 100}%`;
   const imagePath = preview?.image_path ? resolveMediaUrl(preview.image_path) : null;
   const background = preview?.background_path ? resolveMediaUrl(preview.background_path) : null;
-  const marginCm = Number(area.safe_margin_cm || 0);
-
-  const toCm = (pixels) => {
-    const rect = areaRef.current?.getBoundingClientRect();
-    if (!rect?.width) return 0;
-    return (pixels / rect.width) * area.width_cm;
-  };
-  const onPointerDown = (event, index) => {
-    if (!editable) return;
-    onSelect(index);
-    event.currentTarget.setPointerCapture?.(event.pointerId);
-    drag.current = { index, x: event.clientX, y: event.clientY };
-  };
-  const onPointerMove = (event) => {
-    if (!drag.current) return;
-    const dx = toCm(event.clientX - drag.current.x);
-    const dy = toCm(event.clientY - drag.current.y);
-    if (Math.abs(dx) < 0.05 && Math.abs(dy) < 0.05) return;
-    drag.current = { ...drag.current, x: event.clientX, y: event.clientY };
-    onNudge(drag.current.index, dx, dy);
-  };
-  const stop = () => { drag.current = null; };
-  const onKeyDown = (event, index) => {
-    const step = event.shiftKey ? 1 : NUDGE_CM;
-    const moves = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
-    if (!editable || !moves[event.key]) return;
-    event.preventDefault();
-    onNudge(index, ...moves[event.key]);
-  };
-
   return (
     <div className="relative w-full overflow-hidden rounded-sm border border-white/10 select-none" style={{ aspectRatio: `${templateW} / ${templateH}`, backgroundColor: colorCode || "#808080" }} data-testid={testId} data-stale={stale ? "true" : undefined} data-tinted={preview?.tinted ? "true" : undefined}>
       {background && <img src={background} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full pointer-events-none" />}
       {preview?.positioning === "background" && imagePath && <img src={imagePath} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full pointer-events-none" />}
-      <div ref={areaRef} className="absolute outline outline-1 outline-dashed outline-white/40" style={{ left: pct(box.left, templateW), top: pct(box.top, templateH), width: pct(box.width, templateW), height: pct(box.height, templateH) }}
-        onPointerMove={onPointerMove} onPointerUp={stop} onPointerCancel={stop} data-testid={`${testId}-area`}>
-        {/* Die fertige Datei dieser Farbe als Hintergrund (#2141) - genau die Druckfläche, unter den Ebenen. */}
-        {backdrop && <img src={backdrop} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full pointer-events-none" draggable={false} data-testid={`${testId}-backdrop`} />}
-        {marginCm > 0 && (
-          <div className="absolute border border-dashed border-honor/60 pointer-events-none" aria-hidden="true"
-            style={{ inset: `${(marginCm / area.height_cm) * 100}% ${(marginCm / area.width_cm) * 100}%` }} />
-        )}
-        {resolved.map((item) => {
-          if (!item.box) return null;
-          const layer = layers[item.index];
-          const motif = item.kind === "motif" ? motifFor(layer, item.index) : null;
-          const bad = item.outside?.length > 0;
-          const isSelected = selected === item.index;
-          const label = item.kind === "motif" ? `Motiv ${motif?.title || ""}` : KIND_SHORT[item.kind] || item.kind;
-          return (
-            <button key={item.index} type="button" aria-label={`${label} verschieben (Pfeiltasten, mit Umschalt 1 cm)`} aria-pressed={isSelected}
-              onPointerDown={(event) => onPointerDown(event, item.index)} onKeyDown={(event) => onKeyDown(event, item.index)} onFocus={() => onSelect(item.index)}
-              className={`absolute p-0 m-0 bg-transparent touch-none outline-none transition-[box-shadow,opacity] duration-150 ${stale ? "opacity-50" : ""} ${editable ? "cursor-move" : "cursor-default"} ${isSelected ? "ring-2 ring-brand" : "ring-1 ring-white/25"} ${bad ? "ring-2 ring-warn" : ""} focus-visible:ring-2 focus-visible:ring-brand`}
-              style={{ left: pct(item.box.left, area.width_px), top: pct(item.box.top, area.height_px), width: pct(item.box.width, area.width_px), height: pct(item.box.height, area.height_px) }}
-              data-testid={`${testId}-layer-${item.index}`} data-outside={bad ? item.outside.join(",") : undefined}>
-              {item.kind === "motif" && motif?.image_path
-                ? <img src={resolveMediaUrl(motif.image_path)} alt="" aria-hidden="true" className="w-full h-full pointer-events-none" draggable={false} />
-                : item.kind !== "motif" && sampleFor
-                  // Der Name in echter Texthöhe; die Leinwand (Höchstbreite) ist nur der feine Rahmen drumherum (#2105).
-                  ? <SampleImage sample={sampleFor(item.kind, layer)} onProblem={(text) => onSampleProblem?.(item.index, text)} testId={`${testId}-layer-${item.index}-sample`} />
-                  : <span className="flex items-center justify-center w-full h-full border border-dashed border-brand/70 bg-brand/10 text-[10px] font-bold uppercase tracking-wider text-brand pointer-events-none">{item.kind === "motif" ? "Motiv" : item.kind === "gamertag" ? "Gamertag" : item.kind === "text" ? "Text" : "Nr."}</span>}
-            </button>
-          );
-        })}
-      </div>
+      <AreaCanvas {...canvas} area={area} live={live} testId={testId} stale={stale} className="absolute outline outline-1 outline-dashed outline-white/40"
+        style={{ left: pct(box.left, templateW), top: pct(box.top, templateH), width: pct(box.width, templateW), height: pct(box.height, templateH) }} />
       {preview?.positioning !== "background" && imagePath && <img src={imagePath} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full pointer-events-none" />}
+      <LiveReadout area={area} resolved={canvas.resolved} live={live} measure={canvas.settings.measure} testId={testId} className="absolute left-1/2 top-1.5 -translate-x-1/2" />
     </div>
+  );
+}
+
+// ---------------------------------------------------------------- Einstellungen, Zahlenfelder
+
+function SnapSettings({ settings, onChange, testId }) {
+  return (
+    <div className="flex flex-wrap items-end gap-x-3 gap-y-2" data-testid={testId}>
+      <label className="block text-xs min-w-0"><span className="text-white/60">Raster beim Ziehen</span>
+        <select value={String(settings.grid)} onChange={(event) => onChange({ grid: Number(event.target.value) })}
+          className={`${SMALL_SELECT} w-28`} data-testid={`${testId}-grid`}>
+          {GRID_CHOICES_CM.map((grid) => <option key={grid} value={String(grid)}>{grid ? `${formatCm(grid)} cm` : "ohne"}</option>)}
+        </select>
+      </label>
+      <label className="block text-xs min-w-0"><span className="text-white/60">Waagrecht gemessen ab</span>
+        <select value={settings.measure} onChange={(event) => onChange({ measure: event.target.value })}
+          className={`${SMALL_SELECT} w-40`} data-testid={`${testId}-measure`}>
+          <option value="center">Mitte der Fläche</option>
+          <option value="left">linkem Rand</option>
+        </select>
+      </label>
+      <label className="inline-flex items-center gap-2 text-xs min-h-9 cursor-pointer">
+        <input type="checkbox" checked={settings.snap} onChange={(event) => onChange({ snap: event.target.checked })} className="w-4 h-4 accent-brand" data-testid={`${testId}-snap`} />
+        Einrasten an Hilfslinien
+      </label>
+    </div>
+  );
+}
+
+// Eine Zahl in cm mit − und +: Komma erlaubt, Pfeiltasten im Feld 0,1 cm (mit Umschalt 1 cm). Gültige Eingaben wirken
+// sofort; beim Verlassen steht wieder der echte Wert da.
+function CmField({ label, value, editable, onValue, testId, signed = false }) {
+  const [typed, setTyped] = useState(formatCm(value));
+  useEffect(() => {
+    setTyped((now) => {
+      const parsed = parseCm(now);
+      return parsed !== null && Math.abs(parsed - value) < 0.005 ? now : formatCm(value);
+    });
+  }, [value]);
+  const step = (direction, big) => onValue(round2(value + direction * (big ? BIG_STEP_CM : STEP_CM)));
+  const stepButton = (direction) => (
+    <button type="button" disabled={!editable} onClick={(event) => step(direction, event.shiftKey)}
+      aria-label={`${label}: ${direction > 0 ? "plus" : "minus"} 0,1 cm (mit Umschalt 1 cm)`}
+      className={`tls-btn tls-btn--secondary min-h-10 w-10 shrink-0 inline-flex items-center justify-center disabled:opacity-40 ${direction > 0 ? "rounded-r-sm" : "rounded-l-sm"}`}
+      data-testid={`${testId}-${direction > 0 ? "plus" : "minus"}`}>
+      {direction > 0 ? <Plus className="w-3.5 h-3.5" aria-hidden="true" /> : <Minus className="w-3.5 h-3.5" aria-hidden="true" />}
+    </button>
+  );
+  return (
+    <div className="min-w-0">
+      <label htmlFor={testId} className="block text-xs text-white/70">{label}</label>
+      <div className="mt-1 flex items-stretch min-w-0">
+        {stepButton(-1)}
+        {/* Mit Vorzeichen braucht das Handy die volle Tastatur - der Ziffernblock hat oft kein Minus. */}
+        <input id={testId} type="text" inputMode={signed ? "text" : "decimal"} value={typed} disabled={!editable} autoComplete="off"
+          onChange={(event) => {
+            setTyped(event.target.value);
+            const parsed = parseCm(event.target.value);
+            if (parsed !== null) onValue(round2(parsed));
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+              event.preventDefault();
+              step(event.key === "ArrowUp" ? 1 : -1, event.shiftKey);
+            } else if (event.key === "Enter") setTyped(formatCm(value));
+          }}
+          onBlur={() => setTyped(formatCm(value))}
+          className="min-h-10 w-full min-w-0 bg-black/40 border-y border-white/15 px-2 text-sm text-center tabular-nums focus:border-brand outline-none disabled:opacity-50"
+          data-testid={testId} />
+        {stepButton(1)}
+      </div>
+    </div>
+  );
+}
+
+// Position als Zahlen (#2117): Abstand der Oberkante von oben und die waagrechte Lage - ab Mitte (minus = links) oder
+// ab dem linken Rand. Beides setzt nur den Versatz; die Vorgabe bleibt verknüpft.
+function PositionFields({ area, item, layer, measure, editable, onChange, testId }) {
+  const position = positionCm(area, item, measure);
+  if (!position) return null;
+  const set = (axis, value) => onChange(offsetsForPosition(area, item, layer, { [axis]: value }, measure));
+  return (
+    <div className="grid gap-2 grid-cols-1 min-[440px]:grid-cols-2" data-testid={`${testId}-position`}>
+      <CmField label="Von oben (cm)" value={position.y} editable={editable} onValue={(value) => set("y", value)} testId={`${testId}-top`} />
+      <CmField label={measure === "left" ? "Vom linken Rand (cm)" : "Von der Mitte (cm, minus = links)"} value={position.x} signed={measure !== "left"}
+        editable={editable} onValue={(value) => set("x", value)} testId={`${testId}-x`} />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- Groß bearbeiten: nur die Druckfläche, mit Zoom
+
+// Fast bildschirmfüllend, ohne Shirt-Rand. Zoom per Mausrad (an der Stelle der Maus), mit + und − oder „Einpassen“;
+// je stärker der Zoom, desto feiner das Ziehen und das Einrasten. Die Ansicht verschiebt sich mit den Scrollbalken,
+// Umschalt + Mausrad oder Ziehen auf freier Fläche; am Handy wie gewohnt mit dem Finger.
+function BigEditor({ open, onOpenChange, title, area, colorCode, canvas, settings, onSettings, tools, testId }) {
+  const [zoom, setZoom] = useState(1);
+  const [viewport, setViewport] = useState(null);
+  const [fit, setFit] = useState(0);
+  const [live, setLive] = useState(null);
+  const canvasRef = useRef(null);
+  const stage = useRef(null);
+  const anchor = useRef(null);
+  const pan = useRef(null);
+  const size = areaSizeCm(area);
+
+  useEffect(() => {
+    if (!viewport) return undefined;
+    const measure = () => {
+      const room = Math.min((viewport.clientWidth - 32) / size.width, (viewport.clientHeight - 32) / size.height);
+      setFit(Math.max(room, 0));
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return undefined;
+    const observer = new ResizeObserver(measure);
+    observer.observe(viewport);
+    return () => observer.disconnect();
+  }, [viewport, size.width, size.height]);
+
+  // Zoomen hält den Punkt unter der Maus (bzw. die Mitte der Ansicht) an seiner Stelle.
+  const zoomTo = useCallback((direction, clientX, clientY) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (rect?.width && viewport) {
+      const view = viewport.getBoundingClientRect();
+      const x = clientX ?? view.left + view.width / 2;
+      const y = clientY ?? view.top + view.height / 2;
+      anchor.current = { x, y, fx: (x - rect.left) / rect.width, fy: (y - rect.top) / rect.height };
+    }
+    setZoom((now) => nextZoom(now, direction));
+  }, [viewport]);
+  useLayoutEffect(() => {
+    const point = anchor.current;
+    const rect = canvasRef.current?.getBoundingClientRect();
+    anchor.current = null;
+    if (!point || !rect?.width || !viewport) return;
+    viewport.scrollLeft += rect.left + point.fx * rect.width - point.x;
+    viewport.scrollTop += rect.top + point.fy * rect.height - point.y;
+  }, [zoom, viewport]);
+  useEffect(() => {
+    if (!viewport) return undefined;
+    // Nicht passiv, damit das Mausrad zoomt statt zu scrollen; mit Umschalt scrollt es wie gewohnt.
+    const onWheel = (event) => {
+      if (event.shiftKey || !event.deltaY) return;
+      event.preventDefault();
+      zoomTo(event.deltaY < 0 ? 1 : -1, event.clientX, event.clientY);
+    };
+    viewport.addEventListener("wheel", onWheel, { passive: false });
+    return () => viewport.removeEventListener("wheel", onWheel);
+  }, [viewport, zoomTo]);
+
+  const onPanStart = (event) => {
+    if (event.pointerType !== "mouse" || event.button !== 0 || !viewport) return;
+    if (event.target !== viewport && event.target !== stage.current) return;
+    pan.current = { x: event.clientX, y: event.clientY, left: viewport.scrollLeft, top: viewport.scrollTop };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  };
+  const onPanMove = (event) => {
+    if (!pan.current || !viewport) return;
+    viewport.scrollLeft = pan.current.left - (event.clientX - pan.current.x);
+    viewport.scrollTop = pan.current.top - (event.clientY - pan.current.y);
+  };
+  const onPanEnd = () => { pan.current = null; };
+
+  const width = Math.max(fit * size.width * zoom, 1);
+  const height = Math.max(fit * size.height * zoom, 1);
+  const iconButton = "tls-btn tls-btn--secondary min-h-9 min-w-9 px-2 rounded-sm inline-flex items-center justify-center gap-1.5 text-xs disabled:opacity-40";
+  return (
+    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 duration-200" />
+        <DialogPrimitive.Content aria-describedby={`${testId}-help`}
+          className="fixed inset-2 sm:inset-5 z-50 flex flex-col overflow-hidden rounded-sm border border-white/15 bg-[#0b0d12] text-white shadow-2xl outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 motion-safe:data-[state=open]:zoom-in-[0.98] data-[state=closed]:animate-out data-[state=closed]:fade-out-0 motion-safe:data-[state=closed]:zoom-out-[0.98] duration-200 ease-out"
+          data-testid={testId}>
+          <div className="flex flex-wrap items-center gap-2 border-b border-white/10 px-3 py-2">
+            <DialogPrimitive.Title className="text-sm font-bold mr-auto min-w-0 truncate">{title}</DialogPrimitive.Title>
+            <div className="flex items-center gap-1" role="group" aria-label="Zoom">
+              <button type="button" onClick={() => zoomTo(-1)} disabled={zoom <= ZOOM_LIMITS.min} aria-label="Verkleinern" className={iconButton} data-testid={`${testId}-zoom-out`}><ZoomOut className="w-4 h-4" aria-hidden="true" /></button>
+              <span className="w-14 text-center text-xs tabular-nums" aria-live="polite" data-testid={`${testId}-zoom`}>{Math.round(zoom * 100)} %</span>
+              <button type="button" onClick={() => zoomTo(1)} disabled={zoom >= ZOOM_LIMITS.max} aria-label="Vergrößern" className={iconButton} data-testid={`${testId}-zoom-in`}><ZoomIn className="w-4 h-4" aria-hidden="true" /></button>
+              <button type="button" onClick={() => setZoom(1)} disabled={zoom === 1} className={iconButton} data-testid={`${testId}-fit`}><Scan className="w-4 h-4" aria-hidden="true" /> Einpassen</button>
+            </div>
+            <DialogPrimitive.Close className={iconButton} aria-label="Schließen" data-testid={`${testId}-close`}><X className="w-4 h-4" aria-hidden="true" /></DialogPrimitive.Close>
+          </div>
+          <div className="relative flex-1 min-h-0">
+            <div ref={setViewport} className="absolute inset-0 overflow-auto overscroll-contain bg-[repeating-conic-gradient(rgba(255,255,255,0.04)_0%_25%,transparent_0%_50%)] [background-size:24px_24px]"
+              onPointerDown={onPanStart} onPointerMove={onPanMove} onPointerUp={onPanEnd} onPointerCancel={onPanEnd} data-testid={`${testId}-viewport`}>
+              <div ref={stage} className="grid place-items-center p-4 min-w-full min-h-full w-max">
+                <div ref={canvasRef} className="relative shadow-2xl" style={{ width, height, backgroundColor: colorCode || "#808080" }} data-testid={`${testId}-canvas`}>
+                  <AreaCanvas {...canvas} area={area} live={live} onLive={setLive} testId={testId} className="absolute inset-0 select-none" />
+                </div>
+              </div>
+            </div>
+            <LiveReadout area={area} resolved={canvas.resolved} live={live} measure={settings.measure} testId={testId} className="absolute left-1/2 bottom-3 -translate-x-1/2" />
+          </div>
+          <div className="border-t border-white/10 px-3 py-2 space-y-2 max-h-[45vh] overflow-y-auto">
+            <p id={`${testId}-help`} className="text-xs text-white/55" data-testid={`${testId}-help`}>
+              <span className="sm:hidden">Ziehen rastet ein, + und − zoomen. Genau geht es mit den Zahlen.</span>
+              <span className="hidden sm:inline">Ziehen rastet ein (Alt = frei), Pfeiltasten 0,1 cm, Umschalt 1 cm. Mausrad zoomt, Umschalt + Mausrad oder Ziehen auf freier Fläche verschiebt die Ansicht.</span>
+            </p>
+            {/* Am Handy zählt die Fläche: die Einstellungen stehen dort schon unter der Vorschau. */}
+            <div className="hidden sm:block"><SnapSettings settings={settings} onChange={onSettings} testId={`${testId}-settings`} /></div>
+            <div className="max-w-2xl">{tools}</div>
+          </div>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 }
 
@@ -268,7 +571,6 @@ function LayoutPreview({ area, preview, layers, resolved, colorCode, motifFor, s
 function MotifLayer({ layer, area, presets, motifs, colors, colorName, minWidth, rules, aspect, editable, onChange, onRemove, testId }) {
   const max = Math.max(minWidth, maxWidthCm(area, aspect || 1, rules));
   const width = Number(layer.width_cm || minWidth);
-  const offset = Number(layer.offset_x_cm || 0) !== 0 || Number(layer.offset_y_cm || 0) !== 0;
   const exceptions = Object.entries(layer.motif?.by_color || {}).filter(([, key]) => key);
   const [open, setOpen] = useState(exceptions.length > 0);
   // Eingabe als Text (Komma erlaubt): ein leeres Feld beim Tippen ist kein „0 cm“.
@@ -311,8 +613,6 @@ function MotifLayer({ layer, area, presets, motifs, colors, colorName, minWidth,
         <p className="text-xs text-white/45">Höchstens {cmText(max)} - die Fläche begrenzt die Größe, die Höhe folgt aus dem Motiv.</p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        {offset && <span className="text-xs text-white/55 tabular-nums" data-testid={`${testId}-offset`}>Feinjustiert: {round1(layer.offset_x_cm).toString().replace(".", ",")} / {round1(layer.offset_y_cm).toString().replace(".", ",")} cm</span>}
-        {offset && <button type="button" disabled={!editable} onClick={() => onChange({ offset_x_cm: 0, offset_y_cm: 0 })} className={QUIET_BTN} data-testid={`${testId}-reset`}><RotateCcw className="w-3.5 h-3.5" aria-hidden="true" /> Auf die Vorgabe</button>}
         {colors.length > 1 && <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className={QUIET_BTN} data-testid={`${testId}-exceptions-toggle`}>Ausnahme je Farbe{exceptions.length ? ` (${exceptions.length})` : ""}</button>}
         <button type="button" disabled={!editable} onClick={onRemove} className={`${QUIET_BTN} ml-auto`} data-testid={`${testId}-remove`}><Trash2 className="w-3.5 h-3.5" aria-hidden="true" /> Ebene entfernen</button>
       </div>
@@ -431,27 +731,66 @@ function TextLayer({ layer, area, rules, canvas, presets, kindLabel, editable, o
       {problem && <p className="text-xs text-warn" role="alert">{problem}</p>}
       {hint && <p className="text-xs text-honor" role="status" data-testid={`${testId}-hint`}>{hint}</p>}
       <div className="flex flex-wrap gap-2">
-        {(Number(layer.offset_x_cm || 0) !== 0 || Number(layer.offset_y_cm || 0) !== 0) && <button type="button" disabled={!editable} onClick={() => onChange({ offset_x_cm: 0, offset_y_cm: 0 })} className={QUIET_BTN} data-testid={`${testId}-reset`}><RotateCcw className="w-3.5 h-3.5" aria-hidden="true" /> Auf die Vorgabe</button>}
         <button type="button" disabled={!editable} onClick={onRemove} className={`${QUIET_BTN} ml-auto`} data-testid={`${testId}-remove`}><Trash2 className="w-3.5 h-3.5" aria-hidden="true" /> {fixed ? "Ebene entfernen" : "Platzhalter entfernen"}</button>
       </div>
     </div>
   );
 }
 
-// Ausrichten (#2142): mittig auf die Fläche und ein Abstand in cm zur Ebene darüber (sichtbare Kanten: bei Text die
-// Großbuchstaben bzw. Ziffern). Beides setzt nur den Versatz - Zahleneingabe, Einrasten und Zoom kommen mit #2117.
-function AlignTools({ area, item, above, layer, editable, onChange, testId }) {
+const ALIGN_BUTTONS = [
+  ["middle", "Gleiche Höhe"],
+  ["top", "Gleiche Oberkante"],
+  ["center", "Gleiche Mitte (waagrecht)"],
+  ["opposite", "Gegenüber"],
+];
+
+// Position und Ausrichten je Ebene (#2142, #2117): Position als Zahlen, zurück auf die Vorgabe, mittig auf die Fläche,
+// gespiegelt zur Gegenseite, an einer anderen Ebene ausrichten (nicht an einer, die dieser folgt) und ein Abstand in cm
+// zur Ebene darüber (sichtbare Kanten: bei Text die Großbuchstaben bzw. Ziffern). Alles setzt nur den Versatz.
+function PlaceTools({ area, item, above, layer, others = [], measure, editable, onChange, testId }) {
   const now = above ? gapCm(area, above, item) : null;
   const [wanted, setWanted] = useState("");
+  const [target, setTarget] = useState(null);
   if (!item?.box) return null;
   const value = cmNumber(wanted) ?? (wanted.trim() === "0" ? 0 : null);
+  const other = others.find((entry) => entry.item.index === target) || others[0] || null;
+  const offset = Number(layer.offset_x_cm || 0) !== 0 || Number(layer.offset_y_cm || 0) !== 0;
   return (
-    <div className="flex flex-wrap items-end gap-2 border-t border-white/10 pt-2 mt-2" data-testid={`${testId}-align`}>
-      <button type="button" disabled={!editable} onClick={() => onChange({ offset_x_cm: centerOffsetCm(area, item, layer) })} className={QUIET_BTN} data-testid={`${testId}-center`}>
-        <AlignCenterHorizontal className="w-3.5 h-3.5" aria-hidden="true" /> Mittig auf Fläche
-      </button>
+    <div className="space-y-2 border-t border-white/10 pt-2 mt-2" data-testid={`${testId}-align`}>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span className="text-xs font-bold uppercase tracking-wider text-white/60">Position</span>
+        <span className="text-xs text-white/55 tabular-nums" data-testid={`${testId}-offset`}>
+          {offset ? `Feinjustiert: ${formatCm(layer.offset_x_cm || 0)} / ${formatCm(layer.offset_y_cm || 0)} cm` : "wie die Vorgabe"}
+        </span>
+        <button type="button" disabled={!editable || !offset} onClick={() => onChange({ offset_x_cm: 0, offset_y_cm: 0 })} className={`${QUIET_BTN} ml-auto`} data-testid={`${testId}-reset`}>
+          <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" /> Auf die Vorgabe
+        </button>
+      </div>
+      <PositionFields area={area} item={item} layer={layer} measure={measure} editable={editable} onChange={onChange} testId={testId} />
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" disabled={!editable} onClick={() => onChange(centerOnArea(area, item, layer))} className={QUIET_BTN} data-testid={`${testId}-center`}>
+          <AlignCenterHorizontal className="w-3.5 h-3.5" aria-hidden="true" /> Mittig auf Fläche
+        </button>
+        <button type="button" disabled={!editable} onClick={() => onChange(mirrorOnArea(area, item, layer))} className={QUIET_BTN} data-testid={`${testId}-mirror`}>
+          <FlipHorizontal2 className="w-3.5 h-3.5" aria-hidden="true" /> Zur Gegenseite spiegeln
+        </button>
+      </div>
+      {other && (
+        <div className="flex flex-wrap items-end gap-2" data-testid={`${testId}-align-to`}>
+          <label className="block text-sm min-w-0 w-full min-[440px]:w-auto"><span className="text-white/70 text-xs">Ausrichten an</span>
+            <select value={other.item.index} disabled={!editable} onChange={(event) => setTarget(Number(event.target.value))}
+              className={`${SELECT} min-[440px]:w-44`} data-testid={`${testId}-align-target`}>
+              {others.map((entry) => <option key={entry.item.index} value={entry.item.index}>{entry.label}</option>)}
+            </select>
+          </label>
+          {ALIGN_BUTTONS.map(([how, label]) => (
+            <button key={how} type="button" disabled={!editable} onClick={() => onChange(alignToLayer(area, item, layer, other.item, how))}
+              className={QUIET_BTN} data-testid={`${testId}-align-${how}`}>{label}</button>
+          ))}
+        </div>
+      )}
       {above && (
-        <>
+        <div className="flex flex-wrap items-end gap-2">
           <label className="block text-sm w-44 shrink-0"><span className="text-white/70 text-xs">Abstand zur Ebene darüber (cm)</span>
             <input type="text" inputMode="decimal" value={wanted} disabled={!editable} placeholder={now === null ? "" : String(Math.round(now * 10) / 10).replace(".", ",")}
               onChange={(event) => setWanted(event.target.value)} className={`${SELECT} tabular-nums`} data-testid={`${testId}-gap`} />
@@ -461,7 +800,7 @@ function AlignTools({ area, item, above, layer, editable, onChange, testId }) {
             Abstand setzen
           </button>
           <span className="text-xs text-white/50 tabular-nums pb-2.5" data-testid={`${testId}-gap-now`}>jetzt {now === null ? "–" : cmText(now)}</span>
-        </>
+        </div>
       )}
     </div>
   );
@@ -567,7 +906,7 @@ function FileStates({ productId, row, mode, editable, busy, onUpload }) {
 
 // ---------------------------------------------------------------- Eine Fläche
 
-function PlacementCard({ view, available, state, savedRow, used, onToggle, onChange, colors, colorName, previewColor, codes, motifsByKey, sources, infos = {}, backgrounds = {}, problem = null, stale, editable, busy, onUpload }) {
+function PlacementCard({ view, available, state, savedRow, used, onToggle, onChange, colors, colorName, previewColor, codes, motifsByKey, sources, infos = {}, backgrounds = {}, problem = null, stale, editable, busy, onUpload, settings, onSettings }) {
   const area = areaOf(available);
   const presets = view.presets || [];
   const motifPresets = presets.filter((preset) => available.presets.motif.includes(preset.key));
@@ -600,14 +939,16 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
   const background = mode === "upload" ? backgrounds[`${available.key}|${previewColor}`] : null;
   const backdrop = background?.id ? resolveMediaUrl(`/api${BASE}/${view.product.id}/print-files/${background.id}?thumb=1`) : null;
   const infoFor = (index) => infos[`${available.key}|${index}|${previewColor}`] || null;
-  const resolved = resolveLayers(area, visible, {
-    presets, motifFor, gamertagCanvas: view.gamertag_canvas, rules,
-  });
-  const update = (index, patch) => onChange({ ...state, layers: layers.map((layer, at) => (at === index ? { ...layer, ...patch } : layer)) });
-  const nudge = (index, dx, dy) => {
-    const layer = layers[index];
-    update(index, { offset_x_cm: round1(Number(layer.offset_x_cm || 0) + dx), offset_y_cm: round1(Number(layer.offset_y_cm || 0) + dy) });
+  const resolveWith = (next) => resolveLayers(area, next, { presets, motifFor, gamertagCanvas: view.gamertag_canvas, rules });
+  const resolved = resolveWith(visible);
+  const update = (index, patch) => {
+    if (!patch) return;
+    onChange({ ...state, layers: layers.map((layer, at) => (at === index ? { ...layer, ...patch } : layer)) });
   };
+  // Was mitwandert, wenn Ebene `index` sich bewegt (etwa der Name gegenüber dem Motiv) - daran rastet sie nicht ein.
+  const followers = (index) => followersOf(resolveWith, visible, index);
+  const [live, setLive] = useState(null);
+  const [big, setBig] = useState(false);
   const add = (kind) => {
     const preset = kind === "motif" ? motifPresets[0] : (textPresets.find((item) => item.follow === "opposite" && layers.some((layer) => layer.kind === "motif")) || textPresets.find((item) => !item.follow) || textPresets[0]);
     if (!preset) return;
@@ -646,6 +987,26 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
   const kinds = view.labels.kinds || {};
   const surcharge = savedRow && !savedRow.included && savedRow.surcharge_cents ? ` · Aufpreis ${(savedRow.surcharge_cents / 100).toFixed(2).replace(".", ",")} €` : "";
   const resolvedFor = (index) => resolved.find((item) => item.index === index);
+  const placeArea = { ...area, safe_margin_cm: available.safe_margin_cm };
+  const selectedItem = selected === null ? null : resolvedFor(selected);
+  // Woran sich eine Ebene ausrichten lässt: alle anderen mit Rahmen, nur nicht die, die ihr folgen.
+  const alignTargets = (index) => {
+    const skip = followers(index);
+    return resolved.filter((item) => item.box && item.index !== index && !skip.includes(item.index))
+      .map((item) => ({ item, label: layerLabel(item, item.kind === "motif" ? motifFor(layers[item.index], item.index) : null) }));
+  };
+  // Die Fläche zum Ziehen - dieselbe in der kleinen Vorschau und in „Groß bearbeiten“.
+  const canvas = {
+    layers: visible, resolved, motifFor, selected, onSelect: setSelected, onPlace: update, editable, backdrop, settings, followers, onLive: setLive,
+    onSampleProblem,
+    sampleFor: previewColor ? (kind, layer) => {
+      // Die Farbe des Namens aus dem Plan, sobald der Untergrund entschieden ist (Hintergrund, Vorgabe, von Hand).
+      const index = layers.indexOf(layer);
+      const info = index >= 0 ? infoFor(index) : null;
+      const planned = info?.ink && (info.ink.fixed || info.surface?.variant) ? info.ink.key : null;
+      return nameSample(view.product.id, kind, previewColor, layer, layer.ink || planned, available.key);
+    } : null,
+  };
   return (
     <li className={`border rounded-sm p-3 bg-black/20 space-y-3 scroll-mt-24 transition-colors duration-150 ${problem ? "border-warn/70" : "border-white/10"}`} data-testid={`shop-area-${available.key}`} data-blocked={problem ? "true" : undefined}>
       <div className="flex flex-wrap items-center gap-3">
@@ -681,23 +1042,32 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
             )}
           </div>
           <div className="grid gap-4 grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
-            <div className="space-y-1">
-              <LayoutPreview stale={stale} area={{ ...area, safe_margin_cm: available.safe_margin_cm }} preview={preview} layers={visible}
-                resolved={resolved} colorCode={codes[previewColor]} motifFor={motifFor} selected={selected} onSelect={setSelected}
-                sampleFor={previewColor ? (kind, layer) => {
-                  // Die Farbe des Namens aus dem Plan, sobald der Untergrund entschieden ist (Hintergrund, Vorgabe, von Hand).
-                  const index = layers.indexOf(layer);
-                  const info = index >= 0 ? infoFor(index) : null;
-                  const planned = info?.ink && (info.ink.fixed || info.surface?.variant) ? info.ink.key : null;
-                  return nameSample(view.product.id, kind, previewColor, layer, layer.ink || planned, available.key);
-                } : null}
-                onSampleProblem={onSampleProblem}
-                onNudge={nudge} backdrop={backdrop}
-                editable={editable} testId={`shop-preview-${available.key}`} />
+            <div className="space-y-1.5 min-w-0">
+              <LayoutPreview stale={stale} area={placeArea} preview={preview} colorCode={codes[previewColor]} live={live} canvas={canvas}
+                testId={`shop-preview-${available.key}`} />
               {!preview?.image_path && <p className="text-xs text-honor" data-testid={`shop-preview-${available.key}-no-image`}>Kein Vorlagenbild von Printful - die Vorschau zeigt nur die Druckfläche, Maße und Druckdatei stimmen trotzdem.</p>}
               {mode === "upload" && !background && <p className="text-xs text-white/50" data-testid={`shop-preview-${available.key}-no-backdrop`}>Für {colorName(previewColor)} ist noch kein Hintergrund hochgeladen.</p>}
               {mode === "upload" && background && background.ok === false && <p className="text-xs text-honor" role="status" data-testid={`shop-preview-${available.key}-backdrop-outdated`}>Dieser Hintergrund passt nicht mehr zur Vorlage von Printful - bis er neu hochgeladen ist, richten sich Fassung und Farbe nach der Shirtfarbe.</p>}
-              <p className="text-xs text-white/45 inline-flex items-center gap-1"><Move className="w-3 h-3" aria-hidden="true" /> Ziehen oder Pfeiltasten zum Feinjustieren.</p>
+              {/* Die Bedienung sichtbar (#2117) - nicht nur im aria-label. */}
+              <p className="text-xs text-white/50 flex items-start gap-1" data-testid={`shop-preview-${available.key}-help`}>
+                <Move className="w-3 h-3 mt-0.5 shrink-0" aria-hidden="true" />
+                <span>Ziehen rastet ein (Alt = frei), Pfeiltasten 0,1 cm, Umschalt 1 cm. Genau geht es mit den Zahlen bei jeder Ebene.</span>
+              </p>
+              {resolved.some((item) => item.box) && (
+                <button type="button" onClick={() => setBig(true)} className={SMALL_BTN} data-testid={`shop-preview-${available.key}-big`}>
+                  <Maximize2 className="w-3.5 h-3.5" aria-hidden="true" /> Groß bearbeiten
+                </button>
+              )}
+              <SnapSettings settings={settings} onChange={onSettings} testId={`shop-preview-${available.key}-settings`} />
+              <BigEditor open={big} onOpenChange={setBig} title={`„${available.label}“ groß bearbeiten`} area={placeArea} colorCode={codes[previewColor]}
+                canvas={canvas} settings={settings} onSettings={onSettings} testId={`shop-big-${available.key}`}
+                tools={selectedItem?.box ? (
+                  <div className="space-y-1" data-testid={`shop-big-${available.key}-selected`}>
+                    <div className="text-xs text-white/60">{layerLabel(selectedItem, selectedItem.kind === "motif" ? motifFor(layers[selected], selected) : null)}</div>
+                    <PositionFields area={area} item={selectedItem} layer={layers[selected]} measure={settings.measure} editable={editable}
+                      onChange={(patch) => update(selected, patch)} testId={`shop-big-${available.key}-field`} />
+                  </div>
+                ) : <p className="text-xs text-white/50">Eine Ebene antippen, dann lässt sie sich ziehen oder als Zahl setzen.</p>} />
             </div>
             <div className="space-y-3">
               {mode === "upload" && <p className="text-xs text-white/60" data-testid={`shop-area-upload-hint-${available.key}`}>Je Farbe eine fertige Datei der ganzen Fläche als Hintergrund: genau {available.file.width_px} × {available.file.height_px} px (oder größer im selben Seitenverhältnis). Motive, Gamertag und Vereinsnummer kommen als Ebenen darüber. Ob die Datei echte Details hat oder nur hochskaliert ist, misst keine Prüfung - am Muster prüfen.</p>}
@@ -719,9 +1089,9 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
                         onChange={(patch) => update(index, patch)} onRemove={() => onChange({ ...state, layers: layers.filter((_, at) => at !== index) })}
                         testId={`shop-layer-${available.key}-${index}`} />
                     )}
+                    <PlaceTools area={area} item={found} above={layerAbove(resolved, index)} layer={layer} others={alignTargets(index)} measure={settings.measure}
+                      editable={editable} onChange={(patch) => update(index, patch)} testId={`shop-layer-${available.key}-${index}`} />
                     <SurfaceField layer={layer} info={infoFor(index)} labels={view.labels.layer_variants} editable={editable} stale={stale}
-                      onChange={(patch) => update(index, patch)} testId={`shop-layer-${available.key}-${index}`} />
-                    <AlignTools area={area} item={found} above={layerAbove(resolved, index)} layer={layer} editable={editable}
                       onChange={(patch) => update(index, patch)} testId={`shop-layer-${available.key}-${index}`} />
                     {found?.outside?.length > 0 && <p className="text-xs text-warn mt-2" role="alert" data-testid={`shop-layer-${available.key}-${index}-outside`}>Ragt {found.outside.join(" und ")} aus der Fläche - kleiner setzen oder zurück auf die Vorgabe.</p>}
                   </div>
@@ -801,6 +1171,7 @@ export function layoutKey(view) {
 export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGroup }) {
   const { product } = view;
   const [draft, setDraft] = useState(() => draftFrom(view));
+  const [placeSettings, setPlaceSettings] = usePlaceSettings();
   const [included, setIncluded] = useState(view.included_placement || "");
   const colors = useMemo(() => product.offer?.colors || [], [product.offer]);
   const [previewColor, setPreviewColor] = useState(colors[0] || "");
@@ -930,7 +1301,8 @@ export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGrou
             })}
             onChange={(next) => setDraft((now) => ({ ...now, [row.key]: next }))}
             colors={colors} colorName={colorName} previewColor={previewColor} codes={codes} motifsByKey={motifsByKey} sources={shownSources}
-            infos={shownInfos || {}} backgrounds={shownBackgrounds} problem={areaProblem(row.key)} stale={stale} editable={view.editable} busy={busy} onUpload={onUpload} />
+            infos={shownInfos || {}} backgrounds={shownBackgrounds} problem={areaProblem(row.key)} stale={stale} editable={view.editable} busy={busy} onUpload={onUpload}
+            settings={placeSettings} onSettings={setPlaceSettings} />
         ))}
       </ul>
       <div className="space-y-1 max-w-xl">

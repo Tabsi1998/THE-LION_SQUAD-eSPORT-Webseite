@@ -519,6 +519,110 @@ test("Feinjustieren mit Pfeiltasten; was aus der Fläche ragt, sagt die Vorschau
   expect(screen.getByTestId("shop-preview-front-layer-0").querySelector("img").getAttribute("src")).toContain("loewe-schwarz");
 });
 
+// ---------------------------------------------------------------- Präzise setzen (#2117)
+
+const layerCenter = (testId) => {
+  const box = screen.getByTestId(testId).style;
+  return { x: parseFloat(box.left) + parseFloat(box.width) / 2, y: parseFloat(box.top) + parseFloat(box.height) / 2 };
+};
+
+test("Position als Zahl mit Komma, − und + und Pfeiltasten; „Auf die Vorgabe“; gespeichert wird nur der Versatz (#2117)", async () => {
+  window.localStorage.removeItem("tls_shop_place_v1");
+  apiMock.put.mockResolvedValue({ data: view() });
+  apiMock.post.mockResolvedValue({ data: { placements: [] } });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-designs"));
+  // Die Bedienung steht sichtbar unter der Vorschau.
+  expect(screen.getByTestId("shop-preview-front-help")).toHaveTextContent("Ziehen rastet ein (Alt = frei), Pfeiltasten 0,1 cm, Umschalt 1 cm");
+  const top = screen.getByTestId("shop-layer-front-0-top");
+  const x = screen.getByTestId("shop-layer-front-0-x");
+  // Brust rechts: Oberkante 5 cm, Mitte bei 27 % - also 7,01 cm links der Mitte.
+  expect(top).toHaveValue("5");
+  expect(x).toHaveValue("-7,01");
+  expect(screen.getByTestId("shop-layer-front-0-offset")).toHaveTextContent("wie die Vorgabe");
+  expect(screen.getByTestId("shop-layer-front-0-reset")).toBeDisabled();
+  await user.clear(top);
+  await user.type(top, "7,25");
+  expect(screen.getByTestId("shop-layer-front-0-offset")).toHaveTextContent("Feinjustiert: 0 / 2,25 cm");
+  await user.click(screen.getByTestId("shop-layer-front-0-top-plus"));
+  expect(top).toHaveValue("7,35");
+  top.focus();
+  await user.keyboard("{ArrowDown}{Shift>}{ArrowUp}{/Shift}");
+  expect(top).toHaveValue("8,25");
+  await user.clear(x);
+  await user.type(x, "-6");
+  expect(screen.getByTestId("shop-layer-front-0-offset")).toHaveTextContent("Feinjustiert: 1,01 / 3,25 cm");
+  await user.click(screen.getByTestId("shop-layout-submit"));
+  const layer = apiMock.put.mock.calls[0][1].placements[0].layers[0];
+  expect([layer.preset, layer.offset_x_cm, layer.offset_y_cm]).toEqual(["chest_right", 1.01, 3.25]);
+  await user.click(screen.getByTestId("shop-layer-front-0-reset"));
+  expect(top).toHaveValue("5");
+  expect(screen.getByTestId("shop-layer-front-0-offset")).toHaveTextContent("wie die Vorgabe");
+});
+
+test("Ausrichten mit einem Klick: Gamertag auf Höhe des Löwen, gegenüber, Motiv zur Gegenseite gespiegelt (#2117)", async () => {
+  apiMock.post.mockResolvedValue({ data: { placements: [] } });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-designs"));
+  // Der Name folgt dem Löwen - der Löwe kann sich darum nicht am Namen ausrichten, der Name aber am Löwen.
+  expect(screen.queryByTestId("shop-layer-front-0-align-to")).toBeNull();
+  expect(screen.getByTestId("shop-layer-front-1-align-target")).toHaveDisplayValue("Motiv Löwe weiß");
+  const name = screen.getByTestId("shop-layer-front-1-top");
+  await user.clear(name);
+  await user.type(name, "20");
+  expect(layerCenter("shop-preview-front-layer-1").y).not.toBeCloseTo(layerCenter("shop-preview-front-layer-0").y, 1);
+  await user.click(screen.getByTestId("shop-layer-front-1-align-middle"));
+  expect(layerCenter("shop-preview-front-layer-1").y).toBeCloseTo(layerCenter("shop-preview-front-layer-0").y, 1);
+  await user.click(screen.getByTestId("shop-layer-front-1-align-center"));
+  expect(layerCenter("shop-preview-front-layer-1").x).toBeCloseTo(layerCenter("shop-preview-front-layer-0").x, 1);
+  await user.click(screen.getByTestId("shop-layer-front-1-align-opposite"));
+  expect(layerCenter("shop-preview-front-layer-1").x).toBeCloseTo(100 - layerCenter("shop-preview-front-layer-0").x, 1);
+  // Spiegeln: Brust rechts (27 %) wandert auf 73 % - der Name gegenüber kommt mit.
+  await user.click(screen.getByTestId("shop-layer-front-0-mirror"));
+  expect(layerCenter("shop-preview-front-layer-0").x).toBeCloseTo(73, 1);
+  expect(layerCenter("shop-preview-front-layer-1").x).toBeCloseTo(27, 1);
+  expect(screen.getByTestId("shop-layer-front-0-x")).toHaveValue("7,01");
+});
+
+test("Raster und Messart sind einstellbar und bleiben im Browser; „Groß bearbeiten“ zeigt nur die Fläche mit Zoom (#2117)", async () => {
+  window.localStorage.removeItem("tls_shop_place_v1");
+  apiMock.post.mockResolvedValue({ data: { placements: [] } });
+  const user = userEvent.setup();
+  show("/admin/shop/products/p1");
+  await user.click(await screen.findByTestId("shop-step-designs"));
+  expect(screen.getByTestId("shop-preview-front-settings-grid")).toHaveValue("0.5");
+  expect(screen.getByTestId("shop-preview-front-settings-snap")).toBeChecked();
+  await user.selectOptions(screen.getByTestId("shop-preview-front-settings-grid"), "1");
+  await user.selectOptions(screen.getByTestId("shop-preview-front-settings-measure"), "left");
+  expect(JSON.parse(window.localStorage.getItem("tls_shop_place_v1"))).toEqual({ grid: 1, snap: true, measure: "left" });
+  // Vom linken Rand: die linke Kante des Löwen (8,23 - 4,45 cm).
+  expect(screen.getByText("Vom linken Rand (cm)", { selector: "label[for='shop-layer-front-0-x']" })).toBeInTheDocument();
+  expect(screen.getByTestId("shop-layer-front-0-x")).toHaveValue("3,78");
+  await user.click(screen.getByTestId("shop-preview-front-big"));
+  const big = await screen.findByTestId("shop-big-front");
+  expect(within(big).getByText("„Vorderseite“ groß bearbeiten")).toBeInTheDocument();
+  // Nur die Druckfläche, ohne Shirt-Vorlage; dieselben Einstellungen.
+  expect(big.querySelector("img[src*='print-templates']")).toBeNull();
+  expect(big.querySelector("img[src*='loewe-weiss']")).not.toBeNull();
+  expect(within(big).getByTestId("shop-big-front-settings-grid")).toHaveValue("1");
+  await user.click(within(big).getByTestId("shop-big-front-layer-0"));
+  expect(within(big).getByTestId("shop-big-front-field-top")).toHaveValue("5");
+  await user.click(within(big).getByTestId("shop-big-front-zoom-in"));
+  expect(within(big).getByTestId("shop-big-front-zoom")).toHaveTextContent("125 %");
+  await user.click(within(big).getByTestId("shop-big-front-fit"));
+  expect(within(big).getByTestId("shop-big-front-zoom")).toHaveTextContent("100 %");
+  // Eine Zahl im großen Fenster wirkt auch in der Karte.
+  const field = within(big).getByTestId("shop-big-front-field-top");
+  await user.clear(field);
+  await user.type(field, "6,5");
+  await user.keyboard("{Escape}");
+  await waitFor(() => expect(screen.queryByTestId("shop-big-front")).toBeNull());
+  expect(screen.getByTestId("shop-layer-front-0-top")).toHaveValue("6,5");
+  window.localStorage.removeItem("tls_shop_place_v1");
+});
+
 test("Ausnahme je Farbe und Druckdateien je Farbe; erzeugen geht erst nach dem Speichern", async () => {
   apiMock.put.mockResolvedValue({ data: view() });
   apiMock.post.mockResolvedValue({ data: { ...view(), result: { created: [{ placement: "front", color: "White" }], unchanged: 1, failed: [] } } });
