@@ -71,7 +71,7 @@ def test_public_recalculation_error_does_not_expose_internal_detail():
 
 
 def test_normalize_v2_results_requires_all_filled_slots():
-    with pytest.raises(MatchV2ResultError, match="alle belegten Teilnehmer"):
+    with pytest.raises(MatchV2ResultError, match="für alle Teilnehmer"):
         normalize_v2_results(_source_match(), RESULTS[:3])
 
 
@@ -122,7 +122,7 @@ def test_a_marked_person_who_raced_after_all_keeps_the_entered_place():
 
 def test_without_a_mark_a_missing_participant_is_still_an_error():
     match = _heat_with_no_show()
-    with pytest.raises(MatchV2ResultError, match="alle belegten Teilnehmer"):
+    with pytest.raises(MatchV2ResultError, match="für alle Teilnehmer"):
         normalize_v2_results(match, [{"registration_id": "r4", "rank": 1}, {"registration_id": "r1", "rank": 2}])
 
 
@@ -410,7 +410,7 @@ def test_result_application_rejects_same_participant_advanced_twice():
         ],
     }
 
-    with pytest.raises(MatchV2ResultError, match="nicht mehrfach weitergeleitet"):
+    with pytest.raises(MatchV2ResultError, match="nur einmal weiterrücken"):
         build_v2_result_application(
             source,
             [source, _target("m-w", "W"), _target("m-l", "L")],
@@ -502,7 +502,7 @@ def test_v2_result_application_blocks_downstream_overwrite_without_force():
     winner_target["slots"][0]["registration_id"] = "old-reg"
     winner_target["slots"][0]["status"] = "filled"
 
-    with pytest.raises(MatchV2ResultError, match="force=true"):
+    with pytest.raises(MatchV2ResultError, match="als Korrektur mit Grund"):
         build_v2_result_application(
             source,
             [source, winner_target, _target("m-l", "L")],

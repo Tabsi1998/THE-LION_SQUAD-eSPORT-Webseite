@@ -273,7 +273,7 @@ export function LeagueReportForm({ league, state = null, busy = false, readOnly 
           ) : (
             games.map((game, index) => <GameEditor key={game.position} index={index} game={game} games={games} league={league} onChange={(next) => change(game.position, next)} />)
           )}
-          <input value={note} onChange={(event) => setNote(event.target.value)} className="input" placeholder="Notiz für die Turnierleitung (freiwillig)" data-testid="match-report-note" />
+          <input value={note} onChange={(event) => setNote(event.target.value)} maxLength={1000} className="input" placeholder="Notiz für die Turnierleitung (freiwillig)" data-testid="match-report-note" />
           <p className={`rounded-sm border px-3 py-2 text-sm font-bold ${sentence && !problem ? "border-[#29B6E8]/35 bg-[#29B6E8]/10 text-[#BFE9F8]" : "border-white/10 bg-white/5 text-white/45"}`} data-testid="match-report-sentence" aria-live="polite">
             {problem || sentence}
           </p>

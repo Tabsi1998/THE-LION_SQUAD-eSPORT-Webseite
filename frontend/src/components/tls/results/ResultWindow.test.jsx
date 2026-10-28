@@ -116,3 +116,34 @@ test("Rückgängig: 10 Sekunden lang, danach ist die Leiste weg", async () => {
     vi.useRealTimers();
   }
 });
+
+test("inzwischen eingetragen (#2124): bei 409 fragt das Fenster „als Korrektur speichern?“ - dann mit Grund und force", async () => {
+  apiMock.post.mockRejectedValueOnce({ response: { status: 409, data: { detail: "Dieses Spiel hat inzwischen ein Ergebnis. Zum Ändern als Korrektur mit Grund speichern." } } });
+  apiMock.get.mockResolvedValueOnce({ data: { result_entry: { ...DUEL, has_result: true } } });
+  const saved = vi.fn();
+  render(<ResultWindow entry={DUEL} onClose={() => {}} onSaved={saved} />);
+  fireEvent.click(screen.getByTestId("result-score-a-plus"));
+  await act(async () => { fireEvent.click(screen.getByTestId("result-save")); });
+  expect(apiMock.get).toHaveBeenCalledWith("/matches/m1/page");
+  expect(screen.getByTestId("result-correction-offer")).toHaveTextContent("Inzwischen ist ein Ergebnis eingetragen – als Korrektur speichern?");
+  expect(screen.queryByTestId("result-error")).toBeNull();
+  expect(screen.queryByTestId("result-reason")).toBeNull();
+
+  fireEvent.click(screen.getByTestId("result-correction-accept"));
+  expect(screen.getByRole("dialog", { name: "Ergebnis korrigieren" })).toBeInTheDocument();
+  expect(screen.getByTestId("result-reason")).toHaveAttribute("maxLength", "500");
+  fireEvent.change(screen.getByTestId("result-reason"), { target: { value: "Gleichzeitig eingetragen" } });
+  await act(async () => { fireEvent.click(screen.getByTestId("result-save")); });
+  expect(apiMock.post).toHaveBeenLastCalledWith("/matches/m1/result?force=true", expect.objectContaining({ reason: "Gleichzeitig eingetragen", hold: true }));
+  expect(saved).toHaveBeenCalled();
+});
+
+test("409 ohne neues Ergebnis (etwa „wird gerade eingetragen“): der Satz des Servers, kein Korrektur-Angebot", async () => {
+  apiMock.post.mockRejectedValueOnce({ response: { status: 409, data: { detail: "Halbfinale A: dort wird gerade ein Ergebnis eingetragen. Bitte kurz warten." } } });
+  apiMock.get.mockResolvedValueOnce({ data: { result_entry: { ...DUEL, has_result: false } } });
+  render(<ResultWindow entry={DUEL} onClose={() => {}} onSaved={() => {}} />);
+  fireEvent.click(screen.getByTestId("result-score-a-plus"));
+  await act(async () => { fireEvent.click(screen.getByTestId("result-save")); });
+  expect(screen.getByTestId("result-error")).toHaveTextContent("dort wird gerade ein Ergebnis eingetragen");
+  expect(screen.queryByTestId("result-correction-offer")).toBeNull();
+});

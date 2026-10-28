@@ -139,7 +139,7 @@ export function MatchReportForm({ participants = [], match = {}, entry: serverEn
           {kind === "order" && <OrderInput entry={entry} state={form} onChange={setForm} showFlags={false} />}
 
           <ProofPhotoPicker matchId={match.id} value={photo} onChange={setPhoto} />
-          <input value={note} onChange={(e) => setNote(e.target.value)} className="input" placeholder="Notiz für die Turnierleitung (freiwillig)" data-testid="match-report-note" />
+          <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={1000} className="input" placeholder="Notiz für die Turnierleitung (freiwillig)" data-testid="match-report-note" />
           <p className={`rounded-sm border px-3 py-2 text-sm font-bold ${sentence ? "border-[#29B6E8]/35 bg-[#29B6E8]/10 text-[#BFE9F8]" : "border-white/10 bg-white/5 text-white/45"}`} data-testid="match-report-sentence">
             {sentence || outcome.error}
           </p>

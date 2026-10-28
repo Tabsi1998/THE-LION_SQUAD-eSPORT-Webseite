@@ -14,7 +14,7 @@ writer, which owns the advancement cascade.
 from __future__ import annotations
 
 from models import now_utc
-from services.match_v2_results import MatchV2ResultError
+from services.match_v2_results import NO_SIDES_DETAIL, MatchV2ResultError
 
 
 FORFEIT_NOTE_MIN_LENGTH = 5
@@ -55,7 +55,7 @@ def results_for_forfeit(match: dict, forfeiting_registration_id: str) -> list[di
     """
     participants = participant_ids(match)
     if not participants:
-        raise MatchV2ResultError("Match hat keine belegten Slots")
+        raise MatchV2ResultError(NO_SIDES_DETAIL)
     if forfeiting_registration_id not in participants:
         raise MatchV2ResultError("Der angegebene Teilnehmer gehört nicht zu diesem Match")
 
