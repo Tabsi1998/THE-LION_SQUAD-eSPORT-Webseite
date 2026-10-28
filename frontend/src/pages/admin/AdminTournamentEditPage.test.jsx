@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { ConfirmDialogProvider } from "@/components/tls/ConfirmDialog";
@@ -922,4 +922,127 @@ test("Staffel: der Map-Pool steht nur lesend da, gepflegt in der Season", async 
   await screen.findByRole("heading", { name: STAFFEL.title });
   await user.click(screen.getByTestId("admin-tr-tab-maps"));
   expect(await screen.findByTestId("staffel-maps-note")).toHaveTextContent("Den Map-Pool pflegt die Season");
+});
+// Folgenschwere Aktionen (#2120): Rückfragen mit Zahlen, keine Vorschau über echten Spielen, Absage mit Grund.
+const FIXED_MATCHES = [
+  { id: "m-1", stage_id: "s-1", status: "completed", round: 1, results: [{ registration_id: "r-1", rank: 1 }], slots: [{ registration_id: "r-1" }, { registration_id: "r-2" }] },
+  { id: "m-2", stage_id: "s-1", status: "ready", round: 2, slots: [{ registration_id: "r-1" }, { registration_id: null }] },
+];
+
+function serveFixed(overrides = {}, matches = FIXED_MATCHES) {
+  apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path.includes("/registrations")) {
+      return Promise.resolve({ data: [
+        { id: "r-1", status: "approved", display_name: "Max Muster" },
+        { id: "r-3", status: "waitlist", display_name: "Erika Warte" },
+      ] });
+    }
+    if (path.includes("/matches-v2")) return Promise.resolve({ data: matches });
+    if (path.includes("/stages")) return Promise.resolve({ data: [{ id: "s-1", name: "Turnierbaum", stage_type: "single_elimination", match_type: "duel", settings: {} }] });
+    if (path.match(/\/tournaments\/t-1(\?|$)/)) return Promise.resolve({ data: { ...TOURNAMENT, status: "live", ...overrides } });
+    return Promise.resolve(routeFor(path));
+  });
+  return renderPage();
+}
+
+test("Zurücksetzen nennt die Zahl der Spiele und schickt die Bestätigung mit", async () => {
+  const user = userEvent.setup();
+  serveFixed();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  await user.click(screen.getByTestId("admin-tr-tools").querySelector("summary"));
+  await user.click(screen.getByTestId("admin-tr-reset"));
+  expect(screen.getByTestId("confirm-dialog")).toHaveTextContent("2 Spiele, davon 1 begonnen oder gewertet");
+  expect(screen.getByTestId("confirm-dialog")).toHaveTextContent("Der Status bleibt");
+  apiMock.post.mockClear();
+  await user.click(screen.getByTestId("confirm-dialog-confirm"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t-1/reset-bracket?force=true"));
+});
+
+test("nach dem Ende gibt es kein Zurücksetzen mehr", async () => {
+  serveFixed({ status: "results_published" });
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  expect(screen.queryByTestId("admin-tr-reset")).toBeNull();
+});
+
+test("im festen Baum: kein Entfernen und kein Ablehnen - wer nicht spielt, bleibt entfernbar", async () => {
+  serveFixed();
+  await screen.findAllByText("Max Muster");
+  const select = screen.getByTestId("admin-reg-status-r-1");
+  const option = (value) => [...select.querySelectorAll("option")].find((row) => row.value === value);
+  expect(option("rejected")).toBeDisabled();
+  expect(option("waitlist")).toBeDisabled();
+  expect(option("no_show")).not.toBeDisabled();
+  // Eine Entfernen-Zeile je Ansicht (Handy und Tisch) - nur für die Person auf der Warteliste.
+  expect(screen.getAllByRole("button", { name: "Entfernen" })).toHaveLength(2);
+});
+
+test("im festen Baum: Format und Teilnahme nur lesend, kein „Struktur anwenden“", async () => {
+  const user = userEvent.setup();
+  serveFixed();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  await user.click(screen.getByTestId("admin-tr-tab-edit"));
+  expect(await screen.findByTestId("tr-edit-format")).toBeDisabled();
+  expect(screen.getByTestId("tr-edit-team-mode")).toBeDisabled();
+  expect(screen.queryByTestId("tr-edit-save-rebuild")).toBeNull();
+  expect(screen.getByTestId("tr-edit-structure-fixed")).toHaveTextContent("Zurücksetzen");
+});
+
+test("„Speichern & Struktur anwenden“ vor dem Check-in-Ende schickt kein force mehr", async () => {
+  const user = userEvent.setup();
+  renderPage();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  const body = await applyStructure(user);
+  expect(body).toBeTruthy();
+  const [url] = apiMock.post.mock.calls.find(([called]) => String(called).includes("/bracket/from-format"));
+  expect(url).toBe("/tournaments/t-1/bracket/from-format?preview=true");
+});
+
+test("Gruppen neu generieren: die Rückfrage nennt die Zahlen des Servers, erst dann force", async () => {
+  const user = userEvent.setup();
+  serveFixed({ format: "groups" });
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  const refusal = { response: { status: 409, data: { detail: { code: "confirm_destruction", message: "Neue Gruppen löschen 12 Spiele, davon 3 begonnen oder gewertet der Gruppenphase samt Ergebnissen.", match_count: 12, played_count: 3 } } } };
+  apiMock.post.mockImplementation((url) => (String(url).endsWith("/groups/generate")
+    ? Promise.reject(refusal)
+    : Promise.resolve({ data: { group_count: 2, match_count: 12 } })));
+  await user.click(screen.getByTestId("admin-tr-groups"));
+  await user.click(screen.getByTestId("confirm-dialog-confirm"));
+  expect(await screen.findByText(/12 Spiele, davon 3 begonnen oder gewertet/)).toBeInTheDocument();
+  await user.click(screen.getByTestId("confirm-dialog-confirm"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t-1/groups/generate?force=true", { group_count: 4 }));
+});
+
+test("Absagen fragt nach einem freiwilligen Grund und schickt ihn mit", async () => {
+  const user = userEvent.setup();
+  serveFixed({ status: "registration_open" }, []);
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  apiMock.post.mockClear();
+  await user.selectOptions(screen.getByTestId("admin-tr-status-select"), "cancelled");
+  expect(screen.getByTestId("confirm-dialog")).toHaveTextContent("Alle 2 Anmeldungen bekommen eine Nachricht");
+  await user.type(within(screen.getByTestId("confirm-dialog")).getByRole("textbox"), "Halle nicht verfügbar");
+  await user.click(screen.getByTestId("confirm-dialog-confirm"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t-1/status", { status: "cancelled", force: false, reason: "Halle nicht verfügbar" }));
+});
+
+test("Ergebnisse veröffentlichen braucht eine Bestätigung - Abbrechen schickt nichts", async () => {
+  const user = userEvent.setup();
+  serveFixed({ status: "completed" });
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  apiMock.post.mockClear();
+  await user.selectOptions(screen.getByTestId("admin-tr-status-select"), "results_published");
+  expect(screen.getByTestId("confirm-dialog")).toHaveTextContent("Jahreswertung");
+  await user.click(screen.getByTestId("confirm-dialog-cancel"));
+  expect(apiMock.post.mock.calls.filter(([url]) => String(url).includes("/status"))).toHaveLength(0);
+});
+
+test("Schweizer System: die letzte Runde lässt sich zurücknehmen, solange keines ihrer Spiele begonnen hat", async () => {
+  const user = userEvent.setup();
+  serveFixed({ format: "swiss" }, [{ id: "m-9", status: "ready", round: 3, slots: [] }, { id: "m-8", status: "completed", round: 2, results: [{}], slots: [] }]);
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  apiMock.post.mockResolvedValue({ data: { round: 3, match_count: 1 } });
+  await user.click(screen.getByTestId("admin-tr-swiss-undo"));
+  expect(screen.getByTestId("confirm-dialog")).toHaveTextContent("Runde 3 zurücknehmen?");
+  await user.click(screen.getByTestId("confirm-dialog-confirm"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments/t-1/swiss/undo-round"));
 });

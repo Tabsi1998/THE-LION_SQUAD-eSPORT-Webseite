@@ -111,6 +111,47 @@ test.describe("Turnierseite: Kopf und Werkzeuge", () => {
     expect(overflow).toBeLessThanOrEqual(1);
   });
 
+  // Folgenschwere Aktionen (#2120): die Rückfragen nennen die Zahl der Spiele und passen auf Handy und PC.
+  for (const [label, width, height] of [["Handy", 390, 844], ["PC", 1440, 900]]) {
+    test(`${label}: Zurücksetzen nennt die Spiele, Absagen fragt nach dem Grund`, async ({ page }) => {
+      await page.setViewportSize({ width, height });
+      await mockTournament(page, { status: "live" });
+      const json = (body) => (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify(body) });
+      await page.route("**/api/tournaments/t-1/matches-v2**", json([
+        { id: "m-1", stage_id: "s-1", status: "completed", round: 1, results: [{ registration_id: "r-1", rank: 1 }], slots: [{ registration_id: "r-1" }, { registration_id: "r-2" }] },
+        { id: "m-2", stage_id: "s-1", status: "ready", round: 2, slots: [{ registration_id: "r-1" }, { registration_id: null }] },
+      ]));
+      await page.route("**/api/tournaments/t-1/registrations**", json([
+        { id: "r-1", status: "approved", display_name: "Spieler Eins" },
+        { id: "r-2", status: "approved", display_name: "Spieler Zwei" },
+      ]));
+      const posts = [];
+      await page.route("**/api/tournaments/t-1/reset-bracket**", (route) => { posts.push(route.request().url()); return json({ ok: true })(route); });
+      await page.route("**/api/tournaments/t-1/status", (route) => { posts.push(route.request().postDataJSON()); return json({ ok: true, notified: 2 })(route); });
+      await page.goto("/admin/tournaments/t-1");
+      await expect(page.getByRole("heading", { name: "Winter Cup 2026" })).toBeVisible();
+
+      await page.getByTestId("admin-tr-tools").locator("summary").click();
+      await page.getByTestId("admin-tr-reset").click();
+      const dialog = page.getByTestId("confirm-dialog");
+      await expect(dialog).toContainText("2 Spiele, davon 1 begonnen oder gewertet");
+      await expect(page.getByTestId("confirm-dialog-confirm")).toHaveText("2 Spiele löschen");
+      await expect(page.getByTestId("confirm-dialog-confirm")).toBeInViewport();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+      await page.getByTestId("confirm-dialog-confirm").click();
+      await expect.poll(() => posts.length).toBe(1);
+      expect(posts[0]).toContain("reset-bracket?force=true");
+
+      await page.getByTestId("admin-tr-status-select").selectOption("cancelled");
+      await expect(dialog).toContainText("Alle 2 Anmeldungen bekommen eine Nachricht");
+      await dialog.getByRole("textbox").fill("Halle nicht verfügbar");
+      await expect(page.getByTestId("confirm-dialog-confirm")).toBeInViewport();
+      await page.getByTestId("confirm-dialog-confirm").click();
+      await expect.poll(() => posts.length).toBe(2);
+      expect(posts[1]).toMatchObject({ status: "cancelled", reason: "Halle nicht verfügbar" });
+    });
+  }
+
   test("am Telefon sind die Reiter ohne langes Scrollen erreichbar", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await mockTournament(page);
