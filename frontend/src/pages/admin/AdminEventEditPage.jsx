@@ -295,7 +295,7 @@ function EventForm({ event, meta, partners = [], onDone }) {
               </>
             )}
             <EventDaysSection value={daysForm} onChange={changeDays} locations={locationsForm} startDate={form.start_date} endDate={form.end_date} accent={ACCENT} />
-            <TextField label="Max. Teilnehmer" type="number" value={form.max_participants} onChange={(v) => set("max_participants", v)} testId="event-max-participants" />
+            <TextField label="Max. Teilnehmer" type="number" min={1} value={form.max_participants} onChange={(v) => set("max_participants", v)} hint="Leer = unbegrenzt." testId="event-max-participants" />
           </FormSection>
           <DistributeBox kind="event" itemId={event?.id} title={event?.name}>
             <DiscordPreview kind="event" item={usesDays ? { ...form, days: formToDays(daysForm) } : form} skip={form.discord_skip} onSkipChange={(value) => set("discord_skip", value)} />

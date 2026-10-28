@@ -1013,6 +1013,8 @@ async def update_event(event_id: str, body: EventUpdate, me: dict = Depends(requ
         "twitch_channel", "stream_url", "stream_title", "event_url",
         "door_time", "registration_opens_at", "registration_closes_at", "end_date",
         "contact", "program", "stream_platform",
+        # Leer heißt unbegrenzt (#2118) - vorher kam „Gespeichert.“, aber der alte Wert blieb.
+        "max_participants",
     }
     raw = body.model_dump(exclude_unset=True)
     _refuse_event_sponsor_choice(raw)

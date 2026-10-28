@@ -558,7 +558,8 @@ class EventCreate(BaseModel):
     is_hybrid: bool = False
     banner_url: Optional[str] = None
     contact: Optional[str] = None
-    max_participants: Optional[int] = None
+    # Leer heißt unbegrenzt (#2118); 0 oder weniger schickte jede Anmeldung auf die Warteliste.
+    max_participants: Optional[int] = Field(default=None, ge=1)
     show_participants: bool = True
     program: Optional[str] = None  # markdown / freitext mit Tagesablauf
     has_live_stream: bool = False
@@ -612,7 +613,7 @@ class EventUpdate(BaseModel):
     is_hybrid: Optional[bool] = None
     banner_url: Optional[str] = None
     contact: Optional[str] = None
-    max_participants: Optional[int] = None
+    max_participants: Optional[int] = Field(default=None, ge=1)  # null leert das Feld: unbegrenzt (#2118)
     show_participants: Optional[bool] = None
     program: Optional[str] = None
     has_live_stream: Optional[bool] = None
