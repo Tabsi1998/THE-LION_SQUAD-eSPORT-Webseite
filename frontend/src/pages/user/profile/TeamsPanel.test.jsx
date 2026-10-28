@@ -74,7 +74,7 @@ test("Captain und Vertreter kommen aus dem Kader, Rollen sperren das Abwählen b
   expect(url).toBe("/teams/t1/squads/s-a");
   expect(payload.member_ids).toEqual(["u2", "u3"]);
   expect(payload.captain_id).toBe("u3");
-  expect(payload.vice_captain_id).toBe("u2");
+  expect(payload).not.toHaveProperty("vice_captain_id"); // unverändert - nicht mitschicken
   expect(payload).not.toHaveProperty("members");
 });
 

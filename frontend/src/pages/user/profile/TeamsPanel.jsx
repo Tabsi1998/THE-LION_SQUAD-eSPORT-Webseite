@@ -84,11 +84,16 @@ export function TeamsPanel() {
         tournament_id: editing.tournament_id || null,
         season_id: editing.season_id || null,
         member_ids: editing.member_ids || [],
-        // Captain und Vertreter (#1649): leer heißt „niemand“ - dann handelt im Liga-Spiel die Teamleitung.
-        captain_id: editing.captain_id || null,
-        vice_captain_id: editing.vice_captain_id || null,
       };
       delete payload.members;
+      // Captain und Vertreter (#1649): nur geänderte Rollen mitschicken - sonst überschriebe ein alter Stand eine
+      // Neuvergabe, die jemand anderes inzwischen gespeichert hat. Leer heißt „niemand“ (dann handelt die Teamleitung).
+      const original = editing.id ? squads.find((squad) => squad.id === editing.id) : null;
+      for (const role of SQUAD_ROLES) {
+        const next = editing[role.field] || null;
+        if (next === (original?.[role.field] || null)) delete payload[role.field];
+        else payload[role.field] = next;
+      }
       if (editing.id) await api.patch(`/teams/${activeTeam.id}/squads/${editing.id}`, payload);
       else await api.post(`/teams/${activeTeam.id}/squads`, payload);
       toast.success("Squad gespeichert.");
