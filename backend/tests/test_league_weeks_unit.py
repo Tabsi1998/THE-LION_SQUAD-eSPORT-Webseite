@@ -3,7 +3,7 @@ und Sperrzeiten richten sich danach. Ohne die Liga-Felder bleibt alles wie bishe
 """
 import pathlib
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
@@ -68,3 +68,18 @@ def test_response_deadline_pauses_over_the_break():
     assert local(due.isoformat()) == "06.01.2027 20:00"
     plain = matchday_schedule.response_deadline({}, start, 72)
     assert local(plain.isoformat()) == "22.12.2026 20:00"
+
+
+def test_a_started_step_before_the_break_counts_only_its_free_part():
+    """20.12. 23:30: eine halbe Stunde frei, dann Pause bis 5.1. 00:00 - der Rest (71,5 h) läuft danach."""
+    start = datetime.fromisoformat("2026-12-20T23:30:00+01:00")
+    due = matchday_schedule.response_deadline(SEASON_ONE, start, 72)
+    assert local(due.isoformat()) == "07.01.2027 23:30"
+    inside = matchday_schedule.response_deadline(SEASON_ONE, datetime.fromisoformat("2026-12-24T12:00:00+01:00"), 2)
+    assert local(inside.isoformat()) == "05.01.2027 02:00"
+    # Ein Start nicht um Mitternacht (Sperrwochen beginnen mit dem Start der Season): die Grenzen gelten trotzdem genau.
+    shifted = {**SEASON_ONE, "start_date": "2026-11-10T11:00:00+00:00", "blocked_periods": []}
+    week_seven = matchday_schedule.tournament_matchday_window({**shifted, "matchday_blocked_weeks": []}, 7)
+    due = matchday_schedule.response_deadline(shifted, week_seven.start.replace(minute=0) - timedelta(minutes=30), 1)
+    after_break = matchday_schedule.tournament_matchday_window({**shifted, "matchday_blocked_weeks": []}, 9).start
+    assert due == after_break + timedelta(minutes=30)

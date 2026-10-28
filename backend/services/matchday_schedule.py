@@ -204,18 +204,36 @@ def response_deadline(tournament: dict | None, start, hours: int) -> datetime | 
         return begin + timedelta(hours=max(0, int(hours or 0)))
     remaining = timedelta(hours=max(0, int(hours or 0)))
     moment = begin
-    step = timedelta(hours=1)
     guard = 0
-    while remaining > timedelta(0) and guard < 24 * 400:
+    # Gerechnet wird in Abschnitten bis zur nächsten Grenze (Wiener Mitternacht oder Rand einer Sperrwoche): innerhalb
+    # eines Abschnitts ist ein Moment entweder ganz gesperrt oder ganz frei - ein angebrochener Abschnitt zählt genau.
+    while remaining > timedelta(0) and guard < 2000:
         guard += 1
-        chunk = min(step, remaining)
-        if not blocked_period_at(tournament, moment):
-            remaining -= chunk
-        moment += chunk
-    while blocked_period_at(tournament, moment) and guard < 24 * 800:
-        guard += 1
-        moment += step
+        boundary = _next_boundary(tournament, moment)
+        if blocked_period_at(tournament, moment):
+            moment = boundary
+            continue
+        span = boundary - moment
+        if span >= remaining:
+            return moment + remaining
+        remaining -= span
+        moment = boundary
     return moment
+
+
+def _next_boundary(tournament: dict | None, moment: datetime) -> datetime:
+    """Die nächste Stelle nach ``moment``, an der sich „gesperrt“ ändern kann: Wiener Mitternacht (Sperrzeiten sind
+    Kalendertage) oder Beginn bzw. Ende einer Sperrwoche."""
+    local = moment.astimezone(LOCAL_TZ)
+    following = local.date() + timedelta(days=1)
+    candidates = [datetime(following.year, following.month, following.day, tzinfo=LOCAL_TZ).astimezone(timezone.utc)]
+    start = (tournament or {}).get("start_date")
+    if start:
+        days = matchday_settings(tournament)["days"]
+        for week in blocked_weeks_of(tournament):
+            window = matchday_window(start, week, days=days)
+            candidates.extend(edge for edge in (window.start, window.end) if edge > moment)
+    return min(edge for edge in candidates if edge > moment)
 
 
 def matchday_number_of(match: dict) -> int | None:
