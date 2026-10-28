@@ -5,6 +5,7 @@ dafür die festen Vorlagen aus email_service. Ein Blatt, damit sich die beiden n
 """
 from __future__ import annotations
 
+import html as html_lib
 from typing import Any
 
 from database import get_db
@@ -23,4 +24,15 @@ async def apply_override(template_key: str, subject: str, html: str, values: dic
     doc = await db.email_templates.find_one({"key": template_key, "override": True}, {"_id": 0, "subject": 1, "html": 1})
     if not doc or not (doc.get("html") or "").strip():
         return subject, html
-    return substitute(doc.get("subject") or subject, values, escape=False), substitute(doc["html"], values, escape=True)
+    body = substitute(doc["html"], values, escape=True)
+    # Abbestellen (#2119): eine eigene Newsletter-Fassung ohne {{unsubscribe_url}} bekommt den Link als Fußzeile.
+    if values.get("unsubscribe_url") and "{{unsubscribe_url}}" not in doc["html"]:
+        body = with_unsubscribe_footer(body, str(values["unsubscribe_url"]))
+    return substitute(doc.get("subject") or subject, values, escape=False), body
+
+
+def with_unsubscribe_footer(html: str, url: str) -> str:
+    footer = ('<p style="font-size:12px;color:#6b7280">Keine Newsletter mehr? '
+              f'<a href="{html_lib.escape(url, quote=True)}">Mit einem Klick abbestellen</a>.</p>')
+    marker = html.lower().rfind("</body>")
+    return html[:marker] + footer + html[marker:] if marker >= 0 else html + footer
