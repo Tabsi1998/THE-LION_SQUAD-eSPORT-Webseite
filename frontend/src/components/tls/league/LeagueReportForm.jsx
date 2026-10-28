@@ -46,7 +46,11 @@ export function LineupPicker({ roster = [], value = [], size = 1, onChange, labe
               className={`${chip(active)} disabled:opacity-40`}
               data-testid={testId ? `${testId}-${person.id}` : undefined}
             >
-              {active && <Check className="h-3.5 w-3.5 shrink-0" />}
+              {/* Platz fürs Häkchen immer reserviert (#2096): sonst wird der Chip beim Antippen breiter, die Reihe
+                  springt und der nächste Tipp landet daneben. */}
+              <span className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center" data-check-slot aria-hidden="true">
+                {active && <Check className="h-3.5 w-3.5" />}
+              </span>
               <span className="truncate">{person.name}</span>
             </button>
           );
