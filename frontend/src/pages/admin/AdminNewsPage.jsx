@@ -215,6 +215,11 @@ export default function AdminNewsPage() {
                     <td className="px-4 py-3 text-xs text-white/55">{viennaDate(n.published_at || n.created_at)}</td>
                     <td className="px-4 py-3 text-center space-x-2 whitespace-nowrap">
                       <Link to={`/admin/news/${n.id}`} data-testid={`news-edit-${n.id}`} className="inline-flex text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#29B6E8]/40 text-[#29B6E8] hover:bg-[#29B6E8]/10">Bearbeiten</Link>
+                      {n.slug && (
+                        <Link to={`/news/${n.slug}`} target="_blank" rel="noreferrer" data-testid={`news-view-${n.id}`} className="inline-flex text-xs font-bold uppercase px-3 py-1 rounded-sm border border-white/15 text-white/65 hover:text-white hover:border-white/35">
+                          {state.key === "published" ? "Ansehen" : "Vorschau"}
+                        </Link>
+                      )}
                       <button onClick={() => remove(n.id)} data-testid={`news-delete-${n.id}`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10 inline-flex items-center gap-1">
                         <Trash2 className="w-3 h-3" />
                       </button>

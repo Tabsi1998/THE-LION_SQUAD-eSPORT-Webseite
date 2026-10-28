@@ -101,6 +101,17 @@ def _published_now(post: dict) -> bool:
     return not published_at or published_at <= now_utc()
 
 
+def _preview_state(post: dict) -> dict | None:
+    """Warum ein Beitrag noch nicht öffentlich ist - oder None, wenn ihn alle sehen dürfen (#2122 NW2)."""
+    if post.get("withdrawn_at"):
+        return {"state": "withdrawn", "since": post.get("withdrawn_at")}
+    if post.get("published") is False:
+        return {"state": "draft"}
+    if not _published_now(post):
+        return {"state": "scheduled", "published_at": post.get("published_at")}
+    return None
+
+
 def _page_items(items: list[dict], limit: int, offset: int, paged: bool):
     safe_limit = max(1, min(int(limit or 48), 200))
     safe_offset = max(0, int(offset or 0))
@@ -425,8 +436,10 @@ async def list_news(
     user: dict | None = Depends(get_optional_user),
 ):
     db = get_db()
-    is_admin = _is_staff(user)
-    q: dict = {} if is_admin else {"published": True}
+    # Öffentliche Listen immer wie für Gäste (#2122 NW2): Entwürfe und geplante Beiträge stehen nie darin - auch nicht
+    # für das Admin-Team, sonst hält der Vorstand einen Entwurf für veröffentlicht. Die Vorschau gibt es auf der
+    # Detailseite (mit Band „Noch nicht öffentlich“) und in Admin → News.
+    q: dict = {"published": True}
     if category:
         q["category"] = category
     search_term = (search or "").strip()
@@ -444,8 +457,7 @@ async def list_news(
         }
     fetch_limit = max(200, min(max(int(limit or 48), 1) + max(int(offset or 0), 0) + 80, 500))
     posts = await db.news_posts.find(q, projection).sort([("published_at", -1), ("created_at", -1)]).to_list(fetch_limit)
-    if not is_admin:
-        posts = [p for p in posts if _published_now(p)]
+    posts = [p for p in posts if _published_now(p)]
     posts = await _filter_visible(posts, user)
     if sort == "latest":
         posts.sort(
@@ -482,6 +494,11 @@ async def get_news(slug_or_id: str, user: dict | None = Depends(get_optional_use
         raise HTTPException(status_code=403, detail="Nicht sichtbar.")
     if was_old_slug and p.get("slug"):
         return RedirectResponse(url=f"/api/news/{p['slug']}", status_code=301)
+    # Vorschau für das Admin-Team (#2122 NW2): ein nicht öffentlicher Beitrag trägt sein Kennzeichen, die Seite zeigt
+    # das Band „Noch nicht öffentlich“.
+    preview = _preview_state(p)
+    if preview:
+        p["preview"] = preview
     # Resolve linked entities
     db = get_db()
     if p.get("linked_event_ids"):
@@ -661,13 +678,10 @@ EXTRA_CATEGORY_LABELS = {"video": "Video"}
 
 async def _categories_in_use(user: dict | None) -> list[dict]:
     """Kategorien mit mindestens einem Beitrag, den dieser Besucher in der Liste sieht (#1249) - mit Anzahl. Dieselben
-    Regeln wie ``GET /news``: veröffentlicht, schon fällig und sichtbar; das Admin-Team zählt Entwürfe mit."""
+    Regeln wie ``GET /news``: veröffentlicht, schon fällig und sichtbar - auch für das Admin-Team (#2122 NW2)."""
     db = get_db()
-    is_admin = _is_staff(user)
-    q: dict = {} if is_admin else {"published": True}
-    posts = await db.news_posts.find(q, {"_id": 0, "category": 1, "visibility": 1, "published_at": 1}).to_list(5000)
-    if not is_admin:
-        posts = [p for p in posts if _published_now(p)]
+    posts = await db.news_posts.find({"published": True}, {"_id": 0, "category": 1, "visibility": 1, "published_at": 1}).to_list(5000)
+    posts = [p for p in posts if _published_now(p)]
     posts = await _filter_visible(posts, user)
     counts: dict[str, int] = {}
     for post in posts:

@@ -17,7 +17,7 @@ import { appendEmbedToken } from "@/components/tls/RichContent";
 import { toDateTimeLocalInput } from "@/lib/datetime";
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { toast } from "sonner";
-import { AtSign, Flag, Search, X } from "lucide-react";
+import { AtSign, ExternalLink, Flag, Search, X } from "lucide-react";
 
 // Beitrag anlegen und bearbeiten als eigene Seite (#434) - vorher ein 1024-px-Fenster über der
 // Liste. Links Titel, Text, Bild, Personen und Verknüpfungen, Checkliste und SEO-Vorschau; rechts
@@ -246,6 +246,12 @@ function NewsForm({ post, meta, onDone }) {
       backLabel="News"
       onSubmit={submit}
       testId="news-form"
+      headerExtra={!isNew && post.slug ? (
+        // Vorschau (#2122 NW2): die echte Seite - mit Band „Noch nicht öffentlich“, solange Besucher sie nicht sehen.
+        <Link to={`/news/${post.slug}`} target="_blank" rel="noreferrer" data-testid="news-preview-link" className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider font-bold text-white/60 hover:text-[#29B6E8] transition">
+          Vorschau ansehen <ExternalLink className="w-3.5 h-3.5" />
+        </Link>
+      ) : undefined}
       aside={(
         <>
           <FormSection title="Veröffentlichung">

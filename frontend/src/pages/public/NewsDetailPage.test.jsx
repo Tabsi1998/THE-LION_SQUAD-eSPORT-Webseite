@@ -13,7 +13,7 @@ vi.mock("@/hooks/useDocumentTitle", () => ({ useDocumentTitle: () => {} }));
 vi.mock("@/hooks/useCanonicalSlugRedirect", () => ({ useCanonicalSlugRedirect: () => {} }));
 vi.mock("sonner", () => ({ toast: toastMock }));
 
-const { default: NewsDetailPage, stripLeadingTitle, readingMinutes, splitAfterFirstParagraph } = await import("./NewsDetailPage");
+const { default: NewsDetailPage, stripLeadingTitle, readingMinutes, splitAfterFirstParagraph, previewText } = await import("./NewsDetailPage");
 
 const POST = {
   id: "n1", slug: "mario-kart-abgesagt", title: "Mario Kart 8 Deluxe Championship 2026 abgesagt", category: "events", pinned: true,
@@ -108,4 +108,29 @@ test("erster Absatz: Markdown an der Leerzeile, HTML nach dem ersten </p>, nicht
   const fence = "```";
   expect(splitAfterFirstParagraph(`${fence}\na\n\nb\n${fence}\n\nDanach`)).toEqual([`${fence}\na\n\nb\n${fence}`, "Danach"]);
   expect(splitAfterFirstParagraph("Nur einer.")).toEqual(["Nur einer.", ""]);
+});
+
+// Vorschau (#2122 NW2): was Besucher nicht sehen, trägt für das Admin-Team ein Band „Noch nicht öffentlich“.
+test("Vorschau eines Entwurfs: Band mit Weg in den Editor, ohne Band für öffentliche Beiträge", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/news/mario-kart-abgesagt") return { data: { ...POST, published: false, preview: { state: "draft" } } };
+    if (url.startsWith("/news?")) return { data: LIST };
+    throw new Error(`unbekannt: ${url}`);
+  });
+  renderPage();
+  const band = await screen.findByTestId("news-preview-band");
+  expect(band).toHaveTextContent("Noch nicht öffentlich");
+  expect(band).toHaveTextContent("Entwurf – nur das Admin-Team sieht diese Vorschau.");
+  expect(screen.getByRole("link", { name: "Im Editor öffnen" })).toHaveAttribute("href", "/admin/news/n1");
+});
+
+test("ohne Vorschau-Kennzeichen kein Band", async () => {
+  renderPage();
+  expect(await screen.findByRole("heading", { level: 1 })).toBeInTheDocument();
+  expect(screen.queryByTestId("news-preview-band")).toBeNull();
+});
+
+test("previewText: geplant mit Termin, zurückgezogen mit Datum", () => {
+  expect(previewText({ state: "scheduled", published_at: "2026-11-10T17:00:00Z" })).toMatch(/^Geplant – erscheint am 10\.11\.2026, 18:00 von selbst\./);
+  expect(previewText({ state: "withdrawn", since: "2026-10-28T09:00:00Z" })).toBe("Zurückgezogen am 28.10.2026. Besucher sehen statt des Beitrags nur einen Hinweis.");
 });

@@ -18,7 +18,7 @@ import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { seoTextPreview } from "@/lib/textPreview";
 import { Pin, ArrowLeft, ArrowRight, Calendar, Trophy, Users, Flag, Clock, Link2, Share2, MessageCircle, Newspaper, User } from "lucide-react";
-import { asInstant, viennaDate } from "@/lib/vienna";
+import { asInstant, viennaDate, viennaDateTime } from "@/lib/vienna";
 
 // News-Detail (Rückmeldung des Betreibers, 24.09.: „sieht am PC aus wie am Handy, nichts ist
 // ausgenutzt“): am PC und Tablet ein breites Raster - links der Artikel in Lesebreite mit großem
@@ -81,6 +81,32 @@ export function readingMinutes(text) {
 function formatDate(value, style = "long") {
   const date = asInstant(value || 0);
   return Number.isNaN(date.getTime()) ? "" : viennaDate(date, { dateStyle: style });
+}
+
+// Vorschau für das Admin-Team (#2122 NW2): ein Beitrag, den Besucher nicht sehen, trägt ein deutliches Band - sonst
+// hält man einen Entwurf leicht für veröffentlicht.
+export function previewText(preview) {
+  if (!preview) return "";
+  if (preview.state === "withdrawn") {
+    const since = preview.since ? ` am ${formatDate(preview.since, "medium")}` : "";
+    return `Zurückgezogen${since}. Besucher sehen statt des Beitrags nur einen Hinweis.`;
+  }
+  if (preview.state === "scheduled") {
+    const when = asInstant(preview.published_at || 0);
+    const at = Number.isNaN(when.getTime()) ? "" : ` am ${viennaDateTime(when, { dateStyle: "medium", timeStyle: "short" })}`;
+    return `Geplant – erscheint${at} von selbst. Bis dahin sieht nur das Admin-Team diese Vorschau.`;
+  }
+  return "Entwurf – nur das Admin-Team sieht diese Vorschau.";
+}
+
+function PreviewBand({ preview, postId }) {
+  return (
+    <div role="status" data-testid="news-preview-band" data-state={preview.state} className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-sm border border-[#FFD700]/50 bg-[#FFD700]/10 px-4 py-3 text-sm">
+      <span className="font-heading font-black uppercase tracking-wider text-[#FFD700]">Noch nicht öffentlich</span>
+      <span className="min-w-0 flex-1 text-white/80">{previewText(preview)}</span>
+      {postId && <Link to={`/admin/news/${encodeURIComponent(postId)}`} className="text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:underline">Im Editor öffnen</Link>}
+    </div>
+  );
 }
 
 export default function NewsDetailPage() {
@@ -160,6 +186,7 @@ export default function NewsDetailPage() {
   return (
     <PublicLayout>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+        {post.preview && <PreviewBand preview={post.preview} postId={post.id} />}
         <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "News", to: "/news" }, { label: post.title }]} className="mb-4" />
         <Link to="/news" data-testid="news-back" className="inline-flex items-center gap-2 text-xs uppercase tracking-wider text-white/50 hover:text-[#29B6E8]">
           <ArrowLeft className="w-3.5 h-3.5" /> Alle News

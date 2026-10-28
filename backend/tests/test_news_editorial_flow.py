@@ -51,3 +51,38 @@ async def test_single_post_needs_the_content_area(flow):
     await news(flow, "geheim")
     flow.act_as(await flow.add_user(name="leser"))
     assert (await flow.get("/api/admin/news/n-geheim")).status_code == 403
+
+
+# ---------------------------------------------------------------- NW2 öffentliche Listen wie für Gäste
+
+@pytest.mark.asyncio
+async def test_public_lists_hide_drafts_and_scheduled_posts_from_admins_too(flow):
+    await news(flow, "live")
+    await news(flow, "entwurf", published=False)
+    await news(flow, "geplant", days_ago=-2)
+    flow.act_as(await flow.add_user(role="club_admin", name="vorstand"))
+    listed = [row["slug"] for row in (await flow.get("/api/news")).json()]
+    assert listed == ["live"], "die öffentliche Liste zeigt dem Vorstand dasselbe wie Gästen"
+    compact = [row["slug"] for row in (await flow.get("/api/news?compact=true")).json()]
+    assert compact == ["live"]
+    in_use = {row["k"]: row["count"] for row in (await flow.get("/api/news-meta")).json()["in_use"]}
+    assert in_use == {"club": 1}
+    assert [row["title"] for row in (await flow.get("/api/search?q=Live")).json()["items"]] == ["Live"], "die Suche greift"
+    assert (await flow.get("/api/search?q=Entwurf")).json()["items"] == []
+
+
+@pytest.mark.asyncio
+async def test_detail_page_shows_admins_a_marked_preview(flow):
+    await news(flow, "entwurf", published=False)
+    await news(flow, "geplant", days_ago=-2)
+    await news(flow, "live")
+    flow.act_as(None)
+    assert (await flow.get("/api/news/entwurf")).status_code == 404
+    assert (await flow.get("/api/news/geplant")).status_code == 404
+    assert "preview" not in (await flow.get("/api/news/live")).json()
+
+    flow.act_as(await flow.add_user(role="club_admin", name="vorstand"))
+    assert (await flow.get("/api/news/entwurf")).json()["preview"] == {"state": "draft"}
+    planned = (await flow.get("/api/news/geplant")).json()["preview"]
+    assert planned["state"] == "scheduled" and planned["published_at"]
+    assert "preview" not in (await flow.get("/api/news/live")).json()

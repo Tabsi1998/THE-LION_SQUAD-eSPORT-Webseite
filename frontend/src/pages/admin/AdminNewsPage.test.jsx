@@ -40,10 +40,12 @@ test("CSV nennt Begriffe und die Adresse statt Rohwerten", async () => {
   globalThis.Blob = class { constructor(parts) { written = parts.join(""); } };
   globalThis.URL.createObjectURL = vi.fn(() => "blob:x");
   globalThis.URL.revokeObjectURL = vi.fn();
+  const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
   try {
     exportNewsCsv([{ ...POSTS[0], status_label: "Veröffentlicht", date_label: "01.08.2026" }]);
   } finally {
     globalThis.Blob = OriginalBlob;
+    click.mockRestore();
   }
   expect(written).toContain("Titel;Adresse;Kategorie;Sichtbarkeit;Status;Datum");
   expect(written).toContain("Sommerfest;/news/sommerfest;Rückblick;Nur Vereinsmitglieder;Veröffentlicht;01.08.2026");
