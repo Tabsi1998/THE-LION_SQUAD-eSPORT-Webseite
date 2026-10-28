@@ -31,10 +31,9 @@ async def attach_has_bracket_tree(db, tournaments: list[dict]) -> None:
     without = [t["id"] for t in tournaments if t.get("id") and not format_has_tree(t)]
     with_tree_stage: set[str] = set()
     if without:
-        rows = await db.tournament_stages.find(
+        with_tree_stage = set(await db.tournament_stages.distinct(
+            "tournament_id",
             {"tournament_id": {"$in": without}, "stage_type": {"$in": sorted(TREE_STAGE_TYPES)}},
-            {"_id": 0, "tournament_id": 1},
-        ).to_list(len(without) * 10 + 10)
-        with_tree_stage = {row.get("tournament_id") for row in rows}
+        ))
     for t in tournaments:
         t["has_bracket_tree"] = format_has_tree(t) or t.get("id") in with_tree_stage
