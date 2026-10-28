@@ -328,6 +328,8 @@ def staffel_fields(league: dict, season: dict, division: dict) -> dict:
         "is_public": is_public,
         "round_robin_legs": settings["round_robin_legs"],
         "matchday_blocked_weeks": blocked_weeks(season),
+        # Die Sperrzeiten selbst (Wiener Kalendertage) - für matchday_schedule.blocked_period_at (Terminvorschläge, Fristen).
+        "blocked_periods": [dict(period) for period in season.get("blocked_periods") or []],
         "matchday_weeks_total": settings["weeks_total"],
         "scoring_rules": settings["scoring_rules"],
         "game_mode_order": list(settings.get("game_mode_order") or []),
@@ -339,7 +341,8 @@ def staffel_fields(league: dict, season: dict, division: dict) -> dict:
 SYNC_GROUPS: dict[str, tuple[str, ...]] = {
     "always": ("visibility", "is_public", "rules"),
     "before_start": ("start_date", "end_date", "matchday_days", "default_match_weekday", "default_match_time",
-                     "round_robin_legs", "matchday_blocked_weeks", "matchday_weeks_total", "max_participants"),
+                     "round_robin_legs", "matchday_blocked_weeks", "blocked_periods", "matchday_weeks_total",
+                     "max_participants"),
     # Teamgröße und Mindestkader gehen immer gemeinsam - so bleibt min_squad_size ≥ team_size am Turnier.
     "before_result": ("best_of", "team_size", "min_squad_size", "scoring_rules", "game_mode_order",
                       "result_confirm_hours_league", "lineup_amend_hours"),

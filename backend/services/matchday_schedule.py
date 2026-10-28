@@ -114,6 +114,110 @@ def matchday_window(season_start, number: int, *, days: int = MATCHDAY_DAYS) -> 
     return MatchdayWindow(number=number, start=begins, end=ends)
 
 
+# ---------------------------------------------------------------- Sperrwochen (Liga, docs/LIGA.md)
+#
+# Eine Liga-Staffel trägt ``matchday_blocked_weeks`` (gesperrte Kalenderwochen ab dem Start, 1-basiert) und
+# ``blocked_periods`` (die Sperrzeiten als Wiener Kalendertage). Spieltag N liegt dann in der N-ten *aktiven* Woche:
+# Season 1 (Wochen 7 und 8 gesperrt) spielt die Spieltage 1-6 in den Wochen 1-6 und Spieltag 7 in Woche 9. Ohne die
+# Felder ist Spieltag N wie bisher Woche N.
+
+def blocked_weeks_of(tournament: dict | None) -> set[int]:
+    out = set()
+    for value in (tournament or {}).get("matchday_blocked_weeks") or []:
+        try:
+            number = int(value)
+        except (TypeError, ValueError):
+            continue
+        if number >= 1:
+            out.add(number)
+    return out
+
+
+def calendar_week_of(tournament: dict | None, number: int) -> int:
+    """Die Kalenderwoche (ab Start, 1-basiert), in der Spieltag ``number`` gespielt wird - Sperrwochen übersprungen."""
+    blocked = blocked_weeks_of(tournament)
+    if not blocked:
+        return number
+    week = 0
+    active = 0
+    while active < number:
+        week += 1
+        if week not in blocked:
+            active += 1
+    return week
+
+
+def tournament_matchday_window(tournament: dict | None, number: int) -> MatchdayWindow:
+    """Das Fenster von Spieltag ``number`` dieses Turniers - mit Sperrwochen. ``number`` bleibt der Spieltag."""
+    days = matchday_settings(tournament or {})["days"]
+    week = calendar_week_of(tournament, number)
+    window = matchday_window((tournament or {}).get("start_date"), week, days=days)
+    return MatchdayWindow(number=number, start=window.start, end=window.end)
+
+
+def _period_days(period: dict) -> tuple | None:
+    from datetime import date
+
+    try:
+        return date.fromisoformat(str(period["start_date"])[:10]), date.fromisoformat(str(period["end_date"])[:10])
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def blocked_period_at(tournament: dict | None, moment) -> dict | None:
+    """Liegt ``moment`` in einer Sperrzeit dieses Turniers? Dann ``{start_date, end_date, label}`` - sonst ``None``.
+
+    Gesperrt ist ein Tag einer Sperrzeit (``blocked_periods``, Wiener Kalendertage, beide Enden eingeschlossen) und jeder
+    Tag einer gesperrten Spielwoche (``matchday_blocked_weeks``). Für B: Terminvorschläge dort ablehnen
+    (docs/LIGA.md, Abschnitt 5)."""
+    when = _parse(moment)
+    if when is None or not tournament:
+        return None
+    day = when.astimezone(LOCAL_TZ).date()
+    for period in tournament.get("blocked_periods") or []:
+        days = _period_days(period or {})
+        if days and days[0] <= day <= days[1]:
+            return {"start_date": days[0].isoformat(), "end_date": days[1].isoformat(),
+                    "label": (period or {}).get("label") or "Sperrzeit"}
+    start = tournament.get("start_date")
+    blocked = blocked_weeks_of(tournament)
+    if not start or not blocked:
+        return None
+    days_per_week = matchday_settings(tournament)["days"]
+    for week in sorted(blocked):
+        window = matchday_window(start, week, days=days_per_week)
+        if window.contains(when):
+            last = (window.end - timedelta(seconds=1)).astimezone(LOCAL_TZ).date()
+            return {"start_date": window.start.astimezone(LOCAL_TZ).date().isoformat(), "end_date": last.isoformat(),
+                    "label": f"Sperrwoche {week}"}
+    return None
+
+
+def response_deadline(tournament: dict | None, start, hours: int) -> datetime | None:
+    """Antwortfrist eines Terminvorschlags: ``hours`` Stunden ab ``start`` - Zeit in einer Sperrzeit zählt nicht mit
+    (über die Weihnachtspause läuft keine Frist ab). Ohne Sperrzeiten genau ``start + hours``. Für B
+    (``match_routes._schedule_deadline``)."""
+    begin = _parse(start)
+    if begin is None:
+        return None
+    if not (tournament or {}).get("blocked_periods") and not blocked_weeks_of(tournament):
+        return begin + timedelta(hours=max(0, int(hours or 0)))
+    remaining = timedelta(hours=max(0, int(hours or 0)))
+    moment = begin
+    step = timedelta(hours=1)
+    guard = 0
+    while remaining > timedelta(0) and guard < 24 * 400:
+        guard += 1
+        chunk = min(step, remaining)
+        if not blocked_period_at(tournament, moment):
+            remaining -= chunk
+        moment += chunk
+    while blocked_period_at(tournament, moment) and guard < 24 * 800:
+        guard += 1
+        moment += step
+    return moment
+
+
 def matchday_number_of(match: dict) -> int | None:
     """The matchday a match belongs to, from whichever field carries it."""
     for key in ("matchday_number", "round", "round_index"):
@@ -311,7 +415,8 @@ def build_matchday_plan(tournament: dict, matches, proposals=None, stages=None) 
 
     plan = []
     for number in sorted(numbered):
-        window = matchday_window(start, number, days=settings["days"])
+        # Sperrwochen (Liga): Spieltag N liegt in der N-ten aktiven Woche.
+        window = tournament_matchday_window(tournament, number)
         entries = []
         for match in numbered[number]:
             resolution = resolve_matchday_time(
@@ -326,6 +431,7 @@ def build_matchday_plan(tournament: dict, matches, proposals=None, stages=None) 
             })
         plan.append({
             "number": number,
+            "calendar_week": calendar_week_of(tournament, number),
             "starts_at": window.start.isoformat(),
             "ends_at": window.end.isoformat(),
             "matches": entries,
@@ -460,6 +566,8 @@ async def escalate_overdue_proposals(db, tournament: dict, matches) -> int:
     from services.user_notifications import create_user_notification
 
     now = datetime.now(timezone.utc)
+    if blocked_period_at(tournament, now):
+        return 0  # In der Sperrzeit (Liga-Pause) meldet niemand offene Termine - danach wieder.
     overdue = [
         match for match in matches or []
         if match.get("schedule_status") in OPEN_SCHEDULE_STATUSES and not match.get("schedule_escalated_at")

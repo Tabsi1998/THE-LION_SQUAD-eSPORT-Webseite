@@ -20,9 +20,8 @@ from datetime import datetime, timedelta, timezone
 from services.matchday_schedule import (
     MatchdayScheduleError,
     matchday_number_of,
-    matchday_settings,
-    matchday_window,
     plays_in_matchdays,
+    tournament_matchday_window,
 )
 from services.v2_match_flows import latest_reports, no_show_keeps_heat_open
 
@@ -152,7 +151,8 @@ def _matchday_window(match: dict, tournament: dict | None):
     if not number or not start:
         return None
     try:
-        return matchday_window(start, number, days=matchday_settings(tournament)["days"])
+        # Sperrwochen (Liga, docs/LIGA.md): Spieltag N liegt in der N-ten aktiven Woche.
+        return tournament_matchday_window(tournament, number)
     except MatchdayScheduleError:
         return None
 

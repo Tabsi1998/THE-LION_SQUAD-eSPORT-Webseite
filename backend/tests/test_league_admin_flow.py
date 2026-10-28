@@ -128,6 +128,7 @@ async def test_creating_a_staffel_copies_every_setting_into_the_tournament(flow)
         "discord_skip": True, "season_weight": 0, "visibility": "internal", "is_public": False, "status": "draft",
         "round_robin_legs": 1, "matchday_blocked_weeks": [7, 8], "matchday_weeks_total": 10,
         "scoring_rules": normalize_rules({}), "game_mode_order": [], "lineup_amend_hours": 48,
+        "blocked_periods": [{"start_date": "2026-12-21", "end_date": "2027-01-03", "label": "Weihnachtspause"}],
     }
     assert {key: tournament.get(key) for key in expected} == expected
 
