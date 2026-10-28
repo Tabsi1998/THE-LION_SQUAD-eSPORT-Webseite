@@ -9,6 +9,18 @@ export const LOSER_SECTIONS = new Set(SECTIONS.loser);
 export const FINAL_SECTIONS = new Set(SECTIONS.final);
 export const BRONZE_SECTIONS = new Set(SECTIONS.bronze);
 
+// Formate, die in einer Tabelle ausgespielt werden statt in einem Baum: Spieltage, an denen alle gleichzeitig spielen.
+const TABLE_STAGE_TYPES = new Set(["round_robin_groups", "league", "swiss"]);
+const TABLE_SECTION_RE = /^(round_robin|liga|league|swiss|group_.+)$/i;
+
+/** Wird diese Phase als Tabelle gespielt (Liga, Gruppen, Schweizer System)? Entscheidet das erste Spiel der Liste. */
+export function isTableFormat(matches = []) {
+  const first = matches.find(Boolean);
+  if (!first) return false;
+  if (first.stage_type) return TABLE_STAGE_TYPES.has(String(first.stage_type));
+  return TABLE_SECTION_RE.test(String(first.section || ""));
+}
+
 /** Der Abschnittsname, wie der Server ihn vergleicht: klein, ohne Leerraum am Rand. */
 export function sectionKey(section) {
   return String(section || "").trim().toLowerCase();

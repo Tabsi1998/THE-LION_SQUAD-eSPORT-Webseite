@@ -1,6 +1,6 @@
 import { Check } from "lucide-react";
 import { BrandedQRCode } from "@/components/tls/BrandedQRCode";
-import { CHECKIN, DAYPLAN, SCHEDULE, SHEET, TREE, cardHeight, scheduleRowHeight, sheetBody, titleTier, treeColumnCapacity, treeColumns } from "@/lib/printView";
+import { CHECKIN, DAYPLAN, SCHEDULE, SHEET, STANDINGS, TREE, cardHeight, scheduleRowHeight, sheetBody, titleTier, treeColumnCapacity, treeColumns } from "@/lib/printView";
 import "@/styles/printView.css";
 
 // Druckansicht (#1283): die Blätter. Jede Höhe kommt aus lib/printView (Millimeter) - Karten und Zeilen sind genau so
@@ -166,6 +166,40 @@ export function ScheduleBody({ page }) {
               <td><div className="tls-print-ellipsis font-bold">{row.round}</div><div className="tls-print-muted tls-print-ellipsis">{[row.group, row.heat ? `Lauf ${row.key}` : `Spiel ${row.key}`, row.piece ? `Teil ${row.piece.index}/${row.piece.of}` : ""].filter(Boolean).join(" · ")}</div></td>
               <td><ScheduleSides row={row} /></td>
               <td>{row.heat ? <span className="tls-print-muted">Platz je Zeile</span> : <span className="tls-print-write">{row.done ? <span className="block text-center font-bold">{row.sides.map((side) => side.score || "–").join(" : ")}</span> : null}</span>}</td>
+            </tr>
+          )),
+        ])}
+      </tbody>
+    </table>
+  );
+}
+
+/** Tabelle bzw. Rangliste (#2121): Platz, Name und die Zahlen wie auf der Website; bei Gruppen je Gruppe ein Abschnitt. */
+export function StandingsBody({ page, nameLabel = "Name" }) {
+  const heads = page.sections.find((section) => section.rows.length)?.rows[0]?.heads || [];
+  const span = heads.length + 2;
+  return (
+    <table className="tls-print-table">
+      <colgroup>
+        <col style={{ width: "12mm" }} />
+        <col />
+        {heads.map((head) => <col key={head.key} style={{ width: heads.length > 4 ? "13mm" : "20mm" }} />)}
+      </colgroup>
+      <thead>
+        <tr style={{ height: mm(STANDINGS.tableHead) }}>
+          <th>Platz</th>
+          <th>{nameLabel}</th>
+          {heads.map((head) => <th key={head.key} title={head.title} className="text-right">{head.label}</th>)}
+        </tr>
+      </thead>
+      <tbody>
+        {page.sections.map((section) => [
+          section.title ? <SectionRow key={`${section.key}-head`} section={section} span={span} /> : null,
+          ...section.rows.map((row) => (
+            <tr key={row.id} style={{ height: mm(STANDINGS.row) }} data-testid="print-standing-row">
+              <td className="font-bold">{row.rank}</td>
+              <td><div className="tls-print-ellipsis font-bold">{row.name}</div></td>
+              {row.cells.map((cell, index) => <td key={heads[index]?.key || index} className="text-right tabular-nums">{cell}</td>)}
             </tr>
           )),
         ])}

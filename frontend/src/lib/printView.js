@@ -5,7 +5,8 @@
 // in Millimetern - die Seite zeichnet Karten und Zeilen in genau diesen Höhen (feste Höhe, Namen einzeilig mit „…“),
 // deshalb kann nichts über den Rand laufen. Rundennamen kommen aus derselben Regel wie im Web-Baum (lib/bracketNames).
 import { displayRoundLabels, roundName, treeSlotLabel } from "@/lib/bracketNames";
-import { sectionKind } from "@/lib/bracketSections";
+import { isTableFormat, sectionKind } from "@/lib/bracketSections";
+import { STANDING_COLUMNS, standingCell, standingSections, tableKind } from "@/lib/standingsTable";
 import { isCancelled, isDone, markedNoShow } from "@/lib/bracketGraph";
 import { describeSlot, finderFor } from "@/lib/slotSource";
 import { formatBracketSection, stationText } from "@/lib/tournamentLabels";
@@ -18,10 +19,32 @@ import { viennaDate, viennaTime } from "@/lib/vienna";
 /** Die Teile der Druckansicht in der Reihenfolge auf dem Papier. `staff`: nur mit Turnier-Recht (Check-in-Liste). */
 export const PRINT_PARTS = [
   { key: "baum", label: "Turnierbaum", scope: "tournament" },
+  { key: "tabelle", label: "Tabelle", scope: "tournament" },
   { key: "spielplan", label: "Spielplan", scope: "tournament" },
   { key: "tagesplan", label: "Tagesplan", scope: "event" },
   { key: "liste", label: "Check-in-Liste", scope: "both", staff: true },
 ];
+
+const TABLE_FORMATS = new Set(["league", "round_robin", "swiss", "groups"]);
+
+/**
+ * Hat das Turnier einen Baum, eine Tabelle oder beides (#2121)? „pure“: nur Tabelle (Liga, Jeder gegen jeden, Schweizer
+ * System, Gruppen ohne K.-o.) - dann gibt es keinen Teil „Turnierbaum“; „mixed“: Gruppen und danach ein Baum; „none“:
+ * nur ein Baum - die Tabelle heißt dann „Rangliste“. Mit Spielen entscheiden die Spiele, sonst das Format.
+ */
+export function tableMode(tournament, bracket) {
+  const matches = bracket?.matches_v2 || [];
+  if (!matches.length) return TABLE_FORMATS.has(String(tournament?.format || "")) ? "pure" : "none";
+  const tables = matches.filter((match) => isTableFormat([match])).length;
+  if (tables === matches.length) return "pure";
+  return tables ? "mixed" : "none";
+}
+
+/** Wie ein Teil auf dem Papier und in der Auswahl heißt - die Tabelle eines K.-o.-Turniers ist seine Rangliste. */
+export function partLabel(key, mode = "none") {
+  if (key === "tabelle" && mode === "none") return "Rangliste";
+  return (PRINT_PARTS.find((part) => part.key === key) || {}).label || key;
+}
 
 /** Vorgaben, wenn die Adresse nichts sagt: Baum quer, Listen hoch, Spielplan nach Zeit. */
 export const PRINT_DEFAULTS = { treeOrientation: "landscape", listOrientation: "portrait", scheduleOrder: "time" };
@@ -58,16 +81,25 @@ export function titleTier(title, orientation = "portrait") {
   return "longer";
 }
 
-/** Welche Teile die Adresse wählt (`?teile=baum,liste`) - nur bekannte, in Papier-Reihenfolge, ohne Dopplung. */
-export function parseParts(value, scope = "tournament", { staff = false } = {}) {
-  const allowed = PRINT_PARTS.filter((part) => (part.scope === scope || part.scope === "both") && (!part.staff || staff));
+/** Welche Teile es gibt: je Bereich, die Liste nur mit Recht, ohne Baum kein „Turnierbaum“ (`mode` aus `tableMode`). */
+export function printParts(scope = "tournament", { staff = false, mode = "none" } = {}) {
+  return PRINT_PARTS.filter((part) => (part.scope === scope || part.scope === "both") && (!part.staff || staff) && !(part.key === "baum" && mode === "pure"));
+}
+
+/**
+ * Welche Teile die Adresse wählt (`?teile=baum,liste`) - nur bekannte, in Papier-Reihenfolge, ohne Dopplung. Ohne Baum
+ * (`mode` „pure“) wird aus „baum“ die Tabelle: der Druck-Knopf am Turnierbaum einer Liga führt so zur Tabelle.
+ */
+export function parseParts(value, scope = "tournament", { staff = false, mode = "none" } = {}) {
+  const allowed = printParts(scope, { staff, mode });
   const wanted = new Set(String(value || "").split(",").map((item) => item.trim().toLowerCase()).filter(Boolean));
   // „none“: bewusst alles abgewählt - dann bleibt es leer, statt wieder die Vorgabe zu zeigen.
   if (wanted.has("none")) return [];
+  if (mode === "pure" && wanted.has("baum")) wanted.add("tabelle");
   const picked = allowed.filter((part) => wanted.has(part.key)).map((part) => part.key);
   if (picked.length) return picked;
-  // Ohne Auswahl: alles, was öffentlich ist - die Liste nur auf Wunsch.
-  return allowed.filter((part) => !part.staff).map((part) => part.key);
+  // Ohne Auswahl: alles, was öffentlich ist - die Liste nur auf Wunsch, die Rangliste eines K.-o. auch.
+  return allowed.filter((part) => !part.staff && !(part.key === "tabelle" && mode === "none")).map((part) => part.key);
 }
 
 /** „Stand 30.10. 19:12“ - Datum dazu, weil am Vorabend gedruckt wird. */
@@ -185,6 +217,9 @@ export function bracketBlocks(bracket) {
   }
   const blocks = [];
   for (const group of groups.values()) {
+    // Liga, Gruppen und Schweizer System sind kein Baum (#2121): ihre Spieltage stehen im Spielplan, der Stand im Teil
+    // „Tabelle“ - als Baumspalten gedruckt waren sie nur eine lange Reihe Karten.
+    if (isTableFormat([...group.rounds.values()].flat())) continue;
     const numbers = [...group.rounds.keys()].sort((a, b) => a - b);
     const sectionTitle = formatBracketSection(group.section);
     const stage = stages.find((item) => item.id === group.stageId);
@@ -410,6 +445,41 @@ export function schedulePages(bracket, { orientation = PRINT_DEFAULTS.listOrient
   return paginate(sections, {
     capacity: listCapacity(orientation), tableHead: SCHEDULE.tableHead, sectionHead: SCHEDULE.sectionHead, rowHeight: scheduleRowHeight,
   }).map((page) => ({ ...page, kind: "spielplan", orientation }));
+}
+
+// ------------------------------------------------------------------------------------------------- Tabelle (#2121)
+
+export const STANDINGS = { tableHead: 8, sectionHead: 9, row: 7 };
+
+/**
+ * Die Tabelle (bzw. Rangliste) für Papier: je Gruppe ein Abschnitt mit Namen, sonst einer ohne Kopf. Spalten wie auf der
+ * Website (lib/standingsTable), ohne die Form. `heats`: das Turnier spielt in Läufen (FFA).
+ */
+export function standingsSections(standings, { heats = false } = {}) {
+  return standingSections(standings)
+    .filter((section) => section.rows.length)
+    .map((section) => {
+      const columns = (STANDING_COLUMNS[tableKind(section.rows, { heats })] || STANDING_COLUMNS.league).filter((column) => column.key !== "form");
+      return {
+        key: section.key,
+        title: section.label,
+        heads: columns.map((column) => ({ key: column.key, label: column.label, title: column.title })),
+        rows: section.rows.map((row, index) => ({
+          id: row.registration_id || `${section.key}-${index}`,
+          rank: row.rank ?? "",
+          name: row.display_name || "Teilnehmer",
+          cells: columns.map((column) => String(standingCell(column, row))),
+        })),
+      };
+    });
+}
+
+export function standingsPages(standings, { orientation = PRINT_DEFAULTS.listOrientation, heats = false } = {}) {
+  const sections = standingsSections(standings, { heats });
+  const grouped = sections.some((section) => section.title);
+  return paginate(sections.map((section) => ({ ...section, rows: section.rows.map((row) => ({ ...row, heads: section.heads })) })), {
+    capacity: listCapacity(orientation), tableHead: STANDINGS.tableHead, sectionHead: grouped ? STANDINGS.sectionHead : 0, rowHeight: () => STANDINGS.row,
+  }).map((page) => ({ ...page, kind: "tabelle", orientation }));
 }
 
 // ------------------------------------------------------------------------------------------------- Check-in-Liste

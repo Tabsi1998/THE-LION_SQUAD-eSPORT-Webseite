@@ -4,6 +4,7 @@ import { Link, useInRouterContext } from "react-router-dom";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, Trophy } from "lucide-react";
 import { formatBracketSection } from "@/lib/tournamentLabels";
+import { isTableFormat } from "@/lib/bracketSections";
 import { asInstant, viennaTime } from "@/lib/vienna";
 import { finderFor, initials } from "@/lib/slotSource";
 import { buildPodiumMap, finalMatchOf, isBronzeMatch, lastStageId, normalizeSection } from "@/lib/bracketPodium";
@@ -197,16 +198,9 @@ export function BracketTree({ data, compact = false, viewMode = "standard", onMa
   );
 }
 
-// Formate, die in einer Tabelle ausgespielt werden statt in einem Baum: Spieltage, an denen alle gleichzeitig spielen.
-const TABLE_STAGE_TYPES = new Set(["round_robin_groups", "league", "swiss"]);
-const TABLE_SECTION_RE = /^(round_robin|liga|league|swiss|group_.+)$/i;
-
-export function isTableFormat(matches = []) {
-  const first = matches.find(Boolean);
-  if (!first) return false;
-  if (first.stage_type) return TABLE_STAGE_TYPES.has(String(first.stage_type));
-  return TABLE_SECTION_RE.test(String(first.section || ""));
-}
+// Formate, die in einer Tabelle ausgespielt werden statt in einem Baum - seit #2121 in lib/bracketSections (auch die
+// Druckansicht braucht die Regel).
+export { isTableFormat };
 
 /** „Dein nächstes Spiel“: das erste noch offene Match mit der eigenen Anmeldung. */
 export function nextMatchFor(matches = [], mineId) {
