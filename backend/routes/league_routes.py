@@ -29,6 +29,7 @@ from services import league_service as leagues
 from services import map_pools
 from services.change_events import reset_scope_cache
 from services.game_maps import MapProblem
+from services.league_scope import ONLY_LEAGUE
 from services.league_service import LeagueProblem
 from services.map_pools import MapPoolSave
 from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
@@ -153,7 +154,7 @@ async def admin_update_season(season_id: str, body: LeagueSeasonUpdate, me: dict
     doc, changed = await _call(leagues.update_season(db, season, body.model_dump(exclude_unset=True)))
     if changed:
         await _audit(db, "league.season.update", me, season_id, {"fields": changed})
-    staffeln = await db.tournaments.count_documents({"league_context.season_id": season_id})
+    staffeln = await db.tournaments.count_documents({"league_context.season_id": season_id, **ONLY_LEAGUE})
     # Die Staffeln tragen ihre Werte selbst: Änderungen wirken erst über „Vorgaben auf Staffeln übertragen“.
     return {**doc, "changed": changed, "staffeln_to_sync": staffeln if changed else 0}
 

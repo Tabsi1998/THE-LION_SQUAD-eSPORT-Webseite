@@ -555,7 +555,8 @@ async def update_division(db, division: dict, body: dict) -> tuple[dict, list[st
 # ---------------------------------------------------------------- Staffel anlegen
 
 async def _next_letter(db, division_id: str) -> str:
-    taken = set(await db.tournaments.distinct("league_context.staffel", {"league_context.division_id": division_id}))
+    taken = set(await db.tournaments.distinct("league_context.staffel",
+                                              {"league_context.division_id": division_id, **ONLY_LEAGUE}))
     for letter in STAFFEL_LETTERS:
         if letter not in taken:
             return letter
@@ -579,7 +580,7 @@ async def create_staffel(db, division: dict, staffel: str | None, user: dict) ->
         raise LeagueProblem(problem)
     letter = (staffel or "").strip().upper() or await _next_letter(db, division["id"])
     if await db.tournaments.find_one({"league_context.division_id": division["id"],
-                                      "league_context.staffel": letter}, {"_id": 1}):
+                                      "league_context.staffel": letter, **ONLY_LEAGUE}, {"_id": 1}):
         raise LeagueProblem(f"Staffel {letter} gibt es in dieser Liga schon.", 409)
 
     title = staffel_title(league, season, division, letter)
