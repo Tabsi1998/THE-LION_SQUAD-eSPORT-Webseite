@@ -120,6 +120,24 @@ export default function AdminDolibarrPage() {
     });
     if (ok) run("unlink", () => api.delete(`/admin/dolibarr/links/${link.user_id}`), "Zuordnung gelöst.");
   };
+  // Schlüssel entfernen (#2112): mit Rückfrage; der Schlüssel selbst steht nie auf der Seite.
+  const removeKey = async (which) => {
+    const write = which === "write";
+    const ok = await confirm({
+      title: write ? "Schreib-Schlüssel entfernen?" : "API-Schlüssel entfernen?",
+      description: write
+        ? "Der zweite Schlüssel wird gelöscht. Die Website schreibt dann mit dem Schlüssel des Website-Benutzers – gibt es keinen, geht der Schreibzugriff aus."
+        : "Der Schlüssel des Website-Benutzers wird gelöscht und die Anbindung ausgeschaltet (Modus „Aus“). Zum Wiederverbinden einen neuen Schlüssel eintragen.",
+      confirmLabel: "Schlüssel entfernen",
+      tone: "danger",
+    });
+    if (!ok) return;
+    await run(
+      write ? "remove-write-key" : "remove-key",
+      () => api.delete(write ? "/admin/dolibarr/settings/write-api-key" : "/admin/dolibarr/settings/api-key"),
+      write ? "Schreib-Schlüssel entfernt." : "API-Schlüssel entfernt, Anbindung aus.",
+    );
+  };
   const testConnection = async () => {
     const result = await run("test", () => api.post("/admin/dolibarr/test"));
     if (result) setTestResult(result.data);
@@ -439,6 +457,9 @@ export default function AdminDolibarrPage() {
                 <button type="button" disabled={!!busy} data-testid="dolibarr-save" onClick={() => saveSettings({ base_url: form.base_url, instance: form.instance, environment: form.environment, ...(form.api_key ? { api_key: form.api_key } : {}) }).then(() => setForm((current) => ({ ...current, api_key: "" })))}
                   className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40">Speichern</button>
                 <button type="button" disabled={!!busy || !status?.api_key_configured} onClick={testConnection} data-testid="dolibarr-test" className="px-4 py-2 border border-white/20 text-white/80 font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40">Verbindung testen</button>
+                {status?.api_key_configured && (
+                  <button type="button" disabled={!!busy} onClick={() => removeKey("read")} data-testid="dolibarr-key-remove" className="px-4 py-2 border border-[#FF3B30]/40 text-[#FF6B6B] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#FF3B30]/10 disabled:opacity-40">Schlüssel entfernen</button>
+                )}
               </div>
               {testResult && (
                 <div className={`text-sm ${testResult.ok ? "text-[#00FF88]" : "text-[#FF6B6B]"}`} data-testid="dolibarr-test-result">
@@ -473,6 +494,9 @@ export default function AdminDolibarrPage() {
                     <Field label={`API-Schlüssel des Schreib-Benutzers${status?.write_api_key_configured ? " (gespeichert – leer lassen, um ihn zu behalten)" : ""}`} value={writeKey} onChange={setWriteKey} type="password" testId="dolibarr-write-key" />
                     <button type="button" disabled={!!busy || !writeKey} data-testid="dolibarr-write-save" onClick={() => saveSettings({ write_api_key: writeKey }, "Schreib-Schlüssel gespeichert.").then(() => setWriteKey(""))}
                       className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40">Schlüssel speichern</button>
+                    {status?.write_api_key_configured && (
+                      <button type="button" disabled={!!busy} onClick={() => removeKey("write")} data-testid="dolibarr-write-key-remove" className="ml-2 px-4 py-2 border border-[#FF3B30]/40 text-[#FF6B6B] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#FF3B30]/10 disabled:opacity-40">Schlüssel entfernen</button>
+                    )}
                   </div>
                 </details>
               </div>

@@ -241,3 +241,39 @@ test("Teilnahmen: letzter Abgleich, Abgelehntes mit Grund und der Nachzug über 
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/dolibarr/participations/backfill"));
   expect(toastMock.success).toHaveBeenCalledWith("Nachgetragen: 12 gemeldet – 5 folgen mit den nächsten Abgleichen.");
 });
+
+// Schlüssel entfernen (#2112): je Schlüssel ein Knopf mit Rückfrage; ohne gespeicherten Schlüssel kein Knopf.
+test("API- und Schreib-Schlüssel lassen sich nach Rückfrage entfernen", async () => {
+  authState.areas = ["system"];
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/admin/dolibarr/status") return { data: { ...STATUS, write_api_key_configured: true } };
+    if (url === "/admin/dolibarr/consent-texts") return { data: [] };
+    throw new Error(url);
+  });
+  apiMock.delete.mockResolvedValue({ data: { ok: true } });
+  const user = userEvent.setup();
+  renderPage();
+  await user.click(await screen.findByTestId("dolibarr-tab-connection"));
+  confirmMock.mockResolvedValueOnce(false);
+  await user.click(await screen.findByTestId("dolibarr-key-remove"));
+  expect(apiMock.delete).not.toHaveBeenCalled();
+  await user.click(screen.getByTestId("dolibarr-key-remove"));
+  await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith("/admin/dolibarr/settings/api-key"));
+  expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ title: "API-Schlüssel entfernen?", tone: "danger" }));
+  await user.click(screen.getByTestId("dolibarr-write-key-remove"));
+  await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith("/admin/dolibarr/settings/write-api-key"));
+});
+
+test("ohne gespeicherten Schlüssel gibt es nichts zu entfernen", async () => {
+  authState.areas = ["system"];
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/admin/dolibarr/status") return { data: { ...STATUS, mode: "off", api_key_configured: false, write_api_key_configured: false } };
+    throw new Error(url);
+  });
+  const user = userEvent.setup();
+  renderPage();
+  await user.click(await screen.findByTestId("dolibarr-tab-connection"));
+  await screen.findByTestId("dolibarr-save");
+  expect(screen.queryByTestId("dolibarr-key-remove")).toBeNull();
+  expect(screen.queryByTestId("dolibarr-write-key-remove")).toBeNull();
+});

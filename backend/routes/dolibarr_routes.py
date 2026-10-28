@@ -555,9 +555,25 @@ async def update_dolibarr_settings(body: DolibarrSettingsUpdate, me: dict = Depe
 
 @admin_router.delete("/settings/api-key")
 async def clear_dolibarr_key(me: dict = Depends(require_area("system"))):
+    """Den Lese-Schlüssel entfernen (#2112): ohne ihn ist die Anbindung aus. Das Protokoll nennt nur, dass er weg ist."""
     db = get_db()
-    await db.settings.update_one({"id": SETTINGS_ID}, {"$set": {"api_key": "", "mode": "off", "updated_at": now_utc().isoformat()}})
+    await db.settings.update_one({"id": SETTINGS_ID}, {"$set": {"api_key": "", "mode": "off", "updated_at": now_utc().isoformat(),
+                                                                "updated_by": me["id"]}}, upsert=True)
     await _audit(me["id"], "dolibarr.key_removed", SETTINGS_ID)
+    return {"ok": True}
+
+
+@admin_router.delete("/settings/write-api-key")
+async def clear_dolibarr_write_key(me: dict = Depends(require_area("system"))):
+    """Den eigenen Schreib-Schlüssel entfernen (#2112). Danach schreibt die Website mit dem Lese-Schlüssel weiter -
+    gibt es keinen, geht der Schreibzugriff aus."""
+    db = get_db()
+    current = await load_settings(db)
+    updates = {"write_api_key": "", "updated_at": now_utc().isoformat(), "updated_by": me["id"]}
+    if not current.get("api_key"):
+        updates["write_enabled"] = False
+    await db.settings.update_one({"id": SETTINGS_ID}, {"$set": updates}, upsert=True)
+    await _audit(me["id"], "dolibarr.write_key_removed", SETTINGS_ID, {"write_enabled": updates.get("write_enabled", current.get("write_enabled"))})
     return {"ok": True}
 
 
