@@ -154,6 +154,9 @@ PERSONAL: dict[str, Entry] = {
     "team_invites": Entry(DELETED, ("team_invites",)),
     "team_squads": Entry(KEPT, note="Aufstellung des Teams, nur Kennungen"),
     "tournament_registrations": Entry(OVERWRITTEN, ("tournament_registrations",)),
+    # Liga-Kader (#2108): die Spiel-ID, die je Season gilt, mit Zeitpunkt und Freigaben der Liga-Leitung.
+    "league_rosters": Entry(DELETED, ("league_rosters",), "festgehaltene Spiel-ID je Liga-Season; Aufstellungen und "
+                            "Ergebnisse bleiben ohne sie"),
     "matches_v2": Entry(KEPT, ("competition_matches",), SPORT),
     "match_reports_v2": Entry(KEPT, ("match_reports",), f"Ergebnismeldung als Nachweis des Ergebnisses; {THREE_YEARS}"),
     "match_schedule_proposals": Entry(KEPT, ("schedule_proposals",), "Terminvereinbarung zum Match als Nachweis"),

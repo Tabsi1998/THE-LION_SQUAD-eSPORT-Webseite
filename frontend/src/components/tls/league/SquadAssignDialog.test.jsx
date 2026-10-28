@@ -8,7 +8,7 @@ vi.mock("@/lib/api", () => ({
   api: apiMock,
   formatRequestError: (err, fallback) => err?.response?.data?.detail || fallback,
 }));
-const toastMock = { success: vi.fn(), error: vi.fn() };
+const toastMock = { success: vi.fn(), error: vi.fn(), warning: vi.fn() };
 vi.mock("sonner", () => ({ toast: toastMock }));
 const { SquadAssignDialog, canAssignSquads } = await import("./SquadAssignDialog");
 
@@ -72,6 +72,28 @@ test("geführt: Team wählen, Co-Team wählen, zuteilen", async () => {
   await waitFor(() => expect(onAssigned).toHaveBeenCalled());
   expect(toastMock.success).toHaveBeenCalledWith("Loewen · Rudel A ist in der Staffel.");
   expect(screen.queryByTestId("squad-assign-dialog")).not.toBeInTheDocument();
+});
+
+test("Spiel-ID je Spieler (#2108): fehlt sie, warnt der Dialog mit Namen – zuteilen geht trotzdem", async () => {
+  const players = [
+    { id: "u1", name: "Mila", state: "locked", ok: true, text: "Testloewe#1234567" },
+    { id: "u2", name: "Tom", state: "missing", ok: false, text: null, reason: "Activision-ID fehlt im Profil." },
+  ];
+  apiMock.get.mockResolvedValue({ data: { ...CANDIDATES, id_label: "Activision-ID", teams: [{ ...CANDIDATES.teams[0], squads: [{ ...CANDIDATES.teams[0].squads[0], players }] }] } });
+  apiMock.post.mockResolvedValue({ data: { registration: { id: "r1" }, ids_missing: ["Tom"] } });
+  render(<SquadAssignDialog tournament={TOURNAMENT} onAssigned={vi.fn()} />);
+  fireEvent.click(screen.getByTestId("squad-assign-open"));
+  await waitFor(() => expect(screen.getByTestId("squad-assign-team-t-loewen")).toBeInTheDocument());
+  fireEvent.click(screen.getByTestId("squad-assign-team-t-loewen"));
+
+  expect(screen.getByTestId("squad-assign-ids-s-a")).toHaveTextContent("MilaTestloewe#1234567");
+  expect(screen.getByTestId("squad-assign-ids-warning-s-a")).toHaveTextContent("Ohne gültige Activision-ID: Tom.");
+  expect(screen.getByTestId("squad-assign-squad-s-a")).not.toBeDisabled();
+  fireEvent.click(screen.getByTestId("squad-assign-squad-s-a"));
+  fireEvent.click(screen.getByTestId("squad-assign-confirm"));
+
+  await waitFor(() => expect(toastMock.warning).toHaveBeenCalled());
+  expect(toastMock.warning.mock.calls[0][0]).toContain("Activision-ID fehlt: Tom");
 });
 
 test("ein Fehler des Servers steht verständlich im Dialog, der bleibt offen", async () => {

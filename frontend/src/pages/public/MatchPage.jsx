@@ -25,7 +25,7 @@ import { rankingMode } from "@/lib/matchReport";
 import { MatchReportForm } from "@/components/tls/tournament/MatchReportForm";
 import { LeagueReportForm } from "@/components/tls/league/LeagueReportForm";
 import { defaultTimeText, lineupAmendClosed, sidesInSlotOrder } from "@/components/tls/league/leagueGames";
-import { LeagueGamesView, LineupAmendForm, StaffLineupAmend } from "@/components/tls/league/LeagueGamesView";
+import { LeagueGamesView, LeagueLobbyIds, LineupAmendForm, StaffLineupAmend } from "@/components/tls/league/LeagueGamesView";
 import { LiveQueueStatus } from "@/components/tls/live/LiveQueueStatus";
 import { MatchCallBox } from "@/components/tls/tournament/MatchCallBox";
 import { ProblemReportForm } from "@/components/tls/results/ProblemReportForm";
@@ -427,6 +427,8 @@ function MatchPageView() {
 
           {/* Liga (#1650): gespielte Maps mit Sieger und Aufstellungen; fehlt die eigene noch, hier nachtragen. */}
           {data.league ? <LeagueGamesView league={league} /> : null}
+          {/* Spiel-IDs für die Lobby (#2108) - nur Beteiligte und Turnierleitung bekommen sie vom Server. */}
+          {data.league ? <LeagueLobbyIds league={league} /> : null}
           {data.league ? (
             <LineupAmendForm key={`${(data.league.lineups_missing || []).join(",")}-${match.updated_at || ""}`} league={league} busy={busy} onSave={saveLineups}
               onAskStaff={canUseChat && showChat && !chatClosed ? askStaff : null} />

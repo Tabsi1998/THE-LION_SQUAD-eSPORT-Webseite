@@ -6,7 +6,7 @@ from typing import Optional, Literal
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from database import get_db
-from services import moderation_standing
+from services import league_roster, moderation_standing
 from auth import get_current_user, get_optional_user
 from models import TeamCreate, TeamUpdate, now_utc, new_id
 from services.notification_preferences import send_user_template
@@ -1094,6 +1094,10 @@ async def update_squad(team_id: str, squad_id: str, body: TeamSquadUpdate, me: d
         raise HTTPException(status_code=409, detail=SQUAD_CHANGED_MEANWHILE)
     fresh = await db.team_squads.find_one({"id": squad_id}, {"_id": 0})
     await _after_squad_roles(db, team, fresh or current, current, roles, me)
+    # Liga-Kader (#2108): wer neu ins Co-Team kommt, während es in einer Staffel spielt, kommt in den Kader der Season.
+    added = [uid for uid in (fresh or {}).get("member_ids") or [] if uid not in (current.get("member_ids") or [])]
+    if added:
+        await league_roster.on_squad_members_added(db, fresh, added, me.get("id"))
     return fresh
 
 

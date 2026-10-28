@@ -193,8 +193,11 @@ async def test_a_season_is_deleted_only_as_a_draft(flow):
     plan = (await flow.get(f"{ADMIN}/seasons/{season['id']}/delete-plan")).json()
     assert plan["deletable"] is True
     assert [row["label"] for row in plan["divisions"]] == ["Liga 1"]
+    # Liga-Kader (#2108): die festgehaltene Spiel-ID gehört zur Season.
+    await flow.db.league_rosters.insert_one({"id": "roster-probe", "season_id": season["id"], "user_id": "u-probe"})
     deleted = await _delete(flow, f"{ADMIN}/seasons/{season['id']}")
     assert deleted.status_code == 200, deleted.text
+    assert await flow.db.league_rosters.count_documents({"season_id": season["id"]}) == 0
     assert await flow.db.league_seasons.count_documents({"id": season["id"]}) == 0
     assert await flow.db.league_divisions.count_documents({"season_id": season["id"]}) == 0
     assert await flow.db.tournaments.count_documents({"id": staffel["id"]}) == 0

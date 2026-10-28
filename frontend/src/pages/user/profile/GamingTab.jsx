@@ -1,6 +1,7 @@
 import { MultiSelect } from "@/components/tls/MultiSelect";
 import { INPUT_DEVICES, PLATFORMS, SUBSCRIPTIONS } from "./constants";
 import { Field, Input, Row, Section } from "./fields";
+import { LeagueIdNotice } from "./LeagueIdNotice";
 
 export function GamingTab({ form, set, setNow = set, setGameId, gameIdGroups }) {
   return (
@@ -25,6 +26,8 @@ export function GamingTab({ form, set, setNow = set, setGameId, gameIdGroups }) 
                         <h3 className="font-heading font-black uppercase">Spiel-IDs</h3>
                         <p className="text-xs text-white/50 mt-1">IDs können für Hauptspiele gelten und automatisch bei passenden Spielversionen verwendet werden, z.B. Activision ID für Call of Duty und BO6/BO7.</p>
                       </div>
+                      {/* Liga (#2108): welche ID in einer laufenden Season gilt - live zum Formular. */}
+                      <LeagueIdNotice gameIds={form.game_ids} />
                       {gameIdGroups.map((group) => (
                         <div key={group.slug} className="border-t border-white/10 pt-4 first:border-t-0 first:pt-0">
                           <div className="text-[11px] uppercase tracking-widest font-bold text-[#29B6E8] mb-1">{group.title}</div>
@@ -32,7 +35,7 @@ export function GamingTab({ form, set, setNow = set, setGameId, gameIdGroups }) 
                           <Row>
                             {group.fields.map((field) => (
                               <Field key={field.key} label={`${field.label}${field.required !== false ? " *" : ""}`}>
-                                <Input value={form.game_ids?.[group.slug]?.[field.key] || ""} onChange={(v) => setGameId(group.slug, field.key, v)} placeholder={field.help_text || field.label} />
+                                <Input value={form.game_ids?.[group.slug]?.[field.key] || ""} onChange={(v) => setGameId(group.slug, field.key, v)} placeholder={field.help_text || field.label} testId={`profile-game-id-${group.slug}-${field.key}`} />
                               </Field>
                             ))}
                           </Row>

@@ -705,7 +705,9 @@ In der Liga melden **Captain oder Vertreter** des Co-Teams (ohne beide die Teaml
    die Turnierleitung (mit Grund).
 
 Geprüft wird: Best of (keine Map nach der Entscheidung), Map im Pool und für den Modus freigegeben, Aufstellung nur
-aus dem eigenen Kader und **kein Doppel-Einsatz** – niemand spielt am selben Spieltag für zwei Teams derselben Season.
+aus dem eigenen Kader, nur mit **Spiel-ID** (etwa Activision-ID; festgehalten für die Season, siehe
+[Liga leiten, 3.7](liga.md#37-spiel-ids-im-kader)) und **kein Doppel-Einsatz** – niemand spielt am selben Spieltag für
+zwei Teams derselben Season.
 Die Turnierleitung trägt Maps im Ergebnis-Fenster mit Aufstellungen beider Seiten ein oder korrigiert sie mit Grund;
 „Rückgängig“ nimmt die Maps mit dem Ergebnis zurück.
 
