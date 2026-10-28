@@ -15,12 +15,15 @@ import { TvQueueBoard } from "@/components/tv/TvQueueBoard";
 import { TvLiveSlide, TvSlideBar, TvSponsorMoment, TvStatsSlide } from "@/components/tv/TvSlides";
 import { TvCheckInScreen, TvPauseScreen, TvRegistrationScreen } from "@/components/tv/TvScreens";
 import { TvNextUp } from "@/components/tv/TvNextUp";
+import { TvStandingsSlide } from "@/components/tv/TvStandings";
 import { useLowMomentTimer, useMinuteTick, useTvSound, useTvSponsors } from "@/components/tv/tvHooks";
 import { lastStageId } from "@/lib/bracketPodium";
 import { bracketChanges, bracketSnapshot, isLiveMatch } from "@/lib/tvLive";
 import { slotDraw } from "@/lib/bracketGraph";
 import { advancementsOf } from "@/lib/tvTravel";
 import { championKey, championOf } from "@/lib/tvChampion";
+import { TABLE_SLIDE, isTreeless, tableChampionOf, tvTableSections, tvWords, withTableSlide } from "@/lib/tvTable";
+import { nameHead } from "@/lib/standingsTable";
 import { COLLECT_AFTER, createMomentQueue, momentsFromChange } from "@/lib/tvMoments";
 import { advance, changesAfter, firstIndex, isDue, onlyMomentSlides, serializePlaylist } from "@/lib/tvPlaylist";
 import { callsOf, newCalls } from "@/lib/tvCalls";
@@ -52,6 +55,8 @@ const HIGH = new Set(["champion", "result", "live", "draw", "draw_ready", "draw_
 const MAX_EVENTS = 48;
 // Worauf der TV hört - dieselbe Liste für das Nachladen und das Zählen der Meldungen aus dem Strom.
 const LIVE_RESOURCES = ["tournaments", "matches", "stations", "tv"];
+const FINISHED = new Set(["completed", "results_published", "archived"]);
+const isTable = (match) => isTableFormat([match]);
 
 export default function BracketTVPage() {
   return (
@@ -268,7 +273,13 @@ function BracketTv() {
   const hasMatches = matches.length > 0;
   // Anmeldung vor Check-in, solange ein Platz frei ist (#1827) - gezählt wie auf dem Anmelde-Bildschirm.
   const screen = tvScreenFor(t, { now: minute * 60000 + 30000, seats: data?.seats, registrations });
-  const playlist = settings.playlist;
+  // Tabelle (#2121): Liga, Jeder gegen jeden, Schweizer System und Gruppen zeigen nach dem Spielplan ihre Tabelle - und
+  // heißen am TV nach dem, was sie sind, nicht „Turnierbaum“.
+  const standings = data?.standings;
+  const tableSections = useMemo(() => tvTableSections(standings), [standings]);
+  const hasTable = tableSections.length > 0;
+  const words = tvWords(isTreeless(t, matches, isTable));
+  const playlist = useMemo(() => withTableSlide(settings.playlist, hasTable), [settings.playlist, hasTable]);
   const treeInList = playlist.some((entry) => entry.slide === "tree");
   const showMoments = screen === "playlist" && treeInList && hasMatches;
 
@@ -286,7 +297,8 @@ function BracketTv() {
   const seenRef = useRef(new Set());
   const [resultTags, setResultTags] = useState(NO_TAGS);
   const championKeyRef = useRef(null);
-  const champion = useMemo(() => (data ? championOf(matches, data.stages || []) : null), [data, matches]);
+  // Ohne Finale (Liga, Jeder gegen jeden, Schweizer System) kommt der Sieger aus Platz 1 der Tabelle, sobald beendet.
+  const champion = useMemo(() => (data ? championOf(matches, data.stages || []) || tableChampionOf(data.standings, data.tournament) : null), [data, matches]);
 
   useEffect(() => {
     if (!data) return;
@@ -400,7 +412,6 @@ function BracketTv() {
   const plan = sponsorPlan(settings, sponsors);
   const lastStage = lastStageId(matches, data?.stages || []);
   const isLastStage = useCallback((match) => !lastStage || (match.stage_id || "__default") === lastStage, [lastStage]);
-  const isTable = useCallback((match) => isTableFormat([match]), []);
 
   // Wann Sponsor und Zahlen zuletzt kamen - der erste kommt nach dem ersten Takt, nicht gleich beim Einschalten.
   const lastLow = useRef({ sponsor: Date.now(), stats: Date.now() });
@@ -409,6 +420,7 @@ function BracketTv() {
   const onlyLow = onlyMomentSlides(playlist);
   const available = (slide) => {
     if (slide === "tree") return hasMatches;
+    if (slide === TABLE_SLIDE) return hasTable;
     if (slide === "live") return live.length > 0;
     if (slide === "calls") return calls.length > 0 || queued;
     if (slide === "sponsor") return plan.moment && (onlyLow || isDue(lastLow.current.sponsor, settings.sponsor_every));
@@ -457,7 +469,7 @@ function BracketTv() {
     );
   }
 
-  const publicUrl = t ? `${window.location.origin}/tournaments/${t.slug || t.id}/bracket` : window.location.origin;
+  const publicUrl = t ? `${window.location.origin}/tournaments/${t.slug || t.id}/${words.path}` : window.location.origin;
   // Vor-Ort-Zugang (#1592): solange er gilt, trägt der QR-Code ihn - auch Nicht-Mitglieder kommen so zur Anmeldung.
   const registerUrl = data?.onsite_path ? `${window.location.origin}${data.onsite_path}` : t ? `${window.location.origin}/tournaments/${t.slug || t.id}` : window.location.origin;
   const parked = Boolean(champion) && championState.parked && championState.key === championKey(champion);
@@ -473,7 +485,7 @@ function BracketTv() {
     : screen === "pause" ? (t.paused_until ? `Pause bis ${viennaTime(t.paused_until, { hour: "2-digit", minute: "2-digit" })}` : "Kurze Pause")
       : screen === "checkin" ? "Check-in"
         : screen === "registration" ? "Anmeldung offen"
-          : hasMatches ? (parked ? "Turnier entschieden" : { tree: "Turnierbaum", live: "Live-Spiele", calls: queued ? "Stationen" : "Aufrufe", sponsor: "Unser Partner", stats: "Zahlen zum Turnier" }[active] || "Turnierbaum") : null;
+          : hasMatches || hasTable ? (parked ? "Turnier entschieden" : { tree: words.tree, [TABLE_SLIDE]: tableSections.length > 1 ? "Tabellen" : "Tabelle", live: "Live-Spiele", calls: queued ? "Stationen" : "Aufrufe", sponsor: "Unser Partner", stats: "Zahlen zum Turnier" }[active] || words.tree) : null;
 
   return (
     <div className="tv-page" data-testid="bracket-tv" data-screen={screen} data-slide={screen === "playlist" ? active : undefined}>
@@ -481,14 +493,14 @@ function BracketTv() {
         <TvHeader
           className="tls-header-sweep"
           // Rot heißt „läuft gerade“ (#1116): der Punkt in der Kopfleiste nur, solange das Turnier läuft.
-          kicker={toneFor(t.status) === "live" ? "THE LION SQUAD · LIVE" : "THE LION SQUAD · TURNIERBAUM"}
+          kicker={toneFor(t.status) === "live" ? "THE LION SQUAD · LIVE" : `THE LION SQUAD · ${words.kicker}`}
           live={toneFor(t.status) === "live"}
           title={t.title}
           subtitle={subtitle}
           aside={(
             <>
               {presented ? <TvPresentedBy label={presented.label} sponsor={presented.sponsor} /> : null}
-              {parked && parkSpot === "header" && active === "tree" ? (
+              {parked && ((parkSpot === "header" && active === "tree") || active === TABLE_SLIDE) ? (
                 <TvChampionCard champion={champion} registrations={registrations} parked spot="header" testId="tv-champion-parked" />
               ) : null}
               <TvPill tone={toneFor(t.status)} live={toneFor(t.status) === "live"} testId={`status-${t.status}`}>{statusBadgeLabel(t.status)}</TvPill>
@@ -496,7 +508,7 @@ function BracketTv() {
           )}
         />
       ) : null}
-      <DisplayStatusBanner error={loadError} lastUpdated={lastUpdated} label="Turnierbaum" onRetry={load} />
+      <DisplayStatusBanner error={loadError} lastUpdated={lastUpdated} label={words.board} onRetry={load} />
 
       <main className="tv-main tv-main--slides" data-testid="tv-main" data-paused={paused ? "1" : "0"} data-run={playing.runId} data-moment={moment?.type || undefined}>
         {showBar && !lowMoment ? <TvSlideBar key={`${playing.runId}-${playing.tick}`} clock={playing.clock} totalMs={playing.totalMs} paused={paused} /> : null}
@@ -532,7 +544,12 @@ function BracketTv() {
                 </div>
               ) : null}
               {active === "tree" && !hasMatches ? (
-                <div className="tv-empty tv-t-head font-display">Turnierbaum wurde noch nicht generiert</div>
+                <div className="tv-empty tv-t-head font-display">{words.empty}</div>
+              ) : null}
+              {active === TABLE_SLIDE && hasTable ? (
+                <div className="tv-slide" key={`table-${playing.runId}`}>
+                  <TvStandingsSlide standings={standings} nameLabel={nameHead(t)} final={FINISHED.has(String(t?.status || ""))} />
+                </div>
               ) : null}
               {active === "live" ? (
                 <div className="tv-slide" key={`live-${playing.runId}`}>
@@ -560,7 +577,7 @@ function BracketTv() {
         </div>
       </main>
 
-      <TvFooter qrValue={screen === "registration" ? registerUrl : publicUrl} kicker={screen === "registration" ? "Jetzt anmelden" : "Jetzt mitfiebern"} text={screen === "registration" ? "QR scannen und anmelden" : "QR scannen und Turnierbaum öffnen"}>
+      <TvFooter qrValue={screen === "registration" ? registerUrl : publicUrl} kicker={screen === "registration" ? "Jetzt anmelden" : "Jetzt mitfiebern"} text={screen === "registration" ? "QR scannen und anmelden" : words.qr}>
         {screen === "playlist" && hasMatches && !parked ? <TvNextUp matches={matches} stations={stations} nameOf={nameOf} forecast={forecast} queue={liveQueue} /> : null}
       </TvFooter>
       {needsClick ? <div className="tv-hint tv-t-meta" role="status" data-testid="tv-sound-hint">Für Ton einmal klicken</div> : null}
