@@ -1376,6 +1376,18 @@ gelten. Trifft das Update nichts (eine zweite Prüfung oder ein anderer Schritt 
 `release`, sondern `hold` mit „Der Stand der Bestellung hat sich während der Prüfung geändert“ - von zwei gleichzeitigen
 Prüfungen löst höchstens eine aus.
 
+**Vertrag für das Auslösen (#1718):** `release` heißt nur „darf ausgelöst werden“ - der Stand bleibt `placed` bzw.
+`paid`. Eine zweite Prüfung **nach** einem `release` liefert darum wieder `release`. Das Auslösen selbst muss deshalb
+**atomar** von `placed`/`paid` **mit dem erwarteten `price_check_rev`** (dem Zähler nach der eigenen Prüfung) in einen
+neuen Stand wechseln (etwa „wird ausgelöst“), bevor es Printful bestätigt - als ein `find_one_and_update` mit Stand und
+Zähler im Filter. Trifft das nichts, wird nicht bestätigt (jemand anderes war schneller oder hat neu geprüft).
+
+**Stickerei mit Gamertag:** Die Prüfung vor dem Auslösen schätzt mit den eingefrorenen Dateien, also mit der eigenen
+Datei samt Gamertag; Kasse und Bestellung schätzen mit den Grunddateien. Rechnet Printful für jeden Namen eine eigene
+Digitalisierung (Zusatzkosten), fällt die Prüfung teurer aus als eingefroren. Vor dem ersten Stickprodukt mit Gamertag
+darum per Testentwurf (#2062) prüfen, ob die Schätzung Zusatzkosten nennt - und die Toleranz bzw. den Preis danach
+richten.
+
 Jede Prüfung steht an der Bestellung (`price_check`: Zeitpunkt, Entscheidung, eingefroren, geschätzt, Differenz,
 Toleranz, Teile) und als Ereignis (`order.price_checked`, `order.price_changed`, `order.price_check_retry`,
 `order.price_check_blocked`, ohne Anschrift). Die eingefrorenen Beträge ändern sich nie. Wie die Leitung eine
