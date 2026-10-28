@@ -50,9 +50,30 @@ STAFFEL_LOCKED_FIELDS: dict[str, tuple[str, str]] = {
     "discord_skip": ("Ohne Discord", FIXED_IN_LEAGUE),
     "discord_link": ("Discord-Verweis", NOT_IN_LEAGUE),
     "season_weight": ("Jahreswertung", NOT_IN_LEAGUE),
+    # Im Staffel-Formular ausgeblendet (Review #2109) - die Spieltage lost der Start, Podest und Preise gibt es nicht.
+    "seeding_mode": ("Seeding", NOT_IN_LEAGUE),
+    "advancement_mode": ("Weiterkommen", NOT_IN_LEAGUE),
+    "randomize_advancement_rounds": ("Weiterkommen", NOT_IN_LEAGUE),
+    "draw_show_minutes": ("Show-Auslosung", NOT_IN_LEAGUE),
+    "bronze_match": ("Spiel um Platz 3", NOT_IN_LEAGUE),
+    "substitutes_allowed": ("Ersatzspieler", NOT_IN_LEAGUE),
+    "prize_pool": ("Preise", NOT_IN_LEAGUE),
+    "prize_places": ("Preise", NOT_IN_LEAGUE),
+    "award_images": ("Gewinnerbanner", NOT_IN_LEAGUE),
+    "no_show_minutes_on_site": ("Nicht erschienen vor Ort", NOT_IN_LEAGUE),
+    "no_show_minutes_online": ("Nicht erschienen online", NOT_IN_LEAGUE),
+    "result_confirm_minutes_online": ("Ergebnis gilt online nach", NOT_IN_LEAGUE),
+    "is_invite_only": ("Nur Einladung", NOT_IN_LEAGUE),
+    "requires_event_registration": ("Anmeldung nur mit Event-Anmeldung", NOT_IN_LEAGUE),
+    "site_banner_enabled": ("Turnier-Hinweisbanner", NOT_IN_LEAGUE),
+    "auto_start_enabled": ("Automatisch live/beendet", NOT_IN_LEAGUE),
 }
 DATE_FIELDS = frozenset({"start_date", "end_date", "registration_open_from", "registration_open_until",
                          "check_in_from", "check_in_until"})
+# Schalter, die fehlend „aus“ heißen: ``False`` und fehlend sind derselbe Wert.
+OFF_BY_DEFAULT = frozenset({"bronze_match", "substitutes_allowed", "is_invite_only", "requires_event_registration",
+                            "site_banner_enabled", "auto_start_enabled", "randomize_advancement_rounds"})
+EMPTY_VALUES = (None, "", {}, [])
 
 # Status einer Staffel (S1): keine Anmeldung, kein Check-in - „Liga starten“ macht den Spielplan fest.
 STAFFEL_STATUSES = frozenset({"draft", "live", "paused", "completed", "results_published", "archived", "cancelled"})
@@ -65,6 +86,8 @@ STATUS_ONLY_THROUGH_FLOW = ("Den Status änderst du oben in der Turnierverwaltun
 
 STAFFEL_DELETE_REFUSED = ("Diese Staffel hat schon begonnen oder Spiele – Löschen geht nur vor dem Start. Bitte auf "
                           "„Abgesagt“ oder „Archiviert“ setzen.")
+STAFFEL_REBUILD_REFUSED = ("Der Spielplan dieser Staffel steht – zurücksetzen oder neu aufbauen geht nur vor dem "
+                           "Start. Einzelne Spiele korrigierst du im Reiter „Spiele“.")
 STAFFEL_REGISTRATION_REFUSED = ("In einer Liga-Staffel spielen nur Co-Teams – bitte über „Co-Team zuteilen“ "
                                 "eintragen.")
 SQUAD_UNREGISTER_REFUSED = ("Ein zugeteiltes Co-Team nimmt nur die Turnierleitung wieder aus der Staffel – bitte "
@@ -91,7 +114,9 @@ def same_value(key: str, new, old) -> bool:
     """Ändert ``new`` den gespeicherten Wert? Zeiten zählen als Zeitpunkt, leer und fehlend sind gleich."""
     if key in DATE_FIELDS:
         return _instant(new) == _instant(old)
-    if new in (None, "") and old in (None, ""):
+    if key in OFF_BY_DEFAULT and new in (None, False) and old in (None, False):
+        return True
+    if new in EMPTY_VALUES and old in EMPTY_VALUES:
         return True
     return new == old
 
@@ -120,17 +145,29 @@ def staffel_status_problem(tournament: dict, status: str | None) -> str | None:
     return STAFFEL_STATUS_REFUSED
 
 
+async def _staffel_started(db, tournament: dict) -> bool:
+    """Hat die Staffel begonnen - Status nach dem Start oder schon ein fester (nicht Vorschau-)Spielplan?"""
+    if tournament.get("status") not in PRE_START_STATUSES:
+        return True
+    return bool(await db.matches_v2.count_documents({"tournament_id": tournament["id"], "is_preview": {"$ne": True}}))
+
+
 async def staffel_delete_problem(db, tournament: dict) -> str | None:
     """Löschen einer Staffel nur vor dem Start und ohne festen Spielplan (S26, L-D3)."""
     if not is_league_staffel(tournament):
         return None
-    if tournament.get("status") not in PRE_START_STATUSES:
-        return STAFFEL_DELETE_REFUSED
-    fixed = await db.matches_v2.count_documents({"tournament_id": tournament["id"], "is_preview": {"$ne": True}})
-    return STAFFEL_DELETE_REFUSED if fixed else None
+    return STAFFEL_DELETE_REFUSED if await _staffel_started(db, tournament) else None
 
 
-async def staffel_links(db, tournament: dict) -> dict | None:
+async def staffel_rebuild_problem(db, tournament: dict) -> str | None:
+    """Spielplan zurücksetzen oder neu aufbauen (auch mit ``force``) nur vor dem Start - sonst gingen Spiele samt
+    Ergebnissen verloren, und eine zurückgesetzte Staffel ließe sich danach sogar löschen (Review #2109)."""
+    if not is_league_staffel(tournament):
+        return None
+    return STAFFEL_REBUILD_REFUSED if await _staffel_started(db, tournament) else None
+
+
+async def staffel_links(db, tournament: dict, *, with_admin_path: bool = True) -> dict | None:
     """Für den Kopf der Staffel-Verwaltung (S24, L-C1): „Liga 1 · Staffel A – Season öffnen · Ligaseite“."""
     if not is_league_staffel(tournament):
         return None
@@ -145,11 +182,15 @@ async def staffel_links(db, tournament: dict) -> dict | None:
         nickname = str(division.get("nickname") or "").strip()
         division_label = f"Liga {division['level']}" + (f" · {nickname}" if nickname else "")
     public_path = f"/liga/{league['slug']}/{season['slug']}" if league.get("slug") and season.get("slug") else None
-    return {
+    links = {
         "league_name": league.get("name"),
         "season_name": season.get("name"),
         "division_label": division_label,
         "staffel": context.get("staffel"),
-        "season_admin_path": f"/admin/leagues/seasons/{context['season_id']}" if context.get("season_id") else None,
         "public_path": public_path,
     }
+    # Der Weg in die Verwaltung der Season nur für die, die verwalten (Review #2109); Namen und Ligaseite sind
+    # öffentlich.
+    if with_admin_path and context.get("season_id"):
+        links["season_admin_path"] = f"/admin/leagues/seasons/{context['season_id']}"
+    return links

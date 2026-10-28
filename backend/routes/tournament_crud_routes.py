@@ -247,7 +247,9 @@ async def get_tournament(slug_or_id: str, include_draft: bool = False, access: s
     t.update(await tournament_rights(user, t["id"]))
     if is_league_staffel(t):
         # Kopf der Staffel-Verwaltung (#2109): „Liga 1 · Staffel A – Season öffnen · Ligaseite“.
-        t["league_links"] = await staffel_guard.staffel_links(db, t)
+        # Der Admin-Pfad der Season nur für die Verwaltung (Turnierleitung oder Strukturrechte).
+        t["league_links"] = await staffel_guard.staffel_links(
+            db, t, with_admin_path=is_admin or bool(t.get("can_manage_structure")))
     if not t.get("can_manage_structure"):
         # Der Umbau-Vorschlag für die Läufe (#1550) und der für Austritt/Disqualifikation (#1553) sieht nur, wer ihn
         # auch bestätigen darf (Strukturrollen).

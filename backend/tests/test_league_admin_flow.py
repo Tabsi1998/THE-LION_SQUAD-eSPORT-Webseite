@@ -483,6 +483,72 @@ async def test_a_started_staffel_cannot_be_deleted(flow):
 
 
 @pytest.mark.asyncio
+async def test_a_started_staffel_keeps_its_plan_against_reset_and_rebuild(flow):
+    """Review #2109: „Zurücksetzen“ mit force löschte alle Spiele, setzte auf Entwurf - und danach ging Löschen."""
+    admin, _game, _league, _season, division, _maps = await setup_league(flow)
+    staffel = await _staffel(flow, division)
+    # Vor dem Start bleibt beides erlaubt (Vorschau neu mischen).
+    rebuilt = await flow.post(f"/api/tournaments/{staffel['id']}/bracket/from-format?preview=true&force=true")
+    assert rebuilt.status_code == 200, rebuilt.text
+    reset = await flow.post(f"/api/tournaments/{staffel['id']}/reset-bracket")
+    assert reset.status_code == 200, reset.text
+
+    for index in range(1, 5):
+        await flow.register(staffel, await flow.add_user(name=f"Probe {index}"))
+    flow.act_as(admin)
+    started = await flow.post(f"/api/tournaments/{staffel['id']}/status", json={"status": "live"})
+    assert started.status_code == 200, started.text
+    fixed = {"tournament_id": staffel["id"], "is_preview": {"$ne": True}}
+    fixed_before = await flow.db.matches_v2.count_documents(fixed)
+    assert fixed_before > 0
+
+    for url in (f"/api/tournaments/{staffel['id']}/reset-bracket?force=true",
+                f"/api/tournaments/{staffel['id']}/bracket/from-format?preview=true&force=true"):
+        refused = await flow.post(url)
+        assert refused.status_code == 409, url
+        assert "nur vor dem Start" in refused.json()["detail"], url
+    stored = await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0})
+    assert stored["status"] == "live"
+    assert await flow.db.matches_v2.count_documents(fixed) == fixed_before
+    deleted = await flow.delete(f"/api/tournaments/{staffel['id']}")
+    assert deleted.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_hidden_league_fields_are_refused_unchanged_values_pass(flow):
+    _admin, _game, _league, _season, division, _maps = await setup_league(flow)
+    staffel = await _staffel(flow, division)
+    url = f"/api/tournaments/{staffel['id']}"
+    for body in ({"seeding_mode": "manual"}, {"advancement_mode": "draw_show"}, {"draw_show_minutes": 7},
+                 {"bronze_match": True}, {"substitutes_allowed": True}, {"prize_pool": "Pokal"},
+                 {"prize_places": [{"place": 1, "value": "Pokal"}]}, {"award_images": {"1": "/bild.png"}},
+                 {"no_show_minutes_online": 20}, {"result_confirm_minutes_online": 30}, {"is_invite_only": True},
+                 {"requires_event_registration": True}, {"site_banner_enabled": True}, {"auto_start_enabled": True}):
+        refused = await flow.patch(url, json=body)
+        assert refused.status_code == 400, body
+        assert refused.json()["detail"].endswith("Gibt es in einer Liga-Staffel nicht."), body
+    unchanged = await flow.patch(url, json={"bronze_match": False, "substitutes_allowed": False, "award_images": {},
+                                            "prize_places": None, "draw_show_minutes": None,
+                                            "seeding_mode": staffel.get("seeding_mode"),
+                                            "advancement_mode": staffel.get("advancement_mode"),
+                                            "description": "Probe"})
+    assert unchanged.status_code == 200, unchanged.text
+
+
+@pytest.mark.asyncio
+async def test_the_season_admin_path_goes_only_to_the_management(flow):
+    _admin, _game, _league, _season, division, _maps = await setup_league(flow, season={"visibility": "public"})
+    staffel = await _staffel(flow, division)
+    await flow.db.tournaments.update_one({"id": staffel["id"]}, {"$set": {"status": "live"}})  # sichtbar, kein Entwurf
+    flow.act_as(await flow.add_user(name="Mitglied"))
+    view = await flow.get(f"/api/tournaments/{staffel['id']}")
+    assert view.status_code == 200, view.text
+    links = view.json()["league_links"]
+    assert "season_admin_path" not in links
+    assert links["division_label"] == "Liga 1" and links["public_path"].startswith("/liga/")
+
+
+@pytest.mark.asyncio
 async def test_a_staffel_takes_participants_only_as_co_teams(flow):
     admin, _game, _league, _season, division, _maps = await setup_league(flow)
     staffel = await _staffel(flow, division)
