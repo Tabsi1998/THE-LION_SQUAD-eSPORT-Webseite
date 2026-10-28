@@ -262,7 +262,6 @@ async def candidates(db, tournament: dict) -> dict:
     # Spiel-ID je Spieler (#2108): Stand in der Season - fehlt sie, warnt der Dialog; zuteilen geht trotzdem.
     member_ids = {uid for squad in squads if squad.get("team_id") in teams for uid in squad.get("member_ids") or [] if uid}
     roster_ctx = await league_roster.context_for_tournament(db, tournament, member_ids)
-    id_states = league_roster.statuses(roster_ctx, member_ids)
     out: dict[str, dict] = {}
     for squad in squads:
         team = teams.get(squad.get("team_id"))
@@ -299,7 +298,11 @@ async def candidates(db, tournament: dict) -> dict:
                 "captain": _public_user(people.get(squad.get("captain_id") or "")),
                 "vice_captain": _public_user(people.get(squad.get("vice_captain_id") or "")),
                 "problems": [text for _code, text in problems],
-                "players": _id_players(squad, id_states) if roster_ctx and roster_ctx.fields else [],
+                "players": (
+                    _id_players(squad, league_roster.statuses(roster_ctx, squad.get("member_ids"), squad.get("id")))
+                    if roster_ctx and roster_ctx.fields
+                    else []
+                ),
             }
         )
     rows = sorted(out.values(), key=lambda row: str(row.get("name") or "").lower())

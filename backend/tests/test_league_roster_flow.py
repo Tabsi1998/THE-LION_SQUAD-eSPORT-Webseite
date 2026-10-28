@@ -203,7 +203,7 @@ async def test_new_players_after_the_deadline_wait_for_approval(flow):
 
     assert changed.status_code == 200, changed.text
     ida = await roster_entry(flow, w, "Ida")
-    assert ida["late"] is True and ida["added_via"] == "squad_join" and ida["locked_at"] is None
+    assert ida["late_squad_ids"] == [squad["id"]] and ida["added_via"] == "squad_join" and ida["locked_at"] is None
     flow.act_as(w["users"]["Kapitaen"])
     roster = {row["name"]: row for row in (await page(flow, w))["league"]["roster"]}
     assert "Stichtag" in roster["Ida"]["lineup_blocked"]
@@ -231,7 +231,8 @@ async def test_without_a_deadline_new_players_are_recorded_right_away(flow):
 
     assert changed.status_code == 200, changed.text
     ida = await roster_entry(flow, w, "Ida")
-    assert ida["late"] is False and ida["locked_via"] == "squad_join" and ida["id_text"].startswith("TestloeweIda#")
+    assert ida["late_squad_ids"] == [] and ida["squad_ids"] == [squad["id"]]
+    assert ida["locked_via"] == "squad_join" and ida["id_text"].startswith("TestloeweIda#")
 
 
 @pytest.mark.asyncio

@@ -9,8 +9,11 @@ Hauptspiels gilt für seine Versionen - genau wie im Profil und bei der Turniera
 - **Zuteilen** eines Co-Teams: ein Eintrag für jedes Mitglied. Mit vollständiger ID wird sie festgehalten, ohne ID
   steht der Eintrag leer - der Spieler ist nicht aufstellbar, bis die ID im Profil steht.
 - **Aufnahme** in ein zugeteiltes Co-Team während der Season: ebenso; nach dem Stichtag der Season
-  (``league_seasons.roster_deadline``, Vorgabe: keiner) nur mit Freigabe der Liga-Leitung.
-- **Erstes Aufstellen**: wer die ID erst später eingetragen hat, bekommt sie spätestens hier festgehalten.
+  (``league_seasons.roster_deadline``, Vorgabe: keiner) wartet, wer neu in **dieses** Co-Team kommt, auf die
+  Freigabe der Liga-Leitung (``late_squad_ids``) - der Stichtag gilt je Co-Team, der Wiedereintritt ins selbe nicht.
+- **Erstes Aufstellen**: wer die ID erst später eingetragen hat, bekommt sie nach dem Speichern der Aufstellung
+  festgehalten - nur, solange noch keine festgehalten ist.
+- **Nachzug** (Migration 17, ``backfill``): Co-Teams, die vor dem Kader zugeteilt wurden.
 
 Danach gilt die festgehaltene ID die ganze Season, auch wenn das Profil sich ändert. Eine neue ID gilt erst nach der
 **Freigabe** durch die Liga-Leitung (Grund, Protokoll in ``approvals`` und ``audit_logs``). Spiele ohne Pflicht-IDs
@@ -152,13 +155,14 @@ def person_name(person: dict | None) -> str:
     return (person or {}).get("display_name") or (person or {}).get("username") or "Spieler"
 
 
-def status(ctx: RosterContext | None, user_id: str) -> dict:
-    """Der Stand einer Person in der Season.
+def status(ctx: RosterContext | None, user_id: str, squad_id: str | None = None) -> dict:
+    """Der Stand einer Person in der Season - mit ``squad_id`` für dieses Co-Team (der Stichtag gilt je Co-Team).
 
     ``state``: ``free`` (Spiel ohne Pflicht-ID), ``locked`` (ID festgehalten), ``pending`` (ID im Profil, wird beim
-    ersten Aufstellen festgehalten), ``missing`` (ID fehlt im Profil), ``late`` (nach dem Stichtag dazugekommen,
-    wartet auf Freigabe). ``ok``: aufstellbar. ``text``: die ID, die in der Liga gilt bzw. gelten wird.
-    ``changed``: das Profil nennt inzwischen eine andere ID als die festgehaltene."""
+    ersten Aufstellen festgehalten), ``missing`` (ID fehlt im Profil), ``late`` (nach dem Stichtag in dieses Co-Team
+    gekommen, wartet auf Freigabe; ohne ``squad_id``: in irgendeines). ``ok``: aufstellbar. ``text``: die ID, die in
+    der Liga gilt bzw. gelten wird - auch bei ``late`` bleibt die festgehaltene dieselbe. ``changed``: das Profil nennt
+    inzwischen eine andere ID als die festgehaltene."""
     person = (ctx.people.get(user_id) if ctx else None) or {}
     base = {"id": user_id, "name": person_name(person), "state": FREE, "ok": True, "text": None,
             "profile_text": None, "changed": False, "reason": None, "locked_at": None}
@@ -169,27 +173,30 @@ def status(ctx: RosterContext | None, user_id: str) -> dict:
     profile = picked(ctx.fields, _profile_player_ids(person, ctx.game))
     base["profile_text"] = id_text(ctx.fields, profile) if complete(profile) else None
     entry = ctx.entries.get(user_id)
+    late_squads = set((entry or {}).get("late_squad_ids") or [])
+    late = (squad_id in late_squads) if squad_id else bool(late_squads)
     locked = picked(ctx.fields, (entry or {}).get("player_ids"))
     if entry and complete(locked):
-        return {**base, "state": LOCKED, "text": id_text(ctx.fields, locked), "changed": locked != profile,
-                "locked_at": entry.get("locked_at")}
+        row = {**base, "state": LOCKED, "text": id_text(ctx.fields, locked), "changed": locked != profile,
+               "locked_at": entry.get("locked_at")}
+        return {**row, "state": LATE, "ok": False, "reason": LATE_REASON} if late else row
     # Ohne Eintrag (etwa zugeteilt, bevor es den Kader gab) zählt wie beim Zuteilen das Profil - „nach dem Stichtag“
     # weiß nur ein Eintrag aus der Aufnahme ins Co-Team.
-    if entry and entry.get("late"):
+    if late:
         return {**base, "state": LATE, "ok": False, "reason": LATE_REASON}
     if complete(profile):
         return {**base, "state": PENDING, "text": base["profile_text"]}
     return {**base, "state": MISSING, "ok": False, "reason": f"{labels(ctx.fields)} fehlt im Profil."}
 
 
-def statuses(ctx: RosterContext | None, user_ids) -> dict[str, dict]:
-    return {user_id: status(ctx, user_id) for user_id in user_ids or [] if user_id}
+def statuses(ctx: RosterContext | None, user_ids, squad_id: str | None = None) -> dict[str, dict]:
+    return {user_id: status(ctx, user_id, squad_id) for user_id in user_ids or [] if user_id}
 
 
 # ---------------------------------------------------------------- Festhalten
 
 
-def _new_entry(ctx: RosterContext, user_id: str, *, via: str, actor_id: str | None, now: str, late: bool) -> dict:
+def _new_entry(ctx: RosterContext, user_id: str, *, via: str, actor_id: str | None, now: str) -> dict:
     return {
         "id": new_id(),
         "season_id": ctx.season_id,
@@ -200,73 +207,103 @@ def _new_entry(ctx: RosterContext, user_id: str, *, via: str, actor_id: str | No
         "added_via": via,
         "added_by": actor_id,
         "created_at": now,
-        "late": late,
     }
+
+
+def _lock_fields(ctx: RosterContext, values: dict[str, str], *, via: str, actor_id: str | None, now: str) -> dict:
+    return {"player_ids": values, "id_text": id_text(ctx.fields, values), "locked_at": now, "locked_via": via,
+            "locked_by": actor_id, "updated_at": now}
 
 
 async def _lock(db, ctx: RosterContext, user_id: str, values: dict[str, str], *, via: str, actor_id: str | None,
-                approval: dict | None = None) -> None:
+                approval: dict | None = None) -> bool:
+    """ID festhalten. Ohne Freigabe nur, solange noch keine festgehalten ist (Filter ``locked_at: None``) - zwei
+    gleichzeitige Meldungen überschreiben sich so nicht. Die Freigabe ersetzt die ID und hebt jedes „spät“ auf.
+    Liefert, ob geschrieben wurde."""
     now = now_utc().isoformat()
-    entry = _new_entry(ctx, user_id, via=via, actor_id=actor_id, now=now, late=False)
-    entry.pop("late")
-    update = {
-        "$set": {"player_ids": values, "id_text": id_text(ctx.fields, values), "locked_at": now, "locked_via": via,
-                 "locked_by": actor_id, "late": False, "updated_at": now},
-        "$setOnInsert": entry,
-    }
+    key = {"season_id": ctx.season_id, "user_id": user_id}
+    fields = _lock_fields(ctx, values, via=via, actor_id=actor_id, now=now)
     if approval:
-        update["$push"] = {"approvals": approval}
+        update = {"$set": {**fields, "late_squad_ids": []}, "$push": {"approvals": approval},
+                  "$setOnInsert": {**_new_entry(ctx, user_id, via=via, actor_id=actor_id, now=now), "squad_ids": []}}
+        try:
+            await db.league_rosters.update_one(key, update, upsert=True)
+        except DuplicateKeyError:
+            update.pop("$setOnInsert")
+            await db.league_rosters.update_one(key, update)
+        return True
+    if await db.league_rosters.find_one(key, {"_id": 0, "id": 1}):
+        stored = await db.league_rosters.update_one({**key, "locked_at": None}, {"$set": fields})
+        return bool(stored.modified_count)
+    doc = {**_new_entry(ctx, user_id, via=via, actor_id=actor_id, now=now), **fields, "squad_ids": [],
+           "late_squad_ids": []}
     try:
-        await db.league_rosters.update_one({"season_id": ctx.season_id, "user_id": user_id}, update, upsert=True)
+        await db.league_rosters.insert_one(doc)
     except DuplicateKeyError:
-        update.pop("$setOnInsert")
-        await db.league_rosters.update_one({"season_id": ctx.season_id, "user_id": user_id}, update)
-
-
-async def _add_empty(db, ctx: RosterContext, user_id: str, *, via: str, actor_id: str | None, late: bool) -> None:
-    now = now_utc().isoformat()
-    entry = {**_new_entry(ctx, user_id, via=via, actor_id=actor_id, now=now, late=late), "player_ids": {},
-             "id_text": None, "locked_at": None, "updated_at": now}
-    try:
-        await db.league_rosters.update_one({"season_id": ctx.season_id, "user_id": user_id},
-                                           {"$setOnInsert": entry}, upsert=True)
-    except DuplicateKeyError:
-        pass
+        stored = await db.league_rosters.update_one({**key, "locked_at": None}, {"$set": fields})
+        return bool(stored.modified_count)
+    return True
 
 
 async def record_members(db, ctx: RosterContext | None, user_ids, *, via: str, actor_id: str | None,
-                         late: bool = False) -> dict[str, dict]:
-    """Mitglieder eines Co-Teams in den Kader der Season aufnehmen (Zuteilen, Aufnahme ins Co-Team). Wer schon einen
-    Eintrag hat, behält ihn; ein leerer bekommt die ID, sobald sie im Profil steht (nicht bei ``late``). Liefert den
-    Stand danach je Person."""
+                         squad_id: str | None = None, late: bool = False) -> dict[str, dict]:
+    """Mitglieder eines Co-Teams in den Kader der Season aufnehmen (Zuteilen, Aufnahme ins Co-Team, Nachzug). Der
+    Eintrag merkt sich die Co-Teams (``squad_ids``); kommt jemand mit ``late`` in ein Co-Team, in dem er noch nicht
+    stand, wartet er dort auf Freigabe (``late_squad_ids``) - der Wiedereintritt ins selbe Co-Team ist nicht „spät“,
+    das Zuteilen durch die Leitung hebt es für dieses Co-Team auf. Fehlt die festgehaltene ID und steht sie im Profil,
+    wird sie festgehalten (nicht, solange die Person hier wartet). Liefert den Stand danach je Person."""
     if not ctx:
         return {}
     if not ctx.fields:
-        return statuses(ctx, user_ids)
+        return statuses(ctx, user_ids, squad_id)
     from routes.tournament_common import _profile_player_ids
 
     wanted = sorted({uid for uid in user_ids or [] if uid})
+    now = now_utc().isoformat()
     for user_id in wanted:
         entry = ctx.entries.get(user_id)
-        if complete(picked(ctx.fields, (entry or {}).get("player_ids"))):
-            continue
         values = picked(ctx.fields, _profile_player_ids(ctx.people.get(user_id), ctx.game))
-        if (entry or {}).get("late") or (not entry and late) or not complete(values):
-            if not entry:
-                await _add_empty(db, ctx, user_id, via=via, actor_id=actor_id, late=late)
+        if not entry:
+            doc = {**_new_entry(ctx, user_id, via=via, actor_id=actor_id, now=now),
+                   "squad_ids": [squad_id] if squad_id else [],
+                   "late_squad_ids": [squad_id] if squad_id and late else [],
+                   "player_ids": {}, "id_text": None, "locked_at": None, "updated_at": now}
+            if not (squad_id and late) and complete(values):
+                doc.update(_lock_fields(ctx, values, via=via, actor_id=actor_id, now=now))
+            try:
+                await db.league_rosters.insert_one(doc)
+            except DuplicateKeyError:
+                pass
             continue
-        await _lock(db, ctx, user_id, values, via=via, actor_id=actor_id)
+        known = set(entry.get("squad_ids") or [])
+        waiting = set(entry.get("late_squad_ids") or [])
+        change: dict = {}
+        if squad_id and squad_id not in known:
+            change.setdefault("$addToSet", {})["squad_ids"] = squad_id
+            if late:
+                change["$addToSet"]["late_squad_ids"] = squad_id
+                waiting.add(squad_id)
+        elif squad_id and via == "assign" and squad_id in waiting:
+            change["$pull"] = {"late_squad_ids": squad_id}
+            waiting.discard(squad_id)
+        if change:
+            change["$set"] = {"updated_at": now}
+            await db.league_rosters.update_one({"season_id": ctx.season_id, "user_id": user_id}, change)
+        if not complete(picked(ctx.fields, entry.get("player_ids"))) and complete(values) and not (
+                squad_id in waiting if squad_id else waiting):
+            await _lock(db, ctx, user_id, values, via=via, actor_id=actor_id)
     ctx.entries.update({
         row["user_id"]: row
         for row in await db.league_rosters.find(
             {"season_id": ctx.season_id, "user_id": {"$in": wanted}}, {"_id": 0}
         ).to_list(len(wanted) + 10)
     })
-    return statuses(ctx, wanted)
+    return statuses(ctx, wanted, squad_id)
 
 
 async def lock_lineup(db, ctx: RosterContext | None, user_ids, actor_id: str | None) -> None:
-    """Beim Aufstellen: wer die ID erst nach dem Zuteilen eingetragen hat, bekommt sie jetzt festgehalten."""
+    """Nach einer gespeicherten Aufstellung: wer die ID erst nach dem Zuteilen eingetragen hat, bekommt sie jetzt
+    festgehalten - nur, wenn noch keine festgehalten ist."""
     if not ctx or not ctx.fields:
         return
     from routes.tournament_common import _profile_player_ids
@@ -275,8 +312,9 @@ async def lock_lineup(db, ctx: RosterContext | None, user_ids, actor_id: str | N
         if status(ctx, user_id)["state"] != PENDING:
             continue
         values = picked(ctx.fields, _profile_player_ids(ctx.people.get(user_id), ctx.game))
-        await _lock(db, ctx, user_id, values, via="lineup", actor_id=actor_id)
-        ctx.entries[user_id] = {**(ctx.entries.get(user_id) or {}), "player_ids": values, "locked_at": now_utc().isoformat()}
+        if await _lock(db, ctx, user_id, values, via="lineup", actor_id=actor_id):
+            ctx.entries[user_id] = {**(ctx.entries.get(user_id) or {}), "player_ids": values,
+                                    "locked_at": now_utc().isoformat()}
 
 
 async def after_assign(db, tournament: dict, registration: dict, squad: dict, actor_id: str | None) -> dict[str, dict]:
@@ -284,7 +322,7 @@ async def after_assign(db, tournament: dict, registration: dict, squad: dict, ac
     Verantwortlichen des Co-Teams bekommen einen Hinweis."""
     members = [uid for uid in squad.get("member_ids") or [] if uid]
     ctx = await context_for_tournament(db, tournament, members)
-    found = await record_members(db, ctx, members, via="assign", actor_id=actor_id)
+    found = await record_members(db, ctx, members, via="assign", actor_id=actor_id, squad_id=squad.get("id"))
     missing = [row for row in found.values() if not row["ok"]]
     if missing and ctx:
         await _tell_missing(db, ctx, tournament, registration, missing)
@@ -323,8 +361,9 @@ async def _tell_missing(db, ctx: RosterContext, tournament: dict, registration: 
 
 
 async def on_squad_members_added(db, squad: dict, user_ids, actor_id: str | None) -> None:
-    """Neue Mitglieder eines Co-Teams, das in einer laufenden Staffel spielt: in den Kader der Season - nach dem
-    Stichtag der Season nur als „wartet auf Freigabe“."""
+    """Neue Mitglieder eines Co-Teams, das in einer laufenden Staffel spielt: in den Kader der Season. Nach dem
+    Stichtag wartet, wer neu in **dieses** Co-Team kommt, auf Freigabe - auch mit schon festgehaltener ID aus einem
+    anderen Co-Team (sie bleibt dieselbe); der Wiedereintritt ins selbe Co-Team ist nicht „spät“."""
     added = [uid for uid in user_ids or [] if uid]
     if not added or not squad.get("id"):
         return
@@ -346,7 +385,36 @@ async def on_squad_members_added(db, squad: dict, user_ids, actor_id: str | None
         ctx = await context_for_tournament(db, tournament, added)
         if not ctx or (ctx.season or {}).get("status") in CLOSED_SEASON_STATUSES:
             continue
-        await record_members(db, ctx, added, via="squad_join", actor_id=actor_id, late=ctx.deadline_passed())
+        await record_members(db, ctx, added, via="squad_join", actor_id=actor_id, squad_id=squad["id"],
+                             late=ctx.deadline_passed())
+
+
+async def backfill(db) -> int:
+    """Nachzug (Migration 17): Co-Teams, die zugeteilt wurden, bevor es den Liga-Kader gab, bekommen ihre Einträge -
+    mit Co-Team und, wo die ID im Profil steht, festgehalten. Idempotent; wer schon einen Eintrag hat, behält ihn
+    (das Co-Team kommt dazu). So gilt ein Aus- und Wiedereintritt nach dem Stichtag nicht als „spät“."""
+    count = 0
+    tournaments = await db.tournaments.find(
+        {"league_context": {"$type": "object"}, "status": {"$nin": sorted(FINISHED_TOURNAMENT_STATUSES)}},
+        {"_id": 0},
+    ).to_list(1000)
+    for tournament in tournaments:
+        season_id = (tournament.get("league_context") or {}).get("season_id")
+        if not season_id:
+            continue
+        regs = await db.tournament_registrations.find(
+            {"tournament_id": tournament["id"], "squad_id": {"$exists": True},
+             "status": {"$in": list(ACTIVE_REGISTRATION_STATUSES)}},
+            {"_id": 0, "squad_id": 1},
+        ).to_list(500)
+        for reg in regs:
+            squad = await db.team_squads.find_one({"id": reg["squad_id"]}, {"_id": 0, "id": 1, "member_ids": 1})
+            members = [uid for uid in (squad or {}).get("member_ids") or [] if uid]
+            ctx = await context_for_tournament(db, tournament, members)
+            if not ctx or not ctx.fields or (ctx.season or {}).get("status") in CLOSED_SEASON_STATUSES:
+                continue
+            count += len(await record_members(db, ctx, members, via="backfill", actor_id=None, squad_id=squad["id"]))
+    return count
 
 
 # ---------------------------------------------------------------- Liga-Leitung
@@ -373,7 +441,8 @@ async def approve(db, season: dict, user_id: str, reason: str | None, actor: dic
     if before["state"] == LOCKED and not before["changed"]:
         raise LeagueRosterError("Diese ID gilt in der Season schon.", 409)
     now = now_utc().isoformat()
-    approval = {"at": now, "by": actor.get("id"), "reason": text, "old_text": before["text"] if before["state"] == LOCKED else None,
+    locked_before = before["state"] == LOCKED or (before["state"] == LATE and before["locked_at"])
+    approval = {"at": now, "by": actor.get("id"), "reason": text, "old_text": before["text"] if locked_before else None,
                 "new_text": id_text(ctx.fields, values), "was": before["state"]}
     await _lock(db, ctx, user_id, values, via="approval", actor_id=actor.get("id"), approval=approval)
     await db.audit_logs.insert_one({
@@ -480,7 +549,7 @@ async def season_overview(db, season: dict) -> dict:
             f"Staffel {context.get('staffel')}" if context.get("staffel") else None) if part)
         squad = squads.get(reg.get("squad_id")) or {}
         players = [
-            {**status(ctx, uid), "approvals": _approvals_view((ctx.entries if ctx else {}).get(uid), names)}
+            {**status(ctx, uid, reg.get("squad_id")), "approvals": _approvals_view((ctx.entries if ctx else {}).get(uid), names)}
             for uid in squad.get("member_ids") or [] if uid
         ]
         players.sort(key=lambda row: row["name"].lower())
