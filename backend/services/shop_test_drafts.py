@@ -41,7 +41,8 @@ from services.printful_client import order_payload
 from services.shop_common import ShopConflict, ShopError, record_admin_action
 from services.shop_fulfillment import (
     ERROR_TEXTS, TEST_EXTERNAL_PREFIX, CatalogVariantId, DraftLine, DraftOrder, FulfillmentError, FulfillmentInvalid,
-    FulfillmentOrder, FulfillmentPermanent, FulfillmentProvider, Placement, PrintfulOrderId, Recipient)
+    FulfillmentOrder, FulfillmentPermanent, FulfillmentProvider, Placement, PrintfulOrderId, Recipient,
+    short_external_id)
 
 COLLECTION = "shop_test_drafts"
 KIND = "test_draft"
@@ -334,8 +335,9 @@ async def preview(db, *, product_id: Any, variant_id: Any, gamertag: Any, addres
 
 async def _build(db, product: dict, variant: dict, mapping: dict, recipient: dict, name: str | None, *,
                  actor_id: str, provider: FulfillmentProvider) -> dict:
-    draft_id, item_id = new_id(), new_id()
-    external_id = f"{EXTERNAL_PREFIX}{draft_id}"
+    # Printful nimmt je external_id höchstens 32 Zeichen (#2133): Anfang plus Zufall, Position nur Zufall.
+    draft_id, item_id = new_id(), short_external_id()
+    external_id = short_external_id(EXTERNAL_PREFIX)
     try:
         # Derselbe Weg wie die Bestellung (#2069): je Fläche genau eine Datei, mit Gamertag eine eigene.
         files, _sources = await shop_print_files.freeze_line(
@@ -589,7 +591,7 @@ async def delete(db, draft_id: str, *, actor_id: str, provider: FulfillmentProvi
 
     Aufräumen geht auch, wenn der Shop inzwischen wieder auf „Aus“ steht - es reicht ein lesbarer Schlüssel
     (``shop_config.require_printful_key``); der Adapter löscht dann nur Aufträge mit external_id
-    ``lsw-testentwurf-…``. Ein hängendes „wird gelöscht“ darf nach ``SHOP_TEST_DRAFT_DELETING_SECONDS`` übernommen
+    ``lswtest-…``. Ein hängendes „wird gelöscht“ darf nach ``SHOP_TEST_DRAFT_DELETING_SECONDS`` übernommen
     werden. Ein offener Ausgang (``unclear``, hängendes Senden) wird über ``_delete_unclear`` aufgeräumt - ohne erneutes
     Senden, also auch bei Stufe „Aus“ oder wenn eine Druckdatei schon weg ist."""
     await shop_config.require_printful_key(db)
