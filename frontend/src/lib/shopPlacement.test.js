@@ -1,7 +1,7 @@
 import { placeMotif, resolveLayers } from "./shopLayout";
 import {
   alignToLayer, centerOnArea, cmToScreen, followersOf, formatCm, frameCm, mirrorOnArea, nextZoom, offsetsForPosition, parseCm,
-  positionCm, screenToCm, snapDrag, snapLines,
+  positionCm, screenToCm, snapDrag, snapLines, wheelZoom,
 } from "./shopPlacement";
 
 // Synthetische Fläche wie in shopLayout.test.js: 1800 × 2400 px bei 150 DPI = 30,48 × 40,64 cm.
@@ -137,6 +137,29 @@ test("waagrecht ziehen lässt ein genau gesetztes „Von oben“ stehen - erst e
   const near = snapDrag({ ...base, lines: { x: [], y: [{ at: 7.8, kind: "layer", index: 3 }] }, dx: 0, dy: 0.2 });
   expect(frame.middle + near.dy).toBeCloseTo(7.8, 6);
   expect(near.guides).toEqual([{ axis: "y", at: 7.8, kind: "layer", index: 3 }]);
+});
+
+test("Mausrad und Trackpad zoomen höchstens einen Schritt je Raste und je 100 ms", () => {
+  const run = (events) => {
+    let state = null;
+    const steps = [];
+    for (const [deltaY, at, mode] of events) {
+      const out = wheelZoom(state, deltaY, at, mode);
+      state = out.state;
+      if (out.direction) steps.push([at, out.direction]);
+    }
+    return steps;
+  };
+  // Trackpad: 50 kleine Werte (-4) in 500 ms - zusammen 200, also zwei Schritte statt sofort 800 %.
+  expect(run(Array.from({ length: 50 }, (_, at) => [-4, at * 10]))).toHaveLength(2);
+  // Ein heftiger Wisch auf einmal: ein Schritt.
+  expect(run([[-1000, 0]])).toEqual([[0, 1]]);
+  // Mausrad-Rasten: -100 bei 0, 50 und 150 ms - die zweite wartet, die dritte zoomt; nach unten verkleinert.
+  expect(run([[-100, 0], [-100, 50], [-100, 150]])).toEqual([[0, 1], [150, 1]]);
+  expect(run([[100, 0]])).toEqual([[0, -1]]);
+  // Zeilen (Firefox): 3 Zeilen sind 48 px - zwei Rasten ergeben einen Schritt; Richtungswechsel sammelt neu.
+  expect(run([[-3, 0, 1], [-3, 10, 1], [3, 200, 1]])).toEqual([]);
+  expect(run([[-3, 0, 1], [-4, 10, 1]])).toEqual([[10, 1]]);
 });
 
 test("Sicherheitsrand ist eine Hilfslinie", () => {

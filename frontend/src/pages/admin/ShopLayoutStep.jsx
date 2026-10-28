@@ -6,7 +6,7 @@ import { viennaDateTime } from "@/lib/vienna";
 import { cmText, gapCm, gapOffsetCm, layerAbove, layersFromSet, maxWidthCm, resolveLayers, textBoundsCm } from "@/lib/shopLayout";
 import {
   alignToLayer, areaSizeCm, BIG_STEP_CM, centerOnArea, DEFAULT_GRID_CM, DRAG_START_PX, followersOf, formatCm, frameCm, GRID_CHOICES_CM, mirrorOnArea,
-  nextZoom, offsetsForPosition, parseCm, positionCm, round2, screenToCm, SNAP_SCREEN_PX, snapDrag, snapLines, STEP_CM, ZOOM_LIMITS,
+  nextZoom, offsetsForPosition, parseCm, positionCm, round2, screenToCm, SNAP_SCREEN_PX, snapDrag, snapLines, STEP_CM, wheelZoom, ZOOM_LIMITS,
 } from "@/lib/shopPlacement";
 import { techniqueLabel } from "@/lib/shopTechniques";
 
@@ -460,6 +460,7 @@ function BigEditor({ open, onOpenChange, title, area, colorCode, canvas, setting
   const canvasRef = useRef(null);
   const stage = useRef(null);
   const anchor = useRef(null);
+  const wheel = useRef(null);
   const pan = useRef(null);
   const size = areaSizeCm(area);
 
@@ -501,7 +502,10 @@ function BigEditor({ open, onOpenChange, title, area, colorCode, canvas, setting
     const onWheel = (event) => {
       if (event.shiftKey || !event.deltaY) return;
       event.preventDefault();
-      zoomTo(event.deltaY < 0 ? 1 : -1, event.clientX, event.clientY);
+      // Gesammelt und gedrosselt: ein Trackpad springt sonst mit einem Wisch auf 800 %.
+      const out = wheelZoom(wheel.current, event.deltaY, event.timeStamp || performance.now(), event.deltaMode);
+      wheel.current = out.state;
+      if (out.direction) zoomTo(out.direction, event.clientX, event.clientY);
     };
     viewport.addEventListener("wheel", onWheel, { passive: false });
     return () => viewport.removeEventListener("wheel", onWheel);

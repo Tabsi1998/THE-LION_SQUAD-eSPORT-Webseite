@@ -60,6 +60,22 @@ export function nextZoom(zoom, direction, limits = ZOOM_LIMITS) {
   return Math.abs(out - 1) < 0.02 ? 1 : Math.round(out * 100) / 100;
 }
 
+// Mausrad und Trackpad: ein Zoomschritt erst nach 100 Einheiten Drehung (eine Raste) und höchstens einer je 100 ms -
+// ein Trackpad schickt viele kleine Werte schnell hintereinander und sprang sonst sofort auf 800 %.
+export const WHEEL_ZOOM = { delta: 100, ms: 100 };
+
+export function wheelZoom(state, deltaY, now, deltaMode = 0, limits = WHEEL_ZOOM) {
+  // deltaMode 1 = Zeilen, 2 = Seiten (Firefox) - in Pixel umgerechnet.
+  const px = deltaMode === 1 ? deltaY * 16 : deltaMode === 2 ? deltaY * 400 : deltaY;
+  const before = state?.sum || 0;
+  // Richtung gewechselt: neu sammeln.
+  const sum = before && Math.sign(before) !== Math.sign(px) ? px : before + px;
+  const last = state?.last ?? -Infinity;
+  if (Math.abs(sum) >= limits.delta && now - last >= limits.ms) return { state: { sum: 0, last: now }, direction: sum < 0 ? 1 : -1 };
+  // Nicht aufstauen: höchstens ein Schritt wartet.
+  return { state: { sum: Math.max(-limits.delta, Math.min(limits.delta, sum)), last }, direction: 0 };
+}
+
 // ---------------------------------------------------------------- Lage einer Ebene in cm
 
 export function areaSizeCm(area) {
