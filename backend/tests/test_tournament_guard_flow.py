@@ -397,6 +397,29 @@ async def test_a_registration_outside_the_bracket_can_still_go(flow):
 
 
 @pytest.mark.asyncio
+async def test_a_player_cannot_leave_fixed_groups_before_the_start(flow):
+    """Review #2120: auch die eigene Abmeldung ließ feste Gruppenspiele mit einer fehlenden Anmeldung zurück."""
+    staff = await flow.add_staff()
+    flow.act_as(staff)
+    tournament, users, registrations = await flow.with_participants(8, format="groups")
+    assert (await flow.post(f"/api/tournaments/{tournament['id']}/groups/generate", json={"group_count": 2})).status_code == 200
+    target = registrations[0]["id"]
+
+    flow.act_as(users[0])
+    refused = await flow.delete(f"/api/tournaments/{tournament['id']}/registrations/{target}")
+
+    assert refused.status_code == 409, refused.text
+    assert "Turnierleitung" in refused.json()["detail"]
+    assert await flow.db.tournament_registrations.find_one({"id": target})
+
+    # Die Turnierleitung bekommt vor dem Check-in den passenden Weg genannt.
+    flow.act_as(staff)
+    by_staff = await flow.delete(f"/api/tournaments/{tournament['id']}/registrations/{target}")
+    assert by_staff.status_code == 409
+    assert "neu generieren" in by_staff.json()["detail"]
+
+
+@pytest.mark.asyncio
 async def test_before_the_check_in_ends_a_registration_still_leaves_the_preview(flow):
     staff = await flow.add_staff()
     flow.act_as(staff)

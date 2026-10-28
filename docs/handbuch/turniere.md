@@ -208,8 +208,8 @@ eurer **Regeln** – schreibt das Wichtigste also nach oben.
   kommst auf die Warteliste (Platz 3)“, der Knopf heißt dann **Auf die Warteliste**.
 - Es geht nur im Status **Anmeldung offen** und im Zeitfenster **Anmeldung öffnet / endet**. Mit dem Haken
   **Nur Einladung** gibt es keine Selbstanmeldung.
-- Selbst abmelden können sich Spieler nicht mehr, wenn sie eingecheckt sind oder das Turnier läuft; dann geht es nur
-  über die Turnierleitung.
+- Selbst abmelden können sich Spieler nicht mehr, wenn sie eingecheckt sind, das Turnier läuft oder sie schon in festen
+  Spielen stehen (etwa generierte Gruppen oder eine Schweizer Runde); dann geht es nur über die Turnierleitung.
 
 **Startgeld:** Kostet die Teilnahme etwas, steht es im Abschnitt **Startgeld** unter **Turnier öffnen → Bearbeiten**.
 Den sieht und ändert nur der Bereich **Finanzen**. Wer anmeldet, übernimmt das Startgeld ausdrücklich (bei Teams der

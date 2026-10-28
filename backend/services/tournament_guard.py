@@ -158,5 +158,13 @@ def registration_removal_refused(tournament: dict) -> str:
     if status in {"live", "paused"}:
         return ("Die Anmeldung steht im festen Turnierbaum – entfernen würde Baum, Tabelle und Platzierungen "
                 "verfälschen. Bitte „Austritt eintragen“ oder „Disqualifizieren“ nutzen.")
+    if not tournament.get("check_in_closed_at"):
+        # Vor dem Check-in-Ende gibt es feste Spiele nur nach „Gruppen generieren“ oder einer Schweizer Runde.
+        return ("Die Anmeldung steht schon in festen Spielen (etwa generierte Gruppen oder eine Schweizer Runde). "
+                "Die Turnierleitung kann die Spiele neu generieren bzw. die Runde zurücknehmen – danach geht Entfernen.")
     return ("Die Anmeldung steht im festen Turnierbaum. Bitte „Nicht erschienen“ setzen und mit „Ersetzt "
             "Nicht-Erschienen“ einen Ersatz eintragen.")
+
+
+SELF_UNREGISTER_FIXED = ("Du stehst schon in festen Spielen dieses Turniers – abmelden geht nur noch über die "
+                         "Turnierleitung.")

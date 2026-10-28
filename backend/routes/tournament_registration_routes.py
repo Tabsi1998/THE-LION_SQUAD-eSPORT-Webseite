@@ -1117,6 +1117,10 @@ async def _delete_registration_locked(db, tid: str, reg_id: str, me: dict) -> di
         })
         if v2_blocked:
             raise HTTPException(status_code=409, detail="Abmeldung ist nicht mehr möglich, weil bereits Spiele aktiv oder gewertet sind.")
+        if await tournament_guard.fixed_match_count(db, tid, reg_id):
+            # Feste Spiele schon vor dem Start (Gruppen generiert, Schweizer Runde, Review #2120): die Abmeldung ließe
+            # sie mit einer Anmeldung zurück, die es nicht mehr gibt.
+            raise HTTPException(status_code=409, detail=tournament_guard.SELF_UNREGISTER_FIXED)
     await tournament_fees.close_price(db, reg, "Abmeldung")
     await db.tournament_registrations.delete_one({"id": reg_id})
     await _move_up_from_waitlist(db, tid, me.get("id"))
