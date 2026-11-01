@@ -23,7 +23,8 @@ from services.mutation_lock import MutationLockBusy, mutation_lock
 from services.change_events import reset_scope_cache
 from services.permissions import areas_for, can_use_area, needs_mfa, user_has_area
 from services.permissions import is_confirmed_tournament_lead
-from models import EventCreate, EventUpdate, EventPlayAlongCreate, EventRegistrationCreate, EventRegistrationUpdate, now_utc, new_id
+from models import (EventCreate, EventUpdate, EventPlayAlongCreate, EventRegistrationCreate, EventRegistrationSelfUpdate,
+                    EventRegistrationUpdate, now_utc, new_id)
 
 router = APIRouter(prefix="/api/events", tags=["events"])
 # Events gehören zur Turnierleitung (Bereich „tournaments“); Moderatoren moderieren.
@@ -406,10 +407,9 @@ async def _attach_event_registration_view(event: dict, user: dict | None) -> Non
             {"_id": 0},
         )
         if own:
-            event["own_registration"] = _public_event_registration(own, is_staff=True)
-            # Ob die Person ihre Anmeldung noch zurückziehen kann (#1223): bis zum Beginn, nicht nach dem Check-in -
-            # dieselbe Regel, die der Dienst beim Stornieren prüft (Website, App und Discord).
-            event["own_registration"]["can_cancel"] = event_registration.can_cancel(event, own)
+            # Ob die Person ihre Anmeldung noch zurückziehen (#1223) oder ändern (#2113) kann: bis zum Beginn, nicht
+            # nach dem Check-in - dieselbe Regel, die der Dienst dabei prüft (Website, App und Discord).
+            event["own_registration"] = _own_registration_view(event, own)
     if event.get("show_participants") or manages:
         statuses = ADMIN_EVENT_REGISTRATION_STATUSES if manages else PUBLIC_EVENT_REGISTRATION_STATUSES
         regs = await db.event_registrations.find(
@@ -804,6 +804,35 @@ async def cancel_my_event_registration(event_id: str, me: dict = Depends(get_cur
     except RegistrationError as exc:
         raise HTTPException(status_code=exc.status, detail=exc.detail)
     return {"ok": True}
+
+
+@router.patch("/{event_id}/registrations/me")
+async def update_my_event_registration(event_id: str, body: EventRegistrationSelfUpdate,
+                                       me: dict = Depends(get_current_user)):
+    """Die eigene Anmeldung ändern (#2113, L-A3): Begleitpersonen und Hinweis - bis zum Beginn, nicht nach dem
+    Check-in. Vor der Verwaltungs-Route, damit „me“ nicht als Kennung einer Anmeldung gilt."""
+    db = get_db()
+    event, _ = await _find_event(event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event nicht gefunden")
+    try:
+        doc = await event_registration.update_own(db, event, me, body.model_dump(exclude_unset=True), via="web")
+    except RegistrationError as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.detail)
+    own = _own_registration_view(event, doc)
+    if doc.get("unchanged"):
+        own["unchanged"] = True
+    return own
+
+
+def _own_registration_view(event: dict, own: dict) -> dict:
+    """Die eigene Anmeldung, wie die Event-Seite sie zeigt: mit Preis und Hinweis, ohne die interne Notiz der
+    Turnierleitung; dazu, ob sie noch storniert oder geändert werden kann."""
+    view = _public_event_registration(own, is_staff=True)
+    view.pop("internal_note", None)
+    view["can_cancel"] = event_registration.can_cancel(event, own)
+    view["can_edit"] = event_registration.can_edit(event, own)
+    return view
 
 
 @router.patch("/{event_id}/registrations/{registration_id}")

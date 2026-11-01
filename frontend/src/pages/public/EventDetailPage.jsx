@@ -18,6 +18,7 @@ import { offerFriendsHint } from "@/lib/friendsHint";
 import { offerCalendarHint } from "@/lib/calendarHint";
 import { EventBanner } from "@/components/tls/EventBanner";
 import { PlayAlongSheet } from "@/components/tls/PlayAlongSheet";
+import { EventRegistrationEdit } from "@/components/tls/EventRegistrationEdit";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { prefersReducedMotion } from "@/hooks/useLiveChanges";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
@@ -772,6 +773,9 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
             </div>
           )}
           {own.status === "waitlist" && offer && <div className="mt-1 text-xs text-white/45">Bezahlt wird erst, wenn du nachrückst.</div>}
+          {own.note && <div className="mt-2 text-sm text-white/65 break-words" data-testid="event-own-note"><span className="text-white/45">Dein Hinweis: </span>{own.note}</div>}
+          {/* Selbst ändern (#2113, L-A3): Begleitpersonen und Hinweis, solange der Server es erlaubt. */}
+          <EventRegistrationEdit event={event} own={own} onSaved={onChanged} />
         </div>
         {own.can_cancel && (
           <button type="button" disabled={saving} onClick={cancel} data-testid="event-cancel-link"

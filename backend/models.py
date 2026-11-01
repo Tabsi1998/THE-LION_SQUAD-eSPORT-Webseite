@@ -673,6 +673,14 @@ class EventPlayAlongCreate(BaseModel):
     accept_costs: bool = False
 
 
+class EventRegistrationSelfUpdate(BaseModel):
+    """Die eigene Event-Anmeldung ändern (#2113, L-A3): nur Begleitpersonen und Hinweis - Status und interne Notiz
+    bleiben bei der Turnierleitung."""
+    model_config = ConfigDict(extra="forbid")
+    companion_count: Optional[int] = Field(default=None, ge=0, le=20)
+    note: Optional[str] = Field(default=None, max_length=500)
+
+
 class EventRegistrationUpdate(BaseModel):
     status: Optional[EventRegistrationStatus] = None
     companion_count: Optional[int] = Field(default=None, ge=0, le=20)
