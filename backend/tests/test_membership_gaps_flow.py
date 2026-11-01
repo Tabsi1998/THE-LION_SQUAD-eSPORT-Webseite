@@ -452,6 +452,20 @@ async def test_a_post_only_for_display_does_not_block(flow, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_only_ending_the_membership_settles_a_declared_exit(flow):
+    chair = await chair_of(flow)
+    erika = await flow.add_user(name="erika")
+    declared = {"declared_at": "2026-10-20T10:00:00+00:00", "wished_last_day": None}
+    await flow.db.memberships.insert_one({"user_id": erika["id"], "member_status": "active", "exit_request": declared})
+    flow.act_as(chair)
+    for status in ("blocked", "inactive"):
+        assert (await flow.put(f"/api/membership/user/{erika['id']}", json={"member_status": status})).status_code == 200
+        assert (await flow.db.memberships.find_one({"user_id": erika["id"]}))["exit_request"] == declared, status
+    assert (await flow.put(f"/api/membership/user/{erika['id']}", json={"member_status": "none"})).status_code == 200
+    assert "exit_request" not in await flow.db.memberships.find_one({"user_id": erika["id"]})
+
+
+@pytest.mark.asyncio
 async def test_exit_needs_a_running_membership_not_led_by_dolibarr(flow, monkeypatch):
     from routes import membership_routes
 

@@ -969,8 +969,8 @@ async def update_user_membership(
                 await evaluate_membership_badges(user_id)
             except Exception:
                 logger.warning("[achievements] Mitglieder-Erfolge für %s nicht ausgewertet", log_safe(user_id), exc_info=True)
-        elif m.get("exit_request"):
-            # Der erklärte Austritt ist damit erledigt (#2125).
+        elif new_status in ("former", "none") and m.get("exit_request"):
+            # Der erklärte Austritt ist damit erledigt (#2125). Gesperrt oder ruhend ist kein Austritt: die Erklärung bleibt.
             await db.memberships.update_one({"user_id": user_id}, {"$unset": {"exit_request": ""}})
             m.pop("exit_request", None)
 
