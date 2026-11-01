@@ -28,9 +28,11 @@ const REPORT_STEPS = {
   justified: ["reviewing"],
 };
 const STEP_LABEL = { justified: "Berechtigt", resolved: "Erledigt", dismissed: "Verwerfen", open: "Wieder offen" };
+// Ein Stand, den es nicht mehr gibt (alte Meldungen), gilt als offen - sonst stünde die Karte ohne Knöpfe da.
+export const reportStatusOf = (status) => (status in REPORT_STEPS ? status : "open");
 export function reportStepLabel(status, step) {
   if (step !== "reviewing") return STEP_LABEL[step];
-  if (status === "open") return "In Prüfung nehmen";
+  if (reportStatusOf(status) === "open") return "In Prüfung nehmen";
   return status === "justified" ? "Zurückstellen" : "Wieder prüfen";
 }
 export function reportStepHint(status, step, name) {
@@ -374,7 +376,7 @@ function ReportCard({ report, onSaved }) {
 
   return (
     <article className="border border-white/10 bg-[#121212] rounded-sm p-4" data-testid={`report-${report.id}`}>
-      <div className="text-xs font-bold uppercase tracking-wider text-[#FFD700]">{categoryLabel(report.category)} · {STATUS_LABEL[report.status] || report.status}</div>
+      <div className="text-xs font-bold uppercase tracking-wider text-[#FFD700]">{categoryLabel(report.category)} · {STATUS_LABEL[reportStatusOf(report.status)]}</div>
       <div className="mt-1 font-bold text-sm text-white">Gegen {personName(report.target_user, "ein gelöschtes Konto")}</div>
       <div className="mt-1 text-sm text-white/80 whitespace-pre-wrap break-words">{report.details}</div>
       {report.message_excerpt && (
@@ -383,7 +385,7 @@ function ReportCard({ report, onSaved }) {
       {report.resolution_note && <div className="mt-2 text-sm text-white/70" data-testid={`report-note-${report.id}`}><span className="text-white/45">Grund:</span> {report.resolution_note}</div>}
       <div className="mt-2 text-[11px] text-white/35">Gemeldet von {personName(report.reporter, "einem gelöschten Konto")}{report.created_at ? ` · ${viennaDateTime(report.created_at)}` : ""}</div>
       <div className="mt-3 flex flex-wrap gap-2">
-        {(REPORT_STEPS[report.status] || []).map((next) => (
+        {REPORT_STEPS[reportStatusOf(report.status)].map((next) => (
           <button key={next} type="button" disabled={busy} aria-pressed={step === next} onClick={() => open(next)} data-testid={`report-step-${next}-${report.id}`} className={`min-h-10 px-3 py-2 border rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-40 ${step === next ? "border-[#29B6E8] text-[#29B6E8]" : next === "justified" ? "border-[#FF9500]/50 text-[#FF9500]" : "border-white/15 text-white/70 hover:text-white"}`}>
             {reportStepLabel(report.status, next)}
           </button>

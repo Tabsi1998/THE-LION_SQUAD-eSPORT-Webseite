@@ -142,6 +142,14 @@ test("Zurückstellen braucht einen Grund, sagt was mit dem Treffer passiert und 
   await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith(expect.stringContaining("Es läuft noch eine Maßnahme")));
 });
 
+test("ein Stand, den es nicht mehr gibt, gilt als offen - die Knöpfe sind da", async () => {
+  mockApi({ reports: [{ ...REPORT, status: "new" }] });
+  render(<MemoryRouter><AdminModerationPage /></MemoryRouter>);
+  expect(await screen.findByTestId("report-r1")).toHaveTextContent("Belästigung · Offen");
+  expect(screen.getByTestId("report-step-justified-r1")).toBeInTheDocument();
+  expect(screen.getByTestId("report-step-reviewing-r1")).toHaveTextContent("In Prüfung nehmen");
+});
+
 test("Abbrechen schließt die Entscheidung, ohne etwas zu speichern", async () => {
   mockApi({ reports: [REPORT] });
   render(<MemoryRouter><AdminModerationPage /></MemoryRouter>);
