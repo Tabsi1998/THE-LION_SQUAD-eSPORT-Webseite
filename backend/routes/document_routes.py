@@ -28,6 +28,16 @@ logger = logging.getLogger("tls.documents")
 UNLOCK_AREA = "club"
 LOCAL_UPLOAD_PREFIXES = ("/api/static/uploads/", "/uploads/")
 FILE_REMOVED, FILE_KEPT, FILE_RETRY = "removed", "kept", "retry"
+# So benennt der Upload eine Datei: Zufallsname und Endung (routes/upload_routes.py).
+UPLOADED_KEY = re.compile(r"[0-9a-f]{32}(\.[a-z0-9]{1,10})?")
+
+
+async def _refuse_foreign_key(db, key: str, doc_id: str | None = None) -> None:
+    """Eine neue ``storage_key`` kommt aus dem Upload, die Datei liegt da und gehört keinem anderen Dokument."""
+    if not UPLOADED_KEY.fullmatch(key) or not (PRIVATE_DOC_DIR / key).is_file():
+        raise HTTPException(400, "Lade die Datei bitte über „Datei hochladen“ hoch.")
+    if await db.documents.find_one({"storage_key": key, "id": {"$ne": doc_id}}, {"_id": 1}):
+        raise HTTPException(409, "Diese Datei gehört schon zu einem anderen Dokument. Lade sie bitte neu hoch.")
 
 
 def _refuse_new_upload_address(file_url: str | None, previous: dict | None = None) -> None:
@@ -309,6 +319,8 @@ async def create_document(body: DocumentCreate, me: dict = Depends(require_area(
     db = get_db()
     doc = body.model_dump()
     _refuse_new_upload_address(doc.get("file_url"))
+    if doc.get("storage_key"):
+        await _refuse_foreign_key(db, doc["storage_key"])
     doc["visibility"] = _normalise_visibility(doc.get("visibility"))
     doc["id"] = new_id()
     doc["created_at"] = now_utc().isoformat()
@@ -344,6 +356,8 @@ async def update_document(doc_id: str, body: DocumentUpdate, me: dict = Depends(
         raise HTTPException(404, "Dokument nicht gefunden.")
     if "file_url" in raw:
         _refuse_new_upload_address(raw.get("file_url"), previous)
+    if update.get("storage_key") and update["storage_key"] != previous.get("storage_key"):
+        await _refuse_foreign_key(db, update["storage_key"], doc_id)
     await db.documents.update_one({"id": doc_id}, {"$set": update})
     updated = await db.documents.find_one({"id": doc_id}, {"_id": 0})
     # Eine neue Datei ersetzt die alte, auch eine alte öffentliche: sie bleibt sonst unbemerkt liegen.

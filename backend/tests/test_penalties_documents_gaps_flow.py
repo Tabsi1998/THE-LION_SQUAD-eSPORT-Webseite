@@ -13,6 +13,9 @@ from flow_harness import make_flow, new_id  # noqa: E402
 from services.permissions import MFA_MESSAGE  # noqa: E402
 
 
+KEY, KEY2 = f"{'a' * 32}.pdf", f"{'b' * 32}.pdf"
+
+
 @pytest_asyncio.fixture
 async def flow(tmp_path, monkeypatch):
     monkeypatch.setenv("UPLOAD_DIR", str(tmp_path / "uploads"))
@@ -163,8 +166,8 @@ async def stored_doc(flow, folder, key: str = "protokoll.pdf", **extra) -> dict:
 async def test_create_update_delete_are_logged_and_delete_takes_the_file(flow, doc_dir):
     chair = await chair_of(flow)
     flow.act_as(chair)
-    (doc_dir / "neu.pdf").write_bytes(b"%PDF-1.4\n")
-    created = await flow.post("/api/documents", json={"title": "Statuten 2026", "category": "statutes", "file_url": "", "storage_key": "neu.pdf"})
+    (doc_dir / KEY).write_bytes(b"%PDF-1.4\n")
+    created = await flow.post("/api/documents", json={"title": "Statuten 2026", "category": "statutes", "file_url": "", "storage_key": KEY})
     assert created.status_code == 200, created.text
     doc_id = created.json()["id"]
     assert (await flow.db.audit_logs.find_one({"action": "document.create"}))["data"]["title"] == "Statuten 2026"
@@ -173,11 +176,11 @@ async def test_create_update_delete_are_logged_and_delete_takes_the_file(flow, d
     assert updated.status_code == 200
     audit = await flow.db.audit_logs.find_one({"action": "document.update"})
     assert audit["data"]["fields"] == ["title"] and audit["actor_id"] == chair["id"]
-    assert (doc_dir / "neu.pdf").exists()
+    assert (doc_dir / KEY).exists()
 
     deleted = await flow.delete(f"/api/documents/{doc_id}")
     assert deleted.status_code == 200 and deleted.json()["file_removed"] is True
-    assert not (doc_dir / "neu.pdf").exists()
+    assert not (doc_dir / KEY).exists()
     audit = await flow.db.audit_logs.find_one({"action": "document.delete"})
     assert audit["data"] == {"title": "Statuten 2027", "category": "statutes", "file_removed": True}
 
@@ -189,10 +192,10 @@ async def test_create_update_delete_are_logged_and_delete_takes_the_file(flow, d
 async def test_a_new_file_replaces_the_old_one(flow, doc_dir):
     chair = await chair_of(flow)
     doc = await stored_doc(flow, doc_dir)
-    (doc_dir / "neu.pdf").write_bytes(b"%PDF-1.4\n")
+    (doc_dir / KEY).write_bytes(b"%PDF-1.4\n")
     flow.act_as(chair)
-    assert (await flow.patch(f"/api/documents/{doc['id']}", json={"storage_key": "neu.pdf"})).status_code == 200
-    assert not (doc_dir / "protokoll.pdf").exists() and (doc_dir / "neu.pdf").exists()
+    assert (await flow.patch(f"/api/documents/{doc['id']}", json={"storage_key": KEY})).status_code == 200
+    assert not (doc_dir / "protokoll.pdf").exists() and (doc_dir / KEY).exists()
 
 
 @pytest.mark.asyncio
@@ -328,16 +331,17 @@ async def test_a_new_upload_takes_an_old_public_file_with_it(flow, doc_dir, monk
     monkeypatch.setattr(document_routes, "UPLOAD_DIR", uploads)
     (uploads / "alt.pdf").write_bytes(b"x")
     (uploads / "verlinkt.pdf").write_bytes(b"x")
-    (doc_dir / "neu.pdf").write_bytes(b"x")
+    (doc_dir / KEY).write_bytes(b"x")
+    (doc_dir / KEY2).write_bytes(b"x")
     free = {"id": new_id(), "title": "Alt", "file_url": "/api/static/uploads/alt.pdf"}
     linked = {"id": new_id(), "title": "Verlinkt", "file_url": "/api/static/uploads/verlinkt.pdf"}
     await flow.db.documents.insert_many([dict(free), dict(linked)])
     await flow.db.settings.insert_one({"id": "branding", "imprint": "Siehe /api/static/uploads/verlinkt.pdf"})
     flow.act_as(await chair_of(flow))
-    replaced = await flow.patch(f"/api/documents/{free['id']}", json={"storage_key": "neu.pdf"})
+    replaced = await flow.patch(f"/api/documents/{free['id']}", json={"storage_key": KEY})
     assert replaced.status_code == 200, replaced.text
     assert not (uploads / "alt.pdf").exists()
-    still = await flow.patch(f"/api/documents/{linked['id']}", json={"storage_key": "neu.pdf"})
+    still = await flow.patch(f"/api/documents/{linked['id']}", json={"storage_key": KEY2})
     assert still.status_code == 200
     assert (uploads / "verlinkt.pdf").exists(), "ein Link hält die alte Datei"
 
@@ -380,6 +384,30 @@ async def test_account_and_media_cleanups_stay_out_of_the_document_folder(flow, 
     (doc_dir / "protokoll.pdf").write_bytes(b"x")
     assert await account_erasure.remove_upload(flow.db, "protokoll.pdf") is None
     assert (doc_dir / "protokoll.pdf").exists()
+
+
+@pytest.mark.asyncio
+async def test_a_storage_key_comes_from_the_upload(flow, doc_dir):
+    (doc_dir / KEY).write_bytes(b"x")
+    (doc_dir / "sponsoring-abc.pdf").write_bytes(b"x")
+    flow.act_as(await chair_of(flow))
+    for key in ("sponsoring-abc.pdf", "../geheim.pdf", f"{'c' * 32}.pdf"):
+        refused = await flow.post("/api/documents", json={"title": "X", "category": "other", "file_url": "", "storage_key": key})
+        assert refused.status_code == 400, key
+    created = await flow.post("/api/documents", json={"title": "A", "category": "other", "file_url": "", "storage_key": KEY})
+    assert created.status_code == 200, created.text
+
+    # Zu einem anderen Dokument gehört sie schon - beim Anlegen wie beim Ändern.
+    assert (await flow.post("/api/documents", json={"title": "B", "category": "other", "file_url": "", "storage_key": KEY})).status_code == 409
+    (doc_dir / KEY2).write_bytes(b"x")
+    second = await flow.post("/api/documents", json={"title": "B", "category": "other", "file_url": "", "storage_key": KEY2})
+    assert (await flow.patch(f"/api/documents/{second.json()['id']}", json={"storage_key": KEY})).status_code == 409
+    assert (await flow.patch(f"/api/documents/{second.json()['id']}", json={"storage_key": "sponsoring-abc.pdf"})).status_code == 400
+
+    # Die eigene, unveränderte bleibt erlaubt - auch eine alte mit anderem Namen.
+    assert (await flow.patch(f"/api/documents/{second.json()['id']}", json={"storage_key": KEY2, "title": "C"})).status_code == 200
+    old = await stored_doc(flow, doc_dir)
+    assert (await flow.patch(f"/api/documents/{old['id']}", json={"storage_key": "protokoll.pdf", "title": "D"})).status_code == 200
 
 
 @pytest.mark.asyncio
