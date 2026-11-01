@@ -48,7 +48,26 @@ MEDIA_UNPAGED_LIMIT = 500
 MEDIA_SEARCH_MAX = 200
 USAGE_SCOPES = {"unused", "duplicate"}
 # „Ungenutzte löschen“ (#2122): Frisch Hochgeladenes bleibt - das Formular dazu ist vielleicht noch offen.
-MEDIA_CLEANUP_MIN_AGE_HOURS = max(0, int(os.environ.get("MEDIA_CLEANUP_MIN_AGE_HOURS") or 24))
+MEDIA_CLEANUP_DEFAULT_AGE_HOURS = 24
+MEDIA_CLEANUP_LOWEST_AGE_HOURS = 1
+
+
+def _cleanup_min_age_hours(raw: str | None) -> int:
+    """Stunden aus der Umgebung. Ein Tippfehler verhindert keinen Start, und 0 schaltet den Schutz nicht ab."""
+    if raw in (None, ""):
+        return MEDIA_CLEANUP_DEFAULT_AGE_HOURS
+    try:
+        hours = int(raw)
+    except ValueError:
+        logger.warning("MEDIA_CLEANUP_MIN_AGE_HOURS ist keine ganze Zahl - es gelten %s Stunden", MEDIA_CLEANUP_DEFAULT_AGE_HOURS)
+        return MEDIA_CLEANUP_DEFAULT_AGE_HOURS
+    if hours < MEDIA_CLEANUP_LOWEST_AGE_HOURS:
+        logger.warning("MEDIA_CLEANUP_MIN_AGE_HOURS ist zu klein - es gelten %s Stunden", MEDIA_CLEANUP_LOWEST_AGE_HOURS)
+        return MEDIA_CLEANUP_LOWEST_AGE_HOURS
+    return hours
+
+
+MEDIA_CLEANUP_MIN_AGE_HOURS = _cleanup_min_age_hours(os.environ.get("MEDIA_CLEANUP_MIN_AGE_HOURS"))
 MEDIA_CLEANUP_BATCH = 500
 UNDECIDED_SCANS = ("pending", "review", "blocked")
 

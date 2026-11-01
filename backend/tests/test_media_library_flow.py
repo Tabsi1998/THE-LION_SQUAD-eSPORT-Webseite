@@ -338,6 +338,11 @@ async def test_replacing_an_svg_keeps_a_png_address_as_png(flow, public):
     assert partner["tools"][0]["image_url"] == UPLOADS + "bleibt.png"
 
 
+@pytest.mark.parametrize("raw,hours", [(None, 24), ("", 24), ("48", 48), ("1", 1), ("0", 1), ("-5", 1), ("viel", 24), ("1.5", 24)])
+def test_the_cleanup_age_never_stops_the_start_or_turns_off_the_protection(raw, hours):
+    assert phase_fg_routes._cleanup_min_age_hours(raw) == hours
+
+
 @pytest.mark.asyncio
 async def test_the_cleanup_question_separates_this_round_from_the_total(flow, public, monkeypatch):
     await admin(flow)
