@@ -307,7 +307,7 @@ Anmeldungen auch über Co-Teams, deren Captain/Vertreter man ist. Aufrufer mit e
 
 | Regel | Wann | Wer |
 | --- | --- | --- |
-| Co-Team gehört zum Hauptteam (`team_squads.team_id`), ist `active`, `game_id` = Spiel der Liga (ohne `game_id` am Co-Team: passt) | Zuteilen | B |
+| Co-Team gehört zum Hauptteam (`team_squads.team_id`), ist `active`, `game_id` = Spiel der Liga (ohne `game_id` am Co-Team: passt; `game_id` prüft der Server gegen `games`, in laufender Staffel fest, #2128) | Zuteilen | B |
 | Kader ≥ `min_squad_size` der Staffel (fehlt = `team_size`; nie kleiner als `team_size`), alle Mitglieder im Hauptteam | Zuteilen | B |
 | Zwei Co-Teams desselben Hauptteams nie in derselben Staffel | Zuteilen (Index `identity_key`) | B |
 | Ein Co-Team je Season nur in einer Staffel (`league_context.season_id`) | Zuteilen | B |

@@ -698,17 +698,17 @@ function TeamModal({ team, onClose, onSaved, canDissolve = false, canChangeVisib
         <Field label="Discord-Link"><Input value={form.discord_link || ""} onChange={(v) => set("discord_link", v)} placeholder="https://discord.gg/..." /></Field>
         {!isNew && <TeamColorPicker value={form.color || AUTO_COLOR} onChange={(v) => set("color", v)} />}
         {!isNew && canChangeVisibility ? (
-          <label className="flex items-start gap-3 border border-white/10 bg-[#0A0A0A] rounded-sm p-3 min-h-11 cursor-pointer">
-            <input type="checkbox" checked={form.is_public !== false} onChange={(e) => set("is_public", e.target.checked)} data-testid="team-public-toggle" className="mt-0.5 accent-[#29B6E8]" />
-            <span className="min-w-0">
-              <span className="block text-sm font-bold">Team öffentlich</span>
-              <span className="block text-xs text-white/55 mt-0.5" data-testid="team-public-hint">
-                {form.is_public !== false
-                  ? "Alle finden das Team in der Teamliste und der Suche und sehen die Teamseite."
-                  : "Privat: Das Team steht nicht in der Teamliste, der Suche und auf Profilen, die Teamseite sehen nur Mitglieder. Beitreten geht nur über den Einladungs-Link oder eine persönliche Einladung. In Turnieren, an denen ihr teilnehmt, bleibt der Teamname sichtbar."}
-              </span>
-            </span>
-          </label>
+          <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
+            <label className="flex items-center gap-3 min-h-11 cursor-pointer text-sm font-bold">
+              <input type="checkbox" checked={form.is_public !== false} onChange={(e) => set("is_public", e.target.checked)} data-testid="team-public-toggle" className="accent-[#29B6E8]" />
+              Team öffentlich
+            </label>
+            <p className="text-xs text-white/55" data-testid="team-public-hint">
+              {form.is_public !== false
+                ? "Alle finden das Team in der Teamliste und der Suche und sehen die Teamseite."
+                : "Privat: Das Team steht nicht in der Teamliste, der Suche und auf Profilen, die Teamseite sehen nur Mitglieder. Beitreten geht nur über den Einladungs-Link oder eine persönliche Einladung. In Turnieren, an denen ihr teilnehmt, bleibt der Teamname sichtbar."}
+            </p>
+          </div>
         ) : null}
       </form>
       {!isNew && canDissolve ? <TeamDissolveSection team={team} onDissolved={onDissolved} /> : null}

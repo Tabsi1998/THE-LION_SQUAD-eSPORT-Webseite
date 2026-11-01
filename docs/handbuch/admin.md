@@ -110,7 +110,7 @@ die Zwei-Faktor-Anmeldung bestätigt ist (Moderation ausgenommen).
 | **Verein** | Vereinsdaten (Vereinsverwaltung: Stammdaten und Kontakt; System: auch Rechtstexte) · Über uns, Sponsoren, Partner, Referenzen, Serien (Redaktion) · Vorstand, Kontakt-Inbox (Vereinsverwaltung) |
 | **Mitglieder** | Mitglieder (mit dem Reiter Öffentliche Profile), Bewerbungen, Mitgliedervorteile, Dokumente, Einlass (Versammlung), Alle Benutzer (Vereinsverwaltung) · Dolibarr (Vereinsverwaltung, System) |
 | **Finanzen** | Finanzübersicht (Finanzen) |
-| **eSports** | Turniere, Fast Lap, Stationen (Turnierleitung und Helfer mit Einsatz) · Liga, Events, Turnier-Leitfaden, Jahreswertung, Spiele, TV & Beamer, Gewinne, Strafen (Turnierleitung) · Game-Server (System) |
+| **eSports** | Turniere, Fast Lap, Stationen (Turnierleitung und Helfer mit Einsatz) · Liga, Events, Turnier-Leitfaden, Jahreswertung, Spiele, TV & Beamer, Gewinne, Strafen (Turnierleitung) · Teams (Turnierleitung, Vereinsverwaltung) · Game-Server (System) |
 | **Content** | News, Medien, Navigation, Erfolge, Sticker (Redaktion) · Galerie, Adventkalender, Ostereiersuche (Redaktion, Vereinsverwaltung) · Downloads & QR (Turnierleitung, Redaktion, Vereinsverwaltung, System) |
 | **Verbindungen** | Alle Verbindungen, dazu eine Seite je Dienst (System) |
 | **E-Mail** | Newsletter, Mail-Queue, E-Mail-Vorlagen (System) |
@@ -283,6 +283,7 @@ Jedes Thema hat genau **einen** Ort:
 | Fernseher und Beamer | Admin → eSports → TV & Beamer | [TV und Beamer](tv.md) |
 | Fast-Lap-Challenge | Admin → eSports → Fast Lap | [Fast Lap](fastlap.md) |
 | Event anlegen, Anmeldung, Kalender | Admin → eSports → Events | [Events](events.md) |
+| Teams, verwaiste und aufgelöste Teams, Beitrittscodes | Admin → eSports → Teams | [Teams](teams.md) |
 | Erfolge vergeben, Level, Jahresrückblick | Admin → Content → Erfolge | [Erfolge, Level und Jahreswertung](erfolge.md) |
 | Jahreswertung (Saison, Punkte) | Admin → eSports → Jahreswertung | [Erfolge, Level und Jahreswertung](erfolge.md) |
 | Logo, Farbe, Hinweisleisten | Admin → Auftritt → Branding | [Auftritt](auftritt.md) |
