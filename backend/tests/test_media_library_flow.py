@@ -14,7 +14,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
 from routes import phase_fg_routes  # noqa: E402
-from services import account_erasure, media_audit, sponsor_images, uploads_inventory  # noqa: E402
+from services import account_erasure, media_audit, uploads_inventory  # noqa: E402
 
 UPLOADS = "/api/static/uploads/"
 COUNT = 520
