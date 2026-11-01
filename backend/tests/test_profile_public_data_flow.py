@@ -257,6 +257,17 @@ async def test_private_team_stays_off_the_public_profile(flow):
     assert [team["id"] for team in (await flow.get("/api/users/public/spielerin")).json()["teams"]] == ["t-offen"]
 
 
+@pytest.mark.asyncio
+async def test_my_teams_shows_the_code_only_to_those_who_manage(flow):
+    boss = await player(flow, "chefin")
+    member = await player(flow, "mitglied")
+    await flow.db.teams.insert_one({"id": "t-1", "name": "Rudel", "tag": "RDL", "member_ids": [boss["id"], member["id"]], "leader_id": boss["id"], "join_code": "geheim-123"})
+    flow.act_as(member)
+    assert "join_code" not in (await flow.get("/api/teams/my")).json()[0]
+    flow.act_as(boss)
+    assert (await flow.get("/api/teams/my")).json()[0]["join_code"] == "geheim-123"
+
+
 # ---------------------------------------------------------------- Zusatz: Dokumente
 @pytest.mark.asyncio
 async def test_members_never_see_where_a_document_is_stored(flow):

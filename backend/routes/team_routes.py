@@ -467,6 +467,9 @@ async def my_teams(me: dict = Depends(get_current_user)):
             "co_leader" if me["id"] in team.get("co_leader_ids", []) else "member"
         )
         team.update(_viewer_rights(team, me))
+        # Wie GET /teams/{id}: der Code gehört zur Teamleitung (#2126).
+        if not _can_manage(team, me):
+            team.pop("join_code", None)
     return teams
 
 
