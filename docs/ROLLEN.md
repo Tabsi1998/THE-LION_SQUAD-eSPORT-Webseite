@@ -424,6 +424,20 @@ Benachrichtigungen ab. Es hängt nicht am Newsletter.
   (Moderation ausgenommen) und der Helfer-Aufruf (Vorstand). Code: `can_use_area` in `services/permissions.py`, im Web
   `canUseArea`.
 
+## Was andere von einem Konto sehen (#2126)
+
+- **Keine Rollen nach außen:** Das öffentliche Profil, `/api/users/public-list`, `/api/membership/public`, Freundesliste,
+  Direktnachrichten, Team-, Turnier- und Matchchat liefern weder `role` noch `internal_role`. Die Rolle steht nur im eigenen
+  Konto und unter Alle Benutzer.
+- **Aufgabe im Verein** (`internal_role`, früher „Interne Rolle“): sehen das Mitglied selbst und die Verwaltung; die
+  CSV-Spalte heißt gleich.
+- **Felder und Stufen:** Die Stufen unter Einstellungen → Privatsphäre gelten für Kontakt, Website, Gaming-Abos und die
+  bevorzugte Rolle. TikTok und die bevorzugte Rolle sind ohne gewählte Stufe privat, weil beide früher nirgends erschienen.
+  Die E-Mail ist nie öffentlich und hat darum keinen Schalter.
+- **„Erfolge öffentlich“ aus** gilt auch für Spielerliste, Jahreswertung (Zahl und Punkte stehen auf 0) und Kronen.
+- **Direktnachrichten:** Die Moderation erreicht jede Person, auch bei „Nur Moderation und Admins“ oder „Niemand außer der
+  Moderation“.
+
 ## Benutzermenü und Konto-Seiten (#516)
 
 Das Benutzermenü im Kopf (am Handy im Hauptmenü, in der App unter „Mehr → Konto“) hat je Eintrag
@@ -435,7 +449,7 @@ genau ein Ziel, in der Reihenfolge, wie oft man es braucht:
 | Mein Profil | `/profile` (Reiter, darunter „Benachrichtigungen einstellen“) | jedes Konto |
 | Öffentliches Profil | `/u/<name>` – so, wie andere es sehen | jedes Konto |
 | Nachrichten | `/messages` | jedes Konto |
-| Benachrichtigungen | `/notifications` (die Liste) | jedes Konto |
+| Benachrichtigungen | `/notifications` (die Liste, mit dem Weg zu „Benachrichtigungen einstellen“) | jedes Konto |
 | Meine Mitgliedschaft | `/members/membership` | Mitglieder |
 | Mitglied werden | `/membership/join` | wer kein Mitglied ist |
 | Rechnungen | `/profile?tab=invoices` | jedes Konto |
