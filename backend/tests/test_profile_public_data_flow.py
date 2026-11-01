@@ -108,6 +108,25 @@ async def test_website_subscriptions_and_platforms_follow_their_level(flow):
     assert shown["website"] == "https://example.org" and shown["gaming_subscriptions"] == ["ea_play"] and shown["main_platform"] == "PC"
 
 
+# ---------------------------------------------------------------- PR4: „Erfolge öffentlich“ aus, auch auf anderen Wegen
+@pytest.mark.asyncio
+async def test_hidden_achievements_also_leave_season_table_and_crowns(flow):
+    from services import crown_events, season_service
+
+    shy = await player(flow, "zurueckhaltend", privacy_achievements_public=False)
+    proud = await player(flow, "stolz")
+    await flow.db.achievements.insert_one({"code": "tier-1", "name": "Erfolg", "level": 1, "points": 500})
+    for user in (shy, proud):
+        await flow.db.user_achievements.insert_one({"user_id": user["id"], "tier_code": "tier-1", "level": 1, "earned_at": "2026-10-01T10:00:00+00:00"})
+
+    summaries = await season_service._achievement_summaries(flow.db, [shy["id"], proud["id"]])
+    assert summaries[shy["id"]] == {"achievement_count": 0, "achievement_points": 0}
+    assert summaries[proud["id"]] == {"achievement_count": 1, "achievement_points": 500}
+
+    crowns = await crown_events.get_crowns(force=True)
+    assert shy["id"] not in crowns and crowns[proud["id"]] == "gold"
+
+
 # ---------------------------------------------------------------- Zusatz: Dokumente
 @pytest.mark.asyncio
 async def test_members_never_see_where_a_document_is_stored(flow):

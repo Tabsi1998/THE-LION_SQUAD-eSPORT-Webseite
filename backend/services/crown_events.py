@@ -31,8 +31,9 @@ async def _points_rows() -> list[dict]:
         e["points"] += points_map.get(a["tier_code"], 0)
     if not agg:
         return []
+    # „Erfolge öffentlich“ aus (#2126): die Krone verriete, wie viele Punkte jemand hat - wie in der Erfolge-Rangliste nicht dabei.
     users = await db.users.find(
-        {"id": {"$in": list(agg.keys())}, "privacy_public_profile": True},
+        {"id": {"$in": list(agg.keys())}, "privacy_public_profile": True, "privacy_achievements_public": {"$ne": False}},
         {"_id": 0, "id": 1, "username": 1, "display_name": 1},
     ).to_list(5000)
     rows = []

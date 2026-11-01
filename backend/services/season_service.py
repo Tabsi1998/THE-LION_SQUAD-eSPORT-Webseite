@@ -239,8 +239,10 @@ async def _achievement_summaries(db, user_ids: list[str]) -> dict[str, dict]:
     """
     if not user_ids:
         return {}
+    # „Erfolge öffentlich“ aus (#2126): in der Jahreswertung bleibt der Rang, Zahl und Punkte der Erfolge stehen auf 0.
+    hidden = {row["id"] async for row in db.users.find({"id": {"$in": user_ids}, "privacy_achievements_public": False}, {"_id": 0, "id": 1})}
     awards = await db.user_achievements.find(
-        {"user_id": {"$in": user_ids}},
+        {"user_id": {"$in": [user_id for user_id in user_ids if user_id not in hidden]}},
         {"_id": 0, "user_id": 1, "tier_code": 1, "group_code": 1},
     ).to_list(50000)
     tier_codes = list({a.get("tier_code") for a in awards if a.get("tier_code")})
