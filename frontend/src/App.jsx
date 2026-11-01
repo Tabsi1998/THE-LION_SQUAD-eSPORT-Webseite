@@ -393,7 +393,7 @@ function App() {
           <Route path="/admin/documents" element={<ProtectedRoute requireArea="club"><AdminDocumentsPage /></ProtectedRoute>} />
           <Route path="/admin/settings" element={<ProtectedRoute requireArea="system"><AdminSettingsPage /></ProtectedRoute>} />
           <Route path="/admin/settings/:section" element={<ProtectedRoute requireArea="system"><AdminSettingsPage /></ProtectedRoute>} />
-          <Route path="/admin/club" element={<ProtectedRoute requireArea="system"><AdminClubDataPage /></ProtectedRoute>} />
+          <Route path="/admin/club" element={<ProtectedRoute requireArea={["system", "club"]}><AdminClubDataPage /></ProtectedRoute>} />
           <Route path="/admin/seasons" element={<ProtectedRoute requireArea="tournaments"><AdminSeasonsPage /></ProtectedRoute>} />
           <Route path="/admin/logs" element={<Navigate to="/admin/ops?tab=events" replace />} />
           <Route path="/admin/ops" element={<ProtectedRoute requireArea="system"><AdminOpsPage /></ProtectedRoute>} />

@@ -28,7 +28,8 @@ export const ADMIN_GROUPS = [
     label: "Verein",
     items: [
       // Vereinsdaten sind der Reiter „Rechtliches“ der Einstellungen (Stammdaten, Dolibarr-Schalter, Rechtstexte).
-      { to: "/admin/club", label: "Vereinsdaten", icon: Building2, areas: ["system"] },
+      // Stammdaten und Kontakt pflegt auch der Vorstand (#2125); Rechtstexte ändert nur System.
+      { to: "/admin/club", label: "Vereinsdaten", icon: Building2, areas: ["system", "club"] },
       // Über uns (#406): die Leitbild-Texte der Seite „Über den Verein“; Zahlen, Spiele, Vorstand kommen aus den Daten.
       { to: "/admin/about", label: "Über uns", icon: BookOpen, areas: ["content"] },
       { to: "/admin/board", label: "Vorstand", icon: UserCheck, areas: ["club"] },
