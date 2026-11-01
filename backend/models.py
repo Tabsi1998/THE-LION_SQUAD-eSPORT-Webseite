@@ -308,6 +308,8 @@ class TeamUpdate(BaseModel):
     banner_url: Optional[str] = None
     discord_link: Optional[str] = None
     social_links: Optional[dict] = None
+    # Privat (#2128, TM9): nicht in Liste, Suche und Profilen; die Teamseite sehen nur Mitglieder. Ändern darf nur die Teamleitung.
+    is_public: Optional[bool] = None
     # Team-Farbe (#1347): eine von acht ruhigen Farben oder „auto“ (Farbe des Spiels) - Unbekanntes wird abgelehnt.
     color: Optional[str] = None
 

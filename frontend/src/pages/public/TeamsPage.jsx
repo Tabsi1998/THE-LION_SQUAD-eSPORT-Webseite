@@ -492,6 +492,7 @@ function TeamDetail({ id }) {
           onClose={() => setEditing(null)}
           onSaved={() => { setEditing(null); load(); }}
           canDissolve={canDissolve}
+          canChangeVisibility={canChangeRoles}
           onDissolved={() => nav("/teams")}
         />
       )}
@@ -617,7 +618,7 @@ function TeamChat({ team, user }) {
   );
 }
 
-function TeamModal({ team, onClose, onSaved, canDissolve = false, onDissolved }) {
+function TeamModal({ team, onClose, onSaved, canDissolve = false, canChangeVisibility = false, onDissolved }) {
   const isNew = !team?.id;
   const [form, setForm] = useState({ ...emptyTeam, ...team });
   const { submitting: saving, submitOnce } = useSubmissionGuard();
@@ -634,6 +635,7 @@ function TeamModal({ team, onClose, onSaved, canDissolve = false, onDissolved })
         banner_url: form.banner_url || null,
         discord_link: form.discord_link || null,
         ...(isNew ? {} : { color: form.color || AUTO_COLOR }),
+        ...(!isNew && canChangeVisibility ? { is_public: form.is_public !== false } : {}),
     };
     setSubmitError("");
     const attempt = await submitOnce(async () => {
@@ -672,6 +674,19 @@ function TeamModal({ team, onClose, onSaved, canDissolve = false, onDissolved })
         <Field label="Banner" group><ImageUpload value={form.banner_url || ""} onChange={(v) => set("banner_url", v)} testId="team-banner" variant="wide" crop="banner" allowLibrary /></Field>
         <Field label="Discord-Link"><Input value={form.discord_link || ""} onChange={(v) => set("discord_link", v)} placeholder="https://discord.gg/..." /></Field>
         {!isNew && <TeamColorPicker value={form.color || AUTO_COLOR} onChange={(v) => set("color", v)} />}
+        {!isNew && canChangeVisibility ? (
+          <label className="flex items-start gap-3 border border-white/10 bg-[#0A0A0A] rounded-sm p-3 min-h-11 cursor-pointer">
+            <input type="checkbox" checked={form.is_public !== false} onChange={(e) => set("is_public", e.target.checked)} data-testid="team-public-toggle" className="mt-0.5 accent-[#29B6E8]" />
+            <span className="min-w-0">
+              <span className="block text-sm font-bold">Team öffentlich</span>
+              <span className="block text-xs text-white/55 mt-0.5" data-testid="team-public-hint">
+                {form.is_public !== false
+                  ? "Alle finden das Team in der Teamliste und der Suche und sehen die Teamseite."
+                  : "Privat: Das Team steht nicht in der Teamliste, der Suche und auf Profilen, die Teamseite sehen nur Mitglieder. Beitreten geht nur über den Einladungs-Link oder eine persönliche Einladung. In Turnieren, an denen ihr teilnehmt, bleibt der Teamname sichtbar."}
+              </span>
+            </span>
+          </label>
+        ) : null}
       </form>
       {!isNew && canDissolve ? <TeamDissolveSection team={team} onDissolved={onDissolved} /> : null}
     </SideSheet>

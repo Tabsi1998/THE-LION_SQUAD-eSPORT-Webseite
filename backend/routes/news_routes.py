@@ -544,7 +544,7 @@ async def get_news(slug_or_id: str, user: dict | None = Depends(get_optional_use
         p["linked_f1_challenges"] = await _filter_linked_items(items, user, is_staff, "fastlap")
     if p.get("linked_team_ids"):
         p["linked_teams"] = await db.teams.find(
-            {"id": {"$in": p["linked_team_ids"]}}, {"_id": 0, "id": 1, "name": 1, "slug": 1, "logo_url": 1},
+            {"id": {"$in": p["linked_team_ids"]}, "is_public": {"$ne": False}}, {"_id": 0, "id": 1, "name": 1, "slug": 1, "logo_url": 1},
         ).to_list(50)
     if p.get("mentioned_user_ids"):
         users = await db.users.find(

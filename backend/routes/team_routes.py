@@ -944,10 +944,15 @@ async def update_team(team_id: str, body: TeamUpdate, me: dict = Depends(get_cur
         updates["tag"] = _team_label(updates["tag"], team.get("tag"), "Das Kürzel", TEAM_TAG_MIN_LENGTH, TEAM_TAG_MAX_LENGTH)
         if updates["tag"] != team.get("tag") and await db.teams.find_one({"tag": updates["tag"]}):
             raise HTTPException(status_code=409, detail=TAG_TAKEN)
+    visibility_changes = "is_public" in updates and updates["is_public"] != team.get("is_public", True)
+    if visibility_changes and not (_is_team_leader(team, me["id"]) or _team_admin(me, TEAM_OWNER_ADMIN_ROLES)):
+        _refuse(me, "Ob das Team öffentlich oder privat ist, entscheidet die Teamleitung.", TEAM_OWNER_ADMIN_ROLES)
     if updates.get("name") or updates.get("tag"):
         await word_filter.screen_field(db, f"{updates.get('name') or ''} {updates.get('tag') or ''}", kind="team_name", user_id=me["id"], ref_id=team_id)
     updates["updated_at"] = now_utc().isoformat()
     await db.teams.update_one({"id": team_id}, {"$set": updates})
+    if visibility_changes:
+        await _team_audit(db, "team.visibility", team_id, me["id"], {"is_public": updates["is_public"]})
     team = await db.teams.find_one({"id": team_id}, {"_id": 0})
     return team
 

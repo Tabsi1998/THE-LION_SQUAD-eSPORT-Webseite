@@ -143,6 +143,33 @@ test("Club-Admin: Rollen und Übergabe auch ohne eigene Teamleitung; Turnierleit
   expect(screen.queryByTestId("team-promote-u-3")).toBeNull();
 });
 
+// Schalter „öffentlich/privat“ (#2128, TM9): nur die Teamleitung; der Hinweis sagt, was privat bedeutet.
+test("Teamleitung stellt das Team auf privat, der Hinweis nennt die Folgen; Co-Leitung sieht den Schalter nicht", async () => {
+  serve();
+  apiMock.patch.mockResolvedValue({ data: {} });
+  const { unmount } = renderAt("/teams/t-1");
+  fireEvent.click(await screen.findByTestId("team-edit-open"));
+  const toggle = await screen.findByTestId("team-public-toggle");
+  expect(toggle).toBeChecked();
+  fireEvent.click(toggle);
+  expect(screen.getByTestId("team-public-hint")).toHaveTextContent("nicht in der Teamliste");
+  fireEvent.click(screen.getByTestId("team-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/teams/t-1", expect.objectContaining({ is_public: false })));
+  unmount();
+
+  apiMock.patch.mockClear();
+  authState.user = { id: "u-co", username: "pixelpanther" };
+  serve({ ...TEAM, is_public: false });
+  renderAt("/teams/t-1");
+  expect(await screen.findByTestId("team-private-chip")).toHaveTextContent("Privat");
+  fireEvent.click(await screen.findByTestId("team-edit-open"));
+  await screen.findByTestId("team-edit-sheet");
+  expect(screen.queryByTestId("team-public-toggle")).toBeNull();
+  fireEvent.click(screen.getByTestId("team-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalled());
+  expect(apiMock.patch.mock.calls[0][1]).not.toHaveProperty("is_public");
+});
+
 // Keine Teamleitung aus einem gelöschten Konto (#2113): „Zur Teamleitung machen“ fehlt dort.
 test("gelöschtes Mitglied: kein Knopf „Zur Teamleitung machen“", async () => {
   serve({ ...TEAM, members: [MEMBERS[0], { ...MEMBERS[2], is_gone: true }, MEMBERS[1]] });
