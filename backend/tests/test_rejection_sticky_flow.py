@@ -161,3 +161,21 @@ async def test_the_mark_only_counts_on_a_rejected_entry(flow):
     assert not tournament_guard.rejection_dismissed({"status": "rejected"})
     assert not tournament_guard.rejection_dismissed({"status": "approved", "rejection_dismissed_at": "2026-11-01"})
     assert not tournament_guard.rejection_dismissed(None)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("route", ["status", "checkin"])
+async def test_a_second_rejection_is_seen_again(flow, route):
+    """Die Marke gilt nur für die Ablehnung, die weggenommen wurde - eine spätere muss die Person wieder sehen."""
+    staff = await flow.add_staff()
+    tournament, registration, player = await _rejected_solo(flow)
+    await flow.delete(f"/api/tournaments/{tournament['id']}/registrations/{registration['id']}")
+    flow.act_as(staff)
+    path = f"/api/tournaments/{tournament['id']}/registrations/{registration['id']}"
+    moved = await (flow.patch(path, json={"status": "approved"}) if route == "status" else flow.post(f"{path}/checkin", json={"status": "approved"}))
+    assert moved.status_code == 200, moved.text
+    assert "rejection_dismissed_at" not in await _stored(flow, registration)
+    again = await flow.patch(path, json={"status": "rejected"})
+    assert again.status_code == 200, again.text
+    flow.act_as(player)
+    assert await _mine(flow, tournament) == [registration["id"]]

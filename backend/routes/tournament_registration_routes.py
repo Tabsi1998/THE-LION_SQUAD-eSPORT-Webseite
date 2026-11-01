@@ -1015,7 +1015,7 @@ async def admin_create_registration(tid: str, body: RegistrationAdminCreate,
         await _sync_squad_key(db, old, "no_show", tournament)
         await db.tournament_registrations.update_one(
             {"id": old_reg_id},
-            {"$set": {"status": "no_show", "updated_at": now_utc().isoformat()}},
+            {"$set": {"status": "no_show", "updated_at": now_utc().isoformat()}, "$unset": {"rejection_dismissed_at": ""}},
         )
         replacement = await _replace_registration_in_open_matches(db, tid, old_reg_id, reg, me.get("id"), replace_targets)
     auto_bracket_update = None
@@ -1114,10 +1114,13 @@ async def update_registration(tid: str, reg_id: str, body: RegistrationUpdate,
         # inzwischen in einer anderen Staffel spielt, hier nicht wieder aktiv wird.
         await _sync_squad_key(db, reg, updates["status"], tournament_doc)
     updates["updated_at"] = now_utc().isoformat()
-    # Die Angaben zum Ausscheiden gelten nur, solange die Person ausgeschieden ist (die Ansicht liest ``removal``).
+    # Die Angaben zum Ausscheiden gelten nur, solange die Person ausgeschieden ist (die Ansicht liest ``removal``). Die Marke
+    # einer weggenommenen Ablehnung (#2113) nur, solange sie abgelehnt ist - sonst sähe sie eine spätere Ablehnung nie.
+    clears = {**({"removal": ""} if lifts_removal else {}),
+              **({"rejection_dismissed_at": ""} if previous_status == "rejected" and updates.get("status") not in (None, "rejected") else {})}
     await db.tournament_registrations.update_one(
         {"id": reg_id, "tournament_id": tid},
-        {"$set": updates, "$unset": {"removal": ""}} if lifts_removal else {"$set": updates},
+        {"$set": updates, "$unset": clears} if clears else {"$set": updates},
     )
     reg = await db.tournament_registrations.find_one({"id": reg_id, "tournament_id": tid}, {"_id": 0})
     if updates.get("status") and updates["status"] != previous_status:
@@ -1181,7 +1184,7 @@ async def staff_set_registration_checkin(tid: str, reg_id: str, body: dict,
 
             await db.tournament_registrations.update_one(
                 {"id": reg_id},
-                {"$set": {"status": status, "updated_at": now_utc().isoformat()}},
+                {"$set": {"status": status, "updated_at": now_utc().isoformat()}, "$unset": {"rejection_dismissed_at": ""}},
             )
             if status == "checked_in" and reg.get("user_id"):
                 await _apply_late_checkin_hooks(db, tid, reg["user_id"])
