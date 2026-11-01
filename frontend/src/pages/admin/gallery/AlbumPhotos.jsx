@@ -28,6 +28,7 @@ export function AlbumPhotos({ album, onBack }) {
   const [media, setMedia] = useState([]);
   const [selectedMedia, setSelectedMedia] = useState([]);
   const [loadingMedia, setLoadingMedia] = useState(false);
+  const [editingPhoto, setEditingPhoto] = useState(null);
   const confirm = useConfirm();
   const uploadProgress = useUploadProgress();
 
@@ -348,6 +349,17 @@ export function AlbumPhotos({ album, onBack }) {
                         {sections.map((section) => <option key={section.id} value={section.id}>{section.title}</option>)}
                       </select>
                       <button onClick={() => remove(p.id)} className="absolute top-1 right-1 p-1 bg-black/70 text-[#FF3B30] opacity-0 group-hover:opacity-100 transition" aria-label="Löschen"><Trash2 className="w-3.5 h-3.5" /></button>
+                      {/* Beschriftung und Reihenfolge (#2112) - am Handy immer sichtbar, am PC beim Darüberfahren. */}
+                      <button
+                        type="button"
+                        onClick={() => setEditingPhoto(p)}
+                        data-testid={`gallery-photo-edit-${p.id}`}
+                        title={p.caption || "Beschriftung und Reihenfolge"}
+                        className="absolute bottom-1 right-1 p-1 bg-black/70 text-white sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 transition"
+                        aria-label={`${p.caption || "Medium"} bearbeiten`}
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -399,6 +411,7 @@ export function AlbumPhotos({ album, onBack }) {
       )}
       {linkOpen && <VideoLinkModal onClose={() => setLinkOpen(false)} onSave={addExternalMedia} />}
       {editingSection && <SectionModal section={editingSection} onClose={() => setEditingSection(null)} onSave={saveSection} />}
+      {editingPhoto && <PhotoEditSheet photo={editingPhoto} onClose={() => setEditingPhoto(null)} onSaved={() => { setEditingPhoto(null); load(); }} />}
     </AdminLayout>
   );
 }
@@ -444,6 +457,36 @@ function MediaBadge({ item }) {
     <span className="absolute left-1 bottom-1 inline-flex items-center gap-1 rounded-sm bg-black/75 px-1.5 py-1 text-[9px] font-black uppercase tracking-widest text-white">
       <Play className="w-3 h-3 fill-current" /> {label}
     </span>
+  );
+}
+
+// Nach dem Hochladen (#2112): Beschriftung und Reihenfolge eines Mediums ändern. Die Reihenfolge zählt im Abschnitt.
+function PhotoEditSheet({ photo, onClose, onSaved }) {
+  const [caption, setCaption] = useState(photo.caption || "");
+  const [order, setOrder] = useState(String(photo.order_index ?? 0));
+  const [saving, setSaving] = useState(false);
+  const submit = async (event) => {
+    event.preventDefault();
+    const orderIndex = Number(order);
+    if (!Number.isInteger(orderIndex)) { toast.error("Reihenfolge bitte als ganze Zahl."); return; }
+    setSaving(true);
+    try {
+      await api.patch(`/gallery/photos/${photo.id}`, { caption: caption.trim(), order_index: orderIndex });
+      toast.success("Medium gespeichert.");
+      onSaved();
+    } catch (err) {
+      toast.error(formatRequestError(err, "Das Medium konnte nicht gespeichert werden."));
+      setSaving(false);
+    }
+  };
+  return (
+    <AdminSheet title="Medium bearbeiten" eyebrow="Galerie" onClose={onClose} onSubmit={submit} saving={saving} submitTestId="gallery-photo-save" testId="gallery-photo-sheet">
+      <div className="h-40 w-full overflow-hidden rounded-sm border border-white/10 bg-[#0A0A0A]">
+        <GalleryAdminThumb item={photo} />
+      </div>
+      <TextField label="Beschriftung" value={caption} onChange={setCaption} maxLength={300} placeholder="Optional – steht unter dem Bild" testId="gallery-photo-caption" />
+      <TextField label="Reihenfolge" type="number" value={order} onChange={setOrder} hint="Kleinere Zahl steht weiter vorn im Abschnitt." testId="gallery-photo-order" />
+    </AdminSheet>
   );
 }
 

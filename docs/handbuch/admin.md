@@ -212,6 +212,12 @@ Wichtig:
   **sperren** (mit Grund, mindestens fünf Zeichen; die Person bekommt den Grund per Mail), aber keine Rechte ändern.
 - Konten mit Adminbereich sperrt und entsperrt nur der Superadmin. Superadmin-Konten lassen sich nicht sperren, das
   eigene Konto auch nicht.
+- **Profil zurücksetzen** (Vereinsverwaltung, im Blatt eines fremden Kontos): für unpassende Angaben, etwa einen
+  anstößigen Anzeigenamen. Haken bei **Anzeigename**, **Bio**, **Profilbild** und/oder **Banner** setzen, einen **Grund**
+  eintragen (mindestens fünf Zeichen), **Zurücksetzen …** und die Rückfrage bestätigen. Die Person bekommt eine
+  Benachrichtigung mit den Feldern und dem Grund und kann selbst Neues eintragen; ohne Anzeigename steht ihr
+  Benutzername da. Der Grund steht im Protokoll, die alten Angaben nicht. Andere Felder (Einwilligungen,
+  Datenschutz-Schalter) ändert nur die Person selbst; Superadmin-Konten fasst nur der Superadmin an.
 - Weitere Rechte-Themen (Vorstand besetzen, Dolibarr-Funktionen als Rechtequelle) stehen in [Rollen](../ROLLEN.md).
 
 ### 3.7 Helfer, Moderation – und „Mein Dienst“
@@ -283,6 +289,17 @@ Jedes Thema hat genau **einen** Ort:
 | Rollen und Freigaben | Admin → Mitglieder → Alle Benutzer | dieses Kapitel, [Rollen](../ROLLEN.md) |
 | Server, Updates, Sicherungen | Admin → System → Betrieb & Logs, Status | [Betrieb](../BETRIEB.md) |
 | App-Versionen, Play Store | Admin → System → App-Versionen | [Play Store](../PLAY_STORE.md) |
+| Game-Server, AMP-Zugang | Admin → System → Game-Server | dieser Abschnitt (unten) |
+
+**Game-Server über das AMP-Panel (#2112):** Steht ein Server auf der Sync-Quelle **AMP-Panel**, fragt die Website das
+Panel nach dem Stand der Instanz (Feld **AMP-Instanz**: Name oder ID wie im Panel). Den Zugang tragt ihr oben auf der
+Game-Server-Seite im aufklappbaren Bereich **AMP-Panel** ein: **Adresse** (nur `https://`), **Benutzer** (am besten
+ein eigener mit Leserechten), **Passwort** und **Panel abfragen**. Das Passwort wird verschlüsselt gespeichert und nie
+wieder gezeigt; leer lassen heißt „behalten“ – außer bei einer **neuen Adresse**: Dann muss das Passwort neu mit, das
+gespeicherte gilt nur für die bisherige. Adressen der Plattform selbst (localhost, 127.x), Link-local-Adressen und
+Heimnetz-IPs als Zahl sind nicht erlaubt; ein Name, der ins Heimnetz zeigt, schon. **Verbindung testen** nennt die
+Instanzen, die das Panel kennt.
+**Passwort entfernen** (mit Rückfrage) beendet die Abfrage – Server auf „AMP-Panel“ bekommen dann einen Sync-Hinweis.
 
 **Shop-Preise (#2135):** Mitglieder zahlen genau, was der Verein an Printful zahlt – brutto, also Ware, Versand und
 Steuer. Im Produkt unter **Schritt 4 Preise** steht je Variante *Printful brutto*, daraus der *Mitgliederpreis*, ein

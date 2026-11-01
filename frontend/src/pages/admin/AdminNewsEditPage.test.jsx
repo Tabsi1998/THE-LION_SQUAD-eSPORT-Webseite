@@ -29,6 +29,13 @@ const POSTS = [
   { id: "n1", title: "Cup abgesagt", slug: "cup-abgesagt", excerpt: "Zu wenige Anmeldungen.", content: "Text", category: "announcement", visibility: "public", published: true, linked_event_ids: ["ev-1"] },
 ];
 
+// Der Editor lädt den Beitrag einzeln (#2122 NW4); unbekannte Kennung = 404.
+function adminPost(url, posts) {
+  const found = posts.find((post) => url === `/admin/news/${post.id}`);
+  if (!found) throw Object.assign(new Error("nicht gefunden"), { response: { status: 404 } });
+  return { data: found };
+}
+
 function renderAt(path) {
   return render(
     <MemoryRouter initialEntries={[path]}>
@@ -44,7 +51,7 @@ function renderAt(path) {
 beforeEach(() => {
   apiMock.get.mockImplementation(async (url) => {
     if (url === "/news-meta") return { data: META };
-    if (url === "/admin/news") return { data: POSTS };
+    if (url.startsWith("/admin/news/")) return adminPost(url, POSTS);
     return { data: [] };
   });
   apiMock.post.mockReset();
@@ -61,9 +68,74 @@ test("Neuer Beitrag: Seite mit Veröffentlichung rechts, Slug aus dem Titel, Spe
 
   fireEvent.change(screen.getByTestId("news-title"), { target: { value: "Weihnachtsfeier: Anmeldung offen" } });
   expect(screen.getByTestId("news-slug")).toHaveValue("weihnachtsfeier-anmeldung-offen");
+  // Neu ist ein Entwurf (#2122 NW1): Speichern verschickt nichts und fragt deshalb nicht nach.
+  expect(screen.getByTestId("news-publish-draft")).toBeChecked();
+  confirmMock.mockClear();
   fireEvent.submit(screen.getByTestId("news-form"));
-  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/news", expect.objectContaining({ title: "Weihnachtsfeier: Anmeldung offen", slug: "weihnachtsfeier-anmeldung-offen", published: true, linked_event_ids: [] })));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/news", expect.objectContaining({ title: "Weihnachtsfeier: Anmeldung offen", slug: "weihnachtsfeier-anmeldung-offen", published: false, linked_event_ids: [] })));
+  expect(apiMock.post.mock.calls[0][1]).not.toHaveProperty("published_at");
+  expect(confirmMock).not.toHaveBeenCalled();
   expect(await screen.findByTestId("news-list")).toBeInTheDocument();
+});
+
+// Jetzt veröffentlichen (#2122 NW1): vorher eine Rückfrage mit der Zahl der Empfänger und ob Discord meldet.
+test("Neuer Beitrag „Jetzt veröffentlichen“: Rückfrage „geht an N Personen“, dann veröffentlicht", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/news-meta") return { data: META };
+    if (url === "/settings/newsletter/audience") return { data: { kind: "news", visibility: "public", internal: false, recipients: 214, announcement: "Keine eigene Meldung" } };
+    return { data: [] };
+  });
+  apiMock.post.mockImplementation(async (url) => (url === "/settings/discord/preview" ? { data: { would_send: true } } : { data: { id: "n2" } }));
+  confirmMock.mockClear();
+  renderAt("/admin/news/new");
+  fireEvent.change(await screen.findByTestId("news-title"), { target: { value: "Liga startet" } });
+  expect(await screen.findByTestId("distribute-audience-line")).toHaveTextContent("Geht beim Veröffentlichen an 214 Personen");
+  fireEvent.click(screen.getByTestId("news-publish-now"));
+  fireEvent.submit(screen.getByTestId("news-form"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/news", expect.objectContaining({ title: "Liga startet", published: true })));
+  expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({
+    title: "Beitrag jetzt veröffentlichen?",
+    description: "Der Newsletter geht sofort an 214 Personen mit Newsletter-Zustimmung. Discord bekommt eine Meldung.",
+    confirmLabel: "Veröffentlichen",
+  }));
+  const payload = apiMock.post.mock.calls.find(([url]) => url === "/news")[1];
+  expect(payload.publish_now).toBe(true);
+  expect(payload).not.toHaveProperty("published_at");
+});
+
+test("Abbrechen in der Rückfrage speichert nichts", async () => {
+  apiMock.post.mockResolvedValue({ data: {} });
+  confirmMock.mockResolvedValueOnce(false);
+  renderAt("/admin/news/new");
+  fireEvent.change(await screen.findByTestId("news-title"), { target: { value: "Doch nicht" } });
+  fireEvent.click(screen.getByTestId("news-publish-now"));
+  fireEvent.submit(screen.getByTestId("news-form"));
+  await waitFor(() => expect(confirmMock).toHaveBeenCalled());
+  expect(apiMock.post.mock.calls.map(([url]) => url)).not.toContain("/news");
+});
+
+test("Geplant: Termin in der Vergangenheit wird nicht gespeichert", async () => {
+  const { toast } = await import("sonner");
+  apiMock.post.mockResolvedValue({ data: {} });
+  renderAt("/admin/news/new");
+  fireEvent.change(await screen.findByTestId("news-title"), { target: { value: "Zu spät" } });
+  fireEvent.click(screen.getByTestId("news-publish-scheduled"));
+  fireEvent.change(screen.getByTestId("news-published-at"), { target: { value: "2020-01-01T10:00" } });
+  fireEvent.submit(screen.getByTestId("news-form"));
+  await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("Vergangenheit")));
+  expect(apiMock.post.mock.calls.map(([url]) => url)).not.toContain("/news");
+});
+
+test("ein veröffentlichter Beitrag: Änderungen ohne Rückfrage, Datum bleibt", async () => {
+  apiMock.patch.mockResolvedValue({ data: POSTS[0] });
+  confirmMock.mockClear();
+  renderAt("/admin/news/n1");
+  expect(await screen.findByTestId("news-publish-now")).toBeChecked();
+  expect(screen.getByText("Veröffentlicht")).toBeInTheDocument();
+  fireEvent.change(screen.getByTestId("news-excerpt"), { target: { value: "Neu." } });
+  fireEvent.submit(screen.getByTestId("news-form"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/news/n1", { excerpt: "Neu." }));
+  expect(confirmMock).not.toHaveBeenCalled();
 });
 
 test("Bearbeiten lädt den Beitrag aus der Admin-Liste und schickt nur die Änderung", async () => {
@@ -93,7 +165,7 @@ test("unbekannte Kennung: Hinweis mit Weg zurück", async () => {
 test("Personen markieren über die Suche – die ganze Kontoliste wird nie geladen", async () => {
   apiMock.get.mockImplementation(async (url) => {
     if (url === "/news-meta") return { data: META };
-    if (url === "/admin/news") return { data: [{ ...POSTS[0], mentioned_user_ids: ["u-1"], mentioned_users: [{ id: "u-1", username: "erika", display_name: "Erika Beispiel" }] }] };
+    if (url.startsWith("/admin/news/")) return adminPost(url, [{ ...POSTS[0], mentioned_user_ids: ["u-1"], mentioned_users: [{ id: "u-1", username: "erika", display_name: "Erika Beispiel" }] }]);
     if (url === "/users/mention-search") return { data: [{ id: "u-2", username: "max", display_name: "Max Muster" }] };
     return { data: [] };
   });
@@ -113,7 +185,7 @@ const BOX = { kind: "news", source_id: "n1", title: "Cup abgesagt", visibility: 
 function mockWithBox(box) {
   apiMock.get.mockImplementation(async (url) => {
     if (url === "/news-meta") return { data: META };
-    if (url === "/admin/news") return { data: POSTS };
+    if (url.startsWith("/admin/news/")) return adminPost(url, POSTS);
     if (url === "/settings/newsletter/state") {
       if (box instanceof Error) throw box;
       return { data: box };
@@ -142,4 +214,81 @@ test("Verteilen: ohne Recht steht ein Satz statt des Knopfs", async () => {
   renderAt("/admin/news/n1");
   expect(await screen.findByTestId("distribute-error")).toHaveTextContent("Den Newsletter verschickt die Redaktion");
   expect(screen.queryByTestId("distribute-send")).toBeNull();
+});
+
+// Wer geändert hat, Verlauf, Autor (#2122 NW3).
+test("Autor und Verlauf: zuletzt geändert, Verlauf mit Feldern, neuer Autor geht mit", async () => {
+  const post = { ...POSTS[0], author_id: "u-a", author_name: "Rita Redaktion", updated_at: "2026-10-27T08:15:00+00:00", updated_by_name: "Moritz Muster",
+    history: [{ at: "2026-10-27T08:15:00+00:00", action: "news.update", label: "Geändert", by: "Moritz Muster", fields: ["Titel", "Kurzbeschreibung"] }] };
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/news-meta") return { data: META };
+    if (url.startsWith("/admin/news/")) return adminPost(url, [post]);
+    if (url === "/admin/people/search") return { data: [{ id: "u-b", name: "Gastautorin", context: "Mitglied" }] };
+    return { data: [] };
+  });
+  apiMock.patch.mockResolvedValue({ data: post });
+  renderAt("/admin/news/n1");
+  expect(await screen.findByTestId("news-last-change")).toHaveTextContent("Zuletzt geändert von Moritz Muster am 27.10.2026, 09:15.");
+  expect(screen.getByTestId("news-history")).toHaveTextContent("Geändert von Moritz Muster");
+  expect(screen.getByTestId("news-history")).toHaveTextContent("Titel, Kurzbeschreibung");
+  expect(screen.getByTestId("news-author-selected")).toHaveTextContent("Rita Redaktion");
+  fireEvent.click(screen.getByTestId("news-author-clear"));
+  fireEvent.change(screen.getByPlaceholderText("Name tippen …"), { target: { value: "Gast" } });
+  fireEvent.click(await screen.findByRole("option", { name: /Gastautorin/ }));
+  fireEvent.submit(screen.getByTestId("news-form"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/news/n1", { author_id: "u-b" }));
+});
+
+test("zurückgezogen: Hinweis und Wiederherstellen als Entwurf", async () => {
+  const post = { ...POSTS[0], published: false, withdrawn_at: "2026-10-20T10:00:00+00:00", withdrawn_by_name: "Rita Redaktion" };
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/news-meta") return { data: META };
+    if (url.startsWith("/admin/news/")) return adminPost(url, [post]);
+    return { data: [] };
+  });
+  apiMock.post.mockResolvedValue({ data: {} });
+  renderAt("/admin/news/n1");
+  expect(await screen.findByTestId("news-withdrawn")).toHaveTextContent("Zurückgezogen am 20.10.2026, 12:00 von Rita Redaktion.");
+  fireEvent.click(screen.getByTestId("news-restore"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/news/n1/restore"));
+});
+
+// Alltagssprache und Suche in den Verknüpfungen (#2122 NW5).
+test("Verknüpfungen: Suchfeld filtert, Gewähltes bleibt, Entwürfe sind gekennzeichnet; keine Fachbegriffe", async () => {
+  const tournaments = Array.from({ length: 7 }, (_, index) => ({ id: `t${index}`, title: `Cup ${index}`, status: index === 3 ? "draft" : "registration_open" }));
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/news-meta") return { data: META };
+    if (url.startsWith("/admin/news/")) return adminPost(url, [{ ...POSTS[0], linked_tournament_ids: ["t1"] }]);
+    if (url.startsWith("/tournaments")) return { data: tournaments };
+    return { data: [] };
+  });
+  renderAt("/admin/news/n1");
+  const box = await screen.findByTestId("news-link-tournaments");
+  expect(box).toHaveTextContent("Entwurf");
+  fireEvent.change(screen.getByTestId("news-link-tournaments-search"), { target: { value: "Cup 5" } });
+  expect(box).toHaveTextContent("Cup 5");
+  expect(box).toHaveTextContent("Cup 1");
+  expect(box).not.toHaveTextContent("Cup 2");
+  const form = screen.getByTestId("news-form");
+  expect(form).not.toHaveTextContent(/Slug|kebab|Teaser|Embeds|noindex|Markdown/);
+  expect(screen.getByText("Adresse (Link)")).toBeInTheDocument();
+});
+
+// Zurückziehen statt „Zurück zum Entwurf“ (#2122): ein schon öffentlicher Beitrag wird zurückgezogen, mit Rückfrage.
+test("schon öffentlicher Beitrag: „Zurückziehen“ statt „Zurück zum Entwurf“, mit Rückfrage", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/news-meta") return { data: META };
+    if (url.startsWith("/admin/news/")) return adminPost(url, [{ ...POSTS[0], can_delete: false }]);
+    return { data: [] };
+  });
+  apiMock.patch.mockResolvedValue({ data: {} });
+  confirmMock.mockClear();
+  renderAt("/admin/news/n1");
+  const choice = await screen.findByTestId("news-publish-choice");
+  expect(choice).toHaveTextContent("Zurückziehen");
+  expect(choice).not.toHaveTextContent("Zurück zum Entwurf");
+  fireEvent.click(screen.getByTestId("news-publish-draft"));
+  fireEvent.submit(screen.getByTestId("news-form"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/news/n1", expect.objectContaining({ published: false })));
+  expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Beitrag zurückziehen?" }));
 });

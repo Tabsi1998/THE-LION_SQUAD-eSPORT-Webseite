@@ -35,7 +35,7 @@ export function leagueCrumbs(tournament, trail, { tournamentUrl = "", current = 
   const head = trail
     ? [{ label: "Liga", to: "/liga" }, { label: `${trail.leagueName} ${trail.seasonName}`, to: trail.seasonHref }]
     : [{ label: "Liga" }];
-  return [{ label: "Home", to: "/" }, ...head, staffel, ...(current ? [current] : [])];
+  return [{ label: "Start", to: "/" }, ...head, staffel, ...(current ? [current] : [])];
 }
 
 /**
@@ -46,6 +46,6 @@ export function tournamentCrumbs(tournament, trail, { tournamentUrl = "", curren
   const league = leagueCrumbs(tournament, trail, { tournamentUrl, current });
   if (league) return league;
   const title = { label: tournament?.title || "Turnier", ...(current && tournamentUrl ? { to: tournamentUrl } : {}) };
-  return [{ label: "Home", to: "/" }, { label: "eSports", to: "/esports" }, { label: "Turniere", to: "/tournaments" }, title,
+  return [{ label: "Start", to: "/" }, { label: "eSports", to: "/esports" }, { label: "Turniere", to: "/tournaments" }, title,
     ...(current ? [current] : [])];
 }

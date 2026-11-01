@@ -12,6 +12,23 @@ MENTION_RE = re.compile(r"@([A-Za-z0-9_.-]{2,32})")
 PROFILE_LINK_RE = re.compile(r"/u/([A-Za-z0-9_.-]{2,32})")
 
 
+# Felder, die nur die Redaktion braucht (#2122): wer geändert oder zurückgezogen hat, der Versandstand von Newsletter,
+# Discord und Meldungen, wer schon über eine Erwähnung benachrichtigt wurde. Öffentliche Antworten (Website, App,
+# Startseite) tragen sie nie - Admin → News bekommt sie über die eigenen Admin-Wege.
+INTERNAL_NEWS_FIELDS = frozenset({
+    "updated_by", "updated_by_name",
+    "withdrawn_at", "withdrawn_by", "withdrawn_by_name", "withdrawn_was_published",
+    "newsletter_sent_at", "newsletter_sent_count", "newsletter_sent_by", "newsletter_skipped_reason", "newsletter_checked_at",
+    "news_mention_notified_user_ids", "news_mentions_processed_at",
+    "discord_checked_at", "discord_outcome", "members_notified_at", "members_notified_count",
+})
+
+
+def public_news(post: dict) -> dict:
+    """Ein Beitrag ohne die internen Felder der Redaktion - für jede öffentliche Antwort."""
+    return {key: value for key, value in (post or {}).items() if key not in INTERNAL_NEWS_FIELDS}
+
+
 def parse_dt(value):
     if not value:
         return None

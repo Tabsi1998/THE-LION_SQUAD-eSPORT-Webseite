@@ -1284,6 +1284,11 @@ class F1GuestRename(F1GuestCreate):
     change_reason: Optional[str] = Field(default=None, max_length=500)
 
 
+class F1GuestDelete(BaseModel):
+    """Gast ohne Zeiten löschen (#2112) - nach der Veröffentlichung wie Umbenennen nur mit Begründung."""
+    change_reason: Optional[str] = Field(default=None, max_length=500)
+
+
 class F1GuestLink(BaseModel):
     """Gast mit Konto verknüpfen (#1585): das Konto aus der Personensuche, nach der Veröffentlichung mit Begründung."""
     user_id: str
@@ -1352,6 +1357,8 @@ class NewsCreate(BaseModel):
     visibility: NewsVisibility = "public"
     published: bool = True
     published_at: Optional[datetime] = None
+    # „Jetzt veröffentlichen“ (#2122): den Zeitpunkt setzt der Server, nicht die Uhr des Browsers.
+    publish_now: Optional[bool] = None
     # „Ohne Discord veröffentlichen“ (#303)
     discord_skip: bool = False
     # Link-Vorschau beim Teilen (#347)
@@ -1375,6 +1382,7 @@ class NewsUpdate(BaseModel):
     visibility: Optional[NewsVisibility] = None
     published: Optional[bool] = None
     published_at: Optional[datetime] = None
+    publish_now: Optional[bool] = None
     discord_skip: Optional[bool] = None
     share_preview: Optional[bool] = None
     pinned: Optional[bool] = None
@@ -1383,6 +1391,8 @@ class NewsUpdate(BaseModel):
     linked_f1_challenge_ids: Optional[List[str]] = None
     linked_team_ids: Optional[List[str]] = None
     mentioned_user_ids: Optional[List[str]] = None
+    # Autor ändern (#2122 NW3): Kennung eines Kontos, der Name kommt aus dem Konto.
+    author_id: Optional[str] = Field(default=None, max_length=80)
 
 
 SponsorTier = Literal["main", "platinum", "gold", "silver", "bronze"]

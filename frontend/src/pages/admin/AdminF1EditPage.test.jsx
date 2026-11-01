@@ -304,3 +304,76 @@ test("scheitert der Abgleich, sagt die Seite es nach dem Speichern", async () =>
   fireEvent.click(screen.getByTestId("f1-delete-time-t-1"));
   await waitFor(() => expect(toastMock.warning).toHaveBeenCalledWith(expect.stringContaining("bitte prüfen")));
 });
+
+test("ein Entwurf lässt sich nach Rückfrage löschen (#2112), danach geht es zur Liste", async () => {
+  render(
+    <MemoryRouter initialEntries={["/admin/f1/c-1"]}>
+      <Routes>
+        <Route path="/admin/f1/:id" element={<AdminF1EditPage />} />
+        <Route path="/admin/f1" element={<div>Fast-Lap-Liste</div>} />
+      </Routes>
+    </MemoryRouter>,
+  );
+  await screen.findByRole("heading", { name: "Monza Sprint" });
+  fireEvent.click(screen.getByTestId("f1-delete-challenge"));
+  await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith("/f1/challenges/c-1"));
+  expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Entwurf löschen?" }));
+  expect(await screen.findByText("Fast-Lap-Liste")).toBeInTheDocument();
+});
+
+test("ohne Rückfrage-Ja wird nichts gelöscht; außerhalb des Entwurfs gibt es keinen Löschen-Knopf", async () => {
+  confirmMock.mockResolvedValue(false);
+  const { unmount } = renderPage();
+  await screen.findByRole("heading", { name: "Monza Sprint" });
+  fireEvent.click(screen.getByTestId("f1-delete-challenge"));
+  await waitFor(() => expect(confirmMock).toHaveBeenCalled());
+  expect(apiMock.delete).not.toHaveBeenCalled();
+  unmount();
+  answerWith({ status: "live" });
+  renderPage();
+  await screen.findByRole("heading", { name: "Monza Sprint" });
+  expect(screen.queryByTestId("f1-delete-challenge")).not.toBeInTheDocument();
+});
+
+test("Gästeliste (#2112): umbenennen und Gäste ohne Zeiten löschen", async () => {
+  const guests = [
+    { id: "g-1", display_name: "Anna", has_times: true },
+    { id: "g-2", display_name: "Ben", has_times: false },
+  ];
+  apiMock.get.mockImplementation(async (url) => {
+    if (String(url).startsWith("/f1/challenges/c-1?")) return { data: CHALLENGE };
+    if (url === "/f1/challenges/c-1/guests") return { data: guests };
+    return { data: [] };
+  });
+  promptMock.mockResolvedValueOnce("Gast 1");
+  renderPage();
+  expect(await screen.findByTestId("f1-guests-panel")).toBeInTheDocument();
+  expect(screen.queryByTestId("f1-guest-delete-g-1")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("f1-guest-rename-g-1"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/f1/guests/g-1", { display_name: "Gast 1" }));
+  fireEvent.click(screen.getByTestId("f1-guest-delete-g-2"));
+  await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith("/f1/guests/g-2"));
+});
+
+test("nach der Veröffentlichung braucht das Umbenennen eine Begründung", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (String(url).startsWith("/f1/challenges/c-1?")) return { data: { ...CHALLENGE, status: "results_published" } };
+    if (url === "/f1/challenges/c-1/guests") return { data: [{ id: "g-1", display_name: "Anna", has_times: true }] };
+    return { data: [] };
+  });
+  promptMock.mockResolvedValueOnce("Gast 1").mockResolvedValueOnce("Gast will anonym bleiben");
+  renderPage();
+  fireEvent.click(await screen.findByTestId("f1-guest-rename-g-1"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/f1/guests/g-1", { display_name: "Gast 1", change_reason: "Gast will anonym bleiben" }));
+});
+test("nach der Veröffentlichung braucht das Löschen eines Gastes eine Begründung", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (String(url).startsWith("/f1/challenges/c-1?")) return { data: { ...CHALLENGE, status: "results_published" } };
+    if (url === "/f1/challenges/c-1/guests") return { data: [{ id: "g-2", display_name: "Ben", has_times: false }] };
+    return { data: [] };
+  });
+  promptMock.mockResolvedValueOnce("Doppelt angelegt, nie gefahren");
+  renderPage();
+  fireEvent.click(await screen.findByTestId("f1-guest-delete-g-2"));
+  await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith("/f1/guests/g-2", { data: { change_reason: "Doppelt angelegt, nie gefahren" } }));
+});

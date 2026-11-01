@@ -31,12 +31,32 @@ export function newsletterLine(box) {
   return `Noch nicht verschickt – geht an ${people(box.recipients)} mit Newsletter-Zustimmung.`;
 }
 
-export function DistributeBox({ kind, itemId, title = "", children }) {
+/** Vor dem ersten Speichern (#2122 NW1): wie viele den Newsletter bei dieser Sichtbarkeit bekämen. */
+export function audienceLine(audience) {
+  if (!audience) return "";
+  if (audience.internal) return "Kein Newsletter – „Nur intern“ geht nicht per Mail hinaus.";
+  return `Geht beim Veröffentlichen an ${people(audience.recipients)} mit Newsletter-Zustimmung – vorher kommt eine Rückfrage.`;
+}
+
+export function DistributeBox({ kind, itemId, title = "", visibility = "", children }) {
   const [box, setBox] = useState(null);
   const [error, setError] = useState("");
   const [open, setOpen] = useState(startsOpen);
   const [busy, setBusy] = useState(false);
+  const [audience, setAudience] = useState(null);
   const confirm = useConfirm();
+
+  useEffect(() => {
+    if (itemId || !visibility) {
+      setAudience(null);
+      return undefined;
+    }
+    let cancelled = false;
+    api.get("/settings/newsletter/audience", { params: { kind, visibility } })
+      .then(({ data }) => { if (!cancelled) setAudience(data && typeof data === "object" && !Array.isArray(data) ? data : null); })
+      .catch(() => { if (!cancelled) setAudience(null); });
+    return () => { cancelled = true; };
+  }, [kind, itemId, visibility]);
 
   const load = useCallback(() => {
     if (!itemId) return;
@@ -109,7 +129,9 @@ export function DistributeBox({ kind, itemId, title = "", children }) {
             <Mail className="w-4 h-4 mt-0.5 text-white/50 shrink-0" />
             <div className="min-w-0 flex-1 space-y-2">
               <div className="text-xs font-bold uppercase tracking-wider text-white/70">Newsletter</div>
-              {!itemId && <p className="text-sm text-white/55">Nach dem ersten Speichern steht hier, an wie viele Personen der Newsletter geht.</p>}
+              {!itemId && (audience
+                ? <p className="text-sm text-white/75" data-testid="distribute-audience-line">{audienceLine(audience)}</p>
+                : <p className="text-sm text-white/55">Nach dem ersten Speichern steht hier, an wie viele Personen der Newsletter geht.</p>)}
               {itemId && error && <p className="text-sm text-white/55" data-testid="distribute-error">{error}</p>}
               {itemId && !error && box && (
                 <>

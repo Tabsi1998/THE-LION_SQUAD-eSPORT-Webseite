@@ -18,7 +18,8 @@ import { viennaDate } from "@/lib/vienna";
 // Werte mit Satz und Beispiel samt den Zielen (früher die feste Seite „Werte & Ziele“).
 
 const ACCENT = "#29B6E8";
-const TEXT_KEYS = ["hero_eyebrow", "hero_title", "hero_text", "values_title", "values_text", "games_title", "games_text", "offline_title", "offline_text", "cta_title", "cta_text", "purpose"];
+const TEXT_KEYS = ["hero_eyebrow", "hero_title", "hero_text", "values_title", "values_text", "games_title", "games_text", "offline_title", "offline_text", "cta_title", "cta_text", "purpose",
+  "home_title", "home_highlight", "home_text"];
 
 export function textsToForm(texts) {
   const form = {};
@@ -174,7 +175,7 @@ export default function AdminAboutPage() {
         eyebrow="Verein"
         accent={ACCENT}
         title="Über uns"
-        intro="Die Texte der Seite „Über den Verein“. Zahlen, Spiele, Vorstand und Events zieht die Seite selbst aus den Daten."
+        intro="Die Texte der Seite „Über den Verein“ und der Kopf der Startseite. Zahlen, Spiele, Vorstand und Events zieht die Seite selbst aus den Daten."
         backTo="/admin"
         backLabel="Dashboard"
         onSubmit={submit}
@@ -182,7 +183,7 @@ export default function AdminAboutPage() {
         headerExtra={<Link to="/about" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider font-bold text-white/60 hover:text-[#29B6E8] transition" data-testid="about-preview-link">Seite ansehen <ExternalLink className="w-3.5 h-3.5" /></Link>}
         aside={(
           <>
-            <FormSection title="Vereinsdaten" accent={ACCENT} hint={fromDolibarr ? "Gründung, Zweck und gemeinnützig kommen aus Dolibarr (Schalter „Vereinsdaten aus Dolibarr“ in den Einstellungen). Die Felder hier sind nur der Rückfall." : "Solange die Vereinsdaten nicht aus Dolibarr kommen, gelten diese Felder."} testId="about-organization">
+            <FormSection title="Vereinsdaten" accent={ACCENT} hint={fromDolibarr ? "Gründung, Zweck und gemeinnützig kommen aus Dolibarr (Schalter „Vereinsdaten aus Dolibarr“ unter Verein → Vereinsdaten). Die Felder hier sind nur der Rückfall." : "Solange die Vereinsdaten nicht aus Dolibarr kommen, gelten diese Felder."} testId="about-organization">
               {fromDolibarr && (
                 <p className="text-xs text-[#29B6E8]" data-testid="about-organization-dolibarr">
                   Aus Dolibarr: {data.organization.founded_on ? `gegründet am ${foundedLabel(data.organization.founded_on)}` : data.organization.founded_year ? `gegründet ${data.organization.founded_year}` : "kein Gründungsdatum"}{data.organization.nonprofit ? ", gemeinnützig" : ""}{data.organization.purpose ? ` – „${data.organization.purpose}“` : ""}
@@ -193,8 +194,9 @@ export default function AdminAboutPage() {
                 <TextField label="Gründungsjahr" value={form.founded_on ? form.founded_on.slice(0, 4) : form.founded_year} onChange={(v) => set("founded_year", v)} placeholder="2019" maxLength={4} testId="about-founded-year" disabled={fromDolibarr || Boolean(form.founded_on)} hint={fromDolibarr ? "aus Dolibarr" : form.founded_on ? "aus dem Gründungsdatum" : "Reicht für „Jahre aktiv“ – für den Vereinsgeburtstag braucht es den Tag."} />
                 <CheckField label="Gemeinnützig" checked={form.nonprofit} onChange={(v) => set("nonprofit", v)} testId="about-nonprofit" disabled={fromDolibarr} hint={fromDolibarr ? "aus Dolibarr" : undefined} className="mt-6" />
               </FormGrid>
-              <TextAreaField label="Vereinszweck" value={form.purpose} onChange={(v) => set("purpose", v)} rows={3} testId="about-purpose" hint={fromDolibarr ? "aus Dolibarr – wird dort gepflegt" : "Ein Satz, wie er in den Statuten steht."} />
-              <p className="text-xs text-white/45">ZVR und Sitz kommen aus den Vereinsdaten (Einstellungen → Rechtliches).</p>
+              {/* Aus Dolibarr gesperrt wie Gründung und Gemeinnützig (#2122 NW8) - eine Änderung hier würde nicht wirken. */}
+              <TextAreaField label="Vereinszweck" value={form.purpose} onChange={(v) => set("purpose", v)} rows={3} testId="about-purpose" disabled={fromDolibarr} hint={fromDolibarr ? "aus Dolibarr – wird dort gepflegt" : "Ein Satz, wie er in den Statuten steht."} />
+              <p className="text-xs text-white/45" data-testid="about-legal-hint">ZVR und Sitz kommen aus <Link to="/admin/club" className="text-[#29B6E8] hover:underline">Verein → Vereinsdaten</Link>.</p>
             </FormSection>
             <FormSection title="Der Verein in Zahlen" accent={ACCENT} testId="about-numbers">
               <p className="text-xs text-white/50">Gezählt, nicht getippt. Häkchen zeigen die Kachel auf „Über uns“ und der Startseite, die Pfeile bestimmen die Reihenfolge. Zähler mit null bleiben von selbst weg.</p>
@@ -211,7 +213,16 @@ export default function AdminAboutPage() {
         )}
         actions={<FormActions accent={ACCENT} saving={saving} submitTestId="about-save" cancelTo="/admin" cancelLabel="Zurück" />}
       >
-        <FormSection title="Kopf" accent={ACCENT} testId="about-section-hero" hint="Ein eigener Satz für „Über uns“ – nicht derselbe wie auf der Startseite.">
+        {/* Kopf der Startseite (#2122 NW9): vorher fest im Code. Leer heißt Vorgabe. */}
+        <FormSection title="Kopf der Startseite" accent={ACCENT} testId="about-section-home-hero" hint="Die große Überschrift ganz oben auf der Startseite – die zweite Zeile leuchtet. Leere Felder zeigen die Vorgabe.">
+          <FormGrid>
+            <TextField label="Überschrift, erste Zeile" value={form.home_title} onChange={(v) => set("home_title", v)} maxLength={60} placeholder={data.defaults?.home_title || ""} testId="about-home-title" />
+            <TextField label="Überschrift, zweite Zeile" value={form.home_highlight} onChange={(v) => set("home_highlight", v)} maxLength={60} placeholder={data.defaults?.home_highlight || ""} testId="about-home-highlight" />
+          </FormGrid>
+          <TextAreaField label="Satz darunter" value={form.home_text} onChange={(v) => set("home_text", v)} rows={3} testId="about-home-text" hint="Ein, zwei Sätze, wer wir sind – ohne Formatierung." />
+          <Link to="/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider font-bold text-white/60 hover:text-[#29B6E8]" data-testid="about-home-preview">Startseite ansehen <ExternalLink className="w-3.5 h-3.5" /></Link>
+        </FormSection>
+        <FormSection title="Kopf von „Über uns“" accent={ACCENT} testId="about-section-hero" hint="Ein eigener Satz für „Über uns“ – nicht derselbe wie auf der Startseite.">
           <FormGrid>
             <TextField label="Kleine Zeile" value={form.hero_eyebrow} onChange={(v) => set("hero_eyebrow", v)} maxLength={60} testId="about-hero-eyebrow" />
             <TextAreaField label="Überschrift" value={form.hero_title} onChange={(v) => set("hero_title", v)} rows={2} testId="about-hero-title" hint="Leer: „Seit <Gründungsjahr> ein Rudel“. Zeilenumbruch = neue Zeile." />

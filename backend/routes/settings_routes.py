@@ -1244,6 +1244,26 @@ async def newsletter_state(kind: Literal["news", "event"], id: str = Query(..., 
     return await _newsletter_box(item, kind, rights)
 
 
+NEWSLETTER_AUDIENCES = {"public", "community", "members", "internal"}
+
+
+@settings_router.get("/newsletter/audience")
+async def newsletter_audience(kind: Literal["news", "event"], visibility: str = Query("public", max_length=20),
+                              me: dict = Depends(get_current_user)):
+    """Wie viele den Newsletter bei dieser Sichtbarkeit bekämen (#2122 NW1) - für die Rückfrage vor dem Veröffentlichen,
+    auch bevor der Beitrag gespeichert ist. Nur die Zahl, nie Namen oder Adressen."""
+    from services.notification_preferences import newsletter_recipients
+
+    await _require_newsletter_send(me, kind)
+    audience = visibility if visibility in NEWSLETTER_AUDIENCES else "public"
+    internal = audience == "internal"
+    return {
+        "kind": kind, "visibility": audience, "internal": internal,
+        "recipients": 0 if internal else len(await newsletter_recipients(audience)),
+        "announcement": NEWSLETTER_ANNOUNCEMENTS.get(audience, NEWSLETTER_NO_ANNOUNCEMENT),
+    }
+
+
 @settings_router.post("/newsletter/preview")
 async def newsletter_preview(body: NewsletterTriggerBody, me: dict = Depends(get_current_user)):
     """Stand des Kastens und die Mail, wie sie hinausginge (#2119 ML5) - Anrede mit dem eigenen Namen, nichts wird
@@ -2178,6 +2198,16 @@ async def update_amp(body: AmpSettings, me: dict = Depends(require_club_admin())
             updates.pop("password")
 
     current = await db.settings.find_one({"id": "amp"}, {"_id": 0}) or {}
+    # Nur eine neue Adresse: Eine schon gespeicherte darf das Speichern anderer Felder nicht sperren.
+    if updates.get("base_url") and updates["base_url"] != (current.get("base_url") or ""):
+        from services.outbound_address import outbound_block_reason
+        reason = await outbound_block_reason(updates["base_url"])
+        if reason:
+            raise HTTPException(400, reason)
+    # Neue Adresse (#2112): das gespeicherte Passwort gehört zur bisherigen - es geht nur mit neu eingetragenem Passwort.
+    if ("base_url" in updates and updates["base_url"] != (current.get("base_url") or "")
+            and secret_is_configured(current.get("password")) and "password" not in updates and not clear_password):
+        raise HTTPException(400, "Neue Adresse: bitte das Passwort neu eintragen. Das gespeicherte gilt nur für die bisherige Adresse.")
     changed_fields = _changed_setting_fields(current, updates, unset)
     if not changed_fields:
         return {"ok": True, "changed": False}
@@ -2253,18 +2283,28 @@ async def discord_resend(log_id: str, me: dict = Depends(require_club_admin())):
     entry = await db.email_logs.find_one({"id": log_id, "channel": "discord"}, {"_id": 0})
     if not entry or not entry.get("payload"):
         raise HTTPException(404, "Diese Meldung lässt sich nicht erneut senden.")
-    if entry.get("status") != "failed":
-        raise HTTPException(409, "Nur fehlgeschlagene Meldungen lassen sich erneut senden.")
+    # Atomar „failed → resending“ (#2112): ein zweiter Klick, während die erste Sendung läuft, bekommt 409 statt einer
+    # doppelten Meldung. Scheitert das Senden, steht die Meldung wieder auf „failed“.
+    claimed = await db.email_logs.update_one({"id": log_id, "channel": "discord", "status": "failed"},
+                                             {"$set": {"status": "resending"}})
+    if entry.get("status") != "failed" or not claimed.modified_count:
+        raise HTTPException(409, "Nur fehlgeschlagene Meldungen lassen sich erneut senden – diese wird gerade oder wurde schon gesendet.")
     payload = entry["payload"]
     # An das Ziel, an das sie ging - nie an ein anderes. Privat bleibt privat.
     # Eine Meldung aus einem Turnier-Thread (#572) geht zurück in diesen Thread.
-    result = await send_to(entry.get("target") or "community", payload.get("title") or "", payload.get("description") or "",
-                           color=payload.get("color") or 0x29B6E8, url=payload.get("url"), fields=payload.get("fields"),
-                           image_url=payload.get("image_url"), event_key=entry.get("event_key") or "custom",
-                           thread_id=entry.get("thread_id"), buttons=payload.get("buttons"), guild_id=entry.get("guild_id"),
-                           embed=payload.get("embed"), content=payload.get("content"))
+    try:
+        result = await send_to(entry.get("target") or "community", payload.get("title") or "", payload.get("description") or "",
+                               color=payload.get("color") or 0x29B6E8, url=payload.get("url"), fields=payload.get("fields"),
+                               image_url=payload.get("image_url"), event_key=entry.get("event_key") or "custom",
+                               thread_id=entry.get("thread_id"), buttons=payload.get("buttons"), guild_id=entry.get("guild_id"),
+                               embed=payload.get("embed"), content=payload.get("content"))
+    except Exception:
+        await db.email_logs.update_one({"id": log_id, "status": "resending"}, {"$set": {"status": "failed"}})
+        raise
     if result.get("ok"):
         await db.email_logs.update_one({"id": log_id}, {"$set": {"status": "resent", "resent_at": now_utc().isoformat()}})
+    else:
+        await db.email_logs.update_one({"id": log_id, "status": "resending"}, {"$set": {"status": "failed"}})
     return result
 
 

@@ -163,7 +163,7 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/users": ["accounts", "rollen", "user"],
   "/admin/board": ["vorstand", "rollen"],
   "/admin/einlass": ["einlass", "anwesenheit", "präsenz", "praesenz", "generalversammlung", "versammlung", "scannen", "mitgliedskarte"],
-  "/admin/about": ["über uns", "verein", "leitbild", "werte", "texte", "about", "gruendung", "gründung", "zweck", "gemeinnuetzig", "gemeinnützig", "zahlen", "dolibarr"],
+  "/admin/about": ["über uns", "verein", "leitbild", "werte", "texte", "about", "gruendung", "gründung", "zweck", "gemeinnuetzig", "gemeinnützig", "zahlen", "dolibarr", "startseite", "kopf", "ein rudel"],
   "/admin/tournaments": ["bracket", "turnierbaum", "matches", "anmeldungen", "registrierungen"],
   "/admin/leagues": ["liga", "ligen", "season", "staffel", "spielwoche", "sperrzeit", "co-team"],
   "/admin/tournament-guide": ["leitfaden", "anleitung", "voreinstellung", "format", "check-in", "best of"],

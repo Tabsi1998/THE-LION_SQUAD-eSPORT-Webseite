@@ -630,7 +630,7 @@ def clean_prizes(payload) -> list[dict]:
     return out
 
 
-async def save_hunt(db, year: int, payload: dict, actor: dict, now: datetime | None = None) -> dict:
+async def save_hunt(db, year: int, payload: dict, actor: dict, now: datetime | None = None, *, may_draw: bool = True) -> dict:
     """Ein Jahr anlegen oder ändern: Preise, Hinweis-Freigabe, Status (Entwurf oder freigegeben)."""
     now = seasons.to_vienna(now)
     if not 2025 <= int(year) <= 2100:
@@ -659,10 +659,10 @@ async def save_hunt(db, year: int, payload: dict, actor: dict, now: datetime | N
     hunt = await hunt_for(db, year)
     await db[EGGS].update_many({"year": int(year)}, {"$set": {"hunt_id": hunt["id"]}})
     await _sync_raffle(db, hunt, actor)
-    return await admin_view(db, year, now)
+    return await admin_view(db, year, now, may_draw=may_draw)
 
 
-async def save_eggs(db, year: int, payload: list, actor: dict, now: datetime | None = None) -> dict:
+async def save_eggs(db, year: int, payload: list, actor: dict, now: datetime | None = None, *, may_draw: bool = True) -> dict:
     """Die Eier eines Jahres ersetzen (nummeriert der Reihe nach). Sobald jemand ein Ei gefunden hat, bleibt die
     Liste stehen - sonst stimmten Körbe und Funde nicht mehr."""
     now = seasons.to_vienna(now)
@@ -684,10 +684,10 @@ async def save_eggs(db, year: int, payload: list, actor: dict, now: datetime | N
     await db[EGGS].insert_many([{**egg, "id": new_id(), "year": int(year), "hunt_id": (hunt or {}).get("id"), "updated_at": stamp, "updated_by": actor.get("id")} for egg in eggs])
     if hunt:
         await db[HUNTS].update_one({"id": hunt["id"]}, {"$set": {"egg_count": len(eggs), "updated_at": stamp}})
-    return await admin_view(db, year, now)
+    return await admin_view(db, year, now, may_draw=may_draw)
 
 
-async def admin_view(db, year: int, now: datetime | None = None) -> dict:
+async def admin_view(db, year: int, now: datetime | None = None, *, may_draw: bool = True) -> dict:
     """Ein Jahr für die Verwaltung: Einstellungen, alle Eier mit Hinweis, wie oft jedes gefunden wurde, wie viele
     angefangen und wie viele fertig sind, die Verlosung mit Protokoll und die Schnellsten mit Namen."""
     now = seasons.to_vienna(now)
@@ -714,10 +714,11 @@ async def admin_view(db, year: int, now: datetime | None = None) -> dict:
         "eggs": [{**egg, "found": counts.get(egg["egg_no"], 0)} for egg in eggs], "started": started, "completed": completed,
         "routes": {"web": WEB_ROUTES, "app": APP_ROUTES}, "spot_kinds": {channel: list(kinds) for channel, kinds in SPOT_KINDS.items()},
         "places": list(PLACES), "patterns": list(PATTERNS), "prize_kinds": PRIZE_KINDS,
-        "raffle": await raffles.admin_state(db, raffle, now),
+        "raffle": await raffles.admin_state(db, raffle, now, may_draw=may_draw),
         "fastest_awarded": [{**w, "name": names.get(w["user_id"], "Gelöschtes Konto"), "title": PRIZE_KINDS.get(w.get("kind"), "")} for w in draw_record.get("fastest") or []],
         "raffle_note": draw_record.get("raffle_note"),
-        "can_draw": _phase(hunt, now) == "ended",
+        # Auswerten macht die Vereinsleitung (#2122 NW11) - wer nur Inhalte pflegt, bekommt keinen Knopf, der scheitert.
+        "can_draw": may_draw and _phase(hunt, now) == "ended", "may_draw": may_draw,
     }
 
 

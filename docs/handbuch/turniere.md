@@ -19,7 +19,7 @@ Der Weg eines Turniers aus Sicht der Turnierleitung: anlegen, Anmeldung, Check-i
 - **Turnierleitung am Handy** (`/tournaments/<Name>/leitung`) – Ergebnisse eintragen und Streitfälle entscheiden, ohne die Verwaltung
 - **Öffentliche Turnierliste** (`/tournaments`) – Filter **Beendet** zeigt auch veröffentlichte und archivierte Turniere,
   **Live** auch pausierte; je Seite 24 Turniere, ältere mit **Mehr laden**. Alle Turnierseiten tragen dieselben
-  Brotkrumen „Home · eSports · Turniere · Turnier · Seite“ (Staffeln den Liga-Weg).
+  Brotkrumen „Start · eSports · Turniere · Turnier · Seite“ (Staffeln den Liga-Weg).
 - **Terminvorschläge** auf der Matchseite gehen nur in die Zukunft – frühestens 5 Minuten ab jetzt.
 
 Wer was darf: Die **Turnierleitung** (Bereich „Turnierleitung“, mit bestätigter Zwei-Faktor-Anmeldung) verwaltet alle
@@ -570,7 +570,12 @@ Tabelle mit seiner Siegerkarte (bei Gruppen und bei Gleichstand auf Platz 1 nich
    „Keine Jahreswertung“), die Auszeichnungen und legt die **Gewinn-Einträge** an (zu sehen unter **Admin → eSports →
    Gewinne**). Im Bearbeiten-Formular erzeugt **Gewinne erzeugen** (Abschnitt Preise) die Einträge bei Bedarf noch
    einmal – erst ab **Beendet**, vorher ist der Knopf gesperrt (sonst gäbe es Gewinne für einen Zwischenstand).
-   **Sonderpreise** hängen an keinem Platz; die legt ihr unter **Gewinne** von Hand an.
+   **Sonderpreise** hängen an keinem Platz; die legt ihr unter **Gewinne** mit **Gewinn hinzufügen** von Hand an:
+   Turnier wählen, Gewinner suchen, Platz (bei Sonderpreisen eine freie Zahl), Preis, Wert und auf Wunsch eine
+   Abholfrist (gilt bis zum Ende des Tages). **Bearbeiten** in jeder Zeile ändert Preis, Wert und Frist; wer gewonnen
+   hat, bleibt. Eine eigene Frist setzt **Frist zurück auf 90 Tage ab „Bereit“** (oder das geleerte Feld) wieder auf
+   den Standard: offen ohne Frist, bereit 90 Tage ab dem Bereitstellen. Ein Hand-Gewinn verdrängt den Preis aus der
+   Preisstruktur nicht – beide stehen dann in der Liste.
 
    **Korrektur nach dem Veröffentlichen:** Status zurück auf **Beendet**, Ergebnis korrigieren, wieder **Ergebnisse
    veröffentlicht**. Die Jahreswertungs-Punkte des Turniers werden dabei an die neue Rangfolge angeglichen (in der

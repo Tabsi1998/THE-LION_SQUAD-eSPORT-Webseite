@@ -550,7 +550,7 @@ def door_problem(door: dict | None) -> str | None:
     return None
 
 
-async def admin_view(db, year: int, now: datetime | None = None) -> dict:
+async def admin_view(db, year: int, now: datetime | None = None, *, may_draw: bool = True) -> dict:
     year = check_year(year)
     now = seasons.to_vienna(now)
     doors = await _doors(db, year)
@@ -575,7 +575,7 @@ async def admin_view(db, year: int, now: datetime | None = None) -> dict:
             "day": day, "opens_at": opens_at(year, day).isoformat(), "is_open": is_open(year, day, now), "seed": door_seed(year, day),
             "door": _admin_door(door) if door else None, "problem": door_problem(door),
             "stats": {"opened": opened[day], "same_day": same_day[day], "later": opened[day] - same_day[day], "views": views.get(day, 0), "quiz_done": quizzed[day]},
-            "raffle": await raffles.admin_state(db, drawings.get((door or {}).get("raffle_id")), now) if (door or {}).get("kind") == "prize" else None,
+            "raffle": await raffles.admin_state(db, drawings.get((door or {}).get("raffle_id")), now, may_draw=may_draw) if (door or {}).get("kind") == "prize" else None,
         })
     years = sorted({int(value) for value in await db[DOOR_COLLECTION].distinct("year") if value}, reverse=True)
     return {

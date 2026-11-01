@@ -211,7 +211,7 @@ PERSONAL: dict[str, Entry] = {
     # gespeicherte Name des Absenders überschrieben; nach der Frist des Adminprotokolls gelöscht (``ops_alerts.purge_old_logs``).
     "event_messages": Entry(OVERWRITTEN, ("event_messages_sent",), "Nachricht der Turnierleitung an alle Angemeldeten eines "
                             "Events; Name des Absenders überschrieben, gelöscht nach der Frist des Adminprotokolls"),
-    "news_posts": Entry(OVERWRITTEN, note="Beitrag des Vereins; der gespeicherte Name der Autorin oder des Autors wird überschrieben"),
+    "news_posts": Entry(OVERWRITTEN, note="Beitrag des Vereins; die gespeicherten Namen (Autor, zuletzt geändert, zurückgezogen) werden überschrieben"),
 }
 
 CLUB_CONTENT = frozenset({
