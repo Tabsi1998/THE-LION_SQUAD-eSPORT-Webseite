@@ -20,7 +20,7 @@ from services import dolibarr_applications, membership_fees, membership_invitati
 from services.dolibarr_client import DolibarrClient, DolibarrError, load_settings as load_dolibarr_settings
 from services.dolibarr_links import verified_link
 from services.log_safe import log_safe
-from services.membership_service import upsert_membership
+from services.membership_service import MemberNumberConflict, upsert_membership
 from services.private_fields import private_projection
 
 router = APIRouter(prefix="/api", tags=["phase-c"])
@@ -444,7 +444,12 @@ async def admin_decide_application(app_id: str, body: DecisionBody,
         raise HTTPException(400, "Bereits entschieden.")
     if body.decision == "approve":
         # Derselbe Weg wie von Hand (#2125): Nummer nur beim ersten Mal, Art aus dem Antrag, Verlauf, Mitglieder-Erfolge.
-        await upsert_membership(app["user_id"], me["id"], member_status="active", membership_type=_membership_type_of(app))
+        try:
+            await upsert_membership(app["user_id"], me["id"], member_status="active", membership_type=_membership_type_of(app))
+        except MemberNumberConflict as exc:
+            # Ohne Mitgliedschaft bleibt der Antrag offen - nie „aufgenommen“ ohne Nummer und ohne Mail.
+            await db.membership_applications.update_one({"id": app_id, "status": new_status}, {"$set": {"status": "pending", "decided_at": None, "decided_by": None, "decision_note": None}})
+            raise HTTPException(409, str(exc))
         await db.memberships.update_one({"user_id": app["user_id"]}, {"$set": {"contribution_pref": app.get("contribution_pref")}})
         await evaluate_user_progress(app["user_id"])
         try:

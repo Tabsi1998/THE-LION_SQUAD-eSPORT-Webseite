@@ -192,6 +192,78 @@ async def test_approve_goes_the_same_way_as_by_hand(flow):
     assert (await flow.patch(f"/api/membership/applications/{app_id}", json={"decision": "reject", "note": "doch nicht"})).status_code == 400
 
 
+async def with_number_index(flow) -> None:
+    await flow.db.memberships.create_index("member_number", unique=True, sparse=True)
+    taken = await flow.add_user(name="vergeben")
+    await flow.db.memberships.insert_one({"user_id": taken["id"], "member_status": "active", "member_number": "TLS-TAKEN-0001"})
+
+
+@pytest.mark.asyncio
+async def test_two_approvals_at_once_draw_a_new_number(flow, monkeypatch):
+    from services import membership_service
+
+    await with_number_index(flow)
+    drawn = iter(["TLS-TAKEN-0001", "TLS-TAKEN-0001", "TLS-FREI-0002"])
+
+    async def next_number():
+        return next(drawn)
+
+    monkeypatch.setattr(membership_service, "generate_member_number", next_number)
+    chair = await chair_of(flow)
+    erika = await flow.add_user(name="erika")
+    app_id = await application(flow, erika)
+    flow.act_as(chair)
+    response = await flow.patch(f"/api/membership/applications/{app_id}", json={"decision": "approve"})
+    assert response.status_code == 200, response.text
+    assert (await flow.db.memberships.find_one({"user_id": erika["id"]}))["member_number"] == "TLS-FREI-0002"
+    assert len(await mails_to(flow, erika)) == 1
+
+
+@pytest.mark.asyncio
+async def test_no_free_number_keeps_the_application_open(flow, monkeypatch):
+    from services import membership_service
+
+    await with_number_index(flow)
+
+    async def always_taken():
+        return "TLS-TAKEN-0001"
+
+    monkeypatch.setattr(membership_service, "generate_member_number", always_taken)
+    chair = await chair_of(flow)
+    erika = await flow.add_user(name="erika")
+    app_id = await application(flow, erika)
+    flow.act_as(chair)
+    response = await flow.patch(f"/api/membership/applications/{app_id}", json={"decision": "approve", "note": "Willkommen"})
+    assert response.status_code == 409 and "noch einmal" in response.json()["detail"]
+    stored = await flow.db.membership_applications.find_one({"id": app_id})
+    assert stored["status"] == "pending" and stored["decided_at"] is None and stored["decision_note"] is None
+    assert await flow.db.memberships.count_documents({"user_id": erika["id"]}) == 0
+    assert await mails_to(flow, erika) == []
+    assert await flow.db.audit_logs.count_documents({"action": "membership.approve"}) == 0
+
+
+@pytest.mark.asyncio
+async def test_a_number_given_by_hand_says_it_is_taken(flow):
+    await with_number_index(flow)
+    chair = await chair_of(flow)
+    erika = await flow.add_user(name="erika")
+    flow.act_as(chair)
+    response = await flow.put(f"/api/membership/user/{erika['id']}", json={"member_status": "active", "member_number": "TLS-TAKEN-0001"})
+    assert response.status_code == 400 and "schon vergeben" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_memberships_without_a_number_do_not_collide(flow):
+    await flow.db.memberships.create_index("member_number", unique=True, sparse=True)
+    chair = await chair_of(flow)
+    first, second = await flow.add_user(name="erste"), await flow.add_user(name="zweite")
+    flow.act_as(chair)
+    for person in (first, second):
+        response = await flow.put(f"/api/membership/user/{person['id']}", json={"member_status": "none", "notes": "Noch kein Mitglied"})
+        assert response.status_code == 200, response.text
+    assert "member_number" not in await flow.db.memberships.find_one({"user_id": first["id"]})
+
+
 @pytest.mark.asyncio
 async def test_a_returning_member_keeps_the_number_and_the_beginning(flow):
     chair = await chair_of(flow)

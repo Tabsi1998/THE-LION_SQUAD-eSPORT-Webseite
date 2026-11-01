@@ -5,6 +5,7 @@ registered community user to an official club member without touching the auth
 account. The membership doc is keyed by user_id.
 """
 from datetime import datetime, timezone
+from pymongo.errors import DuplicateKeyError
 from database import get_db
 from models import new_id, now_utc
 from services.private_fields import private_projection
@@ -17,6 +18,12 @@ VALID_TYPES = {
     "ordinary", "supporting", "honorary", "youth", "guest", "former",
 }
 VALID_MEMBER_SINCE_PRECISIONS = {"year", "month", "day"}
+# Zwei Aufnahmen gleichzeitig ziehen dieselbe Nummer: die zweite zieht neu (#2125).
+AUTO_NUMBER_ATTEMPTS = 3
+
+
+class MemberNumberConflict(ValueError):
+    """Die Mitgliedsnummer ist schon vergeben."""
 
 
 def is_active_member(membership: dict | None) -> bool:
@@ -71,6 +78,23 @@ async def generate_member_number() -> str:
         except (ValueError, IndexError):
             continue
     return f"{prefix}{max_n + 1:04d}"
+
+
+async def _write_with_number(write, auto_number: bool) -> None:
+    """Schreiben; ist die Nummer inzwischen vergeben, bei automatischer Vergabe mit einer neuen wiederholen."""
+    number = None
+    for attempt in range(1, AUTO_NUMBER_ATTEMPTS + 1):
+        try:
+            await write(number)
+            return
+        except DuplicateKeyError as exc:
+            if "member_number" not in str(exc):
+                raise
+            if not auto_number:
+                raise MemberNumberConflict("Diese Mitgliedsnummer ist schon vergeben.") from exc
+            if attempt == AUTO_NUMBER_ATTEMPTS:
+                raise MemberNumberConflict("Die Mitgliedsnummer konnte gerade nicht vergeben werden. Bitte noch einmal versuchen.") from exc
+            number = await generate_member_number()
 
 
 def normalize_member_since(value: str, precision: str | None = None) -> tuple[str, str]:
@@ -128,6 +152,7 @@ async def upsert_membership(
     db = get_db()
     existing = await get_membership(user_id)
     update = {"updated_at": now_utc().isoformat(), "updated_by": actor_id}
+    auto_number = False
     status_changed = (
         member_status is not None
         and existing
@@ -145,6 +170,7 @@ async def upsert_membership(
                 update["member_since_precision"] = "day"
             if not (existing or {}).get("member_number") and member_number is None:
                 update["member_number"] = await generate_member_number()
+                auto_number = True
 
     if membership_type is not None:
         if membership_type not in VALID_TYPES:
@@ -177,7 +203,11 @@ async def upsert_membership(
                 "to_status": member_status,
                 "notes": notes,
             }}
-        await db.memberships.update_one({"user_id": user_id}, ops)
+
+        async def write(number: str | None) -> None:
+            if number:
+                update["member_number"] = number
+            await db.memberships.update_one({"user_id": user_id}, ops)
     else:
         history = []
         if member_status is not None:
@@ -193,7 +223,7 @@ async def upsert_membership(
             "user_id": user_id,
             "member_status": "none",
             "membership_type": None,
-            "member_number": None,
+            # Keine Nummer heißt: kein Feld. Der Index ist eindeutig und überspringt nur fehlende Felder, nicht None.
             "member_since": None,
             "member_since_precision": None,
             "internal_role": None,
@@ -204,7 +234,13 @@ async def upsert_membership(
             "created_by": actor_id,
             **update,
         }
-        await db.memberships.insert_one(doc)
+
+        async def write(number: str | None) -> None:
+            if number:
+                doc["member_number"] = number
+            await db.memberships.insert_one(doc)
+
+    await _write_with_number(write, auto_number)
 
     # Update derived flag on the user doc for fast filtering
     fresh = await get_membership(user_id)
