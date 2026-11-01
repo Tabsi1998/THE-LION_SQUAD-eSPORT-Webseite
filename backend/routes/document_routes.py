@@ -135,7 +135,9 @@ def _document_url(doc_id: str) -> str:
 
 
 def _public_doc(doc: dict, unlocks: bool = False) -> dict:
+    """Was Mitglieder sehen: Öffnen und Laden laufen über die Adressen, der Ablageort bleibt in der Verwaltung (#2126)."""
     out = dict(doc)
+    out.pop("storage_key", None)
     out["visibility"] = _normalise_visibility(out.get("visibility"))
     out["view_url"] = _document_view_url(out["id"])
     if out.get("allow_download") or unlocks:
@@ -143,6 +145,11 @@ def _public_doc(doc: dict, unlocks: bool = False) -> dict:
     else:
         out.pop("download_url", None)
     return out
+
+
+def _admin_doc(doc: dict, unlocks: bool = False) -> dict:
+    """Für Admin → Dokumente: dazu der Ablageort, denn das Formular schickt ihn beim Speichern zurück."""
+    return {**_public_doc(doc, unlocks), "storage_key": doc.get("storage_key")}
 
 
 def _file_response(doc: dict, path: pathlib.Path, disposition: str) -> FileResponse:
@@ -311,7 +318,7 @@ async def admin_list_documents(me: dict = Depends(require_area("club"))):
     db = get_db()
     docs = await db.documents.find({}, {"_id": 0}).sort([("pinned", -1), ("order_index", 1)]).to_list(1000)
     unlocks = await _unlocks_downloads(db, me)
-    return [_public_doc(doc, unlocks) for doc in docs]
+    return [_admin_doc(doc, unlocks) for doc in docs]
 
 
 @router.post("")
@@ -334,7 +341,7 @@ async def create_document(body: DocumentCreate, me: dict = Depends(require_area(
     await db.documents.insert_one(doc)
     doc.pop("_id", None)
     await _audit(db, "document.create", me, doc["id"], {"title": doc.get("title"), "category": doc.get("category"), "visibility": doc["visibility"]})
-    return _public_doc(doc, await _unlocks_downloads(db, me))
+    return _admin_doc(doc, await _unlocks_downloads(db, me))
 
 
 @router.put("/{doc_id}")
@@ -365,7 +372,7 @@ async def update_document(doc_id: str, body: DocumentUpdate, me: dict = Depends(
     file_fields = _file_fields(await _remove_file(db, previous)) if replaced else {}
     changed = sorted(key for key, value in update.items() if key not in {"updated_at", "file_url"} and value != previous.get(key))
     await _audit(db, "document.update", me, doc_id, {"title": updated.get("title"), "fields": changed, **file_fields})
-    return _public_doc(updated, await _unlocks_downloads(db, me))
+    return _admin_doc(updated, await _unlocks_downloads(db, me))
 
 
 @router.delete("/{doc_id}")
