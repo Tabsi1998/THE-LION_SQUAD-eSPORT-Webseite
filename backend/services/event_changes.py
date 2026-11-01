@@ -140,16 +140,29 @@ async def _cancel_registrations(db, event: dict, now: str) -> tuple[list[dict], 
     return registrations, orders
 
 
+async def _cancel_under_lock(db, event: dict, now: str) -> tuple[list[dict], int]:
+    async with mutation_lock(db, seat_resource(event["id"]), wait_seconds=SEAT_WAIT_SECONDS):
+        return await _cancel_registrations(db, event, now)
+
+
 async def cancel_event(db, event: dict, me: dict) -> dict:
     """Das Event ist abgesagt: Anmeldungen und Warteliste stornieren, Aufträge stornieren, alle informieren."""
     now = now_utc().isoformat()
     # Unter der Platzsperre (#2127): Ein Check-in im selben Moment prüft die Absage darunter noch einmal. Der Status steht
     # zu diesem Zeitpunkt schon - ist die Sperre zu lange belegt, läuft die Absage trotzdem durch.
     try:
-        async with mutation_lock(db, seat_resource(event["id"]), wait_seconds=SEAT_WAIT_SECONDS):
-            registrations, orders = await _cancel_registrations(db, event, now)
+        registrations, orders = await _cancel_under_lock(db, event, now)
     except MutationLockBusy:
         registrations, orders = await _cancel_registrations(db, event, now)
+        # Wer die Sperre hält, kann ein Check-in sein, der die Absage noch nicht gesehen hat und gleich danach Punkte vergibt.
+        # Darum ein zweiter Durchlauf, sobald er durch ist - sonst blieben seine Punkte stehen.
+        try:
+            later, more_orders = await _cancel_under_lock(db, event, now)
+        except MutationLockBusy:
+            later, more_orders = await _cancel_registrations(db, event, now)
+        known = {registration["id"] for registration in registrations}
+        registrations += [registration for registration in later if registration["id"] not in known]
+        orders += more_orders
     users = await _recipients(db, [registration.get("user_id") for registration in registrations])
     message = ("Das Event wurde abgesagt. Deine Anmeldung ist damit storniert – ein offener Kostenbeitrag wird nicht "
                "verrechnet; wurde schon eine Rechnung gestellt, meldet sich der Verein bei dir.")

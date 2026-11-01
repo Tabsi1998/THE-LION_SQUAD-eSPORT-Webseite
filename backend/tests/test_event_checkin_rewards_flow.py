@@ -11,7 +11,8 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
 from models import now_utc  # noqa: E402
-from services import xp  # noqa: E402
+from services import event_changes, event_rewards, xp  # noqa: E402
+from services.mutation_lock import MutationLockBusy  # noqa: E402
 
 
 @pytest_asyncio.fixture
@@ -190,3 +191,62 @@ async def test_xp_stand_rechnet_gleichzeitig_nichts_weg(flow):
     await xp.grant(user["id"], "event_attended", "e:3")
     await xp.correct(user["id"], -1000, "Test", "admin")
     assert (await xp.state(user["id"]))["total"] == 0
+
+
+class _BusyLock:
+    """Die Sperre ist belegt - beim zweiten Versuch ist der Halter durch (``on_second`` spielt, was er noch getan hat)."""
+
+    def __init__(self, on_second=None):
+        self.calls = 0
+        self.on_second = on_second
+
+    def __call__(self, *_args, **_kwargs):
+        return self
+
+    async def __aenter__(self):
+        self.calls += 1
+        if self.calls == 1 or self.on_second is None:
+            raise MutationLockBusy("belegt")
+        await self.on_second()
+        return self
+
+    async def __aexit__(self, *_exc):
+        return False
+
+
+@pytest.mark.asyncio
+async def test_absage_bei_belegter_sperre_laesst_einem_langsamen_checkin_keine_punkte(flow, monkeypatch):
+    """Der Check-in hielt die Sperre und hat die Absage nicht gesehen: er schreibt erst nach dem ersten Durchlauf."""
+    _lead, event, player, reg = await setup(flow)
+
+    async def slow_checkin():
+        stored = await flow.db.event_registrations.find_one({"id": reg["id"]}, {"_id": 0})
+        assert stored["status"] == "cancelled", "der erste Durchlauf ist schon durch"
+        await flow.db.event_registrations.update_one({"id": reg["id"]}, {"$set": {"status": "checked_in"}})
+        stored = await flow.db.event_registrations.find_one({"id": reg["id"]}, {"_id": 0})
+        await event_rewards.apply_checkin(flow.db, await flow.db.events.find_one({"id": event["id"]}, {"_id": 0}), stored)
+        assert (await rewards(flow, player))[2] >= 60
+
+    lock = _BusyLock(on_second=slow_checkin)
+    monkeypatch.setattr(event_changes, "mutation_lock", lock)
+    response = await flow.patch(f"/api/events/{event['id']}", json={"status": "cancelled"})
+    assert response.status_code == 200, response.text
+    assert lock.calls == 2
+    points, events, total = await rewards(flow, player)
+    assert points == [] and events == [] and total == 0
+    assert (await flow.db.event_registrations.find_one({"id": reg["id"]}, {"_id": 0}))["status"] == "cancelled"
+    assert response.json()["cancellation"]["registrations"] == 1, "die Person zählt einmal"
+    assert await flow.db.notifications.count_documents({"kind": "event_message", "user_id": player["id"]}) == 1
+
+
+@pytest.mark.asyncio
+async def test_absage_laeuft_auch_durch_wenn_die_sperre_belegt_bleibt(flow, monkeypatch):
+    _lead, event, player, reg = await setup(flow)
+    await set_status(flow, event, reg, "checked_in")
+    lock = _BusyLock()
+    monkeypatch.setattr(event_changes, "mutation_lock", lock)
+    response = await flow.patch(f"/api/events/{event['id']}", json={"status": "cancelled"})
+    assert response.status_code == 200, response.text
+    assert lock.calls == 2
+    assert (await flow.db.event_registrations.find_one({"id": reg["id"]}, {"_id": 0}))["status"] == "cancelled"
+    assert (await rewards(flow, player))[2] == 0
