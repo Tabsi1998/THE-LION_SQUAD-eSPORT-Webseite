@@ -123,6 +123,22 @@ async def test_oeffentlich_steht_die_warteliste_getrennt(flow):
     assert "waitlist_registrations" not in managed
 
 
+@pytest.mark.asyncio
+async def test_abgesagt_steht_bis_zum_termin_in_kommend(flow):
+    """EV3: mit Kennzeichen bis zum Termin - danach weder in „Kommend“ noch auf der Startseite."""
+    await stored_event(flow, status="cancelled")
+    past = (now_utc() - timedelta(days=2)).isoformat()
+    await stored_event(flow, id="ev-2", slug="alte-lan", name="Alte LAN", status="cancelled", start_date=past, end_date=past)
+    await stored_event(flow, id="ev-3", slug="vorbei", name="Vorbei", status="completed", start_date=past, end_date=past)
+    flow.act_as(None)
+
+    rows = (await flow.get("/api/events", params={"upcoming": "true", "compact": "true"})).json()
+    assert [row["slug"] for row in rows] == ["herbst-lan"]
+    assert rows[0]["status"] == "cancelled" and rows[0]["public_phase"]["state"] == "cancelled" and rows[0]["public_phase"]["label"] == "Abgesagt"
+    state = (await flow.get("/api/home/state")).json()
+    assert not state["upcoming"]["events"], "die Startseite bleibt bei dem, was ansteht"
+
+
 def test_die_uebergebene_fassung_bleibt_unveraendert():
     doc = {"id": "e", "created_by": "x", "billing": PAID}
     view = public_event(doc)

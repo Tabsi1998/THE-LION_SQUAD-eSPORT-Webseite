@@ -469,7 +469,8 @@ async def list_events(
     if event_type:
         q["event_type"] = event_type
     if upcoming:
-        q["status"] = {"$nin": ["completed", "archived", "cancelled"]}
+        # Abgesagte bleiben bis zum Termin stehen (#2127, EV3): die Karte trägt das Kennzeichen „Abgesagt“.
+        q["status"] = {"$nin": ["completed", "archived"]}
         if not is_admin:
             q["status"]["$nin"].append("draft")
     projection = {"_id": 0}

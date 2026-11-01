@@ -368,7 +368,8 @@ class TestEvents:
         r = anon.get(f"{BASE_URL}/api/events?upcoming=true")
         assert r.status_code == 200
         evs = r.json()
-        bad = {"completed", "archived", "cancelled", "draft"}
+        # Abgesagte bleiben bis zum Termin mit Kennzeichen stehen (#2127, EV3).
+        bad = {"completed", "archived", "draft"}
         for ev in evs:
             assert ev.get("status") not in bad
 
