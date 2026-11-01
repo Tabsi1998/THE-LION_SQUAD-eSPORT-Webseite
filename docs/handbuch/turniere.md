@@ -217,7 +217,19 @@ eurer **Regeln** – schreibt das Wichtigste also nach oben.
 - Es geht nur im Status **Anmeldung offen** und im Zeitfenster **Anmeldung öffnet / endet**. Mit dem Haken
   **Nur Einladung** gibt es keine Selbstanmeldung.
 - Selbst abmelden können sich Spieler nicht mehr, wenn sie eingecheckt sind, das Turnier läuft oder sie schon in festen
-  Spielen stehen (etwa generierte Gruppen oder eine Schweizer Runde); dann geht es nur über die Turnierleitung.
+  Spielen stehen (etwa generierte Gruppen oder eine Schweizer Runde); dann geht es nur über die Turnierleitung. **Dein
+  Stand** sagt das: „Abmelden und Angaben ändern nur noch über die Turnierleitung“, für Teammitglieder „… kann nur die
+  Teamleitung“.
+- **Angaben ändern** (in **Dein Stand**): Ingame-Name, Spieler-IDs und Discord lassen sich bis zum eigenen Check-in bzw.
+  bis zum Check-in-Ende selbst korrigieren – bei Team-Anmeldungen nur von Kapitän und Co-Kapitän. Das gilt nur für diese
+  Anmeldung, das Profil bleibt. In **Liga-Staffeln** sind Name und IDs gesperrt, weil die Spiel-ID je Season im Liga-Kader
+  feststeht; nur Discord lässt sich dort ändern.
+- **Abgelehnt:** **Dein Stand** sagt, dass die Turnierleitung abgelehnt hat, und bietet **Anmeldung entfernen** (solange
+  das Turnier nicht läuft). Erst danach ist eine neue Anmeldung möglich. Sie läuft wieder durch die normalen Regeln und
+  gilt bei freiem Platz sofort – wer endgültig nicht mitspielen soll, muss erneut abgelehnt werden.
+- **Team-Einladungen:** Im Blatt **Einladen** auf der Teamseite stehen die offenen persönlichen Einladungen mit
+  **Zurückziehen**. Lehnt jemand ab, bekommt die einladende Person eine Nachricht. Der Kapitän kann das Team erst
+  verlassen, wenn er die Leitung übergeben hat; das steht auf der Teamseite.
 
 **Startgeld:** Kostet die Teilnahme etwas, steht es im Abschnitt **Startgeld** unter **Turnier öffnen → Bearbeiten**.
 Den sieht und ändert nur der Bereich **Finanzen**. Wer anmeldet, übernimmt das Startgeld ausdrücklich (bei Teams der
