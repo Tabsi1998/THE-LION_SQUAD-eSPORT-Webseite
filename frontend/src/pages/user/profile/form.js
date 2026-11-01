@@ -101,6 +101,9 @@ export function profileFormPayload(form) {
   return payload;
 }
 
+// Längengrenzen (#2126), gleich in backend/routes/user_routes.py. Ein schon längerer Wert bleibt, bis er geändert wird.
+export const PROFILE_LIMITS = { display_name: 50, bio: 1000 };
+
 // Eine Website-Adresse: mit oder ohne https://, mit Punkt im Namen, ohne Leerzeichen.
 const WEBSITE_PATTERN = /^(https?:\/\/)?[\p{L}\p{N}-]+(\.[\p{L}\p{N}-]+)*\.\p{L}{2,}(:\d+)?([/?#]\S*)?$/iu;
 
@@ -113,6 +116,11 @@ export function profileFieldErrors(form) {
   if (!form) return errors;
   if (typeof form.display_name === "string" && !form.display_name.trim()) {
     errors.display_name = "Bitte gib einen Anzeigenamen ein – so heißt du überall.";
+  } else if (typeof form.display_name === "string" && form.display_name.trim().length > PROFILE_LIMITS.display_name) {
+    errors.display_name = `Höchstens ${PROFILE_LIMITS.display_name} Zeichen.`;
+  }
+  if (typeof form.bio === "string" && form.bio.trim().length > PROFILE_LIMITS.bio) {
+    errors.bio = `Höchstens ${PROFILE_LIMITS.bio} Zeichen.`;
   }
   const website = typeof form.website === "string" ? form.website.trim() : "";
   if (website && !WEBSITE_PATTERN.test(website)) {

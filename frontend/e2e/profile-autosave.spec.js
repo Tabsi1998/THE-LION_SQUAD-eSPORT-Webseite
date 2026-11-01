@@ -125,7 +125,7 @@ test("Verlassen mit leerem Namen: Link und Browser-Vor halten an, Dialog der Sei
   await page.getByTestId("profile-display-name").fill("");
   // Link: Dialog, „Zurück zum Feld“ bleibt auf der Seite.
   await page.getByTestId("settings-to-profile").click();
-  await expect(page.getByTestId("confirm-dialog")).toContainText("Name ist leer.");
+  await expect(page.getByTestId("confirm-dialog")).toContainText("Name ist leer oder zu lang.");
   await page.getByTestId("confirm-dialog-cancel").click();
   await expect(page).toHaveURL(/\/profile/);
   await expect(page.getByTestId("profile-display-name")).toBeFocused();

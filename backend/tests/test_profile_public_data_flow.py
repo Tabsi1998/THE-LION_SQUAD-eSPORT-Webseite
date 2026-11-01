@@ -127,6 +127,37 @@ async def test_hidden_achievements_also_leave_season_table_and_crowns(flow):
     assert shy["id"] not in crowns and crowns[proud["id"]] == "gold"
 
 
+# ---------------------------------------------------------------- PR6: Längen und leerer Name
+@pytest.mark.asyncio
+async def test_new_profile_texts_have_limits_and_a_name_stays_filled(flow):
+    user = await player(flow, "schreiber", display_name="Schreiber", bio="kurz")
+    flow.act_as(user)
+    empty = await flow.patch("/api/users/me", json={"display_name": "   "})
+    assert empty.status_code == 422 and "Anzeigenamen" in empty.json()["detail"]
+    assert (await flow.patch("/api/users/me", json={"display_name": None})).status_code == 422
+    too_long = await flow.patch("/api/users/me", json={"display_name": "x" * 51})
+    assert too_long.status_code == 422 and too_long.json()["detail"] == "Anzeigename: höchstens 50 Zeichen."
+    assert (await flow.patch("/api/users/me", json={"bio": "x" * 1001})).json()["detail"] == "Bio: höchstens 1000 Zeichen."
+    saved = await flow.patch("/api/users/me", json={"display_name": "  Neuer Name ", "bio": "x" * 1000})
+    assert saved.status_code == 200 and saved.json()["display_name"] == "Neuer Name"
+    assert (await flow.patch("/api/users/me", json={"bio": ""})).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_old_long_or_empty_values_can_be_saved_unchanged(flow):
+    long_name, long_bio = "n" * 80, "b" * 3000
+    user = await player(flow, "altkonto", display_name=long_name, bio=long_bio)
+    flow.act_as({**user, "display_name": long_name, "bio": long_bio})
+    same = await flow.patch("/api/users/me", json={"display_name": long_name, "bio": long_bio, "city": "Innsbruck"})
+    assert same.status_code == 200 and same.json()["display_name"] == long_name and same.json()["city"] == "Innsbruck"
+    assert (await flow.patch("/api/users/me", json={"bio": long_bio + "!"})).status_code == 422
+
+    # Vom Verein zurückgesetzt (#2118): der leere Name hindert nicht am Speichern anderer Felder.
+    reset = await player(flow, "zurueckgesetzt", display_name=None)
+    flow.act_as({**reset, "display_name": None})
+    assert (await flow.patch("/api/users/me", json={"display_name": "", "city": "Wien"})).status_code == 200
+
+
 # ---------------------------------------------------------------- Zusatz: Dokumente
 @pytest.mark.asyncio
 async def test_members_never_see_where_a_document_is_stored(flow):

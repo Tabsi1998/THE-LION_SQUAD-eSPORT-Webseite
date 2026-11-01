@@ -27,6 +27,10 @@ VisibilityLevel = Literal["public", "community", "members", "admins", "private"]
 DirectMessagePrivacy = Literal["everyone", "friends", "team_members", "club_members", "admins_only", "none"]
 
 
+# Anzeigename (#2126): gleich in pages/user/profile/form.js. Gespeicherte längere Namen bleiben gültig.
+DISPLAY_NAME_MAX = 50
+
+
 class UserRegister(BaseModel):
     username: str = Field(min_length=3, max_length=32)
     email: EmailStr
@@ -58,7 +62,7 @@ class AdminUserCreate(BaseModel):
     username: str = Field(min_length=3, max_length=32)
     email: EmailStr
     password: Optional[NewPassword] = None
-    display_name: Optional[str] = None
+    display_name: Optional[str] = Field(default=None, max_length=DISPLAY_NAME_MAX)
     gender: Optional[Literal["male", "female", "diverse"]] = None
     role: Role = "player"
     is_active: bool = True

@@ -40,9 +40,10 @@ const FORM_TABS = new Set(["basic", "gaming", "socials"]);
 // Regler speichern nach der Pause wie Text - jeder Zwischenwert beim Ziehen wäre sonst ein eigener Lauf.
 const SLIDER_SETTINGS = new Set(["ceremony_volume"]);
 // Beim Verlassen mit offener, ungültiger Eingabe (#1048, nach Codex-Prüfung): was fehlt und wo das Feld steht.
-const LEAVE_REASONS = { display_name: "Name ist leer.", website: "Website ist keine gültige Adresse." };
+const LEAVE_REASONS = { display_name: "Name ist leer oder zu lang.", bio: "Bio ist zu lang.", website: "Website ist keine gültige Adresse." };
 const FIELD_PLACES = {
   display_name: { tab: "basic", testId: "profile-display-name" },
+  bio: { tab: "basic", testId: "profile-bio" },
   website: { tab: "socials", testId: "profile-website" },
 };
 

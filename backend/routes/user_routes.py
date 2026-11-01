@@ -31,17 +31,35 @@ from services.private_fields import private_projection, strip_private
 from services.profile_fields import USER_NULLABLE_FIELDS
 from models import (
     AreasUpdate,
-    AdminProfileReset, AdminUserCreate, UserUpdate, RoleUpdate,
+    AdminProfileReset, AdminUserCreate, DISPLAY_NAME_MAX, UserUpdate, RoleUpdate,
     now_utc, new_id,
 )
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 logger = logging.getLogger(__name__)
 
+# Längengrenzen der Profiltexte (#2126), gleich in pages/user/profile/form.js.
+PROFILE_TEXT_LIMITS = {"display_name": ("Anzeigename", DISPLAY_NAME_MAX), "bio": ("Bio", 1000)}
+
 
 def _clean(u: dict) -> dict:
     """Private Kontofelder stehen zentral in services/private_fields.py (#1492)."""
     return strip_private(u)
+
+
+def _check_profile_texts(updates: dict, stored: dict) -> None:
+    """Prüft nur, was sich ändert (#2126): alte längere Werte oder ein alter leerer Name lassen sich weiter mitspeichern -
+    Web und App schicken beim Speichern auch andere Felder, und ein Konto soll daran nicht hängen bleiben."""
+    if "display_name" in updates:
+        name = (updates["display_name"] or "").strip()
+        if not name and (stored.get("display_name") or "").strip():
+            raise HTTPException(422, "Bitte gib einen Anzeigenamen ein – so heißt du überall.")
+        if updates["display_name"] != stored.get("display_name"):
+            updates["display_name"] = name or stored.get("display_name")
+    for field, (label, limit) in PROFILE_TEXT_LIMITS.items():
+        value = updates.get(field)
+        if isinstance(value, str) and value != stored.get(field) and len(value.strip()) > limit:
+            raise HTTPException(422, f"{label}: höchstens {limit} Zeichen.")
 
 
 # Level (#617): eine Kurve für alles in services/levels.py, der Stand je Person in services/xp.py.
@@ -879,6 +897,7 @@ async def update_me(
     db = get_db()
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in USER_NULLABLE_FIELDS}
+    _check_profile_texts(updates, me)
     # Wortfilter (#417): Bio und Anzeigename werden vor dem Speichern geprüft.
     from services import word_filter
     for field in ("bio", "display_name"):
