@@ -18,6 +18,7 @@ _FACHMODULE = (
     "tournament_chat_routes",
     "tournament_lifecycle_routes",
     "tournament_registration_routes",
+    "tournament_self_registration_routes",
     "tournament_staff_routes",
     "tournament_stage_routes",
     "tournament_structure_routes",

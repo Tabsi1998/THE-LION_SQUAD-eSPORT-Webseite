@@ -38,6 +38,7 @@ import { tournamentCrumbs } from "@/lib/leagueTrail";
 import { TournamentTimeline, stepCountdown, timelineSteps } from "@/components/tls/tournament/TournamentTimeline";
 import { useCountdownDays } from "@/hooks/useCountdownDays";
 import { MyStandCard } from "@/components/tls/tournament/MyStandCard";
+import { MyRegistrationEdit } from "@/components/tls/tournament/MyRegistrationEdit";
 import { isPublicLive } from "@/lib/publicPhase";
 import { OnsiteTournamentView } from "@/components/tls/tournament/OnsiteTournamentView";
 import { TournamentUnavailable } from "@/components/tls/tournament/TournamentUnavailable";
@@ -250,6 +251,23 @@ function TournamentDetailView() {
     }, "Abmeldung fehlgeschlagen.");
   };
 
+  // Abgelehnt (#2113, L-C3): die alte Anmeldung wegnehmen - dieselbe Route wie „Abmelden“; erst dann geht eine neue.
+  const handleRemoveRejected = async () => {
+    if (!myReg) return;
+    await runAction(async () => {
+      const ok = await confirm({
+        title: "Anmeldung entfernen?",
+        description: "Die abgelehnte Anmeldung verschwindet. Solange die Anmeldung offen ist, kannst du dich danach neu anmelden – die Turnierleitung sieht das.",
+        confirmLabel: "Entfernen",
+        tone: "danger",
+      });
+      if (!ok) return;
+      await api.delete(`/tournaments/${t.id}/registrations/${myReg.id}`);
+      toast.success("Anmeldung entfernt.");
+      await load();
+    }, "Die Anmeldung konnte nicht entfernt werden.");
+  };
+
   if (!t) {
     const problem = user !== undefined && loadProblem?.key === loadKey ? loadProblem.kind : null;
     if (!problem) return <PublicLayout><PublicLoadingState label="Lade Turnier" /></PublicLayout>;
@@ -298,6 +316,12 @@ function TournamentDetailView() {
   // Ein zugeteiltes Co-Team (#1649, #2110) nimmt nur die Turnierleitung heraus - statt „Abmelden“ steht der Hinweis.
   const leagueSquad = Boolean(myReg?.squad_id);
   const canSelfUnregister = !leagueSquad && !!myReg && (myReg.user_id === user?.id || myRegTeam?.can_manage || ["leader", "co_leader"].includes(myRegTeam?.my_role)) && !["checked_in", "no_show", "rejected"].includes(myReg.status) && !["live", "paused", "completed", "results_published", "archived"].includes(t.status);
+  // Eigene Anmeldung (#2113): wer sie führt - die Person selbst, bei Teams Kapitän und Co-Kapitän. Eine abgelehnte nimmt
+  // sie selbst weg, solange das Turnier nicht läuft (dieselbe Grenze wie beim Server).
+  const leadsMyTeam = ["leader", "co_leader"].includes(myRegTeam?.my_role);
+  const editsMyReg = !!myReg && (myReg.team_id ? leadsMyTeam : myReg.user_id === user?.id);
+  const respondsForMyReg = !!myReg && (myReg.user_id === user?.id || leadsMyTeam || !!myRegTeam?.can_manage);
+  const canRemoveRejected = !leagueSquad && respondsForMyReg && myReg?.status === "rejected" && !["live", "paused", "completed", "results_published", "archived"].includes(t.status);
   const podiumRows = standings.filter((row) => row && !Array.isArray(row.standings) && Number(row.rank) >= 1 && Number(row.rank) <= 3);
   const nextStep = timelineSteps(t).find((step) => step.next) || null;
   const finished = ["completed", "results_published", "archived"].includes(t.status);
@@ -453,7 +477,9 @@ function TournamentDetailView() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 grid lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8 min-w-0">
           <MyStandCard tournament={t} registration={myReg} team={myRegTeam} isTeamTournament={isTeamTournament} canCheckIn={false} staffOnlyCheckIn={staffOnlyCheckIn}
-            canUnregister={canSelfUnregister} leagueSquad={leagueSquad} onUnregister={handleUnregister} busy={loading} scheduleTo={subPage("matches")} />
+            canUnregister={canSelfUnregister} leagueSquad={leagueSquad} onUnregister={handleUnregister} busy={loading} scheduleTo={subPage("matches")}
+            responsible={respondsForMyReg} canRemoveRejected={canRemoveRejected} onRemoveRejected={handleRemoveRejected}
+            detailsEdit={editsMyReg ? <MyRegistrationEdit tournament={t} registration={myReg} onSaved={load} /> : null} />
           {/* Nach dem Ende (#1221) kein Kalender-Knopf mehr. */}
           <TournamentTimeline tournament={t} calendarItem={tournamentIsOver(t) ? null : calendarItem} />
           {/* Freunde beim Turnier (#1188 Teil 2): nur mit Konto, nur bestätigte Freunde, die es erlauben. */}
