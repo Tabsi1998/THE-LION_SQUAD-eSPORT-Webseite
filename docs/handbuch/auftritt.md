@@ -14,7 +14,7 @@ der Cookie-Hinweis, die Jahreszeiten-Deko, der Adventkalender, die Ostereiersuch
 - Weitere Seiten, die zum Auftritt gehören: **Admin → Auftritt → Socials** (eure Kanäle und Links), **Admin → Auftritt
   → SEO & Analytics** (Suchmaschinen), **Admin → Verein → Über uns**, **News**, **Sponsoren**, **Vorstand**
 
-Die Einstellungen unter **Auftritt** und **Vereinsdaten** darf der Bereich **System** ändern, Adventkalender und
+Die Einstellungen unter **Auftritt** und die Rechtstexte unter **Vereinsdaten** darf der Bereich **System** ändern (Stammdaten und Kontakt auch die Vereinsverwaltung), Adventkalender und
 Ostereiersuche der Bereich **Content** oder **Verein**.
 
 ---

@@ -1,7 +1,9 @@
 """Membership routes — admin can mark users as official club members."""
+import csv
+import io
 import logging
 
-from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi import APIRouter, HTTPException, Depends, Request, Response
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from datetime import date
@@ -18,7 +20,8 @@ from services.slug_utils import apply_slug_history, find_by_slug_or_history, slu
 from models import (
     MembershipUpdate, MemberBenefitCreate, MemberBenefitUpdate, now_utc, new_id,
 )
-from services.notification_preferences import send_user_template
+from services import membership_notices
+from services.csv_safe import safe_cell
 from typing import Literal
 
 from pymongo import ReturnDocument
@@ -431,6 +434,8 @@ async def membership_meta():
     return {
         "statuses": sorted(VALID_STATUSES),
         "types": sorted(VALID_TYPES),
+        # Führt Dolibarr die Mitglieder, gibt es dort den Export (#2125).
+        "export_available": (await load_dolibarr_settings())["mode"] != "live",
     }
 
 

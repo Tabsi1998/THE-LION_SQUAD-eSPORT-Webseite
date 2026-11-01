@@ -93,7 +93,7 @@ Alle anderen sind **Themen**, die jede Person selbst an- und abschalten kann (3.
 | **Erfolge** | Freigeschaltete Erfolge, Kronen und neue Level – nur In-App, Push, Discord, keine Mail |
 | **Wochenrückblick** | Montags eine Mail mit XP und neuen Erfolgen, nur bei Aktivität, nur per Mail |
 | **Rechnungen** | „Deine Rechnung ist da“ – nur In-App, Push, Mail; Beträge gehen nie über Discord |
-| **Vereinsmitgliedschaft** | Bewerbung, Mitgliedsstatus, Vorteile |
+| **Vereinsmitgliedschaft** | Einladungen zum Antrag, Nummern, Vorteile. Entscheidungen über die eigene Mitgliedschaft (aufgenommen, abgelehnt, aktiv, ruhend, beendet, gesperrt) kommen immer per Mail und als Meldung, auch wenn das Thema aus ist |
 | **Geburtstagsgruß** | Einmal im Jahr eine Mail vom Verein |
 | **Nachrichten & Erwähnungen** | Direktnachrichten, Team-Chat-Erwähnungen, Freundschafts- und Team-Einladungen |
 | **News & Events** | Neue News, Events, Ankündigungen – nur mit Newsletter-Zustimmung, Standard aus |

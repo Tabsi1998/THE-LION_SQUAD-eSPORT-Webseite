@@ -12,7 +12,7 @@ Rechte hängen an Bereichen, nicht an einer Rangfolge. Eine Person kann mehrere 
 | --- | --- | --- |
 | Turnierleitung | `tournaments` | Turniere, Events, Stationen, Fast Lap, Saisons, Spiele, Gewinne, Strafen, Zugangslinks, PDF-Exporte |
 | Redaktion | `content` | News, Galerie, Medien, Sponsoren, Partner, Referenzen, Serien (externe Wettbewerbe), Navigation, Sticker, Erfolge (Achievements), Seiten-Banner, Newsletter, Twitch-Streams |
-| Vereinsverwaltung | `club` | Mitglieder und öffentliche Profile, Anträge, Dokumente, Vorteile, Vorstand, Kontakt-Inbox, Benutzerliste (lesen, bannen mit Grund – Konten mit Adminbereich oder Admin-Rolle bannt nur der Superadmin, Superadmin-Konten niemand), Discord-Zähler |
+| Vereinsverwaltung | `club` | Mitglieder und öffentliche Profile (mit CSV-Export), Anträge, Dokumente (auch gesperrte Downloads), Vorteile, Vorstand, Stammdaten und Kontakt der Vereinsdaten, Kontakt-Inbox, Benutzerliste (lesen, Rechte-Verlauf, bannen mit Grund – Konten mit Adminbereich oder Admin-Rolle bannt nur der Superadmin, Superadmin-Konten niemand), Discord-Zähler |
 | Finanzen | `finance` | Kosten und Abrechnung an Events (später Turnieren), Finanzübersicht mit Rechnungsaufträgen, Freigaben (#322, docs/ABRECHNUNG.md), Rechnungsangaben: Zahlungsziel, Zahlungsart, Bankkonto, Sprache der PDFs, „Steuersätze geprüft“, „gleich freigeben“ (#1358), Vereinsshop: Produkte, Preise, Varianten, Bestellungen (#1704, docs/SHOP.md) – die übrige Dolibarr-Technik bleibt bei System |
 | System | `system` | Einstellungen (Mail, Branding, Discord, Auth), Game-Server, Betrieb, Logs, Audit, App-Logs, Push-Tests, App-Versionen, E-Mail-Vorlagen, Wartungsläufe für Uploads |
 | Moderation | `moderation` | Moderationsseite: Meldungen, Wortfilter, Bildprüfung, Verwarnungen und Chat-Sperren (bei Konten mit Adminbereich nur der Superadmin, siehe unten); Direktnachrichten an jede Person. Keine Turnierrechte – wer zusätzlich als Helfer eingetragen ist, hat dort genau die Rechte des Einsatzes |
@@ -29,7 +29,7 @@ Rechte hängen an Bereichen, nicht an einer Rangfolge. Eine Person kann mehrere 
 
 **Freigaben:** Der Superadmin kann einer Person einzelne Bereiche geben (Admin → Alle Benutzer):
 Turnierleitung, Redaktion, Vereinsverwaltung, Finanzen. System bleibt an Club-Admin und Superadmin gebunden.
-Jede Freigabe steht im Audit-Log. Eine Freigabe zählt überall genauso wie die Rolle (#1350): Wer die
+Jede Freigabe steht im Audit-Log, die Person bekommt eine Meldung (#2125). Eine Freigabe zählt überall genauso wie die Rolle (#1350): Wer die
 Turnierleitung über eine Freigabe hat, arbeitet in jedem Turnier, jeder Fast Lap, an den Stationen und bei
 den Events wie mit der Rolle (Status, Turnierbaum, Anmeldungen, Check-in, Ergebnisse). Der Server prüft dafür
 den Bereich (`services/permissions.is_tournament_lead`), nicht eine Rollenliste.
@@ -38,7 +38,7 @@ den Bereich (`services/permissions.is_tournament_lead`), nicht eine Rollenliste.
 Vereinsverwaltung von selbst. Die Besetzung der Posten ist damit eine Rechtevergabe – deshalb (#1355): besetzt
 wird über die Personensuche nur mit Vereinsmitgliedern (der Server lehnt andere ab), vorher nennt ein Satz die Rechte
 („… wird Kassier:in und bekommt damit die Vereinsverwaltung: Mitgliederdaten, Anträge, Dokumente, Benutzer.“), eine
-Rückfrage bestätigt, und jede Besetzung steht im Protokoll (`board.assign`). Kommen die Rechte aus Dolibarr-Funktionen,
+Rückfrage bestätigt, und jede Besetzung steht im Protokoll (`board.assign`). Aktivieren und Deaktivieren bringt oder nimmt die Vereinsverwaltung: mit Rückfrage und Protokoll (`board.status`); dazu `board.create`, `board.update`, `board.delete` (#2125). Kommen die Rechte aus Dolibarr-Funktionen,
 sagt der Satz „Der Posten ist nur für die Anzeige – die Rechte kommen aus Dolibarr.“ Führt Dolibarr den Vorstand,
 lässt sich hier nichts ändern (Server: 409). Besetzen dürfen Vereinsverwaltung und System.
 
@@ -132,13 +132,15 @@ Finanzen, Club-Admin und Superadmin zählen nur mit bestätigter Zwei-Faktor-Anm
 Die Liste ist nur zum Lesen: Name, Konto-Art, Rolle als Wort, Bereiche als Schilder, gesperrt ja/nein. „Bearbeiten“
 öffnet ein Seitenblatt (am Handy als ganze Seite):
 
-- **Superadmin:** ändert Rolle und Freigaben – erst mit „Speichern“ und einer Rückfrage, die in einem Satz sagt, was die
+- **Superadmin:** ändert Rolle und Freigaben anderer Konten; die eigene Rolle ist nur lesbar, und der letzte Superadmin lässt sich weder herabstufen noch löscht er sein eigenes Konto (Server: 409, #2125). Erst mit „Speichern“ und einer Rückfrage, die in einem Satz sagt, was die
   Person bekommt oder verliert („Erika Beispiel bekommt damit Zugriff auf Vereinsverwaltung (Mitgliederdaten, Anträge,
   Dokumente und Benutzer).“). Unter „Mehr“: „Zugangs-Mail erneut senden“ (mit Rückfrage) und „Konto löschen“ (erst
   nach Eintippen des Namens).
 - **Club-Admin und Vereinsverwaltung:** sehen Rolle und Bereiche als Text, ohne Auswahl, und sperren Spieler-Konten mit
   Grund. Die Person bekommt den Grund per Mail („Konto gesperrt“); er steht auch im Protokoll.
 - Zum Mitgliedsantrag eingeladen wird auf „Bewerbungen“ (#1356); das Blatt zeigt nur den Stand („eingeladen am …“).
+- **Rechte-Verlauf** (Vereinsverwaltung, `GET /api/users/{id}/rights-history`, #2125): Rollen, Freigaben und Vorstandsposten dieser Person, nur mit Art, Werten, Zeit und Name der handelnden Person; kein Griff ins ganze Protokoll.
+- Wer Rolle, Freigabe oder Posten bekommt oder verliert, bekommt eine Meldung, die sich nicht abbestellen lässt (Art `rights_change`), bei neuem Adminbereich mit dem Hinweis auf die Zwei-Faktor-Anmeldung.
 
 ## Bewerbungen (#1356)
 
@@ -410,7 +412,7 @@ Benachrichtigungen ab. Es hängt nicht am Newsletter.
   erreichbar – auch nicht für Club-Admins.
 - Auch wo der Server noch nach der Rolle fragt (#1469), reicht die Admin-Rolle allein nicht mehr: fremde Teams
   verwalten, private Teams sehen, News-Entwürfe (Liste, Beitrag, Suche), Erfolge und Saison-Fundstücke privater
-  Profile, geheime Erfolgs-Gruppen, die Verein-Kategorie fremder Profile, gesperrte Dokument-Downloads, Admin-Medien
+  Profile, geheime Erfolgs-Gruppen, die Verein-Kategorie fremder Profile, Admin-Medien
   und das Upload-Protokoll sowie die Live-Aktualisierungen für die Verwaltung gehen nur mit bestätigter
   Zwei-Faktor-Anmeldung. Ohne gilt, was jede angemeldete Person sieht. Moderation bleibt ohne Zwei-Faktor.
 - Inhalte „Nur intern“ und „Nur Mitglieder“ öffnet ein Adminbereich (Rolle, Freigabe, Vorstandsposten, Dolibarr)
@@ -456,7 +458,7 @@ Finanzen; die Turnierleitung Turniere, Stationen, Strafen und Gewinne; der Admin
 | Gruppe | Einträge | Wer |
 | --- | --- | --- |
 | Übersicht | Dashboard (Turnierleitung, Redaktion, Vereinsverwaltung, Finanzen, System) · Mein Dienst (Helfer mit Einsatz, Captains externer Serien, Moderation ohne Verwaltungsbereich) | Dashboard mit einem dieser Bereiche und Zwei-Faktor (Server: `require_dashboard`, #992, #1353); „Mein Dienst“ (#1352) für Helfer und reine Moderation – im Benutzermenü statt „Admin“, `/admin` führt Helfer nach `/admin/dienst`, Moderation nach `/admin/moderation`, Konten ohne Dienst auf „Kein Zugriff“ mit dem Satz „Die Verwaltung ist für Vereinsdienste …“ |
-| Verein | Vereinsdaten (System) · Über uns, Sponsoren, Partner, Referenzen, Serien (Redaktion) · Vorstand, Kontakt-Inbox (Vereinsverwaltung) | je Eintrag |
+| Verein | Vereinsdaten (Vereinsverwaltung: Stammdaten und Kontakt über `/api/settings/club-data`, Rechtstexte nur lesen; System: alles, #2125) · Über uns, Sponsoren, Partner, Referenzen, Serien (Redaktion) · Vorstand, Kontakt-Inbox (Vereinsverwaltung) | je Eintrag |
 | Mitglieder | Mitglieder (mit dem Reiter Öffentliche Profile), Bewerbungen, Mitgliedervorteile, Dokumente, Alle Benutzer (Vereinsverwaltung) · Dolibarr (Vereinsverwaltung und System) | Vereinsverwaltung |
 | Finanzen | Finanzübersicht · Shop (Reiter Einstellungen: Stufe, Notschalter, Preise, Printful-Zugang, #1706; Reiter Produkte: Aufbau, Prüfung, Abgleich mit Printful, #1707/#1709; Reiter Designs: Druckdateien, #1708) | Finanzen |
 | eSports | Turniere, Fast Lap, Stationen (Turnierleitung, Helfer) · Turnier-Leitfaden, Jahreswertung, Spiele, Gewinne, Strafen (Turnierleitung) · Game-Server (System) | Turnierleitung |
