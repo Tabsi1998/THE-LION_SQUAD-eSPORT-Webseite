@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 // „Turnier anlegen“ mit Voreinstellung aus dem Leitfaden (#368): Format, Teilnahme, Teamgröße,
@@ -136,4 +137,107 @@ test("Weiterkommen: Vorgabe fester Baum, der gewählte Modus wird mitgeschickt",
   fireEvent.submit(screen.getByTestId("new-tr-form"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments", expect.objectContaining({ advancement_mode: "draw_show", draw_show_minutes: 15 })));
   expect(apiMock.post.mock.calls[0][1]).not.toHaveProperty("randomize_advancement_rounds");
+});
+
+// Format „Liga“ (#2111, F1): heißt „Jeder gegen jeden – Hin- und Rückrunde“, und darunter steht der Weg zur Vereinsliga.
+test("Jeder gegen jeden: unter dem Format steht der Weg zur Vereinsliga", async () => {
+  renderAt("");
+  const format = await screen.findByTestId("new-tr-format");
+  expect(screen.queryByTestId("new-tr-format-hint")).toBeNull();
+  expect(format.querySelector("option[value='league']")).toHaveTextContent("Jeder gegen jeden – Hin- und Rückrunde");
+  fireEvent.change(format, { target: { value: "league" } });
+  expect(screen.getByTestId("new-tr-format-hint")).toHaveTextContent("Seasons, Ligen und Staffeln");
+  expect(screen.getByRole("link", { name: "Admin → eSports → Liga" })).toHaveAttribute("href", "/admin/leagues");
+});
+
+// Adresse (#2111, TA1): sie folgt dem Titel Buchstabe für Buchstabe, bis jemand sie selbst ändert - vorher blieb nur der
+// erste Buchstabe stehen („/tournaments/h“). Der Test tippt wirklich, statt das Feld in einem Zug zu füllen.
+test("die Adresse folgt dem getippten Titel, bis sie selbst geändert wird", async () => {
+  const user = userEvent.setup();
+  renderAt("");
+  const title = await screen.findByTestId("new-tr-title");
+  await user.type(title, "Herbst Cup");
+  const slug = screen.getByTestId("new-tr-slug");
+  expect(slug).toHaveValue("herbst-cup");
+  await user.clear(slug);
+  await user.type(slug, "mein-cup ");
+  expect(slug).toHaveValue("mein-cup-");
+  await user.type(title, " 2026");
+  expect(slug).toHaveValue("mein-cup-");
+});
+
+// Automatisch live (#2111, W4): vor Ort startet die Turnierleitung selbst - der Schalter fehlt und geht aus.
+test("vor Ort kein Schalter „automatisch live/beendet“, mitgeschickt wird aus", async () => {
+  apiMock.get.mockImplementation(async (url) => (url === "/games" ? { data: [{ id: "g1", name: "Mario Kart 8" }] } : { data: [] }));
+  apiMock.post.mockResolvedValue({ data: { id: "t-new" } });
+  renderAt("");
+  fireEvent.click(await screen.findByTestId("new-tr-auto-start"));
+  fireEvent.change(screen.getByTestId("new-tr-event-mode"), { target: { value: "local" } });
+  expect(screen.queryByTestId("new-tr-auto-start")).toBeNull();
+  fireEvent.change(screen.getByTestId("new-tr-title"), { target: { value: "Hallen-Cup" } });
+  fireEvent.change(await screen.findByTestId("new-tr-game"), { target: { value: "g1" } });
+  fireEvent.submit(screen.getByTestId("new-tr-form"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments", expect.objectContaining({ event_mode: "local", auto_start_enabled: false })));
+});
+
+// Sichtbarkeit beim Anlegen (#2111, TA2): vorher war jedes neue Turnier öffentlich.
+test("die Sichtbarkeit lässt sich gleich beim Anlegen wählen", async () => {
+  apiMock.get.mockImplementation(async (url) => (url === "/games" ? { data: [{ id: "g1", name: "Mario Kart 8" }] } : { data: [] }));
+  apiMock.post.mockResolvedValue({ data: { id: "t-new" } });
+  renderAt("");
+  const visibility = await screen.findByTestId("new-tr-visibility");
+  expect(visibility).toHaveValue("public");
+  fireEvent.change(visibility, { target: { value: "members" } });
+  fireEvent.change(screen.getByTestId("new-tr-title"), { target: { value: "Vereins-Cup" } });
+  fireEvent.change(await screen.findByTestId("new-tr-game"), { target: { value: "g1" } });
+  fireEvent.submit(screen.getByTestId("new-tr-form"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments", expect.objectContaining({ visibility: "members" })));
+});
+
+// Ein Weg für den Stream (#2111, F5): Plattform und Kanal, ein Haken - gespeichert, wie die Turnierseite ihn liest.
+test("Stream beim Anlegen: Twitch-Kanal wird zur Adresse, der Haken zeigt ihn", async () => {
+  apiMock.get.mockImplementation(async (url) => (url === "/games" ? { data: [{ id: "g1", name: "Mario Kart 8" }] } : { data: [] }));
+  apiMock.post.mockResolvedValue({ data: { id: "t-new" } });
+  renderAt("");
+  fireEvent.change(await screen.findByTestId("new-tr-stream-platform"), { target: { value: "twitch" } });
+  fireEvent.change(screen.getByTestId("new-tr-stream-url"), { target: { value: "lion" } });
+  fireEvent.click(screen.getByTestId("new-tr-stream-embed"));
+  expect(screen.queryByTestId("new-tr-twitch")).toBeNull();
+  expect(screen.queryByTestId("new-tr-stream")).toBeNull();
+  fireEvent.change(screen.getByTestId("new-tr-title"), { target: { value: "Stream-Cup" } });
+  fireEvent.change(await screen.findByTestId("new-tr-game"), { target: { value: "g1" } });
+  fireEvent.submit(screen.getByTestId("new-tr-form"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments", expect.objectContaining({
+    stream_platform: "twitch", stream_url: "https://www.twitch.tv/lion", twitch_channel: "lion", has_live_stream: true, twitch_enabled: true,
+  })));
+  expect(apiMock.post.mock.calls.at(-1)[1]).not.toHaveProperty("stream_address");
+});
+
+// Preisgruppen (#2111, T5): Siegerrunde und Verliererrunde nur beim Doppel-K.-o.
+test("Siegerrunde und Verliererrunde nur beim Doppel-K.-o.", async () => {
+  renderAt("");
+  const format = await screen.findByTestId("new-tr-format");
+  const groups = () => [...screen.getByTestId("new-tr-prize-group-0").querySelectorAll("option")].map((option) => option.value);
+  expect(screen.queryByTestId("new-tr-prize-loser-top3")).toBeNull();
+  expect(groups()).toEqual(["overall", "special"]);
+  fireEvent.change(format, { target: { value: "double_elim" } });
+  expect(screen.getByTestId("new-tr-prize-loser-top3")).toHaveTextContent("Verliererrunde");
+  expect(groups()).toEqual(["overall", "winner", "loser", "special"]);
+});
+
+// Weiterkommen (#2111, T4): nur bei Formaten mit Turnierbaum; Hin- und Rückrunde hat „Spieltage auslosen“.
+test("Weiterkommen nur mit Turnierbaum, bei Hin- und Rückrunde „Spieltage auslosen“", async () => {
+  apiMock.get.mockImplementation(async (url) => (url === "/games" ? { data: [{ id: "g1", name: "Mario Kart 8" }] } : { data: [] }));
+  apiMock.post.mockResolvedValue({ data: { id: "t-new" } });
+  renderAt("");
+  const format = await screen.findByTestId("new-tr-format");
+  fireEvent.change(format, { target: { value: "swiss" } });
+  expect(screen.queryByTestId("new-tr-advancement")).toBeNull();
+  expect(screen.queryByTestId("new-tr-matchday-draw")).toBeNull();
+  fireEvent.change(format, { target: { value: "league" } });
+  fireEvent.click(screen.getByTestId("new-tr-matchday-draw"));
+  fireEvent.change(screen.getByTestId("new-tr-title"), { target: { value: "Liga-Cup" } });
+  fireEvent.change(await screen.findByTestId("new-tr-game"), { target: { value: "g1" } });
+  fireEvent.submit(screen.getByTestId("new-tr-form"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/tournaments", expect.objectContaining({ format: "league", advancement_mode: "draw_round" })));
 });

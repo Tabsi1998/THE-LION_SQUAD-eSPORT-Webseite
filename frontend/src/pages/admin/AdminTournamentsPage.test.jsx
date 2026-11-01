@@ -19,7 +19,7 @@ const OWN = { id: "t-own", slug: "eigenes", title: "Eigenes Turnier", status: "r
 
 test("ein Helfer sieht in der Verwaltung nur sein Turnier - die Seite fragt die Verwaltungsliste ab", async () => {
   apiMock.get.mockImplementation(async (url) => {
-    if (url === "/tournaments?include_drafts=true&managed=true") return { data: [OWN] };
+    if (url === "/tournaments?include_drafts=true&managed=true&limit=500") return { data: [OWN] };
     return { data: [OWN, { ...OWN, id: "t-fremd", slug: "fremd", title: "Fremdes Turnier" }] };
   });
   render(
@@ -29,7 +29,7 @@ test("ein Helfer sieht in der Verwaltung nur sein Turnier - die Seite fragt die 
   );
   expect(await screen.findByText("Eigenes Turnier")).toBeInTheDocument();
   expect(screen.queryByText("Fremdes Turnier")).toBeNull();
-  expect(apiMock.get).toHaveBeenCalledWith("/tournaments?include_drafts=true&managed=true");
+  expect(apiMock.get).toHaveBeenCalledWith("/tournaments?include_drafts=true&managed=true&limit=500");
 });
 
 test("globale Aktionen nur für die Turnierleitung mit Zwei-Faktor - nicht für Adminbereich plus Helfer-Einsatz", async () => {
@@ -67,6 +67,16 @@ test("Staffeln tragen ihr Kennzeichen und lassen sich filtern", async () => {
   expect(screen.queryByText("Probe-Liga Season 1 · Liga 1 · Staffel A")).toBeNull();
 });
 
+// Löschen nur für Entwürfe (#2111, TA18) - alles andere sagt man ab oder archiviert.
+test("ein Turnier lässt sich nur als Entwurf löschen", async () => {
+  apiMock.get.mockResolvedValue({ data: [{ ...OWN, status: "draft" }, { ...OWN, id: "t-open", slug: "offen", title: "Offenes Turnier", status: "registration_open" }] });
+  authState.isTournamentLead = true;
+  render(<MemoryRouter><AdminTournamentsPage /></MemoryRouter>);
+  await screen.findByText("Offenes Turnier");
+  expect(within(screen.getByTestId("admin-tr-eigenes")).getByTitle("Löschen")).toBeInTheDocument();
+  expect(within(screen.getByTestId("admin-tr-offen")).queryByTitle("Löschen")).toBeNull();
+});
+
 test("eine Staffel: vor dem Start löschbar, danach nicht, und nie „Anmeldung öffnen“", async () => {
   apiMock.get.mockResolvedValue({ data: [STAFFEL, { ...STAFFEL, id: "t-live", slug: "liga-b", title: "Laufende Staffel", status: "live" }] });
   authState.isTournamentLead = true;
@@ -75,4 +85,30 @@ test("eine Staffel: vor dem Start löschbar, danach nicht, und nie „Anmeldung 
   expect(within(screen.getByTestId("admin-tr-liga-a")).getByTitle("Löschen")).toBeInTheDocument();
   expect(within(screen.getByTestId("admin-tr-liga-b")).queryByTitle("Löschen")).toBeNull();
   expect(screen.queryByTitle("Anmeldung öffnen")).toBeNull();
+});
+
+// Turnierliste (#2111, TA21): dieselben Statuswörter wie im Kopf (mit „Check-in offen“), Archiv nur über den Filter,
+// Suche nach deutschen Formatnamen, Meldungen ohne Rohschlüssel.
+test("Turnierliste: Archiv nur im Filter, Suche nach „K.-o.“, Status in Worten", async () => {
+  const { toast } = await import("sonner");
+  const toastSpy = vi.spyOn(toast, "success");
+  apiMock.get.mockResolvedValue({ data: [
+    { ...OWN, format: "single_elim", status: "draft" },
+    { ...OWN, id: "t-old", slug: "alt", title: "Altes Turnier", format: "swiss", status: "archived" },
+  ] });
+  apiMock.post.mockResolvedValue({ data: { ok: true } });
+  authState.isTournamentLead = true;
+  render(<MemoryRouter><AdminTournamentsPage /></MemoryRouter>);
+  await screen.findByText("Eigenes Turnier");
+  expect(screen.queryByText("Altes Turnier")).toBeNull();
+  const filter = screen.getByTestId("admin-tournament-status-filter");
+  expect([...filter.querySelectorAll("option")].map((option) => option.value)).toContain("check_in");
+  expect(filter.querySelector("option[value='check_in']")).toHaveTextContent("Check-in offen");
+  fireEvent.change(filter, { target: { value: "archived" } });
+  expect(screen.getByText("Altes Turnier")).toBeInTheDocument();
+  fireEvent.change(filter, { target: { value: "" } });
+  fireEvent.change(screen.getByTestId("admin-tournament-search"), { target: { value: "K.-o." } });
+  expect(screen.getByText("Eigenes Turnier")).toBeInTheDocument();
+  fireEvent.click(screen.getByTitle("Anmeldung öffnen"));
+  await vi.waitFor(() => expect(toastSpy).toHaveBeenCalledWith("Status: Anmeldung offen"));
 });

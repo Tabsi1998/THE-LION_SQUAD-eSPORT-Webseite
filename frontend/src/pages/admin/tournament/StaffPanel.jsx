@@ -6,9 +6,27 @@ import { StatusBadge } from "@/components/tls/StatusBadge";
 import { PersonPicker } from "@/components/tls/PersonPicker";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
-import { STAFF_ROLE_OPTIONS, STAFF_SCOPE_OPTIONS } from "@/lib/tournamentLabels";
+import { STAFF_ROLE_OPTIONS, STAFF_SCOPE_OPTIONS, formatBracketSection } from "@/lib/tournamentLabels";
 
-export function TournamentStaffPanel({ tournamentId, staff, staffError = "", onChanged }) {
+// Bereich eines Einsatzes (#2111, TA25): eine Auswahl aus diesem Turnier statt einer rohen Kennung als Freitext - ein
+// Tippfehler ergab vorher einen Helfer ohne Rechte. „Alle …“ (leer) gilt für jede Phase, Gruppe, Station oder jedes Spiel.
+const ALL_LABELS = { stage: "Alle Phasen", group: "Alle Gruppen", station: "Alle Stationen", match: "Alle Spiele" };
+
+export function scopeChoices({ stages = [], groups = [], stations = [], matches = [] } = {}) {
+  return {
+    stage: stages.map((stage) => [stage.id, stage.name || `Phase ${stage.number || ""}`.trim()]),
+    group: groups.map((group) => [group.id, group.name || "Gruppe"]),
+    station: stations.map((station) => [station.id, station.name ? `Station ${station.name}` : "Station"]),
+    match: matches.filter((match) => !match.is_preview).map((match) => [
+      match.id,
+      [formatBracketSection(match.section), match.round_name, match.match_key].filter(Boolean).join(" · "),
+    ]),
+  };
+}
+
+export function TournamentStaffPanel({ tournamentId, staff, staffError = "", onChanged, stages = [], groups = [], stations = [], matches = [] }) {
+  const choices = scopeChoices({ stages, groups, stations, matches });
+  const scopeName = (scope, id) => (choices[scope] || []).find(([value]) => value === id)?.[1] || "nicht mehr vorhanden";
   const [person, setPerson] = useState(null);
   const [form, setForm] = useState({ role: "scorekeeper", scope: "tournament", scope_id: "", notes: "" });
   const [saving, setSaving] = useState(false);
@@ -82,14 +100,19 @@ export function TournamentStaffPanel({ tournamentId, staff, staffError = "", onC
         <div className="grid grid-cols-2 gap-2">
           <label className="block">
             <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Bereich</div>
-            <select value={form.scope} onChange={(e) => set("scope", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
+            <select value={form.scope} onChange={(e) => setForm((x) => ({ ...x, scope: e.target.value, scope_id: "" }))} data-testid="tournament-staff-scope" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
               {STAFF_SCOPE_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
           </label>
-          <label className="block">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Bereich-ID</div>
-            <input value={form.scope_id} disabled={form.scope === "tournament"} onChange={(e) => set("scope_id", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm disabled:opacity-40" placeholder="optional" />
-          </label>
+          {form.scope !== "tournament" && (
+            <label className="block">
+              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Welche</div>
+              <select value={form.scope_id} onChange={(e) => set("scope_id", e.target.value)} data-testid="tournament-staff-scope-id" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
+                <option value="">{ALL_LABELS[form.scope]}</option>
+                {(choices[form.scope] || []).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </label>
+          )}
         </div>
         <label className="block">
           <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Notiz</div>
@@ -122,7 +145,8 @@ export function TournamentStaffPanel({ tournamentId, staff, staffError = "", onC
                   <td className="px-4 py-3">{roleLabel(a.role)}</td>
                   <td className="px-4 py-3">
                     <div>{scopeLabel(a.scope || "tournament")}</div>
-                    {a.scope_id && <div className="text-xs text-white/40 font-mono">{a.scope_id}</div>}
+                    {a.scope_id ? <div className="text-xs text-white/40">{scopeName(a.scope, a.scope_id)}</div>
+                      : a.scope && a.scope !== "tournament" ? <div className="text-xs text-white/40">{ALL_LABELS[a.scope]}</div> : null}
                   </td>
                   <td className="px-4 py-3">
                     <StatusBadge status={a.is_active === false ? "paused" : "approved"} />

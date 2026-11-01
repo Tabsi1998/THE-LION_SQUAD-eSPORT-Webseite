@@ -172,6 +172,8 @@ NOTIFICATION_KIND_CATEGORY = {
     "tournament_finished": "tournament_updates",
     # Absage (#2120): „Turnier abgesagt“ an alle, die noch mitspielen wollten.
     "tournament_cancelled": "tournament_updates",
+    # Helfer-Einsatz (#2111, TA25): „Du hilfst bei diesem Turnier als …“.
+    "tournament_staff": "tournament_updates",
     "match_chat_message": "community_messages",
     "match_chat_mention": "community_messages",
     "tournament_checkin": "tournament_updates",

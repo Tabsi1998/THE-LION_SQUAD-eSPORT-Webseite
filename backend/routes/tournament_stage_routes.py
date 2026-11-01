@@ -117,7 +117,7 @@ async def create_tournament_stage(tid: str, body: TournamentStageCreate,
         {"id": 1},
     )
     if duplicate:
-        raise HTTPException(status_code=409, detail="Stage-Nummer existiert bereits")
+        raise HTTPException(status_code=409, detail="Diese Phasennummer gibt es schon – bitte eine andere wählen.")
     doc["id"] = new_id()
     doc["creation_key"] = creation_key
     doc["tournament_id"] = tid
@@ -148,7 +148,7 @@ async def update_tournament_stage(tid: str, stage_id: str, body: TournamentStage
     await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
     current = await db.tournament_stages.find_one({"id": stage_id, "tournament_id": tid}, {"_id": 0})
     if not current:
-        raise HTTPException(status_code=404, detail="Stage nicht gefunden")
+        raise HTTPException(status_code=404, detail="Phase nicht gefunden")
     updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
     _sync_stage_settings(updates.get("settings"))
     if "number" in updates:
@@ -157,7 +157,7 @@ async def update_tournament_stage(tid: str, stage_id: str, body: TournamentStage
             {"id": 1},
         )
         if duplicate:
-            raise HTTPException(status_code=409, detail="Stage-Nummer existiert bereits")
+            raise HTTPException(status_code=409, detail="Diese Phasennummer gibt es schon – bitte eine andere wählen.")
     updates["updated_at"] = now_utc().isoformat()
     await db.tournament_stages.update_one({"id": stage_id}, {"$set": updates})
     await _audit_tournament_action(
@@ -181,7 +181,7 @@ async def delete_tournament_stage(tid: str, stage_id: str, force: bool = False, 
     await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
     stage = await db.tournament_stages.find_one({"id": stage_id, "tournament_id": tid}, {"_id": 0})
     if not stage:
-        raise HTTPException(status_code=404, detail="Stage nicht gefunden")
+        raise HTTPException(status_code=404, detail="Phase nicht gefunden")
     # Eine Phase mit echten Spielen (#2120): nach dem Ende gar nicht, sonst nur mit Bestätigung samt Zahl.
     finished = tournament_guard.finished_problem(tournament)
     if finished:
@@ -321,7 +321,7 @@ async def generate_tournament_stage_matches(tid: str, stage_id: str, force: bool
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     stage = await db.tournament_stages.find_one({"id": stage_id, "tournament_id": tid}, {"_id": 0})
     if not stage:
-        raise HTTPException(status_code=404, detail="Stage nicht gefunden")
+        raise HTTPException(status_code=404, detail="Phase nicht gefunden")
     finished = tournament_guard.finished_problem(tournament)
     if finished:
         raise HTTPException(status_code=409, detail=finished)
@@ -355,7 +355,7 @@ async def generate_tournament_stage_matches(tid: str, stage_id: str, force: bool
     except BracketSchemaError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     if not matches:
-        raise HTTPException(status_code=400, detail="Schema erzeugt keine Matches")
+        raise HTTPException(status_code=400, detail="Das Schema ergibt keine Spiele – bitte die Zeilen im Schema prüfen.")
     _apply_match_plan(matches, match_plan, _v2_plan_key)
 
     if existing:

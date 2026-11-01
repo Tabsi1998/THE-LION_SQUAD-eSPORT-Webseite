@@ -48,6 +48,40 @@ test("kein Statusfeld mehr im Formular - der Status steht nur oben", async () =>
   expect(screen.queryByLabelText("Status")).toBeNull();
 });
 
+// Deutsch statt Technik (#2111, TA27): „Adresse“ statt „Slug“, Jahreswertung ohne „grosses/regulaeres“.
+test("Adresse statt Slug, Jahreswertung in richtigem Deutsch", async () => {
+  render(<TournamentEditForm tournament={BASE} onSaved={() => {}} />);
+  expect((await screen.findByTestId("tr-edit-slug")).closest("label")).toHaveTextContent("Adresse (URL)");
+  const weights = [...document.querySelectorAll("option")].map((option) => option.textContent).join(" | ");
+  expect(weights).toContain("Major – großes Turnier (×3)");
+  expect(weights).not.toMatch(/grosses|regulaeres|Slug|Seeding/);
+});
+
+// Ein Weg für den Stream (#2111, F5): ein älteres Turnier mit Twitch-Kanal steht als „Twitch“ mit Kanal da und geht
+// unverändert nicht mit; „Alter Stream-Verweis“ nur, solange er befüllt ist.
+test("Stream: Plattform und Kanal statt drei Wege, alter Verweis nur wenn befüllt", async () => {
+  apiMock.patch.mockReset();
+  apiMock.patch.mockResolvedValue({ data: {} });
+  const legacy = { ...BASE, twitch_channel: "lion", twitch_enabled: true };
+  const { unmount } = render(<TournamentEditForm tournament={legacy} onSaved={() => {}} />);
+  expect(await screen.findByTestId("tr-edit-stream-platform")).toHaveValue("twitch");
+  expect(screen.getByTestId("tr-edit-stream-url")).toHaveValue("lion");
+  expect(screen.getByTestId("tr-edit-stream-embed")).toBeChecked();
+  expect(screen.queryByTestId("tr-edit-stream")).toBeNull();
+  expect(screen.queryByTestId("tr-edit-twitch")).toBeNull();
+  fireEvent.change(screen.getByTestId("tr-edit-title"), { target: { value: "Probe-Cup 2" } });
+  fireEvent.click(screen.getByTestId("tr-edit-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/tournaments/t-1", { title: "Probe-Cup 2" }));
+  fireEvent.change(screen.getByTestId("tr-edit-stream-url"), { target: { value: "lion_tv" } });
+  fireEvent.click(screen.getByTestId("tr-edit-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenLastCalledWith("/tournaments/t-1", expect.objectContaining({
+    stream_url: "https://www.twitch.tv/lion_tv", twitch_channel: "lion_tv",
+  })));
+  unmount();
+  render(<TournamentEditForm tournament={{ ...BASE, stream_link: "https://example.org/stream" }} onSaved={() => {}} />);
+  expect(await screen.findByTestId("tr-edit-stream")).toHaveValue("https://example.org/stream");
+});
+
 test("Staffel: Season-Werte nur lesend mit Weg zur Season, Liga-fremde Felder fehlen", async () => {
   renderStaffel();
   const values = await screen.findByTestId("tr-edit-season-values");
@@ -96,4 +130,61 @@ test("„Gewinne erzeugen“ erst ab Beendet", async () => {
   render(<TournamentEditForm tournament={{ ...BASE, status: "completed", prize_places: prizes }} onSaved={() => {}} />);
   expect(await screen.findByTestId("tr-edit-create-prizes")).toBeEnabled();
   expect(screen.getByTestId("tr-edit-create-prizes-hint")).toHaveTextContent("Sonderpreise vergebt ihr dort von Hand");
+});
+
+// Zeitfahren und Rennserie (#2111, TA6): ein bestehendes Turnier behält sein Format, darunter steht der Weg zu Fast Lap
+// und Serien - es bekommt im Turnier keine Spiele.
+test("Zeitfahren: das Format bleibt wählbar, mit Hinweis auf Fast Lap und Serien", async () => {
+  render(<MemoryRouter><TournamentEditForm tournament={{ ...BASE, status: "draft", format: "time_trial" }} onSaved={() => {}} /></MemoryRouter>);
+  const format = await screen.findByTestId("tr-edit-format");
+  expect(format).toHaveValue("time_trial");
+  expect(screen.getByTestId("tr-edit-format-hint")).toHaveTextContent("keine Spiele");
+  expect(screen.getByRole("link", { name: "Fast Lap" })).toHaveAttribute("href", "/admin/f1");
+  expect(screen.getByRole("link", { name: "Serien" })).toHaveAttribute("href", "/admin/reference-series");
+  // Ohne Spiele kein Best of, keine Matchdauer und kein „Struktur anwenden“ (TA4).
+  expect(screen.queryByTestId("tr-edit-bo")).toBeNull();
+  expect(screen.queryByTestId("tr-edit-duration")).toBeNull();
+  expect(screen.queryByTestId("tr-edit-save-rebuild")).toBeNull();
+});
+
+// Nur, was wirkt (#2111, TA4): Mindestpause nur, wo der Stationsplaner plant; in Läufen heißt „Best of“ „Runden je Lauf“;
+// beim Schweizer System gibt es keinen Turnierbaum zum Vorausbauen.
+test("Mindestpause nur vor Ort und hybrid, Runden je Lauf bei Mehrspieler, kein Struktur-Knopf beim Schweizer System", async () => {
+  const { unmount } = render(<TournamentEditForm tournament={{ ...BASE, status: "draft", event_mode: "online" }} onSaved={() => {}} />);
+  await screen.findByTestId("tr-edit-title");
+  expect(screen.queryByTestId("tr-edit-break")).toBeNull();
+  expect(screen.getByTestId("tr-edit-save-rebuild")).toBeInTheDocument();
+  unmount();
+  const second = render(<TournamentEditForm tournament={{ ...BASE, status: "draft", event_mode: "local", format: "ffa" }} onSaved={() => {}} />);
+  expect(await screen.findByTestId("tr-edit-break")).toBeInTheDocument();
+  expect(screen.getByTestId("tr-edit-bo").closest("label")).toHaveTextContent("Runden je Lauf");
+  second.unmount();
+  render(<TournamentEditForm tournament={{ ...BASE, status: "draft", format: "swiss" }} onSaved={() => {}} />);
+  await screen.findByTestId("tr-edit-title");
+  expect(screen.queryByTestId("tr-edit-save-rebuild")).toBeNull();
+  expect(screen.getByTestId("tr-edit-bo").closest("label")).toHaveTextContent(/^Best of/);
+});
+
+// Setzliste (#2111, T3): „Ranking“ verhielt sich wie „Manuell“ - es steht als „Manuell“ da und geht unverändert nicht mit.
+test("Setzliste: ein altes „Ranking“ steht als „Manuell“ da, ohne Ranking zur Wahl", async () => {
+  apiMock.patch.mockReset();
+  apiMock.patch.mockResolvedValue({ data: {} });
+  render(<TournamentEditForm tournament={{ ...BASE, status: "draft", seeding_mode: "ranking" }} onSaved={() => {}} />);
+  const seeding = await screen.findByTestId("tr-edit-seeding");
+  expect(seeding).toHaveValue("manual");
+  expect([...seeding.querySelectorAll("option")].map((option) => option.value)).toEqual(["random", "manual"]);
+  fireEvent.change(screen.getByTestId("tr-edit-title"), { target: { value: "Probe-Cup 2" } });
+  fireEvent.click(screen.getByTestId("tr-edit-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/tournaments/t-1", { title: "Probe-Cup 2" }));
+});
+
+// Automatisch live (#2111, W4): vor Ort startet die Turnierleitung selbst - der Schalter steht dort nur, solange er an ist.
+test("Automatisch live/beendet: vor Ort nur, solange es an ist", async () => {
+  const { unmount } = render(<TournamentEditForm tournament={{ ...BASE, event_mode: "local" }} onSaved={() => {}} />);
+  await screen.findByTestId("tr-edit-title");
+  expect(screen.queryByTestId("tr-edit-auto-start")).toBeNull();
+  unmount();
+  render(<TournamentEditForm tournament={{ ...BASE, event_mode: "local", auto_start_enabled: true }} onSaved={() => {}} />);
+  expect(await screen.findByTestId("tr-edit-auto-start")).toBeChecked();
+  expect(screen.getByTestId("tr-edit-auto-start").closest("label")).toHaveTextContent("besser ausschalten");
 });

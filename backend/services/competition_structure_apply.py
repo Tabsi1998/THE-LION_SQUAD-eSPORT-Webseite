@@ -72,11 +72,11 @@ async def activate_structure_plan(
     previous_matches = list(previous_stage_matches)
     if any(not match.get("is_preview") for match in previous_matches):
         raise StructureApplyPreconditionError(
-            "Bestehende reale Matches dürfen mit dem sicheren Apply-Weg nicht ersetzt werden"
+            "Echte Spiele ersetzt „Struktur anwenden“ nicht – erst den Turnierbaum zurücksetzen."
         )
     if tournament.get("status") in PROTECTED_TOURNAMENT_STATUSES:
         raise StructureApplyPreconditionError(
-            "Laufende oder historische Turniere dürfen mit dem sicheren Apply-Weg nicht ersetzt werden"
+            "Bei laufenden oder beendeten Turnieren ersetzt „Struktur anwenden“ nichts."
         )
 
     previous_documents = [

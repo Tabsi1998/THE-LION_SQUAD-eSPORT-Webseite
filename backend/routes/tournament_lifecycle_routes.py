@@ -57,7 +57,7 @@ def _live_start_blocker(report: dict, force: bool) -> dict | None:
         "message": (
             "Turnier kann ohne spielbares Match nicht gestartet werden."
             if hard_block
-            else "Turnierplanung enthält Konflikte. Erneut mit force=true bestätigen oder Konflikte beheben."
+            else "Die Turnierplanung enthält Konflikte. Bitte beheben oder „Trotzdem live“ bestätigen."
         ),
         "force_allowed": not hard_block,
         "planning": report,

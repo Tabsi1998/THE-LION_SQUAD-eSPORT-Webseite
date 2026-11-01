@@ -53,7 +53,7 @@ const TOURNAMENT = {
   title: "Winter Cup 2026",
   status: "registration_open",
   game: "rocket_league",
-  format: "single_elimination",
+  format: "single_elim",
   team_size: 3,
   max_teams: 16,
   registration_enabled: true,
@@ -395,6 +395,23 @@ test("die Spielwochen-Einstellungen erscheinen nur bei Wochenformaten", async ()
   expect(screen.getByTestId("tr-edit-matchday-days")).toHaveValue(7);
   expect(screen.getByTestId("tr-edit-matchday-time")).toHaveValue("20:00");
   expect(screen.getByLabelText("Standardtag")).toHaveValue("6");
+});
+
+// Spielwochen nur online und hybrid (#2111, T1): vor Ort plant der Stationsplaner Runden an einem Tag.
+test("vor Ort gibt es auch im Wochenformat keine Spielwochen", async () => {
+  const user = userEvent.setup();
+  apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path.match(/\/tournaments\/t-1(\?|$)/)) return Promise.resolve({ data: { ...TOURNAMENT, format: "league", event_mode: "local" } });
+    return Promise.resolve(routeFor(path));
+  });
+  renderPage();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  await user.click(screen.getByTestId("admin-tr-tab-edit"));
+  await screen.findByTestId("tr-edit-format");
+  expect(screen.queryByTestId("tr-edit-matchdays")).not.toBeInTheDocument();
+  await user.selectOptions(screen.getByLabelText("Austragung"), "hybrid");
+  expect(screen.getByTestId("tr-edit-matchdays")).toBeInTheDocument();
 });
 
 test("ein K.-o.-Turnier zeigt keine Spielwochen-Einstellungen", async () => {
@@ -751,6 +768,24 @@ test("Bearbeiten: Weiterkommen – vier Modi mit Erklärtext, Show-Minuten nur b
   expect(apiMock.patch.mock.calls[0][1]).not.toHaveProperty("randomize_advancement_rounds");
 });
 
+// Weiterkommen nur, wo Sieger in ein nächstes Spiel gehen (#2111, T4): Hin- und Rückrunde hat dafür „Spieltage
+// auslosen“, Jeder gegen jeden einfach, Gruppen und Schweizer System haben keins.
+test("Bearbeiten: bei Hin- und Rückrunde nur „Spieltage auslosen“, bei Jeder gegen jeden einfach nichts", async () => {
+  const user = userEvent.setup();
+  renderPageWithFormat("league");
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  await user.click(screen.getByTestId("admin-tr-tab-edit"));
+  const draw = await screen.findByTestId("tr-edit-matchday-draw");
+  expect(screen.queryByTestId("tr-edit-advancement")).toBeNull();
+  expect(draw).not.toBeChecked();
+  await user.click(draw);
+  await user.click(screen.getByTestId("tr-edit-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/tournaments/t-1", expect.objectContaining({ advancement_mode: "draw_round" })));
+  await user.selectOptions(screen.getByTestId("tr-edit-format"), "round_robin");
+  expect(screen.queryByTestId("tr-edit-matchday-draw")).toBeNull();
+  expect(screen.queryByTestId("tr-edit-advancement")).toBeNull();
+});
+
 test("Bearbeiten: der alte Schalter wird als „Auslosung nach der Runde“ vorbelegt", async () => {
   const user = userEvent.setup();
   apiMock.get.mockImplementation((url) => {
@@ -824,10 +859,22 @@ test("eine Liga-Staffel zeigt keine Vor-Ort-Anmeldung und startet mit „Liga st
   expect(screen.queryByTestId("onsite-access-panel")).toBeNull();
 });
 
-test("ein gewöhnliches Turnier fragt die Vor-Ort-Anmeldung weiter ab", async () => {
+// Die Vor-Ort-Anmeldung per QR gibt es nur vor Ort und hybrid (#2111, TA4) - ein Online-Turnier fragt sie nicht ab.
+test("ein Turnier vor Ort fragt die Vor-Ort-Anmeldung weiter ab, ein Online-Turnier nicht", async () => {
+  const onsiteCalls = () => apiMock.get.mock.calls.map(([url]) => String(url)).filter((url) => url.includes("/onsite-access"));
   renderPage();
   await screen.findByRole("heading", { name: "Winter Cup 2026" });
-  await waitFor(() => expect(apiMock.get.mock.calls.map(([url]) => String(url)).some((url) => url.includes("/onsite-access"))).toBe(true));
+  expect(onsiteCalls()).toEqual([]);
+  cleanup();
+  apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path.includes("/onsite-access")) return Promise.resolve({ data: {} });
+    if (path.match(/\/tournaments\/t-1(\?|$)/)) return Promise.resolve({ data: { ...TOURNAMENT, event_mode: "hybrid" } });
+    return Promise.resolve(routeFor(path));
+  });
+  renderPage();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  await waitFor(() => expect(onsiteCalls().length).toBeGreaterThan(0));
 });
 
 // Liga-Staffel in der Turnierverwaltung (#2109): nur, was die Liga braucht.
@@ -1081,4 +1128,82 @@ test("ein Hinweis des Servers zur Jahreswertung erscheint als Meldung", async ()
   apiMock.post.mockResolvedValueOnce({ data: { ok: true, season_points_note: "Die Jahrespunkte bleiben unverändert." } });
   await user.selectOptions(screen.getByTestId("admin-tr-status-select"), "registration_closed");
   await waitFor(() => expect(toast.info).toHaveBeenCalledWith("Die Jahrespunkte bleiben unverändert.", { duration: 10000 }));
+});
+// Statuslisten je Zweck (#2111, TA14): der Filter kennt alle acht Status, die Zeile zeigt Austritt und Disqualifikation
+// als aktuellen Stand (vorher „Ausstehend“), „Hinzufügen“ bietet nur, was der Server beim Hinzufügen annimmt.
+test("Statuslisten: Filter mit allen acht, Zeile zeigt „Disqualifiziert“, Hinzufügen nur vier", async () => {
+  apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path.includes("/registrations")) return Promise.resolve({ data: [
+      { id: "r-1", status: "disqualified", display_name: "Max Muster" },
+      { id: "r-2", status: "rejected", display_name: "Erika Nein" },
+    ] });
+    return Promise.resolve(routeFor(path));
+  });
+  renderPage();
+  await screen.findAllByText("Max Muster");
+  const values = (select) => [...select.querySelectorAll("option")].map((option) => option.value);
+  expect(values(screen.getByTestId("admin-reg-status-filter"))).toEqual(["", "approved", "checked_in", "pending", "waitlist", "rejected", "no_show", "withdrawn", "disqualified"]);
+  const row = screen.getByTestId("admin-reg-status-r-1");
+  expect(row).toHaveValue("disqualified");
+  expect(row.querySelector("option[value='disqualified']")).toBeDisabled();
+  expect(values(screen.getByTestId("participant-add-status"))).toEqual(["approved", "checked_in", "pending", "waitlist"]);
+});
+
+// Setzplatz (#2111, TA15): bei „Manuell“ bis zum Ende des Check-ins in der Liste änderbar; leer nimmt ihn weg. Bei
+// „Zufall“ oder im festen Baum gibt es die Spalte nicht.
+test("Setzplatz: bei Manuell in der Liste änderbar, bei Zufall keine Spalte", async () => {
+  const user = userEvent.setup();
+  const serve = (tournament) => apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path.includes("/registrations")) return Promise.resolve({ data: [{ id: "r-1", status: "approved", display_name: "Max Muster", seed: 3 }] });
+    if (path.match(/\/tournaments\/t-1(\?|$)/)) return Promise.resolve({ data: { ...TOURNAMENT, ...tournament } });
+    return Promise.resolve(routeFor(path));
+  });
+  serve({ seeding_mode: "random" });
+  const first = renderPage();
+  await screen.findAllByText("Max Muster");
+  expect(screen.queryByTestId("admin-reg-seed-r-1")).toBeNull();
+  first.unmount();
+
+  serve({ seeding_mode: "manual" });
+  renderPage();
+  const seed = await screen.findByTestId("admin-reg-seed-r-1");
+  expect(seed).toHaveValue(3);
+  await user.clear(seed);
+  await user.type(seed, "1{Enter}");
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/tournaments/t-1/registrations/r-1", { seed: 1 }));
+  await user.clear(seed);
+  seed.blur();
+  await waitFor(() => expect(apiMock.patch).toHaveBeenLastCalledWith("/tournaments/t-1/registrations/r-1", { seed: null }));
+});
+
+test("Setzplatz: lehnt der Server ab, steht wieder der alte Wert im Feld", async () => {
+  const user = userEvent.setup();
+  apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path.includes("/registrations")) return Promise.resolve({ data: [{ id: "r-1", status: "approved", display_name: "Max Muster", seed: 3 }] });
+    if (path.match(/\/tournaments\/t-1(\?|$)/)) return Promise.resolve({ data: { ...TOURNAMENT, seeding_mode: "manual" } });
+    return Promise.resolve(routeFor(path));
+  });
+  apiMock.patch.mockRejectedValueOnce({ response: { status: 409, data: { detail: "Setzplatz 1 hat schon Paula." } } });
+  renderPage();
+  const seed = await screen.findByTestId("admin-reg-seed-r-1");
+  await user.clear(seed);
+  await user.type(seed, "1{Enter}");
+  await waitFor(() => expect(seed).toHaveValue(3));
+});
+
+// Austritt und Disqualifikation nimmt die Turnierleitung über den Status zurück (#2111) - der Check-in bietet dafür nichts an.
+test("Ausgeschiedene haben keine Check-in-Knöpfe", async () => {
+  apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path.includes("/registrations")) return Promise.resolve({ data: [{ id: "r-1", status: "disqualified", display_name: "Max Muster" }] });
+    if (path.match(/\/tournaments\/t-1(\?|$)/)) return Promise.resolve({ data: { ...TOURNAMENT, can_check_in: true } });
+    return Promise.resolve(routeFor(path));
+  });
+  renderPage();
+  await screen.findAllByText("Max Muster");
+  expect(screen.queryByRole("button", { name: "Check-in" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Nicht erschienen" })).toBeNull();
 });

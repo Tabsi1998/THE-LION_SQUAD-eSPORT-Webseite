@@ -152,9 +152,13 @@ async def test_photos_go_with_the_tournament_and_after_the_retention(flow):
     await flow.db.matches_v2.update_one({"id": match["id"]}, {"$set": {"status": "disputed"}})
     assert await match_proofs.purge(flow.db) == 0
 
+    # Ein laufendes Turnier lässt sich seit #2111 (TA18) nicht mehr löschen - verschwindet ein Turnier aus der Datenbank
+    # (Entwurf, leere Staffel), gehen die Fotos weiter mit.
     flow.act_as(staff)
-    gone = await flow.delete(f"/api/tournaments/{tournament['id']}")
-    assert gone.status_code == 200, gone.text
+    refused = await flow.delete(f"/api/tournaments/{tournament['id']}")
+    assert refused.status_code == 409, refused.text
+    from services.tournament_purge import purge_tournament
+    await purge_tournament(flow.db, tournament["id"])
     assert await flow.db.match_proof_photos.count_documents({}) == 0
     assert not any((match_proofs.PROOF_DIR).iterdir()), "auch die Dateien sind weg"
 

@@ -37,7 +37,7 @@ from services.slug_utils import (
     slug_source_for_update,
     unique_slug,
 )
-from models import TournamentCreate, TournamentUpdate, now_utc, new_id
+from models import MIN_OVER_MAX, TournamentCreate, TournamentUpdate, now_utc, new_id
 from services import pricing, tournament_fees
 from services.advancement_draw import MODE_KEY, SETTING_KEY as LEGACY_MODE_KEY, advancement_mode_of, sync_advancement_fields
 from services.permissions import can_use_area, user_has_area
@@ -134,8 +134,8 @@ async def _create_initial_bracket_preview(db, tournament: dict, actor_id: str | 
     return await _create_initial_stage_bracket_preview(db, tournament, actor_id)
 
 
-async def _enrich_tournament(t: dict, user: dict | None = None) -> dict:
-    db = get_db()
+def _prepare_tournament(t: dict) -> None:
+    """Was ohne Datenbank geht - für ein einzelnes Turnier und die Liste gleich."""
     t.pop("creation_key", None)
     apply_competition_version_read_defaults(t)
     # Weiterkommen (#1590): ältere Turniere kennen nur den Schalter - gelesen wird immer der Modus.
@@ -143,6 +143,11 @@ async def _enrich_tournament(t: dict, user: dict | None = None) -> dict:
     t["public_phase"] = derive_public_phase(t, "tournament")
     if is_league_staffel(t):
         t["league_label"] = league_label(t)  # Kennzeichnung „Liga · Staffel A“ (docs/LIGA.md)
+
+
+async def _enrich_tournament(t: dict, user: dict | None = None) -> dict:
+    db = get_db()
+    _prepare_tournament(t)
     if t.get("game_id"):
         g = await db.games.find_one({"id": t["game_id"]}, {"_id": 0})
         t["game"] = await _enrich_game_identity(db, g)
@@ -155,6 +160,37 @@ async def _enrich_tournament(t: dict, user: dict | None = None) -> dict:
     t["participant_count"] = await db.tournament_registrations.count_documents(
         {"tournament_id": t["id"], "status": {"$in": ["approved", "checked_in"]}})
     return t
+
+
+async def _enrich_tournaments(tournaments: list[dict], user: dict | None = None) -> None:
+    """Wie ``_enrich_tournament``, aber eine Abfrage je Art für die ganze Liste - die Verwaltung lädt bis zu 500 Turniere."""
+    db = get_db()
+    tids = [t["id"] for t in tournaments]
+    game_ids = sorted({t["game_id"] for t in tournaments if t.get("game_id")})
+    event_ids = sorted({t["event_id"] for t in tournaments if t.get("event_id")})
+    games = {row["id"]: await _enrich_game_identity(db, row)
+             for row in await db.games.find({"id": {"$in": game_ids}}, {"_id": 0}).to_list(len(game_ids) + 1)}
+    events: dict[str, dict] = {}
+    seen_visibility: dict[str, bool] = {}
+    async for event in db.events.find({"id": {"$in": event_ids}}, {"_id": 0, "tournaments": 0, "f1_challenges": 0}):
+        visibility = event.get("visibility") or "public"
+        if visibility not in seen_visibility:
+            seen_visibility[visibility] = await lead_can_see(user, visibility)
+        if event.get("status") != "draft" and seen_visibility[visibility]:
+            events[event["id"]] = event
+    participants = {row["_id"]: row["count"] async for row in db.tournament_registrations.aggregate([
+        {"$match": {"tournament_id": {"$in": tids}, "status": {"$in": ["approved", "checked_in"]}}},
+        {"$group": {"_id": "$tournament_id", "count": {"$sum": 1}}},
+    ])}
+    await partner_pages.attach_partners_many(db, tournaments)
+    for t in tournaments:
+        _prepare_tournament(t)
+        if t.get("game_id"):
+            game = games.get(t["game_id"])
+            t["game"] = dict(game) if game else None
+        if t.get("event_id") in events:
+            t["event"] = dict(events[t["event_id"]])
+        t["participant_count"] = participants.get(t["id"], 0)
 
 
 @router.get("")
@@ -226,8 +262,8 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
     if compact:
         tournaments = tournaments[page_offset:page_offset + page_limit]
     finance = await can_use_area(user, "finance")
+    await _enrich_tournaments(tournaments, user)
     for t in tournaments:
-        await _enrich_tournament(t, user)
         _expose_offer(t, finance)
         if not is_admin:
             # Der Umbau-Vorschlag für die Läufe (#1550) gehört der Turnierleitung; Helfer sehen ihn am Turnier selbst.
@@ -347,6 +383,10 @@ async def create_tournament_doc(body: TournamentCreate, me: dict) -> dict:
             if not await db.games.find_one({"id": body.game_id}):
                 raise HTTPException(status_code=400, detail="Spiel nicht gefunden")
             doc = body.model_dump()
+            # Teilnahme und Teamgröße wie beim Speichern prüfen (#2111, TA3): ein Team-Turnier ohne Größe hat 2.
+            if doc.get("team_mode") == "team" and "team_size" not in body.model_fields_set:
+                doc["team_size"] = 2
+            doc.update(_normalize_team_settings({"team_mode": doc.get("team_mode"), "team_size": doc.get("team_size")}))
             sync_advancement_fields(doc)
             doc["partner_ids"] = await partner_pages.clean_partner_ids(db, doc.get("partner_ids"))
             doc["creation_key"] = creation_key
@@ -378,6 +418,11 @@ async def create_tournament_doc(body: TournamentCreate, me: dict) -> dict:
                 existing.pop("creation_key", None)
                 apply_competition_version_read_defaults(existing)
                 return {**existing, "auto_generated_bracket": None, "idempotent_replay": True}
+            # Protokoll (#2111, TA19): wer welches Turnier angelegt hat.
+            await _audit_tournament_action(db, "tournament.create", me.get("id"), doc["id"], {
+                "title": doc.get("title"), "format": doc.get("format"), "status": doc.get("status"),
+                "event_id": doc.get("event_id"),
+            })
             auto_preview = await _create_initial_bracket_preview(db, doc, me.get("id"))
             if doc.get("status") != "draft":
                 # Gleich mit „Anmeldung offen“ angelegt: angekündigt wie ein Statuswechsel (#572).
@@ -417,6 +462,8 @@ async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends
         raise HTTPException(status_code=409, detail=fixed_problem)
     preview_changed = tournament_guard.changed_fields(raw_updates, existing, tournament_guard.PREVIEW_FIELDS)
     raw_updates.pop("status", None)
+    if _min_over_max(raw_updates, existing):
+        raise HTTPException(status_code=422, detail=MIN_OVER_MAX)
     # Event als Klammer (#1371): verbunden wird nur im Event. Derselbe Wert stört nicht, ein anderer wird abgelehnt.
     if "event_id" in raw_updates:
         if (raw_updates.pop("event_id") or None) != (existing.get("event_id") or None):
@@ -472,6 +519,10 @@ async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends
     updates["updated_at"] = now_utc().isoformat()
     await db.tournaments.update_one({"id": tid}, {"$set": updates})
     reset_scope_cache()  # Live-Meldungen (#1801): Turnier und Event neu nachschlagen
+    # Protokoll (#2111, TA19): welche Felder sich geändert haben - nur die Namen, keine Inhalte (Regeln, Abrechnung).
+    changed = sorted(key for key, value in updates.items() if key != "updated_at" and existing.get(key) != value)
+    if changed:
+        await _audit_tournament_action(db, "tournament.update", me.get("id"), tid, {"fields": changed})
     t = await db.tournaments.find_one({"id": tid}, {"_id": 0})
     auto_preview = None
     if preview_changed:
@@ -484,6 +535,18 @@ async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends
     if auto_preview is not None:
         t["auto_generated_bracket"] = auto_preview
     return t
+
+
+def _min_over_max(updates: dict, existing: dict) -> bool:
+    """Min. über Max. (#2111, TA3) - nur, wenn die Anfrage eines der beiden ändert; gespeicherte Altwerte stören nicht."""
+    if updates.get("min_participants") is None and updates.get("max_participants") is None:
+        return False
+    try:
+        low = int(updates.get("min_participants") or existing.get("min_participants") or 0)
+        high = int(updates.get("max_participants") or existing.get("max_participants") or 0)
+    except (TypeError, ValueError):
+        return False
+    return bool(low and high and low > high)
 
 
 EMPTY_STAGE_SETTING = (None, "", False, [], {})
@@ -575,14 +638,24 @@ async def delete_tournament(tid: str, me: dict = Depends(require_admin()),
                             _mutation_tid: str = Depends(_serialized_tournament_write)):
     db = get_db()
     tid = await _resolve_tid(tid)
-    # Liga-Staffel (#2109): löschen nur vor dem Start - danach „Abgesagt“ oder „Archiviert“.
-    stored = await db.tournaments.find_one({"id": tid}, {"_id": 0}) or {}
-    problem = await staffel_guard.staffel_delete_problem(db, stored)
+    stored = await db.tournaments.find_one({"id": tid}, {"_id": 0})
+    if not stored:
+        raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    # Liga-Staffel (#2109): löschen nur vor dem Start - danach „Abgesagt“ oder „Archiviert“. Alle anderen Turniere nur
+    # als Entwurf ohne Ergebnisse (#2111, TA18).
+    if is_league_staffel(stored):
+        problem = await staffel_guard.staffel_delete_problem(db, stored)
+    else:
+        problem = await tournament_guard.delete_problem(db, stored)
     if problem:
         raise HTTPException(status_code=409, detail=problem)
     from services.tournament_purge import purge_tournament
     await purge_tournament(db, tid)
     reset_scope_cache()  # Live-Meldungen (#1801): Turnier und Event neu nachschlagen
+    await _audit_tournament_action(db, "tournament.delete", me.get("id"), tid, {
+        "title": stored.get("title"), "status": stored.get("status"), "format": stored.get("format"),
+        "staffel": is_league_staffel(stored),
+    })
     return {"ok": True}
 
 
