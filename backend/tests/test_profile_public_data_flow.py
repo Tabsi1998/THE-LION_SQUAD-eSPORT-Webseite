@@ -391,6 +391,21 @@ async def test_preferred_role_has_a_limit_and_passes_the_word_filter(flow):
     assert (await flow.patch("/api/users/me", json={"preferred_role": "z" * 60, "city": "Wien"})).status_code == 200
 
 
+# ---------------------------------------------------------------- Review: unmögliche Namen beim Abruf
+@pytest.mark.asyncio
+async def test_impossible_names_are_simply_not_found(flow):
+    from fastapi import HTTPException
+    from routes import seo_render_routes
+
+    flow.act_as(None)
+    for path in ("a%00b", "x" * 201):
+        assert (await flow.get(f"/api/users/public/{path}")).status_code == 404, path
+    for name in ("a\x00b", "x" * 201):
+        with pytest.raises(HTTPException) as refused:
+            await seo_render_routes.user_profile_meta(flow.db, name, {"image": "/l.png", "site_name": "TLS", "description": ""}, "https://lionsquad.at")
+        assert refused.value.status_code == 404
+
+
 # ---------------------------------------------------------------- Zusatz: Dokumente
 @pytest.mark.asyncio
 async def test_members_never_see_where_a_document_is_stored(flow):

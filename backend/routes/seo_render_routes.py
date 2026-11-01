@@ -18,7 +18,7 @@ from services.slug_utils import find_by_slug_or_history
 from services.svg_logo import raster_url
 from services.visibility import user_can_see
 from services.private_fields import private_projection
-from services.usernames import any_case, profile_path
+from services.usernames import any_case, can_be_a_username, profile_path
 
 router = APIRouter(prefix="/api/seo", tags=["seo"])
 
@@ -640,6 +640,8 @@ async def member_profile_meta(db, slug: str, base: dict, origin: str) -> dict:
 
 
 async def user_profile_meta(db, username: str, base: dict, origin: str) -> dict:
+    if not can_be_a_username(username):
+        raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
     visible = {"privacy_public_profile": True, "is_active": True, "is_banned": {"$ne": True}}
     user = await db.users.find_one({"username": username, **visible}, private_projection("email")) \
         or await db.users.find_one({**any_case(username), **visible}, private_projection("email"), sort=[("created_at", 1)])

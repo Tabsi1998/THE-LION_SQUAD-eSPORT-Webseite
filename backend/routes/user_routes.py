@@ -26,7 +26,7 @@ from services.notification_preferences import (
     public_preferences_payload,
 )
 from services.query_filters import safe_regex
-from services.usernames import any_case, username_taken
+from services.usernames import any_case, can_be_a_username, username_taken
 from services.private_fields import private_projection, strip_private
 # Die leerbaren Profilfelder (#2118): ein Blatt-Modul - auch die Kontolöschung leitet ihre Liste daraus ab.
 from services.profile_fields import USER_NULLABLE_FIELDS
@@ -617,6 +617,8 @@ async def list_public_users(
 # `:path`, weil ältere Benutzernamen einen Schrägstrich enthalten können (#2126) - ihr Profil bleibt so erreichbar.
 @router.get("/public/{username:path}")
 async def get_public_profile(username: str, view_as: str | None = None, viewer: dict | None = Depends(get_optional_user)):
+    if not can_be_a_username(username):
+        raise HTTPException(status_code=404, detail="Spieler nicht gefunden")
     db = get_db()
     # Exakt zuerst, dann jede Schreibweise (#2126): auch bei alten Doppelten („Max“, „max“) bleibt jedes Profil erreichbar.
     u = await db.users.find_one({"username": username}, private_projection("email")) \

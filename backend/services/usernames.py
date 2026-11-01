@@ -18,6 +18,11 @@ def username_problem(username: str) -> str | None:
     return None if USERNAME_PATTERN.fullmatch(username or "") else USERNAME_RULE
 
 
+def can_be_a_username(name: str) -> bool:
+    """Vor jeder Suche: so lang oder mit NUL gab es nie einen Benutzernamen - die Antwort ist ohne Datenbank „nicht gefunden“."""
+    return len(name) <= 200 and "\x00" not in name
+
+
 def any_case(username: str) -> dict:
     """Die Abfrage für denselben Namen in jeder Schreibweise."""
     return {"username": {"$regex": f"^{re.escape(username)}$", "$options": "i"}}
