@@ -1160,7 +1160,7 @@ Gezählt werden die gewerteten Läufe (Rennen und Sprint), die Pole je Runde ein
 
 **Läuft gerade:** Sobald eine Saison den Status **Läuft** hat (und sichtbar, nicht archiviert ist), erscheint sie oben
 auf der Seite **Erfolge & Referenzen** (`/references`), noch vor der Vitrine. Jede Karte zeigt den Fortschritt in
-Segmenten („6 von 10 Rennen gewertet“, „3 von 7 Spieltagen gespielt“, „2 von 5 Turnieren gewertet“), den **nächsten
+Segmenten („6 von 10 Rennen gewertet“, „3 von 7 Spieltagen gespielt“, „2 von 5 Turniertagen gewertet“), den **nächsten
 Termin** mit Flagge und unseren Platz als große Zahl – bei der Team-Liga den besten Platz eines eigenen Teams in der
 Tabelle, sonst den
 besten Platz eines Vereinsmitglieds („Noch offen“ bis zur ersten Wertung). Ein Klick führt zur Seite der Saison. Steht

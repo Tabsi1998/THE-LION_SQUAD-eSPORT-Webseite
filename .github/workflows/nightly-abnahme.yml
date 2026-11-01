@@ -52,6 +52,10 @@ jobs:
           node-version: "24"
           cache: yarn
           cache-dependency-path: frontend/yarn.lock
+      # Für die Testhilfe der Ergebnis-Bilder (serien-ergebnis-bild-abnahme, backend/tests/result_image_fixture.py): sie
+      # malt auf dem Runner, mit der Pillow-Version des Backends - sonst entstünde ein anderes Bild als in den Backend-Tests.
+      - name: Pillow für die Testbilder
+        run: python3 -m pip install --disable-pip-version-check "$(grep -i '^pillow==' backend/requirements.txt)"
       - name: Abnahme-Stand bauen und starten
         run: bash scripts/run_abnahme_all.sh up
       - name: Website-Pakete installieren
@@ -72,6 +76,7 @@ jobs:
           ABNAHME_SHOTS: ${{ github.workspace }}/abnahme-nacht/bilder
           ABNAHME_SPECS: ${{ inputs.specs }}
           ABNAHME_TRACE: "off"
+          ABNAHME_PYTHON: python3
           PYTHON: python3
         run: bash scripts/run_abnahme_all.sh run
       - name: Bericht ins Job-Summary

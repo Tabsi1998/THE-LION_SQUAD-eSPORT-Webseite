@@ -381,7 +381,13 @@ test.describe("Abnahme: Weiterkommen in vier Modi gegen den echten Server", () =
     await adminPage.getByTestId(`admin-reg-withdraw-${winnerA}`).locator("visible=true").first().click();
     await expect(adminPage.getByTestId("admin-reg-removal-dialog")).toBeVisible();
     await expect(adminPage.getByTestId("admin-reg-removal-ops")).toContainText(/Platz|frei|kampflos|Freilos/);
+    // Fertig ist der Austritt erst mit der Antwort des Servers: Sitze und Anmeldung schreibt er zuerst, den Termin löst der
+    // Planer danach. Das Verschwinden des Dialogs sagt das nicht - lädt die Seite live neu, sieht sie die Anmeldung schon
+    // als ausgetreten und nimmt ihn weg, während der Server noch plant (Nacht zum 1.11.: Spiel gelesen, Termin noch da).
+    const removal = adminPage.waitForResponse((response) => response.request().method() === "POST"
+      && response.url().endsWith(`/registrations/${winnerA}/removal`) && Boolean(response.request().postDataJSON()?.plan_id));
     await adminPage.getByTestId("admin-reg-removal-confirm").click();
+    expect((await removal).status()).toBe(200);
     await expect(adminPage.getByTestId("admin-reg-removal-dialog")).toHaveCount(0);
     rows = await matchesOf(page, tid);
     const loserA = rows.A.results.find((row) => row.rank === 2).registration_id;

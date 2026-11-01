@@ -609,3 +609,71 @@ async def test_a_real_withdrawal_from_a_planned_final_releases_its_time_after_th
     assert after["status"] in {"completed", "cancelled"}
     assert (after.get("result_meta") or {}).get("source") == "auto_bye"
     assert after["scheduled_at"] is None and after["station_id"] is None and after["schedule_source"] is None
+
+
+class SeatDraw:
+    """Das Los von „sofort zufällig“ als feste Wahl: beide Sieger ins selbe Spiel oder in zwei verschiedene."""
+
+    def __init__(self, same_match: bool):
+        self.same_match = same_match
+        self.used: set[str] = set()
+
+    def choice(self, seats):
+        if self.same_match:
+            return seats[0]
+        fresh = next((seat for seat in seats if seat[0]["id"] not in self.used), seats[0])
+        self.used.add(fresh[0]["id"])
+        return fresh
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("same_match", [False, True], ids=["zwei Spiele", "selbes Spiel"])
+async def test_a_withdrawal_after_an_instant_draw_releases_the_time_of_the_freed_match(flow, monkeypatch, same_match):
+    """#1921, Abnahme „sofort zufällig“: Wie das Los fällt, darf nichts ändern. Tritt ein schon gezogener Sieger aus, hat
+    das Spiel mit seinem Platz danach keinen Termin und keine Station des Planers mehr - ob es nur noch auf einen Gegner
+    wartet (zwei Spiele) oder kampflos entschieden ist (beide Sieger im selben Spiel). Die Antwort auf die Bestätigung
+    kommt erst, wenn das geschrieben ist."""
+    from services import match_v2_results
+    from services.match_scheduler import apply_plan, plan_for_tournament
+
+    monkeypatch.setattr(match_v2_results, "DRAW_RNG", SeatDraw(same_match))
+    _staff, tournament, _users, _registrations = await built(flow, count=8, status="live", advancement_mode="instant",
+                                                             **on_site_fields(result_entry_mode="staff_only"))
+    await stations(flow, tournament, "1", "2")
+    stored = await flow.db.tournaments.find_one({"id": tournament["id"]}, {"_id": 0})
+    await apply_plan(flow.db, stored, await plan_for_tournament(flow.db, stored))
+
+    first_round = sorted((row for row in await flow.matches(tournament) if row["round"] == 1), key=lambda row: row["match_key"])
+    winners = []
+    for match in first_round[:2]:
+        seated = [slot["registration_id"] for slot in match["slots"] if slot.get("registration_id")]
+        response = await flow.post(f"/api/matches/{match['id']}/result", json={
+            "results": [{"registration_id": reg, "rank": index + 1, "score": 2 - 2 * index} for index, reg in enumerate(seated)]})
+        assert response.status_code == 200, response.text
+        winners.append(seated[0])
+
+    def seat_of(rows, reg):
+        return next(row for row in rows if row["round"] == 2 and any(slot.get("registration_id") == reg for slot in row["slots"]))
+
+    second_round = await flow.matches(tournament)
+    assert (seat_of(second_round, winners[0])["id"] == seat_of(second_round, winners[1])["id"]) is same_match
+    freed = seat_of(second_round, winners[0])
+    assert freed["schedule_source"] == "planner" and freed["scheduled_at"] and freed["station_id"]
+
+    url = f"/api/tournaments/{tournament['id']}/registrations/{winners[0]}/removal"
+    preview = await flow.post(url, json={"kind": "withdrawn"})
+    assert preview.status_code == 200, preview.text
+    done = await flow.post(url, json={"kind": "withdrawn", "plan_id": preview.json()["plan"]["id"]})
+    assert done.status_code == 200, done.text
+
+    after = await flow.reload(freed)
+    assert any((slot.get("source_result") or {}).get("removed_registration_id") == winners[0] for slot in after["slots"])
+    assert (after.get("result_meta") or {}).get("source") == ("auto_bye" if same_match else None)
+    assert after["scheduled_at"] is None and after["station_id"] is None and after["schedule_source"] is None
+    # Das nächste Spiel des anderen Siegers bleibt geplant - der Plan rechnet nur das Freigewordene heraus. Saßen beide im
+    # selben Spiel, ist er kampflos weiter und steht schon im Finale.
+    rows = await flow.matches(tournament)
+    next_round = 3 if same_match else 2
+    remaining = next(row for row in rows if row["round"] == next_round
+                     and any(slot.get("registration_id") == winners[1] for slot in row["slots"]))
+    assert remaining["schedule_source"] == "planner" and remaining["scheduled_at"] and remaining["station_id"]

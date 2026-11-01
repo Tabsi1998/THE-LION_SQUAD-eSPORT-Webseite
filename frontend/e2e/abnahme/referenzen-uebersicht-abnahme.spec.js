@@ -93,7 +93,7 @@ test.describe("Abnahme #1878: Referenzen - Übersicht neu", () => {
         const today = page.getByTestId(`running-card-${cup.slug}-${cupNow.season_slug}`);
         await expect(today).toHaveAttribute("data-today", "true");
         await expect(today.getByTestId("running-today-badge")).toBeVisible();
-        await expect(today.getByTestId("running-progress-text")).toHaveText("2 von 5 Turnieren gewertet");
+        await expect(today.getByTestId("running-progress-text")).toHaveText("2 von 5 Turniertagen gewertet");
         await expect(today.getByTestId("running-place")).toContainText("5.");
         await expect(page.getByTestId(`running-card-${racing.slug}-${world.seasons.racing[2].season_slug}`).getByTestId("running-progress-text")).toHaveText("6 von 10 Rennen gewertet");
 
