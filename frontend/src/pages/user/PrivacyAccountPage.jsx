@@ -119,6 +119,8 @@ export default function PrivacyAccountPage() {
                         </li>
                       ))}
                     </ul>
+                    {/* Kein Ende ohne Ausweg (#2113): der Löschanspruch hängt nie an einer Team-Rolle. */}
+                    {erasure.data?.closing ? <p className="mt-3 text-sm text-white/70" data-testid="dsgvo-erasure-closing">{erasure.data.closing}</p> : null}
                   </div>
                 )}
                 <button onClick={anonymize} disabled={busy || roleBlockers.length > 0} data-testid="dsgvo-anonymize-btn" className="mt-4 px-5 py-2.5 border border-[#FF3B30] text-[#FF3B30] font-bold uppercase tracking-wider rounded-sm hover:bg-[#FF3B30]/10 disabled:opacity-50 disabled:cursor-not-allowed">

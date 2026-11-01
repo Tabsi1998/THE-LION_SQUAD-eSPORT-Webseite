@@ -70,12 +70,23 @@ async def team_roles(db, user_id: str) -> list[dict]:
     return rows
 
 
-def message(rows: list[dict]) -> str | None:
-    """Ein Satz für die Meldung des Servers - mit jeder Rolle und ihrem Weg; ``None`` ohne Rollen."""
+async def way_out(db) -> str:
+    """Der Schlusssatz (#2113): Der Löschanspruch darf nicht an einer Team-Rolle hängen bleiben - etwa wenn sich ein
+    Team in einer laufenden Liga nicht auflösen lässt. Die Adresse kommt aus den Rechtsdaten (Einstellungen)."""
+    from services.site_texts import legal_context
+
+    legal, _flags = await legal_context(db)
+    email = legal.get("privacy_contact_email") or legal.get("contact_email")
+    where = f"schreib an {email}" if email else "melde dich über das Kontaktformular"
+    return f"Kommst du so nicht weiter, {where} – der Verein löscht dein Konto dann."
+
+
+def message(rows: list[dict], closing: str | None = None) -> str | None:
+    """Ein Satz für die Meldung des Servers - mit jeder Rolle, ihrem Weg und dem Schlusssatz; ``None`` ohne Rollen."""
     if not rows:
         return None
     parts = []
     for row in rows:
         where = f"im Co-Team {row['squad']} von {row['team']}" if row.get("squad") else f"bei {row['team']}"
         parts.append(f"Du bist {row['role_label']} {where}: {row['way']}")
-    return " ".join([LEAD, *parts])
+    return " ".join([LEAD, *parts, *([closing] if closing else [])])

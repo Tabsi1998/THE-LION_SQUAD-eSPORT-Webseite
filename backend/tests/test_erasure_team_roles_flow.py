@@ -75,7 +75,7 @@ async def test_without_a_role_erasure_works_as_before(flow):
     world = await _world(flow)
     flow.act_as(world["player"])
     check = (await flow.get("/api/dsgvo/anonymize-me/check")).json()
-    assert check == {"can_erase": True, "blockers": [], "message": None}
+    assert check == {"can_erase": True, "blockers": [], "message": None, "closing": None}
     assert (await flow.post("/api/dsgvo/anonymize-me")).status_code == 200
     assert not await _still_there(flow, world["player"])
 
@@ -107,3 +107,31 @@ async def test_erasure_by_the_club_is_not_blocked(flow):
     world = await _world(flow)
     await dsgvo_routes._anonymize_user_data(flow.db, world["leader"]["id"], "vorstand-test", "user.admin_anonymize")
     assert not await _still_there(flow, world["leader"])
+
+
+@pytest.mark.asyncio
+async def test_dead_end_always_names_the_way_to_the_club(flow):
+    """Kapitän als einziges Mitglied, Team in laufender Liga: Auflösen und Löschen gehen nicht - der Schlusssatz schon."""
+    await flow.db.settings.update_one({"id": "branding"}, {"$set": {"id": "branding", "privacy_contact_email": "datenschutz@verein.example"}}, upsert=True)
+    leader = await flow.add_user(name=f"allein-{new_id()[:6]}")
+    team_id = new_id()
+    await flow.db.teams.insert_one({"id": team_id, "name": "Einzeln", "tag": "ONE", "leader_id": leader["id"], "co_leader_ids": [], "member_ids": [leader["id"]]})
+    tournament = await flow.create_tournament(team_mode="team", team_size=2, status="live",
+                                              league_context={"league_id": "l1", "season_id": "s1", "division_id": "d1", "staffel": "A"})
+    await flow.db.tournament_registrations.insert_one({"id": new_id(), "tournament_id": tournament["id"], "user_id": None, "team_id": team_id,
+                                                       "squad_id": "x", "status": "approved", "display_name": "Einzeln"})
+    flow.act_as(leader)
+    dissolve = await flow.delete(f"/api/teams/{team_id}?confirm=Einzeln")
+    assert dissolve.status_code == 409
+    erase = await flow.post("/api/dsgvo/anonymize-me")
+    assert erase.status_code == 409 and "schreib an datenschutz@verein.example" in erase.json()["detail"]
+    check = (await flow.get("/api/dsgvo/anonymize-me/check")).json()
+    assert "der Verein löscht dein Konto" in check["closing"] and check["closing"] in check["message"]
+
+
+@pytest.mark.asyncio
+async def test_without_an_address_the_contact_form_is_named(flow):
+    world = await _world(flow)
+    flow.act_as(world["leader"])
+    check = (await flow.get("/api/dsgvo/anonymize-me/check")).json()
+    assert check["closing"].startswith("Kommst du so nicht weiter, ")
