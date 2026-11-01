@@ -917,56 +917,156 @@ async def update_user_membership(
     if not user:
         raise HTTPException(404, "Benutzer nicht gefunden.")
     payload = body.model_dump(exclude_unset=True)
+    notify = payload.pop("notify", None) is not False
+    # Ob die Nummer öffentlich ist, entscheidet das Mitglied selbst (#2125).
+    payload.pop("show_member_number_publicly", None)
     led_fields = {"member_status", "membership_type", "member_number", "member_since", "member_since_precision"} & set(payload)
     if led_fields and await _led_by_dolibarr(user_id):
-        raise HTTPException(409, "Diese Mitgliedschaft wird in Dolibarr geführt. Status, Art, Nummer und Beginn dort ändern – hier bleiben Notiz, interne Rolle und die Sichtbarkeit der Nummer.")
+        raise HTTPException(409, "Diese Mitgliedschaft wird in Dolibarr geführt. Status, Art, Nummer und Beginn dort ändern – hier bleiben Notiz und interne Rolle.")
+    previous_status = ((await get_membership(user_id)) or {}).get("member_status") or "none"
     try:
         m = await upsert_membership(user_id=user_id, actor_id=me["id"], **payload)
     except ValueError as e:
         raise HTTPException(400, str(e))
 
-    await _audit(me["id"], "membership.update", user_id, payload)
+    await _audit(me["id"], "membership.update", user_id, {**payload, **({} if notify else {"notify": False})})
     # Endet die Mitgliedschaft, geht ein selbst angelegter Verzeichnis-Eintrag offline (#410).
     await end_self_directory_entry(user_id, m.get("member_status") in ACTIVE_STATUSES)
     # Austritt: die Wunschnummer ist sofort wieder frei (#2034).
     from services import jersey_numbers
     await jersey_numbers.release_for_status(db, user_id, m.get("member_status"))
 
-    # Fire emails based on transitions
+    # Mail und Meldung nur, wenn sich der Status wirklich ändert (#2125) - eine neue Notiz schrieb sonst „aktiviert“ noch einmal.
     new_status = payload.get("member_status")
-    if new_status == "active":
-        await send_user_template(
-            user,
-            "membership_activated",
-            display_name=user.get("display_name") or user.get("username"),
-            member_number=m.get("member_number") or "",
-        )
-        # Phase 6: Auto-award members-only badges
-        try:
-            from badges import evaluate_membership_badges
-            await evaluate_membership_badges(user_id)
-        except Exception:
-            logger.warning("[achievements] Mitglieder-Erfolge für %s nicht ausgewertet", log_safe(user_id), exc_info=True)
-    elif new_status == "blocked":
-        await send_user_template(
-            user,
-            "membership_blocked",
-            display_name=user.get("display_name") or user.get("username"),
-        )
-    elif new_status in ("inactive", "former"):
-        await send_user_template(
-            user,
-            "membership_deactivated",
-            display_name=user.get("display_name") or user.get("username"),
-        )
+    mail_state = None
+    if new_status and new_status != previous_status:
+        mail_state = await membership_notices.tell_status_change(user, m, new_status, notify=notify)
+        if new_status in ACTIVE_STATUSES:
+            # Phase 6: Auto-award members-only badges
+            try:
+                from badges import evaluate_membership_badges
+                await evaluate_membership_badges(user_id)
+            except Exception:
+                logger.warning("[achievements] Mitglieder-Erfolge für %s nicht ausgewertet", log_safe(user_id), exc_info=True)
+        elif m.get("exit_request"):
+            # Der erklärte Austritt ist damit erledigt (#2125).
+            await db.memberships.update_one({"user_id": user_id}, {"$unset": {"exit_request": ""}})
+            m.pop("exit_request", None)
 
     user["membership"] = m
     user["user_type"] = derived_user_type(user, m)
     user["is_club_member"] = is_active_member(m)
+    user["mail"] = mail_state
     return user
 
 
+# ---------- CSV-Export (#2125) ----------
+EXPORT_STATUS_LABELS = {"none": "Kein Mitglied", "pending": "Entwurf (Dolibarr)", "active": "Aktives Mitglied", "inactive": "Ruhend", "honorary": "Ehrenmitglied", "former": "Ehemalig", "blocked": "Gesperrt"}
+EXPORT_TYPE_LABELS = {"ordinary": "Ordentlich", "supporting": "Unterstützend", "honorary": "Ehrenmitglied", "youth": "Jugend", "guest": "Gast", "former": "Ehemalig"}
+EXPORT_LIMIT = 10000
+EXPORT_LED_DETAIL = "Die Mitgliederliste führt Dolibarr – exportiere sie dort. Hier entstünde eine zweite, schnell veraltete Liste."
+
+
+@router.get("/export.csv")
+async def export_memberships(request: Request, scope: Literal["active", "all"] = "active", me: dict = Depends(require_area("club"))):
+    """Die Mitgliederliste als CSV: nur, was der Vorstand zum Arbeiten braucht - keine Notizen, kein Verlauf. Jeder Export steht
+    im Protokoll (wer, wann, wie viele). Führt Dolibarr die Mitglieder, gibt es ihn dort."""
+    await enforce_rate_limit(request, "membership:export", limit=20, window_seconds=3600, subject=me["id"])
+    db = get_db()
+    if (await load_dolibarr_settings(db))["mode"] == "live":
+        raise HTTPException(409, EXPORT_LED_DETAIL)
+    query: dict = {"member_status": {"$in": sorted(ACTIVE_STATUSES)}} if scope == "active" else {"member_status": {"$nin": [None, "none"]}}
+    memberships = await db.memberships.find(query, {"_id": 0, "user_id": 1, "member_number": 1, "member_status": 1, "membership_type": 1, "member_since": 1, "internal_role": 1}).to_list(EXPORT_LIMIT)
+    users = {row["id"]: row async for row in db.users.find(
+        {"id": {"$in": [row["user_id"] for row in memberships]}}, {"_id": 0, "id": 1, "username": 1, "display_name": 1, "email": 1})}
+    rows = []
+    for membership in memberships:
+        account = users.get(membership["user_id"])
+        if account:
+            rows.append([membership.get("member_number"), account.get("display_name") or account.get("username"), account.get("username"), account.get("email"),
+                         EXPORT_STATUS_LABELS.get(membership.get("member_status"), membership.get("member_status")),
+                         EXPORT_TYPE_LABELS.get(membership.get("membership_type"), membership.get("membership_type")), str(membership.get("member_since") or "")[:10], membership.get("internal_role")])
+    rows.sort(key=lambda row: str(row[1] or "").lower())
+    buffer = io.StringIO()
+    writer = csv.writer(buffer, delimiter=";")
+    writer.writerow(["Mitgliedsnummer", "Name", "Benutzername", "E-Mail", "Status", "Art", "Mitglied seit", "Interne Rolle"])
+    writer.writerows([[safe_cell(cell) for cell in row] for row in rows])
+    await _audit(me["id"], "membership.export", "memberships", {"scope": scope, "rows": len(rows)})
+    filename = f"mitglieder-{club_today()}.csv"
+    return Response(content="﻿" + buffer.getvalue(), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="{filename}"', "Cache-Control": "private, no-store"})
+
+
+# ---------- Eigene Mitgliedschaft: Nummer und Austritt ohne Dolibarr (#2125) ----------
+class NumberVisibilityBody(BaseModel):
+    public: bool
+
+
+class SimpleExitBody(BaseModel):
+    wished_last_day: date | None = None
+
+
+@router.put("/me/number-visibility")
+async def set_my_number_visibility(body: NumberVisibilityBody, me: dict = Depends(get_current_user)):
+    """Ob die eigene Mitgliedsnummer auf dem öffentlichen Profil steht, entscheidet das Mitglied. Standard: nein."""
+    db = get_db()
+    membership = await get_membership(me["id"])
+    if not membership or not membership.get("member_number"):
+        raise HTTPException(409, "Du hast noch keine Mitgliedsnummer.")
+    await db.memberships.update_one({"user_id": me["id"]}, {"$set": {"show_member_number_publicly": body.public, "updated_at": now_utc().isoformat()}})
+    await _audit(me["id"], "membership.number_visibility", me["id"], {"public": body.public})
+    return {"show_member_number_publicly": body.public}
+
+
+@router.post("/me/exit")
+async def declare_my_exit(body: SimpleExitBody, request: Request, me: dict = Depends(get_current_user)):
+    """Austritt erklären, wenn Dolibarr die Mitgliedschaft nicht führt: Die Erklärung geht an den Vorstand, die Mitgliedschaft
+    läuft weiter, bis er sie beendet. Mit Dolibarr geht der Austritt über „Eigene Daten“ (/me/self-service/exit)."""
+    await enforce_rate_limit(request, "membership:exit", limit=5, window_seconds=3600, subject=me["id"])
+    db = get_db()
+    membership = await get_membership(me["id"])
+    if not is_active_member(membership):
+        raise HTTPException(409, "Du hast keine laufende Mitgliedschaft.")
+    if await _led_by_dolibarr(me["id"]):
+        raise HTTPException(409, "Deine Mitgliedschaft führt Dolibarr – den Austritt erklärst du unter „Meine Daten“.")
+    if membership.get("exit_request"):
+        return {"exit_request": membership["exit_request"], "already": True}
+    wished = body.wished_last_day.isoformat() if body.wished_last_day else None
+    request_doc = {"declared_at": now_utc().isoformat(), "wished_last_day": wished}
+    await db.memberships.update_one({"user_id": me["id"]}, {"$set": {"exit_request": request_doc, "updated_at": request_doc["declared_at"]}})
+    await _audit(me["id"], "membership.exit_declared", me["id"], {"wished_last_day": wished})
+    name = me.get("display_name") or me.get("username") or "Ein Mitglied"
+    try:
+        await membership_notices.mail_club_area(db, "membership_exit_admin", {"member": name}, subject="Austritt erklärt",
+                                                html="<p>{{member}} hat den Austritt aus dem Verein erklärt. Beende die Mitgliedschaft unter Admin → Mitglieder, wenn es so weit ist.</p>")
+    except Exception:  # noqa: BLE001 - die Erklärung ist gespeichert und steht in der Mitgliederliste
+        logger.warning("[membership] Mail an den Vorstand zum Austritt fehlgeschlagen", exc_info=True)
+    from services.discord_announcements import notify_board
+    await notify_board("membership.exit", "Ein Austritt wartet auf den Vorstand.")
+    await membership_notices.tell_person(me["id"], "Dein Austritt ist eingegangen", "Der Vorstand beendet deine Mitgliedschaft und meldet sich, wenn Fragen offen sind.", "/members/membership")
+    return {"exit_request": request_doc}
+
+
+@router.delete("/me/exit")
+async def withdraw_my_exit(me: dict = Depends(get_current_user)):
+    """Erklärung zurücknehmen, solange der Vorstand die Mitgliedschaft nicht beendet hat."""
+    db = get_db()
+    membership = await get_membership(me["id"])
+    if not (membership or {}).get("exit_request"):
+        raise HTTPException(404, "Es gibt keine offene Erklärung.")
+    await db.memberships.update_one({"user_id": me["id"]}, {"$unset": {"exit_request": ""}, "$set": {"updated_at": now_utc().isoformat()}})
+    await _audit(me["id"], "membership.exit_withdrawn", me["id"])
+    return {"ok": True}
+
+
 # ---------- Member benefits ----------
+def _benefit_in_time(benefit: dict, today: str) -> bool:
+    """„Gültig von/bis“ (#2125): beide Tage zählen mit, gerechnet wird in Wiener Tagen. Leer heißt: ohne Grenze."""
+    start = str(benefit.get("valid_from") or "")[:10]
+    end = str(benefit.get("valid_until") or "")[:10]
+    return (not start or start <= today) and (not end or today <= end)
+
+
 @router.get("/benefits")
 async def list_benefits(user: dict | None = Depends(get_optional_user)):
     """Public: only returns active benefits visible to the calling user."""
@@ -979,10 +1079,11 @@ async def list_benefits(user: dict | None = Depends(get_optional_user)):
     if not is_active_member(m):
         return []
     user_type = m.get("membership_type")
+    today = club_today()
     out = []
     for b in benefits:
         allowed = b.get("visible_for_membership_types") or []
-        if not allowed or (user_type and user_type in allowed):
+        if (not allowed or (user_type and user_type in allowed)) and _benefit_in_time(b, today):
             out.append(b)
     return out
 

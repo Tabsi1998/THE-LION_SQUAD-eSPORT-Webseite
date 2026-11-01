@@ -8,6 +8,7 @@ import { GermanDateField } from "@/components/tls/GermanDateField";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { viennaDay } from "@/lib/vienna";
 import { toast } from "sonner";
 import { Plus, Trash2, Gift } from "lucide-react";
 
@@ -19,6 +20,15 @@ const TYPE_LABELS = {
   guest: "Gast",
   former: "Ehemalig",
 };
+
+/** „Gültig von/bis“ wirkt bei den Mitgliedern (#2125) - die Liste sagt, warum ein Vorteil dort gerade fehlt. */
+export function benefitTimeLabel(benefit, today = viennaDay(new Date())) {
+  const start = String(benefit?.valid_from || "").slice(0, 10);
+  const end = String(benefit?.valid_until || "").slice(0, 10);
+  if (end && end < today) return "abgelaufen";
+  if (start && start > today) return "noch nicht gültig";
+  return "";
+}
 
 export default function AdminBenefitsPage() {
   const [list, setList] = useState([]);
@@ -71,6 +81,7 @@ export default function AdminBenefitsPage() {
                   <h3 className="font-heading font-black uppercase">{b.title}</h3>
                 </div>
                 {!b.is_active && <span className="text-[10px] text-white/40 uppercase">inaktiv</span>}
+                {b.is_active && benefitTimeLabel(b) && <span className="text-[10px] text-[#FF9500] uppercase" data-testid={`benefit-time-${b.id}`}>{benefitTimeLabel(b)}</span>}
               </div>
               {b.description && <p className="mt-2 text-sm text-white/65 line-clamp-3">{b.description}</p>}
               <div className="mt-4 flex gap-2">
