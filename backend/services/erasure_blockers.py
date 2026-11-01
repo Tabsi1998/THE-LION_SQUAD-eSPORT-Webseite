@@ -22,12 +22,12 @@ WAYS = {
               "das Team unter „Bearbeiten“ auf.",
     "co_leader": "Verlasse das Team auf der Teamseite („Team verlassen“) oder bitte den Kapitän, dich auf Spieler zu "
                  "stellen.",
-    "captain": "Gib die Rolle in deinem Profil unter „Teams“ mit „Rolle abgeben“ ab.",
-    "vice_captain": "Gib die Rolle in deinem Profil unter „Teams“ mit „Rolle abgeben“ ab.",
+    "captain": "Gib die Rolle unter Teams → Deine Teams mit „Rolle abgeben“ ab.",
+    "vice_captain": "Gib die Rolle unter Teams → Deine Teams mit „Rolle abgeben“ ab.",
 }
 # Wohin der Knopf auf der Seite „Meine Daten“ führt - je Rolle dorthin, wo der Weg steht.
-LINKS = {"leader": "/teams/{team_id}", "co_leader": "/teams/{team_id}", "captain": "/profile?tab=teams",
-         "vice_captain": "/profile?tab=teams"}
+LINKS = {"leader": "/teams/{team_id}", "co_leader": "/teams/{team_id}", "captain": "/teams",
+         "vice_captain": "/teams"}
 
 LEAD = "Bevor du dein Konto löschst, gib deine Rollen in Teams ab – sonst stünde ein gelöschtes Konto an der Spitze."
 

@@ -122,7 +122,7 @@ for (const size of SIZES) {
         can_erase: false,
         blockers: [
           { team_id: "team-1", team: "[RDL] Rudel", squad_id: null, squad: null, role: "leader", role_label: "Kapitän", way: "Übergib die Leitung auf der Teamseite oder löse das Team auf.", link: "/teams/team-1" },
-          { team_id: "team-1", team: "[RDL] Rudel", squad_id: "s-1", squad: "Erste", role: "captain", role_label: "Captain", way: "Gib die Rolle in deinem Profil ab.", link: "/profile?tab=teams" },
+          { team_id: "team-1", team: "[RDL] Rudel", squad_id: "s-1", squad: "Erste", role: "captain", role_label: "Captain", way: "Gib die Rolle unter Teams → Deine Teams ab.", link: "/teams" },
         ],
       }));
       await page.goto("/privacy-account");
