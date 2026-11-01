@@ -79,6 +79,35 @@ async def test_friends_and_direct_messages_name_no_system_role(flow):
     no_role_anywhere((await flow.get("/api/messages/conversations")).json())
 
 
+# ---------------------------------------------------------------- PR2, PR3: Felder und ihre Stufen
+@pytest.mark.asyncio
+async def test_preferred_role_shows_only_with_a_chosen_level(flow):
+    hidden = await player(flow, "ohne-stufe", preferred_role="IGL")
+    await player(flow, "mit-stufe", preferred_role="Support", profile_visibility={"preferred_role": "public"})
+    await player(flow, "nur-community", preferred_role="Driver", profile_visibility={"preferred_role": "community"})
+    flow.act_as(None)
+    assert (await flow.get("/api/users/public/ohne-stufe")).json()["preferred_role"] is None
+    assert (await flow.get("/api/users/public/mit-stufe")).json()["preferred_role"] == "Support"
+    assert (await flow.get("/api/users/public/nur-community")).json()["preferred_role"] is None
+    flow.act_as(hidden)
+    assert (await flow.get("/api/users/public/ohne-stufe")).json()["preferred_role"] == "IGL"
+    assert (await flow.get("/api/users/public/ohne-stufe", params={"view_as": "public"})).json()["preferred_role"] is None
+    assert (await flow.get("/api/users/public/nur-community")).json()["preferred_role"] == "Driver"
+
+
+@pytest.mark.asyncio
+async def test_website_subscriptions_and_platforms_follow_their_level(flow):
+    await player(flow, "verschlossen", website="https://example.org", gaming_subscriptions=["ea_play"], main_platform="PC", main_platforms=["PC"],
+                 profile_visibility={"website": "private", "gaming_subscriptions": "members", "main_platforms": "private"})
+    await player(flow, "offen", website="https://example.org", gaming_subscriptions=["ea_play"], main_platform="PC", main_platforms=["PC"])
+    flow.act_as(None)
+    closed = (await flow.get("/api/users/public/verschlossen")).json()
+    assert closed["website"] is None and closed["gaming_subscriptions"] is None
+    assert closed["main_platforms"] == [] and closed["main_platform"] is None
+    shown = (await flow.get("/api/users/public/offen")).json()
+    assert shown["website"] == "https://example.org" and shown["gaming_subscriptions"] == ["ea_play"] and shown["main_platform"] == "PC"
+
+
 # ---------------------------------------------------------------- Zusatz: Dokumente
 @pytest.mark.asyncio
 async def test_members_never_see_where_a_document_is_stored(flow):

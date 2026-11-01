@@ -32,7 +32,7 @@ import {
   Trophy, Flag, Medal, Calendar,
   MapPin, Zap, TrendingUp, Lock, ExternalLink, Radio, Gamepad2, Globe,
   MessageSquare, UserPlus, UserCheck, X, Info, Cake, Crown,
-  Monitor, Keyboard, BadgeCheck, Heart, Users, Sparkles, Copy, Award, Settings,
+  Monitor, Keyboard, BadgeCheck, Heart, Users, Sparkles, Copy, Award, Settings, Target,
 } from "lucide-react";
 import { toast } from "sonner";
 import { asInstant, viennaDate } from "@/lib/vienna";
@@ -1175,6 +1175,8 @@ function SetupCard({ profile }) {
     { label: "Plattformen", items: listItems(profile.main_platforms?.length ? profile.main_platforms : profile.main_platform, PLATFORM_LABELS), icon: Monitor, tone: "blue" },
     { label: "Eingabe", items: listItems(profile.input_devices, INPUT_DEVICE_LABELS), icon: Keyboard, tone: "gold" },
     { label: "Abos", items: listItems(profile.gaming_subscriptions, SUBSCRIPTION_LABELS), icon: BadgeCheck, tone: "green" },
+    // Freitext (#2126): genau so, wie die Person ihn eingetragen hat.
+    { label: "Rolle", items: profile.preferred_role ? [profile.preferred_role] : [], icon: Target, tone: "white" },
     { label: "Lieblingsspiele", items: listItems(profile.favorite_games), icon: Heart, tone: "violet" },
   ].filter((group) => group.items.length);
   if (!groups.length) return null;

@@ -86,6 +86,8 @@ def _visibility_aliases(key: str) -> list[str]:
     aliases = [key, source_key]
     if key == "birth_date":
         aliases += ["birthdate", "birthday"]
+    if key == "main_platform":
+        aliases.append("main_platforms")   # die Stufe „Plattformen“ gilt auch für das alte Einzelfeld (#2126)
     return list(dict.fromkeys(aliases))
 
 
@@ -104,9 +106,10 @@ async def _viewer_context(db, viewer: dict | None, target_id: str) -> dict:
     return {"self": viewer.get("id") == target_id, "logged_in": True, "member": member or admin, "admin": admin}
 
 
-# Felder, die ohne gewählte Stufe nicht öffentlich sind (#2113): TikTok ließ sich pflegen, erschien aber nie im Profil und
-# hatte keine Stufe - wer es eingetragen hat, wurde nie gefragt. Gleich in pages/user/profile/visibility.js.
-FIELD_DEFAULT_LEVELS = {"tiktok": "private"}
+# Felder, die ohne gewählte Stufe nicht öffentlich sind (#2113, #2126): TikTok und die bevorzugte Rolle ließen sich pflegen,
+# erschienen aber nie im Profil und hatten keine Stufe - wer sie eingetragen hat, wurde nie gefragt. Gleich in
+# pages/user/profile/visibility.js.
+FIELD_DEFAULT_LEVELS = {"tiktok": "private", "preferred_role": "private"}
 
 
 def _field_visible(user: dict, key: str, profile_public: bool, ctx: dict | None = None) -> bool:
@@ -665,6 +668,7 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
         "main_platform": _visible_field(u, "main_platform", public, ctx),
         "main_platforms": (u.get("main_platforms") or []) if _field_visible(u, "main_platforms", public, ctx) else [],
         "input_devices": (u.get("input_devices") or []) if _field_visible(u, "input_devices", public, ctx) else [],
+        "preferred_role": _visible_field(u, "preferred_role", public, ctx),
         "gaming_subscriptions": _visible_field(u, "gaming_subscriptions", public, ctx),
         "favorite_games": (u.get("favorite_games") or []) if _field_visible(u, "favorite_games", public, ctx) else [],
         "website": _visible_field(u, "website", public, ctx),
