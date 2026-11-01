@@ -404,7 +404,7 @@ function TeamDetail({ id }) {
               const isMe = user && user.id === m.id;
               const showKick = canRemoveMembers && !isLead && !isMe;
               const showRole = !!user && team.leader_id === user.id && !isLead;
-              const showTransfer = !!user && team.leader_id === user.id && !isLead;
+              const showTransfer = !!user && team.leader_id === user.id && !isLead && !m.is_gone;
               const roleLabel = ROLE_LABELS[memberRole(team, m)];
               const roleColor = isLead ? "text-[#FFD700] border-[#FFD700]/40 bg-[#FFD700]/5" :
                                 isCo ? "text-[#29B6E8] border-[#29B6E8]/40 bg-[#29B6E8]/5" :

@@ -108,6 +108,14 @@ test("Kapitän: Hinweis „erst übergeben oder auflösen“ statt „Team verla
   expect(screen.queryByTestId("team-leave-leader-hint")).toBeNull();
 });
 
+// Kein Kapitän aus einem gelöschten Konto (#2113): „Zum Kapitän machen“ fehlt dort.
+test("gelöschtes Mitglied: kein Knopf „Zum Kapitän machen“", async () => {
+  serve({ ...TEAM, members: [MEMBERS[0], { ...MEMBERS[2], is_gone: true }, MEMBERS[1]] });
+  renderAt("/teams/t-1");
+  expect(await screen.findByTestId("team-transfer-u-co")).toBeInTheDocument();
+  expect(screen.queryByTestId("team-transfer-u-3")).toBeNull();
+});
+
 // „Löschen“ nicht neben „Bearbeiten“ (#1274): oben nur Einladen und Bearbeiten; „Team auflösen“ ganz unten im
 // Bearbeiten-Blatt, mit einem Satz, was passiert, und erst mit dem richtig eingetippten Teamnamen.
 test("oben nur Einladen und Bearbeiten - kein roter Lösch-Knopf", async () => {

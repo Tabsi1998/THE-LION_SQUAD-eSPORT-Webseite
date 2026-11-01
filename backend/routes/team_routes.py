@@ -130,6 +130,19 @@ def _public_user(user: dict | None) -> dict | None:
     }
 
 
+def _account_gone(user: dict | None) -> bool:
+    """Gelöscht oder abgeschaltet - so ein Konto kann kein Team mehr führen (#2113)."""
+    return not user or user.get("is_active") is False or bool(user.get("anonymized_at"))
+
+
+def _public_member(user: dict | None) -> dict | None:
+    """Wie ``_public_user``; ein gelöschtes Konto trägt dazu die Marke, damit die Seite „Zum Kapitän machen“ weglässt."""
+    view = _public_user(user)
+    if view and _account_gone(user):
+        view["is_gone"] = True
+    return view
+
+
 def _user_label(user: dict | None) -> str:
     return (user or {}).get("display_name") or (user or {}).get("username") or "Benutzer"
 
@@ -192,7 +205,7 @@ async def _hydrate_team(team: dict) -> dict:
     ).to_list(100)
     member_order = {uid: idx for idx, uid in enumerate(team.get("member_ids", []))}
     members.sort(key=lambda u: member_order.get(u["id"], 999))
-    team["members"] = [_public_user(member) for member in members]
+    team["members"] = [_public_member(member) for member in members]
     leader = await db.users.find_one(
         {"id": team.get("leader_id")},
         private_projection("email"),
@@ -1034,6 +1047,9 @@ async def transfer_leader(team_id: str, body: dict, me: dict = Depends(get_curre
         raise HTTPException(status_code=404, detail="Empfänger ist kein Team-Mitglied")
     if new_leader_id == team.get("leader_id"):
         raise HTTPException(status_code=400, detail="Empfänger ist bereits Leader")
+    # Sonst ließe sich die Leitung auf ein gelöschtes Konto schieben - und das Team stünde ohne Kapitän da (#2113).
+    if _account_gone(await db.users.find_one({"id": new_leader_id}, {"_id": 0, "id": 1, "is_active": 1, "anonymized_at": 1})):
+        raise HTTPException(status_code=400, detail="Dieses Konto ist gelöscht oder abgeschaltet – bitte ein aktives Mitglied wählen.")
     old_leader = team.get("leader_id")
     await db.teams.update_one({"id": team_id}, {
         "$set": {"leader_id": new_leader_id, "updated_at": now_utc().isoformat()},

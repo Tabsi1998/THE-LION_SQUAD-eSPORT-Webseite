@@ -135,3 +135,32 @@ async def test_without_an_address_the_contact_form_is_named(flow):
     flow.act_as(world["leader"])
     check = (await flow.get("/api/dsgvo/anonymize-me/check")).json()
     assert check["closing"].startswith("Kommst du so nicht weiter, ")
+
+
+@pytest.mark.asyncio
+async def test_lead_cannot_be_handed_to_a_deleted_account(flow):
+    """Sonst ließe sich die Sperre umgehen: Leitung auf ein gelöschtes Konto schieben, gehen, selbst löschen."""
+    leader = await flow.add_user(name=f"leitung-{new_id()[:6]}")
+    ghost = await flow.add_user(name=f"geist-{new_id()[:6]}")
+    team_id = new_id()
+    await flow.db.teams.insert_one({"id": team_id, "name": "Rest", "tag": "RST", "leader_id": leader["id"], "co_leader_ids": [],
+                                    "member_ids": [leader["id"], ghost["id"]], "is_public": True})
+    flow.act_as(ghost)
+    assert (await flow.post("/api/dsgvo/anonymize-me")).status_code == 200
+    flow.act_as(leader)
+    members = (await flow.get(f"/api/teams/{team_id}")).json()["members"]
+    assert [member.get("is_gone") for member in members if member["id"] == ghost["id"]] == [True]
+    assert [member.get("is_gone") for member in members if member["id"] == leader["id"]] == [None]
+    moved = await flow.post(f"/api/teams/{team_id}/transfer-leader", json={"new_leader_id": ghost["id"]})
+    assert moved.status_code == 400 and "gelöscht" in moved.json()["detail"]
+    assert (await flow.post("/api/dsgvo/anonymize-me")).status_code == 409
+    assert (await flow.db.teams.find_one({"id": team_id}))["leader_id"] == leader["id"]
+
+
+@pytest.mark.asyncio
+async def test_lead_cannot_be_handed_to_a_switched_off_account(flow):
+    world = await _world(flow)
+    await flow.db.users.update_one({"id": world["player"]["id"]}, {"$set": {"is_active": False}})
+    flow.act_as(world["leader"])
+    moved = await flow.post(f"/api/teams/{world['team_id']}/transfer-leader", json={"new_leader_id": world["player"]["id"]})
+    assert moved.status_code == 400
