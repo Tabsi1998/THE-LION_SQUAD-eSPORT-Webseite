@@ -137,3 +137,36 @@ async def test_xp_ruecknahme_zweimal_und_nach_prestige(flow):
     await flow.db.user_xp.update_one({"user_id": user["id"]}, {"$set": {"total": 500, "prestige": 1, "prestige_at": "2999-01-01T00:00:00+00:00"}})
     assert (await xp.revoke(user["id"], "event_attended", "e:r"))["removed"] == 0, "aus der Zeit vor dem Prestige: der neue Stand bleibt"
     assert (await xp.state(user["id"]))["total"] == 500
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", ["checked_in", "registered", "waitlist"])
+async def test_nach_der_absage_kommt_niemand_wieder_hinein(flow, status):
+    _lead, event, player, reg = await setup(flow)
+    cancelled = await flow.patch(f"/api/events/{event['id']}", json={"status": "cancelled"})
+    assert cancelled.status_code == 200, cancelled.text
+    refused = await flow.patch(f"/api/events/{event['id']}/registrations/{reg['id']}", json={"status": status})
+    assert refused.status_code == 409 and "abgesagt" in refused.json()["detail"]
+    points, events, total = await rewards(flow, player)
+    assert points == [] and events == [] and total == 0
+    stored = await flow.db.event_registrations.find_one({"id": reg["id"]}, {"_id": 0, "status": 1})
+    assert stored["status"] == "cancelled"
+    # Die Notiz der Leitung bleibt möglich; nach dem Zurücknehmen der Absage geht auch der Check-in wieder.
+    note = await flow.patch(f"/api/events/{event['id']}/registrations/{reg['id']}", json={"internal_note": "abgesagt, Geld zurück"})
+    assert note.status_code == 200
+    reopened = await flow.patch(f"/api/events/{event['id']}", json={"status": "scheduled"})
+    assert reopened.status_code == 200, reopened.text
+    await set_status(flow, event, reg, "checked_in")
+    assert (await rewards(flow, player))[2] >= 60
+
+
+@pytest.mark.asyncio
+async def test_absage_nimmt_auch_ueberschnittenen_checkin_zurueck(flow):
+    """Eine Anmeldung, die in den Daten noch „angemeldet“ steht, aber schon Punkte bekam: die Absage räumt auf."""
+    _lead, event, player, reg = await setup(flow)
+    await set_status(flow, event, reg, "checked_in")
+    await flow.db.event_registrations.update_one({"id": reg["id"]}, {"$set": {"status": "registered"}})
+    response = await flow.patch(f"/api/events/{event['id']}", json={"status": "cancelled"})
+    assert response.status_code == 200, response.text
+    points, events, total = await rewards(flow, player)
+    assert points == [] and events == [] and total == 0

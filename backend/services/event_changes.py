@@ -17,7 +17,9 @@ import logging
 from models import new_id, now_utc
 from services import billing_orders, event_rewards
 from services.event_lead import MESSAGE_CATEGORY, MESSAGE_KIND, MESSAGE_TEMPLATE
+from services.event_registration import SEAT_WAIT_SECONDS, seat_resource
 from services.log_safe import log_safe
+from services.mutation_lock import MutationLockBusy, mutation_lock
 
 logger = logging.getLogger("tls.events.changes")
 
@@ -59,7 +61,7 @@ async def _cancel_orders(db, registration_id: str, reason: str) -> int:
 async def _affected_registrations(db, event_id: str) -> list[dict]:
     return await db.event_registrations.find(
         {"event_id": event_id, "status": {"$in": list(AFFECTED_STATUSES)}},
-        {"_id": 0, "id": 1, "user_id": 1, "status": 1, "price_snapshot": 1},
+        {"_id": 0, "id": 1, "user_id": 1, "status": 1, "price_snapshot": 1, "walk_in": 1},
     ).to_list(5000)
 
 
@@ -122,9 +124,9 @@ def _when_and_where(event: dict) -> str:
     return "; ".join(part for part in (f"Termin: {when}" if when else "", f"Ort: {where}" if where else "") if part)
 
 
-async def cancel_event(db, event: dict, me: dict) -> dict:
-    """Das Event ist abgesagt: Anmeldungen und Warteliste stornieren, Aufträge stornieren, alle informieren."""
-    now = now_utc().isoformat()
+async def _cancel_registrations(db, event: dict, now: str) -> tuple[list[dict], int]:
+    """Alle Betroffenen stornieren und ihre Aufträge schließen. Punkte und XP gehen bei allen zurück (EV12, idempotent): ein
+    abgesagtes Event bringt nichts, auch nicht einem Check-in, der sich gerade noch überschnitten hat."""
     registrations = await _affected_registrations(db, event["id"])
     orders = 0
     for registration in registrations:
@@ -134,9 +136,20 @@ async def cancel_event(db, event: dict, me: dict) -> dict:
                       **({"billing_status": "cancelled"} if registration.get("price_snapshot") else {})}},
         )
         orders += await _cancel_orders(db, registration["id"], "Event abgesagt")
-        # Schon Eingecheckte: ein abgesagtes Event bringt weder Jahrespunkte noch XP (#2127, EV12).
-        if registration.get("status") == "checked_in":
-            await event_rewards.revoke_checkin(db, event, registration)
+        await event_rewards.revoke_checkin(db, event, registration)
+    return registrations, orders
+
+
+async def cancel_event(db, event: dict, me: dict) -> dict:
+    """Das Event ist abgesagt: Anmeldungen und Warteliste stornieren, Aufträge stornieren, alle informieren."""
+    now = now_utc().isoformat()
+    # Unter der Platzsperre (#2127): Ein Check-in im selben Moment prüft die Absage darunter noch einmal. Der Status steht
+    # zu diesem Zeitpunkt schon - ist die Sperre zu lange belegt, läuft die Absage trotzdem durch.
+    try:
+        async with mutation_lock(db, seat_resource(event["id"]), wait_seconds=SEAT_WAIT_SECONDS):
+            registrations, orders = await _cancel_registrations(db, event, now)
+    except MutationLockBusy:
+        registrations, orders = await _cancel_registrations(db, event, now)
     users = await _recipients(db, [registration.get("user_id") for registration in registrations])
     message = ("Das Event wurde abgesagt. Deine Anmeldung ist damit storniert – ein offener Kostenbeitrag wird nicht "
                "verrechnet; wurde schon eine Rechnung gestellt, meldet sich der Verein bei dir.")

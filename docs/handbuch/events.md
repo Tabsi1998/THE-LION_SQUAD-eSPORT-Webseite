@@ -109,7 +109,8 @@ Mal senden nur Redaktion und System.
   schon gestellte Rechnung kommt als Prüffall in die Finanzübersicht. Die Event-Seite zeigt **Event abgesagt** statt der
   Anmeldung; in der öffentlichen Liste bleibt das Event bis zum Termin unter **Kommend** stehen, gedämpft und mit dem Kennzeichen **Abgesagt**
   (die Startseite zeigt es nicht mehr). Die Zahl zählt alle bestehenden Anmeldungen, auch wenn die Anmeldung inzwischen ausgeschaltet ist. Wird die Absage
-  zurückgenommen, bleiben die Anmeldungen storniert.
+  zurückgenommen, bleiben die Anmeldungen storniert. Solange die Absage steht, lässt sich unter **Anmeldungen & Einlass** niemand wieder
+  aktivieren oder einchecken.
 - **Termin oder Ort ändern:** Gibt es Anmeldungen, fragt das Formular beim Speichern **Angemeldete informieren?**.
   **Informieren** schickt allen (samt Warteliste) den neuen Termin und Ort, **Ohne Nachricht speichern** nur das Formular. Turniere und Fast
   Laps bleiben auf ihrem Tag: Liegen sie danach außerhalb des Events, sagt das Speichern das, und im Programm steht bei ihnen **Liegt außerhalb

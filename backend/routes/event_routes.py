@@ -35,6 +35,8 @@ LEGACY_SPONSOR_TIERS = {"supporter": "bronze", "partner": "bronze"}
 ACTIVE_EVENT_REGISTRATION_STATUSES = {"registered", "checked_in"}
 PUBLIC_EVENT_REGISTRATION_STATUSES = {"registered", "checked_in", "waitlist"}
 ADMIN_EVENT_REGISTRATION_STATUSES = {"registered", "checked_in", "waitlist", "cancelled", "no_show"}
+REOPENING_STATUSES = {"registered", "checked_in", "waitlist"}
+EVENT_CANCELLED_DETAIL = "Das Event ist abgesagt – die Anmeldung lässt sich nicht wieder aktivieren. Zuerst die Absage zurücknehmen."
 
 
 async def _user_can_see(user: dict | None, visibility: str) -> bool:
@@ -872,6 +874,12 @@ async def _update_event_registration(db, event: dict, registration_id: str, body
         raise HTTPException(status_code=404, detail="Anmeldung nicht gefunden")
     nullable = {"note", "internal_note"}
     updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None or k in nullable}
+    # Abgesagt (#2127, EV12): niemand kommt wieder hinein - sonst brächte „Da“ Punkte und XP. Frisch gelesen, unter der Sperre,
+    # die auch die Absage hält.
+    if updates.get("status") in REOPENING_STATUSES:
+        fresh = await db.events.find_one({"id": event["id"]}, {"_id": 0, "status": 1})
+        if (fresh or event).get("status") == "cancelled":
+            raise HTTPException(status_code=409, detail=EVENT_CANCELLED_DETAIL)
     if "companion_count" in updates:
         companion_count = _validated_companion_count(event, updates.get("companion_count"))
         updates["companion_count"] = companion_count

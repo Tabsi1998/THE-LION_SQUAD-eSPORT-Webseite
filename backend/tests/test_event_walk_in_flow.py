@@ -180,3 +180,14 @@ async def test_abgesagt_oder_extern_geht_nicht(flow, extra):
     assert response.status_code == 200, response.text
     assert (await walk_in(flow, event)).status_code == 409
     assert (await flow.get(f"/api/events/{event['slug']}/lead")).json()["can_add_walk_in"] is False
+
+
+@pytest.mark.asyncio
+async def test_absage_trifft_auch_eintraege_an_der_tuer(flow):
+    _lead, event = await setup(flow)
+    row = (await walk_in(flow, event)).json()
+    response = await flow.patch(f"/api/events/{event['id']}", json={"status": "cancelled"})
+    assert response.status_code == 200, response.text
+    stored = await flow.db.event_registrations.find_one({"id": row["id"]}, {"_id": 0})
+    assert stored["status"] == "cancelled"
+    assert response.json()["cancellation"]["registrations"] == 1 and response.json()["cancellation"]["notified"] == 0
