@@ -1193,3 +1193,17 @@ test("Setzplatz: lehnt der Server ab, steht wieder der alte Wert im Feld", async
   await user.type(seed, "1{Enter}");
   await waitFor(() => expect(seed).toHaveValue(3));
 });
+
+// Austritt und Disqualifikation nimmt die Turnierleitung über den Status zurück (#2111) - der Check-in bietet dafür nichts an.
+test("Ausgeschiedene haben keine Check-in-Knöpfe", async () => {
+  apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path.includes("/registrations")) return Promise.resolve({ data: [{ id: "r-1", status: "disqualified", display_name: "Max Muster" }] });
+    if (path.match(/\/tournaments\/t-1(\?|$)/)) return Promise.resolve({ data: { ...TOURNAMENT, can_check_in: true } });
+    return Promise.resolve(routeFor(path));
+  });
+  renderPage();
+  await screen.findAllByText("Max Muster");
+  expect(screen.queryByRole("button", { name: "Check-in" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Nicht erschienen" })).toBeNull();
+});

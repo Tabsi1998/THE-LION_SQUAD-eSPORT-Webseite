@@ -273,7 +273,10 @@ verbindlichen Teilnahme: Warteliste kostet nichts. Alles Weitere steht in [Abrec
   auf, der letzte Platz wird ein Freilos. Wer im nächsten Lauf schon aufgerufen oder gefahren ist, bleibt dort. Wird
   die nächste Runde ausgelost (auch **Jetzt auslosen** je Weg und **Neu auslosen**), gilt dieselbe Reihe: wer
   ausgetreten ist, kommt in keinen Topf, die Nächsten rücken auf. Danach steht
-  die Anmeldung auf **Ausgetreten** bzw. **Disqualifiziert**; die Statusauswahl kennt diese Werte nicht.
+  die Anmeldung auf **Ausgetreten** bzw. **Disqualifiziert**; setzen lassen sich diese Werte nur über den Umbauplan.
+  Zurücknehmen geht über die Statusauswahl, mit demselben Recht wie das Eintragen und nur, wenn die Person in keinem festen Spiel
+  mehr steht und im Baum ein Platz frei ist – sonst sagt die Meldung, warum nicht, und nichts ändert sich. Der Check-in
+  bietet dafür nichts an.
 - Bei Team-Turnieren steht unter jedem Team die Aufstellung (3.5).
 - Oben im Turnier: Downloads **PDF Teilnehmer**, **PDF Check-in**, **PDF Anmeldung QR** (zum Aufhängen), **PDF Spiele**
   und **CSV Matchplan**.
