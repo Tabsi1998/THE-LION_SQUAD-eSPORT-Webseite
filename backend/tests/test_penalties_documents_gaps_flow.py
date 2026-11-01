@@ -343,6 +343,46 @@ async def test_a_new_upload_takes_an_old_public_file_with_it(flow, doc_dir, monk
 
 
 @pytest.mark.asyncio
+async def test_the_cleanup_job_leaves_a_file_that_is_needed_again(flow, doc_dir, monkeypatch):
+    from datetime import timedelta
+
+    from models import now_utc
+    from routes import document_routes
+    from services import account_erasure
+
+    monkeypatch.setattr(account_erasure, "PRIVATE_DOC_DIR", doc_dir)
+
+    def locked(_path):
+        raise PermissionError(13, "gesperrt")
+
+    later = now_utc() + timedelta(days=1)
+    flow.act_as(await chair_of(flow))
+    for key, reuse in (("protokoll.pdf", {"id": new_id(), "title": "B", "storage_key": "protokoll.pdf"}), ("mappe.pdf", None)):
+        doc = await stored_doc(flow, doc_dir, key=key)
+        with monkeypatch.context() as patched:
+            patched.setattr(document_routes, "_unlink", locked)
+            removed = await flow.delete(f"/api/documents/{doc['id']}")
+        assert removed.json()["file_retry"] is True
+        if reuse:
+            await flow.db.documents.insert_one(reuse)
+        else:
+            await flow.db.settings.insert_one({"id": "sponsoring_offer", "pdf_key": key})
+        await account_erasure.retry_file_cleanups(flow.db, now=later)
+        assert (doc_dir / key).exists(), key
+        assert await flow.db.pending_file_cleanups.count_documents({"filename": key}) == 0
+
+
+@pytest.mark.asyncio
+async def test_account_and_media_cleanups_stay_out_of_the_document_folder(flow, doc_dir, monkeypatch):
+    from services import account_erasure
+
+    monkeypatch.setattr(account_erasure, "PRIVATE_DOC_DIR", doc_dir)
+    (doc_dir / "protokoll.pdf").write_bytes(b"x")
+    assert await account_erasure.remove_upload(flow.db, "protokoll.pdf") is None
+    assert (doc_dir / "protokoll.pdf").exists()
+
+
+@pytest.mark.asyncio
 async def test_only_the_club_area_changes_documents(flow, doc_dir):
     doc = await stored_doc(flow, doc_dir)
     flow.act_as(await flow.add_user(role="moderator", name="moderator"))

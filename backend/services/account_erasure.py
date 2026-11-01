@@ -321,10 +321,11 @@ def retry_delay(attempts: int) -> timedelta:
     return min(RETRY_BASE * (2 ** min(max(0, attempts - 1), 16)), RETRY_MAX)
 
 
-async def _remove(db, name: str, scans: list[dict]) -> str | None:
-    """Datei, kleinere Fassungen und Quarantäne-Kopien weg; erst danach die Verwaltungszeilen. Liefert den Fehler."""
+async def _remove(db, name: str, scans: list[dict], *, documents: bool = False) -> str | None:
+    """Datei, kleinere Fassungen und Quarantäne-Kopien weg; erst danach die Verwaltungszeilen. Liefert den Fehler.
+    Der Ordner der Vereinsdokumente zählt nur für Dokumente - Konto und Mediathek haben dort nichts zu löschen."""
     try:
-        for base in (PUBLIC_UPLOAD_DIR, UPLOAD_DIR, PRIVATE_DOC_DIR):
+        for base in (PUBLIC_UPLOAD_DIR, UPLOAD_DIR, *((PRIVATE_DOC_DIR,) if documents else ())):
             path = base / name
             for width in VARIANT_WIDTHS:
                 _unlink(variant_path(path, width))
@@ -401,6 +402,32 @@ async def retry_document_file(db, name: str, exc: BaseException) -> None:
     await _remember(db, name, "", True, safe_error(exc), source=SOURCE_DOCUMENTS)
 
 
+async def document_file_in_use(db, name: str, *, without: str | None = None) -> bool:
+    """Steht die Datei an einem Dokument oder ist sie die Sponsoring-Mappe? Beide tragen den nackten Dateinamen, das findet
+    keine Suche nach Upload-Adressen. ``without``: dieses Dokument nicht mitzählen."""
+    query: dict = {"$or": [{"storage_key": name}, {"file_url": {"$regex": f"/{re.escape(name)}$"}}]}
+    if without:
+        query["id"] = {"$ne": without}
+    return bool(await db.documents.find_one(query, {"_id": 1}) or await db.settings.find_one({"pdf_key": name}, {"_id": 1}))
+
+
+async def _retry_document_file(db, name: str, now: datetime) -> int:
+    """Nachholen für ein Dokument: dieselben Prüfungen wie beim Löschen; was inzwischen wieder gebraucht wird, bleibt."""
+    needed = await document_file_in_use(db, name)
+    if not needed and not (PRIVATE_DOC_DIR / name).is_file():
+        # Alte Datei im öffentlichen Upload-Ordner: auch die Mediathek und Links in Texten zählen.
+        needed = bool(await db.media_uploads.find_one({"filename": name}, {"_id": 1}) or await media_audit.still_referenced(db, {name}))
+    if needed:
+        await db[PENDING].delete_many({"filename": name})
+        return 0
+    error = await _remove(db, name, [], documents=True)
+    if error:
+        await _remember(db, name, "", True, error, source=SOURCE_DOCUMENTS, now=now)
+        return 0
+    await db[PENDING].delete_many({"filename": name})
+    return 1
+
+
 async def _clean(db, owner_id: str, owned: set[str], untracked: set[str], now: datetime | None = None) -> int:
     """Löscht, was nirgends mehr steht. Eigene Dateien: persönliche Profile anderer verlieren den Eintrag."""
     names = owned | untracked
@@ -461,7 +488,7 @@ async def retry_file_cleanups(db, limit: int = 200, now: datetime | None = None)
     gelöscht. Ein Eintrag, der aus anderem Grund scheitert (etwa an der Datenbank), hält die übrigen nicht auf."""
     now = now or now_utc()
     removed = 0
-    rows = await db[PENDING].find(_due(now), {"_id": 0, "filename": 1, "owner_id": 1, "owned": 1}).sort(
+    rows = await db[PENDING].find(_due(now), {"_id": 0, "filename": 1, "owner_id": 1, "owned": 1, "source": 1}).sort(
         "next_attempt_at", 1).to_list(limit)
     for row in rows:
         name = row.get("filename")
@@ -469,6 +496,9 @@ async def retry_file_cleanups(db, limit: int = 200, now: datetime | None = None)
             continue
         owned, untracked = ({name}, set()) if row.get("owned") else (set(), {name})
         try:
+            if row.get("source") == SOURCE_DOCUMENTS:
+                removed += await _retry_document_file(db, name, now)
+                continue
             removed += await _clean(db, row.get("owner_id") or "", owned, untracked, now=now)
         except Exception as exc:  # noqa: BLE001 - zählt als Versuch wie jeder andere Fehler
             logger.warning("[media] Nacharbeit einer Datei abgebrochen: %s", exc.__class__.__name__)

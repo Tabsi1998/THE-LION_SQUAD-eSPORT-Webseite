@@ -61,8 +61,7 @@ async def _file_still_needed(db, doc: dict, path: pathlib.Path) -> bool:
     """Braucht noch etwas anderes diese Datei? Ein zweites Dokument, die Sponsoring-Mappe (selber Ordner) oder - bei alten
     Dateien im öffentlichen Upload-Ordner - irgendein Verweis, auch in Texten von Seiten, Newslettern und Rechtstexten."""
     name = path.name
-    other = await db.documents.find_one({"id": {"$ne": doc["id"]}, "$or": [{"storage_key": name}, {"file_url": {"$regex": f"/{re.escape(name)}$"}}]}, {"_id": 1})
-    if other or await db.settings.find_one({"pdf_key": name}, {"_id": 1}):
+    if await account_erasure.document_file_in_use(db, name, without=doc["id"]):
         return True
     if doc.get("storage_key"):
         return False
