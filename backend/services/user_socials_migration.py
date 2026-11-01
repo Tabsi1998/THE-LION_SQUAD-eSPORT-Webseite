@@ -11,10 +11,9 @@ unsichtbar, aber nichts geht verloren; er steht weiter in der Datenauskunft und 
 """
 from __future__ import annotations
 
-import logging
 from typing import Awaitable, Callable
 
-logger = logging.getLogger("tls.migrations")
+from services.private_fields import private_projection
 
 PROFILE_FIELDS = {
     "discord": "discord_name", "twitch": "twitch_handle", "youtube": "youtube_handle", "tiktok": "tiktok_handle",
@@ -49,7 +48,7 @@ async def migrate(db, keep_lease: Callable[[], Awaitable[bool]] | None = None) -
             kept += 1
             continue
         value = str(row.get("value") or row.get("url") or "").strip()
-        user = await db.users.find_one({"id": row.get("user_id")}, {"_id": 0, "id": 1, field: 1}) if row.get("user_id") else None
+        user = await db.users.find_one({"id": row.get("user_id")}, private_projection()) if row.get("user_id") else None
         if not user or not value:
             await db.user_socials.delete_one({"_id": row["_id"]})
             dropped += 1
