@@ -280,13 +280,24 @@ class ChangePasswordBody(BaseModel):
 
 
 # ---------- Teams ----------
+# Länge von Teamname und Kürzel (#2128, TM11). Beim Ändern prüft die Route nur neue Werte (``team_routes._team_label``):
+# ein älteres, längeres Kürzel hält das Speichern anderer Felder nicht auf.
+TEAM_NAME_MIN_LENGTH, TEAM_NAME_MAX_LENGTH = 2, 60
+TEAM_TAG_MIN_LENGTH, TEAM_TAG_MAX_LENGTH = 2, 8
+
+
 class TeamCreate(BaseModel):
-    name: str
-    tag: str = Field(min_length=2, max_length=8)
+    name: str = Field(min_length=TEAM_NAME_MIN_LENGTH, max_length=TEAM_NAME_MAX_LENGTH)
+    tag: str = Field(min_length=TEAM_TAG_MIN_LENGTH, max_length=TEAM_TAG_MAX_LENGTH)
     description: Optional[str] = None
     logo_url: Optional[str] = None
     banner_url: Optional[str] = None
     discord_link: Optional[str] = None
+
+    @field_validator("name", "tag", mode="before")
+    @classmethod
+    def _no_outer_spaces(cls, value):
+        return value.strip() if isinstance(value, str) else value
 
 
 class TeamUpdate(BaseModel):

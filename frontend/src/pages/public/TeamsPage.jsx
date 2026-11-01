@@ -35,7 +35,7 @@ import { TeamJoinCard } from "@/pages/public/team/TeamJoinCard";
 import { TeamDissolveSection } from "@/pages/public/team/TeamDissolveSection";
 import { SideSheet } from "@/components/tls/SideSheet";
 import { TeamHeader } from "@/pages/public/team/TeamHeader";
-import { inviteTokenFrom, memberRole, ROLE_LABELS } from "@/lib/teamPage";
+import { inviteTokenFrom, memberRole, ROLE_LABELS, TEAM_NAME_MAX, TEAM_NAME_MIN, TEAM_TAG_MAX, TEAM_TAG_MIN } from "@/lib/teamPage";
 import { AUTO_COLOR, TEAM_COLORS } from "@/lib/teamColors";
 import { LoadNotice, LoadState, LoadStaleNotice } from "@/components/tls/LoadState";
 import { SkeletonCards } from "@/components/tls/Skeleton";
@@ -665,8 +665,8 @@ function TeamModal({ team, onClose, onSaved, canDissolve = false, onDissolved })
       )}
     >
       <form id="team-edit-form" onSubmit={submit} className="space-y-4">
-        <Field label="Name"><Input value={form.name} onChange={(v) => set("name", v)} required testId="team-name-input" /></Field>
-        <Field label="Kürzel"><Input value={form.tag} onChange={(v) => set("tag", v.toUpperCase().slice(0, 8))} required testId="team-tag" placeholder="TLS" /></Field>
+        <Field label="Name"><Input value={form.name} onChange={(v) => set("name", v)} required minLength={TEAM_NAME_MIN} maxLength={TEAM_NAME_MAX} testId="team-name-input" /></Field>
+        <Field label="Kürzel"><Input value={form.tag} onChange={(v) => set("tag", v.toUpperCase().slice(0, TEAM_TAG_MAX))} required minLength={TEAM_TAG_MIN} maxLength={TEAM_TAG_MAX} testId="team-tag" placeholder="TLS" /></Field>
         <Field label="Beschreibung"><textarea value={form.description || ""} onChange={(e) => set("description", e.target.value)} rows={3} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
         <Field label="Logo" group><ImageUpload value={form.logo_url || ""} onChange={(v) => set("logo_url", v)} testId="team-logo" variant="square" crop="square" allowLibrary {...teamLogoUpload(team)} /></Field>
         <Field label="Banner" group><ImageUpload value={form.banner_url || ""} onChange={(v) => set("banner_url", v)} testId="team-banner" variant="wide" crop="banner" allowLibrary /></Field>
@@ -788,6 +788,6 @@ function Field({ label, group = false, children }) {
   return <label className="block">{title}{children}</label>;
 }
 
-function Input({ value, onChange, placeholder, testId, required }) {
-  return <input value={value ?? ""} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} data-testid={testId} required={required} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />;
+function Input({ value, onChange, placeholder, testId, required, minLength, maxLength }) {
+  return <input value={value ?? ""} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} data-testid={testId} required={required} minLength={minLength} maxLength={maxLength} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />;
 }

@@ -5,6 +5,12 @@ import { viennaDateTime } from "@/lib/vienna";
 /** Der Name des Schlüssels in der Adresse: /teams/<id>?einladung=<schlüssel>. */
 export const INVITE_PARAM = "einladung";
 
+// Länge von Teamname und Kürzel (#2128, TM11) - dieselben Grenzen wie im Server (models.py).
+export const TEAM_NAME_MIN = 2;
+export const TEAM_NAME_MAX = 60;
+export const TEAM_TAG_MIN = 2;
+export const TEAM_TAG_MAX = 8;
+
 const OUTCOME_LABELS = { win: "Sieg", loss: "Niederlage", draw: "Unentschieden" };
 
 /** „Sieg“, „Niederlage“, „Unentschieden“ - bei Durchgängen „Platz 2“. */

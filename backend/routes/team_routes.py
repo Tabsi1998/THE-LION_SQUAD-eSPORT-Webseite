@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from database import get_db
 from services import league_roster, moderation_standing
 from auth import get_current_user, get_optional_user
-from models import TeamCreate, TeamUpdate, now_utc, new_id
+from models import TEAM_NAME_MAX_LENGTH, TEAM_NAME_MIN_LENGTH, TEAM_TAG_MAX_LENGTH, TEAM_TAG_MIN_LENGTH, TeamCreate, TeamUpdate, now_utc, new_id
 from services.notification_preferences import send_user_template
 from services.user_notifications import build_public_url, create_user_notification
 from services.chat_attachments import MAX_ATTACHMENTS_PER_MESSAGE, chat_message_preview, claim_attachments, register_chat_access
@@ -915,6 +915,16 @@ async def create_team(body: TeamCreate, me: dict = Depends(get_current_user)):
     return doc
 
 
+def _team_label(value: str, current: str | None, what: str, low: int, high: int) -> str:
+    """Name oder Kürzel beim Ändern (#2128, TM11): neue Werte in den Grenzen; ein älterer, unveränderter Wert bleibt gültig."""
+    text = str(value or "").strip()
+    if text == (current or "").strip():
+        return current or text
+    if not low <= len(text) <= high:
+        raise HTTPException(status_code=400, detail=f"{what} braucht {low} bis {high} Zeichen.")
+    return text
+
+
 @router.put("/{team_id}")
 @router.patch("/{team_id}")
 async def update_team(team_id: str, body: TeamUpdate, me: dict = Depends(get_current_user)):
@@ -925,11 +935,15 @@ async def update_team(team_id: str, body: TeamUpdate, me: dict = Depends(get_cur
     if team["leader_id"] != me["id"] and me["id"] not in team.get("co_leader_ids", []):
         if not _team_admin(me):
             _refuse(me, "Keine Berechtigung")
-    if body.tag and body.tag != team.get("tag") and await db.teams.find_one({"tag": body.tag}):
-        raise HTTPException(status_code=409, detail=TAG_TAKEN)
     nullable_fields = {"description", "logo_url", "banner_url", "discord_link", "social_links"}
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
+    if "name" in updates:
+        updates["name"] = _team_label(updates["name"], team.get("name"), "Der Name", TEAM_NAME_MIN_LENGTH, TEAM_NAME_MAX_LENGTH)
+    if "tag" in updates:
+        updates["tag"] = _team_label(updates["tag"], team.get("tag"), "Das Kürzel", TEAM_TAG_MIN_LENGTH, TEAM_TAG_MAX_LENGTH)
+        if updates["tag"] != team.get("tag") and await db.teams.find_one({"tag": updates["tag"]}):
+            raise HTTPException(status_code=409, detail=TAG_TAKEN)
     if updates.get("name") or updates.get("tag"):
         await word_filter.screen_field(db, f"{updates.get('name') or ''} {updates.get('tag') or ''}", kind="team_name", user_id=me["id"], ref_id=team_id)
     updates["updated_at"] = now_utc().isoformat()
