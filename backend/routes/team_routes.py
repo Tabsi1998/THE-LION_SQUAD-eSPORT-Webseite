@@ -715,12 +715,16 @@ async def accept_team_invite(invite_id: str, me: dict = Depends(get_current_user
     if not team:
         await db.team_invites.update_one({"id": invite_id}, {"$set": {"status": "cancelled", "updated_at": now_utc().isoformat()}})
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
-    if me["id"] not in (team.get("member_ids") or []):
-        await _add_team_member(db, team["id"], me["id"])
-    await db.team_invites.update_one(
-        {"id": invite_id},
+    # In einem Zug (#2113): Zieht die Leitung im selben Moment zurück, gewinnt genau eine Seite - niemand landet im Team,
+    # dessen Einladung gerade zurückgezogen wurde.
+    claimed = await db.team_invites.update_one(
+        {"id": invite_id, "status": "pending"},
         {"$set": {"status": "accepted", "acted_at": now_utc().isoformat(), "updated_at": now_utc().isoformat()}},
     )
+    if not getattr(claimed, "modified_count", 0):
+        raise HTTPException(status_code=404, detail="Einladung nicht gefunden")
+    if me["id"] not in (team.get("member_ids") or []):
+        await _add_team_member(db, team["id"], me["id"])
     await db.notifications.update_many(
         {"user_id": me["id"], "meta.invite_id": invite_id},
         {"$set": {"read": True}},
@@ -744,20 +748,21 @@ async def decline_team_invite(invite_id: str, me: dict = Depends(get_current_use
     invite = await db.team_invites.find_one({"id": invite_id, "user_id": me["id"], "status": "pending"}, {"_id": 0})
     if not invite:
         raise HTTPException(status_code=404, detail="Einladung nicht gefunden")
-    await db.team_invites.update_one(
-        {"id": invite_id},
+    claimed = await db.team_invites.update_one(
+        {"id": invite_id, "status": "pending"},
         {"$set": {"status": "declined", "acted_at": now_utc().isoformat(), "updated_at": now_utc().isoformat()}},
     )
+    if not getattr(claimed, "modified_count", 0):
+        raise HTTPException(status_code=404, detail="Einladung nicht gefunden")
     await db.notifications.update_many(
         {"user_id": me["id"], "meta.invite_id": invite_id},
         {"$set": {"read": True}},
     )
-    # Abgelehnt (#2113, L-A1): wer eingeladen hat, erfährt es - sonst wartet die Teamleitung auf eine Antwort.
-    team = await db.teams.find_one({"id": invite.get("team_id")}, {"_id": 0, "id": 1, "name": 1, "tag": 1})
-    inviter_id = invite.get("invited_by")
-    if team and inviter_id and inviter_id != me["id"]:
+    # Abgelehnt (#2113, L-A1): wer eingeladen hat und der Kapitän erfahren es - wie bei der Annahme.
+    team = await db.teams.find_one({"id": invite.get("team_id")}, {"_id": 0, "id": 1, "name": 1, "tag": 1, "leader_id": 1})
+    for uid in sorted({invite.get("invited_by"), (team or {}).get("leader_id")} - {None, me["id"]}) if team else []:
         await create_user_notification(
-            inviter_id,
+            uid,
             title=f"Einladung abgelehnt: [{team.get('tag')}]",
             body=f"{_user_label(me)} hat die Einladung in {team.get('name')} abgelehnt.",
             url=f"/teams/{team['id']}",

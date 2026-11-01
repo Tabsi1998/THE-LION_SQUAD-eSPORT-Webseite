@@ -124,3 +124,47 @@ async def test_captain_who_wants_to_leave_is_told_the_way(flow):
     assert response.status_code == 400
     detail = response.json()["detail"]
     assert "Zum Kapitän machen" in detail and "löse das Team" in detail
+
+
+@pytest.mark.asyncio
+async def test_decline_also_tells_the_captain(flow):
+    world = await _team(flow)
+    flow.act_as(world["co_leader"])
+    invite_id = (await flow.post(f"/api/teams/{world['team_id']}/invites", json={"user_id": world["guest"]["id"]})).json()["id"]
+    flow.act_as(world["guest"])
+    assert (await flow.post(f"/api/teams/invites/{invite_id}/decline")).status_code == 200
+    for person in (world["co_leader"], world["leader"]):
+        assert await flow.db.notifications.count_documents({"user_id": person["id"], "kind": "team_invite_declined"}) == 1
+
+
+@pytest.mark.asyncio
+async def test_accept_after_withdraw_race_lets_no_one_join(flow, monkeypatch):
+    """Das Rennen: Die Einladung war beim Lesen noch offen, beim Annehmen schon zurückgezogen."""
+    world = await _team(flow)
+    flow.act_as(world["leader"])
+    invite_id = (await flow.post(f"/api/teams/{world['team_id']}/invites", json={"user_id": world["guest"]["id"]})).json()["id"]
+    class StaleInvites:
+        """Liest wie die echte Sammlung - und zieht die Einladung gleich nach dem Lesen zurück."""
+
+        def __getattr__(self, name):
+            return getattr(flow.db.team_invites, name)
+
+        async def find_one(self, *args, **kwargs):
+            found = await flow.db.team_invites.find_one(*args, **kwargs)
+            await flow.db.team_invites.update_one({"id": invite_id}, {"$set": {"status": "withdrawn"}})
+            return found
+
+    class Db:
+        team_invites = StaleInvites()
+
+        def __getattr__(self, name):
+            return getattr(flow.db, name)
+
+    flow.act_as(world["guest"])
+    with monkeypatch.context() as patch:
+        patch.setattr("routes.team_routes.get_db", lambda: Db())
+        raced = await flow.post(f"/api/teams/invites/{invite_id}/accept")
+    assert raced.status_code == 404
+    team = await flow.db.teams.find_one({"id": world["team_id"]})
+    assert world["guest"]["id"] not in team["member_ids"]
+    assert (await flow.db.team_invites.find_one({"id": invite_id}))["status"] == "withdrawn"
