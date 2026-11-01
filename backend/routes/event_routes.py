@@ -383,6 +383,11 @@ async def _attach_event_registration_view(event: dict, user: dict | None) -> Non
             query["walk_in"] = {"$ne": True}
         regs = await db.event_registrations.find(query, {"_id": 0}).sort("created_at", 1).to_list(2000)
         rows = [_public_event_registration(r, is_staff=manages, with_price=manages and sees_price) for r in regs]
+        # Die interne Notiz gehört der Turnierleitung (#2127): der Vorstand sieht die Teilnehmer, aber nicht sie - auch die
+        # Leitungsseite bleibt ihm verschlossen.
+        if not (is_staff or "tournaments" in areas):
+            for row in rows:
+                row.pop("internal_note", None)
         # Öffentlich steht die Warteliste für sich (#2127, EV10): „Angemeldet“ nennt nur, wer einen Platz hat - auch in
         # der App, die nur `registrations` liest. Die Verwaltung bekommt alle Stände in einer Liste.
         event["registrations"] = rows if manages else [row for row in rows if row["status"] != "waitlist"]

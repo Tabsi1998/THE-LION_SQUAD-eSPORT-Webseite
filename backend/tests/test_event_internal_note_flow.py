@@ -50,3 +50,29 @@ async def test_neuanmeldung_nach_storno_zeigt_die_notiz_nicht(flow):
     # Die Notiz selbst bleibt für die Leitung.
     stored = await flow.db.event_registrations.find_one({"id": first["id"]}, {"_id": 0})
     assert stored["internal_note"] == "nur intern"
+
+
+@pytest.mark.asyncio
+async def test_vorstand_sieht_teilnehmer_aber_nicht_die_notiz(flow):
+    lead, event, _player, first = await setup(flow)
+    written = await flow.patch(f"/api/events/{event['id']}/registrations/{first['id']}", json={"internal_note": "nur intern"})
+    assert written.status_code == 200, written.text
+
+    vorstand = await flow.add_user(role="player", name="vorstand")
+    await flow.db.users.update_one({"id": vorstand["id"]}, {"$set": {"areas": ["club"]}})
+    vorstand["areas"] = ["club"]
+    flow.act_as(vorstand)
+    page = await flow.get(f"/api/events/{event['slug']}")
+    assert page.status_code == 200, page.text
+    assert page.json()["participant_view"] == "staff" and len(page.json()["registrations"]) == 1
+    assert "internal_note" not in page.json()["registrations"][0] and "nur intern" not in page.text
+    assert (await flow.get(f"/api/events/{event['slug']}/lead")).status_code == 403
+
+    # Die Turnierleitung sieht sie weiter - als Rolle und als Freigabe.
+    flow.act_as(lead)
+    assert (await flow.get(f"/api/events/{event['slug']}")).json()["registrations"][0]["internal_note"] == "nur intern"
+    freigabe = await flow.add_user(role="player", name="freigabe")
+    await flow.db.users.update_one({"id": freigabe["id"]}, {"$set": {"areas": ["tournaments"]}})
+    freigabe["areas"] = ["tournaments"]
+    flow.act_as(freigabe)
+    assert (await flow.get(f"/api/events/{event['slug']}")).json()["registrations"][0]["internal_note"] == "nur intern"
