@@ -294,6 +294,38 @@ async def test_search_links_players_to_their_encoded_profile(flow):
     assert {row["url"] for row in rows} == {"/u/alte%20schule", "/u/neonfalke"}
 
 
+# ---------------------------------------------------------------- Review: Wortfilter beim Anlegen
+async def block_word(flow, word="schimpfwort"):
+    from services import word_filter
+
+    await word_filter.save_config(flow.db, enabled=True, entries=[word_filter.clean_entry(word, "hold")])
+
+
+@pytest.mark.asyncio
+async def test_app_registration_uses_the_word_filter(flow, monkeypatch):
+    monkeypatch.setenv("JWT_SECRET", "nur-fuer-tests-" + "x" * 40)
+    await block_word(flow)
+    flow.act_as(None)
+    body = {"email": "neu@verein-beispiel.at", "password": "Lange-Passphrase-2026!", "accept_privacy": True, "accept_terms": True}
+    refused = await flow.post("/api/auth/mobile/register", json={**body, "username": "schimpfwort"})
+    assert refused.status_code == 400 and "Benutzername" in refused.json()["detail"]
+    assert await flow.db.users.find_one({"email": "neu@verein-beispiel.at"}) is None
+    assert (await flow.db.moderation_items.find_one({"kind": "username"}))["state"] == "rejected"
+    fine = await flow.post("/api/auth/mobile/register", json={**body, "username": "neonfalke"})
+    assert fine.status_code == 200, fine.text
+    assert (await flow.db.users.find_one({"username": "neonfalke"}))["id"]
+
+
+@pytest.mark.asyncio
+async def test_google_name_with_a_blocked_word_gets_a_neutral_name(flow):
+    from routes.auth_routes import _google_names
+
+    await block_word(flow)
+    assert await _google_names(flow.db, "Paula Pixel", "p@verein-beispiel.at") == ("Paula_Pixel", "Paula Pixel")
+    assert await _google_names(flow.db, "Schimpfwort Meier", "p@verein-beispiel.at") == ("player", "player")
+    assert await _google_names(flow.db, None, "schimpfwort@verein-beispiel.at") == ("player", "player")
+
+
 # ---------------------------------------------------------------- Zusatz: Dokumente
 @pytest.mark.asyncio
 async def test_members_never_see_where_a_document_is_stored(flow):

@@ -818,6 +818,18 @@ async def _unique_username(db, base: str) -> str:
     return candidate
 
 
+async def _google_names(db, name: str | None, email: str) -> tuple[str, str | None]:
+    """Benutzername und Anzeigename für ein neues Google-Konto (#2126). Den Namen hat die Person nicht hier getippt: Ein
+    Treffer im Wortfilter weist sie nicht ab, sondern gibt ihr einen neutralen Namen, den sie im Profil ändern kann."""
+    from services import word_filter
+    username = await _unique_username(db, name or email.split("@")[0])
+    verdict = await word_filter.check_text(db, f"{name or ''} {username}")
+    if verdict["action"] != "hold":
+        return username, name
+    username = await _unique_username(db, "player")
+    return username, username
+
+
 def _google_user_doc(email: str, name: str, picture: str | None, google_id: str | None, username: str) -> dict:
     display = (name or username).strip() or username
     ts = now_utc().isoformat()
@@ -883,8 +895,8 @@ async def google_session(body: GoogleCredentialBody, request: Request, response:
             raise HTTPException(status_code=403, detail="Die Registrierung mit Google ist derzeit deaktiviert.")
         if not body.accept_privacy or not body.accept_terms:
             raise HTTPException(status_code=400, detail="Datenschutz und Nutzungsbedingungen müssen akzeptiert werden.")
-        username = await _unique_username(db, data.get("name") or email.split("@")[0])
-        user = _google_user_doc(email, data.get("name"), data.get("picture"), google_id, username)
+        username, display_name = await _google_names(db, data.get("name"), email)
+        user = _google_user_doc(email, display_name, data.get("picture"), google_id, username)
         user.update({
             "accepted_privacy": True,
             "accepted_terms": True,
@@ -1000,8 +1012,12 @@ async def mobile_register(body: UserRegister, request: Request):
         raise HTTPException(status_code=409, detail="E-Mail bereits registriert")
     if await username_taken(db, username):
         raise HTTPException(status_code=409, detail="Benutzername bereits vergeben")
+    user_id = new_id()
+    # Wortfilter (#417, #2126): dieselbe Prüfung wie bei der Registrierung im Web.
+    from services import word_filter
+    await word_filter.screen_field(db, username, kind="username", user_id=user_id, ref_id=user_id)
     user_doc = {
-        "id": new_id(),
+        "id": user_id,
         "email": email,
         "username": username,
         **password_fields(body.password),
