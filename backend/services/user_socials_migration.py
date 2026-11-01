@@ -74,4 +74,21 @@ async def migrate(db, keep_lease: Callable[[], Awaitable[bool]] | None = None) -
             await db.users.update_one({"id": user["id"]}, {"$set": {field: value, "profile_visibility": visibility}})
             moved += 1
         await db.user_socials.delete_one({"_id": row["_id"]})
-    return f"{moved} moved, {same} already in the profile, {kept} kept, {dropped} empty or without account removed"
+    linked = await _keep_linked_tiktok_public(db)
+    return (f"{moved} moved, {same} already in the profile, {kept} kept, {dropped} empty or without account removed, "
+            f"{linked} linked TikTok kept public")
+
+
+async def _keep_linked_tiktok_public(db) -> int:
+    """Was öffentlich war, bleibt es (#2113): Ein verknüpftes TikTok stand mit Häkchen im Profil, auch ohne wählbare Stufe.
+    Da TikTok ohne Stufe jetzt privat ist, bekommen diese Konten einmalig ``public``. Eine gewählte Stufe bleibt; wer erst
+    nach dieser Migration verknüpft, folgt der Vorgabe „privat“, bis die Person wählt."""
+    count = 0
+    query = {"platform_verified.tiktok": True, "anonymized_at": {"$in": [None, ""]}}
+    async for user in db.users.find(query, {"_id": 0, "id": 1, "profile_visibility": 1}):
+        levels = user.get("profile_visibility") if isinstance(user.get("profile_visibility"), dict) else {}
+        if {"tiktok", "tiktok_handle"} & set(levels):
+            continue
+        await db.users.update_one({"id": user["id"]}, {"$set": {"profile_visibility": {**levels, "tiktok": "public"}}})
+        count += 1
+    return count

@@ -41,7 +41,7 @@ async def test_rows_move_into_the_profile_fields_with_their_visibility(flow):
     await _social(flow, "gibt-es-nicht", "github", "waise")      # ohne Konto: weg
 
     result = await user_socials_migration.migrate(flow.db)
-    assert result == "3 moved, 1 already in the profile, 2 kept, 1 empty or without account removed"
+    assert result == "3 moved, 1 already in the profile, 2 kept, 1 empty or without account removed, 0 linked TikTok kept public"
 
     stored = await flow.db.users.find_one({"id": person["id"]}, {"_id": 0})
     assert stored["youtube_handle"] == "kanal"
@@ -56,7 +56,7 @@ async def test_rows_move_into_the_profile_fields_with_their_visibility(flow):
 
     # Mehrfach ausführbar: nichts ändert sich mehr.
     again = await user_socials_migration.migrate(flow.db)
-    assert again == "0 moved, 0 already in the profile, 2 kept, 0 empty or without account removed"
+    assert again == "0 moved, 0 already in the profile, 2 kept, 0 empty or without account removed, 0 linked TikTok kept public"
     assert (await flow.db.users.find_one({"id": person["id"]}))["twitch_handle"] == "gepflegt"
 
 
@@ -139,7 +139,7 @@ async def test_rows_of_deleted_accounts_simply_go(flow):
     await _social(flow, person["id"], "youtube", "alt")
     await _social(flow, person["id"], "myspace", "alt")
     result = await user_socials_migration.migrate(flow.db)
-    assert result == "0 moved, 0 already in the profile, 0 kept, 2 empty or without account removed"
+    assert result == "0 moved, 0 already in the profile, 0 kept, 2 empty or without account removed, 0 linked TikTok kept public"
     stored = await flow.db.users.find_one({"id": person["id"]}, {"_id": 0})
     assert "youtube_handle" not in stored
     assert await flow.db.user_socials.count_documents({"user_id": person["id"]}) == 0
@@ -210,3 +210,63 @@ async def test_migration_keeps_what_was_already_public_for_tiktok(flow):
     assert await _tiktok_seen_by_guest(flow, same) == "gleich"
     assert not await _tiktok_seen_by_guest(flow, hidden)
     assert not await _tiktok_seen_by_guest(flow, chosen)
+
+
+async def _guest_profile(flow, person):
+    flow.act_as(None)
+    return (await flow.get(f"/api/users/public/{person['username']}")).json()
+
+
+@pytest.mark.asyncio
+async def test_linked_tiktok_without_a_level_stays_public_with_its_check_mark(flow):
+    """Was öffentlich war, bleibt es: ein verknüpftes TikTok stand schon mit Häkchen im Profil."""
+    person = await _public_person(flow, tiktok_handle="verknuepft", platform_verified={"tiktok": True}, profile_visibility=None)
+    await flow.db.platform_links.insert_one({"id": new_id(), "user_id": person["id"], "platform": "tiktok", "external_id": "tt-1", "handle": "verknuepft"})
+    # Vor der Migration greift schon die Vorgabe „privat“.
+    assert "tiktok" not in (await _guest_profile(flow, person))["verified_platforms"]
+
+    first = await user_socials_migration.migrate(flow.db)
+    assert first.endswith("1 linked TikTok kept public")
+    profile = await _guest_profile(flow, person)
+    assert profile["tiktok_handle"] == "verknuepft"
+    assert "tiktok" in profile["verified_platforms"]
+    assert [row["platform"] for row in profile["linked_accounts"]] == ["tiktok"]
+
+    # Idempotent: Eine danach bewusst gewählte Stufe überschreibt ein zweiter Lauf nicht.
+    await flow.db.users.update_one({"id": person["id"]}, {"$set": {"profile_visibility": {"tiktok": "private"}}})
+    second = await user_socials_migration.migrate(flow.db)
+    assert second.endswith("0 linked TikTok kept public")
+    assert (await flow.db.users.find_one({"id": person["id"]}))["profile_visibility"] == {"tiktok": "private"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("key", ["tiktok", "tiktok_handle"])
+async def test_linked_tiktok_with_a_chosen_level_stays_as_chosen(flow, key):
+    person = await _public_person(flow, tiktok_handle="verknuepft", platform_verified={"tiktok": True}, profile_visibility={key: "private", "email": "members"})
+    await user_socials_migration.migrate(flow.db)
+    assert (await flow.db.users.find_one({"id": person["id"]}))["profile_visibility"] == {key: "private", "email": "members"}
+    profile = await _guest_profile(flow, person)
+    assert not profile.get("tiktok_handle") and "tiktok" not in profile["verified_platforms"]
+
+
+@pytest.mark.asyncio
+async def test_typed_handle_without_a_link_stays_private(flow):
+    person = await _public_person(flow, tiktok_handle="nur_getippt")
+    await user_socials_migration.migrate(flow.db)
+    assert "tiktok" not in ((await flow.db.users.find_one({"id": person["id"]})).get("profile_visibility") or {})
+    assert not (await _guest_profile(flow, person)).get("tiktok_handle")
+
+
+@pytest.mark.asyncio
+async def test_linking_after_the_migration_follows_the_private_default(flow):
+    await user_socials_migration.migrate(flow.db)
+    person = await _public_person(flow, tiktok_handle="spaeter", platform_verified={"tiktok": True})
+    profile = await _guest_profile(flow, person)
+    assert not profile.get("tiktok_handle") and "tiktok" not in profile["verified_platforms"]
+
+
+@pytest.mark.asyncio
+async def test_deleted_account_with_a_link_gets_no_level(flow):
+    person = await _public_person(flow, platform_verified={"tiktok": True}, anonymized_at="2026-10-01T10:00:00+00:00")
+    await user_socials_migration.migrate(flow.db)
+    assert "profile_visibility" not in await flow.db.users.find_one({"id": person["id"]}, {"_id": 0, "profile_visibility": 1})
