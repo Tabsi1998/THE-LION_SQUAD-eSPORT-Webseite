@@ -219,3 +219,28 @@ async def test_league_squad_without_captain_the_lead_changes_the_contact(flow):
     assert (await _stored(flow, registration))["discord"] == "neu"
     flow.act_as(captain)
     assert (await flow.get(f"/api/tournaments/{tournament['id']}/my-registration")).status_code == 404
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", ["registration_closed", "check_in"])
+async def test_fixed_matches_end_self_edit_like_unregistering(flow, status):
+    """Feste Spiele vor dem Check-in-Ende (Gruppen generiert, Schweizer Runde): gleiche Grenze wie beim Abmelden."""
+    tournament, registration, _player = await _solo(flow, status=status)
+    await flow.db.matches_v2.insert_one({"id": new_id(), "tournament_id": tournament["id"], "status": "scheduled",
+                                         "slots": [{"registration_id": registration["id"]}]})
+    view = (await flow.get(f"/api/tournaments/{tournament['id']}/my-registration")).json()
+    assert view["can_edit"] is False and "festen Spielen" in view["reason"]
+    refused = await flow.patch(f"/api/tournaments/{tournament['id']}/my-registration", json={"ingame_name": "Neu", "player_ids": {"riot": "Z#9"}})
+    assert refused.status_code == 409 and "festen Spielen" in refused.json()["detail"]
+    stored = await _stored(flow, registration)
+    assert stored["ingame_name"] == "AlterName" and stored["player_ids"]["riot"] == "Alt#EUW"
+    unregister = await flow.delete(f"/api/tournaments/{tournament['id']}/registrations/{registration['id']}")
+    assert unregister.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_preview_matches_do_not_end_self_edit(flow):
+    tournament, registration, _player = await _solo(flow)
+    await flow.db.matches_v2.insert_one({"id": new_id(), "tournament_id": tournament["id"], "status": "preview", "is_preview": True,
+                                         "slots": [{"registration_id": registration["id"]}]})
+    assert (await flow.get(f"/api/tournaments/{tournament['id']}/my-registration")).json()["can_edit"] is True

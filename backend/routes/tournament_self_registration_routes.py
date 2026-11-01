@@ -25,7 +25,7 @@ from routes.tournament_common import (
 )
 from routes.tournament_registration_routes import WAITLIST_MOVE_UP_STATUSES, _check_in_over
 from routes.tournament_router import router
-from services import word_filter
+from services import tournament_guard, word_filter
 from services.league_scope import is_league_staffel
 from services.match_audience import responsible_ids, responsible_registration, teams_by_id
 
@@ -44,7 +44,7 @@ class RegistrationSelfUpdate(BaseModel):
     player_ids: dict[str, str] | None = None
 
 
-def _edit_block_reason(tournament: dict, registration: dict) -> str | None:
+async def _edit_block_reason(db, tournament: dict, registration: dict) -> str | None:
     """Warum die Anmeldung nicht mehr selbst geändert werden kann - ``None``, solange es geht."""
     status = registration.get("status")
     if status == "checked_in":
@@ -55,6 +55,9 @@ def _edit_block_reason(tournament: dict, registration: dict) -> str | None:
         return "Das Turnier läuft schon – Änderungen macht jetzt die Turnierleitung."
     if _check_in_over(tournament):
         return "Der Check-in ist vorbei – Änderungen macht jetzt die Turnierleitung."
+    # Dieselbe Grenze wie beim Abmelden: wer schon in festen Spielen steht (Gruppen, Schweizer Runde), ändert nicht mehr.
+    if await tournament_guard.fixed_match_count(db, tournament["id"], registration["id"]):
+        return "Du stehst schon in festen Spielen dieses Turniers – Änderungen macht jetzt die Turnierleitung."
     return None
 
 
@@ -99,7 +102,7 @@ async def _view(db, tournament: dict, registration: dict, me: dict) -> dict:
     game = await _game_of(db, tournament)
     league = is_league_staffel(tournament)
     leads = await _leads_registration(db, registration, me)
-    reason = _edit_block_reason(tournament, registration) if leads else ONLY_LEADERSHIP
+    reason = await _edit_block_reason(db, tournament, registration) if leads else ONLY_LEADERSHIP
     # Nur wer ändern darf, sieht die IDs und den Discord-Kontakt der Anmeldung.
     private = {"discord": registration.get("discord"), "player_ids": registration.get("player_ids") or {}} if leads else {}
     return {
@@ -141,7 +144,7 @@ async def update_my_registration(tid: str, body: RegistrationSelfUpdate, me: dic
         raise HTTPException(status_code=404, detail=NOT_YOURS)
     if not await _leads_registration(db, registration, me):
         raise HTTPException(status_code=403, detail=ONLY_LEADERSHIP)
-    blocked = _edit_block_reason(tournament, registration)
+    blocked = await _edit_block_reason(db, tournament, registration)
     if blocked:
         raise HTTPException(status_code=409, detail=blocked)
 
