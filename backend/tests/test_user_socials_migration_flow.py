@@ -143,3 +143,17 @@ async def test_rows_of_deleted_accounts_simply_go(flow):
     stored = await flow.db.users.find_one({"id": person["id"]}, {"_id": 0})
     assert "youtube_handle" not in stored
     assert await flow.db.user_socials.count_documents({"user_id": person["id"]}) == 0
+
+
+@pytest.mark.asyncio
+async def test_tiktok_stays_on_the_public_profile_and_follows_its_level(flow):
+    """Altdaten ziehen auch für TikTok um - das öffentliche Profil muss das Feld zeigen, mit eigener Stufe."""
+    person = await flow.add_user(name=f"person-{new_id()[:6]}")
+    await flow.db.users.update_one({"id": person["id"]}, {"$set": {"privacy_public_profile": True}})
+    await _social(flow, person["id"], "tiktok", "tt_oeffentlich")
+    await user_socials_migration.migrate(flow.db)
+    flow.act_as(None)
+    assert (await flow.get(f"/api/users/public/{person['username']}")).json()["tiktok_handle"] == "tt_oeffentlich"
+    for key in ("tiktok", "tiktok_handle"):
+        await flow.db.users.update_one({"id": person["id"]}, {"$set": {"profile_visibility": {key: "members"}}})
+        assert not (await flow.get(f"/api/users/public/{person['username']}")).json().get("tiktok_handle")

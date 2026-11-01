@@ -23,7 +23,7 @@ test("unterschiedliche Stufen in einer Gruppe heissen gemischt", () => {
 test("jedes der 39 Felder steht in genau einer Gruppe", () => {
   const keys = VISIBILITY_GROUPS.flatMap((group) => group.fields.map((field) => field.k));
   expect(new Set(keys).size).toBe(keys.length);
-  expect(keys).toHaveLength(39);
+  expect(keys).toHaveLength(40);
 });
 
 // Abgehakte Plattformen (#558) fehlen in der Sichtbarkeit; ohne Liste bleibt alles wie es ist.
@@ -33,7 +33,7 @@ test("abgehakte Plattformen fallen aus den Gruppen, leere Gruppen verschwinden",
   const keys = groups.flatMap((group) => group.fields.map((field) => field.k));
   expect(keys).not.toContain("twitch");
   expect(keys).not.toContain("psn");
-  expect(keys).toHaveLength(37);
+  expect(keys).toHaveLength(38);
   const socialKeys = VISIBILITY_GROUPS.find((group) => group.k === "social").fields.map((field) => field.k);
   expect(visibilityGroupsFor(socialKeys).some((group) => group.k === "social")).toBe(false);
 });

@@ -63,6 +63,7 @@ export const VISIBILITY_GROUPS = [
       { k: "twitch", l: "Twitch" },
       { k: "youtube", l: "YouTube" },
       { k: "instagram", l: "Instagram" },
+      { k: "tiktok", l: "TikTok" },
       { k: "x", l: "X / Twitter" },
       { k: "github", l: "GitHub" },
       { k: "kick", l: "Kick" },
