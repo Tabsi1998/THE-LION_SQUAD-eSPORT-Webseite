@@ -82,6 +82,69 @@ async def test_event_am_turnier_ohne_interne_felder(flow):
     assert admin
 
 
+INTERNAL_ON_COMPETITION = {
+    "billing": PAID, "created_by": "leitung-1", "updated_by": "leitung-1", "creation_key": "schluessel", "locked_by": "leitung-1", "slug_history": ["alt"],
+    "discord_skip": False, "discord_registration": True, "discord_thread": {"thread_id": "1"}, "discord_thread_by_guild": {"1": {}}, "discord_bracket_embed": {"message_id": "2"},
+    "discord_checked_at": "2026-01-01T10:00:00+00:00", "discord_outcome": "sent", "discord_scheduled_event": {"id": "3"}, "newsletter_sent_at": "2026-01-01T10:00:00+00:00",
+    "newsletter_sent_count": 9, "members_notified_at": "2026-01-01T10:00:00+00:00", "members_notified_count": 2, "heat_rebuild_plan": {"id": "4"},
+    "heat_rebuild_pending": True, "participant_removal_plan": {"id": "5"},
+}
+
+
+async def stored_competitions(flow):
+    """Turnier und Fast Lap am Event, im Stand der Datenbank - mit dem, was Verwaltung und Hintergrund-Jobs daran schreiben."""
+    start = (now_utc() + timedelta(hours=2)).isoformat()
+    common = {"status": "scheduled", "visibility": "public", "event_id": "ev-1", "start_date": start, **INTERNAL_ON_COMPETITION}
+    await flow.db.tournaments.insert_one({"id": "t-1", "slug": "kart-cup", "title": "Kart-Cup", "is_public": True, "team_mode": "solo", "format": "single_elim",
+                                          "max_participants": 16, "discord_link": "https://example.test/server", **common})
+    await flow.db.f1_challenges.insert_one({"id": "f-1", "slug": "lan-lap", "title": "LAN-Lap", **common})
+
+
+def assert_competition_clean(row):
+    assert set(INTERNAL_ON_COMPETITION).isdisjoint(row), sorted(set(INTERNAL_ON_COMPETITION) & set(row))
+
+
+@pytest.mark.asyncio
+async def test_gast_sieht_keine_internen_felder_an_turnieren_und_fast_laps(flow):
+    await stored_event(flow)
+    await stored_competitions(flow)
+    flow.act_as(None)
+
+    state = (await flow.get("/api/home/state")).json()
+    tournaments = [row for group in ("live", "today", "soon", "upcoming") for row in state[group]["tournaments"]]
+    challenges = [row for group in ("live", "today", "soon", "upcoming") for row in state[group]["challenges"]]
+    assert tournaments and challenges
+    for row in [*tournaments, *challenges]:
+        assert_competition_clean(row)
+        # Was die Startseite liest, bleibt.
+        assert row["id"] and row["slug"] and row["title"] and row["start_date"] and row["status"] == "scheduled"
+        assert row["public_phase"]["state"] and row["event_id"] == "ev-1" and row["live_counts"] is not None
+    assert tournaments[0]["live_counts"]["capacity"] == 16 and challenges[0]["event"]["name"] == "Herbst-LAN"
+
+    page = (await flow.get("/api/events/herbst-lan")).json()
+    assert [row["id"] for row in page["tournaments"]] == ["t-1"] and [row["id"] for row in page["f1_challenges"]] == ["f-1"]
+    for row in [*page["tournaments"], *page["f1_challenges"]]:
+        assert_competition_clean(row)
+        assert row["public_phase"] and "event_day" in row
+    # Was „Was läuft beim Event“ in Web und App liest, bleibt; der Link zum Discord-Server auch.
+    cup = page["tournaments"][0]
+    assert (cup["team_mode"], cup["format"], cup["max_participants"], cup["discord_link"]) == ("solo", "single_elim", 16, "https://example.test/server")
+
+
+@pytest.mark.asyncio
+async def test_turnierleitung_sieht_am_event_weiter_alles(flow):
+    await stored_event(flow)
+    await stored_competitions(flow)
+    member = await flow.add_user(role="player", name="mitglied")
+    flow.act_as(member)
+    assert_competition_clean((await flow.get("/api/events/herbst-lan")).json()["tournaments"][0])
+    lead = await flow.add_user(role="tournament_admin", name="leitung")
+    flow.act_as(lead)
+    assert (await flow.get("/api/events/herbst-lan")).json()["tournaments"][0]["created_by"] == "leitung-1"
+    # Die Startseite ist für alle dieselbe.
+    assert_competition_clean((await flow.get("/api/home/state")).json()["upcoming"]["tournaments"][0])
+
+
 @pytest.mark.asyncio
 async def test_verwaltung_sieht_weiter_alles_mitglieder_nicht(flow):
     await stored_event(flow)

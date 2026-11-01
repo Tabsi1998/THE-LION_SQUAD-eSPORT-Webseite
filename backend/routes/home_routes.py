@@ -22,7 +22,7 @@ from services.visibility import user_can_see
 from services.news_cards import attach_result_winners
 from services.news_publish import public_news
 from services import event_days
-from services.event_public import public_event
+from services.event_public import public_competition, public_event
 from services.league_scope import NOT_LEAGUE
 from services.public_phase import derive_public_phase
 
@@ -111,7 +111,7 @@ async def _filter_rows(rows, user, kind: str | None = None):
         if not await user_can_see(user, r.get("visibility")):
             continue
         row = _normalize_status(r, kind)
-        out.append(public_event(row) if kind == "event" else row)
+        out.append(public_event(row) if kind == "event" else public_competition(row))
     return out
 
 

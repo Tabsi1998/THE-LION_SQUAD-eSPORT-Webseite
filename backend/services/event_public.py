@@ -27,3 +27,23 @@ def public_event(event: dict, *, keep_internal: bool = False, finance: bool = Fa
         if not finance:
             del out["billing"]
     return out
+
+
+# Turniere und Fast Laps auf der Startseite und an der Event-Seite: Web und App lesen dort Titel, Termine, Status, Spielart
+# und Plätze. Der Stand der Hintergrund-Jobs (Discord, Newsletter, Meldungen, Umplanen) und die Abrechnung gehören nicht dazu;
+# das Startgeld zeigen die Turnierseite und „Spielst du auch mit?“ über ihre eigenen Wege. Den Link zum Discord-Server eines
+# Turniers liest die Turnierseite - er bleibt.
+INTERNAL_COMPETITION_FIELDS = frozenset({"billing", "created_by", "updated_by", "creation_key", "locked_by", "slug_history", "participant_removal_plan"})
+INTERNAL_COMPETITION_PREFIXES = ("discord_", "newsletter_", "members_notified_", "heat_rebuild_")
+PUBLIC_DISCORD_FIELDS = frozenset({"discord_link"})
+
+
+def _internal_competition_field(key: str) -> bool:
+    if key in PUBLIC_DISCORD_FIELDS:
+        return False
+    return key in INTERNAL_COMPETITION_FIELDS or key.startswith(INTERNAL_COMPETITION_PREFIXES)
+
+
+def public_competition(doc: dict) -> dict:
+    """Ein Turnier oder eine Fast Lap für diese öffentlichen Wege; das übergebene Dokument bleibt, wie es ist."""
+    return {key: value for key, value in (doc or {}).items() if not _internal_competition_field(key)}

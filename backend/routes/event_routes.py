@@ -18,7 +18,7 @@ from services import partner_pages
 from services.notification_preferences import enqueue_newsletter_for_item
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from services import billing_orders, event_changes, event_days, event_facts, event_locations, event_notifications, event_play_along, event_program, event_registration, event_rewards, pricing
-from services.event_public import public_event
+from services.event_public import public_competition, public_event
 from services.event_registration import RegistrationError
 from services.mutation_lock import MutationLockBusy, mutation_lock
 from services.change_events import reset_scope_cache
@@ -677,6 +677,9 @@ async def get_event(slug_or_id: str, include_draft: bool = False, access: str | 
     if access_link:
         await touch_access_link(db, access_link, user)
         event["access_link"] = public_access_link_payload(access_link)
+    if not is_admin:
+        event["tournaments"] = [public_competition(row) for row in event["tournaments"]]
+        event["f1_challenges"] = [public_competition(row) for row in event["f1_challenges"]]
     return public_event(event, keep_internal=is_admin, finance=finance)
 
 
