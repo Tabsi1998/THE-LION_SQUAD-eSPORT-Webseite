@@ -303,9 +303,13 @@ test.describe("Abnahme #1930: Runde mit Läufen - Ablauf je Runde", () => {
       await anon.getByTestId("racing-table-sprint").click();
       const sprintRows = anon.getByTestId("racing-drivers").getByTestId("series-table").getByTestId("series-row");
       await expect(sprintRows).toHaveCount(6);
+      // Die Punkte zählen beim ersten Sichtbarwerden hoch (#1969): solange steht der Zwischenwert (aria-hidden) neben dem
+      // Endwert im Text, „8“ und „18“. Gezählt wird nur der Endwert - auch für Zeilen, die noch nicht im Bild waren.
       const sprintTotals = await sprintRows.evaluateAll((items) => items.map((row) => {
         const cells = row.querySelectorAll("td");
-        return Number(cells[cells.length - 2].textContent);
+        const points = cells[cells.length - 2].cloneNode(true);
+        points.querySelectorAll('[aria-hidden="true"]').forEach((node) => node.remove());
+        return Number(points.textContent);
       }));
       expect(sprintTotals).toEqual([18, 18, 16, 13, 12, 9]);
       await shot(anon.getByTestId("racing-drivers"), "nachher-sprint-tabelle-1440");
