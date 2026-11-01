@@ -211,7 +211,7 @@ def _device_identity(request: Request) -> dict:
 
 def _eligible_session_user(user: dict | None) -> dict:
     if not user:
-        raise HTTPException(status_code=401, detail="User not found")
+        raise HTTPException(status_code=401, detail="Dieses Konto gibt es nicht mehr.")
     if user.get("is_active") is False:
         raise HTTPException(status_code=403, detail="Account deaktiviert")
     if user.get("is_banned"):
