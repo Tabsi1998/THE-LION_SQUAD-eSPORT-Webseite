@@ -578,6 +578,9 @@ async def admin_rotate_media(filename: str, body: RotateMediaBody, me: dict = De
     ext = p.suffix.lower()
     if ext not in {".png", ".jpg", ".jpeg", ".webp"}:
         raise HTTPException(400, "Dieses Bildformat kann hier nicht gedreht werden.")
+    if filename.startswith(sponsor_images.PREFIX):
+        # Der nächste Abgleich holte das Bild unverändert zurück.
+        raise HTTPException(409, "Dieses Bild kommt aus der Mitgliederverwaltung. Bitte dort ändern.")
     degrees = int(round((body.degrees or 0) / 90) * 90)
     if degrees % 360 == 0:
         stat = p.stat()

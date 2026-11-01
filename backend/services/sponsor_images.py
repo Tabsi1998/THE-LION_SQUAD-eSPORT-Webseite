@@ -18,6 +18,7 @@ import hashlib
 import logging
 from urllib.parse import urlparse
 
+from services.media_formats import bare_upload_url
 from storage import UPLOAD_DIR
 
 logger = logging.getLogger("tls.sponsor_images")
@@ -75,7 +76,7 @@ def admin_summary(doc: dict) -> dict:
 
 
 def _name_of(entry: dict | None) -> str:
-    url = str((entry or {}).get("url") or "")
+    url = bare_upload_url((entry or {}).get("url"))
     return url.rsplit("/", 1)[-1] if url.startswith("/api/static/uploads/") else ""
 
 

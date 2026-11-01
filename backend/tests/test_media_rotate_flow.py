@@ -15,7 +15,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
 from routes import phase_fg_routes  # noqa: E402
-from services import image_variants, league_look, media_audit, photo_cutout, series_logo  # noqa: E402
+from services import image_variants, league_look, media_audit, photo_cutout, series_logo, sponsor_images  # noqa: E402
 
 UPLOADS = "/api/static/uploads/"
 NAME = "hochkant.webp"
@@ -145,6 +145,30 @@ async def test_an_animated_image_is_not_turned_into_a_still(flow, public):
     assert response.status_code == 400
     assert "Animierte" in response.json()["detail"]
     assert (public / "tanz.webp").read_bytes() == before
+
+
+@pytest.mark.asyncio
+async def test_an_image_from_the_member_system_cannot_be_rotated(flow, public):
+    await admin(flow)
+    name = f"{sponsor_images.PREFIX}1-logo-dark-abc.webp"
+    Image.new("RGB", (40, 20), (255, 0, 0)).save(public / name, format="WEBP")
+    before = (public / name).read_bytes()
+
+    response = await flow.post(f"/api/admin/media/{name}/rotate", json={"degrees": 90})
+
+    assert response.status_code == 409
+    assert "Mitgliederverwaltung" in response.json()["detail"]
+    assert (public / name).read_bytes() == before
+
+
+def test_the_sync_recognises_its_file_behind_a_version(tmp_path, monkeypatch):
+    monkeypatch.setattr(sponsor_images, "UPLOAD_DIR", tmp_path)
+    name = f"{sponsor_images.PREFIX}1-logo-dark-abc.png"
+    (tmp_path / name).write_bytes(b"bild")
+    entry = {"url": f"{UPLOADS}{name}?v=123"}
+
+    assert sponsor_images._name_of(entry) == name
+    assert sponsor_images._stored(entry) is True
 
 
 @pytest.mark.asyncio
