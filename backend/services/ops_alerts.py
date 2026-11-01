@@ -448,11 +448,11 @@ async def purge_old_logs(db, *, now: datetime | None = None) -> dict:
     cutoff = (current - timedelta(days=settings["retention_days"]["audit_logs"])).isoformat()
     result = await db.event_messages.delete_many({"created_at": {"$lt": cutoff}})
     removed["event_messages"] = int(getattr(result, "deleted_count", 0) or 0)
-    # An der Tür Eingetragene (#2127, EV17): kein Konto, über das sich der Name löschen ließe. Nach derselben Frist bleibt
-    # nur die Zählung.
+    # An der Tür Eingetragene (#2127, EV17): kein Konto, über das sich Name und Notizen löschen ließen. Nach derselben Frist
+    # bleibt nur die Zählung.
     result = await db.event_registrations.update_many(
         {"walk_in": True, "created_at": {"$lt": cutoff}, "anonymized_at": None},
-        {"$set": {"display_name": "Teilnehmer", "anonymized_at": current.isoformat()}},
+        {"$set": {"display_name": "Teilnehmer", "note": None, "internal_note": None, "anonymized_at": current.isoformat()}},
     )
     removed["walk_in_names"] = int(getattr(result, "modified_count", 0) or 0)
     old_alerts = (current - timedelta(days=365)).isoformat()
