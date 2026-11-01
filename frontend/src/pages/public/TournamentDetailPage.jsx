@@ -316,16 +316,16 @@ function TournamentDetailView() {
   // Ein zugeteiltes Co-Team (#1649, #2110) nimmt nur die Turnierleitung heraus - statt „Abmelden“ steht der Hinweis.
   const leagueSquad = Boolean(myReg?.squad_id);
   const canSelfUnregister = !leagueSquad && !!myReg && (myReg.user_id === user?.id || myRegTeam?.can_manage || ["leader", "co_leader"].includes(myRegTeam?.my_role)) && !["checked_in", "no_show", "rejected"].includes(myReg.status) && !["live", "paused", "completed", "results_published", "archived"].includes(t.status);
+  const podiumRows = standings.filter((row) => row && !Array.isArray(row.standings) && Number(row.rank) >= 1 && Number(row.rank) <= 3);
+  const nextStep = timelineSteps(t).find((step) => step.next) || null;
+  const finished = ["completed", "results_published", "archived"].includes(t.status);
+  const subPage = (part) => `/tournaments/${t.slug || t.id}/${part}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`;
   // Eigene Anmeldung (#2113): wer sie führt - die Person selbst, bei Teams Kapitän und Co-Kapitän. Eine abgelehnte nimmt
   // sie selbst weg, solange das Turnier nicht läuft (dieselbe Grenze wie beim Server).
   const leadsMyTeam = ["leader", "co_leader"].includes(myRegTeam?.my_role);
   const editsMyReg = !!myReg && (myReg.team_id ? leadsMyTeam : myReg.user_id === user?.id);
   const respondsForMyReg = !!myReg && (myReg.user_id === user?.id || leadsMyTeam || !!myRegTeam?.can_manage);
   const canRemoveRejected = !leagueSquad && respondsForMyReg && myReg?.status === "rejected" && !["live", "paused", "completed", "results_published", "archived"].includes(t.status);
-  const podiumRows = standings.filter((row) => row && !Array.isArray(row.standings) && Number(row.rank) >= 1 && Number(row.rank) <= 3);
-  const nextStep = timelineSteps(t).find((step) => step.next) || null;
-  const finished = ["completed", "results_published", "archived"].includes(t.status);
-  const subPage = (part) => `/tournaments/${t.slug || t.id}/${part}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`;
   // Check-in-Ende (#2124): dieselbe Regel wie „Dein Stand“, die App und der Server - danach kein Knopf mehr.
   const checkIn = checkInState(t);
   const checkinNow = !!myReg && canCheckIn && myReg.status === "approved" && checkIn.open;

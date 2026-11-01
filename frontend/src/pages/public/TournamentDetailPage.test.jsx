@@ -70,6 +70,50 @@ test("Discord-Server zum Spiel (#626): Kachel mit Status; ohne Server keine Kach
   expect(screen.queryByTestId("game-discord-tile")).toBeNull();
 });
 
+// Abgelehnt (#2113, L-C3): Hinweis und „Anmeldung entfernen“ - danach ist der Weg zur neuen Anmeldung frei.
+test("abgelehnte Anmeldung: entfernen führt zurück zu „Jetzt anmelden“", async () => {
+  let rows = [{ id: "r1", tournament_id: "t1", user_id: "u1", status: "rejected" }];
+  apiMock.get.mockImplementation((path) => {
+    if (path === "/tournaments/cup") return Promise.resolve({ data: base });
+    if (path === "/tournaments/t1/registrations") return Promise.resolve({ data: rows });
+    return Promise.resolve({ data: [] });
+  });
+  apiMock.delete.mockImplementation(async () => { rows = []; return { data: { ok: true } }; });
+  renderPage();
+  expect(await screen.findByTestId("tournament-rejected-note")).toHaveTextContent("abgelehnt");
+  expect(screen.queryByTestId("tournament-unregister-btn")).toBeNull();
+  fireEvent.click(screen.getByTestId("tournament-remove-rejected"));
+  await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith("/tournaments/t1/registrations/r1"));
+  expect(await screen.findByTestId("tournament-register-btn")).toBeInTheDocument();
+  expect(screen.queryByTestId("tournament-my-stand")).toBeNull();
+});
+
+// Angaben ändern (#2113, L-A2): nur für die Person selbst bzw. die Teamleitung - ein Teammitglied sieht den Hinweis.
+test("Angaben ändern: Link für die eigene Anmeldung, Teammitglied bekommt nur den Hinweis", async () => {
+  apiMock.get.mockImplementation((path) => {
+    if (path === "/tournaments/cup") return Promise.resolve({ data: base });
+    if (path === "/tournaments/t1/registrations") return Promise.resolve({ data: [{ id: "r1", tournament_id: "t1", user_id: "u1", status: "approved" }] });
+    if (path === "/tournaments/t1/my-registration") return Promise.resolve({ data: { can_edit: true, fields: [], ingame_name: "Paula" } });
+    return Promise.resolve({ data: [] });
+  });
+  const { unmount } = renderPage();
+  expect(await screen.findByTestId("my-registration-edit")).toHaveTextContent("Angaben ändern");
+  unmount();
+
+  const team = { ...base, team_mode: "team", team_size: 2 };
+  apiMock.get.mockClear();
+  apiMock.get.mockImplementation((path) => {
+    if (path === "/tournaments/cup") return Promise.resolve({ data: { ...team, status: "live" } });
+    if (path === "/tournaments/t1/registrations") return Promise.resolve({ data: [{ id: "r2", tournament_id: "t1", team_id: "tm1", is_mine: true, status: "approved" }] });
+    if (path === "/teams/my") return Promise.resolve({ data: [{ id: "tm1", name: "Rudel", my_role: "member" }] });
+    return Promise.resolve({ data: [] });
+  });
+  renderPage();
+  expect(await screen.findByTestId("tournament-unregister-note")).toHaveTextContent("kann nur die Teamleitung");
+  expect(screen.queryByTestId("my-registration-edit")).toBeNull();
+  expect(apiMock.get).not.toHaveBeenCalledWith("/tournaments/t1/my-registration", expect.anything());
+});
+
 // Map-Pool (#1616): mit Spiel lädt die Seite die Pools und zeigt sie als Karten; ohne Spiel fragt sie gar nicht.
 test("Map-Pool des Turniers erscheint mit Spiel, ein Cup ohne Spiel fragt nicht danach", async () => {
   mockApi(base);
@@ -650,47 +694,4 @@ test("vor Ort (#2124, Review O4): nach dem Check-in-Ende bleibt bis zum Start �
   renderPage();
   expect(await screen.findByTestId("tournament-checkin-local")).toBeDisabled();
   expect(screen.queryByTestId("tournament-checkin-over")).toBeNull();
-});
-// Abgelehnt (#2113, L-C3): Hinweis und „Anmeldung entfernen“ - danach ist der Weg zur neuen Anmeldung frei.
-test("abgelehnte Anmeldung: entfernen führt zurück zu „Jetzt anmelden“", async () => {
-  let rows = [{ id: "r1", tournament_id: "t1", user_id: "u1", status: "rejected" }];
-  apiMock.get.mockImplementation((path) => {
-    if (path === "/tournaments/cup") return Promise.resolve({ data: base });
-    if (path === "/tournaments/t1/registrations") return Promise.resolve({ data: rows });
-    return Promise.resolve({ data: [] });
-  });
-  apiMock.delete.mockImplementation(async () => { rows = []; return { data: { ok: true } }; });
-  renderPage();
-  expect(await screen.findByTestId("tournament-rejected-note")).toHaveTextContent("abgelehnt");
-  expect(screen.queryByTestId("tournament-unregister-btn")).toBeNull();
-  fireEvent.click(screen.getByTestId("tournament-remove-rejected"));
-  await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith("/tournaments/t1/registrations/r1"));
-  expect(await screen.findByTestId("tournament-register-btn")).toBeInTheDocument();
-  expect(screen.queryByTestId("tournament-my-stand")).toBeNull();
-});
-
-// Angaben ändern (#2113, L-A2): nur für die Person selbst bzw. die Teamleitung - ein Teammitglied sieht den Hinweis.
-test("Angaben ändern: Link für die eigene Anmeldung, Teammitglied bekommt nur den Hinweis", async () => {
-  apiMock.get.mockImplementation((path) => {
-    if (path === "/tournaments/cup") return Promise.resolve({ data: base });
-    if (path === "/tournaments/t1/registrations") return Promise.resolve({ data: [{ id: "r1", tournament_id: "t1", user_id: "u1", status: "approved" }] });
-    if (path === "/tournaments/t1/my-registration") return Promise.resolve({ data: { can_edit: true, fields: [], ingame_name: "Paula" } });
-    return Promise.resolve({ data: [] });
-  });
-  const { unmount } = renderPage();
-  expect(await screen.findByTestId("my-registration-edit")).toHaveTextContent("Angaben ändern");
-  unmount();
-
-  const team = { ...base, team_mode: "team", team_size: 2 };
-  apiMock.get.mockClear();
-  apiMock.get.mockImplementation((path) => {
-    if (path === "/tournaments/cup") return Promise.resolve({ data: { ...team, status: "live" } });
-    if (path === "/tournaments/t1/registrations") return Promise.resolve({ data: [{ id: "r2", tournament_id: "t1", team_id: "tm1", is_mine: true, status: "approved" }] });
-    if (path === "/teams/my") return Promise.resolve({ data: [{ id: "tm1", name: "Rudel", my_role: "member" }] });
-    return Promise.resolve({ data: [] });
-  });
-  renderPage();
-  expect(await screen.findByTestId("tournament-unregister-note")).toHaveTextContent("kann nur die Teamleitung");
-  expect(screen.queryByTestId("my-registration-edit")).toBeNull();
-  expect(apiMock.get).not.toHaveBeenCalledWith("/tournaments/t1/my-registration", expect.anything());
 });
