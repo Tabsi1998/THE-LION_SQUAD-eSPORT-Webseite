@@ -14,6 +14,7 @@ Zustände je Datei:
 """
 from __future__ import annotations
 
+import asyncio
 import pathlib
 import re
 from collections import defaultdict
@@ -26,6 +27,7 @@ VARIANT_RE = re.compile(r"^(?P<stem>.+)-(?P<width>\d{3,4})\.webp$")
 TEXT_IMAGE_RE = re.compile(r"!\[[^\]\n]*\]\((?P<md>[^)\s]+)\)|<img\b[^>]*\bsrc=[\"'](?P<html>[^\"']+)[\"']", re.IGNORECASE)
 URL_IN_TEXT_RE = re.compile(r"[^\s\"'()<>\[\]]*uploads/[^\s\"'()<>\[\]]+")
 SCAN_LIMIT = 50000   # je Sammlung; darüber wird die Sammlung als „nur teilweise“ vermerkt
+YIELD_EVERY = 200
 AREA_LABELS = {
     "public": "öffentliche Medien (public)",
     "variants": "Vorschaubilder (public/variants)",
@@ -131,6 +133,9 @@ async def collect_references(db, known_names: set[str], *, complete: bool = Fals
         count = 0
         async for document in db[collection].find({}, {"_id": 0}):
             count += 1
+            if complete and count % YIELD_EVERY == 0:
+                # Der volle Durchlauf läuft im Serverprozess: Zwischendurch kommen andere Anfragen an die Reihe.
+                await asyncio.sleep(0)
             if not complete and count > SCAN_LIMIT:
                 partial.append(collection)
                 break

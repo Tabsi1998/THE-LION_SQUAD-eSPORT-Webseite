@@ -171,6 +171,9 @@ Uhr des Servers.
 - Überall, wo ein Bild gewählt wird (Banner, Album, Sponsorenlogo …), könnt ihr neu hochladen **oder aus den schon hochgeladenen
   Medien wählen**, mit Suche und **Mehr laden**.
 
+**Löschen** prüft vorher auch Stellen, die „Verwendet in“ nicht aufzählt, etwa die Map in einem gespeicherten Ergebnisblatt. Zeigt so eine
+Stelle die Datei noch, fragt die Mediathek nach; bestätigt ihr, fehlt das Bild dort danach.
+
 **Aufräumen** – beides fragt vorher nach und steht im Protokoll:
 
 - **Ungenutzte löschen** nennt, wie viele Dateien und wie viel Platz es sind. Beim Löschen prüft der Server jede Datei noch einmal,

@@ -176,24 +176,40 @@ export default function AdminMediaPage() {
     const used = (it.usage_count || 0) > 0;
     const places = [...new Set((it.references || []).map((ref) => ref.place || `${ref.collection}.${ref.field}`))].join(", ");
     const description = used
-      ? `"${it.filename}" wird noch verwendet (${it.usage_count}x${places ? `: ${places}` : ""}). Diese Bildfelder werden geleert; Bilder in Texten bleiben als toter Verweis stehen.`
+      ? `"${it.filename}" wird noch verwendet (${it.usage_count}x${places ? `: ${places}` : ""}). Diese Bildfelder werden geleert; Bilder in Texten bleiben als toter Verweis stehen. Gespeicherte Ergebnisse, die die Datei zeigen, verlieren das Bild.`
       : `"${it.filename}" wird nirgends verwendet und wird aus der Medienbibliothek entfernt.`;
     if (!await confirm({ title: used ? "Verwendete Datei löschen?" : "Datei endgültig löschen?", description, confirmLabel: used ? "Trotzdem löschen" : "Löschen" })) return;
     const previous = items;
-    setItems((rows) => rows.filter((row) => row.filename !== it.filename));
-    setSelected(null);
-    try {
-      const { data } = await api.delete(`/admin/media/${encodeURIComponent(it.filename)}${used ? "?force=true" : ""}`);
+    const remove = async (force) => {
+      setItems((rows) => rows.filter((row) => row.filename !== it.filename));
+      setSelected(null);
+      const { data } = await api.delete(`/admin/media/${encodeURIComponent(it.filename)}${force ? "?force=true" : ""}`);
       const cleared = data?.cleared_references ? `, ${data.cleared_references} Verknüpfung(en) bereinigt` : "";
       const inText = data?.text_references ? `, ${data.text_references} Verweis(e) in Texten bitte von Hand anpassen` : "";
       const later = data?.file_pending ? " (die Datei selbst wird beim nächsten Aufräumen entfernt)" : "";
       toast.success(`Datei gelöscht${later}${cleared}${inText}`);
-      load();
-    } catch (e) {
+    };
+    const failed = (e) => {
       setItems(previous);
       toast.error(formatApiError(e.response?.data?.detail) || "Löschen fehlgeschlagen");
-      load();
+    };
+    try {
+      await remove(used);
+    } catch (e) {
+      // Der Server kennt mehr Stellen als die Liste, etwa gespeicherte Ergebnisse (#2122): Rückfrage wie bei jeder Verwendung.
+      if (e.response?.status === 409 && !used) {
+        setItems(previous);
+        const asked = await confirm({
+          title: "Verwendete Datei löschen?",
+          description: `${formatApiError(e.response.data?.detail)} Dort fehlt das Bild danach.`,
+          confirmLabel: "Trotzdem löschen",
+        });
+        if (asked) await remove(true).catch(failed);
+      } else {
+        failed(e);
+      }
     }
+    load();
   };
 
   const copyUrl = async (it) => {

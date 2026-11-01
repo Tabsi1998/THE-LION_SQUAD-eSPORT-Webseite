@@ -115,6 +115,29 @@ test("Drehen fragt nach, nennt die Stellen und übernimmt Adresse und Maße (#21
   expect(screen.getByTestId("media-sheet")).toHaveTextContent("loewe.png?v=7");
 });
 
+test("Löschen: Zeigt der Server eine weitere Stelle, kommt die Rückfrage, gelöscht wird erst danach (#2122)", async () => {
+  const taken = { response: { status: 409, data: { detail: "Die Datei wird noch gezeigt (Ergebnisblatt). Zum Löschen bitte bestätigen." } } };
+  apiMock.delete.mockReset();
+  apiMock.delete.mockRejectedValueOnce(taken);
+  render(<MemoryRouter><AdminMediaPage /></MemoryRouter>);
+
+  // Abgelehnt: Die Datei bleibt, es gibt keinen zweiten Aufruf.
+  confirmMock.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+  fireEvent.click(await screen.findByTestId("media-tile-frei.png"));
+  fireEvent.click(screen.getByTestId("media-delete"));
+  await waitFor(() => expect(confirmMock.mock.calls.at(-1)[0].description).toContain("Ergebnisblatt"));
+  expect(confirmMock.mock.calls.at(-1)[0].title).toBe("Verwendete Datei löschen?");
+  expect(apiMock.delete).toHaveBeenCalledTimes(1);
+  expect(await screen.findByTestId("media-tile-frei.png")).toBeInTheDocument();
+
+  // Bestätigt: jetzt mit force.
+  apiMock.delete.mockRejectedValueOnce(taken).mockResolvedValueOnce({ data: { ok: true } });
+  fireEvent.click(screen.getByTestId("media-tile-frei.png"));
+  fireEvent.click(screen.getByTestId("media-delete"));
+  await waitFor(() => expect(apiMock.delete).toHaveBeenLastCalledWith("/admin/media/frei.png?force=true"));
+  expect(apiMock.delete).toHaveBeenCalledTimes(3);
+});
+
 test("Ungenutzte löschen: erst die Rückfrage mit Zahl und Größe, dann genau diese Dateien (#2122)", async () => {
   apiMock.post.mockReset();
   apiMock.post.mockResolvedValue({ data: { ok: true, deleted: 2, skipped: 1, file_pending: 0 } });

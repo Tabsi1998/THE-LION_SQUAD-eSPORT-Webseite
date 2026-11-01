@@ -97,6 +97,57 @@ async def test_a_file_used_anywhere_counts_as_used_in_the_media_library(flow, pu
 
 
 @pytest.mark.asyncio
+async def test_a_file_shown_only_outside_the_known_places_needs_confirmation(flow, public):
+    chef = await admin(flow)
+    await flow.db.reference_round_results.insert_one({"id": "r-1", "games": [{"map_id": "m", "image_url": URL + "?v=1"}]})
+    await flow.db.league_games.insert_one({"id": "g-1", "map_image_url": URL})
+    await flow.db.neue_sammlung.insert_one({"id": "x-1", "tief": [{"bild": UPLOADS + "variants/genutzt-400.webp"}]})
+    # Verwaltung und Protokolle zeigen nichts.
+    await flow.db.audit_logs.insert_one({"id": "a-1", "action": "media.rotate", "data": {"filename": "frei.webp"}})
+    await flow.db.upload_events.insert_one({"id": "u-1", "result": {"url": UPLOADS + "frei.webp"}})
+
+    refused = await flow.delete(f"/api/admin/media/{NAME}")
+
+    assert refused.status_code == 409
+    detail = refused.json()["detail"]
+    assert "Ergebnisblatt" in detail and "Liga-Spiel" in detail and "an anderer Stelle" in detail
+    assert "neue_sammlung" not in detail and "reference_round_results" not in detail
+    assert (public / NAME).exists()
+
+    # Bleibt möglich, mit Rückfrage in der Oberfläche; was dort steht, wird nicht umgeschrieben.
+    forced = await flow.delete(f"/api/admin/media/{NAME}?force=true")
+    assert forced.status_code == 200, forced.text
+    assert not (public / NAME).exists()
+    assert (await flow.db.league_games.find_one({"id": "g-1"}))["map_image_url"] == URL
+    log = await flow.db.audit_logs.find_one({"action": "media.delete", "target_id": NAME})
+    assert log["actor_id"] == chef["id"] and log["data"]["force"] is True
+
+    free = await flow.delete("/api/admin/media/frei.webp")
+    assert free.status_code == 200, free.text
+
+
+@pytest.mark.asyncio
+async def test_all_collections_are_only_read_when_the_answer_is_still_open(flow, public, monkeypatch):
+    await admin(flow)
+    await flow.db.news_posts.insert_one({"id": "n-1", "banner_url": URL})
+    reads: list[set] = []
+    real = media_audit.referenced_in
+
+    async def counting(db, names):
+        reads.append(names)
+        return await real(db, names)
+
+    monkeypatch.setattr(media_audit, "referenced_in", counting)
+
+    used = await flow.delete(f"/api/admin/media/{NAME}")
+    forced = await flow.delete(f"/api/admin/media/{NAME}?force=true")
+    assert used.status_code == 409 and forced.status_code == 200 and reads == []
+
+    free = await flow.delete("/api/admin/media/frei.webp")
+    assert free.status_code == 200 and reads == [{"frei.webp"}]
+
+
+@pytest.mark.asyncio
 async def test_the_png_next_to_an_svg_logo_counts_as_the_logo(flow, public):
     await admin(flow)
     (public / "logo.svg").write_bytes(b"<svg/>")

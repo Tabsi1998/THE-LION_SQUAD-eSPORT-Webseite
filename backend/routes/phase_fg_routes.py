@@ -655,16 +655,21 @@ async def admin_rotate_media(filename: str, body: RotateMediaBody, me: dict = De
 async def admin_delete_media(filename: str, force: bool = False, me: dict = Depends(require_area("content"))):
     """Delete a file from upload dir. Path-traversal protected.
 
-    Eine verwendete Datei nur mit ``force`` (#1471): Die Mediathek fragt vorher nach. Erst werden die Bildfelder
-    geleert, die auf sie zeigen, dann die Datei gelöscht - scheitert das, holt der Aufräum-Job es nach. Jede Löschung
-    steht im Protokoll."""
+    Eine verwendete Datei nur mit ``force`` (#1471): Die Mediathek fragt vorher nach. Das gilt auch für Stellen außerhalb
+    der Verwendungsstellen, etwa die Map in einem gespeicherten Ergebnisblatt (#2122) - dafür liest dieser Klick alle
+    Sammlungen, außer eine bekannte Stelle hat die Frage schon beantwortet. Erst werden die Bildfelder geleert, die auf
+    sie zeigen, dann die Datei gelöscht - scheitert das, holt der Aufräum-Job es nach. Jede Löschung steht im Protokoll."""
     _media_file_path(filename)
+    db = get_db()
     if not force:
         usage = (await _collect_media_usage({filename}))[filename]
         if usage:
             places = ", ".join(sorted({ref["place"] for ref in usage}))
             raise HTTPException(409, f"Die Datei wird noch verwendet ({places}). Zum Löschen bitte bestätigen.")
-    db = get_db()
+        elsewhere = (await media_audit.referenced_in(db, {filename})).get(filename)
+        if elsewhere:
+            places = ", ".join(sorted({media_audit.other_place_label(collection) for collection in elsewhere}))
+            raise HTTPException(409, f"Die Datei wird noch gezeigt ({places}). Zum Löschen bitte bestätigen.")
     cleared_refs, text_refs = await _clear_media_references(filename)
     error = await account_erasure.remove_upload(db, filename)
     await db.audit_logs.insert_one({

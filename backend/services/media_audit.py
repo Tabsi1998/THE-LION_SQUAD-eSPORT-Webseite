@@ -121,6 +121,8 @@ PLACE_LABELS = {
 }
 # Verwaltung und Protokolle: Ein Eintrag hier sagt nur, dass es die Datei gibt oder gab - gezeigt wird sie dadurch nicht.
 NOT_A_USAGE = {"media_uploads", "media_scans", "upload_events", "audit_logs", "pending_file_cleanups"}
+# Stände von damals: Sie zeigen das Bild, stehen aber bewusst nicht in den Verwendungsstellen (siehe oben, ``game_maps``).
+SNAPSHOT_LABELS = {"reference_round_results": "Ergebnisblatt", "league_games": "Liga-Spiel", "tournament_awards": "Preis"}
 # Wo neben der Adresse auch die Maße stehen: gedreht tauschen sie mit (#2122).
 SIZE_FIELDS = {
     ("gallery_photos", "image_url"): ("width", "height"),
@@ -374,19 +376,30 @@ async def repoint_usages(db, filename: str, target_url: str, stamp: dict | None 
 
 
 async def still_referenced(db, names: set[str]) -> set[str]:
-    """Das Netz unter den bekannten Stellen (``usage_places``): Bevor die Mediathek in Masse löscht, liest sie alle
-    Sammlungen einmal durch (#2122). Steht eine Datei in einem Feld, das noch niemand eingetragen hat, bleibt sie."""
+    """Die Dateien aus ``names``, auf die noch etwas zeigt (``referenced_in``)."""
+    return set(await referenced_in(db, names))
+
+
+def other_place_label(collection: str) -> str:
+    """Der lesbare Name einer Stelle außerhalb der Verwendungsstellen - nie der rohe Sammlungsname."""
+    return SNAPSHOT_LABELS.get(collection) or COLLECTION_LABELS.get(collection) or "an anderer Stelle"
+
+
+async def referenced_in(db, names: set[str]) -> dict[str, set[str]]:
+    """Das Netz unter den bekannten Stellen (``usage_places``): Datei → Sammlungen, die auf sie zeigen. Vor dem Löschen
+    liest die Mediathek alle Sammlungen einmal durch (#2122) - nur auf Klick, das kostet. Steht eine Datei in einem Feld,
+    das noch niemand eingetragen hat, oder in einem gespeicherten Stand von damals, wird sie nicht still gelöscht."""
     if not names:
-        return set()
+        return {}
     stems = {pathlib.PurePosixPath(name).stem: name for name in names}
     png_twins = {f"{stem}.png" for stem, name in stems.items() if name.lower().endswith(".svg")}
     # Vollständig: Davon hängt ab, ob eine Datei gelöscht wird. Dafür bleiben Verwaltung und Protokolle ungelesen.
     references, _partial = await uploads_inventory.collect_references(db, set(names) | png_twins, complete=True, skip=NOT_A_USAGE)
-    found: set[str] = set()
-    for name in references:
+    found: dict[str, set[str]] = {}
+    for name, rows in references.items():
         target = _canonical_of(name, stems)
         if target in names:
-            found.add(target)
+            found.setdefault(target, set()).update(row["collection"] for row in rows)
     return found
 
 
