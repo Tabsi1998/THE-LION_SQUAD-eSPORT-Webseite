@@ -28,6 +28,7 @@ from models import (EventCreate, EventUpdate, EventPlayAlongCreate, EventRegistr
                     EventRegistrationUpdate, now_utc, new_id)
 
 router = APIRouter(prefix="/api/events", tags=["events"])
+admin_router = APIRouter(prefix="/api/admin/events", tags=["events"])
 # Events gehören zur Turnierleitung (Bereich „tournaments“); Moderatoren moderieren.
 STAFF_ROLES = {"tournament_admin", "club_admin", "superadmin"}
 LEGACY_SPONSOR_TIERS = {"supporter": "bronze", "partner": "bronze"}
@@ -482,8 +483,16 @@ async def list_events(
             "start_date": 1, "end_date": 1, "location": 1, "has_registration": 1, "registration_url": 1,
             "max_participants": 1, "days": 1,
         }
-    fetch_limit = max(200, min(max(int(limit or 48), 1) + max(int(offset or 0), 0) + 80, 500))
-    events = await db.events.find(q, projection).sort("start_date", 1 if upcoming else -1).to_list(fetch_limit)
+    # Die Verwaltungsliste blättert in der Datenbank (#2127, EV19): sie sieht alle Events, auch das 201. und ältere.
+    managed_page = paged and include_drafts and is_admin and not compact and not upcoming
+    if managed_page:
+        safe_limit = max(1, min(int(limit or 48), 200))
+        safe_offset = max(0, int(offset or 0))
+        total = await db.events.count_documents(q)
+        events = await db.events.find(q, projection).sort("start_date", -1).skip(safe_offset).limit(safe_limit).to_list(safe_limit)
+    else:
+        fetch_limit = max(200, min(max(int(limit or 48), 1) + max(int(offset or 0), 0) + 80, 500))
+        events = await db.events.find(q, projection).sort("start_date", 1 if upcoming else -1).to_list(fetch_limit)
     if upcoming:
         now = datetime.now(timezone.utc)
         fresh = []
@@ -513,8 +522,28 @@ async def list_events(
         counts = await event_changes.active_registration_counts(db, [ev["id"] for ev in out])
         for ev in out:
             ev["active_registration_count"] = counts.get(ev["id"], 0)
+        if managed_page:
+            return {"items": out, "total": total, "limit": safe_limit, "offset": safe_offset}
         return out
     return [public_event(ev, finance=finance) for ev in out]
+
+
+@admin_router.get("/{event_id}")
+async def admin_get_event(event_id: str, me: dict = Depends(require_admin())):
+    """Ein Event für die Bearbeiten-Seite (#2127, EV19) - einzeln, damit auch ältere als die ersten der Liste zu öffnen
+    sind. Dieselben Felder wie die Verwaltungsliste; die Abrechnung nur für Finanzen."""
+    db = get_db()
+    event = await db.events.find_one({"id": event_id}, {"_id": 0})
+    if not event:
+        raise HTTPException(status_code=404, detail="Event nicht gefunden")
+    offer = event.pop("billing", None)
+    event["offer"] = pricing.public_offer(offer)
+    if await can_use_area(me, "finance"):
+        event["billing"] = offer or pricing.normalize_offer(None)
+    await _decorate_event(event)
+    counts = await event_changes.active_registration_counts(db, [event["id"]])
+    event["active_registration_count"] = counts.get(event["id"], 0)
+    return event
 
 
 @router.get("/meta")

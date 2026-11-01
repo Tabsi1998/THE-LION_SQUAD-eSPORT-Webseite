@@ -63,6 +63,7 @@ async function mockAdmin(page, created) {
     statuses: [{ k: "scheduled", l: "Angekündigt" }],
     visibilities: [{ k: "public", l: "Öffentlich", short: "Alle" }, { k: "members", l: "Nur Vereinsmitglieder", short: "Mitglieder" }],
   })));
+  await page.route("**/api/admin/events/ev-next", (route) => route.fulfill(json(EVENTS[1])));
   await page.route("**/api/events/ev-next/program", (route) => route.fulfill(json(PROGRAM)));
   await page.route("**/api/events/ev-next/tournaments", async (route) => {
     created.push(route.request().postDataJSON());

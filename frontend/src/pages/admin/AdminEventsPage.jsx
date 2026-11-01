@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, formatRequestError } from "@/lib/api";
 import { eventTypeLabel } from "@/lib/eventTypes";
@@ -16,10 +16,15 @@ import { affectedRegistrations, deleteConfirmText, eventIsOver, visibilityWord }
 // `/admin/events/:id`) statt eines Fensters über der Liste - mit Zurück im Browser und Links aus
 // dem Dashboard. Die Anmeldungen stehen seit #1372 auf der Arbeitsseite /events/<slug>/leitung (Suche, Einlass,
 // Nachricht an alle) - „Anm.“ führt dorthin.
+const PAGE_SIZE = 100;
+
 export default function AdminEventsPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [list, setList] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const pagesRef = useRef(1);
   const [meta, setMeta] = useState({ types: [], statuses: [], visibilities: [] });
   const [creatingRecapId, setCreatingRecapId] = useState(null);
   const [query, setQuery] = useState(searchParams.get("q") || "");
@@ -28,10 +33,33 @@ export default function AdminEventsPage() {
   const [visibilityFilter, setVisibilityFilter] = useState(searchParams.get("visibility") || "");
   const confirm = useConfirm();
 
+  // Blättern (#2127, EV19): erst die neuesten, „Weitere laden“ holt die nächsten. Nachladen bei einer Änderung holt dieselbe
+  // Menge wie vorher, damit die Liste nicht wieder zusammenschrumpft.
   const load = useCallback(async () => {
-    const { data } = await api.get("/events?include_drafts=true");
-    setList(data);
+    const rows = [];
+    let count = 0;
+    for (let page = 0; page < pagesRef.current; page += 1) {
+      const { data } = await api.get(`/events?include_drafts=true&paged=true&limit=${PAGE_SIZE}&offset=${page * PAGE_SIZE}`);
+      const items = Array.isArray(data) ? data : data?.items || [];
+      rows.push(...items);
+      count = Array.isArray(data) ? items.length : Number(data?.total) || items.length;
+      if (!items.length || rows.length >= count) break;
+    }
+    setList(rows);
+    setTotal(count);
   }, []);
+  const loadMore = async () => {
+    pagesRef.current += 1;
+    setLoadingMore(true);
+    try {
+      await load();
+    } catch (err) {
+      pagesRef.current -= 1;
+      toast.error(formatRequestError(err, "Weitere Events ließen sich nicht laden."));
+    } finally {
+      setLoadingMore(false);
+    }
+  };
   useEffect(() => {
     load();
     api.get("/events/meta").then(({ data }) => setMeta(data)).catch(() => {});
@@ -218,7 +246,10 @@ export default function AdminEventsPage() {
               <Download className="h-3.5 w-3.5" /> CSV
             </button>
           </div>
-          <div className="mt-2 text-xs text-white/45">{filteredList.length} / {list.length} Events sichtbar</div>
+          <div className="mt-2 text-xs text-white/45" data-testid="events-admin-count">
+            {filteredList.length} / {list.length} Events sichtbar
+            {total > list.length ? ` – ${total} insgesamt, Suche und Filter gelten für die geladenen` : ""}
+          </div>
         </div>
       )}
 
@@ -319,6 +350,13 @@ export default function AdminEventsPage() {
             </table>
           </div>
         </div>
+        {total > list.length && (
+          <div className="mt-4 text-center">
+            <button type="button" onClick={loadMore} disabled={loadingMore} data-testid="events-admin-more" className="tls-btn tls-btn--secondary min-h-[44px] px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+              {loadingMore ? "Wird geladen …" : `Weitere laden (noch ${total - list.length})`}
+            </button>
+          </div>
+        )}
         </>
       )}
     </AdminLayout>

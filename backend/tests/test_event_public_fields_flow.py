@@ -139,6 +139,41 @@ async def test_abgesagt_steht_bis_zum_termin_in_kommend(flow):
     assert not state["upcoming"]["events"], "die Startseite bleibt bei dem, was ansteht"
 
 
+@pytest.mark.asyncio
+async def test_verwaltung_oeffnet_auch_das_201_event_und_blaettert(flow):
+    """EV19: Einzelabruf für die Bearbeiten-Seite wie bei den News, die Liste blättert in der Datenbank."""
+    base = now_utc() + timedelta(days=30)
+    await flow.db.events.insert_many([
+        {"id": f"ev-{index}", "slug": f"event-{index}", "name": f"Event {index}", "status": "draft" if index % 2 else "scheduled", "visibility": "public",
+         "start_date": (base - timedelta(days=index)).isoformat()}
+        for index in range(205)
+    ])
+    lead = await flow.add_user(role="tournament_admin", name="leitung")
+    flow.act_as(lead)
+
+    # Ohne Blättern bleibt die Antwort eine Liste (andere Verwaltungsseiten lesen sie so).
+    assert isinstance((await flow.get("/api/events", params={"include_drafts": "true"})).json(), list)
+    # Das älteste einzeln - mit dem, was das Formular braucht.
+    single = await flow.get("/api/admin/events/ev-204")
+    assert single.status_code == 200, single.text
+    body = single.json()
+    assert body["name"] == "Event 204" and body["active_registration_count"] == 0 and body["registration_summary"] is not None and "schedule" in body
+    assert "billing" not in body, "die Abrechnung nur für Finanzen"
+    assert (await flow.get("/api/admin/events/gibt-es-nicht")).status_code == 404
+
+    page = (await flow.get("/api/events", params={"include_drafts": "true", "paged": "true", "limit": 100, "offset": 200})).json()
+    assert page["total"] == 205 and page["offset"] == 200 and len(page["items"]) == 5
+    assert page["items"][-1]["id"] == "ev-204" and page["items"][-1]["active_registration_count"] == 0
+
+    member = await flow.add_user(role="player", name="mitglied")
+    flow.act_as(member)
+    assert (await flow.get("/api/admin/events/ev-204")).status_code == 403
+    flow.act_as(None)
+    assert (await flow.get("/api/admin/events/ev-204")).status_code == 401
+    # Ohne Leitung gibt es keine Verwaltungs-Seite: die öffentliche Liste bleibt, wie sie ist.
+    assert isinstance((await flow.get("/api/events", params={"include_drafts": "true", "paged": "true"})).json(), list)
+
+
 def test_die_uebergebene_fassung_bleibt_unveraendert():
     doc = {"id": "e", "created_by": "x", "billing": PAID}
     view = public_event(doc)

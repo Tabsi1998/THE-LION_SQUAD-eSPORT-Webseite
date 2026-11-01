@@ -63,11 +63,10 @@ export default function AdminEventEditPage() {
     let cancelled = false;
     setEvent(null);
     setMissing(false);
-    // Dieselben Daten wie die Liste - so ist das Formular mit dem Stand in der Übersicht identisch.
-    api.get("/events?include_drafts=true").then(({ data }) => {
+    // Einzeln (#2127, EV19): auch ein Event, das nicht unter den ersten der Liste steht, lässt sich öffnen.
+    api.get(`/admin/events/${encodeURIComponent(id)}`).then(({ data }) => {
       if (cancelled) return;
-      const found = (data || []).find((item) => item.id === id);
-      if (found) setEvent(found);
+      if (data?.id) setEvent(data);
       else setMissing(true);
     }).catch(() => { if (!cancelled) setMissing(true); });
     return () => { cancelled = true; };
