@@ -26,6 +26,14 @@ logger = logging.getLogger("tls.documents")
 # Moderatoren und die Turnierleitung sehen sie als Mitglied. Gesperrte Downloads öffnet, wer die Vereinsverwaltung hat
 # (Rolle, Freigabe, Vorstandsposten, #2125), wie jeder Adminbereich nur mit bestätigter Zwei-Faktor-Anmeldung (#1469).
 UNLOCK_AREA = "club"
+LOCAL_UPLOAD_PREFIXES = ("/api/static/uploads/", "/uploads/")
+
+
+def _refuse_new_upload_address(file_url: str | None, previous: dict | None = None) -> None:
+    """Neue Dateien laufen über den Upload (``storage_key``); eine alte Upload-Adresse bleibt nur unverändert stehen."""
+    address = str(file_url or "").strip()
+    if address.startswith(LOCAL_UPLOAD_PREFIXES) and address != (previous or {}).get("file_url"):
+        raise HTTPException(400, "Lade die Datei bitte über „Datei hochladen“ hoch.")
 
 
 def _normalise_visibility(value: str | None) -> str:
@@ -57,6 +65,9 @@ async def _file_still_needed(db, doc: dict, path: pathlib.Path) -> bool:
         return True
     if doc.get("storage_key"):
         return False
+    # Eine Datei aus der Mediathek gehört nicht dem Dokument.
+    if await db.media_uploads.find_one({"filename": name}, {"_id": 1}):
+        return True
     return bool(await still_referenced(db, {name}))
 
 
@@ -287,6 +298,7 @@ async def admin_list_documents(me: dict = Depends(require_area("club"))):
 async def create_document(body: DocumentCreate, me: dict = Depends(require_area("club"))):
     db = get_db()
     doc = body.model_dump()
+    _refuse_new_upload_address(doc.get("file_url"))
     doc["visibility"] = _normalise_visibility(doc.get("visibility"))
     doc["id"] = new_id()
     doc["created_at"] = now_utc().isoformat()
@@ -320,6 +332,8 @@ async def update_document(doc_id: str, body: DocumentUpdate, me: dict = Depends(
     previous = await db.documents.find_one({"id": doc_id}, {"_id": 0})
     if not previous:
         raise HTTPException(404, "Dokument nicht gefunden.")
+    if "file_url" in raw:
+        _refuse_new_upload_address(raw.get("file_url"), previous)
     await db.documents.update_one({"id": doc_id}, {"$set": update})
     updated = await db.documents.find_one({"id": doc_id}, {"_id": 0})
     # Eine neue Datei ersetzt die alte: die alte bleibt sonst unbemerkt liegen.

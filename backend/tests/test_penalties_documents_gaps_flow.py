@@ -256,6 +256,41 @@ async def test_a_link_in_a_text_keeps_an_old_file(flow, monkeypatch, tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_documents_only_delete_their_own_files(flow, monkeypatch, tmp_path):
+    from routes import document_routes
+
+    uploads = tmp_path / "alt"
+    uploads.mkdir()
+    monkeypatch.setattr(document_routes, "UPLOAD_DIR", uploads)
+    (uploads / "fremd.webp").write_bytes(b"x")
+    (uploads / "mediathek.pdf").write_bytes(b"x")
+    flow.act_as(await chair_of(flow))
+    for address in ("/api/static/uploads/fremd.webp", " /api/static/uploads/fremd.webp", "/uploads/fremd.webp"):
+        created = await flow.post("/api/documents", json={"title": "Fremd", "category": "other", "file_url": address})
+        assert created.status_code == 400, address
+    assert await flow.db.documents.count_documents({}) == 0
+
+    # Eine alte Adresse darf bleiben, aber keine andere an ihre Stelle treten.
+    legacy = {"id": new_id(), "title": "Alt", "file_url": "/api/static/uploads/mediathek.pdf"}
+    await flow.db.documents.insert_one(dict(legacy))
+    await flow.db.media_uploads.insert_one({"filename": "mediathek.pdf", "url": "/api/static/uploads/mediathek.pdf"})
+    same = await flow.patch(f"/api/documents/{legacy['id']}", json={"file_url": legacy["file_url"], "title": "Neu"})
+    assert same.status_code == 200, same.text
+    other = await flow.patch(f"/api/documents/{legacy['id']}", json={"file_url": "/api/static/uploads/fremd.webp"})
+    assert other.status_code == 400
+    assert (await flow.db.documents.find_one({"id": legacy["id"]}))["file_url"] == legacy["file_url"]
+
+    # Steht die Datei in der Mediathek, bleibt sie.
+    removed = await flow.delete(f"/api/documents/{legacy['id']}")
+    assert removed.json()["file_removed"] is False
+    assert (uploads / "mediathek.pdf").exists() and (uploads / "fremd.webp").exists()
+
+    # Externe Adressen bleiben erlaubt.
+    outside = await flow.post("/api/documents", json={"title": "Extern", "category": "other", "file_url": "https://example.test/uploads/a.pdf"})
+    assert outside.status_code == 200
+
+
+@pytest.mark.asyncio
 async def test_only_the_club_area_changes_documents(flow, doc_dir):
     doc = await stored_doc(flow, doc_dir)
     flow.act_as(await flow.add_user(role="moderator", name="moderator"))
