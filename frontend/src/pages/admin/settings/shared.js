@@ -24,6 +24,7 @@ export const MAIL_TEMPLATE_LABELS = {
   newsletter_news: "Newsletter: News",
   newsletter_event: "Newsletter: Event",
   event_message: "Event: Nachricht an alle",
+  event_registration: "Event: Stand der Anmeldung",
   contact_autoreply: "Kontakt-Antwort",
   contact_admin_notify: "Kontaktmeldung",
   test: "Testmail",

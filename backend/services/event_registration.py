@@ -9,6 +9,7 @@ from pymongo.errors import DuplicateKeyError
 from models import new_id, now_utc
 from services import billing_orders, pricing
 from services.access_links import AccessLinkUsedUp, claim_access_link_use, release_access_link_use
+from services.event_notifications import notify_registration_status
 from services.permissions import is_confirmed_tournament_lead
 from services.public_phase import derive_public_phase
 from services.visibility import user_can_see
@@ -154,13 +155,16 @@ def seat_resource(event_id: str) -> str:
 
 async def register(db, event: dict, me: dict, *, companion_count: int | None = 0, note: str | None = None,
                    selected_positions: list[str] | None = None, register_access: dict | None = None, via: str = "web") -> dict:
-    """Anmelden unter der Platzsperre - jeder Weg (Website, App, Discord, Zugangslink) kommt hier durch (#1037)."""
+    """Anmelden unter der Platzsperre - jeder Weg (Website, App, Discord, Zugangslink) kommt hier durch (#1037). Der
+    Bescheid an die Person (#2127) geht erst danach hinaus, damit die Sperre nicht auf Mail und Push wartet."""
     try:
         async with mutation_lock(db, seat_resource(event["id"]), wait_seconds=SEAT_WAIT_SECONDS):
-            return await _register(db, event, me, companion_count=companion_count, note=note,
-                                   selected_positions=selected_positions, register_access=register_access, via=via)
+            doc = await _register(db, event, me, companion_count=companion_count, note=note,
+                                  selected_positions=selected_positions, register_access=register_access, via=via)
     except MutationLockBusy:
         raise SeatsBusy()
+    await notify_registration_status(db, event, doc, doc.get("status"), actor_id=me["id"])
+    return doc
 
 
 async def _register(db, event: dict, me: dict, *, companion_count: int | None, note: str | None,

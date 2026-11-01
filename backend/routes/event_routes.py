@@ -17,7 +17,7 @@ from services.sponsor_utils import dedupe_public_sponsors
 from services import partner_pages
 from services.notification_preferences import enqueue_newsletter_for_item
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
-from services import billing_orders, event_changes, event_days, event_facts, event_locations, event_play_along, event_registration, event_rewards, pricing
+from services import billing_orders, event_changes, event_days, event_facts, event_locations, event_notifications, event_play_along, event_registration, event_rewards, pricing
 from services.event_public import public_event
 from services.event_registration import RegistrationError
 from services.mutation_lock import MutationLockBusy, mutation_lock
@@ -812,12 +812,15 @@ async def update_event_registration(event_id: str, registration_id: str, body: E
     # und schreiben in einem Zug - auch wenn sich im selben Moment jemand anmeldet.
     try:
         async with mutation_lock(db, event_registration.seat_resource(event["id"]), wait_seconds=event_registration.SEAT_WAIT_SECONDS):
-            return await _update_event_registration(db, event, registration_id, body, me)
+            current, updated = await _update_event_registration(db, event, registration_id, body, me)
     except MutationLockBusy:
         raise HTTPException(status_code=409, detail=event_registration.SEAT_BUSY)
+    # Bescheid an die Person (#2127, EV6, EV13) - nach der Sperre, damit sie nicht auf Mail und Push wartet.
+    await event_notifications.notify_registration_status(db, event, updated, updated.get("status"), previous=current.get("status"), actor_id=me["id"])
+    return _public_event_registration(updated, is_staff=True)
 
 
-async def _update_event_registration(db, event: dict, registration_id: str, body: EventRegistrationUpdate, me: dict) -> dict:
+async def _update_event_registration(db, event: dict, registration_id: str, body: EventRegistrationUpdate, me: dict) -> tuple[dict, dict]:
     current = await db.event_registrations.find_one(
         {"id": registration_id, "event_id": event["id"]},
         {"_id": 0},
@@ -884,7 +887,7 @@ async def _update_event_registration(db, event: dict, registration_id: str, body
                  **({"rewards_revoked": revoked} if revoked else {})},
         "created_at": now_utc().isoformat(),
     })
-    return _public_event_registration(updated, is_staff=True)
+    return current, updated
 
 
 def _apply_locations(target: dict, raw: dict) -> None:
