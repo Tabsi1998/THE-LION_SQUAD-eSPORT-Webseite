@@ -326,6 +326,16 @@ async def test_google_name_with_a_blocked_word_gets_a_neutral_name(flow):
     assert await _google_names(flow.db, None, "schimpfwort@verein-beispiel.at") == ("player", "player")
 
 
+# ---------------------------------------------------------------- Review: Vollständigkeit nur für sich selbst
+@pytest.mark.asyncio
+async def test_profile_completeness_is_only_for_the_person(flow):
+    user = await player(flow, "versteckt", privacy_public_profile=False)
+    flow.act_as(None)
+    assert (await flow.get(f"/api/users/{user['id']}/profile-completeness")).status_code == 404
+    flow.act_as(user)
+    assert (await flow.get("/api/users/me/profile-completeness")).status_code == 200
+
+
 # ---------------------------------------------------------------- Zusatz: Dokumente
 @pytest.mark.asyncio
 async def test_members_never_see_where_a_document_is_stored(flow):
