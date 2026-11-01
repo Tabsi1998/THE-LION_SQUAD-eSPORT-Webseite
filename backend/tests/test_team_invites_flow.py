@@ -80,7 +80,8 @@ async def test_plain_members_neither_see_nor_withdraw_invites(flow):
 
     flow.act_as(world["member"])
     assert (await flow.get(f"/api/teams/{world['team_id']}/invites")).status_code == 403
-    assert (await flow.delete(f"/api/teams/{world['team_id']}/invites/{invite_id}")).status_code == 403
+    refused = await flow.delete(f"/api/teams/{world['team_id']}/invites/{invite_id}")
+    assert refused.status_code == 403
     assert (await flow.db.team_invites.find_one({"id": invite_id}))["status"] == "pending"
 
 

@@ -86,7 +86,8 @@ async def test_public_profile_no_longer_reads_old_rows_and_routes_are_gone(flow)
     assert "altdaten" not in (await flow.get(f"/api/users/public/{person['username']}")).text
     assert (await flow.get("/api/users/me/socials")).status_code in {404, 405}
     assert (await flow.post("/api/users/me/socials", json={"platform": "kick", "value": "x"})).status_code in {404, 405}
-    assert (await flow.delete("/api/users/me/socials/abc")).status_code in {404, 405}
+    deleted = await flow.delete("/api/users/me/socials/abc")
+    assert deleted.status_code in {404, 405}
 
 
 def test_migration_is_registered_once_with_the_next_free_number():
