@@ -88,6 +88,11 @@ async def test_export_holds_only_the_needed_fields_and_is_logged(flow):
     everyone = await flow.get("/api/membership/export.csv?scope=all")
     assert "gone" in everyone.text
 
+    # Gelöschte Konten stehen auch als „ehemalig“ nicht in der Liste.
+    await flow.db.users.update_one({"id": gone["id"]}, {"$set": {"anonymized_at": "2026-10-01T10:00:00+00:00", "username": "deleted_abc"}})
+    without = await flow.get("/api/membership/export.csv?scope=all")
+    assert "deleted_abc" not in without.text and "TLS-2020-0001" not in without.text
+
     flow.act_as(await flow.add_user(role="moderator", name="moderator"))
     assert (await flow.get("/api/membership/export.csv")).status_code == 403
 

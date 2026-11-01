@@ -999,7 +999,7 @@ async def export_memberships(request: Request, scope: Literal["active", "all"] =
     query: dict = {"member_status": {"$in": sorted(ACTIVE_STATUSES)}} if scope == "active" else {"member_status": {"$nin": [None, "none"]}}
     memberships = await db.memberships.find(query, {"_id": 0, "user_id": 1, "member_number": 1, "member_status": 1, "membership_type": 1, "member_since": 1, "internal_role": 1}).to_list(EXPORT_LIMIT)
     users = {row["id"]: row async for row in db.users.find(
-        {"id": {"$in": [row["user_id"] for row in memberships]}}, {"_id": 0, "id": 1, "username": 1, "display_name": 1, "email": 1})}
+        {"id": {"$in": [row["user_id"] for row in memberships]}, "anonymized_at": None}, {"_id": 0, "id": 1, "username": 1, "display_name": 1, "email": 1})}
     rows = []
     for membership in memberships:
         account = users.get(membership["user_id"])
