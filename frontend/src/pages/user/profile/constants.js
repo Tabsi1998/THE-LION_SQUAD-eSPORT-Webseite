@@ -106,8 +106,8 @@ export const DIRECT_MESSAGE_PRIVACY = [
   ["friends", "Nur Freunde"],
   ["team_members", "Nur gemeinsame Teammitglieder"],
   ["club_members", "Nur Vereinsmitglieder"],
-  ["admins_only", "Nur Admins"],
-  ["none", "Niemand"],
+  ["admins_only", "Nur Moderation und Admins"],
+  ["none", "Niemand außer der Moderation"],
 ];
 
 export const GENDER_OPTIONS = [

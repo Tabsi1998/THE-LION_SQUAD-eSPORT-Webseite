@@ -121,7 +121,7 @@ async def _message_permission(db, sender: dict, recipient: dict) -> tuple[bool, 
             return True, ""
         return False, "Dieser Benutzer nimmt Direktnachrichten nur von Vereinsmitgliedern an."
     if privacy == "admins_only":
-        return False, "Dieser Benutzer nimmt Direktnachrichten nur von Admins an."
+        return False, "Dieser Benutzer nimmt Direktnachrichten nur von Moderation und Admins an."
     if privacy == "none":
         return False, "Dieser Benutzer nimmt aktuell keine Direktnachrichten an."
     return False, "Direktnachrichten sind für diesen Benutzer nicht verfügbar."

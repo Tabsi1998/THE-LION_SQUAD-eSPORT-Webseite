@@ -58,7 +58,7 @@ export function PrivacyTab({ form, set, setVisibility, setVisibilityGroup, autos
           <MessageSquare className="w-5 h-5 text-[#29B6E8] mt-1 shrink-0" />
           <div>
             <h3 className="font-heading font-black uppercase mb-1">Direktnachrichten</h3>
-            <p className="text-xs text-white/50">Lege fest, wer dir private Nachrichten über die Webseite senden darf.</p>
+            <p className="text-xs text-white/50">Lege fest, wer dir private Nachrichten über die Webseite senden darf. Die Moderation erreicht dich immer, etwa um eine Meldung zu klären.</p>
           </div>
         </div>
         <select
