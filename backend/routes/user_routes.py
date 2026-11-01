@@ -59,7 +59,10 @@ def _check_profile_texts(updates: dict, stored: dict) -> None:
             updates["display_name"] = name or stored.get("display_name")
     for field, (label, limit) in PROFILE_TEXT_LIMITS.items():
         value = updates.get(field)
-        if isinstance(value, str) and value != stored.get(field) and len(value.strip()) > limit:
+        if not isinstance(value, str) or value == stored.get(field):
+            continue
+        updates[field] = value.strip()
+        if len(updates[field]) > limit:
             raise HTTPException(422, f"{label}: höchstens {limit} Zeichen.")
 
 

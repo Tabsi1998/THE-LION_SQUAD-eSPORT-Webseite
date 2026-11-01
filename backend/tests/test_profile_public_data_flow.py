@@ -359,6 +359,20 @@ async def test_switching_achievements_back_and_forth_does_not_flood_with_crown_n
     assert displaced["user_id"] == people[3]["id"] and "anderen Spieler" not in displaced["body"]
 
 
+# ---------------------------------------------------------------- Review: Leerzeichen, bevorzugte Rolle
+@pytest.mark.asyncio
+async def test_spaces_around_changed_texts_are_removed(flow):
+    user = await player(flow, "polster", display_name="Polster", bio="kurz")
+    flow.act_as(user)
+    saved = await flow.patch("/api/users/me", json={"bio": "x" + " " * 200000, "display_name": "  Neu  "})
+    assert saved.status_code == 200 and saved.json()["bio"] == "x" and saved.json()["display_name"] == "Neu"
+
+    # Ein gespeicherter alter Wert bleibt, wie er ist, solange er sich nicht ändert.
+    old = await player(flow, "altpolster", bio="  alt  ")
+    flow.act_as(old)
+    assert (await flow.patch("/api/users/me", json={"bio": "  alt  "})).json()["bio"] == "  alt  "
+
+
 # ---------------------------------------------------------------- Zusatz: Dokumente
 @pytest.mark.asyncio
 async def test_members_never_see_where_a_document_is_stored(flow):

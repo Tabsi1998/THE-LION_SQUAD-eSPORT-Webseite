@@ -16,20 +16,25 @@ async function mockServer(page, { user = null } = {}) {
   await page.addInitScript(() => {
     window.localStorage.setItem("tls_cookie_consent_v1", JSON.stringify({ essential: true, external_media: false, analytics: false, meta: false, tiktok: false, saved_at: Date.now(), expires_at: Date.now() + 30 * 24 * 60 * 60 * 1000 }));
   });
-  const seen = { paths: [], registered: 0 };
+  const seen = { paths: [], registered: 0, user };
   await page.route("**/api/**", async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname.replace(/^\/api/, "");
     seen.paths.push(path);
     const json = (body, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
     if (path.startsWith("/changes")) return route.abort();
-    if (path === "/auth/me") return user ? json(user) : json({ detail: "Bitte melde dich an." }, 401);
+    if (path === "/auth/me") return seen.user ? json(seen.user) : json({ detail: "Bitte melde dich an." }, 401);
     if (path === "/auth/register") {
       seen.registered += 1;
       return json({ verification_required: true, email: "neu@lionsquad-test.at" });
     }
     if (path === "/settings/public") return json({ club_name: "THE LION SQUAD", registration_enabled: true, password_login_enabled: true });
     if (path === "/users/public/alte%20schule") return json(OLD_NAME_PROFILE);
+    if (path === "/users/me" && request.method() === "PATCH") {
+      const body = request.postDataJSON() || {};
+      seen.user = { ...seen.user, ...body, ...(typeof body.bio === "string" ? { bio: body.bio.trim() } : {}), updated_at: new Date().toISOString() };
+      return json(seen.user);
+    }
     if (request.method() !== "GET") return json(user || { ok: true });
     if (path === "/me/platform-links") return json({ links: [], available: {}, platforms: {} });
     if (path === "/users/me/notification-preferences") return json({});
@@ -89,6 +94,19 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       await expect(page.getByTestId("profile-bio-error")).toHaveText("Höchstens 1000 Zeichen.");
       await expect(page.getByTestId("profile-autosave-status").first()).toHaveAttribute("data-status", "invalid");
       expect(await noSidewaysScroll(page)).toBe(true);
+    });
+
+    test("Grunddaten: das Leerzeichen zwischen zwei Wörtern übersteht das Speichern von selbst", async ({ page }) => {
+      await mockServer(page, { user: ME });
+      await page.goto("/profile?tab=basic");
+      const bio = page.getByTestId("profile-bio");
+      await expect(bio).toHaveValue("Kurz");
+      await bio.fill("Hallo ");
+      await expect(page.getByTestId("profile-autosave-status").first()).toContainText("Gespeichert", { timeout: 5000 });
+      await expect(bio).toHaveValue("Hallo ");
+      await bio.press("End");
+      await bio.pressSequentially("Welt");
+      await expect(bio).toHaveValue("Hallo Welt");
     });
 
     test("Privatsphäre: Direktnachrichten sagen, wer trotzdem schreiben kann; Website und Abos haben eine Stufe", async ({ page }) => {
