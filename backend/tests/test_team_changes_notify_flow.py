@@ -45,7 +45,8 @@ async def test_kick_leave_and_join_tell_people_and_stay_in_the_log(flow):
     team = await make_team(flow, leader, mila, tom)
 
     flow.act_as(leader)
-    assert (await flow.delete(f"/api/teams/{team['id']}/members/{mila['id']}")).status_code == 200
+    kicked = await flow.delete(f"/api/teams/{team['id']}/members/{mila['id']}")
+    assert kicked.status_code == 200
     removed = await notes(flow, mila, "team_member_removed")
     assert len(removed) == 1 and "Rudel" in removed[0]["body"]
     assert (await audit(flow, "team.kick", team))[0]["data"] == {"kicked_user_id": mila["id"]}

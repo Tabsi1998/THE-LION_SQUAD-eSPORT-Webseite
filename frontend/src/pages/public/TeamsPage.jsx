@@ -398,7 +398,7 @@ function TeamDetail({ id }) {
           )}
           <TeamLeague overview={overview} />
           {/* Co-Teams mit Captain und Vertreter (#2110) - nur für Mitglieder und Teamleitung. */}
-          <TeamSquads key={team.id} team={team} userId={user?.id} canManage={canEdit} enabled={isMember || canEdit} />
+          <TeamSquads key={`squads-${team.id}`} team={team} userId={user?.id} canManage={canEdit} enabled={isMember || canEdit} />
           <TeamSchedule overview={overview} />
           {(team.awards || []).length > 0 && (
             <section data-testid="team-awards">
@@ -481,7 +481,7 @@ function TeamDetail({ id }) {
             </div>
           </section>}
           {/* Eigener Stand je Team (#1047); den Kontowechsel übernimmt die Hülle oben. */}
-          {(isMember || canEdit) && <TeamChat key={team.id} team={team} user={user} />}
+          {(isMember || canEdit) && <TeamChat key={`chat-${team.id}`} team={team} user={user} />}
         </div>
         <aside className="space-y-4">
           {levelInfo && <TeamLevelPanel info={levelInfo} />}

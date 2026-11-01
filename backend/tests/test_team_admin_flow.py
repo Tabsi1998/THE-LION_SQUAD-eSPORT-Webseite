@@ -70,7 +70,8 @@ async def test_dissolved_tab_shows_what_can_still_come_back(flow):
     leader = await flow.add_user(role="player", name="leitung")
     team = await add_team(flow, "Altes Rudel", "ALT", leader)
     flow.act_as(leader)
-    assert (await flow.delete(f"/api/teams/{team['id']}", params={"confirm": "Altes Rudel"})).status_code == 200
+    gone = await flow.delete(f"/api/teams/{team['id']}", params={"confirm": "Altes Rudel"})
+    assert gone.status_code == 200
 
     flow.act_as(await flow.add_user(role="club_admin", name="vorstand"))
     active = (await flow.get("/api/admin/teams")).json()
