@@ -57,6 +57,12 @@ PLACES = {
     "Adresse mit Zusatz": ("news_posts", {"id": "n-1", "banner_url": URL + "?v=3#oben"}),
     "Absolute Adresse": ("events", {"id": "e-1", "banner_url": "https://lionsquad.example" + URL}),
     "Kleinere Fassung": ("teams", {"id": "team-9", "logo_url": UPLOADS + "variants/genutzt-400.webp"}),
+    # Eine Nachricht speichert den Sticker aufgelöst (#2122): alte Chats zeigen das Bild, auch wenn der Sticker weg ist.
+    "Sticker in einer Direktnachricht": ("direct_messages", {"id": "m-1", "sticker": {"id": "s-1", "url": URL}}),
+    "Sticker im Team-Chat": ("team_chat_messages", {"id": "m-2", "sticker": {"id": "s-1", "url": URL}}),
+    "Sticker im Turnier-Chat": ("tournament_chat_messages", {"id": "m-3", "sticker": {"id": "s-1", "url": URL}}),
+    "Sticker im Match-Chat": ("match_chat_messages", {"id": "m-4", "sticker": {"id": "s-1", "url": URL}}),
+    "Sticker in einem Türchen": ("advent_doors", {"id": "d-1", "sticker": {"id": "s-1", "url": URL}}),
 }
 
 
@@ -88,6 +94,32 @@ async def test_a_file_used_anywhere_counts_as_used_in_the_media_library(flow, pu
     # Lesbar benannt: kein roher Feldpfad.
     assert reference["place"] and "_url" not in reference["place"] and "." not in reference["place"], reference
     assert items["frei.webp"]["is_unused"] is True
+
+
+@pytest.mark.asyncio
+async def test_the_image_of_a_deleted_sticker_stays_while_old_messages_show_it(flow, public):
+    await admin(flow)
+    await flow.db.direct_messages.insert_one({"id": "m-1", "message": "geheim", "sticker": {"id": "s-weg", "url": URL}})
+
+    item = (await media_items(flow))[NAME]
+
+    assert item["is_unused"] is False
+    # Die Mediathek nennt die Stelle, aber nichts aus der Nachricht.
+    assert item["references"][0]["label"] == "Nachricht im Chat"
+    assert item["references"][0]["place"] == "Direktnachricht · Sticker"
+    assert (await flow.delete(f"/api/admin/media/{NAME}")).status_code == 409
+    assert (public / NAME).exists()
+
+
+@pytest.mark.asyncio
+async def test_a_message_is_not_marked_as_edited_when_its_sticker_image_is_removed(flow, public):
+    await admin(flow)
+    await flow.db.direct_messages.insert_one({"id": "m-1", "updated_at": "alt", "sticker": {"id": "s-weg", "url": URL}})
+
+    assert (await flow.delete(f"/api/admin/media/{NAME}?force=true")).status_code == 200
+
+    message = await flow.db.direct_messages.find_one({"id": "m-1"})
+    assert message["sticker"]["url"] is None and message["updated_at"] == "alt"
 
 
 @pytest.mark.asyncio

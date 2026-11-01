@@ -102,7 +102,7 @@ async def _collect_media_usage(filenames: set[str]) -> dict[str, list[dict[str, 
             "id": doc_id,
             "field": field,
             "place": media_audit.place_label(collection, field),
-            "label": doc.get("title") or doc.get("name") or doc.get("display_name") or doc_id,
+            "label": media_audit.usage_label(collection, doc),
         }
         if text:
             ref["text_reference"] = True
@@ -302,7 +302,7 @@ async def _clear_media_references(filename: str) -> tuple[int, int]:
     for collection, doc, field, _name, text in hits:
         if text:
             in_text += 1
-        elif await media_audit.rewrite_field(getattr(db, collection), doc["_id"], field, change, stamp):
+        elif await media_audit.rewrite_field(getattr(db, collection), doc["_id"], field, change, media_audit.stamp_for(collection, stamp)):
             cleared += 1
     return cleared, in_text
 

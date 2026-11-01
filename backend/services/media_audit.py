@@ -52,6 +52,8 @@ TEXT_TARGETS: list[tuple[str, list[str]]] = [
     ("club_member_profiles", ["bio"]),
 ]
 
+MESSAGE_COLLECTIONS = ("direct_messages", "team_chat_messages", "tournament_chat_messages", "match_chat_messages")
+
 # Weitere Stellen, an denen eine hochgeladene Datei verwendet sein kann (#1039): verschachtelte Felder und Texte, die
 # die Prüfung oben nicht reparieren kann. Die Kontolöschung behält eine Datei, solange sie hier oder oben steht.
 # Gewinnerbilder: die Plätze aus ``services.awards.IMAGE_SLOTS``.
@@ -59,8 +61,11 @@ USAGE_TARGETS: list[tuple[str, list[str]]] = [
     ("tournaments", ["award_images.1", "award_images.2", "award_images.3"]),
     ("partners", ["tools.image_url"]),
     ("settings", ["club_photo.url", "timeline.image_url"]),
-    ("advent_doors", ["media_url"]),
+    ("advent_doors", ["media_url", "sticker.url"]),
     ("stickers", ["url"]),
+    # Eine Nachricht speichert ihren Sticker aufgelöst (``services.stickers``): Alte Chats zeigen das Bild weiter, auch
+    # wenn der Sticker längst gelöscht ist (#2122). Solange so eine Nachricht steht, ist die Datei verwendet.
+    *((collection, ["sticker.url"]) for collection in MESSAGE_COLLECTIONS),
     ("gallery_photos", ["original_url"]),
     ("game_servers", ["server_icon_url"]),
     # Map-Pools (#1616): der Snapshot zeigt das Bild von damals, auch wenn die Map inzwischen ein neues hat.
@@ -91,6 +96,8 @@ COLLECTION_LABELS = {
     "game_servers": "Spielserver", "game_maps": "Map", "map_pools": "Map-Pool",
     "reference_lineages": "Spur", "reference_series": "Saison",
     "leagues": "Liga", "league_seasons": "Liga-Season", "league_divisions": "Liga N",
+    "direct_messages": "Direktnachricht", "team_chat_messages": "Team-Chat", "tournament_chat_messages": "Turnier-Chat",
+    "match_chat_messages": "Match-Chat",
 }
 FIELD_LABELS = {
     "logo_url": "Logo", "logo_light_url": "Logo hell", "logo_dark_url": "Logo dunkel",
@@ -100,7 +107,7 @@ FIELD_LABELS = {
     "thumbnail_url": "Vorschaubild", "video_url": "Video", "photo_url": "Foto", "content": "Text",
     "description": "Beschreibung", "program": "Programm", "bio": "Über mich", "rules": "Regeln", "prize_pool": "Preise",
     **{f"award_images.{place}": f"Gewinnerbild Platz {place}" for place in ("1", "2", "3")},
-    "tools.image_url": "Bild eines Werkzeugs", "media_url": "Bild oder Video", "url": "Bild",
+    "tools.image_url": "Bild eines Werkzeugs", "media_url": "Bild oder Video", "url": "Bild", "sticker.url": "Sticker",
     "original_url": "Original", "server_icon_url": "Server-Symbol", "modes.maps.image_url": "Bild einer Map",
     "image_history": "früheres Bild", "emblem_url": "Emblem", "prizes.image_url": "Bild eines Gewinns",
     **{f"dolibarr_images.{kind}.{variant}.url":
@@ -198,6 +205,18 @@ def place_label(collection: str, field: str) -> str:
     if (collection, field) in PLACE_LABELS:
         return PLACE_LABELS[(collection, field)]
     return f"{COLLECTION_LABELS.get(collection, collection)} · {FIELD_LABELS.get(field, field)}"
+
+
+def usage_label(collection: str, document: dict) -> str | None:
+    """Wovon die Rede ist: der Titel des Eintrags. Eine Nachricht nennt nur, dass es eine ist - nie Kennung oder Inhalt."""
+    if collection in MESSAGE_COLLECTIONS:
+        return "Nachricht im Chat"
+    return document.get("title") or document.get("name") or document.get("display_name") or document.get("id") or document.get("slug")
+
+
+def stamp_for(collection: str, stamp: dict | None) -> dict | None:
+    """Eine Nachricht bekommt kein neues ``updated_at`` - sie wäre sonst „bearbeitet“, ohne dass jemand schrieb."""
+    return None if collection in MESSAGE_COLLECTIONS else stamp
 
 
 def canonical_name(value, candidates: dict[str, str]) -> str | None:
