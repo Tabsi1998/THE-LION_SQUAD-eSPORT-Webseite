@@ -267,7 +267,9 @@ den Plätzen. Wird ein Ergebnis nach dem Veröffentlichen korrigiert und das Tur
 je Person und Kalendermonat die ersten **vier** Einträge voll, danach nur noch zur Hälfte. Turniere (Major, Normal, Mini) zählen immer voll.
 
 **Event-Teilnahme:** Checkt die Turnierleitung eine Person unter **Anmeldungen & Einlass** ein (**Da**), bekommt sie einen Jahreswertungs-Eintrag
-(Gewicht ×0,50 plus 5 Bonuspunkte), 60 XP und eine Erfolgs-Auswertung. Siehe [Events](events.md).
+(Gewicht ×0,50 plus 5 Bonuspunkte), 60 XP und eine Erfolgs-Auswertung. Wird der Check-in zurückgenommen, gehen Eintrag und XP wieder weg,
+auch bei mehrfachem Hin und Her nie doppelt; eine abgeschlossene Jahreswertung bleibt, schon freigeschaltete Erfolge ebenfalls. Siehe
+[Events](events.md).
 
 **Erfolge** sind Profilpunkte und fließen nicht still in die Jahreswertung. Reine Community-Aktivität zählt nicht – nur Turniere,
 Fast Laps, bestätigte Event-Teilnahmen und Korrekturen mit Grund.

@@ -180,7 +180,8 @@ Alles kommt aus der Vereinsakte in Dolibarr; die Website zeigt und reicht durch,
   Ergebnis, sobald die Versammlungsleitung es bestätigt. Zu- oder Absage ist keine Anwesenheit. Ein Knopf trägt die Versammlung
   in den Kalender ein.
 - **Einlass:** Admin → Mitglieder → **Einlass (Versammlung)** am Handy öffnen und die Mitgliedskarte scannen, ohne Karte die
-  Mitgliedsnummer tippen. Einlassen darf, wer am Tag im Vorstand ist. Einrichtung und Grenzen: [Dolibarr](../DOLIBARR.md).
+  Mitgliedsnummer tippen. Einlassen darf, wer am Tag im Vorstand ist. Mit mehreren Geräten am Eingang stimmen die Zahlen zur
+  Beschlussfähigkeit überall: Die Seite lädt alle 10 Sekunden nach. Einrichtung und Grenzen: [Dolibarr](../DOLIBARR.md).
 
 ### 3.8 Helferdienste
 
