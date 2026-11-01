@@ -329,7 +329,12 @@ async def review_report(report_id: str, body: UserReportPatch, me: dict = Depend
     takes_strike_back = previous == "justified" and body.status != "justified"
     if (becomes_strike or takes_strike_back) and report.get("target_user_id"):
         # „Berechtigt“ zählt als Strike - gegen Admin-Konten entscheidet das der Superadmin (#1350), auch das Zurücknehmen.
-        await _measure_target(db, me, report["target_user_id"])
+        try:
+            await _measure_target(db, me, report["target_user_id"])
+        except HTTPException as exc:
+            # Das Konto ist inzwischen gelöscht: Zählen geht nicht mehr, Zurücknehmen schon.
+            if not (takes_strike_back and exc.status_code == 404):
+                raise
     if body.status != previous and not note and (takes_strike_back or (body.status in REASON_REQUIRED and not report.get("resolution_note"))):
         raise HTTPException(422, REASON_MISSING)
     now = now_utc().isoformat()

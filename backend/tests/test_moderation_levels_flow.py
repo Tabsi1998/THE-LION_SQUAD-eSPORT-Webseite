@@ -121,6 +121,24 @@ async def test_a_moderator_cannot_take_back_a_strike_against_an_admin_account(fl
 
 
 @pytest.mark.asyncio
+async def test_a_report_against_a_deleted_account_can_still_be_taken_back(flow):
+    mod, paula, otto = await person(flow, "mod", role="moderator"), await person(flow, "paula"), await person(flow, "otto")
+    report = await report_against(flow, otto, paula, mod)
+    url = f"/api/moderation/reports/{report['id']}"
+    await flow.patch(url, json={"status": "justified", "resolution_note": "Belegt"})
+    await flow.db.users.delete_one({"id": paula["id"]})
+
+    response = await flow.patch(url, json={"status": "reviewing", "resolution_note": "Konto ist weg"})
+
+    assert response.status_code == 200, response.text
+    assert response.json()["strikes_revoked"] == 1
+    assert (await flow.db.user_reports.find_one({"id": report["id"]}))["status"] == "reviewing"
+    # Neu zählen lässt sich gegen ein gelöschtes Konto nichts.
+    again = await flow.patch(url, json={"status": "justified", "resolution_note": "Noch einmal"})
+    assert again.status_code == 404
+
+
+@pytest.mark.asyncio
 async def test_the_report_list_names_people_and_the_reported_message(flow):
     mod, paula, otto = await person(flow, "mod", role="moderator"), await person(flow, "paula"), await person(flow, "otto")
     flow.act_as(paula)
