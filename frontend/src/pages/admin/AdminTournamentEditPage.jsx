@@ -750,13 +750,13 @@ export default function AdminTournamentEditPage() {
                       <SeedField key={`${r.id}-${r.seed ?? ""}`} registration={r} onSave={(seed) => saveSeed(r.id, seed)} testId={`admin-reg-seed-mobile-${r.id}`} />
                     </div>
                   )}
-                  {checkInTools && r.status !== "checked_in" && !["rejected", "waitlist"].includes(r.status) && (
+                  {checkInTools && r.status !== "checked_in" && !["rejected", "waitlist", "withdrawn", "disqualified"].includes(r.status) && (
                     <button type="button" onClick={() => setRegCheckinStatus(r.id, "checked_in")} className="px-2 py-2 border border-[#00FF88]/40 text-[#00FF88] rounded-sm text-[10px] font-bold uppercase">Check-in</button>
                   )}
                   {checkInTools && r.status === "checked_in" && (
                     <button type="button" onClick={() => setRegCheckinStatus(r.id, "approved")} className="px-2 py-2 border border-white/20 text-white/70 rounded-sm text-[10px] font-bold uppercase">Auschecken</button>
                   )}
-                  {checkInTools && !["checked_in", "rejected", "waitlist", "no_show"].includes(r.status) && (
+                  {checkInTools && !["checked_in", "rejected", "waitlist", "no_show", "withdrawn", "disqualified"].includes(r.status) && (
                     <button type="button" onClick={() => setRegCheckinStatus(r.id, "no_show")} className="px-2 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase">Nicht erschienen</button>
                   )}
                   <ParticipantRemovalActions tournament={t} registration={r} onDone={load} compact />
@@ -799,13 +799,13 @@ export default function AdminTournamentEditPage() {
                           <RegistrationStatusOptions fixed={inFixedBracket.has(r.id)} current={r.status} />
                         </select>
                       )}
-                      {checkInTools && r.status !== "checked_in" && !["rejected", "waitlist"].includes(r.status) && (
+                      {checkInTools && r.status !== "checked_in" && !["rejected", "waitlist", "withdrawn", "disqualified"].includes(r.status) && (
                         <button type="button" onClick={() => setRegCheckinStatus(r.id, "checked_in")} className="px-2 py-1 border border-[#00FF88]/40 text-[#00FF88] rounded-sm text-[10px] font-bold uppercase">Check-in</button>
                       )}
                       {checkInTools && r.status === "checked_in" && (
                         <button type="button" onClick={() => setRegCheckinStatus(r.id, "approved")} className="px-2 py-1 border border-white/20 text-white/70 rounded-sm text-[10px] font-bold uppercase">Auschecken</button>
                       )}
-                      {checkInTools && !["checked_in", "rejected", "waitlist", "no_show"].includes(r.status) && (
+                      {checkInTools && !["checked_in", "rejected", "waitlist", "no_show", "withdrawn", "disqualified"].includes(r.status) && (
                         <button type="button" onClick={() => setRegCheckinStatus(r.id, "no_show")} className="px-2 py-1 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase">Nicht erschienen</button>
                       )}
                       <ParticipantRemovalActions tournament={t} registration={r} onDone={load} />

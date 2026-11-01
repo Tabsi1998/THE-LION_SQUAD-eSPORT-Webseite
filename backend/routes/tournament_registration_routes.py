@@ -22,6 +22,7 @@ from services.tournament_rules import self_checkin_allowed
 from services.tournament_permissions import (
     CHECKIN_STAFF_ROLES,
     PARTICIPANT_STAFF_ROLES,
+    STRUCTURE_STAFF_ROLES,
     has_tournament_staff_permission,
     require_tournament_staff_permission,
 )
@@ -126,6 +127,8 @@ LEAVES_BRACKET_STATUSES = {"rejected", "waitlist", "pending"}
 SEED_FIXED = "Der Turnierbaum steht schon – Setzplätze ändern sich nur bis zum Ende des Check-ins."
 REMOVAL_FINAL = ("Austritt und Disqualifikation lassen sich hier nicht zurücknehmen – die Spiele der Person sind schon "
                  "umgebaut. Bei einem Irrtum bitte die betroffenen Ergebnisse im Reiter „Spiele“ korrigieren.")
+REMOVAL_NOT_AT_CHECKIN = ("Austritt und Disqualifikation lassen sich beim Check-in nicht zurücknehmen. Das macht die "
+                          "Turnierleitung über den Status in der Teilnehmerliste.")
 
 
 async def _bracket_is_fixed(db, tid: str) -> bool:
@@ -988,12 +991,15 @@ async def update_registration(tid: str, reg_id: str, body: RegistrationUpdate,
         return {**reg, "idempotent_replay": True}
     previous_status = reg.get("status")
     previous_seed = reg.get("seed")
+    lifts_removal = previous_status in REMOVAL_KINDS and bool(updates.get("status")) and updates["status"] != previous_status
+    if lifts_removal:
+        # Wer eine Disqualifikation aussprechen darf, darf sie auch aufheben - nicht weniger (#2111).
+        await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES, "tournament")
     seed_changed = "seed" in updates and updates["seed"] != previous_seed
     if seed_changed and await tournament_guard.structure_fixed(db, tournament_doc):
         # Der Setzplatz ordnet die Vorschau (#2111, TA15) - steht der Baum, ändert er nichts mehr.
         raise HTTPException(status_code=409, detail=SEED_FIXED)
-    if (previous_status in REMOVAL_KINDS and updates.get("status") and updates["status"] != previous_status
-            and await tournament_guard.fixed_match_count(db, tid, reg_id)):
+    if lifts_removal and await tournament_guard.fixed_match_count(db, tid, reg_id):
         # Austritt und Disqualifikation (#1553) haben die Spiele schon umgebaut (#2111, TA14) - ein anderer Status
         # setzte die Person am Umbau vorbei zurück, ihre Spiele blieben kampflos gewertet.
         raise HTTPException(status_code=409, detail=REMOVAL_FINAL)
@@ -1063,6 +1069,8 @@ async def staff_set_registration_checkin(tid: str, reg_id: str, body: dict,
                 return {**reg, "idempotent_replay": True}
             if reg.get("status") in ("rejected", "waitlist") and status == "checked_in":
                 raise HTTPException(status_code=400, detail="Diese Anmeldung kann nicht eingecheckt werden")
+            if reg.get("status") in REMOVAL_KINDS:
+                raise HTTPException(status_code=409, detail=REMOVAL_NOT_AT_CHECKIN)
             await _sync_squad_key(db, reg, status, tournament_doc)
 
             await db.tournament_registrations.update_one(

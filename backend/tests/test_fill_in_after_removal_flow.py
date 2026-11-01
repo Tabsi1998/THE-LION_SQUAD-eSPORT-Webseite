@@ -103,6 +103,34 @@ async def test_a_removal_comes_back_only_on_a_free_place(flow):
 
 
 @pytest.mark.asyncio
+async def test_lifting_a_removal_needs_the_right_to_remove(flow):
+    """#2111: eine Disqualifikation aufheben darf nur, wer sie auch aussprechen darf - weder ein Helfer, der nur einer
+    Station zugeteilt ist, noch der Weg über den Check-in."""
+    staff, tournament, regs = await eight(flow)
+    tid = tournament["id"]
+    first_round = sorted((m for m in await flow.matches(tournament) if m["round"] == 1), key=lambda m: m["order"])
+    removed = next(reg for reg in regs if reg["id"] == filled(first_round[0])[0])
+    await remove(flow, tournament, removed, kind="disqualified")
+
+    helper = await flow.add_user(name="Helfer")
+    await flow.db.tournament_staff_assignments.insert_one({"tournament_id": tid, "user_id": helper["id"], "role": "referee",
+                                                           "scope": "station", "scope_id": "station-1", "is_active": True})
+    flow.act_as(helper)
+    refused = await flow.patch(f"/api/tournaments/{tid}/registrations/{removed['id']}", json={"status": "approved"})
+    assert refused.status_code == 403, refused.text
+
+    at_checkin = await flow.post(f"/api/tournaments/{tid}/registrations/{removed['id']}/checkin", json={"status": "checked_in"})
+    assert at_checkin.status_code == 409, at_checkin.text
+    assert "Teilnehmerliste" in at_checkin.json()["detail"]
+
+    stored = await flow.db.tournament_registrations.find_one({"id": removed["id"]}, {"_id": 0})
+    assert stored["status"] == "disqualified" and stored["removal"]["kind"] == "disqualified"
+
+    flow.act_as(staff)
+    assert (await flow.patch(f"/api/tournaments/{tid}/registrations/{removed['id']}", json={"status": "approved"})).status_code == 200
+
+
+@pytest.mark.asyncio
 async def test_no_no_show_proposal_for_a_removed_participant(flow):
     _staff, tournament, regs = await eight(flow, event_mode="online")
     first_round = sorted((m for m in await flow.matches(tournament) if m["round"] == 1), key=lambda m: m["order"])
