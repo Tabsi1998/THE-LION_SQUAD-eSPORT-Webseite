@@ -20,7 +20,7 @@ const SHOTS = process.env.ABNAHME_SHOTS || "";
  *  Scrollen - etwa der Rand von tls-swipe - werden nie fertig). */
 async function settle(page) {
   await page.evaluate(() => Promise.all(document.getAnimations()
-    .filter((animation) => animation.timeline instanceof DocumentTimeline)
+    .filter((animation) => animation.timeline instanceof window.DocumentTimeline)
     .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
     .map((animation) => animation.finished.catch(() => null))));
 }

@@ -20,7 +20,7 @@ const VENUES = ["Australien", "Bahrain", "Imola", "Monaco", "Spanien (Barcelona)
  *  der Test sonst bis zum Zeitlimit. */
 async function settle(page) {
   await page.evaluate(() => Promise.all(document.getAnimations()
-    .filter((animation) => animation.timeline instanceof DocumentTimeline)
+    .filter((animation) => animation.timeline instanceof window.DocumentTimeline)
     .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
     .map((animation) => animation.finished.catch(() => null))));
 }
