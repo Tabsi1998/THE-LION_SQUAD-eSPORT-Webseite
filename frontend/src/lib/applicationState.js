@@ -10,11 +10,16 @@ export function applicationState(app, formatDay = (value) => value) {
   const day = (value) => (value ? formatDay(value) : "");
   const decided = day(app?.decided_at);
   if (!app) return { label: "Unbekannt", next: "", tone: "unknown", decide: false };
+  // Dolibarr hat den Antrag beim Senden abgelehnt (#2125): die Person kann ihn neu stellen, hier steht der Grund.
+  if (app.status === "failed") {
+    const reason = app.dolibarr?.error_text ? ` (${app.dolibarr.error_text})` : "";
+    return { label: "Fehlgeschlagen", next: `Dolibarr hat den Antrag nicht angenommen${reason}. Die Person sieht das und kann ihn neu stellen.`, tone: "stop", decide: false };
+  }
   if (!app.coupled) {
     if (app.status === "pending") return { label: "Offen", next: "Annehmen oder ablehnen – hier auf der Website.", tone: "open", decide: true };
     if (app.status === "approved") return { label: "Aufgenommen", next: decided ? `Aufgenommen am ${decided}.` : "Aufgenommen.", tone: "done", decide: false };
     if (app.status === "rejected") return { label: "Abgelehnt", next: decided ? `Abgelehnt am ${decided}.` : "Abgelehnt.", tone: "stop", decide: false };
-    if (app.status === "withdrawn") return { label: "Zurückgezogen", next: decided ? `Zurückgezogen am ${decided}.` : "Die Person hat den Antrag zurückgezogen.", tone: "stop", decide: false };
+    if (app.status === "withdrawn") return { label: "Zurückgezogen", next: decided ? `Zurückgezogen am ${decided}.` : "Der Antrag wurde zurückgezogen.", tone: "stop", decide: false };
     return { label: "Stand unbekannt", next: "Dieser Stand ist neu für die Website – bitte bei der Technik melden.", tone: "unknown", decide: false };
   }
   if (app.status === "submitting") {

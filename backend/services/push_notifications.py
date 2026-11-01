@@ -85,6 +85,7 @@ PUSH_CHANNELS = {
     "ballot_open": "lion_club",
     "membership_update": "lion_club",
     "membership_invited": "lion_club",
+    "membership_decision": "lion_club",   # Entscheidung oder neuer Status der Mitgliedschaft (#2125)
     "jersey_number": "lion_club",   # Wunschnummer (#2034): Entscheidung des Vorstands
     "invoice_ready": "lion_club",
     "moderation": "lion_club",

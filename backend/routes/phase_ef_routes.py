@@ -177,6 +177,11 @@ DEFAULT_EMAIL_TEMPLATES = [
      "subject": "Neue Mitgliedsbewerbung",
      "html": "<p>{{applicant}} hat eine Mitgliedsbewerbung eingereicht. Bitte im Admin-Bereich prüfen.</p>",
      "vars": ["applicant"]},
+    # Austritt ohne Dolibarr (#2125): die Erklärung geht an alle mit der Vereinsverwaltung, beendet wird im Admin.
+    {"key": "membership_exit_admin", "name": "Austritt erklärt (Admin-Notify)",
+     "subject": "Austritt erklärt",
+     "html": "<p>{{member}} hat den Austritt aus dem Verein erklärt. Beende die Mitgliedschaft unter Admin → Mitglieder, wenn es so weit ist.</p>",
+     "vars": ["member"]},
     # Einladung zum Mitgliedsantrag (#507): bisher nur als Ersatztext im Code - ohne Standard fehlte sie in der Liste
     # der E-Mail-Vorlagen (#2119 ML6). Gleicher Text wie der Ersatz in services/membership_invitations.
     {"key": "membership_invited", "name": "Einladung zum Mitgliedsantrag",

@@ -238,12 +238,14 @@ async def test_rejection_in_dolibarr_sends_the_reason_once(flow, fake):
 
 
 @pytest.mark.asyncio
-async def test_switched_off_membership_mails_send_nothing_but_count_as_done(flow, fake):
+async def test_a_decision_arrives_even_with_membership_mails_switched_off(flow, fake):
+    # Pflicht-Mail (#2125): wer die Entscheidung nicht erfährt, wartet ins Leere.
     amelie, external_id = await applied(flow, fake)
     await flow.db.users.update_one({"id": amelie["id"]}, {"$set": {"notification_preferences": {preference_key("email", "membership_updates"): False}}})
     await decided_in_dolibarr(flow, fake, external_id, "accepted")
-    assert await mails_to(flow, amelie) == []
+    assert [mail["template_key"] for mail in await mails_to(flow, amelie)] == ["membership_approve"]
     assert (await flow.db.membership_applications.find_one({"external_id": external_id}))["notified_at"]
+    assert await flow.db.notifications.count_documents({"user_id": amelie["id"], "kind": "membership_decision"}) == 1
 
 
 @pytest.mark.asyncio
@@ -316,7 +318,7 @@ async def test_two_runs_at_once_queue_one_decision_mail(flow, fake, monkeypatch)
 
 @pytest.mark.asyncio
 async def test_the_admin_decision_without_dolibarr_still_mails_the_person(flow, fake):
-    """Der Weg ohne Dolibarr nutzt dieselbe Mail: Vorlage, Begründung, Einstellungen der Person."""
+    """Der Weg ohne Dolibarr nutzt dieselbe Mail: Vorlage und Begründung - und sie kommt auch mit abgeschalteten Mitgliedschafts-Mails an (#2125)."""
     admin = await flow.add_user(role="club_admin")
     for name, prefs in (("amelie", {}), ("ruhig", {preference_key("email", "membership_updates"): False})):
         user = await person(flow, name)
@@ -328,7 +330,4 @@ async def test_the_admin_decision_without_dolibarr_still_mails_the_person(flow, 
         decided = await flow.patch(f"/api/membership/applications/{sent.json()['id']}", json={"decision": "reject", "note": "Bitte im Frühjahr nochmal."})
         assert decided.status_code == 200, decided.text
         mails = await mails_to(flow, user)
-        if prefs:
-            assert mails == [], "abgeschaltete Mitgliedschafts-Mails bleiben aus"
-        else:
-            assert len(mails) == 1 and "Bitte im Frühjahr nochmal." in mails[0]["html"]
+        assert len(mails) == 1 and "Bitte im Frühjahr nochmal." in mails[0]["html"]
