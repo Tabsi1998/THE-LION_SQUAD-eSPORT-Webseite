@@ -38,7 +38,8 @@ async def test_default_menu_has_leaderboards_and_chats_under_community(flow):
     assert ("achievements", "Erfolge") in community
     assert ("chats", "Chats") in community
     assert next(child for child in children(nav, "community") if child["key"] == "chats")["auth_only"] is True
-    assert {child["key"] for child in children(nav, "esports")} == {"esports_overview", "tournaments", "fastlap"}
+    # Liga steht seit #2122 NW7 im Menü-Editor; die Website zeigt sie nur mit sichtbarer Season.
+    assert {child["key"] for child in children(nav, "esports")} == {"esports_overview", "tournaments", "league", "fastlap"}
 
 
 @pytest.mark.asyncio

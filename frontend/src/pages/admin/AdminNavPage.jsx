@@ -1,29 +1,62 @@
 /**
- * Phase F.2 — Admin Navigation Editor.
- * Allows admin to reorder, hide, and rename navigation items + children.
+ * Navigation-Editor (Phase F.2): Reihenfolge, Namen und Sichtbarkeit der Menüpunkte und ihrer Unterpunkte. Seit #2122
+ * mit „Liga“, Pflichtnamen und „Zurücksetzen“; eigene Menüpunkte gibt es bewusst nicht (Entscheidung NW7).
  */
 import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { SkeletonList } from "@/components/tls/Skeleton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
+import { byNavOrder } from "@/components/tls/MainNav";
 import { toast } from "sonner";
 import {
-  Save, Eye, EyeOff, ChevronUp, ChevronDown, RotateCcw, ChevronRight, ChevronDownIcon,
+  Save, Eye, EyeOff, ChevronUp, ChevronDown, RotateCcw, ChevronRight, ChevronDownIcon, Undo2,
 } from "lucide-react";
+
+/** Haupt- und Unterpunkte nach ihrer gespeicherten Reihenfolge - dieselbe Regel wie Website und Server. */
+export function sortNavItems(items) {
+  return byNavOrder(items || []).map((item) => (item.children?.length ? { ...item, children: byNavOrder(item.children) } : item));
+}
+
+/** Die Reihenfolge zum Speichern (#2122 NW6): je Hauptpunkt und je Unterpunkt die Stelle - sonst springt sie zurück. */
+export function withOrder(items) {
+  return items.map((item, index) => ({
+    ...item,
+    order: index,
+    ...(item.children ? { children: item.children.map((child, childIndex) => ({ ...child, order: childIndex })) } : {}),
+  }));
+}
+
+/** Menüpunkte ohne Namen (#2122 NW7) - gespeichert wird erst, wenn jeder einen hat. */
+export function missingLabels(items) {
+  const missing = [];
+  for (const item of items || []) {
+    if (!String(item.label || "").trim()) missing.push(item.key);
+    for (const child of item.children || []) if (!String(child.label || "").trim()) missing.push(child.key);
+  }
+  return missing;
+}
+
+// Hinweise zu einzelnen Einträgen: was die Website zusätzlich entscheidet.
+const ENTRY_NOTES = {
+  league: "Erscheint nur, solange eine Season sichtbar ist.",
+  chats: "Nur für Angemeldete.",
+};
 
 export default function AdminNavPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [expanded, setExpanded] = useState({});
+  const confirm = useConfirm();
+  const missing = missingLabels(items);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const { data } = await api.get("/admin/nav");
-      const sorted = [...(data.items || [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-      setItems(sorted);
+      setItems(sortNavItems(data.items));
     } catch (e) {
       toast.error(formatApiError(e.response?.data?.detail) || "Fehler beim Laden");
     }
@@ -33,11 +66,32 @@ export default function AdminNavPage() {
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["nav"]);
 
-  const save = async () => {
+  const reset = async () => {
+    if (!await confirm({
+      title: "Navigation zurücksetzen?",
+      description: "Reihenfolge, Namen und Sichtbarkeit kommen wie in der Vorgabe zurück. Deine Änderungen am Menü gehen verloren.",
+      confirmLabel: "Zurücksetzen",
+      tone: "danger",
+    })) return;
     setSaving(true);
     try {
-      const normalized = items.map((it, idx) => ({ ...it, order: idx }));
-      await api.put("/admin/nav", { items: normalized });
+      const { data } = await api.post("/admin/nav/reset");
+      setItems(sortNavItems(data?.items));
+      toast.success("Navigation zurückgesetzt");
+    } catch (e) {
+      toast.error(formatApiError(e.response?.data?.detail) || "Zurücksetzen hat nicht geklappt");
+    }
+    setSaving(false);
+  };
+
+  const save = async () => {
+    if (missing.length) {
+      toast.error("Jeder Menüpunkt braucht einen Namen.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await api.put("/admin/nav", { items: withOrder(items) });
       toast.success("Navigation gespeichert");
       load();
     } catch (e) {
@@ -103,13 +157,13 @@ export default function AdminNavPage() {
       <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">Content</span>
       <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Navigation</h1>
       <p className="mt-2 text-white/55 text-sm max-w-2xl">
-        Sortiere die Hauptnavigation, blende Einträge ein/aus und benenne sie um. Sub-Items lassen sich pro Dropdown verwalten.
+        Reihenfolge, Namen und Sichtbarkeit des Menüs der Website. Die Unterpunkte eines Menüs siehst du nach dem Aufklappen.
       </p>
 
-      <div className="mt-6 flex items-center gap-3">
+      <div className="mt-6 flex flex-wrap items-center gap-3">
         <button
           onClick={save}
-          disabled={saving || loading}
+          disabled={saving || loading || missing.length > 0}
           data-testid="nav-save"
           className="px-5 py-2 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm text-xs inline-flex items-center gap-2 disabled:opacity-50"
         >
@@ -123,8 +177,20 @@ export default function AdminNavPage() {
         >
           <RotateCcw className="w-3.5 h-3.5" /> Verwerfen
         </button>
-        <span className="text-xs text-white/40 ml-auto">{items.length} Top-Level Einträge</span>
+        <button
+          type="button"
+          onClick={reset}
+          disabled={loading || saving}
+          data-testid="nav-reset"
+          className="px-3 py-2 border border-white/10 hover:bg-white/5 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 disabled:opacity-50"
+        >
+          <Undo2 className="w-3.5 h-3.5" /> Zurücksetzen
+        </button>
+        <span className="text-xs text-white/40 ml-auto">{items.length} Hauptpunkte</span>
       </div>
+      {missing.length > 0 && (
+        <p role="alert" className="mt-3 text-xs text-[#FF6B6B]" data-testid="nav-missing-label">Jeder Menüpunkt braucht einen Namen – ein Feld ist leer.</p>
+      )}
 
       {loading ? (
         <SkeletonList rows={5} className="mt-6" label="Lade Navigation" />
@@ -148,30 +214,33 @@ export default function AdminNavPage() {
                       onClick={() => move(idx, -1)}
                       disabled={idx === 0}
                       className="p-0.5 text-white/40 hover:text-white disabled:opacity-30"
-                      aria-label="Nach oben"
+                      aria-label={`${it.label || "Eintrag"} nach oben`}
                     ><ChevronUp className="w-3.5 h-3.5" /></button>
                     <button
                       onClick={() => move(idx, 1)}
                       disabled={idx === items.length - 1}
                       className="p-0.5 text-white/40 hover:text-white disabled:opacity-30"
-                      aria-label="Nach unten"
+                      aria-label={`${it.label || "Eintrag"} nach unten`}
                     ><ChevronDown className="w-3.5 h-3.5" /></button>
                   </div>
                   {hasChildren && (
                     <button
                       onClick={() => toggleExpand(it.key)}
                       className="text-white/50 hover:text-white"
-                      aria-label="Aufklappen"
+                      aria-label={`${it.label || "Eintrag"} ${isExpanded ? "zuklappen" : "aufklappen"}`}
+                      aria-expanded={Boolean(isExpanded)}
                     >
                       {isExpanded ? <ChevronDownIcon className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                     </button>
                   )}
-                  <span className="text-[10px] font-mono text-white/30 uppercase w-16 truncate">{it.key}</span>
                   <input
                     value={it.label || ""}
                     onChange={(e) => updateLabel(idx, e.target.value)}
                     data-testid={`nav-label-${it.key}`}
-                    className="flex-1 bg-[#0A0A0A] border border-white/10 rounded-sm px-3 py-1.5 text-sm font-semibold"
+                    aria-label={`Name des Menüpunkts ${it.to || ""}`.trim()}
+                    aria-invalid={!String(it.label || "").trim() || undefined}
+                    required
+                    className={`min-w-0 flex-1 bg-[#0A0A0A] border rounded-sm px-3 py-1.5 text-sm font-semibold ${String(it.label || "").trim() ? "border-white/10" : "border-[#FF6B6B]"}`}
                   />
                   {it.to && (
                     <span className="hidden md:inline text-[11px] text-white/30 font-mono truncate max-w-[180px]">{it.to}</span>
@@ -203,20 +272,28 @@ export default function AdminNavPage() {
                             <button
                               onClick={() => moveChild(idx, cIdx, -1)}
                               disabled={cIdx === 0}
+                              aria-label={`${c.label || "Unterpunkt"} nach oben`}
                               className="p-0.5 text-white/40 hover:text-white disabled:opacity-30"
                             ><ChevronUp className="w-3 h-3" /></button>
                             <button
                               onClick={() => moveChild(idx, cIdx, 1)}
                               disabled={cIdx === it.children.length - 1}
+                              aria-label={`${c.label || "Unterpunkt"} nach unten`}
                               className="p-0.5 text-white/40 hover:text-white disabled:opacity-30"
                             ><ChevronDown className="w-3 h-3" /></button>
                           </div>
-                          <span className="text-[10px] font-mono text-white/30 uppercase w-16 truncate">{c.key}</span>
-                          <input
-                            value={c.label || ""}
-                            onChange={(e) => updateLabel(idx, e.target.value, cIdx)}
-                            className="flex-1 bg-[#121212] border border-white/10 rounded-sm px-2.5 py-1 text-xs"
-                          />
+                          <div className="min-w-0 flex-1">
+                            <input
+                              value={c.label || ""}
+                              onChange={(e) => updateLabel(idx, e.target.value, cIdx)}
+                              data-testid={`nav-label-${it.key}-${c.key}`}
+                              aria-label={`Name des Unterpunkts ${c.to || ""}`.trim()}
+                              aria-invalid={!String(c.label || "").trim() || undefined}
+                              required
+                              className={`w-full bg-[#121212] border rounded-sm px-2.5 py-1 text-xs ${String(c.label || "").trim() ? "border-white/10" : "border-[#FF6B6B]"}`}
+                            />
+                            {ENTRY_NOTES[c.key] && <span className="mt-0.5 block text-[10px] text-white/45" data-testid={`nav-note-${c.key}`}>{ENTRY_NOTES[c.key]}</span>}
+                          </div>
                           {c.to && <span className="hidden md:inline text-[10px] text-white/30 font-mono truncate max-w-[160px]">{c.to}</span>}
                           <button
                             onClick={() => toggleVisible(idx, cIdx)}
@@ -238,7 +315,7 @@ export default function AdminNavPage() {
       )}
 
       <div className="mt-8 p-4 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm text-xs text-white/70">
-        <strong className="text-[#FFD700]">Hinweis:</strong> Versteckte Einträge werden in der öffentlichen Navigation nicht angezeigt. Die Routen selbst bleiben erreichbar — nur der Menü-Link wird ausgeblendet.
+        <strong className="text-[#FFD700]">Hinweis:</strong> Versteckte Einträge stehen nicht im Menü der Website. Die Seiten selbst bleiben erreichbar – nur der Link im Menü fällt weg. Eigene Menüpunkte gibt es bewusst nicht; jede Seite hat ihren festen Platz.
       </div>
     </AdminLayout>
   );

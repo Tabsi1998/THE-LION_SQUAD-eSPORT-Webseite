@@ -51,7 +51,7 @@ Für eine neue Website in dieser Reihenfolge:
 
 1. **Branding:** Admin → Auftritt → Branding. Vereinsname, Tagline, Akzentfarbe, Logos (3.1), **Speichern**.
 2. **Vereinsdaten:** Admin → Verein → Vereinsdaten. Name, ZVR-Zahl, Anschrift, Vertretung, Datenschutz-E-Mail,
-   **Rechtliches speichern** (3.3). Ohne diese Daten sind Impressum und Datenschutz leer.
+   **Vereinsdaten speichern** (3.3). Ohne diese Daten sind Impressum und Datenschutz leer.
 3. **Jahreszeiten:** Admin → Auftritt → Jahreszeiten. Vereinsort für das Wetter, dann je Saison an oder aus (3.5).
 4. **Inhalte für die Startseite:** News, Sponsoren, Vorstand und Über-uns-Zahlen pflegen (3.8).
 5. Im Herbst den **Adventkalender** vorbereiten (3.6), im Frühling die **Ostereiersuche** (3.7).
@@ -138,7 +138,7 @@ Ausfüllen:
 - Zusatztexte: **Zusätzliche rechtliche Hinweise**, **Zusätzliche Datenschutzhinweise**, **Ergänzende
   Nutzungsbedingungen** (alle optional)
 
-Mit **Rechtliches speichern** wird gespeichert. Es werden nur die Felder gesendet, die ihr geändert habt. „Keine
+Mit **Vereinsdaten speichern** wird gespeichert. Es werden nur die Felder gesendet, die ihr geändert habt. „Keine
 Änderungen zum Speichern“ heißt: nichts ist anders als vorher.
 
 **Aus Dolibarr übernehmen:** Ist Dolibarr angebunden, kann die Seite Name, ZVR, Behörde, Anschrift, Telefon und die
@@ -249,7 +249,8 @@ Zusätzlich hat jedes Türchen **Titel** und **Text**, optional ein **Bild** und
 **Verlosung ziehen:** Bei einem Gewinn-Türchen gibt es **Ziehen** (oder „Teilnahme beenden und ziehen“). Gezogen wird
 erst, wenn das Türchen offen war. Die Gewinner werden privat benachrichtigt, das Protokoll steht dabei. Ist ein Gewinn
 verfallen, zieht **Nachziehen** Ersatz. Die Übergabe verwaltet ihr unter **Admin → eSports → Gewinne**. Vorstand und
-Verwaltung machen standardmäßig nicht mit (Haken lässt sich setzen).
+Verwaltung machen standardmäßig nicht mit (Haken lässt sich setzen). Ziehen und Nachziehen macht die **Vereinsverwaltung**;
+wer nur Inhalte pflegt, sieht statt der Knöpfe „Gezogen wird von der Vereinsleitung.“
 
 ### 3.7 Ostereiersuche
 
@@ -269,7 +270,8 @@ Ablauf:
    am Karfreitag.
 5. **Auswerten:** Nach Ostermontag zieht **Auswerten** die Verlosung und vergibt die Preise an die drei Schnellsten.
    Alle Gewinner werden privat benachrichtigt. **Das lässt sich nicht rückgängig machen.** Vorstand und Verwaltung
-   gewinnen nicht.
+   gewinnen nicht. Auswerten und die **Teilnehmenden als CSV** sind Sache der Vereinsverwaltung; wer nur Inhalte pflegt,
+   sieht „Ausgewertet wird von der Vereinsleitung.“
 
 Die Kacheln oben: **Stand** (nicht angelegt, Entwurf, freigegeben, läuft, vorbei – auswerten, ausgewertet), **Eier**,
 **Angefangen**, **Voller Korb**. Sobald jemand ein Ei gefunden hat, bleiben die **Verstecke** wie sie sind.
@@ -282,7 +284,7 @@ Die Startseite hat keinen eigenen Editor. Sie setzt sich aus Inhalten zusammen, 
 | --- | --- |
 | Live-Banner, wenn gerade ein Turnier, Event oder Stream läuft | entsteht von selbst |
 | **Heute im Einsatz** über dem Kopf, nur an Tagen mit einem Termin einer laufenden Serie (Runde, Uhrzeit, gemeldete Vereinsfahrer/-spieler, Link zur Serienseite) | Admin → Verein → Serien: Saison auf **Läuft**, Termine und Teilnehmer der Saison |
-| Der große Kopf mit „Ein Rudel. Eine Familie.“ | fester Text, nicht im Admin änderbar |
+| Der große Kopf (Vorgabe „Ein Rudel. Eine Familie.“) und der Satz darunter | Admin → Verein → Über uns, Abschnitt **Kopf der Startseite** |
 | **Angeheftete oder neueste News** und die **nächsten Termine** mit Countdown (der große Countdown nur, wenn ein Termin in den nächsten 14 Tagen liegt) | Admin → Content → News (Haken **Anpinnen**), Admin → Content → Events; ab wann gezählt wird: Admin → Auftritt → Branding, **Countdown ab … Tagen vorher** |
 | **Jahreswertung** | Admin → eSports → Jahreswertung (die aktive Saison) |
 | **Aktuelle News** | Admin → Content → News |
@@ -344,7 +346,7 @@ Entwickler in [docs/entwicklung/design-system.md](../entwicklung/design-system.m
 | Das Logo ist unscharf oder abgeschnitten | Zu kleine Datei oder falsches Seitenverhältnis | Quadratisches PNG in höherer Auflösung hochladen |
 | Das Favicon ist im Browser nicht zu sehen | Browser-Cache, oder nur die Fassung für dunklen Modus hinterlegt | Seite hart neu laden. Besser **Aus Logo und Akzentfarbe erzeugen** nutzen |
 | Änderungen am Branding sieht man nicht | Browser-Cache | Mit `Strg + F5` neu laden |
-| Impressum oder Datenschutz sind leer | Die Vereinsdaten sind nicht ausgefüllt | Admin → Verein → Vereinsdaten ausfüllen, **Rechtliches speichern** |
+| Impressum oder Datenschutz sind leer | Die Vereinsdaten sind nicht ausgefüllt | Admin → Verein → Vereinsdaten ausfüllen, **Vereinsdaten speichern** |
 | „Keine Änderungen zum Speichern.“ | Es wurde nichts geändert | Kein Fehler |
 | Felder in den Vereinsdaten sind grau, „aus Dolibarr“ | Die Vereinsdaten kommen aus dem Vereinsmodul | Dort ändern, oder den Schalter unter Dolibarr → Funktionen ausschalten |
 | „Dolibarr-Stand nicht abrufbar“ | Die Anbindung fehlt oder hat keinen Zugriff | Verbindung unter **Admin → Mitglieder → Dolibarr** prüfen |

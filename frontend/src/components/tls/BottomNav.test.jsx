@@ -27,7 +27,7 @@ beforeEach(() => {
 test("Gast: fünf Einträge, Profil führt zur Anmeldung", () => {
   renderAt("/");
   const links = ["home", "events", "community", "verein", "profile"].map((key) => screen.getByTestId(`bottom-nav-${key}`));
-  expect(links.map((link) => link.textContent)).toEqual(["Home", "Events", "Community", "Verein", "Profil"]);
+  expect(links.map((link) => link.textContent)).toEqual(["Start", "Events", "Community", "Verein", "Profil"]);
   expect(links.map((link) => link.getAttribute("href"))).toEqual(["/", "/events", "/community", "/verein", "/login"]);
   expect(screen.getByTestId("bottom-nav-home")).toHaveAttribute("aria-current", "page");
 });

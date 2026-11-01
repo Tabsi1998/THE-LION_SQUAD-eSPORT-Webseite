@@ -89,7 +89,7 @@ export function LegalTab({ brand, setBrandField, setCanonicalLegalText, saveBran
           <BrandField label="Vereinssitz" value={brand.registered_seat} onChange={(v) => setBrandField("registered_seat", v)} testId="legal-seat" />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <BrandField label="Strasse und Hausnummer" value={brand.street_address} onChange={(v) => setBrandField("street_address", v)} testId="legal-street" {...dolibarrLegal("street_address")} />
+          <BrandField label="Straße und Hausnummer" value={brand.street_address} onChange={(v) => setBrandField("street_address", v)} testId="legal-street" {...dolibarrLegal("street_address")} />
           <BrandField label="Adresszusatz" value={brand.address_extra} onChange={(v) => setBrandField("address_extra", v)} testId="legal-address-extra" />
           <BrandField label="PLZ" value={brand.postal_code} onChange={(v) => setBrandField("postal_code", v)} testId="legal-postal" {...dolibarrLegal("postal_code")} />
           <BrandField label="Ort" value={brand.city} onChange={(v) => setBrandField("city", v)} testId="legal-city" {...dolibarrLegal("city")} />
@@ -97,7 +97,7 @@ export function LegalTab({ brand, setBrandField, setCanonicalLegalText, saveBran
           <BrandField label="Land" value={brand.country} onChange={(v) => setBrandField("country", v)} testId="legal-country" {...dolibarrLegal("country")} />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <BrandField label="Vereinsbehoerde" value={brand.register_authority} onChange={(v) => setBrandField("register_authority", v)} testId="legal-authority" {...dolibarrLegal("register_authority")} />
+          <BrandField label="Vereinsbehörde" value={brand.register_authority} onChange={(v) => setBrandField("register_authority", v)} testId="legal-authority" {...dolibarrLegal("register_authority")} />
           <BrandField label="Telefon" value={brand.phone} onChange={(v) => setBrandField("phone", v)} testId="legal-phone" {...dolibarrLegal("phone")} />
           <BrandField label="Vertretungsbefugte Person" value={brand.representative_name} onChange={(v) => setBrandField("representative_name", v)} testId="legal-representative" {...dolibarrLegal("representative_name")} />
           <BrandField label="Funktion" value={brand.representative_role} onChange={(v) => setBrandField("representative_role", v)} testId="legal-role" {...dolibarrLegal("representative_role")} />
@@ -117,7 +117,7 @@ export function LegalTab({ brand, setBrandField, setCanonicalLegalText, saveBran
         <LegalTextArea label="Zusätzliche rechtliche Hinweise (optional)" value={mergedLegacyText(brand.legal_extra, brand.imprint)} onChange={(v) => setCanonicalLegalText("legal_extra", "imprint", v)} testId="legal-extra" rows={5} />
         <LegalTextArea label="Zusätzliche Datenschutzhinweise (optional)" value={mergedLegacyText(brand.privacy_extra, brand.privacy_policy)} onChange={(v) => setCanonicalLegalText("privacy_extra", "privacy_policy", v)} testId="privacy-extra" rows={6} />
         <LegalTextArea label="Ergänzende Nutzungsbedingungen (optional)" value={brand.terms_of_use || ""} onChange={(v) => setBrandField("terms_of_use", v)} testId="terms-of-use" rows={8} />
-        <button onClick={saveBrand} disabled={saving} data-testid="legal-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">{saving ? "Speichere..." : "Rechtliches speichern"}</button>
+        <button onClick={saveBrand} disabled={saving} data-testid="legal-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">{saving ? "Speichere..." : "Vereinsdaten speichern"}</button>
       </div>
     </div>
   );

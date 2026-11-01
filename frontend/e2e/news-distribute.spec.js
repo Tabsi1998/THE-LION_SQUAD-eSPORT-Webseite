@@ -30,6 +30,7 @@ async function mockApi(page, state) {
     if (url.pathname === "/api/auth/me") return json(EDITOR);
     if (url.pathname === "/api/settings/public") return json({ club_name: "THE LION SQUAD", domain: "lionsquad.at" });
     if (url.pathname === "/api/admin/news") return json([POST]);
+    if (url.pathname === "/api/admin/news/n-1") return json(POST);
     if (url.pathname === "/api/news-meta") return json({ categories: [{ key: "verein", label: "Verein" }] });
     if (url.pathname === "/api/settings/newsletter/state") return json(box(Boolean(state.sent)));
     const list = /notifications|games$|nav$|site-banners|sponsors|partners|tournaments|challenges|events/.test(url.pathname);

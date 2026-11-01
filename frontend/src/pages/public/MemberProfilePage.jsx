@@ -39,7 +39,7 @@ export default function MemberProfilePage() {
   return (
     <PublicLayout>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "Vereinsmitglieder", to: "/members" }, { label: profile?.display_name || "Profil" }]} className="mb-6" />
+        <Breadcrumbs items={[{ label: "Start", to: "/" }, { label: "Vereinsmitglieder", to: "/members" }, { label: profile?.display_name || "Profil" }]} className="mb-6" />
 
         {loading ? (
           <div className="text-white/40 text-sm">Lade Profil...</div>

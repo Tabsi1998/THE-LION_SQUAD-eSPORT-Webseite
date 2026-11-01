@@ -12,7 +12,8 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { formatWhen } from "@/lib/datetime";
 import { compareByNearestDate, sortByNearestDate } from "@/lib/contentSort";
-import { ArrowRight, CalendarDays, Flag, Medal, Radio, Trophy, Users } from "lucide-react";
+import { ArrowRight, CalendarDays, Flag, Medal, Radio, Shield, Trophy, Users } from "lucide-react";
+import { viennaDate } from "@/lib/vienna";
 
 const ACTIVE_PHASES = new Set(["registration", "check_in", "live", "upcoming"]);
 const ACTIVE_STATUSES = new Set(["scheduled", "registration_open", "registration_closed", "check_in", "live"]);
@@ -20,7 +21,7 @@ const ACTIVE_STATUSES = new Set(["scheduled", "registration_open", "registration
 export default function EsportsOverviewPage() {
   useDocumentTitle(
     "eSports",
-    "Alle eSports-Aktivitäten von THE LION SQUAD: Turniere, Fast-Lap-Challenges, Jahreswertung, Live-Brackets und Leaderboards."
+    "Alle eSports-Aktivitäten von THE LION SQUAD: Turniere, Liga, Fast-Lap-Challenges, Jahreswertung, Live-Brackets und Leaderboards."
   );
 
   const [tournaments, setTournaments] = useState([]);
@@ -52,6 +53,14 @@ export default function EsportsOverviewPage() {
   useEffect(() => {
     api.get("/home/about").then(({ data }) => setGames(Array.isArray(data?.games) ? data.games : [])).catch(() => setGames([]));
   }, []);
+  // Liga (#2122 NW10): eine Kachel, sobald die Person eine Season sehen darf - dieselbe Regel wie der Menüpunkt.
+  const [leagues, setLeagues] = useState([]);
+  const loadLeagues = useCallback(() => {
+    api.get("/leagues").then(({ data }) => setLeagues(Array.isArray(data?.leagues) ? data.leagues : [])).catch(() => setLeagues([]));
+  }, []);
+  useEffect(() => { loadLeagues(); }, [loadLeagues]);
+  useApiInvalidation(loadLeagues, ["leagues", "auth"]);
+  const league = leagueTile(leagues);
 
   const activities = useMemo(() => {
     const rows = [
@@ -77,12 +86,17 @@ export default function EsportsOverviewPage() {
             <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">THE LION SQUAD</span>
             <h1 className="mt-3 font-heading text-5xl font-black uppercase leading-none md:text-7xl">eSports</h1>
             <p className="mt-5 max-w-2xl text-base leading-relaxed text-white/70">
-              Turniere, Fast-Lap-Challenges und Jahreswertung an einem Ort. Alles, was aktiv ist oder als Nächstes kommt, findest du hier.
+              {league ? "Turniere, Liga, Fast-Lap-Challenges und Jahreswertung an einem Ort." : "Turniere, Fast-Lap-Challenges und Jahreswertung an einem Ort."} Alles, was aktiv ist oder als Nächstes kommt, findest du hier.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
               <Link to="/tournaments" className="tls-btn tls-btn--primary inline-flex items-center gap-2 rounded-sm px-5 py-3 text-xs font-bold uppercase tracking-wider">
                 Turniere <ArrowRight className="h-4 w-4" />
               </Link>
+              {league && (
+                <Link to="/liga" data-testid="esports-hero-league" className="tls-btn tls-btn--quiet inline-flex items-center gap-2 rounded-sm px-5 py-3 text-xs font-bold uppercase tracking-wider">
+                  Liga <ArrowRight className="h-4 w-4" />
+                </Link>
+              )}
               <Link to="/fastlap" className="tls-btn tls-btn--quiet inline-flex items-center gap-2 rounded-sm px-5 py-3 text-xs font-bold uppercase tracking-wider">
                 Fast Lap <ArrowRight className="h-4 w-4" />
               </Link>
@@ -97,8 +111,9 @@ export default function EsportsOverviewPage() {
       </section>
 
       <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className={`grid gap-4 ${league ? "sm:grid-cols-2 lg:grid-cols-4" : "md:grid-cols-3"}`} data-testid="esports-hub">
           <HubLink to="/tournaments" icon={Trophy} title="Turniere" text="Cups, Brackets, Anmeldung und Ranglisten." />
+          {league && <HubLink to="/liga" icon={Shield} title="Liga" text="Jede Woche ein Spieltag, Tabelle nach jeder Runde." badge={league.badge} testId="esports-hub-league" />}
           <HubLink to="/fastlap" icon={Flag} title="Fast Lap" text="Racing-Challenges mit Strecken und Bestzeiten." />
           <HubLink to="/seasons/current" icon={Medal} title="Jahreswertung" text="Punkte, Podien und Saisonstand." />
         </div>
@@ -160,15 +175,33 @@ function StatCard({ icon: Icon, label, value }) {
   );
 }
 
-function HubLink({ to, icon: Icon, title, text }) {
+/**
+ * Die Kachel „Liga“ (#2122 NW10): da, sobald eine Season sichtbar ist. Die Zeile darunter sagt, ob sie läuft oder
+ * wann sie startet - die nächste startende Season, sonst die laufende.
+ */
+export function leagueTile(leagues, now = Date.now()) {
+  const seasons = (leagues || []).flatMap((league) => (league.seasons || []).map((season) => ({ ...season, league })));
+  if (!seasons.length) return null;
+  const running = seasons.find((season) => season.status === "active");
+  if (running) return { badge: `Läuft: ${running.name || running.league.name || "Season"}` };
+  const upcoming = seasons
+    .filter((season) => season.status !== "completed" && season.start_date)
+    .sort((a, b) => new Date(a.start_date) - new Date(b.start_date))
+    .find((season) => new Date(season.start_date).getTime() >= now - 24 * 3600 * 1000);
+  if (upcoming) return { badge: `Start am ${viennaDate(upcoming.start_date, { day: "numeric", month: "numeric", year: "numeric" })}` };
+  return { badge: seasons.some((season) => season.status !== "completed") ? "Startet bald" : "" };
+}
+
+function HubLink({ to, icon: Icon, title, text, badge = "", testId }) {
   return (
-    <Link to={to} className="tls-card group rounded-sm border border-white/10 bg-[#121212] p-5">
+    <Link to={to} className="tls-card group rounded-sm border border-white/10 bg-[#121212] p-5" data-testid={testId}>
       <div className="flex items-start justify-between gap-4">
         <Icon className="h-6 w-6 text-[#29B6E8]" />
-        <ArrowRight className="h-4 w-4 text-white/25 transition group-hover:text-[#29B6E8]" />
+        <ArrowRight className="h-4 w-4 text-white/25 transition group-hover:text-[#29B6E8] group-hover:translate-x-0.5" />
       </div>
       <h2 className="mt-5 font-heading text-2xl font-black uppercase text-white">{title}</h2>
       <p className="mt-2 text-sm leading-relaxed text-white/55">{text}</p>
+      {badge && <p className="mt-3 inline-flex rounded-sm border border-honor/40 bg-honor/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-honor" data-testid={testId ? `${testId}-badge` : undefined}>{badge}</p>}
     </Link>
   );
 }

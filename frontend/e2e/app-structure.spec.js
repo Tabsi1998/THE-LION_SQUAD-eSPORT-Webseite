@@ -68,7 +68,7 @@ test.describe("Handy (390 px)", () => {
     await expect(nav).toBeVisible();
     // Die Zahl der ungelesenen Chats kommt kurz nach dem Aufbau.
     await expect.poll(() => nav.getByRole("link").evaluateAll((links) => links.map((link) => link.getAttribute("aria-label"))))
-      .toEqual(["Home", "Events", "Community, 3 ungelesene Chats", "Verein", "Profil"]);
+      .toEqual(["Start", "Events", "Community, 3 ungelesene Chats", "Verein", "Profil"]);
     const cases = [["events", /\/events$/], ["community", /\/community$/], ["verein", /\/verein$/], ["profile", /\/u\/neonfalke$/], ["home", /\/dashboard$/]];
     for (const [key, url] of cases) {
       await page.getByTestId(`bottom-nav-${key}`).click();

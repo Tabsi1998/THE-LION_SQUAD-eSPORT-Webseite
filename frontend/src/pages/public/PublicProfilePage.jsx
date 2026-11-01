@@ -557,7 +557,7 @@ export default function PublicProfilePage() {
       {/* Kopf: Banner, Avatar darüber, Name, Pillen, Aktionen, Level und verknüpfte Konten, Zahlen */}
       <header className="border-b border-white/10" data-testid="profile-hero">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-          <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "Spieler", to: "/players" }, { label: displayName }]} />
+          <Breadcrumbs items={[{ label: "Start", to: "/" }, { label: "Spieler", to: "/players" }, { label: displayName }]} />
         </div>
         <div className="relative h-44 sm:h-56 lg:h-72 overflow-hidden bg-[#0F0F10]" data-testid="profile-banner">
           {profile.banner_url ? (

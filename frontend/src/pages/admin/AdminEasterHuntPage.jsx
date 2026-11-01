@@ -305,12 +305,19 @@ export default function AdminEasterHuntPage() {
               ) : (
                 <>
                   <p className="text-sm text-white/60">Nach Ostermontag: die Verlosung unter allen mit vollem Korb und die Preise für die Schnellsten. Vorstand und Verwaltung gewinnen nicht.</p>
-                  <button type="button" onClick={draw} disabled={busy || !view.can_draw} data-testid="easter-admin-run-draw" className="mt-3 rounded-sm bg-[#ffd700] px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-black hover:opacity-90 disabled:opacity-40">Auswerten</button>
+                  {/* Auswerten und die Liste mit E-Mails sind Sache der Vereinsleitung (#2122 NW11). */}
+                  {view.may_draw === false ? (
+                    <p className="mt-3 text-xs text-white/50" data-testid="easter-admin-no-draw">Ausgewertet wird von der Vereinsleitung.</p>
+                  ) : (
+                    <button type="button" onClick={draw} disabled={busy || !view.can_draw} data-testid="easter-admin-run-draw" className="mt-3 rounded-sm bg-[#ffd700] px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-black hover:opacity-90 disabled:opacity-40">Auswerten</button>
+                  )}
                 </>
               )}
-              <a href={`${API}/seasonal/easter/admin/${year}/participants.csv`} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-white/70 hover:text-white" data-testid="easter-admin-csv">
-                <Download className="h-3.5 w-3.5" /> Teilnehmende als CSV (nur Vereinsleitung)
-              </a>
+              {view.may_draw !== false && (
+                <a href={`${API}/seasonal/easter/admin/${year}/participants.csv`} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-white/70 hover:text-white" data-testid="easter-admin-csv">
+                  <Download className="h-3.5 w-3.5" /> Teilnehmende als CSV (nur Vereinsleitung)
+                </a>
+              )}
             </section>
           </>
         )}

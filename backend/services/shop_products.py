@@ -227,7 +227,7 @@ async def _save_offer(db, product_id: str, *, technique: Any, colors: Any, sizes
     else:
         labels = shop_colors.clean_labels(color_labels, chosen_colors)
     offer = {"colors": chosen_colors, "sizes": chosen_sizes, "color_labels": labels}
-    options = shop_options.clean_choice(product, product_options,
+    options = shop_options.clean_choice(product, product_options, technique=technique,
                                         previous=(product.get("offer") or {}).get("options"))
     if options:
         offer["options"] = options

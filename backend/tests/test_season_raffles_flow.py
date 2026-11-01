@@ -411,3 +411,22 @@ async def test_auskunft_nennt_die_teilnahme_und_konto_loeschen_zieht_sie_zurueck
     record = (await flow.post("/api/seasonal/advent/admin/2026/12/draw", json={"close_early": True})).json()["protocol"][0]
     assert record["entries"] == 1 and [winner["user_id"] for winner in record["winners"]] == [bernd["id"]]
     assert "Bei Verlosungen" in next(b for sec in (await flow.get("/api/settings/public/legal/privacy")).json()["sections"] for b in sec["blocks"] if b.get("testid") == "privacy-raffles")["text"]
+
+
+# ------------------------------------------------------------------ Ziehen nur, wer darf (#2122 NW11)
+
+@pytest.mark.asyncio
+async def test_redaktion_sieht_keinen_ziehen_knopf_der_am_server_scheitert(flow, monkeypatch):
+    staff = await flow.add_staff("Vorstand")
+    await save(flow, staff, 12)
+    editor = await flow.add_user(role="player", name="redaktion")
+    await flow.db.users.update_one({"id": editor["id"]}, {"$set": {"areas": ["content"]}})
+    flow.act_as({**editor, "areas": ["content"]})
+    view = (await flow.get("/api/seasonal/advent/admin/2026")).json()
+    state = next(item for item in view["doors"] if item["day"] == 12)["raffle"]
+    assert state["can_draw"] is False and state["may_draw"] is False, "die Redaktion pflegt Türchen, ziehen macht die Vereinsleitung"
+    assert (await flow.post("/api/seasonal/advent/admin/2026/12/draw", json={})).status_code == 403
+
+    flow.act_as(staff)
+    state = next(item for item in (await flow.get("/api/seasonal/advent/admin/2026")).json()["doors"] if item["day"] == 12)["raffle"]
+    assert state["can_draw"] is True and state["may_draw"] is True
