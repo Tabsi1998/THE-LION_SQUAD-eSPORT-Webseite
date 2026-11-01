@@ -271,11 +271,12 @@ async def _media_rows(
     return items, entries
 
 
-async def _add_usage(items: list[dict], entries: list[tuple[Path, os.stat_result]]) -> None:
-    """Wo die Dateien verwendet werden und welche Duplikate sie haben - nur für diese Zeilen."""
+async def _add_usage(items: list[dict], entries: list[tuple[Path, os.stat_result]], with_duplicates: bool = True) -> None:
+    """Wo die Dateien verwendet werden und welche Duplikate sie haben - nur für diese Zeilen. Prüfsummen rechnet ein
+    eigener Thread: Bei großen Dateien stünde sonst jede andere Anfrage still."""
     names = {item["filename"] for item in items}
     usage = await _collect_media_usage(names)
-    duplicates = _duplicate_lookup(entries, names)
+    duplicates = await asyncio.to_thread(_duplicate_lookup, entries, names) if with_duplicates else {}
     for item in items:
         refs = usage.get(item["filename"]) or []
         same = duplicates.get(item["filename"]) or []
@@ -367,7 +368,7 @@ async def _unused_for_cleanup() -> list[dict]:
     newest = now_utc().timestamp() - MEDIA_CLEANUP_MIN_AGE_HOURS * 3600
     modified = {path.name: stat.st_mtime for path, stat in entries}
     items = [item for item in items if item["media_type"] in ("image", "video") and modified[item["filename"]] <= newest]
-    await _add_usage(items, entries)
+    await _add_usage(items, entries, with_duplicates=False)
     unused = [item for item in items if item["is_unused"]]
     referenced = await media_audit.still_referenced(db, {item["filename"] for item in unused})
     return [item for item in unused if item["filename"] not in referenced]
@@ -425,7 +426,8 @@ async def admin_media_replace_duplicates(body: DuplicateReplaceBody, me: dict = 
         raise HTTPException(409, "Diese Datei lässt sich nicht behalten: Sie gehört einem Mitglied, kommt aus der Mitgliederverwaltung oder hat keinen Upload-Eintrag.")
     if await db.media_scans.find_one({"url": f"/api/static/uploads/{body.keep}", "state": {"$in": list(UNDECIDED_SCANS)}}, {"_id": 1}):
         raise HTTPException(409, "Diese Datei ist noch in der Bildprüfung. Bitte die Entscheidung abwarten.")
-    copies = [name for name in _duplicate_lookup(entries, {body.keep}).get(body.keep, []) if name != body.keep and name in editable]
+    same_content = await asyncio.to_thread(_duplicate_lookup, entries, {body.keep})
+    copies = [name for name in same_content.get(body.keep, []) if name != body.keep and name in editable]
     if not copies:
         raise HTTPException(409, "Zu dieser Datei gibt es keine Kopien mehr.")
     meta = await db.media_uploads.find_one({"filename": body.keep}, {"_id": 0, "version": 1})

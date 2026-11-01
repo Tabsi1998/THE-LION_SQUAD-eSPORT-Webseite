@@ -339,6 +339,22 @@ async def test_replacing_an_svg_keeps_a_png_address_as_png(flow, public):
 
 
 @pytest.mark.asyncio
+async def test_cleanup_does_not_work_out_any_checksums(flow, public, monkeypatch):
+    await admin(flow)
+    add_file(public, "alt.webp", content=b"gleich", age=OLD)
+    add_file(public, "kopie.webp", content=b"gleich", age=OLD)
+    await track(flow, "alt.webp")
+
+    def forbidden(_path):
+        raise AssertionError("Prüfsumme gerechnet")
+
+    monkeypatch.setattr(phase_fg_routes, "_file_digest", forbidden)
+    preview = (await flow.get("/api/admin/media/unused")).json()
+
+    assert preview["filenames"] == ["alt.webp"]
+
+
+@pytest.mark.asyncio
 async def test_cleanup_reads_every_document_even_in_a_huge_collection(flow, public, monkeypatch):
     await admin(flow)
     add_file(public, "alt.webp", age=OLD)
