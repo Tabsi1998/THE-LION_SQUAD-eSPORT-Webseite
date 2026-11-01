@@ -102,7 +102,8 @@ async def test_team_registration_goes_the_same_way(flow):
     flow.act_as(leader)
     # Solange die Ablehnung steht, ist das Team „bereits angemeldet“.
     assert (await flow.post(f"/api/tournaments/{tournament['id']}/register", json={**BODY, "team_id": team_id})).status_code == 409
-    assert (await flow.delete(f"/api/tournaments/{tournament['id']}/registrations/{registration['id']}")).status_code == 200
+    deleted = await flow.delete(f"/api/tournaments/{tournament['id']}/registrations/{registration['id']}")
+    assert deleted.status_code == 200
     assert await _mine(flow, tournament) == []
     fresh = await flow.post(f"/api/tournaments/{tournament['id']}/register", json={**BODY, "team_id": team_id})
     assert fresh.status_code == 200, fresh.text
@@ -115,7 +116,8 @@ async def test_staff_still_delete_for_real(flow):
     staff = await flow.add_staff()
     tournament, registration, _player = await _rejected_solo(flow)
     flow.act_as(staff)
-    assert (await flow.delete(f"/api/tournaments/{tournament['id']}/registrations/{registration['id']}")).status_code == 200
+    deleted = await flow.delete(f"/api/tournaments/{tournament['id']}/registrations/{registration['id']}")
+    assert deleted.status_code == 200
     assert await _stored(flow, registration) is None
 
 
