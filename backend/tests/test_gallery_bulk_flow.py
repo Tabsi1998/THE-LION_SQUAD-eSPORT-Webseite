@@ -12,7 +12,8 @@ import pytest_asyncio
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
-from routes import phase_fg_routes  # noqa: E402
+from models import GALLERY_ALBUM_MAX_PHOTOS  # noqa: E402
+from routes import news_routes, phase_fg_routes  # noqa: E402
 
 URL = "/api/static/uploads/foto.webp"
 
@@ -70,6 +71,22 @@ async def test_bulk_move_checks_the_section(flow):
 
     unknown = await flow.post("/api/gallery/a-1/photos/bulk", json={"ids": ["p-1"], "action": "move", "section_id": "gibt-es-nicht"})
     assert unknown.status_code in (400, 404, 422)
+
+
+@pytest.mark.asyncio
+async def test_select_all_works_for_the_largest_album_the_admin_page_loads(flow):
+    await editor(flow)
+    await album_with_photos(flow)
+    ids = [f"p-{index}" for index in range(GALLERY_ALBUM_MAX_PHOTOS)]
+
+    response = await flow.post("/api/gallery/a-1/photos/bulk", json={"ids": ids, "action": "delete"})
+    too_many = await flow.post("/api/gallery/a-1/photos/bulk", json={"ids": [*ids, "eins-zu-viel"], "action": "delete"})
+
+    assert response.status_code == 200, response.text
+    assert too_many.status_code == 422
+    # Die Seite lädt je Album genau so viele: Die beiden Zahlen gehören zusammen.
+    source = pathlib.Path(news_routes.__file__).read_text(encoding="utf-8")
+    assert f"to_list({GALLERY_ALBUM_MAX_PHOTOS})" in source
 
 
 @pytest.mark.asyncio
