@@ -23,6 +23,7 @@ Job auf: Chat und Daten sind weg, nur Name und Kürzel bleiben, damit alte Turni
 """
 from __future__ import annotations
 
+import logging
 import re
 from datetime import datetime, timedelta
 
@@ -30,6 +31,9 @@ from fastapi import HTTPException
 from pymongo.errors import DuplicateKeyError
 
 from models import TEAM_TAG_MAX_LENGTH, TEAM_TAG_MIN_LENGTH, new_id, now_utc
+from services.log_safe import log_safe
+
+logger = logging.getLogger("tls.teams")
 
 NOT_STARTED = {"draft", "scheduled", "registration_open", "registration_closed"}
 FINISHED = {"completed", "results_published", "archived", "cancelled"}
@@ -160,10 +164,13 @@ async def dissolve(db, team: dict, actor: dict) -> dict:
 
 
 async def _tell_members(team: dict, actor: dict, **note) -> None:
-    from routes.team_routes import _tell
+    from services.user_notifications import create_user_notification
 
     for user_id in sorted(set(team.get("member_ids") or []) - {actor.get("id")}):
-        await _tell(user_id, meta={"team_id": team["id"]}, **note)
+        try:
+            await create_user_notification(user_id, meta={"team_id": team["id"]}, **note)
+        except Exception:  # noqa: BLE001 - das Team ist schon aufgelöst bzw. zurück; eine Nachricht hält das nicht auf
+            logger.warning("[teams] Nachricht an %s nicht verschickt", log_safe(user_id), exc_info=True)
 
 
 def is_restorable(row: dict | None, now: datetime | None = None) -> bool:
