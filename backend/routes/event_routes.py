@@ -496,7 +496,8 @@ async def list_events(
         safe_limit = max(1, min(int(limit or 48), 200))
         safe_offset = max(0, int(offset or 0))
         total = await db.events.count_documents(q)
-        events = await db.events.find(q, projection).sort("start_date", -1).skip(safe_offset).limit(safe_limit).to_list(safe_limit)
+        # Mit Zweitschlüssel: Gleiche Termine ließen sonst beim Blättern Events doppelt erscheinen oder ausfallen.
+        events = await db.events.find(q, projection).sort([("start_date", -1), ("id", 1)]).skip(safe_offset).limit(safe_limit).to_list(safe_limit)
     else:
         fetch_limit = max(200, min(max(int(limit or 48), 1) + max(int(offset or 0), 0) + 80, 500))
         events = await db.events.find(q, projection).sort("start_date", 1 if upcoming else -1).to_list(fetch_limit)

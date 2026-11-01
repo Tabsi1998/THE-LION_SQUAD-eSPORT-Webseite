@@ -166,6 +166,13 @@ async def test_verwaltung_oeffnet_auch_das_201_event_und_blaettert(flow):
     assert page["total"] == 205 and page["offset"] == 200 and len(page["items"]) == 5
     assert page["items"][-1]["id"] == "ev-204" and page["items"][-1]["active_registration_count"] == 0
 
+    # Gleicher Termin: beim Blättern kein Event doppelt, keines fehlt.
+    await flow.db.events.update_many({}, {"$set": {"start_date": base.isoformat()}})
+    seen = []
+    for offset in (0, 100, 200):
+        seen += [row["id"] for row in (await flow.get("/api/events", params={"include_drafts": "true", "paged": "true", "limit": 100, "offset": offset})).json()["items"]]
+    assert len(seen) == 205 and len(set(seen)) == 205 and seen == sorted(seen)
+
     member = await flow.add_user(role="player", name="mitglied")
     flow.act_as(member)
     assert (await flow.get("/api/admin/events/ev-204")).status_code == 403
