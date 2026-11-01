@@ -327,6 +327,7 @@ def can_edit(event: dict, registration: dict | None, now=None) -> bool:
     return edit_block_reason(event, registration, now) is None
 
 
+REGISTRATION_CLOSED_COMPANIONS = "Die Anmeldung ist geschlossen – mehr Begleitpersonen trägt jetzt nur die Turnierleitung ein."
 NO_SEATS_FOR_COMPANIONS = "Für so viele Begleitpersonen ist kein Platz mehr frei – trag weniger ein oder frag die Turnierleitung."
 INVOICED_COMPANIONS = ("Deine Rechnung ist schon erstellt – die Zahl der Begleitpersonen ändert jetzt nur die Turnierleitung. "
                        "Den Hinweis kannst du weiter selbst ändern.")
@@ -367,6 +368,9 @@ async def _update_own(db, event: dict, me: dict, changes: dict, *, via: str) -> 
         return {**reg, "unchanged": True}
     seats_changed = "seat_count" in updates
     active = reg.get("status") in ACTIVE_STATUSES
+    # Mehr Plätze sind eine neue Anmeldung im Kleinen - nur, solange die Anmeldung offen ist. Weniger und der Hinweis gehen.
+    if seats_changed and new_seats > seats(reg) and not registration_open(event):
+        raise RegistrationError(409, REGISTRATION_CLOSED_COMPANIONS)
     if seats_changed and active and new_seats > seats(reg) and event.get("max_participants"):
         counts = await summary(db, event, exclude_registration_id=reg["id"])
         if counts["reserved_seats"] + new_seats > int(event["max_participants"]):

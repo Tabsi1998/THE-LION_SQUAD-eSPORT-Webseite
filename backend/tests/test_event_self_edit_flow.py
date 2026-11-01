@@ -167,3 +167,16 @@ async def test_changed_offer_is_not_applied_by_the_person_herself(flow):
     assert refused.status_code == 409 and "Kosten" in refused.json()["detail"]
     row = await stored(flow, event)
     assert row["price_snapshot"]["total_cents"] == first["price_snapshot"]["total_cents"] and row["companion_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_after_registration_closed_no_more_companions_but_fewer_and_note_go(flow):
+    event, _paula = await setup_event(flow, companions=1)
+    await flow.db.events.update_one({"id": event["id"]}, {"$set": {"registration_closes_at": (now_utc() - timedelta(days=1)).isoformat()}})
+    more = await flow.patch(f"/api/events/{event['id']}/registrations/me", json={"companion_count": 3})
+    assert more.status_code == 409 and "geschlossen" in more.json()["detail"]
+    assert (await stored(flow, event))["companion_count"] == 1
+    fewer = await flow.patch(f"/api/events/{event['id']}/registrations/me", json={"companion_count": 0, "note": "nur ich"})
+    assert fewer.status_code == 200, fewer.text
+    row = await stored(flow, event)
+    assert row["companion_count"] == 0 and row["note"] == "nur ich"
