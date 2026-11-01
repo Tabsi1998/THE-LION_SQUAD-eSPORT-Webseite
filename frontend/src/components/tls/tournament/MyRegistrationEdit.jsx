@@ -62,7 +62,7 @@ function EditSheet({ tournament, details, onClose, onSaved }) {
         <p className="text-sm text-white/60">
           {details.is_team ? "Das gilt für die Anmeldung deines Teams." : "Das gilt nur für dieses Turnier."} Dein Profil bleibt, wie es ist.
         </p>
-        {locked && <p className="rounded-sm border border-[#FFD700]/35 bg-[#FFD700]/5 p-3 text-sm text-white/75" data-testid="my-registration-locked">{details.ids_locked_reason}</p>}
+        {locked && <p className="rounded-sm border border-warn/35 bg-warn/5 p-3 text-sm text-white/75" data-testid="my-registration-locked">{details.ids_locked_reason}</p>}
         <label className="block">
           <div className={LABEL}>Ingame-Name</div>
           <input value={name} onChange={(e) => { setName(e.target.value); setError(""); }} disabled={locked} required={!locked} maxLength={64} data-testid="my-registration-name" className={INPUT} />

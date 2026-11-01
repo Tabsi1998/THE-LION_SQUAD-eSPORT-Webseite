@@ -48,7 +48,7 @@ export function MyStandCard({ tournament: t, registration: myReg, team = null, i
       {step >= 0 ? <StepBar steps={steps} current={step} className="tls-steps--gold mt-3" testId="tournament-my-steps" /> : null}
       {/* Abgelehnt (#2113, L-C3): sagen, was das heißt und was jetzt geht - der Grund steht in der Nachricht. */}
       {myReg.status === "rejected" ? (
-        <div className="mt-3 rounded-sm border border-[#FF3B30]/30 bg-[#FF3B30]/5 p-3 text-sm" data-testid="tournament-rejected-note">
+        <div className="mt-3 rounded-sm border border-warn/35 bg-warn/5 p-3 text-sm" data-testid="tournament-rejected-note">
           <p className="text-white/80">Die Turnierleitung hat {isTeamTournament ? "die Anmeldung deines Teams" : "deine Anmeldung"} abgelehnt. Den Grund findest du, falls angegeben, in deiner Benachrichtigung; Fragen klärt die Turnierleitung.</p>
           {canRemoveRejected ? (
             <button type="button" onClick={onRemoveRejected} disabled={busy} data-testid="tournament-remove-rejected" className="tls-btn tls-btn--quiet mt-2 min-h-11 rounded-sm px-4 text-xs font-bold uppercase tracking-wider disabled:opacity-50">Anmeldung entfernen</button>
