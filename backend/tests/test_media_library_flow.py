@@ -262,6 +262,45 @@ async def test_replacing_keeps_a_copy_that_a_stored_result_still_shows(flow, pub
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("keep", ["mitglied.webp", "ohne-eintrag.webp", "dolibarr-partner-1-logo-dark-abc.webp", "in-pruefung.webp"])
+async def test_only_a_settled_editorial_upload_can_be_the_kept_file(flow, public, keep):
+    await admin(flow)
+    for name in ("redaktion.webp", keep):
+        add_file(public, name, content=b"gleich", age=OLD)
+    await track(flow, "redaktion.webp")
+    await flow.db.news_posts.insert_one({"id": "n-1", "banner_url": UPLOADS + "redaktion.webp"})
+    if keep == "mitglied.webp":
+        await track(flow, keep, scope="user", owner_role="user", owner_id="u-9")
+    elif keep != "ohne-eintrag.webp":
+        await track(flow, keep)
+    if keep == "in-pruefung.webp":
+        await flow.db.media_scans.insert_one({"id": "sc-1", "kind": "upload", "url": UPLOADS + keep, "state": "pending"})
+
+    response = await flow.post("/api/admin/media/duplicates/replace", json={"keep": keep})
+
+    assert response.status_code == 409, response.text
+    assert (public / "redaktion.webp").exists()
+    assert (await flow.db.news_posts.find_one({"id": "n-1"}))["banner_url"] == UPLOADS + "redaktion.webp"
+
+
+@pytest.mark.asyncio
+async def test_copies_without_an_upload_entry_or_from_the_member_system_stay(flow, public):
+    await admin(flow)
+    for name in ("bleibt.webp", "kopie.webp", "ohne-eintrag.webp", "dolibarr-partner-1-logo-dark-abc.webp"):
+        add_file(public, name, content=b"gleich", age=OLD)
+    await track(flow, "bleibt.webp")
+    await track(flow, "kopie.webp")
+    await track(flow, "dolibarr-partner-1-logo-dark-abc.webp")
+
+    response = await flow.post("/api/admin/media/duplicates/replace", json={"keep": "bleibt.webp"})
+
+    assert response.status_code == 200, response.text
+    assert response.json()["removed"] == 1
+    assert not (public / "kopie.webp").exists()
+    assert (public / "ohne-eintrag.webp").exists() and (public / "dolibarr-partner-1-logo-dark-abc.webp").exists()
+
+
+@pytest.mark.asyncio
 async def test_collective_actions_need_the_editorial_area(flow, public):
     moderator = await flow.add_user(role="moderator", name="moni")
     flow.act_as(moderator)

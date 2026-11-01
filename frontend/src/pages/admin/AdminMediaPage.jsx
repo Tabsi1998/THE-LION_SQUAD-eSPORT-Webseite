@@ -664,7 +664,7 @@ export default function AdminMediaPage() {
           onRotateLeft={() => rotateImage(selected, -90)}
           onRotateRight={() => rotateImage(selected, 90)}
           onDelete={() => del(selected)}
-          onKeepDuplicate={selected.duplicate_count > 1 ? () => keepDuplicate(selected) : undefined}
+          onKeepDuplicate={selected.duplicate_count > 1 && selected.tracked && selected.media_scope !== "user" ? () => keepDuplicate(selected) : undefined}
         />
       )}
     </AdminLayout>
