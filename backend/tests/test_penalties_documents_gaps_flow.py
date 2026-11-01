@@ -132,7 +132,8 @@ async def test_create_update_delete_are_logged_and_delete_takes_the_file(flow, d
     audit = await flow.db.audit_logs.find_one({"action": "document.delete"})
     assert audit["data"] == {"title": "Statuten 2027", "category": "statutes", "file_removed": True}
 
-    assert (await flow.delete(f"/api/documents/{doc_id}")).status_code == 404
+    removed = await flow.delete(f"/api/documents/{doc_id}")
+    assert removed.status_code == 404
 
 
 @pytest.mark.asyncio
@@ -153,11 +154,14 @@ async def test_a_shared_file_stays(flow, doc_dir):
     mappe = await stored_doc(flow, doc_dir, key="mappe.pdf")
     await flow.db.settings.insert_one({"id": "sponsoring_offer", "pdf_key": "mappe.pdf"})
     flow.act_as(chair)
-    assert (await flow.delete(f"/api/documents/{first['id']}")).json()["file_removed"] is False
+    removed = await flow.delete(f"/api/documents/{first['id']}")
+    assert removed.json()["file_removed"] is False
     assert (doc_dir / "protokoll.pdf").exists()
-    assert (await flow.delete(f"/api/documents/{second['id']}")).json()["file_removed"] is True
+    removed = await flow.delete(f"/api/documents/{second['id']}")
+    assert removed.json()["file_removed"] is True
     assert not (doc_dir / "protokoll.pdf").exists()
-    assert (await flow.delete(f"/api/documents/{mappe['id']}")).json()["file_removed"] is False
+    removed = await flow.delete(f"/api/documents/{mappe['id']}")
+    assert removed.json()["file_removed"] is False
     assert (doc_dir / "mappe.pdf").exists()
 
 
@@ -177,9 +181,11 @@ async def test_an_old_public_file_stays_while_something_uses_it(flow, monkeypatc
     collection, fields, _text = media_audit.usage_places()[0]
     await getattr(flow.db, collection).insert_one({"id": new_id(), fields[0]: "/api/static/uploads/alt.pdf"})
     flow.act_as(await chair_of(flow))
-    assert (await flow.delete(f"/api/documents/{used['id']}")).json()["file_removed"] is False
+    removed = await flow.delete(f"/api/documents/{used['id']}")
+    assert removed.json()["file_removed"] is False
     assert (uploads / "alt.pdf").exists()
-    assert (await flow.delete(f"/api/documents/{free['id']}")).json()["file_removed"] is True
+    removed = await flow.delete(f"/api/documents/{free['id']}")
+    assert removed.json()["file_removed"] is True
     assert not (uploads / "frei.pdf").exists()
 
 
@@ -187,7 +193,8 @@ async def test_an_old_public_file_stays_while_something_uses_it(flow, monkeypatc
 async def test_only_the_club_area_changes_documents(flow, doc_dir):
     doc = await stored_doc(flow, doc_dir)
     flow.act_as(await flow.add_user(role="moderator", name="moderator"))
-    assert (await flow.delete(f"/api/documents/{doc['id']}")).status_code == 403
+    removed = await flow.delete(f"/api/documents/{doc['id']}")
+    assert removed.status_code == 403
     assert (doc_dir / "protokoll.pdf").exists()
 
 

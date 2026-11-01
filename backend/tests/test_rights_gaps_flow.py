@@ -160,12 +160,15 @@ async def test_a_profile_with_a_post_or_a_reference_cannot_be_deleted_or_handed_
     with_reference = await flow.delete(f"/api/membership/profiles/admin/{reference_profile}")
     assert with_reference.status_code == 409 and "eine Referenz" in with_reference.json()["detail"]
 
-    assert (await flow.delete(f"/api/membership/profiles/admin/{free_profile}")).status_code == 200
-    assert (await flow.delete(f"/api/membership/profiles/admin/{free_profile}")).status_code == 404
+    removed = await flow.delete(f"/api/membership/profiles/admin/{free_profile}")
+    assert removed.status_code == 200
+    removed = await flow.delete(f"/api/membership/profiles/admin/{free_profile}")
+    assert removed.status_code == 404
 
     # Posten neu besetzt: jetzt geht es.
     assert (await flow.patch(f"/api/board/{pid}", json={"user_id": ""})).status_code == 200
-    assert (await flow.delete(f"/api/membership/profiles/admin/{profile_id}")).status_code == 200
+    removed = await flow.delete(f"/api/membership/profiles/admin/{profile_id}")
+    assert removed.status_code == 200
 
 
 @pytest.mark.asyncio
@@ -176,7 +179,8 @@ async def test_a_post_on_the_account_also_blocks_deleting_the_profile(flow):
     await flow.db.club_member_profiles.insert_one({"id": profile_id, "slug": "erika", "display_name": "Erika", "user_id": erika["id"]})
     await position(flow, deputy_user_id=erika["id"], is_active=False)
     flow.act_as(chair)
-    assert (await flow.delete(f"/api/membership/profiles/admin/{profile_id}")).status_code == 409
+    removed = await flow.delete(f"/api/membership/profiles/admin/{profile_id}")
+    assert removed.status_code == 409
 
 
 # ---------------------------------------------------------------- MG25: Vereinsdaten

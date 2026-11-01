@@ -330,9 +330,11 @@ async def test_exit_is_a_declaration_for_the_board_and_ending_clears_it(flow):
     assert await flow.db.notifications.count_documents({"user_id": erika["id"], "kind": "membership_decision"}) == 1
 
     # Zurücknehmen, solange der Vorstand nichts getan hat.
-    assert (await flow.delete("/api/membership/me/exit")).status_code == 200
+    removed = await flow.delete("/api/membership/me/exit")
+    assert removed.status_code == 200
     assert "exit_request" not in await flow.db.memberships.find_one({"user_id": erika["id"]})
-    assert (await flow.delete("/api/membership/me/exit")).status_code == 404
+    removed = await flow.delete("/api/membership/me/exit")
+    assert removed.status_code == 404
 
     await flow.post("/api/membership/me/exit", json={})
     flow.act_as(chair)
