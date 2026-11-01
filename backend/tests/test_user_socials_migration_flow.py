@@ -94,3 +94,17 @@ def test_migration_is_registered_once_with_the_next_free_number():
     versions = [version for version, _name, _run in migrations.MIGRATIONS]
     assert len(versions) == len(set(versions)) and versions == sorted(versions)
     assert ("user_socials_to_profile_fields" in {name for _version, name, _run in migrations.MIGRATIONS})
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("extra", [{}, {"visibility": "geheim"}, {"visibility": None}])
+async def test_without_a_valid_level_the_value_stays_hidden(flow, extra):
+    """Das alte Profil zeigte nur „public“: ein Eintrag ohne gültige Stufe war unsichtbar und darf nicht öffentlich werden."""
+    person = await flow.add_user(name=f"person-{new_id()[:6]}")
+    await flow.db.users.update_one({"id": person["id"]}, {"$set": {"privacy_public_profile": True}})
+    await flow.db.user_socials.insert_one({"id": new_id(), "user_id": person["id"], "platform": "youtube", "value": "ohne_stufe", **extra})
+    await user_socials_migration.migrate(flow.db)
+    stored = await flow.db.users.find_one({"id": person["id"]}, {"_id": 0})
+    assert stored["youtube_handle"] == "ohne_stufe" and stored["profile_visibility"]["youtube"] == "private"
+    flow.act_as(None)
+    assert not (await flow.get(f"/api/users/public/{person['username']}")).json().get("youtube_handle")

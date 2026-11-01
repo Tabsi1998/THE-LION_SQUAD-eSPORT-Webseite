@@ -60,9 +60,9 @@ async def migrate(db, keep_lease: Callable[[], Awaitable[bool]] | None = None) -
                 continue
             same += 1
         else:
-            update = {field: value}
-            if row.get("visibility") in LEVELS:
-                update[f"profile_visibility.{platform}"] = row["visibility"]
+            # Ohne gültige Stufe war der Eintrag unsichtbar (das Profil las nur „public“) - das bleibt so.
+            level = row.get("visibility") if row.get("visibility") in LEVELS else "private"
+            update = {field: value, f"profile_visibility.{platform}": level}
             await db.users.update_one({"id": user["id"]}, {"$set": update})
             moved += 1
         await db.user_socials.delete_one({"_id": row["_id"]})
