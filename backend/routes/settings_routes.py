@@ -2190,11 +2190,6 @@ async def update_amp(body: AmpSettings, me: dict = Depends(require_club_admin())
             updates[key] = updates[key].strip()
     if updates.get("base_url") and not updates["base_url"].lower().startswith("https://"):
         raise HTTPException(400, "Die AMP-Adresse muss mit https:// beginnen; über http würden Zugangsdaten offen übertragen.")
-    if updates.get("base_url"):
-        from services.outbound_address import outbound_block_reason
-        reason = await outbound_block_reason(updates["base_url"])
-        if reason:
-            raise HTTPException(400, reason)
     if "password" in updates:
         password = str(updates["password"]).strip()
         if password:
@@ -2203,6 +2198,12 @@ async def update_amp(body: AmpSettings, me: dict = Depends(require_club_admin())
             updates.pop("password")
 
     current = await db.settings.find_one({"id": "amp"}, {"_id": 0}) or {}
+    # Nur eine neue Adresse: Eine schon gespeicherte darf das Speichern anderer Felder nicht sperren.
+    if updates.get("base_url") and updates["base_url"] != (current.get("base_url") or ""):
+        from services.outbound_address import outbound_block_reason
+        reason = await outbound_block_reason(updates["base_url"])
+        if reason:
+            raise HTTPException(400, reason)
     # Neue Adresse (#2112): das gespeicherte Passwort gehört zur bisherigen - es geht nur mit neu eingetragenem Passwort.
     if ("base_url" in updates and updates["base_url"] != (current.get("base_url") or "")
             and secret_is_configured(current.get("password")) and "password" not in updates and not clear_password):

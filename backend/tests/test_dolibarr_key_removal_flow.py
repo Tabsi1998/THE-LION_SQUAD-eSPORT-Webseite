@@ -140,3 +140,15 @@ async def test_home_network_names_and_a_local_test_setup_stay_possible(flow, fak
     assert back.status_code == 400
     metadata = await flow.put("/api/admin/dolibarr/settings", json={"environment": "test", "base_url": "http://169.254.169.254"})
     assert metadata.status_code == 400
+
+@pytest.mark.asyncio
+async def test_a_stored_address_does_not_block_saving_other_fields(flow, fake_dns):
+    admin = await flow.add_user(role="superadmin", name="admin")
+    flow.act_as(admin)
+    # Eine Altadresse aus der Zeit vor der Prüfung: Wer nur etwas anderes speichert, kommt weiter durch.
+    await flow.db.settings.update_one({"id": "dolibarr"}, {"$set": {"id": "dolibarr", "base_url": "https://192.168.2.100"}},
+                                      upsert=True)
+    same = await flow.put("/api/admin/dolibarr/settings", json={"base_url": "https://192.168.2.100", "api_key": "neu"})
+    assert same.status_code == 200, same.text
+    other = await flow.put("/api/admin/dolibarr/settings", json={"base_url": "https://192.168.2.101", "api_key": "neu"})
+    assert other.status_code == 400, "eine neue Heimnetz-IP bleibt abgelehnt"

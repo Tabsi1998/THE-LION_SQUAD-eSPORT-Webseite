@@ -470,7 +470,9 @@ async def update_dolibarr_settings(body: DolibarrSettingsUpdate, me: dict = Depe
             clean_base_url(current["base_url"], environment=environment)
         except DolibarrError:
             raise HTTPException(400, "Die gespeicherte Adresse ist für diese Umgebung nicht zulässig (https nötig).")
-    target = updates.get("base_url") if "base_url" in updates else (current.get("base_url") if "environment" in updates else "")
+    # Nur bei neuer Adresse oder Umgebung: Eine schon gespeicherte Adresse darf das Speichern anderer Felder nicht sperren.
+    changed = "base_url" in updates and updates["base_url"] != (current.get("base_url") or "")
+    target = updates.get("base_url", current.get("base_url")) if changed or environment != current["environment"] else ""
     if target:
         from services.outbound_address import outbound_block_reason
         # Eine Testumgebung darf auf dem eigenen Rechner laufen (http://localhost), die Produktion nicht (#2112).
