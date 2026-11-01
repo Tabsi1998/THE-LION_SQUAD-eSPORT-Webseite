@@ -38,7 +38,7 @@ den Bereich (`services/permissions.is_tournament_lead`), nicht eine Rollenliste.
 Vereinsverwaltung von selbst. Die Besetzung der Posten ist damit eine Rechtevergabe – deshalb (#1355): besetzt
 wird über die Personensuche nur mit Vereinsmitgliedern (der Server lehnt andere ab), vorher nennt ein Satz die Rechte
 („… wird Kassier:in und bekommt damit die Vereinsverwaltung: Mitgliederdaten, Anträge, Dokumente, Benutzer.“), eine
-Rückfrage bestätigt, und jede Besetzung steht im Protokoll (`board.assign`). Aktivieren und Deaktivieren bringt oder nimmt die Vereinsverwaltung: mit Rückfrage und Protokoll (`board.status`); dazu `board.create`, `board.update`, `board.delete` (#2125). Kommen die Rechte aus Dolibarr-Funktionen,
+Rückfrage bestätigt, und jede Besetzung steht im Protokoll (`board.assign`). Aktivieren und Deaktivieren bringt oder nimmt die Vereinsverwaltung: mit Rückfrage und Protokoll (`board.status`); dazu `board.create`, `board.update`, `board.delete` (#2125). Solange jemand einen lokalen Posten hält, lehnt der Server den Wechsel der Mitgliedschaft auf einen nicht aktiven Status ab (409): zuerst den Posten neu besetzen. Kommen die Rechte aus Dolibarr-Funktionen,
 sagt der Satz „Der Posten ist nur für die Anzeige – die Rechte kommen aus Dolibarr.“ Führt Dolibarr den Vorstand,
 lässt sich hier nichts ändern (Server: 409). Besetzen dürfen Vereinsverwaltung und System.
 

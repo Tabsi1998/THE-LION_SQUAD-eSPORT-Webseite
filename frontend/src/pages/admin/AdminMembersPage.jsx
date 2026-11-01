@@ -351,7 +351,7 @@ function EditModal({ entry, meta, onClose, onSave }) {
       )}
       {exitText && (
         <p className="border border-[#FF9500]/40 bg-[#FF9500]/5 rounded-sm p-3 text-xs text-white/80" data-testid="edit-exit-request">
-          {exitText} Setze den Status auf „Ehemalig“, wenn es so weit ist – die Person bleibt bis dahin Mitglied.
+          {exitText} Setze den Status auf „Ehemalig“, wenn es so weit ist – die Person bleibt bis dahin Mitglied. Hält sie einen Vorstandsposten, besetze ihn zuerst neu.
         </p>
       )}
       <FormGrid>

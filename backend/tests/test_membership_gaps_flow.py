@@ -415,6 +415,43 @@ async def test_exit_is_a_declaration_for_the_board_and_ending_clears_it(flow):
 
 
 @pytest.mark.asyncio
+async def test_a_board_holder_cannot_end_the_membership_before_the_post_is_filled(flow):
+    chair = await chair_of(flow)
+    erika = await flow.add_user(name="erika")
+    await flow.db.memberships.insert_one({"user_id": erika["id"], "member_status": "active", "member_number": "TLS-2026-0001"})
+    profile_id, post = new_id(), new_id()
+    await flow.db.club_member_profiles.insert_one({"id": profile_id, "slug": "erika", "display_name": "Erika", "user_id": erika["id"]})
+    await flow.db.board_positions.insert_one({"id": post, "slug": "kassier", "title_male": "Kassier", "is_active": True, "user_id": profile_id})
+    flow.act_as(erika)
+    assert (await flow.post("/api/membership/me/exit", json={})).status_code == 200, "erklären geht immer"
+    flow.act_as(chair)
+    for status in ("former", "inactive", "blocked", "none"):
+        refused = await flow.put(f"/api/membership/user/{erika['id']}", json={"member_status": status})
+        assert refused.status_code == 409 and "Zuerst den Posten neu besetzen" in refused.json()["detail"], status
+    stored = await flow.db.memberships.find_one({"user_id": erika["id"]})
+    assert stored["member_status"] == "active" and stored["exit_request"]
+    assert await mails_to(flow, erika) == []
+    # Eine Notiz ist kein Statuswechsel.
+    assert (await flow.put(f"/api/membership/user/{erika['id']}", json={"member_status": "active", "notes": "x"})).status_code == 200
+
+    assert (await flow.patch(f"/api/board/{post}", json={"user_id": ""})).status_code == 200
+    assert (await flow.put(f"/api/membership/user/{erika['id']}", json={"member_status": "former"})).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_a_post_only_for_display_does_not_block(flow, monkeypatch):
+    from services import dolibarr_policy
+
+    monkeypatch.setattr(dolibarr_policy, "policy_active", lambda _settings: True)
+    chair = await chair_of(flow)
+    erika = await flow.add_user(name="erika")
+    await flow.db.memberships.insert_one({"user_id": erika["id"], "member_status": "active"})
+    await flow.db.board_positions.insert_one({"id": new_id(), "slug": "kassier", "title_male": "Kassier", "is_active": True, "user_id": erika["id"]})
+    flow.act_as(chair)
+    assert (await flow.put(f"/api/membership/user/{erika['id']}", json={"member_status": "former"})).status_code == 200
+
+
+@pytest.mark.asyncio
 async def test_exit_needs_a_running_membership_not_led_by_dolibarr(flow, monkeypatch):
     from routes import membership_routes
 

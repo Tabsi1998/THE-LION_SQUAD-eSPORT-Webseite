@@ -902,6 +902,20 @@ async def list_memberships(
     return out
 
 
+async def _refuse_while_holding_post(db, user_id: str) -> None:
+    """Wer nicht mehr Mitglied ist, behielte über den Vorstandsposten die Vereinsverwaltung (#2125). Führt Dolibarr den Vorstand
+    oder die Rechte, lässt sich der Posten hier nicht besetzen und bringt nichts - dann gilt die Sperre nicht."""
+    from routes.contact_board_routes import _board_led_by_dolibarr
+    from services.dolibarr_policy import policy_active
+
+    if policy_active(await load_dolibarr_settings(db)) or await _board_led_by_dolibarr(db):
+        return
+    profile = await db.club_member_profiles.find_one({"user_id": user_id}, {"_id": 0, "id": 1, "user_id": 1}) or {"user_id": user_id}
+    posts = await _board_posts_of_profile(db, profile)
+    if posts:
+        raise HTTPException(409, f"Diese Person hält den Vorstandsposten „{posts[0]}“ und behielte damit die Vereinsverwaltung. Zuerst den Posten neu besetzen.")
+
+
 # ---------- Admin: get/update/upgrade a user's membership ----------
 @router.get("/user/{user_id}")
 async def get_user_membership(user_id: str, me: dict = Depends(require_area("club"))):
@@ -929,6 +943,8 @@ async def update_user_membership(
     if led_fields and await _led_by_dolibarr(user_id):
         raise HTTPException(409, "Diese Mitgliedschaft wird in Dolibarr geführt. Status, Art, Nummer und Beginn dort ändern – hier bleiben Notiz und interne Rolle.")
     previous_status = ((await get_membership(user_id)) or {}).get("member_status") or "none"
+    if payload.get("member_status") not in (None, previous_status, *ACTIVE_STATUSES):
+        await _refuse_while_holding_post(db, user_id)
     try:
         m = await upsert_membership(user_id=user_id, actor_id=me["id"], **payload)
     except ValueError as e:
