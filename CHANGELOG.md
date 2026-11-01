@@ -1,34 +1,32 @@
 # Changelog
 
-## [1.53.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.52.0...v1.53.0) (2026-11-01)
-
+## 1.53.0 (01.11.2026)
 
 ### Neu
 
-* Galerie: Häkchen-Auswahl zum Verschieben und Entfernen, mit Protokoll ([#2122](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2122)) ([a5f11e5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a5f11e5233e057308883b306df0bcc851e94cd99))
-* Galerie: Suche in der Medienauswahl ([#2122](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2122)) ([a5f11e5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a5f11e5233e057308883b306df0bcc851e94cd99))
-* Mediathek: „Duplikat ersetzen“ stellt jede Stelle auf die behaltene Datei um ([#2122](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2122)) ([a5f11e5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a5f11e5233e057308883b306df0bcc851e94cd99))
-* Mediathek: „Ungenutzte löschen“ mit erneuter Prüfung am Server ([#2122](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2122)) ([a5f11e5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a5f11e5233e057308883b306df0bcc851e94cd99))
-* Stationen lassen sich bearbeiten: Name, Gerät, Spiel und Hinweis ([#2112](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2112)) ([a5f11e5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a5f11e5233e057308883b306df0bcc851e94cd99))
-
+* Galerie: Häkchen-Auswahl zum Verschieben und Entfernen, mit Protokoll (#2122)
+* Galerie: Suche in der Medienauswahl (#2122)
+* Mediathek: „Duplikat ersetzen“ stellt jede Stelle auf die behaltene Datei um (#2122)
+* Mediathek: „Ungenutzte löschen“ mit erneuter Prüfung am Server (#2122)
+* Stationen lassen sich bearbeiten: Name, Gerät, Spiel und Hinweis (#2112)
 
 ### Fehlerbehebungen
 
-* Alte Uploads einsortieren verwechselt ähnliche Dateinamen nicht mehr ([#2122](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2122)) ([a5f11e5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a5f11e5233e057308883b306df0bcc851e94cd99))
-* Bildauswahl in Bildfeld, Texteditor und Galerie lädt seitenweise und sucht am Server ([#2122](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2122)) ([a5f11e5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a5f11e5233e057308883b306df0bcc851e94cd99))
-* Bilder aus der Mitgliederverwaltung lassen sich nicht drehen ([#2122](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2122)) ([a5f11e5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a5f11e5233e057308883b306df0bcc851e94cd99))
-* Bildfeld nennt die Grenze vom Server, Fehlermeldung ohne Technik ([#2122](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2122)) ([a5f11e5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a5f11e5233e057308883b306df0bcc851e94cd99))
-* Die PNG-Fassung eines SVG-Logos zählt als Verwendung des Logos ([#2122](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2122)) ([a5f11e5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a5f11e5233e057308883b306df0bcc851e94cd99))
-* Einzelnes Löschen in der Mediathek fragt auch bei gespeicherten Ergebnissen nach ([#2122](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2122)) ([a5f11e5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a5f11e5233e057308883b306df0bcc851e94cd99))
-* Galerie: Lösch-Texte sagen ehrlich, dass die Dateien bleiben; Sichtbarkeit in Worten ([#2122](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2122)) ([a5f11e5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a5f11e5233e057308883b306df0bcc851e94cd99))
-* Gedrehtes Bild erscheint überall sofort gedreht, mit Rückfrage und richtigen Maßen ([#2122](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2122)) ([a5f11e5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a5f11e5233e057308883b306df0bcc851e94cd99))
-* Mediathek spricht Deutsch statt Technik-Englisch ([#2122](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2122)) ([a5f11e5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a5f11e5233e057308883b306df0bcc851e94cd99))
-* Mediathek zeigt alle Dateien seitenweise, mit Suche am Server ([#2122](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2122)) ([a5f11e5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a5f11e5233e057308883b306df0bcc851e94cd99))
-* Moderation zeigt Namen, Kategorien und die gemeldete Nachricht statt Rohwerten ([#2122](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2122)) ([a5f11e5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a5f11e5233e057308883b306df0bcc851e94cd99))
-* Moderation: Meldungen mit Knöpfen und Grund statt sofort speichernder Auswahl ([#2122](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2122)) ([a5f11e5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a5f11e5233e057308883b306df0bcc851e94cd99))
-* Moderation: Zurückstellen nimmt den Treffer zurück, die Notiz bleibt erhalten ([#2122](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2122)) ([a5f11e5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a5f11e5233e057308883b306df0bcc851e94cd99))
-* Satzzeichen hinter einer Adresse im Text täuschen keine unbenutzte Datei mehr vor ([#2122](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2122)) ([a5f11e5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a5f11e5233e057308883b306df0bcc851e94cd99))
-* Sticker-Bilder in alten Nachrichten zählen als Verwendung und bleiben erhalten ([#2122](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2122)) ([a5f11e5](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a5f11e5233e057308883b306df0bcc851e94cd99))
+* Alte Uploads einsortieren verwechselt ähnliche Dateinamen nicht mehr (#2122)
+* Bildauswahl in Bildfeld, Texteditor und Galerie lädt seitenweise und sucht am Server (#2122)
+* Bilder aus der Mitgliederverwaltung lassen sich nicht drehen (#2122)
+* Bildfeld nennt die Grenze vom Server, Fehlermeldung ohne Technik (#2122)
+* Die PNG-Fassung eines SVG-Logos zählt als Verwendung des Logos (#2122)
+* Einzelnes Löschen in der Mediathek fragt auch bei gespeicherten Ergebnissen nach (#2122)
+* Galerie: Lösch-Texte sagen ehrlich, dass die Dateien bleiben; Sichtbarkeit in Worten (#2122)
+* Gedrehtes Bild erscheint überall sofort gedreht, mit Rückfrage und richtigen Maßen (#2122)
+* Mediathek spricht Deutsch statt Technik-Englisch (#2122)
+* Mediathek zeigt alle Dateien seitenweise, mit Suche am Server (#2122)
+* Moderation zeigt Namen, Kategorien und die gemeldete Nachricht statt Rohwerten (#2122)
+* Moderation: Meldungen mit Knöpfen und Grund statt sofort speichernder Auswahl (#2122)
+* Moderation: Zurückstellen nimmt den Treffer zurück, die Notiz bleibt erhalten (#2122)
+* Satzzeichen hinter einer Adresse im Text täuschen keine unbenutzte Datei mehr vor (#2122)
+* Sticker-Bilder in alten Nachrichten zählen als Verwendung und bleiben erhalten (#2122)
 
 ## 1.52.0 (01.11.2026)
 
