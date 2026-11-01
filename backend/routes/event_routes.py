@@ -18,6 +18,7 @@ from services import partner_pages
 from services.notification_preferences import enqueue_newsletter_for_item
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from services import billing_orders, event_changes, event_days, event_facts, event_locations, event_play_along, event_registration, pricing
+from services.event_public import public_event
 from services.event_registration import RegistrationError
 from services.mutation_lock import MutationLockBusy, mutation_lock
 from services.change_events import reset_scope_cache
@@ -542,7 +543,8 @@ async def list_events(
         counts = await event_changes.active_registration_counts(db, [ev["id"] for ev in out])
         for ev in out:
             ev["active_registration_count"] = counts.get(ev["id"], 0)
-    return out
+        return out
+    return [public_event(ev, finance=finance) for ev in out]
 
 
 @router.get("/meta")
@@ -662,12 +664,13 @@ async def get_event(slug_or_id: str, include_draft: bool = False, access: str | 
     # Preisangabe für die Anmeldung (#318); die Konfiguration mit Dolibarr-Nummern sieht nur Finanzen.
     offer = event.pop("billing", None)
     event["offer"] = pricing.public_offer(offer)
-    if await can_use_area(user, "finance"):
+    finance = await can_use_area(user, "finance")
+    if finance:
         event["billing"] = offer or pricing.normalize_offer(None)
     if access_link:
         await touch_access_link(db, access_link, user)
         event["access_link"] = public_access_link_payload(access_link)
-    return event
+    return public_event(event, keep_internal=is_admin, finance=finance)
 
 
 @router.post("/{event_id}/recap-draft")
