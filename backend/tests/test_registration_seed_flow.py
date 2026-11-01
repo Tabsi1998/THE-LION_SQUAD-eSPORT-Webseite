@@ -122,3 +122,25 @@ async def test_a_fixed_bracket_lets_a_late_arrival_back_despite_the_same_seed(fl
     late = await flow.register(tournament, await flow.add_user(name="Paula"), seed=1, status="no_show")
     await flow.register(tournament, await flow.add_user(name="Jonas"), seed=1)
     assert (await flow.post(f"{base}/{late['id']}/checkin", json={"status": "checked_in"})).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_a_replacement_team_may_take_the_seed_of_the_team_it_replaces(flow):
+    staff = await flow.add_staff()
+    flow.act_as(staff)
+    tournament = await flow.create_tournament(status="registration_open", seeding_mode="manual", team_mode="team", team_size=2)
+    base = f"/api/tournaments/{tournament['id']}/registrations"
+    leaving = await flow.register(tournament, await flow.add_user(name="Team Alt"), seed=1)
+    await flow.register(tournament, await flow.add_user(name="Team Bleibt"), seed=2)
+    await flow.db.teams.insert_many([{"id": "team-ersatz", "name": "Ersatzteam", "tag": "EZ"},
+                                     {"id": "team-noch", "name": "Noch ein Team", "tag": "NT"}])
+
+    taken = await flow.post(base, json={"team_id": "team-noch", "seed": 2, "replace_registration_id": leaving["id"]})
+    assert taken.status_code == 409, taken.text
+    assert "Setzplatz 2 hat schon Team Bleibt" in taken.json()["detail"]
+    assert (await flow.db.tournament_registrations.find_one({"id": leaving["id"]}))["status"] == "approved"
+
+    replaced = await flow.post(base, json={"team_id": "team-ersatz", "seed": 1, "replace_registration_id": leaving["id"]})
+    assert replaced.status_code == 200, replaced.text
+    assert replaced.json()["registration"]["seed"] == 1
+    assert (await flow.db.tournament_registrations.find_one({"id": leaving["id"]}))["status"] == "no_show"

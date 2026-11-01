@@ -912,7 +912,6 @@ async def admin_create_registration(tid: str, body: RegistrationAdminCreate,
     )
     if not display_name:
         raise HTTPException(status_code=400, detail="Bitte ein Konto wählen oder einen Anzeigenamen eintragen.")
-    await _require_free_seed(db, tid, payload.get("seed"))
     old_reg_id = payload.get("replace_registration_id")
     old = None
     replace_targets: list[dict] | None = None
@@ -922,6 +921,8 @@ async def admin_create_registration(tid: str, body: RegistrationAdminCreate,
             raise HTTPException(status_code=404, detail="Zu ersetzende Anmeldung nicht gefunden")
         # Vor dem Eintragen prüfen (#1551): ein Freilos hindert nicht mehr, ein begonnenes erstes Spiel schon.
         replace_targets = await _replacement_targets_or_409(db, tid, old_reg_id)
+    # Ein Ersatz darf den Setzplatz der Anmeldung übernehmen, die er ersetzt.
+    await _require_free_seed(db, tid, payload.get("seed"), old_reg_id)
 
     reg = {
         "id": new_id(),
