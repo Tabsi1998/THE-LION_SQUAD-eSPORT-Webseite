@@ -13,6 +13,7 @@ from contextvars import ContextVar
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
+from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 
 from database import get_db
@@ -98,7 +99,11 @@ async def grant(user_id: str, source: str, ref: str, *, amount: int | None = Non
     total_after = max(0, total_before + amount + bonus)
     level_before = levels.level_for_xp(total_before, prestige)
     level_after = levels.level_for_xp(total_after, prestige)
-    await db.user_xp.update_one({"user_id": user_id}, {"$set": {"total": total_after, "level": level_after, "updated_at": event["at"]}, "$setOnInsert": {"user_id": user_id, "prestige": prestige}}, upsert=True)
+    # Atomar erhöhen (wie grant_many): gleichzeitige Gutschriften und Rücknahmen überschreiben sich nicht. Nur eine Korrektur
+    # unter null setzt den Stand fest.
+    delta = amount + bonus
+    change = {"$inc": {"total": delta}, "$set": {"level": level_after, "updated_at": event["at"]}} if total_before + delta >= 0 else {"$set": {"total": 0, "level": level_after, "updated_at": event["at"]}}
+    await db.user_xp.update_one({"user_id": user_id}, {**change, "$setOnInsert": {"user_id": user_id, "prestige": prestige}}, upsert=True)
     result = {"amount": amount, "bonus": bonus, "total": total_after, "level": level_after, "level_up": level_after > level_before, "title_changed": levels.title_for_level(level_after) != levels.title_for_level(level_before)}
     if result["level_up"]:
         await _level_up(user_id, level_before, level_after, prestige)
@@ -126,8 +131,13 @@ async def revoke(user_id: str, source: str, ref: str) -> dict | None:
     if doc.get("prestige_at") and str(event.get("at") or "") < str(doc["prestige_at"]):
         return {"removed": 0, "total": int(doc.get("total") or 0)}
     prestige_stars = int(doc.get("prestige") or 0)
-    total_after = max(0, int(doc.get("total") or 0) - gained)
-    await db.user_xp.update_one({"user_id": user_id}, {"$set": {"total": total_after, "level": levels.level_for_xp(total_after, prestige_stars), "updated_at": now_utc().isoformat()}})
+    # Atomar senken, sonst überschriebe eine gleichzeitige Gutschrift die Rücknahme; nie unter null.
+    after = await db.user_xp.find_one_and_update({"user_id": user_id}, {"$inc": {"total": -gained}}, return_document=ReturnDocument.AFTER, projection={"_id": 0, "total": 1})
+    total_after = int((after or {}).get("total") or 0)
+    if total_after < 0:
+        await db.user_xp.update_one({"user_id": user_id, "total": {"$lt": 0}}, {"$set": {"total": 0}})
+        total_after = 0
+    await db.user_xp.update_one({"user_id": user_id}, {"$set": {"level": levels.level_for_xp(total_after, prestige_stars), "updated_at": now_utc().isoformat()}})
     return {"removed": gained, "total": total_after}
 
 

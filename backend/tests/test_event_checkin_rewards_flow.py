@@ -170,3 +170,23 @@ async def test_absage_nimmt_auch_ueberschnittenen_checkin_zurueck(flow):
     assert response.status_code == 200, response.text
     points, events, total = await rewards(flow, player)
     assert points == [] and events == [] and total == 0
+
+
+@pytest.mark.asyncio
+async def test_xp_stand_rechnet_gleichzeitig_nichts_weg(flow):
+    """Gutschrift und Rücknahme erhöhen bzw. senken den Stand, statt ihn zu überschreiben; nie unter null."""
+    user = await flow.add_user(role="player", name="zaehler")
+    await xp.grant(user["id"], "event_attended", "e:1")
+    # Ein anderer Weg bucht zwischendurch: die Rücknahme nimmt nur ihren Betrag.
+    await flow.db.user_xp.update_one({"user_id": user["id"]}, {"$inc": {"total": 500}})
+    assert (await xp.revoke(user["id"], "event_attended", "e:1"))["total"] == 500
+    await xp.grant(user["id"], "event_attended", "e:2")
+    assert (await xp.state(user["id"]))["total"] == 560
+    # Stand kleiner als die Gutschrift (von Hand korrigiert): null, nicht negativ.
+    await flow.db.user_xp.update_one({"user_id": user["id"]}, {"$set": {"total": 10}})
+    assert (await xp.revoke(user["id"], "event_attended", "e:2"))["total"] == 0
+    assert (await xp.state(user["id"]))["total"] == 0
+    # Eine Korrektur unter null bleibt bei null.
+    await xp.grant(user["id"], "event_attended", "e:3")
+    await xp.correct(user["id"], -1000, "Test", "admin")
+    assert (await xp.state(user["id"]))["total"] == 0
