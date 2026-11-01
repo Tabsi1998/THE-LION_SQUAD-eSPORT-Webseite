@@ -148,6 +148,27 @@ async def test_an_animated_image_is_not_turned_into_a_still(flow, public):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("value", [URL, URL + "?v=1", URL + "#oben"])
+async def test_sorting_old_uploads_finds_a_versioned_address(flow, monkeypatch, value):
+    await flow.db.news_posts.insert_one({"id": "n-1", "banner_url": value})
+    monkeypatch.setattr(media_audit, "get_db", lambda: flow.db)
+
+    scope, source = await media_audit._infer_scope_from_references(NAME)
+
+    assert scope == "admin" and source["id"] == "n-1"
+
+
+@pytest.mark.asyncio
+async def test_sorting_old_uploads_does_not_match_a_longer_name(flow, monkeypatch):
+    await flow.db.news_posts.insert_one({"id": "n-1", "banner_url": URL + ".backup"})
+    monkeypatch.setattr(media_audit, "get_db", lambda: flow.db)
+
+    scope, _source = await media_audit._infer_scope_from_references(NAME)
+
+    assert scope is None
+
+
+@pytest.mark.asyncio
 async def test_an_image_from_the_member_system_cannot_be_rotated(flow, public):
     await admin(flow)
     name = f"{sponsor_images.PREFIX}1-logo-dark-abc.webp"

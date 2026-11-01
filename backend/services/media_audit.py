@@ -539,7 +539,8 @@ async def audit_image_references(repair: bool = False, clear_missing: bool = Fal
 
 async def _infer_scope_from_references(filename: str) -> tuple[str | None, dict | None]:
     db = get_db()
-    suffix_re = f"{re.escape(filename)}$"
+    # Auch mit Version oder Zusatz an der Adresse (gedrehtes Bild, #2122).
+    suffix_re = rf"{re.escape(filename)}(\?|#|$)"
     for coll_name, fields, scope in SCOPE_TARGETS:
         collection = db[coll_name]
         for field in fields:
