@@ -23,7 +23,7 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 const { default: PublicProfilePage, podiumHighlights, profileTabs } = await import("./PublicProfilePage");
 
 const PROFILE = {
-  id: "u1", username: "paula", display_name: "Paula B.", bio: "Racing seit 2019.", role: "moderator", country: "AT",
+  id: "u1", username: "paula", display_name: "Paula B.", bio: "Racing seit 2019.", preferred_role: "Driver", country: "AT",
   created_at: "2025-03-01T00:00:00Z", privacy_public_profile: true, banner_url: "/api/static/banner.jpg", avatar_url: "",
   stats: { points: 2590, wins: 1, top3: 2, tournaments: 3, fast_laps: 1, twitch_live_sessions: 7, twitch_stream_minutes: 907 },
   achievement_level: { level: 6, points: 2590, next_level_points: 3000, progress: 40 },
@@ -73,7 +73,8 @@ test("Kopf mit Banner, Pillen, verknüpftem Konto und Zahlen; fünf Reiter; High
   expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("Paula B.");
   expect(screen.getByTestId("profile-banner").querySelector("img")).toHaveAttribute("src", "/api/static/banner.jpg");
   expect(screen.getByTestId("profile-identity")).toHaveTextContent("@paula");
-  expect(screen.getByTestId("profile-identity")).toHaveTextContent("Moderator");
+  // Keine Systemrolle im Kopf (#2126).
+  expect(screen.getByTestId("profile-identity")).not.toHaveTextContent(/Moderator|Admin/);
   expect(screen.getByTestId("profile-accounts-count")).toHaveTextContent("1 Konto verknüpft");
   expect(screen.queryByTestId("profile-verified-chips")).toBeNull();
   expect(screen.getByTestId("profile-stat-points")).toHaveTextContent("2590");
@@ -99,6 +100,8 @@ test("Kopf mit Banner, Pillen, verknüpftem Konto und Zahlen; fünf Reiter; High
   expect(screen.getAllByText("Paula Racing").length).toBe(1);
   expect(screen.getByTestId("public-profile-info")).toHaveTextContent("Ordentliches Mitglied");
   expect(screen.getByTestId("public-profile-setup")).toHaveTextContent("Lenkrad");
+  // Bevorzugte Rolle (#2126): nur, wenn der Server sie für diese Stufe mitschickt - und genau so, wie sie eingetragen ist.
+  expect(screen.getByTestId("public-profile-setup")).toHaveTextContent("Driver");
   expect(screen.getByTestId("public-profile-teams")).toHaveTextContent("Lion Racing");
   // Kein Stream: kein Player, nur die Kanal-Karte.
   await waitFor(() => expect(screen.getByTestId("profile-twitch-offline")).toHaveTextContent("gerade offline · 15 Std. in 7 Streams"));
