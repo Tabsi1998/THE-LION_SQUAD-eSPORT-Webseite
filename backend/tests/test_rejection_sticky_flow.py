@@ -179,3 +179,17 @@ async def test_a_second_rejection_is_seen_again(flow, route):
     assert again.status_code == 200, again.text
     flow.act_as(player)
     assert await _mine(flow, tournament) == [registration["id"]]
+
+
+@pytest.mark.asyncio
+async def test_public_profile_counts_no_rejected_registration(flow):
+    """Eine Ablehnung ist keine Teilnahme - auch nicht, nachdem die Person sie aus ihrer Ansicht genommen hat."""
+    tournament, registration, player = await _rejected_solo(flow)
+    await flow.db.users.update_one({"id": player["id"]}, {"$set": {"privacy_public_profile": True}})
+    played = await flow.create_tournament(title="Gespielt")
+    await flow.register(played, player)
+    await flow.delete(f"/api/tournaments/{tournament['id']}/registrations/{registration['id']}")
+    flow.act_as(None)
+    profile = (await flow.get(f"/api/users/public/{player['username']}")).json()
+    assert [row["id"] for row in profile["tournaments"]] == [played["id"]]
+    assert profile["stats"]["tournaments"] == 1

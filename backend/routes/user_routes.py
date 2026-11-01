@@ -749,7 +749,8 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
         visible_reg_ids = []
         for r in regs:
             t = t_map.get(r["tournament_id"])
-            if not t:
+            # Eine Ablehnung ist keine Teilnahme (#2113) - und bliebe sonst stehen, nachdem die Person sie weggenommen hat.
+            if not t or r.get("status") == "rejected":
                 continue
             visible_reg_ids.append(r["id"])
             final_pos = r.get("final_position")
