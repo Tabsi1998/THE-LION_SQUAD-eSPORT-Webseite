@@ -63,7 +63,7 @@ export function MediaDetailSheet({ item, onClose, onCopy, onRotateLeft, onRotate
         </div>
         {item.width && item.height ? (
           <div>
-            <div className="uppercase text-[10px] text-white/40 tracking-widest">Maße</div>
+            <div className="uppercase text-[10px] text-white/40 tracking-widest">Abmessungen</div>
             <div className="text-white/80" data-testid="media-sheet-dimensions">{item.width} × {item.height} px</div>
           </div>
         ) : null}

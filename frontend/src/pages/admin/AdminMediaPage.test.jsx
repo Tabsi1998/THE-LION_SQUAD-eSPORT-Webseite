@@ -83,7 +83,9 @@ test("Seiten, Filter und Suche fragt die Mediathek beim Server an (#2122)", asyn
 
   fireEvent.click(screen.getByTestId("media-page-next"));
   await waitFor(() => expect(screen.getByTestId("media-page-label")).toHaveTextContent("Seite 2 von 3"));
-  await waitFor(() => expect(apiMock.get.mock.calls.at(-2)[0]).toContain("offset=60"));
+  await waitFor(() => expect(apiMock.get.mock.calls.at(-1)[0]).toContain("offset=60"));
+  // Die Prüfung liest alle Dateien - sie läuft beim Öffnen, nicht bei jedem Blättern.
+  expect(apiMock.get.mock.calls.filter(([url]) => url === "/admin/media/audit")).toHaveLength(1);
 
   // Ein neuer Filter beginnt wieder vorne.
   fireEvent.change(screen.getByTestId("media-scope-filter"), { target: { value: "unused" } });

@@ -59,8 +59,18 @@ export default function AdminMediaPage() {
   }, [q]);
   useEffect(() => { setPage(0); }, [needle, filter, scopeFilter, includeUserUploads]);
 
+  // Die Prüfung liest alle Dateien und Verweise: Sie läuft beim Öffnen und nach Änderungen, nicht bei jedem Blättern.
+  const loadAudit = useCallback(async () => {
+    try {
+      const { data } = await api.get("/admin/media/audit");
+      setMediaAudit(data);
+    } catch {
+      setMediaAudit(null);
+    }
+  }, []);
+
   const requestRef = useRef(0);
-  const load = useCallback(async () => {
+  const loadPage = useCallback(async () => {
     const request = ++requestRef.current;
     setLoading(true);
     const params = new URLSearchParams({
@@ -70,21 +80,23 @@ export default function AdminMediaPage() {
     if (TYPE_PARAM[filter]) params.set("type", TYPE_PARAM[filter]);
     if (scopeFilter !== "all") params.set("scope", scopeFilter);
     if (needle) params.set("q", needle);
-    const [mediaRes, auditRes] = await Promise.allSettled([api.get(`/admin/media?${params.toString()}`), api.get("/admin/media/audit")]);
-    if (request !== requestRef.current) return;
-    if (mediaRes.status === "fulfilled") {
-      const result = mediaPageFrom(mediaRes.value.data);
+    try {
+      const { data } = await api.get(`/admin/media?${params.toString()}`);
+      if (request !== requestRef.current) return;
+      const result = mediaPageFrom(data);
       setItems(result.items);
       setTotal(result.total);
       setTotalSize(result.totalSize ?? result.items.reduce((sum, it) => sum + (it.size || 0), 0));
       // Die letzte Datei einer Seite gelöscht: zurück auf die letzte Seite, die es noch gibt.
       if (!result.items.length && page > 0) setPage(Math.max(0, Math.ceil(result.total / PAGE_SIZE) - 1));
-    } else {
-      toast.error(formatApiError(mediaRes.reason?.response?.data?.detail) || "Fehler beim Laden");
+    } catch (e) {
+      if (request !== requestRef.current) return;
+      toast.error(formatApiError(e.response?.data?.detail) || "Fehler beim Laden");
     }
-    if (auditRes.status === "fulfilled") setMediaAudit(auditRes.value.data);
     setLoading(false);
   }, [includeUserUploads, filter, scopeFilter, needle, page]);
+
+  const load = useCallback(() => Promise.all([loadPage(), loadAudit()]), [loadPage, loadAudit]);
 
   const loadUploadEvents = useCallback(async () => {
     setLoadingUploadEvents(true);
@@ -98,7 +110,8 @@ export default function AdminMediaPage() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { loadPage(); }, [loadPage]);
+  useEffect(() => { loadAudit(); }, [loadAudit]);
   useEffect(() => { loadUploadEvents(); }, [loadUploadEvents]);
   useApiInvalidation(load, ["admin/media", "media", "uploads"]);
   useApiInvalidation(loadUploadEvents, ["uploads"]);

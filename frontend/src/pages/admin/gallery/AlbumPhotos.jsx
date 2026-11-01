@@ -347,7 +347,7 @@ export function AlbumPhotos({ album, onBack }) {
       </div>
 
       {photos.length > 0 && (
-        <div className="sticky top-0 z-10 mb-4 flex flex-wrap items-center gap-2 border border-white/10 bg-[#101010] rounded-sm p-3" data-testid="gallery-bulk-bar">
+        <div className="lg:sticky lg:top-0 z-10 mb-4 flex flex-wrap items-center gap-2 border border-white/10 bg-[#101010] rounded-sm p-3" data-testid="gallery-bulk-bar">
           <span className="text-xs font-bold tabular-nums text-white/70" data-testid="gallery-bulk-count">{checked.length} von {photos.length} ausgewählt</span>
           <button type="button" onClick={() => setChecked(checked.length === photos.length ? [] : photos.map((p) => p.id))} data-testid="gallery-bulk-all" className="min-h-10 px-3 py-2 border border-white/15 text-white/70 rounded-sm text-xs font-bold uppercase tracking-wider hover:text-white">
             {checked.length === photos.length ? "Auswahl aufheben" : "Alle auswählen"}
