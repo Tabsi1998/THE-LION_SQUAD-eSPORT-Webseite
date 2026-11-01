@@ -118,17 +118,20 @@ def references_in(document: dict, known_names: set[str]) -> list[tuple[str, str]
     return found
 
 
-async def collect_references(db, known_names: set[str]) -> tuple[dict[str, list[dict]], list[str]]:
-    """Dateiname → Verweise über alle Sammlungen. Liefert auch, welche Sammlungen nur teilweise gelesen wurden."""
+async def collect_references(db, known_names: set[str], *, complete: bool = False, skip: frozenset[str] | set[str] = frozenset()) -> tuple[dict[str, list[dict]], list[str]]:
+    """Dateiname → Verweise über alle Sammlungen. Liefert auch, welche Sammlungen nur teilweise gelesen wurden.
+
+    ``complete``: ohne Obergrenze - wer danach löscht, darf keine Sammlung nur halb lesen (#2122). ``skip``: Sammlungen,
+    die für die Frage keine Rolle spielen."""
     refs: dict[str, list[dict]] = defaultdict(list)
     partial: list[str] = []
     for collection in sorted(await db.list_collection_names()):
-        if collection.startswith("system."):
+        if collection.startswith("system.") or collection in skip:
             continue
         count = 0
         async for document in db[collection].find({}, {"_id": 0}):
             count += 1
-            if count > SCAN_LIMIT:
+            if not complete and count > SCAN_LIMIT:
                 partial.append(collection)
                 break
             ident = document.get("id") or document.get("slug") or document.get("username") or ""

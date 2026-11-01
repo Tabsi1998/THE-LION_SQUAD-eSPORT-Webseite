@@ -380,11 +380,10 @@ async def still_referenced(db, names: set[str]) -> set[str]:
         return set()
     stems = {pathlib.PurePosixPath(name).stem: name for name in names}
     png_twins = {f"{stem}.png" for stem, name in stems.items() if name.lower().endswith(".svg")}
-    references, _partial = await uploads_inventory.collect_references(db, set(names) | png_twins)
+    # Vollständig: Davon hängt ab, ob eine Datei gelöscht wird. Dafür bleiben Verwaltung und Protokolle ungelesen.
+    references, _partial = await uploads_inventory.collect_references(db, set(names) | png_twins, complete=True, skip=NOT_A_USAGE)
     found: set[str] = set()
-    for name, rows in references.items():
-        if all(row["collection"] in NOT_A_USAGE for row in rows):
-            continue
+    for name in references:
         target = _canonical_of(name, stems)
         if target in names:
             found.add(target)

@@ -14,7 +14,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
 from routes import phase_fg_routes  # noqa: E402
-from services import account_erasure, media_audit  # noqa: E402
+from services import account_erasure, media_audit, sponsor_images, uploads_inventory  # noqa: E402
 
 UPLOADS = "/api/static/uploads/"
 COUNT = 520
@@ -336,6 +336,23 @@ async def test_replacing_an_svg_keeps_a_png_address_as_png(flow, public):
     partner = await flow.db.partners.find_one({"id": "p-1"})
     assert partner["logo_url"] == UPLOADS + "bleibt.svg"
     assert partner["tools"][0]["image_url"] == UPLOADS + "bleibt.png"
+
+
+@pytest.mark.asyncio
+async def test_cleanup_reads_every_document_even_in_a_huge_collection(flow, public, monkeypatch):
+    await admin(flow)
+    add_file(public, "alt.webp", age=OLD)
+    await track(flow, "alt.webp")
+    # Der Verweis steht hinter der Obergrenze, die für die Übersicht gilt.
+    monkeypatch.setattr(uploads_inventory, "SCAN_LIMIT", 1)
+    await flow.db.neue_sammlung.insert_many([{"id": "a"}, {"id": "b"}, {"id": "c", "bild": UPLOADS + "alt.webp"}])
+
+    preview = (await flow.get("/api/admin/media/unused")).json()
+
+    assert preview["filenames"] == []
+    response = await flow.post("/api/admin/media/cleanup-unused", json={"filenames": ["alt.webp"]})
+    assert response.json()["deleted"] == 0
+    assert (public / "alt.webp").exists()
 
 
 @pytest.mark.asyncio
