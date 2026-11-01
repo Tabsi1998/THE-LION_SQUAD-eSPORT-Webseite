@@ -277,7 +277,8 @@ async def pdf_tournament_participants(slug_or_id: str, me: dict = Depends(requir
         raise HTTPException(status_code=404)
     regs = await db.tournament_registrations.find({"tournament_id": t["id"]}, {"_id": 0}).to_list(500)
     team_ids = list({r["team_id"] for r in regs if r.get("team_id")})
-    teams = {x["id"]: x for x in await db.teams.find({"id": {"$in": team_ids}}, {"_id": 0}).to_list(500)}
+    from services.team_history import teams_by_id
+    teams = await teams_by_id(db, team_ids)
     for r in regs:
         if r.get("team_id"):
             r["team"] = teams.get(r["team_id"], {})

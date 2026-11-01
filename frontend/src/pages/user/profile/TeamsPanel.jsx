@@ -7,6 +7,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { Check, Pencil, Plus, Trash2, UserPlus, Users, X } from "lucide-react";
 import { useOptionalAuth } from "@/context/AuthContext";
 import { TEAM_ROLE_LABELS } from "./constants";
+import { DissolvedTeamRow } from "@/pages/public/team/DissolvedTeams";
 import { SQUAD_ROLES, isLocked, roleChoices, roleOf, rolesSummary, squadGameLabel, squadStatusLabel } from "@/components/tls/league/squadRoles";
 
 const emptySquad = {
@@ -23,6 +24,7 @@ import { Field, Input, Row } from "./fields";
 export function TeamsPanel() {
   const [teams, setTeams] = useState([]);
   const [invites, setInvites] = useState([]);
+  const [dissolved, setDissolved] = useState([]);
   const [activeId, setActiveId] = useState("");
   const [squads, setSquads] = useState([]);
   const [games, setGames] = useState([]);
@@ -48,6 +50,11 @@ export function TeamsPanel() {
     setInvites(data || []);
   }, []);
 
+  // Aufgelöste Teams (#2128, TM8): nur für die frühere Teamleitung, bis die Frist vorbei ist.
+  const loadDissolved = useCallback(() => {
+    api.get("/teams/dissolved/mine").then(({ data }) => setDissolved(Array.isArray(data) ? data : [])).catch(() => {});
+  }, []);
+
   const loadMeta = useCallback(() => {
     api.get("/games").then(({ data }) => setGames(Array.isArray(data) ? data : [])).catch(() => {});
   }, []);
@@ -55,11 +62,13 @@ export function TeamsPanel() {
   useEffect(() => {
     loadTeams().catch(() => toast.error("Teams konnten nicht geladen werden."));
     loadInvites().catch(() => {});
+    loadDissolved();
     loadMeta();
-  }, [loadInvites, loadMeta, loadTeams]);
+  }, [loadDissolved, loadInvites, loadMeta, loadTeams]);
   useApiInvalidation(() => {
     loadTeams();
     loadInvites();
+    loadDissolved();
     loadMeta();
   }, ["teams", "games", "admin/notifications"]);
 
@@ -203,6 +212,16 @@ export function TeamsPanel() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {dissolved.length > 0 && (
+        <div className="border border-white/10 bg-[#121212] rounded-sm p-5" data-testid="dissolved-teams">
+          <div className="text-[11px] uppercase tracking-[0.3em] text-white/55 font-bold">Aufgelöste Teams</div>
+          <p className="mt-1 text-sm text-white/55">Als frühere Teamleitung kannst du sie zurückholen – mit allen, die dabei waren, und einem neuen Beitrittscode.</p>
+          <div className="mt-3 space-y-2">
+            {dissolved.map((team) => <DissolvedTeamRow key={team.id} team={team} onRestored={() => { loadDissolved(); loadTeams(); }} />)}
           </div>
         </div>
       )}

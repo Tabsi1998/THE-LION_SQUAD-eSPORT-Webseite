@@ -224,7 +224,8 @@ async def list_adjustments(sid: str, me: dict = Depends(require_admin())):
     users = {u["id"]: u for u in await db.users.find({"id": {"$in": user_ids}},
                                                      {"_id": 0, "id": 1, "display_name": 1, "username": 1}).to_list(500)}
     team_ids = [row["team_id"] for row in rows if row.get("team_id")]
-    teams = {t["id"]: t for t in await db.teams.find({"id": {"$in": team_ids}}, {"_id": 0, "id": 1, "name": 1}).to_list(500)}
+    from services.team_history import teams_by_id
+    teams = await teams_by_id(db, team_ids, {"_id": 0, "id": 1, "name": 1})
     for row in rows:
         person = users.get(row.get("user_id")) or {}
         row["recipient_label"] = (person.get("display_name") or person.get("username")

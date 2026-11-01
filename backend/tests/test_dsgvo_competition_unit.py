@@ -83,7 +83,7 @@ class FakeDb:
             "gallery_submissions",
             # Auskunft Fassung 5 (#1030): alles aus services/personal_data.py
             "auth_sessions", "passkeys", "access_links", "consent_decisions", "chat_reads", "document_opens", "year_review_notices",
-            "feedback_receipts", "team_chat_messages", "match_chat_messages", "tournament_chat_messages", "chat_attachments",
+            "feedback_receipts", "dissolved_teams", "team_chat_messages", "match_chat_messages", "tournament_chat_messages", "chat_attachments",
             "moderation_strikes", "moderation_sanctions", "contact_messages", "achievement_events", "user_stickers",
             "twitch_stream_sessions", "tournament_stream_announcements", "dolibarr_links", "dolibarr_identities",
             "dolibarr_honours", "billing_orders", "billing_customers", "match_reports_v2", "match_schedule_proposals",

@@ -7,6 +7,8 @@
 - ``GET  /api/teams/{id}/invite-link/check``   gilt dieser Schlüssel? Mit Kurzinfo zum Team - auch für private Teams
 - ``POST /api/teams/{id}/join-link``           mit gültigem Schlüssel beitreten (nur noch „Beitreten“ tippen)
 - ``GET  /api/teams/{id}/dissolve-preview``    was beim Auflösen passiert (#1274) - Teamleitung und Club-Admin
+- ``GET  /api/teams/dissolved/mine``           aufgelöste Teams, die ich als frühere Teamleitung wiederherstellen kann (#2128)
+- ``POST /api/teams/{id}/restore``             aufgelöstes Team zurückholen - frühere Teamleitung und Club-Admin
 """
 from __future__ import annotations
 
@@ -20,7 +22,7 @@ from routes.team_routes import (
     TEAM_OWNER_ADMIN_ROLES, _add_team_member, _can_manage, _is_member, _is_staff, _refuse, _team_admin, _team_audit, _user_label,
 )
 from services import team_page
-from services.team_dissolve import dissolve_preview
+from services.team_dissolve import dissolve_preview, dissolved_for_leader, restore as restore_team
 from services.user_notifications import build_public_url, create_user_notification
 
 router = APIRouter(prefix="/api/teams", tags=["teams"])
@@ -30,6 +32,11 @@ INVITE_GONE = "Dieser Einladungs-Link gilt nicht mehr. Frag im Team nach einem n
 
 class JoinLinkBody(BaseModel):
     token: str = Field(min_length=4, max_length=120)
+
+
+class RestoreBody(BaseModel):
+    # Nur nötig, wenn das Kürzel inzwischen ein anderes Team hat.
+    tag: str | None = Field(default=None, max_length=40)
 
 
 async def _team_or_404(db, team_id: str) -> dict:
@@ -156,3 +163,22 @@ async def team_dissolve_preview(team_id: str, me: dict = Depends(get_current_use
     if team.get("leader_id") != me["id"] and not _team_admin(me, TEAM_OWNER_ADMIN_ROLES):
         _refuse(me, "Auflösen darf nur die Teamleitung.", TEAM_OWNER_ADMIN_ROLES)
     return await dissolve_preview(db, team)
+
+
+@router.get("/dissolved/mine")
+async def my_dissolved_teams(me: dict = Depends(get_current_user)):
+    """Was ich als frühere Teamleitung noch wiederherstellen kann (#2128, TM8)."""
+    return await dissolved_for_leader(get_db(), me["id"])
+
+
+@router.post("/{team_id}/restore")
+async def restore_dissolved_team(team_id: str, body: RestoreBody | None = None, me: dict = Depends(get_current_user)):
+    """Ein aufgelöstes Team zurückholen (#2128, TM8): die frühere Teamleitung oder Club-Admin und Superadmin, mit Protokoll."""
+    db = get_db()
+    row = await db.dissolved_teams.find_one({"id": team_id, "purged_at": {"$exists": False}}, {"_id": 0})
+    if not row:
+        raise HTTPException(status_code=404, detail="Team nicht gefunden")
+    if row.get("leader_id") != me["id"] and not _team_admin(me, TEAM_OWNER_ADMIN_ROLES):
+        _refuse(me, "Wiederherstellen darf die frühere Teamleitung.", TEAM_OWNER_ADMIN_ROLES)
+    team = await restore_team(db, row, me, tag=body.tag if body else None)
+    return {"ok": True, "id": team["id"], "name": team.get("name"), "tag": team.get("tag")}

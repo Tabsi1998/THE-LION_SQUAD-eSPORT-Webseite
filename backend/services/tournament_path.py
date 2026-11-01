@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from services.competition_read import load_competition_read_model
 from services.round_labels import round_label, rounds_by_section, section_kind, stage_kind
+from services.team_history import dissolved_views
 
 DONE = {"completed", "forfeit"}
 
@@ -85,6 +86,8 @@ async def visible_names(db, registration_ids: list[str], *, public: bool) -> dic
                 {"id": {"$in": user_ids}, "privacy_public_profile": True, "is_active": {"$ne": False}, "is_banned": {"$ne": True}}, {"_id": 0, "id": 1}).to_list(len(user_ids))}
         if team_ids:
             public_teams = {t["id"] for t in await db.teams.find({"id": {"$in": team_ids}, "is_public": {"$ne": False}}, {"_id": 0, "id": 1}).to_list(len(team_ids))}
+            # Aufgelöste Teams (#2128, TM8): im alten Turnier bleibt der Name des Gegners stehen.
+            public_teams |= {team_id for team_id, view in (await dissolved_views(db, set(team_ids) - public_teams)).items() if view.get("is_public") is not False}
     for reg in regs:
         name = reg.get("display_name") or reg.get("ingame_name") or reg.get("team_name") or None
         if public:

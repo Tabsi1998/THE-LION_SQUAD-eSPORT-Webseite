@@ -22,6 +22,8 @@ TARGETS: list[tuple[str, list[str]]] = [
     ("settings", ["logo_url", "logo_light_url", "logo_dark_url", "share_banner_url", "mascot_url", "qr_logo_url", "favicon_url", "favicon_light_url", "favicon_dark_url", "avatar_url"]),
     ("users", ["avatar_url", "banner_url"]),
     ("teams", ["logo_url", "banner_url"]),
+    # Aufgelöste Teams (#2128, TM8): Logo und Banner bleiben, bis die Frist zum Wiederherstellen vorbei ist.
+    ("dissolved_teams", ["logo_url", "banner_url"]),
     ("sponsors", ["logo_url", "banner_url"]),
     ("partners", ["logo_url", "banner_url"]),
     ("news_posts", ["banner_url", "cover_url"]),
@@ -88,7 +90,7 @@ USAGE_TEXT_TARGETS: list[tuple[str, list[str]]] = [
 
 # Lesbare Namen der Verwendungsstellen für die Mediathek (#1471): „Sammlung · Feld“, Sonderfälle ganz.
 COLLECTION_LABELS = {
-    "settings": "Einstellungen", "users": "Profil", "teams": "Team", "sponsors": "Sponsor", "partners": "Partner",
+    "settings": "Einstellungen", "users": "Profil", "teams": "Team", "dissolved_teams": "Aufgelöstes Team", "sponsors": "Sponsor", "partners": "Partner",
     "news_posts": "News", "events": "Event", "games": "Spiel", "tournaments": "Turnier",
     "f1_challenges": "Fast Lap", "f1_tracks": "Strecke", "seasons": "Jahreswertung",
     "gallery_albums": "Galerie-Album", "gallery_photos": "Galerie-Foto", "member_benefits": "Mitgliedervorteil",
@@ -141,6 +143,7 @@ SCOPE_TARGETS: list[tuple[str, list[str], str]] = [
     ("gallery_albums", ["cover_url"], "gallery"),
     ("gallery_photos", ["image_url", "thumbnail_url", "video_url"], "gallery"),
     ("teams", ["logo_url", "banner_url"], "admin"),
+    ("dissolved_teams", ["logo_url", "banner_url"], "admin"),
     ("partners", ["logo_url"], "admin"),
     ("news_posts", ["banner_url", "cover_url"], "admin"),
     ("events", ["banner_url", "cover_url"], "admin"),

@@ -111,6 +111,22 @@ test("der Stand eines Co-Teams steht in Worten, nie als Rohwert", async () => {
   expect(screen.queryByText("active")).not.toBeInTheDocument();
 });
 
+// Aufgelöste Teams (#2128, TM8): die frühere Teamleitung holt sie hier zurück.
+test("aufgelöstes Team steht mit Frist da und lässt sich wiederherstellen", async () => {
+  apiMock.post.mockReset();
+  apiMock.post.mockResolvedValue({ data: { ok: true } });
+  apiMock.get.mockImplementation((url) => {
+    if (url === "/teams/dissolved/mine") return Promise.resolve({ data: [{ id: "t9", name: "Altes Rudel", tag: "ALT", member_count: 4, days_left: 12 }] });
+    return respond(url);
+  });
+  await renderPanel();
+  const row = await screen.findByTestId("dissolved-team-t9");
+  expect(row).toHaveTextContent("Altes Rudel");
+  expect(row).toHaveTextContent("noch 12 Tage");
+  fireEvent.click(screen.getByTestId("dissolved-team-restore-t9"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/teams/t9/restore", {}));
+});
+
 test("„Niemand“ nimmt eine Rolle weg", async () => {
   await renderPanel();
   const card = screen.getByTestId("team-squad-roles-s-a").parentElement;

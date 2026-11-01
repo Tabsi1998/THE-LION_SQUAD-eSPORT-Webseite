@@ -254,11 +254,12 @@ async def test_dissolve_only_with_the_typed_name_and_says_what_happens(flow):
     # Die Turnierleitung hat das laufende Turnier abgeschlossen - jetzt geht es.
     await flow.db.tournaments.update_one({"id": running["id"]}, {"$set": {"status": "completed"}})
     done_now = await flow.delete(f"/api/teams/{team['id']}", params={"confirm": " lions rocket "})
-    assert done_now.status_code == 200 and done_now.json() == {"ok": True, "withdrawn": 1}
+    assert done_now.status_code == 200 and done_now.json()["ok"] is True and done_now.json()["withdrawn"] == 1
     assert not await flow.db.teams.find_one({"id": team["id"]})
     assert not await flow.db.team_members.find_one({"team_id": team["id"]})
-    assert not await flow.db.team_chat_messages.find_one({"team_id": team["id"]})
     assert not await flow.db.team_invite_links.find_one({"team_id": team["id"]})
+    # Weich aufgelöst (#2128): was danach noch geht, prüft test_team_soft_dissolve_flow.py.
+    assert await flow.db.dissolved_teams.find_one({"id": team["id"]})
     assert not await flow.db.tournament_registrations.find_one({"id": upcoming_reg["id"]}), "kommende Anmeldung zurückgezogen"
     assert await flow.db.tournament_registrations.find_one({"id": done_reg["id"]}), "fertige Turniere bleiben"
     assert await flow.db.tournament_registrations.find_one({"id": running_reg["id"]})

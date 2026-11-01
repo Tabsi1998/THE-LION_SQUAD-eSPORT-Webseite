@@ -626,9 +626,9 @@ async def aggregate_leaderboard(
 
     if teams:
         team_ids = [r["_id"] for r in rows]
-        team_map = {t["id"]: t for t in await db.teams.find(
-            {"id": {"$in": team_ids}}, {"_id": 0, "id": 1, "name": 1, "logo_url": 1, "slug": 1}
-        ).to_list(500)}
+        # Aufgelöste Teams (#2128, TM8) behalten ihren Platz und Namen in der Wertung.
+        from services.team_history import teams_by_id
+        team_map = await teams_by_id(db, team_ids, {"_id": 0, "id": 1, "name": 1, "logo_url": 1, "slug": 1})
         breakdowns = await _leaderboard_breakdowns(
             db,
             season_id=season_id,

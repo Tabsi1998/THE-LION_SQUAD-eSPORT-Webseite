@@ -88,13 +88,21 @@ export function dissolveSentence(preview) {
   const chat = Number(preview.chat_messages || 0);
   const parts = [
     members === 1 ? "Das Mitglied verliert das Team" : `Alle ${members} Mitglieder verlieren das Team`,
-    chat ? `der Team-Chat mit ${chat === 1 ? "einer Nachricht" : `${chat} Nachrichten`} wird gelöscht` : "der Team-Chat wird gelöscht",
+    chat ? `der Team-Chat mit ${chat === 1 ? "einer Nachricht" : `${chat} Nachrichten`} ist nicht mehr erreichbar` : "der Team-Chat ist nicht mehr erreichbar",
   ];
   const titles = (preview.withdraw || []).map((row) => `„${row.title}“`);
   if (titles.length === 1) parts.push(`die Anmeldung für ${titles[0]} wird zurückgezogen`);
   if (titles.length > 1) parts.push(`die Anmeldungen für ${titles.slice(0, -1).join(", ")} und ${titles[titles.length - 1]} werden zurückgezogen`);
   const last = parts.pop();
-  return `${parts.join(", ")} und ${last}. Fertige Turniere und Auszeichnungen bleiben.`;
+  const days = Number(preview.restore_days || 0);
+  const undo = days ? ` ${days} Tage lang lässt sich das Team wiederherstellen (zurückgezogene Anmeldungen bleiben zurückgezogen), danach ist es endgültig weg.` : "";
+  return `${parts.join(", ")} und ${last}. Fertige Turniere und Auszeichnungen bleiben.${undo}`;
+}
+
+/** Noch wie lange wiederherstellbar: „noch 1 Tag“, „noch 12 Tage“. */
+export function restoreDaysLeft(days) {
+  const left = Number(days || 0);
+  return left === 1 ? "noch 1 Tag" : `noch ${left} Tage`;
 }
 
 /** Eingetippt wie der Teamname - Groß/klein und doppelte Leerzeichen zählen nicht (wie im Server). */

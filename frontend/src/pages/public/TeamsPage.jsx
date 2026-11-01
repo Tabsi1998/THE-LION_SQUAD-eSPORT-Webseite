@@ -220,10 +220,14 @@ function TeamDetail({ id }) {
     );
   }
   if (!team && missing) {
+    // Aufgelöst (#2128, TM8): alte Turniere verlinken das Team noch - der Server nennt den Namen.
+    const goneDetail = teamLoad.error?.response?.data?.detail;
+    const dissolved = typeof goneDetail === "string" && goneDetail.includes("aufgelöst");
     return (
       <PublicLayout>
         <div className="p-20 text-center" data-testid="team-missing">
-          <h1 className="font-heading text-3xl uppercase">Team nicht gefunden</h1>
+          <h1 className="font-heading text-3xl uppercase">{dissolved ? "Team aufgelöst" : "Team nicht gefunden"}</h1>
+          {dissolved ? <p className="mt-3 text-white/60">{goneDetail}</p> : null}
           <Link to="/teams" className="inline-block mt-4 text-[#29B6E8] hover:underline">← Zu den Teams</Link>
         </div>
       </PublicLayout>

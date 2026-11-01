@@ -47,9 +47,9 @@ test("Wappen-Kopf (#1347): Rollen in Alltagsworten, Teamleitung zuerst, zwei Buc
 test("Team auflösen (#1274): ein Satz nennt Mitglieder, Chat und kommende Anmeldungen; der Name zählt ohne Groß/klein", async () => {
   const { dissolveSentence, sameTeamName } = await import("@/lib/teamPage");
   expect(dissolveSentence({ member_count: 5, chat_messages: 12, withdraw: [{ title: "Herbst-Cup" }] }))
-    .toBe("Alle 5 Mitglieder verlieren das Team, der Team-Chat mit 12 Nachrichten wird gelöscht und die Anmeldung für „Herbst-Cup“ wird zurückgezogen. Fertige Turniere und Auszeichnungen bleiben.");
+    .toBe("Alle 5 Mitglieder verlieren das Team, der Team-Chat mit 12 Nachrichten ist nicht mehr erreichbar und die Anmeldung für „Herbst-Cup“ wird zurückgezogen. Fertige Turniere und Auszeichnungen bleiben.");
   expect(dissolveSentence({ member_count: 1, chat_messages: 0, withdraw: [] }))
-    .toBe("Das Mitglied verliert das Team und der Team-Chat wird gelöscht. Fertige Turniere und Auszeichnungen bleiben.");
+    .toBe("Das Mitglied verliert das Team und der Team-Chat ist nicht mehr erreichbar. Fertige Turniere und Auszeichnungen bleiben.");
   expect(dissolveSentence({ member_count: 3, chat_messages: 1, withdraw: [{ title: "A-Cup" }, { title: "B-Cup" }, { title: "C-Cup" }] }))
     .toContain("die Anmeldungen für „A-Cup“, „B-Cup“ und „C-Cup“ werden zurückgezogen");
   expect(sameTeamName({ name: "Lions Rocket" }, "  lions   ROCKET ")).toBe(true);

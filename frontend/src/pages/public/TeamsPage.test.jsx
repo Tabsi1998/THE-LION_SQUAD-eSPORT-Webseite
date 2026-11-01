@@ -211,11 +211,11 @@ test("Auflösen im Bearbeiten-Blatt: falscher Name sperrt, richtiger Name löst 
   serve(TEAM, {
     "/teams/t-1/dissolve-preview": { member_count: 3, chat_messages: 4, withdraw: [{ registration_id: "r-1", tournament_id: "tt-1", title: "Rocket League Herbst-Cup" }], blocked: [], can_dissolve: true },
   });
-  apiMock.delete.mockResolvedValue({ data: { ok: true, withdrawn: 1 } });
+  apiMock.delete.mockResolvedValue({ data: { ok: true, withdrawn: 1, restore_until: "2099-01-01T00:00:00+00:00" } });
   renderAt("/teams/t-1");
   fireEvent.click(await screen.findByTestId("team-edit-open"));
   const sheet = await screen.findByTestId("team-edit-sheet");
-  await waitFor(() => expect(screen.getByTestId("team-dissolve-sentence")).toHaveTextContent("Alle 3 Mitglieder verlieren das Team, der Team-Chat mit 4 Nachrichten wird gelöscht und die Anmeldung für „Rocket League Herbst-Cup“ wird zurückgezogen."));
+  await waitFor(() => expect(screen.getByTestId("team-dissolve-sentence")).toHaveTextContent("Alle 3 Mitglieder verlieren das Team, der Team-Chat mit 4 Nachrichten ist nicht mehr erreichbar und die Anmeldung für „Rocket League Herbst-Cup“ wird zurückgezogen."));
   // Das Auflösen steht nach dem Formular, ganz unten im Blatt.
   const order = [...sheet.querySelectorAll("[data-testid]")].map((node) => node.getAttribute("data-testid"));
   expect(order.indexOf("team-dissolve")).toBeGreaterThan(order.indexOf("team-color-picker"));
@@ -246,6 +246,16 @@ test("läuft ein Turnier, bleibt Auflösen gesperrt und das Turnier steht da; Co
   fireEvent.click(await screen.findByTestId("team-edit-open"));
   await screen.findByTestId("team-edit-sheet");
   expect(screen.queryByTestId("team-dissolve")).toBeNull();
+});
+
+// Weich aufgelöst (#2128, TM8): alte Links landen nicht im Leeren.
+test("aufgelöstes Team: die Seite sagt, was los ist", async () => {
+  const gone = Object.assign(new Error("404"), { response: { status: 404, data: { detail: "Lions Rocket wurde aufgelöst." } } });
+  serve(TEAM, { "/teams/t-1": gone });
+  renderAt("/teams/t-1");
+  const missing = await screen.findByTestId("team-missing");
+  expect(missing).toHaveTextContent("Team aufgelöst");
+  expect(missing).toHaveTextContent("Lions Rocket wurde aufgelöst.");
 });
 
 test("ohne Netz oder bei einem Serverfehler: Fehler mit „Nochmal versuchen“ statt ewigem Laden oder „nicht gefunden“ (#983, #1152)", async () => {

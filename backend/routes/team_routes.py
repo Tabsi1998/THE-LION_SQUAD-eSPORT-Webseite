@@ -533,6 +533,11 @@ async def get_team(team_id: str, user: dict | None = Depends(get_optional_user))
     db = get_db()
     team = await db.teams.find_one({"id": team_id}, {"_id": 0})
     if not team:
+        # Aufgelöst (#2128, TM8): alte Turniere verlinken das Team noch - die Seite sagt dann, was los ist.
+        from services.team_history import team_by_id
+        gone = await team_by_id(db, team_id)
+        if gone and gone.get("is_public") is not False:
+            raise HTTPException(status_code=404, detail=f"{gone.get('name') or 'Dieses Team'} wurde aufgelöst.")
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
     if team.get("is_public") is False and not (_is_member(team, user) or _is_staff(user)):
         raise HTTPException(status_code=404, detail="Team nicht gefunden")

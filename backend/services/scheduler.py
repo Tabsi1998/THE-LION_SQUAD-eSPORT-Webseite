@@ -799,6 +799,11 @@ async def _safe_ops_retention():
         expired = await purge_expired_records(get_db())
         if expired:
             logger.info(f"[scheduler] erased_account_records removed={expired}")
+        # Aufgelöste Teams (#2128, TM8): nach der Frist bleiben nur Name und Kürzel für alte Turniere.
+        from services.team_dissolve import purge_dissolved_teams
+        purged_teams = await purge_dissolved_teams(get_db())
+        if purged_teams:
+            logger.info(f"[scheduler] dissolved_teams purged={purged_teams}")
         # Statistik je Server (#631): wer wann aktiv war, bleibt nur für die 30-Tage-Zahl.
         from services.discord_stats import purge_old as purge_discord_activity
         gone = await purge_discord_activity(get_db())
