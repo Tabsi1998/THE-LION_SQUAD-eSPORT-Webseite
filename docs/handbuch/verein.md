@@ -93,7 +93,7 @@ Ohne Mitgliedschaft schickt eine Seite des Mitgliederbereichs auf **Mitglied wer
 **Admin → Mitglieder → Bewerbungen.** Reiter: **Offen**, **Aufgenommen**, **Abgelehnt**, **Zurückgezogen**, **In Übermittlung**, **Fehlgeschlagen** (Dolibarr hat den Antrag nicht angenommen, der Grund steht dabei).
 
 - Jeder Antrag zeigt den Stand und den nächsten Schritt in einem Satz.
-- **Annehmen**, **Ablehnen** (mit Begründung) und **Zurückziehen** gibt es nur, wo **die Website entscheidet**. Annehmen vergibt die Mitgliedsnummer (eine bestehende bleibt), nimmt die Art aus dem Antrag und schreibt den Verlauf. Die Person bekommt immer eine Mail und eine Meldung, auch wenn sie Mitgliedschafts-Mails ausgeschaltet hat; was du dazuschreibst, steht darin. Die Rückmeldung nach dem Klick sagt, ob die Mail versandt ist. Läuft der
+- **Annehmen**, **Ablehnen** (mit Begründung) und **Zurückziehen** gibt es nur, wo **die Website entscheidet**. Annehmen vergibt die Mitgliedsnummer (eine bestehende bleibt), nimmt die Art aus dem Antrag und schreibt den Verlauf. Die Person bekommt immer eine Mail und eine Meldung, auch wenn sie Mitgliedschafts-Mails ausgeschaltet hat; was du dazuschreibst, steht darin. Die Rückmeldung nach dem Klick sagt, ob die Mail unterwegs ist. Der Push nennt nur den ersten Satz der Begründung, den vollen Text gibt es in Mail und Glocke. Läuft der
   Antrag über Dolibarr, öffnet **In Dolibarr öffnen** den Eintrag; dort wird entschieden, die Website zeigt den Stand von selbst.
 - **In Übermittlung** heißt: gespeichert, aber noch nicht bei Dolibarr. Die Website versucht es weiter.
 - **+ Zum Antrag einladen:** Konto suchen (nur Konten **ohne** Mitgliedschaft), optional eine persönliche Zeile, **Einladen**. Die
@@ -120,7 +120,7 @@ einem Mitgliedseintrag zugeordnet sein (Dolibarr → Zuordnungen, oder das Mitgl
 anfragen** bzw. den Einladungscode vom Vorstand). Eine Mitgliedsnummer allein reicht nicht.
 
 **Meine Mitgliedschaft** (`/members/membership`): Karte, Mitgliedsart, „Mitglied seit“, Funktion im Verein, mit Dolibarr **Austritt
-erklären** (mit Wunschdatum, der letzte Tag wird in der Mitgliederverwaltung gerechnet), ohne Dolibarr eine einfache **Austrittserklärung** (mit Wunschtermin; sie geht an den Vorstand, die Person bleibt Mitglied, bis er den Status auf „Ehemalig“ setzt, und kann sie bis dahin zurücknehmen), **Meine Einwilligungen**
+erklären** (mit Wunschdatum, der letzte Tag wird in der Mitgliederverwaltung gerechnet), ohne Dolibarr eine einfache **Austrittserklärung** (mit Wunschtermin; sie geht an den Vorstand, die Person bleibt Mitglied, bis er den Status auf „Ehemalig“ setzt, und kann sie bis dahin zurücknehmen; der Vorstand bekommt beides per Mail), **Meine Einwilligungen**
 (auch in der App; **Ich stimme zu** erst nach dem Lesen der Fassung, **Widerrufen** jederzeit, der Text der zugestimmten Fassung bleibt lesbar), der eigene Eintrag im Mitgliederverzeichnis
 (**Im Mitgliederverzeichnis zeigen**, Gamertag, Spiele, Plattformen, Kurztext, **Eintrag speichern**) und der Schalter **Mitgliedsnummer öffentlich zeigen**: Das entscheidet nur das Mitglied, Standard ist aus.
 
