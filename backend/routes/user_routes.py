@@ -285,6 +285,10 @@ async def _send_user_invite(user: dict, actor: dict) -> dict:
     return {"invite_url": invite_url, "invite_email": result}
 
 
+# So viele Konten zeigt die Liste; die Seiten sagen dazu, wenn es mehr sein können (lib/membersList.js).
+USERS_LIST_LIMIT = 500
+
+
 @router.get("")
 async def list_users(q: str | None = None, role: str | None = None,
                      user_type: str | None = None,
@@ -298,11 +302,15 @@ async def list_users(q: str | None = None, role: str | None = None,
             {"email": {"$regex": pattern, "$options": "i"}},
             {"display_name": {"$regex": pattern, "$options": "i"}},
         ]
+        # Die Mitgliedsnummer steht an der Mitgliedschaft (#2125).
+        numbered = await db.memberships.find({"member_number": {"$regex": pattern, "$options": "i"}}, {"_id": 0, "user_id": 1}).to_list(USERS_LIST_LIMIT)
+        if numbered:
+            query["$or"].append({"id": {"$in": [row["user_id"] for row in numbered]}})
     if role:
         query["role"] = role
     if user_type:
         query["user_type"] = user_type
-    users = await db.users.find(query, private_projection()).to_list(500)
+    users = await db.users.find(query, private_projection()).to_list(USERS_LIST_LIMIT)
     # Bulk fetch memberships
     user_ids = [u["id"] for u in users]
     members = {
