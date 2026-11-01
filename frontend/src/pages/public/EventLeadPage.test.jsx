@@ -219,6 +219,26 @@ test("Bestehende interne Notiz steht im Feld", async () => {
   await waitFor(() => expect(within(details).getByTestId("event-lead-internal-note")).toHaveValue("Rollstuhlplatz"));
 });
 
+test("CSV: lädt die Liste des gewählten Filters", async () => {
+  URL.createObjectURL = vi.fn(() => "blob:liste");
+  URL.revokeObjectURL = vi.fn();
+  const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+  try {
+    apiMock.get.mockResolvedValue({ data: VIEW });
+    renderLead();
+    fireEvent.click(await screen.findByTestId("event-lead-filter-here"));
+    fireEvent.click(screen.getByTestId("event-lead-csv"));
+    await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/events/herbst-lan/lead/export.csv", { params: { filter: "here" }, responseType: "blob" }));
+    await waitFor(() => expect(click).toHaveBeenCalled());
+
+    apiMock.get.mockRejectedValueOnce(new Error("kaputt"));
+    fireEvent.click(screen.getByTestId("event-lead-csv"));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Die Liste ließ sich nicht herunterladen."));
+  } finally {
+    click.mockRestore();
+  }
+});
+
 test("voll: kein Hinweis auf einen freien Platz", async () => {
   renderLead({ ...VIEW, event: { ...VIEW.event, max_participants: 4 } });
   expect(await screen.findByTestId("event-lead-counter")).toBeInTheDocument();

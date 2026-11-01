@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Check, Megaphone, Minus, Plus, Search, Undo2, Users, X } from "lucide-react";
+import { Check, Download, Megaphone, Minus, Plus, Search, Undo2, Users, X } from "lucide-react";
 import { PrintLink } from "@/components/tls/print/PrintLink";
 import { toast } from "sonner";
 import { PublicLayout } from "@/components/tls/PublicLayout";
@@ -37,6 +37,7 @@ export default function EventLeadPage() {
   const [busyId, setBusyId] = useState("");
   const [undo, setUndo] = useState(null);
   const [messageOpen, setMessageOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const searchRef = useRef(null);
   const confirm = useConfirm();
 
@@ -98,6 +99,23 @@ export default function EventLeadPage() {
     await change(row, { status });
   };
 
+  const exportCsv = async () => {
+    setExporting(true);
+    try {
+      const { data: file } = await api.get(`/events/${encodeURIComponent(event.slug || slug)}/lead/export.csv`, { params: { filter }, responseType: "blob" });
+      const url = URL.createObjectURL(file);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `anmeldungen-${event.slug || slug}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Die Liste ließ sich nicht herunterladen.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const checkIn = async (row) => {
     await change(row, { status: "checked_in" }, { offerUndo: true });
     // An der Tür geht es mit dem nächsten Namen weiter.
@@ -142,6 +160,10 @@ export default function EventLeadPage() {
             ) : null}
             {/* Druckansicht (#1283): Liste mit Kästchen, Begleitpersonen, Warteliste, Druckzeit und QR-Code. */}
             <PrintLink scope="event" slug={event.slug || slug} parts="liste" testId="event-lead-print" className="!text-xs !py-2" />
+            {/* CSV (#2127, EV16): die Liste des gewählten Filters - nur Name, Status und Plätze. */}
+            <button type="button" disabled={exporting} onClick={exportCsv} className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid="event-lead-csv">
+              <Download className="w-4 h-4" /> CSV
+            </button>
           </div>
         </div>
 

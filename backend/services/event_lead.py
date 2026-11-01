@@ -17,16 +17,21 @@ gerade zählt; gleich danach ein zweites Mal geht nicht. Jede Nachricht steht mi
 """
 from __future__ import annotations
 
+import csv
+import io
 import logging
 import unicodedata
 from datetime import timedelta
+from zoneinfo import ZoneInfo
 
 from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
+from services.csv_safe import safe_cell
 from services.event_registration import seats
 from services.log_safe import log_safe, mask_addresses
 from services.mutation_lock import MutationLockBusy, mutation_lock
+from services.public_phase import parse_dt
 
 logger = logging.getLogger("tls.events.lead")
 
@@ -180,6 +185,38 @@ async def lead_view(db, event: dict, *, query: str = "", filter_key: str = "open
         view["message_recipients"] = len(await recipient_ids(db, event))
         view["messages"] = await message_log(db, event)
     return view
+
+
+CSV_HEADER = ("Name", "Status", "Plätze", "Begleitpersonen", "Angemeldet am")
+CSV_STATUS = {"registered": "Angemeldet", "checked_in": "Da", "waitlist": "Warteliste", "no_show": "Nicht erschienen", "cancelled": "Storniert"}
+VIENNA = ZoneInfo("Europe/Vienna")
+
+
+def _vienna_text(value) -> str:
+    moment = parse_dt(value)
+    return moment.astimezone(VIENNA).strftime("%d.%m.%Y %H:%M") if moment else ""
+
+
+async def export_csv(db, event: dict, me: dict, *, filter_key: str = "all") -> str:
+    """Die Teilnehmerliste als CSV (#2127, EV16): nur Name, Status und Plätze - keine Mail-Adresse, keine Notiz, kein
+    Geld. Wie die Seite nach Namen sortiert; eine Zelle wird nie zur Formel. Jeder Abruf steht im Protokoll."""
+    if filter_key not in FILTER_STATUSES:
+        raise LeadError(400, "Unbekannter Filter.")
+    statuses = FILTER_STATUSES[filter_key]
+    rows = [r for r in sorted(await _registrations(db, event), key=_sort_key) if statuses is None or r.get("status") in statuses]
+    buffer = io.StringIO()
+    writer = csv.writer(buffer, delimiter=";", lineterminator="\r\n")
+    writer.writerow(CSV_HEADER)
+    for row in rows:
+        writer.writerow([safe_cell(value) for value in (
+            row.get("display_name") or "Teilnehmer", CSV_STATUS.get(row.get("status"), row.get("status")), seats(row),
+            max(0, int(row.get("companion_count") or 0)), _vienna_text(row.get("created_at")),
+        )])
+    await db.audit_logs.insert_one({
+        "id": new_id(), "action": "event.registrations.export", "target_id": event["id"], "actor_id": me["id"],
+        "data": {"filter": filter_key, "count": len(rows)}, "created_at": now_utc().isoformat(),
+    })
+    return buffer.getvalue()
 
 
 async def _claim_event_gate(db, event: dict, now: str, since: str) -> None:

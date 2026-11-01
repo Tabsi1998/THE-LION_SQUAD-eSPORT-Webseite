@@ -4,6 +4,8 @@ Nur mit dem Bereich Turnierleitung (Rolle oder Freigabe) - wie Liste und Ändern
 die Moderation und Angemeldete bekommen 403. Geändert wird über ``PATCH /api/events/{id}/registrations/{rid}``;
 die Logik steht in ``services/event_lead.py``.
 """
+import re
+
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 
@@ -39,6 +41,21 @@ async def event_lead_view(slug_or_id: str, response: Response, q: str = "", filt
         return await event_lead.lead_view(get_db(), event, query=q[:100], filter_key=filter)
     except LeadError as exc:
         raise HTTPException(status_code=exc.status, detail=exc.detail)
+
+
+@router.get("/{slug_or_id}/lead/export.csv")
+async def event_lead_export(slug_or_id: str, filter: str = "all", me: dict = Depends(require_admin())):
+    """Die Teilnehmerliste als CSV (#2127, EV16) - dieselben Rechte wie die Seite, jeder Abruf steht im Protokoll."""
+    event = await _event(slug_or_id)
+    try:
+        text = await event_lead.export_csv(get_db(), event, me, filter_key=filter)
+    except LeadError as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.detail)
+    name = re.sub(r"[^a-z0-9-]+", "-", str(event.get("slug") or event["id"]).lower()).strip("-") or "event"
+    return Response(content="﻿" + text, media_type="text/csv; charset=utf-8", headers={
+        "Content-Disposition": f'attachment; filename="anmeldungen-{name}.csv"',
+        "Cache-Control": "private, no-store",
+    })
 
 
 @router.get("/{slug_or_id}/lead/registrations/{registration_id}")
