@@ -1150,6 +1150,11 @@ async def admin_update_member_profile(profile_id: str, body: ClubMemberProfileUp
         update["gender"] = _clean_gender(update.get("gender"))
     if "user_id" in update:
         update["user_id"] = await _normalize_linked_user_id(db, update.get("user_id"), profile_id)
+        # Am Konto hängt die Vereinsverwaltung des Postens (#2125): nicht still jemand anderem geben oder nehmen.
+        if update["user_id"] != existing.get("user_id"):
+            posts = await _board_posts_of_profile(db, existing)
+            if posts:
+                raise HTTPException(409, f"Dieses Profil hält den Vorstandsposten „{posts[0]}“. Besetze den Posten zuerst neu, dann lässt sich das Konto ändern.")
         # Löst der Vorstand ein Konto, merkt sich das Profil das (#506): der Abgleich und das Mitglied selbst
         # hängen es nicht wieder an - bis der Vorstand ein Konto verknüpft.
         if update["user_id"] is None and existing.get("user_id"):
@@ -1171,12 +1176,39 @@ async def admin_update_member_profile(profile_id: str, body: ClubMemberProfileUp
     return (await _attach_linked_accounts(db, [row], [item], public_only=False, admin=True))[0]
 
 
+async def _board_posts_of_profile(db, profile: dict) -> list[str]:
+    """Die Vorstandsposten, die auf dieses Profil zeigen - über das Profil oder sein Konto; auch inaktive."""
+    refs = [ref for ref in (profile.get("id"), profile.get("user_id")) if ref]
+    positions = await db.board_positions.find(
+        {"$or": [{"user_id": {"$in": refs}}, {"deputy_user_id": {"$in": refs}}]}, {"_id": 0, "title_male": 1, "slug": 1},
+    ).sort("order_index", 1).to_list(50)
+    return [row.get("title_male") or row.get("slug") or "Posten" for row in positions]
+
+
+async def _links_of_profile(db, profile: dict) -> list[str]:
+    """Was ins Leere zeigen würde, wenn das Profil weg wäre (#2125): Vorstandsposten, Referenzen, Serien."""
+    links = [f"Vorstandsposten „{title}“" for title in await _board_posts_of_profile(db, profile)]
+    pid = profile["id"]
+    references = await db.references.count_documents({"$or": [{"member_profile_ids": pid}, {"entries.member_profile_ids": pid}, {"lineup_members.profile_id": pid}, {"entries.lineup_members.profile_id": pid}]})
+    if references:
+        links.append("eine Referenz" if references == 1 else f"{references} Referenzen")
+    participants = await db.reference_participants.count_documents({"profile_id": pid})
+    if participants:
+        links.append("eine Serie" if participants == 1 else f"{participants} Serien")
+    return links
+
+
 @router.delete("/profiles/admin/{profile_id}")
 async def admin_delete_member_profile(profile_id: str, me: dict = Depends(require_area("club"))):
     db = get_db()
-    res = await db.club_member_profiles.delete_one({"id": profile_id})
-    if res.deleted_count == 0:
+    profile = await db.club_member_profiles.find_one({"id": profile_id}, {"_id": 0, "id": 1, "user_id": 1})
+    if not profile:
         raise HTTPException(404, "Mitgliedsprofil nicht gefunden.")
+    # Sonst zeigt der Posten ins Leere, und die Person verliert still die Vereinsverwaltung.
+    links = await _links_of_profile(db, profile)
+    if links:
+        raise HTTPException(409, f"Dieses Profil ist noch verknüpft: {', '.join(links)}. Zuerst dort neu besetzen oder austragen – oder das Profil nur offline schalten.")
+    await db.club_member_profiles.delete_one({"id": profile_id})
     await _audit(me["id"], "club_member_profile.delete", profile_id)
     return {"ok": True}
 
