@@ -52,6 +52,7 @@ PUBLIC_RESOURCE_ALIASES = {
     "admin/nav": "nav",
     "admin/streams": "streams",
     "settings/branding": "settings",
+    "settings/club-data": "settings",
     "settings/site-banners/admin": "settings",
 }
 # Volle Pfade interner Änderungen für die Verwaltungsseiten; die Moderationsseite braucht sie nicht. Wie jeder

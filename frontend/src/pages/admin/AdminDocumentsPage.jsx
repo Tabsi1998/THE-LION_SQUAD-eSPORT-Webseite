@@ -70,10 +70,14 @@ export default function AdminDocumentsPage() {
   const remove = async (id) => {
     if (!await confirm({
       title: "Dokument löschen?",
-      description: "Das Dokument wird aus dem Mitglieder-CMS entfernt.",
+      description: "Das Dokument verschwindet aus dem Mitgliederbereich, die Datei wird vom Server gelöscht – außer etwas anderes braucht sie noch.",
       confirmLabel: "Löschen",
     })) return;
-    try { await api.delete(`/documents/${id}`); toast.success("Gelöscht."); load(); } catch (err) { toast.error(formatRequestError(err, "Dokument konnte nicht gelöscht werden.")); }
+    try {
+      const { data } = await api.delete(`/documents/${id}`);
+      toast.success(data?.file_retry ? "Gelöscht. Die Datei ist gerade gesperrt, das Löschen wird nachgeholt." : data?.file_removed === false ? "Gelöscht. Die Datei bleibt, weil sie noch anderswo verwendet wird oder schon fehlte." : "Gelöscht, samt Datei.");
+      load();
+    } catch (err) { toast.error(formatRequestError(err, "Dokument konnte nicht gelöscht werden.")); }
   };
 
   return (

@@ -11,34 +11,97 @@ from fastapi.responses import FileResponse
 from auth import get_current_user, get_optional_user, require_area
 from database import get_db
 from models import DocumentCreate, DocumentUpdate, new_id, now_utc
-from services import dolibarr_identity
+from services import account_erasure, dolibarr_identity
 from services.dolibarr_client import DolibarrError
+from services.log_safe import log_safe
+from services.media_audit import still_referenced
 from services.member_activity import note_document_open
-from services.permissions import MFA_MESSAGE, admin_role_without_second_factor, is_confirmed_admin_role
+from services.permissions import MFA_MESSAGE, area_refusal, can_use_area
 from services.visibility import user_can_see
 from storage import PRIVATE_DOC_DIR, UPLOAD_DIR
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 logger = logging.getLogger("tls.documents")
 # Vereinsdokumente: Mitglieder und wer die Vereinsverwaltung oder System hat (#1350, services/visibility.py);
-# Moderatoren und die Turnierleitung sehen sie als Mitglied. Gesperrte Downloads öffnen Club-Admin und Superadmin,
-# wie jeder Adminbereich nur mit bestätigter Zwei-Faktor-Anmeldung (#1469).
-ADMIN_ROLES = {"club_admin", "superadmin"}
+# Moderatoren und die Turnierleitung sehen sie als Mitglied. Gesperrte Downloads öffnet, wer die Vereinsverwaltung hat
+# (Rolle, Freigabe, Vorstandsposten, #2125), wie jeder Adminbereich nur mit bestätigter Zwei-Faktor-Anmeldung (#1469).
+UNLOCK_AREA = "club"
+LOCAL_UPLOAD_PREFIXES = ("/api/static/uploads/", "/uploads/")
+FILE_REMOVED, FILE_KEPT, FILE_RETRY = "removed", "kept", "retry"
+# So benennt der Upload eine Datei: Zufallsname und Endung (routes/upload_routes.py).
+UPLOADED_KEY = re.compile(r"[0-9a-f]{32}(\.[a-z0-9]{1,10})?")
+
+
+async def _refuse_foreign_key(db, key: str, doc_id: str | None = None) -> None:
+    """Eine neue ``storage_key`` kommt aus dem Upload, die Datei liegt da und gehört keinem anderen Dokument."""
+    if not UPLOADED_KEY.fullmatch(key) or not (PRIVATE_DOC_DIR / key).is_file():
+        raise HTTPException(400, "Lade die Datei bitte über „Datei hochladen“ hoch.")
+    if await db.documents.find_one({"storage_key": key, "id": {"$ne": doc_id}}, {"_id": 1}):
+        raise HTTPException(409, "Diese Datei gehört schon zu einem anderen Dokument. Lade sie bitte neu hoch.")
+
+
+def _refuse_new_upload_address(file_url: str | None, previous: dict | None = None) -> None:
+    """Neue Dateien laufen über den Upload (``storage_key``); eine alte Upload-Adresse bleibt nur unverändert stehen."""
+    address = str(file_url or "").strip()
+    if address.startswith(LOCAL_UPLOAD_PREFIXES) and address != (previous or {}).get("file_url"):
+        raise HTTPException(400, "Lade die Datei bitte über „Datei hochladen“ hoch.")
 
 
 def _normalise_visibility(value: str | None) -> str:
     return "internal" if value == "internal" else "members"
 
 
-def _is_admin(user: dict | None) -> bool:
-    return is_confirmed_admin_role(user, ADMIN_ROLES)
+async def _unlocks_downloads(db, user: dict | None) -> bool:
+    return await can_use_area(user, UNLOCK_AREA, db=db)
 
 
-def _refuse_locked_download(user: dict | None) -> None:
+async def _refuse_locked_download(db, user: dict | None) -> None:
     """Gesperrter Download - mit dem Hinweis auf die Zwei-Faktor-Anmeldung, wenn nur sie fehlt (#1469)."""
-    if admin_role_without_second_factor(user, ADMIN_ROLES):
+    if await area_refusal(user, (UNLOCK_AREA,), db) == MFA_MESSAGE:
         raise HTTPException(403, MFA_MESSAGE)
     raise HTTPException(403, "Download ist für dieses Dokument deaktiviert.")
+
+
+async def _audit(db, action: str, me: dict, doc_id: str, data: dict) -> None:
+    """Nur Titel und Art, nie der Inhalt oder die Datei (#2125)."""
+    await db.audit_logs.insert_one({"id": new_id(), "action": action, "actor_id": me.get("id"), "target_id": doc_id, "data": data, "created_at": now_utc().isoformat()})
+
+
+async def _file_still_needed(db, doc: dict, path: pathlib.Path) -> bool:
+    """Braucht noch etwas anderes diese Datei? Ein zweites Dokument, die Sponsoring-Mappe (selber Ordner) oder - bei alten
+    Dateien im öffentlichen Upload-Ordner - irgendein Verweis, auch in Texten von Seiten, Newslettern und Rechtstexten."""
+    name = path.name
+    if await account_erasure.document_file_in_use(db, name, without=doc["id"]):
+        return True
+    if doc.get("storage_key"):
+        return False
+    # Eine Datei aus der Mediathek gehört nicht dem Dokument.
+    if await db.media_uploads.find_one({"filename": name}, {"_id": 1}):
+        return True
+    return bool(await still_referenced(db, {name}))
+
+
+def _unlink(path: pathlib.Path) -> None:
+    path.unlink(missing_ok=True)
+
+
+async def _remove_file(db, doc: dict) -> str:
+    """Die Datei zum Eintrag mitlöschen (#2125) - Protokolle tragen Personendaten. Nur, wenn nichts anderes sie braucht.
+    Zurück kommt ``removed``, ``kept`` oder ``retry``: Scheitert das Löschen, holt es der Aufräum-Job nach."""
+    path = _safe_storage_path(doc)
+    if not path or not path.is_file() or await _file_still_needed(db, doc, path):
+        return FILE_KEPT
+    try:
+        _unlink(path)
+    except OSError as exc:
+        logger.warning("[documents] Datei zum Dokument %s bleibt vorerst liegen", log_safe(doc.get("id")))
+        await account_erasure.retry_document_file(db, path.name, exc)
+        return FILE_RETRY
+    return FILE_REMOVED
+
+
+def _file_fields(state: str) -> dict:
+    return {"file_removed": state == FILE_REMOVED, **({"file_retry": True} if state == FILE_RETRY else {})}
 
 
 async def _user_can_see(user: dict | None, visibility: str | None) -> bool:
@@ -71,11 +134,11 @@ def _document_url(doc_id: str) -> str:
     return f"/api/documents/{doc_id}/download"
 
 
-def _public_doc(doc: dict, user: dict | None = None) -> dict:
+def _public_doc(doc: dict, unlocks: bool = False) -> dict:
     out = dict(doc)
     out["visibility"] = _normalise_visibility(out.get("visibility"))
     out["view_url"] = _document_view_url(out["id"])
-    if out.get("allow_download") or _is_admin(user):
+    if out.get("allow_download") or unlocks:
         out["download_url"] = _document_url(out["id"])
     else:
         out.pop("download_url", None)
@@ -120,7 +183,7 @@ async def documents_meta():
             {"k": "guideline", "l": "Leitlinie"},
             {"k": "download", "l": "Download"},
             {"k": "media_kit", "l": "Media Kit"},
-            {"k": "presentation", "l": "Praesentation"},
+            {"k": "presentation", "l": "Präsentation"},
             {"k": "template", "l": "Vorlage"},
             {"k": "other", "l": "Sonstiges"},
         ],
@@ -141,9 +204,10 @@ async def _visible_documents(db, user: dict | None, category: Optional[str] = No
         [("pinned", -1), ("order_index", 1), ("created_at", -1)]
     ).to_list(500)
     out = []
+    unlocks = await _unlocks_downloads(db, user)
     for doc in docs:
         if await _user_can_see(user, doc.get("visibility") or "members"):
-            out.append(_public_doc(doc, user))
+            out.append(_public_doc(doc, unlocks))
     # Dokumente aus der Vereinsakte (#324 Teil 1): nur für Mitglieder, nie ein Fehler für die Seite.
     if user and await user_can_see(user, "members"):
         try:
@@ -246,13 +310,17 @@ async def _dolibarr_file(dolibarr_id: int, user: dict | None, disposition: str, 
 async def admin_list_documents(me: dict = Depends(require_area("club"))):
     db = get_db()
     docs = await db.documents.find({}, {"_id": 0}).sort([("pinned", -1), ("order_index", 1)]).to_list(1000)
-    return [_public_doc(doc, me) for doc in docs]
+    unlocks = await _unlocks_downloads(db, me)
+    return [_public_doc(doc, unlocks) for doc in docs]
 
 
 @router.post("")
 async def create_document(body: DocumentCreate, me: dict = Depends(require_area("club"))):
     db = get_db()
     doc = body.model_dump()
+    _refuse_new_upload_address(doc.get("file_url"))
+    if doc.get("storage_key"):
+        await _refuse_foreign_key(db, doc["storage_key"])
     doc["visibility"] = _normalise_visibility(doc.get("visibility"))
     doc["id"] = new_id()
     doc["created_at"] = now_utc().isoformat()
@@ -265,7 +333,8 @@ async def create_document(body: DocumentCreate, me: dict = Depends(require_area(
         doc["file_url"] = _document_url(doc["id"])
     await db.documents.insert_one(doc)
     doc.pop("_id", None)
-    return _public_doc(doc, me)
+    await _audit(db, "document.create", me, doc["id"], {"title": doc.get("title"), "category": doc.get("category"), "visibility": doc["visibility"]})
+    return _public_doc(doc, await _unlocks_downloads(db, me))
 
 
 @router.put("/{doc_id}")
@@ -282,20 +351,33 @@ async def update_document(doc_id: str, body: DocumentUpdate, me: dict = Depends(
     if update.get("storage_key"):
         update["file_url"] = _document_url(doc_id)
     update["updated_at"] = now_utc().isoformat()
-    res = await db.documents.update_one({"id": doc_id}, {"$set": update})
-    if res.matched_count == 0:
+    previous = await db.documents.find_one({"id": doc_id}, {"_id": 0})
+    if not previous:
         raise HTTPException(404, "Dokument nicht gefunden.")
+    if "file_url" in raw:
+        _refuse_new_upload_address(raw.get("file_url"), previous)
+    if update.get("storage_key") and update["storage_key"] != previous.get("storage_key"):
+        await _refuse_foreign_key(db, update["storage_key"], doc_id)
+    await db.documents.update_one({"id": doc_id}, {"$set": update})
     updated = await db.documents.find_one({"id": doc_id}, {"_id": 0})
-    return _public_doc(updated, me)
+    # Eine neue Datei ersetzt die alte, auch eine alte öffentliche: sie bleibt sonst unbemerkt liegen.
+    replaced = "storage_key" in update and update["storage_key"] != previous.get("storage_key") and bool(_safe_storage_path(previous))
+    file_fields = _file_fields(await _remove_file(db, previous)) if replaced else {}
+    changed = sorted(key for key, value in update.items() if key not in {"updated_at", "file_url"} and value != previous.get(key))
+    await _audit(db, "document.update", me, doc_id, {"title": updated.get("title"), "fields": changed, **file_fields})
+    return _public_doc(updated, await _unlocks_downloads(db, me))
 
 
 @router.delete("/{doc_id}")
 async def delete_document(doc_id: str, me: dict = Depends(require_area("club"))):
     db = get_db()
-    res = await db.documents.delete_one({"id": doc_id})
-    if res.deleted_count == 0:
+    doc = await db.documents.find_one({"id": doc_id}, {"_id": 0})
+    if not doc:
         raise HTTPException(404, "Dokument nicht gefunden.")
-    return {"ok": True}
+    await db.documents.delete_one({"id": doc_id})
+    file_fields = _file_fields(await _remove_file(db, doc))
+    await _audit(db, "document.delete", me, doc_id, {"title": doc.get("title"), "category": doc.get("category"), **file_fields})
+    return {"ok": True, **file_fields}
 
 
 @router.get("/{doc_id}/view")
@@ -334,8 +416,8 @@ async def download_document(doc_id: str, request: Request, user: dict | None = D
         await note_document_open(db, user, doc_id)
         return response
     doc, path = await _load_authorized_doc(doc_id, user)
-    if not doc.get("allow_download") and not _is_admin(user):
-        _refuse_locked_download(user)
+    if not doc.get("allow_download") and not await _unlocks_downloads(db, user):
+        await _refuse_locked_download(db, user)
     await db.documents.update_one({"id": doc_id}, {"$inc": {"download_count": 1}})
     await note_document_open(db, user, doc_id)
     return _file_response(doc, path, "attachment")

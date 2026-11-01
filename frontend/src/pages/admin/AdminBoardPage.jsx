@@ -11,7 +11,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { ChevronDown, Crown, Plus } from "lucide-react";
 import { viennaDate, viennaDateTime } from "@/lib/vienna";
-import { CLUB_ACCESS, boardSentence, clearSentence, postTitle } from "@/lib/boardRights";
+import { CLUB_ACCESS, boardSentence, clearSentence, deleteSentence, postTitle, statusSentence } from "@/lib/boardRights";
 import { isDeputyPosition } from "@/lib/boardSeats";
 
 // Vorstand (#1355): Posten als Liste mit „Besetzen“ bzw. „Ändern“. Besetzt wird über die Personensuche, nur mit
@@ -78,7 +78,14 @@ export default function AdminBoardPage() {
     }
   };
 
-  const toggle = (position) => patch(position, { is_active: !position.is_active }, position.is_active ? "Posten ist inaktiv." : "Posten ist aktiv.");
+  const toggle = async (position) => {
+    if (!await confirm({
+      title: position.is_active ? "Posten deaktivieren?" : "Posten aktivieren?",
+      description: statusSentence({ position, rightsFromDolibarr }),
+      confirmLabel: position.is_active ? "Deaktivieren" : "Aktivieren",
+    })) return;
+    await patch(position, { is_active: !position.is_active }, position.is_active ? "Posten ist inaktiv." : "Posten ist aktiv.");
+  };
 
   const clearHolder = async (position, deputy) => {
     const holder = holderName(deputy ? position.deputy_user : position.user);
@@ -93,7 +100,7 @@ export default function AdminBoardPage() {
   const remove = async (position) => {
     if (!await confirm({
       title: "Posten löschen?",
-      description: `„${postTitle(position)}“ wird gelöscht. ${position.user ? `${holderName(position.user)} verliert damit diesen Posten.` : ""}`.trim(),
+      description: deleteSentence({ position, rightsFromDolibarr }),
       confirmLabel: "Löschen",
     })) return;
     try {
@@ -211,7 +218,7 @@ export default function AdminBoardPage() {
         />
       )}
       {(creating || editing) && (
-        <BoardForm position={editing} onClose={() => { setEditing(null); setCreating(false); }} onSaved={load} />
+        <BoardForm position={editing} rightsFromDolibarr={rightsFromDolibarr} onClose={() => { setEditing(null); setCreating(false); }} onSaved={load} />
       )}
     </AdminLayout>
   );
@@ -285,8 +292,9 @@ function AssignSheet({ position, deputy, rightsFromDolibarr, onClose, onAssigned
   );
 }
 
-function BoardForm({ position, onClose, onSaved }) {
+function BoardForm({ position, rightsFromDolibarr, onClose, onSaved }) {
   const isNew = !position;
+  const confirm = useConfirm();
   const [form, setForm] = useState({
     title_male: position?.title_male || "",
     title_female: position?.title_female || "",
@@ -301,6 +309,12 @@ function BoardForm({ position, onClose, onSaved }) {
 
   const save = async (e) => {
     e.preventDefault();
+    // Auch der Haken „Aktiv“ entscheidet über die Vereinsverwaltung (#2125) - dieselbe Rückfrage wie unter „Mehr“.
+    if (!isNew && form.is_active !== (position.is_active !== false) && !await confirm({
+      title: form.is_active ? "Posten aktivieren?" : "Posten deaktivieren?",
+      description: statusSentence({ position, rightsFromDolibarr }),
+      confirmLabel: form.is_active ? "Aktivieren" : "Deaktivieren",
+    })) return;
     setSaving(true);
     try {
       const { data } = isNew ? await api.post("/board", form) : await api.patch(`/board/${position.id}`, form);

@@ -3,7 +3,7 @@
 import logging
 import os
 from fastapi import Query, APIRouter, HTTPException, Depends, Request, Response
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from typing import Optional, List, Literal, Dict
 from datetime import datetime, timezone
 import httpx
@@ -1658,6 +1658,60 @@ async def update_branding(body: BrandingSettings, me: dict = Depends(require_clu
     await _audit_settings_change(db, "settings.branding.update", "branding", me["id"], changed_fields)
     saved = await db.settings.find_one({"id": "branding"}, {"_id": 0})
     return _hide_branding_secrets(saved) if saved else {"ok": True}
+
+
+# Vereinsdaten für den Vorstand (#2125, erster Teil von #1368): Stammdaten und Kontakt pflegt die Vereinsverwaltung - in denselben
+# Feldern wie System, nichts doppelt. Rechtstexte, Hosting und Preisturniere liest sie nur (rechtliche Folgen); Branding, Geheimnisse
+# und alles andere bleiben ihr verborgen.
+CLUB_DATA_READ_ONLY = ("hosting_provider", "hosting_country", "vat_number", "tournament_terms_url", "paid_tournaments_enabled",
+                       "imprint", "privacy_policy", "legal_extra", "privacy_extra", "terms_of_use", "legal_from_dolibarr")
+
+
+class ClubDataUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    legal_name: Optional[str] = Field(default=None, max_length=300)
+    legal_form: Optional[str] = Field(default=None, max_length=300)
+    zvr_number: Optional[str] = Field(default=None, max_length=100)
+    street_address: Optional[str] = Field(default=None, max_length=300)
+    address_extra: Optional[str] = Field(default=None, max_length=300)
+    postal_code: Optional[str] = Field(default=None, max_length=40)
+    city: Optional[str] = Field(default=None, max_length=200)
+    state: Optional[str] = Field(default=None, max_length=200)
+    country: Optional[str] = Field(default=None, max_length=200)
+    registered_seat: Optional[str] = Field(default=None, max_length=200)
+    register_authority: Optional[str] = Field(default=None, max_length=300)
+    representative_name: Optional[str] = Field(default=None, max_length=200)
+    representative_role: Optional[str] = Field(default=None, max_length=200)
+    content_responsible: Optional[str] = Field(default=None, max_length=200)
+    phone: Optional[str] = Field(default=None, max_length=100)
+    privacy_contact_email: Optional[str] = Field(default=None, max_length=300)
+
+
+def _club_data_view(branding: dict) -> dict:
+    return {key: branding.get(key) for key in (*ClubDataUpdate.model_fields, *CLUB_DATA_READ_ONLY) if key in branding}
+
+
+@settings_router.get("/club-data")
+async def get_club_data(response: Response, me: dict = Depends(require_area("club", "system"))):
+    response.headers["Cache-Control"] = "no-store"
+    return _club_data_view((await get_db().settings.find_one({"id": "branding"}, {"_id": 0})) or {})
+
+
+@settings_router.put("/club-data")
+async def update_club_data(body: ClubDataUpdate, me: dict = Depends(require_area("club", "system"))):
+    db = get_db()
+    updates = body.model_dump(exclude_unset=True)
+    current = await db.settings.find_one({"id": "branding"}, {"_id": 0}) or {}
+    changed_fields = _changed_setting_fields(current, updates)
+    if not changed_fields:
+        return _club_data_view(current)
+    updates["updated_at"] = now_utc().isoformat()
+    if set(changed_fields) & PUBLIC_LEGAL_SOURCE_FIELDS:
+        updates["legal_updated_at"] = updates["updated_at"]
+    await db.settings.update_one({"id": "branding"}, {"$set": updates, "$setOnInsert": {"id": "branding"}}, upsert=True)
+    await _audit_settings_change(db, "settings.club_data.update", "branding", me["id"], changed_fields)
+    return _club_data_view(await db.settings.find_one({"id": "branding"}, {"_id": 0}) or {})
 
 
 @settings_router.post("/branding/favicon/universal")

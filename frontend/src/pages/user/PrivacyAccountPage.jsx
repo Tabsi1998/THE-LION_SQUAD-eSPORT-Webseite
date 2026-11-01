@@ -108,14 +108,14 @@ export default function PrivacyAccountPage() {
                 <p className="mt-1 text-sm text-white/60">Dein Account wird dauerhaft deaktiviert und alle persönlichen Daten (E-Mail, Discord, Plattform-IDs, Bio, Avatar) werden überschrieben. Deine Turnier-Statistiken bleiben anonymisiert zur Wahrung der sportlichen Integrität erhalten. Diese Aktion kann <strong>nicht rückgängig gemacht</strong> werden.</p>
                 {roleBlockers.length > 0 && (
                   <div className="mt-4 border border-warn/35 bg-warn/5 rounded-sm p-4" data-testid="dsgvo-erasure-blockers">
-                    <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-warn"><Users className="w-3.5 h-3.5" /> Erst deine Rollen in Teams abgeben</div>
-                    <p className="mt-1 text-sm text-white/70">Solange du ein Team leitest oder in einem Co-Team Captain oder Vertreter bist, kannst du dein Konto nicht löschen – sonst stünde dort ein gelöschtes Konto. So geht es:</p>
+                    <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-warn"><Users className="w-3.5 h-3.5" /> {roleBlockers.every((row) => row.role === "superadmin") ? "Erst deine Rolle abgeben" : "Erst deine Rollen in Teams abgeben"}</div>
+                    <p className="mt-1 text-sm text-white/70">{roleBlockers.every((row) => row.role === "superadmin") ? "Als letzter Superadmin kannst du dein Konto nicht löschen – sonst vergibt niemand mehr Rollen. So geht es:" : "Solange du ein Team leitest oder in einem Co-Team Captain oder Vertreter bist, kannst du dein Konto nicht löschen – sonst stünde dort ein gelöschtes Konto. So geht es:"}</p>
                     <ul className="mt-3 space-y-2">
                       {roleBlockers.map((row) => (
                         <li key={`${row.team_id}:${row.squad_id || ""}:${row.role}`} className="border border-white/10 bg-black/20 rounded-sm p-3 text-sm" data-testid={`dsgvo-erasure-blocker-${row.role}`}>
                           <div className="font-bold text-white break-words">{row.role_label} {row.squad ? `im Co-Team ${row.squad} von ${row.team}` : `bei ${row.team}`}</div>
                           <div className="mt-1 text-white/60">{row.way}</div>
-                          {row.link ? <Link to={row.link} className="mt-2 inline-flex min-h-11 items-center text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">{row.squad ? "Zu deinen Teams" : "Zur Teamseite"}</Link> : null}
+                          {row.link ? <Link to={row.link} className="mt-2 inline-flex min-h-11 items-center text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">{row.role === "superadmin" ? "Zu Alle Benutzer" : row.squad ? "Zu deinen Teams" : "Zur Teamseite"}</Link> : null}
                         </li>
                       ))}
                     </ul>

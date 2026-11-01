@@ -209,7 +209,10 @@ class MembershipUpdate(BaseModel):
     member_since_precision: Optional[MemberSincePrecision] = None
     internal_role: Optional[str] = None
     notes: Optional[str] = None
+    # Entscheidet das Mitglied selbst (#2125, PUT /membership/me/number-visibility); hier wird der Wert ignoriert.
     show_member_number_publicly: Optional[bool] = None
+    # „Ohne Mail“ beim Statuswechsel (#2125): etwa um einen Fehlklick zu korrigieren.
+    notify: Optional[bool] = None
 
 
 class MemberBenefitCreate(BaseModel):

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { api, formatApiError } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import { setCachedBranding } from "@/lib/brandingEvents";
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { LegalTab } from "./settings/LegalSettings";
@@ -24,18 +25,22 @@ export function legalPayload(source = {}) {
 }
 
 export default function AdminClubDataPage() {
+  const { can } = useAuth();
+  // Vereinsverwaltung ohne System (#2125): eigener, schmaler Weg für Stammdaten und Kontakt; Rechtstexte nur zum Lesen.
+  const clubOnly = !can?.("system");
+  const endpoint = clubOnly ? "/settings/club-data" : "/settings/branding";
   const [brand, setBrand] = useState(LEGAL_DEFAULTS);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const originalRef = useRef(LEGAL_DEFAULTS);
 
   useEffect(() => {
-    api.get("/settings/branding").then(({ data }) => {
+    api.get(endpoint).then(({ data }) => {
       const next = { ...LEGAL_DEFAULTS, ...(data || {}) };
       setBrand(next);
       originalRef.current = next;
     }).catch(() => toast.error("Vereinsdaten konnten nicht geladen werden.")).finally(() => setLoaded(true));
-  }, []);
+  }, [endpoint]);
 
   const setBrandField = (key, value) => setBrand((prev) => ({ ...prev, [key]: value }));
   const setCanonicalLegalText = (key, legacyKey, value) => setBrand((prev) => ({ ...prev, [key]: value, [legacyKey]: "" }));
@@ -49,7 +54,7 @@ export default function AdminClubDataPage() {
     }
     setSaving(true);
     try {
-      const { data } = await api.put("/settings/branding", payload);
+      const { data } = await api.put(endpoint, payload);
       const next = { ...brand, ...(data && !data.ok ? data : {}) };
       setBrand(next);
       originalRef.current = next;
@@ -76,7 +81,7 @@ export default function AdminClubDataPage() {
         Kontakt, Impressum und Datenschutz auf der Website lesen von hier; mit Dolibarr-Anbindung kommen die Vereinsdaten wahlweise aus dem Vereinsmodul.
       </p>
       {loaded ? (
-        <LegalTab brand={brand} setBrandField={setBrandField} setCanonicalLegalText={setCanonicalLegalText} saveBrand={saveBrand} saving={saving} />
+        <LegalTab brand={brand} setBrandField={setBrandField} setCanonicalLegalText={setCanonicalLegalText} saveBrand={saveBrand} saving={saving} clubOnly={clubOnly} />
       ) : (
         <div className="text-sm text-white/45" data-testid="club-data-loading">Lade Vereinsdaten …</div>
       )}

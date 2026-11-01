@@ -15,10 +15,12 @@ from typing import Optional, Literal
 from database import get_db
 from auth import get_current_user, require_area
 from models import now_utc, new_id
-from badges import compute_profile_completeness, PROFILE_FIELDS, evaluate_user_progress
-from services import dolibarr_applications, membership_fees, membership_invitations
+from badges import compute_profile_completeness, PROFILE_FIELDS, evaluate_membership_badges, evaluate_user_progress
+from services import dolibarr_applications, membership_fees, membership_invitations, membership_notices
 from services.dolibarr_client import DolibarrClient, DolibarrError, load_settings as load_dolibarr_settings
+from services.dolibarr_links import verified_link
 from services.log_safe import log_safe
+from services.membership_service import MemberNumberConflict, upsert_membership
 from services.private_fields import private_projection
 
 router = APIRouter(prefix="/api", tags=["phase-c"])
@@ -257,23 +259,13 @@ async def membership_apply(body: ApplyBody, me: dict = Depends(get_current_user)
     # Vorstands-Kanal (#300): nur der Hinweis, keine Namen - Discord ist ein fremder Dienst.
     from services.discord_announcements import notify_board
     await notify_board("membership.application", "Ein neuer Antrag wartet auf die Entscheidung des Vorstands.")
-    # Notify admin via SMTP queue (best-effort)
+    # Alle mit der Vereinsverwaltung (#2125) - Vorstand und Freigaben entscheiden hier genauso wie Club-Admins (best-effort).
     try:
-        from services.mail_queue import enqueue_mail
-        from routes.phase_ef_routes import render_template
-        admins = await db.users.find({"role": {"$in": ["club_admin", "superadmin"]}},
-                                      {"_id": 0, "email": 1}).to_list(20)
+        from services.membership_notices import mail_club_area
         applicant_name = me.get("display_name") or me.get("username") or "Spieler"
         # Werte nur als {{…}} - render_template setzt sie als Text ein.
-        subj, html = await render_template(
-            "membership_application_admin",
-            {"applicant": applicant_name},
-            fallback_subject="Neue Mitgliedsbewerbung",
-            fallback_html="<p>{{applicant}} hat eine Mitgliedsbewerbung eingereicht.</p>",
-        )
-        for a in admins:
-            if a.get("email"):
-                await enqueue_mail(to=a["email"], subject=subj, html=html)
+        await mail_club_area(db, "membership_application_admin", {"applicant": applicant_name}, subject="Neue Mitgliedsbewerbung",
+                             html="<p>{{applicant}} hat eine Mitgliedsbewerbung eingereicht.</p>")
     except Exception:
         logger.warning("[membership] Mail an den Vorstand zur neuen Bewerbung fehlgeschlagen", exc_info=True)
     doc.pop("_id", None)
@@ -318,6 +310,20 @@ async def _apply_via_dolibarr(db, client, body: ApplyBody, me: dict) -> dict:
     return dolibarr_applications.own_view(saved)
 
 
+async def _withdraw_website_application(db, app: dict, actor_id: str, action: str, note: str | None = None) -> dict:
+    """Ein Antrag ohne Dolibarr geht auf „Zurückgezogen“ - nur solange er offen ist."""
+    now = now_utc().isoformat()
+    changed = await db.membership_applications.update_one(
+        {"id": app["id"], "status": "pending"},
+        {"$set": {"status": "withdrawn", "withdrawn_at": now, "decided_at": now, "decided_by": actor_id, "decision_note": note}},
+    )
+    if changed.modified_count != 1:
+        raise HTTPException(409, "Über diesen Antrag ist schon entschieden.")
+    await db.audit_logs.insert_one({"id": new_id(), "action": action, "actor_id": actor_id, "target_id": app["user_id"],
+                                    "data": {"application_id": app["id"], **({"note": note} if note else {})}, "created_at": now})
+    return await db.membership_applications.find_one({"id": app["id"]}, {"_id": 0})
+
+
 @router.post("/membership/apply/withdraw")
 async def withdraw_application(me: dict = Depends(get_current_user)):
     """Zurückziehen, solange der Verein nicht entschieden hat (#328)."""
@@ -326,7 +332,8 @@ async def withdraw_application(me: dict = Depends(get_current_user)):
     if not app:
         raise HTTPException(404, "Kein offener Antrag.")
     if not app.get("external_id"):
-        raise HTTPException(409, "Dieser Antrag liegt beim Vorstand der Website - dort zurückziehen lassen.")
+        # Antrag auf der Website (#2125): die Person zieht ihn selbst zurück, der Vorstand sieht ihn unter „Zurückgezogen“.
+        return await _withdraw_website_application(db, app, me["id"], "membership.application_withdrawn")
     if app.get("status") in ("submitting", "failed"):
         now = now_utc().isoformat()
         await db.membership_applications.update_one({"id": app["id"]}, {"$set": {"status": "withdrawn", "withdrawn_at": now, "decided_at": now, "decided_by": me["id"]}})
@@ -394,6 +401,18 @@ class DecisionBody(BaseModel):
     note: Optional[str] = None
 
 
+# Beitragswunsch im Antrag → Mitgliedsart. Mit einer Mitgliedsart samt Betrag (#1251) entscheidet deren Name.
+PREF_TO_TYPE = {"full": "ordinary", "supporter": "supporting", "youth": "youth", "honorary": "honorary"}
+TYPE_WORDS = (("unterstütz", "supporting"), ("förder", "supporting"), ("jugend", "youth"), ("ehren", "honorary"), ("gast", "guest"))
+
+
+def _membership_type_of(app: dict) -> str:
+    label = str(app.get("type_label") or "").lower()
+    if app.get("type_id") or label:
+        return next((kind for word, kind in TYPE_WORDS if word in label), "ordinary")
+    return PREF_TO_TYPE.get(app.get("contribution_pref"), "ordinary")
+
+
 @router.put("/membership/applications/{app_id}")
 @router.patch("/membership/applications/{app_id}")
 async def admin_decide_application(app_id: str, body: DecisionBody,
@@ -406,9 +425,14 @@ async def admin_decide_application(app_id: str, body: DecisionBody,
         raise HTTPException(409, "Dieser Antrag liegt in der Mitgliederverwaltung (Dolibarr) - dort aufnehmen oder ablehnen; die Website übernimmt den Stand.")
     if app["status"] != "pending":
         raise HTTPException(400, "Bereits entschieden.")
+    if body.decision == "approve":
+        # Führt Dolibarr die Mitgliedschaft, käme der nächste Abgleich darüber - wie beim Ändern von Hand (#295).
+        settings = await load_dolibarr_settings(db)
+        if settings["mode"] == "live" and await verified_link(db, settings, app["user_id"]):
+            raise HTTPException(409, "Diese Mitgliedschaft wird in Dolibarr geführt – dort aufnehmen; die Website übernimmt den Stand.")
     new_status = "approved" if body.decision == "approve" else "rejected"
-    await db.membership_applications.update_one(
-        {"id": app_id},
+    claimed = await db.membership_applications.update_one(
+        {"id": app_id, "status": "pending"},
         {"$set": {
             "status": new_status,
             "decided_at": now_utc().isoformat(),
@@ -416,33 +440,33 @@ async def admin_decide_application(app_id: str, body: DecisionBody,
             "decision_note": body.note,
         }},
     )
+    if claimed.modified_count != 1:
+        raise HTTPException(400, "Bereits entschieden.")
     if body.decision == "approve":
-        # Create or activate membership
-        m = await db.memberships.find_one({"user_id": app["user_id"]})
-        update = {
-            "member_status": "active",
-            "member_since": now_utc().isoformat() if not (m and m.get("member_since")) else m.get("member_since"),
-            "contribution_pref": app["contribution_pref"],
-        }
-        if m:
-            await db.memberships.update_one({"user_id": app["user_id"]}, {"$set": update})
-        else:
-            await db.memberships.insert_one({
-                "id": new_id(),
-                "user_id": app["user_id"],
-                **update,
-                "created_at": now_utc().isoformat(),
-            })
+        # Derselbe Weg wie von Hand (#2125): Nummer nur beim ersten Mal, Art aus dem Antrag, Verlauf, Mitglieder-Erfolge.
+        try:
+            await upsert_membership(app["user_id"], me["id"], member_status="active", membership_type=_membership_type_of(app))
+        except MemberNumberConflict as exc:
+            # Ohne Mitgliedschaft bleibt der Antrag offen - nie „aufgenommen“ ohne Nummer und ohne Mail.
+            await db.membership_applications.update_one({"id": app_id, "status": new_status}, {"$set": {"status": "pending", "decided_at": None, "decided_by": None, "decision_note": None}})
+            raise HTTPException(409, str(exc))
+        await db.memberships.update_one({"user_id": app["user_id"]}, {"$set": {"contribution_pref": app.get("contribution_pref")}})
         await evaluate_user_progress(app["user_id"])
+        try:
+            await evaluate_membership_badges(app["user_id"])
+        except Exception:
+            logger.warning("[achievements] Mitglieder-Erfolge für %s nicht ausgewertet", log_safe(app["user_id"]), exc_info=True)
 
-    # Notify applicant via mail queue
+    # Die Person erfährt es immer (#2125), die Verwaltung sieht, ob die Mail draußen ist.
+    mail_state = membership_notices.FAILED
     try:
         from services.membership_decision_mail import queue_decision_mail
         u = await db.users.find_one(
             {"id": app["user_id"]},
-            {"_id": 0, "email": 1, "display_name": 1, "username": 1, "newsletter_consent": 1, "notification_preferences": 1},
+            {"_id": 0, "id": 1, "email": 1, "display_name": 1, "username": 1},
         )
-        await queue_decision_mail(u, approved=body.decision == "approve", note=body.note or "", application_id=app_id)
+        mail_state = await membership_notices.honest_mail_state(
+            await queue_decision_mail(u, approved=body.decision == "approve", note=body.note or "", application_id=app_id))
     except Exception:
         logger.warning("[membership] Mail zur Entscheidung über Bewerbung %s fehlgeschlagen", log_safe(app_id), exc_info=True)
 
@@ -453,4 +477,24 @@ async def admin_decide_application(app_id: str, body: DecisionBody,
         "data": {"application_id": app_id, "note": body.note},
         "created_at": now_utc().isoformat(),
     })
-    return await db.membership_applications.find_one({"id": app_id}, {"_id": 0})
+    return {**await db.membership_applications.find_one({"id": app_id}, {"_id": 0}), "mail": mail_state}
+
+
+class AdminWithdrawBody(BaseModel):
+    note: Optional[str] = Field(default=None, max_length=500)
+
+
+@router.post("/membership/applications/{app_id}/withdraw")
+async def admin_withdraw_application(app_id: str, body: AdminWithdrawBody | None = None, me: dict = Depends(require_area("club"))):
+    """Der Vorstand zieht einen Website-Antrag zurück (#2125) - etwa, wenn die Person es so wünscht. Sie bekommt eine Meldung."""
+    db = get_db()
+    app = await db.membership_applications.find_one({"id": app_id}, {"_id": 0})
+    if not app:
+        raise HTTPException(404, "Bewerbung nicht gefunden.")
+    if app.get("external_id"):
+        raise HTTPException(409, "Dieser Antrag liegt in der Mitgliederverwaltung (Dolibarr) - dort zurückziehen; die Website übernimmt den Stand.")
+    note = ((body.note if body else None) or "").strip() or None
+    saved = await _withdraw_website_application(db, app, me["id"], "membership.application_withdrawn_by_board", note)
+    await membership_notices.tell_person(app["user_id"], "Deine Mitgliedsbewerbung wurde zurückgezogen", f"Der Vorstand hat deine Bewerbung zurückgezogen. {note or ''}".strip(), "/membership/apply",
+                                         push_body=f"Der Vorstand hat deine Bewerbung zurückgezogen. {membership_notices.first_sentence(note)}".strip())
+    return saved

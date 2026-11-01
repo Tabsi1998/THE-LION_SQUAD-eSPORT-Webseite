@@ -376,13 +376,16 @@ async def _anonymize_user_data(db, user_id: str, actor_id: str, action: str) -> 
     # Druckdateien mit Gamertag (#2069): dasselbe für die zusammengesetzte Datei je Bestellposition.
     from services.shop_print_files import erase_for_user as erase_print_files
     await erase_print_files(db, user_id)
+    # Muss vor dem Aufräumen stehen: danach ist der Eintrag weg, auf den die Posten zeigen.
+    orphaned_posts = await account_erasure.posts_on_own_entry(db, user_id)
     # Alles außerhalb des Kontos (#928): Verzeichnis, Anträge, Anmeldungen, XP, Zugänge und die eigenen Bilder.
     erased = await account_erasure.erase_related(db, user, now)
     # Kontaktanfragen ohne Konto mit derselben Adresse bleiben unberührt (nicht sicher zuzuordnen) - die Zahl steht hier,
     # damit der Vorstand sie bei einem Löschwunsch per Hand prüfen kann.
     await db.audit_logs.insert_one({
         "id": new_id(), "action": action, "actor_id": actor_id, "target_id": user_id,
-        "data": {"personal_data_removed": True, "unlinked_contact_messages": erased["unlinked_contact_messages"]}, "created_at": now,
+        "data": {"personal_data_removed": True, "unlinked_contact_messages": erased["unlinked_contact_messages"],
+                 **({"board_posts_to_fill": orphaned_posts} if orphaned_posts else {})}, "created_at": now,
     })
 
 
@@ -398,7 +401,7 @@ async def anonymize_me_check(me: dict = Depends(get_current_user)):
     vor der Rückfrage. Leer heißt: Löschen geht."""
     from services import erasure_blockers
     db = get_db()
-    rows = await erasure_blockers.team_roles(db, me["id"])
+    rows = await erasure_blockers.blockers(db, me["id"], me.get("role"))
     closing = await erasure_blockers.way_out(db) if rows else None
     return {"can_erase": not rows, "blockers": rows, "message": erasure_blockers.message(rows, closing), "closing": closing}
 
@@ -409,7 +412,7 @@ async def anonymize_me(me: dict = Depends(get_current_user)):
     db = get_db()
     # Erst die Rollen in Teams abgeben (#2113, L-C5) - sonst stünde ein gelöschtes Konto als Kapitän da.
     from services import erasure_blockers
-    rows = await erasure_blockers.team_roles(db, me["id"])
+    rows = await erasure_blockers.blockers(db, me["id"], me.get("role"))
     if rows:
         raise HTTPException(409, erasure_blockers.message(rows, await erasure_blockers.way_out(db)))
     await _anonymize_user_data(db, me["id"], me["id"], "user.self_anonymize")
@@ -419,8 +422,11 @@ async def anonymize_me(me: dict = Depends(get_current_user)):
 @dsgvo_router.post("/admin/anonymize/{user_id}")
 async def admin_anonymize(user_id: str, me: dict = Depends(require_super())):
     db = get_db()
+    # Das eigene Konto läuft über die Datenschutzseite - mit denselben Regeln wie dort (#2125).
+    if user_id == me["id"]:
+        raise HTTPException(400, "Nutze für den eigenen Account die Datenschutzseite.")
     target = await db.users.find_one({"id": user_id}, {"_id": 0, "role": 1})
-    if target and target.get("role") == "superadmin" and user_id != me["id"]:
+    if target and target.get("role") == "superadmin":
         raise HTTPException(403, "Andere Superadmins dürfen nicht anonymisiert werden.")
     await _anonymize_user_data(db, user_id, me["id"], "user.admin_anonymize")
     return {"ok": True}

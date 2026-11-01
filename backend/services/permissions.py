@@ -273,6 +273,17 @@ def is_superadmin(user: dict | None) -> bool:
     return bool(user) and str(user.get("role") or "") == "superadmin"
 
 
+LAST_SUPERADMIN_DETAIL = "Das ist der letzte Superadmin – danach könnte niemand mehr Rollen und Freigaben vergeben. Ernenne zuerst eine zweite Person zum Superadmin."
+
+
+async def usable_superadmins(db, *, without: str | None = None) -> int:
+    """Superadmins, die sich anmelden können - gesperrte und abgeschaltete Konten vergeben keine Rollen."""
+    query: dict = {"role": "superadmin", "is_active": {"$ne": False}, "is_banned": {"$ne": True}}
+    if without:
+        query["id"] = {"$ne": without}
+    return await db.users.count_documents(query)
+
+
 async def moderation_locked(actor: dict | None, target: dict | None, db=None) -> bool:
     """Darf ``actor`` gegen ``target`` keine Maßnahme der Moderation setzen oder zurücknehmen? Wahr bei
     Konten mit Admin-Rolle oder Bereich, außer der Superadmin handelt."""

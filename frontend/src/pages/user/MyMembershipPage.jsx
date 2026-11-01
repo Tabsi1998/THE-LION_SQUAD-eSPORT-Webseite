@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { feeCard, formatDate } from "@/lib/dolibarr";
+import { exitLine } from "@/lib/membershipMail";
 import { MemberCardPanel } from "@/components/tls/MemberCardPanel";
 import { SkeletonCards, SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { SwitchRow } from "@/pages/user/profile/SwitchRow";
@@ -89,6 +90,9 @@ export default function MyMembershipPage() {
           <Stat icon={FileText} label="Mitgliedsart" value={m?.membership_type ? TYPE_LABELS[m.membership_type] : "—"} />
         </div>
 
+        {/* Mitgliedsnummer öffentlich (#2125): entscheidet das Mitglied selbst; Standard ist nein */}
+        {m?.member_number && <NumberVisibilityCard membership={m} onChanged={load} />}
+
         {/* Digitale Mitgliedskarte (#346): nur für aktive Mitglieder, der Server entscheidet */}
         {(m?.member_status === "active" || m?.member_status === "honorary") && <MemberCardPanel />}
 
@@ -141,6 +145,9 @@ export default function MyMembershipPage() {
           </div>
         )}
 
+        {/* Austritt ohne Dolibarr (#2125): eine Erklärung an den Vorstand; mit Dolibarr geht er über „Meine Daten“ */}
+        {(m?.member_status === "active" || m?.member_status === "honorary") && !erp?.led_by_dolibarr && <SimpleExitCard exitRequest={m.exit_request} onChanged={load} />}
+
         {/* History */}
         {!!m?.history?.length && (
           <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] p-5">
@@ -173,6 +180,81 @@ export default function MyMembershipPage() {
         </div>
       </section>
     </PublicLayout>
+  );
+}
+
+function NumberVisibilityCard({ membership, onChanged }) {
+  const [busy, setBusy] = useState(false);
+  const change = async (next) => {
+    setBusy(true);
+    try {
+      await api.put("/membership/me/number-visibility", { public: next });
+      toast.success(next ? "Deine Mitgliedsnummer steht jetzt auf deinem öffentlichen Profil." : "Deine Mitgliedsnummer ist nicht mehr öffentlich.");
+      await onChanged();
+    } catch (err) {
+      toast.error(formatApiError(err?.response?.data?.detail) || "Das hat nicht geklappt.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="membership-number-card">
+      <SwitchRow
+        label="Mitgliedsnummer öffentlich zeigen"
+        description="Auf deinem öffentlichen Profil. Das entscheidest nur du."
+        checked={Boolean(membership.show_member_number_publicly)}
+        onCheckedChange={change}
+        disabled={busy}
+        testId="membership-number-switch"
+      />
+    </div>
+  );
+}
+
+// Einfache Austrittserklärung (#2125): die Mitgliedschaft läuft weiter, bis der Vorstand sie beendet - bis dahin lässt
+// sich die Erklärung zurücknehmen. Eine Kündigungsfrist rechnet hier niemand, das entscheidet der Vorstand.
+function SimpleExitCard({ exitRequest, onChanged }) {
+  const confirm = useConfirm();
+  const [wishedDay, setWishedDay] = useState("");
+  const [busy, setBusy] = useState(false);
+  const run = async (action, success) => {
+    setBusy(true);
+    try {
+      await action();
+      toast.success(success);
+      await onChanged();
+    } catch (err) {
+      toast.error(formatApiError(err?.response?.data?.detail) || "Das hat nicht geklappt.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const declare = async () => {
+    if (!await confirm({
+      title: "Austritt aus dem Verein erklären?",
+      description: "Die Erklärung geht an den Vorstand. Du bleibst Mitglied, bis er die Mitgliedschaft beendet; bis dahin kannst du die Erklärung zurücknehmen.",
+      confirmLabel: "Austritt erklären",
+    })) return;
+    await run(() => api.post("/membership/me/exit", wishedDay ? { wished_last_day: wishedDay } : {}), "Dein Austritt ist beim Vorstand eingegangen.");
+  };
+  return (
+    <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="membership-exit-card">
+      <h2 className="font-heading text-lg font-black uppercase">Austritt</h2>
+      {exitRequest ? (
+        <div className="mt-2 space-y-3">
+          <p className="text-sm text-white/70" data-testid="membership-exit-declared">{exitLine(exitRequest, viennaDate)} Der Vorstand beendet deine Mitgliedschaft und meldet sich, wenn Fragen offen sind.</p>
+          <button type="button" onClick={() => run(() => api.delete("/membership/me/exit"), "Du hast die Erklärung zurückgenommen.")} disabled={busy} data-testid="membership-exit-withdraw" className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">Erklärung zurücknehmen</button>
+        </div>
+      ) : (
+        <div className="mt-3 flex flex-col sm:flex-row sm:items-end gap-3">
+          <label className="block">
+            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Wunschtermin (optional)</div>
+            <input type="date" value={wishedDay} onChange={(event) => setWishedDay(event.target.value)} data-testid="membership-exit-date" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+          </label>
+          <button type="button" onClick={declare} disabled={busy} data-testid="membership-exit-button" className="tls-btn tls-btn--danger px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">Austritt erklären</button>
+        </div>
+      )}
+    </div>
   );
 }
 

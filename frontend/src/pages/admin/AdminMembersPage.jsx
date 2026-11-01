@@ -1,19 +1,24 @@
 import { useCallback, useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { api, formatMemberSince, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormGrid } from "@/components/tls/AdminForm";
 import { CheckField, SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { ClubMemberProfilesAdminContent } from "@/pages/admin/AdminClubMemberProfilesPage";
 import { JerseyNumbersBox } from "@/pages/admin/members/JerseyNumbersBox";
+import { download } from "@/pages/admin/achievements/shared";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { STATUS_MAIL, exitLine, listLimitHint, mailOutcome, statusChangeSentence } from "@/lib/membershipMail";
+import { viennaDate, viennaDay } from "@/lib/vienna";
 import { toast } from "sonner";
-import { Crown, Search } from "lucide-react";
+import { Crown, Download, Search } from "lucide-react";
 
 const STATUS_LABELS = {
   none: "Kein Mitglied",
-  pending: "Anfrage offen",
+  // Entsteht nur aus einem Dolibarr-Entwurf; offene Bewerbungen der Website stehen unter „Bewerbungen“ (#2125).
+  pending: "Entwurf (Dolibarr)",
   active: "Aktives Mitglied",
   inactive: "Ruhend",
   honorary: "Ehrenmitglied",
@@ -73,25 +78,52 @@ export default function AdminMembersPage() {
     return params;
   }, { replace: true });
 
+  const [openApplications, setOpenApplications] = useState(null);
   const load = useCallback(async () => {
     const { data } = await api.get(`/users${q ? `?q=${encodeURIComponent(q)}` : ""}`);
     setUsers(data);
   }, [q]);
+  const loadOpenApplications = useCallback(() => {
+    api.get("/membership/applications?status=pending").then(({ data }) => setOpenApplications(Array.isArray(data) ? data.length : null)).catch(() => setOpenApplications(null));
+  }, []);
   useEffect(() => { api.get("/membership/meta").then(({ data }) => setMeta(data)).catch(() => {}); }, []);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { loadOpenApplications(); }, [loadOpenApplications]);
   useApiInvalidation(load, ["users", "membership"]);
+  useApiInvalidation(loadOpenApplications, ["membership"]);
 
+  // Der Filter für Dolibarr-Entwürfe erscheint nur, wenn es welche gibt (#2125) - sonst wäre er immer leer.
+  const hasDrafts = users.some((u) => u.membership?.member_status === "pending");
+  const activeFilter = filter === "pending" && !hasDrafts ? "all" : filter;
+  const filters = [
+    { k: "all", l: "Alle" },
+    { k: "members", l: "Mitglieder" },
+    { k: "community", l: "Community" },
+    ...(hasDrafts ? [{ k: "pending", l: "Entwurf (Dolibarr)" }] : []),
+  ];
   const filtered = users.filter((u) => {
-    if (filter === "members") return u.is_club_member;
-    if (filter === "community") return !u.is_club_member;
-    if (filter === "pending") return u.membership?.member_status === "pending";
+    if (activeFilter === "members") return u.is_club_member;
+    if (activeFilter === "community") return !u.is_club_member;
+    if (activeFilter === "pending") return u.membership?.member_status === "pending";
     return true;
   });
+  const limitHint = listLimitHint(users.length);
+
+  const exportCsv = async (scope) => {
+    try {
+      await download(`/membership/export.csv?scope=${scope}`, `mitglieder-${viennaDay(new Date())}.csv`);
+    } catch (e) {
+      toast.error(formatRequestError(e, "Der Export hat nicht geklappt."));
+    }
+  };
 
   const save = async (userId, payload) => {
     try {
       const { data } = await api.put(`/membership/user/${userId}`, payload);
-      toast.success("Mitgliedschaft aktualisiert.");
+      const mail = mailOutcome(data?.mail);
+      const text = ["Mitgliedschaft aktualisiert.", mail.text].filter(Boolean).join(" ");
+      if (mail.sent) toast.success(text);
+      else toast.warning(text);
       setEditing(null);
       load();
       return data;
@@ -154,24 +186,34 @@ export default function AdminMembersPage() {
             className="w-full bg-[#0A0A0A] border border-white/10 pl-9 pr-3 py-2 rounded-sm text-sm"
           />
         </div>
-        <div className="flex gap-2">
-          {[
-            { k: "all", l: "Alle" },
-            { k: "members", l: "Mitglieder" },
-            { k: "community", l: "Community" },
-            { k: "pending", l: "Offen" },
-          ].map((t) => (
+        <div className="flex flex-wrap gap-2">
+          {filters.map((t) => (
             <button
               key={t.k}
               onClick={() => setFilter(t.k)}
               data-testid={`members-filter-${t.k}`}
-              className={`px-3 py-2 text-xs uppercase tracking-wider font-bold rounded-sm transition ${filter === t.k ? "bg-[#FFD700] text-black" : "border border-white/10 text-white/60 hover:text-white"}`}
+              className={`px-3 py-2 text-xs uppercase tracking-wider font-bold rounded-sm transition ${activeFilter === t.k ? "bg-[#FFD700] text-black" : "border border-white/10 text-white/60 hover:text-white"}`}
             >
               {t.l}
             </button>
           ))}
         </div>
       </div>
+
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-5 text-xs">
+        {openApplications !== null && (
+          <Link to="/admin/membership-applications" data-testid="members-open-applications" className="font-bold uppercase tracking-wider text-[#29B6E8] hover:underline">Offene Bewerbungen ({openApplications})</Link>
+        )}
+        {meta.export_available === false ? (
+          <span className="text-white/50" data-testid="members-export-dolibarr">Die Mitgliederliste führt Dolibarr – den Export gibt es dort.</span>
+        ) : (
+          <>
+            <button type="button" onClick={() => exportCsv("active")} data-testid="members-export-active" className="tls-btn tls-btn--secondary inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm font-bold uppercase tracking-wider"><Download className="w-3 h-3" /> CSV: aktive Mitglieder</button>
+            <button type="button" onClick={() => exportCsv("all")} data-testid="members-export-all" className="tls-btn tls-btn--quiet inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm font-bold uppercase tracking-wider"><Download className="w-3 h-3" /> CSV: auch ehemalige</button>
+          </>
+        )}
+      </div>
+      {limitHint && <p className="mb-5 border border-[#FF9500]/40 bg-[#FF9500]/5 rounded-sm p-3 text-sm text-white/80" data-testid="members-limit-hint">{limitHint}</p>}
 
       <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
         <div className="tls-swipe pb-0">
@@ -203,6 +245,7 @@ export default function AdminMembersPage() {
                     <td className="px-4 py-3 text-white/60 text-xs">{u.email}</td>
                     <td className="px-4 py-3">
                       <StatusPill status={m?.member_status || "none"} />
+                      {m?.exit_request && <div className="mt-1 text-[10px] uppercase tracking-wider font-bold text-[#FF9500]" data-testid={`member-exit-${u.username}`}>Austritt erklärt</div>}
                     </td>
                     <td className="px-4 py-3 text-xs font-mono text-[#FFD700]">{m?.member_number || "—"}</td>
                     <td className="px-4 py-3 text-xs text-white/70">{m?.membership_type ? TYPE_LABELS[m.membership_type] || m.membership_type : "—"}</td>
@@ -259,20 +302,31 @@ function EditModal({ entry, meta, onClose, onSave }) {
     member_since_month: since.month,
     internal_role: m.internal_role || "",
     notes: m.notes || "",
-    show_member_number_publicly: !!m.show_member_number_publicly,
   });
   const [saving, setSaving] = useState(false);
+  const [notify, setNotify] = useState(true);
+  const confirm = useConfirm();
   // Führt Dolibarr diese Mitgliedschaft (#295), kommen Status, Art, Nummer und Beginn von dort.
   const led = m.source === "dolibarr";
+  // Ein Statuswechsel mailt (#2125): erst mit Rückfrage, und nach einem Fehlklick auch ohne Mail.
+  const statusChanged = !led && form.member_status !== (m.member_status || "none");
+  const statusMails = statusChanged && Boolean(STATUS_MAIL[form.member_status]);
+  const exitText = exitLine(m.exit_request, viennaDate);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const submit = async (e) => {
     e.preventDefault();
+    if (statusChanged && !await confirm({
+      title: "Status ändern?",
+      description: statusChangeSentence({ name: u.display_name || u.username, statusLabel: STATUS_LABELS[form.member_status] || form.member_status, status: form.member_status, notify }),
+      confirmLabel: "Status ändern",
+      tone: ["former", "blocked"].includes(form.member_status) ? "danger" : "info",
+    })) return;
     setSaving(true);
     const payload = led
-      ? { internal_role: form.internal_role, notes: form.notes, show_member_number_publicly: form.show_member_number_publicly }
-      : { ...form };
+      ? { internal_role: form.internal_role, notes: form.notes }
+      : { ...form, ...(statusMails && !notify ? { notify: false } : {}) };
     if (!payload.membership_type) delete payload.membership_type;
     if (!payload.member_number) delete payload.member_number;
     if (payload.member_since_year) {
@@ -292,13 +346,21 @@ function EditModal({ entry, meta, onClose, onSave }) {
     <AdminSheet title="Mitgliedschaft bearbeiten" eyebrow={`${u.display_name || u.username} · @${u.username}`} accent="#FFD700" onClose={onClose} onSubmit={submit} saving={saving} submitTestId="edit-save" testId="member-sheet">
       {led && (
         <div className="border border-[#29B6E8]/30 bg-[#29B6E8]/10 rounded-sm p-3 text-xs text-white/75" data-testid="edit-led-by-dolibarr">
-          Diese Mitgliedschaft führt <strong>Dolibarr</strong>: Status, Mitgliedsart, Nummer und Beginn kommen von dort und lassen sich hier nicht ändern. Rolle, Notiz und Sichtbarkeit der Nummer bleiben hier.
+          Diese Mitgliedschaft führt <strong>Dolibarr</strong>: Status, Mitgliedsart, Nummer und Beginn kommen von dort und lassen sich hier nicht ändern. Rolle und Notiz bleiben hier.
         </div>
+      )}
+      {exitText && (
+        <p className="border border-[#FF9500]/40 bg-[#FF9500]/5 rounded-sm p-3 text-xs text-white/80" data-testid="edit-exit-request">
+          {exitText} Setze den Status auf „Ehemalig“, wenn es so weit ist – die Person bleibt bis dahin Mitglied. Hält sie einen Vorstandsposten, besetze ihn zuerst neu.
+        </p>
       )}
       <FormGrid>
         <SelectField label="Status" disabled={led} value={form.member_status} onChange={(v) => set("member_status", v)} options={meta.statuses.map((s) => [s, STATUS_LABELS[s] || s])} testId="edit-status" />
         <SelectField label="Mitgliedsart" disabled={led} value={form.membership_type} onChange={(v) => set("membership_type", v)} options={[["", "— wählen —"], ...meta.types.map((t) => [t, TYPE_LABELS[t] || t])]} testId="edit-type" />
       </FormGrid>
+      {statusMails && (
+        <CheckField label={`Person informieren: Mail „${STATUS_MAIL[form.member_status]}“ und Meldung`} checked={notify} onChange={setNotify} testId="edit-notify" accent="#FFD700" />
+      )}
       <TextField label={led ? "Mitgliedsnummer (aus Dolibarr)" : "Mitgliedsnummer (leer = automatisch)"} disabled={led} value={form.member_number} onChange={(v) => set("member_number", v)} placeholder="z.B. TLS-2026-0007" testId="edit-number" className="font-mono" />
       <FormGrid>
         <TextField label="Mitglied seit Jahr" type="number" disabled={led} min="1900" max={new Date().getFullYear()} value={form.member_since_year} onChange={(v) => set("member_since_year", v)} placeholder="z.B. 2024" testId="edit-member-since-year" />
@@ -306,7 +368,7 @@ function EditModal({ entry, meta, onClose, onSave }) {
       </FormGrid>
       <TextField label="Interne Rolle" value={form.internal_role} onChange={(v) => set("internal_role", v)} placeholder="z.B. Vorstand, Captain, Helfer" testId="edit-role" />
       <TextAreaField label="Interne Notizen (sieht das Mitglied nicht)" value={form.notes} onChange={(v) => set("notes", v)} rows={3} testId="edit-notes" />
-      <CheckField label="Mitgliedsnummer auf öffentlichem Profil anzeigen" checked={form.show_member_number_publicly} onChange={(v) => set("show_member_number_publicly", v)} testId="edit-show-number" accent="#FFD700" />
+      <p className="text-xs text-white/55" data-testid="edit-show-number">Mitgliedsnummer öffentlich: <strong className="text-white/80">{m.show_member_number_publicly ? "ja" : "nein"}</strong> – das entscheidet das Mitglied unter „Meine Mitgliedschaft“.</p>
     </AdminSheet>
   );
 }

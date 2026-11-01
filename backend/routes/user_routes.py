@@ -285,6 +285,10 @@ async def _send_user_invite(user: dict, actor: dict) -> dict:
     return {"invite_url": invite_url, "invite_email": result}
 
 
+# So viele Konten zeigt die Liste; die Seiten sagen dazu, wenn es mehr sein können (lib/membersList.js).
+USERS_LIST_LIMIT = 500
+
+
 @router.get("")
 async def list_users(q: str | None = None, role: str | None = None,
                      user_type: str | None = None,
@@ -298,11 +302,15 @@ async def list_users(q: str | None = None, role: str | None = None,
             {"email": {"$regex": pattern, "$options": "i"}},
             {"display_name": {"$regex": pattern, "$options": "i"}},
         ]
+        # Die Mitgliedsnummer steht an der Mitgliedschaft (#2125).
+        numbered = await db.memberships.find({"member_number": {"$regex": pattern, "$options": "i"}}, {"_id": 0, "user_id": 1}).to_list(USERS_LIST_LIMIT)
+        if numbered:
+            query["$or"].append({"id": {"$in": [row["user_id"] for row in numbered]}})
     if role:
         query["role"] = role
     if user_type:
         query["user_type"] = user_type
-    users = await db.users.find(query, private_projection()).to_list(500)
+    users = await db.users.find(query, private_projection()).to_list(USERS_LIST_LIMIT)
     # Bulk fetch memberships
     user_ids = [u["id"] for u in users]
     members = {
@@ -1056,14 +1064,34 @@ async def unban_user(user_id: str, body: BanBody | None = None, me: dict = Depen
 @router.put("/{user_id}/role")
 @router.post("/{user_id}/role")
 async def set_role(user_id: str, body: RoleUpdate, me: dict = Depends(require_super())):
+    from services.permissions import LAST_SUPERADMIN_DETAIL, ROLE_LABELS, usable_superadmins
+    from services.rights_notices import areas_snapshot, tell_rights_change
+
     db = get_db()
+    target = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "role": 1})
+    if not target:
+        raise HTTPException(status_code=404, detail="Nutzer nicht gefunden")
+    previous = target.get("role") or "player"
+    if previous == body.role:
+        return await db.users.find_one({"id": user_id}, private_projection())
+    if previous == "superadmin" and not await usable_superadmins(db, without=user_id):
+        raise HTTPException(status_code=409, detail=LAST_SUPERADMIN_DETAIL)
+    before = await areas_snapshot(db, [user_id])
     await db.users.update_one(
         {"id": user_id},
         {"$set": {"role": body.role, "roles": [body.role], "updated_at": now_utc().isoformat()}},
     )
+    # Zwei stufen sich gleichzeitig gegenseitig herab: beide sehen danach keinen mehr und nehmen es zurück.
+    if previous == "superadmin" and not await usable_superadmins(db):
+        await db.users.update_one({"id": user_id}, {"$set": {"role": previous, "roles": [previous], "updated_at": now_utc().isoformat()}})
+        raise HTTPException(status_code=409, detail=LAST_SUPERADMIN_DETAIL)
     await db.audit_logs.insert_one({"id": new_id(), "action": "user.role_change", "target_id": user_id,
-                                     "actor_id": me["id"], "data": {"role": body.role},
+                                     "actor_id": me["id"], "data": {"role": body.role, "from": previous},
                                      "created_at": now_utc().isoformat()})
+    if user_id != me["id"]:
+        after = await areas_snapshot(db, [user_id])
+        await tell_rights_change(db, user_id, f"Deine Rolle ist jetzt „{ROLE_LABELS.get(body.role, body.role)}“.",
+                                 before.get(user_id, set()), after.get(user_id, set()))
     u = await db.users.find_one({"id": user_id}, private_projection())
     return u
 
@@ -1072,6 +1100,7 @@ async def set_role(user_id: str, body: RoleUpdate, me: dict = Depends(require_su
 async def set_areas(user_id: str, body: AreasUpdate, me: dict = Depends(require_super())):
     """Freigaben je Bereich (#287): nur Turnierleitung, Redaktion, Vereinsverwaltung; System bleibt an der Rolle."""
     from services.permissions import GRANTABLE_AREAS, clean_grants
+    from services.rights_notices import areas_snapshot, tell_rights_change
 
     unknown = [a for a in body.areas if a not in GRANTABLE_AREAS]
     if unknown:
@@ -1081,12 +1110,50 @@ async def set_areas(user_id: str, body: AreasUpdate, me: dict = Depends(require_
     target = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "areas": 1})
     if not target:
         raise HTTPException(status_code=404, detail="Nutzer nicht gefunden")
+    before = await areas_snapshot(db, [user_id])
     await db.users.update_one({"id": user_id}, {"$set": {"areas": areas, "updated_at": now_utc().isoformat()}})
     await db.audit_logs.insert_one({"id": new_id(), "action": "user.areas_change", "target_id": user_id,
                                      "actor_id": me["id"], "data": {"areas": areas, "from": target.get("areas") or []},
                                      "created_at": now_utc().isoformat()})
+    if user_id != me["id"]:
+        after = await areas_snapshot(db, [user_id])
+        await tell_rights_change(db, user_id, "", before.get(user_id, set()), after.get(user_id, set()))
     u = await db.users.find_one({"id": user_id}, private_projection())
     return u
+
+
+RIGHTS_HISTORY_LIMIT = 100
+
+
+@router.get("/{user_id}/rights-history")
+async def rights_history(user_id: str, me: dict = Depends(require_area("club"))):
+    """Rechte-Verlauf einer Person (#2125): Rollen, Freigaben, Vorstandsposten - fürs Blatt unter „Alle Benutzer“, auch ohne
+    Bereich System. Nur diese Einträge und nur diese Felder, kein Griff ins ganze Protokoll."""
+    db = get_db()
+    if not await db.users.find_one({"id": user_id}, {"_id": 1}):
+        raise HTTPException(status_code=404, detail="Nutzer nicht gefunden")
+    # Ein Posten zeigt auf das Konto oder auf das Mitgliederprofil dahinter.
+    refs = [user_id, *[row["id"] async for row in db.club_member_profiles.find({"user_id": user_id}, {"_id": 0, "id": 1})]]
+    rows = await db.audit_logs.find({"$or": [
+        {"action": {"$in": ["user.role_change", "user.areas_change"]}, "target_id": user_id},
+        {"action": "board.assign", "$or": [{"data.from": {"$in": refs}}, {"data.to": {"$in": refs}}]},
+        {"action": {"$in": ["board.status", "board.delete"]}, "data.holders": {"$in": refs}},
+    ]}, {"_id": 0, "id": 1, "action": 1, "actor_id": 1, "data": 1, "created_at": 1}).sort("created_at", -1).to_list(RIGHTS_HISTORY_LIMIT)
+    actors = {row["id"]: row.get("display_name") or row.get("username") async for row in db.users.find(
+        {"id": {"$in": sorted({row["actor_id"] for row in rows if row.get("actor_id")})}}, {"_id": 0, "id": 1, "display_name": 1, "username": 1})}
+    items = []
+    for row in rows:
+        data = row.get("data") or {}
+        item = {"id": row.get("id"), "action": row.get("action"), "at": row.get("created_at"), "actor": actors.get(row.get("actor_id"))}
+        if row["action"] == "user.role_change":
+            item.update({"to": data.get("role"), "from": data.get("from")})
+        elif row["action"] == "user.areas_change":
+            item.update({"to": data.get("areas") or [], "from": data.get("from") or []})
+        else:
+            item.update({"title": data.get("title") or data.get("position"), "field": data.get("field"), "active": data.get("active"),
+                         "joined": data.get("to") in refs if row["action"] == "board.assign" else None})
+        items.append(item)
+    return {"items": items}
 
 
 @router.delete("/{user_id}")

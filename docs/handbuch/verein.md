@@ -17,7 +17,7 @@ Helferdienste, Unterlagen), wie ihr den Vorstand auf der Website zeigt und wer w
 - **Admin → Verein → Kontakt-Inbox** (`/admin/contact`) – Nachrichten aus dem Kontaktformular
 
 Wer das sieht: der Bereich **Vereinsverwaltung** (auch, wer einen aktiven Vorstandsposten hält). Dolibarr sehen zusätzlich
-„System“, die Vereinsdaten nur „System“.
+„System“. **Vereinsdaten** (`/admin/club`): Stammdaten und Kontakt pflegt die Vereinsverwaltung; Rechtstexte, Hosting und Preisturniere ändert nur „System“.
 
 Öffentlich: **/verein** (alles vom Verein an einem Ort), **/about**, **/board** (Vorstand), **/members** (Verzeichnis),
 **/membership/join** („Mitglied werden“), **/membership/apply** (Antrag).
@@ -81,19 +81,19 @@ Wer das sieht: der Bereich **Vereinsverwaltung** (auch, wer einen aktiven Vorsta
    verlangt (ohne Dolibarr: eine Nachricht mit mindestens 20 Zeichen), und setzt die Haken **Vereinsstatuten** und
    **Datenschutzerklärung**. Freiwillige Einwilligungen sind getrennt und nie Pflicht. Dann **Antrag einreichen**.
 4. Danach sieht die Person den Stand: **Antrag in Prüfung**, **Antrag wird übermittelt**, **Du bist Mitglied** oder
-   **Antrag abgelehnt**. Mit **Antrag zurückziehen** nimmt sie ihn zurück und kann später einen neuen stellen. Es gibt pro
+   **Antrag abgelehnt**. Mit **Antrag zurückziehen** nimmt sie ihn zurück und kann später einen neuen stellen, auch ohne Dolibarr. Es gibt pro
    Konto einen Antrag.
-5. Entscheiden kann der Vorstand in der **Mitgliederverwaltung (Dolibarr)**. Die Person bekommt eine Mail. Nach der Aufnahme
+5. Entscheiden kann der Vorstand in der **Mitgliederverwaltung (Dolibarr)**. Die Person bekommt immer eine Mail und eine Meldung. Nach der Aufnahme
    erscheinen Mitgliedsnummer und Karte.
 
 Ohne Mitgliedschaft schickt eine Seite des Mitgliederbereichs auf **Mitglied werden** und sagt, warum.
 
 ### 3.2 Anträge bearbeiten und einladen
 
-**Admin → Mitglieder → Bewerbungen.** Reiter: **Offen**, **Aufgenommen**, **Abgelehnt**, **Zurückgezogen**, **In Übermittlung**.
+**Admin → Mitglieder → Bewerbungen.** Reiter: **Offen**, **Aufgenommen**, **Abgelehnt**, **Zurückgezogen**, **In Übermittlung**, **Fehlgeschlagen** (Dolibarr hat den Antrag nicht angenommen, der Grund steht dabei).
 
 - Jeder Antrag zeigt den Stand und den nächsten Schritt in einem Satz.
-- **Annehmen** und **Ablehnen** (mit Begründung, die per Mail geht) gibt es nur, wo **die Website entscheidet**. Läuft der
+- **Annehmen**, **Ablehnen** (mit Begründung) und **Zurückziehen** gibt es nur, wo **die Website entscheidet**. Annehmen vergibt die Mitgliedsnummer (eine bestehende bleibt), nimmt die Art aus dem Antrag und schreibt den Verlauf. Die Person bekommt immer eine Mail und eine Meldung, auch wenn sie Mitgliedschafts-Mails ausgeschaltet hat; was du dazuschreibst, steht darin. Die Rückmeldung nach dem Klick sagt, ob die Mail unterwegs ist. Der Push nennt nur den ersten Satz der Begründung, den vollen Text gibt es in Mail und Glocke. Läuft der
   Antrag über Dolibarr, öffnet **In Dolibarr öffnen** den Eintrag; dort wird entschieden, die Website zeigt den Stand von selbst.
 - **In Übermittlung** heißt: gespeichert, aber noch nicht bei Dolibarr. Die Website versucht es weiter.
 - **+ Zum Antrag einladen:** Konto suchen (nur Konten **ohne** Mitgliedschaft), optional eine persönliche Zeile, **Einladen**. Die
@@ -101,6 +101,7 @@ Ohne Mitgliedschaft schickt eine Seite des Mitgliederbereichs auf **Mitglied wer
   Einladung läuft nach **30 Tagen** ab; offene lassen sich in der Liste der Einladungen **zurückziehen**. Wer schon eingeladen
   ist, steht mit Datum da.
 - Einladen darf nur die Vereinsverwaltung.
+- Eine neue Bewerbung meldet die Website per Mail an alle mit der Vereinsverwaltung: Vorstand, Freigaben, Club-Admin, Superadmin.
 
 ### 3.3 Der Mitgliederbereich
 
@@ -118,10 +119,10 @@ unter Events (gold markiert) und im Kalender. Eigene Rechnungen und eigene Unter
 einem Mitgliedseintrag zugeordnet sein (Dolibarr → Zuordnungen, oder das Mitglied nutzt auf „Meine Mitgliedschaft“ **Zuordnung
 anfragen** bzw. den Einladungscode vom Vorstand). Eine Mitgliedsnummer allein reicht nicht.
 
-**Meine Mitgliedschaft** (`/members/membership`): Karte, Mitgliedsart, „Mitglied seit“, Funktion im Verein, **Austritt
-erklären** (mit Wunschdatum, der letzte Tag wird in der Mitgliederverwaltung gerechnet), **Meine Einwilligungen**
+**Meine Mitgliedschaft** (`/members/membership`): Karte, Mitgliedsart, „Mitglied seit“, Funktion im Verein, mit Dolibarr **Austritt
+erklären** (mit Wunschdatum, der letzte Tag wird in der Mitgliederverwaltung gerechnet), ohne Dolibarr eine einfache **Austrittserklärung** (mit Wunschtermin; sie geht an den Vorstand, die Person bleibt Mitglied, bis er den Status auf „Ehemalig“ setzt, und kann sie bis dahin zurücknehmen; der Vorstand bekommt beides per Mail), **Meine Einwilligungen**
 (auch in der App; **Ich stimme zu** erst nach dem Lesen der Fassung, **Widerrufen** jederzeit, der Text der zugestimmten Fassung bleibt lesbar), der eigene Eintrag im Mitgliederverzeichnis
-(**Im Mitgliederverzeichnis zeigen**, Gamertag, Spiele, Plattformen, Kurztext, **Eintrag speichern**) und **Nummer öffentlich**.
+(**Im Mitgliederverzeichnis zeigen**, Gamertag, Spiele, Plattformen, Kurztext, **Eintrag speichern**) und der Schalter **Mitgliedsnummer öffentlich zeigen**: Das entscheidet nur das Mitglied, Standard ist aus.
 
 ### 3.4 Vorstand und Stellvertretungen
 
@@ -129,11 +130,12 @@ erklären** (mit Wunschdatum, der letzte Tag wird in der Mitgliederverwaltung ge
 
 - **Besetzen** über die Personensuche – nur **Vereinsmitglieder**. Vorher steht ein Satz, welche Rechte der Posten bringt (wer
   einen aktiven Posten hält oder vertritt, bekommt die **Vereinsverwaltung**), und eine Rückfrage bestätigt. Jede Besetzung steht
-  im Protokoll. Besetzen dürfen Vereinsverwaltung und System.
+  im Protokoll. Besetzen dürfen Vereinsverwaltung und System. Die Person bekommt eine Meldung, auch wenn sie den Posten verliert.
+- **Aktivieren und Deaktivieren** entscheidet ebenfalls über die Vereinsverwaltung: erst nach einer Rückfrage, die die Inhaber nennt. Anlegen, Ändern, Aktivieren und Löschen stehen im Protokoll.
 - **Stellvertretung:** Bei Posten mit „Vertretung erlaubt“ lässt sich eine Vertretung eintragen und mit **Vertretung entfernen** wieder
   streichen. Offene Stellvertretungen zeigt die Vorstandsseite nicht.
 - **Posten bearbeiten:** Bezeichnung (männlich, weiblich optional – „Obmann“ oder „Obfrau“ richtet sich nach dem Geschlecht im
-  Profil), Beschreibung, Aktiv/Inaktiv, **Vertretung erlaubt**. Löschen steht unter „Mehr“.
+  Profil), Beschreibung, Aktiv/Inaktiv, **Vertretung erlaubt**. Löschen steht unter „Mehr“. Ein Mitgliederprofil, an dem ein Posten hängt, lässt sich nicht löschen und nicht auf ein anderes Konto umhängen: zuerst den Posten neu besetzen. Dasselbe Löschen sperren Referenzen und Serien.
 - **Wir suchen …:** Ist ein Posten offen, zeigt die Vorstandsseite „Wir suchen …“ mit dem Satz zum Aufwand, den ihr je Posten
   eintragt (zum Beispiel „Zwei Stunden im Monat, Einschulung inklusive.“).
 - **Fotos** kommen aus den Mitgliederprofilen; am schönsten freigestellt, sonst stehen sie einheitlich in Vereinsfarben.
@@ -158,11 +160,12 @@ erklären** (mit Wunschdatum, der letzte Tag wird in der Mitgliederverwaltung ge
   erlauben** (Standard ist nur die Ansicht im Browser). Mitglieder finden sie unter **Vereinsdokumente**.
   Die Liste sagt es in Worten: die Plakette **Alle**, **Mitglieder** oder **Vorstand** zeigt, wer ein Dokument sehen darf;
   darunter steht, wie oft es angesehen und heruntergeladen wurde („1-mal angesehen · 3-mal heruntergeladen“) und ob
-  **Herunterladen erlaubt** ist oder es **nur ansehen** gibt. Am Handy stehen die Dokumente als Karten.
+  **Herunterladen erlaubt** ist oder es **nur ansehen** gibt. Gesperrte Downloads öffnet, wer die Vereinsverwaltung hat. Am Handy stehen die Dokumente als Karten.
+  **Löschen** nimmt die Datei vom Server mit, außer etwas anderes braucht sie noch (auch ein Link in einem Text zählt); dasselbe gilt für die alte Datei, wenn du eine neue hochlädst. Ist sie gerade gesperrt, holt der Aufräum-Job das nach (Betrieb → Checks). Anlegen, Ändern und Löschen stehen im Protokoll.
 
   <img src="../assets/verwaltung/dokumente-liste.png" alt="Dokumentenliste mit den Plaketten Alle, Mitglieder und Vorstand und den Zählern als Satz" width="720">
 - **Mitgliedervorteile:** Admin → Mitglieder → Mitgliedervorteile: Titel, Text, Link, Gültigkeit, **Sichtbar für Mitgliedsarten**
-  (leer = alle), **Aktiv**. Mitglieder sehen sie im Mitgliederbereich und in der App.
+  (leer = alle), **Aktiv**. Mitglieder sehen sie im Mitgliederbereich und in der App, nur innerhalb von **Gültig von/bis** (beide Tage zählen mit); in der Verwaltung steht dann „abgelaufen“ oder „noch nicht gültig“.
 - **Persönliche Unterlagen** (Bestätigungen, Schreiben) legt der Vorstand in der Vereinsakte in Dolibarr ab; das Mitglied
   findet sie im eigenen Profil unter **Nur für dich → Deine Unterlagen** (`/account/documents`). Voraussetzung ist die bestätigte
   Zuordnung des Kontos zum Mitgliedseintrag. Ohne sie steht dort, wie die Verbindung klappt.
@@ -204,10 +207,10 @@ dem Vorstand. Mit Dolibarr kommen Mitglieder mit Einwilligung von selbst ins Ver
 
 <img src="../assets/verwaltung/oeffentliche-profile.png" alt="Seite Mitglieder mit dem Reiter Öffentliche Profile und den Profilkarten" width="720">
 
-**Admin → Mitglieder → Mitglieder** (Reiter **Mitgliedschaften** und **Öffentliche Profile**): Suche
+**Admin → Mitglieder → Mitglieder** (Reiter **Mitgliedschaften** und **Öffentliche Profile**): Die Liste zeigt höchstens 500 Konten und sagt es, wenn es mehr sein können. Der **CSV-Export** (aktive Mitglieder oder auch ehemalige) enthält Nummer, Name, Benutzername, E-Mail, Status, Art, Beginn und interne Rolle, keine Notizen, und steht im Protokoll; führt Dolibarr die Mitglieder, gibt es ihn dort. Daneben führt **Offene Bewerbungen (N)** zu den Anträgen; der Filter **Entwurf (Dolibarr)** erscheint nur, wenn es solche Entwürfe gibt. Ein **Statuswechsel** kommt mit Rückfrage: Sie nennt die Mail, die hinausgeht; nach einem Fehlklick lässt sich der Haken **Person informieren** abwählen. Eine neue Notiz löst keine Mail aus. Hat ein Mitglied den Austritt erklärt, steht das in der Liste und im Blatt. Hält die Person einen Vorstandsposten, geht der Wechsel auf einen nicht aktiven Status erst, wenn der Posten neu besetzt ist; sonst behielte sie die Vereinsverwaltung. Suche
 nach Name, E-Mail oder Mitgliedsnummer; **Mitgliedschaft bearbeiten**. Führt Dolibarr die Mitgliedschaft, kommen Status, Art,
-Nummer und Beginn von dort und lassen sich hier nicht ändern; **interne Notizen** (sieht das Mitglied nicht) und
-**Mitgliedsnummer auf öffentlichem Profil anzeigen** bleiben hier.
+Nummer und Beginn von dort und lassen sich hier nicht ändern; **interne Notizen** (sieht das Mitglied nicht) und die interne
+Rolle bleiben hier. Ob die Mitgliedsnummer öffentlich ist, entscheidet das Mitglied selbst; das Blatt zeigt nur den Stand.
 
 ### 3.11 Kontakt-Inbox
 

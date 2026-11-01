@@ -85,9 +85,11 @@ PUSH_CHANNELS = {
     "ballot_open": "lion_club",
     "membership_update": "lion_club",
     "membership_invited": "lion_club",
+    "membership_decision": "lion_club",   # Entscheidung oder neuer Status der Mitgliedschaft (#2125)
     "jersey_number": "lion_club",   # Wunschnummer (#2034): Entscheidung des Vorstands
     "invoice_ready": "lion_club",
     "moderation": "lion_club",
+    "rights_change": "lion_club",   # Rolle, Freigabe oder Vorstandsposten geändert (#2125)
     "admin_push_test": "lion_club",
     "helper_call": "lion_club",
     "helper_reminder": "lion_club",
@@ -154,7 +156,8 @@ def _push_payload(notification: dict[str, Any], row: dict[str, Any]) -> dict[str
         return payload
     payload.update(
         title=str(notification.get("title") or "LionsAPP")[:120],
-        body=str(notification.get("body") or "")[:180],
+        # Ein eigener Text für den Sperrbildschirm, wenn die Meldung mehr trägt, als dort stehen soll (#2125).
+        body=str((notification.get("meta") or {}).get("push_body") or notification.get("body") or "")[:180],
         data={
             "notification_id": notification.get("id"),
             "kind": kind,

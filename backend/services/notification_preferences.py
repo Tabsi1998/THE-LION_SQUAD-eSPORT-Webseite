@@ -43,7 +43,7 @@ OPTIONAL_EMAIL_PREFERENCES = {
     },
     "membership_updates": {
         "label": "Vereinsmitgliedschaft",
-        "description": "Bewerbung, Mitgliedsstatus und Vereinsvorteile.",
+        "description": "Einladungen zum Antrag, Nummern und Vereinsvorteile. Entscheidungen über deine Mitgliedschaft bekommst du immer per Mail.",
         "default": True,
     },
     "birthday_greetings": {
@@ -231,7 +231,8 @@ NOTIFICATION_KIND_CATEGORY = {
 }
 
 
-REQUIRED_NOTIFICATION_KINDS: set[str] = set()
+# Rechte und Entscheidungen über die Mitgliedschaft (#2125): die Person muss es erfahren - kein Thema zum Abbestellen.
+REQUIRED_NOTIFICATION_KINDS: set[str] = {"rights_change", "membership_decision"}
 
 
 REQUIRED_EMAIL_TEMPLATES = {
@@ -239,6 +240,12 @@ REQUIRED_EMAIL_TEMPLATES = {
     "password_reset",
     "user_invite",
     "account_banned",  # Konto gesperrt mit Grund (#1357) - nicht abbestellbar
+    # Entscheidungen über die eigene Mitgliedschaft (#2125) - nicht abbestellbar.
+    "membership_approve",
+    "membership_reject",
+    "membership_activated",
+    "membership_deactivated",
+    "membership_blocked",
     "test",
 }
 

@@ -30,7 +30,9 @@ export function statutesSummary(statutes) {
   return `noch keine Fassung in Kraft (${statutes.versions} beschlossen)`;
 }
 
-export function LegalTab({ brand, setBrandField, setCanonicalLegalText, saveBrand, saving }) {
+export function LegalTab({ brand, setBrandField, setCanonicalLegalText, saveBrand, saving, clubOnly = false }) {
+  // Vorstand ohne System (#2125): Stammdaten und Kontakt pflegen, Rechtstexte und Hosting nur lesen.
+  const systemOnly = clubOnly ? { disabled: true, hint: "ändert System" } : {};
   // Vereinsdaten aus Dolibarr (#326): Stand, Fehler und was übernommen würde - geladen, sobald der Reiter offen ist.
   const [dolibarrPublic, setDolibarrPublic] = useState(null);
   const [dolibarrPublicBusy, setDolibarrPublicBusy] = useState(false);
@@ -105,18 +107,18 @@ export function LegalTab({ brand, setBrandField, setCanonicalLegalText, saveBran
           <BrandField label="Datenschutz E-Mail" value={brand.privacy_contact_email} onChange={(v) => setBrandField("privacy_contact_email", v)} testId="legal-privacy-email" />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <BrandField label="Hosting / Betreiber" value={brand.hosting_provider} onChange={(v) => setBrandField("hosting_provider", v)} testId="legal-hosting" />
-          <BrandField label="Hosting-Region" value={brand.hosting_country} onChange={(v) => setBrandField("hosting_country", v)} testId="legal-hosting-country" />
-          <BrandField label="UID-Nummer falls vorhanden" value={brand.vat_number} onChange={(v) => setBrandField("vat_number", v)} testId="legal-vat" />
-          <BrandField label="Turnierbedingungen URL" value={brand.tournament_terms_url} onChange={(v) => setBrandField("tournament_terms_url", v)} testId="legal-terms-url" />
+          <BrandField label="Hosting / Betreiber" value={brand.hosting_provider} onChange={(v) => setBrandField("hosting_provider", v)} testId="legal-hosting" {...systemOnly} />
+          <BrandField label="Hosting-Region" value={brand.hosting_country} onChange={(v) => setBrandField("hosting_country", v)} testId="legal-hosting-country" {...systemOnly} />
+          <BrandField label="UID-Nummer falls vorhanden" value={brand.vat_number} onChange={(v) => setBrandField("vat_number", v)} testId="legal-vat" {...systemOnly} />
+          <BrandField label="Turnierbedingungen URL" value={brand.tournament_terms_url} onChange={(v) => setBrandField("tournament_terms_url", v)} testId="legal-terms-url" {...systemOnly} />
         </div>
         <label className="flex items-start gap-2 text-sm text-white/75">
-          <input type="checkbox" checked={!!brand.paid_tournaments_enabled} onChange={(e) => setBrandField("paid_tournaments_enabled", e.target.checked)} data-testid="legal-paid-tournaments" className="accent-[#29B6E8] mt-1" />
-          <span>Preisturniere oder Turniere mit Startgeld können stattfinden.</span>
+          <input type="checkbox" checked={!!brand.paid_tournaments_enabled} onChange={(e) => setBrandField("paid_tournaments_enabled", e.target.checked)} disabled={clubOnly} data-testid="legal-paid-tournaments" className="accent-[#29B6E8] mt-1" />
+          <span>Preisturniere oder Turniere mit Startgeld können stattfinden.{clubOnly ? <span className="ml-2 text-xs text-[#29B6E8]">ändert System</span> : null}</span>
         </label>
-        <LegalTextArea label="Zusätzliche rechtliche Hinweise (optional)" value={mergedLegacyText(brand.legal_extra, brand.imprint)} onChange={(v) => setCanonicalLegalText("legal_extra", "imprint", v)} testId="legal-extra" rows={5} />
-        <LegalTextArea label="Zusätzliche Datenschutzhinweise (optional)" value={mergedLegacyText(brand.privacy_extra, brand.privacy_policy)} onChange={(v) => setCanonicalLegalText("privacy_extra", "privacy_policy", v)} testId="privacy-extra" rows={6} />
-        <LegalTextArea label="Ergänzende Nutzungsbedingungen (optional)" value={brand.terms_of_use || ""} onChange={(v) => setBrandField("terms_of_use", v)} testId="terms-of-use" rows={8} />
+        <LegalTextArea label="Zusätzliche rechtliche Hinweise (optional)" value={mergedLegacyText(brand.legal_extra, brand.imprint)} onChange={(v) => setCanonicalLegalText("legal_extra", "imprint", v)} testId="legal-extra" rows={5} {...systemOnly} />
+        <LegalTextArea label="Zusätzliche Datenschutzhinweise (optional)" value={mergedLegacyText(brand.privacy_extra, brand.privacy_policy)} onChange={(v) => setCanonicalLegalText("privacy_extra", "privacy_policy", v)} testId="privacy-extra" rows={6} {...systemOnly} />
+        <LegalTextArea label="Ergänzende Nutzungsbedingungen (optional)" value={brand.terms_of_use || ""} onChange={(v) => setBrandField("terms_of_use", v)} testId="terms-of-use" rows={8} {...systemOnly} />
         <button onClick={saveBrand} disabled={saving} data-testid="legal-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">{saving ? "Speichere..." : "Vereinsdaten speichern"}</button>
       </div>
     </div>

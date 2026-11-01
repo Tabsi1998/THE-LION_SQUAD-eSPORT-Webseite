@@ -40,7 +40,7 @@ test("Gruppen in der Reihenfolge Übersicht, Verein, Mitglieder, Finanzen, eSpor
 test("Verein bündelt Vereinsdaten, Über uns, Vorstand, Sponsoren, Partner, Referenzen, Serien und Kontakt-Inbox", () => {
   expect(group("Verein").items.map((item) => item.label)).toEqual(["Vereinsdaten", "Über uns", "Vorstand", "Sponsoren", "Partner", "Referenzen", "Serien", "Kontakt-Inbox"]);
   expect(group("Verein").items[0].to).toBe("/admin/club");
-  expect(group("Verein").items[0].areas).toEqual(["system"]);
+  expect(group("Verein").items[0].areas).toEqual(["system", "club"]);
 });
 
 test("Finanzen sind eine eigene Gruppe; Dolibarr liegt bei den Mitgliedern (#512); Downloads & QR bei Content; Rechte bleiben je Eintrag", () => {

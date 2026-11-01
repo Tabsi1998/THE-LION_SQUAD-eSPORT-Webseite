@@ -147,7 +147,7 @@ async def apply_summary(db, settings: dict, link: dict, summary: dict) -> str:
         await db.memberships.update_one({"user_id": user_id}, ops)
     else:
         await db.memberships.insert_one({
-            "id": new_id(), "user_id": user_id, "member_number": None, "internal_role": None, "notes": None,
+            "id": new_id(), "user_id": user_id, "internal_role": None, "notes": None,
             "show_member_number_publicly": False, "created_at": now, "created_by": ACTOR,
             "history": [{"actor_id": ACTOR, "at": now, "from_status": None, "to_status": update["member_status"],
                          "notes": HISTORY_NOTE}],

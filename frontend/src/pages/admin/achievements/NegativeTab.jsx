@@ -69,7 +69,7 @@ export function NegativeTab() {
                 {types.map((t) => <option key={t.key} value={t.key}>{tierByCode[t.tier_code]?.name || t.key}</option>)}
               </select>
             </label>
-            <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Notiz (z. B. Match oder Turnier)" aria-label="Notiz" data-testid="negative-note" className={INPUT_CLASS} />
+            <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Notiz (z. B. Match) – die Person liest sie unter „Meine Strafen“" aria-label="Notiz" data-testid="negative-note" className={INPUT_CLASS} />
             <button type="button" onClick={trigger} disabled={busy || !person || !type} data-testid="negative-submit" className="px-4 py-2 bg-[#FF3B30] text-white text-[10px] font-bold uppercase tracking-widest rounded-sm disabled:opacity-40">Eintragen</button>
           </div>
         </div>

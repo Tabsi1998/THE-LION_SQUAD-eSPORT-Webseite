@@ -350,6 +350,8 @@ async def _normalize_board_assignee(db, assignee_id: str | None) -> str | None:
 
 BOARD_FROM_DOLIBARR_DETAIL = "Den Vorstand führt Dolibarr – hier lässt sich nichts ändern. Funktionen und Inhaber pflegst du in Dolibarr."
 BOARD_MEMBERS_ONLY_DETAIL = "Einen Vorstandsposten besetzen nur Vereinsmitglieder – diese Person hat keine aktive Mitgliedschaft."
+# Diese Felder stehen als eigene Einträge im Protokoll (`board.assign`, `board.status`) oder ergeben sich daraus.
+BOARD_LOGGED_APART = {"user_id", "deputy_user_id", "user_since", "deputy_since", "is_active", "slug_history"}
 
 
 async def _board_led_by_dolibarr(db) -> bool:
@@ -381,6 +383,34 @@ async def _board_candidate(db, assignee_id: str) -> dict:
     if not is_active_member(await get_membership(user_id)):
         raise HTTPException(400, BOARD_MEMBERS_ONLY_DETAIL)
     return {"name": user.get("display_name") or user.get("username") or "Mitglied", "user_id": user_id}
+
+
+async def _audit_board(db, action: str, me: dict, pid: str, data: dict) -> None:
+    await db.audit_logs.insert_one({"id": new_id(), "action": action, "actor_id": me.get("id"), "target_id": pid, "data": data,
+                                    "created_at": now_utc().isoformat()})
+
+
+async def _board_account_ids(db, refs) -> dict[str, str]:
+    """Hinter einem Posten steht ein Mitgliederprofil oder direkt ein Konto: Verweis → Konto. Profile ohne Konto fehlen."""
+    wanted = sorted({ref for ref in refs if ref})
+    accounts: dict[str, str] = {}
+    async for profile in db.club_member_profiles.find({"id": {"$in": wanted}}, {"_id": 0, "id": 1, "user_id": 1}):
+        if profile.get("user_id"):
+            accounts[profile["id"]] = profile["user_id"]
+    rest = [ref for ref in wanted if ref not in accounts]
+    async for user in db.users.find({"id": {"$in": rest}}, {"_id": 0, "id": 1}):
+        accounts[user["id"]] = user["id"]
+    return accounts
+
+
+async def _tell_board_change(db, me: dict, before: dict[str, set[str]], sentences: dict[str, list[str]]) -> None:
+    """Die Meldung an alle Betroffenen (#2125) - nur die Person, die es selbst geändert hat, kennt es schon."""
+    from services.rights_notices import areas_snapshot, tell_rights_change
+
+    after = await areas_snapshot(db, sentences)
+    for user_id, parts in sentences.items():
+        if user_id != me.get("id"):
+            await tell_rights_change(db, user_id, " ".join(parts), before.get(user_id, set()), after.get(user_id, set()))
 
 
 @board_router.get("/admin/state")
@@ -605,6 +635,7 @@ async def create_position(body: BoardPositionCreate, me: dict = Depends(require_
     }
     doc["slug"] = slug
     await db.board_positions.insert_one(doc)
+    await _audit_board(db, "board.create", me, doc["id"], {"position": slug, "title": _neutral_title(doc), "is_active": doc.get("is_active")})
     doc.pop("_id", None)
     return doc
 
@@ -634,21 +665,40 @@ async def update_position(pid: str, body: BoardPositionUpdate, me: dict = Depend
         since_key = "user_since" if k == "user_id" else "deputy_since"
         if k in updates and updates[k] != existing.get(k):
             updates[since_key] = now_utc().isoformat() if updates[k] else None
+    from services.rights_notices import areas_snapshot
+
+    holder_refs = [existing.get("user_id"), existing.get("deputy_user_id")]
+    accounts = await _board_account_ids(db, [*holder_refs, updates.get("user_id"), updates.get("deputy_user_id")])
+    before = await areas_snapshot(db, accounts.values())
     await db.board_positions.update_one({"id": pid}, {"$set": updates})
     if updates.get("slug") and updates["slug"] != existing.get("slug"):
         texts = await vacancy_texts(db)
         moved = {new: texts.pop(old) for old, new in ((existing.get("slug"), updates["slug"]), (f"{existing.get('slug')}-stv", f"{updates['slug']}-stv")) if old in texts}
         if moved:
             await db.settings.update_one({"id": VACANCY_DOC_ID}, {"$set": {"texts": {**texts, **moved}}}, upsert=True)
-    # Eine Besetzung ist eine Rechtevergabe (docs/ROLLEN.md) - jede steht im Protokoll (#1355).
+    title = _neutral_title({**existing, **updates})
+    sentences: dict[str, list[str]] = {}
+    # Eine Besetzung ist eine Rechtevergabe (docs/ROLLEN.md) - jede steht im Protokoll (#1355) und die Person erfährt es (#2125).
     for k in ("user_id", "deputy_user_id"):
         if k in updates and updates[k] != existing.get(k):
-            await db.audit_logs.insert_one({
-                "id": new_id(), "action": "board.assign", "actor_id": me.get("id"), "target_id": pid,
-                "data": {"position": existing.get("slug"), "field": "holder" if k == "user_id" else "deputy",
-                         "from": existing.get(k), "to": updates[k]},
-                "created_at": now_utc().isoformat(),
-            })
+            await _audit_board(db, "board.assign", me, pid, {"position": existing.get("slug"), "title": title, "field": "holder" if k == "user_id" else "deputy",
+                                                             "from": existing.get(k), "to": updates[k]})
+            role = title if k == "user_id" else f"Vertretung für {title}"
+            if accounts.get(updates[k]):
+                sentences.setdefault(accounts[updates[k]], []).append(f"Du bist jetzt {role}.")
+            if accounts.get(existing.get(k)):
+                sentences.setdefault(accounts[existing[k]], []).append(f"Du bist nicht mehr {role}.")
+    # Aktiv oder inaktiv entscheidet, ob der Posten die Vereinsverwaltung bringt (#2125).
+    if "is_active" in updates and bool(updates["is_active"]) != (existing.get("is_active") is not False):
+        await _audit_board(db, "board.status", me, pid, {"position": existing.get("slug"), "title": title, "active": bool(updates["is_active"]),
+                                                         "holders": [ref for ref in holder_refs if ref]})
+        for ref in holder_refs:
+            if accounts.get(ref):
+                sentences.setdefault(accounts[ref], []).append(f"Der Posten {title} ist jetzt {'aktiv' if updates['is_active'] else 'inaktiv'}.")
+    changed = sorted(key for key, value in updates.items() if key not in BOARD_LOGGED_APART and value != existing.get(key))
+    if changed:
+        await _audit_board(db, "board.update", me, pid, {"position": existing.get("slug"), "title": title, "fields": changed})
+    await _tell_board_change(db, me, before, sentences)
     return await db.board_positions.find_one({"id": pid}, {"_id": 0})
 
 
@@ -661,7 +711,15 @@ async def delete_position(pid: str, me: dict = Depends(require_area("club"))):
     await _require_local_board(db)
     if p.get("is_default"):
         raise HTTPException(400, "Standard-Positionen können nicht gelöscht werden — deaktivieren stattdessen.")
+    from services.rights_notices import areas_snapshot
+
+    title = _neutral_title(p)
+    holder_refs = [ref for ref in (p.get("user_id"), p.get("deputy_user_id")) if ref]
+    accounts = await _board_account_ids(db, holder_refs)
+    before = await areas_snapshot(db, accounts.values())
     await db.board_positions.delete_one({"id": pid})
+    await _audit_board(db, "board.delete", me, pid, {"position": p.get("slug"), "title": title, "holders": holder_refs})
+    await _tell_board_change(db, me, before, {account: [f"Den Posten {title} gibt es nicht mehr."] for account in accounts.values()})
     return {"ok": True}
 
 
