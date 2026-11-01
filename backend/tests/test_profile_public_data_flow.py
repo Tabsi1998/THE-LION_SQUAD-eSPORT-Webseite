@@ -268,6 +268,22 @@ async def test_my_teams_shows_the_code_only_to_those_who_manage(flow):
     assert (await flow.get("/api/teams/my")).json()[0]["join_code"] == "geheim-123"
 
 
+@pytest.mark.asyncio
+async def test_joining_needs_a_real_code(flow):
+    boss = await player(flow, "chefin")
+    guest = await player(flow, "gast")
+    await flow.db.teams.insert_many([
+        {"id": "t-ohne", "name": "Ohne Code", "tag": "OHN", "member_ids": [boss["id"]], "leader_id": boss["id"]},
+        {"id": "t-mit", "name": "Mit Code", "tag": "MIT", "member_ids": [boss["id"]], "leader_id": boss["id"], "join_code": "richtig-1"},
+    ])
+    flow.act_as(guest)
+    for body in ({}, {"join_code": None}, {"join_code": ""}):
+        assert (await flow.post("/api/teams/t-ohne/join", json=body)).status_code == 403, body
+    assert (await flow.post("/api/teams/t-mit/join", json={})).status_code == 403
+    assert (await flow.post("/api/teams/t-mit/join", json={"join_code": "falsch"})).status_code == 403
+    assert (await flow.post("/api/teams/t-mit/join", json={"join_code": "richtig-1"})).status_code == 200
+
+
 # ---------------------------------------------------------------- Zusatz: Dokumente
 @pytest.mark.asyncio
 async def test_members_never_see_where_a_document_is_stored(flow):

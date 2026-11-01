@@ -898,7 +898,7 @@ async def join_team(team_id: str, body: dict, me: dict = Depends(get_current_use
     team = await db.teams.find_one({"id": team_id})
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
-    if body.get("join_code") != team.get("join_code"):
+    if not team.get("join_code") or body.get("join_code") != team["join_code"]:
         raise HTTPException(status_code=403, detail="Falscher Join-Code")
     if me["id"] in team.get("member_ids", []):
         return {"ok": True, "already_member": True}
