@@ -10,7 +10,7 @@ ein „Ja“. Jetzt liegt „Team auflösen“ ganz unten im Bearbeiten-Blatt un
   nicht - das klärt erst die Turnierleitung. Die Rückfrage nennt diese Turniere.
 - fertige Turniere bleiben, wie sie sind (Ergebnisse und Auszeichnungen gehören zur Geschichte).
 
-Auflösen darf der Kapitän (und der Club-Admin) - wie bisher; Co-Kapitäne bearbeiten, lösen aber nicht auf.
+Auflösen darf die Teamleitung (und der Club-Admin) - wie bisher; Co-Leitungen bearbeiten, lösen aber nicht auf.
 """
 from __future__ import annotations
 

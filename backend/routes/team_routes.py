@@ -67,8 +67,9 @@ SQUAD_ROLE_LABELS = {"captain_id": "Captain", "vice_captain_id": "Vertreter"}
 # auf der Website in jeder Meldung, die eine Rolle im Weg hat.
 ROLES_ON_WEBSITE = "Captain und Vertreter vergibst du auf der Website unter Teams → Deine Teams (Co-Team bearbeiten)."
 RESIGN_ON_WEBSITE = "Deine Rolle gibst du auf der Website unter Teams → Deine Teams mit „Rolle abgeben“ ab."
-LEADER_CANNOT_LEAVE = ("Als Kapitän kannst du das Team nicht verlassen. Übergib zuerst die Leitung (auf der Teamseite "
-                       "unter „Mitglieder verwalten“ → „Zum Kapitän machen“) oder löse das Team unter „Bearbeiten“ auf.")
+TAG_TAKEN = "Dieses Kürzel ist schon vergeben."
+LEADER_CANNOT_LEAVE = ("Als Teamleitung kannst du das Team nicht verlassen. Übergib zuerst die Leitung (auf der Teamseite "
+                       "unter „Mitglieder verwalten“ → „Zur Teamleitung machen“) oder löse das Team unter „Bearbeiten“ auf.")
 
 
 class TeamInviteCreate(BaseModel):
@@ -136,7 +137,7 @@ def _account_gone(user: dict | None) -> bool:
 
 
 def _public_member(user: dict | None) -> dict | None:
-    """Wie ``_public_user``; ein gelöschtes Konto trägt dazu die Marke, damit die Seite „Zum Kapitän machen“ weglässt."""
+    """Wie ``_public_user``; ein gelöschtes Konto trägt dazu die Marke, damit die Seite „Zur Teamleitung machen“ weglässt."""
     view = _public_user(user)
     if view and _account_gone(user):
         view["is_gone"] = True
@@ -503,7 +504,7 @@ async def get_team(team_id: str, user: dict | None = Depends(get_optional_user))
 
 @router.post("/{team_id}/awards/{award_id}/feature")
 async def feature_team_award(team_id: str, award_id: str, me: dict = Depends(get_current_user)):
-    """Eine Auszeichnung des Teams als Teambanner zeigen - Leader und Co-Leader."""
+    """Eine Auszeichnung des Teams als Teambanner zeigen - Teamleitung und Co-Leitung."""
     db = get_db()
     team = await db.teams.find_one({"id": team_id}, {"_id": 0})
     if not team:
@@ -760,7 +761,7 @@ async def decline_team_invite(invite_id: str, me: dict = Depends(get_current_use
         {"user_id": me["id"], "meta.invite_id": invite_id},
         {"$set": {"read": True}},
     )
-    # Abgelehnt (#2113, L-A1): wer eingeladen hat und der Kapitän erfahren es - wie bei der Annahme.
+    # Abgelehnt (#2113, L-A1): wer eingeladen hat und die Teamleitung erfahren es - wie bei der Annahme.
     team = await db.teams.find_one({"id": invite.get("team_id")}, {"_id": 0, "id": 1, "name": 1, "tag": 1, "leader_id": 1})
     for uid in sorted({invite.get("invited_by"), (team or {}).get("leader_id")} - {None, me["id"]}) if team else []:
         await create_user_notification(
@@ -829,7 +830,7 @@ async def withdraw_team_invite(team_id: str, invite_id: str, me: dict = Depends(
 async def create_team(body: TeamCreate, me: dict = Depends(get_current_user)):
     db = get_db()
     if await db.teams.find_one({"tag": body.tag}):
-        raise HTTPException(status_code=409, detail="Team-Tag bereits vergeben")
+        raise HTTPException(status_code=409, detail=TAG_TAKEN)
     team_id = new_id()
     await word_filter.screen_field(db, f"{body.name} {body.tag}", kind="team_name", user_id=me["id"], ref_id=team_id)
     doc = {
@@ -880,7 +881,7 @@ async def update_team(team_id: str, body: TeamUpdate, me: dict = Depends(get_cur
         if not _team_admin(me):
             _refuse(me, "Keine Berechtigung")
     if body.tag and body.tag != team.get("tag") and await db.teams.find_one({"tag": body.tag}):
-        raise HTTPException(status_code=409, detail="Team-Tag bereits vergeben")
+        raise HTTPException(status_code=409, detail=TAG_TAKEN)
     nullable_fields = {"description", "logo_url", "banner_url", "discord_link", "social_links"}
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
@@ -899,7 +900,7 @@ async def join_team(team_id: str, body: dict, me: dict = Depends(get_current_use
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
     if not team.get("join_code") or body.get("join_code") != team["join_code"]:
-        raise HTTPException(status_code=403, detail="Falscher Join-Code")
+        raise HTTPException(status_code=403, detail="Dieser Beitrittscode stimmt nicht.")
     if me["id"] in team.get("member_ids", []):
         return {"ok": True, "already_member": True}
     await db.teams.update_one({"id": team_id}, {"$addToSet": {"member_ids": me["id"]}})
@@ -960,19 +961,19 @@ def _can_manage_team(team: dict, user: dict) -> bool:
 
 @router.delete("/{team_id}/members/{user_id}")
 async def kick_member(team_id: str, user_id: str, me: dict = Depends(get_current_user)):
-    """Leader/co-leader/admin can kick a member from a team. Leaders cannot be kicked."""
+    """Teamleitung, Co-Leitung und Admin nehmen ein Mitglied aus dem Team; die Teamleitung selbst bleibt."""
     db = get_db()
     team = await db.teams.find_one({"id": team_id})
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
     if not _can_manage_team(team, me):
-        _refuse(me, "Keine Berechtigung das Team zu verwalten", TEAM_OWNER_ADMIN_ROLES)
+        _refuse(me, "Mitglieder entfernen nur Teamleitung und Co-Leitung.", TEAM_OWNER_ADMIN_ROLES)
     if team.get("leader_id") == user_id:
-        raise HTTPException(status_code=400, detail="Leader kann nicht gekickt werden — bitte Leader-Übergabe zuerst durchführen")
+        raise HTTPException(status_code=400, detail="Die Teamleitung lässt sich nicht entfernen – bitte zuerst die Leitung übergeben.")
     if user_id == me["id"]:
-        raise HTTPException(status_code=400, detail="Du kannst dich nicht selbst kicken — nutze 'Verlassen'")
+        raise HTTPException(status_code=400, detail="Dich selbst nimmst du mit „Team verlassen“ aus dem Team.")
     if user_id not in (team.get("member_ids") or []):
-        raise HTTPException(status_code=404, detail="Mitglied nicht im Team")
+        raise HTTPException(status_code=404, detail="Diese Person ist nicht im Team.")
     held = await _squad_role_holder(db, team_id, user_id)
     if held:
         raise HTTPException(status_code=409, detail=f"Diese Person ist Captain oder Vertreter im Co-Team "
@@ -994,21 +995,20 @@ async def kick_member(team_id: str, user_id: str, me: dict = Depends(get_current
 
 @router.post("/{team_id}/members/{user_id}/role")
 async def set_member_role(team_id: str, user_id: str, body: dict, me: dict = Depends(get_current_user)):
-    """Set member role: 'member' (demote co-leader) or 'co_leader' (promote member).
-    Only the team leader or admin can change roles."""
+    """Rolle setzen: ``member`` oder ``co_leader`` - nur Teamleitung und Admin."""
     role = (body.get("role") or "").strip().lower()
     if role not in ("member", "co_leader"):
-        raise HTTPException(status_code=400, detail="Ungültige Rolle. Erlaubt: member, co_leader")
+        raise HTTPException(status_code=400, detail="Diese Rolle gibt es nicht – möglich sind Mitglied und Co-Leitung.")
     db = get_db()
     team = await db.teams.find_one({"id": team_id})
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
     if not (_is_team_leader(team, me["id"]) or _team_admin(me, TEAM_OWNER_ADMIN_ROLES)):
-        _refuse(me, "Nur der Leader kann Rollen ändern", TEAM_OWNER_ADMIN_ROLES)
+        _refuse(me, "Rollen ändert nur die Teamleitung.", TEAM_OWNER_ADMIN_ROLES)
     if user_id not in (team.get("member_ids") or []):
-        raise HTTPException(status_code=404, detail="Mitglied nicht im Team")
+        raise HTTPException(status_code=404, detail="Diese Person ist nicht im Team.")
     if team.get("leader_id") == user_id:
-        raise HTTPException(status_code=400, detail="Leader hat bereits die höchste Rolle")
+        raise HTTPException(status_code=400, detail="Die Teamleitung behält ihre Rolle – übergib dafür die Leitung.")
     if role == "co_leader":
         await db.teams.update_one(
             {"id": team_id}, {"$addToSet": {"co_leader_ids": user_id}, "$set": {"updated_at": now_utc().isoformat()}},
@@ -1025,7 +1025,7 @@ async def set_member_role(team_id: str, user_id: str, body: dict, me: dict = Dep
     await create_user_notification(
         user_id,
         title=f"Teamrolle aktualisiert: [{team.get('tag')}]",
-        body=f"Deine Rolle in {team.get('name')} ist jetzt {('Co-Leader' if role == 'co_leader' else 'Mitglied')}.",
+        body=f"Deine Rolle in {team.get('name')} ist jetzt {('Co-Leitung' if role == 'co_leader' else 'Mitglied')}.",
         url=f"/teams/{team_id}",
         kind="team_role_changed",
         meta={"team_id": team_id, "role": role},
@@ -1040,27 +1040,27 @@ async def set_member_role(team_id: str, user_id: str, body: dict, me: dict = Dep
 
 @router.post("/{team_id}/transfer-leader")
 async def transfer_leader(team_id: str, body: dict, me: dict = Depends(get_current_user)):
-    """Hand over leadership to another team member. Old leader becomes co_leader by default."""
+    """Die Teamleitung übergeben; die bisherige wird Co-Leitung."""
     new_leader_id = body.get("new_leader_id") or body.get("user_id")
     if not new_leader_id:
-        raise HTTPException(status_code=400, detail="new_leader_id ist erforderlich")
+        raise HTTPException(status_code=400, detail="Bitte wähle, wer die Teamleitung übernimmt.")
     db = get_db()
     team = await db.teams.find_one({"id": team_id})
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
     if not (_is_team_leader(team, me["id"]) or _team_admin(me, TEAM_OWNER_ADMIN_ROLES)):
-        _refuse(me, "Nur der Leader (oder Admin) kann übertragen", TEAM_OWNER_ADMIN_ROLES)
+        _refuse(me, "Die Leitung übergibt nur die Teamleitung.", TEAM_OWNER_ADMIN_ROLES)
     if new_leader_id not in (team.get("member_ids") or []):
-        raise HTTPException(status_code=404, detail="Empfänger ist kein Team-Mitglied")
+        raise HTTPException(status_code=404, detail="Diese Person ist nicht im Team.")
     if new_leader_id == team.get("leader_id"):
-        raise HTTPException(status_code=400, detail="Empfänger ist bereits Leader")
-    # Sonst ließe sich die Leitung auf ein gelöschtes Konto schieben - und das Team stünde ohne Kapitän da (#2113).
+        raise HTTPException(status_code=400, detail="Diese Person hat die Teamleitung schon.")
+    # Sonst ließe sich die Leitung auf ein gelöschtes Konto schieben - und das Team stünde ohne Teamleitung da (#2113).
     if _account_gone(await db.users.find_one({"id": new_leader_id}, {"_id": 0, "id": 1, "is_active": 1, "anonymized_at": 1})):
         raise HTTPException(status_code=400, detail="Dieses Konto ist gelöscht oder abgeschaltet – bitte ein aktives Mitglied wählen.")
     old_leader = team.get("leader_id")
     await db.teams.update_one({"id": team_id}, {
         "$set": {"leader_id": new_leader_id, "updated_at": now_utc().isoformat()},
-        # New leader cannot be a co-leader of themselves; old leader becomes co-leader
+        # Die neue Teamleitung ist nicht zugleich Co-Leitung; die bisherige wird es.
         "$pull": {"co_leader_ids": new_leader_id},
     })
     if old_leader:
@@ -1077,7 +1077,7 @@ async def transfer_leader(team_id: str, body: dict, me: dict = Depends(get_curre
     )
     await create_user_notification(
         new_leader_id,
-        title=f"Du bist jetzt Team-Leader: [{team.get('tag')}]",
+        title=f"Du hast jetzt die Teamleitung: [{team.get('tag')}]",
         body=f"Die Leitung von {team.get('name')} wurde an dich übertragen.",
         url=f"/teams/{team_id}",
         kind="team_leader_transferred",
@@ -1116,7 +1116,7 @@ async def list_squads(team_id: str, me: dict = Depends(get_current_user)):
     if me["id"] not in team.get("member_ids", []) and not _can_manage(team, me):
         _refuse(me, "Keine Berechtigung")
     squads = await db.team_squads.find({"team_id": team_id}, {"_id": 0}).sort("created_at", -1).to_list(200)
-    # Nur was die Squad-Ansicht zeigt (#1497) - wie _public_user bei den anderen Team-Antworten.
+    # Nur was die Co-Team-Ansicht zeigt (#1497) - wie _public_user bei den anderen Team-Antworten.
     member_map = {u["id"]: u for u in await db.users.find(
         {"id": {"$in": list({uid for s in squads for uid in s.get("member_ids", [])})}},
         {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1},

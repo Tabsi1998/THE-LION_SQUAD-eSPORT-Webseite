@@ -45,9 +45,9 @@ export function inviteTokenFrom(search) {
 }
 
 // Wappen-Kopf (#1347): Rollen in Alltagsworten unter den Gesichtern.
-export const ROLE_LABELS = { captain: "Kapitän", co_captain: "Co-Kapitän", player: "Spieler" };
+export const ROLE_LABELS = { captain: "Teamleitung", co_captain: "Co-Leitung", player: "Mitglied" };
 
-/** Die Rolle eines Mitglieds: Kapitän (Leitung), Co-Kapitän oder Spieler. */
+/** Die Rolle eines Mitglieds: Teamleitung, Co-Leitung oder Mitglied. */
 export function memberRole(team, member) {
   if (!team || !member) return "player";
   if (team.leader_id === member.id) return "captain";
@@ -55,7 +55,7 @@ export function memberRole(team, member) {
   return "player";
 }
 
-/** Die Gesichter-Reihe: Kapitän zuerst, dann die Co-Kapitäne, dann alle anderen in ihrer Reihenfolge. */
+/** Die Gesichter-Reihe: Teamleitung zuerst, dann die Co-Leitungen, dann alle anderen in ihrer Reihenfolge. */
 export function orderedFaces(team) {
   const order = { captain: 0, co_captain: 1, player: 2 };
   return (team?.members || [])

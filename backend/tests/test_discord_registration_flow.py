@@ -1,6 +1,6 @@
 """Anmeldung im Discord (#885) durch die echte Anwendung: mit verknüpftem Konto in zwei Klicks, privat, über denselben
 Dienst wie das Formular - mit denselben Prüfungen, Kosten und Rechnung, Warteliste, Event-Pflicht (#875), Team nur über
-den Kapitän; ohne Verknüpfung, bei geschlossener Anmeldung, fehlender Sichtbarkeit oder ausgeschaltetem Schalter kommt
+die Teamleitung; ohne Verknüpfung, bei geschlossener Anmeldung, fehlender Sichtbarkeit oder ausgeschaltetem Schalter kommt
 der Grund und nie eine Anmeldung. Doppelklick und zweites Gerät ergeben keine zweite Anmeldung."""
 import pathlib
 import sys
@@ -250,8 +250,8 @@ async def test_team_tournament_only_through_the_captain(flow):
                                     "member_ids": [captain["id"], mate["id"]]})
 
     told = await discord_registration.answer_anmelden(flow.db, OTHER_ID, f"tournament:{cup['id']}")
-    assert "Das macht dein Kapitän" in text_of(told) and not custom_ids(told)
-    assert "Das macht dein Kapitän" in text_of(await discord_registration.handle_button(flow.db, OTHER_ID, f"tls:reg:tournament:{cup['id']}"))
+    assert "Das macht deine Teamleitung" in text_of(told) and not custom_ids(told)
+    assert "Das macht deine Teamleitung" in text_of(await discord_registration.handle_button(flow.db, OTHER_ID, f"tls:reg:tournament:{cup['id']}"))
 
     shown = await discord_registration.answer_anmelden(flow.db, DISCORD_ID, f"tournament:{cup['id']}")
     assert {f["name"]: f["value"] for f in shown["embed"]["fields"]}["Team"] == "Lions"

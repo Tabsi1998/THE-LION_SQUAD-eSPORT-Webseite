@@ -146,7 +146,7 @@ Was mit eingeschalteter Sperre zusätzlich gilt (Stand #1461, kommt mit dem näc
 - **Kontowechsel:** Wechselt jemand direkt von einem Konto zum anderen, räumt die App so gründlich auf wie beim Abmelden: Glocke, Banner, Zähler, Suchen und die
   gespeicherte Mitgliedskarte des vorigen Kontos verschwinden, und das Gerät meldet sich für Pushes mit dem neuen Konto an. Ohne Sperre und für ältere Apps bleibt alles
   wie bisher.
-- **Abmelden** löscht ebenfalls die gespeicherte Karte. **Konto löschen** (Zahnrad → Konto) anonymisiert das Konto dauerhaft und wird zweimal bestätigt. Wer Kapitän, Co-Kapitän, Captain oder Vertreter ist, gibt die Rolle vorher ab – die Meldung nennt den Weg.
+- **Abmelden** löscht ebenfalls die gespeicherte Karte. **Konto löschen** (Zahnrad → Konto) anonymisiert das Konto dauerhaft und wird zweimal bestätigt. Wer Teamleitung, Co-Leitung, Captain oder Vertreter ist, gibt die Rolle vorher ab – die Meldung nennt den Weg.
 
 ### 3.4 Push: Kanäle, Themen, Tests
 

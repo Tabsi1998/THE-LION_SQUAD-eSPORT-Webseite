@@ -1,7 +1,7 @@
 """„Spielst du auch mit?“ (#1184): nach der Event-Anmeldung die Turniere des Events in einem Schritt.
 
 - **Die Auswahl** (``options``): je Einzel-Turnier ein Haken mit Tag, Uhrzeit, Spielart, Startgeld und freien Plätzen;
-  Team-Turniere nur als Hinweis (der Kapitän meldet das Team auf der Turnierseite an), Fast Laps als Hinweis ohne Haken
+  Team-Turniere nur als Hinweis (die Teamleitung meldet das Team auf der Turnierseite an), Fast Laps als Hinweis ohne Haken
   - für eine Fast Lap gibt es keine Anmeldung, man fährt seine Zeit. Geschlossene oder deaktivierte Turniere stehen
   ohne Haken mit dem Grund da („Anmeldung ist bereits beendet“); vorbei, abgesagt oder Entwurf fällt weg. Ohne Einträge
   gibt es den Schritt nicht.
@@ -27,7 +27,7 @@ logger = logging.getLogger("tls.event_play_along")
 MAX_PICKS = 20
 ACTIVE_REGISTRATION = ("pending", "approved", "checked_in")
 FASTLAP_HINT = "Keine Anmeldung nötig – du fährst einfach deine Bestzeit."
-TEAM_HINT = "Dein Kapitän meldet das Team an."
+TEAM_HINT = "Deine Teamleitung meldet das Team an."
 CAPTAIN_HINT = "Melde dein Team auf der Turnierseite an."
 STATE_LABELS = {
     "registered": "Du bist dabei",
@@ -205,7 +205,7 @@ async def _register_one(db, event: dict, tournament_id: str, user: dict, body: R
     if tournament.get("event_id") != event["id"]:
         return _result(tournament_id, title, "error", detail="Dieses Turnier gehört nicht zu diesem Event.")
     if _is_team(tournament):
-        # Team-Turniere meldet der Kapitän mit Teamwahl und Aufstellung auf der Turnierseite an - nie hier nebenbei.
+        # Team-Turniere meldet die Teamleitung mit Teamwahl und Aufstellung auf der Turnierseite an - nie hier nebenbei.
         return _result(tournament_id, title, "error", detail=TEAM_HINT + " Das geht auf der Turnierseite.")
     try:
         reg = await self_register(db, tournament, body, user, None, via="event")

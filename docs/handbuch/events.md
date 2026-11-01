@@ -284,7 +284,7 @@ Hat ein Event Turniere, bietet die Seite direkt **nach der Event-Anmeldung** ein
 Events in einem Schritt anmelden.
 
 - Jedes Einzel-Turnier hat einen Haken mit Tag, Uhrzeit, Spielart, Startgeld und freien Plätzen.
-- **Team-Turniere** haben keinen Haken; dort steht, dass der Kapitän das Team anmeldet, der Kapitän bekommt den Knopf **Team
+- **Team-Turniere** haben keinen Haken; dort steht, dass die Teamleitung das Team anmeldet, die Teamleitung bekommt den Knopf **Team
   anmelden**. **Fast Laps** brauchen keine Anmeldung: Man fährt einfach die Zeit.
 - Geschlossene oder deaktivierte Turniere stehen ohne Haken mit dem Grund da. Vorbeigegangene, abgesagte und Entwurfs-Turniere fehlen.
 - **Anmelden** meldet je Haken ganz normal an, mit **allen Regeln der Turnierseite**: Sperren, Fristen, Event-Pflicht, Startgeld, voll

@@ -94,8 +94,8 @@ test("Einladungs-Link für ein privates Team: nur die Einladung mit „Beitreten
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/teams/t-1/join-link", { token: "AbC123" }));
 });
 
-// Kein stummer Knopf (#2113, L-C6): der Kapitän sieht statt „Team verlassen“, was er tun kann; andere den Knopf.
-test("Kapitän: Hinweis „erst übergeben oder auflösen“ statt „Team verlassen“; Spieler sehen den Knopf", async () => {
+// Kein stummer Knopf (#2113, L-C6): die Teamleitung sieht statt „Team verlassen“, was sie tun kann; andere den Knopf.
+test("Teamleitung: Hinweis „erst übergeben oder auflösen“ statt „Team verlassen“; Mitglieder sehen den Knopf", async () => {
   serve();
   const { unmount } = renderAt("/teams/t-1");
   expect(await screen.findByTestId("team-leave-leader-hint")).toHaveTextContent("Übergib zuerst die Leitung");
@@ -108,8 +108,8 @@ test("Kapitän: Hinweis „erst übergeben oder auflösen“ statt „Team verla
   expect(screen.queryByTestId("team-leave-leader-hint")).toBeNull();
 });
 
-// Kein Kapitän aus einem gelöschten Konto (#2113): „Zum Kapitän machen“ fehlt dort.
-test("gelöschtes Mitglied: kein Knopf „Zum Kapitän machen“", async () => {
+// Kein Teamleitung aus einem gelöschten Konto (#2113): „Zur Teamleitung machen“ fehlt dort.
+test("gelöschtes Mitglied: kein Knopf „Zur Teamleitung machen“", async () => {
   serve({ ...TEAM, members: [MEMBERS[0], { ...MEMBERS[2], is_gone: true }, MEMBERS[1]] });
   renderAt("/teams/t-1");
   expect(await screen.findByTestId("team-transfer-u-co")).toBeInTheDocument();
@@ -150,7 +150,7 @@ test("Auflösen im Bearbeiten-Blatt: falscher Name sperrt, richtiger Name löst 
   await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith("/teams/t-1", { params: { confirm: "lions rocket" } }));
 });
 
-test("läuft ein Turnier, bleibt Auflösen gesperrt und das Turnier steht da; Co-Kapitäne sehen das Auflösen nicht", async () => {
+test("läuft ein Turnier, bleibt Auflösen gesperrt und das Turnier steht da; Co-Leitungen sehen das Auflösen nicht", async () => {
   serve(TEAM, {
     "/teams/t-1/dissolve-preview": { member_count: 3, chat_messages: 0, withdraw: [], blocked: [{ registration_id: "r-9", tournament_id: "tt-9", slug: "liga", title: "Liga live", reason: "Das Turnier läuft gerade – das klärt die Turnierleitung." }], can_dissolve: false },
   });

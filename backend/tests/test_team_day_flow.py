@@ -117,11 +117,11 @@ async def test_presence_counts_lineup_and_nudge_has_a_limit(flow, clock):
     flow.act_as(luna)
     here = (await flow.post(f"/api/team-day/{tournament['id']}/presence")).json()
     assert here["presence"]["me_present"] is True and here["presence"]["count"] == 1 and here["presence"]["total"] == 4, "Aufstellung samt Ersatz"
-    assert (await flow.post(f"/api/team-day/{tournament['id']}/nudge")).status_code == 403, "nur Kapitän und Co-Kapitän"
+    assert (await flow.post(f"/api/team-day/{tournament['id']}/nudge")).status_code == 403, "nur Teamleitung und Co-Leitung"
 
     flow.act_as(captain)
     nudged = await flow.post(f"/api/team-day/{tournament['id']}/nudge")
-    assert nudged.status_code == 200 and nudged.json()["nudged"] == 2, "co und kiwi fehlen - der Kapitän stupst sich nicht selbst an"
+    assert nudged.status_code == 200 and nudged.json()["nudged"] == 2, "co und kiwi fehlen - die Teamleitung stupst sich nicht selbst an"
     notes = await flow.db.notifications.find({"kind": "team_presence_nudge"}, {"_id": 0}).to_list(10)
     assert sorted(n["user_id"] for n in notes) == sorted([co["id"], kiwi["id"]])
     again = await flow.post(f"/api/team-day/{tournament['id']}/nudge")

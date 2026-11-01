@@ -56,7 +56,7 @@ export default function TeamsPage() {
 function TeamList() {
   useDocumentTitle(
     "Teams & Clans",
-    "Teams, Squads und Clans der THE LION SQUAD Gaming Community: Profile, Mitglieder, Join-Codes und eSports Organisation."
+    "Teams, Co-Teams und Clans der THE LION SQUAD Gaming Community: Profile, Mitglieder, Beitrittscodes und eSports Organisation."
   );
 
   const { user } = useAuth();
@@ -78,7 +78,7 @@ function TeamList() {
           <div>
             <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Teams</span>
             <h1 className="mt-2 font-heading text-4xl md:text-6xl font-black uppercase">Teams & Clans</h1>
-            <p className="mt-3 text-white/60 max-w-xl">Erstelle dein Team, teile den Join-Code und verwalte Logo, Banner, Beschreibung und Discord-Link.</p>
+            <p className="mt-3 text-white/60 max-w-xl">Erstelle dein Team, teile den Beitrittscode und verwalte Logo, Banner, Beschreibung und Discord-Link.</p>
           </div>
           {user ? (
             <button onClick={() => setEditing(emptyTeam)} data-testid="team-create-open" className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 rounded-sm font-bold uppercase tracking-wider text-xs">
@@ -89,7 +89,7 @@ function TeamList() {
           )}
         </div>
 
-        {/* Community → Teams (#1143): Einladungen, deine Teams und Squads zuerst - wie in der App; „Teams entdecken“
+        {/* Community → Teams (#1143): Einladungen, deine Teams und Co-Teams zuerst - wie in der App; „Teams entdecken“
             darunter. Vorher stand die Verwaltung als Reiter unter /profile. */}
         {user ? (
           <div className="mt-10" data-testid="teams-mine">
@@ -171,7 +171,7 @@ function TeamCard({ team: t, levelInfo, crown = null }) {
 function TeamDetail({ id }) {
   useDocumentTitle(
     "Teamprofil",
-    "Teamprofil der THE LION SQUAD Gaming Community mit Mitgliedern, Squads und eSports Infos.",
+    "Teamprofil der THE LION SQUAD Gaming Community mit Mitgliedern, Co-Teams und eSports Infos.",
     { canonical: `${window.location.origin}/teams/${id}` }
   );
 
@@ -242,8 +242,8 @@ function TeamDetail({ id }) {
 
   const isMember = !!user && (team.is_member || team.member_ids?.includes(user.id));
   // Was die Person am Team darf, sagt der Server (#1479): `can_manage`, `can_remove_members`, `can_dissolve` - mit
-  // denselben Regeln wie die Aktionen, für Admin-Rollen also nur mit bestätigter Zwei-Faktor-Anmeldung. Kapitän und
-  // Co-Kapitän brauchen sie für ihr eigenes Team nicht. Fehlt nur die Zwei-Faktor-Anmeldung, steht „2FA einrichten“ da.
+  // denselben Regeln wie die Aktionen, für Admin-Rollen also nur mit bestätigter Zwei-Faktor-Anmeldung. Teamleitung und
+  // Co-Leitung brauchen sie für ihr eigenes Team nicht. Fehlt nur die Zwei-Faktor-Anmeldung, steht „2FA einrichten“ da.
   const leadsTeam = !!user && (team.leader_id === user.id || !!team.co_leader_ids?.includes(user.id));
   const canEdit = !!user && (!!team.can_manage || leadsTeam);
   const canRemoveMembers = !!user && (!!team.can_remove_members || leadsTeam);
@@ -303,7 +303,7 @@ function TeamDetail({ id }) {
   const setRole = async (m, role) => {
     await runAction(async () => {
       await api.post(`/teams/${team.id}/members/${m.id}/role`, { role });
-      toast.success(role === "co_leader" ? "Ist jetzt Co-Kapitän." : "Ist wieder Spieler.");
+      toast.success(role === "co_leader" ? "Ist jetzt Co-Leitung." : "Ist wieder Mitglied.");
       await load();
     }, "Rolle konnte nicht geändert werden.");
   };
@@ -311,15 +311,15 @@ function TeamDetail({ id }) {
   const transferLead = async (m) => {
     await runAction(async () => {
       if (!await confirm({
-        title: "Kapitän übergeben?",
-        description: `${m.display_name || m.username} wird Kapitän. Du bist danach Co-Kapitän.`,
+        title: "Teamleitung übergeben?",
+        description: `${m.display_name || m.username} übernimmt die Teamleitung. Du gehörst danach zur Co-Leitung.`,
         confirmLabel: "Übertragen",
         tone: "info",
       })) return;
       await api.post(`/teams/${team.id}/transfer-leader`, { new_leader_id: m.id });
-      toast.success("Kapitän übergeben.");
+      toast.success("Teamleitung übergeben.");
       await load();
-    }, "Kapitän konnte nicht übergeben werden.");
+    }, "Teamleitung konnte nicht übergeben werden.");
   };
 
   return (
@@ -395,7 +395,7 @@ function TeamDetail({ id }) {
           {canEdit && <section data-testid="team-manage-members">
             <div className="mb-4">
               <h2 className="font-heading text-2xl font-bold uppercase">Mitglieder verwalten</h2>
-              <p className="mt-1 text-xs text-white/45">Der Kapitän vergibt Rollen und kann die Leitung übergeben. Co-Kapitäne pflegen Teamdaten, laden ein und verwalten Co-Teams.</p>
+              <p className="mt-1 text-xs text-white/45">Die Teamleitung vergibt Rollen und kann die Leitung übergeben. Co-Leitungen pflegen Teamdaten, laden ein und verwalten Co-Teams.</p>
             </div>
             <div className="grid sm:grid-cols-2 gap-3">
               {team.members?.map((m) => {
@@ -424,17 +424,17 @@ function TeamDetail({ id }) {
                       {showRole && !isCo && (
                         <button disabled={mutating} onClick={(e) => { e.preventDefault(); setRole(m, "co_leader"); }}
                           data-testid={`team-promote-${m.id}`}
-                          className="tls-btn tls-btn--secondary px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-sm">↑ Co-Kapitän</button>
+                          className="tls-btn tls-btn--secondary px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-sm">↑ Co-Leitung</button>
                       )}
                       {showRole && isCo && (
                         <button disabled={mutating} onClick={(e) => { e.preventDefault(); setRole(m, "member"); }}
                           data-testid={`team-demote-${m.id}`}
-                          className="tls-btn tls-btn--quiet px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-sm">↓ Spieler</button>
+                          className="tls-btn tls-btn--quiet px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-sm">↓ Mitglied</button>
                       )}
                       {showTransfer && (
                         <button disabled={mutating} onClick={(e) => { e.preventDefault(); transferLead(m); }}
                           data-testid={`team-transfer-${m.id}`}
-                          className="tls-btn tls-btn--secondary px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-sm">★ Zum Kapitän machen</button>
+                          className="tls-btn tls-btn--secondary px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-sm">★ Zur Teamleitung machen</button>
                       )}
                       {showKick && (
                         <button disabled={mutating} onClick={(e) => { e.preventDefault(); kickMember(m); }}
@@ -460,18 +460,18 @@ function TeamDetail({ id }) {
           {user && !isMember && (
             <form onSubmit={join} className="border border-white/10 bg-[#121212] rounded-sm p-4 space-y-3">
               <div className="text-[11px] uppercase tracking-widest text-[#29B6E8] font-bold">Team beitreten</div>
-              <input value={joinCode} onChange={(e) => { setJoinCode(e.target.value); setActionError(""); }} placeholder="Join-Code" required data-testid="team-join-code" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />
+              <input value={joinCode} onChange={(e) => { setJoinCode(e.target.value); setActionError(""); }} placeholder="Beitrittscode" required data-testid="team-join-code" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />
               <button disabled={mutating} data-testid="team-join-submit" className="tls-btn tls-btn--primary w-full px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold inline-flex justify-center items-center gap-2 disabled:opacity-50"><UserPlus className="w-3.5 h-3.5" /> {mutating ? "Prüfe…" : "Beitreten"}</button>
             </form>
           )}
           {user && isMember && team.leader_id !== user.id && (
             <button onClick={leave} disabled={mutating} data-testid="team-leave" className="tls-btn tls-btn--quiet w-full px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">Team verlassen</button>
           )}
-          {/* Kein Knopf ohne Erklärung (#2113, L-C6): der Kapitän sieht, warum er nicht gehen kann und was er tun kann. */}
+          {/* Kein Knopf ohne Erklärung (#2113, L-C6): die Teamleitung sieht, warum sie nicht gehen kann und was sie tun kann. */}
           {user && isMember && team.leader_id === user.id && (
             <div className="border border-white/10 bg-[#121212] rounded-sm p-4 text-xs text-white/60" data-testid="team-leave-leader-hint">
               <div className="text-[11px] uppercase tracking-widest text-white/45 font-bold">Team verlassen</div>
-              <p className="mt-1">Als Kapitän kannst du das Team nicht einfach verlassen. Übergib zuerst die Leitung unter „Mitglieder verwalten“ mit „Zum Kapitän machen“ – danach bist du Co-Kapitän und kannst gehen. Oder löse das Team unter „Bearbeiten“ auf.</p>
+              <p className="mt-1">Als Teamleitung kannst du das Team nicht einfach verlassen. Übergib zuerst die Leitung unter „Mitglieder verwalten“ mit „Zur Teamleitung machen“ – danach gehörst du zur Co-Leitung und kannst gehen. Oder löse das Team unter „Bearbeiten“ auf.</p>
             </div>
           )}
           {team.discord_link && <a href={team.discord_link} target="_blank" rel="noreferrer" className="tls-btn tls-btn--quiet block px-4 py-3 rounded-sm text-center text-sm font-bold uppercase tracking-wider">Discord</a>}
@@ -657,7 +657,7 @@ function TeamModal({ team, onClose, onSaved, canDissolve = false, onDissolved })
     >
       <form id="team-edit-form" onSubmit={submit} className="space-y-4">
         <Field label="Name"><Input value={form.name} onChange={(v) => set("name", v)} required testId="team-name-input" /></Field>
-        <Field label="Tag"><Input value={form.tag} onChange={(v) => set("tag", v.toUpperCase().slice(0, 8))} required testId="team-tag" placeholder="TLS" /></Field>
+        <Field label="Kürzel"><Input value={form.tag} onChange={(v) => set("tag", v.toUpperCase().slice(0, 8))} required testId="team-tag" placeholder="TLS" /></Field>
         <Field label="Beschreibung"><textarea value={form.description || ""} onChange={(e) => set("description", e.target.value)} rows={3} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
         <Field label="Logo" group><ImageUpload value={form.logo_url || ""} onChange={(v) => set("logo_url", v)} testId="team-logo" variant="square" crop="square" allowLibrary {...teamLogoUpload(team)} /></Field>
         <Field label="Banner" group><ImageUpload value={form.banner_url || ""} onChange={(v) => set("banner_url", v)} testId="team-banner" variant="wide" crop="banner" allowLibrary /></Field>

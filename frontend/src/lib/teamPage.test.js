@@ -27,7 +27,7 @@ test("der Einladungs-Schlüssel kommt aus ?einladung=", () => {
   expect(inviteTokenFrom("")).toBe("");
 });
 
-test("Wappen-Kopf (#1347): Rollen in Alltagsworten, Kapitän zuerst, zwei Buchstaben ohne Bild", async () => {
+test("Wappen-Kopf (#1347): Rollen in Alltagsworten, Teamleitung zuerst, zwei Buchstaben ohne Bild", async () => {
   const { initials, memberRole, orderedFaces, ROLE_LABELS } = await import("@/lib/teamPage");
   const team = {
     leader_id: "u-cap", co_leader_ids: ["u-co"],
@@ -36,8 +36,8 @@ test("Wappen-Kopf (#1347): Rollen in Alltagsworten, Kapitän zuerst, zwei Buchst
   expect(memberRole(team, { id: "u-cap" })).toBe("captain");
   expect(memberRole(team, { id: "u-co" })).toBe("co_captain");
   expect(memberRole(team, { id: "u-1" })).toBe("player");
-  expect(ROLE_LABELS).toEqual({ captain: "Kapitän", co_captain: "Co-Kapitän", player: "Spieler" });
-  expect(orderedFaces(team).map((face) => [face.id, face.roleLabel])).toEqual([["u-cap", "Kapitän"], ["u-co", "Co-Kapitän"], ["u-1", "Spieler"]]);
+  expect(ROLE_LABELS).toEqual({ captain: "Teamleitung", co_captain: "Co-Leitung", player: "Mitglied" });
+  expect(orderedFaces(team).map((face) => [face.id, face.roleLabel])).toEqual([["u-cap", "Teamleitung"], ["u-co", "Co-Leitung"], ["u-1", "Mitglied"]]);
   expect(initials("NeonFalke")).toBe("NF");
   expect(initials("luna byte")).toBe("LB");
   expect(initials("kiwi")).toBe("KI");

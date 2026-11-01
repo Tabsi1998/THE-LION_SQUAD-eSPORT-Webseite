@@ -124,7 +124,7 @@ fassen kann** (Season 1: 8 Spielwochen – höchstens 8 Teams mit nur Hinrunde).
 
 ### 2.4 Co-Teams vorbereiten (Teamleitung)
 
-Das macht die Leitung des Hauptteams, nicht die Turnierleitung: **Profil → Teams** → Team wählen → **Squad** →
+Das macht die Leitung des Hauptteams, nicht die Turnierleitung: **Profil → Teams** → Team wählen → **Co-Team** →
 Name, **Lineup / Mitspieler** (mindestens so viele wie der Mindestkader, Season 1: 4), **Captain** und **Vertreter**
 (beide aus dem Kader, verschieden) → speichern. Captain und Vertreter vereinbaren Termine, melden und bestätigen
 Ergebnisse. Alle im Kader brauchen ein Konto und müssen Mitglied des Hauptteams sein.
@@ -315,7 +315,7 @@ Reiter **Liga** (nur, wenn die Person die Season sehen darf – sonst „Liga ·
 ### 3.6 Captain und Vertreter während der Season
 
 - **Rolle abgeben:** Captain oder Vertreter geben die eigene Rolle unter **Teams → Deine Teams** mit **Rolle
-  abgeben** selbst ab. Leitung und Co-Leitung des Hauptteams bekommen eine Nachricht und vergeben neu (Squad
+  abgeben** selbst ab. Leitung und Co-Leitung des Hauptteams bekommen eine Nachricht und vergeben neu (Co-Team
   bearbeiten). Bis dahin handelt die andere Rolle, ohne beide die Teamleitung.
 - **Teamseite:** Mitglieder sehen dort die Co-Teams mit Captain und Vertreter; Teamleitung und Rollen-Inhaber kommen
   über **Co-Teams verwalten** zur Verwaltung.

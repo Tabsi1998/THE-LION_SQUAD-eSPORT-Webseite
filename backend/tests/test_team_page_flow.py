@@ -127,7 +127,7 @@ async def test_invite_link_join_renew_and_already_member(flow):
     team = await make_team(flow, captain, co, mate, co=(co,))
 
     flow.act_as(mate)
-    assert (await flow.get(f"/api/teams/{team['id']}/invite-link")).status_code == 403, "nur Kapitän und Co-Kapitän laden ein"
+    assert (await flow.get(f"/api/teams/{team['id']}/invite-link")).status_code == 403, "nur Teamleitung und Co-Leitung laden ein"
     flow.act_as(co)
     first = (await flow.get(f"/api/teams/{team['id']}/invite-link")).json()
     assert first["url"].endswith(f"/teams/{team['id']}?einladung={first['token']}")
@@ -160,7 +160,7 @@ async def test_invite_link_join_renew_and_already_member(flow):
     assert old.status_code == 403 and "gilt nicht mehr" in old.json()["detail"]
     assert (await flow.get(f"/api/teams/{team['id']}/invite-link/check", params={"token": first["token"]})).json()["valid"] is False
     assert (await flow.post(f"/api/teams/{team['id']}/join-link", json={"token": renewed["token"]})).json()["already_member"] is False
-    # Der Join-Code bleibt als Rückfall.
+    # Der Beitrittscode bleibt als Rückfall.
     assert (await flow.get(f"/api/teams/{team['id']}")).json()["is_member"] is True
 
 
@@ -181,7 +181,7 @@ async def test_private_team_shows_itself_only_with_a_valid_link(flow):
 
 @pytest.mark.asyncio
 async def test_team_color_only_allowed_values_only_captains_and_game_fallback(flow):
-    """Team-Farbe (#1347): nur die acht erlaubten Werte, nur Kapitän und Co-Kapitän; ohne Wahl die Farbe des Spiels."""
+    """Team-Farbe (#1347): nur die acht erlaubten Werte, nur Teamleitung und Co-Leitung; ohne Wahl die Farbe des Spiels."""
     from services.team_colors import TEAM_COLORS, game_color
 
     captain = await flow.add_user(role="player", name="neonfalke")
@@ -217,7 +217,7 @@ async def test_team_color_only_allowed_values_only_captains_and_game_fallback(fl
 
 @pytest.mark.asyncio
 async def test_dissolve_only_with_the_typed_name_and_says_what_happens(flow):
-    """Team auflösen (#1274): Vorschau nennt Mitglieder, Chat und Anmeldungen; nur der Kapitän, nur mit Namen;
+    """Team auflösen (#1274): Vorschau nennt Mitglieder, Chat und Anmeldungen; nur die Teamleitung, nur mit Namen;
     laufende Turniere sperren, kommende werden zurückgezogen, fertige bleiben."""
     captain = await flow.add_user(role="player", name="neonfalke")
     co = await flow.add_user(role="player", name="pixelpanther")
@@ -233,7 +233,7 @@ async def test_dissolve_only_with_the_typed_name_and_says_what_happens(flow):
     await flow.get(f"/api/teams/{team['id']}/invite-link")
 
     flow.act_as(co)
-    assert (await flow.get(f"/api/teams/{team['id']}/dissolve-preview")).status_code == 403, "Co-Kapitäne lösen nicht auf"
+    assert (await flow.get(f"/api/teams/{team['id']}/dissolve-preview")).status_code == 403, "Co-Leitungen lösen nicht auf"
     by_co = await flow.delete(f"/api/teams/{team['id']}", params={"confirm": "Lions Rocket"})
     assert by_co.status_code == 403
 

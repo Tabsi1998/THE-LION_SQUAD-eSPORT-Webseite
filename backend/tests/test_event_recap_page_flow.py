@@ -191,7 +191,7 @@ async def test_team_counts_who_was_in_it_then_not_today(flow):
     recap = (await flow.get("/api/events/sommer-lan/recap")).json()
     assert recap["mine"] is None, "erst nach dem Turnier beigetreten"
     assert recap["numbers"]["participants"] == 5, "die Zahl bleibt beim damaligen Team"
-    # Ohne Beitrittsdatum zählt niemand aus dem heutigen Team - nur wer angemeldet hat (Kapitän).
+    # Ohne Beitrittsdatum zählt niemand aus dem heutigen Team - nur wer angemeldet hat (Teamleitung).
     await flow.db.team_members.delete_many({"user_id": late["id"]})
     assert (await flow.get("/api/events/sommer-lan/recap")).json()["mine"] is None, "nur in member_ids: nicht dabei"
     # Gegenprobe: vor dem Turnier beigetreten - dabei.

@@ -223,7 +223,7 @@ Person selbst sehen darf und wofür sie angemeldet ist, dazu ihre zugesagten Ver
 Sitzung gilt dort keine Zwei-Faktor-Ausnahme der Turnierleitung. Gesperrte oder abgeschaltete Konten bekommen nichts,
 beim Löschen des Kontos fällt der Link weg. Code: `services/personal_calendar.py`.
 
-Die Team-Seite in Web und App folgt dem Server: Team bearbeiten und Squads dürfen Leitung, Co-Leitung, Turnierleitung,
+Die Team-Seite in Web und App folgt dem Server: Team bearbeiten und Co-Teams dürfen Leitung, Co-Leitung, Turnierleitung,
 Club-Admin und Superadmin; Mitglieder entfernen Leitung, Co-Leitung, Club-Admin und Superadmin; auflösen Leitung,
 Club-Admin und Superadmin. Moderatoren sehen auf fremden Team-Seiten keine Verwaltungs-Knöpfe. Die Admin-Rollen zählen
 dabei – wie überall – nur mit bestätigter Zwei-Faktor-Anmeldung (#1469); Leitung und Co-Leitung brauchen sie für ihr
@@ -245,7 +245,7 @@ Helfer eines Turniers (auch Organisation) ordnen nichts zu. Turnier- und Fast-La
 Sponsoren bei welchem Event erscheinen, legt nur die **Redaktion** beim Sponsor fest (bei allen oder bei ausgewählten Events);
 das Event zeigt sie an und nimmt keine eigene Auswahl mehr an. Code: `services/event_program.py`.
 
-In der App fragt die Team-Seite dieselben Rollen wie der Server: Team bearbeiten und Squads dürfen Leitung,
+In der App fragt die Team-Seite dieselben Rollen wie der Server: Team bearbeiten und Co-Teams dürfen Leitung,
 Co-Leitung, Turnierleitung, Club-Admin und Superadmin; Mitglieder entfernen Leitung, Co-Leitung, Club-Admin und
 Superadmin. Moderatoren sehen auf fremden Team-Seiten keine Verwaltungs-Knöpfe. Die Admin-Rollen zählen dabei –
 wie überall – nur mit bestätigter Zwei-Faktor-Anmeldung (#1469); Leitung und Co-Leitung brauchen sie für ihr Team nicht.
@@ -318,7 +318,7 @@ je Saison Captains eintragen, die nur für diese eine Saison Ergebnisse und Scor
 
 ## Liga: Co-Team mit Captain und Vertreter (#1649)
 
-In der Liga spielt ein **Co-Team** (Squad eines Vereinsteams) – Vertrag in [`LIGA.md`](LIGA.md). Jedes Co-Team hat
+In der Liga spielt ein **Co-Team** eines Vereinsteams – Vertrag in [`LIGA.md`](LIGA.md). Jedes Co-Team hat
 höchstens einen **Captain** und einen **Vertreter**; beide stehen im Kader des Co-Teams und sind verschiedene Personen.
 
 | Was | Turnierleitung (mit Zwei-Faktor) | Teamleitung, Co-Leitung des Hauptteams | Captain | Vertreter | Kader des Co-Teams |

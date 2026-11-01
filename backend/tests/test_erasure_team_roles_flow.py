@@ -1,4 +1,4 @@
-"""Konto löschen mit Rollen in Teams (#2113, L-C5): Kapitän, Co-Kapitän sowie Captain und Vertreter eines Co-Teams
+"""Konto löschen mit Rollen in Teams (#2113, L-C5): Teamleitung, Co-Leitung sowie Captain und Vertreter eines Co-Teams
 löschen ihr Konto erst, wenn sie die Rolle abgegeben haben - die Meldung nennt je Rolle den Weg. Ohne Rolle geht das
 Löschen wie bisher; die Löschung durch den Verein bleibt unberührt. Erfundene Konten, keine echten Personen."""
 import pathlib
@@ -48,8 +48,8 @@ async def _still_there(flow, user: dict) -> bool:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("who, label, way", [
-    ("leader", "Kapitän", "Zum Kapitän machen"),
-    ("co_leader", "Co-Kapitän", "Team verlassen"),
+    ("leader", "Teamleitung", "Zur Teamleitung machen"),
+    ("co_leader", "Co-Leitung", "Team verlassen"),
     ("captain", "Captain", "Rolle abgeben"),
 ])
 async def test_role_in_a_team_blocks_own_erasure_with_the_way_out(flow, who, label, way):
@@ -86,7 +86,7 @@ async def test_after_handing_over_the_lead_erasure_goes_through(flow):
     flow.act_as(world["leader"])
     handed = await flow.post(f"/api/teams/{world['team_id']}/transfer-leader", json={"new_leader_id": world["player"]["id"]})
     assert handed.status_code == 200, handed.text
-    # Nach der Übergabe ist der alte Kapitän Co-Kapitän - auch das hält auf, bis er das Team verlässt.
+    # Nach der Übergabe gehört die alte Teamleitung zur Co-Leitung - auch das hält auf, bis sie das Team verlässt.
     assert (await flow.post("/api/dsgvo/anonymize-me")).status_code == 409
     assert (await flow.post(f"/api/teams/{world['team_id']}/leave")).status_code == 200
     assert (await flow.post("/api/dsgvo/anonymize-me")).status_code == 200
@@ -111,7 +111,7 @@ async def test_erasure_by_the_club_is_not_blocked(flow):
 
 @pytest.mark.asyncio
 async def test_dead_end_always_names_the_way_to_the_club(flow):
-    """Kapitän als einziges Mitglied, Team in laufender Liga: Auflösen und Löschen gehen nicht - der Schlusssatz schon."""
+    """Teamleitung als einziges Mitglied, Team in laufender Liga: Auflösen und Löschen gehen nicht - der Schlusssatz schon."""
     await flow.db.settings.update_one({"id": "branding"}, {"$set": {"id": "branding", "privacy_contact_email": "datenschutz@verein.example"}}, upsert=True)
     leader = await flow.add_user(name=f"allein-{new_id()[:6]}")
     team_id = new_id()

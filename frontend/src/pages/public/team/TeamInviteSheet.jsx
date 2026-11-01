@@ -12,7 +12,7 @@ import { LoadNotice } from "@/components/tls/LoadState";
 import { viennaDate } from "@/lib/vienna";
 
 // „Einladen“ auf der Team-Seite (#1191): Link mit QR-Code - wer ihn öffnet, landet im Team und tippt nur noch
-// „Beitreten“. Neu erzeugen macht den alten Link ungültig. Darunter der Join-Code als Rückfall und die Suche nach
+// „Beitreten“. Neu erzeugen macht den alten Link ungültig. Darunter der Beitrittscode als Rückfall und die Suche nach
 // Benutzern für eine persönliche Einladung.
 
 async function copy(value, message) {
@@ -97,11 +97,11 @@ export function TeamInviteSheet({ team, onClose }) {
 
       {team.join_code ? (
         <section className="border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm p-4" data-testid="team-join-code-box">
-          <div className="text-[11px] uppercase tracking-widest text-[#FFD700] font-bold">Join-Code</div>
+          <div className="text-[11px] uppercase tracking-widest text-[#FFD700] font-bold">Beitrittscode</div>
           <p className="mt-1 text-xs text-white/55">Falls der Link nicht geht: Code auf der Team-Seite unter „Team beitreten“ eingeben.</p>
           <div className="mt-2 flex gap-2">
             <code className="flex-1 bg-black/40 border border-white/10 px-3 py-2 rounded-sm text-sm">{team.join_code}</code>
-            <button type="button" onClick={() => copy(team.join_code, "Join-Code kopiert.")} aria-label="Join-Code kopieren" className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm"><Copy className="w-4 h-4" /></button>
+            <button type="button" onClick={() => copy(team.join_code, "Beitrittscode kopiert.")} aria-label="Beitrittscode kopieren" className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm"><Copy className="w-4 h-4" /></button>
           </div>
         </section>
       ) : null}

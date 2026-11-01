@@ -1,11 +1,11 @@
 """Team-Seite (#1191): Termine, letzte Spiele und Einladungs-Link mit QR-Code.
 
 - ``GET  /api/teams/{id}/overview``            „Angemeldet für“ und „Letzte Spiele“ - für alle, die das Team sehen dürfen
-- ``GET  /api/teams/{id}/invite-link``         der aktuelle Link (wird beim ersten Mal angelegt) - Kapitän und Co-Kapitän
+- ``GET  /api/teams/{id}/invite-link``         der aktuelle Link (wird beim ersten Mal angelegt) - Teamleitung und Co-Leitung
 - ``POST /api/teams/{id}/invite-link``         neuer Link, der alte gilt nicht mehr
 - ``GET  /api/teams/{id}/invite-link/check``   gilt dieser Schlüssel? Mit Kurzinfo zum Team - auch für private Teams
 - ``POST /api/teams/{id}/join-link``           mit gültigem Schlüssel beitreten (nur noch „Beitreten“ tippen)
-- ``GET  /api/teams/{id}/dissolve-preview``    was beim Auflösen passiert (#1274) - Kapitän und Club-Admin
+- ``GET  /api/teams/{id}/dissolve-preview``    was beim Auflösen passiert (#1274) - Teamleitung und Club-Admin
 """
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ from services.user_notifications import build_public_url, create_user_notificati
 
 router = APIRouter(prefix="/api/teams", tags=["teams"])
 
-INVITE_GONE = "Dieser Einladungs-Link gilt nicht mehr. Frag im Team nach einem neuen Link oder gib den Join-Code ein."
+INVITE_GONE = "Dieser Einladungs-Link gilt nicht mehr. Frag im Team nach einem neuen Link oder gib den Beitrittscode ein."
 
 
 class JoinLinkBody(BaseModel):
@@ -77,7 +77,7 @@ async def get_invite_link(team_id: str, me: dict = Depends(get_current_user)):
     db = get_db()
     team = await _team_or_404(db, team_id)
     if not _can_manage(team, me):
-        _refuse(me, "Einladen dürfen Kapitän und Co-Kapitän.")
+        _refuse(me, "Einladen dürfen Teamleitung und Co-Leitung.")
     return await _invite_payload(await team_page.ensure_invite(db, team_id, me["id"]))
 
 
@@ -86,7 +86,7 @@ async def renew_invite_link(team_id: str, me: dict = Depends(get_current_user)):
     db = get_db()
     team = await _team_or_404(db, team_id)
     if not _can_manage(team, me):
-        _refuse(me, "Einladen dürfen Kapitän und Co-Kapitän.")
+        _refuse(me, "Einladen dürfen Teamleitung und Co-Leitung.")
     row = await team_page.renew_invite(db, team_id, me["id"])
     await db.audit_logs.insert_one({
         "id": new_id(), "action": "team.invite_link.renew", "target_id": team_id,
@@ -140,5 +140,5 @@ async def team_dissolve_preview(team_id: str, me: dict = Depends(get_current_use
     db = get_db()
     team = await _team_or_404(db, team_id)
     if team.get("leader_id") != me["id"] and not _team_admin(me, TEAM_OWNER_ADMIN_ROLES):
-        _refuse(me, "Auflösen darf nur der Kapitän.", TEAM_OWNER_ADMIN_ROLES)
+        _refuse(me, "Auflösen darf nur die Teamleitung.", TEAM_OWNER_ADMIN_ROLES)
     return await dissolve_preview(db, team)

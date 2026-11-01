@@ -157,7 +157,7 @@ NOTIFICATION_KIND_CATEGORY = {
     # Aufruf beim Reservieren der Station (#1137): „Du bist dran“.
     "match_call": "match_reminders",
     "match_result": "match_reminders",
-    # Team am Spieltag (#1192): „Bist du schon da?“ vom Kapitän - wie eine Spiel-Erinnerung.
+    # Team am Spieltag (#1192): „Bist du schon da?“ vom Teamleitung - wie eine Spiel-Erinnerung.
     "team_presence_nudge": "match_reminders",
     # Ergebnis melden (#1132): „bitte bestätigen“ an die Gegenseite; Streitfälle für die Turnierleitung.
     "match_report": "match_reminders",

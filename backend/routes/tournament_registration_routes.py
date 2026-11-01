@@ -230,7 +230,7 @@ async def _validate_registration_actor(db, tournament: dict, body: RegistrationC
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
     if not _can_register_team(team, user):
-        raise HTTPException(status_code=403, detail="Nur Team-Leader oder Co-Leader dürfen ein Team anmelden")
+        raise HTTPException(status_code=403, detail="Nur Teamleitung oder Co-Leitung dürfen ein Team anmelden")
     if user["id"] not in (team.get("member_ids") or []):
         raise HTTPException(status_code=403, detail="Du bist kein Mitglied dieses Teams")
     existing_team = await db.tournament_registrations.find_one(

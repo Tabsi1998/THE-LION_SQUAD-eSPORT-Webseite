@@ -410,7 +410,7 @@ async def anonymize_me_check(me: dict = Depends(get_current_user)):
 async def anonymize_me(me: dict = Depends(get_current_user)):
     """Anonymize own account but keep tournament history for statistical integrity."""
     db = get_db()
-    # Erst die Rollen in Teams abgeben (#2113, L-C5) - sonst stünde ein gelöschtes Konto als Kapitän da.
+    # Erst die Rollen in Teams abgeben (#2113, L-C5) - sonst stünde ein gelöschtes Konto als Teamleitung da.
     from services import erasure_blockers
     rows = await erasure_blockers.blockers(db, me["id"], me.get("role"))
     if rows:

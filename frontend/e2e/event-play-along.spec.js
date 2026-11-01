@@ -19,7 +19,7 @@ const ENTRIES = [
   { kind: "tournament", id: "t-mini", slug: "mini-cup", title: "Mini Cup", start_date: "2026-12-17T18:00:00+01:00", mode: "Einzel", game: "Tetris", team: false,
     fee: null, spots_left: 0, full: true, selectable: true, reason: null, captain: false, my_status: null },
   { kind: "tournament", id: "t-rocket", slug: "rocket-cup", title: "Rocket Cup", start_date: START, mode: "Team", game: "Rocket League", team: true,
-    fee: null, spots_left: 8, full: false, selectable: false, reason: "Dein Kapitän meldet das Team an.", captain: false, my_status: null },
+    fee: null, spots_left: 8, full: false, selectable: false, reason: "Deine Teamleitung meldet das Team an.", captain: false, my_status: null },
 ];
 
 async function mockApi(page, calls) {
@@ -75,7 +75,7 @@ test.describe("Spielst du auch mit?", () => {
     const sheet = page.getByTestId("play-along-sheet");
     await expect(sheet).toBeVisible();
     await expect(sheet.getByRole("heading", { name: "Spielst du auch mit?" })).toBeVisible();
-    await expect(sheet.getByTestId("play-along-note-t-rocket")).toHaveText("Dein Kapitän meldet das Team an.");
+    await expect(sheet.getByTestId("play-along-note-t-rocket")).toHaveText("Deine Teamleitung meldet das Team an.");
     await expect(sheet.getByTestId("play-along-check-t-rocket")).toHaveCount(0);
     await sheet.getByLabel(/Kart Cup/).check();
     await sheet.getByLabel(/Mini Cup/).check();

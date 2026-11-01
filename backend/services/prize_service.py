@@ -168,7 +168,7 @@ async def _review_tournament_prizes(db, tid: str, wanted: set[tuple], groups: se
 
 async def prize_recipient_ids(db, pickup: dict) -> list[str]:
     """Wer zu einem Gewinn Nachricht bekommt (#2123, ER3): die Person - bei einem Team-Gewinn ohne Person die
-    Teamleitung (Kapitän)."""
+    Teamleitung (Teamleitung)."""
     if pickup.get("user_id"):
         return [pickup["user_id"]]
     if not pickup.get("team_id"):

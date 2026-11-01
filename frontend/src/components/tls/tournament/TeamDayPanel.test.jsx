@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { lineupLabel, presenceLine, starterLabel } from "@/lib/teamDay";
 
-// Team am Spieltag (#1192): Kapitän wählt, wer spielt (genau so viele wie je Team), am Turniertag „Ich bin da“,
-// der Kapitän sieht „x von y da“ und kann anstupsen. Erfundene Daten.
+// Team am Spieltag (#1192): Teamleitung wählt, wer spielt (genau so viele wie je Team), am Turniertag „Ich bin da“,
+// die Teamleitung sieht „x von y da“ und kann anstupsen. Erfundene Daten.
 
 const apiMock = { get: vi.fn(), put: vi.fn(), post: vi.fn(), delete: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatRequestError: (_e, fallback) => fallback }));
@@ -33,8 +33,8 @@ beforeEach(() => {
   for (const fn of Object.values(apiMock)) fn.mockReset();
 });
 
-test("Sätze: Kapitän heißt so, Hinweis zu Aufruf und Meldungen, „x von y da“", () => {
-  expect(starterLabel({ role: "captain" })).toBe("Kapitän");
+test("Sätze: Teamleitung heißt so, Hinweis zu Aufruf und Meldungen, „x von y da“", () => {
+  expect(starterLabel({ role: "captain" })).toBe("Teamleitung");
   expect(starterLabel({ role: "player" })).toBe("Spielt");
   expect(lineupLabel({ team_size: 3, can_edit: true, lineup: [] }, 1)).toBe("Wähle genau 3 – so viele spielen bei diesem Turnier je Team.");
   expect(lineupLabel({ team_size: 3, can_edit: false, lineup_set: false })).toBe("Noch keine Aufstellung – Aufruf und Spiel-Meldungen gehen an alle im Team.");
@@ -42,7 +42,7 @@ test("Sätze: Kapitän heißt so, Hinweis zu Aufruf und Meldungen, „x von y da
   expect(presenceLine({ count: 4, total: 5 })).toBe("4 von 5 da");
 });
 
-test("Kapitän wählt genau so viele, wie je Team spielen; die übrigen sind Ersatz", async () => {
+test("Teamleitung wählt genau so viele, wie je Team spielen; die übrigen sind Ersatz", async () => {
   apiMock.get.mockResolvedValue({ data: view() });
   apiMock.put.mockResolvedValue({ data: view({ lineup: ["u-cap", "u-3"], substitutes: ["u-co", "u-4"], lineup_set: true }) });
   render(<TeamDayPanel tournament={{ id: "t-1" }} />);
@@ -52,7 +52,7 @@ test("Kapitän wählt genau so viele, wie je Team spielen; die übrigen sind Ers
   fireEvent.click(screen.getByTestId("team-lineup-toggle-u-cap"));
   fireEvent.click(screen.getByTestId("team-lineup-toggle-u-3"));
   expect(screen.getByTestId("team-lineup-count")).toHaveTextContent("2 von 2");
-  expect(within(screen.getByTestId("team-lineup-member-u-cap")).getByText("Kapitän")).toBeInTheDocument();
+  expect(within(screen.getByTestId("team-lineup-member-u-cap")).getByText("Teamleitung")).toBeInTheDocument();
   expect(within(screen.getByTestId("team-lineup-member-u-3")).getByText("Spielt")).toBeInTheDocument();
   expect(within(screen.getByTestId("team-lineup-member-u-4")).getByText("Ersatz")).toBeInTheDocument();
   fireEvent.click(screen.getByTestId("team-lineup-toggle-u-4"));
@@ -72,7 +72,7 @@ test("Spieler sehen die Aufstellung nur; vor dem Turniertag der Hinweis auf „I
   expect(screen.getByTestId("team-presence-later")).toHaveTextContent("Am Turniertag");
 });
 
-test("am Turniertag: „Ich bin da“, der Zähler und Anstupsen für den Kapitän", async () => {
+test("am Turniertag: „Ich bin da“, der Zähler und Anstupsen für die Teamleitung", async () => {
   const day = (present, extra = {}) => view({
     lineup: ["u-cap", "u-3"], substitutes: ["u-co", "u-4"], lineup_set: true, can_nudge: true,
     presence: { enabled: true, present, counted: ["u-cap", "u-3", "u-co", "u-4"], count: Object.keys(present).length, total: 4, me_present: "u-cap" in present, can_mark: true },

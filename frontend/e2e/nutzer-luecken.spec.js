@@ -90,7 +90,7 @@ for (const size of SIZES) {
       await expect(page.getByTestId("tournament-register-btn")).toBeVisible();
     });
 
-    test("Team: Kapitän sieht den Weg, offene Einladung lässt sich zurückziehen", async ({ page }) => {
+    test("Team: Teamleitung sieht den Weg, offene Einladung lässt sich zurückziehen", async ({ page }) => {
       await mockChrome(page);
       let invites = [{ id: "inv-1", created_at: "2026-10-20T10:00:00Z", user: { id: "u-5", username: "nachtfuchs", display_name: "Nachtfuchs mit einem sehr langen Anzeigenamen" }, inviter: { id: user.id, username: "testperson", display_name: "Testperson" } }];
       await page.route("**/api/teams/team-1", (route) => json(route, {
@@ -121,7 +121,7 @@ for (const size of SIZES) {
       await page.route("**/api/dsgvo/anonymize-me/check", (route) => json(route, {
         can_erase: false,
         blockers: [
-          { team_id: "team-1", team: "[RDL] Rudel", squad_id: null, squad: null, role: "leader", role_label: "Kapitän", way: "Übergib die Leitung auf der Teamseite oder löse das Team auf.", link: "/teams/team-1" },
+          { team_id: "team-1", team: "[RDL] Rudel", squad_id: null, squad: null, role: "leader", role_label: "Teamleitung", way: "Übergib die Leitung auf der Teamseite oder löse das Team auf.", link: "/teams/team-1" },
           { team_id: "team-1", team: "[RDL] Rudel", squad_id: "s-1", squad: "Erste", role: "captain", role_label: "Captain", way: "Gib die Rolle unter Teams → Deine Teams ab.", link: "/teams" },
         ],
       }));

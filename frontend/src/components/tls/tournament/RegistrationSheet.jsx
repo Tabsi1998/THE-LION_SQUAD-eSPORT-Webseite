@@ -65,7 +65,7 @@ export function RegistrationSheet({ tournament, user, myTeams = [], loading, err
   // Voller Cup (#1941): Kopfzeile und Knopf sagen „Warteliste“ - bezahlt wird erst mit dem Nachrücken.
   const waitlist = waitlistLead(tournament);
   const lead = waitlist || (needsTeam
-    ? "Wähle das Team aus, das du als Leader oder Co-Leader anmelden möchtest."
+    ? "Wähle das Team aus, das du als Teamleitung oder Co-Leitung anmelden möchtest."
     : fields.length
       ? `${gameLabel(game)} benötigt Spieler-IDs${sourceSlug !== game.slug ? ` aus ${game.identity_game_name || "dem Hauptspiel"}` : ""}.`
       : `Du meldest dich als ${user?.display_name || user?.username || "du"} an.`);
@@ -149,7 +149,7 @@ export function RegistrationSheet({ tournament, user, myTeams = [], loading, err
                   {manageableTeams.map((team) => <option key={team.id} value={team.id}>[{team.tag}] {team.name}</option>)}
                 </select>
                 {manageableTeams.length === 0 && (
-                  <div className="mt-2 text-xs text-[#FF3B30]">Du bist aktuell bei keinem Team als Leader oder Co-Leader eingetragen.</div>
+                  <div className="mt-2 text-xs text-[#FF3B30]">Du bist aktuell bei keinem Team als Teamleitung oder Co-Leitung eingetragen.</div>
                 )}
               </label>
             )}

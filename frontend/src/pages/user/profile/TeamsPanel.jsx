@@ -7,7 +7,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { Check, Pencil, Plus, Trash2, UserPlus, Users, X } from "lucide-react";
 import { useOptionalAuth } from "@/context/AuthContext";
 import { TEAM_ROLE_LABELS } from "./constants";
-import { SQUAD_ROLES, isLocked, roleChoices, roleOf, rolesSummary } from "@/components/tls/league/squadRoles";
+import { SQUAD_ROLES, isLocked, roleChoices, roleOf, rolesSummary, squadStatusLabel } from "@/components/tls/league/squadRoles";
 
 const emptySquad = {
   name: "",
@@ -175,7 +175,7 @@ export function TeamsPanel() {
         <div>
           <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Team-Verwaltung</div>
           <h2 className="font-heading text-2xl md:text-3xl font-black uppercase mt-1">Meine Teams</h2>
-          <p className="text-sm text-white/55 mt-1">Teams sind deine Organisation, Co-Teams die feste Aufstellung für eine Season oder ein Turnier.</p>
+          <p className="text-sm text-white/55 mt-1">Teams sind deine Organisation, Co-Teams die feste Aufstellung für ein Spiel.</p>
         </div>
         <Link to="/teams" className="inline-flex items-center gap-2 px-4 py-2 border border-[#29B6E8]/40 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#29B6E8]/10">
           <Plus className="w-3.5 h-3.5" /> Team erstellen
@@ -267,7 +267,7 @@ export function TeamsPanel() {
                     <div key={squad.id} className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4">
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <div className="text-[10px] uppercase tracking-widest text-[#FFD700]">{squad.status}</div>
+                          <div className="text-[10px] uppercase tracking-widest text-[#FFD700]">{squadStatusLabel(squad.status)}</div>
                           <h4 className="font-heading font-bold text-lg">{squad.name}</h4>
                         </div>
                         {activeTeam.can_manage && (
@@ -329,7 +329,7 @@ export function TeamsPanel() {
                   </select>
                 </Field>
               </Row>
-              <Field label="Lineup / Mitspieler" group>
+              <Field label="Kader" group>
                 <div className="grid sm:grid-cols-2 gap-2">
                   {(activeTeam.members || []).map((m) => {
                     const checked = (editing.member_ids || []).includes(m.id);

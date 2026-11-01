@@ -6,7 +6,7 @@ sehen darf (öffentlich, nicht im Entwurf; „nur Mitglieder“ nur als Vereinsm
 
 Der Einladungs-Link ist die Adresse der Team-Seite mit einem Schlüssel (``?einladung=…``). Er liegt in einer eigenen
 Sammlung ``team_invite_links`` - nicht am Team, damit ihn kein normales Mitglied über die Team-Daten mitliest. Neu
-erzeugen ersetzt den Schlüssel, der alte gilt sofort nicht mehr. Der Join-Code bleibt als Rückfall.
+erzeugen ersetzt den Schlüssel, der alte gilt sofort nicht mehr. Der Beitrittscode bleibt als Rückfall.
 """
 from __future__ import annotations
 
