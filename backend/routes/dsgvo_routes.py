@@ -376,13 +376,16 @@ async def _anonymize_user_data(db, user_id: str, actor_id: str, action: str) -> 
     # Druckdateien mit Gamertag (#2069): dasselbe für die zusammengesetzte Datei je Bestellposition.
     from services.shop_print_files import erase_for_user as erase_print_files
     await erase_print_files(db, user_id)
+    # Muss vor dem Aufräumen stehen: danach ist der Eintrag weg, auf den die Posten zeigen.
+    orphaned_posts = await account_erasure.posts_on_own_entry(db, user_id)
     # Alles außerhalb des Kontos (#928): Verzeichnis, Anträge, Anmeldungen, XP, Zugänge und die eigenen Bilder.
     erased = await account_erasure.erase_related(db, user, now)
     # Kontaktanfragen ohne Konto mit derselben Adresse bleiben unberührt (nicht sicher zuzuordnen) - die Zahl steht hier,
     # damit der Vorstand sie bei einem Löschwunsch per Hand prüfen kann.
     await db.audit_logs.insert_one({
         "id": new_id(), "action": action, "actor_id": actor_id, "target_id": user_id,
-        "data": {"personal_data_removed": True, "unlinked_contact_messages": erased["unlinked_contact_messages"]}, "created_at": now,
+        "data": {"personal_data_removed": True, "unlinked_contact_messages": erased["unlinked_contact_messages"],
+                 **({"board_posts_to_fill": orphaned_posts} if orphaned_posts else {})}, "created_at": now,
     })
 
 

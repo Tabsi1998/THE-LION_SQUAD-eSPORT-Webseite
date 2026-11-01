@@ -323,6 +323,22 @@ async def test_the_last_superadmin_cannot_delete_the_own_account(flow):
 
 
 @pytest.mark.asyncio
+async def test_the_erasure_log_names_posts_on_the_own_directory_entry(flow):
+    root = await flow.add_user(role="superadmin", name="root")
+    erika, mara = await member(flow, "erika"), await member(flow, "mara")
+    entry = new_id()
+    await flow.db.club_member_profiles.insert_one({"id": entry, "slug": "erika", "display_name": "Erika", "user_id": erika["id"], "source": "member"})
+    await position(flow, user_id=entry)
+    flow.act_as(root)
+    assert (await flow.post(f"/api/dsgvo/admin/anonymize/{erika['id']}")).status_code == 200
+    audit = await flow.db.audit_logs.find_one({"action": "user.admin_anonymize", "target_id": erika["id"]}, {"_id": 0})
+    assert audit["data"]["board_posts_to_fill"] == ["Kassier"]
+    assert (await flow.post(f"/api/dsgvo/admin/anonymize/{mara['id']}")).status_code == 200
+    audit = await flow.db.audit_logs.find_one({"action": "user.admin_anonymize", "target_id": mara["id"]}, {"_id": 0})
+    assert "board_posts_to_fill" not in audit["data"]
+
+
+@pytest.mark.asyncio
 async def test_deleting_an_account_follows_the_same_rules_on_every_way(flow):
     root = await flow.add_user(role="superadmin", name="root")
     await flow.db.teams.insert_one({"id": "team-1", "name": "Lions", "leader_id": root["id"], "co_leader_ids": []})

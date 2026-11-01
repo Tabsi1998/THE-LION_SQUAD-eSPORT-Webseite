@@ -128,6 +128,16 @@ async def _directory(db, user_id: str, now: str) -> list[str]:
     return [row[field] for row in own for field in ("photo_url", "cover_url") if row.get(field)]
 
 
+async def posts_on_own_entry(db, user_id: str) -> list[str]:
+    """Vorstandsposten, die auf den selbst angelegten Verzeichnis-Eintrag zeigen. Geht der Eintrag mit dem Konto, stehen sie ohne
+    Inhaber da - das Protokoll der Löschung nennt sie, damit der Vorstand sie neu besetzt (Aufräumen: #2174)."""
+    own = [row["id"] async for row in db.club_member_profiles.find({"user_id": user_id, "source": "member"}, {"_id": 0, "id": 1})]
+    if not own:
+        return []
+    positions = await db.board_positions.find({"$or": [{"user_id": {"$in": own}}, {"deputy_user_id": {"$in": own}}]}, {"_id": 0, "title_male": 1, "slug": 1}).to_list(50)
+    return [row.get("title_male") or row.get("slug") or "Posten" for row in positions]
+
+
 async def _series_links(db, profile_ids: list[str], now: str) -> None:
     """Externe Serien (#1741) zeigen auf Vereinsprofile, nie auf Konten. Geht das eigene Profil mit dem Konto, wird
     der Teilnehmer extern und sein Name (wie beim Veranstalter) ausgeblendet - Ergebnis und Tabelle bleiben; ein Alias
