@@ -81,6 +81,53 @@ test("Anmeldung mit Kosten: Leiste Anmeldung, Bezahlen, Dabei mit dem echten Sta
   expect(await screen.findByTestId("event-register-steps")).toHaveAttribute("aria-label", "Schritt 3 von 3: Dabei");
 });
 
+// Volles Event (#2127, EV7): der Knopf sagt, was passiert - ohne Preis; die Meldung folgt dem Stand vom Server.
+describe("Anmeldung bei vollem Event", () => {
+  const offer = { enabled: true, currency: "EUR", positions: [{ key: "ticket", label: "Ticket", amount_cents: 1000, basis: "per_person", optional: false }] };
+  const open = {
+    ...base, status: "registration_open", has_registration: true, offer, max_participants: 2, allow_companions: true, max_companions_per_registration: 2,
+    public_phase: { state: "registration_open", label: "Anmeldung offen" }, registration_summary: { reserved_seats: 1, registered_count: 1 },
+  };
+  beforeEach(async () => {
+    authState.user = { id: "u1", username: "paula" };
+    apiMock.post = vi.fn();
+    (await import("sonner")).toast.success.mockClear();
+  });
+
+  test("freier Platz: Preis auf dem Knopf; zu viele Begleitpersonen: Warteliste ohne Preis", async () => {
+    renderPage(open);
+    const submit = await screen.findByTestId("event-register-submit");
+    expect(submit).toHaveTextContent("Verbindlich anmelden");
+    expect(screen.getByTestId("event-quote")).toBeInTheDocument();
+    expect(screen.queryByTestId("event-waitlist-note")).toBeNull();
+
+    fireEvent.change(screen.getByTestId("event-register-form").querySelector('input[type="number"]'), { target: { value: "1" } });
+    expect(submit).toHaveTextContent("Auf die Warteliste");
+    expect(submit).not.toHaveTextContent("€");
+    expect(screen.queryByTestId("event-quote")).toBeNull();
+    expect(screen.getByTestId("event-waitlist-note")).toHaveTextContent("Nur noch 1 Platz frei");
+    expect(screen.getByTestId("event-waitlist-note")).toHaveTextContent("Bezahlt wird erst, wenn du nachrückst.");
+  });
+
+  test("voll: die Meldung folgt dem Stand vom Server", async () => {
+    const { toast } = await import("sonner");
+    apiMock.post.mockResolvedValue({ data: { status: "waitlist" } });
+    renderPage({ ...open, registration_summary: { reserved_seats: 2, registered_count: 2 } });
+    const submit = await screen.findByTestId("event-register-submit");
+    expect(submit).toHaveTextContent("Auf die Warteliste");
+    fireEvent.click(submit);
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Du stehst auf der Warteliste. Wird ein Platz frei, bekommst du Bescheid."));
+  });
+
+  test("Platz frei: „Du bist angemeldet.“", async () => {
+    const { toast } = await import("sonner");
+    apiMock.post.mockResolvedValue({ data: { status: "registered" } });
+    renderPage(open);
+    fireEvent.click(await screen.findByTestId("event-register-submit"));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Du bist angemeldet."));
+  });
+});
+
 // Aus der News (#1266): „Anmelden“ führt mit ?anmelden=1 hierher und öffnet das Formular.
 test("?anmelden=1: das Anmeldeformular bekommt den Fokus, ohne den Knopf zu suchen", async () => {
   authState.user = { id: "u1", username: "paula" };

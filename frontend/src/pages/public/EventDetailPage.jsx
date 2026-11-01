@@ -28,7 +28,7 @@ import { renderMarkdownLite } from "@/lib/markdownLite";
 import { seoTextPreview } from "@/lib/textPreview";
 import { formatWhen } from "@/lib/datetime";
 import { eventIsOver, photosComingWindow } from "@/lib/afterEnd";
-import { countText, ownSeatsSentence, seatsLabel } from "@/lib/eventSeats";
+import { countText, ownSeatsSentence, seatsLabel, waitlistNotice } from "@/lib/eventSeats";
 import { cancelledNotice, eventFacts, eventTabs, stripHeadingEmoji, visibilityChip, whatsOnRows } from "@/lib/eventPage";
 import { RETURN_PARAM, offersPlayAlong, returnTournamentPath } from "@/lib/playAlong";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
@@ -638,6 +638,8 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
   const [selectedPositions, setSelectedPositions] = useState([]);
   const offer = event.offer;
   const quote = offer ? previewQuote(offer, { seats: 1 + Number(companionCount || 0), selected: selectedPositions }) : null;
+  // Voll (auch nur wegen der Begleitpersonen): der Knopf sagt „Warteliste“ und nennt keinen Preis (#2127, EV7).
+  const waitlisted = waitlistNotice(event, 1 + Number(companionCount || 0));
   const { submitting: saving, submitOnce } = useSubmissionGuard();
   const confirm = useConfirm();
   const [actionError, setActionError] = useState("");
@@ -671,12 +673,13 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
     ev.preventDefault();
     setActionError("");
     const attempt = await submitOnce(async () => {
-      await api.post(`/events/${event.id}/registrations`, {
+      const response = await api.post(`/events/${event.id}/registrations`, {
         companion_count: Number(companionCount || 0),
         note: note.trim() || null,
         selected_positions: selectedPositions,
       }, { params: accessToken ? { access: accessToken } : undefined });
-      toast.success("Anmeldung gespeichert.");
+      // Was der Server entschieden hat (#2127, EV7) - in der Zwischenzeit kann der letzte Platz weg sein.
+      toast.success(response?.data?.status === "waitlist" ? "Du stehst auf der Warteliste. Wird ein Platz frei, bekommst du Bescheid." : "Du bist angemeldet.");
       await onChanged();
       onRegistered?.();
       // Der einmalige Hinweis direkt nach der ersten Anmeldung (#1188 Teil 2).
@@ -810,7 +813,12 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
               ))}
             </fieldset>
           )}
-          {quote && !quote.free && (
+          {waitlisted && (
+            <div className="border border-[#FFD700]/40 bg-[#FFD700]/5 rounded-sm p-3 text-sm text-white/85" data-testid="event-waitlist-note">
+              {waitlisted}{quote && !quote.free ? " Bezahlt wird erst, wenn du nachrückst." : ""}
+            </div>
+          )}
+          {!waitlisted && quote && !quote.free && (
             <div className="border border-[#FFD700]/40 rounded-sm p-3 text-sm flex items-baseline justify-between gap-3" data-testid="event-quote">
               <span className="text-white/65">Summe für {1 + Number(companionCount || 0)} Person{1 + Number(companionCount || 0) === 1 ? "" : "en"}</span>
               <strong className="font-heading text-xl text-white">{formatCents(quote.total_cents, quote.currency)}</strong>
@@ -821,7 +829,7 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
             <textarea value={note} onChange={(ev) => { setNote(ev.target.value); setActionError(""); }} rows={3} maxLength={500} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" placeholder="z.B. komme etwas später" />
           </label>
           <button disabled={saving} data-testid="event-register-submit" className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm disabled:opacity-50">
-            <UserPlus className="w-3.5 h-3.5" /> {saving ? "Speichere..." : quote && !quote.free ? `Verbindlich anmelden · ${formatCents(quote.total_cents, quote.currency)}` : "Anmelden"}
+            <UserPlus className="w-3.5 h-3.5" /> {saving ? "Speichere..." : waitlisted ? "Auf die Warteliste" : quote && !quote.free ? `Verbindlich anmelden · ${formatCents(quote.total_cents, quote.currency)}` : "Anmelden"}
           </button>
         </form>
       )}
