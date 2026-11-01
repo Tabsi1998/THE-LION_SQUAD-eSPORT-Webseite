@@ -71,6 +71,29 @@ test("eine verwendete Datei wird nur nach Warnung gelöscht, eine unbenutzte ohn
   expect(confirmMock.mock.calls.at(-1)[0].title).toBe("Datei endgültig löschen?");
 });
 
+test("Seiten, Filter und Suche fragt die Mediathek beim Server an (#2122)", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url.startsWith("/admin/media?")) return { data: { items: [ITEM], total: 130, total_size: 2048, limit: 60, offset: 0 } };
+    if (url === "/admin/media/audit") return { data: { summary: {} } };
+    return { data: [] };
+  });
+  render(<MemoryRouter><AdminMediaPage /></MemoryRouter>);
+  expect(await screen.findByTestId("media-page-label")).toHaveTextContent("Seite 1 von 3");
+  expect(apiMock.get.mock.calls.map(([url]) => url)).toContain("/admin/media?paged=true&limit=60&offset=0&include_user_uploads=false&include_usage=true");
+
+  fireEvent.click(screen.getByTestId("media-page-next"));
+  await waitFor(() => expect(screen.getByTestId("media-page-label")).toHaveTextContent("Seite 2 von 3"));
+  await waitFor(() => expect(apiMock.get.mock.calls.at(-2)[0]).toContain("offset=60"));
+
+  // Ein neuer Filter beginnt wieder vorne.
+  fireEvent.change(screen.getByTestId("media-scope-filter"), { target: { value: "unused" } });
+  await waitFor(() => expect(apiMock.get.mock.calls.some(([url]) => url.includes("scope=unused") && url.includes("offset=0"))).toBe(true));
+  fireEvent.click(screen.getByTestId("media-filter-videos"));
+  await waitFor(() => expect(apiMock.get.mock.calls.some(([url]) => url.includes("type=videos"))).toBe(true));
+  fireEvent.change(screen.getByTestId("media-search"), { target: { value: "uralt" } });
+  await waitFor(() => expect(apiMock.get.mock.calls.some(([url]) => url.includes("q=uralt"))).toBe(true));
+});
+
 test("Drehen fragt nach, nennt die Stellen und übernimmt Adresse und Maße (#2122)", async () => {
   apiMock.post.mockReset();
   apiMock.post.mockResolvedValue({ data: { url: "/api/static/uploads/loewe.png?v=7", size: 999, width: 500, height: 1000, updated_at: "2026-10-01T10:00:00Z" } });

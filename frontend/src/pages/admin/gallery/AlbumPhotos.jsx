@@ -8,6 +8,8 @@ import { ImageUpload, prepareImageForUpload } from "@/components/tls/ImageUpload
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { UploadProgressPanel } from "@/components/tls/UploadProgressPanel";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useMediaLibrary } from "@/hooks/useMediaLibrary";
+import { MediaLibraryMore, MediaLibrarySearch } from "@/components/tls/MediaLibraryControls";
 import { useUploadProgress } from "@/hooks/useUploadProgress";
 import { buildExternalGalleryPayload, galleryMediaUrl, galleryPosterUrl, isVideoLike, MEDIA_ACCEPT, mediaTypeFromItem, mediaTypeFromFile, providerLabel } from "@/lib/galleryMedia";
 import { logUploadClientFailure } from "@/lib/uploadDiagnostics";
@@ -25,9 +27,8 @@ export function AlbumPhotos({ album, onBack }) {
   const [uploading, setUploading] = useState(false);
   const [mediaOpen, setMediaOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
-  const [media, setMedia] = useState([]);
+  const media = useMediaLibrary("/admin/media?type=media", mediaOpen);
   const [selectedMedia, setSelectedMedia] = useState([]);
-  const [loadingMedia, setLoadingMedia] = useState(false);
   const [editingPhoto, setEditingPhoto] = useState(null);
   const confirm = useConfirm();
   const uploadProgress = useUploadProgress();
@@ -212,18 +213,9 @@ export function AlbumPhotos({ album, onBack }) {
       toast.error(formatApiError(err.response?.data?.detail));
     }
   };
-  const openMedia = async () => {
-    setMediaOpen(true);
-    setLoadingMedia(true);
+  const openMedia = () => {
     setSelectedMedia([]);
-    try {
-      const { data } = await api.get("/admin/media?type=media");
-      setMedia(data || []);
-    } catch {
-      toast.error("Medienbibliothek konnte nicht geladen werden.");
-    } finally {
-      setLoadingMedia(false);
-    }
+    setMediaOpen(true);
   };
   const toggleMedia = (item) => {
     setSelectedMedia((rows) => rows.some((x) => x.url === item.url)
@@ -378,13 +370,14 @@ export function AlbumPhotos({ album, onBack }) {
               </div>
               <button type="button" onClick={() => setMediaOpen(false)} className="text-white/50 hover:text-white">×</button>
             </div>
-            {loadingMedia ? (
+            <MediaLibrarySearch library={media} testId="gallery-media" />
+            {media.loading ? (
               <div className="text-white/40 py-12 text-center">Lade Medien…</div>
-            ) : media.length === 0 ? (
-              <div className="text-white/40 py-12 text-center">Keine Medien vorhanden.</div>
+            ) : media.items.length === 0 ? (
+              <div className="text-white/40 py-12 text-center">{media.search ? "Nichts gefunden." : "Keine Medien vorhanden."}</div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-                {media.map((item) => {
+                {media.items.map((item) => {
                   const active = selectedMedia.some((x) => x.url === item.url);
                   return (
                     <button
@@ -402,6 +395,7 @@ export function AlbumPhotos({ album, onBack }) {
                 })}
               </div>
             )}
+            <MediaLibraryMore library={media} testId="gallery-media" />
             <div className="mt-5 flex justify-end gap-2 border-t border-white/10 pt-4">
               <button type="button" onClick={() => setMediaOpen(false)} className="px-4 py-2 border border-white/10 text-white/60 rounded-sm text-xs uppercase tracking-wider font-bold">Abbrechen</button>
               <button type="button" onClick={addSelectedMedia} disabled={!selectedMedia.length} data-testid="photo-media-add" className="px-5 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">Auswahl hinzufügen</button>

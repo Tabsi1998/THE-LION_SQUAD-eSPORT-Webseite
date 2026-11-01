@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, Crop, RotateCcw, RotateCw, Upload, X, Image as ImageIcon } from "lucide-react";
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
-import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useMediaLibrary } from "@/hooks/useMediaLibrary";
 import { logUploadClientFailure } from "@/lib/uploadDiagnostics";
-import { isSvgFile, isSvgUpload } from "@/lib/svgLogo";
+import { isSvgFile } from "@/lib/svgLogo";
 import { AvatarCropDialog } from "./AvatarCropDialog";
 import { LogoSurfaces } from "./LogoSurfaces";
+import { MediaLibraryMore, MediaLibrarySearch } from "./MediaLibraryControls";
 import { toast } from "sonner";
 
 const parseUploadMb = (value, fallback) => {
@@ -357,8 +358,8 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
   const effectiveLibraryEndpoint = libraryEndpoint || defaultLibraryEndpoint();
   const [uploading, setUploading] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
-  const [library, setLibrary] = useState([]);
-  const [loadingLibrary, setLoadingLibrary] = useState(false);
+  // SVG-Logos (#1952) nur in Logo-Feldern - ein Profilbild oder Banner bekommt sie gar nicht erst angeboten.
+  const library = useMediaLibrary(`${effectiveLibraryEndpoint}${logo ? "" : `${effectiveLibraryEndpoint.includes("?") ? "&" : "?"}exclude_svg=true`}`, libraryOpen);
   const [editor, setEditor] = useState(null);
   const [drag, setDrag] = useState(null);
   const [cropBox, setCropBox] = useState({ width: 0, height: 0 });
@@ -486,23 +487,6 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
     await uploadFile(file);
   };
 
-  const openLibrary = useCallback(async () => {
-    setLibraryOpen(true);
-    setLoadingLibrary(true);
-    try {
-      const { data } = await api.get(effectiveLibraryEndpoint);
-      setLibrary(data || []);
-    } catch {
-      toast.error("Medienbibliothek konnte nicht geladen werden.");
-    } finally {
-      setLoadingLibrary(false);
-    }
-  }, [effectiveLibraryEndpoint]);
-  useApiInvalidation(() => {
-    if (libraryOpen) return openLibrary();
-    return undefined;
-  }, ["media", "uploads"]);
-
   const editorSource = editor?.naturalWidth && editor?.naturalHeight
     ? calculateCropSourceRect(editor.naturalWidth, editor.naturalHeight, editor)
     : null;
@@ -580,8 +564,6 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
   const previewClass = variant === "wide"
     ? "aspect-[16/9] w-full"
     : "w-20 h-20";
-  // SVG-Logos (#1952) nur in Logo-Feldern - ein Profilbild oder Banner bekommt sie gar nicht erst angeboten.
-  const libraryItems = logo ? library : library.filter((item) => !isSvgUpload(item.url));
   return (
     <div>
       {label && <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>}
@@ -609,7 +591,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
           {allowLibrary && (
             <button
               type="button"
-              onClick={openLibrary}
+              onClick={() => setLibraryOpen(true)}
               data-testid={`${testId}-library`}
               className="w-full inline-flex min-h-11 items-center justify-center gap-2 px-3 py-2 border border-white/15 text-white/70 font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-white/5"
             >
@@ -650,13 +632,14 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
               <h3 className="font-heading text-xl font-black uppercase">Medienbibliothek</h3>
               <button type="button" onClick={() => setLibraryOpen(false)} className="text-white/50 hover:text-white">×</button>
             </div>
-            {loadingLibrary ? (
+            <MediaLibrarySearch library={library} testId={`${testId}-library`} />
+            {library.loading ? (
               <div className="text-white/40 py-12 text-center">Lade Medien…</div>
-            ) : libraryItems.length === 0 ? (
-              <div className="text-white/40 py-12 text-center">Keine Bilder vorhanden.</div>
+            ) : library.items.length === 0 ? (
+              <div className="text-white/40 py-12 text-center">{library.search ? "Nichts gefunden." : "Keine Bilder vorhanden."}</div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                {libraryItems.map((item) => (
+                {library.items.map((item) => (
                   <button
                     key={item.filename}
                     type="button"
@@ -669,6 +652,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
                 ))}
               </div>
             )}
+            <MediaLibraryMore library={library} testId={`${testId}-library`} />
           </div>
         </div>
       )}

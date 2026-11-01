@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, formatApiError, formatUploadError, uploadApi } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { prepareImageForUpload } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { UploadProgressPanel } from "@/components/tls/UploadProgressPanel";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { mediaPageFrom } from "@/hooks/useMediaLibrary";
 import { useUploadProgress } from "@/hooks/useUploadProgress";
 import { MEDIA_ACCEPT, ORIGINAL_MEDIA_EXTENSIONS, mediaTypeFromFile } from "@/lib/galleryMedia";
 import { logUploadClientFailure } from "@/lib/uploadDiagnostics";
@@ -27,8 +28,16 @@ const PROXY_UPLOAD_LIMIT_MB = parseUploadMb(import.meta.env.VITE_PROXY_UPLOAD_LI
 
 const VIDEO_MAX_BYTES = MAX_VIDEO_UPLOAD_MB * 1024 * 1024;
 
+const PAGE_SIZE = 60;
+const TYPE_PARAM = { images: "images", videos: "videos", files: "files" };
+const SEARCH_DELAY_MS = 300;
+
 export default function AdminMediaPage() {
   const [items, setItems] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [totalSize, setTotalSize] = useState(0);
+  const [page, setPage] = useState(0);
+  const [needle, setNeedle] = useState("");
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
   const [scopeFilter, setScopeFilter] = useState("all");
@@ -45,21 +54,39 @@ export default function AdminMediaPage() {
   const confirm = useConfirm();
   const uploadProgress = useUploadProgress();
 
+  // Suche und Filter rechnet der Server (#2122): auch die ältesten Dateien sind so erreichbar.
+  useEffect(() => {
+    const timer = setTimeout(() => setNeedle(q.trim()), SEARCH_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [q]);
+  useEffect(() => { setPage(0); }, [needle, filter, scopeFilter, includeUserUploads]);
+
+  const requestRef = useRef(0);
   const load = useCallback(async () => {
+    const request = ++requestRef.current;
     setLoading(true);
-    try {
-      const [mediaRes, auditRes] = await Promise.allSettled([
-        api.get(`/admin/media?include_user_uploads=${includeUserUploads ? "true" : "false"}&include_usage=true`),
-        api.get("/admin/media/audit"),
-      ]);
-      if (mediaRes.status === "fulfilled") setItems(mediaRes.value.data);
-      else toast.error(formatApiError(mediaRes.reason?.response?.data?.detail) || "Fehler beim Laden");
-      if (auditRes.status === "fulfilled") setMediaAudit(auditRes.value.data);
-    } catch (e) {
-      toast.error(formatApiError(e.response?.data?.detail) || "Fehler beim Laden");
+    const params = new URLSearchParams({
+      paged: "true", limit: String(PAGE_SIZE), offset: String(page * PAGE_SIZE),
+      include_user_uploads: includeUserUploads ? "true" : "false", include_usage: "true",
+    });
+    if (TYPE_PARAM[filter]) params.set("type", TYPE_PARAM[filter]);
+    if (scopeFilter !== "all") params.set("scope", scopeFilter);
+    if (needle) params.set("q", needle);
+    const [mediaRes, auditRes] = await Promise.allSettled([api.get(`/admin/media?${params.toString()}`), api.get("/admin/media/audit")]);
+    if (request !== requestRef.current) return;
+    if (mediaRes.status === "fulfilled") {
+      const result = mediaPageFrom(mediaRes.value.data);
+      setItems(result.items);
+      setTotal(result.total);
+      setTotalSize(result.totalSize ?? result.items.reduce((sum, it) => sum + (it.size || 0), 0));
+      // Die letzte Datei einer Seite gelöscht: zurück auf die letzte Seite, die es noch gibt.
+      if (!result.items.length && page > 0) setPage(Math.max(0, Math.ceil(result.total / PAGE_SIZE) - 1));
+    } else {
+      toast.error(formatApiError(mediaRes.reason?.response?.data?.detail) || "Fehler beim Laden");
     }
+    if (auditRes.status === "fulfilled") setMediaAudit(auditRes.value.data);
     setLoading(false);
-  }, [includeUserUploads]);
+  }, [includeUserUploads, filter, scopeFilter, needle, page]);
 
   const loadUploadEvents = useCallback(async () => {
     setLoadingUploadEvents(true);
@@ -78,25 +105,7 @@ export default function AdminMediaPage() {
   useApiInvalidation(load, ["admin/media", "media", "uploads"]);
   useApiInvalidation(loadUploadEvents, ["uploads"]);
 
-  const filtered = useMemo(() => {
-    return items.filter((it) => {
-      if (filter === "images" && !IMG_EXT.has(it.ext)) return false;
-      if (filter === "videos" && !VIDEO_EXT.has(it.ext)) return false;
-      if (filter === "files" && (IMG_EXT.has(it.ext) || VIDEO_EXT.has(it.ext))) return false;
-      if (scopeFilter === "unused" && !it.is_unused) return false;
-      else if (scopeFilter === "untracked" && it.tracked) return false;
-      else if (scopeFilter === "duplicate" && !(it.duplicate_count > 1)) return false;
-      else if (!["all", "unused", "untracked", "duplicate"].includes(scopeFilter) && it.media_scope !== scopeFilter) return false;
-      const search = `${it.filename || ""} ${it.original_filename || ""} ${(it.duplicate_filenames || []).join(" ")}`.toLowerCase();
-      if (q && !search.includes(q.toLowerCase())) return false;
-      return true;
-    });
-  }, [items, filter, scopeFilter, q]);
-
-  const totalSize = useMemo(
-    () => items.reduce((s, it) => s + (it.size || 0), 0),
-    [items],
-  );
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const qualityChecks = useMemo(() => {
     if (!mediaAudit) return [];
@@ -367,7 +376,7 @@ export default function AdminMediaPage() {
           <input type="file" accept={MEDIA_ACCEPT} multiple disabled={uploading} className="hidden" onChange={(e) => { uploadMediaFiles(e.target.files); e.target.value = ""; }} />
         </label>
         <span className="ml-auto text-xs text-white/45">
-          {filtered.length} / {items.length} · {fmtBytes(totalSize)} gesamt
+          {total} {total === 1 ? "Datei" : "Dateien"} · {fmtBytes(totalSize)}
         </span>
       </div>
       <UploadProgressPanel progress={uploadProgress.progress} className="mt-4" />
@@ -521,16 +530,16 @@ export default function AdminMediaPage() {
       <div className="mt-6">
         {loading ? (
           <div className="text-white/50 text-sm">Lade Medien…</div>
-        ) : filtered.length === 0 ? (
+        ) : items.length === 0 ? (
           <div className="border border-white/10 rounded-sm p-12 bg-[#121212] text-center text-white/40 text-sm">
-            Keine Dateien {q || filter !== "all" ? "gefunden" : "vorhanden"}.
+            Keine Dateien {q || filter !== "all" || scopeFilter !== "all" ? "gefunden" : "vorhanden"}.
           </div>
         ) : (
           <div
             className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3"
             data-testid="media-grid"
           >
-            {filtered.map((it) => {
+            {items.map((it) => {
               const isImg = IMG_EXT.has(it.ext);
               const isVideo = VIDEO_EXT.has(it.ext);
               const isOriginal = ORIGINAL_EXT.has(it.ext);
@@ -571,6 +580,13 @@ export default function AdminMediaPage() {
                 </div>
               );
             })}
+          </div>
+        )}
+        {pageCount > 1 && (
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-3" data-testid="media-pager">
+            <button type="button" onClick={() => setPage((value) => Math.max(0, value - 1))} disabled={page === 0 || loading} data-testid="media-page-prev" className="min-h-11 px-4 py-2 border border-white/10 hover:bg-white/5 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-40">Zurück</button>
+            <span className="text-xs tabular-nums text-white/60" data-testid="media-page-label">Seite {page + 1} von {pageCount}</span>
+            <button type="button" onClick={() => setPage((value) => Math.min(pageCount - 1, value + 1))} disabled={page >= pageCount - 1 || loading} data-testid="media-page-next" className="min-h-11 px-4 py-2 border border-white/10 hover:bg-white/5 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-40">Weiter</button>
           </div>
         )}
       </div>

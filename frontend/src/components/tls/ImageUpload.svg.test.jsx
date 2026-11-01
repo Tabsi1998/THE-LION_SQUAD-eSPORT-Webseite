@@ -74,10 +74,10 @@ test("ein gesetztes Logo steht zur Vorschau auf hellem und dunklem Grund", () =>
 });
 
 test("die Mediathek zeigt SVG nur in Logo-Feldern", async () => {
-  apiMock.get.mockResolvedValue({ data: [
-    { filename: "kiwi.svg", url: "/api/static/uploads/kiwi.svg" },
-    { filename: "foto.webp", url: "/api/static/uploads/foto.webp" },
-  ] });
+  // Der Server lässt SVG weg, wenn das Feld es sagt (#2122) - so bleiben die Seiten der Auswahl voll.
+  apiMock.get.mockImplementation(async (url) => ({ data: url.includes("exclude_svg=true")
+    ? { items: [{ filename: "foto.webp", url: "/api/static/uploads/foto.webp" }], total: 1 }
+    : { items: [{ filename: "kiwi.svg", url: "/api/static/uploads/kiwi.svg" }, { filename: "foto.webp", url: "/api/static/uploads/foto.webp" }], total: 2 } }));
   const { unmount } = render(<ImageUpload value="" onChange={vi.fn()} testId="avatar" allowLibrary />);
   await act(async () => fireEvent.click(screen.getByTestId("avatar-library")));
   await waitFor(() => expect(screen.getByTitle("foto.webp")).toBeInTheDocument());

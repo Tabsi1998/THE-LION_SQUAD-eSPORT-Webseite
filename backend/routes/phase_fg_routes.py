@@ -41,6 +41,12 @@ ADMIN_MEDIA_OWNER_ROLES = {"admin", "moderator", "tournament_admin", "club_admin
 # Wo eine Datei verwendet wird, weiß ``services.media_audit`` (#1471): dieselbe Liste wie Kontolöschung und
 # Bild-Migration, auch verschachtelte Felder, Adressen mit Zusatz und kleinere Fassungen.
 MAX_REFERENCES = 20
+# Eine Seite der Mediathek (#2122). Aufrufe ohne ``paged`` bekommen weiter eine Liste - eine noch offene ältere Seite, Skripte.
+MEDIA_PAGE_DEFAULT = 60
+MEDIA_PAGE_MAX = 200
+MEDIA_UNPAGED_LIMIT = 500
+MEDIA_SEARCH_MAX = 200
+USAGE_SCOPES = {"unused", "duplicate"}
 
 # ============= Media Browser =============
 media_router = APIRouter(prefix="/api/media", tags=["media"])
@@ -118,69 +124,84 @@ def _media_url(filename: str, meta: dict | None) -> str:
     return media_audit.versioned_url(url, version) if version else url
 
 
-async def _list_media_items(
+def _media_candidates(requested_type: str, exclude_svg: bool = False) -> list[tuple[Path, os.stat_result]]:
+    """Die Dateien der Mediathek auf der Platte, neueste zuerst."""
+    if not UPLOAD_DIR.exists():
+        return []
+    paths: list[Path] = []
+    for base in (PUBLIC_UPLOAD_DIR, UPLOAD_DIR):
+        if base.exists():
+            paths.extend([p for p in base.iterdir() if p.is_file()])
+    paths = [p for p in paths if not p.name.startswith(".") and p.suffix.lower() in PUBLIC_MEDIA_EXTS]
+    # Logos als SVG (#1952): die PNG-Fassung daneben gehört zum SVG und steht nicht als eigene Datei in der Mediathek.
+    svg_stems = {p.stem for p in paths if p.suffix.lower() == ".svg"}
+    paths = [p for p in paths if not (p.suffix.lower() == ".png" and p.stem in svg_stems)]
+    if exclude_svg:
+        paths = [p for p in paths if p.suffix.lower() != ".svg"]
+    if requested_type in {"image", "images"}:
+        paths = [p for p in paths if p.suffix.lower() in PUBLIC_IMAGE_EXTS]
+    elif requested_type in {"video", "videos"}:
+        paths = [p for p in paths if p.suffix.lower() in PUBLIC_VIDEO_EXTS]
+    elif requested_type in {"media", "all-media"}:
+        paths = [p for p in paths if p.suffix.lower() in (PUBLIC_IMAGE_EXTS | PUBLIC_VIDEO_EXTS)]
+    entries = []
+    for path in paths:
+        try:
+            entries.append((path, path.stat()))
+        except OSError:
+            continue  # in diesem Augenblick gelöscht
+    return sorted(entries, key=lambda entry: entry[1].st_mtime, reverse=True)
+
+
+def _duplicate_lookup(entries: list[tuple[Path, os.stat_result]], wanted: set[str]) -> dict[str, list[str]]:
+    """Dateiname → alle Dateien mit demselben Inhalt. Gerechnet wird nur, wo eine gewünschte Datei gleich groß ist wie
+    eine andere - die Prüfsumme einer großen Datei ist teuer."""
+    by_size: dict[int, list[Path]] = {}
+    for path, stat in entries:
+        by_size.setdefault(stat.st_size, []).append(path)
+    lookup: dict[str, list[str]] = {}
+    for same_size_paths in by_size.values():
+        if len(same_size_paths) < 2 or not wanted & {path.name for path in same_size_paths}:
+            continue
+        by_digest: dict[str, list[Path]] = {}
+        for path in same_size_paths:
+            try:
+                by_digest.setdefault(_file_digest(path), []).append(path)
+            except OSError:
+                continue
+        for same_content_paths in by_digest.values():
+            if len(same_content_paths) < 2:
+                continue
+            names = sorted({path.name for path in same_content_paths})
+            for name in names:
+                lookup[name] = names
+    return lookup
+
+
+async def _media_rows(
     owner_id: str | None = None,
     include_untracked: bool = True,
     exclude_user_scope: bool = False,
     user_scope_only: bool = False,
-    include_usage: bool = False,
     media_type_filter: str | None = None,
-) -> list[dict]:
-    if not UPLOAD_DIR.exists():
-        return []
-    candidates: list[Path] = []
-    for base in (PUBLIC_UPLOAD_DIR, UPLOAD_DIR):
-        if base.exists():
-            candidates.extend([p for p in base.iterdir() if p.is_file()])
-    candidates = [
-        p for p in candidates
-        if not p.name.startswith(".") and p.suffix.lower() in PUBLIC_MEDIA_EXTS
-    ]
-    # Logos als SVG (#1952): die PNG-Fassung daneben gehört zum SVG und steht nicht als eigene Datei in der Mediathek.
-    svg_stems = {p.stem for p in candidates if p.suffix.lower() == ".svg"}
-    candidates = [p for p in candidates if not (p.suffix.lower() == ".png" and p.stem in svg_stems)]
+    search: str = "",
+    exclude_svg: bool = False,
+) -> tuple[list[dict], list[tuple[Path, os.stat_result]]]:
+    """Alle Zeilen, die zur Anfrage passen, noch ohne Verwendung - die kostet und kommt nur für die gezeigte Seite dazu
+    (``_add_usage``). Dazu die Dateien, die Duplikat-Prüfung braucht."""
     requested_type = str(media_type_filter or "").strip().lower()
-    if requested_type in {"image", "images"}:
-        candidates = [p for p in candidates if p.suffix.lower() in PUBLIC_IMAGE_EXTS]
-    elif requested_type in {"video", "videos"}:
-        candidates = [p for p in candidates if p.suffix.lower() in PUBLIC_VIDEO_EXTS]
-    elif requested_type in {"media", "all-media"}:
-        candidates = [p for p in candidates if p.suffix.lower() in (PUBLIC_IMAGE_EXTS | PUBLIC_VIDEO_EXTS)]
-    duplicate_lookup: dict[str, list[str]] = {}
-    if include_usage:
-        by_size: dict[int, list[Path]] = {}
-        for path in candidates:
-            try:
-                by_size.setdefault(path.stat().st_size, []).append(path)
-            except OSError:
-                continue
-        for same_size_paths in by_size.values():
-            if len(same_size_paths) < 2:
-                continue
-            by_digest: dict[str, list[Path]] = {}
-            for path in same_size_paths:
-                try:
-                    by_digest.setdefault(_file_digest(path), []).append(path)
-                except OSError:
-                    continue
-            for same_content_paths in by_digest.values():
-                if len(same_content_paths) < 2:
-                    continue
-                names = sorted({path.name for path in same_content_paths})
-                for name in names:
-                    duplicate_lookup[name] = names
-    filenames = [p.name for p in candidates]
-    usage = await _collect_media_usage(set(filenames)) if include_usage else {}
+    entries = _media_candidates(requested_type, exclude_svg)
+    filenames = [path.name for path, _stat in entries]
     media_meta: dict[str, dict[str, Any]] = {}
     if filenames:
-        db = get_db()
         meta_query: dict[str, Any] = {"filename": {"$in": filenames}}
         if owner_id:
             meta_query["owner_id"] = owner_id
-        rows = await db.media_uploads.find(meta_query, {"_id": 0}).to_list(len(filenames))
+        rows = await get_db().media_uploads.find(meta_query, {"_id": 0}).to_list(len(filenames))
         media_meta = {row["filename"]: row for row in rows if row.get("filename")}
+    needle = search.strip().lower()
     items: list[dict] = []
-    for p in sorted(candidates, key=lambda p: p.stat().st_mtime, reverse=True):
+    for p, stat in entries:
         meta = media_meta.get(p.name)
         if owner_id and not meta:
             continue
@@ -194,8 +215,6 @@ async def _list_media_items(
             continue
         if exclude_user_scope and is_user_media:
             continue
-        stat = p.stat()
-        refs = usage.get(p.name) or []
         inferred_media_type = _media_type_from_ext(p.suffix.lower())
         media_type = (meta.get("media_type") if meta else None) or inferred_media_type
         if requested_type in {"image", "images"} and media_type != "image":
@@ -203,6 +222,11 @@ async def _list_media_items(
         if requested_type in {"video", "videos"} and media_type != "video":
             continue
         if requested_type in {"media", "all-media"} and media_type not in {"image", "video"}:
+            continue
+        if requested_type in {"file", "files"} and media_type != "file":
+            continue
+        original_filename = meta.get("original_filename") if meta else None
+        if needle and needle not in f"{p.name} {original_filename or ''}".lower():
             continue
         items.append({
             "filename": p.name,
@@ -218,38 +242,113 @@ async def _list_media_items(
             "owner_id": meta.get("owner_id") if meta else None,
             "owner_role": meta.get("owner_role") if meta else None,
             "media_scope": media_scope,
-            "original_filename": meta.get("original_filename") if meta else None,
+            "original_filename": original_filename,
             "original_url": meta.get("original_url") if meta else None,
             "original_mime": meta.get("original_mime") if meta else None,
             "original_file_size": meta.get("original_file_size") if meta else None,
             "derived_from_filename": meta.get("derived_from_filename") if meta else None,
             "created_at": meta.get("created_at") if meta else None,
             "tracked": bool(meta),
-            "usage_count": len(refs) if include_usage else None,
-            "references": refs[:6],
-            "is_unused": (len(refs) == 0) if include_usage else None,
-            "duplicate_count": len(duplicate_lookup.get(p.name) or []),
-            "duplicate_filenames": (duplicate_lookup.get(p.name) or [])[:8],
+            "usage_count": None,
+            "references": [],
+            "is_unused": None,
+            "duplicate_count": 0,
+            "duplicate_filenames": [],
         })
-    return items[:500]
+    return items, entries
+
+
+async def _add_usage(items: list[dict], entries: list[tuple[Path, os.stat_result]]) -> None:
+    """Wo die Dateien verwendet werden und welche Duplikate sie haben - nur für diese Zeilen."""
+    names = {item["filename"] for item in items}
+    usage = await _collect_media_usage(names)
+    duplicates = _duplicate_lookup(entries, names)
+    for item in items:
+        refs = usage.get(item["filename"]) or []
+        same = duplicates.get(item["filename"]) or []
+        item.update({
+            "usage_count": len(refs),
+            "references": refs[:6],
+            "is_unused": len(refs) == 0,
+            "duplicate_count": len(same),
+            "duplicate_filenames": same[:8],
+        })
+
+
+async def _list_media_items(*, limit: int | None = MEDIA_UNPAGED_LIMIT, include_usage: bool = False, **query) -> list[dict]:
+    """Die Zeilen als Liste - für die Prüfung alle (``limit=None``), für Aufrufe ohne ``paged`` höchstens ``limit``."""
+    items, entries = await _media_rows(**query)
+    items = items if limit is None else items[:limit]
+    if include_usage:
+        await _add_usage(items, entries)
+    return items
+
+
+def _scope_matches(item: dict, scope: str) -> bool:
+    if scope in ("", "all"):
+        return True
+    if scope == "unused":
+        return bool(item.get("is_unused"))
+    if scope == "duplicate":
+        return (item.get("duplicate_count") or 0) > 1
+    if scope == "untracked":
+        return not item.get("tracked")
+    return item.get("media_scope") == scope
+
+
+async def _media_page(limit: int, offset: int, scope: str = "", include_usage: bool = False, **query) -> dict:
+    """Eine Seite der Mediathek (#2122): Suche und Filter rechnet der Server über alle Dateien, nicht nur die ersten 500.
+    Die Verwendung kommt nur für die gezeigte Seite dazu - außer der Filter hängt an ihr („ungenutzt“, „Duplikate“)."""
+    items, entries = await _media_rows(**query)
+    needs_usage_first = scope in USAGE_SCOPES
+    if needs_usage_first:
+        await _add_usage(items, entries)
+    items = [item for item in items if _scope_matches(item, scope)]
+    safe_limit = max(1, min(int(limit or MEDIA_PAGE_DEFAULT), MEDIA_PAGE_MAX))
+    safe_offset = max(0, int(offset or 0))
+    window = items[safe_offset:safe_offset + safe_limit]
+    if include_usage and not needs_usage_first:
+        await _add_usage(window, entries)
+    return {
+        "items": window,
+        "total": len(items),
+        "total_size": sum(int(item.get("size") or 0) for item in items),
+        "limit": safe_limit,
+        "offset": safe_offset,
+    }
 
 
 @media_router.get("")
-async def list_media(type: str = "", me: dict = Depends(get_current_user)):
+async def list_media(
+    type: str = "", q: str = "", paged: bool = False, limit: int = MEDIA_PAGE_DEFAULT, offset: int = 0,
+    exclude_svg: bool = False, me: dict = Depends(get_current_user),
+):
     """List uploaded media visible in the current user's media picker."""
-    return await _list_media_items(owner_id=me["id"], include_untracked=False, user_scope_only=True, media_type_filter=type)
+    query = {"owner_id": me["id"], "include_untracked": False, "user_scope_only": True, "media_type_filter": type,
+             "search": q[:MEDIA_SEARCH_MAX], "exclude_svg": exclude_svg}
+    if paged:
+        return await _media_page(limit, offset, **query)
+    return await _list_media_items(**query)
 
 
 @admin_media_router.get("")
-async def admin_list_media(include_user_uploads: bool = False, include_usage: bool = False, type: str = "", me: dict = Depends(require_area("content"))):
+async def admin_list_media(
+    include_user_uploads: bool = False, include_usage: bool = False, type: str = "", q: str = "", scope: str = "",
+    paged: bool = False, limit: int = MEDIA_PAGE_DEFAULT, offset: int = 0, exclude_svg: bool = False,
+    me: dict = Depends(require_area("content")),
+):
     """List CMS/admin files in the upload directory with metadata."""
-    return await _list_media_items(exclude_user_scope=not include_user_uploads, include_usage=include_usage, media_type_filter=type)
+    query = {"exclude_user_scope": not include_user_uploads, "media_type_filter": type, "search": q[:MEDIA_SEARCH_MAX],
+             "exclude_svg": exclude_svg}
+    if paged:
+        return await _media_page(limit, offset, scope=scope, include_usage=include_usage, **query)
+    return await _list_media_items(include_usage=include_usage, **query)
 
 
 @admin_media_router.get("/audit")
 async def admin_media_audit(me: dict = Depends(require_area("content"))):
     """Return media-library health information for the admin media dashboard."""
-    items = await _list_media_items(exclude_user_scope=False, include_usage=True)
+    items = await _list_media_items(limit=None, exclude_user_scope=False, include_usage=True)
     db = get_db()
     by_scope: dict[str, int] = {}
     total_size = 0
