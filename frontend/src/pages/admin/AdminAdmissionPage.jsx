@@ -3,6 +3,10 @@ import { CheckCircle2, Info, ScanLine, Undo2, XCircle } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { QrScanner } from "@/components/tls/QrScanner";
+import { useLiveRefresh } from "@/hooks/useLiveRefresh";
+
+const REFRESH_MS = 10000;
+const ADMISSION_RESOURCES = ["admission"];
 
 // Einlass bei der Generalversammlung (#845): Mitgliedskarte scannen oder Mitgliedsnummer eintippen. Groß steht, was
 // passiert ist; darüber die Zahlen zur Beschlussfähigkeit; darunter die letzten Einlässe mit Rücknahme (nur mit Grund).
@@ -48,13 +52,16 @@ export default function AdminAdmissionPage() {
       setView(data);
       setMeetingId((current) => current ?? data.meetings?.[0]?.id ?? null);
     } catch (err) {
-      setView({ ready: false, text: formatApiError(err.response?.data?.detail) || "Der Einlass ist gerade nicht erreichbar.", meetings: [] });
+      // Scheitert nur ein Nachladen, bleibt der letzte Stand stehen - an der Tür verschwindet nicht plötzlich die Liste.
+      setView((current) => (current?.ready ? current : { ready: false, text: formatApiError(err.response?.data?.detail) || "Der Einlass ist gerade nicht erreichbar.", meetings: [] }));
     }
   }, []);
 
   useEffect(() => {
     load();
   }, [load]);
+  // Mehrere Geräte am Eingang (#2127, EV18): die Beschlussfähigkeit stimmt auch hier - wie in der App alle 10 Sekunden.
+  useLiveRefresh(load, ADMISSION_RESOURCES, { pollMs: REFRESH_MS });
 
   const meeting = (view?.meetings || []).find((item) => item.id === meetingId) || null;
 
