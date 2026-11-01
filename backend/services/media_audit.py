@@ -119,6 +119,12 @@ PLACE_LABELS = {
     ("settings", "club_photo.url"): "Über uns · Vereinsfoto",
     ("settings", "timeline.image_url"): "Über uns · Bild in der Chronik",
 }
+# Wo neben der Adresse auch die Maße stehen: gedreht tauschen sie mit (#2122).
+SIZE_FIELDS = {
+    ("gallery_photos", "image_url"): ("width", "height"),
+    ("stickers", "url"): ("width", "height"),
+    "sticker.url": ("sticker.width", "sticker.height"),
+}
 # Bis zu so vielen Dateien sucht die Verwendungssuche gezielt nach den Namen, darüber liest sie alle Adressen einmal.
 BATCH = 100
 VARIANT_NAME = re.compile(r"^(?P<stem>.+)-(?P<width>\d{3,4})\.webp$")
@@ -171,7 +177,7 @@ def _upload_path(value: str) -> str | None:
 
 
 def _filename_from_upload_path(path: str) -> str | None:
-    filename = pathlib.PurePosixPath(path).name
+    filename = pathlib.PurePosixPath(path.split("#", 1)[0].split("?", 1)[0]).name
     if not filename or filename.startswith(".") or "/" in filename or "\\" in filename:
         return None
     if pathlib.Path(filename).suffix.lower() not in PUBLIC_MEDIA_EXTS:
@@ -302,6 +308,48 @@ async def rewrite_field(collection, row_id, path: str, change, extra: dict | Non
         return False
     await collection.update_one({"_id": row_id}, {"$set": {top: value, **(extra or {})}})
     return True
+
+
+def versioned_url(url: str, version: int) -> str:
+    """Die Adresse mit ``?v=``: bleibt die Datei dieselbe, ändert sich der Inhalt, holt jeder Browser sie neu."""
+    base, _, fragment = str(url).partition("#")
+    path, _, query = base.partition("?")
+    kept = [part for part in query.split("&") if part and not part.startswith("v=")]
+    return f"{path}?{'&'.join([*kept, f'v={version}'])}" + (f"#{fragment}" if fragment else "")
+
+
+async def _rewrite_usages(db, filename: str, change, stamp: dict | None) -> list[tuple]:
+    """Jede Verwendung der Datei mit ``change(adresse)`` umschreiben, auch Adressen in Texten. Liefert die Treffer."""
+    candidates = {pathlib.PurePosixPath(filename).stem: filename}
+
+    def in_field(value):
+        return change(value) if canonical_name(value, candidates) == filename else value
+
+    def in_text(text):
+        if not isinstance(text, str):
+            return text
+        return uploads_inventory.URL_IN_TEXT_RE.sub(lambda match: in_field(match.group(0)), text)
+
+    hits = [hit async for hit in iter_usages(db, {filename})]
+    for collection, doc, field, _name, text in hits:
+        await rewrite_field(getattr(db, collection), doc["_id"], field, in_text if text else in_field, stamp_for(collection, stamp))
+    return hits
+
+
+async def stamp_version(db, filename: str, version: int, size: tuple[int, int], stamp: dict | None = None) -> int:
+    """Nach dem Drehen (#2122): Jede Stelle, die das Bild zeigt, bekommt die neue Version an die Adresse und dort, wo die
+    Maße mitstehen, die neuen Maße. Liefert, wie viele Stellen es sind."""
+    hits = await _rewrite_usages(db, filename, lambda url: versioned_url(url, version), stamp)
+    for collection, doc, field, _name, _text in hits:
+        keys = SIZE_FIELDS.get(field if field == "sticker.url" else (collection, field))
+        if keys:
+            await getattr(db, collection).update_one({"_id": doc["_id"]}, {"$set": dict(zip(keys, size))})
+    return len(hits)
+
+
+async def repoint_usages(db, filename: str, target_url: str, stamp: dict | None = None) -> int:
+    """Jede Stelle, die ``filename`` zeigt, zeigt danach auf ``target_url`` (Duplikat ersetzen, #2122)."""
+    return len(await _rewrite_usages(db, filename, lambda _url: target_url, stamp))
 
 
 async def audit_image_references(repair: bool = False, clear_missing: bool = False) -> dict:

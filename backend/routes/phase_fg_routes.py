@@ -11,6 +11,7 @@ Endpoints:
   GET    /sitemap.xml                           — search-engine sitemap
   GET    /robots.txt                            — search-engine robots
 """
+import asyncio
 import copy
 import hashlib
 import logging
@@ -29,7 +30,7 @@ from pydantic import BaseModel
 from database import get_db
 from auth import get_current_user, require_area
 from models import new_id, now_utc
-from services import account_erasure, media_audit, reference_originals
+from services import account_erasure, image_variants, media_audit, reference_originals
 from services.media_formats import PUBLIC_IMAGE_EXTS, PUBLIC_MEDIA_EXTS, PUBLIC_ORIGINAL_EXTS, PUBLIC_VIDEO_EXTS
 
 logger = logging.getLogger(__name__)
@@ -108,6 +109,13 @@ async def _collect_media_usage(filenames: set[str]) -> dict[str, list[dict[str, 
             ref["text_reference"] = True
         usage[name].append(ref)
     return usage
+
+
+def _media_url(filename: str, meta: dict | None) -> str:
+    """Die Adresse einer Datei - ein gedrehtes Bild mit seiner Version, damit es auch frisch gewählt gedreht erscheint."""
+    url = f"/api/static/uploads/{filename}"
+    version = (meta or {}).get("version")
+    return media_audit.versioned_url(url, version) if version else url
 
 
 async def _list_media_items(
@@ -198,7 +206,7 @@ async def _list_media_items(
             continue
         items.append({
             "filename": p.name,
-            "url": f"/api/static/uploads/{p.name}",
+            "url": _media_url(p.name, meta),
             "size": stat.st_size,
             "mtime": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
             "ext": p.suffix.lower().lstrip("."),
@@ -325,9 +333,45 @@ def _media_file_path(filename: str) -> Path:
     raise HTTPException(404, "Datei nicht gefunden.")
 
 
+def _rotate_file(path: Path, degrees: int) -> tuple[int, int]:
+    """Dreht die Datei an Ort und Stelle und baut die kleineren Fassungen neu (#2122) - sonst zeigt jedes ``srcset`` weiter
+    das alte Bild. Liefert die neuen Maße. Die Datei wird erst ersetzt, wenn das Speichern geklappt hat."""
+    ext = path.suffix.lower()
+    with Image.open(path) as source:
+        if getattr(source, "is_animated", False):
+            # Ein animierter Sticker wäre danach ein Standbild.
+            raise HTTPException(400, "Animierte Bilder lassen sich hier nicht drehen.")
+        rotated = ImageOps.exif_transpose(source).rotate(-degrees, expand=True)
+    save_kwargs: dict[str, Any] = {}
+    if ext in {".jpg", ".jpeg"}:
+        rotated = rotated.convert("RGB")
+        image_format = "JPEG"
+        save_kwargs = {"quality": 88, "optimize": True}
+    elif ext == ".png":
+        rotated = rotated.convert("RGBA" if rotated.mode in ("RGBA", "LA", "P") else "RGB")
+        image_format = "PNG"
+        save_kwargs = {"optimize": True}
+    else:
+        if rotated.mode not in ("RGB", "RGBA"):
+            rotated = rotated.convert("RGBA" if "A" in rotated.getbands() else "RGB")
+        image_format = "WEBP"
+        save_kwargs = {"quality": 88, "method": 6}
+    temporary = path.with_name(f".{path.stem}-gedreht{path.suffix}")
+    try:
+        rotated.save(temporary, format=image_format, **save_kwargs)
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+    for width in image_variants.VARIANT_WIDTHS:
+        image_variants.variant_path(path, width).unlink(missing_ok=True)
+    image_variants.build_all_variants(path)
+    return rotated.size
+
+
 @admin_media_router.post("/{filename}/rotate")
 async def admin_rotate_media(filename: str, body: RotateMediaBody, me: dict = Depends(require_area("content"))):
-    """Rotate an uploaded public image in place."""
+    """Dreht ein Bild an Ort und Stelle. Der Name bleibt - ein Link aus Newsletter oder Discord funktioniert weiter -, jede
+    Stelle, die das Bild zeigt, bekommt die Version an die Adresse (#2122) und zeigt es sofort gedreht."""
     p = _media_file_path(filename)
     ext = p.suffix.lower()
     if ext not in {".png", ".jpg", ".jpeg", ".webp"}:
@@ -337,41 +381,37 @@ async def admin_rotate_media(filename: str, body: RotateMediaBody, me: dict = De
         stat = p.stat()
         return {"ok": True, "filename": filename, "url": f"/api/static/uploads/{filename}", "size": stat.st_size}
     try:
-        with Image.open(p) as source:
-            img = ImageOps.exif_transpose(source)
-            rotated = img.rotate(-degrees, expand=True)
-        save_kwargs: dict[str, Any] = {}
-        if ext in {".jpg", ".jpeg"}:
-            rotated = rotated.convert("RGB")
-            image_format = "JPEG"
-            save_kwargs = {"quality": 88, "optimize": True}
-        elif ext == ".png":
-            rotated = rotated.convert("RGBA" if rotated.mode in ("RGBA", "LA", "P") else "RGB")
-            image_format = "PNG"
-            save_kwargs = {"optimize": True}
-        else:
-            if rotated.mode not in ("RGB", "RGBA"):
-                rotated = rotated.convert("RGBA" if "A" in rotated.getbands() else "RGB")
-            image_format = "WEBP"
-            save_kwargs = {"quality": 88, "method": 6}
-        rotated.save(p, format=image_format, **save_kwargs)
+        width, height = await asyncio.to_thread(_rotate_file, p, degrees)
     except UnidentifiedImageError:
         raise HTTPException(400, "Ungültige Bilddatei.")
     except OSError:
         logger.warning("media rotate failed", exc_info=True)
         raise HTTPException(500, "Drehen fehlgeschlagen.")
 
+    db = get_db()
     stat = p.stat()
-    updated_at = now_utc().isoformat()
-    await get_db().media_uploads.update_many(
+    now = now_utc()
+    updated_at = now.isoformat()
+    version = int(now.timestamp())
+    await db.media_uploads.update_many(
         {"filename": filename},
-        {"$set": {"size": stat.st_size, "updated_at": updated_at}},
+        {"$set": {"size": stat.st_size, "width": width, "height": height, "version": version, "updated_at": updated_at}},
     )
+    references = await media_audit.stamp_version(db, filename, version, (width, height), {"updated_at": updated_at})
+    await db.audit_logs.insert_one({
+        "id": new_id(), "action": "media.rotate", "actor_id": me.get("id"), "target_id": filename,
+        "data": {"filename": filename, "degrees": degrees, "references": references},
+        "created_at": updated_at,
+    })
     return {
         "ok": True,
         "filename": filename,
-        "url": f"/api/static/uploads/{filename}",
+        "url": media_audit.versioned_url(f"/api/static/uploads/{filename}", version),
         "size": stat.st_size,
+        "width": width,
+        "height": height,
+        "version": version,
+        "references": references,
         "updated_at": updated_at,
     }
 

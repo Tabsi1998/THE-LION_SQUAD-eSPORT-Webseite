@@ -61,6 +61,12 @@ export function MediaDetailSheet({ item, onClose, onCopy, onRotateLeft, onRotate
           <div className="uppercase text-[10px] text-white/40 tracking-widest">Geändert</div>
           <div className="text-white/80">{viennaDateTime(item.mtime)}</div>
         </div>
+        {item.width && item.height ? (
+          <div>
+            <div className="uppercase text-[10px] text-white/40 tracking-widest">Maße</div>
+            <div className="text-white/80" data-testid="media-sheet-dimensions">{item.width} × {item.height} px</div>
+          </div>
+        ) : null}
         <div>
           <div className="uppercase text-[10px] text-white/40 tracking-widest">Scope</div>
           <div className="text-white/80">{MEDIA_SCOPE_LABELS[item.media_scope] || item.media_scope || "Legacy"}</div>

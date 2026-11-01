@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from auth import get_current_user, require_area
 from database import get_db
 from models import new_id, now_utc
+from services.media_formats import bare_upload_url
 from services.stickers import (
     CUSTOM_STICKER_URL,
     MAX_CUSTOM_PACKS,
@@ -161,7 +162,7 @@ async def create_sticker(pack_id: str, body: StickerCreate, _me: dict = Depends(
         raise HTTPException(status_code=400, detail="Sticker-Bilder bitte hier hochladen oder aus der Mediathek wählen.")
     if await db.stickers.count_documents({"pack_id": pack_id}) >= MAX_STICKERS_PER_PACK:
         raise HTTPException(status_code=400, detail=f"Höchstens {MAX_STICKERS_PER_PACK} Sticker pro Paket.")
-    upload = await db.media_uploads.find_one({"url": url}, {"_id": 0, "width": 1, "height": 1}) or {}
+    upload = await db.media_uploads.find_one({"url": bare_upload_url(url)}, {"_id": 0, "width": 1, "height": 1}) or {}
     now = now_utc().isoformat()
     doc = {
         "id": new_id(),

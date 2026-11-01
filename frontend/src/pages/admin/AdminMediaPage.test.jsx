@@ -71,6 +71,24 @@ test("eine verwendete Datei wird nur nach Warnung gelöscht, eine unbenutzte ohn
   expect(confirmMock.mock.calls.at(-1)[0].title).toBe("Datei endgültig löschen?");
 });
 
+test("Drehen fragt nach, nennt die Stellen und übernimmt Adresse und Maße (#2122)", async () => {
+  apiMock.post.mockReset();
+  apiMock.post.mockResolvedValue({ data: { url: "/api/static/uploads/loewe.png?v=7", size: 999, width: 500, height: 1000, updated_at: "2026-10-01T10:00:00Z" } });
+  render(<MemoryRouter><AdminMediaPage /></MemoryRouter>);
+  fireEvent.click(await screen.findByTestId("media-tile-loewe.png"));
+
+  confirmMock.mockResolvedValueOnce(false);
+  fireEvent.click(screen.getByTestId("media-rotate-right"));
+  await waitFor(() => expect(confirmMock.mock.calls.at(-1)[0].title).toBe("Bild nach rechts drehen?"));
+  expect(confirmMock.mock.calls.at(-1)[0].description).toContain("an 2 Stellen");
+  expect(apiMock.post).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByTestId("media-rotate-left"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/media/loewe.png/rotate", { degrees: -90 }));
+  expect(await screen.findByTestId("media-sheet-dimensions")).toHaveTextContent("500 × 1000 px");
+  expect(screen.getByTestId("media-sheet")).toHaveTextContent("loewe.png?v=7");
+});
+
 test("Original-Bilder der Serien (#1933) zählt die Mediathek mit - privat, ohne Kachel", async () => {
   apiMock.get.mockImplementation(async (url) => {
     if (url.startsWith("/admin/media?")) return { data: [ITEM] };

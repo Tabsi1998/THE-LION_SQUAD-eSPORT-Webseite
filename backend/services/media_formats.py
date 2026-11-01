@@ -99,3 +99,12 @@ PUBLIC_MEDIA_TYPES = {
 VIDEO_MEDIA_EXTS = PUBLIC_VIDEO_EXTS
 
 ORIGINAL_MEDIA_LABEL = "RAW/HEIC/TIFF/GIF/AVIF/BMP, XMP oder Kamera-/Video-Originale wie AVI/MKV/MTS"
+
+# Ein gedrehtes Bild behält seinen Namen - Links in Newslettern und Discord bleiben gültig - und bekommt eine Version an
+# der Adresse, damit Browser nicht 30 Tage das alte zeigen (#2122). Die Prüfungen der Bildfelder lassen sie zu.
+UPLOAD_URL_VERSION = r"(?:\?v=\d+)?"
+
+
+def bare_upload_url(url) -> str:
+    """Die Adresse ohne Version und Zusatz - so steht sie in ``media_uploads``."""
+    return str(url or "").split("#", 1)[0].split("?", 1)[0]

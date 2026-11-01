@@ -48,7 +48,9 @@ export const fmtBytes = (n) => {
   return `${(n / 1024 / 1024).toFixed(2)} MB`;
 };
 
+// Ein gedrehtes Bild bringt seine Version schon an der Adresse mit (#2122).
 export const cacheBustedMediaUrl = (url, item) => {
+  if (String(url).includes("?")) return url;
   const stamp = encodeURIComponent(item?.mtime || item?.updated_at || item?.size || "");
   return stamp ? `${url}?v=${stamp}` : url;
 };

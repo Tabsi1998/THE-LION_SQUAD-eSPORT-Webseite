@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field, field_validator
 from pymongo.errors import DuplicateKeyError
 
 from models import GAME_MODES_MAX, now_utc
+from services.media_formats import UPLOAD_URL_VERSION
 from services.slug_utils import slugify
 
 # Grenze gegen unkontrollierte Datenmengen - keine feste Kartenzahl eines Spiels.
@@ -28,7 +29,7 @@ MAPS_PER_GAME_MAX = 200
 NAME_MAX = 80
 SLUG_MAX = 80
 # Bilder nur aus dem eigenen Upload: eine fremde Adresse ließe jede Person beim Ansehen bei Dritten anfragen.
-IMAGE_URL = re.compile(r"/api/static/uploads/[A-Za-z0-9][A-Za-z0-9_.-]{0,150}\.(png|webp|jpg|jpeg)")
+IMAGE_URL = re.compile(r"/api/static/uploads/[A-Za-z0-9][A-Za-z0-9_.-]{0,150}\.(png|webp|jpg|jpeg)" + UPLOAD_URL_VERSION)
 IMAGE_REFUSED = "Bild bitte über „Hochladen“ oder die Mediathek wählen (PNG, JPG oder WebP)."
 STATUSES = ("active", "archived")
 SLUG_TAKEN = "Der Slug „{slug}“ ist in diesem Spiel schon vergeben."

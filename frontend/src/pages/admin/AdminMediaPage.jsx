@@ -186,12 +186,25 @@ export default function AdminMediaPage() {
     }
   };
 
+  // Drehen (#2122) ändert das Bild überall, wo es steht - darum die Rückfrage mit der Zahl der Stellen.
   const rotateImage = async (it, degrees) => {
+    const used = it.usage_count || 0;
+    if (!await confirm({
+      title: `Bild nach ${degrees < 0 ? "links" : "rechts"} drehen?`,
+      description: used
+        ? `Das Bild erscheint danach überall gedreht – es wird an ${used} ${used === 1 ? "Stelle" : "Stellen"} verwendet.`
+        : "Das Bild wird in der Datei selbst gedreht. Es wird derzeit nirgends verwendet.",
+      confirmLabel: "Drehen",
+      tone: "info",
+    })) return;
     try {
       const { data } = await api.post(`/admin/media/${encodeURIComponent(it.filename)}/rotate`, { degrees });
       const updated = {
         ...it,
+        url: data?.url || it.url,
         size: data?.size ?? it.size,
+        width: data?.width ?? it.width,
+        height: data?.height ?? it.height,
         mtime: data?.updated_at || new Date().toISOString(),
       };
       setSelected(updated);
