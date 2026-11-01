@@ -11,7 +11,9 @@ const { EventRegistrationEdit } = await import("./EventRegistrationEdit");
 
 const EVENT = { id: "e-1", allow_companions: true, max_companions_per_registration: 3 };
 
-beforeEach(() => apiMock.patch.mockReset());
+beforeEach(() => {
+  apiMock.patch.mockReset();
+});
 
 test("ohne `can_edit` kein Link", () => {
   const { container } = render(<EventRegistrationEdit event={EVENT} own={{ status: "registered", can_edit: false }} />);
