@@ -395,6 +395,19 @@ async def migrate_tournament_point_duplicates(db) -> str:
     return await season_points_cleanup.apply(db)
 
 
+async def migrate_user_socials_to_profile(db) -> str:
+    """Altdaten ``user_socials`` in die Profilfelder (#2113, L-A12) - Regeln in ``services/user_socials_migration.py``."""
+    from services import user_socials_migration
+
+    async def keep_lease() -> bool:
+        return await extend_migration_lease(db)
+
+    try:
+        return await user_socials_migration.migrate(db, keep_lease)
+    except RuntimeError as exc:
+        raise MigrationIncomplete(str(exc)) from exc
+
+
 MIGRATIONS = (
     (1, "encrypt_legacy_integration_credentials", migrate_plaintext_secrets),
     (2, "team_leader_role_to_player", migrate_team_leader_role),
@@ -423,6 +436,8 @@ MIGRATIONS = (
     # #2123: doppelte Jahrespunkte je Turnier entfernen (services/season_points_cleanup.py, Trockenlauf
     # backend/scripts/season_points_duplicates.py).
     (18, "season_points_tournament_duplicates", migrate_tournament_point_duplicates),
+    # #2113: alte Einträge aus user_socials ziehen in die Profilfelder um (services/user_socials_migration.py).
+    (19, "user_socials_to_profile_fields", migrate_user_socials_to_profile),
 )
 
 

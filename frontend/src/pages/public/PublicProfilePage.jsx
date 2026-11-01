@@ -296,19 +296,6 @@ export function accountGroups(profile) {
     .filter(Boolean);
   const socials = build(SOCIAL_PLATFORMS);
   const games = build(GAME_PLATFORMS);
-  // Weitere Socials (eigene Einträge unter Mein Profil → Socials) - ohne Doppelung zu den festen Feldern.
-  const seen = new Set([...socials, ...games].map((entry) => `${entry.key}:${String(entry.url || entry.value).toLowerCase()}`));
-  for (const social of profile.socials || []) {
-    const platform = String(social.platform || "").toLowerCase();
-    const value = social.value || social.url;
-    if (!value || linked.has(platform)) continue;
-    const meta = socialMeta({ platform, label: social.platform });
-    const url = social.url || socialUrl(platform, social.value) || (/^https?:\/\//i.test(String(social.value || "")) ? externalUrl(social.value) : "");
-    const dedupe = `${meta.key}:${String(url || value).toLowerCase()}`;
-    if (seen.has(dedupe)) continue;
-    seen.add(dedupe);
-    socials.push({ platform, key: meta.key, label: meta.label, color: meta.color, title: cleanHandle(value) || value, detail: meta.label, value, url, verified: false, since: "" });
-  }
   // Bestätigte Konten neuer Plattformen, die noch keine feste Gruppe haben, stehen bei den Socials.
   for (const [platform, entry] of linked) {
     if (!SOCIAL_PLATFORMS.includes(platform) && !GAME_PLATFORMS.includes(platform)) socials.push(entry);

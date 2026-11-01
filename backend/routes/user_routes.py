@@ -31,7 +31,7 @@ from services.private_fields import private_projection, strip_private
 from services.profile_fields import USER_NULLABLE_FIELDS
 from models import (
     AreasUpdate,
-    AdminProfileReset, AdminUserCreate, UserUpdate, RoleUpdate, UserSocialCreate, UserSocialUpdate,
+    AdminProfileReset, AdminUserCreate, UserUpdate, RoleUpdate,
     now_utc, new_id,
 )
 
@@ -669,11 +669,6 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
         from services.friend_service import relationship_status
         base["relationship"] = await relationship_status(db, viewer.get("id"), u["id"])
         base["can_message"] = viewer.get("id") != u["id"]
-    # Public socials (separately stored UserSocial entries with visibility=public)
-    socials = await db.user_socials.find(
-        {"user_id": u["id"], "visibility": "public"},
-        {"_id": 0, "platform": 1, "value": 1, "url": 1},
-    ).to_list(50)
     # Achievements v4 (group-aware) — flat list of awarded tiers
     user_id = u["id"]
     # „Erfolge öffentlich“ aus (#619, #2118): Fremde sehen keine Erfolge und keine Zahl - die Person selbst und das
@@ -828,7 +823,6 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
         "references": references,
         "awards": awards,
         "featured_award": next((award for award in awards if award["id"] == u.get("featured_award_id")), None),
-        "socials": socials,
     }
 
 
@@ -937,52 +931,6 @@ async def get_my_notification_preferences(me: dict = Depends(get_current_user)):
     from services.discord_dm import dm_state
     payload["discord"] = await dm_state(db, user)
     return payload
-
-
-# ---------- User socials ----------
-@router.get("/me/socials")
-async def list_my_socials(me: dict = Depends(get_current_user)):
-    db = get_db()
-    rows = await db.user_socials.find({"user_id": me["id"]}, {"_id": 0}).to_list(50)
-    return rows
-
-
-@router.post("/me/socials")
-async def add_my_social(body: UserSocialCreate, me: dict = Depends(get_current_user)):
-    db = get_db()
-    existing = await db.user_socials.find_one({"user_id": me["id"], "platform": body.platform})
-    if existing:
-        raise HTTPException(409, "Plattform bereits verknüpft.")
-    doc = {
-        "id": new_id(), "user_id": me["id"],
-        **body.model_dump(),
-        "created_at": now_utc().isoformat(),
-        "updated_at": now_utc().isoformat(),
-    }
-    await db.user_socials.insert_one(doc)
-    doc.pop("_id", None)
-    return doc
-
-
-@router.put("/me/socials/{social_id}")
-@router.patch("/me/socials/{social_id}")
-async def update_my_social(social_id: str, body: UserSocialUpdate, me: dict = Depends(get_current_user)):
-    db = get_db()
-    update = body.model_dump(exclude_unset=True)
-    update["updated_at"] = now_utc().isoformat()
-    res = await db.user_socials.update_one({"id": social_id, "user_id": me["id"]}, {"$set": update})
-    if res.matched_count == 0:
-        raise HTTPException(404, "Eintrag nicht gefunden.")
-    return await db.user_socials.find_one({"id": social_id}, {"_id": 0})
-
-
-@router.delete("/me/socials/{social_id}")
-async def delete_my_social(social_id: str, me: dict = Depends(get_current_user)):
-    db = get_db()
-    res = await db.user_socials.delete_one({"id": social_id, "user_id": me["id"]})
-    if res.deleted_count == 0:
-        raise HTTPException(404, "Eintrag nicht gefunden.")
-    return {"ok": True}
 
 
 @router.put("/{user_id}")

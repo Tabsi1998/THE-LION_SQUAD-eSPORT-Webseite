@@ -238,29 +238,6 @@ class MemberBenefitUpdate(BaseModel):
     order_index: Optional[int] = None
 
 
-# ---------- User Socials (separate table for fine-grained visibility) ----------
-SocialPlatform = Literal[
-    "discord", "twitch", "youtube", "tiktok", "instagram", "x", "steam",
-    "epic", "psn", "xbox", "nintendo", "ea", "riot", "battlenet", "website",
-    "faceit", "startgg", "roblox", "osu", "lichess", "github", "kick", "reddit", "spotify",
-    "threads", "facebook", "linkedin", "snapchat", "pinterest", "telegram", "wargaming", "bungie",
-    "mastodon", "bluesky"
-]
-
-
-class UserSocialCreate(BaseModel):
-    platform: SocialPlatform
-    value: str
-    url: Optional[str] = None
-    visibility: VisibilityLevel = "public"
-
-
-class UserSocialUpdate(BaseModel):
-    value: Optional[str] = None
-    url: Optional[str] = None
-    visibility: Optional[VisibilityLevel] = None
-
-
 class ForgotPasswordBody(BaseModel):
     email: EmailStr
     # Spamschutz (#2067): nur von der Website; die App ruft dieselbe Adresse ohne beides auf.
