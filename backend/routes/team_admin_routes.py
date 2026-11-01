@@ -1,6 +1,7 @@
 """Teamverwaltung im Admin (#2128, TM7, TM8, TM10): alle Teams mit Suche, aufgelöste Teams, „Alle Beitrittscodes erneuern“.
 
 - ``GET  /api/admin/teams``                      aktive oder aufgelöste Teams - Turnierleitung und Vereinsverwaltung
+- ``POST /api/admin/teams/join-codes/renew``     alle Beitrittscodes neu - Club-Admin und Superadmin, mit Rückfrage und Protokoll
 
 Verwaltet wird ein einzelnes Team auf seiner Teamseite; die Liste führt dorthin. In keiner Antwort und keinem Protokoll
 steht ein Beitrittscode: die Teamleitung findet den neuen auf der Teamseite unter „Einladen“."""
@@ -8,17 +9,24 @@ from __future__ import annotations
 
 from typing import Literal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 
 from auth import require_area
 from database import get_db
-from routes.team_routes import TEAM_OWNER_ADMIN_ROLES, _account_gone, _public_user, _team_admin
+from routes.team_routes import TEAM_OWNER_ADMIN_ROLES, _account_gone, _public_user, _refuse, _team_admin, _team_audit, _tell
+from services import team_page
 from services.query_filters import safe_regex
 from services.team_dissolve import DISSOLVED_TEAM_RETENTION_DAYS, dissolved_view, is_restorable
 
 router = APIRouter(prefix="/api/admin/teams", tags=["team-admin"])
 
 LIST_LIMIT = 200
+RENEW_ALL_LIMIT = 5000
+
+
+class RenewAllBody(BaseModel):
+    confirm: bool = False
 
 
 def _search(q: str | None) -> dict:
@@ -78,3 +86,31 @@ async def list_teams(
         "total": await db.teams.count_documents(query),
         "limit": limit, "offset": offset, **rights,
     }
+
+
+@router.post("/join-codes/renew")
+async def renew_all_join_codes(body: RenewAllBody, me: dict = Depends(require_area("club"))):
+    """Einmal alle neu - etwa nach einer Bereinigung. Die alten Codes gelten sofort nicht mehr; Einladungs-Links bleiben."""
+    if not _team_admin(me, TEAM_OWNER_ADMIN_ROLES):
+        _refuse(me, "Alle Beitrittscodes erneuern dürfen Club-Admin und Superadmin.", TEAM_OWNER_ADMIN_ROLES)
+    if not body.confirm:
+        raise HTTPException(status_code=400, detail="Bitte die Rückfrage bestätigen.")
+    db = get_db()
+    teams = await db.teams.find({}, {"_id": 0, "id": 1, "name": 1, "tag": 1, "leader_id": 1}).to_list(RENEW_ALL_LIMIT)
+    renewed = 0
+    for team in teams:
+        await team_page.renew_join_code(db, team["id"])
+        renewed += 1
+        await _tell(
+            team.get("leader_id"),
+            title=f"Neuer Beitrittscode: [{team.get('tag')}]",
+            body=f"Die Vereinsverwaltung hat alle Beitrittscodes erneuert. Den neuen Code von {team.get('name')} findest du auf der "
+                 "Teamseite unter „Einladen“; der alte gilt nicht mehr.",
+            url=f"/teams/{team['id']}",
+            kind="team_join_code_renewed",
+            meta={"team_id": team["id"]},
+        )
+    await _team_audit(db, "team.join_code.renew_all", None, me["id"], {"teams": renewed})
+    from services.change_events import publish_user_change
+    await publish_user_change([team["leader_id"] for team in teams if team.get("leader_id")], "teams")
+    return {"ok": True, "renewed": renewed}

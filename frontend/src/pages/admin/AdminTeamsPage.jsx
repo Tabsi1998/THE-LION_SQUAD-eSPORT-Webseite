@@ -1,12 +1,16 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Lock, Search, UserX, Users } from "lucide-react";
-import { api, resolveMediaUrl } from "@/lib/api";
+import { KeyRound, Lock, Search, UserX, Users } from "lucide-react";
+import { toast } from "sonner";
+import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { AuthFormAlert } from "@/components/tls/AuthFormFields";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { LoadState } from "@/components/tls/LoadState";
 import { SkeletonList } from "@/components/tls/Skeleton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useLoad } from "@/hooks/useLoad";
+import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { DissolvedTeamRow } from "@/pages/public/team/DissolvedTeams";
 import { viennaDate } from "@/lib/vienna";
 
@@ -52,6 +56,9 @@ export default function AdminTeamsPage() {
   const [tab, setTab] = useState("active");
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(0);
+  const [renewError, setRenewError] = useState("");
+  const confirm = useConfirm();
+  const { submitting, submitOnce } = useSubmissionGuard();
 
   const needle = query.trim();
   const load = useLoad(["admin-teams", tab, needle, page], ({ signal }) => (
@@ -61,6 +68,20 @@ export default function AdminTeamsPage() {
 
   const data = load.data || {};
   const total = Number(data.total || 0);
+
+  const renewAll = async () => {
+    if (!await confirm({
+      title: "Alle Beitrittscodes erneuern?",
+      description: "Jedes Team bekommt einen neuen Beitrittscode, die alten gelten sofort nicht mehr. Wer im Team ist, bleibt drin; Einladungs-Links bleiben, wie sie sind. Die Teamleitungen bekommen eine Nachricht und finden den neuen Code auf ihrer Teamseite unter „Einladen“. Das steht im Protokoll.",
+      confirmLabel: "Alle erneuern",
+    })) return;
+    setRenewError("");
+    const attempt = await submitOnce(async () => {
+      const { data: done } = await api.post("/admin/teams/join-codes/renew", { confirm: true });
+      toast.success(`Neue Beitrittscodes für ${done.renewed} ${done.renewed === 1 ? "Team" : "Teams"}.`);
+    });
+    if (attempt.started && attempt.error) setRenewError(formatRequestError(attempt.error, "Die Beitrittscodes konnten nicht erneuert werden."));
+  };
 
   return (
     <AdminLayout>
@@ -134,6 +155,16 @@ export default function AdminTeamsPage() {
         </LoadState>
       </div>
 
+      {data.can_renew_all ? (
+        <section className="mt-10 border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm p-4 space-y-3 max-w-2xl" data-testid="admin-teams-renew-all">
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-widest text-[#FFD700] font-bold"><KeyRound className="w-4 h-4" aria-hidden="true" /> Beitrittscodes</div>
+          <p className="text-sm text-white/65">Gibt allen Teams auf einmal einen neuen Beitrittscode – zum Beispiel nach einer Bereinigung. Einzelne Teams erneuern ihren Code selbst unter „Einladen“.</p>
+          {renewError ? <AuthFormAlert id="admin-teams-renew-error">{renewError}</AuthFormAlert> : null}
+          <button type="button" onClick={renewAll} disabled={submitting} data-testid="admin-teams-renew-all-button" className="tls-btn tls-btn--danger inline-flex min-h-11 items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">
+            <KeyRound className="w-3.5 h-3.5" aria-hidden="true" /> {submitting ? "Erneuere…" : "Alle Beitrittscodes erneuern"}
+          </button>
+        </section>
+      ) : null}
     </AdminLayout>
   );
 }

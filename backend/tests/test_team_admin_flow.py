@@ -1,5 +1,6 @@
 """Teamverwaltung im Admin (#2128, TM7, TM10): Liste mit Suche - auch private und verwaiste Teams -, aufgelöste Teams und
 „Alle Beitrittscodes erneuern“ mit Rückfrage und Protokoll. Keine Codes in Antworten und Protokollen. Erfundene Daten."""
+import logging
 import pathlib
 import sys
 
@@ -80,3 +81,48 @@ async def test_dissolved_tab_shows_what_can_still_come_back(flow):
     assert (await flow.get("/api/admin/teams", params={"state": "dissolved", "q": "xyz"})).json()["total"] == 0
     assert (await flow.post(f"/api/teams/{team['id']}/restore")).status_code == 200
     assert (await flow.get("/api/admin/teams")).json()["total"] == 1
+
+
+@pytest.mark.asyncio
+async def test_renew_all_join_codes(flow, caplog):
+    first = await flow.add_user(role="player", name="erste")
+    second = await flow.add_user(role="player", name="zweite")
+    joiner = await flow.add_user(role="player", name="neu")
+    rudel = await add_team(flow, "Rudel", "RDL", first, code="AltCodeA")
+    secret = await add_team(flow, "Geheim", "GHM", second, is_public=False, code="AltCodeB")
+    legacy = await add_team(flow, "Uralt", "UAL", first)
+    await flow.db.teams.update_one({"id": legacy["id"]}, {"$unset": {"join_code": ""}})
+    url = "/api/admin/teams/join-codes/renew"
+
+    flow.act_as(first)
+    assert (await flow.post(url, json={"confirm": True})).status_code == 403
+    flow.act_as(await flow.add_user(role="tournament_admin", name="turnierleitung"))
+    assert (await flow.post(url, json={"confirm": True})).status_code == 403, "nur Club-Admin und Superadmin"
+
+    admin = await flow.add_user(role="club_admin", name="vorstand")
+    flow.act_as(admin)
+    assert (await flow.post(url, json={})).status_code == 400, "ohne Bestätigung nicht"
+    assert (await flow.db.teams.find_one({"id": rudel["id"]}))["join_code"] == "AltCodeA"
+
+    caplog.set_level(logging.INFO)
+    done = await flow.post(url, json={"confirm": True})
+    assert done.status_code == 200 and done.json() == {"ok": True, "renewed": 3}
+
+    codes = {row["id"]: row["join_code"] async for row in flow.db.teams.find({}, {"_id": 0, "id": 1, "join_code": 1})}
+    assert codes[rudel["id"]] != "AltCodeA" and codes[secret["id"]] != "AltCodeB" and codes[legacy["id"]]
+    assert len(set(codes.values())) == 3
+
+    row = await flow.db.audit_logs.find_one({"action": "team.join_code.renew_all"}, {"_id": 0})
+    assert row["actor_id"] == admin["id"] and row["data"] == {"teams": 3}
+    told = await flow.db.notifications.find({"kind": "team_join_code_renewed"}, {"_id": 0}).to_list(10)
+    assert {note["user_id"] for note in told} == {first["id"], second["id"]} and len(told) == 3
+    everything = str(row) + str(told) + str(done.json()) + caplog.text
+    for code in [*codes.values(), "AltCodeA", "AltCodeB"]:
+        assert code not in everything, "keine Codes in Antwort, Nachricht, Protokoll und Log"
+
+    flow.act_as(joiner)
+    assert (await flow.post(f"/api/teams/{rudel['id']}/join", json={"join_code": "AltCodeA"})).status_code == 403
+    assert (await flow.post(f"/api/teams/{rudel['id']}/join", json={"join_code": codes[rudel["id"]]})).status_code == 200
+    flow.act_as(first)
+    page = (await flow.get(f"/api/teams/{rudel['id']}")).json()
+    assert page["join_code"] == codes[rudel["id"]], "die Teamleitung sieht den neuen Code auf der Teamseite"

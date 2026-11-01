@@ -91,6 +91,20 @@ test("Kürzel inzwischen vergeben: die Zeile fragt nach einem neuen", async () =
   await waitFor(() => expect(apiMock.post).toHaveBeenLastCalledWith("/teams/t3/restore", { tag: "ALT2" }));
 });
 
+test("Alle Beitrittscodes erneuern: mit Rückfrage; ohne Ja passiert nichts; kein Code auf der Seite", async () => {
+  serve();
+  apiMock.post.mockResolvedValue({ data: { ok: true, renewed: 2 } });
+  renderPage();
+  const button = await screen.findByTestId("admin-teams-renew-all-button");
+  confirmMock.mockResolvedValueOnce(false);
+  fireEvent.click(button);
+  await waitFor(() => expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Alle Beitrittscodes erneuern?" })));
+  expect(apiMock.post).not.toHaveBeenCalled();
+  confirmMock.mockResolvedValueOnce(true);
+  fireEvent.click(button);
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/teams/join-codes/renew", { confirm: true }));
+});
+
 test("ohne das Recht kein Knopf „Alle erneuern“ und kein Wiederherstellen", async () => {
   serve({ canRenew: false });
   renderPage();
