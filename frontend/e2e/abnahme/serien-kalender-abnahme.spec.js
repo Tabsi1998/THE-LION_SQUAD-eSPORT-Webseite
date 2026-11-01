@@ -25,6 +25,33 @@ async function send(page, method, url, data) {
   return page.request[method](url, { data, headers: csrf ? { "X-CSRF-Token": csrf } : {} });
 }
 
+const WEEKDAYS = ["So.", "Mo.", "Di.", "Mi.", "Do.", "Fr.", "Sa."];
+const DAY = 24 * 60 * 60 * 1000;
+
+/** Ein Kalendertag in UTC gerechnet - so spielt die Zeitumstellung keine Rolle, gezählt wird in ganzen Tagen. */
+function firstThursday(year, month) {
+  const first = Date.UTC(year, month, 1);
+  return first + ((4 - new Date(first).getUTCDay() + 7) % 7) * DAY;
+}
+
+const iso = (value) => new Date(value).toISOString().slice(0, 10);
+const shortDay = (value) => `${iso(value).slice(8, 10)}.${iso(value).slice(5, 7)}.`;
+const longDay = (value) => `${WEEKDAYS[new Date(value).getUTCDay()]}, ${shortDay(value)}${iso(value).slice(0, 4)}`;
+
+/** Die Termine einer Saison, die noch ganz vor uns liegt: erster Donnerstag im November (der Wochentag der Saison). Ist
+ *  der schon vorbei, die Saison ein Jahr später - sonst liefe die Spec mit dem ersten Termin ab. */
+function comingSeason(now = new Date()) {
+  const today = Date.parse(new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Vienna" }).format(now));
+  const thisYear = Number(iso(today).slice(0, 4));
+  const year = firstThursday(thisYear, 10) > today ? thisYear : thisYear + 1;
+  const start = firstThursday(year, 10);
+  const january = firstThursday(year + 1, 0);
+  return {
+    season: `${year}/${String(year + 1).slice(2)}`,
+    r1: start, r2: start + 7 * DAY, r3: start + 14 * DAY, r3Moved: start + 16 * DAY, r4: january, r5: january + 7 * DAY,
+  };
+}
+
 test.describe("Abnahme #1742: Kalender je Serie", () => {
   test.skip(!ENABLED, "nur für die lokale Abnahme (ABNAHME=1, siehe docs/entwicklung/abnahme-lokal.md)");
   test.skip(ENABLED && !state?.accounts?.admin, `Kein Seed-Stand: ${STATE_FILE} - erst scripts/seed_abnahme.py laufen lassen`);
@@ -33,6 +60,7 @@ test.describe("Abnahme #1742: Kalender je Serie", () => {
   test("Liste einfügen, Termin anlegen, verschieben, absagen; öffentlich mit Sichtbarkeit", async ({ browser }, testInfo) => {
     test.skip(testInfo.project.name !== "chromium", "ein Durchgang genügt");
     const stamp = Date.now().toString(36).slice(-5);
+    const dates = comingSeason();
     const adminContext = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     const anonContext = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     try {
@@ -44,7 +72,7 @@ test.describe("Abnahme #1742: Kalender je Serie", () => {
       const lineage = await send(admin, "post", "/api/reference-series/admin/lineages", { title: `Probe Kalender ${stamp}`, kind: "racing", label: "F1", organizer: "Probe Liga" });
       expect(lineage.status(), await lineage.text()).toBe(200);
       const { id: lineageId, slug } = await lineage.json();
-      const created = await send(admin, "post", "/api/reference-series/admin/series", { lineage_id: lineageId, season: "2026/27", default_weekday: 3, default_time: "20:30", status: "active" });
+      const created = await send(admin, "post", "/api/reference-series/admin/series", { lineage_id: lineageId, season: dates.season, default_weekday: 3, default_time: "20:30", status: "active" });
       expect(created.status(), await created.text()).toBe(200);
       const series = await created.json();
 
@@ -53,25 +81,25 @@ test.describe("Abnahme #1742: Kalender je Serie", () => {
 
       // Liste einfügen: erst die Vorschau mit Fehler, dann korrigiert übernehmen.
       await admin.getByTestId("calendar-paste").click();
-      await admin.getByTestId("paste-text").fill("R1 · 05.11. · Probering\nR2 · 31.11. · Teststadt");
+      await admin.getByTestId("paste-text").fill(`R1 · ${shortDay(dates.r1)} · Probering\nR2 · 31.11. · Teststadt`);
       await admin.getByTestId("paste-submit").click();
       await expect(admin.getByTestId("paste-errors")).toContainText("Zeile 2: Datum 31.11. gibt es nicht.");
-      await admin.getByTestId("paste-text").fill("R1 · 05.11. · Probering\nR2 · 12.11. 19:00 · Teststadt\nR3 Beispielpark\nR4 · 07.01. · Musterkurs");
+      await admin.getByTestId("paste-text").fill(`R1 · ${shortDay(dates.r1)} · Probering\nR2 · ${shortDay(dates.r2)} 19:00 · Teststadt\nR3 Beispielpark\nR4 · ${shortDay(dates.r4)} · Musterkurs`);
       await admin.getByTestId("paste-submit").click();
       const preview = admin.getByTestId("paste-preview");
-      await expect(preview).toContainText("Do., 19.11.2026");
-      await expect(preview).toContainText("Do., 07.01.2027");
+      await expect(preview).toContainText(longDay(dates.r3));
+      await expect(preview).toContainText(longDay(dates.r4));
       await shot(admin, "serien-kalender-einfuegen");
       await expect(admin.getByTestId("paste-submit")).toHaveText("4 Termine übernehmen");
       await admin.getByTestId("paste-submit").click();
       await expect(admin.getByTestId("paste-sheet")).toBeHidden();
       const rounds = admin.getByTestId("calendar-round");
       await expect(rounds).toHaveCount(4);
-      await expect(rounds.nth(1)).toContainText("Do., 12.11.2026 · 19:00");
+      await expect(rounds.nth(1)).toContainText(`${longDay(dates.r2)} · 19:00`);
 
       // Einzeln: Vorschlag ist der nächste Donnerstag nach dem letzten Termin, mit 20:30.
       await admin.getByTestId("calendar-new").click();
-      await expect(admin.getByTestId("round-day")).toHaveValue("2027-01-14");
+      await expect(admin.getByTestId("round-day")).toHaveValue(iso(dates.r5));
       await expect(admin.getByTestId("round-time")).toHaveValue("20:30");
       await admin.getByTestId("round-code").fill("R5");
       await admin.getByTestId("round-venue").fill("Nordring");
@@ -83,10 +111,10 @@ test.describe("Abnahme #1742: Kalender je Serie", () => {
 
       // Verschieben: R3 auf Samstag, der ursprüngliche Tag bleibt stehen.
       await rounds.nth(2).getByTestId("round-postpone").click();
-      await admin.getByTestId("postpone-day").fill("2026-11-21");
+      await admin.getByTestId("postpone-day").fill(iso(dates.r3Moved));
       await admin.getByTestId("postpone-save").click();
       await expect(admin.getByTestId("postpone-sheet")).toBeHidden();
-      await expect(rounds.nth(2)).toContainText("ursprünglich Do., 19.11.2026");
+      await expect(rounds.nth(2)).toContainText(`ursprünglich ${longDay(dates.r3)}`);
       await expect(rounds.nth(2).getByTestId("round-state")).toHaveText("Verschoben");
 
       // Absagen: R4 ist abgesagt und lässt sich wieder ansetzen.
@@ -97,13 +125,13 @@ test.describe("Abnahme #1742: Kalender je Serie", () => {
       await shot(admin, "serien-kalender-verwaltung");
       expect(problems).toEqual([]);
 
-      // Öffentlich: dieselben Termine, ohne Notizen.
+      // Öffentlich: dieselben Termine, ohne Notizen. Eine Rennliga zeigt sie seit #1746 in ihrem Rennkalender.
       const anon = await anonContext.newPage();
       const url = `/references/series/${slug}/${series.season_slug}`;
       await anon.goto(url);
-      const publicRounds = anon.getByTestId("series-page-round");
+      const publicRounds = anon.getByTestId("racing-calendar").getByTestId("racing-round");
       await expect(publicRounds).toHaveCount(5);
-      await expect(publicRounds.nth(2)).toContainText("ursprünglich Do., 19.11.2026");
+      await expect(publicRounds.nth(2)).toContainText(`ursprünglich ${longDay(dates.r3)}`);
       await expect(publicRounds.nth(3)).toContainText("Abgesagt");
       await expect(anon.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
       await shot(anon, "serien-kalender-oeffentlich");
@@ -114,7 +142,7 @@ test.describe("Abnahme #1742: Kalender je Serie", () => {
       const api = await anon.request.get(`/api/reference-series/public/${slug}/${series.season_slug}/calendar`);
       expect(api.status()).toBe(404);
       await anon.reload();
-      await expect(anon.getByTestId("series-page-round")).toHaveCount(0);
+      await expect(anon.getByTestId("racing-round")).toHaveCount(0);
 
       // Aufräumen: Saison und Spur archivieren (gelöscht wird nichts).
       await send(admin, "post", `/api/reference-series/admin/series/${series.id}/archive`);
