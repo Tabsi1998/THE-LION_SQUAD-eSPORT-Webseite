@@ -284,6 +284,24 @@ async def test_only_a_settled_editorial_upload_can_be_the_kept_file(flow, public
 
 
 @pytest.mark.asyncio
+async def test_replacing_an_original_moves_the_preview_to_the_kept_file(flow, public):
+    await admin(flow)
+    for name in ("bleibt.nef", "kopie.nef"):
+        add_file(public, name, content=b"roh", age=OLD)
+        await track(flow, name, media_type="file")
+    add_file(public, "vorschau.webp", content=b"bild", age=OLD)
+    await track(flow, "vorschau.webp", original_url=UPLOADS + "kopie.nef", derived_from_filename="kopie.nef")
+
+    response = await flow.post("/api/admin/media/duplicates/replace", json={"keep": "bleibt.nef"})
+
+    assert response.status_code == 200, response.text
+    assert response.json()["removed"] == 1
+    preview = await flow.db.media_uploads.find_one({"filename": "vorschau.webp"})
+    assert preview["original_url"] == UPLOADS + "bleibt.nef" and preview["derived_from_filename"] == "bleibt.nef"
+    assert not (public / "kopie.nef").exists()
+
+
+@pytest.mark.asyncio
 async def test_copies_without_an_upload_entry_or_from_the_member_system_stay(flow, public):
     await admin(flow)
     for name in ("bleibt.webp", "kopie.webp", "ohne-eintrag.webp", "dolibarr-partner-1-logo-dark-abc.webp"):

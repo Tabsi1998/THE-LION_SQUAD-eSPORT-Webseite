@@ -458,6 +458,11 @@ async def admin_media_replace_duplicates(body: DuplicateReplaceBody, me: dict = 
     repointed = pending = 0
     for name in copies:
         repointed += await media_audit.repoint_usages(db, name, target, stamp)
+        # Die Vorschau eines Kamera-Originals merkt sich ihre Quelle: Sie soll auf die bleibende Datei zeigen.
+        await db.media_uploads.update_many(
+            {"original_url": f"/api/static/uploads/{name}"},
+            {"$set": {"original_url": f"/api/static/uploads/{body.keep}", "derived_from_filename": body.keep, **stamp}},
+        )
     # Was nicht in den Verwendungsstellen steht, bleibt wie es ist - etwa die Map in einem gespeicherten Ergebnisblatt
     # (Snapshot). Solange so eine Stelle die Kopie zeigt, bleibt ihre Datei.
     kept = sorted(await media_audit.still_referenced(db, set(copies)))
