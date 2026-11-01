@@ -27,6 +27,23 @@ def touch(path: pathlib.Path, size: int = 10) -> None:
     path.write_bytes(b"x" * size)
 
 
+@pytest.mark.parametrize("text", [
+    "Siehe /api/static/uploads/a.png.",
+    "Siehe /api/static/uploads/a.png, und weiter",
+    "Siehe **/api/static/uploads/a.png** bitte",
+    "Siehe _/api/static/uploads/a.png_!",
+    "Wirklich /api/static/uploads/a.png?",
+    "Siehe /api/static/uploads/a.png;",
+    "Plan: /api/static/uploads/a.png:",
+])
+def test_a_bare_address_in_running_text_gives_the_clean_name(text):
+    assert [name for _field, name in uploads_inventory.references_in({"content": text}, {"a.png"})] == ["a.png"]
+
+
+def test_punctuation_does_not_change_a_regular_name():
+    assert uploads_inventory.upload_filename("/api/static/uploads/mein_bild-1.webp?v=3.") == "mein_bild-1.webp"
+
+
 def test_filenames_are_read_from_every_upload_address_shape():
     assert uploads_inventory.upload_filename("/api/static/uploads/a.webp") == "a.webp"
     assert uploads_inventory.upload_filename("https://lionsquad.at/api/static/uploads/b.png?v=2") == "b.png"

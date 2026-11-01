@@ -25,6 +25,7 @@ from urllib.parse import urlparse
 VARIANT_DIR = "variants"
 VARIANT_RE = re.compile(r"^(?P<stem>.+)-(?P<width>\d{3,4})\.webp$")
 TEXT_IMAGE_RE = re.compile(r"!\[[^\]\n]*\]\((?P<md>[^)\s]+)\)|<img\b[^>]*\bsrc=[\"'](?P<html>[^\"']+)[\"']", re.IGNORECASE)
+TEXT_PUNCTUATION = ".,;:!?*_"
 URL_IN_TEXT_RE = re.compile(r"[^\s\"'()<>\[\]]*uploads/[^\s\"'()<>\[\]]+")
 SCAN_LIMIT = 50000   # je Sammlung; darüber wird die Sammlung als „nur teilweise“ vermerkt
 YIELD_EVERY = 200
@@ -61,7 +62,8 @@ def upload_filename(value: str) -> str | None:
     path = raw.split("?", 1)[0].split("#", 1)[0]
     marker = path.rfind("uploads/")
     rest = path[marker + len("uploads/"):]
-    name = pathlib.PurePosixPath(rest).name
+    # Nackte Adresse im Fließtext: Satzzeichen und Markdown am Ende gehören nicht zum Namen (#2122).
+    name = pathlib.PurePosixPath(rest).name.rstrip(TEXT_PUNCTUATION)
     return name or None
 
 

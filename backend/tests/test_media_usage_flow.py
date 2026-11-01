@@ -57,6 +57,8 @@ PLACES = {
     "Adresse mit Zusatz": ("news_posts", {"id": "n-1", "banner_url": URL + "?v=3#oben"}),
     "Absolute Adresse": ("events", {"id": "e-1", "banner_url": "https://lionsquad.example" + URL}),
     "Kleinere Fassung": ("teams", {"id": "team-9", "logo_url": UPLOADS + "variants/genutzt-400.webp"}),
+    "Nackte Adresse mit Punkt": ("news_posts", {"id": "n-2", "content": f"Siehe {URL}."}),
+    "Nackte Adresse fett": ("events", {"id": "e-2", "description": f"Siehe **{URL}** und mehr"}),
     # Eine Nachricht speichert den Sticker aufgelöst (#2122): alte Chats zeigen das Bild, auch wenn der Sticker weg ist.
     "Sticker in einer Direktnachricht": ("direct_messages", {"id": "m-1", "sticker": {"id": "s-1", "url": URL}}),
     "Sticker im Team-Chat": ("team_chat_messages", {"id": "m-2", "sticker": {"id": "s-1", "url": URL}}),

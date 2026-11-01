@@ -340,10 +340,18 @@ async def _rewrite_usages(db, filename: str, change, stamp: dict | None) -> list
     def in_field(value):
         return change(value) if canonical_name(value, candidates) == filename else value
 
+    def in_address(match):
+        # Satzzeichen und Markdown um eine nackte Adresse bleiben im Text stehen - sie gehören nicht zur Adresse.
+        address = match.group(0)
+        tail = len(address) - len(address.rstrip(uploads_inventory.TEXT_PUNCTUATION))
+        body = address[:-tail] if tail else address
+        head = len(body) - len(body.lstrip("*_"))
+        return f"{body[:head]}{in_field(body[head:])}{address[len(body):]}"
+
     def in_text(text):
         if not isinstance(text, str):
             return text
-        return uploads_inventory.URL_IN_TEXT_RE.sub(lambda match: in_field(match.group(0)), text)
+        return uploads_inventory.URL_IN_TEXT_RE.sub(in_address, text)
 
     hits = [hit async for hit in iter_usages(db, {filename})]
     for collection, doc, field, _name, text in hits:

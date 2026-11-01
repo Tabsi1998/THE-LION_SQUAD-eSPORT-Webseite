@@ -115,6 +115,18 @@ async def test_every_place_gets_the_new_version_and_the_size_where_it_is_stored(
 
 
 @pytest.mark.asyncio
+async def test_punctuation_around_a_bare_address_stays_in_the_text(flow, public):
+    await admin(flow)
+    await flow.db.news_posts.insert_one({"id": "n-1", "content": f"Am Satzende {URL}. Fett **{URL}** und mit Komma {URL}, fertig."})
+
+    body = (await flow.post(f"/api/admin/media/{NAME}/rotate", json={"degrees": 90})).json()
+
+    versioned = f"{URL}?v={body['version']}"
+    news = await flow.db.news_posts.find_one({"id": "n-1"})
+    assert news["content"] == f"Am Satzende {versioned}. Fett **{versioned}** und mit Komma {versioned}, fertig."
+
+
+@pytest.mark.asyncio
 async def test_a_rotated_file_is_offered_with_its_version_and_still_counts_as_used(flow, public):
     await admin(flow)
     await flow.db.media_uploads.insert_one({"id": "up-1", "filename": NAME, "url": URL, "media_scope": "admin"})
