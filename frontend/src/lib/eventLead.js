@@ -125,5 +125,28 @@ export function changeText(row, status) {
   if (status === "checked_in") return `${name} ist da.`;
   if (status === "registered" && row?.status === "waitlist") return `${name} ist nachgerückt und bekommt Bescheid.`;
   if (status === "registered" && row?.status === "checked_in") return `${name} ist wieder „noch nicht da“.`;
-  return `${name}: ${STATUS_LABELS[status] || status}.`;
+  const told = ["cancelled", "no_show", "waitlist"].includes(status) && !row?.walk_in ? " Die Person bekommt Bescheid." : "";
+  return `${name}: ${STATUS_LABELS[status] || status}.${told}`;
+}
+
+/**
+ * Die Rückfrage vor „Storniert“ und „Nicht erschienen“ (#2127, EV13): sagt ehrlich, was daraus folgt - Rechnungsaufträge
+ * wie bisher, die Person erfährt es, ein Check-in nimmt Punkte und XP mit zurück. Sonst keine Rückfrage (null).
+ */
+export function statusQuestion(row, status) {
+  if (!["cancelled", "no_show"].includes(status) || row?.status === status) return null;
+  const name = row?.display_name || "Die Person";
+  const parts = status === "cancelled" ? [`${name} wird storniert, der Platz wird frei.`] : [`${name} wird als „nicht erschienen“ eingetragen, der Platz wird frei.`];
+  if (!row?.walk_in) {
+    parts.push("Gibt es einen Kostenbeitrag: Offene Rechnungsaufträge werden storniert, eine schon gestellte Rechnung kommt als Prüffall in die Finanzübersicht.");
+    parts.push("Die Person bekommt eine Nachricht.");
+    if (row?.status === "checked_in") parts.push("Jahrespunkte und XP vom Check-in werden zurückgenommen.");
+  }
+  return {
+    title: status === "cancelled" ? "Anmeldung stornieren?" : "Als „nicht erschienen“ eintragen?",
+    description: parts.join(" "),
+    confirmLabel: status === "cancelled" ? "Stornieren" : "Eintragen",
+    cancelLabel: "Zurück",
+    tone: "danger",
+  };
 }

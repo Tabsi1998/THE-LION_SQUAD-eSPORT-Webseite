@@ -5,6 +5,7 @@ import { PrintLink } from "@/components/tls/print/PrintLink";
 import { toast } from "sonner";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { api, formatApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
@@ -12,7 +13,7 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { viennaDateTime } from "@/lib/vienna";
 import {
   LEAD_FILTERS, MESSAGE_MAX, MESSAGE_TEMPLATES, STATUS_LABELS,
-  changeText, companionsText, counterText, filterRows, leadCounts, messagePreview, seatsText, waitlistHint,
+  changeText, companionsText, counterText, filterRows, leadCounts, messagePreview, seatsText, statusQuestion, waitlistHint,
 } from "@/lib/eventLead";
 
 // Anmeldungen & Einlass (#1372): /events/<slug>/leitung - nur für die Turnierleitung. An der Tür (Handy): Suchfeld und
@@ -36,6 +37,7 @@ export default function EventLeadPage() {
   const [undo, setUndo] = useState(null);
   const [messageOpen, setMessageOpen] = useState(false);
   const searchRef = useRef(null);
+  const confirm = useConfirm();
 
   const load = useCallback(async () => {
     try {
@@ -83,6 +85,13 @@ export default function EventLeadPage() {
     } finally {
       setBusyId("");
     }
+  };
+
+  // „Storniert“ und „Nicht erschienen“ wirken nach außen (#2127, EV13): erst nach der Rückfrage. Die Auswahl bleibt sonst stehen.
+  const changeStatus = async (row, status) => {
+    const question = statusQuestion(row, status);
+    if (question && !await confirm(question)) return;
+    await change(row, { status });
   };
 
   const checkIn = async (row) => {
@@ -183,7 +192,7 @@ export default function EventLeadPage() {
                     onSelect={() => setSelectedId(selectedId === row.id ? "" : row.id)} onCheckIn={() => checkIn(row)}
                     onUndo={undoLast} onMoveUp={() => change(row, { status: "registered" })} />
                   {selectedId === row.id ? (
-                    <div className="lg:hidden mt-1"><Details row={row} event={event} busy={busyId === row.id} onChange={(payload) => change(row, payload)} /></div>
+                    <div className="lg:hidden mt-1"><Details row={row} event={event} busy={busyId === row.id} onChange={(payload) => change(row, payload)} onStatus={(status) => changeStatus(row, status)} /></div>
                   ) : null}
                 </div>
               ))}
@@ -192,7 +201,7 @@ export default function EventLeadPage() {
           </div>
           <aside className="hidden lg:block" data-testid="event-lead-aside">
             <div className="sticky top-[19rem]">
-              {selected ? <Details row={selected} event={event} busy={busyId === selected.id} onChange={(payload) => change(selected, payload)} onClose={() => setSelectedId("")} /> : (
+              {selected ? <Details row={selected} event={event} busy={busyId === selected.id} onChange={(payload) => change(selected, payload)} onStatus={(status) => changeStatus(selected, status)} onClose={() => setSelectedId("")} /> : (
                 <div className="rounded-sm border border-dashed border-white/10 p-6 text-sm text-white/45">Tippe auf einen Namen für Details: Begleitpersonen, Notiz und Status.</div>
               )}
             </div>
@@ -234,7 +243,7 @@ function RegistrationRow({ row, busy, selected, showStatus, undoable, onSelect, 
   );
 }
 
-function Details({ row, event, busy, onChange, onClose }) {
+function Details({ row, event, busy, onChange, onStatus, onClose }) {
   const maxCompanions = event.allow_companions ? event.max_companions_per_registration || 0 : 0;
   // Notizen stehen nicht in der Liste (Codex-Prüfung #1517) - die Detailansicht holt sie je Person.
   const [notes, setNotes] = useState(null);
@@ -292,7 +301,7 @@ function Details({ row, event, busy, onChange, onClose }) {
       </dl>
       <label className="mt-4 block text-[11px] font-bold uppercase tracking-widest text-white/50">
         Status
-        <select value={row.status || "registered"} disabled={busy} onChange={(e) => onChange({ status: e.target.value })} className="mt-1 block w-full min-h-[44px] rounded-sm border border-white/10 bg-[#0A0A0A] px-2 text-sm normal-case tracking-normal text-white" data-testid="event-lead-status">
+        <select value={row.status || "registered"} disabled={busy} onChange={(e) => onStatus(e.target.value)} className="mt-1 block w-full min-h-[44px] rounded-sm border border-white/10 bg-[#0A0A0A] px-2 text-sm normal-case tracking-normal text-white" data-testid="event-lead-status">
           {STATUS_ORDER.map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}
         </select>
       </label>

@@ -12,6 +12,8 @@ vi.mock("@/components/tls/Breadcrumbs", () => ({ Breadcrumbs: () => null }));
 vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: () => {} }));
 vi.mock("@/hooks/useDocumentTitle", () => ({ useDocumentTitle: () => {} }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+const confirmMock = vi.fn(async () => true);
+vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => confirmMock }));
 const { toast } = await import("sonner");
 const EventLeadPage = (await import("./EventLeadPage")).default;
 
@@ -152,6 +154,39 @@ test("„1 Platz frei“: Hinweis mit der Warteliste, nachrücken geht nur per K
   fireEvent.click(screen.getByTestId("event-lead-moveup-r4"));
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/events/e1/registrations/r4", { status: "registered" }));
   expect(toast.success).toHaveBeenCalledWith("Ella Wartend ist nachgerückt und bekommt Bescheid.");
+});
+
+test("„Storniert“ erst nach der Rückfrage, sie nennt Rechnung und Nachricht; „Zurück“ ändert nichts", async () => {
+  apiMock.patch.mockResolvedValue({ data: {} });
+  renderLead();
+  fireEvent.click(await screen.findByTestId("event-lead-name-r3"));
+  const [details] = screen.getAllByTestId("event-lead-details");
+
+  confirmMock.mockResolvedValueOnce(false);
+  fireEvent.change(within(details).getByTestId("event-lead-status"), { target: { value: "cancelled" } });
+  await waitFor(() => expect(confirmMock).toHaveBeenCalled());
+  const question = confirmMock.mock.calls[0][0];
+  expect(question.title).toBe("Anmeldung stornieren?");
+  expect(question.description).toContain("Rechnungsaufträge werden storniert");
+  expect(question.description).toContain("Die Person bekommt eine Nachricht.");
+  expect(apiMock.patch).not.toHaveBeenCalled();
+  expect(within(details).getByTestId("event-lead-status")).toHaveValue("registered");
+
+  confirmMock.mockResolvedValueOnce(true);
+  fireEvent.change(within(details).getByTestId("event-lead-status"), { target: { value: "no_show" } });
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/events/e1/registrations/r3", { status: "no_show" }));
+  expect(toast.success).toHaveBeenCalledWith("Zoë Adler: Nicht erschienen. Die Person bekommt Bescheid.");
+});
+
+test("„Warteliste“ und „Angemeldet“ brauchen keine Rückfrage", async () => {
+  confirmMock.mockClear();
+  apiMock.patch.mockResolvedValue({ data: {} });
+  renderLead();
+  fireEvent.click(await screen.findByTestId("event-lead-name-r3"));
+  const [details] = screen.getAllByTestId("event-lead-details");
+  fireEvent.change(within(details).getByTestId("event-lead-status"), { target: { value: "waitlist" } });
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/events/e1/registrations/r3", { status: "waitlist" }));
+  expect(confirmMock).not.toHaveBeenCalled();
 });
 
 test("voll: kein Hinweis auf einen freien Platz", async () => {
