@@ -182,6 +182,10 @@ DEFAULT_EMAIL_TEMPLATES = [
      "subject": "Austritt erklärt",
      "html": "<p>{{member}} hat den Austritt aus dem Verein erklärt. Beende die Mitgliedschaft unter Admin → Mitglieder, wenn es so weit ist.</p>",
      "vars": ["member"]},
+    {"key": "membership_exit_withdrawn_admin", "name": "Austritt zurückgenommen (Admin-Notify)",
+     "subject": "Austritt zurückgenommen",
+     "html": "<p>{{member}} hat den Austritt zurückgenommen und bleibt Mitglied.</p>",
+     "vars": ["member"]},
     # Einladung zum Mitgliedsantrag (#507): bisher nur als Ersatztext im Code - ohne Standard fehlte sie in der Liste
     # der E-Mail-Vorlagen (#2119 ML6). Gleicher Text wie der Ersatz in services/membership_invitations.
     {"key": "membership_invited", "name": "Einladung zum Mitgliedsantrag",

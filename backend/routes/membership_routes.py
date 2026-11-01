@@ -1061,7 +1061,7 @@ async def declare_my_exit(body: SimpleExitBody, request: Request, me: dict = Dep
     name = me.get("display_name") or me.get("username") or "Ein Mitglied"
     try:
         await membership_notices.mail_club_area(db, "membership_exit_admin", {"member": name}, subject="Austritt erklärt",
-                                                html="<p>{{member}} hat den Austritt aus dem Verein erklärt. Beende die Mitgliedschaft unter Admin → Mitglieder, wenn es so weit ist.</p>")
+                                                html="<p>{{member}} hat den Austritt aus dem Verein erklärt. Beende die Mitgliedschaft unter Admin → Mitglieder, wenn es so weit ist.</p>", exclude=me["id"])
     except Exception:  # noqa: BLE001 - die Erklärung ist gespeichert und steht in der Mitgliederliste
         logger.warning("[membership] Mail an den Vorstand zum Austritt fehlgeschlagen", exc_info=True)
     await membership_notices.tell_person(me["id"], "Dein Austritt ist eingegangen", "Der Vorstand beendet deine Mitgliedschaft und meldet sich, wenn Fragen offen sind.", "/members/membership")
@@ -1077,6 +1077,12 @@ async def withdraw_my_exit(me: dict = Depends(get_current_user)):
         raise HTTPException(404, "Es gibt keine offene Erklärung.")
     await db.memberships.update_one({"user_id": me["id"]}, {"$unset": {"exit_request": ""}, "$set": {"updated_at": now_utc().isoformat()}})
     await _audit(me["id"], "membership.exit_withdrawn", me["id"])
+    name = me.get("display_name") or me.get("username") or "Ein Mitglied"
+    try:
+        await membership_notices.mail_club_area(db, "membership_exit_withdrawn_admin", {"member": name}, subject="Austritt zurückgenommen",
+                                                html="<p>{{member}} hat den Austritt zurückgenommen und bleibt Mitglied.</p>", exclude=me["id"])
+    except Exception:  # noqa: BLE001 - die Rücknahme gilt auch ohne Mail; die Mitgliederliste zeigt sie
+        logger.warning("[membership] Mail an den Vorstand zur Rücknahme des Austritts fehlgeschlagen", exc_info=True)
     return {"ok": True}
 
 

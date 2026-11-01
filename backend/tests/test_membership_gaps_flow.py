@@ -404,6 +404,8 @@ async def test_exit_is_a_declaration_for_the_board_and_ending_clears_it(flow):
     # Zurücknehmen, solange der Vorstand nichts getan hat.
     removed = await flow.delete("/api/membership/me/exit")
     assert removed.status_code == 200
+    told = await flow.db.mail_jobs.find_one({"to": chair_doc["email"], "template_key": "membership_exit_withdrawn_admin"})
+    assert told and (erika.get("display_name") or erika["username"]) in told["html"]
     assert "exit_request" not in await flow.db.memberships.find_one({"user_id": erika["id"]})
     removed = await flow.delete("/api/membership/me/exit")
     assert removed.status_code == 404

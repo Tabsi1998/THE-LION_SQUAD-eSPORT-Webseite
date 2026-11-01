@@ -70,14 +70,14 @@ async def tell_status_change(user: dict, membership: dict, status: str, *, notif
     return await honest_mail_state(QUEUED if result.get("ok", True) else FAILED)
 
 
-async def mail_club_area(db, template_key: str, values: dict, *, subject: str, html: str) -> int:
+async def mail_club_area(db, template_key: str, values: dict, *, subject: str, html: str, exclude: str | None = None) -> int:
     """Ein Hinweis an alle mit dem Bereich Vereinsverwaltung: Rolle, Freigabe, Vorstandsposten, Dolibarr-Funktion. Nur der Name
     der Person - keine weiteren Daten aus dem Antrag."""
     from services.mail_queue import enqueue_mail
     from services.mail_templates import render_template
     from services.member_announcements import club_area_user_ids
 
-    ids = await club_area_user_ids(db)
+    ids = await club_area_user_ids(db) - {exclude}
     if not ids:
         return 0
     rendered_subject, rendered_html = await render_template(template_key, values, fallback_subject=subject, fallback_html=html)
