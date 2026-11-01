@@ -177,7 +177,8 @@ Uhr des Servers.
   gelöscht werden Uploads der letzten 24 Stunden (das Formular dazu ist vielleicht noch offen), Uploads von Mitgliedern, Dateien
   ohne Upload-Eintrag und Kamera-Originale. Bei mehr als 500 Dateien braucht es einen zweiten Klick.
 - **Diese Datei behalten, Kopien ersetzen** (im Blatt einer Datei mit Duplikaten): Jede Stelle, die eine inhaltsgleiche Kopie zeigt,
-  zeigt danach diese Datei, die Kopien werden gelöscht. Kopien aus Uploads von Mitgliedern bleiben.
+  zeigt danach diese Datei, die Kopien werden gelöscht. Es bleiben: Kopien aus Uploads von Mitgliedern und Kopien, die gespeicherte
+  Ergebnisse noch zeigen (Map im Ergebnisblatt, Liga-Spiel, Preisbild) – die Meldung nennt ihre Zahl.
 
 ### 3.3 Galerie und Alben
 

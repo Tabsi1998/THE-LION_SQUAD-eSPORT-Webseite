@@ -218,7 +218,7 @@ async def test_replacing_a_duplicate_points_every_place_at_the_kept_file(flow, p
     response = await flow.post("/api/admin/media/duplicates/replace", json={"keep": "bleibt.webp"})
 
     assert response.status_code == 200, response.text
-    assert response.json() == {"ok": True, "removed": 1, "references": 4, "file_pending": 0}
+    assert response.json() == {"ok": True, "removed": 1, "kept": [], "references": 4, "file_pending": 0}
     kept = UPLOADS + "bleibt.webp?v=7"
     news = await flow.db.news_posts.find_one({"id": "n-1"})
     assert news["banner_url"] == kept and news["content"] == f"![x]({kept}) und ![y]({UPLOADS}anderes.webp)"
@@ -233,6 +233,32 @@ async def test_replacing_a_duplicate_points_every_place_at_the_kept_file(flow, p
     # Kopie schon weg, oder nur noch Mitglieder-Kopien: nichts zu tun.
     response = await flow.post("/api/admin/media/duplicates/replace", json={"keep": "bleibt.webp"})
     assert response.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_replacing_keeps_a_copy_that_a_stored_result_still_shows(flow, public):
+    await admin(flow)
+    for name in ("bleibt.webp", "kopie.webp", "award.webp"):
+        add_file(public, name, content=b"gleich", age=OLD)
+        await track(flow, name)
+    # Ergebnisblatt und Liga-Spiel speichern das Map-Bild von damals, ein Preis sein Bild: nicht in den Verwendungsstellen.
+    await flow.db.reference_round_results.insert_one({"id": "r-1", "games": [{"map_id": "m", "image_url": UPLOADS + "kopie.webp"}]})
+    await flow.db.league_games.insert_one({"id": "g-1", "map_image_url": UPLOADS + "kopie.webp"})
+    await flow.db.tournament_awards.insert_one({"id": "w-1", "image_url": UPLOADS + "award.webp?v=3"})
+    await flow.db.game_maps.insert_one({"id": "m", "image_url": UPLOADS + "kopie.webp"})
+
+    response = await flow.post("/api/admin/media/duplicates/replace", json={"keep": "bleibt.webp"})
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["kept"] == ["award.webp", "kopie.webp"] and body["removed"] == 0
+    assert (public / "kopie.webp").exists() and (public / "award.webp").exists()
+    # Die bekannte Stelle ist umgestellt, die gespeicherten Stände zeigen weiter ihre Datei.
+    assert (await flow.db.game_maps.find_one({"id": "m"}))["image_url"] == UPLOADS + "bleibt.webp"
+    sheet = await flow.db.reference_round_results.find_one({"id": "r-1"})
+    assert sheet["games"][0]["image_url"] == UPLOADS + "kopie.webp"
+    log = await flow.db.audit_logs.find_one({"action": "media.replace_duplicates"})
+    assert log["data"]["kept"] == ["award.webp", "kopie.webp"] and log["data"]["removed"] == []
 
 
 @pytest.mark.asyncio

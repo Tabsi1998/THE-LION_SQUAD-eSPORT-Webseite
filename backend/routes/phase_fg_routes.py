@@ -426,14 +426,19 @@ async def admin_media_replace_duplicates(body: DuplicateReplaceBody, me: dict = 
     repointed = pending = 0
     for name in copies:
         repointed += await media_audit.repoint_usages(db, name, target, stamp)
+    # Was nicht in den Verwendungsstellen steht, bleibt wie es ist - etwa die Map in einem gespeicherten Ergebnisblatt
+    # (Snapshot). Solange so eine Stelle die Kopie zeigt, bleibt ihre Datei.
+    kept = sorted(await media_audit.still_referenced(db, set(copies)))
+    removed = [name for name in copies if name not in kept]
+    for name in removed:
         if await account_erasure.remove_upload(db, name):
             pending += 1
     await db.audit_logs.insert_one({
         "id": new_id(), "action": "media.replace_duplicates", "actor_id": me.get("id"), "target_id": body.keep,
-        "data": {"keep": body.keep, "removed": copies, "references": repointed, "file_pending": pending},
+        "data": {"keep": body.keep, "removed": removed, "kept": kept, "references": repointed, "file_pending": pending},
         "created_at": stamp["updated_at"],
     })
-    return {"ok": True, "removed": len(copies), "references": repointed, "file_pending": pending}
+    return {"ok": True, "removed": len(removed), "kept": kept, "references": repointed, "file_pending": pending}
 
 
 @admin_media_router.get("/audit")

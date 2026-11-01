@@ -324,7 +324,8 @@ export default function AdminMediaPage() {
     })) return;
     try {
       const { data } = await api.post("/admin/media/duplicates/replace", { keep: it.filename });
-      toast.success(`${data?.removed || 0} ${data?.removed === 1 ? "Kopie" : "Kopien"} ersetzt, ${data?.references || 0} ${data?.references === 1 ? "Stelle" : "Stellen"} umgestellt.`);
+      const kept = data?.kept?.length ? ` ${data.kept.length} ${data.kept.length === 1 ? "Kopie bleibt" : "Kopien bleiben"}, weil gespeicherte Ergebnisse sie noch zeigen.` : "";
+      toast.success(`${data?.removed || 0} ${data?.removed === 1 ? "Kopie" : "Kopien"} ersetzt, ${data?.references || 0} ${data?.references === 1 ? "Stelle" : "Stellen"} umgestellt.${kept}`);
       setSelected(null);
       await load();
     } catch (e) {
