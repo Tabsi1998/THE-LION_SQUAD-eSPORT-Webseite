@@ -466,7 +466,7 @@ export default function AdminMediaPage() {
       )}
       {mediaAudit?.unused > 0 && (
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          <button type="button" onClick={cleanupUnused} disabled={cleaning} data-testid="media-cleanup-unused" className="min-h-11 rounded-sm border border-[#FF3B30]/40 bg-[#FF3B30]/10 px-4 py-2 text-xs font-bold uppercase tracking-wider text-[#FF3B30] hover:bg-[#FF3B30]/20 disabled:opacity-50">
+          <button type="button" onClick={cleanupUnused} disabled={cleaning} data-testid="media-cleanup-unused" className="tls-btn tls-btn--danger min-h-11 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
             {cleaning ? "Prüfe …" : "Ungenutzte löschen"}
           </button>
           <span className="text-xs text-white/45">Vor dem Löschen siehst du, wie viele es sind.</span>

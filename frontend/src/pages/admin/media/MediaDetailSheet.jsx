@@ -90,7 +90,7 @@ export function MediaDetailSheet({ item, onClose, onCopy, onRotateLeft, onRotate
               ))}
             </div>
             {onKeepDuplicate && (
-              <button type="button" onClick={onKeepDuplicate} data-testid="media-duplicate-keep" className="mt-2 min-h-11 rounded-sm border border-[#FFD700]/40 px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#FFD700] hover:bg-[#FFD700]/10">
+              <button type="button" onClick={onKeepDuplicate} data-testid="media-duplicate-keep" className="tls-btn tls-btn--quiet mt-2 min-h-11 rounded-sm text-xs font-bold uppercase tracking-wider">
                 Diese Datei behalten, Kopien ersetzen
               </button>
             )}

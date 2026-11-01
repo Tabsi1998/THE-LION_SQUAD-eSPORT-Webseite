@@ -359,7 +359,7 @@ export function AlbumPhotos({ album, onBack }) {
                 <option value={UNSECTIONED_VALUE}>Ohne Abschnitt</option>
                 {sections.map((section) => <option key={section.id} value={section.id}>{section.title}</option>)}
               </select>
-              <button type="button" disabled={bulkBusy} onClick={bulkRemove} data-testid="gallery-bulk-remove" className="min-h-10 px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-xs font-bold uppercase tracking-wider hover:bg-[#FF3B30]/10 disabled:opacity-50">
+              <button type="button" disabled={bulkBusy} onClick={bulkRemove} data-testid="gallery-bulk-remove" className="tls-btn tls-btn--danger min-h-10 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
                 Aus dem Album nehmen
               </button>
             </>

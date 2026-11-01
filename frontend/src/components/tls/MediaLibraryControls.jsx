@@ -32,7 +32,7 @@ export function MediaLibraryMore({ library, testId = "media-library" }) {
         onClick={library.loadMore}
         disabled={library.loadingMore}
         data-testid={`${testId}-more`}
-        className="min-h-11 rounded-sm border border-white/15 px-4 py-2 text-xs font-bold uppercase tracking-wider text-white/70 hover:bg-white/5 disabled:opacity-50"
+        className="tls-btn tls-btn--quiet min-h-11 rounded-sm text-xs font-bold uppercase tracking-wider"
       >
         {library.loadingMore ? "Lade …" : "Mehr laden"}
       </button>
