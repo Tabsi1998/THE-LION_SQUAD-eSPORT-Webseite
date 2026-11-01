@@ -301,6 +301,44 @@ async def test_copies_without_an_upload_entry_or_from_the_member_system_stay(flo
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("collection,document", [
+    ("partners", {"id": "p-1", "tools": [{"image_url": UPLOADS + "logo.png"}]}),
+    # Eine Stelle, die die Liste der Verwendungen nicht kennt: Das Netz darunter muss die PNG-Fassung auch erkennen.
+    ("neue_sammlung", {"id": "x-1", "bild": UPLOADS + "logo.png?v=1"}),
+])
+async def test_cleanup_keeps_an_svg_whose_png_is_shown(flow, public, collection, document):
+    await admin(flow)
+    add_file(public, "logo.svg", content=b"<svg/>", age=OLD)
+    add_file(public, "logo.png", content=b"png", age=OLD)
+    await track(flow, "logo.svg")
+    await getattr(flow.db, collection).insert_one(document)
+
+    preview = (await flow.get("/api/admin/media/unused")).json()
+
+    assert preview["filenames"] == []
+    response = await flow.post("/api/admin/media/cleanup-unused", json={"filenames": ["logo.svg"]})
+    assert response.json()["deleted"] == 0
+    assert (public / "logo.svg").exists() and (public / "logo.png").exists()
+
+
+@pytest.mark.asyncio
+async def test_replacing_an_svg_keeps_a_png_address_as_png(flow, public):
+    await admin(flow)
+    for stem in ("bleibt", "kopie"):
+        add_file(public, f"{stem}.svg", content=b"<svg/>", age=OLD)
+        add_file(public, f"{stem}.png", content=b"png" + stem.encode(), age=OLD)
+        await track(flow, f"{stem}.svg")
+    await flow.db.partners.insert_one({"id": "p-1", "logo_url": UPLOADS + "kopie.svg", "tools": [{"image_url": UPLOADS + "kopie.png"}]})
+
+    response = await flow.post("/api/admin/media/duplicates/replace", json={"keep": "bleibt.svg"})
+
+    assert response.status_code == 200, response.text
+    partner = await flow.db.partners.find_one({"id": "p-1"})
+    assert partner["logo_url"] == UPLOADS + "bleibt.svg"
+    assert partner["tools"][0]["image_url"] == UPLOADS + "bleibt.png"
+
+
+@pytest.mark.asyncio
 async def test_collective_actions_need_the_editorial_area(flow, public):
     moderator = await flow.add_user(role="moderator", name="moni")
     flow.act_as(moderator)

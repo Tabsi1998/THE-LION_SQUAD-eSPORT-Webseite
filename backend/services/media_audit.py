@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 from database import get_db
 from models import now_utc
 from services import uploads_inventory
-from services.media_formats import PUBLIC_MEDIA_EXTS
+from services.media_formats import PUBLIC_MEDIA_EXTS, bare_upload_url
 
 
 UPLOAD_DIR = pathlib.Path(os.environ.get("UPLOAD_DIR", "/app/backend/uploads"))
@@ -229,13 +229,21 @@ def stamp_for(collection: str, stamp: dict | None) -> dict | None:
 
 def canonical_name(value, candidates: dict[str, str]) -> str | None:
     """Der Dateiname hinter einer Adresse - ohne Query und Fragment, auch absolut; eine kleinere Fassung
-    (``variants/<name>-400.webp``) zählt als ihr Original. ``candidates``: Stamm → Dateiname."""
-    name = uploads_inventory.upload_filename(str(value or ""))
+    (``variants/<name>-400.webp``) zählt als ihr Original, die PNG-Fassung neben einem SVG-Logo als das SVG (#1952).
+    ``candidates``: Stamm → Dateiname."""
+    return _canonical_of(uploads_inventory.upload_filename(str(value or "")), candidates)
+
+
+def _canonical_of(name: str | None, candidates: dict[str, str]) -> str | None:
     if not name or name in candidates.values():
         return name
     variant = VARIANT_NAME.match(name)
     if variant and variant.group("stem") in candidates:
         return candidates[variant.group("stem")]
+    path = pathlib.PurePosixPath(name)
+    twin = candidates.get(path.stem)
+    if path.suffix.lower() == ".png" and twin and twin.lower().endswith(".svg"):
+        return twin
     return name
 
 
@@ -292,8 +300,11 @@ async def iter_usages(db, names: set[str]):
         projection = {"_id": 1, **{key: 1 for key in LABEL_FIELDS}, **{field: 1 for field, _text in fields}}
         async for document in getattr(db, collection).find(query, projection):
             for field, text in fields:
-                found = {canonical_name(url, candidates) for value in values_at(document, field)
-                         for url in (urls_in_text(value) if text else [value])}
+                # Steht die PNG-Fassung selbst in der Anfrage, zählt die Adresse für sie, nicht für das SVG daneben.
+                found = {raw if raw in names else _canonical_of(raw, candidates)
+                         for value in values_at(document, field)
+                         for url in (urls_in_text(value) if text else [value])
+                         for raw in [uploads_inventory.upload_filename(str(url or ""))]}
                 for name in sorted(found & names):
                     yield collection, document, field, name, text
 
@@ -350,8 +361,16 @@ async def stamp_version(db, filename: str, version: int, size: tuple[int, int], 
 
 
 async def repoint_usages(db, filename: str, target_url: str, stamp: dict | None = None) -> int:
-    """Jede Stelle, die ``filename`` zeigt, zeigt danach auf ``target_url`` (Duplikat ersetzen, #2122)."""
-    return len(await _rewrite_usages(db, filename, lambda _url: target_url, stamp))
+    """Jede Stelle, die ``filename`` zeigt, zeigt danach auf ``target_url`` (Duplikat ersetzen, #2122). Wer die
+    PNG-Fassung eines SVG-Logos zeigt - Mail, PDF, Teilen-Karte -, bekommt wieder eine PNG-Fassung."""
+    bare_target = bare_upload_url(target_url)
+    both_svg = filename.lower().endswith(".svg") and bare_target.lower().endswith(".svg")
+
+    def to_target(url):
+        wants_png = both_svg and str(uploads_inventory.upload_filename(str(url)) or "").lower().endswith(".png")
+        return f"{bare_target[:-4]}.png" if wants_png else target_url
+
+    return len(await _rewrite_usages(db, filename, to_target, stamp))
 
 
 async def still_referenced(db, names: set[str]) -> set[str]:
@@ -359,15 +378,15 @@ async def still_referenced(db, names: set[str]) -> set[str]:
     Sammlungen einmal durch (#2122). Steht eine Datei in einem Feld, das noch niemand eingetragen hat, bleibt sie."""
     if not names:
         return set()
-    references, _partial = await uploads_inventory.collect_references(db, set(names))
     stems = {pathlib.PurePosixPath(name).stem: name for name in names}
+    png_twins = {f"{stem}.png" for stem, name in stems.items() if name.lower().endswith(".svg")}
+    references, _partial = await uploads_inventory.collect_references(db, set(names) | png_twins)
     found: set[str] = set()
     for name, rows in references.items():
         if all(row["collection"] in NOT_A_USAGE for row in rows):
             continue
-        variant = VARIANT_NAME.match(name)
-        target = name if name in names else stems.get(variant.group("stem")) if variant else None
-        if target:
+        target = _canonical_of(name, stems)
+        if target in names:
             found.add(target)
     return found
 

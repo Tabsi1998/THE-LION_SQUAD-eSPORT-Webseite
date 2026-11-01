@@ -97,6 +97,27 @@ async def test_a_file_used_anywhere_counts_as_used_in_the_media_library(flow, pu
 
 
 @pytest.mark.asyncio
+async def test_the_png_next_to_an_svg_logo_counts_as_the_logo(flow, public):
+    await admin(flow)
+    (public / "logo.svg").write_bytes(b"<svg/>")
+    (public / "logo.png").write_bytes(b"png")
+    await flow.db.partners.insert_one({"id": "p-1", "tools": [{"name": "Tool", "image_url": UPLOADS + "logo.png"}]})
+
+    item = (await media_items(flow))["logo.svg"]
+
+    assert item["is_unused"] is False and item["usage_count"] == 1
+    refused = await flow.delete("/api/admin/media/logo.svg")
+    assert refused.status_code == 409
+    assert (public / "logo.png").exists()
+
+
+def test_a_requested_png_keeps_its_own_usage_next_to_the_svg():
+    assert media_audit.canonical_name(UPLOADS + "logo.png", {"logo": "logo.svg"}) == "logo.svg"
+    assert media_audit.canonical_name(UPLOADS + "logo.png", {"logo": "logo.png"}) == "logo.png"
+    assert media_audit.canonical_name(UPLOADS + "logo.png", {"logo": "logo.webp"}) == "logo.png"
+
+
+@pytest.mark.asyncio
 async def test_the_image_of_a_deleted_sticker_stays_while_old_messages_show_it(flow, public):
     await admin(flow)
     await flow.db.direct_messages.insert_one({"id": "m-1", "message": "geheim", "sticker": {"id": "s-weg", "url": URL}})
