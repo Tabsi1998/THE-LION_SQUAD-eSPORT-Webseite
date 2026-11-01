@@ -28,6 +28,12 @@ def _ms_to_time_str(ms: int | None) -> str:
     return f"{minutes}:{seconds:06.3f}" if minutes else f"{seconds:.3f}s"
 
 
+async def _negative_groups(db) -> dict[str, str]:
+    """Die Erfolgsgruppen, die einen Vorfall bedeuten: Code → Name."""
+    rows = await db.achievement_groups.find({"is_negative": True}, {"_id": 0, "code": 1, "name": 1}).to_list(200)
+    return {row["code"]: row.get("name") or row["code"] for row in rows}
+
+
 async def _collect_user_penalties(user_id: str) -> list[dict]:
     """Build a unified penalty timeline for a single user."""
     db = get_db()
@@ -88,7 +94,7 @@ async def _collect_user_penalties(user_id: str) -> list[dict]:
             t = tours.get(item.get("tournament_id"), {})
             out.append({
                 "kind": "match_forfeit",
-                "label": "Match verloren (Forfeit)",
+                "label": "Kampflos verloren",
                 "reason": item.get("reason") or "(keine Begründung)",
                 "context_title": t.get("title") or "Turnier",
                 "context_url": f"/tournaments/{t.get('slug') or t.get('id') or ''}",
@@ -100,20 +106,23 @@ async def _collect_user_penalties(user_id: str) -> list[dict]:
             })
 
     # --- Negative achievement awards (admin-issued incidents) ---
+    # „Negativ“ steht an der Gruppe, nicht an der Vergabe (#2125).
+    groups = await _negative_groups(db)
     neg = await db.user_achievements.find(
-        {"user_id": user_id, "is_negative": True},
+        {"user_id": user_id, "group_code": {"$in": sorted(groups)}},
         {"_id": 0},
-    ).sort("awarded_at", -1).to_list(500)
+    ).sort("earned_at", -1).to_list(500) if groups else []
     for n in neg:
+        context = n.get("context") or {}
         out.append({
             "kind": "incident",
-            "label": n.get("name") or n.get("code") or "Vorfall",
-            "reason": n.get("note") or n.get("context", {}).get("reason") or "(intern)",
+            "label": groups.get(n.get("group_code")) or "Vorfall",
+            "reason": context.get("note") or context.get("reason") or "(keine Begründung hinterlegt)",
             "context_title": "Verhalten / Vorfall",
             "context_url": "",
             "context_subtitle": "",
-            "issued_by": n.get("awarded_by"),
-            "issued_at": n.get("awarded_at"),
+            "issued_by": n.get("awarded_by") or context.get("by"),
+            "issued_at": n.get("earned_at"),
             "ref_id": n.get("id"),
         })
 
@@ -171,9 +180,11 @@ async def all_penalties(
             ).to_list(5000):
                 if registration.get("user_id"):
                     user_ids.add(registration["user_id"])
-        async for a in db.user_achievements.find({"is_negative": True}, {"_id": 0, "user_id": 1}):
-            if a.get("user_id"):
-                user_ids.add(a["user_id"])
+        groups = await _negative_groups(db)
+        if groups:
+            async for a in db.user_achievements.find({"group_code": {"$in": sorted(groups)}}, {"_id": 0, "user_id": 1}):
+                if a.get("user_id"):
+                    user_ids.add(a["user_id"])
 
         items = []
         for uid in user_ids:
@@ -192,7 +203,11 @@ async def all_penalties(
             it["user_display_name"] = u.get("display_name") or u.get("username")
             it["user_avatar_url"] = u.get("avatar_url")
 
+    # Die Zähler auf den Filterknöpfen gelten für alle Einträge - auch wenn gerade ein Filter aktiv ist (#2125).
+    counts: dict[str, int] = {"all": len(items)}
+    for item in items:
+        counts[item.get("kind")] = counts.get(item.get("kind"), 0) + 1
     if kind:
         items = [i for i in items if i.get("kind") == kind]
     items.sort(key=lambda x: x.get("issued_at") or "", reverse=True)
-    return {"count": len(items), "items": items[:limit]}
+    return {"count": len(items), "counts": counts, "items": items[:limit]}

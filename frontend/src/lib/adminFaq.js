@@ -56,7 +56,7 @@ export const FAQ_TOPICS = [
       { key: "saison", q: "Wie funktioniert die Jahreswertung?", a: "eSports → Jahreswertung: Saison anlegen, Punkte je Turnier und Fast Lap, Podien. Die Startseite zeigt die aktive Saison.", to: "/admin/seasons", label: "eSports → Saisons / Circuit" },
       { key: "spiele", q: "Wo pflege ich die Spiele und ihre Spieler-IDs?", a: "eSports → Spiele: Name, Logo, ob Solo/Teams/FFA, welche Spieler-ID gefragt wird.", to: "/admin/games", label: "eSports → Spiele" },
       { key: "gewinne", q: "Wie gebe ich Gewinne aus und halte die Abholung fest?", a: "eSports → Gewinne: Gewinn je Turnier, Empfänger, Abholung mit Unterschrift oder Vermerk.", to: "/admin/prizes", label: "eSports → Gewinne" },
-      { key: "strafen", q: "Wo sehe ich Strafzeiten, ungültige Runden und Forfeits?", a: "eSports → Strafen: alle Vorfälle nach Datum; Spieler sehen ihre eigenen unter „Meine Strafen“.", to: "/admin/penalties", label: "eSports → Strafen" },
+      { key: "strafen", q: "Wo sehe ich Strafzeiten, ungültige Runden und kampflose Niederlagen?", a: "eSports → Strafen: alle Vorfälle nach Datum; Spieler sehen ihre eigenen unter „Meine Strafen“.", to: "/admin/penalties", label: "eSports → Strafen" },
       { key: "gameserver", q: "Wie trage ich unsere Game-Server ein?", a: "eSports → Game-Server: Adresse, Spiel, Beschreibung; die Community-Seite zeigt Stand und Spieleranzahl.", to: "/admin/game-servers", label: "eSports → Game-Server" },
     ],
   },

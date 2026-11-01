@@ -13,8 +13,8 @@ import { viennaDateTime } from "@/lib/vienna";
 
 const KIND_META = {
   lap_penalty: { icon: Clock, color: "#FF9500", label: "Strafzeit" },
-  lap_invalid: { icon: Flag, color: "#FF3B30", label: "Lap Invalid" },
-  match_forfeit: { icon: ShieldAlert, color: "#FF3B30", label: "Forfeit" },
+  lap_invalid: { icon: Flag, color: "#FF3B30", label: "Runde ungültig" },
+  match_forfeit: { icon: ShieldAlert, color: "#FF3B30", label: "Kampflos verloren" },
   incident: { icon: AlertTriangle, color: "#FFD700", label: "Vorfall" },
 };
 
@@ -36,26 +36,23 @@ export default function AdminPenaltiesPage() {
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["penalties", "matches", "f1"]);
 
-  const counts = (() => {
-    const c = { all: data.items.length, lap_penalty: 0, lap_invalid: 0, match_forfeit: 0, incident: 0 };
-    data.items.forEach((i) => { c[i.kind] = (c[i.kind] || 0) + 1; });
-    return c;
-  })();
+  // Die Zähler kommen vom Server (#2125): mit aktivem Filter stünde sonst bei den anderen Knöpfen 0.
+  const counts = data.counts || {};
 
   return (
     <AdminLayout>
       <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FF3B30]">eSports</span>
       <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Strafen</h1>
       <p className="mt-2 text-white/55 text-sm max-w-2xl">
-        Alle Strafzeiten, ungültigen Runden, Forfeits und Vorfälle — sortiert nach Datum. Spieler sehen ihre eigenen Einträge unter „Meine Strafen".
+        Alle Strafzeiten, ungültigen Runden, kampflosen Niederlagen und Vorfälle – sortiert nach Datum. Spieler sehen ihre eigenen Einträge unter „Meine Strafen“.
       </p>
 
       <div className="mt-6 flex flex-wrap items-center gap-2">
         {[
           ["all", "Alle"],
           ["lap_penalty", "Strafzeit"],
-          ["lap_invalid", "Lap Invalid"],
-          ["match_forfeit", "Forfeit"],
+          ["lap_invalid", "Runde ungültig"],
+          ["match_forfeit", "Kampflos verloren"],
           ["incident", "Vorfall"],
         ].map(([k, label]) => (
           <button

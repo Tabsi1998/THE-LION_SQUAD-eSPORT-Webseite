@@ -19,7 +19,7 @@ import { showLapTime } from "@/lib/laptime";
 const KIND_META = {
   lap_penalty: { icon: Clock, color: "#FF9500", label: "Strafzeit" },
   lap_invalid: { icon: Flag, color: "#FF3B30", label: "Runde ungültig" },
-  match_forfeit: { icon: ShieldAlert, color: "#FF3B30", label: "Forfeit" },
+  match_forfeit: { icon: ShieldAlert, color: "#FF3B30", label: "Kampflos verloren" },
   incident: { icon: AlertTriangle, color: "#FFD700", label: "Vorfall" },
 };
 
@@ -36,7 +36,7 @@ export default function MyPenaltiesPage() {
         <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FF3B30]">Transparenz</span>
         <h1 className="mt-2 font-heading text-4xl md:text-5xl font-black uppercase">Meine Strafen</h1>
         <p className="mt-3 text-white/60 max-w-2xl">
-          Hier siehst du jede Strafe, ungültige Runde oder Forfeit-Entscheidung gegen dich — inklusive der vollständigen Begründung des Admins. Bei Fragen wende dich an den Vorstand.
+          Hier siehst du jede Strafe, ungültige Runde oder kampflose Niederlage – inklusive der vollständigen Begründung. Bei Fragen wende dich an den Vorstand.
         </p>
 
         {/* Verwarnungen mit Stufen (#416): der eigene Stand bei der Moderation samt Einspruch. */}
@@ -51,7 +51,7 @@ export default function MyPenaltiesPage() {
               <div className="border border-dashed border-white/15 rounded-sm p-12 text-center">
                 <ShieldAlert className="w-10 h-10 text-[#00FF88] mx-auto mb-3" />
                 <div className="font-heading text-xl font-bold uppercase">Saubere Weste</div>
-                <p className="mt-2 text-white/60 text-sm">Keine Strafen, keine ungültigen Runden, keine Forfeits — keep it up!</p>
+                <p className="mt-2 text-white/60 text-sm">Keine Strafen, keine ungültigen Runden, keine kampflosen Niederlagen – weiter so!</p>
               </div>
             )}
           >
