@@ -29,6 +29,10 @@
   Sie steht nicht in der Anmeldung der Person und nicht bei anderen Bereichen, ist aber ein Personendatum: Die Datenauskunft
   (Art. 15 DSGVO, Schlüssel `event_registrations`) liefert sie mit; die Kontolöschung leert sie. Im Adminprotokoll steht nur
   „geändert“, nicht der Text.
+- Person an der Tür (#2127): Die Turnierleitung trägt Personen ohne Konto mit Namen ein. Der Name steht nur bei der Leitung
+  und in ihrer Druckliste, nicht öffentlich und nicht im Adminprotokoll (dort nur die Kennung). Ohne Konto gibt es keine
+  Auskunft und Löschung über die Website: Das läuft über die Turnierleitung, die den Eintrag berichtigen oder löschen kann.
+  Nach der Frist des Adminprotokolls bleibt nur die Zählung; Name und Notizen werden gelöscht (Job `ops_retention`).
 - Partner-Plattform einer Turnierserie (#1964): Der Vorstand holt öffentliche Turniertage von der Plattform eines
   Partners (feste Adressliste, mit dem Partner abgesprochen, nur lesend). Übernommen werden nur Name wie beim
   Veranstalter (Riot-ID `Name#TAG`, Gäste ohne Tag), Platz, Punkte je Runde, Lobby, Partner im Double Up und

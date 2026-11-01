@@ -100,6 +100,40 @@ export default function EventLeadPage() {
     await change(row, { status });
   };
 
+  // Einträge an der Tür (#2127): ohne Konto lassen sie sich nur hier berichtigen oder löschen.
+  const renameWalkIn = async (row, name) => {
+    setBusyId(row.id);
+    try {
+      await api.patch(`/events/${event.id}/lead/walk-in/${row.id}`, { display_name: name });
+      toast.success("Name geändert.");
+      await load();
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail) || "Der Name ließ sich nicht ändern.");
+    } finally {
+      setBusyId("");
+    }
+  };
+  const deleteWalkIn = async (row) => {
+    if (!await confirm({
+      title: "Eintrag löschen?",
+      description: `„${row.display_name}“ wird samt Notiz gelöscht, der Platz wird frei. Das lässt sich nicht zurückholen.`,
+      confirmLabel: "Löschen",
+      cancelLabel: "Zurück",
+      tone: "danger",
+    })) return;
+    setBusyId(row.id);
+    try {
+      await api.delete(`/events/${event.id}/lead/walk-in/${row.id}`);
+      toast.success("Eintrag gelöscht.");
+      setSelectedId("");
+      await load();
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail) || "Der Eintrag ließ sich nicht löschen.");
+    } finally {
+      setBusyId("");
+    }
+  };
+
   const exportCsv = async () => {
     setExporting(true);
     try {
@@ -224,7 +258,7 @@ export default function EventLeadPage() {
                     onSelect={() => setSelectedId(selectedId === row.id ? "" : row.id)} onCheckIn={() => checkIn(row)}
                     onUndo={undoLast} onMoveUp={() => change(row, { status: "registered" })} />
                   {selectedId === row.id ? (
-                    <div className="lg:hidden mt-1"><Details row={row} event={event} busy={busyId === row.id} onChange={(payload) => change(row, payload)} onStatus={(status) => changeStatus(row, status)} /></div>
+                    <div className="lg:hidden mt-1"><Details row={row} event={event} busy={busyId === row.id} onChange={(payload) => change(row, payload)} onStatus={(status) => changeStatus(row, status)} onRename={(name) => renameWalkIn(row, name)} onDelete={() => deleteWalkIn(row)} /></div>
                   ) : null}
                 </div>
               ))}
@@ -233,7 +267,7 @@ export default function EventLeadPage() {
           </div>
           <aside className="hidden lg:block" data-testid="event-lead-aside">
             <div className="sticky top-[19rem]">
-              {selected ? <Details row={selected} event={event} busy={busyId === selected.id} onChange={(payload) => change(selected, payload)} onStatus={(status) => changeStatus(selected, status)} onClose={() => setSelectedId("")} /> : (
+              {selected ? <Details row={selected} event={event} busy={busyId === selected.id} onChange={(payload) => change(selected, payload)} onStatus={(status) => changeStatus(selected, status)} onRename={(name) => renameWalkIn(selected, name)} onDelete={() => deleteWalkIn(selected)} onClose={() => setSelectedId("")} /> : (
                 <div className="rounded-sm border border-dashed border-white/10 p-6 text-sm text-white/45">Tippe auf einen Namen für Details: Begleitpersonen, Notiz und Status.</div>
               )}
             </div>
@@ -276,7 +310,27 @@ function RegistrationRow({ row, busy, selected, showStatus, undoable, onSelect, 
   );
 }
 
-function Details({ row, event, busy, onChange, onStatus, onClose }) {
+function WalkInEdit({ row, busy, onRename, onDelete }) {
+  const [name, setName] = useState(row.display_name || "");
+  useEffect(() => { setName(row.display_name || ""); }, [row.id, row.display_name]);
+  const trimmed = name.trim();
+  return (
+    <div className="mt-4" data-testid="event-lead-walkin-edit">
+      <label className="block text-[11px] font-bold uppercase tracking-widest text-white/50">
+        Name
+        <input value={name} disabled={busy} onChange={(e) => setName(e.target.value)} maxLength={80} autoComplete="off" className="mt-1 block w-full min-h-[44px] rounded-sm border border-white/10 bg-[#0A0A0A] px-3 text-sm normal-case tracking-normal text-white" data-testid="event-lead-walkin-edit-name" />
+      </label>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {trimmed && trimmed !== row.display_name ? (
+          <button type="button" disabled={busy} onClick={() => onRename(trimmed)} className="tls-btn tls-btn--secondary min-h-[44px] px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid="event-lead-walkin-edit-save">Name speichern</button>
+        ) : null}
+        <button type="button" disabled={busy} onClick={onDelete} className="tls-btn tls-btn--quiet min-h-[44px] px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid="event-lead-walkin-delete">Eintrag löschen</button>
+      </div>
+    </div>
+  );
+}
+
+function Details({ row, event, busy, onChange, onStatus, onRename, onDelete, onClose }) {
   const maxCompanions = event.allow_companions ? event.max_companions_per_registration || 0 : 0;
   // Notizen stehen nicht in der Liste (Codex-Prüfung #1517) - die Detailansicht holt sie je Person.
   const [notes, setNotes] = useState(null);
@@ -314,6 +368,7 @@ function Details({ row, event, busy, onChange, onStatus, onClose }) {
           <button type="button" onClick={onClose} aria-label="Details schließen" className="tls-btn tls-btn--quiet shrink-0 p-2 rounded-sm"><X className="w-4 h-4" /></button>
         ) : null}
       </div>
+      {row.walk_in ? <WalkInEdit row={row} busy={busy} onRename={onRename} onDelete={onDelete} /> : null}
       <dl className="mt-3 space-y-2 text-sm">
         <div className="flex items-center justify-between gap-3">
           <dt className="text-white/50">Plätze</dt>

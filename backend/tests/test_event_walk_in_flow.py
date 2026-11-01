@@ -12,7 +12,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
 from models import now_utc  # noqa: E402
-from services import event_photos, feedback, xp  # noqa: E402
+from services import event_photos, feedback, ops_alerts, xp  # noqa: E402
 
 PAID = {"enabled": True, "positions": [{"key": "eintritt", "label": "Eintritt", "amount_cents": 1000, "basis": "per_person"}]}
 
@@ -57,8 +57,57 @@ async def test_nur_die_leitung_und_mit_protokoll(flow):
     assert row["display_name"] == "Gast Tür" and row["status"] == "checked_in" and row["walk_in"] is True and row["seat_count"] == 1
     assert "user_id" not in row
     audit = await flow.db.audit_logs.find_one({"action": "event.registration.walk_in"}, {"_id": 0})
-    assert audit["actor_id"] == lead["id"] and audit["data"]["registration_id"] == row["id"] and audit["data"]["display_name"] == "Gast Tür"
+    assert audit["actor_id"] == lead["id"] and audit["data"]["registration_id"] == row["id"]
+    assert "display_name" not in audit["data"], "im Protokoll nur die Kennung"
     assert (await walk_in(flow, event, name="   ")).status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_name_berichtigen_und_eintrag_loeschen_nur_leitung_nur_tuer_eintraege(flow):
+    lead, event = await setup(flow, max_participants=2)
+    row = (await walk_in(flow, event, name="Gast Falsch")).json()
+    url = f"/api/events/{event['slug']}/lead/walk-in/{row['id']}"
+    player = await flow.add_user(role="player", name="spieler")
+    flow.act_as(player)
+    own = (await flow.post(f"/api/events/{event['id']}/registrations", json={"companion_count": 0})).json()
+    assert (await flow.patch(url, json={"display_name": "Fremd"})).status_code == 403
+    denied = await flow.delete(url)
+    assert denied.status_code == 403
+
+    flow.act_as(lead)
+    renamed = await flow.patch(url, json={"display_name": "  Gast   Richtig "})
+    assert renamed.status_code == 200 and renamed.json()["display_name"] == "Gast Richtig" and renamed.json()["walk_in"] is True
+    assert (await flow.patch(url, json={"display_name": "  "})).status_code == 400
+    audit = await flow.db.audit_logs.find_one({"action": "event.registration.walk_in_rename"}, {"_id": 0})
+    assert audit["data"] == {"registration_id": row["id"]} and audit["actor_id"] == lead["id"]
+
+    # Anmeldungen mit Konto gehen nicht diesen Weg.
+    other = f"/api/events/{event['slug']}/lead/walk-in/{own['id']}"
+    assert (await flow.patch(other, json={"display_name": "Überschrieben"})).status_code == 404
+    refused = await flow.delete(other)
+    assert refused.status_code == 404
+    assert (await flow.db.event_registrations.find_one({"id": own["id"]}))["display_name"] != "Überschrieben"
+
+    # Voll: Löschen macht den Platz frei; danach ist nichts mehr vom Namen da.
+    assert (await walk_in(flow, event, name="Zu viel")).status_code == 400
+    deleted = await flow.delete(url)
+    assert deleted.status_code == 200
+    assert await flow.db.event_registrations.find_one({"id": row["id"]}) is None
+    audit = await flow.db.audit_logs.find_one({"action": "event.registration.walk_in_delete"}, {"_id": 0})
+    assert audit["data"] == {"registration_id": row["id"]}
+    assert (await walk_in(flow, event, name="Gast Neu")).status_code == 200
+    gone = await flow.delete(url)
+    assert gone.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_frist_loescht_name_und_notiz(flow):
+    _lead, event = await setup(flow)
+    row = (await walk_in(flow, event)).json()
+    await flow.patch(f"/api/events/{event['id']}/registrations/{row['id']}", json={"internal_note": "Gast Tür, Tel 0664 1234"})
+    await ops_alerts.purge_old_logs(flow.db, now=now_utc() + timedelta(days=800))
+    stored = await flow.db.event_registrations.find_one({"id": row["id"]}, {"_id": 0})
+    assert stored["display_name"] == "Teilnehmer" and stored["internal_note"] is None
 
 
 @pytest.mark.asyncio

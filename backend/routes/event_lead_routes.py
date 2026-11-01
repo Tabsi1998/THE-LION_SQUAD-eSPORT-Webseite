@@ -29,6 +29,10 @@ class EventLeadWalkIn(BaseModel):
     companion_count: int = Field(default=0, ge=0, le=20)
 
 
+class EventLeadWalkInName(BaseModel):
+    display_name: str = Field(max_length=80)
+
+
 async def _event(slug_or_id: str) -> dict:
     event, _ = await find_by_slug_or_history(get_db().events, slug_or_id, {"_id": 0})
     if not event:
@@ -80,6 +84,26 @@ async def event_lead_walk_in(slug_or_id: str, body: EventLeadWalkIn, me: dict = 
     event = await _event(slug_or_id)
     try:
         return await event_lead.add_walk_in(get_db(), event, me, display_name=body.display_name, companion_count=body.companion_count)
+    except LeadError as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.detail)
+
+
+@router.patch("/{slug_or_id}/lead/walk-in/{registration_id}")
+async def event_lead_walk_in_rename(slug_or_id: str, registration_id: str, body: EventLeadWalkInName, me: dict = Depends(require_admin())):
+    """Den Namen eines Eintrags an der Tür berichtigen - ohne Konto geht das nur hier."""
+    event = await _event(slug_or_id)
+    try:
+        return await event_lead.rename_walk_in(get_db(), event, me, registration_id, display_name=body.display_name)
+    except LeadError as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.detail)
+
+
+@router.delete("/{slug_or_id}/lead/walk-in/{registration_id}")
+async def event_lead_walk_in_delete(slug_or_id: str, registration_id: str, me: dict = Depends(require_admin())):
+    """Einen Eintrag an der Tür löschen - samt Name und Notizen, der Platz wird frei."""
+    event = await _event(slug_or_id)
+    try:
+        return await event_lead.delete_walk_in(get_db(), event, me, registration_id)
     except LeadError as exc:
         raise HTTPException(status_code=exc.status, detail=exc.detail)
 

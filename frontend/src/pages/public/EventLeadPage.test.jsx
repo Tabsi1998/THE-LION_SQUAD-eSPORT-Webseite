@@ -4,7 +4,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 // Anmeldungen & Einlass (#1372): Suche, Filter „noch nicht da“, Einchecken mit „Rückgängig“, Nachrücken und
 // „Nachricht an alle“ mit Vorschau und Bestätigung. Namen und Adressen sind erfunden.
 
-const apiMock = { get: vi.fn(), post: vi.fn(), patch: vi.fn() };
+const apiMock = { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, API_BASE: "", formatApiError: (value) => value }));
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { id: "s1" } }) }));
 vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <div>{children}</div> }));
@@ -273,6 +273,32 @@ test("Person an der Tür: ohne Freigabe vom Server kein Knopf; Eintrag ohne Kont
   fireEvent.change(within(details).getByTestId("event-lead-status"), { target: { value: "cancelled" } });
   await waitFor(() => expect(confirmMock).toHaveBeenCalled());
   expect(confirmMock.mock.lastCall[0].description).not.toContain("Nachricht");
+});
+
+test("Eintrag an der Tür: Name berichtigen und löschen; Anmeldungen mit Konto bieten das nicht an", async () => {
+  apiMock.patch.mockResolvedValue({ data: {} });
+  apiMock.delete.mockReset();
+  apiMock.delete.mockResolvedValue({ data: { ok: true } });
+  renderLead({ ...VIEW, registrations: [...ROWS, { id: "w1", display_name: "Gast Falsch", status: "registered", seat_count: 1, companion_count: 0, walk_in: true }] });
+  fireEvent.click(await screen.findByTestId("event-lead-name-r3"));
+  expect(within(screen.getAllByTestId("event-lead-details")[0]).queryByTestId("event-lead-walkin-edit")).toBeNull();
+
+  fireEvent.click(screen.getByTestId("event-lead-name-w1"));
+  const [details] = screen.getAllByTestId("event-lead-details");
+  expect(within(details).queryByTestId("event-lead-walkin-edit-save")).toBeNull();
+  fireEvent.change(within(details).getByTestId("event-lead-walkin-edit-name"), { target: { value: " Gast Richtig " } });
+  fireEvent.click(within(details).getByTestId("event-lead-walkin-edit-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/events/e1/lead/walk-in/w1", { display_name: "Gast Richtig" }));
+  await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Name geändert."));
+
+  confirmMock.mockResolvedValueOnce(false);
+  fireEvent.click(within(details).getByTestId("event-lead-walkin-delete"));
+  await waitFor(() => expect(confirmMock.mock.lastCall[0].title).toBe("Eintrag löschen?"));
+  expect(apiMock.delete).not.toHaveBeenCalled();
+  confirmMock.mockResolvedValueOnce(true);
+  fireEvent.click(within(details).getByTestId("event-lead-walkin-delete"));
+  await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith("/events/e1/lead/walk-in/w1"));
+  await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Eintrag gelöscht."));
 });
 
 test("voll: kein Hinweis auf einen freien Platz", async () => {

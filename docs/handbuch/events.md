@@ -240,8 +240,10 @@ diese eine Liste der Anmeldungen.
 - **Person an der Tür:** Jemand steht ohne Anmeldung da? Knopf **Person an der Tür**, Name eintragen (dazu Begleitpersonen, wenn erlaubt),
   **Eintragen**. Das geht ohne Konto und ohne Preis; die Person ist gleich **Da**, belegt einen Platz und steht im Protokoll. Ist das Event
   voll, sagt die Seite das: erst **Max. Teilnehmer** erhöhen oder eine Anmeldung stornieren. Eintragungen ohne Konto stehen nicht in der
-  öffentlichen Teilnehmerliste, bekommen keine Nachricht, keine Punkte und keine Rückfrage „Wie war …?“. Nach der Frist des Adminprotokolls
-  bleibt von ihnen nur die Zählung, der Name wird gelöscht.
+  öffentlichen Teilnehmerliste, bekommen keine Nachricht, keine Punkte und keine Rückfrage „Wie war …?“. Ein Tipp auf den Namen zeigt
+  **Name speichern** (bei einem Tippfehler) und **Eintrag löschen**. Ohne Konto gibt es keine Datenauskunft und keine Kontolöschung: Fragt jemand
+  danach, läuft das über die Turnierleitung – sie schaut in der Liste nach, berichtigt oder löscht den Eintrag. Im Protokoll steht nur die Kennung,
+  nicht der Name. Nach der Frist des Adminprotokolls bleibt von selbst nur die Zählung; Name und Notizen werden gelöscht.
 - **CSV:** lädt die Liste des gewählten Filters herunter – Name, Status, Plätze, Begleitpersonen, Anmeldedatum. Keine Mail-Adressen, keine Notizen,
   kein Geld. Jeder Abruf steht im Protokoll.
 - **Drucken:** öffnet die Druckansicht – Liste der Angemeldeten mit Kästchen zum Abhaken, Begleitpersonen, Warteliste,

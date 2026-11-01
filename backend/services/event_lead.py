@@ -235,11 +235,46 @@ async def add_walk_in(db, event: dict, me: dict, *, display_name: str, companion
     except MutationLockBusy:
         raise LeadError(409, SEAT_BUSY)
     doc.pop("_id", None)
+    # Im Protokoll nur die Kennung: den Namen löscht man an einer Stelle, nämlich am Eintrag.
     await db.audit_logs.insert_one({
         "id": new_id(), "action": "event.registration.walk_in", "target_id": event["id"], "actor_id": me["id"],
-        "data": {"registration_id": registration_id, "display_name": name, "companion_count": companions}, "created_at": now,
+        "data": {"registration_id": registration_id, "companion_count": companions}, "created_at": now,
     })
     return registration_row(doc)
+
+
+async def _walk_in(db, event: dict, registration_id: str) -> dict:
+    row = await db.event_registrations.find_one({"id": registration_id, "event_id": event["id"], "walk_in": True}, {"_id": 0})
+    if not row:
+        raise LeadError(404, "Eintrag nicht gefunden.")
+    return row
+
+
+async def rename_walk_in(db, event: dict, me: dict, registration_id: str, *, display_name: str) -> dict:
+    """Den Namen eines Eintrags an der Tür berichtigen (#2127): ohne Konto geht das nur hier."""
+    row = await _walk_in(db, event, registration_id)
+    name = " ".join(str(display_name or "").split())
+    if not name:
+        raise LeadError(400, "Bitte einen Namen eingeben.")
+    now = now_utc().isoformat()
+    await db.event_registrations.update_one({"id": row["id"]}, {"$set": {"display_name": name, "updated_at": now}})
+    await db.audit_logs.insert_one({
+        "id": new_id(), "action": "event.registration.walk_in_rename", "target_id": event["id"], "actor_id": me["id"],
+        "data": {"registration_id": row["id"]}, "created_at": now,
+    })
+    return registration_row({**row, "display_name": name, "updated_at": now})
+
+
+async def delete_walk_in(db, event: dict, me: dict, registration_id: str) -> dict:
+    """Einen Eintrag an der Tür löschen (#2127): samt Name und Notizen; der Platz wird frei. Einträge mit Konto gehen
+    nicht diesen Weg - die bleiben als Zählung und werden über das Konto gelöscht."""
+    row = await _walk_in(db, event, registration_id)
+    await db.event_registrations.delete_one({"id": row["id"]})
+    await db.audit_logs.insert_one({
+        "id": new_id(), "action": "event.registration.walk_in_delete", "target_id": event["id"], "actor_id": me["id"],
+        "data": {"registration_id": row["id"]}, "created_at": now_utc().isoformat(),
+    })
+    return {"ok": True}
 
 
 CSV_HEADER = ("Name", "Status", "Plätze", "Begleitpersonen", "Angemeldet am")
