@@ -69,6 +69,7 @@ def _cleanup_min_age_hours(raw: str | None) -> int:
 
 MEDIA_CLEANUP_MIN_AGE_HOURS = _cleanup_min_age_hours(os.environ.get("MEDIA_CLEANUP_MIN_AGE_HOURS"))
 MEDIA_CLEANUP_BATCH = 500
+MEDIA_CLEANUP_RECHECK_EVERY = 50
 UNDECIDED_SCANS = ("pending", "review", "blocked")
 
 # ============= Media Browser =============
@@ -416,15 +417,20 @@ async def admin_media_cleanup_unused(body: MediaCleanupBody, me: dict = Depends(
     db = get_db()
     still_unused = {item["filename"] for item in await _unused_for_cleanup()}
     deleted: list[str] = []
-    skipped: list[str] = []
+    skipped: list[str] = [name for name in dict.fromkeys(body.filenames) if name not in still_unused]
     pending = 0
-    for filename in dict.fromkeys(body.filenames):
-        if filename not in still_unused:
-            skipped.append(filename)
-            continue
-        if await account_erasure.remove_upload(db, filename):
-            pending += 1
-        deleted.append(filename)
+    wanted = [name for name in dict.fromkeys(body.filenames) if name in still_unused]
+    # Löschen dauert: Während eines großen Laufs kann jemand eine Datei einbauen. Darum vor jedem Stapel noch einmal fragen.
+    for start in range(0, len(wanted), MEDIA_CLEANUP_RECHECK_EVERY):
+        batch = wanted[start:start + MEDIA_CLEANUP_RECHECK_EVERY]
+        shown = await media_audit.still_referenced(db, set(batch))
+        for filename in batch:
+            if filename in shown:
+                skipped.append(filename)
+                continue
+            if await account_erasure.remove_upload(db, filename):
+                pending += 1
+            deleted.append(filename)
     await db.audit_logs.insert_one({
         "id": new_id(), "action": "media.cleanup_unused", "actor_id": me.get("id"), "target_id": None,
         "data": {"deleted": deleted, "skipped": skipped, "file_pending": pending},

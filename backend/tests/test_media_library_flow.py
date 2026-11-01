@@ -203,6 +203,32 @@ async def test_cleanup_checks_again_on_the_server_and_logs_the_action(flow, publ
 
 
 @pytest.mark.asyncio
+async def test_cleanup_asks_again_before_every_batch(flow, public, monkeypatch):
+    await admin(flow)
+    names = ["a.webp", "b.webp", "c.webp"]
+    for name in names:
+        add_file(public, name, age=OLD)
+        await track(flow, name)
+    monkeypatch.setattr(phase_fg_routes, "MEDIA_CLEANUP_RECHECK_EVERY", 1)
+    real = account_erasure.remove_upload
+
+    # Während „a“ gelöscht wird, baut jemand „b“ in einen neuen Beitrag ein - nach der ersten Prüfung des Laufs.
+    async def with_a_race(db, name):
+        await db.news_posts.insert_one({"id": f"n-{name}", "banner_url": UPLOADS + "b.webp"})
+        return await real(db, name)
+
+    monkeypatch.setattr(account_erasure, "remove_upload", with_a_race)
+    response = await flow.post("/api/admin/media/cleanup-unused", json={"filenames": names})
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {"ok": True, "deleted": 2, "skipped": 1, "file_pending": 0}
+    assert (public / "b.webp").exists()
+    assert not (public / "a.webp").exists() and not (public / "c.webp").exists()
+    log = await flow.db.audit_logs.find_one({"action": "media.cleanup_unused"})
+    assert log["data"]["skipped"] == ["b.webp"]
+
+
+@pytest.mark.asyncio
 async def test_replacing_a_duplicate_points_every_place_at_the_kept_file(flow, public):
     chef = await admin(flow)
     for name in ("bleibt.webp", "kopie.webp", "mitglied.webp"):
