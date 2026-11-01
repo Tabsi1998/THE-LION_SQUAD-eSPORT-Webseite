@@ -61,7 +61,7 @@ async def event_lead_export(slug_or_id: str, filter: str = "all", me: dict = Dep
     except LeadError as exc:
         raise HTTPException(status_code=exc.status, detail=exc.detail)
     name = re.sub(r"[^a-z0-9-]+", "-", str(event.get("slug") or event["id"]).lower()).strip("-") or "event"
-    return Response(content="﻿" + text, media_type="text/csv; charset=utf-8", headers={
+    return Response(content="\ufeff" + text, media_type="text/csv; charset=utf-8", headers={
         "Content-Disposition": f'attachment; filename="anmeldungen-{name}.csv"',
         "Cache-Control": "private, no-store",
     })
