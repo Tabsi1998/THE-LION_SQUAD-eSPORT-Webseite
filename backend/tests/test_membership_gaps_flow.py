@@ -312,17 +312,21 @@ async def test_exit_is_a_declaration_for_the_board_and_ending_clears_it(flow):
     erika = await flow.add_user(name="erika")
     await flow.db.memberships.insert_one({"user_id": erika["id"], "member_status": "active", "member_number": "TLS-2026-0001"})
     flow.act_as(erika)
-    declared = await flow.post("/api/membership/me/exit", json={"wished_last_day": "2030-12-31"})
+    today = date.fromisoformat(club_today())
+    past = (today - timedelta(days=1)).isoformat()
+    assert (await flow.post("/api/membership/me/exit", json={"wished_last_day": past})).status_code == 422
+    wished = (today + timedelta(days=30)).isoformat()
+    declared = await flow.post("/api/membership/me/exit", json={"wished_last_day": wished})
     assert declared.status_code == 200, declared.text
     stored = await flow.db.memberships.find_one({"user_id": erika["id"]})
     assert stored["member_status"] == "active", "die Mitgliedschaft läuft, bis der Vorstand sie beendet"
-    assert stored["exit_request"]["wished_last_day"] == "2030-12-31"
-    assert (await flow.get("/api/membership/me")).json()["membership"]["exit_request"]["wished_last_day"] == "2030-12-31"
+    assert stored["exit_request"]["wished_last_day"] == wished
+    assert (await flow.get("/api/membership/me")).json()["membership"]["exit_request"]["wished_last_day"] == wished
     assert (await flow.post("/api/membership/me/exit", json={})).json()["already"] is True
     assert await flow.db.audit_logs.count_documents({"action": "membership.exit_declared"}) == 1
     chair_doc = await flow.db.users.find_one({"id": chair["id"]})
     notice = await flow.db.mail_jobs.find_one({"to": chair_doc["email"], "template_key": "membership_exit_admin"})
-    assert notice and erika["username"] in notice["html"] or erika.get("display_name", "") in notice["html"]
+    assert notice and (erika.get("display_name") or erika["username"]) in notice["html"]
     assert await flow.db.notifications.count_documents({"user_id": erika["id"], "kind": "membership_decision"}) == 1
 
     # Zurücknehmen, solange der Vorstand nichts getan hat.

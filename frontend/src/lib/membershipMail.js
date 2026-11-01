@@ -11,7 +11,7 @@ const NOT_SENT = {
  * @returns {{ sent: boolean, text: string }}
  */
 export function mailOutcome(state) {
-  if (state === "queued") return { sent: true, text: "Die Mail an die Person ist versandt." };
+  if (state === "queued") return { sent: true, text: "Die Mail an die Person ist unterwegs." };
   if (state === "skipped") return { sent: true, text: "Ohne Mail, wie gewählt." };
   if (NOT_SENT[state]) return { sent: false, text: NOT_SENT[state] };
   return { sent: true, text: "" };

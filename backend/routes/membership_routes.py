@@ -1037,6 +1037,8 @@ async def declare_my_exit(body: SimpleExitBody, request: Request, me: dict = Dep
     if membership.get("exit_request"):
         return {"exit_request": membership["exit_request"], "already": True}
     wished = body.wished_last_day.isoformat() if body.wished_last_day else None
+    if wished and wished < club_today():
+        raise HTTPException(422, "Der Wunschtermin liegt in der Vergangenheit.")
     request_doc = {"declared_at": now_utc().isoformat(), "wished_last_day": wished}
     await db.memberships.update_one({"user_id": me["id"]}, {"$set": {"exit_request": request_doc, "updated_at": request_doc["declared_at"]}})
     await _audit(me["id"], "membership.exit_declared", me["id"], {"wished_last_day": wished})

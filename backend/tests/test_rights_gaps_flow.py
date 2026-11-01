@@ -179,6 +179,35 @@ async def test_a_post_on_the_account_also_blocks_deleting_the_profile(flow):
     assert (await flow.delete(f"/api/membership/profiles/admin/{profile_id}")).status_code == 409
 
 
+# ---------------------------------------------------------------- MG25: Vereinsdaten
+@pytest.mark.asyncio
+async def test_the_board_keeps_club_data_but_not_legal_texts_or_secrets(flow):
+    await flow.db.settings.insert_one({"id": "branding", "legal_name": "Alt", "terms_of_use": "Bedingungen", "site_title": "Titel", "discord_bot_token": "GEHEIM"})
+    chair = await granted(flow, "vorstand", "club")
+    flow.act_as(chair)
+    view = await flow.get("/api/settings/club-data")
+    assert view.status_code == 200 and view.json()["legal_name"] == "Alt" and view.json()["terms_of_use"] == "Bedingungen"
+    assert "site_title" not in view.json() and "GEHEIM" not in view.text
+
+    saved = await flow.put("/api/settings/club-data", json={"legal_name": "Neu", "phone": "0512"})
+    assert saved.status_code == 200, saved.text
+    stored = await flow.db.settings.find_one({"id": "branding"})
+    assert stored["legal_name"] == "Neu" and stored["phone"] == "0512" and stored["site_title"] == "Titel"
+    assert stored["legal_updated_at"]
+    audit = await flow.db.audit_logs.find_one({"action": "settings.club_data.update"})
+    assert audit["actor_id"] == chair["id"] and set(audit["data"]["changed_fields"]) == {"legal_name", "phone"}
+
+    # Rechtstexte, Branding und anderes gehen nicht diesen Weg.
+    for field in ("terms_of_use", "imprint", "site_title", "legal_from_dolibarr", "paid_tournaments_enabled"):
+        assert (await flow.put("/api/settings/club-data", json={field: "x"})).status_code == 422, field
+    assert (await flow.get("/api/settings/branding")).status_code == 403
+    assert (await flow.put("/api/settings/branding", json={"terms_of_use": "x"})).status_code == 403
+
+    flow.act_as(await flow.add_user(role="tournament_admin", name="turnierleitung"))
+    assert (await flow.get("/api/settings/club-data")).status_code == 403
+    assert (await flow.put("/api/settings/club-data", json={"phone": "1"})).status_code == 403
+
+
 # ---------------------------------------------------------------- MG1: Rechte-Verlauf
 @pytest.mark.asyncio
 async def test_rights_history_shows_only_this_person_to_the_club_area(flow):

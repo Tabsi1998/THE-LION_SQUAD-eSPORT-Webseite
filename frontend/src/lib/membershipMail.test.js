@@ -1,7 +1,7 @@
 import { exitLine, listLimitHint, mailOutcome, statusChangeSentence } from "./membershipMail";
 
 test("die Meldung sagt ehrlich, ob die Mail draußen ist (#2125)", () => {
-  expect(mailOutcome("queued")).toEqual({ sent: true, text: "Die Mail an die Person ist versandt." });
+  expect(mailOutcome("queued")).toEqual({ sent: true, text: "Die Mail an die Person ist unterwegs." });
   expect(mailOutcome("skipped").sent).toBe(true);
   for (const state of ["no_address", "mail_off", "failed"]) expect(mailOutcome(state).sent).toBe(false);
   expect(mailOutcome("no_address").text).toContain("keine Adresse");
