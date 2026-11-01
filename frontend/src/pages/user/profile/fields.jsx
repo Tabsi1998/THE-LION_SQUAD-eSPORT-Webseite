@@ -31,7 +31,7 @@ export function Field({ label, error = "", errorTestId, group = false, children 
     </label>
   );
 }
-export function Input({ value, onChange, placeholder, testId, type = "text", required = false, invalid = false }) {
+export function Input({ value, onChange, placeholder, testId, type = "text", required = false, invalid = false, maxLength }) {
   return (
     <input
       type={type}
