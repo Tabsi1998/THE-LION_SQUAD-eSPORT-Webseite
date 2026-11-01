@@ -211,3 +211,22 @@ async def test_discord_does_not_call_a_dismissed_team_registered(flow):
     await flow.db.tournament_registrations.update_one({"id": registration["id"]}, {"$set": {"rejection_dismissed_at": "2026-11-01T10:00:00+00:00"}})
     team, reason = await discord_registration._captain_team(flow.db, leader, tournament)
     assert team["id"] == team_id and reason is None
+
+
+@pytest.mark.asyncio
+async def test_new_registration_does_not_keep_the_old_lineup(flow):
+    tournament = await flow.create_tournament(team_mode="team", team_size=2)
+    leader = await flow.add_user(name=f"kapitaen-{new_id()[:6]}")
+    team_id = new_id()
+    await flow.db.teams.insert_one({"id": team_id, "name": "Rudel", "tag": "RDL", "leader_id": leader["id"], "co_leader_ids": [], "member_ids": [leader["id"]]})
+    registration = {"id": new_id(), "tournament_id": tournament["id"], "user_id": None, "team_id": team_id, "status": "rejected", "registration_type": "team",
+                    "display_name": "[RDL] Rudel", "rejection_dismissed_at": "2026-11-01T10:00:00+00:00", "lineup": [leader["id"]], "substitutes": ["alt"],
+                    "lineup_updated_at": "2026-10-01T10:00:00+00:00", "lineup_updated_by": leader["id"], "presence": {leader["id"]: "2026-10-01T10:00:00+00:00"},
+                    "presence_nudged_at": "2026-10-01T10:00:00+00:00"}
+    await flow.db.tournament_registrations.insert_one(dict(registration))
+    flow.act_as(leader)
+    fresh = await flow.post(f"/api/tournaments/{tournament['id']}/register", json={**BODY, "team_id": team_id})
+    assert fresh.status_code == 200 and fresh.json()["status"] == "pending"
+    stored = await _stored(flow, registration)
+    for field in ("lineup", "substitutes", "lineup_updated_at", "lineup_updated_by", "presence", "presence_nudged_at"):
+        assert field not in stored

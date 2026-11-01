@@ -124,10 +124,10 @@ WAITLIST_MOVE_UP_STATUSES = {"scheduled", "registration_open", "registration_clo
 ACTIVE_REGISTRATION_STATUSES = ["pending", "approved", "checked_in"]
 # Status, mit denen eine Anmeldung nicht (mehr) spielt - im festen Baum nur über Austritt oder Nicht erschienen.
 LEAVES_BRACKET_STATUSES = {"rejected", "waitlist", "pending"}
-# Was eine neue Anmeldung nach einer weggenommenen Ablehnung nicht mitnimmt (#2113): die Marke, die alte Bestätigung und
-# den alten Preis samt Beleg - den Preis friert erst die Freigabe neu ein.
+# Was eine neue Anmeldung nach einer weggenommenen Ablehnung nicht mitnimmt (#2113): die Marke, die alte Bestätigung, den
+# alten Preis samt Beleg (den Preis friert erst die Freigabe neu ein) und die Aufstellung samt „Wer ist da“ von damals.
 REOPEN_CLEARS = ("rejection_dismissed_at", "notified_status", "price_snapshot", "billing_status", "invoice_ref", "invoice_status",
-                 "payment_state")
+                 "payment_state", "lineup", "substitutes", "lineup_updated_at", "lineup_updated_by", "presence", "presence_nudged_at")
 SEED_FIXED = "Der Turnierbaum steht schon – Setzplätze ändern sich nur bis zum Ende des Check-ins."
 # Wer nicht (mehr) mitspielt, hält keinen Setzplatz fest - ein Ersatz darf den Platz einer fehlenden Person übernehmen.
 SEED_FREE_STATUSES = ["rejected", "no_show", "withdrawn", "disqualified", "cancelled"]
