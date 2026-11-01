@@ -222,7 +222,7 @@ test("Bestehende interne Notiz steht im Feld", async () => {
 test("CSV: lädt die Liste des gewählten Filters", async () => {
   URL.createObjectURL = vi.fn(() => "blob:liste");
   URL.revokeObjectURL = vi.fn();
-  const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+  const click = vi.spyOn(window.HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
   try {
     apiMock.get.mockResolvedValue({ data: VIEW });
     renderLead();

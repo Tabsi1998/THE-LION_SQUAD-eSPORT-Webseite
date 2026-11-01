@@ -200,9 +200,9 @@ export default function EventLeadPage() {
           <div>
             {/* Niemand rückt von selbst nach (#2127, EV6): die Leitung sieht den freien Platz und entscheidet. */}
             {freeHint ? (
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-sm border border-[#FFD700]/35 bg-[#FFD700]/5 px-4 py-3" role="status" data-testid="event-lead-free-hint">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-sm border border-honor/35 bg-honor/5 px-4 py-3" role="status" data-testid="event-lead-free-hint">
                 <div className="min-w-0">
-                  <div className="text-sm font-bold text-[#FFD700]">{freeHint.text}</div>
+                  <div className="text-sm font-bold text-honor">{freeHint.text}</div>
                   <div className="text-xs text-white/60 [overflow-wrap:anywhere]">{freeHint.next}</div>
                 </div>
                 {filter !== "waitlist" ? (
@@ -490,7 +490,7 @@ function WalkInDialog({ event, rows, onClose, onAdded }) {
           {/* eslint-disable-next-line jsx-a11y/no-autofocus -- an der Tür geht es direkt mit dem Tippen los */}
           <input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} autoFocus autoComplete="off" className="mt-1 block w-full min-h-[48px] rounded-sm border border-white/10 bg-[#0A0A0A] px-3 text-base normal-case tracking-normal text-white" data-testid="event-lead-walkin-name" />
         </label>
-        {twin ? <p className="mt-2 text-xs text-[#FFD700]" data-testid="event-lead-walkin-twin">„{twin.display_name}“ steht schon in der Liste ({STATUS_LABELS[twin.status] || twin.status}). Trotzdem eintragen, wenn es eine andere Person ist.</p> : null}
+        {twin ? <p className="mt-2 text-xs text-honor" data-testid="event-lead-walkin-twin">„{twin.display_name}“ steht schon in der Liste ({STATUS_LABELS[twin.status] || twin.status}). Trotzdem eintragen, wenn es eine andere Person ist.</p> : null}
         {maxCompanions ? (
           <label className="mt-4 block text-[11px] font-bold uppercase tracking-widest text-white/50">
             Begleitpersonen

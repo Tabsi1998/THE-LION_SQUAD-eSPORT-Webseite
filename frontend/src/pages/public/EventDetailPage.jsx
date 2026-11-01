@@ -818,7 +818,7 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
             </fieldset>
           )}
           {waitlisted && (
-            <div className="border border-[#FFD700]/40 bg-[#FFD700]/5 rounded-sm p-3 text-sm text-white/85" data-testid="event-waitlist-note">
+            <div className="border border-honor/40 bg-honor/5 rounded-sm p-3 text-sm text-white/85" data-testid="event-waitlist-note">
               {waitlisted}{quote && !quote.free ? " Bezahlt wird erst, wenn du nachrückst." : ""}
             </div>
           )}
