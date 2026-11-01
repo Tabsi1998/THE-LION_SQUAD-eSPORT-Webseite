@@ -280,7 +280,7 @@ function Details({ row, event, busy, onChange, onStatus, onClose }) {
   const maxCompanions = event.allow_companions ? event.max_companions_per_registration || 0 : 0;
   // Notizen stehen nicht in der Liste (Codex-Prüfung #1517) - die Detailansicht holt sie je Person.
   const [notes, setNotes] = useState(null);
-  // Interne Notiz (#2127, EV15): nur für die Leitung; leer gespeichert löscht sie.
+  // Interne Notiz (#2127, EV15): leer gespeichert löscht sie.
   const [noteDraft, setNoteDraft] = useState("");
   useEffect(() => {
     let alive = true;
@@ -342,8 +342,10 @@ function Details({ row, event, busy, onChange, onStatus, onClose }) {
       </dl>
       <label className="mt-4 block text-[11px] font-bold uppercase tracking-widest text-white/50">
         Interne Notiz
-        <textarea value={noteDraft} disabled={busy || notes?.error} onChange={(e) => setNoteDraft(e.target.value.slice(0, INTERNAL_NOTE_MAX))} rows={2} placeholder="Sieht nur die Turnierleitung" className="mt-1 block w-full rounded-sm border border-white/10 bg-[#0A0A0A] p-2 text-sm normal-case tracking-normal text-white placeholder:text-white/35" data-testid="event-lead-internal-note" />
+        <textarea value={noteDraft} disabled={busy || notes?.error} onChange={(e) => setNoteDraft(e.target.value.slice(0, INTERNAL_NOTE_MAX))} rows={2} className="mt-1 block w-full rounded-sm border border-white/10 bg-[#0A0A0A] p-2 text-sm normal-case tracking-normal text-white" data-testid="event-lead-internal-note" />
       </label>
+      {/* Ein Personendatum (Art. 15 DSGVO): nichts versprechen, was die Datenauskunft nicht hält. */}
+      <p className="mt-1 text-xs text-white/45" data-testid="event-lead-internal-note-hint">Für die Turnierleitung. Die Person sieht sie nicht in der Anmeldung; bei einer Datenauskunft wird sie mitgeliefert.</p>
       {noteChanged ? (
         <button type="button" disabled={busy} onClick={saveNote} className="tls-btn tls-btn--secondary mt-2 min-h-[44px] px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid="event-lead-internal-note-save">Notiz speichern</button>
       ) : null}

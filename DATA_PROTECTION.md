@@ -25,6 +25,10 @@
   setzt der Server ein technisch notwendiges, HttpOnly-Cookie `tls_onsite` nur unter `/api`: Turnier-Kennung, Ablauf und
   Signatur, ohne Angaben zur Person, höchstens 12 Stunden und nie über das Turnierende hinaus. Eine Anmeldung darüber
   trägt `registered_via: "onsite"`.
+- Interne Notiz an einer Event-Anmeldung (#2127): Die Turnierleitung schreibt sie auf der Seite „Anmeldungen & Einlass“.
+  Sie steht nicht in der Anmeldung der Person und nicht bei anderen Bereichen, ist aber ein Personendatum: Die Datenauskunft
+  (Art. 15 DSGVO, Schlüssel `event_registrations`) liefert sie mit; die Kontolöschung leert sie. Im Adminprotokoll steht nur
+  „geändert“, nicht der Text.
 - Partner-Plattform einer Turnierserie (#1964): Der Vorstand holt öffentliche Turniertage von der Plattform eines
   Partners (feste Adressliste, mit dem Partner abgesprochen, nur lesend). Übernommen werden nur Name wie beim
   Veranstalter (Riot-ID `Name#TAG`, Gäste ohne Tag), Platz, Punkte je Runde, Lobby, Partner im Double Up und

@@ -195,6 +195,7 @@ test("Interne Notiz: eintragen, speichern, leeren", async () => {
   fireEvent.click(await screen.findByTestId("event-lead-name-r3"));
   const [details] = screen.getAllByTestId("event-lead-details");
   expect(within(details).queryByTestId("event-lead-internal-note-save")).toBeNull();
+  expect(within(details).getByTestId("event-lead-internal-note-hint")).toHaveTextContent("bei einer Datenauskunft wird sie mitgeliefert");
 
   fireEvent.change(within(details).getByTestId("event-lead-internal-note"), { target: { value: "  zahlt an der Tür " } });
   fireEvent.click(within(details).getByTestId("event-lead-internal-note-save"));

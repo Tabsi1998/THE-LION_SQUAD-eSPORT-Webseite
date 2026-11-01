@@ -226,8 +226,9 @@ diese eine Liste der Anmeldungen.
   Nächstes dran ist, und **Zur Warteliste**. Die Warteliste steht in der Reihenfolge der Anmeldung.
 - **Nachrücken:** Unter **Warteliste** der Knopf **Nachrücken**. Die Person bekommt Bescheid. Ist kein Platz frei, kommt „Kapazität wäre
   überschritten“.
-- **Details:** Ein Tipp auf den Namen zeigt Plätze, **Begleitpersonen** (mit − und +), die Notiz der Person, die **Interne Notiz** (nur für die
-  Leitung, **Notiz speichern**; leer speichern löscht sie), die Mail-Adresse **gekürzt** (`p***@…`) und den **Status** zum Ändern:
+- **Details:** Ein Tipp auf den Namen zeigt Plätze, **Begleitpersonen** (mit − und +), die Notiz der Person, die **Interne Notiz** (für die
+  Leitung, **Notiz speichern**; leer speichern löscht sie. Die Person sieht sie nicht in der Anmeldung, bei einer Datenauskunft wird sie aber
+  mitgeliefert – schreibt also nur hinein, was sie lesen darf), die Mail-Adresse **gekürzt** (`p***@…`) und den **Status** zum Ändern:
   **Angemeldet**, **Da**, **Warteliste**, **Nicht erschienen**, **Storniert**. Am Handy klappen die Details unter der Zeile auf, auf Tablet
   quer und PC stehen sie rechts neben der Liste.
 - **Da** (eingecheckt) heißt: die Person war da. Das bringt ihr einen Eintrag in der Jahreswertung, XP und kann Erfolge
