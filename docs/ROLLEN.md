@@ -434,6 +434,9 @@ Benachrichtigungen ab. Es hängt nicht am Newsletter.
 - **Felder und Stufen:** Die Stufen unter Einstellungen → Privatsphäre gelten für Kontakt, Website, Gaming-Abos und die
   bevorzugte Rolle. TikTok und die bevorzugte Rolle sind ohne gewählte Stufe privat, weil beide früher nirgends erschienen.
   Die E-Mail ist nie öffentlich und hat darum keinen Schalter.
+- **Profiltexte:** Anzeigename höchstens 50, Bio 1000, bevorzugte Rolle 40 Zeichen, ohne Leerzeichen am Rand. Geprüft wird nur,
+  was sich ändert; ältere längere Werte bleiben, bis jemand sie ändert. Die bevorzugte Rolle läuft durch den Wortfilter.
+- **Teams im Profil:** nur öffentliche Teams, nur Name, Kürzel, Logo und Beschreibung.
 - **„Erfolge öffentlich“ aus** gilt auch für Spielerliste, Jahreswertung (Zahl und Punkte stehen auf 0) und Kronen.
 - **Direktnachrichten:** Die Moderation erreicht jede Person, auch bei „Nur Moderation und Admins“ oder „Niemand außer der
   Moderation“.
