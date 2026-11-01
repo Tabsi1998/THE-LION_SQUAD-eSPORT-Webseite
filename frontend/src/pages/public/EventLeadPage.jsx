@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Check, Download, Megaphone, Minus, Plus, Search, Undo2, Users, X } from "lucide-react";
+import { Check, Download, Megaphone, Minus, Plus, Search, Undo2, UserPlus, Users, X } from "lucide-react";
 import { PrintLink } from "@/components/tls/print/PrintLink";
 import { toast } from "sonner";
 import { PublicLayout } from "@/components/tls/PublicLayout";
@@ -13,7 +13,7 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { viennaDateTime } from "@/lib/vienna";
 import {
   LEAD_FILTERS, MESSAGE_MAX, MESSAGE_TEMPLATES, STATUS_LABELS,
-  changeText, companionsText, counterText, filterRows, leadCounts, messagePreview, seatsText, statusQuestion, waitlistHint,
+  changeText, companionsText, counterText, filterRows, leadCounts, messagePreview, normalizeName, seatsText, statusQuestion, waitlistHint,
 } from "@/lib/eventLead";
 
 // Anmeldungen & Einlass (#1372): /events/<slug>/leitung - nur für die Turnierleitung. An der Tür (Handy): Suchfeld und
@@ -38,6 +38,7 @@ export default function EventLeadPage() {
   const [undo, setUndo] = useState(null);
   const [messageOpen, setMessageOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [walkInOpen, setWalkInOpen] = useState(false);
   const searchRef = useRef(null);
   const confirm = useConfirm();
 
@@ -153,6 +154,11 @@ export default function EventLeadPage() {
             {event.start_date ? <div className="mt-1 text-sm text-white/50">{viennaDateTime(event.start_date, { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</div> : null}
           </div>
           <div className="flex flex-wrap gap-2">
+            {data?.can_add_walk_in ? (
+              <button type="button" onClick={() => setWalkInOpen(true)} className="tls-btn tls-btn--primary inline-flex min-h-[44px] items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid="event-lead-walkin-open">
+                <UserPlus className="w-4 h-4" /> Person an der Tür
+              </button>
+            ) : null}
             {data?.can_message ? (
               <button type="button" onClick={() => setMessageOpen(true)} className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid="event-lead-message-open">
                 <Megaphone className="w-4 h-4" /> Nachricht an alle
@@ -238,6 +244,7 @@ export default function EventLeadPage() {
 
       {undo ? <UndoBar undo={undo} onUndo={undoLast} /> : null}
       {messageOpen ? <MessageDialog event={event} recipients={data?.message_recipients || 0} onClose={() => setMessageOpen(false)} onSent={load} /> : null}
+      {walkInOpen ? <WalkInDialog event={event} rows={rows} onClose={() => setWalkInOpen(false)} onAdded={load} /> : null}
     </PublicLayout>
   );
 }
@@ -246,7 +253,7 @@ export default function EventLeadPage() {
 // in den Details der Person.
 function RegistrationRow({ row, busy, selected, showStatus, undoable, onSelect, onCheckIn, onUndo, onMoveUp }) {
   const here = row.status === "checked_in";
-  const sub = [companionsText(row), row.has_note ? "Notiz" : "", showStatus ? STATUS_LABELS[row.status] || row.status : ""].filter(Boolean).join(" · ");
+  const sub = [row.walk_in ? "An der Tür" : "", companionsText(row), row.has_note ? "Notiz" : "", showStatus ? STATUS_LABELS[row.status] || row.status : ""].filter(Boolean).join(" · ");
   return (
     <div className={`flex items-center gap-3 rounded-sm border p-3 ${selected ? "border-[#29B6E8]/60 bg-[#29B6E8]/5" : "border-white/10 bg-[#121212]"}`} data-testid={`event-lead-row-${row.id}`} data-status={row.status}>
       <button type="button" onClick={onSelect} aria-expanded={selected} className="min-w-0 flex-1 text-left" data-testid={`event-lead-name-${row.id}`}>
@@ -301,6 +308,7 @@ function Details({ row, event, busy, onChange, onStatus, onClose }) {
         <div className="min-w-0">
           <div className="text-lg font-bold text-white [overflow-wrap:anywhere]">{row.display_name}</div>
           {row.email_masked ? <div className="text-xs text-white/45" data-testid="event-lead-mail">{row.email_masked}</div> : null}
+          {row.walk_in ? <div className="text-xs text-white/45" data-testid="event-lead-walkin-note">An der Tür eingetragen, ohne Konto und ohne Preis.</div> : null}
         </div>
         {onClose ? (
           <button type="button" onClick={onClose} aria-label="Details schließen" className="tls-btn tls-btn--quiet shrink-0 p-2 rounded-sm"><X className="w-4 h-4" /></button>
@@ -431,6 +439,69 @@ function MessageDialog({ event, recipients, onClose, onSent }) {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+// „Person an der Tür hinzufügen“ (#2127, EV17): nur ein Name, ohne Konto und ohne Preis - die Person ist danach gleich „Da“.
+function WalkInDialog({ event, rows, onClose, onAdded }) {
+  const [name, setName] = useState("");
+  const [companions, setCompanions] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const maxCompanions = event.allow_companions ? event.max_companions_per_registration || 0 : 0;
+  const trimmed = name.trim();
+  const twin = rows.find((row) => normalizeName(row.display_name) === normalizeName(trimmed) && trimmed);
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!trimmed || saving) return;
+    setSaving(true);
+    try {
+      const { data } = await api.post(`/events/${event.id}/lead/walk-in`, { display_name: trimmed, companion_count: Number(companions) || 0 });
+      toast.success(`${data.display_name} ist da.`);
+      await onAdded();
+      onClose();
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail) || "Die Person ließ sich nicht eintragen.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/70 p-0 sm:p-4 print:hidden" role="dialog" aria-modal="true" aria-labelledby="event-lead-walkin-title" data-testid="event-lead-walkin">
+      <form onSubmit={submit} className="w-full max-w-lg rounded-t-lg sm:rounded-sm border border-white/10 bg-[#121212] p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Person an der Tür hinzufügen</div>
+            <h2 id="event-lead-walkin-title" className="mt-1 font-heading text-lg font-black uppercase [overflow-wrap:anywhere]">{event.name}</h2>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Schließen" className="tls-btn tls-btn--quiet shrink-0 p-2 rounded-sm"><X className="w-4 h-4" /></button>
+        </div>
+        <p className="mt-3 text-sm text-white/65">Ohne Konto und ohne Preis. Die Person ist danach gleich „Da“, belegt einen Platz und steht im Protokoll. Öffentlich steht ihr Name nicht.</p>
+        <label className="mt-4 block text-[11px] font-bold uppercase tracking-widest text-white/50">
+          Name
+          {/* eslint-disable-next-line jsx-a11y/no-autofocus -- an der Tür geht es direkt mit dem Tippen los */}
+          <input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} autoFocus autoComplete="off" className="mt-1 block w-full min-h-[48px] rounded-sm border border-white/10 bg-[#0A0A0A] px-3 text-base normal-case tracking-normal text-white" data-testid="event-lead-walkin-name" />
+        </label>
+        {twin ? <p className="mt-2 text-xs text-[#FFD700]" data-testid="event-lead-walkin-twin">„{twin.display_name}“ steht schon in der Liste ({STATUS_LABELS[twin.status] || twin.status}). Trotzdem eintragen, wenn es eine andere Person ist.</p> : null}
+        {maxCompanions ? (
+          <label className="mt-4 block text-[11px] font-bold uppercase tracking-widest text-white/50">
+            Begleitpersonen
+            <input type="number" min="0" max={maxCompanions} value={companions} onChange={(e) => setCompanions(e.target.value)} className="mt-1 block w-28 min-h-[44px] rounded-sm border border-white/10 bg-[#0A0A0A] px-3 text-sm normal-case tracking-normal text-white" data-testid="event-lead-walkin-companions" />
+          </label>
+        ) : null}
+        <div className="mt-5 flex justify-end gap-2">
+          <button type="button" onClick={onClose} className="tls-btn tls-btn--quiet min-h-[44px] px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">Abbrechen</button>
+          <button type="submit" disabled={!trimmed || saving} className="tls-btn tls-btn--primary min-h-[44px] px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid="event-lead-walkin-save">{saving ? "Wird eingetragen …" : "Eintragen"}</button>
+        </div>
+      </form>
     </div>
   );
 }

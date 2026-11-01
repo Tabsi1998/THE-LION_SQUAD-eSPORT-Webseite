@@ -151,7 +151,7 @@ async def active_user_ids(db, year: int) -> set[str]:
         users |= {row["user_id"] for row in await db.team_members.find({"team_id": {"$in": team_ids}}, {"_id": 0, "user_id": 1}).to_list(100000) if row.get("user_id")}
     events = await _year_events(db, year)
     if events:
-        users |= {row["user_id"] for row in await db.event_registrations.find({"event_id": {"$in": list(events)}, "status": "checked_in"},
+        users |= {row["user_id"] for row in await db.event_registrations.find({"event_id": {"$in": list(events)}, "status": "checked_in", "walk_in": {"$ne": True}},
                                                                              {"_id": 0, "user_id": 1}).to_list(100000) if row.get("user_id")}
     return users | await _lap_users(db, year)
 

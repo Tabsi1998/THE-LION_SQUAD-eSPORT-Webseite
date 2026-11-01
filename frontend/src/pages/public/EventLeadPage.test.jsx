@@ -239,6 +239,41 @@ test("CSV: lädt die Liste des gewählten Filters", async () => {
   }
 });
 
+test("Person an der Tür: Name genügt, Hinweis bei gleichem Namen, Ablehnung bleibt im Fenster", async () => {
+  renderLead({ ...VIEW, can_add_walk_in: true });
+  fireEvent.click(await screen.findByTestId("event-lead-walkin-open"));
+  expect(screen.getByTestId("event-lead-walkin-save")).toBeDisabled();
+
+  fireEvent.change(screen.getByTestId("event-lead-walkin-name"), { target: { value: "zoe adler" } });
+  expect(screen.getByTestId("event-lead-walkin-twin")).toHaveTextContent("„Zoë Adler“ steht schon in der Liste");
+
+  apiMock.post.mockRejectedValueOnce({ response: { status: 400, data: { detail: "Das Event ist voll." } } });
+  fireEvent.click(screen.getByTestId("event-lead-walkin-save"));
+  await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Das Event ist voll."));
+  expect(screen.getByTestId("event-lead-walkin")).toBeInTheDocument();
+
+  apiMock.post.mockResolvedValueOnce({ data: { id: "w1", display_name: "Gast Neu", status: "checked_in", walk_in: true } });
+  fireEvent.change(screen.getByTestId("event-lead-walkin-name"), { target: { value: " Gast Neu " } });
+  fireEvent.change(screen.getByTestId("event-lead-walkin-companions"), { target: { value: "1" } });
+  fireEvent.click(screen.getByTestId("event-lead-walkin-save"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenLastCalledWith("/events/e1/lead/walk-in", { display_name: "Gast Neu", companion_count: 1 }));
+  await waitFor(() => expect(screen.queryByTestId("event-lead-walkin")).toBeNull());
+  expect(toast.success).toHaveBeenCalledWith("Gast Neu ist da.");
+});
+
+test("Person an der Tür: ohne Freigabe vom Server kein Knopf; Eintrag ohne Konto ist gekennzeichnet", async () => {
+  renderLead({ ...VIEW, registrations: [...ROWS, { id: "w1", display_name: "Gast Tür", status: "registered", seat_count: 1, companion_count: 0, walk_in: true }] });
+  fireEvent.click(await screen.findByTestId("event-lead-name-w1"));
+  expect(screen.queryByTestId("event-lead-walkin-open")).toBeNull();
+  expect(screen.getByTestId("event-lead-row-w1")).toHaveTextContent("An der Tür");
+  const [details] = screen.getAllByTestId("event-lead-details");
+  expect(within(details).getByTestId("event-lead-walkin-note")).toHaveTextContent("ohne Konto und ohne Preis");
+  // Niemand bekommt eine Nachricht: die Rückfrage sagt das auch nicht.
+  fireEvent.change(within(details).getByTestId("event-lead-status"), { target: { value: "cancelled" } });
+  await waitFor(() => expect(confirmMock).toHaveBeenCalled());
+  expect(confirmMock.mock.lastCall[0].description).not.toContain("Nachricht");
+});
+
 test("voll: kein Hinweis auf einen freien Platz", async () => {
   renderLead({ ...VIEW, event: { ...VIEW.event, max_participants: 4 } });
   expect(await screen.findByTestId("event-lead-counter")).toBeInTheDocument();

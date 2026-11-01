@@ -28,7 +28,7 @@ from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
 from services.csv_safe import safe_cell
-from services.event_registration import seats
+from services.event_registration import SEAT_BUSY, SEAT_WAIT_SECONDS, RegistrationError, seat_resource, seats, summary, validated_companion_count
 from services.log_safe import log_safe, mask_addresses
 from services.mutation_lock import MutationLockBusy, mutation_lock
 from services.public_phase import parse_dt
@@ -87,6 +87,8 @@ def registration_row(registration: dict, *, full: bool = True) -> dict:
             "created_at": registration.get("created_at"),
             "updated_at": registration.get("updated_at"),
         })
+    if registration.get("walk_in"):
+        row["walk_in"] = True
     return row
 
 
@@ -95,7 +97,7 @@ async def registration_detail(db, event: dict, registration_id: str) -> dict:
     registration = await db.event_registrations.find_one(
         {"id": registration_id, "event_id": event["id"]},
         {"_id": 0, "id": 1, "display_name": 1, "status": 1, "companion_count": 1, "seat_count": 1, "email": 1, "note": 1,
-         "internal_note": 1, "created_at": 1, "updated_at": 1},
+         "internal_note": 1, "walk_in": 1, "created_at": 1, "updated_at": 1},
     )
     if not registration:
         raise LeadError(404, "Anmeldung nicht gefunden")
@@ -132,7 +134,7 @@ async def _registrations(db, event: dict) -> list[dict]:
     return await db.event_registrations.find(
         {"event_id": event["id"]},
         {"_id": 0, "id": 1, "user_id": 1, "display_name": 1, "status": 1, "companion_count": 1, "seat_count": 1,
-         "email": 1, "note": 1, "internal_note": 1, "created_at": 1, "updated_at": 1},
+         "email": 1, "note": 1, "internal_note": 1, "walk_in": 1, "created_at": 1, "updated_at": 1},
     ).to_list(5000)
 
 
@@ -184,7 +186,60 @@ async def lead_view(db, event: dict, *, query: str = "", filter_key: str = "open
     if full:
         view["message_recipients"] = len(await recipient_ids(db, event))
         view["messages"] = await message_log(db, event)
+        view["can_add_walk_in"] = walk_in_block_reason(event) is None
     return view
+
+
+WALK_IN_CLOSED = {"cancelled", "archived"}
+WALK_IN_VIA = "door"
+WALK_IN_FULL = "Das Event ist voll: kein Platz mehr frei. Erhöhe „Max. Teilnehmer“ oder storniere zuerst eine Anmeldung."
+
+
+def walk_in_block_reason(event: dict) -> str | None:
+    if event.get("status") in WALK_IN_CLOSED:
+        return "Dieses Event ist abgesagt oder archiviert – hier kommt niemand mehr dazu."
+    if not event.get("has_registration") or event.get("registration_url"):
+        return "Dieses Event führt keine Anmeldungen auf dieser Seite."
+    return None
+
+
+async def add_walk_in(db, event: dict, me: dict, *, display_name: str, companion_count: int = 0) -> dict:
+    """„Person an der Tür hinzufügen“ (#2127, EV17): ohne Konto und ohne Preis, gleich eingecheckt, mit Protokoll.
+
+    Unter derselben Platzsperre wie jede Anmeldung; ist kein Platz frei, sagt die Antwort das. Die Kennung im Feld
+    ``user_id`` gehört zu keinem Konto - sie hält nur den eindeutigen Index je Event und Person ein. Solche Einträge
+    bekommen keine Nachricht, keine Punkte und stehen nicht in der öffentlichen Teilnehmerliste."""
+    blocked = walk_in_block_reason(event)
+    if blocked:
+        raise LeadError(409, blocked)
+    name = " ".join(str(display_name or "").split())
+    if not name:
+        raise LeadError(400, "Bitte einen Namen eingeben.")
+    try:
+        companions = validated_companion_count(event, companion_count)
+    except RegistrationError as exc:
+        raise LeadError(exc.status, exc.detail)
+    registration_id = new_id()
+    now = now_utc().isoformat()
+    doc = {
+        "id": registration_id, "event_id": event["id"], "user_id": f"walkin:{registration_id}", "walk_in": True, "display_name": name,
+        "email": None, "status": "checked_in", "companion_count": companions, "seat_count": 1 + companions, "note": None,
+        "selected_positions": [], "registered_via": WALK_IN_VIA, "added_by": me["id"], "created_at": now, "updated_at": now,
+    }
+    try:
+        async with mutation_lock(db, seat_resource(event["id"]), wait_seconds=SEAT_WAIT_SECONDS):
+            taken = await summary(db, event)
+            if event.get("max_participants") and taken["reserved_seats"] + doc["seat_count"] > int(event["max_participants"]):
+                raise LeadError(400, WALK_IN_FULL)
+            await db.event_registrations.insert_one(doc)
+    except MutationLockBusy:
+        raise LeadError(409, SEAT_BUSY)
+    doc.pop("_id", None)
+    await db.audit_logs.insert_one({
+        "id": new_id(), "action": "event.registration.walk_in", "target_id": event["id"], "actor_id": me["id"],
+        "data": {"registration_id": registration_id, "display_name": name, "companion_count": companions}, "created_at": now,
+    })
+    return registration_row(doc)
 
 
 CSV_HEADER = ("Name", "Status", "Plätze", "Begleitpersonen", "Angemeldet am")

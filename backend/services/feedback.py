@@ -104,7 +104,7 @@ async def tournament_participants(db, tournament: dict) -> set[str]:
 
 
 async def event_participants(db, event: dict) -> set[str]:
-    rows = await db.event_registrations.find({"event_id": event["id"], "status": "checked_in"}, {"_id": 0, "user_id": 1}).to_list(5000)
+    rows = await db.event_registrations.find({"event_id": event["id"], "status": "checked_in", "walk_in": {"$ne": True}}, {"_id": 0, "user_id": 1}).to_list(5000)
     return {row["user_id"] for row in rows if row.get("user_id")}
 
 

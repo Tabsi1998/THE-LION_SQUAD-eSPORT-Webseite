@@ -375,10 +375,11 @@ async def _attach_event_registration_view(event: dict, user: dict | None) -> Non
             event["own_registration"] = _own_registration_view(event, own)
     if event.get("show_participants") or manages:
         statuses = ADMIN_EVENT_REGISTRATION_STATUSES if manages else PUBLIC_EVENT_REGISTRATION_STATUSES
-        regs = await db.event_registrations.find(
-            {"event_id": event["id"], "status": {"$in": list(statuses)}},
-            {"_id": 0},
-        ).sort("created_at", 1).to_list(2000)
+        query = {"event_id": event["id"], "status": {"$in": list(statuses)}}
+        if not manages:
+            # An der Tür Eingetragene (#2127, EV17) haben nichts zugestimmt: ihr Name steht nur bei der Leitung.
+            query["walk_in"] = {"$ne": True}
+        regs = await db.event_registrations.find(query, {"_id": 0}).sort("created_at", 1).to_list(2000)
         event["registrations"] = [_public_event_registration(r, is_staff=manages, with_price=manages and sees_price) for r in regs]
     else:
         event["registrations"] = []
@@ -841,7 +842,8 @@ async def _update_event_registration(db, event: dict, registration_id: str, body
             raise HTTPException(status_code=400, detail="Kapazität wäre überschritten")
     # Nachrücken von der Warteliste oder Änderung der Begleitpersonen: Preis einfrieren, solange
     # noch kein Beleg entstanden ist. Ein angelegter Beleg wird nicht still ersetzt (#321).
-    offer = event.get("billing") or {}
+    # An der Tür Eingetragene (#2127, EV17) sind ohne Preis - auch wenn sie später wieder aktiviert werden.
+    offer = {} if current.get("walk_in") else (event.get("billing") or {})
     becomes_active = proposed_status in ACTIVE_EVENT_REGISTRATION_STATUSES
     seats_changed = "seat_count" in updates and updates["seat_count"] != _registration_seats(current)
     if pricing.is_paid(offer) and becomes_active and (not current.get("price_snapshot") or (seats_changed and current.get("billing_status") in (None, "pending"))):

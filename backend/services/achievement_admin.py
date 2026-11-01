@@ -244,7 +244,7 @@ async def resolve_recipients(db, selection: dict) -> list[str]:
     if selection.get("tournament_id"):
         add([r["user_id"] async for r in db.tournament_registrations.find({"tournament_id": selection["tournament_id"], "status": {"$in": list(ACTIVE_TOURNAMENT_STATUSES)}}, {"_id": 0, "user_id": 1}) if r.get("user_id")])
     if selection.get("event_id"):
-        add([r["user_id"] async for r in db.event_registrations.find({"event_id": selection["event_id"], "status": {"$in": list(ACTIVE_EVENT_STATUSES)}}, {"_id": 0, "user_id": 1}) if r.get("user_id")])
+        add([r["user_id"] async for r in db.event_registrations.find({"event_id": selection["event_id"], "status": {"$in": list(ACTIVE_EVENT_STATUSES)}, "walk_in": {"$ne": True}}, {"_id": 0, "user_id": 1}) if r.get("user_id")])
     if selection.get("team_id"):
         add([m["user_id"] async for m in db.team_members.find({"team_id": selection["team_id"]}, {"_id": 0, "user_id": 1}) if m.get("user_id")])
     if selection.get("members"):
