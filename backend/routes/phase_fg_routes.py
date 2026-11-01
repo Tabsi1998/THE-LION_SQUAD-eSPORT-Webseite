@@ -115,14 +115,15 @@ async def _collect_media_usage(filenames: set[str]) -> dict[str, list[dict[str, 
     async for collection, doc, field, name, text in media_audit.iter_usages(get_db(), set(filenames)):
         if len(usage[name]) >= MAX_REFERENCES:
             continue
-        doc_id = doc.get("id") or doc.get("slug")
         ref = {
             "collection": collection,
-            "id": doc_id,
             "field": field,
             "place": media_audit.place_label(collection, field),
             "label": media_audit.usage_label(collection, doc),
         }
+        # Wer Medien pflegt, liest keine Chats: Von einer Nachricht erfährt er nur die Stelle, keine Kennung.
+        if collection not in media_audit.MESSAGE_COLLECTIONS:
+            ref["id"] = doc.get("id") or doc.get("slug")
         if text:
             ref["text_reference"] = True
         usage[name].append(ref)

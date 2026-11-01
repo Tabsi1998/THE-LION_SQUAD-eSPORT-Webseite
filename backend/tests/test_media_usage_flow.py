@@ -128,6 +128,8 @@ async def test_the_image_of_a_deleted_sticker_stays_while_old_messages_show_it(f
     # Die Mediathek nennt die Stelle, aber nichts aus der Nachricht.
     assert item["references"][0]["label"] == "Nachricht im Chat"
     assert item["references"][0]["place"] == "Direktnachricht · Sticker"
+    assert "id" not in item["references"][0]
+    assert "m-1" not in str(item)
     response = await flow.delete(f"/api/admin/media/{NAME}")
     assert response.status_code == 409
     assert (public / NAME).exists()
