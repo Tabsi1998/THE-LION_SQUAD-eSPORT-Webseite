@@ -16,9 +16,11 @@ const { ENABLED, STATE_FILE, state, signIn, watch } = require("./abnahmeSession"
 const SERIES = "/api/reference-series/admin";
 const SHOTS = process.env.ABNAHME_SHOTS || "";
 
-/** Bilder erst, wenn Zeilen und Balken fertig eingeblendet sind (endlose Animationen der Seite zählen nicht). */
+/** Bilder erst, wenn Zeilen und Balken fertig eingeblendet sind (endlose Animationen der Seite zählen nicht, solche am
+ *  Scrollen - etwa der Rand von tls-swipe - werden nie fertig). */
 async function settle(page) {
   await page.evaluate(() => Promise.all(document.getAnimations()
+    .filter((animation) => animation.timeline instanceof DocumentTimeline)
     .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
     .map((animation) => animation.finished.catch(() => null))));
 }

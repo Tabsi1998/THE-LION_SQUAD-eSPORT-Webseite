@@ -16,8 +16,11 @@ const SHOTS = process.env.ABNAHME_SHOTS || "";
 const PHASE = process.env.ABNAHME_RW_PHASE || "nachher";
 const VENUES = ["Australien", "Bahrain", "Imola", "Monaco", "Spanien (Barcelona)", "Österreich", "Silverstone", "Ungarn"];
 
+/** Animationen am Scrollen (der Rand von tls-swipe, etwa um die Vorschau der Terminliste) werden nie fertig - hier hing
+ *  der Test sonst bis zum Zeitlimit. */
 async function settle(page) {
   await page.evaluate(() => Promise.all(document.getAnimations()
+    .filter((animation) => animation.timeline instanceof DocumentTimeline)
     .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
     .map((animation) => animation.finished.catch(() => null))));
 }

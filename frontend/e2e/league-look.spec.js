@@ -68,9 +68,11 @@ async function mockServer(page, { admin = false } = {}) {
   await page.route("**/api/admin/leagues/seasons/s1", json(SEASON_PAGE));
 }
 
-/** Wartet, bis Einblenden und Aufsteigen fertig sind (endlose Bewegungen wie der Ladeschimmer zählen nicht). */
+/** Wartet, bis Einblenden und Aufsteigen fertig sind (endlose Bewegungen wie der Ladeschimmer zählen nicht, solche am
+ *  Scrollen - der Rand von tls-swipe - werden nie fertig). */
 async function settled(page) {
   await page.evaluate(() => Promise.all(document.getAnimations()
+    .filter((animation) => animation.timeline instanceof DocumentTimeline)
     .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
     .map((animation) => animation.finished.catch(() => null))));
 }
