@@ -102,7 +102,7 @@ async def test_a_file_used_anywhere_counts_as_used_in_the_media_library(flow, pu
 async def test_a_file_shown_only_outside_the_known_places_needs_confirmation(flow, public):
     chef = await admin(flow)
     await flow.db.reference_round_results.insert_one({"id": "r-1", "games": [{"map_id": "m", "image_url": URL + "?v=1"}]})
-    await flow.db.league_games.insert_one({"id": "g-1", "map_image_url": URL})
+    await flow.db.matches_v2.insert_one({"id": "g-1", "games": [{"map_id": "m", "map_image_url": URL}]})
     await flow.db.neue_sammlung.insert_one({"id": "x-1", "tief": [{"bild": UPLOADS + "variants/genutzt-400.webp"}]})
     # Verwaltung und Protokolle zeigen nichts.
     await flow.db.audit_logs.insert_one({"id": "a-1", "action": "media.rotate", "data": {"filename": "frei.webp"}})
@@ -120,7 +120,7 @@ async def test_a_file_shown_only_outside_the_known_places_needs_confirmation(flo
     forced = await flow.delete(f"/api/admin/media/{NAME}?force=true")
     assert forced.status_code == 200, forced.text
     assert not (public / NAME).exists()
-    assert (await flow.db.league_games.find_one({"id": "g-1"}))["map_image_url"] == URL
+    assert (await flow.db.matches_v2.find_one({"id": "g-1"}))["games"][0]["map_image_url"] == URL
     log = await flow.db.audit_logs.find_one({"action": "media.delete", "target_id": NAME})
     assert log["actor_id"] == chef["id"] and log["data"]["force"] is True
 

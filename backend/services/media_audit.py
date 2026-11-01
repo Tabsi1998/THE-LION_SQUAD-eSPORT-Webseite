@@ -122,7 +122,7 @@ PLACE_LABELS = {
 # Verwaltung und Protokolle: Ein Eintrag hier sagt nur, dass es die Datei gibt oder gab - gezeigt wird sie dadurch nicht.
 NOT_A_USAGE = {"media_uploads", "media_scans", "upload_events", "audit_logs", "pending_file_cleanups"}
 # Stände von damals: Sie zeigen das Bild, stehen aber bewusst nicht in den Verwendungsstellen (siehe oben, ``game_maps``).
-SNAPSHOT_LABELS = {"reference_round_results": "Ergebnisblatt", "league_games": "Liga-Spiel", "tournament_awards": "Preis"}
+SNAPSHOT_LABELS = {"reference_round_results": "Ergebnisblatt", "reference_round_result_revisions": "Ergebnisblatt", "matches_v2": "Liga-Spiel", "tournament_awards": "Preis"}
 # Wo neben der Adresse auch die Maße stehen: gedreht tauschen sie mit (#2122).
 SIZE_FIELDS = {
     ("gallery_photos", "image_url"): ("width", "height"),
