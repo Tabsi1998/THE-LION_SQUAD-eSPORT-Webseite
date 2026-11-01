@@ -297,7 +297,7 @@ in der Zeile.
 
 ### 3.8 Negativ, Vorschau, Statistik
 
-**Negativ & Vorfälle:** Fun-Erfolge für kleine Missgeschicke, bis zur Freischaltung geheim, danach im Profil sichtbar. Von Hand eingetragene stehen außerdem unter **Strafen** bzw. **Meine Strafen**; dort liest die Person die Notiz, die du beim Eintragen schreibst. Notizen aus der Einzel- und Massenvergabe bleiben intern. **Vorfall
+**Negativ & Vorfälle:** Fun-Erfolge für kleine Missgeschicke, bis zur Freischaltung geheim, danach im Profil sichtbar. Von Hand eingetragene stehen außerdem unter **Strafen** bzw. **Meine Strafen**; dort liest die Person die Notiz, die du beim Eintragen schreibst. Notizen aus der Einzel- und Massenvergabe bleiben intern; was von selbst kommt (Dispute geöffnet, spät eingecheckt), ist keine Strafe. **Vorfall
 eintragen**: Person, Vorfall aus der Liste, optional eine Notiz. Darunter steht, wer welchen Fun-Erfolg hat; **Entfernen** verlangt einen Grund.
 
 **Vorschau:** Jede **Zeremonie** aus Material, Kategorie (Bewegung) und Sonderablauf (einzelner Erfolg, mehrere, Diamant, Legendär, Level-Aufstieg …)

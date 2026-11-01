@@ -106,10 +106,11 @@ async def _collect_user_penalties(user_id: str) -> list[dict]:
             })
 
     # --- Negative achievement awards (admin-issued incidents) ---
-    # „Negativ“ steht an der Gruppe, nicht an der Vergabe (#2125).
+    # „Negativ“ steht an der Gruppe, nicht an der Vergabe (#2125). Von Hand eingetragene zählen; was von selbst kommt
+    # (Dispute geöffnet, spät eingecheckt), ist ein Fun-Erfolg und keine Strafe.
     groups = await _negative_groups(db)
     neg = await db.user_achievements.find(
-        {"user_id": user_id, "group_code": {"$in": sorted(groups)}},
+        {"user_id": user_id, "group_code": {"$in": sorted(groups)}, "context.manual": True},
         {"_id": 0},
     ).sort("earned_at", -1).to_list(500) if groups else []
     for n in neg:
@@ -183,7 +184,7 @@ async def all_penalties(
                     user_ids.add(registration["user_id"])
         groups = await _negative_groups(db)
         if groups:
-            async for a in db.user_achievements.find({"group_code": {"$in": sorted(groups)}}, {"_id": 0, "user_id": 1}):
+            async for a in db.user_achievements.find({"group_code": {"$in": sorted(groups)}, "context.manual": True}, {"_id": 0, "user_id": 1}):
                 if a.get("user_id"):
                     user_ids.add(a["user_id"])
 

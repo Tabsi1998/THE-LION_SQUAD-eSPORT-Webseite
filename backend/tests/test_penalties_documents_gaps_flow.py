@@ -87,7 +87,6 @@ async def test_an_internal_note_stays_internal(flow):
 async def test_a_note_from_the_incident_form_reaches_the_person(flow):
     from services.achievement_core import NEGATIVE_INCIDENTS
 
-    await flow.db.achievement_groups.update_one({"code": "neg_dispute"}, {"$set": {"code": "neg_dispute", "name": "Einspruch", "is_negative": True}}, upsert=True)
     kind, tier = next(iter(NEGATIVE_INCIDENTS.items()))
     from badges import TIER_BY_CODE
 
@@ -102,6 +101,22 @@ async def test_a_note_from_the_incident_form_reaches_the_person(flow):
     assert award["context"]["note_visible"] is True
     flow.act_as(erika)
     assert (await flow.get("/api/penalties/me")).json()["items"][0]["reason"] == "Beim Finale"
+
+
+@pytest.mark.asyncio
+async def test_automatic_fun_awards_are_no_penalties(flow):
+    # Einen Dispute öffnen oder spät einchecken vergibt von selbst einen Fun-Erfolg - das ist keine Strafe.
+    erika, mara = await flow.add_user(name="erika"), await flow.add_user(name="mara")
+    await flow.db.achievement_groups.insert_one({"code": "neg_dispute", "name": "Einspruch", "is_negative": True})
+    await flow.db.user_achievements.insert_many([
+        {"id": new_id(), "user_id": erika["id"], "tier_code": "neg_dispute_1", "group_code": "neg_dispute", "earned_at": "2026-10-20T10:00:00+00:00", "context": {"match_id": "m-1"}},
+        {"id": new_id(), "user_id": mara["id"], "tier_code": "neg_dispute_1", "group_code": "neg_dispute", "earned_at": "2026-10-20T10:00:00+00:00", "context": {"tournament_id": "t-1", "reason": "late_checkin"}},
+    ])
+    flow.act_as(erika)
+    assert (await flow.get("/api/penalties/me")).json() == {"count": 0, "items": []}
+    flow.act_as(await flow.add_user(role="tournament_admin", name="turnierleitung"))
+    listed = (await flow.get("/api/admin/penalties")).json()
+    assert listed["count"] == 0 and listed["counts"] == {"all": 0}
 
 
 @pytest.mark.asyncio
