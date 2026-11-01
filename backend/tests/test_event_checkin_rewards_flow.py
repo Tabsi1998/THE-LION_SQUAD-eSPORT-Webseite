@@ -11,7 +11,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
 from models import now_utc  # noqa: E402
-from services import event_changes, event_rewards, xp  # noqa: E402
+from services import event_changes, event_rewards, levels, xp  # noqa: E402
 from services.mutation_lock import MutationLockBusy  # noqa: E402
 
 
@@ -191,6 +191,23 @@ async def test_xp_stand_rechnet_gleichzeitig_nichts_weg(flow):
     await xp.grant(user["id"], "event_attended", "e:3")
     await xp.correct(user["id"], -1000, "Test", "admin")
     assert (await xp.state(user["id"]))["total"] == 0
+
+
+@pytest.mark.asyncio
+async def test_xp_gutschrift_rechnet_level_aus_dem_echten_stand(flow, monkeypatch):
+    """Eine Gutschrift hat einen alten Stand gelesen, dazwischen kam etwas dazu: Stand und Level kommen aus dem Ergebnis."""
+    user = await flow.add_user(role="player", name="gleichzeitig")
+    await flow.db.user_xp.insert_one({"user_id": user["id"], "total": 100000, "level": 1, "prestige": 0})
+
+    async def stale_state(_user_id):
+        return {"user_id": user["id"], "total": 0, "prestige": 0, "level": 1}
+
+    monkeypatch.setattr(xp, "state", stale_state)
+    result = await xp.grant(user["id"], "event_attended", "e:1")
+    assert result["total"] == 100060 and result["level"] == levels.level_for_xp(100060, 0)
+    assert result["level_up"] is (levels.level_for_xp(100060, 0) > levels.level_for_xp(100000, 0)), "kein Aufstieg aus dem alten Stand"
+    stored = await flow.db.user_xp.find_one({"user_id": user["id"]}, {"_id": 0})
+    assert stored["total"] == 100060 and stored["level"] == result["level"]
 
 
 class _BusyLock:

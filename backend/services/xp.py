@@ -95,15 +95,21 @@ async def grant(user_id: str, source: str, ref: str, *, amount: int | None = Non
         await db.xp_events.insert_one(event)
     except DuplicateKeyError:
         return None
-    total_before = int(before.get("total") or 0)
-    total_after = max(0, total_before + amount + bonus)
-    level_before = levels.level_for_xp(total_before, prestige)
-    level_after = levels.level_for_xp(total_after, prestige)
-    # Atomar erhöhen (wie grant_many): gleichzeitige Gutschriften und Rücknahmen überschreiben sich nicht. Nur eine Korrektur
-    # unter null setzt den Stand fest.
+    # Atomar erhöhen, und Level und Stand aus dem, was danach wirklich dasteht: gleichzeitige Gutschriften und Rücknahmen
+    # überschreiben sich nicht, und jede sieht ihren eigenen Aufstieg. Nur eine Korrektur unter null setzt den Stand fest.
     delta = amount + bonus
-    change = {"$inc": {"total": delta}, "$set": {"level": level_after, "updated_at": event["at"]}} if total_before + delta >= 0 else {"$set": {"total": 0, "level": level_after, "updated_at": event["at"]}}
-    await db.user_xp.update_one({"user_id": user_id}, {**change, "$setOnInsert": {"user_id": user_id, "prestige": prestige}}, upsert=True)
+    after = await db.user_xp.find_one_and_update(
+        {"user_id": user_id}, {"$inc": {"total": delta}, "$set": {"updated_at": event["at"]}, "$setOnInsert": {"user_id": user_id, "prestige": prestige}},
+        upsert=True, return_document=ReturnDocument.AFTER, projection={"_id": 0, "total": 1, "prestige": 1},
+    )
+    raw_total = int((after or {}).get("total") or 0)
+    prestige = int((after or {}).get("prestige", prestige) or 0)
+    total_after = max(0, raw_total)
+    if raw_total < 0:
+        await db.user_xp.update_one({"user_id": user_id, "total": {"$lt": 0}}, {"$set": {"total": 0}})
+    level_before = levels.level_for_xp(max(0, raw_total - delta), prestige)
+    level_after = levels.level_for_xp(total_after, prestige)
+    await db.user_xp.update_one({"user_id": user_id}, {"$set": {"level": level_after}})
     result = {"amount": amount, "bonus": bonus, "total": total_after, "level": level_after, "level_up": level_after > level_before, "title_changed": levels.title_for_level(level_after) != levels.title_for_level(level_before)}
     if result["level_up"]:
         await _level_up(user_id, level_before, level_after, prestige)
