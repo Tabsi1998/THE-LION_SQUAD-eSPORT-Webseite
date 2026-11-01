@@ -6,9 +6,9 @@ import { MemoryRouter } from "react-router-dom";
 // Superadmin - erst mit „Speichern“ und einer Rückfrage mit Satz. Gesperrt wird im Blatt mit dem Grund-Fenster; Konten mit
 // Adminbereich sperrt nur der Superadmin, das eigene Konto niemand, Superadmin-Konten niemand.
 
-const apiMock = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() };
+const apiMock = { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn() };
 const toastMock = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
-const authState = { isSuperAdmin: true, user: null };
+const authState = { isSuperAdmin: true, user: null, can: () => false };
 const confirmMock = vi.fn(async () => true);
 
 vi.mock("@/lib/api", () => ({ api: apiMock, formatRequestError: (_e, fallback) => fallback }));
@@ -47,7 +47,9 @@ beforeEach(() => {
   confirmMock.mockImplementation(async () => true);
   authState.isSuperAdmin = true;
   authState.user = { id: "u-root", role: "superadmin" };
+  authState.can = () => false;
   apiMock.get.mockResolvedValue({ data: USERS });
+  apiMock.patch.mockResolvedValue({ data: {} });
   apiMock.put.mockResolvedValue({ data: {} });
   apiMock.post.mockResolvedValue({ data: { ok: true } });
 });
@@ -173,4 +175,39 @@ test("je Rolle steht, was sie darf und was nicht", async () => {
   expect(screen.getByTestId("role-can-tournament_admin")).toHaveTextContent("Turniere, Events, Stationen");
   expect(screen.getByTestId("role-cannot-superadmin")).toHaveTextContent("andere Superadmin-Konten bannen");
   expect(screen.queryByTestId("role-can-team_leader")).toBeNull();
+});
+
+// Profil zurücksetzen (#2112): Vereinsverwaltung, mit Auswahl der Felder, Grund und Rückfrage; die Person wird benachrichtigt.
+test("Vereinsverwaltung setzt Anzeigename und Profilbild mit Grund zurück", async () => {
+  authState.isSuperAdmin = false;
+  authState.user = { id: "u-board", role: "player" };
+  authState.can = (area) => area === "club";
+  const user = userEvent.setup();
+  renderPage();
+  const sheet = await openSheet(user, "spieler");
+  const section = within(sheet).getByTestId("user-sheet-profile-reset");
+  expect(within(section).getByTestId("user-sheet-reset")).toBeDisabled();
+  await user.click(within(section).getByTestId("user-sheet-reset-display_name"));
+  await user.click(within(section).getByTestId("user-sheet-reset-avatar_url"));
+  await user.type(within(section).getByTestId("user-sheet-reset-reason"), "Beleidigender Name");
+  await user.click(within(section).getByTestId("user-sheet-reset"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/users/u-3", { reset: ["display_name", "avatar_url"], reason: "Beleidigender Name" }));
+  expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ description: expect.stringContaining("Anzeigename, Profilbild") }));
+});
+
+test("ohne Vereinsverwaltung, beim eigenen Konto und bei Superadmin-Konten gibt es kein Zurücksetzen", async () => {
+  authState.isSuperAdmin = false;
+  authState.user = { id: "u-3", role: "player" };
+  authState.can = (area) => area === "club";
+  const user = userEvent.setup();
+  renderPage();
+  let sheet = await openSheet(user, "spieler");
+  expect(within(sheet).queryByTestId("user-sheet-profile-reset")).toBeNull();
+  await user.keyboard("{Escape}");
+  sheet = await openSheet(user, "chef");
+  expect(within(sheet).queryByTestId("user-sheet-profile-reset")).toBeNull();
+  await user.keyboard("{Escape}");
+  authState.can = () => false;
+  sheet = await openSheet(user, "helferin");
+  expect(within(sheet).queryByTestId("user-sheet-profile-reset")).toBeNull();
 });

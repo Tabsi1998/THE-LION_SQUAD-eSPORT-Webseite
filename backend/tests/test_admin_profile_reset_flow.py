@@ -113,3 +113,30 @@ async def test_players_and_unknown_accounts(flow):
     flow.act_as(chair)
     missing = await flow.patch("/api/users/gibt-es-nicht", json={"reset": ["bio"], "reason": "Konto fehlt"})
     assert missing.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_the_person_is_told_what_was_reset_and_why(flow):
+    """#2112: die betroffene Person bekommt eine Benachrichtigung - mit Feldern und Grund, ohne die alten Angaben."""
+    chair = await granted(flow, "vorsitz", "club")
+    person = await target(flow)
+    flow.act_as(chair)
+    response = await flow.patch(f"/api/users/{person['id']}", json={"reset": ["display_name", "avatar_url"], "reason": "Beleidigender Anzeigename"})
+    assert response.status_code == 200, response.text
+    notes = await flow.db.notifications.find({"user_id": person["id"]}, {"_id": 0}).to_list(5)
+    assert len(notes) == 1
+    assert notes[0]["title"] == "Dein Profil wurde angepasst" and notes[0]["kind"] == "moderation"
+    assert "Profilbild" in notes[0]["body"] and "Anzeigename" in notes[0]["body"] and "Beleidigender Anzeigename" in notes[0]["body"]
+    assert "Unpassender" not in str(notes[0])
+    assert await flow.db.notifications.count_documents({"user_id": chair["id"]}) == 0
+
+@pytest.mark.asyncio
+async def test_the_own_account_is_refused(flow):
+    """#2112: das eigene Profil setzt man hier nicht zurück - auch nicht am Server vorbei an der Oberfläche."""
+    chair = await granted(flow, "vorsitz", "club")
+    await flow.db.users.update_one({"id": chair["id"]}, {"$set": {"bio": "Meine Bio"}})
+    flow.act_as(chair)
+    response = await flow.patch(f"/api/users/{chair['id']}", json={"reset": ["bio"], "reason": "Selbst zurücksetzen"})
+    assert response.status_code == 403
+    assert (await flow.db.users.find_one({"id": chair["id"]}))["bio"] == "Meine Bio"
+    assert await flow.db.audit_logs.count_documents({"action": "user.admin_profile_reset"}) == 0

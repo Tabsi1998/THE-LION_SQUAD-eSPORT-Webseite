@@ -1,4 +1,5 @@
 """User profile + admin user management routes."""
+import logging
 import os
 import secrets
 import re
@@ -35,6 +36,7 @@ from models import (
 )
 
 router = APIRouter(prefix="/api/users", tags=["users"])
+logger = logging.getLogger(__name__)
 
 
 def _clean(u: dict) -> dict:
@@ -992,6 +994,9 @@ async def admin_update_user(user_id: str, body: AdminProfileReset,
     Superadmin-Konten fasst nur ein Superadmin an."""
     db = get_db()
     fields = sorted(set(body.reset))
+    # Das eigene Profil ändert man im eigenen Profil (#2112) - hier nur fremde Konten.
+    if user_id == me.get("id"):
+        raise HTTPException(status_code=403, detail="Das eigene Profil änderst du unter „Einstellungen“, nicht hier.")
     target = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "role": 1})
     if not target:
         raise HTTPException(status_code=404, detail="Nutzer nicht gefunden")
@@ -1005,8 +1010,23 @@ async def admin_update_user(user_id: str, body: AdminProfileReset,
         "data": {"fields": fields, "reason": body.reason},
         "created_at": now,
     })
+    # Die Person erfährt es (#2112): was zurückgesetzt wurde und warum - in der Glocke, nicht abbestellbar per Thema.
+    from services.user_notifications import create_user_notification
+
+    labels = ", ".join(PROFILE_RESET_LABELS[field] for field in fields)
+    try:
+        await create_user_notification(
+            user_id, title="Dein Profil wurde angepasst",
+            body=f"Die Vereinsverwaltung hat zurückgesetzt: {labels}. Grund: {body.reason}",
+            url="/profile", kind="moderation", meta={"fields": fields},
+        )
+    except Exception:  # noqa: BLE001 - die Meldung darf das Zurücksetzen nicht aufhalten
+        logger.exception("Benachrichtigung zum Profil-Zurücksetzen fehlgeschlagen")
     u = await db.users.find_one({"id": user_id}, private_projection())
     return u
+
+
+PROFILE_RESET_LABELS = {"display_name": "Anzeigename", "bio": "Bio", "avatar_url": "Profilbild", "banner_url": "Banner"}
 
 
 BAN_REASON_MIN_LENGTH = 5

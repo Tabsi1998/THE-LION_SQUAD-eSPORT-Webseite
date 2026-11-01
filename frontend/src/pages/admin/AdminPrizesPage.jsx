@@ -6,8 +6,9 @@ import { useConfirm, usePrompt } from "@/components/tls/ConfirmDialog";
 import { SkeletonLines } from "@/components/tls/Skeleton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
-import { Award, CheckCircle2, Clock, XCircle, Gift, RefreshCw, AlertCircle, Search, Users, User, CalendarDays } from "lucide-react";
+import { Award, CheckCircle2, Clock, XCircle, Gift, RefreshCw, AlertCircle, Search, Users, User, CalendarDays, Plus } from "lucide-react";
 import { asInstant, viennaDate } from "@/lib/vienna";
+import { PrizeFormSheet } from "./prizes/PrizeFormSheet";
 
 const STATUS_LABEL = {
   pending: { label: "Offen", icon: Clock, color: "text-[#FFD700] bg-[#FFD700]/10 border-[#FFD700]/30" },
@@ -52,6 +53,8 @@ export default function AdminPrizesPage() {
   const [query, setQuery] = useState(searchParams.get("q") || "");
   const [loading, setLoading] = useState(true);
   const [creatingMissing, setCreatingMissing] = useState(false);
+  // Gewinn von Hand (#2112): null = zu, "new" = neu, sonst der Gewinn, der bearbeitet wird.
+  const [sheet, setSheet] = useState(null);
   const confirm = useConfirm();
   const prompt = usePrompt();
 
@@ -179,16 +182,27 @@ export default function AdminPrizesPage() {
         <p className="text-xs text-white/45 max-w-2xl">
           Öffentliche Preise sind die Ausschreibung. Diese Seite zeigt konkrete Abhol-Einträge, die nach veröffentlichten Ergebnissen entstehen.
         </p>
-        <button
-          type="button"
-          onClick={createMissing}
-          disabled={creatingMissing}
-          data-testid="prizes-create-missing"
-          className="inline-flex items-center justify-center gap-2 rounded-sm border border-[#FFD700]/40 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-[#FFD700] hover:bg-[#FFD700]/10 disabled:opacity-50"
-        >
-          <RefreshCw className={`h-4 w-4 ${creatingMissing ? "animate-spin" : ""}`} />
-          Gewinne neu erzeugen
-        </button>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <button
+            type="button"
+            onClick={() => setSheet("new")}
+            data-testid="prizes-add"
+            className="inline-flex items-center justify-center gap-2 rounded-sm bg-[#29B6E8] px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-black hover:bg-[#1E95C2]"
+          >
+            <Plus className="h-4 w-4" />
+            Gewinn hinzufügen
+          </button>
+          <button
+            type="button"
+            onClick={createMissing}
+            disabled={creatingMissing}
+            data-testid="prizes-create-missing"
+            className="inline-flex items-center justify-center gap-2 rounded-sm border border-[#FFD700]/40 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-[#FFD700] hover:bg-[#FFD700]/10 disabled:opacity-50"
+          >
+            <RefreshCw className={`h-4 w-4 ${creatingMissing ? "animate-spin" : ""}`} />
+            Gewinne neu erzeugen
+          </button>
+        </div>
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2">
@@ -246,7 +260,7 @@ export default function AdminPrizesPage() {
               <p className="text-xs text-white/30 mt-1">Preise werden nach veröffentlichten Ergebnissen oder über "Gewinne neu erzeugen" zu Abhol-Einträgen.</p>
             </div>
           ) : items.map((p) => (
-            <PrizeMobileCard key={p.id} p={p} updateStatus={updateStatus} markPickedUp={markPickedUp} remove={remove} />
+            <PrizeMobileCard key={p.id} p={p} updateStatus={updateStatus} markPickedUp={markPickedUp} remove={remove} edit={setSheet} />
           ))}
         </div>
 
@@ -322,6 +336,7 @@ export default function AdminPrizesPage() {
                       {p.status === "expired" && (
                         <button onClick={() => updateStatus(p.id, "ready", "", "expired")} data-testid={`prize-reopen-${p.id}`} className="text-[#29B6E8] hover:underline mr-3 text-xs font-semibold"><RefreshCw className="w-3 h-3 inline mr-1" />Wieder öffnen</button>
                       )}
+                      <button onClick={() => setSheet(p)} data-testid={`prize-edit-${p.id}`} className="text-white/70 hover:text-white hover:underline mr-3 text-xs">Bearbeiten</button>
                       <button onClick={() => remove(p.id)} className="text-[#FF3B30] hover:underline text-xs">Löschen</button>
                     </td>
                   </tr>
@@ -340,6 +355,13 @@ export default function AdminPrizesPage() {
           „Zurück“ bei einem abgeholten Gewinn schickt keine neue Nachricht. Jeder Schritt steht im Protokoll.
         </div>
       </div>
+      {sheet && (
+        <PrizeFormSheet
+          prize={sheet === "new" ? null : sheet}
+          onClose={() => setSheet(null)}
+          onSaved={() => { setSheet(null); load(); }}
+        />
+      )}
     </AdminLayout>
   );
 }
@@ -354,7 +376,7 @@ function ReviewMark({ p }) {
   );
 }
 
-function PrizeMobileCard({ p, updateStatus, markPickedUp, remove }) {
+function PrizeMobileCard({ p, updateStatus, markPickedUp, remove, edit }) {
   const s = STATUS_LABEL[p.status] || STATUS_LABEL.pending;
   const Icn = s.icon;
   const RecipientIcon = p.recipient_type === "team" ? Users : User;
@@ -415,6 +437,7 @@ function PrizeMobileCard({ p, updateStatus, markPickedUp, remove }) {
         {p.status === "expired" && (
           <button onClick={() => updateStatus(p.id, "ready", "", "expired")} data-testid={`prize-mobile-reopen-${p.id}`} className="px-3 py-2 border border-[#29B6E8]/40 text-[#29B6E8] rounded-sm text-xs font-bold uppercase tracking-wider">Wieder öffnen</button>
         )}
+        <button onClick={() => edit(p)} data-testid={`prize-mobile-edit-${p.id}`} className="px-3 py-2 border border-white/15 text-white/70 rounded-sm text-xs font-bold uppercase tracking-wider">Bearbeiten</button>
         <button onClick={() => remove(p.id)} className="px-3 py-2 border border-[#FF3B30]/35 text-[#FF3B30] rounded-sm text-xs font-bold uppercase tracking-wider">Löschen</button>
       </div>
     </article>

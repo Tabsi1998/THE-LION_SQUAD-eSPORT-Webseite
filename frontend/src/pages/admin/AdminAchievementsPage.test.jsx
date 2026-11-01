@@ -11,7 +11,8 @@ vi.mock("@/components/tls/AdminLayout", () => ({ AdminLayout: ({ children }) => 
 vi.mock("sonner", () => ({ toast: toastMock }));
 vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => async () => true }));
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
-vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { id: "admin" } }) }));
+const authState = { areas: [] };
+vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { id: "admin" }, can: (...wanted) => wanted.some((area) => authState.areas.includes(area)) }) }));
 
 const { default: AdminAchievementsPage, TABS } = await import("./AdminAchievementsPage");
 const { allowedMaterials, slugFrom } = await import("./achievements/CatalogTab");
@@ -107,6 +108,7 @@ async function pickPaula(prefix) {
 
 beforeEach(() => {
   board = true;
+  authState.areas = [];
   apiMock.get.mockReset().mockImplementation(routeGet);
   apiMock.post.mockReset().mockResolvedValue({ data: {} });
   apiMock.patch.mockReset().mockResolvedValue({ data: {} });
@@ -124,6 +126,23 @@ describe("Reiter", () => {
     expect(await screen.findByTestId("xp-empty")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("ach-tab-stats"));
     expect(await screen.findByTestId("ach-stats")).toBeInTheDocument();
+  });
+});
+
+describe("Pokale nachtragen (#2112)", () => {
+  it("gibt es nur für System; der Lauf meldet, wie viele Turniere und Pokale", async () => {
+    renderAt();
+    await screen.findByTestId("ov-unlocks-7d");
+    expect(screen.queryByTestId("ach-awards-rebuild")).toBeNull();
+  });
+
+  it("System trägt die Pokale nach", async () => {
+    authState.areas = ["system"];
+    apiMock.post.mockResolvedValue({ data: { tournaments: 4, awards: 11 } });
+    renderAt();
+    fireEvent.click(await screen.findByTestId("ach-awards-rebuild"));
+    await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/awards/rebuild"));
+    expect(toastMock.success).toHaveBeenCalledWith("4 Turniere geprüft, 11 Pokale und Banner stehen.");
   });
 });
 

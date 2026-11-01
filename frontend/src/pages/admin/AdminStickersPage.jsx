@@ -19,6 +19,7 @@ export default function AdminStickersPage() {
   const [loaded, setLoaded] = useState(false);
   const [newPackName, setNewPackName] = useState("");
   const [addingTo, setAddingTo] = useState(null);
+  const [editing, setEditing] = useState(null);
   const confirm = useConfirm();
 
   const load = useCallback(async () => {
@@ -125,6 +126,7 @@ export default function AdminStickersPage() {
             onDelete={removePack}
             onAdd={() => setAddingTo(pack)}
             onDeleteSticker={removeSticker}
+            onEditSticker={(sticker) => setEditing({ pack, sticker })}
           />
         ))}
         {loaded && custom.length === 0 && (
@@ -152,6 +154,15 @@ export default function AdminStickersPage() {
         ))}
       </section>
 
+      {editing && (
+        <StickerForm
+          pack={editing.pack}
+          sticker={editing.sticker}
+          onClose={() => setEditing(null)}
+          onSaved={() => { setEditing(null); load(); }}
+        />
+      )}
+
       {addingTo && (
         <StickerForm
           pack={addingTo}
@@ -163,7 +174,7 @@ export default function AdminStickersPage() {
   );
 }
 
-function PackCard({ pack, onToggle, onRename, onDelete, onAdd, onDeleteSticker }) {
+function PackCard({ pack, onToggle, onRename, onDelete, onAdd, onDeleteSticker, onEditSticker }) {
   const [draftName, setDraftName] = useState(null);
 
   const submitName = async (event) => {
@@ -225,6 +236,17 @@ function PackCard({ pack, onToggle, onRename, onDelete, onAdd, onDeleteSticker }
             {!pack.builtin && (
               <button
                 type="button"
+                onClick={() => onEditSticker(sticker)}
+                aria-label={`${sticker.name} bearbeiten`}
+                data-testid={`sticker-edit-${sticker.id}`}
+                className="absolute left-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/80 text-white/80 hover:text-white"
+              >
+                <Pencil className="h-3 w-3" />
+              </button>
+            )}
+            {!pack.builtin && (
+              <button
+                type="button"
                 onClick={() => onDeleteSticker(sticker)}
                 aria-label={`${sticker.name} löschen`}
                 className="absolute right-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/80 text-white/80 hover:text-white"
@@ -242,8 +264,16 @@ function PackCard({ pack, onToggle, onRename, onDelete, onAdd, onDeleteSticker }
   );
 }
 
-function StickerForm({ pack, onClose, onSaved }) {
-  const [form, setForm] = useState({ name: "", url: "", keywords: "" });
+// Neu anlegen oder bearbeiten (#2112): beim Bearbeiten bleiben Name, Suchwörter und Reihenfolge änderbar, das Bild nicht -
+// ein anderes Bild ist ein neuer Sticker.
+function StickerForm({ pack, sticker, onClose, onSaved }) {
+  const editing = !!sticker;
+  const [form, setForm] = useState(() => ({
+    name: sticker?.name || "",
+    url: sticker?.url || "",
+    keywords: (sticker?.keywords || []).join(", "),
+    sort_order: String(sticker?.sort_order ?? 0),
+  }));
   const [saving, setSaving] = useState(false);
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
 
@@ -253,14 +283,25 @@ function StickerForm({ pack, onClose, onSaved }) {
       toast.error("Bitte zuerst ein Bild hochladen.");
       return;
     }
+    const sortOrder = Number(form.sort_order);
+    if (!Number.isInteger(sortOrder) || sortOrder < -1000 || sortOrder > 1000) {
+      toast.error("Reihenfolge bitte als ganze Zahl zwischen -1000 und 1000.");
+      return;
+    }
+    const fields = {
+      name: form.name,
+      keywords: form.keywords.split(",").map((word) => word.trim()).filter(Boolean),
+      sort_order: sortOrder,
+    };
     setSaving(true);
     try {
-      await api.post(`/stickers/admin/packs/${pack.id}/stickers`, {
-        name: form.name,
-        url: form.url,
-        keywords: form.keywords.split(",").map((word) => word.trim()).filter(Boolean),
-      });
-      toast.success("Sticker hinzugefügt.");
+      if (editing) {
+        await api.patch(`/stickers/admin/stickers/${sticker.id}`, fields);
+        toast.success("Sticker gespeichert.");
+      } else {
+        await api.post(`/stickers/admin/packs/${pack.id}/stickers`, { ...fields, url: form.url });
+        toast.success("Sticker hinzugefügt.");
+      }
       onSaved();
     } catch (err) {
       toast.error(errorText(err, "Sticker konnte nicht gespeichert werden."));
@@ -271,20 +312,30 @@ function StickerForm({ pack, onClose, onSaved }) {
 
   // Seitenblatt statt Fenster (#435); Esc und Klick daneben übernimmt das Blatt.
   return (
-    <AdminSheet title={`Sticker für ${pack.name}`} eyebrow="Sticker" onClose={onClose} onSubmit={save} saving={saving} submitTestId="sticker-save" testId="sticker-sheet">
-      <ImageUpload
-        value={form.url}
-        onChange={(value) => set("url", value)}
-        label="Bild"
-        testId="sticker-image"
-        variant="square"
-        endpoint="/uploads/image?trim_empty_borders=true"
-        mediaScope="admin"
-        allowLibrary
-      />
-      <p className="text-xs text-white/45">Am besten PNG oder WebP mit durchsichtigem Hintergrund, etwa 512 × 512 Pixel. Leere Ränder schneidet der Upload ab.</p>
+    <AdminSheet title={editing ? `${sticker.name} bearbeiten` : `Sticker für ${pack.name}`} eyebrow="Sticker" onClose={onClose} onSubmit={save} saving={saving} submitTestId="sticker-save" testId="sticker-sheet">
+      {editing ? (
+        <div className="flex items-center gap-3">
+          <img src={resolveMediaUrl(sticker.url)} alt="" className="h-20 w-20 rounded-sm bg-black/30 object-contain p-1" />
+          <p className="text-xs text-white/45">Das Bild bleibt. Für ein anderes Bild einen neuen Sticker anlegen.</p>
+        </div>
+      ) : (
+        <>
+          <ImageUpload
+            value={form.url}
+            onChange={(value) => set("url", value)}
+            label="Bild"
+            testId="sticker-image"
+            variant="square"
+            endpoint="/uploads/image?trim_empty_borders=true"
+            mediaScope="admin"
+            allowLibrary
+          />
+          <p className="text-xs text-white/45">Am besten PNG oder WebP mit durchsichtigem Hintergrund, etwa 512 × 512 Pixel. Leere Ränder schneidet der Upload ab.</p>
+        </>
+      )}
       <TextField label="Name" value={form.name} onChange={(v) => set("name", v)} required maxLength={60} placeholder="z. B. Brüllender Löwe" testId="sticker-name" />
       <TextField label="Suchwörter" value={form.keywords} onChange={(v) => set("keywords", v)} placeholder="löwe, brüllen, gg" hint="Mit Komma trennen. Die Stickersuche im Chat findet Name und Suchwörter." testId="sticker-keywords" />
+      <TextField label="Reihenfolge" type="number" value={form.sort_order} onChange={(v) => set("sort_order", v)} hint="Kleinere Zahl steht weiter vorn. Gleiche Zahl: der ältere Sticker zuerst." testId="sticker-sort-order" />
     </AdminSheet>
   );
 }

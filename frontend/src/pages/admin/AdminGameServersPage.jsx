@@ -9,6 +9,7 @@ import { Link } from "react-router-dom";
 import { GameServerIcon } from "@/components/tls/GameServerIcon";
 import { serverResourceLabels } from "@/lib/serverResources";
 import { viennaDateTime } from "@/lib/vienna";
+import { AmpPanelCard } from "./gameServers/AmpPanelCard";
 
 const emptyForm = {
   name: "",
@@ -327,6 +328,8 @@ export default function AdminGameServersPage() {
         <Stat label="Versteckt" value={stats.hidden} tone="gold" />
       </div>
 
+      <AmpPanelCard />
+
       {(creating || editing) && (
         <form onSubmit={save} className="mb-8 border border-[#29B6E8]/25 bg-[#101416] rounded-sm p-4 sm:p-5">
           <div className="flex items-start justify-between gap-3 mb-5">
@@ -403,6 +406,7 @@ export default function AdminGameServersPage() {
               <select value={form.sync_provider} onChange={(e) => set("sync_provider", e.target.value)} className="mt-1 w-full bg-[#0A0A0A] border border-white/10 rounded-sm px-3 py-2 text-sm">
                 {Object.entries(syncLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
               </select>
+              {form.sync_provider === "amp" && <span className="mt-1 block text-xs text-white/45" data-testid="amp-sync-hint">Den Zugang zum Panel trägst du oben unter „AMP-Panel“ ein.</span>}
             </label>
             {form.sync_provider !== "manual" && (
               <>

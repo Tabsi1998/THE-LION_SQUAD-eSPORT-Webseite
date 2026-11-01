@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from auth import get_current_user, require_area
 from database import get_db
+from models import new_id, now_utc
 from services.awards import awards_for_user, feature_award_for_user, rebuild_all_awards
 
 router = APIRouter(prefix="/api", tags=["awards"])
@@ -32,6 +33,11 @@ async def unfeature_award(user: dict = Depends(get_current_user)):
 
 
 @router.post("/admin/awards/rebuild")
-async def rebuild_awards(me: dict = Depends(require_area("tournaments"))):
-    """Für alle Turniere mit veröffentlichten Ergebnissen nachtragen - idempotent."""
-    return await rebuild_all_awards(get_db())
+async def rebuild_awards(me: dict = Depends(require_area("system"))):
+    """Für alle Turniere mit veröffentlichten Ergebnissen nachtragen - idempotent. Ein Wartungsgriff (#2112): nur System,
+    mit Protokoll."""
+    db = get_db()
+    result = await rebuild_all_awards(db)
+    await db.audit_logs.insert_one({"id": new_id(), "action": "awards.rebuild", "actor_id": me["id"], "target_id": "tournament_awards",
+                                    "data": result, "created_at": now_utc().isoformat()})
+    return result
