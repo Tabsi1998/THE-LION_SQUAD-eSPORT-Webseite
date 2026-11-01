@@ -393,6 +393,14 @@ async def test_preferred_role_has_a_limit_and_passes_the_word_filter(flow):
 
 # ---------------------------------------------------------------- Review: unmögliche Namen beim Abruf
 @pytest.mark.asyncio
+async def test_odd_public_paths_stay_harmless(flow):
+    flow.act_as(None)
+    assert (await flow.get("/api/users/public/")).status_code == 404
+    assert (await flow.get("/api/users/public/x/y/z")).status_code == 404
+    assert (await flow.get("/api/users/public-list")).status_code == 200
+
+
+@pytest.mark.asyncio
 async def test_impossible_names_are_simply_not_found(flow):
     from fastapi import HTTPException
     from routes import seo_render_routes
