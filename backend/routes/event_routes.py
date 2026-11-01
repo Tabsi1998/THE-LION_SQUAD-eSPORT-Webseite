@@ -17,7 +17,7 @@ from services.sponsor_utils import dedupe_public_sponsors
 from services import partner_pages
 from services.notification_preferences import enqueue_newsletter_for_item
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
-from services import billing_orders, event_changes, event_days, event_facts, event_locations, event_notifications, event_play_along, event_registration, event_rewards, pricing
+from services import billing_orders, event_changes, event_days, event_facts, event_locations, event_notifications, event_play_along, event_program, event_registration, event_rewards, pricing
 from services.event_public import public_event
 from services.event_registration import RegistrationError
 from services.mutation_lock import MutationLockBusy, mutation_lock
@@ -1098,6 +1098,11 @@ async def update_event(event_id: str, body: EventUpdate, me: dict = Depends(requ
             event["cancellation"] = cancellation
         if change_notice is not None:
             event["change_notice"] = change_notice
+        # Verschoben (#2127, EV4): Turniere und Fast Laps bleiben auf ihrem Tag - das Speichern sagt, was jetzt danebenliegt.
+        if any(existing.get(field) != event.get(field) for field in event_changes.SCHEDULE_FIELDS) and event.get("status") != "cancelled":
+            notice = event_program.outside_notice(await event_program.outside_items(db, event))
+            if notice:
+                event["program_outside"] = notice
     return event
 
 

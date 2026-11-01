@@ -94,6 +94,15 @@ test("Bearbeiten lädt das Event aus der Liste und schickt nur die Änderung", a
   expect(await screen.findByTestId("events-list")).toBeInTheDocument();
 });
 
+test("Termin verschoben: das Speichern sagt, was jetzt außerhalb liegt (#2127)", async () => {
+  toast.warning.mockClear();
+  apiMock.patch.mockResolvedValue({ data: { ...EVENTS[0], program_outside: { tournaments: 2, fastlaps: 0, items: [] } } });
+  renderAt("/admin/events/ev-1");
+  fireEvent.change(await screen.findByTestId("event-name"), { target: { value: "Halloween Night 2026" } });
+  fireEvent.submit(screen.getByTestId("event-form"));
+  await waitFor(() => expect(toast.warning).toHaveBeenCalledWith("2 Turniere liegen jetzt außerhalb des Events – bitte im Programm den Tag prüfen."));
+});
+
 test("unbekannte Kennung: Hinweis mit Weg zurück statt leerem Formular", async () => {
   renderAt("/admin/events/gibt-es-nicht");
   expect(await screen.findByTestId("event-missing")).toHaveTextContent("Event nicht gefunden");

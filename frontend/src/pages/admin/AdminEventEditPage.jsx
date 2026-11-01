@@ -25,7 +25,7 @@ import { normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { EventProgramPanel, useEventProgram } from "@/pages/admin/event/EventProgramPanel";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
-import { affectedRegistrations, cancelConfirmText, eventStatusOptions, savedEventMessage, touchesScheduleOrPlace } from "@/lib/eventAdmin";
+import { affectedRegistrations, cancelConfirmText, eventStatusOptions, outsideText, savedEventMessage, touchesScheduleOrPlace } from "@/lib/eventAdmin";
 import { toast } from "sonner";
 
 const ACCENT = "#9F7AEA";
@@ -289,6 +289,7 @@ function EventForm({ event, meta, partners = [], onDone }) {
         }
         const { data } = await api.patch(`/events/${event.id}`, patch);
         toast.success(savedEventMessage(data));
+        if (data?.program_outside) toast.warning(outsideText(data.program_outside));
         onDone();
         setSaving(false);
         return;

@@ -65,6 +65,15 @@ export function savedEventMessage(saved) {
   return "Gespeichert.";
 }
 
+/** Nach einer Verschiebung (#2127, EV4): „2 Turniere und 1 Fast Lap liegen jetzt außerhalb des Events.“ - sonst leer. */
+export function outsideText(outside) {
+  const tournaments = Number(outside?.tournaments) || 0;
+  const fastlaps = Number(outside?.fastlaps) || 0;
+  if (!tournaments && !fastlaps) return "";
+  const parts = [tournaments ? plural(tournaments, "Turnier", "Turniere") : "", fastlaps ? plural(fastlaps, "Fast Lap", "Fast Laps") : ""].filter(Boolean);
+  return `${parts.join(" und ")} ${tournaments + fastlaps === 1 ? "liegt" : "liegen"} jetzt außerhalb des Events – bitte im Programm den Tag prüfen.`;
+}
+
 export function deleteConfirmText(event) {
   const count = affectedRegistrations(event);
   if (count) {

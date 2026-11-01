@@ -1,7 +1,13 @@
 import {
-  affectedRegistrations, cancelConfirmText, deleteConfirmText, eventIsOver, eventLastDay, eventStatusOptions, savedEventMessage,
+  affectedRegistrations, cancelConfirmText, deleteConfirmText, eventIsOver, eventLastDay, eventStatusOptions, outsideText, savedEventMessage,
   touchesScheduleOrPlace, visibilityWord,
 } from "@/lib/eventAdmin";
+
+test("Verschoben: wie viele Turniere und Fast Laps jetzt außerhalb liegen (#2127)", () => {
+  expect(outsideText(null)).toBe("");
+  expect(outsideText({ tournaments: 1, fastlaps: 0 })).toBe("1 Turnier liegt jetzt außerhalb des Events – bitte im Programm den Tag prüfen.");
+  expect(outsideText({ tournaments: 2, fastlaps: 1 })).toBe("2 Turniere und 1 Fast Lap liegen jetzt außerhalb des Events – bitte im Programm den Tag prüfen.");
+});
 
 test("Status-Auswahl: „Anmeldung offen/geschlossen“ nicht zur Wahl, ein bestehender Wert bleibt (#2127)", () => {
   const statuses = [{ k: "draft" }, { k: "scheduled" }, { k: "registration_open" }, { k: "registration_closed" }, { k: "live" }, { k: "cancelled" }];
