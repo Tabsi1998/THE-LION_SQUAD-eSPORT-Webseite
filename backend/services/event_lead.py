@@ -190,14 +190,14 @@ async def lead_view(db, event: dict, *, query: str = "", filter_key: str = "open
     return view
 
 
-WALK_IN_CLOSED = {"cancelled", "archived"}
+WALK_IN_CLOSED = {"draft", "cancelled", "archived"}
 WALK_IN_VIA = "door"
 WALK_IN_FULL = "Das Event ist voll: kein Platz mehr frei. Erhöhe „Max. Teilnehmer“ oder storniere zuerst eine Anmeldung."
 
 
 def walk_in_block_reason(event: dict) -> str | None:
     if event.get("status") in WALK_IN_CLOSED:
-        return "Dieses Event ist abgesagt oder archiviert – hier kommt niemand mehr dazu."
+        return "Dieses Event ist noch ein Entwurf, abgesagt oder archiviert – an der Tür kommt hier niemand dazu."
     if not event.get("has_registration") or event.get("registration_url"):
         return "Dieses Event führt keine Anmeldungen auf dieser Seite."
     return None

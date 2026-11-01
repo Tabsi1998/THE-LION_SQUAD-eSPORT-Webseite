@@ -173,8 +173,8 @@ async def test_nicht_in_der_oeffentlichen_liste_aber_bei_der_leitung(flow):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("extra", [{"status": "cancelled"}, {"registration_url": "https://example.test/anmelden"}])
-async def test_abgesagt_oder_extern_geht_nicht(flow, extra):
+@pytest.mark.parametrize("extra", [{"status": "cancelled"}, {"status": "draft"}, {"status": "archived"}, {"registration_url": "https://example.test/anmelden"}])
+async def test_abgesagt_entwurf_oder_extern_geht_nicht(flow, extra):
     _lead, event = await setup(flow)
     response = await flow.patch(f"/api/events/{event['id']}", json=extra)
     assert response.status_code == 200, response.text
