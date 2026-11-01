@@ -160,9 +160,9 @@ async def _applications(db, user_id: str, now: str) -> None:
 
 
 async def _registrations(db, user_id: str, now: str) -> None:
-    """Die Anmeldung bleibt als Zählung und für den Turnierbaum - ohne die Kopien von Name, Adresse und Notiz."""
+    """Die Anmeldung bleibt als Zählung und für den Turnierbaum - ohne die Kopien von Name, Adresse und Notizen."""
     await db.event_registrations.update_many(
-        {"user_id": user_id}, {"$set": {"display_name": GONE, "email": None, "note": None, "anonymized_at": now}},
+        {"user_id": user_id}, {"$set": {"display_name": GONE, "email": None, "note": None, "internal_note": None, "anonymized_at": now}},
     )
     await db.tournament_registrations.update_many(
         {"user_id": user_id}, {"$set": {"ingame_name": None, "discord": None, "platform_id": None, "notes": None, "anonymized_at": now}},
