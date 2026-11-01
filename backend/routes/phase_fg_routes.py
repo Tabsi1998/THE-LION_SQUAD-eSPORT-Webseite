@@ -25,7 +25,7 @@ from urllib.parse import urlparse
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import Response
 from PIL import Image, ImageOps, UnidentifiedImageError
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from database import get_db
 from auth import get_current_user, require_area
@@ -47,6 +47,9 @@ MEDIA_PAGE_MAX = 200
 MEDIA_UNPAGED_LIMIT = 500
 MEDIA_SEARCH_MAX = 200
 USAGE_SCOPES = {"unused", "duplicate"}
+# „Ungenutzte löschen“ (#2122): Frisch Hochgeladenes bleibt - das Formular dazu ist vielleicht noch offen.
+MEDIA_CLEANUP_MIN_AGE_HOURS = max(0, int(os.environ.get("MEDIA_CLEANUP_MIN_AGE_HOURS") or 24))
+MEDIA_CLEANUP_BATCH = 500
 
 # ============= Media Browser =============
 media_router = APIRouter(prefix="/api/media", tags=["media"])
@@ -55,6 +58,14 @@ admin_media_router = APIRouter(prefix="/api/admin/media", tags=["cms-admin"])
 
 class RotateMediaBody(BaseModel):
     degrees: int = 90
+
+
+class MediaCleanupBody(BaseModel):
+    filenames: list[str] = Field(default_factory=list, max_length=MEDIA_CLEANUP_BATCH)
+
+
+class DuplicateReplaceBody(BaseModel):
+    keep: str = Field(min_length=1, max_length=200)
 
 
 def _filename_from_media_value(value: Any) -> str | None:
@@ -343,6 +354,86 @@ async def admin_list_media(
     if paged:
         return await _media_page(limit, offset, scope=scope, include_usage=include_usage, **query)
     return await _list_media_items(include_usage=include_usage, **query)
+
+
+async def _unused_for_cleanup() -> list[dict]:
+    """Was „Ungenutzte löschen“ anfassen darf (#2122) - frisch vom Server geprüft: Bilder und Videos der Redaktion, die
+    nirgends stehen und nicht gerade erst hochgeladen wurden. Nie Uploads von Mitgliedern (sie sind deren Bibliothek),
+    nie Dateien ohne Upload-Eintrag (Herkunft unbekannt), nie Kamera-Originale (sie gehören zur Vorschau eines Bilds)."""
+    db = get_db()
+    items, entries = await _media_rows(exclude_user_scope=True, include_untracked=False)
+    newest = now_utc().timestamp() - MEDIA_CLEANUP_MIN_AGE_HOURS * 3600
+    modified = {path.name: stat.st_mtime for path, stat in entries}
+    items = [item for item in items if item["media_type"] in ("image", "video") and modified[item["filename"]] <= newest]
+    await _add_usage(items, entries)
+    unused = [item for item in items if item["is_unused"]]
+    referenced = await media_audit.still_referenced(db, {item["filename"] for item in unused})
+    return [item for item in unused if item["filename"] not in referenced]
+
+
+@admin_media_router.get("/unused")
+async def admin_media_unused(me: dict = Depends(require_area("content"))):
+    """Was „Ungenutzte löschen“ gerade löschen würde - die Rückfrage nennt Zahl und Größe."""
+    unused = await _unused_for_cleanup()
+    return {
+        "count": len(unused),
+        "total_size": sum(int(item.get("size") or 0) for item in unused),
+        "filenames": [item["filename"] for item in unused[:MEDIA_CLEANUP_BATCH]],
+        "batch": MEDIA_CLEANUP_BATCH,
+        "min_age_hours": MEDIA_CLEANUP_MIN_AGE_HOURS,
+    }
+
+
+@admin_media_router.post("/cleanup-unused")
+async def admin_media_cleanup_unused(body: MediaCleanupBody, me: dict = Depends(require_area("content"))):
+    """Löscht nur, was in der Rückfrage stand und auch jetzt noch ungenutzt ist: Der Server prüft erneut. Was inzwischen
+    verwendet wird, bleibt und steht als ausgelassen in der Antwort. Die Sammelaktion steht im Protokoll."""
+    db = get_db()
+    still_unused = {item["filename"] for item in await _unused_for_cleanup()}
+    deleted: list[str] = []
+    skipped: list[str] = []
+    pending = 0
+    for filename in dict.fromkeys(body.filenames):
+        if filename not in still_unused:
+            skipped.append(filename)
+            continue
+        if await account_erasure.remove_upload(db, filename):
+            pending += 1
+        deleted.append(filename)
+    await db.audit_logs.insert_one({
+        "id": new_id(), "action": "media.cleanup_unused", "actor_id": me.get("id"), "target_id": None,
+        "data": {"deleted": deleted, "skipped": skipped, "file_pending": pending},
+        "created_at": now_utc().isoformat(),
+    })
+    return {"ok": True, "deleted": len(deleted), "skipped": len(skipped), "file_pending": pending}
+
+
+@admin_media_router.post("/duplicates/replace")
+async def admin_media_replace_duplicates(body: DuplicateReplaceBody, me: dict = Depends(require_area("content"))):
+    """Duplikat ersetzen (#2122): ``keep`` bleibt, jede Stelle, die eine inhaltsgleiche Kopie zeigt, zeigt danach auf
+    ``keep``, die Kopie verschwindet. Ob die Dateien gleich sind, prüft der Server jetzt - nicht die Liste von vorhin.
+    Kopien von Mitgliedern bleiben unangetastet: Das ist deren Bibliothek."""
+    _media_file_path(body.keep)
+    db = get_db()
+    items, entries = await _media_rows(exclude_user_scope=True)
+    editable = {item["filename"] for item in items}
+    copies = [name for name in _duplicate_lookup(entries, {body.keep}).get(body.keep, []) if name != body.keep and name in editable]
+    if not copies:
+        raise HTTPException(409, "Zu dieser Datei gibt es keine Kopien mehr.")
+    meta = await db.media_uploads.find_one({"filename": body.keep}, {"_id": 0, "version": 1})
+    target = _media_url(body.keep, meta)
+    stamp = {"updated_at": now_utc().isoformat()}
+    repointed = pending = 0
+    for name in copies:
+        repointed += await media_audit.repoint_usages(db, name, target, stamp)
+        if await account_erasure.remove_upload(db, name):
+            pending += 1
+    await db.audit_logs.insert_one({
+        "id": new_id(), "action": "media.replace_duplicates", "actor_id": me.get("id"), "target_id": body.keep,
+        "data": {"keep": body.keep, "removed": copies, "references": repointed, "file_pending": pending},
+        "created_at": stamp["updated_at"],
+    })
+    return {"ok": True, "removed": len(copies), "references": repointed, "file_pending": pending}
 
 
 @admin_media_router.get("/audit")

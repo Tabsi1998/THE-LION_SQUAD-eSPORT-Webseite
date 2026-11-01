@@ -119,6 +119,8 @@ PLACE_LABELS = {
     ("settings", "club_photo.url"): "Über uns · Vereinsfoto",
     ("settings", "timeline.image_url"): "Über uns · Bild in der Chronik",
 }
+# Verwaltung und Protokolle: Ein Eintrag hier sagt nur, dass es die Datei gibt oder gab - gezeigt wird sie dadurch nicht.
+NOT_A_USAGE = {"media_uploads", "media_scans", "upload_events", "audit_logs", "pending_file_cleanups"}
 # Wo neben der Adresse auch die Maße stehen: gedreht tauschen sie mit (#2122).
 SIZE_FIELDS = {
     ("gallery_photos", "image_url"): ("width", "height"),
@@ -350,6 +352,24 @@ async def stamp_version(db, filename: str, version: int, size: tuple[int, int], 
 async def repoint_usages(db, filename: str, target_url: str, stamp: dict | None = None) -> int:
     """Jede Stelle, die ``filename`` zeigt, zeigt danach auf ``target_url`` (Duplikat ersetzen, #2122)."""
     return len(await _rewrite_usages(db, filename, lambda _url: target_url, stamp))
+
+
+async def still_referenced(db, names: set[str]) -> set[str]:
+    """Das Netz unter den bekannten Stellen (``usage_places``): Bevor die Mediathek in Masse löscht, liest sie alle
+    Sammlungen einmal durch (#2122). Steht eine Datei in einem Feld, das noch niemand eingetragen hat, bleibt sie."""
+    if not names:
+        return set()
+    references, _partial = await uploads_inventory.collect_references(db, set(names))
+    stems = {pathlib.PurePosixPath(name).stem: name for name in names}
+    found: set[str] = set()
+    for name, rows in references.items():
+        if all(row["collection"] in NOT_A_USAGE for row in rows):
+            continue
+        variant = VARIANT_NAME.match(name)
+        target = name if name in names else stems.get(variant.group("stem")) if variant else None
+        if target:
+            found.add(target)
+    return found
 
 
 async def audit_image_references(repair: bool = False, clear_missing: bool = False) -> dict:

@@ -5,7 +5,7 @@ import { MediaImage } from "./parts";
 import { BACKEND, IMG_EXT, MEDIA_SCOPE_LABELS, VIDEO_EXT, cacheBustedMediaUrl, fmtBytes } from "./shared";
 import { viennaDateTime } from "@/lib/vienna";
 
-export function MediaDetailSheet({ item, onClose, onCopy, onRotateLeft, onRotateRight, onDelete }) {
+export function MediaDetailSheet({ item, onClose, onCopy, onRotateLeft, onRotateRight, onDelete, onKeepDuplicate }) {
   const isImg = IMG_EXT.has(item.ext);
   const isVideo = VIDEO_EXT.has(item.ext);
   const canRotate = ["png", "jpg", "jpeg", "webp"].includes(item.ext);
@@ -24,10 +24,10 @@ export function MediaDetailSheet({ item, onClose, onCopy, onRotateLeft, onRotate
         </>
       )}
       <button type="button" onClick={onCopy} data-testid="media-copy-url" className="px-4 py-2 border border-white/10 hover:bg-white/5 text-xs font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2">
-        <Copy className="w-3.5 h-3.5" /> URL kopieren
+        <Copy className="w-3.5 h-3.5" /> Adresse kopieren
       </button>
       <a href={fullUrl} download={item.original_filename || item.filename} className="px-4 py-2 border border-white/10 hover:bg-white/5 text-xs font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2">
-        <Download className="w-3.5 h-3.5" /> Download
+        <Download className="w-3.5 h-3.5" /> Herunterladen
       </a>
       <button type="button" onClick={onDelete} data-testid="media-delete" className="px-4 py-2 bg-[#FF3B30]/15 text-[#FF3B30] border border-[#FF3B30]/40 hover:bg-[#FF3B30]/25 text-xs font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2">
         <Trash2 className="w-3.5 h-3.5" /> Löschen
@@ -68,12 +68,12 @@ export function MediaDetailSheet({ item, onClose, onCopy, onRotateLeft, onRotate
           </div>
         ) : null}
         <div>
-          <div className="uppercase text-[10px] text-white/40 tracking-widest">Scope</div>
-          <div className="text-white/80">{MEDIA_SCOPE_LABELS[item.media_scope] || item.media_scope || "Legacy"}</div>
+          <div className="uppercase text-[10px] text-white/40 tracking-widest">Bereich</div>
+          <div className="text-white/80">{MEDIA_SCOPE_LABELS[item.media_scope] || MEDIA_SCOPE_LABELS.legacy}</div>
         </div>
         <div>
-          <div className="uppercase text-[10px] text-white/40 tracking-widest">Nutzung</div>
-          <div className="text-white/80">{item.usage_count || 0} Referenz(en){item.tracked ? "" : " · ungetrackt"}</div>
+          <div className="uppercase text-[10px] text-white/40 tracking-widest">Verwendung</div>
+          <div className="text-white/80">{item.usage_count || 0}× verwendet{item.tracked ? "" : " · nicht erfasst"}</div>
         </div>
         {item.original_filename && (
           <div className="col-span-2">
@@ -89,10 +89,15 @@ export function MediaDetailSheet({ item, onClose, onCopy, onRotateLeft, onRotate
                 <span key={name} className="rounded-sm border border-[#FFD700]/25 bg-[#FFD700]/5 px-2 py-1 font-mono text-[10px] text-[#FFD700]">{name}</span>
               ))}
             </div>
+            {onKeepDuplicate && (
+              <button type="button" onClick={onKeepDuplicate} data-testid="media-duplicate-keep" className="mt-2 min-h-11 rounded-sm border border-[#FFD700]/40 px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#FFD700] hover:bg-[#FFD700]/10">
+                Diese Datei behalten, Kopien ersetzen
+              </button>
+            )}
           </div>
         )}
         <div className="col-span-2">
-          <div className="uppercase text-[10px] text-white/40 tracking-widest">URL</div>
+          <div className="uppercase text-[10px] text-white/40 tracking-widest">Adresse</div>
           <code className="text-white/80 font-mono text-[11px] break-all">{fullUrl}</code>
         </div>
       </div>

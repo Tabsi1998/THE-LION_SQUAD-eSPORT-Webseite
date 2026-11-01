@@ -112,6 +112,62 @@ test("Drehen fragt nach, nennt die Stellen und übernimmt Adresse und Maße (#21
   expect(screen.getByTestId("media-sheet")).toHaveTextContent("loewe.png?v=7");
 });
 
+test("Ungenutzte löschen: erst die Rückfrage mit Zahl und Größe, dann genau diese Dateien (#2122)", async () => {
+  apiMock.post.mockReset();
+  apiMock.post.mockResolvedValue({ data: { ok: true, deleted: 2, skipped: 1, file_pending: 0 } });
+  apiMock.get.mockImplementation(async (url) => {
+    if (url.startsWith("/admin/media?")) return { data: { items: [UNUSED], total: 1 } };
+    if (url === "/admin/media/audit") return { data: { unused: 3, summary: {} } };
+    if (url === "/admin/media/unused") return { data: { count: 3, total_size: 2048, filenames: ["a.webp", "b.webp", "c.webp"], min_age_hours: 24 } };
+    return { data: [] };
+  });
+  render(<MemoryRouter><AdminMediaPage /></MemoryRouter>);
+
+  confirmMock.mockResolvedValueOnce(false);
+  fireEvent.click(await screen.findByTestId("media-cleanup-unused"));
+  await waitFor(() => expect(confirmMock.mock.calls.at(-1)[0].title).toBe("3 ungenutzte Dateien löschen?"));
+  expect(confirmMock.mock.calls.at(-1)[0].description).toContain("2.0 KB");
+  expect(confirmMock.mock.calls.at(-1)[0].description).toContain("letzten 24 Stunden");
+  expect(apiMock.post).not.toHaveBeenCalled();
+
+  await waitFor(() => expect(screen.getByTestId("media-cleanup-unused")).toBeEnabled());
+  fireEvent.click(screen.getByTestId("media-cleanup-unused"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/media/cleanup-unused", { filenames: ["a.webp", "b.webp", "c.webp"] }));
+});
+
+test("Duplikat ersetzen: fragt nach und nennt, was bleibt (#2122)", async () => {
+  apiMock.post.mockReset();
+  apiMock.post.mockResolvedValue({ data: { ok: true, removed: 1, references: 3 } });
+  const COPY = { ...ITEM, duplicate_count: 2, duplicate_filenames: ["loewe.png", "kopie.png"] };
+  apiMock.get.mockImplementation(async (url) => {
+    if (url.startsWith("/admin/media?")) return { data: { items: [COPY], total: 1 } };
+    if (url === "/admin/media/audit") return { data: { summary: {} } };
+    return { data: [] };
+  });
+  render(<MemoryRouter><AdminMediaPage /></MemoryRouter>);
+  fireEvent.click(await screen.findByTestId("media-tile-loewe.png"));
+  fireEvent.click(screen.getByTestId("media-duplicate-keep"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/media/duplicates/replace", { keep: "loewe.png" }));
+  expect(confirmMock.mock.calls.at(-1)[0].title).toBe("Kopie ersetzen?");
+  expect(confirmMock.mock.calls.at(-1)[0].description).toContain("„loewe.png“ bleibt");
+});
+
+test("die Mediathek spricht Deutsch statt Technik-Englisch (#2122)", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url.startsWith("/admin/media?")) return { data: { items: [{ ...UNUSED, media_scope: "legacy", tracked: false }], total: 1 } };
+    if (url === "/admin/media/audit") return { data: { unused: 1, untracked: 1, by_scope: { legacy: 1 }, summary: {} } };
+    return { data: [] };
+  });
+  const { container } = render(<MemoryRouter><AdminMediaPage /></MemoryRouter>);
+  fireEvent.click(await screen.findByTestId("media-tile-frei.png"));
+  for (const word of ["Scope", "Legacy", "ngetrackt", "User-Medien", "Metadaten", "Referenz"]) {
+    expect(container.textContent).not.toContain(word);
+    expect(screen.getByTestId("media-sheet").textContent).not.toContain(word);
+  }
+  expect(screen.getByTestId("media-tile-frei.png")).toHaveTextContent("Ohne Zuordnung");
+  expect(screen.getByTestId("media-tile-frei.png")).toHaveTextContent("nicht erfasst");
+});
+
 test("Original-Bilder der Serien (#1933) zählt die Mediathek mit - privat, ohne Kachel", async () => {
   apiMock.get.mockImplementation(async (url) => {
     if (url.startsWith("/admin/media?")) return { data: [ITEM] };

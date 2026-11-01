@@ -10,15 +10,15 @@ export const IMG_EXT = new Set(["png", "jpg", "jpeg", "webp", "gif", "avif", "bm
 export const VIDEO_EXT = VIDEO_EXTENSIONS;
 
 export const MEDIA_SCOPE_LABELS = {
-  all: "Alle",
-  admin: "Admin/CMS",
+  all: "Alle Bereiche",
+  admin: "Redaktion",
   sponsor: "Sponsor",
-  branding: "Branding",
+  branding: "Logos und Marke",
   gallery: "Galerie",
-  user: "User",
-  legacy: "Legacy",
+  user: "Mitglieder",
+  legacy: "Ohne Zuordnung",
   unused: "Ungenutzt",
-  untracked: "Ungetrackt",
+  untracked: "Nicht erfasst",
   duplicate: "Duplikate",
 };
 

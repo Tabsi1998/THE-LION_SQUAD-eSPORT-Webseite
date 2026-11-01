@@ -43,7 +43,7 @@ export function UploadEventsPanel({ events, loading, onRefresh }) {
           <div className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.25em] text-[#29B6E8]">
             <Activity className="h-4 w-4" /> Upload-Protokoll
           </div>
-          <p className="mt-1 text-xs text-white/45">Letzte Medien-Uploads inklusive Serverfehler, Proxy-Abbruch und Browserfehler.</p>
+          <p className="mt-1 text-xs text-white/45">Letzte Medien-Uploads, auch die fehlgeschlagenen.</p>
         </div>
         <button
           type="button"

@@ -138,6 +138,111 @@ async def test_type_filter_and_svg_can_be_left_out_on_the_server(flow, public):
     assert await names("type=files") == ["roh.nef"]
 
 
+# ---------------------------------------------------------------- Sammelaktionen
+
+OLD = 3 * 24 * 3600
+
+
+async def track(flow, name: str, scope: str = "admin", **extra) -> None:
+    await flow.db.media_uploads.insert_one({"id": name, "filename": name, "url": UPLOADS + name, "media_type": "image", "media_scope": scope, "owner_role": "admin", **extra})
+
+
+@pytest.mark.asyncio
+async def test_cleanup_offers_only_what_is_safe_to_remove(flow, public):
+    await admin(flow)
+    for name in ("alt-frei.webp", "alt-genutzt.webp", "alt-sticker.webp", "alt-fremdes-feld.webp"):
+        add_file(public, name, age=OLD)
+        await track(flow, name)
+    await flow.db.news_posts.insert_one({"id": "n-1", "banner_url": UPLOADS + "alt-genutzt.webp"})
+    await flow.db.direct_messages.insert_one({"id": "m-1", "sticker": {"id": "s-1", "url": UPLOADS + "alt-sticker.webp"}})
+    # Ein Feld, das noch niemand in die Liste der Verwendungsstellen eingetragen hat: Das Netz darunter findet es.
+    await flow.db.neue_sammlung.insert_one({"id": "x-1", "tief": [{"bild": UPLOADS + "alt-fremdes-feld.webp?v=1"}]})
+    # Frisch hochgeladen - das Formular dazu ist vielleicht noch offen.
+    add_file(public, "frisch.webp")
+    await track(flow, "frisch.webp")
+    # Uploads von Mitgliedern, Dateien ohne Eintrag und Kamera-Originale bleiben.
+    add_file(public, "mitglied.webp", age=OLD)
+    await track(flow, "mitglied.webp", scope="user", owner_role="user")
+    add_file(public, "ohne-eintrag.webp", age=OLD)
+    add_file(public, "roh.nef", age=OLD)
+    await flow.db.media_uploads.insert_one({"id": "roh", "filename": "roh.nef", "url": UPLOADS + "roh.nef", "media_type": "file", "media_scope": "admin", "owner_role": "admin"})
+    # Ein Protokolleintrag ist keine Verwendung.
+    await flow.db.audit_logs.insert_one({"id": "a-1", "action": "media.delete", "data": {"filename": "alt-frei.webp"}})
+
+    preview = (await flow.get("/api/admin/media/unused")).json()
+
+    assert preview["filenames"] == ["alt-frei.webp"] and preview["count"] == 1
+    assert preview["total_size"] == len("alt-frei.webp")
+    assert preview["min_age_hours"] == phase_fg_routes.MEDIA_CLEANUP_MIN_AGE_HOURS
+
+
+@pytest.mark.asyncio
+async def test_cleanup_checks_again_on_the_server_and_logs_the_action(flow, public):
+    chef = await admin(flow)
+    for name in ("frei-a.webp", "frei-b.webp"):
+        add_file(public, name, age=OLD)
+        await track(flow, name)
+    (public / "variants" / "frei-a-400.webp").write_bytes(b"klein")
+    preview = (await flow.get("/api/admin/media/unused")).json()
+    assert sorted(preview["filenames"]) == ["frei-a.webp", "frei-b.webp"]
+
+    # Zwischen Rückfrage und Klick wird eine Datei verwendet; eine fremde steht gar nicht zur Wahl.
+    await flow.db.events.insert_one({"id": "e-1", "banner_url": UPLOADS + "frei-b.webp"})
+    add_file(public, "behalten.webp")
+    response = await flow.post("/api/admin/media/cleanup-unused", json={"filenames": [*preview["filenames"], "behalten.webp", "../boese.webp"]})
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {"ok": True, "deleted": 1, "skipped": 3, "file_pending": 0}
+    assert not (public / "frei-a.webp").exists() and not (public / "variants" / "frei-a-400.webp").exists()
+    assert (public / "frei-b.webp").exists() and (public / "behalten.webp").exists()
+    assert await flow.db.media_uploads.count_documents({"filename": "frei-a.webp"}) == 0
+    log = await flow.db.audit_logs.find_one({"action": "media.cleanup_unused"})
+    assert log["actor_id"] == chef["id"]
+    assert log["data"]["deleted"] == ["frei-a.webp"]
+    assert sorted(log["data"]["skipped"]) == ["../boese.webp", "behalten.webp", "frei-b.webp"]
+
+
+@pytest.mark.asyncio
+async def test_replacing_a_duplicate_points_every_place_at_the_kept_file(flow, public):
+    chef = await admin(flow)
+    for name in ("bleibt.webp", "kopie.webp", "mitglied.webp"):
+        add_file(public, name, content=b"gleicher inhalt", age=OLD)
+    add_file(public, "anders-gleich-gross.webp", content=b"anderer  inhalt", age=OLD)
+    await track(flow, "bleibt.webp", version=7)
+    await track(flow, "kopie.webp")
+    await track(flow, "mitglied.webp", scope="user", owner_role="user")
+    await flow.db.news_posts.insert_one({"id": "n-1", "banner_url": UPLOADS + "kopie.webp", "content": f"![x]({UPLOADS}kopie.webp) und ![y]({UPLOADS}anderes.webp)"})
+    await flow.db.direct_messages.insert_one({"id": "m-1", "updated_at": "alt", "sticker": {"id": "s-1", "url": UPLOADS + "kopie.webp"}})
+    await flow.db.teams.insert_one({"id": "t-1", "logo_url": UPLOADS + "variants/kopie-400.webp"})
+
+    response = await flow.post("/api/admin/media/duplicates/replace", json={"keep": "bleibt.webp"})
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {"ok": True, "removed": 1, "references": 4, "file_pending": 0}
+    kept = UPLOADS + "bleibt.webp?v=7"
+    news = await flow.db.news_posts.find_one({"id": "n-1"})
+    assert news["banner_url"] == kept and news["content"] == f"![x]({kept}) und ![y]({UPLOADS}anderes.webp)"
+    message = await flow.db.direct_messages.find_one({"id": "m-1"})
+    assert message["sticker"]["url"] == kept and message["updated_at"] == "alt"
+    assert (await flow.db.teams.find_one({"id": "t-1"}))["logo_url"] == kept
+    assert not (public / "kopie.webp").exists()
+    assert (public / "bleibt.webp").exists() and (public / "mitglied.webp").exists() and (public / "anders-gleich-gross.webp").exists()
+    log = await flow.db.audit_logs.find_one({"action": "media.replace_duplicates"})
+    assert log["actor_id"] == chef["id"] and log["data"]["removed"] == ["kopie.webp"]
+
+    # Kopie schon weg, oder nur noch Mitglieder-Kopien: nichts zu tun.
+    assert (await flow.post("/api/admin/media/duplicates/replace", json={"keep": "bleibt.webp"})).status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_collective_actions_need_the_editorial_area(flow, public):
+    moderator = await flow.add_user(role="moderator", name="moni")
+    flow.act_as(moderator)
+    assert (await flow.get("/api/admin/media/unused")).status_code == 403
+    assert (await flow.post("/api/admin/media/cleanup-unused", json={"filenames": []})).status_code == 403
+    assert (await flow.post("/api/admin/media/duplicates/replace", json={"keep": "a.webp"})).status_code == 403
+
+
 @pytest.mark.asyncio
 async def test_page_size_stays_within_bounds(flow, public):
     await admin(flow)
