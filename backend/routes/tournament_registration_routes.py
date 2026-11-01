@@ -127,6 +127,8 @@ LEAVES_BRACKET_STATUSES = {"rejected", "waitlist", "pending"}
 SEED_FIXED = "Der Turnierbaum steht schon – Setzplätze ändern sich nur bis zum Ende des Check-ins."
 REMOVAL_FINAL = ("Austritt und Disqualifikation lassen sich hier nicht zurücknehmen – die Spiele der Person sind schon "
                  "umgebaut. Bei einem Irrtum bitte die betroffenen Ergebnisse im Reiter „Spiele“ korrigieren.")
+REMOVAL_NO_PLACE = ("Im Turnierbaum ist kein Platz frei, darum lässt sich der Austritt oder die Disqualifikation nicht "
+                    "zurücknehmen. Ein Platz wird frei, wenn jemand austritt oder als „Nicht erschienen“ gilt.")
 REMOVAL_NOT_AT_CHECKIN = ("Austritt und Disqualifikation lassen sich beim Check-in nicht zurücknehmen. Das macht die "
                           "Turnierleitung über den Status in der Teilnehmerliste.")
 
@@ -378,6 +380,24 @@ async def _replace_registration_in_open_matches(db, tid: str, old_reg_id: str, n
     return {"v2_matches": v2_count}
 
 
+async def _open_place(db, tid: str, matches: list[dict]) -> dict | None:
+    """Der Platz, den ein Nachrücker im festen Baum bekäme (#1551) - nur nachsehen, nichts schreiben. Zuerst der einer
+    Person „Nicht erschienen“ (mit dem niedrigsten Setzplatz), sonst ein leerer Platz neben einem Freilos."""
+    in_tree = sorted({reg_id for match in matches if not match.get("is_preview") for reg_id in slot_ids(match)})
+    absent = await db.tournament_registrations.find(
+        {"tournament_id": tid, "status": "no_show", "id": {"$in": in_tree}}, {"_id": 0, "id": 1, "seed": 1},
+    ).to_list(len(in_tree) + 1)
+    for row in sorted(absent, key=lambda item: (item.get("seed") is None, item.get("seed") or 0, item["id"])):
+        try:
+            targets = replacement_targets(matches, row["id"])
+        except FillInRefused:
+            continue
+        if targets:
+            return {"kind": "no_show", "registration_id": row["id"], "targets": targets}
+    place = free_bye_place(matches)
+    return {"kind": "bye", "place": place} if place else None
+
+
 async def _place_fill_in(db, tid: str, reg: dict, actor_id: str | None) -> dict | None:
     """Nachrücker nach dem Baubau (#1551): wer jetzt bestätigt oder eingecheckt wird, bekommt genau einen freien Platz -
     zuerst den einer Person „Nicht erschienen“, sonst einen leeren Platz neben einem Freilos. Ohne festen Baum (Vorschau)
@@ -388,24 +408,15 @@ async def _place_fill_in(db, tid: str, reg: dict, actor_id: str | None) -> dict 
     fixed = [match for match in matches if not match.get("is_preview")]
     if not fixed or any(reg["id"] in slot_ids(match) for match in fixed):
         return None
-    in_tree = sorted({reg_id for match in fixed for reg_id in slot_ids(match)})
-    absent = await db.tournament_registrations.find(
-        {"tournament_id": tid, "status": "no_show", "id": {"$in": in_tree}}, {"_id": 0, "id": 1, "seed": 1},
-    ).to_list(len(in_tree) + 1)
-    placement = None
-    for row in sorted(absent, key=lambda item: (item.get("seed") is None, item.get("seed") or 0, item["id"])):
-        try:
-            targets = replacement_targets(matches, row["id"])
-        except FillInRefused:
-            continue
-        if targets:
-            await _replace_registration_in_open_matches(db, tid, row["id"], reg, actor_id, targets)
-            placement = {"ok": True, "kind": "no_show", "match_id": targets[0]["id"], "replaced_registration_id": row["id"]}
-            break
-    if placement is None:
-        place = free_bye_place(matches)
-        if not place:
-            return {"ok": False, "reason": "no_free_place", "detail": NO_PLACE_DETAIL}
+    spot = await _open_place(db, tid, matches)
+    if not spot:
+        return {"ok": False, "reason": "no_free_place", "detail": NO_PLACE_DETAIL}
+    if spot["kind"] == "no_show":
+        absent_id, targets = spot["registration_id"], spot["targets"]
+        await _replace_registration_in_open_matches(db, tid, absent_id, reg, actor_id, targets)
+        placement = {"ok": True, "kind": "no_show", "match_id": targets[0]["id"], "replaced_registration_id": absent_id}
+    else:
+        place = spot["place"]
         changes = reopened_bye(place, matches, reg, now_utc().isoformat())
         # Folgespiele zuerst, das Freilos-Spiel zuletzt - wie beim Ergebnis-Weg.
         for match_id, change in changes.items():
@@ -1008,12 +1019,22 @@ async def update_registration(tid: str, reg_id: str, body: RegistrationUpdate,
         # Abgelehnt, Warteliste oder Ausstehend nimmt die Anmeldung aus dem Spiel (#2120, TA13) - im festen Baum
         # blieben ihre Spiele mit einer Anmeldung stehen, die nicht mehr mitspielt.
         raise HTTPException(status_code=409, detail=tournament_guard.registration_removal_refused(tournament_doc))
+    if lifts_removal and updates["status"] in {"approved", "checked_in"}:
+        # Steht der Baum, kommt die Person nur auf einen freien Platz zurück (#2111) - sonst stünde sie als angenommen da,
+        # ohne Spiel und mit offenem Startgeld. Deshalb vor dem Schreiben prüfen.
+        matches = await _tournament_v2_matches(db, tid)
+        if any(not match.get("is_preview") for match in matches) and not await _open_place(db, tid, matches):
+            raise HTTPException(status_code=409, detail=REMOVAL_NO_PLACE)
     if updates.get("status") and updates["status"] != previous_status:
         # Co-Team einer Liga (#1649): der Season-Schlüssel folgt dem Status - vor dem Schreiben, damit ein Co-Team, das
         # inzwischen in einer anderen Staffel spielt, hier nicht wieder aktiv wird.
         await _sync_squad_key(db, reg, updates["status"], tournament_doc)
     updates["updated_at"] = now_utc().isoformat()
-    await db.tournament_registrations.update_one({"id": reg_id, "tournament_id": tid}, {"$set": updates})
+    # Die Angaben zum Ausscheiden gelten nur, solange die Person ausgeschieden ist (die Ansicht liest ``removal``).
+    await db.tournament_registrations.update_one(
+        {"id": reg_id, "tournament_id": tid},
+        {"$set": updates, "$unset": {"removal": ""}} if lifts_removal else {"$set": updates},
+    )
     reg = await db.tournament_registrations.find_one({"id": reg_id, "tournament_id": tid}, {"_id": 0})
     if updates.get("status") and updates["status"] != previous_status:
         await _notify_registration(db, tid, reg, updates["status"], previous=previous_status, reason=status_reason, actor_id=me.get("id"))

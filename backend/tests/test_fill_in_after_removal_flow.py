@@ -131,6 +131,47 @@ async def test_lifting_a_removal_needs_the_right_to_remove(flow):
 
 
 @pytest.mark.asyncio
+async def test_no_way_back_once_a_late_participant_took_the_place(flow):
+    """#2111: steht der Baum und der Platz ist weg, sagt der Server das vorher - die Person steht nicht als „Angenommen“
+    ohne Spiel da, das Startgeld bleibt, wie es war."""
+    _staff, tournament, regs = await eight(flow)
+    tid = tournament["id"]
+    first_round = sorted((m for m in await flow.matches(tournament) if m["round"] == 1), key=lambda m: m["order"])
+    removed = next(reg for reg in regs if reg["id"] == filled(first_round[0])[0])
+    await remove(flow, tournament, removed, kind="disqualified")
+    await flow.db.tournament_registrations.update_one({"id": removed["id"]}, {"$set": {"billing_status": "cancelled"}})
+
+    late = await flow.add_user(name="Nachrücker")
+    took = await flow.post(f"/api/tournaments/{tid}/registrations", json={"user_id": late["id"], "status": "checked_in"})
+    assert took.json()["placement"]["ok"] is True, took.text
+    before = await flow.db.tournament_registrations.find_one({"id": removed["id"]}, {"_id": 0})
+
+    refused = await flow.patch(f"/api/tournaments/{tid}/registrations/{removed['id']}", json={"status": "approved"})
+    assert refused.status_code == 409, refused.text
+    assert "kein Platz frei" in refused.json()["detail"]
+    after = await flow.db.tournament_registrations.find_one({"id": removed["id"]}, {"_id": 0})
+    assert after == before, "Status, Startgeld und Ausscheiden bleiben, wie sie waren"
+    assert after["status"] == "disqualified" and after["billing_status"] == "cancelled" and after["removal"]
+
+
+@pytest.mark.asyncio
+async def test_coming_back_clears_the_removal(flow):
+    _staff, tournament, regs = await eight(flow)
+    tid = tournament["id"]
+    first_round = sorted((m for m in await flow.matches(tournament) if m["round"] == 1), key=lambda m: m["order"])
+    back = next(reg for reg in regs if reg["id"] == filled(first_round[0])[0])
+    await remove(flow, tournament, back)
+    assert (await flow.db.tournament_registrations.find_one({"id": back["id"]}, {"_id": 0}))["removal"]
+
+    undone = await flow.patch(f"/api/tournaments/{tid}/registrations/{back['id']}", json={"status": "approved"})
+    assert undone.status_code == 200, undone.text
+    assert undone.json()["placement"]["ok"] is True and "removal" not in undone.json()
+    assert back["id"] in filled(await flow.reload(first_round[0]))
+    stored = await flow.db.tournament_registrations.find_one({"id": back["id"]}, {"_id": 0})
+    assert stored["status"] == "approved" and "removal" not in stored
+
+
+@pytest.mark.asyncio
 async def test_no_no_show_proposal_for_a_removed_participant(flow):
     _staff, tournament, regs = await eight(flow, event_mode="online")
     first_round = sorted((m for m in await flow.matches(tournament) if m["round"] == 1), key=lambda m: m["order"])
