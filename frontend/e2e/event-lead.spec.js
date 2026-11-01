@@ -53,6 +53,16 @@ async function setup(page) {
       state.rows = [...state.rows, row].sort((a, b) => a.display_name.localeCompare(b.display_name, "de"));
       return route.fulfill(json(row));
     }
+    const walkIn = url.pathname.match(/^\/api\/events\/e1\/lead\/walk-in\/(w\d+)$/);
+    if (walkIn && request.method() === "PATCH") {
+      const body = request.postDataJSON();
+      state.rows = state.rows.map((row) => (row.id === walkIn[1] ? { ...row, ...body } : row));
+      return route.fulfill(json(state.rows.find((row) => row.id === walkIn[1])));
+    }
+    if (walkIn && request.method() === "DELETE") {
+      state.rows = state.rows.filter((row) => row.id !== walkIn[1]);
+      return route.fulfill(json({ ok: true }));
+    }
     if (url.pathname === "/api/events/herbst-lan/lead/export.csv") {
       state.exports.push(url.searchParams.get("filter"));
       return route.fulfill({ status: 200, contentType: "text/csv; charset=utf-8", body: "Name;Status\r\nPaula;Da\r\n", headers: { "Content-Disposition": 'attachment; filename="anmeldungen-herbst-lan.csv"' } });
@@ -179,6 +189,18 @@ test.describe("Anmeldungen & Einlass", () => {
       expect((await download).suggestedFilename()).toBe("anmeldungen-herbst-lan.csv");
       expect(state.exports).toEqual(["here"]);
       await noSideScroll(page);
+
+      // Eintrag an der Tür: Name berichtigen, dann löschen.
+      await page.getByTestId("event-lead-name-w1").click();
+      const walkIn = page.getByTestId("event-lead-details").filter({ visible: true });
+      await walkIn.getByTestId("event-lead-walkin-edit-name").fill("Gast Hofer-Maier");
+      await walkIn.getByTestId("event-lead-walkin-edit-save").click();
+      await expect(page.getByTestId("event-lead-row-w1")).toContainText("Gast Hofer-Maier");
+      await screenshot(page, testInfo, `einlass-tuer-bearbeiten-${width}.png`);
+      await noSideScroll(page);
+      await walkIn.getByTestId("event-lead-walkin-delete").click();
+      await page.getByTestId("confirm-dialog-confirm").click();
+      await expect(page.getByTestId("event-lead-row-w1")).toHaveCount(0);
     });
   }
 });
