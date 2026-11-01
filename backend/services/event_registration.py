@@ -131,6 +131,9 @@ async def ensure_can_register(db, event: dict, me: dict, *, has_access: bool = F
         raise RegistrationError(404, "Event nicht gefunden")
     if not has_access and not await user_can_see(me, event.get("visibility") or "public"):
         raise RegistrationError(403, "Event ist nicht sichtbar")
+    # Ein Zugangslink umgeht Fristen, aber keine Absage (#2127).
+    if event.get("status") == "cancelled":
+        raise RegistrationError(409, "Das Event ist abgesagt – eine Anmeldung ist nicht möglich.")
     if not registration_open(event) and not register_access:
         raise RegistrationError(400, "Die Anmeldung ist aktuell nicht offen")
     if not event.get("has_registration"):

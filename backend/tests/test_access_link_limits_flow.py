@@ -191,3 +191,22 @@ async def test_an_expiry_sent_with_another_time_zone_is_stored_in_utc(flow):
     created = await create_access_link(body, me=staff)
 
     assert (await flow.db.access_links.find_one({"id": created["id"]}))["expires_at"] == "2026-10-20T10:00:00+00:00"
+
+
+@pytest.mark.asyncio
+async def test_a_register_link_does_not_open_a_cancelled_event(flow):
+    """#2127: Ein Zugangslink umgeht Fristen, aber keine Absage - sonst stünde jemand angemeldet bei einem abgesagten Event."""
+    event = await draft_event(flow)
+    await flow.db.events.update_one({"id": event["id"]}, {"$set": {"status": "cancelled"}})
+    token, link = await access_link(flow, "event", event["id"], max_uses=2)
+    flow.act_as(await flow.add_user(name="Anna"))
+
+    response = await flow.post(f"/api/events/{event['id']}/registrations", params={"access": token}, json={"companion_count": 0})
+
+    assert response.status_code == 409 and "abgesagt" in response.json()["detail"]
+    assert await flow.db.event_registrations.count_documents({"event_id": event["id"]}) == 0
+    assert (await stored_link(flow, link))["use_count"] == 0, "die Nutzung bleibt frei"
+    # Wird die Absage zurückgenommen, gilt der Link wieder.
+    await flow.db.events.update_one({"id": event["id"]}, {"$set": {"status": "scheduled"}})
+    again = await flow.post(f"/api/events/{event['id']}/registrations", params={"access": token}, json={"companion_count": 0})
+    assert again.status_code == 200, again.text
