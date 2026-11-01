@@ -902,9 +902,12 @@ async def _update_event_registration(db, event: dict, registration_id: str, body
     seats_changed = "seat_count" in updates and updates["seat_count"] != _registration_seats(current)
     # Von der Leitung wieder aktiviert (#2127): Der alte Auftrag ist storniert, es gilt ein neu eingefrorener Preis. Gibt es
     # schon einen Beleg, wird er nicht still ersetzt - Finanzen bekommt einen Prüffall.
-    reactivated = pricing.is_paid(offer) and becomes_active and current.get("status") in {"cancelled", "no_show"} and current.get("billing_status") == "cancelled"
-    invoiced_before = reactivated and bool(await db.billing_orders.find_one({"kind": "event", "registration_id": registration_id, "status": "invoiced"}, {"_id": 0, "id": 1}))
-    if reactivated and invoiced_before:
+    # Es zählt der Stand der Abrechnung, nicht der alte Status: auch wer nach einem Storno über die Warteliste zurückkommt.
+    moving_in = becomes_active and current.get("status") not in ACTIVE_EVENT_REGISTRATION_STATUSES
+    reactivated = pricing.is_paid(offer) and moving_in and current.get("billing_status") == "cancelled"
+    new_price_due = reactivated or (pricing.is_paid(offer) and moving_in and not current.get("price_snapshot"))
+    invoiced_before = new_price_due and bool(await db.billing_orders.find_one({"kind": "event", "registration_id": registration_id, "status": "invoiced"}, {"_id": 0, "id": 1}))
+    if invoiced_before:
         try:
             price = pricing.quote(offer, seats=_registration_seats(proposed), selected=current.get("selected_positions") or [])
         except pricing.PricingError as exc:

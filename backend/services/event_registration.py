@@ -213,6 +213,11 @@ async def _register(db, event: dict, me: dict, *, companion_count: int | None, n
         doc["price_snapshot"] = pricing.snapshot(price, recipient=me, source={"kind": "event", "id": event["id"], "slug": event.get("slug")},
                                                  invoice_timing=offer.get("invoice_timing") or "on_confirm")
         doc["billing_status"] = "pending"
+    elif existing:
+        # Neuanmeldung nach Storno ohne Preis (Warteliste, inzwischen kostenlos): Der alte Preis gilt nicht mehr (#2127) - sonst
+        # friert das Nachrücken keinen neuen ein, und es entsteht keine Rechnung.
+        doc["price_snapshot"] = None
+        doc["billing_status"] = None
     # Zugangslink mit Limit (#1036): die Nutzung atomar belegen, bevor die Anmeldung geschrieben wird.
     try:
         claimed = await claim_access_link_use(db, register_access, me)
@@ -246,7 +251,7 @@ async def _register(db, event: dict, me: dict, *, companion_count: int | None, n
         "target_id": event["id"],
         "actor_id": me["id"],
         "data": {"registration_id": doc["id"], "status": status, "companion_count": companions,
-                 "total_cents": doc.get("price_snapshot", {}).get("total_cents"), "via": via},
+                 "total_cents": (doc.get("price_snapshot") or {}).get("total_cents"), "via": via},
         "created_at": now,
     })
     if doc.get("price_snapshot"):

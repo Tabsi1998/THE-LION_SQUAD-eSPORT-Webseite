@@ -155,6 +155,77 @@ async def test_wieder_aktiviert_mit_gestellter_rechnung_kein_zweiter_auftrag_und
     assert "Kostenbeitrag" not in back["body"] and "Rechnung" not in back["body"]
 
 
+async def _storno_platz_weg_warteliste(flow, event, a, b):
+    """A storniert sich, B nimmt den Platz, A meldet sich wieder an und landet auf der Warteliste."""
+    first = await register(flow, event, a)
+    flow.act_as(a)
+    gone = await flow.delete(f"/api/events/{event['id']}/registrations/me")
+    assert gone.status_code == 200, gone.text
+    second = await register(flow, event, b)
+    again = await register(flow, event, a)
+    assert again["id"] == first["id"] and again["status"] == "waitlist"
+    return first, second
+
+
+@pytest.mark.asyncio
+async def test_nach_storno_ueber_die_warteliste_zurueck_neuer_preis_und_auftrag(flow):
+    lead, event = await setup(flow, billing=PAID)
+    a = await person(flow, "aa")
+    first, second = await _storno_platz_weg_warteliste(flow, event, a, await person(flow, "bb"))
+    waiting = await flow.db.event_registrations.find_one({"id": first["id"]}, {"_id": 0})
+    assert waiting["price_snapshot"] is None and waiting["billing_status"] is None, "die Warteliste bezahlt erst beim Nachrücken"
+
+    flow.act_as(lead)
+    await flow.patch(f"/api/events/{event['id']}/registrations/{second['id']}", json={"status": "cancelled"})
+    moved = await flow.patch(f"/api/events/{event['id']}/registrations/{first['id']}", json={"status": "registered"})
+    assert moved.status_code == 200, moved.text
+
+    row = await flow.db.event_registrations.find_one({"id": first["id"]}, {"_id": 0})
+    assert row["billing_status"] == "pending" and row["price_snapshot"]["total_cents"] == 1000
+    orders = await flow.db.billing_orders.find({"registration_id": first["id"]}, {"_id": 0, "status": 1}).to_list(5)
+    assert sorted(order["status"] for order in orders) == ["cancelled", "pending"]
+    note = (await notes(flow, a))[-1]
+    assert note["title"] == "Nachgerückt: Herbst-LAN" and "10,00" in note["body"]
+
+
+@pytest.mark.asyncio
+async def test_aeltere_warteliste_mit_stornierter_abrechnung_bekommt_beim_nachruecken_einen_auftrag(flow):
+    """Einträge aus der Zeit vor dieser Korrektur: alter Preis und „cancelled“ stehen noch an der Warteliste."""
+    lead, event = await setup(flow, billing=PAID)
+    a = await person(flow, "aa")
+    first, second = await _storno_platz_weg_warteliste(flow, event, a, await person(flow, "bb"))
+    await flow.db.event_registrations.update_one({"id": first["id"]}, {"$set": {"billing_status": "cancelled", "price_snapshot": {"total_cents": 1000, "currency": "EUR", "hash": "alt"}}})
+    flow.act_as(lead)
+    await flow.patch(f"/api/events/{event['id']}/registrations/{second['id']}", json={"status": "cancelled"})
+    moved = await flow.patch(f"/api/events/{event['id']}/registrations/{first['id']}", json={"status": "registered"})
+    assert moved.status_code == 200, moved.text
+    row = await flow.db.event_registrations.find_one({"id": first["id"]}, {"_id": 0})
+    assert row["billing_status"] == "pending" and row["price_snapshot"]["hash"] != "alt"
+    assert await flow.db.billing_orders.count_documents({"registration_id": first["id"], "status": "pending"}) == 1
+
+
+@pytest.mark.asyncio
+async def test_ueber_die_warteliste_zurueck_mit_gestellter_rechnung_kein_zweiter_auftrag(flow):
+    lead, event = await setup(flow, billing=PAID)
+    a = await person(flow, "aa")
+    b = await person(flow, "bb")
+    first = await register(flow, event, a)
+    await flow.db.billing_orders.update_many({"registration_id": first["id"]}, {"$set": {"status": "invoiced", "invoice_ref": "RE-1"}})
+    flow.act_as(a)
+    gone = await flow.delete(f"/api/events/{event['id']}/registrations/me")
+    assert gone.status_code == 200, gone.text
+    second = await register(flow, event, b)
+    assert (await register(flow, event, a))["status"] == "waitlist"
+    flow.act_as(lead)
+    await flow.patch(f"/api/events/{event['id']}/registrations/{second['id']}", json={"status": "cancelled"})
+    moved = await flow.patch(f"/api/events/{event['id']}/registrations/{first['id']}", json={"status": "registered"})
+    assert moved.status_code == 200, moved.text
+    assert await flow.db.billing_orders.count_documents({"registration_id": first["id"]}) == 1
+    order = await flow.db.billing_orders.find_one({"registration_id": first["id"]}, {"_id": 0})
+    assert order["booking_change"] == "Anmeldung wieder aktiviert", "Finanzen bekommt den Prüffall"
+    assert "Kostenbeitrag" not in (await notes(flow, a))[-1]["body"]
+
+
 def test_kostensatz_nach_rechnungszeitpunkt():
     now = {"price_snapshot": {"total_cents": 1000, "currency": "EUR", "invoice_timing": "on_confirm"}}
     later = {"price_snapshot": {"total_cents": 1000, "currency": "EUR", "invoice_timing": "manual"}}
