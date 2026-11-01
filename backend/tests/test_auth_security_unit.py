@@ -15,6 +15,7 @@ from auth import (
     create_refresh_token,
     get_jwt_secret,
     get_current_user,
+    require_role,
     hash_token,
     refresh_expires_at,
     set_auth_cookies,
@@ -330,7 +331,29 @@ def test_access_token_is_rejected_after_its_session_is_revoked(monkeypatch):
         with pytest.raises(HTTPException) as exc:
             await get_current_user(request)
         assert exc.value.status_code == 401
-        assert exc.value.detail == "Session expired"
+        assert exc.value.detail == "Deine Sitzung ist abgelaufen. Bitte melde dich neu an."
+
+    asyncio.run(scenario())
+
+
+def test_refusals_at_the_authenticated_boundary_speak_german(monkeypatch):
+    async def scenario():
+        db = SimpleNamespace(
+            refresh_tokens=SimpleNamespace(find_one=AsyncMock(return_value={
+                "jti": "session-1",
+                "expires_at": datetime.now(timezone.utc) + timedelta(days=1),
+            })),
+            users=SimpleNamespace(find_one=AsyncMock(return_value={"id": "user-1", "role": "player", "is_banned": True})),
+        )
+        monkeypatch.setattr("auth.get_db", lambda: db)
+        token = create_access_token("user-1", "player@example.test", "player", "session-1")
+        with pytest.raises(HTTPException) as exc:
+            await get_current_user(SimpleNamespace(cookies={"access_token": token}, headers={}))
+        assert exc.value.status_code == 403 and exc.value.detail == "Dieses Konto ist gesperrt."
+
+        with pytest.raises(HTTPException) as exc:
+            await require_role("superadmin")({"id": "user-1", "role": "player"})
+        assert exc.value.status_code == 403 and exc.value.detail == "Dafür fehlen dir die Rechte."
 
     asyncio.run(scenario())
 
@@ -352,7 +375,7 @@ def test_inactive_account_is_rejected_at_the_authenticated_boundary(monkeypatch)
         with pytest.raises(HTTPException) as exc:
             await get_current_user(SimpleNamespace(cookies={"access_token": token}, headers={}))
         assert exc.value.status_code == 403
-        assert exc.value.detail == "Account is inactive"
+        assert exc.value.detail == "Dieses Konto ist deaktiviert."
 
     asyncio.run(scenario())
 
