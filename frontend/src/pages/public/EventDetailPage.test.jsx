@@ -128,6 +128,16 @@ describe("Anmeldung bei vollem Event", () => {
   });
 });
 
+// Externer Anmeldelink (#2127, EV11): Plätze und Leitungsseite führt die andere Seite.
+test("externer Anmeldelink: keine Zahlen, kein Link zur Leitungsseite", async () => {
+  renderPage({ ...base, has_registration: true, registration_url: "https://example.test/tickets", max_participants: 40, can_check_in: true, registration_summary: { reserved_seats: 0, spots_left: 40 }, public_phase: { state: "registration_open", label: "Anmeldung offen" } });
+  const panel = await screen.findByTestId("event-yours");
+  expect(panel).toHaveTextContent("Registrierung möglich");
+  expect(screen.queryByTestId("event-registration-stats")).toBeNull();
+  expect(panel).not.toHaveTextContent("Freie Plätze");
+  expect(screen.queryByTestId("event-lead-link")).toBeNull();
+});
+
 // Die Liste der Anmeldungen (#2127, EV10): Warteliste getrennt, Stornierte nicht, nach 12 Namen „+N weitere“.
 test("Teilnehmerliste: Warteliste getrennt, keine Stornierten, „+N weitere“ zeigt alle", async () => {
   const people = Array.from({ length: 14 }, (_, index) => ({ id: `p${index}`, display_name: `Person ${index}`, status: "registered", seat_count: 1 }));

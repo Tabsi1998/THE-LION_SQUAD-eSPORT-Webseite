@@ -330,7 +330,10 @@ function EventForm({ event, meta, partners = [], onDone }) {
               </>
             )}
             <EventDaysSection value={daysForm} onChange={changeDays} locations={locationsForm} startDate={form.start_date} endDate={form.end_date} accent={ACCENT} />
-            <TextField label="Max. Teilnehmer" type="number" min={1} value={form.max_participants} onChange={(v) => set("max_participants", v)} hint="Leer = unbegrenzt." testId="event-max-participants" />
+            {/* Mit externem Anmeldelink zählen wir keine Plätze (#2127, EV11). */}
+            {form.has_registration && form.registration_url
+              ? <p className="text-xs text-white/45" data-testid="event-external-no-seats">Externer Anmeldelink: Plätze und Warteliste führt die andere Seite.</p>
+              : <TextField label="Max. Teilnehmer" type="number" min={1} value={form.max_participants} onChange={(v) => set("max_participants", v)} hint="Leer = unbegrenzt." testId="event-max-participants" />}
           </FormSection>
           <DistributeBox kind="event" itemId={event?.id} title={event?.name}>
             <DiscordPreview kind="event" item={usesDays ? { ...form, days: formToDays(daysForm) } : form} skip={form.discord_skip} onSkipChange={(value) => set("discord_skip", value)} />
@@ -400,12 +403,14 @@ function EventForm({ event, meta, partners = [], onDone }) {
             <TextField label="Anmeldung öffnet" type="datetime-local" value={form.registration_opens_at} onChange={(v) => set("registration_opens_at", v)} />
             <TextField label="Anmeldung schließt" type="datetime-local" value={form.registration_closes_at} onChange={(v) => set("registration_closes_at", v)} />
             <TextField label="Externer Anmeldelink" value={form.registration_url} onChange={(v) => set("registration_url", v)} placeholder="https://…" />
-            <div className="space-y-3 self-end">
-              <CheckField label="Begleitpersonen erlauben" checked={form.allow_companions} onChange={(v) => set("allow_companions", v)} accent={ACCENT} />
-              {form.allow_companions && (
-                <TextField label="Max. Begleitpersonen pro Anmeldung" type="number" min="0" max="20" value={form.max_companions_per_registration} onChange={(v) => set("max_companions_per_registration", v)} />
-              )}
-            </div>
+            {!form.registration_url && (
+              <div className="space-y-3 self-end">
+                <CheckField label="Begleitpersonen erlauben" checked={form.allow_companions} onChange={(v) => set("allow_companions", v)} accent={ACCENT} />
+                {form.allow_companions && (
+                  <TextField label="Max. Begleitpersonen pro Anmeldung" type="number" min="0" max="20" value={form.max_companions_per_registration} onChange={(v) => set("max_companions_per_registration", v)} />
+                )}
+              </div>
+            )}
           </FormGrid>
         )}
         {/* Anmeldung im Discord (#885): Vorgabe an; mit externem Link oder Begleitpersonen geht sie nur auf der Website. */}

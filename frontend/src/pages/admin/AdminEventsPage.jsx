@@ -244,7 +244,7 @@ export default function AdminEventsPage() {
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
                 {eventIsOver(e) && <RecapButton event={e} busy={creatingRecapId === e.id} onClick={() => createRecapDraft(e)} testPrefix="event-card-recap" />}
-                {e.has_registration && (
+                {e.has_registration && !e.registration_url && (
                   <button type="button" onClick={() => navigate(`/events/${e.slug || e.id}/leitung`)} data-testid={`event-card-registrations-${e.id}`} className="text-xs font-bold uppercase px-3 py-2 rounded-sm border border-[#29B6E8]/40 text-[#29B6E8] inline-flex items-center gap-1">
                     <UserCheck className="w-3 h-3" /> Anmeldungen
                   </button>
@@ -280,7 +280,10 @@ export default function AdminEventsPage() {
                     <td className="px-4 py-3 text-xs text-white/70">{e.start_date ? viennaDate(e.start_date) : "—"}</td>
                     <td className="px-4 py-3 text-xs text-white/55">{e.location || "—"}</td>
                     <td className="px-4 py-3 text-xs text-white/65">
-                      {e.has_registration ? (
+                      {/* Externer Anmeldelink (#2127, EV11): die Anmeldungen stehen woanders - keine Plätze, kein „Anm.“. */}
+                      {e.has_registration && e.registration_url ? (
+                        <span data-testid={`event-external-${e.id}`}>Extern</span>
+                      ) : e.has_registration ? (
                         <div>
                           <div className="font-bold text-white">{e.registration_summary?.reserved_seats || 0}{e.max_participants ? `/${e.max_participants}` : ""} Plätze</div>
                           <div className="text-[11px] text-white/40">{e.registration_summary?.registered_count || 0} Anm. · {e.registration_summary?.companion_count || 0} Begleitp.</div>
@@ -296,7 +299,7 @@ export default function AdminEventsPage() {
                       <div className="flex flex-wrap items-center justify-end gap-1">
                       {/* Rückblick (#1373): erst wenn das Event vorbei ist - dann als erster Knopf. */}
                       {eventIsOver(e) && <RecapButton event={e} busy={creatingRecapId === e.id} onClick={() => createRecapDraft(e)} />}
-                      {e.has_registration && (
+                      {e.has_registration && !e.registration_url && (
                         <button onClick={() => navigate(`/events/${e.slug || e.id}/leitung`)} data-testid={`event-registrations-${e.id}`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#29B6E8]/40 text-[#29B6E8] hover:bg-[#29B6E8]/10 inline-flex items-center gap-1">
                           <UserCheck className="w-3 h-3" /> Anm.
                         </button>

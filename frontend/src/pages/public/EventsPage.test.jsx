@@ -96,6 +96,19 @@ test("abgesagtes Event: bleibt in „Kommend“ mit Kennzeichen, ohne Zahl der P
   expect(screen.getByTestId("event-card-herbst-lan")).not.toHaveAttribute("data-cancelled");
 });
 
+test("externer Anmeldelink: keine Zahl der Plätze auf der Karte (#2127)", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/events/meta") return { data: { types: [], statuses: [] } };
+    if (url.startsWith("/events")) {
+      return { data: [...EVENTS, { id: "e-ext", slug: "extern", name: "Messe", status: "scheduled", visibility: "public", start_date: "2099-10-20T10:00:00+02:00", max_participants: 40, has_registration: true, registration_url: "https://example.test/tickets" }] };
+    }
+    return { data: [] };
+  });
+  await renderPage();
+  expect(screen.getByTestId("event-card-extern")).not.toHaveTextContent("Plätze");
+  expect(screen.getByTestId("event-card-extern")).not.toHaveTextContent("angemeldet");
+});
+
 test("„Zusätzlich einzeln“ zeigt das Turnier auch als Karte und bleibt am Gerät", async () => {
   await renderPage();
   await userEvent.click(screen.getByTestId("events-mode-separate"));

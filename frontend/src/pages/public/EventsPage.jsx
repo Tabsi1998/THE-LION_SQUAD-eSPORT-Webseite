@@ -227,6 +227,8 @@ function EventCard({ card, meta }) {
   const ownChild = card.children.some((row) => row.mine);
   // Abgesagt (#2127, EV3): die Karte bleibt bis zum Termin stehen - gedämpft, mit Kennzeichen, ohne Zahl der Plätze.
   const cancelled = (e.public_phase?.state || e.status) === "cancelled";
+  // Externer Anmeldelink (#2127, EV11): Plätze zählt die andere Seite, hier stünde immer 0.
+  const showsSeats = !cancelled && !e.registration_url;
   // Die Saison-Deko an Karten (Ketten, Eier) braucht unten ein freies Band: ein Link über die ganze Karte zählt dort als
   // Bedienung. Ohne Turniere ist die Karte darum selbst der Link (wie bisher), mit Turnieren hält sie Link und Knopf.
   const shell = {
@@ -266,12 +268,12 @@ function EventCard({ card, meta }) {
             <MapPin className="w-3 h-3 shrink-0" /> <span className="min-w-0 truncate">{e.location}</span>
           </div>
         )}
-        {!cancelled && e.max_participants && (
+        {showsSeats && e.max_participants && (
           <div className="mt-1 inline-flex items-center gap-1.5 text-xs text-white/50">
             <UsersIcon className="w-3 h-3" /> {e.registration_summary?.reserved_seats || 0}/{e.max_participants} Plätze
           </div>
         )}
-        {!cancelled && e.has_registration && !e.max_participants && (
+        {showsSeats && e.has_registration && !e.max_participants && (
           <div className="mt-1 inline-flex items-center gap-1.5 text-xs text-white/50">
             <UsersIcon className="w-3 h-3" /> {e.registration_summary?.registered_count || 0} angemeldet
           </div>

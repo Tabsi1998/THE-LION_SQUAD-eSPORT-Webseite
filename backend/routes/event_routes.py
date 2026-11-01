@@ -123,6 +123,7 @@ def _compact_event(event: dict) -> dict:
         "end_date": event.get("end_date"),
         "location": event.get("location"),
         "has_registration": bool(event.get("has_registration")),
+        "registration_url": event.get("registration_url"),
         "max_participants": event.get("max_participants"),
         "registration_summary": event.get("registration_summary"),
         "public_phase": event.get("public_phase"),
@@ -478,7 +479,7 @@ async def list_events(
         projection = {
             "_id": 0, "id": 1, "name": 1, "slug": 1, "description": 1,
             "banner_url": 1, "event_type": 1, "status": 1, "visibility": 1,
-            "start_date": 1, "end_date": 1, "location": 1, "has_registration": 1,
+            "start_date": 1, "end_date": 1, "location": 1, "has_registration": 1, "registration_url": 1,
             "max_participants": 1, "days": 1,
         }
     fetch_limit = max(200, min(max(int(limit or 48), 1) + max(int(offset or 0), 0) + 80, 500))

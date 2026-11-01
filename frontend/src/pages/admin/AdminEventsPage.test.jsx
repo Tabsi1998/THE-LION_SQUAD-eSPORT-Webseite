@@ -64,6 +64,25 @@ test("Handy-Karten: Rückblick in der Karte nur beim vergangenen Event", async (
   expect(pastCard).toHaveTextContent("Sichtbar für: Mitglieder");
 });
 
+test("externer Anmeldelink: kein „Anm.“, statt der Plätze steht „Extern“; Warteliste mit freiem Platz fällt auf (#2127)", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/events/meta") return { data: META };
+    if (url.startsWith("/events?")) {
+      return { data: [
+        { ...EVENTS[1], id: "ext", name: "Messe", slug: "messe", has_registration: true, registration_url: "https://example.test/tickets", max_participants: 40 },
+        { ...EVENTS[1], id: "own", name: "Eigene", slug: "eigene", has_registration: true, max_participants: 4, registration_summary: { reserved_seats: 3, registered_count: 3, companion_count: 0, waitlist_count: 2, spots_left: 1 } },
+      ] };
+    }
+    return { data: [] };
+  });
+  renderList();
+  expect(await screen.findByTestId("event-external-ext")).toHaveTextContent("Extern");
+  expect(screen.queryByTestId("event-registrations-ext")).toBeNull();
+  expect(screen.queryByTestId("event-card-registrations-ext")).toBeNull();
+  expect(screen.getByTestId("event-registrations-own")).toBeInTheDocument();
+  expect(screen.getByTestId("event-waitlist-own")).toHaveTextContent("2 Warteliste · 1 frei");
+});
+
 test("Sichtbarkeit in Worten, kein Rohwert in der Liste", async () => {
   renderList();
   expect(await screen.findByTestId("event-visibility-past")).toHaveTextContent("Mitglieder");

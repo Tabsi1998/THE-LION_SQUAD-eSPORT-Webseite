@@ -724,11 +724,14 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
       <div className="text-[11px] uppercase tracking-widest font-bold text-[#9F7AEA]">{activeOwn ? "Dein Event" : "Anmeldung"}</div>
       <h2 className="mt-2 font-heading text-2xl font-black uppercase">{activeOwn ? "Du bist angemeldet" : event.registration_url ? "Registrierung möglich" : "Event-Anmeldung"}</h2>
       {showSteps ? <StepBar steps={steps} current={step} className="mt-3" testId="event-register-steps" /> : null}
-      <div className="mt-4 grid grid-cols-3 gap-2">
-        <MiniStat label="Reserviert" value={`${summary.reserved_seats || 0}${event.max_participants ? `/${event.max_participants}` : ""}`} />
-        <MiniStat label="Anmeldungen" value={summary.registered_count || 0} />
-        <MiniStat label="Begleitp." value={summary.companion_count || 0} />
-      </div>
+      {/* Externer Anmeldelink (#2127, EV11): die Zahlen stehen woanders - hier wären sie immer null. */}
+      {!event.registration_url && (
+        <div className="mt-4 grid grid-cols-3 gap-2" data-testid="event-registration-stats">
+          <MiniStat label="Reserviert" value={`${summary.reserved_seats || 0}${event.max_participants ? `/${event.max_participants}` : ""}`} />
+          <MiniStat label="Anmeldungen" value={summary.registered_count || 0} />
+          <MiniStat label="Begleitp." value={summary.companion_count || 0} />
+        </div>
+      )}
       {!!summary.waitlist_count && (
         <div className="mt-2 text-xs text-[#FFD700]">{countText(summary.waitlist_count, "Anmeldung", "Anmeldungen")} auf der Warteliste.</div>
       )}
@@ -746,7 +749,7 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
       <div className="mt-4 space-y-1 text-sm text-white/65">
         {event.registration_opens_at && <div>Öffnet: {viennaDateTime(event.registration_opens_at, { dateStyle: "medium", timeStyle: "short" })}</div>}
         {event.registration_closes_at && <div>Schließt: {viennaDateTime(event.registration_closes_at, { dateStyle: "medium", timeStyle: "short" })}</div>}
-        {summary.spots_left != null && <div>Freie Plätze: {summary.spots_left}</div>}
+        {!event.registration_url && summary.spots_left != null && <div>Freie Plätze: {summary.spots_left}</div>}
       </div>
       {event.registration_url ? (
         <a href={event.registration_url} target="_blank" rel="noreferrer" className="tls-btn tls-btn--primary mt-5 inline-flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm">
@@ -836,7 +839,7 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
       )}
       {actionError && <div className="mt-4"><AuthFormAlert id="event-registration-error">{actionError}</AuthFormAlert></div>}
       {/* Die Arbeitsseite der Turnierleitung (#1372): Suche, Einlass, Nachricht an alle. */}
-      {event.can_check_in && (
+      {event.can_check_in && !event.registration_url && (
         <Link to={`/events/${event.slug || event.id}/leitung`} className="tls-btn tls-btn--secondary mt-4 inline-flex min-h-11 items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm" data-testid="event-lead-link">
           Anmeldungen &amp; Einlass
         </Link>
