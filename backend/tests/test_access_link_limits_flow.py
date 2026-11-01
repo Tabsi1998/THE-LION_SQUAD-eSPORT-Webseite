@@ -135,6 +135,27 @@ async def test_the_same_person_uses_a_link_only_once_even_after_signing_off_and_
 
 
 @pytest.mark.asyncio
+async def test_the_admin_note_stays_with_the_admin(flow):
+    """#2127: Wer den Link hat, sieht Rechte und Grenzen - nicht die Notiz der Verwaltung („Presse, nur Herr X“)."""
+    event = await draft_event(flow)
+    token, link = await access_link(flow, "event", event["id"], max_uses=5)
+    await flow.db.access_links.update_one({"id": link["id"]}, {"$set": {"note": "Notiz der Verwaltung"}})
+
+    flow.act_as(None)
+    page = await flow.get(f"/api/events/{event['slug']}", params={"access": token})
+    assert page.status_code == 200, page.text
+    assert page.json()["access_link"]["grants"] == ["view", "register"]
+    assert "note" not in page.json()["access_link"] and "Notiz der Verwaltung" not in page.text
+
+    lead = await flow.add_user(role="tournament_admin", name="leitung")
+    flow.act_as(lead)
+    listed = await flow.get("/api/access-links", params={"target_type": "event", "target_id": event["id"]})
+    assert listed.status_code == 200, listed.text
+    rows = listed.json() if isinstance(listed.json(), list) else listed.json()["items"]
+    assert rows[0]["note"] == "Notiz der Verwaltung", "die Verwaltung sieht sie weiter"
+
+
+@pytest.mark.asyncio
 async def test_a_link_revoked_in_the_meantime_carries_no_registration(flow):
     from services import event_registration
 
