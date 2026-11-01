@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 
 from models import new_id, now_utc
-from services import billing_orders
+from services import billing_orders, event_rewards
 from services.event_lead import MESSAGE_CATEGORY, MESSAGE_KIND, MESSAGE_TEMPLATE
 from services.log_safe import log_safe
 
@@ -134,6 +134,9 @@ async def cancel_event(db, event: dict, me: dict) -> dict:
                       **({"billing_status": "cancelled"} if registration.get("price_snapshot") else {})}},
         )
         orders += await _cancel_orders(db, registration["id"], "Event abgesagt")
+        # Schon Eingecheckte: ein abgesagtes Event bringt weder Jahrespunkte noch XP (#2127, EV12).
+        if registration.get("status") == "checked_in":
+            await event_rewards.revoke_checkin(db, event, registration)
     users = await _recipients(db, [registration.get("user_id") for registration in registrations])
     message = ("Das Event wurde abgesagt. Deine Anmeldung ist damit storniert – ein offener Kostenbeitrag wird nicht "
                "verrechnet; wurde schon eine Rechnung gestellt, meldet sich der Verein bei dir.")

@@ -17,7 +17,7 @@ from services.sponsor_utils import dedupe_public_sponsors
 from services import partner_pages
 from services.notification_preferences import enqueue_newsletter_for_item
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
-from services import billing_orders, event_changes, event_days, event_facts, event_locations, event_play_along, event_registration, pricing
+from services import billing_orders, event_changes, event_days, event_facts, event_locations, event_play_along, event_registration, event_rewards, pricing
 from services.event_public import public_event
 from services.event_registration import RegistrationError
 from services.mutation_lock import MutationLockBusy, mutation_lock
@@ -347,44 +347,6 @@ def _validated_companion_count(event: dict, value: int | None) -> int:
         return event_registration.validated_companion_count(event, value)
     except RegistrationError as exc:
         raise HTTPException(status_code=exc.status, detail=exc.detail)
-
-
-async def _apply_event_checkin_rewards(event: dict, registration: dict) -> None:
-    """Award Season/achievement progress once an admin confirms attendance."""
-    user_id = registration.get("user_id")
-    if not user_id:
-        return
-    try:
-        from services.season_service import award_points
-
-        summary = await _event_registration_summary(event)
-        await award_points(
-            user_id=user_id,
-            source_type="event",
-            source_id=f"{event['id']}:{registration['id']}",
-            source_name=event.get("name") or "Event-Teilnahme",
-            rank=None,
-            num_participants=max(int(summary.get("checked_in_count") or summary.get("registered_count") or 1), 1),
-            weight=0.5,
-            bonus=5,
-            bonus_reason="Teilnahme von Admin/Moderator bestätigt",
-        )
-    except Exception:
-        import logging
-        logging.getLogger("tls.events").warning("event check-in season points failed", exc_info=True)
-    try:
-        from services import xp
-        await xp.grant(user_id, "event_attended", f"{event['id']}:{registration['id']}")
-    except Exception:
-        import logging
-        logging.getLogger("tls.events").warning("event check-in xp failed", exc_info=True)
-    try:
-        from badges import evaluate_user_progress
-
-        await evaluate_user_progress(user_id)
-    except Exception:
-        import logging
-        logging.getLogger("tls.events").warning("event check-in achievement evaluation failed", exc_info=True)
 
 
 async def _attach_event_registration_view(event: dict, user: dict | None) -> None:
@@ -906,17 +868,22 @@ async def _update_event_registration(db, event: dict, registration_id: str, body
     if updates.get("price_snapshot") and proposed_status == "registered":
         await billing_orders.create_order(db, kind="event", source_id=event["id"], registration_id=registration_id, user_id=current["user_id"],
                                           snapshot=updates["price_snapshot"], timing=pricing.order_timing(updates["price_snapshot"], offer))
+    updated = await db.event_registrations.find_one({"id": registration_id}, {"_id": 0})
+    # Punkte und XP folgen dem Check-in (#2127, EV12): zurückgenommen wird beim Wechsel weg von „Da“, einmal und nie doppelt.
+    revoked = None
+    if current.get("status") != "checked_in" and updated.get("status") == "checked_in":
+        await event_rewards.apply_checkin(db, event, updated)
+    elif current.get("status") == "checked_in" and updated.get("status") != "checked_in":
+        revoked = await event_rewards.revoke_checkin(db, event, updated)
     await db.audit_logs.insert_one({
         "id": new_id(),
         "action": "event.registration.update",
         "target_id": event["id"],
         "actor_id": me["id"],
-        "data": {"registration_id": registration_id, "updates": {k: v for k, v in updates.items() if k != "updated_at"}},
+        "data": {"registration_id": registration_id, "updates": {k: v for k, v in updates.items() if k != "updated_at"},
+                 **({"rewards_revoked": revoked} if revoked else {})},
         "created_at": now_utc().isoformat(),
     })
-    updated = await db.event_registrations.find_one({"id": registration_id}, {"_id": 0})
-    if current.get("status") != "checked_in" and updated.get("status") == "checked_in":
-        await _apply_event_checkin_rewards(event, updated)
     return _public_event_registration(updated, is_staff=True)
 
 

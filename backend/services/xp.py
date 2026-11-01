@@ -110,6 +110,27 @@ async def grant(user_id: str, source: str, ref: str, *, amount: int | None = Non
     return result
 
 
+async def revoke(user_id: str, source: str, ref: str) -> dict | None:
+    """Eine Gutschrift zurücknehmen (#2127, EV12): der Eintrag fällt weg, der Stand sinkt um genau diesen Betrag - samt
+    Mitglieder-Bonus. None, wenn es dazu nichts (mehr) gibt; ein zweiter Aufruf ändert also nichts, und dieselbe
+    Quelle lässt sich danach wieder gutschreiben. Das Level sinkt still mit; eine Gutschrift aus der Zeit vor einem
+    Prestige zählt im neuen Stand nicht mehr und wird nur gelöscht."""
+    if not user_id:
+        return None
+    db = get_db()
+    event = await db.xp_events.find_one_and_delete({"user_id": user_id, "source": source, "ref": str(ref)}, projection={"_id": 0})
+    if not event:
+        return None
+    doc = await state(user_id)
+    gained = int(event.get("amount") or 0) + int(event.get("bonus") or 0)
+    if doc.get("prestige_at") and str(event.get("at") or "") < str(doc["prestige_at"]):
+        return {"removed": 0, "total": int(doc.get("total") or 0)}
+    prestige_stars = int(doc.get("prestige") or 0)
+    total_after = max(0, int(doc.get("total") or 0) - gained)
+    await db.user_xp.update_one({"user_id": user_id}, {"$set": {"total": total_after, "level": levels.level_for_xp(total_after, prestige_stars), "updated_at": now_utc().isoformat()}})
+    return {"removed": gained, "total": total_after}
+
+
 # Mehrere Aufstiege in einer Auswertung (#1296): vier Erfolge auf einmal schickten vier Meldungen „Level X erreicht“
 # hintereinander. In einer Sammlung (``collected_level_ups``) merkt sich jede Person nur den Stand vor dem ersten und
 # nach dem letzten Aufstieg - am Ende kommt eine Meldung mit dem erreichten Level.
