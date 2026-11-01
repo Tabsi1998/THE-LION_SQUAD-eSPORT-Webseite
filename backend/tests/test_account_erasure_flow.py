@@ -89,7 +89,7 @@ async def fill(flow, user: dict, public: pathlib.Path, quarantine: pathlib.Path)
                                                  "motivation": "noch einmal", "person": {"firstname": "Paula", "lastname": "Probe", "email": user["email"]},
                                                  "fields": {"gamertag": "paula"}, "consents": [{"code": "verzeichnis"}]})
     await db.event_registrations.insert_one({"id": "ev-reg", "event_id": "ev-1", "user_id": uid, "display_name": "paula", "email": user["email"],
-                                             "note": "komme später", "status": "registered", "seat_count": 2})
+                                             "note": "komme später", "internal_note": "zahlt an der Tür", "status": "registered", "seat_count": 2})
     await db.tournament_registrations.insert_one({"id": "solo", "tournament_id": "t-1", "user_id": uid, "registration_type": "solo", "display_name": "paula",
                                                   "ingame_name": "paula_rl", "discord": "paula#1", "platform_id": "steam-123", "notes": "nur abends",
                                                   "status": "approved"})
@@ -260,6 +260,7 @@ async def test_the_export_names_everything_and_deleting_leaves_no_personal_copy(
     # Anmeldungen bleiben als Zählung - ohne Kopien.
     event = await db.event_registrations.find_one({"id": "ev-reg"})
     assert (event["display_name"], event["email"], event["note"], event["seat_count"]) == ("Gelöschter User", None, None, 2)
+    assert event["internal_note"] is None, "auch die Notiz der Turnierleitung (#2127)"
     solo, team = await db.tournament_registrations.find_one({"id": "solo"}), await db.tournament_registrations.find_one({"id": "team"})
     assert (solo["display_name"], solo["ingame_name"], solo["discord"], solo["platform_id"], solo["notes"]) == ("Gelöschter User", None, None, None, None)
     assert team["display_name"] == "[LW] Löwen" and team["ingame_name"] is None and team["discord"] is None, "das Team behält seinen Namen"

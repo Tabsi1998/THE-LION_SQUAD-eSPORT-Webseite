@@ -270,3 +270,35 @@ async def test_recap_draft_only_after_the_event(flow):
     made = await flow.post(f"/api/events/{past['id']}/recap-draft")
     assert made.status_code == 200, made.text
     assert made.json()["created"] is True
+
+
+@pytest.mark.asyncio
+async def test_after_moving_the_event_the_save_and_the_program_name_what_is_outside(flow):
+    """EV4 (#2127): Turniere und Fast Laps bleiben auf ihrem Tag - das Speichern und das Programm sagen, was danebenliegt."""
+    _, event = await setup(flow)
+    cup = (await in_event(flow, event)).json()
+    lap = await flow.post(f"/api/events/{event['id']}/fastlaps", json={"title": "LAN-Lap", "game_id": "g1", "track": "Spa"})
+    assert lap.status_code == 200, lap.text
+    finished = (await in_event(flow, event, title="Schon fertig")).json()
+    await flow.db.tournaments.update_one({"id": finished["id"]}, {"$set": {"status": "completed"}})
+
+    # Eine Änderung ohne neuen Termin sagt nichts.
+    same = await flow.patch(f"/api/events/{event['id']}", json={"description": "Neuer Text"})
+    assert same.status_code == 200 and "program_outside" not in same.json()
+
+    moved = await flow.patch(f"/api/events/{event['id']}", json={"start_date": "2026-12-05T10:00:00+01:00", "end_date": "2026-12-06T22:00:00+01:00"})
+    assert moved.status_code == 200, moved.text
+    outside = moved.json()["program_outside"]
+    assert outside["tournaments"] == 1 and outside["fastlaps"] == 1, "Beendetes zählt nicht mehr"
+    assert {item["id"] for item in outside["items"]} == {cup["id"], lap.json()["id"]}
+    assert (await flow.db.tournaments.find_one({"id": cup["id"]}))["start_date"].startswith("2026-11-14"), "der Termin bleibt"
+
+    program = (await flow.get(f"/api/events/{event['id']}/program")).json()
+    assert next(row for row in program["tournaments"] if row["id"] == cup["id"])["outside"] is True
+    assert next(row for row in program["tournaments"] if row["id"] == finished["id"])["outside"] is False
+    assert next(row for row in program["fastlaps"] if row["id"] == lap.json()["id"])["outside"] is True
+
+    # Zurück in den alten Zeitraum: nichts mehr daneben.
+    back = await flow.patch(f"/api/events/{event['id']}", json={"start_date": DAY_1, "end_date": END})
+    assert "program_outside" not in back.json()
+    assert (await flow.get(f"/api/events/{event['id']}/program")).json()["tournaments"][0]["outside"] is False

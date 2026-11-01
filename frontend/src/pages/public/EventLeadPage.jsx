@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Check, Megaphone, Minus, Plus, Search, Undo2, Users, X } from "lucide-react";
+import { Check, Download, Megaphone, Minus, Plus, Search, Undo2, UserPlus, Users, X } from "lucide-react";
 import { PrintLink } from "@/components/tls/print/PrintLink";
 import { toast } from "sonner";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { api, formatApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
@@ -12,7 +13,7 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { viennaDateTime } from "@/lib/vienna";
 import {
   LEAD_FILTERS, MESSAGE_MAX, MESSAGE_TEMPLATES, STATUS_LABELS,
-  changeText, companionsText, counterText, filterRows, leadCounts, messagePreview, seatsText,
+  changeText, companionsText, counterText, filterRows, leadCounts, messagePreview, normalizeName, seatsText, statusQuestion, waitlistHint,
 } from "@/lib/eventLead";
 
 // Anmeldungen & Einlass (#1372): /events/<slug>/leitung - nur für die Turnierleitung. An der Tür (Handy): Suchfeld und
@@ -22,6 +23,7 @@ import {
 
 const UNDO_SECONDS = 10;
 const STATUS_ORDER = ["registered", "checked_in", "waitlist", "no_show", "cancelled"];
+const INTERNAL_NOTE_MAX = 1000;
 
 export default function EventLeadPage() {
   const { slug } = useParams();
@@ -35,7 +37,10 @@ export default function EventLeadPage() {
   const [busyId, setBusyId] = useState("");
   const [undo, setUndo] = useState(null);
   const [messageOpen, setMessageOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [walkInOpen, setWalkInOpen] = useState(false);
   const searchRef = useRef(null);
+  const confirm = useConfirm();
 
   const load = useCallback(async () => {
     try {
@@ -62,6 +67,7 @@ export default function EventLeadPage() {
   const shown = useMemo(() => filterRows(rows, filter, query), [rows, filter, query]);
   const selected = rows.find((row) => row.id === selectedId) || null;
   const event = data?.event || {};
+  const freeHint = useMemo(() => waitlistHint(rows, data?.event?.max_participants), [rows, data?.event?.max_participants]);
 
   // Jede Änderung über den vorhandenen Weg der Anmeldungen: der Server prüft Plätze, Preis und Belohnung.
   const change = async (row, payload, { offerUndo = false } = {}) => {
@@ -75,12 +81,73 @@ export default function EventLeadPage() {
         if (offerUndo) setUndo({ row: { ...row, ...payload }, previous: row.status, sentence });
         else toast.success(sentence);
       }
+      if ("internal_note" in payload) toast.success(payload.internal_note ? "Notiz gespeichert." : "Notiz gelöscht.");
       await load();
+      return true;
     } catch (err) {
       setRows(before);
       toast.error(formatApiError(err.response?.data?.detail) || "Das hat nicht geklappt.");
+      return false;
     } finally {
       setBusyId("");
+    }
+  };
+
+  // „Storniert“ und „Nicht erschienen“ wirken nach außen (#2127, EV13): erst nach der Rückfrage. Die Auswahl bleibt sonst stehen.
+  const changeStatus = async (row, status) => {
+    const question = statusQuestion(row, status);
+    if (question && !await confirm(question)) return;
+    await change(row, { status });
+  };
+
+  // Einträge an der Tür (#2127): ohne Konto lassen sie sich nur hier berichtigen oder löschen.
+  const renameWalkIn = async (row, name) => {
+    setBusyId(row.id);
+    try {
+      await api.patch(`/events/${event.id}/lead/walk-in/${row.id}`, { display_name: name });
+      toast.success("Name geändert.");
+      await load();
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail) || "Der Name ließ sich nicht ändern.");
+    } finally {
+      setBusyId("");
+    }
+  };
+  const deleteWalkIn = async (row) => {
+    if (!await confirm({
+      title: "Eintrag löschen?",
+      description: `„${row.display_name}“ wird samt Notiz gelöscht, der Platz wird frei. Das lässt sich nicht zurückholen.`,
+      confirmLabel: "Löschen",
+      cancelLabel: "Zurück",
+      tone: "danger",
+    })) return;
+    setBusyId(row.id);
+    try {
+      await api.delete(`/events/${event.id}/lead/walk-in/${row.id}`);
+      toast.success("Eintrag gelöscht.");
+      setSelectedId("");
+      await load();
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail) || "Der Eintrag ließ sich nicht löschen.");
+    } finally {
+      setBusyId("");
+    }
+  };
+
+  const exportCsv = async () => {
+    setExporting(true);
+    try {
+      const { data: file } = await api.get(`/events/${encodeURIComponent(event.slug || slug)}/lead/export.csv`, { params: { filter }, responseType: "blob" });
+      const url = URL.createObjectURL(file);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `anmeldungen-${event.slug || slug}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Die Liste ließ sich nicht herunterladen.");
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -121,6 +188,11 @@ export default function EventLeadPage() {
             {event.start_date ? <div className="mt-1 text-sm text-white/50">{viennaDateTime(event.start_date, { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</div> : null}
           </div>
           <div className="flex flex-wrap gap-2">
+            {data?.can_add_walk_in ? (
+              <button type="button" onClick={() => setWalkInOpen(true)} className="tls-btn tls-btn--primary inline-flex min-h-[44px] items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid="event-lead-walkin-open">
+                <UserPlus className="w-4 h-4" /> Person an der Tür
+              </button>
+            ) : null}
             {data?.can_message ? (
               <button type="button" onClick={() => setMessageOpen(true)} className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid="event-lead-message-open">
                 <Megaphone className="w-4 h-4" /> Nachricht an alle
@@ -128,6 +200,10 @@ export default function EventLeadPage() {
             ) : null}
             {/* Druckansicht (#1283): Liste mit Kästchen, Begleitpersonen, Warteliste, Druckzeit und QR-Code. */}
             <PrintLink scope="event" slug={event.slug || slug} parts="liste" testId="event-lead-print" className="!text-xs !py-2" />
+            {/* CSV (#2127, EV16): die Liste des gewählten Filters - nur Name, Status und Plätze. */}
+            <button type="button" disabled={exporting} onClick={exportCsv} className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid="event-lead-csv">
+              <Download className="w-4 h-4" /> CSV
+            </button>
           </div>
         </div>
 
@@ -156,6 +232,18 @@ export default function EventLeadPage() {
 
         <div className="mt-4 lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-6">
           <div>
+            {/* Niemand rückt von selbst nach (#2127, EV6): die Leitung sieht den freien Platz und entscheidet. */}
+            {freeHint ? (
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-sm border border-honor/35 bg-honor/5 px-4 py-3" role="status" data-testid="event-lead-free-hint">
+                <div className="min-w-0">
+                  <div className="text-sm font-bold text-honor">{freeHint.text}</div>
+                  <div className="text-xs text-white/60 [overflow-wrap:anywhere]">{freeHint.next}</div>
+                </div>
+                {filter !== "waitlist" ? (
+                  <button type="button" onClick={() => setFilter("waitlist")} className="tls-btn tls-btn--secondary min-h-[44px] shrink-0 px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid="event-lead-free-open">Zur Warteliste</button>
+                ) : null}
+              </div>
+            ) : null}
             <div className="space-y-2" data-testid="event-lead-list">
               {!data ? <div className="py-10 text-center text-white/40">Wird geladen …</div> : null}
               {data && shown.length === 0 ? (
@@ -170,7 +258,7 @@ export default function EventLeadPage() {
                     onSelect={() => setSelectedId(selectedId === row.id ? "" : row.id)} onCheckIn={() => checkIn(row)}
                     onUndo={undoLast} onMoveUp={() => change(row, { status: "registered" })} />
                   {selectedId === row.id ? (
-                    <div className="lg:hidden mt-1"><Details row={row} event={event} busy={busyId === row.id} onChange={(payload) => change(row, payload)} /></div>
+                    <div className="lg:hidden mt-1"><Details row={row} event={event} busy={busyId === row.id} onChange={(payload) => change(row, payload)} onStatus={(status) => changeStatus(row, status)} onRename={(name) => renameWalkIn(row, name)} onDelete={() => deleteWalkIn(row)} /></div>
                   ) : null}
                 </div>
               ))}
@@ -179,7 +267,7 @@ export default function EventLeadPage() {
           </div>
           <aside className="hidden lg:block" data-testid="event-lead-aside">
             <div className="sticky top-[19rem]">
-              {selected ? <Details row={selected} event={event} busy={busyId === selected.id} onChange={(payload) => change(selected, payload)} onClose={() => setSelectedId("")} /> : (
+              {selected ? <Details row={selected} event={event} busy={busyId === selected.id} onChange={(payload) => change(selected, payload)} onStatus={(status) => changeStatus(selected, status)} onRename={(name) => renameWalkIn(selected, name)} onDelete={() => deleteWalkIn(selected)} onClose={() => setSelectedId("")} /> : (
                 <div className="rounded-sm border border-dashed border-white/10 p-6 text-sm text-white/45">Tippe auf einen Namen für Details: Begleitpersonen, Notiz und Status.</div>
               )}
             </div>
@@ -190,6 +278,7 @@ export default function EventLeadPage() {
 
       {undo ? <UndoBar undo={undo} onUndo={undoLast} /> : null}
       {messageOpen ? <MessageDialog event={event} recipients={data?.message_recipients || 0} onClose={() => setMessageOpen(false)} onSent={load} /> : null}
+      {walkInOpen ? <WalkInDialog event={event} rows={rows} onClose={() => setWalkInOpen(false)} onAdded={load} /> : null}
     </PublicLayout>
   );
 }
@@ -198,7 +287,7 @@ export default function EventLeadPage() {
 // in den Details der Person.
 function RegistrationRow({ row, busy, selected, showStatus, undoable, onSelect, onCheckIn, onUndo, onMoveUp }) {
   const here = row.status === "checked_in";
-  const sub = [companionsText(row), row.has_note ? "Notiz" : "", showStatus ? STATUS_LABELS[row.status] || row.status : ""].filter(Boolean).join(" · ");
+  const sub = [row.walk_in ? "An der Tür" : "", companionsText(row), row.has_note ? "Notiz" : "", showStatus ? STATUS_LABELS[row.status] || row.status : ""].filter(Boolean).join(" · ");
   return (
     <div className={`flex items-center gap-3 rounded-sm border p-3 ${selected ? "border-[#29B6E8]/60 bg-[#29B6E8]/5" : "border-white/10 bg-[#121212]"}`} data-testid={`event-lead-row-${row.id}`} data-status={row.status}>
       <button type="button" onClick={onSelect} aria-expanded={selected} className="min-w-0 flex-1 text-left" data-testid={`event-lead-name-${row.id}`}>
@@ -221,30 +310,65 @@ function RegistrationRow({ row, busy, selected, showStatus, undoable, onSelect, 
   );
 }
 
-function Details({ row, event, busy, onChange, onClose }) {
+function WalkInEdit({ row, busy, onRename, onDelete }) {
+  const [name, setName] = useState(row.display_name || "");
+  useEffect(() => { setName(row.display_name || ""); }, [row.id, row.display_name]);
+  const trimmed = name.trim();
+  return (
+    <div className="mt-4" data-testid="event-lead-walkin-edit">
+      <label className="block text-[11px] font-bold uppercase tracking-widest text-white/50">
+        Name
+        <input value={name} disabled={busy} onChange={(e) => setName(e.target.value)} maxLength={80} autoComplete="off" className="mt-1 block w-full min-h-[44px] rounded-sm border border-white/10 bg-[#0A0A0A] px-3 text-sm normal-case tracking-normal text-white" data-testid="event-lead-walkin-edit-name" />
+      </label>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {trimmed && trimmed !== row.display_name ? (
+          <button type="button" disabled={busy} onClick={() => onRename(trimmed)} className="tls-btn tls-btn--secondary min-h-[44px] px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid="event-lead-walkin-edit-save">Name speichern</button>
+        ) : null}
+        <button type="button" disabled={busy} onClick={onDelete} className="tls-btn tls-btn--quiet min-h-[44px] px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid="event-lead-walkin-delete">Eintrag löschen</button>
+      </div>
+    </div>
+  );
+}
+
+function Details({ row, event, busy, onChange, onStatus, onRename, onDelete, onClose }) {
   const maxCompanions = event.allow_companions ? event.max_companions_per_registration || 0 : 0;
   // Notizen stehen nicht in der Liste (Codex-Prüfung #1517) - die Detailansicht holt sie je Person.
   const [notes, setNotes] = useState(null);
+  // Interne Notiz (#2127, EV15): leer gespeichert löscht sie.
+  const [noteDraft, setNoteDraft] = useState("");
   useEffect(() => {
     let alive = true;
     setNotes(null);
+    setNoteDraft("");
     if (!row.has_note || !event.id) return undefined;
     api.get(`/events/${event.id}/lead/registrations/${row.id}`)
-      .then(({ data }) => { if (alive) setNotes({ note: data.note, internal_note: data.internal_note }); })
+      .then(({ data }) => {
+        if (!alive) return;
+        setNotes({ note: data.note, internal_note: data.internal_note });
+        setNoteDraft(data.internal_note || "");
+      })
       .catch(() => { if (alive) setNotes({ error: true }); });
     return () => { alive = false; };
   }, [event.id, row.id, row.has_note]);
+  const savedNote = notes?.internal_note || "";
+  const noteChanged = noteDraft.trim() !== savedNote.trim();
+  const saveNote = async () => {
+    const value = noteDraft.trim();
+    if (await onChange({ internal_note: value || null })) setNotes((current) => ({ ...current, internal_note: value }));
+  };
   return (
     <div className="rounded-sm border border-white/10 bg-[#121212] p-4" data-testid="event-lead-details">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-lg font-bold text-white [overflow-wrap:anywhere]">{row.display_name}</div>
           {row.email_masked ? <div className="text-xs text-white/45" data-testid="event-lead-mail">{row.email_masked}</div> : null}
+          {row.walk_in ? <div className="text-xs text-white/45" data-testid="event-lead-walkin-note">An der Tür eingetragen, ohne Konto und ohne Preis.</div> : null}
         </div>
         {onClose ? (
           <button type="button" onClick={onClose} aria-label="Details schließen" className="tls-btn tls-btn--quiet shrink-0 p-2 rounded-sm"><X className="w-4 h-4" /></button>
         ) : null}
       </div>
+      {row.walk_in ? <WalkInEdit row={row} busy={busy} onRename={onRename} onDelete={onDelete} /> : null}
       <dl className="mt-3 space-y-2 text-sm">
         <div className="flex items-center justify-between gap-3">
           <dt className="text-white/50">Plätze</dt>
@@ -270,16 +394,19 @@ function Details({ row, event, busy, onChange, onClose }) {
             <dd className="mt-0.5 whitespace-pre-line text-white/80 [overflow-wrap:anywhere]">{notes.note}</dd>
           </div>
         ) : null}
-        {notes?.internal_note ? (
-          <div>
-            <dt className="text-white/50">Interne Notiz</dt>
-            <dd className="mt-0.5 whitespace-pre-line text-white/80 [overflow-wrap:anywhere]">{notes.internal_note}</dd>
-          </div>
-        ) : null}
       </dl>
       <label className="mt-4 block text-[11px] font-bold uppercase tracking-widest text-white/50">
+        Interne Notiz
+        <textarea value={noteDraft} disabled={busy || notes?.error} onChange={(e) => setNoteDraft(e.target.value.slice(0, INTERNAL_NOTE_MAX))} rows={2} className="mt-1 block w-full rounded-sm border border-white/10 bg-[#0A0A0A] p-2 text-sm normal-case tracking-normal text-white" data-testid="event-lead-internal-note" />
+      </label>
+      {/* Ein Personendatum (Art. 15 DSGVO): nichts versprechen, was die Datenauskunft nicht hält. */}
+      <p className="mt-1 text-xs text-white/45" data-testid="event-lead-internal-note-hint">Für die Turnierleitung. Die Person sieht sie nicht in der Anmeldung; bei einer Datenauskunft wird sie mitgeliefert.</p>
+      {noteChanged ? (
+        <button type="button" disabled={busy} onClick={saveNote} className="tls-btn tls-btn--secondary mt-2 min-h-[44px] px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid="event-lead-internal-note-save">Notiz speichern</button>
+      ) : null}
+      <label className="mt-4 block text-[11px] font-bold uppercase tracking-widest text-white/50">
         Status
-        <select value={row.status || "registered"} disabled={busy} onChange={(e) => onChange({ status: e.target.value })} className="mt-1 block w-full min-h-[44px] rounded-sm border border-white/10 bg-[#0A0A0A] px-2 text-sm normal-case tracking-normal text-white" data-testid="event-lead-status">
+        <select value={row.status || "registered"} disabled={busy} onChange={(e) => onStatus(e.target.value)} className="mt-1 block w-full min-h-[44px] rounded-sm border border-white/10 bg-[#0A0A0A] px-2 text-sm normal-case tracking-normal text-white" data-testid="event-lead-status">
           {STATUS_ORDER.map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}
         </select>
       </label>
@@ -369,6 +496,69 @@ function MessageDialog({ event, recipients, onClose, onSent }) {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+// „Person an der Tür hinzufügen“ (#2127, EV17): nur ein Name, ohne Konto und ohne Preis - die Person ist danach gleich „Da“.
+function WalkInDialog({ event, rows, onClose, onAdded }) {
+  const [name, setName] = useState("");
+  const [companions, setCompanions] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const maxCompanions = event.allow_companions ? event.max_companions_per_registration || 0 : 0;
+  const trimmed = name.trim();
+  const twin = rows.find((row) => normalizeName(row.display_name) === normalizeName(trimmed) && trimmed);
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!trimmed || saving) return;
+    setSaving(true);
+    try {
+      const { data } = await api.post(`/events/${event.id}/lead/walk-in`, { display_name: trimmed, companion_count: Number(companions) || 0 });
+      toast.success(`${data.display_name} ist da.`);
+      await onAdded();
+      onClose();
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail) || "Die Person ließ sich nicht eintragen.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/70 p-0 sm:p-4 print:hidden" role="dialog" aria-modal="true" aria-labelledby="event-lead-walkin-title" data-testid="event-lead-walkin">
+      <form onSubmit={submit} className="w-full max-w-lg rounded-t-lg sm:rounded-sm border border-white/10 bg-[#121212] p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Person an der Tür hinzufügen</div>
+            <h2 id="event-lead-walkin-title" className="mt-1 font-heading text-lg font-black uppercase [overflow-wrap:anywhere]">{event.name}</h2>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Schließen" className="tls-btn tls-btn--quiet shrink-0 p-2 rounded-sm"><X className="w-4 h-4" /></button>
+        </div>
+        <p className="mt-3 text-sm text-white/65">Ohne Konto und ohne Preis. Die Person ist danach gleich „Da“, belegt einen Platz und steht im Protokoll. Öffentlich steht ihr Name nicht.</p>
+        <label className="mt-4 block text-[11px] font-bold uppercase tracking-widest text-white/50">
+          Name
+          {/* eslint-disable-next-line jsx-a11y/no-autofocus -- an der Tür geht es direkt mit dem Tippen los */}
+          <input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} autoFocus autoComplete="off" className="mt-1 block w-full min-h-[48px] rounded-sm border border-white/10 bg-[#0A0A0A] px-3 text-base normal-case tracking-normal text-white" data-testid="event-lead-walkin-name" />
+        </label>
+        {twin ? <p className="mt-2 text-xs text-honor" data-testid="event-lead-walkin-twin">„{twin.display_name}“ steht schon in der Liste ({STATUS_LABELS[twin.status] || twin.status}). Trotzdem eintragen, wenn es eine andere Person ist.</p> : null}
+        {maxCompanions ? (
+          <label className="mt-4 block text-[11px] font-bold uppercase tracking-widest text-white/50">
+            Begleitpersonen
+            <input type="number" min="0" max={maxCompanions} value={companions} onChange={(e) => setCompanions(e.target.value)} className="mt-1 block w-28 min-h-[44px] rounded-sm border border-white/10 bg-[#0A0A0A] px-3 text-sm normal-case tracking-normal text-white" data-testid="event-lead-walkin-companions" />
+          </label>
+        ) : null}
+        <div className="mt-5 flex justify-end gap-2">
+          <button type="button" onClick={onClose} className="tls-btn tls-btn--quiet min-h-[44px] px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">Abbrechen</button>
+          <button type="submit" disabled={!trimmed || saving} className="tls-btn tls-btn--primary min-h-[44px] px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid="event-lead-walkin-save">{saving ? "Wird eingetragen …" : "Eintragen"}</button>
+        </div>
+      </form>
     </div>
   );
 }

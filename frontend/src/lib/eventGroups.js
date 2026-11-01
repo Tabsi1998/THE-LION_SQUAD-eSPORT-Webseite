@@ -72,7 +72,11 @@ export function buildCards({ events = [], tournaments = [], fastlaps = [] } = {}
   const add = (kind, item) => {
     if (!item?.id) return;
     const parent = item.event_id ? eventById.get(item.event_id) : null;
-    if (parent) {
+    // Abgesagtes Event (#2127, EV3): es steht gedämpft bis zum Termin in der Liste. Ein Turnier, das trotzdem noch läuft, bleibt
+    // sichtbar - als eigene Karte mit „gehört zu …“, nicht versteckt in der abgesagten.
+    if (parent && parent.status === "cancelled" && !DONE.has(item.status)) {
+      loose.push(single(kind, item, mine, parent));
+    } else if (parent) {
       const row = single(kind, item, mine, parent);
       children.set(parent.id, [...(children.get(parent.id) || []), row]);
       if (mode === "separate" || filter === "tournaments" || filter === "fastlaps") loose.push(row);

@@ -472,6 +472,17 @@ def tpl_event_message(display_name: str, event_name: str, message: str, url: str
     return f"{event_name}: Nachricht der Turnierleitung", _wrap("Nachricht zum Event", body, "Zum Event", url)
 
 
+# Die eigene Event-Anmeldung (#2127): angemeldet, Warteliste, nachgerückt, von der Leitung storniert - wie bei Turnieren.
+@mail_template
+def tpl_event_registration(display_name: str, event_name: str, headline: str, detail: str, url: str = "") -> tuple[str, str]:
+    body = (
+        f"<p>Hallo {display_name or 'Löwe'},</p>"
+        f"<p>zu deiner Anmeldung bei <strong>{event_name}</strong>:</p>"
+        f"<p>{detail}</p>"
+    )
+    return f"{headline}: {event_name}", _wrap(headline, body, "Zum Event" if url else None, url or None)
+
+
 # Absage (#2119): eigene Mails statt „Nachricht der Turnierleitung“ (Event, #2118) bzw. nur Glocke und Push (Turnier, #2120).
 @mail_template
 def tpl_event_cancelled(display_name: str, event_name: str, url: str = "") -> tuple[str, str]:
@@ -709,6 +720,7 @@ async def render_named(template_key: str, **kwargs) -> Optional[tuple[str, str]]
         "newsletter_news": tpl_newsletter_news,
         "newsletter_event": tpl_newsletter_event,
         "event_message": tpl_event_message,
+        "event_registration": tpl_event_registration,
         "event_cancelled": tpl_event_cancelled,
         "tournament_cancelled": tpl_tournament_cancelled,
     }

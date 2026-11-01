@@ -74,7 +74,9 @@ async def event_program_view(event_id: str, me: dict = Depends(require_admin()))
         free = await _collection(db, kind).find(
             {"event_id": FREE, "status": {"$nin": list(ENDED)}}, ITEM_FIELDS,
         ).sort("start_date", 1).to_list(200)
-        lists[kind] = ([_row(item) for item in own], [_row(item) for item in free])
+        # Passt es nach einer Verschiebung nicht mehr in den Zeitraum (#2127, EV4)? Dann steht es mit Hinweis im Programm.
+        lists[kind] = ([{**_row(item), "outside": item.get("status") not in ENDED and bool(event_program.fits(event, kind, item))} for item in own],
+                       [_row(item) for item in free])
     return {
         "event": {
             "id": event["id"], "name": event.get("name"), "slug": event.get("slug"),

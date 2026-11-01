@@ -17,7 +17,8 @@ from services.sponsor_utils import dedupe_public_sponsors
 from services import partner_pages
 from services.notification_preferences import enqueue_newsletter_for_item
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
-from services import billing_orders, event_changes, event_days, event_facts, event_locations, event_play_along, event_registration, pricing
+from services import billing_orders, event_changes, event_days, event_facts, event_locations, event_notifications, event_play_along, event_program, event_registration, event_rewards, pricing
+from services.event_public import public_competition, public_event
 from services.event_registration import RegistrationError
 from services.mutation_lock import MutationLockBusy, mutation_lock
 from services.change_events import reset_scope_cache
@@ -27,12 +28,15 @@ from models import (EventCreate, EventUpdate, EventPlayAlongCreate, EventRegistr
                     EventRegistrationUpdate, now_utc, new_id)
 
 router = APIRouter(prefix="/api/events", tags=["events"])
+admin_router = APIRouter(prefix="/api/admin/events", tags=["events"])
 # Events gehören zur Turnierleitung (Bereich „tournaments“); Moderatoren moderieren.
 STAFF_ROLES = {"tournament_admin", "club_admin", "superadmin"}
 LEGACY_SPONSOR_TIERS = {"supporter": "bronze", "partner": "bronze"}
 ACTIVE_EVENT_REGISTRATION_STATUSES = {"registered", "checked_in"}
 PUBLIC_EVENT_REGISTRATION_STATUSES = {"registered", "checked_in", "waitlist"}
 ADMIN_EVENT_REGISTRATION_STATUSES = {"registered", "checked_in", "waitlist", "cancelled", "no_show"}
+REOPENING_STATUSES = {"registered", "checked_in", "waitlist"}
+EVENT_CANCELLED_DETAIL = "Das Event ist abgesagt – die Anmeldung lässt sich nicht wieder aktivieren. Zuerst die Absage zurücknehmen."
 
 
 async def _user_can_see(user: dict | None, visibility: str) -> bool:
@@ -122,6 +126,7 @@ def _compact_event(event: dict) -> dict:
         "end_date": event.get("end_date"),
         "location": event.get("location"),
         "has_registration": bool(event.get("has_registration")),
+        "registration_url": event.get("registration_url"),
         "max_participants": event.get("max_participants"),
         "registration_summary": event.get("registration_summary"),
         "public_phase": event.get("public_phase"),
@@ -348,44 +353,6 @@ def _validated_companion_count(event: dict, value: int | None) -> int:
         raise HTTPException(status_code=exc.status, detail=exc.detail)
 
 
-async def _apply_event_checkin_rewards(event: dict, registration: dict) -> None:
-    """Award Season/achievement progress once an admin confirms attendance."""
-    user_id = registration.get("user_id")
-    if not user_id:
-        return
-    try:
-        from services.season_service import award_points
-
-        summary = await _event_registration_summary(event)
-        await award_points(
-            user_id=user_id,
-            source_type="event",
-            source_id=f"{event['id']}:{registration['id']}",
-            source_name=event.get("name") or "Event-Teilnahme",
-            rank=None,
-            num_participants=max(int(summary.get("checked_in_count") or summary.get("registered_count") or 1), 1),
-            weight=0.5,
-            bonus=5,
-            bonus_reason="Teilnahme von Admin/Moderator bestätigt",
-        )
-    except Exception:
-        import logging
-        logging.getLogger("tls.events").warning("event check-in season points failed", exc_info=True)
-    try:
-        from services import xp
-        await xp.grant(user_id, "event_attended", f"{event['id']}:{registration['id']}")
-    except Exception:
-        import logging
-        logging.getLogger("tls.events").warning("event check-in xp failed", exc_info=True)
-    try:
-        from badges import evaluate_user_progress
-
-        await evaluate_user_progress(user_id)
-    except Exception:
-        import logging
-        logging.getLogger("tls.events").warning("event check-in achievement evaluation failed", exc_info=True)
-
-
 async def _attach_event_registration_view(event: dict, user: dict | None) -> None:
     """Eigene Anmeldung und Teilnehmerliste - mit den Rechten, die der Server kennt (#397).
 
@@ -412,11 +379,22 @@ async def _attach_event_registration_view(event: dict, user: dict | None) -> Non
             event["own_registration"] = _own_registration_view(event, own)
     if event.get("show_participants") or manages:
         statuses = ADMIN_EVENT_REGISTRATION_STATUSES if manages else PUBLIC_EVENT_REGISTRATION_STATUSES
-        regs = await db.event_registrations.find(
-            {"event_id": event["id"], "status": {"$in": list(statuses)}},
-            {"_id": 0},
-        ).sort("created_at", 1).to_list(2000)
-        event["registrations"] = [_public_event_registration(r, is_staff=manages, with_price=manages and sees_price) for r in regs]
+        query = {"event_id": event["id"], "status": {"$in": list(statuses)}}
+        if not manages:
+            # An der Tür Eingetragene (#2127, EV17) haben nichts zugestimmt: ihr Name steht nur bei der Leitung.
+            query["walk_in"] = {"$ne": True}
+        regs = await db.event_registrations.find(query, {"_id": 0}).sort("created_at", 1).to_list(2000)
+        rows = [_public_event_registration(r, is_staff=manages, with_price=manages and sees_price) for r in regs]
+        # Die interne Notiz gehört der Turnierleitung (#2127): der Vorstand sieht die Teilnehmer, aber nicht sie - auch die
+        # Leitungsseite bleibt ihm verschlossen.
+        if not (is_staff or "tournaments" in areas):
+            for row in rows:
+                row.pop("internal_note", None)
+        # Öffentlich steht die Warteliste für sich (#2127, EV10): „Angemeldet“ nennt nur, wer einen Platz hat - auch in
+        # der App, die nur `registrations` liest. Die Verwaltung bekommt alle Stände in einer Liste.
+        event["registrations"] = rows if manages else [row for row in rows if row["status"] != "waitlist"]
+        if not manages:
+            event["waitlist_registrations"] = [row for row in rows if row["status"] == "waitlist"]
     else:
         event["registrations"] = []
     event["participant_view"] = "staff" if manages else ("public" if event.get("show_participants") else "none")
@@ -500,7 +478,8 @@ async def list_events(
     if event_type:
         q["event_type"] = event_type
     if upcoming:
-        q["status"] = {"$nin": ["completed", "archived", "cancelled"]}
+        # Abgesagte bleiben bis zum Termin stehen (#2127, EV3): die Karte trägt das Kennzeichen „Abgesagt“.
+        q["status"] = {"$nin": ["completed", "archived"]}
         if not is_admin:
             q["status"]["$nin"].append("draft")
     projection = {"_id": 0}
@@ -508,11 +487,20 @@ async def list_events(
         projection = {
             "_id": 0, "id": 1, "name": 1, "slug": 1, "description": 1,
             "banner_url": 1, "event_type": 1, "status": 1, "visibility": 1,
-            "start_date": 1, "end_date": 1, "location": 1, "has_registration": 1,
+            "start_date": 1, "end_date": 1, "location": 1, "has_registration": 1, "registration_url": 1,
             "max_participants": 1, "days": 1,
         }
-    fetch_limit = max(200, min(max(int(limit or 48), 1) + max(int(offset or 0), 0) + 80, 500))
-    events = await db.events.find(q, projection).sort("start_date", 1 if upcoming else -1).to_list(fetch_limit)
+    # Die Verwaltungsliste blättert in der Datenbank (#2127, EV19): sie sieht alle Events, auch das 201. und ältere.
+    managed_page = paged and include_drafts and is_admin and not compact and not upcoming
+    if managed_page:
+        safe_limit = max(1, min(int(limit or 48), 200))
+        safe_offset = max(0, int(offset or 0))
+        total = await db.events.count_documents(q)
+        # Mit Zweitschlüssel: Gleiche Termine ließen sonst beim Blättern Events doppelt erscheinen oder ausfallen.
+        events = await db.events.find(q, projection).sort([("start_date", -1), ("id", 1)]).skip(safe_offset).limit(safe_limit).to_list(safe_limit)
+    else:
+        fetch_limit = max(200, min(max(int(limit or 48), 1) + max(int(offset or 0), 0) + 80, 500))
+        events = await db.events.find(q, projection).sort("start_date", 1 if upcoming else -1).to_list(fetch_limit)
     if upcoming:
         now = datetime.now(timezone.utc)
         fresh = []
@@ -542,7 +530,28 @@ async def list_events(
         counts = await event_changes.active_registration_counts(db, [ev["id"] for ev in out])
         for ev in out:
             ev["active_registration_count"] = counts.get(ev["id"], 0)
-    return out
+        if managed_page:
+            return {"items": out, "total": total, "limit": safe_limit, "offset": safe_offset}
+        return out
+    return [public_event(ev, finance=finance) for ev in out]
+
+
+@admin_router.get("/{event_id}")
+async def admin_get_event(event_id: str, me: dict = Depends(require_admin())):
+    """Ein Event für die Bearbeiten-Seite (#2127, EV19) - einzeln, damit auch ältere als die ersten der Liste zu öffnen
+    sind. Dieselben Felder wie die Verwaltungsliste; die Abrechnung nur für Finanzen."""
+    db = get_db()
+    event = await db.events.find_one({"id": event_id}, {"_id": 0})
+    if not event:
+        raise HTTPException(status_code=404, detail="Event nicht gefunden")
+    offer = event.pop("billing", None)
+    event["offer"] = pricing.public_offer(offer)
+    if await can_use_area(me, "finance"):
+        event["billing"] = offer or pricing.normalize_offer(None)
+    await _decorate_event(event)
+    counts = await event_changes.active_registration_counts(db, [event["id"]])
+    event["active_registration_count"] = counts.get(event["id"], 0)
+    return event
 
 
 @router.get("/meta")
@@ -662,12 +671,16 @@ async def get_event(slug_or_id: str, include_draft: bool = False, access: str | 
     # Preisangabe für die Anmeldung (#318); die Konfiguration mit Dolibarr-Nummern sieht nur Finanzen.
     offer = event.pop("billing", None)
     event["offer"] = pricing.public_offer(offer)
-    if await can_use_area(user, "finance"):
+    finance = await can_use_area(user, "finance")
+    if finance:
         event["billing"] = offer or pricing.normalize_offer(None)
     if access_link:
         await touch_access_link(db, access_link, user)
         event["access_link"] = public_access_link_payload(access_link)
-    return event
+    if not is_admin:
+        event["tournaments"] = [public_competition(row) for row in event["tournaments"]]
+        event["f1_challenges"] = [public_competition(row) for row in event["f1_challenges"]]
+    return public_event(event, keep_internal=is_admin, finance=finance)
 
 
 @router.post("/{event_id}/recap-draft")
@@ -760,7 +773,8 @@ async def register_for_event(event_id: str, body: EventRegistrationCreate,
                                                 selected_positions=body.selected_positions, register_access=register_access, via="web")
     except RegistrationError as exc:
         raise HTTPException(status_code=exc.status, detail=exc.detail)
-    return _public_event_registration(doc, is_staff=True)
+    # Wie die Event-Seite: eine Neuanmeldung nach Storno behält das Dokument - die Antwort zeigt nur, was die Person sehen darf.
+    return _own_registration_view(event, doc)
 
 
 async def _event_for_player(event_id: str, user: dict, access: str | None) -> dict:
@@ -847,12 +861,15 @@ async def update_event_registration(event_id: str, registration_id: str, body: E
     # und schreiben in einem Zug - auch wenn sich im selben Moment jemand anmeldet.
     try:
         async with mutation_lock(db, event_registration.seat_resource(event["id"]), wait_seconds=event_registration.SEAT_WAIT_SECONDS):
-            return await _update_event_registration(db, event, registration_id, body, me)
+            current, updated = await _update_event_registration(db, event, registration_id, body, me)
     except MutationLockBusy:
         raise HTTPException(status_code=409, detail=event_registration.SEAT_BUSY)
+    # Bescheid an die Person (#2127, EV6, EV13) - nach der Sperre, damit sie nicht auf Mail und Push wartet.
+    await event_notifications.notify_registration_status(db, event, updated, updated.get("status"), previous=current.get("status"), actor_id=me["id"])
+    return _public_event_registration(updated, is_staff=True)
 
 
-async def _update_event_registration(db, event: dict, registration_id: str, body: EventRegistrationUpdate, me: dict) -> dict:
+async def _update_event_registration(db, event: dict, registration_id: str, body: EventRegistrationUpdate, me: dict) -> tuple[dict, dict]:
     current = await db.event_registrations.find_one(
         {"id": registration_id, "event_id": event["id"]},
         {"_id": 0},
@@ -861,6 +878,12 @@ async def _update_event_registration(db, event: dict, registration_id: str, body
         raise HTTPException(status_code=404, detail="Anmeldung nicht gefunden")
     nullable = {"note", "internal_note"}
     updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None or k in nullable}
+    # Abgesagt (#2127, EV12): niemand kommt wieder hinein - sonst brächte „Da“ Punkte und XP. Frisch gelesen, unter der Sperre,
+    # die auch die Absage hält.
+    if updates.get("status") in REOPENING_STATUSES:
+        fresh = await db.events.find_one({"id": event["id"]}, {"_id": 0, "status": 1})
+        if (fresh or event).get("status") == "cancelled":
+            raise HTTPException(status_code=409, detail=EVENT_CANCELLED_DETAIL)
     if "companion_count" in updates:
         companion_count = _validated_companion_count(event, updates.get("companion_count"))
         updates["companion_count"] = companion_count
@@ -873,10 +896,24 @@ async def _update_event_registration(db, event: dict, registration_id: str, body
             raise HTTPException(status_code=400, detail="Kapazität wäre überschritten")
     # Nachrücken von der Warteliste oder Änderung der Begleitpersonen: Preis einfrieren, solange
     # noch kein Beleg entstanden ist. Ein angelegter Beleg wird nicht still ersetzt (#321).
-    offer = event.get("billing") or {}
+    # An der Tür Eingetragene (#2127, EV17) sind ohne Preis - auch wenn sie später wieder aktiviert werden.
+    offer = {} if current.get("walk_in") else (event.get("billing") or {})
     becomes_active = proposed_status in ACTIVE_EVENT_REGISTRATION_STATUSES
     seats_changed = "seat_count" in updates and updates["seat_count"] != _registration_seats(current)
-    if pricing.is_paid(offer) and becomes_active and (not current.get("price_snapshot") or (seats_changed and current.get("billing_status") in (None, "pending"))):
+    # Von der Leitung wieder aktiviert (#2127): Der alte Auftrag ist storniert, es gilt ein neu eingefrorener Preis. Gibt es
+    # schon einen Beleg, wird er nicht still ersetzt - Finanzen bekommt einen Prüffall.
+    # Es zählt der Stand der Abrechnung, nicht der alte Status: auch wer nach einem Storno über die Warteliste zurückkommt.
+    moving_in = becomes_active and current.get("status") not in ACTIVE_EVENT_REGISTRATION_STATUSES
+    reactivated = pricing.is_paid(offer) and moving_in and current.get("billing_status") == "cancelled"
+    new_price_due = reactivated or (pricing.is_paid(offer) and moving_in and not current.get("price_snapshot"))
+    invoiced_before = new_price_due and bool(await db.billing_orders.find_one({"kind": "event", "registration_id": registration_id, "status": "invoiced"}, {"_id": 0, "id": 1}))
+    if invoiced_before:
+        try:
+            price = pricing.quote(offer, seats=_registration_seats(proposed), selected=current.get("selected_positions") or [])
+        except pricing.PricingError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        await billing_orders.note_change_after_invoice(db, kind="event", registration_id=registration_id, reason="Anmeldung wieder aktiviert", new_total_cents=int(price.get("total_cents") or 0))
+    elif pricing.is_paid(offer) and becomes_active and (reactivated or not current.get("price_snapshot") or (seats_changed and current.get("billing_status") in (None, "pending"))):
         try:
             price = pricing.quote(offer, seats=_registration_seats(proposed), selected=current.get("selected_positions") or [])
         except pricing.PricingError as exc:
@@ -900,21 +937,28 @@ async def _update_event_registration(db, event: dict, registration_id: str, body
             updates["billing_status"] = "cancelled"
     updates["updated_at"] = now_utc().isoformat()
     await db.event_registrations.update_one({"id": registration_id}, {"$set": updates})
-    if updates.get("price_snapshot") and proposed_status == "registered":
+    if updates.get("price_snapshot") and becomes_active:
         await billing_orders.create_order(db, kind="event", source_id=event["id"], registration_id=registration_id, user_id=current["user_id"],
                                           snapshot=updates["price_snapshot"], timing=pricing.order_timing(updates["price_snapshot"], offer))
+    updated = await db.event_registrations.find_one({"id": registration_id}, {"_id": 0})
+    # Punkte und XP folgen dem Check-in (#2127, EV12): zurückgenommen wird beim Wechsel weg von „Da“, einmal und nie doppelt.
+    revoked = None
+    if current.get("status") != "checked_in" and updated.get("status") == "checked_in":
+        await event_rewards.apply_checkin(db, event, updated)
+    elif current.get("status") == "checked_in" and updated.get("status") != "checked_in":
+        revoked = await event_rewards.revoke_checkin(db, event, updated)
     await db.audit_logs.insert_one({
         "id": new_id(),
         "action": "event.registration.update",
         "target_id": event["id"],
         "actor_id": me["id"],
-        "data": {"registration_id": registration_id, "updates": {k: v for k, v in updates.items() if k != "updated_at"}},
+        # Notizen nur als „geändert“: ihr Text steht an der Anmeldung, nicht noch einmal im Protokoll (#2127, EV15).
+        "data": {"registration_id": registration_id,
+                 "updates": {k: ("geändert" if k in nullable else v) for k, v in updates.items() if k != "updated_at"},
+                 **({"rewards_revoked": revoked} if revoked else {})},
         "created_at": now_utc().isoformat(),
     })
-    updated = await db.event_registrations.find_one({"id": registration_id}, {"_id": 0})
-    if current.get("status") != "checked_in" and updated.get("status") == "checked_in":
-        await _apply_event_checkin_rewards(event, updated)
-    return _public_event_registration(updated, is_staff=True)
+    return current, updated
 
 
 def _apply_locations(target: dict, raw: dict) -> None:
@@ -1114,6 +1158,11 @@ async def update_event(event_id: str, body: EventUpdate, me: dict = Depends(requ
             event["cancellation"] = cancellation
         if change_notice is not None:
             event["change_notice"] = change_notice
+        # Verschoben (#2127, EV4): Turniere und Fast Laps bleiben auf ihrem Tag - das Speichern sagt, was jetzt danebenliegt.
+        if any(existing.get(field) != event.get(field) for field in event_changes.SCHEDULE_FIELDS) and event.get("status") != "cancelled":
+            notice = event_program.outside_notice(await event_program.outside_items(db, event))
+            if notice:
+                event["program_outside"] = notice
     return event
 
 

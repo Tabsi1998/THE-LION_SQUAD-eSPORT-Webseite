@@ -55,6 +55,8 @@ async def _target_doc(target_type: str, target_id: str) -> dict:
 
 def _safe_link_payload(link: dict, target: dict | None = None) -> dict:
     payload = public_access_link_payload(link) or {}
+    # Die Notiz der Verwaltung („Presse“) steht nur hier, nicht in dem, was Link-Inhaber bekommen (#2127).
+    payload["note"] = link.get("note")
     payload["created_at"] = link.get("created_at")
     payload["created_by"] = link.get("created_by")
     payload["is_active"] = link.get("is_active") is not False

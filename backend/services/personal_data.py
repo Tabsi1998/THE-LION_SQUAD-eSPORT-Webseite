@@ -184,7 +184,10 @@ PERSONAL: dict[str, Entry] = {
     "reference_aliases": Entry(DELETED, ("reference_aliases",),
                                "Name bei einem Veranstalter, der auf ein eigenes Vereinsprofil zeigt; mit dem selbst angelegten "
                                "Profil gelöscht, an einem Eintrag des Vereins bleibt er"),
-    "event_registrations": Entry(OVERWRITTEN, ("event_registrations",)),
+    "event_registrations": Entry(OVERWRITTEN, ("event_registrations",),
+                                 "mit Konto: Name, Adresse und Notizen beim Löschen überschrieben, die Zählung bleibt. An der Tür "
+                                 "Eingetragene ohne Konto (#2127): kein Konto, also keine Auskunft und Löschung darüber - beides "
+                                 "über die Turnierleitung; nach der Frist des Adminprotokolls bleibt nur die Zählung (Job ops_retention)"),
     "f1_lap_times": Entry(OVERWRITTEN, ("f1_lap_times",)),
     # Fast Lap vor Ort (#1585): Gäste ohne Konto und die Liste „Am Start / Als Nächstes“.
     "f1_guests": Entry(EXPIRES, note="Anzeigename eines Gastes ohne Konto - kein Konto, also weder Auskunft noch Löschung "

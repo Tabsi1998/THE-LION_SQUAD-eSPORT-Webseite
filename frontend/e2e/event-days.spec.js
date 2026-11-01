@@ -88,6 +88,7 @@ test("Admin-Formular: Schalter ersetzt Start, Ende und Einlass durch die Tage", 
   })));
   await page.route("**/api/games", (route) => route.fulfill(json([])));
   await page.route("**/api/events**", (route) => route.fulfill(json([EVENT])));
+  await page.route("**/api/admin/events/event-1", (route) => route.fulfill(json(EVENT)));
   await page.route("**/api/events/meta", (route) => route.fulfill(json({
     types: [{ k: "general", l: "Allgemein" }, { k: "lan", l: "LAN" }],
     statuses: [{ k: "draft", l: "Entwurf" }, { k: "scheduled", l: "Angekündigt" }, { k: "live", l: "Live" }],

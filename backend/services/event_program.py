@@ -16,6 +16,7 @@ from services.event_recap import last_day, vienna_day
 
 KINDS = {"tournament": "tournaments", "fastlap": "f1_challenges"}
 KIND_WORD = {"tournament": "Das Turnier", "fastlap": "Die Fast Lap"}
+ENDED_STATUSES = frozenset({"completed", "results_published", "archived", "cancelled"})
 
 
 def first_day(event: dict) -> date | None:
@@ -84,3 +85,23 @@ def fits(event: dict, kind: str, item: dict) -> str:
         return ""
     return (f"{KIND_WORD[kind]} beginnt am {_day_text(item_start)}, das Event ist {window_text(event)}. "
             "Passe den Tag an oder wähle ein anderes Event.")
+
+
+async def outside_items(db, event: dict) -> list[dict]:
+    """Was nach einer Verschiebung nicht mehr in den Zeitraum passt (#2127, EV4): Turniere und Fast Laps bleiben auf ihrem
+    Tag - die Verwaltung bekommt den Hinweis und entscheidet selbst. Beendetes und Abgesagtes zählt nicht mehr."""
+    fields = {"_id": 0, "id": 1, "title": 1, "start_date": 1, "end_date": 1}
+    query = {"event_id": event["id"], "status": {"$nin": list(ENDED_STATUSES)}}
+    tournaments = await db.tournaments.find(query, fields).to_list(200)
+    fastlaps = await db.f1_challenges.find(query, fields).to_list(200)
+    rows = [("tournament", item) for item in tournaments] + [("fastlap", item) for item in fastlaps]
+    return [{"kind": kind, "id": item["id"], "title": item.get("title"), "start_date": item.get("start_date")}
+            for kind, item in rows if fits(event, kind, item)]
+
+
+def outside_notice(items: list[dict]) -> dict | None:
+    """Für die Antwort beim Speichern: wie viele je Art - oder nichts, wenn alles passt."""
+    if not items:
+        return None
+    return {"tournaments": sum(1 for item in items if item["kind"] == "tournament"),
+            "fastlaps": sum(1 for item in items if item["kind"] == "fastlap"), "items": items}

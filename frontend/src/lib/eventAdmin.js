@@ -19,6 +19,16 @@ export function eventIsOver(event, now = new Date()) {
   return Boolean(last) && viennaDay(now) > last;
 }
 
+// Status-Auswahl (#2127, EV9): Ob die Anmeldung offen ist, rechnet die öffentliche Phase aus Haken und Fristen. Die beiden
+// gespeicherten Werte schreibt der Hintergrund-Job von selbst fort (nur vorwärts, nie zurück), sie steuern die Anmeldung
+// nicht. Von Hand gewählt täuschten sie also etwas vor, darum stehen sie nicht zur Wahl. Ein Event, das schon so steht,
+// behält seinen Wert in der Liste.
+const DATE_DRIVEN_STATUSES = new Set(["registration_open", "registration_closed"]);
+
+export function eventStatusOptions(statuses, current) {
+  return (statuses || []).filter((item) => !DATE_DRIVEN_STATUSES.has(item.k) || item.k === current);
+}
+
 // Absagen, Verschieben, Löschen (#2118). Was der Server dabei tut, steht in backend/services/event_changes.py.
 const SCHEDULE_OR_PLACE_FIELDS = ["start_date", "end_date", "days", "location", "address", "postal_code", "city", "locations", "is_online"];
 
@@ -54,6 +64,15 @@ export function savedEventMessage(saved) {
   }
   if (saved?.change_notice) return `Gespeichert. ${plural(saved.change_notice.notified, "Person", "Personen")} benachrichtigt.`;
   return "Gespeichert.";
+}
+
+/** Nach einer Verschiebung (#2127, EV4): „2 Turniere und 1 Fast Lap liegen jetzt außerhalb des Events.“ - sonst leer. */
+export function outsideText(outside) {
+  const tournaments = Number(outside?.tournaments) || 0;
+  const fastlaps = Number(outside?.fastlaps) || 0;
+  if (!tournaments && !fastlaps) return "";
+  const parts = [tournaments ? plural(tournaments, "Turnier", "Turniere") : "", fastlaps ? plural(fastlaps, "Fast Lap", "Fast Laps") : ""].filter(Boolean);
+  return `${parts.join(" und ")} ${tournaments + fastlaps === 1 ? "liegt" : "liegen"} jetzt außerhalb des Events – bitte im Programm den Tag prüfen.`;
 }
 
 export function deleteConfirmText(event) {

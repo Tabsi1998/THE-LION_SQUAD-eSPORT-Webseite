@@ -28,7 +28,7 @@ import { renderMarkdownLite } from "@/lib/markdownLite";
 import { seoTextPreview } from "@/lib/textPreview";
 import { formatWhen } from "@/lib/datetime";
 import { eventIsOver, photosComingWindow } from "@/lib/afterEnd";
-import { countText, ownSeatsSentence, seatsLabel } from "@/lib/eventSeats";
+import { countText, ownSeatsSentence, participantLists, seatsLabel, waitlistNotice } from "@/lib/eventSeats";
 import { cancelledNotice, eventFacts, eventTabs, stripHeadingEmoji, visibilityChip, whatsOnRows } from "@/lib/eventPage";
 import { RETURN_PARAM, offersPlayAlong, returnTournamentPath } from "@/lib/playAlong";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
@@ -638,6 +638,9 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
   const [selectedPositions, setSelectedPositions] = useState([]);
   const offer = event.offer;
   const quote = offer ? previewQuote(offer, { seats: 1 + Number(companionCount || 0), selected: selectedPositions }) : null;
+  // Voll (auch nur wegen der Begleitpersonen): der Knopf sagt „Warteliste“ und nennt keinen Preis (#2127, EV7).
+  const waitlisted = waitlistNotice(event, 1 + Number(companionCount || 0));
+  const participants = participantLists(event);
   const { submitting: saving, submitOnce } = useSubmissionGuard();
   const confirm = useConfirm();
   const [actionError, setActionError] = useState("");
@@ -671,12 +674,13 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
     ev.preventDefault();
     setActionError("");
     const attempt = await submitOnce(async () => {
-      await api.post(`/events/${event.id}/registrations`, {
+      const response = await api.post(`/events/${event.id}/registrations`, {
         companion_count: Number(companionCount || 0),
         note: note.trim() || null,
         selected_positions: selectedPositions,
       }, { params: accessToken ? { access: accessToken } : undefined });
-      toast.success("Anmeldung gespeichert.");
+      // Was der Server entschieden hat (#2127, EV7) - in der Zwischenzeit kann der letzte Platz weg sein.
+      toast.success(response?.data?.status === "waitlist" ? "Du stehst auf der Warteliste. Wird ein Platz frei, bekommst du Bescheid." : "Du bist angemeldet.");
       await onChanged();
       onRegistered?.();
       // Der einmalige Hinweis direkt nach der ersten Anmeldung (#1188 Teil 2).
@@ -720,11 +724,14 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
       <div className="text-[11px] uppercase tracking-widest font-bold text-[#9F7AEA]">{activeOwn ? "Dein Event" : "Anmeldung"}</div>
       <h2 className="mt-2 font-heading text-2xl font-black uppercase">{activeOwn ? "Du bist angemeldet" : event.registration_url ? "Registrierung möglich" : "Event-Anmeldung"}</h2>
       {showSteps ? <StepBar steps={steps} current={step} className="mt-3" testId="event-register-steps" /> : null}
-      <div className="mt-4 grid grid-cols-3 gap-2">
-        <MiniStat label="Reserviert" value={`${summary.reserved_seats || 0}${event.max_participants ? `/${event.max_participants}` : ""}`} />
-        <MiniStat label="Anmeldungen" value={summary.registered_count || 0} />
-        <MiniStat label="Begleitp." value={summary.companion_count || 0} />
-      </div>
+      {/* Externer Anmeldelink (#2127, EV11): die Zahlen stehen woanders - hier wären sie immer null. */}
+      {!event.registration_url && (
+        <div className="mt-4 grid grid-cols-3 gap-2" data-testid="event-registration-stats">
+          <MiniStat label="Reserviert" value={`${summary.reserved_seats || 0}${event.max_participants ? `/${event.max_participants}` : ""}`} />
+          <MiniStat label="Anmeldungen" value={summary.registered_count || 0} />
+          <MiniStat label="Begleitp." value={summary.companion_count || 0} />
+        </div>
+      )}
       {!!summary.waitlist_count && (
         <div className="mt-2 text-xs text-[#FFD700]">{countText(summary.waitlist_count, "Anmeldung", "Anmeldungen")} auf der Warteliste.</div>
       )}
@@ -742,7 +749,7 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
       <div className="mt-4 space-y-1 text-sm text-white/65">
         {event.registration_opens_at && <div>Öffnet: {viennaDateTime(event.registration_opens_at, { dateStyle: "medium", timeStyle: "short" })}</div>}
         {event.registration_closes_at && <div>Schließt: {viennaDateTime(event.registration_closes_at, { dateStyle: "medium", timeStyle: "short" })}</div>}
-        {summary.spots_left != null && <div>Freie Plätze: {summary.spots_left}</div>}
+        {!event.registration_url && summary.spots_left != null && <div>Freie Plätze: {summary.spots_left}</div>}
       </div>
       {event.registration_url ? (
         <a href={event.registration_url} target="_blank" rel="noreferrer" className="tls-btn tls-btn--primary mt-5 inline-flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm">
@@ -810,7 +817,12 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
               ))}
             </fieldset>
           )}
-          {quote && !quote.free && (
+          {waitlisted && (
+            <div className="border border-honor/40 bg-honor/5 rounded-sm p-3 text-sm text-white/85" data-testid="event-waitlist-note">
+              {waitlisted}{quote && !quote.free ? " Bezahlt wird erst, wenn du nachrückst." : ""}
+            </div>
+          )}
+          {!waitlisted && quote && !quote.free && (
             <div className="border border-[#FFD700]/40 rounded-sm p-3 text-sm flex items-baseline justify-between gap-3" data-testid="event-quote">
               <span className="text-white/65">Summe für {1 + Number(companionCount || 0)} Person{1 + Number(companionCount || 0) === 1 ? "" : "en"}</span>
               <strong className="font-heading text-xl text-white">{formatCents(quote.total_cents, quote.currency)}</strong>
@@ -821,29 +833,44 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
             <textarea value={note} onChange={(ev) => { setNote(ev.target.value); setActionError(""); }} rows={3} maxLength={500} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" placeholder="z.B. komme etwas später" />
           </label>
           <button disabled={saving} data-testid="event-register-submit" className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm disabled:opacity-50">
-            <UserPlus className="w-3.5 h-3.5" /> {saving ? "Speichere..." : quote && !quote.free ? `Verbindlich anmelden · ${formatCents(quote.total_cents, quote.currency)}` : "Anmelden"}
+            <UserPlus className="w-3.5 h-3.5" /> {saving ? "Speichere..." : waitlisted ? "Auf die Warteliste" : quote && !quote.free ? `Verbindlich anmelden · ${formatCents(quote.total_cents, quote.currency)}` : "Anmelden"}
           </button>
         </form>
       )}
       {actionError && <div className="mt-4"><AuthFormAlert id="event-registration-error">{actionError}</AuthFormAlert></div>}
       {/* Die Arbeitsseite der Turnierleitung (#1372): Suche, Einlass, Nachricht an alle. */}
-      {event.can_check_in && (
+      {event.can_check_in && !event.registration_url && (
         <Link to={`/events/${event.slug || event.id}/leitung`} className="tls-btn tls-btn--secondary mt-4 inline-flex min-h-11 items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm" data-testid="event-lead-link">
           Anmeldungen &amp; Einlass
         </Link>
       )}
-      {!!event.registrations?.length && (
-        <div className="mt-6 border-t border-white/10 pt-4">
-          <div className="text-[11px] uppercase tracking-widest font-bold text-white/45 mb-2">Angemeldet</div>
-          <div className="space-y-1.5">
-            {event.registrations.slice(0, 12).map((registration) => (
-              <div key={registration.id} className="flex items-center justify-between gap-3 text-sm border border-white/5 bg-black/15 rounded-sm px-3 py-2">
-                <span className="truncate">{registration.display_name || "Teilnehmer"}</span>
-                <span className="text-xs text-white/45 shrink-0">{seatsLabel(registration)}</span>
-              </div>
-            ))}
+      <ParticipantList title="Angemeldet" rows={participants.active} testId="event-participants" />
+      <ParticipantList title="Warteliste" rows={participants.waitlist} testId="event-waitlist" />
+    </div>
+  );
+}
+
+// Die Liste der Anmeldungen (#2127, EV10): nach 12 Namen „+N weitere“ - ein Tipp zeigt alle.
+const PARTICIPANTS_SHOWN = 12;
+
+function ParticipantList({ title, rows, testId }) {
+  const [all, setAll] = useState(false);
+  if (!rows.length) return null;
+  const shown = all ? rows : rows.slice(0, PARTICIPANTS_SHOWN);
+  const more = rows.length - shown.length;
+  return (
+    <div className="mt-6 border-t border-white/10 pt-4" data-testid={testId}>
+      <div className="text-[11px] uppercase tracking-widest font-bold text-white/45 mb-2">{title}</div>
+      <div className="space-y-1.5">
+        {shown.map((registration) => (
+          <div key={registration.id} className="flex items-center justify-between gap-3 text-sm border border-white/5 bg-black/15 rounded-sm px-3 py-2">
+            <span className="truncate">{registration.display_name || "Teilnehmer"}</span>
+            <span className="text-xs text-white/45 shrink-0">{seatsLabel(registration)}</span>
           </div>
-        </div>
+        ))}
+      </div>
+      {more > 0 && (
+        <button type="button" onClick={() => setAll(true)} className="tls-btn tls-btn--quiet mt-2 min-h-11 px-3 py-2 rounded-sm text-xs font-bold" data-testid={`${testId}-more`}>+{more} weitere</button>
       )}
     </div>
   );

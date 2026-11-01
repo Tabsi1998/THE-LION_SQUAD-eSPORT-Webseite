@@ -517,6 +517,31 @@ async def sync_tournament_points(*, tournament_id: str, source_name: str | None,
     return counts
 
 
+async def revoke_source_points(*, source_type: SourceType, source_id: str, user_id: str) -> dict:
+    """Die Punkte einer Person aus einer Quelle zurücknehmen (#2127, EV12) - etwa einen zurückgenommenen Check-in.
+
+    Abgeschlossene Wertungen bleiben, wie sie sind (wie ``sync_tournament_points``): solche Einträge bleiben stehen und
+    werden nur gezählt. Mehrfach aufgerufen ändert sich nichts mehr."""
+    db = get_db()
+    rows = await db.season_points.find(
+        {"source_type": source_type, "source_id": source_id, "user_id": user_id}, {"_id": 0, "id": 1, "season_id": 1}).to_list(None)
+    if not rows:
+        return {"removed": 0, "kept_closed": 0}
+    closed = {s["id"] for s in await db.seasons.find(
+        {"id": {"$in": sorted({row.get("season_id") for row in rows if row.get("season_id")})}, "status": {"$nin": list(OPEN_SEASON_STATUSES)}},
+        {"_id": 0, "id": 1}).to_list(None)}
+    removed = 0
+    for row in rows:
+        if row.get("season_id") in closed:
+            continue
+        written = await db.season_points.delete_one({"id": row["id"]})
+        removed += int(written.deleted_count)
+    if removed:
+        from services.discord_embed_queue import request_refresh
+        request_refresh("ranking")
+    return {"removed": removed, "kept_closed": len(rows) - removed}
+
+
 async def aggregate_leaderboard(
     *,
     season_id: str | None = None,

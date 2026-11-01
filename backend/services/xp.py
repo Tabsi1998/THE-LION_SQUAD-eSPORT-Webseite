@@ -13,6 +13,7 @@ from contextvars import ContextVar
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
+from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 
 from database import get_db
@@ -94,11 +95,21 @@ async def grant(user_id: str, source: str, ref: str, *, amount: int | None = Non
         await db.xp_events.insert_one(event)
     except DuplicateKeyError:
         return None
-    total_before = int(before.get("total") or 0)
-    total_after = max(0, total_before + amount + bonus)
-    level_before = levels.level_for_xp(total_before, prestige)
+    # Atomar erhöhen, und Level und Stand aus dem, was danach wirklich dasteht: gleichzeitige Gutschriften und Rücknahmen
+    # überschreiben sich nicht, und jede sieht ihren eigenen Aufstieg. Nur eine Korrektur unter null setzt den Stand fest.
+    delta = amount + bonus
+    after = await db.user_xp.find_one_and_update(
+        {"user_id": user_id}, {"$inc": {"total": delta}, "$set": {"updated_at": event["at"]}, "$setOnInsert": {"user_id": user_id, "prestige": prestige}},
+        upsert=True, return_document=ReturnDocument.AFTER, projection={"_id": 0, "total": 1, "prestige": 1},
+    )
+    raw_total = int((after or {}).get("total") or 0)
+    prestige = int((after or {}).get("prestige", prestige) or 0)
+    total_after = max(0, raw_total)
+    if raw_total < 0:
+        await db.user_xp.update_one({"user_id": user_id, "total": {"$lt": 0}}, {"$set": {"total": 0}})
+    level_before = levels.level_for_xp(max(0, raw_total - delta), prestige)
     level_after = levels.level_for_xp(total_after, prestige)
-    await db.user_xp.update_one({"user_id": user_id}, {"$set": {"total": total_after, "level": level_after, "updated_at": event["at"]}, "$setOnInsert": {"user_id": user_id, "prestige": prestige}}, upsert=True)
+    await db.user_xp.update_one({"user_id": user_id}, {"$set": {"level": level_after}})
     result = {"amount": amount, "bonus": bonus, "total": total_after, "level": level_after, "level_up": level_after > level_before, "title_changed": levels.title_for_level(level_after) != levels.title_for_level(level_before)}
     if result["level_up"]:
         await _level_up(user_id, level_before, level_after, prestige)
@@ -108,6 +119,32 @@ async def grant(user_id: str, source: str, ref: str, *, amount: int | None = Non
         except Exception:  # noqa: BLE001
             logger.debug("[xp] queue after level-up failed", exc_info=True)
     return result
+
+
+async def revoke(user_id: str, source: str, ref: str) -> dict | None:
+    """Eine Gutschrift zurücknehmen (#2127, EV12): der Eintrag fällt weg, der Stand sinkt um genau diesen Betrag - samt
+    Mitglieder-Bonus. None, wenn es dazu nichts (mehr) gibt; ein zweiter Aufruf ändert also nichts, und dieselbe
+    Quelle lässt sich danach wieder gutschreiben. Das Level sinkt still mit; eine Gutschrift aus der Zeit vor einem
+    Prestige zählt im neuen Stand nicht mehr und wird nur gelöscht."""
+    if not user_id:
+        return None
+    db = get_db()
+    event = await db.xp_events.find_one_and_delete({"user_id": user_id, "source": source, "ref": str(ref)}, projection={"_id": 0})
+    if not event:
+        return None
+    doc = await state(user_id)
+    gained = int(event.get("amount") or 0) + int(event.get("bonus") or 0)
+    if doc.get("prestige_at") and str(event.get("at") or "") < str(doc["prestige_at"]):
+        return {"removed": 0, "total": int(doc.get("total") or 0)}
+    prestige_stars = int(doc.get("prestige") or 0)
+    # Atomar senken, sonst überschriebe eine gleichzeitige Gutschrift die Rücknahme; nie unter null.
+    after = await db.user_xp.find_one_and_update({"user_id": user_id}, {"$inc": {"total": -gained}}, return_document=ReturnDocument.AFTER, projection={"_id": 0, "total": 1})
+    total_after = int((after or {}).get("total") or 0)
+    if total_after < 0:
+        await db.user_xp.update_one({"user_id": user_id, "total": {"$lt": 0}}, {"$set": {"total": 0}})
+        total_after = 0
+    await db.user_xp.update_one({"user_id": user_id}, {"$set": {"level": levels.level_for_xp(total_after, prestige_stars), "updated_at": now_utc().isoformat()}})
+    return {"removed": gained, "total": total_after}
 
 
 # Mehrere Aufstiege in einer Auswertung (#1296): vier Erfolge auf einmal schickten vier Meldungen „Level X erreicht“

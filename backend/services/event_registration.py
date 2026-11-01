@@ -9,6 +9,7 @@ from pymongo.errors import DuplicateKeyError
 from models import new_id, now_utc
 from services import billing_orders, pricing
 from services.access_links import AccessLinkUsedUp, claim_access_link_use, release_access_link_use
+from services.event_notifications import notify_registration_status
 from services.permissions import is_confirmed_tournament_lead
 from services.public_phase import derive_public_phase
 from services.visibility import user_can_see
@@ -130,6 +131,9 @@ async def ensure_can_register(db, event: dict, me: dict, *, has_access: bool = F
         raise RegistrationError(404, "Event nicht gefunden")
     if not has_access and not await user_can_see(me, event.get("visibility") or "public"):
         raise RegistrationError(403, "Event ist nicht sichtbar")
+    # Ein Zugangslink umgeht Fristen, aber keine Absage (#2127).
+    if event.get("status") == "cancelled":
+        raise RegistrationError(409, "Das Event ist abgesagt – eine Anmeldung ist nicht möglich.")
     if not registration_open(event) and not register_access:
         raise RegistrationError(400, "Die Anmeldung ist aktuell nicht offen")
     if not event.get("has_registration"):
@@ -154,13 +158,16 @@ def seat_resource(event_id: str) -> str:
 
 async def register(db, event: dict, me: dict, *, companion_count: int | None = 0, note: str | None = None,
                    selected_positions: list[str] | None = None, register_access: dict | None = None, via: str = "web") -> dict:
-    """Anmelden unter der Platzsperre - jeder Weg (Website, App, Discord, Zugangslink) kommt hier durch (#1037)."""
+    """Anmelden unter der Platzsperre - jeder Weg (Website, App, Discord, Zugangslink) kommt hier durch (#1037). Der
+    Bescheid an die Person (#2127) geht erst danach hinaus, damit die Sperre nicht auf Mail und Push wartet."""
     try:
         async with mutation_lock(db, seat_resource(event["id"]), wait_seconds=SEAT_WAIT_SECONDS):
-            return await _register(db, event, me, companion_count=companion_count, note=note,
-                                   selected_positions=selected_positions, register_access=register_access, via=via)
+            doc = await _register(db, event, me, companion_count=companion_count, note=note,
+                                  selected_positions=selected_positions, register_access=register_access, via=via)
     except MutationLockBusy:
         raise SeatsBusy()
+    await notify_registration_status(db, event, doc, doc.get("status"), actor_id=me["id"])
+    return doc
 
 
 async def _register(db, event: dict, me: dict, *, companion_count: int | None, note: str | None,
@@ -206,6 +213,11 @@ async def _register(db, event: dict, me: dict, *, companion_count: int | None, n
         doc["price_snapshot"] = pricing.snapshot(price, recipient=me, source={"kind": "event", "id": event["id"], "slug": event.get("slug")},
                                                  invoice_timing=offer.get("invoice_timing") or "on_confirm")
         doc["billing_status"] = "pending"
+    elif existing:
+        # Neuanmeldung nach Storno ohne Preis (Warteliste, inzwischen kostenlos): Der alte Preis gilt nicht mehr (#2127) - sonst
+        # friert das Nachrücken keinen neuen ein, und es entsteht keine Rechnung.
+        doc["price_snapshot"] = None
+        doc["billing_status"] = None
     # Zugangslink mit Limit (#1036): die Nutzung atomar belegen, bevor die Anmeldung geschrieben wird.
     try:
         claimed = await claim_access_link_use(db, register_access, me)
@@ -239,7 +251,7 @@ async def _register(db, event: dict, me: dict, *, companion_count: int | None, n
         "target_id": event["id"],
         "actor_id": me["id"],
         "data": {"registration_id": doc["id"], "status": status, "companion_count": companions,
-                 "total_cents": doc.get("price_snapshot", {}).get("total_cents"), "via": via},
+                 "total_cents": (doc.get("price_snapshot") or {}).get("total_cents"), "via": via},
         "created_at": now,
     })
     if doc.get("price_snapshot"):

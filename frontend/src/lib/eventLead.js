@@ -44,7 +44,14 @@ export function matchesSearch(row, query) {
   return words.every((word) => name.includes(word));
 }
 
+/** Die Warteliste in der Reihenfolge der Anmeldung - wer zuerst da war, steht oben. */
+export function waitlistRows(rows) {
+  return (rows || []).filter((row) => row.status === "waitlist")
+    .sort((a, b) => String(a.created_at || "").localeCompare(String(b.created_at || "")));
+}
+
 export function filterRows(rows, filter = "open", query = "") {
+  if (filter === "waitlist") return waitlistRows(rows).filter((row) => matchesSearch(row, query));
   const statuses = FILTER_STATUSES[filter] ?? null;
   return (rows || []).filter((row) => (!statuses || statuses.includes(row.status)) && matchesSearch(row, query));
 }
@@ -63,6 +70,27 @@ export function leadCounts(rows) {
     expected: registered.length + here.length,
     expected_seats: [...registered, ...here].reduce((sum, row) => sum + seats(row), 0),
     here_seats: here.reduce((sum, row) => sum + seats(row), 0),
+  };
+}
+
+/**
+ * „1 Platz frei“ (#2127, EV6): Die Warteliste rückt nicht von selbst nach, weil Plätze etwas kosten können - die Leitung
+ * sieht den freien Platz und rückt per Knopf nach. Ohne Warteliste oder ohne freien Platz: nichts.
+ */
+export function waitlistHint(rows, maxParticipants) {
+  const waiting = waitlistRows(rows);
+  if (!waiting.length) return null;
+  const max = Number(maxParticipants) || 0;
+  const free = max ? Math.max(max - leadCounts(rows).expected_seats, 0) : null;
+  if (max && !free) return null;
+  const next = waiting[0];
+  const needed = Number(next.seat_count) || 1;
+  const fits = free === null || needed <= free;
+  return {
+    free,
+    fits,
+    text: `${free === null ? "Keine Platzgrenze mehr" : `${free} ${free === 1 ? "Platz" : "Plätze"} frei`} · ${waiting.length} auf der Warteliste`,
+    next: `Als Nächste: ${next.display_name || "Teilnehmer"}${fits ? "" : ` – braucht ${needed} Plätze`}`,
   };
 }
 
@@ -95,7 +123,30 @@ export function messagePreview(count) {
 export function changeText(row, status) {
   const name = row?.display_name || "Die Person";
   if (status === "checked_in") return `${name} ist da.`;
-  if (status === "registered" && row?.status === "waitlist") return `${name} ist nachgerückt.`;
+  if (status === "registered" && row?.status === "waitlist") return `${name} ist nachgerückt und bekommt Bescheid.`;
   if (status === "registered" && row?.status === "checked_in") return `${name} ist wieder „noch nicht da“.`;
-  return `${name}: ${STATUS_LABELS[status] || status}.`;
+  const told = row?.walk_in ? "" : " Die Person bekommt Bescheid.";
+  return `${name}: ${STATUS_LABELS[status] || status}.${told}`;
+}
+
+/**
+ * Die Rückfrage vor „Storniert“ und „Nicht erschienen“ (#2127, EV13): sagt ehrlich, was daraus folgt - Rechnungsaufträge
+ * wie bisher, die Person erfährt es, ein Check-in nimmt Punkte und XP mit zurück. Sonst keine Rückfrage (null).
+ */
+export function statusQuestion(row, status) {
+  if (!["cancelled", "no_show"].includes(status) || row?.status === status) return null;
+  const name = row?.display_name || "Die Person";
+  const parts = status === "cancelled" ? [`${name} wird storniert, der Platz wird frei.`] : [`${name} wird als „nicht erschienen“ eingetragen, der Platz wird frei.`];
+  if (!row?.walk_in) {
+    parts.push("Gibt es einen Kostenbeitrag: Offene Rechnungsaufträge werden storniert, eine schon gestellte Rechnung kommt als Prüffall in die Finanzübersicht.");
+    parts.push("Die Person bekommt eine Nachricht.");
+    if (row?.status === "checked_in") parts.push("Jahrespunkte und XP vom Check-in werden zurückgenommen.");
+  }
+  return {
+    title: status === "cancelled" ? "Anmeldung stornieren?" : "Als „nicht erschienen“ eintragen?",
+    description: parts.join(" "),
+    confirmLabel: status === "cancelled" ? "Stornieren" : "Eintragen",
+    cancelLabel: "Zurück",
+    tone: "danger",
+  };
 }

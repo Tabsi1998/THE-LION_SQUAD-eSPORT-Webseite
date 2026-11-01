@@ -25,7 +25,7 @@ import { normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { EventProgramPanel, useEventProgram } from "@/pages/admin/event/EventProgramPanel";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
-import { affectedRegistrations, cancelConfirmText, savedEventMessage, touchesScheduleOrPlace } from "@/lib/eventAdmin";
+import { affectedRegistrations, cancelConfirmText, eventStatusOptions, outsideText, savedEventMessage, touchesScheduleOrPlace } from "@/lib/eventAdmin";
 import { toast } from "sonner";
 
 const ACCENT = "#9F7AEA";
@@ -63,11 +63,10 @@ export default function AdminEventEditPage() {
     let cancelled = false;
     setEvent(null);
     setMissing(false);
-    // Dieselben Daten wie die Liste - so ist das Formular mit dem Stand in der Übersicht identisch.
-    api.get("/events?include_drafts=true").then(({ data }) => {
+    // Einzeln (#2127, EV19): auch ein Event, das nicht unter den ersten der Liste steht, lässt sich öffnen.
+    api.get(`/admin/events/${encodeURIComponent(id)}`).then(({ data }) => {
       if (cancelled) return;
-      const found = (data || []).find((item) => item.id === id);
-      if (found) setEvent(found);
+      if (data?.id) setEvent(data);
       else setMissing(true);
     }).catch(() => { if (!cancelled) setMissing(true); });
     return () => { cancelled = true; };
@@ -289,6 +288,7 @@ function EventForm({ event, meta, partners = [], onDone }) {
         }
         const { data } = await api.patch(`/events/${event.id}`, patch);
         toast.success(savedEventMessage(data));
+        if (data?.program_outside) toast.warning(outsideText(data.program_outside));
         onDone();
         setSaving(false);
         return;
@@ -313,10 +313,10 @@ function EventForm({ event, meta, partners = [], onDone }) {
       testId="event-form"
       aside={(
         <>
-          <FormSection title="Veröffentlichung" accent={ACCENT} hint="Für neue Inhalte reicht normalerweise Entwurf oder Angekündigt. Anmeldung, Live und Beendet werden über die Datumsfelder automatisch berechnet.">
+          <FormSection title="Veröffentlichung" accent={ACCENT} hint="Für neue Events reichen Entwurf oder Angekündigt. Ob die Anmeldung offen ist, ob das Event läuft und wann es beendet ist, rechnet die Seite aus den Datumsfeldern. Früher schließen: „Anmeldung schließt“ setzen.">
             <SelectField label="Typ" value={form.event_type} onChange={(v) => set("event_type", v)} options={eventTypes} testId="event-type" />
             <SelectField label="Sichtbarkeit" value={form.visibility} onChange={(v) => set("visibility", v)} options={meta.visibilities || []} testId="event-visibility" />
-            <SelectField label={isNew ? "Veröffentlichung" : "Status"} value={form.status} onChange={(v) => set("status", v)} options={isNew ? CREATE_STATUS_OPTIONS : (meta.statuses || [])} testId="event-status" />
+            <SelectField label={isNew ? "Veröffentlichung" : "Status"} value={form.status} onChange={(v) => set("status", v)} options={isNew ? CREATE_STATUS_OPTIONS : eventStatusOptions(meta.statuses, event.status)} testId="event-status" />
           </FormSection>
           <FormSection title="Zeiten und Plätze" accent={ACCENT}>
             {/* Eine Auswahl statt zweier Haken (#2111, W2): „Nur Online“ und „Hybrid“ ließen sich gleichzeitig setzen. */}
@@ -330,7 +330,10 @@ function EventForm({ event, meta, partners = [], onDone }) {
               </>
             )}
             <EventDaysSection value={daysForm} onChange={changeDays} locations={locationsForm} startDate={form.start_date} endDate={form.end_date} accent={ACCENT} />
-            <TextField label="Max. Teilnehmer" type="number" min={1} value={form.max_participants} onChange={(v) => set("max_participants", v)} hint="Leer = unbegrenzt." testId="event-max-participants" />
+            {/* Mit externem Anmeldelink zählen wir keine Plätze (#2127, EV11). */}
+            {form.has_registration && form.registration_url
+              ? <p className="text-xs text-white/45" data-testid="event-external-no-seats">Externer Anmeldelink: Plätze und Warteliste führt die andere Seite.</p>
+              : <TextField label="Max. Teilnehmer" type="number" min={1} value={form.max_participants} onChange={(v) => set("max_participants", v)} hint="Leer = unbegrenzt." testId="event-max-participants" />}
           </FormSection>
           <DistributeBox kind="event" itemId={event?.id} title={event?.name}>
             <DiscordPreview kind="event" item={usesDays ? { ...form, days: formToDays(daysForm) } : form} skip={form.discord_skip} onSkipChange={(value) => set("discord_skip", value)} />
@@ -400,12 +403,14 @@ function EventForm({ event, meta, partners = [], onDone }) {
             <TextField label="Anmeldung öffnet" type="datetime-local" value={form.registration_opens_at} onChange={(v) => set("registration_opens_at", v)} />
             <TextField label="Anmeldung schließt" type="datetime-local" value={form.registration_closes_at} onChange={(v) => set("registration_closes_at", v)} />
             <TextField label="Externer Anmeldelink" value={form.registration_url} onChange={(v) => set("registration_url", v)} placeholder="https://…" />
-            <div className="space-y-3 self-end">
-              <CheckField label="Begleitpersonen erlauben" checked={form.allow_companions} onChange={(v) => set("allow_companions", v)} accent={ACCENT} />
-              {form.allow_companions && (
-                <TextField label="Max. Begleitpersonen pro Anmeldung" type="number" min="0" max="20" value={form.max_companions_per_registration} onChange={(v) => set("max_companions_per_registration", v)} />
-              )}
-            </div>
+            {!form.registration_url && (
+              <div className="space-y-3 self-end">
+                <CheckField label="Begleitpersonen erlauben" checked={form.allow_companions} onChange={(v) => set("allow_companions", v)} accent={ACCENT} />
+                {form.allow_companions && (
+                  <TextField label="Max. Begleitpersonen pro Anmeldung" type="number" min="0" max="20" value={form.max_companions_per_registration} onChange={(v) => set("max_companions_per_registration", v)} />
+                )}
+              </div>
+            )}
           </FormGrid>
         )}
         {/* Anmeldung im Discord (#885): Vorgabe an; mit externem Link oder Begleitpersonen geht sie nur auf der Website. */}

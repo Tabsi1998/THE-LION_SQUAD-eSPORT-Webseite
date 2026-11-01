@@ -18,6 +18,7 @@ from services.access_links import (
     touch_access_link,
     validate_access_link,
 )
+from services.event_public import public_event
 from services.public_phase import derive_public_phase
 from services.league_scope import is_league_staffel, league_filter, league_label
 from services.tournament_permissions import (
@@ -156,7 +157,7 @@ async def _enrich_tournament(t: dict, user: dict | None = None) -> dict:
     if t.get("event_id"):
         e = await db.events.find_one({"id": t["event_id"]}, {"_id": 0, "tournaments": 0, "f1_challenges": 0})
         if e and e.get("status") != "draft" and await lead_can_see(user, e.get("visibility") or "public"):
-            t["event"] = e
+            t["event"] = public_event(e)
     t["participant_count"] = await db.tournament_registrations.count_documents(
         {"tournament_id": t["id"], "status": {"$in": ["approved", "checked_in"]}})
     return t
@@ -177,7 +178,7 @@ async def _enrich_tournaments(tournaments: list[dict], user: dict | None = None)
         if visibility not in seen_visibility:
             seen_visibility[visibility] = await lead_can_see(user, visibility)
         if event.get("status") != "draft" and seen_visibility[visibility]:
-            events[event["id"]] = event
+            events[event["id"]] = public_event(event)
     participants = {row["_id"]: row["count"] async for row in db.tournament_registrations.aggregate([
         {"$match": {"tournament_id": {"$in": tids}, "status": {"$in": ["approved", "checked_in"]}}},
         {"$group": {"_id": "$tournament_id", "count": {"$sum": 1}}},

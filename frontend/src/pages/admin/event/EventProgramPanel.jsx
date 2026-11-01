@@ -103,6 +103,12 @@ export function EventProgramPanel({ eventId, program, failed, reload, onEmbed })
                 <div className="min-w-0 flex-1">
                   <Link to={KIND[kind].edit(item.id)} className="font-semibold text-sm hover:underline break-words">{item.title || "Ohne Titel"}</Link>
                   <div className="text-xs text-white/45">{[KIND[kind].label, item.start_date ? viennaDate(item.start_date) : ""].filter(Boolean).join(" · ")}</div>
+                  {/* Nach einer Verschiebung (#2127, EV4): der Termin bleibt, aber er passt nicht mehr zum Event. */}
+                  {item.outside && (
+                    <div className="mt-0.5 text-xs font-bold text-[#FF9F43]" data-testid={`event-program-outside-${item.id}`}>
+                      Liegt außerhalb des Events{program.event?.window ? ` (${program.event.window})` : ""} – Tag prüfen.
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-wider">
                   {onEmbed && (

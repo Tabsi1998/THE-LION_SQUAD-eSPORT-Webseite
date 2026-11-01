@@ -43,7 +43,6 @@ def public_access_link_payload(link: dict | None) -> dict | None:
         "expires_at": link.get("expires_at"),
         "max_uses": link.get("max_uses"),
         "use_count": int(link.get("use_count") or 0),
-        "note": link.get("note"),
     }
 
 
