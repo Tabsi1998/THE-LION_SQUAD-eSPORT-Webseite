@@ -83,6 +83,8 @@ export const ADMIN_GROUPS = [
       // Events unter eSports (#2111, F6): sie brauchen den Bereich Turniere - Content-Leute sahen sie nie, Turnierleute
       // suchten sie hier.
       { to: "/admin/events", label: "Events", icon: CalendarDays, areas: ["tournaments"], hint: "LAN, Turniertage, Programm" },
+      // Teamverwaltung (#2128, TM7): Liste mit Suche, aufgelöste Teams, Beitrittscodes.
+      { to: "/admin/teams", label: "Teams", icon: UsersIcon, areas: ["tournaments", "club"], hint: "Alle Teams, aufgelöste Teams, Beitrittscodes" },
       { to: "/admin/tournament-guide", label: "Turnier-Leitfaden", icon: BookOpen, areas: ["tournaments"] },
       { to: "/admin/f1", label: "Fast Lap", icon: Flag, areas: ["tournaments"], staff: true },
       { to: "/admin/seasons", label: "Jahreswertung", icon: TrendingUp, areas: ["tournaments"], hint: "Punkte über alle Turniere eines Jahres" },
@@ -179,6 +181,7 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/game-servers": ["server", "communityserver"],
   "/admin/prizes": ["preise", "gewinn", "gewinnabholung", "abholung"],
   "/admin/penalties": ["strafen", "fairplay"],
+  "/admin/teams": ["team", "clans", "teamleitung", "co-leitung", "beitrittscode", "join-code", "aufgelöst", "wiederherstellen", "verwaist"],
   "/admin/events": ["termine", "lan", "veranstaltungen"],
   "/admin/news": ["beitraege", "ankuendigungen"],
   "/admin/gallery": ["bilder", "fotos", "alben"],

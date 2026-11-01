@@ -153,3 +153,12 @@ test("Startseite: Zahlen in richtiger Ein- und Mehrzahl, Streitfälle statt Disp
   }
   for (const wrong of ["Disputes", "1 offene Anträge", "1 Verträge", "1 warten", "1 Prüffälle"]) expect(page).not.toContain(wrong);
 });
+
+// Kachel „Teams“ (#2128, TM7): führt zur Teamverwaltung, die anderen Zahlen bleiben Zahlen.
+test("die Kachel „Teams“ führt zur Teamverwaltung", async () => {
+  apiMock.get.mockImplementation(async (url) => (url === "/admin/dashboard" ? { data: { team_count: 7, player_count: 3 } } : { data: {} }));
+  await renderAs({ id: "s", role: "superadmin", ...mfa });
+  const tile = await screen.findByTestId("kpi-Teams");
+  expect(tile.closest("a")).toHaveAttribute("href", "/admin/teams");
+  expect(screen.getByTestId("kpi-Spieler").closest("a")).toBeNull();
+});

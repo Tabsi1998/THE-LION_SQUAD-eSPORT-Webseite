@@ -27,6 +27,7 @@ from routes.award_routes import router as award_router
 from routes.honour_routes import router as honour_router
 from routes.team_routes import router as team_router
 from routes.team_page_routes import router as team_page_router
+from routes.team_admin_routes import router as team_admin_router
 from routes.team_day_routes import router as team_day_router
 from routes.feedback_routes import router as feedback_router, admin_router as feedback_admin_router
 from routes.helper_call_routes import router as helper_call_router
@@ -331,6 +332,7 @@ app.include_router(honour_router)
 app.include_router(team_level_router)
 app.include_router(team_router)
 app.include_router(team_page_router)
+app.include_router(team_admin_router)
 app.include_router(team_day_router)
 app.include_router(feedback_router)
 app.include_router(feedback_admin_router)
