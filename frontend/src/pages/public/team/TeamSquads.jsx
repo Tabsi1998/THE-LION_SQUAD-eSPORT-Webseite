@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Shield } from "lucide-react";
 import { api } from "@/lib/api";
-import { roleOf, rolesSummary } from "@/components/tls/league/squadRoles";
+import { roleOf, rolesSummary, squadGameLabel } from "@/components/tls/league/squadRoles";
 
 // Teamseite (#2110, L-D13): die Co-Teams des Teams mit Captain und Vertreter - nur für Mitglieder und die Teamleitung
 // (GET /api/teams/:id/squads prüft das selbst; Außenstehende sehen nur „Liga“ ohne Kader). Die Nachricht „Du bist
@@ -43,6 +43,7 @@ export function TeamSquads({ team, userId, canManage = false, enabled = false })
                 <div className="min-w-0 font-heading text-lg font-bold [overflow-wrap:anywhere]">{squad.name}</div>
                 {mine ? <span className="shrink-0 rounded-sm border border-honor/40 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-honor">Du: {mine.label}</span> : null}
               </div>
+              {squad.game || squad.game_id ? <p className="mt-1 text-xs text-white/60 break-words" data-testid={`team-squad-game-line-${squad.id}`}>{squadGameLabel(squad)}</p> : null}
               <p className="mt-1 text-xs text-white/60 break-words" data-testid={`team-squad-roles-line-${squad.id}`}>{rolesSummary(squad, squad.members)}</p>
               <p className="mt-1 text-xs text-white/40">{(squad.members || []).length} im Kader</p>
             </li>

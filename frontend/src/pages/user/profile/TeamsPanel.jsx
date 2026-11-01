@@ -7,13 +7,12 @@ import { Link, useSearchParams } from "react-router-dom";
 import { Check, Pencil, Plus, Trash2, UserPlus, Users, X } from "lucide-react";
 import { useOptionalAuth } from "@/context/AuthContext";
 import { TEAM_ROLE_LABELS } from "./constants";
-import { SQUAD_ROLES, isLocked, roleChoices, roleOf, rolesSummary, squadStatusLabel } from "@/components/tls/league/squadRoles";
+import { SQUAD_ROLES, isLocked, roleChoices, roleOf, rolesSummary, squadGameLabel, squadStatusLabel } from "@/components/tls/league/squadRoles";
 
 const emptySquad = {
   name: "",
   description: "",
-  tournament_id: "",
-  season_id: "",
+  game_id: "",
   member_ids: [],
   status: "active",
   captain_id: "",
@@ -26,8 +25,7 @@ export function TeamsPanel() {
   const [invites, setInvites] = useState([]);
   const [activeId, setActiveId] = useState("");
   const [squads, setSquads] = useState([]);
-  const [tournaments, setTournaments] = useState([]);
-  const [seasons, setSeasons] = useState([]);
+  const [games, setGames] = useState([]);
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
   const confirm = useConfirm();
@@ -51,8 +49,7 @@ export function TeamsPanel() {
   }, []);
 
   const loadMeta = useCallback(() => {
-    api.get("/tournaments").then(({ data }) => setTournaments(data || [])).catch(() => {});
-    api.get("/seasons").then(({ data }) => setSeasons(data || [])).catch(() => {});
+    api.get("/games").then(({ data }) => setGames(Array.isArray(data) ? data : [])).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -64,7 +61,7 @@ export function TeamsPanel() {
     loadTeams();
     loadInvites();
     loadMeta();
-  }, ["teams", "tournaments", "seasons", "admin/notifications"]);
+  }, ["teams", "games", "admin/notifications"]);
 
   const loadSquads = useCallback(() => {
     if (!activeId) {
@@ -87,11 +84,14 @@ export function TeamsPanel() {
       const payload = {
         ...editing,
         description: editing.description || null,
-        tournament_id: editing.tournament_id || null,
-        season_id: editing.season_id || null,
+        game_id: editing.game_id || null,
         member_ids: editing.member_ids || [],
       };
       delete payload.members;
+      // Altfelder alter Co-Teams (#2128, TM3): bleiben gespeichert, das Formular schickt sie nicht mit.
+      delete payload.tournament_id;
+      delete payload.season_id;
+      delete payload.game;
       // Captain und Vertreter (#1649): nur geänderte Rollen mitschicken - sonst überschriebe ein alter Stand eine
       // Neuvergabe, die jemand anderes inzwischen gespeichert hat. Leer heißt „niemand“ (dann handelt die Teamleitung).
       const original = editing.id ? squads.find((squad) => squad.id === editing.id) : null;
@@ -277,6 +277,7 @@ export function TeamsPanel() {
                           </div>
                         )}
                       </div>
+                      <p className="text-xs text-white/55 mt-1" data-testid={`team-squad-game-${squad.id}`}>{squadGameLabel(squad)}</p>
                       {squad.description && <p className="text-sm text-white/55 mt-2">{squad.description}</p>}
                       <p className="text-xs text-white/55 mt-2 break-words" data-testid={`team-squad-roles-${squad.id}`}>{rolesSummary(squad, squad.members)}</p>
                       {roleOf(squad, myId) ? (
@@ -315,20 +316,15 @@ export function TeamsPanel() {
             <div className="p-5 space-y-4">
               <Field label="Name"><Input value={editing.name} onChange={(v) => setEditing({ ...editing, name: v })} required testId="team-squad-name" /></Field>
               <Field label="Beschreibung"><textarea value={editing.description || ""} onChange={(e) => setEditing({ ...editing, description: e.target.value })} rows={3} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-white" /></Field>
-              <Row>
-                <Field label="Turnier">
-                  <select value={editing.tournament_id || ""} onChange={(e) => setEditing({ ...editing, tournament_id: e.target.value })} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
-                    <option value="">Kein Turnier</option>
-                    {tournaments.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
-                  </select>
-                </Field>
-                <Field label="Jahreswertung / Circuit">
-                  <select value={editing.season_id || ""} onChange={(e) => setEditing({ ...editing, season_id: e.target.value })} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
-                    <option value="">Keine Jahreswertung</option>
-                    {seasons.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
-                </Field>
-              </Row>
+              {/* Das Spiel zählt für die Discord-Rollen und die Liga (ein Co-Team mit anderem Spiel lässt sich nicht zuteilen). */}
+              <Field label="Spiel">
+                <select value={editing.game_id || ""} onChange={(e) => setEditing({ ...editing, game_id: e.target.value })} data-testid="team-squad-game" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
+                  <option value="">Kein bestimmtes Spiel</option>
+                  {/* Ein alter Freitext bleibt wählbar, bis jemand ein Spiel aus der Liste nimmt. */}
+                  {editing.game_id && !games.some((game) => game.id === editing.game_id) ? <option value={editing.game_id}>{editing.game || `${editing.game_id} (nicht in der Liste)`}</option> : null}
+                  {games.map((game) => <option key={game.id} value={game.id}>{game.display_name || game.name}</option>)}
+                </select>
+              </Field>
               <Field label="Kader" group>
                 <div className="grid sm:grid-cols-2 gap-2">
                   {(activeTeam.members || []).map((m) => {

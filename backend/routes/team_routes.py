@@ -31,11 +31,11 @@ def _page_items(items: list[dict], limit: int, offset: int, paged: bool):
     return {"items": page, "total": len(items), "limit": safe_limit, "offset": safe_offset}
 
 
+# Das Formular kennt nur noch das Spiel (#2128, TM3). ``tournament_id`` und ``season_id`` stehen an alten Co-Teams noch in
+# der Datenbank, liest aber niemand - und sie werden nicht mehr geschrieben (ein älterer Aufruf, der sie schickt, stört nicht).
 class TeamSquadCreate(BaseModel):
     name: str = Field(min_length=2, max_length=80)
     description: Optional[str] = None
-    tournament_id: Optional[str] = None
-    season_id: Optional[str] = None
     game_id: Optional[str] = None
     member_ids: list[str] = Field(default_factory=list)
     status: Literal["active", "archived"] = "active"
@@ -47,8 +47,6 @@ class TeamSquadCreate(BaseModel):
 class TeamSquadUpdate(BaseModel):
     name: Optional[str] = Field(default=None, min_length=2, max_length=80)
     description: Optional[str] = None
-    tournament_id: Optional[str] = None
-    season_id: Optional[str] = None
     game_id: Optional[str] = None
     member_ids: Optional[list[str]] = None
     status: Optional[Literal["active", "archived"]] = None
@@ -431,6 +429,31 @@ def _unchanged_squad(current: dict) -> dict:
         "member_ids": current.get("member_ids"),
         **{field: current.get(field) for field in SQUAD_ROLE_FIELDS},
     }
+
+
+GAME_UNKNOWN = ("Dieses Spiel gibt es hier nicht. Wähle es auf der Website unter Teams → Deine Teams aus der Liste – "
+                "oder lass das Feld leer.")
+
+
+async def _squad_game(db, value: str | None, current: str | None = None) -> str | None:
+    """Das Spiel eines Co-Teams (#2128, TM3): eine Kennung aus ``games`` oder leer. Discord-Rollen und die Spielprüfung der
+    Liga lesen es.
+
+    Ein unveränderter Wert bleibt gültig - ein alter Freitext hält also keine andere Änderung am Co-Team auf. Die App hat
+    noch ein Freitextfeld: ein genau passender Spielname wird zur Kennung, alles andere abgelehnt (der Text steht in der
+    App als Meldung)."""
+    text = (value or "").strip()
+    if not text:
+        return None
+    if text == (current or ""):
+        return text
+    if await db.games.find_one({"id": text}, {"_id": 1}):
+        return text
+    exactly = {"$regex": f"^{re.escape(text)}$", "$options": "i"}
+    game = await db.games.find_one({"$or": [{"name": exactly}, {"short_name": exactly}, {"slug": exactly}]}, {"_id": 0, "id": 1})
+    if not game:
+        raise HTTPException(status_code=400, detail=GAME_UNKNOWN)
+    return game["id"]
 
 
 async def _squad_role_holder(db, team_id: str, user_id: str) -> dict | None:
@@ -1121,10 +1144,17 @@ async def list_squads(team_id: str, me: dict = Depends(get_current_user)):
         {"id": {"$in": list({uid for s in squads for uid in s.get("member_ids", [])})}},
         {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1},
     ).to_list(500)}
+    game_ids = sorted({squad["game_id"] for squad in squads if squad.get("game_id")})
+    games = {row["id"]: row.get("name") for row in await db.games.find(
+        {"id": {"$in": game_ids}}, {"_id": 0, "id": 1, "name": 1},
+    ).to_list(len(game_ids) or 1)} if game_ids else {}
     for squad in squads:
         squad["members"] = [
             _public_user(member_map[uid]) for uid in squad.get("member_ids", []) if uid in member_map
         ]
+        # Der Name zum Spiel - Web und App zeigen ihn statt der Kennung; ein alter Freitext hat keinen.
+        if games.get(squad.get("game_id")):
+            squad["game"] = games[squad["game_id"]]
     return squads
 
 
@@ -1137,6 +1167,7 @@ async def create_squad(team_id: str, body: TeamSquadCreate, me: dict = Depends(g
     if not _can_manage(team, me):
         _refuse(me, "Keine Berechtigung")
     doc = body.model_dump()
+    doc["game_id"] = await _squad_game(db, doc.get("game_id"))
     doc["member_ids"] = _validate_squad_members(team, doc.get("member_ids") or [])
     requested_roles = {field: doc.pop(field) for field in SQUAD_ROLE_FIELDS}
     roles = _squad_roles({}, requested_roles, doc["member_ids"], team)
@@ -1164,12 +1195,22 @@ async def update_squad(team_id: str, squad_id: str, body: TeamSquadUpdate, me: d
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
     if not _can_manage(team, me):
         _refuse(me, "Keine Berechtigung")
-    nullable_fields = {"description", "tournament_id", "season_id", "game_id", "member_ids", *SQUAD_ROLE_FIELDS}
+    nullable_fields = {"description", "game_id", "member_ids", *SQUAD_ROLE_FIELDS}
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     current = await db.team_squads.find_one({"id": squad_id, "team_id": team_id}, {"_id": 0})
     if not current:
         raise HTTPException(status_code=404, detail="Co-Team nicht gefunden")
+    if "game_id" in updates:
+        updates["game_id"] = await _squad_game(db, updates["game_id"], current.get("game_id"))
+        if (updates["game_id"] or None) != (current.get("game_id") or None):
+            # Zugeteilt wurde es für das Spiel der Staffel - das bleibt, bis die Staffel vorbei ist.
+            from services.squad_registration import active_league_registration
+
+            active = await active_league_registration(db, squad_id)
+            if active:
+                raise HTTPException(status_code=409, detail=f"Das Co-Team spielt in {active.get('tournament_title') or 'einer Liga-Staffel'} "
+                                                            "– das Spiel lässt sich erst ändern, wenn die Staffel beendet ist.")
     if "member_ids" in updates:
         updates["member_ids"] = _validate_squad_members(team, updates.get("member_ids") or [])
     requested_roles = {field: updates.pop(field) for field in SQUAD_ROLE_FIELDS if field in updates}
