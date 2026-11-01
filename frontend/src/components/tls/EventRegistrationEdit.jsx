@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { api, formatRequestError } from "@/lib/api";
 import { AuthFormAlert } from "@/components/tls/AuthFormFields";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
+import { formatCents, previewQuote } from "@/lib/pricing";
 
 // Die eigene Event-Anmeldung ändern (#2113, L-A3): Begleitpersonen und Hinweis - bisher nur über Stornieren und neu
 // anmelden. Ein leiser Link „Anmeldung ändern“ öffnet das kleine Formular im Kasten „Dein Event“; der Server sagt mit
@@ -16,6 +17,11 @@ export function EventRegistrationEdit({ event, own, onSaved }) {
   const [error, setError] = useState("");
   const { submitting, submitOnce } = useSubmissionGuard();
   const maxCompanions = event.allow_companions ? Number(event.max_companions_per_registration || 0) : 0;
+  // Neue Summe vor dem Speichern (#2113): nur, wenn es schon einen Preis gibt - ohne ihn rechnet die Turnierleitung.
+  const seatsNow = 1 + Number(companions || 0);
+  const chosen = (own?.price?.positions || []).filter((line) => line.optional).map((line) => line.key);
+  const quote = own?.price && event.offer ? previewQuote(event.offer, { seats: seatsNow, selected: chosen }) : null;
+  const seatsChanged = Number(companions || 0) !== Number(own?.companion_count || 0);
 
   if (!own?.can_edit) return null;
 
@@ -66,10 +72,14 @@ export function EventRegistrationEdit({ event, own, onSaved }) {
           <div className="text-[11px] uppercase tracking-widest text-white/50 font-bold mb-1.5">Begleitpersonen</div>
           <input type="number" min="0" max={maxCompanions} value={companions} onChange={(ev) => { setCompanions(ev.target.value); setError(""); }}
             data-testid="event-edit-companions" className="w-full min-h-11 bg-[#121212] border border-white/10 px-3 py-2 rounded-sm" />
-          <div className="mt-1 text-xs text-white/40">
-            Maximal {maxCompanions} pro Anmeldung.{event.offer ? " Dein Kostenbeitrag rechnet sich dabei neu." : ""}
-          </div>
+          <div className="mt-1 text-xs text-white/40">Maximal {maxCompanions} pro Anmeldung.</div>
         </label>
+      )}
+      {seatsChanged && quote && !quote.free && (
+        <div className="border border-white/15 rounded-sm p-3 text-sm flex items-baseline justify-between gap-3" data-testid="event-edit-quote">
+          <span className="text-white/65">Neue Summe für {seatsNow} Person{seatsNow === 1 ? "" : "en"}</span>
+          <strong className="font-heading text-xl text-white">{formatCents(quote.total_cents, quote.currency)}</strong>
+        </div>
       )}
       <label className="block">
         <div className="text-[11px] uppercase tracking-widest text-white/50 font-bold mb-1.5">Hinweis optional</div>

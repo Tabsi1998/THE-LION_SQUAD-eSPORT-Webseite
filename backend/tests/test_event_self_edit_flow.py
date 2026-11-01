@@ -137,3 +137,33 @@ async def test_paid_event_requotes_before_the_invoice_and_refuses_after(flow):
     # Der Hinweis geht trotzdem.
     assert (await flow.patch(f"/api/events/{event['id']}/registrations/me", json={"note": "vegetarisch"})).status_code == 200
     assert (await stored(flow, event))["companion_count"] == 1
+
+
+PAID_LATER = {"enabled": True, "currency": "EUR", "version": 1,
+              "positions": [{"key": "beitrag", "label": "Beitrag", "amount_cents": 2000, "basis": "per_person", "tax_profile": "none"}]}
+
+
+@pytest.mark.asyncio
+async def test_free_registration_is_never_billed_by_changing_companions(flow):
+    """Kostenlos angemeldet, der Verein schaltet Kosten ein: eine Begleitperson weniger erzeugt keine Rechnung."""
+    event, _paula = await setup_event(flow, companions=1)
+    await flow.db.events.update_one({"id": event["id"]}, {"$set": {"billing": PAID_LATER}})
+    refused = await flow.patch(f"/api/events/{event['id']}/registrations/me", json={"companion_count": 0})
+    assert refused.status_code == 409 and "Turnierleitung" in refused.json()["detail"]
+    row = await stored(flow, event)
+    assert row["companion_count"] == 1 and not row.get("price_snapshot") and not row.get("billing_status")
+    assert await flow.db.billing_orders.count_documents({"registration_id": row["id"]}) == 0
+    # Der Hinweis geht weiter.
+    assert (await flow.patch(f"/api/events/{event['id']}/registrations/me", json={"note": "später"})).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_changed_offer_is_not_applied_by_the_person_herself(flow):
+    event, _paula = await setup_event(flow, billing=OFFER)
+    first = await stored(flow, event)
+    version = first["price_snapshot"]["offer_version"]
+    await flow.db.events.update_one({"id": event["id"]}, {"$set": {"billing": {**PAID_LATER, "version": version + 1}}})
+    refused = await flow.patch(f"/api/events/{event['id']}/registrations/me", json={"companion_count": 1})
+    assert refused.status_code == 409 and "Kosten" in refused.json()["detail"]
+    row = await stored(flow, event)
+    assert row["price_snapshot"]["total_cents"] == first["price_snapshot"]["total_cents"] and row["companion_count"] == 0

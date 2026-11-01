@@ -33,6 +33,26 @@ test("ändern schickt nur, was sich geändert hat, und lädt danach neu", async 
   expect(screen.queryByTestId("event-edit-form")).toBeNull();
 });
 
+const OFFER = { enabled: true, currency: "EUR", positions: [
+  { key: "beitrag", label: "Beitrag", amount_cents: 2000, basis: "per_person" },
+  { key: "shirt", label: "Shirt", amount_cents: 1500, basis: "per_registration", optional: true },
+] };
+
+test("neue Summe vor dem Speichern: mit dem gewählten Zusatz - ohne bisherigen Preis keine Summe", () => {
+  const paid = { status: "registered", can_edit: true, companion_count: 0, note: null, price: { total_cents: 3500, currency: "EUR", positions: [{ key: "beitrag" }, { key: "shirt", optional: true }] } };
+  const { unmount } = render(<EventRegistrationEdit event={{ ...EVENT, offer: OFFER }} own={paid} />);
+  fireEvent.click(screen.getByTestId("event-edit-link"));
+  expect(screen.queryByTestId("event-edit-quote")).toBeNull();
+  fireEvent.change(screen.getByTestId("event-edit-companions"), { target: { value: "2" } });
+  expect(screen.getByTestId("event-edit-quote")).toHaveTextContent("Neue Summe für 3 Personen");
+  expect(screen.getByTestId("event-edit-quote").textContent.replace(/\s/g, " ")).toContain("75,00");
+  unmount();
+  render(<EventRegistrationEdit event={{ ...EVENT, offer: OFFER }} own={{ status: "registered", can_edit: true, companion_count: 0 }} />);
+  fireEvent.click(screen.getByTestId("event-edit-link"));
+  fireEvent.change(screen.getByTestId("event-edit-companions"), { target: { value: "2" } });
+  expect(screen.queryByTestId("event-edit-quote")).toBeNull();
+});
+
 test("ohne Begleitpersonen am Event nur der Hinweis; ein Fehler bleibt im Formular stehen", async () => {
   apiMock.patch.mockRejectedValue(Object.assign(new Error("409"), { response: { status: 409, data: { detail: "Das Event hat schon begonnen – ändern geht jetzt nur über die Turnierleitung." } } }));
   render(<EventRegistrationEdit event={{ id: "e-1", allow_companions: false }} own={{ status: "registered", can_edit: true, companion_count: 0, note: null }} />);

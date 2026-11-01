@@ -330,6 +330,8 @@ def can_edit(event: dict, registration: dict | None, now=None) -> bool:
 NO_SEATS_FOR_COMPANIONS = "Für so viele Begleitpersonen ist kein Platz mehr frei – trag weniger ein oder frag die Turnierleitung."
 INVOICED_COMPANIONS = ("Deine Rechnung ist schon erstellt – die Zahl der Begleitpersonen ändert jetzt nur die Turnierleitung. "
                        "Den Hinweis kannst du weiter selbst ändern.")
+PRICE_CHANGED = ("Die Kosten dieses Events haben sich seit deiner Anmeldung geändert – die Zahl der Begleitpersonen ändert "
+                 "jetzt die Turnierleitung. Den Hinweis kannst du weiter selbst ändern.")
 
 
 async def update_own(db, event: dict, me: dict, changes: dict, *, via: str = "web") -> dict:
@@ -371,9 +373,14 @@ async def _update_own(db, event: dict, me: dict, changes: dict, *, via: str) -> 
             raise RegistrationError(409, NO_SEATS_FOR_COMPANIONS)
     offer = event.get("billing") or {}
     new_snapshot = None
-    if seats_changed and active and pricing.is_paid(offer):
+    snapshot = reg.get("price_snapshot")
+    if seats_changed and active and (pricing.is_paid(offer) or snapshot):
         if reg.get("billing_status") not in (None, "pending"):
             raise RegistrationError(409, INVOICED_COMPANIONS)
+        # Nur rechnen, wozu die Person schon zugesagt hat: Wer kostenlos angemeldet ist oder einem anderen Angebot
+        # zugestimmt hat, bekommt durch eine Begleitperson weniger keine neue Rechnung.
+        if not snapshot or not pricing.is_paid(offer) or int(snapshot.get("offer_version") or 0) != int(offer.get("version") or 0):
+            raise RegistrationError(409, PRICE_CHANGED)
         try:
             price = pricing.quote(offer, seats=new_seats, selected=reg.get("selected_positions") or [])
         except pricing.PricingError as exc:
