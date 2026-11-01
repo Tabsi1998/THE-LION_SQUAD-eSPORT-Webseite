@@ -175,7 +175,8 @@ Uhr des Servers.
 - **Ungenutzte löschen** nennt, wie viele Dateien und wie viel Platz es sind. Beim Löschen prüft der Server jede Datei noch einmal,
   auch in Feldern, die die Liste „Verwendet in“ nicht kennt; was inzwischen verwendet wird, bleibt und steht in der Meldung. Nie
   gelöscht werden Uploads der letzten 24 Stunden (das Formular dazu ist vielleicht noch offen), Uploads von Mitgliedern, Dateien
-  ohne Upload-Eintrag und Kamera-Originale. Bei mehr als 500 Dateien braucht es einen zweiten Klick.
+  ohne Upload-Eintrag und Kamera-Originale. Bei mehr als 500 Dateien nennt die Rückfrage „die ersten 500 von …“, die übrigen löscht
+  ein weiterer Klick.
 - **Diese Datei behalten, Kopien ersetzen** (im Blatt einer Datei mit Duplikaten): Jede Stelle, die eine inhaltsgleiche Kopie zeigt,
   zeigt danach diese Datei, die Kopien werden gelöscht. Es bleiben: Kopien aus Uploads von Mitgliedern und Kopien, die gespeicherte
   Ergebnisse noch zeigen (Map im Ergebnisblatt, Liga-Spiel, Preisbild) – die Meldung nennt ihre Zahl.

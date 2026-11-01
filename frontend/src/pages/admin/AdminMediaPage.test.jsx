@@ -137,6 +137,23 @@ test("Ungenutzte löschen: erst die Rückfrage mit Zahl und Größe, dann genau 
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/media/cleanup-unused", { filenames: ["a.webp", "b.webp", "c.webp"] }));
 });
 
+test("Ungenutzte löschen: Bei mehr als einer Runde nennt die Rückfrage genau, was dieser Klick löscht (#2122)", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url.startsWith("/admin/media?")) return { data: { items: [UNUSED], total: 1 } };
+    if (url === "/admin/media/audit") return { data: { unused: 612, summary: {} } };
+    if (url === "/admin/media/unused") return { data: { count: 612, total_size: 10 * 1024 * 1024, batch_size: 2048, filenames: Array.from({ length: 500 }, (_, i) => `f${i}.webp`), min_age_hours: 24 } };
+    return { data: [] };
+  });
+  render(<MemoryRouter><AdminMediaPage /></MemoryRouter>);
+  confirmMock.mockResolvedValueOnce(false);
+  fireEvent.click(await screen.findByTestId("media-cleanup-unused"));
+  await waitFor(() => expect(confirmMock.mock.calls.at(-1)[0].title).toBe("Die ersten 500 von 612 ungenutzten Dateien löschen?"));
+  const { description } = confirmMock.mock.calls.at(-1)[0];
+  expect(description).toContain("2.0 KB");
+  expect(description).not.toContain("10.00 MB");
+  expect(description).toContain("weiteren Klick");
+});
+
 test("Duplikat ersetzen: fragt nach und nennt, was bleibt (#2122)", async () => {
   apiMock.post.mockReset();
   apiMock.post.mockResolvedValue({ data: { ok: true, removed: 1, references: 3 } });

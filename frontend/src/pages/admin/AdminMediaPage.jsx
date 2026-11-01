@@ -295,10 +295,11 @@ export default function AdminMediaPage() {
         return;
       }
       const shown = preview.filenames?.length || 0;
-      const more = preview.count > shown ? ` Es sind mehr als ${shown} – die übrigen löschst du danach mit einem zweiten Klick.` : "";
+      const partial = preview.count > shown;
+      const more = partial ? " Die übrigen löschst du danach mit einem weiteren Klick." : "";
       if (!await confirm({
-        title: `${shown} ungenutzte ${shown === 1 ? "Datei" : "Dateien"} löschen?`,
-        description: `Das sind ${fmtBytes(preview.total_size)} und lässt sich nicht rückgängig machen. Der Server prüft vorher noch einmal jede Datei. Es bleiben: Uploads der letzten ${preview.min_age_hours} Stunden, Uploads von Mitgliedern, Dateien ohne Upload-Eintrag und Kamera-Originale.${more}`,
+        title: partial ? `Die ersten ${shown} von ${preview.count} ungenutzten Dateien löschen?` : `${shown} ungenutzte ${shown === 1 ? "Datei" : "Dateien"} löschen?`,
+        description: `Das sind ${fmtBytes(preview.batch_size ?? preview.total_size)} und lässt sich nicht rückgängig machen. Der Server prüft vorher noch einmal jede Datei. Es bleiben: Uploads der letzten ${preview.min_age_hours} Stunden, Uploads von Mitgliedern, Dateien ohne Upload-Eintrag und Kamera-Originale.${more}`,
         confirmLabel: "Endgültig löschen",
       })) return;
       const { data } = await api.post("/admin/media/cleanup-unused", { filenames: preview.filenames });

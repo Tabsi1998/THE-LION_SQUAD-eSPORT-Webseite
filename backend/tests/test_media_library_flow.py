@@ -339,6 +339,21 @@ async def test_replacing_an_svg_keeps_a_png_address_as_png(flow, public):
 
 
 @pytest.mark.asyncio
+async def test_the_cleanup_question_separates_this_round_from_the_total(flow, public, monkeypatch):
+    await admin(flow)
+    monkeypatch.setattr(phase_fg_routes, "MEDIA_CLEANUP_BATCH", 2)
+    for index in range(3):
+        name = f"alt{index}.webp"
+        add_file(public, name, content=b"x" * 10, age=OLD + index)
+        await track(flow, name)
+
+    preview = (await flow.get("/api/admin/media/unused")).json()
+
+    assert preview["count"] == 3 and preview["total_size"] == 30
+    assert len(preview["filenames"]) == 2 and preview["batch_size"] == 20
+
+
+@pytest.mark.asyncio
 async def test_cleanup_does_not_work_out_any_checksums(flow, public, monkeypatch):
     await admin(flow)
     add_file(public, "alt.webp", content=b"gleich", age=OLD)

@@ -378,10 +378,13 @@ async def _unused_for_cleanup() -> list[dict]:
 async def admin_media_unused(me: dict = Depends(require_area("content"))):
     """Was „Ungenutzte löschen“ gerade löschen würde - die Rückfrage nennt Zahl und Größe."""
     unused = await _unused_for_cleanup()
+    batch = unused[:MEDIA_CLEANUP_BATCH]
     return {
         "count": len(unused),
         "total_size": sum(int(item.get("size") or 0) for item in unused),
-        "filenames": [item["filename"] for item in unused[:MEDIA_CLEANUP_BATCH]],
+        # Was dieser Klick löscht: höchstens eine Runde. Zahl und Größe in der Rückfrage gehören zu dieser Liste.
+        "filenames": [item["filename"] for item in batch],
+        "batch_size": sum(int(item.get("size") or 0) for item in batch),
         "batch": MEDIA_CLEANUP_BATCH,
         "min_age_hours": MEDIA_CLEANUP_MIN_AGE_HOURS,
     }
