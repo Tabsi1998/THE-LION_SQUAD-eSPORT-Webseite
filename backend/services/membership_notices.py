@@ -38,11 +38,20 @@ async def honest_mail_state(state: str) -> str:
     return QUEUED if (await get_mail_settings()).get("enabled", True) else MAIL_OFF
 
 
+ABBREVIATIONS = frozenset({"bzw", "ca", "etc", "evtl", "ggf", "inkl", "max", "min", "nr", "sog", "tel", "usw", "vgl", "zb"})
+
+
 def first_sentence(text: str | None, limit: int = 140) -> str:
     """Der erste Satz einer Begründung - für den Sperrbildschirm und fremde Dienste; der volle Text steht in Mail und Glocke."""
     clean = " ".join(str(text or "").split())
-    match = re.match(r".+?[.!?](?=\s|$)", clean)
-    sentence = match.group(0) if match else clean
+    sentence = clean
+    for mark in re.finditer(r"[.!?](?=\s|$)", clean):
+        word = re.split(r"[\s.]", clean[:mark.start()])[-1].lower()
+        # „z. B.“, „bzw.“, „3. Mai“: Kein Satzende.
+        if mark.group() == "." and (len(word) <= 1 or word.isdigit() or word in ABBREVIATIONS):
+            continue
+        sentence = clean[:mark.end()]
+        break
     return sentence if len(sentence) <= limit else f"{sentence[:limit - 1].rstrip()}…"
 
 

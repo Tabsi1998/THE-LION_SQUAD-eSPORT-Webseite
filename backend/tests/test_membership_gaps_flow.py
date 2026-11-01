@@ -326,6 +326,8 @@ async def test_the_push_names_only_the_first_sentence_of_a_reason(flow):
 
     assert first_sentence("Bitte zuerst vorbeischauen. Du warst beim Turnier auffällig.") == "Bitte zuerst vorbeischauen."
     assert first_sentence("Ohne Punkt am Ende") == "Ohne Punkt am Ende"
+    assert first_sentence("Bitte z. B. beim Vereinsabend melden. Danach reden wir.") == "Bitte z. B. beim Vereinsabend melden."
+    assert first_sentence("Am 3. Mai bzw. z.B. später vorbeischauen! Rest.") == "Am 3. Mai bzw. z.B. später vorbeischauen!"
     assert first_sentence(None) == ""
     assert len(first_sentence("x" * 500)) == 140
 
