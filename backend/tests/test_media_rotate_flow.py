@@ -126,7 +126,8 @@ async def test_a_rotated_file_is_offered_with_its_version_and_still_counts_as_us
     item = next(row for row in items if row["filename"] == NAME)
     assert item["url"] == f"{URL}?v={body['version']}"
     assert item["usage_count"] == 1
-    assert (await flow.delete(f"/api/admin/media/{NAME}")).status_code == 409
+    response = await flow.delete(f"/api/admin/media/{NAME}")
+    assert response.status_code == 409
     # Die Bildprüfung sieht in der Version keine kaputte Adresse.
     audit = await media_audit.audit_image_references()
     assert audit["summary"]["invalid_local"] == 0 and audit["summary"]["local_ok"] >= 1

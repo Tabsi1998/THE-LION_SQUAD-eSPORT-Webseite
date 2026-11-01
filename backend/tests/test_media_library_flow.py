@@ -231,7 +231,8 @@ async def test_replacing_a_duplicate_points_every_place_at_the_kept_file(flow, p
     assert log["actor_id"] == chef["id"] and log["data"]["removed"] == ["kopie.webp"]
 
     # Kopie schon weg, oder nur noch Mitglieder-Kopien: nichts zu tun.
-    assert (await flow.post("/api/admin/media/duplicates/replace", json={"keep": "bleibt.webp"})).status_code == 409
+    response = await flow.post("/api/admin/media/duplicates/replace", json={"keep": "bleibt.webp"})
+    assert response.status_code == 409
 
 
 @pytest.mark.asyncio
@@ -239,8 +240,10 @@ async def test_collective_actions_need_the_editorial_area(flow, public):
     moderator = await flow.add_user(role="moderator", name="moni")
     flow.act_as(moderator)
     assert (await flow.get("/api/admin/media/unused")).status_code == 403
-    assert (await flow.post("/api/admin/media/cleanup-unused", json={"filenames": []})).status_code == 403
-    assert (await flow.post("/api/admin/media/duplicates/replace", json={"keep": "a.webp"})).status_code == 403
+    response = await flow.post("/api/admin/media/cleanup-unused", json={"filenames": []})
+    assert response.status_code == 403
+    response = await flow.post("/api/admin/media/duplicates/replace", json={"keep": "a.webp"})
+    assert response.status_code == 403
 
 
 @pytest.mark.asyncio

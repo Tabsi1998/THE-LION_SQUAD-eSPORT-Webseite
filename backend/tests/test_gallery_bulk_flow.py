@@ -76,11 +76,14 @@ async def test_bulk_move_checks_the_section(flow):
 async def test_bulk_needs_an_album_a_selection_and_the_editorial_area(flow):
     await editor(flow)
     await album_with_photos(flow)
-    assert (await flow.post("/api/gallery/weg/photos/bulk", json={"ids": ["p-1"], "action": "delete"})).status_code == 404
-    assert (await flow.post("/api/gallery/a-1/photos/bulk", json={"ids": [], "action": "delete"})).status_code == 422
+    response = await flow.post("/api/gallery/weg/photos/bulk", json={"ids": ["p-1"], "action": "delete"})
+    assert response.status_code == 404
+    response = await flow.post("/api/gallery/a-1/photos/bulk", json={"ids": [], "action": "delete"})
+    assert response.status_code == 422
 
     flow.act_as(await flow.add_user(role="moderator", name="moni"))
-    assert (await flow.post("/api/gallery/a-1/photos/bulk", json={"ids": ["p-1"], "action": "delete"})).status_code == 403
+    response = await flow.post("/api/gallery/a-1/photos/bulk", json={"ids": ["p-1"], "action": "delete"})
+    assert response.status_code == 403
     assert await flow.db.gallery_photos.count_documents({"album_id": "a-1"}) == 3
 
 
@@ -94,7 +97,8 @@ async def test_deleting_an_album_keeps_the_files_as_the_dialog_says(flow, tmp_pa
     (folder / "foto.webp").write_bytes(b"bild")
     await album_with_photos(flow)
 
-    assert (await flow.delete("/api/gallery/a-1")).status_code == 200
+    response = await flow.delete("/api/gallery/a-1")
+    assert response.status_code == 200
 
     assert await flow.db.gallery_photos.count_documents({"album_id": "a-1"}) == 0
     assert (folder / "foto.webp").exists()

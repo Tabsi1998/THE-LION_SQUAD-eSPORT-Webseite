@@ -50,8 +50,10 @@ async def test_a_report_only_counts_as_a_strike_with_a_reason(flow):
     assert (await flow.db.user_reports.find_one({"id": report["id"]}))["status"] == "open"
 
     # In Prüfung nehmen und Erledigt gehen ohne Grund.
-    assert (await flow.patch(url, json={"status": "reviewing"})).status_code == 200
-    assert (await flow.patch(url, json={"status": "resolved"})).status_code == 200
+    response = await flow.patch(url, json={"status": "reviewing"})
+    assert response.status_code == 200
+    response = await flow.patch(url, json={"status": "resolved"})
+    assert response.status_code == 200
 
 
 @pytest.mark.asyncio
@@ -66,7 +68,8 @@ async def test_a_status_change_keeps_the_note(flow):
     assert (await flow.db.user_reports.find_one({"id": report["id"]}))["resolution_note"] == "Chatverlauf angefordert"
 
     # Ein vorhandener Grund reicht, ein neuer ersetzt ihn.
-    assert (await flow.patch(url, json={"status": "dismissed"})).status_code == 200
+    response = await flow.patch(url, json={"status": "dismissed"})
+    assert response.status_code == 200
     await flow.patch(url, json={"status": "dismissed", "resolution_note": "Nichts gefunden"})
     assert (await flow.db.user_reports.find_one({"id": report["id"]}))["resolution_note"] == "Nichts gefunden"
 
@@ -79,7 +82,8 @@ async def test_taking_a_justified_report_back_revokes_its_strike(flow):
     await flow.patch(url, json={"status": "justified", "resolution_note": "Beleidigung bestätigt"})
 
     # Ohne Grund geht es nicht zurück.
-    assert (await flow.patch(url, json={"status": "reviewing"})).status_code == 422
+    response = await flow.patch(url, json={"status": "reviewing"})
+    assert response.status_code == 422
     assert (await flow.db.user_reports.find_one({"id": report["id"]}))["status"] == "justified"
 
     response = await flow.patch(url, json={"status": "reviewing", "resolution_note": "War ein Missverständnis"})
@@ -106,11 +110,13 @@ async def test_a_moderator_cannot_take_back_a_strike_against_an_admin_account(fl
     mod, boss, otto = await person(flow, "mod", role="moderator"), await person(flow, "boss", role="club_admin"), await person(flow, "otto")
     report = await report_against(flow, otto, boss, chef)
     url = f"/api/moderation/reports/{report['id']}"
-    assert (await flow.patch(url, json={"status": "justified", "resolution_note": "Belegt"})).status_code == 200
+    response = await flow.patch(url, json={"status": "justified", "resolution_note": "Belegt"})
+    assert response.status_code == 200
 
     flow.act_as(mod)
 
-    assert (await flow.patch(url, json={"status": "dismissed", "resolution_note": "Geht nicht"})).status_code == 403
+    response = await flow.patch(url, json={"status": "dismissed", "resolution_note": "Geht nicht"})
+    assert response.status_code == 403
     assert (await flow.db.moderation_strikes.find_one({"report_id": report["id"]})).get("revoked") is not True
 
 

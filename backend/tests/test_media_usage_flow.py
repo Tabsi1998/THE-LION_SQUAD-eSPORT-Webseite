@@ -107,7 +107,8 @@ async def test_the_image_of_a_deleted_sticker_stays_while_old_messages_show_it(f
     # Die Mediathek nennt die Stelle, aber nichts aus der Nachricht.
     assert item["references"][0]["label"] == "Nachricht im Chat"
     assert item["references"][0]["place"] == "Direktnachricht · Sticker"
-    assert (await flow.delete(f"/api/admin/media/{NAME}")).status_code == 409
+    response = await flow.delete(f"/api/admin/media/{NAME}")
+    assert response.status_code == 409
     assert (public / NAME).exists()
 
 
@@ -116,7 +117,8 @@ async def test_a_message_is_not_marked_as_edited_when_its_sticker_image_is_remov
     await admin(flow)
     await flow.db.direct_messages.insert_one({"id": "m-1", "updated_at": "alt", "sticker": {"id": "s-weg", "url": URL}})
 
-    assert (await flow.delete(f"/api/admin/media/{NAME}?force=true")).status_code == 200
+    response = await flow.delete(f"/api/admin/media/{NAME}?force=true")
+    assert response.status_code == 200
 
     message = await flow.db.direct_messages.find_one({"id": "m-1"})
     assert message["sticker"]["url"] is None and message["updated_at"] == "alt"

@@ -68,7 +68,8 @@ async def test_the_running_status_is_not_part_of_the_edit_log(flow):
     flow.act_as(await flow.add_user(role="superadmin", name="leitung"))
     await station(flow)
 
-    assert (await flow.patch("/api/stations/st-1", json={"status": "broken"})).status_code == 200
+    response = await flow.patch("/api/stations/st-1", json={"status": "broken"})
+    assert response.status_code == 200
 
     assert await flow.db.audit_logs.count_documents({"action": "station.update"}) == 0
 
@@ -81,8 +82,10 @@ async def test_empty_name_unknown_game_and_unknown_station_are_refused(flow):
     blank = await flow.patch("/api/stations/st-1", json={"name": "   "})
     assert blank.status_code == 422
     assert "Namen" in blank.json()["detail"]
-    assert (await flow.patch("/api/stations/st-1", json={"game_id": "gibt-es-nicht"})).status_code == 404
-    assert (await flow.patch("/api/stations/weg", json={"name": "Neu"})).status_code == 404
+    response = await flow.patch("/api/stations/st-1", json={"game_id": "gibt-es-nicht"})
+    assert response.status_code == 404
+    response = await flow.patch("/api/stations/weg", json={"name": "Neu"})
+    assert response.status_code == 404
     assert (await flow.db.stations.find_one({"id": "st-1"}))["name"] == "Switch 1"
 
 
@@ -90,7 +93,9 @@ async def test_empty_name_unknown_game_and_unknown_station_are_refused(flow):
 async def test_only_the_tournament_lead_may_edit(flow):
     await station(flow)
     flow.act_as(await flow.add_user(role="user", name="mitglied"))
-    assert (await flow.patch("/api/stations/st-1", json={"name": "Meins"})).status_code in (401, 403)
+    response = await flow.patch("/api/stations/st-1", json={"name": "Meins"})
+    assert response.status_code in (401, 403)
     flow.act_as(await flow.add_user(role="moderator", name="moni"))
-    assert (await flow.patch("/api/stations/st-1", json={"name": "Meins"})).status_code in (401, 403)
+    response = await flow.patch("/api/stations/st-1", json={"name": "Meins"})
+    assert response.status_code in (401, 403)
     assert (await flow.db.stations.find_one({"id": "st-1"}))["name"] == "Switch 1"
