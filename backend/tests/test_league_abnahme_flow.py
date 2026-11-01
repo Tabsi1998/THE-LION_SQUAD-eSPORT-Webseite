@@ -207,6 +207,18 @@ async def stored(flow, match: dict) -> dict:
     return await flow.db.matches_v2.find_one({"id": match["id"]}, {"_id": 0})
 
 
+# Mitten in Spieltag 1 (die Spielwoche ab 10.11.2026 liegt in SEASON_ONE fest).
+REPORTED_AT = datetime(2026, 11, 11, 19, 0, tzinfo=timezone.utc)
+
+
+async def reported_in_week_one(flow, match: dict) -> None:
+    """Die 48 Stunden laufen ab der Meldung, gedeckelt vom Ende der Spielwoche - gemeldet wird im Test aber „jetzt“. Nach
+    dem Ende der festen Spielwoche hat der Gegner nur noch die Mindestzeit, und der Test hinge am heutigen Tag (#1921):
+    die Meldung liegt darum in der Spielwoche."""
+    reports = [{**row, "at": REPORTED_AT.isoformat()} for row in (await stored(flow, match))["reports"]]
+    await flow.db.matches_v2.update_one({"id": match["id"]}, {"$set": {"reports": reports}})
+
+
 # ---------------------------------------------------------------- Rahmen bis zum Spielplan
 
 @pytest.mark.asyncio
@@ -306,9 +318,10 @@ async def test_results_reach_the_table_and_a_correction_after_a_dispute_moves_th
     flow.act_as(vice(world, a_away))
     ok(await flow.post(f"/api/matches/{automatic['id']}/report",
                        json=report_body(world, a_away, a_home, (2, 1), side=a_away)))
-    await sweep(flow.db, now=datetime.now(timezone.utc) + timedelta(hours=47))
+    await reported_in_week_one(flow, automatic)
+    await sweep(flow.db, now=REPORTED_AT + timedelta(hours=47))
     assert (await stored(flow, automatic))["status"] != "completed", "vor Ablauf der 48 Stunden bleibt es offen"
-    await sweep(flow.db, now=datetime(2027, 2, 1, tzinfo=timezone.utc))
+    await sweep(flow.db, now=REPORTED_AT + timedelta(hours=49))
     after = await stored(flow, automatic)
     assert after["status"] == "completed" and after["result_meta"]["auto_confirmed"] is True
 
@@ -409,7 +422,8 @@ async def test_maps_and_lineups_from_report_to_app_confirmation_amendment_and_le
     flow.act_as(captain(world, a_home))
     ok(await flow.post(f"/api/matches/{automatic['id']}/report",
                        json=report_body(world, a_home, a_away, (2, 0), side=a_home)))
-    await sweep(flow.db, now=datetime(2027, 2, 1, tzinfo=timezone.utc))
+    await reported_in_week_one(flow, automatic)
+    await sweep(flow.db, now=REPORTED_AT + timedelta(hours=49))
     match = await stored(flow, automatic)
     assert match["status"] == "completed"
     assert [game["position"] for game in match["games"]] == [1, 2]
