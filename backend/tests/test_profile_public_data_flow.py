@@ -336,6 +336,29 @@ async def test_profile_completeness_is_only_for_the_person(flow):
     assert (await flow.get("/api/users/me/profile-completeness")).status_code == 200
 
 
+# ---------------------------------------------------------------- Review: Kronen-Meldungen
+@pytest.mark.asyncio
+async def test_switching_achievements_back_and_forth_does_not_flood_with_crown_notices(flow):
+    from services import crown_events
+
+    people = [await player(flow, f"krone{i}") for i in range(4)]
+    await flow.db.achievements.insert_many([{"code": f"t{i}", "name": "E", "level": 1, "points": 1000 - i * 100} for i in range(4)])
+    for i, user in enumerate(people):
+        await flow.db.user_achievements.insert_one({"user_id": user["id"], "tier_code": f"t{i}", "level": 1, "earned_at": "2026-10-01T10:00:00+00:00"})
+    await crown_events.get_crowns(force=True)
+    for _ in range(3):
+        await flow.db.users.update_one({"id": people[0]["id"]}, {"$set": {"privacy_achievements_public": False}})
+        await crown_events.get_crowns(force=True)
+        await flow.db.users.update_one({"id": people[0]["id"]}, {"$set": {"privacy_achievements_public": True}})
+        await crown_events.get_crowns(force=True)
+    rows = await flow.db.notifications.find({"kind": {"$regex": "^crown"}}, {"_id": 0, "user_id": 1, "kind": 1, "body": 1}).to_list(200)
+    seen = [(row["user_id"], row["kind"]) for row in rows]
+    assert len(seen) == len(set(seen)), "höchstens eine Meldung je Person und Art"
+    assert (people[0]["id"], "crown_lost") not in seen, "wer selbst ausschaltet, hat nichts verloren"
+    displaced = next(row for row in rows if row["kind"] == "crown_lost")
+    assert displaced["user_id"] == people[3]["id"] and "anderen Spieler" not in displaced["body"]
+
+
 # ---------------------------------------------------------------- Zusatz: Dokumente
 @pytest.mark.asyncio
 async def test_members_never_see_where_a_document_is_stored(flow):

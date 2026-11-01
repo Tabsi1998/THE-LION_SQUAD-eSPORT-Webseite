@@ -97,6 +97,9 @@ async def _persist_and_notify(rank_crowns: dict[str, str]) -> list[dict]:
             events.append({"user_id": uid, "type": "changed", "variant": n, "prev": o})
         elif o and not n:
             events.append({"user_id": uid, "type": "lost", "variant": None, "prev": o})
+    # Wer „Erfolge öffentlich“ selbst ausschaltet, hat die Krone nicht verloren (#2126): keine Meldung.
+    lost_ids = [ev["user_id"] for ev in events if ev["type"] == "lost"]
+    hid_themselves = {row["id"] async for row in db.users.find({"id": {"$in": lost_ids}, "privacy_achievements_public": False}, {"_id": 0, "id": 1})} if lost_ids else set()
     for ev in events:
         uid = ev["user_id"]
         dedupe = f"crown-v{version}-{uid}"
@@ -120,11 +123,11 @@ async def _persist_and_notify(rank_crowns: dict[str, str]) -> list[dict]:
                 kind="crown_changed",
                 meta={"variant": ev["variant"], "prev": ev["prev"], "category": "achievements", "dedupe_key": dedupe},
             )
-        else:
+        elif uid not in hid_themselves:
             await create_user_notification(
                 uid,
                 title="Krone verloren",
-                body=f"Deine {CROWN_NAMES[ev['prev']]} wurde von einem anderen Spieler erobert. Sammle Punkte und hol sie dir zurück!",
+                body=f"Du trägst die {CROWN_NAMES[ev['prev']]} gerade nicht mehr. Sammle Punkte und hol sie dir zurück!",
                 url="/achievements",
                 kind="crown_lost",
                 meta={"prev": ev["prev"], "category": "achievements", "dedupe_key": dedupe},
