@@ -128,6 +128,29 @@ describe("Anmeldung bei vollem Event", () => {
   });
 });
 
+// Die Liste der Anmeldungen (#2127, EV10): Warteliste getrennt, Stornierte nicht, nach 12 Namen „+N weitere“.
+test("Teilnehmerliste: Warteliste getrennt, keine Stornierten, „+N weitere“ zeigt alle", async () => {
+  const people = Array.from({ length: 14 }, (_, index) => ({ id: `p${index}`, display_name: `Person ${index}`, status: "registered", seat_count: 1 }));
+  renderPage({
+    ...base, has_registration: true,
+    registrations: [...people, { id: "s1", display_name: "Otto Storno", status: "cancelled", seat_count: 1 }, { id: "n1", display_name: "Nele Nicht", status: "no_show", seat_count: 1 }],
+    waitlist_registrations: [{ id: "w1", display_name: "Ella Wartend", status: "waitlist", seat_count: 2 }],
+  });
+  const list = await screen.findByTestId("event-participants");
+  expect(list).toHaveTextContent("Person 11");
+  expect(list).not.toHaveTextContent("Person 12");
+  expect(list).not.toHaveTextContent("Otto Storno");
+  expect(list).not.toHaveTextContent("Nele Nicht");
+  expect(list).not.toHaveTextContent("Ella Wartend");
+  expect(screen.getByTestId("event-waitlist")).toHaveTextContent("Ella Wartend");
+  expect(screen.getByTestId("event-waitlist")).toHaveTextContent("2 Plätze");
+
+  expect(screen.getByTestId("event-participants-more")).toHaveTextContent("+2 weitere");
+  fireEvent.click(screen.getByTestId("event-participants-more"));
+  expect(list).toHaveTextContent("Person 13");
+  expect(screen.queryByTestId("event-participants-more")).toBeNull();
+});
+
 // Aus der News (#1266): „Anmelden“ führt mit ?anmelden=1 hierher und öffnet das Formular.
 test("?anmelden=1: das Anmeldeformular bekommt den Fokus, ohne den Knopf zu suchen", async () => {
   authState.user = { id: "u1", username: "paula" };

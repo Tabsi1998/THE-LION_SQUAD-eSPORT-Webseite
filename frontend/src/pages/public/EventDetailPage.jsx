@@ -28,7 +28,7 @@ import { renderMarkdownLite } from "@/lib/markdownLite";
 import { seoTextPreview } from "@/lib/textPreview";
 import { formatWhen } from "@/lib/datetime";
 import { eventIsOver, photosComingWindow } from "@/lib/afterEnd";
-import { countText, ownSeatsSentence, seatsLabel, waitlistNotice } from "@/lib/eventSeats";
+import { countText, ownSeatsSentence, participantLists, seatsLabel, waitlistNotice } from "@/lib/eventSeats";
 import { cancelledNotice, eventFacts, eventTabs, stripHeadingEmoji, visibilityChip, whatsOnRows } from "@/lib/eventPage";
 import { RETURN_PARAM, offersPlayAlong, returnTournamentPath } from "@/lib/playAlong";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
@@ -640,6 +640,7 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
   const quote = offer ? previewQuote(offer, { seats: 1 + Number(companionCount || 0), selected: selectedPositions }) : null;
   // Voll (auch nur wegen der Begleitpersonen): der Knopf sagt „Warteliste“ und nennt keinen Preis (#2127, EV7).
   const waitlisted = waitlistNotice(event, 1 + Number(companionCount || 0));
+  const participants = participantLists(event);
   const { submitting: saving, submitOnce } = useSubmissionGuard();
   const confirm = useConfirm();
   const [actionError, setActionError] = useState("");
@@ -840,18 +841,33 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
           Anmeldungen &amp; Einlass
         </Link>
       )}
-      {!!event.registrations?.length && (
-        <div className="mt-6 border-t border-white/10 pt-4">
-          <div className="text-[11px] uppercase tracking-widest font-bold text-white/45 mb-2">Angemeldet</div>
-          <div className="space-y-1.5">
-            {event.registrations.slice(0, 12).map((registration) => (
-              <div key={registration.id} className="flex items-center justify-between gap-3 text-sm border border-white/5 bg-black/15 rounded-sm px-3 py-2">
-                <span className="truncate">{registration.display_name || "Teilnehmer"}</span>
-                <span className="text-xs text-white/45 shrink-0">{seatsLabel(registration)}</span>
-              </div>
-            ))}
+      <ParticipantList title="Angemeldet" rows={participants.active} testId="event-participants" />
+      <ParticipantList title="Warteliste" rows={participants.waitlist} testId="event-waitlist" />
+    </div>
+  );
+}
+
+// Die Liste der Anmeldungen (#2127, EV10): nach 12 Namen „+N weitere“ - ein Tipp zeigt alle.
+const PARTICIPANTS_SHOWN = 12;
+
+function ParticipantList({ title, rows, testId }) {
+  const [all, setAll] = useState(false);
+  if (!rows.length) return null;
+  const shown = all ? rows : rows.slice(0, PARTICIPANTS_SHOWN);
+  const more = rows.length - shown.length;
+  return (
+    <div className="mt-6 border-t border-white/10 pt-4" data-testid={testId}>
+      <div className="text-[11px] uppercase tracking-widest font-bold text-white/45 mb-2">{title}</div>
+      <div className="space-y-1.5">
+        {shown.map((registration) => (
+          <div key={registration.id} className="flex items-center justify-between gap-3 text-sm border border-white/5 bg-black/15 rounded-sm px-3 py-2">
+            <span className="truncate">{registration.display_name || "Teilnehmer"}</span>
+            <span className="text-xs text-white/45 shrink-0">{seatsLabel(registration)}</span>
           </div>
-        </div>
+        ))}
+      </div>
+      {more > 0 && (
+        <button type="button" onClick={() => setAll(true)} className="tls-btn tls-btn--quiet mt-2 min-h-11 px-3 py-2 rounded-sm text-xs font-bold" data-testid={`${testId}-more`}>+{more} weitere</button>
       )}
     </div>
   );

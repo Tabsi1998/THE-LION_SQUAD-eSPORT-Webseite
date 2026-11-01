@@ -98,6 +98,31 @@ async def test_verwaltung_sieht_weiter_alles_mitglieder_nicht(flow):
     assert "created_by" not in (await flow.get("/api/events")).json()[0]
 
 
+@pytest.mark.asyncio
+async def test_oeffentlich_steht_die_warteliste_getrennt(flow):
+    """EV10: „Angemeldet“ nennt nur, wer einen Platz hat - auch für die App, die nur `registrations` liest."""
+    await stored_event(flow, show_participants=True, max_participants=1, status="registration_open", billing=None)
+    first = await flow.add_user(role="player", name="erste")
+    second = await flow.add_user(role="player", name="zweite")
+    gone = await flow.add_user(role="player", name="dritte")
+    for user in (first, second, gone):
+        flow.act_as(user)
+        assert (await flow.post("/api/events/ev-1/registrations", json={"companion_count": 0})).status_code == 200
+    flow.act_as(gone)
+    assert (await flow.delete("/api/events/ev-1/registrations/me")).status_code == 200
+
+    flow.act_as(None)
+    page = (await flow.get("/api/events/herbst-lan")).json()
+    assert [row["user_id"] for row in page["registrations"]] == [first["id"]]
+    assert [row["user_id"] for row in page["waitlist_registrations"]] == [second["id"]]
+
+    lead = await flow.add_user(role="tournament_admin", name="leitung")
+    flow.act_as(lead)
+    managed = (await flow.get("/api/events/herbst-lan")).json()
+    assert {row["status"] for row in managed["registrations"]} == {"registered", "waitlist", "cancelled"}
+    assert "waitlist_registrations" not in managed
+
+
 def test_die_uebergebene_fassung_bleibt_unveraendert():
     doc = {"id": "e", "created_by": "x", "billing": PAID}
     view = public_event(doc)

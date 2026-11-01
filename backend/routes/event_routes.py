@@ -380,7 +380,12 @@ async def _attach_event_registration_view(event: dict, user: dict | None) -> Non
             # An der Tür Eingetragene (#2127, EV17) haben nichts zugestimmt: ihr Name steht nur bei der Leitung.
             query["walk_in"] = {"$ne": True}
         regs = await db.event_registrations.find(query, {"_id": 0}).sort("created_at", 1).to_list(2000)
-        event["registrations"] = [_public_event_registration(r, is_staff=manages, with_price=manages and sees_price) for r in regs]
+        rows = [_public_event_registration(r, is_staff=manages, with_price=manages and sees_price) for r in regs]
+        # Öffentlich steht die Warteliste für sich (#2127, EV10): „Angemeldet“ nennt nur, wer einen Platz hat - auch in
+        # der App, die nur `registrations` liest. Die Verwaltung bekommt alle Stände in einer Liste.
+        event["registrations"] = rows if manages else [row for row in rows if row["status"] != "waitlist"]
+        if not manages:
+            event["waitlist_registrations"] = [row for row in rows if row["status"] == "waitlist"]
     else:
         event["registrations"] = []
     event["participant_view"] = "staff" if manages else ("public" if event.get("show_participants") else "none")
