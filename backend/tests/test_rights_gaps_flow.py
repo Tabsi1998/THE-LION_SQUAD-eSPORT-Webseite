@@ -179,6 +179,47 @@ async def test_a_post_on_the_account_also_blocks_deleting_the_profile(flow):
     assert (await flow.delete(f"/api/membership/profiles/admin/{profile_id}")).status_code == 409
 
 
+# ---------------------------------------------------------------- MG1: Rechte-Verlauf
+@pytest.mark.asyncio
+async def test_rights_history_shows_only_this_person_to_the_club_area(flow):
+    root = await flow.add_user(role="superadmin", name="root")
+    chair = await granted(flow, "vorstand", "club")
+    erika, mara = await member(flow, "erika"), await member(flow, "mara")
+    profile_id = new_id()
+    await flow.db.club_member_profiles.insert_one({"id": profile_id, "slug": "erika", "display_name": "Erika", "user_id": erika["id"]})
+    pid = await position(flow, user_id=profile_id)
+    other_post = await position(flow, slug="obmann", title_male="Obmann", title_female="Obfrau")
+    flow.act_as(root)
+    await flow.post(f"/api/users/{erika['id']}/role", json={"role": "moderator"})
+    await flow.put(f"/api/users/{erika['id']}/areas", json={"areas": ["content"]})
+    await flow.put(f"/api/users/{mara['id']}/areas", json={"areas": ["content"]})
+    flow.act_as(chair)
+    await flow.patch(f"/api/board/{pid}", json={"is_active": False})
+    await flow.patch(f"/api/board/{pid}", json={"user_id": mara["id"]})
+    await flow.patch(f"/api/board/{other_post}", json={"deputy_user_id": mara["id"]})
+    await flow.db.audit_logs.insert_one({"id": new_id(), "action": "user.ban", "target_id": erika["id"], "actor_id": root["id"], "data": {"reason": "steht nicht im Verlauf"}, "created_at": "2026-01-01T00:00:00+00:00"})
+
+    response = await flow.get(f"/api/users/{erika['id']}/rights-history")
+    assert response.status_code == 200, response.text
+    items = response.json()["items"]
+    by_action = {row["action"]: row for row in items}
+    assert set(by_action) == {"user.role_change", "user.areas_change", "board.status", "board.assign"}
+    assert by_action["user.role_change"]["from"] == erika["role"] and by_action["user.role_change"]["to"] == "moderator"
+    assert by_action["user.role_change"]["actor"] in (root.get("display_name"), root["username"])
+    assert by_action["user.areas_change"]["to"] == ["content"]
+    assert by_action["board.assign"]["joined"] is False and by_action["board.assign"]["title"] == "Kassier:in"
+    assert by_action["board.status"]["active"] is False
+    assert "reason" not in str(items) and "actor_id" not in items[0]
+
+    mara_items = (await flow.get(f"/api/users/{mara['id']}/rights-history")).json()["items"]
+    assign = [row for row in mara_items if row["action"] == "board.assign"]
+    assert {row["joined"] for row in assign} == {True} and {row["field"] for row in assign} == {"holder", "deputy"}
+
+    assert (await flow.get("/api/users/gibt-es-nicht/rights-history")).status_code == 404
+    flow.act_as(await flow.add_user(role="moderator", name="moderator"))
+    assert (await flow.get(f"/api/users/{erika['id']}/rights-history")).status_code == 403
+
+
 # ---------------------------------------------------------------- MG2, MG3: Rollen
 @pytest.mark.asyncio
 async def test_the_last_superadmin_cannot_step_down_but_with_a_second_one_it_works(flow):

@@ -1114,6 +1114,40 @@ async def set_areas(user_id: str, body: AreasUpdate, me: dict = Depends(require_
     return u
 
 
+RIGHTS_HISTORY_LIMIT = 100
+
+
+@router.get("/{user_id}/rights-history")
+async def rights_history(user_id: str, me: dict = Depends(require_area("club"))):
+    """Rechte-Verlauf einer Person (#2125): Rollen, Freigaben, Vorstandsposten - fürs Blatt unter „Alle Benutzer“, auch ohne
+    Bereich System. Nur diese Einträge und nur diese Felder, kein Griff ins ganze Protokoll."""
+    db = get_db()
+    if not await db.users.find_one({"id": user_id}, {"_id": 1}):
+        raise HTTPException(status_code=404, detail="Nutzer nicht gefunden")
+    # Ein Posten zeigt auf das Konto oder auf das Mitgliederprofil dahinter.
+    refs = [user_id, *[row["id"] async for row in db.club_member_profiles.find({"user_id": user_id}, {"_id": 0, "id": 1})]]
+    rows = await db.audit_logs.find({"$or": [
+        {"action": {"$in": ["user.role_change", "user.areas_change"]}, "target_id": user_id},
+        {"action": "board.assign", "$or": [{"data.from": {"$in": refs}}, {"data.to": {"$in": refs}}]},
+        {"action": {"$in": ["board.status", "board.delete"]}, "data.holders": {"$in": refs}},
+    ]}, {"_id": 0, "id": 1, "action": 1, "actor_id": 1, "data": 1, "created_at": 1}).sort("created_at", -1).to_list(RIGHTS_HISTORY_LIMIT)
+    actors = {row["id"]: row.get("display_name") or row.get("username") async for row in db.users.find(
+        {"id": {"$in": sorted({row["actor_id"] for row in rows if row.get("actor_id")})}}, {"_id": 0, "id": 1, "display_name": 1, "username": 1})}
+    items = []
+    for row in rows:
+        data = row.get("data") or {}
+        item = {"id": row.get("id"), "action": row.get("action"), "at": row.get("created_at"), "actor": actors.get(row.get("actor_id"))}
+        if row["action"] == "user.role_change":
+            item.update({"to": data.get("role"), "from": data.get("from")})
+        elif row["action"] == "user.areas_change":
+            item.update({"to": data.get("areas") or [], "from": data.get("from") or []})
+        else:
+            item.update({"title": data.get("title") or data.get("position"), "field": data.get("field"), "active": data.get("active"),
+                         "joined": data.get("to") in refs if row["action"] == "board.assign" else None})
+        items.append(item)
+    return {"items": items}
+
+
 @router.delete("/{user_id}")
 async def delete_user(user_id: str, me: dict = Depends(require_super())):
     db = get_db()

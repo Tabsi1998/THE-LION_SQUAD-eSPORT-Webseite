@@ -1,6 +1,17 @@
-import { banState, effectiveAreas, invitationText, rightsChange } from "./userRights";
+import { banState, effectiveAreas, invitationText, rightsChange, rightsHistoryLine } from "./userRights";
 
 // Alle Benutzer (#1357): die Rückfrage sagt in einem Satz, was eine Person bekommt oder verliert.
+
+test("Rechte-Verlauf in Worten (#2125)", () => {
+  expect(rightsHistoryLine({ action: "user.role_change", from: "player", to: "moderator" })).toBe("Rolle: Spieler → Moderator");
+  expect(rightsHistoryLine({ action: "user.role_change", to: "moderator" })).toBe("Rolle: Moderator");
+  expect(rightsHistoryLine({ action: "user.areas_change", from: [], to: ["club", "content"] })).toBe("Freigaben: keine → Vereinsverwaltung, Redaktion");
+  expect(rightsHistoryLine({ action: "board.assign", joined: true, title: "Kassier:in", field: "holder" })).toBe("Vorstand: wird Kassier:in");
+  expect(rightsHistoryLine({ action: "board.assign", joined: false, title: "Kassier:in", field: "deputy" })).toBe("Vorstand: nicht mehr Vertretung für Kassier:in");
+  expect(rightsHistoryLine({ action: "board.status", title: "Kassier:in", active: false })).toBe("Vorstand: Posten Kassier:in ist inaktiv");
+  expect(rightsHistoryLine({ action: "board.delete", title: "Beirat" })).toBe("Vorstand: Posten Beirat gelöscht");
+  expect(rightsHistoryLine({ action: "neu" })).toBe("Rechte geändert");
+});
 
 test("Bereiche aus Rolle und Freigaben in fester Reihenfolge", () => {
   expect(effectiveAreas("player", ["club", "content"])).toEqual(["content", "club"]);
