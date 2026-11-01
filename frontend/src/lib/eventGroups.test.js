@@ -21,6 +21,20 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+test("abgesagtes Event: ein noch aktives Turnier behält seine eigene Karte, ein beendetes bleibt im Event (#2127)", () => {
+  const off = { ...LAN, status: "cancelled" };
+  const ended = { ...KART, status: "completed" };
+  const cards = buildCards({ events: [off], tournaments: [ROCKET, ended], fastlaps: [LAP] });
+  expect(keys(cards).sort()).toEqual(["event-e-lan", "fastlap-f-lan", "tournament-t-rocket"]);
+  const lan = cards.find((card) => card.key === "event-e-lan");
+  expect(lan.children.map((row) => row.key)).toEqual(["tournament-t-kart"]);
+  // „gehört zu …“ bleibt auf der eigenen Karte.
+  expect(cards.find((card) => card.key === "tournament-t-rocket").event).toEqual(off);
+  // Im Modus „einzeln“ auch nicht doppelt; „keep“ gilt wie für jede eigene Karte.
+  expect(keys(buildCards({ events: [off], tournaments: [ROCKET], fastlaps: [] }, { mode: "separate" })).filter((key) => key === "tournament-t-rocket")).toHaveLength(1);
+  expect(keys(buildCards({ events: [off], tournaments: [ROCKET], fastlaps: [] }, { keep: () => false }))).toEqual(["event-e-lan"]);
+});
+
 test("Variante A: jedes Turnier eines Events steht im Event und nicht doppelt", () => {
   const cards = buildCards(DATA);
   expect(keys(cards).sort()).toEqual(["event-e-fest", "event-e-lan", "fastlap-f-monza", "tournament-t-online"]);
