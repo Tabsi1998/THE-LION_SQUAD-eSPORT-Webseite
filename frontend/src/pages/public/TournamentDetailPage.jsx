@@ -199,7 +199,7 @@ function TournamentDetailView() {
   const submitRegistration = async ({ playerIds = {}, teamId = null, acceptCosts = false, selectedPositions = [] } = {}) => {
     if (!user) { nav(`/login?next=${encodeURIComponent(`/tournaments/${slug}${accessToken ? `?access=${accessToken}` : ""}`)}`); return; }
     await runAction(async () => {
-      await api.post(`/tournaments/${t.id}/register`, {
+      const { data: created } = await api.post(`/tournaments/${t.id}/register`, {
         team_id: teamId,
         ingame_name: user.display_name || user.username,
         discord: user.discord_name,
@@ -209,7 +209,7 @@ function TournamentDetailView() {
         accept_costs: Boolean(acceptCosts),
         selected_positions: selectedPositions,
       }, { params: accessToken ? { access: accessToken } : undefined });
-      toast.success("Erfolgreich angemeldet!");
+      toast.success(created?.status === "pending" ? "Anmeldung eingegangen – die Turnierleitung prüft sie." : "Erfolgreich angemeldet!");
       setRegisterModal(false);
       await load();
       // Der einmalige Hinweis direkt nach der ersten Anmeldung (#1188), nicht erst auf der Event-Seite.
@@ -257,7 +257,7 @@ function TournamentDetailView() {
     await runAction(async () => {
       const ok = await confirm({
         title: "Anmeldung entfernen?",
-        description: "Die abgelehnte Anmeldung verschwindet. Solange die Anmeldung offen ist, kannst du dich danach neu anmelden – die Turnierleitung sieht das.",
+        description: "Die abgelehnte Anmeldung verschwindet aus deiner Ansicht. Meldest du dich neu an, solange die Anmeldung offen ist, entscheidet die Turnierleitung noch einmal – du bist erst dabei, wenn sie bestätigt.",
         confirmLabel: "Entfernen",
         tone: "danger",
       });

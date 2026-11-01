@@ -163,21 +163,6 @@ async def test_league_staffel_refuses_a_changed_id(flow):
     assert (await _stored(flow, registration))["player_ids"]["riot"] == "Alt#EUW"
 
 
-@pytest.mark.asyncio
-async def test_rejected_registration_can_be_removed_and_registered_anew(flow):
-    """Abgelehnt (#2113, L-C3): ohne Entfernen liefert eine neue Anmeldung die alte zurück; danach geht sie durch."""
-    tournament, registration, _player = await _solo(flow, reg_status="rejected")
-    body = {"accept_rules": True, "accept_privacy": True, "player_ids": {"riot": "Neu#EUW"}}
-    replay = await flow.post(f"/api/tournaments/{tournament['id']}/register", json=body)
-    assert replay.status_code == 200 and replay.json()["status"] == "rejected" and replay.json()["idempotent_replay"] is True
-
-    removed = await flow.delete(f"/api/tournaments/{tournament['id']}/registrations/{registration['id']}")
-    assert removed.status_code == 200, removed.text
-    fresh = await flow.post(f"/api/tournaments/{tournament['id']}/register", json=body)
-    assert fresh.status_code == 200, fresh.text
-    assert fresh.json()["id"] != registration["id"] and fresh.json()["status"] == "approved"
-
-
 async def _league_squad(flow, *, with_captain=True, **fields):
     tournament = await flow.create_tournament(team_mode="team", team_size=2, league_context=LEAGUE, **fields)
     leader = await flow.add_user(name=f"kapitaen-{new_id()[:6]}")

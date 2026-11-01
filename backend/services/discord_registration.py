@@ -15,7 +15,7 @@ from datetime import datetime
 from fastapi import HTTPException
 
 from models import RegistrationCreate
-from services import event_days, event_registration, pricing, tournament_event_gate, tournament_fees
+from services import event_days, event_registration, pricing, tournament_event_gate, tournament_fees, tournament_guard
 from services.discord_registration_rules import CUSTOM_ID_PATTERN, custom_id, enabled, event_blocker, tournament_blocker
 from services.discord_texts import LINK_PATH, NOT_LINKED, answer
 from services.event_registration import RegistrationError
@@ -233,8 +233,8 @@ async def tournament_summary(db, user: dict, tournament: dict) -> dict:
         return answer(problem + ".", buttons=link)
     if tournament.get("block_club_member_registration") and await _is_active_club_member(db, user):
         return answer("Dieses Turnier ist für externe Teilnehmer vorgesehen – Vereinsmitglieder können sich hier nicht selbst anmelden.", buttons=link)
-    own = await db.tournament_registrations.find_one({"tournament_id": tournament["id"], "user_id": user["id"]}, {"_id": 0, "status": 1})
-    if own:
+    own = await db.tournament_registrations.find_one({"tournament_id": tournament["id"], "user_id": user["id"]}, {"_id": 0, "status": 1, "rejection_dismissed_at": 1})
+    if own and not tournament_guard.rejection_dismissed(own):
         return answer(f"Du bist bei „{title}“ schon {TOURNAMENT_STATUS_TEXT.get(own.get('status'), own.get('status'))}. Abmelden geht auf der Website.", buttons=link)
     team = None
     if _is_team_tournament(tournament):
