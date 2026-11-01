@@ -883,7 +883,9 @@ async def _update_event_registration(db, event: dict, registration_id: str, body
         "action": "event.registration.update",
         "target_id": event["id"],
         "actor_id": me["id"],
-        "data": {"registration_id": registration_id, "updates": {k: v for k, v in updates.items() if k != "updated_at"},
+        # Notizen nur als „geändert“: ihr Text steht an der Anmeldung, nicht noch einmal im Protokoll (#2127, EV15).
+        "data": {"registration_id": registration_id,
+                 "updates": {k: ("geändert" if k in nullable else v) for k, v in updates.items() if k != "updated_at"},
                  **({"rewards_revoked": revoked} if revoked else {})},
         "created_at": now_utc().isoformat(),
     })

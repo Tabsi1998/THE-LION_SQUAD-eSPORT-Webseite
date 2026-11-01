@@ -189,6 +189,36 @@ test("„Warteliste“ und „Angemeldet“ brauchen keine Rückfrage", async ()
   expect(confirmMock).not.toHaveBeenCalled();
 });
 
+test("Interne Notiz: eintragen, speichern, leeren", async () => {
+  apiMock.patch.mockResolvedValue({ data: {} });
+  renderLead();
+  fireEvent.click(await screen.findByTestId("event-lead-name-r3"));
+  const [details] = screen.getAllByTestId("event-lead-details");
+  expect(within(details).queryByTestId("event-lead-internal-note-save")).toBeNull();
+
+  fireEvent.change(within(details).getByTestId("event-lead-internal-note"), { target: { value: "  zahlt an der Tür " } });
+  fireEvent.click(within(details).getByTestId("event-lead-internal-note-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/events/e1/registrations/r3", { internal_note: "zahlt an der Tür" }));
+  await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Notiz gespeichert."));
+  await waitFor(() => expect(within(details).queryByTestId("event-lead-internal-note-save")).toBeNull());
+
+  fireEvent.change(within(details).getByTestId("event-lead-internal-note"), { target: { value: "" } });
+  fireEvent.click(within(details).getByTestId("event-lead-internal-note-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/events/e1/registrations/r3", { internal_note: null }));
+});
+
+test("Bestehende interne Notiz steht im Feld", async () => {
+  apiMock.get.mockImplementation((url) => Promise.resolve(url.endsWith("/lead/registrations/r2") ? { data: { id: "r2", note: null, internal_note: "Rollstuhlplatz" } } : { data: VIEW }));
+  render(
+    <MemoryRouter initialEntries={["/events/herbst-lan/leitung"]}>
+      <Routes><Route path="/events/:slug/leitung" element={<EventLeadPage />} /></Routes>
+    </MemoryRouter>,
+  );
+  fireEvent.click(await screen.findByTestId("event-lead-name-r2"));
+  const [details] = screen.getAllByTestId("event-lead-details");
+  await waitFor(() => expect(within(details).getByTestId("event-lead-internal-note")).toHaveValue("Rollstuhlplatz"));
+});
+
 test("voll: kein Hinweis auf einen freien Platz", async () => {
   renderLead({ ...VIEW, event: { ...VIEW.event, max_participants: 4 } });
   expect(await screen.findByTestId("event-lead-counter")).toBeInTheDocument();

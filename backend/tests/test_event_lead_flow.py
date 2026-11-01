@@ -141,6 +141,31 @@ def test_door_rows_leave_out_notes_and_mail():
     assert "note" not in full and "internal_note" not in full
 
 
+@pytest.mark.asyncio
+async def test_internal_note_only_for_the_lead_and_not_in_the_log(flow):
+    """Interne Notiz (#2127, EV15): die Leitung trägt sie ein, die Person sieht sie nicht, im Protokoll steht kein Text."""
+    leitung, event, people = await setup_event(flow)
+    flow.act_as(leitung)
+    row = next(item for item in (await lead(flow, event, filter="all"))["registrations"] if item["display_name"] == "Max Mustermann")
+    assert row["has_note"] is False
+    saved = await flow.patch(f"/api/events/{event['id']}/registrations/{row['id']}", json={"internal_note": "zahlt an der Tür"})
+    assert saved.status_code == 200 and saved.json()["internal_note"] == "zahlt an der Tür"
+    view = await lead(flow, event, filter="all")
+    assert next(item for item in view["registrations"] if item["id"] == row["id"])["has_note"] is True
+    detail = (await flow.get(f"/api/events/{event['id']}/lead/registrations/{row['id']}")).json()
+    assert detail["internal_note"] == "zahlt an der Tür"
+    audit = await flow.db.audit_logs.find_one({"action": "event.registration.update", "data.registration_id": row["id"]}, {"_id": 0})
+    assert audit["data"]["updates"] == {"internal_note": "geändert"}
+
+    flow.act_as(people["max"])
+    assert (await flow.patch(f"/api/events/{event['id']}/registrations/{row['id']}", json={"internal_note": "selbst"})).status_code == 403
+    assert "internal_note" not in (await flow.get(f"/api/events/{event['slug']}")).json()["own_registration"]
+
+    flow.act_as(leitung)
+    cleared = await flow.patch(f"/api/events/{event['id']}/registrations/{row['id']}", json={"internal_note": None})
+    assert cleared.status_code == 200 and cleared.json()["internal_note"] is None
+
+
 # --------------------------------------------------------------------------- Suche und Filter
 @pytest.mark.asyncio
 async def test_search_and_filter_not_yet_here(flow):

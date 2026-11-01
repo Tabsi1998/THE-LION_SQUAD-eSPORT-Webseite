@@ -23,6 +23,7 @@ import {
 
 const UNDO_SECONDS = 10;
 const STATUS_ORDER = ["registered", "checked_in", "waitlist", "no_show", "cancelled"];
+const INTERNAL_NOTE_MAX = 1000;
 
 export default function EventLeadPage() {
   const { slug } = useParams();
@@ -78,10 +79,13 @@ export default function EventLeadPage() {
         if (offerUndo) setUndo({ row: { ...row, ...payload }, previous: row.status, sentence });
         else toast.success(sentence);
       }
+      if ("internal_note" in payload) toast.success(payload.internal_note ? "Notiz gespeichert." : "Notiz gelöscht.");
       await load();
+      return true;
     } catch (err) {
       setRows(before);
       toast.error(formatApiError(err.response?.data?.detail) || "Das hat nicht geklappt.");
+      return false;
     } finally {
       setBusyId("");
     }
@@ -247,15 +251,28 @@ function Details({ row, event, busy, onChange, onStatus, onClose }) {
   const maxCompanions = event.allow_companions ? event.max_companions_per_registration || 0 : 0;
   // Notizen stehen nicht in der Liste (Codex-Prüfung #1517) - die Detailansicht holt sie je Person.
   const [notes, setNotes] = useState(null);
+  // Interne Notiz (#2127, EV15): nur für die Leitung; leer gespeichert löscht sie.
+  const [noteDraft, setNoteDraft] = useState("");
   useEffect(() => {
     let alive = true;
     setNotes(null);
+    setNoteDraft("");
     if (!row.has_note || !event.id) return undefined;
     api.get(`/events/${event.id}/lead/registrations/${row.id}`)
-      .then(({ data }) => { if (alive) setNotes({ note: data.note, internal_note: data.internal_note }); })
+      .then(({ data }) => {
+        if (!alive) return;
+        setNotes({ note: data.note, internal_note: data.internal_note });
+        setNoteDraft(data.internal_note || "");
+      })
       .catch(() => { if (alive) setNotes({ error: true }); });
     return () => { alive = false; };
   }, [event.id, row.id, row.has_note]);
+  const savedNote = notes?.internal_note || "";
+  const noteChanged = noteDraft.trim() !== savedNote.trim();
+  const saveNote = async () => {
+    const value = noteDraft.trim();
+    if (await onChange({ internal_note: value || null })) setNotes((current) => ({ ...current, internal_note: value }));
+  };
   return (
     <div className="rounded-sm border border-white/10 bg-[#121212] p-4" data-testid="event-lead-details">
       <div className="flex items-start justify-between gap-3">
@@ -292,13 +309,14 @@ function Details({ row, event, busy, onChange, onStatus, onClose }) {
             <dd className="mt-0.5 whitespace-pre-line text-white/80 [overflow-wrap:anywhere]">{notes.note}</dd>
           </div>
         ) : null}
-        {notes?.internal_note ? (
-          <div>
-            <dt className="text-white/50">Interne Notiz</dt>
-            <dd className="mt-0.5 whitespace-pre-line text-white/80 [overflow-wrap:anywhere]">{notes.internal_note}</dd>
-          </div>
-        ) : null}
       </dl>
+      <label className="mt-4 block text-[11px] font-bold uppercase tracking-widest text-white/50">
+        Interne Notiz
+        <textarea value={noteDraft} disabled={busy || notes?.error} onChange={(e) => setNoteDraft(e.target.value.slice(0, INTERNAL_NOTE_MAX))} rows={2} placeholder="Sieht nur die Turnierleitung" className="mt-1 block w-full rounded-sm border border-white/10 bg-[#0A0A0A] p-2 text-sm normal-case tracking-normal text-white placeholder:text-white/35" data-testid="event-lead-internal-note" />
+      </label>
+      {noteChanged ? (
+        <button type="button" disabled={busy} onClick={saveNote} className="tls-btn tls-btn--secondary mt-2 min-h-[44px] px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid="event-lead-internal-note-save">Notiz speichern</button>
+      ) : null}
       <label className="mt-4 block text-[11px] font-bold uppercase tracking-widest text-white/50">
         Status
         <select value={row.status || "registered"} disabled={busy} onChange={(e) => onStatus(e.target.value)} className="mt-1 block w-full min-h-[44px] rounded-sm border border-white/10 bg-[#0A0A0A] px-2 text-sm normal-case tracking-normal text-white" data-testid="event-lead-status">
