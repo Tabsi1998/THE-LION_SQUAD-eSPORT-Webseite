@@ -245,6 +245,18 @@ def test_profile_links_are_encoded_only_where_needed():
     assert profile_path("a/b c#") == "/u/a%2Fb%20c%23"
 
 
+# ---------------------------------------------------------------- Review: Teams
+@pytest.mark.asyncio
+async def test_private_team_stays_off_the_public_profile(flow):
+    user = await player(flow, "spielerin")
+    await flow.db.teams.insert_many([
+        {"id": "t-geheim", "name": "Geheimteam", "tag": "GEH", "member_ids": [user["id"]], "leader_id": user["id"], "is_public": False},
+        {"id": "t-offen", "name": "Offenes Team", "tag": "OFF", "member_ids": [user["id"]], "leader_id": user["id"]},
+    ])
+    flow.act_as(None)
+    assert [team["id"] for team in (await flow.get("/api/users/public/spielerin")).json()["teams"]] == ["t-offen"]
+
+
 # ---------------------------------------------------------------- Zusatz: Dokumente
 @pytest.mark.asyncio
 async def test_members_never_see_where_a_document_is_stored(flow):

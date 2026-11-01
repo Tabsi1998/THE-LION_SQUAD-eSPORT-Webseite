@@ -852,7 +852,7 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
         team_ids = [tm["team_id"] for tm in await db.team_members.find(
             {"user_id": user_id}, {"_id": 0}).to_list(50)]
         teams = await db.teams.find(
-            {"$or": [{"id": {"$in": team_ids}}, {"member_ids": user_id}]},
+            {"$or": [{"id": {"$in": team_ids}}, {"member_ids": user_id}], "is_public": {"$ne": False}},
             # Nur was die Team-Kachel zeigt (#2126): der Rest des Team-Eintrags gehört auf die Teamseite.
             {"_id": 0, "id": 1, "name": 1, "tag": 1, "logo_url": 1, "description": 1},
         ).to_list(50)
