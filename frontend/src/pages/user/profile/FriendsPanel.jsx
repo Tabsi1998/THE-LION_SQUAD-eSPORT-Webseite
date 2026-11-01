@@ -44,7 +44,7 @@ function Person({ user }) {
       <Avatar user={user} />
       <div className="min-w-0">
         {user?.username ? (
-          <Link to={`/u/${user.username}`} className="block font-bold text-sm text-white truncate hover:text-[#29B6E8]">{nameOf(user)}</Link>
+          <Link to={`/u/${encodeURIComponent(user.username)}`} className="block font-bold text-sm text-white truncate hover:text-[#29B6E8]">{nameOf(user)}</Link>
         ) : (
           <div className="font-bold text-sm text-white truncate">{nameOf(user)}</div>
         )}

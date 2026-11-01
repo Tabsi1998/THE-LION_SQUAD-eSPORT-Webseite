@@ -233,7 +233,7 @@ Namen von wem.
   lokal gepflegte Vorstandsposten keine Rechte mehr.
 - **Gesperrt in der Website:** Für zugeordnete Mitglieder lassen sich Status,
   Art, Nummer und Beginn hier nicht mehr ändern (Meldung „wird in Dolibarr
-  geführt“). Notiz, interne Rolle und Sichtbarkeit der Nummer bleiben.
+  geführt“). Notiz, Aufgabe im Verein und Sichtbarkeit der Nummer bleiben.
 
 ## Fehler lesen
 

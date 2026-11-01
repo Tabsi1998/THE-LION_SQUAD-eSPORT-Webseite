@@ -412,7 +412,7 @@ function TeamDetail({ id }) {
               return (
                 <div key={m.id} data-testid={`team-member-row-${m.id}`}
                   className="tls-card border border-white/10 bg-[#121212] rounded-sm p-4 flex flex-col gap-2">
-                  <Link to={`/u/${m.username}`} className="flex items-center justify-between gap-2">
+                  <Link to={`/u/${encodeURIComponent(m.username)}`} className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
                       <div className="font-heading text-lg font-bold truncate">{m.display_name || m.username}</div>
                       <div className="text-xs text-white/45">@{m.username}</div>

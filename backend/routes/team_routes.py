@@ -220,7 +220,7 @@ async def _enrich_team_chat(messages: list[dict]) -> list[dict]:
     user_ids = list({m.get("user_id") for m in messages if m.get("user_id")})
     users = {u["id"]: u for u in await db.users.find(
         {"id": {"$in": user_ids}},
-        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1, "role": 1},
+        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1},
     ).to_list(300)}
     for message in messages:
         author = users.get(message.get("user_id")) or {}
@@ -229,7 +229,6 @@ async def _enrich_team_chat(messages: list[dict]) -> list[dict]:
             "username": author.get("username"),
             "display_name": author.get("display_name") or author.get("username") or "Benutzer",
             "avatar_url": author.get("avatar_url"),
-            "role": author.get("role"),
         }
     return messages
 
@@ -468,6 +467,9 @@ async def my_teams(me: dict = Depends(get_current_user)):
             "co_leader" if me["id"] in team.get("co_leader_ids", []) else "member"
         )
         team.update(_viewer_rights(team, me))
+        # Wie GET /teams/{id}: der Code gehört zur Teamleitung (#2126).
+        if not _can_manage(team, me):
+            team.pop("join_code", None)
     return teams
 
 
@@ -896,7 +898,7 @@ async def join_team(team_id: str, body: dict, me: dict = Depends(get_current_use
     team = await db.teams.find_one({"id": team_id})
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
-    if body.get("join_code") != team.get("join_code"):
+    if not team.get("join_code") or body.get("join_code") != team["join_code"]:
         raise HTTPException(status_code=403, detail="Falscher Join-Code")
     if me["id"] in team.get("member_ids", []):
         return {"ok": True, "already_member": True}

@@ -23,7 +23,7 @@ export function SteamPresence({ data }) {
       {players.length > 0 && (
         <div className="space-y-2">
           {players.map((player) => (
-            <Link key={player.user_id} to={player.username ? `/u/${player.username}` : "#"} className="flex items-center gap-3 group" data-testid={`steam-presence-${player.user_id}`}>
+            <Link key={player.user_id} to={player.username ? `/u/${encodeURIComponent(player.username)}` : "#"} className="flex items-center gap-3 group" data-testid={`steam-presence-${player.user_id}`}>
               <span className="w-9 h-9 rounded-sm border border-white/10 bg-[#0A0A0A] overflow-hidden inline-flex items-center justify-center shrink-0">
                 {player.avatar_url ? <img src={resolveMediaUrl(player.avatar_url)} alt="" className="w-full h-full object-cover" /> : <Users className="w-4 h-4 text-white/40" />}
               </span>

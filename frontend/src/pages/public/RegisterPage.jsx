@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { DEFAULT_RETURN_PATH, nextQuery, safeNextPath } from "@/lib/returnPath";
 import { useReturnPurpose } from "@/hooks/useReturnPurpose";
 import { MIN_PASSWORD_LENGTH, PASSWORD_RULE_HINT, passwordProblem } from "@/lib/passwordRules";
+import { USERNAME_RULE_HINT, usernameProblem } from "@/lib/username";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -83,7 +84,7 @@ export default function RegisterPage() {
 
   const validate = () => {
     const errors = {};
-    if (!form.username.trim()) errors.username = "Bitte gib einen Benutzernamen ein.";
+    if (usernameProblem(form.username)) errors.username = usernameProblem(form.username);
     if (!form.email.trim()) errors.email = "Bitte gib deine E-Mail-Adresse ein.";
     else if (!EMAIL_RE.test(form.email.trim())) errors.email = "Bitte gib eine gültige E-Mail-Adresse ein.";
     if (!form.password) errors.password = "Bitte vergib ein Passwort.";
@@ -180,6 +181,7 @@ export default function RegisterPage() {
             error={fieldErrors.username}
             testId="register-username"
           />
+          {fieldErrors.username ? null : <p className="-mt-2 text-xs text-white/50" data-testid="register-username-hint">{USERNAME_RULE_HINT}</p>}
           <AuthTextField
             id="register-email"
             label="E-Mail"

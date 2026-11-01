@@ -9,6 +9,7 @@ import uuid
 from match_rules import RESULT_MAX_SCORE, RESULT_MAX_TIME_MS
 # Der Passwortvertrag (#1033) steht in services/password_policy.py.
 from services.password_policy import NewPassword
+from services.usernames import username_problem
 
 
 def now_utc():
@@ -27,8 +28,22 @@ VisibilityLevel = Literal["public", "community", "members", "admins", "private"]
 DirectMessagePrivacy = Literal["everyone", "friends", "team_members", "club_members", "admins_only", "none"]
 
 
+# Anzeigename (#2126): gleich in pages/user/profile/form.js. Gespeicherte längere Namen bleiben gültig.
+DISPLAY_NAME_MAX = 50
+PREFERRED_ROLE_MAX = 40
+
+
+def _new_username(value: str) -> str:
+    """Nur beim Anlegen (#2126) - ältere Konten behalten ihren Namen."""
+    value = value.strip()
+    problem = username_problem(value)
+    if problem:
+        raise ValueError(problem)
+    return value
+
+
 class UserRegister(BaseModel):
-    username: str = Field(min_length=3, max_length=32)
+    username: str
     email: EmailStr
     password: NewPassword
     display_name: Optional[str] = None
@@ -46,6 +61,8 @@ class UserRegister(BaseModel):
     hp_fax: Optional[str] = Field(default=None, max_length=300)
     turnstile_token: Optional[str] = Field(default=None, max_length=4096)
 
+    _username_rule = field_validator("username")(_new_username)
+
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -55,15 +72,17 @@ class UserLogin(BaseModel):
 
 
 class AdminUserCreate(BaseModel):
-    username: str = Field(min_length=3, max_length=32)
+    username: str
     email: EmailStr
     password: Optional[NewPassword] = None
-    display_name: Optional[str] = None
+    display_name: Optional[str] = Field(default=None, max_length=DISPLAY_NAME_MAX)
     gender: Optional[Literal["male", "female", "diverse"]] = None
     role: Role = "player"
     is_active: bool = True
     privacy_public_profile: bool = False
     send_invite: bool = True
+
+    _username_rule = field_validator("username")(_new_username)
 
 
 class UserUpdate(BaseModel):

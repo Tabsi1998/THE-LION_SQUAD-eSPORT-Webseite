@@ -31,13 +31,14 @@ export function Field({ label, error = "", errorTestId, group = false, children 
     </label>
   );
 }
-export function Input({ value, onChange, placeholder, testId, type = "text", required = false, invalid = false }) {
+export function Input({ value, onChange, placeholder, testId, type = "text", required = false, invalid = false, maxLength }) {
   return (
     <input
       type={type}
       value={value ?? ""}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
+      maxLength={maxLength}
       data-testid={testId}
       required={required}
       aria-invalid={invalid || undefined}

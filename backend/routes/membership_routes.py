@@ -34,6 +34,7 @@ from services import dolibarr_helper_shifts, dolibarr_identity, dolibarr_meeting
 from services.rate_limit import enforce_rate_limit
 from services.log_safe import log_safe
 from services.private_fields import private_projection
+from services.usernames import profile_path
 
 router = APIRouter(prefix="/api/membership", tags=["membership"])
 logger = logging.getLogger("tls.membership")
@@ -224,7 +225,7 @@ def _public_account(user: dict | None, admin: bool = False) -> dict | None:
         "username": user.get("username"),
         "display_name": user.get("display_name"),
         "avatar_url": user.get("avatar_url"),
-        "profile_url": f"/u/{user.get('username')}" if user.get("username") else None,
+        "profile_url": profile_path(user["username"]) if user.get("username") else None,
         "achievement_level": user.get("achievement_level"),
         "twitch_handle": twitch_handle,
         "show_twitch_embed": bool(user.get("show_twitch_embed") and twitch_handle),
@@ -941,7 +942,7 @@ async def update_user_membership(
     payload.pop("show_member_number_publicly", None)
     led_fields = {"member_status", "membership_type", "member_number", "member_since", "member_since_precision"} & set(payload)
     if led_fields and await _led_by_dolibarr(user_id):
-        raise HTTPException(409, "Diese Mitgliedschaft wird in Dolibarr geführt. Status, Art, Nummer und Beginn dort ändern – hier bleiben Notiz und interne Rolle.")
+        raise HTTPException(409, "Diese Mitgliedschaft wird in Dolibarr geführt. Status, Art, Nummer und Beginn dort ändern – hier bleiben Notiz und Aufgabe im Verein.")
     previous_status = ((await get_membership(user_id)) or {}).get("member_status") or "none"
     if payload.get("member_status") not in (None, previous_status, *ACTIVE_STATUSES):
         await _refuse_while_holding_post(db, user_id)
@@ -1010,7 +1011,7 @@ async def export_memberships(request: Request, scope: Literal["active", "all"] =
     rows.sort(key=lambda row: str(row[1] or "").lower())
     buffer = io.StringIO()
     writer = csv.writer(buffer, delimiter=";")
-    writer.writerow(["Mitgliedsnummer", "Name", "Benutzername", "E-Mail", "Status", "Art", "Mitglied seit", "Interne Rolle"])
+    writer.writerow(["Mitgliedsnummer", "Name", "Benutzername", "E-Mail", "Status", "Art", "Mitglied seit", "Aufgabe im Verein"])
     writer.writerows([[safe_cell(cell) for cell in row] for row in rows])
     await _audit(me["id"], "membership.export", "memberships", {"scope": scope, "rows": len(rows)})
     filename = f"mitglieder-{club_today()}.csv"

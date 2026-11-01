@@ -218,6 +218,12 @@ Wichtig:
   Benachrichtigung mit den Feldern und dem Grund und kann selbst Neues eintragen; ohne Anzeigename steht ihr
   Benutzername da. Der Grund steht im Protokoll, die alten Angaben nicht. Andere Felder (Einwilligungen,
   Datenschutz-Schalter) ändert nur die Person selbst; Superadmin-Konten fasst nur der Superadmin an.
+- **Rollen bleiben intern.** Das öffentliche Profil, die Spielerliste, Chats und Freundeslisten zeigen weder die Rolle
+  noch die **Aufgabe im Verein** (Admin → Mitglieder, früher „Interne Rolle“). Die Aufgabe sieht nur das Mitglied selbst
+  und die Verwaltung.
+- **Benutzer anlegen:** Der Benutzername hat 3 bis 32 Zeichen: Buchstaben ohne Umlaute, Ziffern und `_ . -`, keine
+  Leerzeichen, mindestens ein Buchstabe oder eine Ziffer. „Max“ und „max“ gelten als derselbe Name. Das gilt nur für neue Konten: Ältere Konten behalten ihren Namen,
+  melden sich weiter mit ihrer E-Mail an und ihr Profil bleibt erreichbar. Nachträglich umbenennen lässt sich niemand.
 - Weitere Rechte-Themen (Vorstand besetzen, Dolibarr-Funktionen als Rechtequelle) stehen in [Rollen](../ROLLEN.md).
 
 ### 3.7 Helfer, Moderation – und „Mein Dienst“
@@ -326,6 +332,8 @@ geändert“ auf die Leitung; wird es günstiger, bleibt die Differenz beim Vere
 | Statt einer Liste steht „Dafür fehlt dir …“ | Der Server hat die Liste abgelehnt: der Bereich fehlt, oder die Zwei-Faktor-Anmeldung | Was der Satz nennt: Freigabe erfragen (3.6) oder 2FA (2.1) |
 | Ein Menüpunkt aus einer Anleitung fehlt | Er gehört zu einem Bereich, den du nicht hast, oder es ist nur ein Reiter | Suche nutzen (3.3) |
 | Du kannst die Rolle einer Person nicht ändern | Nur der Superadmin darf das; du siehst nur Text | Superadmin fragen |
+| „Benutzername: 3 bis 32 Zeichen …“ beim Anlegen | Der Name hat Leerzeichen, Umlaute oder andere Zeichen | Name anpassen (3.6) |
+| „Benutzername oder E-Mail bereits vergeben“, obwohl der Name anders geschrieben ist | Groß- und Kleinschreibung zählen nicht: „max“ und „Max“ sind derselbe Name | Anderen Namen wählen |
 | Eine Person lässt sich nicht sperren | Superadmin-Konto, eigenes Konto, oder ein Konto mit Adminbereich (das sperrt nur der Superadmin) | Siehe 3.6 |
 | Freigabe gespeichert, die Person sieht nichts | Sie hat noch keine bestätigte Zwei-Faktor-Anmeldung, oder sie muss sich neu anmelden | 3.5 |
 | Am Event: „Zu viele Anmeldungen aus diesem Netz. Bitte versuche es in … erneut.“ | Viele Handys im selben WLAN teilen sich eine Adresse, die Grenze je Netz ist erreicht | Eine Minute warten; für das Event unter System → Zugang → **Grenze je Netz** einen Event-Zeitraum mit höherem Wert setzen ([Betrieb](../BETRIEB.md#anmelde-grenze-je-netz-für-events-1802)) |

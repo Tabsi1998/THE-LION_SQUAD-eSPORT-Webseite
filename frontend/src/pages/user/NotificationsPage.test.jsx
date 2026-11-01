@@ -33,6 +33,12 @@ test("ein Ladefehler zeigt den Fehler mit „Nochmal versuchen“, nicht „Kein
   expect(await screen.findByText("Dein Match startet")).toBeInTheDocument();
 });
 
+test("von der Liste führt ein Weg zu den Einstellungen (#2126)", async () => {
+  apiMock.get.mockResolvedValue({ data: ROWS });
+  renderPage();
+  expect(await screen.findByTestId("notifications-settings-link")).toHaveAttribute("href", "/profile?tab=notifications");
+});
+
 test("„Alle als gelesen markieren“ scheitert: der Zähler bleibt, der Fehler steht da", async () => {
   apiMock.get.mockResolvedValue({ data: ROWS });
   apiMock.post.mockRejectedValueOnce(serverError());

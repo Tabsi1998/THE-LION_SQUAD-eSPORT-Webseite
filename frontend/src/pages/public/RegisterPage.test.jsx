@@ -86,6 +86,21 @@ test("Spamschutz (#2067): war die Seite zu lange offen, steht die Meldung des Se
   expect(screen.queryByTestId("where")).toBeNull();
 });
 
+test("Benutzername (#2126): dieselbe Regel wie der Server, vor dem Absenden gemeldet", async () => {
+  const user = userEvent.setup();
+  renderAt("/register");
+  expect(await screen.findByTestId("register-username-hint")).toHaveTextContent("3 bis 32 Zeichen");
+  await user.type(screen.getByTestId("register-username"), "neon falke");
+  await user.type(screen.getByTestId("register-email"), "neonfalke@lionsquad-test.at");
+  await user.type(screen.getByTestId("register-password"), "testtest-42");
+  await user.click(screen.getByTestId("register-accept"));
+  await user.click(screen.getByTestId("register-accept-terms"));
+  await user.click(screen.getByTestId("register-submit"));
+  expect(await screen.findByText(/Benutzername: 3 bis 32 Zeichen/)).toBeInTheDocument();
+  expect(screen.queryByTestId("register-username-hint")).toBeNull();
+  expect(authState.register).not.toHaveBeenCalled();
+});
+
 test("ein fremdes Ziel geht nicht mit", async () => {
   const user = userEvent.setup();
   renderAt("/register?next=%2F%2Ffremd.example");

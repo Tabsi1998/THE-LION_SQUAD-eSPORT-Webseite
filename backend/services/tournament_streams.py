@@ -17,6 +17,7 @@ import logging
 
 from models import new_id, now_utc
 from services.tournament_visibility import public_tournament
+from services.usernames import profile_path
 
 logger = logging.getLogger("tls.tournament.streams")
 
@@ -70,7 +71,7 @@ async def participant_streams(db, tournament: dict) -> list[dict]:
         if not user:
             continue
         row = {key: stream.get(key) for key in STREAM_FIELDS}
-        row["public_profile_url"] = f"/u/{user.get('username')}" if user.get("username") else None
+        row["public_profile_url"] = profile_path(user["username"]) if user.get("username") else None
         rows.append(row)
     return rows
 

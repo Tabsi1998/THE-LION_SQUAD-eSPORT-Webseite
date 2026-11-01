@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, formatRequestError, keepaliveRequest } from "@/lib/api";
 import { createSaveQueue, EXPECTED_USER_HEADER, sameValue } from "@/lib/profileSaveQueue";
-import { profileFieldErrors, profileFormPayload, profileToForm } from "./form";
+import { keepTypedSpaces, profileFieldErrors, profileFormPayload, profileToForm } from "./form";
 
 // Pause nach dem letzten Tastendruck, bis ein Textfeld von selbst speichert. Schalter, Auswahlfelder und das Verlassen
 // eines Felds speichern sofort.
@@ -30,7 +30,7 @@ export function useProfileSave({ user, refresh }) {
         if (keepaliveRef.current) return keepaliveRequest("PATCH", "/users/me", payload, headers);
         return api.patch("/users/me", payload, { headers }).then(({ data }) => data);
       },
-      fromServer: profileToForm,
+      fromServer: (data) => keepTypedSpaces(profileToForm(data), created.getState().local),
       toPayload: profileFormPayload,
       onSaved: () => {
         // Die Sitzung (Name oben, Avatar …) nachziehen; ältere Stände verwirft die Warteschlange selbst.

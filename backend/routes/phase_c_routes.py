@@ -47,15 +47,6 @@ async def my_profile_completeness(me: dict = Depends(get_current_user)):
     return {"score": score, "missing": missing, "fields_total": len(PROFILE_FIELDS)}
 
 
-@router.get("/users/{user_id}/profile-completeness")
-async def public_profile_completeness(user_id: str):
-    db = get_db()
-    user = await db.users.find_one({"id": user_id}, private_projection())
-    if not user:
-        raise HTTPException(404, "Nicht gefunden.")
-    return {"score": compute_profile_completeness(user)}
-
-
 # -------------- Membership Applications --------------
 class ApplicationConsent(BaseModel):
     code: str = Field(max_length=32)

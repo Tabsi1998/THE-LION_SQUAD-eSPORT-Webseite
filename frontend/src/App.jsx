@@ -35,7 +35,7 @@ function MeRedirect() {
   if (user === undefined) return null;
   const query = params.toString() ? `?${params.toString()}` : "";
   if (!user) return <Navigate to={`/login?next=${encodeURIComponent(`/u/me${query}`)}`} replace />;
-  return <Navigate to={`/u/${user.username}${query}`} replace />;
+  return <Navigate to={`/u/${encodeURIComponent(user.username)}${query}`} replace />;
 }
 
 function FastLapLegacyRedirect() {
@@ -50,7 +50,7 @@ function GalleryLegacyRedirect() {
 
 function PlayerLegacyRedirect() {
   const { username } = useParams();
-  return <Navigate to={`/u/${username}`} replace />;
+  return <Navigate to={`/u/${encodeURIComponent(username)}`} replace />;
 }
 
 // Turnierbaum-TV (#1110): mit Anzeige-Schlüssel im Link läuft er ohne Anmeldung - der Schlüssel erlaubt nur das

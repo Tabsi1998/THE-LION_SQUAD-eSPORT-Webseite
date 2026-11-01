@@ -69,7 +69,7 @@ function RoleLine({ label, word, quiet = false }) {
 export function BoardPortrait({ person, title, label = "", withheld = false, size = "lg", since = "", testId }) {
   const role = label ? { label, word: title } : splitRole(title);
   const names = personNames(person);
-  const target = person?.profile_url || (person?.username ? `/u/${person.username}` : null);
+  const target = person?.profile_url || (person?.username ? `/u/${encodeURIComponent(person.username)}` : null);
   const Wrapper = target ? Link : "div";
   const photo = person?.photo_url || person?.avatar_url || "";
   return (

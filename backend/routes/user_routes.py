@@ -26,22 +26,44 @@ from services.notification_preferences import (
     public_preferences_payload,
 )
 from services.query_filters import safe_regex
+from services.usernames import any_case, can_be_a_username, username_taken
 from services.private_fields import private_projection, strip_private
 # Die leerbaren Profilfelder (#2118): ein Blatt-Modul - auch die Kontolöschung leitet ihre Liste daraus ab.
 from services.profile_fields import USER_NULLABLE_FIELDS
 from models import (
     AreasUpdate,
-    AdminProfileReset, AdminUserCreate, UserUpdate, RoleUpdate,
+    AdminProfileReset, AdminUserCreate, DISPLAY_NAME_MAX, PREFERRED_ROLE_MAX, UserUpdate, RoleUpdate,
     now_utc, new_id,
 )
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 logger = logging.getLogger(__name__)
 
+# Längengrenzen der Profiltexte (#2126), gleich in pages/user/profile/form.js.
+PROFILE_TEXT_LIMITS = {"display_name": ("Anzeigename", DISPLAY_NAME_MAX), "bio": ("Bio", 1000), "preferred_role": ("Bevorzugte Rolle", PREFERRED_ROLE_MAX)}
+
 
 def _clean(u: dict) -> dict:
     """Private Kontofelder stehen zentral in services/private_fields.py (#1492)."""
     return strip_private(u)
+
+
+def _check_profile_texts(updates: dict, stored: dict) -> None:
+    """Prüft nur, was sich ändert (#2126): alte längere Werte oder ein alter leerer Name lassen sich weiter mitspeichern -
+    Web und App schicken beim Speichern auch andere Felder, und ein Konto soll daran nicht hängen bleiben."""
+    if "display_name" in updates:
+        name = (updates["display_name"] or "").strip()
+        if not name and (stored.get("display_name") or "").strip():
+            raise HTTPException(422, "Bitte gib einen Anzeigenamen ein – so heißt du überall.")
+        if updates["display_name"] != stored.get("display_name"):
+            updates["display_name"] = name or stored.get("display_name")
+    for field, (label, limit) in PROFILE_TEXT_LIMITS.items():
+        value = updates.get(field)
+        if not isinstance(value, str) or value == stored.get(field):
+            continue
+        updates[field] = value.strip()
+        if len(updates[field]) > limit:
+            raise HTTPException(422, f"{label}: höchstens {limit} Zeichen.")
 
 
 # Level (#617): eine Kurve für alles in services/levels.py, der Stand je Person in services/xp.py.
@@ -86,6 +108,8 @@ def _visibility_aliases(key: str) -> list[str]:
     aliases = [key, source_key]
     if key == "birth_date":
         aliases += ["birthdate", "birthday"]
+    if key == "main_platform":
+        aliases.append("main_platforms")   # die Stufe „Plattformen“ gilt auch für das alte Einzelfeld (#2126)
     return list(dict.fromkeys(aliases))
 
 
@@ -104,9 +128,10 @@ async def _viewer_context(db, viewer: dict | None, target_id: str) -> dict:
     return {"self": viewer.get("id") == target_id, "logged_in": True, "member": member or admin, "admin": admin}
 
 
-# Felder, die ohne gewählte Stufe nicht öffentlich sind (#2113): TikTok ließ sich pflegen, erschien aber nie im Profil und
-# hatte keine Stufe - wer es eingetragen hat, wurde nie gefragt. Gleich in pages/user/profile/visibility.js.
-FIELD_DEFAULT_LEVELS = {"tiktok": "private"}
+# Felder, die ohne gewählte Stufe nicht öffentlich sind (#2113, #2126): TikTok und die bevorzugte Rolle ließen sich pflegen,
+# erschienen aber nie im Profil und hatten keine Stufe - wer sie eingetragen hat, wurde nie gefragt. Gleich in
+# pages/user/profile/visibility.js.
+FIELD_DEFAULT_LEVELS = {"tiktok": "private", "preferred_role": "private"}
 
 
 def _field_visible(user: dict, key: str, profile_public: bool, ctx: dict | None = None) -> bool:
@@ -417,8 +442,8 @@ async def admin_create_user(body: AdminUserCreate, me: dict = Depends(require_su
         raise HTTPException(422, "Administrativ angelegte Konten müssen per E-Mail eingeladen werden, damit die Person selbst Passwort und Einwilligungen festlegt.")
     username = body.username.strip()
     email = str(body.email).lower().strip()
-    if await db.users.find_one({"$or": [{"username": username}, {"email": email}]}, {"_id": 0, "id": 1}):
-        raise HTTPException(status_code=409, detail="Username oder E-Mail bereits vergeben")
+    if await username_taken(db, username) or await db.users.find_one({"email": email}, {"_id": 0, "id": 1}):
+        raise HTTPException(status_code=409, detail="Benutzername oder E-Mail bereits vergeben")
     user_id = new_id()
     password_setup_required = True
     doc = {
@@ -589,10 +614,15 @@ async def list_public_users(
     return out
 
 
-@router.get("/public/{username}")
+# `:path`, weil ältere Benutzernamen einen Schrägstrich enthalten können (#2126) - ihr Profil bleibt so erreichbar.
+@router.get("/public/{username:path}")
 async def get_public_profile(username: str, view_as: str | None = None, viewer: dict | None = Depends(get_optional_user)):
+    if not can_be_a_username(username):
+        raise HTTPException(status_code=404, detail="Spieler nicht gefunden")
     db = get_db()
-    u = await db.users.find_one({"username": username}, private_projection("email"))
+    # Exakt zuerst, dann jede Schreibweise (#2126): auch bei alten Doppelten („Max“, „max“) bleibt jedes Profil erreichbar.
+    u = await db.users.find_one({"username": username}, private_projection("email")) \
+        or await db.users.find_one(any_case(username), private_projection("email"), sort=[("created_at", 1)])
     if not u or u.get("is_active") is False or u.get("is_banned") is True:
         raise HTTPException(status_code=404, detail="Spieler nicht gefunden")
     # „So sehen dich andere“ (#1149): das eigene Profil so, wie es jemand ohne Anmeldung sieht - nur was die
@@ -624,7 +654,8 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
         "username": u["username"], "display_name": u.get("display_name"),
         "avatar_url": u.get("avatar_url"), "banner_url": u.get("banner_url"),
         "bio": u.get("bio") if public else None,
-        "role": u.get("role"), "created_at": u.get("created_at"),
+        # Keine Systemrolle (#2126): sie sagt Fremden, wer welche Rechte hat - die Verwaltung sieht sie unter „Alle Benutzer“.
+        "created_at": u.get("created_at"),
         "birth_date": _visible_field(u, "birth_date", public, ctx),
         "country": _visible_field(u, "country", public, ctx),
         "city": _visible_field(u, "city", public, ctx),
@@ -664,6 +695,7 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
         "main_platform": _visible_field(u, "main_platform", public, ctx),
         "main_platforms": (u.get("main_platforms") or []) if _field_visible(u, "main_platforms", public, ctx) else [],
         "input_devices": (u.get("input_devices") or []) if _field_visible(u, "input_devices", public, ctx) else [],
+        "preferred_role": _visible_field(u, "preferred_role", public, ctx),
         "gaming_subscriptions": _visible_field(u, "gaming_subscriptions", public, ctx),
         "favorite_games": (u.get("favorite_games") or []) if _field_visible(u, "favorite_games", public, ctx) else [],
         "website": _visible_field(u, "website", public, ctx),
@@ -825,8 +857,9 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
         team_ids = [tm["team_id"] for tm in await db.team_members.find(
             {"user_id": user_id}, {"_id": 0}).to_list(50)]
         teams = await db.teams.find(
-            {"$or": [{"id": {"$in": team_ids}}, {"member_ids": user_id}]},
-            {"_id": 0},
+            {"$or": [{"id": {"$in": team_ids}}, {"member_ids": user_id}], "is_public": {"$ne": False}},
+            # Nur was die Team-Kachel zeigt (#2126): der Rest des Team-Eintrags gehört auf die Teamseite.
+            {"_id": 0, "id": 1, "name": 1, "tag": 1, "logo_url": 1, "description": 1},
         ).to_list(50)
     return {
         **base,
@@ -873,9 +906,10 @@ async def update_me(
     db = get_db()
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in USER_NULLABLE_FIELDS}
-    # Wortfilter (#417): Bio und Anzeigename werden vor dem Speichern geprüft.
+    _check_profile_texts(updates, me)
+    # Wortfilter (#417): Bio, Anzeigename und bevorzugte Rolle werden vor dem Speichern geprüft.
     from services import word_filter
-    for field in ("bio", "display_name"):
+    for field in ("bio", "display_name", "preferred_role"):
         if updates.get(field):
             await word_filter.screen_field(db, updates[field], kind=field, user_id=me["id"], ref_id=me["id"])
     updates = _normalize_social_updates(updates)

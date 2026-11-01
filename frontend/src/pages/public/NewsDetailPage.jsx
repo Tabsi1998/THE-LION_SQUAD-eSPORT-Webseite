@@ -260,7 +260,7 @@ export default function NewsDetailPage() {
                 <div className="text-[11px] font-bold uppercase tracking-widest text-white/45 mb-3">Markierte Personen</div>
                 <div className="grid gap-2">
                   {post.mentioned_users.map((user) => (
-                    <Link key={user.id} to={`/u/${user.username}`} className="inline-flex items-center gap-3 border border-white/10 hover:border-[#29B6E8]/50 bg-[#0A0A0A] rounded-sm px-3 py-2 transition">
+                    <Link key={user.id} to={`/u/${encodeURIComponent(user.username)}`} className="inline-flex items-center gap-3 border border-white/10 hover:border-[#29B6E8]/50 bg-[#0A0A0A] rounded-sm px-3 py-2 transition">
                       <span className="w-9 h-9 rounded-sm bg-[#121212] border border-white/10 overflow-hidden flex items-center justify-center shrink-0">
                         {user.avatar_url ? <SizedImage src={user.avatar_url} size={36} alt="" className="w-full h-full" /> : <Users className="w-4 h-4 text-white/35" />}
                       </span>

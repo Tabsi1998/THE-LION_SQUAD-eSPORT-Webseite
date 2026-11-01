@@ -168,8 +168,9 @@ ein **Rang**, der zugleich der **Titel** ist und überall gleich heißt (Abzeich
 
 Jeder der zwölf Ränge hat einen **eigenen gezeichneten Rahmen** um das Profilbild (Web und App); im Profilkopf kommt je Rang eine
 Signatur dazu, auf Wunsch ruhig und ohne Bewegung (Einstellung „weniger Bewegung“ des Geräts). Die **Kronen** (Gold, Silber, Bronze)
-tragen die drei Personen mit den meisten Erfolgspunkten – nur Konten mit **öffentlichem Profil** –; wer eine erobert oder verliert,
-bekommt eine Meldung.
+tragen die drei Personen mit den meisten Erfolgspunkten – nur Konten mit **öffentlichem Profil** und eingeschaltetem „Erfolge
+öffentlich“ –; wer eine erobert oder verliert, bekommt eine Meldung, höchstens eine je Art in sechs Stunden. Wer „Erfolge
+öffentlich“ selbst ausschaltet, bekommt keine.
 
 **Was XP bringt** (Auszug; Quelle: Programmwerte, „Deckel“ = höchstens so oft pro Tag):
 

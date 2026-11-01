@@ -86,7 +86,7 @@ export default function CommunityPage() {
             cta="Profile öffnen"
             items={players.slice(0, 6).map((p) => ({
               key: p.username,
-              to: `/u/${p.username}`,
+              to: `/u/${encodeURIComponent(p.username)}`,
               title: p.display_name || p.username,
               subtitle: `@${p.username}`,
               image: p.avatar_url,

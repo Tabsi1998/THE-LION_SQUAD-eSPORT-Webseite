@@ -16,6 +16,7 @@ from auth import get_optional_user as get_current_user_optional, require_area
 from models import now_utc, new_id
 from services import spam_guard
 from services.slug_utils import apply_slug_history, slug_source_for_update, slugify, unique_slug
+from services.usernames import profile_path
 
 # ---------- Contact ----------
 contact_router = APIRouter(prefix="/api/contact", tags=["contact"])
@@ -332,7 +333,7 @@ def _board_person_from_profile(profile: dict) -> dict:
 def _board_person_from_user(user: dict) -> dict:
     return {
         **user,
-        "profile_url": f"/u/{user.get('username')}",
+        "profile_url": profile_path(user.get('username')),
         "source": "user",
     }
 

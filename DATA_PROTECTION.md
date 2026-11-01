@@ -138,7 +138,7 @@ ohne alles auf einmal im Speicher. Bewusst nicht enthalten:
 ## Mitgliederliste als CSV (#2125)
 
 Die Vereinsverwaltung kann die Mitgliederliste herunterladen (`GET /api/membership/export.csv`), solange Dolibarr die
-Mitglieder nicht führt: Nummer, Name, Benutzername, E-Mail, Status, Art, Beginn und interne Rolle; keine Notizen, kein
+Mitglieder nicht führt: Nummer, Name, Benutzername, E-Mail, Status, Art, Beginn und Aufgabe im Verein; keine Notizen, kein
 Verlauf. Das Protokoll hält fest, wer wann wie viele Zeilen geladen hat (`membership.export`), nie den Inhalt. Die
 heruntergeladene Datei liegt danach bei der Person, die sie geladen hat: Sie gehört nach der Arbeit gelöscht.
 

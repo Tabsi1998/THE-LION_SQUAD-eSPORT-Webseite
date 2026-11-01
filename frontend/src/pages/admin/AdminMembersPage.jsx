@@ -226,7 +226,7 @@ export default function AdminMembersPage() {
                 <th className="text-left px-4 py-3">Nummer</th>
                 <th className="text-left px-4 py-3">Typ</th>
                 <th className="text-left px-4 py-3">Seit</th>
-                <th className="text-left px-4 py-3">Rolle</th>
+                <th className="text-left px-4 py-3">Aufgabe</th>
                 <th className="text-center px-4 py-3">Aktion</th>
               </tr>
             </thead>
@@ -346,7 +346,7 @@ function EditModal({ entry, meta, onClose, onSave }) {
     <AdminSheet title="Mitgliedschaft bearbeiten" eyebrow={`${u.display_name || u.username} · @${u.username}`} accent="#FFD700" onClose={onClose} onSubmit={submit} saving={saving} submitTestId="edit-save" testId="member-sheet">
       {led && (
         <div className="border border-[#29B6E8]/30 bg-[#29B6E8]/10 rounded-sm p-3 text-xs text-white/75" data-testid="edit-led-by-dolibarr">
-          Diese Mitgliedschaft führt <strong>Dolibarr</strong>: Status, Mitgliedsart, Nummer und Beginn kommen von dort und lassen sich hier nicht ändern. Rolle und Notiz bleiben hier.
+          Diese Mitgliedschaft führt <strong>Dolibarr</strong>: Status, Mitgliedsart, Nummer und Beginn kommen von dort und lassen sich hier nicht ändern. Aufgabe und Notiz bleiben hier.
         </div>
       )}
       {exitText && (
@@ -366,7 +366,7 @@ function EditModal({ entry, meta, onClose, onSave }) {
         <TextField label="Mitglied seit Jahr" type="number" disabled={led} min="1900" max={new Date().getFullYear()} value={form.member_since_year} onChange={(v) => set("member_since_year", v)} placeholder="z.B. 2024" testId="edit-member-since-year" />
         <SelectField label="Monat optional" disabled={led} value={form.member_since_month} onChange={(v) => set("member_since_month", v)} options={MONTHS} testId="edit-member-since-month" />
       </FormGrid>
-      <TextField label="Interne Rolle" value={form.internal_role} onChange={(v) => set("internal_role", v)} placeholder="z.B. Vorstand, Captain, Helfer" testId="edit-role" />
+      <TextField label="Aufgabe im Verein" value={form.internal_role} onChange={(v) => set("internal_role", v)} placeholder="z.B. Vorstand, Captain, Helfer" hint="Sieht nur das Mitglied selbst und die Verwaltung, nie die Öffentlichkeit." testId="edit-role" />
       <TextAreaField label="Interne Notizen (sieht das Mitglied nicht)" value={form.notes} onChange={(v) => set("notes", v)} rows={3} testId="edit-notes" />
       <p className="text-xs text-white/55" data-testid="edit-show-number">Mitgliedsnummer öffentlich: <strong className="text-white/80">{m.show_member_number_publicly ? "ja" : "nein"}</strong> – das entscheidet das Mitglied unter „Meine Mitgliedschaft“.</p>
     </AdminSheet>

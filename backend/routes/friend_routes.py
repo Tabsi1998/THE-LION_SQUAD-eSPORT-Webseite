@@ -29,14 +29,13 @@ def _public_user(user: dict | None) -> dict | None:
         "username": user.get("username"),
         "display_name": user.get("display_name"),
         "avatar_url": user.get("avatar_url"),
-        "role": user.get("role"),
     }
 
 
 async def _active_user_or_404(db, user_id: str) -> dict:
     user = await db.users.find_one(
         {"id": user_id, "is_active": True, "is_banned": {"$ne": True}},
-        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1, "role": 1},
+        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1},
     )
     if not user:
         raise HTTPException(status_code=404, detail="Benutzer nicht gefunden")
@@ -48,7 +47,7 @@ async def _hydrate(rows: list[dict], me_id: str) -> list[dict]:
     user_ids = list({row.get("requester_id") for row in rows} | {row.get("recipient_id") for row in rows})
     users = {u["id"]: u for u in await db.users.find(
         {"id": {"$in": user_ids}},
-        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1, "role": 1},
+        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1},
     ).to_list(500)}
     out = []
     for row in rows:

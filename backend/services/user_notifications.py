@@ -21,6 +21,10 @@ DEFAULT_COOLDOWN_SECONDS = {
     "team_chat_message": 2 * 60,
     "news_mention": 10 * 60,
     "membership_update": 10 * 60,
+    # Kronen (#2126): schaltet jemand „Erfolge öffentlich“ hin und her, wechseln sie jedes Mal - höchstens eine Meldung je Art.
+    "crown_gained": 6 * 60 * 60,
+    "crown_changed": 6 * 60 * 60,
+    "crown_lost": 6 * 60 * 60,
 }
 NO_COOLDOWN_KINDS = {
     "direct_message",

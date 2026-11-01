@@ -57,7 +57,6 @@ def _public_user(user: dict | None) -> dict | None:
         "username": user.get("username"),
         "display_name": user.get("display_name"),
         "avatar_url": user.get("avatar_url"),
-        "role": user.get("role"),
         "is_club_member": bool(user.get("is_club_member")),
         "dm_privacy": user.get("dm_privacy") or "everyone",
     }
@@ -122,7 +121,7 @@ async def _message_permission(db, sender: dict, recipient: dict) -> tuple[bool, 
             return True, ""
         return False, "Dieser Benutzer nimmt Direktnachrichten nur von Vereinsmitgliedern an."
     if privacy == "admins_only":
-        return False, "Dieser Benutzer nimmt Direktnachrichten nur von Admins an."
+        return False, "Dieser Benutzer nimmt Direktnachrichten nur von Moderation und Admins an."
     if privacy == "none":
         return False, "Dieser Benutzer nimmt aktuell keine Direktnachrichten an."
     return False, "Direktnachrichten sind für diesen Benutzer nicht verfügbar."

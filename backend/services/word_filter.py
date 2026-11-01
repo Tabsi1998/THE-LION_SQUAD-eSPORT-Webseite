@@ -31,10 +31,10 @@ ACTIONS = ("hold", "flag")
 COMPACT_MIN = 5          # ab dieser Länge (ohne Trennzeichen) zählt auch ein Fund mit Trennzeichen oder als Wortteil
 TERM_MIN, TERM_MAX = 2, 60
 MAX_ENTRIES = 2000
-KINDS = ("direct", "team", "tournament", "match", "bio", "display_name", "team_name", "username", "ingame_name")
+KINDS = ("direct", "team", "tournament", "match", "bio", "display_name", "preferred_role", "team_name", "username", "ingame_name")
 CHAT_COLLECTIONS = {"direct": "direct_messages", "team": "team_chat_messages", "tournament": "tournament_chat_messages", "match": "match_chat_messages"}
 KIND_LABELS = {"direct": "Direktnachricht", "team": "Team-Chat", "tournament": "Turnier-Chat", "match": "Match-Chat", "bio": "Profil-Bio",
-               "display_name": "Anzeigename", "team_name": "Teamname", "username": "Benutzername", "ingame_name": "Ingame-Name"}
+               "display_name": "Anzeigename", "preferred_role": "Bevorzugte Rolle", "team_name": "Teamname", "username": "Benutzername", "ingame_name": "Ingame-Name"}
 _UMLAUTS = {"ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss"}
 _LEET = str.maketrans({"0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "8": "b", "@": "a", "$": "s", "€": "e", "!": "i", "|": "l", "+": "t"})
 _NON_ALNUM = re.compile(r"[^a-z0-9]+")

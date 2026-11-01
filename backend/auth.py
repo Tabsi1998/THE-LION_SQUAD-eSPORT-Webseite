@@ -327,9 +327,9 @@ def _decode(token: str) -> dict:
     try:
         return jwt.decode(token, get_jwt_secret(), algorithms=[JWT_ALGORITHM])
     except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expired")
+        raise HTTPException(status_code=401, detail="Deine Anmeldung ist abgelaufen.")
     except jwt.InvalidTokenError:
-        raise HTTPException(status_code=401, detail="Invalid token")
+        raise HTTPException(status_code=401, detail="Deine Anmeldung ist ungültig.")
 
 
 def _extract_token(request: Request) -> str | None:
@@ -361,15 +361,15 @@ async def touch_session_activity(db, user_id: str, family_id: str, now: datetime
 async def get_current_user(request: Request) -> dict:
     token = _extract_token(request)
     if not token:
-        raise HTTPException(status_code=401, detail="Not authenticated")
+        raise HTTPException(status_code=401, detail="Bitte melde dich an.")
     payload = _decode(token)
     if payload.get("type") != "access":
-        raise HTTPException(status_code=401, detail="Invalid token type")
+        raise HTTPException(status_code=401, detail="Deine Anmeldung ist ungültig.")
     db = get_db()
     user_id = payload.get("sub")
     session_id = payload.get("sid")
     if not user_id or not session_id:
-        raise HTTPException(status_code=401, detail="Session expired")
+        raise HTTPException(status_code=401, detail="Deine Sitzung ist abgelaufen. Bitte melde dich neu an.")
     now = datetime.now(timezone.utc)
     session_ok = False
     family_id = payload.get("fam")
@@ -406,16 +406,16 @@ async def get_current_user(request: Request) -> dict:
             if not expires_at or expires_at > now:
                 session_ok = True
     if not session_ok:
-        raise HTTPException(status_code=401, detail="Session expired")
+        raise HTTPException(status_code=401, detail="Deine Sitzung ist abgelaufen. Bitte melde dich neu an.")
     if family_id:
         await touch_session_activity(db, user_id, family_id, now)
     user = await db.users.find_one({"id": user_id}, private_projection())
     if not user:
-        raise HTTPException(status_code=401, detail="User not found")
+        raise HTTPException(status_code=401, detail="Dieses Konto gibt es nicht mehr.")
     if user.get("is_active") is False:
-        raise HTTPException(status_code=403, detail="Account is inactive")
+        raise HTTPException(status_code=403, detail="Dieses Konto ist deaktiviert.")
     if user.get("is_banned"):
-        raise HTTPException(status_code=403, detail="Account is banned")
+        raise HTTPException(status_code=403, detail="Dieses Konto ist gesperrt.")
     # Attach membership for downstream guards / UI
     membership = await db.memberships.find_one({"user_id": user["id"]}, {"_id": 0})
     user["membership"] = membership
@@ -469,7 +469,7 @@ def require_role(*allowed_roles: str):
         for r in allowed_roles:
             if user_level >= ROLE_LEVELS.get(r, 99):
                 return user
-        raise HTTPException(status_code=403, detail="Insufficient permissions")
+        raise HTTPException(status_code=403, detail="Dafür fehlen dir die Rechte.")
     return dep
 
 
