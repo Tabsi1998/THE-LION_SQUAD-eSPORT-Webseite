@@ -97,21 +97,25 @@ async def registration_detail(db, event: dict, registration_id: str) -> dict:
     return {**registration_row(registration), "note": registration.get("note"), "internal_note": registration.get("internal_note")}
 
 
-def counts(registrations: list[dict]) -> dict:
+def counts(registrations: list[dict], max_participants: int | None = None) -> dict:
     """„84 von 120 da“: Personen und Plätze (mit Begleitpersonen) - erwartet sind alle Angemeldeten."""
     by_status: dict[str, list[dict]] = {}
     for registration in registrations:
         by_status.setdefault(registration.get("status") or "", []).append(registration)
     expected = by_status.get("registered", []) + by_status.get("checked_in", [])
     here = by_status.get("checked_in", [])
+    expected_seats = sum(seats(r) for r in expected)
+    # Freie Plätze (#2127, EV6): die Warteliste rückt nicht von selbst nach - die Leitung sieht „1 Platz frei“.
+    spots_left = max(int(max_participants) - expected_seats, 0) if max_participants else None
     return {
         "open": len(by_status.get("registered", [])),
         "here": len(here),
         "waitlist": len(by_status.get("waitlist", [])),
         "all": len(registrations),
         "expected": len(expected),
-        "expected_seats": sum(seats(r) for r in expected),
+        "expected_seats": expected_seats,
         "here_seats": sum(seats(r) for r in here),
+        "spots_left": spots_left,
     }
 
 
@@ -167,7 +171,7 @@ async def lead_view(db, event: dict, *, query: str = "", filter_key: str = "open
             "max_participants": event.get("max_participants"), "allow_companions": bool(event.get("allow_companions")),
             "max_companions_per_registration": int(event.get("max_companions_per_registration") or 0),
         },
-        "counts": {**counts(registrations), "max_participants": event.get("max_participants")},
+        "counts": {**counts(registrations, event.get("max_participants")), "max_participants": event.get("max_participants")},
         "filter": filter_key,
         "registrations": [registration_row(r, full=full) for r in shown],
         "can_message": full,

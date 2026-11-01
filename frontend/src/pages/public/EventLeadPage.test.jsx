@@ -138,6 +138,28 @@ test("Nachricht an alle: Vorlage, Vorschau der Empfänger, erst nach Bestätigun
   expect(toast.success).toHaveBeenCalledWith("Gesendet an 3 Personen.");
 });
 
+test("„1 Platz frei“: Hinweis mit der Warteliste, nachrücken geht nur per Knopf", async () => {
+  apiMock.patch.mockResolvedValue({ data: {} });
+  const rows = ROWS.map((row) => (row.id === "r3" ? { ...row, status: "cancelled" } : row));
+  // Plätze: Max 1 + Paula 2 = 3 von 4, also einer frei.
+  renderLead({ ...VIEW, event: { ...VIEW.event, max_participants: 4 }, registrations: rows });
+  const hint = await screen.findByTestId("event-lead-free-hint");
+  expect(hint).toHaveTextContent("1 Platz frei · 1 auf der Warteliste");
+  expect(hint).toHaveTextContent("Als Nächste: Ella Wartend");
+  expect(apiMock.patch).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByTestId("event-lead-free-open"));
+  fireEvent.click(screen.getByTestId("event-lead-moveup-r4"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/events/e1/registrations/r4", { status: "registered" }));
+  expect(toast.success).toHaveBeenCalledWith("Ella Wartend ist nachgerückt und bekommt Bescheid.");
+});
+
+test("voll: kein Hinweis auf einen freien Platz", async () => {
+  renderLead({ ...VIEW, event: { ...VIEW.event, max_participants: 4 } });
+  expect(await screen.findByTestId("event-lead-counter")).toBeInTheDocument();
+  expect(screen.queryByTestId("event-lead-free-hint")).toBeNull();
+});
+
 test("ohne Recht: Hinweis statt Liste", async () => {
   apiMock.get.mockRejectedValue({ response: { status: 403, data: { detail: "Für diesen Bereich fehlt dir die Berechtigung." } } });
   render(

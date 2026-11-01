@@ -44,7 +44,14 @@ export function matchesSearch(row, query) {
   return words.every((word) => name.includes(word));
 }
 
+/** Die Warteliste in der Reihenfolge der Anmeldung - wer zuerst da war, steht oben. */
+export function waitlistRows(rows) {
+  return (rows || []).filter((row) => row.status === "waitlist")
+    .sort((a, b) => String(a.created_at || "").localeCompare(String(b.created_at || "")));
+}
+
 export function filterRows(rows, filter = "open", query = "") {
+  if (filter === "waitlist") return waitlistRows(rows).filter((row) => matchesSearch(row, query));
   const statuses = FILTER_STATUSES[filter] ?? null;
   return (rows || []).filter((row) => (!statuses || statuses.includes(row.status)) && matchesSearch(row, query));
 }
@@ -63,6 +70,27 @@ export function leadCounts(rows) {
     expected: registered.length + here.length,
     expected_seats: [...registered, ...here].reduce((sum, row) => sum + seats(row), 0),
     here_seats: here.reduce((sum, row) => sum + seats(row), 0),
+  };
+}
+
+/**
+ * „1 Platz frei“ (#2127, EV6): Die Warteliste rückt nicht von selbst nach, weil Plätze etwas kosten können - die Leitung
+ * sieht den freien Platz und rückt per Knopf nach. Ohne Warteliste oder ohne freien Platz: nichts.
+ */
+export function waitlistHint(rows, maxParticipants) {
+  const waiting = waitlistRows(rows);
+  if (!waiting.length) return null;
+  const max = Number(maxParticipants) || 0;
+  const free = max ? Math.max(max - leadCounts(rows).expected_seats, 0) : null;
+  if (max && !free) return null;
+  const next = waiting[0];
+  const needed = Number(next.seat_count) || 1;
+  const fits = free === null || needed <= free;
+  return {
+    free,
+    fits,
+    text: `${free === null ? "Keine Platzgrenze mehr" : `${free} ${free === 1 ? "Platz" : "Plätze"} frei`} · ${waiting.length} auf der Warteliste`,
+    next: `Als Nächste: ${next.display_name || "Teilnehmer"}${fits ? "" : ` – braucht ${needed} Plätze`}`,
   };
 }
 
@@ -95,7 +123,7 @@ export function messagePreview(count) {
 export function changeText(row, status) {
   const name = row?.display_name || "Die Person";
   if (status === "checked_in") return `${name} ist da.`;
-  if (status === "registered" && row?.status === "waitlist") return `${name} ist nachgerückt.`;
+  if (status === "registered" && row?.status === "waitlist") return `${name} ist nachgerückt und bekommt Bescheid.`;
   if (status === "registered" && row?.status === "checked_in") return `${name} ist wieder „noch nicht da“.`;
   return `${name}: ${STATUS_LABELS[status] || status}.`;
 }

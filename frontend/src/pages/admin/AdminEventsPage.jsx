@@ -284,6 +284,11 @@ export default function AdminEventsPage() {
                         <div>
                           <div className="font-bold text-white">{e.registration_summary?.reserved_seats || 0}{e.max_participants ? `/${e.max_participants}` : ""} Plätze</div>
                           <div className="text-[11px] text-white/40">{e.registration_summary?.registered_count || 0} Anm. · {e.registration_summary?.companion_count || 0} Begleitp.</div>
+                          {e.registration_summary?.waitlist_count ? (
+                            <div className="text-[11px] text-[#FFD700]" data-testid={`event-waitlist-${e.id}`}>
+                              {e.registration_summary.waitlist_count} Warteliste{e.registration_summary?.spots_left ? ` · ${e.registration_summary.spots_left} frei` : ""}
+                            </div>
+                          ) : null}
                         </div>
                       ) : "—"}
                     </td>

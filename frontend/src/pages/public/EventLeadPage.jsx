@@ -12,7 +12,7 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { viennaDateTime } from "@/lib/vienna";
 import {
   LEAD_FILTERS, MESSAGE_MAX, MESSAGE_TEMPLATES, STATUS_LABELS,
-  changeText, companionsText, counterText, filterRows, leadCounts, messagePreview, seatsText,
+  changeText, companionsText, counterText, filterRows, leadCounts, messagePreview, seatsText, waitlistHint,
 } from "@/lib/eventLead";
 
 // Anmeldungen & Einlass (#1372): /events/<slug>/leitung - nur für die Turnierleitung. An der Tür (Handy): Suchfeld und
@@ -62,6 +62,7 @@ export default function EventLeadPage() {
   const shown = useMemo(() => filterRows(rows, filter, query), [rows, filter, query]);
   const selected = rows.find((row) => row.id === selectedId) || null;
   const event = data?.event || {};
+  const freeHint = useMemo(() => waitlistHint(rows, data?.event?.max_participants), [rows, data?.event?.max_participants]);
 
   // Jede Änderung über den vorhandenen Weg der Anmeldungen: der Server prüft Plätze, Preis und Belohnung.
   const change = async (row, payload, { offerUndo = false } = {}) => {
@@ -156,6 +157,18 @@ export default function EventLeadPage() {
 
         <div className="mt-4 lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-6">
           <div>
+            {/* Niemand rückt von selbst nach (#2127, EV6): die Leitung sieht den freien Platz und entscheidet. */}
+            {freeHint ? (
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-sm border border-[#FFD700]/35 bg-[#FFD700]/5 px-4 py-3" role="status" data-testid="event-lead-free-hint">
+                <div className="min-w-0">
+                  <div className="text-sm font-bold text-[#FFD700]">{freeHint.text}</div>
+                  <div className="text-xs text-white/60 [overflow-wrap:anywhere]">{freeHint.next}</div>
+                </div>
+                {filter !== "waitlist" ? (
+                  <button type="button" onClick={() => setFilter("waitlist")} className="tls-btn tls-btn--secondary min-h-[44px] shrink-0 px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid="event-lead-free-open">Zur Warteliste</button>
+                ) : null}
+              </div>
+            ) : null}
             <div className="space-y-2" data-testid="event-lead-list">
               {!data ? <div className="py-10 text-center text-white/40">Wird geladen …</div> : null}
               {data && shown.length === 0 ? (
