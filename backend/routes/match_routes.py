@@ -1050,7 +1050,6 @@ async def post_match_chat(match_id: str, body: MatchChatCreate, request: Request
         "username": me.get("username"),
         "display_name": me.get("display_name"),
         "avatar_url": me.get("avatar_url"),
-        "role": me.get("role"),
     }
     return doc
 

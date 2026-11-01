@@ -29,7 +29,7 @@ import { seoTextPreview } from "@/lib/textPreview";
 import { headNameClass, isLongHeadName } from "@/lib/headName";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import {
-  Trophy, Flag, Medal, Shield, Calendar,
+  Trophy, Flag, Medal, Calendar,
   MapPin, Zap, TrendingUp, Lock, ExternalLink, Radio, Gamepad2, Globe,
   MessageSquare, UserPlus, UserCheck, X, Info, Cake, Crown,
   Monitor, Keyboard, BadgeCheck, Heart, Users, Sparkles, Copy, Award, Settings,
@@ -99,15 +99,6 @@ function formatPublicDate(value) {
   if (Number.isNaN(date.getTime())) return "";
   return viennaDate(date, { day: "2-digit", month: "long", year: "numeric" });
 }
-
-const ROLE_LABELS = {
-  player: "Spieler",
-  team_leader: "Teamleitung",
-  moderator: "Moderator",
-  tournament_admin: "Turnier-Admin",
-  club_admin: "Club-Admin",
-  superadmin: "Superadmin",
-};
 
 const MEMBERSHIP_TYPE_LABELS = {
   ordinary: "Ordentliches Mitglied",
@@ -597,11 +588,6 @@ export default function PublicProfilePage() {
               <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-white/55" data-testid="profile-identity">
                 <span>@{profile.username}</span>
                 <AccountLevelPill level={level.level} />
-                {profile.role && profile.role !== "player" && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 border border-[#FFD700]/40 text-[#FFD700] text-[10px] uppercase tracking-widest rounded-sm font-bold">
-                    <Shield className="w-3 h-3" /> {labelValue(profile.role, ROLE_LABELS)}
-                  </span>
-                )}
                 {liveStream && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 border border-[#FF3B30]/50 text-[#FF3B30] text-[10px] uppercase tracking-widest rounded-sm font-bold" data-testid="profile-live-pill">
                     <Radio className="w-3 h-3 animate-live" /> Live

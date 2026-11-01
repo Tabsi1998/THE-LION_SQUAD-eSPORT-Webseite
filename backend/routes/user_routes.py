@@ -624,7 +624,8 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
         "username": u["username"], "display_name": u.get("display_name"),
         "avatar_url": u.get("avatar_url"), "banner_url": u.get("banner_url"),
         "bio": u.get("bio") if public else None,
-        "role": u.get("role"), "created_at": u.get("created_at"),
+        # Keine Systemrolle (#2126): sie sagt Fremden, wer welche Rechte hat - die Verwaltung sieht sie unter „Alle Benutzer“.
+        "created_at": u.get("created_at"),
         "birth_date": _visible_field(u, "birth_date", public, ctx),
         "country": _visible_field(u, "country", public, ctx),
         "city": _visible_field(u, "city", public, ctx),
@@ -826,7 +827,8 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
             {"user_id": user_id}, {"_id": 0}).to_list(50)]
         teams = await db.teams.find(
             {"$or": [{"id": {"$in": team_ids}}, {"member_ids": user_id}]},
-            {"_id": 0},
+            # Nur was die Team-Kachel zeigt (#2126): der Rest des Team-Eintrags gehört auf die Teamseite.
+            {"_id": 0, "id": 1, "name": 1, "tag": 1, "logo_url": 1, "description": 1},
         ).to_list(50)
     return {
         **base,

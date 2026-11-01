@@ -57,7 +57,6 @@ def _public_user(user: dict | None) -> dict | None:
         "username": user.get("username"),
         "display_name": user.get("display_name"),
         "avatar_url": user.get("avatar_url"),
-        "role": user.get("role"),
         "is_club_member": bool(user.get("is_club_member")),
         "dm_privacy": user.get("dm_privacy") or "everyone",
     }

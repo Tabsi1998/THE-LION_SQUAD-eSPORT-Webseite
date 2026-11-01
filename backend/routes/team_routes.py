@@ -220,7 +220,7 @@ async def _enrich_team_chat(messages: list[dict]) -> list[dict]:
     user_ids = list({m.get("user_id") for m in messages if m.get("user_id")})
     users = {u["id"]: u for u in await db.users.find(
         {"id": {"$in": user_ids}},
-        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1, "role": 1},
+        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1},
     ).to_list(300)}
     for message in messages:
         author = users.get(message.get("user_id")) or {}
@@ -229,7 +229,6 @@ async def _enrich_team_chat(messages: list[dict]) -> list[dict]:
             "username": author.get("username"),
             "display_name": author.get("display_name") or author.get("username") or "Benutzer",
             "avatar_url": author.get("avatar_url"),
-            "role": author.get("role"),
         }
     return messages
 
