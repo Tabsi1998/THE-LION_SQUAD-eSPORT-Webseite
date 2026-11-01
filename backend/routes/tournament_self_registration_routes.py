@@ -27,7 +27,7 @@ from routes.tournament_registration_routes import WAITLIST_MOVE_UP_STATUSES, _ch
 from routes.tournament_router import router
 from services import word_filter
 from services.league_scope import is_league_staffel
-from services.match_audience import responsible_registration
+from services.match_audience import responsible_ids, responsible_registration, teams_by_id
 
 EDITABLE_STATUSES = {"pending", "approved", "waitlist"}
 MAX_ID_LENGTH = 128
@@ -59,13 +59,13 @@ def _edit_block_reason(tournament: dict, registration: dict) -> str | None:
 
 
 async def _leads_registration(db, registration: dict, me: dict) -> bool:
-    """Einzelanmeldung: die Person selbst. Team-Anmeldung: nur Kapitän und Co-Kapitän - auch wer das Team angemeldet hat,
-    ändert nach einem Wechsel in der Leitung nichts mehr."""
+    """Einzelanmeldung: die Person selbst. Team-Anmeldung: Kapitän und Co-Kapitän, beim Co-Team einer Liga Captain und
+    Vertreter (ohne beide die Teamleitung) - dieselbe Regel wie beim Einchecken (``match_audience``). Wer das Team einst
+    angemeldet hat, ändert nach einem Wechsel in der Leitung nichts mehr: darum zählt ``user_id`` hier nicht."""
     if not registration.get("team_id"):
         return registration.get("user_id") == me["id"]
-    team = await db.teams.find_one({"id": registration["team_id"]}, {"_id": 0, "leader_id": 1, "co_leader_ids": 1})
-    return bool(team) and (team.get("leader_id") == me["id"] or me["id"] in (team.get("co_leader_ids") or []))
-
+    teams = await teams_by_id(db, [registration])
+    return me["id"] in responsible_ids({**registration, "user_id": None}, teams.get(registration["team_id"]))
 
 async def _game_of(db, tournament: dict) -> dict | None:
     game = await db.games.find_one({"id": tournament.get("game_id")}, {"_id": 0}) if tournament.get("game_id") else None

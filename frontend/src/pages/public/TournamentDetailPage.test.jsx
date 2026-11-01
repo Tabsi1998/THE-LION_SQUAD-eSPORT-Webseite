@@ -88,8 +88,8 @@ test("abgelehnte Anmeldung: entfernen führt zurück zu „Jetzt anmelden“", a
   expect(screen.queryByTestId("tournament-my-stand")).toBeNull();
 });
 
-// Angaben ändern (#2113, L-A2): nur für die Person selbst bzw. die Teamleitung - ein Teammitglied sieht den Hinweis.
-test("Angaben ändern: Link für die eigene Anmeldung, Teammitglied bekommt nur den Hinweis", async () => {
+// Angaben ändern (#2113, L-A2): der Server entscheidet (`can_edit`) - ein Teammitglied sieht nur den Hinweis.
+test("Angaben ändern: Link, wenn der Server es erlaubt; Teammitglied bekommt nur den Hinweis", async () => {
   apiMock.get.mockImplementation((path) => {
     if (path === "/tournaments/cup") return Promise.resolve({ data: base });
     if (path === "/tournaments/t1/registrations") return Promise.resolve({ data: [{ id: "r1", tournament_id: "t1", user_id: "u1", status: "approved" }] });
@@ -111,7 +111,6 @@ test("Angaben ändern: Link für die eigene Anmeldung, Teammitglied bekommt nur 
   renderPage();
   expect(await screen.findByTestId("tournament-unregister-note")).toHaveTextContent("kann nur die Teamleitung");
   expect(screen.queryByTestId("my-registration-edit")).toBeNull();
-  expect(apiMock.get).not.toHaveBeenCalledWith("/tournaments/t1/my-registration", expect.anything());
 });
 
 // Map-Pool (#1616): mit Spiel lädt die Seite die Pools und zeigt sie als Karten; ohne Spiel fragt sie gar nicht.

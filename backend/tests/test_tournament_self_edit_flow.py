@@ -10,6 +10,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow, new_id  # noqa: E402
 
+LEAGUE = {"league_id": "l1", "season_id": "s1", "division_id": "d1", "staffel": "A"}
 FIELDS = [{"key": "riot", "label": "Riot-ID", "required": True, "help_text": "Name#TAG"},
           {"key": "steam", "label": "Steam", "required": False}]
 
@@ -175,3 +176,46 @@ async def test_rejected_registration_can_be_removed_and_registered_anew(flow):
     fresh = await flow.post(f"/api/tournaments/{tournament['id']}/register", json=body)
     assert fresh.status_code == 200, fresh.text
     assert fresh.json()["id"] != registration["id"] and fresh.json()["status"] == "approved"
+
+
+async def _league_squad(flow, *, with_captain=True, **fields):
+    tournament = await flow.create_tournament(team_mode="team", team_size=2, league_context=LEAGUE, **fields)
+    leader = await flow.add_user(name=f"kapitaen-{new_id()[:6]}")
+    captain = await flow.add_user(name=f"captain-{new_id()[:6]}")
+    team_id, squad_id = new_id(), new_id()
+    await flow.db.teams.insert_one({"id": team_id, "name": "Rudel", "tag": "RDL", "leader_id": leader["id"], "co_leader_ids": [],
+                                    "member_ids": [leader["id"], captain["id"]]})
+    squad = {"id": squad_id, "team_id": team_id, "name": "Erste", "status": "active", "member_ids": [captain["id"]]}
+    if with_captain:
+        squad["captain_id"] = captain["id"]
+    await flow.db.team_squads.insert_one(squad)
+    registration = {"id": new_id(), "tournament_id": tournament["id"], "user_id": None, "team_id": team_id, "squad_id": squad_id, "status": "approved",
+                    "registration_type": "team", "ingame_name": "Rudel", "display_name": "[RDL] Rudel", "discord": "alt", "player_ids": {}}
+    await flow.db.tournament_registrations.insert_one(dict(registration))
+    return tournament, registration, leader, captain
+
+
+@pytest.mark.asyncio
+async def test_league_squad_captain_changes_the_contact_the_lead_stands_back(flow):
+    """Liga-Co-Team ohne ``user_id``: Captain und Vertreter handeln, die Leitung des Hauptteams tritt zurück."""
+    tournament, registration, leader, captain = await _league_squad(flow)
+    flow.act_as(captain)
+    view = (await flow.get(f"/api/tournaments/{tournament['id']}/my-registration")).json()
+    assert view["can_edit"] is True and view["ids_locked"] is True
+    changed = await flow.patch(f"/api/tournaments/{tournament['id']}/my-registration", json={"discord": "neu"})
+    assert changed.status_code == 200, changed.text
+    assert (await _stored(flow, registration))["discord"] == "neu"
+    flow.act_as(leader)
+    assert (await flow.get(f"/api/tournaments/{tournament['id']}/my-registration")).status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_league_squad_without_captain_the_lead_changes_the_contact(flow):
+    tournament, registration, leader, captain = await _league_squad(flow, with_captain=False)
+    flow.act_as(leader)
+    assert (await flow.get(f"/api/tournaments/{tournament['id']}/my-registration")).json()["can_edit"] is True
+    changed = await flow.patch(f"/api/tournaments/{tournament['id']}/my-registration", json={"discord": "neu"})
+    assert changed.status_code == 200, changed.text
+    assert (await _stored(flow, registration))["discord"] == "neu"
+    flow.act_as(captain)
+    assert (await flow.get(f"/api/tournaments/{tournament['id']}/my-registration")).status_code == 404

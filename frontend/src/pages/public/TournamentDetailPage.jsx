@@ -321,9 +321,9 @@ function TournamentDetailView() {
   const finished = ["completed", "results_published", "archived"].includes(t.status);
   const subPage = (part) => `/tournaments/${t.slug || t.id}/${part}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`;
   // Eigene Anmeldung (#2113): wer sie führt - die Person selbst, bei Teams Kapitän und Co-Kapitän. Eine abgelehnte nimmt
-  // sie selbst weg, solange das Turnier nicht läuft (dieselbe Grenze wie beim Server).
+  // sie selbst weg, solange das Turnier nicht läuft (dieselbe Grenze wie beim Server). Ob Angaben änderbar sind, sagt der
+  // Server (`can_edit`) - beim Co-Team einer Liga sind es Captain und Vertreter, das kennt `my_role` nicht.
   const leadsMyTeam = ["leader", "co_leader"].includes(myRegTeam?.my_role);
-  const editsMyReg = !!myReg && (myReg.team_id ? leadsMyTeam : myReg.user_id === user?.id);
   const respondsForMyReg = !!myReg && (myReg.user_id === user?.id || leadsMyTeam || !!myRegTeam?.can_manage);
   const canRemoveRejected = !leagueSquad && respondsForMyReg && myReg?.status === "rejected" && !["live", "paused", "completed", "results_published", "archived"].includes(t.status);
   // Check-in-Ende (#2124): dieselbe Regel wie „Dein Stand“, die App und der Server - danach kein Knopf mehr.
@@ -479,7 +479,7 @@ function TournamentDetailView() {
           <MyStandCard tournament={t} registration={myReg} team={myRegTeam} isTeamTournament={isTeamTournament} canCheckIn={false} staffOnlyCheckIn={staffOnlyCheckIn}
             canUnregister={canSelfUnregister} leagueSquad={leagueSquad} onUnregister={handleUnregister} busy={loading} scheduleTo={subPage("matches")}
             responsible={respondsForMyReg} canRemoveRejected={canRemoveRejected} onRemoveRejected={handleRemoveRejected}
-            detailsEdit={editsMyReg ? <MyRegistrationEdit tournament={t} registration={myReg} onSaved={load} /> : null} />
+            detailsEdit={myReg ? <MyRegistrationEdit tournament={t} registration={myReg} onSaved={load} /> : null} />
           {/* Nach dem Ende (#1221) kein Kalender-Knopf mehr. */}
           <TournamentTimeline tournament={t} calendarItem={tournamentIsOver(t) ? null : calendarItem} />
           {/* Freunde beim Turnier (#1188 Teil 2): nur mit Konto, nur bestätigte Freunde, die es erlauben. */}

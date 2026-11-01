@@ -49,6 +49,6 @@ Die Turnierleitung entscheidet einen Einspruch und korrigiert das Ergebnis; beid
   vergeben“, das auf der Website erledigen.
 - **Abmelden** einer Staffel geht nicht selbst („Austritt nur über die Turnierleitung“) – im Matchchat oder direkt bei
   der Turnierleitung melden.
-- **Angaben ändern** auf der Staffel geht nur für den Discord-Kontakt und nur für die Teamleitung: Name und Spiel-ID stehen
-  je Season im Liga-Kader, ändern kann sie nur die Liga-Leitung.
+- **Angaben ändern** auf der Staffel geht nur für den Discord-Kontakt: Das dürfen Captain und Vertreter, ohne beide die
+  Teamleitung. Name und Spiel-ID stehen je Season im Liga-Kader, ändern kann sie nur die Liga-Leitung.
 - **Konto löschen** geht erst, wenn die Rolle abgegeben ist; **Meine Daten** nennt den Weg.
