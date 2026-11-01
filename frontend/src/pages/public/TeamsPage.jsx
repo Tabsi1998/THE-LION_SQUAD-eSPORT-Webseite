@@ -248,6 +248,8 @@ function TeamDetail({ id }) {
   const canEdit = !!user && (!!team.can_manage || leadsTeam);
   const canRemoveMembers = !!user && (!!team.can_remove_members || leadsTeam);
   const canDissolve = !!user && (!!team.can_dissolve || team.leader_id === user.id);
+  // Rollen und Übergabe (#2128, TM6): auch der Club-Admin - sonst säße ein Team ohne Teamleitung fest.
+  const canChangeRoles = !!user && (!!team.can_change_roles || team.leader_id === user.id);
   const teamNeedsSecondFactor = !!user && !canEdit && !!team.admin_needs_second_factor && needsSecondFactor(user);
   // Teambanner (#230): eine Auszeichnung des Teams im Kopf; nur die Teamleitung wählt, der Server prüft.
   const featureTeamAward = async (awardId) => {
@@ -317,7 +319,9 @@ function TeamDetail({ id }) {
     await runAction(async () => {
       if (!await confirm({
         title: "Teamleitung übergeben?",
-        description: `${m.display_name || m.username} übernimmt die Teamleitung. Du gehörst danach zur Co-Leitung.`,
+        description: team.leader_id === user?.id
+          ? `${m.display_name || m.username} übernimmt die Teamleitung. Du gehörst danach zur Co-Leitung.`
+          : `${m.display_name || m.username} übernimmt die Teamleitung. Die bisherige Teamleitung gehört danach zur Co-Leitung – ein gelöschtes Konto nicht.`,
         confirmLabel: "Übertragen",
         tone: "info",
       })) return;
@@ -408,8 +412,8 @@ function TeamDetail({ id }) {
               const isCo = (team.co_leader_ids || []).includes(m.id);
               const isMe = user && user.id === m.id;
               const showKick = canRemoveMembers && !isLead && !isMe;
-              const showRole = !!user && team.leader_id === user.id && !isLead;
-              const showTransfer = !!user && team.leader_id === user.id && !isLead && !m.is_gone;
+              const showRole = canChangeRoles && !isLead;
+              const showTransfer = canChangeRoles && !isLead && !m.is_gone;
               const roleLabel = ROLE_LABELS[memberRole(team, m)];
               const roleColor = isLead ? "text-[#FFD700] border-[#FFD700]/40 bg-[#FFD700]/5" :
                                 isCo ? "text-[#29B6E8] border-[#29B6E8]/40 bg-[#29B6E8]/5" :

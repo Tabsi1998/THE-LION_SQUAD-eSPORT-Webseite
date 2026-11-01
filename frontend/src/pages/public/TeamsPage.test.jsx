@@ -108,7 +108,42 @@ test("Teamleitung: Hinweis „erst übergeben oder auflösen“ statt „Team ve
   expect(screen.queryByTestId("team-leave-leader-hint")).toBeNull();
 });
 
-// Kein Teamleitung aus einem gelöschten Konto (#2113): „Zur Teamleitung machen“ fehlt dort.
+// „Team verlassen“ mit Rückfrage (#2128, TM4) - wie in der App: erst das Ja verlässt das Team.
+test("Team verlassen fragt nach; abgelehnt passiert nichts", async () => {
+  authState.user = { id: "u-3", username: "lunabyte" };
+  serve({ ...TEAM, can_manage: false });
+  apiMock.post.mockResolvedValue({ data: { ok: true } });
+  renderAt("/teams/t-1");
+  confirmMock.mockResolvedValueOnce(false);
+  fireEvent.click(await screen.findByTestId("team-leave"));
+  await waitFor(() => expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Team verlassen?" })));
+  expect(apiMock.post).not.toHaveBeenCalled();
+  confirmMock.mockResolvedValueOnce(true);
+  fireEvent.click(screen.getByTestId("team-leave"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/teams/t-1/leave"));
+});
+
+// Verwaistes Team (#2128, TM6): Club-Admins sehen Rollen und Übergabe, wie es der Server erlaubt.
+test("Club-Admin: Rollen und Übergabe auch ohne eigene Teamleitung; Turnierleitung ohne das Recht nicht", async () => {
+  authState.user = { id: "u-adm", username: "vorstand" };
+  serve({ ...TEAM, can_manage: true, can_remove_members: true, can_dissolve: true, can_change_roles: true });
+  const { unmount } = renderAt("/teams/t-1");
+  expect(await screen.findByTestId("team-transfer-u-co")).toBeInTheDocument();
+  expect(screen.getByTestId("team-demote-u-co")).toBeInTheDocument();
+  expect(screen.getByTestId("team-promote-u-3")).toBeInTheDocument();
+  confirmMock.mockResolvedValueOnce(false);
+  fireEvent.click(screen.getByTestId("team-transfer-u-co"));
+  await waitFor(() => expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ description: expect.stringContaining("bisherige Teamleitung") })));
+  unmount();
+
+  serve({ ...TEAM, can_manage: true, can_remove_members: false, can_change_roles: false });
+  renderAt("/teams/t-1");
+  await screen.findByTestId("team-manage-members");
+  expect(screen.queryByTestId("team-transfer-u-co")).toBeNull();
+  expect(screen.queryByTestId("team-promote-u-3")).toBeNull();
+});
+
+// Keine Teamleitung aus einem gelöschten Konto (#2113): „Zur Teamleitung machen“ fehlt dort.
 test("gelöschtes Mitglied: kein Knopf „Zur Teamleitung machen“", async () => {
   serve({ ...TEAM, members: [MEMBERS[0], { ...MEMBERS[2], is_gone: true }, MEMBERS[1]] });
   renderAt("/teams/t-1");

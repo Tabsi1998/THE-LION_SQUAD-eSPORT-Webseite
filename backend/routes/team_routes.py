@@ -317,12 +317,17 @@ def _viewer_rights(team: dict, user: dict | None) -> dict:
     statt Rollen selbst zu deuten. ``admin_needs_second_factor``: eine Admin-Rolle, der nur die bestätigte
     Zwei-Faktor-Anmeldung fehlt - dann zeigen sie „2FA einrichten“ statt der Verwaltung."""
     if not user:
-        return {"can_manage": False, "can_remove_members": False, "can_dissolve": False, "admin_needs_second_factor": False}
+        return {"can_manage": False, "can_remove_members": False, "can_dissolve": False, "can_change_roles": False,
+                "admin_needs_second_factor": False}
     leads = team.get("leader_id") == user.get("id") or user.get("id") in (team.get("co_leader_ids") or [])
+    owns = team.get("leader_id") == user.get("id") or _team_admin(user, TEAM_OWNER_ADMIN_ROLES)
     return {
         "can_manage": _can_manage(team, user),
         "can_remove_members": _can_manage_team(team, user),
-        "can_dissolve": team.get("leader_id") == user.get("id") or _team_admin(user, TEAM_OWNER_ADMIN_ROLES),
+        "can_dissolve": owns,
+        # Rollen ändern und die Leitung übergeben (#2128, TM6): Teamleitung, Club-Admin, Superadmin - auch für ein Team,
+        # dessen Teamleitung nicht mehr da ist.
+        "can_change_roles": owns,
         "admin_needs_second_factor": not leads and admin_role_without_second_factor(user, TEAM_ADMIN_ROLES),
     }
 
@@ -1086,7 +1091,8 @@ async def transfer_leader(team_id: str, body: dict, me: dict = Depends(get_curre
         # Die neue Teamleitung ist nicht zugleich Co-Leitung; die bisherige wird es.
         "$pull": {"co_leader_ids": new_leader_id},
     })
-    if old_leader:
+    # Ein gelöschtes Konto rückt nicht in die Co-Leitung (Admin übergibt ein verwaistes Team, #2128 TM6).
+    if old_leader and not _account_gone(await db.users.find_one({"id": old_leader}, {"_id": 0, "id": 1, "is_active": 1, "anonymized_at": 1})):
         await db.teams.update_one({"id": team_id}, {"$addToSet": {"co_leader_ids": old_leader}})
         await db.team_members.update_one(
             {"team_id": team_id, "user_id": old_leader},
