@@ -157,3 +157,56 @@ async def test_tiktok_stays_on_the_public_profile_and_follows_its_level(flow):
     for key in ("tiktok", "tiktok_handle"):
         await flow.db.users.update_one({"id": person["id"]}, {"$set": {"profile_visibility": {key: "members"}}})
         assert not (await flow.get(f"/api/users/public/{person['username']}")).json().get("tiktok_handle")
+
+
+async def _public_person(flow, **fields):
+    person = await flow.add_user(name=f"person-{new_id()[:6]}")
+    await flow.db.users.update_one({"id": person["id"]}, {"$set": {"privacy_public_profile": True, **fields}})
+    return person
+
+
+async def _tiktok_seen_by_guest(flow, person):
+    flow.act_as(None)
+    return (await flow.get(f"/api/users/public/{person['username']}")).json().get("tiktok_handle")
+
+
+@pytest.mark.asyncio
+async def test_tiktok_without_a_level_is_not_public(flow):
+    """Eingetragen, als das Feld nirgends erschien und keine Stufe wählbar war: wird nicht ungefragt öffentlich."""
+    person = await _public_person(flow, tiktok_handle="schon_gepflegt")
+    assert not await _tiktok_seen_by_guest(flow, person)
+    flow.act_as(person)
+    assert (await flow.get(f"/api/users/public/{person['username']}")).json()["tiktok_handle"] == "schon_gepflegt"
+
+
+@pytest.mark.asyncio
+async def test_tiktok_with_a_chosen_level_follows_it(flow):
+    person = await _public_person(flow, tiktok_handle="schon_gepflegt", profile_visibility={"tiktok": "public"})
+    assert await _tiktok_seen_by_guest(flow, person) == "schon_gepflegt"
+    await flow.db.users.update_one({"id": person["id"]}, {"$set": {"profile_visibility": {"tiktok": "members"}}})
+    assert not await _tiktok_seen_by_guest(flow, person)
+
+
+@pytest.mark.asyncio
+async def test_other_platforms_keep_the_public_default(flow):
+    person = await _public_person(flow, youtube_handle="kanal", tiktok_handle="schon_gepflegt")
+    flow.act_as(None)
+    assert (await flow.get(f"/api/users/public/{person['username']}")).json()["youtube_handle"] == "kanal"
+
+
+@pytest.mark.asyncio
+async def test_migration_keeps_what_was_already_public_for_tiktok(flow):
+    """Leeres Feld und gleicher Wert: Beides war über den alten Eintrag schon öffentlich und bleibt es."""
+    moved = await _public_person(flow)
+    await _social(flow, moved["id"], "tiktok", "alt_oeffentlich")
+    same = await _public_person(flow, tiktok_handle="gleich")
+    await _social(flow, same["id"], "tiktok", "gleich")
+    hidden = await _public_person(flow, tiktok_handle="gleich2")
+    await _social(flow, hidden["id"], "tiktok", "gleich2", visibility="private")
+    chosen = await _public_person(flow, tiktok_handle="gleich3", profile_visibility={"tiktok": "private"})
+    await _social(flow, chosen["id"], "tiktok", "gleich3")
+    await user_socials_migration.migrate(flow.db)
+    assert await _tiktok_seen_by_guest(flow, moved) == "alt_oeffentlich"
+    assert await _tiktok_seen_by_guest(flow, same) == "gleich"
+    assert not await _tiktok_seen_by_guest(flow, hidden)
+    assert not await _tiktok_seen_by_guest(flow, chosen)

@@ -60,6 +60,11 @@ async def migrate(db, keep_lease: Callable[[], Awaitable[bool]] | None = None) -
                 kept += 1
                 continue
             same += 1
+            # TikTok ist ohne Stufe privat (user_routes.FIELD_DEFAULT_LEVELS, #2113): Dieser Eintrag war schon mit seiner
+            # Stufe sichtbar, und sie zieht mit um - beim Verschwinden des Eintrags ginge sie sonst verloren.
+            levels = user.get("profile_visibility") if isinstance(user.get("profile_visibility"), dict) else {}
+            if platform == "tiktok" and row.get("visibility") in LEVELS and not {"tiktok", "tiktok_handle"} & set(levels):
+                await db.users.update_one({"id": user["id"]}, {"$set": {"profile_visibility": {**levels, "tiktok": row["visibility"]}}})
         else:
             # Ohne gültige Stufe war der Eintrag unsichtbar (das Profil las nur „public“) - das bleibt so.
             level = row.get("visibility") if row.get("visibility") in LEVELS else "private"

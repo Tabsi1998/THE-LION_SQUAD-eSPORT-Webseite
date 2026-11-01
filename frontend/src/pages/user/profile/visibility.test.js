@@ -10,6 +10,15 @@ test("ohne Einstellung ist alles oeffentlich", () => {
   expect(groupLevel({}, contact)).toBe("public");
 });
 
+test("TikTok ist ohne gewählte Stufe privat, eine gewählte Stufe gilt (#2113)", () => {
+  const social = VISIBILITY_GROUPS.find((group) => group.k === "social");
+  expect(fieldLevel({}, "tiktok")).toBe("private");
+  expect(fieldLevel(undefined, "tiktok")).toBe("private");
+  expect(fieldLevel({ tiktok: "public" }, "tiktok")).toBe("public");
+  expect(groupLevel({}, social)).toBe("mixed");
+  expect(groupLevel(applyGroupLevel({}, social, "public"), social)).toBe("public");
+});
+
 test("die Schnellwahl setzt alle Felder der Gruppe und laesst andere Gruppen stehen", () => {
   const next = applyGroupLevel({ steam: "private" }, contact, "members");
   expect(next).toEqual({ steam: "private", email: "members", discord: "members", city: "members", country: "members" });

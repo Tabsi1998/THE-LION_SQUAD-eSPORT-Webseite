@@ -104,6 +104,11 @@ async def _viewer_context(db, viewer: dict | None, target_id: str) -> dict:
     return {"self": viewer.get("id") == target_id, "logged_in": True, "member": member or admin, "admin": admin}
 
 
+# Felder, die ohne gewählte Stufe nicht öffentlich sind (#2113): TikTok ließ sich pflegen, erschien aber nie im Profil und
+# hatte keine Stufe - wer es eingetragen hat, wurde nie gefragt. Gleich in pages/user/profile/visibility.js.
+FIELD_DEFAULT_LEVELS = {"tiktok": "private"}
+
+
 def _field_visible(user: dict, key: str, profile_public: bool, ctx: dict | None = None) -> bool:
     """Die Stufe eines Felds gegen den Betrachter: public → alle, community → eingeloggt, members →
     Vereinsmitglieder und Admin-Team, admins → Admin-Team, private → nur die Person selbst."""
@@ -115,7 +120,7 @@ def _field_visible(user: dict, key: str, profile_public: bool, ctx: dict | None 
     if ctx.get("self"):
         return True
     visibility_map = user.get("profile_visibility") or {}
-    visibility = next((visibility_map[a] for a in _visibility_aliases(key) if a in visibility_map), "public")
+    visibility = next((visibility_map[a] for a in _visibility_aliases(key) if a in visibility_map), FIELD_DEFAULT_LEVELS.get(key, "public"))
     if visibility == "public":
         return True
     if visibility == "community":
