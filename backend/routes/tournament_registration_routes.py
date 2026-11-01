@@ -40,7 +40,7 @@ from services.competition_versions import persist_competition_versions
 from services.heat_rebuild import evaluate_after_write
 from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
 from models import RegistrationCreate, RegistrationUpdate, RegistrationAdminCreate, now_utc, new_id
-from services import league_roster, onsite_access, tournament_event_gate, tournament_fees, tournament_guard
+from services import league_roster, onsite_access, tournament_event_gate, tournament_fees, tournament_guard, word_filter
 from services.query_filters import safe_regex
 from services.private_fields import private_projection
 from routes.tournament_common import (
@@ -614,6 +614,10 @@ async def _create_self_registration(db, tid: str, tournament: dict, body: Regist
     missing = _missing_game_fields(game, player_ids)
     if missing:
         raise HTTPException(status_code=400, detail=f"Für dieses Turnier fehlen Pflicht-IDs: {', '.join(missing)}")
+    # Ein selbst gewählter Name steht öffentlich in der Teilnehmerliste (#2113) - der eigene Anzeigename ist schon geprüft.
+    ingame_name = (body.ingame_name or "").strip()
+    if ingame_name and ingame_name not in {me.get("display_name"), me.get("username")}:
+        await word_filter.screen_field(db, ingame_name, kind="ingame_name", user_id=me["id"], ref_id=tid)
     # Count approved
     count = await db.tournament_registrations.count_documents(
         {"tournament_id": tid, "status": {"$in": ["pending", "approved", "checked_in"]}})

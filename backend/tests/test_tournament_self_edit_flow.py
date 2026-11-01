@@ -9,6 +9,7 @@ import pytest_asyncio
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow, new_id  # noqa: E402
+from services import word_filter  # noqa: E402
 
 LEAGUE = {"league_id": "l1", "season_id": "s1", "division_id": "d1", "staffel": "A"}
 FIELDS = [{"key": "riot", "label": "Riot-ID", "required": True, "help_text": "Name#TAG"},
@@ -229,3 +230,35 @@ async def test_preview_matches_do_not_end_self_edit(flow):
     await flow.db.matches_v2.insert_one({"id": new_id(), "tournament_id": tournament["id"], "status": "preview", "is_preview": True,
                                          "slots": [{"registration_id": registration["id"]}]})
     assert (await flow.get(f"/api/tournaments/{tournament['id']}/my-registration")).json()["can_edit"] is True
+
+
+@pytest.mark.asyncio
+async def test_word_filter_guards_the_ingame_name_and_says_so(flow):
+    await word_filter.save_config(flow.db, enabled=True, entries=[word_filter.clean_entry("schimpfwort", "hold")])
+    tournament, registration, _player = await _solo(flow)
+    refused = await flow.patch(f"/api/tournaments/{tournament['id']}/my-registration", json={"ingame_name": "Das Schimpfwort"})
+    assert refused.status_code == 400 and refused.json()["detail"].startswith("Ingame-Name enthält")
+    assert (await _stored(flow, registration))["ingame_name"] == "AlterName"
+
+    other = await flow.create_tournament()
+    person = await flow.add_user(name=f"neu-{new_id()[:6]}")
+    flow.act_as(person)
+    body = {"accept_rules": True, "accept_privacy": True, "ingame_name": "Das Schimpfwort"}
+    blocked = await flow.post(f"/api/tournaments/{other['id']}/register", json=body)
+    assert blocked.status_code == 400 and blocked.json()["detail"].startswith("Ingame-Name enthält")
+    assert await flow.db.tournament_registrations.count_documents({"tournament_id": other["id"]}) == 0
+    clean = await flow.post(f"/api/tournaments/{other['id']}/register", json={**body, "ingame_name": "Sauber"})
+    assert clean.status_code == 200 and clean.json()["ingame_name"] == "Sauber"
+
+
+@pytest.mark.asyncio
+async def test_protocol_keeps_old_and_new_name_never_the_ids(flow):
+    tournament, _registration, player = await _solo(flow)
+    await flow.patch(f"/api/tournaments/{tournament['id']}/my-registration", json={"ingame_name": "NeuerName", "player_ids": {"riot": "Neu#EUW"}})
+    audit = await flow.db.audit_logs.find_one({"action": "tournament.registration.self_update"}, {"_id": 0})
+    assert audit["data"]["ingame_name"] == {"from": "AlterName", "to": "NeuerName"}
+    assert "Neu#EUW" not in str(audit) and "Alt#EUW" not in str(audit)
+    # Mit dem Konto geht auch der Name aus dem Protokoll.
+    assert (await flow.post("/api/dsgvo/anonymize-me")).status_code == 200
+    audit = await flow.db.audit_logs.find_one({"action": "tournament.registration.self_update", "actor_id": player["id"]}, {"_id": 0})
+    assert "ingame_name" not in audit["data"]

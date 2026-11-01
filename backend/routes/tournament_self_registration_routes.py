@@ -159,7 +159,7 @@ async def update_my_registration(tid: str, body: RegistrationSelfUpdate, me: dic
                 if not name:
                     raise HTTPException(status_code=400, detail="Bitte einen Ingame-Namen eintragen.")
                 # Der Name steht öffentlich in der Teilnehmerliste - derselbe Wortfilter wie beim Anzeigenamen.
-                await word_filter.screen_field(db, name, kind="display_name", user_id=me["id"], ref_id=registration["id"])
+                await word_filter.screen_field(db, name, kind="ingame_name", user_id=me["id"], ref_id=registration["id"])
                 updates["ingame_name"] = name
     if changes.get("player_ids") is not None:
         game = await _game_of(db, tournament)
@@ -179,8 +179,10 @@ async def update_my_registration(tid: str, body: RegistrationSelfUpdate, me: dic
         if discord != (registration.get("discord") or None):
             updates["discord"] = discord
     if updates:
+        # Im Protokoll der Name von vorher und nachher (die Leitung findet die Person so wieder), von den IDs nur der Feldname.
+        names = {"ingame_name": {"from": registration.get("ingame_name"), "to": updates["ingame_name"]}} if "ingame_name" in updates else {}
         await _audit_tournament_action(db, "tournament.registration.self_update", me["id"], tid,
-                                       {"registration_id": registration["id"], "fields": sorted(updates)})
+                                       {"registration_id": registration["id"], "fields": sorted(updates), **names})
         updates["updated_at"] = now_utc().isoformat()
         await db.tournament_registrations.update_one({"id": registration["id"]}, {"$set": updates})
         registration = {**registration, **updates}
