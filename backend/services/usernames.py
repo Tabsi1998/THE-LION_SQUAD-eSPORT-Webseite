@@ -9,9 +9,9 @@ import re
 import unicodedata
 from urllib.parse import quote
 
-USERNAME_PATTERN = re.compile(r"[A-Za-z0-9_.-]{3,32}")
+USERNAME_PATTERN = re.compile(r"(?=.*[A-Za-z0-9])[A-Za-z0-9_.-]{3,32}")
 # Ohne Feldnamen: services/validation_messages.py setzt „Benutzername:“ davor.
-USERNAME_RULE = "3 bis 32 Zeichen, nur Buchstaben ohne Umlaute, Ziffern und _ . - (keine Leerzeichen)"
+USERNAME_RULE = "3 bis 32 Zeichen, nur Buchstaben ohne Umlaute, Ziffern und _ . - (keine Leerzeichen), mindestens ein Buchstabe oder eine Ziffer"
 
 
 def username_problem(username: str) -> str | None:

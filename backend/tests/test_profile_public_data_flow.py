@@ -159,7 +159,7 @@ async def test_old_long_or_empty_values_can_be_saved_unchanged(flow):
 
 
 # ---------------------------------------------------------------- PR12: Benutzername
-@pytest.mark.parametrize("name", ["ab", "x" * 33, "mit leerzeichen", "a/b", "a#b", "Jörg", "a?b", "a%b"])
+@pytest.mark.parametrize("name", ["ab", "x" * 33, "mit leerzeichen", "a/b", "a#b", "Jörg", "a?b", "a%b", "---", "...", "_._"])
 def test_new_usernames_follow_the_rule(name):
     from pydantic import ValidationError
     from models import AdminUserCreate, UserRegister
@@ -184,7 +184,7 @@ async def test_refused_username_says_why_in_german(flow):
     flow.act_as(await flow.add_user(role="superadmin", name="chefin"))
     refused = await flow.post("/api/users", json={"username": "mit leerzeichen", "email": "neu@verein-beispiel.at"})
     assert refused.status_code == 422
-    assert refused.json()["detail"][0]["msg"] == "Benutzername: 3 bis 32 Zeichen, nur Buchstaben ohne Umlaute, Ziffern und _ . - (keine Leerzeichen)."
+    assert refused.json()["detail"][0]["msg"] == "Benutzername: 3 bis 32 Zeichen, nur Buchstaben ohne Umlaute, Ziffern und _ . - (keine Leerzeichen), mindestens ein Buchstabe oder eine Ziffer."
 
 
 @pytest.mark.asyncio

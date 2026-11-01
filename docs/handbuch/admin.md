@@ -222,7 +222,7 @@ Wichtig:
   noch die **Aufgabe im Verein** (Admin → Mitglieder, früher „Interne Rolle“). Die Aufgabe sieht nur das Mitglied selbst
   und die Verwaltung.
 - **Benutzer anlegen:** Der Benutzername hat 3 bis 32 Zeichen: Buchstaben ohne Umlaute, Ziffern und `_ . -`, keine
-  Leerzeichen. „Max“ und „max“ gelten als derselbe Name. Das gilt nur für neue Konten: Ältere Konten behalten ihren Namen,
+  Leerzeichen, mindestens ein Buchstabe oder eine Ziffer. „Max“ und „max“ gelten als derselbe Name. Das gilt nur für neue Konten: Ältere Konten behalten ihren Namen,
   melden sich weiter mit ihrer E-Mail an und ihr Profil bleibt erreichbar. Nachträglich umbenennen lässt sich niemand.
 - Weitere Rechte-Themen (Vorstand besetzen, Dolibarr-Funktionen als Rechtequelle) stehen in [Rollen](../ROLLEN.md).
 

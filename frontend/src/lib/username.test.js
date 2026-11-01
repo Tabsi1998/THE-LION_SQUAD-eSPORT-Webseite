@@ -5,7 +5,7 @@ test.each(["abc", "x".repeat(32), "Max_Mustermann", "a.b-c_1", "  rund  "])("%s 
   expect(usernameProblem(name)).toBeNull();
 });
 
-test.each(["ab", "x".repeat(33), "mit leerzeichen", "a/b", "a#b", "Jörg", "a?b"])("%s ist nicht gültig", (name) => {
+test.each(["ab", "x".repeat(33), "mit leerzeichen", "a/b", "a#b", "Jörg", "a?b", "---", "...", "_._"])("%s ist nicht gültig", (name) => {
   expect(usernameProblem(name)).toBe(`Benutzername: ${USERNAME_RULE_HINT}`);
 });
 
