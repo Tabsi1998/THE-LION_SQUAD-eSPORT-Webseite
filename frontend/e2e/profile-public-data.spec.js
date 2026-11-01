@@ -84,6 +84,13 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       expect(await noSidewaysScroll(page)).toBe(true);
     });
 
+    test("als Gast: Nachricht schreiben führt zum Login und zurück zum richtigen Profil", async ({ page }) => {
+      await mockServer(page);
+      await page.goto("/u/alte%20schule");
+      await page.getByTestId("profile-actions").getByRole("button").first().click();
+      await expect(page).toHaveURL(/\/login\?next=%2Fu%2Falte%2520schule$/);
+    });
+
     test("eine lange alte Rolle ohne Leerzeichen bleibt im Kasten", async ({ page }) => {
       await mockServer(page, { profile: { ...OLD_NAME_PROFILE, preferred_role: "x".repeat(120) } });
       await page.goto("/u/alte%20schule");

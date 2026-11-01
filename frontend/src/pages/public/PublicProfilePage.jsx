@@ -456,7 +456,7 @@ export default function PublicProfilePage() {
 
   const updateFriendship = async (action) => {
     if (!user) {
-      nav(`/login?next=/u/${encodeURIComponent(profile.username)}`);
+      nav(`/login?next=${encodeURIComponent(`/u/${encodeURIComponent(profile.username)}`)}`);
       return;
     }
     try {
@@ -484,7 +484,7 @@ export default function PublicProfilePage() {
 
   const openMessage = () => {
     if (!user) {
-      nav(`/login?next=/u/${encodeURIComponent(profile.username)}`);
+      nav(`/login?next=${encodeURIComponent(`/u/${encodeURIComponent(profile.username)}`)}`);
       return;
     }
     nav(`/messages/${encodeURIComponent(profile.id)}`);
