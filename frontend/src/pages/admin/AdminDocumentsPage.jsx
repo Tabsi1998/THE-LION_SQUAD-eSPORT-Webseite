@@ -75,7 +75,7 @@ export default function AdminDocumentsPage() {
     })) return;
     try {
       const { data } = await api.delete(`/documents/${id}`);
-      toast.success(data?.file_removed === false ? "Gelöscht. Die Datei bleibt, weil sie noch anderswo verwendet wird oder schon fehlte." : "Gelöscht, samt Datei.");
+      toast.success(data?.file_retry ? "Gelöscht. Die Datei ist gerade gesperrt, das Löschen wird nachgeholt." : data?.file_removed === false ? "Gelöscht. Die Datei bleibt, weil sie noch anderswo verwendet wird oder schon fehlte." : "Gelöscht, samt Datei.");
       load();
     } catch (err) { toast.error(formatRequestError(err, "Dokument konnte nicht gelöscht werden.")); }
   };

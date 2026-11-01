@@ -161,7 +161,7 @@ erklären** (mit Wunschdatum, der letzte Tag wird in der Mitgliederverwaltung ge
   Die Liste sagt es in Worten: die Plakette **Alle**, **Mitglieder** oder **Vorstand** zeigt, wer ein Dokument sehen darf;
   darunter steht, wie oft es angesehen und heruntergeladen wurde („1-mal angesehen · 3-mal heruntergeladen“) und ob
   **Herunterladen erlaubt** ist oder es **nur ansehen** gibt. Gesperrte Downloads öffnet, wer die Vereinsverwaltung hat. Am Handy stehen die Dokumente als Karten.
-  **Löschen** nimmt die Datei vom Server mit, außer etwas anderes braucht sie noch; dasselbe gilt für die alte Datei, wenn du eine neue hochlädst. Anlegen, Ändern und Löschen stehen im Protokoll.
+  **Löschen** nimmt die Datei vom Server mit, außer etwas anderes braucht sie noch (auch ein Link in einem Text zählt); dasselbe gilt für die alte Datei, wenn du eine neue hochlädst. Ist sie gerade gesperrt, holt der Aufräum-Job das nach (Betrieb → Checks). Anlegen, Ändern und Löschen stehen im Protokoll.
 
   <img src="../assets/verwaltung/dokumente-liste.png" alt="Dokumentenliste mit den Plaketten Alle, Mitglieder und Vorstand und den Zählern als Satz" width="720">
 - **Mitgliedervorteile:** Admin → Mitglieder → Mitgliedervorteile: Titel, Text, Link, Gültigkeit, **Sichtbar für Mitgliedsarten**

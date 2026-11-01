@@ -32,7 +32,7 @@ from pymongo import ReturnDocument
 from models import now_utc
 from services import media_audit, uploads_inventory
 from services.image_variants import VARIANT_WIDTHS, variant_path
-from storage import PUBLIC_UPLOAD_DIR, QUARANTINE_DIR, UPLOAD_DIR
+from storage import PRIVATE_DOC_DIR, PUBLIC_UPLOAD_DIR, QUARANTINE_DIR, UPLOAD_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -246,7 +246,7 @@ PENDING_STATUS, FAILED_STATUS = "pending", "failed"
 RETRY_LIMIT = 8
 RETRY_BASE = timedelta(hours=1)
 RETRY_MAX = timedelta(hours=24)
-SOURCE_ERASURE, SOURCE_MEDIA = "account_erasure", "media_library"
+SOURCE_ERASURE, SOURCE_MEDIA, SOURCE_DOCUMENTS = "account_erasure", "media_library", "documents"
 
 
 def _id_forms(user_id: str) -> list:
@@ -314,7 +314,7 @@ def retry_delay(attempts: int) -> timedelta:
 async def _remove(db, name: str, scans: list[dict]) -> str | None:
     """Datei, kleinere Fassungen und Quarantäne-Kopien weg; erst danach die Verwaltungszeilen. Liefert den Fehler."""
     try:
-        for base in (PUBLIC_UPLOAD_DIR, UPLOAD_DIR):
+        for base in (PUBLIC_UPLOAD_DIR, UPLOAD_DIR, PRIVATE_DOC_DIR):
             path = base / name
             for width in VARIANT_WIDTHS:
                 _unlink(variant_path(path, width))
@@ -383,6 +383,12 @@ async def remove_upload(db, name: str) -> str | None:
     else:
         await db[PENDING].delete_many({"filename": name})
     return error
+
+
+async def retry_document_file(db, name: str, exc: BaseException) -> None:
+    """Die Datei eines gelöschten Dokuments ließ sich nicht löschen (#2125): der Aufräum-Job holt es nach und prüft vorher,
+    ob sie inzwischen wieder verwendet wird."""
+    await _remember(db, name, "", True, safe_error(exc), source=SOURCE_DOCUMENTS)
 
 
 async def _clean(db, owner_id: str, owned: set[str], untracked: set[str], now: datetime | None = None) -> int:

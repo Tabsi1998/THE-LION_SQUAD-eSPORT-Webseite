@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse
 from auth import get_current_user, get_optional_user, require_area
 from database import get_db
 from models import DocumentCreate, DocumentUpdate, new_id, now_utc
-from services import dolibarr_identity
+from services import account_erasure, dolibarr_identity
 from services.dolibarr_client import DolibarrError
 from services.log_safe import log_safe
 from services.media_audit import still_referenced
@@ -27,6 +27,7 @@ logger = logging.getLogger("tls.documents")
 # (Rolle, Freigabe, Vorstandsposten, #2125), wie jeder Adminbereich nur mit bestätigter Zwei-Faktor-Anmeldung (#1469).
 UNLOCK_AREA = "club"
 LOCAL_UPLOAD_PREFIXES = ("/api/static/uploads/", "/uploads/")
+FILE_REMOVED, FILE_KEPT, FILE_RETRY = "removed", "kept", "retry"
 
 
 def _refuse_new_upload_address(file_url: str | None, previous: dict | None = None) -> None:
@@ -71,17 +72,27 @@ async def _file_still_needed(db, doc: dict, path: pathlib.Path) -> bool:
     return bool(await still_referenced(db, {name}))
 
 
-async def _remove_file(db, doc: dict) -> bool:
-    """Die Datei zum Eintrag mitlöschen (#2125) - Protokolle tragen Personendaten. Nur, wenn nichts anderes sie braucht."""
+def _unlink(path: pathlib.Path) -> None:
+    path.unlink(missing_ok=True)
+
+
+async def _remove_file(db, doc: dict) -> str:
+    """Die Datei zum Eintrag mitlöschen (#2125) - Protokolle tragen Personendaten. Nur, wenn nichts anderes sie braucht.
+    Zurück kommt ``removed``, ``kept`` oder ``retry``: Scheitert das Löschen, holt es der Aufräum-Job nach."""
     path = _safe_storage_path(doc)
     if not path or not path.is_file() or await _file_still_needed(db, doc, path):
-        return False
+        return FILE_KEPT
     try:
-        path.unlink(missing_ok=True)
-    except OSError:
-        logger.warning("[documents] Datei zum gelöschten Dokument %s bleibt liegen", log_safe(doc.get("id")), exc_info=True)
-        return False
-    return True
+        _unlink(path)
+    except OSError as exc:
+        logger.warning("[documents] Datei zum Dokument %s bleibt vorerst liegen", log_safe(doc.get("id")))
+        await account_erasure.retry_document_file(db, path.name, exc)
+        return FILE_RETRY
+    return FILE_REMOVED
+
+
+def _file_fields(state: str) -> dict:
+    return {"file_removed": state == FILE_REMOVED, **({"file_retry": True} if state == FILE_RETRY else {})}
 
 
 async def _user_can_see(user: dict | None, visibility: str | None) -> bool:
@@ -336,11 +347,11 @@ async def update_document(doc_id: str, body: DocumentUpdate, me: dict = Depends(
         _refuse_new_upload_address(raw.get("file_url"), previous)
     await db.documents.update_one({"id": doc_id}, {"$set": update})
     updated = await db.documents.find_one({"id": doc_id}, {"_id": 0})
-    # Eine neue Datei ersetzt die alte: die alte bleibt sonst unbemerkt liegen.
-    replaced = "storage_key" in update and previous.get("storage_key") and update["storage_key"] != previous["storage_key"]
-    file_removed = bool(replaced and await _remove_file(db, {**previous, "file_url": None}))
+    # Eine neue Datei ersetzt die alte, auch eine alte öffentliche: sie bleibt sonst unbemerkt liegen.
+    replaced = "storage_key" in update and update["storage_key"] != previous.get("storage_key") and bool(_safe_storage_path(previous))
+    file_fields = _file_fields(await _remove_file(db, previous)) if replaced else {}
     changed = sorted(key for key, value in update.items() if key not in {"updated_at", "file_url"} and value != previous.get(key))
-    await _audit(db, "document.update", me, doc_id, {"title": updated.get("title"), "fields": changed, **({"file_removed": file_removed} if replaced else {})})
+    await _audit(db, "document.update", me, doc_id, {"title": updated.get("title"), "fields": changed, **file_fields})
     return _public_doc(updated, await _unlocks_downloads(db, me))
 
 
@@ -351,9 +362,9 @@ async def delete_document(doc_id: str, me: dict = Depends(require_area("club")))
     if not doc:
         raise HTTPException(404, "Dokument nicht gefunden.")
     await db.documents.delete_one({"id": doc_id})
-    file_removed = await _remove_file(db, doc)
-    await _audit(db, "document.delete", me, doc_id, {"title": doc.get("title"), "category": doc.get("category"), "file_removed": file_removed})
-    return {"ok": True, "file_removed": file_removed}
+    file_fields = _file_fields(await _remove_file(db, doc))
+    await _audit(db, "document.delete", me, doc_id, {"title": doc.get("title"), "category": doc.get("category"), **file_fields})
+    return {"ok": True, **file_fields}
 
 
 @router.get("/{doc_id}/view")

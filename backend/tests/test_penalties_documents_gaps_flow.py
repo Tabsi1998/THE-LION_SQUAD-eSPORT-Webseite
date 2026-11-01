@@ -291,6 +291,58 @@ async def test_documents_only_delete_their_own_files(flow, monkeypatch, tmp_path
 
 
 @pytest.mark.asyncio
+async def test_a_locked_file_is_removed_later(flow, doc_dir, monkeypatch):
+    from datetime import timedelta
+
+    from models import now_utc
+    from routes import document_routes
+    from services import account_erasure
+
+    monkeypatch.setattr(account_erasure, "PRIVATE_DOC_DIR", doc_dir)
+    doc = await stored_doc(flow, doc_dir)
+
+    def locked(_path):
+        raise PermissionError(13, "gesperrt")
+
+    with monkeypatch.context() as patched:
+        patched.setattr(document_routes, "_unlink", locked)
+        flow.act_as(await chair_of(flow))
+        removed = await flow.delete(f"/api/documents/{doc['id']}")
+    assert removed.status_code == 200 and removed.json()["file_retry"] is True and removed.json()["file_removed"] is False
+    assert await flow.db.documents.find_one({"id": doc["id"]}) is None
+    pending = await flow.db.pending_file_cleanups.find_one({"filename": "protokoll.pdf"}, {"_id": 0})
+    assert pending["source"] == "documents" and pending["status"] == "pending" and "gesperrt" not in str(pending)
+    assert (await flow.db.audit_logs.find_one({"action": "document.delete"}))["data"]["file_retry"] is True
+
+    await account_erasure.retry_file_cleanups(flow.db, now=now_utc() + timedelta(days=1))
+    assert not (doc_dir / "protokoll.pdf").exists()
+    assert await flow.db.pending_file_cleanups.count_documents({}) == 0
+
+
+@pytest.mark.asyncio
+async def test_a_new_upload_takes_an_old_public_file_with_it(flow, doc_dir, monkeypatch, tmp_path):
+    from routes import document_routes
+
+    uploads = tmp_path / "alt"
+    uploads.mkdir()
+    monkeypatch.setattr(document_routes, "UPLOAD_DIR", uploads)
+    (uploads / "alt.pdf").write_bytes(b"x")
+    (uploads / "verlinkt.pdf").write_bytes(b"x")
+    (doc_dir / "neu.pdf").write_bytes(b"x")
+    free = {"id": new_id(), "title": "Alt", "file_url": "/api/static/uploads/alt.pdf"}
+    linked = {"id": new_id(), "title": "Verlinkt", "file_url": "/api/static/uploads/verlinkt.pdf"}
+    await flow.db.documents.insert_many([dict(free), dict(linked)])
+    await flow.db.settings.insert_one({"id": "branding", "imprint": "Siehe /api/static/uploads/verlinkt.pdf"})
+    flow.act_as(await chair_of(flow))
+    replaced = await flow.patch(f"/api/documents/{free['id']}", json={"storage_key": "neu.pdf"})
+    assert replaced.status_code == 200, replaced.text
+    assert not (uploads / "alt.pdf").exists()
+    still = await flow.patch(f"/api/documents/{linked['id']}", json={"storage_key": "neu.pdf"})
+    assert still.status_code == 200
+    assert (uploads / "verlinkt.pdf").exists(), "ein Link hält die alte Datei"
+
+
+@pytest.mark.asyncio
 async def test_only_the_club_area_changes_documents(flow, doc_dir):
     doc = await stored_doc(flow, doc_dir)
     flow.act_as(await flow.add_user(role="moderator", name="moderator"))
