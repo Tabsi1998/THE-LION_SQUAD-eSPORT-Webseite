@@ -281,6 +281,11 @@ function TeamDetail({ id }) {
 
   const leave = async () => {
     await runAction(async () => {
+      if (!await confirm({
+        title: "Team verlassen?",
+        description: `Du bist danach nicht mehr in ${team.name} und seinen Co-Teams. Zurück kommst du nur mit einer neuen Einladung oder dem Beitrittscode.`,
+        confirmLabel: "Team verlassen",
+      })) return;
       await api.post(`/teams/${team.id}/leave`);
       toast.success("Team verlassen.");
       await load();
