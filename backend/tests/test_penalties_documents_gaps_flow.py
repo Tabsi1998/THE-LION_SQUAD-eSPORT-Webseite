@@ -39,11 +39,11 @@ async def chair_of(flow, **extra) -> dict:
     return {**user, "areas": ["club"], **extra}
 
 
-async def incident(flow, user: dict, *, group: str = "unsport", note: str | None = "Beleidigung im Chat", by: str = "admin-1") -> str:
+async def incident(flow, user: dict, *, group: str = "unsport", note: str | None = "Beleidigung im Chat", by: str = "admin-1", visible: bool = True) -> str:
     await flow.db.achievement_groups.update_one({"code": group}, {"$set": {"code": group, "name": "Unsportliches Verhalten", "is_negative": True}}, upsert=True)
     award = new_id()
     await flow.db.user_achievements.insert_one({"id": award, "user_id": user["id"], "tier_code": f"{group}_1", "group_code": group, "level": 1,
-                                                "earned_at": "2026-10-20T10:00:00+00:00", "context": {"manual": True, "by": by, "note": note}, "awarded_by": by})
+                                                "earned_at": "2026-10-20T10:00:00+00:00", "context": {"manual": True, "by": by, "note": note, **({"note_visible": True} if visible else {})}, "awarded_by": by})
     return award
 
 
@@ -68,6 +68,40 @@ async def test_incidents_appear_for_the_person_and_the_admin(flow):
     flow.act_as(admin)
     listed = (await flow.get("/api/admin/penalties")).json()
     assert [item["user_id"] for item in listed["items"]] == [erika["id"]]
+
+
+@pytest.mark.asyncio
+async def test_an_internal_note_stays_internal(flow):
+    # Einzel- und Massenvergabe schreiben ihre Notiz ohne Freigabe: Die Person und die Turnierleitung sehen sie nicht.
+    erika = await flow.add_user(name="erika")
+    await incident(flow, erika, note="Nur für den Vorstand", visible=False)
+    flow.act_as(erika)
+    mine = (await flow.get("/api/penalties/me")).json()["items"][0]
+    assert mine["reason"] == "(keine Begründung hinterlegt)"
+    flow.act_as(await flow.add_user(role="tournament_admin", name="turnierleitung"))
+    listed = await flow.get("/api/admin/penalties")
+    assert "Nur für den Vorstand" not in listed.text
+
+
+@pytest.mark.asyncio
+async def test_a_note_from_the_incident_form_reaches_the_person(flow):
+    from services.achievement_core import NEGATIVE_INCIDENTS
+
+    await flow.db.achievement_groups.update_one({"code": "neg_dispute"}, {"$set": {"code": "neg_dispute", "name": "Einspruch", "is_negative": True}}, upsert=True)
+    kind, tier = next(iter(NEGATIVE_INCIDENTS.items()))
+    from badges import TIER_BY_CODE
+
+    group = TIER_BY_CODE[tier]["group_code"]
+    await flow.db.achievement_groups.update_one({"code": group}, {"$set": {"code": group, "name": "Vorfall", "is_negative": True}}, upsert=True)
+    await flow.db.achievements.update_one({"code": tier}, {"$set": TIER_BY_CODE[tier]}, upsert=True)
+    erika = await flow.add_user(name="erika")
+    flow.act_as(await flow.add_user(role="club_admin", name="clubadmin"))
+    sent = await flow.post("/api/admin/achievements/trigger-incident", json={"user_id": erika["id"], "incident_type": kind, "note": "Beim Finale"})
+    assert sent.status_code == 200, sent.text
+    award = await flow.db.user_achievements.find_one({"user_id": erika["id"]}, {"_id": 0})
+    assert award["context"]["note_visible"] is True
+    flow.act_as(erika)
+    assert (await flow.get("/api/penalties/me")).json()["items"][0]["reason"] == "Beim Finale"
 
 
 @pytest.mark.asyncio

@@ -117,7 +117,8 @@ async def _collect_user_penalties(user_id: str) -> list[dict]:
         out.append({
             "kind": "incident",
             "label": groups.get(n.get("group_code")) or "Vorfall",
-            "reason": context.get("note") or context.get("reason") or "(keine Begründung hinterlegt)",
+            # Sichtbar ist nur, was „Vorfall eintragen“ ausdrücklich für die Person freigibt; Notizen aus anderen Vergaben sind intern.
+            "reason": (context.get("note_visible") and context.get("note")) or "(keine Begründung hinterlegt)",
             "context_title": "Verhalten / Vorfall",
             "context_url": "",
             "context_subtitle": "",

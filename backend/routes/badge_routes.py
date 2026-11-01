@@ -791,7 +791,8 @@ async def admin_trigger_incident(body: IncidentBody, me: dict = Depends(require_
         raise HTTPException(404, "Nutzer nicht gefunden.")
     code = await trigger_negative_incident(
         body.user_id, body.incident_type,
-        context={"manual": True, "by": me["id"], "note": body.note, "match_id": body.match_id},
+        # Das Formular sagt, dass die Person diese Notiz unter „Meine Strafen“ liest (#2125).
+        context={"manual": True, "by": me["id"], "note": body.note, "note_visible": True, "match_id": body.match_id},
         awarded_by=me["id"],
     )
     await db.audit_logs.insert_one({
