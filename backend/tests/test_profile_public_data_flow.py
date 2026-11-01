@@ -284,6 +284,16 @@ async def test_joining_needs_a_real_code(flow):
     assert (await flow.post("/api/teams/t-mit/join", json={"join_code": "richtig-1"})).status_code == 200
 
 
+@pytest.mark.asyncio
+async def test_search_links_players_to_their_encoded_profile(flow):
+    from routes import search_routes
+
+    await player(flow, "alte schule")
+    await player(flow, "neonfalke")
+    rows = await search_routes._search_players(flow.db, "(alte|neon)", 5)
+    assert {row["url"] for row in rows} == {"/u/alte%20schule", "/u/neonfalke"}
+
+
 # ---------------------------------------------------------------- Zusatz: Dokumente
 @pytest.mark.asyncio
 async def test_members_never_see_where_a_document_is_stored(flow):

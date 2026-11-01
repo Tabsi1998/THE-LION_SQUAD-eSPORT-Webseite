@@ -11,6 +11,7 @@ from services.league_scope import league_label
 from services.visibility import user_can_see
 from services.visibility import lead_can_see
 from services.query_filters import safe_regex
+from services.usernames import profile_path
 
 router = APIRouter(prefix="/api/search", tags=["search"])
 # Entwürfe und nicht öffentliche Turniere findet nur, wer sie auch verwaltet - mit bestätigter Zwei-Faktor-Anmeldung
@@ -161,7 +162,7 @@ async def _search_players(db, pattern: str, limit: int) -> list[dict]:
         _result(
             "player",
             row.get("display_name") or row.get("username") or "Spieler",
-            f"/players/{row.get('username')}",
+            profile_path(row["username"]),
             subtitle=row.get("username"),
             image=row.get("avatar_url"),
         )
