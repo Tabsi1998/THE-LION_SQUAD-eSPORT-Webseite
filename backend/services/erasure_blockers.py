@@ -70,6 +70,18 @@ async def team_roles(db, user_id: str) -> list[dict]:
     return rows
 
 
+async def blockers(db, user_id: str, role: str | None) -> list[dict]:
+    """Was das eigene Löschen aufhält: Team-Rollen und der letzte Superadmin (#2125) - danach vergäbe niemand mehr Rollen."""
+    from services.permissions import usable_superadmins
+
+    rows = await team_roles(db, user_id)
+    if role == "superadmin" and not await usable_superadmins(db, without=user_id):
+        rows.append({"team_id": None, "team": "der Website", "squad_id": None, "squad": None, "role": "superadmin",
+                     "role_label": "der letzte Superadmin", "way": "Ernenne unter Admin → Alle Benutzer zuerst eine zweite Person zum Superadmin.",
+                     "link": "/admin/users"})
+    return rows
+
+
 async def way_out(db) -> str:
     """Der Schlusssatz (#2113): Der Löschanspruch darf nicht an einer Team-Rolle hängen bleiben - etwa wenn sich ein
     Team in einer laufenden Liga nicht auflösen lässt. Die Adresse kommt aus den Rechtsdaten (Einstellungen)."""
@@ -89,4 +101,5 @@ def message(rows: list[dict], closing: str | None = None) -> str | None:
     for row in rows:
         where = f"im Co-Team {row['squad']} von {row['team']}" if row.get("squad") else f"bei {row['team']}"
         parts.append(f"Du bist {row['role_label']} {where}: {row['way']}")
-    return " ".join([LEAD, *parts, *([closing] if closing else [])])
+    lead = [LEAD] if any(row["role"] != "superadmin" for row in rows) else []
+    return " ".join([*lead, *parts, *([closing] if closing else [])])

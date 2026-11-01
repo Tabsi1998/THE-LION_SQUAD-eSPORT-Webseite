@@ -1056,13 +1056,27 @@ async def unban_user(user_id: str, body: BanBody | None = None, me: dict = Depen
 @router.put("/{user_id}/role")
 @router.post("/{user_id}/role")
 async def set_role(user_id: str, body: RoleUpdate, me: dict = Depends(require_super())):
+    from services.permissions import LAST_SUPERADMIN_DETAIL, usable_superadmins
+
     db = get_db()
+    target = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "role": 1})
+    if not target:
+        raise HTTPException(status_code=404, detail="Nutzer nicht gefunden")
+    previous = target.get("role") or "player"
+    if previous == body.role:
+        return await db.users.find_one({"id": user_id}, private_projection())
+    if previous == "superadmin" and not await usable_superadmins(db, without=user_id):
+        raise HTTPException(status_code=409, detail=LAST_SUPERADMIN_DETAIL)
     await db.users.update_one(
         {"id": user_id},
         {"$set": {"role": body.role, "roles": [body.role], "updated_at": now_utc().isoformat()}},
     )
+    # Zwei stufen sich gleichzeitig gegenseitig herab: beide sehen danach keinen mehr und nehmen es zurück.
+    if previous == "superadmin" and not await usable_superadmins(db):
+        await db.users.update_one({"id": user_id}, {"$set": {"role": previous, "roles": [previous], "updated_at": now_utc().isoformat()}})
+        raise HTTPException(status_code=409, detail=LAST_SUPERADMIN_DETAIL)
     await db.audit_logs.insert_one({"id": new_id(), "action": "user.role_change", "target_id": user_id,
-                                     "actor_id": me["id"], "data": {"role": body.role},
+                                     "actor_id": me["id"], "data": {"role": body.role, "from": previous},
                                      "created_at": now_utc().isoformat()})
     u = await db.users.find_one({"id": user_id}, private_projection())
     return u

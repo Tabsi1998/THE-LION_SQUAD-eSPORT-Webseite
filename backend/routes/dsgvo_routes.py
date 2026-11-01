@@ -398,7 +398,7 @@ async def anonymize_me_check(me: dict = Depends(get_current_user)):
     vor der Rückfrage. Leer heißt: Löschen geht."""
     from services import erasure_blockers
     db = get_db()
-    rows = await erasure_blockers.team_roles(db, me["id"])
+    rows = await erasure_blockers.blockers(db, me["id"], me.get("role"))
     closing = await erasure_blockers.way_out(db) if rows else None
     return {"can_erase": not rows, "blockers": rows, "message": erasure_blockers.message(rows, closing), "closing": closing}
 
@@ -409,7 +409,7 @@ async def anonymize_me(me: dict = Depends(get_current_user)):
     db = get_db()
     # Erst die Rollen in Teams abgeben (#2113, L-C5) - sonst stünde ein gelöschtes Konto als Kapitän da.
     from services import erasure_blockers
-    rows = await erasure_blockers.team_roles(db, me["id"])
+    rows = await erasure_blockers.blockers(db, me["id"], me.get("role"))
     if rows:
         raise HTTPException(409, erasure_blockers.message(rows, await erasure_blockers.way_out(db)))
     await _anonymize_user_data(db, me["id"], me["id"], "user.self_anonymize")

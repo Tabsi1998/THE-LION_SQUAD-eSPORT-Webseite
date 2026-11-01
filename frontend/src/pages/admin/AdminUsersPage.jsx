@@ -213,6 +213,8 @@ function UserSheet({ target, me, isSuperAdmin, canClub, onClose, onChanged }) {
   const name = displayName(target);
   // Profil zurücksetzen (#2112): Vereinsverwaltung, fremde Konten; Superadmin-Konten nur durch den Superadmin.
   const canResetProfile = canClub && target.id !== me?.id && (target.role !== "superadmin" || isSuperAdmin);
+  // Die eigene Rolle ändert niemand selbst (#2125): so stuft sich der letzte Superadmin nicht aus Versehen herab.
+  const canEditRights = isSuperAdmin && target.id !== me?.id;
   const [role, setRole] = useState(target.role || "player");
   const [grants, setGrants] = useState(() => (Array.isArray(target.areas) ? target.areas.filter((area) => GRANTABLE_AREAS.includes(area)) : []));
   const [saving, setSaving] = useState(false);
@@ -227,7 +229,7 @@ function UserSheet({ target, me, isSuperAdmin, canClub, onClose, onChanged }) {
 
   const save = async (event) => {
     event.preventDefault();
-    if (!isSuperAdmin) return;
+    if (!canEditRights) return;
     if (!change.changed) {
       toast.info("Keine Änderung zum Speichern.");
       return;
@@ -293,11 +295,11 @@ function UserSheet({ target, me, isSuperAdmin, canClub, onClose, onChanged }) {
         title={name}
         eyebrow="Konto"
         onClose={onClose}
-        onSubmit={isSuperAdmin ? save : undefined}
+        onSubmit={canEditRights ? save : undefined}
         saving={saving}
         submitLabel="Speichern"
         submitTestId="user-sheet-save"
-        cancelLabel={isSuperAdmin ? "Abbrechen" : "Schließen"}
+        cancelLabel={canEditRights ? "Abbrechen" : "Schließen"}
         testId="user-sheet"
       >
         <section className="space-y-2" data-testid="user-sheet-account">
@@ -318,7 +320,7 @@ function UserSheet({ target, me, isSuperAdmin, canClub, onClose, onChanged }) {
 
         <section className="space-y-3 border-t border-white/10 pt-4" data-testid="user-sheet-rights">
           <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Rolle und Freigaben</div>
-          {isSuperAdmin ? (
+          {canEditRights ? (
             <>
               <SelectField label="Rolle" value={role} onChange={setRole} options={ROLE_OPTIONS.map((r) => [r, roleLabel(r)])} testId="user-sheet-role" />
               <div>
@@ -338,10 +340,13 @@ function UserSheet({ target, me, isSuperAdmin, canClub, onClose, onChanged }) {
               {change.changed ? <p className="text-xs text-[#FFD700]" data-testid="user-sheet-pending">{change.sentence} Gespeichert wird erst mit „Speichern“.</p> : null}
             </>
           ) : (
-            <dl className="grid grid-cols-[8rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-sm" data-testid="user-sheet-rights-read">
-              <dt className="text-white/45">Rolle</dt><dd>{roleLabel(target.role || "player")}</dd>
-              <dt className="text-white/45">Bereiche</dt><dd>{areaBadges(target).map((area) => area.label).join(", ") || "keine"}</dd>
-            </dl>
+            <>
+              <dl className="grid grid-cols-[8rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-sm" data-testid="user-sheet-rights-read">
+                <dt className="text-white/45">Rolle</dt><dd>{roleLabel(target.role || "player")}</dd>
+                <dt className="text-white/45">Bereiche</dt><dd>{areaBadges(target).map((area) => area.label).join(", ") || "keine"}</dd>
+              </dl>
+              {isSuperAdmin && <p className="text-xs text-white/50" data-testid="user-sheet-own-role">Deine eigene Rolle ändert eine andere Person mit Superadmin-Rolle.</p>}
+            </>
           )}
         </section>
 
