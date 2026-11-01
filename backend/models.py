@@ -30,6 +30,7 @@ DirectMessagePrivacy = Literal["everyone", "friends", "team_members", "club_memb
 
 # Anzeigename (#2126): gleich in pages/user/profile/form.js. Gespeicherte längere Namen bleiben gültig.
 DISPLAY_NAME_MAX = 50
+PREFERRED_ROLE_MAX = 40
 
 
 def _new_username(value: str) -> str:

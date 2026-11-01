@@ -1196,7 +1196,7 @@ function SetupCard({ profile }) {
             </div>
             <div className="flex flex-wrap gap-1.5">
               {group.items.map((item) => (
-                <span key={item} className="inline-flex items-center rounded-sm border border-white/10 bg-white/[0.03] px-2 py-1 text-xs text-white/75">{item}</span>
+                <span key={item} className="inline-flex max-w-full items-center break-words rounded-sm border border-white/10 bg-white/[0.03] px-2 py-1 text-xs text-white/75">{item}</span>
               ))}
             </div>
           </div>

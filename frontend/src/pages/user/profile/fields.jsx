@@ -38,6 +38,7 @@ export function Input({ value, onChange, placeholder, testId, type = "text", req
       value={value ?? ""}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
+      maxLength={maxLength}
       data-testid={testId}
       required={required}
       aria-invalid={invalid || undefined}

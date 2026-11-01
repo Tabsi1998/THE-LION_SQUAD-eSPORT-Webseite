@@ -12,7 +12,7 @@ const OLD_NAME_PROFILE = {
   stats: {}, teams: [], awards: [], badges: [], tournaments: [], f1_bests: [], references: { items: [] }, created_at: "2024-02-01T10:00:00+00:00",
 };
 
-async function mockServer(page, { user = null } = {}) {
+async function mockServer(page, { user = null, profile = OLD_NAME_PROFILE } = {}) {
   await page.addInitScript(() => {
     window.localStorage.setItem("tls_cookie_consent_v1", JSON.stringify({ essential: true, external_media: false, analytics: false, meta: false, tiktok: false, saved_at: Date.now(), expires_at: Date.now() + 30 * 24 * 60 * 60 * 1000 }));
   });
@@ -29,7 +29,7 @@ async function mockServer(page, { user = null } = {}) {
       return json({ verification_required: true, email: "neu@lionsquad-test.at" });
     }
     if (path === "/settings/public") return json({ club_name: "THE LION SQUAD", registration_enabled: true, password_login_enabled: true });
-    if (path === "/users/public/alte%20schule") return json(OLD_NAME_PROFILE);
+    if (path === "/users/public/alte%20schule") return json(profile);
     if (path === "/users/me" && request.method() === "PATCH") {
       const body = request.postDataJSON() || {};
       seen.user = { ...seen.user, ...body, ...(typeof body.bio === "string" ? { bio: body.bio.trim() } : {}), updated_at: new Date().toISOString() };
@@ -82,6 +82,19 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       await expect(page.getByTestId("profile-identity")).not.toContainText(/Admin|Moderator/);
       expect(seen.paths).toContain("/users/public/alte%20schule");
       expect(await noSidewaysScroll(page)).toBe(true);
+    });
+
+    test("eine lange alte Rolle ohne Leerzeichen bleibt im Kasten", async ({ page }) => {
+      await mockServer(page, { profile: { ...OLD_NAME_PROFILE, preferred_role: "x".repeat(120) } });
+      await page.goto("/u/alte%20schule");
+      await expect(page.getByTestId("public-profile-setup")).toContainText("xxxx");
+      expect(await noSidewaysScroll(page)).toBe(true);
+    });
+
+    test("Gaming: die bevorzugte Rolle hat im Formular dieselbe Grenze wie im Server", async ({ page }) => {
+      await mockServer(page, { user: ME });
+      await page.goto("/profile?tab=gaming");
+      await expect(page.getByTestId("profile-preferred-role")).toHaveAttribute("maxlength", "40");
     });
 
     test("Grunddaten: zu lange Bio hat den Hinweis am Feld und bleibt stehen", async ({ page }) => {

@@ -102,7 +102,7 @@ export function profileFormPayload(form) {
 }
 
 // Längengrenzen (#2126), gleich in backend/routes/user_routes.py. Ein schon längerer Wert bleibt, bis er geändert wird.
-export const PROFILE_LIMITS = { display_name: 50, bio: 1000 };
+export const PROFILE_LIMITS = { display_name: 50, bio: 1000, preferred_role: 40 };
 
 // Der Server schneidet Leerzeichen am Rand ab (#2126). Mitten im Tippen („Hallo “, Pause, „Welt“) bleiben sie im Feld, sonst
 // fehlte nach dem Speichern von selbst das Leerzeichen zwischen den Wörtern.

@@ -32,7 +32,7 @@ from services.private_fields import private_projection, strip_private
 from services.profile_fields import USER_NULLABLE_FIELDS
 from models import (
     AreasUpdate,
-    AdminProfileReset, AdminUserCreate, DISPLAY_NAME_MAX, UserUpdate, RoleUpdate,
+    AdminProfileReset, AdminUserCreate, DISPLAY_NAME_MAX, PREFERRED_ROLE_MAX, UserUpdate, RoleUpdate,
     now_utc, new_id,
 )
 
@@ -40,7 +40,7 @@ router = APIRouter(prefix="/api/users", tags=["users"])
 logger = logging.getLogger(__name__)
 
 # Längengrenzen der Profiltexte (#2126), gleich in pages/user/profile/form.js.
-PROFILE_TEXT_LIMITS = {"display_name": ("Anzeigename", DISPLAY_NAME_MAX), "bio": ("Bio", 1000)}
+PROFILE_TEXT_LIMITS = {"display_name": ("Anzeigename", DISPLAY_NAME_MAX), "bio": ("Bio", 1000), "preferred_role": ("Bevorzugte Rolle", PREFERRED_ROLE_MAX)}
 
 
 def _clean(u: dict) -> dict:
@@ -905,9 +905,9 @@ async def update_me(
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in USER_NULLABLE_FIELDS}
     _check_profile_texts(updates, me)
-    # Wortfilter (#417): Bio und Anzeigename werden vor dem Speichern geprüft.
+    # Wortfilter (#417): Bio, Anzeigename und bevorzugte Rolle werden vor dem Speichern geprüft.
     from services import word_filter
-    for field in ("bio", "display_name"):
+    for field in ("bio", "display_name", "preferred_role"):
         if updates.get(field):
             await word_filter.screen_field(db, updates[field], kind=field, user_id=me["id"], ref_id=me["id"])
     updates = _normalize_social_updates(updates)

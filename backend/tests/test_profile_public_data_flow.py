@@ -373,6 +373,24 @@ async def test_spaces_around_changed_texts_are_removed(flow):
     assert (await flow.patch("/api/users/me", json={"bio": "  alt  "})).json()["bio"] == "  alt  "
 
 
+@pytest.mark.asyncio
+async def test_preferred_role_has_a_limit_and_passes_the_word_filter(flow):
+    from services import word_filter
+
+    await word_filter.save_config(flow.db, enabled=True, entries=[word_filter.clean_entry("schimpfwort", "hold")])
+    user = await player(flow, "freitext", display_name="Freitext")
+    flow.act_as(user)
+    too_long = await flow.patch("/api/users/me", json={"preferred_role": "y" * 41})
+    assert too_long.status_code == 422 and too_long.json()["detail"] == "Bevorzugte Rolle: höchstens 40 Zeichen."
+    assert (await flow.patch("/api/users/me", json={"preferred_role": "y" * 40})).status_code == 200
+    blocked = await flow.patch("/api/users/me", json={"preferred_role": "schimpfwort"})
+    assert blocked.status_code == 400 and "Bevorzugte Rolle" in blocked.json()["detail"]
+
+    old = await player(flow, "altrolle", display_name="Alt", preferred_role="z" * 60)
+    flow.act_as(old)
+    assert (await flow.patch("/api/users/me", json={"preferred_role": "z" * 60, "city": "Wien"})).status_code == 200
+
+
 # ---------------------------------------------------------------- Zusatz: Dokumente
 @pytest.mark.asyncio
 async def test_members_never_see_where_a_document_is_stored(flow):
