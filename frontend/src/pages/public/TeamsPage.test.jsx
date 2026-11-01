@@ -108,6 +108,24 @@ test("Teamleitung: Hinweis „erst übergeben oder auflösen“ statt „Team ve
   expect(screen.queryByTestId("team-leave-leader-hint")).toBeNull();
 });
 
+// Suchfeld auf der öffentlichen Liste (#2128, TM7): fragt den Server, damit auch ältere Teams gefunden werden.
+test("Teamliste: Suche fragt den Server und sagt, wenn nichts passt", async () => {
+  authState.user = null;
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/teams?limit=90") return { data: [{ id: "t-1", name: "Lions Rocket", tag: "LRK" }] };
+    if (url === "/teams?limit=90&q=Alte%20L%C3%B6wen") return { data: [{ id: "t-2", name: "Alte Löwen", tag: "ALT" }] };
+    if (url === "/teams?limit=90&q=Niemand") return { data: [] };
+    return { data: {} };
+  });
+  render(<MemoryRouter initialEntries={["/teams"]}><Routes><Route path="/teams" element={<TeamsPage />} /></Routes></MemoryRouter>);
+  expect(await screen.findByTestId("team-card-LRK")).toBeInTheDocument();
+  fireEvent.change(screen.getByTestId("teams-search"), { target: { value: " Alte Löwen " } });
+  expect(await screen.findByTestId("team-card-ALT")).toBeInTheDocument();
+  expect(screen.queryByTestId("team-card-LRK")).toBeNull();
+  fireEvent.change(screen.getByTestId("teams-search"), { target: { value: "Niemand" } });
+  expect(await screen.findByTestId("teams-empty")).toHaveTextContent("KEIN TEAM GEFUNDEN");
+});
+
 // „Team verlassen“ mit Rückfrage (#2128, TM4) - wie in der App: erst das Ja verlässt das Team.
 test("Team verlassen fragt nach; abgelehnt passiert nichts", async () => {
   authState.user = { id: "u-3", username: "lunabyte" };

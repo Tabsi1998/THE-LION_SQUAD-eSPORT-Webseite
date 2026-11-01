@@ -22,7 +22,7 @@ import { useChatRead } from "@/hooks/useChats";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { toast } from "sonner";
-import { Crown, Edit, Lock, MessageSquare, Plus, Send, Shield, ShieldCheck, Star, Swords, TrendingUp, Trophy, Users, UserPlus, Zap } from "lucide-react";
+import { Crown, Edit, Lock, MessageSquare, Plus, Search, Send, Shield, ShieldCheck, Star, Swords, TrendingUp, Trophy, Users, UserPlus, Zap } from "lucide-react";
 import { AwardBanner } from "@/components/tls/AwardBanner";
 import { viennaDateTime } from "@/lib/vienna";
 import { teamLogoUpload } from "@/lib/svgLogo";
@@ -53,6 +53,8 @@ export default function TeamsPage() {
   return id ? <TeamDetail key={`${id}:${accountGeneration}`} id={id} /> : <TeamList />;
 }
 
+const TEAM_LIST_LIMIT = 90;
+
 function TeamList() {
   useDocumentTitle(
     "Teams & Clans",
@@ -64,7 +66,12 @@ function TeamList() {
 
   // „KEINE TEAMS“ nur nach einer erfolgreichen, leeren Antwort (#984); ohne Level bleiben die Teams stehen.
   // Level sind Zusatzdaten (nach Codex-Prüfung): sie halten die Liste nicht auf, ein Ausfall zeigt sich nur bei den Level.
-  const teams = useLoad("teams", ({ signal }) => api.get("/teams?limit=90", { signal }).then(({ data }) => (Array.isArray(data) ? data : [])));
+  // Suchfeld (#2128, TM7): die Liste zeigt die neuesten Teams, die Suche findet alle.
+  const [query, setQuery] = useState("");
+  const needle = query.trim();
+  const teams = useLoad(["teams", needle], ({ signal }) => (
+    api.get(`/teams?limit=${TEAM_LIST_LIMIT}${needle ? `&q=${encodeURIComponent(needle)}` : ""}`, { signal }).then(({ data }) => (Array.isArray(data) ? data : []))
+  ), { debounceMs: needle ? 220 : 0 });
   const teamLevels = useLoad("teams/levels", ({ signal }) => api.get("/teams/levels", { signal }).then(({ data }) => ({ levels: data?.levels || {}, crowns: data?.crowns || {} })), { isEmpty: () => false });
   const levels = teamLevels.data?.levels || {};
   const crowns = teamLevels.data?.crowns || {};
@@ -98,18 +105,30 @@ function TeamList() {
             <h2 className="mt-10 font-heading text-2xl font-black uppercase">Teams entdecken</h2>
           </div>
         ) : null}
-        <div className="mt-10">
+        <div className="mt-6 relative max-w-xl">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/35" aria-hidden="true" />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Team oder Kürzel suchen"
+            aria-label="Teams suchen"
+            data-testid="teams-search"
+            className="w-full bg-[#0A0A0A] border border-white/10 pl-9 pr-3 py-2 rounded-sm"
+          />
+        </div>
+        <div className="mt-6">
           <LoadState
             load={teams}
             loading={<SkeletonCards count={6} image={false} label="Lade Teams" />}
             errorTitle="Die Teams konnten nicht geladen werden"
-            empty={<div className="text-center py-20 text-white/40 font-display tracking-widest">KEINE TEAMS</div>}
+            empty={<div className="text-center py-20 text-white/40 font-display tracking-widest" data-testid="teams-empty">{needle ? "KEIN TEAM GEFUNDEN" : "KEINE TEAMS"}</div>}
           >
             {(list) => (
               <>
               {teamLevels.status === "error" && (
                 <LoadNotice testId="teams-levels-error" className="mb-5" message="Die Team-Level konnten gerade nicht geladen werden." onRetry={teamLevels.reload} />
               )}
+              {!needle && list.length >= TEAM_LIST_LIMIT ? <p className="mb-4 text-xs text-white/45" data-testid="teams-more-hint">Das sind die {TEAM_LIST_LIMIT} neuesten Teams – die Suche findet alle.</p> : null}
               <Reveal className="tls-reveal-grid tls-dim-siblings grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5">
                 {list.map((t) => <TeamCard key={t.id} team={t} levelInfo={levels[t.id]} crown={crowns[t.id] || null} />)}
               </Reveal>
