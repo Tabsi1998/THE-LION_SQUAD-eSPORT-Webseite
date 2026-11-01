@@ -76,7 +76,7 @@ async def test_export_holds_only_the_needed_fields_and_is_logged(flow):
     assert response.headers["content-type"].startswith("text/csv") and "no-store" in response.headers["cache-control"]
     assert "GEHEIME NOTIZ" not in response.text
     rows = list(csv.reader(io.StringIO(response.text.lstrip("﻿")), delimiter=";"))
-    assert rows[0] == ["Mitgliedsnummer", "Name", "Benutzername", "E-Mail", "Status", "Art", "Mitglied seit", "Interne Rolle"]
+    assert rows[0] == ["Mitgliedsnummer", "Name", "Benutzername", "E-Mail", "Status", "Art", "Mitglied seit", "Aufgabe im Verein"]
     names = [row[2] for row in rows[1:]]
     assert sorted(names) == ["erika", "mara"], "Ehemalige nur mit scope=all"
     by_name = {row[2]: row for row in rows[1:]}

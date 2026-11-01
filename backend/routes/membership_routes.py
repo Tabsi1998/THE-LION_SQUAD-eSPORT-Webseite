@@ -941,7 +941,7 @@ async def update_user_membership(
     payload.pop("show_member_number_publicly", None)
     led_fields = {"member_status", "membership_type", "member_number", "member_since", "member_since_precision"} & set(payload)
     if led_fields and await _led_by_dolibarr(user_id):
-        raise HTTPException(409, "Diese Mitgliedschaft wird in Dolibarr geführt. Status, Art, Nummer und Beginn dort ändern – hier bleiben Notiz und interne Rolle.")
+        raise HTTPException(409, "Diese Mitgliedschaft wird in Dolibarr geführt. Status, Art, Nummer und Beginn dort ändern – hier bleiben Notiz und Aufgabe im Verein.")
     previous_status = ((await get_membership(user_id)) or {}).get("member_status") or "none"
     if payload.get("member_status") not in (None, previous_status, *ACTIVE_STATUSES):
         await _refuse_while_holding_post(db, user_id)
@@ -1010,7 +1010,7 @@ async def export_memberships(request: Request, scope: Literal["active", "all"] =
     rows.sort(key=lambda row: str(row[1] or "").lower())
     buffer = io.StringIO()
     writer = csv.writer(buffer, delimiter=";")
-    writer.writerow(["Mitgliedsnummer", "Name", "Benutzername", "E-Mail", "Status", "Art", "Mitglied seit", "Interne Rolle"])
+    writer.writerow(["Mitgliedsnummer", "Name", "Benutzername", "E-Mail", "Status", "Art", "Mitglied seit", "Aufgabe im Verein"])
     writer.writerows([[safe_cell(cell) for cell in row] for row in rows])
     await _audit(me["id"], "membership.export", "memberships", {"scope": scope, "rows": len(rows)})
     filename = f"mitglieder-{club_today()}.csv"
