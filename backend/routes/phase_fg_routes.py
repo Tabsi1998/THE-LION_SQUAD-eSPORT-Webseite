@@ -282,6 +282,7 @@ async def _media_rows(
             "derived_from_filename": meta.get("derived_from_filename") if meta else None,
             "created_at": meta.get("created_at") if meta else None,
             "tracked": bool(meta),
+            "kept_for_results": bool(meta.get("kept_for_results")) if meta else False,
             "usage_count": None,
             "references": [],
             "is_unused": None,
@@ -475,6 +476,8 @@ async def admin_media_replace_duplicates(body: DuplicateReplaceBody, me: dict = 
     # (Snapshot). Solange so eine Stelle die Kopie zeigt, bleibt ihre Datei.
     kept = sorted(await media_audit.still_referenced(db, set(copies)))
     removed = [name for name in copies if name not in kept]
+    # Für den Hinweis in der Mediathek: Ihn zu berechnen hieße, bei jedem Blättern alle Sammlungen zu lesen.
+    await db.media_uploads.update_many({"filename": {"$in": kept}}, {"$set": {"kept_for_results": True, **stamp}})
     for name in removed:
         if await account_erasure.remove_upload(db, name):
             pending += 1

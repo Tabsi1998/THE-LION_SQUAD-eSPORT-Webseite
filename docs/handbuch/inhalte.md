@@ -183,7 +183,8 @@ Stelle die Datei noch, fragt die Mediathek nach; bestätigt ihr, fehlt das Bild 
   ein weiterer Klick.
 - **Diese Datei behalten, Kopien ersetzen** (im Blatt einer Datei mit Duplikaten): Jede Stelle, die eine inhaltsgleiche Kopie zeigt,
   zeigt danach diese Datei, die Kopien werden gelöscht. Es bleiben: Kopien aus Uploads von Mitgliedern und Kopien, die gespeicherte
-  Ergebnisse noch zeigen (Map im Ergebnisblatt, Liga-Spiel, Preisbild) – die Meldung nennt ihre Zahl.
+  Ergebnisse noch zeigen (Map im Ergebnisblatt, Liga-Spiel, Preisbild) – die Meldung nennt ihre Zahl, die Zeile der Kopie trägt den
+  Hinweis „wird noch von gespeicherten Ergebnissen gezeigt“.
 
 ### 3.3 Galerie und Alben
 

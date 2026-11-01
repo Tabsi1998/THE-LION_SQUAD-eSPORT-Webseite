@@ -195,6 +195,17 @@ test("Duplikat ersetzen: fragt nach und nennt, was bleibt (#2122)", async () => 
   expect(confirmMock.mock.calls.at(-1)[0].description).toContain("„loewe.png“ bleibt");
 });
 
+test("eine behaltene Kopie sagt in ihrer Zeile, warum sie noch da ist (#2122)", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url.startsWith("/admin/media?")) return { data: { items: [ITEM, { ...UNUSED, kept_for_results: true }], total: 2 } };
+    if (url === "/admin/media/audit") return { data: { summary: {} } };
+    return { data: [] };
+  });
+  render(<MemoryRouter><AdminMediaPage /></MemoryRouter>);
+  expect(await screen.findByTestId("media-kept-frei.png")).toHaveTextContent("wird noch von gespeicherten Ergebnissen gezeigt");
+  expect(screen.queryByTestId("media-kept-loewe.png")).toBeNull();
+});
+
 test("die Mediathek spricht Deutsch statt Technik-Englisch (#2122)", async () => {
   apiMock.get.mockImplementation(async (url) => {
     if (url.startsWith("/admin/media?")) return { data: { items: [{ ...UNUSED, media_scope: "legacy", tracked: false }], total: 1 } };

@@ -660,6 +660,7 @@ export default function AdminMediaPage() {
                       {it.duplicate_count > 1 && <span className="text-[9px] uppercase tracking-wider border border-[#FFD700]/30 px-1.5 py-0.5 text-[#FFD700]">duplikat</span>}
                     </div>
                     <div className="text-[10px] text-white/40 mt-1">{fmtBytes(it.size)} · {it.usage_count || 0}x genutzt</div>
+                    {it.kept_for_results && <div className="text-[10px] text-white/60 mt-1" data-testid={`media-kept-${it.filename}`}>wird noch von gespeicherten Ergebnissen gezeigt</div>}
                   </div>
                 </div>
               );

@@ -285,6 +285,9 @@ async def test_replacing_keeps_a_copy_that_a_stored_result_still_shows(flow, pub
     assert sheet["games"][0]["image_url"] == UPLOADS + "kopie.webp"
     log = await flow.db.audit_logs.find_one({"action": "media.replace_duplicates"})
     assert log["data"]["kept"] == ["award.webp", "kopie.webp"] and log["data"]["removed"] == []
+    # Die Mediathek-Zeile sagt, warum die Kopie noch da ist.
+    items = {item["filename"]: item for item in (await flow.get("/api/admin/media?paged=true")).json()["items"]}
+    assert items["kopie.webp"]["kept_for_results"] is True and items["bleibt.webp"]["kept_for_results"] is False
 
 
 @pytest.mark.asyncio
