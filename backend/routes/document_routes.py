@@ -14,7 +14,7 @@ from models import DocumentCreate, DocumentUpdate, new_id, now_utc
 from services import dolibarr_identity
 from services.dolibarr_client import DolibarrError
 from services.log_safe import log_safe
-from services.media_audit import iter_usages
+from services.media_audit import still_referenced
 from services.member_activity import note_document_open
 from services.permissions import MFA_MESSAGE, area_refusal, can_use_area
 from services.visibility import user_can_see
@@ -50,16 +50,14 @@ async def _audit(db, action: str, me: dict, doc_id: str, data: dict) -> None:
 
 async def _file_still_needed(db, doc: dict, path: pathlib.Path) -> bool:
     """Braucht noch etwas anderes diese Datei? Ein zweites Dokument, die Sponsoring-Mappe (selber Ordner) oder - bei alten
-    Dateien im öffentlichen Upload-Ordner - irgendeine Verwendungsstelle aus der Mediathek."""
+    Dateien im öffentlichen Upload-Ordner - irgendein Verweis, auch in Texten von Seiten, Newslettern und Rechtstexten."""
     name = path.name
     other = await db.documents.find_one({"id": {"$ne": doc["id"]}, "$or": [{"storage_key": name}, {"file_url": {"$regex": f"/{re.escape(name)}$"}}]}, {"_id": 1})
     if other or await db.settings.find_one({"pdf_key": name}, {"_id": 1}):
         return True
     if doc.get("storage_key"):
         return False
-    async for _usage in iter_usages(db, {name}):
-        return True
-    return False
+    return bool(await still_referenced(db, {name}))
 
 
 async def _remove_file(db, doc: dict) -> bool:

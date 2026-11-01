@@ -239,6 +239,23 @@ async def test_an_old_public_file_stays_while_something_uses_it(flow, monkeypatc
 
 
 @pytest.mark.asyncio
+async def test_a_link_in_a_text_keeps_an_old_file(flow, monkeypatch, tmp_path):
+    from routes import document_routes
+
+    uploads = tmp_path / "alt"
+    uploads.mkdir()
+    monkeypatch.setattr(document_routes, "UPLOAD_DIR", uploads)
+    (uploads / "verlinkt.pdf").write_bytes(b"%PDF-1.4\n")
+    doc = {"id": new_id(), "title": "Alt", "file_url": "/api/static/uploads/verlinkt.pdf"}
+    await flow.db.documents.insert_one(dict(doc))
+    await flow.db.settings.insert_one({"id": "branding", "terms_of_use": 'Siehe <a href="/api/static/uploads/verlinkt.pdf">Bedingungen</a>.'})
+    flow.act_as(await chair_of(flow))
+    removed = await flow.delete(f"/api/documents/{doc['id']}")
+    assert removed.json()["file_removed"] is False
+    assert (uploads / "verlinkt.pdf").exists()
+
+
+@pytest.mark.asyncio
 async def test_only_the_club_area_changes_documents(flow, doc_dir):
     doc = await stored_doc(flow, doc_dir)
     flow.act_as(await flow.add_user(role="moderator", name="moderator"))
