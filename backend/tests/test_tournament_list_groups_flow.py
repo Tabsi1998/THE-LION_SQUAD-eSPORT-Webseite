@@ -104,13 +104,13 @@ async def test_compact_list_enriches_only_the_page(flow, monkeypatch):
         await flow.create_tournament(id=f"t-{number:02d}", slug=f"cup-{number:02d}", created_at=f"2026-01-01T10:{number:02d}:00+00:00")
     flow.act_as(None)
     enriched = []
-    original = crud._enrich_tournament
+    original = crud._enrich_tournaments
 
-    async def counting(t, user=None):
-        enriched.append(t["id"])
-        return await original(t, user)
+    async def counting(tournaments, user=None):
+        enriched.extend(t["id"] for t in tournaments)
+        return await original(tournaments, user)
 
-    monkeypatch.setattr(crud, "_enrich_tournament", counting)
+    monkeypatch.setattr(crud, "_enrich_tournaments", counting)
     page = (await flow.get("/api/tournaments", params={"compact": "true", "paged": "true", "limit": 10, "offset": 5})).json()
     assert [row["id"] for row in page["items"]] == [f"t-{number:02d}" for number in range(24, 14, -1)]
     assert page["total"] == 30 and page["offset"] == 5 and page["limit"] == 10

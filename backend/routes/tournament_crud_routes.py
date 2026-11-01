@@ -134,8 +134,8 @@ async def _create_initial_bracket_preview(db, tournament: dict, actor_id: str | 
     return await _create_initial_stage_bracket_preview(db, tournament, actor_id)
 
 
-async def _enrich_tournament(t: dict, user: dict | None = None) -> dict:
-    db = get_db()
+def _prepare_tournament(t: dict) -> None:
+    """Was ohne Datenbank geht - für ein einzelnes Turnier und die Liste gleich."""
     t.pop("creation_key", None)
     apply_competition_version_read_defaults(t)
     # Weiterkommen (#1590): ältere Turniere kennen nur den Schalter - gelesen wird immer der Modus.
@@ -143,6 +143,11 @@ async def _enrich_tournament(t: dict, user: dict | None = None) -> dict:
     t["public_phase"] = derive_public_phase(t, "tournament")
     if is_league_staffel(t):
         t["league_label"] = league_label(t)  # Kennzeichnung „Liga · Staffel A“ (docs/LIGA.md)
+
+
+async def _enrich_tournament(t: dict, user: dict | None = None) -> dict:
+    db = get_db()
+    _prepare_tournament(t)
     if t.get("game_id"):
         g = await db.games.find_one({"id": t["game_id"]}, {"_id": 0})
         t["game"] = await _enrich_game_identity(db, g)
@@ -155,6 +160,37 @@ async def _enrich_tournament(t: dict, user: dict | None = None) -> dict:
     t["participant_count"] = await db.tournament_registrations.count_documents(
         {"tournament_id": t["id"], "status": {"$in": ["approved", "checked_in"]}})
     return t
+
+
+async def _enrich_tournaments(tournaments: list[dict], user: dict | None = None) -> None:
+    """Wie ``_enrich_tournament``, aber eine Abfrage je Art für die ganze Liste - die Verwaltung lädt bis zu 500 Turniere."""
+    db = get_db()
+    tids = [t["id"] for t in tournaments]
+    game_ids = sorted({t["game_id"] for t in tournaments if t.get("game_id")})
+    event_ids = sorted({t["event_id"] for t in tournaments if t.get("event_id")})
+    games = {row["id"]: await _enrich_game_identity(db, row)
+             for row in await db.games.find({"id": {"$in": game_ids}}, {"_id": 0}).to_list(len(game_ids) + 1)}
+    events: dict[str, dict] = {}
+    seen_visibility: dict[str, bool] = {}
+    async for event in db.events.find({"id": {"$in": event_ids}}, {"_id": 0, "tournaments": 0, "f1_challenges": 0}):
+        visibility = event.get("visibility") or "public"
+        if visibility not in seen_visibility:
+            seen_visibility[visibility] = await lead_can_see(user, visibility)
+        if event.get("status") != "draft" and seen_visibility[visibility]:
+            events[event["id"]] = event
+    participants = {row["_id"]: row["count"] async for row in db.tournament_registrations.aggregate([
+        {"$match": {"tournament_id": {"$in": tids}, "status": {"$in": ["approved", "checked_in"]}}},
+        {"$group": {"_id": "$tournament_id", "count": {"$sum": 1}}},
+    ])}
+    await partner_pages.attach_partners_many(db, tournaments)
+    for t in tournaments:
+        _prepare_tournament(t)
+        if t.get("game_id"):
+            game = games.get(t["game_id"])
+            t["game"] = dict(game) if game else None
+        if t.get("event_id") in events:
+            t["event"] = dict(events[t["event_id"]])
+        t["participant_count"] = participants.get(t["id"], 0)
 
 
 @router.get("")
@@ -226,8 +262,8 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
     if compact:
         tournaments = tournaments[page_offset:page_offset + page_limit]
     finance = await can_use_area(user, "finance")
+    await _enrich_tournaments(tournaments, user)
     for t in tournaments:
-        await _enrich_tournament(t, user)
         _expose_offer(t, finance)
         if not is_admin:
             # Der Umbau-Vorschlag für die Läufe (#1550) gehört der Turnierleitung; Helfer sehen ihn am Turnier selbst.
