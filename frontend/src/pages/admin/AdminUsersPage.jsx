@@ -10,6 +10,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useModalBehavior } from "@/hooks/useModalBehavior";
 import { toast } from "sonner";
 import { AREA_HINTS, AREA_LABELS, GRANTABLE_AREAS, ROLE_AREAS, roleLabel } from "@/lib/permissions";
+import { listLimitHint } from "@/lib/membershipMail";
 import { banState, effectiveAreas, invitationText, rightsChange, rightsHistoryLine } from "@/lib/userRights";
 import { viennaDate } from "@/lib/vienna";
 import { AlertTriangle, ChevronDown, Pencil, Plus, X } from "lucide-react";
@@ -95,7 +96,8 @@ export default function AdminUsersPage() {
           </button>
         )}
       </div>
-      <input placeholder="Name, Benutzername oder E-Mail suchen …" value={q} onChange={(e) => setQ(e.target.value)} data-testid="users-search" className="w-full max-w-md bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm mb-4" />
+      <input placeholder="Name, Benutzername, E-Mail oder Mitgliedsnummer suchen …" value={q} onChange={(e) => setQ(e.target.value)} data-testid="users-search" className="w-full max-w-md bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm mb-4" />
+      {listLimitHint(list.length) && <p className="mb-4 border border-[#FF9500]/40 bg-[#FF9500]/5 rounded-sm p-3 text-sm text-white/80" data-testid="users-limit-hint">{listLimitHint(list.length)}</p>}
 
       <details className="mb-5 border border-white/10 bg-[#121212] rounded-sm group" data-testid="roles-info">
         <summary className="cursor-pointer list-none px-4 py-3 flex items-center justify-between gap-3">

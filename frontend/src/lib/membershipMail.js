@@ -40,7 +40,7 @@ export const USERS_LIST_LIMIT = 500;
 
 /** Die Liste zeigt höchstens so viele Konten - der Hinweis sagt es, statt still abzuschneiden. */
 export function listLimitHint(count) {
-  return count >= USERS_LIST_LIMIT ? `Angezeigt werden höchstens ${USERS_LIST_LIMIT} Konten. Es können mehr sein: Suche gezielter oder nutze den CSV-Export.` : "";
+  return count >= USERS_LIST_LIMIT ? `Angezeigt werden höchstens ${USERS_LIST_LIMIT} Konten. Es können mehr sein: Suche gezielter oder nutze unter „Mitglieder“ den CSV-Export.` : "";
 }
 
 /** Der erklärte Austritt in einem Satz. */

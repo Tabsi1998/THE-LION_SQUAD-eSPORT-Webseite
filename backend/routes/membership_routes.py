@@ -1048,8 +1048,6 @@ async def declare_my_exit(body: SimpleExitBody, request: Request, me: dict = Dep
                                                 html="<p>{{member}} hat den Austritt aus dem Verein erklärt. Beende die Mitgliedschaft unter Admin → Mitglieder, wenn es so weit ist.</p>")
     except Exception:  # noqa: BLE001 - die Erklärung ist gespeichert und steht in der Mitgliederliste
         logger.warning("[membership] Mail an den Vorstand zum Austritt fehlgeschlagen", exc_info=True)
-    from services.discord_announcements import notify_board
-    await notify_board("membership.exit", "Ein Austritt wartet auf den Vorstand.")
     await membership_notices.tell_person(me["id"], "Dein Austritt ist eingegangen", "Der Vorstand beendet deine Mitgliedschaft und meldet sich, wenn Fragen offen sind.", "/members/membership")
     return {"exit_request": request_doc}
 
