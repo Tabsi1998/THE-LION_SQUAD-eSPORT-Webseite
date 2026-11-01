@@ -560,8 +560,9 @@ async def audit_image_references(repair: bool = False, clear_missing: bool = Fal
 
 async def _infer_scope_from_references(filename: str) -> tuple[str | None, dict | None]:
     db = get_db()
-    # Auch mit Version oder Zusatz an der Adresse (gedrehtes Bild, #2122).
-    suffix_re = rf"{re.escape(filename)}(\?|#|$)"
+    # Auch mit Version oder Zusatz an der Adresse (gedrehtes Bild, #2122); „x.webp“ trifft nicht „mx.webp“.
+    suffix_re = rf"(?:^|/){re.escape(filename)}(\?|#|$)"
+    text_re = rf"(?:^|/){re.escape(filename)}(?![A-Za-z0-9_-]|\.[A-Za-z0-9])"
     for coll_name, fields, scope in SCOPE_TARGETS:
         collection = db[coll_name]
         for field in fields:
@@ -576,7 +577,7 @@ async def _infer_scope_from_references(filename: str) -> tuple[str | None, dict 
     for coll_name, fields in TEXT_TARGETS:
         collection = db[coll_name]
         for field in fields:
-            doc = await collection.find_one({field: {"$regex": re.escape(filename)}}, {"_id": 0, "id": 1, "slug": 1})
+            doc = await collection.find_one({field: {"$regex": text_re}}, {"_id": 0, "id": 1, "slug": 1})
             if doc:
                 return "admin", {
                     "collection": coll_name,

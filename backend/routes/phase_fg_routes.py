@@ -31,7 +31,7 @@ from database import get_db
 from auth import get_current_user, require_area
 from models import new_id, now_utc
 from services import account_erasure, image_variants, media_audit, reference_originals, sponsor_images
-from services.media_formats import PUBLIC_IMAGE_EXTS, PUBLIC_MEDIA_EXTS, PUBLIC_ORIGINAL_EXTS, PUBLIC_VIDEO_EXTS
+from services.media_formats import PUBLIC_IMAGE_EXTS, PUBLIC_MEDIA_EXTS, PUBLIC_ORIGINAL_EXTS, PUBLIC_VIDEO_EXTS, bare_upload_url
 
 logger = logging.getLogger(__name__)
 
@@ -452,7 +452,9 @@ async def admin_media_replace_duplicates(body: DuplicateReplaceBody, me: dict = 
     editable = {item["filename"] for item in items if not item["filename"].startswith(sponsor_images.PREFIX)}
     if body.keep not in editable:
         raise HTTPException(409, "Diese Datei lässt sich nicht behalten: Sie gehört einem Mitglied, kommt aus der Mitgliederverwaltung oder hat keinen Upload-Eintrag.")
-    if await db.media_scans.find_one({"url": f"/api/static/uploads/{body.keep}", "state": {"$in": list(UNDECIDED_SCANS)}}, {"_id": 1}):
+    # Auch eine Prüfung, deren Adresse eine Version trägt, zählt.
+    scan_url = rf"^{re.escape(bare_upload_url(f'/api/static/uploads/{body.keep}'))}(\?|#|$)"
+    if await db.media_scans.find_one({"url": {"$regex": scan_url}, "state": {"$in": list(UNDECIDED_SCANS)}}, {"_id": 1}):
         raise HTTPException(409, "Diese Datei ist noch in der Bildprüfung. Bitte die Entscheidung abwarten.")
     same_content = await asyncio.to_thread(_duplicate_lookup, entries, {body.keep})
     copies = [name for name in same_content.get(body.keep, []) if name != body.keep and name in editable]

@@ -171,13 +171,24 @@ async def test_sorting_old_uploads_finds_a_versioned_address(flow, monkeypatch, 
 
 
 @pytest.mark.asyncio
-async def test_sorting_old_uploads_does_not_match_a_longer_name(flow, monkeypatch):
-    await flow.db.news_posts.insert_one({"id": "n-1", "banner_url": URL + ".backup"})
+@pytest.mark.parametrize("value", [URL + ".backup", UPLOADS + "m" + NAME, UPLOADS + "m" + NAME + "?v=1"])
+async def test_sorting_old_uploads_does_not_match_another_name(flow, monkeypatch, value):
+    await flow.db.news_posts.insert_one({"id": "n-1", "banner_url": value, "content": f"![Bild]({value})"})
     monkeypatch.setattr(media_audit, "get_db", lambda: flow.db)
 
     scope, _source = await media_audit._infer_scope_from_references(NAME)
 
     assert scope is None
+
+
+@pytest.mark.asyncio
+async def test_sorting_old_uploads_finds_the_name_in_a_text(flow, monkeypatch):
+    await flow.db.news_posts.insert_one({"id": "n-1", "content": f"![Bild]({URL}?v=1) und mehr"})
+    monkeypatch.setattr(media_audit, "get_db", lambda: flow.db)
+
+    scope, source = await media_audit._infer_scope_from_references(NAME)
+
+    assert scope == "admin" and source["field"] == "content"
 
 
 @pytest.mark.asyncio

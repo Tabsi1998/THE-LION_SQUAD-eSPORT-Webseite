@@ -328,6 +328,23 @@ async def test_replacing_an_original_moves_the_preview_to_the_kept_file(flow, pu
 
 
 @pytest.mark.asyncio
+async def test_an_open_scan_with_a_versioned_address_also_blocks_the_kept_file(flow, public):
+    await admin(flow)
+    for name in ("bleibt.webp", "kopie.webp"):
+        add_file(public, name, content=b"gleich", age=OLD)
+        await track(flow, name)
+    await flow.db.media_scans.insert_one({"id": "sc-1", "kind": "upload", "url": UPLOADS + "bleibt.webp?v=7", "state": "review"})
+    # Ein anderer Name, der nur ähnlich anfängt, stört nicht.
+    await flow.db.media_scans.insert_one({"id": "sc-2", "kind": "upload", "url": UPLOADS + "kopie.webp.alt", "state": "review"})
+
+    blocked = await flow.post("/api/admin/media/duplicates/replace", json={"keep": "bleibt.webp"})
+    assert blocked.status_code == 409
+
+    open_for_copy = await flow.post("/api/admin/media/duplicates/replace", json={"keep": "kopie.webp"})
+    assert open_for_copy.status_code == 200, open_for_copy.text
+
+
+@pytest.mark.asyncio
 async def test_copies_without_an_upload_entry_or_from_the_member_system_stay(flow, public):
     await admin(flow)
     for name in ("bleibt.webp", "kopie.webp", "ohne-eintrag.webp", "dolibarr-partner-1-logo-dark-abc.webp"):
