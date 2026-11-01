@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Plus, Trash2, Image as ImageIcon } from "lucide-react";
 import { AlbumModal } from "./gallery/AlbumModal";
 import { AlbumPhotos } from "./gallery/AlbumPhotos";
-import { albumMediaCount } from "./gallery/shared";
+import { ALBUM_VISIBILITY, albumMediaCount } from "./gallery/shared";
 import { SubmissionQueue } from "./gallery/SubmissionQueue";
 import { useAuth } from "@/context/AuthContext";
 import { hasArea } from "@/lib/permissions";
@@ -37,7 +37,7 @@ export default function AdminGalleryPage() {
   const remove = async (id) => {
     if (!await confirm({
       title: "Album löschen?",
-      description: "Das Album und alle zugeordneten Medien werden entfernt.",
+      description: "Das Album und seine Einträge werden entfernt. Die Dateien bleiben in den Medien. Nur eingesandte Fotos, die noch auf Freigabe warten, werden mit gelöscht.",
       confirmLabel: "Löschen",
     })) return;
     const previous = albums;
@@ -93,7 +93,7 @@ export default function AdminGalleryPage() {
                 {/* Leere Alben (#1224) sehen Besucher nicht - sie erscheinen von selbst, sobald Medien da sind. */}
                 {albumMediaCount(a) === 0 && <div className="mt-1 text-[10px] uppercase tracking-widest font-bold text-[#FFD700]" data-testid={`admin-album-empty-${a.id}`}>leer – für Besucher unsichtbar</div>}
                 <div className="text-[10px] uppercase tracking-widest text-[#29B6E8]/80 mt-1">
-                  {a.visibility} · {a.published ? "live" : "entwurf"}{a.section_count ? ` · ${a.section_count} Abschnitte` : ""}{a.video_count ? ` · ${a.video_count} Videos` : ""}
+                  {ALBUM_VISIBILITY[a.visibility] || a.visibility} · {a.published ? "Veröffentlicht" : "Entwurf"}{a.section_count ? ` · ${a.section_count} Abschnitte` : ""}{a.video_count ? ` · ${a.video_count} Videos` : ""}
                 </div>
                 <div className="mt-3 flex gap-2">
                   <button onClick={() => setActiveAlbum(a)} data-testid={`album-open-${a.id}`} className="flex-1 text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#29B6E8]/40 text-[#29B6E8] hover:bg-[#29B6E8]/10">Medien</button>

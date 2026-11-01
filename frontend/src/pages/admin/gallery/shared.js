@@ -11,6 +11,8 @@ export const PROXY_UPLOAD_LIMIT_MB = parseUploadMb(import.meta.env.VITE_PROXY_UP
 
 export const UNSECTIONED_VALUE = "__none";
 
+export const ALBUM_VISIBILITY = { public: "Öffentlich", community: "Community", members: "Nur Mitglieder" };
+
 export function albumMediaCount(album) {
   return album.media_count ?? ((album.photo_count || 0) + (album.video_count || 0));
 }

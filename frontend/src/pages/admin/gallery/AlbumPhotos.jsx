@@ -31,6 +31,9 @@ export function AlbumPhotos({ album, onBack }) {
   const media = useMediaLibrary("/admin/media?type=media", mediaOpen);
   const [selectedMedia, setSelectedMedia] = useState([]);
   const [editingPhoto, setEditingPhoto] = useState(null);
+  // Häkchen-Auswahl (#2122): mehrere Einträge auf einmal aus dem Album nehmen oder verschieben.
+  const [checked, setChecked] = useState([]);
+  const [bulkBusy, setBulkBusy] = useState(false);
   const confirm = useConfirm();
   const uploadProgress = useUploadProgress();
 
@@ -157,7 +160,7 @@ export function AlbumPhotos({ album, onBack }) {
   const remove = async (id) => {
     if (!await confirm({
       title: "Medium löschen?",
-      description: "Der Eintrag wird aus diesem Album entfernt.",
+      description: "Der Eintrag wird aus diesem Album entfernt. Die Datei bleibt in den Medien.",
       confirmLabel: "Löschen",
     })) return;
     const previous = photos;
@@ -170,6 +173,40 @@ export function AlbumPhotos({ album, onBack }) {
       toast.error(formatApiError(err.response?.data?.detail));
       load();
     }
+  };
+  const toggleChecked = (id) => setChecked((rows) => (rows.includes(id) ? rows.filter((row) => row !== id) : [...rows, id]));
+  const runBulk = async (body, success) => {
+    setBulkBusy(true);
+    try {
+      const { data } = await api.post(`/gallery/${album.id}/photos/bulk`, { ids: checked, ...body });
+      toast.success(success(data?.count ?? checked.length));
+      setChecked([]);
+      await load();
+    } catch (err) {
+      toast.error(formatRequestError(err, "Das hat nicht geklappt."));
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+  const bulkRemove = async () => {
+    if (!await confirm({
+      title: `${checked.length} ${checked.length === 1 ? "Eintrag" : "Einträge"} aus dem Album nehmen?`,
+      description: "Die Einträge verschwinden aus diesem Album. Die Dateien bleiben in den Medien.",
+      confirmLabel: "Entfernen",
+    })) return;
+    await runBulk({ action: "delete" }, (count) => `${count} aus dem Album genommen.`);
+  };
+  const bulkMove = async (value) => {
+    if (!value) return;
+    const sectionId = sectionIdFromValue(value);
+    const name = sectionTitle(sections, sectionId);
+    if (!await confirm({
+      title: `${checked.length} ${checked.length === 1 ? "Eintrag" : "Einträge"} verschieben?`,
+      description: `Die Auswahl kommt nach „${name}“.`,
+      confirmLabel: "Verschieben",
+      tone: "info",
+    })) return;
+    await runBulk({ action: "move", section_id: sectionId }, (count) => `${count} nach „${name}“ verschoben.`);
   };
   const saveSection = async (payload) => {
     if (editingSection?.id) {
@@ -309,6 +346,26 @@ export function AlbumPhotos({ album, onBack }) {
         </div>
       </div>
 
+      {photos.length > 0 && (
+        <div className="sticky top-0 z-10 mb-4 flex flex-wrap items-center gap-2 border border-white/10 bg-[#101010] rounded-sm p-3" data-testid="gallery-bulk-bar">
+          <span className="text-xs font-bold tabular-nums text-white/70" data-testid="gallery-bulk-count">{checked.length} von {photos.length} ausgewählt</span>
+          <button type="button" onClick={() => setChecked(checked.length === photos.length ? [] : photos.map((p) => p.id))} data-testid="gallery-bulk-all" className="min-h-10 px-3 py-2 border border-white/15 text-white/70 rounded-sm text-xs font-bold uppercase tracking-wider hover:text-white">
+            {checked.length === photos.length ? "Auswahl aufheben" : "Alle auswählen"}
+          </button>
+          {checked.length > 0 && (
+            <>
+              <select value="" disabled={bulkBusy} onChange={(e) => bulkMove(e.target.value)} aria-label="Auswahl in einen Abschnitt verschieben" data-testid="gallery-bulk-move" className="min-h-10 bg-black/40 border border-white/15 px-2 py-2 rounded-sm text-xs text-white">
+                <option value="">Verschieben nach …</option>
+                <option value={UNSECTIONED_VALUE}>Ohne Abschnitt</option>
+                {sections.map((section) => <option key={section.id} value={section.id}>{section.title}</option>)}
+              </select>
+              <button type="button" disabled={bulkBusy} onClick={bulkRemove} data-testid="gallery-bulk-remove" className="min-h-10 px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-xs font-bold uppercase tracking-wider hover:bg-[#FF3B30]/10 disabled:opacity-50">
+                Aus dem Album nehmen
+              </button>
+            </>
+          )}
+        </div>
+      )}
       {photos.length === 0 ? (
         <div className="border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">Noch keine Medien. Lade Fotos oder Videos hoch, oder füge einen Video-Link hinzu.</div>
       ) : (
@@ -327,13 +384,16 @@ export function AlbumPhotos({ album, onBack }) {
               ) : (
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
                   {group.items.map((p) => (
-                    <div key={p.id} className="relative group aspect-square bg-[#0A0A0A] border border-white/10">
+                    <div key={p.id} className={`relative group aspect-square bg-[#0A0A0A] border ${checked.includes(p.id) ? "border-[#29B6E8] ring-2 ring-[#29B6E8]/30" : "border-white/10"}`}>
                       <GalleryAdminThumb item={p} />
                       <MediaBadge item={p} />
+                      <label className="absolute left-0 top-0 z-[1] flex h-9 w-9 cursor-pointer items-center justify-center">
+                        <input type="checkbox" checked={checked.includes(p.id)} onChange={() => toggleChecked(p.id)} aria-label={`${p.caption || "Medium"} auswählen`} data-testid={`gallery-photo-check-${p.id}`} className="h-5 w-5 accent-[#29B6E8]" />
+                      </label>
                       <select
                         value={sectionValue(p.section_id)}
                         onChange={(e) => moveMediaToSection(p, sectionIdFromValue(e.target.value))}
-                        className="absolute left-1 top-1 max-w-[calc(100%-2.5rem)] bg-black/75 border border-white/10 px-1.5 py-1 text-[10px] text-white opacity-0 group-hover:opacity-100 focus:opacity-100 transition rounded-sm"
+                        className="absolute left-1 top-9 max-w-[calc(100%-0.5rem)] bg-black/75 border border-white/10 px-1.5 py-1 text-[10px] text-white opacity-0 group-hover:opacity-100 focus:opacity-100 transition rounded-sm"
                         aria-label="Abschnitt ändern"
                       >
                         <option value={UNSECTIONED_VALUE}>Ohne Abschnitt</option>

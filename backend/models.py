@@ -2277,6 +2277,13 @@ class GalleryPhotoUpdate(BaseModel):
     height: Optional[int] = None
 
 
+class GalleryPhotoBulk(BaseModel):
+    """Mehrere Einträge eines Albums auf einmal (#2122): aus dem Album nehmen oder in einen Abschnitt verschieben."""
+    ids: List[str] = Field(min_length=1, max_length=500)
+    action: Literal["delete", "move"]
+    section_id: Optional[str] = None
+
+
 # ---------- Admin ----------
 class RoleUpdate(BaseModel):
     role: Role
