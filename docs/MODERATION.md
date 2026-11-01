@@ -51,6 +51,25 @@ wurden, räumt der bestehende Job weiter ab.
 prüfen will, schaltet auf Google Vision. Die Maschine sperrt nie eine Person – das bleibt beim
 Menschen (#416, Stufe 3).
 
+## Meldungen
+
+Unter **Admin → System → Moderation → Meldungen** steht jede Meldung mit Kategorie, der gemeldeten Person, wer gemeldet hat,
+und dem Text der gemeldeten Nachricht. Entschieden wird mit Knöpfen (#2122), jeder öffnet erst die Entscheidung mit den Folgen:
+
+| Knopf | Was passiert | Grund |
+|---|---|---|
+| **In Prüfung nehmen** / **Wieder offen** / **Wieder prüfen** | Nur der Stand ändert sich | freiwillig |
+| **Berechtigt** | Zählt als Treffer; je nach Stufe folgt eine Maßnahme mit Nachricht an die Person | Pflicht |
+| **Erledigt** | Geschlossen ohne Treffer | freiwillig |
+| **Verwerfen** | Geschlossen ohne Folgen | Pflicht |
+| **Zurückstellen** (bei einer berechtigten Meldung) | Der Treffer aus dieser Meldung wird zurückgenommen | Pflicht |
+
+- Eine schon laufende Maßnahme hebt Zurückstellen **nicht** auf – das bleibt eine eigene Entscheidung unter **Personen**. Die
+  Meldung danach sagt, ob noch eine läuft.
+- Der Grund bleibt stehen, wenn eine spätere Änderung keinen neuen mitbringt. Ein neuer ersetzt ihn.
+- Gegen Konten mit Adminbereich entscheidet **Berechtigt** und **Zurückstellen** nur der Superadmin.
+- Jede Änderung des Stands steht im Protokoll.
+
 ## Verwarnungen mit Stufen (#416)
 
 Treffer aus Wortfilter, berechtigten Meldungen, Bildprüfung und von Hand zählen nach einstellbaren

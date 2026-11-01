@@ -23,7 +23,7 @@ from models import (
     PartnerCreate, PartnerUpdate, ReferenceCreate, ReferenceShowcaseSettings, ReferenceUpdate,
     GalleryAlbumCreate, GalleryAlbumUpdate,
     GallerySectionCreate, GallerySectionUpdate,
-    GalleryPhotoCreate, GalleryPhotoUpdate,
+    GalleryPhotoBulk, GalleryPhotoCreate, GalleryPhotoUpdate,
     now_utc, new_id,
 )
 from models import ReferenceCheckSettings
@@ -2029,12 +2029,20 @@ async def delete_album(aid: str, me: dict = Depends(require_area("content"))):
     album = await db.gallery_albums.find_one({"$or": [{"id": aid}, {"slug": aid}]}, {"_id": 0, "id": 1})
     if not album:
         raise HTTPException(404, "Album nicht gefunden.")
-    await db.gallery_photos.delete_many({"album_id": album["id"]})
+    removed = await db.gallery_photos.delete_many({"album_id": album["id"]})
     await db.gallery_albums.delete_one({"id": album["id"]})
     # Eingesandte Fotos (#1186), die noch auf Freigabe warten, samt Dateien.
     from services.event_photos import delete_for_album
     await delete_for_album(db, album["id"])
+    await _audit_gallery(db, me, "gallery.album_delete", album["id"], {"entries": removed.deleted_count})
     return {"ok": True}
+
+
+async def _audit_gallery(db, me: dict, action: str, target_id: str, data: dict) -> None:
+    await db.audit_logs.insert_one({
+        "id": new_id(), "action": action, "actor_id": me.get("id"), "target_id": target_id, "data": data,
+        "created_at": now_utc().isoformat(),
+    })
 
 
 @router.post("/gallery/{aid}/sections")
@@ -2143,6 +2151,26 @@ async def update_photo(pid: str, body: GalleryPhotoUpdate, me: dict = Depends(re
     if res.matched_count == 0:
         raise HTTPException(404, "Foto nicht gefunden.")
     return await db.gallery_photos.find_one({"id": pid}, {"_id": 0})
+
+
+@router.post("/gallery/{aid}/photos/bulk")
+async def bulk_photos(aid: str, body: GalleryPhotoBulk, me: dict = Depends(require_area("content"))):
+    """Sammelaktion im Album (#2122), mit Protokoll. Betrifft nur Einträge dieses Albums. „delete“ nimmt die Einträge aus
+    dem Album - die Dateien bleiben in den Medien."""
+    db = get_db()
+    album = await db.gallery_albums.find_one({"id": aid}, {"_id": 0, "id": 1})
+    if not album:
+        raise HTTPException(404, "Album nicht gefunden.")
+    query = {"album_id": aid, "id": {"$in": body.ids}}
+    if body.action == "delete":
+        count = (await db.gallery_photos.delete_many(query)).deleted_count
+        data = {"action": "delete", "count": count}
+    else:
+        section_id = await _ensure_gallery_section_exists(db, aid, body.section_id)
+        count = (await db.gallery_photos.update_many(query, {"$set": {"section_id": section_id}})).matched_count
+        data = {"action": "move", "count": count, "section_id": section_id}
+    await _audit_gallery(db, me, "gallery.photos_bulk", aid, data)
+    return {"ok": True, "count": count}
 
 
 @router.delete("/gallery/photos/{pid}")

@@ -37,6 +37,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
+import { useMediaLibrary } from "@/hooks/useMediaLibrary";
+import { MediaLibraryMore, MediaLibrarySearch } from "./MediaLibraryControls";
 import { renderMarkdownLite } from "@/lib/markdownLite";
 import { usePrompt } from "@/components/tls/ConfirmDialog";
 import { prepareImageForUpload } from "@/components/tls/ImageUpload";
@@ -227,9 +229,8 @@ export function MarkdownEditor({
   const [mode, setMode] = useState("visual");
   const [htmlInput, setHtmlInput] = useState("");
   const [mediaOpen, setMediaOpen] = useState(false);
-  const [mediaLoading, setMediaLoading] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
-  const [media, setMedia] = useState([]);
+  const media = useMediaLibrary(libraryEndpoint || defaultLibraryEndpoint(), mediaOpen);
   const [visualMention, setVisualMention] = useState(null);
   const [visualMentionIndex, setVisualMentionIndex] = useState(0);
   const [visualMentionPosition, setVisualMentionPosition] = useState({ left: 12, top: 44 });
@@ -417,18 +418,7 @@ export function MarkdownEditor({
     }
   };
 
-  const openMedia = async () => {
-    setMediaOpen(true);
-    setMediaLoading(true);
-    try {
-      const { data } = await api.get(libraryEndpoint || defaultLibraryEndpoint());
-      setMedia(Array.isArray(data) ? data : []);
-    } catch {
-      toast.error("Medienbibliothek konnte nicht geladen werden.");
-    } finally {
-      setMediaLoading(false);
-    }
-  };
+  const openMedia = () => setMediaOpen(true);
 
   const insertMedia = (item) => {
     if (!editor || editor.isDestroyed) return;
@@ -572,17 +562,19 @@ export function MarkdownEditor({
                 <X className="w-5 h-5" />
               </button>
             </div>
-            {mediaLoading ? (
+            <MediaLibrarySearch library={media} testId="markdown-media" />
+            {media.loading ? (
               <div className="text-white/40 py-12 text-center">Lade Medien…</div>
-            ) : media.length === 0 ? (
-              <div className="text-white/40 py-12 text-center">Keine Bilder in der Medienbibliothek vorhanden.</div>
+            ) : media.items.length === 0 ? (
+              <div className="text-white/40 py-12 text-center">{media.search ? "Nichts gefunden." : "Keine Bilder in der Medienbibliothek vorhanden."}</div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-                {media.map((item) => (
+                {media.items.map((item) => (
                   <MediaThumb key={item.filename || item.url} item={item} onSelect={insertMedia} />
                 ))}
               </div>
             )}
+            <MediaLibraryMore library={media} testId="markdown-media" />
           </div>
         </div>
       )}

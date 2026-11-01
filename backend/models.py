@@ -2280,6 +2280,17 @@ class GalleryPhotoUpdate(BaseModel):
     height: Optional[int] = None
 
 
+# Mehr Einträge lädt die Verwaltung je Album nicht - „Alle auswählen“ schickt höchstens so viele.
+GALLERY_ALBUM_MAX_PHOTOS = 2000
+
+
+class GalleryPhotoBulk(BaseModel):
+    """Mehrere Einträge eines Albums auf einmal (#2122): aus dem Album nehmen oder in einen Abschnitt verschieben."""
+    ids: List[str] = Field(min_length=1, max_length=GALLERY_ALBUM_MAX_PHOTOS)
+    action: Literal["delete", "move"]
+    section_id: Optional[str] = None
+
+
 # ---------- Admin ----------
 class RoleUpdate(BaseModel):
     role: Role

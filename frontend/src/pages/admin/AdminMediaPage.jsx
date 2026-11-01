@@ -1,13 +1,15 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, formatApiError, formatUploadError, uploadApi } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { prepareImageForUpload } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { UploadProgressPanel } from "@/components/tls/UploadProgressPanel";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { mediaPageFrom } from "@/hooks/useMediaLibrary";
 import { useUploadProgress } from "@/hooks/useUploadProgress";
 import { MEDIA_ACCEPT, ORIGINAL_MEDIA_EXTENSIONS, mediaTypeFromFile } from "@/lib/galleryMedia";
 import { logUploadClientFailure } from "@/lib/uploadDiagnostics";
+import { loadUploadLimits, tooLargeMessage } from "@/lib/uploadLimits";
 import { toast } from "sonner";
 import { FileText, Search, RefreshCw, Upload, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { MediaDetailSheet } from "./media/MediaDetailSheet";
@@ -21,14 +23,18 @@ const parseUploadMb = (value, fallback) => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 };
 
-const MAX_VIDEO_UPLOAD_MB = parseUploadMb(import.meta.env.VITE_MAX_VIDEO_UPLOAD_MB, 1536);
-
 const PROXY_UPLOAD_LIMIT_MB = parseUploadMb(import.meta.env.VITE_PROXY_UPLOAD_LIMIT_MB, 1700);
 
-const VIDEO_MAX_BYTES = MAX_VIDEO_UPLOAD_MB * 1024 * 1024;
+const PAGE_SIZE = 60;
+const TYPE_PARAM = { images: "images", videos: "videos", files: "files" };
+const SEARCH_DELAY_MS = 300;
 
 export default function AdminMediaPage() {
   const [items, setItems] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [totalSize, setTotalSize] = useState(0);
+  const [page, setPage] = useState(0);
+  const [needle, setNeedle] = useState("");
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
   const [scopeFilter, setScopeFilter] = useState("all");
@@ -42,24 +48,55 @@ export default function AdminMediaPage() {
   const [loadingUploadEvents, setLoadingUploadEvents] = useState(false);
   const [auditingScopes, setAuditingScopes] = useState(false);
   const [repairingScopes, setRepairingScopes] = useState(false);
+  const [cleaning, setCleaning] = useState(false);
   const confirm = useConfirm();
   const uploadProgress = useUploadProgress();
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  // Suche und Filter rechnet der Server (#2122): auch die ältesten Dateien sind so erreichbar.
+  useEffect(() => {
+    const timer = setTimeout(() => setNeedle(q.trim()), SEARCH_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [q]);
+  useEffect(() => { setPage(0); }, [needle, filter, scopeFilter, includeUserUploads]);
+
+  // Die Prüfung liest alle Dateien und Verweise: Sie läuft beim Öffnen und nach Änderungen, nicht bei jedem Blättern.
+  const loadAudit = useCallback(async () => {
     try {
-      const [mediaRes, auditRes] = await Promise.allSettled([
-        api.get(`/admin/media?include_user_uploads=${includeUserUploads ? "true" : "false"}&include_usage=true`),
-        api.get("/admin/media/audit"),
-      ]);
-      if (mediaRes.status === "fulfilled") setItems(mediaRes.value.data);
-      else toast.error(formatApiError(mediaRes.reason?.response?.data?.detail) || "Fehler beim Laden");
-      if (auditRes.status === "fulfilled") setMediaAudit(auditRes.value.data);
+      const { data } = await api.get("/admin/media/audit");
+      setMediaAudit(data);
+    } catch {
+      setMediaAudit(null);
+    }
+  }, []);
+
+  const requestRef = useRef(0);
+  const loadPage = useCallback(async () => {
+    const request = ++requestRef.current;
+    setLoading(true);
+    const params = new URLSearchParams({
+      paged: "true", limit: String(PAGE_SIZE), offset: String(page * PAGE_SIZE),
+      include_user_uploads: includeUserUploads ? "true" : "false", include_usage: "true",
+    });
+    if (TYPE_PARAM[filter]) params.set("type", TYPE_PARAM[filter]);
+    if (scopeFilter !== "all") params.set("scope", scopeFilter);
+    if (needle) params.set("q", needle);
+    try {
+      const { data } = await api.get(`/admin/media?${params.toString()}`);
+      if (request !== requestRef.current) return;
+      const result = mediaPageFrom(data);
+      setItems(result.items);
+      setTotal(result.total);
+      setTotalSize(result.totalSize ?? result.items.reduce((sum, it) => sum + (it.size || 0), 0));
+      // Die letzte Datei einer Seite gelöscht: zurück auf die letzte Seite, die es noch gibt.
+      if (!result.items.length && page > 0) setPage(Math.max(0, Math.ceil(result.total / PAGE_SIZE) - 1));
     } catch (e) {
+      if (request !== requestRef.current) return;
       toast.error(formatApiError(e.response?.data?.detail) || "Fehler beim Laden");
     }
     setLoading(false);
-  }, [includeUserUploads]);
+  }, [includeUserUploads, filter, scopeFilter, needle, page]);
+
+  const load = useCallback(() => Promise.all([loadPage(), loadAudit()]), [loadPage, loadAudit]);
 
   const loadUploadEvents = useCallback(async () => {
     setLoadingUploadEvents(true);
@@ -73,46 +110,29 @@ export default function AdminMediaPage() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { loadPage(); }, [loadPage]);
+  useEffect(() => { loadAudit(); }, [loadAudit]);
   useEffect(() => { loadUploadEvents(); }, [loadUploadEvents]);
   useApiInvalidation(load, ["admin/media", "media", "uploads"]);
   useApiInvalidation(loadUploadEvents, ["uploads"]);
 
-  const filtered = useMemo(() => {
-    return items.filter((it) => {
-      if (filter === "images" && !IMG_EXT.has(it.ext)) return false;
-      if (filter === "videos" && !VIDEO_EXT.has(it.ext)) return false;
-      if (filter === "files" && (IMG_EXT.has(it.ext) || VIDEO_EXT.has(it.ext))) return false;
-      if (scopeFilter === "unused" && !it.is_unused) return false;
-      else if (scopeFilter === "untracked" && it.tracked) return false;
-      else if (scopeFilter === "duplicate" && !(it.duplicate_count > 1)) return false;
-      else if (!["all", "unused", "untracked", "duplicate"].includes(scopeFilter) && it.media_scope !== scopeFilter) return false;
-      const search = `${it.filename || ""} ${it.original_filename || ""} ${(it.duplicate_filenames || []).join(" ")}`.toLowerCase();
-      if (q && !search.includes(q.toLowerCase())) return false;
-      return true;
-    });
-  }, [items, filter, scopeFilter, q]);
-
-  const totalSize = useMemo(
-    () => items.reduce((s, it) => s + (it.size || 0), 0),
-    [items],
-  );
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const qualityChecks = useMemo(() => {
     if (!mediaAudit) return [];
     return [
       {
         key: "missing",
-        label: "Kaputte Referenzen",
+        label: "Verweise ins Leere",
         value: mediaAudit.reference_summary?.missing_file || 0,
-        detail: "Bildfelder zeigen auf Dateien, die nicht mehr existieren.",
+        detail: "Bildfelder zeigen auf Dateien, die es nicht mehr gibt.",
         tone: "danger",
       },
       {
         key: "metadata",
-        label: "Defekte Metadaten",
+        label: "Einträge ohne Datei",
         value: mediaAudit.metadata_missing_files || 0,
-        detail: "Upload-Metadaten existieren, aber die Datei fehlt.",
+        detail: "Der Upload ist eingetragen, aber die Datei fehlt.",
         tone: "danger",
       },
       {
@@ -127,23 +147,23 @@ export default function AdminMediaPage() {
         key: "unused",
         label: "Ungenutzt",
         value: mediaAudit.unused || 0,
-        detail: "Dateien ohne erkannte CMS-, Event-, Profil- oder Galerie-Referenz.",
+        detail: "Dateien, die nirgends verwendet werden.",
         tone: "warn",
         filter: "unused",
       },
       {
         key: "untracked",
-        label: "Ungetrackt",
+        label: "Nicht erfasst",
         value: mediaAudit.untracked || 0,
-        detail: "Dateien ohne Upload-Metadaten oder klare Zuordnung.",
+        detail: "Dateien ohne Upload-Eintrag – woher sie kommen, ist unbekannt.",
         tone: "warn",
         filter: "untracked",
       },
       {
         key: "legacy",
-        label: "Legacy-Scope",
+        label: "Ohne Zuordnung",
         value: mediaAudit.by_scope?.legacy || 0,
-        detail: "Alte Uploads ohne saubere Medienkategorie.",
+        detail: "Alte Uploads, die noch keinem Bereich zugeordnet sind.",
         tone: "info",
         filter: "legacy",
       },
@@ -156,42 +176,73 @@ export default function AdminMediaPage() {
     const used = (it.usage_count || 0) > 0;
     const places = [...new Set((it.references || []).map((ref) => ref.place || `${ref.collection}.${ref.field}`))].join(", ");
     const description = used
-      ? `"${it.filename}" wird noch verwendet (${it.usage_count}x${places ? `: ${places}` : ""}). Diese Bildfelder werden geleert; Bilder in Texten bleiben als toter Verweis stehen.`
+      ? `"${it.filename}" wird noch verwendet (${it.usage_count}x${places ? `: ${places}` : ""}). Diese Bildfelder werden geleert; Bilder in Texten bleiben als toter Verweis stehen. Gespeicherte Ergebnisse, die die Datei zeigen, verlieren das Bild.`
       : `"${it.filename}" wird nirgends verwendet und wird aus der Medienbibliothek entfernt.`;
     if (!await confirm({ title: used ? "Verwendete Datei löschen?" : "Datei endgültig löschen?", description, confirmLabel: used ? "Trotzdem löschen" : "Löschen" })) return;
     const previous = items;
-    setItems((rows) => rows.filter((row) => row.filename !== it.filename));
-    setSelected(null);
-    try {
-      const { data } = await api.delete(`/admin/media/${encodeURIComponent(it.filename)}${used ? "?force=true" : ""}`);
+    const remove = async (force) => {
+      setItems((rows) => rows.filter((row) => row.filename !== it.filename));
+      setSelected(null);
+      const { data } = await api.delete(`/admin/media/${encodeURIComponent(it.filename)}${force ? "?force=true" : ""}`);
       const cleared = data?.cleared_references ? `, ${data.cleared_references} Verknüpfung(en) bereinigt` : "";
       const inText = data?.text_references ? `, ${data.text_references} Verweis(e) in Texten bitte von Hand anpassen` : "";
       const later = data?.file_pending ? " (die Datei selbst wird beim nächsten Aufräumen entfernt)" : "";
       toast.success(`Datei gelöscht${later}${cleared}${inText}`);
-      load();
-    } catch (e) {
+    };
+    const failed = (e) => {
       setItems(previous);
       toast.error(formatApiError(e.response?.data?.detail) || "Löschen fehlgeschlagen");
-      load();
+    };
+    try {
+      await remove(used);
+    } catch (e) {
+      // Der Server kennt mehr Stellen als die Liste, etwa gespeicherte Ergebnisse (#2122): Rückfrage wie bei jeder Verwendung.
+      if (e.response?.status === 409 && !used) {
+        setItems(previous);
+        const asked = await confirm({
+          title: "Verwendete Datei löschen?",
+          description: `${formatApiError(e.response.data?.detail)} Dort fehlt das Bild danach.`,
+          confirmLabel: "Trotzdem löschen",
+        });
+        if (asked) await remove(true).catch(failed);
+      } else {
+        failed(e);
+      }
     }
+    load();
   };
 
   const copyUrl = async (it) => {
     const fullUrl = `${BACKEND}${it.url}`;
     try {
       await navigator.clipboard.writeText(fullUrl);
-      toast.success("URL in Zwischenablage kopiert");
+      toast.success("Adresse kopiert.");
     } catch {
       toast.error("Kopieren fehlgeschlagen");
     }
   };
 
+  // Drehen (#2122) ändert das Bild überall, wo es steht - darum die Rückfrage mit der Zahl der Stellen.
   const rotateImage = async (it, degrees) => {
+    const used = it.usage_count || 0;
+    if (!await confirm({
+      title: `Bild nach ${degrees < 0 ? "links" : "rechts"} drehen?`,
+      description: (used
+        ? `Das Bild erscheint danach überall gedreht – es wird an ${used} ${used === 1 ? "Stelle" : "Stellen"} verwendet.`
+        : "Das Bild wird in der Datei selbst gedreht. Es wird derzeit nirgends verwendet.")
+        // Gespeicherte Ergebnisse behalten ihre Adresse von damals: Dort entscheidet der Browser-Speicher, wann es gedreht erscheint.
+        + " In gespeicherten Ergebnissen (Ergebnisblatt, Liga-Spiel) kann es im Browser noch bis zu 30 Tage ungedreht zu sehen sein.",
+      confirmLabel: "Drehen",
+      tone: "info",
+    })) return;
     try {
       const { data } = await api.post(`/admin/media/${encodeURIComponent(it.filename)}/rotate`, { degrees });
       const updated = {
         ...it,
+        url: data?.url || it.url,
         size: data?.size ?? it.size,
+        width: data?.width ?? it.width,
+        height: data?.height ?? it.height,
         mtime: data?.updated_at || new Date().toISOString(),
       };
       setSelected(updated);
@@ -208,6 +259,7 @@ export default function AdminMediaPage() {
     const picked = Array.from(files);
     uploadProgress.start(picked);
     setUploading(true);
+    const { video_mb: videoMb } = await loadUploadLimits();
     let ok = 0;
     let failed = 0;
     let originals = 0;
@@ -215,8 +267,8 @@ export default function AdminMediaPage() {
       let kind = mediaTypeFromFile(file);
       try {
         uploadProgress.startFile(file, index, kind === "image" ? "Bild wird vorbereitet" : "Upload startet");
-        if (kind === "video" && file.size > VIDEO_MAX_BYTES) {
-          throw new Error(`Datei zu groß (max ${MAX_VIDEO_UPLOAD_MB} MB).`);
+        if (kind === "video" && file.size > videoMb * 1024 * 1024) {
+          throw new Error(tooLargeMessage(videoMb));
         }
         const uploadFile = kind === "image" ? await prepareImageForUpload(file) : file;
         const fd = new FormData();
@@ -231,17 +283,14 @@ export default function AdminMediaPage() {
       } catch (e) {
         failed++;
         uploadProgress.failFile();
-        const message = formatUploadError(e, "Upload fehlgeschlagen.", {
-          appLimitMb: MAX_VIDEO_UPLOAD_MB,
-          proxyLimitMb: PROXY_UPLOAD_LIMIT_MB,
-        });
+        const message = formatUploadError(e, "Upload fehlgeschlagen.", { appLimitMb: kind === "video" ? videoMb : undefined });
         await logUploadClientFailure(e, file, {
           endpoint: "/uploads/media",
           mediaScope: "admin",
           kind,
           message,
           phase: uploadProgress.progress?.phase,
-          appLimitMb: MAX_VIDEO_UPLOAD_MB,
+          appLimitMb: videoMb,
           proxyLimitMb: PROXY_UPLOAD_LIMIT_MB,
         });
         toast.error(`${file.name}: ${message}`);
@@ -254,15 +303,64 @@ export default function AdminMediaPage() {
     loadUploadEvents();
   };
 
+  // „Ungenutzte löschen“ (#2122): Der Server nennt, was gelöscht würde, und prüft beim Löschen jede Datei erneut.
+  const cleanupUnused = async () => {
+    setCleaning(true);
+    try {
+      const { data: preview } = await api.get("/admin/media/unused");
+      if (!preview?.count) {
+        toast.success("Es gibt nichts zu löschen.");
+        return;
+      }
+      const shown = preview.filenames?.length || 0;
+      const partial = preview.count > shown;
+      const more = partial ? " Die übrigen löschst du danach mit einem weiteren Klick." : "";
+      if (!await confirm({
+        title: partial ? `Die ersten ${shown} von ${preview.count} ungenutzten Dateien löschen?` : `${shown} ungenutzte ${shown === 1 ? "Datei" : "Dateien"} löschen?`,
+        description: `Das sind ${fmtBytes(preview.batch_size ?? preview.total_size)} und lässt sich nicht rückgängig machen. Der Server prüft vorher noch einmal jede Datei. Es bleiben: Uploads der letzten ${preview.min_age_hours} Stunden, Uploads von Mitgliedern, Dateien ohne Upload-Eintrag und Kamera-Originale.${more}`,
+        confirmLabel: "Endgültig löschen",
+      })) return;
+      const { data } = await api.post("/admin/media/cleanup-unused", { filenames: preview.filenames });
+      const skipped = data?.skipped ? `, ${data.skipped} inzwischen verwendet und behalten` : "";
+      const later = data?.file_pending ? ` (${data.file_pending} beim nächsten Aufräumen)` : "";
+      toast.success(`${data?.deleted || 0} ${data?.deleted === 1 ? "Datei" : "Dateien"} gelöscht${later}${skipped}.`);
+      setSelected(null);
+      await load();
+    } catch (e) {
+      toast.error(formatApiError(e.response?.data?.detail) || "Löschen fehlgeschlagen");
+    } finally {
+      setCleaning(false);
+    }
+  };
+
+  // Duplikat ersetzen (#2122): Diese Datei bleibt, jede Stelle mit einer Kopie zeigt danach auf sie.
+  const keepDuplicate = async (it) => {
+    const copies = (it.duplicate_filenames || []).filter((name) => name !== it.filename);
+    if (!await confirm({
+      title: `${copies.length === 1 ? "Kopie" : `${copies.length} Kopien`} ersetzen?`,
+      description: `„${it.filename}“ bleibt. Jede Stelle, die eine Kopie zeigt, zeigt danach diese Datei, die Kopien werden gelöscht. Das lässt sich nicht rückgängig machen. Kopien aus Uploads von Mitgliedern bleiben.`,
+      confirmLabel: "Ersetzen",
+    })) return;
+    try {
+      const { data } = await api.post("/admin/media/duplicates/replace", { keep: it.filename });
+      const kept = data?.kept?.length ? ` ${data.kept.length} ${data.kept.length === 1 ? "Kopie bleibt" : "Kopien bleiben"}, weil gespeicherte Ergebnisse sie noch zeigen.` : "";
+      toast.success(`${data?.removed || 0} ${data?.removed === 1 ? "Kopie" : "Kopien"} ersetzt, ${data?.references || 0} ${data?.references === 1 ? "Stelle" : "Stellen"} umgestellt.${kept}`);
+      setSelected(null);
+      await load();
+    } catch (e) {
+      toast.error(formatApiError(e.response?.data?.detail) || "Das Ersetzen ist fehlgeschlagen.");
+    }
+  };
+
   const auditScopes = async () => {
     setAuditingScopes(true);
     try {
       const { data } = await api.get("/uploads/audit-media-scopes");
       setScopeAudit(data);
       const s = data.summary || {};
-      toast.success(`Medien geprüft: ${s.already_scoped || 0} einsortiert, ${(s.scanned || 0) - (s.already_scoped || 0)} Legacy.`);
+      toast.success(`Medien geprüft: ${s.already_scoped || 0} zugeordnet, ${(s.scanned || 0) - (s.already_scoped || 0)} ohne Zuordnung.`);
     } catch (e) {
-      toast.error(formatApiError(e.response?.data?.detail) || "Medien-Scope-Prüfung fehlgeschlagen.");
+      toast.error(formatApiError(e.response?.data?.detail) || "Die Prüfung ist fehlgeschlagen.");
     } finally {
       setAuditingScopes(false);
     }
@@ -270,8 +368,8 @@ export default function AdminMediaPage() {
 
   const repairScopes = async () => {
     if (!await confirm({
-      title: "Medien sauber einsortieren?",
-      description: "Alte Upload-Metadaten ohne Scope werden anhand der gespeicherten Bildverknüpfungen in Profil-, Admin-, Sponsor-, Branding- oder Galerie-Medien einsortiert.",
+      title: "Alte Uploads einsortieren?",
+      description: "Uploads ohne Bereich werden danach einsortiert, wo sie verwendet werden: Profil, Redaktion, Sponsor, Logos und Marke oder Galerie. An den Dateien ändert sich nichts.",
       confirmLabel: "Einsortieren",
       tone: "info",
     })) return;
@@ -279,10 +377,10 @@ export default function AdminMediaPage() {
     try {
       const { data } = await api.post("/uploads/repair-media-scopes");
       setScopeAudit(data);
-      toast.success(`${data.summary?.updated || 0} Medien-Einträge einsortiert.`);
+      toast.success(`${data.summary?.updated || 0} Uploads einsortiert.`);
       load();
     } catch (e) {
-      toast.error(formatApiError(e.response?.data?.detail) || "Medien-Scope-Reparatur fehlgeschlagen.");
+      toast.error(formatApiError(e.response?.data?.detail) || "Das Einsortieren ist fehlgeschlagen.");
     } finally {
       setRepairingScopes(false);
     }
@@ -293,7 +391,7 @@ export default function AdminMediaPage() {
       <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">Content</span>
       <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Medien</h1>
       <p className="mt-2 text-white/55 text-sm max-w-2xl">
-        Alle hochgeladenen Bilder und Dateien an einem Ort. Vorschau, URL kopieren oder löschen — keine SFTP nötig.
+        Alle hochgeladenen Bilder und Dateien an einem Ort: ansehen, Adresse kopieren, drehen oder löschen.
       </p>
 
       {/* Toolbar */}
@@ -330,7 +428,7 @@ export default function AdminMediaPage() {
             data-testid="media-include-users"
             className="accent-[#29B6E8]"
           />
-          User-Medien
+          Uploads von Mitgliedern
         </label>
         <div className="flex items-center gap-2 flex-1 min-w-[200px] max-w-md">
           <Search className="w-4 h-4 text-white/40" />
@@ -354,7 +452,7 @@ export default function AdminMediaPage() {
           <input type="file" accept={MEDIA_ACCEPT} multiple disabled={uploading} className="hidden" onChange={(e) => { uploadMediaFiles(e.target.files); e.target.value = ""; }} />
         </label>
         <span className="ml-auto text-xs text-white/45">
-          {filtered.length} / {items.length} · {fmtBytes(totalSize)} gesamt
+          {total} {total === 1 ? "Datei" : "Dateien"} · {fmtBytes(totalSize)}
         </span>
       </div>
       <UploadProgressPanel progress={uploadProgress.progress} className="mt-4" />
@@ -365,17 +463,17 @@ export default function AdminMediaPage() {
           {[
             ["Dateien", mediaAudit.total || 0, "text-white"],
             ["Ungenutzt", mediaAudit.unused || 0, mediaAudit.unused ? "text-[#FFD700]" : "text-white"],
-            ["Ungetrackt", mediaAudit.untracked || 0, mediaAudit.untracked ? "text-[#FFD700]" : "text-white"],
+            ["Nicht erfasst", mediaAudit.untracked || 0, mediaAudit.untracked ? "text-[#FFD700]" : "text-white"],
             ["Duplikate", mediaAudit.duplicate_files || 0, mediaAudit.duplicate_files ? "text-[#FFD700]" : "text-white"],
-            ["Defekte Metadaten", mediaAudit.metadata_missing_files || 0, mediaAudit.metadata_missing_files ? "text-[#FF3B30]" : "text-white"],
-            ["Fehlende Referenzen", mediaAudit.reference_summary?.missing_file || 0, mediaAudit.reference_summary?.missing_file ? "text-[#FF3B30]" : "text-white"],
+            ["Einträge ohne Datei", mediaAudit.metadata_missing_files || 0, mediaAudit.metadata_missing_files ? "text-[#FF3B30]" : "text-white"],
+            ["Verweise ins Leere", mediaAudit.reference_summary?.missing_file || 0, mediaAudit.reference_summary?.missing_file ? "text-[#FF3B30]" : "text-white"],
           ].map(([label, value, color]) => (
             <button
               key={label}
               type="button"
               onClick={() => {
                 if (label === "Ungenutzt") setScopeFilter("unused");
-                if (label === "Ungetrackt") setScopeFilter("untracked");
+                if (label === "Nicht erfasst") setScopeFilter("untracked");
                 if (label === "Duplikate") setScopeFilter("duplicate");
               }}
               className="border border-white/10 bg-[#121212] rounded-sm p-3 text-left hover:border-white/25"
@@ -384,6 +482,14 @@ export default function AdminMediaPage() {
               <div className={`font-heading text-2xl font-black mt-1 tabular-nums ${color}`}>{value}</div>
             </button>
           ))}
+        </div>
+      )}
+      {mediaAudit?.unused > 0 && (
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <button type="button" onClick={cleanupUnused} disabled={cleaning} data-testid="media-cleanup-unused" className="tls-btn tls-btn--danger min-h-11 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+            {cleaning ? "Prüfe …" : "Ungenutzte löschen"}
+          </button>
+          <span className="text-xs text-white/45">Vor dem Löschen siehst du, wie viele es sind.</span>
         </div>
       )}
       {/* Original-Bilder der Serien (#1933): privat abgelegt, gepflegt im Ergebnisblatt des Termins - hier nur gezählt. */}
@@ -398,7 +504,7 @@ export default function AdminMediaPage() {
           <summary className="cursor-pointer list-none flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="text-[11px] font-bold uppercase tracking-[0.25em] text-[#29B6E8]">Medienpflege</div>
-              <p className="mt-1 text-xs text-white/45">Kategorien, Einsortierung und Reparatur nur bei Bedarf einblenden.</p>
+              <p className="mt-1 text-xs text-white/45">Bereiche und das Einsortieren alter Uploads – nur bei Bedarf einblenden.</p>
             </div>
             <span className="text-[10px] font-bold uppercase tracking-widest text-white/45 group-open:text-white">Einblenden</span>
           </summary>
@@ -409,7 +515,7 @@ export default function AdminMediaPage() {
               data-testid="media-scope-audit"
               className="px-3 py-2 border border-white/10 hover:border-[#29B6E8]/60 hover:text-[#29B6E8] rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 disabled:opacity-50"
             >
-              {auditingScopes ? "Prüfe..." : "Scopes prüfen"}
+              {auditingScopes ? "Prüfe..." : "Zuordnung prüfen"}
             </button>
             <button
               onClick={repairScopes}
@@ -417,7 +523,7 @@ export default function AdminMediaPage() {
               data-testid="media-scope-repair"
               className="px-3 py-2 border border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/10 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 disabled:opacity-50"
             >
-              {repairingScopes ? "Sortiere..." : "Scopes reparieren"}
+              {repairingScopes ? "Sortiere..." : "Alte Uploads einsortieren"}
             </button>
           </div>
           <div className="mt-3 flex flex-wrap gap-2 text-[10px] uppercase tracking-widest font-bold text-white/50">
@@ -439,9 +545,9 @@ export default function AdminMediaPage() {
         <details className="mt-4 border border-white/10 bg-[#121212] rounded-sm p-4 group" data-testid="media-quality-checklist">
           <summary className="cursor-pointer list-none flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
             <div>
-              <div className="text-[11px] font-bold uppercase tracking-[0.25em] text-[#29B6E8]">Medien-Qualitätscheck</div>
+              <div className="text-[11px] font-bold uppercase tracking-[0.25em] text-[#29B6E8]">Medien-Prüfung</div>
               <p className="mt-1 max-w-3xl text-xs text-white/50">
-                Zeigt technische Medienprobleme sofort sichtbar. Alt-Texte werden am Einsatzort gepflegt, weil ein Bild je nach News, Event, Galerie oder Sponsor unterschiedliche Bedeutung haben kann.
+                Zeigt, wo bei den Medien etwas nicht stimmt. Bildbeschreibungen pflegt ihr dort, wo das Bild steht – es kann in News, Event, Galerie oder beim Sponsor etwas anderes bedeuten.
               </p>
             </div>
             <span className="inline-flex items-center justify-center gap-2 rounded-sm border border-white/10 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-white/60 group-open:text-white">
@@ -480,19 +586,19 @@ export default function AdminMediaPage() {
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
               <div className="text-[11px] font-bold uppercase tracking-widest text-white/50">Medien-Einsortierung</div>
-              <p className="mt-1 text-xs text-white/45">Zeigt, wie viele Uploads persönliche Profilbilder, Admin/CMS-Medien oder Spezialmedien sind.</p>
+              <p className="mt-1 text-xs text-white/45">Zeigt, wie viele Uploads persönliche Profilbilder, Medien der Redaktion oder aus anderen Bereichen sind.</p>
             </div>
-            {scopeAudit.repair && <span className="text-[10px] uppercase tracking-widest font-bold text-[#00FF88]">Reparatur ausgeführt</span>}
+            {scopeAudit.repair && <span className="text-[10px] uppercase tracking-widest font-bold text-[#00FF88]">Einsortiert</span>}
           </div>
           <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 text-xs">
             {[
               ["Gesamt", scopeAudit.summary.scanned],
               ["Schon sauber", scopeAudit.summary.already_scoped],
-              ["Repariert", scopeAudit.summary.updated],
+              ["Neu einsortiert", scopeAudit.summary.updated],
               ["Profil", scopeAudit.summary.user],
-              ["Admin", scopeAudit.summary.admin],
+              ["Redaktion", scopeAudit.summary.admin],
               ["Sponsor", scopeAudit.summary.sponsor],
-              ["Branding", scopeAudit.summary.branding],
+              ["Logos und Marke", scopeAudit.summary.branding],
               ["Galerie", scopeAudit.summary.gallery],
             ].map(([label, value]) => (
               <div key={label} className="border border-white/10 rounded-sm px-3 py-2">
@@ -508,16 +614,16 @@ export default function AdminMediaPage() {
       <div className="mt-6">
         {loading ? (
           <div className="text-white/50 text-sm">Lade Medien…</div>
-        ) : filtered.length === 0 ? (
+        ) : items.length === 0 ? (
           <div className="border border-white/10 rounded-sm p-12 bg-[#121212] text-center text-white/40 text-sm">
-            Keine Dateien {q || filter !== "all" ? "gefunden" : "vorhanden"}.
+            Keine Dateien {q || filter !== "all" || scopeFilter !== "all" ? "gefunden" : "vorhanden"}.
           </div>
         ) : (
           <div
             className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3"
             data-testid="media-grid"
           >
-            {filtered.map((it) => {
+            {items.map((it) => {
               const isImg = IMG_EXT.has(it.ext);
               const isVideo = VIDEO_EXT.has(it.ext);
               const isOriginal = ORIGINAL_EXT.has(it.ext);
@@ -548,16 +654,24 @@ export default function AdminMediaPage() {
                   <div className="p-2">
                     <div className="text-[11px] font-mono text-white/70 truncate">{it.filename}</div>
                     <div className="mt-1 flex flex-wrap gap-1">
-                      <span className="text-[9px] uppercase tracking-wider border border-white/10 px-1.5 py-0.5 text-white/45">{MEDIA_SCOPE_LABELS[it.media_scope] || it.media_scope || "Legacy"}</span>
+                      <span className="text-[9px] uppercase tracking-wider border border-white/10 px-1.5 py-0.5 text-white/45">{MEDIA_SCOPE_LABELS[it.media_scope] || MEDIA_SCOPE_LABELS.legacy}</span>
                       {it.is_unused && <span className="text-[9px] uppercase tracking-wider border border-[#FFD700]/30 px-1.5 py-0.5 text-[#FFD700]">ungenutzt</span>}
-                      {!it.tracked && <span className="text-[9px] uppercase tracking-wider border border-[#FF3B30]/30 px-1.5 py-0.5 text-[#FF3B30]">ungetrackt</span>}
+                      {!it.tracked && <span className="text-[9px] uppercase tracking-wider border border-[#FF3B30]/30 px-1.5 py-0.5 text-[#FF3B30]">nicht erfasst</span>}
                       {it.duplicate_count > 1 && <span className="text-[9px] uppercase tracking-wider border border-[#FFD700]/30 px-1.5 py-0.5 text-[#FFD700]">duplikat</span>}
                     </div>
                     <div className="text-[10px] text-white/40 mt-1">{fmtBytes(it.size)} · {it.usage_count || 0}x genutzt</div>
+                    {it.kept_for_results && <div className="text-[10px] text-white/60 mt-1" data-testid={`media-kept-${it.filename}`}>wird noch von gespeicherten Ergebnissen gezeigt</div>}
                   </div>
                 </div>
               );
             })}
+          </div>
+        )}
+        {pageCount > 1 && (
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-3" data-testid="media-pager">
+            <button type="button" onClick={() => setPage((value) => Math.max(0, value - 1))} disabled={page === 0 || loading} data-testid="media-page-prev" className="min-h-11 px-4 py-2 border border-white/10 hover:bg-white/5 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-40">Zurück</button>
+            <span className="text-xs tabular-nums text-white/60" data-testid="media-page-label">Seite {page + 1} von {pageCount}</span>
+            <button type="button" onClick={() => setPage((value) => Math.min(pageCount - 1, value + 1))} disabled={page >= pageCount - 1 || loading} data-testid="media-page-next" className="min-h-11 px-4 py-2 border border-white/10 hover:bg-white/5 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-40">Weiter</button>
           </div>
         )}
       </div>
@@ -570,6 +684,7 @@ export default function AdminMediaPage() {
           onRotateLeft={() => rotateImage(selected, -90)}
           onRotateRight={() => rotateImage(selected, 90)}
           onDelete={() => del(selected)}
+          onKeepDuplicate={selected.duplicate_count > 1 && selected.tracked && selected.media_scope !== "user" ? () => keepDuplicate(selected) : undefined}
         />
       )}
     </AdminLayout>

@@ -244,26 +244,22 @@ export function formatRequestError(error, fallback = "Ein Fehler ist aufgetreten
 }
 
 export function formatUploadError(error, fallback = "Upload fehlgeschlagen.", options = {}) {
-  const { appLimitMb, proxyLimitMb } = options;
+  const { appLimitMb } = options;
   const status = error?.response?.status;
   const detail = error?.response?.data?.detail;
   const detailMessage = formatApiError(detail);
-  const proxyHint = proxyLimitMb ? ` Externer Proxy bitte auf mindestens ${proxyLimitMb} MB setzen.` : "";
-  const appHint = appLimitMb ? ` App-Limit: ${appLimitMb} MB.` : "";
 
+  // Die Meldung ist für die Person am Bildschirm (#2122): was los ist und was sie tun kann, keine Technik.
   if (status === 413) {
-    return `Upload fehlgeschlagen (413): Datei zu groß oder Reverse Proxy blockiert den Upload.${appHint}${proxyHint}`;
+    return `Die Datei ist zu groß.${appLimitMb ? ` Erlaubt sind höchstens ${appLimitMb} MB.` : ""} Bitte eine kleinere Datei wählen.`;
   }
   if (status) {
-    const message = detailMessage && detailMessage !== "Ein Fehler ist aufgetreten." ? detailMessage : plainTextReason(error) || fallback;
-    return `Upload fehlgeschlagen (${status}): ${message}`;
+    if (detailMessage && detailMessage !== "Ein Fehler ist aufgetreten.") return `Upload fehlgeschlagen: ${detailMessage}`;
+    return `Upload fehlgeschlagen (${status}): ${plainTextReason(error) || fallback}`;
   }
   if (error?.code === "ERR_CANCELED") return "Upload abgebrochen.";
   if (error?.code === "ERR_NETWORK" || (error?.request && !error?.response)) {
-    const limitHint = appLimitMb || proxyLimitMb
-      ? ` App-Limit: ${appLimitMb || "?"} MB${proxyLimitMb ? `, Proxy mindestens ${proxyLimitMb} MB` : ""}.`
-      : "";
-    return `Upload fehlgeschlagen: Keine Antwort vom Server. Bei großen Videos ist meistens ein Proxy-Limit, Timeout oder Verbindungsabbruch die Ursache.${limitHint}`;
+    return "Upload fehlgeschlagen: Keine Antwort vom Server. Bitte die Verbindung prüfen und noch einmal versuchen – große Dateien brechen bei schwacher Verbindung leichter ab.";
   }
   if (error?.message) return error.message;
   return fallback;

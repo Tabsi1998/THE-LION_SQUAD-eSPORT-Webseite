@@ -22,6 +22,7 @@ from fastapi import HTTPException
 from models import new_id, now_utc
 from services import season_raffles as raffles
 from services import seasons
+from services.media_formats import UPLOAD_URL_VERSION
 from services.season_collections import DOORS, OPENINGS  # noqa: F401 - umgezogen (#1420)
 
 SEASON = "advent_calendar"
@@ -47,7 +48,7 @@ QUIZ_ANSWERS = 3
 TITLE_MAX = 80
 BODY_MAX = 2000
 # Bilder nur aus dem eigenen Upload - eine fremde Adresse würde beim Öffnen jede Person bei Dritten abrufen lassen.
-UPLOAD_URL = re.compile(r"/api/static/uploads/[A-Za-z0-9][A-Za-z0-9_.-]{0,150}\.(png|webp|jpg|jpeg|gif)")
+UPLOAD_URL = re.compile(r"/api/static/uploads/[A-Za-z0-9][A-Za-z0-9_.-]{0,150}\.(png|webp|jpg|jpeg|gif)" + UPLOAD_URL_VERSION)
 YOUTUBE_ID = re.compile(r"[\w-]{11}")
 CLIP_URL = re.compile(r"https?://(?:clips\.twitch\.tv/|(?:www\.|m\.)?twitch\.tv/[A-Za-z0-9_]{2,64}/clip/)([A-Za-z0-9_-]{4,120})(?:[/?#].*)?", re.IGNORECASE)
 LINK_URL = re.compile(r"(/(?!/)[^\s]{0,300}|https://[^\s]{4,300})")

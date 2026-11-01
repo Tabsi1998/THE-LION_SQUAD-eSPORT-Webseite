@@ -71,6 +71,157 @@ test("eine verwendete Datei wird nur nach Warnung gelöscht, eine unbenutzte ohn
   expect(confirmMock.mock.calls.at(-1)[0].title).toBe("Datei endgültig löschen?");
 });
 
+test("Seiten, Filter und Suche fragt die Mediathek beim Server an (#2122)", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url.startsWith("/admin/media?")) return { data: { items: [ITEM], total: 130, total_size: 2048, limit: 60, offset: 0 } };
+    if (url === "/admin/media/audit") return { data: { summary: {} } };
+    return { data: [] };
+  });
+  render(<MemoryRouter><AdminMediaPage /></MemoryRouter>);
+  expect(await screen.findByTestId("media-page-label")).toHaveTextContent("Seite 1 von 3");
+  expect(apiMock.get.mock.calls.map(([url]) => url)).toContain("/admin/media?paged=true&limit=60&offset=0&include_user_uploads=false&include_usage=true");
+
+  fireEvent.click(screen.getByTestId("media-page-next"));
+  await waitFor(() => expect(screen.getByTestId("media-page-label")).toHaveTextContent("Seite 2 von 3"));
+  await waitFor(() => expect(apiMock.get.mock.calls.at(-1)[0]).toContain("offset=60"));
+  // Die Prüfung liest alle Dateien - sie läuft beim Öffnen, nicht bei jedem Blättern.
+  expect(apiMock.get.mock.calls.filter(([url]) => url === "/admin/media/audit")).toHaveLength(1);
+
+  // Ein neuer Filter beginnt wieder vorne.
+  fireEvent.change(screen.getByTestId("media-scope-filter"), { target: { value: "unused" } });
+  await waitFor(() => expect(apiMock.get.mock.calls.some(([url]) => url.includes("scope=unused") && url.includes("offset=0"))).toBe(true));
+  fireEvent.click(screen.getByTestId("media-filter-videos"));
+  await waitFor(() => expect(apiMock.get.mock.calls.some(([url]) => url.includes("type=videos"))).toBe(true));
+  fireEvent.change(screen.getByTestId("media-search"), { target: { value: "uralt" } });
+  await waitFor(() => expect(apiMock.get.mock.calls.some(([url]) => url.includes("q=uralt"))).toBe(true));
+});
+
+test("Drehen fragt nach, nennt die Stellen und übernimmt Adresse und Maße (#2122)", async () => {
+  apiMock.post.mockReset();
+  apiMock.post.mockResolvedValue({ data: { url: "/api/static/uploads/loewe.png?v=7", size: 999, width: 500, height: 1000, updated_at: "2026-10-01T10:00:00Z" } });
+  render(<MemoryRouter><AdminMediaPage /></MemoryRouter>);
+  fireEvent.click(await screen.findByTestId("media-tile-loewe.png"));
+
+  confirmMock.mockResolvedValueOnce(false);
+  fireEvent.click(screen.getByTestId("media-rotate-right"));
+  await waitFor(() => expect(confirmMock.mock.calls.at(-1)[0].title).toBe("Bild nach rechts drehen?"));
+  expect(confirmMock.mock.calls.at(-1)[0].description).toContain("an 2 Stellen");
+  expect(confirmMock.mock.calls.at(-1)[0].description).toContain("gespeicherten Ergebnissen");
+  expect(apiMock.post).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByTestId("media-rotate-left"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/media/loewe.png/rotate", { degrees: -90 }));
+  expect(await screen.findByTestId("media-sheet-dimensions")).toHaveTextContent("500 × 1000 px");
+  expect(screen.getByTestId("media-sheet")).toHaveTextContent("loewe.png?v=7");
+});
+
+test("Löschen: Zeigt der Server eine weitere Stelle, kommt die Rückfrage, gelöscht wird erst danach (#2122)", async () => {
+  const taken = { response: { status: 409, data: { detail: "Die Datei wird noch gezeigt (Ergebnisblatt). Zum Löschen bitte bestätigen." } } };
+  apiMock.delete.mockReset();
+  apiMock.delete.mockRejectedValueOnce(taken);
+  render(<MemoryRouter><AdminMediaPage /></MemoryRouter>);
+
+  // Abgelehnt: Die Datei bleibt, es gibt keinen zweiten Aufruf.
+  confirmMock.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+  fireEvent.click(await screen.findByTestId("media-tile-frei.png"));
+  fireEvent.click(screen.getByTestId("media-delete"));
+  await waitFor(() => expect(confirmMock.mock.calls.at(-1)[0].description).toContain("Ergebnisblatt"));
+  expect(confirmMock.mock.calls.at(-1)[0].title).toBe("Verwendete Datei löschen?");
+  expect(apiMock.delete).toHaveBeenCalledTimes(1);
+  expect(await screen.findByTestId("media-tile-frei.png")).toBeInTheDocument();
+
+  // Bestätigt: jetzt mit force.
+  apiMock.delete.mockRejectedValueOnce(taken).mockResolvedValueOnce({ data: { ok: true } });
+  fireEvent.click(screen.getByTestId("media-tile-frei.png"));
+  fireEvent.click(screen.getByTestId("media-delete"));
+  await waitFor(() => expect(apiMock.delete).toHaveBeenLastCalledWith("/admin/media/frei.png?force=true"));
+  expect(apiMock.delete).toHaveBeenCalledTimes(3);
+});
+
+test("Ungenutzte löschen: erst die Rückfrage mit Zahl und Größe, dann genau diese Dateien (#2122)", async () => {
+  apiMock.post.mockReset();
+  apiMock.post.mockResolvedValue({ data: { ok: true, deleted: 2, skipped: 1, file_pending: 0 } });
+  apiMock.get.mockImplementation(async (url) => {
+    if (url.startsWith("/admin/media?")) return { data: { items: [UNUSED], total: 1 } };
+    if (url === "/admin/media/audit") return { data: { unused: 3, summary: {} } };
+    if (url === "/admin/media/unused") return { data: { count: 3, total_size: 2048, filenames: ["a.webp", "b.webp", "c.webp"], min_age_hours: 24 } };
+    return { data: [] };
+  });
+  render(<MemoryRouter><AdminMediaPage /></MemoryRouter>);
+
+  confirmMock.mockResolvedValueOnce(false);
+  fireEvent.click(await screen.findByTestId("media-cleanup-unused"));
+  await waitFor(() => expect(confirmMock.mock.calls.at(-1)[0].title).toBe("3 ungenutzte Dateien löschen?"));
+  expect(confirmMock.mock.calls.at(-1)[0].description).toContain("2.0 KB");
+  expect(confirmMock.mock.calls.at(-1)[0].description).toContain("letzten 24 Stunden");
+  expect(apiMock.post).not.toHaveBeenCalled();
+
+  await waitFor(() => expect(screen.getByTestId("media-cleanup-unused")).toBeEnabled());
+  fireEvent.click(screen.getByTestId("media-cleanup-unused"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/media/cleanup-unused", { filenames: ["a.webp", "b.webp", "c.webp"] }));
+});
+
+test("Ungenutzte löschen: Bei mehr als einer Runde nennt die Rückfrage genau, was dieser Klick löscht (#2122)", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url.startsWith("/admin/media?")) return { data: { items: [UNUSED], total: 1 } };
+    if (url === "/admin/media/audit") return { data: { unused: 612, summary: {} } };
+    if (url === "/admin/media/unused") return { data: { count: 612, total_size: 10 * 1024 * 1024, batch_size: 2048, filenames: Array.from({ length: 500 }, (_, i) => `f${i}.webp`), min_age_hours: 24 } };
+    return { data: [] };
+  });
+  render(<MemoryRouter><AdminMediaPage /></MemoryRouter>);
+  confirmMock.mockResolvedValueOnce(false);
+  fireEvent.click(await screen.findByTestId("media-cleanup-unused"));
+  await waitFor(() => expect(confirmMock.mock.calls.at(-1)[0].title).toBe("Die ersten 500 von 612 ungenutzten Dateien löschen?"));
+  const { description } = confirmMock.mock.calls.at(-1)[0];
+  expect(description).toContain("2.0 KB");
+  expect(description).not.toContain("10.00 MB");
+  expect(description).toContain("weiteren Klick");
+});
+
+test("Duplikat ersetzen: fragt nach und nennt, was bleibt (#2122)", async () => {
+  apiMock.post.mockReset();
+  apiMock.post.mockResolvedValue({ data: { ok: true, removed: 1, references: 3 } });
+  const COPY = { ...ITEM, duplicate_count: 2, duplicate_filenames: ["loewe.png", "kopie.png"] };
+  apiMock.get.mockImplementation(async (url) => {
+    if (url.startsWith("/admin/media?")) return { data: { items: [COPY], total: 1 } };
+    if (url === "/admin/media/audit") return { data: { summary: {} } };
+    return { data: [] };
+  });
+  render(<MemoryRouter><AdminMediaPage /></MemoryRouter>);
+  fireEvent.click(await screen.findByTestId("media-tile-loewe.png"));
+  fireEvent.click(screen.getByTestId("media-duplicate-keep"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/media/duplicates/replace", { keep: "loewe.png" }));
+  expect(confirmMock.mock.calls.at(-1)[0].title).toBe("Kopie ersetzen?");
+  expect(confirmMock.mock.calls.at(-1)[0].description).toContain("„loewe.png“ bleibt");
+});
+
+test("eine behaltene Kopie sagt in ihrer Zeile, warum sie noch da ist (#2122)", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url.startsWith("/admin/media?")) return { data: { items: [ITEM, { ...UNUSED, kept_for_results: true }], total: 2 } };
+    if (url === "/admin/media/audit") return { data: { summary: {} } };
+    return { data: [] };
+  });
+  render(<MemoryRouter><AdminMediaPage /></MemoryRouter>);
+  expect(await screen.findByTestId("media-kept-frei.png")).toHaveTextContent("wird noch von gespeicherten Ergebnissen gezeigt");
+  expect(screen.queryByTestId("media-kept-loewe.png")).toBeNull();
+});
+
+test("die Mediathek spricht Deutsch statt Technik-Englisch (#2122)", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url.startsWith("/admin/media?")) return { data: { items: [{ ...UNUSED, media_scope: "legacy", tracked: false }], total: 1 } };
+    if (url === "/admin/media/audit") return { data: { unused: 1, untracked: 1, by_scope: { legacy: 1 }, summary: {} } };
+    return { data: [] };
+  });
+  const { container } = render(<MemoryRouter><AdminMediaPage /></MemoryRouter>);
+  fireEvent.click(await screen.findByTestId("media-tile-frei.png"));
+  for (const word of ["Scope", "Legacy", "ngetrackt", "User-Medien", "Metadaten", "Referenz"]) {
+    expect(container.textContent).not.toContain(word);
+    expect(screen.getByTestId("media-sheet").textContent).not.toContain(word);
+  }
+  expect(screen.getByTestId("media-tile-frei.png")).toHaveTextContent("Ohne Zuordnung");
+  expect(screen.getByTestId("media-tile-frei.png")).toHaveTextContent("nicht erfasst");
+});
+
 test("Original-Bilder der Serien (#1933) zählt die Mediathek mit - privat, ohne Kachel", async () => {
   apiMock.get.mockImplementation(async (url) => {
     if (url.startsWith("/admin/media?")) return { data: [ITEM] };

@@ -18,6 +18,7 @@ from __future__ import annotations
 import re
 
 from services import series_logo
+from services.media_formats import UPLOAD_URL_VERSION, bare_upload_url
 
 EMBLEM = "emblem_url"
 BANNER = "banner_url"
@@ -30,7 +31,7 @@ FOCUS_KEYS = ("x", "y", "mobile_x", "mobile_y")
 DEFAULT_FOCUS = {key: 50 for key in FOCUS_KEYS}
 
 # Banner und Gewinnbilder: eigene Uploads ohne SVG (nur der Logo-Upload bereinigt SVG).
-IMAGE_URL = re.compile(r"/api/static/uploads/[A-Za-z0-9][A-Za-z0-9_-]{0,150}\.(png|webp|jpg|jpeg)")
+IMAGE_URL = re.compile(r"/api/static/uploads/[A-Za-z0-9][A-Za-z0-9_-]{0,150}\.(png|webp|jpg|jpeg)" + UPLOAD_URL_VERSION)
 IMAGE_REFUSED = "Bild bitte über „Hochladen“ oder die Mediathek wählen (PNG, JPG oder WebP)."
 IMAGE_MISSING = "Bild nicht in der Mediathek gefunden – bitte neu hochladen."
 
@@ -151,7 +152,7 @@ def image_urls(fields: dict) -> list[str]:
 async def check_uploaded(db, fields: dict) -> None:
     """Jede Bild-Adresse muss über den Upload in die Mediathek gekommen sein."""
     for url in image_urls(fields):
-        if not await db.media_uploads.find_one({"url": url, "media_type": "image"}, {"_id": 1}):
+        if not await db.media_uploads.find_one({"url": bare_upload_url(url), "media_type": "image"}, {"_id": 1}):
             raise LookProblem(IMAGE_MISSING)
 
 

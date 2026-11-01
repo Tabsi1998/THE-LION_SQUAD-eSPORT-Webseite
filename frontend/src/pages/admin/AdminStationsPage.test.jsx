@@ -142,3 +142,43 @@ test("Stationen: vor Ort zuerst, ein laufendes vorgewählt, online und beendet d
   expect(preferredStationTournament(rows, "vorbei")).toBe("vorbei");
   expect(preferredStationTournament([rows[0]])).toBe("neu-online");
 });
+
+// Station bearbeiten (#2112): Name, Gerät, Spiel und Hinweis nach dem Anlegen ändern.
+test("Station bearbeiten: Angaben vorbelegt, Spiel aus der Liste, gespeichert wird genau das", async () => {
+  const user = userEvent.setup();
+  apiMock.get.mockImplementation((url) => {
+    if (String(url) === "/games") return Promise.resolve({ data: [{ id: "g-1", name: "Mario Kart" }] });
+    if (String(url).includes("/stations")) return Promise.resolve({ data: [{ id: "st-1", name: "Tisch 1", device_type: "switch2", status: "free", notes: "Alt", game_id: null, current_match_id: null }] });
+    return Promise.resolve(routeFor(String(url)));
+  });
+  apiMock.patch.mockReset();
+  apiMock.patch.mockResolvedValue({ data: {} });
+  render(<MemoryRouter><ConfirmDialogProvider><AdminStationsPage /></ConfirmDialogProvider></MemoryRouter>);
+
+  await user.click(await screen.findByTestId("station-edit-st-1"));
+  expect(screen.getByTestId("station-edit-name")).toHaveValue("Tisch 1");
+  expect(screen.getByTestId("station-edit-device")).toHaveValue("switch2");
+  expect(screen.getByTestId("station-edit-notes")).toHaveValue("Alt");
+  await screen.findByRole("option", { name: "Mario Kart" });
+
+  await user.clear(screen.getByTestId("station-edit-name"));
+  await user.type(screen.getByTestId("station-edit-name"), "Tisch 7");
+  await user.selectOptions(screen.getByTestId("station-edit-device"), "pc");
+  await user.selectOptions(screen.getByTestId("station-edit-game"), "g-1");
+  await user.clear(screen.getByTestId("station-edit-notes"));
+  await user.click(screen.getByTestId("station-edit-save"));
+
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/stations/st-1", { name: "Tisch 7", device_type: "pc", game_id: "g-1", notes: null }));
+  await waitFor(() => expect(screen.queryByTestId("station-edit-sheet")).toBeNull());
+});
+
+test("Station bearbeiten: ein unbekanntes Gerät bleibt beim Speichern erhalten", async () => {
+  const user = userEvent.setup();
+  apiMock.get.mockImplementation((url) => {
+    if (String(url).includes("/stations")) return Promise.resolve({ data: [{ id: "st-1", name: "Tisch 1", device_type: "vr_brille", status: "free", current_match_id: null }] });
+    return Promise.resolve(routeFor(String(url)));
+  });
+  render(<MemoryRouter><ConfirmDialogProvider><AdminStationsPage /></ConfirmDialogProvider></MemoryRouter>);
+  await user.click(await screen.findByTestId("station-edit-st-1"));
+  expect(screen.getByTestId("station-edit-device")).toHaveValue("vr_brille");
+});
