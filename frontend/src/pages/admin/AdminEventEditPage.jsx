@@ -25,7 +25,7 @@ import { normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { EventProgramPanel, useEventProgram } from "@/pages/admin/event/EventProgramPanel";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
-import { affectedRegistrations, cancelConfirmText, savedEventMessage, touchesScheduleOrPlace } from "@/lib/eventAdmin";
+import { affectedRegistrations, cancelConfirmText, eventStatusOptions, savedEventMessage, touchesScheduleOrPlace } from "@/lib/eventAdmin";
 import { toast } from "sonner";
 
 const ACCENT = "#9F7AEA";
@@ -313,10 +313,10 @@ function EventForm({ event, meta, partners = [], onDone }) {
       testId="event-form"
       aside={(
         <>
-          <FormSection title="Veröffentlichung" accent={ACCENT} hint="Für neue Inhalte reicht normalerweise Entwurf oder Angekündigt. Anmeldung, Live und Beendet werden über die Datumsfelder automatisch berechnet.">
+          <FormSection title="Veröffentlichung" accent={ACCENT} hint="Für neue Events reichen Entwurf oder Angekündigt. Ob die Anmeldung offen ist, ob das Event läuft und wann es beendet ist, rechnet die Seite aus den Datumsfeldern. Früher schließen: „Anmeldung schließt“ setzen.">
             <SelectField label="Typ" value={form.event_type} onChange={(v) => set("event_type", v)} options={eventTypes} testId="event-type" />
             <SelectField label="Sichtbarkeit" value={form.visibility} onChange={(v) => set("visibility", v)} options={meta.visibilities || []} testId="event-visibility" />
-            <SelectField label={isNew ? "Veröffentlichung" : "Status"} value={form.status} onChange={(v) => set("status", v)} options={isNew ? CREATE_STATUS_OPTIONS : (meta.statuses || [])} testId="event-status" />
+            <SelectField label={isNew ? "Veröffentlichung" : "Status"} value={form.status} onChange={(v) => set("status", v)} options={isNew ? CREATE_STATUS_OPTIONS : eventStatusOptions(meta.statuses, event.status)} testId="event-status" />
           </FormSection>
           <FormSection title="Zeiten und Plätze" accent={ACCENT}>
             {/* Eine Auswahl statt zweier Haken (#2111, W2): „Nur Online“ und „Hybrid“ ließen sich gleichzeitig setzen. */}

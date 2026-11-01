@@ -19,6 +19,15 @@ export function eventIsOver(event, now = new Date()) {
   return Boolean(last) && viennaDay(now) > last;
 }
 
+// Status-Auswahl (#2127, EV9): Ob die Anmeldung offen ist, rechnet die Seite aus Haken und Fristen - auch der Server setzt
+// „offen“ und „geschlossen“ danach selbst. Von Hand wirkten beide nicht, darum stehen sie nicht zur Wahl. Ein Event, das
+// schon so steht, behält seinen Wert in der Liste.
+const DATE_DRIVEN_STATUSES = new Set(["registration_open", "registration_closed"]);
+
+export function eventStatusOptions(statuses, current) {
+  return (statuses || []).filter((item) => !DATE_DRIVEN_STATUSES.has(item.k) || item.k === current);
+}
+
 // Absagen, Verschieben, Löschen (#2118). Was der Server dabei tut, steht in backend/services/event_changes.py.
 const SCHEDULE_OR_PLACE_FIELDS = ["start_date", "end_date", "days", "location", "address", "postal_code", "city", "locations", "is_online"];
 

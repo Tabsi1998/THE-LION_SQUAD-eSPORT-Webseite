@@ -1,7 +1,14 @@
 import {
-  affectedRegistrations, cancelConfirmText, deleteConfirmText, eventIsOver, eventLastDay, savedEventMessage,
+  affectedRegistrations, cancelConfirmText, deleteConfirmText, eventIsOver, eventLastDay, eventStatusOptions, savedEventMessage,
   touchesScheduleOrPlace, visibilityWord,
 } from "@/lib/eventAdmin";
+
+test("Status-Auswahl: „Anmeldung offen/geschlossen“ nicht zur Wahl, ein bestehender Wert bleibt (#2127)", () => {
+  const statuses = [{ k: "draft" }, { k: "scheduled" }, { k: "registration_open" }, { k: "registration_closed" }, { k: "live" }, { k: "cancelled" }];
+  expect(eventStatusOptions(statuses, "scheduled").map((item) => item.k)).toEqual(["draft", "scheduled", "live", "cancelled"]);
+  expect(eventStatusOptions(statuses, "registration_closed").map((item) => item.k)).toEqual(["draft", "scheduled", "registration_closed", "live", "cancelled"]);
+  expect(eventStatusOptions(undefined, "draft")).toEqual([]);
+});
 
 // Absagen, Verschieben, Löschen (#2118): Rückfragen mit Zahl und ehrliche Texte.
 test("Betroffene: Angemeldete (samt Eingecheckten) und Warteliste", () => {

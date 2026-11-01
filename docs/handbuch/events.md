@@ -90,9 +90,10 @@ Mal senden nur Redaktion und System.
   bestehende Events.
 - **Sichtbarkeit:** **Öffentlich**, **Nur registrierte Community**, **Nur Vereinsmitglieder** oder **Nur intern**. Wer das Event
   nicht sehen darf, bekommt „Dieses Event ist nicht öffentlich zugänglich“.
-- **Status:** **Entwurf**, **Angekündigt**, **Anmeldung offen**, **Anmeldung geschlossen**, **Check-in offen**, **Läuft**,
-  **Pausiert**, **Beendet**, **Ergebnisse veröffentlicht**, **Archiviert**, **Abgesagt**. Für neue Events reichen **Entwurf** und
-  **Angekündigt**: Anmeldung offen, Läuft und Beendet rechnet die Seite aus den Datumsfeldern selbst. Von Hand wirken sofort
+- **Status:** **Entwurf**, **Angekündigt**, **Check-in offen**, **Läuft**, **Pausiert**, **Beendet**, **Ergebnisse veröffentlicht**,
+  **Archiviert**, **Abgesagt**. Für neue Events reichen **Entwurf** und **Angekündigt**: Ob die Anmeldung offen ist, ob das Event läuft
+  und wann es beendet ist, rechnet die Seite aus den Datumsfeldern selbst. Darum stehen **Anmeldung offen** und **Anmeldung geschlossen**
+  nicht zur Wahl (nur bei einem Event, das schon so steht). Früher schließen: **Anmeldung schließt** setzen. Von Hand wirken sofort
   Entwurf, Pausiert, Beendet, Ergebnisse veröffentlicht, Archiviert und Abgesagt; **Check-in offen** gilt bis zum Beginn.
 - **Austragung** (rechts unter „Zeiten und Plätze“): **Vor Ort**, **Online** oder **Hybrid (vor Ort und online)**. Bei Online
   fehlen Einlass, Ort, Adresse und Karte – es gibt sie dort nicht.
