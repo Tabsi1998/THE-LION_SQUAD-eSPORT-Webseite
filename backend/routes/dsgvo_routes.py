@@ -419,8 +419,11 @@ async def anonymize_me(me: dict = Depends(get_current_user)):
 @dsgvo_router.post("/admin/anonymize/{user_id}")
 async def admin_anonymize(user_id: str, me: dict = Depends(require_super())):
     db = get_db()
+    # Das eigene Konto läuft über die Datenschutzseite - mit denselben Regeln wie dort (#2125).
+    if user_id == me["id"]:
+        raise HTTPException(400, "Nutze für den eigenen Account die Datenschutzseite.")
     target = await db.users.find_one({"id": user_id}, {"_id": 0, "role": 1})
-    if target and target.get("role") == "superadmin" and user_id != me["id"]:
+    if target and target.get("role") == "superadmin":
         raise HTTPException(403, "Andere Superadmins dürfen nicht anonymisiert werden.")
     await _anonymize_user_data(db, user_id, me["id"], "user.admin_anonymize")
     return {"ok": True}

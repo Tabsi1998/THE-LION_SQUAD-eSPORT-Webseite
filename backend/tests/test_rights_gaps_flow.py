@@ -320,3 +320,27 @@ async def test_the_last_superadmin_cannot_delete_the_own_account(flow):
     await flow.add_user(role="superadmin", name="zweite")
     flow.act_as(root)
     assert (await flow.get("/api/dsgvo/anonymize-me/check")).json()["can_erase"] is True
+
+
+@pytest.mark.asyncio
+async def test_deleting_an_account_follows_the_same_rules_on_every_way(flow):
+    root = await flow.add_user(role="superadmin", name="root")
+    await flow.db.teams.insert_one({"id": "team-1", "name": "Lions", "leader_id": root["id"], "co_leader_ids": []})
+    flow.act_as(root)
+    own = await flow.post(f"/api/dsgvo/admin/anonymize/{root['id']}")
+    assert own.status_code == 400 and "Datenschutzseite" in own.json()["detail"]
+    assert (await flow.db.users.find_one({"id": root["id"]}))["role"] == "superadmin"
+
+    # Fremde Superadmin-Konten fasst niemand an, auf keinem der beiden Wege - auch das letzte nutzbare nicht.
+    other = await flow.add_user(role="superadmin", name="zweite")
+    flow.act_as(other)
+    assert (await flow.post(f"/api/dsgvo/admin/anonymize/{root['id']}")).status_code == 403
+    removed = await flow.delete(f"/api/users/{root['id']}")
+    assert removed.status_code == 403
+
+    # Der Löschanspruch fremder Konten bleibt erfüllbar - auch mit Team-Rolle.
+    person = await flow.add_user(name="erika")
+    await flow.db.teams.insert_one({"id": "team-2", "name": "Tiger", "leader_id": person["id"], "co_leader_ids": []})
+    flow.act_as(root)
+    assert (await flow.post(f"/api/dsgvo/admin/anonymize/{person['id']}")).status_code == 200
+    assert (await flow.db.users.find_one({"id": person["id"]})).get("anonymized_at")
