@@ -272,7 +272,8 @@ externen Anmeldelink; bearbeiten darf ihn der Bereich **Finanzen**. Kurz:
   haken die Teilnehmenden sie selbst an.
 - **Rechnung anlegen:** **gleich nach der verbindlichen Anmeldung** oder **erst nach Freigabe in der Finanzübersicht**.
 - Der Preis wird bei der **verbindlichen** Anmeldung eingefroren; spätere Änderungen betreffen nur neue Anmeldungen. Die
-  **Warteliste** bezahlt erst beim Nachrücken.
+  **Warteliste** bezahlt erst beim Nachrücken. Holt die Leitung eine stornierte Anmeldung zurück, gilt der aktuelle Preis mit einem neuen
+  Rechnungsauftrag; gibt es schon eine Rechnung, bleibt sie, und die Änderung kommt als Prüffall in die Finanzübersicht.
 - Die Rechnung entsteht in Dolibarr, sobald der Schreibzugriff eingerichtet ist (Einstellungen → Dolibarr). Teilnehmende finden sie unter **Meine
   Rechnungen**. Alles Weitere: [Abrechnung](../ABRECHNUNG.md), [Dolibarr](../DOLIBARR.md).
 

@@ -111,7 +111,57 @@ async def test_nachruecken_mit_kosten_nennt_den_preis(flow):
     await flow.patch(f"/api/events/{event['id']}/registrations/{first['id']}", json={"status": "cancelled"})
     await flow.patch(f"/api/events/{event['id']}/registrations/{wartend['id']}", json={"status": "registered"})
     moved = (await notes(flow, zweite))[-1]
-    assert "10,00" in moved["body"] and "Meine Rechnungen" in moved["body"]
+    assert "10,00" in moved["body"] and "Die Rechnung findest du" in moved["body"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", ["registered", "checked_in"])
+async def test_wieder_aktiviert_neuer_preis_neuer_auftrag_und_ehrlicher_text(flow, status):
+    lead, event = await setup(flow, billing=PAID)
+    erste = await person(flow, "erste")
+    first = await register(flow, event, erste)
+    before = await flow.db.event_registrations.find_one({"id": first["id"]}, {"_id": 0})
+    flow.act_as(lead)
+    await flow.patch(f"/api/events/{event['id']}/registrations/{first['id']}", json={"status": "cancelled"})
+    response = await flow.patch(f"/api/events/{event['id']}/registrations/{first['id']}", json={"status": status})
+    assert response.status_code == 200, response.text
+
+    row = await flow.db.event_registrations.find_one({"id": first["id"]}, {"_id": 0})
+    assert row["billing_status"] == "pending" and row["price_snapshot"]["hash"] != before["price_snapshot"]["hash"]
+    orders = await flow.db.billing_orders.find({"registration_id": first["id"]}, {"_id": 0, "status": 1, "booking_key": 1}).to_list(5)
+    assert sorted(order["status"] for order in orders) == ["cancelled", "pending"], "der neue Preis hat seinen eigenen Auftrag"
+    assert len({order["booking_key"] for order in orders}) == 2
+    back = (await notes(flow, erste))[-1]
+    assert back["title"] == "Du bist wieder dabei: Herbst-LAN" and "10,00" in back["body"]
+
+
+@pytest.mark.asyncio
+async def test_wieder_aktiviert_mit_gestellter_rechnung_kein_zweiter_auftrag_und_kein_kostensatz(flow):
+    lead, event = await setup(flow, billing=PAID)
+    erste = await person(flow, "erste")
+    first = await register(flow, event, erste)
+    await flow.db.billing_orders.update_many({"registration_id": first["id"]}, {"$set": {"status": "invoiced", "invoice_ref": "RE-1"}})
+    flow.act_as(lead)
+    await flow.patch(f"/api/events/{event['id']}/registrations/{first['id']}", json={"status": "cancelled"})
+    response = await flow.patch(f"/api/events/{event['id']}/registrations/{first['id']}", json={"status": "registered"})
+    assert response.status_code == 200, response.text
+    row = await flow.db.event_registrations.find_one({"id": first["id"]}, {"_id": 0})
+    assert row["billing_status"] == "cancelled"
+    assert await flow.db.billing_orders.count_documents({"registration_id": first["id"]}) == 1
+    order = await flow.db.billing_orders.find_one({"registration_id": first["id"]}, {"_id": 0})
+    assert order["booking_change"] == "Anmeldung wieder aktiviert", "Finanzen bekommt den Prüffall"
+    back = (await notes(flow, erste))[-1]
+    assert back["title"] == "Du bist wieder dabei: Herbst-LAN"
+    assert "Kostenbeitrag" not in back["body"] and "Rechnung" not in back["body"]
+
+
+def test_kostensatz_nach_rechnungszeitpunkt():
+    now = {"price_snapshot": {"total_cents": 1000, "currency": "EUR", "invoice_timing": "on_confirm"}}
+    later = {"price_snapshot": {"total_cents": 1000, "currency": "EUR", "invoice_timing": "manual"}}
+    assert "Die Rechnung findest du" in registration_message({}, now, "registered")["detail"]
+    assert "Die Rechnung bekommst du später" in registration_message({}, later, "registered")["detail"]
+    gone = {**now, "billing_status": "cancelled"}
+    assert "Kostenbeitrag" not in registration_message({}, gone, "registered", "cancelled")["detail"]
 
 
 @pytest.mark.asyncio

@@ -28,12 +28,16 @@ COST_ENDED = ("Ein offener Kostenbeitrag wird nicht verrechnet; wurde schon eine
 
 
 def _cost_line(registration: dict) -> str:
+    """Der Satz zum Kostenbeitrag - nur, wenn wirklich abgerechnet wird. Kommt die Rechnung erst nach der Freigabe in der
+    Finanzübersicht, steht sie noch nicht in „Meine Rechnungen“."""
     snapshot = registration.get("price_snapshot") or {}
     cents = int(snapshot.get("total_cents") or 0)
-    if cents <= 0:
+    if cents <= 0 or registration.get("billing_status") == "cancelled":
         return ""
     amount = pricing.format_cents(cents, snapshot.get("currency") or "EUR")
-    return f"Dein Kostenbeitrag: {amount}. Die Rechnung findest du unter „Meine Rechnungen“."
+    later = snapshot.get("invoice_timing") not in (None, "on_confirm")
+    invoice = "Die Rechnung bekommst du später unter „Meine Rechnungen“." if later else "Die Rechnung findest du unter „Meine Rechnungen“."
+    return f"Dein Kostenbeitrag: {amount}. {invoice}"
 
 
 def registration_message(event: dict, registration: dict, status: str, previous: str | None = None) -> dict | None:
