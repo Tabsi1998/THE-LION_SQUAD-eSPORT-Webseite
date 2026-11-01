@@ -108,3 +108,38 @@ async def test_without_a_valid_level_the_value_stays_hidden(flow, extra):
     assert stored["youtube_handle"] == "ohne_stufe" and stored["profile_visibility"]["youtube"] == "private"
     flow.act_as(None)
     assert not (await flow.get(f"/api/users/public/{person['username']}")).json().get("youtube_handle")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("broken", [None, "kaputt", []])
+async def test_broken_visibility_map_does_not_stop_the_migration_and_the_level_stays(flow, broken):
+    person = await flow.add_user(name=f"person-{new_id()[:6]}")
+    await flow.db.users.update_one({"id": person["id"]}, {"$set": {"profile_visibility": broken}})
+    await _social(flow, person["id"], "youtube", "kanal", visibility="members")
+    await user_socials_migration.migrate(flow.db)
+    stored = await flow.db.users.find_one({"id": person["id"]}, {"_id": 0})
+    assert stored["youtube_handle"] == "kanal" and stored["profile_visibility"] == {"youtube": "members"}
+
+
+@pytest.mark.asyncio
+async def test_existing_levels_stay_next_to_the_new_one(flow):
+    person = await flow.add_user(name=f"person-{new_id()[:6]}")
+    await flow.db.users.update_one({"id": person["id"]}, {"$set": {"profile_visibility": {"email": "private", "twitch": "members"}}})
+    await _social(flow, person["id"], "youtube", "kanal", visibility="community")
+    await _social(flow, person["id"], "kick", "stream", visibility="public")
+    await user_socials_migration.migrate(flow.db)
+    stored = await flow.db.users.find_one({"id": person["id"]}, {"_id": 0})
+    assert stored["profile_visibility"] == {"email": "private", "twitch": "members", "youtube": "community", "kick": "public"}
+
+
+@pytest.mark.asyncio
+async def test_rows_of_deleted_accounts_simply_go(flow):
+    person = await flow.add_user(name=f"person-{new_id()[:6]}")
+    await flow.db.users.update_one({"id": person["id"]}, {"$set": {"anonymized_at": "2026-10-01T10:00:00+00:00"}})
+    await _social(flow, person["id"], "youtube", "alt")
+    await _social(flow, person["id"], "myspace", "alt")
+    result = await user_socials_migration.migrate(flow.db)
+    assert result == "0 moved, 0 already in the profile, 0 kept, 2 empty or without account removed"
+    stored = await flow.db.users.find_one({"id": person["id"]}, {"_id": 0})
+    assert "youtube_handle" not in stored
+    assert await flow.db.user_socials.count_documents({"user_id": person["id"]}) == 0

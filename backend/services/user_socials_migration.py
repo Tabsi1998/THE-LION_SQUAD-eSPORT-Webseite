@@ -42,16 +42,17 @@ async def migrate(db, keep_lease: Callable[[], Awaitable[bool]] | None = None) -
         seen += 1
         if keep_lease and seen % LEASE_EVERY == 0 and not await keep_lease():
             raise RuntimeError("lease lost")
+        user = await db.users.find_one({"id": row.get("user_id")}, private_projection()) if row.get("user_id") else None
+        value = str(row.get("value") or row.get("url") or "").strip()
         platform = str(row.get("platform") or "").strip().lower()
         field = PROFILE_FIELDS.get(platform)
-        if not field:
-            kept += 1
-            continue
-        value = str(row.get("value") or row.get("url") or "").strip()
-        user = await db.users.find_one({"id": row.get("user_id")}, private_projection()) if row.get("user_id") else None
-        if not user or not value:
+        # Ohne Konto, mit gelöschtem Konto oder ohne Wert hat der Eintrag keinen Zweck mehr.
+        if not user or user.get("anonymized_at") or (field and not value):
             await db.user_socials.delete_one({"_id": row["_id"]})
             dropped += 1
+            continue
+        if not field:
+            kept += 1
             continue
         current = user.get(field)
         if str(current or "").strip():
@@ -62,8 +63,10 @@ async def migrate(db, keep_lease: Callable[[], Awaitable[bool]] | None = None) -
         else:
             # Ohne gültige Stufe war der Eintrag unsichtbar (das Profil las nur „public“) - das bleibt so.
             level = row.get("visibility") if row.get("visibility") in LEVELS else "private"
-            update = {field: value, f"profile_visibility.{platform}": level}
-            await db.users.update_one({"id": user["id"]}, {"$set": update})
+            # Die ganze Karte schreiben: ``profile_visibility.x`` bricht bei ``null`` im Feld mit einem Datenbankfehler ab.
+            visibility = user.get("profile_visibility")
+            visibility = {**(visibility if isinstance(visibility, dict) else {}), platform: level}
+            await db.users.update_one({"id": user["id"]}, {"$set": {field: value, "profile_visibility": visibility}})
             moved += 1
         await db.user_socials.delete_one({"_id": row["_id"]})
     return f"{moved} moved, {same} already in the profile, {kept} kept, {dropped} empty or without account removed"
