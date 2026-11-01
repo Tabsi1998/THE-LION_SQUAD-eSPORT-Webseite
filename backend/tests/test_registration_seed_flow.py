@@ -79,3 +79,46 @@ async def test_each_seed_exists_only_once(flow):
 
     await flow.db.tournament_registrations.update_one({"id": paula["id"]}, {"$set": {"status": "no_show"}})
     assert (await flow.patch(f"{base}/{jonas['id']}", json={"seed": 1})).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_a_returning_registration_brings_its_seed_only_if_it_is_still_free(flow):
+    """#2111: A (Platz 1) ist weg, B bekommt Platz 1 - kommt A zurück, gäbe es Platz 1 zweimal. Das sagt der Server vorher."""
+    staff = await flow.add_staff()
+    flow.act_as(staff)
+    tournament = await flow.create_tournament(status="registration_open", seeding_mode="manual")
+    base = f"/api/tournaments/{tournament['id']}/registrations"
+    gone = await flow.register(tournament, await flow.add_user(name="Paula"), seed=1, status="withdrawn")
+    absent = await flow.register(tournament, await flow.add_user(name="Mia"), seed=3, status="no_show")
+    jonas = await flow.register(tournament, await flow.add_user(name="Jonas"), seed=2)
+    assert (await flow.patch(f"{base}/{jonas['id']}", json={"seed": 1})).status_code == 200
+
+    refused = await flow.patch(f"{base}/{gone['id']}", json={"status": "approved"})
+    assert refused.status_code == 409, refused.text
+    assert "Setzplatz 1 hat schon Jonas" in refused.json()["detail"]
+    assert (await flow.db.tournament_registrations.find_one({"id": gone["id"]}))["status"] == "withdrawn"
+    # In einen anderen freien Status geht es weiter: dort hält niemand den Platz.
+    assert (await flow.patch(f"{base}/{gone['id']}", json={"status": "rejected"})).status_code == 200
+    assert (await flow.patch(f"{base}/{jonas['id']}", json={"seed": 2})).status_code == 200
+    assert (await flow.patch(f"{base}/{gone['id']}", json={"status": "approved"})).status_code == 200
+
+    assert (await flow.patch(f"{base}/{jonas['id']}", json={"seed": 3})).status_code == 200
+    at_checkin = await flow.post(f"{base}/{absent['id']}/checkin", json={"status": "checked_in"})
+    assert at_checkin.status_code == 409, at_checkin.text
+    assert "Setzplatz 3 hat schon Jonas" in at_checkin.json()["detail"]
+    assert (await flow.db.tournament_registrations.find_one({"id": absent["id"]}))["status"] == "no_show"
+    assert (await flow.patch(f"{base}/{jonas['id']}", json={"seed": 2})).status_code == 200
+    assert (await flow.post(f"{base}/{absent['id']}/checkin", json={"status": "checked_in"})).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_a_fixed_bracket_lets_a_late_arrival_back_despite_the_same_seed(flow):
+    """Steht der Baum, ändert sich kein Setzplatz mehr - eine Meldung „anderen wählen“ wäre eine Sackgasse am Eventtag."""
+    staff = await flow.add_staff()
+    flow.act_as(staff)
+    tournament = await flow.create_tournament(status="registration_open", seeding_mode="manual",
+                                              check_in_closed_at="2026-10-31T17:00:00+00:00")
+    base = f"/api/tournaments/{tournament['id']}/registrations"
+    late = await flow.register(tournament, await flow.add_user(name="Paula"), seed=1, status="no_show")
+    await flow.register(tournament, await flow.add_user(name="Jonas"), seed=1)
+    assert (await flow.post(f"{base}/{late['id']}/checkin", json={"status": "checked_in"})).status_code == 200

@@ -396,6 +396,14 @@ async def _require_free_seed(db, tid: str, seed: int | None, reg_id: str | None 
                                                     "oder ihn dort zuerst entfernen.")
 
 
+async def _require_seed_on_return(db, tournament: dict, reg: dict, new_status: str) -> None:
+    """Wer wieder mitspielt, bringt seinen Setzplatz mit (#2111) - hat ihn inzwischen jemand, klärt die Leitung das vorher.
+    Steht der Baum, ordnet der Setzplatz nichts mehr und lässt sich nicht mehr ändern: dann hält er niemanden auf."""
+    if (reg.get("status") in SEED_FREE_STATUSES and new_status not in SEED_FREE_STATUSES
+            and not await tournament_guard.structure_fixed(db, tournament)):
+        await _require_free_seed(db, tournament["id"], reg.get("seed"), reg["id"])
+
+
 async def _open_place(db, tid: str, matches: list[dict]) -> dict | None:
     """Der Platz, den ein Nachrücker im festen Baum bekäme (#1551) - nur nachsehen, nichts schreiben. Zuerst der einer
     Person „Nicht erschienen“ (mit dem niedrigsten Setzplatz), sonst ein leerer Platz neben einem Freilos."""
@@ -1029,6 +1037,8 @@ async def update_registration(tid: str, reg_id: str, body: RegistrationUpdate,
         raise HTTPException(status_code=409, detail=SEED_FIXED)
     if seed_changed:
         await _require_free_seed(db, tid, updates["seed"], reg_id)
+    elif updates.get("status"):
+        await _require_seed_on_return(db, tournament_doc, reg, updates["status"])
     if lifts_removal and await tournament_guard.fixed_match_count(db, tid, reg_id):
         # Austritt und Disqualifikation (#1553) haben die Spiele schon umgebaut (#2111, TA14) - ein anderer Status
         # setzte die Person am Umbau vorbei zurück, ihre Spiele blieben kampflos gewertet.
@@ -1111,6 +1121,7 @@ async def staff_set_registration_checkin(tid: str, reg_id: str, body: dict,
                 raise HTTPException(status_code=400, detail="Diese Anmeldung kann nicht eingecheckt werden")
             if reg.get("status") in REMOVAL_KINDS:
                 raise HTTPException(status_code=409, detail=REMOVAL_NOT_AT_CHECKIN)
+            await _require_seed_on_return(db, tournament_doc, reg, status)
             await _sync_squad_key(db, reg, status, tournament_doc)
 
             await db.tournament_registrations.update_one(
