@@ -6,7 +6,7 @@ import { MemoryRouter } from "react-router-dom";
 
 const apiMock = { get: vi.fn(), post: vi.fn(), delete: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatRequestError: (_e, fallback) => fallback }));
-vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { id: "u-1", username: "nachtfuchs" }, logout: vi.fn().mockResolvedValue(true) }) }));
+vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { id: "u-1", username: "nachtfuchs", role: "tournament_admin" }, logout: vi.fn().mockResolvedValue(true) }) }));
 vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <div>{children}</div> }));
 const promptMock = vi.fn();
 vi.mock("@/components/tls/ConfirmDialog", () => ({ usePrompt: () => promptMock }));
@@ -46,6 +46,12 @@ test("mit Rollen in Teams: Weg je Rolle mit Link, „Account anonymisieren“ ge
   expect(screen.getByTestId("dsgvo-anonymize-btn")).toBeDisabled();
   fireEvent.click(screen.getByTestId("dsgvo-anonymize-btn"));
   expect(promptMock).not.toHaveBeenCalled();
+});
+
+test("„Meine Daten“ nennt die Rolle als Wort, nicht als Rohwert (#2126)", async () => {
+  serve({ can_erase: true, blockers: [], message: null });
+  render(<MemoryRouter><PrivacyAccountPage /></MemoryRouter>);
+  expect(await screen.findByTestId("privacy-account-role")).toHaveTextContent(/^Turnierleitung$/);
 });
 
 test("ohne Rolle: kein Hinweis, Löschen über die Rückfrage wie bisher", async () => {

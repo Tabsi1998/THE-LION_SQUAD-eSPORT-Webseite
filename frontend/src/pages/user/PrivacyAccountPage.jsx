@@ -8,6 +8,7 @@ import { Download, AlertTriangle, ShieldOff, Users } from "lucide-react";
 import { usePrompt } from "@/components/tls/ConfirmDialog";
 import { viennaDate } from "@/lib/vienna";
 import { useLoad } from "@/hooks/useLoad";
+import { roleLabel } from "@/lib/permissions";
 
 export default function PrivacyAccountPage() {
   const { user, logout } = useAuth();
@@ -153,7 +154,7 @@ export default function PrivacyAccountPage() {
             <dl className="grid grid-cols-2 gap-y-2">
               <dt className="text-white/40">Benutzername</dt><dd>{user?.username}</dd>
               <dt className="text-white/40">E-Mail</dt><dd>{user?.email}</dd>
-              <dt className="text-white/40">Rolle</dt><dd className="text-[#29B6E8] uppercase text-xs tracking-widest">{user?.role}</dd>
+              <dt className="text-white/40">Rolle</dt><dd className="text-[#29B6E8]" data-testid="privacy-account-role">{roleLabel(user?.role || "player")}</dd>
               <dt className="text-white/40">Registriert</dt><dd>{user?.created_at && viennaDate(user.created_at)}</dd>
             </dl>
           </div>
