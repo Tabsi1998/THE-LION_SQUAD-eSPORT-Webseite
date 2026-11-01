@@ -109,7 +109,8 @@ async def test_oeffentlich_steht_die_warteliste_getrennt(flow):
         flow.act_as(user)
         assert (await flow.post("/api/events/ev-1/registrations", json={"companion_count": 0})).status_code == 200
     flow.act_as(gone)
-    assert (await flow.delete("/api/events/ev-1/registrations/me")).status_code == 200
+    cancelled = await flow.delete("/api/events/ev-1/registrations/me")
+    assert cancelled.status_code == 200
 
     flow.act_as(None)
     page = (await flow.get("/api/events/herbst-lan")).json()

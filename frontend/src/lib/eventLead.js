@@ -125,7 +125,7 @@ export function changeText(row, status) {
   if (status === "checked_in") return `${name} ist da.`;
   if (status === "registered" && row?.status === "waitlist") return `${name} ist nachgerückt und bekommt Bescheid.`;
   if (status === "registered" && row?.status === "checked_in") return `${name} ist wieder „noch nicht da“.`;
-  const told = ["cancelled", "no_show", "waitlist"].includes(status) && !row?.walk_in ? " Die Person bekommt Bescheid." : "";
+  const told = row?.walk_in ? "" : " Die Person bekommt Bescheid.";
   return `${name}: ${STATUS_LABELS[status] || status}.${told}`;
 }
 

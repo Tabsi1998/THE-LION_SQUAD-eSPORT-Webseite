@@ -82,7 +82,8 @@ async def test_abmeldung_laesst_niemanden_von_selbst_nachruecken_erst_der_knopf(
     wartend = await register(flow, event, zweite)
 
     flow.act_as(erste)
-    assert (await flow.delete(f"/api/events/{event['id']}/registrations/me")).status_code == 200
+    cancelled = await flow.delete(f"/api/events/{event['id']}/registrations/me")
+    assert cancelled.status_code == 200
     stored = await flow.db.event_registrations.find_one({"id": wartend["id"]}, {"_id": 0, "status": 1})
     assert stored["status"] == "waitlist", "kein automatisches Nachrücken - der Platz kann etwas kosten"
     assert len(await notes(flow, erste)) == 1, "wer sich selbst abmeldet, bekommt keine Nachricht"
