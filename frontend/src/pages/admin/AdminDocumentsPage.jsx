@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, useRef } from "react";
-import { API, api, formatApiError, formatRequestError } from "@/lib/api";
+import { API, api, formatRequestError, formatUploadError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormGrid } from "@/components/tls/AdminForm";
@@ -9,17 +9,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Plus, Trash2, FileText, Pin, UploadCloud, Eye, Download } from "lucide-react";
 import { documentVisibility, timesDone } from "@/lib/adminWords";
-
-const parseUploadMb = (value, fallback) => {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-};
-
-const DOCUMENT_UPLOAD_LIMIT_MB = parseUploadMb(
-  import.meta.env.VITE_MAX_DOCUMENT_UPLOAD_MB || import.meta.env.VITE_MAX_IMAGE_UPLOAD_MB,
-  50,
-);
-const PROXY_UPLOAD_LIMIT_MB = parseUploadMb(import.meta.env.VITE_PROXY_UPLOAD_LIMIT_MB, Math.ceil(DOCUMENT_UPLOAD_LIMIT_MB * 1.2));
+import { tooLargeMessage, useUploadLimits } from "@/lib/uploadLimits";
 
 const CATEGORY_LABELS = {
   statutes: "Statuten", minutes: "Protokolle", form: "Formular",
@@ -178,6 +168,7 @@ export default function AdminDocumentsPage() {
 }
 
 function DocModal({ doc, meta, onClose, onSaved }) {
+  const { document_mb: documentMb } = useUploadLimits();
   const isNew = !doc?.id;
   const fileRef = useRef(null);
   const [form, setForm] = useState({
@@ -202,8 +193,8 @@ function DocModal({ doc, meta, onClose, onSaved }) {
   const upload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > DOCUMENT_UPLOAD_LIMIT_MB * 1024 * 1024) {
-      toast.error(`Datei zu gross (max ${DOCUMENT_UPLOAD_LIMIT_MB} MB)`);
+    if (file.size > documentMb * 1024 * 1024) {
+      toast.error(tooLargeMessage(documentMb));
       e.target.value = "";
       return;
     }
@@ -223,12 +214,7 @@ function DocModal({ doc, meta, onClose, onSaved }) {
       }));
       toast.success("Datei hochgeladen.");
     } catch (err) {
-      const status = err.response?.status;
-      const detail = err.response?.data?.detail;
-      const message = status === 413
-        ? `Datei zu gross oder Reverse Proxy blockiert den Upload. App-Limit: ${DOCUMENT_UPLOAD_LIMIT_MB} MB, externer Proxy bitte auf mindestens ${PROXY_UPLOAD_LIMIT_MB} MB setzen.`
-        : detail ? formatApiError(detail) : "Upload fehlgeschlagen.";
-      toast.error(status ? `Upload fehlgeschlagen (${status}): ${message}` : message);
+      toast.error(formatUploadError(err, "Upload fehlgeschlagen.", { appLimitMb: documentMb }));
     } finally {
       e.target.value = "";
       setUploading(false);
@@ -273,7 +259,7 @@ function DocModal({ doc, meta, onClose, onSaved }) {
           </div>
         ) : (
           <button type="button" onClick={() => fileRef.current.click()} disabled={uploading} data-testid="doc-upload-btn" className="inline-flex items-center gap-2 text-sm text-[#FFD700] font-bold uppercase tracking-wider">
-            <UploadCloud className="w-4 h-4" /> {uploading ? "Lade hoch…" : `Datei auswählen (max ${DOCUMENT_UPLOAD_LIMIT_MB} MB)`}
+            <UploadCloud className="w-4 h-4" /> {uploading ? "Lade hoch…" : `Datei auswählen (bis ${documentMb} MB)`}
           </button>
         )}
       </div>

@@ -8,7 +8,10 @@ const { apiMock, toastMock } = vi.hoisted(() => ({
   apiMock: { post: vi.fn(), get: vi.fn() },
   toastMock: { success: vi.fn(), error: vi.fn() },
 }));
-vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (detail) => String(detail || ""), resolveMediaUrl: (value) => value || "" }));
+vi.mock("@/lib/api", async (importOriginal) => {
+  const { formatUploadError } = await importOriginal();
+  return { api: apiMock, formatApiError: (detail) => String(detail || ""), formatUploadError, resolveMediaUrl: (value) => value || "" };
+});
 vi.mock("sonner", () => ({ toast: toastMock }));
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
 vi.mock("@/lib/uploadDiagnostics", () => ({ logUploadClientFailure: vi.fn() }));
@@ -86,6 +89,22 @@ test("die Mediathek zeigt SVG nur in Logo-Feldern", async () => {
   render(<ImageUpload value="" onChange={vi.fn()} testId="brand-logo" allowLibrary logo />);
   await act(async () => fireEvent.click(screen.getByTestId("brand-logo-library")));
   await waitFor(() => expect(screen.getByTitle("kiwi.svg")).toBeInTheDocument());
+});
+
+test("die Grenze im Bildfeld kommt vom Server, eine Ablehnung nennt sie ohne Technik (#2122)", async () => {
+  apiMock.get.mockImplementation(async (url) => (url === "/uploads/limits" ? { data: { image_mb: 37, svg_mb: 3 } } : { data: [] }));
+  vi.resetModules();
+  const fresh = await import("./ImageUpload");
+  const { unmount } = render(<fresh.ImageUpload value="" onChange={vi.fn()} testId="foto" variant="wide" />);
+  await waitFor(() => expect(screen.getByTestId("foto-hint")).toHaveTextContent("PNG/JPG/WebP bis 37 MB."));
+  unmount();
+
+  render(<fresh.ImageUpload value="" onChange={vi.fn()} testId="logo" logo />);
+  expect(screen.getByTestId("logo-hint")).toHaveTextContent("SVG bis 3 MB, Bilder bis 37 MB.");
+  apiMock.post.mockRejectedValue({ message: "x", response: { status: 413, data: "<html></html>" } });
+  await pick("logo", SVG_FILE());
+  await waitFor(() => expect(toastMock.error).toHaveBeenCalled());
+  expect(toastMock.error.mock.calls.at(-1)[0]).toBe("Die Datei ist zu groß. Erlaubt sind höchstens 37 MB. Bitte eine kleinere Datei wählen.");
 });
 
 test("die Vorschau zeigt ein geladenes Logo und lädt ein neues wieder", () => {

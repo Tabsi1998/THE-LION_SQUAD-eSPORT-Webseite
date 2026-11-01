@@ -741,6 +741,19 @@ async def upload_media(
     return result
 
 
+@router.get("/limits")
+async def upload_limits():
+    """Wie groß eine Datei sein darf: dieselben Zahlen, die der Server beim Hochladen durchsetzt (#2122). Das Bildfeld
+    zeigt sie an, statt eine eigene Zahl zu kennen. Für alle lesbar - sie verraten nichts."""
+    return {
+        "image_mb": MAX_IMAGE_UPLOAD_MB,
+        "video_mb": MAX_VIDEO_UPLOAD_MB,
+        "document_mb": MAX_DOCUMENT_UPLOAD_MB,
+        "original_mb": MAX_ORIGINAL_UPLOAD_MB,
+        "svg_mb": svg_logo.MAX_SVG_BYTES // (1024 * 1024),
+    }
+
+
 @router.get("/events")
 async def list_upload_events(
     limit: int = 80,

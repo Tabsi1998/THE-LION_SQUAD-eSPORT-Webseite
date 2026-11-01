@@ -244,6 +244,20 @@ async def test_collective_actions_need_the_editorial_area(flow, public):
 
 
 @pytest.mark.asyncio
+async def test_the_upload_limits_come_from_the_server_for_everyone(flow):
+    from routes import upload_routes
+
+    response = await flow.get("/api/uploads/limits")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["image_mb"] == upload_routes.MAX_IMAGE_UPLOAD_MB
+    assert body["video_mb"] == upload_routes.MAX_VIDEO_UPLOAD_MB
+    assert body["document_mb"] == upload_routes.MAX_DOCUMENT_UPLOAD_MB
+    assert body["svg_mb"] >= 1
+
+
+@pytest.mark.asyncio
 async def test_page_size_stays_within_bounds(flow, public):
     await admin(flow)
     for index in range(3):

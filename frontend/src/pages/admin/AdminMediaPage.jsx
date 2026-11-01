@@ -9,6 +9,7 @@ import { mediaPageFrom } from "@/hooks/useMediaLibrary";
 import { useUploadProgress } from "@/hooks/useUploadProgress";
 import { MEDIA_ACCEPT, ORIGINAL_MEDIA_EXTENSIONS, mediaTypeFromFile } from "@/lib/galleryMedia";
 import { logUploadClientFailure } from "@/lib/uploadDiagnostics";
+import { loadUploadLimits, tooLargeMessage } from "@/lib/uploadLimits";
 import { toast } from "sonner";
 import { FileText, Search, RefreshCw, Upload, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { MediaDetailSheet } from "./media/MediaDetailSheet";
@@ -22,11 +23,7 @@ const parseUploadMb = (value, fallback) => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 };
 
-const MAX_VIDEO_UPLOAD_MB = parseUploadMb(import.meta.env.VITE_MAX_VIDEO_UPLOAD_MB, 1536);
-
 const PROXY_UPLOAD_LIMIT_MB = parseUploadMb(import.meta.env.VITE_PROXY_UPLOAD_LIMIT_MB, 1700);
-
-const VIDEO_MAX_BYTES = MAX_VIDEO_UPLOAD_MB * 1024 * 1024;
 
 const PAGE_SIZE = 60;
 const TYPE_PARAM = { images: "images", videos: "videos", files: "files" };
@@ -231,6 +228,7 @@ export default function AdminMediaPage() {
     const picked = Array.from(files);
     uploadProgress.start(picked);
     setUploading(true);
+    const { video_mb: videoMb } = await loadUploadLimits();
     let ok = 0;
     let failed = 0;
     let originals = 0;
@@ -238,8 +236,8 @@ export default function AdminMediaPage() {
       let kind = mediaTypeFromFile(file);
       try {
         uploadProgress.startFile(file, index, kind === "image" ? "Bild wird vorbereitet" : "Upload startet");
-        if (kind === "video" && file.size > VIDEO_MAX_BYTES) {
-          throw new Error(`Datei zu groß (max ${MAX_VIDEO_UPLOAD_MB} MB).`);
+        if (kind === "video" && file.size > videoMb * 1024 * 1024) {
+          throw new Error(tooLargeMessage(videoMb));
         }
         const uploadFile = kind === "image" ? await prepareImageForUpload(file) : file;
         const fd = new FormData();
@@ -254,17 +252,14 @@ export default function AdminMediaPage() {
       } catch (e) {
         failed++;
         uploadProgress.failFile();
-        const message = formatUploadError(e, "Upload fehlgeschlagen.", {
-          appLimitMb: MAX_VIDEO_UPLOAD_MB,
-          proxyLimitMb: PROXY_UPLOAD_LIMIT_MB,
-        });
+        const message = formatUploadError(e, "Upload fehlgeschlagen.", { appLimitMb: kind === "video" ? videoMb : undefined });
         await logUploadClientFailure(e, file, {
           endpoint: "/uploads/media",
           mediaScope: "admin",
           kind,
           message,
           phase: uploadProgress.progress?.phase,
-          appLimitMb: MAX_VIDEO_UPLOAD_MB,
+          appLimitMb: videoMb,
           proxyLimitMb: PROXY_UPLOAD_LIMIT_MB,
         });
         toast.error(`${file.name}: ${message}`);
