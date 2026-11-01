@@ -248,3 +248,29 @@ async def test_real_erasure_and_export_reach_dissolved_teams(flow):
     user = await flow.db.users.find_one({"id": member["id"]}, {"_id": 0})
     await erase_related(flow.db, user, now_utc().isoformat())
     assert member["id"] not in str(await flow.db.dissolved_teams.find_one({"id": team["id"]}, {"_id": 0}))
+
+    flow.act_as(leader)
+    export = (await flow.get("/api/dsgvo/export-my-data")).json()
+    assert [row["id"] for row in export["dissolved_teams"]] == [team["id"]]
+    assert "memberships" not in export["dissolved_teams"][0] and "squads" not in export["dissolved_teams"][0]
+    flow.act_as(member)
+    assert (await flow.get("/api/dsgvo/export-my-data")).json()["dissolved_teams"] == []
+
+
+@pytest.mark.asyncio
+async def test_a_new_tag_on_restore_goes_through_the_word_filter(flow, monkeypatch):
+    from fastapi import HTTPException
+    from services import word_filter
+
+    async def refuse(_db, text, **_kwargs):
+        if text == "BOESE":
+            raise HTTPException(status_code=400, detail="Dieses Wort geht nicht.")
+
+    monkeypatch.setattr(word_filter, "screen_field", refuse)
+    leader, _co, _member, team, _squad = await world(flow)
+    await dissolve(flow, leader, team)
+    await flow.db.teams.insert_one({"id": new_id(), "name": "Neue", "tag": "LRK", "leader_id": new_id(), "member_ids": []})
+    refused = await flow.post(f"/api/teams/{team['id']}/restore", json={"tag": "boese"})
+    assert refused.status_code == 400, refused.text
+    assert await flow.db.dissolved_teams.find_one({"id": team["id"]}), "nichts passiert"
+    assert (await flow.post(f"/api/teams/{team['id']}/restore", json={"tag": "GUT"})).status_code == 200

@@ -210,6 +210,9 @@ async def restore(db, row: dict, actor: dict, tag: str | None = None) -> dict:
         raise HTTPException(status_code=400, detail=f"Das Kürzel braucht {TEAM_TAG_MIN_LENGTH} bis {TEAM_TAG_MAX_LENGTH} Zeichen.")
     if await db.teams.find_one({"tag": final_tag}, {"_id": 1}):
         raise HTTPException(status_code=409, detail=f"Das Kürzel {final_tag} hat inzwischen ein anderes Team – bitte gib ein neues an.")
+    if final_tag != row.get("tag"):
+        from services import word_filter
+        await word_filter.screen_field(db, final_tag, kind="team_name", user_id=actor.get("id"), ref_id=team_id)
     leader_id = await _next_leader(db, row)
     if not leader_id:
         raise HTTPException(status_code=409, detail="Niemand aus dem Team hat noch ein aktives Konto – so ließe es sich nicht führen.")

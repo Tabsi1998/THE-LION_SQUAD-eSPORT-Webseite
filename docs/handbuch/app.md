@@ -100,6 +100,8 @@ Fünf Tabs unten: **Home**, **Events**, **Community**, **Verein**, **Profil**. O
 - **Anmelden mit Google** und **Passwort vergessen** – gibt es im Anmeldebildschirm der App nicht, nur auf der Website.
 - **Auskunft und Datenexport** („Meine Daten“) – die App öffnet dafür die Website.
 - **Bezahlen** – Zahlungslinks öffnen im Browser, bezahlt wird nicht in der App.
+- **In Teams:** Captain und Vertreter vergeben, Beitrittscode erneuern, öffentlich/privat schalten und ein aufgelöstes Team
+  wiederherstellen ([Teams](teams.md)). Das Spiel eines Co-Teams tippt die App noch von Hand ein; ein Name, den die Website nicht kennt, wird abgelehnt.
 - Lange Seiten wie Mitgliederverzeichnis, Server, Rechtliches und Kontaktformular bleiben auf der Website.
 
 Alles andere gibt es in beiden. Die Rechte sind dieselben wie im Web: Was dein Konto nicht darf, sieht es auch in der App nicht.
