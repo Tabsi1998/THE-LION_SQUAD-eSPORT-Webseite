@@ -88,6 +88,7 @@ PUSH_CHANNELS = {
     "jersey_number": "lion_club",   # Wunschnummer (#2034): Entscheidung des Vorstands
     "invoice_ready": "lion_club",
     "moderation": "lion_club",
+    "rights_change": "lion_club",   # Rolle, Freigabe oder Vorstandsposten geändert (#2125)
     "admin_push_test": "lion_club",
     "helper_call": "lion_club",
     "helper_reminder": "lion_club",

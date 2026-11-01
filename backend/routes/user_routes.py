@@ -1056,7 +1056,8 @@ async def unban_user(user_id: str, body: BanBody | None = None, me: dict = Depen
 @router.put("/{user_id}/role")
 @router.post("/{user_id}/role")
 async def set_role(user_id: str, body: RoleUpdate, me: dict = Depends(require_super())):
-    from services.permissions import LAST_SUPERADMIN_DETAIL, usable_superadmins
+    from services.permissions import LAST_SUPERADMIN_DETAIL, ROLE_LABELS, usable_superadmins
+    from services.rights_notices import areas_snapshot, tell_rights_change
 
     db = get_db()
     target = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "role": 1})
@@ -1067,6 +1068,7 @@ async def set_role(user_id: str, body: RoleUpdate, me: dict = Depends(require_su
         return await db.users.find_one({"id": user_id}, private_projection())
     if previous == "superadmin" and not await usable_superadmins(db, without=user_id):
         raise HTTPException(status_code=409, detail=LAST_SUPERADMIN_DETAIL)
+    before = await areas_snapshot(db, [user_id])
     await db.users.update_one(
         {"id": user_id},
         {"$set": {"role": body.role, "roles": [body.role], "updated_at": now_utc().isoformat()}},
@@ -1078,6 +1080,10 @@ async def set_role(user_id: str, body: RoleUpdate, me: dict = Depends(require_su
     await db.audit_logs.insert_one({"id": new_id(), "action": "user.role_change", "target_id": user_id,
                                      "actor_id": me["id"], "data": {"role": body.role, "from": previous},
                                      "created_at": now_utc().isoformat()})
+    if user_id != me["id"]:
+        after = await areas_snapshot(db, [user_id])
+        await tell_rights_change(db, user_id, f"Deine Rolle ist jetzt „{ROLE_LABELS.get(body.role, body.role)}“.",
+                                 before.get(user_id, set()), after.get(user_id, set()))
     u = await db.users.find_one({"id": user_id}, private_projection())
     return u
 
@@ -1086,6 +1092,7 @@ async def set_role(user_id: str, body: RoleUpdate, me: dict = Depends(require_su
 async def set_areas(user_id: str, body: AreasUpdate, me: dict = Depends(require_super())):
     """Freigaben je Bereich (#287): nur Turnierleitung, Redaktion, Vereinsverwaltung; System bleibt an der Rolle."""
     from services.permissions import GRANTABLE_AREAS, clean_grants
+    from services.rights_notices import areas_snapshot, tell_rights_change
 
     unknown = [a for a in body.areas if a not in GRANTABLE_AREAS]
     if unknown:
@@ -1095,10 +1102,14 @@ async def set_areas(user_id: str, body: AreasUpdate, me: dict = Depends(require_
     target = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "areas": 1})
     if not target:
         raise HTTPException(status_code=404, detail="Nutzer nicht gefunden")
+    before = await areas_snapshot(db, [user_id])
     await db.users.update_one({"id": user_id}, {"$set": {"areas": areas, "updated_at": now_utc().isoformat()}})
     await db.audit_logs.insert_one({"id": new_id(), "action": "user.areas_change", "target_id": user_id,
                                      "actor_id": me["id"], "data": {"areas": areas, "from": target.get("areas") or []},
                                      "created_at": now_utc().isoformat()})
+    if user_id != me["id"]:
+        after = await areas_snapshot(db, [user_id])
+        await tell_rights_change(db, user_id, "", before.get(user_id, set()), after.get(user_id, set()))
     u = await db.users.find_one({"id": user_id}, private_projection())
     return u
 

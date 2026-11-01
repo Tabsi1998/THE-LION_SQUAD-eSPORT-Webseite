@@ -231,7 +231,8 @@ NOTIFICATION_KIND_CATEGORY = {
 }
 
 
-REQUIRED_NOTIFICATION_KINDS: set[str] = set()
+# Rechte und Entscheidungen über die Mitgliedschaft (#2125): die Person muss es erfahren - kein Thema zum Abbestellen.
+REQUIRED_NOTIFICATION_KINDS: set[str] = {"rights_change"}
 
 
 REQUIRED_EMAIL_TEMPLATES = {
