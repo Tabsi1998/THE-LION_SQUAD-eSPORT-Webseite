@@ -205,7 +205,10 @@ async def _captain_team(db, user: dict, tournament: dict) -> tuple[dict | None, 
     allowed = [team for team in teams if _can_register_team(team, user)]
     if not allowed:
         return None, "Das macht dein Kapitän – nur Team-Leader oder Co-Leader melden ein Team an."
-    registered = {row["team_id"] for row in await db.tournament_registrations.find({"tournament_id": tournament["id"], "team_id": {"$in": [team["id"] for team in allowed]}}, {"_id": 0, "team_id": 1}).to_list(50)}
+    rows = await db.tournament_registrations.find({"tournament_id": tournament["id"], "team_id": {"$in": [team["id"] for team in allowed]}},
+                                                  {"_id": 0, "team_id": 1, "status": 1, "rejection_dismissed_at": 1}).to_list(50)
+    # Abgelehnt und weggenommen (#2113): gilt nicht als angemeldet - eine neue Anmeldung geht zur Prüfung.
+    registered = {row["team_id"] for row in rows if not tournament_guard.rejection_dismissed(row)}
     free = [team for team in allowed if team["id"] not in registered]
     if not free:
         return None, "Dein Team ist bei diesem Turnier schon angemeldet."

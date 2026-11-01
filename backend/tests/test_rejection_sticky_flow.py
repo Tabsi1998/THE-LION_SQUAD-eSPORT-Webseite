@@ -193,3 +193,21 @@ async def test_public_profile_counts_no_rejected_registration(flow):
     profile = (await flow.get(f"/api/users/public/{player['username']}")).json()
     assert [row["id"] for row in profile["tournaments"]] == [played["id"]]
     assert profile["stats"]["tournaments"] == 1
+
+
+@pytest.mark.asyncio
+async def test_discord_does_not_call_a_dismissed_team_registered(flow):
+    from services import discord_registration
+
+    tournament = await flow.create_tournament(team_mode="team", team_size=2)
+    leader = await flow.add_user(name=f"kapitaen-{new_id()[:6]}")
+    team_id = new_id()
+    await flow.db.teams.insert_one({"id": team_id, "name": "Rudel", "tag": "RDL", "leader_id": leader["id"], "co_leader_ids": [], "member_ids": [leader["id"]]})
+    registration = {"id": new_id(), "tournament_id": tournament["id"], "user_id": None, "team_id": team_id, "status": "rejected",
+                    "registration_type": "team", "display_name": "[RDL] Rudel"}
+    await flow.db.tournament_registrations.insert_one(dict(registration))
+    team, reason = await discord_registration._captain_team(flow.db, leader, tournament)
+    assert team is None and "schon angemeldet" in reason
+    await flow.db.tournament_registrations.update_one({"id": registration["id"]}, {"$set": {"rejection_dismissed_at": "2026-11-01T10:00:00+00:00"}})
+    team, reason = await discord_registration._captain_team(flow.db, leader, tournament)
+    assert team["id"] == team_id and reason is None
