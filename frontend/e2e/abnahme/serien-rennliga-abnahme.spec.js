@@ -32,6 +32,12 @@ async function shot(target, name, options = {}) {
   await target.screenshot({ path: path.join(SHOTS, `${name}.png`), ...options });
 }
 
+/** Tag relativ zu heute (Wien) als JJJJ-MM-TT - die drei gefahrenen Rennen liegen immer zurück, das letzte immer vor uns. */
+function viennaDay(offset) {
+  const today = Date.parse(new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Vienna" }).format(new Date()));
+  return new Date(today + offset * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
 /** Anfrage wie die Website: mit dem CSRF-Kopf aus dem Cookie der Sitzung. */
 async function send(page, method, url, data) {
   const cookies = await page.context().cookies();
@@ -88,10 +94,10 @@ test.describe("Abnahme #1746: Seite Rennliga - Rennraster, Teamwertung, Garage, 
         lineage_id: lineage.id, season: String(year - 1), tier: "F1", status: "completed", points_scheme_id: "formula_1",
       }));
       const round = async (code, day, venue) => ok(await send(admin, "POST", `${SERIES}/series/${series.id}/rounds`, { code, day, venue }));
-      const r1 = await round("R1", `${year}-01-08`, "Probering");
-      const r2 = await round("R2", `${year}-01-15`, "Testkurs");
-      const r3 = await round("R3", `${year}-01-22`, "Übungsstrecke");
-      await round("R4", `${year + 1}-03-04`, "Zielgerade");
+      const r1 = await round("R1", viennaDay(-21), "Probering");
+      const r2 = await round("R2", viennaDay(-14), "Testkurs");
+      const r3 = await round("R3", viennaDay(-7), "Übungsstrecke");
+      await round("R4", viennaDay(120), "Zielgerade");
       await ok(await send(admin, "POST", `${SERIES}/series/${series.id}/rounds/${r3.id}/cancel`, {}));
 
       // Rennen 1: neue Namen werden offene Teilnehmer; Teams je Rennen, schnellste Runde, Ausfall.
@@ -132,7 +138,7 @@ test.describe("Abnahme #1746: Seite Rennliga - Rennraster, Teamwertung, Garage, 
       const body = await ok(api);
       expect(JSON.stringify(body)).not.toContain(gamma);
       expect(body.racing.club_teams).toEqual([lions, juniors]);
-      expect(Object.values(body.racing.drivers).every((item) => Object.keys(item).sort().join() === "guest,round_teams,team")).toBe(true);
+      expect(Object.values(body.racing.drivers).every((item) => Object.keys(item).sort().join() === "guest,round_teams,team,team_since")).toBe(true);
       // Detail nur für öffentliche Vereinsfahrer (Tabellen-Reihenfolge), Teampunkte je Fahrer vom Server.
       expect(body.racing.club_drivers).toEqual([ids[lena], ids[toni], ids[max]]);
       for (const row of body.racing.teams.rows) {
