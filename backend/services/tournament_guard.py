@@ -149,6 +149,12 @@ async def fixed_match_count(db, tid: str, registration_id: str) -> int:
     })
 
 
+def rejection_dismissed(registration: dict | None) -> bool:
+    """Eine abgelehnte Anmeldung, die die Person aus ihrer Ansicht genommen hat (#2113). Der Eintrag bleibt: Eine neue
+    Anmeldung derselben Person oder desselben Teams geht zur Prüfung an die Turnierleitung, statt bei freiem Platz sofort
+    zu gelten - sonst hieße „entfernen und neu anmelden“: Ablehnung aufgehoben."""
+    return bool(registration) and registration.get("status") == "rejected" and bool(registration.get("rejection_dismissed_at"))
+
 def registration_removal_refused(tournament: dict) -> str:
     """Warum eine Anmeldung im festen Baum nicht einfach verschwinden darf - und was stattdessen geht (TA13)."""
     status = tournament.get("status")

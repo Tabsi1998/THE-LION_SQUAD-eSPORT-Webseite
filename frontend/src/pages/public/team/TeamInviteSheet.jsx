@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Copy, RefreshCw, Search, Share2, UserPlus } from "lucide-react";
+import { Copy, RefreshCw, Search, Share2, UserPlus, X } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatRequestError } from "@/lib/api";
 import { SideSheet } from "@/components/tls/SideSheet";
@@ -9,6 +9,7 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { useLoad } from "@/hooks/useLoad";
 import { LoadNotice } from "@/components/tls/LoadState";
+import { viennaDate } from "@/lib/vienna";
 
 // „Einladen“ auf der Team-Seite (#1191): Link mit QR-Code - wer ihn öffnet, landet im Team und tippt nur noch
 // „Beitreten“. Neu erzeugen macht den alten Link ungültig. Darunter der Join-Code als Rückfall und die Suche nach
@@ -114,6 +115,10 @@ export function InviteMemberPanel({ team }) {
   const [query, setQuery] = useState("");
   const { submitting: inviting, submitOnce } = useSubmissionGuard();
   const [inviteError, setInviteError] = useState("");
+  // Offene Einladungen (#2113, L-A1): wer schon eingeladen ist, steht darunter - mit „Zurückziehen“.
+  const pending = useLoad(["team-invites", team.id], ({ signal }) => (
+    api.get(`/teams/${team.id}/invites`, { signal }).then(({ data }) => (Array.isArray(data) ? data : []))
+  ));
 
   // Nur die Antwort auf den aktuellen Begriff zählt (#985): ein neuer Begriff oder ein leeres Feld lässt eine laufende
   // Suche verfallen. Ein Fehler ist kein „Keine passenden Benutzer“.
@@ -130,6 +135,7 @@ export function InviteMemberPanel({ team }) {
       await api.post(`/teams/${team.id}/invites`, { user_id: user.id });
       toast.success(`${user.display_name || user.username} eingeladen.`);
       search.mutate((rows) => rows.map((row) => row.id === user.id ? { ...row, has_pending_invite: true } : row));
+      pending.reload();
     });
     if (attempt.started && attempt.error) {
       const message = formatRequestError(attempt.error, "Einladung konnte nicht gesendet werden.");
@@ -175,7 +181,74 @@ export function InviteMemberPanel({ team }) {
         {search.status === "error" && <LoadNotice testId="team-invite-search-error" message="Die Suche hat nicht geklappt." onRetry={search.reload} />}
         {inviteError && <AuthFormAlert id="team-invite-error">{inviteError}</AuthFormAlert>}
       </div>
+      <PendingInvites team={team} load={pending} onWithdrawn={(invite) => search.mutate((rows) => (rows || []).map((row) => (
+        row.id === invite.user?.id ? { ...row, has_pending_invite: false } : row
+      )))} />
     </section>
+  );
+}
+
+// Offene Einladungen (#2113, L-A1): wen das Team eingeladen hat und wer es war; „Zurückziehen“ nimmt die Einladung
+// nach einer Rückfrage zurück - sie verschwindet bei der Person aus der Glocke. Ohne offene Einladung kein Abschnitt.
+export function PendingInvites({ team, load, onWithdrawn }) {
+  const confirm = useConfirm();
+  const { submitting, submitOnce } = useSubmissionGuard();
+  const [error, setError] = useState("");
+  const rows = load.data || [];
+
+  const withdraw = async (invite) => {
+    const name = invite.user?.display_name || invite.user?.username || "diese Person";
+    if (!await confirm({
+      title: "Einladung zurückziehen?",
+      description: `${name} kann der Einladung dann nicht mehr folgen. Du kannst später neu einladen.`,
+      confirmLabel: "Zurückziehen",
+      cancelLabel: "Behalten",
+      tone: "danger",
+    })) return;
+    setError("");
+    const attempt = await submitOnce(async () => {
+      await api.delete(`/teams/${team.id}/invites/${invite.id}`);
+      toast.success(`Einladung an ${name} zurückgezogen.`);
+      load.mutate((current) => (current || []).filter((row) => row.id !== invite.id));
+      onWithdrawn?.(invite);
+    });
+    if (attempt.started && attempt.error) {
+      const message = formatRequestError(attempt.error, "Die Einladung konnte nicht zurückgezogen werden.");
+      setError(message);
+      toast.error(message);
+      load.reload();
+    }
+  };
+
+  if (load.status === "error") {
+    return <LoadNotice testId="team-pending-invites-error" message="Die offenen Einladungen konnten nicht geladen werden." onRetry={load.reload} />;
+  }
+  if (!rows.length) return null;
+  return (
+    <div className="space-y-2 border-t border-white/10 pt-3" data-testid="team-pending-invites">
+      <div className="text-[11px] uppercase tracking-widest text-white/55 font-bold">Offene Einladungen ({rows.length})</div>
+      {rows.map((invite) => (
+        <div key={invite.id} className="flex items-center gap-2 border border-white/10 bg-[#0A0A0A] rounded-sm p-2" data-testid={`team-pending-invite-${invite.id}`}>
+          <div className="min-w-0 flex-1">
+            <div className="font-bold text-sm truncate">{invite.user?.display_name || invite.user?.username || "Unbekannt"}</div>
+            <div className="text-xs text-white/40 truncate">
+              {invite.inviter ? `eingeladen von ${invite.inviter.display_name || invite.inviter.username}` : "wartet auf Antwort"}
+              {invite.created_at ? ` · ${viennaDate(invite.created_at)}` : ""}
+            </div>
+          </div>
+          <button
+            type="button"
+            disabled={submitting}
+            onClick={() => withdraw(invite)}
+            data-testid={`team-pending-invite-withdraw-${invite.id}`}
+            className="tls-btn tls-btn--quiet shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-[10px] uppercase tracking-wider font-bold disabled:opacity-45"
+          >
+            <X className="w-3.5 h-3.5" /> Zurückziehen
+          </button>
+        </div>
+      ))}
+      {error && <AuthFormAlert id="team-pending-invite-error">{error}</AuthFormAlert>}
+    </div>
   );
 }
 

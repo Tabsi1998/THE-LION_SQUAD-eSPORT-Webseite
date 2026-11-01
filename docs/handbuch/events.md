@@ -184,6 +184,9 @@ Im Kasten **Anmeldung** den Haken **Registrierung/Anmeldung für dieses Event an
 3. Danach steht da **Du bist dabei** (oder **Warteliste**) mit der Zahl der Plätze.
 4. **Stornieren** (leiser Link, mit Rückfrage) geht **bis zum Beginn** des Events und **nicht nach dem Check-in**. Danach bittet die
    Seite, sich an die Turnierleitung zu wenden. Die Regel gilt gleich auf Website, App und Discord.
+5. **Anmeldung ändern** (Website): Begleitpersonen und Hinweis lassen sich mit derselben Frist selbst ändern. Mehr
+   Begleitpersonen brauchen freie Plätze. Bei Kosten rechnet der Beitrag neu, solange noch keine Rechnung erstellt ist;
+   danach ändert die Begleitpersonen nur die Turnierleitung, der Hinweis geht weiter.
 
 **Anmeldungen verwalten – Anmeldungen & Einlass:** In der Events-Liste führt der Knopf **Anm.** (nur bei Events mit Anmeldung) auf die
 Seite **Anmeldungen & Einlass** (`/events/<name>/leitung`); auf der Event-Seite steht für die Turnierleitung derselbe Link. Es gibt nur

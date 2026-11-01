@@ -188,6 +188,7 @@ NOTIFICATION_KIND_CATEGORY = {
     "friend_accept": "community_messages",
     "team_invite": "community_messages",
     "team_invite_accepted": "community_messages",
+    "team_invite_declined": "community_messages",
     "team_role_changed": "community_messages",
     "team_leader_transferred": "community_messages",
     "f1_prize": "prize_updates",

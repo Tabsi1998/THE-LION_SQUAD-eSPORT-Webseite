@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 // „Dein Stand“ (#1194): nach dem Turnier „Ergebnis teilen“ - vorher und ohne bestätigte Teilnahme nicht.
@@ -70,4 +70,32 @@ test("Co-Team einer Staffel (#2110): kein „Abmelden“, sondern „Austritt nu
   unmount();
   render(<MemoryRouter><MyStandCard tournament={{ id: "t1", status: "completed" }} registration={{ id: "r1", status: "approved", squad_id: "s1" }} leagueSquad /></MemoryRouter>);
   expect(screen.queryByTestId("tournament-unregister-league")).toBeNull();
+});
+
+// Keine Sackgasse (#2113, L-C3, L-C4): was „abgelehnt“ heißt, und warum „Abmelden“ fehlt.
+test("abgelehnt: Hinweis, „Anmeldung entfernen“ nur, wenn es geht", () => {
+  const onRemoveRejected = vi.fn();
+  const { unmount } = render(<MemoryRouter><MyStandCard tournament={{ id: "t1", status: "registration_open" }} registration={{ id: "r1", status: "rejected" }} canRemoveRejected onRemoveRejected={onRemoveRejected} /></MemoryRouter>);
+  expect(screen.getByTestId("tournament-rejected-note")).toHaveTextContent("deine Anmeldung abgelehnt");
+  fireEvent.click(screen.getByTestId("tournament-remove-rejected"));
+  expect(onRemoveRejected).toHaveBeenCalledTimes(1);
+  expect(screen.queryByTestId("tournament-unregister-note")).toBeNull();
+  unmount();
+  render(<MemoryRouter><MyStandCard tournament={{ id: "t1", status: "live" }} registration={{ id: "r1", status: "rejected" }} isTeamTournament /></MemoryRouter>);
+  expect(screen.getByTestId("tournament-rejected-note")).toHaveTextContent("die Anmeldung deines Teams abgelehnt");
+  expect(screen.queryByTestId("tournament-remove-rejected")).toBeNull();
+});
+
+test("nach dem Check-in: Hinweis auf die Turnierleitung statt eines fehlenden Links", () => {
+  const { unmount } = renderCard({ status: "check_in" }, { status: "checked_in" });
+  expect(screen.getByTestId("tournament-unregister-note")).toHaveTextContent("nur noch über die Turnierleitung");
+  unmount();
+  const running = render(<MemoryRouter><MyStandCard tournament={{ id: "t1", status: "live" }} registration={{ id: "r1", status: "approved" }} responsible={false} /></MemoryRouter>);
+  expect(screen.getByTestId("tournament-unregister-note")).toHaveTextContent("kann nur die Teamleitung");
+  running.unmount();
+  const canLeave = render(<MemoryRouter><MyStandCard tournament={{ id: "t1", status: "registration_open" }} registration={{ id: "r1", status: "approved" }} canUnregister /></MemoryRouter>);
+  expect(screen.queryByTestId("tournament-unregister-note")).toBeNull();
+  canLeave.unmount();
+  renderCard({ status: "completed" }, { status: "checked_in" });
+  expect(screen.queryByTestId("tournament-unregister-note")).toBeNull();
 });

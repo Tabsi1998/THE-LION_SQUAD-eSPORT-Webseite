@@ -31,7 +31,7 @@ from services.private_fields import private_projection, strip_private
 from services.profile_fields import USER_NULLABLE_FIELDS
 from models import (
     AreasUpdate,
-    AdminProfileReset, AdminUserCreate, UserUpdate, RoleUpdate, UserSocialCreate, UserSocialUpdate,
+    AdminProfileReset, AdminUserCreate, UserUpdate, RoleUpdate,
     now_utc, new_id,
 )
 
@@ -53,6 +53,7 @@ def _visibility_aliases(key: str) -> list[str]:
         "twitch": "twitch_handle",
         "youtube": "youtube_handle",
         "instagram": "instagram_handle",
+        "tiktok": "tiktok_handle",
         "x": "x_handle",
         "steam": "steam_id",
         "epic": "epic_id",
@@ -103,6 +104,11 @@ async def _viewer_context(db, viewer: dict | None, target_id: str) -> dict:
     return {"self": viewer.get("id") == target_id, "logged_in": True, "member": member or admin, "admin": admin}
 
 
+# Felder, die ohne gewählte Stufe nicht öffentlich sind (#2113): TikTok ließ sich pflegen, erschien aber nie im Profil und
+# hatte keine Stufe - wer es eingetragen hat, wurde nie gefragt. Gleich in pages/user/profile/visibility.js.
+FIELD_DEFAULT_LEVELS = {"tiktok": "private"}
+
+
 def _field_visible(user: dict, key: str, profile_public: bool, ctx: dict | None = None) -> bool:
     """Die Stufe eines Felds gegen den Betrachter: public → alle, community → eingeloggt, members →
     Vereinsmitglieder und Admin-Team, admins → Admin-Team, private → nur die Person selbst."""
@@ -114,7 +120,7 @@ def _field_visible(user: dict, key: str, profile_public: bool, ctx: dict | None 
     if ctx.get("self"):
         return True
     visibility_map = user.get("profile_visibility") or {}
-    visibility = next((visibility_map[a] for a in _visibility_aliases(key) if a in visibility_map), "public")
+    visibility = next((visibility_map[a] for a in _visibility_aliases(key) if a in visibility_map), FIELD_DEFAULT_LEVELS.get(key, "public"))
     if visibility == "public":
         return True
     if visibility == "community":
@@ -134,6 +140,7 @@ def _visible_field(user: dict, key: str, profile_public: bool, ctx: dict | None 
         "twitch": "twitch_handle",
         "youtube": "youtube_handle",
         "instagram": "instagram_handle",
+        "tiktok": "tiktok_handle",
         "x": "x_handle",
         "steam": "steam_id",
         "epic": "epic_id",
@@ -617,6 +624,7 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
         "twitch_handle": _visible_field(u, "twitch", public, ctx),
         "youtube_handle": _visible_field(u, "youtube", public, ctx),
         "instagram_handle": _visible_field(u, "instagram", public, ctx),
+        "tiktok_handle": _visible_field(u, "tiktok", public, ctx),
         "x_handle": _visible_field(u, "x", public, ctx),
         "steam_id": _visible_field(u, "steam", public, ctx),
         "epic_id": _visible_field(u, "epic", public, ctx),
@@ -669,11 +677,6 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
         from services.friend_service import relationship_status
         base["relationship"] = await relationship_status(db, viewer.get("id"), u["id"])
         base["can_message"] = viewer.get("id") != u["id"]
-    # Public socials (separately stored UserSocial entries with visibility=public)
-    socials = await db.user_socials.find(
-        {"user_id": u["id"], "visibility": "public"},
-        {"_id": 0, "platform": 1, "value": 1, "url": 1},
-    ).to_list(50)
     # Achievements v4 (group-aware) — flat list of awarded tiers
     user_id = u["id"]
     # „Erfolge öffentlich“ aus (#619, #2118): Fremde sehen keine Erfolge und keine Zahl - die Person selbst und das
@@ -746,7 +749,8 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
         visible_reg_ids = []
         for r in regs:
             t = t_map.get(r["tournament_id"])
-            if not t:
+            # Eine Ablehnung ist keine Teilnahme (#2113) - und bliebe sonst stehen, nachdem die Person sie weggenommen hat.
+            if not t or r.get("status") == "rejected":
                 continue
             visible_reg_ids.append(r["id"])
             final_pos = r.get("final_position")
@@ -828,7 +832,6 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
         "references": references,
         "awards": awards,
         "featured_award": next((award for award in awards if award["id"] == u.get("featured_award_id")), None),
-        "socials": socials,
     }
 
 
@@ -937,52 +940,6 @@ async def get_my_notification_preferences(me: dict = Depends(get_current_user)):
     from services.discord_dm import dm_state
     payload["discord"] = await dm_state(db, user)
     return payload
-
-
-# ---------- User socials ----------
-@router.get("/me/socials")
-async def list_my_socials(me: dict = Depends(get_current_user)):
-    db = get_db()
-    rows = await db.user_socials.find({"user_id": me["id"]}, {"_id": 0}).to_list(50)
-    return rows
-
-
-@router.post("/me/socials")
-async def add_my_social(body: UserSocialCreate, me: dict = Depends(get_current_user)):
-    db = get_db()
-    existing = await db.user_socials.find_one({"user_id": me["id"], "platform": body.platform})
-    if existing:
-        raise HTTPException(409, "Plattform bereits verknüpft.")
-    doc = {
-        "id": new_id(), "user_id": me["id"],
-        **body.model_dump(),
-        "created_at": now_utc().isoformat(),
-        "updated_at": now_utc().isoformat(),
-    }
-    await db.user_socials.insert_one(doc)
-    doc.pop("_id", None)
-    return doc
-
-
-@router.put("/me/socials/{social_id}")
-@router.patch("/me/socials/{social_id}")
-async def update_my_social(social_id: str, body: UserSocialUpdate, me: dict = Depends(get_current_user)):
-    db = get_db()
-    update = body.model_dump(exclude_unset=True)
-    update["updated_at"] = now_utc().isoformat()
-    res = await db.user_socials.update_one({"id": social_id, "user_id": me["id"]}, {"$set": update})
-    if res.matched_count == 0:
-        raise HTTPException(404, "Eintrag nicht gefunden.")
-    return await db.user_socials.find_one({"id": social_id}, {"_id": 0})
-
-
-@router.delete("/me/socials/{social_id}")
-async def delete_my_social(social_id: str, me: dict = Depends(get_current_user)):
-    db = get_db()
-    res = await db.user_socials.delete_one({"id": social_id, "user_id": me["id"]})
-    if res.deleted_count == 0:
-        raise HTTPException(404, "Eintrag nicht gefunden.")
-    return {"ok": True}
 
 
 @router.put("/{user_id}")

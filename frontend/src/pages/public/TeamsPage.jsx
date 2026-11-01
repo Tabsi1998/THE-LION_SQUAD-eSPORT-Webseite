@@ -404,7 +404,7 @@ function TeamDetail({ id }) {
               const isMe = user && user.id === m.id;
               const showKick = canRemoveMembers && !isLead && !isMe;
               const showRole = !!user && team.leader_id === user.id && !isLead;
-              const showTransfer = !!user && team.leader_id === user.id && !isLead;
+              const showTransfer = !!user && team.leader_id === user.id && !isLead && !m.is_gone;
               const roleLabel = ROLE_LABELS[memberRole(team, m)];
               const roleColor = isLead ? "text-[#FFD700] border-[#FFD700]/40 bg-[#FFD700]/5" :
                                 isCo ? "text-[#29B6E8] border-[#29B6E8]/40 bg-[#29B6E8]/5" :
@@ -466,6 +466,13 @@ function TeamDetail({ id }) {
           )}
           {user && isMember && team.leader_id !== user.id && (
             <button onClick={leave} disabled={mutating} data-testid="team-leave" className="tls-btn tls-btn--quiet w-full px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">Team verlassen</button>
+          )}
+          {/* Kein Knopf ohne Erklärung (#2113, L-C6): der Kapitän sieht, warum er nicht gehen kann und was er tun kann. */}
+          {user && isMember && team.leader_id === user.id && (
+            <div className="border border-white/10 bg-[#121212] rounded-sm p-4 text-xs text-white/60" data-testid="team-leave-leader-hint">
+              <div className="text-[11px] uppercase tracking-widest text-white/45 font-bold">Team verlassen</div>
+              <p className="mt-1">Als Kapitän kannst du das Team nicht einfach verlassen. Übergib zuerst die Leitung unter „Mitglieder verwalten“ mit „Zum Kapitän machen“ – danach bist du Co-Kapitän und kannst gehen. Oder löse das Team unter „Bearbeiten“ auf.</p>
+            </div>
           )}
           {team.discord_link && <a href={team.discord_link} target="_blank" rel="noreferrer" className="tls-btn tls-btn--quiet block px-4 py-3 rounded-sm text-center text-sm font-bold uppercase tracking-wider">Discord</a>}
         </aside>

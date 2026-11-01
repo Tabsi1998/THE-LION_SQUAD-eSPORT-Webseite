@@ -44,7 +44,9 @@
 ## Konto löschen: was mit welchen Daten passiert
 
 Ein Mitglied löscht sein Konto selbst (Website: Datenschutz → Meine Daten, App: Profil → Einstellungen); ein Superadmin
-kann es für jemanden tun. Die vollständige Liste je Sammlung führt `backend/services/personal_data.py`: was beim Löschen
+kann es für jemanden tun. Wer selbst löscht und noch Kapitän, Co-Kapitän oder Captain bzw. Vertreter eines Co-Teams ist,
+gibt die Rolle vorher ab (`services/erasure_blockers.py`, #2113); die Seite nennt den Weg. Die Löschung durch den Verein
+hält das nicht auf. Die vollständige Liste je Sammlung führt `backend/services/personal_data.py`: was beim Löschen
 passiert, wo die Sammlung in der Auskunft steht und warum etwas bleibt. Der Wächter `test_personal_data_map_unit.py` sucht
 alle Sammlungen im Code und verlangt jede dort – eine neue Sammlung ohne Entscheidung lässt die CI scheitern (#1029,
 #1030). Umgesetzt in `backend/routes/dsgvo_routes.py` und `backend/services/account_erasure.py`, geprüft in

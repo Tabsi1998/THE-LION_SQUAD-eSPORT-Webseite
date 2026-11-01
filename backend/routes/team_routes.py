@@ -67,6 +67,8 @@ SQUAD_ROLE_LABELS = {"captain_id": "Captain", "vice_captain_id": "Vertreter"}
 # auf der Website in jeder Meldung, die eine Rolle im Weg hat.
 ROLES_ON_WEBSITE = "Captain und Vertreter vergibst du auf der Website unter Teams → Deine Teams (Co-Team bearbeiten)."
 RESIGN_ON_WEBSITE = "Deine Rolle gibst du auf der Website unter Teams → Deine Teams mit „Rolle abgeben“ ab."
+LEADER_CANNOT_LEAVE = ("Als Kapitän kannst du das Team nicht verlassen. Übergib zuerst die Leitung (auf der Teamseite "
+                       "unter „Mitglieder verwalten“ → „Zum Kapitän machen“) oder löse das Team unter „Bearbeiten“ auf.")
 
 
 class TeamInviteCreate(BaseModel):
@@ -126,6 +128,19 @@ def _public_user(user: dict | None) -> dict | None:
         "display_name": user.get("display_name"),
         "avatar_url": user.get("avatar_url"),
     }
+
+
+def _account_gone(user: dict | None) -> bool:
+    """Gelöscht oder abgeschaltet - so ein Konto kann kein Team mehr führen (#2113)."""
+    return not user or user.get("is_active") is False or bool(user.get("anonymized_at"))
+
+
+def _public_member(user: dict | None) -> dict | None:
+    """Wie ``_public_user``; ein gelöschtes Konto trägt dazu die Marke, damit die Seite „Zum Kapitän machen“ weglässt."""
+    view = _public_user(user)
+    if view and _account_gone(user):
+        view["is_gone"] = True
+    return view
 
 
 def _user_label(user: dict | None) -> str:
@@ -190,7 +205,7 @@ async def _hydrate_team(team: dict) -> dict:
     ).to_list(100)
     member_order = {uid: idx for idx, uid in enumerate(team.get("member_ids", []))}
     members.sort(key=lambda u: member_order.get(u["id"], 999))
-    team["members"] = [_public_user(member) for member in members]
+    team["members"] = [_public_member(member) for member in members]
     leader = await db.users.find_one(
         {"id": team.get("leader_id")},
         private_projection("email"),
@@ -700,12 +715,16 @@ async def accept_team_invite(invite_id: str, me: dict = Depends(get_current_user
     if not team:
         await db.team_invites.update_one({"id": invite_id}, {"$set": {"status": "cancelled", "updated_at": now_utc().isoformat()}})
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
-    if me["id"] not in (team.get("member_ids") or []):
-        await _add_team_member(db, team["id"], me["id"])
-    await db.team_invites.update_one(
-        {"id": invite_id},
+    # In einem Zug (#2113): Zieht die Leitung im selben Moment zurück, gewinnt genau eine Seite - niemand landet im Team,
+    # dessen Einladung gerade zurückgezogen wurde.
+    claimed = await db.team_invites.update_one(
+        {"id": invite_id, "status": "pending"},
         {"$set": {"status": "accepted", "acted_at": now_utc().isoformat(), "updated_at": now_utc().isoformat()}},
     )
+    if not getattr(claimed, "modified_count", 0):
+        raise HTTPException(status_code=404, detail="Einladung nicht gefunden")
+    if me["id"] not in (team.get("member_ids") or []):
+        await _add_team_member(db, team["id"], me["id"])
     await db.notifications.update_many(
         {"user_id": me["id"], "meta.invite_id": invite_id},
         {"$set": {"read": True}},
@@ -729,14 +748,78 @@ async def decline_team_invite(invite_id: str, me: dict = Depends(get_current_use
     invite = await db.team_invites.find_one({"id": invite_id, "user_id": me["id"], "status": "pending"}, {"_id": 0})
     if not invite:
         raise HTTPException(status_code=404, detail="Einladung nicht gefunden")
-    await db.team_invites.update_one(
-        {"id": invite_id},
+    claimed = await db.team_invites.update_one(
+        {"id": invite_id, "status": "pending"},
         {"$set": {"status": "declined", "acted_at": now_utc().isoformat(), "updated_at": now_utc().isoformat()}},
     )
+    if not getattr(claimed, "modified_count", 0):
+        raise HTTPException(status_code=404, detail="Einladung nicht gefunden")
     await db.notifications.update_many(
         {"user_id": me["id"], "meta.invite_id": invite_id},
         {"$set": {"read": True}},
     )
+    # Abgelehnt (#2113, L-A1): wer eingeladen hat und der Kapitän erfahren es - wie bei der Annahme.
+    team = await db.teams.find_one({"id": invite.get("team_id")}, {"_id": 0, "id": 1, "name": 1, "tag": 1, "leader_id": 1})
+    for uid in sorted({invite.get("invited_by"), (team or {}).get("leader_id")} - {None, me["id"]}) if team else []:
+        await create_user_notification(
+            uid,
+            title=f"Einladung abgelehnt: [{team.get('tag')}]",
+            body=f"{_user_label(me)} hat die Einladung in {team.get('name')} abgelehnt.",
+            url=f"/teams/{team['id']}",
+            kind="team_invite_declined",
+            meta={"invite_id": invite_id, "team_id": team["id"]},
+        )
+    return {"ok": True}
+
+
+@router.get("/{team_id}/invites")
+async def list_team_invites(team_id: str, me: dict = Depends(get_current_user)):
+    """Offene Einladungen des Teams (#2113, L-A1) - für Leitung und Co-Leitung, damit sie sie sehen und zurückziehen."""
+    db = get_db()
+    team = await db.teams.find_one({"id": team_id}, {"_id": 0})
+    if not team:
+        raise HTTPException(status_code=404, detail="Team nicht gefunden")
+    if not _can_manage(team, me):
+        _refuse(me, "Offene Einladungen sieht nur die Teamleitung.")
+    invites = await db.team_invites.find(
+        {"team_id": team_id, "status": "pending"}, {"_id": 0},
+    ).sort("created_at", -1).to_list(100)
+    people = {row["id"]: row for row in await db.users.find(
+        {"id": {"$in": list({i.get("user_id") for i in invites} | {i.get("invited_by") for i in invites})}},
+        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1},
+    ).to_list(200)}
+    return [{
+        "id": invite["id"],
+        "team_id": team_id,
+        "status": invite.get("status"),
+        "created_at": invite.get("created_at"),
+        "user": _public_user(people.get(invite.get("user_id"))),
+        "inviter": _public_user(people.get(invite.get("invited_by"))),
+    } for invite in invites]
+
+
+@router.delete("/{team_id}/invites/{invite_id}")
+async def withdraw_team_invite(team_id: str, invite_id: str, me: dict = Depends(get_current_user)):
+    """Einladung zurückziehen (#2113, L-A1): Leitung und Co-Leitung. Die Einladung verschwindet aus der Glocke der
+    eingeladenen Person; eine schon beantwortete bleibt, wie sie ist."""
+    db = get_db()
+    team = await db.teams.find_one({"id": team_id}, {"_id": 0})
+    if not team:
+        raise HTTPException(status_code=404, detail="Team nicht gefunden")
+    if not _can_manage(team, me):
+        _refuse(me, "Einladungen zieht nur die Teamleitung zurück.")
+    now = now_utc().isoformat()
+    result = await db.team_invites.update_one(
+        {"id": invite_id, "team_id": team_id, "status": "pending"},
+        {"$set": {"status": "withdrawn", "acted_at": now, "withdrawn_by": me["id"], "updated_at": now}},
+    )
+    if not getattr(result, "modified_count", 0):
+        raise HTTPException(status_code=404, detail="Diese Einladung ist nicht mehr offen.")
+    invite = await db.team_invites.find_one({"id": invite_id}, {"_id": 0, "user_id": 1})
+    await db.notifications.delete_many({"user_id": (invite or {}).get("user_id"), "kind": "team_invite",
+                                        "meta.invite_id": invite_id})
+    from services.change_events import publish_user_change
+    await publish_user_change([(invite or {}).get("user_id")], "teams")
     return {"ok": True}
 
 
@@ -843,7 +926,8 @@ async def leave_team(team_id: str, me: dict = Depends(get_current_user)):
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
     if team["leader_id"] == me["id"]:
-        raise HTTPException(status_code=400, detail="Leader kann Team nicht verlassen")
+        # Geführt statt Sackgasse (#2113, L-C6): der Weg steht in der Meldung - auch für die App.
+        raise HTTPException(status_code=400, detail=LEADER_CANNOT_LEAVE)
     held = await _squad_role_holder(db, team_id, me["id"])
     if held:
         raise HTTPException(status_code=409, detail=f"Du bist Captain oder Vertreter im Co-Team {held.get('name') or ''} – "
@@ -968,6 +1052,9 @@ async def transfer_leader(team_id: str, body: dict, me: dict = Depends(get_curre
         raise HTTPException(status_code=404, detail="Empfänger ist kein Team-Mitglied")
     if new_leader_id == team.get("leader_id"):
         raise HTTPException(status_code=400, detail="Empfänger ist bereits Leader")
+    # Sonst ließe sich die Leitung auf ein gelöschtes Konto schieben - und das Team stünde ohne Kapitän da (#2113).
+    if _account_gone(await db.users.find_one({"id": new_leader_id}, {"_id": 0, "id": 1, "is_active": 1, "anonymized_at": 1})):
+        raise HTTPException(status_code=400, detail="Dieses Konto ist gelöscht oder abgeschaltet – bitte ein aktives Mitglied wählen.")
     old_leader = team.get("leader_id")
     await db.teams.update_one({"id": team_id}, {
         "$set": {"leader_id": new_leader_id, "updated_at": now_utc().isoformat()},

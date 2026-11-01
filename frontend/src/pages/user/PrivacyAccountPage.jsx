@@ -3,10 +3,11 @@ import { api, formatRequestError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { toast } from "sonner";
-import { useNavigate } from "react-router-dom";
-import { Download, AlertTriangle, ShieldOff } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { Download, AlertTriangle, ShieldOff, Users } from "lucide-react";
 import { usePrompt } from "@/components/tls/ConfirmDialog";
 import { viennaDate } from "@/lib/vienna";
+import { useLoad } from "@/hooks/useLoad";
 
 export default function PrivacyAccountPage() {
   const { user, logout } = useAuth();
@@ -14,6 +15,12 @@ export default function PrivacyAccountPage() {
   const [busy, setBusy] = useState(false);
   const [blocks, setBlocks] = useState([]);
   const prompt = usePrompt();
+  // Rollen in Teams (#2113, L-C5): wer Kapitän, Co-Kapitän, Captain oder Vertreter ist, gibt die Rolle vorher ab - die
+  // Seite nennt je Rolle den Weg, statt erst nach dem Tippen von „LÖSCHEN“ zu scheitern. Der Server prüft selbst noch einmal.
+  const erasure = useLoad(user?.id ? ["erasure-check", user.id] : null, ({ signal }) => (
+    api.get("/dsgvo/anonymize-me/check", { signal }).then(({ data }) => data || {})
+  ), { isEmpty: () => false });
+  const roleBlockers = erasure.data?.blockers || [];
 
   const loadBlocks = useCallback(async () => {
     try {
@@ -39,6 +46,7 @@ export default function PrivacyAccountPage() {
   };
 
   const anonymize = async () => {
+    if (roleBlockers.length) return;
     const answer = await prompt({
       title: "Account anonymisieren?",
       description: 'Diese Aktion ist unwiderruflich. Tippe "LÖSCHEN", um die Anonymisierung zu bestätigen.',
@@ -53,7 +61,11 @@ export default function PrivacyAccountPage() {
       await api.post("/dsgvo/anonymize-me");
       toast.success("Dein Account wurde anonymisiert.");
       if (await logout()) nav("/");
-    } catch (err) { toast.error(formatRequestError(err, "Anonymisierung fehlgeschlagen.")); }
+    } catch (err) {
+      toast.error(formatRequestError(err, "Anonymisierung fehlgeschlagen."));
+      // Inzwischen eine Rolle bekommen (#2113): die Liste der Rollen frisch holen, damit der Weg dasteht.
+      if (err?.response?.status === 409) erasure.reload();
+    }
     setBusy(false);
   };
 
@@ -94,7 +106,24 @@ export default function PrivacyAccountPage() {
               <div className="flex-1">
                 <h2 className="font-heading text-lg md:text-xl font-bold uppercase text-[#FF3B30]">Account anonymisieren</h2>
                 <p className="mt-1 text-sm text-white/60">Dein Account wird dauerhaft deaktiviert und alle persönlichen Daten (E-Mail, Discord, Plattform-IDs, Bio, Avatar) werden überschrieben. Deine Turnier-Statistiken bleiben anonymisiert zur Wahrung der sportlichen Integrität erhalten. Diese Aktion kann <strong>nicht rückgängig gemacht</strong> werden.</p>
-                <button onClick={anonymize} disabled={busy} data-testid="dsgvo-anonymize-btn" className="mt-4 px-5 py-2.5 border border-[#FF3B30] text-[#FF3B30] font-bold uppercase tracking-wider rounded-sm hover:bg-[#FF3B30]/10 disabled:opacity-50">
+                {roleBlockers.length > 0 && (
+                  <div className="mt-4 border border-warn/35 bg-warn/5 rounded-sm p-4" data-testid="dsgvo-erasure-blockers">
+                    <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-warn"><Users className="w-3.5 h-3.5" /> Erst deine Rollen in Teams abgeben</div>
+                    <p className="mt-1 text-sm text-white/70">Solange du ein Team leitest oder in einem Co-Team Captain oder Vertreter bist, kannst du dein Konto nicht löschen – sonst stünde dort ein gelöschtes Konto. So geht es:</p>
+                    <ul className="mt-3 space-y-2">
+                      {roleBlockers.map((row) => (
+                        <li key={`${row.team_id}:${row.squad_id || ""}:${row.role}`} className="border border-white/10 bg-black/20 rounded-sm p-3 text-sm" data-testid={`dsgvo-erasure-blocker-${row.role}`}>
+                          <div className="font-bold text-white break-words">{row.role_label} {row.squad ? `im Co-Team ${row.squad} von ${row.team}` : `bei ${row.team}`}</div>
+                          <div className="mt-1 text-white/60">{row.way}</div>
+                          {row.link ? <Link to={row.link} className="mt-2 inline-flex min-h-11 items-center text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">{row.squad ? "Zu deinen Teams" : "Zur Teamseite"}</Link> : null}
+                        </li>
+                      ))}
+                    </ul>
+                    {/* Kein Ende ohne Ausweg (#2113): der Löschanspruch hängt nie an einer Team-Rolle. */}
+                    {erasure.data?.closing ? <p className="mt-3 text-sm text-white/70" data-testid="dsgvo-erasure-closing">{erasure.data.closing}</p> : null}
+                  </div>
+                )}
+                <button onClick={anonymize} disabled={busy || roleBlockers.length > 0} data-testid="dsgvo-anonymize-btn" className="mt-4 px-5 py-2.5 border border-[#FF3B30] text-[#FF3B30] font-bold uppercase tracking-wider rounded-sm hover:bg-[#FF3B30]/10 disabled:opacity-50 disabled:cursor-not-allowed">
                   Account anonymisieren
                 </button>
               </div>

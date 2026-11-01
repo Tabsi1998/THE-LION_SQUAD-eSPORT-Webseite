@@ -38,6 +38,7 @@ import { tournamentCrumbs } from "@/lib/leagueTrail";
 import { TournamentTimeline, stepCountdown, timelineSteps } from "@/components/tls/tournament/TournamentTimeline";
 import { useCountdownDays } from "@/hooks/useCountdownDays";
 import { MyStandCard } from "@/components/tls/tournament/MyStandCard";
+import { MyRegistrationEdit } from "@/components/tls/tournament/MyRegistrationEdit";
 import { isPublicLive } from "@/lib/publicPhase";
 import { OnsiteTournamentView } from "@/components/tls/tournament/OnsiteTournamentView";
 import { TournamentUnavailable } from "@/components/tls/tournament/TournamentUnavailable";
@@ -198,7 +199,7 @@ function TournamentDetailView() {
   const submitRegistration = async ({ playerIds = {}, teamId = null, acceptCosts = false, selectedPositions = [] } = {}) => {
     if (!user) { nav(`/login?next=${encodeURIComponent(`/tournaments/${slug}${accessToken ? `?access=${accessToken}` : ""}`)}`); return; }
     await runAction(async () => {
-      await api.post(`/tournaments/${t.id}/register`, {
+      const { data: created } = await api.post(`/tournaments/${t.id}/register`, {
         team_id: teamId,
         ingame_name: user.display_name || user.username,
         discord: user.discord_name,
@@ -208,7 +209,7 @@ function TournamentDetailView() {
         accept_costs: Boolean(acceptCosts),
         selected_positions: selectedPositions,
       }, { params: accessToken ? { access: accessToken } : undefined });
-      toast.success("Erfolgreich angemeldet!");
+      toast.success(created?.status === "pending" ? "Anmeldung eingegangen – die Turnierleitung prüft sie." : "Erfolgreich angemeldet!");
       setRegisterModal(false);
       await load();
       // Der einmalige Hinweis direkt nach der ersten Anmeldung (#1188), nicht erst auf der Event-Seite.
@@ -248,6 +249,23 @@ function TournamentDetailView() {
       toast.success("Du bist vom Turnier abgemeldet.");
       await load();
     }, "Abmeldung fehlgeschlagen.");
+  };
+
+  // Abgelehnt (#2113, L-C3): die alte Anmeldung wegnehmen - dieselbe Route wie „Abmelden“; erst dann geht eine neue.
+  const handleRemoveRejected = async () => {
+    if (!myReg) return;
+    await runAction(async () => {
+      const ok = await confirm({
+        title: "Anmeldung entfernen?",
+        description: "Die abgelehnte Anmeldung verschwindet aus deiner Ansicht. Meldest du dich neu an, solange die Anmeldung offen ist, entscheidet die Turnierleitung noch einmal – du bist erst dabei, wenn sie bestätigt.",
+        confirmLabel: "Entfernen",
+        tone: "danger",
+      });
+      if (!ok) return;
+      await api.delete(`/tournaments/${t.id}/registrations/${myReg.id}`);
+      toast.success("Anmeldung entfernt.");
+      await load();
+    }, "Die Anmeldung konnte nicht entfernt werden.");
   };
 
   if (!t) {
@@ -302,6 +320,12 @@ function TournamentDetailView() {
   const nextStep = timelineSteps(t).find((step) => step.next) || null;
   const finished = ["completed", "results_published", "archived"].includes(t.status);
   const subPage = (part) => `/tournaments/${t.slug || t.id}/${part}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`;
+  // Eigene Anmeldung (#2113): wer sie führt - die Person selbst, bei Teams Kapitän und Co-Kapitän. Eine abgelehnte nimmt
+  // sie selbst weg, solange das Turnier nicht läuft (dieselbe Grenze wie beim Server). Ob Angaben änderbar sind, sagt der
+  // Server (`can_edit`) - beim Co-Team einer Liga sind es Captain und Vertreter, das kennt `my_role` nicht.
+  const leadsMyTeam = ["leader", "co_leader"].includes(myRegTeam?.my_role);
+  const respondsForMyReg = !!myReg && (myReg.user_id === user?.id || leadsMyTeam || !!myRegTeam?.can_manage);
+  const canRemoveRejected = !leagueSquad && respondsForMyReg && myReg?.status === "rejected" && !["live", "paused", "completed", "results_published", "archived"].includes(t.status);
   // Check-in-Ende (#2124): dieselbe Regel wie „Dein Stand“, die App und der Server - danach kein Knopf mehr.
   const checkIn = checkInState(t);
   const checkinNow = !!myReg && canCheckIn && myReg.status === "approved" && checkIn.open;
@@ -453,7 +477,9 @@ function TournamentDetailView() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 grid lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8 min-w-0">
           <MyStandCard tournament={t} registration={myReg} team={myRegTeam} isTeamTournament={isTeamTournament} canCheckIn={false} staffOnlyCheckIn={staffOnlyCheckIn}
-            canUnregister={canSelfUnregister} leagueSquad={leagueSquad} onUnregister={handleUnregister} busy={loading} scheduleTo={subPage("matches")} />
+            canUnregister={canSelfUnregister} leagueSquad={leagueSquad} onUnregister={handleUnregister} busy={loading} scheduleTo={subPage("matches")}
+            responsible={respondsForMyReg} canRemoveRejected={canRemoveRejected} onRemoveRejected={handleRemoveRejected}
+            detailsEdit={myReg ? <MyRegistrationEdit tournament={t} registration={myReg} onSaved={load} /> : null} />
           {/* Nach dem Ende (#1221) kein Kalender-Knopf mehr. */}
           <TournamentTimeline tournament={t} calendarItem={tournamentIsOver(t) ? null : calendarItem} />
           {/* Freunde beim Turnier (#1188 Teil 2): nur mit Konto, nur bestätigte Freunde, die es erlauben. */}

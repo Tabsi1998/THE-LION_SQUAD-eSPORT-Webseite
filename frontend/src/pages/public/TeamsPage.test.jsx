@@ -94,6 +94,28 @@ test("Einladungs-Link für ein privates Team: nur die Einladung mit „Beitreten
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/teams/t-1/join-link", { token: "AbC123" }));
 });
 
+// Kein stummer Knopf (#2113, L-C6): der Kapitän sieht statt „Team verlassen“, was er tun kann; andere den Knopf.
+test("Kapitän: Hinweis „erst übergeben oder auflösen“ statt „Team verlassen“; Spieler sehen den Knopf", async () => {
+  serve();
+  const { unmount } = renderAt("/teams/t-1");
+  expect(await screen.findByTestId("team-leave-leader-hint")).toHaveTextContent("Übergib zuerst die Leitung");
+  expect(screen.queryByTestId("team-leave")).toBeNull();
+  unmount();
+  authState.user = { id: "u-3", username: "lunabyte" };
+  serve({ ...TEAM, can_manage: false });
+  renderAt("/teams/t-1");
+  expect(await screen.findByTestId("team-leave")).toHaveTextContent("Team verlassen");
+  expect(screen.queryByTestId("team-leave-leader-hint")).toBeNull();
+});
+
+// Kein Kapitän aus einem gelöschten Konto (#2113): „Zum Kapitän machen“ fehlt dort.
+test("gelöschtes Mitglied: kein Knopf „Zum Kapitän machen“", async () => {
+  serve({ ...TEAM, members: [MEMBERS[0], { ...MEMBERS[2], is_gone: true }, MEMBERS[1]] });
+  renderAt("/teams/t-1");
+  expect(await screen.findByTestId("team-transfer-u-co")).toBeInTheDocument();
+  expect(screen.queryByTestId("team-transfer-u-3")).toBeNull();
+});
+
 // „Löschen“ nicht neben „Bearbeiten“ (#1274): oben nur Einladen und Bearbeiten; „Team auflösen“ ganz unten im
 // Bearbeiten-Blatt, mit einem Satz, was passiert, und erst mit dem richtig eingetippten Teamnamen.
 test("oben nur Einladen und Bearbeiten - kein roter Lösch-Knopf", async () => {

@@ -63,6 +63,7 @@ export const VISIBILITY_GROUPS = [
       { k: "twitch", l: "Twitch" },
       { k: "youtube", l: "YouTube" },
       { k: "instagram", l: "Instagram" },
+      { k: "tiktok", l: "TikTok" },
       { k: "x", l: "X / Twitter" },
       { k: "github", l: "GitHub" },
       { k: "kick", l: "Kick" },
@@ -95,8 +96,12 @@ export function visibilityLabel(level) {
   return VISIBILITY_LEVELS.find((item) => item.k === level)?.l || level;
 }
 
+// Ohne gewählte Stufe nicht öffentlich (#2113): TikTok erschien früher nirgends - wer es eingetragen hat, wurde nie
+// gefragt. Gleich in backend/routes/user_routes.py (FIELD_DEFAULT_LEVELS); das Formular zeigt so die wirkliche Stufe.
+const FIELD_DEFAULT_LEVELS = { tiktok: "private" };
+
 export function fieldLevel(visibility, key) {
-  return (visibility && visibility[key]) || DEFAULT_VISIBILITY;
+  return (visibility && visibility[key]) || FIELD_DEFAULT_LEVELS[key] || DEFAULT_VISIBILITY;
 }
 
 // Eine Stufe, wenn alle Felder der Gruppe sie teilen, sonst "mixed".

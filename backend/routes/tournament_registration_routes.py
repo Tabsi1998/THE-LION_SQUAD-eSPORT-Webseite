@@ -40,7 +40,7 @@ from services.competition_versions import persist_competition_versions
 from services.heat_rebuild import evaluate_after_write
 from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
 from models import RegistrationCreate, RegistrationUpdate, RegistrationAdminCreate, now_utc, new_id
-from services import league_roster, onsite_access, tournament_event_gate, tournament_fees, tournament_guard
+from services import league_roster, onsite_access, tournament_event_gate, tournament_fees, tournament_guard, word_filter
 from services.query_filters import safe_regex
 from services.private_fields import private_projection
 from routes.tournament_common import (
@@ -124,6 +124,10 @@ WAITLIST_MOVE_UP_STATUSES = {"scheduled", "registration_open", "registration_clo
 ACTIVE_REGISTRATION_STATUSES = ["pending", "approved", "checked_in"]
 # Status, mit denen eine Anmeldung nicht (mehr) spielt - im festen Baum nur über Austritt oder Nicht erschienen.
 LEAVES_BRACKET_STATUSES = {"rejected", "waitlist", "pending"}
+# Was eine neue Anmeldung nach einer weggenommenen Ablehnung nicht mitnimmt (#2113): die Marke, die alte Bestätigung, den
+# alten Preis samt Beleg (den Preis friert erst die Freigabe neu ein) und die Aufstellung samt „Wer ist da“ von damals.
+REOPEN_CLEARS = ("rejection_dismissed_at", "notified_status", "price_snapshot", "billing_status", "invoice_ref", "invoice_status",
+                 "payment_state", "lineup", "substitutes", "lineup_updated_at", "lineup_updated_by", "presence", "presence_nudged_at")
 SEED_FIXED = "Der Turnierbaum steht schon – Setzplätze ändern sich nur bis zum Ende des Check-ins."
 # Wer nicht (mehr) mitspielt, hält keinen Setzplatz fest - ein Ersatz darf den Platz einer fehlenden Person übernehmen.
 SEED_FREE_STATUSES = ["rejected", "no_show", "withdrawn", "disqualified", "cancelled"]
@@ -231,9 +235,9 @@ async def _validate_registration_actor(db, tournament: dict, body: RegistrationC
         raise HTTPException(status_code=403, detail="Du bist kein Mitglied dieses Teams")
     existing_team = await db.tournament_registrations.find_one(
         {"tournament_id": tournament["id"], "team_id": team["id"]},
-        {"id": 1},
+        {"id": 1, "status": 1, "rejection_dismissed_at": 1},
     )
-    if existing_team:
+    if existing_team and not tournament_guard.rejection_dismissed(existing_team):
         raise HTTPException(status_code=409, detail="Dieses Team ist bereits angemeldet")
     return team
 
@@ -498,6 +502,9 @@ async def list_registrations(tid: str, access: str | None = None, user=Depends(g
         t_doc = await _get_visible_tournament(tid, user)
     is_staff = _is_staff(user) or await _is_tournament_staff(tid, user)
     regs = await db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0}).to_list(500)
+    if not is_staff:
+        # Weggenommene Ablehnung (#2113): die Person sieht wieder „Anmelden“, die Leitung sieht den Eintrag weiter.
+        regs = [r for r in regs if not tournament_guard.rejection_dismissed(r)]
     user_team_ids = set()
     if user:
         user_team_ids = {
@@ -569,6 +576,12 @@ async def _create_self_registration(db, tid: str, tournament: dict, body: Regist
         {"tournament_id": tid, "user_id": me["id"]},
         {"_id": 0},
     )
+    # Abgelehnt und weggenommen (#2113): derselbe Eintrag kommt neu zur Prüfung - bei anderem Team ist es eine neue Anmeldung.
+    reopen = None
+    if tournament_guard.rejection_dismissed(existing):
+        if (existing.get("team_id") or None) == (body.team_id or None):
+            reopen = existing
+        existing = None
     if existing:
         existing.pop("identity_key", None)
         # Fehlte nach einem Abbruch der Rechnungsauftrag, legt die Wiederholung ihn nach (#1184).
@@ -582,7 +595,9 @@ async def _create_self_registration(db, tid: str, tournament: dict, body: Regist
             {"tournament_id": tid, "team_id": team["id"]},
             {"_id": 0},
         )
-        if existing_team:
+        if tournament_guard.rejection_dismissed(existing_team):
+            reopen = existing_team
+        elif existing_team:
             existing_team.pop("identity_key", None)
             return {**existing_team, "auto_bracket_update": None, "idempotent_replay": True}
     # Turnier nur mit Event-Anmeldung (#875) - auch über einen Zugangslink; das Team mit genug Leuten beim Event.
@@ -599,6 +614,10 @@ async def _create_self_registration(db, tid: str, tournament: dict, body: Regist
     missing = _missing_game_fields(game, player_ids)
     if missing:
         raise HTTPException(status_code=400, detail=f"Für dieses Turnier fehlen Pflicht-IDs: {', '.join(missing)}")
+    # Ein selbst gewählter Name steht öffentlich in der Teilnehmerliste (#2113) - der eigene Anzeigename ist schon geprüft.
+    ingame_name = (body.ingame_name or "").strip()
+    if ingame_name and ingame_name not in {me.get("display_name"), me.get("username")}:
+        await word_filter.screen_field(db, ingame_name, kind="ingame_name", user_id=me["id"], ref_id=tid)
     # Count approved
     count = await db.tournament_registrations.count_documents(
         {"tournament_id": tid, "status": {"$in": ["pending", "approved", "checked_in"]}})
@@ -628,13 +647,20 @@ async def _create_self_registration(db, tid: str, tournament: dict, body: Regist
     }
     if count >= tournament.get("max_participants", 32):
         reg["status"] = "waitlist"
+    if reopen:
+        # Immer „ausstehend“, auch wenn das Turnier voll ist: Die Warteliste rückte von selbst auf „bestätigt“ nach.
+        reg.update({"id": reopen["id"], "status": "pending", "created_at": reopen.get("created_at") or reg["created_at"],
+                    "identity_key": reopen.get("identity_key") or reg["identity_key"]})
     # Zugangslink mit Limit (#1036): die Nutzung atomar belegen, bevor die Anmeldung geschrieben wird.
     try:
         claimed = await claim_access_link_use(db, register_access, me)
     except AccessLinkUsedUp as exc:
         raise HTTPException(status_code=409, detail=exc.detail)
     try:
-        await db.tournament_registrations.insert_one(reg)
+        if reopen:
+            await db.tournament_registrations.update_one({"id": reopen["id"]}, {"$set": reg, "$unset": {key: "" for key in REOPEN_CLEARS}})
+        else:
+            await db.tournament_registrations.insert_one(reg)
     except Exception as exc:
         if claimed:
             await release_access_link_use(db, register_access, me)
@@ -658,7 +684,31 @@ async def _create_self_registration(db, tid: str, tournament: dict, body: Regist
     # Vorschau-Baum, Bestätigung und Erfolge folgen nach der Sperre (#1859, ``self_register``).
     reg["auto_bracket_update"] = None
     reg["idempotent_replay"] = False
+    if reopen:
+        reg["reopened_after_rejection"] = True
+        await _audit_tournament_action(db, "tournament.registration.reopened", me.get("id"), tid, {"registration_id": reg["id"]})
     return reg
+
+
+async def _tell_leads_about_reopened(db, tournament: dict, reg: dict, me: dict) -> None:
+    """Nach einer Ablehnung neu angemeldet (#2113): Die Turnierleitung soll prüfen - eine Nachricht hält nichts auf."""
+    try:
+        from services.matchday_schedule import _tournament_staff_user_ids
+        from services.user_notifications import create_user_notification
+
+        title = tournament.get("title") or "Turnier"
+        for user_id in sorted(await _tournament_staff_user_ids(db, tournament["id"]) - {me["id"]}):
+            await create_user_notification(
+                user_id,
+                title=f"Anmeldung prüfen: {title}",
+                body=f"{reg.get('display_name') or 'Jemand'} hat sich nach einer Ablehnung neu angemeldet – bitte bestätigen oder ablehnen.",
+                url=f"/admin/tournaments/{tournament['id']}",
+                kind="tournament_registration",
+                meta={"category": "tournament_updates", "tournament_id": tournament["id"], "registration_id": reg["id"],
+                      "dedupe_key": f"registration-reopened:{reg['id']}:{reg.get('updated_at')}"},
+            )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Reopened registration notice failed for tournament=%s type=%s", _log_safe(tournament.get("id")), type(exc).__name__)
 
 
 @router.post("/{tid}/register")
@@ -727,6 +777,8 @@ async def self_register(db, t: dict, body: RegistrationCreate, me: dict, registe
             reg["auto_bracket_update"] = await _refresh_previews_after_self_registration(db, tid, queue.requested,
                                                                                          me.get("id"))
         await _confirm_self_registration(db, tid, reg, me)
+        if reg.get("reopened_after_rejection"):
+            await _tell_leads_about_reopened(db, t, reg, me)
         if followups is not None:
             followups.add_task(_award_registration_badges, me["id"], tid)
         else:
@@ -820,7 +872,7 @@ async def _refresh_previews_after_self_registration(db, tid: str, number: int, a
 
 
 # Felder der Antwort, die nicht zur Anmeldung selbst gehören.
-RESPONSE_ONLY_KEYS = {"auto_bracket_update", "idempotent_replay"}
+RESPONSE_ONLY_KEYS = {"auto_bracket_update", "idempotent_replay", "reopened_after_rejection"}
 
 
 async def _after_self_registration(db, tid: str, reg: dict, me: dict) -> None:
@@ -963,7 +1015,7 @@ async def admin_create_registration(tid: str, body: RegistrationAdminCreate,
         await _sync_squad_key(db, old, "no_show", tournament)
         await db.tournament_registrations.update_one(
             {"id": old_reg_id},
-            {"$set": {"status": "no_show", "updated_at": now_utc().isoformat()}},
+            {"$set": {"status": "no_show", "updated_at": now_utc().isoformat()}, "$unset": {"rejection_dismissed_at": ""}},
         )
         replacement = await _replace_registration_in_open_matches(db, tid, old_reg_id, reg, me.get("id"), replace_targets)
     auto_bracket_update = None
@@ -1062,10 +1114,13 @@ async def update_registration(tid: str, reg_id: str, body: RegistrationUpdate,
         # inzwischen in einer anderen Staffel spielt, hier nicht wieder aktiv wird.
         await _sync_squad_key(db, reg, updates["status"], tournament_doc)
     updates["updated_at"] = now_utc().isoformat()
-    # Die Angaben zum Ausscheiden gelten nur, solange die Person ausgeschieden ist (die Ansicht liest ``removal``).
+    # Die Angaben zum Ausscheiden gelten nur, solange die Person ausgeschieden ist (die Ansicht liest ``removal``). Die Marke
+    # einer weggenommenen Ablehnung (#2113) nur, solange sie abgelehnt ist - sonst sähe sie eine spätere Ablehnung nie.
+    clears = {**({"removal": ""} if lifts_removal else {}),
+              **({"rejection_dismissed_at": ""} if previous_status == "rejected" and updates.get("status") not in (None, "rejected") else {})}
     await db.tournament_registrations.update_one(
         {"id": reg_id, "tournament_id": tid},
-        {"$set": updates, "$unset": {"removal": ""}} if lifts_removal else {"$set": updates},
+        {"$set": updates, "$unset": clears} if clears else {"$set": updates},
     )
     reg = await db.tournament_registrations.find_one({"id": reg_id, "tournament_id": tid}, {"_id": 0})
     if updates.get("status") and updates["status"] != previous_status:
@@ -1129,7 +1184,7 @@ async def staff_set_registration_checkin(tid: str, reg_id: str, body: dict,
 
             await db.tournament_registrations.update_one(
                 {"id": reg_id},
-                {"$set": {"status": status, "updated_at": now_utc().isoformat()}},
+                {"$set": {"status": status, "updated_at": now_utc().isoformat()}, "$unset": {"rejection_dismissed_at": ""}},
             )
             if status == "checked_in" and reg.get("user_id"):
                 await _apply_late_checkin_hooks(db, tid, reg["user_id"])
@@ -1209,6 +1264,13 @@ async def _delete_registration_locked(db, tid: str, reg_id: str, me: dict) -> di
             # Feste Spiele schon vor dem Start (Gruppen generiert, Schweizer Runde, Review #2120): die Abmeldung ließe
             # sie mit einer Anmeldung zurück, die es nicht mehr gibt.
             raise HTTPException(status_code=409, detail=tournament_guard.SELF_UNREGISTER_FIXED)
+    if reg.get("status") == "rejected" and not is_staff:
+        # „Anmeldung entfernen“ (#2113): nur aus der Ansicht der Person - die Ablehnung bleibt, eine neue Anmeldung prüft
+        # die Turnierleitung. Der Platz war schon frei, der Auftrag mit der Ablehnung geschlossen.
+        now = now_utc().isoformat()
+        await db.tournament_registrations.update_one({"id": reg_id}, {"$set": {"rejection_dismissed_at": now, "updated_at": now}})
+        await _audit_tournament_action(db, "tournament.registration.rejection_dismissed", me.get("id"), tid, {"registration_id": reg_id})
+        return None
     await tournament_fees.close_price(db, reg, "Abmeldung")
     await db.tournament_registrations.delete_one({"id": reg_id})
     await _move_up_from_waitlist(db, tid, me.get("id"))
