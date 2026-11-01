@@ -208,3 +208,36 @@ async def test_a_removal_drops_an_open_no_show_proposal_and_its_extension(flow):
     assert not after.get("no_show_proposal") and not after.get("no_show_extended_until"), "der Fall gehörte zur alten Paarung"
     lead = (await flow.get(f"/api/tournaments/{tournament['id']}/lead")).json()
     assert not [row for row in lead["attention"] if row["kind"] == "no_show" and row["match_id"] == match["id"]], "kein offener Fall"
+
+
+@pytest.mark.asyncio
+async def test_unregistering_does_not_lift_a_disqualification(flow):
+    """#2111: abmelden und neu anmelden hätte den Ausschluss aufgehoben - das darf nur, wer ihn auch aussprechen darf."""
+    staff = await flow.add_staff()
+    flow.act_as(staff)
+    tournament = await flow.create_tournament(status="registration_open")
+    tid = tournament["id"]
+    player = await flow.add_user(name="Paula")
+    out = await flow.register(tournament, player, status="disqualified")
+    helper = await flow.add_user(name="Helfer")
+    await flow.db.tournament_staff_assignments.insert_one({"tournament_id": tid, "user_id": helper["id"], "role": "scorekeeper",
+                                                           "scope": "tournament", "is_active": True})
+    url = f"/api/tournaments/{tid}/registrations/{out['id']}"
+
+    for person in (player, helper):
+        flow.act_as(person)
+        refused = await flow.delete(url)
+        assert refused.status_code == 409, refused.text
+        assert "nur die Turnierleitung" in refused.json()["detail"]
+        assert await flow.db.tournament_registrations.find_one({"id": out["id"]}) is not None
+
+    # Wer freiwillig ausgetreten ist, darf sich weiter abmelden.
+    other = await flow.add_user(name="Jonas")
+    left = await flow.register(tournament, other, status="withdrawn")
+    flow.act_as(other)
+    gone = await flow.delete(f"/api/tournaments/{tid}/registrations/{left['id']}")
+    assert gone.status_code == 200, gone.text
+
+    flow.act_as(staff)
+    removed = await flow.delete(url)
+    assert removed.status_code == 200, removed.text

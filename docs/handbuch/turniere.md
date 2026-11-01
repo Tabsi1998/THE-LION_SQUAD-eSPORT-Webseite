@@ -276,7 +276,7 @@ verbindlichen Teilnahme: Warteliste kostet nichts. Alles Weitere steht in [Abrec
   die Anmeldung auf **Ausgetreten** bzw. **Disqualifiziert**; setzen lassen sich diese Werte nur über den Umbauplan.
   Zurücknehmen geht über die Statusauswahl, mit demselben Recht wie das Eintragen und nur, wenn die Person in keinem festen Spiel
   mehr steht und im Baum ein Platz frei ist – sonst sagt die Meldung, warum nicht, und nichts ändert sich. Der Check-in
-  bietet dafür nichts an.
+  bietet dafür nichts an, und wer disqualifiziert ist, kann sich nicht selbst abmelden.
 - Bei Team-Turnieren steht unter jedem Team die Aufstellung (3.5).
 - Oben im Turnier: Downloads **PDF Teilnehmer**, **PDF Check-in**, **PDF Anmeldung QR** (zum Aufhängen), **PDF Spiele**
   und **CSV Matchplan**.

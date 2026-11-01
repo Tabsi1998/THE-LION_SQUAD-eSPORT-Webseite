@@ -131,6 +131,8 @@ REMOVAL_FINAL = ("Austritt und Disqualifikation lassen sich hier nicht zurückne
                  "umgebaut. Bei einem Irrtum bitte die betroffenen Ergebnisse im Reiter „Spiele“ korrigieren.")
 REMOVAL_NO_PLACE = ("Im Turnierbaum ist kein Platz frei, darum lässt sich der Austritt oder die Disqualifikation nicht "
                     "zurücknehmen. Ein Platz wird frei, wenn jemand austritt oder als „Nicht erschienen“ gilt.")
+DISQUALIFIED_STAYS = ("Eine Disqualifikation lässt sich nicht durch Abmelden aufheben. Das kann nur die Turnierleitung "
+                      "zurücknehmen.")
 REMOVAL_NOT_AT_CHECKIN = ("Austritt und Disqualifikation lassen sich beim Check-in nicht zurücknehmen. Das macht die "
                           "Turnierleitung über den Status in der Teilnehmerliste.")
 
@@ -1184,6 +1186,9 @@ async def _delete_registration_locked(db, tid: str, reg_id: str, me: dict) -> di
     if not is_own_registration and not is_team_manager and not is_staff:
         # Co-Team (#2109): eine deutsche Begründung statt eines nackten 403.
         raise HTTPException(status_code=403, detail=SQUAD_UNREGISTER_REFUSED if reg.get("squad_id") else None)
+    if reg.get("status") == "disqualified" and not await has_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES, "tournament"):
+        # Abmelden und neu anmelden hieße: Ausschluss aufgehoben (#2111) - dasselbe Recht wie beim Aufheben über den Status.
+        raise HTTPException(status_code=409, detail=DISQUALIFIED_STAYS)
     tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
     if is_staff and await tournament_guard.fixed_match_count(db, tid, reg_id):
         # Nur ein fester Baum hält die Person (#1551) - die Vorschau während des Check-ins wächst noch mit. Seit #2120
