@@ -496,7 +496,7 @@ function TeamDetail({ id }) {
           onDissolved={() => nav("/teams")}
         />
       )}
-      {inviteOpen && <TeamInviteSheet team={team} onClose={() => setInviteOpen(false)} />}
+      {inviteOpen && <TeamInviteSheet team={team} onClose={() => setInviteOpen(false)} onCodeRenewed={teamLoad.reload} />}
     </PublicLayout>
   );
 }

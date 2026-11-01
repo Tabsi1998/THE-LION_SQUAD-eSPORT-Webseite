@@ -1,7 +1,6 @@
 """Team routes."""
 import logging
 import re
-import secrets
 from typing import Optional, Literal
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
@@ -13,6 +12,7 @@ from services.notification_preferences import send_user_template
 from services.user_notifications import build_public_url, create_user_notification
 from services.chat_attachments import MAX_ATTACHMENTS_PER_MESSAGE, chat_message_preview, claim_attachments, register_chat_access
 from services.query_filters import safe_regex
+from services.team_page import new_join_code
 from services import word_filter
 from services.log_safe import log_safe
 from services.private_fields import private_projection
@@ -890,7 +890,7 @@ async def create_team(body: TeamCreate, me: dict = Depends(get_current_user)):
         "leader_id": me["id"],
         "co_leader_ids": [],
         "member_ids": [me["id"]],
-        "join_code": secrets.token_urlsafe(6),
+        "join_code": new_join_code(),
         "is_public": True,
         "created_at": now_utc().isoformat(),
         "updated_at": now_utc().isoformat(),

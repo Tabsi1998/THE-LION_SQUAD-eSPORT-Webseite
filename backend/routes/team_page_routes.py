@@ -3,6 +3,7 @@
 - ``GET  /api/teams/{id}/overview``            „Angemeldet für“ und „Letzte Spiele“ - für alle, die das Team sehen dürfen
 - ``GET  /api/teams/{id}/invite-link``         der aktuelle Link (wird beim ersten Mal angelegt) - Teamleitung und Co-Leitung
 - ``POST /api/teams/{id}/invite-link``         neuer Link, der alte gilt nicht mehr
+- ``POST /api/teams/{id}/join-code``           neuer Beitrittscode, der alte gilt nicht mehr
 - ``GET  /api/teams/{id}/invite-link/check``   gilt dieser Schlüssel? Mit Kurzinfo zum Team - auch für private Teams
 - ``POST /api/teams/{id}/join-link``           mit gültigem Schlüssel beitreten (nur noch „Beitreten“ tippen)
 - ``GET  /api/teams/{id}/dissolve-preview``    was beim Auflösen passiert (#1274) - Teamleitung und Club-Admin
@@ -93,6 +94,18 @@ async def renew_invite_link(team_id: str, me: dict = Depends(get_current_user)):
         "actor_id": me["id"], "data": {}, "created_at": now_utc().isoformat(),
     })
     return await _invite_payload(row)
+
+
+@router.post("/{team_id}/join-code")
+async def renew_join_code(team_id: str, me: dict = Depends(get_current_user)):
+    """Beitrittscode erneuern (#2128, TM10) - wie der Link: Teamleitung und Co-Leitung. Der alte gilt danach nicht mehr."""
+    db = get_db()
+    team = await _team_or_404(db, team_id)
+    if not _can_manage(team, me):
+        _refuse(me, "Den Beitrittscode erneuert die Teamleitung.")
+    code = await team_page.renew_join_code(db, team_id)
+    await _team_audit(db, "team.join_code.renew", team_id, me["id"], {})
+    return {"join_code": code}
 
 
 @router.get("/{team_id}/invite-link/check")

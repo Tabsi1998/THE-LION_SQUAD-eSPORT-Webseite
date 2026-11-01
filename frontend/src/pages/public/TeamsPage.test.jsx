@@ -143,6 +143,23 @@ test("Club-Admin: Rollen und Übergabe auch ohne eigene Teamleitung; Turnierleit
   expect(screen.queryByTestId("team-promote-u-3")).toBeNull();
 });
 
+// „Beitrittscode erneuern“ (#2128, TM10): mit Rückfrage; danach steht der neue Code da.
+test("Beitrittscode erneuern fragt nach und zeigt den neuen Code", async () => {
+  serve();
+  apiMock.post.mockResolvedValue({ data: { join_code: "N3uCode" } });
+  renderAt("/teams/t-1");
+  fireEvent.click(await screen.findByTestId("team-invite-open"));
+  expect(await screen.findByTestId("team-join-code-value")).toHaveTextContent("Kx7pQ2");
+  confirmMock.mockResolvedValueOnce(false);
+  fireEvent.click(screen.getByTestId("team-join-code-renew"));
+  await waitFor(() => expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Neuen Beitrittscode erzeugen?" })));
+  expect(apiMock.post).not.toHaveBeenCalled();
+  confirmMock.mockResolvedValueOnce(true);
+  fireEvent.click(screen.getByTestId("team-join-code-renew"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/teams/t-1/join-code"));
+  expect(await screen.findByTestId("team-join-code-value")).toHaveTextContent("N3uCode");
+});
+
 // Schalter „öffentlich/privat“ (#2128, TM9): nur die Teamleitung; der Hinweis sagt, was privat bedeutet.
 test("Teamleitung stellt das Team auf privat, der Hinweis nennt die Folgen; Co-Leitung sieht den Schalter nicht", async () => {
   serve();

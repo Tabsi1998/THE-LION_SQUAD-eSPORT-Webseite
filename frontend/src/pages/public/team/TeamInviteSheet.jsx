@@ -24,8 +24,9 @@ async function copy(value, message) {
   }
 }
 
-export function TeamInviteSheet({ team, onClose }) {
+export function TeamInviteSheet({ team, onClose, onCodeRenewed }) {
   const [link, setLink] = useState(null);
+  const [joinCode, setJoinCode] = useState(team.join_code || "");
   const [error, setError] = useState("");
   const confirm = useConfirm();
   const { submitting, submitOnce } = useSubmissionGuard();
@@ -55,6 +56,23 @@ export function TeamInviteSheet({ team, onClose }) {
       toast.success("Neuer Link ist da – der alte gilt nicht mehr.");
     });
     if (attempt.started && attempt.error) setError(formatRequestError(attempt.error, "Neuer Link hat nicht geklappt."));
+  };
+
+  // Beitrittscode erneuern (#2128, TM10): wie der Link - der alte Code gilt danach nicht mehr.
+  const renewCode = async () => {
+    if (!await confirm({
+      title: "Neuen Beitrittscode erzeugen?",
+      description: "Der bisherige Code gilt danach nicht mehr. Wer schon im Team ist, bleibt drin; der Einladungs-Link bleibt, wie er ist.",
+      confirmLabel: "Neuen Code erzeugen",
+      tone: "info",
+    })) return;
+    const attempt = await submitOnce(async () => {
+      const { data } = await api.post(`/teams/${team.id}/join-code`);
+      setJoinCode(data.join_code);
+      toast.success("Neuer Beitrittscode ist da – der alte gilt nicht mehr.");
+      onCodeRenewed?.();
+    });
+    if (attempt.started && attempt.error) setError(formatRequestError(attempt.error, "Neuer Beitrittscode hat nicht geklappt."));
   };
 
   const share = async () => {
@@ -95,14 +113,17 @@ export function TeamInviteSheet({ team, onClose }) {
         </div>
       </section>
 
-      {team.join_code ? (
+      {joinCode ? (
         <section className="border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm p-4" data-testid="team-join-code-box">
           <div className="text-[11px] uppercase tracking-widest text-[#FFD700] font-bold">Beitrittscode</div>
           <p className="mt-1 text-xs text-white/55">Falls der Link nicht geht: Code auf der Team-Seite unter „Team beitreten“ eingeben.</p>
           <div className="mt-2 flex gap-2">
-            <code className="flex-1 bg-black/40 border border-white/10 px-3 py-2 rounded-sm text-sm">{team.join_code}</code>
-            <button type="button" onClick={() => copy(team.join_code, "Beitrittscode kopiert.")} aria-label="Beitrittscode kopieren" className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm"><Copy className="w-4 h-4" /></button>
+            <code className="flex-1 min-w-0 break-all bg-black/40 border border-white/10 px-3 py-2 rounded-sm text-sm" data-testid="team-join-code-value">{joinCode}</code>
+            <button type="button" onClick={() => copy(joinCode, "Beitrittscode kopiert.")} aria-label="Beitrittscode kopieren" className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm"><Copy className="w-4 h-4" /></button>
           </div>
+          <button type="button" onClick={renewCode} disabled={submitting} data-testid="team-join-code-renew" className="tls-btn tls-btn--quiet mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">
+            <RefreshCw className="w-3.5 h-3.5" /> Beitrittscode erneuern
+          </button>
         </section>
       ) : null}
 
