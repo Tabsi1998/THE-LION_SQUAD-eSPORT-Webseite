@@ -33,11 +33,13 @@ const DETAIL = {
 };
 const LEVELS = { levels: [{ strikes: 1, action: "notice", chat_hours: 0 }, { strikes: 2, action: "warning", chat_hours: 24 }, { strikes: 3, action: "suspension", chat_hours: 0 }], strike_ttl_months: 12 };
 
-function mockApi({ filter = FILTER_OFF, items = ITEMS, people = PEOPLE, detail = DETAIL } = {}) {
+const REPORT = { id: "r1", category: "harassment", status: "open", details: "Beleidigt mich im Chat.", target_user_id: "u-rohe-kennung", target_user: { id: "u-rohe-kennung", display_name: "Paula" }, reporter_id: "u-otto", reporter: { username: "otto" }, message_id: "m-rohe-kennung", message_excerpt: "Du Noob!", created_at: "2026-09-23T10:00:00Z" };
+
+function mockApi({ filter = FILTER_OFF, items = ITEMS, people = PEOPLE, detail = DETAIL, reports = [] } = {}) {
   apiMock.get.mockImplementation(async (url) => {
     if (url.startsWith("/moderation/word-filter")) return { data: filter };
     if (url.startsWith("/moderation/items")) return { data: items };
-    if (url.startsWith("/moderation/reports")) return { data: [] };
+    if (url.startsWith("/moderation/reports")) return { data: reports };
     if (url === "/moderation/people") return { data: people };
     if (url.startsWith("/moderation/people/")) return { data: detail };
     if (url === "/moderation/levels") return { data: LEVELS };
@@ -93,6 +95,60 @@ test("Meldungen bleiben der erste Reiter", async () => {
   render(<MemoryRouter><AdminModerationPage /></MemoryRouter>);
   expect(await screen.findByText("Keine Meldungen in diesem Status.")).toBeInTheDocument();
   expect(apiMock.get).toHaveBeenCalledWith("/moderation/reports?status=open");
+});
+
+// Meldungen (#2122): Knöpfe mit Grund statt einer Auswahl, die sofort speichert.
+test("Meldung: nennt Namen und Kategorie statt Rohwerten", async () => {
+  mockApi({ reports: [REPORT] });
+  render(<MemoryRouter><AdminModerationPage /></MemoryRouter>);
+  const card = await screen.findByTestId("report-r1");
+  expect(card).toHaveTextContent("Belästigung · Offen");
+  expect(card).toHaveTextContent("Gegen Paula");
+  expect(card).toHaveTextContent("Gemeldet von otto");
+  expect(screen.getByTestId("report-message-r1")).toHaveTextContent("Du Noob!");
+  expect(card.textContent).not.toContain("harassment");
+  expect(card.textContent).not.toContain("rohe-kennung");
+  expect(screen.queryByRole("combobox")).toBeNull();
+  expect(screen.queryByText("Community Safety")).toBeNull();
+});
+
+test("Berechtigt speichert nichts ohne Grund und nennt vorher die Folgen", async () => {
+  mockApi({ reports: [REPORT] });
+  apiMock.patch.mockResolvedValue({ data: { ok: true, strike: "k1", sanction: { label: "Verwarnung mit Chat-Sperre" } } });
+  render(<MemoryRouter><AdminModerationPage /></MemoryRouter>);
+  fireEvent.click(await screen.findByTestId("report-step-justified-r1"));
+  expect(apiMock.patch).not.toHaveBeenCalled();
+  expect(screen.getByTestId("report-decision-r1")).toHaveTextContent("Zählt als Treffer gegen Paula");
+  expect(screen.getByTestId("report-save-r1")).toBeDisabled();
+
+  fireEvent.change(screen.getByTestId("report-reason-r1"), { target: { value: " Beleidigung bestätigt " } });
+  fireEvent.click(screen.getByTestId("report-save-r1"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/moderation/reports/r1", { status: "justified", resolution_note: "Beleidigung bestätigt" }));
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Als Treffer gezählt: Verwarnung mit Chat-Sperre."));
+});
+
+test("Zurückstellen braucht einen Grund, sagt was mit dem Treffer passiert und erinnert an die laufende Maßnahme", async () => {
+  mockApi({ reports: [{ ...REPORT, status: "justified", resolution_note: "Damals bestätigt" }] });
+  apiMock.patch.mockResolvedValue({ data: { ok: true, strikes_revoked: 1, sanction_active: true } });
+  render(<MemoryRouter><AdminModerationPage /></MemoryRouter>);
+  expect(await screen.findByTestId("report-note-r1")).toHaveTextContent("Damals bestätigt");
+  fireEvent.click(screen.getByTestId("report-step-reviewing-r1"));
+  expect(screen.getByTestId("report-step-reviewing-r1")).toHaveTextContent("Zurückstellen");
+  expect(screen.getByTestId("report-decision-r1")).toHaveTextContent("Treffer aus dieser Meldung wird zurückgenommen");
+  expect(screen.getByTestId("report-save-r1")).toBeDisabled();
+  fireEvent.change(screen.getByTestId("report-reason-r1"), { target: { value: "War ein Missverständnis" } });
+  fireEvent.click(screen.getByTestId("report-save-r1"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/moderation/reports/r1", { status: "reviewing", resolution_note: "War ein Missverständnis" }));
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith(expect.stringContaining("Es läuft noch eine Maßnahme")));
+});
+
+test("Abbrechen schließt die Entscheidung, ohne etwas zu speichern", async () => {
+  mockApi({ reports: [REPORT] });
+  render(<MemoryRouter><AdminModerationPage /></MemoryRouter>);
+  fireEvent.click(await screen.findByTestId("report-step-dismissed-r1"));
+  fireEvent.click(screen.getByTestId("report-cancel-r1"));
+  expect(screen.queryByTestId("report-decision-r1")).toBeNull();
+  expect(apiMock.patch).not.toHaveBeenCalled();
 });
 
 // Verwarnungen mit Stufen (#416): Personen mit Historie, Stufe von Hand, Einspruch entscheiden; Stufen einstellbar.

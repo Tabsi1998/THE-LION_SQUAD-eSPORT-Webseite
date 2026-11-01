@@ -11,12 +11,17 @@ from database import get_db
 from models import new_id, now_utc
 from services.rate_limit import enforce_rate_limit
 from services import media_scan, moderation_standing, word_filter
+from services.chat_attachments import chat_message_preview
 
 router = APIRouter(prefix="/api/moderation", tags=["moderation"])
 
 ReportCategory = Literal["harassment", "spam", "hate", "impersonation", "privacy", "cheating", "other"]
 # „berechtigt“ (#416): erledigt und zählt als Treffer für die Stufen.
 ReportStatus = Literal["open", "reviewing", "resolved", "dismissed", "justified"]
+# Hier braucht es einen Grund (#2122): Ein Treffer hat Folgen für die Person, eine verworfene Meldung für die meldende.
+REASON_REQUIRED = {"justified", "dismissed"}
+REASON_MISSING = "Bitte einen Grund angeben – er steht bei der Meldung und im Protokoll."
+MESSAGE_EXCERPT_MAX = 300
 
 
 class UserReportCreate(BaseModel):
@@ -290,7 +295,26 @@ async def _after_message_decision(db, item: dict, decision: str, moderator: dict
 async def list_reports(status: ReportStatus | None = None, me: dict = Depends(require_area("moderation"))):
     db = get_db()
     query = {"status": status} if status else {}
-    return await db.user_reports.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
+    reports = await db.user_reports.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
+    return await _with_names(db, reports)
+
+
+async def _with_names(db, reports: list[dict]) -> list[dict]:
+    """Namen statt Kennungen (#2122): wen es betrifft, wer gemeldet hat und was in der gemeldeten Nachricht stand."""
+    user_ids = {report.get(key) for report in reports for key in ("target_user_id", "reporter_id")} - {None}
+    users = {user["id"]: user for user in await db.users.find(
+        {"id": {"$in": sorted(user_ids)}}, {"_id": 0, "id": 1, "username": 1, "display_name": 1},
+    ).to_list(len(user_ids) or 1)}
+    message_ids = sorted({report["message_id"] for report in reports if report.get("message_id")})
+    messages = {message["id"]: message for message in await db.direct_messages.find(
+        {"id": {"$in": message_ids}}, {"_id": 0, "id": 1, "message": 1, "attachments": 1, "sticker": 1},
+    ).to_list(len(message_ids) or 1)}
+    for report in reports:
+        report["target_user"] = users.get(report.get("target_user_id"))
+        report["reporter"] = users.get(report.get("reporter_id"))
+        message = messages.get(report.get("message_id"))
+        report["message_excerpt"] = chat_message_preview(message, MESSAGE_EXCERPT_MAX) if message else None
+    return reports
 
 
 @router.patch("/reports/{report_id}")
@@ -299,24 +323,41 @@ async def review_report(report_id: str, body: UserReportPatch, me: dict = Depend
     report = await db.user_reports.find_one({"id": report_id}, {"_id": 0})
     if not report:
         raise HTTPException(404, "Meldung nicht gefunden")
-    if body.status == "justified" and report.get("status") != "justified" and report.get("target_user_id"):
-        # „Berechtigt“ zählt als Strike - gegen Admin-Konten entscheidet das der Superadmin (#1350).
+    previous = report.get("status")
+    note = (body.resolution_note or "").strip()
+    becomes_strike = body.status == "justified" and previous != "justified"
+    takes_strike_back = previous == "justified" and body.status != "justified"
+    if (becomes_strike or takes_strike_back) and report.get("target_user_id"):
+        # „Berechtigt“ zählt als Strike - gegen Admin-Konten entscheidet das der Superadmin (#1350), auch das Zurücknehmen.
         await _measure_target(db, me, report["target_user_id"])
+    if body.status != previous and not note and (takes_strike_back or (body.status in REASON_REQUIRED and not report.get("resolution_note"))):
+        raise HTTPException(422, REASON_MISSING)
     now = now_utc().isoformat()
-    await db.user_reports.update_one({"id": report_id}, {"$set": {
-        "status": body.status, "resolution_note": (body.resolution_note or "").strip() or None,
-        "reviewed_by": me["id"], "reviewed_at": now, "updated_at": now,
-    }})
+    changes = {"status": body.status, "reviewed_by": me["id"], "reviewed_at": now, "updated_at": now}
+    if note:
+        # Ohne neuen Text bleibt die Notiz stehen - vorher löschte jede Änderung sie (#2122).
+        changes["resolution_note"] = note
+    await db.user_reports.update_one({"id": report_id}, {"$set": changes})
     result: dict = {"ok": True}
     # „berechtigt“ zählt genau einmal als Treffer (#416) - und stößt die Stufe an.
-    if body.status == "justified" and report.get("status") != "justified":
+    if becomes_strike:
         outcome = await moderation_standing.add_strike(
             db, report["target_user_id"], source="report", kind=report.get("category"), ref_id=report.get("message_id"),
-            report_id=report_id, moderator_id=me["id"], note=body.resolution_note,
+            report_id=report_id, moderator_id=me["id"], note=note or report.get("resolution_note"),
         )
         result["strike"] = outcome["strike"]["id"]
         result["sanction"] = outcome["sanction"]
-        await _audit(me["id"], "moderation.report_justified", report["target_user_id"], {"report_id": report_id})
+        await _audit(me["id"], "moderation.report_justified", report["target_user_id"], {"report_id": report_id, "note": note or None})
+    elif body.status != previous:
+        await _audit(me["id"], "moderation.report_status", report.get("target_user_id"), {"report_id": report_id, "from": previous, "to": body.status, "note": note or None})
+    # Zurückgestellt (#2122): Der Treffer aus dieser Meldung zählt nicht mehr. Eine schon laufende Maßnahme hebt ein Mensch
+    # getrennt auf - die Antwort sagt, ob noch eine läuft.
+    if takes_strike_back:
+        strikes = await db.moderation_strikes.find({"report_id": report_id, "revoked": {"$ne": True}}, {"_id": 0, "id": 1}).to_list(20)
+        for strike in strikes:
+            await moderation_standing.revoke_strike(db, strike["id"], moderator_id=me["id"], note=note)
+        result["strikes_revoked"] = len(strikes)
+        result["sanction_active"] = bool(await moderation_standing.active_sanction(db, report["target_user_id"]))
     return result
 
 
