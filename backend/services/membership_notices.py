@@ -18,6 +18,7 @@ NO_ADDRESS = "no_address"
 MAIL_OFF = "mail_off"  # Eingereiht, aber der Mailversand ist abgeschaltet: Sie liegt nur in der Warteschlange.
 FAILED = "failed"
 
+ACTIVE_NOTICES = ("active", "honorary")
 STATUS_NOTICES = {
     "active": ("membership_activated", "Deine Mitgliedschaft ist aktiv", "Willkommen im Verein! Karte und Vorteile findest du in deiner Mitgliedschaft."),
     "honorary": ("membership_activated", "Du bist Ehrenmitglied", "Karte und Vorteile findest du in deiner Mitgliedschaft."),
@@ -56,7 +57,8 @@ async def tell_status_change(user: dict, membership: dict, status: str, *, notif
     if not notify:
         return SKIPPED
     template_key, title, body = notice
-    await tell_person(user.get("id"), title, body, "/members/membership")
+    # Der Mitgliederbereich steht nur Mitgliedern offen - wer nicht mehr aktiv ist, käme dort nicht weiter.
+    await tell_person(user.get("id"), title, body, "/members/membership" if status in ACTIVE_NOTICES else "")
     if not user.get("email"):
         return NO_ADDRESS
     values = {"display_name": user.get("display_name") or user.get("username")}

@@ -156,7 +156,8 @@ async def test_blocked_and_ended_arrive_with_mails_switched_off(flow):
     ended = await flow.put(f"/api/membership/user/{erika['id']}", json={"member_status": "former"})
     assert ended.json()["mail"] == "queued"
     assert [mail["template_key"] for mail in await mails_to(flow, erika)] == ["membership_blocked", "membership_deactivated"]
-    assert await flow.db.notifications.count_documents({"user_id": erika["id"], "kind": "membership_decision"}) == 2
+    told = await flow.db.notifications.find({"user_id": erika["id"], "kind": "membership_decision"}, {"_id": 0}).to_list(5)
+    assert len(told) == 2 and {row["url"] for row in told} == {""}, "kein Link in den Mitgliederbereich, wenn er nicht mehr offen steht"
 
 
 @pytest.mark.asyncio
