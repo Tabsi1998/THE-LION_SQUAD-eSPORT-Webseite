@@ -158,6 +158,93 @@ async def test_old_long_or_empty_values_can_be_saved_unchanged(flow):
     assert (await flow.patch("/api/users/me", json={"display_name": "", "city": "Wien"})).status_code == 200
 
 
+# ---------------------------------------------------------------- PR12: Benutzername
+@pytest.mark.parametrize("name", ["ab", "x" * 33, "mit leerzeichen", "a/b", "a#b", "Jörg", "a?b", "a%b"])
+def test_new_usernames_follow_the_rule(name):
+    from pydantic import ValidationError
+    from models import AdminUserCreate, UserRegister
+
+    with pytest.raises(ValidationError) as admin:
+        AdminUserCreate(username=name, email="neu@verein-beispiel.at")
+    assert [error["loc"] for error in admin.value.errors()] == [("username",)]
+    with pytest.raises(ValidationError) as public:
+        UserRegister(username=name, email="neu@verein-beispiel.at", password="Lange-Passphrase-2026!", accept_privacy=True, accept_terms=True)
+    assert [error["loc"] for error in public.value.errors()] == [("username",)]
+
+
+@pytest.mark.parametrize("name", ["abc", "x" * 32, "Max_Mustermann", "a.b-c_1"])
+def test_good_usernames_pass_and_are_trimmed(name):
+    from models import AdminUserCreate
+
+    assert AdminUserCreate(username=f"  {name} ", email="neu@verein-beispiel.at").username == name
+
+
+@pytest.mark.asyncio
+async def test_refused_username_says_why_in_german(flow):
+    flow.act_as(await flow.add_user(role="superadmin", name="chefin"))
+    refused = await flow.post("/api/users", json={"username": "mit leerzeichen", "email": "neu@verein-beispiel.at"})
+    assert refused.status_code == 422
+    assert refused.json()["detail"][0]["msg"] == "Benutzername: 3 bis 32 Zeichen, nur Buchstaben ohne Umlaute, Ziffern und _ . - (keine Leerzeichen)."
+
+
+@pytest.mark.asyncio
+async def test_a_name_counts_as_taken_in_any_spelling(flow):
+    await player(flow, "MaxMuster")
+    flow.act_as(await flow.add_user(role="superadmin", name="chefin"))
+    taken = await flow.post("/api/users", json={"username": "maxmuster", "email": "neu@verein-beispiel.at"})
+    assert taken.status_code == 409 and taken.json()["detail"] == "Benutzername oder E-Mail bereits vergeben"
+
+
+@pytest.mark.asyncio
+async def test_old_names_stay_reachable_in_every_spelling(flow):
+    for name in ("Max", "max", "Alte Schule", "a/b", "wer#da", "was?nun", "100%"):
+        await player(flow, name)
+    flow.act_as(None)
+    # Exakt gewinnt: beide Doppelten behalten ihr eigenes Profil.
+    assert (await flow.get("/api/users/public/Max")).json()["username"] == "Max"
+    assert (await flow.get("/api/users/public/max")).json()["username"] == "max"
+    assert (await flow.get("/api/users/public/MAX")).status_code == 200
+    # Andere Schreibweise eines Einzelnen und kodierte Sonderzeichen.
+    assert (await flow.get("/api/users/public/alte%20schule")).json()["username"] == "Alte Schule"
+    for name, encoded in (("a/b", "a%2Fb"), ("wer#da", "wer%23da"), ("was?nun", "was%3Fnun"), ("100%", "100%25")):
+        shown = await flow.get(f"/api/users/public/{encoded}")
+        assert shown.status_code == 200 and shown.json()["username"] == name, name
+    assert (await flow.get("/api/users/public/gibt-es-nicht")).status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_case_lookup_treats_a_name_as_text_not_as_a_pattern(flow):
+    await player(flow, "abc")
+    flow.act_as(None)
+    assert (await flow.get("/api/users/public/a.c")).status_code == 404
+    assert (await flow.get("/api/users/public/.*")).status_code == 404
+
+
+def test_google_names_become_valid_usernames():
+    from services.usernames import username_from_name, username_problem
+
+    assert username_from_name("Jörg Müller") == "Jorg_Muller"
+    assert username_from_name("Straße") == "Strasse"
+    assert username_from_name("李") == "player" and username_from_name(None) == "player" and username_from_name("Al") == "player"
+    for name in ("Jörg Müller", "x" * 90, "a/b#c d", "   ", "__..__"):
+        assert username_problem(username_from_name(name)) is None, name
+
+
+@pytest.mark.asyncio
+async def test_google_login_finds_a_free_name_in_any_spelling(flow):
+    from routes.auth_routes import _unique_username
+
+    await player(flow, "Paula_Pixel")
+    assert await _unique_username(flow.db, "paula pixel") == "paula_pixel1"
+
+
+def test_profile_links_are_encoded_only_where_needed():
+    from services.usernames import profile_path
+
+    assert profile_path("Max_M.-1") == "/u/Max_M.-1"
+    assert profile_path("a/b c#") == "/u/a%2Fb%20c%23"
+
+
 # ---------------------------------------------------------------- Zusatz: Dokumente
 @pytest.mark.asyncio
 async def test_members_never_see_where_a_document_is_stored(flow):

@@ -67,6 +67,19 @@ function renderPage() {
   );
 }
 
+test("ältere Namen mit Sonderzeichen (#2126): Abruf kodiert, das Profil öffnet", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/users/public/alte%20schule%2F1") return { data: { ...PROFILE, username: "alte schule/1" } };
+    return { data: [] };
+  });
+  render(
+    <MemoryRouter initialEntries={["/u/alte%20schule%2F1"]}>
+      <Routes><Route path="/u/:username" element={<PublicProfilePage />} /></Routes>
+    </MemoryRouter>
+  );
+  expect(await screen.findByTestId("profile-identity")).toHaveTextContent("@alte schule/1");
+});
+
 test("Kopf mit Banner, Pillen, verknüpftem Konto und Zahlen; fünf Reiter; Highlights nur vom Podest; Twitch offline als Kanal-Karte", async () => {
   mockApi();
   renderPage();

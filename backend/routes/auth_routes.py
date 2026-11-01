@@ -29,6 +29,7 @@ from services.totp import generate_recovery_codes, generate_totp_secret, matchin
 from services.return_path import safe_next_path
 from services.log_safe import log_safe
 from services.private_fields import strip_private
+from services.usernames import username_from_name, username_taken
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 logger = logging.getLogger("tls.auth")
@@ -699,7 +700,7 @@ async def register(body: UserRegister, request: Request, response: Response):
         return {"verification_required": True, "email": email}
     if await db.users.find_one({"email": email}):
         raise HTTPException(status_code=409, detail="E-Mail bereits registriert")
-    if await db.users.find_one({"username": username}):
+    if await username_taken(db, username):
         raise HTTPException(status_code=409, detail="Benutzername bereits vergeben")
     user_id = new_id()
     # Wortfilter (#417): ein gesperrtes Wort im Benutzernamen kommt gar nicht erst ins System.
@@ -808,11 +809,10 @@ async def _resolve_google_identity(credential: str, client_id: str) -> dict:
 
 
 async def _unique_username(db, base: str) -> str:
-    cleaned = "".join(ch for ch in (base or "").strip() if ch.isalnum() or ch in ("_", "-", " ")).replace(" ", "_")
-    cleaned = (cleaned or "player")[:20]
+    cleaned = username_from_name(base)
     candidate = cleaned
     suffix = 0
-    while await db.users.find_one({"username": candidate}):
+    while await username_taken(db, candidate):
         suffix += 1
         candidate = f"{cleaned}{suffix}"
     return candidate
@@ -998,7 +998,7 @@ async def mobile_register(body: UserRegister, request: Request):
         return {"verification_required": True, "email": email}
     if await db.users.find_one({"email": email}):
         raise HTTPException(status_code=409, detail="E-Mail bereits registriert")
-    if await db.users.find_one({"username": username}):
+    if await username_taken(db, username):
         raise HTTPException(status_code=409, detail="Benutzername bereits vergeben")
     user_doc = {
         "id": new_id(),

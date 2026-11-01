@@ -344,7 +344,7 @@ export default function PublicProfilePage() {
     image: profile?.avatar_url || profile?.banner_url,
     type: "profile",
     robots: "noindex, follow",
-    canonical: profile?.username ? `${window.location.origin}/u/${profile.username}` : undefined,
+    canonical: profile?.username ? `${window.location.origin}/u/${encodeURIComponent(profile.username)}` : undefined,
   });
   const { hasConsent } = useCookieConsent();
 
@@ -355,7 +355,7 @@ export default function PublicProfilePage() {
   const load = useCallback(async ({ quiet = false } = {}) => {
     if (!quiet) setLoading(true);
     try {
-      const { data } = await api.get(`/users/public/${username}`, asOthers ? { params: { view_as: "public" } } : undefined);
+      const { data } = await api.get(`/users/public/${encodeURIComponent(username)}`, asOthers ? { params: { view_as: "public" } } : undefined);
       setProfile(data);
       api.get("/streams/live").then(({ data: streams }) => setLiveStreams(Array.isArray(streams) ? streams : [])).catch(() => { if (!quiet) setLiveStreams([]); });
       if (data?.id) {

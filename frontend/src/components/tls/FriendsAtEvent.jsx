@@ -90,7 +90,7 @@ export function FriendsAtEvent({ event, user, over = false, path = "", scope = "
                 <li key={friend.id} className="flex items-center gap-3 rounded-sm bg-white/[0.04] px-3 py-2 min-w-0" data-testid={`event-friend-${friend.id}`}>
                   <FriendAvatar friend={friend} />
                   <span className="min-w-0">
-                    {friend.username ? <Link to={`/u/${friend.username}`} className="hover:text-[#9F7AEA]">{name}</Link> : name}
+                    {friend.username ? <Link to={`/u/${encodeURIComponent(friend.username)}`} className="hover:text-[#9F7AEA]">{name}</Link> : name}
                     <span className="block text-xs text-white/55 break-words">{friendPlaces(friend, { scope }).join(" · ")}</span>
                   </span>
                 </li>

@@ -10,6 +10,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useModalBehavior } from "@/hooks/useModalBehavior";
 import { toast } from "sonner";
 import { AREA_HINTS, AREA_LABELS, GRANTABLE_AREAS, ROLE_AREAS, roleLabel } from "@/lib/permissions";
+import { USERNAME_RULE_HINT, usernameProblem } from "@/lib/username";
 import { listLimitHint } from "@/lib/membershipMail";
 import { banState, effectiveAreas, invitationText, rightsChange, rightsHistoryLine } from "@/lib/userRights";
 import { viennaDate } from "@/lib/vienna";
@@ -581,6 +582,11 @@ function CreateUserModal({ onClose, onSaved, onCreated }) {
 
   const submit = async (e) => {
     e.preventDefault();
+    const problem = usernameProblem(form.username);
+    if (problem) {
+      toast.error(problem);
+      return;
+    }
     setSaving(true);
     try {
       const { data } = await api.post("/users", { ...form, gender: form.gender || null });
@@ -612,7 +618,7 @@ function CreateUserModal({ onClose, onSaved, onCreated }) {
       submitTestId="create-user-submit"
       testId="create-user-sheet"
     >
-      <TextField label="Username" value={form.username} onChange={(v) => set("username", v)} required testId="create-user-username" />
+      <TextField label="Benutzername" value={form.username} onChange={(v) => set("username", v)} required hint={USERNAME_RULE_HINT} testId="create-user-username" />
       <TextField label="Anzeigename" value={form.display_name} onChange={(v) => set("display_name", v)} testId="create-user-display" />
       <TextField label="E-Mail" type="email" value={form.email} onChange={(v) => set("email", v)} required testId="create-user-email" />
       <SelectField label="Geschlecht" value={form.gender || ""} onChange={(v) => set("gender", v)} options={[["", "Keine Angabe"], ["male", "Männlich"], ["female", "Weiblich"], ["diverse", "Divers"]]} testId="create-user-gender" />

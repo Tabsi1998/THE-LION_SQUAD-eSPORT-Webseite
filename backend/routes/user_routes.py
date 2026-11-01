@@ -26,6 +26,7 @@ from services.notification_preferences import (
     public_preferences_payload,
 )
 from services.query_filters import safe_regex
+from services.usernames import any_case, username_taken
 from services.private_fields import private_projection, strip_private
 # Die leerbaren Profilfelder (#2118): ein Blatt-Modul - auch die Kontolöschung leitet ihre Liste daraus ab.
 from services.profile_fields import USER_NULLABLE_FIELDS
@@ -438,8 +439,8 @@ async def admin_create_user(body: AdminUserCreate, me: dict = Depends(require_su
         raise HTTPException(422, "Administrativ angelegte Konten müssen per E-Mail eingeladen werden, damit die Person selbst Passwort und Einwilligungen festlegt.")
     username = body.username.strip()
     email = str(body.email).lower().strip()
-    if await db.users.find_one({"$or": [{"username": username}, {"email": email}]}, {"_id": 0, "id": 1}):
-        raise HTTPException(status_code=409, detail="Username oder E-Mail bereits vergeben")
+    if await username_taken(db, username) or await db.users.find_one({"email": email}, {"_id": 0, "id": 1}):
+        raise HTTPException(status_code=409, detail="Benutzername oder E-Mail bereits vergeben")
     user_id = new_id()
     password_setup_required = True
     doc = {
@@ -610,10 +611,13 @@ async def list_public_users(
     return out
 
 
-@router.get("/public/{username}")
+# `:path`, weil ältere Benutzernamen einen Schrägstrich enthalten können (#2126) - ihr Profil bleibt so erreichbar.
+@router.get("/public/{username:path}")
 async def get_public_profile(username: str, view_as: str | None = None, viewer: dict | None = Depends(get_optional_user)):
     db = get_db()
-    u = await db.users.find_one({"username": username}, private_projection("email"))
+    # Exakt zuerst, dann jede Schreibweise (#2126): auch bei alten Doppelten („Max“, „max“) bleibt jedes Profil erreichbar.
+    u = await db.users.find_one({"username": username}, private_projection("email")) \
+        or await db.users.find_one(any_case(username), private_projection("email"), sort=[("created_at", 1)])
     if not u or u.get("is_active") is False or u.get("is_banned") is True:
         raise HTTPException(status_code=404, detail="Spieler nicht gefunden")
     # „So sehen dich andere“ (#1149): das eigene Profil so, wie es jemand ohne Anmeldung sieht - nur was die

@@ -90,7 +90,7 @@ export function AccountBox({ form, set, profile, profiles = [] }) {
             <div className="font-bold text-white truncate" data-testid="club-member-account-name">{account.display_name || account.username}</div>
             <div className="text-xs text-white/50 truncate">@{account.username}{account.email ? ` · ${account.email}` : ""}</div>
           </div>
-          <Link to={`/u/${account.username}`} target="_blank" data-testid="club-member-account-profile" className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">
+          <Link to={`/u/${encodeURIComponent(account.username)}`} target="_blank" data-testid="club-member-account-profile" className="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">
             <ExternalLink className="w-3.5 h-3.5" /> Spielerprofil
           </Link>
           <button type="button" onClick={takeOver} data-testid="club-member-account-takeover" className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-white/15 rounded-sm text-xs font-bold uppercase tracking-wider text-white/70 hover:text-white">

@@ -11,6 +11,7 @@ from auth import get_current_user
 from models import now_utc, new_id
 from services.prize_service import mark_ready, mark_picked_up, revert_picked_up
 from services.visibility import user_can_see
+from services.usernames import profile_path
 
 router = APIRouter(prefix="/api/prizes", tags=["prizes"])
 
@@ -100,7 +101,7 @@ async def _hydrate_pickups(pickups: list[dict]) -> list[dict]:
             p["recipient_type"] = "user"
             p["recipient_label"] = user.get("display_name") or user.get("username") or "Unbekannter User"
             p["recipient_subtitle"] = user.get("email") or user.get("username") or ""
-            p["recipient_url"] = f"/u/{user.get('username')}" if user.get("username") else None
+            p["recipient_url"] = profile_path(user["username"]) if user.get("username") else None
         p["display_name"] = p["recipient_label"]
         p["email"] = user.get("email")
         if user:

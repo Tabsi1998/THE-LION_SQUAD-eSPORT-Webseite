@@ -34,7 +34,7 @@ export function bottomNavItems(user) {
 export function activeSection(pathname, username = "") {
   const path = pathname || "/";
   if (path === "/" || path === "/dashboard") return "home";
-  if (path.startsWith("/u/")) return username && path.split("/")[2]?.toLowerCase() === username.toLowerCase() ? "profile" : path === "/u/me" ? "profile" : "community";
+  if (path.startsWith("/u/")) return username && path.split("/")[2]?.toLowerCase() === encodeURIComponent(username).toLowerCase() ? "profile" : path === "/u/me" ? "profile" : "community";
   for (const [key, prefixes] of Object.entries(BOTTOM_SECTIONS)) {
     if (key === "home") continue;
     if (prefixes.some((prefix) => (prefix.endsWith("/") ? path.startsWith(prefix) : path === prefix || path.startsWith(`${prefix}/`)))) return key;
@@ -66,7 +66,7 @@ export function BottomNav() {
   const onPress = (event, item) => {
     if (current !== item.key) return;
     // Schon auf der Übersicht: nicht neu laden, sondern ganz nach oben (#1144).
-    const onOverview = location.pathname === item.to || (item.key === "profile" && user && location.pathname === `/u/${user.username}`);
+    const onOverview = location.pathname === item.to || (item.key === "profile" && user && location.pathname === `/u/${encodeURIComponent(user.username)}`);
     if (onOverview) {
       event.preventDefault();
       window.scrollTo({ top: 0, behavior: "smooth" });

@@ -18,6 +18,7 @@ from services.slug_utils import find_by_slug_or_history
 from services.svg_logo import raster_url
 from services.visibility import user_can_see
 from services.private_fields import private_projection
+from services.usernames import any_case, profile_path
 
 router = APIRouter(prefix="/api/seo", tags=["seo"])
 
@@ -639,12 +640,14 @@ async def member_profile_meta(db, slug: str, base: dict, origin: str) -> dict:
 
 
 async def user_profile_meta(db, username: str, base: dict, origin: str) -> dict:
-    user = await db.users.find_one({"username": username, "privacy_public_profile": True, "is_active": True, "is_banned": {"$ne": True}}, private_projection("email"))
+    visible = {"privacy_public_profile": True, "is_active": True, "is_banned": {"$ne": True}}
+    user = await db.users.find_one({"username": username, **visible}, private_projection("email")) \
+        or await db.users.find_one({**any_case(username), **visible}, private_projection("email"), sort=[("created_at", 1)])
     if not user:
         raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
     label = user.get("display_name") or user.get("username")
     image = absolute_url(user.get("avatar_url") or user.get("banner_url") or base["image"], origin)
-    canonical = f"{origin}/u/{user.get('username') or username}"
+    canonical = f"{origin}{profile_path(user.get('username') or username)}"
     # Vorschau für Suchmaschinen und Link-Karten (#2118): Plattform und Spiele nur mit der Stufe „öffentlich“.
     from routes.user_routes import _field_visible
     platform = user.get("main_platform") if _field_visible(user, "main_platform", True) else None

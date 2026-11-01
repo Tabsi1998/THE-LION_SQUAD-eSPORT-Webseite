@@ -7,7 +7,7 @@ import { Bell, CalendarPlus, Eye, Gamepad2, Globe, Info, LayoutDashboard, Settin
 export function userMenuEntries({ username = "" } = {}) {
   return [
     { key: "dashboard", to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { key: "profile", to: `/u/${username}`, label: "Mein Profil", icon: UserCircle },
+    { key: "profile", to: `/u/${encodeURIComponent(username)}`, label: "Mein Profil", icon: UserCircle },
     { key: "settings", to: "/profile", label: "Einstellungen", icon: Settings },
   ];
 }
@@ -44,7 +44,7 @@ export const TABS = SETTINGS_GROUPS.flatMap((group) => group.tabs.map((tab) => (
 
 /** Frühere Reiter von /profile, die keine Einstellungen sind - sie haben einen eigenen Ort (#1150). */
 export function tabRedirect(tab, params, username = "") {
-  const me = username ? `/u/${username}` : "/u/me";
+  const me = username ? `/u/${encodeURIComponent(username)}` : "/u/me";
   switch (tab) {
     case "teams":
       return "/teams";

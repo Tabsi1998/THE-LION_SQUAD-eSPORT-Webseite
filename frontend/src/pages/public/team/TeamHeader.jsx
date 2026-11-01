@@ -61,7 +61,7 @@ export function TeamFaces({ team, userId }) {
           const mine = Boolean(userId && face.id === userId);
           return (
             <li key={face.id} className="shrink-0 w-[68px] text-center" data-testid={`team-face-${face.id}`}>
-              <Link to={face.username ? `/u/${face.username}` : "#"} className="group inline-flex flex-col items-center gap-1.5" aria-label={`${name}, ${face.roleLabel}${mine ? " (du)" : ""}`}>
+              <Link to={face.username ? `/u/${encodeURIComponent(face.username)}` : "#"} className="group inline-flex flex-col items-center gap-1.5" aria-label={`${name}, ${face.roleLabel}${mine ? " (du)" : ""}`}>
                 <span className="relative inline-flex">
                   <span className="w-14 h-14 rounded-full overflow-hidden flex items-center justify-center text-sm font-black text-white ring-1 ring-white/15 group-hover:ring-[#29B6E8]/60 transition" style={face.avatar_url ? undefined : { backgroundColor: faceTone(name) }}>
                     {face.avatar_url ? <img src={resolveMediaUrl(face.avatar_url)} alt="" loading="lazy" className="w-full h-full object-cover" /> : initials(name)}

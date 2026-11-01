@@ -34,6 +34,7 @@ from services import dolibarr_helper_shifts, dolibarr_identity, dolibarr_meeting
 from services.rate_limit import enforce_rate_limit
 from services.log_safe import log_safe
 from services.private_fields import private_projection
+from services.usernames import profile_path
 
 router = APIRouter(prefix="/api/membership", tags=["membership"])
 logger = logging.getLogger("tls.membership")
@@ -224,7 +225,7 @@ def _public_account(user: dict | None, admin: bool = False) -> dict | None:
         "username": user.get("username"),
         "display_name": user.get("display_name"),
         "avatar_url": user.get("avatar_url"),
-        "profile_url": f"/u/{user.get('username')}" if user.get("username") else None,
+        "profile_url": profile_path(user["username"]) if user.get("username") else None,
         "achievement_level": user.get("achievement_level"),
         "twitch_handle": twitch_handle,
         "show_twitch_embed": bool(user.get("show_twitch_embed") and twitch_handle),

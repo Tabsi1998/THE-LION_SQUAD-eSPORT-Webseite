@@ -351,7 +351,7 @@ export default function AchievementsShowcasePage() {
                       <span className="w-7 text-center font-display font-bold text-white/40 tabular-nums">{entry.rank}</span>
                       <Avatar entry={entry} size={9} />
                       <Link
-                        to={entry.username ? `/u/${entry.username}` : "#"}
+                        to={entry.username ? `/u/${encodeURIComponent(entry.username)}` : "#"}
                         className="flex-1 min-w-0 truncate font-semibold text-white/85 hover:text-[#29B6E8]"
                       >
                         {entry.display_name}
@@ -510,7 +510,7 @@ function WeekTile({ week, loading }) {
             <div className="mt-2 text-xs text-white/60" data-testid="week-award-rarity">
               Nur <span className="text-white font-bold tabular-nums">{formatPercent(award.percent)}</span> haben das · {award.holders === 1 ? "eine Person" : `${award.holders} Personen`}
             </div>
-            <Link to={award.user?.username ? `/u/${award.user.username}` : "#"} className="mt-3 inline-flex items-center gap-2 text-sm hover:text-[#29B6E8]" data-testid="week-award-user">
+            <Link to={award.user?.username ? `/u/${encodeURIComponent(award.user.username)}` : "#"} className="mt-3 inline-flex items-center gap-2 text-sm hover:text-[#29B6E8]" data-testid="week-award-user">
               <Avatar entry={award.user || {}} size={7} />
               <span className="font-semibold truncate">{award.user?.display_name || "Spieler"}</span>
               {award.earned_at && <span className="text-white/35 text-xs">{viennaDate(award.earned_at)}</span>}
@@ -542,7 +542,7 @@ function UnlockTicker({ items }) {
   const renderItem = (item, index, duplicate) => (
     <Link
       key={`${item.award_id || item.tier_code}-${item.user?.id || index}-${duplicate ? "b" : "a"}`}
-      to={item.user?.username ? `/u/${item.user.username}` : "#"}
+      to={item.user?.username ? `/u/${encodeURIComponent(item.user.username)}` : "#"}
       tabIndex={duplicate ? -1 : undefined}
       aria-hidden={duplicate ? "true" : undefined}
       className="inline-flex items-center gap-2 px-5 text-xs whitespace-nowrap hover:text-white"
@@ -622,7 +622,7 @@ function PodiumCard({ entry, index, byLevel = false }) {
         </LevelAvatarFrame>
       </div>
       <Link
-        to={entry.username ? `/u/${entry.username}` : "#"}
+        to={entry.username ? `/u/${encodeURIComponent(entry.username)}` : "#"}
         className="block font-heading font-bold uppercase truncate text-xs sm:text-base hover:text-[#29B6E8]"
       >
         {entry.display_name}

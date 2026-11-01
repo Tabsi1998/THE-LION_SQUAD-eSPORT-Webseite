@@ -301,7 +301,7 @@ function PodiumCard({ row }) {
   const className = "group border border-white/10 hover:border-[#FFD700]/50 bg-[#121212] rounded-sm p-5 transition";
   if (!row.username) return <div className={className}>{content}</div>;
   return (
-    <Link to={`/u/${row.username}`} className={className}>
+    <Link to={`/u/${encodeURIComponent(row.username)}`} className={className}>
       {content}
     </Link>
   );

@@ -26,6 +26,7 @@ from models import now_utc
 from services import discord_design
 from services.discord_embed_queue import KINDS, _dirty, pending, request_refresh  # noqa: F401 - umgezogen (#1420)
 from services.log_safe import log_safe
+from services.usernames import profile_path
 
 # Bewusster Wiederexport (#1420): diese Namen holen andere Module und Tests weiterhin von hier.
 __all__ = ["pending", "request_refresh"]
@@ -146,7 +147,7 @@ def achievement_week_context(doc: dict | None, origin: str) -> tuple[dict, list[
     return {"achievement": award.get("name") or "", "description": str(award.get("description") or "")[:300],
             "person": user.get("display_name") or user.get("username") or "", "material": award.get("material_name") or "",
             "rarity": f"{rarity} % – {'nur diese Person' if holders <= 1 else f'{holders} Personen'}", "group": award.get("group_name") or "Erfolge",
-            "link": f"{origin}/u/{user.get('username')}" if user.get("username") else f"{origin}/achievements",
+            "link": f"{origin}{profile_path(user['username'])}" if user.get("username") else f"{origin}/achievements",
             "avatar": user.get("avatar_url") if str(user.get("avatar_url") or "").startswith("http") else "",
             "material_color": color if len(color.lstrip("#")) == 6 else "#A66BFF"}, []
 

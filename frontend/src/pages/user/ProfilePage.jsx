@@ -293,7 +293,7 @@ export default function ProfilePage() {
             <span className="mx-2 text-white/20">·</span>
             <span>@{user.username}</span>
             {/* Zurück zum eigenen Profil (#1149) - dort steht auch „So sehen dich andere“. */}
-            <Link to={`/u/${user.username}`} data-testid="settings-to-profile" className="tls-hit ml-2 inline-flex items-center gap-1 px-2 py-1 border border-white/15 text-[11px] uppercase tracking-wider hover:border-[#29B6E8] hover:text-[#29B6E8]"><UserCircle className="w-3.5 h-3.5" /> Mein Profil</Link>
+            <Link to={`/u/${encodeURIComponent(user.username)}`} data-testid="settings-to-profile" className="tls-hit ml-2 inline-flex items-center gap-1 px-2 py-1 border border-white/15 text-[11px] uppercase tracking-wider hover:border-[#29B6E8] hover:text-[#29B6E8]"><UserCircle className="w-3.5 h-3.5" /> Mein Profil</Link>
           </div>
         </div>
 
