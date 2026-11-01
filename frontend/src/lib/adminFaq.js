@@ -98,7 +98,7 @@ export const FAQ_TOPICS = [
     label: "Inhalte und Auftritt",
     questions: [
       { key: "news", q: "Wie veröffentliche ich eine News?", a: "Content → News → „Neuer Beitrag“: Titel, Text, Bild, Sichtbarkeit (öffentlich oder nur Mitglieder). Öffentliche News gehen über den Discord-Bot auch in den gewählten Kanal.", to: "/admin/news/new", label: "Content → News → Neu" },
-      { key: "events", q: "Wie lege ich ein Event mit Programm an?", a: "Content → Events → „Neues Event“: Ort, Zeit, Programmpunkte, Turniere und Fast-Lap-Challenges ins Programm nehmen.", to: "/admin/events/new", label: "Content → Events → Neu" },
+      { key: "events", q: "Wie lege ich ein Event mit Programm an?", a: "eSports → Events → „Neues Event“: Ort, Zeit, Programmpunkte, Turniere und Fast-Lap-Challenges ins Programm nehmen.", to: "/admin/events/new", label: "eSports → Events → Neu" },
       { key: "galerie", q: "Wie stelle ich Fotos in die Galerie?", a: "Content → Galerie: Album anlegen, Bilder hochladen, sichtbar schalten. Content → Medien zeigt alle hochgeladenen Dateien.", to: "/admin/gallery", label: "Content → Galerie" },
       { key: "branding", q: "Wo ändere ich Logo, Farben, Favicon und die Hinweisleiste?", a: "Auftritt → Branding: Logos (hell/dunkel), Akzentfarbe, Favicon aus dem Logo erzeugen, Hinweisleisten.", to: "/admin/settings/branding", label: "Auftritt → Branding" },
       { key: "socials", q: "Wo trage ich die Social-Media-Kanäle des Vereins ein?", a: "Auftritt → Socials – oder mit Dolibarr der Haken „Kanäle aus Dolibarr übernehmen“.", to: "/admin/settings/socials", label: "Auftritt → Socials" },

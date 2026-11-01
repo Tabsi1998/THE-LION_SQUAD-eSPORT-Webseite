@@ -16,14 +16,17 @@ import { dateWarnings } from "@/lib/tournamentDateWarnings";
 import { useAuth } from "@/context/AuthContext";
 import { gameOptionLabel } from "@/lib/gameLabels";
 import { RULE_PRESETS, ruleModeSummary, rulePresetKey, rulePresetWarnings } from "@/lib/tournamentRulePresets";
-import { TOURNAMENT_FORMAT_OPTIONS } from "@/lib/tournamentLabels";
+import { tournamentFormatOptions } from "@/lib/tournamentLabels";
 import { durationSourceText, gameModes, matchDurationSource, ownDurationInput, ownDurationPayload } from "@/lib/matchDuration";
 import { gamePresets } from "@/lib/gameMatchData";
 import { PrizeEditor, Txt } from "./PrizeEditor";
 import { DeadlineFields } from "./DeadlineFields";
 import { deadlineFormValues, deadlinePayload } from "@/lib/tournamentDeadlines";
-import { ADVANCEMENT_MODE_OPTIONS, BRONZE_FORMATS, DRAW_SHOW_MINUTES_DEFAULT, DRAW_SHOW_MINUTES_HINT, advancementModeHint, drawShowMinutesPayload, CUSTOM_BRACKET_FORMATS, EVENT_MODE_OPTIONS, GRAND_FINAL_FORMATS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, HEAT_REBUILD_FORMATS, HEAT_REBUILD_HINT, HEAT_REBUILD_OPTIONS, MATCHDAY_FORMATS, RESULT_ENTRY_MODE_OPTIONS, SCHEDULE_MODE_OPTIONS, SEEDING_OPTIONS, STREAM_PLATFORM_OPTIONS, TEAM_MODE_OPTIONS, TOURNAMENT_SEASON_WEIGHT_OPTIONS, VISIBILITY_OPTIONS, WEEKDAY_OPTIONS, advancementModeOf } from "./shared";
+import { ADVANCEMENT_MODE_OPTIONS, BRONZE_FORMATS, DRAW_SHOW_MINUTES_DEFAULT, DRAW_SHOW_MINUTES_HINT, advancementModeHint, drawShowMinutesPayload, CUSTOM_BRACKET_FORMATS, EVENT_MODE_OPTIONS, GRAND_FINAL_FORMATS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, HEAT_REBUILD_FORMATS, HEAT_REBUILD_HINT, HEAT_REBUILD_OPTIONS, RESULT_ENTRY_MODE_OPTIONS, SCHEDULE_MODE_OPTIONS, SEEDING_OPTIONS, seedingModeOf, STREAM_PLATFORM_OPTIONS, TEAM_MODE_OPTIONS, TOURNAMENT_SEASON_WEIGHT_OPTIONS, VISIBILITY_OPTIONS, WEEKDAY_OPTIONS, advancementModeOf } from "./shared";
 import { StaffelSeasonValues, isStaffel, staffelBeforeStart } from "./StaffelParts";
+import { FormatHint } from "./FormatHint";
+import { STREAM_ADDRESS_HINT, streamFormValues, streamPayload } from "@/lib/tournamentStream";
+import { BEST_OF_RUNS_HINT, MATCHDAY_DRAW_HINT, NO_MATCH_FORMATS, matchdayDrawMode, matchdayDrawOn, tournamentFieldRules } from "@/lib/tournamentFormFields";
 
 // „Gewinne erzeugen“ erst ab dem Ende (#2123, TA23) - wie der Server (services/tournament_guard.py FINISHED_STATUSES).
 const PRIZE_READY_STATUSES = new Set(["completed", "results_published", "archived"]);
@@ -87,7 +90,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
     bronze_match: !!source.bronze_match,
     grand_final_mode: source.grand_final_mode || "reset",
     heat_rebuild_mode: source.heat_rebuild_mode || "suggest",
-    seeding_mode: source.seeding_mode || "random",
+    seeding_mode: seedingModeOf(source.seeding_mode),
     advancement_mode: advancementModeOf(source),
     draw_show_minutes: source.draw_show_minutes ?? "",
     is_public: source.is_public !== false,
@@ -103,11 +106,8 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
     default_match_time: source.default_match_time || "20:00",
     match_schedule_response_hours: source.match_schedule_response_hours ?? 72,
     match_break_minutes: source.match_break_minutes ?? 5,
-    twitch_channel: source.twitch_channel || "",
-    twitch_enabled: !!source.twitch_enabled,
-    has_live_stream: !!source.has_live_stream,
-    stream_platform: source.stream_platform || "",
-    stream_url: source.stream_url || "",
+    // Stream (#2111, F5): Plattform, Kanal oder Adresse, ein Haken - gespeichert in den bekannten Feldern.
+    ...streamFormValues(source),
     stream_title: source.stream_title || "",
     show_chat: !!source.show_chat,
     season_weight: source.season_weight ?? 2,
@@ -153,7 +153,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
     bronze_match: !!tournament.bronze_match,
     grand_final_mode: tournament.grand_final_mode || "reset",
     heat_rebuild_mode: tournament.heat_rebuild_mode || "suggest",
-    seeding_mode: tournament.seeding_mode || "random",
+    seeding_mode: seedingModeOf(tournament.seeding_mode),
     advancement_mode: advancementModeOf(tournament),
     draw_show_minutes: tournament.draw_show_minutes ?? "",
     is_public: tournament.is_public !== false,
@@ -169,11 +169,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
     default_match_time: tournament.default_match_time || "20:00",
     match_schedule_response_hours: tournament.match_schedule_response_hours ?? 72,
     match_break_minutes: tournament.match_break_minutes ?? 5,
-    twitch_channel: tournament.twitch_channel || "",
-    twitch_enabled: !!tournament.twitch_enabled,
-    has_live_stream: !!tournament.has_live_stream,
-    stream_platform: tournament.stream_platform || "",
-    stream_url: tournament.stream_url || "",
+    ...streamFormValues(tournament),
     stream_title: tournament.stream_title || "",
     show_chat: !!tournament.show_chat,
     season_weight: tournament.season_weight ?? 2,
@@ -201,6 +197,8 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
   }, []);
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
   const timeWarnings = dateWarnings(f);
+  // Nur, was zu Format und Austragung passt (#2111): Spielwochen, Fristen, Weiterkommen, Best of, Mindestpause.
+  const rules = tournamentFieldRules(f);
   // Spiel-Daten (#1554): woher die Dauer kommt, und was das Spiel für Best-of und Laufgröße vorschlägt.
   const selectedGame = games.find((game) => game.id === f.game_id) || null;
   const modes = gameModes(selectedGame);
@@ -238,11 +236,14 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
   };
   const normalizeTournamentPayload = (source) => {
     const payload = { ...source };
+    payload.slug = slugify(payload.slug);
     if (!payload.event_id) {
       payload.event_id = null;
       payload.requires_event_registration = false;
     }
-    if (!payload.stream_platform) payload.stream_platform = null;
+    Object.assign(payload, streamPayload(payload));
+    delete payload.stream_address;
+    delete payload.stream_embed;
     if (!payload.result_entry_mode) payload.result_entry_mode = null;
     if (!payload.schedule_mode) payload.schedule_mode = null;
     payload.match_duration_minutes = ownDurationPayload(payload.match_duration_minutes);
@@ -374,7 +375,8 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
             <CheckField label="Anmeldung über Discord erlauben" hint="Mit verknüpftem Konto über /anmelden oder den Knopf „Anmelden“ – privat, mit denselben Regeln; Teams meldet der Kapitän an." checked={f.discord_registration} onChange={(v)=>set("discord_registration",v)} accent="#5865F2" testId="tr-edit-discord-registration" />
             <CheckField label="Nur Einladung/manuelle Teilnehmer" checked={f.is_invite_only} onChange={(v)=>set("is_invite_only",v)} />
             <CheckField label="Automatisches Turnier-Hinweisbanner anzeigen" checked={f.site_banner_enabled} onChange={(v)=>set("site_banner_enabled",v)} accent="#FFD700" />
-            <CheckField label="Start-/Endzeit darf Turnier automatisch live/beendet schalten" checked={f.auto_start_enabled} onChange={(v)=>set("auto_start_enabled",v)} testId="tr-edit-auto-start" />
+            {/* Vor Ort startet die Turnierleitung selbst (#2111, W4): der Schalter steht dort nur noch, solange er an ist. */}
+            {(f.event_mode !== "local" || f.auto_start_enabled) && <CheckField label="Start-/Endzeit darf Turnier automatisch live/beendet schalten" hint={f.event_mode === "local" ? "Vor Ort startet die Turnierleitung selbst – besser ausschalten." : undefined} checked={f.auto_start_enabled} onChange={(v)=>set("auto_start_enabled",v)} testId="tr-edit-auto-start" />}
             <CheckField label="Vereinsmitglieder von der Selbstanmeldung ausschließen, z.B. wenn wir das Turnier für externe Teilnehmer veranstalten" checked={f.block_club_member_registration} onChange={(v)=>set("block_club_member_registration",v)} accent="#FFD700" />
             {/* Turnier nur mit Event-Anmeldung (#875): nur sinnvoll, wenn das Turnier zu einem Event gehört. */}
             {f.event_id && <CheckField label="Anmeldung nur mit Event-Anmeldung – wer nicht beim Event angemeldet ist, kann sich nicht anmelden (Teams: so viele Spieler wie die Teamgröße)" checked={f.requires_event_registration} onChange={(v)=>set("requires_event_registration",v)} accent="#29B6E8" testId="tr-edit-event-gate" />}
@@ -384,7 +386,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
         <FormSection title="Basis">
           <FormGrid>
             <TextField label="Titel" value={f.title} onChange={(v)=>set("title",v)} testId="tr-edit-title"/>
-            <TextField label="Slug / URL" value={f.slug} onChange={(v)=>set("slug", slugify(v))} testId="tr-edit-slug"/>
+            <TextField label="Adresse (URL)" value={f.slug} onChange={(v)=>set("slug", slugify(v, { typing: true }))} testId="tr-edit-slug"/>
             {show && <SelectInput label="Spiel" value={f.game_id} onChange={setGame} disabled={structureFixed} hint={fixedHint} testId="tr-edit-game" options={[["", "— auswählen —"], ...games.map((g) => [g.id, gameOptionLabel(g)])]} />}
             <TextField label="Plattform" value={f.platform} onChange={(v)=>set("platform",v)} testId="tr-edit-platform"/>
             {/* Kein Statusfeld (#2109, S2): der Status wechselt nur oben über den Ablauf - mit Spielplan, Check-in und
@@ -409,7 +411,8 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
             </FormGrid>
           )}
           {/* Antwortfrist einer Staffel (#2106, F3): kommt aus der Season und steht rechts unter „Aus der Season“. */}
-          {show && MATCHDAY_FORMATS.has(f.format) && (
+          {/* Spielwochen nur online und hybrid (#2111, T1) - vor Ort plant der Stationsplaner Runden an einem Tag. */}
+          {show && rules.matchdays && (
             <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-4 space-y-3" data-testid="tr-edit-matchdays">
               <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Spielwochen</div>
               <p className="text-xs text-white/55">
@@ -431,7 +434,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
           ? "Eine Staffel spielt im Format Liga mit Co-Teams; Teamgröße und Staffelgröße gibt die Season vor."
           : "Teilnahme legt fest, wer sich anmelden darf: Einzelspieler melden sich selbst an, bei Team meldet ein Team-Leader oder Co-Leader das Team an."}>
           <FormGrid cols={3}>
-            {show && <SelectInput label="Turnierstruktur" value={f.format} onChange={setFormat} options={TOURNAMENT_FORMAT_OPTIONS} disabled={structureFixed} hint={fixedHint} testId="tr-edit-format" />}
+            {show && <SelectInput label="Turnierstruktur" value={f.format} onChange={setFormat} options={tournamentFormatOptions(tournament.format)} disabled={structureFixed} hint={fixedHint || <FormatHint format={f.format} testId="tr-edit-format-hint" />} testId="tr-edit-format" />}
             <TextField label="Format-Anzeigename" value={f.format_label} onChange={(v)=>set("format_label",v)} placeholder="z.B. Gamers Heaven F1 Heat" testId="tr-edit-format-label"/>
             {show && <SelectInput label="Teilnahme" value={f.team_mode} onChange={setTeamMode} options={TEAM_MODE_OPTIONS} disabled={structureFixed} testId="tr-edit-team-mode" />}
             {show && f.team_mode !== "solo" && <TextField label="Spieler pro Team" type="number" min="2" max="6" value={f.team_size} onChange={(v)=>set("team_size",v)} disabled={structureFixed} testId="tr-edit-team-size"/>}
@@ -440,14 +443,18 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
           </FormGrid>
           <FormSection title="Erweiterte Spieloptionen" collapsible plain>
             <FormGrid cols={3}>
-              {show && <SelectInput label="Seeding" value={f.seeding_mode} onChange={(v)=>set("seeding_mode",v)} options={SEEDING_OPTIONS} />}
-              {show && (
+              {show && <SelectInput label="Setzliste" value={f.seeding_mode} onChange={(v)=>set("seeding_mode",v)} options={SEEDING_OPTIONS} testId="tr-edit-seeding" />}
+              {show && rules.advancement === "select" && (
                 <div className="md:col-span-2">
-                  {/* Weiterkommen in vier Modi (#1548, #1590): fester Baum, Auslosung nach der Runde, Show, sofort zufällig. */}
+                  {/* Weiterkommen in vier Modi (#1548, #1590): fester Baum, Auslosung nach der Runde, Show, sofort zufällig.
+                      Nur, wo Sieger in ein nächstes Spiel gehen (#2111, T4). */}
                   <SelectInput label="Weiterkommen (Gegner der nächsten Runde)" value={f.advancement_mode} onChange={(v)=>set("advancement_mode", v)} options={ADVANCEMENT_MODE_OPTIONS} hint={<span data-testid="tr-edit-advancement-hint">{advancementModeHint(f.advancement_mode)}</span>} testId="tr-edit-advancement" />
                 </div>
               )}
-              {show && f.advancement_mode === "draw_show" && (
+              {show && rules.advancement === "matchday_draw" && (
+                <CheckField label="Spieltage auslosen" hint={MATCHDAY_DRAW_HINT} checked={matchdayDrawOn(f.advancement_mode)} onChange={(v)=>set("advancement_mode", matchdayDrawMode(v))} testId="tr-edit-matchday-draw" className="md:col-span-2 self-end pb-2" />
+              )}
+              {show && rules.advancement === "select" && f.advancement_mode === "draw_show" && (
                 <TextField label="Show-Auslosung: Erinnerung nach Minuten" type="number" min="1" max="240" value={f.draw_show_minutes} onChange={(v)=>set("draw_show_minutes", v)} placeholder={String(DRAW_SHOW_MINUTES_DEFAULT)} hint={DRAW_SHOW_MINUTES_HINT} testId="tr-edit-draw-show-minutes" />
               )}
               {modes.length > 0 && (
@@ -455,12 +462,15 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
                   options={[["", `Erster Modus (${modes[0].label || "ohne Namen"})`], ...modes.map((mode) => [mode.mode, `${mode.label || mode.mode}${mode.minutes ? ` · ${mode.minutes} Min.${mode.per_game ? " je Spiel" : ""}` : ""}`])]}
                   hint="Bestimmt die Dauer, wenn unten keine eigene steht." />
               )}
-              {show && <TextField label="Best of" type="number" min="1" value={f.best_of} onChange={(v)=>set("best_of",v)} testId="tr-edit-bo"
-                hint={presets.bestOf ? <span data-testid="tr-edit-bo-source">vom Spiel: Best of {presets.bestOf}</span> : null}/>}
-              <TextField label="Matchdauer Min." type="number" min="1" value={f.match_duration_minutes} onChange={(v)=>set("match_duration_minutes",v)} testId="tr-edit-duration"
+              {/* Ohne Spiele kein Best of und keine Dauer (#2111, TA4); in Läufen heißt es „Runden je Lauf“ und zählt nur für
+                  die geplante Dauer. */}
+              {show && rules.bestOf && <TextField label={rules.bestOfIsRuns ? "Runden je Lauf" : "Best of"} type="number" min="1" value={f.best_of} onChange={(v)=>set("best_of",v)} testId="tr-edit-bo"
+                hint={presets.bestOf ? <span data-testid="tr-edit-bo-source">vom Spiel: Best of {presets.bestOf}</span> : rules.bestOfIsRuns ? BEST_OF_RUNS_HINT : null}/>}
+              {rules.bestOf && <TextField label="Matchdauer Min." type="number" min="1" value={f.match_duration_minutes} onChange={(v)=>set("match_duration_minutes",v)} testId="tr-edit-duration"
                 placeholder={String(inherited.minutes)}
-                hint={<span data-testid="tr-edit-duration-source">{f.match_duration_minutes === "" ? durationSourceText(inherited) : `Leer lassen: ${durationSourceText(inherited)}`}</span>}/>
-              <TextField label="Mindestpause Min." type="number" min="0" max="240" value={f.match_break_minutes} onChange={(v)=>set("match_break_minutes",v)} hint="So lange hat ein Spieler zwischen zwei Spielen mindestens frei; der Planer hält das ein." testId="tr-edit-break"/>
+                hint={<span data-testid="tr-edit-duration-source">{f.match_duration_minutes === "" ? durationSourceText(inherited) : `Leer lassen: ${durationSourceText(inherited)}`}</span>}/>}
+              {/* Die Mindestpause hält nur der Stationsplaner ein - vor Ort und hybrid (#2111, TA4). */}
+              {rules.matchBreak && <TextField label="Mindestpause Min." type="number" min="0" max="240" value={f.match_break_minutes} onChange={(v)=>set("match_break_minutes",v)} hint="So lange hat ein Spieler zwischen zwei Spielen mindestens frei; der Stationsplaner hält das ein." testId="tr-edit-break"/>}
               {/* Staffeln zählen nie für die Jahreswertung (docs/LIGA.md, Abschnitt 7). */}
               {show && <SeasonWeightField value={f.season_weight} onChange={(v)=>set("season_weight",v)} />}
             </FormGrid>
@@ -525,7 +535,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
         </FormSection>
 
         {show && <FormSection title="Preise" collapsible accent="#FFD700">
-          <PrizeEditor value={f.prize_places} onChange={(v)=>set("prize_places", v)} />
+          <PrizeEditor value={f.prize_places} onChange={(v)=>set("prize_places", v)} format={f.format} />
           <Txt label="Preise" value={f.prize_pool} onChange={(v)=>set("prize_pool",v)} testId="tr-edit-prizes"/>
           <div className="border border-[#FFD700]/20 bg-[#FFD700]/5 rounded-sm p-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             {/* Erst ab „Beendet“ (#2123, TA23): vorher gäbe es Gewinne und „Gewinn vorgemerkt“ für einen Zwischenstand. */}
@@ -555,16 +565,16 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
               <TextField label="Ort" value={f.location} onChange={(v)=>set("location",v)} testId="tr-edit-location"/>
             )}
             {show && <TextField label="Discord-Verweis" value={f.discord_link} onChange={(v)=>set("discord_link",v)} testId="tr-edit-discord"/>}
-            <TextField label="Alter Stream-Verweis" value={f.stream_link} onChange={(v)=>set("stream_link",v)} testId="tr-edit-stream"/>
-            <TextField label="Twitch-Kanal" value={f.twitch_channel} onChange={(v)=>set("twitch_channel",v)} testId="tr-edit-twitch"/>
-            <SelectInput label="Stream-Plattform" value={f.stream_platform} onChange={(v)=>set("stream_platform",v)} options={STREAM_PLATFORM_OPTIONS} />
-            <TextField label="Stream-URL" value={f.stream_url} onChange={(v)=>set("stream_url",v)} testId="tr-edit-stream-url"/>
-            <TextField label="Stream-Titel" value={f.stream_title} onChange={(v)=>set("stream_title",v)} testId="tr-edit-stream-title"/>
+            {/* Ein Weg für den Stream (#2111, F5): Plattform und Kanal oder Adresse. Der alte Stream-Verweis steht nur
+                noch da, solange er befüllt ist. */}
+            <SelectInput label="Stream-Plattform" value={f.stream_platform} onChange={(v)=>set("stream_platform",v)} options={STREAM_PLATFORM_OPTIONS} testId="tr-edit-stream-platform" />
+            <TextField label="Kanal oder Adresse" value={f.stream_address} onChange={(v)=>set("stream_address",v)} placeholder={STREAM_ADDRESS_HINT[f.stream_platform] || STREAM_ADDRESS_HINT[""]} testId="tr-edit-stream-url"/>
+            <TextField label="Stream-Titel" value={f.stream_title} onChange={(v)=>set("stream_title",v)} placeholder="Leer: LIVE STREAM" testId="tr-edit-stream-title"/>
+            {tournament.stream_link ? <TextField label="Alter Stream-Verweis" value={f.stream_link} onChange={(v)=>set("stream_link",v)} hint="Steht als Link „Stream“ auf der Turnierseite. Leeren, wenn der Stream oben eingetragen ist." testId="tr-edit-stream"/> : null}
           </FormGrid>
           <div className="flex flex-wrap gap-4">
-            <CheckField label="Twitch einbetten" checked={f.twitch_enabled} onChange={(v)=>set("twitch_enabled",v)} accent="#9146FF" />
-            <CheckField label="Live-Stream aktiv" checked={f.has_live_stream} onChange={(v)=>set("has_live_stream",v)} accent="#9146FF" />
-            <CheckField label="Chat anzeigen" checked={f.show_chat} onChange={(v)=>set("show_chat",v)} accent="#9146FF" />
+            <CheckField label="Stream auf der Turnierseite zeigen" checked={f.stream_embed} onChange={(v)=>set("stream_embed",v)} accent="#9146FF" testId="tr-edit-stream-embed" />
+            <CheckField label="Turnier-Chat für Teilnehmer anzeigen" checked={f.show_chat} onChange={(v)=>set("show_chat",v)} accent="#9146FF" testId="tr-edit-show-chat" />
           </div>
         </FormSection>
       </FormColumns>
@@ -582,11 +592,13 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
         ) : structureFixed ? (
           // Der Baum steht (#2120, TA17): „Struktur anwenden“ ersetzte hier alle echten Spiele samt Ergebnissen.
           <span className="text-xs text-white/50 self-center" data-testid="tr-edit-structure-fixed">{FIXED_FIELD_HINT}</span>
-        ) : (
+        ) : rules.structureRebuild ? (
+          // Ohne Turnierbaum zum Vorausbauen (Schweizer System, Zeitfahren, Rennserie) endete der Knopf mit einem Fehler
+          // (#2111, TA4).
           <button onClick={() => save({ rebuildPreview: true })} type="button" data-testid="tr-edit-save-rebuild" className="px-5 py-2.5 border border-[#FFD700]/50 text-[#FFD700] text-xs font-bold uppercase tracking-wider rounded-sm hover:bg-[#FFD700]/10">
             Speichern & Struktur anwenden
           </button>
-        )}
+        ) : null}
       </FormActions>
     </div>
   );
@@ -594,14 +606,16 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
 
 const FIXED_FIELD_HINT = "Der Turnierbaum steht seit dem Ende des Check-ins fest – Format, Teilnahme und Spiel bleiben. Neu aufbauen geht nur über „Zurücksetzen“.";
 
-function slugify(value) {
+// Beim Tippen bleibt ein Bindestrich am Ende stehen (#2111) - sonst ließe sich „herbst-cup“ nicht eintippen; beim
+// Speichern wird er abgeschnitten.
+function slugify(value, { typing = false } = {}) {
   return (value || "")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/ß/g, "ss")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "")
+    .replace(typing ? /^-/ : /(^-|-$)/g, "")
     .slice(0, 80);
 }
 
@@ -637,11 +651,13 @@ function emptyBracketReason(tournament) {
       action: "Teilnehmer bestätigen, dann „Schweizer Runde“ drücken.",
     };
   }
-  if (format === "time_trial" || format === "grand_prix") {
+  if (NO_MATCH_FORMATS.has(format)) {
+    // Zeitfahren und Rennserie (#2111, TA6): es gibt weder Spiele noch eine Zeiteingabe - vorher stand hier, das Format
+    // werde über Rundenzeiten gewertet.
     return {
-      title: "Kein Turnierbaum vorgesehen",
-      detail: "Dieses Format wird über Rundenzeiten gewertet, nicht über Spielpaarungen.",
-      action: null,
+      title: "Kein Turnierbaum, keine Spiele",
+      detail: "Zeitfahren und Rennserie bekommen im Turnier keine Spiele und keine Zeiteingabe.",
+      action: "Zeitfahren laufen über Fast Lap, Rennserien über Serien.",
     };
   }
   const pairings = format === "league" ? size * (size - 1)

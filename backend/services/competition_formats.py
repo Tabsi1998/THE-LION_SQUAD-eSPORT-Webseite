@@ -158,7 +158,7 @@ _FORMAT_CAPABILITIES = {
     ),
     "league": TournamentFormatCapability(
         key="league",
-        label="Liga",
+        label="Jeder gegen jeden – Hin- und Rückrunde",
         canonical_stage_type="league",
         canonical_match_type="duel",
         result_model="standings",

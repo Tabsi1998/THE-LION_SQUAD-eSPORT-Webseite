@@ -1,13 +1,16 @@
 // Glossar (#2124, TP10): K.-o., Doppel-K.-o. - die Wörter der Spieler- und Verwaltungsseiten stehen hier an einer Stelle.
+// #2111 (F1): „Liga“ heißt als Turnierformat „Jeder gegen jeden – Hin- und Rückrunde“ - die Vereinsliga mit Seasons
+// und Staffeln ist Admin → Liga. Der Schlüssel `league` bleibt. „Überlebensmodus“ verhält sich genau wie „Mehrspieler
+// frei“ (TA5) und heißt deshalb auch so; gespeichert bleibt `battle_royale`.
 export const TOURNAMENT_FORMAT_LABELS = {
   single_elim: "K.-o.",
   double_elim: "Doppel-K.-o.",
-  round_robin: "Jeder gegen jeden",
+  round_robin: "Jeder gegen jeden – einfach",
   swiss: "Schweizer System",
   groups: "Gruppenphase",
   ffa: "Mehrspieler frei",
-  battle_royale: "Überlebensmodus",
-  league: "Liga",
+  battle_royale: "Mehrspieler frei",
+  league: "Jeder gegen jeden – Hin- und Rückrunde",
   time_trial: "Zeitfahren",
   grand_prix: "Rennserie",
   custom_bracket: "Freier Turnierbaum",
@@ -29,6 +32,18 @@ export const TOURNAMENT_FORMAT_OPTIONS = [
   ["ffa_custom_bracket", TOURNAMENT_FORMAT_LABELS.ffa_custom_bracket],
 ];
 
+// Nicht mehr zur Wahl (#2111): „Überlebensmodus“ ist dasselbe wie „Mehrspieler frei“ (TA5), Zeitfahren und Rennserie
+// bekommen nie Spiele (TA6 - dafür gibt es Fast Lap und Serien). Ein bestehendes Turnier behält sein Format und sieht
+// es in der Auswahl.
+const RETIRED_FORMATS = new Set(["battle_royale", "time_trial", "grand_prix"]);
+
+/** Die Formate zur Auswahl: ohne die stillgelegten - außer dem, das das Turnier gerade hat. */
+export function tournamentFormatOptions(current = "") {
+  return TOURNAMENT_FORMAT_OPTIONS.filter(([value]) => (RETIRED_FORMATS.has(value) ? value === current : true)
+    // Ein Überlebensmodus-Turnier sieht „Mehrspieler frei“ genau einmal - als sein eigenes Format.
+    && !(value === "ffa" && current === "battle_royale"));
+}
+
 export const STAGE_TYPE_LABELS = {
   single_elimination: "K.-o.",
   double_elimination: "Doppel-K.-o.",
@@ -41,19 +56,6 @@ export const STAGE_TYPE_LABELS = {
   ffa_custom_bracket: "Mehrspieler freier Turnierbaum",
   ffa_league: "Mehrspieler-Liga",
 };
-
-export const STAGE_TYPE_OPTIONS = [
-  ["single_elimination", STAGE_TYPE_LABELS.single_elimination],
-  ["double_elimination", STAGE_TYPE_LABELS.double_elimination],
-  ["custom_bracket", STAGE_TYPE_LABELS.custom_bracket],
-  ["round_robin_groups", STAGE_TYPE_LABELS.round_robin_groups],
-  ["swiss", STAGE_TYPE_LABELS.swiss],
-  ["league", STAGE_TYPE_LABELS.league],
-  ["simple", STAGE_TYPE_LABELS.simple],
-  ["ffa_single_elimination", STAGE_TYPE_LABELS.ffa_single_elimination],
-  ["ffa_custom_bracket", STAGE_TYPE_LABELS.ffa_custom_bracket],
-  ["ffa_league", STAGE_TYPE_LABELS.ffa_league],
-];
 
 export const MATCH_TYPE_LABELS = {
   duel: "Duell",
@@ -93,21 +95,24 @@ export const REGISTRATION_STATUS_LABELS = {
   disqualified: "Disqualifiziert",
 };
 
-export const REGISTRATION_STATUS_OPTIONS = [
+// Je Zweck eine Liste (#2111, TA14): der Filter kennt alle acht Status, „Hinzufügen“ nur die vier, die der Server beim
+// Hinzufügen annimmt (models.RegistrationAdminCreate) - Austritt und Disqualifikation gehen nur über den Umbauplan.
+export const REGISTRATION_STATUS_FILTER_OPTIONS = [
   ["approved", REGISTRATION_STATUS_LABELS.approved],
   ["checked_in", REGISTRATION_STATUS_LABELS.checked_in],
   ["pending", REGISTRATION_STATUS_LABELS.pending],
   ["waitlist", REGISTRATION_STATUS_LABELS.waitlist],
+  ["rejected", REGISTRATION_STATUS_LABELS.rejected],
+  ["no_show", REGISTRATION_STATUS_LABELS.no_show],
   ["withdrawn", REGISTRATION_STATUS_LABELS.withdrawn],
   ["disqualified", REGISTRATION_STATUS_LABELS.disqualified],
 ];
 
-export const STAGE_STATUS_OPTIONS = [
-  ["pending", MATCH_STATUS_LABELS.pending],
-  ["ready", MATCH_STATUS_LABELS.ready],
-  ["running", MATCH_STATUS_LABELS.running],
-  ["completed", MATCH_STATUS_LABELS.completed],
-  ["archived", MATCH_STATUS_LABELS.archived],
+export const REGISTRATION_ADD_STATUS_OPTIONS = [
+  ["approved", REGISTRATION_STATUS_LABELS.approved],
+  ["checked_in", REGISTRATION_STATUS_LABELS.checked_in],
+  ["pending", REGISTRATION_STATUS_LABELS.pending],
+  ["waitlist", REGISTRATION_STATUS_LABELS.waitlist],
 ];
 
 export const STAFF_ROLE_LABELS = {
@@ -201,6 +206,8 @@ export function formatTournamentDisplay(tournamentOrFormat) {
   if (tournamentOrFormat && typeof tournamentOrFormat === "object") {
     const customLabel = String(tournamentOrFormat.format_label || tournamentOrFormat.format_display_name || "").trim();
     if (customLabel) return customLabel;
+    // Eine Liga-Staffel (docs/LIGA.md) heißt weiter „Liga“ - der lange Formatname gilt nur für Turniere (#2111, F1).
+    if (tournamentOrFormat.league_context) return "Liga";
     return formatTournamentFormat(tournamentOrFormat.format);
   }
   return formatTournamentFormat(tournamentOrFormat);

@@ -404,6 +404,9 @@ def test_tournament_creation_persists_engine_and_ruleset_versions(monkeypatch):
     monkeypatch.setattr(tournament_crud_routes, "_create_initial_bracket_preview", preview)
     # Startgeld (#319): die Antwort fragt den Bereich Finanzen ab - hier ohne echte DB.
     monkeypatch.setattr(tournament_crud_routes, "user_has_area", AsyncMock(return_value=False))
+    # Protokoll (#2111, TA19): das Anlegen steht im Protokoll - hier ohne echte DB.
+    audit = AsyncMock()
+    monkeypatch.setattr(tournament_crud_routes, "_audit_tournament_action", audit)
 
     result = asyncio.run(tournament_crud_routes.create_tournament(
         TournamentCreate(title="Sommer-Cup", game_id="game-1", format="single_elim"),
@@ -419,6 +422,7 @@ def test_tournament_creation_persists_engine_and_ruleset_versions(monkeypatch):
     assert result["ruleset_version"] == "competition.ruleset.v1"
     assert result["version_inferred"] is False
     preview.assert_awaited_once()
+    assert audit.await_args.args[1] == "tournament.create"
 
 
 def test_tournament_stage_creation_replay_reuses_existing_document(monkeypatch):

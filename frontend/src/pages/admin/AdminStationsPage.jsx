@@ -29,6 +29,24 @@ const DEVICES = [
 ];
 const STATUSES = ["free", "busy", "broken", "reserved"];
 
+// Welches Turnier die Stationen-Seite zeigt (#2111, TA26): Stationen gibt es vor Ort und hybrid. Diese Turniere stehen
+// oben (solange sie nicht vorbei sind), vorgewählt ist ein laufendes; alle übrigen folgen unter „Weitere Turniere“.
+const STATION_OVER = new Set(["completed", "results_published", "archived", "cancelled"]);
+const STATION_RUNNING = new Set(["check_in", "live", "paused"]);
+const stationTournament = (tournament) => ["local", "hybrid"].includes(tournament?.event_mode) && !STATION_OVER.has(tournament?.status);
+
+export function stationTournamentGroups(rows = []) {
+  const onsite = rows.filter(stationTournament);
+  const others = rows.filter((tournament) => !stationTournament(tournament));
+  return { onsite, others };
+}
+
+export function preferredStationTournament(rows = [], current = "") {
+  if (rows.some((row) => row.id === current)) return current;
+  const { onsite } = stationTournamentGroups(rows);
+  return (onsite.find((row) => STATION_RUNNING.has(row.status)) || onsite[0] || rows[0])?.id || "";
+}
+
 function stationExportUrl(tournamentId, orientation) {
   if (!tournamentId || !/^[A-Za-z0-9_-]+$/.test(String(tournamentId))) return "#";
   const params = new URLSearchParams({ orientation });
@@ -62,7 +80,7 @@ export default function AdminStationsPage() {
       const { data: t } = await api.get("/tournaments?include_drafts=true&managed=true");
       const rows = Array.isArray(t) ? t.filter(Boolean) : [];
       setTournaments(rows);
-      setActiveTid((current) => rows.some((row) => row.id === current) ? current : rows?.[0]?.id || "");
+      setActiveTid((current) => preferredStationTournament(rows, current));
       setPageError("");
     } catch (e) {
       setTournaments([]);
@@ -231,6 +249,7 @@ export default function AdminStationsPage() {
     (m) => !m.station_id && ["ready", "scheduled"].includes(m.status)
   );
   const occupiedMatchIds = new Set(safeArray(list).map((station) => station.current_match_id).filter(Boolean));
+  const groups = stationTournamentGroups(tournaments);
   const queuedMatches = safeArray(matches)
     .filter((m) => m.station_id && ["ready", "scheduled"].includes(m.status))
     .sort((a, b) => (Date.parse(a.scheduled_at || "") || Number.MAX_SAFE_INTEGER) - (Date.parse(b.scheduled_at || "") || Number.MAX_SAFE_INTEGER));
@@ -277,7 +296,16 @@ export default function AdminStationsPage() {
           <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Aktives Turnier</div>
           <select value={activeTid} onChange={(e) => setActiveTid(e.target.value)} data-testid="station-tournament-select" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
             {!tournaments.length && <option value="">Keine Turniere verfügbar</option>}
-            {tournaments.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
+            {groups.onsite.length > 0 && groups.others.length > 0 ? (
+              <>
+                <optgroup label="Vor Ort und hybrid">
+                  {groups.onsite.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
+                </optgroup>
+                <optgroup label="Weitere Turniere">
+                  {groups.others.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
+                </optgroup>
+              </>
+            ) : tournaments.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
           </select>
         </label>
         {(() => {
@@ -346,7 +374,7 @@ export default function AdminStationsPage() {
           {isTournamentLead && <div className="border border-white/10 rounded-sm bg-[#121212] p-5 space-y-3">
             <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Schnell-Setup</div>
             <div className="grid grid-cols-2 gap-2">
-              <input placeholder="Prefix" value={bulk.prefix} onChange={(e) => setBulk({ ...bulk, prefix: e.target.value })} className="bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+              <input placeholder="Namensanfang" aria-label="Namensanfang" value={bulk.prefix} onChange={(e) => setBulk({ ...bulk, prefix: e.target.value })} className="bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
               <input type="number" min="1" max="64" value={bulk.count} onChange={(e) => setBulk({ ...bulk, count: e.target.value })} className="bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
             </div>
             <select value={bulk.device_type} onChange={(e) => setBulk({ ...bulk, device_type: e.target.value })} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
@@ -375,7 +403,7 @@ export default function AdminStationsPage() {
             </div>
           </div>
           <div className="border border-white/10 rounded-sm bg-[#121212] p-5">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-3">Geplante Queue</div>
+            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-3">Geplante Warteschlange</div>
             <div className="space-y-1.5 max-h-[260px] overflow-y-auto">
               {plannedQueue.map((m) => (
                 <div key={m.id} className="p-2 border border-white/10 rounded-sm text-xs bg-[#0A0A0A]">

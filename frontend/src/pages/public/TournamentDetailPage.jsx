@@ -315,7 +315,7 @@ function TournamentDetailView() {
   const canSelfRegister = (registration.canRegister || hasRegisterAccess) && !clubMemberBlocked && !eventBlocked;
   // Ein zugeteiltes Co-Team (#1649, #2110) nimmt nur die Turnierleitung heraus - statt „Abmelden“ steht der Hinweis.
   const leagueSquad = Boolean(myReg?.squad_id);
-  const canSelfUnregister = !leagueSquad && !!myReg && (myReg.user_id === user?.id || myRegTeam?.can_manage || ["leader", "co_leader"].includes(myRegTeam?.my_role)) && !["checked_in", "no_show", "rejected"].includes(myReg.status) && !["live", "paused", "completed", "results_published", "archived"].includes(t.status);
+  const canSelfUnregister = !leagueSquad && !!myReg && (myReg.user_id === user?.id || myRegTeam?.can_manage || ["leader", "co_leader"].includes(myRegTeam?.my_role)) && !["checked_in", "no_show", "rejected", "disqualified"].includes(myReg.status) && !["live", "paused", "completed", "results_published", "archived"].includes(t.status);
   const podiumRows = standings.filter((row) => row && !Array.isArray(row.standings) && Number(row.rank) >= 1 && Number(row.rank) <= 3);
   const nextStep = timelineSteps(t).find((step) => step.next) || null;
   const finished = ["completed", "results_published", "archived"].includes(t.status);

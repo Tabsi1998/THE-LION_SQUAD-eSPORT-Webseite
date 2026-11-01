@@ -406,6 +406,8 @@ class GameCreate(GameMatchData):
     cover_url: Optional[str] = None
     platforms: List[str] = []
     genre: Optional[str] = None
+    # Altfelder (#2111, W1): wirken nirgends und stehen nicht mehr in der Verwaltung - sie bleiben nur, damit ältere
+    # Aufrufe und gespeicherte Spiele unverändert durchgehen.
     supports_solo: bool = True
     supports_teams: bool = True
     supports_ffa: bool = False
@@ -691,8 +693,20 @@ def _empty_stream_platform_to_none(value):
     return value
 
 
+def _strip_text(value):
+    return value.strip() if isinstance(value, str) else value
+
+
+# Grenzen für Turnierzahlen (#2111, TA3): geprüft wird nur, was eine Anfrage schickt - gespeicherte Turniere laden und
+# speichern weiter, auch wenn sie aus der Zeit davor andere Werte haben.
+PARTICIPANT_LIMIT = 4096
+BEST_OF_LIMIT = 99
+SEASON_WEIGHT_LIMIT = 10
+MIN_OVER_MAX = "Min. Teilnehmer darf nicht größer als Max. Teilnehmer sein."
+
+
 class TournamentCreate(BaseModel):
-    title: str
+    title: str = Field(min_length=1, max_length=200)
     slug: Optional[str] = None
     description: Optional[str] = None
     game_id: str
@@ -705,8 +719,8 @@ class TournamentCreate(BaseModel):
     team_size: int = 1
     substitutes_allowed: bool = False
     billing: Optional[BillingConfig] = None
-    max_participants: int = 32
-    min_participants: int = 2
+    max_participants: int = Field(default=32, ge=1, le=PARTICIPANT_LIMIT)
+    min_participants: int = Field(default=2, ge=1, le=PARTICIPANT_LIMIT)
     registration_enabled: bool = True
     block_club_member_registration: bool = False
     # Turnier nur mit Event-Anmeldung (#875): wirkt nur mit `event_id`.
@@ -724,7 +738,7 @@ class TournamentCreate(BaseModel):
     rules: Optional[str] = None
     prize_pool: Optional[str] = None
     prize_places: Optional[List[dict]] = None  # [{"group":"overall|winner|loser","place":1,"label":"1. Platz","value":"…"}]
-    best_of: int = 1
+    best_of: int = Field(default=1, ge=1, le=BEST_OF_LIMIT)
     bronze_match: bool = False
     # Doppel-K.-o. (#1549): kein Grand Final, eines, oder mit Reset-Spiel (Vorgabe).
     grand_final_mode: Literal["none", "single", "reset"] = "reset"
@@ -776,7 +790,7 @@ class TournamentCreate(BaseModel):
     result_confirm_minutes_online: Optional[int] = Field(default=None, ge=1, le=1440)
     result_confirm_hours_league: Optional[int] = Field(default=None, ge=1, le=336)
     # Phase 7
-    season_weight: float = 2.0
+    season_weight: float = Field(default=2.0, ge=0, le=SEASON_WEIGHT_LIMIT)
     visibility: Literal["public", "community", "members", "internal"] = "public"
     site_banner_enabled: bool = False
     # „Ohne Discord“ (#572): keine Meldung, kein Thread, kein Bracket, kein Termin im Discord.
@@ -785,6 +799,14 @@ class TournamentCreate(BaseModel):
     status: Optional[TournamentStatus] = None
 
     _normalize_stream_platform = field_validator("stream_platform", mode="before")(_empty_stream_platform_to_none)
+    _strip_title = field_validator("title", mode="before")(_strip_text)
+
+    @model_validator(mode="after")
+    def _min_not_over_max(self):
+        # Nur, wenn das Minimum ausdrücklich mitkommt (#2111, TA3) - die Vorgabe 2 bei einem Turnier für 1 bleibt erlaubt.
+        if "min_participants" in self.model_fields_set and self.min_participants > self.max_participants:
+            raise ValueError(MIN_OVER_MAX)
+        return self
 
 
 class TournamentUpdate(BaseModel):
@@ -792,7 +814,7 @@ class TournamentUpdate(BaseModel):
     # ``matchday_blocked_weeks``, ``matchday_weeks_total``, ``scoring_rules``, ``game_mode_order``,
     # ``lineup_amend_hours``) setzt nur der Liga-Service - wie bei ``TournamentCreate`` bewusst kein Feld hier,
     # unbekannte Felder verwirft Pydantic.
-    title: Optional[str] = None
+    title: Optional[str] = Field(default=None, min_length=1, max_length=200)
     slug: Optional[str] = None
     description: Optional[str] = None
     game_id: Optional[str] = None
@@ -806,8 +828,8 @@ class TournamentUpdate(BaseModel):
     team_size: Optional[int] = None
     substitutes_allowed: Optional[bool] = None
     billing: Optional[BillingConfig] = None
-    max_participants: Optional[int] = None
-    min_participants: Optional[int] = None
+    max_participants: Optional[int] = Field(default=None, ge=1, le=PARTICIPANT_LIMIT)
+    min_participants: Optional[int] = Field(default=None, ge=1, le=PARTICIPANT_LIMIT)
     registration_enabled: Optional[bool] = None
     block_club_member_registration: Optional[bool] = None
     requires_event_registration: Optional[bool] = None
@@ -823,7 +845,7 @@ class TournamentUpdate(BaseModel):
     rules: Optional[str] = None
     prize_pool: Optional[str] = None
     prize_places: Optional[List[dict]] = None
-    best_of: Optional[int] = None
+    best_of: Optional[int] = Field(default=None, ge=1, le=BEST_OF_LIMIT)
     bronze_match: Optional[bool] = None
     grand_final_mode: Optional[Literal["none", "single", "reset"]] = None
     heat_rebuild_mode: Optional[Literal["suggest", "auto"]] = None
@@ -859,12 +881,13 @@ class TournamentUpdate(BaseModel):
     no_show_minutes_online: Optional[int] = Field(default=None, ge=1, le=240)
     result_confirm_minutes_online: Optional[int] = Field(default=None, ge=1, le=1440)
     result_confirm_hours_league: Optional[int] = Field(default=None, ge=1, le=336)
-    season_weight: Optional[float] = None
+    season_weight: Optional[float] = Field(default=None, ge=0, le=SEASON_WEIGHT_LIMIT)
     visibility: Optional[Literal["public", "community", "members", "internal"]] = None
     site_banner_enabled: Optional[bool] = None
     discord_skip: Optional[bool] = None
 
     _normalize_stream_platform = field_validator("stream_platform", mode="before")(_empty_stream_platform_to_none)
+    _strip_title = field_validator("title", mode="before")(_strip_text)
 
 
 class RegistrationCreate(BaseModel):
@@ -886,7 +909,8 @@ class RegistrationUpdate(BaseModel):
     # ``POST /registrations/{id}/removal`` - die Statusroute lehnt sie mit einem Hinweis ab.
     status: Optional[Literal["pending", "approved", "rejected", "waitlist", "checked_in", "no_show",
                              "withdrawn", "disqualified"]] = None
-    seed: Optional[int] = None
+    # Setzplatz (#2111, TA15): ab 1; null nimmt ihn weg.
+    seed: Optional[int] = Field(default=None, ge=1, le=9999)
     ingame_name: Optional[str] = None
     # Grund einer Absage (#1133): steht nur in der Nachricht an die Person, nicht an der Anmeldung.
     status_reason: Optional[str] = Field(default=None, max_length=300)

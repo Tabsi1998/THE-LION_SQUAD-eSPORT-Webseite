@@ -79,6 +79,99 @@ async def test_a_late_participant_takes_the_place_freed_by_a_withdrawal(flow):
 
 
 @pytest.mark.asyncio
+async def test_a_removal_comes_back_only_on_a_free_place(flow):
+    """#2111 (TA14): zurücknehmen über den Status geht wie ein Nachrücken - auf den frei gewordenen Platz. Steht die Person
+    noch in festen Spielen (schon gespielt), bleibt es beim Austritt; vorher setzte der Status sie am Umbau vorbei zurück."""
+    _staff, tournament, regs = await eight(flow)
+    first_round = sorted((m for m in await flow.matches(tournament) if m["round"] == 1), key=lambda m: m["order"])
+    url = f"/api/tournaments/{tournament['id']}/registrations"
+    back = next(reg for reg in regs if reg["id"] == filled(first_round[0])[0])
+    await remove(flow, tournament, back, kind="disqualified")
+    undone = await flow.patch(f"{url}/{back['id']}", json={"status": "approved"})
+    assert undone.status_code == 200, undone.text
+    assert undone.json()["placement"]["ok"] is True
+
+    played = next(reg for reg in regs if reg["id"] == filled(first_round[1])[0])
+    await remove(flow, tournament, played, kind="withdrawn")
+    # Wer schon gespielt hat, steht weiter in einem festen Spiel.
+    await flow.db.matches_v2.update_one({"id": first_round[2]["id"]}, {"$set": {"slots.0.registration_id": played["id"]}})
+    refused = await flow.patch(f"{url}/{played['id']}", json={"status": "approved"})
+    assert refused.status_code == 409, refused.text
+    assert "nicht zurücknehmen" in refused.json()["detail"]
+    stored = await flow.db.tournament_registrations.find_one({"id": played["id"]}, {"_id": 0})
+    assert stored["status"] == "withdrawn"
+
+
+@pytest.mark.asyncio
+async def test_lifting_a_removal_needs_the_right_to_remove(flow):
+    """#2111: eine Disqualifikation aufheben darf nur, wer sie auch aussprechen darf - weder ein Helfer, der nur einer
+    Station zugeteilt ist, noch der Weg über den Check-in."""
+    staff, tournament, regs = await eight(flow)
+    tid = tournament["id"]
+    first_round = sorted((m for m in await flow.matches(tournament) if m["round"] == 1), key=lambda m: m["order"])
+    removed = next(reg for reg in regs if reg["id"] == filled(first_round[0])[0])
+    await remove(flow, tournament, removed, kind="disqualified")
+
+    helper = await flow.add_user(name="Helfer")
+    await flow.db.tournament_staff_assignments.insert_one({"tournament_id": tid, "user_id": helper["id"], "role": "referee",
+                                                           "scope": "station", "scope_id": "station-1", "is_active": True})
+    flow.act_as(helper)
+    refused = await flow.patch(f"/api/tournaments/{tid}/registrations/{removed['id']}", json={"status": "approved"})
+    assert refused.status_code == 403, refused.text
+
+    at_checkin = await flow.post(f"/api/tournaments/{tid}/registrations/{removed['id']}/checkin", json={"status": "checked_in"})
+    assert at_checkin.status_code == 409, at_checkin.text
+    assert "Teilnehmerliste" in at_checkin.json()["detail"]
+
+    stored = await flow.db.tournament_registrations.find_one({"id": removed["id"]}, {"_id": 0})
+    assert stored["status"] == "disqualified" and stored["removal"]["kind"] == "disqualified"
+
+    flow.act_as(staff)
+    assert (await flow.patch(f"/api/tournaments/{tid}/registrations/{removed['id']}", json={"status": "approved"})).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_no_way_back_once_a_late_participant_took_the_place(flow):
+    """#2111: steht der Baum und der Platz ist weg, sagt der Server das vorher - die Person steht nicht als „Angenommen“
+    ohne Spiel da, das Startgeld bleibt, wie es war."""
+    _staff, tournament, regs = await eight(flow)
+    tid = tournament["id"]
+    first_round = sorted((m for m in await flow.matches(tournament) if m["round"] == 1), key=lambda m: m["order"])
+    removed = next(reg for reg in regs if reg["id"] == filled(first_round[0])[0])
+    await remove(flow, tournament, removed, kind="disqualified")
+    await flow.db.tournament_registrations.update_one({"id": removed["id"]}, {"$set": {"billing_status": "cancelled"}})
+
+    late = await flow.add_user(name="Nachrücker")
+    took = await flow.post(f"/api/tournaments/{tid}/registrations", json={"user_id": late["id"], "status": "checked_in"})
+    assert took.json()["placement"]["ok"] is True, took.text
+    before = await flow.db.tournament_registrations.find_one({"id": removed["id"]}, {"_id": 0})
+
+    refused = await flow.patch(f"/api/tournaments/{tid}/registrations/{removed['id']}", json={"status": "approved"})
+    assert refused.status_code == 409, refused.text
+    assert "kein Platz frei" in refused.json()["detail"]
+    after = await flow.db.tournament_registrations.find_one({"id": removed["id"]}, {"_id": 0})
+    assert after == before, "Status, Startgeld und Ausscheiden bleiben, wie sie waren"
+    assert after["status"] == "disqualified" and after["billing_status"] == "cancelled" and after["removal"]
+
+
+@pytest.mark.asyncio
+async def test_coming_back_clears_the_removal(flow):
+    _staff, tournament, regs = await eight(flow)
+    tid = tournament["id"]
+    first_round = sorted((m for m in await flow.matches(tournament) if m["round"] == 1), key=lambda m: m["order"])
+    back = next(reg for reg in regs if reg["id"] == filled(first_round[0])[0])
+    await remove(flow, tournament, back)
+    assert (await flow.db.tournament_registrations.find_one({"id": back["id"]}, {"_id": 0}))["removal"]
+
+    undone = await flow.patch(f"/api/tournaments/{tid}/registrations/{back['id']}", json={"status": "approved"})
+    assert undone.status_code == 200, undone.text
+    assert undone.json()["placement"]["ok"] is True and "removal" not in undone.json()
+    assert back["id"] in filled(await flow.reload(first_round[0]))
+    stored = await flow.db.tournament_registrations.find_one({"id": back["id"]}, {"_id": 0})
+    assert stored["status"] == "approved" and "removal" not in stored
+
+
+@pytest.mark.asyncio
 async def test_no_no_show_proposal_for_a_removed_participant(flow):
     _staff, tournament, regs = await eight(flow, event_mode="online")
     first_round = sorted((m for m in await flow.matches(tournament) if m["round"] == 1), key=lambda m: m["order"])
@@ -115,3 +208,36 @@ async def test_a_removal_drops_an_open_no_show_proposal_and_its_extension(flow):
     assert not after.get("no_show_proposal") and not after.get("no_show_extended_until"), "der Fall gehörte zur alten Paarung"
     lead = (await flow.get(f"/api/tournaments/{tournament['id']}/lead")).json()
     assert not [row for row in lead["attention"] if row["kind"] == "no_show" and row["match_id"] == match["id"]], "kein offener Fall"
+
+
+@pytest.mark.asyncio
+async def test_unregistering_does_not_lift_a_disqualification(flow):
+    """#2111: abmelden und neu anmelden hätte den Ausschluss aufgehoben - das darf nur, wer ihn auch aussprechen darf."""
+    staff = await flow.add_staff()
+    flow.act_as(staff)
+    tournament = await flow.create_tournament(status="registration_open")
+    tid = tournament["id"]
+    player = await flow.add_user(name="Paula")
+    out = await flow.register(tournament, player, status="disqualified")
+    helper = await flow.add_user(name="Helfer")
+    await flow.db.tournament_staff_assignments.insert_one({"tournament_id": tid, "user_id": helper["id"], "role": "scorekeeper",
+                                                           "scope": "tournament", "is_active": True})
+    url = f"/api/tournaments/{tid}/registrations/{out['id']}"
+
+    for person in (player, helper):
+        flow.act_as(person)
+        refused = await flow.delete(url)
+        assert refused.status_code == 409, refused.text
+        assert "nur die Turnierleitung" in refused.json()["detail"]
+        assert await flow.db.tournament_registrations.find_one({"id": out["id"]}) is not None
+
+    # Wer freiwillig ausgetreten ist, darf sich weiter abmelden.
+    other = await flow.add_user(name="Jonas")
+    left = await flow.register(tournament, other, status="withdrawn")
+    flow.act_as(other)
+    gone = await flow.delete(f"/api/tournaments/{tid}/registrations/{left['id']}")
+    assert gone.status_code == 200, gone.text
+
+    flow.act_as(staff)
+    removed = await flow.delete(url)
+    assert removed.status_code == 200, removed.text

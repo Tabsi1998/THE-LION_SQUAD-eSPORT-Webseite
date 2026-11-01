@@ -695,3 +695,16 @@ test("vor Ort (#2124, Review O4): nach dem Check-in-Ende bleibt bis zum Start �
   expect(await screen.findByTestId("tournament-checkin-local")).toBeDisabled();
   expect(screen.queryByTestId("tournament-checkin-over")).toBeNull();
 });
+
+
+test("disqualifiert: „Dein Stand“ ohne Abmelden - das nimmt nur die Turnierleitung zurück", async () => {
+  const tournament = { ...base, ...DATES, status: "check_in", public_phase: { state: "check_in", label: "Check-in" } };
+  apiMock.get.mockImplementation((path) => {
+    if (path === "/tournaments/cup") return Promise.resolve({ data: tournament });
+    if (path === "/tournaments/t1/registrations") return Promise.resolve({ data: [{ id: "r1", status: "disqualified", display_name: "Paula", user_id: "u1", is_mine: true }] });
+    return Promise.resolve({ data: [] });
+  });
+  renderPage();
+  expect(await screen.findByTestId("tournament-my-stand")).toBeInTheDocument();
+  expect(screen.queryByTestId("tournament-unregister-btn")).toBeNull();
+});

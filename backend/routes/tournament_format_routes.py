@@ -74,7 +74,10 @@ async def _swiss_next_round_graph(db, tournament: dict, actor_id: str | None) ->
     round_number = next_round_number(played)
     still_open = open_swiss_matches(played, round_number - 1)
     if still_open:
-        raise HTTPException(status_code=400, detail=f"{len(still_open)} Matches sind noch offen")
+        # Wie die anderen Meldungen (#2111, TA28): auf Deutsch und mit dem, was zu tun ist.
+        raise HTTPException(status_code=400, detail=(
+            f"{len(still_open)} Spiele der letzten Runde sind noch offen – die nächste Runde entsteht, wenn alle "
+            "gewertet sind."))
 
     regs = await db.tournament_registrations.find(
         {"tournament_id": tid, "status": {"$in": ["approved", "checked_in"]}},
@@ -111,7 +114,7 @@ async def _swiss_tournament(db, tid: str) -> dict:
     """Ein Schweizer Turnier, das sich noch ändern lässt: nicht gesperrt (423), nicht vorbei oder abgesagt (409)."""
     t = await db.tournaments.find_one({"id": tid}, {"_id": 0})
     if not t or t.get("format") != "swiss":
-        raise HTTPException(status_code=400, detail="Nur für Swiss-Turniere")
+        raise HTTPException(status_code=400, detail="Schweizer Runden gibt es nur bei Turnieren im Schweizer System.")
     await _ensure_tournament_unlocked(db, tid)
     problem = tournament_guard.finished_problem(t) or (SWISS_CANCELLED if t.get("status") == "cancelled" else None)
     if problem:
@@ -247,7 +250,7 @@ async def groups_generate(tid: str, body: dict | None = None, force: bool = Fals
     tid = await _resolve_tid(tid)
     t = await db.tournaments.find_one({"id": tid}, {"_id": 0})
     if not t or t.get("format") != "groups":
-        raise HTTPException(status_code=400, detail="Nur für Group-Stage")
+        raise HTTPException(status_code=400, detail="Gruppen gibt es nur beim Format „Gruppenphase“.")
     # Sperre und Ende (#2120, TA10): ein gesperrtes oder beendetes Turnier bekommt keine neuen Gruppen.
     await _ensure_tournament_unlocked(db, tid)
     finished = tournament_guard.finished_problem(t)
