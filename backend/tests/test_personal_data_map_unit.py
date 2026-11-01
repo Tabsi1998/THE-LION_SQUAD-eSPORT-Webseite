@@ -49,6 +49,8 @@ DYNAMIC = {
     "services/media_audit.py:_infer_scope_from_references:db[coll_name]": MEDIA,
     "services/media_audit.py:audit_image_references:db[coll_name]": MEDIA,
     "services/media_audit.py:iter_usages:getattr(db, collection)": MEDIA,
+    "services/media_audit.py:_rewrite_usages:getattr(db, collection)": MEDIA,
+    "services/media_audit.py:stamp_version:getattr(db, collection)": MEDIA,
     "services/media_scan.py:_clear_references:db[collection]": "media_scan.REFERENCE_FIELDS (Chat, Ergebnisfotos, Galerie)",
     "services/media_scan.py:_mark_ref:db[REF_COLLECTIONS.get(doc.get('kind'), 'media_uploads')]": "media_scan.REF_COLLECTIONS",
     "services/member_activity.py:member_id_of:db[collection]": "dolibarr_links und dolibarr_identities",

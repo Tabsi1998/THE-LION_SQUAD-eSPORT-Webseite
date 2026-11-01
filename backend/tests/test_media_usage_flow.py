@@ -57,6 +57,14 @@ PLACES = {
     "Adresse mit Zusatz": ("news_posts", {"id": "n-1", "banner_url": URL + "?v=3#oben"}),
     "Absolute Adresse": ("events", {"id": "e-1", "banner_url": "https://lionsquad.example" + URL}),
     "Kleinere Fassung": ("teams", {"id": "team-9", "logo_url": UPLOADS + "variants/genutzt-400.webp"}),
+    "Nackte Adresse mit Punkt": ("news_posts", {"id": "n-2", "content": f"Siehe {URL}."}),
+    "Nackte Adresse fett": ("events", {"id": "e-2", "description": f"Siehe **{URL}** und mehr"}),
+    # Eine Nachricht speichert den Sticker aufgelöst (#2122): alte Chats zeigen das Bild, auch wenn der Sticker weg ist.
+    "Sticker in einer Direktnachricht": ("direct_messages", {"id": "m-1", "sticker": {"id": "s-1", "url": URL}}),
+    "Sticker im Team-Chat": ("team_chat_messages", {"id": "m-2", "sticker": {"id": "s-1", "url": URL}}),
+    "Sticker im Turnier-Chat": ("tournament_chat_messages", {"id": "m-3", "sticker": {"id": "s-1", "url": URL}}),
+    "Sticker im Match-Chat": ("match_chat_messages", {"id": "m-4", "sticker": {"id": "s-1", "url": URL}}),
+    "Sticker in einem Türchen": ("advent_doors", {"id": "d-1", "sticker": {"id": "s-1", "url": URL}}),
 }
 
 
@@ -88,6 +96,108 @@ async def test_a_file_used_anywhere_counts_as_used_in_the_media_library(flow, pu
     # Lesbar benannt: kein roher Feldpfad.
     assert reference["place"] and "_url" not in reference["place"] and "." not in reference["place"], reference
     assert items["frei.webp"]["is_unused"] is True
+
+
+@pytest.mark.asyncio
+async def test_a_file_shown_only_outside_the_known_places_needs_confirmation(flow, public):
+    chef = await admin(flow)
+    await flow.db.reference_round_results.insert_one({"id": "r-1", "games": [{"map_id": "m", "image_url": URL + "?v=1"}]})
+    await flow.db.matches_v2.insert_one({"id": "g-1", "games": [{"map_id": "m", "map_image_url": URL}]})
+    await flow.db.neue_sammlung.insert_one({"id": "x-1", "tief": [{"bild": UPLOADS + "variants/genutzt-400.webp"}]})
+    # Verwaltung und Protokolle zeigen nichts.
+    await flow.db.audit_logs.insert_one({"id": "a-1", "action": "media.rotate", "data": {"filename": "frei.webp"}})
+    await flow.db.upload_events.insert_one({"id": "u-1", "result": {"url": UPLOADS + "frei.webp"}})
+
+    refused = await flow.delete(f"/api/admin/media/{NAME}")
+
+    assert refused.status_code == 409
+    detail = refused.json()["detail"]
+    assert "Ergebnisblatt" in detail and "Liga-Spiel" in detail and "an anderer Stelle" in detail
+    assert "neue_sammlung" not in detail and "reference_round_results" not in detail
+    assert (public / NAME).exists()
+
+    # Bleibt möglich, mit Rückfrage in der Oberfläche; was dort steht, wird nicht umgeschrieben.
+    forced = await flow.delete(f"/api/admin/media/{NAME}?force=true")
+    assert forced.status_code == 200, forced.text
+    assert not (public / NAME).exists()
+    assert (await flow.db.matches_v2.find_one({"id": "g-1"}))["games"][0]["map_image_url"] == URL
+    log = await flow.db.audit_logs.find_one({"action": "media.delete", "target_id": NAME})
+    assert log["actor_id"] == chef["id"] and log["data"]["force"] is True
+
+    free = await flow.delete("/api/admin/media/frei.webp")
+    assert free.status_code == 200, free.text
+
+
+@pytest.mark.asyncio
+async def test_all_collections_are_only_read_when_the_answer_is_still_open(flow, public, monkeypatch):
+    await admin(flow)
+    await flow.db.news_posts.insert_one({"id": "n-1", "banner_url": URL})
+    reads: list[set] = []
+    real = media_audit.referenced_in
+
+    async def counting(db, names):
+        reads.append(names)
+        return await real(db, names)
+
+    monkeypatch.setattr(media_audit, "referenced_in", counting)
+
+    used = await flow.delete(f"/api/admin/media/{NAME}")
+    forced = await flow.delete(f"/api/admin/media/{NAME}?force=true")
+    assert used.status_code == 409 and forced.status_code == 200 and reads == []
+
+    free = await flow.delete("/api/admin/media/frei.webp")
+    assert free.status_code == 200 and reads == [{"frei.webp"}]
+
+
+@pytest.mark.asyncio
+async def test_the_png_next_to_an_svg_logo_counts_as_the_logo(flow, public):
+    await admin(flow)
+    (public / "logo.svg").write_bytes(b"<svg/>")
+    (public / "logo.png").write_bytes(b"png")
+    await flow.db.partners.insert_one({"id": "p-1", "tools": [{"name": "Tool", "image_url": UPLOADS + "logo.png"}]})
+
+    item = (await media_items(flow))["logo.svg"]
+
+    assert item["is_unused"] is False and item["usage_count"] == 1
+    refused = await flow.delete("/api/admin/media/logo.svg")
+    assert refused.status_code == 409
+    assert (public / "logo.png").exists()
+
+
+def test_a_requested_png_keeps_its_own_usage_next_to_the_svg():
+    assert media_audit.canonical_name(UPLOADS + "logo.png", {"logo": "logo.svg"}) == "logo.svg"
+    assert media_audit.canonical_name(UPLOADS + "logo.png", {"logo": "logo.png"}) == "logo.png"
+    assert media_audit.canonical_name(UPLOADS + "logo.png", {"logo": "logo.webp"}) == "logo.png"
+
+
+@pytest.mark.asyncio
+async def test_the_image_of_a_deleted_sticker_stays_while_old_messages_show_it(flow, public):
+    await admin(flow)
+    await flow.db.direct_messages.insert_one({"id": "m-1", "message": "geheim", "sticker": {"id": "s-weg", "url": URL}})
+
+    item = (await media_items(flow))[NAME]
+
+    assert item["is_unused"] is False
+    # Die Mediathek nennt die Stelle, aber nichts aus der Nachricht.
+    assert item["references"][0]["label"] == "Nachricht im Chat"
+    assert item["references"][0]["place"] == "Direktnachricht · Sticker"
+    assert "id" not in item["references"][0]
+    assert "m-1" not in str(item)
+    response = await flow.delete(f"/api/admin/media/{NAME}")
+    assert response.status_code == 409
+    assert (public / NAME).exists()
+
+
+@pytest.mark.asyncio
+async def test_a_message_is_not_marked_as_edited_when_its_sticker_image_is_removed(flow, public):
+    await admin(flow)
+    await flow.db.direct_messages.insert_one({"id": "m-1", "updated_at": "alt", "sticker": {"id": "s-weg", "url": URL}})
+
+    response = await flow.delete(f"/api/admin/media/{NAME}?force=true")
+    assert response.status_code == 200
+
+    message = await flow.db.direct_messages.find_one({"id": "m-1"})
+    assert message["sticker"]["url"] is None and message["updated_at"] == "alt"
 
 
 @pytest.mark.asyncio

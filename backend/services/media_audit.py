@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 from database import get_db
 from models import now_utc
 from services import uploads_inventory
-from services.media_formats import PUBLIC_MEDIA_EXTS
+from services.media_formats import PUBLIC_MEDIA_EXTS, bare_upload_url
 
 
 UPLOAD_DIR = pathlib.Path(os.environ.get("UPLOAD_DIR", "/app/backend/uploads"))
@@ -52,6 +52,8 @@ TEXT_TARGETS: list[tuple[str, list[str]]] = [
     ("club_member_profiles", ["bio"]),
 ]
 
+MESSAGE_COLLECTIONS = ("direct_messages", "team_chat_messages", "tournament_chat_messages", "match_chat_messages")
+
 # Weitere Stellen, an denen eine hochgeladene Datei verwendet sein kann (#1039): verschachtelte Felder und Texte, die
 # die Prüfung oben nicht reparieren kann. Die Kontolöschung behält eine Datei, solange sie hier oder oben steht.
 # Gewinnerbilder: die Plätze aus ``services.awards.IMAGE_SLOTS``.
@@ -59,8 +61,11 @@ USAGE_TARGETS: list[tuple[str, list[str]]] = [
     ("tournaments", ["award_images.1", "award_images.2", "award_images.3"]),
     ("partners", ["tools.image_url"]),
     ("settings", ["club_photo.url", "timeline.image_url"]),
-    ("advent_doors", ["media_url"]),
+    ("advent_doors", ["media_url", "sticker.url"]),
     ("stickers", ["url"]),
+    # Eine Nachricht speichert ihren Sticker aufgelöst (``services.stickers``): Alte Chats zeigen das Bild weiter, auch
+    # wenn der Sticker längst gelöscht ist (#2122). Solange so eine Nachricht steht, ist die Datei verwendet.
+    *((collection, ["sticker.url"]) for collection in MESSAGE_COLLECTIONS),
     ("gallery_photos", ["original_url"]),
     ("game_servers", ["server_icon_url"]),
     # Map-Pools (#1616): der Snapshot zeigt das Bild von damals, auch wenn die Map inzwischen ein neues hat.
@@ -91,6 +96,8 @@ COLLECTION_LABELS = {
     "game_servers": "Spielserver", "game_maps": "Map", "map_pools": "Map-Pool",
     "reference_lineages": "Spur", "reference_series": "Saison",
     "leagues": "Liga", "league_seasons": "Liga-Season", "league_divisions": "Liga N",
+    "direct_messages": "Direktnachricht", "team_chat_messages": "Team-Chat", "tournament_chat_messages": "Turnier-Chat",
+    "match_chat_messages": "Match-Chat",
 }
 FIELD_LABELS = {
     "logo_url": "Logo", "logo_light_url": "Logo hell", "logo_dark_url": "Logo dunkel",
@@ -100,7 +107,7 @@ FIELD_LABELS = {
     "thumbnail_url": "Vorschaubild", "video_url": "Video", "photo_url": "Foto", "content": "Text",
     "description": "Beschreibung", "program": "Programm", "bio": "Über mich", "rules": "Regeln", "prize_pool": "Preise",
     **{f"award_images.{place}": f"Gewinnerbild Platz {place}" for place in ("1", "2", "3")},
-    "tools.image_url": "Bild eines Werkzeugs", "media_url": "Bild oder Video", "url": "Bild",
+    "tools.image_url": "Bild eines Werkzeugs", "media_url": "Bild oder Video", "url": "Bild", "sticker.url": "Sticker",
     "original_url": "Original", "server_icon_url": "Server-Symbol", "modes.maps.image_url": "Bild einer Map",
     "image_history": "früheres Bild", "emblem_url": "Emblem", "prizes.image_url": "Bild eines Gewinns",
     **{f"dolibarr_images.{kind}.{variant}.url":
@@ -111,6 +118,16 @@ PLACE_LABELS = {
     ("settings", "avatar_url"): "Discord · Bild des Bots",
     ("settings", "club_photo.url"): "Über uns · Vereinsfoto",
     ("settings", "timeline.image_url"): "Über uns · Bild in der Chronik",
+}
+# Verwaltung und Protokolle: Ein Eintrag hier sagt nur, dass es die Datei gibt oder gab - gezeigt wird sie dadurch nicht.
+NOT_A_USAGE = {"media_uploads", "media_scans", "upload_events", "audit_logs", "pending_file_cleanups"}
+# Stände von damals: Sie zeigen das Bild, stehen aber bewusst nicht in den Verwendungsstellen (siehe oben, ``game_maps``).
+SNAPSHOT_LABELS = {"reference_round_results": "Ergebnisblatt", "reference_round_result_revisions": "Ergebnisblatt", "matches_v2": "Liga-Spiel", "tournament_awards": "Preis"}
+# Wo neben der Adresse auch die Maße stehen: gedreht tauschen sie mit (#2122).
+SIZE_FIELDS = {
+    ("gallery_photos", "image_url"): ("width", "height"),
+    ("stickers", "url"): ("width", "height"),
+    "sticker.url": ("sticker.width", "sticker.height"),
 }
 # Bis zu so vielen Dateien sucht die Verwendungssuche gezielt nach den Namen, darüber liest sie alle Adressen einmal.
 BATCH = 100
@@ -164,7 +181,7 @@ def _upload_path(value: str) -> str | None:
 
 
 def _filename_from_upload_path(path: str) -> str | None:
-    filename = pathlib.PurePosixPath(path).name
+    filename = pathlib.PurePosixPath(path.split("#", 1)[0].split("?", 1)[0]).name
     if not filename or filename.startswith(".") or "/" in filename or "\\" in filename:
         return None
     if pathlib.Path(filename).suffix.lower() not in PUBLIC_MEDIA_EXTS:
@@ -200,15 +217,35 @@ def place_label(collection: str, field: str) -> str:
     return f"{COLLECTION_LABELS.get(collection, collection)} · {FIELD_LABELS.get(field, field)}"
 
 
+def usage_label(collection: str, document: dict) -> str | None:
+    """Wovon die Rede ist: der Titel des Eintrags. Eine Nachricht nennt nur, dass es eine ist - nie Kennung oder Inhalt."""
+    if collection in MESSAGE_COLLECTIONS:
+        return "Nachricht im Chat"
+    return document.get("title") or document.get("name") or document.get("display_name") or document.get("id") or document.get("slug")
+
+
+def stamp_for(collection: str, stamp: dict | None) -> dict | None:
+    """Eine Nachricht bekommt kein neues ``updated_at`` - sie wäre sonst „bearbeitet“, ohne dass jemand schrieb."""
+    return None if collection in MESSAGE_COLLECTIONS else stamp
+
+
 def canonical_name(value, candidates: dict[str, str]) -> str | None:
     """Der Dateiname hinter einer Adresse - ohne Query und Fragment, auch absolut; eine kleinere Fassung
-    (``variants/<name>-400.webp``) zählt als ihr Original. ``candidates``: Stamm → Dateiname."""
-    name = uploads_inventory.upload_filename(str(value or ""))
+    (``variants/<name>-400.webp``) zählt als ihr Original, die PNG-Fassung neben einem SVG-Logo als das SVG (#1952).
+    ``candidates``: Stamm → Dateiname."""
+    return _canonical_of(uploads_inventory.upload_filename(str(value or "")), candidates)
+
+
+def _canonical_of(name: str | None, candidates: dict[str, str]) -> str | None:
     if not name or name in candidates.values():
         return name
     variant = VARIANT_NAME.match(name)
     if variant and variant.group("stem") in candidates:
         return candidates[variant.group("stem")]
+    path = pathlib.PurePosixPath(name)
+    twin = candidates.get(path.stem)
+    if path.suffix.lower() == ".png" and twin and twin.lower().endswith(".svg"):
+        return twin
     return name
 
 
@@ -265,8 +302,11 @@ async def iter_usages(db, names: set[str]):
         projection = {"_id": 1, **{key: 1 for key in LABEL_FIELDS}, **{field: 1 for field, _text in fields}}
         async for document in getattr(db, collection).find(query, projection):
             for field, text in fields:
-                found = {canonical_name(url, candidates) for value in values_at(document, field)
-                         for url in (urls_in_text(value) if text else [value])}
+                # Steht die PNG-Fassung selbst in der Anfrage, zählt die Adresse für sie, nicht für das SVG daneben.
+                found = {raw if raw in names else _canonical_of(raw, candidates)
+                         for value in values_at(document, field)
+                         for url in (urls_in_text(value) if text else [value])
+                         for raw in [uploads_inventory.upload_filename(str(url or ""))]}
                 for name in sorted(found & names):
                     yield collection, document, field, name, text
 
@@ -283,6 +323,92 @@ async def rewrite_field(collection, row_id, path: str, change, extra: dict | Non
         return False
     await collection.update_one({"_id": row_id}, {"$set": {top: value, **(extra or {})}})
     return True
+
+
+def versioned_url(url: str, version: int) -> str:
+    """Die Adresse mit ``?v=``: bleibt die Datei dieselbe, ändert sich der Inhalt, holt jeder Browser sie neu."""
+    base, _, fragment = str(url).partition("#")
+    path, _, query = base.partition("?")
+    kept = [part for part in query.split("&") if part and not part.startswith("v=")]
+    return f"{path}?{'&'.join([*kept, f'v={version}'])}" + (f"#{fragment}" if fragment else "")
+
+
+async def _rewrite_usages(db, filename: str, change, stamp: dict | None) -> list[tuple]:
+    """Jede Verwendung der Datei mit ``change(adresse)`` umschreiben, auch Adressen in Texten. Liefert die Treffer."""
+    candidates = {pathlib.PurePosixPath(filename).stem: filename}
+
+    def in_field(value):
+        return change(value) if canonical_name(value, candidates) == filename else value
+
+    def in_address(match):
+        # Satzzeichen und Markdown um eine nackte Adresse bleiben im Text stehen - sie gehören nicht zur Adresse.
+        address = match.group(0)
+        tail = len(address) - len(address.rstrip(uploads_inventory.TEXT_PUNCTUATION))
+        body = address[:-tail] if tail else address
+        head = len(body) - len(body.lstrip("*_"))
+        return f"{body[:head]}{in_field(body[head:])}{address[len(body):]}"
+
+    def in_text(text):
+        if not isinstance(text, str):
+            return text
+        return uploads_inventory.URL_IN_TEXT_RE.sub(in_address, text)
+
+    hits = [hit async for hit in iter_usages(db, {filename})]
+    for collection, doc, field, _name, text in hits:
+        await rewrite_field(getattr(db, collection), doc["_id"], field, in_text if text else in_field, stamp_for(collection, stamp))
+    return hits
+
+
+async def stamp_version(db, filename: str, version: int, size: tuple[int, int], stamp: dict | None = None) -> int:
+    """Nach dem Drehen (#2122): Jede Stelle, die das Bild zeigt, bekommt die neue Version an die Adresse und dort, wo die
+    Maße mitstehen, die neuen Maße. Liefert, wie viele Stellen es sind."""
+    hits = await _rewrite_usages(db, filename, lambda url: versioned_url(url, version), stamp)
+    for collection, doc, field, _name, _text in hits:
+        keys = SIZE_FIELDS.get(field if field == "sticker.url" else (collection, field))
+        if keys:
+            await getattr(db, collection).update_one({"_id": doc["_id"]}, {"$set": dict(zip(keys, size))})
+    return len(hits)
+
+
+async def repoint_usages(db, filename: str, target_url: str, stamp: dict | None = None) -> int:
+    """Jede Stelle, die ``filename`` zeigt, zeigt danach auf ``target_url`` (Duplikat ersetzen, #2122). Wer die
+    PNG-Fassung eines SVG-Logos zeigt - Mail, PDF, Teilen-Karte -, bekommt wieder eine PNG-Fassung."""
+    bare_target = bare_upload_url(target_url)
+    both_svg = filename.lower().endswith(".svg") and bare_target.lower().endswith(".svg")
+
+    def to_target(url):
+        wants_png = both_svg and str(uploads_inventory.upload_filename(str(url)) or "").lower().endswith(".png")
+        return f"{bare_target[:-4]}.png" if wants_png else target_url
+
+    return len(await _rewrite_usages(db, filename, to_target, stamp))
+
+
+async def still_referenced(db, names: set[str]) -> set[str]:
+    """Die Dateien aus ``names``, auf die noch etwas zeigt (``referenced_in``)."""
+    return set(await referenced_in(db, names))
+
+
+def other_place_label(collection: str) -> str:
+    """Der lesbare Name einer Stelle außerhalb der Verwendungsstellen - nie der rohe Sammlungsname."""
+    return SNAPSHOT_LABELS.get(collection) or COLLECTION_LABELS.get(collection) or "an anderer Stelle"
+
+
+async def referenced_in(db, names: set[str]) -> dict[str, set[str]]:
+    """Das Netz unter den bekannten Stellen (``usage_places``): Datei → Sammlungen, die auf sie zeigen. Vor dem Löschen
+    liest die Mediathek alle Sammlungen einmal durch (#2122) - nur auf Klick, das kostet. Steht eine Datei in einem Feld,
+    das noch niemand eingetragen hat, oder in einem gespeicherten Stand von damals, wird sie nicht still gelöscht."""
+    if not names:
+        return {}
+    stems = {pathlib.PurePosixPath(name).stem: name for name in names}
+    png_twins = {f"{stem}.png" for stem, name in stems.items() if name.lower().endswith(".svg")}
+    # Vollständig: Davon hängt ab, ob eine Datei gelöscht wird. Dafür bleiben Verwaltung und Protokolle ungelesen.
+    references, _partial = await uploads_inventory.collect_references(db, set(names) | png_twins, complete=True, skip=NOT_A_USAGE)
+    found: dict[str, set[str]] = {}
+    for name, rows in references.items():
+        target = _canonical_of(name, stems)
+        if target in names:
+            found.setdefault(target, set()).update(row["collection"] for row in rows)
+    return found
 
 
 async def audit_image_references(repair: bool = False, clear_missing: bool = False) -> dict:
@@ -434,7 +560,9 @@ async def audit_image_references(repair: bool = False, clear_missing: bool = Fal
 
 async def _infer_scope_from_references(filename: str) -> tuple[str | None, dict | None]:
     db = get_db()
-    suffix_re = f"{re.escape(filename)}$"
+    # Auch mit Version oder Zusatz an der Adresse (gedrehtes Bild, #2122); „x.webp“ trifft nicht „mx.webp“.
+    suffix_re = rf"(?:^|/){re.escape(filename)}(\?|#|$)"
+    text_re = rf"(?:^|/){re.escape(filename)}(?![A-Za-z0-9_-]|\.[A-Za-z0-9])"
     for coll_name, fields, scope in SCOPE_TARGETS:
         collection = db[coll_name]
         for field in fields:
@@ -449,7 +577,7 @@ async def _infer_scope_from_references(filename: str) -> tuple[str | None, dict 
     for coll_name, fields in TEXT_TARGETS:
         collection = db[coll_name]
         for field in fields:
-            doc = await collection.find_one({field: {"$regex": re.escape(filename)}}, {"_id": 0, "id": 1, "slug": 1})
+            doc = await collection.find_one({field: {"$regex": text_re}}, {"_id": 0, "id": 1, "slug": 1})
             if doc:
                 return "admin", {
                     "collection": coll_name,

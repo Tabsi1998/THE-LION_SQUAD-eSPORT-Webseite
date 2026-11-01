@@ -129,7 +129,7 @@ export default function ImageScanTab() {
           <div>
             <div className="font-heading font-bold uppercase">Anbieter und Schwellen</div>
             <p className="mt-1 text-xs text-white/50">
-              Geprüft wird jedes hochgeladene Bild (Chat, Profil, Team). Es zählt der höhere Wert aus Nacktheit und Gewalt: ab „Prüfung nötig“ bleibt ein Chat-Bild verborgen, bis ihr entscheidet;
+              Geprüft wird jedes hochgeladene Bild: im Chat, bei Profil und Team, Fotos vom Ergebnis, eingesandte Fotos und alles aus den Bildfeldern der Verwaltung. Es zählt der höhere Wert aus Nacktheit und Gewalt: ab „Prüfung nötig“ bleibt ein Chat-Bild verborgen, bis ihr entscheidet;
               ab „Entfernen“ geht es sofort in die Quarantäne, die Person bekommt eine Nachricht und – wenn eingeschaltet – einen Treffer für die Stufen. Die Maschine entscheidet nie endgültig: jede Entscheidung lässt sich unten umdrehen.
             </p>
           </div>

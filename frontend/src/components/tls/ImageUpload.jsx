@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, Crop, RotateCcw, RotateCw, Upload, X, Image as ImageIcon } from "lucide-react";
-import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
-import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { api, formatUploadError, resolveMediaUrl } from "@/lib/api";
+import { useMediaLibrary } from "@/hooks/useMediaLibrary";
 import { logUploadClientFailure } from "@/lib/uploadDiagnostics";
-import { isSvgFile, isSvgUpload } from "@/lib/svgLogo";
+import { tooLargeMessage, uploadLimits, useUploadLimits } from "@/lib/uploadLimits";
+import { isSvgFile } from "@/lib/svgLogo";
 import { AvatarCropDialog } from "./AvatarCropDialog";
 import { LogoSurfaces } from "./LogoSurfaces";
+import { MediaLibraryMore, MediaLibrarySearch } from "./MediaLibraryControls";
 import { toast } from "sonner";
 
 const parseUploadMb = (value, fallback) => {
@@ -13,10 +15,8 @@ const parseUploadMb = (value, fallback) => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 };
 
-const DEFAULT_IMAGE_UPLOAD_MB = parseUploadMb(import.meta.env.VITE_MAX_IMAGE_UPLOAD_MB, 120);
-const PROXY_UPLOAD_LIMIT_MB = parseUploadMb(import.meta.env.VITE_PROXY_UPLOAD_LIMIT_MB, Math.ceil(DEFAULT_IMAGE_UPLOAD_MB * 1.25));
 const IMAGE_COMPRESS_TRIGGER_MB = parseUploadMb(import.meta.env.VITE_IMAGE_COMPRESS_TRIGGER_MB, 4);
-const IMAGE_COMPRESS_TARGET_MB = parseUploadMb(import.meta.env.VITE_IMAGE_COMPRESS_TARGET_MB, Math.min(10, DEFAULT_IMAGE_UPLOAD_MB));
+const IMAGE_COMPRESS_TARGET_MB = parseUploadMb(import.meta.env.VITE_IMAGE_COMPRESS_TARGET_MB, 10);
 const IMAGE_MAX_DIMENSION = Number.parseInt(import.meta.env.VITE_IMAGE_MAX_DIMENSION || "4096", 10) || 4096;
 const SUPPORTED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 const SUPPORTED_IMAGE_EXT_RE = /\.(png|jpe?g|webp)$/i;
@@ -70,9 +70,8 @@ function fileLooksSupported(file, logo = false) {
 // derselbe Wortlaut wie am Server.
 export const SVG_REFUSED_MESSAGE = "SVG-Dateien gehen hier nicht. Bitte als PNG mit durchsichtigem Hintergrund (z. B. 2000 px breit) oder als WebP exportieren – die Website macht daraus alle Größen.";
 export const LOGO_HINT = "Am besten SVG, sonst PNG mit durchsichtigem Hintergrund.";
-const SVG_MAX_MB = parseUploadMb(import.meta.env.VITE_MAX_SVG_UPLOAD_MB, 2); // wie MAX_SVG_UPLOAD_MB im Backend (services/svg_safe.py)
 // Derselbe Wortlaut wie am Server (services/svg_logo.py) - ein zu großes SVG geht gar nicht erst los.
-const SVG_TOO_BIG_MESSAGE = `Das SVG ist zu groß (höchstens ${SVG_MAX_MB} MB). Bitte schlanker exportieren oder als PNG hochladen.`;
+const svgTooBigMessage = (mb) => `Das SVG ist zu groß (höchstens ${mb} MB). Bitte schlanker exportieren oder als PNG hochladen.`;
 
 export function unsupportedImageMessage(file) {
   const type = (file?.type || "").toLowerCase();
@@ -273,7 +272,7 @@ async function loadImage(file) {
   }
 }
 
-export async function prepareImageForUpload(file, maxSizeMb = DEFAULT_IMAGE_UPLOAD_MB, editOptions = null) {
+export async function prepareImageForUpload(file, maxSizeMb = uploadLimits().image_mb, editOptions = null) {
   if (!file) return file;
   if (!fileLooksSupported(file)) {
     throw new Error(unsupportedImageMessage(file));
@@ -334,6 +333,8 @@ export async function prepareImageForUpload(file, maxSizeMb = DEFAULT_IMAGE_UPLO
  * Reusable image upload field. Renders preview + upload button.
  * Returns the public URL (e.g. /api/static/uploads/abc.png) via onChange.
  *
+ * Die erlaubte Größe kommt vom Server (#2122) - `maxSizeMb` engt sie für ein Feld höchstens ein.
+ *
  * Props:
  *   value: current url string
  *   onChange: (url) => void
@@ -348,17 +349,19 @@ export async function prepareImageForUpload(file, maxSizeMb = DEFAULT_IMAGE_UPLO
  *         Vorschau auf hellem und dunklem Grund (`logoPreview={false}`, wenn das Feld sie selbst zeigt). SVG nimmt der
  *         Server nur über die Logo-Routen an (`endpoint` oben, mit Rechteprüfung) - nie über `/uploads/image`.
  */
-export function ImageUpload({ value, onChange, label, testId = "image-upload", variant = "square", crop, endpoint = "/uploads/image", maxSizeMb = DEFAULT_IMAGE_UPLOAD_MB, allowLibrary = false, mediaScope, libraryEndpoint, logo = false, logoPreview = true }) {
+export function ImageUpload({ value, onChange, label, testId = "image-upload", variant = "square", crop, endpoint = "/uploads/image", maxSizeMb, allowLibrary = false, mediaScope, libraryEndpoint, logo = false, logoPreview = true }) {
   const fileRef = useRef(null);
   const cropBoxRef = useRef(null);
   const previewCanvasRef = useRef(null);
   const previewImageRef = useRef(null);
   const effectiveMediaScope = mediaScope || defaultMediaScope();
+  const limits = useUploadLimits();
+  const maxMb = maxSizeMb ?? limits.image_mb;
   const effectiveLibraryEndpoint = libraryEndpoint || defaultLibraryEndpoint();
   const [uploading, setUploading] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
-  const [library, setLibrary] = useState([]);
-  const [loadingLibrary, setLoadingLibrary] = useState(false);
+  // SVG-Logos (#1952) nur in Logo-Feldern - ein Profilbild oder Banner bekommt sie gar nicht erst angeboten.
+  const library = useMediaLibrary(`${effectiveLibraryEndpoint}${logo ? "" : `${effectiveLibraryEndpoint.includes("?") ? "&" : "?"}exclude_svg=true`}`, libraryOpen);
   const [editor, setEditor] = useState(null);
   const [drag, setDrag] = useState(null);
   const [cropBox, setCropBox] = useState({ width: 0, height: 0 });
@@ -402,9 +405,9 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
     changeActiveUploads(1);
     try {
       // Schon zugeschnitten (Profilbild, #1459): klein und fertig, nicht noch einmal durch die Optimierung.
-      const uploadFile = prepared ? file : await prepareImageForUpload(file, maxSizeMb, editOptions);
-      if (uploadFile.size > maxSizeMb * 1024 * 1024) {
-        toast.error(`Datei zu groß (max ${maxSizeMb} MB). Bitte Bild kleiner exportieren oder Proxy-Limit erhöhen.`);
+      const uploadFile = prepared ? file : await prepareImageForUpload(file, maxMb, editOptions);
+      if (uploadFile.size > maxMb * 1024 * 1024) {
+        toast.error(tooLargeMessage(maxMb));
         return false;
       }
       const fd = new FormData();
@@ -414,21 +417,16 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
       toast.success(uploadFile !== file ? "Bild optimiert und hochgeladen." : "Bild hochgeladen.");
       return true;
     } catch (e) {
-      const detail = e.response?.data?.detail;
-      const status = e.response?.status;
-      const message = status === 413
-        ? `Datei zu groß oder Reverse Proxy blockiert den Upload. App-Limit: ${maxSizeMb} MB, externer Proxy bitte auf mindestens ${PROXY_UPLOAD_LIMIT_MB} MB setzen.`
-        : detail ? formatApiError(detail) : e.message || "Upload fehlgeschlagen";
+      const message = formatUploadError(e, "Upload fehlgeschlagen.", { appLimitMb: maxMb });
       await logUploadClientFailure(e, file, {
         endpoint,
         mediaScope: effectiveMediaScope,
         kind: "image",
         message,
         phase: "Bild-Upload",
-        appLimitMb: maxSizeMb,
-        proxyLimitMb: PROXY_UPLOAD_LIMIT_MB,
+        appLimitMb: maxMb,
       });
-      toast.error(status ? `Upload fehlgeschlagen (${status}): ${message}` : `Upload fehlgeschlagen: ${message}`);
+      toast.error(message);
       return false;
     } finally {
       if (fileRef.current) fileRef.current.value = "";
@@ -447,8 +445,8 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
     // SVG-Logo (#1952): ohne Zuschnitt und ohne Umrechnen im Browser - der Server bereinigt es und schneidet leere
     // Ränder ab; ein zu großes geht gar nicht erst los.
     if (logo && isSvgFile(file)) {
-      if (file.size > SVG_MAX_MB * 1024 * 1024) {
-        toast.error(SVG_TOO_BIG_MESSAGE);
+      if (file.size > limits.svg_mb * 1024 * 1024) {
+        toast.error(svgTooBigMessage(limits.svg_mb));
         if (fileRef.current) fileRef.current.value = "";
         return;
       }
@@ -485,23 +483,6 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
     }
     await uploadFile(file);
   };
-
-  const openLibrary = useCallback(async () => {
-    setLibraryOpen(true);
-    setLoadingLibrary(true);
-    try {
-      const { data } = await api.get(effectiveLibraryEndpoint);
-      setLibrary(data || []);
-    } catch {
-      toast.error("Medienbibliothek konnte nicht geladen werden.");
-    } finally {
-      setLoadingLibrary(false);
-    }
-  }, [effectiveLibraryEndpoint]);
-  useApiInvalidation(() => {
-    if (libraryOpen) return openLibrary();
-    return undefined;
-  }, ["media", "uploads"]);
 
   const editorSource = editor?.naturalWidth && editor?.naturalHeight
     ? calculateCropSourceRect(editor.naturalWidth, editor.naturalHeight, editor)
@@ -580,8 +561,6 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
   const previewClass = variant === "wide"
     ? "aspect-[16/9] w-full"
     : "w-20 h-20";
-  // SVG-Logos (#1952) nur in Logo-Feldern - ein Profilbild oder Banner bekommt sie gar nicht erst angeboten.
-  const libraryItems = logo ? library : library.filter((item) => !isSvgUpload(item.url));
   return (
     <div>
       {label && <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>}
@@ -609,7 +588,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
           {allowLibrary && (
             <button
               type="button"
-              onClick={openLibrary}
+              onClick={() => setLibraryOpen(true)}
               data-testid={`${testId}-library`}
               className="w-full inline-flex min-h-11 items-center justify-center gap-2 px-3 py-2 border border-white/15 text-white/70 font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-white/5"
             >
@@ -638,7 +617,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
             </div>
           )}
           <p className="text-[10px] text-white/40" data-testid={`${testId}-hint`}>
-            {logo ? `${LOGO_HINT} SVG bis ${SVG_MAX_MB} MB, Bilder bis ${maxSizeMb} MB.` : `PNG/JPG/WebP bis ${maxSizeMb} MB. SVG geht nicht.`}
+            {logo ? `${LOGO_HINT} SVG bis ${limits.svg_mb} MB, Bilder bis ${maxMb} MB.` : `PNG/JPG/WebP bis ${maxMb} MB. SVG geht nicht.`}
           </p>
         </div>
       </div>
@@ -650,13 +629,14 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
               <h3 className="font-heading text-xl font-black uppercase">Medienbibliothek</h3>
               <button type="button" onClick={() => setLibraryOpen(false)} className="text-white/50 hover:text-white">×</button>
             </div>
-            {loadingLibrary ? (
+            <MediaLibrarySearch library={library} testId={`${testId}-library`} />
+            {library.loading ? (
               <div className="text-white/40 py-12 text-center">Lade Medien…</div>
-            ) : libraryItems.length === 0 ? (
-              <div className="text-white/40 py-12 text-center">Keine Bilder vorhanden.</div>
+            ) : library.items.length === 0 ? (
+              <div className="text-white/40 py-12 text-center">{library.search ? "Nichts gefunden." : "Keine Bilder vorhanden."}</div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                {libraryItems.map((item) => (
+                {library.items.map((item) => (
                   <button
                     key={item.filename}
                     type="button"
@@ -669,6 +649,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
                 ))}
               </div>
             )}
+            <MediaLibraryMore library={library} testId={`${testId}-library`} />
           </div>
         </div>
       )}

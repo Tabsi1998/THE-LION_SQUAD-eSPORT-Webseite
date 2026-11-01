@@ -14,6 +14,7 @@ Zustände je Datei:
 """
 from __future__ import annotations
 
+import asyncio
 import pathlib
 import re
 from collections import defaultdict
@@ -24,8 +25,10 @@ from urllib.parse import urlparse
 VARIANT_DIR = "variants"
 VARIANT_RE = re.compile(r"^(?P<stem>.+)-(?P<width>\d{3,4})\.webp$")
 TEXT_IMAGE_RE = re.compile(r"!\[[^\]\n]*\]\((?P<md>[^)\s]+)\)|<img\b[^>]*\bsrc=[\"'](?P<html>[^\"']+)[\"']", re.IGNORECASE)
+TEXT_PUNCTUATION = ".,;:!?*_"
 URL_IN_TEXT_RE = re.compile(r"[^\s\"'()<>\[\]]*uploads/[^\s\"'()<>\[\]]+")
 SCAN_LIMIT = 50000   # je Sammlung; darüber wird die Sammlung als „nur teilweise“ vermerkt
+YIELD_EVERY = 200
 AREA_LABELS = {
     "public": "öffentliche Medien (public)",
     "variants": "Vorschaubilder (public/variants)",
@@ -59,7 +62,8 @@ def upload_filename(value: str) -> str | None:
     path = raw.split("?", 1)[0].split("#", 1)[0]
     marker = path.rfind("uploads/")
     rest = path[marker + len("uploads/"):]
-    name = pathlib.PurePosixPath(rest).name
+    # Nackte Adresse im Fließtext: Satzzeichen und Markdown am Ende gehören nicht zum Namen (#2122).
+    name = pathlib.PurePosixPath(rest).name.rstrip(TEXT_PUNCTUATION)
     return name or None
 
 
@@ -118,17 +122,23 @@ def references_in(document: dict, known_names: set[str]) -> list[tuple[str, str]
     return found
 
 
-async def collect_references(db, known_names: set[str]) -> tuple[dict[str, list[dict]], list[str]]:
-    """Dateiname → Verweise über alle Sammlungen. Liefert auch, welche Sammlungen nur teilweise gelesen wurden."""
+async def collect_references(db, known_names: set[str], *, complete: bool = False, skip: frozenset[str] | set[str] = frozenset()) -> tuple[dict[str, list[dict]], list[str]]:
+    """Dateiname → Verweise über alle Sammlungen. Liefert auch, welche Sammlungen nur teilweise gelesen wurden.
+
+    ``complete``: ohne Obergrenze - wer danach löscht, darf keine Sammlung nur halb lesen (#2122). ``skip``: Sammlungen,
+    die für die Frage keine Rolle spielen."""
     refs: dict[str, list[dict]] = defaultdict(list)
     partial: list[str] = []
     for collection in sorted(await db.list_collection_names()):
-        if collection.startswith("system."):
+        if collection.startswith("system.") or collection in skip:
             continue
         count = 0
         async for document in db[collection].find({}, {"_id": 0}):
             count += 1
-            if count > SCAN_LIMIT:
+            if complete and count % YIELD_EVERY == 0:
+                # Der volle Durchlauf läuft im Serverprozess: Zwischendurch kommen andere Anfragen an die Reihe.
+                await asyncio.sleep(0)
+            if not complete and count > SCAN_LIMIT:
                 partial.append(collection)
                 break
             ident = document.get("id") or document.get("slug") or document.get("username") or ""

@@ -496,6 +496,8 @@ mitgefahren, nehmt ihr den Schalter im Ergebnis-Fenster zurück – dann fällt 
 
 - **Einzelne Station** (Name, Gerätetyp, öffentlicher Hinweis) oder **Schnell-Setup** (Präfix und Anzahl, zum Beispiel
   „Switch“ mal 8) – nur für die Turnierleitung.
+- **Station bearbeiten:** Der Stift an der Station ändert **Name**, **Gerät**, **Spiel** und **Hinweis** – ebenfalls nur für die
+  Turnierleitung. Jede Änderung steht im Protokoll.
 - **Spiel zuweisen** an einer Station: **Zuweisen** reserviert, **Direkt starten** startet gleich. **Starten** und
   **Freigeben** stehen an der belegten Station.
 - **Zeitplan füllen** plant offene Spiele mit Vorschau, **Freie Stationen starten** startet, was bereit ist. Im

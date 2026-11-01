@@ -604,7 +604,7 @@ def _context_label(doc: dict, chat_context: dict | None = None) -> str:
     if doc.get("kind") == "gallery_submission":
         return "Eingesandtes Foto (Galerie)"
     scope = context.get("media_scope") or "user"
-    return {"user": "Profil/Team", "club": "Verein", "admin": "Admin"}.get(scope, f"Upload ({scope})")
+    return {"user": "Profil/Team", "club": "Verein", "admin": "Redaktion", "sponsor": "Sponsor", "branding": "Logos und Marke", "gallery": "Galerie"}.get(scope, "Upload")
 
 
 async def queue(db, *, state: str = "review", limit: int = 100) -> list[dict]:

@@ -26,12 +26,14 @@ import re
 
 from fastapi import HTTPException
 
+from services.media_formats import UPLOAD_URL_VERSION
+
 STICKER_ROOT = pathlib.Path(__file__).resolve().parents[1] / "static" / "stickers"
 BUILTIN_CATALOG_PATH = pathlib.Path(__file__).resolve().parent / "sticker_catalog_fluent.json"
 STICKER_PREVIEW_TEXT = "[Sticker]"
 # Eigene Sticker nur aus dem eigenen Upload. Eine fremde Adresse würde beim
 # Anzeigen jeden Chatteilnehmer bei Dritten abrufen lassen.
-CUSTOM_STICKER_URL = re.compile(r"/api/static/uploads/[A-Za-z0-9][A-Za-z0-9_-]{0,150}\.(png|webp|jpg|jpeg)")
+CUSTOM_STICKER_URL = re.compile(r"/api/static/uploads/[A-Za-z0-9][A-Za-z0-9_-]{0,150}\.(png|webp|jpg|jpeg)" + UPLOAD_URL_VERSION)
 MAX_CUSTOM_PACKS = 30
 MAX_STICKERS_PER_PACK = 120
 MESSAGE_STICKER_FIELDS = ("id", "pack_id", "name", "url", "width", "height")

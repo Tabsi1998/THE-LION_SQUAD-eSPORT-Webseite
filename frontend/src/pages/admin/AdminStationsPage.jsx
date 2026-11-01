@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { API, api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminSheet } from "@/components/tls/AdminSheet";
+import { SelectField, TextField } from "@/components/tls/FormFields";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
@@ -11,7 +12,7 @@ import { useAuth } from "@/context/AuthContext";
 import { formatBracketSection, formatDeviceType, formatMatchKind, formatMatchStatus, formatScheduleGroupLabel } from "@/lib/tournamentLabels";
 import { formatDateTime } from "@/lib/datetime";
 import { finderFor, sourceLabel } from "@/lib/slotSource";
-import { Plus, Trash2, Link as LinkIcon, X as XIcon, Wand2, Play } from "lucide-react";
+import { Pencil, Plus, Trash2, Link as LinkIcon, X as XIcon, Wand2, Play } from "lucide-react";
 import { toast } from "sonner";
 import { ResultWindowLoader } from "@/components/tls/results/ResultWindow";
 import { ResultUndoBar, useResultUndo } from "@/components/tls/results/ResultUndoBar";
@@ -69,6 +70,7 @@ export default function AdminStationsPage() {
   const [form, setForm] = useState({ name: "", device_type: "switch", notes: "" });
   const [bulk, setBulk] = useState({ prefix: "Station", count: 4, device_type: "switch", notes: "" });
   const [assignFor, setAssignFor] = useState(null); // station object for assignment dialog
+  const [editing, setEditing] = useState(null);
   // Das eine Ergebnis-Fenster (#1370) statt eigener Formulare je Station.
   const [resultFor, setResultFor] = useState("");
   const stationsRequestRef = useRef(0);
@@ -429,7 +431,12 @@ export default function AdminStationsPage() {
                     <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">{formatDeviceType(s.device_type)}</div>
                     <div className="font-heading text-lg font-bold">{s.name}</div>
                   </div>
-                  {isTournamentLead && <button onClick={() => del(s.id)} className="p-1 text-white/40 hover:text-live"><Trash2 className="w-4 h-4" /></button>}
+                  {isTournamentLead && (
+                    <div className="flex shrink-0 gap-1">
+                      <button type="button" onClick={() => setEditing(s)} aria-label={`${s.name} bearbeiten`} data-testid={`station-edit-${s.id}`} className="p-2 text-white/50 hover:text-[#29B6E8]"><Pencil className="w-4 h-4" /></button>
+                      <button type="button" onClick={() => del(s.id)} aria-label={`${s.name} löschen`} className="p-2 text-white/40 hover:text-live"><Trash2 className="w-4 h-4" /></button>
+                    </div>
+                  )}
                 </div>
                 <div className="mt-2 flex items-center gap-2 flex-wrap">
                   <StatusBadge status={s.status} />
@@ -466,6 +473,7 @@ export default function AdminStationsPage() {
         </div>
       </div>
 
+      {editing && <StationEditSheet station={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); loadStations(); }} />}
       {resultFor ? <ResultWindowLoader matchId={resultFor} onClose={() => setResultFor("")} onSaved={resultUndo.start} /> : null}
       <ResultUndoBar undo={resultUndo} />
       {/* Zuweisen als Seitenblatt (#435): die Stationen bleiben daneben sichtbar. */}
@@ -487,6 +495,44 @@ export default function AdminStationsPage() {
         </AdminSheet>
       )}
     </AdminLayout>
+  );
+}
+
+// Station bearbeiten (#2112): Name, Gerät, Spiel und Hinweis nach dem Anlegen ändern. Ein Gerät, das die Liste nicht kennt,
+// bleibt wählbar - sonst würde das Speichern es still überschreiben.
+function StationEditSheet({ station, onClose, onSaved }) {
+  const [form, setForm] = useState({ name: station.name || "", device_type: station.device_type || "switch", game_id: station.game_id || "", notes: station.notes || "" });
+  const [games, setGames] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  useEffect(() => {
+    let live = true;
+    api.get("/games").then(({ data }) => { if (live) setGames(safeArray(data)); }).catch(() => {});
+    return () => { live = false; };
+  }, []);
+  const devices = DEVICES.some(([key]) => key === form.device_type) ? DEVICES : [...DEVICES, [form.device_type, formatDeviceType(form.device_type)]];
+  const gameOptions = [["", "Kein bestimmtes Spiel"], ...games.map((game) => [game.id, game.name || game.title || game.id])];
+  if (form.game_id && !games.some((game) => game.id === form.game_id)) gameOptions.push([form.game_id, "Bisher gewähltes Spiel"]);
+  const submit = async (event) => {
+    event.preventDefault();
+    if (!form.name.trim()) { toast.error("Bitte einen Namen angeben."); return; }
+    setSaving(true);
+    try {
+      await api.patch(`/stations/${station.id}`, { name: form.name.trim(), device_type: form.device_type, game_id: form.game_id || null, notes: form.notes.trim() || null });
+      toast.success("Station gespeichert.");
+      onSaved();
+    } catch (e) {
+      toast.error(formatRequestError(e, "Station konnte nicht gespeichert werden.", { name: form.name }));
+      setSaving(false);
+    }
+  };
+  return (
+    <AdminSheet title="Station bearbeiten" eyebrow={station.name} onClose={onClose} onSubmit={submit} saving={saving} submitTestId="station-edit-save" testId="station-edit-sheet">
+      <TextField label="Name" value={form.name} onChange={(value) => set("name", value)} maxLength={120} required testId="station-edit-name" />
+      <SelectField label="Gerät" value={form.device_type} onChange={(value) => set("device_type", value)} options={devices} testId="station-edit-device" />
+      <SelectField label="Spiel" value={form.game_id} onChange={(value) => set("game_id", value)} options={gameOptions} testId="station-edit-game" />
+      <TextField label="Hinweis" value={form.notes} onChange={(value) => set("notes", value)} maxLength={500} hint="Öffentlich sichtbar, zum Beispiel „Tisch hinten links“." testId="station-edit-notes" />
+    </AdminSheet>
   );
 }
 

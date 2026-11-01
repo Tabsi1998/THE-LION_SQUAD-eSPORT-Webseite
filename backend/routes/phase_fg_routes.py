@@ -11,6 +11,7 @@ Endpoints:
   GET    /sitemap.xml                           — search-engine sitemap
   GET    /robots.txt                            — search-engine robots
 """
+import asyncio
 import copy
 import hashlib
 import logging
@@ -24,13 +25,13 @@ from urllib.parse import urlparse
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import Response
 from PIL import Image, ImageOps, UnidentifiedImageError
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from database import get_db
 from auth import get_current_user, require_area
 from models import new_id, now_utc
-from services import account_erasure, media_audit, reference_originals
-from services.media_formats import PUBLIC_IMAGE_EXTS, PUBLIC_MEDIA_EXTS, PUBLIC_ORIGINAL_EXTS, PUBLIC_VIDEO_EXTS
+from services import account_erasure, image_variants, media_audit, reference_originals, sponsor_images
+from services.media_formats import PUBLIC_IMAGE_EXTS, PUBLIC_MEDIA_EXTS, PUBLIC_ORIGINAL_EXTS, PUBLIC_VIDEO_EXTS, bare_upload_url
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +41,36 @@ ADMIN_MEDIA_OWNER_ROLES = {"admin", "moderator", "tournament_admin", "club_admin
 # Wo eine Datei verwendet wird, weiß ``services.media_audit`` (#1471): dieselbe Liste wie Kontolöschung und
 # Bild-Migration, auch verschachtelte Felder, Adressen mit Zusatz und kleinere Fassungen.
 MAX_REFERENCES = 20
+# Eine Seite der Mediathek (#2122). Aufrufe ohne ``paged`` bekommen weiter eine Liste - eine noch offene ältere Seite, Skripte.
+MEDIA_PAGE_DEFAULT = 60
+MEDIA_PAGE_MAX = 200
+MEDIA_UNPAGED_LIMIT = 500
+MEDIA_SEARCH_MAX = 200
+USAGE_SCOPES = {"unused", "duplicate"}
+# „Ungenutzte löschen“ (#2122): Frisch Hochgeladenes bleibt - das Formular dazu ist vielleicht noch offen.
+MEDIA_CLEANUP_DEFAULT_AGE_HOURS = 24
+MEDIA_CLEANUP_LOWEST_AGE_HOURS = 1
+
+
+def _cleanup_min_age_hours(raw: str | None) -> int:
+    """Stunden aus der Umgebung. Ein Tippfehler verhindert keinen Start, und 0 schaltet den Schutz nicht ab."""
+    if raw in (None, ""):
+        return MEDIA_CLEANUP_DEFAULT_AGE_HOURS
+    try:
+        hours = int(raw)
+    except ValueError:
+        logger.warning("MEDIA_CLEANUP_MIN_AGE_HOURS ist keine ganze Zahl - es gelten %s Stunden", MEDIA_CLEANUP_DEFAULT_AGE_HOURS)
+        return MEDIA_CLEANUP_DEFAULT_AGE_HOURS
+    if hours < MEDIA_CLEANUP_LOWEST_AGE_HOURS:
+        logger.warning("MEDIA_CLEANUP_MIN_AGE_HOURS ist zu klein - es gelten %s Stunden", MEDIA_CLEANUP_LOWEST_AGE_HOURS)
+        return MEDIA_CLEANUP_LOWEST_AGE_HOURS
+    return hours
+
+
+MEDIA_CLEANUP_MIN_AGE_HOURS = _cleanup_min_age_hours(os.environ.get("MEDIA_CLEANUP_MIN_AGE_HOURS"))
+MEDIA_CLEANUP_BATCH = 500
+MEDIA_CLEANUP_RECHECK_EVERY = 50
+UNDECIDED_SCANS = ("pending", "review", "blocked")
 
 # ============= Media Browser =============
 media_router = APIRouter(prefix="/api/media", tags=["media"])
@@ -48,6 +79,14 @@ admin_media_router = APIRouter(prefix="/api/admin/media", tags=["cms-admin"])
 
 class RotateMediaBody(BaseModel):
     degrees: int = 90
+
+
+class MediaCleanupBody(BaseModel):
+    filenames: list[str] = Field(default_factory=list, max_length=MEDIA_CLEANUP_BATCH)
+
+
+class DuplicateReplaceBody(BaseModel):
+    keep: str = Field(min_length=1, max_length=200)
 
 
 def _filename_from_media_value(value: Any) -> str | None:
@@ -96,83 +135,106 @@ async def _collect_media_usage(filenames: set[str]) -> dict[str, list[dict[str, 
     async for collection, doc, field, name, text in media_audit.iter_usages(get_db(), set(filenames)):
         if len(usage[name]) >= MAX_REFERENCES:
             continue
-        doc_id = doc.get("id") or doc.get("slug")
         ref = {
             "collection": collection,
-            "id": doc_id,
             "field": field,
             "place": media_audit.place_label(collection, field),
-            "label": doc.get("title") or doc.get("name") or doc.get("display_name") or doc_id,
+            "label": media_audit.usage_label(collection, doc),
         }
+        # Wer Medien pflegt, liest keine Chats: Von einer Nachricht erfährt er nur die Stelle, keine Kennung.
+        if collection not in media_audit.MESSAGE_COLLECTIONS:
+            ref["id"] = doc.get("id") or doc.get("slug")
         if text:
             ref["text_reference"] = True
         usage[name].append(ref)
     return usage
 
 
-async def _list_media_items(
+def _media_url(filename: str, meta: dict | None) -> str:
+    """Die Adresse einer Datei - ein gedrehtes Bild mit seiner Version, damit es auch frisch gewählt gedreht erscheint."""
+    url = f"/api/static/uploads/{filename}"
+    version = (meta or {}).get("version")
+    return media_audit.versioned_url(url, version) if version else url
+
+
+def _media_candidates(requested_type: str, exclude_svg: bool = False) -> list[tuple[Path, os.stat_result]]:
+    """Die Dateien der Mediathek auf der Platte, neueste zuerst."""
+    if not UPLOAD_DIR.exists():
+        return []
+    paths: list[Path] = []
+    for base in (PUBLIC_UPLOAD_DIR, UPLOAD_DIR):
+        if base.exists():
+            paths.extend([p for p in base.iterdir() if p.is_file()])
+    paths = [p for p in paths if not p.name.startswith(".") and p.suffix.lower() in PUBLIC_MEDIA_EXTS]
+    # Logos als SVG (#1952): die PNG-Fassung daneben gehört zum SVG und steht nicht als eigene Datei in der Mediathek.
+    svg_stems = {p.stem for p in paths if p.suffix.lower() == ".svg"}
+    paths = [p for p in paths if not (p.suffix.lower() == ".png" and p.stem in svg_stems)]
+    if exclude_svg:
+        paths = [p for p in paths if p.suffix.lower() != ".svg"]
+    if requested_type in {"image", "images"}:
+        paths = [p for p in paths if p.suffix.lower() in PUBLIC_IMAGE_EXTS]
+    elif requested_type in {"video", "videos"}:
+        paths = [p for p in paths if p.suffix.lower() in PUBLIC_VIDEO_EXTS]
+    elif requested_type in {"media", "all-media"}:
+        paths = [p for p in paths if p.suffix.lower() in (PUBLIC_IMAGE_EXTS | PUBLIC_VIDEO_EXTS)]
+    entries = []
+    for path in paths:
+        try:
+            entries.append((path, path.stat()))
+        except OSError:
+            continue  # in diesem Augenblick gelöscht
+    return sorted(entries, key=lambda entry: entry[1].st_mtime, reverse=True)
+
+
+def _duplicate_lookup(entries: list[tuple[Path, os.stat_result]], wanted: set[str]) -> dict[str, list[str]]:
+    """Dateiname → alle Dateien mit demselben Inhalt. Gerechnet wird nur, wo eine gewünschte Datei gleich groß ist wie
+    eine andere - die Prüfsumme einer großen Datei ist teuer."""
+    by_size: dict[int, list[Path]] = {}
+    for path, stat in entries:
+        by_size.setdefault(stat.st_size, []).append(path)
+    lookup: dict[str, list[str]] = {}
+    for same_size_paths in by_size.values():
+        if len(same_size_paths) < 2 or not wanted & {path.name for path in same_size_paths}:
+            continue
+        by_digest: dict[str, list[Path]] = {}
+        for path in same_size_paths:
+            try:
+                by_digest.setdefault(_file_digest(path), []).append(path)
+            except OSError:
+                continue
+        for same_content_paths in by_digest.values():
+            if len(same_content_paths) < 2:
+                continue
+            names = sorted({path.name for path in same_content_paths})
+            for name in names:
+                lookup[name] = names
+    return lookup
+
+
+async def _media_rows(
     owner_id: str | None = None,
     include_untracked: bool = True,
     exclude_user_scope: bool = False,
     user_scope_only: bool = False,
-    include_usage: bool = False,
     media_type_filter: str | None = None,
-) -> list[dict]:
-    if not UPLOAD_DIR.exists():
-        return []
-    candidates: list[Path] = []
-    for base in (PUBLIC_UPLOAD_DIR, UPLOAD_DIR):
-        if base.exists():
-            candidates.extend([p for p in base.iterdir() if p.is_file()])
-    candidates = [
-        p for p in candidates
-        if not p.name.startswith(".") and p.suffix.lower() in PUBLIC_MEDIA_EXTS
-    ]
-    # Logos als SVG (#1952): die PNG-Fassung daneben gehört zum SVG und steht nicht als eigene Datei in der Mediathek.
-    svg_stems = {p.stem for p in candidates if p.suffix.lower() == ".svg"}
-    candidates = [p for p in candidates if not (p.suffix.lower() == ".png" and p.stem in svg_stems)]
+    search: str = "",
+    exclude_svg: bool = False,
+) -> tuple[list[dict], list[tuple[Path, os.stat_result]]]:
+    """Alle Zeilen, die zur Anfrage passen, noch ohne Verwendung - die kostet und kommt nur für die gezeigte Seite dazu
+    (``_add_usage``). Dazu die Dateien, die Duplikat-Prüfung braucht."""
     requested_type = str(media_type_filter or "").strip().lower()
-    if requested_type in {"image", "images"}:
-        candidates = [p for p in candidates if p.suffix.lower() in PUBLIC_IMAGE_EXTS]
-    elif requested_type in {"video", "videos"}:
-        candidates = [p for p in candidates if p.suffix.lower() in PUBLIC_VIDEO_EXTS]
-    elif requested_type in {"media", "all-media"}:
-        candidates = [p for p in candidates if p.suffix.lower() in (PUBLIC_IMAGE_EXTS | PUBLIC_VIDEO_EXTS)]
-    duplicate_lookup: dict[str, list[str]] = {}
-    if include_usage:
-        by_size: dict[int, list[Path]] = {}
-        for path in candidates:
-            try:
-                by_size.setdefault(path.stat().st_size, []).append(path)
-            except OSError:
-                continue
-        for same_size_paths in by_size.values():
-            if len(same_size_paths) < 2:
-                continue
-            by_digest: dict[str, list[Path]] = {}
-            for path in same_size_paths:
-                try:
-                    by_digest.setdefault(_file_digest(path), []).append(path)
-                except OSError:
-                    continue
-            for same_content_paths in by_digest.values():
-                if len(same_content_paths) < 2:
-                    continue
-                names = sorted({path.name for path in same_content_paths})
-                for name in names:
-                    duplicate_lookup[name] = names
-    filenames = [p.name for p in candidates]
-    usage = await _collect_media_usage(set(filenames)) if include_usage else {}
+    entries = _media_candidates(requested_type, exclude_svg)
+    filenames = [path.name for path, _stat in entries]
     media_meta: dict[str, dict[str, Any]] = {}
     if filenames:
-        db = get_db()
         meta_query: dict[str, Any] = {"filename": {"$in": filenames}}
         if owner_id:
             meta_query["owner_id"] = owner_id
-        rows = await db.media_uploads.find(meta_query, {"_id": 0}).to_list(len(filenames))
+        rows = await get_db().media_uploads.find(meta_query, {"_id": 0}).to_list(len(filenames))
         media_meta = {row["filename"]: row for row in rows if row.get("filename")}
+    needle = search.strip().lower()
     items: list[dict] = []
-    for p in sorted(candidates, key=lambda p: p.stat().st_mtime, reverse=True):
+    for p, stat in entries:
         meta = media_meta.get(p.name)
         if owner_id and not meta:
             continue
@@ -186,8 +248,6 @@ async def _list_media_items(
             continue
         if exclude_user_scope and is_user_media:
             continue
-        stat = p.stat()
-        refs = usage.get(p.name) or []
         inferred_media_type = _media_type_from_ext(p.suffix.lower())
         media_type = (meta.get("media_type") if meta else None) or inferred_media_type
         if requested_type in {"image", "images"} and media_type != "image":
@@ -196,9 +256,14 @@ async def _list_media_items(
             continue
         if requested_type in {"media", "all-media"} and media_type not in {"image", "video"}:
             continue
+        if requested_type in {"file", "files"} and media_type != "file":
+            continue
+        original_filename = meta.get("original_filename") if meta else None
+        if needle and needle not in f"{p.name} {original_filename or ''}".lower():
+            continue
         items.append({
             "filename": p.name,
-            "url": f"/api/static/uploads/{p.name}",
+            "url": _media_url(p.name, meta),
             "size": stat.st_size,
             "mtime": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
             "ext": p.suffix.lower().lstrip("."),
@@ -210,38 +275,224 @@ async def _list_media_items(
             "owner_id": meta.get("owner_id") if meta else None,
             "owner_role": meta.get("owner_role") if meta else None,
             "media_scope": media_scope,
-            "original_filename": meta.get("original_filename") if meta else None,
+            "original_filename": original_filename,
             "original_url": meta.get("original_url") if meta else None,
             "original_mime": meta.get("original_mime") if meta else None,
             "original_file_size": meta.get("original_file_size") if meta else None,
             "derived_from_filename": meta.get("derived_from_filename") if meta else None,
             "created_at": meta.get("created_at") if meta else None,
             "tracked": bool(meta),
-            "usage_count": len(refs) if include_usage else None,
-            "references": refs[:6],
-            "is_unused": (len(refs) == 0) if include_usage else None,
-            "duplicate_count": len(duplicate_lookup.get(p.name) or []),
-            "duplicate_filenames": (duplicate_lookup.get(p.name) or [])[:8],
+            "kept_for_results": bool(meta.get("kept_for_results")) if meta else False,
+            "usage_count": None,
+            "references": [],
+            "is_unused": None,
+            "duplicate_count": 0,
+            "duplicate_filenames": [],
         })
-    return items[:500]
+    return items, entries
+
+
+async def _add_usage(items: list[dict], entries: list[tuple[Path, os.stat_result]], with_duplicates: bool = True) -> None:
+    """Wo die Dateien verwendet werden und welche Duplikate sie haben - nur für diese Zeilen. Prüfsummen rechnet ein
+    eigener Thread: Bei großen Dateien stünde sonst jede andere Anfrage still."""
+    names = {item["filename"] for item in items}
+    usage = await _collect_media_usage(names)
+    duplicates = await asyncio.to_thread(_duplicate_lookup, entries, names) if with_duplicates else {}
+    for item in items:
+        refs = usage.get(item["filename"]) or []
+        same = duplicates.get(item["filename"]) or []
+        item.update({
+            "usage_count": len(refs),
+            "references": refs[:6],
+            "is_unused": len(refs) == 0,
+            "duplicate_count": len(same),
+            "duplicate_filenames": same[:8],
+        })
+
+
+async def _list_media_items(*, limit: int | None = MEDIA_UNPAGED_LIMIT, include_usage: bool = False, **query) -> list[dict]:
+    """Die Zeilen als Liste - für die Prüfung alle (``limit=None``), für Aufrufe ohne ``paged`` höchstens ``limit``."""
+    items, entries = await _media_rows(**query)
+    items = items if limit is None else items[:limit]
+    if include_usage:
+        await _add_usage(items, entries)
+    return items
+
+
+def _scope_matches(item: dict, scope: str) -> bool:
+    if scope in ("", "all"):
+        return True
+    if scope == "unused":
+        return bool(item.get("is_unused"))
+    if scope == "duplicate":
+        return (item.get("duplicate_count") or 0) > 1
+    if scope == "untracked":
+        return not item.get("tracked")
+    return item.get("media_scope") == scope
+
+
+async def _media_page(limit: int, offset: int, scope: str = "", include_usage: bool = False, **query) -> dict:
+    """Eine Seite der Mediathek (#2122): Suche und Filter rechnet der Server über alle Dateien, nicht nur die ersten 500.
+    Die Verwendung kommt nur für die gezeigte Seite dazu - außer der Filter hängt an ihr („ungenutzt“, „Duplikate“)."""
+    items, entries = await _media_rows(**query)
+    needs_usage_first = scope in USAGE_SCOPES
+    if needs_usage_first:
+        await _add_usage(items, entries)
+    items = [item for item in items if _scope_matches(item, scope)]
+    safe_limit = max(1, min(int(limit or MEDIA_PAGE_DEFAULT), MEDIA_PAGE_MAX))
+    safe_offset = max(0, int(offset or 0))
+    window = items[safe_offset:safe_offset + safe_limit]
+    if include_usage and not needs_usage_first:
+        await _add_usage(window, entries)
+    return {
+        "items": window,
+        "total": len(items),
+        "total_size": sum(int(item.get("size") or 0) for item in items),
+        "limit": safe_limit,
+        "offset": safe_offset,
+    }
 
 
 @media_router.get("")
-async def list_media(type: str = "", me: dict = Depends(get_current_user)):
+async def list_media(
+    type: str = "", q: str = "", paged: bool = False, limit: int = MEDIA_PAGE_DEFAULT, offset: int = 0,
+    exclude_svg: bool = False, me: dict = Depends(get_current_user),
+):
     """List uploaded media visible in the current user's media picker."""
-    return await _list_media_items(owner_id=me["id"], include_untracked=False, user_scope_only=True, media_type_filter=type)
+    query = {"owner_id": me["id"], "include_untracked": False, "user_scope_only": True, "media_type_filter": type,
+             "search": q[:MEDIA_SEARCH_MAX], "exclude_svg": exclude_svg}
+    if paged:
+        return await _media_page(limit, offset, **query)
+    return await _list_media_items(**query)
 
 
 @admin_media_router.get("")
-async def admin_list_media(include_user_uploads: bool = False, include_usage: bool = False, type: str = "", me: dict = Depends(require_area("content"))):
+async def admin_list_media(
+    include_user_uploads: bool = False, include_usage: bool = False, type: str = "", q: str = "", scope: str = "",
+    paged: bool = False, limit: int = MEDIA_PAGE_DEFAULT, offset: int = 0, exclude_svg: bool = False,
+    me: dict = Depends(require_area("content")),
+):
     """List CMS/admin files in the upload directory with metadata."""
-    return await _list_media_items(exclude_user_scope=not include_user_uploads, include_usage=include_usage, media_type_filter=type)
+    query = {"exclude_user_scope": not include_user_uploads, "media_type_filter": type, "search": q[:MEDIA_SEARCH_MAX],
+             "exclude_svg": exclude_svg}
+    if paged:
+        return await _media_page(limit, offset, scope=scope, include_usage=include_usage, **query)
+    return await _list_media_items(include_usage=include_usage, **query)
+
+
+async def _unused_for_cleanup() -> list[dict]:
+    """Was „Ungenutzte löschen“ anfassen darf (#2122) - frisch vom Server geprüft: Bilder und Videos der Redaktion, die
+    nirgends stehen und nicht gerade erst hochgeladen wurden. Nie Uploads von Mitgliedern (sie sind deren Bibliothek),
+    nie Dateien ohne Upload-Eintrag (Herkunft unbekannt), nie Kamera-Originale (sie gehören zur Vorschau eines Bilds)."""
+    db = get_db()
+    items, entries = await _media_rows(exclude_user_scope=True, include_untracked=False)
+    newest = now_utc().timestamp() - MEDIA_CLEANUP_MIN_AGE_HOURS * 3600
+    modified = {path.name: stat.st_mtime for path, stat in entries}
+    items = [item for item in items if item["media_type"] in ("image", "video") and modified[item["filename"]] <= newest]
+    await _add_usage(items, entries, with_duplicates=False)
+    unused = [item for item in items if item["is_unused"]]
+    referenced = await media_audit.still_referenced(db, {item["filename"] for item in unused})
+    return [item for item in unused if item["filename"] not in referenced]
+
+
+@admin_media_router.get("/unused")
+async def admin_media_unused(me: dict = Depends(require_area("content"))):
+    """Was „Ungenutzte löschen“ gerade löschen würde - die Rückfrage nennt Zahl und Größe."""
+    unused = await _unused_for_cleanup()
+    batch = unused[:MEDIA_CLEANUP_BATCH]
+    return {
+        "count": len(unused),
+        "total_size": sum(int(item.get("size") or 0) for item in unused),
+        # Was dieser Klick löscht: höchstens eine Runde. Zahl und Größe in der Rückfrage gehören zu dieser Liste.
+        "filenames": [item["filename"] for item in batch],
+        "batch_size": sum(int(item.get("size") or 0) for item in batch),
+        "batch": MEDIA_CLEANUP_BATCH,
+        "min_age_hours": MEDIA_CLEANUP_MIN_AGE_HOURS,
+    }
+
+
+@admin_media_router.post("/cleanup-unused")
+async def admin_media_cleanup_unused(body: MediaCleanupBody, me: dict = Depends(require_area("content"))):
+    """Löscht nur, was in der Rückfrage stand und auch jetzt noch ungenutzt ist: Der Server prüft erneut. Was inzwischen
+    verwendet wird, bleibt und steht als ausgelassen in der Antwort. Die Sammelaktion steht im Protokoll."""
+    db = get_db()
+    still_unused = {item["filename"] for item in await _unused_for_cleanup()}
+    deleted: list[str] = []
+    skipped: list[str] = [name for name in dict.fromkeys(body.filenames) if name not in still_unused]
+    pending = 0
+    wanted = [name for name in dict.fromkeys(body.filenames) if name in still_unused]
+    # Löschen dauert: Während eines großen Laufs kann jemand eine Datei einbauen. Darum vor jedem Stapel noch einmal fragen.
+    for start in range(0, len(wanted), MEDIA_CLEANUP_RECHECK_EVERY):
+        batch = wanted[start:start + MEDIA_CLEANUP_RECHECK_EVERY]
+        shown = await media_audit.still_referenced(db, set(batch))
+        for filename in batch:
+            if filename in shown:
+                skipped.append(filename)
+                continue
+            if await account_erasure.remove_upload(db, filename):
+                pending += 1
+            deleted.append(filename)
+    await db.audit_logs.insert_one({
+        "id": new_id(), "action": "media.cleanup_unused", "actor_id": me.get("id"), "target_id": None,
+        "data": {"deleted": deleted, "skipped": skipped, "file_pending": pending},
+        "created_at": now_utc().isoformat(),
+    })
+    return {"ok": True, "deleted": len(deleted), "skipped": len(skipped), "file_pending": pending}
+
+
+@admin_media_router.post("/duplicates/replace")
+async def admin_media_replace_duplicates(body: DuplicateReplaceBody, me: dict = Depends(require_area("content"))):
+    """Duplikat ersetzen (#2122): ``keep`` bleibt, jede Stelle, die eine inhaltsgleiche Kopie zeigt, zeigt danach auf
+    ``keep``, die Kopie verschwindet. Ob die Dateien gleich sind, prüft der Server jetzt - nicht die Liste von vorhin.
+    Kopien von Mitgliedern bleiben unangetastet: Das ist deren Bibliothek."""
+    _media_file_path(body.keep)
+    db = get_db()
+    # Nur Uploads der Redaktion: Dateien ohne Upload-Eintrag haben unbekannte Herkunft, eine Datei aus der
+    # Mitgliederverwaltung löscht deren Abgleich, und ein Mitglied kann seine Datei jederzeit selbst entfernen.
+    items, entries = await _media_rows(exclude_user_scope=True, include_untracked=False)
+    editable = {item["filename"] for item in items if not item["filename"].startswith(sponsor_images.PREFIX)}
+    if body.keep not in editable:
+        raise HTTPException(409, "Diese Datei lässt sich nicht behalten: Sie gehört einem Mitglied, kommt aus der Mitgliederverwaltung oder hat keinen Upload-Eintrag.")
+    # Auch eine Prüfung, deren Adresse eine Version trägt, zählt.
+    scan_url = rf"^{re.escape(bare_upload_url(f'/api/static/uploads/{body.keep}'))}(\?|#|$)"
+    if await db.media_scans.find_one({"url": {"$regex": scan_url}, "state": {"$in": list(UNDECIDED_SCANS)}}, {"_id": 1}):
+        raise HTTPException(409, "Diese Datei ist noch in der Bildprüfung. Bitte die Entscheidung abwarten.")
+    same_content = await asyncio.to_thread(_duplicate_lookup, entries, {body.keep})
+    copies = [name for name in same_content.get(body.keep, []) if name != body.keep and name in editable]
+    if not copies:
+        raise HTTPException(409, "Zu dieser Datei gibt es keine Kopien mehr.")
+    meta = await db.media_uploads.find_one({"filename": body.keep}, {"_id": 0, "version": 1})
+    target = _media_url(body.keep, meta)
+    stamp = {"updated_at": now_utc().isoformat()}
+    repointed = pending = 0
+    for name in copies:
+        repointed += await media_audit.repoint_usages(db, name, target, stamp)
+        # Die Vorschau eines Kamera-Originals merkt sich ihre Quelle: Sie soll auf die bleibende Datei zeigen.
+        await db.media_uploads.update_many(
+            {"original_url": f"/api/static/uploads/{name}"},
+            {"$set": {"original_url": f"/api/static/uploads/{body.keep}", "derived_from_filename": body.keep, **stamp}},
+        )
+    # Was nicht in den Verwendungsstellen steht, bleibt wie es ist - etwa die Map in einem gespeicherten Ergebnisblatt
+    # (Snapshot). Solange so eine Stelle die Kopie zeigt, bleibt ihre Datei.
+    kept = sorted(await media_audit.still_referenced(db, set(copies)))
+    removed = [name for name in copies if name not in kept]
+    # Für den Hinweis in der Mediathek: Ihn zu berechnen hieße, bei jedem Blättern alle Sammlungen zu lesen.
+    await db.media_uploads.update_many({"filename": {"$in": kept}}, {"$set": {"kept_for_results": True, **stamp}})
+    for name in removed:
+        if await account_erasure.remove_upload(db, name):
+            pending += 1
+    await db.audit_logs.insert_one({
+        "id": new_id(), "action": "media.replace_duplicates", "actor_id": me.get("id"), "target_id": body.keep,
+        "data": {"keep": body.keep, "removed": removed, "kept": kept, "references": repointed, "file_pending": pending},
+        "created_at": stamp["updated_at"],
+    })
+    return {"ok": True, "removed": len(removed), "kept": kept, "references": repointed, "file_pending": pending}
 
 
 @admin_media_router.get("/audit")
 async def admin_media_audit(me: dict = Depends(require_area("content"))):
     """Return media-library health information for the admin media dashboard."""
-    items = await _list_media_items(exclude_user_scope=False, include_usage=True)
+    items = await _list_media_items(limit=None, exclude_user_scope=False, include_usage=True)
     db = get_db()
     by_scope: dict[str, int] = {}
     total_size = 0
@@ -302,7 +553,7 @@ async def _clear_media_references(filename: str) -> tuple[int, int]:
     for collection, doc, field, _name, text in hits:
         if text:
             in_text += 1
-        elif await media_audit.rewrite_field(getattr(db, collection), doc["_id"], field, change, stamp):
+        elif await media_audit.rewrite_field(getattr(db, collection), doc["_id"], field, change, media_audit.stamp_for(collection, stamp)):
             cleared += 1
     return cleared, in_text
 
@@ -325,53 +576,88 @@ def _media_file_path(filename: str) -> Path:
     raise HTTPException(404, "Datei nicht gefunden.")
 
 
+def _rotate_file(path: Path, degrees: int) -> tuple[int, int]:
+    """Dreht die Datei an Ort und Stelle und baut die kleineren Fassungen neu (#2122) - sonst zeigt jedes ``srcset`` weiter
+    das alte Bild. Liefert die neuen Maße. Die Datei wird erst ersetzt, wenn das Speichern geklappt hat."""
+    ext = path.suffix.lower()
+    with Image.open(path) as source:
+        if getattr(source, "is_animated", False):
+            # Ein animierter Sticker wäre danach ein Standbild.
+            raise HTTPException(400, "Animierte Bilder lassen sich hier nicht drehen.")
+        rotated = ImageOps.exif_transpose(source).rotate(-degrees, expand=True)
+    save_kwargs: dict[str, Any] = {}
+    if ext in {".jpg", ".jpeg"}:
+        rotated = rotated.convert("RGB")
+        image_format = "JPEG"
+        save_kwargs = {"quality": 88, "optimize": True}
+    elif ext == ".png":
+        rotated = rotated.convert("RGBA" if rotated.mode in ("RGBA", "LA", "P") else "RGB")
+        image_format = "PNG"
+        save_kwargs = {"optimize": True}
+    else:
+        if rotated.mode not in ("RGB", "RGBA"):
+            rotated = rotated.convert("RGBA" if "A" in rotated.getbands() else "RGB")
+        image_format = "WEBP"
+        save_kwargs = {"quality": 88, "method": 6}
+    temporary = path.with_name(f".{path.stem}-gedreht{path.suffix}")
+    try:
+        rotated.save(temporary, format=image_format, **save_kwargs)
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+    for width in image_variants.VARIANT_WIDTHS:
+        image_variants.variant_path(path, width).unlink(missing_ok=True)
+    image_variants.build_all_variants(path)
+    return rotated.size
+
+
 @admin_media_router.post("/{filename}/rotate")
 async def admin_rotate_media(filename: str, body: RotateMediaBody, me: dict = Depends(require_area("content"))):
-    """Rotate an uploaded public image in place."""
+    """Dreht ein Bild an Ort und Stelle. Der Name bleibt - ein Link aus Newsletter oder Discord funktioniert weiter -, jede
+    Stelle, die das Bild zeigt, bekommt die Version an die Adresse (#2122) und zeigt es sofort gedreht."""
     p = _media_file_path(filename)
     ext = p.suffix.lower()
     if ext not in {".png", ".jpg", ".jpeg", ".webp"}:
         raise HTTPException(400, "Dieses Bildformat kann hier nicht gedreht werden.")
+    if filename.startswith(sponsor_images.PREFIX):
+        # Der nächste Abgleich holte das Bild unverändert zurück.
+        raise HTTPException(409, "Dieses Bild kommt aus der Mitgliederverwaltung. Bitte dort ändern.")
     degrees = int(round((body.degrees or 0) / 90) * 90)
     if degrees % 360 == 0:
         stat = p.stat()
         return {"ok": True, "filename": filename, "url": f"/api/static/uploads/{filename}", "size": stat.st_size}
     try:
-        with Image.open(p) as source:
-            img = ImageOps.exif_transpose(source)
-            rotated = img.rotate(-degrees, expand=True)
-        save_kwargs: dict[str, Any] = {}
-        if ext in {".jpg", ".jpeg"}:
-            rotated = rotated.convert("RGB")
-            image_format = "JPEG"
-            save_kwargs = {"quality": 88, "optimize": True}
-        elif ext == ".png":
-            rotated = rotated.convert("RGBA" if rotated.mode in ("RGBA", "LA", "P") else "RGB")
-            image_format = "PNG"
-            save_kwargs = {"optimize": True}
-        else:
-            if rotated.mode not in ("RGB", "RGBA"):
-                rotated = rotated.convert("RGBA" if "A" in rotated.getbands() else "RGB")
-            image_format = "WEBP"
-            save_kwargs = {"quality": 88, "method": 6}
-        rotated.save(p, format=image_format, **save_kwargs)
+        width, height = await asyncio.to_thread(_rotate_file, p, degrees)
     except UnidentifiedImageError:
         raise HTTPException(400, "Ungültige Bilddatei.")
     except OSError:
         logger.warning("media rotate failed", exc_info=True)
         raise HTTPException(500, "Drehen fehlgeschlagen.")
 
+    db = get_db()
     stat = p.stat()
-    updated_at = now_utc().isoformat()
-    await get_db().media_uploads.update_many(
+    now = now_utc()
+    updated_at = now.isoformat()
+    version = int(now.timestamp())
+    await db.media_uploads.update_many(
         {"filename": filename},
-        {"$set": {"size": stat.st_size, "updated_at": updated_at}},
+        {"$set": {"size": stat.st_size, "width": width, "height": height, "version": version, "updated_at": updated_at}},
     )
+    references = await media_audit.stamp_version(db, filename, version, (width, height), {"updated_at": updated_at})
+    await db.audit_logs.insert_one({
+        "id": new_id(), "action": "media.rotate", "actor_id": me.get("id"), "target_id": filename,
+        "data": {"filename": filename, "degrees": degrees, "references": references},
+        "created_at": updated_at,
+    })
     return {
         "ok": True,
         "filename": filename,
-        "url": f"/api/static/uploads/{filename}",
+        "url": media_audit.versioned_url(f"/api/static/uploads/{filename}", version),
         "size": stat.st_size,
+        "width": width,
+        "height": height,
+        "version": version,
+        "references": references,
         "updated_at": updated_at,
     }
 
@@ -380,16 +666,21 @@ async def admin_rotate_media(filename: str, body: RotateMediaBody, me: dict = De
 async def admin_delete_media(filename: str, force: bool = False, me: dict = Depends(require_area("content"))):
     """Delete a file from upload dir. Path-traversal protected.
 
-    Eine verwendete Datei nur mit ``force`` (#1471): Die Mediathek fragt vorher nach. Erst werden die Bildfelder
-    geleert, die auf sie zeigen, dann die Datei gelöscht - scheitert das, holt der Aufräum-Job es nach. Jede Löschung
-    steht im Protokoll."""
+    Eine verwendete Datei nur mit ``force`` (#1471): Die Mediathek fragt vorher nach. Das gilt auch für Stellen außerhalb
+    der Verwendungsstellen, etwa die Map in einem gespeicherten Ergebnisblatt (#2122) - dafür liest dieser Klick alle
+    Sammlungen, außer eine bekannte Stelle hat die Frage schon beantwortet. Erst werden die Bildfelder geleert, die auf
+    sie zeigen, dann die Datei gelöscht - scheitert das, holt der Aufräum-Job es nach. Jede Löschung steht im Protokoll."""
     _media_file_path(filename)
+    db = get_db()
     if not force:
         usage = (await _collect_media_usage({filename}))[filename]
         if usage:
             places = ", ".join(sorted({ref["place"] for ref in usage}))
             raise HTTPException(409, f"Die Datei wird noch verwendet ({places}). Zum Löschen bitte bestätigen.")
-    db = get_db()
+        elsewhere = (await media_audit.referenced_in(db, {filename})).get(filename)
+        if elsewhere:
+            places = ", ".join(sorted({media_audit.other_place_label(collection) for collection in elsewhere}))
+            raise HTTPException(409, f"Die Datei wird noch gezeigt ({places}). Zum Löschen bitte bestätigen.")
     cleared_refs, text_refs = await _clear_media_references(filename)
     error = await account_erasure.remove_upload(db, filename)
     await db.audit_logs.insert_one({

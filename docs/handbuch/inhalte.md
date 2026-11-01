@@ -8,7 +8,7 @@ und Partner, die Seite „Sponsor werden“, die Referenzen und die Serien (exte
 
 - **Admin → Content → News** (`/admin/news`) – Beiträge, **Neuer Beitrag** (`/admin/news/new`)
 - **Admin → Content → Galerie** (`/admin/gallery`) – Alben und **Eingesandte Fotos**
-- **Admin → Content → Medien** (`/admin/media`, Seitenname „Medien-Browser“) – alle hochgeladenen Dateien
+- **Admin → Content → Medien** (`/admin/media`) – alle hochgeladenen Dateien
 - **Admin → Verein → Über uns** (`/admin/about`) – die Texte der Seite „Über den Verein“
 - **Admin → Verein → Sponsoren** (`/admin/sponsors`) – Sponsoren und die Seite „Sponsor werden“
 - **Admin → Verein → Partner** (`/admin/partners`) – befreundete Vereine, Veranstalter, Communitys
@@ -41,7 +41,7 @@ Turnierleitung. Die Turnierleitung allein darf keine News, Galerie, Sponsoren od
 | **News** | Beitrag mit Bild, Video, Verknüpfungen, geplantem Termin, Newsletter und Discord-Meldung | Content → News |
 | **Galerie** | Alben mit Abschnitten, Bildern und Videos, an ein Event gehängt | Content → Galerie |
 | **Eingesandte Fotos** | Mitglieder schicken Fotos vom Event, ihr gebt frei oder lehnt ab | Content → Galerie, oben |
-| **Medien** | Eine Bibliothek für alles Hochgeladene, mit Drehen, Zuschneiden, Prüfen | Content → Medien |
+| **Medien** | Eine Bibliothek für alles Hochgeladene, mit Drehen, Aufräumen, Prüfen | Content → Medien |
 | **Über uns** | Leitbild, Zeitstrahl, Werte und Ziele, Vereinsfoto, Zahlen | Verein → Über uns |
 | **Sponsoren** | Logo, Stufe, Laufzeit, wo der Sponsor erscheint | Verein → Sponsoren |
 | **Sponsor werden** | Zahlen, Leistungen je Stufe, Mappe als PDF | Verein → Sponsoren, Kasten unten |
@@ -152,16 +152,39 @@ Uhr des Servers.
 
 ### 3.2 Die Medien-Bibliothek
 
-**Admin → Content → Medien** (Seite „Medien-Browser“). Hier liegt alles Hochgeladene: News-Bilder, Galerie, Sponsoren, Banner.
+**Admin → Content → Medien.** Hier liegt alles Hochgeladene: News-Bilder, Galerie, Sponsoren, Banner.
 
-- **Medien hochladen** (Bilder und Videos, Größenlimit steht an der Auswahl) und Suche nach Dateinamen.
-- Ein Klick auf eine Datei öffnet ein Blatt mit Vorschau, Angaben und **Verwendet in** (wo sie eingebaut ist), dazu **Drehen**,
-  **Zuschneiden**, **URL kopieren** und **Löschen**. „Datei endgültig löschen?“ fragt vorher nach.
-- Der **Qualitätscheck** zeigt unter anderem Kaputte Referenzen (Bildfelder zeigen auf Dateien, die es nicht mehr gibt), defekte
-  Metadaten, doppelte Dateien und Dateien ohne Verwendung. **Scopes reparieren** sortiert alte Uploads ohne saubere Kategorie ein.
-  Das braucht ihr nur bei Bedarf.
+- **Medien hochladen** (Bilder und Videos). Wie groß eine Datei sein darf, sagt der Server: Das Bildfeld zeigt seine Grenze an,
+  ist etwas zu groß, steht das in der Meldung.
+- Die Liste zeigt **alle** Dateien, je 60 auf einer Seite (**Zurück**, **Weiter**). Suche (auch nach dem ursprünglichen
+  Dateinamen) und Filter (Art, Bereich, Ungenutzt, Nicht erfasst, Duplikate) gelten für alle Dateien, nicht nur für die Seite.
+- Ein Klick auf eine Datei öffnet ein Blatt mit Vorschau, Angaben und **Verwendet in** (wo sie eingebaut ist), dazu **Links** und
+  **Rechts** (drehen), **Adresse kopieren**, **Herunterladen** und **Löschen**. „Datei endgültig löschen?“ fragt vorher nach.
+- **Drehen** fragt nach und nennt, an wie vielen Stellen das Bild steht. Danach erscheint es überall gedreht, auch die kleineren
+  Fassungen und in alten Chats. Nur gespeicherte Ergebnisse (Ergebnisblatt, Liga-Spiel) behalten ihre Adresse: Dort kann es im Browser
+  noch bis zu 30 Tage ungedreht zu sehen sein. Der Dateiname bleibt, Links in Newslettern oder auf Discord funktionieren weiter.
+  Animierte Bilder und Bilder aus der Mitgliederverwaltung lassen sich nicht drehen.
+- **Sticker** in alten Nachrichten zählen als Verwendung: Das Bild eines gelöschten Stickers bleibt, solange ein Chat es zeigt.
+- Die **Medien-Prüfung** zeigt unter anderem Verweise ins Leere (Bildfelder zeigen auf Dateien, die es nicht mehr gibt), Einträge
+  ohne Datei, doppelte Dateien und Dateien ohne Verwendung. **Alte Uploads einsortieren** ordnet alte Uploads einem Bereich zu. Das
+  braucht ihr nur bei Bedarf.
 - Überall, wo ein Bild gewählt wird (Banner, Album, Sponsorenlogo …), könnt ihr neu hochladen **oder aus den schon hochgeladenen
-  Medien wählen**.
+  Medien wählen**, mit Suche und **Mehr laden**.
+
+**Löschen** prüft vorher auch Stellen, die „Verwendet in“ nicht aufzählt, etwa die Map in einem gespeicherten Ergebnisblatt. Zeigt so eine
+Stelle die Datei noch, fragt die Mediathek nach; bestätigt ihr, fehlt das Bild dort danach.
+
+**Aufräumen** – beides fragt vorher nach und steht im Protokoll:
+
+- **Ungenutzte löschen** nennt, wie viele Dateien und wie viel Platz es sind. Beim Löschen prüft der Server jede Datei noch einmal,
+  auch in Feldern, die die Liste „Verwendet in“ nicht kennt; was inzwischen verwendet wird, bleibt und steht in der Meldung. Nie
+  gelöscht werden Uploads der letzten 24 Stunden (das Formular dazu ist vielleicht noch offen), Uploads von Mitgliedern, Dateien
+  ohne Upload-Eintrag und Kamera-Originale. Bei mehr als 500 Dateien nennt die Rückfrage „die ersten 500 von …“, die übrigen löscht
+  ein weiterer Klick.
+- **Diese Datei behalten, Kopien ersetzen** (im Blatt einer Datei mit Duplikaten): Jede Stelle, die eine inhaltsgleiche Kopie zeigt,
+  zeigt danach diese Datei, die Kopien werden gelöscht. Es bleiben: Kopien aus Uploads von Mitgliedern und Kopien, die gespeicherte
+  Ergebnisse noch zeigen (Map im Ergebnisblatt, Liga-Spiel, Preisbild) – die Meldung nennt ihre Zahl, die Zeile der Kopie trägt den
+  Hinweis „wird noch von gespeicherten Ergebnissen gezeigt“.
 
 ### 3.3 Galerie und Alben
 
@@ -177,7 +200,11 @@ Uhr des Servers.
 - **Abschnitte** gliedern ein Album (zum Beispiel „Aufbau, Tag 1, Tag 2“). Löscht ihr einen Abschnitt, bleiben die Medien im
   Album unter „Ohne Abschnitt“.
 - Ein Album, das an ein Event hängt, zeigt dort seine Kachel; das Album verweist mit „Vom Event: …“ zurück.
-- Löschen eines Albums entfernt es und die zugeordneten Medien.
+- **Mehrere auf einmal:** Die Häkchen auf den Kacheln (**Alle auswählen** darüber) wählen Medien aus. Danach **Verschieben nach …**
+  oder **Aus dem Album nehmen** – mit Rückfrage und im Protokoll. Die Medienauswahl hat eine Suche; was ihr angekreuzt habt, bleibt
+  beim Suchen erhalten.
+- **Löschen** eines Albums oder Eintrags nimmt die Einträge weg, die **Dateien bleiben in den Medien** (dort löscht ihr sie, wenn
+  sie weg sollen). Nur eingesandte Fotos, die noch auf Freigabe warten, gehen mit dem Album mit.
 
 **Hinweis „Die Fotos sind da“:** Veröffentlicht ihr ein Event-Album, meldet ein Job das **einmal je Person** an die Angemeldeten
 des Events (Event-Anmeldung, Turniere des Events, Teams mit allen Mitgliedern). Er wartet, bis zehn Minuten lang keine Fotos
@@ -1455,7 +1482,9 @@ Reihenfolge; ein Menü mit Unterpunkten klappt ihr auf und ordnet die Unterpunkt
 | **Freigeben** ist grau | Die Bildprüfung läuft noch | Warten |
 | Mitglied sieht „Fotos einsenden“ nicht | Außerhalb des Zeitfensters (bis sieben Tage nach dem Event), kein Mitglied, oder Album nicht an ein Event gehängt | Verknüpftes Event und Datum prüfen |
 | „Fotos sind da“ kam nicht | Album nicht veröffentlicht, oder noch Fotos in den letzten zehn Minuten dazugekommen | Veröffentlichen und kurz warten |
-| Bild ist plötzlich weg („Kaputte Referenzen“) | Die Datei wurde gelöscht | Medien → Qualitätscheck, neues Bild wählen |
+| Bild ist plötzlich weg („Verweise ins Leere“) | Die Datei wurde gelöscht | Medien → Medien-Prüfung, neues Bild wählen |
+| „Die Datei ist zu groß“ beim Hochladen | Über der Grenze, die das Bildfeld anzeigt | Kleinere Datei wählen; die Grenze stellt der Betreiber ein ([Betrieb](../BETRIEB.md)) |
+| Eine Datei fehlt in „Ungenutzte löschen“ | Sie ist jünger als 24 Stunden, von einem Mitglied, ohne Upload-Eintrag oder ein Kamera-Original | Einzeln im Blatt der Datei löschen |
 | Upload scheitert („zu groß oder Reverse Proxy blockiert“) | Datei über dem Limit | Verkleinern; Limit steht an der Auswahl |
 | Sponsor ist angelegt, aber nicht zu sehen | Status nicht aktiv, Laufzeit abgelaufen oder keine Platzierung | Vorschau „Ausspielung“ am Sponsor |
 | Sponsor-Felder lassen sich nicht ändern | Dolibarr führt sie | In Dolibarr ändern |
@@ -1495,7 +1524,7 @@ Im Beitrag unter **Sichtbarkeit**: **Nur Vereinsmitglieder**.
 Beim Veröffentlichen geht er von selbst hinaus; sonst im Kasten **Verteilen** mit **Jetzt senden**.
 
 **Kann ich ein Foto nachträglich entfernen?**
-Im Album das Medium löschen. In den Medien gibt es **Löschen** für die Datei selbst.
+Im Album das Medium löschen: Es verschwindet aus dem Album, die Datei bleibt. In den Medien gibt es **Löschen** für die Datei selbst.
 
 **Wo steht das Vereinsfoto?**
 Admin → Verein → Über uns, Abschnitt Vereinsfoto.

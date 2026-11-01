@@ -188,6 +188,10 @@ PROXY_UPLOAD_LIMIT_MB=1700
 PUBLIC_UPLOAD_BACKEND_URL=https://upload.lionsquad.at
 ```
 
+Die Grenzen liest das Web über `GET /api/uploads/limits` (#2122) – das Bildfeld zeigt also, was der Server wirklich nimmt;
+die `VITE_MAX_…`-Werte gelten nur, bis die Antwort da ist. `MEDIA_CLEANUP_MIN_AGE_HOURS` (24, mindestens 1): „Ungenutzte
+löschen“ in der Mediathek lässt jüngere Dateien in Ruhe, weil das Formular dazu vielleicht noch offen ist.
+
 **SVG-Logos (#1952):** Logo-Felder nehmen SVG an – nur über die Logo-Uploads (`/api/uploads/logo`, `/sponsor-logo`,
 `/team-logo` für die Leitung eines Teams). Das Backend bereinigt die Datei beim Hochladen (Positivliste, `defusedxml`)
 und zeichnet sie **einmal** zur PNG-Fassung daneben (`resvg-py`, ohne Systembibliothek) – in einem eigenen Prozess mit

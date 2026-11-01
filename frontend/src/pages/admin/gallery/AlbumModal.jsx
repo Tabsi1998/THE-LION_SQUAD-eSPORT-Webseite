@@ -7,6 +7,7 @@ import { CheckField, FieldLabel, SelectField, TextAreaField, TextField } from "@
 import { GermanDateField } from "@/components/tls/GermanDateField";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { toast } from "sonner";
+import { ALBUM_VISIBILITY } from "./shared";
 
 export function AlbumModal({ album, events, onClose, onSaved }) {
   const isNew = !album?.id;
@@ -65,7 +66,7 @@ export function AlbumModal({ album, events, onClose, onSaved }) {
       <FormGrid>
         <SelectField label="Verknüpftes Event" value={form.event_id || ""} onChange={(v) => set("event_id", v)} options={[["", "— keines —"], ...events.map((e) => [e.id, e.name])]} testId="album-event" />
         <GermanDateField id="gallery-taken-at" label="Aufgenommen am" value={(form.taken_at || "").slice(0, 10)} onChange={(v) => set("taken_at", v)} testId="gallery-taken-at" />
-        <SelectField label="Sichtbarkeit" value={form.visibility} onChange={(v) => set("visibility", v)} options={[["public", "Öffentlich"], ["community", "Community"], ["members", "Nur Mitglieder"]]} testId="album-visibility" />
+        <SelectField label="Sichtbarkeit" value={form.visibility} onChange={(v) => set("visibility", v)} options={Object.entries(ALBUM_VISIBILITY)} testId="album-visibility" />
         <TextField label="Sortierung" value={form.order_index} onChange={(v) => set("order_index", v)} testId="album-order" />
       </FormGrid>
       <CheckField label="Veröffentlicht" checked={form.published} onChange={(v) => set("published", v)} testId="album-published" />

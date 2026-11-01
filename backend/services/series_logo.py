@@ -13,9 +13,11 @@ import re
 
 from fastapi import HTTPException
 
+from services.media_formats import UPLOAD_URL_VERSION, bare_upload_url
+
 FIELD = "logo_url"
 # SVG seit #1952: der Logo-Upload bereinigt es und legt die PNG-Fassung daneben (Teilen-Karte, App).
-LOGO_URL = re.compile(r"/api/static/uploads/[A-Za-z0-9][A-Za-z0-9_-]{0,150}\.(png|webp|jpg|jpeg|svg)")
+LOGO_URL = re.compile(r"/api/static/uploads/[A-Za-z0-9][A-Za-z0-9_-]{0,150}\.(png|webp|jpg|jpeg|svg)" + UPLOAD_URL_VERSION)
 LOGO_REFUSED = "Logo bitte über „Hochladen“ oder die Mediathek wählen (SVG, PNG, JPG oder WebP)."
 LOGO_MISSING = "Logo nicht in der Mediathek gefunden - bitte neu hochladen."
 
@@ -32,7 +34,7 @@ def clean(value) -> str | None:
 
 async def check(db, value: str | None) -> None:
     """Die Datei muss über den Upload in die Mediathek gekommen sein - sonst 422."""
-    if value and not await db.media_uploads.find_one({"url": value, "media_type": "image"}, {"_id": 1}):
+    if value and not await db.media_uploads.find_one({"url": bare_upload_url(value), "media_type": "image"}, {"_id": 1}):
         raise HTTPException(422, LOGO_MISSING)
 
 
