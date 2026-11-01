@@ -15,6 +15,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow, new_id  # noqa: E402
+from services import chat_attachments  # noqa: E402
 
 
 @pytest_asyncio.fixture
@@ -60,6 +61,35 @@ async def test_a_draft_goes_with_everything_that_belongs_to_it(flow):
     assert station is not None and station.get("tournament_id") is None, "die Station bleibt, nur ohne Turnier"
     entry = await flow.db.audit_logs.find_one({"action": "tournament.delete", "target_id": tid}, {"_id": 0})
     assert entry and entry["actor_id"] == staff["id"] and entry["data"]["title"] == "Probe-Cup"
+
+
+@pytest.mark.asyncio
+async def test_chat_messages_and_their_files_go_with_the_draft(flow, tmp_path, monkeypatch):
+    monkeypatch.setattr(chat_attachments, "PRIVATE_CHAT_DIR", tmp_path)
+    await lead(flow)
+    tournament = await flow.create_tournament(status="draft")
+    tid = tournament["id"]
+    await flow.db.matches_v2.insert_one({"id": "m-chat", "tournament_id": tid, "is_preview": True, "status": "pending", "slots": []})
+
+    async def attachment(name, context):
+        (tmp_path / f"{name}.webp").write_bytes(b"bild")
+        await flow.db.chat_attachments.insert_one({"id": name, "owner_id": "u-1", "status": "attached",
+                                                   "storage_key": f"{name}.webp", "context": context})
+
+    await attachment("im-turnier", {"type": "tournament", "tournament_id": tid, "message_id": "t-1"})
+    await attachment("im-spiel", {"type": "match", "match_id": "m-chat", "message_id": "m-1"})
+    await attachment("anderes-turnier", {"type": "tournament", "tournament_id": "anderes", "message_id": "t-2"})
+    await attachment("anderes-spiel", {"type": "match", "match_id": "m-anderes", "message_id": "m-2"})
+    await flow.db.match_chat_messages.insert_many([{"id": "m-1", "match_id": "m-chat", "tournament_id": tid, "message": "Hallo"},
+                                                   {"id": "m-2", "match_id": "m-anderes", "tournament_id": "anderes", "message": "Bleibt"}])
+
+    deleted = await flow.delete(f"/api/tournaments/{tid}")
+    assert deleted.status_code == 200, deleted.text
+
+    left = {row["id"] for row in await flow.db.chat_attachments.find({}, {"_id": 0, "id": 1}).to_list(10)}
+    assert left == {"anderes-turnier", "anderes-spiel"}
+    assert sorted(path.name for path in tmp_path.iterdir()) == ["anderes-spiel.webp", "anderes-turnier.webp"]
+    assert [row["id"] for row in await flow.db.match_chat_messages.find({}, {"_id": 0, "id": 1}).to_list(10)] == ["m-2"]
 
 
 @pytest.mark.asyncio
