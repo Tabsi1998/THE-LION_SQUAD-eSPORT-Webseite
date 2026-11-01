@@ -1300,6 +1300,11 @@ class F1GuestRename(F1GuestCreate):
     change_reason: Optional[str] = Field(default=None, max_length=500)
 
 
+class F1GuestDelete(BaseModel):
+    """Gast ohne Zeiten löschen (#2112) - nach der Veröffentlichung wie Umbenennen nur mit Begründung."""
+    change_reason: Optional[str] = Field(default=None, max_length=500)
+
+
 class F1GuestLink(BaseModel):
     """Gast mit Konto verknüpfen (#1585): das Konto aus der Personensuche, nach der Veröffentlichung mit Begründung."""
     user_id: str

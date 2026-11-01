@@ -81,6 +81,9 @@ Reiter **Übersicht** (Admin → Content → Erfolge):
 - **Auswertung** mit „Warten gerade“, „Noch zu melden“, „Letzter Lauf“ und dem Knopf **Alle jetzt auswerten**. Der Knopf merkt alle
   Konten vor; abgearbeitet wird im Hintergrund. Nützlich nach einer Katalog-Änderung.
 - **Nächtlicher Abgleich** mit „Zuletzt“, „Geprüft“, „Abweichungen“, „Dabei vergeben“.
+- **Turnier-Pokale nachtragen** (nur Bereich **System**): Der Knopf **Pokale nachtragen** leitet Pokale und Banner aller
+  Turniere mit veröffentlichten Ergebnissen neu ab – etwa nach einer Korrektur alter Ergebnisse. Doppelt entsteht nichts;
+  der Lauf meldet, wie viele Turniere und Pokale es sind, und steht im Protokoll.
 
 Was die Person erlebt: Beim Freischalten feiert eine **Zeremonie** das Abzeichen (Look und Klang nach Material, Bewegung nach
 Kategorie); jede Person stellt unter **Einstellungen → Benachrichtigungen**, Kasten **Zeremonien**, ein, ob sie mit Klang und voller Bewegung gefeiert wird oder dezent (siehe

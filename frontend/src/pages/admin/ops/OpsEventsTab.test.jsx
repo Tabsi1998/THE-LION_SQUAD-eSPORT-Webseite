@@ -5,10 +5,11 @@ import { MemoryRouter } from "react-router-dom";
 // Ereignisse (#517 Teil 2): eine Liste über alle Quellen, Filter gehen an den Server, die Quelle steht in
 // der Adresse (alte Seiten leiten mit ?source= hierher), der Audit-Schnellfilter erscheint nur bei Adminaktionen.
 
-const apiMock = { get: vi.fn() };
+const apiMock = { get: vi.fn(), post: vi.fn() };
+const toastMock = { error: vi.fn(), success: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (d) => String(d || "") }));
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
-vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
+vi.mock("sonner", () => ({ toast: toastMock }));
 
 const { OpsEventsTab } = await import("./OpsEventsTab");
 
@@ -62,5 +63,29 @@ test("Discord-Meldungen nach Server filtern, erst ab zwei Servern", async () => 
   render(<MemoryRouter initialEntries={["/admin/ops?tab=events"]}><OpsEventsTab /></MemoryRouter>);
   await user.selectOptions(await screen.findByTestId("ops-events-guild"), "222");
   await waitFor(() => expect(apiMock.get).toHaveBeenLastCalledWith("/admin/ops/events", { params: expect.objectContaining({ guild: "222" }) }));
+});
+
+// Erneut senden (#2112): fehlgeschlagene Discord-Meldungen mit gespeichertem Inhalt bekommen einen Knopf.
+test("eine fehlgeschlagene Discord-Meldung lässt sich erneut senden", async () => {
+  const user = userEvent.setup();
+  const discord = { id: "d1", source: "email", source_label: "E-Mail-Versand", href: "/admin/ops?tab=events&source=email", severity: "error", status: "failed",
+    time: "2026-09-24T21:00:00Z", title: "news", subtitle: "discord · LION", detail: "Missing Access", resendable: true };
+  apiMock.get.mockResolvedValue({ data: { ...PAYLOAD, items: [discord, PAYLOAD.items[0]] } });
+  apiMock.post.mockResolvedValue({ data: { ok: true } });
+  render(<MemoryRouter initialEntries={["/admin/ops?tab=events"]}><OpsEventsTab /></MemoryRouter>);
+  expect(screen.queryByTestId("ops-event-resend-e1")).toBeNull();
+  await user.click(await screen.findByTestId("ops-event-resend-d1"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/settings/discord/resend/d1"));
+  expect(toastMock.success).toHaveBeenCalledWith("Meldung erneut gesendet.");
+  expect(apiMock.get).toHaveBeenCalledTimes(2);
+});
+
+test("klappt das erneute Senden nicht, steht der Grund in der Meldung", async () => {
+  const user = userEvent.setup();
+  apiMock.get.mockResolvedValue({ data: { ...PAYLOAD, items: [{ ...PAYLOAD.items[0], id: "d2", source: "email", resendable: true }] } });
+  apiMock.post.mockResolvedValue({ data: { ok: false, error: "Der Bot darf in diesem Kanal nicht schreiben." } });
+  render(<MemoryRouter initialEntries={["/admin/ops?tab=events"]}><OpsEventsTab /></MemoryRouter>);
+  await user.click(await screen.findByTestId("ops-event-resend-d2"));
+  await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Der Bot darf in diesem Kanal nicht schreiben."));
 });
 

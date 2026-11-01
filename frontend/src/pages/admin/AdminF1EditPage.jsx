@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { API, api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { formatLapTime, parseLapTime, plausibilityText, showLapTime } from "@/lib/laptime";
 import { safeHttpUrl } from "@/lib/safeLink";
@@ -19,6 +19,7 @@ import { F1StaffPanel } from "./f1/F1StaffPanel";
 import { FastLapQuickEntry } from "@/components/tls/fastlap/FastLapQuickEntry";
 import { FastLapQueuePanel } from "@/components/tls/fastlap/FastLapQueuePanel";
 import { FastLapGuestLinkDialog } from "@/components/tls/fastlap/FastLapGuestLinkDialog";
+import { FastLapGuestsPanel } from "@/components/tls/fastlap/FastLapGuestsPanel";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 
 // Nach „Ergebnisse veröffentlicht“ (#1584) ändert nur die Turnierleitung Zeiten - mit Begründung, die im Protokoll steht.
@@ -52,6 +53,7 @@ export default function AdminF1EditPage() {
   // Globale Aktionen nur für die Turnierleitung mit Zwei-Faktor (#1028), Helfer sehen die ihres Einsatzes.
   const { isTournamentLead } = useAuth();
   const { id } = useParams();
+  const navigate = useNavigate();
   const [challenge, setChallenge] = useState(null);
   const [tracks, setTracks] = useState([]);
   // Fahrer (#1354): aus der Personensuche - Name, Bild und ob Vereinsmitglied; nicht mehr die ganze Kontoliste.
@@ -320,6 +322,23 @@ export default function AdminF1EditPage() {
     }
   };
 
+  // Löschen (#2112) nur für Entwürfe ohne Zeiten - der Server prüft das; alles andere wird abgesagt oder archiviert.
+  const deleteChallenge = async () => {
+    if (!await confirm({
+      title: "Entwurf löschen?",
+      description: `„${challenge.title}“ wird mit Strecken, Gästen und Team-Einteilung gelöscht. Das geht nur, solange noch keine Zeiten eingetragen sind.`,
+      confirmLabel: "Entwurf löschen",
+      tone: "danger",
+    })) return;
+    try {
+      await api.delete(`/f1/challenges/${challenge.id}`);
+      toast.success("Challenge gelöscht.");
+      navigate("/admin/f1");
+    } catch (err) {
+      toast.error(formatRequestError(err, "Die Challenge konnte nicht gelöscht werden."));
+    }
+  };
+
   if (!challenge) return <AdminLayout><div className="p-10"><SkeletonDetailHeader label="Lade Challenge" /></div></AdminLayout>;
 
   return (
@@ -347,6 +366,11 @@ export default function AdminF1EditPage() {
           <Link target="_blank" to={`/fastlap/${challenge.slug || challenge.id}`} className="px-4 py-2 border border-white/20 text-white rounded-sm uppercase tracking-wider text-sm font-bold hover:border-[#29B6E8]/60">Public</Link>
           <a href={`${API}/f1/challenges/${challenge.id}/export.csv`} className="px-4 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40" target="_blank" rel="noreferrer">CSV</a>
           <a href={`${API}/exports/f1/${challenge.id}/leaderboard.pdf${activeTrack ? `?track_id=${activeTrack}` : ""}`} className="px-4 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40" target="_blank" rel="noreferrer">PDF</a>
+          {isTournamentLead && challenge.status === "draft" && (
+            <button type="button" onClick={deleteChallenge} data-testid="f1-delete-challenge" className="inline-flex items-center gap-2 px-4 py-2 border border-live/40 text-live text-xs uppercase font-bold rounded-sm hover:bg-live/10">
+              <Trash2 className="w-3.5 h-3.5" /> Entwurf löschen
+            </button>
+          )}
         </div>
       </div>
 
@@ -523,6 +547,8 @@ export default function AdminF1EditPage() {
           ) : <div className="text-white/40 text-sm">Bitte erst eine Strecke anlegen.</div>}
         </div>
       </div>
+
+      <FastLapGuestsPanel guests={guests} locked={locked} onChanged={() => { loadGuests(); loadTimes(); loadQueue(); }} />
 
       {linkGuest && (
         <FastLapGuestLinkDialog challengeId={challenge.id} guest={linkGuest} onClose={() => setLinkGuest(null)} onLinked={() => { loadTimes(); loadGuests(); loadQueue(); }} />
