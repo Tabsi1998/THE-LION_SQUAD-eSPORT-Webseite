@@ -247,8 +247,10 @@ eurer **Regeln** – schreibt das Wichtigste also nach oben.
   Anmeldung, das Profil bleibt. In **Liga-Staffeln** sind Name und IDs gesperrt, weil die Spiel-ID je Season im Liga-Kader
   feststeht; nur Discord lässt sich dort ändern.
 - **Abgelehnt:** **Dein Stand** sagt, dass die Turnierleitung abgelehnt hat, und bietet **Anmeldung entfernen** (solange
-  das Turnier nicht läuft). Erst danach ist eine neue Anmeldung möglich. Sie läuft wieder durch die normalen Regeln und
-  gilt bei freiem Platz sofort – wer endgültig nicht mitspielen soll, muss erneut abgelehnt werden.
+  das Turnier nicht läuft). Das nimmt die Anmeldung nur aus der Ansicht der Person; in der Teilnehmerliste bleibt sie
+  **Abgelehnt**. Meldet sich die Person neu an, steht derselbe Eintrag als **Ausstehend** da, und die Turnierleitung bekommt
+  eine Nachricht – auch bei vollem Turnier und ohne Warteliste. Dabei ist sie erst, wenn die Leitung bestätigt. Löscht die
+  Leitung den Eintrag selbst, ist er weg, und eine neue Anmeldung gilt wieder nach den normalen Regeln.
 - **Team-Einladungen:** Im Blatt **Einladen** auf der Teamseite stehen die offenen persönlichen Einladungen mit
   **Zurückziehen**. Lehnt jemand ab, bekommt die einladende Person eine Nachricht. Der Kapitän kann das Team erst
   verlassen, wenn er die Leitung übergeben hat; das steht auf der Teamseite.
