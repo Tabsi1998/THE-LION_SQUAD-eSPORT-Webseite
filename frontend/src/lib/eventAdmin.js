@@ -19,9 +19,10 @@ export function eventIsOver(event, now = new Date()) {
   return Boolean(last) && viennaDay(now) > last;
 }
 
-// Status-Auswahl (#2127, EV9): Ob die Anmeldung offen ist, rechnet die Seite aus Haken und Fristen - auch der Server setzt
-// „offen“ und „geschlossen“ danach selbst. Von Hand wirkten beide nicht, darum stehen sie nicht zur Wahl. Ein Event, das
-// schon so steht, behält seinen Wert in der Liste.
+// Status-Auswahl (#2127, EV9): Ob die Anmeldung offen ist, rechnet die öffentliche Phase aus Haken und Fristen. Die beiden
+// gespeicherten Werte schreibt der Hintergrund-Job von selbst fort (nur vorwärts, nie zurück), sie steuern die Anmeldung
+// nicht. Von Hand gewählt täuschten sie also etwas vor, darum stehen sie nicht zur Wahl. Ein Event, das schon so steht,
+// behält seinen Wert in der Liste.
 const DATE_DRIVEN_STATUSES = new Set(["registration_open", "registration_closed"]);
 
 export function eventStatusOptions(statuses, current) {
