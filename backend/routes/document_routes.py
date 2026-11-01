@@ -13,32 +13,66 @@ from database import get_db
 from models import DocumentCreate, DocumentUpdate, new_id, now_utc
 from services import dolibarr_identity
 from services.dolibarr_client import DolibarrError
+from services.log_safe import log_safe
+from services.media_audit import iter_usages
 from services.member_activity import note_document_open
-from services.permissions import MFA_MESSAGE, admin_role_without_second_factor, is_confirmed_admin_role
+from services.permissions import MFA_MESSAGE, area_refusal, can_use_area
 from services.visibility import user_can_see
 from storage import PRIVATE_DOC_DIR, UPLOAD_DIR
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 logger = logging.getLogger("tls.documents")
 # Vereinsdokumente: Mitglieder und wer die Vereinsverwaltung oder System hat (#1350, services/visibility.py);
-# Moderatoren und die Turnierleitung sehen sie als Mitglied. Gesperrte Downloads öffnen Club-Admin und Superadmin,
-# wie jeder Adminbereich nur mit bestätigter Zwei-Faktor-Anmeldung (#1469).
-ADMIN_ROLES = {"club_admin", "superadmin"}
+# Moderatoren und die Turnierleitung sehen sie als Mitglied. Gesperrte Downloads öffnet, wer die Vereinsverwaltung hat
+# (Rolle, Freigabe, Vorstandsposten, #2125), wie jeder Adminbereich nur mit bestätigter Zwei-Faktor-Anmeldung (#1469).
+UNLOCK_AREA = "club"
 
 
 def _normalise_visibility(value: str | None) -> str:
     return "internal" if value == "internal" else "members"
 
 
-def _is_admin(user: dict | None) -> bool:
-    return is_confirmed_admin_role(user, ADMIN_ROLES)
+async def _unlocks_downloads(db, user: dict | None) -> bool:
+    return await can_use_area(user, UNLOCK_AREA, db=db)
 
 
-def _refuse_locked_download(user: dict | None) -> None:
+async def _refuse_locked_download(db, user: dict | None) -> None:
     """Gesperrter Download - mit dem Hinweis auf die Zwei-Faktor-Anmeldung, wenn nur sie fehlt (#1469)."""
-    if admin_role_without_second_factor(user, ADMIN_ROLES):
+    if await area_refusal(user, (UNLOCK_AREA,), db) == MFA_MESSAGE:
         raise HTTPException(403, MFA_MESSAGE)
     raise HTTPException(403, "Download ist für dieses Dokument deaktiviert.")
+
+
+async def _audit(db, action: str, me: dict, doc_id: str, data: dict) -> None:
+    """Nur Titel und Art, nie der Inhalt oder die Datei (#2125)."""
+    await db.audit_logs.insert_one({"id": new_id(), "action": action, "actor_id": me.get("id"), "target_id": doc_id, "data": data, "created_at": now_utc().isoformat()})
+
+
+async def _file_still_needed(db, doc: dict, path: pathlib.Path) -> bool:
+    """Braucht noch etwas anderes diese Datei? Ein zweites Dokument, die Sponsoring-Mappe (selber Ordner) oder - bei alten
+    Dateien im öffentlichen Upload-Ordner - irgendeine Verwendungsstelle aus der Mediathek."""
+    name = path.name
+    other = await db.documents.find_one({"id": {"$ne": doc["id"]}, "$or": [{"storage_key": name}, {"file_url": {"$regex": f"/{re.escape(name)}$"}}]}, {"_id": 1})
+    if other or await db.settings.find_one({"pdf_key": name}, {"_id": 1}):
+        return True
+    if doc.get("storage_key"):
+        return False
+    async for _usage in iter_usages(db, {name}):
+        return True
+    return False
+
+
+async def _remove_file(db, doc: dict) -> bool:
+    """Die Datei zum Eintrag mitlöschen (#2125) - Protokolle tragen Personendaten. Nur, wenn nichts anderes sie braucht."""
+    path = _safe_storage_path(doc)
+    if not path or not path.is_file() or await _file_still_needed(db, doc, path):
+        return False
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:
+        logger.warning("[documents] Datei zum gelöschten Dokument %s bleibt liegen", log_safe(doc.get("id")), exc_info=True)
+        return False
+    return True
 
 
 async def _user_can_see(user: dict | None, visibility: str | None) -> bool:
@@ -71,11 +105,11 @@ def _document_url(doc_id: str) -> str:
     return f"/api/documents/{doc_id}/download"
 
 
-def _public_doc(doc: dict, user: dict | None = None) -> dict:
+def _public_doc(doc: dict, unlocks: bool = False) -> dict:
     out = dict(doc)
     out["visibility"] = _normalise_visibility(out.get("visibility"))
     out["view_url"] = _document_view_url(out["id"])
-    if out.get("allow_download") or _is_admin(user):
+    if out.get("allow_download") or unlocks:
         out["download_url"] = _document_url(out["id"])
     else:
         out.pop("download_url", None)
@@ -120,7 +154,7 @@ async def documents_meta():
             {"k": "guideline", "l": "Leitlinie"},
             {"k": "download", "l": "Download"},
             {"k": "media_kit", "l": "Media Kit"},
-            {"k": "presentation", "l": "Praesentation"},
+            {"k": "presentation", "l": "Präsentation"},
             {"k": "template", "l": "Vorlage"},
             {"k": "other", "l": "Sonstiges"},
         ],
@@ -141,9 +175,10 @@ async def _visible_documents(db, user: dict | None, category: Optional[str] = No
         [("pinned", -1), ("order_index", 1), ("created_at", -1)]
     ).to_list(500)
     out = []
+    unlocks = await _unlocks_downloads(db, user)
     for doc in docs:
         if await _user_can_see(user, doc.get("visibility") or "members"):
-            out.append(_public_doc(doc, user))
+            out.append(_public_doc(doc, unlocks))
     # Dokumente aus der Vereinsakte (#324 Teil 1): nur für Mitglieder, nie ein Fehler für die Seite.
     if user and await user_can_see(user, "members"):
         try:
@@ -246,7 +281,8 @@ async def _dolibarr_file(dolibarr_id: int, user: dict | None, disposition: str, 
 async def admin_list_documents(me: dict = Depends(require_area("club"))):
     db = get_db()
     docs = await db.documents.find({}, {"_id": 0}).sort([("pinned", -1), ("order_index", 1)]).to_list(1000)
-    return [_public_doc(doc, me) for doc in docs]
+    unlocks = await _unlocks_downloads(db, me)
+    return [_public_doc(doc, unlocks) for doc in docs]
 
 
 @router.post("")
@@ -265,7 +301,8 @@ async def create_document(body: DocumentCreate, me: dict = Depends(require_area(
         doc["file_url"] = _document_url(doc["id"])
     await db.documents.insert_one(doc)
     doc.pop("_id", None)
-    return _public_doc(doc, me)
+    await _audit(db, "document.create", me, doc["id"], {"title": doc.get("title"), "category": doc.get("category"), "visibility": doc["visibility"]})
+    return _public_doc(doc, await _unlocks_downloads(db, me))
 
 
 @router.put("/{doc_id}")
@@ -282,20 +319,29 @@ async def update_document(doc_id: str, body: DocumentUpdate, me: dict = Depends(
     if update.get("storage_key"):
         update["file_url"] = _document_url(doc_id)
     update["updated_at"] = now_utc().isoformat()
-    res = await db.documents.update_one({"id": doc_id}, {"$set": update})
-    if res.matched_count == 0:
+    previous = await db.documents.find_one({"id": doc_id}, {"_id": 0})
+    if not previous:
         raise HTTPException(404, "Dokument nicht gefunden.")
+    await db.documents.update_one({"id": doc_id}, {"$set": update})
     updated = await db.documents.find_one({"id": doc_id}, {"_id": 0})
-    return _public_doc(updated, me)
+    # Eine neue Datei ersetzt die alte: die alte bleibt sonst unbemerkt liegen.
+    replaced = "storage_key" in update and previous.get("storage_key") and update["storage_key"] != previous["storage_key"]
+    file_removed = bool(replaced and await _remove_file(db, {**previous, "file_url": None}))
+    changed = sorted(key for key, value in update.items() if key not in {"updated_at", "file_url"} and value != previous.get(key))
+    await _audit(db, "document.update", me, doc_id, {"title": updated.get("title"), "fields": changed, **({"file_removed": file_removed} if replaced else {})})
+    return _public_doc(updated, await _unlocks_downloads(db, me))
 
 
 @router.delete("/{doc_id}")
 async def delete_document(doc_id: str, me: dict = Depends(require_area("club"))):
     db = get_db()
-    res = await db.documents.delete_one({"id": doc_id})
-    if res.deleted_count == 0:
+    doc = await db.documents.find_one({"id": doc_id}, {"_id": 0})
+    if not doc:
         raise HTTPException(404, "Dokument nicht gefunden.")
-    return {"ok": True}
+    await db.documents.delete_one({"id": doc_id})
+    file_removed = await _remove_file(db, doc)
+    await _audit(db, "document.delete", me, doc_id, {"title": doc.get("title"), "category": doc.get("category"), "file_removed": file_removed})
+    return {"ok": True, "file_removed": file_removed}
 
 
 @router.get("/{doc_id}/view")
@@ -334,8 +380,8 @@ async def download_document(doc_id: str, request: Request, user: dict | None = D
         await note_document_open(db, user, doc_id)
         return response
     doc, path = await _load_authorized_doc(doc_id, user)
-    if not doc.get("allow_download") and not _is_admin(user):
-        _refuse_locked_download(user)
+    if not doc.get("allow_download") and not await _unlocks_downloads(db, user):
+        await _refuse_locked_download(db, user)
     await db.documents.update_one({"id": doc_id}, {"$inc": {"download_count": 1}})
     await note_document_open(db, user, doc_id)
     return _file_response(doc, path, "attachment")

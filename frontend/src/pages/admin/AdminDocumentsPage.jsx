@@ -80,10 +80,14 @@ export default function AdminDocumentsPage() {
   const remove = async (id) => {
     if (!await confirm({
       title: "Dokument löschen?",
-      description: "Das Dokument wird aus dem Mitglieder-CMS entfernt.",
+      description: "Das Dokument verschwindet aus dem Mitgliederbereich, die Datei wird vom Server gelöscht – außer etwas anderes braucht sie noch.",
       confirmLabel: "Löschen",
     })) return;
-    try { await api.delete(`/documents/${id}`); toast.success("Gelöscht."); load(); } catch (err) { toast.error(formatRequestError(err, "Dokument konnte nicht gelöscht werden.")); }
+    try {
+      const { data } = await api.delete(`/documents/${id}`);
+      toast.success(data?.file_removed === false ? "Gelöscht. Die Datei bleibt, weil sie noch anderswo verwendet wird oder schon fehlte." : "Gelöscht, samt Datei.");
+      load();
+    } catch (err) { toast.error(formatRequestError(err, "Dokument konnte nicht gelöscht werden.")); }
   };
 
   return (
@@ -203,7 +207,7 @@ function DocModal({ doc, meta, onClose, onSaved }) {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > DOCUMENT_UPLOAD_LIMIT_MB * 1024 * 1024) {
-      toast.error(`Datei zu gross (max ${DOCUMENT_UPLOAD_LIMIT_MB} MB)`);
+      toast.error(`Datei zu groß (max. ${DOCUMENT_UPLOAD_LIMIT_MB} MB)`);
       e.target.value = "";
       return;
     }
@@ -226,7 +230,7 @@ function DocModal({ doc, meta, onClose, onSaved }) {
       const status = err.response?.status;
       const detail = err.response?.data?.detail;
       const message = status === 413
-        ? `Datei zu gross oder Reverse Proxy blockiert den Upload. App-Limit: ${DOCUMENT_UPLOAD_LIMIT_MB} MB, externer Proxy bitte auf mindestens ${PROXY_UPLOAD_LIMIT_MB} MB setzen.`
+        ? `Datei zu groß oder Reverse Proxy blockiert den Upload. App-Limit: ${DOCUMENT_UPLOAD_LIMIT_MB} MB, externer Proxy bitte auf mindestens ${PROXY_UPLOAD_LIMIT_MB} MB setzen.`
         : detail ? formatApiError(detail) : "Upload fehlgeschlagen.";
       toast.error(status ? `Upload fehlgeschlagen (${status}): ${message}` : message);
     } finally {
