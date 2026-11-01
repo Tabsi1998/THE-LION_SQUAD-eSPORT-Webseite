@@ -762,7 +762,8 @@ async def register_for_event(event_id: str, body: EventRegistrationCreate,
                                                 selected_positions=body.selected_positions, register_access=register_access, via="web")
     except RegistrationError as exc:
         raise HTTPException(status_code=exc.status, detail=exc.detail)
-    return _public_event_registration(doc, is_staff=True)
+    # Wie die Event-Seite: eine Neuanmeldung nach Storno behält das Dokument - die Antwort zeigt nur, was die Person sehen darf.
+    return _own_registration_view(event, doc)
 
 
 async def _event_for_player(event_id: str, user: dict, access: str | None) -> dict:
