@@ -222,8 +222,10 @@ export default function AdminTournamentEditPage() {
       await api.patch(`/tournaments/${id}/registrations/${rid}`, { seed });
       toast.success(seed == null ? "Setzplatz entfernt." : `Setzplatz ${seed} gespeichert.`);
       load();
+      return true;
     } catch (e) {
       toast.error(formatRequestError(e, "Setzplatz konnte nicht gespeichert werden."));
+      return false;
     }
   };
   const setRegCheckinStatus = async (rid, status) => {
@@ -944,7 +946,8 @@ function SeedField({ registration, onSave, testId }) {
       setValue(current);
       return;
     }
-    onSave(next === "" ? null : number);
+    // Lehnt der Server ab (Platz schon vergeben), zeigt das Feld wieder, was wirklich gilt.
+    onSave(next === "" ? null : number).then((saved) => { if (!saved) setValue(current); });
   };
   return (
     <input

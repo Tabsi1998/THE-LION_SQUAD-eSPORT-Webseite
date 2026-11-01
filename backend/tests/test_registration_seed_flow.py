@@ -50,3 +50,32 @@ async def test_the_seed_changes_until_the_bracket_is_fixed(flow):
     assert "Ende des Check-ins" in refused.json()["detail"]
     # Ein Status ohne Setzplatz geht weiter.
     assert (await flow.patch(url, json={"status": "checked_in"})).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_each_seed_exists_only_once(flow):
+    """#2111: zweimal Setzplatz 1 lehnt der Server ab - in der Liste wie beim Hinzufügen. Wer nicht mehr mitspielt, hält
+    keinen Platz fest."""
+    staff = await flow.add_staff()
+    flow.act_as(staff)
+    tournament = await flow.create_tournament(status="registration_open", seeding_mode="manual")
+    base = f"/api/tournaments/{tournament['id']}/registrations"
+    paula = await flow.register(tournament, await flow.add_user(name="Paula"), seed=1)
+    jonas = await flow.register(tournament, await flow.add_user(name="Jonas"), seed=2)
+
+    refused = await flow.patch(f"{base}/{jonas['id']}", json={"seed": 1})
+    assert refused.status_code == 409, refused.text
+    assert "Setzplatz 1 hat schon" in refused.json()["detail"] and "einen anderen" in refused.json()["detail"]
+    assert (await flow.db.tournament_registrations.find_one({"id": jonas["id"]}))["seed"] == 2
+
+    added = await flow.post(base, json={"display_name": "Gast", "seed": 2})
+    assert added.status_code == 409, added.text
+    assert await flow.db.tournament_registrations.count_documents({"tournament_id": tournament["id"]}) == 2
+
+    # Der eigene Platz und „kein Setzplatz“ stören nicht.
+    assert (await flow.patch(f"{base}/{paula['id']}", json={"seed": 1})).status_code == 200
+    assert (await flow.post(base, json={"display_name": "Ohne Platz"})).status_code == 200
+    assert (await flow.post(base, json={"display_name": "Noch ohne Platz", "seed": None})).status_code == 200
+
+    await flow.db.tournament_registrations.update_one({"id": paula["id"]}, {"$set": {"status": "no_show"}})
+    assert (await flow.patch(f"{base}/{jonas['id']}", json={"seed": 1})).status_code == 200

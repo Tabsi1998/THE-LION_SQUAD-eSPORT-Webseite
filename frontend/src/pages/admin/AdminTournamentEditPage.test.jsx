@@ -1177,3 +1177,19 @@ test("Setzplatz: bei Manuell in der Liste änderbar, bei Zufall keine Spalte", a
   seed.blur();
   await waitFor(() => expect(apiMock.patch).toHaveBeenLastCalledWith("/tournaments/t-1/registrations/r-1", { seed: null }));
 });
+
+test("Setzplatz: lehnt der Server ab, steht wieder der alte Wert im Feld", async () => {
+  const user = userEvent.setup();
+  apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path.includes("/registrations")) return Promise.resolve({ data: [{ id: "r-1", status: "approved", display_name: "Max Muster", seed: 3 }] });
+    if (path.match(/\/tournaments\/t-1(\?|$)/)) return Promise.resolve({ data: { ...TOURNAMENT, seeding_mode: "manual" } });
+    return Promise.resolve(routeFor(path));
+  });
+  apiMock.patch.mockRejectedValueOnce({ response: { status: 409, data: { detail: "Setzplatz 1 hat schon Paula." } } });
+  renderPage();
+  const seed = await screen.findByTestId("admin-reg-seed-r-1");
+  await user.clear(seed);
+  await user.type(seed, "1{Enter}");
+  await waitFor(() => expect(seed).toHaveValue(3));
+});

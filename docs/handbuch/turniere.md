@@ -165,7 +165,8 @@ Zu den Besonderheiten:
   der Anmeldereihenfolge. Die frühere Option „Ranking“ verhielt sich genauso; ein gespeichertes „Ranking“ steht als
   Manuell da. Den Setzplatz trägst du beim Hinzufügen ein oder – bei „Manuell“ – bis zum Ende des Check-ins in der
   Spalte **Setzplatz** der Teilnehmerliste (Feld verlassen oder Enter speichert, leer nimmt ihn weg; die Vorschau ordnet
-  sich neu). Danach steht der Baum, und die Spalte verschwindet.
+  sich neu). Jeden Setzplatz gibt es nur einmal – ist er vergeben, sagt die Meldung, wer ihn hat. Danach steht der Baum,
+  und die Spalte verschwindet.
 
 Ob der Baum Vorschau oder fix ist, siehst du im Reiter **Spiele** (Hinweis „Vorschau“). Phasen entstehen aus dem Format;
 anlegen, umbauen oder löschen lassen sie sich nicht von Hand. **Regeln dieser Phase** (Austragung, Ergebniserfassung,

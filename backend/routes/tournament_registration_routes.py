@@ -125,6 +125,8 @@ ACTIVE_REGISTRATION_STATUSES = ["pending", "approved", "checked_in"]
 # Status, mit denen eine Anmeldung nicht (mehr) spielt - im festen Baum nur über Austritt oder Nicht erschienen.
 LEAVES_BRACKET_STATUSES = {"rejected", "waitlist", "pending"}
 SEED_FIXED = "Der Turnierbaum steht schon – Setzplätze ändern sich nur bis zum Ende des Check-ins."
+# Wer nicht (mehr) mitspielt, hält keinen Setzplatz fest - ein Ersatz darf den Platz einer fehlenden Person übernehmen.
+SEED_FREE_STATUSES = ["rejected", "no_show", "withdrawn", "disqualified", "cancelled"]
 REMOVAL_FINAL = ("Austritt und Disqualifikation lassen sich hier nicht zurücknehmen – die Spiele der Person sind schon "
                  "umgebaut. Bei einem Irrtum bitte die betroffenen Ergebnisse im Reiter „Spiele“ korrigieren.")
 REMOVAL_NO_PLACE = ("Im Turnierbaum ist kein Platz frei, darum lässt sich der Austritt oder die Disqualifikation nicht "
@@ -378,6 +380,20 @@ async def _replace_registration_in_open_matches(db, tid: str, old_reg_id: str, n
         {"old_registration_id": old_reg_id, "new_registration_id": new_reg_id, "v2_matches": v2_count},
     )
     return {"v2_matches": v2_count}
+
+
+async def _require_free_seed(db, tid: str, seed: int | None, reg_id: str | None = None) -> None:
+    """Jeden Setzplatz gibt es nur einmal (#2111) - bei zweimal Platz 1 entschiede sonst der Zufall der Sortierung."""
+    if seed is None:
+        return
+    other = await db.tournament_registrations.find_one(
+        {"tournament_id": tid, "seed": seed, "id": {"$ne": reg_id}, "status": {"$nin": SEED_FREE_STATUSES}},
+        {"_id": 0, "display_name": 1, "ingame_name": 1},
+    )
+    if other:
+        holder = other.get("display_name") or other.get("ingame_name") or "eine andere Anmeldung"
+        raise HTTPException(status_code=409, detail=f"Setzplatz {seed} hat schon {holder}. Bitte einen anderen wählen "
+                                                    "oder ihn dort zuerst entfernen.")
 
 
 async def _open_place(db, tid: str, matches: list[dict]) -> dict | None:
@@ -888,6 +904,7 @@ async def admin_create_registration(tid: str, body: RegistrationAdminCreate,
     )
     if not display_name:
         raise HTTPException(status_code=400, detail="Bitte ein Konto wählen oder einen Anzeigenamen eintragen.")
+    await _require_free_seed(db, tid, payload.get("seed"))
     old_reg_id = payload.get("replace_registration_id")
     old = None
     replace_targets: list[dict] | None = None
@@ -1010,6 +1027,8 @@ async def update_registration(tid: str, reg_id: str, body: RegistrationUpdate,
     if seed_changed and await tournament_guard.structure_fixed(db, tournament_doc):
         # Der Setzplatz ordnet die Vorschau (#2111, TA15) - steht der Baum, ändert er nichts mehr.
         raise HTTPException(status_code=409, detail=SEED_FIXED)
+    if seed_changed:
+        await _require_free_seed(db, tid, updates["seed"], reg_id)
     if lifts_removal and await tournament_guard.fixed_match_count(db, tid, reg_id):
         # Austritt und Disqualifikation (#1553) haben die Spiele schon umgebaut (#2111, TA14) - ein anderer Status
         # setzte die Person am Umbau vorbei zurück, ihre Spiele blieben kampflos gewertet.
