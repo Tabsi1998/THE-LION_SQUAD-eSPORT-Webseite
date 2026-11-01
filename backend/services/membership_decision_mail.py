@@ -7,7 +7,7 @@ Ein Fehler beim Einreihen geht an den Aufrufer: nur er weiß, ob er es später n
 """
 from __future__ import annotations
 
-from services.membership_notices import NO_ADDRESS, QUEUED, tell_person
+from services.membership_notices import NO_ADDRESS, QUEUED, first_sentence, tell_person
 
 __all__ = ["NO_ADDRESS", "QUEUED", "queue_decision_mail"]
 
@@ -21,7 +21,8 @@ async def queue_decision_mail(user: dict | None, *, approved: bool, note: str = 
         lead = "Deine Bewerbung wurde angenommen. Willkommen im Verein!" if approved else "Deine Bewerbung wurde abgelehnt."
         await tell_person(user["id"], "Mitgliedsbewerbung angenommen" if approved else "Mitgliedsbewerbung abgelehnt", f"{lead} {note}".strip(),
                           "/members/membership" if approved else "/membership/apply",
-                          dedupe_key=f"membership-decision:{application_id}" if application_id else None)
+                          dedupe_key=f"membership-decision:{application_id}" if application_id else None,
+                          push_body=f"{lead} {first_sentence(note)}".strip())
     if not user or not user.get("email"):
         return NO_ADDRESS
     template_key = "membership_approve" if approved else "membership_reject"

@@ -320,6 +320,28 @@ async def test_a_membership_led_by_dolibarr_is_not_approved_here(flow, monkeypat
 
 
 @pytest.mark.asyncio
+async def test_the_push_names_only_the_first_sentence_of_a_reason(flow):
+    from services.membership_notices import first_sentence
+    from services.push_notifications import _push_payload
+
+    assert first_sentence("Bitte zuerst vorbeischauen. Du warst beim Turnier auffällig.") == "Bitte zuerst vorbeischauen."
+    assert first_sentence("Ohne Punkt am Ende") == "Ohne Punkt am Ende"
+    assert first_sentence(None) == ""
+    assert len(first_sentence("x" * 500)) == 140
+
+    chair = await chair_of(flow)
+    erika = await flow.add_user(name="erika")
+    app_id = await application(flow, erika)
+    flow.act_as(chair)
+    await flow.patch(f"/api/membership/applications/{app_id}", json={"decision": "reject", "note": "Bitte zuerst vorbeischauen. Du warst beim Turnier auffällig."})
+    told = await flow.db.notifications.find_one({"user_id": erika["id"], "kind": "membership_decision"}, {"_id": 0})
+    assert "auffällig" in told["body"], "die Glocke trägt den vollen Text"
+    payload = _push_payload(told, {"token": "x", "channel_set": 2})
+    assert payload["body"] == "Deine Bewerbung wurde abgelehnt. Bitte zuerst vorbeischauen."
+    assert "auffällig" in (await mails_to(flow, erika))[0]["html"]
+
+
+@pytest.mark.asyncio
 async def test_a_rejection_arrives_even_with_mails_switched_off(flow):
     chair = await chair_of(flow)
     erika = await flow.add_user(name="erika")

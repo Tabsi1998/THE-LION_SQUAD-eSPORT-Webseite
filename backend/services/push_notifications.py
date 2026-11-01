@@ -156,7 +156,8 @@ def _push_payload(notification: dict[str, Any], row: dict[str, Any]) -> dict[str
         return payload
     payload.update(
         title=str(notification.get("title") or "LionsAPP")[:120],
-        body=str(notification.get("body") or "")[:180],
+        # Ein eigener Text für den Sperrbildschirm, wenn die Meldung mehr trägt, als dort stehen soll (#2125).
+        body=str((notification.get("meta") or {}).get("push_body") or notification.get("body") or "")[:180],
         data={
             "notification_id": notification.get("id"),
             "kind": kind,

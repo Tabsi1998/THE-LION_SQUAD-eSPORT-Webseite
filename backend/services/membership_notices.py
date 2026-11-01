@@ -6,6 +6,7 @@ der Mail passiert ist. Hinweise an den Vorstand gehen an alle mit dem Bereich Ve
 from __future__ import annotations
 
 import logging
+import re
 
 from services.log_safe import log_safe
 
@@ -37,12 +38,21 @@ async def honest_mail_state(state: str) -> str:
     return QUEUED if (await get_mail_settings()).get("enabled", True) else MAIL_OFF
 
 
-async def tell_person(user_id: str | None, title: str, body: str, url: str = "", *, dedupe_key: str | None = None) -> None:
+def first_sentence(text: str | None, limit: int = 140) -> str:
+    """Der erste Satz einer Begründung - für den Sperrbildschirm und fremde Dienste; der volle Text steht in Mail und Glocke."""
+    clean = " ".join(str(text or "").split())
+    match = re.match(r".+?[.!?](?=\s|$)", clean)
+    sentence = match.group(0) if match else clean
+    return sentence if len(sentence) <= limit else f"{sentence[:limit - 1].rstrip()}…"
+
+
+async def tell_person(user_id: str | None, title: str, body: str, url: str = "", *, dedupe_key: str | None = None, push_body: str | None = None) -> None:
     """Die Meldung in Glocke und App. Sie darf eine Entscheidung nie aufhalten."""
     from services.user_notifications import create_user_notification
 
+    meta = {**({"dedupe_key": dedupe_key} if dedupe_key else {}), **({"push_body": push_body} if push_body else {})}
     try:
-        await create_user_notification(user_id, title=title, body=body, url=url, kind="membership_decision", meta={"dedupe_key": dedupe_key} if dedupe_key else None)
+        await create_user_notification(user_id, title=title, body=body, url=url, kind="membership_decision", meta=meta or None)
     except Exception:  # noqa: BLE001
         logger.exception("Meldung zur Mitgliedschaft fehlgeschlagen")
 

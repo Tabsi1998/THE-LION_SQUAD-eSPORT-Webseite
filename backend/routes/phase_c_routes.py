@@ -495,5 +495,6 @@ async def admin_withdraw_application(app_id: str, body: AdminWithdrawBody | None
         raise HTTPException(409, "Dieser Antrag liegt in der Mitgliederverwaltung (Dolibarr) - dort zurückziehen; die Website übernimmt den Stand.")
     note = ((body.note if body else None) or "").strip() or None
     saved = await _withdraw_website_application(db, app, me["id"], "membership.application_withdrawn_by_board", note)
-    await membership_notices.tell_person(app["user_id"], "Deine Mitgliedsbewerbung wurde zurückgezogen", f"Der Vorstand hat deine Bewerbung zurückgezogen. {note or ''}".strip(), "/membership/apply")
+    await membership_notices.tell_person(app["user_id"], "Deine Mitgliedsbewerbung wurde zurückgezogen", f"Der Vorstand hat deine Bewerbung zurückgezogen. {note or ''}".strip(), "/membership/apply",
+                                         push_body=f"Der Vorstand hat deine Bewerbung zurückgezogen. {membership_notices.first_sentence(note)}".strip())
     return saved

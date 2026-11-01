@@ -83,7 +83,7 @@ def dm_content(notification: dict, category: str | None, name: str = "") -> dict
     kind = str(notification.get("kind") or "")
     if kind == "achievement":
         return achievement_content(notification, name)
-    body = str(notification.get("body") or "")
+    body = str((notification.get("meta") or {}).get("push_body") or notification.get("body") or "")
     if category in PRIVATE_BODY_CATEGORIES:
         body = PRIVATE_BODY_TEXT
     return {"title": str(notification.get("title") or "LION")[:256], "description": body[:1000],
