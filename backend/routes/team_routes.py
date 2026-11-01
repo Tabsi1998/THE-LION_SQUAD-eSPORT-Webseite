@@ -159,6 +159,22 @@ async def _attachment_allowed(db, context: dict, user: dict | None) -> bool:
 register_chat_access("team", _attachment_allowed)
 
 
+async def _team_audit(db, action: str, team_id: str, actor_id: str | None, data: dict) -> None:
+    """Eine Zeile im Adminprotokoll - nie mit einem Beitrittscode oder Schlüssel darin."""
+    await db.audit_logs.insert_one({
+        "id": new_id(), "action": action, "target_id": team_id, "actor_id": actor_id, "data": data,
+        "created_at": now_utc().isoformat(),
+    })
+
+
+async def _tell(user_id: str | None, **note) -> None:
+    """Eine Nachricht in die Glocke - was schon gespeichert ist, hält sie nicht mehr auf."""
+    try:
+        await create_user_notification(user_id, **note)
+    except Exception:  # noqa: BLE001
+        logger.warning("[teams] Nachricht an %s nicht verschickt", log_safe(user_id), exc_info=True)
+
+
 async def _add_team_member(db, team_id: str, user_id: str, role: str = "member") -> None:
     await db.teams.update_one(
         {"id": team_id},
@@ -756,6 +772,7 @@ async def accept_team_invite(invite_id: str, me: dict = Depends(get_current_user
         raise HTTPException(status_code=404, detail="Einladung nicht gefunden")
     if me["id"] not in (team.get("member_ids") or []):
         await _add_team_member(db, team["id"], me["id"])
+        await _team_audit(db, "team.join", team["id"], me["id"], {"via": "invite"})
     await db.notifications.update_many(
         {"user_id": me["id"], "meta.invite_id": invite_id},
         {"$set": {"read": True}},
@@ -931,22 +948,19 @@ async def join_team(team_id: str, body: dict, me: dict = Depends(get_current_use
         raise HTTPException(status_code=403, detail="Dieser Beitrittscode stimmt nicht.")
     if me["id"] in team.get("member_ids", []):
         return {"ok": True, "already_member": True}
-    await db.teams.update_one({"id": team_id}, {"$addToSet": {"member_ids": me["id"]}})
-    await db.team_members.update_one(
-        {"team_id": team_id, "user_id": me["id"]},
-        {"$set": {
-            "team_id": team_id,
-            "user_id": me["id"],
-            "role": "member",
-            "joined_at": now_utc().isoformat(),
-        }},
-        upsert=True,
-    )
-    try:
-        from badges import on_team_joined
-        await on_team_joined(me["id"], team_id)
-    except Exception:
-        logger.warning("[achievements] Beitritt zu Team %s nicht ausgewertet", log_safe(team_id), exc_info=True)
+    await _add_team_member(db, team_id, me["id"])
+    await _team_audit(db, "team.join", team_id, me["id"], {"via": "join_code"})
+    if team.get("leader_id") and team.get("leader_id") != me["id"]:
+        await _tell(
+            team["leader_id"],
+            title=f"{_user_label(me)} ist [{team.get('tag')}] beigetreten",
+            body=f"Mit dem Beitrittscode von {team.get('name')}.",
+            url=f"/teams/{team_id}",
+            kind="team_invite_accepted",
+            meta={"team_id": team_id, "via": "join_code"},
+        )
+    from services.change_events import publish_user_change
+    await publish_user_change([*(team.get("member_ids") or []), me["id"]], "teams")
     return {"ok": True}
 
 
@@ -966,6 +980,17 @@ async def leave_team(team_id: str, me: dict = Depends(get_current_user)):
     await db.teams.update_one({"id": team_id}, {"$pull": {"member_ids": me["id"], "co_leader_ids": me["id"]}})
     await db.team_members.delete_one({"team_id": team_id, "user_id": me["id"]})
     await _leave_squads(db, team_id, me["id"])
+    await _team_audit(db, "team.leave", team_id, me["id"], {})
+    await _tell(
+        team.get("leader_id"),
+        title=f"{_user_label(me)} hat [{team.get('tag')}] verlassen",
+        body=f"{_user_label(me)} ist nicht mehr in {team.get('name')}.",
+        url=f"/teams/{team_id}",
+        kind="team_member_left",
+        meta={"team_id": team_id, "user_id": me["id"]},
+    )
+    from services.change_events import publish_user_change
+    await publish_user_change([*(team.get("member_ids") or []), me["id"]], "teams")
     return {"ok": True}
 
 
@@ -1013,11 +1038,17 @@ async def kick_member(team_id: str, user_id: str, me: dict = Depends(get_current
     )
     await db.team_members.delete_many({"team_id": team_id, "user_id": user_id})
     await _leave_squads(db, team_id, user_id)
-    await db.audit_logs.insert_one({
-        "id": new_id(), "action": "team.kick", "target_id": team_id,
-        "actor_id": me["id"], "data": {"kicked_user_id": user_id},
-        "created_at": now_utc().isoformat(),
-    })
+    await _team_audit(db, "team.kick", team_id, me["id"], {"kicked_user_id": user_id})
+    await _tell(
+        user_id,
+        title=f"Du bist nicht mehr in [{team.get('tag')}]",
+        body=f"{_user_label(me)} hat dich aus {team.get('name')} entfernt.",
+        url="/teams",
+        kind="team_member_removed",
+        meta={"team_id": team_id},
+    )
+    from services.change_events import publish_user_change
+    await publish_user_change(list(team.get("member_ids") or []), "teams")
     return {"ok": True}
 
 

@@ -192,6 +192,12 @@ NOTIFICATION_KIND_CATEGORY = {
     "team_invite_declined": "community_messages",
     "team_role_changed": "community_messages",
     "team_leader_transferred": "community_messages",
+    # Wer kommt und geht, und was mit dem Team passiert (#2128, TM5, TM8, TM10).
+    "team_member_removed": "community_messages",
+    "team_member_left": "community_messages",
+    "team_dissolved": "community_messages",
+    "team_restored": "community_messages",
+    "team_join_code_renewed": "community_messages",
     "f1_prize": "prize_updates",
     "f1_prize_reminder": "prize_updates",
     "prize_pending": "prize_updates",

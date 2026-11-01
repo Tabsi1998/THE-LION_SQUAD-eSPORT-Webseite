@@ -80,6 +80,11 @@ PUSH_CHANNELS = {
     "team_invite_declined": "lion_chats",
     "team_role_changed": "lion_chats",
     "team_leader_transferred": "lion_chats",
+    "team_member_removed": "lion_chats",
+    "team_member_left": "lion_chats",
+    "team_dissolved": "lion_chats",
+    "team_restored": "lion_chats",
+    "team_join_code_renewed": "lion_chats",
     # Vereinsintern, News, Mitgliedschaft, Rechnungen, Helferdienste.
     "news_member": "lion_club",
     "news_board": "lion_club",

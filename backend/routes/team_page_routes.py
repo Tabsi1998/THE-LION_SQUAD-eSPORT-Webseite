@@ -16,7 +16,7 @@ from auth import get_current_user, get_optional_user
 from database import get_db
 from models import new_id, now_utc
 from routes.team_routes import (
-    TEAM_OWNER_ADMIN_ROLES, _add_team_member, _can_manage, _is_member, _is_staff, _refuse, _team_admin, _user_label,
+    TEAM_OWNER_ADMIN_ROLES, _add_team_member, _can_manage, _is_member, _is_staff, _refuse, _team_admin, _team_audit, _user_label,
 )
 from services import team_page
 from services.team_dissolve import dissolve_preview
@@ -115,6 +115,7 @@ async def join_with_link(team_id: str, body: JoinLinkBody, me: dict = Depends(ge
     if me["id"] in (team.get("member_ids") or []):
         return {"ok": True, "already_member": True}
     await _add_team_member(db, team_id, me["id"])
+    await _team_audit(db, "team.join", team_id, me["id"], {"via": "invite_link"})
     # Eine offene persönliche Einladung ins selbe Team ist damit erledigt.
     await db.team_invites.update_many(
         {"team_id": team_id, "user_id": me["id"], "status": "pending"},
