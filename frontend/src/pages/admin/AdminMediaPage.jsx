@@ -211,9 +211,11 @@ export default function AdminMediaPage() {
     const used = it.usage_count || 0;
     if (!await confirm({
       title: `Bild nach ${degrees < 0 ? "links" : "rechts"} drehen?`,
-      description: used
+      description: (used
         ? `Das Bild erscheint danach überall gedreht – es wird an ${used} ${used === 1 ? "Stelle" : "Stellen"} verwendet.`
-        : "Das Bild wird in der Datei selbst gedreht. Es wird derzeit nirgends verwendet.",
+        : "Das Bild wird in der Datei selbst gedreht. Es wird derzeit nirgends verwendet.")
+        // Gespeicherte Ergebnisse behalten ihre Adresse von damals: Dort entscheidet der Browser-Speicher, wann es gedreht erscheint.
+        + " In gespeicherten Ergebnissen (Ergebnisblatt, Liga-Spiel) kann es im Browser noch bis zu 30 Tage ungedreht zu sehen sein.",
       confirmLabel: "Drehen",
       tone: "info",
     })) return;

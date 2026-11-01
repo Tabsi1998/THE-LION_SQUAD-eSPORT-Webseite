@@ -106,6 +106,7 @@ test("Drehen fragt nach, nennt die Stellen und übernimmt Adresse und Maße (#21
   fireEvent.click(screen.getByTestId("media-rotate-right"));
   await waitFor(() => expect(confirmMock.mock.calls.at(-1)[0].title).toBe("Bild nach rechts drehen?"));
   expect(confirmMock.mock.calls.at(-1)[0].description).toContain("an 2 Stellen");
+  expect(confirmMock.mock.calls.at(-1)[0].description).toContain("gespeicherten Ergebnissen");
   expect(apiMock.post).not.toHaveBeenCalled();
 
   fireEvent.click(screen.getByTestId("media-rotate-left"));

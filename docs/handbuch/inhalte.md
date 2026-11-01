@@ -161,8 +161,9 @@ Uhr des Servers.
 - Ein Klick auf eine Datei öffnet ein Blatt mit Vorschau, Angaben und **Verwendet in** (wo sie eingebaut ist), dazu **Links** und
   **Rechts** (drehen), **Adresse kopieren**, **Herunterladen** und **Löschen**. „Datei endgültig löschen?“ fragt vorher nach.
 - **Drehen** fragt nach und nennt, an wie vielen Stellen das Bild steht. Danach erscheint es überall gedreht, auch die kleineren
-  Fassungen und in alten Chats. Der Dateiname bleibt, Links in Newslettern oder auf Discord funktionieren weiter. Animierte
-  Bilder lassen sich nicht drehen, sie wären danach ein Standbild.
+  Fassungen und in alten Chats. Nur gespeicherte Ergebnisse (Ergebnisblatt, Liga-Spiel) behalten ihre Adresse: Dort kann es im Browser
+  noch bis zu 30 Tage ungedreht zu sehen sein. Der Dateiname bleibt, Links in Newslettern oder auf Discord funktionieren weiter.
+  Animierte Bilder und Bilder aus der Mitgliederverwaltung lassen sich nicht drehen.
 - **Sticker** in alten Nachrichten zählen als Verwendung: Das Bild eines gelöschten Stickers bleibt, solange ein Chat es zeigt.
 - Die **Medien-Prüfung** zeigt unter anderem Verweise ins Leere (Bildfelder zeigen auf Dateien, die es nicht mehr gibt), Einträge
   ohne Datei, doppelte Dateien und Dateien ohne Verwendung. **Alte Uploads einsortieren** ordnet alte Uploads einem Bereich zu. Das
