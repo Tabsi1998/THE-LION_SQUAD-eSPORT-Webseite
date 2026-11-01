@@ -6,6 +6,7 @@ nichts zuordnen."""
 import asyncio
 import pathlib
 import sys
+from datetime import timedelta
 
 import pytest
 import pytest_asyncio
@@ -13,6 +14,7 @@ import pytest_asyncio
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import InterleavedReads, make_flow, new_id  # noqa: E402
+from models import now_utc  # noqa: E402
 
 DAY_1 = "2026-11-14T10:00:00+01:00"
 DAY_2_EVENING = "2026-11-15T19:00:00+01:00"
@@ -251,7 +253,12 @@ async def test_two_events_grabbing_the_same_item_at_once_one_wins(flow, monkeypa
 
 @pytest.mark.asyncio
 async def test_recap_draft_only_after_the_event(flow):
-    _, event = await setup(flow)
+    await setup(flow)
+    # Liegt immer vor uns - die festen Tage oben wären irgendwann vorbei (#1921).
+    start = now_utc() + timedelta(days=30)
+    event = (await flow.post("/api/events", json={
+        "name": "Winter-LAN", "status": "scheduled", "start_date": start.isoformat(), "end_date": (start + timedelta(days=1)).isoformat(),
+    })).json()
     early = await flow.post(f"/api/events/{event['id']}/recap-draft")
     assert early.status_code == 400
     assert "vorbei" in early.json()["detail"]

@@ -185,7 +185,8 @@ bash scripts/run_abnahme_all.sh down   # Stand samt Testdatenbank weg
 ```
 
 `ABNAHME_SPECS="tv-abnahme matchplan-abnahme"` wählt einzelne Specs, `PYTHON` das Python (unter Windows etwa das
-eigene venv). Geplante Workflows laufen nur auf `main`; nach 60 Tagen ohne Aktivität im Repository schaltet GitHub
+eigene venv), `ABNAHME_PYTHON` ein Python mit Pillow für die Testbilder von `serien-ergebnis-bild-abnahme` (Version aus
+`backend/requirements.txt`; der Nachtlauf installiert sie selbst). Geplante Workflows laufen nur auf `main`; nach 60 Tagen ohne Aktivität im Repository schaltet GitHub
 sie ab - dann im Reiter Actions wieder einschalten.
 
 ## 6. Lasttest für den Event-Abend

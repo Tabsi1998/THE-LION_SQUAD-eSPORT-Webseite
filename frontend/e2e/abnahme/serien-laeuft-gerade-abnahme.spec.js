@@ -94,7 +94,7 @@ test.describe("Abnahme #1748: Referenzen - Heute im Einsatz und Läuft gerade", 
         await expect(running).toBeVisible();
         const card = page.getByTestId(`running-card-${cup.slug}-${cupSeason.season_slug}`);
         await expect(card).toHaveAttribute("data-today", "true");
-        await expect(card).toContainText("1 von 3 Turnieren gewertet");
+        await expect(card).toContainText("1 von 3 Turniertagen gewertet");
         await expect(card).toContainText("Heute");
         await expect(card.getByTestId("running-place")).toContainText("2.");
         await expect(card.getByTestId("running-place")).toContainText("von 3");
