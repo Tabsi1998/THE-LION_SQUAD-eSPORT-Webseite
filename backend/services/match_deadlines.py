@@ -4,7 +4,8 @@
 Planzeit, wie „antreten bis“ (``appear_by``, #1791) -, online 15 Minuten ab der Öffnung
 des Spiels. Geöffnet ist ein Online-Spiel, sobald beide Seiten feststehen und die Zeit da ist: die geplante Zeit, das
 Weiterrücken aus dem Vorspiel, der Turnierstart, das Check-in-Ende - was zuletzt kam. Danach schlägt der Server der
-Turnierleitung „kampflos verloren“ vor (services/match_deadline_sweep); sie bestätigt oder verlängert.
+Turnierleitung „kampflos verloren“ vor (services/match_deadline_sweep); sie bestätigt oder verlängert. Liga-Staffeln
+haben diese Frist nicht, solange es dort keinen Check-in gibt (#2201).
 
 „Ergebnis gilt“: meldet eine Seite und die andere widerspricht nicht, gilt die Meldung online nach 15 Minuten, in der
 Liga nach 48 Stunden, spätestens zum Ende der Spielwoche. Vor Ort bestätigt wie bisher die Turnierleitung.
@@ -17,6 +18,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
+from services.league_scope import is_league_staffel
 from services.matchday_schedule import (
     MatchdayScheduleError,
     matchday_number_of,
@@ -113,19 +115,28 @@ def appear_by(match: dict, called_at, minutes: int) -> datetime | None:
     return None
 
 
-def no_show_deadline(match: dict, tournament: dict | None, stage: dict | None = None) -> dict | None:
-    """Ab wann „nicht erschienen“ vorgeschlagen wird - ``None``, wenn die Frist hier nicht gilt. Vor Ort dieselbe Regel
-    wie „antreten bis“ (``appear_by``): wer vor der Planzeit aufgerufen wird, hat bis zur Planzeit."""
+def no_show_open(match: dict) -> bool:
+    """Kann noch jemand als nicht erschienen gelten? Beide Seiten stehen fest, nichts begonnen, nichts gemeldet."""
     if match.get("is_preview") or str(match.get("status") or "") not in NO_SHOW_OPEN_STATUSES:
-        return None
+        return False
     if len(_filled(match)) < 2 or match.get("started_at") or match.get("reports"):
-        return None
+        return False
     if isinstance(match.get("pending_result"), dict):
-        return None
+        return False
     # Die Frist gilt je Person (#1823): im Lauf läuft sie für alle, die noch nicht als nicht erschienen markiert sind;
     # sind alle markiert oder ist der Vorschlag (im Duell) bestätigt, ist sie vorbei.
     proposal = match.get("no_show_proposal")
-    if not no_show_candidates(match) or (isinstance(proposal, dict) and proposal.get("decision")):
+    return bool(no_show_candidates(match)) and not (isinstance(proposal, dict) and proposal.get("decision"))
+
+
+def no_show_deadline(match: dict, tournament: dict | None, stage: dict | None = None) -> dict | None:
+    """Ab wann „nicht erschienen“ vorgeschlagen wird - ``None``, wenn die Frist hier nicht gilt. Vor Ort dieselbe Regel
+    wie „antreten bis“ (``appear_by``): wer vor der Planzeit aufgerufen wird, hat bis zur Planzeit."""
+    if not no_show_open(match):
+        return None
+    # Liga-Staffel (#2201): online setzt niemand ``started_at``, ohne Check-in sagt der Termin nichts darüber, ob jemand
+    # da war. Kein automatischer Vorschlag, bis der Check-in kommt (#1652); die Leitung wertet weiter von Hand.
+    if is_league_staffel(tournament):
         return None
     mode = (tournament or {}).get("event_mode") or "online"
     if match.get("called_at"):

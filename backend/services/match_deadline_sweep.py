@@ -3,7 +3,8 @@
 - „Nicht erschienen“: ist die Frist eines Spiels um (services/match_deadlines), legt der Job genau einen Vorschlag
   „kampflos verloren“ an das Spiel (``no_show_proposal``), schreibt „match.no_show.proposed“ ins Protokoll und meldet
   es der Turnierleitung mit Ergebnis-Recht für dieses Spiel. Sichtbar wird der Vorschlag in „Braucht Aufmerksamkeit“;
-  die Turnierleitung bestätigt (Wertung über den Forfeit-Weg) oder verlängert (routes/tournament_lead_routes).
+  die Turnierleitung bestätigt (Wertung über den Forfeit-Weg) oder verlängert (routes/tournament_lead_routes). Liga-
+  Staffeln bekommen keinen Vorschlag; alte offene räumt der Job ab („match.no_show.cleared“, #2201).
 - „Ergebnis gilt“: ist die Frist einer einzelnen Meldung um und hat niemand widersprochen, trägt der Job sie über den
   einen Ergebnis-Weg ein (``submit_v2_result``, Protokoll „match.result.auto_confirm“) - unter der Schreibsperre des
   Turniers, mit erneuter Prüfung. Ein zweiter Lauf findet nichts mehr.
@@ -22,6 +23,7 @@ from services.match_deadlines import (
     no_show_due_text,
     single_report,
 )
+from services.league_scope import is_league_staffel
 from services.live_sweep import live_tournaments_with
 from services.match_timing import registration_name
 from services.match_v2_results import MatchV2ResultError
@@ -104,6 +106,22 @@ async def _propose_no_show(db, tournament: dict, match: dict, info: dict, now: d
     return 1
 
 
+async def _clear_league_proposal(db, tournament: dict, match: dict) -> None:
+    """Liga-Staffel (#2201): ein offener Vorschlag aus der Zeit vor der Regel bleibt nicht stehen. Unter der Turniersperre,
+    denn die Leitung schreibt beim Bestätigen in den Vorschlag. Entschiedene bleiben als Verlauf."""
+    try:
+        async with mutation_lock(db, tournament_write_resource(tournament["id"]), wait_seconds=2.0):
+            fresh = await db.matches_v2.find_one({"id": match["id"]}, {"_id": 0, "no_show_proposal": 1})
+            proposal = (fresh or {}).get("no_show_proposal")
+            if not isinstance(proposal, dict) or proposal.get("decision"):
+                return
+            await db.matches_v2.update_one({"id": match["id"]}, {"$set": {"no_show_proposal": None}})
+    except MutationLockBusy:
+        logger.info("No-show proposal of match=%s waits for the tournament lock", match.get("id"))
+        return
+    await _audit(db, "match.no_show.cleared", match, {"proposal_id": proposal.get("id"), "reason": "league_without_check_in"})
+
+
 def league_missing(match: dict, games: list[dict] | None) -> list[str]:
     """Seiten des Spiels ohne Aufstellung in den Maps der Erstmeldung."""
     from services.league_games import missing_lineups
@@ -165,8 +183,12 @@ async def sweep(db, *, now: datetime | None = None) -> dict:
             {"tournament_id": tournament["id"], "status": {"$in": SWEEP_STATUSES}, "is_preview": {"$ne": True}},
             {"_id": 0},
         ).to_list(3000)
+        league_staffel = is_league_staffel(tournament)
         for match in matches:
             stage = stages.get(match.get("stage_id") or "")
+            proposal = match.get("no_show_proposal")
+            if league_staffel and isinstance(proposal, dict) and not proposal.get("decision"):
+                await _clear_league_proposal(db, tournament, match)
             due = auto_confirm_due(match, tournament, stage)
             if due and due <= now:
                 confirmed += await _auto_confirm(db, tournament, match["id"], stage, now)

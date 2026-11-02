@@ -21,7 +21,8 @@ from models import new_id, now_utc
 from routes.tournament_common import _ensure_tournament_unlocked, _resolve_tid, _serialized_tournament_write
 from routes.tournament_router import router
 from services.match_forfeit import apply_forfeit
-from services.match_deadlines import no_show_deadline
+from services.league_scope import is_league_staffel
+from services.match_deadlines import no_show_deadline, no_show_open
 from services.match_lead import lead_view
 from services.match_planning import ensure_tournament_accepts_results
 from services.match_v2_results import MatchV2ResultError
@@ -93,12 +94,17 @@ async def decide_no_show(tid: str, match_id: str, body: NoShowDecision, me: dict
         raise HTTPException(status_code=404, detail="Spiel nicht gefunden")
     if not await has_match_result_permission(me, match):
         raise HTTPException(status_code=403, detail="Keine Turnierberechtigung für diese Aktion")
-    proposal = match.get("no_show_proposal")
-    if not isinstance(proposal, dict):
+    tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0, "creation_key": 0, "billing": 0}) or {}
+    # Liga-Staffel (#2201): ohne Check-in entsteht kein Vorschlag mehr - die Leitung wertet trotzdem, solange nichts gemeldet ist.
+    league_staffel = is_league_staffel(tournament)
+    if not isinstance(match.get("no_show_proposal"), dict) and not (league_staffel and body.action == "confirm"):
         raise HTTPException(status_code=409, detail="Für dieses Spiel liegt kein Vorschlag „nicht erschienen“ vor.")
+    proposal = match.get("no_show_proposal") if isinstance(match.get("no_show_proposal"), dict) else {}
     # Schon bestätigt: im Duell der ganze Vorschlag, im Lauf diese eine Person (#1823: je Person). Mit Stand - im Lauf
     # bleibt er offen, im Duell ist er „forfeit“; danach richtet sich die Rückmeldung.
     already = proposal.get("decision") == "confirmed" or body.registration_id in (match.get("no_show_registration_ids") or [])
+    if league_staffel and body.registration_id and match.get("forfeit_registration_id") == body.registration_id:
+        already = True
     if already and body.action == "confirm":
         return {"ok": True, "idempotent_replay": True, "match_id": match_id, "status": match.get("status")}
     now = now_utc()
@@ -117,25 +123,30 @@ async def decide_no_show(tid: str, match_id: str, body: NoShowDecision, me: dict
         raise HTTPException(status_code=422, detail="Bitte die Seite wählen, die nicht erschienen ist.")
     await ensure_tournament_accepts_results(db, tournament_id)
     # Gilt der Vorschlag noch? Dieselbe Paarung, nicht begonnen, keine Meldung, Frist um - sonst keine Wertung.
-    tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0, "creation_key": 0, "billing": 0}) or {}
     stage_id = match.get("stage_id")
     stage = await db.tournament_stages.find_one({"id": stage_id}, {"_id": 0}) if stage_id else None
-    info = no_show_deadline(match, tournament, stage)
     same_pairing = sorted(proposal.get("registration_ids") or filled) == sorted(filled)
-    if not same_pairing or not info or info["due_at"] > now:
+    if league_staffel:
+        # In der Liga läuft keine Frist: es zählt nur, dass das Spiel noch offen ist.
+        still_valid = no_show_open(match)
+    else:
+        info = no_show_deadline(match, tournament, stage)
+        still_valid = bool(info and info["due_at"] <= now)
+    if not same_pairing or not still_valid:
         raise HTTPException(status_code=409, detail=STALE_PROPOSAL_DETAIL)
     minutes = int(proposal.get("minutes") or 0)
-    note = f"Nicht erschienen – Frist von {minutes} Minuten abgelaufen"
+    note = f"Nicht erschienen – Frist von {minutes} Minuten abgelaufen" if minutes else \
+        "Nicht erschienen – von der Turnierleitung festgestellt"
     per_person = no_show_keeps_heat_open(match)
     try:
         ensure_no_hold(match)
         decided = await apply_forfeit(db, match, body.registration_id, note=note, actor_id=me["id"], force=False)
     except MatchV2ResultError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from None
-    if per_person:
+    if per_person and proposal:
         # Im Lauf (#1823): der Vorschlag bleibt für die anderen offen - bestätigt ist nur diese Person.
         await db.matches_v2.update_one({"id": match_id}, {"$addToSet": {"no_show_proposal.confirmed_ids": body.registration_id}})
-    else:
+    elif proposal:
         await db.matches_v2.update_one({"id": match_id}, {"$set": {
             "no_show_proposal.decision": "confirmed", "no_show_proposal.decided_by": me["id"],
             "no_show_proposal.decided_at": now.isoformat(),
