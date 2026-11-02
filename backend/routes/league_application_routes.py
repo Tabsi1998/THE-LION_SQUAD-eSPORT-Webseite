@@ -53,13 +53,13 @@ async def my_application_page(league_slug: str, season_slug: str, me: dict = Dep
 @router.post("/{league_slug}/{season_slug}/applications")
 async def submit_application(league_slug: str, season_slug: str, body: LeagueApplicationSubmit, me: dict = Depends(get_current_user)):
     league, season = await _visible(league_slug, season_slug, me)
-    return _answer(await _call(applications.submit(get_db(), league, season, body.model_dump(), me)))
+    return applications.team_answer(await _call(applications.submit(get_db(), league, season, body.model_dump(), me)))
 
 
 @router.post("/{league_slug}/{season_slug}/applications/{application_id}/withdraw")
 async def withdraw_application(league_slug: str, season_slug: str, application_id: str, me: dict = Depends(get_current_user)):
     league, season = await _visible(league_slug, season_slug, me)
-    return _answer(await _call(applications.withdraw(get_db(), league, season, application_id, me)))
+    return applications.team_answer(await _call(applications.withdraw(get_db(), league, season, application_id, me)))
 
 
 @me_router.get("/league-applications")

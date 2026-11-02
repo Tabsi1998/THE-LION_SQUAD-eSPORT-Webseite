@@ -587,12 +587,26 @@ async def _tell_status(db, league: dict, season: dict, application: dict, status
 
 # ---------------------------------------------------------------- Lesen: Captain und Team
 
-def own_view(application: dict | None, *, responsible: bool) -> dict | None:
+async def _left_staffel(db, rows: list[dict]) -> set[str]:
+    """Welche zugeteilten Anträge nicht mehr in der Staffel stehen (Austritt, Disqualifikation): Der Antrag bleibt, sein Platz ist frei."""
+    ids = [row["assignment"]["registration_id"] for row in rows if (row.get("assignment") or {}).get("registration_id")]
+    if not ids:
+        return set()
+    active = {row["id"] for row in await db.tournament_registrations.find({"id": {"$in": ids}, "status": {"$in": list(SEAT_STATUSES)}}, {"_id": 0, "id": 1}).to_list(len(ids) + 1)}
+    return {row["id"] for row in rows if (row.get("assignment") or {}).get("registration_id") and row["assignment"]["registration_id"] not in active}
+
+
+def team_answer(application: dict) -> dict:
+    """Die Antwort an Captain und Vertreter nach dem Einreichen oder Zurückziehen: ohne Kennungen der Leitung."""
+    return {**own_view(application, responsible=True), "rule_consent": application.get("rule_consent")}
+
+
+def own_view(application: dict | None, *, responsible: bool, left: bool = False) -> dict | None:
     """Ein Antrag für das eigene Team. Grund und Rückzug nur für die Verantwortlichen, der Kader sieht den Stand."""
     if not application:
         return None
     out = {"id": application["id"], "status": application["status"], "submitted_at": application.get("submitted_at"),
-           "staffel": (application.get("assignment") or {}).get("label")}
+           "staffel": (application.get("assignment") or {}).get("label"), "staffel_left": left}
     if responsible:
         out.update(decided_at=application.get("decided_at"), decision_reason=application.get("decision_reason"),
                    rules_label=f"Version {(application.get('rule_consent') or {}).get('version')}" if application.get("rule_consent") else None,
@@ -635,6 +649,7 @@ async def my_view(db, league: dict, season: dict, user: dict) -> dict:
     games, parents = await load_games(db)
     squads = sorted((row for row in squads if _fits_game(row, league, games, parents)), key=lambda row: str(row.get("name") or "").casefold())
     latest = await _latest(db, season["id"], [row["id"] for row in squads])
+    gone = await _left_staffel(db, list(latest.values()))
     state = window_state(season)
     stats = await seat_stats(db, season) if state else None
     blocked = await season_problems(db, league, season, stats)
@@ -649,7 +664,7 @@ async def my_view(db, league: dict, season: dict, user: dict) -> dict:
         row = {"squad_id": squad["id"], "squad_name": squad.get("name"), "team_id": team["id"], "team_name": team.get("name"),
                "display_name": squad_registration.display_name(team, squad), "member_count": len([uid for uid in squad.get("member_ids") or [] if uid]),
                "can_apply": can_apply, "state": application["status"] if application else OPEN_TO_APPLY if state == OPEN else NOT_APPLIED,
-               "application": own_view(application, responsible=can_apply or user["id"] in _leads(team))}
+               "application": own_view(application, responsible=can_apply or user["id"] in _leads(team), left=bool(application and application["id"] in gone))}
         if can_apply:
             check = await check_squad(db, league, season, team, squad) if state == OPEN and not active else {"problems": [], "warnings": []}
             row.update(problems=[text for _code, text in check["problems"]], warnings=check["warnings"],
@@ -672,6 +687,7 @@ async def my_applications(db, user: dict) -> list[dict]:
     squads, teams = await _own_squads(db, user)
     by_id = {row["id"]: row for row in squads}
     latest = await _latest(db, None, sorted(by_id))
+    gone = await _left_staffel(db, list(latest.values()))
     seasons: dict[str, dict] = {}
     items = []
     for (season_id, squad_id), application in sorted(latest.items(), key=lambda pair: str(pair[1].get("created_at") or ""), reverse=True):
@@ -683,7 +699,7 @@ async def my_applications(db, user: dict) -> list[dict]:
         league = await db.leagues.find_one({"id": season.get("league_id")}, {"_id": 0, "name": 1, "slug": 1}) or {}
         squad = by_id[squad_id]
         responsible = user["id"] in {squad.get("captain_id"), squad.get("vice_captain_id")} or user["id"] in _leads(teams[squad["team_id"]])
-        items.append({**own_view(application, responsible=responsible), "squad_id": squad_id, "season_id": season_id, "title": _season_title(league, season),
+        items.append({**own_view(application, responsible=responsible, left=application["id"] in gone), "squad_id": squad_id, "season_id": season_id, "title": _season_title(league, season),
                       "url": f"/liga/{league.get('slug')}/{season.get('slug')}"})
     return items
 
@@ -716,6 +732,7 @@ async def inbox(db, league: dict, season: dict, user: dict) -> dict:
         people |= {row.get("applied_by"), row.get("decided_by"), row.get("withdrawn_by"), squad.get("captain_id"), squad.get("vice_captain_id")}
         people |= {step.get("by") for step in row.get("history") or []}
     names = await _names(db, people)
+    gone = await _left_staffel(db, rows)
     open_rows = [(row, squads[row["squad_id"]]) for row in rows if row["status"] in OPEN_STATUSES and row["squad_id"] in squads]
     items = []
     for row in rows:
@@ -733,7 +750,7 @@ async def inbox(db, league: dict, season: dict, user: dict) -> dict:
             "rules_version": (row.get("rule_consent") or {}).get("version"), "rules_at": (row.get("rule_consent") or {}).get("at"),
             "privacy_at": (row.get("privacy_consent") or {}).get("at"),
             "decided_at": row.get("decided_at"), "decided_by_name": names.get(row.get("decided_by")), "decision_reason": row.get("decision_reason"),
-            "assignment": row.get("assignment"),
+            "assignment": {**row["assignment"], "left": row["id"] in gone} if row.get("assignment") else None,
             "member_count": len([uid for uid in (squad or {}).get("member_ids") or [] if uid]),
             "captain_name": names.get((squad or {}).get("captain_id")), "vice_name": names.get((squad or {}).get("vice_captain_id")),
             "problems": [text for _code, text in check["problems"]], "warnings": check["warnings"],

@@ -25,7 +25,7 @@ function OwnSquadRow({ row, onWithdraw }) {
           <span className="min-w-0 font-semibold text-white [overflow-wrap:anywhere]">{row.display_name}</span>
           <ApplicationStateBadge state={row.state} />
         </div>
-        {application?.staffel ? <p className="mt-1 text-sm text-white/75">Spielt in {application.staffel}.</p> : null}
+        {application?.staffel ? <p className="mt-1 text-sm text-white/75">{application.staffel_left ? `Nicht mehr in ${application.staffel}: Austritt oder Disqualifikation.` : `Spielt in ${application.staffel}.`}</p> : null}
         {row.state === "accepted" && !application?.staffel ? <p className="mt-1 text-sm text-white/75">Der Startplatz steht. Liga und Staffel teilt die Liga-Leitung noch zu.</p> : null}
         {row.state === "waitlist" ? <p className="mt-1 text-sm text-white/75">Wird ein Platz frei, entscheidet die Liga-Leitung. Es rückt niemand von selbst nach.</p> : null}
         {application?.decision_reason ? <p className="mt-1 text-sm text-white/75 [overflow-wrap:anywhere]">Grund: {application.decision_reason}</p> : null}

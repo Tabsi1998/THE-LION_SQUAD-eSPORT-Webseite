@@ -113,6 +113,8 @@ Bestätigen, Tabelle und Ligaseite als Gast, Einspruch, Entscheidung und Korrekt
 48-Stunden-Automatik mit Nachtrag der Liste. Für die Zeit-Jobs braucht sie `ABNAHME_PROJECT` (der Stand) und `PYTHON`.
 `liga-regeln-abnahme.spec.js` (gleiche Stand-Datei, #1646) schreibt zwei Versionen des Regelwerks mit Baustein und Anlage; ein Gast liest bei 390
 und 1440 px Text, Markierung, Vergleich und PDF, ein Captain stimmt zu.
+`liga-anmeldung-abnahme.spec.js` (gleiche Stand-Datei, #2205) schreibt in der eigenen Liga „Liga-Anmeldung“, je Seed eine neue Season mit Regelwerk: Die Leitung setzt Fenster und Startplätze, Captains reichen bei 390 und 1440 px ein und ziehen zurück,
+zwei Anträge gehen gleichzeitig auf den letzten Platz, die Leitung nimmt an, setzt auf die Warteliste, lehnt ab und teilt zu.
 Ohne `ABNAHME=1` überspringt der normale Testlauf diese Tests.
 `ABNAHME_SHOTS` legt Bilder ab (optional). Anmeldungen: Die Tests merken sich die Sitzung je Konto
 (`.local-testing/abnahme/sessions-…/`) und melden sich nur neu an, wenn sie nicht mehr gilt - nie zweimal mit einem

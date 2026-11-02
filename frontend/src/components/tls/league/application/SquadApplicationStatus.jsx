@@ -12,7 +12,7 @@ export function SquadApplicationStatus({ items = [] }) {
             <Link to={row.url} className="min-w-0 text-sm font-semibold text-[#29B6E8] hover:underline [overflow-wrap:anywhere]">{row.title}</Link>
             <ApplicationStateBadge state={row.status} />
           </div>
-          {row.staffel ? <p className="mt-0.5 text-xs text-white/65">Spielt in {row.staffel}.</p> : null}
+          {row.staffel ? <p className="mt-0.5 text-xs text-white/65">{row.staffel_left ? `Nicht mehr in ${row.staffel}.` : `Spielt in ${row.staffel}.`}</p> : null}
           {row.decision_reason ? <p className="mt-0.5 text-xs text-white/65 [overflow-wrap:anywhere]">Grund: {row.decision_reason}</p> : null}
         </li>
       ))}

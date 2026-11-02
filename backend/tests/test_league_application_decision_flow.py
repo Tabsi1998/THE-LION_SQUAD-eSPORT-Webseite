@@ -492,6 +492,37 @@ async def test_inbox_names_shared_players_and_the_own_team(flow):
     assert other["team"]["name"] not in str(ok(await flow.get(f"{base_url(w)}/application")))
 
 
+@pytest.mark.asyncio
+async def test_after_leaving_the_staffel_team_and_inbox_say_so(flow):
+    w = await application_world(flow, application_slots=1)
+    side = w["teams"][0]
+    application = await submitted(flow, w, side)
+    done = ok(await decide(flow, w, application, "accept", tournament_id=w["tid"]))
+    await flow.db.tournament_registrations.update_one({"id": done["assignment"]["registration_id"]}, {"$set": {"status": "withdrawn"}})
+
+    assert (await inbox(flow, w))["items"][0]["assignment"]["left"] is True
+    assert (await inbox(flow, w))["stats"]["free"] == 1, "der Platz ist frei"
+    flow.act_as(side["captain"])
+    row = ok(await flow.get(f"{base_url(w)}/application"))["squads"][0]
+    assert row["application"]["staffel_left"] is True
+    assert ok(await flow.get("/api/me/league-applications"))["items"][0]["staffel_left"] is True
+
+
+@pytest.mark.asyncio
+async def test_the_answer_to_the_team_carries_no_ids_of_the_lead(flow):
+    w = await application_world(flow)
+    side = w["teams"][0]
+    application = await submitted(flow, w, side)
+    ok(await decide(flow, w, application, "waitlist", reason="Erst einmal warten"))
+    flow.act_as(side["captain"])
+
+    answer = ok(await flow.post(f"{base_url(w)}/applications/{application['id']}/withdraw", json={}))
+    view = ok(await flow.get(f"{base_url(w)}/application"))
+
+    assert w["lead"]["id"] not in str(answer) and w["lead"]["id"] not in str(view)
+    assert answer["decision_reason"] == "Erst einmal warten"
+
+
 # ---------------------------------------------------------------- Löschen und Auskunft
 
 @pytest.mark.asyncio

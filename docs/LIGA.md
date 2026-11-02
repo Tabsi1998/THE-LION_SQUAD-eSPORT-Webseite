@@ -240,6 +240,7 @@ Altbestand auf beiden Seiten durch, nur mit `match_id` und Anzahl, ohne Personen
 | Antwortfrist auf Terminvorschläge (#2106) | Season, Liga N überschreibt | 72 h |
 | Map-Pool | Season (`league_season`) | keiner = keine Liga-Meldung möglich |
 | Regeltext, Meldeschluss, Sichtbarkeit | Season | leer · leer · aus |
+| Selbstanmeldung: Fenster, Startplätze, Warteliste, Zulassung, zwei Co-Teams, Datenschutz-Hinweis (#2205, Abschnitt 12) | Season | keine · keine · an · alle Konten · nein · Platzhalter |
 
 Season-Änderungen wirken erst über „Vorgaben auf Staffeln übertragen“ (`league.staffel.sync`, A): Termine und
 Kalender nur vor dem Start, Best of/Teamgröße/Punkte nur vor dem ersten Ergebnis, Sichtbarkeit und Regeltext immer.
@@ -375,7 +376,7 @@ Meldung mit gleichem Stand → angenommen; abweichender Stand ohne `games` → e
 | Season-Stand | Start der ersten Staffel: `draft` → `active`, nur aus dem Entwurf und nur, wenn keine andere Staffel gestartet ist | `league_service.season_follows_first_staffel` |
 | Staffelgröße | Schätzung für Format `league` mit `round_robin_legs`: n·(n−1)/2·Runden statt Zweierpotenz | `tournament_common._estimated_match_count` |
 | Standardtermin | Nie in einer Sperrzeit: nächster freier Tag der Woche zur selben Uhrzeit, sonst der letzte davor, sonst kein Termin und `schedule_hint` im Plan | `matchday_schedule.default_time_for` |
-| Anmeldung, Spiel-Antworten | Eine Staffel hat auf keinem Weg eine Selbstanmeldung; `schedule_proposals` an Unbeteiligte nur mit `scheduled_at`, `status`, `actor_registration_id`; Notizen höchstens 500, Einspruch höchstens 1000 Zeichen | `self_register`, `access_link_routes`, `_match_page_payload`, `models.py` |
+| Anmeldung, Spiel-Antworten | Eine Staffel hat auf keinem Weg eine Selbstanmeldung (die läuft seit B.4 über die Season); `schedule_proposals` an Unbeteiligte nur mit `scheduled_at`, `status`, `actor_registration_id`; Notizen höchstens 500, Einspruch höchstens 1000 Zeichen | `self_register`, `access_link_routes`, `_match_page_payload`, `models.py` |
 
 ### Kader und Aufstellung (#2202, Paket A.4)
 
@@ -453,7 +454,7 @@ gemeinsam, damit das Heimrecht fair bleibt.
 | Zusammenlegen unterbesetzter Ligen | #1628 |
 | Abzeichen, Momente, Rückblick, „spielte in“ im Profil | #1630, #1638 ff. (Daten liegen ab Stufe 1 in `games[].lineups`) |
 | Versioniertes Regelwerk | #1646 (Stufe 1: `rules_text`) |
-| Gastteams anderer Vereine | #1665 (ab Season 2) |
+| Gastteams anderer Vereine | #1665: Konten ohne Mitgliedschaft melden sich seit B.4 an (`entry_policy`), Gast-Plakette in Tabelle und Profil folgt |
 | Solo-Ligen (`participant_kind="solo"`) | #1629 |
 | Direkter Vergleich als Gleichstandsregel | #1559 |
 | Discord-Meldungen der Liga (Spieltag, Saisonende) | eigenes Folgepaket |
@@ -735,7 +736,7 @@ Spielen laufen weiter. Kontolöschung: gelöscht (`account_erasure.PURGED`), Aus
 eine Korrektur lässt es stehen, das Zurücknehmen entfernt es. Andere Formate schreiben das Feld nie.
 
 **`accepted_rules`, `accepted_privacy`:** Beim Zuteilen eines Co-Teams schreibt der Server beide `false`, die Zustimmung zu den Regeln steht allein in
-`league_rule_consents`. An Anmeldungen liest beide Felder kein Code; alte Zeilen bleiben unberührt, andere Anmeldewege auch.
+`league_rule_consents`. Nur eine Anmeldung aus einem Antrag (B.4) trägt beide `true`, die Zustimmung steht dann im Antrag und in `league_rule_consents`. An Anmeldungen liest beide Felder kein Code; alte Zeilen bleiben unberührt, andere Anmeldewege auch.
 
 **Unveränderlich auch von außen:** Die Mediathek schreibt veröffentlichte Fassungen nicht um (`media_audit.is_frozen`) und lässt die Bild-Migration dort aus.
 Eine Datei, die eine veröffentlichte Fassung zeigt, lässt sich nicht drehen und nicht löschen, auch nicht mit Bestätigung (409); beim Duplikat ersetzen bleibt die
@@ -923,7 +924,7 @@ teilt Liga N und Staffel zu. Erst dann entsteht die `tournament_registrations`-Z
 | `privacy_consent` | `{text, user_id, at}` | Der Wortlaut, dem zugestimmt wurde |
 | `decided_by`, `decided_at`, `decision_reason` | str, ISO, str | Letzte Entscheidung der Leitung. Der Grund ist beim Ablehnen Pflicht |
 | `withdrawn_by`, `withdrawn_at` | str, ISO | Rückzug |
-| `assignment` | `{division_id, tournament_id, staffel, registration_id, assigned_by, assigned_at}` | Zuteilung, fehlt bis dahin |
+| `assignment` | `{division_id, tournament_id, staffel, label, registration_id, assigned_by, assigned_at}` | Zuteilung, fehlt bis dahin. Tritt das Co-Team aus der Staffel aus, bleibt sie stehen, die Antworten sagen `staffel_left` bzw. `assignment.left`, der Platz ist frei |
 | `history` | `[{status, by, at, reason?}]` | Jeder Schritt |
 | `created_at`, `updated_at` | ISO | |
 

@@ -93,7 +93,7 @@ function ApplicationRow({ row, options, busy, act }) {
       </p>
       {row.assignment ? (
         <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-white/85">
-          {row.assignment.label}
+          {row.assignment.label}{row.assignment.left ? " (nicht mehr dabei, der Platz ist frei)" : ""}
           <Link to={`/admin/tournaments/${row.assignment.tournament_id}`} data-testid={`application-open-staffel-${row.id}`} className="inline-flex items-center gap-1 text-xs font-bold text-[#29B6E8] hover:text-white">Turnierverwaltung <ExternalLink className="h-3 w-3" aria-hidden="true" /></Link>
         </p>
       ) : null}

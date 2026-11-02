@@ -137,7 +137,7 @@ export default function LeagueApplyPage() {
   const [busy, setBusy] = useState(false);
   const heading = useRef(null);
   const backPath = `/liga/${league}/${season}`;
-  useDocumentTitle("Mit Co-Team anmelden", "Anmeldung eines Co-Teams für die Liga.", { noindex: true });
+  useDocumentTitle("Mit Co-Team anmelden", "Anmeldung eines Co-Teams für die Liga.", { robots: "noindex, nofollow" });
 
   const load = useCallback(async () => {
     try {
