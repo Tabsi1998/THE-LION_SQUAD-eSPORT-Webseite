@@ -219,9 +219,15 @@ async def _records(db, user: dict, now: str, until: datetime) -> int:
     # Kontaktanfragen (#1029) bleiben als Vorgang des Vereins - ohne Name, Adresse, Betreff und Text. Nur angemeldet
     # geschriebene: eine Anfrage ohne Konto lässt sich nicht sicher zuordnen, denn ob die Adresse damals schon zu diesem
     # Konto gehörte, hält niemand fest. Solche bleiben unberührt und werden gezählt (Protokoll der Löschung).
+    own_contacts = [row["id"] async for row in db.contact_messages.find({"user_id": user_id}, {"_id": 0, "id": 1})]
     await db.contact_messages.update_many({"user_id": user_id}, {"$set": {
         "name": GONE, "email": None, "user_id": None, "subject": DELETED_TEXT, "message": DELETED_TEXT, "anonymized_at": now,
+        # Auch Notiz, Antworten und der Kontext einer Fehlermeldung (#2131) sprechen über die Person.
+        "internal_note": "", "replies": [], "context": None,
         "erase_after": until}})
+    if own_contacts:
+        # Die Meldung an den Verein trägt Name und Text - sie geht an dessen Adresse, nicht an die der Person.
+        await db.mail_jobs.delete_many({"meta.contact_id": {"$in": own_contacts}})
     unlinked = await db.contact_messages.count_documents({"user_id": None, "email": email}) if email else 0
     if email:
         # Was noch in der Warteschlange steht, geht nicht mehr raus; Versandtes steht überschrieben in email_logs.
