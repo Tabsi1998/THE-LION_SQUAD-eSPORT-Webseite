@@ -125,10 +125,12 @@ def squad_problems(
     other_staffel_squad_ids: set[str],
     games: dict[str, dict] | None = None,
     parents: dict[str, str | None] | None = None,
+    siblings: bool = False,
 ) -> list[tuple[int, str]]:
     """Alle Gründe, warum dieses Co-Team nicht in die Staffel kann - leer heißt: zuteilbar.
 
-    Reihenfolge = Reihenfolge der Meldung beim Zuteilen (der erste Grund wird zur Antwort)."""
+    Reihenfolge = Reihenfolge der Meldung beim Zuteilen (der erste Grund wird zur Antwort). ``siblings``: Die Season erlaubt
+    zwei Co-Teams eines Hauptteams in derselben Staffel, ``taken_teams`` zählt dann je Co-Team (``_staffel_state``)."""
     problems: list[tuple[int, str]] = []
     name = squad.get("name") or "Das Co-Team"
     if squad.get("team_id") != team.get("id"):
@@ -160,7 +162,9 @@ def squad_problems(
         )
     if squad.get("id") in other_staffel_squad_ids:
         problems.append((409, f"{name} spielt in dieser Season schon in einer anderen Staffel."))
-    if team.get("id") in taken_teams:
+    if siblings and squad.get("id") in taken_teams:
+        problems.append((409, f"{name} stand schon in dieser Staffel – ein Co-Team tritt je Staffel nur einmal an."))
+    if not siblings and team.get("id") in taken_teams:
         status = taken_teams[team["id"]]
         team_name = team.get("name") or "Dieses Team"
         if status in ACTIVE_REGISTRATION_STATUSES:
@@ -180,48 +184,82 @@ def squad_problems(
     return problems
 
 
+async def siblings_allowed(db, tournament: dict) -> bool:
+    """Erlaubt die Season zwei Co-Teams eines Hauptteams in derselben Staffel (#2205)? Ohne Feld und ohne Liga-Rahmen: nein."""
+    season_id = (tournament.get("league_context") or {}).get("season_id")
+    if not season_id:
+        return False
+    season = await db.league_seasons.find_one({"id": season_id}, {"_id": 0, "sibling_squads_in_staffel": 1})
+    return bool((season or {}).get("sibling_squads_in_staffel"))
+
+
 async def _staffel_state(db, tournament: dict) -> tuple[dict[str, str | None], int, set[str]]:
     """Welche Hauptteams schon in der Staffel stehen (mit Status - jede Anmeldung eines Teams belegt den
     ``identity_key``, auch eine ausgetretene), wie viele Plätze belegt sind und welche Co-Teams in einer anderen
-    Staffel derselben Season stehen."""
+    Staffel derselben Season stehen. Erlaubt die Season zwei Co-Teams eines Hauptteams, zählt der ``identity_key`` je
+    Co-Team, also auch die erste Liste."""
     tid = tournament["id"]
+    siblings = await siblings_allowed(db, tournament)
     regs = await db.tournament_registrations.find(
         {"tournament_id": tid},
-        {"_id": 0, "team_id": 1, "status": 1},
+        {"_id": 0, "team_id": 1, "squad_id": 1, "status": 1},
     ).to_list(2000)
     taken_teams: dict[str, str | None] = {}
     for reg in regs:
-        if reg.get("team_id") and taken_teams.get(reg["team_id"]) not in ACTIVE_REGISTRATION_STATUSES:
-            taken_teams[reg["team_id"]] = reg.get("status")
+        key = reg.get("squad_id") if siblings else reg.get("team_id")
+        if key and taken_teams.get(key) not in ACTIVE_REGISTRATION_STATUSES:
+            taken_teams[key] = reg.get("status")
     seats = len([reg for reg in regs if reg.get("status") in SEAT_STATUSES])
     other: set[str] = set()
     season_id = (tournament.get("league_context") or {}).get("season_id")
     if season_id:
-        sibling_ids = [
-            row["id"]
-            for row in await db.tournaments.find(
-                {"league_context.season_id": season_id, "id": {"$ne": tid}},
-                {"_id": 0, "id": 1},
-            ).to_list(200)
-            if row.get("id")
-        ]
-        if sibling_ids:
-            other = {
-                row["squad_id"]
-                for row in await db.tournament_registrations.find(
-                    {
-                        "tournament_id": {"$in": sibling_ids},
-                        "squad_id": {"$exists": True},
-                        "$or": [
-                            {"status": {"$in": list(ACTIVE_REGISTRATION_STATUSES)}},
-                            {"league_squad_key": {"$exists": True}},
-                        ],
-                    },
-                    {"_id": 0, "squad_id": 1},
-                ).to_list(2000)
-                if row.get("squad_id")
-            }
+        other = await _squads_in_staffeln(db, season_id, except_tournament=tid)
     return taken_teams, seats, other
+
+
+async def _squads_in_staffeln(db, season_id: str, *, except_tournament: str | None = None) -> set[str]:
+    """Die Co-Teams, die in Staffeln dieser Season stehen - aktiv oder noch mit Season-Schlüssel."""
+    query: dict = {"league_context.season_id": season_id}
+    if except_tournament:
+        query["id"] = {"$ne": except_tournament}
+    staffel_ids = [row["id"] for row in await db.tournaments.find(query, {"_id": 0, "id": 1}).to_list(200) if row.get("id")]
+    if not staffel_ids:
+        return set()
+    return {
+        row["squad_id"]
+        for row in await db.tournament_registrations.find(
+            {
+                "tournament_id": {"$in": staffel_ids},
+                "squad_id": {"$exists": True},
+                "$or": [
+                    {"status": {"$in": list(ACTIVE_REGISTRATION_STATUSES)}},
+                    {"league_squad_key": {"$exists": True}},
+                ],
+            },
+            {"_id": 0, "squad_id": 1},
+        ).to_list(2000)
+        if row.get("squad_id")
+    }
+
+
+async def season_problems(db, season: dict, game_id: str | None, team: dict, squad: dict, *, min_size: int) -> list[tuple[int, str]]:
+    """Dieselbe Prüfung wie beim Zuteilen, nur ohne Staffel (#2205): Die Anmeldung gilt der Season, die Staffel steht erst nach der
+    Genehmigung fest. Staffelgröße und „schon in der Staffel“ prüft das Zuteilen."""
+    memberships = await db.team_members.find({"team_id": team.get("id")}, {"_id": 0, "user_id": 1}).to_list(500)
+    games, parents = await load_games(db)
+    frame = {"id": None, "game_id": game_id, "team_mode": "team", "format": "league"}
+    return squad_problems(
+        team,
+        squad,
+        frame,
+        min_size=min_size,
+        team_member_ids=_team_member_ids(team, memberships),
+        taken_teams={},
+        seats_taken=0,
+        other_staffel_squad_ids=await _squads_in_staffeln(db, season["id"]),
+        games=games,
+        parents=parents,
+    )
 
 
 def _public_user(user: dict | None) -> dict | None:
@@ -234,6 +272,7 @@ async def candidates(db, tournament: dict) -> dict:
     """Für den Dialog „Co-Team zuteilen“: je Hauptteam die aktiven Co-Teams mit Kader, Captain, Vertreter und den
     Gründen, warum eines (noch) nicht geht."""
     min_size = min_squad_size(tournament)
+    siblings = await siblings_allowed(db, tournament)
     taken_teams, seats, other = await _staffel_state(db, tournament)
     squads = await db.team_squads.find({"status": {"$ne": "archived"}}, {"_id": 0}).to_list(1000)
     team_ids = sorted({squad.get("team_id") for squad in squads if squad.get("team_id")})
@@ -286,6 +325,7 @@ async def candidates(db, tournament: dict) -> dict:
             other_staffel_squad_ids=other,
             games=games,
             parents=parents,
+            siblings=siblings,
         ) + league_eligibility.registration_problems(eligibility, squad)
         entry = out.setdefault(
             team["id"],
@@ -294,10 +334,11 @@ async def candidates(db, tournament: dict) -> dict:
                 "name": team.get("name"),
                 "tag": team.get("tag"),
                 "logo_url": team.get("logo_url"),
-                "in_staffel": team["id"] in taken_teams,
+                "in_staffel": False,
                 "squads": [],
             },
         )
+        entry["in_staffel"] = entry["in_staffel"] or (squad.get("id") if siblings else team["id"]) in taken_teams
         entry["squads"].append(
             {
                 "id": squad.get("id"),
@@ -338,8 +379,13 @@ def _id_players(squad: dict, id_states: dict[str, dict]) -> list[dict]:
     return sorted(rows, key=lambda row: str(row["name"]).lower())
 
 
-async def build_registration(db, tournament: dict, team_id: str, squad_id: str, actor: dict) -> dict:
-    """Prüft das Co-Team und baut die Anmeldung - ohne zu schreiben. Wirft ``SquadAssignError``."""
+async def build_registration(db, tournament: dict, team_id: str, squad_id: str, actor: dict, *, status: str = "approved",
+                             consent: bool = False, via: str = "league_assign", source: str = "staff_add",
+                             application_id: str | None = None, registered_by: str | None = None) -> dict:
+    """Prüft das Co-Team und baut die Anmeldung - ohne zu schreiben. Wirft ``SquadAssignError``.
+
+    Die Selbstanmeldung (#2205) sagt, woher sie kommt (``via``, ``source``, ``application_id``, ``registered_by``: wer eingereicht hat)
+    und ob ausdrücklich zugestimmt wurde (``consent``). Ohne diese Angaben bleibt es das Zuteilen durch die Leitung."""
     if not is_league_tournament(tournament):
         raise SquadAssignError(400, "Co-Teams teilt die Turnierleitung nur Team-Turnieren im Format Liga zu.")
     if tournament.get("status") in FINISHED_TOURNAMENT_STATUSES:
@@ -351,6 +397,7 @@ async def build_registration(db, tournament: dict, team_id: str, squad_id: str, 
     if not squad:
         raise SquadAssignError(404, "Co-Team nicht gefunden.")
     memberships = await db.team_members.find({"team_id": team_id}, {"_id": 0, "user_id": 1}).to_list(500)
+    siblings = await siblings_allowed(db, tournament)
     taken_teams, seats, other = await _staffel_state(db, tournament)
     games, parents = await load_games(db)
     problems = squad_problems(
@@ -364,6 +411,7 @@ async def build_registration(db, tournament: dict, team_id: str, squad_id: str, 
         other_staffel_squad_ids=other,
         games=games,
         parents=parents,
+        siblings=siblings,
     )
     eligibility = await league_eligibility.context_for_tournament(db, tournament, squad.get("member_ids") or [])
     problems += league_eligibility.registration_problems(eligibility, squad)
@@ -380,22 +428,23 @@ async def build_registration(db, tournament: dict, team_id: str, squad_id: str, 
         "team_id": team_id,
         "squad_id": squad_id,
         "squad_name": squad.get("name"),
-        "status": "approved",
+        "status": status,
         "display_name": name,
         "ingame_name": name,
         "player_ids": {},
         # Das Zuteilen ist keine Zustimmung (D-7, #1646): Regeln stehen in league_rule_consents, zum Datenschutz hat hier niemand
-        # etwas erklärt. An Anmeldungen liest beide Felder kein Code.
-        "accepted_rules": False,
-        "accepted_privacy": False,
+        # etwas erklärt. Wahr nur, wenn ein Antrag beide Zustimmungen trägt (#2205). An Anmeldungen liest beide Felder kein Code.
+        "accepted_rules": consent,
+        "accepted_privacy": consent,
         "seed": None,
         "registration_type": "team",
-        "registered_via": "league_assign",
-        "registered_by": actor.get("id"),
-        "source": "staff_add",
+        "registered_via": via,
+        "registered_by": registered_by or actor.get("id"),
+        "source": source,
         "is_guest": False,
-        "identity_key": f"{tid}:team:{team_id}",
+        "identity_key": f"{tid}:team:{team_id}:squad:{squad_id}" if siblings else f"{tid}:team:{team_id}",
         **({"league_squad_key": key} if (key := league_squad_key(tournament, squad_id)) else {}),
+        **({"application_id": application_id} if application_id else {}),
         "created_by": actor.get("id"),
         "created_at": now_iso,
         "updated_at": now_iso,
