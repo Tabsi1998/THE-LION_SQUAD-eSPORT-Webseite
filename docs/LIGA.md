@@ -1,6 +1,10 @@
-# Liga – Stufe 1 (CoD-Liga, Start Di 10.11.2026)
+# Liga
 
-Stand: 28.10.2026, verbindlicher Vertrag für die Pakete P1–P6 des Epics #1621 (Entscheidungen 15.10. und 27.10.).
+Abschnitte 1 bis 11 beschreiben die gebaute **Stufe 1**. Abschnitt 12 ist der Vertrag für den **Ausbau** (Epic #2211).
+Beispielwerte in Stufe 1 (Start 10.11., zehn Wochen, Best of 3, acht Teams, 3/1/0) sind Vorgaben von damals, keine festen
+Regeln: Jede Season stellt sie selbst ein.
+
+Stand Stufe 1: 28.10.2026, verbindlicher Vertrag für die Pakete P1–P6 des Epics #1621 (Entscheidungen 15.10. und 27.10.).
 Zwei Worker bauen parallel darauf: **A** = P1 Liga-Rahmen und Admin, P2 Spielplan und Wertung, P5 Ligaseite;
 **B** = P3 Co-Team als Teilnehmer, P4 Ergebnis je Map mit Aufstellung. Wer den Vertrag ändern will, ändert zuerst
 dieses Papier (eigener Commit, der andere Worker zieht nach).
@@ -472,3 +476,71 @@ Logik in `services/league_look.py`, alles optional – ohne Felder sieht die Lig
 - **Mediathek:** `media_audit` kennt `leagues`/`league_seasons` (`emblem_url`, `banner_url`) und `prizes.image_url`
   an Season und Liga N – die Dateien gelten als verwendet.
 - Audit: Änderungen laufen über `league.update`, `league.season.update`, `league.division.update` (Feldnamen).
+
+## 12. Ausbau zur Wettbewerbsplattform (Epic #2211)
+
+Stand: 02.11.2026. Dieser Abschnitt legt Richtung und Grenzen fest. Die genauen Felder trägt jedes Paket hier nach, bevor
+es gebaut wird. Fachregeln stehen nicht hier, sondern werden je Season eingestellt.
+
+### Grundsätze
+
+- **Kein zweites System.** `Spiel → Liga → Season → Liga N → Staffel → Spiele` bleibt. Kein paralleles Match-, Modus- oder
+  Map-System.
+- **Jedes neue Feld ist optional.** Ohne Feld verhält sich alles wie vorher. Andere Turnierformate und die App ohne neuen
+  Build bleiben unverändert.
+- **Keine Werte eines Titels im Code.** Modi, Ergebnisgrenzen, Reihenfolgen und Veto-Abläufe stehen am Spiel oder an der
+  Season.
+- **Nichts Fachliches wird still entschieden.** Offene Regeln bekommen eine Einstellung, ihre Vorgabe gibt der Betreiber frei.
+- **Season bleibt Vorlage, die Staffel trägt die geltenden Werte** (Abschnitt 1). Neue Werte laufen über `SYNC_GROUPS`.
+
+### Datenfluss
+
+```
+games.match_modes[] ── Modus mit Status und Ergebnisregel
+game_maps ──────────── Bibliothek, Map ↔ Modus (M:N)
+map_pools ──────────── unveränderliche Versionen: league_season → Kopie je Staffel (tournament)
+league_seasons ─────── Vorlage: Anmeldung, Kader, Best of, Modusfolge, Veto, Wertung, Fristen
+league_rules ───────── Regelwerk in Versionen, Zustimmung
+
+league_applications ── Antrag je Season (Kapitän) ──Genehmigung──▶ tournament_registrations (Staffel)
+                                                                        │
+matches_v2 ── flow (Check-in, Start) ── veto + planned_games[] ── games[] (Ergebnis) ── incidents[] ── disputes
+                                                                        │
+competition_sanctions ──▶ league_eligibility (Aufstellung, Check-in, Anmeldung)
+                     └─▶ Tabelle (standings_for_structure) ──▶ league_final_tables (Endstand)
+```
+
+### Neue Bausteine
+
+| Baustein | Paket | Kern | Baut auf |
+| --- | --- | --- | --- |
+| Echte Tests | A.2 | `flow_harness.py` wahlweise gegen MongoDB, schreibende Abnahme-Spec | CI, `docker-compose.abnahme.yml` |
+| Bereich `leagues`, `league_staff` | B.1 | Zuständigkeiten je Liga, Befangenheit | `permissions.py`, `tournament_permissions.py` |
+| `league_rules` | B.2 | Versionen, Zustimmung, Spiel merkt sich die Version | `rules` der Staffel, `rules_text` als Rückfall |
+| `league_eligibility.py` | B.3 | Eine Prüfung für Anmeldung, Aufstellung, Check-in | `league_roster.py`, `league_games._lineup` |
+| `league_applications` | B.4 | Antrag je Season, die Staffel steht erst nach Genehmigung fest | `squad_problems`, `build_registration` |
+| Modus-Felder | C.1 | Status, Ergebnisregel | `games.match_modes[]`, Dauerplanung bleibt |
+| `season_readiness` | C.2 | Vorab-Prüfung vor der Veröffentlichung | `map_pools`, `game_mode_order` |
+| Ergebnisregeln | C.3 | Prüfung in `normalize_games`, nur mit gesetzter Regel | `games[]` |
+| `matches_v2.flow`, `match_flow.py` | D.2 | Stand abgeleitet, kein neuer globaler `status`; setzt `started_at` | `no_show_deadline`, `call_view` |
+| `matches_v2.veto`, `planned_games[]` | D.3 | Zustandsautomat auf dem Server, gleiche Schlüssel wie `games[]` | `map_pools.allowed`, `map_pool_id` |
+| `matches_v2.incidents[]` | D.5 | Abbruch, Pause, Rehost, Wiederholung, Entscheidung | `games[]` |
+| Tabellen-Regeln | E.1 | Direkter Vergleich, Mini-Tabelle, Default-Win, Punktabzug | `scoring_rules`, `standings_for_structure` |
+| `competition_sanctions` | E.3 | Strafen mit Wirkung, Moderation bleibt getrennt | `penalty_routes.py` |
+| `league_final_tables` | F.1 | Dauerhafter Endstand, Meister | Muster `record_tournament_awards` |
+
+### Darf nicht beschädigt werden
+
+Jedes Paket prüft das per Regressionstest:
+
+- Unveränderliche `map_pools`, `effective_pool`, `map_pools.allowed`.
+- Vertrag von `games[]`, Konsens `same_outcome`, App-Bestätigung ohne Maps.
+- Dauerplanung an `games.match_modes[]` (`minutes`, `per_game`).
+- Getrennte Referenz-Ligen (`team_league_maps.py`, `reference_round_results`).
+- Turnierkern und andere Formate, `league_scope.py`, `staffel_guard.py`.
+
+### Abgeschlossen heißt
+
+Datenmodell und API passen zusammen, Rechte greifen, die Oberfläche trägt den ganzen Ablauf, Fehler sind verständlich,
+Daten bleiben erhalten. Dazu Tests für Haupt- und Fehlerfälle, gleichzeitige Aktionen, Protokoll, Lauf gegen echtes MongoDB,
+Browserlauf mit echter API bei 390 und 1440 px, App kompatibel, Doku und Handbuch aktuell. Mongomock allein reicht nicht.
