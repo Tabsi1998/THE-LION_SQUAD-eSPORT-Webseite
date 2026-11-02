@@ -270,11 +270,13 @@ function TeamDetail({ id }) {
   // Co-Leitung brauchen sie für ihr eigenes Team nicht. Fehlt nur die Zwei-Faktor-Anmeldung, steht „2FA einrichten“ da.
   const leadsTeam = !!user && (team.leader_id === user.id || !!team.co_leader_ids?.includes(user.id));
   const canEdit = !!user && (!!team.can_manage || leadsTeam);
+  // Nur die Pflege (#2202): Die Freigabe „Turnierleitung“ bearbeitet Team und Co-Teams, öffnet aber weder Chat noch Einladungen.
+  const canEditTeam = canEdit || (!!user && !!team.can_edit_team);
   const canRemoveMembers = !!user && (!!team.can_remove_members || leadsTeam);
   const canDissolve = !!user && (!!team.can_dissolve || team.leader_id === user.id);
   // Rollen und Übergabe (#2128, TM6): auch der Club-Admin - sonst säße ein Team ohne Teamleitung fest.
   const canChangeRoles = !!user && (!!team.can_change_roles || team.leader_id === user.id);
-  const teamNeedsSecondFactor = !!user && !canEdit && !!team.admin_needs_second_factor && needsSecondFactor(user);
+  const teamNeedsSecondFactor = !!user && !canEditTeam && !!team.admin_needs_second_factor && needsSecondFactor(user);
   // Teambanner (#230): eine Auszeichnung des Teams im Kopf; nur die Teamleitung wählt, der Server prüft.
   const featureTeamAward = async (awardId) => {
     try {
@@ -378,10 +380,10 @@ function TeamDetail({ id }) {
         actions={(
           <>
             {canEdit ? (
-              <>
-                <button type="button" onClick={() => setInviteOpen(true)} data-testid="team-invite-open" className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold inline-flex items-center gap-2"><UserPlus className="w-3.5 h-3.5" /> Einladen</button>
-                <button onClick={() => setEditing(team)} disabled={mutating} data-testid="team-edit-open" className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold inline-flex items-center gap-2 disabled:opacity-50"><Edit className="w-3.5 h-3.5" /> Bearbeiten</button>
-              </>
+              <button type="button" onClick={() => setInviteOpen(true)} data-testid="team-invite-open" className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold inline-flex items-center gap-2"><UserPlus className="w-3.5 h-3.5" /> Einladen</button>
+            ) : null}
+            {canEditTeam ? (
+              <button onClick={() => setEditing(team)} disabled={mutating} data-testid="team-edit-open" className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold inline-flex items-center gap-2 disabled:opacity-50"><Edit className="w-3.5 h-3.5" /> Bearbeiten</button>
             ) : null}
             {teamNeedsSecondFactor ? (
               <Link to={mfaSetupPath(`/teams/${team.id}`)} data-testid="team-mfa-setup" title="Teams verwalten geht für Admins erst mit bestätigter Zwei-Faktor-Anmeldung." className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold inline-flex items-center gap-2"><ShieldCheck className="w-3.5 h-3.5" /> 2FA einrichten</Link>
@@ -411,7 +413,7 @@ function TeamDetail({ id }) {
           )}
           <TeamLeague overview={overview} />
           {/* Co-Teams mit Captain und Vertreter (#2110) - nur für Mitglieder und Teamleitung. */}
-          <TeamSquads key={`squads-${team.id}`} team={team} userId={user?.id} canManage={canEdit} enabled={isMember || canEdit} />
+          <TeamSquads key={`squads-${team.id}`} team={team} userId={user?.id} canManage={canEditTeam} enabled={isMember || canEditTeam} />
           <TeamSchedule overview={overview} />
           {(team.awards || []).length > 0 && (
             <section data-testid="team-awards">

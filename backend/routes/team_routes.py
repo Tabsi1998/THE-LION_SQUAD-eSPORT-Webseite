@@ -89,7 +89,8 @@ class TeamChatCreate(BaseModel):
 MENTION_RE = re.compile(r"@([A-Za-z0-9_.-]{2,32})")
 
 
-# Teams verwalten außer Leitung und Co-Leitung: Turnierleitung (Rolle oder Freigabe), Club-Admin, Superadmin. Moderatoren
+# Teams verwalten außer Leitung und Co-Leitung: Turnierleitung, Club-Admin, Superadmin (die Freigabe nur bei der Pflege,
+# ``_can_edit_team``). Moderatoren
 # moderieren (Wortfilter für Teamnamen, Bildprüfung für Logos und Banner). Mitglieder entfernen, Rollen ändern, die
 # Leitung übergeben und auflösen dürfen außer der Leitung nur Club-Admin und Superadmin. Wie jeder Adminbereich nur mit
 # bestätigter Zwei-Faktor-Anmeldung (#1469); Leitung und Co-Leitung brauchen sie für ihr eigenes Team nicht.
@@ -98,17 +99,12 @@ TEAM_OWNER_ADMIN_ROLES = ("club_admin", "superadmin")
 
 
 def _team_admin(user: dict | None, roles=TEAM_ADMIN_ROLES) -> bool:
-    """Die Freigabe „Turnierleitung“ zählt wie die Rolle (docs/ROLLEN.md, #2202) - nur, wo die Liste die Rolle nennt."""
-    return is_confirmed_admin_role(user, roles) or ("tournament_admin" in roles and is_confirmed_tournament_lead(user))
-
-
-def _only_second_factor_missing(user: dict | None, roles=TEAM_ADMIN_ROLES) -> bool:
-    return admin_role_without_second_factor(user, roles) or ("tournament_admin" in roles and lead_without_second_factor(user))
+    return is_confirmed_admin_role(user, roles)
 
 
 def _refuse(user: dict | None, detail: str, roles=TEAM_ADMIN_ROLES):
     """403 - mit dem Hinweis auf die Zwei-Faktor-Anmeldung, wenn nur sie fehlt."""
-    if _only_second_factor_missing(user, roles):
+    if admin_role_without_second_factor(user, roles):
         raise HTTPException(status_code=403, detail=MFA_MESSAGE)
     raise HTTPException(status_code=403, detail=detail)
 
@@ -119,6 +115,24 @@ def _can_manage(team: dict, user: dict) -> bool:
         or user["id"] in team.get("co_leader_ids", [])
         or _team_admin(user)
     )
+
+
+def _can_edit_team(team: dict, user: dict) -> bool:
+    """Die Pflege aus docs/ROLLEN.md (#2202): Team bearbeiten und Co-Teams. Dort zählt die Freigabe „Turnierleitung“ wie die
+    Rolle - nur bei öffentlichen Teams, denn sie öffnet keine Inhalte: Chat, private Teams, Beitrittscode und Einladungen
+    bleiben bei ``_can_manage`` und ``_is_staff``."""
+    return _can_manage(team, user) or (team.get("is_public") is not False and is_confirmed_tournament_lead(user))
+
+
+def _grant_lacks_second_factor(team: dict, user: dict | None) -> bool:
+    return team.get("is_public") is not False and lead_without_second_factor(user)
+
+
+def _refuse_edit(team: dict, user: dict | None, detail: str):
+    """403 für die Pflege - auch eine Freigabe, der nur die Zwei-Faktor-Anmeldung fehlt, bekommt den Hinweis darauf."""
+    if _grant_lacks_second_factor(team, user):
+        raise HTTPException(status_code=403, detail=MFA_MESSAGE)
+    _refuse(user, detail)
 
 
 def _is_staff(user: dict | None) -> bool:
@@ -344,18 +358,21 @@ def _viewer_rights(team: dict, user: dict | None) -> dict:
     statt Rollen selbst zu deuten. ``admin_needs_second_factor``: eine Admin-Rolle, der nur die bestätigte
     Zwei-Faktor-Anmeldung fehlt - dann zeigen sie „2FA einrichten“ statt der Verwaltung."""
     if not user:
-        return {"can_manage": False, "can_remove_members": False, "can_dissolve": False, "can_change_roles": False,
-                "admin_needs_second_factor": False}
+        return {"can_manage": False, "can_edit_team": False, "can_remove_members": False, "can_dissolve": False,
+                "can_change_roles": False, "admin_needs_second_factor": False}
     leads = team.get("leader_id") == user.get("id") or user.get("id") in (team.get("co_leader_ids") or [])
     owns = team.get("leader_id") == user.get("id") or _team_admin(user, TEAM_OWNER_ADMIN_ROLES)
     return {
         "can_manage": _can_manage(team, user),
+        # Nur die Pflege (#2202): Wer das hat, aber nicht ``can_manage``, bekommt nur „Bearbeiten“ und die Co-Teams.
+        "can_edit_team": _can_edit_team(team, user),
         "can_remove_members": _can_manage_team(team, user),
         "can_dissolve": owns,
         # Rollen ändern und die Leitung übergeben (#2128, TM6): Teamleitung, Club-Admin, Superadmin - auch für ein Team,
         # dessen Teamleitung nicht mehr da ist.
         "can_change_roles": owns,
-        "admin_needs_second_factor": not leads and _only_second_factor_missing(user),
+        "admin_needs_second_factor": not leads and (admin_role_without_second_factor(user, TEAM_ADMIN_ROLES)
+                                                    or _grant_lacks_second_factor(team, user)),
     }
 
 
@@ -372,6 +389,9 @@ def _team_response(team: dict, user: dict | None = None) -> dict:
         out["member_ids"] = team.get("member_ids", [])
         out["is_member"] = False
         out.update(rights)
+        if rights["can_edit_team"]:
+            # Das Formular schickt die Farbe mit - sonst setzte die Pflege sie zurück.
+            out["color"] = team.get("color")
         return out
 
     team["member_count"] = len(team.get("member_ids") or [])
@@ -965,9 +985,8 @@ async def update_team(team_id: str, body: TeamUpdate, me: dict = Depends(get_cur
     team = await db.teams.find_one({"id": team_id})
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
-    if team["leader_id"] != me["id"] and me["id"] not in team.get("co_leader_ids", []):
-        if not _team_admin(me):
-            _refuse(me, "Keine Berechtigung")
+    if not _can_edit_team(team, me):
+        _refuse_edit(team, me, "Keine Berechtigung")
     nullable_fields = {"description", "logo_url", "banner_url", "discord_link", "social_links"}
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
@@ -987,6 +1006,8 @@ async def update_team(team_id: str, body: TeamUpdate, me: dict = Depends(get_cur
     if visibility_changes:
         await _team_audit(db, "team.visibility", team_id, me["id"], {"is_public": updates["is_public"]})
     team = await db.teams.find_one({"id": team_id}, {"_id": 0})
+    if not _can_manage(team, me):
+        team.pop("join_code", None)
     return team
 
 
@@ -1230,8 +1251,8 @@ async def list_squads(team_id: str, me: dict = Depends(get_current_user)):
     team = await db.teams.find_one({"id": team_id}, {"_id": 0})
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
-    if me["id"] not in team.get("member_ids", []) and not _can_manage(team, me):
-        _refuse(me, "Keine Berechtigung")
+    if me["id"] not in team.get("member_ids", []) and not _can_edit_team(team, me):
+        _refuse_edit(team, me, "Keine Berechtigung")
     squads = await db.team_squads.find({"team_id": team_id}, {"_id": 0}).sort("created_at", -1).to_list(200)
     # Nur was die Co-Team-Ansicht zeigt (#1497) - wie _public_user bei den anderen Team-Antworten.
     member_map = {u["id"]: u for u in await db.users.find(
@@ -1265,8 +1286,8 @@ async def create_squad(team_id: str, body: TeamSquadCreate, me: dict = Depends(g
     team = await db.teams.find_one({"id": team_id}, {"_id": 0})
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
-    if not _can_manage(team, me):
-        _refuse(me, "Keine Berechtigung")
+    if not _can_edit_team(team, me):
+        _refuse_edit(team, me, "Keine Berechtigung")
     doc = body.model_dump()
     doc["game_id"] = await _squad_game(db, doc.get("game_id"))
     doc["member_ids"] = _validate_squad_members(team, doc.get("member_ids") or [])
@@ -1294,8 +1315,8 @@ async def update_squad(team_id: str, squad_id: str, body: TeamSquadUpdate, me: d
     team = await db.teams.find_one({"id": team_id}, {"_id": 0})
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
-    if not _can_manage(team, me):
-        _refuse(me, "Keine Berechtigung")
+    if not _can_edit_team(team, me):
+        _refuse_edit(team, me, "Keine Berechtigung")
     nullable_fields = {"description", "game_id", "member_ids", *SQUAD_ROLE_FIELDS}
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
@@ -1349,8 +1370,8 @@ async def set_squad_roles(team_id: str, squad_id: str, body: TeamSquadRoles, me:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
     current = await db.team_squads.find_one({"id": squad_id, "team_id": team_id}, {"_id": 0})
     requested = body.model_dump(exclude_unset=True)
-    if not _can_manage(team, me) and not _resigns_own_role(current, requested, me):
-        _refuse(me, "Captain und Vertreter vergeben Teamleitung und Co-Leitung.")
+    if not _can_edit_team(team, me) and not _resigns_own_role(current, requested, me):
+        _refuse_edit(team, me, "Captain und Vertreter vergeben Teamleitung und Co-Leitung.")
     if not current:
         raise HTTPException(status_code=404, detail="Co-Team nicht gefunden")
     roles = _squad_roles(current, requested, current.get("member_ids") or [], team)
@@ -1362,7 +1383,7 @@ async def set_squad_roles(team_id: str, squad_id: str, body: TeamSquadRoles, me:
         raise HTTPException(status_code=409, detail=SQUAD_CHANGED_MEANWHILE)
     fresh = await db.team_squads.find_one({"id": squad_id}, {"_id": 0})
     await _after_squad_roles(db, team, fresh or current, current, roles, me)
-    if not _can_manage(team, me):
+    if not _can_edit_team(team, me):
         await _tell_role_resigned(db, team, fresh or current, requested, me)
     return fresh
 
@@ -1401,8 +1422,8 @@ async def delete_squad(team_id: str, squad_id: str, me: dict = Depends(get_curre
     team = await db.teams.find_one({"id": team_id}, {"_id": 0})
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
-    if not _can_manage(team, me):
-        _refuse(me, "Keine Berechtigung")
+    if not _can_edit_team(team, me):
+        _refuse_edit(team, me, "Keine Berechtigung")
     # Ein Co-Team, das in einer laufenden Liga-Staffel steht, bleibt (#1649) - erst die Zuteilung zurücknehmen.
     from services.squad_registration import active_league_registration
 

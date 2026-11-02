@@ -141,6 +141,21 @@ test("Team verlassen fragt nach; abgelehnt passiert nichts", async () => {
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/teams/t-1/leave"));
 });
 
+// Freigabe „Turnierleitung“ (#2202): nur die Pflege - die Seite zeigt nichts, was der Server dann ablehnt.
+test("Nur Pflege (can_edit_team): „Bearbeiten“ und Co-Teams, aber kein Einladen, keine Mitgliederverwaltung, kein Chat", async () => {
+  authState.user = { id: "u-grant", username: "freigabe" };
+  serve({ ...TEAM, is_member: false, member_ids: ["u-cap"], can_manage: false, can_edit_team: true, join_code: undefined }, { "/teams/t-1/squads": [] });
+  renderAt("/teams/t-1");
+
+  expect(await screen.findByTestId("team-edit-open")).toBeInTheDocument();
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/teams/t-1/squads"));
+  expect(screen.queryByTestId("team-invite-open")).toBeNull();
+  expect(screen.queryByTestId("team-manage-members")).toBeNull();
+  expect(screen.queryByTestId("team-chat")).toBeNull();
+  expect(apiMock.get).not.toHaveBeenCalledWith("/teams/t-1/chat");
+  expect(apiMock.get).not.toHaveBeenCalledWith("/teams/t-1/invite-link");
+});
+
 // Kader unter Mindestgröße (#2202): der Abgang bleibt möglich, die Rückfrage sagt vorher, was er bewirkt.
 const LEAGUE_SQUADS = [{ id: "s-1", name: "Rocket A", member_ids: ["u-3", "u-co"], league_requirement: { min_size: 2, title: "Staffel A" } }];
 

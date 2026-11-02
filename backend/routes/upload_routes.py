@@ -882,12 +882,14 @@ async def upload_team_logo(request: Request, team_id: str, file: UploadFile = Fi
     zuerst als Bild über ``/image``."""
     started_at = time.perf_counter()
     try:
-        team = await get_db().teams.find_one({"id": team_id}, {"_id": 0, "leader_id": 1, "co_leader_ids": 1})
+        team = await get_db().teams.find_one({"id": team_id}, {"_id": 0, "leader_id": 1, "co_leader_ids": 1, "is_public": 1})
         if not team:
             raise HTTPException(status_code=404, detail="Team nicht gefunden")
         leads = team.get("leader_id") == me.get("id") or me.get("id") in (team.get("co_leader_ids") or [])
-        if not leads and not is_confirmed_admin_role(me, TEAM_LOGO_ADMIN_ROLES) and not is_confirmed_tournament_lead(me):
-            if admin_role_without_second_factor(me, TEAM_LOGO_ADMIN_ROLES) or lead_without_second_factor(me):
+        # Die Freigabe „Turnierleitung“ zählt wie beim Team bearbeiten nur bei öffentlichen Teams (#2202).
+        public = team.get("is_public") is not False
+        if not leads and not is_confirmed_admin_role(me, TEAM_LOGO_ADMIN_ROLES) and not (public and is_confirmed_tournament_lead(me)):
+            if admin_role_without_second_factor(me, TEAM_LOGO_ADMIN_ROLES) or (public and lead_without_second_factor(me)):
                 raise HTTPException(status_code=403, detail=MFA_MESSAGE)
             raise HTTPException(status_code=403, detail="Das Logo kann nur die Leitung des Teams ändern.")
         await _enforce_upload_rate_limit(request, me, "image", "user")

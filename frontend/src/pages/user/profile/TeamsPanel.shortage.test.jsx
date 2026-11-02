@@ -38,6 +38,19 @@ beforeEach(() => {
   apiMock.patch.mockResolvedValue({ data: {} });
 });
 
+test("Pflege über die Freigabe (can_edit_team): Co-Teams lassen sich bearbeiten (#2202)", async () => {
+  apiMock.get.mockImplementation((url) => {
+    if (url === "/teams/my") return Promise.resolve({ data: [{ ...TEAM, my_role: "member", can_manage: false, can_edit_team: true }] });
+    if (url === "/teams/t1/squads") return Promise.resolve({ data: [SQUAD] });
+    return Promise.resolve({ data: [] });
+  });
+  await openEditor();
+
+  fireEvent.click(screen.getByText("Speichern"));
+
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalled());
+});
+
 test("unter die Vorgabe der Staffel: erst die Rückfrage, dann gespeichert", async () => {
   answer({ ...SQUAD, league_requirement: { min_size: 2, title: "Staffel A" } });
   confirmMock.mockResolvedValue(true);
