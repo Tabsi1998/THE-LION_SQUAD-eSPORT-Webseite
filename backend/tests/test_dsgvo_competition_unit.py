@@ -39,6 +39,7 @@ class FakeCollection:
 class FakeDb:
     def __init__(self):
         self.users = FakeCollection([{"id": "u1", "email": "lion@example.at", "display_name": "Lion"}])
+        self.tournaments = FakeCollection()
         self.tournament_registrations = FakeCollection([{
             "id": "r1",
             "tournament_id": "t1",

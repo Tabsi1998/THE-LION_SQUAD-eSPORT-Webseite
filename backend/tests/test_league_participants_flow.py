@@ -471,6 +471,46 @@ async def test_the_data_request_names_the_matches_on_a_list_without_other_people
     assert await league_appearance_snapshot(flow.db, w["users"]["Fremd"]["id"]) == []
 
 
+async def old_per_map_result(flow, w: dict, *, index: bool) -> None:
+    """Ein gültiger Altbestand: Aufstellungen beider Seiten nur in ``games[].lineups``, keine Liste, wahlweise ohne Index."""
+    body = two_nil(w)
+    games = [{**game, "scores": game.get("scores") or {},
+              "lineups": {w["reg_a"]["id"]: ids(w, "Kapitaen", "Mila"), w["reg_h"]["id"]: ids(w, "Falke1", "Falke2")}} for game in body["games"]]
+    people = ids(w, "Kapitaen", "Mila", "Falke1", "Falke2")
+    await flow.db.matches_v2.update_one({"id": w["match"]["id"]}, {"$set": {
+        "games": games, "status": "completed", "results": body["results"], "completed_at": now_utc().isoformat(),
+        **({"lineup_user_ids": people} if index else {})}})
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("index", [True, False])
+async def test_the_data_request_finds_old_lineups_per_map_with_and_without_the_index(flow, index):
+    w = await id_world(flow)
+    await old_per_map_result(flow, w, index=index)
+    from services.competition_privacy import league_appearance_snapshot
+
+    home = await league_appearance_snapshot(flow.db, w["users"]["Mila"]["id"])
+    away = await league_appearance_snapshot(flow.db, w["users"]["Falke1"]["id"])
+
+    assert [(row["match_id"], row["registration_id"]) for row in home] == [(w["match"]["id"], w["reg_a"]["id"])]
+    assert [(row["match_id"], row["registration_id"]) for row in away] == [(w["match"]["id"], w["reg_h"]["id"])]
+    for person in ("Kapitaen", "Falke2"):
+        assert w["users"][person]["id"] not in str(home) + str(away), "keine andere Person"
+    assert w["reg_h"]["id"] not in str(home), "nie die Gegenseite"
+    assert await league_appearance_snapshot(flow.db, w["users"]["Tom"]["id"]) == [], "im Kader, aber nicht aufgestellt"
+
+
+@pytest.mark.asyncio
+async def test_the_data_request_names_the_own_side_of_an_open_report(flow):
+    w = await series_world(flow)
+    assert (await report(flow, w, *HOME)).status_code == 200
+    from services.competition_privacy import league_appearance_snapshot
+
+    rows = await league_appearance_snapshot(flow.db, w["users"]["Mila"]["id"])
+
+    assert [row["registration_id"] for row in rows] == [w["reg_a"]["id"]]
+
+
 # ---------------------------------------------------------------- Altbestand
 
 
