@@ -94,8 +94,8 @@ test("Einladungs-Link für ein privates Team: nur die Einladung mit „Beitreten
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/teams/t-1/join-link", { token: "AbC123" }));
 });
 
-// Kein stummer Knopf (#2113, L-C6): der Kapitän sieht statt „Team verlassen“, was er tun kann; andere den Knopf.
-test("Kapitän: Hinweis „erst übergeben oder auflösen“ statt „Team verlassen“; Spieler sehen den Knopf", async () => {
+// Kein stummer Knopf (#2113, L-C6): die Teamleitung sieht statt „Team verlassen“, was sie tun kann; andere den Knopf.
+test("Teamleitung: Hinweis „erst übergeben oder auflösen“ statt „Team verlassen“; Mitglieder sehen den Knopf", async () => {
   serve();
   const { unmount } = renderAt("/teams/t-1");
   expect(await screen.findByTestId("team-leave-leader-hint")).toHaveTextContent("Übergib zuerst die Leitung");
@@ -108,8 +108,129 @@ test("Kapitän: Hinweis „erst übergeben oder auflösen“ statt „Team verla
   expect(screen.queryByTestId("team-leave-leader-hint")).toBeNull();
 });
 
-// Kein Kapitän aus einem gelöschten Konto (#2113): „Zum Kapitän machen“ fehlt dort.
-test("gelöschtes Mitglied: kein Knopf „Zum Kapitän machen“", async () => {
+// Suchfeld auf der öffentlichen Liste (#2128, TM7): fragt den Server, damit auch ältere Teams gefunden werden.
+test("Teamliste: Suche fragt den Server und sagt, wenn nichts passt", async () => {
+  authState.user = null;
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/teams?limit=90") return { data: [{ id: "t-1", name: "Lions Rocket", tag: "LRK" }] };
+    if (url === "/teams?limit=90&q=Alte%20L%C3%B6wen") return { data: [{ id: "t-2", name: "Alte Löwen", tag: "ALT" }] };
+    if (url === "/teams?limit=90&q=Niemand") return { data: [] };
+    return { data: {} };
+  });
+  render(<MemoryRouter initialEntries={["/teams"]}><Routes><Route path="/teams" element={<TeamsPage />} /></Routes></MemoryRouter>);
+  expect(await screen.findByTestId("team-card-LRK")).toBeInTheDocument();
+  fireEvent.change(screen.getByTestId("teams-search"), { target: { value: " Alte Löwen " } });
+  expect(await screen.findByTestId("team-card-ALT")).toBeInTheDocument();
+  expect(screen.queryByTestId("team-card-LRK")).toBeNull();
+  fireEvent.change(screen.getByTestId("teams-search"), { target: { value: "Niemand" } });
+  expect(await screen.findByTestId("teams-empty")).toHaveTextContent("KEIN TEAM GEFUNDEN");
+});
+
+// „Team verlassen“ mit Rückfrage (#2128, TM4) - wie in der App: erst das Ja verlässt das Team.
+test("Team verlassen fragt nach; abgelehnt passiert nichts", async () => {
+  authState.user = { id: "u-3", username: "lunabyte" };
+  serve({ ...TEAM, can_manage: false });
+  apiMock.post.mockResolvedValue({ data: { ok: true } });
+  renderAt("/teams/t-1");
+  confirmMock.mockResolvedValueOnce(false);
+  fireEvent.click(await screen.findByTestId("team-leave"));
+  await waitFor(() => expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Team verlassen?" })));
+  expect(apiMock.post).not.toHaveBeenCalled();
+  confirmMock.mockResolvedValueOnce(true);
+  fireEvent.click(screen.getByTestId("team-leave"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/teams/t-1/leave"));
+});
+
+// Verwaistes Team (#2128, TM6): Club-Admins sehen Rollen und Übergabe, wie es der Server erlaubt.
+test("Club-Admin: Rollen und Übergabe auch ohne eigene Teamleitung; Turnierleitung ohne das Recht nicht", async () => {
+  authState.user = { id: "u-adm", username: "vorstand" };
+  serve({ ...TEAM, can_manage: true, can_remove_members: true, can_dissolve: true, can_change_roles: true });
+  const { unmount } = renderAt("/teams/t-1");
+  expect(await screen.findByTestId("team-transfer-u-co")).toBeInTheDocument();
+  expect(screen.getByTestId("team-demote-u-co")).toBeInTheDocument();
+  expect(screen.getByTestId("team-promote-u-3")).toBeInTheDocument();
+  confirmMock.mockResolvedValueOnce(false);
+  fireEvent.click(screen.getByTestId("team-transfer-u-co"));
+  await waitFor(() => expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ description: expect.stringContaining("bisherige Teamleitung") })));
+  unmount();
+
+  serve({ ...TEAM, can_manage: true, can_remove_members: false, can_change_roles: false });
+  renderAt("/teams/t-1");
+  await screen.findByTestId("team-manage-members");
+  expect(screen.queryByTestId("team-transfer-u-co")).toBeNull();
+  expect(screen.queryByTestId("team-promote-u-3")).toBeNull();
+});
+
+// „Beitrittscode erneuern“ (#2128, TM10): mit Rückfrage; danach steht der neue Code da.
+test("Beitrittscode erneuern fragt nach und zeigt den neuen Code", async () => {
+  serve();
+  apiMock.post.mockResolvedValue({ data: { join_code: "N3uCode" } });
+  renderAt("/teams/t-1");
+  fireEvent.click(await screen.findByTestId("team-invite-open"));
+  expect(await screen.findByTestId("team-join-code-value")).toHaveTextContent("Kx7pQ2");
+  confirmMock.mockResolvedValueOnce(false);
+  fireEvent.click(screen.getByTestId("team-join-code-renew"));
+  await waitFor(() => expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Neuen Beitrittscode erzeugen?" })));
+  expect(apiMock.post).not.toHaveBeenCalled();
+  confirmMock.mockResolvedValueOnce(true);
+  fireEvent.click(screen.getByTestId("team-join-code-renew"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/teams/t-1/join-code"));
+  expect(await screen.findByTestId("team-join-code-value")).toHaveTextContent("N3uCode");
+});
+
+// Privat (#2128, TM9): Außenstehende sehen die Teamseite nicht - das Blatt verspricht nichts, was dort nicht geht.
+test("Einladen im privaten Team: der Hinweis zum Beitrittscode sagt, was geht", async () => {
+  serve({ ...TEAM, is_public: false });
+  const { unmount } = renderAt("/teams/t-1");
+  fireEvent.click(await screen.findByTestId("team-invite-open"));
+  expect(await screen.findByTestId("team-join-code-hint")).toHaveTextContent("Das Team ist privat");
+  unmount();
+
+  serve();
+  renderAt("/teams/t-1");
+  fireEvent.click(await screen.findByTestId("team-invite-open"));
+  expect(await screen.findByTestId("team-join-code-hint")).toHaveTextContent("Falls der Link nicht geht");
+});
+
+test("alter Link zu einem privaten Team: kein Verweis auf „Team beitreten“", async () => {
+  authState.user = { id: "u-9", username: "kiwikomet" };
+  const missing = Object.assign(new Error("404"), { response: { status: 404 } });
+  serve(TEAM, { "/teams/t-1": missing, "/teams/t-1/invite-link/check": missing });
+  renderAt("/teams/t-1?einladung=AltesToken");
+  const card = await screen.findByTestId("team-join-invalid");
+  expect(card).toHaveTextContent("Frag im Team nach einem neuen Link.");
+  expect(card).not.toHaveTextContent("Team beitreten");
+});
+
+// Schalter „öffentlich/privat“ (#2128, TM9): nur die Teamleitung; der Hinweis sagt, was privat bedeutet.
+test("Teamleitung stellt das Team auf privat, der Hinweis nennt die Folgen; Co-Leitung sieht den Schalter nicht", async () => {
+  serve();
+  apiMock.patch.mockResolvedValue({ data: {} });
+  const { unmount } = renderAt("/teams/t-1");
+  fireEvent.click(await screen.findByTestId("team-edit-open"));
+  const toggle = await screen.findByTestId("team-public-toggle");
+  expect(toggle).toBeChecked();
+  fireEvent.click(toggle);
+  expect(screen.getByTestId("team-public-hint")).toHaveTextContent("nicht in der Teamliste");
+  fireEvent.click(screen.getByTestId("team-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/teams/t-1", expect.objectContaining({ is_public: false })));
+  unmount();
+
+  apiMock.patch.mockClear();
+  authState.user = { id: "u-co", username: "pixelpanther" };
+  serve({ ...TEAM, is_public: false });
+  renderAt("/teams/t-1");
+  expect(await screen.findByTestId("team-private-chip")).toHaveTextContent("Privat");
+  fireEvent.click(await screen.findByTestId("team-edit-open"));
+  await screen.findByTestId("team-edit-sheet");
+  expect(screen.queryByTestId("team-public-toggle")).toBeNull();
+  fireEvent.click(screen.getByTestId("team-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalled());
+  expect(apiMock.patch.mock.calls[0][1]).not.toHaveProperty("is_public");
+});
+
+// Keine Teamleitung aus einem gelöschten Konto (#2113): „Zur Teamleitung machen“ fehlt dort.
+test("gelöschtes Mitglied: kein Knopf „Zur Teamleitung machen“", async () => {
   serve({ ...TEAM, members: [MEMBERS[0], { ...MEMBERS[2], is_gone: true }, MEMBERS[1]] });
   renderAt("/teams/t-1");
   expect(await screen.findByTestId("team-transfer-u-co")).toBeInTheDocument();
@@ -132,11 +253,11 @@ test("Auflösen im Bearbeiten-Blatt: falscher Name sperrt, richtiger Name löst 
   serve(TEAM, {
     "/teams/t-1/dissolve-preview": { member_count: 3, chat_messages: 4, withdraw: [{ registration_id: "r-1", tournament_id: "tt-1", title: "Rocket League Herbst-Cup" }], blocked: [], can_dissolve: true },
   });
-  apiMock.delete.mockResolvedValue({ data: { ok: true, withdrawn: 1 } });
+  apiMock.delete.mockResolvedValue({ data: { ok: true, withdrawn: 1, restore_until: "2099-01-01T00:00:00+00:00" } });
   renderAt("/teams/t-1");
   fireEvent.click(await screen.findByTestId("team-edit-open"));
   const sheet = await screen.findByTestId("team-edit-sheet");
-  await waitFor(() => expect(screen.getByTestId("team-dissolve-sentence")).toHaveTextContent("Alle 3 Mitglieder verlieren das Team, der Team-Chat mit 4 Nachrichten wird gelöscht und die Anmeldung für „Rocket League Herbst-Cup“ wird zurückgezogen."));
+  await waitFor(() => expect(screen.getByTestId("team-dissolve-sentence")).toHaveTextContent("Alle 3 Mitglieder verlieren das Team, der Team-Chat mit 4 Nachrichten ist nicht mehr erreichbar und die Anmeldung für „Rocket League Herbst-Cup“ wird zurückgezogen."));
   // Das Auflösen steht nach dem Formular, ganz unten im Blatt.
   const order = [...sheet.querySelectorAll("[data-testid]")].map((node) => node.getAttribute("data-testid"));
   expect(order.indexOf("team-dissolve")).toBeGreaterThan(order.indexOf("team-color-picker"));
@@ -150,7 +271,7 @@ test("Auflösen im Bearbeiten-Blatt: falscher Name sperrt, richtiger Name löst 
   await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith("/teams/t-1", { params: { confirm: "lions rocket" } }));
 });
 
-test("läuft ein Turnier, bleibt Auflösen gesperrt und das Turnier steht da; Co-Kapitäne sehen das Auflösen nicht", async () => {
+test("läuft ein Turnier, bleibt Auflösen gesperrt und das Turnier steht da; Co-Leitungen sehen das Auflösen nicht", async () => {
   serve(TEAM, {
     "/teams/t-1/dissolve-preview": { member_count: 3, chat_messages: 0, withdraw: [], blocked: [{ registration_id: "r-9", tournament_id: "tt-9", slug: "liga", title: "Liga live", reason: "Das Turnier läuft gerade – das klärt die Turnierleitung." }], can_dissolve: false },
   });
@@ -167,6 +288,16 @@ test("läuft ein Turnier, bleibt Auflösen gesperrt und das Turnier steht da; Co
   fireEvent.click(await screen.findByTestId("team-edit-open"));
   await screen.findByTestId("team-edit-sheet");
   expect(screen.queryByTestId("team-dissolve")).toBeNull();
+});
+
+// Weich aufgelöst (#2128, TM8): alte Links landen nicht im Leeren.
+test("aufgelöstes Team: die Seite sagt, was los ist", async () => {
+  const gone = Object.assign(new Error("404"), { response: { status: 404, data: { detail: "Lions Rocket wurde aufgelöst." } } });
+  serve(TEAM, { "/teams/t-1": gone });
+  renderAt("/teams/t-1");
+  const missing = await screen.findByTestId("team-missing");
+  expect(missing).toHaveTextContent("Team aufgelöst");
+  expect(missing).toHaveTextContent("Lions Rocket wurde aufgelöst.");
 });
 
 test("ohne Netz oder bei einem Serverfehler: Fehler mit „Nochmal versuchen“ statt ewigem Laden oder „nicht gefunden“ (#983, #1152)", async () => {

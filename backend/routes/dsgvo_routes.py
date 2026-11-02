@@ -125,6 +125,14 @@ def _own_profile_rows(db, user_id: str, collection, fields: tuple[str, ...]):
     return ("list", produce)
 
 
+def _dissolved_team(user_id: str):
+    def shape(row: dict) -> dict:
+        role = "leader" if row.get("leader_id") == user_id else "co_leader" if user_id in (row.get("co_leader_ids") or []) else "member"
+        fields = ("id", "name", "tag", "description", "is_public", "logo_url", "banner_url", "discord_link", "created_at", "dissolved_at", "purge_at")
+        return {**{key: row[key] for key in fields if key in row}, "my_role": role}
+    return shape
+
+
 def _chat_rows(db, user_id: str):
     async def own_chat_messages():
         for name in ("team_chat_messages", "match_chat_messages", "tournament_chat_messages"):
@@ -175,6 +183,9 @@ async def _user_data_sections(db, user_id: str) -> list[tuple[str, tuple]]:
         ("event_registrations", _rows(db.event_registrations, me)),
         ("f1_lap_times", _rows(db.f1_lap_times, me)),
         ("teams", _rows(db.teams, {"$or": [{"member_ids": user_id}, {"leader_id": user_id}]}, lambda row: _clean(row, "join_code"))),
+        # Aufgelöste Teams (#2128, TM8), solange sie wiederherstellbar sind: das Team und die eigene Rolle darin - keine
+        # Kennungen anderer Personen.
+        ("dissolved_teams", _rows(db.dissolved_teams, {"$or": [{"member_ids": user_id}, {"leader_id": user_id}]}, _dissolved_team(user_id))),
         ("team_memberships", _rows(db.team_members, me)),
         ("team_invites", _rows(db.team_invites, me)),
         ("achievements", _rows(db.user_achievements, me)),
@@ -410,7 +421,7 @@ async def anonymize_me_check(me: dict = Depends(get_current_user)):
 async def anonymize_me(me: dict = Depends(get_current_user)):
     """Anonymize own account but keep tournament history for statistical integrity."""
     db = get_db()
-    # Erst die Rollen in Teams abgeben (#2113, L-C5) - sonst stünde ein gelöschtes Konto als Kapitän da.
+    # Erst die Rollen in Teams abgeben (#2113, L-C5) - sonst stünde ein gelöschtes Konto als Teamleitung da.
     from services import erasure_blockers
     rows = await erasure_blockers.blockers(db, me["id"], me.get("role"))
     if rows:

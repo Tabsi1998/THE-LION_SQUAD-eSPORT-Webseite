@@ -1,7 +1,7 @@
 """Die eigene Turnieranmeldung ändern (#2113, L-A2): Ingame-Name, Spieler-IDs und Discord selbst korrigieren.
 
 Bisher ging das nur über die Turnierleitung. Wer die Anmeldung ändern darf: bei Einzelanmeldungen die Person selbst, bei
-Team-Anmeldungen nur die Teamleitung (Kapitän und Co-Kapitän). Bis wann: solange die Anmeldung nicht eingecheckt ist und
+Team-Anmeldungen nur Teamleitung und Co-Leitung. Bis wann: solange die Anmeldung nicht eingecheckt ist und
 der Check-in läuft oder noch kommt - danach ändert die Turnierleitung.
 
 Liga-Staffeln: die Spiel-ID einer Season steht eingefroren im Liga-Kader (``league_rosters``, #2108). Ingame-Name und IDs
@@ -62,7 +62,7 @@ async def _edit_block_reason(db, tournament: dict, registration: dict) -> str | 
 
 
 async def _leads_registration(db, registration: dict, me: dict) -> bool:
-    """Einzelanmeldung: die Person selbst. Team-Anmeldung: Kapitän und Co-Kapitän, beim Co-Team einer Liga Captain und
+    """Einzelanmeldung: die Person selbst. Team-Anmeldung: Teamleitung und Co-Leitung, beim Co-Team einer Liga Captain und
     Vertreter (ohne beide die Teamleitung) - dieselbe Regel wie beim Einchecken (``match_audience``). Wer das Team einst
     angemeldet hat, ändert nach einem Wechsel in der Leitung nichts mehr: darum zählt ``user_id`` hier nicht."""
     if not registration.get("team_id"):

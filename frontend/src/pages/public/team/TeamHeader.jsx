@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Crown } from "lucide-react";
+import { Crown, Lock } from "lucide-react";
 import { resolveMediaUrl } from "@/lib/api";
 import { MascotBadge } from "@/components/tls/Logo";
 import { bandBackground, teamColorHex, TEAM_COLORS } from "@/lib/teamColors";
@@ -94,6 +94,11 @@ export function TeamHeader({ team, header, levelInfo, userId, actions = null, ch
           <h1 className="mt-3 font-heading text-3xl md:text-4xl font-black leading-tight break-words max-w-full" data-testid="team-name">{team.name}</h1>
           <div className="mt-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm text-white/65" data-testid="team-header-line">
             {team.tag ? <span className="font-bold tracking-wider">{team.tag}</span> : null}
+            {team.is_public === false ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-sm border border-white/15 bg-white/[0.06] text-xs font-bold text-white/85" data-testid="team-private-chip">
+                <Lock className="w-3 h-3" aria-hidden="true" /> Privat
+              </span>
+            ) : null}
             {game ? (
               <>
                 <span aria-hidden="true">·</span>

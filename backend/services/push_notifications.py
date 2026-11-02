@@ -38,7 +38,7 @@ PUSH_CHANNELS = {
     "schedule_escalation": "lion_tournaments",
     # Terminvorschlag, Antwort oder Zurückziehen der anderen Seite (#2110) - wie „Ergebnis gemeldet“.
     "match_schedule": "lion_tournaments",
-    # Team am Spieltag (#1192): „Bist du schon da?“ vom Kapitän - ein Ruf zum Antreten.
+    # Team am Spieltag (#1192): „Bist du schon da?“ von der Teamleitung - ein Ruf zum Antreten.
     "team_presence_nudge": "lion_calls",
     # Check-in, Ergebnisse, Turnier-Updates, Gewinne, Event-Hinweise, „Wie war …?“ nach Turnier oder Event.
     "tournament_checkin": "lion_tournaments",
@@ -80,6 +80,11 @@ PUSH_CHANNELS = {
     "team_invite_declined": "lion_chats",
     "team_role_changed": "lion_chats",
     "team_leader_transferred": "lion_chats",
+    "team_member_removed": "lion_chats",
+    "team_member_left": "lion_chats",
+    "team_dissolved": "lion_chats",
+    "team_restored": "lion_chats",
+    "team_join_code_renewed": "lion_chats",
     # Vereinsintern, News, Mitgliedschaft, Rechnungen, Helferdienste.
     "news_member": "lion_club",
     "news_board": "lion_club",

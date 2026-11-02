@@ -133,7 +133,8 @@ async def record_tournament_awards(db, tournament_id: str) -> int:
     season = await _active_season(db)
     season_view = {"id": season["id"], "name": season.get("name") or "Saison"} if season else None
     team_ids = [reg["team_id"] for reg in regs if reg.get("team_id")]
-    teams = {row["id"]: row for row in await db.teams.find({"id": {"$in": team_ids}}, {"_id": 0, "id": 1, "name": 1, "tag": 1, "logo_url": 1}).to_list(500)} if team_ids else {}
+    from services.team_history import teams_by_id
+    teams = await teams_by_id(db, team_ids, {"_id": 0, "id": 1, "name": 1, "tag": 1, "logo_url": 1})
     now = now_utc().isoformat()
     kept: list[str] = []
     for reg in regs:

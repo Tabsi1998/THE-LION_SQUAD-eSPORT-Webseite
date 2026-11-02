@@ -40,7 +40,7 @@ from services.competition_versions import persist_competition_versions
 from services.heat_rebuild import evaluate_after_write
 from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
 from models import RegistrationCreate, RegistrationUpdate, RegistrationAdminCreate, now_utc, new_id
-from services import league_roster, onsite_access, tournament_event_gate, tournament_fees, tournament_guard, word_filter
+from services import league_roster, onsite_access, team_history, tournament_event_gate, tournament_fees, tournament_guard, word_filter
 from services.query_filters import safe_regex
 from services.private_fields import private_projection
 from routes.tournament_common import (
@@ -230,7 +230,7 @@ async def _validate_registration_actor(db, tournament: dict, body: RegistrationC
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
     if not _can_register_team(team, user):
-        raise HTTPException(status_code=403, detail="Nur Team-Leader oder Co-Leader dürfen ein Team anmelden")
+        raise HTTPException(status_code=403, detail="Nur Teamleitung oder Co-Leitung dürfen ein Team anmelden")
     if user["id"] not in (team.get("member_ids") or []):
         raise HTTPException(status_code=403, detail="Du bist kein Mitglied dieses Teams")
     existing_team = await db.tournament_registrations.find_one(
@@ -526,8 +526,8 @@ async def list_registrations(tid: str, access: str | None = None, user=Depends(g
     team_ids = list({r["team_id"] for r in regs if r.get("team_id")})
     users = {u["id"]: u for u in await db.users.find(
         {"id": {"$in": user_ids}}, private_projection()).to_list(500)}
-    teams = {t["id"]: t for t in await db.teams.find(
-        {"id": {"$in": team_ids}}, {"_id": 0}).to_list(500)}
+    # Aufgelöste Teams (#2128, TM8) zeigen in alten Turnieren weiter ihren Namen.
+    teams = await team_history.teams_by_id(db, team_ids)
     # Turnier nur mit Event-Anmeldung (#875): die Turnierleitung sieht, wer (noch) beim Event angemeldet ist.
     if is_staff:
         marks = await tournament_event_gate.staff_marks(db, t_doc, regs, teams)
@@ -542,6 +542,8 @@ async def list_registrations(tid: str, access: str | None = None, user=Depends(g
             t = teams.get(r["team_id"]) or {}
             r["team"] = {"id": t.get("id"), "name": t.get("name"), "tag": t.get("tag"),
                          "logo_url": t.get("logo_url"), "member_count": len(t.get("member_ids") or [])}
+            if t.get("dissolved"):
+                r["team"]["dissolved"] = True
             if user and r.get("team_id") in user_team_ids:
                 r["is_mine"] = True
     return regs

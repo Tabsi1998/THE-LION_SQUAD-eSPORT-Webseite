@@ -372,7 +372,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
             )}
             <CheckField label="Öffentliche Anmeldung erlauben" checked={f.registration_enabled} onChange={(v)=>set("registration_enabled",v)} />
             {/* Anmeldung im Discord (#885): Vorgabe an. */}
-            <CheckField label="Anmeldung über Discord erlauben" hint="Mit verknüpftem Konto über /anmelden oder den Knopf „Anmelden“ – privat, mit denselben Regeln; Teams meldet der Kapitän an." checked={f.discord_registration} onChange={(v)=>set("discord_registration",v)} accent="#5865F2" testId="tr-edit-discord-registration" />
+            <CheckField label="Anmeldung über Discord erlauben" hint="Mit verknüpftem Konto über /anmelden oder den Knopf „Anmelden“ – privat, mit denselben Regeln; Teams meldet die Teamleitung an." checked={f.discord_registration} onChange={(v)=>set("discord_registration",v)} accent="#5865F2" testId="tr-edit-discord-registration" />
             <CheckField label="Nur Einladung/manuelle Teilnehmer" checked={f.is_invite_only} onChange={(v)=>set("is_invite_only",v)} />
             <CheckField label="Automatisches Turnier-Hinweisbanner anzeigen" checked={f.site_banner_enabled} onChange={(v)=>set("site_banner_enabled",v)} accent="#FFD700" />
             {/* Vor Ort startet die Turnierleitung selbst (#2111, W4): der Schalter steht dort nur noch, solange er an ist. */}
@@ -432,7 +432,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
 
         <FormSection title="Struktur" hint={staffel
           ? "Eine Staffel spielt im Format Liga mit Co-Teams; Teamgröße und Staffelgröße gibt die Season vor."
-          : "Teilnahme legt fest, wer sich anmelden darf: Einzelspieler melden sich selbst an, bei Team meldet ein Team-Leader oder Co-Leader das Team an."}>
+          : "Teilnahme legt fest, wer sich anmelden darf: Einzelspieler melden sich selbst an, bei Team melden Teamleitung oder Co-Leitung das Team an."}>
           <FormGrid cols={3}>
             {show && <SelectInput label="Turnierstruktur" value={f.format} onChange={setFormat} options={tournamentFormatOptions(tournament.format)} disabled={structureFixed} hint={fixedHint || <FormatHint format={f.format} testId="tr-edit-format-hint" />} testId="tr-edit-format" />}
             <TextField label="Format-Anzeigename" value={f.format_label} onChange={(v)=>set("format_label",v)} placeholder="z.B. Gamers Heaven F1 Heat" testId="tr-edit-format-label"/>

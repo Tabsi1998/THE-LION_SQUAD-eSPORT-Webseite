@@ -157,7 +157,7 @@ NOTIFICATION_KIND_CATEGORY = {
     # Aufruf beim Reservieren der Station (#1137): „Du bist dran“.
     "match_call": "match_reminders",
     "match_result": "match_reminders",
-    # Team am Spieltag (#1192): „Bist du schon da?“ vom Kapitän - wie eine Spiel-Erinnerung.
+    # Team am Spieltag (#1192): „Bist du schon da?“ von der Teamleitung - wie eine Spiel-Erinnerung.
     "team_presence_nudge": "match_reminders",
     # Ergebnis melden (#1132): „bitte bestätigen“ an die Gegenseite; Streitfälle für die Turnierleitung.
     "match_report": "match_reminders",
@@ -192,6 +192,12 @@ NOTIFICATION_KIND_CATEGORY = {
     "team_invite_declined": "community_messages",
     "team_role_changed": "community_messages",
     "team_leader_transferred": "community_messages",
+    # Wer kommt und geht, und was mit dem Team passiert (#2128, TM5, TM8, TM10).
+    "team_member_removed": "community_messages",
+    "team_member_left": "community_messages",
+    "team_dissolved": "community_messages",
+    "team_restored": "community_messages",
+    "team_join_code_renewed": "community_messages",
     "f1_prize": "prize_updates",
     "f1_prize_reminder": "prize_updates",
     "prize_pending": "prize_updates",

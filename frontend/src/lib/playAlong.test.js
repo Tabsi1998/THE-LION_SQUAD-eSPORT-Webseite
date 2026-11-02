@@ -6,7 +6,7 @@ const SOLO = { kind: "tournament", id: "t1", slug: "lan-cup", title: "LAN-Cup", 
   team: false, fee: { total_cents: 1000, currency: "EUR" }, spots_left: 3, full: false, selectable: true, reason: null, event_day: { index: 2 } };
 const FULL = { ...SOLO, id: "t2", slug: "mini", title: "Mini-Cup", fee: { total_cents: 500, currency: "EUR" }, spots_left: 0, full: true };
 const FREE = { ...SOLO, id: "t3", slug: "fun", title: "Fun-Cup", fee: null, spots_left: 1 };
-const TEAM = { ...SOLO, id: "t4", slug: "team", title: "Team-Cup", mode: "Team", team: true, fee: null, selectable: false, reason: "Dein Kapitän meldet das Team an." };
+const TEAM = { ...SOLO, id: "t4", slug: "team", title: "Team-Cup", mode: "Team", team: true, fee: null, selectable: false, reason: "Deine Teamleitung meldet das Team an." };
 const LAP = { kind: "fastlap", id: "f1", slug: "lap", title: "LAN Fast Lap", start_date: null, mode: "Bestzeit fahren", selectable: false, reason: "Keine Anmeldung nötig – du fährst einfach deine Bestzeit." };
 
 test("die Frage gibt es nur mit Konto und nur mit Turnieren oder Fast Laps", () => {

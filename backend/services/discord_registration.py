@@ -196,7 +196,7 @@ async def event_summary(db, user: dict, event: dict, then: str | None = None) ->
 
 
 async def _captain_team(db, user: dict, tournament: dict) -> tuple[dict | None, str | None]:
-    """Das Team, das die Person anmelden darf (Leader oder Co-Leader, selbst Mitglied, noch nicht angemeldet) - oder der Grund."""
+    """Das Team, das die Person anmelden darf (Teamleitung oder Co-Leitung, selbst Mitglied, noch nicht angemeldet) - oder der Grund."""
     from routes.tournament_registration_routes import _can_register_team
 
     teams = await db.teams.find({"member_ids": user["id"]}, {"_id": 0}).to_list(50)
@@ -204,7 +204,7 @@ async def _captain_team(db, user: dict, tournament: dict) -> tuple[dict | None, 
         return None, "Für dieses Turnier brauchst du ein Team – anlegen oder beitreten geht auf der Website."
     allowed = [team for team in teams if _can_register_team(team, user)]
     if not allowed:
-        return None, "Das macht dein Kapitän – nur Team-Leader oder Co-Leader melden ein Team an."
+        return None, "Das macht deine Teamleitung – nur Teamleitung oder Co-Leitung melden ein Team an."
     rows = await db.tournament_registrations.find({"tournament_id": tournament["id"], "team_id": {"$in": [team["id"] for team in allowed]}},
                                                   {"_id": 0, "team_id": 1, "status": 1, "rejection_dismissed_at": 1}).to_list(50)
     # Abgelehnt und weggenommen (#2113): gilt nicht als angemeldet - eine neue Anmeldung geht zur Prüfung.

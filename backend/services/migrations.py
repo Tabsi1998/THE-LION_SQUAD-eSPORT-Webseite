@@ -408,6 +408,37 @@ async def migrate_user_socials_to_profile(db) -> str:
         raise MigrationIncomplete(str(exc)) from exc
 
 
+async def migrate_squad_game_names(db) -> str:
+    """Co-Teams mit altem Freitext als Spiel (#2128): Trifft der Text genau einen Spielnamen (ohne Groß/klein), wird er zur
+    Kennung - sonst käme das Co-Team nicht in die Liga. Der Rest bleibt, wie er ist; die Zuteilung nennt ihn, und die
+    Teamleitung wählt aus der Liste. Läuft ein zweites Mal ohne Wirkung."""
+    def norm(value) -> str:
+        return " ".join(str(value or "").split()).casefold()
+
+    games = await db.games.find({}, {"_id": 0, "id": 1, "name": 1}).to_list(5000)
+    known = {game["id"] for game in games}
+    by_name: dict[str, list[str]] = {}
+    for game in games:
+        by_name.setdefault(norm(game.get("name")), []).append(game["id"])
+    moved = left = 0
+    async for squad in db.team_squads.find({"game_id": {"$nin": [None, ""]}}, {"_id": 0, "id": 1, "game_id": 1}):
+        if squad["game_id"] in known or not norm(squad["game_id"]):
+            continue
+        hits = by_name.get(norm(squad["game_id"])) or []
+        if len(hits) == 1:
+            await db.team_squads.update_one({"id": squad["id"], "game_id": squad["game_id"]}, {"$set": {"game_id": hits[0]}})
+            moved += 1
+        else:
+            left += 1
+    if left:
+        logger.warning("[migration] %s Co-Teams haben einen alten Spielnamen, der zu keinem Spiel passt", left)
+    await db.audit_logs.insert_one({
+        "id": new_id(), "action": "team.squad.game_names", "target_id": None, "actor_id": None,
+        "data": {"moved": moved, "left": left}, "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    return f"{moved} squads moved to a game id, {left} left"
+
+
 MIGRATIONS = (
     (1, "encrypt_legacy_integration_credentials", migrate_plaintext_secrets),
     (2, "team_leader_role_to_player", migrate_team_leader_role),
@@ -438,6 +469,8 @@ MIGRATIONS = (
     (18, "season_points_tournament_duplicates", migrate_tournament_point_duplicates),
     # #2113: alte Einträge aus user_socials ziehen in die Profilfelder um (services/user_socials_migration.py).
     (19, "user_socials_to_profile_fields", migrate_user_socials_to_profile),
+    # #2128: alter Freitext als Spiel eines Co-Teams wird zur Kennung, wenn er genau einen Spielnamen trifft.
+    (20, "squad_game_names", migrate_squad_game_names),
 )
 
 

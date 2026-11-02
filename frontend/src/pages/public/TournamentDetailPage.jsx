@@ -320,7 +320,7 @@ function TournamentDetailView() {
   const nextStep = timelineSteps(t).find((step) => step.next) || null;
   const finished = ["completed", "results_published", "archived"].includes(t.status);
   const subPage = (part) => `/tournaments/${t.slug || t.id}/${part}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`;
-  // Eigene Anmeldung (#2113): wer sie führt - die Person selbst, bei Teams Kapitän und Co-Kapitän. Eine abgelehnte nimmt
+  // Eigene Anmeldung (#2113): wer sie führt - die Person selbst, bei Teams Teamleitung und Co-Leitung. Eine abgelehnte nimmt
   // sie selbst weg, solange das Turnier nicht läuft (dieselbe Grenze wie beim Server). Ob Angaben änderbar sind, sagt der
   // Server (`can_edit`) - beim Co-Team einer Liga sind es Captain und Vertreter, das kennt `my_role` nicht.
   const leadsMyTeam = ["leader", "co_leader"].includes(myRegTeam?.my_role);

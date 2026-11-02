@@ -143,7 +143,7 @@ export default function CommunityPage() {
 function CommunityPaths() {
   const paths = [
     { to: "/players", label: "Spieler", text: "Profile, Level und sichtbare Achievement-Signale.", icon: Users, color: "#29B6E8" },
-    { to: "/teams", label: "Teams", text: "Squads, Clans und gemeinsame Teamseiten.", icon: Shield, color: "#00FF88" },
+    { to: "/teams", label: "Teams", text: "Teams, Co-Teams und gemeinsame Teamseiten.", icon: Shield, color: "#00FF88" },
     { to: "/servers", label: "Server", text: "Aktive Community- und Vereinsserver.", icon: Server, color: "#9F7AEA" },
     { to: "/members", label: "Mitglieder", text: "Offizielle Vereinsprofile und Rollen.", icon: Crown, color: "#FFD700" },
     { to: "/references", label: "Referenzen", text: "Turnier-, Event- und Community-Historie.", icon: Trophy, color: "#FFD700" },

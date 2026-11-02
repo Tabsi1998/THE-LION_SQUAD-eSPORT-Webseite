@@ -158,14 +158,11 @@ async def compact_match_overviews(
         {"_id": 0, "id": 1, "display_name": 1, "ingame_name": 1, "team_id": 1},
     ).to_list(max(200, len(registration_ids))) if registration_ids else []
     team_ids = list({row.get("team_id") for row in registrations if row.get("team_id")})
-    teams = await db.teams.find(
-        {"id": {"$in": team_ids}},
-        {"_id": 0, "id": 1, "name": 1, "tag": 1},
-    ).to_list(max(100, len(team_ids))) if team_ids else []
+    from services.team_history import teams_by_id
+    team_map = await teams_by_id(db, team_ids, {"_id": 0, "id": 1, "name": 1, "tag": 1})
 
     tournament_map = {row["id"]: row for row in tournaments}
     registration_map = {row["id"]: row for row in registrations}
-    team_map = {row["id"]: row for row in teams}
     summaries = []
     for match in matches:
         participant_ids = match_registration_ids(match)

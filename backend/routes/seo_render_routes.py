@@ -851,7 +851,7 @@ def static_page_meta(slug: str, base: dict) -> dict | None:
         "fastlap": ("F1 Fast Lap Challenges", "F1 und Racing Fast-Lap-Challenges von THE LION SQUAD mit Live-Leaderboards, Strecken, Zeiten und Championship-Wertung."),
         "f1": ("F1 Fast Lap Challenges", "Formel-1-Fast-Lap-Challenges, aktuelle Strecken, Bestenlisten und Racing Events von THE LION SQUAD eSports."),
         "references": ("Referenzen", "Externe Turniere, Ligen, Platzierungen, Podien und Erfolge von THE LION SQUAD eSports."),
-        "teams": ("Teams & Clans", "Teams, Squads und Clans der THE LION SQUAD Gaming Community: Profile, Mitglieder, Join-Codes und eSports Organisation."),
+        "teams": ("Teams & Clans", "Teams, Co-Teams und Clans der THE LION SQUAD Gaming Community: Profile, Mitglieder, Beitrittscodes und eSports Organisation."),
         "players": ("Community-Spieler", "Öffentliche Spielerprofile, Community-Mitglieder und aktive eSports-Profile von THE LION SQUAD."),
         "members": ("Vereinsmitglieder", "Offizielle Vereinsmitglieder von THE LION SQUAD eSports: Gaming Profile, Rollen, Teams und Community aus Tirol."),
         "membership": ("Mitgliedschaft", "Mitglied werden bei THE LION SQUAD: eSports Verein, Gaming Community, Mitgliederbereich, Events, Turniere und Vorteile in Tirol."),

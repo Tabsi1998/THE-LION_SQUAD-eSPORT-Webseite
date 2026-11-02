@@ -16,7 +16,7 @@ export default function PrivacyAccountPage() {
   const [busy, setBusy] = useState(false);
   const [blocks, setBlocks] = useState([]);
   const prompt = usePrompt();
-  // Rollen in Teams (#2113, L-C5): wer Kapitän, Co-Kapitän, Captain oder Vertreter ist, gibt die Rolle vorher ab - die
+  // Rollen in Teams (#2113, L-C5): wer Teamleitung, Co-Leitung, Captain oder Vertreter ist, gibt die Rolle vorher ab - die
   // Seite nennt je Rolle den Weg, statt erst nach dem Tippen von „LÖSCHEN“ zu scheitern. Der Server prüft selbst noch einmal.
   const erasure = useLoad(user?.id ? ["erasure-check", user.id] : null, ({ signal }) => (
     api.get("/dsgvo/anonymize-me/check", { signal }).then(({ data }) => data || {})

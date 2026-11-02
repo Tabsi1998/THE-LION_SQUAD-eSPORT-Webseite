@@ -7,9 +7,9 @@ import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { lineupLabel, presenceLine, starterLabel } from "@/lib/teamDay";
 import { viennaDateTime, viennaTime } from "@/lib/vienna";
 
-// Team am Spieltag (#1192) in „Dein Stand“ - nur bei Team-Turnieren. Kapitän oder Co-Kapitän wählt, wer spielt
+// Team am Spieltag (#1192) in „Dein Stand“ - nur bei Team-Turnieren. Teamleitung oder Co-Leitung wählt, wer spielt
 // (genau so viele wie Spieler je Team; die übrigen sind Ersatz, wenn erlaubt), bis zum Ende des Check-ins. Am
-// Turniertag tippt jedes Mitglied „Ich bin da“; der Kapitän sieht „4 von 5 da“ und kann Fehlende anstupsen.
+// Turniertag tippt jedes Mitglied „Ich bin da“; die Teamleitung sieht „4 von 5 da“ und kann Fehlende anstupsen.
 
 export function TeamDayPanel({ tournament }) {
   const [data, setData] = useState(null);

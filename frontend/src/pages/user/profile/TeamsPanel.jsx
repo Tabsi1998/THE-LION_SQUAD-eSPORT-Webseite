@@ -7,13 +7,13 @@ import { Link, useSearchParams } from "react-router-dom";
 import { Check, Pencil, Plus, Trash2, UserPlus, Users, X } from "lucide-react";
 import { useOptionalAuth } from "@/context/AuthContext";
 import { TEAM_ROLE_LABELS } from "./constants";
-import { SQUAD_ROLES, isLocked, roleChoices, roleOf, rolesSummary } from "@/components/tls/league/squadRoles";
+import { DissolvedTeamRow } from "@/pages/public/team/DissolvedTeams";
+import { SQUAD_ROLES, isLocked, roleChoices, roleOf, rolesSummary, squadGameLabel, squadStatusLabel } from "@/components/tls/league/squadRoles";
 
 const emptySquad = {
   name: "",
   description: "",
-  tournament_id: "",
-  season_id: "",
+  game_id: "",
   member_ids: [],
   status: "active",
   captain_id: "",
@@ -24,10 +24,10 @@ import { Field, Input, Row } from "./fields";
 export function TeamsPanel() {
   const [teams, setTeams] = useState([]);
   const [invites, setInvites] = useState([]);
+  const [dissolved, setDissolved] = useState([]);
   const [activeId, setActiveId] = useState("");
   const [squads, setSquads] = useState([]);
-  const [tournaments, setTournaments] = useState([]);
-  const [seasons, setSeasons] = useState([]);
+  const [games, setGames] = useState([]);
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
   const confirm = useConfirm();
@@ -50,21 +50,27 @@ export function TeamsPanel() {
     setInvites(data || []);
   }, []);
 
+  // Aufgelöste Teams (#2128, TM8): nur für die frühere Teamleitung, bis die Frist vorbei ist.
+  const loadDissolved = useCallback(() => {
+    api.get("/teams/dissolved/mine").then(({ data }) => setDissolved(Array.isArray(data) ? data : [])).catch(() => {});
+  }, []);
+
   const loadMeta = useCallback(() => {
-    api.get("/tournaments").then(({ data }) => setTournaments(data || [])).catch(() => {});
-    api.get("/seasons").then(({ data }) => setSeasons(data || [])).catch(() => {});
+    api.get("/games").then(({ data }) => setGames(Array.isArray(data) ? data : [])).catch(() => {});
   }, []);
 
   useEffect(() => {
     loadTeams().catch(() => toast.error("Teams konnten nicht geladen werden."));
     loadInvites().catch(() => {});
+    loadDissolved();
     loadMeta();
-  }, [loadInvites, loadMeta, loadTeams]);
+  }, [loadDissolved, loadInvites, loadMeta, loadTeams]);
   useApiInvalidation(() => {
     loadTeams();
     loadInvites();
+    loadDissolved();
     loadMeta();
-  }, ["teams", "tournaments", "seasons", "admin/notifications"]);
+  }, ["teams", "games", "admin/notifications"]);
 
   const loadSquads = useCallback(() => {
     if (!activeId) {
@@ -87,11 +93,14 @@ export function TeamsPanel() {
       const payload = {
         ...editing,
         description: editing.description || null,
-        tournament_id: editing.tournament_id || null,
-        season_id: editing.season_id || null,
+        game_id: editing.game_id || null,
         member_ids: editing.member_ids || [],
       };
       delete payload.members;
+      // Altfelder alter Co-Teams (#2128, TM3): bleiben gespeichert, das Formular schickt sie nicht mit.
+      delete payload.tournament_id;
+      delete payload.season_id;
+      delete payload.game;
       // Captain und Vertreter (#1649): nur geänderte Rollen mitschicken - sonst überschriebe ein alter Stand eine
       // Neuvergabe, die jemand anderes inzwischen gespeichert hat. Leer heißt „niemand“ (dann handelt die Teamleitung).
       const original = editing.id ? squads.find((squad) => squad.id === editing.id) : null;
@@ -175,7 +184,7 @@ export function TeamsPanel() {
         <div>
           <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Team-Verwaltung</div>
           <h2 className="font-heading text-2xl md:text-3xl font-black uppercase mt-1">Meine Teams</h2>
-          <p className="text-sm text-white/55 mt-1">Teams sind deine Organisation, Co-Teams die feste Aufstellung für eine Season oder ein Turnier.</p>
+          <p className="text-sm text-white/55 mt-1">Teams sind deine Organisation, Co-Teams die feste Aufstellung für ein Spiel.</p>
         </div>
         <Link to="/teams" className="inline-flex items-center gap-2 px-4 py-2 border border-[#29B6E8]/40 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#29B6E8]/10">
           <Plus className="w-3.5 h-3.5" /> Team erstellen
@@ -203,6 +212,16 @@ export function TeamsPanel() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {dissolved.length > 0 && (
+        <div className="border border-white/10 bg-[#121212] rounded-sm p-5" data-testid="dissolved-teams">
+          <div className="text-[11px] uppercase tracking-[0.3em] text-white/55 font-bold">Aufgelöste Teams</div>
+          <p className="mt-1 text-sm text-white/55">Als frühere Teamleitung kannst du sie zurückholen – mit allen, die dabei waren, und einem neuen Beitrittscode.</p>
+          <div className="mt-3 space-y-2">
+            {dissolved.map((team) => <DissolvedTeamRow key={team.id} team={team} onRestored={() => { loadDissolved(); loadTeams(); }} />)}
           </div>
         </div>
       )}
@@ -267,7 +286,7 @@ export function TeamsPanel() {
                     <div key={squad.id} className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4">
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <div className="text-[10px] uppercase tracking-widest text-[#FFD700]">{squad.status}</div>
+                          <div className="text-[10px] uppercase tracking-widest text-[#FFD700]">{squadStatusLabel(squad.status)}</div>
                           <h4 className="font-heading font-bold text-lg">{squad.name}</h4>
                         </div>
                         {activeTeam.can_manage && (
@@ -277,6 +296,7 @@ export function TeamsPanel() {
                           </div>
                         )}
                       </div>
+                      <p className="text-xs text-white/55 mt-1" data-testid={`team-squad-game-${squad.id}`}>{squadGameLabel(squad)}</p>
                       {squad.description && <p className="text-sm text-white/55 mt-2">{squad.description}</p>}
                       <p className="text-xs text-white/55 mt-2 break-words" data-testid={`team-squad-roles-${squad.id}`}>{rolesSummary(squad, squad.members)}</p>
                       {roleOf(squad, myId) ? (
@@ -315,21 +335,17 @@ export function TeamsPanel() {
             <div className="p-5 space-y-4">
               <Field label="Name"><Input value={editing.name} onChange={(v) => setEditing({ ...editing, name: v })} required testId="team-squad-name" /></Field>
               <Field label="Beschreibung"><textarea value={editing.description || ""} onChange={(e) => setEditing({ ...editing, description: e.target.value })} rows={3} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-white" /></Field>
-              <Row>
-                <Field label="Turnier">
-                  <select value={editing.tournament_id || ""} onChange={(e) => setEditing({ ...editing, tournament_id: e.target.value })} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
-                    <option value="">Kein Turnier</option>
-                    {tournaments.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
-                  </select>
-                </Field>
-                <Field label="Jahreswertung / Circuit">
-                  <select value={editing.season_id || ""} onChange={(e) => setEditing({ ...editing, season_id: e.target.value })} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
-                    <option value="">Keine Jahreswertung</option>
-                    {seasons.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
-                </Field>
-              </Row>
-              <Field label="Lineup / Mitspieler" group>
+              {/* Das Spiel zählt für die Discord-Rollen und die Liga (ein Co-Team mit anderem Spiel lässt sich nicht zuteilen). */}
+              <Field label="Spiel">
+                <select value={editing.game_id || ""} onChange={(e) => setEditing({ ...editing, game_id: e.target.value })} data-testid="team-squad-game" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
+                  <option value="">Kein bestimmtes Spiel</option>
+                  {/* Ein alter Freitext bleibt wählbar, bis jemand ein Spiel aus der Liste nimmt. */}
+                  {editing.game_id && !games.some((game) => game.id === editing.game_id) ? <option value={editing.game_id}>{editing.game || `${editing.game_id} (nicht in der Liste)`}</option> : null}
+                  {games.map((game) => <option key={game.id} value={game.id}>{game.display_name || game.name}</option>)}
+                </select>
+                <span className="block mt-1 text-xs text-white/45" data-testid="team-squad-game-hint">Hauptspiel oder Version: In der Liga zählen beide als dasselbe Spiel.</span>
+              </Field>
+              <Field label="Kader" group>
                 <div className="grid sm:grid-cols-2 gap-2">
                   {(activeTeam.members || []).map((m) => {
                     const checked = (editing.member_ids || []).includes(m.id);

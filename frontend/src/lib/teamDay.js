@@ -3,9 +3,9 @@
 
 const NUMBER_WORDS = { 1: "eine Person", 2: "zwei", 3: "drei", 4: "vier", 5: "fünf", 6: "sechs" };
 
-/** Rechts neben einem Aufgestellten: der Kapitän heißt so, alle anderen „Spielt“. */
+/** Rechts neben einem Aufgestellten: die Teamleitung heißt so, alle anderen „Spielt“. */
 export function starterLabel(member) {
-  return member?.role === "captain" ? "Kapitän" : "Spielt";
+  return member?.role === "captain" ? "Teamleitung" : "Spielt";
 }
 
 /** Der Satz unter der Aufstellung - wer sie sieht und wer die Meldungen bekommt. */

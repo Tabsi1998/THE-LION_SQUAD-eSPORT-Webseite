@@ -13,7 +13,7 @@ from typing import Any
 
 FIELD_LABELS = {
     "message": "Nachricht", "name": "Name", "subject": "Betreff", "email": "E-Mail", "title": "Titel", "body": "Text",
-    "text": "Text", "password": "Passwort", "new_password": "Neues Passwort", "status": "Status", "reason": "Grund",
+    "text": "Text", "tag": "Kürzel", "password": "Passwort", "new_password": "Neues Passwort", "status": "Status", "reason": "Grund",
     "description": "Beschreibung", "note": "Notiz", "username": "Benutzername", "display_name": "Anzeigename",
     "comment": "Kommentar", "phone": "Telefon", "topic": "Thema", "content": "Inhalt", "excerpt": "Auszug",
     "location": "Ort", "city": "Ort", "postal_code": "PLZ", "address": "Adresse", "first_name": "Vorname",

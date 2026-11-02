@@ -49,7 +49,7 @@ Turniere. **Ohne 2FA** erscheint stattdessen der Hinweis **2FA einrichten**, sie
 | **Spielweise** | **Online**, **Vor Ort** oder **Hybrid**: wer Ergebnisse meldet, wer Termine macht, wer eincheckt | „Wie gespielt wird“ |
 | **Anmeldung** | Selbstanmeldung, Warteliste, Einladung, Speziallinks, Startgeld | Reiter Bearbeiten, Reiter Teilnehmer |
 | **Check-in** | Online selbst, vor Ort durch die Turnierleitung | Reiter Teilnehmer |
-| **Aufstellung** | Bei Team-Turnieren wählt der Kapitän, wer spielt | Dein-Stand-Karte der Spieler, Anzeige im Reiter Teilnehmer |
+| **Aufstellung** | Bei Team-Turnieren wählt die Teamleitung, wer spielt | Dein-Stand-Karte der Spieler, Anzeige im Reiter Teilnehmer |
 | **Turnierbaum, Gruppen** | Vorschau wächst mit den Anmeldungen, fix wird sie mit dem Ende des Check-ins | Reiter Turnierbaum, Matchplan, Gruppen |
 | **Ergebnisse** | Spieler melden, oder die Turnierleitung trägt im **Ergebnis-Fenster** ein, danach 10 Sekunden **Rückgängig** | Matchplan, Stationen, Turnierleitung am Handy |
 | **Dispute** | Streitfall entscheiden mit einem Tipp | Turnierleitung am Handy |
@@ -227,7 +227,7 @@ dem Hinweis, ihn auszuschalten. Vor Ort startet ihr selbst.
 **Mitspielen**). Das öffnet immer zuerst ein kurzes Blatt – am Handy von unten, am PC als Fenster – mit **Start**,
 **Check-in**-Fenster, **Ort** (online oder vor Ort mit Adresse), **Startgeld** (falls eingestellt) und den **Regeln in
 drei Sätzen**; **Alle Regeln** klappt den ganzen Text auf. Erst **Verbindlich anmelden** meldet an, **Abbrechen**,
-das Kreuz oder die Escape-Taste nicht. Bei Team-Turnieren wählt der Kapitän oder Co-Kapitän im selben Blatt das Team;
+das Kreuz oder die Escape-Taste nicht. Bei Team-Turnieren wählt die Teamleitung oder Co-Leitung im selben Blatt das Team;
 fehlt dem Spiel eine Pflicht-ID (zum Beispiel Spielername), fragt das Blatt sie ab. Die drei Sätze kommen vom Anfang
 eurer **Regeln** – schreibt das Wichtigste also nach oben.
 
@@ -243,7 +243,7 @@ eurer **Regeln** – schreibt das Wichtigste also nach oben.
   Stand** sagt das: „Abmelden und Angaben ändern nur noch über die Turnierleitung“, für Teammitglieder „… kann nur die
   Teamleitung“.
 - **Angaben ändern** (in **Dein Stand**): Ingame-Name, Spieler-IDs und Discord lassen sich bis zum eigenen Check-in bzw.
-  bis zum Check-in-Ende selbst korrigieren – bei Team-Anmeldungen nur von Kapitän und Co-Kapitän. Das gilt nur für diese
+  bis zum Check-in-Ende selbst korrigieren – bei Team-Anmeldungen nur von Teamleitung und Co-Leitung. Das gilt nur für diese
   Anmeldung, das Profil bleibt. In **Liga-Staffeln** sind Name und IDs gesperrt, weil die Spiel-ID je Season im Liga-Kader
   feststeht; nur Discord lässt sich dort ändern.
 - **Abgelehnt:** **Dein Stand** sagt, dass die Turnierleitung abgelehnt hat, und bietet **Anmeldung entfernen** (solange
@@ -252,12 +252,12 @@ eurer **Regeln** – schreibt das Wichtigste also nach oben.
   eine Nachricht – auch bei vollem Turnier und ohne Warteliste. Dabei ist sie erst, wenn die Leitung bestätigt. Löscht die
   Leitung den Eintrag selbst, ist er weg, und eine neue Anmeldung gilt wieder nach den normalen Regeln.
 - **Team-Einladungen:** Im Blatt **Einladen** auf der Teamseite stehen die offenen persönlichen Einladungen mit
-  **Zurückziehen**. Lehnt jemand ab, bekommt die einladende Person eine Nachricht. Der Kapitän kann das Team erst
+  **Zurückziehen**. Lehnt jemand ab, bekommt die einladende Person eine Nachricht. Die Teamleitung kann das Team erst
   verlassen, wenn er die Leitung übergeben hat; das steht auf der Teamseite.
 
 **Startgeld:** Kostet die Teilnahme etwas, steht es im Abschnitt **Startgeld** unter **Turnier öffnen → Bearbeiten**.
 Den sieht und ändert nur der Bereich **Finanzen**. Wer anmeldet, übernimmt das Startgeld ausdrücklich (bei Teams der
-Kapitän für das ganze Team); ohne diese Bestätigung nimmt die Seite die Anmeldung nicht an. Bezahlt wird mit der
+Teamleitung für das ganze Team); ohne diese Bestätigung nimmt die Seite die Anmeldung nicht an. Bezahlt wird mit der
 verbindlichen Teilnahme: Warteliste kostet nichts. Alles Weitere steht in [Abrechnung](../ABRECHNUNG.md).
 
 **Reiter Teilnehmer** (Standard beim Öffnen):
@@ -380,7 +380,7 @@ verbindlichen Teilnahme: Warteliste kostet nichts. Alles Weitere steht in [Abrec
 
 ### 3.5 Aufstellung bei Team-Turnieren
 
-Bei Team-Turnieren (Teilnahme „Team“) wählen Kapitän oder Co-Kapitän in **Dein Stand** auf der Turnierseite, wer
+Bei Team-Turnieren (Teilnahme „Team“) wählen Teamleitung oder Co-Leitung in **Dein Stand** auf der Turnierseite, wer
 spielt: genau so viele wie **Spieler pro Team**, die übrigen sind Ersatz, wenn **Ersatzspieler erlauben** (Spieloptionen)
 an ist. Das geht bis zum Ende des Check-ins. Am Turniertag tippt jedes Teammitglied **Ich bin da**.
 

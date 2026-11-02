@@ -32,13 +32,13 @@ test("mit Rollen in Teams: Weg je Rolle mit Link, „Account anonymisieren“ ge
     can_erase: false,
     closing: "Kommst du so nicht weiter, schreib an datenschutz@verein.example – der Verein löscht dein Konto dann.",
     blockers: [
-      { team_id: "t-1", team: "[RDL] Rudel", squad_id: null, squad: null, role: "leader", role_label: "Kapitän", way: "Übergib die Leitung …", link: "/teams/t-1" },
+      { team_id: "t-1", team: "[RDL] Rudel", squad_id: null, squad: null, role: "leader", role_label: "Teamleitung", way: "Übergib die Leitung …", link: "/teams/t-1" },
       { team_id: "t-1", team: "[RDL] Rudel", squad_id: "s-1", squad: "Erste", role: "captain", role_label: "Captain", way: "Gib die Rolle … ab.", link: "/teams" },
     ],
   });
   render(<MemoryRouter><PrivacyAccountPage /></MemoryRouter>);
   expect(await screen.findByTestId("dsgvo-erasure-blockers")).toHaveTextContent("Erst deine Rollen in Teams abgeben");
-  expect(screen.getByTestId("dsgvo-erasure-blocker-leader")).toHaveTextContent("Kapitän bei [RDL] Rudel");
+  expect(screen.getByTestId("dsgvo-erasure-blocker-leader")).toHaveTextContent("Teamleitung bei [RDL] Rudel");
   expect(screen.getByTestId("dsgvo-erasure-blocker-captain")).toHaveTextContent("Captain im Co-Team Erste von [RDL] Rudel");
   expect(screen.getByRole("link", { name: "Zur Teamseite" })).toHaveAttribute("href", "/teams/t-1");
   expect(screen.getByRole("link", { name: "Zu deinen Teams" })).toHaveAttribute("href", "/teams");

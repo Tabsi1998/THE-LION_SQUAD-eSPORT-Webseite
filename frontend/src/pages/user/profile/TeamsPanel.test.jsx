@@ -78,6 +78,56 @@ test("Captain und Vertreter kommen aus dem Kader, Rollen sperren das Abwählen b
   expect(payload).not.toHaveProperty("members");
 });
 
+// Co-Team-Formular (#2128, TM3): Spiel als Auswahl, „Turnier“ und „Jahreswertung“ sind weg; Altfelder gehen nicht mit.
+test("Spiel kommt aus der Liste, die Altfelder stehen nicht mehr im Formular und gehen nicht mit", async () => {
+  apiMock.get.mockImplementation((url) => {
+    if (url === "/games") return Promise.resolve({ data: [{ id: "g1", name: "Probe Rush" }] });
+    if (url === "/teams/t1/squads") return Promise.resolve({ data: [{ ...SQUADS[0], tournament_id: "alt", season_id: "alt", game_id: "Freitext" }] });
+    return respond(url);
+  });
+  await renderPanel();
+  expect(screen.getByTestId("team-squad-game-s-a")).toHaveTextContent("Spiel: Freitext");
+  const card = screen.getByTestId("team-squad-roles-s-a").parentElement;
+  fireEvent.click(within(card).getAllByRole("button")[0]);
+
+  const select = await screen.findByTestId("team-squad-game");
+  await waitFor(() => expect([...select.options].map((option) => option.value)).toEqual(["", "Freitext", "g1"]));
+  expect(select).toHaveValue("Freitext");
+  expect(screen.getByTestId("team-squad-game-hint")).toHaveTextContent("Hauptspiel oder Version");
+  expect(screen.queryByText("Turnier")).not.toBeInTheDocument();
+  expect(screen.queryByText("Jahreswertung / Circuit")).not.toBeInTheDocument();
+
+  fireEvent.change(select, { target: { value: "g1" } });
+  fireEvent.click(screen.getByText("Speichern"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalled());
+  const [, payload] = apiMock.patch.mock.calls[0];
+  expect(payload.game_id).toBe("g1");
+  expect(payload).not.toHaveProperty("tournament_id");
+  expect(payload).not.toHaveProperty("season_id");
+});
+
+test("der Stand eines Co-Teams steht in Worten, nie als Rohwert", async () => {
+  await renderPanel();
+  expect(screen.getAllByText("Aktiv").length).toBeGreaterThan(0);
+  expect(screen.queryByText("active")).not.toBeInTheDocument();
+});
+
+// Aufgelöste Teams (#2128, TM8): die frühere Teamleitung holt sie hier zurück.
+test("aufgelöstes Team steht mit Frist da und lässt sich wiederherstellen", async () => {
+  apiMock.post.mockReset();
+  apiMock.post.mockResolvedValue({ data: { ok: true } });
+  apiMock.get.mockImplementation((url) => {
+    if (url === "/teams/dissolved/mine") return Promise.resolve({ data: [{ id: "t9", name: "Altes Rudel", tag: "ALT", member_count: 4, days_left: 12 }] });
+    return respond(url);
+  });
+  await renderPanel();
+  const row = await screen.findByTestId("dissolved-team-t9");
+  expect(row).toHaveTextContent("Altes Rudel");
+  expect(row).toHaveTextContent("noch 12 Tage");
+  fireEvent.click(screen.getByTestId("dissolved-team-restore-t9"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/teams/t9/restore", {}));
+});
+
 test("„Niemand“ nimmt eine Rolle weg", async () => {
   await renderPanel();
   const card = screen.getByTestId("team-squad-roles-s-a").parentElement;

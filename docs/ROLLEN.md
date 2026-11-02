@@ -223,12 +223,14 @@ Person selbst sehen darf und wofür sie angemeldet ist, dazu ihre zugesagten Ver
 Sitzung gilt dort keine Zwei-Faktor-Ausnahme der Turnierleitung. Gesperrte oder abgeschaltete Konten bekommen nichts,
 beim Löschen des Kontos fällt der Link weg. Code: `services/personal_calendar.py`.
 
-Die Team-Seite in Web und App folgt dem Server: Team bearbeiten und Squads dürfen Leitung, Co-Leitung, Turnierleitung,
-Club-Admin und Superadmin; Mitglieder entfernen Leitung, Co-Leitung, Club-Admin und Superadmin; auflösen Leitung,
-Club-Admin und Superadmin. Moderatoren sehen auf fremden Team-Seiten keine Verwaltungs-Knöpfe. Die Admin-Rollen zählen
+Die Team-Seite in Web und App folgt dem Server: Team bearbeiten und Co-Teams dürfen Leitung, Co-Leitung, Turnierleitung,
+Club-Admin und Superadmin; Mitglieder entfernen Leitung, Co-Leitung, Club-Admin und Superadmin; auflösen, Rollen
+ändern, die Leitung übergeben und öffentlich/privat schalten Leitung, Club-Admin und Superadmin; ein aufgelöstes Team
+wiederherstellen Club-Admin und Superadmin, die frühere Leitung nur nach eigenem Auflösen (#2128). Die Teamliste im Admin sehen die Bereiche
+Turnierleitung und Vereinsverwaltung; alle Beitrittscodes erneuern Club-Admin und Superadmin. Moderatoren sehen auf fremden Team-Seiten keine Verwaltungs-Knöpfe. Die Admin-Rollen zählen
 dabei – wie überall – nur mit bestätigter Zwei-Faktor-Anmeldung (#1469); Leitung und Co-Leitung brauchen sie für ihr
 Team nicht. Seit #1479 schickt der Server das fertige Ergebnis mit (`can_manage`, `can_remove_members`,
-`can_dissolve`); fehlt einer Admin-Rolle nur die Zwei-Faktor-Anmeldung (`admin_needs_second_factor`), steht statt der
+`can_dissolve`, `can_change_roles`); fehlt einer Admin-Rolle nur die Zwei-Faktor-Anmeldung (`admin_needs_second_factor`), steht statt der
 Knöpfe „2FA einrichten“ da.
 
 **„Spielst du auch mit?“ (#1184):** nach der Event-Anmeldung meldet `POST /api/events/{id}/play-along` die gewählten
@@ -245,7 +247,7 @@ Helfer eines Turniers (auch Organisation) ordnen nichts zu. Turnier- und Fast-La
 Sponsoren bei welchem Event erscheinen, legt nur die **Redaktion** beim Sponsor fest (bei allen oder bei ausgewählten Events);
 das Event zeigt sie an und nimmt keine eigene Auswahl mehr an. Code: `services/event_program.py`.
 
-In der App fragt die Team-Seite dieselben Rollen wie der Server: Team bearbeiten und Squads dürfen Leitung,
+In der App fragt die Team-Seite dieselben Rollen wie der Server: Team bearbeiten und Co-Teams dürfen Leitung,
 Co-Leitung, Turnierleitung, Club-Admin und Superadmin; Mitglieder entfernen Leitung, Co-Leitung, Club-Admin und
 Superadmin. Moderatoren sehen auf fremden Team-Seiten keine Verwaltungs-Knöpfe. Die Admin-Rollen zählen dabei –
 wie überall – nur mit bestätigter Zwei-Faktor-Anmeldung (#1469); Leitung und Co-Leitung brauchen sie für ihr Team nicht.
@@ -318,7 +320,7 @@ je Saison Captains eintragen, die nur für diese eine Saison Ergebnisse und Scor
 
 ## Liga: Co-Team mit Captain und Vertreter (#1649)
 
-In der Liga spielt ein **Co-Team** (Squad eines Vereinsteams) – Vertrag in [`LIGA.md`](LIGA.md). Jedes Co-Team hat
+In der Liga spielt ein **Co-Team** eines Vereinsteams – Vertrag in [`LIGA.md`](LIGA.md). Jedes Co-Team hat
 höchstens einen **Captain** und einen **Vertreter**; beide stehen im Kader des Co-Teams und sind verschiedene Personen.
 
 | Was | Turnierleitung (mit Zwei-Faktor) | Teamleitung, Co-Leitung des Hauptteams | Captain | Vertreter | Kader des Co-Teams |

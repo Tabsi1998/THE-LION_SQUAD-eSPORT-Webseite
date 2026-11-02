@@ -6,6 +6,19 @@ export const SQUAD_ROLES = [
   { field: "vice_captain_id", label: "Vertreter", short: "V" },
 ];
 
+// Der Stand eines Co-Teams in Worten - nie der Rohwert aus der Datenbank.
+export const SQUAD_STATUS_LABELS = { active: "Aktiv", archived: "Archiviert" };
+
+export function squadStatusLabel(status) {
+  return SQUAD_STATUS_LABELS[status] || SQUAD_STATUS_LABELS.active;
+}
+
+// Das Spiel eines Co-Teams in Worten: der Name vom Server, sonst der alte Freitext.
+export function squadGameLabel(squad) {
+  const name = squad?.game || squad?.game_id;
+  return name ? `Spiel: ${name}` : "Kein bestimmtes Spiel";
+}
+
 export function personName(person) {
   return person?.display_name || person?.username || "Unbekannt";
 }

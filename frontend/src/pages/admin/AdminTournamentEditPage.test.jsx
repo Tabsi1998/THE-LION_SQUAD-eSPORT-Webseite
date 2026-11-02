@@ -432,7 +432,7 @@ test("Anmeldung im Discord (#885): Vorgabe an, Abwahl geht beim Speichern mit", 
 
   const box = await screen.findByTestId("tr-edit-discord-registration");
   expect(box).toBeChecked();
-  expect(box.closest("label")).toHaveTextContent("Kapitän");
+  expect(box.closest("label")).toHaveTextContent("Teamleitung");
   await user.click(box);
   await user.click(screen.getByTestId("tr-edit-save"));
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/tournaments/t-1", expect.objectContaining({ discord_registration: false })));

@@ -1,11 +1,14 @@
 """Team-Seite (#1191): Termine, letzte Spiele und Einladungs-Link mit QR-Code.
 
 - ``GET  /api/teams/{id}/overview``            „Angemeldet für“ und „Letzte Spiele“ - für alle, die das Team sehen dürfen
-- ``GET  /api/teams/{id}/invite-link``         der aktuelle Link (wird beim ersten Mal angelegt) - Kapitän und Co-Kapitän
+- ``GET  /api/teams/{id}/invite-link``         der aktuelle Link (wird beim ersten Mal angelegt) - Teamleitung und Co-Leitung
 - ``POST /api/teams/{id}/invite-link``         neuer Link, der alte gilt nicht mehr
+- ``POST /api/teams/{id}/join-code``           neuer Beitrittscode, der alte gilt nicht mehr
 - ``GET  /api/teams/{id}/invite-link/check``   gilt dieser Schlüssel? Mit Kurzinfo zum Team - auch für private Teams
 - ``POST /api/teams/{id}/join-link``           mit gültigem Schlüssel beitreten (nur noch „Beitreten“ tippen)
-- ``GET  /api/teams/{id}/dissolve-preview``    was beim Auflösen passiert (#1274) - Kapitän und Club-Admin
+- ``GET  /api/teams/{id}/dissolve-preview``    was beim Auflösen passiert (#1274) - Teamleitung und Club-Admin
+- ``GET  /api/teams/dissolved/mine``           aufgelöste Teams, die ich als frühere Teamleitung wiederherstellen kann (#2128)
+- ``POST /api/teams/{id}/restore``             aufgelöstes Team zurückholen - Club-Admin, frühere Teamleitung nur nach eigenem Auflösen
 """
 from __future__ import annotations
 
@@ -16,19 +19,24 @@ from auth import get_current_user, get_optional_user
 from database import get_db
 from models import new_id, now_utc
 from routes.team_routes import (
-    TEAM_OWNER_ADMIN_ROLES, _add_team_member, _can_manage, _is_member, _is_staff, _refuse, _team_admin, _user_label,
+    TEAM_OWNER_ADMIN_ROLES, _add_team_member, _can_manage, _is_member, _is_staff, _refuse, _team_admin, _team_audit, _user_label,
 )
 from services import team_page
-from services.team_dissolve import dissolve_preview
+from services.team_dissolve import dissolve_preview, dissolved_for_leader, former_lead_may_restore, restore as restore_team
 from services.user_notifications import build_public_url, create_user_notification
 
 router = APIRouter(prefix="/api/teams", tags=["teams"])
 
-INVITE_GONE = "Dieser Einladungs-Link gilt nicht mehr. Frag im Team nach einem neuen Link oder gib den Join-Code ein."
+INVITE_GONE = "Dieser Einladungs-Link gilt nicht mehr. Frag im Team nach einem neuen Link oder gib den Beitrittscode ein."
 
 
 class JoinLinkBody(BaseModel):
     token: str = Field(min_length=4, max_length=120)
+
+
+class RestoreBody(BaseModel):
+    # Nur nötig, wenn das Kürzel inzwischen ein anderes Team hat.
+    tag: str | None = Field(default=None, max_length=40)
 
 
 async def _team_or_404(db, team_id: str) -> dict:
@@ -77,7 +85,7 @@ async def get_invite_link(team_id: str, me: dict = Depends(get_current_user)):
     db = get_db()
     team = await _team_or_404(db, team_id)
     if not _can_manage(team, me):
-        _refuse(me, "Einladen dürfen Kapitän und Co-Kapitän.")
+        _refuse(me, "Einladen dürfen Teamleitung und Co-Leitung.")
     return await _invite_payload(await team_page.ensure_invite(db, team_id, me["id"]))
 
 
@@ -86,13 +94,25 @@ async def renew_invite_link(team_id: str, me: dict = Depends(get_current_user)):
     db = get_db()
     team = await _team_or_404(db, team_id)
     if not _can_manage(team, me):
-        _refuse(me, "Einladen dürfen Kapitän und Co-Kapitän.")
+        _refuse(me, "Einladen dürfen Teamleitung und Co-Leitung.")
     row = await team_page.renew_invite(db, team_id, me["id"])
     await db.audit_logs.insert_one({
         "id": new_id(), "action": "team.invite_link.renew", "target_id": team_id,
         "actor_id": me["id"], "data": {}, "created_at": now_utc().isoformat(),
     })
     return await _invite_payload(row)
+
+
+@router.post("/{team_id}/join-code")
+async def renew_join_code(team_id: str, me: dict = Depends(get_current_user)):
+    """Beitrittscode erneuern (#2128, TM10) - wie der Link: Teamleitung und Co-Leitung. Der alte gilt danach nicht mehr."""
+    db = get_db()
+    team = await _team_or_404(db, team_id)
+    if not _can_manage(team, me):
+        _refuse(me, "Den Beitrittscode erneuern Teamleitung und Co-Leitung.")
+    code = await team_page.renew_join_code(db, team_id)
+    await _team_audit(db, "team.join_code.renew", team_id, me["id"], {})
+    return {"join_code": code}
 
 
 @router.get("/{team_id}/invite-link/check")
@@ -115,6 +135,7 @@ async def join_with_link(team_id: str, body: JoinLinkBody, me: dict = Depends(ge
     if me["id"] in (team.get("member_ids") or []):
         return {"ok": True, "already_member": True}
     await _add_team_member(db, team_id, me["id"])
+    await _team_audit(db, "team.join", team_id, me["id"], {"via": "invite_link"})
     # Eine offene persönliche Einladung ins selbe Team ist damit erledigt.
     await db.team_invites.update_many(
         {"team_id": team_id, "user_id": me["id"], "status": "pending"},
@@ -140,5 +161,27 @@ async def team_dissolve_preview(team_id: str, me: dict = Depends(get_current_use
     db = get_db()
     team = await _team_or_404(db, team_id)
     if team.get("leader_id") != me["id"] and not _team_admin(me, TEAM_OWNER_ADMIN_ROLES):
-        _refuse(me, "Auflösen darf nur der Kapitän.", TEAM_OWNER_ADMIN_ROLES)
+        _refuse(me, "Auflösen darf nur die Teamleitung.", TEAM_OWNER_ADMIN_ROLES)
     return await dissolve_preview(db, team)
+
+
+@router.get("/dissolved/mine")
+async def my_dissolved_teams(me: dict = Depends(get_current_user)):
+    """Was ich als frühere Teamleitung noch wiederherstellen kann (#2128, TM8)."""
+    return await dissolved_for_leader(get_db(), me["id"])
+
+
+@router.post("/{team_id}/restore")
+async def restore_dissolved_team(team_id: str, body: RestoreBody | None = None, me: dict = Depends(get_current_user)):
+    """Ein aufgelöstes Team zurückholen (#2128, TM8): Club-Admin und Superadmin, die frühere Teamleitung nur, wenn sie
+    selbst aufgelöst hat. Mit Protokoll."""
+    db = get_db()
+    row = await db.dissolved_teams.find_one({"id": team_id, "purged_at": {"$exists": False}}, {"_id": 0})
+    if not row:
+        raise HTTPException(status_code=404, detail="Team nicht gefunden")
+    own = row.get("leader_id") == me["id"]
+    if not (own and former_lead_may_restore(row)) and not _team_admin(me, TEAM_OWNER_ADMIN_ROLES):
+        _refuse(me, "Dieses Team hat die Vereinsverwaltung aufgelöst – wiederherstellen kann nur sie." if own
+                else "Wiederherstellen darf die frühere Teamleitung.", TEAM_OWNER_ADMIN_ROLES)
+    team = await restore_team(db, row, me, tag=body.tag if body else None)
+    return {"ok": True, "id": team["id"], "name": team.get("name"), "tag": team.get("tag")}

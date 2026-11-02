@@ -100,6 +100,8 @@ Fünf Tabs unten: **Home**, **Events**, **Community**, **Verein**, **Profil**. O
 - **Anmelden mit Google** und **Passwort vergessen** – gibt es im Anmeldebildschirm der App nicht, nur auf der Website.
 - **Auskunft und Datenexport** („Meine Daten“) – die App öffnet dafür die Website.
 - **Bezahlen** – Zahlungslinks öffnen im Browser, bezahlt wird nicht in der App.
+- **In Teams:** Captain und Vertreter vergeben, Beitrittscode erneuern, öffentlich/privat schalten und ein aufgelöstes Team
+  wiederherstellen ([Teams](teams.md)). Das Spiel eines Co-Teams tippt die App noch von Hand ein; ein Name, den die Website nicht kennt, wird abgelehnt.
 - Lange Seiten wie Mitgliederverzeichnis, Server, Rechtliches und Kontaktformular bleiben auf der Website.
 
 Alles andere gibt es in beiden. Die Rechte sind dieselben wie im Web: Was dein Konto nicht darf, sieht es auch in der App nicht.
@@ -146,7 +148,7 @@ Was mit eingeschalteter Sperre zusätzlich gilt (Stand #1461, kommt mit dem näc
 - **Kontowechsel:** Wechselt jemand direkt von einem Konto zum anderen, räumt die App so gründlich auf wie beim Abmelden: Glocke, Banner, Zähler, Suchen und die
   gespeicherte Mitgliedskarte des vorigen Kontos verschwinden, und das Gerät meldet sich für Pushes mit dem neuen Konto an. Ohne Sperre und für ältere Apps bleibt alles
   wie bisher.
-- **Abmelden** löscht ebenfalls die gespeicherte Karte. **Konto löschen** (Zahnrad → Konto) anonymisiert das Konto dauerhaft und wird zweimal bestätigt. Wer Kapitän, Co-Kapitän, Captain oder Vertreter ist, gibt die Rolle vorher ab – die Meldung nennt den Weg.
+- **Abmelden** löscht ebenfalls die gespeicherte Karte. **Konto löschen** (Zahnrad → Konto) anonymisiert das Konto dauerhaft und wird zweimal bestätigt. Wer Teamleitung, Co-Leitung, Captain oder Vertreter ist, gibt die Rolle vorher ab – die Meldung nennt den Weg.
 
 ### 3.4 Push: Kanäle, Themen, Tests
 

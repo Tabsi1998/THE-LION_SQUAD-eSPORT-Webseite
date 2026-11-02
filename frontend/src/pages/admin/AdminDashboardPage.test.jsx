@@ -32,6 +32,7 @@ const DASHBOARD = {
   client_logs: { open: 1, critical_open: 1 }, ops: { checks: { status: "warn" } }, discord_broken: [{ label: "News", text: "kein Recht" }],
   today: [{ kind: "check_in", at: "2026-10-13T16:00:00Z", title: "Check-in: Cup", url: "/admin/tournaments/t-1" }],
   recent_audit_logs: [],
+  team_count: 7, player_count: 3,
 };
 
 function serve() {
@@ -152,4 +153,12 @@ test("Startseite: Zahlen in richtiger Ein- und Mehrzahl, Streitfälle statt Disp
     expect(page).toContain(text);
   }
   for (const wrong of ["Disputes", "1 offene Anträge", "1 Verträge", "1 warten", "1 Prüffälle"]) expect(page).not.toContain(wrong);
+});
+
+// Kachel „Teams“ (#2128, TM7): führt zur Teamverwaltung, die anderen Zahlen bleiben Zahlen.
+test("die Kachel „Teams“ führt zur Teamverwaltung", async () => {
+  await renderAs({ id: "s", role: "superadmin", ...mfa });
+  const tile = await screen.findByTestId("kpi-Teams");
+  expect(tile.closest("a")).toHaveAttribute("href", "/admin/teams");
+  expect(screen.getByTestId("kpi-Spieler").closest("a")).toBeNull();
 });

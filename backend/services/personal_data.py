@@ -156,6 +156,7 @@ PERSONAL: dict[str, Entry] = {
                               "geht (#2150). Grunddateien des Katalogs haben kein Konto"),
     # Teams, Turniere, Events, F1, Saison
     "teams": Entry(KEPT, ("teams",), "gehört dem Team; das Konto heißt in der Liste „Gelöschter User“"),
+    "dissolved_teams": Entry(OVERWRITTEN, ("dissolved_teams",), "aufgelöstes Team bis zum Ende der Frist: die Person wird herausgenommen; nach der Frist bleiben nur Name und Kürzel für alte Turniere"),
     "team_members": Entry(KEPT, ("team_memberships",), "Teamhistorie und Aufstellungen; das Konto heißt „Gelöschter User“"),
     "team_invites": Entry(DELETED, ("team_invites",)),
     "team_squads": Entry(KEPT, note="Aufstellung des Teams, nur Kennungen"),

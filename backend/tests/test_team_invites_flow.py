@@ -123,7 +123,7 @@ async def test_captain_who_wants_to_leave_is_told_the_way(flow):
     response = await flow.post(f"/api/teams/{world['team_id']}/leave")
     assert response.status_code == 400
     detail = response.json()["detail"]
-    assert "Zum Kapitän machen" in detail and "löse das Team" in detail
+    assert "Zur Teamleitung machen" in detail and "löse das Team" in detail
 
 
 @pytest.mark.asyncio

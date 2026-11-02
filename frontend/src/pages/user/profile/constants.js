@@ -160,4 +160,4 @@ export const ACHIEVEMENT_ACTIONS = {
   membership_days: "Vereinsmitgliedschaft pflegen",
 };
 // Begriffe statt Rohwerten: vorher stand "LEADER" in der Teamkarte (#253).
-export const TEAM_ROLE_LABELS = { leader: "Leitung", co_leader: "Co-Leitung", member: "Mitglied" };
+export const TEAM_ROLE_LABELS = { leader: "Teamleitung", co_leader: "Co-Leitung", member: "Mitglied" };

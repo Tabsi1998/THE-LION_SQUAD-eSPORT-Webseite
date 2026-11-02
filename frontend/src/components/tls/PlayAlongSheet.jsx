@@ -10,7 +10,7 @@ import { offerFriendsHint } from "@/lib/friendsHint";
 import { offerCalendarHint } from "@/lib/calendarHint";
 
 // „Spielst du auch mit?“ (#1184): nach der Event-Anmeldung die Turniere des Events in einem Schritt. Am Handy ein Blatt
-// von unten, ab 640 px mittig. Haken nur bei Einzel-Turnieren; Team-Turniere sagen, dass der Kapitän anmeldet (Kapitäne
+// von unten, ab 640 px mittig. Haken nur bei Einzel-Turnieren; Team-Turniere sagen, dass die Teamleitung anmeldet (Teamleitungen
 // bekommen den Link), Fast Laps brauchen keine Anmeldung. „Anmelden“ legt je Haken eine normale Turnier-Anmeldung an
 // (dieselben Regeln, voll → Warteliste); danach steht je Eintrag, was passiert ist. „Nein danke“ beendet ohne Rückfrage.
 

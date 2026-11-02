@@ -121,9 +121,9 @@ test("Kopf ohne Logo: Platzhalter mit Kürzel, Farbe aus dem Server, Zeile mit S
   expect(screen.getByTestId("team-lion")).toBeInTheDocument();
   const faces = within(screen.getByTestId("team-faces")).getAllByRole("listitem").map((item) => item.getAttribute("data-testid"));
   expect(faces).toEqual(["team-face-u-cap", "team-face-u-co", "team-face-u-3"]);
-  expect(screen.getByTestId("team-face-role-u-cap")).toHaveTextContent("Kapitän");
-  expect(screen.getByTestId("team-face-role-u-co")).toHaveTextContent("Co-Kapitän");
-  expect(screen.getByTestId("team-face-role-u-3")).toHaveTextContent("Spieler");
+  expect(screen.getByTestId("team-face-role-u-cap")).toHaveTextContent("Teamleitung");
+  expect(screen.getByTestId("team-face-role-u-co")).toHaveTextContent("Co-Leitung");
+  expect(screen.getByTestId("team-face-role-u-3")).toHaveTextContent("Mitglied");
   // Du: Ecken-Klammern nur an deinem Gesicht.
   expect(within(screen.getByTestId("team-face-u-3")).getByTestId("team-face-you")).toBeInTheDocument();
   expect(within(screen.getByTestId("team-face-u-cap")).queryByTestId("team-face-you")).toBeNull();

@@ -1,7 +1,7 @@
 """Was das eigene Löschen des Kontos aufhält (#2113, L-C5).
 
-Wer ein Team als Kapitän führt, Co-Kapitän ist oder in einem Co-Team Captain bzw. Vertreter ist, löscht sein Konto
-nicht einfach weg: sonst stünde „Gelöschter Benutzer“ als Kapitän da, und die Co-Leitung säße fest. Stattdessen nennt
+Wer ein Team als Teamleitung führt, Co-Leitung ist oder in einem Co-Team Captain bzw. Vertreter ist, löscht sein Konto
+nicht einfach weg: sonst stünde „Gelöschter Benutzer“ als Teamleitung da, und die Co-Leitung säße fest. Stattdessen nennt
 die Seite (und die Meldung des Servers, die auch die App zeigt) je Rolle den Weg - Leitung übergeben, Team auflösen,
 Team verlassen oder die Rolle abgeben. Danach geht das Löschen wie bisher.
 
@@ -11,17 +11,17 @@ mehr erreichbar ist."""
 from __future__ import annotations
 
 ROLE_LABELS = {
-    "leader": "Kapitän",
-    "co_leader": "Co-Kapitän",
+    "leader": "Teamleitung",
+    "co_leader": "Co-Leitung",
     "captain": "Captain",
     "vice_captain": "Vertreter",
 }
 
 WAYS = {
-    "leader": "Übergib die Leitung auf der Teamseite unter „Mitglieder verwalten“ („Zum Kapitän machen“) oder löse "
+    "leader": "Übergib die Leitung auf der Teamseite unter „Mitglieder verwalten“ („Zur Teamleitung machen“) oder löse "
               "das Team unter „Bearbeiten“ auf.",
-    "co_leader": "Verlasse das Team auf der Teamseite („Team verlassen“) oder bitte den Kapitän, dich auf Spieler zu "
-                 "stellen.",
+    "co_leader": "Verlasse das Team auf der Teamseite („Team verlassen“) oder bitte die Teamleitung, dich wieder zum "
+                 "Mitglied zu machen.",
     "captain": "Gib die Rolle unter Teams → Deine Teams mit „Rolle abgeben“ ab.",
     "vice_captain": "Gib die Rolle unter Teams → Deine Teams mit „Rolle abgeben“ ab.",
 }
