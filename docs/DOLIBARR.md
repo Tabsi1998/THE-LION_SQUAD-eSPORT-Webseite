@@ -217,11 +217,19 @@ Namen von wem.
 
 - **Abgleich:** alle 10 Minuten das Geänderte, einmal am Tag alles. *Jetzt
   abgleichen* stößt einen Lauf von Hand an.
-- **Webhook (optional):** Reiter *Verbindung* → *Neue Adresse erzeugen*. In
-  Dolibarr Modul *Webhooks*: Ziel mit dieser Adresse, Ereignis *Vereine:
-  Mitglieds-Zusammenfassung geändert*, Typ *Nicht blockierend*. Das Ereignis
-  trägt keinen Stand – die Website liest ein paar Sekunden später nach. Ohne
-  Webhook dauert eine Änderung bis zu 10 Minuten.
+- **Signierter Webhook (empfohlen, #1540):** Im Vereinsmodul unter *Einrichtung →
+  Vereine → Webhooks* die Adresse aus Reiter *Verbindung* → *Signierter Webhook*
+  eintragen, Schlüssel-Kennung und Geheimnis dort übernehmen und speichern (nur
+  „System“, mit Rückfrage). Das Geheimnis liegt verschlüsselt in den
+  Einstellungen, kommt nie zurück und steht in keinem Protokoll. Wer es lieber
+  auf dem Server hält, setzt `DOLIBARR_WEBHOOK_SECRETS` (`<Kennung>:<Geheimnis>`,
+  mehrere mit Komma): Die Server-Umgebung gilt zusätzlich und hat bei gleicher
+  Kennung Vorrang. Ohne Webhook dauert eine Änderung bis zu 10 Minuten.
+- **Alter Webhook-Weg (Token in der Adresse):** Reiter *Verbindung* → *Neue Adresse
+  erzeugen* ersetzt das Token nach einer Rückfrage; die bisherige Adresse gilt dann
+  nicht mehr. In Dolibarr Modul *Webhooks*: Ziel mit dieser Adresse, Ereignis
+  *Vereine: Mitglieds-Zusammenfassung geändert*, Typ *Nicht blockierend*. Bleibt nur
+  bis zur Umstellung; abschalten unter *Funktionen*.
 - **Neue Mitglieder:** Auf „Meine Mitgliedschaft“ gibt es *Zuordnung anfragen*.
   Die Anfrage steht unter *Zuordnungen*; bestätigt wird sie unter *Umstellung*.
   Wer es bequemer will, schaltet *Konten über die bestätigte E-Mail von selbst
@@ -649,7 +657,8 @@ das Modul ausliefert (festgehalten in `backend/tests/contracts/manifest.json`):
 | Vorhanden und genutzt | Im Modul vorhanden, auf der Website noch nicht genutzt |
 | --- | --- |
 | Zusammenfassung je Mitglied mit Beitragsstand und Funktionen | Änderungsfeed mit Revisionen und Löschhinweisen (dolibarr-vereine#154, seit 0.8.0-beta; kommt mit #844) |
-| Suche über E-Mail oder Nummer | signierte Webhooks (dolibarr-vereine#155, seit 0.8.0-beta) |
+| Suche über E-Mail oder Nummer | |
+| signierte Webhooks (dolibarr-vereine#155, seit 0.8.0-beta; Empfänger seit #1540) | |
 | nur geänderte Mitglieder (`changed_since`) | Einlass über eine App (ab Vereine 1.7.0), Teilnahmen und Ehrungen (ab 1.8.0) – kommen mit Vereinsmodul 1.5 |
 | Benachrichtigung bei Änderung (ohne Personendaten) | |
 | Rechnungen mit PDF (Dolibarr II) | |

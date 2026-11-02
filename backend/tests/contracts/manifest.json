@@ -65,8 +65,6 @@
     "core_paths": [
       "/status"
     ],
-    "not_used_yet": {
-      "signed_webhooks": "Modul seit 0.8.0-beta (dolibarr-vereine#155) - die Website hat keinen Empfaenger"
-    }
+    "not_used_yet": {}
   }
 }

@@ -11,7 +11,31 @@ beforeEach(() => {
   authState.current = null;
 });
 
-const { ForbiddenPage } = await import("./ErrorPages");
+const { ForbiddenPage, NotFoundPage, ServerErrorPage } = await import("./ErrorPages");
+
+test("Fehler melden nennt den Pfad ohne Kennungen", () => {
+  render(<MemoryRouter initialEntries={["/karte/pruefen/abc123"]}><NotFoundPage /></MemoryRouter>);
+  const href = screen.getByTestId("error-report-btn").getAttribute("href");
+  expect(new URL(href, "https://example.test").searchParams.get("from")).toBe("/karte/pruefen/…");
+  expect(href).not.toContain("abc123");
+});
+
+// Fehler melden (#2131): mit der Seite, auf der es passiert ist - nur der Pfad, nie eine Abfrage mit möglichen Schlüsseln.
+test("404 und 500 führen zum Kontaktformular mit Thema und Seite, 403 nicht", () => {
+  const { unmount } = render(<MemoryRouter initialEntries={["/events/weg?token=geheim"]}><NotFoundPage /></MemoryRouter>);
+  const href = screen.getByTestId("error-report-btn").getAttribute("href");
+  const url = new URL(href, "https://example.test");
+  expect(url.pathname).toBe("/contact");
+  expect(url.searchParams.get("topic")).toBe("report_bug");
+  expect(url.searchParams.get("from")).toBe("/events/weg");
+  expect(href).not.toContain("geheim");
+  unmount();
+  const second = render(<MemoryRouter initialEntries={["/500"]}><ServerErrorPage /></MemoryRouter>);
+  expect(screen.getByTestId("error-report-btn")).toBeInTheDocument();
+  second.unmount();
+  render(<MemoryRouter initialEntries={["/403"]}><ForbiddenPage /></MemoryRouter>);
+  expect(screen.queryByTestId("error-report-btn")).toBeNull();
+});
 
 test("mit Bereich aus der Weiterleitung steht er im Text", () => {
   render(

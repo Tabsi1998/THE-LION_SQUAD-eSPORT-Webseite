@@ -45,43 +45,20 @@ export function summaryLines(summary) {
   return SUMMARY_FIELDS.map(([key, label]) => ({ key, label, value: formatCents(summary[key] || 0) }));
 }
 
-// Eine CSV-Zelle: Anführungszeichen verdoppelt; Zellen, die eine Tabellenkalkulation als Formel
-// lesen würde (=, +, -, @, Tab, CR), bekommen ein Hochkomma davor.
-export function csvCell(value) {
-  let text = value === null || value === undefined ? "" : String(value);
-  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
-  return /[";\n\r]/.test(text) ? `"${text.replace(/"/g, "\"\"")}"` : text;
-}
-
-const CSV_COLUMNS = [
-  ["Rechnung", (row) => row.invoice_ref || ""],
-  ["Angebot", (row) => row.source?.name || row.source_id || ""],
-  ["Person", (row) => row.person || ""],
-  ["Betrag", (row) => formatCents(row.total_cents, row.currency)],
-  ["Zahlungsstand", (row) => row.payment_label || row.status_label || ""],
-  ["Bezahlt", (row) => formatCents(row.paid_cents || 0, row.currency)],
-  ["Gutgeschrieben", (row) => formatCents(row.credited_cents || 0, row.currency)],
-  ["Erstattet", (row) => formatCents(row.refunded_cents || 0, row.currency)],
-  ["Buchung", (row) => (row.booking_state === "cancelled" ? "storniert" : "aktiv")],
-  ["Stand", (row) => row.synced_at || ""],
-];
-
-const BOM = String.fromCharCode(0xfeff);
-
-// Nur, was der Kassier braucht - keine Adressen, keine Bankdaten, keine Dolibarr-Schlüssel.
-export function toCsv(rows) {
-  const lines = [CSV_COLUMNS.map(([label]) => csvCell(label)).join(";")];
-  for (const row of rows || []) lines.push(CSV_COLUMNS.map(([, pick]) => csvCell(pick(row))).join(";"));
-  return `${BOM}${lines.join("\r\n")}\r\n`;
-}
-
 // Wo Belege hängen (#842): die drei Blicke - im Dateinamen des Exports, in der Tageszentrale in Worten.
 export const ATTENTION_ORDER = ["overdue", "pdf_missing", "draft_old"];
 const ATTENTION_FILE = { overdue: "überfällig", pdf_missing: "pdf-fehlt", draft_old: "entwurf-alt" };
 
-export function csvFilename(now = new Date(), attention = "") {
-  const day = now.toISOString().slice(0, 10);
-  return ATTENTION_FILE[attention] ? `abrechnung-${ATTENTION_FILE[attention]}-${day}.csv` : `abrechnung-${day}.csv`;
+// Der Export kommt vom Server (#2131): vollständig, ohne die Grenze der Liste. Hier nur der Dateiname - mit Blick und Zeitraum.
+export function csvFilename(now = new Date(), attention = "", { from = "", to = "" } = {}) {
+  const period = [from, to].filter(Boolean).join("-bis-");
+  const stamp = period || now.toISOString().slice(0, 10);
+  return ATTENTION_FILE[attention] ? `abrechnung-${ATTENTION_FILE[attention]}-${stamp}.csv` : `abrechnung-${stamp}.csv`;
+}
+
+// „250 von 1.234“: was die Liste zeigt und was es in dieser Auswahl gibt.
+export function shownOf(shown, total) {
+  return `${Number(shown || 0).toLocaleString("de-AT")} von ${Number(total ?? shown ?? 0).toLocaleString("de-AT")}`;
 }
 
 // „3 überfällig · 1 ohne PDF · 2 Entwürfe älter als 7 Tage“ - oder „alles in Ordnung“.

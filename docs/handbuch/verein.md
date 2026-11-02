@@ -215,8 +215,17 @@ Rolle bleiben hier. Ob die Mitgliedsnummer öffentlich ist, entscheidet das Mitg
 
 ### 3.11 Kontakt-Inbox
 
-**Admin → Verein → Kontakt-Inbox:** Nachrichten aus dem Kontaktformular mit Status; **Per E-Mail antworten**; Löschen ist endgültig.
-Dazu die Benachrichtigung „Kontaktanfragen“ in der Kommandozentrale.
+**Admin → Verein → Kontakt-Inbox:** Nachrichten aus dem Kontaktformular. Du siehst zuerst, was **offen** ist (Neu und In Bearbeitung).
+
+- **Suchen und filtern:** Das Suchfeld sucht in Name, Adresse, Betreff und Text. Die Kacheln zeigen je Status die Zahl, ein Klick filtert. „Mir zugewiesen“ und „Ohne Zuständige“ grenzen weiter ein.
+- **Zuständig:** In der Nachricht wählst du, wer sich kümmert. Zur Auswahl steht, wer die Vereinsverwaltung hat.
+- **Antworten:** Text ins Feld **Antwort** schreiben und **Antwort senden** wählen. Die Mail geht über die Warteschlange an die Adresse der Anfrage, der Wortlaut steht danach im **Verlauf** mit Name und Zeit, der Status ist **Beantwortet**. Spam bekommt keine Antwort – erst **Kein Spam** ordnet die Nachricht ein. Den Text der Mail stellst du unter System → E-Mail-Vorlagen ein („Kontakt: Antwort“). Sie lässt sich nicht abbestellen, weil die Person gefragt hat.
+- **Interne Notiz:** Speichert beim Verlassen des Felds, nur wenn sich etwas geändert hat. Sie steht nie in der Mail.
+- **Fehlermeldungen:** Über „Fehler melden“ auf einer Fehlerseite kommen Seite, Gerät und Version mit. Die Person sieht das vor dem Absenden.
+- **Löschen** ist endgültig, auch für die Kopien der Mails.
+- **Aufbewahrung:** Erledigte Anfragen (Beantwortet oder Geschlossen) löscht die Website nach 365 Tagen, Spam nach 30 Tagen, je ab dem letzten Statuswechsel. Einstellen kann das „System“ unter **Betrieb → Alarme**. Offene laufen nicht ab.
+
+Dazu die Benachrichtigung „Kontaktanfragen“ in der Kommandozentrale. Das Thema **Rechnung** ist der Weg aus „Meine Rechnungen“ zum Kassier: Solche Anfragen landen hier, gib sie an den Kassier weiter.
 
 ### 3.12 Wunschnummer (#2034)
 

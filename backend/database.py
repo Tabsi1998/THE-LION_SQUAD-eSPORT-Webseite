@@ -353,6 +353,7 @@ async def init_indexes():
     await db.site_banners.create_index([("enabled", 1), ("priority", -1), ("updated_at", -1)])
     await db.site_banner_stats.create_index("id", unique=True)
     await db.email_logs.create_index("created_at")
+    await db.email_logs.create_index("contact_id", sparse=True)
     await db.seasons.create_index("id", unique=True)
     await db.seasons.create_index("slug", unique=True)
     await db.seasons.create_index("slug_history")

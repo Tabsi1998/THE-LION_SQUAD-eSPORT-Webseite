@@ -42,7 +42,8 @@ ALERT_KINDS = {
 }
 
 DEFAULT_RULES = {kind: {"discord": True, "email": False} for kind in ALERT_KINDS}
-DEFAULT_RETENTION = {"email_logs": 90, "audit_logs": 730}
+# Kontaktanfragen (#2131): erledigt 12 Monate, Spam 30 Tage - siehe services/contact_retention.py.
+DEFAULT_RETENTION = {"email_logs": 90, "audit_logs": 730, "contact_done": 365, "contact_spam": 30}
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
@@ -455,6 +456,9 @@ async def purge_old_logs(db, *, now: datetime | None = None) -> dict:
         {"$set": {"display_name": "Teilnehmer", "note": None, "internal_note": None, "anonymized_at": current.isoformat()}},
     )
     removed["walk_in_names"] = int(getattr(result, "modified_count", 0) or 0)
+    from services.contact_retention import purge_expired
+
+    removed["contact_messages"] = await purge_expired(db, done_days=settings["retention_days"]["contact_done"], spam_days=settings["retention_days"]["contact_spam"], now=current)
     old_alerts = (current - timedelta(days=365)).isoformat()
     await db.ops_alert_log.delete_many({"at": {"$lt": old_alerts}})
     return removed

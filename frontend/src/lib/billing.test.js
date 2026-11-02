@@ -1,6 +1,6 @@
-import { attentionLine, csvCell, csvFilename, firstAttention, formatCents, parseEuro, sourcesFrom, summaryLines, syncLine, toCsv } from "./billing";
+import { attentionLine, csvFilename, firstAttention, formatCents, parseEuro, shownOf, sourcesFrom, summaryLines, syncLine } from "./billing";
 
-// Finanzübersicht (#321, #322): Beträge, Eingaben, Quellen und der CSV-Export ohne Formel-Injektion.
+// Finanzübersicht (#321, #322): Beträge, Eingaben, Quellen und der Name des Exports (die Datei selbst baut der Server).
 
 test("Beträge in Cent werden als Euro gezeigt, Eingaben in Euro werden Cent", () => {
   expect(formatCents(4000)).toBe("40,00 €");
@@ -13,24 +13,12 @@ test("Beträge in Cent werden als Euro gezeigt, Eingaben in Euro werden Cent", (
   expect(parseEuro("-5")).toBeNull();
 });
 
-test("die CSV-Zelle entschärft Formeln und Anführungszeichen", () => {
-  expect(csvCell("=SUMME(A1)")).toBe("'=SUMME(A1)");
-  expect(csvCell("+43 664")).toBe("'+43 664");
-  expect(csvCell("Paula; Beispiel")).toBe("\"Paula; Beispiel\"");
-  expect(csvCell("sagt \"hallo\"")).toBe("\"sagt \"\"hallo\"\"\"");
-  expect(csvCell(null)).toBe("");
-});
-
-test("der Export enthält nur Kassier-Spalten, keine Bankdaten oder Schlüssel", () => {
-  const csv = toCsv([{ invoice_ref: "FA2609-0001", source: { name: "Weihnachtsfeier" }, person: "=Paula", total_cents: 4000, currency: "EUR",
-    payment_label: "teilweise bezahlt", paid_cents: 1000, credited_cents: 0, refunded_cents: 0, booking_state: "cancelled", synced_at: "2026-09-23T10:00:00+00:00",
-    thirdparty_id: 42, invoice_id: 7, api_key: "geheim" }]);
-  const [head, row] = csv.replace(String.fromCharCode(0xfeff), "").trim().split("\r\n");
-  expect(head).toBe("Rechnung;Angebot;Person;Betrag;Zahlungsstand;Bezahlt;Gutgeschrieben;Erstattet;Buchung;Stand");
-  expect(row).toBe("FA2609-0001;Weihnachtsfeier;'=Paula;40,00 €;teilweise bezahlt;10,00 €;0,00 €;0,00 €;storniert;2026-09-23T10:00:00+00:00");
-  expect(csv).not.toContain("geheim");
-  expect(csv).not.toContain("42");
+test("der Dateiname nennt Blick und Zeitraum, die Liste sagt N von M (#2131)", () => {
   expect(csvFilename(new Date("2026-09-23T12:00:00Z"))).toBe("abrechnung-2026-09-23.csv");
+  expect(csvFilename(new Date("2026-09-23T12:00:00Z"), "", { from: "2026-01-01", to: "2026-12-31" })).toBe("abrechnung-2026-01-01-bis-2026-12-31.csv");
+  expect(csvFilename(new Date("2026-09-23T12:00:00Z"), "overdue", { from: "2026-01-01" })).toBe("abrechnung-überfällig-2026-01-01.csv");
+  expect(shownOf(250, 1234)).toBe(`250 von ${(1234).toLocaleString("de-AT")}`);
+  expect(shownOf(3)).toBe("3 von 3");
 });
 
 test("Quellen werden einmal gelistet, die Summenzeile hat sechs getrennte Zahlen, der Stand nennt Fehler", () => {

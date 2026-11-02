@@ -78,7 +78,7 @@ CAPABILITIES_V1 = {
     "webhook_member_changed": True,
     "verified_identities": True,    # dolibarr-vereine#153 - seit Vereine 0.11: identities/claim, me/*
     "change_feed": True,            # dolibarr-vereine#154 - seit 0.8.0-beta; die Website liest Abstimmungen und Versammlungen (#844)
-    "signed_webhooks": False,       # dolibarr-vereine#155 - kann das Modul; die Website hat keinen Empfänger
+    "signed_webhooks": True,        # dolibarr-vereine#155 - seit 0.8.0-beta; Empfänger der Website: services/vereine_webhooks (#1540)
     "documents": True,              # dolibarr-vereine#157 - seit Vereine 0.11: me/documents, documents
 }
 

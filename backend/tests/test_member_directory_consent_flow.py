@@ -146,6 +146,24 @@ async def test_consent_texts_and_the_code_are_set_in_the_admin(flow, fake):
     player = await flow.add_user(role="player", name="spieler")
     flow.act_as(player)
     assert (await flow.get("/api/admin/dolibarr/consent-texts")).status_code == 403
+    # Die Auswahl steht unter Funktionen und gehört auch der Vereinsverwaltung (#2131).
+    vorstand = await flow.add_user(role="player", name="vorstand")
+    await flow.db.users.update_one({"id": vorstand["id"]}, {"$set": {"areas": ["club"]}})
+    flow.act_as({**vorstand, "areas": ["club"]})
+    assert [t["code"] for t in (await flow.get("/api/admin/dolibarr/consent-texts")).json()] == ["fotos", "verzeichnis"]
+    # Scheitert das Lesen, sagt die Antwort warum - die Oberfläche behauptet dann nicht, im Modul fehle etwas.
+    from services.dolibarr_client import DolibarrClient, DolibarrError
+
+    async def broken(_self):
+        raise DolibarrError("forbidden", 403)
+
+    original = DolibarrClient.consent_texts
+    DolibarrClient.consent_texts = broken
+    try:
+        failed = (await flow.get("/api/admin/dolibarr/consent-texts")).json()
+    finally:
+        DolibarrClient.consent_texts = original
+    assert failed["error"] == "forbidden" and failed["texts"] == [] and "Recht" in failed["text"]
 
 
 PNG = b"%PNG-fake-" + bytes(range(32))

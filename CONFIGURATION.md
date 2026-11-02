@@ -96,14 +96,17 @@ Das Vereinsmodul meldet Änderungen als signierten Hinweis; die Website liest da
 1. In Dolibarr unter **Einrichtung → Vereine → Webhooks** ein Ziel anlegen: Adresse
    `https://<deine-domain>/api/integrations/dolibarr/vereine-webhook`, als Benutzer den API-Benutzer der Website
    (braucht „Änderungsfeed verfolgen“). Dolibarr zeigt Schlüssel-Kennung und Geheimnis **genau einmal**.
-2. Beides in die `.env` des Servers, nie ins Repository:
+2. Beides eintragen, nie ins Repository. Am einfachsten unter **Admin → Dolibarr → Verbindung → Signierter Webhook**
+   (nur „System“): Das Geheimnis liegt dann verschlüsselt in den Einstellungen und wird nie wieder angezeigt.
+   Oder in die `.env` des Servers:
 
    ```env
    DOLIBARR_WEBHOOK_SECRETS=<Kennung>:<Geheimnis>
    ```
 
-   Bei einem Schlüsselwechsel in Dolibarr den neuen Schlüssel mit Komma dazuschreiben, den alten nach dem
-   Wechsel entfernen. Danach `docker compose up -d --force-recreate backend`.
+   Die Server-Umgebung gilt zusätzlich zur Oberfläche und hat bei gleicher Kennung Vorrang. Bei einem Schlüsselwechsel
+   in Dolibarr den neuen Schlüssel mit Komma dazuschreiben, den alten nach dem Wechsel entfernen. Danach
+   `docker compose up -d --force-recreate backend`.
 3. Unter **Admin → Dolibarr → Funktionen** steht „Benachrichtigung aus Dolibarr (signierter Webhook)“ dann auf
    „eingerichtet“. Den „Alten Webhook-Weg“ dort abschalten, sobald der signierte Webhook zustellt;
    **Betrieb → Checks** zeigt gelb, solange der alte Weg noch an ist.

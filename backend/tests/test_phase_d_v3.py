@@ -95,7 +95,7 @@ class TestContact:
         # Admin lists messages
         r2 = requests.get(f"{BASE}/api/contact", headers=admin_h, timeout=10)
         assert r2.status_code == 200
-        msgs = r2.json()
+        msgs = r2.json()["items"]
         found = next((m for m in msgs if m["id"] == cid), None)
         assert found is not None, "submitted contact not in admin inbox"
         assert found["status"] == "new"

@@ -255,7 +255,9 @@ async def _user_data_sections(db, user_id: str) -> list[tuple[str, tuple]]:
         ("moderation_strikes", _rows(db.moderation_strikes, me, lambda row: _clean(row, "moderator_id", "revoked_by"))),
         ("moderation_sanctions", _rows(db.moderation_sanctions, me, _sanction)),
         # Nur, was angemeldet geschrieben wurde: eine Anfrage ohne Konto lässt sich der Person nicht sicher zuordnen.
-        ("contact_messages", _rows(db.contact_messages, me, lambda row: _clean(row, "internal_note", "answered_by"))),
+        # Interne Notiz und wer in der Verwaltung zuständig war, bleiben draußen; die Antworten bekam die Person ohnehin (#2131).
+        ("contact_messages", _rows(db.contact_messages, me, lambda row: {**_clean(row, "internal_note", "answered_by", "assigned_to"),
+                                                                          "replies": [{"at": reply.get("at"), "text": reply.get("text")} for reply in row.get("replies") or []]})),
         # Was die Verwaltung bei den Erfolgen für die Person vermerkt hat - ohne den Namen der Verwalterin.
         ("achievement_log", _rows(db.achievement_events, me, _pick("id", "kind", "at", "tier_code", "tier_name", "note"))),
         ("stickers", _rows(db.user_stickers, me)),

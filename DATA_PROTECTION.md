@@ -81,7 +81,7 @@ alle Sammlungen im Code und verlangt jede dort – eine neue Sammlung ohne Entsc
 | Gewinne | der Nachweis der Übergabe bleibt, die Notiz ist gelöscht |
 | Eigene Chatnachrichten, gehaltene Texte der Moderation | als „gelöscht“ markiert; die Entscheidung der Moderation bleibt |
 | Meldungen, Verwarnungen und Sperren | bleiben als Nachweis der Moderation; die Kennung zeigt auf „Gelöschter User“. Meldungen von und über die Person, Verwarnungen und Sperren werden drei Jahre nach der Löschung endgültig gelöscht |
-| Kontaktanfragen, die angemeldet geschrieben wurden | bleiben als Vorgang – Name, E-Mail-Adresse, Betreff und Text überschrieben; nach drei Jahren gelöscht |
+| Kontaktanfragen, die angemeldet geschrieben wurden | bleiben als Vorgang – Name, E-Mail-Adresse, Betreff, Text, Antworten, interne Notiz und Kontext einer Fehlermeldung überschrieben; nach drei Jahren gelöscht, erledigte schon nach ihrer eigenen Frist (siehe unten) |
 | Kontaktanfragen ohne Anmeldung mit derselben E-Mail-Adresse | bleiben unberührt: ob die Adresse damals zu diesem Konto gehörte, hält niemand fest. Ihre Zahl steht im Protokoll der Löschung (`unlinked_contact_messages`); der Vorstand prüft sie bei einem Löschwunsch per Hand |
 | Mails, die noch in der Warteschlange stehen | gelöscht; im Versandprotokoll ist der Empfänger überschrieben |
 | Gespeicherte Namen: Autorin oder Autor eines News-Beitrags, Protokoll der Erfolge, Angaben zur Person in den Daten des Adminprotokolls | überschrieben bzw. entfernt; Beitrag und Vorgang bleiben |
@@ -100,6 +100,7 @@ Migration 5 für #1029). Sie nimmt nur Konten im vollständigen Löschzustand: Z
 | Belege in der Buchhaltung (Dolibarr) | sieben Jahre | Steuerrecht |
 | Adminprotokoll (`audit_logs`) | 730 Tage, einstellbar unter Betrieb → Alarme (Job `ops_retention`) | Nachvollziehbarkeit; enthält Kennungen, Namen werden erst beim Lesen aufgelöst; Angaben zur Person in den Daten entfernt die Kontolöschung |
 | Nachrichten an alle Angemeldeten eines Events (`event_messages`: Absender, Text, Zahl der Empfänger) | wie das Adminprotokoll (Job `ops_retention`); in der Auskunft des Absenders unter `event_messages_sent` | Nachweis, was die Turnierleitung wann an wie viele geschickt hat |
+| Kontaktanfragen (`contact_messages`: Name, Adresse, Betreff, Text, Antworten, interne Notiz) | erledigt (beantwortet oder geschlossen) 365 Tage, Spam 30 Tage, je ab dem letzten Statuswechsel; einstellbar unter Betrieb → Alarme (Job `ops_retention`). Offene laufen nicht ab, wieder geöffnete beginnen neu | Anfrage bearbeiten und nachschlagen. Gelöscht wird die Zeile samt Kopien in `mail_jobs` und den Zeilen in `email_logs`, die die Kennung der Anfrage tragen; ältere Zeilen des Versandprotokolls ohne diese Kennung laufen über dessen Frist aus |
 | Versandprotokoll (`email_logs`) | 90 Tage, einstellbar wie oben | Zustellnachweis; Empfänger bei der Kontolöschung überschrieben |
 | Versandte Mails der Warteschlange (`mail_jobs`) | 30 Tage | Doppelversand verhindern |
 | Upload-Protokoll mit IP-Adresse (`upload_events`) | 60 Tage (`UPLOAD_EVENT_RETENTION_DAYS`), läuft auch nach einer Kontolöschung ab | Missbrauch und Fehler bei Uploads nachvollziehen |
