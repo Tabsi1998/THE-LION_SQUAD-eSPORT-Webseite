@@ -23,6 +23,7 @@ from pymongo.errors import DuplicateKeyError
 
 from models import TournamentCreate, new_id, now_utc
 from services import game_maps, game_usage, league_games, league_look, map_pools, pricing, staffel_guard
+from services.league_rules_store import delete_for, staffel_rules
 from services.advancement_draw import sync_advancement_fields
 from services.bracket_fill_in import has_started, is_auto_bye
 from services.competition_versions import new_competition_version_fields
@@ -805,7 +806,6 @@ async def delete_tree(db, kind: str, target: dict, *, on_staffel_deleted=None) -
         await db.league_rosters.delete_many({"season_id": {"$in": sorted(season_ids)}})
         await db.league_seasons.delete_many({"id": {"$in": sorted(season_ids)}})
     # Regelwerk (#1646): nur Entwurfs-Seasons lassen sich löschen - ihre Fassungen und Zustimmungen gehen mit.
-    from services.league_rules import delete_for
     await delete_for(db, league_id=target["id"] if kind == "league" else None, season_ids=sorted(season_ids))
     if kind == "league":
         await db.leagues.delete_one({"id": target["id"]})
@@ -851,7 +851,6 @@ async def create_staffel(db, division: dict, staffel: str | None, user: dict) ->
         raise LeagueProblem("Die Season braucht zuerst den Beginn der ersten Spielwoche.")
     fields = staffel_fields(league, season, division)
     # Regelwerk (#1646): statt des Regeltexts der Hinweis auf die Regelseite, sobald es eines gibt.
-    from services.league_rules import staffel_rules
     fields["rules"] = await staffel_rules(db, league, season)
     problem = rounds_problem(fields["max_participants"], fields["round_robin_legs"], fields["matchday_weeks_total"],
                              fields["matchday_blocked_weeks"])
@@ -941,7 +940,6 @@ async def sync_staffel(db, tournament: dict, league: dict, season: dict, divisio
     Eine gesperrte Staffel (``locked_at``) bekommt nur noch, was immer gilt (Sichtbarkeit, Regeltext, Map-Pool)."""
     wanted = staffel_fields(league, season, division)
     # Regelwerk (#1646): Übertragen schreibt nicht den alten Regeltext zurück.
-    from services.league_rules import staffel_rules
     wanted["rules"] = await staffel_rules(db, league, season)
     applied: list[str] = []
     skipped: list[dict] = []

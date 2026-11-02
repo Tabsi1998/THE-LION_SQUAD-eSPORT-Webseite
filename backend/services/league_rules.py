@@ -9,6 +9,7 @@ Rechte der Verwaltung prüft die Route (``require_rules_editor``). Sichtbarkeit:
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 
@@ -21,23 +22,19 @@ from services import league_rule_blocks as blocks
 from services import league_rules_text as text
 from services import league_service as leagues
 from services.dolibarr_policy import club_today
+from services.league_rules_store import LEAGUE, PUBLISHED, SEASON, STAFFEL_POINTER
 from services.league_scope import ONLY_LEAGUE
 from services.league_service import LeagueProblem
 from services.match_audience import responsible_ids, teams_by_id
 
 logger = logging.getLogger("tls.league_rules")
 
-LEAGUE = "league"
-SEASON = "league_season"
 SCOPES = (LEAGUE, SEASON)
 DRAFT = "draft"
-PUBLISHED = "published"
 ACTIVE_REGISTRATIONS = ("approved", "checked_in", "pending")
 REASON_MIN = 5
 REASON_MAX = 500
 DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-# Steht in der Staffel statt des Regeltexts, sobald es ein Regelwerk gibt: reiner Text, die App zeigt das Feld zeilenweise.
-STAFFEL_POINTER = "Das Regelwerk dieser Liga steht im Web auf der Regelseite der Liga: Liga-Seite der Season, Link „Regeln“."
 CHANGED_MEANWHILE = "Der Entwurf wurde inzwischen geändert - bitte neu laden."
 PUBLIC_FIELDS = ("id", "scope", "version", "title", "valid_from", "published_at", "change_reason", "requires_consent", "blocks_used")
 
@@ -112,8 +109,12 @@ def page_path(league: dict, season: dict | None) -> str:
 
 
 def api_path(league: dict, season: dict | None) -> str:
-    base = f"/api/league-rules/seasons/{league['slug']}/{season['slug']}" if season else f"/api/league-rules/leagues/{league['slug']}"
-    return base
+    return f"/api/league-rules/seasons/{league['slug']}/{season['slug']}" if season else f"/api/league-rules/leagues/{league['slug']}"
+
+
+async def _compared(previous: dict | None, season: dict | None, sections: list[dict]) -> dict:
+    """Der Vergleich zur vorigen Fassung - bei langen Texten spürbar, darum nicht im Ablauf der übrigen Anfragen."""
+    return await asyncio.to_thread(text.compare, _sections(previous, season) if previous else None, sections)
 
 
 def _previous(chain: list[dict], version: dict) -> dict | None:
@@ -169,7 +170,7 @@ async def page_view(db, league: dict, season: dict | None, user: dict | None, *,
                 "sections": [], "changes": {"base": None, "new": [], "changed": [], "removed": []}}
     sections = _sections(version, season)
     previous = _previous(chain["rows"], version)
-    result = text.compare(_sections(previous, season) if previous else None, sections)
+    result = await _compared(previous, season, sections)
     return {
         **out, "source": "rules", "fallback_text": None,
         "version": {**_head(version, current), "pdf_url": f"{api_path(league, season)}/versions/{version['id']}/pdf"},
@@ -196,7 +197,7 @@ async def compare_view(db, league: dict, season: dict | None, base_id: str | Non
     chain = await _chain(db, league, season)
     base, target = _find(chain["rows"], base_id), _find(chain["rows"], target_id)
     return {"base": _head(base, chain["current"]), "target": _head(target, chain["current"]),
-            "sections": text.diff_view(_sections(base, season), _sections(target, season))}
+            "sections": await asyncio.to_thread(text.diff_view, _sections(base, season), _sections(target, season))}
 
 
 async def pdf_document(db, league: dict, season: dict | None, version_id: str, *, marks: bool = True) -> dict:
@@ -205,7 +206,7 @@ async def pdf_document(db, league: dict, season: dict | None, version_id: str, *
     version = _find(chain["rows"], version_id)
     sections = _sections(version, season)
     previous = _previous(chain["rows"], version)
-    result = text.compare(_sections(previous, season) if previous else None, sections)
+    result = await _compared(previous, season, sections)
     return {
         "title": version.get("title") or "Regelwerk",
         "context": " · ".join(str(part) for part in (league.get("name"), (season or {}).get("name")) if part),
@@ -385,7 +386,7 @@ async def preview(db, scope: str, scope_id: str, body: dict) -> dict:
     sections = text.sections_of(body.get("body_md"), annexes, fill=lambda value: text.fill_blocks(value, values, missing=missing))
     chain = await _chain(db, league, season)
     previous = chain["rows"][-1] if chain["rows"] else None
-    result = text.compare(_sections(previous, season) if previous else None, sections)
+    result = await _compared(previous, season, sections)
     return {"sections": [{**row, "mark": result["marks"].get(row["anchor"])} for row in sections],
             "changes": {"base": _head(previous, chain["current"]) if previous else None,
                         **{key: result[key] for key in ("new", "changed", "removed")}},
@@ -453,14 +454,6 @@ async def _point_staffeln(db, league: dict, season: dict | None) -> None:
     if ids:
         await db.tournaments.update_many({"league_context.season_id": {"$in": ids}, **ONLY_LEAGUE},
                                          {"$set": {"rules": STAFFEL_POINTER, "updated_at": now_utc().isoformat()}})
-
-
-async def staffel_rules(db, league: dict, season: dict) -> str | None:
-    """Was eine Staffel als Regeltext trägt: ohne Regelwerk der Text der Season, sonst der Hinweis auf die Regelseite."""
-    has_rules = await db.league_rules.find_one(
-        {"status": PUBLISHED, "$or": [{"scope": SEASON, "scope_id": season["id"]}, {"scope": LEAGUE, "scope_id": league["id"]}]},
-        {"_id": 1})
-    return STAFFEL_POINTER if has_rules else season.get("rules_text")
 
 
 # ---------------------------------------------------------------- Zustimmung
@@ -636,14 +629,3 @@ async def search_results(db, pattern: str, user: dict | None, limit: int) -> lis
         if len(out) >= limit:
             break
     return out
-
-
-# ---------------------------------------------------------------- Löschen
-
-async def delete_for(db, *, league_id: str | None, season_ids: list[str]) -> None:
-    """Geht mit einer gelöschten Season oder Liga (nur Entwurfs-Seasons lassen sich löschen)."""
-    if season_ids:
-        await db.league_rules.delete_many({"scope": SEASON, "scope_id": {"$in": season_ids}})
-        await db.league_rule_consents.delete_many({"season_id": {"$in": season_ids}})
-    if league_id:
-        await db.league_rules.delete_many({"scope": LEAGUE, "scope_id": league_id})

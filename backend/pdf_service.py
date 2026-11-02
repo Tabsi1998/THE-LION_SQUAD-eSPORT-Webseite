@@ -1526,6 +1526,15 @@ def pdf_rules_inline(raw: str, anchors=frozenset()) -> str:
     return out + _rules_inline_marks(text[last:])
 
 
+def _rules_para(make, raw: str, style, anchors, **extra):
+    """Ein Absatz aus einer Zeile Markdown. Überkreuzte Marken („**a*b**c*“) verzeiht der Browser, der Absatz-Parser nicht: dann
+    steht der Text ohne Formatierung da, statt dass das ganze PDF scheitert."""
+    try:
+        return make(pdf_rules_inline(raw, anchors), style, **extra)
+    except ValueError:
+        return make(escape(_rules_pdf_text(raw)), style, **extra)
+
+
 class _MarkedParagraph(Paragraph):
     """Absatz eines geänderten Abschnitts: Randstrich links, auch wenn er über Seiten läuft (``split`` baut dieselbe Klasse)."""
 
@@ -1561,7 +1570,7 @@ def _rules_styles() -> dict:
 def _rules_table(rows: list[list[str]], styles: dict, width: float, anchors, marked: bool):
     columns = max(len(row) for row in rows)
     cell = styles["cell_small"] if columns > 6 else styles["cell"]
-    data = [[Paragraph(pdf_rules_inline(row[index] if index < len(row) else "", anchors), cell) for index in range(columns)] for row in rows]
+    data = [[_rules_para(Paragraph, row[index] if index < len(row) else "", cell, anchors) for index in range(columns)] for row in rows]
     table = Table(data, colWidths=[width / columns] * columns, repeatRows=1)
     table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), TINT), ("GRID", (0, 0), (-1, -1), 0.25, RULE), ("VALIGN", (0, 0), (-1, -1), "TOP"),
@@ -1603,16 +1612,16 @@ def _rules_blocks(body_md: str, styles: dict, width: float, anchors, marked: boo
             out.append(_rules_table(rows, styles, width, anchors, marked))
             out.append(Spacer(1, 6))
         elif re.match(r"^\s*[-*]\s+", raw):
-            out.append(make(pdf_rules_inline(re.sub(r"^\s*[-*]\s+", "", raw), anchors), styles["item"], bulletText="•"))
+            out.append(_rules_para(make, re.sub(r"^\s*[-*]\s+", "", raw), styles["item"], anchors, bulletText="•"))
         elif re.match(r"^\s*\d+\.\s+", raw):
             number = re.match(r"^\s*(\d+)\.", raw).group(1)
-            out.append(make(pdf_rules_inline(re.sub(r"^\s*\d+\.\s+", "", raw), anchors), styles["item"], bulletText=f"{number}."))
+            out.append(_rules_para(make, re.sub(r"^\s*\d+\.\s+", "", raw), styles["item"], anchors, bulletText=f"{number}."))
         elif raw.startswith(">"):
-            out.append(make(pdf_rules_inline(re.sub(r"^>\s?", "", raw), anchors), styles["quote"]))
+            out.append(_rules_para(make, re.sub(r"^>\s?", "", raw), styles["quote"], anchors))
         elif re.match(r"^---+$", raw):
             out.append(HRFlowable(width="100%", thickness=0.5, color=RULE, spaceBefore=4, spaceAfter=8))
         elif raw.strip():
-            out.append(make(pdf_rules_inline(raw, anchors), styles["body"]))
+            out.append(_rules_para(make, raw, styles["body"], anchors))
     return out
 
 

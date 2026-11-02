@@ -571,7 +571,8 @@ competition_sanctions ──▶ league_eligibility (Aufstellung, Check-in, Anmel
 ### Regelwerk (Paket B.2, #1646)
 
 Logik in `services/league_rules.py` (Daten, Rechte, Ablauf), `services/league_rules_text.py` (Abschnitte, Anker, Vergleich, ohne
-Datenbank), `services/league_rule_blocks.py` (Bausteine), `pdf_service.pdf_league_rules`. Routen in `routes/league_rules_routes.py`.
+Datenbank), `services/league_rule_blocks.py` (Bausteine), `services/league_rules_store.py` (was `league_service` braucht, ohne
+Import-Kreis), `pdf_service.pdf_league_rules`. Routen in `routes/league_rules_routes.py`.
 
 **`league_rules`** – eine Zeile je Fassung, Muster `map_pools`:
 

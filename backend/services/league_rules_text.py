@@ -111,7 +111,13 @@ def _head(row: dict) -> dict:
 
 
 def _same_words(left: str, right: str) -> float:
-    return SequenceMatcher(None, left.split(), right.split(), autojunk=False).ratio() if left and right else 0.0
+    """Anteil gleicher Wörter. Erst die billigen Obergrenzen: Bei einem umgeschriebenen langen Text trifft das fast jedes Paar."""
+    if not left or not right:
+        return 0.0
+    matcher = SequenceMatcher(None, left.split(), right.split(), autojunk=False)
+    if matcher.real_quick_ratio() < RENAME_RATIO or matcher.quick_ratio() < RENAME_RATIO:
+        return 0.0
+    return matcher.ratio()
 
 
 def _pairs(base: list[dict], target: list[dict]) -> dict[str, dict]:

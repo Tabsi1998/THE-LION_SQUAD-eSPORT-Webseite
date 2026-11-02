@@ -115,6 +115,14 @@ def test_inline_marks_become_only_our_own_tags():
     assert pdf_rules_inline("![Plan](/api/uploads/plan.png)") == "[Bild: Plan]"
 
 
+@pytest.mark.parametrize("text", ["**a*b**c*", "*a**b*c**", "`a**b`c**", "~~a++b~~c++", "| a **b | c** |\n| --- | --- |\n| *d | e* |", "- **a*b**c*\n> ~~d++e~~f++"])
+def test_marks_that_cross_each_other_do_not_break_the_file(text):
+    """Im Web verzeiht der Browser überkreuzte Marken, der PDF-Baukasten nicht - dann steht dort der Text ohne Formatierung."""
+    data = pdf_league_rules(document(sections=[{"anchor": "a", "title": "Titel", "level": 1, "kind": "main", "mark": "changed", "body_md": text}]))
+    assert pages_of(data)
+    assert "Titel" in text_of(data)
+
+
 def test_unusual_characters_and_long_words_do_not_break_the_file():
     word = "Donaudampfschifffahrtsgesellschaft" * 12
     data = pdf_league_rules(document(sections=[

@@ -108,6 +108,14 @@ def test_a_renamed_heading_with_the_same_text_counts_as_changed_not_as_new_and_r
     assert result["new"] == [] and result["removed"] == []
 
 
+def test_a_complete_rewrite_of_a_long_text_is_still_compared():
+    """Ohne gleiche Anker paart der Vergleich über Ähnlichkeit - der schnelle Vorfilter hält das bei langen Texten klein."""
+    base = sections("\n\n".join(f"# Alt {index}\n" + " ".join(f"alt{index}x{word}" for word in range(800)) for index in range(60)))
+    target = sections("\n\n".join(f"# Neu {index}\n" + " ".join(f"neu{index}x{word}" for word in range(800)) for index in range(60)))
+    result = text.compare(base, target)
+    assert len(result["new"]) == 60 and len(result["removed"]) == 60 and result["changed"] == []
+
+
 def test_compare_without_a_base_marks_nothing():
     assert text.compare(None, sections("# A\nB")) == {"new": [], "changed": [], "removed": [], "marks": {}}
 
