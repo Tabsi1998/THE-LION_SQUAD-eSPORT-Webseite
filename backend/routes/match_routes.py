@@ -1170,8 +1170,11 @@ async def _submit_staff_result(db, match: dict, body: MatchV2ResultSubmit, raw_r
     games, missing, league = await _staff_games(db, match, body, raw_results)
     if body.hold:
         # Ergebnis-Fenster (#1156): 10 Sekunden „Rückgängig“, erst danach Baum, TV und Nachrichten.
+        # Notausnahme (#2203): Der Grund geht nur mit, wenn die Person wirklich befangen ist.
+        conflict = await league_permissions.conflict_of_interest(db, me, match)
         held = await hold_result(db, match, raw_results, actor=me, note=body.note, proof_url=body.proof_url,
-                                 force=force, reason=body.reason, games=games, lineups_missing=missing)
+                                 force=force, reason=body.reason, games=games, lineups_missing=missing,
+                                 conflict_reason=(body.conflict_reason or "").strip() if conflict else None)
         if league and games:
             await league_games.lock_lineup_ids(db, league, games, league.reg_ids)
             await league_games.log_both_sides_kept(db, league, games, league.reg_ids, me.get("id"))

@@ -267,6 +267,36 @@ async def conflict_of_interest(db, user: dict | None, match: dict, *, decided_by
     return None
 
 
+HOLD_NO_ACCOUNT = "Dein Konto ist gesperrt oder abgeschaltet."
+HOLD_NO_SECOND_FACTOR = "Deine Zwei-Faktor-Anmeldung ist nicht mehr eingerichtet."
+HOLD_NO_RIGHT = "Du hast in dieser Liga nicht mehr das Recht dazu."
+HOLD_CONFLICT = "Du bist inzwischen an diesem Spiel beteiligt. Das entscheidet eine zweite berechtigte Person."
+
+
+async def held_result_refusal(db, match: dict, hold: dict) -> str | None:
+    """Darf ein gehaltenes Ergebnis einer Staffel noch hinaus? Zwischen Ablegen und Veröffentlichen liegen 12 Sekunden - zählt
+    wird der Stand beim Veröffentlichen: Konto, Zwei-Faktor, Liga-Recht und Befangenheit. ``None``: Ja. Andere Turniere kennen die
+    Prüfung nicht. Die Bestätigung der Sitzung gehört zur Anfrage, hier zählt die eingerichtete Zwei-Faktor-Anmeldung des Kontos.
+    Die Notausnahme des Superadmins bleibt, wenn sie beim Ablegen mit Grund gesetzt war und die Person noch Superadmin ist."""
+    tournament = await db.tournaments.find_one({"id": match.get("tournament_id")}, {"_id": 0, "league_context": 1})
+    if not is_league_staffel(tournament):
+        return None
+    account = await db.users.find_one({"id": hold.get("actor_id")}, {"_id": 0})
+    if not account or account.get("is_active") is False or account.get("is_banned"):
+        return HOLD_NO_ACCOUNT
+    if not account.get("mfa_enabled"):
+        return HOLD_NO_SECOND_FACTOR
+    person = {**account, "auth_mfa_verified": True}
+    capabilities = await capabilities_of(db, person, tournament["league_context"].get("league_id"))
+    if "results" not in capabilities or (str(match.get("status") or "") == "disputed" and "disputes" not in capabilities):
+        return HOLD_NO_RIGHT
+    # Auch wer sich mit diesem Ergebnis selbst aufgestellt hat, gehört zum Spiel.
+    conflict = await conflict_of_interest(db, person, {**match, "games": [*(match.get("games") or []), *(hold.get("games") or [])]})
+    if conflict and not (conflict["override"] and hold.get("conflict_reason")):
+        return HOLD_CONFLICT
+    return None
+
+
 async def require_no_conflict(db, user: dict, match: dict, *, action: str, conflict_reason: str | None = None,
                               decided_by: str | None = None, record: bool = True) -> None:
     """Bricht mit 403 ab, wenn die Person befangen ist. Der Superadmin kommt als Notausnahme mit Grund durch, das steht im

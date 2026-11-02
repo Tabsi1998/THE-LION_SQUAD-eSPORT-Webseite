@@ -95,7 +95,8 @@ def _no_show(match: dict, results: list[dict]) -> str | None:
 
 async def hold_result(db, match: dict, raw_results: list[dict], *, actor: dict, note: str | None,
                       proof_url: str | None, force: bool, reason: str | None,
-                      games: list[dict] | None = None, lineups_missing: list[str] | None = None) -> dict:
+                      games: list[dict] | None = None, lineups_missing: list[str] | None = None,
+                      conflict_reason: str | None = None) -> dict:
     """Ein Ergebnis für 10 Sekunden bereitlegen. Prüft alles wie beim Speichern - Fehler kommen sofort zurück."""
     actor_id = actor["id"]
     normalized = await checked_results(db, match, raw_results)
@@ -131,6 +132,8 @@ async def hold_result(db, match: dict, raw_results: list[dict], *, actor: dict, 
         "publish_at": (now + timedelta(seconds=HOLD_SECONDS + GRACE_SECONDS)).isoformat(),
         # Liga (#1650): geprüfte Maps samt Aufstellungen gehen mit dem Ergebnis raus.
         **({"games": games, "lineups_missing": lineups_missing or []} if games is not None else {}),
+        # Notausnahme des Superadmins (#2203): Beim Veröffentlichen zählt, dass sie beim Ablegen gesetzt war.
+        **({"conflict_reason": conflict_reason} if conflict_reason else {}),
     }
     stored = await db.matches_v2.update_one(
         {"id": match["id"], "pending_result": {"$exists": False}},
@@ -217,6 +220,17 @@ async def _publish_one(db, match_id: str, hold_id: str | None, moment: str) -> b
     if not claimed.modified_count:
         return False
     match.pop("pending_result", None)
+    # Liga-Staffel (#2203): Wer inzwischen kein Recht mehr hat oder befangen ist, veröffentlicht nicht.
+    from services.league_permissions import held_result_refusal
+
+    refusal = await held_result_refusal(db, match, hold)
+    if refusal:
+        if hold.get("games"):
+            from services.league_games import refresh_lineup_index
+            await refresh_lineup_index(db, match_id)
+        await _audit(db, "match.result.hold_failed", match, hold.get("actor_id"), {"hold_id": hold_id, "detail": refusal})
+        await _tell_actor_failed(db, match, hold, refusal)
+        return False
     try:
         if hold.get("kind") == "forfeit" and hold.get("forfeit_registration_id"):
             await apply_forfeit(db, match, hold["forfeit_registration_id"], note=hold.get("note") or NO_SHOW_NOTE,
