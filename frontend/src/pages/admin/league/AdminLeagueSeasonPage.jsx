@@ -435,7 +435,11 @@ export default function AdminLeagueSeasonPage() {
               </FormSection>
 
               <FormSection title="Regeltext und Sichtbarkeit">
-                <TextAreaField label="Regeltext" rows={8} value={form.rules_text} onChange={(value) => set("rules_text", value)} placeholder="Markdown, z. B. Ablauf, Fairplay, Map-Veto" testId="season-form-rules" />
+                {/* Regelwerk (#1646): Versionen, PDF und Zustimmung auf eigener Seite; der Regeltext bleibt der Rückfall ohne Regelwerk. */}
+                <Link to={`/admin/leagues/rules/league_season/${seasonId}`} data-testid="season-rules-link"
+                  className="tls-btn tls-btn--secondary inline-flex rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider">Regelwerk mit Versionen pflegen</Link>
+                <TextAreaField label="Regeltext" rows={8} value={form.rules_text} onChange={(value) => set("rules_text", value)} placeholder="Markdown, z. B. Ablauf, Fairplay, Map-Veto"
+                  hint="Gilt nur, solange es für die Season und die Liga kein Regelwerk gibt." testId="season-form-rules" />
                 <FormGrid>
                   <SelectField label="Sichtbarkeit" value={form.visibility} onChange={(value) => set("visibility", value)} options={VISIBILITY_OPTIONS}
                     hint="Gilt beim Speichern sofort für Ligaseite, Menüpunkt „Liga“ und alle Staffel-Turniere – auch gesperrte." testId="season-form-visibility" />

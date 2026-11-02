@@ -223,6 +223,9 @@ export default function AdminLeaguesPage() {
                   className="tls-btn tls-btn--quiet ml-1 px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
                   <Plus className="w-3.5 h-3.5" aria-hidden="true" /> Season anlegen
                 </button>
+                {/* Regelwerk (#1646): liga-weit, jede Season ohne eigenes erbt es. */}
+                <Link to={`/admin/leagues/rules/league/${league.id}`} data-testid={`league-rules-link-${league.slug}`}
+                  className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider">Regelwerk</Link>
               </div>
             </header>
             {league.seasons.length ? (
