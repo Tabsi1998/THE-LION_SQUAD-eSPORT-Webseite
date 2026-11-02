@@ -2,12 +2,13 @@
 // Der Server schickt die Bereiche mit (`user.areas`); fehlt das Feld (älterer
 // Server, Tests), leiten wir sie aus der Rolle ab.
 
-export const AREAS = ["tournaments", "content", "club", "finance", "system", "moderation"];
-export const ADMIN_AREAS = ["tournaments", "content", "club", "finance", "system"];
-export const GRANTABLE_AREAS = ["tournaments", "content", "club", "finance"];
+export const AREAS = ["tournaments", "leagues", "content", "club", "finance", "system", "moderation"];
+export const ADMIN_AREAS = ["tournaments", "leagues", "content", "club", "finance", "system"];
+export const GRANTABLE_AREAS = ["tournaments", "leagues", "content", "club", "finance"];
 
 export const AREA_LABELS = {
   tournaments: "Turnierleitung",
+  leagues: "Ligen",
   content: "Redaktion",
   club: "Vereinsverwaltung",
   finance: "Finanzen",
@@ -16,7 +17,8 @@ export const AREA_LABELS = {
 };
 
 export const AREA_HINTS = {
-  tournaments: "Turniere, Events, Stationen, Fast Lap, Saisons, Gewinne",
+  tournaments: "Turniere, Events, Stationen, Fast Lap, Saisons, Gewinne – keine Liga",
+  leagues: "Alle Ligen: Seasons, Staffeln, Kader, Spiele, Ergebnisse, Zuständige",
   content: "News, Galerie, Medien, Sponsoren, Partner, Referenzen, CMS, Sticker, Achievements",
   club: "Mitglieder, Anträge, Dokumente, Vorteile, Vorstand, Kontakt-Inbox, Benutzer",
   finance: "Kosten an Events und Turnieren, Rechnungsaufträge, Freigaben",
@@ -31,6 +33,19 @@ export const ROLE_AREAS = {
   moderator: ["moderation"],
   player: [],
 };
+
+// Zuständigkeiten je Liga (#2203): Spiegel von `CAPABILITIES` in backend/services/league_permissions.py.
+export const LEAGUE_CAPABILITIES = [
+  { key: "manage", label: "Liga verwalten", hint: "Liga bearbeiten, Seasons anlegen, Staffel starten, pausieren und sperren" },
+  { key: "season", label: "Season konfigurieren", hint: "Vorgaben, Map-Pool, Liga N, Staffeln, Spielplan" },
+  { key: "applications", label: "Teams freigeben", hint: "Co-Teams zuteilen und herausnehmen" },
+  { key: "roster", label: "Kader prüfen", hint: "Spiel-IDs einsehen und neue IDs freigeben" },
+  { key: "matches", label: "Spiele betreuen", hint: "Termine festlegen, Terminvorschläge entscheiden" },
+  { key: "results", label: "Ergebnisse korrigieren", hint: "Ergebnisse eintragen und korrigieren, kampflos werten" },
+  { key: "disputes", label: "Proteste", hint: "Streitfälle entscheiden" },
+  { key: "sanctions", label: "Strafen", hint: "Strafen verhängen – kommt später" },
+  { key: "rules", label: "Regeln veröffentlichen", hint: "Regeltext der Season" },
+];
 
 export const ROLE_LABELS = {
   player: "Spieler",
@@ -97,10 +112,16 @@ export function hasSeriesCaptain(user) {
   return Boolean(user?.has_series_captain);
 }
 
+/** Zuständig in einer Liga (#2203) - der Server setzt `has_league_staff`. Öffnet „Mein Dienst“ und die Liga-Seiten; die Seiten
+ * verlangen Zwei-Faktor, die Routen prüfen jede Liga und jede Zuständigkeit einzeln. */
+export function hasLeagueStaff(user) {
+  return Boolean(user?.has_league_staff);
+}
+
 /** Wohin /admin führt (#1352, #1353):
  * - „dashboard“: ein Verwaltungsbereich mit bestätigter Zwei-Faktor-Anmeldung (auch Finanzen, #992) - wie
  *   `require_dashboard` im Server;
- * - „duty“: „Mein Dienst“ für Helfer mit Einsatz und Captains externer Serien (#1749) - auch ein Admin, der die
+ * - „duty“: „Mein Dienst“ für Helfer mit Einsatz, Captains externer Serien (#1749) und Zuständige einer Liga (#2203) - auch ein Admin, der die
  *   Zwei-Faktor-Anmeldung noch nicht hat;
  * - „mfa“: Verwaltungsbereich ohne Zwei-Faktor und ohne Einsatz - erst einrichten;
  * - „moderation“: nur Moderation - direkt zu den Meldungen;
@@ -109,7 +130,7 @@ export function hasSeriesCaptain(user) {
 export function adminHome(user) {
   if (!user) return "login";
   if (canUseArea(user, ...ADMIN_AREAS)) return "dashboard";
-  if (hasHelperAssignment(user) || hasSeriesCaptain(user)) return "duty";
+  if (hasHelperAssignment(user) || hasSeriesCaptain(user) || hasLeagueStaff(user)) return "duty";
   if (isAnyAdmin(user)) return "mfa";
   if (canUseArea(user, "moderation")) return "moderation";
   return "none";

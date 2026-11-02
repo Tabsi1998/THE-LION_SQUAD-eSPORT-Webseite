@@ -11,7 +11,7 @@ const CONSENT = () => window.localStorage.setItem("tls_cookie_consent_v1", JSON.
   essential: true, external_media: false, analytics: false, meta: false, tiktok: false,
   saved_at: Date.now(), expires_at: Date.now() + 30 * 24 * 60 * 60 * 1000,
 }));
-const ADMIN = { id: "admin-1", username: "leitung", display_name: "Leitung", role: "superadmin", areas: ["tournaments"], mfa_enabled: true, auth_mfa_verified: true };
+const ADMIN = { id: "admin-1", username: "leitung", display_name: "Leitung", role: "superadmin", areas: ["tournaments", "leagues"], mfa_enabled: true, auth_mfa_verified: true };
 const FIELDS = [{ key: "activision_id", label: "Activision-ID" }];
 
 async function noSideScroll(page) {

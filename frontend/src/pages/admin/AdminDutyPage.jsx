@@ -2,7 +2,7 @@
 // Bereich), darunter die eigenen Turniere und Fast Laps, heute zuerst, je mit der eigenen Rolle; für die Turnierleitung
 // zusätzlich alles, was heute läuft. Die Daten kommen aus dem Server-Dienst „deine Aufgaben“ (`/users/me/duty`), den
 // später auch die Startseite je Rolle (#1286) und „Dein Dienst“ auf Home (#1175) nutzen. Captains externer Serien
-// (#1749) sehen darunter „Meine Serien“.
+// (#1749) sehen darunter „Meine Serien“, Zuständige einer Liga (#2203) „Meine Ligen“.
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
@@ -10,7 +10,8 @@ import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { DutyList, ModerationDuty } from "@/pages/admin/duty/DutyList";
 import { SeriesDutyList } from "@/pages/admin/duty/SeriesDutyList";
 import { useAuth } from "@/context/AuthContext";
-import { mfaSetupPath, needsSecondFactor } from "@/lib/permissions";
+import { hasLeagueStaff, mfaSetupPath, needsSecondFactor } from "@/lib/permissions";
+import { capabilityWords } from "@/pages/admin/league/LeagueStaffSheet";
 import { Link } from "react-router-dom";
 
 export default function AdminDutyPage() {
@@ -28,7 +29,9 @@ export default function AdminDutyPage() {
   const assignments = data?.assignments || [];
   const leadToday = data?.lead_today || [];
   const series = data?.series || [];
-  const nothing = data && !data.moderation && assignments.length === 0 && leadToday.length === 0 && series.length === 0;
+  const leagues = data?.leagues || [];
+  const leagueDuty = hasLeagueStaff(user);
+  const nothing = data && !data.moderation && assignments.length === 0 && leadToday.length === 0 && series.length === 0 && !leagueDuty;
 
   return (
     <AdminLayout>
@@ -51,7 +54,7 @@ export default function AdminDutyPage() {
         </section>
       )}
 
-      {data && (assignments.length > 0 || (!data.moderation && series.length === 0)) && (
+      {data && (assignments.length > 0 || (!data.moderation && series.length === 0 && !leagueDuty)) && (
         <section className="mb-8" aria-labelledby="duty-assignments-heading">
           <h2 id="duty-assignments-heading" className="font-heading font-bold uppercase text-lg mb-3">Deine Einsätze</h2>
           {assignments.length > 0 ? (
@@ -73,6 +76,29 @@ export default function AdminDutyPage() {
             </p>
           )}
           <SeriesDutyList rows={series} />
+        </section>
+      )}
+
+      {leagueDuty && (
+        <section className="mb-8" aria-labelledby="duty-leagues-heading" data-testid="duty-leagues">
+          <h2 id="duty-leagues-heading" className="font-heading font-bold uppercase text-lg mb-3">Meine Ligen</h2>
+          {needsSecondFactor(user) ? (
+            <p className="mb-3 rounded-sm border border-warn/30 bg-warn/5 px-4 py-3 text-sm text-white/70" data-testid="duty-leagues-mfa">
+              Zuständige brauchen die Zwei-Faktor-Anmeldung. <Link to={mfaSetupPath("/admin/dienst")} className="underline hover:text-white">Jetzt einrichten</Link>
+            </p>
+          ) : null}
+          {leagues.length ? (
+            <ul className="divide-y divide-white/5 rounded-sm border border-white/10 bg-[#121212]">
+              {leagues.map((league) => (
+                <li key={league.id}>
+                  <Link to="/admin/leagues" className="block px-4 py-3 hover:bg-white/[0.03] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]" data-testid={`duty-league-${league.id}`}>
+                    <span className="block font-semibold text-white break-words">{league.name}</span>
+                    <span className="block text-xs text-white/55">{capabilityWords(league.capabilities)}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </section>
       )}
 

@@ -278,8 +278,8 @@ export default function AdminTournamentsPage() {
                     <Link to={`/admin/tournaments/${t.id}?tab=participants`} title="Teilnehmer" className="p-2 hover:text-[#29B6E8]"><Users className="w-3.5 h-3.5" /></Link>
                     {/* Eine Staffel hat keine Anmeldung (#2109) - sie startet in ihrer Verwaltung mit „Liga starten“. */}
                     {isTournamentLead && t.status === "draft" && !isStaffel(t) && <button onClick={() => setStatus(t.id, "registration_open")} title="Anmeldung öffnen" className="p-2 hover:text-ok"><Play className="w-3.5 h-3.5" /></button>}
-                    {isTournamentLead && t.status === "live" && <button onClick={() => setStatus(t.id, "paused")} title="Pause" className="p-2 hover:text-[#FFD700]"><Pause className="w-3.5 h-3.5" /></button>}
-                    {isTournamentLead && canDelete(t) && <button onClick={() => del(t)} className="p-2 hover:text-[#FF3B30]" title="Löschen"><Trash2 className="w-3.5 h-3.5" /></button>}
+                    {isTournamentLead && !isStaffel(t) && t.status === "live" && <button onClick={() => setStatus(t.id, "paused")} title="Pause" className="p-2 hover:text-[#FFD700]"><Pause className="w-3.5 h-3.5" /></button>}
+                    {isTournamentLead && !isStaffel(t) && canDelete(t) && <button onClick={() => del(t)} className="p-2 hover:text-[#FF3B30]" title="Löschen"><Trash2 className="w-3.5 h-3.5" /></button>}
                   </div>
                 </td>
               </tr>

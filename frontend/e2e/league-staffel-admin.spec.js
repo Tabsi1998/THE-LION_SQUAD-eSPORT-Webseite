@@ -4,7 +4,7 @@ const { test, expect } = require("@playwright/test");
 // Status ohne Anmeldung/Check-in, Reiter „Tabelle“ und das Formular mit den Season-Werten nur lesend. Bei 390 und
 // 1440 px ohne seitliches Scrollen. Nur erfundene Namen.
 
-const ADMIN = { id: "admin-1", username: "leitung", display_name: "Leitung", role: "superadmin", areas: ["tournaments"], mfa_enabled: true, auth_mfa_verified: true };
+const ADMIN = { id: "admin-1", username: "leitung", display_name: "Leitung", role: "superadmin", areas: ["tournaments", "leagues"], mfa_enabled: true, auth_mfa_verified: true };
 const STAFFEL = {
   id: "t1", slug: "probe-liga-season-1-liga-1-a", title: "Probe-Liga Season 1 · Liga 1 · Staffel A", status: "draft",
   format: "league", team_mode: "team", team_size: 4, min_participants: 2, max_participants: 8, best_of: 3, game_id: "g1",
