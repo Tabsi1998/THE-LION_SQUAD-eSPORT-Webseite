@@ -643,6 +643,13 @@ async def cleanup_sent_jobs(days: int = QUEUE_CLEANUP_SENT_DAYS) -> int:
     return int(res.deleted_count or 0)
 
 
+def _log_link(job: dict) -> dict:
+    """Zu welcher Kontaktanfrage eine Log-Zeile gehört (#2131): läuft die Anfrage ab, geht genau ihre Zeile mit - auch wenn
+    eine andere denselben Betreff trägt."""
+    contact_id = (job.get("meta") or {}).get("contact_id")
+    return {"contact_id": contact_id} if contact_id else {}
+
+
 async def _try_send_job(job: dict) -> None:
     db = get_db()
     cfg = await get_mail_settings()
@@ -679,6 +686,7 @@ async def _try_send_job(job: dict) -> None:
             "error": None,
             "provider": cfg["provider"],
             "created_at": now_utc().isoformat(),
+            **_log_link(job),
         })
     except Exception as exc:
         # Ins Protokoll ohne Mail-Adressen und in einer Zeile; die volle Meldung steht unten im Eintrag der
@@ -703,6 +711,7 @@ async def _try_send_job(job: dict) -> None:
                 "error": str(exc)[:300],
                 "provider": cfg["provider"],
                 "created_at": now_utc().isoformat(),
+                **_log_link(job),
             })
             # Alarm (#517): endgültig nicht zustellbar - nur per Discord, eine Mail darüber käme ja auch nicht an.
             try:

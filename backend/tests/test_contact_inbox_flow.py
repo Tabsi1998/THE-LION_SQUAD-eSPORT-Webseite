@@ -10,8 +10,9 @@ import pytest_asyncio
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
+from database import get_db  # noqa: E402
 from flow_harness import make_flow  # noqa: E402
-from services import contact_retention, ops_alerts  # noqa: E402
+from services import contact_retention, mail_queue, ops_alerts  # noqa: E402
 from services.mail_catalog import CATALOG  # noqa: E402
 from services.notification_preferences import TEMPLATE_CATEGORY  # noqa: E402
 
@@ -281,8 +282,61 @@ async def test_rows_from_before_the_rule_get_a_full_term_instead_of_going_right_
     assert await contact_retention.purge_expired(flow.db, done_days=365, spam_days=30, now=NOW + timedelta(days=366)) == 1
 
 
+async def send_queue(monkeypatch, *, broken: bool = False) -> None:
+    """Die Warteschlange abarbeiten wie der Job - mit einem Fake statt eines Mailservers."""
+    async def settings():
+        return {"enabled": True, "provider": "fake"}
+
+    async def dispatch(*_args, **_kwargs):
+        if broken:
+            raise RuntimeError("kein Empfang")
+        return "fake-id"
+
+    async def quiet(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr(mail_queue, "get_mail_settings", settings)
+    monkeypatch.setattr(mail_queue, "_dispatch", dispatch)
+    monkeypatch.setattr(ops_alerts, "notify", quiet)
+    db = get_db()
+    for job in await db.mail_jobs.find({"status": "pending"}, {"_id": 0}).to_list(None):
+        await mail_queue._try_send_job({**job, "attempts": mail_queue.MAX_ATTEMPTS - 1} if broken else job)
+
+
 @pytest.mark.asyncio
-async def test_personal_data_really_goes_with_the_copies_of_the_mails(flow):
+async def test_the_log_of_an_open_request_with_the_same_subject_stays(flow, monkeypatch):
+    """Dieselbe Adresse, derselbe Betreff, zwei Anfragen: mit der alten geht nur ihre eigene Log-Zeile."""
+    await flow.db.contact_messages.insert_many([message("alt", subject="Frage", status="closed", status_changed_at=days_ago(500)), message("offen", subject="Frage")])
+    same = {"to": "verein@example.test", "subject": "[TLS Kontakt] Allgemeine Anfrage: Frage", "html": "<p>Frage</p>", "template_key": "contact_admin_notify", "status": "pending"}
+    await flow.db.mail_jobs.insert_many([{"id": "j-alt", "meta": {"contact_id": "alt"}, **same}, {"id": "j-offen", "meta": {"contact_id": "offen"}, **same}])
+    await send_queue(monkeypatch)
+    # Eine Zeile von vor der Kennung bleibt: über sie entscheidet die Frist des Versandlogs.
+    await flow.db.email_logs.insert_one({"id": "log-frueher", "to": same["to"], "subject": same["subject"], "template_key": same["template_key"], "created_at": days_ago(1)})
+
+    assert await contact_retention.purge_expired(flow.db, done_days=365, spam_days=30) == 1
+    logs = await flow.db.email_logs.find({}, {"_id": 0}).to_list(10)
+    assert sorted(str(row.get("contact_id")) for row in logs) == ["None", "offen"]
+    assert await flow.db.mail_jobs.count_documents({"meta.contact_id": "offen"}) == 1
+    assert await flow.db.mail_jobs.count_documents({"meta.contact_id": "alt"}) == 0
+
+
+@pytest.mark.asyncio
+async def test_a_failed_mail_also_carries_the_request_in_the_log(flow, monkeypatch):
+    await flow.db.mail_jobs.insert_one({"id": "j", "to": "a@example.test", "subject": "x", "html": "<p>x</p>", "template_key": "contact_reply", "status": "pending", "meta": {"contact_id": "a"}})
+    await send_queue(monkeypatch, broken=True)
+    row = await flow.db.email_logs.find_one({"contact_id": "a"})
+    assert row["status"] == "failed"
+
+
+@pytest.mark.asyncio
+async def test_other_mails_have_no_request_in_the_log(flow, monkeypatch):
+    await flow.db.mail_jobs.insert_one({"id": "j", "to": "a@example.test", "subject": "x", "html": "<p>x</p>", "template_key": "password_reset", "status": "pending"})
+    await send_queue(monkeypatch)
+    assert "contact_id" not in await flow.db.email_logs.find_one({"to": "a@example.test"})
+
+
+@pytest.mark.asyncio
+async def test_personal_data_really_goes_with_the_copies_of_the_mails(flow, monkeypatch):
     await flow.db.settings.update_one({"id": "branding"}, {"$set": {"id": "branding", "contact_email": "vorstand@example.test", "domain": "https://lionsquad.at"}}, upsert=True)
     from routes import contact_board_routes
 
@@ -292,10 +346,9 @@ async def test_personal_data_really_goes_with_the_copies_of_the_mails(flow):
     other = message("b", name="Andere Person", email="andere@example.test", subject="Bleibt", status="new")
     await flow.db.contact_messages.insert_one(other)
     await contact_board_routes._notify_contact(flow.db, other)
-    jobs = await flow.db.mail_jobs.find({"meta.contact_id": "a"}, {"_id": 0}).to_list(10)
-    assert len(jobs) == 2
-    for job in jobs:
-        await flow.db.email_logs.insert_one({"id": job["id"], "to": job["to"], "subject": job["subject"], "template_key": job["template_key"], "status": "sent", "created_at": days_ago(1)})
+    assert await flow.db.mail_jobs.count_documents({"meta.contact_id": "a"}) == 2
+    await send_queue(monkeypatch)
+    assert await flow.db.email_logs.count_documents({"contact_id": "a"}) == 2, "der echte Versand schreibt die Kennung ins Log"
 
     assert (await ops_alerts.purge_old_logs(flow.db))["contact_messages"] == 1
     assert await flow.db.contact_messages.find_one({"id": "a"}) is None
@@ -309,7 +362,7 @@ async def test_personal_data_really_goes_with_the_copies_of_the_mails(flow):
 async def test_deleting_by_hand_also_takes_the_copies(flow):
     await flow.db.contact_messages.insert_one(message("a"))
     await flow.db.mail_jobs.insert_one({"id": "j", "to": "paula@example.test", "subject": "Betreff a", "template_key": "contact_autoreply", "meta": {"contact_id": "a"}})
-    await flow.db.email_logs.insert_one({"id": "l", "to": "paula@example.test", "subject": "Betreff a", "template_key": "contact_autoreply"})
+    await flow.db.email_logs.insert_one({"id": "l", "to": "paula@example.test", "subject": "Betreff a", "template_key": "contact_autoreply", "contact_id": "a"})
     flow.act_as(await club_person(flow))
     gone = await flow.delete("/api/contact/a")
     assert gone.status_code == 200

@@ -20,15 +20,13 @@ SPAM_STATUSES = ("spam",)
 
 
 async def forget_copies(db, contact_ids: list[str]) -> None:
-    """Die Mails zu diesen Anfragen: erst das Versandlog über die Warteschlange finden, dann die Warteschlange leeren.
-    Ist ein Auftrag schon weg, gilt für den Log-Eintrag die Frist des Versandlogs."""
+    """Die Mails zu diesen Anfragen, über die Kennung der Anfrage: Betreff und Adresse können bei einer anderen, offenen
+    Anfrage genauso lauten. Log-Zeilen von vor dieser Kennung laufen über die Frist des Versandlogs aus."""
     if not contact_ids:
         return
-    query = {"meta.contact_id": {"$in": list(contact_ids)}}
-    jobs = await db.mail_jobs.find(query, {"_id": 0, "to": 1, "subject": 1, "template_key": 1}).to_list(None)
-    for job in jobs:
-        await db.email_logs.delete_many({"to": job.get("to"), "subject": job.get("subject"), "template_key": job.get("template_key")})
-    await db.mail_jobs.delete_many(query)
+    ids = list(contact_ids)
+    await db.email_logs.delete_many({"contact_id": {"$in": ids}})
+    await db.mail_jobs.delete_many({"meta.contact_id": {"$in": ids}})
 
 
 async def purge_expired(db, *, done_days: int, spam_days: int, now: datetime | None = None) -> int:
