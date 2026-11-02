@@ -54,7 +54,8 @@ async def test_an_unused_game_can_be_deleted_with_its_default_pool(flow):
     assert deleted.status_code == 200, deleted.text
     assert await flow.db.games.find_one({"id": game["id"]}) is None
     assert await flow.db.map_pools.count_documents({"scope_id": game["id"]}) == 0
-    assert (await flow.delete(f"/api/games/{game['id']}")).status_code == 404
+    gone = await flow.delete(f"/api/games/{game['id']}")
+    assert gone.status_code == 404
 
 
 @pytest.mark.asyncio
@@ -88,7 +89,8 @@ async def test_usage_counts_series_servers_stations_teams_and_profiles(flow):
 
     for key in ("series", "references", "servers", "stations", "teams", "leagues", "profiles", "identity_sources"):
         assert counts[key] == 1, key
-    assert (await flow.delete(f"/api/games/{game['id']}")).status_code == 409
+    refused = await flow.delete(f"/api/games/{game['id']}")
+    assert refused.status_code == 409
 
 
 @pytest.mark.asyncio

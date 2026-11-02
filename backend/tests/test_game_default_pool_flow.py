@@ -56,7 +56,8 @@ async def test_a_game_saves_versions_of_its_default_pool_and_can_clear_it(flow):
     locked = await flow.put(url, json=body_of("stellung", maps["Nebelwerk"]))
     assert locked.status_code == 422, "dieselben Regeln: Nebelwerk ist für Stellung nicht freigegeben"
 
-    assert (await flow.delete(url)).status_code == 200
+    cleared = await flow.delete(url)
+    assert cleared.status_code == 200
     assert (await flow.get(f"/api/games/{game['id']}/maps")).json()["default_pool"] is None
 
 
@@ -92,7 +93,8 @@ async def test_the_default_pool_holds_no_map_and_does_not_count_as_use(flow):
     usage = (await flow.get(f"/api/games/{game['id']}/usage")).json()
     assert usage["counts"]["pools"] == 0 and usage["modes"]["snd"]["pools"] == 0
     # Die Map lässt sich weiter löschen; die Vorlage zeigt sie dann noch, der Editor bietet sie nicht mehr an.
-    assert (await flow.delete(f"/api/games/{game['id']}/maps/{maps['Hafenkante']['id']}")).status_code == 200
+    deleted = await flow.delete(f"/api/games/{game['id']}/maps/{maps['Hafenkante']['id']}")
+    assert deleted.status_code == 200
 
 
 @pytest.mark.asyncio
