@@ -389,7 +389,9 @@ Beides steht ausführlich in [Inhalte](inhalte.md) (3.3 und 3.4) und [Mails und 
 
 **Rückmeldungen:** Am Tag nach dem Event werden alle, die dabei waren, zwei Wochen lang nach ihrer Meinung gefragt („Wie war …?“).
 Im Formular des Events steht ganz unten der Abschnitt **Rückmeldungen**: Schnitt, Verteilung, gelobte und kritisierte Stichworte und
-die Sätze – **ohne Namen**. Unter drei Rückmeldungen steht nur die Zahl, damit niemand erkennbar ist.
+die Sätze – **ohne Namen**. Unter drei Rückmeldungen steht nur die Zahl, damit niemand erkennbar ist. Alle Turniere und Events auf einen
+Blick stehen unter **Admin → eSports → Rückmeldungen**: Zahl und Schnitt je Veranstaltung und der Gesamtschnitt; Veranstaltungen unter drei
+Antworten zählen dort nicht in den Schnitt.
 
 ### 3.12 Freunde beim Event
 

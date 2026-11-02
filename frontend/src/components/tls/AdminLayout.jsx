@@ -3,7 +3,7 @@ import { INTEGRATIONS, MENU_INTEGRATIONS } from "@/lib/integrations";
 import { NavLink, useLocation, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Logo } from "@/components/tls/Logo";
-import { LayoutDashboard, Trophy, Gamepad2, Users as UsersIcon, CalendarDays, Flag, Building2, Newspaper, LogOut, ExternalLink, Menu, X, Code2, Star, Crown, Gift, Image as ImageIcon, Award, Inbox, UserCheck, Medal, FolderOpen, FileText, AlertTriangle, Handshake, BellRing, Search, Server, QrCode, Activity, MessagesSquare, ChevronDown, Sticker, Smartphone, Link2, Wallet, BookOpen, Mail, Palette, Share2, LogIn, Sparkles, CalendarHeart, Egg, ScanLine, Tv, ShieldCheck, ClipboardList, ShoppingBag, Globe, Layers, Repeat, TrendingUp } from "lucide-react";
+import { LayoutDashboard, Trophy, Gamepad2, Users as UsersIcon, CalendarDays, Flag, Building2, Newspaper, LogOut, ExternalLink, Menu, X, Code2, Star, Crown, Gift, Image as ImageIcon, Award, Inbox, UserCheck, Medal, FolderOpen, FileText, AlertTriangle, Handshake, BellRing, Search, Server, QrCode, Activity, MessagesSquare, ChevronDown, Sticker, Smartphone, Link2, Wallet, BookOpen, Mail, Palette, Share2, LogIn, Sparkles, CalendarHeart, Egg, ScanLine, Tv, ShieldCheck, ClipboardList, ShoppingBag, Globe, Layers, Repeat, TrendingUp, MessageSquareText } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePublicSiteSettings } from "@/hooks/usePublicSiteSettings";
 import { OfflineBar } from "@/components/tls/OfflineBar";
@@ -94,6 +94,8 @@ export const ADMIN_GROUPS = [
       { to: "/admin/tv", label: "TV & Beamer", icon: Tv, areas: ["tournaments"] },
       { to: "/admin/game-servers", label: "Game-Server", icon: Server, areas: ["system"] },
       { to: "/admin/prizes", label: "Gewinne", icon: Award, areas: ["tournaments"] },
+      // Alle Rückmeldungen auf einen Blick (#2131) - je Turnier oder Event stehen sie weiter auf dessen Seite.
+      { to: "/admin/feedback", label: "Rückmeldungen", icon: MessageSquareText, areas: ["tournaments"], hint: "Zahl und Schnitt je Turnier und Event, ohne Namen" },
       { to: "/admin/penalties", label: "Strafen", icon: AlertTriangle, areas: ["tournaments"] },
     ],
   },
@@ -180,6 +182,7 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/tv": ["tv", "beamer", "fernseher", "display", "bildschirm", "anzeige", "turnierbaum tv", "hallen-tv", "schlüssel", "schluessel", "anzeige-schlüssel", "kontrast", "schrift", "sicherer bereich", "pixel", "wach halten", "bewegung reduzieren"],
   "/admin/game-servers": ["server", "communityserver"],
   "/admin/prizes": ["preise", "gewinn", "gewinnabholung", "abholung"],
+  "/admin/feedback": ["feedback", "bewertung", "sterne", "rückmeldung"],
   "/admin/penalties": ["strafen", "fairplay"],
   "/admin/teams": ["team", "clans", "teamleitung", "co-leitung", "beitrittscode", "join-code", "aufgelöst", "wiederherstellen", "verwaist"],
   "/admin/events": ["termine", "lan", "veranstaltungen"],
