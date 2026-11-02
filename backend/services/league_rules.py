@@ -68,21 +68,20 @@ def _upcoming(rows: list[dict]) -> dict | None:
     return next((row for row in rows if str(row.get("valid_from") or "") > today), None)
 
 
+def _in_force_order(row: dict) -> tuple[str, str]:
+    """Die Reihenfolge, in der Fassungen gelten: nach „Gültig ab“, am selben Tag gilt die zuletzt veröffentlichte."""
+    return str(row.get("valid_from") or ""), str(row.get("published_at") or "")
+
+
 def _chain_of(league_rows: list[dict], own: list[dict] | None) -> dict:
-    """Alles, was auf einer Seite gilt und vergleichbar ist. Auf einer Season (``own``): die eigenen Fassungen und die der Liga bis zur
-    ersten eigenen gültigen - danach betrifft die Liga diese Season nicht mehr."""
+    """Alles, was auf einer Seite gilt und vergleichbar ist. Auf einer Season (``own``): die eigenen Fassungen und die der Liga, die vor der
+    ersten eigenen gelten - danach betrifft die Liga diese Season nicht mehr. Entscheidend ist, ab wann eine Fassung gilt, nicht wann sie
+    veröffentlicht wurde: Eine eigene Fassung kann früh für später stehen, und die Season erbt bis dahin auch neuere der Liga."""
     if own is None:
         return {"rows": league_rows, "current": _current(league_rows), "upcoming": _upcoming(league_rows)}
-    today = _today()
-    first_own = next((row for row in own if str(row.get("valid_from") or "") <= today), None)
-    if first_own:
-        inherited = [row for row in league_rows if str(row.get("published_at") or "") < str(first_own.get("published_at") or "")]
-    else:
-        inherited = league_rows
-    rows = sorted(inherited + own, key=lambda row: str(row.get("published_at") or ""))
-    current = _current(own) or _current(inherited)
-    upcoming = _upcoming(own) or (None if first_own else _upcoming(inherited))
-    return {"rows": rows, "current": current, "upcoming": upcoming}
+    inherited = [row for row in league_rows if _in_force_order(row) < _in_force_order(own[0])] if own else league_rows
+    rows = sorted(inherited + own, key=_in_force_order)
+    return {"rows": rows, "current": _current(own) or _current(inherited), "upcoming": _upcoming(rows)}
 
 
 async def _chain(db, league: dict, season: dict | None) -> dict:

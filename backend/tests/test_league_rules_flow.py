@@ -261,6 +261,74 @@ async def test_a_season_inherits_the_league_until_it_has_its_own(flow):
 
 
 @pytest.mark.asyncio
+async def test_a_league_version_inherited_until_the_own_one_starts_stays_in_the_chain(flow, monkeypatch):
+    """Die eigene Fassung ist schon veröffentlicht, gilt aber erst in einer Woche. Bis dahin erbt die Season neue Liga-Fassungen - sie
+    gelten wirklich und müssen auch danach Vorgänger, Vergleich und PDF bestimmen."""
+    w = await make_bare_world(flow, visibility="public")
+    first = await publish(flow, w, scope=league_scope(w), body="# A\nLiga eins", annexes=[])
+    own = await publish(flow, w, body="# A\nEigener Text", annexes=[], valid_from=in_days(7))
+    second = await publish(flow, w, scope=league_scope(w), body="# A\nLiga zwei", annexes=[])
+    flow.act_as(None)
+    before = ok(await flow.get(season_page(w)))
+    assert before["version"]["id"] == second["id"] and before["upcoming"]["id"] == own["id"]
+    assert before["changes"]["base"]["id"] == first["id"]
+
+    start = in_days(7)
+    monkeypatch.setattr(league_rules, "club_today", lambda: start)
+    page = ok(await flow.get(season_page(w)))
+    assert page["version"]["id"] == own["id"]
+    assert [row["id"] for row in page["versions"]] == [own["id"], second["id"], first["id"]], "neueste zuerst, nach ihrer Geltung"
+    assert page["changes"]["base"]["id"] == second["id"], "der Vergleich geht gegen das, was bis gestern galt"
+    assert [row["anchor"] for row in page["changes"]["changed"]] == ["a"]
+    compared = ok(await flow.get(f"{season_page(w)}/compare", params={"base": second["id"], "target": own["id"]}))
+    assert {"op": "del", "text": "Liga"} in compared["sections"][0]["ops"]
+    pdf = await flow.get(f"{season_page(w)}/versions/{own['id']}/pdf")
+    assert pdf.status_code == 200
+    import pymupdf
+
+    words = "\n".join(sheet.get_text() for sheet in pymupdf.open(stream=pdf.content, filetype="pdf"))
+    assert "Vergleich mit Version 2 (Liga)" in " ".join(words.split())
+
+
+@pytest.mark.asyncio
+async def test_a_league_version_that_starts_after_the_own_one_never_belongs_to_the_season(flow, monkeypatch):
+    w = await make_bare_world(flow, visibility="public")
+    await publish(flow, w, scope=league_scope(w), body="# A\nLiga eins", annexes=[])
+    own = await publish(flow, w, body="# A\nEigener Text", annexes=[], valid_from=in_days(7))
+    late = await publish(flow, w, scope=league_scope(w), body="# A\nLiga später", annexes=[], valid_from=in_days(10))
+    flow.act_as(None)
+    page = ok(await flow.get(season_page(w)))
+    assert page["upcoming"]["id"] == own["id"] and late["id"] not in [row["id"] for row in page["versions"]]
+    later = in_days(12)
+    monkeypatch.setattr(league_rules, "club_today", lambda: later)
+    page = ok(await flow.get(season_page(w)))
+    assert page["version"]["id"] == own["id"] and late["id"] not in [row["id"] for row in page["versions"]]
+    assert page["upcoming"] is None
+
+
+@pytest.mark.asyncio
+async def test_the_next_change_for_a_season_is_the_earliest_one(flow):
+    w = await make_bare_world(flow, visibility="public")
+    await publish(flow, w, scope=league_scope(w), body="# A\nLiga eins", annexes=[])
+    own = await publish(flow, w, body="# A\nEigener Text", annexes=[], valid_from=in_days(7))
+    soon = await publish(flow, w, scope=league_scope(w), body="# A\nLiga bald", annexes=[], valid_from=in_days(3))
+    flow.act_as(None)
+    page = ok(await flow.get(season_page(w)))
+    assert page["upcoming"]["id"] == soon["id"], "die Liga-Fassung kommt vor der eigenen"
+    assert [row["id"] for row in page["versions"]][:2] == [own["id"], soon["id"]]
+
+
+@pytest.mark.asyncio
+async def test_an_own_version_of_the_same_day_follows_the_league_version_published_before_it(flow):
+    w = await make_bare_world(flow, visibility="public")
+    league_version = await publish(flow, w, scope=league_scope(w), body="# A\nLiga", annexes=[])
+    own = await publish(flow, w, body="# A\nEigen", annexes=[])
+    flow.act_as(None)
+    page = ok(await flow.get(season_page(w)))
+    assert page["version"]["id"] == own["id"] and page["changes"]["base"]["id"] == league_version["id"]
+
+
+@pytest.mark.asyncio
 async def test_an_old_version_stays_readable_and_a_foreign_one_is_not_found(flow):
     w = await make_world(flow)
     first = await publish(flow, w, body="# A\nErste Fassung")
