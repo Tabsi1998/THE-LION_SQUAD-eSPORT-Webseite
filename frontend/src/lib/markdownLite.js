@@ -76,7 +76,9 @@ function renderInline(rawText, options = {}) {
     if (href && isImage) {
       html += `<img src="${escapeHtml(href)}" alt="${escapeHtml(match[2])}" loading="lazy"/>`;
     } else if (href && allowedProfileLink(href, options)) {
-      html += `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+      // Regelwerk (#1646): Ein Sprung auf einen Paragrafen bleibt in der Seite.
+      const external = options.anchorLinksInPage && href.startsWith("#") ? "" : ' target="_blank" rel="noopener noreferrer"';
+      html += `<a href="${escapeHtml(href)}"${external}>${label}</a>`;
     } else {
       html += label;
     }
