@@ -143,6 +143,51 @@ async def test_every_old_reference_combination_stays_as_visible_as_it_was(flow):
     assert await migrations.migrate_one_hide_field(flow.db) == "0 sponsors hidden, 0 contract statuses cleared, 0 references renamed"
 
 
+@pytest.mark.asyncio
+async def test_a_sponsor_without_id_does_not_stop_the_migration(flow):
+    """Altbestand ohne ``id``: darf den Start nicht abbrechen und wird trotzdem umgestellt."""
+    await flow.db.sponsors.insert_many([
+        {"name": "Altbestand", "contract_status": "paused", "logo_url": "/x.png"},
+        {"id": "s-2", "name": "Mit Kennung", "contract_status": "active"},
+    ])
+    assert await migrations.migrate_one_hide_field(flow.db) == "1 sponsors hidden, 2 contract statuses cleared, 0 references renamed"
+    old = await flow.db.sponsors.find_one({"name": "Altbestand"}, {"_id": 0})
+    assert old["is_active"] is False and "contract_status" not in old
+    assert "contract_status" not in await flow.db.sponsors.find_one({"id": "s-2"}, {"_id": 0})
+    rows = await audit(flow, "content.one_hide_field")
+    assert [row["data"]["section"] for row in rows] == ["sponsors"]
+    assert rows[0]["data"]["sponsors_hidden"] == [{"id": None, "name": "Altbestand", "contract_status": "paused"}]
+
+
+@pytest.mark.asyncio
+async def test_the_log_is_written_section_by_section_before_changing_anything(flow):
+    """Bricht der Lauf bei den Referenzen ab, stehen die Namen der Sponsoren schon im Protokoll; der nächste Lauf holt den Rest nach."""
+    await flow.db.sponsors.insert_one({"id": "s-1", "name": "Pause GmbH", "contract_status": "paused"})
+    await flow.db.references.insert_one({"id": "r-1", "title": "Alt", "status": "archived"})
+
+    class BrokenReferences:
+        def __init__(self, collection):
+            self.find = collection.find
+
+        async def update_many(self, *_args, **_kwargs):
+            raise RuntimeError("Datenbank weg")
+
+    class BrokenDb:
+        def __getattr__(self, name):
+            collection = getattr(flow.db, name)
+            return BrokenReferences(collection) if name == "references" else collection
+
+    with pytest.raises(RuntimeError):
+        await migrations.migrate_one_hide_field(BrokenDb())
+    rows = await audit(flow, "content.one_hide_field")
+    assert [row["data"]["section"] for row in rows] == ["sponsors", "references"]
+    assert rows[0]["data"]["sponsors_hidden"][0]["name"] == "Pause GmbH"
+    assert rows[1]["data"]["references_renamed"] == [{"id": "r-1", "title": "Alt"}]
+
+    assert await migrations.migrate_one_hide_field(flow.db) == "0 sponsors hidden, 0 contract statuses cleared, 1 references renamed"
+    assert (await flow.db.references.find_one({"id": "r-1"}))["status"] == "completed"
+
+
 def test_the_migration_is_registered_with_the_next_free_number():
     versions = [row[0] for row in migrations.MIGRATIONS]
     assert versions == sorted(set(versions))

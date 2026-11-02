@@ -442,29 +442,40 @@ async def migrate_squad_game_names(db) -> str:
 async def migrate_one_hide_field(db) -> str:
     """Je Eintrag ein Feld zum Ausblenden: ``is_active`` (#2130). Wer heute verborgen ist, bleibt es, wer sichtbar ist, auch.
 
-    Sponsor: „Pausiert“ und „Gekündigt“ verbargen ihn, also wird ``is_active`` aus; alle anderen Vertragsstatus wirkten
-    nicht, die Laufzeit zählt weiter. Danach gibt es ``contract_status`` nicht mehr. Referenz: „Archiviert“ blendete nichts
-    aus; solche Referenzen heißen jetzt „Abgeschlossen“, ``is_active`` bleibt, wie es ist. Was umgestellt wurde, steht mit
-    Namen und altem Status im Protokoll. Läuft ein zweites Mal ohne Wirkung."""
-    hidden: list[dict] = []
-    cleared = 0
-    async for doc in db.sponsors.find({"contract_status": {"$exists": True}}, {"_id": 0, "id": 1, "name": 1, "is_active": 1, "contract_status": 1}):
-        status = str(doc.get("contract_status") or "").strip().lower()
-        hide = status in {"paused", "cancelled"} and doc.get("is_active") is not False
+    Sponsor: „Pausiert“ und „Gekündigt“ verbargen ihn in der Sponsorenliste, am TV und im PDF, also wird ``is_active`` aus;
+    alle anderen Vertragsstatus wirkten nicht, die Laufzeit zählt weiter. Danach gibt es ``contract_status`` nicht mehr.
+    Eine Ausnahme ist gewollt: Event-Seiten und Mails fragten den Vertragsstatus nie ab und zeigten solche Sponsoren
+    weiter - mit ``is_active`` aus sind sie auch dort weg. Referenz: „Archiviert“ blendete nichts aus; solche Referenzen
+    heißen jetzt „Abgeschlossen“, ``is_active`` bleibt, wie es ist.
+
+    Das Protokoll steht je Abschnitt vor dem Schreiben, mit Namen und altem Status: Bricht der Lauf ab, ist nichts
+    verloren, und der nächste Lauf nennt, was noch fehlt. Altbestand ohne ``id`` wird über ``_id`` umgestellt. Läuft ein
+    zweites Mal ohne Wirkung."""
+    async def log(**data) -> None:
+        await db.audit_logs.insert_one({
+            "id": new_id(), "action": "content.one_hide_field", "target_id": None, "actor_id": None,
+            "data": data, "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+
+    rows = await db.sponsors.find({"contract_status": {"$exists": True}}, {"id": 1, "name": 1, "is_active": 1, "contract_status": 1}).to_list(None)
+    to_hide = {
+        row["_id"]: str(row.get("contract_status") or "").strip().lower() for row in rows
+        if str(row.get("contract_status") or "").strip().lower() in {"paused", "cancelled"} and row.get("is_active") is not False
+    }
+    hidden = [{"id": row.get("id"), "name": row.get("name"), "contract_status": to_hide[row["_id"]]} for row in rows if row["_id"] in to_hide]
+    if rows:
+        await log(section="sponsors", sponsors_hidden=hidden, sponsors_cleared=len(rows))
+    for row in rows:
         change: dict = {"$unset": {"contract_status": ""}}
-        if hide:
+        if row["_id"] in to_hide:
             change["$set"] = {"is_active": False}
-            hidden.append({"id": doc.get("id"), "name": doc.get("name"), "contract_status": status})
-        await db.sponsors.update_one({"id": doc["id"]}, change)
-        cleared += 1
-    renamed = await db.references.update_many({"status": "archived"}, {"$set": {"status": "completed"}})
-    references = getattr(renamed, "modified_count", 0) or 0
-    await db.audit_logs.insert_one({
-        "id": new_id(), "action": "content.one_hide_field", "target_id": None, "actor_id": None,
-        "data": {"sponsors_hidden": hidden, "sponsors_cleared": cleared, "references_renamed": references},
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    })
-    return f"{len(hidden)} sponsors hidden, {cleared} contract statuses cleared, {references} references renamed"
+        await db.sponsors.update_one({"_id": row["_id"]}, change)
+
+    archived = await db.references.find({"status": "archived"}, {"_id": 0, "id": 1, "title": 1}).to_list(None)
+    if archived:
+        await log(section="references", references_renamed=archived)
+        await db.references.update_many({"status": "archived"}, {"$set": {"status": "completed"}})
+    return f"{len(hidden)} sponsors hidden, {len(rows)} contract statuses cleared, {len(archived)} references renamed"
 
 
 MIGRATIONS = (
