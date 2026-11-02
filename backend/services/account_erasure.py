@@ -556,7 +556,7 @@ async def erase_related(db, user: dict, now: str, erased_at: str | None = None) 
     await _registrations(db, user_id, now)
     unlinked_contacts = await _records(db, user, now, until)
     # Aufgelöste Teams (#2128, TM8): die Person kommt beim Wiederherstellen nicht zurück.
-    from services.team_dissolve import forget_person
+    from services.team_forget import forget_person
     await forget_person(db, user_id)
     await _retention(db, user_id, until)
     images = await _own_images(db, user_id, [user.get("avatar_url"), user.get("banner_url"), *directory_images])

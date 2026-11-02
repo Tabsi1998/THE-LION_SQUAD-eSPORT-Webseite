@@ -33,6 +33,7 @@ from pymongo.errors import DuplicateKeyError
 
 from models import TEAM_TAG_MAX_LENGTH, TEAM_TAG_MIN_LENGTH, new_id, now_utc
 from services.log_safe import log_safe
+from services.team_forget import forget_person  # noqa: F401 - gehört zum Vertrag dieses Moduls
 
 logger = logging.getLogger("tls.teams")
 
@@ -314,60 +315,44 @@ async def _remove_restored_parts(db, team_id: str) -> None:
     await db.team_members.delete_many({"team_id": team_id})
 
 
+async def _remove_unused_images(db, row: dict) -> None:
+    """Logo und Banner des Teams, wenn sie sonst nirgends stehen - nachdem die Zeile des Teams sie nicht mehr nennt. Ein Bild
+    aus der Mediathek des Vereins bleibt; das hat die Mediathek zu entscheiden, nicht das Team."""
+    from services import account_erasure, media_audit, uploads_inventory
+
+    names = {uploads_inventory.upload_filename(str(row.get(field) or "")) for field in ("logo_url", "banner_url")} - {None}
+    names = {name for name in names if media_audit._filename_from_upload_path(name)}
+    if not names:
+        return
+    library = {upload["filename"] async for upload in db.media_uploads.find(
+        {"filename": {"$in": sorted(names)}, "media_scope": {"$in": sorted(media_audit.MEDIA_SCOPES - {"user"})}}, {"_id": 0, "filename": 1})}
+    for name in sorted(names - library - await media_audit.still_referenced(db, names)):
+        await account_erasure.remove_upload(db, name)
+
+
 async def _final_cleanup(db, row: dict, now: str) -> None:
-    """Nur Name und Kürzel bleiben - für alte Turniere; Chat und Daten sind weg."""
-    if not await db.teams.find_one({"id": row["id"]}, {"_id": 1}):
+    """Nur Name und Kürzel bleiben - für alte Turniere; Chat samt Anhängen, Einladungen, Bilder und Daten sind weg."""
+    from services.chat_attachments import delete_team_attachments
+
+    active = await db.teams.find_one({"id": row["id"]}, {"_id": 1})
+    if not active:
+        await delete_team_attachments(db, row["id"])
         await db.team_chat_messages.delete_many({"team_id": row["id"]})
+        await db.team_invites.delete_many({"team_id": row["id"]})
         await _remove_restored_parts(db, row["id"])  # Rest eines abgebrochenen Wiederherstellens
     keep = {key: row.get(key) for key in GONE_AFTER_PURGE if key != "_id" and key in row}
     await db.dissolved_teams.replace_one({"id": row["id"]}, {**keep, "purged_at": now})
+    if not active:
+        try:
+            await _remove_unused_images(db, row)
+        except Exception:  # noqa: BLE001 - ein gesperrtes Bild hält weder den Job noch eine Kontolöschung auf
+            logger.warning("[teams] Bilder von %s nicht aufgeräumt", log_safe(row["id"]), exc_info=True)
 
 
 async def purge_dissolved_teams(db, now: datetime | None = None) -> int:
     """Der tägliche Job: aufgelöste Teams, deren Frist vorbei ist, endgültig aufräumen."""
     stamp = (now or now_utc()).isoformat()
-    rows = await db.dissolved_teams.find({"purged_at": {"$exists": False}, "purge_at": {"$lte": stamp}}, GONE_AFTER_PURGE).to_list(500)
+    rows = await db.dissolved_teams.find({"purged_at": {"$exists": False}, "purge_at": {"$lte": stamp}}, {"_id": 0}).to_list(500)
     for row in rows:
         await _final_cleanup(db, row, stamp)
-    return len(rows)
-
-
-def _without_person(row: dict, user_id: str) -> dict:
-    """Die Person aus Mitgliedern, Rollen, Co-Teams und Mitgliederzeilen nehmen - das Team bleibt bis zum Ende der Frist."""
-    changes: dict = {
-        "member_ids": [uid for uid in row.get("member_ids") or [] if uid != user_id],
-        "co_leader_ids": [uid for uid in row.get("co_leader_ids") or [] if uid != user_id],
-        "memberships": [member for member in row.get("memberships") or [] if member.get("user_id") != user_id],
-    }
-    if row.get("leader_id") == user_id:
-        changes["leader_id"] = None
-    if row.get("dissolved_by") == user_id:
-        changes["dissolved_by"] = None
-    squads = []
-    for squad in row.get("squads") or []:
-        clean = {**squad, "member_ids": [uid for uid in squad.get("member_ids") or [] if uid != user_id]}
-        for field in ("captain_id", "vice_captain_id"):
-            if clean.get(field) == user_id:
-                clean.pop(field)
-        if clean.get("created_by") == user_id:
-            clean["created_by"] = None
-        squads.append(clean)
-    changes["squads"] = squads
-    return changes
-
-
-async def forget_person(db, user_id: str) -> int:
-    """Personenlöschung: gilt auch für aufgelöste Teams. Bleibt niemand übrig, ist auch das Team vorzeitig aufgeräumt.
-    Beim Nachzug einer Löschung läuft das wieder - es ändert dann nichts."""
-    rows = await db.dissolved_teams.find({"purged_at": {"$exists": False}, "$or": [
-        {"member_ids": user_id}, {"leader_id": user_id}, {"co_leader_ids": user_id}, {"dissolved_by": user_id},
-        {"memberships.user_id": user_id}, {"squads.member_ids": user_id}, {"squads.captain_id": user_id},
-        {"squads.vice_captain_id": user_id}, {"squads.created_by": user_id},
-    ]}, {"_id": 0}).to_list(200)
-    for row in rows:
-        changes = _without_person(row, user_id)
-        if changes["member_ids"]:
-            await db.dissolved_teams.update_one({"id": row["id"]}, {"$set": changes})
-        else:
-            await _final_cleanup(db, row, now_utc().isoformat())
     return len(rows)

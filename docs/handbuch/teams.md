@@ -73,8 +73,8 @@ zurück. Name und Kürzel laufen dabei durch den Wortfilter. Mitglieder, Co-Team
 und ein neuer Link. Hat ein anderes Team das Kürzel inzwischen, fragt die Seite nach einem neuen. Hat die frühere Teamleitung
 ihr Konto gelöscht, übernimmt die Co-Leitung, sonst ein Mitglied.
 
-Nach den 30 Tagen räumt der tägliche Job auf: Chat, Kader und Mitgliederlisten sind weg, nur Name und Kürzel bleiben für alte
-Turniere. Löscht jemand sein Konto, ist die Person sofort auch aus aufgelösten Teams heraus.
+Nach den 30 Tagen räumt der tägliche Job auf: Chat samt Anhängen, Einladungen, Kader und Mitgliederlisten sind weg, Logo und
+Banner auch, wenn sie sonst nirgends stehen (Bilder aus der Mediathek bleiben). Nur Name und Kürzel bleiben für alte Turniere. Löscht jemand sein Konto, ist die Person sofort auch aus aufgelösten Teams heraus.
 
 ### 3.5 Teamverwaltung im Admin
 

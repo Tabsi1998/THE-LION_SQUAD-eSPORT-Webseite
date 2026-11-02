@@ -117,6 +117,49 @@ async def test_old_tournaments_keep_the_name_also_after_the_deadline(flow):
 
 
 @pytest.mark.asyncio
+async def test_the_deadline_removes_attachments_invites_and_unused_images(flow, monkeypatch, tmp_path):
+    """Prüfer-Probe: Nach der Frist sind Anhänge, Einladungen, Logo und Banner wirklich weg - was sonst noch genutzt wird, bleibt."""
+    from services import chat_attachments
+
+    removed = []
+    monkeypatch.setattr(chat_attachments, "_remove_files", lambda row: removed.append(row["id"]))
+    leader, _co, member, team, _squad = await world(flow)
+    await flow.db.teams.update_one({"id": team["id"]}, {"$set": {"logo_url": "/api/static/uploads/nur-team.webp", "banner_url": "/api/static/uploads/geteilt.webp"}})
+    await flow.db.news_posts.insert_one({"id": new_id(), "title": "Bild", "banner_url": "/api/static/uploads/geteilt.webp"})
+    for name in ("nur-team.webp", "geteilt.webp"):
+        await flow.db.media_uploads.insert_one({"filename": name, "media_scope": "user", "owner_id": leader["id"]})
+    await flow.db.team_chat_messages.insert_one({"id": new_id(), "team_id": team["id"], "user_id": member["id"], "message": "x", "attachments": [{"id": "a1"}]})
+    await flow.db.chat_attachments.insert_one({"id": "a1", "owner_id": member["id"], "status": "attached", "storage_key": "chat/a1.png", "context": {"type": "team", "team_id": team["id"]}})
+    await flow.db.chat_attachments.insert_one({"id": "a2", "owner_id": member["id"], "status": "attached", "storage_key": "chat/a2.png", "context": {"type": "team", "team_id": "anderes-team"}})
+    await flow.db.team_invites.insert_one({"id": new_id(), "team_id": team["id"], "user_id": member["id"], "status": "pending"})
+    await dissolve(flow, leader, team)
+
+    assert await flow.db.chat_attachments.count_documents({"context.team_id": team["id"]}) == 1, "in der Frist bleibt alles"
+    assert await flow.db.media_uploads.find_one({"filename": "nur-team.webp"})
+
+    await flow.db.dissolved_teams.update_one({"id": team["id"]}, {"$set": {"purge_at": (now_utc() - timedelta(minutes=1)).isoformat()}})
+    assert await purge_dissolved_teams(flow.db) == 1
+    assert await flow.db.team_chat_messages.count_documents({"team_id": team["id"]}) == 0
+    assert await flow.db.chat_attachments.count_documents({"context.team_id": team["id"]}) == 0 and removed == ["a1"]
+    assert await flow.db.chat_attachments.find_one({"id": "a2"}), "fremde Anhänge bleiben"
+    assert await flow.db.team_invites.count_documents({"team_id": team["id"]}) == 0
+    assert not await flow.db.media_uploads.find_one({"filename": "nur-team.webp"}), "Logo steht nirgends mehr"
+    assert await flow.db.media_uploads.find_one({"filename": "geteilt.webp"}), "das Banner nutzt noch ein News-Beitrag"
+    tombstone = await flow.db.dissolved_teams.find_one({"id": team["id"]}, {"_id": 0})
+    assert "logo_url" not in tombstone and "banner_url" not in tombstone
+
+
+@pytest.mark.asyncio
+async def test_an_image_from_the_club_library_stays(flow):
+    leader, _co, _member, team, _squad = await world(flow)
+    await flow.db.teams.update_one({"id": team["id"]}, {"$set": {"logo_url": "/api/static/uploads/vereinslogo.webp"}})
+    await flow.db.media_uploads.insert_one({"filename": "vereinslogo.webp", "media_scope": "branding"})
+    await dissolve(flow, leader, team)
+    await purge_dissolved_teams(flow.db, now_utc() + timedelta(days=DISSOLVED_TEAM_RETENTION_DAYS + 1))
+    assert await flow.db.media_uploads.find_one({"filename": "vereinslogo.webp"})
+
+
+@pytest.mark.asyncio
 async def test_private_team_stays_hidden_after_dissolving(flow):
     leader, _co, _member, team, _squad = await world(flow, is_public=False)
     await dissolve(flow, leader, team)
@@ -226,13 +269,16 @@ async def test_erasure_removes_the_person_from_dissolved_teams(flow):
 
 
 @pytest.mark.asyncio
-async def test_erasing_the_last_person_cleans_up_at_once(flow):
+async def test_erasing_the_last_person_ends_the_deadline(flow):
     leader, co, member, team, _squad = await world(flow)
     await dissolve(flow, leader, team)
     for user in (member, co):
         await forget_person(flow.db, user["id"])
     assert await flow.db.team_chat_messages.find_one({"team_id": team["id"]})
     await forget_person(flow.db, leader["id"])
+    row = await flow.db.dissolved_teams.find_one({"id": team["id"]}, {"_id": 0})
+    assert not row["member_ids"] and not row["memberships"] and not row["squads"][0]["member_ids"], "sofort niemand mehr darin"
+    assert await purge_dissolved_teams(flow.db) == 1, "der nächste Lauf des Jobs räumt auf"
     row = await flow.db.dissolved_teams.find_one({"id": team["id"]}, {"_id": 0})
     assert row.get("purged_at") and set(row) <= {"id", "name", "tag", "is_public", "dissolved_at", "purged_at"}
     assert not await flow.db.team_chat_messages.find_one({"team_id": team["id"]})
