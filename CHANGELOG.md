@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.54.2 (02.11.2026)
+
+### Fehlerbehebungen
+
+* Startseite: „Live jetzt“ zeigt kein Turnier und keine Fast Lap nach dem Ende mehr (#2194)
+
 ## 1.54.1 (02.11.2026)
 
 ### Dokumentation
