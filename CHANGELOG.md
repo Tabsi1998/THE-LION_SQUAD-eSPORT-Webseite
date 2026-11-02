@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.55.3](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.55.2...v1.55.3) (2026-11-02)
+
+
+### Fehlerbehebungen
+
+* Ablehnung eines Termins eskaliert nicht, wenn ein Termin gilt ([#2201](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2201)) ([a9dc42c](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a9dc42cacf73229617405801f1f15d7ab38ec595))
+* Einspruchsfenster rechnet mit Sperrwochen ([#2201](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2201)) ([a9dc42c](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a9dc42cacf73229617405801f1f15d7ab38ec595))
+* Kampflos-Wertungen von Co-Teams erscheinen unter „Meine Strafen“ und in der Admin-Liste ([#2201](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2201)) ([a9dc42c](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a9dc42cacf73229617405801f1f15d7ab38ec595))
+* Karte „Nicht erschienen?“ verschwindet mit der ersten Meldung ([#2201](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2201)) ([a9dc42c](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a9dc42cacf73229617405801f1f15d7ab38ec595))
+* Liga schlägt ohne Check-in kein „Nicht erschienen?“ mehr vor, „Ergebnis fehlt“ bleibt ([#2201](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2201)) ([a9dc42c](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a9dc42cacf73229617405801f1f15d7ab38ec595))
+* Maps fallen bei einer Kampflos-Wertung weg ([#2201](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2201)) ([a9dc42c](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a9dc42cacf73229617405801f1f15d7ab38ec595))
+* Neue Terminvorschläge bekommen eine neue Antwortfrist ([#2201](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2201)) ([a9dc42c](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a9dc42cacf73229617405801f1f15d7ab38ec595))
+* Season-Stand folgt dem Start der ersten Staffel ([#2201](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2201)) ([a9dc42c](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a9dc42cacf73229617405801f1f15d7ab38ec595))
+* Spiel-Antworten auf das Nötige beschränkt, Eingabegrenzen ([#2201](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2201)) ([a9dc42c](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a9dc42cacf73229617405801f1f15d7ab38ec595))
+* Spielplan einer laufenden Staffel nicht über die Phasen-Routen löschbar ([#2201](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2201)) ([a9dc42c](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a9dc42cacf73229617405801f1f15d7ab38ec595))
+* Spieltag-Lauf überschreibt keine neuere Terminaktion ([#2201](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2201)) ([a9dc42c](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a9dc42cacf73229617405801f1f15d7ab38ec595))
+* Staffeln mit mehr als 16 Teams lassen sich starten ([#2201](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2201)) ([a9dc42c](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a9dc42cacf73229617405801f1f15d7ab38ec595))
+* Standardtermin liegt nie in einer Sperrzeit ([#2201](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2201)) ([a9dc42c](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a9dc42cacf73229617405801f1f15d7ab38ec595))
+* Terminänderung der Leitung mit Protokoll und Nachricht an beide Seiten ([#2201](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2201)) ([a9dc42c](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/a9dc42cacf73229617405801f1f15d7ab38ec595))
+
 ## 1.55.2 (02.11.2026)
 
 ### Fehlerbehebungen
