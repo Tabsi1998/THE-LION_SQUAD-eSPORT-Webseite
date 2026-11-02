@@ -77,7 +77,7 @@ STAFFEL_VISIBILITY = {
     "members": ("members", True),
     "public": ("public", True),
 }
-RESERVED_SLUGS = frozenset({"admin", "neu", "new"})
+RESERVED_SLUGS = frozenset({"admin", "neu", "new", "regeln"})
 STAFFEL_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 
@@ -802,6 +802,9 @@ async def delete_tree(db, kind: str, target: dict, *, on_staffel_deleted=None) -
         # Liga-Kader (#2108): die festgehaltenen Spiel-IDs gehören zur Season und gehen mit ihr.
         await db.league_rosters.delete_many({"season_id": {"$in": sorted(season_ids)}})
         await db.league_seasons.delete_many({"id": {"$in": sorted(season_ids)}})
+    # Regelwerk (#1646): nur Entwurfs-Seasons lassen sich löschen - ihre Fassungen und Zustimmungen gehen mit.
+    from services.league_rules import delete_for
+    await delete_for(db, league_id=target["id"] if kind == "league" else None, season_ids=sorted(season_ids))
     if kind == "league":
         await db.leagues.delete_one({"id": target["id"]})
     return fresh
@@ -845,6 +848,9 @@ async def create_staffel(db, division: dict, staffel: str | None, user: dict) ->
     if not season.get("start_date"):
         raise LeagueProblem("Die Season braucht zuerst den Beginn der ersten Spielwoche.")
     fields = staffel_fields(league, season, division)
+    # Regelwerk (#1646): statt des Regeltexts der Hinweis auf die Regelseite, sobald es eines gibt.
+    from services.league_rules import staffel_rules
+    fields["rules"] = await staffel_rules(db, league, season)
     problem = rounds_problem(fields["max_participants"], fields["round_robin_legs"], fields["matchday_weeks_total"],
                              fields["matchday_blocked_weeks"])
     if problem:
@@ -932,6 +938,9 @@ async def sync_staffel(db, tournament: dict, league: dict, season: dict, divisio
     """Überträgt die Vorgaben auf eine Staffel - je Gruppe nur, wenn sie noch darf (docs/LIGA.md, Abschnitt 3).
     Eine gesperrte Staffel (``locked_at``) bekommt nur noch, was immer gilt (Sichtbarkeit, Regeltext, Map-Pool)."""
     wanted = staffel_fields(league, season, division)
+    # Regelwerk (#1646): Übertragen schreibt nicht den alten Regeltext zurück.
+    from services.league_rules import staffel_rules
+    wanted["rules"] = await staffel_rules(db, league, season)
     applied: list[str] = []
     skipped: list[dict] = []
     updates: dict = {}

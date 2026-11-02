@@ -484,6 +484,21 @@ def _squad_task_action(task: dict) -> dict:
     }
 
 
+def _rules_task_action(task: dict) -> dict:
+    """„Regeln zustimmen“ (#1646). Wie „Kader auffüllen“: Die App kennt ``target_type: "league_rules"`` nicht und zeigt ohne
+    ``target_id`` die Zeile ohne Pfeil, das Web liest ``rules_url``. Eine fehlende Zustimmung hält kein Spiel auf."""
+    parts = (task.get("title"), task.get("squad_name"), f"{task.get('version_label')}, im Web zustimmen")
+    return {
+        "id": f"rules-consent-{task.get('season_id')}-{task.get('squad_id')}",
+        "type": "rules_consent",
+        "label": "Regeln zustimmen",
+        "detail": " · ".join(part for part in parts if part),
+        "target_type": "league_rules",
+        "rules_url": task.get("rules_url"),
+        "priority": 7,
+    }
+
+
 def _match_task_actions(tasks: list[dict]) -> list[dict]:
     """Terminvorschlag beantworten und Aufstellung nachtragen (#2110). Ältere Apps kennen die Arten nicht: sie zeigen
     jede Aktion mit Text, Zeile und Symbol nach ``type`` (alles mit „match“ als Spiel-Symbol) und öffnen über
@@ -493,6 +508,9 @@ def _match_task_actions(tasks: list[dict]) -> list[dict]:
         kind = task.get("task")
         if kind == "squad":
             actions.append(_squad_task_action(task))
+            continue
+        if kind == "rules_consent":
+            actions.append(_rules_task_action(task))
             continue
         if kind not in {"schedule", "lineup"}:
             continue
@@ -634,6 +652,10 @@ async def mobile_dashboard(user: dict | None = Depends(get_optional_user)):
         match_tasks = await own_match_tasks(db, user, match_registrations) if match_registrations else []
         # Kader auffüllen (#2202): Captain, Vertreter und die Leitung des Hauptteams.
         match_tasks += await own_squad_tasks(db, user, match_registrations) if match_registrations else []
+        # Regeln zustimmen (#1646): Captain, Vertreter, ohne beide die Leitung des Hauptteams.
+        if match_registrations:
+            from services.league_rules import own_consent_tasks
+            match_tasks += await own_consent_tasks(db, user, match_registrations)
     else:
         match_tasks = []
 

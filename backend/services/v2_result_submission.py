@@ -343,6 +343,9 @@ async def submit_v2_result(
     # for a completed replay.
     for target_id, update in application["target_sets"].items():
         await db.matches_v2.update_one({"id": target_id}, {"$set": update})
+    # Regelwerk (#1646): welche Fassung galt, als das Ergebnis festgeschrieben wurde - nur Liga-Staffeln, nur beim ersten Mal.
+    from services.league_rules import match_stamp
+    application["match_set"].update(await match_stamp(db, match))
     await db.matches_v2.update_one({"id": match["id"]}, {"$set": application["match_set"]})
     if games is not None or match.get("lineup_user_ids"):
         # Liga (#1650): mit dem Ergebnis gelten nur noch seine Maps - auch ohne Maps (etwa „Nicht erschienen“).
