@@ -78,6 +78,31 @@ async def test_export_keeps_the_amounts_and_protects_cells_and_columns(flow):
 
 
 @pytest.mark.asyncio
+async def test_a_credit_note_is_no_payment_in_export_list_and_detail(flow):
+    await as_kassier(flow)
+    await flow.db.billing_orders.insert_one(order("o-gut", remaining_cents=0, payment_state="credited", payments=[],
+                                                  credit_notes=[{"id": 1, "ref": "AV1", "total_cents": 2000, "status": "validated"}]))
+    await flow.db.billing_orders.insert_one(order("o-zahl", remaining_cents=500, payments=[{"amount_cents": 1500, "date": "2026-05-05"}]))
+    rows = {row["Rechnung"]: row for row in parse(await flow.get(EXPORT))}
+    assert rows["FA-o-gut"]["Bezahlt"] == "0,00 €" and rows["FA-o-gut"]["Gutgeschrieben"] == "20,00 €"
+    assert rows["FA-o-zahl"]["Bezahlt"] == "15,00 €"
+    listed = {row["id"]: row for row in (await flow.get("/api/admin/finance/overview")).json()["invoiced"]}
+    assert listed["o-gut"]["paid_cents"] == 0 and listed["o-zahl"]["paid_cents"] == 1500
+    assert "payments" not in listed["o-gut"] and "payments" not in listed["o-zahl"], "die einzelnen Zahlungen zeigt erst das Detail"
+    detail = (await flow.get("/api/admin/finance/orders/o-gut")).json()
+    assert detail["sums"]["paid_cents"] == 0, "Liste, Export und Detail nennen dieselbe Zahl"
+
+
+@pytest.mark.asyncio
+async def test_without_known_payments_the_sum_minus_rest_still_applies(flow):
+    """Fehlt das Recht auf die Zahlungen in Dolibarr, steht `payments` nicht am Auftrag: dann bleibt die Rechnung über den Rest."""
+    await as_kassier(flow)
+    await flow.db.billing_orders.insert_one(order("o-ohne", remaining_cents=500))
+    assert parse(await flow.get(EXPORT))[0]["Bezahlt"] == "15,00 €"
+    assert (await flow.get("/api/admin/finance/overview")).json()["invoiced"][0]["paid_cents"] == 1500
+
+
+@pytest.mark.asyncio
 async def test_export_period_counts_vienna_days_and_is_checked(flow):
     await as_kassier(flow)
     await flow.db.billing_orders.insert_many([

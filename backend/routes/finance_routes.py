@@ -153,6 +153,8 @@ async def finance_overview(kind: str | None = Query(None), source: str | None = 
         _decorate(row, names, people)
     for row in data["invoiced"]:
         row["dolibarr_url"] = dolibarr_invoice_url(settings, row.get("invoice_id"))
+        # „bezahlt“ steht gerechnet am Beleg; die einzelnen Zahlungen zeigt erst das Detail.
+        row.pop("payments", None)
     for case in data["cases"]:
         case["source"] = names.get(case.get("source_id"))
         case["person"] = people.get(case.get("user_id"))

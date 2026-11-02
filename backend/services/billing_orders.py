@@ -360,7 +360,8 @@ async def overview(db, *, kind: str | None = None, source_id: str | None = None,
     open_query = {**base, "status": {"$in": list(OPEN_STATUSES) + ["held", "failed"]}}
     open_orders = await db.billing_orders.find(open_query, {"_id": 0, "snapshot": 0}).sort("created_at", 1).limit(OPEN_LIST_LIMIT).to_list(OPEN_LIST_LIMIT)
     invoiced_query = invoiced_row_query(kind=kind, source_id=source_id, user_ids=user_ids, attention=attention)
-    invoiced = await db.billing_orders.find(invoiced_query, {"_id": 0, "snapshot": 0, "payments": 0}).sort("updated_at", -1).limit(INVOICED_LIST_LIMIT).to_list(INVOICED_LIST_LIMIT)
+    # Mit den Zahlungen: ohne sie wäre „bezahlt“ nur Summe minus Rest, und eine Gutschrift zählte als Zahlung. Die Route nimmt sie nach dem Rechnen wieder heraus.
+    invoiced = await db.billing_orders.find(invoiced_query, {"_id": 0, "snapshot": 0}).sort("updated_at", -1).limit(INVOICED_LIST_LIMIT).to_list(INVOICED_LIST_LIMIT)
     # Kachel und Liste (#2131) lesen dieselbe Auswahl; die Liste kürzt, der Zähler nicht.
     selection = {"kind": kind, "source_id": source_id, "user_ids": user_ids}
     cases = await billing_cases.list_cases(db, "open", **selection)
@@ -395,7 +396,7 @@ async def export_rows(db, *, kind: str | None = None, source_id: str | None = No
                       date_from: str | None = None, date_to: str | None = None) -> list[dict]:
     """Alle Belege der Auswahl für den Export (#2131) - ohne die Grenze der Liste, nach dem Tag des Belegs sortiert."""
     query = {**invoiced_row_query(kind=kind, source_id=source_id, user_ids=user_ids, attention=attention), **export_period(date_from, date_to)}
-    return await db.billing_orders.find(query, {"_id": 0, "snapshot": 0, "payments": 0}).sort([("invoiced_at", 1), ("invoice_ref", 1)]).to_list(None)
+    return await db.billing_orders.find(query, {"_id": 0, "snapshot": 0}).sort([("invoiced_at", 1), ("invoice_ref", 1)]).to_list(None)
 
 
 async def source_summary(db, kind: str, source_id: str) -> dict:
