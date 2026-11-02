@@ -298,6 +298,18 @@ Jedes Thema hat genau **einen** Ort:
 | App-Versionen, Play Store | Admin → System → App-Versionen | [Play Store](../PLAY_STORE.md) |
 | Game-Server, AMP-Zugang | Admin → eSports → Game-Server | dieser Abschnitt (unten) |
 
+**Kassa: welcher Weg in Dolibarr?** Ein Hinweis, keine Steuerberatung; Details in der [Abrechnung](../ABRECHNUNG.md).
+
+| Was passiert ist | Weg in Dolibarr | In der Finanzübersicht |
+| --- | --- | --- |
+| Leistung fiel weg | Teil-Gutschrift, auf die Rechnung anwenden | bezahlt |
+| Verein übernimmt das Essen wegen eines Gewinns | Teil-Gutschrift mit dem Grund im Text, auf die Rechnung anwenden | bezahlt |
+| Festes Preisgeld wird verrechnet | Zahlung als Verrechnung, Preisgeld als Ausgabe | bezahlt |
+| Echter Nachlass | „Bezahlt (mit Abzug)“ mit Anmerkung | bezahlt mit Abzug, Betrag als erlassen, Grund und Anmerkung nur für die Verwaltung |
+
+Löscht ihr einen Entwurf in Dolibarr, verschwindet er aus den Rechnungen. Der Auftrag fragt dann: **Freigeben** rechnet neu ab,
+**Keine neue Rechnung** beendet ihn.
+
 **Game-Server pflegen:** **Live-Daten von** sagt, woher Status und Spielerzahl kommen; **Automatisch erkennen** reicht
 meistens. **Technik** (eingeklappt) braucht ihr nur, wenn das Abrufen nicht klappt: eigene Abfrage-Adresse, Abfrage-Port,
 RCON-Port. Schlägt ein Abruf fehl, steht der echte Fehler rot am Server (nur in der Verwaltung), darunter gelb, was er

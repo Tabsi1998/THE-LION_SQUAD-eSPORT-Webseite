@@ -47,8 +47,16 @@ async def _names(db, rows: list[dict]) -> tuple[dict, dict]:
     return names, people
 
 
+# Das Event oder Turnier gibt es nicht mehr: ein Satz statt der internen Kennung (#2226).
+SOURCE_GONE = "Angebot nicht mehr vorhanden"
+
+
+def _source(row: dict, names: dict) -> dict:
+    return names.get(row.get("source_id")) or {"name": SOURCE_GONE, "slug": None, "kind": row.get("kind") or row.get("source_kind")}
+
+
 def _decorate(row: dict, names: dict, people: dict) -> dict:
-    row["source"] = names.get(row.get("source_id"))
+    row["source"] = _source(row, names)
     row["person"] = people.get(row.get("user_id"))
     row["status_label"] = billing_orders.STATUS_LABELS.get(row.get("status"), row.get("status"))
     row["total"] = pricing.format_cents(int(row.get("total_cents") or 0), row.get("currency") or "EUR")
@@ -57,6 +65,9 @@ def _decorate(row: dict, names: dict, people: dict) -> dict:
         row["paid_cents"] = billing_orders.paid_cents(row)
         row["refunded_cents"] = billing_orders.refunded_cents(row)
         row["credited_cents"] = billing_orders.credited_cents(row)
+        row["waived_cents"] = billing_orders.waived_cents(row)
+        # Grund und Anmerkung (`close_note` steht schon am Auftrag): nur hier, in der Verwaltung (#2226).
+        row["close_reason"] = billing_orders.close_reason(row)
     return row
 
 
@@ -92,16 +103,16 @@ def _vienna_moment(value) -> str:
 
 EXPORT_DAY = r"^\d{4}-\d{2}-\d{2}$"
 # Nur, was der Kassier braucht - keine Adressen, keine Bankdaten, keine Dolibarr-Schlüssel.
-EXPORT_COLUMNS = ("Rechnung", "Angelegt am", "Angebot", "Person", "Betrag", "Zahlungsstand", "Bezahlt", "Gutgeschrieben", "Erstattet", "Buchung", "Stand")
+EXPORT_COLUMNS = ("Rechnung", "Angelegt am", "Angebot", "Person", "Betrag", "Zahlungsstand", "Bezahlt", "Gutgeschrieben", "Erlassen", "Grund", "Erstattet", "Buchung", "Stand")
 
 
 def _export_cells(row: dict) -> tuple:
-    source = (row.get("source") or {}).get("name") or row.get("source_id") or ""
+    source = (row.get("source") or {}).get("name") or SOURCE_GONE
     currency = row.get("currency") or "EUR"
     money = lambda cents: pricing.format_cents(int(cents or 0), currency)  # noqa: E731
     return (
         row.get("invoice_ref") or "", _vienna_moment(row.get("invoiced_at")), source, row.get("person") or "", money(row.get("total_cents")),
-        row.get("payment_label") or row.get("status_label") or "", money(row.get("paid_cents")), money(row.get("credited_cents")), money(row.get("refunded_cents")),
+        row.get("payment_label") or row.get("status_label") or "", money(row.get("paid_cents")), money(row.get("credited_cents")), money(row.get("waived_cents")), row.get("close_reason") or "", money(row.get("refunded_cents")),
         "storniert" if row.get("booking_state") == "cancelled" else "aktiv", _vienna_moment(row.get("synced_at")),
     )
 
@@ -151,7 +162,7 @@ async def finance_overview(kind: str | None = Query(None), source: str | None = 
         # „bezahlt“ steht gerechnet am Beleg; die einzelnen Zahlungen zeigt erst das Detail.
         row.pop("payments", None)
     for case in data["cases"]:
-        case["source"] = names.get(case.get("source_id"))
+        case["source"] = _source(case, names)
         case["person"] = people.get(case.get("user_id"))
         case["total"] = pricing.format_cents(int(case.get("total_cents") or 0))
     # Rechnungstext vorab (#370): so kämen die Zeilen auf den Beleg - solange keiner existiert,
@@ -247,7 +258,7 @@ async def finance_invoice_options(me: dict = Depends(require_area("finance", "sy
 
 @router.get("/sources/{kind}/{source_id}")
 async def source_summary(kind: str, source_id: str, me: dict = Depends(require_area("finance"))):
-    """Die Zahlen einer Veranstaltung (#322): gebucht, fakturiert, bezahlt, offen, gutgeschrieben, erstattet."""
+    """Die Zahlen einer Veranstaltung (#322): gebucht, fakturiert, bezahlt, offen, gutgeschrieben, erlassen, erstattet."""
     if kind not in ("event", "tournament"):
         raise HTTPException(404, "Unbekannte Art.")
     return await billing_orders.source_summary(get_db(), kind, source_id)
@@ -282,6 +293,9 @@ AUDIT_TEXTS = {
     "billing.thirdparty.create": "Geschäftspartner neu angelegt",
     "billing.pdfs.build_missing": "Fehlende PDFs nachgezogen",
     "billing.reconcile": "Alles abgeglichen",
+    "billing.invoice.close": "Abschluss in Dolibarr",
+    "billing.invoice.removed": "Entwurf in Dolibarr gelöscht",
+    "billing.order.dismiss": "Keine neue Rechnung",
     "billing.settings.credit_note_draft": "Schalter „Gutschrift-Entwurf“ geändert",
     "billing.export": "Export erstellt",
     "event.registration.create": "Anmeldung angelegt",
@@ -317,6 +331,14 @@ def _german_day(value) -> str:
     return ".".join(reversed(text.split("-"))) if re.fullmatch(r"\d{4}-\d{2}-\d{2}", text) else text
 
 
+def _close_text(data: dict) -> str:
+    """Ein Eintrag „Abschluss in Dolibarr“ (#2226) in Worten - nennt den Grund, die Anmerkung steht beim Auftrag."""
+    code, previous = data.get("close_code") or "", data.get("previous_code") or ""
+    if code == previous:
+        return "Abschluss in Dolibarr: Anmerkung geändert"
+    return f"Abschluss in Dolibarr: {billing_orders.close_reason(data)}" if code else "Abschluss in Dolibarr zurückgenommen"
+
+
 def _timeline(order: dict, cases: list[dict], audit: list[dict], people: dict) -> list[dict]:
     """Was mit dem Auftrag passiert ist, in einer Reihe: Preis, Beleg, Zahlungen, Gutschriften,
     Storno, Erstattungen, Prüffälle, Freigaben - jedes Ereignis einmal, mit Zeitpunkt."""
@@ -326,6 +348,8 @@ def _timeline(order: dict, cases: list[dict], audit: list[dict], people: dict) -
         items.append({"at": order["released_at"], "kind": "release", "text": f"Freigegeben von {people.get(order.get('released_by'), 'Finanzen')}"})
     if order.get("invoiced_at"):
         items.append({"at": order["invoiced_at"], "kind": "invoice", "text": f"Beleg in Dolibarr: {order.get('invoice_ref') or '–'}"})
+    for removed in order.get("removed_invoices") or []:
+        items.append({"at": removed.get("at"), "kind": "invoice", "text": f"Entwurf {removed.get('invoice_ref') or ''} in Dolibarr gelöscht"})
     for payment in order.get("payments") or []:
         items.append({"at": payment.get("date") or order.get("synced_at"), "kind": "payment", "text": f"Zahlung {money(payment.get('amount_cents'))}" + (f" ({payment['type']})" if payment.get("type") else "") + (f" – {payment['ref']}" if payment.get("ref") else "")})
     for note in order.get("credit_notes") or []:
@@ -343,8 +367,11 @@ def _timeline(order: dict, cases: list[dict], audit: list[dict], people: dict) -
             items.append({"at": case.get("resolved_at"), "kind": "case_resolved", "text": f"Prüffall erledigt ({who}): {case.get('resolution') or ''}"})
     for entry in audit:
         action = str(entry.get("action") or "")
-        if action in ("billing.order.release", "billing.refund.record", "billing.case.resolve"):
+        if action in ("billing.order.release", "billing.refund.record", "billing.case.resolve", "billing.invoice.removed"):
             continue   # steht schon oben, aus den Daten des Auftrags
+        if action == "billing.invoice.close":
+            items.append({"at": entry.get("created_at"), "kind": "invoice", "text": f"{_close_text(entry.get('data') or {})} – {people.get(entry.get('actor_id'), 'System')}"})
+            continue
         if action.startswith("billing.") or action.startswith("event.registration") or action.startswith("tournament.registration"):
             items.append({"at": entry.get("created_at"), "kind": "audit", "text": f"{AUDIT_TEXTS.get(action, 'Änderung am Vorgang')} – {people.get(entry.get('actor_id'), 'System')}"})
     if order.get("sync_error"):
@@ -382,7 +409,7 @@ async def order_detail(order_id: str, me: dict = Depends(require_area("finance")
         "cases": cases,
         "timeline": _timeline(order, cases, audit, people),
         "sums": {"paid_cents": paid, "refunded_cents": billing_orders.refunded_cents(order), "credited_cents": billing_orders.credited_cents(order),
-                 "refundable_cents": max(0, paid - billing_orders.refunded_cents(order))},
+                 "waived_cents": billing_orders.waived_cents(order), "refundable_cents": max(0, paid - billing_orders.refunded_cents(order))},
         "payment_labels": billing_orders.PAYMENT_STATE_LABELS,
     }
 
@@ -460,7 +487,7 @@ async def list_cases(status: str = Query("open", pattern="^(open|resolved|all)$"
         async for user in db.users.find({"id": {"$in": solvers}}, {"_id": 0, "id": 1, "display_name": 1, "username": 1}):
             people[user["id"]] = user.get("display_name") or user.get("username")
     for case in cases:
-        case["source"] = names.get(case.get("source_id"))
+        case["source"] = _source(case, names)
         case["person"] = people.get(case.get("user_id"))
         case["total"] = pricing.format_cents(int(case.get("total_cents") or 0))
         if case.get("status") == "resolved":
@@ -503,6 +530,20 @@ async def release_billing_order(order_id: str, me: dict = Depends(require_area("
                                     "data": {"registration_id": order.get("registration_id"), "total_cents": order.get("total_cents")},
                                     "created_at": now_utc().isoformat()})
     return updated
+
+
+@router.post("/orders/{order_id}/dismiss")
+async def dismiss_removed_order(order_id: str, me: dict = Depends(require_area("finance"))):
+    """Der Entwurf ist in Dolibarr gelöscht (#2226), und es soll keine neue Rechnung geben. Das Gegenstück zu „Freigeben“."""
+    db = get_db()
+    order = await db.billing_orders.find_one({"id": order_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(404, "Auftrag nicht gefunden.")
+    if order.get("status") != "held" or not order.get("removed_invoices"):
+        raise HTTPException(409, "Zu diesem Auftrag wurde kein Entwurf gelöscht.")
+    if not await billing_orders.dismiss_removed(db, order, me["id"]):
+        raise HTTPException(409, "Dieser Auftrag wartet nicht mehr auf eine Entscheidung.")
+    return {"ok": True}
 
 
 class InvoiceExtraText(BaseModel):

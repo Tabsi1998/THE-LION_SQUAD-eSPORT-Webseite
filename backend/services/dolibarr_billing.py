@@ -30,6 +30,7 @@ Die Finanzverwaltung kann je Auftrag einen Zusatztext ergänzen, solange kein Be
 """
 from __future__ import annotations
 
+import html
 import logging
 import time
 from datetime import datetime, timedelta, timezone
@@ -37,6 +38,7 @@ from datetime import datetime, timedelta, timezone
 from models import new_id, now_utc
 from services.billing_amounts import paid_cents
 from services.billing_facts import booking_facts, source_label
+from services.discord_plain_text import _without_tags
 from services.dolibarr_client import DolibarrClient, DolibarrError, instance_key, write_capable
 from services.dolibarr_links import verified_link
 from services.dolibarr_policy import CLUB_TZ
@@ -48,7 +50,7 @@ MAX_ATTEMPTS = 5
 # überschreibt sie; „none“ ist immer 0.
 DEFAULT_TAX_RATES = {"none": 0.0, "standard": 20.0, "reduced": 10.0}
 # Zahlungsstände, bei denen sich am Beleg nichts mehr bewegt - der Abgleich liest sie nur einmal am Tag nach.
-SETTLED_STATES = ("paid", "credited", "abandoned")
+SETTLED_STATES = ("paid", "paid_reduced", "credited", "abandoned")
 
 
 class Waiting(Exception):
@@ -78,6 +80,8 @@ DEFAULT_TERM_CODE = "30D"
 DEFAULT_MODE_CODE = "VIR"
 MAX_DESC = 1000
 MAX_EXTRA_TEXT = 500
+MAX_CLOSE_CODE = 40
+MAX_CLOSE_NOTE = 500
 
 
 def invoice_terms(settings: dict) -> dict:
@@ -413,9 +417,13 @@ def _day(value) -> str:
         return str(value)[:10]
 
 
-def payment_state_for(invoice_status: str, total_cents: int | None, remaining_cents: int | None, due_on: str, *, credited_cents: int = 0, today: str | None = None) -> str:
-    """Der fachliche Zahlungsstand eines Belegs (#321): offen, teilweise bezahlt, bezahlt,
-    überfällig, Überzahlung, gutgeschrieben, aufgegeben - aus Summe, Rest und Zahlungsziel."""
+def payment_state_for(invoice_status: str, total_cents: int | None, remaining_cents: int | None, due_on: str, *, credited_cents: int = 0,
+                      today: str | None = None, paid: bool = False) -> str:
+    """Der fachliche Zahlungsstand eines Belegs (#321): offen, teilweise bezahlt, bezahlt, bezahlt mit Abzug,
+    überfällig, Überzahlung, gutgeschrieben, aufgegeben - aus Status, Summe, Rest und Zahlungsziel.
+
+    „Bezahlt (mit Abzug)“ (#2226): Dolibarr rechnet ``remaintopay`` als Summe minus Zahlungen und Gutschriften. Schließt
+    jemand den Beleg mit Abzug, bleibt dort ein Rest stehen - offen ist er trotzdem nicht mehr. ``paid`` ist ``paye=1``."""
     if invoice_status == "draft":
         return "draft"
     if invoice_status == "abandoned":
@@ -423,18 +431,36 @@ def payment_state_for(invoice_status: str, total_cents: int | None, remaining_ce
     total = total_cents or 0
     if credited_cents and total and credited_cents >= total:
         return "credited"
+    settled = paid or invoice_status == "paid"
     if remaining_cents is None:
-        return "paid" if invoice_status == "paid" else "open"
+        return "paid" if settled else "open"
     if remaining_cents < 0:
         return "overpaid"
     if remaining_cents == 0:
         return "paid"
+    if settled:
+        return "paid_reduced"
     if remaining_cents < total:
         return "partial"
     today = today or datetime.now(CLUB_TZ).strftime("%Y-%m-%d")
     if due_on and due_on < today:
         return "overdue"
     return "open"
+
+
+def plain_close_note(value) -> str:
+    """Die Anmerkung vom Abschluss als reiner Text mit fester Länge (#2226): freier Text aus Dolibarr, kann auch HTML tragen."""
+    text = html.unescape(_without_tags(str(value or "")))
+    lines = (" ".join("".join(ch for ch in line if ch.isprintable()).split()) for line in text.splitlines())
+    return "\n".join(line for line in lines if line)[:MAX_CLOSE_NOTE]
+
+
+def _close_fields(invoice: dict) -> dict:
+    """Grund und Anmerkung des Abschlusses (#2226). Laut Dolibarr-Quellcode gehören sie zur Antwort; fehlen sie doch, steht
+    nichts im Stand - dann bleibt es bei „bezahlt mit Abzug“ ohne Grund, ohne Fehler, und ein schon gelesener Grund bleibt."""
+    if "close_code" not in invoice and "close_note" not in invoice:
+        return {}
+    return {"close_code": str(invoice.get("close_code") or "").strip()[:MAX_CLOSE_CODE], "close_note": plain_close_note(invoice.get("close_note"))}
 
 
 def _invoice_state(invoice: dict, *, credit_notes: list[dict] | None = None, today: str | None = None) -> dict:
@@ -461,8 +487,9 @@ def _invoice_state(invoice: dict, *, credit_notes: list[dict] | None = None, tod
         "remaining_cents": remaining_cents,
         "due_on": due_on,
         "credit_notes": notes,
-        "payment_state": payment_state_for(invoice_status, total_cents, remaining_cents, due_on, credited_cents=credited, today=today),
+        "payment_state": payment_state_for(invoice_status, total_cents, remaining_cents, due_on, credited_cents=credited, today=today, paid=paid),
         "remote_socid": int(invoice.get("socid") or 0) or None,
+        **_close_fields(invoice),
     }
 
 
@@ -472,8 +499,23 @@ def payment_view(row: dict) -> dict:
             "type": str(row.get("type") or ""), "ref": str(row.get("ref") or row.get("num") or "")[:60]}
 
 
+async def _note_close_change(db, order: dict, state: dict) -> None:
+    """Grund oder Anmerkung haben sich in Dolibarr geändert: ein Eintrag im Verlauf. Er nennt den Grund, nie den freien Text -
+    der steht einmal am Auftrag, wo die Kontolöschung ihn findet."""
+    if "close_code" not in state:
+        return
+    code, previous = state["close_code"], order.get("close_code") or ""
+    note_changed = "close_note" in state and state["close_note"] != (order.get("close_note") or "")
+    if code == previous and not note_changed:
+        return
+    await db.audit_logs.insert_one({"id": new_id(), "action": "billing.invoice.close", "target_id": order["id"], "actor_id": None,
+                                    "data": {"registration_id": order.get("registration_id"), "close_code": code, "previous_code": previous, "note_changed": note_changed},
+                                    "created_at": now_utc().isoformat()})
+
+
 async def _mark_invoiced(db, order: dict, state: dict, *, payments: list[dict] | None = None) -> None:
     now = now_utc().isoformat()
+    await _note_close_change(db, order, state)
     fields = {key: value for key, value in state.items() if key != "remote_socid"}
     await db.billing_orders.update_one({"id": order["id"]}, {"$set": {
         "status": "invoiced", "note": "", **fields, "invoiced_at": order.get("invoiced_at") or now, "synced_at": now, "updated_at": now,
@@ -605,9 +647,60 @@ async def _review_cases(db, order: dict, state: dict, payments: list[dict] | Non
     return opened
 
 
+# Was am Auftrag zum Beleg gehört: Ist der Entwurf in Dolibarr gelöscht, gibt es das alles nicht mehr (#2226).
+INVOICE_FIELDS = ("invoice_id", "invoice_ref", "invoice_status", "invoice_type", "paid", "paid_at", "remaining", "total", "remote_total_cents", "remaining_cents",
+                  "due_on", "credit_notes", "payment_state", "payments", "close_code", "close_note", "invoiced_at", "synced_at",
+                  "sync_error", "sync_error_text", "sync_error_at", "pdf_built_at", "pdf_source", "pdf_missing", "pdf_error", "pdf_error_text", "pdf_error_at", "pdf_attempts",
+                  "invoice_notice_due_at", "credit_note_due_at", "credit_note_claim_at")
+# Prüffälle, die am Beleg hängen - mit dem gelöschten Entwurf sind sie gegenstandslos. „Buchung nach dem Beleg geändert“ bleibt:
+# Der eingefrorene Preis passt dann nicht mehr, das entscheidet die Finanzverwaltung.
+DRAFT_CASES = ("invoice_gone", "amount_mismatch", "recipient_mismatch", "cancelled_after_invoice")
+
+
+async def _draft_is_gone(client: DolibarrClient, order: dict, exc: DolibarrError) -> bool:
+    """Beweist dieses „nicht gefunden“, dass der Entwurf weg ist? Nur bei einem Entwurf, nur wenn Dolibarr selbst geantwortet hat
+    (eine Fehlerangabe im Text - die Seite „Not Found“ eines Webservers davor ist kein Beweis), und nur wenn Dolibarr auch über
+    die Auftragskennung nichts findet. Scheitert dieser zweite Blick, kommt sein Fehler nach oben: Dann ist nichts bewiesen."""
+    if exc.kind != "not_found" or exc.detail is None or order.get("invoice_status") != "draft":
+        return False
+    return not await client.invoices_by_ref_ext(ref_ext_for(order))
+
+
+async def _remove_draft(db, order: dict) -> bool:
+    """Der Entwurf ist in Dolibarr gelöscht: Der Beleg gilt als entfernt. Offene Prüffälle dazu sind erledigt, die Anmeldung steht
+    wieder ohne Beleg da. Neu abgerechnet wird nicht von selbst - sonst käme ein gelöschter Entwurf immer wieder: Der Auftrag wartet auf
+    die Freigabe der Finanzverwaltung (und findet über ``ref_ext`` einen Beleg, den Dolibarr doch noch hat). Bei stornierter Buchung ist er zu Ende."""
+    from services import billing_cases
+
+    now = now_utc().isoformat()
+    cancelled = order.get("booking_state") == "cancelled"
+    ref = str(order.get("invoice_ref") or order.get("invoice_id"))
+    note = "" if cancelled else f"Entwurf {ref} wurde in Dolibarr gelöscht. Soll neu abgerechnet werden: „Freigeben“. Sonst: „Keine neue Rechnung“."
+    if order.get("booking_changed_at") and not cancelled:
+        note += " Die Buchung wurde nach dem Beleg geändert – Preis prüfen."
+    done = await db.billing_orders.update_one(
+        {"id": order["id"], "status": "invoiced", "invoice_id": order["invoice_id"]},
+        {"$set": {"status": "cancelled" if cancelled else "held", "note": note, "attempts": 0, "updated_at": now},
+         "$unset": {field: "" for field in INVOICE_FIELDS},
+         "$push": {"removed_invoices": {"invoice_id": order["invoice_id"], "invoice_ref": ref, "at": now}}})
+    if done.modified_count != 1:
+        return False
+    collection = {"event": db.event_registrations, "tournament": db.tournament_registrations}.get(order.get("kind"))
+    if collection is not None:
+        await collection.update_one({"id": order["registration_id"]}, {"$set": {"billing_status": "cancelled" if cancelled else "pending"},
+                                                                       "$unset": {"invoice_id": "", "invoice_ref": "", "invoice_status": "", "payment_state": ""}})
+    for kind in DRAFT_CASES:
+        await billing_cases.auto_resolve(db, order["id"], kind, f"Der Entwurf {ref} ist in Dolibarr gelöscht.")
+    await db.audit_logs.insert_one({"id": new_id(), "action": "billing.invoice.removed", "target_id": order["id"], "actor_id": None,
+                                    "data": {"registration_id": order.get("registration_id"), "invoice_id": order["invoice_id"], "invoice_ref": ref}, "created_at": now})
+    logger.info("[billing] Entwurf %s zu Auftrag %s ist in Dolibarr gelöscht", ref, order["id"])
+    return True
+
+
 async def sync_one(db, settings: dict, client: DolibarrClient, order: dict, counts: dict | None = None) -> dict | None:
     """Einen Beleg samt Zahlungen und Gutschriften nachlesen. Nicht lesbar → sichtbar am Auftrag
-    (`sync_error`), nie still; verschwunden → Prüffall. Gibt den Stand zurück, None ohne."""
+    (`sync_error`), nie still; freigegebener Beleg verschwunden → Prüffall; gelöschter Entwurf → entfernt
+    (#2226). Gibt den Stand zurück, None ohne."""
     from services import billing_cases
 
     counts = counts if counts is not None else {"looked": 0, "changed": 0, "paid": 0, "cases": 0, "errors": 0}
@@ -623,6 +716,14 @@ async def sync_one(db, settings: dict, client: DolibarrClient, order: dict, coun
                 raise
             payments = None   # Zahlungen darf der Website-Benutzer nicht lesen: dann gilt Summe minus Rest.
     except DolibarrError as exc:
+        try:
+            if await _draft_is_gone(client, order, exc):
+                if await _remove_draft(db, order):
+                    counts["removed"] = counts.get("removed", 0) + 1
+                    counts["changed"] += 1
+                return None
+        except DolibarrError as second:
+            exc = second
         counts["errors"] += 1
         await db.billing_orders.update_one({"id": order["id"]}, {"$set": {"sync_error": exc.kind, "sync_error_text": exc.text, "sync_error_at": now}})
         if exc.kind == "not_found":
@@ -632,7 +733,10 @@ async def sync_one(db, settings: dict, client: DolibarrClient, order: dict, coun
             logger.warning("[billing] Stand von Beleg %s nicht lesbar: %s", order.get("invoice_id"), exc.kind)
         return None
     state = _invoice_state(invoice, credit_notes=notes)
+    if order.get("anonymized_at"):
+        state.pop("close_note", None)   # Kontolöschung: die Anmerkung bleibt in Dolibarr beim Beleg, hierher kommt sie nicht mehr.
     changed = any(state.get(key) != order.get(key) for key in ("invoice_status", "paid", "invoice_ref", "payment_state", "remaining_cents", "remote_total_cents")) \
+        or any(key in state and state[key] != (order.get(key) or "") for key in ("close_code", "close_note")) \
         or (payments is not None and payments != (order.get("payments") or [])) or state["credit_notes"] != (order.get("credit_notes") or [])
     await _mark_invoiced(db, order, state, payments=payments)
     # Fehlende PDFs nachbauen (#840) - auch für Belege, die jemand in Dolibarr von Hand freigegeben hat.

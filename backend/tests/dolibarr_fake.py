@@ -1082,8 +1082,18 @@ class FakeDolibarr:
                 original.update(statut=2, paye=1)
         return row
 
-    def abandon(self, invoice_id: int) -> None:
+    def close_reduced(self, invoice_id: int, *, code: str | None = "other", note: str | None = "Nachlass laut Vorstand") -> None:
+        """„Bezahlt (mit Abzug)“ in Dolibarr (#2226): der Beleg gilt als bezahlt, `remaintopay` bleibt aber stehen - Dolibarr
+        rechnet ihn als Summe minus Zahlungen und Gutschriften. Ohne ``code`` fehlen Grund und Anmerkung in der Antwort."""
+        row = self.core_invoices[invoice_id]
+        row.update(statut=2, paye=1)
+        if code is not None:
+            row.update(close_code=code, close_note=note)
+
+    def abandon(self, invoice_id: int, *, code: str | None = None, note: str | None = None) -> None:
         self.core_invoices[invoice_id].update(statut=3)
+        if code is not None:
+            self.core_invoices[invoice_id].update(close_code=code, close_note=note)
 
     def remove(self, invoice_id: int) -> None:
         """Jemand löscht den Beleg in Dolibarr - die Website darf das nie, sieht es aber."""
