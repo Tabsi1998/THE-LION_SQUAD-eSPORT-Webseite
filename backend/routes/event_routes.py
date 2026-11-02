@@ -18,6 +18,7 @@ from services import partner_pages
 from services.notification_preferences import enqueue_newsletter_for_item
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from services import billing_orders, event_changes, event_days, event_facts, event_locations, event_notifications, event_play_along, event_program, event_registration, event_rewards, pricing
+from services.billing_amounts import public_payment_state
 from services.event_public import public_competition, public_event
 from services.event_registration import RegistrationError
 from services.mutation_lock import MutationLockBusy, mutation_lock
@@ -216,7 +217,7 @@ def _public_event_registration(registration: dict, is_staff: bool = False, with_
             "positions": [{k: line.get(k) for k in ("key", "label", "quantity", "unit_cents", "total_cents", "optional")} for line in snapshot.get("positions") or []],
             "accepted_at": snapshot.get("accepted_at"), "billing_status": registration.get("billing_status") or "pending",
             "invoice_ref": registration.get("invoice_ref"), "invoice_status": registration.get("invoice_status"),
-            "payment_state": registration.get("payment_state"),
+            "payment_state": public_payment_state(registration.get("payment_state")),
         }
     if is_staff:
         payload["email"] = registration.get("email")

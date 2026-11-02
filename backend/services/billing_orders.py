@@ -24,7 +24,7 @@ Profil-Update erzeugt einen Auftrag - nur die bestätigte Buchung mit Preis-Snap
 Buchung storniert oder geändert, obwohl der Beleg existiert, bleibt der Auftrag ``invoiced`` und
 bekommt einen **Prüffall** (``services/billing_cases``); ``booking_state`` sagt, dass die Buchung
 weg ist. Zahlungen liest die Website nur (Dolibarr ist führend): ``payment_state`` ist die Sicht
-darauf - offen, teilweise bezahlt, bezahlt, überfällig, Überzahlung, gutgeschrieben, aufgegeben.
+darauf - offen, teilweise bezahlt, bezahlt, bezahlt mit Abzug, überfällig, Überzahlung, gutgeschrieben, aufgegeben.
 **Erstattungen** sind kein Beleg und keine Gutschrift: Die Finanzverwaltung erfasst am Auftrag,
 was tatsächlich zurücküberwiesen wurde (Betrag, Tag, Referenz), nie mehr als bezahlt ist.
 """
@@ -38,7 +38,7 @@ from pymongo.errors import DuplicateKeyError
 
 from database import get_db
 from models import new_id, now_utc
-from services.billing_amounts import credited_cents, paid_cents, refunded_cents
+from services.billing_amounts import credited_cents, paid_cents, refunded_cents, waived_cents
 
 logger = logging.getLogger("tls.billing")
 
@@ -60,6 +60,7 @@ PAYMENT_STATE_LABELS = {
     "open": "offen",
     "partial": "teilweise bezahlt",
     "paid": "bezahlt",
+    "paid_reduced": "bezahlt mit Abzug",
     "overdue": "überfällig",
     "overpaid": "Überzahlung",
     "credited": "gutgeschrieben",
@@ -301,7 +302,7 @@ async def add_refund(db, order: dict, actor_id: str, *, amount_cents: int, paid_
 ATTENTION = {"pdf_missing": "PDF fehlt", "draft_old": "Entwurf seit mehr als 7 Tagen", "overdue": "überfällig"}
 DRAFT_DAYS = 7
 # Was nicht mehr offen ist, ist nie überfällig - auch wenn das Zahlungsziel vorbei ist.
-NOT_OPEN_STATES = ("paid", "credited", "abandoned", "overpaid")
+NOT_OPEN_STATES = ("paid", "paid_reduced", "credited", "abandoned", "overpaid")
 
 
 def attention_query(name: str, now=None) -> dict:
@@ -408,8 +409,8 @@ async def export_rows(db, *, kind: str | None = None, source_id: str | None = No
 
 async def source_summary(db, kind: str, source_id: str) -> dict:
     """Die Zahlen einer Veranstaltung (#322), getrennt statt in einen Topf: gebucht, fakturiert,
-    bezahlt, offen, gutgeschrieben, erstattet - jede Belegrevision nur einmal."""
-    totals = {"booked_cents": 0, "invoiced_cents": 0, "paid_cents": 0, "open_cents": 0, "credited_cents": 0, "refunded_cents": 0,
+    bezahlt, offen, gutgeschrieben, erlassen, erstattet - jede Belegrevision nur einmal."""
+    totals = {"booked_cents": 0, "invoiced_cents": 0, "paid_cents": 0, "open_cents": 0, "credited_cents": 0, "waived_cents": 0, "refunded_cents": 0,
               "orders": 0, "cancelled_orders": 0, "cases_open": 0}
     async for order in db.billing_orders.find({"kind": kind, "source_id": source_id}, {"_id": 0, "snapshot": 0}):
         totals["orders"] += 1
@@ -424,6 +425,7 @@ async def source_summary(db, kind: str, source_id: str) -> dict:
             paid = paid_cents(order)
             totals["paid_cents"] += paid
             totals["credited_cents"] += credited_cents(order)
+            totals["waived_cents"] += waived_cents(order)
             if order.get("payment_state") in ("open", "partial", "overdue"):
                 remaining = order.get("remaining_cents")
                 totals["open_cents"] += max(0, int(remaining)) if remaining is not None else max(0, total - paid)

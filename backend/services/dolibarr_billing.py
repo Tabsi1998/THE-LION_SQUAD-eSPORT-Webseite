@@ -48,7 +48,7 @@ MAX_ATTEMPTS = 5
 # überschreibt sie; „none“ ist immer 0.
 DEFAULT_TAX_RATES = {"none": 0.0, "standard": 20.0, "reduced": 10.0}
 # Zahlungsstände, bei denen sich am Beleg nichts mehr bewegt - der Abgleich liest sie nur einmal am Tag nach.
-SETTLED_STATES = ("paid", "credited", "abandoned")
+SETTLED_STATES = ("paid", "paid_reduced", "credited", "abandoned")
 
 
 class Waiting(Exception):
@@ -413,9 +413,13 @@ def _day(value) -> str:
         return str(value)[:10]
 
 
-def payment_state_for(invoice_status: str, total_cents: int | None, remaining_cents: int | None, due_on: str, *, credited_cents: int = 0, today: str | None = None) -> str:
-    """Der fachliche Zahlungsstand eines Belegs (#321): offen, teilweise bezahlt, bezahlt,
-    überfällig, Überzahlung, gutgeschrieben, aufgegeben - aus Summe, Rest und Zahlungsziel."""
+def payment_state_for(invoice_status: str, total_cents: int | None, remaining_cents: int | None, due_on: str, *, credited_cents: int = 0,
+                      today: str | None = None, paid: bool = False) -> str:
+    """Der fachliche Zahlungsstand eines Belegs (#321): offen, teilweise bezahlt, bezahlt, bezahlt mit Abzug,
+    überfällig, Überzahlung, gutgeschrieben, aufgegeben - aus Status, Summe, Rest und Zahlungsziel.
+
+    „Bezahlt (mit Abzug)“ (#2226): Dolibarr rechnet ``remaintopay`` als Summe minus Zahlungen und Gutschriften. Schließt
+    jemand den Beleg mit Abzug, bleibt dort ein Rest stehen - offen ist er trotzdem nicht mehr. ``paid`` ist ``paye=1``."""
     if invoice_status == "draft":
         return "draft"
     if invoice_status == "abandoned":
@@ -423,12 +427,15 @@ def payment_state_for(invoice_status: str, total_cents: int | None, remaining_ce
     total = total_cents or 0
     if credited_cents and total and credited_cents >= total:
         return "credited"
+    settled = paid or invoice_status == "paid"
     if remaining_cents is None:
-        return "paid" if invoice_status == "paid" else "open"
+        return "paid" if settled else "open"
     if remaining_cents < 0:
         return "overpaid"
     if remaining_cents == 0:
         return "paid"
+    if settled:
+        return "paid_reduced"
     if remaining_cents < total:
         return "partial"
     today = today or datetime.now(CLUB_TZ).strftime("%Y-%m-%d")
@@ -461,7 +468,7 @@ def _invoice_state(invoice: dict, *, credit_notes: list[dict] | None = None, tod
         "remaining_cents": remaining_cents,
         "due_on": due_on,
         "credit_notes": notes,
-        "payment_state": payment_state_for(invoice_status, total_cents, remaining_cents, due_on, credited_cents=credited, today=today),
+        "payment_state": payment_state_for(invoice_status, total_cents, remaining_cents, due_on, credited_cents=credited, today=today, paid=paid),
         "remote_socid": int(invoice.get("socid") or 0) or None,
     }
 

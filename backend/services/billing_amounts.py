@@ -20,6 +20,18 @@ def paid_cents(order: dict, payments: list[dict] | None = None) -> int:
     return max(0, total - int(remaining))
 
 
+def waived_cents(order: dict) -> int:
+    """Was bei „Bezahlt (mit Abzug)“ erlassen wurde (#2226): der Rest, den Dolibarr stehen lässt. Kein Geld und keine Gutschrift -
+    zählt nie zu ``paid_cents`` und damit nie zum Erstattungslimit."""
+    return max(0, int(order.get("remaining_cents") or 0)) if order.get("payment_state") == "paid_reduced" else 0
+
+
+def public_payment_state(state: str | None) -> str | None:
+    """Der Zahlungsstand für die Person selbst (Web und App): „mit Abzug“ heißt für sie schlicht bezahlt. So kommt bei keinem
+    App-Build ein Wert an, den es nicht kennt; die Gründe bleiben in der Verwaltung."""
+    return "paid" if state == "paid_reduced" else state
+
+
 def refunded_cents(order: dict) -> int:
     return sum(int(row.get("amount_cents") or 0) for row in order.get("refunds") or [])
 

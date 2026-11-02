@@ -57,6 +57,7 @@ def _decorate(row: dict, names: dict, people: dict) -> dict:
         row["paid_cents"] = billing_orders.paid_cents(row)
         row["refunded_cents"] = billing_orders.refunded_cents(row)
         row["credited_cents"] = billing_orders.credited_cents(row)
+        row["waived_cents"] = billing_orders.waived_cents(row)
     return row
 
 
@@ -92,7 +93,7 @@ def _vienna_moment(value) -> str:
 
 EXPORT_DAY = r"^\d{4}-\d{2}-\d{2}$"
 # Nur, was der Kassier braucht - keine Adressen, keine Bankdaten, keine Dolibarr-Schlüssel.
-EXPORT_COLUMNS = ("Rechnung", "Angelegt am", "Angebot", "Person", "Betrag", "Zahlungsstand", "Bezahlt", "Gutgeschrieben", "Erstattet", "Buchung", "Stand")
+EXPORT_COLUMNS = ("Rechnung", "Angelegt am", "Angebot", "Person", "Betrag", "Zahlungsstand", "Bezahlt", "Gutgeschrieben", "Erlassen", "Erstattet", "Buchung", "Stand")
 
 
 def _export_cells(row: dict) -> tuple:
@@ -101,7 +102,7 @@ def _export_cells(row: dict) -> tuple:
     money = lambda cents: pricing.format_cents(int(cents or 0), currency)  # noqa: E731
     return (
         row.get("invoice_ref") or "", _vienna_moment(row.get("invoiced_at")), source, row.get("person") or "", money(row.get("total_cents")),
-        row.get("payment_label") or row.get("status_label") or "", money(row.get("paid_cents")), money(row.get("credited_cents")), money(row.get("refunded_cents")),
+        row.get("payment_label") or row.get("status_label") or "", money(row.get("paid_cents")), money(row.get("credited_cents")), money(row.get("waived_cents")), money(row.get("refunded_cents")),
         "storniert" if row.get("booking_state") == "cancelled" else "aktiv", _vienna_moment(row.get("synced_at")),
     )
 
@@ -247,7 +248,7 @@ async def finance_invoice_options(me: dict = Depends(require_area("finance", "sy
 
 @router.get("/sources/{kind}/{source_id}")
 async def source_summary(kind: str, source_id: str, me: dict = Depends(require_area("finance"))):
-    """Die Zahlen einer Veranstaltung (#322): gebucht, fakturiert, bezahlt, offen, gutgeschrieben, erstattet."""
+    """Die Zahlen einer Veranstaltung (#322): gebucht, fakturiert, bezahlt, offen, gutgeschrieben, erlassen, erstattet."""
     if kind not in ("event", "tournament"):
         raise HTTPException(404, "Unbekannte Art.")
     return await billing_orders.source_summary(get_db(), kind, source_id)
@@ -382,7 +383,7 @@ async def order_detail(order_id: str, me: dict = Depends(require_area("finance")
         "cases": cases,
         "timeline": _timeline(order, cases, audit, people),
         "sums": {"paid_cents": paid, "refunded_cents": billing_orders.refunded_cents(order), "credited_cents": billing_orders.credited_cents(order),
-                 "refundable_cents": max(0, paid - billing_orders.refunded_cents(order))},
+                 "waived_cents": billing_orders.waived_cents(order), "refundable_cents": max(0, paid - billing_orders.refunded_cents(order))},
         "payment_labels": billing_orders.PAYMENT_STATE_LABELS,
     }
 
