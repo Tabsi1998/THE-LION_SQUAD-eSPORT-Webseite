@@ -98,12 +98,7 @@ EXPORT_COLUMNS = ("Rechnung", "Rechnungsdatum", "Angebot", "Person", "Betrag", "
 def _export_cells(row: dict) -> tuple:
     source = (row.get("source") or {}).get("name") or row.get("source_id") or ""
     currency = row.get("currency") or "EUR"
-
-    def money(cents) -> str:
-        # Wie auf der Seite (formatCents): das Vorzeichen getrennt, damit eine Gutschrift nicht um einen Euro danebenliegt.
-        value = int(cents or 0)
-        return ("-" if value < 0 else "") + pricing.format_cents(abs(value), currency)
-
+    money = lambda cents: pricing.format_cents(int(cents or 0), currency)  # noqa: E731
     return (
         row.get("invoice_ref") or "", _vienna_moment(row.get("invoiced_at")), source, row.get("person") or "", money(row.get("total_cents")),
         row.get("payment_label") or row.get("status_label") or "", money(row.get("paid_cents")), money(row.get("credited_cents")), money(row.get("refunded_cents")),
