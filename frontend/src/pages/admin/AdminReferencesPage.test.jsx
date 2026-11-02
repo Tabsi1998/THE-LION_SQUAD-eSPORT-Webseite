@@ -78,6 +78,31 @@ test("Archivieren und Zurückholen schalten „Aktiv“; Löschen in Verwendung 
   await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Diese Referenz wird noch verwendet: gehört zu einer Saison."));
 });
 
+test("Liste: Suche, Filter und Seiten; eine neue Suche beginnt auf Seite 1 (#2130)", async () => {
+  const many = Array.from({ length: 30 }, (_, index) => ({ ...LEGACY_ITEM, id: `r-${index}`, title: `Cup ${index}`, display_title: `Cup ${index}`, start_date: index === 29 ? "2024-02-02" : "2026-02-02" }));
+  mockApi(many);
+  render(<MemoryRouter><AdminReferencesPage /></MemoryRouter>);
+  expect(await screen.findByTestId("reference-row-r-0")).toBeInTheDocument();
+  expect(screen.queryByTestId("reference-row-r-25")).toBeNull();
+  expect(screen.getByTestId("reference-filter-count")).toHaveTextContent("30 von 30 Referenzen");
+  fireEvent.click(screen.getByTestId("reference-page-next"));
+  expect(screen.getByTestId("reference-row-r-25")).toBeInTheDocument();
+  expect(screen.getByTestId("reference-page-info")).toHaveTextContent("Seite 2 von 2");
+
+  fireEvent.change(screen.getByTestId("reference-search"), { target: { value: "cup 7" } });
+  expect(screen.getByTestId("reference-row-r-7")).toBeInTheDocument();
+  expect(screen.getByTestId("reference-filter-count")).toHaveTextContent("1 von 30 Referenzen");
+  expect(screen.queryByTestId("reference-pages")).toBeNull();
+
+  fireEvent.change(screen.getByTestId("reference-search"), { target: { value: "" } });
+  fireEvent.change(screen.getByTestId("reference-filter-year"), { target: { value: "2024" } });
+  expect(screen.getByTestId("reference-row-r-29")).toBeInTheDocument();
+  expect(screen.getByTestId("reference-filter-count")).toHaveTextContent("1 von 30 Referenzen");
+
+  fireEvent.change(screen.getByTestId("reference-filter-status"), { target: { value: "archived" } });
+  expect(screen.getByTestId("reference-filter-empty")).toBeInTheDocument();
+});
+
 test("Neue Referenz: Felder statt Titel, zwei Einzelstarter mit je eigener Platzierung", async () => {
   mockApi([]);
   render(<MemoryRouter><AdminReferencesPage /></MemoryRouter>);

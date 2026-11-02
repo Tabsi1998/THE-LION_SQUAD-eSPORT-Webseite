@@ -13,7 +13,8 @@ import { gameOptionLabel, selectableGames } from "@/lib/gameLabels";
 import { checkKey, warningSummary, warningsByField } from "@/lib/referenceChecks";
 import { AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
-import { Archive, ArchiveRestore, ExternalLink, Flag, History, Medal, Pencil, Plus, Save, Trash2, User, Users } from "lucide-react";
+import { Archive, ArchiveRestore, ExternalLink, Flag, History, Medal, Pencil, Plus, Save, Search, Trash2, User, Users } from "lucide-react";
+import { filterReferences, pageOf, REFERENCE_STATUS_FILTERS, referenceFilterOptions } from "@/lib/referenceAdminList";
 import { viennaDate, viennaDay } from "@/lib/vienna";
 import { podiumItems, yearOf } from "@/lib/referencesOverview";
 import { bestPlacement } from "@/components/tls/references/referenceParts";
@@ -218,6 +219,13 @@ export default function AdminReferencesPage() {
   const [editing, setEditing] = useState(null);
   const confirm = useConfirm();
   const suggestions = useMemo(() => buildReferenceSuggestions(items, helperSettings), [items, helperSettings]);
+  // Suche, Filter und Seiten (#2130): die Liste kann bis zu 1000 Einträge haben.
+  const [filters, setFilters] = useState({ query: "", game: "", year: "", status: "" });
+  const [page, setPage] = useState(1);
+  const setFilter = (key, value) => { setFilters((current) => ({ ...current, [key]: value })); setPage(1); };
+  const filterOptions = useMemo(() => referenceFilterOptions(items), [items]);
+  const filtered = useMemo(() => filterReferences(items, filters), [items, filters]);
+  const visible = pageOf(filtered, page);
 
   const load = useCallback(async () => {
     const [{ data: refs }, { data: gameRows }, { data: profileRows }, { data: helpers }, partnerRows, seasonRows] = await Promise.all([
@@ -302,8 +310,32 @@ export default function AdminReferencesPage() {
       <ReferenceHelperAdmin helpers={helperSettings} onSaved={(helpers) => { setHelperSettings(helpers); load(); }} />
       <ReferenceCheckAdmin items={items} onEdit={(id) => setEditing(items.find((item) => item.id === id) || null)} />
 
+      {items.length > 0 && (
+        <div className="mb-4 rounded-sm border border-white/10 bg-[#121212] p-3" data-testid="reference-filters">
+          <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-[minmax(16rem,1fr)_14rem_8rem_11rem] gap-2">
+            <label className="relative block sm:col-span-3 lg:col-span-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" aria-hidden="true" />
+              <input value={filters.query} onChange={(e) => setFilter("query", e.target.value)} placeholder="Turnier, Veranstalter, Team oder Name suchen" aria-label="Referenzen suchen" data-testid="reference-search" className="w-full rounded-sm border border-white/10 bg-[#0A0A0A] py-2 pl-9 pr-3 text-sm focus:border-[#29B6E8] focus:outline-none" />
+            </label>
+            <select value={filters.game} onChange={(e) => setFilter("game", e.target.value)} aria-label="Nach Spiel filtern" data-testid="reference-filter-game" className="min-w-0 rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2 text-sm">
+              <option value="">Alle Spiele</option>
+              {filterOptions.games.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+            <select value={filters.year} onChange={(e) => setFilter("year", e.target.value)} aria-label="Nach Jahr filtern" data-testid="reference-filter-year" className="min-w-0 rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2 text-sm">
+              <option value="">Alle Jahre</option>
+              {filterOptions.years.map((value) => <option key={value} value={value}>{value}</option>)}
+            </select>
+            <select value={filters.status} onChange={(e) => setFilter("status", e.target.value)} aria-label="Nach Status filtern" data-testid="reference-filter-status" className="min-w-0 rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2 text-sm">
+              <option value="">Alle Status</option>
+              {REFERENCE_STATUS_FILTERS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          </div>
+          <div className="mt-2 text-xs text-white/45" data-testid="reference-filter-count">{filtered.length} von {items.length} Referenzen</div>
+        </div>
+      )}
+
       <div className="space-y-3">
-        {items.map((item) => (
+        {visible.rows.map((item) => (
           <div key={item.id} className={`border border-white/10 rounded-sm bg-[#121212] p-4 ${item.is_active === false ? "opacity-70" : ""}`} data-testid={`reference-row-${item.id}`}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -355,7 +387,16 @@ export default function AdminReferencesPage() {
           </div>
         ))}
         {items.length === 0 && <div className="text-center py-16 border border-dashed border-white/15 rounded-sm text-white/40 font-display tracking-widest">NOCH KEINE REFERENZEN</div>}
+        {items.length > 0 && filtered.length === 0 && <div className="text-center py-12 border border-dashed border-white/15 rounded-sm text-white/45" data-testid="reference-filter-empty">Keine Referenz passt zu dieser Suche.</div>}
       </div>
+
+      {visible.pages > 1 && (
+        <nav className="mt-4 flex items-center justify-between gap-3" aria-label="Seiten der Referenzliste" data-testid="reference-pages">
+          <button type="button" onClick={() => setPage(visible.page - 1)} disabled={visible.page <= 1} data-testid="reference-page-back" className="px-3 py-2 border border-white/15 rounded-sm text-xs font-bold uppercase tracking-wider text-white/70 hover:text-white disabled:opacity-40">Zurück</button>
+          <span className="text-xs text-white/55 tabular-nums" data-testid="reference-page-info">Seite {visible.page} von {visible.pages}</span>
+          <button type="button" onClick={() => setPage(visible.page + 1)} disabled={visible.page >= visible.pages} data-testid="reference-page-next" className="px-3 py-2 border border-white/15 rounded-sm text-xs font-bold uppercase tracking-wider text-white/70 hover:text-white disabled:opacity-40">Weiter</button>
+        </nav>
+      )}
 
       {editing && <ReferenceForm reference={editing} games={games} memberProfiles={memberProfiles} partners={partners} lineages={lineages} suggestions={suggestions} items={items} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
     </AdminLayout>
