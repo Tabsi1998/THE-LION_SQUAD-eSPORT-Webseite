@@ -73,6 +73,7 @@ def test_the_backend_of_the_acceptance_stack_has_no_public_backend_url():
     {"MONGO_URL": "mongodb://abnahme:nur-test@db.lionsquad.at:27017"},
     {"MONGO_URL": "mongodb+srv://abnahme:nur-test@cluster0.example.net"},
     {"MONGO_URL": "mongodb://mongodb:27017,db.lionsquad.at:27017/?replicaSet=rs0"},
+    {"MONGO_URL": "mongodb://abnahme:nur-test@mongodb:27017/?authSource=admin&replicaSet=rs0"},
 ])
 def test_anything_else_stops_before_writing(change):
     with pytest.raises(SystemExit):
