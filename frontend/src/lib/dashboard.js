@@ -124,6 +124,8 @@ export function actionHref(action) {
     case "event": return target ? `/events/${target}` : "/events";
     case "match": return target ? `/matches/${target}` : "/dashboard";
     case "prizes": return "/my/prizes";
+    // Kader auffüllen (#2202): `team_id` statt `target_id` - die App kennt das Ziel noch nicht und zeigt nur die Zeile.
+    case "team": return action.team_id ? `/teams/${action.team_id}` : "/teams";
     default: return "";
   }
 }

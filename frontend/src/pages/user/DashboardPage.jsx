@@ -63,9 +63,9 @@ function Pill({ children, tone = "cyan", testId }) {
 }
 
 function actionIcon(type) {
-  // Liga (#2110): Terminvorschlag beantworten, Aufstellung nachtragen.
+  // Liga (#2110, #2202): Terminvorschlag beantworten, Aufstellung nachtragen, Kader auffüllen.
   if (type === "match_schedule") return CalendarClock;
-  if (type === "match_lineup") return Users;
+  if (type === "match_lineup" || type === "squad_short") return Users;
   if (String(type || "").includes("checkin")) return ClipboardCheck;
   if (String(type || "").includes("prize")) return Gift;
   if (String(type || "").includes("match")) return Swords;

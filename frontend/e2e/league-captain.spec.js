@@ -45,6 +45,7 @@ const DASHBOARD = {
     actions: [
       { id: "match-schedule-m1", type: "match_schedule", label: "Terminvorschlag beantworten", detail: `${TOURNAMENT.title} · gegen ${SIDES[1].name} · Vorschlag Mo 16.11. 20:00`, target_type: "match", target_id: "m1", priority: 8 },
       { id: "match-lineup-m2", type: "match_lineup", label: "Aufstellung nachtragen", detail: `${TOURNAMENT.title} · gegen ${SIDES[1].name} · im Web bis Mi 18.11. 21:00`, target_type: "match", target_id: "m2", priority: 6 },
+      { id: "squad-short-r1", type: "squad_short", label: "Kader auffüllen", detail: `${TOURNAMENT.title} · Rudel mit langem Namen · 3 von mindestens 4 Spielern, im Web ergänzen`, target_type: "team", team_id: "t1", priority: 8 },
     ],
   },
   season: null, stats: {},
@@ -111,6 +112,8 @@ test.describe("Liga: Captains", () => {
       await expect(actions.getByText("Terminvorschlag beantworten", { exact: true })).toBeVisible();
       await expect(actions.getByText("Aufstellung nachtragen", { exact: true })).toBeVisible();
       await expect(page.getByTestId("dashboard-action-match-schedule-m1")).toHaveAttribute("href", "/matches/m1");
+      await expect(page.getByTestId("dashboard-action-squad-short-r1")).toHaveAttribute("href", "/teams/t1");
+      await expect(page.getByTestId("dashboard-action-squad-short-r1")).toContainText("3 von mindestens 4");
       await expectNoSideScroll(page);
       await testInfo.attach(`startseite-${width}.png`, { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
     });

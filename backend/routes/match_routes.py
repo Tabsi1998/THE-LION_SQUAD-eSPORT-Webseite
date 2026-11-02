@@ -1174,6 +1174,7 @@ async def _submit_staff_result(db, match: dict, body: MatchV2ResultSubmit, raw_r
                                  force=force, reason=body.reason, games=games, lineups_missing=missing)
         if league and games:
             await league_games.lock_lineup_ids(db, league, games, league.reg_ids)
+            await league_games.log_both_sides_kept(db, league, games, league.reg_ids, me.get("id"))
         return held
     ensure_no_hold(match)
     outcome = await submit_v2_result(
@@ -1197,6 +1198,7 @@ async def _submit_staff_result(db, match: dict, body: MatchV2ResultSubmit, raw_r
     if league and games and not outcome.get("idempotent_replay"):
         # Spiel-ID je Season (#2108): erst nach dem Speichern des Ergebnisses festhalten.
         await league_games.lock_lineup_ids(db, league, games, league.reg_ids)
+        await league_games.log_both_sides_kept(db, league, games, league.reg_ids, me.get("id"))
     return outcome
 
 

@@ -337,6 +337,7 @@ def normalize_games(
             f"Best of {setup.best_of}: eine Seite braucht {setup.needed} gewonnene "
             f"{'Map' if setup.needed == 1 else 'Maps'}."
         )
+    check_both_sides(setup, games, allowed_lineups)
     return games
 
 
@@ -421,13 +422,64 @@ def lineup_union(match: dict) -> list[str]:
 
 
 def _sides_of(match: dict, user_id: str) -> set[str]:
-    sides: set[str] = set()
-    for games in _lineup_sources(match):
+    return _sides_by_person(_lineup_sources(match)).get(user_id, set())
+
+
+def _sides_by_person(sources: list[list[dict]]) -> dict[str, set[str]]:
+    """Je Person die Seiten, für die sie in diesen Maps aufgestellt ist."""
+    sides: dict[str, set[str]] = {}
+    for games in sources:
         for game in games:
             for reg_id, lineup in (game.get("lineups") or {}).items():
-                if user_id in (lineup or []):
-                    sides.add(reg_id)
+                for user_id in lineup or []:
+                    if user_id:
+                        sides.setdefault(user_id, set()).add(reg_id)
     return sides
+
+
+def check_both_sides(setup: LeagueSetup, games: list[dict], own_sides) -> None:
+    """Dieselbe Person steht nie auf beiden Seiten desselben Spiels (#2202) - über alle Maps. ``own_sides``: die Seiten, deren
+    Aufstellung ``games`` neu setzt; für die anderen zählt, was am Spiel gilt (etwa die Meldung der Gegenseite beim
+    Bestätigen). Altbestand: Wer dort schon auf beiden Seiten steht, hält keine Korrektur auf - sonst käme ein altes Spiel
+    nicht mehr aus diesem Stand heraus; das Protokoll hält es fest (``log_both_sides_kept``)."""
+    fresh, _kept = _on_both_sides(setup, games, own_sides)
+    if fresh:
+        user_id, sides = fresh[0]
+        state = next((setup.id_status[side][user_id] for side in sides if user_id in setup.id_status.get(side, {})), None)
+        name = (state or {}).get("name") or "Eine Person"
+        raise LeagueGamesError(f"{name} steht schon in der Aufstellung der anderen Seite – dieselbe Person spielt nie "
+                               "auf beiden Seiten eines Spiels.")
+
+
+def _on_both_sides(setup: LeagueSetup, games: list[dict], own_sides) -> tuple[list[tuple[str, set[str]]], list[str]]:
+    """Wer danach auf beiden Seiten stünde: neu dazugekommen (mit den neuen Seiten) und schon vorher so gespeichert."""
+    stored = _sides_by_person(_lineup_sources(setup.match))
+    own = set(own_sides)
+    fresh, kept = [], []
+    for user_id, sides in sorted(_sides_by_person([games]).items()):
+        if sides & own and len(sides | (stored.get(user_id, set()) - own)) > 1:
+            if len(stored.get(user_id, set())) > 1:
+                kept.append(user_id)
+            else:
+                fresh.append((user_id, sides))
+    return fresh, kept
+
+
+async def log_both_sides_kept(db, setup: LeagueSetup, games: list[dict] | None, own_sides, actor_id: str | None) -> None:
+    """Protokoll, wenn eine Korrektur Altbestand auf beiden Seiten durchlässt - nur die Zahl, ohne Personen. ``setup.match``
+    ist der Stand vor dem Schreiben."""
+    from models import new_id, now_utc
+
+    _fresh, kept = _on_both_sides(setup, games or [], own_sides)
+    if kept:
+        await db.audit_logs.insert_one({
+            "id": new_id(),
+            "action": "match.lineup.both_sides_kept",
+            "target_id": setup.match.get("tournament_id"),
+            "actor_id": actor_id,
+            "data": {"match_id": setup.match.get("id"), "people": len(kept)},
+            "created_at": now_utc().isoformat(),
+        })
 
 
 async def check_double_use(db, setup: LeagueSetup, games: list[dict], registration_ids: set[str] | list[str]) -> None:
@@ -657,6 +709,7 @@ async def amend_lineups(
         }
         for game in games
     ]
+    check_both_sides(setup, new_games, {registration_id})
     await check_double_use(db, setup, new_games, {registration_id})
     missing = missing_lineups(new_games, setup.reg_ids)
     stored = await db.matches_v2.update_one(
@@ -667,6 +720,7 @@ async def amend_lineups(
         raise LeagueGamesError("Das Spiel hat sich gerade geändert – bitte neu laden und noch einmal speichern.", 409)
     await lock_lineup_ids(db, setup, new_games, {registration_id})
     await refresh_lineup_index(db, match["id"])
+    await log_both_sides_kept(db, setup, new_games, {registration_id}, actor_id)
     await db.audit_logs.insert_one(
         {
             "id": new_id(),
@@ -720,8 +774,9 @@ def _games_view(games: list[dict] | None, people: dict[str, dict], with_lineups:
     return out
 
 
-def _lobby_ids(setup: LeagueSetup) -> list[dict]:
-    """Je Seite die Spieler mit der Spiel-ID, die in der Season gilt - leer bei Spielen ohne Pflicht-ID."""
+def _lobby_ids(setup: LeagueSetup, side_id: str | None, staff: bool) -> list[dict]:
+    """Je Seite die Spieler mit der Spiel-ID, die in der Season gilt - leer bei Spielen ohne Pflicht-ID. Eine Sperre bleibt
+    bei der eigenen Seite und der Leitung: Für die Gegenseite fehlt der gesperrte Spieler in der Liste."""
     if not setup.roster or not getattr(setup.roster, "fields", None):
         return []
     out = []
@@ -729,6 +784,8 @@ def _lobby_ids(setup: LeagueSetup) -> list[dict]:
         players = []
         for user_id in setup.rosters.get(reg_id) or set():
             state = (setup.id_status.get(reg_id) or {}).get(user_id) or {}
+            if state.get("state") == league_roster.BANNED and reg_id != side_id and not staff:
+                continue
             players.append({"id": user_id, "name": state.get("name") or "Spieler", "text": state.get("text"),
                             "ok": bool(state.get("ok", True)), "reason": state.get("reason")})
         players.sort(key=lambda row: row["name"].lower())
@@ -822,7 +879,7 @@ async def page_block(db, setup: LeagueSetup, *, side_id: str | None, can_act: bo
             else {}
         ),
         # Spiel-IDs beider Seiten für die Lobby (#2108) - nur Beteiligte und Turnierleitung, wie Aufstellungen.
-        "lobby_ids": _lobby_ids(setup) if sees_lineups else [],
+        "lobby_ids": _lobby_ids(setup, side_id, staff) if sees_lineups else [],
         "id_label": league_roster.labels(setup.roster.fields) if setup.roster and setup.roster.fields else None,
         "games": _games_view(match.get("games"), people, sees_lineups),
         "lineups_missing": list(match.get("lineups_missing") or []),

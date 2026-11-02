@@ -143,6 +143,24 @@ for (const [label, width, height] of WIDTHS) {
       await expect.poll(() => calls.some((call) => call.path === "/api/teams/t-3/restore")).toBe(true);
     });
 
+    test("Teamseite: Rückfrage warnt vor zu kleinem Liga-Kader, der Abgang bleibt möglich (#2202)", async ({ page }) => {
+      const calls = [];
+      const mate = { id: "u-2", username: "probegast", display_name: "ProbeGast" };
+      await mockApi(page, LEAD, {
+        "/api/teams/t-1": { ...TEAM, member_ids: [LEAD.id, mate.id], members: [...TEAM.members, mate] },
+        "/api/teams/t-1/overview": { upcoming: [], recent: [] },
+        "/api/teams/t-1/level": {},
+        "/api/teams/t-1/squads": [{ id: "s-1", team_id: "t-1", name: "Erste", status: "active", member_ids: [LEAD.id, mate.id], members: [...TEAM.members, mate], league_requirement: { min_size: 2, title: `Staffel ${LONG_NAME}` } }],
+      }, calls);
+      await page.goto("/teams/t-1");
+      await page.getByTestId("team-kick-u-2").click();
+      await expect(page.getByTestId("confirm-dialog")).toContainText("noch 1 von mindestens 2 Spielern");
+      await expect(page.getByTestId("confirm-dialog")).toContainText("Das bleibt möglich");
+      expect(await overflow(page)).toBeLessThanOrEqual(0);
+      await page.getByTestId("confirm-dialog-confirm").click();
+      await expect.poll(() => calls.find((call) => call.method === "DELETE")?.path).toBe("/api/teams/t-1/members/u-2");
+    });
+
     test("Teamseite: privat schalten mit Hinweis, Beitrittscode erneuern, aufgelöst statt nicht gefunden", async ({ page }) => {
       const calls = [];
       await mockApi(page, LEAD, {

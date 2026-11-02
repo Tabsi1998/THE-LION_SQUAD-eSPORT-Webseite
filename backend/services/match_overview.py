@@ -289,6 +289,20 @@ async def own_match_tasks(db, user: dict, registrations: list[dict]) -> list[dic
     ]
 
 
+async def own_squad_tasks(db, user: dict, registrations: list[dict]) -> list[dict]:
+    """„Kader auffüllen“ (#2202): für Co-Teams in einer nicht beendeten Staffel, deren Kader unter der Mindestgröße liegt - für
+    Captain, Vertreter und die Leitung des Hauptteams. Der Stand kommt jedes Mal frisch; reicht der Kader, ist die Aufgabe
+    weg. Eigene Aufgabe neben ``own_match_tasks``: Die Teamleitung pflegt den Kader auch, wenn ein Captain da ist."""
+    from services.squad_shortage import open_shortages
+
+    return [
+        {"task": "squad", "registration_id": row["registration_id"], "team_id": row["team_id"], "squad_name": row["squad_name"],
+         "size": row["size"], "min_size": row["min_size"], "tournament_title": row["tournament"].get("title")}
+        for row in await open_shortages(db, registrations)
+        if user.get("id") in row["care_ids"]
+    ]
+
+
 def _assignment_matches(assignment: dict, match: dict) -> bool:
     scope = assignment.get("scope") or "tournament"
     scope_id = assignment.get("scope_id")

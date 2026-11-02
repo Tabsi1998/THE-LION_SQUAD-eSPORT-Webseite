@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { Crown, Edit, Lock, MessageSquare, Plus, Search, Send, Shield, ShieldCheck, Star, Swords, TrendingUp, Trophy, Users, UserPlus, Zap } from "lucide-react";
 import { AwardBanner } from "@/components/tls/AwardBanner";
 import { viennaDateTime } from "@/lib/vienna";
+import { departureWarning } from "@/lib/squadShortage";
 import { teamLogoUpload } from "@/lib/svgLogo";
 import { TeamsPanel } from "@/pages/user/profile/TeamsPanel";
 import { TeamSchedule } from "@/pages/public/team/TeamSchedule";
@@ -269,11 +270,13 @@ function TeamDetail({ id }) {
   // Co-Leitung brauchen sie für ihr eigenes Team nicht. Fehlt nur die Zwei-Faktor-Anmeldung, steht „2FA einrichten“ da.
   const leadsTeam = !!user && (team.leader_id === user.id || !!team.co_leader_ids?.includes(user.id));
   const canEdit = !!user && (!!team.can_manage || leadsTeam);
+  // Nur die Pflege (#2202): Die Freigabe „Turnierleitung“ bearbeitet Team und Co-Teams, öffnet aber weder Chat noch Einladungen.
+  const canEditTeam = canEdit || (!!user && !!team.can_edit_team);
   const canRemoveMembers = !!user && (!!team.can_remove_members || leadsTeam);
   const canDissolve = !!user && (!!team.can_dissolve || team.leader_id === user.id);
   // Rollen und Übergabe (#2128, TM6): auch der Club-Admin - sonst säße ein Team ohne Teamleitung fest.
   const canChangeRoles = !!user && (!!team.can_change_roles || team.leader_id === user.id);
-  const teamNeedsSecondFactor = !!user && !canEdit && !!team.admin_needs_second_factor && needsSecondFactor(user);
+  const teamNeedsSecondFactor = !!user && !canEditTeam && !!team.admin_needs_second_factor && needsSecondFactor(user);
   // Teambanner (#230): eine Auszeichnung des Teams im Kopf; nur die Teamleitung wählt, der Server prüft.
   const featureTeamAward = async (awardId) => {
     try {
@@ -304,11 +307,23 @@ function TeamDetail({ id }) {
     }, "Team-Beitritt fehlgeschlagen.");
   };
 
+  // Kader unter Mindestgröße (#2202): Der Abgang bleibt möglich, die Rückfrage sagt vorher, was er bewirkt. Lädt die Liste
+  // nicht, kommt die Rückfrage ohne den Satz - der Server warnt danach trotzdem.
+  const departureNote = async (userId) => {
+    try {
+      const { data } = await api.get(`/teams/${team.id}/squads`);
+      const warning = departureWarning(data, userId);
+      return warning ? ` ${warning}` : "";
+    } catch {
+      return "";
+    }
+  };
+
   const leave = async () => {
     await runAction(async () => {
       if (!await confirm({
         title: "Team verlassen?",
-        description: `Du bist danach nicht mehr in ${team.name} und seinen Co-Teams. Zurück kommst du nur mit einer neuen Einladung oder dem Beitrittscode.`,
+        description: `Du bist danach nicht mehr in ${team.name} und seinen Co-Teams. Zurück kommst du nur mit einer neuen Einladung oder dem Beitrittscode.${await departureNote(user?.id)}`,
         confirmLabel: "Team verlassen",
       })) return;
       await api.post(`/teams/${team.id}/leave`);
@@ -321,7 +336,7 @@ function TeamDetail({ id }) {
     await runAction(async () => {
       if (!await confirm({
         title: "Mitglied entfernen?",
-        description: `${m.display_name || m.username} wirklich aus dem Team entfernen?`,
+        description: `${m.display_name || m.username} wirklich aus dem Team entfernen?${await departureNote(m.id)}`,
         confirmLabel: "Entfernen",
       })) return;
       await api.delete(`/teams/${team.id}/members/${m.id}`);
@@ -365,10 +380,10 @@ function TeamDetail({ id }) {
         actions={(
           <>
             {canEdit ? (
-              <>
-                <button type="button" onClick={() => setInviteOpen(true)} data-testid="team-invite-open" className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold inline-flex items-center gap-2"><UserPlus className="w-3.5 h-3.5" /> Einladen</button>
-                <button onClick={() => setEditing(team)} disabled={mutating} data-testid="team-edit-open" className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold inline-flex items-center gap-2 disabled:opacity-50"><Edit className="w-3.5 h-3.5" /> Bearbeiten</button>
-              </>
+              <button type="button" onClick={() => setInviteOpen(true)} data-testid="team-invite-open" className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold inline-flex items-center gap-2"><UserPlus className="w-3.5 h-3.5" /> Einladen</button>
+            ) : null}
+            {canEditTeam ? (
+              <button onClick={() => setEditing(team)} disabled={mutating} data-testid="team-edit-open" className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold inline-flex items-center gap-2 disabled:opacity-50"><Edit className="w-3.5 h-3.5" /> Bearbeiten</button>
             ) : null}
             {teamNeedsSecondFactor ? (
               <Link to={mfaSetupPath(`/teams/${team.id}`)} data-testid="team-mfa-setup" title="Teams verwalten geht für Admins erst mit bestätigter Zwei-Faktor-Anmeldung." className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold inline-flex items-center gap-2"><ShieldCheck className="w-3.5 h-3.5" /> 2FA einrichten</Link>
@@ -398,7 +413,7 @@ function TeamDetail({ id }) {
           )}
           <TeamLeague overview={overview} />
           {/* Co-Teams mit Captain und Vertreter (#2110) - nur für Mitglieder und Teamleitung. */}
-          <TeamSquads key={`squads-${team.id}`} team={team} userId={user?.id} canManage={canEdit} enabled={isMember || canEdit} />
+          <TeamSquads key={`squads-${team.id}`} team={team} userId={user?.id} canManage={canEditTeam} enabled={isMember || canEditTeam} />
           <TeamSchedule overview={overview} />
           {(team.awards || []).length > 0 && (
             <section data-testid="team-awards">
@@ -516,6 +531,7 @@ function TeamDetail({ id }) {
           onSaved={() => { setEditing(null); load(); }}
           canDissolve={canDissolve}
           canChangeVisibility={canChangeRoles}
+          canEditBanner={canEdit}
           onDissolved={() => nav("/teams")}
         />
       )}
@@ -641,7 +657,7 @@ function TeamChat({ team, user }) {
   );
 }
 
-function TeamModal({ team, onClose, onSaved, canDissolve = false, canChangeVisibility = false, onDissolved }) {
+function TeamModal({ team, onClose, onSaved, canDissolve = false, canChangeVisibility = false, canEditBanner = true, onDissolved }) {
   const isNew = !team?.id;
   const [form, setForm] = useState({ ...emptyTeam, ...team });
   const { submitting: saving, submitOnce } = useSubmissionGuard();
@@ -655,7 +671,7 @@ function TeamModal({ team, onClose, onSaved, canDissolve = false, canChangeVisib
         tag: form.tag.trim().toUpperCase(),
         description: form.description || null,
         logo_url: form.logo_url || null,
-        banner_url: form.banner_url || null,
+        ...(canEditBanner ? { banner_url: form.banner_url || null } : {}),
         discord_link: form.discord_link || null,
         ...(isNew ? {} : { color: form.color || AUTO_COLOR }),
         ...(!isNew && canChangeVisibility ? { is_public: form.is_public !== false } : {}),
@@ -694,7 +710,7 @@ function TeamModal({ team, onClose, onSaved, canDissolve = false, canChangeVisib
         <Field label="Kürzel"><Input value={form.tag} onChange={(v) => set("tag", v.toUpperCase().slice(0, TEAM_TAG_MAX))} required minLength={TEAM_TAG_MIN} maxLength={TEAM_TAG_MAX} testId="team-tag" placeholder="TLS" /></Field>
         <Field label="Beschreibung"><textarea value={form.description || ""} onChange={(e) => set("description", e.target.value)} rows={3} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
         <Field label="Logo" group><ImageUpload value={form.logo_url || ""} onChange={(v) => set("logo_url", v)} testId="team-logo" variant="square" crop="square" allowLibrary {...teamLogoUpload(team)} /></Field>
-        <Field label="Banner" group><ImageUpload value={form.banner_url || ""} onChange={(v) => set("banner_url", v)} testId="team-banner" variant="wide" crop="banner" allowLibrary /></Field>
+        {canEditBanner ? <Field label="Banner" group><ImageUpload value={form.banner_url || ""} onChange={(v) => set("banner_url", v)} testId="team-banner" variant="wide" crop="banner" allowLibrary /></Field> : null}
         <Field label="Discord-Link"><Input value={form.discord_link || ""} onChange={(v) => set("discord_link", v)} placeholder="https://discord.gg/..." /></Field>
         {!isNew && <TeamColorPicker value={form.color || AUTO_COLOR} onChange={(v) => set("color", v)} />}
         {!isNew && canChangeVisibility ? (

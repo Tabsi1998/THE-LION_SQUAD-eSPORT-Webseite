@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { gameOptionLabel, selectableGames } from "@/lib/gameLabels";
+import { shortageAfter, shortageWarning } from "@/lib/squadShortage";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
@@ -38,6 +39,8 @@ export function TeamsPanel() {
   const wantedTeam = searchParams.get("team") || "";
 
   const activeTeam = teams.find((t) => t.id === activeId);
+  // Co-Teams pflegen auch, wer nur die Freigabe „Turnierleitung“ hat (#2202).
+  const canEditSquads = Boolean(activeTeam?.can_manage || activeTeam?.can_edit_team);
 
   const loadTeams = useCallback(async () => {
     const { data } = await api.get("/teams/my");
@@ -88,7 +91,7 @@ export function TeamsPanel() {
 
   const saveSquad = async (e) => {
     e.preventDefault();
-    if (!activeTeam?.can_manage) return;
+    if (!canEditSquads) return;
     setSaving(true);
     try {
       const payload = {
@@ -110,6 +113,13 @@ export function TeamsPanel() {
         if (next === (original?.[role.field] || null)) delete payload[role.field];
         else payload[role.field] = next;
       }
+      // Kader unter Mindestgröße (#2202): Das Speichern bleibt möglich, die Rückfrage sagt vorher, was es bewirkt.
+      const shortage = original ? shortageAfter(original, payload.member_ids) : null;
+      if (shortage && !await confirm({
+        title: "Kader wird zu klein",
+        description: shortageWarning([shortage]),
+        confirmLabel: "Trotzdem speichern",
+      })) return;
       if (editing.id) await api.patch(`/teams/${activeTeam.id}/squads/${editing.id}`, payload);
       else await api.post(`/teams/${activeTeam.id}/squads`, payload);
       toast.success("Co-Team gespeichert.");
@@ -270,11 +280,11 @@ export function TeamsPanel() {
                     <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">[{activeTeam.tag}]</div>
                     <h3 className="font-heading text-2xl font-black uppercase">{activeTeam.name}</h3>
                     <div className="text-xs text-white/50 mt-1">{activeTeam.members?.length || 0} Mitglieder · Deine Rolle: {TEAM_ROLE_LABELS[activeTeam.my_role] || activeTeam.my_role}</div>
-                    {activeTeam.can_manage && <div className="mt-2 text-xs text-[#29B6E8]">Du kannst für dieses Team Co-Teams erstellen und bearbeiten.</div>}
+                    {canEditSquads && <div className="mt-2 text-xs text-[#29B6E8]">Du kannst für dieses Team Co-Teams erstellen und bearbeiten.</div>}
                   </div>
                   <div className="flex gap-2">
                     <Link to={`/teams/${activeTeam.id}`} className="px-3 py-2 border border-white/15 text-white/70 hover:text-white rounded-sm text-xs uppercase font-bold">Teamseite</Link>
-                    {activeTeam.can_manage && (
+                    {canEditSquads && (
                       <button type="button" onClick={() => setEditing({ ...emptySquad, member_ids: activeTeam.member_ids || [] })} className="tls-btn tls-btn--primary px-3 py-2 rounded-sm text-xs uppercase font-bold inline-flex items-center gap-1">
                         <Plus className="w-3.5 h-3.5" /> Co-Team
                       </button>
@@ -290,7 +300,7 @@ export function TeamsPanel() {
                           <div className="text-[10px] uppercase tracking-widest text-[#FFD700]">{squadStatusLabel(squad.status)}</div>
                           <h4 className="font-heading font-bold text-lg">{squad.name}</h4>
                         </div>
-                        {activeTeam.can_manage && (
+                        {canEditSquads && (
                           <div className="flex gap-1">
                             <button type="button" onClick={() => setEditing({ ...emptySquad, ...squad })} className="p-1 text-white/45 hover:text-[#29B6E8]"><Pencil className="w-3.5 h-3.5" /></button>
                             <button type="button" onClick={() => deleteSquad(squad)} className="p-1 text-white/45 hover:text-[#FF3B30]"><Trash2 className="w-3.5 h-3.5" /></button>
