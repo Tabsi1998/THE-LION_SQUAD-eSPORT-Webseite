@@ -176,9 +176,9 @@ export function FeaturesTab({ status, busy, run, consentTexts = [], consentError
                         <option value={status.directory_consent_code}>{status.directory_consent_code} (im Modul nicht mehr gefunden)</option>
                       )}
                     </select>
-                    {consentError ? <div className="text-xs text-[#FF3B30] mt-1" data-testid="dolibarr-consent-error">Einwilligungstexte nicht lesbar: {consentError}</div>
+                    {consentError ? <div className="text-xs text-live mt-1" data-testid="dolibarr-consent-error">Einwilligungstexte nicht lesbar: {consentError}</div>
                       : status?.mode === "off" ? <div className="text-xs text-white/45 mt-1" data-testid="dolibarr-consent-off">Die Anbindung ist aus – erst mit Verbindung gibt es hier eine Auswahl.</div>
-                        : !consentTexts.length ? <div className="text-xs text-[#FFD700] mt-1" data-testid="dolibarr-consent-empty">Im Modul stehen noch keine Einwilligungstexte – unter Einrichtung → Vereine → Einwilligungen anlegen.</div> : null}
+                        : !consentTexts.length ? <div className="text-xs text-warn mt-1" data-testid="dolibarr-consent-empty">Im Modul stehen noch keine Einwilligungstexte – unter Einrichtung → Vereine → Einwilligungen anlegen.</div> : null}
                   </div>
                   <div data-testid="dolibarr-directory-fields">
                     <div className="font-bold text-xs">Felder des Website-Profils → Spalten des Verzeichnisses</div>

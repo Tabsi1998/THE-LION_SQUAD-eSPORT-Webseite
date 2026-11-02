@@ -34,14 +34,14 @@ export default function AdminFeedbackPage() {
       <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Rückmeldungen</h1>
       <p className="mt-2 mb-5 text-sm text-white/60 max-w-2xl">Was Teilnehmende nach Turnieren und Events sagen, ohne Namen. Unter {data?.min_for_details ?? 3} Antworten steht nur die Zahl: Bei zwei Leuten wüsste man sonst, wer was geschrieben hat.</p>
 
-      {error && <div className="mb-4 border border-[#FF3B30]/40 bg-[#FF3B30]/10 rounded-sm p-3 text-sm" data-testid="feedback-overview-error">{error}</div>}
+      {error && <div className="mb-4 border border-live/40 bg-live/10 rounded-sm p-3 text-sm" data-testid="feedback-overview-error">{error}</div>}
       {!data && !error && <SkeletonTable rows={4} columns={4} label="Lade Rückmeldungen" />}
 
       {data && (
         <>
           <div className="grid gap-3 grid-cols-1 sm:grid-cols-3 mb-5" data-testid="feedback-overview-summary">
             <Tile label="Schnitt" testId="feedback-overview-average">
-              {summary?.average != null ? <span className="inline-flex items-center gap-1 text-[#FFD700]">{averageLabel(summary.average)} <Star className="w-5 h-5 fill-[#FFD700]" aria-hidden="true" /></span> : "–"}
+              {summary?.average != null ? <span className="inline-flex items-center gap-1 text-honor">{averageLabel(summary.average)} <Star className="w-5 h-5 fill-honor" aria-hidden="true" /></span> : "–"}
             </Tile>
             <Tile label="Antworten" testId="feedback-overview-answers">{summary?.answers ?? 0}</Tile>
             <Tile label="Veranstaltungen" testId="feedback-overview-targets">{summary?.targets ?? 0}</Tile>
@@ -76,7 +76,7 @@ export default function AdminFeedbackPage() {
                       <div className="flex items-center gap-4 shrink-0">
                         <div className="text-sm text-white/70">{item.count === 1 ? "1 Antwort" : `${item.count} Antworten`}</div>
                         {item.details
-                          ? <div className="inline-flex items-center gap-1 font-heading font-black text-[#FFD700]" data-testid={`feedback-average-${item.target_id}`}>{averageLabel(item.average)} <Star className="w-4 h-4 fill-[#FFD700]" aria-hidden="true" /></div>
+                          ? <div className="inline-flex items-center gap-1 font-heading font-black text-honor" data-testid={`feedback-average-${item.target_id}`}>{averageLabel(item.average)} <Star className="w-4 h-4 fill-honor" aria-hidden="true" /></div>
                           : <div className="text-xs text-white/40" data-testid={`feedback-few-${item.target_id}`}>zu wenige</div>}
                         {item.details && (
                           <button type="button" aria-expanded={expanded} onClick={() => setOpen(expanded ? "" : key)} data-testid={`feedback-open-${item.target_id}`} className="text-[11px] uppercase tracking-wider font-bold text-[#29B6E8] hover:underline">

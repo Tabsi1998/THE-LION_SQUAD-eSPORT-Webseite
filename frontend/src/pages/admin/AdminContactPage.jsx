@@ -74,7 +74,7 @@ function ReplyHistory({ message }) {
       )}
       <ol className="space-y-3">
         {replies.map((reply) => (
-          <li key={reply.id} className="border-l-2 border-[#00FF88]/40 pl-3" data-testid={`contact-reply-${reply.id}`}>
+          <li key={reply.id} className="border-l-2 border-ok/40 pl-3" data-testid={`contact-reply-${reply.id}`}>
             <div className="text-xs text-white/50">Antwort von {reply.by_name || "der Verwaltung"} · {viennaDateTime(reply.at)}</div>
             <pre className="mt-1 whitespace-pre-wrap text-sm text-white/85 font-sans leading-relaxed">{reply.text}</pre>
           </li>
@@ -357,7 +357,7 @@ export default function AdminContactPage() {
         </select>
       </div>
 
-      {loadError && <div className="mb-4 border border-[#FF3B30]/40 bg-[#FF3B30]/10 rounded-sm p-3 text-sm" data-testid="contact-load-error">{loadError}</div>}
+      {loadError && <div className="mb-4 border border-live/40 bg-live/10 rounded-sm p-3 text-sm" data-testid="contact-load-error">{loadError}</div>}
 
       <div className="border border-white/10 bg-[#121212] rounded-sm overflow-hidden">
         <div className="tls-swipe pb-0">

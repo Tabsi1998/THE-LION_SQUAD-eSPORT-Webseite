@@ -578,7 +578,7 @@ export default function AdminDolibarrPage() {
             <Panel title="Signierter Webhook">
               <div className="space-y-3" data-testid="dolibarr-signed-webhook">
                 <p className="text-xs text-white/55">Empfohlen. Dolibarr meldet Änderungen sofort, die Website prüft die Signatur und liest dann nach. Ohne Webhook holt der Abgleich alle 10 Minuten auf.</p>
-                <p className={`text-xs ${status?.signed_webhook?.configured ? "text-[#00FF88]" : "text-[#FFD700]"}`} data-testid="dolibarr-signed-state">
+                <p className={`text-xs ${status?.signed_webhook?.configured ? "text-ok" : "text-warn"}`} data-testid="dolibarr-signed-state">
                   {status?.signed_webhook?.source === "env" ? "Eingerichtet in der Server-Umgebung." : status?.signed_webhook?.configured ? "Eingerichtet." : "Noch nicht eingerichtet."}
                 </p>
                 <div className="text-xs text-white/65">

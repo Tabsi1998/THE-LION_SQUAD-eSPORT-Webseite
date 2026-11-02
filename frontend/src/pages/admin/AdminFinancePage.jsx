@@ -406,7 +406,7 @@ export default function AdminFinancePage() {
             </table>
           </TableScroll>
           {data.open_total > data.open.length && (
-            <p className="mt-2 text-xs text-[#FFD700]" data-testid="finance-open-count">Angezeigt: {shownOf(data.open.length, data.open_total)} offenen Aufträgen – die ältesten zuerst.</p>
+            <p className="mt-2 text-xs text-warn" data-testid="finance-open-count">Angezeigt: {shownOf(data.open.length, data.open_total)} offenen Aufträgen – die ältesten zuerst.</p>
           )}
 
           {filters.attention && !data.invoiced?.length && (
@@ -416,7 +416,7 @@ export default function AdminFinancePage() {
             <div className="mt-8">
               <h2 className="font-heading text-xl font-black uppercase">{filters.attention ? `Angelegte Rechnungen · ${capitalize(data.attention_labels?.[filters.attention] || "")}` : "Angelegte Rechnungen"}</h2>
               <p className="mt-1 text-xs text-white/45">Nummer, Freigabe und Zahlungen kommen aus Dolibarr; offene Belege liest die Website alle zehn Minuten nach, bezahlte einmal am Tag. Der Stand daneben sagt, wie frisch das ist.</p>
-              <p className={`mt-1 text-xs ${data.invoiced_total > data.invoiced.length ? "text-[#FFD700]" : "text-white/45"}`} data-testid="finance-invoiced-count">
+              <p className={`mt-1 text-xs ${data.invoiced_total > data.invoiced.length ? "text-warn" : "text-white/45"}`} data-testid="finance-invoiced-count">
                 Angezeigt: {shownOf(data.invoiced.length, data.invoiced_total)} Rechnungen{data.invoiced_total > data.invoiced.length ? " – die zuletzt geänderten. Vollständig ist der CSV-Export." : "."}
               </p>
               <TableScroll label="Angelegte Rechnungen" testId="finance-invoiced-scroll" className="mt-3">
