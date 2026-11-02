@@ -309,23 +309,38 @@ def _lockable(ctx: RosterContext, user_id: str, values: dict) -> bool:
     return complete(values) and not format_problem(ctx.fields, values) and not _id_taken(ctx, user_id, values)
 
 
+def _moment(value):
+    """Ein gespeicherter Zeitpunkt als Datum (ältere Einträge tragen ``Z``, neue ``+00:00``) - ``None``: nicht lesbar."""
+    from datetime import datetime
+
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=now_utc().tzinfo)
+
+
+def _waiver_covers(row: dict, squad_id: str, start) -> bool:
+    """Eine Aufhebung gilt für die Wartezeit, die zu ihr lief: Ein späterer Transfer ins selbe Co-Team wartet neu.
+    Ohne lesbares Datum zählt sie: Die Aufhebung ist belegt, sie soll nicht von selbst wieder sperren."""
+    if row.get("squad_id") != squad_id:
+        return False
+    waived = _moment(row.get("at"))
+    return waived is None or waived >= start
+
+
 def wait_until(ctx: RosterContext | None, user_id: str, squad_id: str | None):
     """Bis wann eine Person in diesem Co-Team wartet (#2204) - ``None``: gar nicht. Volle Tage in Wiener Zeit ab der Aufnahme."""
-    from datetime import datetime, timedelta
+    from datetime import timedelta
 
     from services.matchday_schedule import LOCAL_TZ
 
     days = (ctx.season or {}).get("new_player_wait_days") if ctx else None
     entry = ctx.entries.get(user_id) if ctx else None
-    start = ((entry or {}).get("wait_from") or {}).get(squad_id) if squad_id else None
-    # Eine Aufhebung gilt für die Wartezeit, die zu ihr lief: Ein späterer Transfer ins selbe Co-Team wartet neu.
-    if not days or not start or any(row.get("squad_id") == squad_id and str(row.get("at")) >= str(start) for row in entry.get("wait_waivers") or []):
+    start = _moment(((entry or {}).get("wait_from") or {}).get(squad_id)) if squad_id else None
+    if not days or not start or any(_waiver_covers(row, squad_id, start) for row in entry.get("wait_waivers") or []):
         return None
-    try:
-        moment = datetime.fromisoformat(str(start).replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    return (moment.astimezone(LOCAL_TZ) + timedelta(days=int(days))).astimezone(now_utc().tzinfo)
+    return (start.astimezone(LOCAL_TZ) + timedelta(days=int(days))).astimezone(now_utc().tzinfo)
 
 
 def first_matchday_over(tournament: dict | None) -> bool:
