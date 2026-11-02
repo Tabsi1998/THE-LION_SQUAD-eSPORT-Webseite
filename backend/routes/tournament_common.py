@@ -64,6 +64,11 @@ def _next_power_of_two(n: int) -> int:
 
 def _estimated_match_count(tournament: dict) -> int:
     fmt = tournament.get("format") or "single_elim"
+    legs = tournament.get("round_robin_legs")
+    if fmt == "league" and legs:
+        # Liga mit festgelegten Runden (Staffel, #2201): genau die Paarungen, nichts wird auf einen Baum gerundet.
+        teams = max(2, int(tournament.get("max_participants") or 2))
+        return teams * (teams - 1) // 2 * max(1, int(legs))
     count = _next_power_of_two(max(2, int(tournament.get("max_participants") or 2)))
     if fmt == "single_elim":
         return max(1, count - 1) + (1 if tournament.get("bronze_match") and count >= 4 else 0)

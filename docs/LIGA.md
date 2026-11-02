@@ -220,7 +220,9 @@ Namen der Aufgestellten, Meldungen beider Seiten, `can_amend_lineup`, `amend_unt
 `league.division.create|update`, `league.staffel.create`, `league.staffel.sync` (A) · `team.squad.roles`, `league.squad.assign|remove` (B) · `match.games.report`,
 `match.lineup.amend`, `match.games.correct` (B) · `league.delete`, `league.season.delete`, `league.division.delete`,
 `league.staffel.delete` (#2106, mit `reason` und den Kennungen dessen, was mitging) · `league.roster.approve` (neue
-Spiel-ID freigegeben, mit Grund, ohne die ID selbst), `league.season.roster_deadline` (#2108).
+Spiel-ID freigegeben, mit Grund, ohne die ID selbst), `league.season.roster_deadline` (#2108) · `league.season.status`
+(Season folgt dem Start der ersten Staffel), `match.plan.change` (Termin, Best of je Spiel mit `from`/`to`),
+`match.no_show.cleared` (alter Vorschlag abgeräumt) (#2201).
 
 ## 3. Einstellbar statt fest
 
@@ -349,6 +351,24 @@ Anmeldungen auch über Co-Teams, deren Captain/Vertreter man ist. Aufrufer mit e
 Die App meldet heute ohne `games`: Erstmeldung → abgelehnt mit dem Satz oben; Bestätigung einer vorhandenen
 Meldung mit gleichem Stand → angenommen; abweichender Stand ohne `games` → ebenfalls abgelehnt mit demselben Satz
 (Einspruch über die App bleibt möglich). Aufstellungen spielen für die Tabelle keine Rolle.
+
+### Spielbetrieb (#2201, Paket A.3)
+
+| Thema | Vertrag | Stelle |
+| --- | --- | --- |
+| „Nicht erschienen?“ | Staffeln ohne Check-in haben keine Frist und keinen Vorschlag, alte offene Vorschläge räumt der Fristen-Job ab, entschiedene bleiben. „Ergebnis fehlt“ bleibt. `POST /lead/no-show/{match}` mit `confirm` gilt in Staffeln auch ohne Vorschlag, solange `no_show_open` (keine Meldung, nicht begonnen). Endgültig mit dem Check-in (#1652) | `match_deadlines.no_show_deadline`, `match_deadline_sweep`, `tournament_lead_routes` |
+| Karte | Mit einer Meldung gibt es in keinem Format mehr die Karte „Nicht erschienen?“ | `match_attention.attention_items` |
+| Kampflos in den Strafen | Teamstrafe des Co-Teams: Captain, Vertreter, Leitung und Co-Leitung des Hauptteams (`match_audience.team_penalty_ids`), nicht der Kader. Admin-Liste einmal je Wertung mit `team_name`. Kein persönlicher Negativ-Eintrag | `penalty_routes` |
+| Maps bei Wertung | `apply_forfeit` setzt `games` und `lineups_missing` leer, wenn das Spiel Maps hat; `match_reports_v2.previous_games` hält sie fest | `match_forfeit` |
+| Einspruchsfenster | Spielwoche mit Sperrwochen und Sperrzeiten, Turnier vollständig gelesen | `match_disputes.dispute_window` |
+| Antwortfrist | Vorschlag und Gegenvorschlag rechnen immer neu (`settings.schedule_deadline_at` in der Zukunft geht vor), Annahme löscht Frist und `schedule_escalated_at`, je abgelaufener Frist eine Nachricht | `match_routes._schedule_deadline` |
+| Ablehnung | Nur in Spielwochen: offener anderer Vorschlag → `proposed`; angenommener → `accepted`; sonst ohne Stand und Frist, solange ein Termin gilt; ohne Termin `declined` mit Frist. Altbestand räumt `_settle_declined` im Spieltag-Lauf ab | `match_routes._status_after_decline`, `matchday_schedule` |
+| Änderung durch die Leitung | `PATCH /matches/{id}`: `scheduled_at` und `best_of` immer im Protokoll; Nachricht (`match_schedule`, Grund `schedule_lead_changed`) nur in Spielwochen an die Verantwortlichen beider Seiten | `match_routes._record_plan_change`, `match_notifications.notify_lead_plan_change` |
+| Spielplan | `DELETE /stages/{id}` und `POST /stages/{id}/generate` fallen nach dem Start unter `staffel_rebuild_problem`, auch mit `force` | `tournament_stage_routes` |
+| Season-Stand | Start der ersten Staffel: `draft` → `active`, nur aus dem Entwurf und nur, wenn keine andere Staffel gestartet ist | `league_service.season_follows_first_staffel` |
+| Staffelgröße | Schätzung für Format `league` mit `round_robin_legs`: n·(n−1)/2·Runden statt Zweierpotenz | `tournament_common._estimated_match_count` |
+| Standardtermin | Nie in einer Sperrzeit: nächster freier Tag der Woche zur selben Uhrzeit, sonst der letzte davor, sonst kein Termin und `schedule_hint` im Plan | `matchday_schedule.default_time_for` |
+| Anmeldung, Spiel-Antworten | Eine Staffel hat auf keinem Weg eine Selbstanmeldung; `schedule_proposals` an Unbeteiligte nur mit `scheduled_at`, `status`, `actor_registration_id`; Notizen höchstens 500, Einspruch höchstens 1000 Zeichen | `self_register`, `access_link_routes`, `_match_page_payload`, `models.py` |
 
 ## 7. Nebenwirkungen „Staffel = Turnier“ (Worker A, P1)
 

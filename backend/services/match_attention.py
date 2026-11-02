@@ -26,6 +26,7 @@ import logging
 from datetime import datetime
 
 from models import now_utc
+from services.league_scope import is_league_staffel
 from services.match_deadlines import no_show_action, no_show_candidates, no_show_due_text
 from services.match_disputes import category_label, open_dispute
 from services.match_duration import load_duration_game
@@ -91,8 +92,10 @@ def attention_items(tournament: dict, matches: list[dict], stations: list[dict],
         proposal = match.get("no_show_proposal")
         # Je Person (#1823): im Lauf bleibt der Fall offen für alle, die noch nicht als nicht erschienen markiert sind.
         candidates = no_show_candidates(match)
-        open_proposal = isinstance(proposal, dict) and not proposal.get("decision")
-        if open_proposal and status in NO_SHOW_STATUSES and not match.get("started_at") and candidates:
+        # Liga-Staffel (#2201): kein Vorschlag ohne Check-in - ein alter zeigt keine Karte mehr, „Ergebnis fehlt“ bleibt.
+        open_proposal = isinstance(proposal, dict) and not proposal.get("decision") and not is_league_staffel(tournament)
+        # Mit einer Meldung gilt der Vorschlag nicht mehr (Bestätigen gäbe 409) - sie darf „Ergebnis fehlt“ nicht verdecken.
+        if open_proposal and status in NO_SHOW_STATUSES and not match.get("started_at") and not match.get("reports") and candidates:
             items.append({**base, "id": f"ns-{match.get('id')}", "kind": "no_show", "title": "Nicht erschienen?",
                           "detail": f"{no_show_due_text(match, proposal)} – "
                                     f"{no_show_action(match)}.",

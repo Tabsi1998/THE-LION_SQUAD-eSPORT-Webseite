@@ -94,8 +94,9 @@ async def dispute_window(db, match: dict, now: datetime | None = None) -> dict:
     # Ergebnis nach Frist (#1551): niemand hat bestätigt - der Einspruch bleibt bis zum Rundenende, in der Liga bis zum
     # Ende der Spielwoche.
     if (match.get("result_meta") or {}).get("auto_confirmed"):
+        # Das ganze Turnier: Sperrwochen, Sperrzeiten und Austragung bestimmen, wo die Spielwoche liegt (#2201).
         tournament = await db.tournaments.find_one(
-            {"id": match.get("tournament_id")}, {"_id": 0, "format": 1, "start_date": 1, "matchday_days": 1})
+            {"id": match.get("tournament_id")}, {"_id": 0, "creation_key": 0, "billing": 0})
         round_end = matchday_end(match, tournament)
         if round_end and round_end > until:
             until = round_end

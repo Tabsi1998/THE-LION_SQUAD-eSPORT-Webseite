@@ -291,6 +291,25 @@ def default_time_in(window: MatchdayWindow, *, weekday: int = DEFAULT_WEEKDAY,
     return moment if window.contains(moment) else None
 
 
+def default_time_for(tournament: dict | None, window: MatchdayWindow, *, weekday: int = DEFAULT_WEEKDAY,
+                     hour: int = DEFAULT_HOUR, minute: int = DEFAULT_MINUTE) -> datetime | None:
+    """Der Standardtermin dieser Woche, nie in einer Sperrzeit (#2201): Fällt der Standardtag hinein, gilt zur selben
+    Uhrzeit der nächste freie Tag der Woche, sonst der letzte davor. Ohne freien Tag ``None``."""
+    moment = default_time_in(window, weekday=weekday, hour=hour, minute=minute)
+    if moment is None or not blocked_period_at(tournament, moment):
+        return moment
+    local = moment.astimezone(LOCAL_TZ)
+    span = round((window.end - window.start).total_seconds() / 86400)
+    for offset in [*range(1, span), *range(-1, -span, -1)]:
+        candidate = (local + timedelta(days=offset)).astimezone(timezone.utc)
+        if window.contains(candidate) and not blocked_period_at(tournament, candidate):
+            return candidate
+    return None
+
+
+BLOCKED_DEFAULT_HINT = "Der Standardtermin fällt in eine Sperrzeit und die Woche hat keinen freien Tag – bitte einen Termin festlegen."
+
+
 def usable_proposals(proposals, window: MatchdayWindow) -> list[dict]:
     """Proposals that could still decide this matchday.
 
@@ -314,7 +333,7 @@ def usable_proposals(proposals, window: MatchdayWindow) -> list[dict]:
 
 def resolve_matchday_time(match: dict, proposals, window: MatchdayWindow, *,
                           weekday: int = DEFAULT_WEEKDAY, hour: int = DEFAULT_HOUR,
-                          minute: int = DEFAULT_MINUTE) -> ScheduleResolution | None:
+                          minute: int = DEFAULT_MINUTE, tournament: dict | None = None) -> ScheduleResolution | None:
     """The time that counts for this match, and the rule that produced it.
 
     The order is the operator's: an accepted time wins, otherwise the home
@@ -340,7 +359,7 @@ def resolve_matchday_time(match: dict, proposals, window: MatchdayWindow, *,
             winner = min(home_offers, key=lambda p: p["_moment"])
             return ScheduleResolution(winner["_moment"], "home", winner.get("id"))
 
-    fallback = default_time_in(window, weekday=weekday, hour=hour, minute=minute)
+    fallback = default_time_for(tournament, window, weekday=weekday, hour=hour, minute=minute)
     if fallback is None:
         return None
     return ScheduleResolution(fallback, "default", None)
@@ -439,14 +458,19 @@ def build_matchday_plan(tournament: dict, matches, proposals=None, stages=None) 
         for match in numbered[number]:
             resolution = resolve_matchday_time(
                 match, by_proposal.get(match.get("id"), []), window,
-                weekday=settings["weekday"], hour=settings["hour"], minute=settings["minute"],
+                weekday=settings["weekday"], hour=settings["hour"], minute=settings["minute"], tournament=tournament,
             )
-            entries.append({
+            entry = {
                 "match_id": match.get("id"),
                 "scheduled_at": resolution.scheduled_at.isoformat() if resolution else None,
                 "schedule_source": resolution.source if resolution else None,
                 "home_registration_id": home_registration_id(match),
-            })
+            }
+            if not resolution and default_time_in(window, weekday=settings["weekday"], hour=settings["hour"],
+                                                  minute=settings["minute"]):
+                # Nur die Sperrzeit nimmt den Termin - das sieht die Leitung in den Spielwochen.
+                entry["schedule_hint"] = BLOCKED_DEFAULT_HINT
+            entries.append(entry)
         plan.append({
             "number": number,
             "calendar_week": calendar_week_of(tournament, number),
@@ -503,12 +527,22 @@ def schedule_writes(tournament: dict, matches, proposals=None, stages=None) -> l
     for matchday in plan["matchdays"]:
         for entry in matchday["matches"]:
             match = by_id.get(entry["match_id"]) or {}
-            if not entry.get("scheduled_at"):
-                continue
             if match.get("schedule_source") in KEPT_SOURCES or match.get("status") in FROZEN_MATCH_STATUSES:
                 continue
-            resolved = _parse(entry["scheduled_at"])
             current = _parse(match.get("scheduled_at"))
+            if not entry.get("scheduled_at"):
+                # Sperrzeit ohne freien Tag (#2201): Ein schon geschriebener Standardtermin bleibt dort nicht stehen.
+                if not (entry.get("schedule_hint") and current and match.get("schedule_source") == "default"):
+                    continue
+                writes.append({
+                    "match_id": entry["match_id"], "matchday": matchday["number"],
+                    "update": {"scheduled_at": None, "schedule_source": None,
+                               "schedule_written_at": datetime.now(timezone.utc).isoformat()},
+                    "expect": {"schedule_source": match.get("schedule_source"), "scheduled_at": match.get("scheduled_at"),
+                               "status": match.get("status")},
+                })
+                continue
+            resolved = _parse(entry["scheduled_at"])
             if current == resolved and match.get("schedule_source") == entry["schedule_source"]:
                 continue
             update = {
@@ -554,6 +588,10 @@ async def persist_matchday_schedule(db, tournament: dict) -> dict:
     proposals = await db.match_schedule_proposals.find({"tournament_id": tid}, {"_id": 0, "match_collection": 0}).to_list(3000)
     writes = schedule_writes(tournament, matches, proposals, stages)
     written = await apply_schedule_writes(db, writes)
+    by_id = {match.get("id"): match for match in matches}
+    for write in writes:
+        by_id[write["match_id"]].update(write["update"])
+    await _settle_declined(db, tournament, matches, proposals, stages)
     escalated = await escalate_overdue_proposals(db, tournament, matches)
     return {"applies": True, "written": written, "escalated": escalated}
 
@@ -580,6 +618,30 @@ async def _tournament_staff_user_ids(db, tournament_id: str) -> set[str]:
     return ids
 
 
+async def _settle_declined(db, tournament: dict, matches, proposals, stages) -> None:
+    """Altbestand (#2201): „abgelehnt“ oder eskaliert, nichts mehr offen und trotzdem ein Termin - das meldet sich nicht
+    mehr bei der Leitung und zeigt den geltenden Termin nicht als abgelehnt. Die Ablehnung selbst schreibt das sofort."""
+    open_ids = {(row or {}).get("match_id") for row in proposals or [] if (row or {}).get("status") == "pending"}
+    stage_by_id = {(stage or {}).get("id"): stage for stage in stages or []}
+    now_iso = datetime.now(timezone.utc).isoformat()
+    for match in matches or []:
+        if match.get("schedule_status") not in {"declined", "escalated"} or match.get("id") in open_ids:
+            continue
+        if not match.get("scheduled_at") or match.get("status") in FROZEN_MATCH_STATUSES:
+            continue
+        if not plays_in_matchdays(tournament, stage_by_id.get(match.get("stage_id"))):
+            continue
+        agreed = match.get("schedule_source") == "accepted"
+        unset = {"schedule_deadline_at": "", "schedule_escalated_at": "", **({} if agreed else {"schedule_status": ""})}
+        # Nur, wenn das Spiel noch so dasteht wie gelesen: Ein neuer Vorschlag oder ein Termin der Leitung seit dem Lesen bleibt.
+        await db.matches_v2.update_one(
+            {"id": match["id"], "schedule_status": match["schedule_status"],
+             "schedule_deadline_at": match.get("schedule_deadline_at"), "scheduled_at": match["scheduled_at"]},
+            {"$set": {"updated_at": now_iso, **({"schedule_status": "accepted"} if agreed else {})}, "$unset": unset})
+        # Dieser Lauf eskaliert das Spiel so oder so nicht: Geklappt heißt erledigt, sonst sieht es der nächste Lauf neu.
+        match["schedule_status"] = "accepted" if agreed else None
+
+
 async def escalate_overdue_proposals(db, tournament: dict, matches) -> int:
     from services.user_notifications import create_user_notification
 
@@ -596,11 +658,19 @@ async def escalate_overdue_proposals(db, tournament: dict, matches) -> int:
         return 0
     staff_ids = await _tournament_staff_user_ids(db, tournament["id"])
     title = (tournament or {}).get("title") or "Turnier"
+    escalated = 0
     for match in overdue:
         now_iso = now.isoformat()
-        await db.matches_v2.update_one({"id": match["id"]}, {"$set": {
-            "schedule_status": "escalated", "schedule_escalated_at": now_iso, "updated_at": now_iso,
-        }})
+        # Nur die Frist, die der Lauf gelesen hat: Eine Antwort seit dem Lesen hat sie beendet oder erneuert - dann keine
+        # Eskalation und keine Nachricht.
+        changed = await db.matches_v2.update_one(
+            {"id": match["id"], "schedule_status": match.get("schedule_status"),
+             "schedule_deadline_at": match.get("schedule_deadline_at"), "schedule_escalated_at": None,
+             "status": match.get("status")},
+            {"$set": {"schedule_status": "escalated", "schedule_escalated_at": now_iso, "updated_at": now_iso}})
+        if not changed.matched_count:
+            continue
+        escalated += 1
         label = match.get("match_key") or match.get("round_name") or "Spiel"
         for user_id in sorted(staff_ids):
             await create_user_notification(
@@ -609,10 +679,12 @@ async def escalate_overdue_proposals(db, tournament: dict, matches) -> int:
                 f"{label}: die Antwortfrist für den Terminvorschlag ist abgelaufen. Bitte einen Termin festlegen.",
                 url=f"/matches/{match.get('id')}",
                 kind="schedule_escalation",
-                meta={"category": "tournament_updates", "dedupe_key": f"schedule_escalation:{match.get('id')}",
+                # Je abgelaufener Frist eine Nachricht: ein neuer Vorschlag hat eine neue Frist (#2201).
+                meta={"category": "tournament_updates",
+                      "dedupe_key": f"schedule_escalation:{match.get('id')}:{match.get('schedule_deadline_at') or ''}",
                       "match_id": match.get("id"), "tournament_id": tournament.get("id")},
             )
-    return len(overdue)
+    return escalated
 
 
 async def persist_all_matchday_schedules(db, limit: int = 50) -> dict:

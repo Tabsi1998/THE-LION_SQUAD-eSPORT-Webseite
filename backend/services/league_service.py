@@ -526,6 +526,31 @@ async def mark_published(db, league_id: str, visibility: str | None) -> None:
         await db.leagues.update_one({"id": league_id, "published_at": None}, {"$set": {"published_at": _now()}})
 
 
+async def season_follows_first_staffel(db, tournament: dict, previous_status: str | None, actor_id: str | None) -> bool:
+    """Der Start der ersten Staffel stellt die Season von Entwurf auf „Läuft“ (#2201) - mit Protokoll. Einen von Hand
+    gesetzten Stand fasst das nicht an: nur aus dem Entwurf, und nur wenn noch keine andere Staffel gestartet ist (sonst
+    hat jemand die Season bewusst zurückgestellt)."""
+    season_id = ((tournament or {}).get("league_context") or {}).get("season_id")
+    if not season_id or previous_status not in PRE_START_STATUSES:
+        return False
+    started = await db.tournaments.count_documents({
+        "id": {"$ne": tournament["id"]}, "league_context.season_id": season_id, "status": {"$nin": sorted(PRE_START_STATUSES)}})
+    if started:
+        return False
+    changed = await db.league_seasons.update_one({"id": season_id, "status": {"$in": ["draft", None]}},
+                                                 {"$set": {"status": "active", "updated_at": _now()}})
+    if not changed.modified_count:
+        return False
+    season = await db.league_seasons.find_one({"id": season_id}, {"_id": 0, "league_id": 1}) or {}
+    # Wie beim Speichern einer Sichtbarkeit: Eine Season, die lief, hat die Adresse ihrer Liga veröffentlicht.
+    await db.leagues.update_one({"id": season.get("league_id"), "published_at": None}, {"$set": {"published_at": _now()}})
+    await db.audit_logs.insert_one({
+        "id": new_id(), "action": "league.season.status", "target_id": season_id, "actor_id": actor_id,
+        "data": {"from": "draft", "to": "active", "trigger": "staffel_start", "tournament_id": tournament["id"]},
+        "created_at": _now()})
+    return True
+
+
 async def league_admin_flags(db, league: dict) -> dict:
     """Was die Verwaltung beim Bearbeiten wissen muss: Spiel und Adresse noch änderbar?"""
     has_staffel = bool(await db.tournaments.count_documents({"league_context.league_id": league["id"],

@@ -1,7 +1,7 @@
 """Match/Score/Dispute routes."""
 import logging
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from pymongo import ReturnDocument
 from fastapi import APIRouter, HTTPException, Depends, Request
@@ -59,6 +59,7 @@ from services.match_calls import CALL_OPEN_STATUSES, call_view
 from services.match_disputes import CATEGORIES as DISPUTE_CATEGORIES, CLOSED_DETAIL as DISPUTE_CLOSED_DETAIL, dispute_window
 from services.match_notifications import (
     proposal_sentence,
+    notify_lead_plan_change,
     notify_schedule_event,
     notify_dispute_kept,
     notify_dispute_opened,
@@ -443,10 +444,25 @@ async def _rewrite_matchday_schedule(db, tournament_id: str | None) -> None:
         await persist_matchday_schedule(db, tournament)
 
 
+def _moment(value) -> datetime | None:
+    try:
+        moment = datetime.fromisoformat(str(value).replace("Z", "+00:00")) if value else None
+    except ValueError:
+        return None
+    return moment if not moment or moment.tzinfo else moment.replace(tzinfo=timezone.utc)
+
+
+def _is_future(value) -> bool:
+    moment = _moment(value)
+    return bool(moment and moment > now_utc())
+
+
 def _schedule_deadline(match: dict, tournament: dict | None = None) -> str:
-    value = match.get("schedule_deadline_at") or (match.get("settings") or {}).get("schedule_deadline_at")
-    if value:
-        return value
+    """Die Antwortfrist eines neuen Vorschlags oder Gegenvorschlags. Die am Spiel gespeicherte gehört zum vorigen
+    Vorschlag (#2201) - nur eine fest eingestellte Frist in ``settings`` gilt weiter, solange sie nicht abgelaufen ist."""
+    fixed = (match.get("settings") or {}).get("schedule_deadline_at")
+    if fixed and _is_future(fixed):
+        return fixed
     hours = int((tournament or {}).get("match_schedule_response_hours") or (match.get("settings") or {}).get("schedule_response_hours") or 72)
     # Liga (P2, docs/LIGA.md): Zeit in einer Sperrzeit zählt nicht mit - ohne Sperrzeiten genau „jetzt + Stunden“.
     from services.matchday_schedule import response_deadline
@@ -483,11 +499,16 @@ async def _refresh_schedule_escalation(match: dict, collection: str) -> dict:
     try:
         dt = datetime.fromisoformat(str(deadline).replace("Z", "+00:00"))
         if now_utc() > dt:
-            await get_db()[collection].update_one(
-                {"id": match["id"]},
+            # Nur die gelesene Frist: Ein neuer Vorschlag seit dem Lesen hat eine eigene (#2201).
+            changed = await get_db()[collection].update_one(
+                {"id": match["id"], "schedule_status": status, "schedule_deadline_at": deadline},
                 {"$set": {"schedule_status": "escalated", "updated_at": now_utc().isoformat()}},
             )
-            match["schedule_status"] = "escalated"
+            if changed.matched_count:
+                match["schedule_status"] = "escalated"
+            else:
+                fresh = await get_db()[collection].find_one({"id": match["id"]}, {"_id": 0})
+                return fresh or match
     except Exception:
         logger.warning("[match] Terminfrist von %s nicht geprüft", _log_safe(match.get("id")), exc_info=True)
     return match
@@ -611,6 +632,9 @@ async def _squad_player_of_match(db, match: dict, user: dict | None) -> bool:
     return bool(member_reg and member_reg.get("squad_id"))
 
 
+OUTSIDE_PROPOSAL_FIELDS = ("scheduled_at", "status", "actor_registration_id")
+
+
 async def _match_page_payload(match: dict, collection: str, user: dict | None = None) -> dict:
     db = get_db()
     match = await _refresh_schedule_escalation(match, collection)
@@ -625,10 +649,17 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         {"match_id": match["id"]},
         {"_id": 0},
     ).sort("created_at", -1).to_list(50)
-    actors = await _public_user_map(list({p.get("actor_user_id") for p in proposals if p.get("actor_user_id")}))
-    for proposal in proposals:
-        proposal["actor"] = actors.get(proposal.get("actor_user_id"))
-        proposal.pop("match_collection", None)
+    # Alle Felder bekommt, wer dazugehört oder das Spiel leitet (darin steckt jeder, der handeln darf: ``_can_act_for_match``
+    # verlangt Rollen, die ``_can_read_match`` mitzählt) - alle anderen nur Termin, Stand und Seite (#2201).
+    involved = bool(user) and (await _can_read_match(match, user)
+                               or bool(await _member_registration_for_match(db, match, user.get("id"))))
+    if involved:
+        actors = await _public_user_map(list({p.get("actor_user_id") for p in proposals if p.get("actor_user_id")}))
+        for proposal in proposals:
+            proposal.pop("match_collection", None)
+            proposal["actor"] = actors.get(proposal.get("actor_user_id"))
+    else:
+        proposals = [{key: proposal.get(key) for key in OUTSIDE_PROPOSAL_FIELDS} for proposal in proposals]
     acting_reg = await _acting_registration_for_match(match, user)
     policy = _match_policy(match, tournament, stage)
     can_submit_result = await _can_submit_result_for_match(match, user)
@@ -793,7 +824,7 @@ async def create_schedule_proposal(match_id: str, body: MatchScheduleProposalCre
         "schedule_status": "proposed",
         "schedule_deadline_at": _schedule_deadline(match, tournament),
         "updated_at": now_iso,
-    }})
+    }, "$unset": {"schedule_escalated_at": ""}})
     doc.pop("_id", None)
     doc.pop("match_collection", None)
     doc["idempotent_replay"] = False
@@ -837,14 +868,44 @@ async def _withdraw_proposal(db, match: dict, collection: str, proposal: dict, m
         # oder Standardtermin (der Planer schreibt ihn gleich nach).
         if await db.match_schedule_proposals.count_documents({"match_id": match["id"], "status": "accepted"}):
             change = {"$set": {"schedule_status": "accepted", "updated_at": now_iso},
-                      "$unset": {"schedule_deadline_at": ""}}
+                      "$unset": {"schedule_deadline_at": "", "schedule_escalated_at": ""}}
         else:
-            change = {"$set": {"updated_at": now_iso}, "$unset": {"schedule_status": "", "schedule_deadline_at": ""}}
+            change = {"$set": {"updated_at": now_iso},
+                      "$unset": {"schedule_status": "", "schedule_deadline_at": "", "schedule_escalated_at": ""}}
         await getattr(db, collection).update_one({"id": match["id"]}, change)
         await _rewrite_matchday_schedule(db, match.get("tournament_id"))
     # Wer handelt, ist die eigene Seite - oder die Turnierleitung ohne Seite: dann erfahren es beide Seiten.
     await _tell_schedule(db, match, "withdrawn", proposal, me, (acting_reg or {}).get("id"))
     return {"ok": True, "status": "withdrawn", "idempotent_replay": False}
+
+
+async def _status_after_decline(db, match: dict, collection: str, tournament: dict | None, stage: dict | None,
+                                now_iso: str) -> None:
+    """Der Stand nach einer Ablehnung. In Spielwochen (#2201) gilt oft trotzdem ein Termin: der vereinbarte, sonst Heimrecht
+    oder Standardtermin - dann zeigt das Spiel nicht „abgelehnt“, und keine Frist meldet sich bei der Leitung. Nur wenn
+    wirklich keiner gilt, bleibt es dabei. Andere Formate kennen keinen Standardtermin und bleiben bei „abgelehnt“."""
+    from services.matchday_schedule import plays_in_matchdays
+
+    target = getattr(db, collection)
+    if not plays_in_matchdays(tournament or {}, stage):
+        await target.update_one({"id": match["id"]}, {"$set": {"schedule_status": "declined", "updated_at": now_iso}})
+        await _rewrite_matchday_schedule(db, match.get("tournament_id"))
+        return
+    if await db.match_schedule_proposals.count_documents({"match_id": match["id"], "status": "pending"}):
+        # Ein anderer Vorschlag ist noch offen: seine Frist läuft weiter.
+        await target.update_one({"id": match["id"]}, {"$set": {"schedule_status": "proposed", "updated_at": now_iso}})
+    elif await db.match_schedule_proposals.count_documents({"match_id": match["id"], "status": "accepted"}):
+        await target.update_one({"id": match["id"]}, {"$set": {"schedule_status": "accepted", "updated_at": now_iso},
+                                                      "$unset": {"schedule_deadline_at": "", "schedule_escalated_at": ""}})
+    else:
+        await target.update_one({"id": match["id"]}, {
+            "$set": {"updated_at": now_iso},
+            "$unset": {"schedule_status": "", "schedule_deadline_at": "", "schedule_escalated_at": ""}})
+    await _rewrite_matchday_schedule(db, match.get("tournament_id"))
+    fresh = await target.find_one({"id": match["id"]}, {"_id": 0, "scheduled_at": 1, "schedule_status": 1})
+    if fresh and not fresh.get("scheduled_at") and not fresh.get("schedule_status"):
+        await target.update_one({"id": match["id"]}, {"$set": {
+            "schedule_status": "declined", "schedule_deadline_at": _schedule_deadline(match, tournament), "updated_at": now_iso}})
 
 
 @router.post("/{match_id}/schedule-proposals/{proposal_id}/decision")
@@ -915,7 +976,7 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
             "schedule_written_at": now_iso,
             "status": "scheduled" if match.get("status") in {"pending", "ready", "preview"} else match.get("status"),
             "updated_at": now_iso,
-        }})
+        }, "$unset": {"schedule_deadline_at": "", "schedule_escalated_at": ""}})  # Der Termin steht: keine Frist mehr.
         await _tell_schedule(db, match, "accepted", proposal, me, (acting_reg or {}).get("id"), normalized_note)
         return {"ok": True, "status": "accepted", "scheduled_at": scheduled_at, "idempotent_replay": False}
     if body.action == "decline":
@@ -925,8 +986,7 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
             "decision_note": normalized_note,
             "updated_at": now_iso,
         }})
-        await getattr(db, collection).update_one({"id": match_id}, {"$set": {"schedule_status": "declined", "updated_at": now_iso}})
-        await _rewrite_matchday_schedule(db, match.get("tournament_id"))
+        await _status_after_decline(db, match, collection, tournament, stage, now_iso)
         await _tell_schedule(db, match, "declined", proposal, me, (acting_reg or {}).get("id"), normalized_note)
         return {"ok": True, "status": "declined", "idempotent_replay": False}
     if not body.scheduled_at:
@@ -960,7 +1020,7 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
         "schedule_status": "proposed",
         "schedule_deadline_at": _schedule_deadline(match, tournament),
         "updated_at": now_iso,
-    }})
+    }, "$unset": {"schedule_escalated_at": ""}})
     counter.pop("_id", None)
     counter.pop("match_collection", None)
     counter["idempotent_replay"] = False
@@ -1163,6 +1223,29 @@ async def get_match(match_id: str, user: dict | None = Depends(get_optional_user
     return public_match_view(m, (user or {}).get("id"))
 
 
+async def _record_plan_change(db, before: dict, after: dict, me: dict) -> None:
+    """Termin oder Best of je Spiel von der Turnierleitung geändert (#2201): immer ins Protokoll, mit altem und neuem Wert.
+    In Spielwochen erfahren es die Verantwortlichen beider Seiten; sonst plant die Leitung am Stück um, dort keine Nachricht."""
+    changes = {}
+    if _moment(before.get("scheduled_at")) != _moment(after.get("scheduled_at")):
+        changes["scheduled_at"] = {"from": before.get("scheduled_at"), "to": after.get("scheduled_at")}
+    if before.get("best_of") != after.get("best_of"):
+        changes["best_of"] = {"from": before.get("best_of"), "to": after.get("best_of")}
+    if not changes:
+        return
+    await _audit_match_action(db, "match.plan.change", after, me.get("id"), {"changes": changes})
+    from services.matchday_schedule import plays_in_matchdays
+
+    tournament = await db.tournaments.find_one({"id": after.get("tournament_id")}, {"_id": 0, "creation_key": 0, "billing": 0})
+    stage = await db.tournament_stages.find_one({"id": after.get("stage_id")}, {"_id": 0}) if after.get("stage_id") else None
+    if not plays_in_matchdays(tournament or {}, stage):
+        return
+    try:
+        await notify_lead_plan_change(db, after, changes, actor_id=me.get("id"), token=str(after.get("updated_at")))
+    except Exception:  # noqa: BLE001 - die Änderung ist schon gespeichert
+        logger.warning("[match] Nachricht zur Planänderung für %s nicht verschickt", _log_safe(after.get("id")), exc_info=True)
+
+
 @router.put("/{match_id}")
 @router.patch("/{match_id}")
 async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_current_user),
@@ -1229,6 +1312,7 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
             # hält schon ``_serialized_match_write``; sie ist nicht wiedereintrittsfähig, also direkt auswerten.
             from services.heat_rebuild import evaluate_after_write
             await evaluate_after_write(db, v2_match.get("tournament_id"), actor_id=me.get("id"), trigger="match_update")
+        await _record_plan_change(db, before, updated, me)
         return {**updated, "idempotent_replay": False}
     raise HTTPException(status_code=404, detail="Match nicht gefunden")
 

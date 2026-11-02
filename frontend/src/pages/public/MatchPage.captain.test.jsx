@@ -60,6 +60,19 @@ beforeEach(() => {
   apiMock.post.mockResolvedValue({ data: { ok: true } });
 });
 
+test("wer nicht zum Spiel gehört, sieht Termin und Stand ohne Kennung und ohne Knöpfe", async () => {
+  const keyWarning = vi.spyOn(console, "error").mockImplementation(() => {});
+  const outside = (row) => ({ scheduled_at: row.scheduled_at, status: row.status, actor_registration_id: row.actor_registration_id });
+  renderMatch({ ...BASE, can_act: false, can_propose_schedule: false, can_manage_schedule: false, acting_registration_id: null,
+    schedule_proposals: [outside(THEIRS), outside(OLD)] });
+  expect(await screen.findByTestId("match-proposal-status-zeile-0")).toHaveTextContent("Teilnehmer · offen");
+  expect(screen.getByTestId("match-proposal-status-zeile-1")).toHaveTextContent("abgelehnt");
+  expect(screen.queryByLabelText("Termin annehmen")).toBeNull();
+  expect(screen.queryByText("Zurückziehen")).toBeNull();
+  expect(keyWarning.mock.calls.filter(([text]) => String(text).includes('unique "key"'))).toEqual([]);
+  keyWarning.mockRestore();
+});
+
 test("der eigene Vorschlag wartet auf die Gegenseite und lässt sich zurückziehen", async () => {
   renderMatch({ ...BASE, schedule_proposals: [OWN, OLD] });
   const own = await screen.findByTestId("match-proposal-p-own");

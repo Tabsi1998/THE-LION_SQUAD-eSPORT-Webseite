@@ -17,6 +17,7 @@ from services.access_links import (
     public_access_link_payload,
     parse_dt,
 )
+from services.league_scope import is_league_staffel
 from services.user_notifications import build_public_url, create_user_notification
 
 router = APIRouter(prefix="/api/access-links", tags=["access-links"])
@@ -47,7 +48,7 @@ async def _target_doc(target_type: str, target_id: str) -> dict:
     collection = _collection_for_target(target_type)
     if collection is None:
         raise HTTPException(status_code=400, detail="Ungültiger Zieltyp")
-    doc = await collection.find_one({"id": target_id}, {"_id": 0, "id": 1, "slug": 1, "name": 1, "title": 1})
+    doc = await collection.find_one({"id": target_id}, {"_id": 0, "id": 1, "slug": 1, "name": 1, "title": 1, "league_context": 1})
     if not doc:
         raise HTTPException(status_code=404, detail="Ziel nicht gefunden")
     return doc
@@ -170,6 +171,8 @@ async def create_access_link(body: AccessLinkCreate, me: dict = Depends(require_
         grants.insert(0, "view")
     if any(grant not in ACCESS_GRANTS for grant in grants):
         raise HTTPException(status_code=400, detail="Ungültige Freigabe")
+    if "register" in grants and body.target_type == "tournament" and is_league_staffel(target):
+        raise HTTPException(status_code=409, detail="Eine Liga-Staffel hat keine Anmeldung – Co-Teams teilt die Turnierleitung zu.")
     token = new_access_token()
     now = now_utc().isoformat()
     doc = {

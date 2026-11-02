@@ -128,7 +128,7 @@ export function LeagueWeeks({ tournament, matches, registrations, matchdays, err
                     <li key={entry.match_id} className="mp-remote" data-tone={done ? "done" : entry.schedule_source || "open"}>
                       <span className="mp-remote__names">{namesOf(match, registrations, findIn).join(" – ")}</span>
                       <span className="mp-remote__state">
-                        {done ? "gespielt" : entry.scheduled_at ? `${SOURCE_TEXT[entry.schedule_source] || "Termin"} ${dayTime(entry.scheduled_at)}` : "noch kein Termin"}
+                        {done ? "gespielt" : entry.scheduled_at ? `${SOURCE_TEXT[entry.schedule_source] || "Termin"} ${dayTime(entry.scheduled_at)}` : entry.schedule_hint || "noch kein Termin"}
                       </span>
                       {match.id ? <EditToggle match={match} canEdit={canEdit} editor={editor} open={open} setOpen={setOpen} /> : null}
                     </li>

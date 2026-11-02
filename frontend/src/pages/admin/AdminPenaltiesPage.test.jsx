@@ -41,6 +41,11 @@ test("jede Zeile führt in die Verwaltung; Zurücknehmen nur bei Fast-Lap-Strafe
   expect(screen.queryByTestId("pen-take-back-m-1")).toBeNull();
 });
 
+test("eine Teamstrafe steht unter dem Co-Team, ohne Person", async () => {
+  renderPage([{ ...FORFEIT, team_penalty: true, team_name: "Löwen · Rudel A", user_username: null }]);
+  expect(await screen.findByTestId("pen-team-m-1")).toHaveTextContent("Löwen · Rudel A");
+});
+
 test("Zurücknehmen fragt nach, nimmt Strafe und „ungültig“ weg und lädt neu", async () => {
   renderPage([LAP]);
   fireEvent.click(await screen.findByTestId("pen-take-back-lap-1"));

@@ -556,7 +556,7 @@ function MatchPageView() {
                     <input type="datetime-local" min={earliestProposalInput()} value={proposalAt} onChange={(e) => setProposalAt(e.target.value)} className="input" data-testid="match-proposal-at" />
                   </Field>
                   <Field label="Notiz">
-                    <input value={proposalNote} onChange={(e) => setProposalNote(e.target.value)} className="input" placeholder="z.B. nach 20:00 Uhr möglich" />
+                    <input value={proposalNote} onChange={(e) => setProposalNote(e.target.value)} maxLength={500} className="input" placeholder="z.B. nach 20:00 Uhr möglich" />
                   </Field>
                   <button disabled={busy} className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">Vorschlagen</button>
                 </form>
@@ -567,17 +567,19 @@ function MatchPageView() {
               )}
 
               <div className="mt-5 space-y-3">
-                {(data.schedule_proposals || []).map((p) => {
+                {(data.schedule_proposals || []).map((p, index) => {
                   const open = p.status === "pending";
                   // Der eigene Vorschlag (#2110): annehmen oder ablehnen kann nur die Gegenseite - hier „Zurückziehen“.
                   const own = open && isOwnProposal(p, data, user?.id);
                   const answer = canManageSchedule && open && !own;
+                  // Wer nicht zum Spiel gehört, bekommt keine Kennung (#2201) - dann zählt die Stelle in der Liste.
+                  const rowId = p.id || `zeile-${index}`;
                   return (
-                  <div key={p.id} className="border border-white/10 bg-[#0A0A0A] rounded-sm p-3" data-testid={`match-proposal-${p.id}`}>
+                  <div key={rowId} className="border border-white/10 bg-[#0A0A0A] rounded-sm p-3" data-testid={`match-proposal-${rowId}`}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="text-sm font-bold">{formatDateTime(p.scheduled_at)}</div>
-                        <div className="text-xs text-white/45 mt-1 [overflow-wrap:anywhere]" data-testid={`match-proposal-status-${p.id}`}>{p.actor?.display_name || p.actor?.username || "Teilnehmer"} · {own ? "wartet auf die Gegenseite" : proposalStatusLabel(p)}</div>
+                        <div className="text-xs text-white/45 mt-1 [overflow-wrap:anywhere]" data-testid={`match-proposal-status-${rowId}`}>{p.actor?.display_name || p.actor?.username || "Teilnehmer"} · {own ? "wartet auf die Gegenseite" : proposalStatusLabel(p)}</div>
                         {p.note && <div className="text-xs text-white/60 mt-2 [overflow-wrap:anywhere]">{p.note}</div>}
                       </div>
                       {answer && (
