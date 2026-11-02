@@ -608,8 +608,11 @@ Zuständigkeit. Ein Zuständiger braucht keinen Bereich; `/admin` führt ihn üb
 **Befangenheit** (`league_permissions.conflict_of_interest(db, user, match, decided_by=None)`): Befangen ist, wer zu einer Seite des
 Spiels gehört: Kader des Co-Teams, Captain, Vertreter, Hauptteam-Leitung, Person der Anmeldung, oder wer in einer Aufstellung des
 Spiels steht. Dann gibt es dort keine Ergebnis-Korrektur, keine Protest-Entscheidung und keine Strafe zum Spiel. Es entscheidet eine
-zweite berechtigte Person. Notausnahme nur für den Superadmin, mit Pflichtgrund (mindestens fünf Zeichen, Feld `conflict_reason`) und
-Protokoll `league.conflict.override`. `decided_by` ist für E.3: Einen Einspruch entscheidet nie die Person, die die Ausgangsentscheidung
+zweite berechtigte Person. Dasselbe gilt für den direkt gesetzten Termin: `matches` setzt im eigenen Spiel keinen Termin, als Captain oder
+Vertreter gilt Vorschlag und Zustimmung wie für jede Seite. Notausnahme nur für den Superadmin, mit Pflichtgrund (mindestens fünf Zeichen, Feld
+`conflict_reason`) und Protokoll `league.conflict.override`. Ein gehaltenes Ergebnis prüft Konto, Zwei-Faktor, Liga-Recht und Befangenheit beim
+Veröffentlichen noch einmal; passt es nicht mehr, fällt es weg (`match.result.hold_failed`, Nachricht an die Person). Die Notausnahme gilt dabei, wenn sie
+beim Ablegen gesetzt war. `decided_by` ist für E.3: Einen Einspruch entscheidet nie die Person, die die Ausgangsentscheidung
 traf, auch nicht der Superadmin. Die eigene Seite handelt weiter als Captain oder Vertreter (melden, bestätigen, Termin).
 
 **Helfer an Staffeln:** `organizer`, `referee`, `scorekeeper`, `station_manager` und `stream_operator` lesen in Staffeln wie bisher
@@ -640,7 +643,8 @@ Zugriff, außer „lesen“ steht in der Zeile. Prüfung: `backend/tests/test_le
 | Staffel: `GET /staff`, `/lead`, `/planning-check`, `/match-plan.csv`, `/bracket/display`, `/schedule/deadlines`, Chat, Teilnehmer intern | jede Zuständigkeit | – | lesen |
 | Staffel: `squad-candidates`, `squad-registrations`, `registrations` schreiben, `removal*`, `assignable-users` | `applications` | – | – |
 | Staffel: `registrations/{id}/checkin`, `print/checkin`, `schedule/plan`, `/apply`, `/release`, `live-queue/*`, Team-Tag `lineups` | `matches` | – | – |
-| Spiel: `PATCH`, Terminvorschläge entscheiden und zurückziehen | `matches`, Beteiligte weiter als Seite | nein | – |
+| Spiel: `PATCH` (Termin und Betreuung), `schedule/apply` und `/release` mit eigenem Spiel | `matches` | ja, im Sammellauf ohne Notausnahme | – |
+| Spiel: Terminvorschläge entscheiden und zurückziehen | `matches`; Beteiligte nur als Captain oder Vertreter wie jede Seite | ja | – |
 | Spiel: `POST /result`, `/result/undo`, `/forfeit`, `PUT /lineups` als Leitung, `POST …/lead/no-show/{id}` | `results` | ja | – |
 | Spiel: `POST /dispute/decision` | `disputes` | ja | – |
 | Spiel: `POST /result` bei offenem Streitfall | `results` und `disputes` | ja | – |
@@ -660,7 +664,7 @@ abgeben geht weiter. Alle anderen Teams und Co-Teams, auch nach dem Ende der Sta
 Jahreswertung, Spiele und Map-Bibliothek bleiben beim Bereich `tournaments`. Die Moderation bleibt getrennt.
 
 **Antworten an das Web:** `GET /api/tournaments/{tid}` schickt bei Staffeln `league_capabilities[]` und `can_edit_staffel`; die
-Matchseite `conflict` (`{"kind": "involved", "override": bool}` oder `null`); die Verwaltung je Liga `capabilities[]`. `GET /api/auth/me`
+Matchseite `conflict` (`{"kind": "involved", "override": bool}` oder `null`); `matches-v2` einer Staffel für die Leitung `viewer_involved` und `viewer_override`; die Verwaltung je Liga `capabilities[]`. `GET /api/auth/me`
 schickt `has_league_staff`.
 
 ### Darf nicht beschädigt werden

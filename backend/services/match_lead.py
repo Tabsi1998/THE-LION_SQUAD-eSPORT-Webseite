@@ -26,7 +26,7 @@ from services.result_hold import hold_view
 from services.round_labels import round_label, rounds_by_section, stage_kind
 from services.station_labels import attach_station_info
 from services.draw_show import lead_cards
-from services.league_permissions import capabilities_of, conflict_of_interest
+from services.league_permissions import capabilities_of, involved_match_ids
 from services.league_scope import is_league_staffel
 from services.permissions import is_superadmin
 from services.tournament_permissions import (
@@ -190,17 +190,6 @@ async def _result_scope(db, user: dict, tournament: dict, capability: str = "res
     return allowed
 
 
-async def _conflicts(db, user: dict, tournament: dict, matches: list[dict]) -> set[str]:
-    """Staffel (#2203): die Spiele, in denen diese Person befangen ist."""
-    if not is_league_staffel(tournament):
-        return set()
-    out: set[str] = set()
-    for match in matches:
-        if await conflict_of_interest(db, user, match):
-            out.add(match.get("id"))
-    return out
-
-
 def _station_sort_key(text: str) -> tuple:
     """„PC 2“ vor „PC 10“: Zahlen in Stationsnamen zählen als Zahlen."""
     parts = re.split(r"(\d+)", (text or "").lower())
@@ -239,7 +228,7 @@ async def lead_view(db, tournament: dict, user: dict, *, now: datetime | None = 
         by_stage.setdefault(match.get("stage_id") or "", []).append(match)
     may_enter = await _result_scope(db, user, tournament)
     may_decide = await _result_scope(db, user, tournament, "disputes")
-    conflicted = await _conflicts(db, user, tournament, matches)
+    conflicted = await involved_match_ids(db, user, tournament, matches)
     override = is_superadmin(user)
     # Streitfälle (#1158): Fotos (nur nach der Bildprüfung) und wer das Ergebnis eingetragen hat.
     disputed = [match for match in matches if str(match.get("status") or "") == "disputed"]

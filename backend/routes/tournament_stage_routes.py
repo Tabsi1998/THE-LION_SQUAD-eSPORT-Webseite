@@ -37,6 +37,9 @@ from services import tournament_guard
 from services.staffel_guard import staffel_rebuild_problem
 from services.match_public_view import public_match_view, public_stage_view
 from services.round_labels import attach_round_labels
+from services.league_permissions import involved_match_ids
+from services.league_scope import is_league_staffel
+from services.permissions import is_superadmin
 from routes.tournament_common import (
     _apply_match_plan,
     _audit_tournament_action,
@@ -227,6 +230,12 @@ async def list_tournament_matches_v2(tid: str, stage_id: str | None = None,
     stages = await db.tournament_stages.find({"tournament_id": tid}, {"_id": 0, "id": 1, "stage_type": 1}).to_list(200)
     attach_round_labels(matches, stages, tournament)
     if await _is_tournament_staff(tid, user):
+        # Staffel (#2203): Der Plan sagt je Spiel, ob die Person dort beteiligt ist - der Server entscheidet trotzdem.
+        if is_league_staffel(tournament):
+            own = await involved_match_ids(db, user, tournament, matches)
+            for match in matches:
+                match["viewer_involved"] = match["id"] in own
+                match["viewer_override"] = match["id"] in own and is_superadmin(user)
         return matches
     # Ohne Turnier-Recht dieselbe Sicht wie auf der Spielseite und im Turnierbaum.
     viewer_id = (user or {}).get("id")

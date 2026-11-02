@@ -370,12 +370,17 @@ async def _acting_registration_for_match(match: dict, user: dict | None) -> dict
     return await acting_registration(get_db(), await _registrations_for_match(match), user.get("id"))
 
 
+async def _plans_as_lead(match: dict, user: dict | None) -> bool:
+    """Plant die Person dieses Spiel als Leitung? In einer Staffel (#2203): „Spiele betreuen“ - aber nicht im eigenen Spiel, dort gilt
+    der normale Weg als Captain oder Vertreter."""
+    if not await has_match_result_permission(user, match, capability="matches"):
+        return False
+    return not await league_permissions.conflict_of_interest(get_db(), user, match)
+
+
 async def _can_act_for_match(match: dict, user: dict | None) -> bool:
     # Staffel (#2203): die Seite handelt selbst, von der Leitung nur „Spiele betreuen“.
-    return bool(
-        await has_match_result_permission(user, match, capability="matches")
-        or await _acting_registration_for_match(match, user)
-    )
+    return bool(await _plans_as_lead(match, user) or await _acting_registration_for_match(match, user))
 
 
 async def _can_submit_result_for_match(match: dict, user: dict | None) -> bool:
@@ -414,7 +419,7 @@ async def _result_conflict(db, user: dict | None, match: dict) -> dict | None:
     bekommen keine Meldung: sie handeln als Seite."""
     if not user:
         return None
-    for capability in ("results", "disputes"):
+    for capability in ("results", "disputes", "matches"):
         if await has_match_result_permission(user, match, capability=capability):
             return await league_permissions.conflict_of_interest(db, user, match)
     return None
@@ -951,7 +956,7 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
     if body.action == "withdraw":
         return await _withdraw_proposal(db, match, collection, proposal, me, acting_reg)
     if (
-        not await leads_tournament(me, match.get("tournament_id"), "matches")
+        not await _plans_as_lead(match, me)
         and acting_reg
         and proposal.get("actor_registration_id") == acting_reg.get("id")
         and body.action in {"accept", "decline"}
@@ -1295,8 +1300,11 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
         await require_tournament_staff_permission(
             me, v2_match["tournament_id"], CHECKIN_STAFF_ROLES, "match", match_id, capability="matches"
         )
+        # Termin des eigenen Spiels (#2203): setzt eine zweite Person, der Superadmin nur als Notausnahme mit Grund.
+        await league_permissions.require_no_conflict(db, me, v2_match, action="match_plan", conflict_reason=body.conflict_reason)
         nullable_fields = {"scheduled_at", "station_id", "admin_note", "map", "best_of", "duration_minutes"}
         raw = body.model_dump(exclude_unset=True)
+        raw.pop("conflict_reason", None)
         for result_field in ("score_a", "score_b", "winner_id"):
             raw.pop(result_field, None)
         updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}

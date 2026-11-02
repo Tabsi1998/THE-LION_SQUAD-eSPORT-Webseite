@@ -4,13 +4,15 @@
 - Zuständige (``league_staff``) haben nur ihre Liga und nur ihre Zuständigkeiten.
 - Bereich und Zuständigkeit gelten nur mit bestätigter Zwei-Faktor-Anmeldung.
 - ``conflict_of_interest`` sagt, ob jemand über ein Spiel nicht entscheiden darf, weil er dazugehört. Die Prüfung gilt für
-  Ergebnisse, Proteste und Strafen; ``decided_by`` ist für Einsprüche (E.3).
+  Ergebnisse, Proteste, Strafen und den direkt gesetzten Termin; ``decided_by`` ist für Einsprüche (E.3).
 """
 from __future__ import annotations
 
 from typing import Iterable
 
 from fastapi import Depends, HTTPException, Request
+
+from match_rules import participant_source_ids
 
 from auth import get_current_user
 from database import get_db
@@ -37,14 +39,17 @@ CAPABILITY_LABELS: dict[str, str] = {
 ANY = "any"
 READ = "read"
 AREA = "area"
-# Hier gilt die Befangenheit (Entscheidung des Obmanns zu #2203).
-CONFLICT_CAPABILITIES = frozenset({"results", "disputes", "sanctions"})
+# Hier gilt die Befangenheit (Entscheidungen des Obmanns zu #2203). „matches“: das Spiel direkt planen - als Captain oder Vertreter
+# bleibt Vorschlag und Zustimmung.
+CONFLICT_CAPABILITIES = frozenset({"results", "disputes", "sanctions", "matches"})
 
 CONFLICT_REASON_MIN = 5
 CONFLICT_REASON_MAX = 500
 CONFLICT_INVOLVED = "involved"
 CONFLICT_OWN_DECISION = "own_decision"
 CONFLICT_DETAIL = "Du bist an diesem Spiel selbst beteiligt. Das entscheidet eine zweite berechtigte Person."
+BULK_CONFLICT_DETAIL = ("Du bist an einem dieser Spiele selbst beteiligt. Das macht eine zweite berechtigte Person - "
+                        "als Captain oder Vertreter nutzt du Vorschlag und Zustimmung.")
 CONFLICT_SUPERADMIN_DETAIL = ("Du bist an diesem Spiel selbst beteiligt. Als Superadmin geht es nur als Notausnahme, mit "
                               "einem Grund von mindestens fünf Zeichen.")
 OWN_DECISION_DETAIL = "Über einen Einspruch entscheidet nie, wer die Ausgangsentscheidung getroffen hat."
@@ -247,6 +252,18 @@ async def involved_user_ids(db, match: dict) -> set[str]:
     for registration in registrations:
         people |= _people_of_side(registration, teams.get(registration.get("team_id") or ""))
     return people
+
+
+async def involved_match_ids(db, user: dict | None, tournament: dict | None, matches: list[dict]) -> set[str]:
+    """Für Listen einer Staffel: in welchen dieser Spiele ist die Person beteiligt? Eine Abfrage je Art statt je Spiel - dieselbe Regel
+    wie ``involved_user_ids``. Andere Turniere: keine."""
+    if not user or not user.get("id") or not is_league_staffel(tournament) or not matches:
+        return set()
+    registrations = await db.tournament_registrations.find({"tournament_id": tournament["id"]}, {"_id": 0}).to_list(2000)
+    teams = await teams_by_id(db, registrations)
+    own = {row["id"] for row in registrations if user["id"] in _people_of_side(row, teams.get(row.get("team_id") or ""))}
+    return {match["id"] for match in matches
+            if user["id"] in _people_in_lineups(match) or own & set(participant_source_ids(match))}
 
 
 async def conflict_of_interest(db, user: dict | None, match: dict, *, decided_by: str | None = None) -> dict | None:

@@ -1150,6 +1150,8 @@ class MatchUpdate(BaseModel):
     map: Optional[str] = None
     best_of: Optional[int] = None
     duration_minutes: Optional[int] = None
+    # Notausnahme des Superadmins bei Befangenheit (#2203) - geht ins Protokoll, nicht ans Spiel.
+    conflict_reason: Optional[str] = Field(default=None, max_length=500)
 
 
 class MatchV2Update(BaseModel):

@@ -330,7 +330,7 @@ Ergebnisse korrigieren, Proteste, Strafen, Regeln veröffentlichen. Zuständige 
 Protokoll, die Person bekommt eine Meldung.
 
 **Befangenheit:** Wer in einem Spiel selbst beteiligt ist (Kader einer Seite, Captain, Vertreter, Hauptteam-Leitung), korrigiert dort
-keine Ergebnisse, entscheidet keine Proteste und verhängt keine Strafen zum Spiel. Es entscheidet eine zweite berechtigte Person. Nur der
+keine Ergebnisse, entscheidet keine Proteste, verhängt keine Strafen zum Spiel und setzt keinen Termin direkt (als Captain oder Vertreter gilt Vorschlag und Zustimmung). Es entscheidet eine zweite berechtigte Person. Nur der
 Superadmin darf als Notausnahme, mit Pflichtgrund im Protokoll (`league.conflict.override`).
 
 **Helfer an Staffeln** lesen, ändern aber nichts. Sonstige Turniere bleiben unverändert. Die Matrix je Route steht in

@@ -131,8 +131,8 @@ function ConflictNotice({ conflict }) {
     <p className="mt-5 rounded-sm border border-warn/40 bg-warn/10 px-4 py-3 text-sm text-white/85" data-testid="match-conflict">
       <strong>Du bist an diesem Spiel selbst beteiligt.</strong>{" "}
       {conflict.override
-        ? "Das entscheidet sonst eine zweite Person. Als Superadmin geht es nur als Notausnahme: Im Ergebnis-Fenster steht das Feld für den Grund, er kommt ins Protokoll."
-        : "Ergebnisse, Proteste und Strafen zu diesem Spiel entscheidet eine zweite berechtigte Person. Als eigene Seite meldest du wie alle anderen."}
+        ? "Das entscheidet sonst eine zweite Person. Als Superadmin geht es nur als Notausnahme: Im Ergebnis-Fenster und im Matchplan fragt die Seite nach dem Grund, er kommt ins Protokoll."
+        : "Ergebnisse, Proteste, Strafen und den festen Termin zu diesem Spiel entscheidet eine zweite berechtigte Person. Als Captain oder Vertreter meldest du und nutzt Vorschlag und Zustimmung wie alle anderen."}
     </p>
   );
 }
