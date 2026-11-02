@@ -430,17 +430,16 @@ async def _assignment(db, tournament: dict, registration: dict, actor_id: str | 
             "registration_id": registration["id"], "assigned_by": actor_id, "assigned_at": now_utc().isoformat()}
 
 
-async def _after_assign(db, tournament: dict, registration: dict, actor: dict) -> list[str]:
-    """Wie beim Zuteilen: Vorschau auffrischen, Spiel-IDs festhalten. Sagt, wem die ID noch fehlt."""
-    from routes.tournament_registration_routes import _refresh_tournament_previews_after_registration
-
-    await _refresh_tournament_previews_after_registration(db, tournament, actor.get("id"))
+async def _after_assign(db, tournament: dict, registration: dict, actor: dict, refresh_previews) -> list[str]:
+    """Wie beim Zuteilen: Vorschau auffrischen (``refresh_previews`` reicht die Route herein, ein Service importiert keine Route), Spiel-IDs
+    festhalten. Sagt, wem die ID noch fehlt."""
+    await refresh_previews(db, tournament, actor.get("id"))
     squad = await db.team_squads.find_one({"id": registration["squad_id"]}, {"_id": 0, "id": 1, "member_ids": 1}) or {}
     ids = await league_roster.after_assign(db, tournament, registration, squad, actor.get("id"))
     return sorted(row["name"] for row in league_roster.waiting_for_id(ids.values()))
 
 
-async def accept(db, league: dict, season: dict, application_id: str, tournament_id: str | None, actor: dict) -> dict:
+async def accept(db, league: dict, season: dict, application_id: str, tournament_id: str | None, actor: dict, *, refresh_previews) -> dict:
     """Annehmen, mit ``tournament_id`` gleich zuteilen. Der letzte Platz geht unter der Season-Sperre nur einmal weg."""
     registration = None
     tournament = None
@@ -470,13 +469,13 @@ async def accept(db, league: dict, season: dict, application_id: str, tournament
                 if registration:
                     await db.tournament_registrations.delete_one({"id": registration["id"]})
                 raise
-        ids_missing = await _after_assign(db, tournament, registration, actor) if registration else []
+        ids_missing = await _after_assign(db, tournament, registration, actor, refresh_previews) if registration else []
     await _audit(db, "accept", done, actor["id"], **({"tournament_id": tournament_id} if tournament_id else {}))
     await _tell_status(db, league, season, done, ACCEPTED, squad=squad)
     return {**done, "ids_missing": ids_missing}
 
 
-async def assign(db, league: dict, season: dict, application_id: str, tournament_id: str | None, actor: dict) -> dict:
+async def assign(db, league: dict, season: dict, application_id: str, tournament_id: str | None, actor: dict, *, refresh_previews) -> dict:
     """Einen angenommenen Antrag einer Staffel zuteilen - erst hier entsteht die Anmeldung."""
     if not tournament_id:
         raise LeagueProblem("Bitte eine Staffel wählen.")
@@ -503,7 +502,7 @@ async def assign(db, league: dict, season: dict, application_id: str, tournament
             except LeagueProblem:
                 await db.tournament_registrations.delete_one({"id": registration["id"]})
                 raise
-        ids_missing = await _after_assign(db, tournament, registration, actor)
+        ids_missing = await _after_assign(db, tournament, registration, actor, refresh_previews)
     await _audit(db, "assign", done, actor["id"], tournament_id=tournament_id)
     await _tell_status(db, league, season, done, "assigned")
     return {**done, "ids_missing": ids_missing}

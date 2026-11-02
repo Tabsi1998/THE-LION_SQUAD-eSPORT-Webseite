@@ -163,7 +163,8 @@ test.describe("Abnahme: Selbstanmeldung gegen den echten Server", () => {
 
     await lead.page.getByTestId(`application-staffel-${first}`).selectOption(run.tournament_id);
     await lead.page.getByTestId(`application-accept-${first}`).click();
-    await expect(lead.page.getByTestId(`application-${first}`)).toContainText("Liga 1 · Staffel A");
+    // Die Auswahl der Staffel nennt denselben Namen: Erst der Link zur Verwaltung zeigt, dass zugeteilt ist.
+    await expect(lead.page.getByTestId(`application-open-staffel-${first}`)).toBeVisible();
     await lead.page.getByTestId(`application-accept-${second}`).click();
     await expect(lead.page.getByTestId(`application-assign-${second}`)).toBeVisible();
 
@@ -181,7 +182,7 @@ test.describe("Abnahme: Selbstanmeldung gegen den echten Server", () => {
 
     await lead.page.getByTestId(`application-staffel-${second}`).selectOption(run.tournament_id);
     await lead.page.getByTestId(`application-assign-${second}`).click();
-    await expect(lead.page.getByTestId(`application-${second}`)).toContainText("Liga 1 · Staffel A");
+    await expect(lead.page.getByTestId(`application-open-staffel-${second}`)).toBeVisible();
     await noSideScroll(lead.page);
     await shot(lead.page, "anmeldung-eingang-1440.png");
     expect(lead.problems).toEqual([]);

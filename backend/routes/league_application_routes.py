@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from auth import get_current_user
 from database import get_db
 from models import LeagueApplicationDecision, LeagueApplicationSubmit
+from routes.tournament_registration_routes import _refresh_tournament_previews_after_registration
 from services import league_applications as applications
 from services import league_service as leagues
 from services.league_permissions import require_league
@@ -85,7 +86,8 @@ async def review_application(season_id: str, application_id: str, me: dict = Dep
 @admin_router.post("/{season_id}/applications/{application_id}/accept")
 async def accept_application(season_id: str, application_id: str, body: LeagueApplicationDecision, me: dict = Depends(require_applications)):
     league, season = await _scope(season_id)
-    return _answer(await _call(applications.accept(get_db(), league, season, application_id, body.tournament_id, me)))
+    return _answer(await _call(applications.accept(get_db(), league, season, application_id, body.tournament_id, me,
+                                                  refresh_previews=_refresh_tournament_previews_after_registration)))
 
 
 @admin_router.post("/{season_id}/applications/{application_id}/reject")
@@ -103,4 +105,5 @@ async def waitlist_application(season_id: str, application_id: str, body: League
 @admin_router.post("/{season_id}/applications/{application_id}/assign")
 async def assign_application(season_id: str, application_id: str, body: LeagueApplicationDecision, me: dict = Depends(require_applications)):
     league, season = await _scope(season_id)
-    return _answer(await _call(applications.assign(get_db(), league, season, application_id, body.tournament_id, me)))
+    return _answer(await _call(applications.assign(get_db(), league, season, application_id, body.tournament_id, me,
+                                                  refresh_previews=_refresh_tournament_previews_after_registration)))

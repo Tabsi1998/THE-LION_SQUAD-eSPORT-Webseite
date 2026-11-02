@@ -26,6 +26,10 @@ async def flow():
         await shutdown()
 
 
+async def no_preview(_db, _tournament, _actor_id):
+    return None
+
+
 async def attempt(coroutine):
     try:
         await coroutine
@@ -97,7 +101,7 @@ async def test_withdrawing_against_accepting_leaves_one_clean_state(flow):
     league, season = await fresh_season(flow, w)
 
     answers = await asyncio.gather(attempt(applications.withdraw(flow.db, league, season, application["id"], side["captain"])),
-                                   attempt(applications.accept(flow.db, league, season, application["id"], w["tid"], w["lead"])))
+                                   attempt(applications.accept(flow.db, league, season, application["id"], w["tid"], w["lead"], refresh_previews=no_preview)))
 
     row = await flow.db.league_applications.find_one({"id": application["id"]}, {"_id": 0})
     registrations = await flow.db.tournament_registrations.count_documents({"squad_id": side["squad"]["id"]})
