@@ -370,6 +370,9 @@ async def update_game_server(server_id: str, body: GameServerPatch, me: dict = D
     if "game_id" in raw:
         await _validate_game(db, raw["game_id"], existing.get("game_id"))
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
+    if updates.get("sync_provider") == "manual":
+        # Von Hand gepflegt (#2129): kein Abruf mehr, also auch kein alter Fehler und kein Hinweis dazu.
+        updates.update({"last_sync_error": None, "last_sync_note": None})
     if updates.get("access_secret"):
         updates["access_secret"] = encrypt_secret(updates["access_secret"])
     slug_source = slug_source_for_update(raw, existing, "name", fallback="server")
