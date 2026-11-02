@@ -52,7 +52,7 @@ async def _season(db, season_id: str) -> dict:
 @admin_router.get("/seasons/{season_id}/roster")
 async def season_roster(season_id: str, _me: dict = Depends(require_roster)):
     db = get_db()
-    return await league_roster.season_overview(db, await _season(db, season_id))
+    return await league_eligibility.season_overview(db, await _season(db, season_id))
 
 
 @admin_router.post("/seasons/{season_id}/roster/{user_id}/approve")

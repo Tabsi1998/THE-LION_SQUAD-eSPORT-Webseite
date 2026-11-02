@@ -119,6 +119,31 @@ def min_squad_size(tournament: dict) -> int:
     return max(value or team_size, team_size)
 
 
+async def active_league_registrations(db, squad_id: str) -> list[dict]:
+    """Alle Anmeldungen dieses Co-Teams in Staffeln, die noch nicht beendet sind - egal mit welchem Status. Ein Co-Team kann in Staffeln
+    verschiedener Seasons stehen."""
+    regs = await db.tournament_registrations.find(
+        {"squad_id": squad_id},
+        {"_id": 0, "id": 1, "tournament_id": 1},
+    ).to_list(500)
+    if not regs:
+        return []
+    tournaments = {
+        row["id"]: row
+        for row in await db.tournaments.find(
+            {"id": {"$in": sorted({reg["tournament_id"] for reg in regs if reg.get("tournament_id")})}},
+            {"_id": 0, "id": 1, "title": 1, "slug": 1, "status": 1, "game_id": 1, "league_context": 1},
+        ).to_list(510)
+    }
+    active = []
+    for reg in regs:
+        tournament = tournaments.get(reg.get("tournament_id") or "")
+        if tournament and tournament.get("status") not in FINISHED_TOURNAMENT_STATUSES:
+            active.append({**reg, "tournament_title": tournament.get("title"), "tournament_slug": tournament.get("slug"),
+                           "tournament_game_id": tournament.get("game_id"), "league_context": tournament.get("league_context")})
+    return active
+
+
 # ---------------------------------------------------------------- Laden
 
 
@@ -692,8 +717,9 @@ async def on_squad_members_added(db, squad: dict, user_ids, actor_id: str | None
 
 async def tell_waiting(db, ctx: RosterContext, tournament: dict, registration: dict, user_ids: list[str], squad_id: str) -> None:
     """Neu im Kader nach dem ersten Spieltag (#2204): Die Person und die Verantwortlichen erfahren, ab wann sie spielen darf."""
-    from services.user_notifications import create_user_notification
+    from services.league_mail import send_league_mail
     from services.matchday_schedule import LOCAL_TZ
+    from services.user_notifications import create_user_notification
 
     name = registration.get("display_name") or tournament.get("title") or "Liga"
     title = tournament.get("title") or "Liga"
@@ -712,6 +738,8 @@ async def tell_waiting(db, ctx: RosterContext, tournament: dict, registration: d
             meta={"tournament_id": tournament.get("id"), "reason": "league_wait",
                   "dedupe_key": f"league-wait:{ctx.season_id}:{squad_id}:{user_id}"},
         )
+        await send_league_mail(db, user_id, "Wartezeit in der Liga", f"{title}: Du bist neu im Kader und darfst ab {when} spielen.",
+                               f"/tournaments/{tournament.get('slug') or tournament.get('id')}", f"league-wait:{ctx.season_id}:{squad_id}:{user_id}:mail")
         for lead_id in responsible:
             await create_user_notification(
                 lead_id, "Neuer Spieler wartet",
@@ -877,10 +905,6 @@ async def season_overview(db, season: dict) -> dict:
         for row in await db.users.find({"id": {"$in": team_people}}, {"_id": 0, "id": 1, "display_name": 1, "username": 1}).to_list(len(team_people) + 1)
     } if team_people else {}
     ctx = await context_for_season(db, season, members)
-    # Spielberechtigung (#2204): dieselbe Prüfung wie überall. Das Geburtsdatum bleibt im Server, hier steht nur der Stand.
-    from services import league_eligibility
-
-    eligibility = await league_eligibility.context_for_season(db, season, members)
     divisions = {
         row["id"]: row
         for row in await db.league_divisions.find(
@@ -905,8 +929,7 @@ async def season_overview(db, season: dict) -> dict:
             f"Staffel {context.get('staffel')}" if context.get("staffel") else None) if part)
         squad = squads.get(reg.get("squad_id")) or {}
         players = [
-            {**status(ctx, uid, reg.get("squad_id")), "approvals": _approvals_view((ctx.entries if ctx else {}).get(uid), names),
-             "eligibility": league_eligibility.public_row(league_eligibility.status(eligibility, uid, reg.get("squad_id")))}
+            {**status(ctx, uid, reg.get("squad_id")), "approvals": _approvals_view((ctx.entries if ctx else {}).get(uid), names)}
             for uid in squad.get("member_ids") or [] if uid
         ]
         players.sort(key=lambda row: row["name"].lower())
@@ -934,22 +957,19 @@ async def season_overview(db, season: dict) -> dict:
         })
     rows.sort(key=lambda row: row.pop("_sort"))
     counts = {state: 0 for state in (MISSING, LATE, BANNED)}
-    changed = waiting = age = 0
+    changed = 0
     for row in rows:
         for player in row["players"]:
             if player["state"] in counts:
                 counts[player["state"]] += 1
             changed += 1 if player["changed"] else 0
-            waiting += 1 if player["eligibility"]["state"] == league_eligibility.WAITING else 0
-            age += 1 if player["eligibility"]["state"] in (league_eligibility.AGE_MISSING, league_eligibility.AGE_NOT_MET_STATE) else 0
     return {
-        "rules": league_eligibility.rules_view(season),
         "season": {"id": season["id"], "name": season.get("name"), "status": season.get("status"),
                    "roster_deadline": (ctx.deadline if ctx else None) or season.get("roster_deadline")},
         "game": {"name": ((ctx.game if ctx else None) or {}).get("display_name")},
         "fields": [{"key": item["key"], "label": item.get("label") or item["key"]} for item in (ctx.fields if ctx else [])],
         "squads": rows,
-        "counts": {**counts, "changed": changed, "waiting": waiting, "age": age, "short": sum(1 for row in rows if row["short"])},
+        "counts": {**counts, "changed": changed, "short": sum(1 for row in rows if row["short"])},
     }
 
 

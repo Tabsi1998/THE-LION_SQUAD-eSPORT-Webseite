@@ -456,6 +456,21 @@ async def test_the_other_side_sees_no_eligibility_reason(flow):
     assert "Geburtsdatum fehlt" in blocked["lineup_blocked"]
 
 
+@pytest.mark.asyncio
+async def test_the_data_request_names_the_matches_on_a_list_without_other_people(flow):
+    w = await series_world(flow)
+    assert (await report(flow, w, *HOME)).status_code == 200
+    assert (await confirm(flow, w, *AWAY)).status_code == 200
+    from services.competition_privacy import league_appearance_snapshot
+
+    rows = await league_appearance_snapshot(flow.db, w["users"]["Mila"]["id"])
+
+    assert [row["match_id"] for row in rows] == [w["match"]["id"]]
+    assert rows[0]["registration_id"] == w["reg_a"]["id"]
+    assert w["users"]["Tom"]["id"] not in str(rows)
+    assert await league_appearance_snapshot(flow.db, w["users"]["Fremd"]["id"]) == []
+
+
 # ---------------------------------------------------------------- Altbestand
 
 

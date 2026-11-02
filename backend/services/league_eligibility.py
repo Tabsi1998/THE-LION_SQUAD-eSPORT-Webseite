@@ -245,6 +245,23 @@ async def squad_view(db, team: dict, squad: dict, *, can_edit: bool, transfers) 
     return {"seasons": seasons}
 
 
+async def season_overview(db, season: dict) -> dict:
+    """Die Kaderübersicht (``league_roster.season_overview``) mit Regeln und Stand je Spieler: dieselbe Prüfung wie überall. Das
+    Geburtsdatum bleibt im Server, hier steht nur der Stand."""
+    overview = await league_roster.season_overview(db, season)
+    members = {player["id"] for row in overview["squads"] for player in row["players"]}
+    ctx = await context_for_season(db, season, members)
+    waiting = age = 0
+    for row in overview["squads"]:
+        for player in row["players"]:
+            player["eligibility"] = public_row(status(ctx, player["id"], row.get("squad_id")))
+            waiting += 1 if player["eligibility"]["state"] == WAITING else 0
+            age += 1 if player["eligibility"]["state"] in (AGE_MISSING, AGE_NOT_MET_STATE) else 0
+    overview["counts"].update({"waiting": waiting, "age": age})
+    overview["rules"] = rules_view(season)
+    return overview
+
+
 async def my_status(db, user: dict) -> list[dict]:
     """Der eigene Stand je Season, in der die Person gerade in einem Co-Team steht. Ohne Datum."""
     user_id = user["id"]
@@ -266,12 +283,10 @@ async def my_status(db, user: dict) -> list[dict]:
 
 async def open_seasons_of_squad(db, squad_id: str | None) -> list[tuple[dict, dict]]:
     """Die Seasons (mit einer ihrer Staffeln), in denen dieses Co-Team gerade in einer nicht beendeten Staffel steht."""
-    from services.squad_registration import active_league_registrations
-
     if not squad_id:
         return []
     out: dict[str, tuple[dict, dict]] = {}
-    for reg in await active_league_registrations(db, squad_id):
+    for reg in await league_roster.active_league_registrations(db, squad_id):
         season_id = (reg.get("league_context") or {}).get("season_id")
         if not season_id or season_id in out:
             continue

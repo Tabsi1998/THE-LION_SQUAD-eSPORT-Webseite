@@ -9,7 +9,7 @@ from fastapi.responses import StreamingResponse
 from database import get_db
 from auth import require_super, get_current_user
 from services import account_erasure
-from services.competition_privacy import registration_match_snapshot
+from services.competition_privacy import league_appearance_snapshot, registration_match_snapshot
 from models import now_utc, new_id
 
 dsgvo_router = APIRouter(prefix="/api/dsgvo", tags=["dsgvo"])
@@ -159,14 +159,7 @@ async def _user_data_sections(db, user_id: str) -> list[tuple[str, tuple]]:
         return await registration_match_snapshot(db, registration_ids, limit=None)
 
     async def league_appearances():
-        rows = await db.matches_v2.find(
-            {"lineup_user_ids": user_id},
-            {"_id": 0, "id": 1, "tournament_id": 1, "status": 1, "completed_at": 1, "lineups": 1},
-        ).to_list(5000)
-        return [{"match_id": row.get("id"), "tournament_id": row.get("tournament_id"), "status": row.get("status"),
-                 "completed_at": row.get("completed_at"),
-                 "registration_id": next((side for side, people in (row.get("lineups") or {}).items() if user_id in people), None)}
-                for row in rows]
+        return await league_appearance_snapshot(db, user_id)
 
     async def stamp():
         return now_utc().isoformat()

@@ -19,7 +19,7 @@ from pymongo.errors import DuplicateKeyError
 from models import new_id, now_utc
 from services import league_eligibility, league_roster
 from services.discord_roles import load_games, top_game
-from services.league_roster import min_squad_size
+from services.league_roster import active_league_registrations, min_squad_size
 
 ACTIVE_REGISTRATION_STATUSES = ("pending", "approved", "checked_in", "waitlist")
 # Plätze einer Staffel belegen wie beim Nachrücken (#1551) nur diese - die Warteliste zählt nicht mit.
@@ -406,25 +406,3 @@ async def active_league_registration(db, squad_id: str) -> dict | None:
     return active[0] if active else None
 
 
-async def active_league_registrations(db, squad_id: str) -> list[dict]:
-    """Alle solchen Anmeldungen - ein Co-Team kann in Staffeln verschiedener Seasons stehen."""
-    regs = await db.tournament_registrations.find(
-        {"squad_id": squad_id},
-        {"_id": 0, "id": 1, "tournament_id": 1},
-    ).to_list(500)
-    if not regs:
-        return []
-    tournaments = {
-        row["id"]: row
-        for row in await db.tournaments.find(
-            {"id": {"$in": sorted({reg["tournament_id"] for reg in regs if reg.get("tournament_id")})}},
-            {"_id": 0, "id": 1, "title": 1, "slug": 1, "status": 1, "game_id": 1, "league_context": 1},
-        ).to_list(510)
-    }
-    active = []
-    for reg in regs:
-        tournament = tournaments.get(reg.get("tournament_id") or "")
-        if tournament and tournament.get("status") not in FINISHED_TOURNAMENT_STATUSES:
-            active.append({**reg, "tournament_title": tournament.get("title"), "tournament_slug": tournament.get("slug"),
-                           "tournament_game_id": tournament.get("game_id"), "league_context": tournament.get("league_context")})
-    return active

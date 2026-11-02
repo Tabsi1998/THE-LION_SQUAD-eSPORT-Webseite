@@ -19,6 +19,19 @@ def _privacy_match_projection(match: dict) -> dict:
     return projected
 
 
+async def league_appearance_snapshot(db, user_id: str) -> list[dict]:
+    """Für die Auskunft (#2204): Spiele, in denen die Person auf einer Aufstellung oder Teilnehmerliste steht - nur ihre eigene Seite, keine
+    anderen Personen."""
+    rows = await db.matches_v2.find(
+        {"lineup_user_ids": user_id},
+        {"_id": 0, "id": 1, "tournament_id": 1, "status": 1, "completed_at": 1, "lineups": 1},
+    ).to_list(5000)
+    return [{"match_id": row.get("id"), "tournament_id": row.get("tournament_id"), "status": row.get("status"),
+             "completed_at": row.get("completed_at"),
+             "registration_id": next((side for side, people in (row.get("lineups") or {}).items() if user_id in people), None)}
+            for row in rows]
+
+
 async def registration_match_snapshot(db, registration_ids: list[str], *, limit: int = 5000) -> list[dict]:
     """Export every canonical match that references one of the registrations."""
 
