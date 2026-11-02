@@ -5,6 +5,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { LoadNotice } from "@/components/tls/LoadState";
 import { useOptionalAuth } from "@/context/AuthContext";
 import { reportCaughtError, scrubClientLogText } from "@/lib/clientLog";
+import { reportablePath } from "@/lib/reportPath";
 import { viennaDateTime } from "@/lib/vienna";
 
 // Fehlergrenze (#944): stürzt eine Seite beim Zeichnen ab, bleibt die Website bedienbar - Kopfzeile und Footer
@@ -139,9 +140,9 @@ function ErrorCard({ error, report }) {
         >
           <Home className="w-4 h-4" /> Startseite
         </Link>
-        {/* Fehler melden (#2131): mit der Seite - nur der Pfad, ohne Abfrage. */}
+        {/* Fehler melden (#2131): mit der Seite - der Pfad ohne Kennungen. */}
         <Link
-          to={`/contact?topic=report_bug&subject=${encodeURIComponent("Fehler auf der Website")}&from=${encodeURIComponent(String(report?.path || "/").split(/[?#]/)[0])}`}
+          to={`/contact?topic=report_bug&subject=${encodeURIComponent("Fehler auf der Website")}&from=${encodeURIComponent(reportablePath(report?.path) || "/")}`}
           data-testid="page-error-report"
           className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-4 py-2 font-bold uppercase tracking-wider rounded-sm text-xs"
         >

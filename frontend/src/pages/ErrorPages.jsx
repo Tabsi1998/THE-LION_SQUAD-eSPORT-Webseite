@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { adminHome, areaList } from "@/lib/permissions";
+import { reportablePath } from "@/lib/reportPath";
 import { useOptionalAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Home, ArrowLeft, Calendar, Trophy, Newspaper, Medal, LogIn, RefreshCw, ClipboardList, Mail, Bug } from "lucide-react";
@@ -24,7 +25,7 @@ const QUICK_LINKS = [
 ];
 
 function bugReportPath(pathname) {
-  return `/contact?topic=report_bug&subject=${encodeURIComponent("Fehler auf der Website")}&from=${encodeURIComponent(pathname || "/")}`;
+  return `/contact?topic=report_bug&subject=${encodeURIComponent("Fehler auf der Website")}&from=${encodeURIComponent(reportablePath(pathname) || "/")}`;
 }
 
 // `title` und `primary` ersetzen Überschrift und ersten Knopf - für Angemeldete auf „Kein Zugriff“ (#1352), die keinen

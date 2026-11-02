@@ -47,6 +47,14 @@ test("beim Thema „Fehler melden“ steht, was mitgeht, und nur dann geht es mi
   })));
 });
 
+test("die Seite geht ohne Kennung mit, auch wenn sie von Hand in der Adresse steht", async () => {
+  apiMock.get.mockImplementation(async (url) => (url === "/spam-guard/token" ? { data: TOKEN } : { data: [{ value: "report_bug", label: "Fehler melden" }] }));
+  render(<MemoryRouter initialEntries={[`/contact?topic=report_bug&from=${encodeURIComponent("/karte/pruefen/abc123")}`]}><ContactPage /></MemoryRouter>);
+  const box = await screen.findByTestId("contact-bug-context");
+  expect(box).toHaveTextContent("Seite: /karte/pruefen/…");
+  expect(box).not.toHaveTextContent("abc123");
+});
+
 test("eine fremde Adresse oder Abfrage kommt nicht als Seite mit, und ohne Fehler-Thema geht nichts mit", async () => {
   const { default: userEvent } = await import("@testing-library/user-event");
   apiMock.get.mockImplementation(async (url) => (url === "/spam-guard/token" ? { data: TOKEN } : { data: [{ value: "general", label: "Allgemeine Anfrage" }, { value: "report_bug", label: "Fehler melden" }] }));

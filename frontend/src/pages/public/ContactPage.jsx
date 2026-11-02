@@ -9,6 +9,7 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { usePublicSiteSettings } from "@/hooks/usePublicSiteSettings";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { useSpamGuard } from "@/hooks/useSpamGuard";
+import { reportablePath } from "@/lib/reportPath";
 import { AuthFormAlert } from "@/components/tls/AuthFormFields";
 import { SpamGuardFields } from "@/components/tls/SpamGuardFields";
 import { toast } from "sonner";
@@ -17,12 +18,12 @@ import { Mail, MessageSquare, MapPin, Send, Check } from "lucide-react";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
- * Was eine Fehlermeldung mitbringt: die Seite aus der Adresse (`?from=`, nur ein Pfad - nie eine fremde Adresse oder
- * Abfrage mit möglichen Schlüsseln), das Gerät und die Version (`?version=` kommt von der App, sonst die der Website).
+ * Was eine Fehlermeldung mitbringt: die Seite aus der Adresse (`?from=`, nur ein Pfad ohne Kennungen - nie eine fremde
+ * Adresse oder Abfrage), das Gerät und die Version (`?version=` kommt von der App, sonst die der Website).
  */
 function reportContext(params) {
   const from = String(params?.get?.("from") || "");
-  const page = /^\/[^?#\s]{0,299}$/.test(from) ? from : "";
+  const page = /^\/[^?#\s]{0,299}$/.test(from) ? reportablePath(from) : "";
   const wanted = String(params?.get?.("version") || "");
   const version = /^[\w.+-]{1,40}$/.test(wanted) ? wanted : import.meta.env.VITE_APP_VERSION || "";
   return { page, device: String(globalThis.navigator?.userAgent || "").slice(0, 300), version };
