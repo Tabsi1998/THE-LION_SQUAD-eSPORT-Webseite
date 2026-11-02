@@ -302,6 +302,34 @@ test("nach der Veröffentlichung: „Vereinsmitglieder ausschließen“ ändern 
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/f1/challenges/c-1", expect.objectContaining({ block_club_member_results: true, change_reason: "Mitglied fuhr irrtümlich offiziell" })));
 });
 
+test("Meisterschaft, Punkte je Platz und Stream stehen im Bearbeiten; geschickt wird nur, was sich ändert (#2130)", async () => {
+  answerWith({ status: "live", twitch_channel: "alt", twitch_enabled: true });
+  renderPage();
+  await screen.findByRole("heading", { name: "Monza Sprint" });
+  expect(screen.queryByTestId("f1-edit-points")).toBeNull();
+  expect(screen.getByTestId("f1-edit-stream-url")).toHaveValue("alt");
+  fireEvent.click(screen.getByTestId("f1-edit-championship"));
+  expect(screen.getByTestId("f1-edit-points")).toHaveValue("25, 18, 15, 12, 10, 8, 6, 4, 2, 1");
+  fireEvent.change(screen.getByTestId("f1-edit-points"), { target: { value: "" } });
+  fireEvent.click(screen.getByTestId("f1-edit-save"));
+  await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Bitte die Punkte je Platz eintragen, z. B. 25, 18, 15."));
+  expect(apiMock.patch).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByTestId("f1-edit-points"), { target: { value: "10, 5" } });
+  fireEvent.click(screen.getByTestId("f1-edit-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/f1/challenges/c-1", { is_championship: true, points_per_position: [10, 5] }));
+  expect(promptMock).not.toHaveBeenCalled();
+});
+
+test("nach der Veröffentlichung: Punkte je Platz ändern braucht eine Begründung (#2130)", async () => {
+  answerWith({ status: "results_published", is_championship: true, points_per_position: [10, 5] });
+  renderPage();
+  await screen.findByRole("heading", { name: "Monza Sprint" });
+  fireEvent.change(screen.getByTestId("f1-edit-points"), { target: { value: "12, 6" } });
+  promptMock.mockResolvedValueOnce("Ausschreibung sah andere Punkte vor");
+  fireEvent.click(screen.getByTestId("f1-edit-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/f1/challenges/c-1", { points_per_position: [12, 6], change_reason: "Ausschreibung sah andere Punkte vor" }));
+});
+
 test("nach der Veröffentlichung: ein neuer Preis braucht eine Begründung", async () => {
   answerWith({ status: "results_published", prize_places: [{ place: 1, label: "Platz 1", value: "Pokal" }] });
   renderPage();

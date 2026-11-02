@@ -9,6 +9,8 @@ import {
   canDriveAgain,
   keypadInput,
   participantKey,
+  pointsField,
+  pointsPayload,
   timePreview,
 } from "./fastLapEvent";
 
@@ -122,6 +124,16 @@ describe("Feld „Versuche je Person“ (#1585)", () => {
     expect(attemptsField({ unlimited_attempts: true, max_attempts: 3 })).toBe("");
     expect(attemptsField({ unlimited_attempts: false, max_attempts: 0 })).toBe("");
     expect(attemptsField(undefined)).toBe("3");
+  });
+
+  it("Punkte je Platz: Vorgabe, eigene Liste, Fehler (#2130)", () => {
+    expect(pointsField({})).toBe("25, 18, 15, 12, 10, 8, 6, 4, 2, 1");
+    expect(pointsField({ points_per_position: [10, 5] })).toBe("10, 5");
+    expect(pointsPayload("10, 5;3 1")).toEqual({ points_per_position: [10, 5, 3, 1] });
+    expect(pointsPayload("").error).toContain("eintragen");
+    expect(pointsPayload("10, x").error).toContain("ganze Zahlen");
+    expect(pointsPayload("-1").error).toContain("ganze Zahlen");
+    expect(pointsPayload(Array(101).fill("1").join(",")).error).toContain("ganze Zahlen");
   });
 
   it("macht daraus, was der Server versteht - oder einen Fehler", () => {

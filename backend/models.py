@@ -1194,6 +1194,15 @@ class F1TrackUpdate(BaseModel):
     max_plausible_ms: Optional[int] = Field(default=None, ge=0)
 
 
+def _points_per_position(value):
+    """Punkte je Platz (#2130): einstellbar, aber eine Liste aus ganzen Zahlen - leer hieße still die Vorgabe."""
+    if value is None:
+        return value
+    if not value or len(value) > 100 or any(point < 0 or point > 10000 for point in value):
+        raise ValueError("Punkte je Platz: mindestens ein Wert, höchstens 100, jeweils 0 bis 10000.")
+    return value
+
+
 class F1ChallengeCreate(BaseModel):
     title: str
     slug: Optional[str] = None
@@ -1237,6 +1246,7 @@ class F1ChallengeCreate(BaseModel):
     status: Optional[TournamentStatus] = None
 
     _normalize_stream_platform = field_validator("stream_platform", mode="before")(_empty_stream_platform_to_none)
+    _check_points = field_validator("points_per_position")(_points_per_position)
 
 
 class F1ChallengeUpdate(BaseModel):
@@ -1279,6 +1289,7 @@ class F1ChallengeUpdate(BaseModel):
     change_reason: Optional[str] = Field(default=None, max_length=500)
 
     _normalize_stream_platform = field_validator("stream_platform", mode="before")(_empty_stream_platform_to_none)
+    _check_points = field_validator("points_per_position")(_points_per_position)
 
 
 class F1LapTimeCreate(BaseModel):

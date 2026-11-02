@@ -329,6 +329,32 @@ async def test_after_publishing_scoring_rules_change_only_with_a_reason(flow):
 
 
 @pytest.mark.asyncio
+async def test_championship_and_points_per_place_can_be_edited_and_are_checked(flow):
+    """#2130: Meisterschaft, Punkte je Platz und Stream gehen auch im Bearbeiten; die Wertung rechnet sofort neu."""
+    cid, _tid, anna, bert, _laps = await published(flow)
+    before = {row["user_id"]: row["total_points"] async for row in flow.db.season_points.find({}, {"_id": 0})}
+    for broken in ([], [-1], [1] * 101, [10001]):
+        refused = await flow.patch(f"/api/f1/challenges/{cid}", json={"points_per_position": broken, "change_reason": REASON})
+        assert refused.status_code == 422, (broken, refused.text)
+    saved = await flow.patch(f"/api/f1/challenges/{cid}", json={"is_championship": True, "points_per_position": [7, 3], "change_reason": REASON})
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["points_per_position"] == [7, 3]
+    standings = (await flow.get(f"/api/f1/challenges/{cid}/championship")).json()["standings"]
+    assert {row["user_id"]: row["points"] for row in standings} == {anna["id"]: 7, bert["id"]: 3}
+    rows = await flow.db.audit_logs.find({"action": "fastlap.challenge.rules"}, {"_id": 0}).to_list(5)
+    assert sorted(rows[0]["data"]["fields"]) == ["is_championship", "points_per_position"]
+    # Die Jahrespunkte hängen am Platz, nicht an diesen Punkten - sie bleiben, was sie waren.
+    assert {row["user_id"]: row["total_points"] async for row in flow.db.season_points.find({}, {"_id": 0})} == before
+    stream = await flow.patch(f"/api/f1/challenges/{cid}", json={"stream_platform": "twitch", "stream_url": "https://www.twitch.tv/probe",
+                                                                 "twitch_channel": "probe", "has_live_stream": True, "twitch_enabled": True})
+    assert stream.status_code == 200, stream.text
+    assert stream.json()["has_live_stream"] is True and stream.json()["twitch_channel"] == "probe"
+    cleared = await flow.patch(f"/api/f1/challenges/{cid}", json={"stream_platform": None, "stream_url": None, "twitch_channel": None,
+                                                                  "has_live_stream": False, "twitch_enabled": False})
+    assert cleared.status_code == 200 and cleared.json()["stream_url"] is None and cleared.json()["has_live_stream"] is False
+
+
+@pytest.mark.asyncio
 async def test_a_challenge_with_weight_zero_awards_no_season_points(flow):
     await published(flow, season_weight=0)
     assert await flow.db.season_points.count_documents({}) == 0

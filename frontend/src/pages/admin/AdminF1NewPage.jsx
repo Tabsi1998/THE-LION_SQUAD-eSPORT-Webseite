@@ -9,8 +9,10 @@ import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
 import { normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
 import { EventMembershipLine } from "@/pages/admin/event/EventProgramPanel";
 import { toast } from "sonner";
-import { attemptsPayload } from "@/lib/fastLapEvent";
+import { attemptsPayload, pointsField, pointsPayload } from "@/lib/fastLapEvent";
 import { LIVE_HINT } from "@/lib/fastLapStatus";
+import { streamFormValues, streamPayload } from "@/lib/tournamentStream";
+import { FastLapChampionshipFields, FastLapStreamFields } from "./f1/FastLapRulesFields";
 
 const CREATE_STATUS_OPTIONS = [
   ["draft", "Entwurf"],
@@ -53,8 +55,9 @@ export default function AdminF1NewPage() {
     start_date: "", end_date: "", status: "draft",
     site_banner_enabled: false,
     is_championship: false,
+    points_text: pointsField(null),
     season_weight: 1,
-    twitch_channel: "", twitch_enabled: false,
+    ...streamFormValues({}),
     prize_places: [],
   });
   const [event, setEvent] = useState(null);
@@ -85,8 +88,10 @@ export default function AdminF1NewPage() {
     try {
       const attempts = attemptsPayload(form.attempts);
       if (attempts.error) { toast.error(attempts.error); setSaving(false); return; }
-      const { attempts: _attemptsText, ...fields } = form;
-      const payload = { ...fields, ...attempts };
+      const points = pointsPayload(form.points_text);
+      if (form.is_championship && points.error) { toast.error(points.error); setSaving(false); return; }
+      const { attempts: _attemptsText, points_text: _pointsText, stream_address: _streamAddress, stream_embed: _streamEmbed, ...fields } = form;
+      const payload = { ...fields, ...attempts, ...(form.is_championship ? points : {}), ...streamPayload(form) };
       if (payload.block_club_member_results) payload.allow_club_reference_times = true;
       payload.season_weight = Number(payload.season_weight || 0);
       normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "start_date", "end_date"]);
@@ -128,9 +133,7 @@ export default function AdminF1NewPage() {
               <SelectField label="Veröffentlichung" value={form.status} onChange={(v) => set("status", v)} options={CREATE_STATUS_OPTIONS} testId="f1-new-status" />
               <TextField label="Start Challenge/Event" type="datetime-local" value={form.start_date} onChange={(v) => set("start_date", v)} testId="f1-new-start" />
               <TextField label="Ende Challenge/Event" type="datetime-local" value={form.end_date} onChange={(v) => set("end_date", v)} testId="f1-new-end" />
-              <CheckField label="Online-Einreichung auf der öffentlichen Seite anzeigen" hint="Optional - lokale Zeiten können Moderatoren immer im Admin eintragen." checked={form.registration_enabled} onChange={(v) => set("registration_enabled", v)} testId="f1-new-reg-enabled" />
-              {form.registration_enabled && <TextField label="Online-Einreichung öffnet" type="datetime-local" value={form.registration_open_from} onChange={(v) => set("registration_open_from", v)} testId="f1-new-reg-from" />}
-              {form.registration_enabled && <TextField label="Online-Einreichung endet" type="datetime-local" value={form.registration_open_until} onChange={(v) => set("registration_open_until", v)} testId="f1-new-reg-until" />}
+              {/* Online-Einreichen gibt es noch nicht: der Schalter kommt mit #1278 zurück (#2130). */}
               <CheckField label="Automatisches Fast-Lap-Hinweisbanner für diese Challenge anzeigen" checked={form.site_banner_enabled} onChange={(v) => set("site_banner_enabled", v)} testId="f1-new-site-banner" accent="#FFD700" />
             </FormSection>
 
@@ -184,7 +187,7 @@ export default function AdminF1NewPage() {
             <TextField label="Controller-Typ" value={form.controller_type} onChange={(v) => set("controller_type", v)} testId="f1-new-controller" />
             <TextField label="Plattform" value={form.platform} onChange={(v) => set("platform", v)} testId="f1-new-platform" />
           </FormGrid>
-          <CheckField label="Championship (mehrere Strecken + Punkte pro Platz)" checked={form.is_championship} onChange={(v) => set("is_championship", v)} testId="f1-new-championship" />
+          <FastLapChampionshipFields form={form} set={set} prefix="f1-new" />
           <TextField label="Versuche je Person und Strecke" hint="Leer = unbegrenzt. Ungültige Runden zählen mit." type="number" value={form.attempts} onChange={(v) => set("attempts", v)} testId="f1-new-attempts" className="md:max-w-xs" />
         </FormSection>
 
@@ -203,10 +206,7 @@ export default function AdminF1NewPage() {
           {(form.prize_places || []).length === 0 && <div className="text-xs text-white/40">Noch keine Preise - „Platz hinzufügen“ legt die erste Zeile an.</div>}
         </FormSection>
 
-        <FormSection title="Streaming" accent="#9146FF">
-          <TextField label="Twitch Channel" value={form.twitch_channel} onChange={(v) => set("twitch_channel", v)} testId="f1-new-twitch" className="md:max-w-md" />
-          <CheckField label="Twitch-Player auf F1-Seite einbetten" checked={form.twitch_enabled} onChange={(v) => set("twitch_enabled", v)} testId="f1-new-twitch-enabled" accent="#9146FF" />
-        </FormSection>
+        <FastLapStreamFields form={form} set={set} prefix="f1-new" />
       </AdminFormPage>
     </AdminLayout>
   );

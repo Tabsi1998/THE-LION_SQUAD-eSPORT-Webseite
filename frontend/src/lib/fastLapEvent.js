@@ -87,3 +87,24 @@ export function attemptsPayload(text) {
   if (!/^\d+$/.test(raw) || value < 1 || value > 100) return { error: "Versuche bitte als ganze Zahl zwischen 1 und 100 - oder leer für unbegrenzt." };
   return { unlimited_attempts: false, max_attempts: value };
 }
+
+// Punkte je Platz einer Meisterschaft (#2130): Vorgabe wie auf dem Server, einstellbar je Challenge.
+export const DEFAULT_POINTS_PER_POSITION = Object.freeze([25, 18, 15, 12, 10, 8, 6, 4, 2, 1]);
+
+/** Das Feld „Punkte je Platz“: „25, 18, 15“ - Platz 1 zuerst. */
+export function pointsField(challenge) {
+  const points = Array.isArray(challenge?.points_per_position) && challenge.points_per_position.length
+    ? challenge.points_per_position
+    : DEFAULT_POINTS_PER_POSITION;
+  return points.join(", ");
+}
+
+/** Aus dem Feld die Liste für den Server - oder `{ error }`. */
+export function pointsPayload(text) {
+  const parts = String(text ?? "").split(/[,;\s]+/).filter(Boolean);
+  if (!parts.length) return { error: "Bitte die Punkte je Platz eintragen, z. B. 25, 18, 15." };
+  if (parts.length > 100 || parts.some((part) => !/^\d+$/.test(part) || Number(part) > 10000)) {
+    return { error: "Punkte je Platz bitte als ganze Zahlen, durch Komma getrennt, z. B. 25, 18, 15." };
+  }
+  return { points_per_position: parts.map(Number) };
+}
