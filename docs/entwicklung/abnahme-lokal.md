@@ -65,16 +65,30 @@ python scripts/seed_abnahme_liga.py
 
 Eigener Seed mit eigenen Konten (`liga-…@abnahme.lionsquad.at`) für die Liga Stufe 1 ([LIGA.md](../LIGA.md), #2096):
 Spiel „Call of Duty“ (falls es fehlt) mit drei Modi und fünf erfundenen Test-Maps mit Platzhalterbild, Liga
-„CoD-Liga“, Season 1 (Start Di 10.11.2026, 10 Wochen, Weihnachtspause 21.12.–3.1., nur Hinrunde, Best of 3,
-Teamgröße 4, Modus je Map, Map-Pool, Regeltext-Platzhalter, Sichtbarkeit „Nur Turnierleitung“), Liga 1, Staffel A
-(Entwurf) und acht erfundene Hauptteams mit je einem Co-Team (4 bis 6 im Kader, Captain und Vertreter), zugeteilt.
-Den Spielplan erzeugt erst **Liga starten** in der Turnierverwaltung der Staffel – so lässt sich die
-[Checkliste für den Obmann](../handbuch/liga.md#6-checkliste-für-den-obmann-bis-911) am Stand durchspielen.
+„CoD-Liga“, Season 1 (Start an einem Dienstag mindestens acht Tage voraus, 10 Wochen, „Weihnachtspause“ in den
+Wochen 7 und 8, nur Hinrunde, Best of 3, Teamgröße 4, Modus je Map, Map-Pool, Regeltext-Platzhalter, Sichtbarkeit
+„Nur Turnierleitung“), Liga 1, Staffel A (Entwurf) und acht erfundene Hauptteams mit je einem Co-Team (4 bis 6 im
+Kader, Captain und Vertreter), zugeteilt. Den Spielplan erzeugt erst **Liga starten** in der Turnierverwaltung der
+Staffel – so lässt sich die [Checkliste für den Obmann](../handbuch/liga.md#6-checkliste-für-den-obmann-bis-911) am
+Stand durchspielen. Die Tage rechnet der Seed vom heutigen Tag aus, der Stand läuft also nicht aus (#2200).
+
+Für den schreibenden Ablauf kommt die eigene Liga „Liga-Probelauf“ dazu: eine öffentliche Season, Staffel A im Entwurf,
+fünf Co-Teams zugeteilt, das sechste teilt die Spec im Browser zu. Ist die Staffel schon gestartet, legt der nächste
+Aufruf die nächste Season an.
 
 Mehrfach aufrufbar: Was steht, bleibt; die Vorgaben der Season (auch die Sichtbarkeit) gehen zurück auf den Stand
 oben, eine gestartete Staffel bleibt gestartet. Passwort und Zwei-Faktor-Geheimnis entstehen bei jedem Lauf neu und
 stehen nur in `.local-testing/abnahme/state-liga.json` (anderer Ort über `ABNAHME_STATE`), dazu die Zugänge von
-Captain, Vertreter, einem Mitglied und der Teamleitung des ersten Co-Teams.
+Captain, Vertreter, einem Mitglied und der Teamleitung des ersten Co-Teams sowie je Co-Team ein Captain.
+
+Zeitgesteuerte Läufe stößt die Abnahme gezielt an, immer nur für eine Staffel – so bleiben die Stände der anderen Specs
+unberührt und `SCHEDULER_JOBS` kurz (die Antwort steht als JSON in der letzten Zeile):
+
+```bash
+python scripts/seed_abnahme_liga.py --job matchday_schedule --tournament <id>   # Standardtermin schreiben
+python scripts/seed_abnahme_liga.py --job match_reminders --tournament <id>     # Erinnerung 10 Minuten vorher
+python scripts/seed_abnahme_liga.py --job match_deadlines --tournament <id> --hours 49   # Fristen, als wäre es 49 h später
+```
 
 ## 3. Durchklicken lassen
 
@@ -92,6 +106,10 @@ Konsolenfehler und keine Antwort 4xx/5xx. `tables-schedule-abnahme.spec.js`: Ran
 Admin, bei 1440 und 375 px. `liga-abnahme.spec.js` (Stand aus `seed_abnahme_liga.py`, also
 `ABNAHME_STATE=…/state-liga.json`): Verwaltung „Liga“, Season mit Pause und Pool, Staffel A mit acht Co-Teams und
 dem Knopf „Liga starten“, die Ligaseite bei 390 und 1440 px und ohne Anmeldung „Liga nicht gefunden“ – nur lesend.
+`liga-ablauf-abnahme.spec.js` (gleiche Stand-Datei, #2200) schreibt: Co-Team zuteilen, „Liga starten“, Standardtermin,
+dann bei 390 und 1440 px Terminvorschlag und Annahme durch zwei Captains, Erinnerung, Melden mit Maps und Aufstellung,
+Bestätigen, Tabelle und Ligaseite als Gast, Einspruch, Entscheidung und Korrektur der Leitung, zuletzt die
+48-Stunden-Automatik. Für die Zeit-Jobs braucht sie `ABNAHME_PROJECT` (der Stand) und `PYTHON`.
 Ohne `ABNAHME=1` überspringt der normale Testlauf diese Tests.
 `ABNAHME_SHOTS` legt Bilder ab (optional). Anmeldungen: Die Tests merken sich die Sitzung je Konto
 (`.local-testing/abnahme/sessions-…/`) und melden sich nur neu an, wenn sie nicht mehr gilt - nie zweimal mit einem
@@ -224,3 +242,21 @@ die Grenzwerte, die langsamsten Anfragen und `docker stats` von Backend, Datenba
 zählt als abgelehnt, eine besetzte Turnier-Sperre („bitte erneut versuchen“) als Fehler. Exit 0 grün, 1 rot, 2
 abgebrochen. Die Zahlen gelten für diesen Rechner (Docker Desktop), nicht für den Server; „Verzögerung der
 Lastschleife“ zeigt, ob der Lasttest selbst bremst. Zugänge stehen nur in der Stand-Datei, nie im Bericht.
+
+## 7. Backend-Abläufe auf echtem MongoDB
+
+Die Ablauf-Tests (`backend/tests/flow_harness.py`) laufen sonst auf mongomock: ohne Indizes und ohne echte Nebenläufigkeit.
+Mit `FLOW_MONGO_URL` laufen dieselben Tests gegen einen echten Server (#2200): Jeder Prozess bekommt eine eigene Datenbank
+`flowtest_…`, `init_indexes` läuft wie beim Start der Anwendung, jeder Test beginnt leer, am Ende ist die Datenbank weg.
+Erlaubt sind nur die Hosts `localhost`, `127.0.0.1` und `mongo`, sonst bricht der Lauf vor dem ersten Test ab.
+
+```bash
+docker run -d --name flow-mongo -p 127.0.0.1:27217:27017 --tmpfs /data/db:size=4g \
+  mongo:7.0.40-jammy --wiredTigerCacheSizeGB 1
+FLOW_MONGO_URL=mongodb://127.0.0.1:27217 APP_ENV=test DISABLE_SCHEDULER=true \
+  python scripts/flow_mongo_tests.py -n 4     # Liga, Squads, Spiele, Maps; --list zeigt die Dateien
+docker rm -f flow-mongo
+```
+
+In der CI läuft das als Job „Backend-Abläufe auf MongoDB“, in `scripts/local_check.py` als Schritt `mongo-flows`. Einzelne
+Dateien gehen auch direkt mit `FLOW_MONGO_URL=… python -m pytest backend/tests/test_x_flow.py`.
