@@ -33,8 +33,8 @@ const TIER_DEFAULTS = {
 };
 
 const PLACEMENT_LABELS = [
-  ["show_on_home", "Home"],
-  ["show_on_footer", "Footer"],
+  ["show_on_home", "Startseite"],
+  ["show_on_footer", "Fußzeile"],
   ["show_on_events", "Events"],
   ["show_on_tv", "TV"],
   ["show_on_pdf", "PDF"],
@@ -99,7 +99,7 @@ export default function AdminSponsorsPage() {
     <AdminLayout>
       <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
         <div>
-          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Partner</span>
+          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Verein</span>
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Sponsoren</h1>
           <p className="mt-2 text-white/60 text-sm max-w-xl">
             Die Stufe bestimmt Größe und Reihenfolge. Die Laufzeit und „Öffentlich zeigen“ entscheiden, ob ein Sponsor zu sehen ist, die Haken, wo.
@@ -134,8 +134,8 @@ export default function AdminSponsorsPage() {
                     <span className={`text-[9px] px-1.5 py-0.5 rounded-sm font-bold uppercase tracking-widest ${STATUS_CLASSES[effectiveSponsorStatus(s)] || STATUS_CLASSES.inactive}`}>
                       {STATUS_LABELS[effectiveSponsorStatus(s)] || effectiveSponsorStatus(s)}
                     </span>
-                    {s.show_on_home && <span className="text-[9px] px-1.5 py-0.5 bg-[#29B6E8]/15 text-[#29B6E8] rounded-sm font-bold uppercase tracking-widest">Home</span>}
-                    {s.show_on_footer && <span className="text-[9px] px-1.5 py-0.5 bg-white/10 text-white/70 rounded-sm font-bold uppercase tracking-widest">Footer</span>}
+                    {s.show_on_home && <span className="text-[9px] px-1.5 py-0.5 bg-[#29B6E8]/15 text-[#29B6E8] rounded-sm font-bold uppercase tracking-widest">Startseite</span>}
+                    {s.show_on_footer && <span className="text-[9px] px-1.5 py-0.5 bg-white/10 text-white/70 rounded-sm font-bold uppercase tracking-widest">Fußzeile</span>}
                     {s.show_on_events && <span className="text-[9px] px-1.5 py-0.5 bg-[#FFD700]/15 text-[#FFD700] rounded-sm font-bold uppercase tracking-widest">Events</span>}
                     {s.show_on_tv && <span className="text-[9px] px-1.5 py-0.5 bg-[#9F7AEA]/15 text-[#BFA6FF] rounded-sm font-bold uppercase tracking-widest">TV</span>}
                     {s.show_on_pdf && <span className="text-[9px] px-1.5 py-0.5 bg-[#29B6E8]/15 text-[#8EE6FF] rounded-sm font-bold uppercase tracking-widest">PDF</span>}
@@ -269,7 +269,7 @@ function SponsorForm({ sponsor, events = [], locked = new Set(), onClose, onSave
           </p>
         )}
         <FormGrid>
-          <SelectField label="Tier" value={form.tier} onChange={setTier} options={TIERS.map((t) => [t, TIER_LABELS[t]])} testId="sponsor-tier" {...lock("tier")} />
+          <SelectField label="Stufe" value={form.tier} onChange={setTier} options={TIERS.map((t) => [t, TIER_LABELS[t]])} testId="sponsor-tier" {...lock("tier")} />
           <TextField label="Reihenfolge" type="number" value={form.order_index ?? 0} onChange={(v) => set("order_index", parseInt(v, 10) || 0)} testId="sponsor-order" />
         </FormGrid>
       </FormSection>
@@ -286,16 +286,16 @@ function SponsorForm({ sponsor, events = [], locked = new Set(), onClose, onSave
         </FormGrid>
       </FormSection>
 
-      <FormSection title="Sichtbarkeit" hint="Haken entscheiden live. Tier-Standard ist nur eine schnelle Vorlage.">
+      <FormSection title="Sichtbarkeit" hint="Die Haken gelten sofort. „Vorgabe der Stufe“ setzt sie auf einen Schlag.">
         <div className="flex justify-end">
           <button type="button" onClick={() => applyTierDefaults()} className="px-3 py-1.5 border border-[#29B6E8]/40 text-[#29B6E8] text-[10px] font-bold uppercase tracking-wider rounded-sm hover:bg-[#29B6E8]/10">
-            Tier-Standard
+            Vorgabe der Stufe
           </button>
         </div>
         <FormGrid cols={3}>
           <CheckField label="Öffentlich zeigen" hint="Aus = archiviert: überall weg, hier noch da." checked={form.is_active !== false} onChange={(v) => set("is_active", v)} testId="sponsor-active" />
-          <CheckField label="Auf Home" checked={form.show_on_home === true} onChange={(v) => setPlacement("show_on_home", v)} testId="sponsor-show-home" />
-          <CheckField label="Im Footer" checked={form.show_on_footer === true} onChange={(v) => setPlacement("show_on_footer", v)} testId="sponsor-show-footer" />
+          <CheckField label="Auf der Startseite" checked={form.show_on_home === true} onChange={(v) => setPlacement("show_on_home", v)} testId="sponsor-show-home" />
+          <CheckField label="In der Fußzeile" checked={form.show_on_footer === true} onChange={(v) => setPlacement("show_on_footer", v)} testId="sponsor-show-footer" />
           <CheckField label="Events" checked={form.show_on_events === true} onChange={(v) => setPlacement("show_on_events", v)} testId="sponsor-show-events" accent="#FFD700" />
           <CheckField label="TV / Anzeige" checked={form.show_on_tv === true} onChange={(v) => setPlacement("show_on_tv", v)} testId="sponsor-show-tv" accent="#9F7AEA" />
           <CheckField label="PDFs" checked={form.show_on_pdf === true} onChange={(v) => setPlacement("show_on_pdf", v)} testId="sponsor-show-pdf" />

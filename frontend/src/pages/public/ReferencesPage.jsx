@@ -180,7 +180,7 @@ export function ReferenceDetailPage() {
             {hasLinks && (
               <div className="grid gap-2" data-testid="reference-detail-links">
                 <RefButton href={item.external_url} label="Turnierseite" />
-                <RefButton href={item.bracket_url} label="Bracket" />
+                <RefButton href={item.bracket_url} label="Turnierbaum" />
                 <RefButton href={item.match_url} label="Matchseite" />
                 <RefButton href={item.result_url} label="Ergebnis" />
               </div>

@@ -368,7 +368,7 @@ export default function AdminReferencesPage() {
                 {(item.external_url || item.bracket_url || item.match_url || item.result_url) && (
                   <div className="mt-2 flex flex-wrap gap-2">
                     <RefLink href={item.external_url} label="Turnier" />
-                    <RefLink href={item.bracket_url} label="Bracket" />
+                    <RefLink href={item.bracket_url} label="Turnierbaum" />
                     <RefLink href={item.match_url} label="Match" />
                     <RefLink href={item.result_url} label="Ergebnis" />
                   </div>
@@ -509,7 +509,7 @@ function ReferenceHelperAdmin({ helpers, onSaved }) {
           <HelperTextArea label="Veranstalter" value={form.organizers} onChange={(v) => set("organizers", v)} rows={7} />
           <HelperTextArea label="Freie Spielnamen" value={form.game_names} onChange={(v) => set("game_names", v)} />
           <HelperTextArea label="Team-Namen" value={form.team_names} onChange={(v) => set("team_names", v)} />
-          <HelperTextArea label="Platzierungslabels" value={form.placement_labels} onChange={(v) => set("placement_labels", v)} />
+          <HelperTextArea label="Bezeichnungen der Platzierung" value={form.placement_labels} onChange={(v) => set("placement_labels", v)} />
           <HelperTextArea label="Orte" value={form.locations} onChange={(v) => set("locations", v)} />
         </div>
         <button type="button" onClick={save} disabled={saving} className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">
@@ -894,14 +894,14 @@ function ReferenceForm({ reference, games, memberProfiles, partners = [], lineag
           </FormGrid>
           <FieldWarnings messages={warningsAt("end_date")} testId="reference-end-date-warnings" />
           <FormGrid cols={3}>
-            <TextField label="Bracket / Tabelle" value={form.bracket_url} onChange={(v) => set("bracket_url", v)} placeholder="https://..." testId="reference-bracket-url" />
+            <TextField label="Turnierbaum / Tabelle" value={form.bracket_url} onChange={(v) => set("bracket_url", v)} placeholder="https://..." testId="reference-bracket-url" />
             <TextField label="Match-Webseite" value={form.match_url} onChange={(v) => set("match_url", v)} placeholder="https://..." testId="reference-match-url" />
             <TextField label="Ergebnis-Link" value={form.result_url} onChange={(v) => set("result_url", v)} placeholder="https://..." testId="reference-result-url" />
           </FormGrid>
         </FormSection>
 
         {form.entries.length > 0 && (
-          <FormSection plain title="Zu den Einträgen" hint="Label der Platzierung, externe Spieler ohne Vereinsprofil und die zweite Feldgröße.">
+          <FormSection plain title="Zu den Einträgen" hint="Bezeichnung der Platzierung, externe Spieler ohne Vereinsprofil und die zweite Feldgröße.">
             {form.entries.map((entry, index) => (
               <EntryDetails key={entry.key} entry={entry} index={index} suggestions={suggestions} onChange={(patch) => setEntry(entry.key, patch)} />
             ))}
@@ -982,7 +982,7 @@ function EntryDetails({ entry, index, suggestions, onChange }) {
       <div className="text-[11px] font-bold uppercase tracking-widest text-white/55">Eintrag {index + 1} · {who}</div>
       <TextField label={isSolo ? "Externer Spieler (falls kein Vereinsprofil)" : "Weitere externe Spieler"} value={entry.lineup_text} onChange={(v) => onChange({ lineup_text: v })} placeholder={isSolo ? "Name" : "Name 1, Name 2, Name 3"} testId={`reference-entry-${index}-lineup`} />
       <FormGrid>
-        <TextField label="Label" value={entry.placement_label} onChange={(v) => onChange({ placement_label: v })} placeholder="z.B. Podium" suggestions={suggestions.placementLabels} testId={`reference-entry-${index}-label`} />
+        <TextField label="Bezeichnung der Platzierung" value={entry.placement_label} onChange={(v) => onChange({ placement_label: v })} placeholder="z.B. Podium" suggestions={suggestions.placementLabels} testId={`reference-entry-${index}-label`} />
         {other === "participant_count"
           ? <TextField label="Teilnehmer" type="number" min="1" value={entry.participant_count} onChange={(v) => onChange({ participant_count: v })} testId={`reference-entry-${index}-participants`} />
           : <TextField label="Teams" type="number" min="1" value={entry.team_count} onChange={(v) => onChange({ team_count: v })} testId={`reference-entry-${index}-teams`} />}
