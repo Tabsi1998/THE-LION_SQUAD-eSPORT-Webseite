@@ -37,7 +37,8 @@ ALL = set(areas.AREAS)
         ("scripts/dependency-audit-gate.cjs", {"backend", "frontend", "mobile"}),
         ("scripts/dependency-audit-gate.test.mjs", {"backend", "frontend", "mobile"}),
         ("scripts/check-web-update.py", {"backend", "container"}),
-        ("docker-compose.yml", {"frontend", "container"}),
+        # Das Mongo-Image steht hier - der Job „Backend-Abläufe auf MongoDB“ liest es (#2200).
+        ("docker-compose.yml", {"backend", "frontend", "container"}),
         ("docker-compose.staging.yml", {"frontend", "container"}),
         (".env.staging.example", {"frontend", "container"}),
         ("install.sh", {"backend"}),
