@@ -162,6 +162,9 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await expect(view.locator("del", { hasText: "Entfernter Satz" })).toBeVisible();
     if (process.env.ABNAHME_SHOTS) await page.screenshot({ path: `${process.env.ABNAHME_SHOTS}/regeln-vergleich-${width}.png` });
     await expect(page).toHaveURL(/vergleich=v1/);
+    // Die Auswahl ist weg: Der Fokus geht auf die Überschrift des Vergleichs, Tastatur und Vorleser verlieren den Faden nicht.
+    await expect(page.getByTestId("rules-compare-title")).toBeFocused();
+    await expect(page.getByTestId("rules-compare-title")).toBeInViewport();
     expect(await page.locator('meta[name="robots"]').getAttribute("content")).toBe("noindex, nofollow");
     await noSideScroll(page);
     await view.getByRole("button", { name: /Zurück zum Text/ }).click();

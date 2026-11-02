@@ -181,7 +181,8 @@ export default function LeagueRulesPage() {
   const [missing, setMissing] = useState(false);
   const [marks, setMarks] = useState(true);
   const documentRef = useRef(null);
-  const base = rulesApiPath(leagueSlug, seasonSlug);
+  const compareTitleRef = useRef(null);
+  const base =rulesApiPath(leagueSlug, seasonSlug);
   const pagePath = rulesPagePath(leagueSlug, seasonSlug);
 
   const load = useCallback(async () => {
@@ -207,6 +208,11 @@ export default function LeagueRulesPage() {
       .catch((err) => { if (alive) toast.error(formatApiError(err.response?.data?.detail)); });
     return () => { alive = false; };
   }, [base, compareParam, version?.id]);
+
+  // Die Auswahl verschwindet mit dem Vergleich: Der Fokus geht auf seine Überschrift, nicht verloren.
+  useEffect(() => {
+    if (comparison && compareParam) compareTitleRef.current?.focus?.();
+  }, [comparison, compareParam]);
 
   // Sprung auf einen Paragrafen: Der Text ist erst nach dem Laden da.
   const sectionCount = data?.sections?.length || 0;
@@ -330,7 +336,7 @@ export default function LeagueRulesPage() {
               {comparison && compareParam ? (
                 <RulesComparison sections={comparison.sections}>
                   <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-                    <h2 className="font-heading text-xl font-black uppercase">{comparison.base.label} und {comparison.target.label}</h2>
+                    <h2 ref={compareTitleRef} tabIndex={-1} data-testid="rules-compare-title" className="font-heading text-xl font-black uppercase outline-none scroll-mt-24">{comparison.base.label} und {comparison.target.label}</h2>
                     <button type="button" className={QUIET_BUTTON} onClick={() => setParam("vergleich", null)}>Zurück zum Text</button>
                   </div>
                 </RulesComparison>
