@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { Crown, Edit, Lock, MessageSquare, Plus, Search, Send, Shield, ShieldCheck, Star, Swords, TrendingUp, Trophy, Users, UserPlus, Zap } from "lucide-react";
 import { AwardBanner } from "@/components/tls/AwardBanner";
 import { viennaDateTime } from "@/lib/vienna";
+import { departureWarning } from "@/lib/squadShortage";
 import { teamLogoUpload } from "@/lib/svgLogo";
 import { TeamsPanel } from "@/pages/user/profile/TeamsPanel";
 import { TeamSchedule } from "@/pages/public/team/TeamSchedule";
@@ -304,11 +305,23 @@ function TeamDetail({ id }) {
     }, "Team-Beitritt fehlgeschlagen.");
   };
 
+  // Kader unter Mindestgröße (#2202): Der Abgang bleibt möglich, die Rückfrage sagt vorher, was er bewirkt. Lädt die Liste
+  // nicht, kommt die Rückfrage ohne den Satz - der Server warnt danach trotzdem.
+  const departureNote = async (userId) => {
+    try {
+      const { data } = await api.get(`/teams/${team.id}/squads`);
+      const warning = departureWarning(data, userId);
+      return warning ? ` ${warning}` : "";
+    } catch {
+      return "";
+    }
+  };
+
   const leave = async () => {
     await runAction(async () => {
       if (!await confirm({
         title: "Team verlassen?",
-        description: `Du bist danach nicht mehr in ${team.name} und seinen Co-Teams. Zurück kommst du nur mit einer neuen Einladung oder dem Beitrittscode.`,
+        description: `Du bist danach nicht mehr in ${team.name} und seinen Co-Teams. Zurück kommst du nur mit einer neuen Einladung oder dem Beitrittscode.${await departureNote(user?.id)}`,
         confirmLabel: "Team verlassen",
       })) return;
       await api.post(`/teams/${team.id}/leave`);
@@ -321,7 +334,7 @@ function TeamDetail({ id }) {
     await runAction(async () => {
       if (!await confirm({
         title: "Mitglied entfernen?",
-        description: `${m.display_name || m.username} wirklich aus dem Team entfernen?`,
+        description: `${m.display_name || m.username} wirklich aus dem Team entfernen?${await departureNote(m.id)}`,
         confirmLabel: "Entfernen",
       })) return;
       await api.delete(`/teams/${team.id}/members/${m.id}`);

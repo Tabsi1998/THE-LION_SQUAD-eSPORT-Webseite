@@ -17,7 +17,7 @@ from services.permissions import is_confirmed_tournament_lead
 from models import new_id, now_utc
 from services.match_audience import acting_registration_ids
 from services.tournament_rules import self_checkin_allowed, tournament_event_mode
-from services.match_overview import operational_match_overviews, own_match_overviews, own_match_tasks
+from services.match_overview import operational_match_overviews, own_match_overviews, own_match_tasks, own_squad_tasks
 from services.profile_references import personal_profile_references
 from services import event_days
 from services.public_phase import derive_public_phase
@@ -468,6 +468,22 @@ def _vienna_time(value) -> str:
     return f"{weekday} {local.strftime('%d.%m. %H:%M')}"
 
 
+def _squad_task_action(task: dict) -> dict:
+    """„Kader auffüllen“ (#2202). Die App kennt ``target_type: "team"`` noch nicht: Ohne ``target_id`` zeigt sie die Zeile ohne
+    Pfeil und öffnet nichts - alles Nötige steht in ``label`` und ``detail``; das Web liest ``team_id``."""
+    parts = (task.get("tournament_title"), task.get("squad_name"),
+             f"{task.get('size')} von mindestens {task.get('min_size')} Spielern, im Web ergänzen")
+    return {
+        "id": f"squad-short-{task.get('registration_id')}",
+        "type": "squad_short",
+        "label": "Kader auffüllen",
+        "detail": " · ".join(part for part in parts if part),
+        "target_type": "team",
+        "team_id": task.get("team_id"),
+        "priority": 8,
+    }
+
+
 def _match_task_actions(tasks: list[dict]) -> list[dict]:
     """Terminvorschlag beantworten und Aufstellung nachtragen (#2110). Ältere Apps kennen die Arten nicht: sie zeigen
     jede Aktion mit Text, Zeile und Symbol nach ``type`` (alles mit „match“ als Spiel-Symbol) und öffnen über
@@ -475,6 +491,9 @@ def _match_task_actions(tasks: list[dict]) -> list[dict]:
     actions = []
     for task in tasks:
         kind = task.get("task")
+        if kind == "squad":
+            actions.append(_squad_task_action(task))
+            continue
         if kind not in {"schedule", "lineup"}:
             continue
         opponent = f"gegen {task['opponent_name']}" if task.get("opponent_name") else ""
@@ -613,6 +632,8 @@ async def mobile_dashboard(user: dict | None = Depends(get_optional_user)):
         )
         # Termin beantworten, Aufstellung nachtragen (#2110) - nur die Verantwortlichen der eigenen Seite.
         match_tasks = await own_match_tasks(db, user, match_registrations) if match_registrations else []
+        # Kader auffüllen (#2202): Captain, Vertreter und die Leitung des Hauptteams.
+        match_tasks += await own_squad_tasks(db, user, match_registrations) if match_registrations else []
     else:
         match_tasks = []
 

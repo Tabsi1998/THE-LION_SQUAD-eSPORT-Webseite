@@ -38,6 +38,27 @@ function countsLine(counts = {}) {
   return parts.length ? parts.join(" · ") : "Alle Spieler haben eine gültige ID.";
 }
 
+// Kader unter Mindestgröße (#2202): Abgänge bleiben möglich - hier sieht die Leitung, wer auffüllen muss.
+function ShortKaders({ squads = [] }) {
+  const short = squads.filter((squad) => squad.short);
+  if (!short.length) return null;
+  return (
+    <div className="mb-4 rounded-sm border border-warn/40 bg-warn/5 p-3" data-testid="season-roster-short">
+      <p className="inline-flex items-center gap-2 text-sm font-bold text-warn">
+        <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" /> Kader unter der Mindestgröße
+      </p>
+      <ul className="mt-2 space-y-1 text-sm text-white/80">
+        {short.map((squad) => (
+          <li key={squad.registration_id} className="[overflow-wrap:anywhere]">
+            <span className="font-semibold text-white">{squad.display_name}</span>: {squad.member_count} von mindestens {squad.min_squad_size} Spielern
+            {squad.staffel_label ? <span className="text-white/55"> · {squad.staffel_label}</span> : null}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function canApprove(player) {
   return player.state !== "banned" && Boolean(player.profile_text) && (player.changed || player.state === "late" || player.state === "pending");
 }
@@ -173,6 +194,7 @@ export function SeasonRosterPanel({ seasonId }) {
       hint={`Je Spieler die ${label}, die in dieser Season gilt – festgehalten beim Zuteilen, bei der Aufnahme ins Co-Team oder spätestens beim ersten Aufstellen. Ändert jemand sie im Profil, gilt weiter die festgehaltene, bis du die neue freigibst.`}>
       {error ? <p role="alert" className="text-sm text-warn">{error}</p> : null}
       {!data && !error ? <p className="text-sm text-white/50">Lade Kader …</p> : null}
+      {data ? <ShortKaders squads={data.squads} /> : null}
       {data && !fields.length ? (
         <p className="text-sm text-white/55" data-testid="season-roster-free">Das Spiel dieser Liga hat keine Pflicht-ID – aufstellbar ist jeder im Kader.</p>
       ) : null}

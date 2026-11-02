@@ -55,6 +55,41 @@ test("je Co-Team die Spieler mit ID-Stand; eine neue ID im Profil wird mit Grund
   expect(toastMock.success).toHaveBeenCalledWith("Mila: neue ID gilt ab jetzt.");
 });
 
+test("ein Kader unter der Mindestgröße steht oben mit Namen und Zahlen (#2202)", async () => {
+  apiMock.get.mockResolvedValue({ data: {
+    ...BODY,
+    counts: { missing: 0, late: 0, changed: 0, short: 1 },
+    squads: [{ ...BODY.squads[0], short: true, member_count: 2, min_squad_size: 4 }, { ...BODY.squads[0], registration_id: "r2", display_name: "Falken · Horst", short: false, member_count: 4, min_squad_size: 4 }],
+  } });
+  render(<SeasonRosterPanel seasonId="s1" />);
+
+  const hint = await screen.findByTestId("season-roster-short");
+  expect(hint).toHaveTextContent("Loewen · Rudel A");
+  expect(hint).toHaveTextContent("2 von mindestens 4 Spielern");
+  expect(hint).toHaveTextContent("Liga 1 · Staffel A");
+  expect(hint).not.toHaveTextContent("Falken");
+});
+
+test("der Hinweis auf den zu kleinen Kader steht auch bei einem Spiel ohne Pflicht-ID da (#2202)", async () => {
+  apiMock.get.mockResolvedValue({ data: {
+    ...BODY,
+    fields: [],
+    counts: { short: 1 },
+    squads: [{ ...BODY.squads[0], short: true, member_count: 1, min_squad_size: 3 }],
+  } });
+  render(<SeasonRosterPanel seasonId="s1" />);
+
+  expect(await screen.findByTestId("season-roster-short")).toHaveTextContent("1 von mindestens 3 Spielern");
+  expect(screen.getByTestId("season-roster-free")).toBeInTheDocument();
+});
+
+test("reichen alle Kader, gibt es keinen Hinweis (#2202)", async () => {
+  render(<SeasonRosterPanel seasonId="s1" />);
+
+  await waitFor(() => expect(screen.getByTestId("roster-squad-r1")).toBeInTheDocument());
+  expect(screen.queryByTestId("season-roster-short")).not.toBeInTheDocument();
+});
+
 test("ein gesperrtes Konto steht mit eigenem Stand da und bekommt keinen Knopf „freigeben“ (#2202)", async () => {
   apiMock.get.mockResolvedValue({ data: {
     ...BODY,

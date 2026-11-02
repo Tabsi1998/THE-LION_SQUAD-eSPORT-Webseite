@@ -5,6 +5,11 @@ import { dashboardActions, isLiveOrToday,registrationLabel, seasonLine, splitHom
 
 const NOW = new Date("2026-09-16T10:00:00+02:00");
 
+test("„Kader auffüllen“ führt zur Teamseite (#2202)", () => {
+  const [action] = dashboardActions({ me: { actions: [{ id: "squad-short-r1", type: "squad_short", target_type: "team", team_id: "t1" }] } });
+  expect(action.href).toBe("/teams/t1");
+});
+
 function payload() {
   return {
     me: {

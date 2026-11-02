@@ -158,6 +158,12 @@ def playing_ids(registration: dict | None, team: dict | None = None) -> set[str]
     return player_ids(registration, team)
 
 
+def kader_care_ids(registration: dict | None, team: dict | None) -> set[str]:
+    """Wer von einem zu kleinen Kader erfährt und ihn auffüllt (#2202): Captain und Vertreter - und immer die Leitung des
+    Hauptteams, denn nur sie pflegt den Kader (docs/LIGA.md, Abschnitt 4). Dieselben Personen wie bei der Teamstrafe."""
+    return team_penalty_ids(registration, team)
+
+
 def team_penalty_ids(registration: dict | None, team: dict | None) -> set[str]:
     """Wer die Teamstrafe eines Co-Teams sieht (#2201): Captain und Vertreter, dazu immer die Leitung des Hauptteams - sie
     trägt das Team. Nicht der übrige Kader: die Strafe trifft das Co-Team, nicht die einzelne Person. Ohne Co-Team niemand

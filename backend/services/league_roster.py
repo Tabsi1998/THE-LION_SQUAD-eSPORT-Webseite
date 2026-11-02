@@ -567,7 +567,7 @@ async def set_deadline(db, season: dict, value: str | None, actor: dict) -> dict
 async def _season_registrations(db, season_id: str) -> tuple[list[dict], list[dict]]:
     tournaments = await db.tournaments.find(
         {"league_context.season_id": season_id},
-        {"_id": 0, "id": 1, "title": 1, "slug": 1, "status": 1, "league_context": 1},
+        {"_id": 0, "id": 1, "title": 1, "slug": 1, "status": 1, "league_context": 1, "team_size": 1, "min_squad_size": 1},
     ).to_list(200)
     ids = [row["id"] for row in tournaments if row.get("id")]
     regs = await db.tournament_registrations.find(
@@ -601,6 +601,8 @@ def _approvals_view(entry: dict | None, names: dict[str, str]) -> list[dict]:
 
 async def season_overview(db, season: dict) -> dict:
     """Kaderübersicht je Co-Team mit ID-Stand - für die Season-Seite der Liga-Leitung."""
+    from services.squad_registration import min_squad_size
+
     tournaments, regs = await _season_registrations(db, season["id"])
     squads = {
         row["id"]: row
@@ -638,12 +640,17 @@ async def season_overview(db, season: dict) -> dict:
             for uid in squad.get("member_ids") or [] if uid
         ]
         players.sort(key=lambda row: row["name"].lower())
+        minimum = min_squad_size(tournament)
         rows.append({
             "registration_id": reg.get("id"),
             "tournament_id": reg.get("tournament_id"),
             "staffel_label": label or tournament.get("title"),
             "display_name": reg.get("display_name"),
             "players": players,
+            # Kader unter Mindestgröße (#2202): gilt nur, solange die Staffel läuft.
+            "member_count": len(players),
+            "min_squad_size": minimum,
+            "short": len(players) < minimum and tournament.get("status") not in FINISHED_TOURNAMENT_STATUSES,
             "_sort": (level or 0, context.get("staffel") or "", str(reg.get("display_name") or "").lower()),
         })
     rows.sort(key=lambda row: row.pop("_sort"))
@@ -660,7 +667,7 @@ async def season_overview(db, season: dict) -> dict:
         "game": {"name": ((ctx.game if ctx else None) or {}).get("display_name")},
         "fields": [{"key": item["key"], "label": item.get("label") or item["key"]} for item in (ctx.fields if ctx else [])],
         "squads": rows,
-        "counts": {**counts, "changed": changed},
+        "counts": {**counts, "changed": changed, "short": sum(1 for row in rows if row["short"])},
     }
 
 

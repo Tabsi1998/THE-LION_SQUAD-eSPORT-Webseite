@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { gameOptionLabel, selectableGames } from "@/lib/gameLabels";
+import { shortageAfter, shortageWarning } from "@/lib/squadShortage";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
@@ -110,6 +111,13 @@ export function TeamsPanel() {
         if (next === (original?.[role.field] || null)) delete payload[role.field];
         else payload[role.field] = next;
       }
+      // Kader unter Mindestgröße (#2202): Das Speichern bleibt möglich, die Rückfrage sagt vorher, was es bewirkt.
+      const shortage = original ? shortageAfter(original, payload.member_ids) : null;
+      if (shortage && !await confirm({
+        title: "Kader wird zu klein",
+        description: shortageWarning([shortage]),
+        confirmLabel: "Trotzdem speichern",
+      })) return;
       if (editing.id) await api.patch(`/teams/${activeTeam.id}/squads/${editing.id}`, payload);
       else await api.post(`/teams/${activeTeam.id}/squads`, payload);
       toast.success("Co-Team gespeichert.");

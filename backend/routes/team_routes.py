@@ -1047,9 +1047,14 @@ async def leave_team(team_id: str, me: dict = Depends(get_current_user)):
 
 
 async def _leave_squads(db, team_id: str, user_id: str) -> None:
-    """Wer das Team verlässt, verlässt auch jeden Kader seiner Co-Teams (#1649) - sonst bliebe er Liga-Spieler."""
+    """Wer das Team verlässt, verlässt auch jeden Kader seiner Co-Teams (#1649) - sonst bliebe er Liga-Spieler. Reicht ein
+    Kader danach nicht mehr für seine Staffel, erfahren es Verantwortliche und Turnierleitung (#2202)."""
+    from services import squad_shortage
+
+    before = await db.team_squads.find({"team_id": team_id, "member_ids": user_id}, {"_id": 0, "id": 1, "member_ids": 1}).to_list(200)
     await db.team_squads.update_many({"team_id": team_id, "member_ids": user_id},
                                      {"$pull": {"member_ids": user_id}, "$set": {"updated_at": now_utc().isoformat()}})
+    await squad_shortage.warn_after_departure(db, before)
 
 
 def _is_team_leader(team: dict, user_id: str) -> bool:
@@ -1244,6 +1249,13 @@ async def list_squads(team_id: str, me: dict = Depends(get_current_user)):
         # Der Name zum Spiel - Web und App zeigen ihn statt der Kennung; ein alter Freitext hat keinen.
         if games.get(squad.get("game_id")):
             squad["game"] = games[squad["game_id"]]
+    # Was die Staffel verlangt (#2202): Web warnt damit, bevor jemand den Kader unter die Mindestgröße bringt.
+    from services import squad_shortage
+
+    demands = await squad_shortage.requirements(db, [squad["id"] for squad in squads if squad.get("id")])
+    for squad in squads:
+        if squad.get("id") in demands:
+            squad["league_requirement"] = demands[squad["id"]]
     return squads
 
 
@@ -1318,6 +1330,11 @@ async def update_squad(team_id: str, squad_id: str, body: TeamSquadUpdate, me: d
     added = [uid for uid in (fresh or {}).get("member_ids") or [] if uid not in (current.get("member_ids") or [])]
     if added:
         await league_roster.on_squad_members_added(db, fresh, added, me.get("id"))
+    # Abgänge bleiben möglich (#2202) - reicht der Kader nicht mehr für die Staffel, gibt es eine Warnung.
+    if set(current.get("member_ids") or []) - set((fresh or {}).get("member_ids") or []):
+        from services import squad_shortage
+
+        await squad_shortage.warn_after_departure(db, [current])
     return fresh
 
 
