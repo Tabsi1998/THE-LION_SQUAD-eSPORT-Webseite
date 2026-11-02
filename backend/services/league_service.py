@@ -22,7 +22,7 @@ from zoneinfo import ZoneInfo
 from pymongo.errors import DuplicateKeyError
 
 from models import TournamentCreate, new_id, now_utc
-from services import game_maps, game_usage, league_look, map_pools, pricing, staffel_guard
+from services import game_maps, game_usage, league_games, league_look, map_pools, pricing, staffel_guard
 from services.advancement_draw import sync_advancement_fields
 from services.bracket_fill_in import has_started, is_auto_bye
 from services.competition_versions import new_competition_version_fields
@@ -950,7 +950,19 @@ async def sync_staffel(db, tournament: dict, league: dict, season: dict, divisio
     except map_pools.MapProblem as problem:
         # Die Felder oben sind schon geschrieben - das Ergebnis sagt ehrlich, dass nur der Pool fehlt.
         skipped.append({"group": "map_pool", "label": SYNC_GROUP_LABELS["map_pool"], "reason": problem.message})
+    await _note_mode_order(db, tournament, updates, skipped)
     return SyncResult(tournament["id"], tournament.get("title") or "", applied, skipped, changed)
+
+
+async def _note_mode_order(db, tournament: dict, updates: dict, skipped: list) -> None:
+    """Sagt ehrlich, wenn „Modus je Map“ der Staffel nach dem Übertragen nicht mehr gilt (#2129): Der Pool geht immer über,
+    die Reihenfolge nur vor dem ersten Ergebnis."""
+    order = updates.get("game_mode_order", tournament.get("game_mode_order"))
+    pool = await map_pools.current(db, "tournament", tournament["id"])
+    if order and pool and not league_games.effective_mode_order({"game_mode_order": order}, pool):
+        skipped.append({"group": "game_mode_order", "label": "Modus je Map",
+                        "reason": "Der Map-Pool der Staffel hat nicht mehr alle Modi ihrer Reihenfolge. Die Teams wählen den "
+                                  "Modus je Map deshalb frei; Spiele mit festgehaltenem Pool behalten ihre Reihenfolge."})
 
 
 async def _sync_pool(db, tournament: dict, season: dict, user: dict, *, locked: bool, has_result: bool,

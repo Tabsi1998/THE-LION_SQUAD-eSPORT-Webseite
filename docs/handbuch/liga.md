@@ -86,6 +86,10 @@ Ausblenden des Menüpunkts stellt die Redaktion unter **Admin → Content → Na
 
 Modi und Maps dürfen sich auch während einer laufenden Season ändern: Gemeldet wird immer aus dem gespeicherten Pool der
 Staffel. Wer einen Modus entfernt, bekommt vorher die Zahl der betroffenen Maps genannt; Pool und Ergebnisse bleiben.
+Nennt **Modus je Map** den Modus noch, ändert zuerst diese Reihenfolge: Einen Pool ohne ihn nimmt die Season sonst nicht an.
+Nach dem ersten Ergebnis geht beim **Übertragen** nur noch der Pool an die Staffel, nicht die Reihenfolge. Fehlt ihrem Pool
+dann ein Modus der Reihenfolge, sagt das Übertragen das, und die Teams wählen den Modus je Map frei. Spiele mit
+festgehaltenem Pool behalten ihre Reihenfolge.
 
 ### 2.2 Liga und Season anlegen
 
