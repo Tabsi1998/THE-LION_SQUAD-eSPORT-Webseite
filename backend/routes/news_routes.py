@@ -930,7 +930,12 @@ async def _reference_uses(db, ref: dict) -> list[str]:
     showcase = await _get_reference_showcase(db)
     if showcase["reference_id"] == ref["id"]:
         uses.append("Hauptkarte der Vitrine")
-    profiles = {profile for entry in _reference_entries(ref) for profile in (entry.get("member_profile_ids") or [])}
+    # Alle vier Formen wie beim Mitgliederprofil (membership_routes._links_of_profile): alte Referenzen tragen die Personen
+    # nur oben oder nur als ``lineup_members``.
+    holders = [ref, *[entry for entry in ref.get("entries") or [] if isinstance(entry, dict)]]
+    profiles = {profile for holder in holders for profile in holder.get("member_profile_ids") or [] if profile}
+    profiles |= {member.get("profile_id") for holder in holders for member in holder.get("lineup_members") or []
+                 if isinstance(member, dict) and member.get("profile_id")}
     uses.extend(_counted(len(profiles), "Mitgliederprofil", "Mitgliederprofile"))
     return uses
 

@@ -280,6 +280,35 @@ async def test_events_tournaments_and_series_keep_an_archived_partner(flow):
     assert (await flow.db.reference_series.find_one({"id": "s-1"}))["partner_ids"] == ["pa"]
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("people", [
+    {"member_profile_ids": ["p1"]},
+    {"member_profile_ids": ["p1"], "entries": [{"id": "e", "kind": "team", "member_profile_ids": []}]},
+    {"entries": [{"id": "e", "kind": "team", "member_profile_ids": ["p1"]}]},
+    {"lineup_members": [{"profile_id": "p1", "display_name": "Anni"}]},
+    {"entries": [{"id": "e", "kind": "team", "lineup_members": [{"profile_id": "p1", "display_name": "Anni"}]}]},
+])
+async def test_a_reference_with_people_in_any_old_form_is_not_deleted(flow, people):
+    await editor(flow)
+    await flow.db.references.insert_one({"id": "r1", "title": "Alt", "is_active": True, **people})
+    answer = await flow.delete("/api/references/r1")
+    assert answer.status_code == 409 and "1 Mitgliederprofil" in answer.json()["detail"]
+    assert await flow.db.references.count_documents({"id": "r1"}) == 1
+
+
+@pytest.mark.asyncio
+async def test_about_counts_only_public_participations(flow):
+    await flow.db.references.insert_many([
+        {"id": "r1", "title": "Öffentlich", "visibility": "public", "is_active": True},
+        {"id": "r2", "title": "Ohne Angabe"},
+        {"id": "r3", "title": "Archiviert", "visibility": "public", "is_active": False},
+        {"id": "r4", "title": "Intern", "visibility": "internal", "is_active": True},
+        {"id": "r5", "title": "Mitglieder", "visibility": "members", "is_active": True},
+    ])
+    flow.act_as(None)
+    assert (await flow.get("/api/home/about")).json()["numbers"]["participations"] == 2
+
+
 # ---------------------------------------------------------------- RF4: archivieren, löschen nur unbenutzt, Protokoll
 
 @pytest.mark.asyncio
