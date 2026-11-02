@@ -201,6 +201,67 @@ async def test_old_data_does_not_let_a_second_person_onto_both_sides(flow):
     assert refused.status_code == 422 and "Tom" in refused.json()["detail"]
 
 
+async def kept_entries(flow) -> list[dict]:
+    return await flow.db.audit_logs.find({"action": "match.lineup.both_sides_kept"}, {"_id": 0}).to_list(None)
+
+
+@pytest.mark.asyncio
+async def test_a_correction_that_keeps_old_data_on_both_sides_stands_in_the_log_without_names(flow):
+    w = await both_kaders(flow)
+    await decided(flow, w, ["Kapitaen", "Mila"], ["Falke1", "Mila"])
+    flow.act_as(w["staff"])
+
+    corrected = await flow.post(f"/api/matches/{w['match']['id']}/result?force=true",
+                                json=correction(w, ["Kapitaen", "Mila"], ["Falke1", "Mila"]))
+
+    assert corrected.status_code == 200, corrected.text
+    rows = await kept_entries(flow)
+    assert len(rows) == 1
+    assert rows[0]["target_id"] == w["tournament"]["id"] and rows[0]["actor_id"] == w["staff"]["id"]
+    assert rows[0]["data"] == {"match_id": w["match"]["id"], "people": 1}, "ohne Namen und Kennungen der Personen"
+
+
+@pytest.mark.asyncio
+async def test_an_amendment_that_keeps_old_data_on_both_sides_stands_in_the_log(flow):
+    w = await both_kaders(flow)
+    await decided(flow, w, ["Kapitaen", "Mila"], ["Falke1", "Mila"])
+    flow.act_as(w["staff"])
+    lineup = ids(w, "Falke2", "Mila")
+
+    amended = await flow.put(f"/api/matches/{w['match']['id']}/lineups", json={
+        "registration_id": w["reg_h"]["id"], "reason": "Nachtrag der Leitung",
+        "games": [{"position": 1, "lineup": lineup}, {"position": 2, "lineup": lineup}]})
+
+    assert amended.status_code == 200, amended.text
+    assert [row["data"]["people"] for row in await kept_entries(flow)] == [1]
+
+
+@pytest.mark.asyncio
+async def test_a_correction_that_clears_the_old_data_leaves_no_log_entry(flow):
+    w = await both_kaders(flow)
+    await decided(flow, w, ["Kapitaen", "Mila"], ["Falke1", "Mila"])
+    flow.act_as(w["staff"])
+
+    corrected = await flow.post(f"/api/matches/{w['match']['id']}/result?force=true",
+                                json=correction(w, ["Kapitaen", "Mila"], ["Falke1", "Falke2"]))
+
+    assert corrected.status_code == 200, corrected.text
+    assert await kept_entries(flow) == []
+
+
+@pytest.mark.asyncio
+async def test_an_ordinary_correction_leaves_no_log_entry(flow):
+    w = await both_kaders(flow)
+    await decided(flow, w, ["Kapitaen", "Mila"], ["Falke1", "Falke2"])
+    flow.act_as(w["staff"])
+
+    corrected = await flow.post(f"/api/matches/{w['match']['id']}/result?force=true",
+                                json=correction(w, ["Kapitaen", "Mila"], ["Falke1", "Falke2"]))
+
+    assert corrected.status_code == 200, corrected.text
+    assert await kept_entries(flow) == []
+
+
 # ---------------------------------------------------------------- Kompatibel
 
 

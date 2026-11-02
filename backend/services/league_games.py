@@ -441,17 +441,45 @@ def check_both_sides(setup: LeagueSetup, games: list[dict], own_sides) -> None:
     """Dieselbe Person steht nie auf beiden Seiten desselben Spiels (#2202) - über alle Maps. ``own_sides``: die Seiten, deren
     Aufstellung ``games`` neu setzt; für die anderen zählt, was am Spiel gilt (etwa die Meldung der Gegenseite beim
     Bestätigen). Altbestand: Wer dort schon auf beiden Seiten steht, hält keine Korrektur auf - sonst käme ein altes Spiel
-    nicht mehr aus diesem Stand heraus."""
+    nicht mehr aus diesem Stand heraus; das Protokoll hält es fest (``log_both_sides_kept``)."""
+    fresh, _kept = _on_both_sides(setup, games, own_sides)
+    if fresh:
+        user_id, sides = fresh[0]
+        state = next((setup.id_status[side][user_id] for side in sides if user_id in setup.id_status.get(side, {})), None)
+        name = (state or {}).get("name") or "Eine Person"
+        raise LeagueGamesError(f"{name} steht schon in der Aufstellung der anderen Seite – dieselbe Person spielt nie "
+                               "auf beiden Seiten eines Spiels.")
+
+
+def _on_both_sides(setup: LeagueSetup, games: list[dict], own_sides) -> tuple[list[tuple[str, set[str]]], list[str]]:
+    """Wer danach auf beiden Seiten stünde: neu dazugekommen (mit den neuen Seiten) und schon vorher so gespeichert."""
     stored = _sides_by_person(_lineup_sources(setup.match))
     own = set(own_sides)
+    fresh, kept = [], []
     for user_id, sides in sorted(_sides_by_person([games]).items()):
-        if not sides & own or len(stored.get(user_id, set())) > 1:
-            continue
-        if len(sides | (stored.get(user_id, set()) - own)) > 1:
-            state = next((setup.id_status[side][user_id] for side in sides if user_id in setup.id_status.get(side, {})), None)
-            name = (state or {}).get("name") or "Eine Person"
-            raise LeagueGamesError(f"{name} steht schon in der Aufstellung der anderen Seite – dieselbe Person spielt nie "
-                                   "auf beiden Seiten eines Spiels.")
+        if sides & own and len(sides | (stored.get(user_id, set()) - own)) > 1:
+            if len(stored.get(user_id, set())) > 1:
+                kept.append(user_id)
+            else:
+                fresh.append((user_id, sides))
+    return fresh, kept
+
+
+async def log_both_sides_kept(db, setup: LeagueSetup, games: list[dict] | None, own_sides, actor_id: str | None) -> None:
+    """Protokoll, wenn eine Korrektur Altbestand auf beiden Seiten durchlässt - nur die Zahl, ohne Personen. ``setup.match``
+    ist der Stand vor dem Schreiben."""
+    from models import new_id, now_utc
+
+    _fresh, kept = _on_both_sides(setup, games or [], own_sides)
+    if kept:
+        await db.audit_logs.insert_one({
+            "id": new_id(),
+            "action": "match.lineup.both_sides_kept",
+            "target_id": setup.match.get("tournament_id"),
+            "actor_id": actor_id,
+            "data": {"match_id": setup.match.get("id"), "people": len(kept)},
+            "created_at": now_utc().isoformat(),
+        })
 
 
 async def check_double_use(db, setup: LeagueSetup, games: list[dict], registration_ids: set[str] | list[str]) -> None:
@@ -692,6 +720,7 @@ async def amend_lineups(
         raise LeagueGamesError("Das Spiel hat sich gerade geändert – bitte neu laden und noch einmal speichern.", 409)
     await lock_lineup_ids(db, setup, new_games, {registration_id})
     await refresh_lineup_index(db, match["id"])
+    await log_both_sides_kept(db, setup, new_games, {registration_id}, actor_id)
     await db.audit_logs.insert_one(
         {
             "id": new_id(),

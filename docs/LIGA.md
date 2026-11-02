@@ -224,7 +224,8 @@ Namen der Aufgestellten, Meldungen beider Seiten, `can_amend_lineup`, `amend_unt
 `league.staffel.delete` (#2106, mit `reason` und den Kennungen dessen, was mitging) · `league.roster.approve` (neue
 Spiel-ID freigegeben, mit Grund, ohne die ID selbst), `league.season.roster_deadline` (#2108) · `league.season.status`
 (Season folgt dem Start der ersten Staffel), `match.plan.change` (Termin, Best of je Spiel mit `from`/`to`),
-`match.no_show.cleared` (alter Vorschlag abgeräumt) (#2201).
+`match.no_show.cleared` (alter Vorschlag abgeräumt) (#2201) · `match.lineup.both_sides_kept` (Korrektur oder Nachtrag ließ
+Altbestand auf beiden Seiten durch, nur mit `match_id` und Anzahl, ohne Personen; #2202).
 
 ## 3. Einstellbar statt fest
 
@@ -293,7 +294,7 @@ Angelehnt an `services/match_audience.py` (Verantwortliche/Spieler) und `auth.re
 | Liga, Season, Liga N, Staffel anlegen/ändern, Spielplan, Start | ja | – | – | – | – |
 | Co-Team zuteilen/entfernen | ja | – | – | – | – |
 | Spiel-ID freigeben, Stichtag für neue Spieler (#2108) | ja | – | – | – | – |
-| Co-Team-Kader pflegen | ja (`_can_manage`) | ja | – | – | – |
+| Co-Team-Kader pflegen | ja (`_can_edit_team`) | ja | – | – | – |
 | Captain/Vertreter vergeben (mit Protokoll) | ja | ja | – | – | – |
 | Eigene Rolle abgeben (`PUT …/roles` nur mit dem eigenen Feld auf `null`, #2110) | – | – | ja | ja | – |
 | Termin vorschlagen/annehmen | ja | nur Fallback¹ | ja | ja | – |
@@ -384,7 +385,8 @@ Meldung mit gleichem Stand → angenommen; abweichender Stand ohne `games` → e
 | Kader zu klein | Abgänge bleiben möglich (Entscheidung des Obmanns). Fällt der Kader eines Co-Teams mit aktiver Anmeldung in einer nicht beendeten Staffel unter `min_squad_size`: Warnung (Art `tournament_registration`, `meta.reason` `league_squad_short` und `league_squad_short_lead`, einmal je Größe und Wiener Tag) an Captain, Vertreter, Hauptteam-Leitung und Turnierleitung. Nie gespeichert, jedes Mal frisch berechnet | `squad_shortage`, `team_routes` |
 | Aufgabe „Kader auffüllen“ | `me.actions[]` mit `type: "squad_short"`, `target_type: "team"`, `team_id`, ohne `target_id`: Apps ohne neuen Build zeigen die Zeile ohne Pfeil und öffnen nichts. Für Captain, Vertreter und Hauptteam-Leitung, bis der Kader reicht | `match_overview.own_squad_tasks`, `mobile_routes` |
 | Hinweise vorab | `GET /api/teams/{id}/squads` trägt `league_requirement: {min_size, title}` bei Co-Teams in einer nicht beendeten Staffel (strengste Vorgabe). `GET …/seasons/{id}/roster`: je Co-Team `member_count`, `min_squad_size`, `short`; `counts.short`, `counts.banned` | `squad_shortage.requirements`, `league_roster.season_overview` |
-| Beide Seiten | `check_both_sides` vergleicht die neuen Aufstellungen mit denen der anderen Seite am Spiel (`_lineup_sources`), über alle Maps. Die Korrektur der Leitung ersetzt beide Seiten: Dort zählt nur, was sie schickt | `league_games` |
+| Beide Seiten | `check_both_sides` vergleicht die neuen Aufstellungen mit denen der anderen Seite am Spiel (`_lineup_sources`), über alle Maps. Die Korrektur der Leitung ersetzt beide Seiten: Dort zählt nur, was sie schickt. Lässt eine Korrektur oder ein Nachtrag Altbestand durch: Protokoll `match.lineup.both_sides_kept` | `league_games` |
+| Freigabe „Turnierleitung“ in Teams | Zählt nur bei der Pflege öffentlicher Teams (Team bearbeiten, Co-Teams, Logo), Schalter `can_edit_team`. Chat, private Teams, Beitrittscode und Einladungen bleiben bei der Rolle (`can_manage`). Vertrag in [ROLLEN.md](ROLLEN.md) | `team_routes._can_edit_team` |
 | Spätere Aufnahme | Fehlende ID und „wartet auf Freigabe“: `meta.reason` `league_id_missing`, `league_id_missing_team`, `league_late`, `league_late_team`, je Person einmal. Gesperrte bekommen nichts. Eine klemmende Nachricht hält die Änderung nicht auf | `league_roster.on_squad_members_added` |
 
 ## 7. Nebenwirkungen „Staffel = Turnier“ (Worker A, P1)

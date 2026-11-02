@@ -394,7 +394,7 @@ Die IDs sehen nur die Beteiligten des Spiels und die Turnierleitung, nie Gäste.
   niemanden mit gesperrtem Konto, aber keinen Grund.
 - **Beide Seiten:** Dieselbe Person steht nie auf beiden Seiten eines Spiels, über alle Maps – beim Melden, Bestätigen,
   Nachtragen und in eurer Korrektur. Steht sie in einem alten Spiel schon auf beiden Seiten, geht die Korrektur trotzdem
-  durch; nehmt sie dabei auf der falschen Seite heraus.
+  durch und steht im Protokoll; nehmt sie dabei auf der falschen Seite heraus.
 
 ---
 
