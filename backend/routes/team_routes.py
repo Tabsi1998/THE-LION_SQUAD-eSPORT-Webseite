@@ -477,15 +477,17 @@ async def _squad_game(db, value: str | None, current: str | None = None) -> str 
     return game["id"]
 
 
-async def _fits_staffel(db, game_id: str | None, registration: dict) -> bool:
-    """Passt dieses Spiel weiter zur Staffel, in der das Co-Team spielt? Dieselbe Regel wie beim Zuteilen."""
+async def _staffel_without_this_game(db, game_id: str | None, registrations: list[dict]) -> dict | None:
+    """Die erste laufende Staffel, zu der das Spiel nicht passt. Hat sie ein Spiel, muss das Co-Team zum selben Hauptspiel
+    gehören; leeren geht dann nicht - zugeteilt wurde es für dieses Spiel."""
     from services.discord_roles import load_games, top_game
 
-    tournament = await db.tournaments.find_one({"id": registration.get("tournament_id")}, {"_id": 0, "game_id": 1}) or {}
-    if not game_id or not tournament.get("game_id"):
-        return True
     _games, parents = await load_games(db)
-    return top_game(game_id, parents) == top_game(tournament["game_id"], parents)
+    for registration in registrations:
+        wanted = registration.get("tournament_game_id")
+        if wanted and (not game_id or top_game(game_id, parents) != top_game(wanted, parents)):
+            return registration
+    return None
 
 
 async def _squad_role_holder(db, team_id: str, user_id: str) -> dict | None:
@@ -1278,10 +1280,10 @@ async def update_squad(team_id: str, squad_id: str, body: TeamSquadUpdate, me: d
         if (updates["game_id"] or None) != (current.get("game_id") or None):
             # Zugeteilt wurde es für das Spiel der Staffel - das bleibt, bis die Staffel vorbei ist. Innerhalb desselben
             # Hauptspiels (etwa ein alter Freitext wird zur richtigen Version) darf es sich ändern.
-            from services.squad_registration import active_league_registration
+            from services.squad_registration import active_league_registrations
 
-            active = await active_league_registration(db, squad_id)
-            if active and not await _fits_staffel(db, updates["game_id"], active):
+            active = await _staffel_without_this_game(db, updates["game_id"], await active_league_registrations(db, squad_id))
+            if active:
                 raise HTTPException(status_code=409, detail=f"Das Co-Team spielt in {active.get('tournament_title') or 'einer Liga-Staffel'} "
                                                             "– das Spiel lässt sich erst ändern, wenn die Staffel beendet ist.")
     if "member_ids" in updates:

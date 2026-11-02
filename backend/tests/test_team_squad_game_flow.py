@@ -160,3 +160,37 @@ def test_another_game_names_the_expected_one():
     games = {"cod": {"id": "cod", "name": "Call of Duty"}, "bo7": {"id": "bo7", "name": "Black Ops 7"}, "kart": {"id": "kart", "name": "Probe Kart"}}
     parents = {"cod": None, "bo7": "cod", "kart": None}
     assert game_texts("kart", "bo7", games, parents) == ["Erste ist für ein anderes Spiel eingetragen (Probe Kart) – diese Staffel spielt Black Ops 7."]
+
+
+@pytest.mark.asyncio
+async def test_clearing_the_game_in_a_running_staffel_depends_on_the_staffel(flow):
+    _leader, team, game = await world(flow)
+    squad = (await flow.post(f"/api/teams/{team['id']}/squads", json={"name": "Liga", "game_id": game["id"]})).json()
+    url = f"/api/teams/{team['id']}/squads/{squad['id']}"
+    staffel = await flow.create_tournament(title="Staffel", status="live", team_mode="team")
+    registration = {"id": new_id(), "tournament_id": staffel["id"], "team_id": team["id"], "squad_id": squad["id"], "status": "approved"}
+    await flow.db.tournament_registrations.insert_one(dict(registration))
+
+    await flow.db.tournaments.update_one({"id": staffel["id"]}, {"$set": {"game_id": game["id"]}})
+    refused = await flow.patch(url, json={"game_id": None})
+    assert refused.status_code == 409 and "Staffel" in refused.json()["detail"]
+    assert (await flow.db.team_squads.find_one({"id": squad["id"]}))["game_id"] == game["id"]
+
+    await flow.db.tournaments.update_one({"id": staffel["id"]}, {"$unset": {"game_id": ""}})
+    assert (await flow.patch(url, json={"game_id": None})).status_code == 200, "die Staffel hat kein Spiel"
+
+
+@pytest.mark.asyncio
+async def test_every_running_staffel_counts_not_only_the_first(flow):
+    _leader, team, game = await world(flow)
+    other = {"id": new_id(), "name": "Anderes"}
+    await flow.db.games.insert_one(dict(other))
+    squad = (await flow.post(f"/api/teams/{team['id']}/squads", json={"name": "Liga", "game_id": game["id"]})).json()
+    url = f"/api/teams/{team['id']}/squads/{squad['id']}"
+    for title, game_id in (("Staffel Eins", other["id"]), ("Staffel Zwei", game["id"])):
+        staffel = await flow.create_tournament(title=title, status="live", team_mode="team")
+        await flow.db.tournaments.update_one({"id": staffel["id"]}, {"$set": {"game_id": game_id}})
+        await flow.db.tournament_registrations.insert_one({"id": new_id(), "tournament_id": staffel["id"], "team_id": team["id"], "squad_id": squad["id"], "status": "approved"})
+
+    refused = await flow.patch(url, json={"game_id": other["id"]})
+    assert refused.status_code == 409 and "Staffel Zwei" in refused.json()["detail"]

@@ -405,21 +405,29 @@ async def build_registration(db, tournament: dict, team_id: str, squad_id: str, 
 async def active_league_registration(db, squad_id: str) -> dict | None:
     """Eine Anmeldung dieses Co-Teams in einer Staffel, die noch nicht beendet ist - egal mit welchem Status (auch
     ausgetreten oder disqualifiziert steht es in Tabelle und Spielplan). Dann darf es nicht gelöscht werden."""
+    active = await active_league_registrations(db, squad_id)
+    return active[0] if active else None
+
+
+async def active_league_registrations(db, squad_id: str) -> list[dict]:
+    """Alle solchen Anmeldungen - ein Co-Team kann in Staffeln verschiedener Seasons stehen."""
     regs = await db.tournament_registrations.find(
         {"squad_id": squad_id},
         {"_id": 0, "id": 1, "tournament_id": 1},
     ).to_list(500)
     if not regs:
-        return None
+        return []
     tournaments = {
         row["id"]: row
         for row in await db.tournaments.find(
             {"id": {"$in": sorted({reg["tournament_id"] for reg in regs if reg.get("tournament_id")})}},
-            {"_id": 0, "id": 1, "title": 1, "slug": 1, "status": 1},
+            {"_id": 0, "id": 1, "title": 1, "slug": 1, "status": 1, "game_id": 1},
         ).to_list(510)
     }
+    active = []
     for reg in regs:
         tournament = tournaments.get(reg.get("tournament_id") or "")
         if tournament and tournament.get("status") not in FINISHED_TOURNAMENT_STATUSES:
-            return {**reg, "tournament_title": tournament.get("title"), "tournament_slug": tournament.get("slug")}
-    return None
+            active.append({**reg, "tournament_title": tournament.get("title"), "tournament_slug": tournament.get("slug"),
+                           "tournament_game_id": tournament.get("game_id")})
+    return active
