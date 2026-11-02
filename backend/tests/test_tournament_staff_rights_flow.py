@@ -102,15 +102,15 @@ async def test_events_and_fast_laps_follow_the_same_rule(flow):
 
 
 def test_team_registration_and_match_checks_follow_the_same_rule():
-    from routes import match_routes, tournament_common, tournament_registration_routes
+    from routes import tournament_common, tournament_registration_routes
 
     confirmed = {"id": "lead", "role": "tournament_admin", "mfa_enabled": True, "auth_mfa_verified": True}
     unconfirmed = {**confirmed, "auth_mfa_verified": False}
     foreign_team = {"leader_id": "jemand", "co_leader_ids": []}
-    checks = (tournament_common._is_staff, match_routes._is_staff,
+    checks = (tournament_common._is_staff,
               lambda user: tournament_registration_routes._can_register_team(foreign_team, user))
-    assert [check(confirmed) for check in checks] == [True, True, True]
-    assert [check(unconfirmed) for check in checks] == [False, False, False]
+    assert [check(confirmed) for check in checks] == [True, True]
+    assert [check(unconfirmed) for check in checks] == [False, False]
     own_team = {"leader_id": "lead", "co_leader_ids": []}
     assert tournament_registration_routes._can_register_team(own_team, unconfirmed), "das eigene Team ohne Adminrechte"
 

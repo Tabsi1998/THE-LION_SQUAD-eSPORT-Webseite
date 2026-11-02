@@ -19,7 +19,7 @@ async def tournament_print_checkin(tid: str, response: Response, me: dict = Depe
     response.headers["Cache-Control"] = "private, no-store"
     db = get_db()
     tournament_id = await _resolve_tid(tid)
-    await require_tournament_staff_permission(me, tournament_id, CHECKIN_STAFF_ROLES)
+    await require_tournament_staff_permission(me, tournament_id, CHECKIN_STAFF_ROLES, capability="matches")
     tournament = await db.tournaments.find_one(
         {"id": tournament_id}, {"_id": 0, "id": 1, "slug": 1, "title": 1, "team_mode": 1})
     if not tournament:

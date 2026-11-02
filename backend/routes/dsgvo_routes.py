@@ -227,6 +227,7 @@ async def _user_data_sections(db, user_id: str) -> list[tuple[str, tuple]]:
         ("membership_invitations", _rows(db.membership_invitations, me)),
         ("board_positions", _rows(db.board_positions, {"$or": [me, {"deputy_user_id": user_id}]})),
         ("tournament_staff", _rows(db.tournament_staff_assignments, me)),
+        ("league_staff", _rows(db.league_staff, me)),
         ("moderation_items", _rows(db.moderation_items, me)),
         ("discord_activity", _rows(db.discord_activity, me)),
         # Statistik je Server (#631): an welchen Tagen das Konto auf welchem Server geschrieben hat - höchstens 35 Tage zurück.

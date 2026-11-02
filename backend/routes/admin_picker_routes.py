@@ -34,6 +34,8 @@ PURPOSES = {
     "season": "Korrekturen der Jahreswertung",
     # Autor eines News-Beitrags (#2122 NW3): wer News pflegt, darf den Autor ändern.
     "news_author": "Autor eines News-Beitrags",
+    # Zuständige einer Liga (#2203): vergibt der Bereich Ligen.
+    "league_staff": "Zuständige einer Liga",
 }
 MISSING_RIGHT = "Dafür fehlt dir das Recht: {what}."
 
@@ -49,7 +51,7 @@ async def _allowed(purpose: str, me: dict, context_id: str | None) -> bool:
             return False
         from services.tournament_permissions import PARTICIPANT_STAFF_ROLES, has_tournament_staff_permission
 
-        return await has_tournament_staff_permission(me, context_id, PARTICIPANT_STAFF_ROLES)
+        return await has_tournament_staff_permission(me, context_id, PARTICIPANT_STAFF_ROLES, capability=("applications", "manage"))
     if purpose == "fastlap":
         if not context_id:
             return False
@@ -70,6 +72,8 @@ async def _allowed(purpose: str, me: dict, context_id: str | None) -> bool:
         return await user_has_area(me, "tournaments") and not needs_mfa(me)
     if purpose == "news_author":
         return await user_has_area(me, "content") and not needs_mfa(me)
+    if purpose == "league_staff":
+        return await user_has_area(me, "leagues") and not needs_mfa(me)
     return False
 
 

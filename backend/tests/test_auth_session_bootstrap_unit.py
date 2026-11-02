@@ -40,6 +40,7 @@ def test_authenticated_bootstrap_returns_the_user_without_refresh(monkeypatch):
         return False
 
     monkeypatch.setattr(reference_series_access, "has_captain_series", no_captain)
+    monkeypatch.setattr("services.league_permissions.has_league_duty", no_captain)
     monkeypatch.setattr("routes.auth_routes.get_db", lambda: None)
     # Tagesbonus (#617) - ebenfalls ohne Datenbank. Sonst wartete der Aufruf 30 s auf einen MongoDB-Server, den es
     # im Test nicht gibt, und der Fehler verschwand im Log (#2054).
@@ -53,6 +54,6 @@ def test_authenticated_bootstrap_returns_the_user_without_refresh(monkeypatch):
     monkeypatch.setattr(xp, "daily_login_once", note_daily_login)
 
     assert asyncio.run(me(SimpleNamespace(cookies={"refresh_token": "opaque"}), response, user)) == {
-        **user, "areas": [], "has_series_captain": False}
+        **user, "areas": [], "has_series_captain": False, "has_league_staff": False}
     assert "x-session-refresh" not in response.headers
     assert daily == ["user-1"]

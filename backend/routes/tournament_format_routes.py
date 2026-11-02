@@ -2,7 +2,7 @@
 """
 from fastapi import HTTPException, Depends
 from database import get_db
-from auth import require_admin, get_optional_user
+from auth import get_optional_user
 from services.custom_bracket import (
     BracketSchemaError,
     build_matches_v2_from_schema,
@@ -17,6 +17,7 @@ from services.competition_versions import persist_competition_versions
 from services import tournament_guard
 from models import now_utc, new_id
 from routes.tournament_common import (
+    require_lead_of,
     _audit_tournament_action,
     _default_group_count,
     _ensure_tournament_unlocked,
@@ -126,7 +127,7 @@ SWISS_CANCELLED = "Das Turnier ist abgesagt – es gibt keine neue Runde."
 
 
 @router.post("/{tid}/swiss/next-round")
-async def swiss_next_round(tid: str, me: dict = Depends(require_admin()),
+async def swiss_next_round(tid: str, me: dict = Depends(require_lead_of("season")),
                            _mutation_tid: str = Depends(_serialized_tournament_write)):
     db = get_db()
     tid = await _resolve_tid(tid)
@@ -135,7 +136,7 @@ async def swiss_next_round(tid: str, me: dict = Depends(require_admin()),
 
 
 @router.post("/{tid}/swiss/undo-round")
-async def swiss_undo_round(tid: str, me: dict = Depends(require_admin()),
+async def swiss_undo_round(tid: str, me: dict = Depends(require_lead_of("season")),
                            _mutation_tid: str = Depends(_serialized_tournament_write)):
     """„Letzte Runde zurücknehmen“ (#2120, TA11): eine falsch erzeugte Runde verschwindet wieder - solange keines ihrer
     Spiele aufgerufen, gestartet, gemeldet oder gewertet ist (ein Freilos zählt nicht) und keines an einer Station
@@ -244,7 +245,7 @@ async def _groups_generate_graph(db, tournament: dict, group_count: int, actor_i
 
 @router.post("/{tid}/groups/generate")
 async def groups_generate(tid: str, body: dict | None = None, force: bool = False,
-                          me: dict = Depends(require_admin()),
+                          me: dict = Depends(require_lead_of("season")),
                           _mutation_tid: str = Depends(_serialized_tournament_write)):
     db = get_db()
     tid = await _resolve_tid(tid)

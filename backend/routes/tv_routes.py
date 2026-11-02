@@ -14,6 +14,7 @@ from auth import require_admin
 from database import get_db
 from models import new_id, now_utc
 from services.access_links import hash_access_token, new_access_token
+from services.tournament_permissions import require_lead_for_staffel
 from services.tv_display import (
     DISPLAY_GRANT,
     EVENT_NOT_ON_TV,
@@ -181,6 +182,7 @@ async def list_tv_keys(tournament_id: str | None = None, event_id: str | None = 
     db = get_db()
     query: dict = {"grants": DISPLAY_GRANT, "target_type": {"$in": ["tournament", "event"]}, "is_active": {"$ne": False}}
     if tournament_id:
+        await require_lead_for_staffel(me, tournament_id)
         query.update({"target_type": "tournament", "target_id": tournament_id})
     elif event_id:
         query.update({"target_type": "event", "target_id": event_id})
@@ -205,6 +207,7 @@ async def create_tv_key(body: TvKeyCreate, me: dict = Depends(require_admin())):
         target = await db.tournaments.find_one({"id": body.tournament_id}, TARGET_FIELDS)
         if not target:
             raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+        await require_lead_for_staffel(me, target["id"])
     token = new_access_token()
     now = now_utc().isoformat()
     doc = {
@@ -238,6 +241,7 @@ async def revoke_tv_key(key_id: str, me: dict = Depends(require_admin())):
     existing = await db.access_links.find_one({"id": key_id, "grants": DISPLAY_GRANT}, {"_id": 0, "id": 1, "target_id": 1})
     if not existing:
         raise HTTPException(status_code=404, detail="TV-Link nicht gefunden")
+    await require_lead_for_staffel(me, existing.get("target_id"))
     now = now_utc().isoformat()
     await db.access_links.update_one(
         {"id": key_id},

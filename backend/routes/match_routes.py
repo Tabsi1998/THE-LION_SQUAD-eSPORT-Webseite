@@ -7,7 +7,9 @@ from pymongo import ReturnDocument
 from fastapi import APIRouter, HTTPException, Depends, Request
 from database import get_db
 from services.chat_attachments import register_chat_access
-from services.permissions import is_confirmed_tournament_lead, is_tournament_lead, tournament_lead_filter
+from services import league_permissions
+from services.league_permissions import READ
+from services.permissions import is_tournament_lead, tournament_lead_filter
 from services import moderation_standing
 from auth import get_current_user, get_optional_user
 from services.visibility import hide_unseen_event_links
@@ -17,7 +19,9 @@ from services.tournament_permissions import (
     RESULT_STAFF_ROLES,
     has_match_result_permission,
     has_tournament_staff_permission,
+    leads_tournament,
     require_tournament_staff_permission,
+    tournament_lead_user_ids,
 )
 from models import (
     MatchChatCreate,
@@ -113,17 +117,11 @@ async def _ensure_match_tournament_unlocked(db, match: dict) -> None:
         raise HTTPException(status_code=423, detail=TOURNAMENT_MUTATION_LOCKED_DETAIL)
 
 
-def _is_staff(user: dict | None) -> bool:
-    # Bereich Turnierleitung aus Rolle oder Freigabe (#1350) - für die angemeldete Person nur mit bestätigter
-    # Zwei-Faktor-Anmeldung (#291). Empfänger von Erwähnungen (unten) prüft is_tournament_lead am Konto.
-    return is_confirmed_tournament_lead(user)
-
-
 async def _sees_internal(match: dict, user: dict | None) -> bool:
     """Notizen, Entscheidungs-Begründungen, Einsprüche und Meldungen im Detail sieht nur, wer das Turnier leitet."""
     if not user:
         return False
-    return _is_staff(user) or await has_tournament_staff_permission(user, match.get("tournament_id"), READ_STAFF_ROLES)
+    return await has_tournament_staff_permission(user, match.get("tournament_id"), READ_STAFF_ROLES, capability=READ)
 
 
 # Die Regeln stehen an einer Stelle (services/tournament_rules, #1132): ohne Angabe melden online und hybrid die
@@ -238,7 +236,9 @@ def _staff_assignment_matches_match(assignment: dict, match: dict) -> bool:
 async def _match_staff_user_ids(db, match: dict) -> set[str]:
     tournament_id = match.get("tournament_id")
     user_ids: set[str] = set()
-    global_staff = await db.users.find(
+    # Liga-Staffel (#2203): die Liga-Rechte statt der Turnierleitung, Helfer bleiben (sie lesen mit).
+    league_staff = await tournament_lead_user_ids(db, tournament_id)
+    global_staff = [{"id": user_id} for user_id in league_staff] if league_staff is not None else await db.users.find(
         {**tournament_lead_filter(), "is_active": True, "is_banned": {"$ne": True}},
         {"_id": 0, "id": 1},
     ).to_list(200)
@@ -286,10 +286,11 @@ async def _mentioned_match_user_ids(db, match: dict, message: str) -> set[str]:
         {"_id": 0, "id": 1, "role": 1, "areas": 1},
     ).to_list(100)
     allowed_ids = await _match_chat_user_ids(db, match)
+    staffel = await tournament_lead_user_ids(db, match.get("tournament_id"), ()) is not None
     return {
         candidate["id"]
         for candidate in candidates
-        if candidate.get("id") in allowed_ids or is_tournament_lead(candidate)
+        if candidate.get("id") in allowed_ids or (not staffel and is_tournament_lead(candidate))
     }
 
 
@@ -370,9 +371,9 @@ async def _acting_registration_for_match(match: dict, user: dict | None) -> dict
 
 
 async def _can_act_for_match(match: dict, user: dict | None) -> bool:
+    # Staffel (#2203): die Seite handelt selbst, von der Leitung nur „Spiele betreuen“.
     return bool(
-        _is_staff(user)
-        or await has_match_result_permission(user, match)
+        await has_match_result_permission(user, match, capability="matches")
         or await _acting_registration_for_match(match, user)
     )
 
@@ -386,20 +387,37 @@ async def _can_forfeit_match(match: dict, user: dict | None) -> bool:
 
 
 async def _can_read_match(match: dict, user: dict | None) -> bool:
+    tournament_id = match.get("tournament_id")
     return (
-        _is_staff(user)
-        or await has_tournament_staff_permission(user, match.get("tournament_id"), READ_STAFF_ROLES)
-        or await has_tournament_staff_permission(user, match.get("tournament_id"), READ_STAFF_ROLES, "match", match.get("id"))
-        or await has_tournament_staff_permission(user, match.get("tournament_id"), READ_STAFF_ROLES, "stage", match.get("stage_id"))
+        await has_tournament_staff_permission(user, tournament_id, READ_STAFF_ROLES, capability=READ)
+        or await has_tournament_staff_permission(user, tournament_id, READ_STAFF_ROLES, "match", match.get("id"), capability=READ)
+        or await has_tournament_staff_permission(user, tournament_id, READ_STAFF_ROLES, "stage", match.get("stage_id"), capability=READ)
         or bool(await _user_registration_for_match(match, user))
         or bool(await _acting_registration_for_match(match, user))
     )
 
 
-async def _require_result_permission(user: dict, match: dict) -> None:
-    allowed = await has_match_result_permission(user, match)
+async def _require_result_permission(user: dict, match: dict, *, capability="results") -> None:
+    allowed = await has_match_result_permission(user, match, capability=capability)
     if not allowed:
         raise HTTPException(status_code=403, detail="Keine Turnierberechtigung für diese Aktion")
+
+
+async def _require_undisputed_or_both(user: dict, match: dict) -> None:
+    """Staffel (#2203): Bei offenem Streitfall schließt eine Korrektur den Protest - dafür braucht es auch „Proteste“."""
+    if str(match.get("status") or "") == "disputed":
+        await _require_result_permission(user, match, capability="disputes")
+
+
+async def _result_conflict(db, user: dict | None, match: dict) -> dict | None:
+    """Für die Matchseite: befangen, obwohl die Person hier sonst entscheiden dürfte - sonst ``None``. Spieler ohne Liga-Recht
+    bekommen keine Meldung: sie handeln als Seite."""
+    if not user:
+        return None
+    for capability in ("results", "disputes"):
+        if await has_match_result_permission(user, match, capability=capability):
+            return await league_permissions.conflict_of_interest(db, user, match)
+    return None
 
 
 async def _assert_match_visible(match: dict, user: dict | None) -> None:
@@ -514,10 +532,9 @@ async def _refresh_schedule_escalation(match: dict, collection: str) -> dict:
     return match
 
 
-def _public_registration(reg: dict | None, user: dict | None) -> dict | None:
+def _public_registration(reg: dict | None, user: dict | None, is_staff: bool) -> dict | None:
     if not reg:
         return None
-    is_staff = _is_staff(user)
     is_self = bool(user and reg.get("user_id") == user.get("id"))
     if is_staff:
         return reg
@@ -538,6 +555,7 @@ def _public_registration(reg: dict | None, user: dict | None) -> dict | None:
 async def _match_participants(match: dict, user: dict | None) -> list[dict]:
     db = get_db()
     regs = await _registrations_for_match(match)
+    is_staff = await leads_tournament(user, match.get("tournament_id"))
     reg_by_id = {r["id"]: r for r in regs}
     user_ids = list({r.get("user_id") for r in regs if r.get("user_id")})
     team_ids = list({r.get("team_id") for r in regs if r.get("team_id")})
@@ -556,7 +574,7 @@ async def _match_participants(match: dict, user: dict | None) -> list[dict]:
     participants = []
     for slot in source_slots:
         reg = reg_by_id.get(slot.get("registration_id")) or {}
-        public_reg = _public_registration({**reg, "user": users.get(reg.get("user_id"))} if reg else None, user) or {}
+        public_reg = _public_registration({**reg, "user": users.get(reg.get("user_id"))} if reg else None, user, is_staff) or {}
         user_doc = users.get(reg.get("user_id") or "")
         team = teams.get(reg.get("team_id") or "")
         participants.append({
@@ -662,7 +680,10 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         proposals = [{key: proposal.get(key) for key in OUTSIDE_PROPOSAL_FIELDS} for proposal in proposals]
     acting_reg = await _acting_registration_for_match(match, user)
     policy = _match_policy(match, tournament, stage)
-    can_submit_result = await _can_submit_result_for_match(match, user)
+    # Befangenheit (#2203): Wer dazugehört, entscheidet hier nicht - der Superadmin nur als Notausnahme mit Grund.
+    conflict = await _result_conflict(db, user, match)
+    can_decide = not conflict or conflict["override"]
+    can_submit_result = can_decide and await _can_submit_result_for_match(match, user)
     can_player_report = bool(acting_reg and _players_can_report(policy) and _accepts_reports(match))
     can_propose_schedule = bool(user and await _can_act_for_match(match, user) and _schedule_proposals_enabled(policy))
     round_number = match.get("matchday_number") or match.get("round")
@@ -705,7 +726,7 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         info = entry_info(match, tournament=tournament, stage=stage, stage_matches=stage_matches,
                           regs_by_id=regs_by_id, viewer_id=(user or {}).get("id"))
         if can_submit_result:
-            result_entry = info
+            result_entry = {**info, "conflict_override": bool(conflict and conflict["override"])}
         # Spieler-Meldung (#1157): dieselben Bausteine - Format, Seiten, wohin es weitergeht. Ohne Internes der Leitung.
         report_entry_info = {key: value for key, value in info.items() if key not in {"result_note", "hold"}}
     if not await _sees_internal(match, user):
@@ -741,7 +762,9 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         "call": call,
         "result_entry": result_entry,
         "report_entry": report_entry_info if can_player_report else None,
-        "can_forfeit": await _can_forfeit_match(match, user),
+        "can_forfeit": can_decide and await _can_forfeit_match(match, user),
+        "can_decide_dispute": can_decide and bool(user) and await has_match_result_permission(user, match, capability="disputes"),
+        "conflict": conflict,
         "event_mode": policy["event_mode"],
         "result_entry_mode": policy["result_entry_mode"],
         "schedule_mode": policy["schedule_mode"],
@@ -851,7 +874,7 @@ async def _withdraw_proposal(db, match: dict, collection: str, proposal: dict, m
         own = bool(proposal.get("actor_registration_id") and proposal.get("actor_registration_id") == acting_reg.get("id"))
     else:
         own = proposal.get("actor_user_id") == me["id"]
-    if not (own or _is_staff(me)):
+    if not (own or await leads_tournament(me, match.get("tournament_id"), "matches")):
         raise HTTPException(status_code=403, detail="Zurückziehen kann nur die Seite, die den Termin vorgeschlagen hat.")
     if proposal.get("status") == "withdrawn" and proposal.get("decision_user_id") == me["id"]:
         return {"ok": True, "status": "withdrawn", "idempotent_replay": True}
@@ -928,7 +951,7 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
     if body.action == "withdraw":
         return await _withdraw_proposal(db, match, collection, proposal, me, acting_reg)
     if (
-        not _is_staff(me)
+        not await leads_tournament(me, match.get("tournament_id"), "matches")
         and acting_reg
         and proposal.get("actor_registration_id") == acting_reg.get("id")
         and body.action in {"accept", "decline"}
@@ -1115,15 +1138,19 @@ async def submit_match_result(match_id: str, body: MatchV2ResultSubmit,
                               me: dict = Depends(get_current_user)):
     db = get_db()
     match, _collection = await _find_match_any(match_id)
+    await _require_result_permission(me, match)
+    await _require_undisputed_or_both(me, match)
+    await league_permissions.require_no_conflict(db, me, match, action="result", conflict_reason=body.conflict_reason, record=False)
     await _ensure_match_tournament_unlocked(db, match)
     await ensure_tournament_accepts_results(db, match["tournament_id"])
-    await _require_result_permission(me, match)
     try:
         async with mutation_lock(db, tournament_write_resource(match["tournament_id"])):
             match, _collection = await _find_match_any(match_id)
             await _ensure_match_tournament_unlocked(db, match)
             await ensure_tournament_accepts_results(db, match["tournament_id"])
             await _require_result_permission(me, match)
+            await _require_undisputed_or_both(me, match)
+            await league_permissions.require_no_conflict(db, me, match, action="result", conflict_reason=body.conflict_reason)
             raw_results = [entry.model_dump() for entry in body.results]
             tournament = await db.tournaments.find_one({"id": match["tournament_id"]}, {"_id": 0, "league_context": 1})
             # Liga (#1650): Doppel-Einsatz über Staffeln derselben Season - Prüfen und Schreiben unter der Season-Sperre.
@@ -1202,11 +1229,14 @@ async def undo_match_result(match_id: str, body: MatchResultUndo | None = None, 
     warum es nicht mehr geht."""
     db = get_db()
     match, _collection = await _find_match_any(match_id)
-    await _ensure_match_tournament_unlocked(db, match)
     await _require_result_permission(me, match)
+    conflict_reason = body.conflict_reason if body else None
+    await league_permissions.require_no_conflict(db, me, match, action="result_undo", conflict_reason=conflict_reason, record=False)
+    await _ensure_match_tournament_unlocked(db, match)
     try:
         async with mutation_lock(db, tournament_write_resource(match["tournament_id"])):
             match, _collection = await _find_match_any(match_id)
+            await league_permissions.require_no_conflict(db, me, match, action="result_undo", conflict_reason=conflict_reason)
             return await undo_result(db, match, actor_id=me["id"], hold_id=(body.hold_id if body else None))
     except MutationLockBusy:
         raise HTTPException(status_code=409, detail="Eine Turnieraktion wird bereits verarbeitet. Bitte erneut versuchen.")
@@ -1258,7 +1288,7 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
     if v2_match:
         await _ensure_match_tournament_unlocked(db, v2_match)
         await require_tournament_staff_permission(
-            me, v2_match["tournament_id"], CHECKIN_STAFF_ROLES, "match", match_id
+            me, v2_match["tournament_id"], CHECKIN_STAFF_ROLES, "match", match_id, capability="matches"
         )
         nullable_fields = {"scheduled_at", "station_id", "admin_note", "map", "best_of", "duration_minutes"}
         raw = body.model_dump(exclude_unset=True)
@@ -1466,6 +1496,9 @@ async def amend_lineups(match_id: str, body: MatchLineupAmend, me: dict = Depend
     acting = None if staff else await _acting_registration_for_match(match, me)
     if not staff and not acting:
         raise HTTPException(status_code=403, detail="Die Aufstellung tragen Captain und Vertreter der eigenen Seite nach.")
+    if staff:
+        # Als Leitung ist es eine Korrektur des Spiels (#2203): die eigene Seite trägt ohne ``registration_id`` nach.
+        await league_permissions.require_no_conflict(db, me, match, action="lineups", conflict_reason=body.conflict_reason)
     try:
         async with league_games.season_lock(db, league.tournament):
             updated = await league_games.amend_lineups(
@@ -1489,7 +1522,7 @@ async def dispute(match_id: str, body: MatchDispute, me: dict = Depends(get_curr
     m, collection = await _find_match_any(match_id)
     await _ensure_match_tournament_unlocked(db, m)
     acting_reg = await _acting_registration_for_match(m, me)
-    if not _is_staff(me) and not acting_reg:
+    if not acting_reg and not await leads_tournament(me, m.get("tournament_id"), "disputes"):
         raise HTTPException(status_code=403, detail="Nicht Teilnehmer dieses Matches")
     reason = body.reason.strip()
     if is_duplicate_dispute(m, me["id"], reason):
@@ -1544,8 +1577,9 @@ async def decide_dispute(match_id: str, body: MatchDisputeDecision, me: dict = D
     Entscheiden darf, wer Ergebnisse eintragen darf; beide Seiten bekommen die Entscheidung."""
     db = get_db()
     m, collection = await _find_match_any(match_id)
+    await _require_result_permission(me, m, capability="disputes")
+    await league_permissions.require_no_conflict(db, me, m, action="dispute_decision", conflict_reason=body.conflict_reason)
     await _ensure_match_tournament_unlocked(db, m)
-    await _require_result_permission(me, m)
     if str(m.get("status") or "") != "disputed":
         raise HTTPException(status_code=409, detail="Zu diesem Spiel ist kein Dispute offen.")
     now_iso = now_utc().isoformat()
@@ -1618,7 +1652,8 @@ async def forfeit(match_id: str, body: dict, me: dict = Depends(get_current_user
     """
     db = get_db()
     m, collection = await _find_match_any(match_id)
+    await _require_result_permission(me, m)
+    await league_permissions.require_no_conflict(db, me, m, action="forfeit", conflict_reason=body.get("conflict_reason"))
     await _ensure_match_tournament_unlocked(db, m)
     await ensure_tournament_accepts_results(db, m["tournament_id"])
-    await _require_result_permission(me, m)
     return await _forfeit_v2(db, m, body, me, force)

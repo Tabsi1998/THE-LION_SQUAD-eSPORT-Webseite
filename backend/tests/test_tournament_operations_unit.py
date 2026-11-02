@@ -142,7 +142,7 @@ def test_manual_live_start_does_not_change_status_before_hard_preflight(monkeypa
     async def unlocked(db_arg, tournament_id):
         return {"id": tournament_id}
 
-    async def permitted(user, tournament_id, roles, scope):
+    async def permitted(user, tournament_id, roles, scope, **_rights):
         return None
 
     async def finalize(db_arg, tournament, actor_id):
@@ -151,12 +151,16 @@ def test_manual_live_start_does_not_change_status_before_hard_preflight(monkeypa
     async def collect(db_arg, tournament_id):
         return [], {"id": tournament_id, "min_participants": 2, "event_mode": "online"}
 
+    async def not_lead(user, tournament_id, capability):
+        return False
+
     monkeypatch.setattr(tournament_common, "get_db", lambda: db)
     monkeypatch.setattr(tournament_lifecycle_routes, "get_db", lambda: db)
     monkeypatch.setattr(tournament_common, "_resolve_tid", resolve)
     monkeypatch.setattr(tournament_lifecycle_routes, "_resolve_tid", resolve)
     monkeypatch.setattr(tournament_lifecycle_routes, "_ensure_tournament_unlocked", unlocked)
     monkeypatch.setattr(tournament_lifecycle_routes, "require_tournament_staff_permission", permitted)
+    monkeypatch.setattr(tournament_lifecycle_routes, "leads_tournament", not_lead)
     monkeypatch.setattr(tournament_lifecycle_routes, "_finalize_bracket_for_checkin", finalize)
     # Aus dem Check-in heraus endet zuerst der Check-in (#1551) - derselbe Baubau, hier ebenso nachgestellt.
     monkeypatch.setattr(tournament_lifecycle_routes, "close_check_in", finalize)

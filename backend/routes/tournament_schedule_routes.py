@@ -15,6 +15,7 @@ from database import get_db
 from models import new_id, now_utc
 from services.match_deadlines import auto_confirm_due, no_show_deadline, opened_at
 from services.match_scheduler import DONE_STATUSES, RUNNING_STATUSES, apply_plan, plan_for_tournament, station_query
+from services.league_permissions import READ
 from services.tournament_permissions import READ_STAFF_ROLES, STATION_ASSIGN_ROLES, require_tournament_staff_permission
 from routes.tournament_common import _ensure_tournament_unlocked, _resolve_tid, _serialized_tournament_write
 from routes.tournament_router import router
@@ -33,7 +34,7 @@ class SchedulePlanApply(BaseModel):
 
 
 async def _planning_tournament(db, tid: str, me: dict) -> dict:
-    await require_tournament_staff_permission(me, tid, STATION_ASSIGN_ROLES, "tournament")
+    await require_tournament_staff_permission(me, tid, STATION_ASSIGN_ROLES, "tournament", capability="matches")
     tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
     if not tournament:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
@@ -83,7 +84,7 @@ async def schedule_deadlines(tid: str, me: dict = Depends(get_current_user)):
     (``services/match_deadlines``) - die Website zeigt nur an."""
     db = get_db()
     tid = await _resolve_tid(tid)
-    await require_tournament_staff_permission(me, tid, READ_STAFF_ROLES, "tournament")
+    await require_tournament_staff_permission(me, tid, READ_STAFF_ROLES, "tournament", capability=READ)
     tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0, "creation_key": 0, "billing": 0})
     if not tournament:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")

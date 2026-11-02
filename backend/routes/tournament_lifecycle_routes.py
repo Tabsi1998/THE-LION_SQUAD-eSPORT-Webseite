@@ -8,10 +8,10 @@ import logging
 from fastapi import HTTPException, Depends
 from pydantic import BaseModel, ConfigDict, Field
 from database import get_db
-from auth import get_current_user, require_admin
+from auth import get_current_user
 from services.tournament_permissions import (
     STRUCTURE_STAFF_ROLES,
-    is_global_tournament_admin,
+    leads_tournament,
     require_tournament_staff_permission,
 )
 from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
@@ -29,6 +29,7 @@ from services.staffel_guard import staffel_status_problem
 from services.change_events import reset_scope_cache
 from services.public_phase import parse_dt
 from routes.tournament_common import (
+    require_lead_of,
     _apply_match_plan,
     _audit_tournament_action,
     _collect_match_plan,
@@ -216,7 +217,7 @@ async def close_check_in(db, tournament: dict, actor_id: str | None) -> dict | N
 
 
 @router.post("/{tid}/lock")
-async def lock_tournament(tid: str, me: dict = Depends(require_admin()),
+async def lock_tournament(tid: str, me: dict = Depends(require_lead_of("manage")),
                           _mutation_tid: str = Depends(_serialized_tournament_write)):
     db = get_db()
     tid = await _resolve_tid(tid)
@@ -237,7 +238,7 @@ async def lock_tournament(tid: str, me: dict = Depends(require_admin()),
 
 
 @router.post("/{tid}/unlock")
-async def unlock_tournament(tid: str, me: dict = Depends(require_admin()),
+async def unlock_tournament(tid: str, me: dict = Depends(require_lead_of("manage")),
                             _mutation_tid: str = Depends(_serialized_tournament_write)):
     db = get_db()
     tid = await _resolve_tid(tid)
@@ -294,7 +295,7 @@ async def set_pause_until(tid: str, body: PauseUntilUpdate, me: dict = Depends(g
     db = get_db()
     tid = await _resolve_tid(tid)
     await _ensure_tournament_unlocked(db, tid)
-    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES, "tournament")
+    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES, "tournament", capability="manage")
     tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0, "status": 1, "paused_until": 1})
     if not tournament:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
@@ -330,7 +331,7 @@ async def set_round_sponsors(tid: str, body: RoundSponsorsUpdate, me: dict = Dep
     db = get_db()
     tid = await _resolve_tid(tid)
     await _ensure_tournament_unlocked(db, tid)
-    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES, "tournament")
+    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES, "tournament", capability="manage")
     if not await db.tournaments.find_one({"id": tid}, {"_id": 0, "id": 1}):
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     from routes.news_routes import list_sponsors  # dieselbe Liste, die die TV-Seiten bekommen
@@ -351,7 +352,7 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
     db = get_db()
     tid = await _resolve_tid(tid)
     await _ensure_tournament_unlocked(db, tid)
-    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES, "tournament")
+    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES, "tournament", capability="manage")
     status = body.get("status")
     force = body.get("force") is True
     # Grund der Absage (#2120, TA24): freiwillig, nur für die Nachricht an die Angemeldeten.
@@ -363,7 +364,7 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
     }
     if status not in allowed:
         raise HTTPException(status_code=400, detail="Ungültiger Status")
-    if not is_global_tournament_admin(me) and status not in {"check_in", "live", "paused", "completed"}:
+    if not await leads_tournament(me, tid, "manage") and status not in {"check_in", "live", "paused", "completed"}:
         raise HTTPException(status_code=403, detail="Turnierleitung darf nur operative Status setzen")
     t = await db.tournaments.find_one({"id": tid}, {"_id": 0}) or {}
     prev = t.get("status")

@@ -42,7 +42,7 @@ DELETED_TEXT = "[Nachricht gelöscht]"
 # Zeilen, die nur mit Konto einen Zweck haben: Verhalten, Zustände und Zugänge.
 PURGED = (
     "user_xp", "xp_events", "membership_invitations", "member_card_tokens", "discord_activity", "discord_guild_active", "discord_memberships",
-    "achievement_eval_queue", "live_streams", "twitch_stream_sessions", "tournament_staff_assignments", "calendar_feed_tokens",
+    "achievement_eval_queue", "live_streams", "twitch_stream_sessions", "tournament_staff_assignments", "league_staff", "calendar_feed_tokens",
     # Seit #1029: Lesestände, Einladungen in Teams, Erfolge samt Warteschlange, Sticker, Verlauf der Saisonränge, Merker zu
     # Jahresrückblick, Feedback und Stream-Ankündigungen, F1-Aufgaben und die Verbindung zur Mitgliederakte samt Ehrungen.
     "chat_reads", "document_opens", "team_invites", "user_achievements", "achievement_outbox", "user_stickers", "season_rank_snapshots",
