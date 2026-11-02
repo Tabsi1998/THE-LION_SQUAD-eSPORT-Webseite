@@ -42,6 +42,22 @@ function renderPage() {
   );
 }
 
+// #2129, SP3: Der Standard-Pool wird auf der Map-Seite gepflegt.
+test("Standard-Pool speichern und entfernen", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...BODY, default_pool: { id: "d1", version: 2, origin: "game_default", stale: false, outdated_map_ids: [],
+    modes: [{ mode: "snd", label: "Suchen & Zerstören", maps: [{ map_id: "hafen", name: "Hafenkante" }] }] } } });
+  renderPage();
+  const box = await screen.findByTestId("game-default-pool-box");
+  expect(box).toHaveTextContent("Standard-Pool · Version 2");
+  fireEvent.click(within(box).getByRole("checkbox", { name: "Hafenkante in Stellung" }));
+  fireEvent.click(within(box).getByTestId("game-default-pool-save"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/games/g1/default-pool", expect.objectContaining({
+    expected_version: 2, modes: [{ mode: "stellung", map_ids: ["hafen"] }, { mode: "snd", map_ids: ["hafen"] }],
+  })));
+  fireEvent.click(within(box).getByTestId("game-default-pool-clear"));
+  await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith("/games/g1/default-pool"));
+});
+
 // #2129, SP2: Maps ohne Modus werden benannt und lassen sich gesammelt zuordnen; ein alter Modus blockiert nichts.
 describe("Maps ohne Modus", () => {
   test("der Hinweis nennt sie, ein Klick ordnet sie allen gewählten Modi zu", async () => {

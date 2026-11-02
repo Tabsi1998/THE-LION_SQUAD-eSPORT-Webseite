@@ -5,7 +5,7 @@
 // damals. Keine eingebauten Hersteller-Maps: jede Map legt die Verwaltung selbst an.
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Archive, ArchiveRestore, ArrowLeft, ArrowDown, ArrowUp, Pencil, Plus, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, ArrowLeft, ArrowDown, ArrowUp, Copy, Pencil, Plus, Trash2 } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminSheet } from "@/components/tls/AdminSheet";
@@ -16,6 +16,8 @@ import { MapCard } from "@/components/tls/maps/MapPoolView";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { mapFormPayload, mapToForm, mapsWithoutMode } from "@/lib/mapPools";
+import { MapPoolEditor } from "./maps/MapPoolEditor";
+import { MapImportSheet } from "./maps/MapImportSheet";
 import { toast } from "sonner";
 
 const ICON_BUTTON = "p-1.5 text-white/50 hover:text-[#29B6E8] disabled:opacity-25 disabled:hover:text-white/50 focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8] rounded-sm";
@@ -123,6 +125,7 @@ export default function AdminGameMapsPage() {
   const [missing, setMissing] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [importing, setImporting] = useState(false);
   const confirm = useConfirm();
 
   const load = useCallback(async () => {
@@ -172,6 +175,21 @@ export default function AdminGameMapsPage() {
     if (!await confirm({ title: `„${item.name}“ löschen?`, description: "Die Map stand noch in keinem Pool und wird dauerhaft entfernt.", confirmLabel: "Löschen" })) return;
     act(() => api.delete(`/games/${gameId}/maps/${item.id}`), "Map gelöscht.");
   };
+  // Standard-Pool (#2129, SP3): lädt „Vorgabe des Spiels“ in Turnier, Phase, Season und Saison.
+  const saveDefault = async (body) => {
+    try {
+      await api.put(`/games/${gameId}/default-pool`, body);
+      toast.success("Standard-Pool gespeichert.");
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail));
+    }
+    await load();
+  };
+  const clearDefault = async () => {
+    if (!await confirm({ title: "Standard-Pool entfernen?", description: "„Vorgabe des Spiels“ lädt dann wieder alle aktiven Maps. Gespeicherte Pools ändern sich nicht.", confirmLabel: "Entfernen" })) return false;
+    await act(() => api.delete(`/games/${gameId}/default-pool`), "Standard-Pool entfernt.");
+    return true;
+  };
 
   return (
     <AdminLayout>
@@ -196,6 +214,10 @@ export default function AdminGameMapsPage() {
                   Archivierte zeigen ({archivedCount})
                 </label>
               ) : null}
+              <button type="button" onClick={() => setImporting(true)} disabled={maps.length >= (data.limit || 200)} data-testid="game-maps-import"
+                className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 disabled:opacity-50">
+                <Copy className="w-3.5 h-3.5" /> Aus Spiel übernehmen
+              </button>
               <button type="button" onClick={() => setEditing({})} disabled={maps.length >= (data.limit || 200)} data-testid="game-maps-add"
                 className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 disabled:opacity-50">
                 <Plus className="w-3.5 h-3.5" /> Map hinzufügen
@@ -256,6 +278,20 @@ export default function AdminGameMapsPage() {
               })}
             </ul>
           )}
+          {maps.some((item) => item.status !== "archived") ? (
+            <details className="mt-6 group" data-testid="game-default-pool-box">
+              <summary className="cursor-pointer select-none text-xs font-bold uppercase tracking-widest text-white/70 hover:text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8] rounded-sm">
+                Standard-Pool {data.default_pool ? `· Version ${data.default_pool.version}` : "· noch keiner"}
+              </summary>
+              <div className="mt-3">
+                <MapPoolEditor key={data.default_pool?.id || "neu"} title="Standard-Pool des Spiels"
+                  hint="Den lädt „Vorgabe des Spiels“ in Turnier, Phase, Season und Saison. Ohne Standard-Pool sind das alle aktiven Maps. Gespeicherte Pools ändert er nicht."
+                  game={data.game} library={maps.filter((item) => item.status !== "archived")} entry={data.default_pool} defaultsLabel="Alle aktiven Maps"
+                  onSave={saveDefault} onClear={clearDefault} testId="game-default-pool" />
+              </div>
+            </details>
+          ) : null}
+          {importing ? <MapImportSheet game={data.game} onClose={() => setImporting(false)} onDone={() => { setImporting(false); load(); }} /> : null}
           {editing ? <MapSheet game={data.game} item={editing.id ? editing : null} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} /> : null}
         </>
       ) : null}
