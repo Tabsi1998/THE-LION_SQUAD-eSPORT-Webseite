@@ -80,7 +80,12 @@ Ausblenden des Menüpunkts stellt die Redaktion unter **Admin → Content → Na
 1. **Admin → eSports → Spiele → Spiel bearbeiten**, Abschnitt **Für Turniere → Modi und Dauer**: je Modus eine Zeile,
    etwa **Stellung**, **Suchen & Zerstören**, **Kontrolle**. Minuten braucht ein Modus nur für Maps nicht.
 2. **Admin → eSports → Spiele → Maps** → **Map hinzufügen**: Name, **Bild** im Format 16 : 9 (nur eigene Uploads),
-   und die **Modi**, in denen die Map gespielt wird. Details: [Turniere, 3.14](turniere.md#314-maps-und-map-pools).
+   und die **Modi**, in denen die Map gespielt wird. Mit **Aus Spiel übernehmen** kommen Maps einer anderen Spielversion
+   samt Bild dazu; gibt es schon Maps ohne Modus, ordnet **Allen … Maps zuordnen** sie gesammelt zu. Details:
+   [Turniere, 3.14](turniere.md#314-maps-und-map-pools).
+
+Modi und Maps dürfen sich auch während einer laufenden Season ändern: Gemeldet wird immer aus dem gespeicherten Pool der
+Staffel. Wer einen Modus entfernt, bekommt vorher die Zahl der betroffenen Maps genannt; Pool und Ergebnisse bleiben.
 
 ### 2.2 Liga und Season anlegen
 
@@ -110,8 +115,9 @@ Ausblenden des Menüpunkts stellt die Redaktion unter **Admin → Content → Na
 Unter dem Kalender steht nach dem Speichern, welche Wochen gesperrt sind und **wie viele Teams eine Staffel höchstens
 fassen kann** (Season 1: 8 Spielwochen – höchstens 8 Teams mit nur Hinrunde).
 
-4. **Map-Pool der Season**: je Modus die Maps anhaken und sortieren, **Speichern**. Ohne Pool kann niemand mit Maps
-   melden. Jede neue Staffel bekommt eine Kopie.
+4. **Map-Pool der Season**: je Modus die Maps anhaken und sortieren, **Speichern** (**Vorgabe des Spiels** lädt den
+   Standard-Pool des Spiels, ohne ihn alle aktiven Maps). Ohne Pool kann niemand mit Maps melden. Jede neue Staffel bekommt
+   eine Kopie.
 
 ### 2.3 Liga 1 und Staffel anlegen
 
