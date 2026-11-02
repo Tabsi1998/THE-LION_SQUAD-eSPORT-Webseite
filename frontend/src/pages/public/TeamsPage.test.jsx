@@ -141,6 +141,90 @@ test("Team verlassen fragt nach; abgelehnt passiert nichts", async () => {
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/teams/t-1/leave"));
 });
 
+// Freigabe „Turnierleitung“ (#2202): nur die Pflege - die Seite zeigt nichts, was der Server dann ablehnt.
+test("Nur Pflege (can_edit_team): „Bearbeiten“ und Co-Teams, aber kein Einladen, keine Mitgliederverwaltung, kein Chat", async () => {
+  authState.user = { id: "u-grant", username: "freigabe" };
+  serve({ ...TEAM, is_member: false, member_ids: ["u-cap"], can_manage: false, can_edit_team: true, join_code: undefined }, { "/teams/t-1/squads": [] });
+  renderAt("/teams/t-1");
+
+  expect(await screen.findByTestId("team-edit-open")).toBeInTheDocument();
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/teams/t-1/squads"));
+  expect(screen.queryByTestId("team-invite-open")).toBeNull();
+  expect(screen.queryByTestId("team-manage-members")).toBeNull();
+  expect(screen.queryByTestId("team-chat")).toBeNull();
+  expect(apiMock.get).not.toHaveBeenCalledWith("/teams/t-1/chat");
+  expect(apiMock.get).not.toHaveBeenCalledWith("/teams/t-1/invite-link");
+});
+
+test("Nur Pflege (can_edit_team): die Maske zeigt kein Banner und schickt keins mit", async () => {
+  authState.user = { id: "u-grant", username: "freigabe" };
+  serve({ ...TEAM, banner_url: "/uploads/alt.webp", is_member: false, member_ids: ["u-cap"], can_manage: false, can_edit_team: true, join_code: undefined }, { "/teams/t-1/squads": [] });
+  apiMock.patch.mockReset();
+  apiMock.patch.mockResolvedValue({ data: {} });
+  renderAt("/teams/t-1");
+
+  fireEvent.click(await screen.findByTestId("team-edit-open"));
+  expect(screen.queryByText("Banner")).toBeNull();
+  fireEvent.click(screen.getByTestId("team-save"));
+
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalled());
+  expect(apiMock.patch.mock.calls[0][1]).not.toHaveProperty("banner_url");
+});
+
+test("Volle Verwaltung (can_manage): die Maske zeigt das Banner und schickt es mit", async () => {
+  serve({ ...TEAM, banner_url: "/uploads/alt.webp" }, { "/teams/t-1/squads": [] });
+  apiMock.patch.mockReset();
+  apiMock.patch.mockResolvedValue({ data: {} });
+  renderAt("/teams/t-1");
+
+  fireEvent.click(await screen.findByTestId("team-edit-open"));
+  expect(screen.getByText("Banner")).toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("team-save"));
+
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalled());
+  expect(apiMock.patch.mock.calls[0][1].banner_url).toBe("/uploads/alt.webp");
+});
+
+// Kader unter Mindestgröße (#2202): der Abgang bleibt möglich, die Rückfrage sagt vorher, was er bewirkt.
+const LEAGUE_SQUADS = [{ id: "s-1", name: "Rocket A", member_ids: ["u-3", "u-co"], league_requirement: { min_size: 2, title: "Staffel A" } }];
+
+test("Team verlassen: die Rückfrage warnt, wenn ein Liga-Kader dadurch zu klein wird", async () => {
+  authState.user = { id: "u-3", username: "lunabyte" };
+  serve({ ...TEAM, can_manage: false }, { "/teams/t-1/squads": LEAGUE_SQUADS });
+  apiMock.post.mockResolvedValue({ data: { ok: true } });
+  confirmMock.mockResolvedValueOnce(true);
+  renderAt("/teams/t-1");
+
+  fireEvent.click(await screen.findByTestId("team-leave"));
+
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/teams/t-1/leave"));
+  expect(confirmMock.mock.calls[0][0].description).toContain("„Rocket A“ unter den Mindestkader (Staffel A): noch 1 von mindestens 2 Spielern");
+});
+
+test("Mitglied entfernen: die Rückfrage warnt ebenso", async () => {
+  serve({ ...TEAM, can_remove_members: true }, { "/teams/t-1/squads": LEAGUE_SQUADS });
+  apiMock.delete.mockResolvedValue({ data: { ok: true } });
+  confirmMock.mockResolvedValueOnce(true);
+  renderAt("/teams/t-1");
+
+  fireEvent.click(await screen.findByTestId("team-kick-u-3"));
+
+  await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith("/teams/t-1/members/u-3"));
+  expect(confirmMock.mock.calls[0][0].description).toContain("noch 1 von mindestens 2 Spielern");
+});
+
+test("Lädt die Co-Team-Liste nicht, kommt die Rückfrage trotzdem - ohne Warnung", async () => {
+  authState.user = { id: "u-3", username: "lunabyte" };
+  serve({ ...TEAM, can_manage: false }, { "/teams/t-1/squads": new Error("kaputt") });
+  confirmMock.mockResolvedValueOnce(false);
+  renderAt("/teams/t-1");
+
+  fireEvent.click(await screen.findByTestId("team-leave"));
+
+  await waitFor(() => expect(confirmMock).toHaveBeenCalled());
+  expect(confirmMock.mock.calls[0][0].description).not.toContain("Mindestkader");
+});
+
 // Verwaistes Team (#2128, TM6): Club-Admins sehen Rollen und Übergabe, wie es der Server erlaubt.
 test("Club-Admin: Rollen und Übergabe auch ohne eigene Teamleitung; Turnierleitung ohne das Recht nicht", async () => {
   authState.user = { id: "u-adm", username: "vorstand" };

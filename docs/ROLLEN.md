@@ -32,7 +32,8 @@ Turnierleitung, Redaktion, Vereinsverwaltung, Finanzen. System bleibt an Club-Ad
 Jede Freigabe steht im Audit-Log, die Person bekommt eine Meldung (#2125). Eine Freigabe zählt überall genauso wie die Rolle (#1350): Wer die
 Turnierleitung über eine Freigabe hat, arbeitet in jedem Turnier, jeder Fast Lap, an den Stationen und bei
 den Events wie mit der Rolle (Status, Turnierbaum, Anmeldungen, Check-in, Ergebnisse). Der Server prüft dafür
-den Bereich (`services/permissions.is_tournament_lead`), nicht eine Rollenliste.
+den Bereich (`services/permissions.is_tournament_lead`), nicht eine Rollenliste. Bei Teams zählt sie nur für die Pflege
+(siehe die Team-Seite unten, #2202).
 
 **Vorstand:** Wer einen aktiven Vorstandsposten hält oder vertritt (Admin → Vorstand), hat die
 Vereinsverwaltung von selbst. Die Besetzung der Posten ist damit eine Rechtevergabe – deshalb (#1355): besetzt
@@ -224,7 +225,8 @@ Sitzung gilt dort keine Zwei-Faktor-Ausnahme der Turnierleitung. Gesperrte oder 
 beim Löschen des Kontos fällt der Link weg. Code: `services/personal_calendar.py`.
 
 Die Team-Seite in Web und App folgt dem Server: Team bearbeiten und Co-Teams dürfen Leitung, Co-Leitung, Turnierleitung,
-Club-Admin und Superadmin; Mitglieder entfernen Leitung, Co-Leitung, Club-Admin und Superadmin; auflösen, Rollen
+Club-Admin und Superadmin; die Freigabe Turnierleitung zählt dabei nur für diese Pflege samt Team-Logo und nur bei öffentlichen
+Teams (`can_edit_team`, #2202) – Team-Banner, Team-Chat, private Teams, Beitrittscode und Einladungen bleiben bei der Rolle. Mitglieder entfernen Leitung, Co-Leitung, Club-Admin und Superadmin; auflösen, Rollen
 ändern, die Leitung übergeben und öffentlich/privat schalten Leitung, Club-Admin und Superadmin; ein aufgelöstes Team
 wiederherstellen Club-Admin und Superadmin, die frühere Leitung nur nach eigenem Auflösen (#2128). Die Teamliste im Admin sehen die Bereiche
 Turnierleitung und Vereinsverwaltung; alle Beitrittscodes erneuern Club-Admin und Superadmin. Moderatoren sehen auf fremden Team-Seiten keine Verwaltungs-Knöpfe. Die Admin-Rollen zählen
@@ -335,7 +337,11 @@ höchstens einen **Captain** und einen **Vertreter**; beide stehen im Kader des 
 | Matchchat schreiben, Spiel-Hinweise (Aufruf, Erinnerung, Ergebnis) | ja | ja | ja | ja | ja |
 
 - **Rückfall:** Hat ein Co-Team weder Captain noch Vertreter, handeln Leitung und Co-Leitung des Hauptteams – niemand
-  sperrt sich aus. Sobald eine Rolle vergeben ist, gilt sie ohne neue Anmeldung.
+  sperrt sich aus. Sobald eine Rolle vergeben ist, gilt sie ohne neue Anmeldung. Ein gesperrtes Konto zählt nicht als
+  Captain oder Vertreter und ist nicht aufstellbar (#2202).
+- **Zu kleiner Kader (#2202):** Fällt ein Kader unter den Mindestkader einer laufenden Staffel, erfahren es Captain,
+  Vertreter, Leitung und Co-Leitung des Hauptteams und die Turnierleitung; die ersten vier sehen die Aufgabe „Kader
+  auffüllen“. Auffüllen dürfen wie immer die Hauptteam-Leitung und die Turnierleitung.
 - **Kader:** Wer Captain oder Vertreter ist, verlässt Kader und Team erst, wenn die Rolle neu vergeben oder selbst
   abgegeben ist (Neuvergabe geht auch in derselben Änderung; beim Abgeben bekommen Leitung und Co-Leitung eine
   Nachricht). Wer das Hauptteam verlässt oder entfernt wird, verlässt auch jeden Kader seiner Co-Teams; Kader,

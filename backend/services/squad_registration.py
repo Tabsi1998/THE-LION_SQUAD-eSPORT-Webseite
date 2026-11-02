@@ -19,6 +19,7 @@ from pymongo.errors import DuplicateKeyError
 from models import new_id, now_utc
 from services import league_roster
 from services.discord_roles import load_games, top_game
+from services.league_roster import min_squad_size
 
 ACTIVE_REGISTRATION_STATUSES = ("pending", "approved", "checked_in", "waitlist")
 # Plätze einer Staffel belegen wie beim Nachrücken (#1551) nur diese - die Warteliste zählt nicht mit.
@@ -103,14 +104,6 @@ def _positive_int(value) -> int | None:
     except (TypeError, ValueError):
         return None
     return number if number >= 1 else None
-
-
-def min_squad_size(tournament: dict) -> int:
-    """Mindestkader: das Feld ``min_squad_size`` der Staffel (der Liga-Rahmen kopiert es aus Season bzw. Liga N), sonst
-    die Teamgröße des Turniers - nie kleiner als sie. Der Turnierkern liest nur das Turnier, nie die Season."""
-    team_size = _positive_int(tournament.get("team_size")) or 1
-    value = _positive_int(tournament.get("min_squad_size"))
-    return max(value or team_size, team_size)
 
 
 def _team_member_ids(team: dict, memberships: list[dict] | None = None) -> set[str]:

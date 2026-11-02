@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 
@@ -545,7 +545,7 @@ test("Ersatzfarbe und Schwelle: Beispiele folgen der Schwelle, Speichern schickt
   await user.type(ink, "#0A2540");
   await user.type(screen.getByTestId("shop-motif-settings-save-reason"), "Vereins-Dunkelblau");
   await user.click(screen.getByTestId("shop-motif-settings-save-submit"));
-  expect(apiMock.put).toHaveBeenCalledWith("/admin/shop/designs/motif-settings", { light_ink: "#0a2540", threshold: 0.5, reason: "Vereins-Dunkelblau" });
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/admin/shop/designs/motif-settings", { light_ink: "#0a2540", threshold: 0.5, reason: "Vereins-Dunkelblau" }));
 });
 
 test("die Schwellen der Paar-Prüfung stehen in Prozent und gehen als Anteil an den Server - nur geänderte", async () => {
@@ -564,7 +564,7 @@ test("die Schwellen der Paar-Prüfung stehen in Prozent und gehen als Anteil an 
   await user.clear(overlap);
   await user.type(overlap, "85,5");
   await user.click(screen.getByTestId("shop-motif-settings-save-submit"));
-  expect(apiMock.put).toHaveBeenCalledWith("/admin/shop/designs/motif-settings", { light_ink: "#111111", threshold: 0.18, pair_min_overlap: 0.855, reason: "" });
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/admin/shop/designs/motif-settings", { light_ink: "#111111", threshold: 0.18, pair_min_overlap: 0.855, reason: "" }));
 });
 
 test("Weiß als Ersatzfarbe geht nicht - der Knopf sagt warum", async () => {

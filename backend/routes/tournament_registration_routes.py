@@ -1399,7 +1399,7 @@ async def assign_squad(tid: str, body: SquadAssignBody, me: dict = Depends(requi
     # Liga-Kader (#2108): die Spiel-ID jedes Spielers für die Season festhalten; wem sie fehlt, bekommt einen Hinweis.
     squad = await db.team_squads.find_one({"id": reg["squad_id"]}, {"_id": 0, "id": 1, "member_ids": 1}) or {}
     ids = await league_roster.after_assign(db, tournament, reg, squad, me.get("id"))
-    missing = [row["name"] for row in ids.values() if not row["ok"]]
+    missing = [row["name"] for row in league_roster.waiting_for_id(ids.values())]
     return {"registration": reg, "auto_bracket_update": auto_bracket_update, "ids_missing": sorted(missing)}
 
 

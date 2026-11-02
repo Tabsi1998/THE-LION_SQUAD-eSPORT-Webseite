@@ -24,21 +24,27 @@ Die IDs sehen nur die Person selbst, die Beteiligten eines Spiels und die Turnie
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass, field
 
 from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
+from services.log_safe import log_safe
 
-FREE, LOCKED, PENDING, MISSING, LATE = "free", "locked", "pending", "missing", "late"
+logger = logging.getLogger("tls.league_roster")
+
+FREE, LOCKED, PENDING, MISSING, LATE, BANNED = "free", "locked", "pending", "missing", "late", "banned"
 CLOSED_SEASON_STATUSES = {"completed", "archived"}
 FINISHED_TOURNAMENT_STATUSES = {"completed", "results_published", "archived", "cancelled"}
 ACTIVE_REGISTRATION_STATUSES = ("pending", "approved", "checked_in", "waitlist")
 REASON_MIN_LENGTH = 5
 LATE_REASON = "Nach dem Stichtag ins Co-Team gekommen – die Liga-Leitung muss die Spiel-ID erst freigeben."
+# Kommt auch in Meldungen an die Person und an die eigene Seite - nie an die Gegenseite (``league_games._lobby_ids``).
+BANNED_REASON = "Das Konto ist gesperrt."
 DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-PEOPLE_FIELDS = {"_id": 0, "id": 1, "display_name": 1, "username": 1, "game_ids": 1}
+PEOPLE_FIELDS = {"_id": 0, "id": 1, "display_name": 1, "username": 1, "game_ids": 1, "is_banned": 1}
 
 
 class LeagueRosterError(Exception):
@@ -69,6 +75,27 @@ class RosterContext:
         from services.dolibarr_policy import club_today
 
         return bool(self.deadline) and club_today() > self.deadline
+
+
+def _positive_int(value) -> int | None:
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return None
+    return number if number >= 1 else None
+
+
+def is_active_squad(squad: dict | None) -> bool:
+    """Spielt das Co-Team? Ältere Co-Teams tragen kein ``status`` - sie zählen als aktiv, wie beim Zuteilen."""
+    return ((squad or {}).get("status") or "active") == "active"
+
+
+def min_squad_size(tournament: dict) -> int:
+    """Mindestkader: das Feld ``min_squad_size`` der Staffel (der Liga-Rahmen kopiert es aus Season bzw. Liga N), sonst
+    die Teamgröße des Turniers - nie kleiner als sie. Der Turnierkern liest nur das Turnier, nie die Season."""
+    team_size = _positive_int(tournament.get("team_size")) or 1
+    value = _positive_int(tournament.get("min_squad_size"))
+    return max(value or team_size, team_size)
 
 
 # ---------------------------------------------------------------- Laden
@@ -160,9 +187,18 @@ def status(ctx: RosterContext | None, user_id: str, squad_id: str | None = None)
 
     ``state``: ``free`` (Spiel ohne Pflicht-ID), ``locked`` (ID festgehalten), ``pending`` (ID im Profil, wird beim
     ersten Aufstellen festgehalten), ``missing`` (ID fehlt im Profil), ``late`` (nach dem Stichtag in dieses Co-Team
-    gekommen, wartet auf Freigabe; ohne ``squad_id``: in irgendeines). ``ok``: aufstellbar. ``text``: die ID, die in
-    der Liga gilt bzw. gelten wird - auch bei ``late`` bleibt die festgehaltene dieselbe. ``changed``: das Profil nennt
-    inzwischen eine andere ID als die festgehaltene."""
+    gekommen, wartet auf Freigabe; ohne ``squad_id``: in irgendeines), ``banned`` (Konto gesperrt - geht jedem anderen
+    Stand vor, auch in Spielen ohne Pflicht-ID; die Spiel-ID bleibt, was sie ist). ``ok``: aufstellbar. ``text``: die
+    ID, die in der Liga gilt bzw. gelten wird - auch bei ``late`` bleibt die festgehaltene dieselbe. ``changed``: das
+    Profil nennt inzwischen eine andere ID als die festgehaltene."""
+    row = _id_status(ctx, user_id, squad_id)
+    if ctx and (ctx.people.get(user_id) or {}).get("is_banned") is True:
+        return {**row, "state": BANNED, "ok": False, "reason": BANNED_REASON}
+    return row
+
+
+def _id_status(ctx: RosterContext | None, user_id: str, squad_id: str | None = None) -> dict:
+    """Nur der Stand der Spiel-ID, ohne die Kontosperre - für Festhalten und Freigabe, die an der ID hängen."""
     person = (ctx.people.get(user_id) if ctx else None) or {}
     base = {"id": user_id, "name": person_name(person), "state": FREE, "ok": True, "text": None,
             "profile_text": None, "changed": False, "reason": None, "locked_at": None}
@@ -191,6 +227,12 @@ def status(ctx: RosterContext | None, user_id: str, squad_id: str | None = None)
 
 def statuses(ctx: RosterContext | None, user_ids, squad_id: str | None = None) -> dict[str, dict]:
     return {user_id: status(ctx, user_id, squad_id) for user_id in user_ids or [] if user_id}
+
+
+def waiting_for_id(rows) -> list[dict]:
+    """Wer etwas an der Spiel-ID tun oder abwarten muss. Gesperrte zählen nicht: Eine Nachricht hilft ihnen nicht weiter,
+    und „ID fehlt“ wäre falsch."""
+    return [row for row in rows if not row["ok"] and row["state"] != BANNED]
 
 
 # ---------------------------------------------------------------- Festhalten
@@ -272,9 +314,12 @@ async def record_members(db, ctx: RosterContext | None, user_ids, *, via: str, a
                 doc.update(_lock_fields(ctx, values, via=via, actor_id=actor_id, now=now))
             try:
                 await db.league_rosters.insert_one(doc)
+                continue
             except DuplicateKeyError:
-                pass
-            continue
+                # Eine gleichzeitige Aufnahme war schneller (#2202): Ihr Eintrag gilt, dieses Co-Team kommt per $addToSet dazu.
+                entry = await db.league_rosters.find_one({"season_id": ctx.season_id, "user_id": user_id}, {"_id": 0})
+                if not entry:
+                    continue
         known = set(entry.get("squad_ids") or [])
         waiting = set(entry.get("late_squad_ids") or [])
         change: dict = {}
@@ -309,7 +354,7 @@ async def lock_lineup(db, ctx: RosterContext | None, user_ids, actor_id: str | N
     from routes.tournament_common import _profile_player_ids
 
     for user_id in sorted({uid for uid in user_ids or [] if uid}):
-        if status(ctx, user_id)["state"] != PENDING:
+        if _id_status(ctx, user_id)["state"] != PENDING:
             continue
         values = picked(ctx.fields, _profile_player_ids(ctx.people.get(user_id), ctx.game))
         if await _lock(db, ctx, user_id, values, via="lineup", actor_id=actor_id):
@@ -323,31 +368,45 @@ async def after_assign(db, tournament: dict, registration: dict, squad: dict, ac
     members = [uid for uid in squad.get("member_ids") or [] if uid]
     ctx = await context_for_tournament(db, tournament, members)
     found = await record_members(db, ctx, members, via="assign", actor_id=actor_id, squad_id=squad.get("id"))
-    missing = [row for row in found.values() if not row["ok"]]
+    missing = waiting_for_id(found.values())
     if missing and ctx:
         await _tell_missing(db, ctx, tournament, registration, missing)
     return found
 
 
+async def _tell_player_id_missing(ctx: RosterContext, tournament: dict, user_id: str) -> None:
+    from services.user_notifications import create_user_notification
+
+    await create_user_notification(
+        user_id,
+        "Spiel-ID für die Liga fehlt",
+        f"{tournament.get('title') or 'Liga'}: Trag deine {labels(ctx.fields)} im Profil ein – ohne sie kannst du in der "
+        "Liga nicht aufgestellt werden.",
+        url="/profile?tab=gaming",
+        kind="tournament_registration",
+        meta={"tournament_id": tournament.get("id"), "reason": "league_id_missing",
+              "dedupe_key": f"league-id-missing:{ctx.season_id}:{user_id}"},
+    )
+
+
+async def _reachable_responsibles(db, registration: dict) -> list[str]:
+    """Die Verantwortlichen eines Co-Teams ohne gesperrte Konten - sortiert, damit Nachrichten stets gleich ausgehen."""
+    from services.match_audience import responsible_user_ids, users_for
+
+    people = await users_for(db, await responsible_user_ids(db, [registration]), {"_id": 0, "id": 1})
+    return sorted(row["id"] for row in people)
+
+
 async def _tell_missing(db, ctx: RosterContext, tournament: dict, registration: dict, missing: list[dict]) -> None:
-    from services.match_audience import responsible_user_ids
     from services.user_notifications import create_user_notification
 
     title = tournament.get("title") or "Liga"
     what = labels(ctx.fields)
     for row in missing:
-        await create_user_notification(
-            row["id"],
-            "Spiel-ID für die Liga fehlt",
-            f"{title}: Trag deine {what} im Profil ein – ohne sie kannst du in der Liga nicht aufgestellt werden.",
-            url="/profile?tab=gaming",
-            kind="tournament_registration",
-            meta={"tournament_id": tournament.get("id"), "reason": "league_id_missing",
-                  "dedupe_key": f"league-id-missing:{ctx.season_id}:{row['id']}"},
-        )
+        await _tell_player_id_missing(ctx, tournament, row["id"])
     names = ", ".join(row["name"] for row in missing)
     verb = "fehlt" if len(missing) == 1 else "fehlen"
-    for user_id in await responsible_user_ids(db, [registration]):
+    for user_id in await _reachable_responsibles(db, registration):
         await create_user_notification(
             user_id,
             "Spiel-IDs im Co-Team fehlen",
@@ -360,18 +419,61 @@ async def _tell_missing(db, ctx: RosterContext, tournament: dict, registration: 
         )
 
 
+async def _tell_added(db, ctx: RosterContext, tournament: dict, registration: dict, rows: list[dict],
+                      squad_id: str) -> None:
+    """Hinweis bei späterer Aufnahme (#2202): an die Person und an die Verantwortlichen, je Person einmal - auch wenn sie
+    geht und wiederkommt. Der Schlüssel nennt die Person: Beim Zuteilen fasst eine Nachricht alle zusammen, hier kommt
+    jemand später dazu, und das soll trotz dieser ersten Nachricht ankommen."""
+    from services.user_notifications import create_user_notification
+
+    name = registration.get("display_name") or tournament.get("title") or "Liga"
+    what = labels(ctx.fields)
+    for row in rows:
+        if row["state"] == MISSING:
+            await _tell_player_id_missing(ctx, tournament, row["id"])
+        else:
+            await create_user_notification(
+                row["id"],
+                "Freigabe für die Liga nötig",
+                f"{tournament.get('title') or 'Liga'}: Du bist nach dem Stichtag ins Co-Team gekommen – die Liga-Leitung muss "
+                f"deine {what} erst freigeben. Bis dahin kannst du dort nicht aufgestellt werden.",
+                url=f"/tournaments/{tournament.get('slug') or tournament.get('id')}",
+                kind="tournament_registration",
+                meta={"tournament_id": tournament.get("id"), "reason": "league_late",
+                      "dedupe_key": f"league-late:{ctx.season_id}:{squad_id}:{row['id']}"},
+            )
+    for user_id in await _reachable_responsibles(db, registration):
+        for row in rows:
+            missing = row["state"] == MISSING
+            await create_user_notification(
+                user_id,
+                "Spiel-ID im Co-Team fehlt" if missing else "Neuer Spieler wartet auf Freigabe",
+                f"{name}: {row['name']} fehlt die {what} – aufgestellt werden kann erst, wer sie im Profil eingetragen hat."
+                if missing else
+                f"{name}: {row['name']} kam nach dem Stichtag ins Co-Team und wartet auf die Freigabe der Liga-Leitung – bis "
+                "dahin nicht aufstellbar.",
+                url=f"/tournaments/{tournament.get('slug') or tournament.get('id')}",
+                kind="tournament_registration",
+                meta={"tournament_id": tournament.get("id"),
+                      "reason": "league_id_missing_team" if missing else "league_late_team",
+                      "dedupe_key": f"league-added-{row['state']}:{registration.get('id')}:{row['id']}:{user_id}"},
+            )
+
+
 async def on_squad_members_added(db, squad: dict, user_ids, actor_id: str | None) -> None:
     """Neue Mitglieder eines Co-Teams, das in einer laufenden Staffel spielt: in den Kader der Season. Nach dem
     Stichtag wartet, wer neu in **dieses** Co-Team kommt, auf Freigabe - auch mit schon festgehaltener ID aus einem
-    anderen Co-Team (sie bleibt dieselbe); der Wiedereintritt ins selbe Co-Team ist nicht „spät“."""
+    anderen Co-Team (sie bleibt dieselbe); der Wiedereintritt ins selbe Co-Team ist nicht „spät“. Wer nicht aufstellbar
+    ist, und die Verantwortlichen bekommen einen Hinweis (#2202)."""
     added = [uid for uid in user_ids or [] if uid]
     if not added or not squad.get("id"):
         return
     regs = await db.tournament_registrations.find(
         {"squad_id": squad["id"], "status": {"$in": list(ACTIVE_REGISTRATION_STATUSES)}},
-        {"_id": 0, "tournament_id": 1},
+        {"_id": 0, "id": 1, "tournament_id": 1, "team_id": 1, "squad_id": 1, "user_id": 1, "display_name": 1},
     ).to_list(50)
-    tournament_ids = sorted({reg["tournament_id"] for reg in regs if reg.get("tournament_id")})
+    registration_of = {reg["tournament_id"]: reg for reg in regs if reg.get("tournament_id")}
+    tournament_ids = sorted(registration_of)
     if not tournament_ids:
         return
     seen: set[str] = set()
@@ -385,8 +487,15 @@ async def on_squad_members_added(db, squad: dict, user_ids, actor_id: str | None
         ctx = await context_for_tournament(db, tournament, added)
         if not ctx or (ctx.season or {}).get("status") in CLOSED_SEASON_STATUSES:
             continue
-        await record_members(db, ctx, added, via="squad_join", actor_id=actor_id, squad_id=squad["id"],
-                             late=ctx.deadline_passed())
+        found = await record_members(db, ctx, added, via="squad_join", actor_id=actor_id, squad_id=squad["id"],
+                                     late=ctx.deadline_passed())
+        waiting = waiting_for_id(found.values())
+        if not waiting or not is_active_squad(squad):
+            continue
+        try:
+            await _tell_added(db, ctx, tournament, registration_of[tournament["id"]], waiting, squad["id"])
+        except Exception:  # noqa: BLE001 - der Kader ist schon gespeichert; eine Nachricht hält das nicht auf
+            logger.warning("[liga] Hinweis zur Kaderaufnahme nicht verschickt: %s", log_safe(squad["id"]), exc_info=True)
 
 
 async def backfill(db) -> int:
@@ -434,7 +543,7 @@ async def approve(db, season: dict, user_id: str, reason: str | None, actor: dic
         raise LeagueRosterError("Für das Spiel dieser Liga gibt es keine Pflicht-ID.", 409)
     from routes.tournament_common import _profile_player_ids
 
-    before = status(ctx, user_id)
+    before = _id_status(ctx, user_id)
     values = picked(ctx.fields, _profile_player_ids(ctx.people.get(user_id), ctx.game))
     if not complete(values):
         raise LeagueRosterError(f"Im Profil fehlt noch: {labels(ctx.fields)} – erst eintragen, dann freigeben.")
@@ -482,7 +591,7 @@ async def set_deadline(db, season: dict, value: str | None, actor: dict) -> dict
 async def _season_registrations(db, season_id: str) -> tuple[list[dict], list[dict]]:
     tournaments = await db.tournaments.find(
         {"league_context.season_id": season_id},
-        {"_id": 0, "id": 1, "title": 1, "slug": 1, "status": 1, "league_context": 1},
+        {"_id": 0, "id": 1, "title": 1, "slug": 1, "status": 1, "league_context": 1, "team_size": 1, "min_squad_size": 1},
     ).to_list(200)
     ids = [row["id"] for row in tournaments if row.get("id")]
     regs = await db.tournament_registrations.find(
@@ -520,7 +629,7 @@ async def season_overview(db, season: dict) -> dict:
     squads = {
         row["id"]: row
         for row in await db.team_squads.find(
-            {"id": {"$in": sorted({reg["squad_id"] for reg in regs})}}, {"_id": 0, "id": 1, "member_ids": 1, "name": 1}
+            {"id": {"$in": sorted({reg["squad_id"] for reg in regs})}}, {"_id": 0, "id": 1, "member_ids": 1, "name": 1, "status": 1}
         ).to_list(500)
     } if regs else {}
     members = {uid for squad in squads.values() for uid in squad.get("member_ids") or [] if uid}
@@ -553,16 +662,21 @@ async def season_overview(db, season: dict) -> dict:
             for uid in squad.get("member_ids") or [] if uid
         ]
         players.sort(key=lambda row: row["name"].lower())
+        minimum = min_squad_size(tournament)
         rows.append({
             "registration_id": reg.get("id"),
             "tournament_id": reg.get("tournament_id"),
             "staffel_label": label or tournament.get("title"),
             "display_name": reg.get("display_name"),
             "players": players,
+            # Kader unter Mindestgröße (#2202): gilt nur für aktive Co-Teams, solange die Staffel läuft.
+            "member_count": len(players),
+            "min_squad_size": minimum,
+            "short": len(players) < minimum and is_active_squad(squad) and tournament.get("status") not in FINISHED_TOURNAMENT_STATUSES,
             "_sort": (level or 0, context.get("staffel") or "", str(reg.get("display_name") or "").lower()),
         })
     rows.sort(key=lambda row: row.pop("_sort"))
-    counts = {state: 0 for state in (MISSING, LATE)}
+    counts = {state: 0 for state in (MISSING, LATE, BANNED)}
     changed = 0
     for row in rows:
         for player in row["players"]:
@@ -575,7 +689,7 @@ async def season_overview(db, season: dict) -> dict:
         "game": {"name": ((ctx.game if ctx else None) or {}).get("display_name")},
         "fields": [{"key": item["key"], "label": item.get("label") or item["key"]} for item in (ctx.fields if ctx else [])],
         "squads": rows,
-        "counts": {**counts, "changed": changed},
+        "counts": {**counts, "changed": changed, "short": sum(1 for row in rows if row["short"])},
     }
 
 
