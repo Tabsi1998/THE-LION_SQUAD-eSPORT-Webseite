@@ -415,11 +415,112 @@ async def test_duty_lists_the_own_leagues(flow):
 
 
 @pytest.mark.asyncio
+async def test_league_area_uses_the_staff_stream(flow):
+    from services.change_events import visibility_scope_for_user
+
+    confirmed = {"id": "a", "role": "player", "areas": ["leagues"], "mfa_enabled": True, "auth_mfa_verified": True}
+    assert visibility_scope_for_user(confirmed) == "staff"
+    assert visibility_scope_for_user({**confirmed, "auth_mfa_verified": False}) == "public"
+
+
+@pytest.mark.asyncio
 async def test_tournament_lead_duty_has_no_staffel(flow):
     w = await world(flow)
     flow.act_as(await flow.add_user(role="tournament_admin", name="Turnierleitung"))
     duty = (await flow.get("/api/users/me/duty")).json()
     assert w["tournament"]["id"] not in [row.get("id") for row in duty["lead_today"]]
+
+
+# ---------------------------------------------------------------- Seitentüren am Bereich Turnierleitung
+
+async def both_rights(flow) -> dict:
+    person = await flow.add_user(role="tournament_admin", name="Beides")
+    person["areas"] = ["leagues"]
+    return person
+
+
+@pytest.mark.asyncio
+async def test_access_links_at_a_staffel_need_league_rights_too(flow):
+    w = await world(flow)
+    tid = w["tournament"]["id"]
+    body = {"target_type": "tournament", "target_id": tid, "grants": ["view"]}
+    flow.act_as(await both_rights(flow))
+    made = await flow.post("/api/access-links", json=body)
+    assert made.status_code == 200, made.text
+
+    flow.act_as(await flow.add_user(role="tournament_admin", name="Nur Turniere"))
+    assert (await flow.post("/api/access-links", json=body)).status_code == 403
+    assert (await flow.get(f"/api/access-links?target_type=tournament&target_id={tid}")).status_code == 403
+    assert tid not in [row.get("target_id") for row in (await flow.get("/api/access-links")).json()]
+    revoked = await flow.delete(f"/api/access-links/{made.json()['id']}")
+    assert revoked.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_tv_keys_at_a_staffel_need_league_rights_too(flow):
+    w = await world(flow)
+    tid = w["tournament"]["id"]
+    flow.act_as(await flow.add_user(role="tournament_admin", name="Nur Turniere"))
+    assert (await flow.post("/api/tv/keys", json={"tournament_id": tid, "label": "Beamer"})).status_code == 403
+    assert (await flow.get(f"/api/tv/keys?tournament_id={tid}")).status_code == 403
+    flow.act_as(await both_rights(flow))
+    assert (await flow.post("/api/tv/keys", json={"tournament_id": tid, "label": "Beamer"})).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_stations_at_a_staffel_need_league_rights_too(flow):
+    w = await world(flow)
+    tid = w["tournament"]["id"]
+    body = {"name": "PC 1", "device_type": "pc", "tournament_id": tid}
+    flow.act_as(await flow.add_user(role="tournament_admin", name="Nur Turniere"))
+    assert (await flow.post("/api/stations", json=body)).status_code == 403
+    assert (await flow.post("/api/stations/bulk", json={"tournament_id": tid, "count": 2})).status_code == 403
+    flow.act_as(await both_rights(flow))
+    assert (await flow.post("/api/stations", json=body)).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_a_staffel_stays_out_of_the_event_program(flow):
+    w = await world(flow)
+    event = {"id": new_id(), "name": "Probe-Event", "slug": "probe-event", "status": "published", "start_date": "2027-01-01"}
+    await flow.db.events.insert_one(dict(event))
+    flow.act_as(await flow.add_user(role="tournament_admin", name="Nur Turniere"))
+    response = await flow.post(f"/api/events/{event['id']}/program", json={"kind": "tournament", "item_id": w["tournament"]["id"]})
+    assert response.status_code == 409
+    assert (await flow.db.tournaments.find_one({"id": w["tournament"]["id"]}, {"_id": 0})).get("event_id") is None
+
+
+@pytest.mark.asyncio
+async def test_operational_matches_follow_league_rights(flow):
+    from services.match_overview import operational_match_overviews
+
+    w = await world(flow)
+    match = w["match"]["id"]
+    lead = await flow.add_user(role="tournament_admin", name="Nur Turniere")
+    assert match not in [row["id"] for row in await operational_match_overviews(flow.db, lead)]
+    helper = await flow.add_user(name="Helfer")
+    await flow.db.tournament_staff_assignments.insert_one(
+        {"id": new_id(), "tournament_id": w["tournament"]["id"], "user_id": helper["id"], "role": "referee", "scope": "tournament"})
+    assert match not in [row["id"] for row in await operational_match_overviews(flow.db, helper)]
+    decider = await holder(flow, w, "results")
+    assert match in [row["id"] for row in await operational_match_overviews(flow.db, decider)]
+    assert match not in [row["id"] for row in await operational_match_overviews(flow.db, await holder(flow, w, "roster"))]
+
+
+@pytest.mark.asyncio
+async def test_the_list_hides_the_plans_of_a_staffel_from_the_tournament_lead(flow):
+    w = await world(flow)
+    tid = w["tournament"]["id"]
+    await flow.db.tournaments.update_one({"id": tid}, {"$set": {"participant_removal_plan": {"id": "plan"}}})
+    flow.act_as(await flow.add_user(role="tournament_admin", name="Nur Turniere"))
+    rows = (await flow.get("/api/tournaments?include_drafts=true&managed=true")).json()
+    assert "participant_removal_plan" not in next(row for row in rows if row["id"] == tid)
+    assert "participant_removal_plan" not in (await flow.get(f"/api/tournaments/{tid}")).json()
+    # Am Turnier selbst: wer ihn bestätigen darf - in der Staffel „Teams freigeben“ (Austritt) oder „Season konfigurieren“.
+    flow.act_as(await holder(flow, w, "applications"))
+    assert "participant_removal_plan" in (await flow.get(f"/api/tournaments/{tid}")).json()
+    flow.act_as(await holder(flow, w, "roster"))
+    assert "participant_removal_plan" not in (await flow.get(f"/api/tournaments/{tid}")).json()
 
 
 # ---------------------------------------------------------------- Vergabe der Zuständigen

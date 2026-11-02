@@ -283,7 +283,7 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
     await _enrich_tournaments(tournaments, user)
     for t in tournaments:
         _expose_offer(t, finance)
-        if not is_admin:
+        if not is_admin or (is_league_staffel(t) and not staffeln.covers(t)):
             # Der Umbau-Vorschlag für die Läufe (#1550) gehört der Turnierleitung; Helfer sehen ihn am Turnier selbst.
             t.pop("heat_rebuild_plan", None)
             t.pop("heat_rebuild_dismissed", None)
@@ -333,7 +333,7 @@ async def get_tournament(slug_or_id: str, include_draft: bool = False, access: s
         # Der Admin-Pfad der Season nur für die Verwaltung (Turnierleitung oder Strukturrechte).
         t["league_links"] = await staffel_guard.staffel_links(
             db, t, with_admin_path=is_admin or bool(t.get("can_manage_structure")))
-    if not t.get("can_manage_structure"):
+    if not t.get("can_manage_structure") and "applications" not in (t.get("league_capabilities") or []):
         # Der Umbau-Vorschlag für die Läufe (#1550) und der für Austritt/Disqualifikation (#1553) sieht nur, wer ihn
         # auch bestätigen darf (Strukturrollen).
         t.pop("heat_rebuild_plan", None)
