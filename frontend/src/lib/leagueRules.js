@@ -8,6 +8,14 @@ const SEARCH_MIN = 2;
 const HIT = "tls-rules-hit";
 const ACTIVE_HIT = "tls-rules-hit-active";
 
+// Bilder im Editor: Die Admin-Medien gehen über die Rolle (upload_routes), Zuständigkeiten öffnen sie nicht. Wer sie nicht hat, nimmt wie jedes
+// Konto die eigenen Bilder - sonst wäre das Hochladen auf dieser Seite für Zuständige immer ein 403.
+const ADMIN_MEDIA_ROLES = ["admin", "tournament_admin", "club_admin", "superadmin"];
+
+export function rulesMediaProps(user) {
+  return ADMIN_MEDIA_ROLES.includes(user?.role) ? {} : { mediaScope: "user", libraryEndpoint: "/media?type=images" };
+}
+
 export function rulesApiPath(league, season) {
   return season ? `/league-rules/seasons/${league}/${season}` : `/league-rules/leagues/${league}`;
 }

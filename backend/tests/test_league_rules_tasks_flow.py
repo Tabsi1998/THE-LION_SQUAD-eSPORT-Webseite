@@ -112,6 +112,16 @@ async def test_a_task_lists_only_what_is_open_and_visible(flow):
 
 
 @pytest.mark.asyncio
+async def test_visibility_of_a_season_for_admins_is_asked_per_league(flow):
+    """„Nur Liga-Leitung“ hängt seit #2203 an der Liga: Wer in Liga 0 zuständig ist, sieht deren Season, aber nicht die gleich sichtbare von Liga 1."""
+    captain, registrations = await world(flow, 2)
+    await flow.db.league_seasons.update_many({}, {"$set": {"visibility": "admins"}})
+    await flow.db.league_staff.insert_one({"id": "z", "league_id": "l0", "user_id": captain["id"], "capabilities": ["roster"]})
+    tasks = await own_consent_tasks(flow.db, captain, registrations)
+    assert [row["season_id"] for row in tasks] == ["s0"]
+
+
+@pytest.mark.asyncio
 async def test_someone_without_a_role_gets_no_task(flow):
     captain, registrations = await world(flow, 2)
     other = await flow.add_user(name="Mitglied")

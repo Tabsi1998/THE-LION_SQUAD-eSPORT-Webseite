@@ -265,6 +265,7 @@ test("Zuständigkeit „Regeln veröffentlichen“ (#2203): nur der Regeltext, u
   apiMock.get.mockResolvedValue({ data: { ...BODY, capabilities: ["rules"] } });
   renderPage();
   const rules = await screen.findByTestId("season-form-rules");
+  expect(screen.getByTestId("season-rules-link")).toHaveAttribute("href", "/admin/leagues/rules/league_season/s1");
   for (const id of ["season-form-name", "season-form-visibility", "season-pool", "season-sync", "division-add", "season-delete"]) {
     expect(screen.queryByTestId(id), id).toBeNull();
   }
@@ -278,6 +279,7 @@ test("Zuständigkeit „Kader prüfen“ (#2203): kein Formular, Liga N und Staf
   renderPage();
   expect(await screen.findByTestId("season-divisions")).toBeInTheDocument();
   expect(screen.queryByTestId("season-form")).toBeNull();
+  expect(screen.queryByTestId("season-rules-link")).toBeNull();
   for (const id of ["division-edit-1", "division-delete-1", "staffel-add-1", "staffel-delete-1-A", "season-delete"]) {
     expect(screen.queryByTestId(id), id).toBeNull();
   }

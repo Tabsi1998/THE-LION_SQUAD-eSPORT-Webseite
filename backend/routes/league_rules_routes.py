@@ -9,18 +9,22 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from auth import get_current_user, get_optional_user, require_area
+from auth import get_current_user, get_optional_user
 from database import get_db
 from models import new_id, now_utc
 from services import league_rules as rules
+from services.league_permissions import require_league
 from services.league_service import LeagueProblem
 from services.rate_limit import enforce_rate_limit
 
 router = APIRouter(prefix="/api/league-rules", tags=["league-rules"])
 admin_router = APIRouter(prefix="/api/admin/league-rules", tags=["league-rules-admin"])
 
-# Das Recht an einer Stelle. Bis der Bereich „Ligen“ da ist (#2203), gilt der Weg der Liga-Verwaltung.
-require_rules_editor = require_area("tournaments")
+# Zuständigkeit „Regeln veröffentlichen“ (#2203). Maßgeblich ist die Liga aus der Adresse, bei einer Season die Liga der gespeicherten Season - nie
+# eine Angabe aus dem Inhalt. Ein unbekannter Geltungsbereich hat keine Liga: Der Bereich bekommt von der Route 404, Zuständige 403.
+_RULES_RIGHT = {rules.LEAGUE: require_league("rules", param="scope_id"),
+                rules.SEASON: require_league("rules", via="season_id", param="scope_id")}
+_RULES_RIGHT_NO_SCOPE = require_league("rules", param="kein_geltungsbereich")
 
 BODY_MAX = 200_000
 ANNEXES_MAX = 26
@@ -28,6 +32,10 @@ NOINDEX = {"X-Robots-Tag": "noindex, nofollow"}
 # PDF und Vergleich je Besucher: reichlich fürs Lesen, nicht für einen Lauf durch alle Fassungen. Bursts fängt schon nginx ab.
 HEAVY_LIMIT = 60
 HEAVY_WINDOW_SECONDS = 60
+
+
+async def require_rules_editor(request: Request, user: dict = Depends(get_current_user)) -> dict:
+    return await _RULES_RIGHT.get(request.path_params.get("scope"), _RULES_RIGHT_NO_SCOPE)(request, user)
 
 
 class RuleAnnex(BaseModel):

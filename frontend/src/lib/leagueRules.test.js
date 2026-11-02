@@ -1,6 +1,6 @@
 import {
   addAnnex, annexLabel, changeRows, clearHits, dayLabel, findRanges, insertBlock, moveAnnex, paintHits, removeAnnex, renderRulesMarkdown,
-  rulesApiPath, rulesPagePath, tocOf,
+  rulesApiPath, rulesMediaProps, rulesPagePath, tocOf,
 } from "./leagueRules";
 
 const SECTIONS = [
@@ -114,4 +114,11 @@ describe("Pflege", () => {
     expect(insertBlock("", "[[baustein:map_pool]]")).toBe("[[baustein:map_pool]]\n");
     expect(insertBlock("# Maps\n", "[[baustein:map_pool]]")).toBe("# Maps\n\n[[baustein:map_pool]]\n");
   });
+});
+
+test("Bilder im Editor: Admin-Medien nur mit der Rolle, Zuständige laden eigene Bilder", () => {
+  for (const role of ["tournament_admin", "club_admin", "superadmin", "admin"]) expect(rulesMediaProps({ role })).toEqual({});
+  for (const user of [{ role: "player", areas: [] }, { role: "moderator", areas: ["leagues"] }, null]) {
+    expect(rulesMediaProps(user)).toEqual({ mediaScope: "user", libraryEndpoint: "/media?type=images" });
+  }
 });

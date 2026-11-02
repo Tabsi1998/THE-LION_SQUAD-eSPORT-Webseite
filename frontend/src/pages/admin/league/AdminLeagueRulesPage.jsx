@@ -6,13 +6,14 @@ import { Link, useParams } from "react-router-dom";
 import { ArrowDown, ArrowLeft, ArrowUp, ExternalLink, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { API, api, formatApiError } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { FormSection } from "@/components/tls/AdminForm";
 import { CheckField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { RuleOps, RulesChanges, RulesDocument } from "@/components/tls/league/rules/RulesDocument";
-import { RULES_MARKDOWN, addAnnex, annexLabel, dayLabel, insertBlock, moveAnnex, removeAnnex, rulesApiPath } from "@/lib/leagueRules";
+import { RULES_MARKDOWN, addAnnex, annexLabel, dayLabel, insertBlock, moveAnnex, removeAnnex, rulesApiPath, rulesMediaProps } from "@/lib/leagueRules";
 import { viennaDate } from "@/lib/vienna";
 
 const LONG_DAY = { day: "2-digit", month: "2-digit", year: "numeric" };
@@ -98,6 +99,8 @@ function Consents({ consents }) {
 export default function AdminLeagueRulesPage() {
   const { scope, scopeId } = useParams();
   const confirm = useConfirm();
+  const { user } = useAuth();
+  const media = rulesMediaProps(user);
   const [view, setView] = useState(null);
   const [error, setError] = useState(null);
   const [editing, setEditing] = useState(false);
@@ -226,7 +229,7 @@ export default function AdminLeagueRulesPage() {
                     </div>
                     <p className="mt-1.5 text-xs text-white/50">Der Inhalt kommt aus den Daten der Season und wird beim Veröffentlichen eingefroren.</p>
                   </div>
-                  <MarkdownEditor value={form.body_md} onChange={(value) => change({ body_md: value })} testId="rules-body" rows={18} mentionsEnabled={false} previewOptions={RULES_MARKDOWN}
+                  <MarkdownEditor value={form.body_md} onChange={(value) => change({ body_md: value })} testId="rules-body" rows={18} mentionsEnabled={false} previewOptions={RULES_MARKDOWN} {...media}
                     placeholder="# § 1 Geltung" helperText="Markdown. Rohes HTML wird nicht übernommen." />
                 </FormSection>
 
@@ -244,7 +247,7 @@ export default function AdminLeagueRulesPage() {
                       </div>
                       <div className="space-y-3">
                         <TextField label="Titel der Anlage" value={annex.title} onChange={(value) => changeAnnex(index, { title: value })} maxLength={160} testId={`rules-annex-title-${index}`} />
-                        <MarkdownEditor value={annex.body_md} onChange={(value) => changeAnnex(index, { body_md: value })} testId={`rules-annex-body-${index}`} rows={8} mentionsEnabled={false} previewOptions={RULES_MARKDOWN}
+                        <MarkdownEditor value={annex.body_md} onChange={(value) => changeAnnex(index, { body_md: value })} testId={`rules-annex-body-${index}`} rows={8} mentionsEnabled={false} previewOptions={RULES_MARKDOWN} {...media}
                           helperText="Markdown wie im Haupttext, auch mit Bausteinen." />
                       </div>
                     </div>

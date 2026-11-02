@@ -7,9 +7,13 @@ vi.mock("@/lib/api", () => ({ api: apiMock, API: "/api", resolveMediaUrl: (url) 
 vi.mock("@/components/tls/AdminLayout", () => ({ AdminLayout: ({ children }) => <div>{children}</div> }));
 vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => () => Promise.resolve(true), usePrompt: () => () => Promise.resolve(false) }));
 vi.mock("@/components/tls/MarkdownEditor", () => ({
-  MarkdownEditor: ({ value, onChange, testId }) => <textarea data-testid={testId} value={value} onChange={(event) => onChange(event.target.value)} />,
+  MarkdownEditor: ({ value, onChange, testId, mediaScope, libraryEndpoint }) => (
+    <textarea data-testid={testId} data-scope={mediaScope} data-library={libraryEndpoint} value={value} onChange={(event) => onChange(event.target.value)} />
+  ),
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+const auth = { user: { role: "superadmin" } };
+vi.mock("@/context/AuthContext", () => ({ useAuth: () => auth }));
 
 const { default: AdminLeagueRulesPage } = await import("./AdminLeagueRulesPage");
 
@@ -36,6 +40,18 @@ function renderPage(path = "/admin/leagues/rules/league_season/s1") {
 beforeEach(() => {
   for (const mock of Object.values(apiMock)) mock.mockReset();
   serve();
+});
+
+test("Zuständige ohne Admin-Medien bekommen im Haupttext und in Anlagen die eigenen Bilder", async () => {
+  auth.user = { role: "player", areas: [], has_league_staff: true };
+  serve({ ...VIEW, draft: DRAFT });
+  renderPage();
+  for (const testId of ["rules-body", "rules-annex-body-0"]) {
+    const editor = await screen.findByTestId(testId);
+    expect(editor).toHaveAttribute("data-scope", "user");
+    expect(editor).toHaveAttribute("data-library", "/media?type=images");
+  }
+  auth.user = { role: "superadmin" };
 });
 
 test("Ohne alles: Entwurf anfangen, speichern schickt Text und Anlagen", async () => {

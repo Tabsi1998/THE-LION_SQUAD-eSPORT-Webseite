@@ -317,6 +317,7 @@ beiden Bereichen, Turnierleitung und Ligen. Mit nur einem von beiden fehlen sie.
 Das Regelwerk hat eine eigene Seite mit Inhaltsverzeichnis, Suche und festen Links auf jeden Paragrafen, dazu ein PDF je Version. Gepflegt
 wird es an einer Stelle: **Season → Regeltext und Sichtbarkeit → Regelwerk mit Versionen pflegen** (nur diese Season) oder **Liga → Regelwerk**
 (für alle Seasons ohne eigenes). Fertige Dateien hochladen geht bewusst nicht, das PDF entsteht aus dem Text.
+Das dürfen der Bereich **Ligen** und Zuständige mit **Regeln veröffentlichen** in dieser Liga, mit Zwei-Faktor-Anmeldung. Die Turnierleitung allein darf es nicht.
 
 1. **Neuen Entwurf beginnen.** Titel und Text in Markdown. Jede Überschrift wird ein Abschnitt mit eigenem Link. Bleibt sie gleich, bleibt auch
    der Link über alle Versionen gleich.

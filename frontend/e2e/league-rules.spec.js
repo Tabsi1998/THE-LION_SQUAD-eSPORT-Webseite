@@ -210,6 +210,50 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
   });
 }
 
+const MFA = { mfa_enabled: true, auth_mfa_verified: true };
+const DUTY = { id: "z1", username: "zustaendig", display_name: "Zuständig", role: "player", areas: [], has_league_staff: true, ...MFA };
+const LEAD = { id: "t1", username: "turnierleitung", display_name: "Turnierleitung", role: "tournament_admin", areas: ["tournaments", "moderation"], ...MFA };
+
+for (const [width, height] of [[390, 844], [1440, 900]]) {
+  test(`Pflege (${width} px): Zuständige ohne Bereich kommen hinein`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    await mockServer(page, { user: DUTY });
+    await page.goto("/admin/leagues/rules/league_season/s1");
+    await expect(page.getByTestId("rules-draft")).toBeVisible();
+    await noSideScroll(page);
+  });
+
+  test(`Pflege (${width} px): Die Turnierleitung kommt nicht hinein`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    await mockServer(page, { user: LEAD });
+    await page.goto("/admin/leagues/rules/league_season/s1");
+    await expect(page).toHaveURL(/\/403/);
+    await expect(page.getByTestId("rules-draft")).toHaveCount(0);
+  });
+}
+
+const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64");
+
+for (const [who, user, scope] of [["Zuständige ohne Bereich", DUTY, null], ["Superadmin", ADMIN, "media_scope=admin"]]) {
+  test(`Pflege: ${who} laden das Bild dorthin, wo sie dürfen`, async ({ page }) => {
+    await mockServer(page, { user });
+    await page.route("**/api/uploads/image**", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ url: "/api/static/uploads/plan.png" }) }));
+    await page.goto("/admin/leagues/rules/league_season/s1");
+    await expect(page.getByTestId("rules-draft")).toBeVisible();
+    const sent = page.waitForRequest((request) => request.url().includes("/api/uploads/image") && request.method() === "POST");
+    await page.locator('input[type="file"]').first().setInputFiles({ name: "plan.png", mimeType: "image/png", buffer: PNG });
+    const url = (await sent).url();
+    if (scope) expect(url).toContain(scope); else expect(url).not.toContain("media_scope");
+  });
+}
+
+test("Pflege: Zuständige ohne Zwei-Faktor gehen zuerst zur Sicherheit", async ({ page }) => {
+  await mockServer(page, { user: { ...DUTY, auth_mfa_verified: false, mfa_enabled: false } });
+  await page.goto("/admin/leagues/rules/league_season/s1");
+  await expect(page).not.toHaveURL(/\/admin\/leagues\/rules/);
+  await expect(page.getByTestId("rules-draft")).toHaveCount(0);
+});
+
 test("Ligaseite verlinkt das Regelwerk statt des Aufklappblocks", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockServer(page);

@@ -654,13 +654,13 @@ async def own_consent_tasks(db, user: dict, registrations: list[dict]) -> list[d
     if not season_of:
         return []
     seasons = await _by_id(db.league_seasons, {value for value in season_of.values() if value}, {"status": {"$nin": ["archived", "completed"]}})
-    # Was jemand sehen darf, hängt nur an der Sichtbarkeit - je Wert einmal fragen.
-    allowed: dict[str | None, bool] = {}
+    # Was jemand sehen darf, hängt an Sichtbarkeit und Liga (Rechte je Liga, #2203) - je Paar einmal fragen.
+    allowed: dict[tuple, bool] = {}
     for season in seasons.values():
-        visibility = season.get("visibility")
-        if visibility not in allowed:
-            allowed[visibility] = await leagues.can_see_season(user, season)
-    seasons = {key: season for key, season in seasons.items() if allowed[season.get("visibility")]}
+        key = (season.get("visibility"), season.get("league_id"))
+        if key not in allowed:
+            allowed[key] = await leagues.can_see_season(user, season)
+    seasons = {key: season for key, season in seasons.items() if allowed[(season.get("visibility"), season.get("league_id"))]}
     league_rows = await _by_id(db.leagues, {season.get("league_id") for season in seasons.values()}, {"status": "active"})
     seasons = {key: season for key, season in seasons.items() if season.get("league_id") in league_rows}
     if not seasons:
