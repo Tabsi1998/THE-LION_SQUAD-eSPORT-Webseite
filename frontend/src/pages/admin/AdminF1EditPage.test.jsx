@@ -19,7 +19,8 @@ vi.mock("@/components/tls/ImageUpload", () => ({ ImageUpload: () => <div data-te
 vi.mock("@/components/tls/MarkdownEditor", () => ({ MarkdownEditor: ({ testId }) => <textarea data-testid={testId} readOnly /> }));
 vi.mock("@/components/tls/AccessLinksPanel", () => ({ AccessLinksPanel: () => <div data-testid="access-links" /> }));
 vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => confirmMock, usePrompt: () => promptMock }));
-vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ isAdmin: true, isTournamentLead: true, user: { id: "admin-1" } }) }));
+let isTournamentLead = true;
+vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ isAdmin: true, isTournamentLead, user: { id: "admin-1" } }) }));
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
 vi.mock("sonner", () => ({ toast: toastMock }));
 
@@ -266,6 +267,21 @@ test("Beendet mit Zeiten: Hinweis auf die Saisonpunkte, Archivieren steht erst n
   const archived = [...screen.getByTestId("f1-status-select").options].find((option) => option.value === "archived");
   expect(archived.disabled).toBe(true);
   expect(archived.textContent).toContain("erst nach dem Veröffentlichen");
+});
+
+test("CSV nur für die Turnierleitung - ein Helfer bekäme sonst eine rohe 403 (#2130)", async () => {
+  answerWith({ status: "live" });
+  const lead = renderPage();
+  expect(await screen.findByTestId("f1-export-csv")).toBeInTheDocument();
+  lead.unmount();
+  isTournamentLead = false;
+  try {
+    renderPage();
+    await screen.findByRole("heading", { name: "Monza Sprint" });
+    expect(screen.queryByTestId("f1-export-csv")).toBeNull();
+  } finally {
+    isTournamentLead = true;
+  }
 });
 
 test("Veröffentlicht: Archivieren ist frei (#2130)", async () => {

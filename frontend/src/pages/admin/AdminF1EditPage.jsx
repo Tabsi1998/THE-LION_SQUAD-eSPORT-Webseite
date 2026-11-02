@@ -349,7 +349,8 @@ export default function AdminF1EditPage() {
             <Tv className="w-4 h-4" /> TV-Ansicht
           </Link>
           <Link target="_blank" to={`/fastlap/${challenge.slug || challenge.id}`} className="px-4 py-2 border border-white/20 text-white rounded-sm uppercase tracking-wider text-sm font-bold hover:border-[#29B6E8]/60">Öffentliche Seite</Link>
-          <a href={`${API}/f1/challenges/${challenge.id}/export.csv`} className="px-4 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40" target="_blank" rel="noreferrer">CSV</a>
+          {/* Der Export gehört der Turnierleitung (#2130) - ein Helfer bekäme nur eine rohe 403. */}
+          {isTournamentLead && <a href={`${API}/f1/challenges/${challenge.id}/export.csv`} data-testid="f1-export-csv" className="px-4 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40" target="_blank" rel="noreferrer">CSV</a>}
           <a href={`${API}/exports/f1/${challenge.id}/leaderboard.pdf${activeTrack ? `?track_id=${activeTrack}` : ""}`} className="px-4 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40" target="_blank" rel="noreferrer">PDF</a>
           {isTournamentLead && challenge.status === "draft" && (
             <button type="button" onClick={deleteChallenge} data-testid="f1-delete-challenge" className="inline-flex items-center gap-2 px-4 py-2 border border-live/40 text-live text-xs uppercase font-bold rounded-sm hover:bg-live/10">
