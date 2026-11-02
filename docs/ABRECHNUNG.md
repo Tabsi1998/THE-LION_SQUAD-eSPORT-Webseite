@@ -167,12 +167,46 @@ Löschung nicht unbemerkt bleibt); „Alles abgleichen“ in der Finanzübersich
 | teilweise bezahlt | eine Zahlung ist da, ein Rest offen (steht dabei) |
 | überfällig | Zahlungsziel vorbei, Rest offen |
 | bezahlt | Rest null |
+| bezahlt mit Abzug | in Dolibarr als „Bezahlt (mit Abzug)“ abgeschlossen: nichts mehr offen, der Rest steht als „erlassen“ dabei |
 | Überzahlung | mehr Geld als der Beleg verlangt → Prüffall |
 | gutgeschrieben | eine Gutschrift in Dolibarr deckt den Beleg |
 | aufgegeben | in Dolibarr als uneinbringlich/aufgegeben markiert |
 
 Bei jedem Beleg steht, wie frisch der Stand ist („Stand 23.09., 11:40“). Konnte Dolibarr nicht
 lesen, steht der Grund dort – nichts wird still alt.
+
+**Bezahlt mit Abzug (#2226).** Dolibarr rechnet den Rest als Summe minus Zahlungen und Gutschriften, bei einem Abschluss mit
+Abzug bleibt er dort also stehen. Die Website zeigt ihn nicht als offen, sondern als „20,00 € erlassen“. Erlassen ist kein Geld:
+Es zählt weder als bezahlt noch zur Erstattungsgrenze und steht in den Summen und im CSV für sich. Die Person sieht schlicht
+„bezahlt“.
+
+**Grund und Anmerkung**, die ihr beim Abschluss in Dolibarr eintragt, stehen in Liste und Detail, Änderungen im Verlauf; das gilt
+auch für aufgegebene Belege. Die Anmerkung ist freier Text und bleibt in der Verwaltung: nicht in „Meine Rechnungen“, nicht in der
+App, nicht in Mails, nicht im CSV (dort steht nur der Grund). In der Auskunft an die Person steht sie, bei einer Kontolöschung fällt
+sie auf der Website weg. Liefert Dolibarr die beiden Felder nicht, steht „bezahlt mit Abzug“ ohne Grund da. Ältere Belege bekommen
+den Stand beim nächsten Nachlesen, ohne dass ihr etwas tun müsst.
+
+**Welcher Weg in der Kassa?** Ein Hinweis aus der Praxis, keine Steuerberatung. Im Zweifel Kassier, Rechnungsprüfung oder
+Steuerberatung fragen.
+
+| Was passiert ist | Weg in Dolibarr | Auf der Website |
+| --- | --- | --- |
+| Leistung fiel weg oder die Rechnung war zu hoch (Begleitperson kam nicht) | Teil-Gutschrift über den Betrag, auf die Rechnung anwenden | bezahlt, sobald der Rest gezahlt ist; die Gutschrift steht dabei |
+| Verein übernimmt das Essen wegen eines Gewinns | Teil-Gutschrift mit dem Grund im Text, auf die Rechnung anwenden | wie oben |
+| Festes Preisgeld wird verrechnet | Zahlung als Verrechnung, das Preisgeld als Ausgabe buchen | bezahlt; die Verrechnung zählt wie jede gebuchte Zahlung, auch für die Erstattungsgrenze |
+| Echter Nachlass, Kleinbetrag bewusst erlassen | „Bezahlt (mit Abzug)“ mit Grund und Anmerkung | bezahlt mit Abzug, Betrag als erlassen |
+
+Eine Gutschrift, die nicht auf die Rechnung angewendet ist, lässt den Rest offen. Freigegebene Rechnungen nicht löschen, nur
+Entwürfe dürfen weg.
+
+**Entwurf in Dolibarr gelöscht (#2226).** Antwortet Dolibarr bei einem Entwurf mit „nicht gefunden“ und findet ihn auch über die
+Auftragskennung nicht, gilt der Beleg als entfernt: Er verschwindet aus „Angelegte Rechnungen“ und den Summen, ein Prüffall dazu
+ist erledigt, das steht im Protokoll und im Verlauf. Die Anmeldung bleibt, nur ohne Beleg. Neu angelegt wird nichts von selbst:
+Der Auftrag steht bei den offenen mit **Freigeben** (legt einen neuen Beleg an) und **Keine neue Rechnung** (beendet den Auftrag,
+die Person sieht den Betrag als storniert). Bis dahin ändert die Begleitpersonen nur die Turnierleitung. War die Buchung schon storniert, ist er ohne weiteres Zutun zu Ende. Wurde die Buchung
+nach dem Beleg geändert, bleibt dieser Prüffall offen: Vor dem Freigeben den Preis prüfen. Ein Verbindungsfehler oder die
+Fehlerseite eines Webservers davor beweisen nichts, dann bleibt alles, wie es ist. Bei einem **freigegebenen** Beleg bleibt es beim
+Prüffall unten.
 
 **Prüffälle.** Wenn Buchung und Beleg auseinanderlaufen, ändert die Website nichts – weder in
 Dolibarr noch am eingefrorenen Preis. Sie legt einen Prüffall an und sagt, was zu tun ist:
@@ -185,7 +219,7 @@ Dolibarr noch am eingefrorenen Preis. Sie legt einen Prüffall an und sagt, was 
 | Zahlung auf stornierte Buchung | Geld kommt für eine abgesagte Anmeldung | nicht reaktivieren – erstatten oder klären |
 | Betrag weicht ab | der Beleg in Dolibarr lautet auf einen anderen Betrag als der eingefrorene Preis | Beleg prüfen; wenn richtig, Fall mit Grund erledigen |
 | Empfänger weicht ab | der Beleg hängt an einem anderen Geschäftspartner | Zuordnung prüfen |
-| Beleg nicht mehr in Dolibarr | Dolibarr kennt die Nummer nicht mehr | nachsehen; die Website legt keinen zweiten an |
+| Beleg nicht mehr in Dolibarr | Dolibarr kennt die Nummer eines freigegebenen Belegs nicht mehr | nachsehen; die Website legt keinen zweiten an |
 
 Ein Fall wird **mit Grund** erledigt („Gutschrift GA2026-0003 angelegt, 20 € am 24.09.
 überwiesen“). Sieht der Abgleich, dass Dolibarr den Fall aufgelöst hat (Gutschrift über den
@@ -216,9 +250,9 @@ Website löst keine Überweisung aus. Der Verlauf je Auftrag zeigt beides getren
 Gutschriften, Erstattungen, Storno, Prüffälle, Freigaben.
 
 **Summen je Veranstaltung** (Filter „Veranstaltung“ in der Finanzübersicht): gebucht, fakturiert,
-bezahlt, offen, gutgeschrieben, erstattet – jede Belegrevision zählt einmal, stornierte Aufträge
-ohne Beleg zählen nicht mit. **CSV** exportiert die angelegten Belege für den Kassier – nur
-Nummer, Tag des Anlegens, Angebot, Person, Beträge, Stand; keine Adressen, Bankdaten oder Dolibarr-Nummern.
+bezahlt, offen, gutgeschrieben, erlassen (sobald es etwas gibt), erstattet – jede Belegrevision zählt einmal, stornierte
+Aufträge ohne Beleg zählen nicht mit. **CSV** exportiert die angelegten Belege für den Kassier – nur
+Nummer, Tag des Anlegens, Angebot, Person, Beträge, Grund des Abschlusses, Stand; keine Adressen, Bankdaten, Anmerkungen oder Dolibarr-Nummern.
 Die Datei kommt vom Server (#2131) und ist **vollständig**: Die Liste auf der Seite zeigt höchstens 250
 Rechnungen und 200 offene Aufträge und sagt „N von M“; der Export hat keine Grenze. **Export von/bis**
 wählt einen Zeitraum nach dem Tag, an dem die Website den Beleg angelegt hat (Wiener Uhr). Das Rechnungsdatum in
@@ -240,8 +274,8 @@ Link **„In Dolibarr“** zur Rechnungskarte. Ohne Treffer steht dort „Alles 
 - **PDF fehlt:** freigegeben, aber kein bestätigtes PDF (siehe oben, „Fehlende PDFs nachziehen“).
 - **Entwurf seit mehr als 7 Tagen:** angelegt, aber noch nicht freigegeben.
 - **Überfällig:** Zahlungsziel vor heute (Wiener Tag), Rest offen – auch teilweise bezahlte. Gerechnet
-  wird mit dem Datum, nicht erst nach dem nächsten Abgleich. Bezahlt, gutgeschrieben oder
-  aufgegeben ist nie überfällig.
+  wird mit dem Datum, nicht erst nach dem nächsten Abgleich. Bezahlt, bezahlt mit Abzug, gutgeschrieben
+  oder aufgegeben ist nie überfällig.
 - **Tageszentrale:** „Belege prüfen – 3 überfällig · 1 ohne PDF“ führt direkt zum dringendsten
   Blick. Die Zahlen bekommt nur, wer den Bereich Finanzen hat.
 
@@ -267,9 +301,9 @@ Link **„In Dolibarr“** zur Rechnungskarte. Ohne Treffer steht dort „Alles 
 ## Aufbewahrung und Kontolöschung
 
 Belege und Zahlungen leben in Dolibarr (dort gilt die Aufbewahrung der BAO, sieben Jahre). Die
-Website hält je Auftrag nur Betrag, Positionen, Belegnummer, Zahlungsstand und Zeitpunkte. Löscht
-jemand sein Konto, bleibt der Auftrag mit Betrag und Belegnummer (Nachweis gegenüber Dolibarr),
-verliert aber Name und E-Mail; die Zuordnung Konto ↔ Geschäftspartner fällt weg. Der Verlauf
+Website hält je Auftrag nur Betrag, Positionen, Belegnummer, Zahlungsstand, Grund und Anmerkung des
+Abschlusses und Zeitpunkte. Löscht jemand sein Konto, bleibt der Auftrag mit Betrag, Belegnummer und Grund
+(Nachweis gegenüber Dolibarr), verliert aber Name, E-Mail und die Anmerkung; die Zuordnung Konto ↔ Geschäftspartner fällt weg. Der Verlauf
 enthält keine Bankdaten – sie stehen nie auf der Website.
 
 ## Was noch nicht geht

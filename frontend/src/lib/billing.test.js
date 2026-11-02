@@ -1,4 +1,4 @@
-import { attentionLine, csvFilename, firstAttention, formatCents, parseEuro, shownOf, sourcesFrom, summaryLines, syncLine } from "./billing";
+import { PAYMENT_TONE, attentionLine, csvFilename, firstAttention, formatCents, parseEuro, shownOf, sourceName, sourcesFrom, summaryLines, syncLine } from "./billing";
 
 // Finanzübersicht (#321, #322): Beträge, Eingaben, Quellen und der Name des Exports (die Datei selbst baut der Server).
 
@@ -31,9 +31,26 @@ test("Quellen werden einmal gelistet, die Summenzeile hat sechs getrennte Zahlen
   expect(summaryLines({ booked_cents: 20000, invoiced_cents: 20000, paid_cents: 16000, open_cents: 4000, credited_cents: 2000, refunded_cents: 2000 }).map((l) => `${l.label} ${l.value}`))
     .toEqual(["gebucht 200,00 €", "fakturiert 200,00 €", "bezahlt 160,00 €", "offen 40,00 €", "gutgeschrieben 20,00 €", "erstattet 20,00 €"]);
   expect(summaryLines(null)).toEqual([]);
-  expect(syncLine({ sync_error: "not_found", sync_error_text: "Nicht gefunden (404)" }).text).toContain("Nicht gefunden");
+  expect(syncLine({ sync_error: "unavailable", sync_error_text: "Dolibarr antwortet nicht" }).text).toBe("Dolibarr nicht lesbar: Dolibarr antwortet nicht");
   expect(syncLine({}).text).toBe("noch nicht nachgelesen");
   expect(syncLine({ synced_at: "2026-09-23T10:00:00+00:00" }).text.startsWith("Stand ")).toBe(true);
+});
+
+test("bezahlt mit Abzug (#2226): eigene Farbe wie bezahlt, „erlassen“ nur in den Summen, wenn etwas erlassen wurde", () => {
+  expect(PAYMENT_TONE.paid_reduced).toBe(PAYMENT_TONE.paid);
+  const lines = summaryLines({ booked_cents: 4000, invoiced_cents: 4000, paid_cents: 2000, open_cents: 0, credited_cents: 0, waived_cents: 2000, refunded_cents: 0 });
+  expect(lines.map((l) => `${l.label} ${l.value}`)).toContain("erlassen 20,00 €");
+  expect(lines).toHaveLength(7);
+  expect(summaryLines({ paid_cents: 100, waived_cents: 0 }).map((l) => l.key)).not.toContain("waived_cents");
+});
+
+test("nie eine interne Kennung als Angebotsname (#2226), ein fehlender Beleg sagt, wo es weitergeht", () => {
+  expect(sourceName({ source: { name: "Weihnachtsfeier" }, source_id: "e1" })).toBe("Weihnachtsfeier");
+  expect(sourceName({ source: null, source_id: "ev-1234" })).toBe("Angebot nicht mehr vorhanden");
+  expect(sourcesFrom([{ source_id: "ev-1234", kind: "event" }]).map((s) => s.name)).toEqual(["Angebot nicht mehr vorhanden"]);
+  const gone = syncLine({ sync_error: "not_found", sync_error_text: "Nicht gefunden (404)" });
+  expect(gone.text).toBe("In Dolibarr nicht mehr gefunden – siehe Prüffall");
+  expect(gone.text).not.toContain("404");
 });
 
 test("wo Belege hängen (#842): Export mit Blick im Namen, die Tageszentrale in Worten, der dringendste Blick zuerst", () => {

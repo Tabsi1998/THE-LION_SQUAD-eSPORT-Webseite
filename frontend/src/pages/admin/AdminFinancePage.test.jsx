@@ -93,6 +93,57 @@ test("der CSV-Knopf holt die Datei vom Server, mit Zeitraum; ein Zeitraum verkeh
   vi.restoreAllMocks();
 });
 
+const REDUCED = {
+  id: "o5", kind: "event", source_id: "e1", user_id: "u5", status: "invoiced", total_cents: 4000, currency: "EUR", total: "40,00 €", invoice_ref: "FA2609-0005",
+  invoice_status: "paid", paid: true, payment_state: "paid_reduced", payment_label: "bezahlt mit Abzug", remaining_cents: 2000, waived_cents: 2000, paid_cents: 2000, refunded_cents: 0, credited_cents: 0,
+  close_code: "other", close_reason: "Sonstiger Grund", close_note: "<img src=x onerror=alert(1)> Begleitperson kam nicht",
+  synced_at: "2026-09-23T10:00:00+00:00", source: { name: "Weihnachtsfeier", slug: "weihnachtsfeier", kind: "event" }, person: "Rita",
+};
+
+test("bezahlt mit Abzug (#2226): kein offener Betrag, sondern erlassen - mit Grund und Anmerkung als reiner Text", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/admin/finance/overview") return { data: { ...OVERVIEW, open: [], cases: [], cases_open: 0, invoiced: [REDUCED, { ...REDUCED, id: "o6", close_code: undefined, close_reason: null, close_note: undefined }] } };
+    if (url === "/admin/finance/orders/o5") return { data: { ...DETAIL, order: { ...REDUCED, status_label: "Rechnung angelegt" }, cases: [], sums: { paid_cents: 2000, refunded_cents: 0, credited_cents: 0, waived_cents: 2000, refundable_cents: 2000 }, payment_labels: { paid_reduced: "bezahlt mit Abzug" } } };
+    throw new Error(url);
+  });
+  const user = userEvent.setup();
+  render(<MemoryRouter><AdminFinancePage /></MemoryRouter>);
+  const line = await screen.findByTestId("finance-payment-o5");
+  expect(line).toHaveTextContent("bezahlt mit Abzug · 20,00 € erlassen");
+  expect(line).not.toHaveTextContent("offen");
+  const close = screen.getByTestId("finance-close-o5");
+  expect(close).toHaveTextContent("Sonstiger Grund");
+  expect(close).toHaveTextContent("<img src=x onerror=alert(1)> Begleitperson kam nicht");
+  expect(close.querySelector("img")).toBeNull();
+  // Fehlen Grund und Anmerkung in Dolibarrs Antwort: bezahlt mit Abzug ohne Grund, kein Fehler.
+  expect(screen.getByTestId("finance-payment-o6")).toHaveTextContent("bezahlt mit Abzug · 20,00 € erlassen");
+  expect(screen.queryByTestId("finance-close-o6")).toBeNull();
+
+  await user.click(screen.getByTestId("finance-detail-o5"));
+  const detail = await screen.findByTestId("finance-detail");
+  expect(within(detail).getByTestId("finance-detail-sums")).toHaveTextContent("erlassen 20,00 €");
+  expect(within(detail).getByTestId("finance-close-o5")).toHaveTextContent("Begleitperson kam nicht");
+});
+
+test("gelöschter Entwurf (#2226): neu abrechnen oder „Keine neue Rechnung“, statt einer internen Kennung ein Satz", async () => {
+  const removed = { id: "o7", kind: "event", source_id: "ev-interne-kennung", user_id: "u7", status: "held", total_cents: 2000, currency: "EUR", total: "20,00 €", created_at: "2026-09-22T10:00:00+00:00",
+    source: { name: "Angebot nicht mehr vorhanden", slug: null, kind: "event" }, person: "Tom", note: "Entwurf (PROV7) wurde in Dolibarr gelöscht.", removed_invoices: [{ invoice_ref: "(PROV7)", at: "2026-09-23T10:00:00+00:00" }] };
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/admin/finance/overview") return { data: { ...OVERVIEW, open: [removed, { ...removed, id: "o8", removed_invoices: undefined, source: null, note: "" }], invoiced: [], cases: [], cases_open: 0 } };
+    throw new Error(url);
+  });
+  const user = userEvent.setup();
+  render(<MemoryRouter><AdminFinancePage /></MemoryRouter>);
+  const row = await screen.findByTestId("finance-order-o7");
+  expect(row).toHaveTextContent("Angebot nicht mehr vorhanden");
+  expect(row).not.toHaveTextContent("ev-interne-kennung");
+  expect(screen.getByTestId("finance-order-o8")).not.toHaveTextContent("ev-interne-kennung");
+  expect(screen.getByTestId("finance-release-o7")).toBeInTheDocument();
+  expect(screen.queryByTestId("finance-dismiss-o8")).toBeNull();
+  await user.click(screen.getByTestId("finance-dismiss-o7"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/finance/orders/o7/dismiss"));
+});
+
 test("Prüffälle: Umschalter zeigt die erledigten mit Grund, wer und wann (#2131)", async () => {
   apiMock.get.mockImplementation(async (path, options) => {
     if (path === "/admin/finance/overview") return { data: { ...OVERVIEW, cases_resolved: 1 } };
