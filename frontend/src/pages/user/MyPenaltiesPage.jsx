@@ -12,7 +12,7 @@ import { LoadState } from "@/components/tls/LoadState";
 import { useLoad } from "@/hooks/useLoad";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { AlertTriangle, Clock, Flag, ShieldAlert, ArrowRight } from "lucide-react";
+import { AlertTriangle, Clock, Flag, MessageCircleQuestion, ShieldAlert, ArrowRight } from "lucide-react";
 import { viennaDateTime } from "@/lib/vienna";
 import { showLapTime } from "@/lib/laptime";
 
@@ -36,7 +36,7 @@ export default function MyPenaltiesPage() {
         <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FF3B30]">Transparenz</span>
         <h1 className="mt-2 font-heading text-4xl md:text-5xl font-black uppercase">Meine Strafen</h1>
         <p className="mt-3 text-white/60 max-w-2xl">
-          Hier siehst du jede Strafe, ungültige Runde oder kampflose Niederlage – inklusive der vollständigen Begründung. Bei Fragen wende dich an den Vorstand.
+          Hier siehst du jede Strafe, ungültige Runde oder kampflose Niederlage – inklusive der vollständigen Begründung. Hältst du etwas für falsch? Stell über „Rückfrage“ an der Strafe eine Frage, wir schauen es uns an.
         </p>
 
         {/* Verwarnungen mit Stufen (#416): der eigene Stand bei der Moderation samt Einspruch. */}
@@ -122,8 +122,21 @@ function PenaltyCard({ p }) {
               </>
             )}
           </div>
+
+          {/* Rückfrage statt eigenem Einspruch (#2130): der Betreff nennt nur die Sache, keine Person. */}
+          <Link to={penaltyContactLink(p)} data-testid={`penalty-question-${p.ref_id}`} className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">
+            <MessageCircleQuestion className="w-3.5 h-3.5" aria-hidden="true" /> Rückfrage stellen
+          </Link>
         </div>
       </div>
     </div>
   );
+}
+
+const CONTACT_TOPIC = { lap_penalty: "fastlap", lap_invalid: "fastlap", match_forfeit: "tournament" };
+
+function penaltyContactLink(p) {
+  const about = [p.context_title, p.context_subtitle].filter(Boolean).join(" · ");
+  const subject = `Rückfrage zur Strafe: ${about}`.slice(0, 200);
+  return `/contact?topic=${CONTACT_TOPIC[p.kind] || "general"}&subject=${encodeURIComponent(subject)}`;
 }
