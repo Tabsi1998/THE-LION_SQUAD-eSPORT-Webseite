@@ -11,13 +11,15 @@ logger = logging.getLogger("tls.league_mail")
 
 
 async def send_league_mail(db, user_id: str | None, title: str, text: str, path: str, dedupe_key: str) -> None:
+    from services.match_audience import users_for
     from services.notification_preferences import send_user_template
     from services.user_notifications import build_public_url
 
     try:
-        user = await db.users.find_one({"id": user_id, "is_banned": {"$ne": True}}, {"_id": 0}) if user_id else None
-        if not user:
+        people = await users_for(db, [user_id]) if user_id else []
+        if not people:
             return
+        user = people[0]
         await send_user_template(user, "league_notice", title=title, text=text, url=await build_public_url(path), dedupe_key=dedupe_key,
                                  mail_meta={"kind": "league_notice", "user_id": user_id})
     except Exception:  # noqa: BLE001 - siehe oben
