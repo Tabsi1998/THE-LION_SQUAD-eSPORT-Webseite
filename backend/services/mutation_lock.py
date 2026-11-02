@@ -63,6 +63,16 @@ def series_write_resource(series_id: str) -> str:
     return f"series:{series_id}"
 
 
+def league_season_resource(season_id: str) -> str:
+    """Eine Liga-Season: Co-Teams zuteilen (#1649), Regelwerk veröffentlichen und zustimmen, Season löschen (#1646). Immer nach der Turnier-Sperre."""
+    return f"league_season:{season_id}:squads"
+
+
+def league_resource(league_id: str) -> str:
+    """Eine Liga: liga-weites Regelwerk veröffentlichen, Liga löschen (#1646). Vor den Sperren ihrer Seasons."""
+    return f"league:{league_id}:rules"
+
+
 class _MutationLease:
     def __init__(self, db, resource: str, wait_seconds: float, lease_seconds: float, retry_seconds: float):
         self._db = db

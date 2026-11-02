@@ -165,9 +165,17 @@ test("Zuständige (#2203): kein Anlegen und Löschen, nur die Knöpfe der eigene
   apiMock.get.mockResolvedValue({ data: { ...BODY, can_create: false, leagues: [{ ...league, capabilities: ["roster"] }] } });
   renderPage();
   expect(await screen.findByTestId("season-link-season-1")).toBeInTheDocument();
-  for (const id of ["league-add", "league-steps", "league-edit-probe-shooter", "league-delete-probe-shooter", "league-staff-probe-shooter", "season-add-probe-shooter"]) {
+  for (const id of ["league-add", "league-steps", "league-edit-probe-shooter", "league-delete-probe-shooter", "league-staff-probe-shooter", "season-add-probe-shooter", "league-rules-link-probe-shooter"]) {
     expect(screen.queryByTestId(id), id).toBeNull();
   }
+});
+
+test("Regelwerk (#1646): der Einstieg gehört zur Zuständigkeit „rules“ und steht auch ohne Bereich da", async () => {
+  const [league] = BODY.leagues;
+  apiMock.get.mockResolvedValue({ data: { ...BODY, can_create: false, leagues: [{ ...league, capabilities: ["rules"] }] } });
+  renderPage();
+  expect(await screen.findByTestId("league-rules-link-probe-shooter")).toHaveAttribute("href", "/admin/leagues/rules/league/l1");
+  expect(screen.queryByTestId("league-edit-probe-shooter")).toBeNull();
 });
 
 test("„Liga verwalten“ ohne Bereich (#2203): bearbeiten und Zuständige lesen, aber kein Löschen", async () => {

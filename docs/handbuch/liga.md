@@ -115,7 +115,7 @@ festgehaltenem Pool behalten ihre Reihenfolge.
 | | **Punkte Sieg / Remis / Niederlage**, **Bei Punktgleichheit** | 3 / 1 / 0 · Differenz, Mehr gewonnene Maps |
 | | **Ergebnis gilt nach (Stunden)** · **Aufstellung nachtragen bis (Stunden)** | 48 · 48 |
 | | **Antwort auf Terminvorschlag (Stunden)** – so lange hat die Gegenseite Zeit; leer heißt bei älteren Seasons „je Staffel wie bisher“ | 72 |
-| Regeltext und Sichtbarkeit | **Regeltext** (Markdown) | Regelwerk der Liga |
+| Regeltext und Sichtbarkeit | **Regeltext** (Markdown) – nur, solange es kein Regelwerk gibt (2.11) | leer, Regelwerk nutzen |
 | | **Sichtbarkeit** | bis zum Start *Nur Liga-Leitung* (siehe 2.8) |
 
 Unter dem Kalender steht nach dem Speichern, welche Wochen gesperrt sind und **wie viele Teams eine Staffel höchstens
@@ -311,6 +311,44 @@ Nachricht, der Vorgang steht im Protokoll.
 beiden Bereichen, Turnierleitung und Ligen. Mit nur einem von beiden fehlen sie. Am Spiel selbst bleibt die Wertung sichtbar.
 
 ---
+
+### 2.11 Regelwerk: Versionen, PDF und Zustimmung
+
+Das Regelwerk hat eine eigene Seite mit Inhaltsverzeichnis, Suche und festen Links auf jeden Paragrafen, dazu ein PDF je Version. Gepflegt
+wird es an einer Stelle: **Season → Regeltext und Sichtbarkeit → Regelwerk mit Versionen pflegen** (nur diese Season) oder **Liga → Regelwerk**
+(für alle Seasons ohne eigenes). Fertige Dateien hochladen geht bewusst nicht, das PDF entsteht aus dem Text.
+Das dürfen der Bereich **Ligen** und Zuständige mit **Regeln veröffentlichen** in dieser Liga, mit Zwei-Faktor-Anmeldung. Die Turnierleitung allein darf es nicht.
+
+1. **Neuen Entwurf beginnen.** Titel und Text in Markdown. Jede Überschrift wird ein Abschnitt mit eigenem Link. Bleibt sie gleich, bleibt auch
+   der Link über alle Versionen gleich.
+2. **Anlagen** bekommen ihren Buchstaben aus der Reihenfolge (Anlage A, B, C …) und stehen eigens im Inhaltsverzeichnis.
+3. **Bausteine:** Die Knöpfe **Map-Pool** und **Modusfolge** setzen eine Marke in den Text, etwa `[[baustein:map_pool]]`. Der Inhalt kommt aus den
+   Daten der Season. Tippe die Listen also nicht ab.
+4. **Vorschau** zeigt die Seite mit den Daten von heute und den Änderungen zur letzten Version.
+5. **Veröffentlichen:** **Gültig ab**, **Änderungsgrund** (steht öffentlich dabei) und die Wahl, ob **Captains neu zustimmen** müssen. Danach lässt sich
+   die Version nicht mehr ändern. Die Bausteine werden eingefroren: alte Versionen zeigen ihre Listen von damals, im Web und im PDF.
+
+**Was die Seite selbst macht:** Sie vergleicht jede Version mit der vorigen. Geänderte Paragrafen tragen einen Strich am Rand und das Wort
+„Geändert“, oben steht „Neu in Version X“ mit Links zu den Stellen. Leser können die Markierung ausblenden und Wort für Wort mit jeder alten Version
+vergleichen, auch entfernter Text ist dann zu sehen.
+
+**„Daten geändert, neue Version vorbereiten“:** Hast du zum Beispiel den Map-Pool geändert, zeigt die Verwaltung den Unterschied zur letzten Version.
+Das ist nur ein Vorschlag: Die gültige Version bleibt, wie sie ist, bis du eine neue veröffentlichst.
+
+**Zustimmung:** Verlangt eine Version Zustimmung, sehen Captain und Vertreter (ohne beide die Leitung des Hauptteams) eine Aufgabe auf der Startseite und
+einen Hinweis auf der Regelseite. Der Stand je Co-Team steht unter **Zustimmungen**. **Fehlt sie, läuft das Spiel trotzdem**, nichts wird blockiert.
+
+**Gut zu wissen:**
+
+- Ohne Regelwerk zeigt die Ligaseite weiter den **Regeltext** der Season. Mit Regelwerk steht dort ein Link mit Version und Stand plus PDF.
+- Die Staffel zeigt mit Regelwerk nur noch den Hinweis auf die Regelseite, auch in der App.
+- Jedes festgeschriebene Ergebnis merkt sich die Version, die gerade galt. Eine spätere Korrektur ändert das nicht.
+- Die Seite folgt der Sichtbarkeit der Season (2.8), alte Versionen auch.
+- **Bilder** nur über **Hochladen** oder die Mediathek. Eine fremde Adresse lehnt das Speichern ab, sie geht nur als Link.
+- **Im PDF** steht ein Bild auf eigener Zeile als Bild, sonst als `[Bild: …]`. Die PDF-Schrift kann nur Westeuropäisches: Zeichen wie → werden umschrieben, Emoji fallen weg.
+- Eine **veröffentlichte Version** bleibt, wie sie ist: Ihre Bilder lassen sich in der Mediathek weder drehen noch löschen. Für ein neues Bild eine neue Version veröffentlichen.
+- Eine Season oder Liga mit veröffentlichtem Regelwerk oder mit Zustimmungen lässt sich nicht mehr löschen, nur archivieren. Entwürfe gehen mit.
+- Ein Regelwerk darf mit allen Anlagen höchstens 400 000 Zeichen und 400 Überschriften haben.
 
 ## 3. Während der Season
 
@@ -531,7 +569,7 @@ Zum Abhaken in dieser Reihenfolge – jeder Punkt mit dem Klickweg von oben.
 - [ ] **Maps** in der Bibliothek, je mit **Bild** und den richtigen **Modi** – 2.1
 - [ ] **Season 1**: Beginn 10.11.2026, 10 Wochen, **Weihnachtspause** 21.12.–3.1., nur Hinrunde, Meldeschluss 6.11. – 2.2
 - [ ] **Best of 3**, **Teamgröße 4**, Mindestkader, **Modus je Map** laut Regelwerk, Punkte 3/1/0 – 2.2
-- [ ] **Regeltext** eingetragen – 2.2
+- [ ] **Regelwerk** veröffentlicht, Bausteine für Map-Pool und Modusfolge gesetzt – 2.11
 - [ ] **Map-Pool der Season** gespeichert – 2.2
 - [ ] **Liga 1** und **Staffel A** angelegt (bei mehr als acht Teams auch Staffel B) – 2.3
 - [ ] Alle **Co-Teams** angelegt, jeder im Kader hat ein **Konto** und ist im Hauptteam – 2.4

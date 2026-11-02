@@ -18,7 +18,7 @@ from reportlab.graphics import renderPDF
 from reportlab.graphics.barcode import qr
 from reportlab.graphics.shapes import Drawing
 from reportlab.platypus import (
-    KeepTogether, SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
+    HRFlowable, Image as PlatypusImage, KeepTogether, SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
 )
 from PIL import Image
 
@@ -1472,4 +1472,264 @@ def pdf_qr_sign(
     c.drawRightString(page_w - 2 * cm, 0.72 * cm, "QR-Schild")
     c.showPage()
     c.save()
+    return buf.getvalue()
+
+
+# ---------------------------------------------------------------- Regelwerk der Liga (docs/LIGA.md, #1646)
+
+# Randstrich und Hinweis der geänderten Abschnitte: Der Strich trägt die Farbe, das Wort „GEÄNDERT“ sagt es auch ohne Farbe.
+MARK_INK = GOLD_INK
+_RULES_PDF_SUBSTITUTES = {"→": "->", "←": "<-", "≥": ">=", "≤": "<=", "≠": "!=", "✓": "OK", "✔": "OK", "✗": "X", "✘": "X"}
+_RULES_LINK = re.compile(r"(!?)\[([^\]\n]+)\]\(([^)\s]+)\)")
+_RULES_SAFE_LINK = re.compile(r"^(https?://|mailto:|tel:)", re.IGNORECASE)
+_RULES_IMAGE_LINE = re.compile(r"^!\[[^\]\n]*\]\(([^)\s]+)\)$")
+_RULES_TABLE_DIVIDER = re.compile(r"^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$")
+
+
+def _rules_pdf_text(value) -> str:
+    """Die Standardschrift kann nur Westeuropäisches: Bekannte Zeichen bekommen eine Umschreibung, Emoji fallen weg."""
+    out = []
+    for char in str(value or ""):
+        try:
+            char.encode("cp1252")
+            out.append(char)
+        except UnicodeEncodeError:
+            out.append(_RULES_PDF_SUBSTITUTES.get(char, ""))
+    return "".join(out)
+
+
+def _rules_inline_marks(raw: str) -> str:
+    html = escape(raw)
+    html = re.sub(r"`(.+?)`", r'<font face="Courier">\1</font>', html)
+    html = re.sub(r"~~(.+?)~~", r"<strike>\1</strike>", html)
+    html = re.sub(r"\+\+(.+?)\+\+", r"<u>\1</u>", html)
+    html = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", html)
+    return re.sub(r"\*(.+?)\*", r"<i>\1</i>", html)
+
+
+def pdf_rules_inline(raw: str, anchors=frozenset()) -> str:
+    """Eine Zeile Markdown als Absatz-Markup - alles maskiert, nur unsere Tags; Links nur auf sichere Ziele oder eigene Anker,
+    Bilder als Hinweis (das PDF lädt nichts nach)."""
+    text = _rules_pdf_text(raw)
+    out = ""
+    last = 0
+    for match in _RULES_LINK.finditer(text):
+        out += _rules_inline_marks(text[last:match.start()])
+        label = _rules_inline_marks(match.group(2))
+        target = match.group(3)
+        if match.group(1):
+            out += f"[Bild: {escape(match.group(2))}]"
+        elif _RULES_SAFE_LINK.match(target) or (target.startswith("#") and target[1:] in anchors):
+            out += f'<a href="{escape(target, {chr(34): "&quot;"})}" color="#10688A"><u>{label}</u></a>'
+        else:
+            out += label
+        last = match.end()
+    return out + _rules_inline_marks(text[last:])
+
+
+def _rules_para(make, raw: str, style, anchors, **extra):
+    """Ein Absatz aus einer Zeile Markdown. Überkreuzte Marken („**a*b**c*“) verzeiht der Browser, der Absatz-Parser nicht: dann
+    steht der Text ohne Formatierung da, statt dass das ganze PDF scheitert."""
+    try:
+        return make(pdf_rules_inline(raw, anchors), style, **extra)
+    except ValueError:
+        return make(escape(_rules_pdf_text(raw)), style, **extra)
+
+
+class _MarkedParagraph(Paragraph):
+    """Absatz eines geänderten Abschnitts: Randstrich links, auch wenn er über Seiten läuft (``split`` baut dieselbe Klasse)."""
+
+    def draw(self):
+        self.canv.saveState()
+        self.canv.setStrokeColor(MARK_INK)
+        self.canv.setLineWidth(2.2)
+        self.canv.line(-9, -float(self.style.spaceAfter or 0), -9, self.height)
+        self.canv.restoreState()
+        super().draw()
+
+
+def _rules_styles() -> dict:
+    base = _base_styles()
+    body = ParagraphStyle("RulesBody", parent=base["TLSBody"], fontSize=9.5, leading=13.5, spaceAfter=6)
+    return {
+        "body": body,
+        "item": ParagraphStyle("RulesItem", parent=body, leftIndent=14, bulletIndent=2, spaceAfter=3),
+        "quote": ParagraphStyle("RulesQuote", parent=body, leftIndent=12, textColor=INK_SOFT),
+        "code": ParagraphStyle("RulesCode", parent=body, fontName="Courier", fontSize=8, leading=11, backColor=TINT, borderPadding=4),
+        "cell": ParagraphStyle("RulesCell", parent=body, fontSize=8.5, leading=11, spaceAfter=0),
+        "cell_small": ParagraphStyle("RulesCellSmall", parent=body, fontSize=6, leading=8, spaceAfter=0),
+        "meta": ParagraphStyle("RulesMeta", parent=body, textColor=INK_SOFT, fontSize=8.5, leading=12, spaceAfter=2),
+        "h1": ParagraphStyle("RulesH1", parent=base["TLSSection"], fontSize=13, leading=17, spaceBefore=14, spaceAfter=6, keepWithNext=1),
+        "h2": ParagraphStyle("RulesH2", parent=base["TLSSection"], fontSize=11, leading=15, spaceBefore=10, spaceAfter=4, keepWithNext=1),
+        "h3": ParagraphStyle("RulesH3", parent=base["TLSBody"], fontName="Helvetica-Bold", fontSize=9.5, leading=13, spaceBefore=8, spaceAfter=3, keepWithNext=1),
+        "box_title": ParagraphStyle("RulesBoxTitle", parent=base["TLSSection"], fontSize=11, leading=15, spaceBefore=4, spaceAfter=3, textColor=MARK_INK),
+        "toc": ParagraphStyle("RulesToc", parent=body, spaceAfter=1, fontSize=9, leading=12.5),
+        "TLSTitle": base["TLSTitle"], "TLSSubtitle": base["TLSSubtitle"],
+    }
+
+
+def _rules_table(rows: list[list[str]], styles: dict, width: float, anchors, marked: bool):
+    columns = max(len(row) for row in rows)
+    cell = styles["cell_small"] if columns > 6 else styles["cell"]
+    data = [[_rules_para(Paragraph, row[index] if index < len(row) else "", cell, anchors) for index in range(columns)] for row in rows]
+    table = Table(data, colWidths=[width / columns] * columns, repeatRows=1)
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), TINT), ("GRID", (0, 0), (-1, -1), 0.25, RULE), ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("LEFTPADDING", (0, 0), (-1, -1), 3 if columns > 6 else 5), ("RIGHTPADDING", (0, 0), (-1, -1), 3 if columns > 6 else 5),
+        *([("LINEBEFORE", (0, 0), (0, -1), 2.2, MARK_INK)] if marked else []),
+    ]))
+    table.hAlign = "LEFT"
+    return table
+
+
+def _rules_image(url: str, width: float):
+    """Ein Bild auf eigener Zeile aus dem eigenen Upload, höchstens so breit wie der Text. Fehlt die Datei oder ist sie kaputt: ``None``."""
+    path = _local_upload_path(url)
+    if not path:
+        return None
+    try:
+        with Image.open(path) as picture:
+            picture.verify()
+        with Image.open(path) as picture:
+            image_w, image_h = picture.size
+    except (OSError, ValueError, SyntaxError):
+        return None
+    scale = min(width / image_w, 16 * cm / image_h, 1)
+    flowable = PlatypusImage(str(path), width=image_w * scale, height=image_h * scale)
+    flowable.hAlign = "LEFT"
+    return flowable
+
+
+def _rules_blocks(body_md: str, styles: dict, width: float, anchors, marked: bool) -> list:
+    """Markdown wie ``markdownLite`` im Web - Absätze, Listen, Zitate, Tabellen, Code. Rohes HTML bleibt Text."""
+    make = _MarkedParagraph if marked else Paragraph
+    lines = str(body_md or "").replace("\r\n", "\n").split("\n")
+    out: list = []
+    index = 0
+
+    def cells(line: str) -> list[str]:
+        return [part.strip() for part in line.strip().removeprefix("|").removesuffix("|").split("|")]
+
+    while index < len(lines):
+        raw = lines[index]
+        index += 1
+        if raw.strip().startswith("```"):
+            code: list[str] = []
+            while index < len(lines) and not lines[index].strip().startswith("```"):
+                code.append(lines[index])
+                index += 1
+            index += 1
+            markup = "<br/>".join(escape(_rules_pdf_text(line)).replace("  ", "&nbsp;&nbsp;") for line in code)
+            out.append(make(markup, styles["code"]))
+        elif "|" in raw and index < len(lines) and _RULES_TABLE_DIVIDER.match(lines[index]):
+            rows = [cells(raw)]
+            index += 1
+            while index < len(lines) and "|" in lines[index] and not _RULES_TABLE_DIVIDER.match(lines[index]):
+                rows.append(cells(lines[index]))
+                index += 1
+            out.append(_rules_table(rows, styles, width, anchors, marked))
+            out.append(Spacer(1, 6))
+        elif re.match(r"^\s*[-*]\s+", raw):
+            out.append(_rules_para(make, re.sub(r"^\s*[-*]\s+", "", raw), styles["item"], anchors, bulletText="•"))
+        elif re.match(r"^\s*\d+\.\s+", raw):
+            number = re.match(r"^\s*(\d+)\.", raw).group(1)
+            out.append(_rules_para(make, re.sub(r"^\s*\d+\.\s+", "", raw), styles["item"], anchors, bulletText=f"{number}."))
+        elif raw.startswith(">"):
+            out.append(_rules_para(make, re.sub(r"^>\s?", "", raw), styles["quote"], anchors))
+        elif re.match(r"^---+$", raw):
+            out.append(HRFlowable(width="100%", thickness=0.5, color=RULE, spaceBefore=4, spaceAfter=8))
+        elif raw.strip():
+            own_line = _RULES_IMAGE_LINE.match(raw.strip())
+            picture = _rules_image(own_line.group(1), width) if own_line else None
+            if picture:
+                out.extend([picture, Spacer(1, 6)])
+            else:
+                out.append(_rules_para(make, raw, styles["body"], anchors))
+    return out
+
+
+def _rules_day(value) -> str:
+    match = re.match(r"^(\d{4})-(\d{2})-(\d{2})$", str(value or ""))
+    return f"{match.group(3)}.{match.group(2)}.{match.group(1)}" if match else "—"
+
+
+def _rules_footer_text(document: dict) -> str:
+    stand = _pdf_datetime_label(document.get("published_at"))[:10]
+    parts = (document.get("context"), f"Version {document.get('version')}", f"gültig ab {_rules_day(document.get('valid_from'))}", f"Stand {stand}")
+    return _rules_pdf_text(" · ".join(str(part) for part in parts if part))
+
+
+def _rules_change_box(document: dict, styles: dict, anchors) -> list:
+    sections = document.get("sections") or []
+    marked = [row for row in sections if row.get("mark")]
+    removed = document.get("removed") or []
+    if not marked and not removed:
+        return []
+    story: list = [Paragraph(f"Neu in Version {document.get('version')}", styles["box_title"])]
+    if document.get("base_label"):
+        story.append(Paragraph(escape(f"Vergleich mit {document['base_label']}. Markierte Abschnitte haben links einen Strich."), styles["meta"]))
+    for row in marked:
+        word = "Neu" if row["mark"] == "new" else "Geändert"
+        title = escape(_rules_pdf_text(row.get("title") or "Einleitung"))
+        link = f'<a href="#{escape(row["anchor"])}" color="#10688A"><u>{title}</u></a>' if row["anchor"] in anchors else title
+        story.append(Paragraph(f"{word}: {link}", styles["toc"]))
+    for row in removed:
+        story.append(Paragraph(f"Entfernt: {escape(_rules_pdf_text(row.get('title') or 'Einleitung'))}", styles["toc"]))
+    story.append(Spacer(1, 10))
+    return story
+
+
+def pdf_league_rules(document: dict, pdf_branding: dict | None = None) -> bytes:
+    """Eine Fassung des Regelwerks: Version und Datum auf jeder Seite, geänderte Abschnitte mit Strich und Wort. Alles kommt aus der
+    Fassung; ohne Erzeugungszeit, damit dieselbe Fassung dieselbe Datei gibt."""
+    buf = io.BytesIO()
+    title = _rules_pdf_text(document.get("title") or "Regelwerk")
+    doc = _doc(buf, f"{title} - Version {document.get('version')}", branding=pdf_branding)
+    doc.invariant = 1
+    footer = _rules_footer_text(document)
+    styles = _rules_styles()
+    sections = document.get("sections") or []
+    anchors = {row["anchor"] for row in sections}
+    width = doc.width - 12
+
+    def page(canvas, template):
+        canvas.saveState()
+        canvas.setFillColor(PAPER)
+        canvas.rect(0, 0, template.pagesize[0], template.pagesize[1], fill=1, stroke=0)
+        canvas.setFillColor(CYAN)
+        canvas.rect(0, template.pagesize[1] - 3, template.pagesize[0], 3, fill=1, stroke=0)
+        _draw_brand_header(canvas, template, getattr(template, "tls_pdf_branding", {}))
+        canvas.setFillColor(INK_SOFT)
+        canvas.setFont("Helvetica", 7.5)
+        canvas.drawString(2 * cm, 0.72 * cm, _truncate_to_width(footer, template.pagesize[0] - 6 * cm, "Helvetica", 7.5))
+        canvas.drawRightString(template.pagesize[0] - 2 * cm, 0.72 * cm, f"Seite {template.page}")
+        canvas.restoreState()
+
+    story: list = []
+    _header(story, styles, f"Regelwerk · {_rules_pdf_text(document.get('context'))}", title)
+    story.append(Paragraph(escape(footer), styles["meta"]))
+    if document.get("change_reason"):
+        story.append(Paragraph(escape(_rules_pdf_text(f"Änderungsgrund: {document['change_reason']}")), styles["meta"]))
+    story.append(Spacer(1, 10))
+    story.extend(_rules_change_box(document, styles, anchors))
+    headed = [row for row in sections if row.get("title") and int(row.get("level") or 0) <= 2]
+    if len(headed) >= 3:
+        story.append(Paragraph("Inhalt", styles["h2"]))
+        for row in headed:
+            indent = "&nbsp;&nbsp;&nbsp;" if int(row.get("level") or 0) > 1 else ""
+            story.append(Paragraph(f'{indent}<a href="#{escape(row["anchor"])}" color="#10688A">{escape(_rules_pdf_text(row["title"]))}</a>', styles["toc"]))
+        story.append(Spacer(1, 8))
+    for row in sections:
+        marked = bool(row.get("mark"))
+        make = _MarkedParagraph if marked else Paragraph
+        if row.get("title"):
+            word = {"new": "NEU", "changed": "GEÄNDERT"}.get(row.get("mark"))
+            hint = f' <font size="7" color="#8A6D22">{word} IN VERSION {document.get("version")}</font>' if word else ""
+            markup = f'<a name="{escape(row["anchor"])}"/>{escape(_rules_pdf_text(row["title"]))}{hint}'
+            story.append(make(markup, styles[f"h{min(max(int(row.get('level') or 1), 1), 3)}"]))
+        elif marked:
+            story.append(make(f'<a name="{escape(row["anchor"])}"/><font size="7" color="#8A6D22">GEÄNDERT IN VERSION {document.get("version")}</font>', styles["meta"]))
+        story.extend(_rules_blocks(row.get("body_md") or "", styles, width, anchors, marked))
+    doc.build(story, onFirstPage=page, onLaterPages=page)
     return buf.getvalue()

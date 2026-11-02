@@ -162,6 +162,15 @@ async def init_indexes():
     # Liga-Kader (#2108): die Spiel-ID je Season und Spieler - ein Eintrag je Person und Season.
     await db.league_rosters.create_index([("season_id", 1), ("user_id", 1)], unique=True)
     await db.league_rosters.create_index("user_id")
+    # Regelwerk (#1646): je Geltungsbereich jede Nummer einmal und höchstens ein Entwurf; eine Zustimmung je Fassung, Co-Team und Person.
+    await db.league_rules.create_index("id", unique=True)
+    await db.league_rules.create_index([("scope", 1), ("scope_id", 1), ("version", 1)], unique=True, name="league_rules_version",
+                                       partialFilterExpression={"status": "published"})
+    await db.league_rules.create_index([("scope", 1), ("scope_id", 1)], unique=True, name="league_rules_one_draft",
+                                       partialFilterExpression={"status": "draft"})
+    await db.league_rule_consents.create_index([("rule_version_id", 1), ("season_id", 1), ("squad_id", 1), ("user_id", 1)], unique=True)
+    await db.league_rule_consents.create_index([("season_id", 1), ("squad_id", 1)])
+    await db.league_rule_consents.create_index("user_id")
     # Events
     await db.events.create_index("id", unique=True)
     await db.events.create_index("slug", unique=True)

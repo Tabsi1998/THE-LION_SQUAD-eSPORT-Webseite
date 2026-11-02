@@ -110,6 +110,8 @@ async def migrate_all() -> dict:
             cursor = db[coll_name].find({})
             async for doc in cursor:
                 scanned += 1
+                if media_audit.is_frozen(coll_name, doc):
+                    continue  # eine veröffentlichte Regelversion bleibt, wie sie ist (#1646)
                 changed = dict(doc)
                 for f, text in fields:
                     for value in media_audit.values_at(doc, f):
@@ -125,7 +127,8 @@ async def migrate_all() -> dict:
                 updates = {key: value for key, value in changed.items() if value != doc.get(key)}
                 if updates:
                     query = {"id": doc["id"]} if doc.get("id") else {"_id": doc["_id"]}
-                    await db[coll_name].update_one(query, {"$set": updates})
+                    # Das Herunterladen dauert: Inzwischen veröffentlicht heißt unveränderlich (#1646).
+                    await db[coll_name].update_one({**query, **media_audit.write_guard(coll_name)}, {"$set": updates})
                     updated += 1
             summary[coll_name] = {"scanned": scanned, "updated": updated, "failed": failed}
     logger.info(f"[image-migrate] done: {summary}")

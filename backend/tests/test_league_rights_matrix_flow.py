@@ -30,6 +30,8 @@ DELETE_BODY = {"reason": "Testfall aufräumen"}
 RESULT_BODY = "RESULT"
 FORFEIT_BODY = "FORFEIT"
 POOL_BODY = {"modes": [{"mode": "stellung", "map_ids": ["map-hafen"]}]}
+RULE_TEXT = {"title": "Regelwerk", "body_md": "# Fairplay\nText", "annexes": []}
+RULE_PUBLISH = {"revision": 1, "valid_from": "2030-01-01", "change_reason": "Ein Grund"}
 
 
 def route(method: str, url: str, needs, body=None):
@@ -64,6 +66,15 @@ ROUTES = [
     route("GET", "/api/admin/leagues/seasons/{season}/roster", "roster"),
     route("POST", "/api/admin/leagues/seasons/{season}/roster/{user}/approve", "roster", {"reason": "Geprüft"}),
     route("PUT", "/api/admin/leagues/seasons/{season}/roster-settings", "roster", {"roster_deadline": None}),
+    # Regelwerk (#1646): je Season und liga-weit
+    *[entry for target in ("league_season/{season}", "league/{league}") for entry in (
+        route("GET", f"/api/admin/league-rules/{target}", "rules"),
+        route("PUT", f"/api/admin/league-rules/{target}/draft", "rules", RULE_TEXT),
+        route("POST", f"/api/admin/league-rules/{target}/draft/from-version", "rules", {}),
+        route("DELETE", f"/api/admin/league-rules/{target}/draft", "rules"),
+        route("POST", f"/api/admin/league-rules/{target}/preview", "rules", RULE_TEXT),
+        route("POST", f"/api/admin/league-rules/{target}/publish", "rules", RULE_PUBLISH),
+    )],
     # Staffel: verwalten
     route("PATCH", "/api/tournaments/{tid}", "manage", {"description": "Neu"}),
     route("POST", "/api/tournaments/{tid}/status", "manage", {"status": "paused"}),

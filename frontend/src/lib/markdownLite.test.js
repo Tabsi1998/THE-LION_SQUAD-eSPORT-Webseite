@@ -19,6 +19,10 @@ test("generic markdown keeps existing profile-link behavior without an allowlist
   expect(html).toContain('href="/u/Player"');
 });
 
+test("ohne Option bleibt jedes sichere Bild ein Bild (News, Events, Turniertexte)", () => {
+  expect(renderMarkdownLite("![Plan](https://bilder.example.test/plan.png)")).toContain('<img src="https://bilder.example.test/plan.png"');
+});
+
 test("protokoll-relative Links auf fremde Seiten werden kein Link", () => {
   for (const href of ["//evil.example", "//evil.example/pfad", "/\\evil.example"]) {
     const html = renderMarkdownLite(`[Klick](${href})`);

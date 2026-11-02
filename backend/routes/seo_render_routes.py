@@ -243,6 +243,11 @@ async def resolve_meta(raw_path: str, request: Request) -> dict:
     if first == "seasons" and slug:
         return await season_meta(db, slug, meta, origin)
     if first == "liga" and slug and len(parts) > 2:
+        # Regelseite (#1646): „regeln“ ist als Season-Adresse reserviert.
+        if parts[2].lower() == "regeln":
+            return await league_rules_meta(db, slug, None, meta, origin)
+        if len(parts) > 3 and parts[3].lower() == "regeln":
+            return await league_rules_meta(db, slug, unquote(parts[2]), meta, origin)
         return await league_season_meta(db, slug, unquote(parts[2]), meta, origin)
     if first in {"gallery", "galerie"} and slug:
         return await gallery_meta(db, slug, meta, origin)
@@ -521,6 +526,27 @@ async def season_meta(db, slug: str, base: dict, origin: str) -> dict:
     }
     meta["json_ld"] = webpage_json_ld(meta)
     return add_breadcrumbs(meta, origin, [("Jahreswertung", "/seasons")], season.get("name"))
+
+
+async def league_rules_meta(db, league_slug: str, season_slug: str | None, base: dict, origin: str) -> dict:
+    """Regelseite (#1646): wie die Ligaseite - öffentlich mit Titel, „Nur Mitglieder“ neutral ohne Index, sonst 404. Die Seite der Liga
+    richtet sich nach ihren Seasons."""
+    league = await db.leagues.find_one({"slug": league_slug, "status": "active"}, {"_id": 0})
+    query = {"league_id": (league or {}).get("id"), "status": {"$ne": "archived"}}
+    rows = await db.league_seasons.find({**query, **({"slug": season_slug} if season_slug else {})}, {"_id": 0}).to_list(200) if league else []
+    visibilities = {row.get("visibility") or "off" for row in rows}
+    if not visibilities & {"public", "members"}:
+        raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
+    path = f"{league['slug']}/{season_slug}/regeln" if season_slug else f"{league['slug']}/regeln"
+    canonical = f"{origin}/liga/{path}"
+    if "public" not in visibilities:
+        return restricted_meta("league", rows[0], base, origin, canonical)
+    name = " ".join(str(part) for part in (league.get("name"), rows[0].get("name") if season_slug else None) if part)
+    title = f"Regeln {name}"
+    meta = {**base, "title": f"{title} · {base['site_name']}", "url": canonical, "canonical": canonical, "type": "website",
+            "description": clean_text(f"Das Regelwerk der {name}: Inhaltsverzeichnis, Änderungen je Version und PDF.")}
+    meta["json_ld"] = webpage_json_ld(meta)
+    return add_breadcrumbs(meta, origin, [("Liga", "/liga")], title)
 
 
 async def league_season_meta(db, league_slug: str, season_slug: str, base: dict, origin: str) -> dict:

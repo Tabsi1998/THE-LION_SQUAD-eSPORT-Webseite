@@ -46,6 +46,8 @@ HOLD_SECONDS = 10
 # Das „Rückgängig“ der Oberfläche zählt 10 Sekunden ab der Antwort; der Server wartet etwas länger.
 GRACE_SECONDS = 2
 NO_SHOW_NOTE = "Nicht erschienen"
+# Was mit dem Ergebnis gilt und beim Zurücknehmen mit weggeht (Liga: #1650, Regelwerk: #1646).
+RESULT_ONLY_FIELDS = ("games", "lineups_missing", "rule_version_id")
 BUSY_DETAIL = "Für dieses Spiel wird gerade ein Ergebnis gespeichert. Bitte kurz warten oder „Rückgängig“ nutzen."
 # Felder einer Ergebniszeile, die das gehaltene Ergebnis aufhebt - dieselben, die der Ergebnis-Weg liest.
 RESULT_FIELDS = ("registration_id", "rank", "score", "points", "time_ms", "dnf", "forfeit", "note")
@@ -401,7 +403,9 @@ async def _revert_published(db, match: dict, *, actor_id: str, hold_id: str | No
         "$set": {"results": [], "result_meta": None, "completed_at": None, "completed_by": None,
                  "status": _open_status(match), "updated_at": now_iso},
         # Liga (#1650): die geltenden Maps gehören zum Ergebnis - offene Meldungen bleiben, der Index folgt ihnen.
-        **({"$unset": {"games": "", "lineups_missing": ""}} if "games" in match or "lineups_missing" in match else {}),
+        # Regelwerk (#1646): kein Ergebnis, keine Fassung - das nächste Ergebnis hält die dann gültige fest.
+        **({"$unset": {key: "" for key in RESULT_ONLY_FIELDS if key in match}}
+           if any(key in match for key in RESULT_ONLY_FIELDS) else {}),
     })
     if "games" in match or match.get("lineup_user_ids"):
         from services.league_games import refresh_lineup_index

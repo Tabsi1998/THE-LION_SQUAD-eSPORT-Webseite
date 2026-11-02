@@ -150,6 +150,6 @@ def test_internal_nginx_uses_one_nonce_based_csp_without_external_fonts():
     # für den persönlichen Kalender-Link ohne Zugriffsprotokoll (#1189). Dazu die Update-Prüfung der App (#1002): ihr Block
     # lässt das „no-store“ von /api/ weg, damit sie kurz zwischenspeicherbar ist - nginx erbt add_header dann nicht, also
     # stehen die Sicherheits-Kopfzeilen dort noch einmal.
-    assert nginx.count("add_header Content-Security-Policy $tls_content_security_policy always;") == 12
+    assert nginx.count("add_header Content-Security-Policy $tls_content_security_policy always;") == 13
     assert 'meta name="csp-nonce" content="$request_id"' in nginx
     assert "fonts.googleapis.com" not in css

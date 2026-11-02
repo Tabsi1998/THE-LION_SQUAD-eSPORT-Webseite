@@ -179,6 +179,8 @@ async def _user_data_sections(db, user_id: str) -> list[tuple[str, tuple]]:
         ("tournament_registrations", _rows(db.tournament_registrations, me)),
         # Liga-Kader (#2108): die festgehaltene Spiel-ID je Season samt Freigaben.
         ("league_rosters", _rows(db.league_rosters, me)),
+        # Regelwerk (#1646): welcher Fassung die Person für welches Co-Team zugestimmt hat.
+        ("league_rule_consents", _rows(db.league_rule_consents, me)),
         ("competition_matches", _value(matches)),
         ("event_registrations", _rows(db.event_registrations, me)),
         ("f1_lap_times", _rows(db.f1_lap_times, me)),

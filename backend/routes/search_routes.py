@@ -203,6 +203,14 @@ async def _search_teams(db, pattern: str, limit: int) -> list[dict]:
     ]
 
 
+async def _search_league_rules(db, pattern: str, user: dict | None, limit: int) -> list[dict]:
+    """Regelwerke (#1646): nur gültige Fassungen, nur was die Person als Seite sehen darf."""
+    from services.league_rules import search_results
+
+    return [_result("league_rules", row["title"], row["url"], subtitle=row["subtitle"], date=row["date"])
+            for row in await search_results(db, pattern, user, limit)]
+
+
 @router.get("")
 async def global_search(
     q: str = Query(default="", min_length=0, max_length=80),
@@ -220,6 +228,7 @@ async def global_search(
         await _search_news(db, pattern, user, limit),
         await _search_players(db, pattern, limit),
         await _search_teams(db, pattern, limit),
+        await _search_league_rules(db, pattern, user, limit),
     ]
     items = [item for group in groups for item in group]
     return {"q": needle, "items": items[: limit * 5]}

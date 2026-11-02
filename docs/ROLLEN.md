@@ -374,6 +374,9 @@ höchstens einen **Captain** und einen **Vertreter**; beide stehen im Kader des 
   gesetzt wird). Die Anmeldung heißt „Team · Co-Team“; die Teamleitung meldet sie nicht selbst ab.
 - **Protokoll:** `team.squad.roles` (vorher und nachher), `league.squad.assign`, `league.squad.remove`,
   `league.roster.approve` (Grund, ohne die ID), `league.season.roster_deadline`.
+- **Regelwerk (#1646):** Pflegen und veröffentlichen, den Stand der Zustimmungen und den Hinweis „Daten geändert“ sehen darf der Bereich `leagues` oder die Zuständigkeit
+  `rules` in dieser Liga, mit bestätigter Zwei-Faktor-Anmeldung. Die Rolle `tournament_admin` und die Freigabe `tournaments` geben dort nichts. Zustimmen dürfen die
+  Verantwortlichen des Co-Teams: Captain und Vertreter, ohne beide die Leitung des Hauptteams. Die Turnierleitung stimmt nicht für ein Co-Team zu.
 - **Spiel-ID je Season (#2108):** Die IDs der Spieler sehen nur die Person selbst (Profil), die Beteiligten des Spiels
   (Matchseite, wie Aufstellungen) und wer das Liga-Recht „Kader prüfen“ hat (`/api/admin/leagues/seasons/{id}/roster`).
   Code: `services/league_roster.py`.

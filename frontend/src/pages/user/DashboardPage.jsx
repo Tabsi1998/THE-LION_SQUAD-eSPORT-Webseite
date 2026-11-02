@@ -11,7 +11,7 @@ import { AchievementsTile } from "@/components/tls/AchievementsTile";
 import { DashboardNotifications } from "./DashboardNotifications";
 import { dashboardActions, formatVienna, registrationLabel, seasonLine, splitHomeTimeline, timelineItems } from "@/lib/dashboard";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
-import { Trophy, Crown, Gift, AlertTriangle, UserCheck, CalendarClock, CalendarDays, ClipboardCheck, Shield, ChevronRight, Award, Swords, Settings, Star, Users } from "lucide-react";
+import { Trophy, Crown, Gift, AlertTriangle, UserCheck, CalendarClock, CalendarDays, ClipboardCheck, Shield, ChevronRight, Award, Swords, Settings, ScrollText, Star, Users } from "lucide-react";
 import { viennaDateTime } from "@/lib/vienna";
 import { stationText } from "@/lib/tournamentLabels";
 import { FeedbackDialog } from "@/components/tls/FeedbackDialog";
@@ -66,6 +66,7 @@ function actionIcon(type) {
   // Liga (#2110, #2202): Terminvorschlag beantworten, Aufstellung nachtragen, Kader auffüllen.
   if (type === "match_schedule") return CalendarClock;
   if (type === "match_lineup" || type === "squad_short") return Users;
+  if (type === "rules_consent") return ScrollText;
   if (String(type || "").includes("checkin")) return ClipboardCheck;
   if (String(type || "").includes("prize")) return Gift;
   if (String(type || "").includes("match")) return Swords;

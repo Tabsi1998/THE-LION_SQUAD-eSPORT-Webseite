@@ -126,6 +126,8 @@ export function actionHref(action) {
     case "prizes": return "/my/prizes";
     // Kader auffüllen (#2202): `team_id` statt `target_id` - die App kennt das Ziel noch nicht und zeigt nur die Zeile.
     case "team": return action.team_id ? `/teams/${action.team_id}` : "/teams";
+    // Regeln zustimmen (#1646): `rules_url` statt `target_id` - die App zeigt nur die Zeile.
+    case "league_rules": return action.rules_url || "";
     default: return "";
   }
 }
