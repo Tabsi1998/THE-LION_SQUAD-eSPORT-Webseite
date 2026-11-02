@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.55.2 (02.11.2026)
+
+### Fehlerbehebungen
+
+* Profil zeigt alle verknüpften Konten, nicht nur 20 (#2200)
+
 ## 1.55.1 (02.11.2026)
 
 ### Dokumentation
