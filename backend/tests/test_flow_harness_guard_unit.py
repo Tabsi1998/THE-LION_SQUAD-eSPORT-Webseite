@@ -1,6 +1,7 @@
 """Die Sicherung der Ablauf-Tests gegen echtes MongoDB (#2200): nur eigene Rechner, nur Testdatenbanken. Ohne Server."""
 from __future__ import annotations
 
+import importlib.util
 import pathlib
 import re
 import sys
@@ -70,7 +71,11 @@ def test_other_database_names_are_never_touched(name):
         flow_mongo.check_db_name(name)
 
 
-def test_the_local_check_uses_the_image_of_the_compose_file():
+def test_the_local_check_reads_the_image_from_the_compose_file():
     root = pathlib.Path(__file__).resolve().parents[2]
-    image = re.search(r"^\s*image: (mongo:\S+)$", (root / "docker-compose.yml").read_text(encoding="utf-8"), re.M).group(1)
-    assert f'FLOW_MONGO_IMAGE = "{image}"' in (root / "scripts" / "local_check.py").read_text(encoding="utf-8")
+    spec = importlib.util.spec_from_file_location("local_check", root / "scripts" / "local_check.py")
+    local_check = importlib.util.module_from_spec(spec)
+    sys.modules["local_check"] = local_check  # @dataclass löst Typen über sys.modules auf
+    spec.loader.exec_module(local_check)
+    compose = (root / "docker-compose.yml").read_text(encoding="utf-8")
+    assert local_check.mongo_image() == re.search(r"image: (mongo:\S+)", compose).group(1)
