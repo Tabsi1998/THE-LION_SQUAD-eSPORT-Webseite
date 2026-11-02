@@ -568,14 +568,12 @@ test("die Schwellen der Paar-Prüfung stehen in Prozent und gehen als Anteil an 
 });
 
 test("Weiß als Ersatzfarbe geht nicht - der Knopf sagt warum", async () => {
-  const user = userEvent.setup();
   show();
-  const ink = await screen.findByTestId("shop-motif-ink");
-  await user.clear(ink);
-  await user.type(ink, "#ffffff");
-  await user.click(screen.getByTestId("shop-motif-settings-save-submit"));
+  // In einem Zug: Beim Tippen Zeichen für Zeichen kam auf dem CI vereinzelt „Nichts geändert.“ an.
+  fireEvent.change(await screen.findByTestId("shop-motif-ink"), { target: { value: "#ffffff" } });
+  fireEvent.click(screen.getByTestId("shop-motif-settings-save-submit"));
   expect(apiMock.put).not.toHaveBeenCalled();
-  expect(screen.getByTestId("shop-motif-settings-save-hint")).toHaveTextContent("nicht Weiß");
+  expect(await screen.findByTestId("shop-motif-settings-save-hint")).toHaveTextContent("nicht Weiß");
 });
 
 test("einen Druckbereich ändern zeigt cm mit und schickt Zoll mit Grund", async () => {
