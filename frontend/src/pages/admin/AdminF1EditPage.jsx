@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import { API, api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { formatLapTime, parseLapTime, plausibilityText, showLapTime } from "@/lib/laptime";
 import { safeHttpUrl } from "@/lib/safeLink";
@@ -39,6 +39,9 @@ export default function AdminF1EditPage() {
   const { isTournamentLead } = useAuth();
   const { id } = useParams();
   const navigate = useNavigate();
+  // Aus der Strafenliste (#2130): ?track= öffnet die Strecke, auf der die Zeit steht.
+  const [searchParams] = useSearchParams();
+  const wantedTrack = searchParams.get("track");
   const [challenge, setChallenge] = useState(null);
   const [tracks, setTracks] = useState([]);
   // Fahrer (#1354): aus der Personensuche - Name, Bild und ob Vereinsmitglied; nicht mehr die ganze Kontoliste.
@@ -65,7 +68,11 @@ export default function AdminF1EditPage() {
     const { data: c } = await api.get(`/f1/challenges/${id}?include_draft=true`);
     setChallenge(c);
     setTracks(c.tracks || []);
-    setActiveTrack((current) => (c.tracks || []).some((track) => track.id === current) ? current : c.tracks?.[0]?.id || null);
+    setActiveTrack((current) => {
+      const known = (trackId) => (c.tracks || []).some((track) => track.id === trackId);
+      if (known(current)) return current;
+      return known(wantedTrack) ? wantedTrack : c.tracks?.[0]?.id || null;
+    });
     // Jede Liste lädt für sich (#1354): fehlt ein Recht, steht an der Stelle ein Satz und der Rest geht weiter.
     if (!isTournamentLead) return;
     try {
@@ -78,7 +85,7 @@ export default function AdminF1EditPage() {
         ? formatRequestError(failure, "Dafür fehlt dir das Recht, das Fast-Lap-Team zu sehen.")
         : "Das Fast-Lap-Team lässt sich gerade nicht laden.");
     }
-  }, [id, isTournamentLead]);
+  }, [id, isTournamentLead, wantedTrack]);
 
   const loadTimes = useCallback(async () => {
     if (!activeTrack) return;

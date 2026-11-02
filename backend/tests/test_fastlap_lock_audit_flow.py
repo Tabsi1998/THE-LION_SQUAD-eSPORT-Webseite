@@ -61,6 +61,39 @@ async def audit(flow, action):
     return await flow.db.audit_logs.find({"action": action}, {"_id": 0}).to_list(50)
 
 
+# ------------------------------------------------------------------ Strafenliste (#2130)
+
+@pytest.mark.asyncio
+async def test_the_penalty_list_leads_to_the_lap_and_a_penalty_can_be_taken_back(flow):
+    cid, tid, driver, lead, _helper = await setup(flow)
+    lap = (await enter(flow, cid, tid, driver, penalty_seconds=5, admin_note=NOTE)).json()
+    row = (await flow.get("/api/admin/penalties")).json()["items"][0]
+    assert row["admin_url"] == f"/admin/f1/{cid}?track={tid}" and row["results_locked"] is False and row["ref_id"] == lap["id"]
+
+    flow.act_as(driver)
+    mine = (await flow.get("/api/penalties/me")).json()["items"][0]
+    assert "admin_url" not in mine and "results_locked" not in mine
+
+    flow.act_as(lead)
+    taken_back = await flow.patch(f"/api/f1/times/{lap['id']}", json={"penalty_seconds": 0, "is_invalid": False})
+    assert taken_back.status_code == 200, taken_back.text
+    assert (await flow.get("/api/admin/penalties")).json()["items"] == []
+    logged = await audit(flow, "fastlap.time.update")
+    assert logged[-1]["data"]["before"]["penalty_seconds"] == 5 and logged[-1]["data"]["after"]["penalty_seconds"] == 0
+
+
+@pytest.mark.asyncio
+async def test_after_publishing_taking_a_penalty_back_needs_a_reason(flow):
+    cid, tid, driver, _lead, _helper = await setup(flow)
+    lap = (await enter(flow, cid, tid, driver, penalty_seconds=5, admin_note=NOTE)).json()
+    await publish(flow, cid)
+    assert (await flow.get("/api/admin/penalties")).json()["items"][0]["results_locked"] is True
+    refused = await flow.patch(f"/api/f1/times/{lap['id']}", json={"penalty_seconds": 0, "is_invalid": False})
+    assert refused.status_code == 409
+    done = await flow.patch(f"/api/f1/times/{lap['id']}", json={"penalty_seconds": 0, "is_invalid": False, "change_reason": REASON})
+    assert done.status_code == 200, done.text
+
+
 # ------------------------------------------------------------------ Sperre nach Veröffentlichung
 
 @pytest.mark.asyncio

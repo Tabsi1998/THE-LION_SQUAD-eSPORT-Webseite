@@ -284,6 +284,17 @@ test("CSV nur für die Turnierleitung - ein Helfer bekäme sonst eine rohe 403 (
   }
 });
 
+test("aus der Strafenliste: ?track= öffnet die Strecke mit der Zeit (#2130)", async () => {
+  answerWith({ status: "live", tracks: [{ id: "tr-1", name: "Spa" }, { id: "tr-2", name: "Monza" }] });
+  render(
+    <MemoryRouter initialEntries={["/admin/f1/c-1?track=tr-2"]}>
+      <Routes><Route path="/admin/f1/:id" element={<AdminF1EditPage />} /></Routes>
+    </MemoryRouter>,
+  );
+  await screen.findByRole("heading", { name: "Monza Sprint" });
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/f1/challenges/c-1/times?track_id=tr-2"));
+});
+
 test("Veröffentlicht: Archivieren ist frei (#2130)", async () => {
   answerWith({ status: "results_published", participant_count: 3 });
   renderPage();

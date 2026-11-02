@@ -56,7 +56,7 @@ async def _collect_user_penalties(user_id: str) -> list[dict]:
     tracks = {t["id"]: t for t in await db.f1_tracks.find(
         {"id": {"$in": track_ids}}, {"_id": 0, "id": 1, "name": 1}).to_list(500)}
     chals = {c["id"]: c for c in await db.f1_challenges.find(
-        {"id": {"$in": chal_ids}}, {"_id": 0, "id": 1, "title": 1, "slug": 1}).to_list(500)}
+        {"id": {"$in": chal_ids}}, {"_id": 0, "id": 1, "title": 1, "slug": 1, "status": 1}).to_list(500)}
 
     for l in laps:
         chal = chals.get(l.get("challenge_id"), {})
@@ -78,6 +78,9 @@ async def _collect_user_penalties(user_id: str) -> list[dict]:
             "issued_by": l.get("penalty_set_by") or l.get("created_by"),
             "issued_at": l.get("penalty_set_at") or l.get("updated_at") or l.get("created_at"),
             "ref_id": l.get("id"),
+            "admin_url": f"/admin/f1/{l.get('challenge_id')}?track={l.get('track_id')}",
+            # Nach der Veröffentlichung geht Zurücknehmen nur mit Begründung (#1584, #2130).
+            "results_locked": chal.get("status") in {"results_published", "archived"},
         })
 
     # --- Tournament forfeits across Legacy and Stage/FFA ---
@@ -103,6 +106,7 @@ async def _collect_user_penalties(user_id: str) -> list[dict]:
                 "issued_at": item.get("issued_at"),
                 "ref_id": item.get("match_id"),
                 "match_source": item.get("source"),
+                "admin_url": f"/admin/tournaments/{item.get('tournament_id')}" if item.get("tournament_id") else "",
             })
 
     # --- Negative achievement awards (admin-issued incidents) ---
@@ -126,6 +130,7 @@ async def _collect_user_penalties(user_id: str) -> list[dict]:
             "issued_by": n.get("awarded_by") or context.get("by"),
             "issued_at": n.get("earned_at"),
             "ref_id": n.get("id"),
+            "admin_url": "/admin/achievements?tab=negative",
         })
 
     # Enrich issuer (admin) names
@@ -145,6 +150,10 @@ async def _collect_user_penalties(user_id: str) -> list[dict]:
 async def my_penalties(me: dict = Depends(get_current_user)):
     """Authenticated user's own penalty log."""
     items = await _collect_user_penalties(me["id"])
+    # Wege in die Verwaltung gehören nicht in die eigene Liste.
+    for item in items:
+        item.pop("admin_url", None)
+        item.pop("results_locked", None)
     return {"count": len(items), "items": items}
 
 
