@@ -656,6 +656,16 @@ describe("online und Liga: keine Stationen, keine Zeitleiste je Station", () => 
     expect(weeks).toHaveTextContent("Standardzeit");
     expect(screen.queryByTestId("mp-timeline")).toBeNull();
   });
+
+  it("Liga: Sperrzeit ohne freien Tag zeigt den Hinweis statt eines Termins", async () => {
+    const hint = "Der Standardtermin fällt in eine Sperrzeit und die Woche hat keinen freien Tag – bitte einen Termin festlegen.";
+    const [first, ...rest] = fixture.league.matchdays.matchdays;
+    const [entry, ...others] = first.matches;
+    setup({ ...fixture.league, matchdays: { ...fixture.league.matchdays, matchdays: [
+      { ...first, matches: [{ ...entry, scheduled_at: null, schedule_source: null, schedule_hint: hint }, ...others] }, ...rest] } });
+    const weeks = await screen.findByTestId("mp-league");
+    await waitFor(() => expect(weeks).toHaveTextContent(hint));
+  });
 });
 
 // Live vor Ort (#1556): die Warteschlange des Servers ist die Wahrheit - „Als Nächstes“ je Station, Aufruf und Frist,

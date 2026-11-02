@@ -741,7 +741,7 @@ def default_time(setup: LeagueSetup) -> str | None:
     solange ihn noch kein Lauf ins Spiel geschrieben hat (#2096). ``None``, wenn die Woche ihn nicht enthält."""
     from services.matchday_schedule import (
         MatchdayScheduleError,
-        default_time_in,
+        default_time_for,
         matchday_number_of,
         matchday_settings,
         tournament_matchday_window,
@@ -753,7 +753,8 @@ def default_time(setup: LeagueSetup) -> str | None:
     settings = matchday_settings(setup.tournament)
     try:
         window = tournament_matchday_window(setup.tournament, number)
-        moment = default_time_in(window, weekday=settings["weekday"], hour=settings["hour"], minute=settings["minute"])
+        moment = default_time_for(setup.tournament, window, weekday=settings["weekday"], hour=settings["hour"],
+                                  minute=settings["minute"])
     except (MatchdayScheduleError, TypeError, ValueError):
         return None
     return moment.isoformat() if moment else None

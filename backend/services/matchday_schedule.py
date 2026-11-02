@@ -291,6 +291,25 @@ def default_time_in(window: MatchdayWindow, *, weekday: int = DEFAULT_WEEKDAY,
     return moment if window.contains(moment) else None
 
 
+def default_time_for(tournament: dict | None, window: MatchdayWindow, *, weekday: int = DEFAULT_WEEKDAY,
+                     hour: int = DEFAULT_HOUR, minute: int = DEFAULT_MINUTE) -> datetime | None:
+    """Der Standardtermin dieser Woche, nie in einer Sperrzeit (#2201): Fällt der Standardtag hinein, gilt zur selben
+    Uhrzeit der nächste freie Tag der Woche, sonst der letzte davor. Ohne freien Tag ``None``."""
+    moment = default_time_in(window, weekday=weekday, hour=hour, minute=minute)
+    if moment is None or not blocked_period_at(tournament, moment):
+        return moment
+    local = moment.astimezone(LOCAL_TZ)
+    span = round((window.end - window.start).total_seconds() / 86400)
+    for offset in [*range(1, span), *range(-1, -span, -1)]:
+        candidate = (local + timedelta(days=offset)).astimezone(timezone.utc)
+        if window.contains(candidate) and not blocked_period_at(tournament, candidate):
+            return candidate
+    return None
+
+
+BLOCKED_DEFAULT_HINT = "Der Standardtermin fällt in eine Sperrzeit und die Woche hat keinen freien Tag – bitte einen Termin festlegen."
+
+
 def usable_proposals(proposals, window: MatchdayWindow) -> list[dict]:
     """Proposals that could still decide this matchday.
 
@@ -314,7 +333,7 @@ def usable_proposals(proposals, window: MatchdayWindow) -> list[dict]:
 
 def resolve_matchday_time(match: dict, proposals, window: MatchdayWindow, *,
                           weekday: int = DEFAULT_WEEKDAY, hour: int = DEFAULT_HOUR,
-                          minute: int = DEFAULT_MINUTE) -> ScheduleResolution | None:
+                          minute: int = DEFAULT_MINUTE, tournament: dict | None = None) -> ScheduleResolution | None:
     """The time that counts for this match, and the rule that produced it.
 
     The order is the operator's: an accepted time wins, otherwise the home
@@ -340,7 +359,7 @@ def resolve_matchday_time(match: dict, proposals, window: MatchdayWindow, *,
             winner = min(home_offers, key=lambda p: p["_moment"])
             return ScheduleResolution(winner["_moment"], "home", winner.get("id"))
 
-    fallback = default_time_in(window, weekday=weekday, hour=hour, minute=minute)
+    fallback = default_time_for(tournament, window, weekday=weekday, hour=hour, minute=minute)
     if fallback is None:
         return None
     return ScheduleResolution(fallback, "default", None)
@@ -439,14 +458,19 @@ def build_matchday_plan(tournament: dict, matches, proposals=None, stages=None) 
         for match in numbered[number]:
             resolution = resolve_matchday_time(
                 match, by_proposal.get(match.get("id"), []), window,
-                weekday=settings["weekday"], hour=settings["hour"], minute=settings["minute"],
+                weekday=settings["weekday"], hour=settings["hour"], minute=settings["minute"], tournament=tournament,
             )
-            entries.append({
+            entry = {
                 "match_id": match.get("id"),
                 "scheduled_at": resolution.scheduled_at.isoformat() if resolution else None,
                 "schedule_source": resolution.source if resolution else None,
                 "home_registration_id": home_registration_id(match),
-            })
+            }
+            if not resolution and default_time_in(window, weekday=settings["weekday"], hour=settings["hour"],
+                                                  minute=settings["minute"]):
+                # Nur die Sperrzeit nimmt den Termin - das sieht die Leitung in den Spielwochen.
+                entry["schedule_hint"] = BLOCKED_DEFAULT_HINT
+            entries.append(entry)
         plan.append({
             "number": number,
             "calendar_week": calendar_week_of(tournament, number),
@@ -503,12 +527,22 @@ def schedule_writes(tournament: dict, matches, proposals=None, stages=None) -> l
     for matchday in plan["matchdays"]:
         for entry in matchday["matches"]:
             match = by_id.get(entry["match_id"]) or {}
-            if not entry.get("scheduled_at"):
-                continue
             if match.get("schedule_source") in KEPT_SOURCES or match.get("status") in FROZEN_MATCH_STATUSES:
                 continue
-            resolved = _parse(entry["scheduled_at"])
             current = _parse(match.get("scheduled_at"))
+            if not entry.get("scheduled_at"):
+                # Sperrzeit ohne freien Tag (#2201): Ein schon geschriebener Standardtermin bleibt dort nicht stehen.
+                if not (entry.get("schedule_hint") and current and match.get("schedule_source") == "default"):
+                    continue
+                writes.append({
+                    "match_id": entry["match_id"], "matchday": matchday["number"],
+                    "update": {"scheduled_at": None, "schedule_source": None,
+                               "schedule_written_at": datetime.now(timezone.utc).isoformat()},
+                    "expect": {"schedule_source": match.get("schedule_source"), "scheduled_at": match.get("scheduled_at"),
+                               "status": match.get("status")},
+                })
+                continue
+            resolved = _parse(entry["scheduled_at"])
             if current == resolved and match.get("schedule_source") == entry["schedule_source"]:
                 continue
             update = {
