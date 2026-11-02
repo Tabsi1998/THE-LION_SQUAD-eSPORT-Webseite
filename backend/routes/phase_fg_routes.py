@@ -626,6 +626,10 @@ async def admin_rotate_media(filename: str, body: RotateMediaBody, me: dict = De
     if degrees % 360 == 0:
         stat = p.stat()
         return {"ok": True, "filename": filename, "url": f"/api/static/uploads/{filename}", "size": stat.st_size}
+    # Drehen ändert die Datei selbst - eine veröffentlichte Regelversion zeigt aber, was damals galt (#1646).
+    frozen = await media_audit.frozen_usages(get_db(), filename)
+    if frozen:
+        raise HTTPException(409, media_audit.frozen_message(frozen, "drehen"))
     try:
         width, height = await asyncio.to_thread(_rotate_file, p, degrees)
     except UnidentifiedImageError:
@@ -672,6 +676,10 @@ async def admin_delete_media(filename: str, force: bool = False, me: dict = Depe
     sie zeigen, dann die Datei gelöscht - scheitert das, holt der Aufräum-Job es nach. Jede Löschung steht im Protokoll."""
     _media_file_path(filename)
     db = get_db()
+    # Auch mit Bestätigung nicht: eine veröffentlichte Regelversion zeigt die Datei weiter (#1646).
+    frozen = await media_audit.frozen_usages(db, filename)
+    if frozen:
+        raise HTTPException(409, media_audit.frozen_message(frozen, "löschen"))
     if not force:
         usage = (await _collect_media_usage({filename}))[filename]
         if usage:

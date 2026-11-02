@@ -110,6 +110,8 @@ async def migrate_all() -> dict:
             cursor = db[coll_name].find({})
             async for doc in cursor:
                 scanned += 1
+                if media_audit.is_frozen(coll_name, doc):
+                    continue  # eine veröffentlichte Regelversion bleibt, wie sie ist (#1646)
                 changed = dict(doc)
                 for f, text in fields:
                     for value in media_audit.values_at(doc, f):

@@ -138,6 +138,8 @@ SIZE_FIELDS = {
 BATCH = 100
 VARIANT_NAME = re.compile(r"^(?P<stem>.+)-(?P<width>\d{3,4})\.webp$")
 LABEL_FIELDS = ("id", "slug", "name", "title", "display_name", "source")
+# Eine veröffentlichte Regelversion (#1646) bleibt, wie sie ist - dafür liest ``iter_usages`` Stand und Nummer mit.
+FROZEN_FIELDS = ("status", "version")
 
 SCOPE_TARGETS: list[tuple[str, list[str], str]] = [
     ("users", ["avatar_url", "banner_url"], "user"),
@@ -305,7 +307,7 @@ async def iter_usages(db, names: set[str]):
         grouped.setdefault(collection, []).extend((field, text) for field in fields)
     for collection, fields in grouped.items():
         query = {"$or": [{field: {"$regex": pattern}} for field, _text in fields]}
-        projection = {"_id": 1, **{key: 1 for key in LABEL_FIELDS}, **{field: 1 for field, _text in fields}}
+        projection = {"_id": 1, **{key: 1 for key in LABEL_FIELDS + FROZEN_FIELDS}, **{field: 1 for field, _text in fields}}
         async for document in getattr(db, collection).find(query, projection):
             for field, text in fields:
                 # Steht die PNG-Fassung selbst in der Anfrage, zählt die Adresse für sie, nicht für das SVG daneben.
@@ -315,6 +317,23 @@ async def iter_usages(db, names: set[str]):
                          for raw in [uploads_inventory.upload_filename(str(url or ""))]}
                 for name in sorted(found & names):
                     yield collection, document, field, name, text
+
+
+def is_frozen(collection: str, document: dict) -> bool:
+    """Darf diese Stelle nie umgeschrieben werden? Eine veröffentlichte Regelversion ist unveränderlich (#1646), ein Entwurf nicht."""
+    return collection == "league_rules" and document.get("status") == "published"
+
+
+async def frozen_usages(db, filename: str) -> list[str]:
+    """Die unveränderlichen Stellen, die eine Datei zeigen - als Text für die Meldung. Solange es sie gibt, bleibt die Datei, wie sie ist."""
+    return sorted({f"{document.get('title') or 'Regelwerk'}, Version {document.get('version')}"
+                   async for collection, document, _field, _name, _text in iter_usages(db, {filename})
+                   if is_frozen(collection, document)})
+
+
+def frozen_message(places: list[str], action: str) -> str:
+    return (f"Die Datei steht in einer veröffentlichten Regelversion ({'; '.join(places)}) und lässt sich deshalb nicht {action}. "
+            "Eine veröffentlichte Version bleibt unverändert. Für ein neues Bild bitte eine neue Version veröffentlichen.")
 
 
 async def rewrite_field(collection, row_id, path: str, change, extra: dict | None = None) -> bool:
@@ -340,7 +359,8 @@ def versioned_url(url: str, version: int) -> str:
 
 
 async def _rewrite_usages(db, filename: str, change, stamp: dict | None) -> list[tuple]:
-    """Jede Verwendung der Datei mit ``change(adresse)`` umschreiben, auch Adressen in Texten. Liefert die Treffer."""
+    """Jede Verwendung der Datei mit ``change(adresse)`` umschreiben, auch Adressen in Texten - außer in unveränderlichen Stellen
+    (``is_frozen``). Liefert die umgeschriebenen Treffer."""
     candidates = {pathlib.PurePosixPath(filename).stem: filename}
 
     def in_field(value):
@@ -359,7 +379,7 @@ async def _rewrite_usages(db, filename: str, change, stamp: dict | None) -> list
             return text
         return uploads_inventory.URL_IN_TEXT_RE.sub(in_address, text)
 
-    hits = [hit async for hit in iter_usages(db, {filename})]
+    hits = [hit async for hit in iter_usages(db, {filename}) if not is_frozen(hit[0], hit[1])]
     for collection, doc, field, _name, text in hits:
         await rewrite_field(getattr(db, collection), doc["_id"], field, in_text if text else in_field, stamp_for(collection, stamp))
     return hits
