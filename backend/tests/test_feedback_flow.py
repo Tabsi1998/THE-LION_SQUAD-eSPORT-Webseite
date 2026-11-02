@@ -135,7 +135,7 @@ async def test_overview_shows_number_and_average_but_keeps_the_limit_of_three(fl
     assert rows["Mini-Cup"]["count"] == 1 and rows["Mini-Cup"]["details"] is False and rows["Mini-Cup"]["average"] is None
     assert rows["Herbst-Cup"]["average"] == 4.0 and rows["Herbst-LAN"]["average"] == 4.0 and rows["Herbst-LAN"]["declined"] == 1
     # Gesamtschnitt nur aus Veranstaltungen ab drei Antworten: (12 + 16) / 7 = 4,0 - die eine Sterne-Antwort zählt nicht mit.
-    assert data["summary"] == {"targets": 3, "answers": 8, "average": 4.0}
+    assert data["summary"] == {"targets": 3, "answers": 7, "average": 4.0}, "die Antworten, die im Schnitt stecken"
     assert "u9" not in str(data), "ohne Personen"
 
     only_events = (await flow.get("/api/admin/feedback/overview", params={"kind": "event"})).json()

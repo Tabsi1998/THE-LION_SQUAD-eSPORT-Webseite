@@ -269,7 +269,8 @@ async def overview(db, *, kind: str | None = None) -> dict:
     answers = sum(int(row["count"]) for row in counted)
     return {
         "items": items[:OVERVIEW_LIMIT], "total": len(items), "min_for_details": MIN_FOR_DETAILS,
-        "summary": {"targets": len(items), "answers": sum(item["count"] for item in items),
+        # `answers` sind die Antworten, die im Schnitt stecken - damit die beiden Kacheln zueinander passen.
+        "summary": {"targets": len(items), "answers": answers,
                     "average": round(sum(int(row["stars"]) for row in counted) / answers, 1) if answers else None},
     }
 

@@ -43,7 +43,7 @@ export default function AdminFeedbackPage() {
             <Tile label="Schnitt" testId="feedback-overview-average">
               {summary?.average != null ? <span className="inline-flex items-center gap-1 text-honor">{averageLabel(summary.average)} <Star className="w-5 h-5 fill-honor" aria-hidden="true" /></span> : "–"}
             </Tile>
-            <Tile label="Antworten" testId="feedback-overview-answers">{summary?.answers ?? 0}</Tile>
+            <Tile label="Antworten im Schnitt" testId="feedback-overview-answers">{summary?.answers ?? 0}</Tile>
             <Tile label="Veranstaltungen" testId="feedback-overview-targets">{summary?.targets ?? 0}</Tile>
           </div>
 
