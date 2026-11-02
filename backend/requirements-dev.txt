@@ -2,14 +2,14 @@
 
 black==26.10.1
 coverage==7.17.0
-flake8==7.4.1
+flake8==7.5.0
 isort==8.0.1
 mongomock-motor==0.0.36
-mypy==2.4.0
+mypy==2.4.1
 pip-audit==2.10.1
 pymupdf==1.28.2
-pytest==9.1.1
-pytest-asyncio==1.4.0
+pytest==9.2.0
+pytest-asyncio==1.4.1
 pytest-cov==7.1.0
 pytest-xdist==3.8.0
 requests==2.34.2
