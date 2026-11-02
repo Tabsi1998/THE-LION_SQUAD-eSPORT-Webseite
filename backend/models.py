@@ -439,10 +439,10 @@ class GameCreate(GameMatchData):
     short_name: Optional[str] = None
     logo_url: Optional[str] = None
     cover_url: Optional[str] = None
+    # Altfelder (#2111 W1, #2129 SP5): wirken nirgends und stehen nicht mehr in der Verwaltung - sie bleiben nur, damit
+    # ältere Aufrufe und gespeicherte Spiele unverändert durchgehen.
     platforms: List[str] = []
     genre: Optional[str] = None
-    # Altfelder (#2111, W1): wirken nirgends und stehen nicht mehr in der Verwaltung - sie bleiben nur, damit ältere
-    # Aufrufe und gespeicherte Spiele unverändert durchgehen.
     supports_solo: bool = True
     supports_teams: bool = True
     supports_ffa: bool = False

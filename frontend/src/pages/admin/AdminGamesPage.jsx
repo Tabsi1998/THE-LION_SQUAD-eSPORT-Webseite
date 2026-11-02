@@ -31,7 +31,7 @@ const GAME_KIND_OPTIONS = [
 ];
 
 const emptyGameForm = {
-  name: "", slug: "", short_name: "", genre: "", platforms: "", cover_url: "", logo_url: "",
+  name: "", slug: "", short_name: "", cover_url: "", logo_url: "",
   kind: "standalone", parent_game_id: "", identity_source_game_id: "", inherit_player_ids: true,
   player_id_fields: [], discord_guild_id: "", discord_role_name: "",
 };
@@ -88,10 +88,7 @@ export default function AdminGamesPage() {
   const submit = async (e) => {
     e.preventDefault();
     try {
-      await api.post("/games", {
-        ...gamePayload(form),
-        platforms: form.platforms ? form.platforms.split(",").map((s) => s.trim()) : [],
-      });
+      await api.post("/games", gamePayload(form));
       toast.success("Spiel erstellt.");
       setForm(emptyGameForm);
       load();
@@ -138,8 +135,6 @@ export default function AdminGamesPage() {
           <DiscordServerField form={form} games={list} servers={servers} onChange={(v) => set("discord_guild_id", v)} testId="game-discord" />
           {form.kind !== "edition" && <Input placeholder={roleNamePlaceholder(form)} value={form.discord_role_name} onChange={(v) => set("discord_role_name", v)} testId="game-role" />}
           <Input placeholder="Kurzname (z.B. MK8DX)" value={form.short_name} onChange={(v) => set("short_name", v)} testId="game-short" />
-          <Input placeholder="Genre" value={form.genre} onChange={(v) => set("genre", v)} testId="game-genre" />
-          <Input placeholder="Plattformen (komma-getrennt)" value={form.platforms} onChange={(v) => set("platforms", v)} testId="game-platforms" />
           <ImageUpload value={form.logo_url} onChange={(v) => set("logo_url", v)} label="Logo" testId="game-logo" variant="square" endpoint="/uploads/logo?trim_empty_borders=false" allowLibrary logo />
           <ImageUpload value={form.cover_url} onChange={(v) => set("cover_url", v)} label="Cover" testId="game-cover" variant="wide" allowLibrary />
           <PlayerIdFieldsEditor value={form.player_id_fields} onChange={(v) => set("player_id_fields", v)} />
@@ -209,8 +204,6 @@ function toForm(game) {
     identity_source_game_id: game.identity_source_game_id || "",
     inherit_player_ids: game.inherit_player_ids !== false,
     short_name: game.short_name || "",
-    genre: game.genre || "",
-    platforms: (game.platforms || []).join(", "),
     cover_url: game.cover_url || "",
     logo_url: game.logo_url || "",
     player_id_fields: game.player_id_fields || [],
@@ -242,7 +235,6 @@ function gamePayload(form) {
     parent_game_id: isEdition ? (form.parent_game_id || null) : null,
     identity_source_game_id: isEdition ? (form.identity_source_game_id || null) : null,
     inherit_player_ids: form.inherit_player_ids !== false,
-    platforms: form.platforms ? form.platforms.split(",").map((s) => s.trim()).filter(Boolean) : [],
     player_id_fields: normalizePlayerIdFields(form.player_id_fields),
     discord_guild_id: form.discord_guild_id || null,
     discord_role_name: isEdition ? null : ((form.discord_role_name || "").trim() || null),
@@ -279,8 +271,6 @@ function EditGameModal({ game, games, servers = [], onClose, onSaved }) {
         <Input placeholder="Slug" value={form.slug} onChange={(v) => set("slug", slugFrom(v))} required testId="game-edit-slug" />
         <Select value={form.kind} onChange={(v) => set("kind", v)} options={GAME_KIND_OPTIONS} testId="game-edit-kind" />
         <Input placeholder="Kurzname" value={form.short_name} onChange={(v) => set("short_name", v)} testId="game-edit-short" />
-        <Input placeholder="Genre" value={form.genre} onChange={(v) => set("genre", v)} testId="game-edit-genre" />
-        <Input placeholder="Plattformen (komma-getrennt)" value={form.platforms} onChange={(v) => set("platforms", v)} testId="game-edit-platforms" />
         <DiscordServerField form={form} games={games} servers={servers} onChange={(v) => set("discord_guild_id", v)} testId="game-edit-discord" />
         {form.kind !== "edition" && <Input placeholder={roleNamePlaceholder(form)} value={form.discord_role_name} onChange={(v) => set("discord_role_name", v)} testId="game-edit-role" />}
       </FormGrid>
