@@ -6,7 +6,7 @@ import { ShieldAlert, Trash2, UserPlus } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { PersonAvatar, PersonPicker } from "@/components/tls/PersonPicker";
-import { useConfirm } from "@/components/ui/confirm-dialog";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { LEAGUE_CAPABILITIES } from "@/lib/permissions";
 import { toast } from "sonner";
 
@@ -141,8 +141,8 @@ export function LeagueStaffSheet({ league, onClose }) {
   const canGrant = Boolean(data?.can_grant);
   const rows = data?.staff || [];
   return (
-    <AdminSheet title="Zuständige" eyebrow={league.name} size="lg" onClose={onClose} testId="league-staff-sheet"
-      footer={<button type="button" onClick={onClose} className="tls-btn tls-btn--quiet min-h-[44px] rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider" data-testid="league-staff-close">Schließen</button>}>
+    <AdminSheet title="Zuständige" eyebrow={league.name} size="lg" onClose={onClose} cancelLabel="Schließen" testId="league-staff-sheet">
+
       <p className="text-sm leading-relaxed text-white/65">
         Zuständige arbeiten nur in dieser Liga und nur an dem, was hier angehakt ist. Der Bereich „Ligen“ darf alle Ligen. In einem Spiel, an dem jemand selbst beteiligt ist, entscheidet eine zweite Person.
       </p>

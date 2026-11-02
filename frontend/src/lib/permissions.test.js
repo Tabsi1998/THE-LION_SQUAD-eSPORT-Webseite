@@ -3,7 +3,7 @@ import { adminHome, adminWithoutSecondFactor, areaList, areasOf, canUseArea, has
 test("Bereiche kommen vom Server, sonst aus der Rolle", () => {
   expect(areasOf({ role: "player", areas: ["content", "unsinn"] })).toEqual(["content"]);
   expect(areasOf({ role: "tournament_admin" })).toEqual(["tournaments", "moderation"]);
-  expect(areasOf({ role: "superadmin" })).toHaveLength(6);
+  expect(areasOf({ role: "superadmin" })).toHaveLength(7);
   expect(areasOf({ role: "player" })).toEqual([]);
   expect(areasOf(null)).toEqual([]);
 });
@@ -77,6 +77,9 @@ test.each([
   ["Moderator", { role: "moderator" }, "moderation", true],
   ["Moderator mit Einsatz", { role: "moderator", has_staff_assignment: true }, "duty", true],
   ["Captain einer Serie (#1749)", { role: "player", has_series_captain: true }, "duty", true],
+  ["Zuständig in einer Liga (#2203)", { role: "player", has_league_staff: true, mfa_enabled: true, auth_mfa_verified: true }, "duty", true],
+  ["Freigabe Ligen mit 2FA (#2203)", { role: "player", areas: ["leagues"], mfa_enabled: true, auth_mfa_verified: true }, "dashboard", false],
+  ["Freigabe Ligen ohne 2FA (#2203)", { role: "player", areas: ["leagues"] }, "mfa", false],
   ["Redaktion mit 2FA, auch Captain", { role: "player", areas: ["content"], has_series_captain: true, mfa_enabled: true, auth_mfa_verified: true }, "dashboard", false],
   ["Spieler ohne Dienst", { role: "player" }, "none", false],
   ["nicht angemeldet", null, "login", false],

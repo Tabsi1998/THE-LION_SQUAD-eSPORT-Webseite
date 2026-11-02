@@ -16,7 +16,7 @@ const STAFFEL = {
   league_context: { league_id: "l1", season_id: "s1", division_id: "d1", staffel: "A" }, league_label: "Liga · Staffel A",
   league_links: { league_name: "Probe-Liga", season_name: "Season 1", division_label: "Liga 1", staffel: "A",
     season_admin_path: "/admin/leagues/seasons/s1", public_path: "/liga/probe-shooter/season-1" },
-  can_manage_structure: true, can_manage_results: true, can_manage_all_results: true, can_plan_matches: true, staff_scopes: [],
+  can_edit_staffel: true, can_manage_structure: true, can_manage_results: true, can_manage_all_results: true, can_plan_matches: true, staff_scopes: [],
   can_check_in: true, can_manage_participants: true, can_assign_stations: false, can_use_staff_tools: true,
 };
 const REGS = [

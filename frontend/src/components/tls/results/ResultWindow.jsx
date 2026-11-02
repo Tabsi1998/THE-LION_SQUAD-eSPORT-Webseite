@@ -114,7 +114,7 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
         hold: true,
         reason: correcting ? reason.trim() : null,
       });
-      onSaved?.({ matchId: entry.id, hold: data?.hold || null, sentence, conflictReason: entry.conflict_override ? conflictReason.trim() : null });
+      onSaved?.({ matchId: entry.id, hold: data?.hold || null, sentence, ...(entry.conflict_override ? { conflictReason: conflictReason.trim() } : {}) });
       onClose?.();
     } catch (err) {
       if (!correcting && err.response?.status === 409 && await resultArrived(entry.id)) {

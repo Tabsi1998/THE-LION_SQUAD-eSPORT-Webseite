@@ -1,0 +1,87 @@
+const { test, expect } = require("@playwright/test");
+
+// Bereich Ligen und Zuständige (docs/LIGA.md Abschnitt 12, #2203) im echten Browser, Server nachgestellt: Vergabe auf der Liga-Seite,
+// was Zuständige und die Turnierleitung sehen, Befangenheit auf der Matchseite. Bei 390 und 1440 px ohne seitliches Scrollen.
+// Nur erfundene Namen.
+
+const MFA = { mfa_enabled: true, auth_mfa_verified: true };
+const AREA = { id: "a1", username: "ligaleitung", display_name: "Ligaleitung", role: "player", areas: ["leagues"], ...MFA };
+const STAFF = { id: "z1", username: "zustaendig", display_name: "Zuständig", role: "player", areas: [], has_league_staff: true, ...MFA };
+const LEAD = { id: "t1", username: "turnierleitung", display_name: "Turnierleitung", role: "tournament_admin", areas: ["tournaments", "moderation"], ...MFA };
+const SEASON_ROW = { id: "s1", number: 1, name: "Season 1", slug: "season-1", status: "draft", visibility: "members", start_date: "2026-11-09T23:00:00+00:00", weeks_total: 10 };
+const LEAGUE = { id: "l1", name: "Probe-Liga mit einem recht langen Namen", slug: "probe", game_name: "Probe Shooter", status: "active", seasons: [SEASON_ROW] };
+const ROW = { user_id: "u1", display_name: "Erika Beispiel mit recht langem Namen", capabilities: ["results", "disputes", "matches"], second_factor: true };
+const NO_MFA_ROW = { user_id: "u2", display_name: "Max Muster", capabilities: ["roster"], second_factor: false };
+
+async function mockServer(page, user, routes = {}) {
+  await page.addInitScript(() => {
+    window.localStorage.setItem("tls_cookie_consent_v1", JSON.stringify({
+      essential: true, external_media: false, analytics: false, meta: false, tiktok: false,
+      saved_at: Date.now(), expires_at: Date.now() + 30 * 24 * 60 * 60 * 1000,
+    }));
+  });
+  const json = (body) => (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify(body) });
+  await page.route("**/api/**", json({}));
+  for (const path of ["sponsors**", "notifications/me", "games"]) await page.route(`**/api/${path}`, json([]));
+  await page.route("**/api/friends", json({ incoming: [], friends: [], outgoing: [] }));
+  await page.route("**/api/auth/me", json(user));
+  for (const [path, body] of Object.entries(routes)) await page.route(`**/api/${path}`, json(body));
+}
+
+async function noSideScroll(page) {
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+}
+
+for (const [name, viewport] of [["390", { width: 390, height: 844 }], ["1440", { width: 1440, height: 900 }]]) {
+  test.describe(`bei ${name} px`, () => {
+    test.use({ viewport });
+
+    test("der Bereich Ligen vergibt Zuständigkeiten", async ({ page }) => {
+      await mockServer(page, AREA, {
+        "admin/leagues": { games: [{ id: "g1", name: "Probe Shooter" }], season_defaults: {}, can_create: true, leagues: [{ ...LEAGUE, capabilities: ["manage", "season"] }] },
+        "admin/leagues/l1/staff": { staff: [ROW, NO_MFA_ROW], can_grant: true },
+        "admin/people/search**": [{ id: "p9", name: "Neue Person", context: "Mitglied" }],
+      });
+      const saved = [];
+      await page.route("**/api/admin/leagues/l1/staff/p9", async (route) => {
+        saved.push(route.request().postDataJSON());
+        await route.fulfill({ contentType: "application/json", body: "{}" });
+      });
+      await page.goto("/admin/leagues");
+      await page.getByTestId("league-staff-probe").click();
+      const sheet = page.getByTestId("league-staff-sheet");
+      await expect(sheet.getByTestId("league-staff-row-u1")).toContainText("Ergebnisse korrigieren · Proteste · Spiele betreuen");
+      await expect(sheet.getByTestId("league-staff-no-mfa-u2")).toContainText("Zwei-Faktor");
+      await noSideScroll(page);
+
+      await expect(sheet.getByTestId("league-staff-grant")).toBeDisabled();
+      await sheet.getByTestId("league-staff-person-search").fill("Neue");
+      await sheet.getByTestId("league-staff-person-option-p9").click();
+      await sheet.getByTestId("league-staff-new-results").check();
+      await sheet.getByTestId("league-staff-new-roster").check();
+      await sheet.getByTestId("league-staff-grant").click();
+      await expect.poll(() => saved).toEqual([{ capabilities: ["results", "roster"] }]);
+      await noSideScroll(page);
+    });
+
+    test("Zuständige sehen nur die Knöpfe ihrer Zuständigkeit", async ({ page }) => {
+      await mockServer(page, STAFF, {
+        "admin/leagues": { games: [], season_defaults: {}, can_create: false, leagues: [{ ...LEAGUE, capabilities: ["roster"] }] },
+      });
+      await page.goto("/admin/leagues");
+      await expect(page.getByTestId("season-link-season-1")).toBeVisible();
+      await expect(page.getByTestId("league-add")).toHaveCount(0);
+      await expect(page.getByTestId("league-staff-probe")).toHaveCount(0);
+      await expect(page.getByTestId("league-delete-probe")).toHaveCount(0);
+      await noSideScroll(page);
+    });
+
+    test("die Turnierleitung allein kommt nicht auf die Liga-Seite", async ({ page }) => {
+      await mockServer(page, LEAD);
+      await page.goto("/admin/leagues");
+      await expect(page).toHaveURL(/\/403/);
+      await noSideScroll(page);
+    });
+  });
+}

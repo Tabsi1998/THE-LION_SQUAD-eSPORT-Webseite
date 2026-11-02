@@ -199,6 +199,10 @@ test.each([
   ["Helfer", { role: "player", has_staff_assignment: true, is_tournament_staff: true }, ["/admin/dienst", "/admin/tournaments", "/admin/f1", "/admin/stations"]],
   // Captain einer Serie (#1749): nur „Mein Dienst“ - keine Turnierseiten, keine Serien-Verwaltung.
   ["Captain einer Serie", { role: "player", has_series_captain: true, ...MFA }, ["/admin/dienst"]],
+  // Zuständige einer Liga (#2203): „Mein Dienst“ und die Liga - ohne Zwei-Faktor nur „Mein Dienst“.
+  ["Zuständig in einer Liga", { role: "player", has_league_staff: true, ...MFA }, ["/admin/dienst", "/admin/leagues"]],
+  ["Zuständig ohne Zwei-Faktor", { role: "player", has_league_staff: true }, ["/admin/dienst"]],
+  ["Freigabe Ligen", { role: "player", areas: ["leagues"], ...MFA }, ["/admin", "/admin/leagues"]],
   ["Turnierleitung und Captain", { role: "tournament_admin", has_series_captain: true, ...MFA }, expect.arrayContaining(["/admin", "/admin/dienst", "/admin/tournaments"])],
   ["Spieler", { role: "player" }, []],
 ])("%s sieht genau seine Einträge", (_name, user, expected) => {

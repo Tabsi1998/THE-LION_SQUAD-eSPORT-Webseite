@@ -456,9 +456,9 @@ export default function AdminLeagueSeasonPage() {
                 ) : null}
               </FormSection>
 
-              {canSeason ? (
               {/* Gestaltung (#2107): Emblem und Banner überschreiben die der Liga, leer heißt „wie die Liga“. Die Farbe
                   gehört der Liga (Stift in der Ligaübersicht). Gewinne sind reine Anzeige - kein Bezug zu XP oder Pokalen. */}
+              {canSeason ? (
               <FormSection title="Gestaltung und Gewinne" testId="season-look"
                 hint="Wirkt beim Speichern sofort auf Ligaseite, Übersicht, Teamseite und Link-Vorschau – ohne Übertragen. Das Banner bekommen auch die Staffeln (die App zeigt es beim Turnier).">
                 <FormGrid>

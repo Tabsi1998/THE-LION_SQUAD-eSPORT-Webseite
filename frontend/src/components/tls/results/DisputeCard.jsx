@@ -68,7 +68,7 @@ export function DisputeCard({ item, busy = false, highlighted = false, onKeep, o
       ) : null}
       <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} className="input" placeholder="Begründung (freiwillig, geht an beide Seiten)" data-testid={`lead-dispute-note-${item.id}`} />
       <div className="grid grid-cols-2 gap-2">
-        <button type="button" disabled={busy || !mayDecide || needsReason} onClick={() => onKeep(note.trim() || null, conflictReason.trim() || null)} className="tls-btn tls-btn--secondary min-h-[44px] px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid={`lead-dispute-keep-${item.id}`}>
+        <button type="button" disabled={busy || !mayDecide || needsReason} onClick={() => (item.conflict_override ? onKeep(note.trim() || null, conflictReason.trim()) : onKeep(note.trim() || null))} className="tls-btn tls-btn--secondary min-h-[44px] px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid={`lead-dispute-keep-${item.id}`}>
           {hasResult ? "Ergebnis bleibt" : "Weiter wie bisher"}
         </button>
         <button type="button" disabled={busy || !item.can_enter} onClick={onChange} className="tls-btn tls-btn--primary min-h-[44px] px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid={`lead-dispute-change-${item.id}`}>

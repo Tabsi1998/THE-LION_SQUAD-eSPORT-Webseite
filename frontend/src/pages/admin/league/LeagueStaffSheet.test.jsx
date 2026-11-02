@@ -4,7 +4,7 @@ import { beforeEach, expect, test, vi } from "vitest";
 const apiMock = vi.hoisted(() => ({ get: vi.fn(), put: vi.fn(), delete: vi.fn() }));
 const confirmMock = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/api", async (original) => ({ ...(await original()), api: apiMock }));
-vi.mock("@/components/ui/confirm-dialog", () => ({ useConfirm: () => confirmMock }));
+vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => confirmMock }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("@/components/tls/PersonPicker", () => ({
   PersonAvatar: () => null,

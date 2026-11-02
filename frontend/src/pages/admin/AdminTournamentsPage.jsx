@@ -8,6 +8,7 @@ import { StatusBadge } from "@/components/tls/StatusBadge";
 import { Plus, Trash2, Play, Pause, Search, Users, Download } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
+import { canUseArea } from "@/lib/permissions";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { formatTournamentDisplay, formatTournamentFormat } from "@/lib/tournamentLabels";
@@ -53,7 +54,9 @@ const canDelete = (tournament) => (isStaffel(tournament) ? staffelBeforeStart(to
 
 export default function AdminTournamentsPage() {
   // Globale Aktionen nur für die Turnierleitung mit Zwei-Faktor (#1028), Helfer sehen die ihres Einsatzes.
-  const { isTournamentLead } = useAuth();
+  const { isTournamentLead, user } = useAuth();
+  // Staffeln (#2203): Status und Löschen hier nur mit dem Bereich Ligen - die Turnierleitung allein leitet sie nicht.
+  const leadsRow = (t) => isTournamentLead && (!isStaffel(t) || canUseArea(user, "leagues"));
   const [searchParams, setSearchParams] = useSearchParams();
   const [list, setList] = useState([]);
   const [query, setQuery] = useState(searchParams.get("q") || "");
@@ -278,8 +281,8 @@ export default function AdminTournamentsPage() {
                     <Link to={`/admin/tournaments/${t.id}?tab=participants`} title="Teilnehmer" className="p-2 hover:text-[#29B6E8]"><Users className="w-3.5 h-3.5" /></Link>
                     {/* Eine Staffel hat keine Anmeldung (#2109) - sie startet in ihrer Verwaltung mit „Liga starten“. */}
                     {isTournamentLead && t.status === "draft" && !isStaffel(t) && <button onClick={() => setStatus(t.id, "registration_open")} title="Anmeldung öffnen" className="p-2 hover:text-ok"><Play className="w-3.5 h-3.5" /></button>}
-                    {isTournamentLead && !isStaffel(t) && t.status === "live" && <button onClick={() => setStatus(t.id, "paused")} title="Pause" className="p-2 hover:text-[#FFD700]"><Pause className="w-3.5 h-3.5" /></button>}
-                    {isTournamentLead && !isStaffel(t) && canDelete(t) && <button onClick={() => del(t)} className="p-2 hover:text-[#FF3B30]" title="Löschen"><Trash2 className="w-3.5 h-3.5" /></button>}
+                    {leadsRow(t) && t.status === "live" && <button onClick={() => setStatus(t.id, "paused")} title="Pause" className="p-2 hover:text-[#FFD700]"><Pause className="w-3.5 h-3.5" /></button>}
+                    {leadsRow(t) && canDelete(t) && <button onClick={() => del(t)} className="p-2 hover:text-[#FF3B30]" title="Löschen"><Trash2 className="w-3.5 h-3.5" /></button>}
                   </div>
                 </td>
               </tr>
