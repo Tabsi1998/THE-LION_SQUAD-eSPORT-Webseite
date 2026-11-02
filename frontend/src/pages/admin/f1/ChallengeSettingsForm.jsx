@@ -260,7 +260,7 @@ function FastLapPrizeEditor({ value, onChange }) {
             onChange={(e) => update(i, { label: e.target.value })}
             data-testid={`f1-edit-prize-label-${i}`}
             className="col-span-4 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm"
-            placeholder="Label"
+            placeholder="Bezeichnung"
           />
           <input
             value={p.value || ""}

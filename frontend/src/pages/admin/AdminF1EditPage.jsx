@@ -266,7 +266,7 @@ export default function AdminF1EditPage() {
       const inv = !!editTime.is_invalid;
       const note = (editTime.admin_note || "").trim();
       if ((pen > 0 || inv) && note.length < 5) {
-        toast.error("Bei Strafzeit oder Invalid-Markierung ist eine Begründung (mind. 5 Zeichen) Pflicht.");
+        toast.error("Bei Strafzeit oder ungültiger Runde ist eine Begründung (mind. 5 Zeichen) Pflicht.");
         return;
       }
       const consent = ms !== editTime.time_ms ? await plausibilityConsent(ms) : {};
@@ -330,7 +330,7 @@ export default function AdminF1EditPage() {
     <AdminLayout>
       <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
         <div>
-          <Link to="/admin/f1" className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← Fast-Lap Challenges</Link>
+          <Link to="/admin/f1" className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← Fast-Lap-Challenges</Link>
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">{challenge.title}</h1>
           <div className="mt-2 flex items-center gap-3"><StatusBadge status={challenge.status} /></div>
         </div>
@@ -346,9 +346,9 @@ export default function AdminF1EditPage() {
             </div>
           )}
           <Link target="_blank" to={`/display/f1/${challenge.id}`} data-testid="f1-tv-admin-link" className="inline-flex items-center gap-2 px-4 py-2 border border-[#29B6E8] text-[#29B6E8] rounded-sm uppercase tracking-wider text-sm font-bold hover:bg-[#29B6E8]/10">
-            <Tv className="w-4 h-4" /> TV Modus
+            <Tv className="w-4 h-4" /> TV-Ansicht
           </Link>
-          <Link target="_blank" to={`/fastlap/${challenge.slug || challenge.id}`} className="px-4 py-2 border border-white/20 text-white rounded-sm uppercase tracking-wider text-sm font-bold hover:border-[#29B6E8]/60">Public</Link>
+          <Link target="_blank" to={`/fastlap/${challenge.slug || challenge.id}`} className="px-4 py-2 border border-white/20 text-white rounded-sm uppercase tracking-wider text-sm font-bold hover:border-[#29B6E8]/60">Öffentliche Seite</Link>
           <a href={`${API}/f1/challenges/${challenge.id}/export.csv`} className="px-4 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40" target="_blank" rel="noreferrer">CSV</a>
           <a href={`${API}/exports/f1/${challenge.id}/leaderboard.pdf${activeTrack ? `?track_id=${activeTrack}` : ""}`} className="px-4 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40" target="_blank" rel="noreferrer">PDF</a>
           {isTournamentLead && challenge.status === "draft" && (
@@ -478,8 +478,8 @@ export default function AdminF1EditPage() {
                   <input type="number" step="0.1" value={newTime.penalty_seconds} onChange={(e) => setNewTime({ ...newTime, penalty_seconds: e.target.value })} data-testid="f1-add-time-penalty" className="w-24 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />
                 </div>
                 <div className="flex-1 min-w-[160px]">
-                  <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Proof URL</div>
-                  <input value={newTime.proof_url} onChange={(e) => setNewTime({ ...newTime, proof_url: e.target.value })} placeholder="Screenshot/Video Link" data-testid="f1-add-time-proof" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+                  <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Nachweis-Link</div>
+                  <input value={newTime.proof_url} onChange={(e) => setNewTime({ ...newTime, proof_url: e.target.value })} placeholder="Link zu Bild oder Video" data-testid="f1-add-time-proof" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
                 </div>
                 {Number(newTime.penalty_seconds) > 0 && (
                   <div className="w-full">
@@ -489,7 +489,7 @@ export default function AdminF1EditPage() {
                       required
                       value={newTime.admin_note}
                       onChange={(e) => setNewTime({ ...newTime, admin_note: e.target.value })}
-                      placeholder="z. B. Cut Curb in Kurve 7, Lap 3 — Replay 0:42"
+                      placeholder="z. B. Kurve 7 abgekürzt, Runde 3 – im Video bei 0:42"
                       data-testid="f1-add-time-note"
                       className="w-full bg-[#0A0A0A] border border-[#FF3B30]/40 px-3 py-2 rounded-sm text-sm"
                     />
@@ -514,8 +514,8 @@ export default function AdminF1EditPage() {
                       <span className={`font-display font-bold text-lg tabular-nums ${t.is_invalid ? "line-through text-white/40" : "text-white"}`}>{showLapTime(t.time_str)}</span>
                       {(t.score_scope || "official") === "club_reference" && <span className="text-[#FFD700] border border-[#FFD700]/30 bg-[#FFD700]/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest rounded-sm">Referenz</span>}
                       {t.penalty_seconds > 0 && <span className="text-[#FF3B30] text-xs">+{t.penalty_seconds}s</span>}
-                      {t.is_invalid && <span className="text-[#FF3B30] text-[10px] font-bold uppercase tracking-widest">INVALID</span>}
-                      {safeHttpUrl(t.proof_url) && <a href={safeHttpUrl(t.proof_url)} target="_blank" rel="noreferrer" className="text-[10px] text-[#29B6E8] uppercase tracking-widest hover:underline">Proof</a>}
+                      {t.is_invalid && <span className="text-[#FF3B30] text-[10px] font-bold uppercase tracking-widest">Ungültig</span>}
+                      {safeHttpUrl(t.proof_url) && <a href={safeHttpUrl(t.proof_url)} target="_blank" rel="noreferrer" className="text-[10px] text-[#29B6E8] uppercase tracking-widest hover:underline">Nachweis</a>}
                       <button
                         onClick={() => setEditTime({
                           ...t,
@@ -577,8 +577,8 @@ export default function AdminF1EditPage() {
               )}
             </label>
             <label className="block">
-              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Proof URL</div>
-              <input value={editTime.proof_url || ""} onChange={(e) => setEditTime({ ...editTime, proof_url: e.target.value })} placeholder="Screenshot / Video" data-testid="f1-edit-time-proof" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Nachweis-Link</div>
+              <input value={editTime.proof_url || ""} onChange={(e) => setEditTime({ ...editTime, proof_url: e.target.value })} placeholder="Link zu Bild oder Video" data-testid="f1-edit-time-proof" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
             </label>
             <label className="block">
               <div className={`text-[11px] font-bold uppercase tracking-widest mb-1 ${(Number(editTime.penalty_seconds) > 0 || editTime.is_invalid) ? "text-[#FF3B30]" : "text-white/60"}`}>
@@ -592,7 +592,7 @@ export default function AdminF1EditPage() {
                 onChange={(e) => setEditTime({ ...editTime, admin_note: e.target.value })}
                 data-testid="f1-edit-time-note"
                 placeholder={(Number(editTime.penalty_seconds) > 0 || editTime.is_invalid)
-                  ? "z. B. Cut Curb T7 Lap 3 — replay 0:42"
+                  ? "z. B. Kurve 7 abgekürzt, Runde 3 – im Video bei 0:42"
                   : "optionale Notiz"}
                 className={`w-full bg-[#0A0A0A] border px-3 py-2 rounded-sm text-sm ${
                   (Number(editTime.penalty_seconds) > 0 || editTime.is_invalid) ? "border-[#FF3B30]/40" : "border-white/10"

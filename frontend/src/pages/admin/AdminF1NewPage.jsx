@@ -198,7 +198,7 @@ export default function AdminF1NewPage() {
           {(form.prize_places || []).map((p, i) => (
             <div key={i} className="grid grid-cols-12 gap-2">
               <input type="number" min="1" value={p.place} onChange={(e) => updatePrize(i, { place: Number(e.target.value) || 1 })} data-testid={`f1-new-prize-place-${i}`} className="col-span-2 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm tabular-nums" placeholder="#" />
-              <input value={p.label || ""} onChange={(e) => updatePrize(i, { label: e.target.value })} data-testid={`f1-new-prize-label-${i}`} className="col-span-4 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm" placeholder="Label" />
+              <input value={p.label || ""} onChange={(e) => updatePrize(i, { label: e.target.value })} data-testid={`f1-new-prize-label-${i}`} className="col-span-4 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm" placeholder="Bezeichnung" />
               <input value={p.value || ""} onChange={(e) => updatePrize(i, { value: e.target.value })} data-testid={`f1-new-prize-value-${i}`} className="col-span-5 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm" placeholder="Preis" />
               <button type="button" onClick={() => set("prize_places", form.prize_places.filter((_, j) => j !== i))} data-testid={`f1-new-prize-remove-${i}`} className="col-span-1 text-white/40 hover:text-[#FF3B30] text-center py-2">✕</button>
             </div>

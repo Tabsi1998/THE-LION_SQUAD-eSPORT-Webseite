@@ -158,7 +158,7 @@ test("Nachweis-Link nur bei http(s)", async () => {
   });
   renderPage();
   await screen.findByText("Otto");
-  const links = screen.getAllByRole("link", { name: "Proof" });
+  const links = screen.getAllByRole("link", { name: "Nachweis" });
   expect(links).toHaveLength(1);
   expect(links[0]).toHaveAttribute("href", "https://example.test/clip");
 });

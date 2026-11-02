@@ -16,7 +16,7 @@ import { sortByNearestDate } from "@/lib/contentSort";
 export default function F1ListPage() {
   useDocumentTitle(
     "F1 Fast Lap Challenges",
-    "F1 und Racing Fast-Lap-Challenges von THE LION SQUAD mit Live-Leaderboards, Strecken, Zeiten und Championship-Wertung."
+    "F1 und Racing Fast-Lap-Challenges von THE LION SQUAD mit Live-Ranglisten, Strecken, Zeiten und Gesamtwertung."
   );
 
   const [list, setList] = useState([]);
@@ -46,7 +46,7 @@ export default function F1ListPage() {
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Fast Lap Challenge</span>
           <h1 className="mt-2 font-heading text-4xl md:text-6xl font-black uppercase">Speed. Rhythmus. Beste Runde.</h1>
-          <p className="mt-4 text-white/70 max-w-2xl">Time-Trial Events mit Live-Leaderboards, mehreren Strecken und Championship-Wertung.</p>
+          <p className="mt-4 text-white/70 max-w-2xl">Zeitfahren mit Live-Ranglisten, mehreren Strecken und Gesamtwertung.</p>
         </div>
       </div>
       <Reveal className="tls-reveal-grid max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-5">
@@ -57,7 +57,7 @@ export default function F1ListPage() {
         ) : (
           <PublicEmptyState
             title="Noch keine Challenges sichtbar"
-            description="Sobald eine Fast-Lap-Challenge aktiv oder angekündigt ist, findest du hier Strecken, Leaderboards und Teilnahmeinfos."
+            description="Sobald eine Fast-Lap-Challenge aktiv oder angekündigt ist, findest du hier Strecken, Ranglisten und alles zum Mitmachen."
             primaryAction={{ to: "/tournaments", label: "Turniere ansehen" }}
             secondaryAction={{ to: "/news", label: "News lesen" }}
           />
@@ -85,7 +85,7 @@ function FastLapCard({ challenge: c }) {
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2 mb-2">
             <PhaseBadge phase={c.public_phase} status={c.status} />
-            {c.is_championship && <span className="text-[10px] font-bold uppercase tracking-wider text-[#FFD700] border border-[#FFD700]/40 px-2 py-[3px] rounded-sm">Championship</span>}
+            {c.is_championship && <span className="text-[10px] font-bold uppercase tracking-wider text-[#FFD700] border border-[#FFD700]/40 px-2 py-[3px] rounded-sm">Meisterschaft</span>}
             {c.block_club_member_results && <span className="text-[10px] font-bold uppercase tracking-wider text-[#FFD700] border border-[#FFD700]/40 bg-[#FFD700]/10 px-2 py-[3px] rounded-sm">Externe Wertung</span>}
             {c.allow_club_reference_times !== false && c.show_club_reference_times !== false && (c.club_reference_count || 0) > 0 && (
               <span className="text-[10px] font-bold uppercase tracking-wider text-white/65 border border-white/15 px-2 py-[3px] rounded-sm">Referenzzeiten</span>

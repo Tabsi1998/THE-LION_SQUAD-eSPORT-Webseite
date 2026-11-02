@@ -1256,7 +1256,7 @@ async def list_times(cid: str, track_id: str | None = None, user_id: str | None 
 async def _lap_challenge_id(time_id: str) -> str:
     lap = await get_db().f1_lap_times.find_one({"id": time_id}, {"_id": 0, "challenge_id": 1})
     if not lap:
-        raise HTTPException(404, "Lap-Time nicht gefunden")
+        raise HTTPException(404, "Zeit nicht gefunden")
     return lap.get("challenge_id")
 
 
@@ -1272,7 +1272,7 @@ async def _update_time_locked(time_id: str, body: F1LapTimeUpdate, me: dict):
     # Frisch unter der Sperre: ein Verknüpfen kann die Zeit gerade einem Konto (und der Mitglieder-Regel) gegeben haben.
     existing = await db.f1_lap_times.find_one({"id": time_id}, {"_id": 0})
     if not existing:
-        raise HTTPException(404, "Lap-Time nicht gefunden")
+        raise HTTPException(404, "Zeit nicht gefunden")
     await _require_f1_result_permission(me, existing.get("challenge_id"))
     nullable_fields = {"proof_url", "admin_note"}
     raw = body.model_dump(exclude_unset=True)
@@ -1323,7 +1323,7 @@ async def _delete_time_locked(time_id: str, body: F1LapTimeDelete | None, me: di
     db = get_db()
     existing = await db.f1_lap_times.find_one({"id": time_id}, {"_id": 0})
     if not existing:
-        raise HTTPException(404, "Lap-Time nicht gefunden")
+        raise HTTPException(404, "Zeit nicht gefunden")
     await _require_f1_result_permission(me, existing.get("challenge_id"))
     challenge = await db.f1_challenges.find_one({"id": existing.get("challenge_id")}, {"_id": 0, "status": 1}) or {}
     reason = _published_change_reason(challenge, me, body.change_reason if body else None)
