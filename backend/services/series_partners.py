@@ -28,13 +28,13 @@ def clean_roles(ids: list[str], roles: dict | None, previous: dict | None = None
 
 
 async def clean(db, updates: dict, existing: dict | None = None) -> None:
-    """``partner_ids``/``partner_roles`` in ``updates`` bereinigen: nur aktive Partner, Rollen passend dazu. Schickt ein
-    älterer Aufruf nur ``partner_ids``, bleiben die Rollen der übrigen Partner."""
+    """``partner_ids``/``partner_roles`` in ``updates`` bereinigen: nur aktive Partner oder solche, die schon dastehen
+    (#2130), Rollen passend dazu. Schickt ein älterer Aufruf nur ``partner_ids``, bleiben die Rollen der übrigen Partner."""
     if "partner_ids" not in updates and "partner_roles" not in updates:
         return
     existing = existing or {}
     ids = updates["partner_ids"] if "partner_ids" in updates else existing.get("partner_ids")
-    ids = await partner_pages.clean_partner_ids(db, ids)
+    ids = await partner_pages.clean_partner_ids(db, ids, keep=existing.get("partner_ids"))
     roles = updates.get("partner_roles") if "partner_roles" in updates else None
     updates["partner_ids"] = ids
     updates["partner_roles"] = clean_roles(ids, roles, existing.get("partner_roles"))

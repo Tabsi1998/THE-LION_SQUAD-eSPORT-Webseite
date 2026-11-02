@@ -89,6 +89,69 @@ test("Sponsor aus Dolibarr: Dolibarr-Felder gesperrt, Website-Felder frei; Hande
   expect(screen.getByTestId("sponsor-name")).not.toBeDisabled();
 });
 
+test("Anbindung aus: kein Abgleich, Löschen ist frei (#2130)", async () => {
+  mockApi({ ...SOURCE_ON, connected: false });
+  render(<MemoryRouter><AdminSponsorsPage /></MemoryRouter>);
+  expect(await screen.findByTestId("sponsor-delete-s1")).not.toBeDisabled();
+});
+
+test("Sponsor aus Dolibarr lässt sich nicht löschen, solange der Schalter an ist (#2130)", async () => {
+  mockApi(SOURCE_ON);
+  const on = render(<MemoryRouter><AdminSponsorsPage /></MemoryRouter>);
+  expect(await screen.findByTestId("sponsor-delete-s1")).toBeDisabled();
+  expect(screen.getByTestId("sponsor-delete-s1")).toHaveAttribute("title", expect.stringContaining("aus der Kategorie"));
+  expect(screen.getByTestId("sponsor-delete-s2")).not.toBeDisabled();
+  on.unmount();
+  mockApi(SOURCE_OFF);
+  render(<MemoryRouter><AdminSponsorsPage /></MemoryRouter>);
+  await screen.findByTestId("dolibarr-source-off");
+  expect(screen.getByTestId("sponsor-delete-s1")).not.toBeDisabled();
+});
+
+test("Archivieren und Zurückholen schalten „Aktiv“; ein Sponsor in Verwendung zeigt den Grund beim Löschen (#2130)", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/admin/dolibarr/sponsors") return { data: SOURCE_OFF };
+    if (url === "/sponsors/admin") return { data: [{ id: "s4", name: "Archiv GmbH", tier: "gold", is_active: false, effective_status: "inactive" }, { id: "s5", name: "Laufend GmbH", tier: "gold", is_active: true, effective_status: "active" }] };
+    return { data: [] };
+  });
+  apiMock.patch.mockResolvedValue({ data: {} });
+  render(<MemoryRouter><AdminSponsorsPage /></MemoryRouter>);
+  expect(await screen.findByTestId("sponsor-card-s4")).toHaveTextContent("Archiviert");
+  fireEvent.click(screen.getByTestId("sponsor-archive-s5"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/sponsors/s5", { is_active: false }));
+  fireEvent.click(screen.getByTestId("sponsor-restore-s4"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/sponsors/s4", { is_active: true }));
+
+  apiMock.delete.mockRejectedValue({ response: { data: { detail: "Dieser Sponsor wird noch verwendet: 1 Event." } } });
+  fireEvent.click(screen.getByTestId("sponsor-delete-s5"));
+  await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Dieser Sponsor wird noch verwendet: 1 Event."));
+});
+
+test("ein Satz sagt den Unterschied zu den Partnern; die Bild-Wartung ist hier weg (#2130)", async () => {
+  mockApi(SOURCE_OFF);
+  render(<MemoryRouter><AdminSponsorsPage /></MemoryRouter>);
+  expect(await screen.findByRole("link", { name: "Partner" })).toHaveAttribute("href", "/admin/partners");
+  expect(screen.queryByText("Bilder prüfen")).toBeNull();
+});
+
+test("ein Schalter: kein Vertragsstatus mehr, die Vorschau rechnet mit Schalter und Laufzeit (#2130)", async () => {
+  mockApi(SOURCE_OFF);
+  render(<MemoryRouter><AdminSponsorsPage /></MemoryRouter>);
+  fireEvent.click((await screen.findByTestId("sponsor-card-s2")).querySelector("button"));
+  expect(screen.queryByTestId("sponsor-contract-status")).toBeNull();
+  const preview = screen.getByTestId("sponsor-placement-preview");
+  expect(preview).toHaveTextContent("Wird ausgespielt");
+  fireEvent.click(screen.getByTestId("sponsor-active"));
+  expect(preview).toHaveTextContent("Nicht öffentlich");
+  fireEvent.click(screen.getByTestId("sponsor-active"));
+  fireEvent.change(screen.getByTestId("sponsor-contract-end"), { target: { value: "2020-01-01" } });
+  expect(preview).toHaveTextContent("Nicht öffentlich");
+  apiMock.patch.mockResolvedValue({ data: {} });
+  fireEvent.click(screen.getByTestId("sponsor-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalled());
+  expect(apiMock.patch.mock.calls[0][1]).not.toHaveProperty("contract_status");
+});
+
 // Event-Sponsoren (#1371): nur der Sponsor sagt, wo er erscheint - „bei allen Events“ oder „bei ausgewählten Events“.
 test("Events: bei allen leert die Auswahl, bei ausgewählten verlangt mindestens ein Event", async () => {
   apiMock.get.mockImplementation(async (url) => {

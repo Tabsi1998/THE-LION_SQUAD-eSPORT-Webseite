@@ -25,6 +25,29 @@ function renderAt(search) {
   );
 }
 
+test("Meisterschaft mit eigenen Punkten und Stream gehen so mit, wie der Server sie liest (#2130)", async () => {
+  apiMock.post.mockReset();
+  apiMock.post.mockResolvedValue({ data: { id: "f-new" } });
+  renderAt("");
+  fireEvent.change(screen.getByTestId("f1-new-title"), { target: { value: "Zwei Strecken" } });
+  fireEvent.click(screen.getByTestId("f1-new-championship"));
+  fireEvent.change(screen.getByTestId("f1-new-points"), { target: { value: "10, 5" } });
+  fireEvent.change(screen.getByTestId("f1-new-stream-platform"), { target: { value: "twitch" } });
+  fireEvent.change(screen.getByTestId("f1-new-stream-url"), { target: { value: "probe" } });
+  fireEvent.click(screen.getByTestId("f1-new-stream-embed"));
+  fireEvent.submit(screen.getByTestId("f1-new-form"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalled());
+  const body = apiMock.post.mock.calls[0][1];
+  expect(body).toMatchObject({ is_championship: true, points_per_position: [10, 5], stream_platform: "twitch", twitch_channel: "probe", has_live_stream: true });
+  expect(body).not.toHaveProperty("points_text");
+  expect(body).not.toHaveProperty("stream_address");
+});
+
+test("Online-Einreichung steht bis #1278 nicht zur Wahl (#2130)", () => {
+  renderAt("");
+  expect(screen.queryByTestId("f1-new-reg-enabled")).toBeNull();
+});
+
 test("im Event: Zeitraum vom Event, Zeile statt Auswahl, Anlegen über das Event", async () => {
   apiMock.get.mockImplementation(async (url) => (url === "/events/ev-1/program"
     ? { data: { event: { id: "ev-1", name: "Herbst-LAN" }, defaults: { fastlap: { start_date: "2026-11-14T10:00:00+01:00", end_date: "2026-11-15T23:00:00+01:00" } } } }

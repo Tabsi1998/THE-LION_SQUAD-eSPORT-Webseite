@@ -4,12 +4,14 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "@/lib/api";
+import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { SkeletonList } from "@/components/tls/Skeleton";
+import { useConfirm, usePrompt } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { AlertTriangle, Clock, Flag, ShieldAlert, RefreshCw } from "lucide-react";
+import { AlertTriangle, Clock, ExternalLink, Flag, ShieldAlert, RefreshCw, Undo2 } from "lucide-react";
 import { viennaDateTime } from "@/lib/vienna";
+import { toast } from "sonner";
 
 const KIND_META = {
   lap_penalty: { icon: Clock, color: "#FF9500", label: "Strafzeit" },
@@ -38,6 +40,42 @@ export default function AdminPenaltiesPage() {
 
   // Die Zähler kommen vom Server (#2125): mit aktivem Filter stünde sonst bei den anderen Knöpfen 0.
   const counts = data.counts || {};
+  const confirm = useConfirm();
+  const prompt = usePrompt();
+
+  // Zurücknehmen (#2130): Strafzeit und „ungültig“ fallen weg, die Zeit zählt wieder. Nach der Veröffentlichung nur mit
+  // Begründung - dann gleicht der Server Gewinne und Saisonpunkte an.
+  const takeBack = async (p) => {
+    const body = { penalty_seconds: 0, is_invalid: false };
+    // Eine Runde kann beides tragen - dann fallen auch beide weg, und das soll vorher dastehen.
+    const both = p.is_invalid && Number(p.penalty_seconds) > 0;
+    const falling = both ? `Die Strafzeit (+${p.penalty_seconds}s) und „ungültig“ fallen weg` : `„${p.label}“ fällt weg`;
+    if (p.results_locked) {
+      const reason = await prompt({
+        title: "Begründung nötig",
+        description: `Die Ergebnisse sind veröffentlicht. ${falling}. Das geht nur mit Begründung (mind. 10 Zeichen) - sie steht im Protokoll, Gewinne und Saisonpunkte werden angeglichen.`,
+        placeholder: "z. B. Video zeigt: Runde war sauber",
+        confirmLabel: "Zurücknehmen",
+        required: true,
+      });
+      const text = typeof reason === "string" ? reason.trim() : "";
+      if (!text) return;
+      body.change_reason = text;
+    } else if (!await confirm({
+      title: "Strafe zurücknehmen?",
+      description: `${falling}, die Zeit zählt wieder normal. Das steht im Protokoll.`,
+      confirmLabel: "Zurücknehmen",
+      tone: "info",
+    })) return;
+    try {
+      const { data: saved } = await api.patch(`/f1/times/${p.ref_id}`, body);
+      toast.success("Strafe zurückgenommen.");
+      if (saved?.resync_warning) toast.warning(saved.resync_warning);
+      load();
+    } catch (error) {
+      toast.error(formatRequestError(error, "Die Strafe ließ sich nicht zurücknehmen."));
+    }
+  };
 
   return (
     <AdminLayout>
@@ -85,14 +123,16 @@ export default function AdminPenaltiesPage() {
             Keine Strafen für diesen Filter.
           </div>
         ) : (
-          data.items.map((p) => <Row key={p.ref_id + p.kind} p={p} />)
+          data.items.map((p) => <Row key={p.ref_id + p.kind} p={p} onTakeBack={takeBack} />)
         )}
       </div>
     </AdminLayout>
   );
 }
 
-function Row({ p }) {
+const LAP_KINDS = new Set(["lap_penalty", "lap_invalid"]);
+
+function Row({ p, onTakeBack }) {
   const meta = KIND_META[p.kind] || KIND_META.incident;
   const Icon = meta.icon;
   const date = p.issued_at ? viennaDateTime(p.issued_at, {
@@ -130,9 +170,21 @@ function Row({ p }) {
           {p.context_subtitle && <span> · {p.context_subtitle}</span>}
         </div>
       </div>
-      <div className="text-right text-[11px] text-white/45 whitespace-nowrap">
+      <div className="md:text-right text-[11px] text-white/45 whitespace-nowrap">
         <div>{date}</div>
         <div>von {p.issued_by_name}</div>
+        <div className="mt-2 flex flex-wrap md:justify-end gap-2">
+          {p.admin_url && (
+            <Link to={p.admin_url} data-testid={`pen-open-${p.ref_id}`} className="inline-flex items-center gap-1 px-2 py-1 border border-white/15 rounded-sm text-[10px] font-bold uppercase tracking-wider text-white/70 hover:text-[#29B6E8] hover:border-[#29B6E8]/50">
+              <ExternalLink className="w-3 h-3" aria-hidden="true" /> Öffnen
+            </Link>
+          )}
+          {LAP_KINDS.has(p.kind) && (
+            <button type="button" onClick={() => onTakeBack(p)} data-testid={`pen-take-back-${p.ref_id}`} className="inline-flex items-center gap-1 px-2 py-1 border border-white/15 rounded-sm text-[10px] font-bold uppercase tracking-wider text-white/70 hover:text-[#FF3B30] hover:border-[#FF3B30]/50">
+              <Undo2 className="w-3 h-3" aria-hidden="true" /> Zurücknehmen
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

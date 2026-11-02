@@ -10,7 +10,10 @@ import { normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { usePrompt } from "@/components/tls/ConfirmDialog";
 import { toast } from "sonner";
-import { attemptsField, attemptsPayload } from "@/lib/fastLapEvent";
+import { attemptsField, attemptsPayload, pointsField, pointsPayload } from "@/lib/fastLapEvent";
+import { LIVE_HINT } from "@/lib/fastLapStatus";
+import { streamFormValues, streamPayload } from "@/lib/tournamentStream";
+import { FastLapChampionshipFields, FastLapStreamFields } from "./FastLapRulesFields";
 
 // Nach „Ergebnisse veröffentlicht“ (#1584) ändern Wertungsregeln Rangfolge, Gewinne oder Saisonpunkte - nur mit
 // Begründung; danach gleicht der Server Gewinne und Punkte an. Dieselbe Liste wie SCORING_FIELDS in f1_routes.py.
@@ -52,6 +55,9 @@ export function ChallengeSettingsForm({ challenge, onSaved }) {
     site_banner_enabled: !!source.site_banner_enabled,
     season_weight: source.season_weight ?? 1,
     prize_places: source.prize_places || [],
+    is_championship: !!source.is_championship,
+    points_text: pointsField(source),
+    ...streamFormValues(source),
   });
   const [form, setForm] = useState(formFromChallenge());
   const [events, setEvents] = useState([]);
@@ -72,6 +78,12 @@ export function ChallengeSettingsForm({ challenge, onSaved }) {
         const attempts = attemptsPayload(payload.attempts);
         delete payload.attempts;
         if (!attempts.error) Object.assign(payload, attempts);
+        const points = pointsPayload(payload.points_text);
+        delete payload.points_text;
+        if (!points.error) Object.assign(payload, points);
+        Object.assign(payload, streamPayload(payload));
+        delete payload.stream_address;
+        delete payload.stream_embed;
         if (!payload.registration_enabled) {
           payload.registration_open_from = null;
           payload.registration_open_until = null;
@@ -86,6 +98,8 @@ export function ChallengeSettingsForm({ challenge, onSaved }) {
       };
       const attemptsCheck = attemptsPayload(form.attempts);
       if (attemptsCheck.error) { toast.error(attemptsCheck.error); return; }
+      const pointsCheck = pointsPayload(form.points_text);
+      if (pointsCheck.error) { toast.error(pointsCheck.error); return; }
       const payload = normalizePayload(form);
       const patch = buildDirtyPayload(payload, normalizePayload(formFromChallenge()));
       if (!hasPayloadChanges(patch)) {
@@ -129,15 +143,13 @@ export function ChallengeSettingsForm({ challenge, onSaved }) {
       <FormColumns
         aside={(
           <>
-            <FormSection title="Veröffentlichung und Zeitplan" hint="Live und Beendet werden anhand von Start/Ende automatisch geschaltet.">
+            <FormSection title="Veröffentlichung und Zeitplan" hint={LIVE_HINT}>
               {/* Event als Klammer (#1371): verbunden wird nur im Event. */}
               <EventMembershipLine eventId={form.event_id} events={events} testId="f1-edit-event" />
               <SelectField label="Sichtbarkeit" value={form.visibility} onChange={(v) => set("visibility", v)} options={[["public", "Öffentlich"], ["community", "Nur registrierte Community"], ["members", "Nur Vereinsmitglieder"], ["internal", "Nur intern"]]} testId="f1-edit-visibility" />
               <TextField label="Start Challenge/Event" type="datetime-local" value={form.start_date} onChange={(v)=>set("start_date", v)} testId="f1-edit-start" />
               <TextField label="Ende Challenge/Event" type="datetime-local" value={form.end_date} onChange={(v)=>set("end_date", v)} testId="f1-edit-end" />
-              <CheckField label="Online-Einreichung öffentlich anzeigen" checked={form.registration_enabled} onChange={(v)=>set("registration_enabled", v)} testId="f1-edit-reg-enabled" />
-              {form.registration_enabled && <TextField label="Online-Einreichung öffnet" type="datetime-local" value={form.registration_open_from} onChange={(v)=>set("registration_open_from", v)} />}
-              {form.registration_enabled && <TextField label="Online-Einreichung endet" type="datetime-local" value={form.registration_open_until} onChange={(v)=>set("registration_open_until", v)} />}
+              {/* Online-Einreichen gibt es noch nicht: der Schalter kommt mit #1278 zurück (#2130). Gespeichertes bleibt unberührt. */}
               <CheckField label="Automatisches Fast-Lap-Hinweisbanner anzeigen" checked={form.site_banner_enabled} onChange={(v)=>set("site_banner_enabled", v)} accent="#FFD700" />
             </FormSection>
             <FormSection title="Teilnahme und Vereins-Referenzzeiten" accent="#FFD700" hint="Für externe Fast-Lap-Challenges kann die Vereinswertung sauber von Referenzzeiten getrennt werden.">
@@ -186,7 +198,10 @@ export function ChallengeSettingsForm({ challenge, onSaved }) {
             <TextField label="Controller-Typ" value={form.controller_type} onChange={(v)=>set("controller_type", v)} />
           </FormGrid>
           <TextField label="Versuche je Person und Strecke" hint="Leer = unbegrenzt. Ungültige Runden zählen mit." type="number" value={form.attempts} onChange={(v)=>set("attempts", v)} testId="f1-edit-attempts" className="md:max-w-xs" />
+          <FastLapChampionshipFields form={form} set={set} prefix="f1-edit" />
         </FormSection>
+
+        <FastLapStreamFields form={form} set={set} prefix="f1-edit" />
 
         <FastLapPrizeEditor value={form.prize_places} onChange={(v)=>set("prize_places", v)} />
         {challenge.status === "results_published" && (
@@ -245,7 +260,7 @@ function FastLapPrizeEditor({ value, onChange }) {
             onChange={(e) => update(i, { label: e.target.value })}
             data-testid={`f1-edit-prize-label-${i}`}
             className="col-span-4 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm"
-            placeholder="Label"
+            placeholder="Bezeichnung"
           />
           <input
             value={p.value || ""}

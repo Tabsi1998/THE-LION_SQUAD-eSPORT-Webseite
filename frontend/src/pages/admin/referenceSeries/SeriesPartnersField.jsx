@@ -1,4 +1,5 @@
 import { CheckField } from "@/components/tls/FormFields";
+import { ArchivedPartnersNote } from "@/components/tls/PartnerPicker";
 import { PARTNER_ROLE_LABELS, PARTNER_ROLE_OPTIONS, roleOf, setPartnerRole, togglePartner } from "@/lib/seriesPartners";
 
 // Partner einer Spur bzw. Saison (#1934): ein Haken je aktivem Partner, bei gewähltem Partner die Rolle – Veranstalter
@@ -9,6 +10,8 @@ export function SeriesPartnersField({ partners = [], value, onChange, inherited 
   if (!Array.isArray(partners) || partners.length === 0) return null;
   const inheritedIds = new Set(inherited.map((item) => item.id));
   const selectable = partners.filter((partner) => !inheritedIds.has(partner.id) || (value?.partner_ids || []).includes(partner.id));
+  const shown = new Set(partners.map((partner) => partner.id));
+  const archived = (value?.partner_ids || []).filter((id) => !shown.has(id));
   return (
     <fieldset className="border border-white/10 p-3 rounded-sm bg-[#0A0A0A] min-w-0" data-testid={`${testPrefix}-picker`}>
       <legend className="px-1 text-[11px] uppercase tracking-widest font-bold text-white/60">Partner</legend>
@@ -45,6 +48,7 @@ export function SeriesPartnersField({ partners = [], value, onChange, inherited 
           );
         })}
       </ul>
+      <ArchivedPartnersNote count={archived.length} onRemove={() => onChange(archived.reduce((next, id) => togglePartner(next, id, false), value))} testId={`${testPrefix}-archived`} />
       {hint && <p className="mt-2 text-[11px] text-white/40">{hint}</p>}
     </fieldset>
   );

@@ -16,6 +16,14 @@ const { default: AdminF1Page } = await import("./AdminF1Page");
 
 const OWN = { id: "fl-eigen", slug: "eigen", title: "Eigene Fast Lap", status: "draft", track_count: 1, participant_count: 0 };
 
+test("der Filter nennt die Status wie die Challenge-Seite und kennt auch „Pausiert“ (#2130)", async () => {
+  apiMock.get.mockResolvedValue({ data: [OWN, { ...OWN, id: "fl-2", slug: "zwei", status: "registration_closed" }] });
+  render(<MemoryRouter><AdminF1Page /></MemoryRouter>);
+  const options = [...(await screen.findByTestId("f1-admin-status-filter")).options].map((option) => option.textContent);
+  expect(options).toEqual(expect.arrayContaining(["Alle Status (2)", "Pausiert (0)", "Beendet (0)", "Ergebnisse veröffentlicht (0)", "Einreichung geschlossen (1)"]));
+  expect(options.some((text) => text.startsWith("Einreichung offen"))).toBe(false);
+});
+
 test("ein Helfer sieht nur seine Fast Lap, auch als Entwurf - ohne „Neue Challenge“", async () => {
   apiMock.get.mockImplementation(async (url) => {
     if (url === "/f1/challenges?include_drafts=true&managed=true") return { data: [OWN] };
