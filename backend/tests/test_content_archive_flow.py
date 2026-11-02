@@ -190,10 +190,12 @@ async def test_sponsor_is_archived_while_used_and_deleted_when_not(flow):
 
     await flow.db.events.delete_many({})
     await flow.db.tournaments.delete_many({})
-    assert (await flow.delete(f"/api/sponsors/{sid}")).status_code == 200
+    removed = await flow.delete(f"/api/sponsors/{sid}")
+    assert removed.status_code == 200, removed.text
     rows = await audit(flow, "sponsor.delete")
     assert len(rows) == 1 and rows[0]["data"]["name"] == "Probe GmbH"
-    assert (await flow.delete(f"/api/sponsors/{sid}")).status_code == 404
+    removed = await flow.delete(f"/api/sponsors/{sid}")
+    assert removed.status_code == 404, removed.text
 
 
 @pytest.mark.asyncio
@@ -213,7 +215,8 @@ async def test_partner_in_use_stays_and_archiving_hides_it(flow):
     flow.act_as(admin)
     await flow.db.references.delete_many({})
     await flow.db.reference_series.delete_many({})
-    assert (await flow.delete(f"/api/partners/{pid}")).status_code == 200
+    removed = await flow.delete(f"/api/partners/{pid}")
+    assert removed.status_code == 200, removed.text
     assert (await audit(flow, "partner.delete"))[0]["data"]["name"] == "Probe Verein"
 
 
@@ -242,6 +245,8 @@ async def test_reference_in_use_is_archived_not_deleted(flow):
     flow.act_as(None)
     assert (await flow.get(f"/api/references/{rid}")).status_code == 404
     flow.act_as(admin)
-    assert (await flow.delete(f"/api/references/{rid}")).status_code == 200
+    removed = await flow.delete(f"/api/references/{rid}")
+    assert removed.status_code == 200, removed.text
     assert (await audit(flow, "reference.delete"))[0]["data"]["name"] == "Probe Cup"
-    assert (await flow.delete(f"/api/references/{rid}")).status_code == 404
+    removed = await flow.delete(f"/api/references/{rid}")
+    assert removed.status_code == 404, removed.text

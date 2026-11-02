@@ -208,12 +208,14 @@ async def test_what_dolibarr_keeps_is_locked_and_the_sync_runs_as_before(flow, f
     # Aus der Kategorie genommen: Der Abgleich fasst den Eintrag nicht mehr an, Löschen geht.
     fake.thirdparty_categories[sponsor["id"]] = set()
     assert (await flow.post("/api/admin/dolibarr/sponsors/refresh")).json()["sponsors"]["gone"] == 1
-    assert (await flow.delete(f"/api/sponsors/{alpha['id']}")).status_code == 200
+    removed = await flow.delete(f"/api/sponsors/{alpha['id']}")
+    assert removed.status_code == 200, removed.text
 
     # Schalter aus: alles ist wieder von Hand pflegbar - auch „Aktiv“ und Löschen.
     assert (await flow.patch("/api/admin/dolibarr/sponsors", json={"from_dolibarr": False})).status_code == 200
     assert (await flow.patch(f"/api/partners/{partner['id']}", json={"is_active": True})).json()["is_active"] is True
-    assert (await flow.delete(f"/api/partners/{partner['id']}")).status_code == 200
+    removed = await flow.delete(f"/api/partners/{partner['id']}")
+    assert removed.status_code == 200, removed.text
 
 
 @pytest.mark.asyncio
