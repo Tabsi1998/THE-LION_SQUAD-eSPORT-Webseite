@@ -494,7 +494,7 @@ async def inside_main() -> None:
     # Der Ablauf spielt mit mehreren Captains (#2200) - je Co-Team ein Zugang, Reihenfolge wie in state["teams"].
     for index, row in enumerate(squads):
         state["accounts"][f"captain-{index}"] = {"email": by_id[row["squad"]["captain_id"]]["email"], "password": password, "totp": None}
-    print(f"Liga: {league['name']} /{season.get('name')} / Liga {division.get('level')} / Staffel A "
+    print(f"Liga: {league['name']} / {season.get('name')} / Liga {division.get('level')} / Staffel A "
           f"({tournament.get('status')}), {len(squads)} Co-Teams zugeteilt. Ligaseite: /liga/{league['slug']}/{season['slug']}")
     print("ABNAHME-STATE " + json.dumps(state, ensure_ascii=False))
 
