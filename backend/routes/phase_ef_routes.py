@@ -176,7 +176,7 @@ DEFAULT_EMAIL_TEMPLATES = [
     # Antwort aus der Kontakt-Inbox (#2131): {{reply}} ist der Wortlaut der Verwaltung.
     {"key": "contact_reply", "name": "Kontakt-Antwort",
      "subject": "Antwort auf deine Nachricht: {{subject}}",
-     "html": "<p>Hallo {{name}},</p><div style=\"white-space:pre-line\">{{reply}}</div><hr/><p>Deine Nachricht:</p><blockquote>{{message}}</blockquote>",
+     "html": "<p>Hallo {{name}},</p><div>{{reply}}</div><hr/><p>Deine Nachricht:</p><blockquote>{{message}}</blockquote>",
      "vars": ["name", "reply", "subject", "message"]},
     {"key": "membership_application_admin", "name": "Neue Bewerbung (Admin-Notify)",
      "subject": "Neue Mitgliedsbewerbung",

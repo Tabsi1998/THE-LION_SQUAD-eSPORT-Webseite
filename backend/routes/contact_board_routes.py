@@ -348,16 +348,17 @@ async def _send_reply(doc: dict, reply: dict) -> None:
     """Die Antwort über die Warteschlange - nur an die Adresse der Anfrage. Wortlaut und Name gehen als Text in die Mail."""
     from email_service import _wrap
     from services import mail_outbox
+    from services.email_delivery import html_lines
     from services.mail_templates import render_template
 
     subject, html = await render_template(
         "contact_reply",
-        {"name": (doc.get("name") or "").split()[0] if (doc.get("name") or "").split() else "dort", "reply": reply["text"], "subject": doc.get("subject") or "", "message": doc.get("message") or ""},
+        {"name": (doc.get("name") or "").split()[0] if (doc.get("name") or "").split() else "dort", "reply": html_lines(reply["text"]), "subject": doc.get("subject") or "", "message": html_lines(doc.get("message") or "")},
         fallback_subject="Antwort auf deine Nachricht: {{subject}}",
         fallback_html=_wrap(
             "Antwort auf deine Nachricht",
             "<p>Hallo {{name}},</p>"
-            "<div style='white-space:pre-line'>{{reply}}</div>"
+            "<div>{{reply}}</div>"
             "<hr style='border:0;border-top:1px solid #1F2937;margin:20px 0;'/>"
             "<p style='color:#6B7280;font-size:12px'>Deine Nachricht:</p>"
             "<blockquote style='margin:8px 0;padding:8px 12px;border-left:3px solid #29B6E8;color:#9CA3AF;font-size:13px'>{{message}}</blockquote>",

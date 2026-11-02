@@ -13,6 +13,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from database import get_db  # noqa: E402
 from flow_harness import make_flow  # noqa: E402
 from services import contact_retention, mail_queue, ops_alerts  # noqa: E402
+from services.email_delivery import html_lines  # noqa: E402
 from services.mail_catalog import CATALOG  # noqa: E402
 from services.notification_preferences import TEMPLATE_CATEGORY  # noqa: E402
 
@@ -218,6 +219,37 @@ async def test_no_reply_to_spam_without_address_or_with_a_bad_one(flow):
     assert empty.status_code == 400
     assert await flow.db.mail_jobs.count_documents({}) == 0
     assert (await flow.db.contact_messages.find_one({"id": "spam"}))["status"] == "spam"
+
+
+@pytest.mark.asyncio
+async def test_line_breaks_in_the_mail_are_br_and_values_stay_text(flow):
+    await flow.db.contact_messages.insert_one(message("a", message="Erste <i>Frage</i>\nZweite Frage"))
+    flow.act_as(await club_person(flow))
+    assert (await flow.post("/api/contact/a/reply", json={"text": "Erste Zeile\r\n<b>Zweite</b> Zeile\nDritte", "request_id": "antwort-eins"})).status_code == 200
+    job = await flow.db.mail_jobs.find_one({"template_key": "contact_reply"})
+    assert "Erste Zeile<br>&lt;b&gt;Zweite&lt;/b&gt; Zeile<br>Dritte" in job["html"]
+    assert "Erste &lt;i&gt;Frage&lt;/i&gt;<br>Zweite Frage" in job["html"], "auch das Zitat behält seine Zeilen"
+    assert "pre-line" not in job["html"]
+
+
+def test_html_lines_protects_first_and_does_not_escape_twice():
+    assert html_lines("a<b\nc") == "a&lt;b<br>c"
+    assert html_lines("a\r\nb") == "a<br>b"
+    assert html_lines(None) == ""
+    assert html_lines(html_lines("a\nb")) == "a<br>b"
+
+
+@pytest.mark.asyncio
+async def test_the_default_template_of_the_reply_is_used_with_line_breaks(flow):
+    from routes.phase_ef_routes import DEFAULT_EMAIL_TEMPLATES
+
+    default = next(row for row in DEFAULT_EMAIL_TEMPLATES if row["key"] == "contact_reply")
+    assert "pre-line" not in default["html"]
+    await flow.db.contact_messages.insert_one(message("a"))
+    await flow.db.email_templates.insert_one({**default, "id": "contact_reply"})
+    flow.act_as(await club_person(flow))
+    assert (await flow.post("/api/contact/a/reply", json={"text": "Eins\nZwei", "request_id": "antwort-eins"})).status_code == 200
+    assert "Eins<br>Zwei" in (await flow.db.mail_jobs.find_one({"template_key": "contact_reply"}))["html"]
 
 
 @pytest.mark.asyncio
