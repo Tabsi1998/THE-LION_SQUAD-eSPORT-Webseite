@@ -94,9 +94,12 @@ async def test_the_crown_is_the_same_in_list_and_detail(flow, monkeypatch):
 @pytest.mark.asyncio
 async def test_level_of_a_team_that_is_gone_is_404_even_from_the_cache(flow, monkeypatch):
     _leader, levels = await _two_teams(flow, monkeypatch)
-    levels["weg"] = {"team_id": "weg", "points": 1, "level": 1, "progress": 0}
+    levels["weg"] = {"team_id": "weg", "points": 9999, "level": 9, "progress": 0}
     flow.act_as(None)
     assert (await flow.get("/api/teams/weg/level")).status_code == 404
+    listed = (await flow.get("/api/teams/levels")).json()
+    assert "weg" not in listed["levels"] and listed["crowns"] == {"offen": "gold"}, "der Zwischenspeicher eines anderen Prozesses vergibt keine Krone"
+    assert (await flow.get("/api/teams/offen/level")).json()["crown"] == "gold"
 
 
 @pytest.mark.asyncio

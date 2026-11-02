@@ -9,9 +9,10 @@ router = APIRouter(prefix="/api/teams", tags=["team-levels"])
 
 
 async def _without_private(data: dict[str, dict]) -> dict[str, dict]:
-    """Private Teams (#2128, TM9) tauchen in der öffentlichen Übersicht nicht auf und tragen keine Krone."""
-    private = {row["id"] async for row in get_db().teams.find({"is_public": False}, {"_id": 0, "id": 1})}
-    return {tid: v for tid, v in data.items() if tid not in private}
+    """Nur öffentliche Teams, die es noch gibt (#2128, TM9): Private tauchen in der Übersicht nicht auf und tragen keine Krone,
+    und ein aufgelöstes Team kann im Zwischenspeicher eines anderen Prozesses noch stehen."""
+    visible = {row["id"] async for row in get_db().teams.find({"id": {"$in": list(data)}, "is_public": {"$ne": False}}, {"_id": 0, "id": 1})}
+    return {tid: v for tid, v in data.items() if tid in visible}
 
 
 @router.get("/levels")
