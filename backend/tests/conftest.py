@@ -3,6 +3,7 @@ import os
 import sys
 from datetime import datetime
 
+import flow_mongo
 import pytest
 import requests
 import shard_plan
@@ -47,6 +48,16 @@ DEMO_PASSWORD = os.environ.get("TEST_DEMO_PASSWORD", "")
 def pytest_configure(config):
     # CI in Teilen (TEST_SHARD=n/gesamt, #2054); ohne die Variable läuft die ganze Suite.
     shard_plan.configure(config)
+    # Ablauf-Tests gegen echtes MongoDB (#2200): eine Adresse, die nicht erlaubt ist, beendet den Lauf vor dem ersten Test.
+    try:
+        flow_mongo.configured_url()
+    except flow_mongo.FlowMongoRefused as refused:
+        raise pytest.UsageError(str(refused)) from refused
+
+
+def pytest_sessionfinish(session, exitstatus):
+    # Die Datenbank dieses Prozesses wieder weg - auch nach roten Tests.
+    flow_mongo.drop_process_database()
 
 
 def pytest_collection_modifyitems(config, items):

@@ -41,7 +41,8 @@ STATE="${ABNAHME_STATE:-$ROOT/.local-testing/abnahme/state-${ABNAHME_PROJECT}.js
 STATE_FASTLAP="${STATE%.json}-fastlap.json"
 STATE_LIGA="${STATE%.json}-liga.json"
 RESULTS="${ABNAHME_RESULTS:-$ROOT/.local-testing/abnahme/nacht-${ABNAHME_PROJECT}}"
-PYTHON="${PYTHON:-python3}"
+# Exportiert: liga-ablauf-abnahme stößt damit Zeit-Jobs an (scripts/seed_abnahme_liga.py --job, #2200).
+export PYTHON="${PYTHON:-python3}"
 
 # Im Workflow faltet GitHub die Ausgabe je Spec zusammen; am eigenen Rechner nur eine Überschrift.
 group() {

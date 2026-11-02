@@ -39,6 +39,7 @@ Teilen auf mehreren Rechnern gleichzeitig – mit denselben Tests und denselben 
 | Backend-Prüfungen | Kompilieren, Doku-Links, Shell-Skripte, flake8, pip-audit |
 | Backend-Tests (1/3 … 3/3) | je ein Drittel der Testdateien, darin vier Prozesse (`pytest-xdist`, `--numprocesses=auto`) |
 | Backend-Coverage | prüft, dass jede Testdatei in genau einem Teil lief, legt die Coverage aller Teile zusammen und verlangt wie bisher **35 % über das ganze Backend** |
+| Backend-Abläufe auf MongoDB | Liga-, Squad-, Match- und Map-Abläufe auf echtem MongoDB, jeder Prozess mit eigener Datenbank ([Abnahme lokal](abnahme-lokal.md#7-backend-abläufe-auf-echtem-mongodb), #2200) |
 | Frontend | Compose- und Nginx-Konfiguration, Routen-Vertrag, Audit, ESLint, Build |
 | Frontend-Unit-Tests (1/2, 2/2) | je die Hälfte der Vitest-Dateien (`--shard`), mit Blob-Bericht samt Coverage |
 | Frontend-Coverage | legt beide Berichte zum Gesamtbericht zusammen (`--merge-reports`), wie vorher aus einem Lauf |

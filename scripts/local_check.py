@@ -115,6 +115,8 @@ BACKEND_TEST_ENV = {
     "DB_NAME": "tls_ci" + (f"_{FOLDER_SLUG}" if FOLDER_SLUG else ""),
     "DISABLE_SCHEDULER": "true",
 }
+# The CI job "Backend-Abläufe auf MongoDB" (#2200): a port of its own, the image from docker-compose.yml (mongo_image).
+FLOW_MONGO_PORT = 27217
 
 # The environment of the CI's compose validation and container smoke.
 # Throwaway values; nothing here reaches a real system.
@@ -143,8 +145,6 @@ COMPOSE_ENV = {
 
 PASS, FAIL, SKIP = "passed", "failed", "skipped"
 
-# The MongoDB the CI workflows run as a service.
-MONGO_IMAGE = "mongo:7.0.39-jammy"
 # OSV-Scanner 2.6.0 and ShellCheck 0.11.0, pinned by digest: a scanner that
 # updates itself between two runs would change the findings on its own.
 OSV_IMAGE = "ghcr.io/google/osv-scanner@sha256:afd838850ac1a0fcc15ff4a041dc9ba11123c3f0d2666217a5f0fcf9222b55fa"
@@ -465,7 +465,15 @@ def run_yarn(context: Context, cwd: Path, *arguments, node: str, check: bool = T
 
 # ------------------------------------------------------------------ services
 
-def start_mongo(context: Context, name: str, port: int, image: str = MONGO_IMAGE) -> str:
+def mongo_image() -> str:
+    """The MongoDB image of docker-compose.yml - the CI reads it from there too."""
+    found = re.search(r"^\s*image:\s*(mongo:\S+)\s*$", (ROOT / "docker-compose.yml").read_text(encoding="utf-8"), re.M)
+    if not found:
+        raise StepFailed("docker-compose.yml names no mongo image")
+    return found.group(1)
+
+
+def start_mongo(context: Context, name: str, port: int, image: str | None = None) -> str:
     """A MongoDB of the CI's image, in a container of its own on a port of its own.
 
     A fresh container per run means no test ever sees the previous run's data,
@@ -474,6 +482,7 @@ def start_mongo(context: Context, name: str, port: int, image: str = MONGO_IMAGE
     key = f"mongo:{name}"
     if key in context.cache:
         return context.cache[key]
+    image = image or mongo_image()
     binary = docker(context)
     context.run(binary, "rm", "--force", name, check=False, timeout=120)
     if port_open(port):
@@ -1082,6 +1091,35 @@ def backend_tests(context: Context) -> str:
     return note
 
 
+def backend_mongo_flows(context: Context) -> str:
+    """The league, squad, match and map flows on a real MongoDB, as the CI job "Backend-Abläufe auf MongoDB" (#2200)."""
+    name = f"lsw-check-flow-mongo-{ROOT.name}".lower()
+    binary = docker(context)
+    context.run(binary, "rm", "--force", name, check=False, timeout=120)
+    if port_open(FLOW_MONGO_PORT):
+        raise StepSkipped(f"port {FLOW_MONGO_PORT} is taken by something else; stop it and run again")
+    image = mongo_image()
+    context.run(binary, "run", "--detach", "--name", name, "--publish", f"127.0.0.1:{FLOW_MONGO_PORT}:27017",
+                "--tmpfs", "/data/db:size=4g", image, "--wiredTigerCacheSizeGB", "1", timeout=1800)
+    context.containers.append(name)
+    deadline = time.time() + 120
+    while time.time() < deadline:
+        ping = context.run(binary, "exec", name, "mongosh", "--quiet", "--eval", "db.adminCommand({ping: 1}).ok",
+                           check=False, timeout=60)
+        if ping.returncode == 0 and ping.stdout.strip().endswith("1"):
+            break
+        time.sleep(2)
+    else:
+        raise StepFailed(f"{image} did not answer a ping within 120 s")
+    env = dict(BACKEND_TEST_ENV, FLOW_MONGO_URL=f"mongodb://127.0.0.1:{FLOW_MONGO_PORT}")
+    completed = context.run(venv_python(), "scripts/flow_mongo_tests.py", "--numprocesses=4", env=env, check=False, timeout=3600)
+    text = completed.stdout + completed.stderr
+    path = context.log("backend-mongo-flows", text)
+    if completed.returncode != 0:
+        raise StepFailed(f"the flows on MongoDB failed. Full output: {path}\n" + tail(completed, 30))
+    return describe_counts(pytest_counts(text))
+
+
 def backend_steps() -> list:
     return [
         Step("backend", "venv", f"Python {BACKEND_PYTHON} with both requirement files", backend_environment),
@@ -1089,6 +1127,8 @@ def backend_steps() -> list:
         Step("backend", "lint", "No undefined names, syntax hazards or unused imports", backend_lint, ("venv",)),
         Step("backend", "audit", "No known vulnerabilities in the dependencies", backend_audit, ("venv",)),
         Step("backend", "tests", f"The suite, with the {COVERAGE_FLOOR}% coverage floor", backend_tests,
+             ("venv",)),
+        Step("backend", "mongo-flows", "League, squad, match and map flows on a real MongoDB", backend_mongo_flows,
              ("venv",)),
     ]
 

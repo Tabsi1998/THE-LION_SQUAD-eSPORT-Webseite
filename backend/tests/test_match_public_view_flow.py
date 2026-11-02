@@ -34,7 +34,7 @@ async def match_with_internals(flow):
     response = await flow.post(f"/api/tournaments/{tournament['id']}/bracket/from-format?preview=false")
     assert response.status_code == 200, response.text
     await flow.start(tournament)
-    match = await flow.db.matches_v2.find_one({"tournament_id": tournament["id"], "slots.1.registration_id": {"$ne": None}}, {"_id": 0})
+    match = next(row for row in await flow.matches(tournament) if len(row["slots"]) > 1 and row["slots"][1].get("registration_id"))
     reg_ids = [slot.get("registration_id") for slot in match["slots"][:2]]
     owners = {reg["id"]: reg.get("user_id") for reg in registrations}
     first, second = (next(user for user in users if user["id"] == owners[reg_id]) for reg_id in reg_ids)

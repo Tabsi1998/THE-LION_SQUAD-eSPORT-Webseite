@@ -211,6 +211,52 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  # Dieselben Abläufe wie in „Backend-Tests“, aber auf echtem MongoDB (#2200): Indizes, Sperren und Aggregationen, die
+  # mongomock nicht prüft. Jeder Prozess hat seine Datenbank, jeder Test beginnt leer: backend/tests/flow_mongo.py.
+  backend-mongo:
+    name: Backend-Abläufe auf MongoDB
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      APP_ENV: test
+      # Wie in „Backend-Tests“: auf 27017 antwortet niemand. Die Abläufe schreiben nur in ihre eigene Testdatenbank.
+      MONGO_URL: mongodb://127.0.0.1:27017
+      DB_NAME: tls_ci
+      DISABLE_SCHEDULER: "true"
+      UPLOAD_DIR: /tmp/tls-uploads
+      FLOW_MONGO_URL: mongodb://127.0.0.1:27217
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+      - name: Start MongoDB (same image as docker-compose.yml)
+        # Kein services-Block: der kann dem Server keine Argumente mitgeben, der Speicher soll aber klein bleiben.
+        run: |
+          image=$(sed -n 's/^ *image: \(mongo:.*\)$/\1/p' docker-compose.yml)
+          test -n "$image"
+          docker run --detach --name flow-mongo --publish 127.0.0.1:27217:27017 --tmpfs /data/db:size=4g \
+            "$image" --wiredTigerCacheSizeGB 1
+          for attempt in $(seq 1 30); do
+            if docker exec flow-mongo mongosh --quiet --eval 'quit(db.runCommand({ ping: 1 }).ok ? 0 : 2)'; then exit 0; fi
+            sleep 2
+          done
+          docker logs flow-mongo
+          exit 1
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install -r backend/requirements-dev.txt
+      - name: Run the league, squad, match and map flows on MongoDB
+        run: python scripts/flow_mongo_tests.py --numprocesses=auto
+
   frontend:
     name: Frontend
     needs: changes
@@ -532,8 +578,8 @@ jobs:
   # "failure", sobald einer seiner Teile rot ist.
   ci-result:
     name: CI-Ergebnis
-    needs: [changes, backend-checks, backend, backend-coverage, frontend, frontend-unit, frontend-coverage, frontend-e2e, mobile,
-      container-smoke]
+    needs: [changes, backend-checks, backend, backend-coverage, backend-mongo, frontend, frontend-unit, frontend-coverage, frontend-e2e,
+      mobile, container-smoke]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5

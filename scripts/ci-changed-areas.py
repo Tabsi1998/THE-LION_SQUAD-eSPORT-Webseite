@@ -43,7 +43,9 @@ def areas_for(path: str) -> set[str]:
     compose = name.startswith("docker-compose") and name.endswith((".yml", ".yaml"))
     env_example = name in {".env.example", ".env.staging.example"}
 
-    if path.startswith(("backend/", "scripts/")) or path in {"install.sh", "update.sh", "frontend/nginx.conf", ".flake8"}:
+    # docker-compose.yml nennt das Mongo-Image: ein Update muss den Job „Backend-Abläufe auf MongoDB“ auslösen (#2200).
+    if (path.startswith(("backend/", "scripts/"))
+            or path in {"install.sh", "update.sh", "frontend/nginx.conf", ".flake8", "docker-compose.yml"}):
         hits.add("backend")
     if (path.startswith("frontend/") or compose or env_example
             or path in {"scripts/check-public-routes.sh", "scripts/compose-backup-target.py"} or path in AUDIT_GATE):

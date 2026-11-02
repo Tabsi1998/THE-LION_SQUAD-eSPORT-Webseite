@@ -14,6 +14,10 @@ What that does not cover: this is mongomock, not MongoDB. It behaves the same
 for the operations the tournament code uses - documents, ``$set``, ``$push``,
 ``distinct``, upserts - but it is not the place to verify index behaviour,
 transactions or aggregation pipelines.
+
+For those: with ``FLOW_MONGO_URL`` set the same tests run against a real server
+(#2200, ``flow_mongo.py``) - ``init_indexes`` for real, every test starts empty,
+the database is gone afterwards. Without the variable nothing changes.
 """
 from __future__ import annotations
 
@@ -24,6 +28,8 @@ import uuid
 
 from httpx import ASGITransport, AsyncClient
 from mongomock_motor import AsyncMongoMockClient
+
+import flow_mongo
 
 
 STAFF_ROLE = "superadmin"
@@ -81,17 +87,23 @@ def new_id() -> str:
 class Flow:
     """One test's application, database and current user."""
 
-    def __init__(self, client: AsyncClient, db):
+    def __init__(self, client: AsyncClient, db, *, real_mongo: bool = False):
         self.client = client
         self.db = db
         self.user: dict | None = None
+        self.real_mongo = real_mongo
 
     # ------------------------------------------------ Wer gerade handelt
     async def add_user(self, *, role: str = "user", name: str | None = None) -> dict:
         """Create a user the way the routes expect to find one."""
+        username = name or f"spieler-{new_id()[:8]}"
+        # Auf echtem MongoDB gilt der eindeutige Index: Viele Tests nennen zwei Personen gleich („Spieler 1“) - das ist hier
+        # der Anzeigename, das Konto braucht trotzdem einen eigenen Benutzernamen.
+        if self.real_mongo and await self.db.users.find_one({"username": username}, {"_id": 1}):
+            username = f"{username}-{new_id()[:8]}"
         user = {
             "id": new_id(),
-            "username": name or f"spieler-{new_id()[:8]}",
+            "username": username,
             "display_name": name or "Testspieler",
             "email": f"{new_id()[:8]}@example.test",
             "role": role,
@@ -222,13 +234,20 @@ def make_flow():
     """
     database, server, get_current_user, get_optional_user = load_application()
 
-    db = AsyncMongoMockClient()["tls_flow_tests"]
+    mongo_url = flow_mongo.configured_url()
+    if mongo_url:
+        db_name = flow_mongo.prepare_database(database, mongo_url)
+        mongo_client = flow_mongo.new_client(mongo_url)
+        db = mongo_client[db_name]
+    else:
+        mongo_client = None
+        db = AsyncMongoMockClient()["tls_flow_tests"]
     previous_db = database._db
     database._db = db
 
     transport = ASGITransport(app=server.app)
     client = AsyncClient(transport=transport, base_url="http://testserver")
-    flow = Flow(client, db)
+    flow = Flow(client, db, real_mongo=bool(mongo_url))
 
     async def current_user() -> dict:
         if flow.user is None:
@@ -247,6 +266,8 @@ def make_flow():
         server.app.dependency_overrides.pop(get_current_user, None)
         server.app.dependency_overrides.pop(get_optional_user, None)
         database._db = previous_db
+        if mongo_client is not None:
+            mongo_client.close()
 
     return flow, shutdown
 

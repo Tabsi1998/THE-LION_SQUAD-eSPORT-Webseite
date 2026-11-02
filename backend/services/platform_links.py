@@ -1437,7 +1437,7 @@ async def linked_accounts(db, user_id: str, platforms: list[str]) -> list[dict]:
     if not platforms:
         return []
     rows = await db.platform_links.find({"user_id": user_id, "platform": {"$in": list(platforms)}},
-                                        {"_id": 0, "platform": 1, "handle": 1, "display_name": 1, "linked_at": 1, "external_id": 1}).to_list(20)
+                                        {"_id": 0, "platform": 1, "handle": 1, "display_name": 1, "linked_at": 1, "external_id": 1}).to_list(len(platforms))
     out = []
     for row in sorted(rows, key=lambda row: list(PLATFORMS).index(row["platform"]) if row.get("platform") in PLATFORMS else 99):
         platform = row.get("platform") or ""
