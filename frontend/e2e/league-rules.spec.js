@@ -4,7 +4,7 @@ const { test, expect } = require("@playwright/test");
 // Texten, langen Wörtern und einer breiten Tabelle. Inhaltsverzeichnis, Sprung auf einen Paragrafen, Suche, Markierung, Vergleich,
 // Zustimmung. Erfundene Regeln, erfundene Namen.
 
-const ADMIN = { id: "admin-1", username: "leitung", display_name: "Leitung", role: "superadmin", areas: ["tournaments"], mfa_enabled: true, auth_mfa_verified: true };
+const ADMIN = { id: "admin-1", username: "leitung", display_name: "Leitung", role: "superadmin", areas: ["tournaments", "leagues"], mfa_enabled: true, auth_mfa_verified: true };
 const LONG_WORD = "Donaudampfschifffahrtsgesellschaftskapitänsmützenabzeichen".repeat(3);
 const FILLER = Array.from({ length: 12 }, (_, index) => `Satz ${index + 1} dieser Probe-Regel erklärt ruhig und in normaler Länge, was im Spielbetrieb gelten soll.`).join(" ");
 const WIDE = `| ${Array.from({ length: 9 }, (_, index) => `Spalte ${index + 1}`).join(" | ")} |\n| ${Array(9).fill("---").join(" | ")} |\n| ${Array.from({ length: 9 }, () => "Ein Wert mit etwas Text").join(" | ")} |`;
