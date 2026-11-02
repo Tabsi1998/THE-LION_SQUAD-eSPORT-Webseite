@@ -5,8 +5,8 @@ import { render, screen } from "@testing-library/react";
 const auth = { user: null };
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => auth }));
 vi.mock("@/components/tls/ImageUpload", () => ({
-  ImageUpload: ({ testId, endpoint, mediaScope, libraryEndpoint }) => (
-    <div data-testid={testId} data-endpoint={endpoint} data-scope={mediaScope} data-library={libraryEndpoint} />
+  ImageUpload: ({ testId, endpoint, mediaScope, libraryEndpoint, logo }) => (
+    <div data-testid={testId} data-endpoint={endpoint} data-scope={mediaScope} data-library={libraryEndpoint} data-logo={String(Boolean(logo))} />
   ),
 }));
 
@@ -35,10 +35,19 @@ test.each([
   }
 });
 
-test("Zuständig: Das Emblem wählt aus den eigenen Bildern", () => {
-  auth.user = { role: "player", areas: [], has_league_staff: true };
+test.each([
+  ["Zuständig", { role: "player", areas: [], has_league_staff: true }],
+  ["Freigabe Ligen", { role: "player", areas: ["leagues"] }],
+  ["Moderator und zuständig", { role: "moderator", areas: ["moderation"], has_league_staff: true }],
+])("%s: Das Emblem nimmt eigene Bilder über den Bild-Upload, der Hinweis sagt: kein SVG", (_name, user) => {
+  auth.user = user;
   renderFields();
-  expect(screen.getByTestId("emblem")).toHaveAttribute("data-library", "/media?type=images");
+  const emblem = screen.getByTestId("emblem");
+  expect(emblem).toHaveAttribute("data-endpoint", "/uploads/image");
+  expect(emblem).toHaveAttribute("data-logo", "false");
+  expect(emblem).toHaveAttribute("data-scope", "user");
+  expect(emblem).toHaveAttribute("data-library", "/media?type=images");
+  expect(screen.getByText(/PNG, JPG oder WebP/)).toHaveTextContent("kein SVG");
 });
 
 test.each(["tournament_admin", "club_admin", "superadmin"])("%s behält die Admin-Medien", (role) => {
@@ -49,4 +58,6 @@ test.each(["tournament_admin", "club_admin", "superadmin"])("%s behält die Admi
     expect(screen.getByTestId(testId)).not.toHaveAttribute("data-library");
   }
   expect(screen.getByTestId("emblem")).toHaveAttribute("data-endpoint", "/uploads/logo");
+  expect(screen.getByTestId("emblem")).toHaveAttribute("data-logo", "true");
+  expect(screen.getByText(/am besten SVG/)).toBeInTheDocument();
 });

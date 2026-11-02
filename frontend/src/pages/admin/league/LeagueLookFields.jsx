@@ -15,13 +15,16 @@ import "@/components/tls/league/public/league.css";
 const CLUB_COLOR = "#29B6E8";
 const ICON_DANGER = "p-1.5 text-white/50 hover:text-live focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8] rounded-sm";
 
-/** Emblem: quadratisch über den Logo-Upload (SVG wird bereinigt, PNG/WebP neu kodiert); Vorschau groß und klein. */
+/** Emblem: quadratisch über den Logo-Upload (SVG wird bereinigt, PNG/WebP neu kodiert); Vorschau groß und klein. Die Logo-Route steht nur
+ *  den Rollen mit Admin-Medien offen, alle anderen laden ein eigenes Bild über den Bild-Upload hoch - ohne SVG (#2230). */
 export function EmblemField({ value, onChange, inherited = "", inheritedLabel = "", accent, testId }) {
   const media = rulesMediaProps(useAuth().user);
+  const ownImage = media.mediaScope === "user";
   const shown = value || inherited;
   return (
-    <FieldLabel label="Emblem" hint="Quadratisch, am besten SVG oder PNG mit durchsichtigem Hintergrund.">
-      <ImageUpload value={value} onChange={onChange} testId={testId} variant="square" crop="square" endpoint="/uploads/logo" allowLibrary logo logoPreview={false} {...media} />
+    <FieldLabel label="Emblem" hint={ownImage ? "Quadratisch, als PNG, JPG oder WebP, kein SVG. Am besten mit durchsichtigem Hintergrund." : "Quadratisch, am besten SVG oder PNG mit durchsichtigem Hintergrund."}>
+      <ImageUpload value={value} onChange={onChange} testId={testId} variant="square" crop="square" allowLibrary {...media}
+        {...(ownImage ? { endpoint: "/uploads/image" } : { endpoint: "/uploads/logo", logo: true, logoPreview: false })} />
       <div className="mt-2 flex items-end gap-3" style={accentStyle(accent)} data-testid={`${testId}-sizes`}>
         <LeagueEmblem src={shown} size={72} />
         <LeagueEmblem src={shown} size={40} />
