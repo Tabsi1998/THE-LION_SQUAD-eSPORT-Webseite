@@ -192,7 +192,7 @@ export default function AdminGamesPage() {
                 <tr key={g.id} className={isArchivedGame(g) ? "opacity-60" : undefined} data-testid={`game-row-${g.slug}`}>
                   <td className="px-4 py-3">
                     <div className="font-semibold text-white">{gameLabel(g)}</div>
-                    {isArchivedGame(g) ? <div className="mt-0.5 text-[10px] uppercase tracking-widest text-[#FFD700]" data-testid={`game-archived-${g.slug}`}>Archiviert – beim Anlegen nicht zur Wahl</div> : null}
+                    {isArchivedGame(g) ? <div className="mt-0.5 text-[10px] uppercase tracking-widest text-warn" data-testid={`game-archived-${g.slug}`}>Archiviert – beim Anlegen nicht zur Wahl</div> : null}
                     {gameLabel(g) !== g.name && <div className="mt-0.5 text-[10px] uppercase tracking-widest text-white/35">Version: {g.name}</div>}
                     {g.discord_guild_id && servers.length ? <div className="mt-0.5 text-[10px] uppercase tracking-widest text-[#8EA1FF]" data-testid={`game-discord-${g.slug}`}>Discord: {servers.find((server) => server.guild_id === g.discord_guild_id)?.name || g.discord_guild_id}</div> : null}
                   </td>
@@ -207,7 +207,7 @@ export default function AdminGamesPage() {
                       <button onClick={() => setEditing(toForm(g))} className="p-1 text-white/40 hover:text-[#29B6E8]" title="Spiel bearbeiten" data-testid={`game-edit-${g.slug}`}>
                         <Pencil className="w-4 h-4" />
                       </button>
-                      <button onClick={() => setStatus(g, isArchivedGame(g) ? "active" : "archived")} className="p-1 text-white/40 hover:text-[#FFD700]"
+                      <button onClick={() => setStatus(g, isArchivedGame(g) ? "active" : "archived")} className="p-1 text-white/40 hover:text-warn"
                         title={isArchivedGame(g) ? "Spiel zurückholen" : "Spiel archivieren"} aria-label={isArchivedGame(g) ? `${gameLabel(g)} zurückholen` : `${gameLabel(g)} archivieren`} data-testid={`game-archive-${g.slug}`}>
                         {isArchivedGame(g) ? <ArchiveRestore className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
                       </button>

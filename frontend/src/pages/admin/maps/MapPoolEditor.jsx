@@ -177,7 +177,7 @@ export function MapPoolEditor({ title, hint = "", game, library = [], entry = nu
         </p>
       ) : null}
       {oldGroups.length ? (
-        <p role="status" className="rounded-sm border border-[#FFD700]/30 bg-[#FFD700]/5 px-3 py-2 text-xs text-[#FFD700]" data-testid={`${testId}-old-groups`}>
+        <p role="status" className="rounded-sm border border-warn/30 bg-warn/5 px-3 py-2 text-xs text-warn" data-testid={`${testId}-old-groups`}>
           Im gespeicherten Pool steht noch {oldGroups.map((group) => `„${group.label || group.mode || "Alle Maps"}“ (${(group.maps || []).length})`).join(", ")} – so hat das Spiel das nicht mehr. Der Pool gilt unverändert weiter, Spiele melden weiter daraus. Erst neues Speichern ersetzt ihn durch die Auswahl unten.
         </p>
       ) : null}

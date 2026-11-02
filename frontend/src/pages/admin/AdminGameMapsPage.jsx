@@ -35,8 +35,8 @@ function WithoutModeNotice({ game, maps, onAssign }) {
   const names = maps.slice(0, 5).map((item) => item.name).join(", ");
   const more = maps.length > 5 ? ` und ${maps.length - 5} weitere` : "";
   return (
-    <section className="mb-4 rounded-sm border border-[#FFD700]/30 bg-[#FFD700]/5 p-3 space-y-2" aria-label="Maps ohne Modus" data-testid="game-maps-without-mode">
-      <p className="text-sm font-semibold text-[#FFD700]">Diese Maps haben noch keinen Modus</p>
+    <section className="mb-4 rounded-sm border border-warn/30 bg-warn/5 p-3 space-y-2" aria-label="Maps ohne Modus" data-testid="game-maps-without-mode">
+      <p className="text-sm font-semibold text-warn">Diese Maps haben noch keinen Modus</p>
       <p className="text-xs text-white/70 break-words">
         {names}{more}. In neuen Pools stehen sie erst mit Modus zur Wahl. Gespeicherte Pools und laufende Spiele betrifft das nicht.
       </p>
