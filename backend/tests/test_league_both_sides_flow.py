@@ -100,7 +100,8 @@ async def test_the_rule_spans_all_maps_of_the_match_not_only_the_same_map(flow):
     body = two_nil(w)
     body["games"][0]["lineup"] = ids(w, "Kapitaen", "Mila")
     body["games"][1]["lineup"] = ids(w, "Kapitaen", "Tom")
-    assert (await flow.post(f"/api/matches/{w['match']['id']}/report", json=body)).status_code == 200
+    first = await flow.post(f"/api/matches/{w['match']['id']}/report", json=body)
+    assert first.status_code == 200, first.text
 
     flow.act_as(w["users"]["Falke1"])
     other = two_nil(w)
@@ -208,7 +209,8 @@ async def test_the_app_can_still_confirm_without_maps(flow):
     w = await both_kaders(flow)
     flow.act_as(w["users"]["Kapitaen"])
     body = two_nil(w, lineup=ids(w, "Kapitaen", "Mila"))
-    assert (await flow.post(f"/api/matches/{w['match']['id']}/report", json=body)).status_code == 200
+    first = await flow.post(f"/api/matches/{w['match']['id']}/report", json=body)
+    assert first.status_code == 200, first.text
 
     flow.act_as(w["users"]["Falke1"])
     confirmed = await flow.post(f"/api/matches/{w['match']['id']}/report", json={"results": body["results"]})

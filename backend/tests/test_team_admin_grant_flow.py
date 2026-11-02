@@ -126,9 +126,11 @@ async def test_dissolving_and_changing_roles_stay_out_of_reach(flow, kind):
 
     rights = (await flow.get(f"/api/teams/{team_id}")).json()
     assert rights["can_dissolve"] is False and rights["can_change_roles"] is False and rights["can_remove_members"] is False
-    assert (await flow.delete(f"/api/teams/{team_id}?confirm=Lions Rocket")).status_code == REFUSED
-    assert (await flow.post(f"/api/teams/{team_id}/members/{w['mate']['id']}/role", json={"role": "co_leader"})).status_code == REFUSED
-    assert (await flow.post(f"/api/teams/{team_id}/transfer-leader", json={"new_leader_id": w["mate"]["id"]})).status_code == REFUSED
+    dissolve = await flow.delete(f"/api/teams/{team_id}?confirm=Lions Rocket")
+    role = await flow.post(f"/api/teams/{team_id}/members/{w['mate']['id']}/role", json={"role": "co_leader"})
+    transfer = await flow.post(f"/api/teams/{team_id}/transfer-leader", json={"new_leader_id": w["mate"]["id"]})
+    public = await flow.patch(f"/api/teams/{team_id}", json={"is_public": True})
+    assert [dissolve.status_code, role.status_code, transfer.status_code, public.status_code] == [REFUSED] * 4
 
 
 @pytest.mark.asyncio

@@ -157,7 +157,8 @@ Ablauf (`services/league_roster.py`):
 - **Zuteilen** eines Co-Teams: jedes Mitglied bekommt einen Eintrag; mit vollständiger ID im Profil wird sie
   festgehalten. Fehlt sie, steht der Eintrag leer, Spieler und Verantwortliche des Co-Teams bekommen eine Nachricht
   (Art `tournament_registration`); der Dialog warnt vorab mit Namen. Zuteilen geht trotzdem.
-- **Aufnahme** in ein zugeteiltes Co-Team einer laufenden Staffel (`PATCH /api/teams/{id}/squads/{id}`): ebenso.
+- **Aufnahme** in ein zugeteiltes Co-Team einer laufenden Staffel (`PATCH /api/teams/{id}/squads/{id}`): ebenso, auch
+  die Nachricht an Spieler und Verantwortliche – je Person einmal, ebenso für „wartet auf Freigabe“ (#2202).
   Der **Stichtag gilt je Co-Team**: wer danach in ein Co-Team kommt, in dem er in der Season noch nicht stand, wartet
   dort auf Freigabe (`late_squad_ids`) – auch mit schon festgehaltener ID aus einem anderen Co-Team; die ID bleibt
   dieselbe, im bisherigen Co-Team spielt er weiter. Der Wiedereintritt ins selbe Co-Team ist nicht „spät“; das
@@ -174,8 +175,9 @@ Ablauf (`services/league_roster.py`):
   nach der Freigabe der Liga-Leitung (`POST /api/admin/leagues/seasons/{id}/roster/{user_id}/approve` mit Grund ≥ 5
   Zeichen; übernimmt die aktuelle ID aus dem Profil; Protokoll in `approvals` und `audit_logs`).
 - Stand je Person (`league_roster.status`): `locked` (festgehalten), `pending` (im Profil, wird beim ersten Aufstellen
-  festgehalten), `missing` (fehlt), `late` (wartet im Co-Team der Seite auf Freigabe), `free` (Spiel ohne
-  Pflicht-ID). Aufstellbar sind `locked`, `pending` und `free`. Die Freigabe hebt jedes „spät“ auf.
+  festgehalten), `missing` (fehlt), `late` (wartet im Co-Team der Seite auf Freigabe), `banned` (Konto gesperrt, geht
+  jedem anderen Stand vor, auch bei Spielen ohne Pflicht-ID; #2202), `free` (Spiel ohne Pflicht-ID). Aufstellbar sind
+  `locked`, `pending` und `free`. Die Freigabe hebt jedes „spät“ auf, nie die Sperre.
 - **Sichtbarkeit:** die IDs der Spieler stehen im Block `league` der Matchseite (`roster[].game_id_text`,
   `lobby_ids`) nur für Beteiligte des Spiels und die Turnierleitung – wie Aufstellungen. Die eigene ID je laufender
   Season steht unter `GET /api/me/league-ids` (Hinweis im Profil). Die Kaderübersicht
@@ -301,7 +303,8 @@ Angelehnt an `services/match_audience.py` (Verantwortliche/Spieler) und `auth.re
 | Matchchat, Spiel-Hinweise | ja | ja | ja | ja | ja |
 | Ligaseite lesen | immer | nach Sichtbarkeit | nach Sichtbarkeit | nach Sichtbarkeit | nach Sichtbarkeit |
 
-¹ Hat ein Co-Team weder Captain noch Vertreter, handelt die Hauptteam-Leitung (niemand sperrt sich aus).
+¹ Hat ein Co-Team weder Captain noch Vertreter, handelt die Hauptteam-Leitung (niemand sperrt sich aus). Ein gesperrtes
+Konto zählt nicht als Captain oder Vertreter (#2202).
 Umsetzung B: Für Anmeldungen mit `squad_id` gilt in `match_audience` – Verantwortliche = `captain_id`,
 `vice_captain_id` (sonst Leitung und Co-Leitung des Hauptteams); Spieler = `member_ids` des Co-Teams plus
 Verantwortliche plus Leitung und Co-Leitung des Hauptteams (Zeile „Matchchat, Spiel-Hinweise“), nicht die übrigen
@@ -329,6 +332,8 @@ Anmeldungen auch über Co-Teams, deren Captain/Vertreter man ist. Aufrufer mit e
 | Map-Wiederholung nach `map_repeat` (Vorgabe: dieselbe Map im selben Modus nur einmal je Serie) | Melden, Korrektur | P6 |
 | Aufstellung: genau `team_size` verschiedene Mitglieder des eigenen Co-Teams je Map | Melden, Nachtrag | B |
 | Aufstellung: nur mit gültiger Spiel-ID der Season (festgehalten oder im Profil; nicht „wartet auf Freigabe“), sonst 422 „… kann nicht aufgestellt werden – …“ – auch für die Turnierleitung (#2108) | Melden, Nachtrag, Ergebnis | B |
+| Aufstellung: kein gesperrtes Konto, sonst 422 „… kann nicht aufgestellt werden – Das Konto ist gesperrt.“ – auch für die Turnierleitung, Altbestand wie bei der Spiel-ID (#2202) | Melden, Nachtrag, Ergebnis | A.4 |
+| Dieselbe Person nie auf beiden Seiten desselben Spiels, über alle Maps, sonst 422; wer am Spiel schon auf beiden Seiten steht, hält keine Korrektur auf (#2202) | Melden, Bestätigen, Nachtrag, Ergebnis | A.4 |
 | Kein Doppel-Einsatz: dieselbe Person nicht in Aufstellungen zweier Anmeldungen am selben Spieltag (`matchday_number_of`) in Staffeln derselben `league_context.season_id` | Melden, Nachtrag | B |
 | Bestätigung mit anderen Maps/Modi/Siegern als die Erstmeldung → 409 mit Hinweis auf Einspruch | Bestätigen | B |
 
@@ -369,6 +374,18 @@ Meldung mit gleichem Stand → angenommen; abweichender Stand ohne `games` → e
 | Staffelgröße | Schätzung für Format `league` mit `round_robin_legs`: n·(n−1)/2·Runden statt Zweierpotenz | `tournament_common._estimated_match_count` |
 | Standardtermin | Nie in einer Sperrzeit: nächster freier Tag der Woche zur selben Uhrzeit, sonst der letzte davor, sonst kein Termin und `schedule_hint` im Plan | `matchday_schedule.default_time_for` |
 | Anmeldung, Spiel-Antworten | Eine Staffel hat auf keinem Weg eine Selbstanmeldung; `schedule_proposals` an Unbeteiligte nur mit `scheduled_at`, `status`, `actor_registration_id`; Notizen höchstens 500, Einspruch höchstens 1000 Zeichen | `self_register`, `access_link_routes`, `_match_page_payload`, `models.py` |
+
+### Kader und Aufstellung (#2202, Paket A.4)
+
+| Thema | Vertrag | Stelle |
+| --- | --- | --- |
+| Kontosperre | Stand `banned` in `league_roster.status`, eine Stelle für alle Prüfungen (Paket B.3 baut darauf auf). Festhalten und Freigabe hängen an der ID, nicht an der Sperre (`_id_status`). Die Gegenseite sieht in `lobby_ids` niemanden mit Sperre, kein Grund | `league_roster`, `league_games._lobby_ids` |
+| Gesperrte Verantwortliche | Ein gesperrtes Konto zählt nicht als Captain oder Vertreter: Es handelt der andere, ohne beide die Hauptteam-Leitung. Anmeldungen ohne Co-Team bleiben unverändert | `match_audience._squad_roles` |
+| Kader zu klein | Abgänge bleiben möglich (Entscheidung des Obmanns). Fällt der Kader eines Co-Teams mit aktiver Anmeldung in einer nicht beendeten Staffel unter `min_squad_size`: Warnung (Art `tournament_registration`, `meta.reason` `league_squad_short` und `league_squad_short_lead`, einmal je Größe und Wiener Tag) an Captain, Vertreter, Hauptteam-Leitung und Turnierleitung. Nie gespeichert, jedes Mal frisch berechnet | `squad_shortage`, `team_routes` |
+| Aufgabe „Kader auffüllen“ | `me.actions[]` mit `type: "squad_short"`, `target_type: "team"`, `team_id`, ohne `target_id`: Apps ohne neuen Build zeigen die Zeile ohne Pfeil und öffnen nichts. Für Captain, Vertreter und Hauptteam-Leitung, bis der Kader reicht | `match_overview.own_squad_tasks`, `mobile_routes` |
+| Hinweise vorab | `GET /api/teams/{id}/squads` trägt `league_requirement: {min_size, title}` bei Co-Teams in einer nicht beendeten Staffel (strengste Vorgabe). `GET …/seasons/{id}/roster`: je Co-Team `member_count`, `min_squad_size`, `short`; `counts.short`, `counts.banned` | `squad_shortage.requirements`, `league_roster.season_overview` |
+| Beide Seiten | `check_both_sides` vergleicht die neuen Aufstellungen mit denen der anderen Seite am Spiel (`_lineup_sources`), über alle Maps. Die Korrektur der Leitung ersetzt beide Seiten: Dort zählt nur, was sie schickt | `league_games` |
+| Spätere Aufnahme | Fehlende ID und „wartet auf Freigabe“: `meta.reason` `league_id_missing`, `league_id_missing_team`, `league_late`, `league_late_team`, je Person einmal. Gesperrte bekommen nichts. Eine klemmende Nachricht hält die Änderung nicht auf | `league_roster.on_squad_members_added` |
 
 ## 7. Nebenwirkungen „Staffel = Turnier“ (Worker A, P1)
 

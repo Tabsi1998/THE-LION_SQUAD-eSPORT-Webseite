@@ -188,5 +188,25 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       await expect(page.getByTestId("roster-approve-u3")).toHaveText("ID freigeben");
       await noSideScroll(page);
     });
+
+    test("Season-Seite: zu kleine Kader und gesperrte Konten stehen sichtbar da (#2202)", async ({ page }) => {
+      await page.setViewportSize({ width, height });
+      const [squad] = ROSTER_PAGE.squads;
+      await mock(page, (path) => {
+        if (path === "/admin/leagues/seasons/s1/roster") {
+          return { ...ROSTER_PAGE, counts: { ...ROSTER_PAGE.counts, banned: 1, short: 1 },
+            squads: [{ ...squad, short: true, member_count: 1, min_squad_size: 4, display_name: "Ein Hauptteam mit wirklich sehr langem Namen · Co-Team mit langem Namen",
+              players: [{ id: "u9", name: "Gesperrt", state: "banned", ok: false, text: "Probe#1234567", profile_text: "Probe#1234567", changed: false, reason: "Das Konto ist gesperrt.", approvals: [] }] }] };
+        }
+        if (path === "/admin/leagues/seasons/s1") return SEASON_PAGE;
+        return undefined;
+      }, ADMIN);
+      await page.goto("/admin/leagues/seasons/s1");
+      await expect(page.getByTestId("season-roster-short")).toContainText("1 von mindestens 4 Spielern");
+      await expect(page.getByTestId("roster-player-u9")).toContainText("gesperrt");
+      await expect(page.getByTestId("season-roster-counts")).toContainText("1 gesperrt");
+      await expect(page.getByTestId("roster-approve-u9")).toHaveCount(0);
+      await noSideScroll(page);
+    });
   });
 }

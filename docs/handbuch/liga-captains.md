@@ -40,6 +40,7 @@ Strafen**. Notiz und Name eines Terminvorschlags sehen nur die beiden Seiten und
   bis dahin spielt er mit der alten.
 - Neue Spieler im Co-Team: Gibt es einen **Stichtag** der Season, braucht jeder, der danach dazukommt, die Freigabe
   der Liga-Leitung – auch wer aus einem anderen Co-Team wechselt. Wer nur kurz draußen war und zurückkommt, nicht.
+  Fehlt die ID oder wartet jemand auf die Freigabe, bekommen er und ihr eine Nachricht.
 - **Lobby:** Auf der Matchseite steht unter **Activision-ID für die Lobby** die ID jedes Spielers beider Seiten – nur
   für euch, den Gegner und die Turnierleitung.
 
@@ -50,6 +51,11 @@ Strafen**. Notiz und Name eines Terminvorschlags sehen nur die beiden Seiten und
 - **Rolle abgeben:** Wer Captain oder Vertreter ist und nicht mehr will oder kann, tippt beim Co-Team auf **Rolle
   abgeben**. Leitung und Co-Leitung des Hauptteams bekommen eine Nachricht und vergeben neu; bis dahin handelt der
   andere (Captain oder Vertreter), ohne beide die Teamleitung. Erst ohne Rolle lässt sich das Team verlassen.
+- **Kader zu klein:** Geht jemand und der Kader fällt unter den Mindestkader der Staffel, bekommen ihr und die
+  Turnierleitung eine Warnung. Auf der Startseite steht **Kader auffüllen**, bis er wieder reicht. Auffüllen kann nur die
+  Teamleitung – sagt ihr Bescheid.
+- **Wer nicht aufstellbar ist:** Ein gesperrtes Konto lässt sich nicht aufstellen und zählt nicht als Captain oder
+  Vertreter; ohne beide handelt die Teamleitung. Dieselbe Person spielt nie auf beiden Seiten eines Spiels.
 - **In der App** gibt es Captain und Vertreter noch nicht – meldet sie beim Kader-Ändern „… bitte erst die Rolle neu
   vergeben“, das auf der Website erledigen.
 - **Abmelden** einer Staffel geht nicht selbst („Austritt nur über die Turnierleitung“) – im Matchchat oder direkt bei
