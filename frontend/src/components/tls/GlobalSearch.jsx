@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { CalendarDays, Clock, Newspaper, RotateCcw, Search, Trophy, UserRound, Users, X } from "lucide-react";
+import { CalendarDays, Clock, Newspaper, RotateCcw, ScrollText, Search, Trophy, UserRound, Users, X } from "lucide-react";
 import { clearRecentSearches, forgetSearch, loadRecentSearches, rememberSearch } from "@/lib/recentSearches";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { asInstant, viennaDate } from "@/lib/vienna";
@@ -12,6 +12,7 @@ const KIND_META = {
   news: { label: "News", icon: Newspaper },
   player: { label: "Spieler", icon: UserRound },
   team: { label: "Team", icon: Users },
+  league_rules: { label: "Regeln", icon: ScrollText },
 };
 
 const QUICK_LINKS = [

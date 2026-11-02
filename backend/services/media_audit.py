@@ -86,6 +86,8 @@ USAGE_TARGETS: list[tuple[str, list[str]]] = [
 
 USAGE_TEXT_TARGETS: list[tuple[str, list[str]]] = [
     ("tournaments", ["rules", "prize_pool"]),
+    # Bilder im Regelwerk (#1646): Text und Anlagen jeder Fassung - alte Fassungen bleiben abrufbar.
+    ("league_rules", ["body_md", "annexes.body_md"]),
 ]
 
 # Lesbare Namen der Verwendungsstellen für die Mediathek (#1471): „Sammlung · Feld“, Sonderfälle ganz.
@@ -97,7 +99,7 @@ COLLECTION_LABELS = {
     "club_member_profiles": "Vereinsprofil", "advent_doors": "Adventkalender", "stickers": "Sticker",
     "game_servers": "Spielserver", "game_maps": "Map", "map_pools": "Map-Pool",
     "reference_lineages": "Spur", "reference_series": "Saison",
-    "leagues": "Liga", "league_seasons": "Liga-Season", "league_divisions": "Liga N",
+    "leagues": "Liga", "league_seasons": "Liga-Season", "league_divisions": "Liga N", "league_rules": "Regelwerk",
     "direct_messages": "Direktnachricht", "team_chat_messages": "Team-Chat", "tournament_chat_messages": "Turnier-Chat",
     "match_chat_messages": "Match-Chat",
 }
@@ -112,6 +114,7 @@ FIELD_LABELS = {
     "tools.image_url": "Bild eines Werkzeugs", "media_url": "Bild oder Video", "url": "Bild", "sticker.url": "Sticker",
     "original_url": "Original", "server_icon_url": "Server-Symbol", "modes.maps.image_url": "Bild einer Map",
     "image_history": "früheres Bild", "emblem_url": "Emblem", "prizes.image_url": "Bild eines Gewinns",
+    "body_md": "Text", "annexes.body_md": "Text einer Anlage",
     **{f"dolibarr_images.{kind}.{variant}.url":
        f"{kind.capitalize()} aus der Mitgliederverwaltung ({'dunkler' if variant == 'dark' else 'heller'} Hintergrund)"
        for kind in ("logo", "banner") for variant in ("dark", "light")},

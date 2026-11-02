@@ -344,11 +344,17 @@ async def sitemap():
     league_slugs = {row["id"]: row.get("slug") async for row in db.leagues.find({"status": "active"}, {"_id": 0, "id": 1, "slug": 1})}
     league_urls = []
     async for league_season in db.league_seasons.find({"visibility": "public", "status": {"$ne": "archived"}},
-                                                      {"_id": 0, "league_id": 1, "slug": 1, "updated_at": 1}):
+                                                      {"_id": 0, "id": 1, "league_id": 1, "slug": 1, "updated_at": 1}):
         league_slug = league_slugs.get(league_season.get("league_id"))
         if league_slug and league_season.get("slug"):
             league_urls.append({"loc": f"{base}/liga/{league_slug}/{league_season['slug']}",
                                 "lastmod": league_season.get("updated_at"), "changefreq": "daily", "priority": "0.7"})
+            # Regelseite (#1646): nur, wenn die Season ein Regelwerk hat - eigenes oder das der Liga.
+            if await db.league_rules.find_one({"status": "published", "$or": [
+                    {"scope": "league_season", "scope_id": league_season.get("id")},
+                    {"scope": "league", "scope_id": league_season.get("league_id")}]}, {"_id": 1}):
+                league_urls.append({"loc": f"{base}/liga/{league_slug}/{league_season['slug']}/regeln",
+                                    "lastmod": league_season.get("updated_at"), "changefreq": "weekly", "priority": "0.5"})
     if league_urls:
         urls.append({"loc": f"{base}/liga", "lastmod": None, "changefreq": "weekly", "priority": "0.7"})
         urls.extend(league_urls)
