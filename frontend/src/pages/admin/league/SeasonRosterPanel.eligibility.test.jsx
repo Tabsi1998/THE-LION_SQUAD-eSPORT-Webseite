@@ -97,7 +97,9 @@ test("eine ältere Season schickt leere Regeln und bleibt, wie sie ist", () => {
   expect(body.min_age).toBeNull();
   expect(body.new_player_wait_days).toBeNull();
   expect(body.lineup_min_players).toBeNull();
-  expect(body.lineup_mode).toBe("per_map");
+  expect(body).not.toHaveProperty("lineup_mode");
+  expect(body).not.toHaveProperty("one_team_per_season");
+  expect(body).not.toHaveProperty("unique_game_ids");
 });
 
 test("eine neue Season behält ihre Regeln im Formular", () => {

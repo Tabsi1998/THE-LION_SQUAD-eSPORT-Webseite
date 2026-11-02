@@ -52,6 +52,7 @@ export function seasonToForm(season = {}) {
     min_squad_size: String(season.min_squad_size ?? season.team_size ?? 4),
     // Spielberechtigung (#2204): Fehlt ein Wert (ältere Season), bleibt das Feld leer und die Season, wie sie ist.
     max_squad_size: season.max_squad_size != null ? String(season.max_squad_size) : "",
+    had_rules: season.lineup_mode != null,
     one_team_per_season: Boolean(season.one_team_per_season),
     new_player_wait_days: season.new_player_wait_days != null ? String(season.new_player_wait_days) : "",
     min_age: season.min_age != null ? String(season.min_age) : "",
@@ -106,11 +107,12 @@ export function seasonPayload(form) {
     team_size: number(form.team_size),
     min_squad_size: number(form.min_squad_size),
     max_squad_size: number(form.max_squad_size),
-    one_team_per_season: Boolean(form.one_team_per_season),
+    // Eine ältere Season bleibt, wie sie ist (#2204): Was niemand angefasst hat, geht gar nicht erst mit.
+    ...(form.had_rules || form.one_team_per_season ? { one_team_per_season: Boolean(form.one_team_per_season) } : {}),
     new_player_wait_days: number(form.new_player_wait_days),
     min_age: number(form.min_age),
-    unique_game_ids: Boolean(form.unique_game_ids),
-    lineup_mode: form.lineup_mode || "per_map",
+    ...(form.had_rules || form.unique_game_ids ? { unique_game_ids: Boolean(form.unique_game_ids) } : {}),
+    ...(form.had_rules || (form.lineup_mode && form.lineup_mode !== "per_map") ? { lineup_mode: form.lineup_mode || "per_map" } : {}),
     lineup_min_players: number(form.lineup_min_players),
     transfer_windows: (form.transfer_windows || []).filter((window) => window.start_date && window.end_date),
     scoring_rules: {
