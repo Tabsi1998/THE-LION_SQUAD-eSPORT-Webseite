@@ -191,6 +191,27 @@ async def test_a_change_by_league_rights_is_logged(flow):
 
 
 @pytest.mark.asyncio
+async def test_a_role_change_by_league_rights_is_logged_too(flow):
+    w = await squad_world(flow)
+    person = await holder(flow, "roster")
+    flow.act_as(person)
+    response = await flow.put(url(w) + "/roles", json={"vice_captain_id": w["users"]["Mila"]["id"]})
+    assert response.status_code == 200, response.text
+    logged = await flow.db.audit_logs.find({"action": "league.squad.edit"}, {"_id": 0}).to_list(5)
+    assert len(logged) == 1 and logged[0]["actor_id"] == person["id"]
+    assert logged[0]["data"] == {"squad_id": w["squad_a"]["id"], "fields": ["vice_captain_id"]}
+
+
+@pytest.mark.asyncio
+async def test_the_own_team_does_not_write_the_league_entry(flow):
+    w = await squad_world(flow)
+    flow.act_as(w["users"]["LoeLeitung"])
+    response = await flow.put(url(w) + "/roles", json={"vice_captain_id": w["users"]["Mila"]["id"]})
+    assert response.status_code == 200, response.text
+    assert await flow.db.audit_logs.find({"action": "league.squad.edit"}, {"_id": 0}).to_list(5) == []
+
+
+@pytest.mark.asyncio
 async def test_the_list_says_which_squads_can_be_changed(flow):
     w = await squad_world(flow)
     list_url = f"/api/teams/{w['lions']['id']}/squads"

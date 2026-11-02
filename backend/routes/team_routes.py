@@ -1437,6 +1437,9 @@ async def set_squad_roles(team_id: str, squad_id: str, body: TeamSquadRoles, me:
     await _after_squad_roles(db, team, fresh or current, current, roles, me)
     if not may_change:
         await _tell_role_resigned(db, team, fresh or current, requested, me)
+    # Griff von außen in ein Co-Team einer Staffel (#2203): wie beim Ändern des Co-Teams, mit den Feldern, nicht den Werten.
+    elif not _leads_team(team, me) and await _squad_staffeln(db, squad_id):
+        await _team_audit(db, "league.squad.edit", team_id, me["id"], {"squad_id": squad_id, "fields": sorted(requested)})
     return fresh
 
 
