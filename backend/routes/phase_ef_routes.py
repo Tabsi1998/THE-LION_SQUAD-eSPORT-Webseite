@@ -173,6 +173,11 @@ DEFAULT_EMAIL_TEMPLATES = [
      "html": "<p>Hallo {{name}},</p><p>Vielen Dank für deine Nachricht zum Thema <strong>{{topic}}</strong>. Wir melden uns zeitnah.</p>",
      # Das Kontaktformular setzt auch Betreff und Nachricht ein (#2119 ML7).
      "vars": ["name", "topic", "subject", "message"]},
+    # Antwort aus der Kontakt-Inbox (#2131): {{reply}} ist der Wortlaut der Verwaltung.
+    {"key": "contact_reply", "name": "Kontakt-Antwort",
+     "subject": "Antwort auf deine Nachricht: {{subject}}",
+     "html": "<p>Hallo {{name}},</p><div style=\"white-space:pre-line\">{{reply}}</div><hr/><p>Deine Nachricht:</p><blockquote>{{message}}</blockquote>",
+     "vars": ["name", "reply", "subject", "message"]},
     {"key": "membership_application_admin", "name": "Neue Bewerbung (Admin-Notify)",
      "subject": "Neue Mitgliedsbewerbung",
      "html": "<p>{{applicant}} hat eine Mitgliedsbewerbung eingereicht. Bitte im Admin-Bereich prüfen.</p>",
