@@ -296,8 +296,7 @@ Zuständigkeit dieser Liga, beides mit Zwei-Faktor. Der Bereich `tournaments` gi
 | Liga, Season, Liga N, Staffel anlegen/ändern, Spielplan, Start | ja | – | – | – | – |
 | Co-Team zuteilen/entfernen | ja | – | – | – | – |
 | Spiel-ID freigeben, Stichtag für neue Spieler (#2108) | ja | – | – | – | – |
-| Co-Team-Kader pflegen | ja (`_can_edit_team`) | ja | – | – | – |
-| Captain/Vertreter vergeben (mit Protokoll) | ja | ja | – | – | – |
+| Co-Team-Kader, Captain/Vertreter, Status, Löschen, solange es in einer nicht beendeten Staffel spielt (mit Protokoll) | `roster` | ja | – | – | – |
 | Eigene Rolle abgeben (`PUT …/roles` nur mit dem eigenen Feld auf `null`, #2110) | – | – | ja | ja | – |
 | Termin vorschlagen/annehmen | ja | nur Fallback¹ | ja | ja | – |
 | Ergebnis melden, bestätigen, Einspruch | ja | nur Fallback¹ | ja | ja | – |
@@ -633,6 +632,7 @@ Zugriff, außer „lesen“ steht in der Zeile. Prüfung: `backend/tests/test_le
 | `POST …/divisions/{id}/staffeln`, `DELETE …/staffeln/{tid}` | `season` | – | – |
 | `GET …/seasons/{id}/roster`, `POST …/roster/{uid}/approve`, `PUT …/roster-settings` | `roster` | – | – |
 | `GET …/{id}/staff` | `manage` | – | – |
+| `PATCH`, `PUT …/roles`, `DELETE /api/teams/{id}/squads/{sid}` eines Co-Teams in nicht beendeter Staffel | `roster` oder eigenes Team | – | – |
 | `PUT`, `DELETE …/{id}/staff/{uid}` | nur Bereich | – | – |
 | Staffel: `PATCH`, `POST /lock`, `/unlock`, `/status`, `PUT /pause`, `/round-sponsors`, `/onsite-access` | `manage` | – | – |
 | Staffel: `DELETE`, `bracket/*`, `reset-bracket`, `stages*`, `swiss/*`, `groups/generate`, `heat-rebuild/*`, Map-Pool | `season` | – | – |
@@ -650,7 +650,13 @@ Zugriff, außer „lesen“ steht in der Zeile. Prüfung: `backend/tests/test_le
 | Zugangslinks, TV-Schlüssel, Stationen, Gewinne an einer Staffel | zusätzlich zum Bereich `tournaments`: `manage` | – | – |
 | Öffentliche Ligaseite, Staffel, Spielplan, Tabelle, Matchseite | nach Sichtbarkeit; Sichtbarkeit `admins` nur mit Liga-Recht | – | lesen |
 
-**Bewusst unverändert:** Team- und Co-Team-Verwaltung (`team_routes.py`, Team-Admin-Rollen) bleibt ein eigener Rechtebereich.
+**Co-Teams in nicht beendeten Staffeln** (`PATCH`, `PUT …/roles`, `DELETE /api/teams/{id}/squads/{sid}`): Kader, Captain, Vertreter, Status und
+Löschen ändern nur die Leitung und Co-Leitung des eigenen Teams und die Liga-Leitung mit `roster`, bei mehreren Ligen in jeder. Die Rolle
+`tournament_admin` und die Freigabe `tournaments` nicht mehr. `GET …/squads` sagt je Co-Team `can_edit`; wer nur `roster` hat, liest nur die Co-Teams
+seiner Liga. Die Liga-Leitung bearbeitet aus der Kaderübersicht der Season („Kader bearbeiten“), Protokoll `league.squad.edit`. Die eigene Rolle
+abgeben geht weiter. Alle anderen Teams und Co-Teams, auch nach dem Ende der Staffel, bleiben wie bisher.
+
+**Bewusst unverändert:** Die übrige Team-Verwaltung (`team_routes.py`, Team-Admin-Rollen) bleibt ein eigener Rechtebereich.
 Jahreswertung, Spiele und Map-Bibliothek bleiben beim Bereich `tournaments`. Die Moderation bleibt getrennt.
 
 **Antworten an das Web:** `GET /api/tournaments/{tid}` schickt bei Staffeln `league_capabilities[]` und `can_edit_staffel`; die

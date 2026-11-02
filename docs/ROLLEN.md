@@ -346,7 +346,8 @@ höchstens einen **Captain** und einen **Vertreter**; beide stehen im Kader des 
 | Co-Team einer Staffel zuteilen oder herausnehmen | ja | nein | nein | nein | nein |
 | Neue Spiel-ID freigeben, Stichtag für neue Spieler, Kaderübersicht mit IDs (#2108) | ja | nein | nein | nein | nein |
 | Spiel-IDs beider Seiten für die Lobby sehen (#2108) | ja | ja | ja | ja | ja |
-| Kader pflegen, Captain und Vertreter vergeben | ja (Team-Admin-Rollen) | ja | nein | nein | nein |
+| Kader, Captain, Vertreter, Status, Löschen, solange das Co-Team in einer nicht beendeten Staffel spielt (#2203) | ja, „Kader prüfen“ | ja | nein | nein | nein |
+| Dasselbe bei allen anderen Co-Teams | Team-Admin-Rollen wie bisher | ja | nein | nein | nein |
 | Die eigene Rolle abgeben („Rolle abgeben“, #2110) | – | – | ja | ja | nein |
 | Termin vorschlagen, annehmen; einchecken | ja | nur ohne Captain und Vertreter | ja | ja | nein |
 | Ergebnis melden, bestätigen, Einspruch | ja | nur ohne Captain und Vertreter | ja | ja | nein |

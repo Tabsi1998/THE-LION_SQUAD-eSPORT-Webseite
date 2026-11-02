@@ -135,6 +135,46 @@ def _refuse_edit(team: dict, user: dict | None, detail: str):
     _refuse(user, detail)
 
 
+def _leads_team(team: dict, user: dict) -> bool:
+    return team.get("leader_id") == user["id"] or user["id"] in (team.get("co_leader_ids") or [])
+
+
+async def _squad_staffeln(db, squad_id: str | None) -> list[dict]:
+    """Die nicht beendeten Liga-Staffeln dieses Co-Teams - ein Turnier im Format Liga ohne Liga-Rahmen zählt nicht."""
+    from services.squad_registration import active_league_registrations
+
+    return [row for row in await active_league_registrations(db, squad_id) if isinstance(row.get("league_context"), dict)]
+
+
+async def _may_change_squad(db, team: dict, squad_id: str | None, user: dict) -> bool:
+    """Kader, Captain, Vertreter, Status und Löschen (#2203): Solange das Co-Team in einer nicht beendeten Staffel spielt, nur das
+    eigene Team und die Liga-Leitung mit „Kader prüfen“ - in jeder Liga, in der es spielt. Sonst die Pflege wie bisher."""
+    staffeln = await _squad_staffeln(db, squad_id)
+    if not staffeln:
+        return _can_edit_team(team, user)
+    if _leads_team(team, user):
+        return True
+    from services.league_permissions import can
+
+    for row in staffeln:
+        if not await can(user, "roster", row["league_context"].get("league_id"), db=db):
+            return False
+    return True
+
+
+async def _refuse_squad(db, team: dict, squad_id: str | None, user: dict, detail: str):
+    staffeln = await _squad_staffeln(db, squad_id)
+    if not staffeln:
+        _refuse_edit(team, user, detail)
+    from services.league_permissions import refuse
+
+    refusal = await refuse(db, user, staffeln[0]["league_context"].get("league_id"))
+    if refusal.detail == MFA_MESSAGE:
+        raise refusal
+    raise HTTPException(status_code=403, detail=f"Das Co-Team spielt in {staffeln[0].get('tournament_title') or 'einer Liga-Staffel'}. Kader und "
+                                                "Rollen ändern jetzt nur das eigene Team und die Liga-Leitung mit „Kader prüfen“.")
+
+
 def _is_staff(user: dict | None) -> bool:
     return _team_admin(user)
 
@@ -1254,9 +1294,14 @@ async def list_squads(team_id: str, me: dict = Depends(get_current_user)):
     team = await db.teams.find_one({"id": team_id}, {"_id": 0})
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
-    if me["id"] not in team.get("member_ids", []) and not _can_edit_team(team, me):
-        _refuse_edit(team, me, "Keine Berechtigung")
     squads = await db.team_squads.find({"team_id": team_id}, {"_id": 0}).sort("created_at", -1).to_list(200)
+    # Je Co-Team: Darf die Person es ändern (#2203)? Die Liga-Leitung mit „Kader prüfen“ liest nur die Co-Teams ihrer Liga.
+    for squad in squads:
+        squad["can_edit"] = await _may_change_squad(db, team, squad.get("id"), me)
+    if me["id"] not in team.get("member_ids", []) and not _can_edit_team(team, me):
+        squads = [squad for squad in squads if squad["can_edit"]]
+        if not squads:
+            _refuse_edit(team, me, "Keine Berechtigung")
     # Nur was die Co-Team-Ansicht zeigt (#1497) - wie _public_user bei den anderen Team-Antworten.
     member_map = {u["id"]: u for u in await db.users.find(
         {"id": {"$in": list({uid for s in squads for uid in s.get("member_ids", [])})}},
@@ -1318,8 +1363,8 @@ async def update_squad(team_id: str, squad_id: str, body: TeamSquadUpdate, me: d
     team = await db.teams.find_one({"id": team_id}, {"_id": 0})
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
-    if not _can_edit_team(team, me):
-        _refuse_edit(team, me, "Keine Berechtigung")
+    if not await _may_change_squad(db, team, squad_id, me):
+        await _refuse_squad(db, team, squad_id, me, "Keine Berechtigung")
     nullable_fields = {"description", "game_id", "member_ids", *SQUAD_ROLE_FIELDS}
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
@@ -1350,6 +1395,9 @@ async def update_squad(team_id: str, squad_id: str, body: TeamSquadUpdate, me: d
         raise HTTPException(status_code=409, detail=SQUAD_CHANGED_MEANWHILE)
     fresh = await db.team_squads.find_one({"id": squad_id}, {"_id": 0})
     await _after_squad_roles(db, team, fresh or current, current, roles, me)
+    # Griff von außen in ein Co-Team einer Staffel (#2203): steht im Protokoll, mit den Feldern, nicht den Werten.
+    if not _leads_team(team, me) and await _squad_staffeln(db, squad_id):
+        await _team_audit(db, "league.squad.edit", team_id, me["id"], {"squad_id": squad_id, "fields": sorted(raw)})
     # Liga-Kader (#2108): wer neu ins Co-Team kommt, während es in einer Staffel spielt, kommt in den Kader der Season.
     added = [uid for uid in (fresh or {}).get("member_ids") or [] if uid not in (current.get("member_ids") or [])]
     if added:
@@ -1373,8 +1421,9 @@ async def set_squad_roles(team_id: str, squad_id: str, body: TeamSquadRoles, me:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
     current = await db.team_squads.find_one({"id": squad_id, "team_id": team_id}, {"_id": 0})
     requested = body.model_dump(exclude_unset=True)
-    if not _can_edit_team(team, me) and not _resigns_own_role(current, requested, me):
-        _refuse_edit(team, me, "Captain und Vertreter vergeben Teamleitung und Co-Leitung.")
+    may_change = await _may_change_squad(db, team, squad_id, me)
+    if not may_change and not _resigns_own_role(current, requested, me):
+        await _refuse_squad(db, team, squad_id, me, "Captain und Vertreter vergeben Teamleitung und Co-Leitung.")
     if not current:
         raise HTTPException(status_code=404, detail="Co-Team nicht gefunden")
     roles = _squad_roles(current, requested, current.get("member_ids") or [], team)
@@ -1386,7 +1435,7 @@ async def set_squad_roles(team_id: str, squad_id: str, body: TeamSquadRoles, me:
         raise HTTPException(status_code=409, detail=SQUAD_CHANGED_MEANWHILE)
     fresh = await db.team_squads.find_one({"id": squad_id}, {"_id": 0})
     await _after_squad_roles(db, team, fresh or current, current, roles, me)
-    if not _can_edit_team(team, me):
+    if not may_change:
         await _tell_role_resigned(db, team, fresh or current, requested, me)
     return fresh
 
@@ -1425,8 +1474,8 @@ async def delete_squad(team_id: str, squad_id: str, me: dict = Depends(get_curre
     team = await db.teams.find_one({"id": team_id}, {"_id": 0})
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
-    if not _can_edit_team(team, me):
-        _refuse_edit(team, me, "Keine Berechtigung")
+    if not await _may_change_squad(db, team, squad_id, me):
+        await _refuse_squad(db, team, squad_id, me, "Keine Berechtigung")
     # Ein Co-Team, das in einer laufenden Liga-Staffel steht, bleibt (#1649) - erst die Zuteilung zurücknehmen.
     from services.squad_registration import active_league_registration
 
