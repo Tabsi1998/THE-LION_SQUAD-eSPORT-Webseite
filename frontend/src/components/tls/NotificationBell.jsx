@@ -51,6 +51,9 @@ export function NotificationBell() {
   const [shake, setShake] = useState(false);
   const boxRef = useRef(null);
   const markReadRef = useRef(null);
+  const shakeTimer = useRef(null);
+
+  useEffect(() => () => clearTimeout(shakeTimer.current), []);
 
   const openUrl = useCallback((url) => {
     if (!url) return;
@@ -72,7 +75,8 @@ export function NotificationBell() {
 
   const onFresh = useCallback((freshRows) => {
     setShake(true);
-    setTimeout(() => setShake(false), 1900);
+    clearTimeout(shakeTimer.current);
+    shakeTimer.current = setTimeout(() => setShake(false), 1900);
     freshRows.slice(0, 4).forEach((item) => {
       const target = notificationTarget(item);
       toast.info(item.title || "Benachrichtigung", {

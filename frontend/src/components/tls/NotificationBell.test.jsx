@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
 // Toast „Öffnen“ der Glocke (Rest aus #1543, Muster #987): führt sofort ans Ziel und markiert als gelesen. Lehnt der
@@ -52,6 +52,17 @@ test("„Öffnen“ führt ans Ziel und markiert gelesen", async () => {
   expect(apiMock.post).toHaveBeenCalledWith("/admin/notifications/n-9/read");
   expect(toastMock.error).not.toHaveBeenCalled();
   await waitFor(() => expect(screen.queryByTestId("notification-unread-badge")).toBeNull());
+});
+
+test("verschwindet die Glocke, läuft das Wackeln nicht weiter", async () => {
+  const started = vi.spyOn(globalThis, "setTimeout");
+  const stopped = vi.spyOn(globalThis, "clearTimeout");
+  await freshToast();
+  const timer = started.mock.results[started.mock.calls.findIndex(([, delay]) => delay === 1900)].value;
+  cleanup();
+  expect(stopped).toHaveBeenCalledWith(timer);
+  started.mockRestore();
+  stopped.mockRestore();
 });
 
 test("lehnt der Server „gelesen“ ab, bleibt sie ungelesen und ein Hinweis bietet „Nochmal versuchen“", async () => {
