@@ -384,11 +384,15 @@ def export_period(date_from: str | None, date_to: str | None) -> dict:
     if start and end and start > end:
         raise ValueError("Der Zeitraum beginnt nach seinem Ende.")
     period: dict = {}
-    if start:
-        period["$gte"] = start.astimezone(timezone.utc).isoformat()
-    if end:
-        # Rechnen mit Zone heißt Wanduhr: der nächste Wiener Mitternacht, auch am Tag der Zeitumstellung (23 oder 25 Stunden).
-        period["$lt"] = (end + timedelta(days=1)).astimezone(timezone.utc).isoformat()
+    try:
+        if start:
+            period["$gte"] = start.astimezone(timezone.utc).isoformat()
+        if end:
+            # Rechnen mit Zone heißt Wanduhr: der nächste Wiener Mitternacht, auch am Tag der Zeitumstellung (23 oder 25 Stunden).
+            period["$lt"] = (end + timedelta(days=1)).astimezone(timezone.utc).isoformat()
+    except OverflowError as exc:
+        # Am Rand des Kalenders (Jahr 1, Jahr 9999) läuft die Umrechnung über.
+        raise ValueError("Der Zeitraum liegt außerhalb des Kalenders.") from exc
     return {"invoiced_at": period} if period else {}
 
 

@@ -133,6 +133,12 @@ async def test_export_period_counts_vienna_days_and_is_checked(flow):
     assert (await flow.get(EXPORT, params={"from": "2027-02-01", "to": "2027-01-01"})).status_code == 400
     assert (await flow.get(EXPORT, params={"from": "2027-02-30"})).status_code == 400
     assert (await flow.get(EXPORT, params={"from": "morgen"})).status_code == 422
+    # Am Rand des Kalenders läuft die Umrechnung über: eine Meldung, kein Serverfehler.
+    for edge in ({"from": "0001-01-01"}, {"to": "9999-12-31"}, {"from": "0001-01-01", "to": "9999-12-31"}):
+        response = await flow.get(EXPORT, params=edge)
+        assert response.status_code == 400, edge
+        assert response.json()["detail"] == "Der Zeitraum liegt außerhalb des Kalenders."
+    assert len(parse(await flow.get(EXPORT, params={"from": "1000-01-01", "to": "9000-01-01"}))) == 5, "weit, aber gültig"
 
 
 @pytest.mark.asyncio
