@@ -146,7 +146,8 @@ async def test_a_refusal_needs_a_reason_and_changes_nothing(flow):
 @pytest.mark.asyncio
 async def test_only_one_open_request_and_it_can_be_withdrawn(flow):
     w = await transfer_world(flow)
-    await flow.db.league_transfers.create_index([("season_id", 1), ("user_id", 1)], unique=True, partialFilterExpression={"status": "pending"})
+    await flow.db.league_transfers.create_index([("season_id", 1), ("user_id", 1)], unique=True, name="league_transfer_one_open",
+                                                partialFilterExpression={"status": "pending"})
     row = (await ask(flow, w)).json()
 
     assert (await ask(flow, w)).status_code == 409
