@@ -10,7 +10,9 @@ LEAGUE_WAYS = [
     BACKEND / "routes" / "league_routes.py",
     BACKEND / "routes" / "league_roster_routes.py",
     BACKEND / "routes" / "team_routes.py",
+    BACKEND / "routes" / "match_routes.py",
     BACKEND / "services" / "match_audience.py",
+    BACKEND / "services" / "competition_privacy.py",
 ]
 
 

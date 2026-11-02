@@ -38,12 +38,14 @@ def _own_side(row: dict, user_id: str) -> str | None:
 
 async def league_appearance_snapshot(db, user_id: str) -> list[dict]:
     """Für die Auskunft (#2204): Spiele, in denen die Person auf einer Aufstellung oder Teilnehmerliste steht - nur ihre eigene Seite, keine anderen
-    Personen. Gültiger Altbestand steht nur in ``games[].lineups`` und braucht ``lineup_user_ids`` nicht zu tragen. Die Schlüssel dort sind Kennungen
-    der Seiten, also lässt sich nicht danach suchen: Gelesen werden die Spiele der Staffeln mit Maps, die Auswahl trifft ``_own_side``."""
+    Personen. Gültiger Altbestand steht nur in ``games[].lineups``, in offenen Meldungen oder im gehaltenen Ergebnis und braucht ``lineup_user_ids`` nicht
+    zu tragen. Die Schlüssel dort sind Kennungen der Seiten, also lässt sich nicht danach suchen: Gelesen werden die Spiele der Staffeln, die so etwas
+    tragen, die Auswahl trifft ``_own_side``."""
     staffeln = await db.tournaments.find({"league_context": {"$type": "object"}}, {"_id": 0, "id": 1}).to_list(5000)
     query: dict = {"lineup_user_ids": user_id}
     if staffeln:
-        query = {"$or": [query, {"tournament_id": {"$in": [row["id"] for row in staffeln]}, "games.0": {"$exists": True}}]}
+        query = {"$or": [query, {"tournament_id": {"$in": [row["id"] for row in staffeln]},
+                                 "$or": [{"games.0": {"$exists": True}}, {"reports.0": {"$exists": True}}, {"pending_result": {"$type": "object"}}]}]}
     rows = await db.matches_v2.find(query, {"_id": 0, "id": 1, "tournament_id": 1, "status": 1, "completed_at": 1, "lineups": 1, "lineup_user_ids": 1,
                                             "games.lineups": 1, "reports.registration_id": 1, "reports.lineup": 1, "reports.games.lineups": 1,
                                             "pending_result.lineups": 1, "pending_result.games.lineups": 1}).to_list(None)

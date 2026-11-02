@@ -511,6 +511,22 @@ async def test_the_data_request_names_the_own_side_of_an_open_report(flow):
     assert [row["registration_id"] for row in rows] == [w["reg_a"]["id"]]
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("where", ["reports", "pending_result"])
+async def test_the_data_request_finds_an_open_report_and_a_held_result_without_any_index(flow, where):
+    """Altbestand: Die Aufstellung steht nur in der offenen Meldung oder im gehaltenen Ergebnis, das Spiel selbst hat weder Maps noch Index."""
+    w = await id_world(flow)
+    game = {"lineups": {w["reg_a"]["id"]: ids(w, "Mila"), w["reg_h"]["id"]: ids(w, "Falke1")}}
+    stored_there = {"reports": [{"registration_id": w["reg_a"]["id"], "games": [game]}], "pending_result": {"games": [game]}}[where]
+    await flow.db.matches_v2.update_one({"id": w["match"]["id"]}, {"$set": {where: stored_there}, "$unset": {"games": "", "lineup_user_ids": "", "lineups": ""}})
+    from services.competition_privacy import league_appearance_snapshot
+
+    rows = await league_appearance_snapshot(flow.db, w["users"]["Mila"]["id"])
+
+    assert [(row["match_id"], row["registration_id"]) for row in rows] == [(w["match"]["id"], w["reg_a"]["id"])]
+    assert w["reg_h"]["id"] not in str(rows), "nie die Gegenseite"
+
+
 # ---------------------------------------------------------------- Altbestand
 
 
