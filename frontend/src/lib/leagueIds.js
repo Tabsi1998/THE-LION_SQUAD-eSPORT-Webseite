@@ -7,6 +7,8 @@ export const ID_STATE_LABELS = {
   pending: "im Profil – wird beim ersten Aufstellen festgehalten",
   missing: "fehlt",
   late: "wartet auf Freigabe",
+  format: "Format passt nicht",
+  taken: "ID schon vergeben",
   banned: "gesperrt",
   free: "keine Pflicht-ID",
 };
@@ -55,6 +57,9 @@ export function leagueIdNotice(entry, gameIds = {}) {
   }
   if (entry.state === "late") {
     return { tone: "warn", text: `${title}: Du bist nach dem Stichtag ins Co-Team gekommen – die Liga-Leitung muss deine ${what} erst freigeben.` };
+  }
+  if (entry.state === "format" || entry.state === "taken") {
+    return { tone: "warn", text: `${title}: ${entry.reason}` };
   }
   if (complete(fields, current)) {
     return { tone: "info", text: `${title}: ${idText(fields, current)} wird beim ersten Aufstellen für die Season festgehalten.` };

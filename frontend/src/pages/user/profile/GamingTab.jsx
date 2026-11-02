@@ -2,6 +2,7 @@ import { MultiSelect } from "@/components/tls/MultiSelect";
 import { INPUT_DEVICES, PLATFORMS, SUBSCRIPTIONS } from "./constants";
 import { Field, Input, Row, Section } from "./fields";
 import { PROFILE_LIMITS } from "./form";
+import { LeagueEligibilityNotice } from "./LeagueEligibilityNotice";
 import { LeagueIdNotice } from "./LeagueIdNotice";
 
 export function GamingTab({ form, set, setNow = set, setGameId, gameIdGroups }) {
@@ -24,6 +25,8 @@ export function GamingTab({ form, set, setNow = set, setGameId, gameIdGroups }) 
                     <Input value={form.preferred_role} onChange={(v) => set("preferred_role", v)} placeholder="z.B. IGL, Support, Driver" maxLength={PROFILE_LIMITS.preferred_role} testId="profile-preferred-role" />
                     <p className="text-[11px] text-white/45 mt-1.5">Erscheint auf deinem Profil, sobald du sie unter Privatsphäre → Sonstiges freigibst. Ohne Freigabe siehst nur du sie.</p>
                   </Field>
+                  {/* Liga (#2204): ob ich in meiner Season spielen darf und was ich tun muss. */}
+                  <LeagueEligibilityNotice />
                   {gameIdGroups.length > 0 && (
                     <div className="border border-white/10 rounded-sm bg-[#0A0A0A] p-5 space-y-4">
                       <div>
@@ -39,7 +42,15 @@ export function GamingTab({ form, set, setNow = set, setGameId, gameIdGroups }) 
                           <Row>
                             {group.fields.map((field) => (
                               <Field key={field.key} label={`${field.label}${field.required !== false ? " *" : ""}`}>
-                                <Input value={form.game_ids?.[group.slug]?.[field.key] || ""} onChange={(v) => setGameId(group.slug, field.key, v)} placeholder={field.help_text || field.label} testId={`profile-game-id-${group.slug}-${field.key}`} />
+                                {(field.options || []).length ? (
+                                  <select value={form.game_ids?.[group.slug]?.[field.key] || ""} onChange={(event) => setGameId(group.slug, field.key, event.target.value)} className="input" data-testid={`profile-game-id-${group.slug}-${field.key}`}>
+                                    <option value="">Bitte wählen</option>
+                                    {field.options.map((option) => <option key={option} value={option}>{option}</option>)}
+                                  </select>
+                                ) : (
+                                  <Input value={form.game_ids?.[group.slug]?.[field.key] || ""} onChange={(v) => setGameId(group.slug, field.key, v)} placeholder={field.help_text || field.label} testId={`profile-game-id-${group.slug}-${field.key}`} />
+                                )}
+                                {field.format_hint ? <p className="text-[11px] text-white/45 mt-1.5" data-testid={`profile-game-id-hint-${group.slug}-${field.key}`}>So soll es aussehen: {field.format_hint}</p> : null}
                               </Field>
                             ))}
                           </Row>
