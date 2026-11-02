@@ -458,6 +458,8 @@ class GameCreate(GameMatchData):
 
 
 class GameUpdate(GameMatchData):
+    # Archiviert (#2129, SP1): beim Anlegen nicht mehr zur Wahl, alles Bestehende zeigt das Spiel weiter.
+    status: Optional[Literal["active", "archived"]] = None
     name: Optional[str] = None
     slug: Optional[str] = None
     kind: Optional[GameKind] = None

@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from auth import get_optional_user, require_club_admin
 from database import get_db
+from services import game_usage
 from services.visibility import sees_member_content
 from models import new_id, now_utc
 from services.slug_utils import apply_slug_history, slug_source_for_update, slugify, unique_slug
@@ -145,9 +146,11 @@ class ServerModResource(BaseModel):
         return self
 
 
-async def _validate_game(db, game_id):
+async def _validate_game(db, game_id, current=None):
     if game_id and not await db.games.find_one({"id": game_id}, {"id": 1}):
         raise HTTPException(400, "Das ausgewählte Spiel existiert nicht mehr. Bitte erneut auswählen.")
+    if await game_usage.chosen_is_archived(db, game_id, current):
+        raise HTTPException(422, game_usage.ARCHIVED_DETAIL)
 
 
 class GameServerPayload(BaseModel):
@@ -354,7 +357,7 @@ async def update_game_server(server_id: str, body: GameServerPatch, me: dict = D
     }
     raw = body.model_dump(exclude_unset=True)
     if "game_id" in raw:
-        await _validate_game(db, raw["game_id"])
+        await _validate_game(db, raw["game_id"], existing.get("game_id"))
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     if updates.get("access_secret"):
         updates["access_secret"] = encrypt_secret(updates["access_secret"])

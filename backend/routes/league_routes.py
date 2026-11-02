@@ -76,7 +76,7 @@ async def admin_list_leagues(_me: dict = Depends(require_league_admin)):
     db = get_db()
     rows = await db.leagues.find({}, {"_id": 0}).sort("name", 1).to_list(200)
     seasons = await db.league_seasons.find({}, {"_id": 0}).sort("number", -1).to_list(2000)
-    games = await db.games.find({}, {"_id": 0, "id": 1, "name": 1, "slug": 1}).sort("name", 1).to_list(500)
+    games = await db.games.find({}, {"_id": 0, "id": 1, "name": 1, "slug": 1, "status": 1}).sort("name", 1).to_list(500)
     names = {game["id"]: game.get("name") for game in games}
     return {
         "leagues": [{**row, "game_name": names.get(row.get("game_id")),

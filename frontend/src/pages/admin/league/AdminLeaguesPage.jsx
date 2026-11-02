@@ -9,6 +9,7 @@ import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormGrid } from "@/components/tls/AdminForm";
 import { SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { isArchivedGame, selectableGames } from "@/lib/gameLabels";
 import { fromViennaInput, viennaDate } from "@/lib/vienna";
 import { ACTIVE_STATUS_OPTIONS, SEASON_STATUS_OPTIONS, VISIBILITY_SHORT, leagueLookChanges, leagueLookToForm, weekdayName } from "@/lib/league";
 import { accentProblem, accentStyle } from "@/lib/leagueLook";
@@ -32,7 +33,7 @@ const STEPS = [
 function LeagueSheet({ league, games, onClose, onSaved }) {
   const editing = Boolean(league);
   const [form, setForm] = useState(() => ({
-    name: league?.name || "", game_id: league?.game_id || games[0]?.id || "", description: league?.description || "",
+    name: league?.name || "", game_id: league?.game_id || selectableGames(games)[0]?.id || "", description: league?.description || "",
     slug: league?.slug || "", status: league?.status || "active",
     ...leagueLookToForm(league),
   }));
@@ -70,7 +71,7 @@ function LeagueSheet({ league, games, onClose, onSaved }) {
       submitLabel={editing ? "Speichern" : "Anlegen"} submitTestId={editing ? "league-edit-save" : "league-create-save"} testId={editing ? "league-edit-sheet" : "league-create-sheet"}>
       <TextField label="Name" required maxLength={80} value={form.name} onChange={(value) => set("name", value)} placeholder="z. B. CoD-Liga" testId="league-name" />
       <SelectField label="Spiel" required value={form.game_id} onChange={(value) => set("game_id", value)} disabled={editing && league.game_locked}
-        options={games.map((game) => [game.id, game.name])} testId="league-game"
+        options={selectableGames(games, league?.game_id).map((game) => [game.id, `${game.name}${isArchivedGame(game) ? " – archiviert" : ""}`])} testId="league-game"
         hint={editing
           ? (league.game_locked ? "Bleibt: eine Season hat schon eine Staffel. Für ein anderes Spiel eine neue Liga anlegen." : "Änderbar, solange keine Season eine Staffel hat. Die Modus-Reihenfolge der Seasons wird dabei geleert.")
           : "Die Adresse der Liga folgt dem Spiel, etwa /liga/call-of-duty."} />

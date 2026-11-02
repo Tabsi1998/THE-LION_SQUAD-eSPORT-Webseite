@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { dateWarnings } from "@/lib/tournamentDateWarnings";
 import { useAuth } from "@/context/AuthContext";
-import { gameOptionLabel } from "@/lib/gameLabels";
+import { gameOptionLabel, selectableGames } from "@/lib/gameLabels";
 import { RULE_PRESETS, ruleModeSummary, rulePresetKey, rulePresetWarnings } from "@/lib/tournamentRulePresets";
 import { tournamentFormatOptions } from "@/lib/tournamentLabels";
 import { durationSourceText, gameModes, matchDurationSource, ownDurationInput, ownDurationPayload } from "@/lib/matchDuration";
@@ -387,7 +387,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
           <FormGrid>
             <TextField label="Titel" value={f.title} onChange={(v)=>set("title",v)} testId="tr-edit-title"/>
             <TextField label="Adresse (URL)" value={f.slug} onChange={(v)=>set("slug", slugify(v, { typing: true }))} testId="tr-edit-slug"/>
-            {show && <SelectInput label="Spiel" value={f.game_id} onChange={setGame} disabled={structureFixed} hint={fixedHint} testId="tr-edit-game" options={[["", "— auswählen —"], ...games.map((g) => [g.id, gameOptionLabel(g)])]} />}
+            {show && <SelectInput label="Spiel" value={f.game_id} onChange={setGame} disabled={structureFixed} hint={fixedHint} testId="tr-edit-game" options={[["", "— auswählen —"], ...selectableGames(games, f.game_id).map((g) => [g.id, gameOptionLabel(g)])]} />}
             <TextField label="Plattform" value={f.platform} onChange={(v)=>set("platform",v)} testId="tr-edit-platform"/>
             {/* Kein Statusfeld (#2109, S2): der Status wechselt nur oben über den Ablauf - mit Spielplan, Check-in und
                 Protokoll. Das Formular schrieb ihn am Ablauf vorbei. */}

@@ -9,6 +9,7 @@ import { Link } from "react-router-dom";
 import { GameServerIcon } from "@/components/tls/GameServerIcon";
 import { serverResourceLabels } from "@/lib/serverResources";
 import { viennaDateTime } from "@/lib/vienna";
+import { gameOptionLabel, selectableGames } from "@/lib/gameLabels";
 import { AmpPanelCard } from "./gameServers/AmpPanelCard";
 
 const emptyForm = {
@@ -348,7 +349,7 @@ export default function AdminGameServersPage() {
               <select value={form.game_id} onChange={(e) => set("game_id", e.target.value)} className="mt-1 w-full bg-[#0A0A0A] border border-white/10 rounded-sm px-3 py-2 text-sm">
                 <option value="">Keine Verknüpfung</option>
                 {form.game_id && !games.some((game) => game.id === form.game_id) && <option value={form.game_id}>Spiel nicht verfügbar – bitte neu auswählen</option>}
-                {games.map((game) => <option key={game.id} value={game.id}>{game.display_name || game.name}</option>)}
+                {selectableGames(games, form.game_id).map((game) => <option key={game.id} value={game.id}>{gameOptionLabel(game)}</option>)}
               </select>
             </label>
             <Field label="Spielname fallback" value={form.game_name} onChange={(v) => set("game_name", v)} placeholder="z.B. Rust" />

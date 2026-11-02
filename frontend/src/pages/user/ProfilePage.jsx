@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, formatRequestError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
-import { gameLabel } from "@/lib/gameLabels";
+import { gameLabel, isArchivedGame } from "@/lib/gameLabels";
 import { toast } from "sonner";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
@@ -244,6 +244,8 @@ export default function ProfilePage() {
       const fields = game.effective_player_id_fields || game.player_id_fields || [];
       if (!fields.length) return;
       const sourceSlug = game.identity_game_slug || game.slug;
+      // Archiviert (#2129): niemand trägt dafür neu etwas ein - eine schon gespeicherte ID bleibt sichtbar und änderbar.
+      if (isArchivedGame(game) && !Object.values(form.game_ids?.[sourceSlug] || {}).some(Boolean)) return;
       const sourceName = game.identity_game_name || gameLabel(game);
       const key = `${sourceSlug}:${fields.map((field) => field.key).join("|")}`;
       const existing = groups.get(key) || {

@@ -9,7 +9,7 @@ from auth import require_admin
 from database import get_db
 from models import new_id
 from services import game_maps
-from services.game_maps import GameMapCreate, GameMapOrder, GameMapUpdate, MapProblem
+from services.game_maps import GameMapCreate, GameMapModes, GameMapOrder, GameMapUpdate, MapProblem
 
 router = APIRouter(prefix="/api/games", tags=["game-maps"])
 
@@ -63,6 +63,17 @@ async def order_game_maps(game_id: str, body: GameMapOrder, me: dict = Depends(r
     game = await _game(db, game_id)
     try:
         return {"maps": await game_maps.reorder(db, game, body.ids, me)}
+    except MapProblem as problem:
+        raise _refuse(problem) from None
+
+
+@router.post("/{game_id}/maps/assign-modes")
+async def assign_game_map_modes(game_id: str, body: GameMapModes, me: dict = Depends(require_admin())):
+    """Sammelaktion (#2129): die aktiven Maps ohne Modus bekommen die gewählten Modi."""
+    db = get_db()
+    game = await _game(db, game_id)
+    try:
+        return {"updated": await game_maps.assign_modes(db, game, body.modes, me)}
     except MapProblem as problem:
         raise _refuse(problem) from None
 

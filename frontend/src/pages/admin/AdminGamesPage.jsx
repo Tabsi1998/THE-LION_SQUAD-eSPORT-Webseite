@@ -8,11 +8,11 @@ import { CheckField } from "@/components/tls/FormFields";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
-import { gameLabel } from "@/lib/gameLabels";
+import { gameLabel, gameOptionLabel, isArchivedGame, selectableGames } from "@/lib/gameLabels";
 import { gameMatchDataPayload, gameMatchDataProblem, gameMatchDataToForm } from "@/lib/gameMatchData";
 import { GameMatchDataFields } from "./GameMatchDataFields";
 import { toast } from "sonner";
-import { Map as MapIcon, Pencil, Plus, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, Map as MapIcon, Pencil, Plus, Trash2 } from "lucide-react";
 
 const slugFrom = (txt) => (txt || "")
   .normalize("NFD")
@@ -76,14 +76,17 @@ export default function AdminGamesPage() {
   const [form, setForm] = useState(emptyGameForm);
   const [editing, setEditing] = useState(null);
   const [servers, setServers] = useState([]);
+  const [showArchived, setShowArchived] = useState(false);
   const confirm = useConfirm();
   const load = useCallback(async () => { const { data } = await api.get("/games"); setList(data); }, []);
   useEffect(() => { load(); }, [load]);
   useEffect(() => { api.get("/games/discord-servers").then(({ data }) => setServers(Array.isArray(data) ? data : [])).catch(() => setServers([])); }, []);
   useApiInvalidation(load, ["games"]);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-  const parentOptions = list.filter((g) => g.kind !== "edition").map((g) => [g.id, gameLabel(g)]);
-  const identityOptions = list.map((g) => [g.id, `ID von ${gameLabel(g)}`]);
+  const parentOptions = selectableGames(list).filter((g) => g.kind !== "edition").map((g) => [g.id, gameLabel(g)]);
+  const identityOptions = selectableGames(list).map((g) => [g.id, `ID von ${gameLabel(g)}`]);
+  const archivedCount = list.filter(isArchivedGame).length;
+  const shown = list.filter((g) => showArchived || !isArchivedGame(g));
 
   const submit = async (e) => {
     e.preventDefault();
@@ -95,14 +98,45 @@ export default function AdminGamesPage() {
     } catch (err) { toast.error(formatRequestError(err, "Spiel konnte nicht erstellt werden.", { slug: form.slug, name: form.name })); }
   };
 
-  const del = async (id) => {
+  const setStatus = async (game, status) => {
+    try {
+      await api.patch(`/games/${game.id}`, { status });
+      toast.success(status === "archived" ? `„${gameLabel(game)}“ archiviert.` : `„${gameLabel(game)}“ zurückgeholt.`);
+      load();
+    } catch (err) {
+      toast.error(formatRequestError(err, "Das hat nicht geklappt."));
+    }
+  };
+
+  // Löschen nur ohne Verwendung (#2129): vorab fragen, was am Spiel hängt - bei Verwendung bietet der Dialog das Archiv an.
+  const del = async (game) => {
+    let used = null;
+    try {
+      ({ data: used } = await api.get(`/games/${game.id}/usage`));
+    } catch (err) {
+      toast.error(formatRequestError(err, "Spiel konnte nicht geprüft werden."));
+      return;
+    }
+    if (used?.total) {
+      if (isArchivedGame(game)) {
+        toast.error(`„${gameLabel(game)}“ bleibt im Archiv: ${used.text}.`);
+        return;
+      }
+      if (await confirm({
+        title: `„${gameLabel(game)}“ wird noch verwendet`,
+        description: `Gelöscht werden kann es nicht: ${used.text}. Archiviert steht es beim Anlegen nicht mehr zur Wahl, alles Bestehende zeigt es weiter.`,
+        confirmLabel: "Archivieren",
+        tone: "info",
+      })) await setStatus(game, "archived");
+      return;
+    }
     if (!await confirm({
-      title: "Spiel löschen?",
-      description: "Das Spiel wird dauerhaft entfernt. Bestehende Verknüpfungen können danach unvollständig sein.",
+      title: `„${gameLabel(game)}“ löschen?`,
+      description: "Es hängt nichts daran. Das Spiel wird dauerhaft entfernt.",
       confirmLabel: "Löschen",
     })) return;
     try {
-      await api.delete(`/games/${id}`);
+      await api.delete(`/games/${game.id}`);
       toast.success("Spiel gelöscht.");
       load();
     } catch (err) {
@@ -143,15 +177,22 @@ export default function AdminGamesPage() {
           </button>
         </form>
         <div className="lg:col-span-2 border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
+          {archivedCount ? (
+            <label className="flex items-center gap-2 px-4 py-2.5 border-b border-white/10 text-xs text-white/65">
+              <input type="checkbox" checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} className="accent-[#29B6E8]" data-testid="games-show-archived" />
+              Archivierte zeigen ({archivedCount})
+            </label>
+          ) : null}
           <table className="w-full text-sm">
             <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
               <tr><th className="text-left px-4 py-3">Name</th><th className="text-left px-4 py-3">Typ</th><th className="text-left px-4 py-3">ID-Quelle</th><th></th></tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {list.map((g) => (
-                <tr key={g.id}>
+              {shown.map((g) => (
+                <tr key={g.id} className={isArchivedGame(g) ? "opacity-60" : undefined} data-testid={`game-row-${g.slug}`}>
                   <td className="px-4 py-3">
                     <div className="font-semibold text-white">{gameLabel(g)}</div>
+                    {isArchivedGame(g) ? <div className="mt-0.5 text-[10px] uppercase tracking-widest text-[#FFD700]" data-testid={`game-archived-${g.slug}`}>Archiviert – beim Anlegen nicht zur Wahl</div> : null}
                     {gameLabel(g) !== g.name && <div className="mt-0.5 text-[10px] uppercase tracking-widest text-white/35">Version: {g.name}</div>}
                     {g.discord_guild_id && servers.length ? <div className="mt-0.5 text-[10px] uppercase tracking-widest text-[#8EA1FF]" data-testid={`game-discord-${g.slug}`}>Discord: {servers.find((server) => server.guild_id === g.discord_guild_id)?.name || g.discord_guild_id}</div> : null}
                   </td>
@@ -166,7 +207,11 @@ export default function AdminGamesPage() {
                       <button onClick={() => setEditing(toForm(g))} className="p-1 text-white/40 hover:text-[#29B6E8]" title="Spiel bearbeiten" data-testid={`game-edit-${g.slug}`}>
                         <Pencil className="w-4 h-4" />
                       </button>
-                      <button onClick={() => del(g.id)} className="p-1 text-white/40 hover:text-[#FF3B30]" title="Spiel löschen" data-testid={`game-delete-${g.slug}`}>
+                      <button onClick={() => setStatus(g, isArchivedGame(g) ? "active" : "archived")} className="p-1 text-white/40 hover:text-[#FFD700]"
+                        title={isArchivedGame(g) ? "Spiel zurückholen" : "Spiel archivieren"} aria-label={isArchivedGame(g) ? `${gameLabel(g)} zurückholen` : `${gameLabel(g)} archivieren`} data-testid={`game-archive-${g.slug}`}>
+                        {isArchivedGame(g) ? <ArchiveRestore className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
+                      </button>
+                      <button onClick={() => del(g)} className="p-1 text-white/40 hover:text-[#FF3B30]" title="Spiel löschen" data-testid={`game-delete-${g.slug}`}>
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -245,8 +290,8 @@ function EditGameModal({ game, games, servers = [], onClose, onSaved }) {
   const [form, setForm] = useState(game);
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-  const parentOptions = games.filter((g) => g.id !== form.id && g.kind !== "edition").map((g) => [g.id, gameLabel(g)]);
-  const identityOptions = games.filter((g) => g.id !== form.id).map((g) => [g.id, `ID von ${gameLabel(g)}`]);
+  const parentOptions = selectableGames(games, form.parent_game_id).filter((g) => g.id !== form.id && g.kind !== "edition").map((g) => [g.id, gameOptionLabel(g)]);
+  const identityOptions = selectableGames(games, form.identity_source_game_id).filter((g) => g.id !== form.id).map((g) => [g.id, `ID von ${gameOptionLabel(g)}`]);
 
   const submit = async (e) => {
     e.preventDefault();

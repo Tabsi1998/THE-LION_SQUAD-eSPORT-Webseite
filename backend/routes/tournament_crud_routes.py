@@ -12,7 +12,7 @@ from services.permissions import is_confirmed_tournament_lead
 from auth import require_admin, get_optional_user
 from services.visibility import user_can_see
 from services.visibility import hide_unseen_event_links, lead_can_see
-from services import partner_pages, staffel_guard, tournament_guard
+from services import game_usage, partner_pages, staffel_guard, tournament_guard
 from services.access_links import (
     public_access_link_payload,
     touch_access_link,
@@ -383,6 +383,8 @@ async def create_tournament_doc(body: TournamentCreate, me: dict) -> dict:
             # Validate game
             if not await db.games.find_one({"id": body.game_id}):
                 raise HTTPException(status_code=400, detail="Spiel nicht gefunden")
+            if await game_usage.chosen_is_archived(db, body.game_id):
+                raise HTTPException(status_code=422, detail=game_usage.ARCHIVED_DETAIL)
             doc = body.model_dump()
             # Teilnahme und Teamgröße wie beim Speichern prüfen (#2111, TA3): ein Team-Turnier ohne Größe hat 2.
             if doc.get("team_mode") == "team" and "team_size" not in body.model_fields_set:
@@ -449,6 +451,8 @@ async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends
     if body.game_id and not await db.games.find_one({"id": body.game_id}, {"id": 1}):
         raise HTTPException(status_code=400, detail="Spiel nicht gefunden")
     existing = await _ensure_tournament_unlocked(db, tid)
+    if await game_usage.chosen_is_archived(db, body.game_id, existing.get("game_id")):
+        raise HTTPException(status_code=422, detail=game_usage.ARCHIVED_DETAIL)
     raw_updates = body.model_dump(exclude_unset=True)
     # Status nur über den Ablauf (#2109): ``POST /status`` prüft Spielplan, Check-in und schreibt ins Protokoll - das
     # Formular nicht. Derselbe Status stört nicht, ein anderer wird abgelehnt (alle Turniere).

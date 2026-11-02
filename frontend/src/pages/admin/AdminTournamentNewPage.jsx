@@ -17,7 +17,7 @@ import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
 import { normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { tournamentFormatOptions } from "@/lib/tournamentLabels";
-import { gameOptionLabel } from "@/lib/gameLabels";
+import { gameOptionLabel, selectableGames } from "@/lib/gameLabels";
 import { RULE_PRESETS, ruleModeSummary, rulePresetKey, rulePresetWarnings } from "@/lib/tournamentRulePresets";
 import { dateWarnings } from "@/lib/tournamentDateWarnings";
 import { toast } from "sonner";
@@ -255,7 +255,7 @@ export default function AdminTournamentNewPage() {
         <FormSection title="Das Turnier" hint="Mehr als das braucht es nicht zum Anlegen — alles Weitere lässt sich danach in Ruhe einstellen.">
           <FormGrid>
             <TextField label="Titel" value={form.title} onChange={(v) => setForm((f) => ({ ...f, title: v, slug: slugTouched ? f.slug : autoSlug(v) }))} required testId="new-tr-title" />
-            <SelectField label="Spiel" value={form.game_id} onChange={(v) => set("game_id", v)} options={[["", "— auswählen —"], ...games.map((g) => [g.id, gameOptionLabel(g)])]} required testId="new-tr-game" />
+            <SelectField label="Spiel" value={form.game_id} onChange={(v) => set("game_id", v)} options={[["", "— auswählen —"], ...selectableGames(games, form.game_id).map((g) => [g.id, gameOptionLabel(g)])]} required testId="new-tr-game" />
           </FormGrid>
           <FormGrid>
             <SelectField label="Format" value={form.format} onChange={setFormat} options={tournamentFormatOptions()} hint={<FormatHint format={form.format} testId="new-tr-format-hint" />} testId="new-tr-format" />
