@@ -161,19 +161,21 @@ async def _dissolve_locked(db, team: dict, actor: dict) -> dict:
     team = await db.teams.find_one({"id": team_id}, {"_id": 0}) or team
     now = now_utc()
     purge_at = (now + timedelta(days=DISSOLVED_TEAM_RETENTION_DAYS)).isoformat()
-    # Erst sichern, dann löschen - bricht es dazwischen ab, ist nichts verloren. In der Sperre mit bestehendem Team ist eine
-    # schon vorhandene Zeile nur ein Rest eines abgebrochenen Laufs, darum ersetzen statt einfügen.
+    # Erst sichern, dann löschen, das Team zuletzt - bricht es dazwischen ab, ist nichts verloren. In der Sperre mit bestehendem
+    # Team ist eine schon vorhandene Zeile nur ein Rest eines abgebrochenen Laufs: ersetzen statt einfügen, und was jener Lauf
+    # schon gelöscht hat, steht nur noch in ihr.
+    earlier = await db.dissolved_teams.find_one({"id": team_id}, {"_id": 0, "squads": 1, "memberships": 1}) or {}
     archive = {key: value for key, value in team.items() if key not in ("_id", "join_code", "members", "leader")}
     archive.update({
         "dissolved_at": now.isoformat(), "dissolved_by": actor.get("id"), "purge_at": purge_at,
-        "squads": await db.team_squads.find({"team_id": team_id}, {"_id": 0}).to_list(500),
-        "memberships": await db.team_members.find({"team_id": team_id}, {"_id": 0}).to_list(2000),
+        "squads": await db.team_squads.find({"team_id": team_id}, {"_id": 0}).to_list(500) or earlier.get("squads") or [],
+        "memberships": await db.team_members.find({"team_id": team_id}, {"_id": 0}).to_list(2000) or earlier.get("memberships") or [],
     })
     await db.dissolved_teams.replace_one({"id": team_id}, archive, upsert=True)
-    await db.teams.delete_one({"id": team_id})
     await db.team_members.delete_many({"team_id": team_id})
     await db.team_squads.delete_many({"team_id": team_id})
     await db.team_invite_links.delete_many({"team_id": team_id})
+    await db.teams.delete_one({"id": team_id})
     forget_cached_levels()
     await db.team_invites.update_many({"team_id": team_id, "status": "pending"},
                                       {"$set": {"status": "cancelled", "updated_at": now.isoformat()}})

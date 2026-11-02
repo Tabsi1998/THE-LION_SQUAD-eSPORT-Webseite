@@ -561,3 +561,38 @@ async def test_a_failing_image_is_remembered_and_the_row_is_finished(flow, monke
     assert (await flow.db.dissolved_teams.find_one({"id": team["id"]}, {"_id": 0})).get("purged_at")
     pending = await flow.db[account_erasure.PENDING].find_one({"filename": "nur-team.webp"}, {"_id": 0})
     assert pending and pending["source"] == account_erasure.SOURCE_MEDIA and pending["last_error"].startswith("OSError")
+
+
+class _TeamsWontDelete:
+    def __init__(self, real):
+        self._real = real
+
+    def __getattr__(self, name):
+        return getattr(self._real, name)
+
+    async def delete_one(self, _query):
+        raise RuntimeError("Abbruch")
+
+
+class _AbortBeforeTeamDelete:
+    def __init__(self, real):
+        self._real = real
+        self.teams = _TeamsWontDelete(real.teams)
+
+    def __getattr__(self, name):
+        return getattr(self._real, name)
+
+
+@pytest.mark.asyncio
+async def test_a_dissolve_aborted_before_the_team_is_gone_can_be_repeated(flow):
+    """Das Team wird zuletzt gelöscht. Bricht es davor ab, steht das Team noch; der zweite Versuch verliert nichts."""
+    leader, _co, _member, team, squad = await world(flow)
+    with pytest.raises(RuntimeError):
+        await dissolve_team(_AbortBeforeTeamDelete(flow.db), dict(team), leader)
+    assert await flow.db.teams.find_one({"id": team["id"]}), "das Team steht noch"
+    assert not await flow.db.team_squads.find_one({"id": squad["id"]}), "Co-Teams sind schon weg"
+
+    await dissolve(flow, leader, team)
+    row = await flow.db.dissolved_teams.find_one({"id": team["id"]}, {"_id": 0})
+    assert [item["id"] for item in row["squads"]] == [squad["id"]] and len(row["memberships"]) == 3, "die Sicherung bleibt vollständig"
+    assert not await flow.db.teams.find_one({"id": team["id"]})
