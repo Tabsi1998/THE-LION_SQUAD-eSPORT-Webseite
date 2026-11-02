@@ -11,7 +11,7 @@ auf einen Fernseher oder Beamer kommen, was ihr dafür einstellt und was ihr in 
   gewählt), „Pause bis“ beim Status „Pausiert“ und, im Reiter **Turnierbaum**, „Runde präsentiert von“
 - **Admin → eSports → Stationen** – ein Spiel einer Station zuweisen („Spiel zuweisen“); das ist der Aufruf
 - **Admin → Verein → Sponsoren → Sponsor bearbeiten** – der Haken **TV / Anzeige**
-- **Admin → eSports → Fast Lap → Challenge öffnen** – der Knopf **TV Modus**
+- **Admin → eSports → Fast Lap → Challenge öffnen** – der Knopf **TV-Ansicht**
 
 Wer das sehen darf: der Bereich **Turnierleitung** (der Menüpunkt „TV & Beamer“ ist für Moderation allein nicht da).
 
@@ -260,7 +260,7 @@ Ein Turnier-Schlüssel erlaubt **nur das Anschauen dieses einen Turniers** (und 
 
 ### 3.10 Fast Lap am TV
 
-Ansicht **Fast Lap** im Baukasten, oder in der Challenge der Knopf **TV Modus**. Der Bildschirm zeigt Podium und
+Ansicht **Fast Lap** im Baukasten, oder in der Challenge der Knopf **TV-Ansicht**. Der Bildschirm zeigt Podium und
 Rangliste, so viele Zeilen, wie ohne Abschneiden Platz haben. Kommt eine neue Zeit, rückt die Zeile an ihren Platz, an
 der Zeile steht kurz der Abstand (zum Beispiel „−1.204 s · persönliche Bestzeit“). Bei einer **neuen Bestzeit** liegt
 etwa 3 Sekunden ein Moment über der Liste („Neue Bestzeit!“, mit Bild, Name, Zeit, Abstand und dem bisherigen
