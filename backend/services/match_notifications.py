@@ -389,6 +389,35 @@ async def notify_schedule_event(db, match: dict, *, event: str, proposal: dict, 
     return sent
 
 
+def _plan_change_text(changes: dict) -> str:
+    parts = []
+    if "scheduled_at" in changes:
+        moved_to = changes["scheduled_at"].get("to")
+        parts.append(f"Die Turnierleitung hat den Termin auf {_when_text(moved_to)} gelegt." if moved_to else
+                     "Die Turnierleitung hat den festen Termin aufgehoben – es gilt wieder die Terminregel.")
+    if "best_of" in changes:
+        best_of = changes["best_of"].get("to")
+        parts.append(f"Die Turnierleitung hat dieses Spiel auf Best of {best_of} gestellt." if best_of else
+                     "Für dieses Spiel gilt wieder das Best of der Staffel.")
+    return " ".join(parts)
+
+
+async def notify_lead_plan_change(db, match: dict, changes: dict, *, actor_id: str | None, token: str) -> int:
+    """Die Turnierleitung hat Termin oder Best of eines Spiels geändert (#2201): die Verantwortlichen beider Seiten
+    erfahren es sofort. Je Änderung eine Nachricht (``token``), dieselbe Änderung erreicht diese Stelle nicht zweimal."""
+    tournament, registrations, regs_by_id = await _match_context(db, match)
+    recipient_ids = await responsible_user_ids(db, registrations) - {actor_id}
+    body = f"{tournament.get('title') or 'Turnier'} · {match_title(match, regs_by_id)}: {_plan_change_text(changes)}"
+    meta = {"category": "match_reminders", "dedupe_key": f"match-plan:{match.get('id')}:{token}", "match_id": match.get("id"),
+            "tournament_id": match.get("tournament_id"), "reason": "schedule_lead_changed"}
+    title = "Termin geändert" if "scheduled_at" in changes else "Spiel geändert"
+    sent = 0
+    for user in await users_for(db, recipient_ids):
+        if await create_user_notification(user["id"], title, body, url=f"/matches/{match.get('id')}", kind="match_schedule", meta=meta):
+            sent += 1
+    return sent
+
+
 # ---------------------------------------------------------------- Dispute (#1134)
 
 def _short(text: str, limit: int = 120) -> str:

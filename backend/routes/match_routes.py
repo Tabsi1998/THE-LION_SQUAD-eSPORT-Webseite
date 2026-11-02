@@ -59,6 +59,7 @@ from services.match_calls import CALL_OPEN_STATUSES, call_view
 from services.match_disputes import CATEGORIES as DISPUTE_CATEGORIES, CLOSED_DETAIL as DISPUTE_CLOSED_DETAIL, dispute_window
 from services.match_notifications import (
     proposal_sentence,
+    notify_lead_plan_change,
     notify_schedule_event,
     notify_dispute_kept,
     notify_dispute_opened,
@@ -443,12 +444,17 @@ async def _rewrite_matchday_schedule(db, tournament_id: str | None) -> None:
         await persist_matchday_schedule(db, tournament)
 
 
-def _is_future(value) -> bool:
+def _moment(value) -> datetime | None:
     try:
-        moment = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        moment = datetime.fromisoformat(str(value).replace("Z", "+00:00")) if value else None
     except ValueError:
-        return False
-    return (moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)) > now_utc()
+        return None
+    return moment if not moment or moment.tzinfo else moment.replace(tzinfo=timezone.utc)
+
+
+def _is_future(value) -> bool:
+    moment = _moment(value)
+    return bool(moment and moment > now_utc())
 
 
 def _schedule_deadline(match: dict, tournament: dict | None = None) -> str:
@@ -1202,6 +1208,29 @@ async def get_match(match_id: str, user: dict | None = Depends(get_optional_user
     return public_match_view(m, (user or {}).get("id"))
 
 
+async def _record_plan_change(db, before: dict, after: dict, me: dict) -> None:
+    """Termin oder Best of je Spiel von der Turnierleitung geändert (#2201): immer ins Protokoll, mit altem und neuem Wert.
+    In Spielwochen erfahren es die Verantwortlichen beider Seiten; sonst plant die Leitung am Stück um, dort keine Nachricht."""
+    changes = {}
+    if _moment(before.get("scheduled_at")) != _moment(after.get("scheduled_at")):
+        changes["scheduled_at"] = {"from": before.get("scheduled_at"), "to": after.get("scheduled_at")}
+    if before.get("best_of") != after.get("best_of"):
+        changes["best_of"] = {"from": before.get("best_of"), "to": after.get("best_of")}
+    if not changes:
+        return
+    await _audit_match_action(db, "match.plan.change", after, me.get("id"), {"changes": changes})
+    from services.matchday_schedule import plays_in_matchdays
+
+    tournament = await db.tournaments.find_one({"id": after.get("tournament_id")}, {"_id": 0, "creation_key": 0, "billing": 0})
+    stage = await db.tournament_stages.find_one({"id": after.get("stage_id")}, {"_id": 0}) if after.get("stage_id") else None
+    if not plays_in_matchdays(tournament or {}, stage):
+        return
+    try:
+        await notify_lead_plan_change(db, after, changes, actor_id=me.get("id"), token=str(after.get("updated_at")))
+    except Exception:  # noqa: BLE001 - die Änderung ist schon gespeichert
+        logger.warning("[match] Nachricht zur Planänderung für %s nicht verschickt", _log_safe(after.get("id")), exc_info=True)
+
+
 @router.put("/{match_id}")
 @router.patch("/{match_id}")
 async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_current_user),
@@ -1268,6 +1297,7 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
             # hält schon ``_serialized_match_write``; sie ist nicht wiedereintrittsfähig, also direkt auswerten.
             from services.heat_rebuild import evaluate_after_write
             await evaluate_after_write(db, v2_match.get("tournament_id"), actor_id=me.get("id"), trigger="match_update")
+        await _record_plan_change(db, before, updated, me)
         return {**updated, "idempotent_replay": False}
     raise HTTPException(status_code=404, detail="Match nicht gefunden")
 
