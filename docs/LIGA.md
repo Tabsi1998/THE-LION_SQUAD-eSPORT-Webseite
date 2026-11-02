@@ -763,6 +763,8 @@ bleiben gültig und lesbar. Eine Wertung (kampflos) nimmt auch die Liste weg.
 **Kaderänderungen im Protokoll:** Jede Änderung am Kader eines Co-Teams in einer nicht beendeten Staffel schreibt `league.squad.roster` mit `squad_id`, `added`, `removed`. Austritt und Rauswurf aus dem Hauptteam ebenso.
 **Griff von außen:** Ändert die Liga-Leitung einen Co-Team-Kader oder dessen Rollen (Löschen geht in einer laufenden Staffel nicht), bekommen Leitung und Co-Leitung des Hauptteams eine Nachricht mit wer, was, wann (Art `team_role_changed`, `meta.reason` `league_squad_edit`, Schlüssel `league-squad-edit:<squad>:<Zeitpunkt>:<user>`).
 
+**Mail:** Vorlage `league_notice` (Einstellung wie Spiel-Hinweise): Teilnehmerliste fehlt, Griff von außen, Transfer entschieden, Wartezeit der eigenen Person. Sonst bleibt es bei Postfach, Push und Discord.
+
 **Antworten an das Web:** `GET /api/me/league-eligibility` (eigener Stand je Season, ohne Datum). `GET /api/teams/{tid}/squads/{sid}/eligibility`: Stand je Kaderspieler und je möglichem Neuzugang, offene Transfers, Fenster; für Teamleitung, Captain, Vertreter und Liga-Recht `roster`.
 `league_requirement` an `GET /api/teams/{id}/squads` trägt zusätzlich `max_size`, `min_age`, `transfers_open`. `GET …/seasons/{id}/roster`: `eligibility` je Spieler (`state`, `ok`, `reason`, `until`, `age`) und `counts.waiting`, `counts.age`.
 Der Block `league` der Matchseite trägt `lineup_mode`, `lineup_min_players`, `participants`, `own_lineup`, `lineup_overdue`.

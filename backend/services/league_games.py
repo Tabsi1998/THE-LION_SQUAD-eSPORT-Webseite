@@ -637,6 +637,11 @@ async def tell_missing_lineups(db, match: dict, registration_ids: list[str]) -> 
                 "dedupe_key": f"lineup-missing:{match.get('id')}:{user['id']}",
             },
         )
+        if series:
+            from services.league_mail import send_league_mail
+
+            await send_league_mail(db, user["id"], SERIES_MISSING_TITLE, f"{tournament.get('title') or 'Liga'} · {label}: {SERIES_MISSING_TEXT}",
+                                   f"/matches/{match.get('id')}", f"lineup-missing:{match.get('id')}:{user['id']}:mail")
 
 
 # ---------------------------------------------------------------- Melden und Bestätigen

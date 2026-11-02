@@ -9,8 +9,10 @@ from __future__ import annotations
 
 from pymongo.errors import DuplicateKeyError
 
+from database import get_db
 from models import new_id, now_utc
 from services import league_eligibility, league_roster
+from services.league_mail import send_league_mail
 from services.dolibarr_policy import club_today
 
 PENDING, APPROVED, REJECTED, WITHDRAWN = "pending", "approved", "rejected", "withdrawn"
@@ -49,6 +51,8 @@ async def _tell(user_ids, *, title: str, body: str, url: str, reason: str, row: 
     for user_id in sorted({uid for uid in user_ids if uid}):
         await create_user_notification(user_id, title, body, url=url, kind="tournament_registration",
                                        meta={"reason": reason, "dedupe_key": f"league-transfer:{row['id']}:{status}:{user_id}"})
+        if status != PENDING:
+            await send_league_mail(get_db(), user_id, title, body, url, f"league-transfer:{row['id']}:{status}:{user_id}:mail")
 
 
 async def _team_leads(db, team_id: str | None) -> list[str]:

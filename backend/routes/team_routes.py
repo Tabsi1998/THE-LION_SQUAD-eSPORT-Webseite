@@ -1134,6 +1134,7 @@ async def _audit_squad_roster(db, team_id: str, actor_id: str | None, squad_id: 
 async def _tell_squad_edited(db, team: dict, before: dict, after: dict, me: dict, *, fields: list[str]) -> None:
     """Griff von außen in ein Co-Team einer Staffel (#2204): Leitung und Co-Leitung des Hauptteams erfahren wer, was, wann. Der Kader
     ist schon gespeichert - eine klemmende Nachricht hält das nicht auf."""
+    from services.league_mail import send_league_mail
     from services.matchday_schedule import LOCAL_TZ
 
     added = [uid for uid in after.get("member_ids") or [] if uid not in (before.get("member_ids") or [])]
@@ -1169,6 +1170,9 @@ async def _tell_squad_edited(db, team: dict, before: dict, after: dict, me: dict
                 meta={"team_id": team["id"], "squad_id": before.get("id"), "reason": "league_squad_edit",
                       "dedupe_key": f"league-squad-edit:{before.get('id')}:{moment.isoformat()}:{user_id}"},
             )
+            await send_league_mail(db, user_id, f"Liga-Leitung hat den Kader geändert: {name}",
+                                   f"{_user_label(me)} hat am {when} im Co-Team {name} geändert: {'; '.join(parts)}.",
+                                   f"/teams/{team['id']}", f"league-squad-edit:{before.get('id')}:{moment.isoformat()}:{user_id}:mail")
         except Exception:  # noqa: BLE001 - siehe oben
             logger.warning("[teams] Nachricht zum Kader an %s nicht verschickt", log_safe(user_id), exc_info=True)
 
