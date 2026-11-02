@@ -18,6 +18,27 @@ async function shot(page, name) {
   await page.screenshot({ path: path.join(SHOTS, `${name}.png`), fullPage: true });
 }
 
+/**
+ * Der Text der Seite, wenn alle Zähler stehen. „Hochzählen“ (CountUp) trägt `data-counting`, solange es läuft, und beginnt
+ * erst, wenn der Wert im Bild ist - darum einmal alle ins Bild holen. Vorher läse der Vergleich einen Zwischenstand.
+ */
+async function settledText(page) {
+  const main = page.locator("main");
+  const counting = main.locator('[data-counting="true"]');
+  let text = "";
+  await expect(async () => {
+    await counting.evaluateAll((nodes) => nodes.forEach((node) => node.scrollIntoView({ block: "center" })));
+    await expect(counting).toHaveCount(0, { timeout: 5_000 });
+    // Kommen Zahlen später nach, beginnt ein neuer Zähler: Der Text muss auch danach gleich bleiben.
+    text = await main.innerText();
+    await page.waitForTimeout(500);
+    await expect(counting).toHaveCount(0, { timeout: 100 });
+    expect(await main.innerText()).toBe(text);
+  }).toPass({ timeout: 30_000 });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  return text;
+}
+
 /** Schreiben wie die Website: mit dem CSRF-Kopf aus dem Cookie der Sitzung. */
 async function post(page, url, data) {
   const cookies = await page.context().cookies();
@@ -58,7 +79,7 @@ test.describe("Abnahme #1741: Serien anlegen, bearbeiten, archivieren - Referenz
       const before = await (await anon.request.get("/api/references")).json();
       await anon.goto("/references");
       await expect(anon.getByText(referenceTitle).first()).toBeVisible();
-      const beforeText = await anon.locator("main").innerText();
+      const beforeText = await settledText(anon);
       await shot(anon, "references-vorher");
 
       // Spur anlegen
@@ -125,7 +146,7 @@ test.describe("Abnahme #1741: Serien anlegen, bearbeiten, archivieren - Referenz
       expect(await (await anon.request.get("/api/references")).json()).toEqual(before);
       await anon.reload();
       await expect(anon.getByText(referenceTitle).first()).toBeVisible();
-      expect(await anon.locator("main").innerText()).toBe(beforeText);
+      expect(await settledText(anon)).toBe(beforeText);
       await shot(anon, "references-nachher");
     } finally {
       await adminContext.close();
