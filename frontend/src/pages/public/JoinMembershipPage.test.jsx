@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 // Mitglied werden (#1251, #1335): die Karte als Muster, vier Vorteils-Kacheln, der goldene Knopf „Antrag stellen“ und der
@@ -44,7 +44,8 @@ test("Bühne mit Karte (Muster), goldener Antrag-Knopf, vier Vorteile und der Be
   expect(apply).toHaveClass("tls-btn", "tls-btn--honor");
   expect(apply).toHaveAttribute("href", "/membership/apply");
   expect(await screen.findByTestId("join-benefit-3")).toHaveTextContent("Eigene Mitgliedskarte");
-  expect(screen.getByTestId("join-benefit-0")).toHaveTextContent("Stimmrecht im VereinDu redest mit.");
+  // Die Kacheln stehen sofort mit den Vorgabetexten, die Texte vom Server kommen danach.
+  await waitFor(() => expect(screen.getByTestId("join-benefit-0")).toHaveTextContent("Stimmrecht im VereinDu redest mit."));
   const table = await screen.findByTestId("join-fees-table");
   expect(within(table).getAllByRole("row")).toHaveLength(3);
   expect(table).toHaveTextContent("Ordentliches Mitglied60,00 € je Jahr10,00 €Mit Stimmrecht · Eintritt unterm Jahr anteilig");
