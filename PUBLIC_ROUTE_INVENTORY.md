@@ -35,7 +35,7 @@ Liga (docs/LIGA.md, #1622): Eine Staffel ist ein Turnier und folgt den Regeln vo
 Regelwerk der Liga (docs/LIGA.md, #1646): `/liga/<liga>/regeln` und `/liga/<liga>/<season>/regeln` lesen `GET /api/league-rules/leagues/<liga>` bzw.
 `GET /api/league-rules/seasons/<liga>/<season>`, dazu `/compare` und `/versions/<id>/pdf` unter denselben Adressen - alles nach `league_seasons.visibility`, unsichtbar antwortet 404 (die Seite der Liga, sobald
 eine ihrer Seasons sichtbar ist). `members`: erreichbar, aber `noindex` mit neutraler Vorschaukarte, das PDF mit `X-Robots-Tag: noindex`. Alte Fassungen (`?version=`) und der Vergleich (`?vergleich=`) sind nie indexiert.
-`POST /api/league-rules/consents` verlangt eine Anmeldung und Verantwortung für das Co-Team.
+`POST /api/league-rules/consents` verlangt eine Anmeldung und Verantwortung für das Co-Team. `/compare` und `/versions/<id>/pdf` haben eine Bremse je Besucher (nginx-Zone `tls_rules_heavy`, im Server 60 je Minute) und bleiben `no-store`.
 
 ## Oeffentlich, aber bewusst nicht indexiert
 

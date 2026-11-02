@@ -625,11 +625,29 @@ hat. Dann gibt es die Aufgabe `me.actions[]` `type: "rules_consent"` (`target_ty
 Apps ohne neuen Build zeigen die Zeile ohne Pfeil) und den Hinweis auf der Regelseite. **Nichts blockiert:** Melden, Aufstellen und
 Spielen laufen weiter. Kontolöschung: gelöscht (`account_erasure.PURGED`), Auskunft: ja.
 
+**Startseite:** `own_consent_tasks` lädt Seasons, Ligen, Fassungen (ohne Text), Teams und Zustimmungen gesammelt, die Zahl der Abfragen hängt nicht an der Zahl der Seasons.
+
 **Am Spiel:** `matches_v2.rule_version_id` (optional) setzt `submit_v2_result` beim ersten Festschreiben eines Ergebnisses einer Staffel;
 eine Korrektur lässt es stehen, das Zurücknehmen entfernt es. Andere Formate schreiben das Feld nie.
 
-**`accepted_rules`:** Beim Zuteilen eines Co-Teams schreibt der Server `false`, die Zustimmung steht allein in `league_rule_consents`.
-Das Feld liest im Code niemand; alte Zeilen bleiben unberührt, andere Anmeldewege auch.
+**`accepted_rules`, `accepted_privacy`:** Beim Zuteilen eines Co-Teams schreibt der Server beide `false`, die Zustimmung zu den Regeln steht allein in
+`league_rule_consents`. An Anmeldungen liest beide Felder kein Code; alte Zeilen bleiben unberührt, andere Anmeldewege auch.
+
+**Unveränderlich auch von außen:** Die Mediathek schreibt veröffentlichte Fassungen nicht um (`media_audit.is_frozen`) und lässt die Bild-Migration dort aus.
+Eine Datei, die eine veröffentlichte Fassung zeigt, lässt sich nicht drehen und nicht löschen, auch nicht mit Bestätigung (409); beim Duplikat ersetzen bleibt die
+Kopie stehen. Entwürfe ändern sich mit. Eine Season oder Liga mit veröffentlichter Fassung oder mit Zustimmungen lässt sich nicht löschen (409, Grund im `delete-plan`,
+Hinweis auf Archivieren), nur Entwürfe gehen mit.
+
+**Bilder:** Im Regelwerk nur eigene Uploads (`game_maps.IMAGE_URL`). Der Server lehnt alles andere beim Speichern und Veröffentlichen mit 422 ab, die Vorschau nennt es
+(`foreign_images`), das Web lädt es nicht (`markdownLite`, Option `imageAllowed`; andere Nutzer ohne Option bleiben unverändert) und zeigt einen Link. Die CSP bleibt.
+Im PDF steht ein eigener Upload auf eigener Zeile als Bild, alles andere als `[Bild: …]`. Die PDF-Schrift kann nur Westeuropäisches: Zeichen wie → werden umschrieben,
+Emoji fallen weg.
+
+**Rechenlast:** Je Fassung höchstens 400 000 Zeichen und 400 Abschnitte mit allen Anlagen (`TEXT_TOTAL_MAX`, `SECTIONS_MAX`, 422). Über 60 000 Wörtern in geänderten
+Abschnitten fällt der Vergleich auf ganze Abschnitte zurück (`coarse`, alt und neu), die Suche nach umbenannten Abschnitten prüft höchstens 900 Paare. PDF, Vergleich und Seite
+werden je unveränderlicher Fassung einmal gerechnet (`league_rules_cache`, 64 MB je Prozess, gleichzeitige Abrufe warten auf eine Rechnung); die Sichtbarkeit prüft die Route
+jedes Mal vorher, die Vorschau bleibt ohne Speicher. PDF und Vergleich: 60 Abrufe je Minute und Besucher im Server (`enforce_rate_limit`), in nginx Zone `tls_rules_heavy`
+gegen Bursts.
 
 **Staffel:** Gibt es für eine Season ein Regelwerk (eigenes oder der Liga), steht in `tournaments.rules` statt `rules_text` nur der
 Hinweis auf die Regelseite. Das schreibt das Veröffentlichen sofort und das Übertragen (`SYNC_GROUPS.always`).
