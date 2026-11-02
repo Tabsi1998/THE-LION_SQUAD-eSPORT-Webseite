@@ -203,12 +203,15 @@ async def home_state(user: dict | None = Depends(get_optional_user)):
         {"status": {"$in": list(LIVE_STATUSES)}}, {"_id": 0},
     ).sort("updated_at", -1).to_list(20)
 
-    # Mehrtägige Events (#884) sind zwischen zwei Tagen nicht „live“, auch wenn ihr Stand so heißt.
-    live_event_rows = [row for row in await _filter_rows(live_events, user, "event") if (row.get("public_phase") or {}).get("state") == "live"]
+    # Das Band folgt derselben Phase wie die Detailseite: Mehrtägige Events (#884) sind zwischen zwei Tagen nicht „live“,
+    # und ein Turnier oder eine Fast Lap nach dem Ende auch dann nicht, wenn die Leitung den Stand noch nicht umgestellt hat.
+    def still_live(rows: list[dict]) -> list[dict]:
+        return [row for row in rows if (row.get("public_phase") or {}).get("state") == "live"]
+
     live = {
-        "tournaments": await _filter_rows(live_tournaments, user, "tournament"),
-        "challenges": await _attach_events_to_challenges(await _filter_rows(live_challenges, user, "fastlap")),
-        "events": live_event_rows,
+        "tournaments": still_live(await _filter_rows(live_tournaments, user, "tournament")),
+        "challenges": await _attach_events_to_challenges(still_live(await _filter_rows(live_challenges, user, "fastlap"))),
+        "events": still_live(await _filter_rows(live_events, user, "event")),
     }
 
     # ---------- TODAY ----------
