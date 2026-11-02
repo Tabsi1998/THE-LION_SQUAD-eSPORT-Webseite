@@ -181,7 +181,8 @@ def mongo_hosts(url: str) -> list[str] | None:
 
 def mongo_is_local(url: str) -> bool:
     hosts = mongo_hosts(url)
-    return bool(hosts) and all(host in MONGO_HOSTS for host in hosts)
+    # Ein Replica-Set kündigt weitere Hosts an, der Treiber folgt ihnen - die Prüfung hier sähe nur den ersten.
+    return bool(hosts) and all(host in MONGO_HOSTS for host in hosts) and "replicaset=" not in url.lower()
 
 
 def guard_environment(env) -> None:
