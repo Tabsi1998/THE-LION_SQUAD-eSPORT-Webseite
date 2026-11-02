@@ -320,6 +320,74 @@ async def test_the_log_of_an_open_request_with_the_same_subject_stays(flow, monk
     assert await flow.db.mail_jobs.count_documents({"meta.contact_id": "alt"}) == 0
 
 
+class ChangedAfterReading:
+    """Die Sammlung `contact_messages`, die nach dem Lesen der fälligen Zeilen `change` ausführt - wie jemand, der im
+    selben Moment in der Inbox arbeitet."""
+
+    def __init__(self, db, change):
+        self._db = db
+        self._change = change
+
+    def __getattr__(self, name):
+        return getattr(self._db, name)
+
+    @property
+    def contact_messages(self):
+        return _ReadThenChange(self._db.contact_messages, self._change)
+
+
+class _ReadThenChange:
+    def __init__(self, collection, change):
+        self._collection = collection
+        self._change = change
+
+    def __getattr__(self, name):
+        return getattr(self._collection, name)
+
+    def find(self, *args, **kwargs):
+        cursor = self._collection.find(*args, **kwargs)
+        change = self._change
+
+        class Reading:
+            @staticmethod
+            async def to_list(length):
+                rows = await cursor.to_list(length)
+                await change()
+                return rows
+
+        return Reading()
+
+
+@pytest.mark.asyncio
+async def test_a_request_answered_while_the_job_runs_stays_with_its_mail(flow, monkeypatch):
+    await flow.db.contact_messages.insert_one(message("a", status="closed", status_changed_at=days_ago(400)))
+    await flow.db.mail_jobs.insert_one({"id": "j-alt", "to": "paula@example.test", "subject": "alt", "html": "<p>alt</p>", "template_key": "contact_autoreply", "status": "pending", "meta": {"contact_id": "a"}})
+    await send_queue(monkeypatch)
+    me = await club_person(flow)
+
+    async def answer_now():
+        flow.act_as(me)
+        response = await flow.post("/api/contact/a/reply", json={"text": "Gerade noch rechtzeitig", "request_id": "im-selben-moment"})
+        assert response.status_code == 200
+
+    removed = await contact_retention.purge_expired(ChangedAfterReading(flow.db, answer_now), done_days=365, spam_days=30)
+    assert removed == 0, "die Zeile hat sich seit dem Lesen geändert"
+    assert (await flow.db.contact_messages.find_one({"id": "a"}))["status"] == "answered"
+    assert await flow.db.mail_jobs.find_one({"template_key": "contact_reply", "status": "pending"}), "die Antwort geht noch hinaus"
+    assert await flow.db.email_logs.count_documents({"contact_id": "a"}) == 1, "auch die Kopien bleiben"
+
+
+@pytest.mark.asyncio
+async def test_a_request_reopened_while_the_job_runs_stays(flow):
+    await flow.db.contact_messages.insert_many([message("a", status="closed", status_changed_at=days_ago(400)), message("b", status="closed", status_changed_at=days_ago(400))])
+
+    async def reopen():
+        await flow.db.contact_messages.update_one({"id": "a"}, {"$set": {"status": "in_progress", "status_changed_at": days_ago(0)}})
+
+    assert await contact_retention.purge_expired(ChangedAfterReading(flow.db, reopen), done_days=365, spam_days=30) == 1
+    assert {row["id"] async for row in flow.db.contact_messages.find({}, {"_id": 0, "id": 1})} == {"a"}, "nur die unveränderte Zeile geht"
+
+
 @pytest.mark.asyncio
 async def test_a_failed_mail_also_carries_the_request_in_the_log(flow, monkeypatch):
     await flow.db.mail_jobs.insert_one({"id": "j", "to": "a@example.test", "subject": "x", "html": "<p>x</p>", "template_key": "contact_reply", "status": "pending", "meta": {"contact_id": "a"}})

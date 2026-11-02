@@ -38,12 +38,13 @@ async def purge_expired(db, *, done_days: int, spam_days: int, now: datetime | N
     for statuses, days in ((DONE_STATUSES, done_days), (SPAM_STATUSES, spam_days)):
         cutoff = (current - timedelta(days=int(days))).isoformat()
         # Eine laufende „Kein Spam“-Freigabe holt gerade Mails nach - die wird nicht weggeräumt.
-        rows = await db.contact_messages.find(
-            {"status": {"$in": list(statuses)}, "status_changed_at": {"$lt": cutoff}, "spam.release.state": {"$ne": "releasing"}}, {"_id": 0, "id": 1},
-        ).to_list(None)
-        ids = [row["id"] for row in rows]
-        if not ids:
-            continue
-        await forget_copies(db, ids)
-        removed += int((await db.contact_messages.delete_many({"id": {"$in": ids}})).deleted_count)
+        due = {"status": {"$in": list(statuses)}, "status_changed_at": {"$lt": cutoff}, "spam.release.state": {"$ne": "releasing"}}
+        for row in await db.contact_messages.find(due, {"_id": 0, "id": 1}).to_list(None):
+            # Je Zeile mit derselben Bedingung: Wer sie seit dem Lesen wieder geöffnet oder beantwortet hat, behält sie -
+            # und eine gerade eingereihte Antwort geht noch hinaus. Die Kopien gehen erst, wenn die Zeile wirklich weg ist.
+            gone = await db.contact_messages.delete_one({"id": row["id"], **due})
+            if gone.deleted_count != 1:
+                continue
+            await forget_copies(db, [row["id"]])
+            removed += 1
     return removed
