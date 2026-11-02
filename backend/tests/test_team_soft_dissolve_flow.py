@@ -85,7 +85,7 @@ async def test_dissolved_team_is_gone_from_everything_that_reads_teams(flow):
     # Jeder im Team erfährt es, wer aufgelöst hat nicht.
     told = await flow.db.notifications.find({"kind": "team_dissolved"}, {"_id": 0}).to_list(10)
     assert {row["user_id"] for row in told} == {_co["id"], member["id"]}
-    assert str(DISSOLVED_TEAM_RETENTION_DAYS) in told[0]["body"]
+    assert str(DISSOLVED_TEAM_RETENTION_DAYS) in told[0]["body"] and "frühere Teamleitung" in told[0]["body"]
     row = await flow.db.audit_logs.find_one({"action": "team.dissolve", "target_id": team["id"]})
     assert "Alt-Code1" not in str(row)
 
@@ -263,7 +263,7 @@ async def test_a_new_tag_on_restore_goes_through_the_word_filter(flow, monkeypat
     from services import word_filter
 
     async def refuse(_db, text, **_kwargs):
-        if text == "BOESE":
+        if "BOESE" in text or "Verboten" in text:
             raise HTTPException(status_code=400, detail="Dieses Wort geht nicht.")
 
     monkeypatch.setattr(word_filter, "screen_field", refuse)
@@ -274,3 +274,43 @@ async def test_a_new_tag_on_restore_goes_through_the_word_filter(flow, monkeypat
     assert refused.status_code == 400, refused.text
     assert await flow.db.dissolved_teams.find_one({"id": team["id"]}), "nichts passiert"
     assert (await flow.post(f"/api/teams/{team['id']}/restore", json={"tag": "GUT"})).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_a_name_that_is_forbidden_by_now_does_not_come_back(flow, monkeypatch):
+    from fastapi import HTTPException
+    from services import word_filter
+
+    leader, _co, _member, team, _squad = await world(flow)
+    await dissolve(flow, leader, team)
+
+    async def refuse(_db, text, **_kwargs):
+        if "Lions" in text:
+            raise HTTPException(status_code=400, detail="Dieses Wort geht nicht.")
+
+    monkeypatch.setattr(word_filter, "screen_field", refuse)
+    assert (await flow.post(f"/api/teams/{team['id']}/restore")).status_code == 400
+    assert not await flow.db.teams.find_one({"id": team["id"]})
+
+
+@pytest.mark.asyncio
+async def test_what_an_admin_dissolved_only_admins_bring_back(flow):
+    """Prüfer-Probe: Löst ein Admin ein Team auf, darf es die frühere Teamleitung nicht einfach zurückholen."""
+    leader, _co, member, team, _squad = await world(flow)
+    admin = await flow.add_user(role="club_admin", name="vorstand")
+    flow.act_as(admin)
+    gone = await flow.delete(f"/api/teams/{team['id']}", params={"confirm": team["name"]})
+    assert gone.status_code == 200
+
+    note = await flow.db.notifications.find_one({"user_id": member["id"], "kind": "team_dissolved"})
+    assert "Vereinsverwaltung" in note["body"] and "frühere Teamleitung" not in note["body"]
+
+    flow.act_as(leader)
+    assert (await flow.get("/api/teams/dissolved/mine")).json() == [], "die Zeile fehlt bei der früheren Teamleitung"
+    refused = await flow.post(f"/api/teams/{team['id']}/restore", json={})
+    assert refused.status_code == 403 and "Vereinsverwaltung" in refused.json()["detail"]
+    assert not await flow.db.teams.find_one({"id": team["id"]})
+
+    flow.act_as(admin)
+    assert (await flow.post(f"/api/teams/{team['id']}/restore", json={})).status_code == 200
+    assert await flow.db.teams.find_one({"id": team["id"]})

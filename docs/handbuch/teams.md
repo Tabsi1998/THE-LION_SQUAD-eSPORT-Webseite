@@ -15,7 +15,7 @@ wer was darf, wie man Teams verwaltet und was beim Auflösen passiert. Wie Co-Te
 | Öffentlich oder privat | Teamseite → **Bearbeiten** | Teamleitung, Club-Admin, Superadmin |
 | Co-Teams, Captain, Vertreter | **Teams → Deine Teams** | Teamleitung, Co-Leitung, Turnierleitung, Club-Admin, Superadmin |
 | Team auflösen | Teamseite → **Bearbeiten**, ganz unten | Teamleitung, Club-Admin, Superadmin |
-| Aufgelöstes Team zurückholen | **Teams → Deine Teams** oder **Admin → eSports → Teams** | frühere Teamleitung, Club-Admin, Superadmin |
+| Aufgelöstes Team zurückholen | **Admin → eSports → Teams** oder **Teams → Deine Teams** | Club-Admin, Superadmin; die frühere Teamleitung nur, wenn sie selbst aufgelöst hat |
 | Alle Teams, verwaiste Teams | **Admin → eSports → Teams** | Turnierleitung, Vereinsverwaltung |
 | Alle Beitrittscodes erneuern | **Admin → eSports → Teams** | Club-Admin, Superadmin |
 
@@ -67,8 +67,9 @@ Nach dem Auflösen:
 - Anmeldungen für Turniere, die noch nicht begonnen haben, sind zurückgezogen – und bleiben das auch beim Wiederherstellen.
 - **Alte Turniere** und Wertungen zeigen weiter den Namen; die Adresse des Teams sagt „wurde aufgelöst“.
 
-**30 Tage** lang lässt sich das Team wiederherstellen: unter **Teams → Deine Teams** (frühere Teamleitung) oder unter
-**Admin → eSports → Teams → Aufgelöste Teams**. Mitglieder, Co-Teams und Chat sind wieder da, dazu ein **neuer Beitrittscode**
+**30 Tage** lang lässt sich das Team wiederherstellen: unter **Admin → eSports → Teams → Aufgelöste Teams** oder, wenn die
+frühere Teamleitung selbst aufgelöst hat, von ihr unter **Teams → Deine Teams**. Was ein Admin aufgelöst hat, holen nur Admins
+zurück. Name und Kürzel laufen dabei durch den Wortfilter. Mitglieder, Co-Teams und Chat sind wieder da, dazu ein **neuer Beitrittscode**
 und ein neuer Link. Hat ein anderes Team das Kürzel inzwischen, fragt die Seite nach einem neuen. Hat die frühere Teamleitung
 ihr Konto gelöscht, übernimmt die Co-Leitung, sonst ein Mitglied.
 
@@ -98,7 +99,7 @@ ihrer Teamseite unter **Einladen**. Die Einladungs-Links bleiben; einen Code zei
 
 ## 5. Häufige Fragen
 
-**Kann die Co-Leitung ein aufgelöstes Team zurückholen?** Nein, nur die frühere Teamleitung und Club-Admin oder Superadmin.
+**Kann die Co-Leitung ein aufgelöstes Team zurückholen?** Nein, nur Club-Admin oder Superadmin und die frühere Teamleitung, wenn sie selbst aufgelöst hat.
 
 **Kommen zurückgezogene Turnier-Anmeldungen zurück?** Nein, das Team meldet sich neu an, wenn die Anmeldung noch offen ist.
 

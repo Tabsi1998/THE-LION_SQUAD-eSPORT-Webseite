@@ -10,7 +10,7 @@ import { dissolveSentence, sameTeamName } from "@/lib/teamPage";
 // Team auflösen (#1274): ganz unten im Bearbeiten-Blatt statt rot neben „Bearbeiten“. Ein Satz sagt vorher, was
 // passiert (Mitglieder, Chat, kommende Turnier-Anmeldungen); erst mit dem richtig eingetippten Teamnamen geht der Knopf.
 // Läuft ein Turnier gerade, nennt die Vorschau es - auflösen geht dann erst, wenn die Turnierleitung es geklärt hat.
-// Weich (#2128, TM8): die Vorschau nennt die Frist; wiederherstellen geht unter „Deine Teams“ (DissolvedTeams.jsx).
+// Weich (#2128, TM8): die Vorschau nennt die Frist; wiederherstellen geht über DissolvedTeams.jsx.
 
 export function TeamDissolveSection({ team, onDissolved }) {
   const [preview, setPreview] = useState(null);
@@ -34,7 +34,7 @@ export function TeamDissolveSection({ team, onDissolved }) {
     setError("");
     const attempt = await submitOnce(async () => {
       await api.delete(`/teams/${team.id}`, { params: { confirm: typed.trim() } });
-      toast.success(`${team.name} ist aufgelöst. Unter „Deine Teams“ kannst du es wiederherstellen.`);
+      toast.success(`${team.name} ist aufgelöst und lässt sich ${preview?.restore_days || 30} Tage lang wiederherstellen.`);
       onDissolved?.();
     });
     if (attempt.started && attempt.error) setError(formatRequestError(attempt.error, "Auflösen hat nicht geklappt."));

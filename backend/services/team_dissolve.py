@@ -15,8 +15,9 @@ Auflösen darf die Teamleitung (und der Club-Admin) - wie bisher; die Co-Leitung
 **Weich:** Team, Mitgliederzeilen und Co-Teams wandern in einem Zug nach ``dissolved_teams``. Alles, was ``teams`` liest -
 öffentliche Listen, Suche, Beitritt, Team-Prüfungen, Liga, App -, kennt das Team damit nicht mehr, ohne dass irgendwo ein
 Filter stehen müsste. Der Chat bleibt liegen, ist aber ohne Team für niemanden erreichbar.
-``DISSOLVED_TEAM_RETENTION_DAYS`` Tage lang stellen die frühere Teamleitung oder ein Admin das Team wieder her
-(mit neuem Beitrittscode und neuem Einladungs-Link; der alte Code wird nicht mitgespeichert). Danach räumt der tägliche
+``DISSOLVED_TEAM_RETENTION_DAYS`` Tage lang stellt ein Admin das Team wieder her, und die frühere Teamleitung, wenn sie
+selbst aufgelöst hat - was ein Admin aufgelöst hat, holt sie nicht zurück (``former_lead_may_restore``). Das Team bekommt
+einen neuen Beitrittscode und einen neuen Einladungs-Link; der alte Code wird nicht mitgespeichert. Danach räumt der tägliche
 Job auf: Chat und Daten sind weg, nur Name und Kürzel bleiben, damit alte Turniere einen Namen zeigen
 (``services/team_history.py``). Löscht eine Person ihr Konto, verschwindet sie sofort auch aus den aufgelösten Teams
 (``forget_person``).
@@ -154,9 +155,9 @@ async def dissolve(db, team: dict, actor: dict) -> dict:
                  "purge_at": purge_at},
         "created_at": now.isoformat(),
     })
+    who = "Die frühere Teamleitung" if actor.get("id") == team.get("leader_id") else "Die Vereinsverwaltung"
     await _tell_members(team, actor, title=f"[{team.get('tag')}] wurde aufgelöst",
-                        body=f"{team.get('name')} gibt es nicht mehr. Die frühere Teamleitung kann es "
-                             f"{DISSOLVED_TEAM_RETENTION_DAYS} Tage lang wiederherstellen.",
+                        body=f"{team.get('name')} gibt es nicht mehr. {who} kann es {DISSOLVED_TEAM_RETENTION_DAYS} Tage lang wiederherstellen.",
                         url="/teams", kind="team_dissolved")
     from services.change_events import publish_user_change
     await publish_user_change(list(team.get("member_ids") or []), "teams")
@@ -171,6 +172,13 @@ async def _tell_members(team: dict, actor: dict, **note) -> None:
             await create_user_notification(user_id, meta={"team_id": team["id"]}, **note)
         except Exception:  # noqa: BLE001 - das Team ist schon aufgelöst bzw. zurück; eine Nachricht hält das nicht auf
             logger.warning("[teams] Nachricht an %s nicht verschickt", log_safe(user_id), exc_info=True)
+
+
+def former_lead_may_restore(row: dict | None) -> bool:
+    """Die frühere Teamleitung holt nur zurück, was sie selbst aufgelöst hat. Was ein Admin aufgelöst hat - etwa wegen des
+    Namens -, stellen nur Admins wieder her."""
+    leader_id = (row or {}).get("leader_id")
+    return bool(leader_id) and row.get("dissolved_by") == leader_id
 
 
 def is_restorable(row: dict | None, now: datetime | None = None) -> bool:
@@ -191,8 +199,9 @@ def dissolved_view(row: dict, now: datetime | None = None) -> dict:
 
 
 async def dissolved_for_leader(db, user_id: str) -> list[dict]:
-    """Was diese Person als frühere Teamleitung noch wiederherstellen kann."""
-    rows = await db.dissolved_teams.find({"leader_id": user_id, "purged_at": {"$exists": False}}, {"_id": 0}).sort("dissolved_at", -1).to_list(50)
+    """Was diese Person als frühere Teamleitung noch wiederherstellen kann - nur, was sie selbst aufgelöst hat."""
+    rows = await db.dissolved_teams.find({"leader_id": user_id, "dissolved_by": user_id, "purged_at": {"$exists": False}},
+                                         {"_id": 0}).sort("dissolved_at", -1).to_list(50)
     return [dissolved_view(row) for row in rows if is_restorable(row)]
 
 
@@ -217,9 +226,9 @@ async def restore(db, row: dict, actor: dict, tag: str | None = None) -> dict:
         raise HTTPException(status_code=400, detail=f"Das Kürzel braucht {TEAM_TAG_MIN_LENGTH} bis {TEAM_TAG_MAX_LENGTH} Zeichen.")
     if await db.teams.find_one({"tag": final_tag}, {"_id": 1}):
         raise HTTPException(status_code=409, detail=f"Das Kürzel {final_tag} hat inzwischen ein anderes Team – bitte gib ein neues an.")
-    if final_tag != row.get("tag"):
-        from services import word_filter
-        await word_filter.screen_field(db, final_tag, kind="team_name", user_id=actor.get("id"), ref_id=team_id)
+    # Der Wortfilter kann seit dem Auflösen strenger geworden sein - und das Kürzel ist vielleicht neu.
+    from services import word_filter
+    await word_filter.screen_field(db, f"{row.get('name') or ''} {final_tag}", kind="team_name", user_id=actor.get("id"), ref_id=team_id)
     leader_id = await _next_leader(db, row)
     if not leader_id:
         raise HTTPException(status_code=409, detail="Niemand aus dem Team hat noch ein aktives Konto – so ließe es sich nicht führen.")

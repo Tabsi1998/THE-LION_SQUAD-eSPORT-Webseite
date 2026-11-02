@@ -133,7 +133,7 @@ export default function AdminTeamsPage() {
           {(result) => (
             <div className="space-y-2" data-testid="admin-teams-list">
               {tab === "dissolved" ? (
-                <p className="text-xs text-white/50">Aufgelöste Teams lassen sich {result.restore_days} Tage lang wiederherstellen{result.can_restore ? "" : " – das machen die frühere Teamleitung und Club-Admins"}. Danach bleiben nur Name und Kürzel für alte Turniere.</p>
+                <p className="text-xs text-white/50">Aufgelöste Teams lassen sich {result.restore_days} Tage lang wiederherstellen{result.can_restore ? "" : " – das machen Club-Admins und, wenn sie selbst aufgelöst hat, die frühere Teamleitung"}. Danach bleiben nur Name und Kürzel für alte Turniere.</p>
               ) : null}
               {(result.items || []).map((team) => (tab === "dissolved" && result.can_restore
                 ? <DissolvedTeamRow key={team.id} team={team} onRestored={load.reload} />

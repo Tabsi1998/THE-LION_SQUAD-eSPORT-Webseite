@@ -8,7 +8,7 @@
 - ``POST /api/teams/{id}/join-link``           mit gültigem Schlüssel beitreten (nur noch „Beitreten“ tippen)
 - ``GET  /api/teams/{id}/dissolve-preview``    was beim Auflösen passiert (#1274) - Teamleitung und Club-Admin
 - ``GET  /api/teams/dissolved/mine``           aufgelöste Teams, die ich als frühere Teamleitung wiederherstellen kann (#2128)
-- ``POST /api/teams/{id}/restore``             aufgelöstes Team zurückholen - frühere Teamleitung und Club-Admin
+- ``POST /api/teams/{id}/restore``             aufgelöstes Team zurückholen - Club-Admin, frühere Teamleitung nur nach eigenem Auflösen
 """
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from routes.team_routes import (
     TEAM_OWNER_ADMIN_ROLES, _add_team_member, _can_manage, _is_member, _is_staff, _refuse, _team_admin, _team_audit, _user_label,
 )
 from services import team_page
-from services.team_dissolve import dissolve_preview, dissolved_for_leader, restore as restore_team
+from services.team_dissolve import dissolve_preview, dissolved_for_leader, former_lead_may_restore, restore as restore_team
 from services.user_notifications import build_public_url, create_user_notification
 
 router = APIRouter(prefix="/api/teams", tags=["teams"])
@@ -173,12 +173,15 @@ async def my_dissolved_teams(me: dict = Depends(get_current_user)):
 
 @router.post("/{team_id}/restore")
 async def restore_dissolved_team(team_id: str, body: RestoreBody | None = None, me: dict = Depends(get_current_user)):
-    """Ein aufgelöstes Team zurückholen (#2128, TM8): die frühere Teamleitung oder Club-Admin und Superadmin, mit Protokoll."""
+    """Ein aufgelöstes Team zurückholen (#2128, TM8): Club-Admin und Superadmin, die frühere Teamleitung nur, wenn sie
+    selbst aufgelöst hat. Mit Protokoll."""
     db = get_db()
     row = await db.dissolved_teams.find_one({"id": team_id, "purged_at": {"$exists": False}}, {"_id": 0})
     if not row:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
-    if row.get("leader_id") != me["id"] and not _team_admin(me, TEAM_OWNER_ADMIN_ROLES):
-        _refuse(me, "Wiederherstellen darf die frühere Teamleitung.", TEAM_OWNER_ADMIN_ROLES)
+    own = row.get("leader_id") == me["id"]
+    if not (own and former_lead_may_restore(row)) and not _team_admin(me, TEAM_OWNER_ADMIN_ROLES):
+        _refuse(me, "Dieses Team hat die Vereinsverwaltung aufgelöst – wiederherstellen kann nur sie." if own
+                else "Wiederherstellen darf die frühere Teamleitung.", TEAM_OWNER_ADMIN_ROLES)
     team = await restore_team(db, row, me, tag=body.tag if body else None)
     return {"ok": True, "id": team["id"], "name": team.get("name"), "tag": team.get("tag")}
