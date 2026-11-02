@@ -209,6 +209,8 @@ async def create_station(body: StationCreate, me: dict = Depends(require_admin()
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     if doc.get("tournament_id"):
         await _ensure_tournament_unlocked(db, doc["tournament_id"])
+    if await game_usage.chosen_is_archived(db, doc.get("game_id")):
+        raise HTTPException(status_code=422, detail=game_usage.ARCHIVED_DETAIL)
     doc["id"] = new_id()
     doc["status"] = "free"
     doc["current_match_id"] = None
@@ -387,6 +389,8 @@ async def bulk_create_stations(body: dict, me: dict = Depends(require_admin())):
     count = int(body.get("count") or 0)
     if count < 1 or count > 64:
         raise HTTPException(status_code=400, detail="Anzahl muss zwischen 1 und 64 liegen")
+    if await game_usage.chosen_is_archived(db, body.get("game_id")):
+        raise HTTPException(status_code=422, detail=game_usage.ARCHIVED_DETAIL)
     prefix = (body.get("prefix") or "Station").strip() or "Station"
     device_type = (body.get("device_type") or "switch").strip()
     notes = (body.get("notes") or "").strip() or None

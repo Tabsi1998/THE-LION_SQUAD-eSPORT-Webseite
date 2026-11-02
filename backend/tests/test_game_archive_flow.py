@@ -87,7 +87,7 @@ async def test_usage_counts_series_servers_stations_teams_and_profiles(flow):
 
     counts = (await flow.get(f"/api/games/{game['id']}/usage")).json()["counts"]
 
-    for key in ("series", "references", "servers", "stations", "teams", "leagues", "profiles", "identity_sources"):
+    for key in ("series", "references", "name_links", "challenges", "servers", "stations", "teams", "leagues", "profiles", "identity_sources"):
         assert counts[key] == 1, key
     refused = await flow.delete(f"/api/games/{game['id']}")
     assert refused.status_code == 409
