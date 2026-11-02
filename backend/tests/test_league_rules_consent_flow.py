@@ -321,6 +321,7 @@ async def test_other_tournament_formats_never_get_the_field(flow):
 async def test_assigning_a_squad_no_longer_pretends_a_consent(flow):
     w = await make_world(flow)
     assert {reg["accepted_rules"] for reg in w["regs"]} == {False}
+    assert {reg["accepted_privacy"] for reg in w["regs"]} == {False}, "auch dazu hat beim Zuteilen niemand etwas erklärt"
     assert all(reg["registered_via"] == "league_assign" for reg in w["regs"])
     assert await flow.db.league_rule_consents.count_documents({}) == 0
 

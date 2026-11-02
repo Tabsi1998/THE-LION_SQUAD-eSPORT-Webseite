@@ -379,9 +379,10 @@ async def build_registration(db, tournament: dict, team_id: str, squad_id: str, 
         "display_name": name,
         "ingame_name": name,
         "player_ids": {},
-        # Das Zuteilen ist keine Zustimmung (D-7, #1646): die steht in league_rule_consents.
+        # Das Zuteilen ist keine Zustimmung (D-7, #1646): Regeln stehen in league_rule_consents, zum Datenschutz hat hier niemand
+        # etwas erklärt. An Anmeldungen liest beide Felder kein Code.
         "accepted_rules": False,
-        "accepted_privacy": True,
+        "accepted_privacy": False,
         "seed": None,
         "registration_type": "team",
         "registered_via": "league_assign",
