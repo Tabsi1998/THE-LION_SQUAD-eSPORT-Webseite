@@ -131,7 +131,8 @@ function SeasonSheet({ league, defaults, onClose, onSaved }) {
       <p className="text-xs leading-relaxed text-white/60" data-testid="season-defaults">
         Startet mit den Vorgaben: {defaults.weeks_total} Wochen, Spielwoche {defaults.matchday_days} Tage,
         Standardtermin {weekdayName(defaults.default_match_weekday)} {defaults.default_match_time}, {legs}, Best of {defaults.best_of},
-        {" "}{defaults.team_size} gegen {defaults.team_size}, bis {defaults.max_staffel_size} Teams je Staffel. Sichtbar ist sie erst,
+        {" "}{defaults.team_size} gegen {defaults.team_size}, bis {defaults.max_staffel_size} Teams je Staffel. Kader {defaults.min_squad_size} bis {defaults.max_squad_size} Spieler,
+        Mindestalter {defaults.min_age}, Wartezeit neuer Spieler {defaults.new_player_wait_days} Tage, ein Team je Season. Sichtbar ist sie erst,
         wenn du es auf der Season-Seite einstellst.
       </p>
     </AdminSheet>
