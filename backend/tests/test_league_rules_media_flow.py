@@ -15,6 +15,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from flow_harness import make_flow  # noqa: E402
 from routes import phase_fg_routes  # noqa: E402
 from services import account_erasure, image_migrate, media_audit  # noqa: E402
+from services.mutation_lock import MutationLockBusy, league_season_resource, mutation_lock  # noqa: E402
 
 UPLOADS = "/api/static/uploads/"
 OLD = 3 * 24 * 3600
@@ -164,7 +165,116 @@ async def test_cleanup_keeps_an_image_of_a_published_version(flow, public):
     assert (public / "plan.webp").exists(), response.text
 
 
+# ---------------------------------------------------------------- Gleichzeitig veröffentlicht
+
+def publish_while_reading(flow, monkeypatch, rule_id: str) -> None:
+    """Die Mediathek liest den Entwurf, und noch bevor sie schreibt, ist er veröffentlicht."""
+    real = media_audit.iter_usages
+
+    async def reading(db, names):
+        async for hit in real(db, names):
+            yield hit
+        await flow.db.league_rules.update_one({"id": rule_id}, {"$set": {"status": "published", "version": 1}})
+
+    monkeypatch.setattr(media_audit, "iter_usages", reading)
+
+
+@pytest.mark.asyncio
+async def test_repointing_leaves_a_draft_alone_that_was_published_meanwhile(flow, public, monkeypatch):
+    before = await add_rule(flow, "gerade", status="draft", image="kopie.webp", version=None)
+    publish_while_reading(flow, monkeypatch, "gerade")
+    await media_audit.repoint_usages(flow.db, "kopie.webp", UPLOADS + "bleibt.webp", {"updated_at": "jetzt"})
+    assert await stored(flow, "gerade") == {"body_md": before["body_md"], "annexes": before["annexes"]}
+
+
+@pytest.mark.asyncio
+async def test_a_new_version_stamp_leaves_a_draft_alone_that_was_published_meanwhile(flow, public, monkeypatch):
+    before = await add_rule(flow, "gerade", status="draft", image="plan.png", version=None)
+    publish_while_reading(flow, monkeypatch, "gerade")
+    await media_audit.stamp_version(flow.db, "plan.png", 7, (4, 8), {"updated_at": "jetzt"})
+    assert await stored(flow, "gerade") == {"body_md": before["body_md"], "annexes": before["annexes"]}
+
+
+@pytest.mark.asyncio
+async def test_other_places_are_still_rewritten_without_a_status(flow, public):
+    await flow.db.news_posts.insert_one({"id": "n-1", "banner_url": UPLOADS + "kopie.webp", "status": "published"})
+    await media_audit.repoint_usages(flow.db, "kopie.webp", UPLOADS + "bleibt.webp", {"updated_at": "jetzt"})
+    assert (await flow.db.news_posts.find_one({"id": "n-1"}))["banner_url"] == UPLOADS + "bleibt.webp"
+
+
+async def locked_rule(flow, public, name: str, content: bytes) -> str:
+    """Ein Entwurf einer Season zeigt die Datei; die Antwort ist die Sperre seiner Season."""
+    await add_file(flow, public, name, content)
+    doc = await add_rule(flow, "entwurf", status="draft", image=name, version=None)
+    return league_season_resource(doc["scope_id"])
+
+
+@pytest.mark.asyncio
+async def test_rotating_waits_for_the_lock_of_a_draft_that_shows_the_image(flow, public):
+    if not flow.real_mongo:
+        pytest.skip("Sperren sind nur auf echtem MongoDB exklusiv")
+    await admin(flow)
+    original = png()
+    resource = await locked_rule(flow, public, "plan.png", original)
+    async with mutation_lock(flow.db, resource):
+        busy = await flow.post("/api/admin/media/plan.png/rotate", json={"degrees": 90})
+    assert busy.status_code == 409 and "Regelwerk" in busy.json()["detail"]
+    assert (public / "plan.png").read_bytes() == original
+    done = await flow.post("/api/admin/media/plan.png/rotate", json={"degrees": 90})
+    assert done.status_code == 200, done.text
+
+
+@pytest.mark.asyncio
+async def test_deleting_waits_for_the_lock_of_a_draft_that_shows_the_image(flow, public):
+    if not flow.real_mongo:
+        pytest.skip("Sperren sind nur auf echtem MongoDB exklusiv")
+    await admin(flow)
+    resource = await locked_rule(flow, public, "plan.webp", b"bild")
+    async with mutation_lock(flow.db, resource):
+        busy = await flow.delete("/api/admin/media/plan.webp?force=true")
+    assert busy.status_code == 409 and "Regelwerk" in busy.json()["detail"]
+    assert (public / "plan.webp").exists()
+
+
+@pytest.mark.asyncio
+async def test_rotating_holds_the_lock_while_it_checks_and_changes_the_file(flow, public, monkeypatch):
+    if not flow.real_mongo:
+        pytest.skip("Sperren sind nur auf echtem MongoDB exklusiv")
+    await admin(flow)
+    resource = await locked_rule(flow, public, "plan.png", png())
+    held = []
+    real = media_audit.frozen_usages
+
+    async def checking(db, filename):
+        try:
+            async with mutation_lock(db, resource, wait_seconds=0.1):
+                held.append(False)
+        except MutationLockBusy:
+            held.append(True)
+        return await real(db, filename)
+
+    monkeypatch.setattr(media_audit, "frozen_usages", checking)
+    done = await flow.post("/api/admin/media/plan.png/rotate", json={"degrees": 90})
+    assert done.status_code == 200, done.text
+    assert held == [True], "während der Prüfung kann niemand veröffentlichen"
+
+
 # ---------------------------------------------------------------- Bild-Migration
+
+@pytest.mark.asyncio
+async def test_image_migration_leaves_a_draft_alone_that_was_published_while_it_downloaded(flow, monkeypatch):
+    external = "![Alt](https://bilder.example.test/alt.png)"
+    await flow.db.league_rules.insert_one({"id": "gerade", "scope": "league_season", "scope_id": "s", "status": "draft", "body_md": external, "annexes": []})
+
+    async def downloading(_url, _client):
+        await flow.db.league_rules.update_one({"id": "gerade"}, {"$set": {"status": "published", "version": 1}})
+        return UPLOADS + "lokal.webp"
+
+    monkeypatch.setattr(image_migrate, "_download_to_local", downloading)
+    await image_migrate.migrate_all()
+    assert (await flow.db.league_rules.find_one({"id": "gerade"}))["body_md"] == external
+
+
 
 @pytest.mark.asyncio
 async def test_image_migration_leaves_published_versions_alone(flow, monkeypatch):

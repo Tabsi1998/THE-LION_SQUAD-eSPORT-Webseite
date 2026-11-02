@@ -4,12 +4,14 @@ from __future__ import annotations
 import os
 import pathlib
 import re
+from contextlib import AsyncExitStack, asynccontextmanager
 from urllib.parse import urlparse
 
 from database import get_db
 from models import now_utc
 from services import uploads_inventory
 from services.media_formats import PUBLIC_MEDIA_EXTS, bare_upload_url
+from services.mutation_lock import league_resource, league_season_resource, mutation_lock
 
 
 UPLOAD_DIR = pathlib.Path(os.environ.get("UPLOAD_DIR", "/app/backend/uploads"))
@@ -139,7 +141,7 @@ BATCH = 100
 VARIANT_NAME = re.compile(r"^(?P<stem>.+)-(?P<width>\d{3,4})\.webp$")
 LABEL_FIELDS = ("id", "slug", "name", "title", "display_name", "source")
 # Eine veröffentlichte Regelversion (#1646) bleibt, wie sie ist - dafür liest ``iter_usages`` Stand und Nummer mit.
-FROZEN_FIELDS = ("status", "version")
+FROZEN_FIELDS = ("status", "version", "scope", "scope_id")
 
 SCOPE_TARGETS: list[tuple[str, list[str], str]] = [
     ("users", ["avatar_url", "banner_url"], "user"),
@@ -331,22 +333,42 @@ async def frozen_usages(db, filename: str) -> list[str]:
                    if is_frozen(collection, document)})
 
 
+def write_guard(collection: str) -> dict:
+    """Die Bedingung fürs Schreiben: Im Regelwerk nur auf Entwürfe. Wird einer zwischen Lesen und Schreiben veröffentlicht, trifft das Schreiben
+    nichts mehr."""
+    return {"status": "draft"} if collection == "league_rules" else {}
+
+
+@asynccontextmanager
+async def rule_draft_locks(db, filename: str):
+    """Hält die Sperren der Regelwerke, deren Entwürfe die Datei zeigen - währenddessen wird keiner von ihnen veröffentlicht. Ändert sich eine
+    Datei unter diesem Schutz, bleibt eine veröffentlichte Fassung, wie sie war. ``MutationLockBusy``: eines wird gerade veröffentlicht."""
+    resources = {league_resource(document["scope_id"]) if document.get("scope") == "league" else league_season_resource(document["scope_id"])
+                 async for collection, document, _field, _name, _text in iter_usages(db, {filename})
+                 if collection == "league_rules" and document.get("status") == "draft" and document.get("scope_id")}
+    async with AsyncExitStack() as locks:
+        for resource in sorted(resources):
+            await locks.enter_async_context(mutation_lock(db, resource))
+        yield
+
+
 def frozen_message(places: list[str], action: str) -> str:
     return (f"Die Datei steht in einer veröffentlichten Regelversion ({'; '.join(places)}) und lässt sich deshalb nicht {action}. "
             "Eine veröffentlichte Version bleibt unverändert. Für ein neues Bild bitte eine neue Version veröffentlichen.")
 
 
-async def rewrite_field(collection, row_id, path: str, change, extra: dict | None = None) -> bool:
+async def rewrite_field(collection, row_id, path: str, change, extra: dict | None = None, guard: dict | None = None) -> bool:
     """Ändert die Werte unter einem Feldpfad einer Zeile (``replace_values``). Liest dafür das ganze Feld der obersten
-    Ebene neu - die Treffer von ``iter_usages`` enthalten nur die Feldpfade. Liefert, ob sich etwas geändert hat."""
+    Ebene neu - die Treffer von ``iter_usages`` enthalten nur die Feldpfade. ``guard``: nur, solange die Zeile das noch erfüllt
+    (``write_guard``). Liefert, ob sich etwas geändert hat."""
     top, *rest = path.split(".")
-    row = await collection.find_one({"_id": row_id}, {top: 1})
+    row = await collection.find_one({"_id": row_id, **(guard or {})}, {top: 1})
     if not row or top not in row:
         return False
     value = replace_values(row[top], rest, change)
     if value == row[top]:
         return False
-    await collection.update_one({"_id": row_id}, {"$set": {top: value, **(extra or {})}})
+    await collection.update_one({"_id": row_id, **(guard or {})}, {"$set": {top: value, **(extra or {})}})
     return True
 
 
@@ -381,7 +403,8 @@ async def _rewrite_usages(db, filename: str, change, stamp: dict | None) -> list
 
     hits = [hit async for hit in iter_usages(db, {filename}) if not is_frozen(hit[0], hit[1])]
     for collection, doc, field, _name, text in hits:
-        await rewrite_field(getattr(db, collection), doc["_id"], field, in_text if text else in_field, stamp_for(collection, stamp))
+        await rewrite_field(getattr(db, collection), doc["_id"], field, in_text if text else in_field, stamp_for(collection, stamp),
+                            guard=write_guard(collection))
     return hits
 
 

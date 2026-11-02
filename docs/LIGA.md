@@ -610,6 +610,9 @@ solange sie gleich bleibt; doppelte zählen weiter (`-2`). Text vor der ersten �
 Fassungen zeigen ihren Stand von damals. Ohne Season (Seite der Liga) oder bei einer Season, die erst nach dem Veröffentlichen dazukam,
 steht dort ein Hinweis statt einer Liste.
 
+**Reihenfolge:** Fassungen folgen ihrer Geltung (`valid_from`, am selben Tag die zuletzt veröffentlichte), nicht dem Tag der Veröffentlichung. Eine Season erbt die Liga-Fassungen, die
+vor ihrer ersten eigenen gelten, auch wenn die eigene früher veröffentlicht wurde; spätere Liga-Fassungen gehören nicht zu ihrer Kette.
+
 **Vergleich:** Abschnitte gleichen Ankers werden ohne Rücksicht auf Leerraum verglichen; übrige paaren sich bei ähnlichem Text (Überschrift
 umbenannt = geändert). Ergebnis `{new, changed, removed}` gegen die Vorgänger-Fassung, auf der Season in der Reihe aus Liga und Season.
 Der Wort-für-Wort-Vergleich (`ops: [{op: "eq"|"ins"|"del", text}]`) geht mit jeder alten Fassung und zeigt auch entfernten Text.
@@ -637,6 +640,13 @@ eine Korrektur lässt es stehen, das Zurücknehmen entfernt es. Andere Formate s
 Eine Datei, die eine veröffentlichte Fassung zeigt, lässt sich nicht drehen und nicht löschen, auch nicht mit Bestätigung (409); beim Duplikat ersetzen bleibt die
 Kopie stehen. Entwürfe ändern sich mit. Eine Season oder Liga mit veröffentlichter Fassung oder mit Zustimmungen lässt sich nicht löschen (409, Grund im `delete-plan`,
 Hinweis auf Archivieren), nur Entwürfe gehen mit.
+
+**Sperren:** Veröffentlichen und Zustimmen halten die Sperre ihrer Season (`mutation_lock.league_season_resource`, dieselbe wie beim Zuteilen), das liga-weite
+Regelwerk die der Liga (`league_resource`). Das Löschen hält nach den Staffeln die der Liga und aller Seasons bis zum letzten Schritt. Ist eine besetzt: 409,
+bitte noch einmal. Die Mediathek schreibt nur mit der Bedingung `status: "draft"` (`media_audit.write_guard`, auch die Bild-Migration); Drehen und Löschen einer Datei
+halten die Sperren der Entwürfe, die sie zeigen (`rule_draft_locks`). Bekannte Grenze: Speichert jemand genau in diesem Moment einen Entwurf neu mit dieser Datei und
+veröffentlicht ihn noch während des Drehens, schützt die Sperre nicht, weil sie den Entwurf noch nicht kannte. Das Fenster sind Sekundenbruchteile, und der Vorgang
+braucht zwei Schritte von Hand.
 
 **Bilder:** Im Regelwerk nur eigene Uploads (`game_maps.IMAGE_URL`). Der Server lehnt alles andere beim Speichern und Veröffentlichen mit 422 ab, die Vorschau nennt es
 (`foreign_images`), das Web lädt es nicht (`markdownLite`, Option `imageAllowed`; andere Nutzer ohne Option bleiben unverändert) und zeigt einen Link. Die CSP bleibt.

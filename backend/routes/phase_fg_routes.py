@@ -24,6 +24,8 @@ from urllib.parse import urlparse
 
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import Response
+
+from services.mutation_lock import MutationLockBusy
 from PIL import Image, ImageOps, UnidentifiedImageError
 from pydantic import BaseModel, Field
 
@@ -558,6 +560,9 @@ async def _clear_media_references(filename: str) -> tuple[int, int]:
     return cleared, in_text
 
 
+RULES_BUSY = "Ein Regelwerk mit dieser Datei wird gerade veröffentlicht. Bitte gleich noch einmal versuchen."
+
+
 def _media_file_path(filename: str) -> Path:
     safe_name = Path(filename).name
     if safe_name != filename or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,180}", safe_name):
@@ -626,10 +631,19 @@ async def admin_rotate_media(filename: str, body: RotateMediaBody, me: dict = De
     if degrees % 360 == 0:
         stat = p.stat()
         return {"ok": True, "filename": filename, "url": f"/api/static/uploads/{filename}", "size": stat.st_size}
-    # Drehen ändert die Datei selbst - eine veröffentlichte Regelversion zeigt aber, was damals galt (#1646).
-    frozen = await media_audit.frozen_usages(get_db(), filename)
-    if frozen:
-        raise HTTPException(409, media_audit.frozen_message(frozen, "drehen"))
+    # Drehen ändert die Datei selbst - eine veröffentlichte Regelversion zeigt aber, was damals galt (#1646). Unter der Sperre der Entwürfe,
+    # die die Datei zeigen: Sonst würde einer davon genau jetzt veröffentlicht.
+    try:
+        async with media_audit.rule_draft_locks(get_db(), filename):
+            frozen = await media_audit.frozen_usages(get_db(), filename)
+            if frozen:
+                raise HTTPException(409, media_audit.frozen_message(frozen, "drehen"))
+            return await _rotate_and_stamp(filename, p, degrees, me)
+    except MutationLockBusy:
+        raise HTTPException(409, RULES_BUSY) from None
+
+
+async def _rotate_and_stamp(filename: str, p: Path, degrees: int, me: dict) -> dict:
     try:
         width, height = await asyncio.to_thread(_rotate_file, p, degrees)
     except UnidentifiedImageError:
@@ -676,10 +690,18 @@ async def admin_delete_media(filename: str, force: bool = False, me: dict = Depe
     sie zeigen, dann die Datei gelöscht - scheitert das, holt der Aufräum-Job es nach. Jede Löschung steht im Protokoll."""
     _media_file_path(filename)
     db = get_db()
-    # Auch mit Bestätigung nicht: eine veröffentlichte Regelversion zeigt die Datei weiter (#1646).
-    frozen = await media_audit.frozen_usages(db, filename)
-    if frozen:
-        raise HTTPException(409, media_audit.frozen_message(frozen, "löschen"))
+    # Auch mit Bestätigung nicht: eine veröffentlichte Regelversion zeigt die Datei weiter (#1646). Unter der Sperre der Entwürfe, die sie zeigen.
+    try:
+        async with media_audit.rule_draft_locks(db, filename):
+            frozen = await media_audit.frozen_usages(db, filename)
+            if frozen:
+                raise HTTPException(409, media_audit.frozen_message(frozen, "löschen"))
+            return await _delete_checked(db, filename, force, me)
+    except MutationLockBusy:
+        raise HTTPException(409, RULES_BUSY) from None
+
+
+async def _delete_checked(db, filename: str, force: bool, me: dict) -> dict:
     if not force:
         usage = (await _collect_media_usage({filename}))[filename]
         if usage:

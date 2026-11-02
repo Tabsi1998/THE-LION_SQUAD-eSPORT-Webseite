@@ -127,7 +127,8 @@ async def migrate_all() -> dict:
                 updates = {key: value for key, value in changed.items() if value != doc.get(key)}
                 if updates:
                     query = {"id": doc["id"]} if doc.get("id") else {"_id": doc["_id"]}
-                    await db[coll_name].update_one(query, {"$set": updates})
+                    # Das Herunterladen dauert: Inzwischen veröffentlicht heißt unveränderlich (#1646).
+                    await db[coll_name].update_one({**query, **media_audit.write_guard(coll_name)}, {"$set": updates})
                     updated += 1
             summary[coll_name] = {"scanned": scanned, "updated": updated, "failed": failed}
     logger.info(f"[image-migrate] done: {summary}")
