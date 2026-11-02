@@ -1,11 +1,10 @@
 # Changelog
 
-## [1.54.2](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.54.1...v1.54.2) (2026-11-02)
-
+## 1.54.2 (02.11.2026)
 
 ### Fehlerbehebungen
 
-* Startseite: „Live jetzt“ zeigt kein Turnier und keine Fast Lap nach dem Ende mehr ([#2194](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2194)) ([aa88f8d](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/aa88f8da08712a6d217d69b40e094cd0882733a5))
+* Startseite: „Live jetzt“ zeigt kein Turnier und keine Fast Lap nach dem Ende mehr (#2194)
 
 ## 1.54.1 (02.11.2026)
 
