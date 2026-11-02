@@ -824,8 +824,8 @@ Das Profil lehnt beim Speichern nur Werte ab, die neu sind und nicht zu `pattern
 | Feld | Bedeutung |
 | --- | --- |
 | `squad_joined_at` | `{squad_id: ISO}`: erste Aufnahme je Co-Team, wird nie überschrieben |
-| `wait_from` | `{squad_id: ISO}`: Beginn der Wartezeit in diesem Co-Team. Gesetzt bei Aufnahme nach dem Ende von Spieltag 1 und beim Transfer, nie beim Zuteilen durch die Leitung |
-| `wait_waivers` | `[{squad_id, at, by, reason}]`: Aufhebungen der Leitung |
+| `wait_from` | `{squad_id: ISO}`: Beginn der Wartezeit in diesem Co-Team. Gesetzt bei Aufnahme nach dem Ende von Spieltag 1 und bei jedem genehmigten Transfer (dort immer neu), nie beim Zuteilen durch die Leitung |
+| `wait_waivers` | `[{squad_id, at, by, reason}]`: Aufhebungen der Leitung. Eine gilt nur für die Wartezeit, die zu ihr lief |
 | `id_keys` | `[str]`: normalisierte IDs für den eindeutigen Teilindex (`season_id`, `id_keys`), nur in Seasons mit `unique_game_ids`. Fehlt das Feld, greift der Index nicht |
 
 **Neue Sammlung `league_transfers`:** `id`, `season_id`, `league_id`, `user_id`, `from_squad_id`, `to_squad_id`, `to_team_id`, `status`
@@ -844,19 +844,18 @@ Das Profil lehnt beim Speichern nur Werte ab, die neu sind und nicht zu `pattern
 | `min_squad_size` | Zuteilen (wie bisher). Abgang bleibt möglich, Warnung und Aufgabe aus #2202 | wie viele fehlen |
 | `one_team_per_season` | Zuteilen, Aufnahme (409): schon in einem anderen Co-Team oder dort gestanden, solange dieses in der Season angemeldet ist. Teilnehmerliste: aktuell in zwei Co-Teams | dass ein Transfer nötig ist |
 | `min_age` | Zuteilen, Aufnahme, Transfer (422), Teilnehmerliste | „Geburtsdatum fehlt“ mit Weg ins Profil, sonst „erfüllt die Altersvorgabe nicht“. Nie ein Datum |
-| `new_player_wait_days` | Teilnehmerliste, Check-in. Aufnahme bleibt möglich, Hinweis an Person und Verantwortliche | bis wann gewartet wird |
+| `new_player_wait_days` | Teilnehmerliste, Check-in. Aufnahme bleibt möglich, Hinweis an Person und Verantwortliche. Neuzugang erst nach dem Ende von Spieltag 1, Transfer immer | bis wann gewartet wird |
 | Spiel-ID, Format, Eindeutigkeit | Festhalten, Freigabe, Teilnehmerliste. Eine schon festgehaltene ID bleibt gültig. Meldung nennt nie, wem die ID gehört | was zu tun ist |
 | Transferfenster | Antrag (409 außerhalb). Entscheidung auch nach dem Fenster | wann es offen ist |
 
 **Spieltag 1** endet mit `matchday_schedule.tournament_matchday_window(staffel, 1).end`. Wartezeit ist `wait_from + new_player_wait_days` in Wiener Zeit.
-Der Wiedereintritt ins selbe Co-Team startet keine neue Wartezeit. Aufhebung: `POST /api/admin/leagues/seasons/{id}/roster/{uid}/waive-wait` mit
+Ein gewöhnlicher Neuzugang spielt bis zum Ende von Spieltag 1 sofort, danach wartet er ab der Aufnahme. Der Wiedereintritt ins selbe Co-Team startet keine neue Wartezeit. Ein genehmigter **Transfer wartet immer** ab der Kaderaufnahme (Entscheidung Nr. 71, Regelwerk § 4.6): auch vor dem Ende von Spieltag 1, auch wenn die Person das alte Co-Team schon verlassen hat, auch im Co-Team, in dem sie früher stand. Das Zuteilen eines Co-Teams durch die Leitung startet keine Wartezeit. Aufhebung: `POST /api/admin/leagues/seasons/{id}/roster/{uid}/waive-wait` mit
 `squad_id` und `reason` (mindestens fünf Zeichen), Recht `roster`, Protokoll `league.roster.wait_waive`.
 
 **Transfers:** `POST /api/teams/{tid}/squads/{sid}/transfers` mit `user_id` (Recht wie Kader ändern, 409 außerhalb des Fensters, Person muss im Hauptteam
 stehen), `GET` dasselbe, `DELETE …/transfers/{id}` zieht zurück. Leitung: `GET /api/admin/leagues/seasons/{id}/transfers`,
 `POST …/transfers/{id}/approve`, `…/reject` mit `reason`, Recht `roster`. Genehmigen läuft unter der Season-Sperre `league_season:{id}:squads`:
-prüft Alter, Höchstkader und Rolle im alten Co-Team, nimmt aus dem alten und setzt ins neue Co-Team, startet die Wartezeit (auch vor dem Ende von Spieltag 1 keine,
-danach wie bei jeder Aufnahme), benachrichtigt Person und beide Teamleitungen, warnt bei zu kleinem Kader. Protokoll `league.transfer.request`, `.approve`,
+prüft Alter, Höchstkader und Rolle im alten Co-Team, nimmt aus dem alten und setzt ins neue Co-Team, startet die Wartezeit, benachrichtigt Person und beide Teamleitungen samt dem Tag, ab dem sie spielen darf, warnt bei zu kleinem Kader. Protokoll `league.transfer.request`, `.approve`,
 `.reject`, `.withdraw`. Ein Transfer ist nur nötig, wenn `one_team_per_season` gilt.
 
 **Teilnehmerliste** (`lineup_mode: series`):
@@ -885,7 +884,7 @@ bleiben gültig und lesbar. Eine Wertung (kampflos) nimmt auch die Liste weg.
 `league_requirement` an `GET /api/teams/{id}/squads` trägt zusätzlich `max_size`, `min_age`, `transfers_open`. `GET …/seasons/{id}/roster`: `eligibility` je Spieler (`state`, `ok`, `reason`, `until`, `age`) und `counts.waiting`, `counts.age`.
 Der Block `league` der Matchseite trägt `lineup_mode`, `lineup_min_players`, `participants`, `own_lineup`, `lineup_overdue`.
 
-**Datenschutz:** `birth_date` wird nur serverseitig gelesen und geht nie in eine Antwort, eine Nachricht oder ins Protokoll einer anderen Person. Die Gegenseite sieht keinen Eignungsgrund. Eine Meldung zu einer doppelten Spiel-ID nennt keinen Inhaber. Die Auskunft enthält `league_rosters`, `league_transfers` und `league_appearances` (Spiele, in denen die Person auf einer Aufstellung oder Liste steht, nur die eigene Seite). Das Löschen des Kontos löscht Kadereinträge und Anträge; `matches_v2` bleibt als Sportdaten, das Konto heißt dort „Gelöschter User“.
+**Datenschutz:** Die Liga-Prüfung und ihre Antworten nennen nie ein Datum oder Alter der Person, weder Stand, Team-Seite, Kaderübersicht, Fehlertext, Nachricht, Mail noch Protokoll. Gelesen wird `users.birth_date` dafür an einer Stelle (`league_eligibility._ages`), heraus kommen nur `met`, `missing` oder der Stand `age_not_met` (Wächter: `test_league_birth_date_guard_unit.py`). Das öffentliche Profil kann das Feld nach der freiwilligen Sichtbarkeits-Einstellung der Person selbst zeigen (`user_routes._visible_field`); das ist kein Liga-Weg und von dieser Regel nicht berührt. Die Gegenseite sieht keinen Eignungsgrund. Eine Meldung zu einer doppelten Spiel-ID nennt keinen Inhaber. Die Auskunft enthält `league_rosters`, `league_transfers` und `league_appearances` (Spiele, in denen die Person auf einer Teilnehmerliste, in `games[].lineups` oder einer offenen Meldung steht, auch ohne `lineup_user_ids`, nur die eigene Seite). Das Löschen des Kontos löscht Kadereinträge und Anträge; `matches_v2` bleibt als Sportdaten, das Konto heißt dort „Gelöschter User“.
 
 **Audit-Aktionen neu:** `league.squad.roster`, `league.roster.wait_waive`, `league.transfer.request|approve|reject|withdraw`, `match.lineup.overdue`.
 

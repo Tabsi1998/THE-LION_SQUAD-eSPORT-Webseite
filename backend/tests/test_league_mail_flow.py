@@ -58,6 +58,34 @@ async def test_an_edit_from_outside_is_mailed_to_the_team_lead(flow):
 
 
 @pytest.mark.asyncio
+async def test_no_league_answer_or_message_carries_a_birth_date(flow):
+    w = await transfer_world(flow, min_age=18, new_player_wait_days=7)
+    marker = "1987-06-05"
+    for name in w["users"]:
+        await flow.db.users.update_one({"id": w["users"][name]["id"]}, {"$set": {"birth_date": marker}})
+    await flow.db.users.update_one({"id": w["users"]["Mila"]["id"]}, {"$set": {"birth_date": "2020-06-05"}})
+    row = (await ask(flow, w)).json()
+    flow.act_as(w["staff"])
+    answers = [await flow.post(f"{admin_url(w)}/{row['id']}/approve", json={}),
+               await flow.get(f"/api/admin/leagues/seasons/{w['season_id']}/roster"),
+               await flow.get(admin_url(w))]
+    flow.act_as(w["users"]["LoeLeitung"])
+    answers += [await flow.get(f"/api/teams/{w['lions']['id']}/squads/{w['squad_a']['id']}/eligibility"),
+                await flow.get(f"/api/teams/{w['lions']['id']}/squads"),
+                await flow.patch(f"/api/teams/{w['lions']['id']}/squads/{w['squad_b']['id']}", json={"member_ids": [w["users"]["Mila"]["id"]]})]
+    flow.act_as(w["users"]["Ida"])
+    answers.append(await flow.get("/api/me/league-eligibility"))
+
+    assert all(answer.status_code < 500 for answer in answers)
+    written = [str(row) async for row in flow.db.notifications.find({}, {"_id": 0})]
+    written += [str(row) async for row in flow.db.mail_jobs.find({}, {"_id": 0})]
+    written += [str(row) async for row in flow.db.audit_logs.find({}, {"_id": 0})]
+    for text in [*(answer.text for answer in answers), *written]:
+        assert marker not in text and "2020-06-05" not in text and "birth_date" not in text
+        assert "1987" not in text
+
+
+@pytest.mark.asyncio
 async def test_a_transfer_decision_is_mailed_to_the_person(flow):
     w = await transfer_world(flow)
     row = (await ask(flow, w)).json()
