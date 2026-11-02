@@ -161,16 +161,16 @@ async def _non_members(db, squad: dict) -> list[str]:
     return [league_roster.person_name(row) for row in rows if not await user_can_see(row, "members", for_request=False)]
 
 
-async def check_squad(db, league: dict, season: dict, team: dict, squad: dict, *, application: dict | None = None) -> dict:
+async def check_squad(db, league: dict, season: dict, team: dict, squad: dict, *, application: dict | None = None, seated: bool = False) -> dict:
     """Die Prüfung im Klartext: ``problems`` (Statuscode, Satz) halten die Anmeldung auf, ``warnings`` stehen nur da.
-    ``application``: Der eigene Antrag zählt nicht als „läuft schon“."""
+    ``application``: Der eigene Antrag zählt nicht als „läuft schon“. ``seated``: Seine eigene Anmeldung zählt nicht als „spielt schon“ (``_left_over``)."""
     problems: list[tuple[int, str]] = []
     other_open = await db.league_applications.find_one({"season_id": season["id"], "squad_id": squad["id"], "active_key": {"$exists": True},
                                                         "id": {"$ne": (application or {}).get("id")}}, {"_id": 1})
     if other_open:
         problems.append((409, ALREADY_OPEN))
     minimum = await _min_size(db, season)
-    problems += await squad_registration.season_problems(db, season, league.get("game_id"), team, squad, min_size=minimum)
+    problems += await squad_registration.season_problems(db, season, league.get("game_id"), team, squad, min_size=minimum, seated=seated)
     members = [uid for uid in squad.get("member_ids") or [] if uid]
     ctx = await league_eligibility.context_for_season(db, season, members)
     problems += league_eligibility.registration_problems(ctx, squad)
@@ -454,11 +454,19 @@ async def _staffel_to_lock(db, season_id: str, application_id: str, tournament_i
     return left_over["tournament_id"] if left_over else tournament_id
 
 
+async def _left_over_under_lock(db, application: dict, tournament_id: str | None, locked_id: str | None) -> dict | None:
+    """Noch einmal unter den Sperren: Passt die gehaltene Staffel-Sperre nicht mehr, kommt die Antwort „gleich noch einmal“, und der nächste Versuch sperrt die richtige."""
+    left_over = await _left_over(db, application)
+    if (left_over["tournament_id"] if left_over else tournament_id) != locked_id:
+        raise LeagueProblem(BUSY, 409)
+    return left_over
+
+
 async def _place(db, season: dict, application: dict, tournament_id: str | None, actor: dict, fields: dict, left_over: dict | None) -> tuple[dict, dict | None, dict | None]:
     """Anmeldung und Antrag gehören zusammen, eine Transaktion gibt es nicht: Scheitert der Antrag, fällt die neue Anmeldung wieder weg. Bleibt sie trotzdem stehen, hilft ``_left_over``."""
     tournament = registration = None
     if left_over:
-        tournament, registration = await _load_staffel(db, season, left_over["tournament_id"]), left_over
+        tournament, registration = await _staffel_for_write(db, season, left_over["tournament_id"]), left_over
     elif tournament_id:
         tournament = await _staffel_for_write(db, season, tournament_id)
         registration = await _insert_registration(db, tournament, application, actor)
@@ -475,22 +483,22 @@ async def _place(db, season: dict, application: dict, tournament_id: str | None,
 
 async def accept(db, league: dict, season: dict, application_id: str, tournament_id: str | None, actor: dict, *, refresh_previews) -> dict:
     """Annehmen, mit ``tournament_id`` gleich zuteilen. Der letzte Platz geht unter der Season-Sperre nur einmal weg."""
-    async with _staffel_lock(db, await _staffel_to_lock(db, season["id"], application_id, tournament_id)):
+    locked_id = await _staffel_to_lock(db, season["id"], application_id, tournament_id)
+    async with _staffel_lock(db, locked_id):
         async with _season_lock(db, season["id"]):
             fresh = await league_service.get_season(db, season["id"])
             application = await _load(db, season["id"], application_id)
             if application["status"] not in (SUBMITTED, IN_REVIEW, WAITLIST):
                 raise LeagueProblem(DECIDED, 409)
-            left_over = await _left_over(db, application)
+            left_over = await _left_over_under_lock(db, application, tournament_id, locked_id)
             if not left_over and (await seat_stats(db, fresh))["full"]:
                 raise LeagueProblem(SEATS_TAKEN, 409)
             team, squad = await _load_side(db, application["squad_id"])
             if not squad:
                 raise LeagueProblem(SQUAD_GONE, 409)
-            if not left_over:
-                problems = (await check_squad(db, league, fresh, team, squad, application=application))["problems"]
-                if problems:
-                    raise LeagueProblem(problems[0][1], problems[0][0])
+            problems = (await check_squad(db, league, fresh, team, squad, application=application, seated=bool(left_over)))["problems"]
+            if problems:
+                raise LeagueProblem(problems[0][1], problems[0][0])
             now = now_utc().isoformat()
             fields = {"decided_by": actor["id"], "decided_at": now, "decision_reason": None}
             done, tournament, registration = await _place(db, fresh, application, tournament_id, actor, fields, left_over)
@@ -504,7 +512,8 @@ async def assign(db, league: dict, season: dict, application_id: str, tournament
     """Einen angenommenen Antrag einer Staffel zuteilen - erst hier entsteht die Anmeldung."""
     if not tournament_id:
         raise LeagueProblem("Bitte eine Staffel wählen.")
-    async with _staffel_lock(db, await _staffel_to_lock(db, season["id"], application_id, tournament_id)):
+    locked_id = await _staffel_to_lock(db, season["id"], application_id, tournament_id)
+    async with _staffel_lock(db, locked_id):
         async with _season_lock(db, season["id"]):
             fresh = await league_service.get_season(db, season["id"])
             application = await _load(db, season["id"], application_id)
@@ -516,11 +525,10 @@ async def assign(db, league: dict, season: dict, application_id: str, tournament
             team, squad = await _load_side(db, application["squad_id"])
             if not squad:
                 raise LeagueProblem(SQUAD_GONE, 409)
-            left_over = await _left_over(db, application)
-            if not left_over:
-                problems = (await check_squad(db, league, fresh, team, squad, application=application))["problems"]
-                if problems:
-                    raise LeagueProblem(problems[0][1], problems[0][0])
+            left_over = await _left_over_under_lock(db, application, tournament_id, locked_id)
+            problems = (await check_squad(db, league, fresh, team, squad, application=application, seated=bool(left_over)))["problems"]
+            if problems:
+                raise LeagueProblem(problems[0][1], problems[0][0])
             done, tournament, registration = await _place(db, fresh, application, tournament_id, actor, {}, left_over)
         ids_missing = await _after_assign(db, tournament, registration, actor, refresh_previews)
     await _audit(db, "assign", done, actor["id"], tournament_id=tournament_id)
@@ -827,11 +835,14 @@ def export_query(user_id: str) -> dict:
 
 
 def export_row(user_id: str):
-    """Ohne Kennungen anderer: nur die eigenen Zustimmungen und die eigenen Schritte im Verlauf."""
+    """Ohne Kennungen anderer: nur die eigenen Zustimmungen und die eigenen Schritte im Verlauf. Wer nur als Leitung handelte, bekommt wie im Adminprotokoll den Vorgang
+    ohne Inhalt: Team und Grund betreffen andere."""
     def shape(row: dict) -> dict:
-        out = {key: row.get(key) for key in EXPORT_FIELDS}
-        for key in ("rule_consent", "privacy_consent"):
-            out[key] = row[key] if (row.get(key) or {}).get("user_id") == user_id else None
-        out["my_steps"] = [{key: step[key] for key in ("status", "at", "reason") if key in step} for step in row.get("history") or [] if step.get("by") == user_id]
-        return out
+        steps = [step for step in row.get("history") or [] if step.get("by") == user_id]
+        consents = {key: row[key] for key in ("rule_consent", "privacy_consent") if (row.get(key) or {}).get("user_id") == user_id}
+        if not consents and user_id not in (row.get("applied_by"), row.get("withdrawn_by")):
+            return {"id": row.get("id"), "season_id": row.get("season_id"), "league_id": row.get("league_id"),
+                    "my_steps": [{key: step.get(key) for key in ("status", "at")} for step in steps]}
+        return {**{key: row.get(key) for key in EXPORT_FIELDS}, "rule_consent": consents.get("rule_consent"), "privacy_consent": consents.get("privacy_consent"),
+                "my_steps": [{key: step[key] for key in ("status", "at", "reason") if key in step} for step in steps]}
     return shape

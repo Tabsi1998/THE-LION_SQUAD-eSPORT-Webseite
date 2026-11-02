@@ -229,6 +229,59 @@ async def test_an_interrupted_assignment_cannot_be_rejected_or_withdrawn_past_th
 
 
 @pytest.mark.asyncio
+async def test_finishing_an_interrupted_assignment_respects_a_locked_staffel(flow):
+    w = await application_world(flow)
+    application = await submitted(flow, w, w["teams"][0])
+    await broke_between_writes(flow, w, application, "submitted")
+    await flow.db.tournaments.update_one({"id": w["tid"]}, {"$set": {"locked_at": "2026-01-01T00:00:00+00:00"}})
+
+    assert (await decide(flow, w, application, "accept")).status_code == 423
+    assert (await flow.db.league_applications.find_one({"id": application["id"]}))["status"] == "submitted"
+
+
+@pytest.mark.asyncio
+async def test_finishing_an_interrupted_assignment_repeats_the_check(flow):
+    w = await application_world(flow)
+    side = w["teams"][0]
+    application = await submitted(flow, w, side)
+    await broke_between_writes(flow, w, application, "submitted")
+    await flow.db.team_squads.update_one({"id": side["squad"]["id"]}, {"$set": {"member_ids": [side["captain"]["id"], side["vice"]["id"]]}})
+
+    refused = await decide(flow, w, application, "accept")
+
+    assert refused.status_code == 400 and "mindestens" in refused.json()["detail"]
+    row = await flow.db.league_applications.find_one({"id": application["id"]}, {"_id": 0})
+    assert row["status"] == "submitted" and "assignment" not in row
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("action,status", [("accept", "submitted"), ("assign", "accepted")])
+async def test_a_lock_that_no_longer_fits_asks_for_another_try(flow, monkeypatch, action, status):
+    """Zwischen dem Lesen vor der Sperre und der Sperre kann die Anmeldung kommen oder gehen."""
+    w = await application_world(flow, staffeln=2)
+    side = w["teams"][0]
+    application = await submitted(flow, w, side)
+    registration = await broke_between_writes(flow, w, application, status)
+    league, season = await fresh_season(flow, w)
+
+    async def stale(_db, _season_id, _application_id, _tournament_id):
+        return w["tids"][1]
+
+    monkeypatch.setattr(applications, "_staffel_to_lock", stale)
+    with pytest.raises(LeagueProblem) as busy:
+        await getattr(applications, action)(flow.db, league, season, application["id"], w["tids"][1], w["lead"], refresh_previews=no_preview)
+    assert busy.value.status == 409 and busy.value.args[0] == applications.BUSY
+    row = await flow.db.league_applications.find_one({"id": application["id"]}, {"_id": 0})
+    assert row["status"] == status and "assignment" not in row
+
+    await flow.db.tournament_registrations.delete_one({"id": registration["id"]})
+    with pytest.raises(LeagueProblem) as busy:
+        await getattr(applications, action)(flow.db, league, season, application["id"], w["tids"][0], w["lead"], refresh_previews=no_preview)
+    assert busy.value.args[0] == applications.BUSY
+    assert await flow.db.tournament_registrations.count_documents({"squad_id": side["squad"]["id"]}) == 0, "in die ungesperrte Staffel kommt nichts"
+
+
+@pytest.mark.asyncio
 async def test_a_registration_taken_out_again_does_not_count_as_left_over(flow):
     w = await application_world(flow)
     side = w["teams"][0]

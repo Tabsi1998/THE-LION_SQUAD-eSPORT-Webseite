@@ -645,14 +645,15 @@ async def test_export_shows_the_lead_their_own_steps_without_the_team(flow):
     side = w["teams"][0]
     application = await submitted(flow, w, side)
     ok(await decide(flow, w, application, "review"))
-    ok(await decide(flow, w, application, "accept", tournament_id=w["tid"]))
+    ok(await decide(flow, w, application, "reject", reason="Geheim bleibender Grund"))
 
     rows = await exported(flow, w["lead"]["id"])
 
     assert [row["id"] for row in rows] == [application["id"]]
-    assert [step["status"] for step in rows[0]["my_steps"]] == ["in_review", "accepted"]
-    assert rows[0]["rule_consent"] is None and rows[0]["privacy_consent"] is None
-    assert side["captain"]["id"] not in str(rows)
+    assert [step["status"] for step in rows[0]["my_steps"]] == ["in_review", "rejected"]
+    assert set(rows[0]) == {"id", "season_id", "league_id", "my_steps"}
+    for foreign in (side["captain"]["id"], side["team"]["id"], side["squad"]["id"], side["squad"]["name"], "Geheim"):
+        assert foreign not in str(rows)
 
 
 @pytest.mark.asyncio

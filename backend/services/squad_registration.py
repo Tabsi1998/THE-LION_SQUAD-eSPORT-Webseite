@@ -242,9 +242,9 @@ async def _squads_in_staffeln(db, season_id: str, *, except_tournament: str | No
     }
 
 
-async def season_problems(db, season: dict, game_id: str | None, team: dict, squad: dict, *, min_size: int) -> list[tuple[int, str]]:
+async def season_problems(db, season: dict, game_id: str | None, team: dict, squad: dict, *, min_size: int, seated: bool = False) -> list[tuple[int, str]]:
     """Dieselbe Prüfung wie beim Zuteilen, nur ohne Staffel (#2205): Die Anmeldung gilt der Season, die Staffel steht erst nach der
-    Genehmigung fest. Staffelgröße und „schon in der Staffel“ prüft das Zuteilen."""
+    Genehmigung fest. Staffelgröße und „schon in der Staffel“ prüft das Zuteilen. ``seated``: Die Anmeldung gehört zum Antrag selbst und zählt nicht dagegen."""
     memberships = await db.team_members.find({"team_id": team.get("id")}, {"_id": 0, "user_id": 1}).to_list(500)
     games, parents = await load_games(db)
     frame = {"id": None, "game_id": game_id, "team_mode": "team", "format": "league"}
@@ -256,7 +256,7 @@ async def season_problems(db, season: dict, game_id: str | None, team: dict, squ
         team_member_ids=_team_member_ids(team, memberships),
         taken_teams={},
         seats_taken=0,
-        other_staffel_squad_ids=await _squads_in_staffeln(db, season["id"]),
+        other_staffel_squad_ids=set() if seated else await _squads_in_staffeln(db, season["id"]),
         games=games,
         parents=parents,
     )
