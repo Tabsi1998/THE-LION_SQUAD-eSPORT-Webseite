@@ -24,12 +24,16 @@ Die IDs sehen nur die Person selbst, die Beteiligten eines Spiels und die Turnie
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass, field
 
 from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
+from services.log_safe import log_safe
+
+logger = logging.getLogger("tls.league_roster")
 
 FREE, LOCKED, PENDING, MISSING, LATE, BANNED = "free", "locked", "pending", "missing", "late", "banned"
 CLOSED_SEASON_STATUSES = {"completed", "archived"}
@@ -346,25 +350,39 @@ async def after_assign(db, tournament: dict, registration: dict, squad: dict, ac
     return found
 
 
+async def _tell_player_id_missing(ctx: RosterContext, tournament: dict, user_id: str) -> None:
+    from services.user_notifications import create_user_notification
+
+    await create_user_notification(
+        user_id,
+        "Spiel-ID für die Liga fehlt",
+        f"{tournament.get('title') or 'Liga'}: Trag deine {labels(ctx.fields)} im Profil ein – ohne sie kannst du in der "
+        "Liga nicht aufgestellt werden.",
+        url="/profile?tab=gaming",
+        kind="tournament_registration",
+        meta={"tournament_id": tournament.get("id"), "reason": "league_id_missing",
+              "dedupe_key": f"league-id-missing:{ctx.season_id}:{user_id}"},
+    )
+
+
+async def _reachable_responsibles(db, registration: dict) -> list[str]:
+    """Die Verantwortlichen eines Co-Teams ohne gesperrte Konten - sortiert, damit Nachrichten stets gleich ausgehen."""
+    from services.match_audience import responsible_user_ids, users_for
+
+    people = await users_for(db, await responsible_user_ids(db, [registration]), {"_id": 0, "id": 1})
+    return sorted(row["id"] for row in people)
+
+
 async def _tell_missing(db, ctx: RosterContext, tournament: dict, registration: dict, missing: list[dict]) -> None:
-    from services.match_audience import responsible_user_ids
     from services.user_notifications import create_user_notification
 
     title = tournament.get("title") or "Liga"
     what = labels(ctx.fields)
     for row in missing:
-        await create_user_notification(
-            row["id"],
-            "Spiel-ID für die Liga fehlt",
-            f"{title}: Trag deine {what} im Profil ein – ohne sie kannst du in der Liga nicht aufgestellt werden.",
-            url="/profile?tab=gaming",
-            kind="tournament_registration",
-            meta={"tournament_id": tournament.get("id"), "reason": "league_id_missing",
-                  "dedupe_key": f"league-id-missing:{ctx.season_id}:{row['id']}"},
-        )
+        await _tell_player_id_missing(ctx, tournament, row["id"])
     names = ", ".join(row["name"] for row in missing)
     verb = "fehlt" if len(missing) == 1 else "fehlen"
-    for user_id in await responsible_user_ids(db, [registration]):
+    for user_id in await _reachable_responsibles(db, registration):
         await create_user_notification(
             user_id,
             "Spiel-IDs im Co-Team fehlen",
@@ -377,18 +395,61 @@ async def _tell_missing(db, ctx: RosterContext, tournament: dict, registration: 
         )
 
 
+async def _tell_added(db, ctx: RosterContext, tournament: dict, registration: dict, rows: list[dict],
+                      squad_id: str) -> None:
+    """Hinweis bei späterer Aufnahme (#2202): an die Person und an die Verantwortlichen, je Person einmal - auch wenn sie
+    geht und wiederkommt. Der Schlüssel nennt die Person: Beim Zuteilen fasst eine Nachricht alle zusammen, hier kommt
+    jemand später dazu, und das soll trotz dieser ersten Nachricht ankommen."""
+    from services.user_notifications import create_user_notification
+
+    name = registration.get("display_name") or tournament.get("title") or "Liga"
+    what = labels(ctx.fields)
+    for row in rows:
+        if row["state"] == MISSING:
+            await _tell_player_id_missing(ctx, tournament, row["id"])
+        else:
+            await create_user_notification(
+                row["id"],
+                "Freigabe für die Liga nötig",
+                f"{tournament.get('title') or 'Liga'}: Du bist nach dem Stichtag ins Co-Team gekommen – die Liga-Leitung muss "
+                f"deine {what} erst freigeben. Bis dahin kannst du dort nicht aufgestellt werden.",
+                url=f"/tournaments/{tournament.get('slug') or tournament.get('id')}",
+                kind="tournament_registration",
+                meta={"tournament_id": tournament.get("id"), "reason": "league_late",
+                      "dedupe_key": f"league-late:{ctx.season_id}:{squad_id}:{row['id']}"},
+            )
+    for user_id in await _reachable_responsibles(db, registration):
+        for row in rows:
+            missing = row["state"] == MISSING
+            await create_user_notification(
+                user_id,
+                "Spiel-ID im Co-Team fehlt" if missing else "Neuer Spieler wartet auf Freigabe",
+                f"{name}: {row['name']} fehlt die {what} – aufgestellt werden kann erst, wer sie im Profil eingetragen hat."
+                if missing else
+                f"{name}: {row['name']} kam nach dem Stichtag ins Co-Team und wartet auf die Freigabe der Liga-Leitung – bis "
+                "dahin nicht aufstellbar.",
+                url=f"/tournaments/{tournament.get('slug') or tournament.get('id')}",
+                kind="tournament_registration",
+                meta={"tournament_id": tournament.get("id"),
+                      "reason": "league_id_missing_team" if missing else "league_late_team",
+                      "dedupe_key": f"league-added-{row['state']}:{registration.get('id')}:{row['id']}:{user_id}"},
+            )
+
+
 async def on_squad_members_added(db, squad: dict, user_ids, actor_id: str | None) -> None:
     """Neue Mitglieder eines Co-Teams, das in einer laufenden Staffel spielt: in den Kader der Season. Nach dem
     Stichtag wartet, wer neu in **dieses** Co-Team kommt, auf Freigabe - auch mit schon festgehaltener ID aus einem
-    anderen Co-Team (sie bleibt dieselbe); der Wiedereintritt ins selbe Co-Team ist nicht „spät“."""
+    anderen Co-Team (sie bleibt dieselbe); der Wiedereintritt ins selbe Co-Team ist nicht „spät“. Wer nicht aufstellbar
+    ist, und die Verantwortlichen bekommen einen Hinweis (#2202)."""
     added = [uid for uid in user_ids or [] if uid]
     if not added or not squad.get("id"):
         return
     regs = await db.tournament_registrations.find(
         {"squad_id": squad["id"], "status": {"$in": list(ACTIVE_REGISTRATION_STATUSES)}},
-        {"_id": 0, "tournament_id": 1},
+        {"_id": 0, "id": 1, "tournament_id": 1, "team_id": 1, "squad_id": 1, "user_id": 1, "display_name": 1},
     ).to_list(50)
-    tournament_ids = sorted({reg["tournament_id"] for reg in regs if reg.get("tournament_id")})
+    registration_of = {reg["tournament_id"]: reg for reg in regs if reg.get("tournament_id")}
+    tournament_ids = sorted(registration_of)
     if not tournament_ids:
         return
     seen: set[str] = set()
@@ -402,8 +463,15 @@ async def on_squad_members_added(db, squad: dict, user_ids, actor_id: str | None
         ctx = await context_for_tournament(db, tournament, added)
         if not ctx or (ctx.season or {}).get("status") in CLOSED_SEASON_STATUSES:
             continue
-        await record_members(db, ctx, added, via="squad_join", actor_id=actor_id, squad_id=squad["id"],
-                             late=ctx.deadline_passed())
+        found = await record_members(db, ctx, added, via="squad_join", actor_id=actor_id, squad_id=squad["id"],
+                                     late=ctx.deadline_passed())
+        waiting = waiting_for_id(found.values())
+        if not waiting:
+            continue
+        try:
+            await _tell_added(db, ctx, tournament, registration_of[tournament["id"]], waiting, squad["id"])
+        except Exception:  # noqa: BLE001 - der Kader ist schon gespeichert; eine Nachricht hält das nicht auf
+            logger.warning("[liga] Hinweis zur Kaderaufnahme nicht verschickt: %s", log_safe(squad["id"]), exc_info=True)
 
 
 async def backfill(db) -> int:
