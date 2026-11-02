@@ -62,8 +62,7 @@ type MatchParticipant = {
 
 type ScheduleProposal = {
   actor_registration_id?: string | null;
-  // Fehlt für alle, die nicht zum Spiel gehören und nicht handeln dürfen (#2201).
-  id?: string;
+  id: string;
   actor?: { username?: string; display_name?: string | null } | null;
   note?: string | null;
   scheduled_at?: string | null;
@@ -535,8 +534,8 @@ export function MatchDetailScreen({ navigation, route }: Props) {
           )}
           {pendingProposals.length ? (
             <View style={styles.stack}>
-              {pendingProposals.map((proposal, index) => (
-                <View key={proposal.id ?? `zeile-${index}`} style={styles.proposal}>
+              {pendingProposals.map((proposal) => (
+                <View key={proposal.id} style={styles.proposal}>
                   <Body style={styles.strong}>{formatWhen(proposal.scheduled_at, { fallback: "ohne Zeit" })}</Body>
                   <Muted>{proposal.actor?.display_name || proposal.actor?.username || "Teilnehmer"}{proposal.note ? ` · ${proposal.note}` : ""}</Muted>
                   {canManageSchedule && canDecideScheduleProposal(page, proposal) ? (

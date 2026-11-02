@@ -221,23 +221,6 @@ test("fertiges Spiel: Überschrift mit Namen, „Beendet“ mit Ergebnis, Statio
   expect(screen.queryByTestId("match-proposal-at")).toBeNull();
 });
 
-test("wer nicht zum Spiel gehört, sieht offene Termine ohne Kennung und ohne Knöpfe", async () => {
-  const keyWarning = jest.spyOn(console, "error").mockImplementation(() => {});
-  answer({
-    ...PAGE, can_act: false, can_player_report_result: false, can_report_score: false, report_state: null,
-    schedule_proposals: [
-      { scheduled_at: "2026-05-21T09:00:00+00:00", status: "pending", actor_registration_id: "r1" },
-      { scheduled_at: "2026-05-22T09:00:00+00:00", status: "pending", actor_registration_id: "r2" },
-    ],
-  });
-  await render(<MatchDetailScreen navigation={navigation} route={route} />);
-  // Die Überschrift der Teilnehmerliste und die zwei Vorschläge.
-  await waitFor(() => expect(screen.getAllByText("Teilnehmer")).toHaveLength(3));
-  expect(screen.queryByText("Annehmen")).toBeNull();
-  expect(keyWarning.mock.calls.filter(([text]) => String(text).includes('unique "key"'))).toEqual([]);
-  keyWarning.mockRestore();
-});
-
 test("Freilos statt „Offen“", async () => {
   answer({
     ...PAGE, can_player_report_result: false, report_state: null, can_staff_submit_result: true, can_submit_result: true,
