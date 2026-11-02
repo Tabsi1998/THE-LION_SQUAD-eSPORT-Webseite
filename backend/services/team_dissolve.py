@@ -326,44 +326,86 @@ async def _remove_restored_parts(db, team_id: str) -> None:
     await db.team_members.delete_many({"team_id": team_id})
 
 
-async def _remove_unused_images(db, row: dict) -> None:
-    """Logo und Banner des Teams, wenn sie sonst nirgends stehen - nachdem die Zeile des Teams sie nicht mehr nennt. Ein Bild
-    aus der Mediathek des Vereins bleibt; das hat die Mediathek zu entscheiden, nicht das Team."""
-    from services import account_erasure, media_audit, uploads_inventory
+async def _team_images(db, row: dict) -> set[str]:
+    """Logo und Banner des Teams als Dateinamen - ohne Bilder aus der Mediathek des Vereins; die entscheidet die Mediathek."""
+    from services import media_audit, uploads_inventory
 
     names = {uploads_inventory.upload_filename(str(row.get(field) or "")) for field in ("logo_url", "banner_url")} - {None}
     names = {name for name in names if media_audit._filename_from_upload_path(name)}
     if not names:
-        return
+        return set()
     library = {upload["filename"] async for upload in db.media_uploads.find(
         {"filename": {"$in": sorted(names)}, "media_scope": {"$in": sorted(media_audit.MEDIA_SCOPES - {"user"})}}, {"_id": 0, "filename": 1})}
-    for name in sorted(names - library - await media_audit.still_referenced(db, names)):
-        await account_erasure.remove_upload(db, name)
+    return names - library
 
 
-async def _final_cleanup(db, row: dict, now: str) -> None:
-    """Nur Name und Kürzel bleiben - für alte Turniere; Chat samt Anhängen, Einladungen, Bilder und Daten sind weg."""
+async def _remove_unused_images(db, names: set[str]) -> None:
+    """Löscht, was sonst nirgends mehr steht - nachdem die Zeile des Teams die Bilder nicht mehr nennt. Geht etwas schief,
+    holt es der stündliche Aufräum-Job nach (``account_erasure.retry_file_cleanups``); er prüft die Verwendung noch einmal."""
+    from services import account_erasure, media_audit
+
+    if not names:
+        return
+    try:
+        unused = names - await media_audit.still_referenced(db, names)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("[teams] Verwendung der Teambilder nicht geprüft: %s", account_erasure.safe_error(exc))
+        for name in sorted(names):
+            await account_erasure._remember(db, name, "", True, account_erasure.safe_error(exc), source=account_erasure.SOURCE_MEDIA)
+        return
+    for name in sorted(unused):
+        try:
+            await account_erasure.remove_upload(db, name)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("[teams] Teambild nicht gelöscht: %s", account_erasure.safe_error(exc))
+            await account_erasure._remember(db, name, "", True, account_erasure.safe_error(exc), source=account_erasure.SOURCE_MEDIA)
+
+
+async def _final_cleanup(db, row: dict, now: str) -> bool:
+    """Nur Name und Kürzel bleiben - für alte Turniere; Chat samt Anhängen, Einladungen, Bilder und Daten sind weg.
+
+    Jeder Schritt läuft für sich und ist wiederholbar. Scheitert einer, bleibt die Zeile, wie sie ist, und der nächste Lauf
+    versucht es erneut (``False``). Bilder kommen zuletzt, weil die Zeile sie sonst noch nennt: ihr Nacharbeiten übernimmt
+    der Aufräum-Job für Dateien."""
     from services.chat_attachments import delete_team_attachments
 
-    active = await db.teams.find_one({"id": row["id"]}, {"_id": 1})
+    team_id = row["id"]
+    active = await db.teams.find_one({"id": team_id}, {"_id": 1})
+    images: set[str] = set()
     if not active:
-        await delete_team_attachments(db, row["id"])
-        await db.team_chat_messages.delete_many({"team_id": row["id"]})
-        await db.team_invites.delete_many({"team_id": row["id"]})
-        await _remove_restored_parts(db, row["id"])  # Rest eines abgebrochenen Wiederherstellens
+        steps = (
+            ("Anhänge", lambda: delete_team_attachments(db, team_id)),
+            ("Chat", lambda: db.team_chat_messages.delete_many({"team_id": team_id})),
+            ("Einladungen", lambda: db.team_invites.delete_many({"team_id": team_id})),
+            ("Reste", lambda: _remove_restored_parts(db, team_id)),  # eines abgebrochenen Wiederherstellens
+            ("Bilder", lambda: _team_images(db, row)),
+        )
+        failed = False
+        for label, step in steps:
+            try:
+                result = await step()
+            except Exception:  # noqa: BLE001 - jeder Schritt für sich; der nächste Lauf holt ihn nach
+                logger.warning("[teams] %s von %s nicht aufgeräumt", label, log_safe(team_id), exc_info=True)
+                failed = True
+                continue
+            if label == "Bilder":
+                images = result
+        if failed:
+            return False
     keep = {key: row.get(key) for key in GONE_AFTER_PURGE if key != "_id" and key in row}
-    await db.dissolved_teams.replace_one({"id": row["id"]}, {**keep, "purged_at": now})
-    if not active:
-        try:
-            await _remove_unused_images(db, row)
-        except Exception:  # noqa: BLE001 - ein gesperrtes Bild hält weder den Job noch eine Kontolöschung auf
-            logger.warning("[teams] Bilder von %s nicht aufgeräumt", log_safe(row["id"]), exc_info=True)
+    await db.dissolved_teams.replace_one({"id": team_id}, {**keep, "purged_at": now})
+    await _remove_unused_images(db, images)
+    return True
 
 
 async def purge_dissolved_teams(db, now: datetime | None = None) -> int:
     """Der tägliche Job: aufgelöste Teams, deren Frist vorbei ist, endgültig aufräumen."""
     stamp = (now or now_utc()).isoformat()
     rows = await db.dissolved_teams.find({"purged_at": {"$exists": False}, "purge_at": {"$lte": stamp}}, {"_id": 0}).to_list(500)
+    done = 0
     for row in rows:
-        await _final_cleanup(db, row, stamp)
-    return len(rows)
+        try:
+            done += bool(await _final_cleanup(db, row, stamp))
+        except Exception:  # noqa: BLE001 - eine Zeile hält die anderen Teams nicht auf
+            logger.warning("[teams] Aufräumen von %s abgebrochen", log_safe(row.get("id")), exc_info=True)
+    return done

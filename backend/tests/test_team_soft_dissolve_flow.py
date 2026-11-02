@@ -466,3 +466,98 @@ async def test_a_leftover_archive_of_a_standing_team_is_cleared(flow):
     assert again.status_code == 409 and "schon wiederhergestellt" in again.json()["detail"]
     assert not await flow.db.dissolved_teams.find_one({"id": team["id"]})
     assert await flow.db.teams.count_documents({"id": team["id"]}) == 1
+
+
+class _BrokenCollection:
+    """Eine Sammlung, deren ``delete_many`` für ein Team scheitert."""
+
+    def __init__(self, real, team_id):
+        self._real = real
+        self._team_id = team_id
+
+    def __getattr__(self, name):
+        return getattr(self._real, name)
+
+    async def delete_many(self, query):
+        if query.get("team_id") == self._team_id:
+            raise RuntimeError("Datenbank weg")
+        return await self._real.delete_many(query)
+
+
+class _BrokenStepDb:
+    def __init__(self, real, name, team_id):
+        self._real = real
+        setattr(self, name, _BrokenCollection(getattr(real, name), team_id))
+
+    def __getattr__(self, name):
+        return getattr(self._real, name)
+
+
+async def _two_expired_teams(flow):
+    first = await world(flow)
+    await dissolve(flow, first[0], first[3])
+    other = {"id": new_id(), "name": "Zweites", "tag": "ZWE", "leader_id": first[0]["id"], "co_leader_ids": [], "member_ids": [first[0]["id"]], "is_public": True}
+    await flow.db.teams.insert_one(dict(other))
+    await dissolve(flow, first[0], other)
+    past = (now_utc() - timedelta(minutes=1)).isoformat()
+    await flow.db.dissolved_teams.update_many({}, {"$set": {"purge_at": past}})
+    return first[3], other
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("broken", ["team_invites", "team_chat_messages"])
+async def test_a_failing_step_keeps_the_row_for_the_next_run_and_stops_nothing_else(flow, broken):
+    team, other = await _two_expired_teams(flow)
+    await flow.db.team_chat_messages.insert_one({"id": new_id(), "team_id": team["id"], "user_id": "u", "message": "x"})
+    await flow.db.team_invites.insert_one({"id": new_id(), "team_id": team["id"], "user_id": "u", "status": "cancelled"})
+
+    assert await purge_dissolved_teams(_BrokenStepDb(flow.db, broken, team["id"])) == 1, "nur das andere Team ist fertig"
+    stuck = await flow.db.dissolved_teams.find_one({"id": team["id"]}, {"_id": 0})
+    assert "purged_at" not in stuck and stuck["squads"], "die Zeile bleibt für den nächsten Lauf"
+    assert (await flow.db.dissolved_teams.find_one({"id": other["id"]}, {"_id": 0})).get("purged_at")
+    other_step = "team_chat_messages" if broken == "team_invites" else "team_invites"
+    assert await getattr(flow.db, other_step).count_documents({"team_id": team["id"]}) == 0, "die übrigen Schritte liefen trotzdem"
+
+    assert await purge_dissolved_teams(flow.db) == 1, "der nächste Lauf holt es nach"
+    assert (await flow.db.dissolved_teams.find_one({"id": team["id"]}, {"_id": 0})).get("purged_at")
+    assert await getattr(flow.db, broken).count_documents({"team_id": team["id"]}) == 0
+
+
+@pytest.mark.asyncio
+async def test_a_locked_attachment_does_not_stop_the_others(flow, monkeypatch):
+    from services import chat_attachments
+
+    def locked(row):
+        if row["id"] == "gesperrt":
+            raise PermissionError("gesperrt")
+
+    monkeypatch.setattr(chat_attachments, "_remove_files", locked)
+    leader, _co, _member, team, _squad = await world(flow)
+    await dissolve(flow, leader, team)
+    for key in ("gesperrt", "frei"):
+        await flow.db.chat_attachments.insert_one({"id": key, "context": {"type": "team", "team_id": team["id"]}})
+    await flow.db.dissolved_teams.update_one({"id": team["id"]}, {"$set": {"purge_at": (now_utc() - timedelta(minutes=1)).isoformat()}})
+
+    assert await purge_dissolved_teams(flow.db) == 0
+    assert not await flow.db.chat_attachments.find_one({"id": "frei"})
+    assert await flow.db.chat_attachments.find_one({"id": "gesperrt"})
+    assert "purged_at" not in await flow.db.dissolved_teams.find_one({"id": team["id"]}, {"_id": 0})
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failing", ["remove_upload", "still_referenced"])
+async def test_a_failing_image_is_remembered_and_the_row_is_finished(flow, monkeypatch, failing):
+    from services import account_erasure, media_audit
+
+    async def boom(*_args, **_kwargs):
+        raise OSError("gesperrt")
+
+    monkeypatch.setattr(account_erasure if failing == "remove_upload" else media_audit, failing, boom)
+    leader, _co, _member, team, _squad = await world(flow)
+    await flow.db.teams.update_one({"id": team["id"]}, {"$set": {"logo_url": "/api/static/uploads/nur-team.webp"}})
+    await dissolve(flow, leader, team)
+    await purge_dissolved_teams(flow.db, now_utc() + timedelta(days=DISSOLVED_TEAM_RETENTION_DAYS + 1))
+
+    assert (await flow.db.dissolved_teams.find_one({"id": team["id"]}, {"_id": 0})).get("purged_at")
+    pending = await flow.db[account_erasure.PENDING].find_one({"filename": "nur-team.webp"}, {"_id": 0})
+    assert pending and pending["source"] == account_erasure.SOURCE_MEDIA and pending["last_error"].startswith("OSError")
