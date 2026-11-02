@@ -4,6 +4,7 @@ import io
 import os
 import pathlib
 import sys
+from datetime import timedelta
 
 import pytest
 import pytest_asyncio
@@ -13,6 +14,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
+from models import now_utc  # noqa: E402
 from routes import phase_fg_routes  # noqa: E402
 from services import account_erasure, image_migrate, media_audit  # noqa: E402
 from services.mutation_lock import MutationLockBusy, league_season_resource, mutation_lock  # noqa: E402
@@ -74,18 +76,103 @@ async def stored(flow, rule_id: str) -> dict:
 
 # ---------------------------------------------------------------- Kontolöschung
 
+async def owned_file(flow, folder, name: str, person: dict, scope: str = "user") -> bytes:
+    content = png()
+    await add_file(flow, folder, name, content)
+    await flow.db.media_uploads.update_one({"filename": name}, {"$set": {
+        "owner_id": person["id"], "owner_role": person["role"], "media_scope": scope, "original_filename": f"{person['display_name']}.png"}})
+    return content
+
+
+async def upload_row(flow, name: str) -> dict:
+    return await flow.db.media_uploads.find_one({"filename": name}, {"_id": 0})
+
+
+def without_person(row: dict) -> bool:
+    return row["owner_id"] is None and row["owner_role"] is None and row["original_filename"] is None
+
+
 @pytest.mark.asyncio
-async def test_a_published_version_keeps_the_file_of_a_deleted_account(flow, public):
-    """Eine Fassung ändert sich nie (#1646, #2230): Das Bild einer gelöschten Person bleibt samt Eintrag, solange eine Fassung es zeigt."""
+async def test_a_published_version_keeps_the_file_of_a_deleted_account_without_the_person(flow, public):
+    """Eine Fassung ändert sich nie (#1646): Das Bild bleibt, solange eine Fassung es zeigt, aber nichts daran zeigt noch auf die Person (#2230)."""
     person = await flow.add_user(name="Geht")
-    await add_file(flow, public, "ihres.webp", png())
-    await flow.db.media_uploads.update_one({"filename": "ihres.webp"}, {"$set": {"owner_id": person["id"], "media_scope": "user"}})
-    await add_rule(flow, "fertig", status="published", image="ihres.webp")
-    assert await media_audit.still_referenced(flow.db, {"ihres.webp"}) == {"ihres.webp"}
+    content = await owned_file(flow, public, "ihres.webp", person)
+    await flow.db.media_scans.insert_one({"id": "scan", "kind": "upload", "owner_id": person["id"], "url": f"{UPLOADS}ihres.webp", "state": "clean"})
+    published = await add_rule(flow, "fertig", status="published", image="ihres.webp")
+
     removed = await account_erasure._own_images(flow.db, person["id"], [])
+
+    assert removed == 0
+    assert without_person(await upload_row(flow, "ihres.webp"))
+    assert (await flow.db.media_scans.find_one({"id": "scan"}))["owner_id"] is None
+    assert (public / "ihres.webp").read_bytes() == content
+    assert await media_audit.still_referenced(flow.db, {"ihres.webp"}) == {"ihres.webp"}
+    assert await stored(flow, "fertig") == {"body_md": published["body_md"], "annexes": published["annexes"]}
+
+    await admin(flow)
+    rotated = await flow.post("/api/admin/media/ihres.webp/rotate", json={"degrees": 90})
+    deleted = await flow.delete("/api/admin/media/ihres.webp?force=true")
+    assert rotated.status_code == 409 and deleted.status_code == 409
+    assert (public / "ihres.webp").read_bytes() == content
+
+
+@pytest.mark.asyncio
+async def test_a_club_image_of_a_deleted_account_in_a_published_version_loses_the_person_too(flow, public):
+    person = await flow.add_user(role="club_admin", name="Geht")
+    await owned_file(flow, public, "verein.webp", person, scope="admin")
+    await owned_file(flow, public, "anderswo.webp", person, scope="admin")
+    await add_rule(flow, "fertig", status="published", image="verein.webp")
+
+    await account_erasure._own_images(flow.db, person["id"], [])
+
+    assert without_person(await upload_row(flow, "verein.webp"))
+    assert (await upload_row(flow, "anderswo.webp"))["owner_id"] == person["id"], "was keine Fassung zeigt, bleibt wie bisher"
+
+
+@pytest.mark.asyncio
+async def test_the_follow_up_run_also_removes_the_person(flow, public):
+    """Scheiterte das Löschen, läuft die Löschung über den Nachlauf. Zeigt inzwischen eine Fassung das Bild, gilt dasselbe."""
+    person = await flow.add_user(name="Geht")
+    await owned_file(flow, public, "ihres.webp", person)
+    await account_erasure._remember(flow.db, "ihres.webp", person["id"], True, "OSError EACCES")
+    await add_rule(flow, "fertig", status="published", image="ihres.webp")
+
+    removed = await account_erasure.retry_file_cleanups(flow.db, now=now_utc() + timedelta(hours=2))
+
     assert removed == 0
     assert (public / "ihres.webp").is_file()
-    assert await flow.db.media_uploads.count_documents({"filename": "ihres.webp"}) == 1
+    assert without_person(await upload_row(flow, "ihres.webp"))
+    assert await flow.db[account_erasure.PENDING].count_documents({"filename": "ihres.webp"}) == 0
+
+
+@pytest.mark.asyncio
+async def test_a_follow_up_of_the_library_knows_no_person_and_changes_no_owner(flow, public):
+    person = await flow.add_user(name="Bleibt")
+    await owned_file(flow, public, "ihres.webp", person)
+    await account_erasure._remember(flow.db, "ihres.webp", "", True, "OSError EACCES", source=account_erasure.SOURCE_MEDIA)
+    await add_rule(flow, "fertig", status="published", image="ihres.webp")
+
+    await account_erasure.retry_file_cleanups(flow.db, now=now_utc() + timedelta(hours=2))
+
+    assert (await upload_row(flow, "ihres.webp"))["owner_id"] == person["id"]
+
+
+@pytest.mark.asyncio
+async def test_files_outside_published_versions_go_or_stay_as_before(flow, public):
+    person, other = await flow.add_user(name="Geht"), await flow.add_user(name="Bleibt")
+    await owned_file(flow, public, "weg.webp", person)
+    await owned_file(flow, public, "entwurf.webp", person)
+    await owned_file(flow, public, "fremd.webp", other)
+    await add_rule(flow, "offen", status="draft", image="entwurf.webp", version=None)
+    await add_rule(flow, "fertig", status="published", image="fremd.webp")
+
+    removed = await account_erasure._own_images(flow.db, person["id"], [])
+
+    assert removed == 1
+    assert not (public / "weg.webp").exists() and await upload_row(flow, "weg.webp") is None
+    assert (public / "entwurf.webp").is_file()
+    assert (await upload_row(flow, "entwurf.webp"))["owner_id"] == person["id"]
+    assert (await upload_row(flow, "fremd.webp"))["owner_id"] == other["id"]
 
 
 # ---------------------------------------------------------------- Duplikate
