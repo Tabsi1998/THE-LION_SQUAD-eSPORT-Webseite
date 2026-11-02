@@ -732,3 +732,35 @@ describe("live: Warteschlange je Station", () => {
     expect(within(preview).queryByRole("button", { name: /Übernehmen/ })).toBeNull();
   });
 });
+
+describe("Termin des eigenen Spiels (#2203)", () => {
+  const withOwn = (state, fields) => ({ ...state, matches: state.matches.map((match, index) => (index === 0 ? { ...match, ...fields } : match)) });
+
+  it("sagt, dass eine zweite Person den Termin setzt", async () => {
+    setup(withOwn(fixture.local.applied, { viewer_involved: true, viewer_override: false }));
+    expect(await screen.findByTestId("mp-own-matches")).toHaveTextContent("zweite berechtigte Person");
+  });
+
+  it("nennt dem Superadmin die Notausnahme", async () => {
+    setup(withOwn(fixture.local.applied, { viewer_involved: true, viewer_override: true }));
+    expect(await screen.findByTestId("mp-own-matches")).toHaveTextContent("nur mit Grund");
+  });
+
+  it("ohne eigenes Spiel kein Hinweis", async () => {
+    setup(fixture.local.applied);
+    expect(await screen.findByTestId("mp-settings")).toBeInTheDocument();
+    expect(screen.queryByTestId("mp-own-matches")).toBeNull();
+  });
+});
+
+describe("emergencyFields (#2203)", () => {
+  it("fragt nur bei befangenem Superadmin, zu kurz oder Abbruch schickt nichts", async () => {
+    const { emergencyFields } = await import("@/lib/schedulePlan");
+    const never = vi.fn();
+    expect(await emergencyFields({ id: "m" }, never)).toEqual({});
+    expect(never).not.toHaveBeenCalled();
+    expect(await emergencyFields({ viewer_override: true }, async () => false)).toBeNull();
+    expect(await emergencyFields({ viewer_override: true }, async () => "kurz")).toBeNull();
+    expect(await emergencyFields({ viewer_override: true }, async () => " Sonst niemand da ")).toEqual({ conflict_reason: "Sonst niemand da" });
+  });
+});

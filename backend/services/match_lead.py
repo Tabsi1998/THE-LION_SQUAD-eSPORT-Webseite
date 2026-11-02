@@ -26,6 +26,9 @@ from services.result_hold import hold_view
 from services.round_labels import round_label, rounds_by_section, stage_kind
 from services.station_labels import attach_station_info
 from services.draw_show import lead_cards
+from services.league_permissions import capabilities_of, involved_match_ids
+from services.league_scope import is_league_staffel
+from services.permissions import is_superadmin
 from services.tournament_permissions import (
     RESULT_STAFF_ROLES,
     STRUCTURE_STAFF_ROLES,
@@ -156,9 +159,15 @@ def _photo_ids(match: dict) -> list[str]:
     return [photo_id for photo_id in ids if photo_id]
 
 
-async def _result_scope(db, user: dict, tournament_id: str):
+async def _result_scope(db, user: dict, tournament: dict, capability: str = "results"):
     """Darf diese Person für ein Spiel eintragen? Einmal laden, je Spiel nur noch nachsehen - dieselbe Regel wie
-    ``has_match_result_permission`` (ganzes Turnier, Phase, Gruppe, Station oder genau dieses Spiel)."""
+    ``has_match_result_permission`` (ganzes Turnier, Phase, Gruppe, Station oder genau dieses Spiel). In einer Staffel das
+    Liga-Recht, ohne Helfer (#2203); die Befangenheit je Spiel steht daneben (``_conflicts``)."""
+    tournament_id = tournament["id"]
+    if is_league_staffel(tournament):
+        capabilities = await capabilities_of(db, user, tournament["league_context"].get("league_id"))
+        # Bei offenem Streitfall schließt die Korrektur den Protest: dafür braucht es auch „Proteste“.
+        return lambda match: capability in capabilities and (str(match.get("status") or "") != "disputed" or "disputes" in capabilities)
     if is_global_tournament_staff(user):
         return lambda match: True
     assignments = await db.tournament_staff_assignments.find(
@@ -217,7 +226,10 @@ async def lead_view(db, tournament: dict, user: dict, *, now: datetime | None = 
     by_stage: dict[str, list[dict]] = {}
     for match in matches:
         by_stage.setdefault(match.get("stage_id") or "", []).append(match)
-    may_enter = await _result_scope(db, user, tournament_id)
+    may_enter = await _result_scope(db, user, tournament)
+    may_decide = await _result_scope(db, user, tournament, "disputes")
+    conflicted = await involved_match_ids(db, user, tournament, matches)
+    override = is_superadmin(user)
     # Streitfälle (#1158): Fotos (nur nach der Bildprüfung) und wer das Ergebnis eingetragen hat.
     disputed = [match for match in matches if str(match.get("status") or "") == "disputed"]
     photos = await visible_proofs(db, [photo_id for match in disputed for photo_id in _photo_ids(match)])
@@ -234,7 +246,12 @@ async def lead_view(db, tournament: dict, user: dict, *, now: datetime | None = 
                           stage_matches=by_stage.get(match.get("stage_id") or "", []), regs_by_id=regs_by_id,
                           viewer_id=user.get("id"))
         info["timing"] = timing(match, tournament, now, stage=stages.get(match.get("stage_id") or ""), game=game)
-        info["can_enter"] = may_enter(match)
+        # Befangen (#2203): Der Superadmin darf als Notausnahme mit Grund, alle anderen gar nicht.
+        involved = match.get("id") in conflicted
+        info["can_enter"] = may_enter(match) and (not involved or override)
+        info["can_decide"] = may_decide(match) and (not involved or override)
+        info["conflict"] = involved and not override
+        info["conflict_override"] = involved and override
         if str(match.get("status") or "") == "disputed":
             info["dispute"] = dispute_card(match, regs_by_id, photos, names)
         return info
@@ -250,7 +267,7 @@ async def lead_view(db, tournament: dict, user: dict, *, now: datetime | None = 
     stations = await db.stations.find({"tournament_id": tournament_id}, {"_id": 0}).to_list(500)
     attention = attention_items(tournament, matches, stations, regs_by_id, now, stages=stages, game=game)
     # Show-Auslosung (#1590): „Auslosung bereit · N Namen“ mit „Jetzt auslosen“ für die Leitung mit Aufbau-Recht.
-    can_draw = await has_tournament_staff_permission(user, tournament_id, STRUCTURE_STAFF_ROLES)
+    can_draw = await has_tournament_staff_permission(user, tournament_id, STRUCTURE_STAFF_ROLES, capability="season")
     draws = lead_cards(matches, tournament, stages, regs_by_id, can_draw=can_draw,
                        eliminated=await eliminated_registration_ids(db, tournament_id))
     recent = sorted(

@@ -15,6 +15,7 @@ from database import get_db
 from models import new_id, now_utc
 from services.match_deadlines import auto_confirm_due, no_show_deadline, opened_at
 from services.match_scheduler import DONE_STATUSES, RUNNING_STATUSES, apply_plan, plan_for_tournament, station_query
+from services.league_permissions import BULK_CONFLICT_DETAIL, READ, involved_match_ids
 from services.tournament_permissions import READ_STAFF_ROLES, STATION_ASSIGN_ROLES, require_tournament_staff_permission
 from routes.tournament_common import _ensure_tournament_unlocked, _resolve_tid, _serialized_tournament_write
 from routes.tournament_router import router
@@ -33,11 +34,18 @@ class SchedulePlanApply(BaseModel):
 
 
 async def _planning_tournament(db, tid: str, me: dict) -> dict:
-    await require_tournament_staff_permission(me, tid, STATION_ASSIGN_ROLES, "tournament")
+    await require_tournament_staff_permission(me, tid, STATION_ASSIGN_ROLES, "tournament", capability="matches")
     tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
     if not tournament:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     return tournament
+
+
+async def _refuse_own_matches(db, tournament: dict, me: dict, matches: list[dict]) -> None:
+    """Termine auf einmal (#2203): Ist ein eigenes Spiel dabei, macht das eine zweite Person. Hier gibt es kein Feld für den Grund der
+    Notausnahme - der Superadmin setzt den einzelnen Termin mit Grund (``PATCH /matches``)."""
+    if await involved_match_ids(db, me, tournament, matches):
+        raise HTTPException(status_code=403, detail=BULK_CONFLICT_DETAIL)
 
 
 @router.post("/{tid}/schedule/plan")
@@ -63,6 +71,9 @@ async def apply_schedule_plan(tid: str, body: SchedulePlanApply, me: dict = Depe
     plan = await plan_for_tournament(db, tournament, now=anchor)
     if body.fingerprint != plan["fingerprint"]:
         raise HTTPException(status_code=409, detail="Der Plan hat sich inzwischen geändert - bitte noch einmal Planen.")
+    # Der Plan setzt Termine (``assignments``) und löst sie (``releases``) - beides ändert das Spiel.
+    planned = {row.get("match_id") or row.get("id") for row in [*(plan.get("assignments") or []), *(plan.get("releases") or [])]}
+    await _refuse_own_matches(db, tournament, me, await db.matches_v2.find({"id": {"$in": sorted(id_ for id_ in planned if id_)}}, {"_id": 0}).to_list(3000))
     result = await apply_plan(db, tournament, plan)
     return {**result, "assignments": plan["assignments"], "fingerprint": plan["fingerprint"]}
 
@@ -83,7 +94,7 @@ async def schedule_deadlines(tid: str, me: dict = Depends(get_current_user)):
     (``services/match_deadlines``) - die Website zeigt nur an."""
     db = get_db()
     tid = await _resolve_tid(tid)
-    await require_tournament_staff_permission(me, tid, READ_STAFF_ROLES, "tournament")
+    await require_tournament_staff_permission(me, tid, READ_STAFF_ROLES, "tournament", capability=READ)
     tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0, "creation_key": 0, "billing": 0})
     if not tournament:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
@@ -135,6 +146,7 @@ async def release_schedule(tid: str, body: ScheduleRelease, me: dict = Depends(g
         elif not match.get("station_id") or match["station_id"] in known:
             continue
         chosen.append(match)
+    await _refuse_own_matches(db, tournament, me, chosen)
     stamp = now_utc().isoformat()
     released = []
     for match in chosen:

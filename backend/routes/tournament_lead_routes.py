@@ -20,6 +20,7 @@ from database import get_db
 from models import new_id, now_utc
 from routes.tournament_common import _ensure_tournament_unlocked, _resolve_tid, _serialized_tournament_write
 from routes.tournament_router import router
+from services.league_permissions import READ, require_no_conflict
 from services.match_forfeit import apply_forfeit
 from services.league_scope import is_league_staffel
 from services.match_deadlines import no_show_deadline, no_show_open
@@ -41,7 +42,7 @@ from services.visibility import hide_unseen_event_links
 async def tournament_lead(tid: str, me: dict = Depends(get_current_user)):
     db = get_db()
     tournament_id = await _resolve_tid(tid)
-    if not await has_tournament_staff_permission(me, tournament_id, READ_STAFF_ROLES | RESULT_STAFF_ROLES):
+    if not await has_tournament_staff_permission(me, tournament_id, READ_STAFF_ROLES | RESULT_STAFF_ROLES, capability=READ):
         raise HTTPException(status_code=403, detail="Diese Ansicht ist nur für die Turnierleitung dieses Turniers.")
     tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0, "creation_key": 0, "billing": 0})
     if not tournament:
@@ -65,6 +66,8 @@ class NoShowDecision(BaseModel):
     action: Literal["confirm", "extend"]
     registration_id: str | None = Field(default=None, max_length=120)
     minutes: int = Field(default=5, ge=1, le=60)
+    # Notausnahme des Superadmins bei Befangenheit (#2203).
+    conflict_reason: str | None = Field(default=None, max_length=500)
 
 
 def _parse(value) -> datetime | None:
@@ -88,12 +91,13 @@ async def decide_no_show(tid: str, match_id: str, body: NoShowDecision, me: dict
                          _mutation_tid: str = Depends(_serialized_tournament_write)):
     db = get_db()
     tournament_id = await _resolve_tid(tid)
-    await _ensure_tournament_unlocked(db, tournament_id)
     match = await db.matches_v2.find_one({"id": match_id, "tournament_id": tournament_id}, {"_id": 0})
     if not match:
         raise HTTPException(status_code=404, detail="Spiel nicht gefunden")
     if not await has_match_result_permission(me, match):
         raise HTTPException(status_code=403, detail="Keine Turnierberechtigung für diese Aktion")
+    await require_no_conflict(db, me, match, action="no_show", conflict_reason=body.conflict_reason)
+    await _ensure_tournament_unlocked(db, tournament_id)
     tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0, "creation_key": 0, "billing": 0}) or {}
     # Liga-Staffel (#2201): ohne Check-in entsteht kein Vorschlag mehr - die Leitung wertet trotzdem, solange nichts gemeldet ist.
     league_staffel = is_league_staffel(tournament)

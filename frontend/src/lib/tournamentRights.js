@@ -18,6 +18,8 @@ export function matchRights(tournament, match) {
   const scopes = Array.isArray(tournament?.staff_scopes) ? tournament.staff_scopes : [];
   return {
     results: Boolean(tournament?.can_manage_all_results) || scopes.some((scope) => scope.results && covers(scope, match)),
-    plan: Boolean(tournament?.can_plan_matches) || scopes.some((scope) => scope.plan && covers(scope, match)),
+    // Termin des eigenen Spiels (#2203): direkt setzt eine zweite Person - der Superadmin als Notausnahme mit Grund.
+    plan: (Boolean(tournament?.can_plan_matches) || scopes.some((scope) => scope.plan && covers(scope, match)))
+      && !(match?.viewer_involved && !match?.viewer_override),
   };
 }

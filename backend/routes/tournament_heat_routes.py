@@ -22,7 +22,7 @@ class HeatRebuildDecision(BaseModel):
 
 
 async def _structure_staff_tournament(db, tid: str, me: dict) -> dict:
-    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES, "tournament")
+    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES, "tournament", capability="season")
     return await _ensure_tournament_unlocked(db, tid)
 
 

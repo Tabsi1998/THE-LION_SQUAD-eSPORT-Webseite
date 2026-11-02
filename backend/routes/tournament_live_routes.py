@@ -30,7 +30,8 @@ from services.station_labels import station_text
 from services.tournament_permissions import (
     STATION_ASSIGN_ROLES,
     has_tournament_staff_permission,
-    is_global_tournament_staff,
+    is_staffel,
+    leads_tournament,
 )
 from services.tournament_rules import match_policy
 from services.tv_display import DISPLAY_GRANT, KEY_EXPIRED, KEY_INVALID, key_expired
@@ -66,8 +67,10 @@ async def _operate(user: dict | None, tournament_id: str, stations: list[dict]) 
     Einsätze statt einem je Station (Codex zu #1595)."""
     if not user:
         return None
-    if is_global_tournament_staff(user):
+    if await leads_tournament(user, tournament_id, "matches"):
         return {"all": True, "station_ids": []}
+    if await is_staffel(tournament_id):
+        return None  # Helfer lesen in einer Staffel nur (#2203).
     assignments = await get_db().tournament_staff_assignments.find(
         {"tournament_id": tournament_id, "user_id": user.get("id"), "is_active": {"$ne": False},
          "role": {"$in": sorted(STATION_ASSIGN_ROLES)}},
@@ -127,8 +130,8 @@ async def _context(tid: str, body: QueueAction, me: dict) -> tuple:
     db = get_db()
     tournament_id = await _resolve_tid(tid)
     allowed = await has_tournament_staff_permission(
-        me, tournament_id, STATION_ASSIGN_ROLES, "tournament"
-    ) or await has_tournament_staff_permission(me, tournament_id, STATION_ASSIGN_ROLES, "station", body.station_id)
+        me, tournament_id, STATION_ASSIGN_ROLES, "tournament", capability="matches"
+    ) or await has_tournament_staff_permission(me, tournament_id, STATION_ASSIGN_ROLES, "station", body.station_id, capability="matches")
     if not allowed:
         raise HTTPException(status_code=403, detail="Keine Turnierberechtigung für diese Station")
     tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0, "creation_key": 0, "billing": 0})

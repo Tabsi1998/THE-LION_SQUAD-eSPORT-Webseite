@@ -1,9 +1,10 @@
 """Liga (docs/LIGA.md, P1): Verwaltung von Liga, Season, Liga N und Staffel, dazu die öffentliche Lese-API.
 
-- Verwaltung unter ``/api/admin/leagues``: nur Turnierleitung (``require_area("tournaments")``, mit bestätigter
-  Zwei-Faktor-Anmeldung). Jede Änderung steht im Protokoll (``league.*``).
+- Verwaltung unter ``/api/admin/leagues``: Bereich Ligen oder die passende Zuständigkeit dieser Liga
+  (``services/league_permissions.py``, Rechte-Matrix in docs/LIGA.md), mit bestätigter Zwei-Faktor-Anmeldung. Jede Änderung
+  steht im Protokoll (``league.*``).
 - Öffentlich unter ``/api/leagues``: Ligen, Seasons, Liga N und Staffeln (mit Turnier-Kennungen) nach der Sichtbarkeit
-  der Season - ``off`` sieht niemand, ``admins`` nur die Turnierleitung, ``members`` wie „Nur Mitglieder“ bei
+  der Season - ``off`` sieht niemand, ``admins`` nur wer Liga-Rechte hat, ``members`` wie „Nur Mitglieder“ bei
   Turnieren, ``public`` alle. Unsichtbar antwortet wie „gibt es nicht“ (404).
 
 Die Logik steht in ``services/league_service.py``.
@@ -11,6 +12,7 @@ Die Logik steht in ``services/league_service.py``.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
+from pymongo.errors import DuplicateKeyError
 
 from auth import get_optional_user, require_area
 from database import get_db
@@ -21,6 +23,7 @@ from models import (
     LeagueDivisionUpdate,
     LeagueSeasonCreate,
     LeagueSeasonUpdate,
+    LeagueStaffUpdate,
     LeagueStaffelCreate,
     LeagueUpdate,
     new_id,
@@ -29,6 +32,18 @@ from models import (
 from services import game_maps
 from services import league_look
 from services import league_service as leagues
+from services.league_permissions import (
+    ANY,
+    CAPABILITIES,
+    CAPABILITY_LABELS,
+    NO_LEAGUE_RIGHT,
+    capabilities_of,
+    clean_capabilities,
+    has_leagues_area,
+    require_any_league,
+    require_league,
+    staffed_league_ids,
+)
 from services import map_pools
 from services.change_events import reset_scope_cache
 from services.game_maps import MapProblem
@@ -40,7 +55,8 @@ from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_w
 admin_router = APIRouter(prefix="/api/admin/leagues", tags=["leagues-admin"])
 router = APIRouter(prefix="/api/leagues", tags=["leagues"])
 
-require_league_admin = require_area("tournaments")
+# Bereich Ligen: Liga anlegen und löschen; alles andere prüft ``require_league`` gegen die Liga aus der Adresse.
+require_leagues_area = require_area("leagues")
 
 
 def _refuse(problem: LeagueProblem | MapProblem) -> HTTPException:
@@ -71,16 +87,20 @@ def _season_head(season: dict) -> dict:
 
 
 @admin_router.get("")
-async def admin_list_leagues(_me: dict = Depends(require_league_admin)):
-    """Alle Ligen mit ihren Seasons - der Einstieg der Verwaltung. Dazu die Spiele zur Auswahl und die Vorgaben einer
-    neuen Season."""
+async def admin_list_leagues(me: dict = Depends(require_any_league)):
+    """Die Ligen dieser Person mit ihren Seasons - mit dem Bereich alle, sonst die, in denen sie zuständig ist. Dazu die Spiele
+    zur Auswahl und die Vorgaben einer neuen Season. Je Liga ``capabilities``: Danach richten sich die Knöpfe."""
     db = get_db()
-    rows = await db.leagues.find({}, {"_id": 0}).sort("name", 1).to_list(200)
-    seasons = await db.league_seasons.find({}, {"_id": 0}).sort("number", -1).to_list(2000)
+    area = has_leagues_area(me)
+    only = {} if area else {"id": {"$in": sorted(await staffed_league_ids(db, me))}}
+    rows = await db.leagues.find(only, {"_id": 0}).sort("name", 1).to_list(200)
+    seasons = await db.league_seasons.find({} if area else {"league_id": only["id"]}, {"_id": 0}).sort("number", -1).to_list(2000)
     games = await db.games.find({}, {"_id": 0, "id": 1, "name": 1, "slug": 1, "status": 1}).sort("name", 1).to_list(500)
     names = {game["id"]: game.get("name") for game in games}
     return {
+        "can_create": area,
         "leagues": [{**row, "game_name": names.get(row.get("game_id")),
+                     "capabilities": sorted(await capabilities_of(db, me, row["id"])),
                      # Bearbeiten (#2106): Spiel nur ohne Staffel, Adresse nur vor der ersten Veröffentlichung.
                      **await leagues.league_admin_flags(db, row),
                      "seasons": [_season_head(season) for season in seasons if season["league_id"] == row["id"]]}
@@ -92,7 +112,7 @@ async def admin_list_leagues(_me: dict = Depends(require_league_admin)):
 
 
 @admin_router.get("/seasons/{season_id}")
-async def admin_season(season_id: str, _me: dict = Depends(require_league_admin)):
+async def admin_season(season_id: str, me: dict = Depends(require_league(ANY, via="season_id"))):
     """Eine Season für die Verwaltung: Vorgaben, Kalender (Wochen, Sperrwochen, größte Staffel), Map-Pool mit
     Bibliothek, Liga N mit geltenden Vorgaben und ihren Staffeln."""
     db = get_db()
@@ -113,6 +133,7 @@ async def admin_season(season_id: str, _me: dict = Depends(require_league_admin)
                          if row["league_context"].get("division_id") == division["id"]],
         })
     return {
+        "capabilities": sorted(await capabilities_of(db, me, league["id"])),
         "league": league, "season": season, "game": map_pools.game_summary(game),
         # Gestaltung (#2107): was die Ligaseite zeigt - für die Vorschau mit dem Erbe der Liga.
         "look": league_look.effective(league, season),
@@ -127,7 +148,7 @@ async def admin_season(season_id: str, _me: dict = Depends(require_league_admin)
 # ---------------------------------------------------------------- Verwaltung: Liga
 
 @admin_router.post("")
-async def admin_create_league(body: LeagueCreate, me: dict = Depends(require_league_admin)):
+async def admin_create_league(body: LeagueCreate, me: dict = Depends(require_leagues_area)):
     db = get_db()
     doc = await _call(leagues.create_league(db, body.model_dump(), me))
     await _audit(db, "league.create", me, doc["id"], {"game_id": doc["game_id"]})
@@ -135,13 +156,100 @@ async def admin_create_league(body: LeagueCreate, me: dict = Depends(require_lea
 
 
 @admin_router.patch("/{league_id}")
-async def admin_update_league(league_id: str, body: LeagueUpdate, me: dict = Depends(require_league_admin)):
+async def admin_update_league(league_id: str, body: LeagueUpdate, me: dict = Depends(require_league("manage"))):
     db = get_db()
     league = await _call(leagues.get_league(db, league_id))
     doc, changed = await _call(leagues.update_league(db, league, body.model_dump(exclude_unset=True)))
     if changed:
         await _audit(db, "league.update", me, league_id, {"fields": changed})
     return {**doc, "changed": changed, **await leagues.league_admin_flags(db, doc)}
+
+
+# ---------------------------------------------------------------- Verwaltung: Zuständige (#2203)
+
+def _staff_view(row: dict, person: dict | None) -> dict:
+    return {"user_id": row["user_id"], "capabilities": clean_capabilities(row.get("capabilities")),
+            "display_name": (person or {}).get("display_name") or (person or {}).get("username") or "Unbekannt",
+            "username": (person or {}).get("username"), "avatar_url": (person or {}).get("avatar_url"),
+            # Zuständige brauchen Zwei-Faktor: Die Verwaltung sagt, wenn sie noch fehlt.
+            "second_factor": bool((person or {}).get("mfa_enabled")),
+            "updated_at": row.get("updated_at") or row.get("created_at")}
+
+
+PERSON_FIELDS = {"_id": 0, "id": 1, "display_name": 1, "username": 1, "avatar_url": 1, "mfa_enabled": 1, "is_banned": 1, "is_active": 1}
+
+
+@admin_router.get("/{league_id}/staff")
+async def admin_league_staff(league_id: str, me: dict = Depends(require_league("manage"))):
+    """Die Zuständigen dieser Liga. Lesen darf auch „Liga verwalten“, vergeben nur der Bereich (``can_grant``)."""
+    db = get_db()
+    await _call(leagues.get_league(db, league_id))
+    rows = await db.league_staff.find({"league_id": league_id}, {"_id": 0}).to_list(500)
+    ids = sorted({row["user_id"] for row in rows})
+    people = {person["id"]: person for person in await db.users.find({"id": {"$in": ids}}, PERSON_FIELDS).to_list(len(ids) + 1)}
+    views = [_staff_view(row, people.get(row["user_id"])) for row in rows]
+    return {"staff": sorted(views, key=lambda row: str(row["display_name"]).casefold()), "can_grant": has_leagues_area(me),
+            "capabilities": [{"key": key, "label": CAPABILITY_LABELS[key]} for key in CAPABILITIES]}
+
+
+async def _tell_staff_change(db, user_id: str, me: dict, league: dict, sentence: str) -> None:
+    from services.rights_notices import tell_rights_change
+
+    if user_id != me.get("id"):
+        await tell_rights_change(db, user_id, f"{sentence} (Liga „{league.get('name')}“)", set(), set())
+
+
+def _capability_words(capabilities: list[str]) -> str:
+    return ", ".join(CAPABILITY_LABELS[key] for key in capabilities)
+
+
+@admin_router.put("/{league_id}/staff/{user_id}")
+async def admin_set_league_staff(league_id: str, user_id: str, body: LeagueStaffUpdate, me: dict = Depends(require_leagues_area)):
+    """Zuständigkeiten einer Person in dieser Liga setzen - mit Protokoll, die Person bekommt eine Meldung."""
+    db = get_db()
+    league = await _call(leagues.get_league(db, league_id))
+    unknown = sorted(set(body.capabilities) - set(CAPABILITIES))
+    if unknown:
+        raise HTTPException(status_code=422, detail="Unbekannte Zuständigkeit.")
+    capabilities = clean_capabilities(body.capabilities)
+    if not capabilities:
+        raise HTTPException(status_code=422, detail="Bitte mindestens eine Zuständigkeit wählen - oder die Person entfernen.")
+    person = await db.users.find_one({"id": user_id}, PERSON_FIELDS)
+    if not person or person.get("is_active") is False or person.get("is_banned"):
+        raise HTTPException(status_code=404, detail="Dieses Konto gibt es nicht oder es ist gesperrt.")
+    now = now_utc().isoformat()
+    before = await db.league_staff.find_one({"league_id": league_id, "user_id": user_id}, {"_id": 0})
+    if before and clean_capabilities(before.get("capabilities")) == capabilities:
+        return {**_staff_view(before, person), "idempotent_replay": True}
+    try:
+        await db.league_staff.update_one(
+            {"league_id": league_id, "user_id": user_id},
+            {"$set": {"capabilities": capabilities, "updated_at": now, "updated_by": me.get("id")},
+             "$setOnInsert": {"id": new_id(), "created_at": now, "created_by": me.get("id")}},
+            upsert=True)
+    except DuplicateKeyError:
+        # Zwei Vergaben gleichzeitig: Die zweite setzt die Zuständigkeiten auf die schon angelegte Zeile.
+        await db.league_staff.update_one({"league_id": league_id, "user_id": user_id},
+                                          {"$set": {"capabilities": capabilities, "updated_at": now, "updated_by": me.get("id")}})
+    previous = clean_capabilities((before or {}).get("capabilities"))
+    await _audit(db, "league.staff.update" if before else "league.staff.grant", me, league_id,
+                 {"user_id": user_id, "capabilities": capabilities, "from": previous})
+    await _tell_staff_change(db, user_id, me, league, f"Du bist jetzt zuständig für: {_capability_words(capabilities)}.")
+    row = await db.league_staff.find_one({"league_id": league_id, "user_id": user_id}, {"_id": 0})
+    return {**_staff_view(row, person), "idempotent_replay": False}
+
+
+@admin_router.delete("/{league_id}/staff/{user_id}")
+async def admin_remove_league_staff(league_id: str, user_id: str, me: dict = Depends(require_leagues_area)):
+    db = get_db()
+    league = await _call(leagues.get_league(db, league_id))
+    before = await db.league_staff.find_one_and_delete({"league_id": league_id, "user_id": user_id}, projection={"_id": 0})
+    if not before:
+        return {"ok": True, "idempotent_replay": True}
+    await _audit(db, "league.staff.revoke", me, league_id,
+                 {"user_id": user_id, "from": clean_capabilities(before.get("capabilities"))})
+    await _tell_staff_change(db, user_id, me, league, "Du bist hier nicht mehr zuständig.")
+    return {"ok": True, "idempotent_replay": False}
 
 
 # ---------------------------------------------------------------- Verwaltung: Löschen (#2106)
@@ -174,6 +282,9 @@ async def _delete(kind: str, target_id: str, body: LeagueDelete, me: dict) -> di
         plan = await _call(leagues.delete_tree(db, kind, target, on_staffel_deleted=staffel_deleted))
     finally:
         reset_scope_cache()
+    if kind == "league":
+        # Mit der Liga enden ihre Zuständigkeiten - sonst hätte niemand mehr den Weg, sie zu entfernen.
+        await db.league_staff.delete_many({"league_id": target_id})
     await _audit(db, action, me, target_id, {
         "reason": reason, "name": plan["name"],
         "seasons": [row["id"] for row in plan["seasons"]], "divisions": [row["id"] for row in plan["divisions"]],
@@ -191,20 +302,20 @@ def _reason(body: LeagueDelete) -> str:
 
 
 @admin_router.get("/{league_id}/delete-plan")
-async def admin_league_delete_plan(league_id: str, _me: dict = Depends(require_league_admin)):
+async def admin_league_delete_plan(league_id: str, _me: dict = Depends(require_leagues_area)):
     """Was mit der Liga ginge - oder warum sie archiviert statt gelöscht wird."""
     return await _delete_plan("league", league_id)
 
 
 @admin_router.delete("/{league_id}")
-async def admin_delete_league(league_id: str, body: LeagueDelete, me: dict = Depends(require_league_admin)):
+async def admin_delete_league(league_id: str, body: LeagueDelete, me: dict = Depends(require_leagues_area)):
     return await _delete("league", league_id, body, me)
 
 
 # ---------------------------------------------------------------- Verwaltung: Season
 
 @admin_router.post("/{league_id}/seasons")
-async def admin_create_season(league_id: str, body: LeagueSeasonCreate, me: dict = Depends(require_league_admin)):
+async def admin_create_season(league_id: str, body: LeagueSeasonCreate, me: dict = Depends(require_league("manage"))):
     db = get_db()
     league = await _call(leagues.get_league(db, league_id))
     doc = await _call(leagues.create_season(db, league, body.model_dump(exclude_unset=True), me))
@@ -214,10 +325,16 @@ async def admin_create_season(league_id: str, body: LeagueSeasonCreate, me: dict
 
 
 @admin_router.patch("/seasons/{season_id}")
-async def admin_update_season(season_id: str, body: LeagueSeasonUpdate, me: dict = Depends(require_league_admin)):
+async def admin_update_season(season_id: str, body: LeagueSeasonUpdate,
+                              me: dict = Depends(require_league(("season", "rules"), via="season_id"))):
     db = get_db()
     season = await _call(leagues.get_season(db, season_id))
-    doc, changed = await _call(leagues.update_season(db, season, body.model_dump(exclude_unset=True)))
+    payload = body.model_dump(exclude_unset=True)
+    # Der Regeltext gehört „Regeln veröffentlichen“, alles andere „Season konfigurieren“.
+    capabilities = await capabilities_of(db, me, season["league_id"])
+    if ("rules" if "rules_text" in payload else "season") not in capabilities or (set(payload) - {"rules_text"} and "season" not in capabilities):
+        raise HTTPException(status_code=403, detail=NO_LEAGUE_RIGHT)
+    doc, changed = await _call(leagues.update_season(db, season, payload))
     if changed:
         await _audit(db, "league.season.update", me, season_id, {"fields": changed})
     visibility_applied = 0
@@ -236,12 +353,12 @@ async def admin_update_season(season_id: str, body: LeagueSeasonUpdate, me: dict
 
 
 @admin_router.get("/seasons/{season_id}/delete-plan")
-async def admin_season_delete_plan(season_id: str, _me: dict = Depends(require_league_admin)):
+async def admin_season_delete_plan(season_id: str, _me: dict = Depends(require_league("manage", via="season_id"))):
     return await _delete_plan("season", season_id)
 
 
 @admin_router.delete("/seasons/{season_id}")
-async def admin_delete_season(season_id: str, body: LeagueDelete, me: dict = Depends(require_league_admin)):
+async def admin_delete_season(season_id: str, body: LeagueDelete, me: dict = Depends(require_league("manage", via="season_id"))):
     """Season löschen (#2106): nur als Entwurf, ohne Staffel mit Co-Teams oder Spielen - leere Entwürfe gehen mit."""
     return await _delete("season", season_id, body, me)
 
@@ -252,7 +369,7 @@ async def _season_game(db, season: dict) -> dict | None:
 
 
 @admin_router.put("/seasons/{season_id}/map-pool")
-async def admin_save_season_pool(season_id: str, body: MapPoolSave, me: dict = Depends(require_league_admin)):
+async def admin_save_season_pool(season_id: str, body: MapPoolSave, me: dict = Depends(require_league("season", via="season_id"))):
     db = get_db()
     season = await _call(leagues.get_season(db, season_id))
     game = await _season_game(db, season)
@@ -270,7 +387,7 @@ async def admin_save_season_pool(season_id: str, body: MapPoolSave, me: dict = D
 
 
 @admin_router.delete("/seasons/{season_id}/map-pool")
-async def admin_clear_season_pool(season_id: str, me: dict = Depends(require_league_admin)):
+async def admin_clear_season_pool(season_id: str, me: dict = Depends(require_league("season", via="season_id"))):
     db = get_db()
     await _call(leagues.get_season(db, season_id))
     doc = await _call(map_pools.clear(db, scope="league_season", scope_id=season_id, user=me))
@@ -280,7 +397,7 @@ async def admin_clear_season_pool(season_id: str, me: dict = Depends(require_lea
 
 
 @admin_router.post("/seasons/{season_id}/sync")
-async def admin_sync_season(season_id: str, me: dict = Depends(require_league_admin)):
+async def admin_sync_season(season_id: str, me: dict = Depends(require_league("season", via="season_id"))):
     """„Vorgaben auf Staffeln übertragen“: je Staffel, was noch darf - der Rest kommt mit Grund zurück."""
     from routes.tournament_common import _is_tournament_locked
 
@@ -328,7 +445,7 @@ async def admin_sync_season(season_id: str, me: dict = Depends(require_league_ad
 
 @admin_router.post("/seasons/{season_id}/divisions")
 async def admin_create_division(season_id: str, body: LeagueDivisionCreate,
-                                me: dict = Depends(require_league_admin)):
+                                me: dict = Depends(require_league("season", via="season_id"))):
     db = get_db()
     season = await _call(leagues.get_season(db, season_id))
     payload = body.model_dump(exclude_unset=True)
@@ -341,7 +458,7 @@ async def admin_create_division(season_id: str, body: LeagueDivisionCreate,
 
 @admin_router.patch("/divisions/{division_id}")
 async def admin_update_division(division_id: str, body: LeagueDivisionUpdate,
-                                me: dict = Depends(require_league_admin)):
+                                me: dict = Depends(require_league("season", via="division_id"))):
     db = get_db()
     division = await _call(leagues.get_division(db, division_id))
     payload = body.model_dump(exclude_unset=True)
@@ -354,18 +471,18 @@ async def admin_update_division(division_id: str, body: LeagueDivisionUpdate,
 
 
 @admin_router.get("/divisions/{division_id}/delete-plan")
-async def admin_division_delete_plan(division_id: str, _me: dict = Depends(require_league_admin)):
+async def admin_division_delete_plan(division_id: str, _me: dict = Depends(require_league("season", via="division_id"))):
     return await _delete_plan("division", division_id)
 
 
 @admin_router.delete("/divisions/{division_id}")
-async def admin_delete_division(division_id: str, body: LeagueDelete, me: dict = Depends(require_league_admin)):
+async def admin_delete_division(division_id: str, body: LeagueDelete, me: dict = Depends(require_league("season", via="division_id"))):
     """Liga N löschen (#2106): ohne Staffel mit Co-Teams oder Spielen - leere Entwurfs-Staffeln gehen mit."""
     return await _delete("division", division_id, body, me)
 
 
 @admin_router.delete("/staffeln/{tournament_id}")
-async def admin_delete_staffel(tournament_id: str, body: LeagueDelete, me: dict = Depends(require_league_admin)):
+async def admin_delete_staffel(tournament_id: str, body: LeagueDelete, me: dict = Depends(require_league("season", via="tournament_id"))):
     """Staffel auf der Season-Seite löschen (#2106) - mit derselben Löschsperre wie in der Turnierverwaltung (#2109)
     und mit Grund im Protokoll."""
     db = get_db()
@@ -383,7 +500,7 @@ async def admin_delete_staffel(tournament_id: str, body: LeagueDelete, me: dict 
 
 
 @admin_router.post("/divisions/{division_id}/staffeln")
-async def admin_create_staffel(division_id: str, body: LeagueStaffelCreate, me: dict = Depends(require_league_admin)):
+async def admin_create_staffel(division_id: str, body: LeagueStaffelCreate, me: dict = Depends(require_league("season", via="division_id"))):
     """Staffel anlegen: ein Liga-Turnier (Entwurf) mit allen Vorgaben - danach Co-Teams in der Turnierverwaltung
     zuteilen."""
     from routes.tournament_common import _create_initial_stage_bracket_preview

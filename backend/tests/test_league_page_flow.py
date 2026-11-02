@@ -170,16 +170,19 @@ async def test_staffel_route_for_seasons_off_and_admins(flow):
     guest = await flow.add_user(name="gast")
     member = await flow.add_user(name="mitglied")
     member["is_club_member"] = True
-    unconfirmed = await flow.add_user(role="tournament_admin", name="ohne-2fa")
+    unconfirmed = await flow.add_user(name="ohne-2fa")
+    unconfirmed["areas"] = ["leagues"]
     unconfirmed["auth_mfa_verified"] = False
-    lead = await flow.add_user(role="tournament_admin", name="leitung")
+    lead = await flow.add_user(name="leitung")
+    lead["areas"] = ["leagues"]
+    tournament_lead = await flow.add_user(role="tournament_admin", name="turnierleitung")  # gibt in der Liga nichts (#2203)
 
     for visibility, allowed in (("admins", {"leitung"}), ("off", set())):
         flow.act_as(admin)
         changed = await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"visibility": visibility})
         assert changed.status_code == 200
         for name, person in (("anonym", None), ("gast", guest), ("mitglied", member), ("ohne-2fa", unconfirmed),
-                             ("leitung", lead)):
+                             ("leitung", lead), ("turnierleitung", tournament_lead)):
             flow.act_as(person)
             response = await flow.get(url)
             assert response.status_code == (200 if name in allowed else 404), (visibility, name)

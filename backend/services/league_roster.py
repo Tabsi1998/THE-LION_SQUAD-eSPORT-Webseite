@@ -629,10 +629,20 @@ async def season_overview(db, season: dict) -> dict:
     squads = {
         row["id"]: row
         for row in await db.team_squads.find(
-            {"id": {"$in": sorted({reg["squad_id"] for reg in regs})}}, {"_id": 0, "id": 1, "member_ids": 1, "name": 1, "status": 1}
+            {"id": {"$in": sorted({reg["squad_id"] for reg in regs})}},
+            {"_id": 0, "id": 1, "member_ids": 1, "name": 1, "status": 1, "captain_id": 1, "vice_captain_id": 1}
         ).to_list(500)
     } if regs else {}
     members = {uid for squad in squads.values() for uid in squad.get("member_ids") or [] if uid}
+    # Für „Kader bearbeiten“ (#2203): wen das Hauptteam überhaupt hat - nur Kennung und Name.
+    from services.match_audience import teams_by_id
+
+    teams = await teams_by_id(db, regs)
+    team_people = sorted({uid for team in teams.values() for uid in team.get("member_ids") or [] if uid})
+    team_names = {
+        row["id"]: person_name(row)
+        for row in await db.users.find({"id": {"$in": team_people}}, {"_id": 0, "id": 1, "display_name": 1, "username": 1}).to_list(len(team_people) + 1)
+    } if team_people else {}
     ctx = await context_for_season(db, season, members)
     divisions = {
         row["id"]: row
@@ -669,6 +679,15 @@ async def season_overview(db, season: dict) -> dict:
             "staffel_label": label or tournament.get("title"),
             "display_name": reg.get("display_name"),
             "players": players,
+            "team_id": reg.get("team_id"),
+            "squad_id": reg.get("squad_id"),
+            "squad_status": squad.get("status") or "active",
+            "captain_id": squad.get("captain_id"),
+            "vice_captain_id": squad.get("vice_captain_id"),
+            "member_ids": [uid for uid in squad.get("member_ids") or [] if uid],
+            "team_members": sorted(
+                ({"id": uid, "name": team_names[uid]} for uid in (teams.get(reg.get("team_id") or "") or {}).get("member_ids") or [] if uid in team_names),
+                key=lambda row: row["name"].lower()),
             # Kader unter Mindestgröße (#2202): gilt nur für aktive Co-Teams, solange die Staffel läuft.
             "member_count": len(players),
             "min_squad_size": minimum,

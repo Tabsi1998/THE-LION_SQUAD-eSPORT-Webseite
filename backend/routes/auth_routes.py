@@ -401,6 +401,10 @@ async def with_areas(user: dict) -> dict:
     from services.reference_series_access import has_captain_series
 
     doc["has_series_captain"] = await has_captain_series(get_db(), user)
+    # Zuständig in einer Liga (#2203): öffnet „Mein Dienst“ und die Liga-Seiten - die Routen prüfen selbst.
+    from services.league_permissions import has_league_duty
+
+    doc["has_league_staff"] = await has_league_duty(get_db(), user)
     doc.pop("_areas", None)
     return doc
 

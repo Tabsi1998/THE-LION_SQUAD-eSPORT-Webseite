@@ -181,7 +181,7 @@ Ablauf (`services/league_roster.py`):
 - **Sichtbarkeit:** die IDs der Spieler stehen im Block `league` der Matchseite (`roster[].game_id_text`,
   `lobby_ids`) nur für Beteiligte des Spiels und die Turnierleitung – wie Aufstellungen. Die eigene ID je laufender
   Season steht unter `GET /api/me/league-ids` (Hinweis im Profil). Die Kaderübersicht
-  (`GET /api/admin/leagues/seasons/{id}/roster`) sieht nur die Turnierleitung.
+  (`GET /api/admin/leagues/seasons/{id}/roster`) sieht nur, wer das Liga-Recht „Kader prüfen“ hat.
 - **Datenschutz:** Die Auskunft enthält `league_rosters`; das Löschen des Kontos löscht die Einträge
   (`account_erasure.PURGED`) – Aufstellungen und Ergebnisse bleiben ohne sie.
 
@@ -287,15 +287,16 @@ Staffel, Liga N oder Season dazu, bricht es danach mit 409 ab und lässt alles d
 
 ## 4. Rechte
 
-Angelehnt an `services/match_audience.py` (Verantwortliche/Spieler) und `auth.require_area` (Bereiche).
+Angelehnt an `services/match_audience.py` (Verantwortliche/Spieler) und `services/league_permissions.py` (Bereich Ligen und
+Zuständige, seit #2203, Rechte-Matrix in Abschnitt 12). Die Spalte „Liga-Recht“ heißt: Bereich `leagues` oder die passende
+Zuständigkeit dieser Liga, beides mit Zwei-Faktor. Der Bereich `tournaments` gibt in Staffeln nichts mehr.
 
-| Aktion | Turnierleitung (`require_area("tournaments")`, mit Zwei-Faktor) | Hauptteam-Leitung (Leitung, Co-Leitung) | Captain | Vertreter | Mitglied Co-Team |
+| Aktion | Liga-Recht | Hauptteam-Leitung (Leitung, Co-Leitung) | Captain | Vertreter | Mitglied Co-Team |
 | --- | --- | --- | --- | --- | --- |
 | Liga, Season, Liga N, Staffel anlegen/ändern, Spielplan, Start | ja | – | – | – | – |
 | Co-Team zuteilen/entfernen | ja | – | – | – | – |
 | Spiel-ID freigeben, Stichtag für neue Spieler (#2108) | ja | – | – | – | – |
-| Co-Team-Kader pflegen | ja (`_can_edit_team`) | ja | – | – | – |
-| Captain/Vertreter vergeben (mit Protokoll) | ja | ja | – | – | – |
+| Co-Team-Kader, Captain/Vertreter, Status, Löschen, solange es in einer nicht beendeten Staffel spielt (mit Protokoll) | `roster` | ja | – | – | – |
 | Eigene Rolle abgeben (`PUT …/roles` nur mit dem eigenen Feld auf `null`, #2110) | – | – | ja | ja | – |
 | Termin vorschlagen/annehmen | ja | nur Fallback¹ | ja | ja | – |
 | Ergebnis melden, bestätigen, Einspruch | ja | nur Fallback¹ | ja | ja | – |
@@ -462,7 +463,7 @@ gemeinsam, damit das Heimrecht fair bleibt.
 
 - **Schalter ist die Season-Sichtbarkeit** (Vorgabe `off`), kein globaler Schalter. Die Navigation zeigt „Liga“ nur,
   wenn die öffentliche Lese-API für die Person mindestens eine Season liefert.
-- **APIs (P1):** Verwaltung `/api/admin/leagues` (`require_area("tournaments")`): `GET ""` (Ligen mit Seasons, Spiele,
+- **APIs (P1):** Verwaltung `/api/admin/leagues` (Bereich `leagues` oder Zuständigkeit, Abschnitt 12): `GET ""` (Ligen mit Seasons, Spiele,
   Vorgaben), `POST ""`, `PATCH /{league_id}`, `POST /{league_id}/seasons`, `GET|PATCH /seasons/{id}` (mit Kalender,
   Map-Pool, Liga N samt Staffeln), `PUT|DELETE /seasons/{id}/map-pool`, `POST /seasons/{id}/sync`,
   `POST /seasons/{id}/divisions`, `PATCH /divisions/{id}`, `POST /divisions/{id}/staffeln`; seit #2106
@@ -475,7 +476,7 @@ gemeinsam, damit das Heimrecht fair bleibt.
 | `league_seasons.visibility` | Ligaseite | Staffel-Turniere (`visibility`, `is_public`) |
 | --- | --- | --- |
 | `off` | 404 | `internal`, `false`, Status bleibt `draft` |
-| `admins` | nur Turnierleitung | `internal`, `false` |
+| `admins` | nur Bereich Ligen und Zuständige dieser Liga | `internal`, `false` |
 | `members` | wie Turnier-Sichtbarkeit `members` | `members`, `true` |
 | `public` | alle | `public`, `true` |
 
@@ -567,6 +568,104 @@ competition_sanctions ──▶ league_eligibility (Aufstellung, Check-in, Anmel
 | Tabellen-Regeln | E.1 | Direkter Vergleich, Mini-Tabelle, Default-Win, Punktabzug | `scoring_rules`, `standings_for_structure` |
 | `competition_sanctions` | E.3 | Strafen mit Wirkung, Moderation bleibt getrennt | `penalty_routes.py` |
 | `league_final_tables` | F.1 | Dauerhafter Endstand, Meister | Muster `record_tournament_awards` |
+
+### B.1 Bereich „Ligen“, Zuständige, Befangenheit (#2203)
+
+**Bereich `leagues`** (Zwei-Faktor Pflicht, vergibt der Superadmin unter Alle Benutzer): darf alle Ligen und alle Zuständigkeiten.
+Superadmin und Club-Admin haben ihn über `frozenset(AREAS)`. Die Rolle `tournament_admin` hat ihn **nicht**. Der Bereich
+`tournaments` gibt in einer Staffel nichts mehr außer dem, was jede Person lesen darf. Keine Migration vergibt Rechte: Nach dem
+Release vergibt der Superadmin den Bereich einmalig.
+
+**Zuständige je Liga** (`league_staff`, eine Zeile je Person und Liga):
+
+| Feld | Inhalt |
+| --- | --- |
+| `id` | Kennung |
+| `league_id`, `user_id` | Liga und Person, eindeutig zusammen |
+| `capabilities[]` | Zuständigkeiten, mindestens eine, nur aus der Liste unten |
+| `created_at`, `created_by`, `updated_at`, `updated_by` | Wer es wann vergeben oder geändert hat |
+
+Eigene Sammlung statt Feld an `leagues`: Das Liga-Dokument geht an die Verwaltung und in Teilen an die Öffentlichkeit, „meine Ligen“
+je Person läuft über den Index `user_id`, Löschen des Kontos und Auskunft (`personal_data.py`) brauchen je Person eine Zeile.
+
+| Zuständigkeit | Schlüssel | Was dazugehört |
+| --- | --- | --- |
+| Liga verwalten | `manage` | Liga bearbeiten, Season anlegen und löschen, Status und Sperre einer Staffel, Staffel-Einstellungen, Helfer der Staffel |
+| Season konfigurieren | `season` | Season ändern, Map-Pool, Liga N, Staffel anlegen und löschen, Übertragen, Spielplan und Phasen |
+| Teams freigeben | `applications` | Co-Team zuteilen und herausnehmen, Teilnehmerliste, Austritt |
+| Kader prüfen | `roster` | Kaderübersicht mit Spiel-IDs, neue ID freigeben, Stichtag |
+| Spiele betreuen | `matches` | Termine, Terminvorschläge entscheiden, Spielplan freigeben, Aufstellungen lesen, Check-in |
+| Ergebnisse korrigieren | `results` | Ergebnis eintragen und korrigieren, Rückgängig, kampflos, nicht erschienen, Aufstellung nachtragen als Leitung |
+| Proteste | `disputes` | Streitfälle entscheiden (zusammen mit `results` auch über eine Korrektur) |
+| Strafen | `sanctions` | Vorgesehen für E.3, heute noch ohne eigene Route |
+| Regeln veröffentlichen | `rules` | Regeltext der Season, ab B.2 die Versionen |
+
+Regeln: Wer den Bereich hat, darf alle Ligen. Zuständige haben nur ihre Liga und nur ihre Zuständigkeiten. Liga anlegen und löschen
+und die Vergabe der Zuständigen brauchen den Bereich. Vergabe mit Protokoll (`league.staff.grant`, `league.staff.update`,
+`league.staff.revoke`) und Meldung an die Person (`rights_change`). Ohne bestätigte Zwei-Faktor-Anmeldung gilt weder Bereich noch
+Zuständigkeit. Ein Zuständiger braucht keinen Bereich; `/admin` führt ihn über „Mein Dienst“ zu seinen Ligen.
+
+**Befangenheit** (`league_permissions.conflict_of_interest(db, user, match, decided_by=None)`): Befangen ist, wer zu einer Seite des
+Spiels gehört: Kader des Co-Teams, Captain, Vertreter, Hauptteam-Leitung, Person der Anmeldung, oder wer in einer Aufstellung des
+Spiels steht. Dann gibt es dort keine Ergebnis-Korrektur, keine Protest-Entscheidung und keine Strafe zum Spiel. Es entscheidet eine
+zweite berechtigte Person. Dasselbe gilt für den direkt gesetzten Termin: `matches` setzt im eigenen Spiel keinen Termin, als Captain oder
+Vertreter gilt Vorschlag und Zustimmung wie für jede Seite. Notausnahme nur für den Superadmin, mit Pflichtgrund (mindestens fünf Zeichen, Feld
+`conflict_reason`) und Protokoll `league.conflict.override`. Ein gehaltenes Ergebnis prüft Konto, Zwei-Faktor, Liga-Recht und Befangenheit beim
+Veröffentlichen noch einmal; passt es nicht mehr, fällt es weg (`match.result.hold_failed`, Nachricht an die Person). Die Notausnahme gilt dabei, wenn sie
+beim Ablegen gesetzt war. `decided_by` ist für E.3: Einen Einspruch entscheidet nie die Person, die die Ausgangsentscheidung
+traf, auch nicht der Superadmin. Die eigene Seite handelt weiter als Captain oder Vertreter (melden, bestätigen, Termin).
+
+**Helfer an Staffeln:** `organizer`, `referee`, `scorekeeper`, `station_manager` und `stream_operator` lesen in Staffeln wie bisher
+(`READ_STAFF_ROLES`), ändern dort aber nichts. Andere Turniere bleiben unverändert.
+
+**Rechte-Matrix.** „Staffel“ meint `/api/tournaments/{tid}/…` und `/api/matches/{id}/…` eines Turniers mit `league_context`. Das
+Recht in der Spalte gilt zusätzlich zum Bereich `leagues`, der alles darf. Bereich `tournaments` allein, Helfer und Moderation: kein
+Zugriff, außer „lesen“ steht in der Zeile. Prüfung: `backend/tests/test_league_rights_matrix_flow.py`.
+
+| Route | Liga-Recht | Befangenheit | Helfer |
+| --- | --- | --- | --- |
+| `POST /api/admin/leagues`, `DELETE /api/admin/leagues/{id}`, `GET …/{id}/delete-plan` | nur Bereich | – | – |
+| `GET /api/admin/leagues` | jede Zuständigkeit, nur die eigenen Ligen | – | – |
+| `GET /api/admin/leagues/seasons/{id}` | jede Zuständigkeit der Liga | – | – |
+| `PATCH /api/admin/leagues/{id}`, `POST …/{id}/seasons` | `manage` | – | – |
+| `DELETE …/seasons/{id}`, `GET …/seasons/{id}/delete-plan` | `manage` | – | – |
+| `PATCH …/seasons/{id}` | `season`; `rules_text` braucht `rules` | – | – |
+| `PUT`, `DELETE …/seasons/{id}/map-pool`, `POST …/seasons/{id}/sync` | `season` | – | – |
+| `POST …/seasons/{id}/divisions`, `PATCH`, `DELETE …/divisions/{id}`, `GET …/delete-plan` | `season` | – | – |
+| `POST …/divisions/{id}/staffeln`, `DELETE …/staffeln/{tid}` | `season` | – | – |
+| `GET …/seasons/{id}/roster`, `POST …/roster/{uid}/approve`, `PUT …/roster-settings` | `roster` | – | – |
+| `GET …/{id}/staff` | `manage` | – | – |
+| `PATCH`, `PUT …/roles`, `DELETE /api/teams/{id}/squads/{sid}` eines Co-Teams in nicht beendeter Staffel | `roster` oder eigenes Team | – | – |
+| `PUT`, `DELETE …/{id}/staff/{uid}` | nur Bereich | – | – |
+| Staffel: `PATCH`, `POST /lock`, `/unlock`, `/status`, `PUT /pause`, `/round-sponsors`, `/onsite-access` | `manage` | – | – |
+| Staffel: `DELETE`, `bracket/*`, `reset-bracket`, `stages*`, `swiss/*`, `groups/generate`, `heat-rebuild/*`, Map-Pool | `season` | – | – |
+| Staffel: `POST`, `PUT`, `DELETE /staff` | `manage` | – | – |
+| Staffel: `GET /staff`, `/lead`, `/planning-check`, `/match-plan.csv`, `/bracket/display`, `/schedule/deadlines`, Chat, Teilnehmer intern | jede Zuständigkeit | – | lesen |
+| Staffel: `squad-candidates`, `squad-registrations`, `registrations` schreiben, `removal*`, `assignable-users` | `applications` | – | – |
+| Staffel: `registrations/{id}/checkin`, `print/checkin`, `schedule/plan`, `/apply`, `/release`, `live-queue/*`, Team-Tag `lineups` | `matches` | – | – |
+| Spiel: `PATCH` (Termin und Betreuung), `schedule/apply` und `/release` mit eigenem Spiel | `matches` | ja, im Sammellauf ohne Notausnahme | – |
+| Spiel: Terminvorschläge entscheiden und zurückziehen | `matches`; Beteiligte nur als Captain oder Vertreter wie jede Seite | ja | – |
+| Spiel: `POST /result`, `/result/undo`, `/forfeit`, `PUT /lineups` als Leitung, `POST …/lead/no-show/{id}` | `results` | ja | – |
+| Spiel: `POST /dispute/decision` | `disputes` | ja | – |
+| Spiel: `POST /result` bei offenem Streitfall | `results` und `disputes` | ja | – |
+| Spiel: `POST /dispute` (ohne eigene Seite) | `disputes` | nein | – |
+| Spiel: `POST /proof-photos` als Leitung, `matches-v2/recalculate-advancement` | `results` | nein | – |
+| PDF-Exporte und Ergebnis-Vorabzug einer Staffel | jede Zuständigkeit | – | – |
+| Zugangslinks, TV-Schlüssel, Stationen, Gewinne an einer Staffel | zusätzlich zum Bereich `tournaments`: `manage` | – | – |
+| Öffentliche Ligaseite, Staffel, Spielplan, Tabelle, Matchseite | nach Sichtbarkeit; Sichtbarkeit `admins` nur mit Liga-Recht | – | lesen |
+
+**Co-Teams in nicht beendeten Staffeln** (`PATCH`, `PUT …/roles`, `DELETE /api/teams/{id}/squads/{sid}`): Kader, Captain, Vertreter, Status und
+Löschen ändern nur die Leitung und Co-Leitung des eigenen Teams und die Liga-Leitung mit `roster`, bei mehreren Ligen in jeder. Die Rolle
+`tournament_admin` und die Freigabe `tournaments` nicht mehr. `GET …/squads` sagt je Co-Team `can_edit`; wer nur `roster` hat, liest nur die Co-Teams
+seiner Liga. Die Liga-Leitung bearbeitet aus der Kaderübersicht der Season („Kader bearbeiten“), Protokoll `league.squad.edit`. Die eigene Rolle
+abgeben geht weiter. Alle anderen Teams und Co-Teams, auch nach dem Ende der Staffel, bleiben wie bisher.
+
+**Bewusst unverändert:** Die übrige Team-Verwaltung (`team_routes.py`, Team-Admin-Rollen) bleibt ein eigener Rechtebereich.
+Jahreswertung, Spiele und Map-Bibliothek bleiben beim Bereich `tournaments`. Die Moderation bleibt getrennt.
+
+**Antworten an das Web:** `GET /api/tournaments/{tid}` schickt bei Staffeln `league_capabilities[]` und `can_edit_staffel`; die
+Matchseite `conflict` (`{"kind": "involved", "override": bool}` oder `null`); `matches-v2` einer Staffel für die Leitung `viewer_involved` und `viewer_override`; die Verwaltung je Liga `capabilities[]`. `GET /api/auth/me`
+schickt `has_league_staff`.
 
 ### Darf nicht beschädigt werden
 

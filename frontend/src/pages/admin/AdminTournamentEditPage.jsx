@@ -35,7 +35,7 @@ export default function AdminTournamentEditPage() {
   // Globale Aktionen nur für die Turnierleitung mit Zwei-Faktor (#1028), Helfer sehen die ihres Einsatzes.
   // Turnierleitung über alle Turniere (mit Zwei-Faktor) für Einstellungen, Team, Sperren und Zugangslinks; alles
   // andere nach den Rechten, die der Server je Turnier schickt (#1353) - nicht nach „irgendein Adminbereich“.
-  const { isTournamentLead } = useAuth();
+  const { isTournamentLead: tournamentLead } = useAuth();
   const { id } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const [t, setT] = useState(null);
@@ -115,7 +115,8 @@ export default function AdminTournamentEditPage() {
     const missing = (failure, what) => (failure?.response?.status === 403
       ? formatRequestError(failure, `Dafür fehlt dir das Recht: ${what}.`)
       : `${what} lassen sich gerade nicht laden.`);
-    if (isTournamentLead) {
+    // In einer Staffel (#2203) zählt das Liga-Recht, nicht der Bereich Turnierleitung.
+    if (isStaffel(data) ? data.can_edit_staffel : tournamentLead) {
       try {
         const { data: s } = await api.get(`/tournaments/${id}/staff`);
         setStaff(s || []);
@@ -135,7 +136,7 @@ export default function AdminTournamentEditPage() {
         setTeamsError(missing(failure, "Teams dieses Turniers"));
       }
     }
-  }, [id, isTournamentLead]);
+  }, [id, tournamentLead]);
 
   // Ohne diesen Fang bleibt die Seite bei unerreichbarem Backend stumm auf
   // "Lade…" stehen und die Rejection landet unbehandelt in der Konsole.
@@ -465,6 +466,8 @@ export default function AdminTournamentEditPage() {
   };
   // Liga-Staffel (#2109): nur, was die Liga braucht - Season-Werte lesend, keine Anmeldung, kein Check-in.
   const staffel = isStaffel(t);
+  // „Liga verwalten“ an der Staffel (#2203): Der Bereich Turnierleitung gibt hier nichts - der Server sagt, was die Person darf.
+  const isTournamentLead = staffel ? Boolean(t.can_edit_staffel) : tournamentLead;
   const availableTabs = [
     ["participants", "Teilnehmer"],
     // Eine Liga hat keinen Baum (#2109, S16): der Reiter zeigt den Weg zu Tabelle und Spielplan.
@@ -647,7 +650,7 @@ export default function AdminTournamentEditPage() {
           auch nicht (#2111, TA4): der QR-Code gilt für die Halle. */}
       {isTournamentLead && !t.league_context && ONSITE_EVENT_MODES.has(t.event_mode) && <div className="mb-5"><OnsiteAccessPanel tournamentId={t.id} /></div>}
       {/* Staffel (S21): Zugangslinks nur zum Ansehen - angemeldet wird nicht, Co-Teams werden zugeteilt. */}
-      {isTournamentLead && <div className="mb-5"><AccessLinksPanel targetType="tournament" targetId={t.id} allowRegister={!staffel} collapsible /></div>}
+      {tournamentLead && isTournamentLead && <div className="mb-5"><AccessLinksPanel targetType="tournament" targetId={t.id} allowRegister={!staffel} collapsible /></div>}
 
       <TournamentFlowStepper
         tournament={t}
@@ -672,7 +675,7 @@ export default function AdminTournamentEditPage() {
       {activeTab === "participants" && (
         <div className="space-y-4">
         {/* Liga (#1649): Co-Teams teilt die Turnierleitung von Hand zu - Hauptteam, dann Co-Team, mit allen Prüfungen. */}
-        {isTournamentLead && canAssignSquads(t) && (
+        {(staffel ? t.can_manage_participants : isTournamentLead) && canAssignSquads(t) && (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-white/10 bg-[#121212] p-4">
             {/* T9 (#2109): nur in einer Staffel sind Co-Teams die Teilnehmer; ein Turnier im Format Liga nimmt auch ganze Teams. */}
             <p className="min-w-0 flex-1 text-sm text-white/60" data-testid="admin-tr-squad-hint">

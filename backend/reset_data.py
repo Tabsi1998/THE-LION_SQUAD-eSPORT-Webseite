@@ -19,7 +19,7 @@ RESET_COLLECTIONS = [
     "documents", "season_points", "audit_logs", "email_logs", "notifications",
     "password_reset_tokens", "login_attempts", "user_achievements", "achievements",
     "achievement_groups", "mail_jobs", "media_uploads", "prize_pickups",
-    "club_member_profiles", "tournament_staff_assignments", "event_registrations",
+    "club_member_profiles", "tournament_staff_assignments", "league_staff", "event_registrations",
     "tournament_stages", "matches_v2", "match_reports_v2",
     "match_schedule_proposals", "match_chat_messages", "direct_messages",
     "team_chat_messages", "team_invites", "dissolved_teams",

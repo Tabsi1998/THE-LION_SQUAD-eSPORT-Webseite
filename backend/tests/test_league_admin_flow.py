@@ -299,12 +299,14 @@ async def test_season_input_is_checked(flow):
 # ---------------------------------------------------------------- Rechte
 
 @pytest.mark.asyncio
-async def test_only_the_tournament_lead_with_two_factor_manages_leagues(flow):
+async def test_only_league_rights_with_two_factor_manage_leagues(flow):
     _admin, game, league, season, division, _maps = await setup_league(flow)
     member = await flow.add_user(name="mitglied")
     member["is_club_member"] = True
-    unconfirmed = await flow.add_user(role="tournament_admin", name="ohne-2fa")
+    unconfirmed = await flow.add_user(name="ohne-2fa")
+    unconfirmed["areas"] = ["leagues"]
     unconfirmed["auth_mfa_verified"] = False
+    tournament_lead = await flow.add_user(role="tournament_admin", name="turnierleitung")  # gibt in der Liga nichts (#2203)
     calls = [
         ("get", ADMIN, None),
         ("post", ADMIN, {"name": "Fremde Liga", "game_id": game["id"]}),
@@ -317,7 +319,7 @@ async def test_only_the_tournament_lead_with_two_factor_manages_leagues(flow):
         ("post", f"{ADMIN}/seasons/{season['id']}/sync", None),
         ("delete", f"{ADMIN}/seasons/{season['id']}/map-pool", None),
     ]
-    for person, expected in ((None, 401), (member, 403), (unconfirmed, 403)):
+    for person, expected in ((None, 401), (member, 403), (unconfirmed, 403), (tournament_lead, 403)):
         flow.act_as(person)
         for method, url, body in calls:
             kwargs = {"json": body} if body is not None else {}
@@ -326,7 +328,8 @@ async def test_only_the_tournament_lead_with_two_factor_manages_leagues(flow):
     assert await flow.db.tournaments.count_documents({}) == 0
     assert (await flow.db.leagues.find_one({"id": league["id"]}))["name"] == "Probe-Liga"
 
-    lead = await flow.add_user(role="tournament_admin", name="turnierleitung")
+    lead = await flow.add_user(name="ligaleitung")
+    lead["areas"] = ["leagues"]
     flow.act_as(lead)
     assert (await flow.get(ADMIN)).status_code == 200
 

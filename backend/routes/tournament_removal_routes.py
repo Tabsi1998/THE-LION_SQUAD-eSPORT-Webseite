@@ -33,7 +33,7 @@ class RemovalDecision(BaseModel):
 
 
 async def _structure_staff(db, tid: str, reg_id: str, me: dict) -> tuple[dict, dict]:
-    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES, "tournament")
+    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES, "tournament", capability="applications")
     tournament = await _ensure_tournament_unlocked(db, tid)
     registration = await db.tournament_registrations.find_one({"id": reg_id, "tournament_id": tid}, {"_id": 0})
     if not registration:

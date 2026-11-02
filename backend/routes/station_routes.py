@@ -11,10 +11,12 @@ from services import game_usage
 from services.access_links import validate_access_link
 from services.change_events import reset_scope_cache
 from services.heat_rebuild import evaluate_after_write, reevaluate_after_release
+from services.league_permissions import READ
 from services.tournament_permissions import (
     READ_STAFF_ROLES,
     STATION_ASSIGN_ROLES,
     has_tournament_staff_permission,
+    require_lead_for_staffel,
     is_global_tournament_admin,
     is_global_tournament_staff,
     require_tournament_staff_permission,
@@ -39,8 +41,8 @@ async def _ensure_tournament_unlocked(db, tournament_id: str) -> None:
 
 async def _require_station_permission(user: dict, tournament_id: str, station_id: str | None = None) -> None:
     allowed = (
-        await has_tournament_staff_permission(user, tournament_id, STATION_ASSIGN_ROLES, "tournament")
-        or (station_id and await has_tournament_staff_permission(user, tournament_id, STATION_ASSIGN_ROLES, "station", station_id))
+        await has_tournament_staff_permission(user, tournament_id, STATION_ASSIGN_ROLES, "tournament", capability="matches")
+        or (station_id and await has_tournament_staff_permission(user, tournament_id, STATION_ASSIGN_ROLES, "station", station_id, capability="matches"))
     )
     if not allowed:
         raise HTTPException(status_code=403, detail="Keine Turnierberechtigung für diese Station")
@@ -151,7 +153,7 @@ class _StationView:
         tournament = await self.db.tournaments.find_one({"id": tournament_id}, {"_id": 0})
         if not tournament:
             return None
-        if await has_tournament_staff_permission(self.user, tournament_id, READ_STAFF_ROLES):
+        if await has_tournament_staff_permission(self.user, tournament_id, READ_STAFF_ROLES, capability=READ):
             return "full"
         if await tournament_hidden_reason(self.db, tournament, self.user) is None:
             return "listed"
@@ -208,6 +210,7 @@ async def create_station(body: StationCreate, me: dict = Depends(require_admin()
     if doc.get("tournament_id") and not await db.tournaments.find_one({"id": doc["tournament_id"]}, {"id": 1}):
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     if doc.get("tournament_id"):
+        await require_lead_for_staffel(me, doc["tournament_id"])
         await _ensure_tournament_unlocked(db, doc["tournament_id"])
     if await game_usage.chosen_is_archived(db, doc.get("game_id")):
         raise HTTPException(status_code=422, detail=game_usage.ARCHIVED_DETAIL)
@@ -233,10 +236,12 @@ async def update_station(sid: str, body: StationUpdate, me: dict = Depends(requi
     if not current:
         raise HTTPException(status_code=404, detail="Station nicht gefunden")
     if current.get("tournament_id"):
+        await require_lead_for_staffel(me, current["tournament_id"])
         await _ensure_tournament_unlocked(db, current["tournament_id"])
     if updates.get("tournament_id") and not await db.tournaments.find_one({"id": updates["tournament_id"]}, {"id": 1}):
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     if updates.get("tournament_id"):
+        await require_lead_for_staffel(me, updates["tournament_id"])
         await _ensure_tournament_unlocked(db, updates["tournament_id"])
     if "name" in updates:
         updates["name"] = str(updates["name"]).strip()
@@ -385,6 +390,7 @@ async def bulk_create_stations(body: dict, me: dict = Depends(require_admin())):
     if tournament_id and not await db.tournaments.find_one({"id": tournament_id}, {"id": 1}):
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     if tournament_id:
+        await require_lead_for_staffel(me, tournament_id)
         await _ensure_tournament_unlocked(db, tournament_id)
     count = int(body.get("count") or 0)
     if count < 1 or count > 64:
@@ -428,7 +434,7 @@ async def auto_assign_stations(tournament_id: str, start_now: bool = False,
     if not tournament:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     await _ensure_tournament_unlocked(db, tournament_id)
-    await require_tournament_staff_permission(me, tournament_id, STATION_ASSIGN_ROLES, "tournament")
+    await require_tournament_staff_permission(me, tournament_id, STATION_ASSIGN_ROLES, "tournament", capability="matches")
     if plan and not start_now:
         # Planen heißt seit #1552: der Spielplaner rechnet Zeit und Station zusammen - hier nur als Vorschau.
         # Geschrieben wird allein über POST /tournaments/{tid}/schedule/apply mit dem Fingerabdruck der Vorschau.
@@ -551,6 +557,7 @@ async def delete_station(sid: str, me: dict = Depends(require_admin())):
     db = get_db()
     station = await db.stations.find_one({"id": sid}, {"_id": 0})
     if station and station.get("tournament_id"):
+        await require_lead_for_staffel(me, station["tournament_id"])
         await _ensure_tournament_unlocked(db, station["tournament_id"])
     # Nicht löschen, solange ein Spiel daran hängt, das nicht vorbei ist (Praxis 14.10.): sonst behielte es die Kennung
     # einer Station, die es nicht mehr gibt, samt fester Zeit - der Plan wäre nicht mehr zu lesen. Stilles Lösen wäre

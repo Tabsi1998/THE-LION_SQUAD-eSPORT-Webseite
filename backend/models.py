@@ -1080,6 +1080,8 @@ class MatchLineupAmend(BaseModel):
     games: List[MatchLineupAmendGame] = Field(min_length=1, max_length=MATCH_GAMES_MAX)
     registration_id: Optional[str] = Field(default=None, max_length=100)
     reason: Optional[str] = Field(default=None, max_length=500)
+    # Notausnahme des Superadmins bei Befangenheit (#2203, docs/LIGA.md Abschnitt 12).
+    conflict_reason: Optional[str] = Field(default=None, max_length=500)
 
 
 class MatchV2ResultEntry(BaseModel):
@@ -1102,11 +1104,15 @@ class MatchV2ResultSubmit(BaseModel):
     reason: Optional[str] = Field(default=None, max_length=500)
     # Liga (#1650): Maps samt Aufstellungen beider Seiten - freiwillig, sonst bleiben die Maps des Spiels.
     games: Optional[List[MatchGameAdmin]] = Field(default=None, max_length=MATCH_GAMES_MAX)
+    # Notausnahme des Superadmins bei Befangenheit (#2203).
+    conflict_reason: Optional[str] = Field(default=None, max_length=500)
 
 
 class MatchResultUndo(BaseModel):
     # Das „Rückgängig“ nennt den Eintrag, den es zurücknehmen will - nur der letzte eines Spiels zählt.
     hold_id: Optional[str] = None
+    # Notausnahme des Superadmins bei Befangenheit (#2203).
+    conflict_reason: Optional[str] = Field(default=None, max_length=500)
 
 
 MatchScoreReport.model_rebuild()
@@ -1144,6 +1150,8 @@ class MatchUpdate(BaseModel):
     map: Optional[str] = None
     best_of: Optional[int] = None
     duration_minutes: Optional[int] = None
+    # Notausnahme des Superadmins bei Befangenheit (#2203) - geht ins Protokoll, nicht ans Spiel.
+    conflict_reason: Optional[str] = Field(default=None, max_length=500)
 
 
 class MatchV2Update(BaseModel):
@@ -1168,6 +1176,8 @@ class MatchDisputeDecision(BaseModel):
     # „Ergebnis ändern“ läuft über das Ergebnis-Fenster (Korrektur mit Grund).
     decision: Literal["keep"]
     note: Optional[str] = Field(default=None, max_length=500)
+    # Notausnahme des Superadmins bei Befangenheit (#2203).
+    conflict_reason: Optional[str] = Field(default=None, max_length=500)
 
 
 # ---------- F1 ----------
@@ -2503,6 +2513,13 @@ class LeagueDivisionUpdate(BaseModel):
 class LeagueStaffelCreate(BaseModel):
     """Staffel anlegen: ohne Buchstaben die nächste freie (A, B, …)."""
     staffel: Optional[str] = Field(default=None, pattern=r"^[A-Za-z]$")
+
+
+class LeagueStaffUpdate(BaseModel):
+    """Zuständigkeiten einer Person in einer Liga (#2203). Geprüft wird in der Route: mindestens eine, nur bekannte."""
+    model_config = ConfigDict(extra="forbid")
+
+    capabilities: List[str] = Field(default_factory=list, max_length=20)
 
 
 class LeagueDelete(BaseModel):

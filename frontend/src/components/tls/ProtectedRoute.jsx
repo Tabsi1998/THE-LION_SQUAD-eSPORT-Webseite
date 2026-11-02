@@ -1,6 +1,6 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { ADMIN_AREAS, MFA_AREAS, adminHome, hasArea, hasSeriesCaptain, isAnyAdmin, leadWithoutSecondFactor, mfaSetupPath, needsSecondFactor } from "@/lib/permissions";
+import { ADMIN_AREAS, MFA_AREAS, adminHome, hasArea, hasLeagueStaff, hasSeriesCaptain, isAnyAdmin, leadWithoutSecondFactor, mfaSetupPath, needsSecondFactor } from "@/lib/permissions";
 import { SkeletonDetailHeader } from "@/components/tls/Skeleton";
 
 // Rechte nach Bereichen (#287): `requireArea` verlangt einen der genannten
@@ -17,8 +17,10 @@ import { SkeletonDetailHeader } from "@/components/tls/Skeleton";
 // `requireDuty` öffnet „Mein Dienst“ für alle mit einem Dienst - Helfer, Moderation oder Verwaltung.
 // `allowSeriesCaptain` (#1749) öffnet eine Seite mit `requireArea` zusätzlich für Captains externer Serien - wie im
 // Server nur mit bestätigter Zwei-Faktor-Anmeldung; welche Serie, prüft der Server bei jedem Aufruf.
+// `allowLeagueStaff` (#2203) öffnet eine Seite für den Bereich Ligen und für Zuständige einer Liga - nur mit bestätigter
+// Zwei-Faktor-Anmeldung; welche Liga und welche Zuständigkeit, prüft der Server bei jedem Aufruf.
 
-export function ProtectedRoute({ children, requireArea = null, requireAdmin = false, requireClubAdmin = false, requireMember = false, requireTournamentStaff = false, adminHome: entrance = false, requireDuty = false, allowSeriesCaptain = false }) {
+export function ProtectedRoute({ children, requireArea = null, requireAdmin = false, requireClubAdmin = false, requireMember = false, requireTournamentStaff = false, adminHome: entrance = false, requireDuty = false, allowSeriesCaptain = false, allowLeagueStaff = false }) {
   const { user } = useAuth();
   const loc = useLocation();
   const wantedAreas = requireArea ? [requireArea].flat() : requireClubAdmin ? ["system"] : requireAdmin ? ADMIN_AREAS : [];
@@ -42,6 +44,10 @@ export function ProtectedRoute({ children, requireArea = null, requireAdmin = fa
     return children;
   }
   if (allowSeriesCaptain && hasSeriesCaptain(user) && !hasArea(user, ...wantedAreas)) {
+    if (needsSecondFactor(user)) return <Navigate to={mfaSetupPath(loc.pathname)} replace />;
+    return children;
+  }
+  if (allowLeagueStaff && (hasLeagueStaff(user) || hasArea(user, "leagues")) && !hasArea(user, "tournaments", ...wantedAreas) && !user.has_staff_assignment) {
     if (needsSecondFactor(user)) return <Navigate to={mfaSetupPath(loc.pathname)} replace />;
     return children;
   }

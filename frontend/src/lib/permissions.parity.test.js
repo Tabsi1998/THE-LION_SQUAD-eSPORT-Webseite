@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { ADMIN_AREAS, AREAS, GRANTABLE_AREAS, MFA_AREAS, ROLE_AREAS } from "@/lib/permissions";
+import { ADMIN_AREAS, AREAS, GRANTABLE_AREAS, LEAGUE_CAPABILITIES, MFA_AREAS, ROLE_AREAS } from "@/lib/permissions";
 
 // Eine Rechte-Liste, zwei Orte (#1353): `lib/permissions.js` spiegelt `backend/services/permissions.py`. Menü,
 // Seiten-Schutz und Knöpfe fragen das Web, der Server prüft selbst - laufen die Listen auseinander, zeigt das Web Knöpfe,
@@ -21,6 +21,27 @@ test("Bereiche, vergebbare Bereiche und Bereiche mit Zwei-Faktor wie im Server",
   expect(strings(block(server, /^AREAS: tuple\[str, \.\.\.\] = \(([^)]*)\)/m))).toEqual(AREAS);
   expect(strings(block(server, /^GRANTABLE_AREAS: tuple\[str, \.\.\.\] = \(([^)]*)\)/m))).toEqual(GRANTABLE_AREAS);
   expect(strings(block(server, /^MFA_AREAS: frozenset\[str\] = frozenset\(\{([^}]*)\}\)/m)).sort()).toEqual([...MFA_AREAS].sort());
+});
+
+test("Zuständigkeiten je Liga wie im Server (#2203)", () => {
+  const leagues = readFileSync(path.join(repo, "backend/services/league_permissions.py"), "utf8");
+  const keys = strings(block(leagues, /^CAPABILITIES: tuple\[str, \.\.\.\] = \(([^)]*)\)/m));
+  expect(keys).toEqual(LEAGUE_CAPABILITIES.map((row) => row.key));
+  const labels = block(leagues, /^CAPABILITY_LABELS: dict\[str, str\] = \{([\s\S]*?)^\}/m);
+  const parsed = Object.fromEntries([...labels.matchAll(/"([a-z_]+)": "([^"]+)"/g)].map(([, key, label]) => [key, label]));
+  expect(parsed).toEqual(Object.fromEntries(LEAGUE_CAPABILITIES.map((row) => [row.key, row.label])));
+});
+
+test("Die Liga hängt am Bereich Ligen, nicht an der Turnierleitung (#2203)", () => {
+  const layout = readFileSync(path.join(repo, "frontend/src/components/tls/AdminLayout.jsx"), "utf8");
+  expect(layout).toMatch(/\{ to: "\/admin\/leagues", label: "Liga", icon: Layers, areas: \["leagues"\], leagueStaff: true/);
+  const app = readFileSync(path.join(repo, "frontend/src/App.jsx"), "utf8");
+  expect(app).toMatch(/path="\/admin\/leagues" element=\{<ProtectedRoute requireArea="leagues" allowLeagueStaff>/);
+  expect(app).toMatch(/path="\/admin\/leagues\/seasons\/:seasonId" element=\{<ProtectedRoute requireArea="leagues" allowLeagueStaff>/);
+  // Eine Rolle bekommt den Bereich nur über `frozenset(AREAS)` - die Turnierleitung nicht.
+  expect(ROLE_AREAS.tournament_admin).not.toContain("leagues");
+  expect(ROLE_AREAS.superadmin).toContain("leagues");
+  expect(ROLE_AREAS.club_admin).toContain("leagues");
 });
 
 test("Bereiche je Rolle wie im Server", () => {

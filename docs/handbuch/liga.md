@@ -1,6 +1,6 @@
 # Liga leiten – Handbuch
 
-Für die **Turnierleitung** (und den Obmann der Liga): eine Liga über Wochen aufsetzen, starten und durch die Season
+Für die **Liga-Leitung** (und den Obmann der Liga): eine Liga über Wochen aufsetzen, starten und durch die Season
 bringen – am Beispiel der CoD-Liga, Season 1 (Start Di 10.11.2026). Ohne Vorwissen lesbar; was technisch dahinter
 steckt, steht in [LIGA.md](../LIGA.md). Für die Captains der Co-Teams gibt es einen eigenen
 [Spickzettel](liga-captains.md), zum Abhaken vor dem Start die [Checkliste für den Obmann](#6-checkliste-für-den-obmann-bis-911).
@@ -14,10 +14,12 @@ steckt, steht in [LIGA.md](../LIGA.md). Für die Captains der Co-Teams gibt es e
   zuteilen**) – Co-Teams zuteilen, starten, Spiele, Ergebnisse
 - **Ligaseite** (`/liga/<liga>/<season>`, etwa `/liga/call-of-duty/season-1`) – was Mitglieder und Gäste sehen
 
-Wer was darf: Liga, Season, Liga N, Staffel, Zuteilen, Start und Korrekturen macht nur die **Turnierleitung mit
-bestätigter Zwei-Faktor-Anmeldung**. Co-Teams, Captain und Vertreter pflegt die **Teamleitung** (Leitung oder
-Co-Leitung des Hauptteams) im Profil. Termine, Melden, Bestätigen und Einspruch machen **Captain und Vertreter** des
-Co-Teams – hat ein Co-Team keinen von beiden, die Teamleitung.
+Wer was darf: Liga, Season, Liga N, Staffel, Zuteilen, Start und Korrekturen macht nur die **Liga-Leitung mit
+bestätigter Zwei-Faktor-Anmeldung**: wer den Bereich **Ligen** hat oder in dieser Liga **zuständig** ist, siehe
+[2.11](#211-bereich-ligen-und-zuständige). Wo dieses Handbuch und die Oberfläche von „Turnierleitung“ schreiben, ist bei einer
+Liga genau diese Liga-Leitung gemeint. Der Bereich **Turnierleitung allein gibt in der Liga nichts mehr**. Co-Teams, Captain und
+Vertreter pflegt die **Teamleitung** (Leitung oder Co-Leitung des Hauptteams) im Profil. Termine, Melden, Bestätigen und Einspruch
+machen **Captain und Vertreter** des Co-Teams – hat ein Co-Team keinen von beiden, die Teamleitung.
 
 ---
 
@@ -114,7 +116,7 @@ festgehaltenem Pool behalten ihre Reihenfolge.
 | | **Ergebnis gilt nach (Stunden)** · **Aufstellung nachtragen bis (Stunden)** | 48 · 48 |
 | | **Antwort auf Terminvorschlag (Stunden)** – so lange hat die Gegenseite Zeit; leer heißt bei älteren Seasons „je Staffel wie bisher“ | 72 |
 | Regeltext und Sichtbarkeit | **Regeltext** (Markdown) | Regelwerk der Liga |
-| | **Sichtbarkeit** | bis zum Start *Nur Turnierleitung* (siehe 2.8) |
+| | **Sichtbarkeit** | bis zum Start *Nur Liga-Leitung* (siehe 2.8) |
 
 Unter dem Kalender steht nach dem Speichern, welche Wochen gesperrt sind und **wie viele Teams eine Staffel höchstens
 fassen kann** (Season 1: 8 Spielwochen – höchstens 8 Teams mit nur Hinrunde).
@@ -203,7 +205,7 @@ mehr geht, steht je Staffel mit Grund da:
 | Einstellung | Ligaseite und Menüpunkt „Liga“ | Staffel-Turnier |
 | --- | --- | --- |
 | **Aus** | niemand („Liga nicht gefunden“) | intern |
-| **Nur Turnierleitung** | nur ihr – zum Prüfen vor dem Start | intern |
+| **Nur Liga-Leitung** | Bereich Ligen und Zuständige dieser Liga – zum Prüfen vor dem Start | intern |
 | **Nur Mitglieder** | angemeldete Mitglieder | Nur Mitglieder |
 | **Öffentlich** | alle | öffentlich |
 
@@ -260,6 +262,53 @@ und bei den **Staffeln** – die App zeigt eine Staffel als Turnier mit ihrem Ba
 Turnierverwaltung ein eigenes Banner bekommen, bleibt das stehen.
 
 **Gewinne sind reine Anzeige:** Staffeln zählen weiter nicht für XP, Pokale oder die Jahreswertung.
+
+### 2.11 Bereich Ligen und Zuständige
+
+**Einmal nach dem Update (nur der Superadmin):** Die Rolle Turnierleitung und die Freigabe „Turnierleitung“ öffnen die Liga nicht
+mehr. Superadmin und Club-Admin haben den Bereich **Ligen** von selbst, alle anderen bekommen ihn einzeln. Nichts geschieht
+automatisch. Bis zu dieser Vergabe sehen bisherige Turnierleiter von der Liga nur noch, was alle sehen.
+
+1. **Admin → Alle Benutzer** öffnen und die Person suchen.
+2. **Bearbeiten** tippen.
+3. Unter **Freigaben** den Haken bei **Ligen** setzen.
+4. **Speichern** und die Rückfrage bestätigen. Die Person bekommt eine Meldung, die Vergabe steht im Protokoll.
+5. Die Person braucht die Zwei-Faktor-Anmeldung. Hat sie noch keine, steht das in ihrer Meldung.
+
+**Zuständige je Liga:** Wer nur einen Teil machen soll, bekommt den Bereich nicht, sondern eine Zuständigkeit in einer Liga.
+
+1. **Admin → eSports → Liga** öffnen und bei der Liga **Zuständige** tippen.
+2. Unter **Person hinzufügen** den Namen tippen und die Person wählen.
+3. Anhaken, wofür sie zuständig ist, dann **Zuständig machen**.
+
+| Zuständigkeit | Was die Person darf |
+| --- | --- |
+| **Liga verwalten** | Liga bearbeiten, Seasons anlegen und löschen, Staffel starten, pausieren, beenden und sperren, Helfer der Staffel. Sieht auch, wer zuständig ist |
+| **Season konfigurieren** | Vorgaben, Map-Pool, Liga 1, 2 …, Staffeln anlegen und löschen, Übertragen, Spielplan |
+| **Teams freigeben** | Co-Teams zuteilen und herausnehmen, Austritt |
+| **Kader prüfen** | Kaderübersicht mit Spiel-IDs, neue ID freigeben, Stichtag |
+| **Spiele betreuen** | Termine festlegen, Terminvorschläge entscheiden, Spielplan freigeben |
+| **Ergebnisse korrigieren** | Ergebnis eintragen und korrigieren, Rückgängig, kampflos und „nicht erschienen“ werten, Aufstellung nachtragen |
+| **Proteste** | Streitfälle entscheiden. Für „Ergebnis ändern“ im Streitfall braucht es zusätzlich **Ergebnisse korrigieren** |
+| **Strafen** | Vorgesehen, kommt später |
+| **Regeln veröffentlichen** | Regeltext der Season |
+
+- Zuständige brauchen keinen Bereich, aber die Zwei-Faktor-Anmeldung. Ohne sie gilt die Zuständigkeit nicht, das Blatt sagt es an der Zeile.
+- Zuständige finden ihre Ligen unter **Admin → Mein Dienst → Meine Ligen** und im Menü unter **Liga**. Sie sehen nur ihre Ligen und nur die Knöpfe ihrer Zuständigkeiten.
+- Vergeben und entfernen darf nur der Bereich **Ligen**. Liga anlegen und löschen auch.
+- **Co-Teams in einer laufenden Staffel:** Kader, Captain, Vertreter und Status ändern nur noch die eigene Teamleitung und die Liga-Leitung mit **Kader prüfen** (Season → Kader und Spiel-IDs → **Kader bearbeiten**). Die Turnierleitung nicht mehr. Nach dem Ende der Staffel gilt wieder alles wie vorher.
+- **Helfer** am Turnier (Organisation, Schiedsrichter, Ergebnisdienst, Station) lesen in einer Staffel nur noch. Ergebnisse tragen dort nur Zuständige und der Bereich Ligen ein.
+
+**Befangenheit:** Wer in einem Spiel selbst beteiligt ist (Kader einer Seite, Captain, Vertreter, Hauptteam-Leitung), korrigiert dort
+keine Ergebnisse, entscheidet keine Proteste, verhängt keine Strafen und setzt keinen Termin direkt. Die Matchseite und der Matchplan sagen es, der
+Knopf fehlt, und die Person meldet als eigene Seite wie alle anderen, den Termin über Vorschlag und Zustimmung. Es entscheidet eine zweite berechtigte Person. Nur der **Superadmin** darf als Notausnahme: Das Ergebnis-Fenster
+oder der Matchplan fragt dann nach dem Grund, er steht im Protokoll (`league.conflict.override`).
+
+**Ergebnis mit „Rückgängig“:** Verliert jemand in den 10 Sekunden die Zuständigkeit oder wird befangen, geht das Ergebnis nicht hinaus. Die Person bekommt eine
+Nachricht, der Vorgang steht im Protokoll.
+
+**Bekannte Grenze – Strafen-Eingang:** Admin → eSports → Strafen hängt bis #2208 am Bereich Turnierleitung. Kampflos-Wertungen einer Staffel siehst du dort nur mit
+beiden Bereichen, Turnierleitung und Ligen. Mit nur einem von beiden fehlen sie. Am Spiel selbst bleibt die Wertung sichtbar.
 
 ---
 
@@ -323,7 +372,8 @@ und spätere Statistiken.
   48-Stunden-Automatik entschieden, bis zum Ende der Spielwoche. Später nur über die Turnierleitung (Matchchat mit
   **@leitung**).
 - **Entscheiden**: Turnierleitung am Handy → **Braucht Aufmerksamkeit**, oder auf der Matchseite **Streitfall
-  entscheiden**: **Ergebnis bleibt** oder **Ergebnis ändern**.
+  entscheiden**: **Ergebnis bleibt** oder **Ergebnis ändern**. Wer am Spiel selbst beteiligt ist, entscheidet nicht
+  ([2.11](#211-bereich-ligen-und-zuständige)).
 - **Korrigieren**: am Spiel **Ergebnis korrigieren** – Stand, auf Wunsch Maps und Aufstellungen, Pflicht ist ein
   **Grund** (mindestens fünf Zeichen). Die Korrektur schließt einen offenen Einspruch, die Tabelle rechnet sofort neu.
   Ohne neue Maps bleiben die alten, solange sie zum Stand passen – sonst fallen sie weg. Ablauf wie in
@@ -424,7 +474,9 @@ Die IDs sehen nur die Beteiligten des Spiels und die Turnierleitung, nie Gäste.
 | „Bitte einen Grund angeben (mindestens 5 Zeichen) …“ | Löschen ohne Grund | Grund eintragen |
 | „Das Spiel bleibt, sobald eine Season eine Staffel hat …“ | Spiel einer Liga mit Staffel ändern | Neue Liga anlegen, die alte archivieren |
 | „Die Adresse bleibt, seit eine Season der Liga sichtbar war …“ | Adresse nach der Veröffentlichung ändern | Adresse lassen; nur der Name ändert sich || „Ein zugeteiltes Co-Team nimmt nur die Turnierleitung wieder aus der Staffel …“ | Teamleitung will ihr Co-Team abmelden | Bei der Turnierleitung melden |
-| Ligaseite zeigt „Liga nicht gefunden“ | Sichtbarkeit *Aus* oder *Nur Turnierleitung* | Sichtbarkeit der Season ändern und speichern |
+| Ligaseite zeigt „Liga nicht gefunden“ | Sichtbarkeit *Aus* oder *Nur Liga-Leitung* | Sichtbarkeit der Season ändern und speichern |
+| „Dafür fehlt dir das Recht in dieser Liga …“ | Bereich Turnierleitung allein oder falsche Zuständigkeit | Superadmin vergibt den Bereich Ligen, der Bereich Ligen die Zuständigkeit – [2.11](#211-bereich-ligen-und-zuständige) |
+| „Du bist an diesem Spiel selbst beteiligt …“ | Eigenes Spiel | Eine zweite berechtigte Person entscheidet; Superadmin nur mit Grund – [2.11](#211-bereich-ligen-und-zuständige) |
 | „Bitte im Web mit Maps und Aufstellung melden.“ | Erstmeldung oder abweichende Meldung aus der App | Im Web auf der Matchseite melden |
 | „In dieser Zeit wird nicht gespielt (Weihnachtspause, 21.12.2026 bis 3.1.2027) …“ | Termin in einer Sperrzeit | Anderen Termin vorschlagen |
 | „Deine Maps, Modi oder Sieger weichen von der Meldung der Gegenseite ab …“ | Bestätigung passt nicht | Einspruch über **Problem melden**; die Turnierleitung entscheidet |
@@ -474,6 +526,7 @@ Erst nach eurer Freigabe (3.7). Bis dahin spielt er mit der gemeldeten ID; aufst
 
 Zum Abhaken in dieser Reihenfolge – jeder Punkt mit dem Klickweg von oben.
 
+- [ ] **Bereich Ligen** an alle vergeben, die die Liga leiten; Zuständige eingetragen – 2.11
 - [ ] **Modi** des Spiels angelegt (Stellung, Suchen & Zerstören, Kontrolle) – 2.1
 - [ ] **Maps** in der Bibliothek, je mit **Bild** und den richtigen **Modi** – 2.1
 - [ ] **Season 1**: Beginn 10.11.2026, 10 Wochen, **Weihnachtspause** 21.12.–3.1., nur Hinrunde, Meldeschluss 6.11. – 2.2
@@ -487,7 +540,7 @@ Zum Abhaken in dieser Reihenfolge – jeder Punkt mit dem Klickweg von oben.
 - [ ] Je Co-Team **Captain** und **Vertreter** vergeben – 2.4
 - [ ] Alle Co-Teams **zugeteilt** (Teilnehmer: 8 von 8) – 2.5
 - [ ] Season gespeichert und, falls nach dem Anlegen der Staffel etwas geändert wurde, **Vorgaben übertragen** – 2.7
-- [ ] Ligaseite mit *Nur Turnierleitung* geprüft: Teams, Wochen mit Weihnachtspause, Pool, Regeln – 2.8
+- [ ] Ligaseite mit *Nur Liga-Leitung* geprüft: Teams, Wochen mit Weihnachtspause, Pool, Regeln – 2.8
 - [ ] **Liga starten** (Spielplan fest, sieben Spieltage) – 2.6
 - [ ] **Am 10.11.:** Sichtbarkeit auf **Öffentlich**, **Season speichern** – 2.8
 - [ ] **Discord-Ankündigung von Hand** (die Liga meldet sich noch nicht selbst): Link zur Ligaseite, Start, Ablauf,

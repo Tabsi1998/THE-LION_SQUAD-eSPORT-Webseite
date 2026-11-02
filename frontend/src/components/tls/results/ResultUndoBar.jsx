@@ -27,9 +27,9 @@ export function useResultUndo({ onDone } = {}) {
     return () => clearTimeout(reload);
   }, [now, pending]);
 
-  const start = useCallback(({ matchId, hold, sentence }) => {
+  const start = useCallback(({ matchId, hold, sentence, conflictReason = null }) => {
     setNow(Date.now());
-    setPending({ matchId, holdId: hold?.id || null, sentence, until: Date.now() + UNDO_SECONDS * 1000 });
+    setPending({ matchId, holdId: hold?.id || null, sentence, conflictReason, until: Date.now() + UNDO_SECONDS * 1000 });
     doneRef.current?.();
   }, []);
 
@@ -38,7 +38,7 @@ export function useResultUndo({ onDone } = {}) {
     const current = pending;
     setPending(null);
     try {
-      await api.post(`/matches/${current.matchId}/result/undo`, { hold_id: current.holdId });
+      await api.post(`/matches/${current.matchId}/result/undo`, { hold_id: current.holdId, ...(current.conflictReason ? { conflict_reason: current.conflictReason } : {}) });
       toast.success("Rückgängig gemacht – es ist nichts passiert.");
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail) || "Rückgängig ging nicht.");
