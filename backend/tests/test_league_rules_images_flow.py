@@ -130,14 +130,16 @@ async def test_links_and_plain_addresses_count_like_images(flow, text):
     address = await upload(flow, "bild.webp", await flow.add_user(name="Jemand"))
     flow.act_as(person)
     body = text.format(address=address)
-    assert (await save(flow, w, body)).status_code == 422
+    refused = await save(flow, w, body)
+    assert refused.status_code == 422
     assert await preview(flow, w, body)
 
 
 @pytest.mark.asyncio
 async def test_a_link_to_an_unregistered_upload_is_refused_a_link_elsewhere_is_not(flow):
     w = await make_bare_world(flow)
-    assert (await save(flow, w, f"[Plan]({UPLOADS}ohne-eintrag.pdf)")).status_code == 422
+    refused = await save(flow, w, f"[Plan]({UPLOADS}ohne-eintrag.pdf)")
+    assert refused.status_code == 422
     ok(await save(flow, w, "[Plan](https://bilder.example.test/wp-content/uploads/2026/plan.pdf)\n\nMehr: https://bilder.example.test/uploads/plan.png"))
 
 
@@ -170,7 +172,8 @@ async def test_what_left_the_draft_does_not_come_back_through_another_editor(flo
     draft = ok(await save(flow, w, picture(hers)))
     gone = ok(await save(flow, w, "# A\nOhne Bild", revision=draft["revision"]))
     flow.act_as(second)
-    assert (await save(flow, w, picture(hers), revision=gone["revision"])).status_code == 422
+    refused = await save(flow, w, picture(hers), revision=gone["revision"])
+    assert refused.status_code == 422
 
 
 @pytest.mark.asyncio
@@ -181,7 +184,8 @@ async def test_an_entry_that_is_gone_stops_also_what_was_in_the_draft(flow):
     flow.act_as(person)
     draft = ok(await save(flow, w, picture(own)))
     await flow.db.media_uploads.delete_many({"filename": "eigen.webp"})
-    assert (await save(flow, w, picture(own), revision=draft["revision"])).status_code == 422
+    refused = await save(flow, w, picture(own), revision=draft["revision"])
+    assert refused.status_code == 422
 
 
 @pytest.mark.asyncio
@@ -192,7 +196,8 @@ async def test_a_stale_editor_hears_about_the_revision_first(flow):
     flow.act_as(person)
     first = ok(await save(flow, w, "# A\nEins"))
     ok(await save(flow, w, "# A\nZwei", revision=first["revision"]))
-    assert (await save(flow, w, picture(foreign), revision=first["revision"])).status_code == 409
+    stale = await save(flow, w, picture(foreign), revision=first["revision"])
+    assert stale.status_code == 409
 
 
 @pytest.mark.asyncio

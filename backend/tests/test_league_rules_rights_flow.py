@@ -199,15 +199,14 @@ async def test_a_managing_duty_gets_the_look_of_the_league_with_own_images_only(
     picture = io.BytesIO()
     Image.new("RGB", (40, 40), (20, 90, 160)).save(picture, format="PNG")
     files = {"file": ("banner.png", picture.getvalue(), "image/png")}
-    assert (await flow.post("/api/uploads/image?media_scope=admin", files=files)).status_code == 403
-    assert (await flow.post("/api/uploads/logo", files=files)).status_code == 403
-    assert (await flow.post("/api/uploads/logo?media_scope=user", files=files)).status_code == 403
+    for target in ("/api/uploads/image?media_scope=admin", "/api/uploads/logo", "/api/uploads/logo?media_scope=user"):
+        refused = await flow.post(target, files=files)
+        assert refused.status_code == 403, target
     assert (await flow.get("/api/admin/media?type=images")).status_code == 403
     url = ok(await flow.post("/api/uploads/image", files=files))["url"]
     saved = ok(await flow.patch(f"{ADMIN_LEAGUES}/{w['league']['id']}", json={"banner_url": url, "emblem_url": url}))
     assert sorted(saved["changed"]) == ["banner_url", "emblem_url"]
-    prizes = [{"place": 1, "text": "Pokal", "image_url": url}]
-    assert (await flow.patch(f"{ADMIN_LEAGUES}/seasons/{w['season']['id']}", json={"prizes": prizes})).status_code == 200
+    ok(await flow.patch(f"{ADMIN_LEAGUES}/seasons/{w['season']['id']}", json={"prizes": [{"place": 1, "text": "Pokal", "image_url": url}]}))
 
 
 @pytest.mark.asyncio

@@ -82,7 +82,8 @@ async def test_a_published_version_keeps_the_file_of_a_deleted_account(flow, pub
     await flow.db.media_uploads.update_one({"filename": "ihres.webp"}, {"$set": {"owner_id": person["id"], "media_scope": "user"}})
     await add_rule(flow, "fertig", status="published", image="ihres.webp")
     assert await media_audit.still_referenced(flow.db, {"ihres.webp"}) == {"ihres.webp"}
-    assert await account_erasure._own_images(flow.db, person["id"], []) == 0
+    removed = await account_erasure._own_images(flow.db, person["id"], [])
+    assert removed == 0
     assert (public / "ihres.webp").is_file()
     assert await flow.db.media_uploads.count_documents({"filename": "ihres.webp"}) == 1
 
