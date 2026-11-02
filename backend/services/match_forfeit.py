@@ -51,6 +51,8 @@ async def apply_forfeit(db, match: dict, forfeiting_registration_id: str, *, not
         results_for_forfeit(match, forfeiting_registration_id)  # gehört die Person zum Lauf?
         return await mark_heat_no_show(db, match, forfeiting_registration_id, note=note, actor_id=actor_id)
     results = results_for_forfeit(match, forfeiting_registration_id)
+    # Eine Wertung hat keine Maps (#2201): gespielte fallen weg wie beim Ergebnis-Fenster, match_reports_v2 hält sie fest.
+    drop_maps = bool(match.get("games"))
     outcome = await submit_v2_result(
         db,
         match,
@@ -63,6 +65,8 @@ async def apply_forfeit(db, match: dict, forfeiting_registration_id: str, *, not
         # Eine Wertung als Korrektur (#1035): ihre Pflicht-Begründung ist zugleich der Grund der Korrektur.
         reason=reason or (note if force else None),
         hold_id=hold_id,
+        games=[] if drop_maps else None,
+        lineups_missing=[] if drop_maps else None,
     )
     updated = outcome.get("match") or match
     now_iso = now_utc().isoformat()
