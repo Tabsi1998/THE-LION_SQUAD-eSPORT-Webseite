@@ -395,7 +395,10 @@ def export_period(date_from: str | None, date_to: str | None) -> dict:
 async def export_rows(db, *, kind: str | None = None, source_id: str | None = None, user_ids: list[str] | None = None, attention: str | None = None,
                       date_from: str | None = None, date_to: str | None = None) -> list[dict]:
     """Alle Belege der Auswahl für den Export (#2131) - ohne die Grenze der Liste, nach dem Tag des Belegs sortiert."""
-    query = {**invoiced_row_query(kind=kind, source_id=source_id, user_ids=user_ids, attention=attention), **export_period(date_from, date_to)}
+    selection = invoiced_row_query(kind=kind, source_id=source_id, user_ids=user_ids, attention=attention)
+    period = export_period(date_from, date_to)
+    # Mit $and: „Entwurf alt“ fragt selbst nach dem Tag des Anlegens - der Zeitraum kommt dazu, statt ihn zu ersetzen.
+    query = {"$and": [selection, period]} if period else selection
     return await db.billing_orders.find(query, {"_id": 0, "snapshot": 0}).sort([("invoiced_at", 1), ("invoice_ref", 1)]).to_list(None)
 
 

@@ -5,6 +5,7 @@ import io
 import pathlib
 import re
 import sys
+from datetime import timedelta
 
 import pytest
 import pytest_asyncio
@@ -12,6 +13,7 @@ import pytest_asyncio
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
+from models import now_utc  # noqa: E402
 from routes import finance_routes  # noqa: E402
 from services import billing_cases, billing_orders  # noqa: E402
 
@@ -131,6 +133,33 @@ async def test_export_period_counts_vienna_days_and_is_checked(flow):
     assert (await flow.get(EXPORT, params={"from": "2027-02-01", "to": "2027-01-01"})).status_code == 400
     assert (await flow.get(EXPORT, params={"from": "2027-02-30"})).status_code == 400
     assert (await flow.get(EXPORT, params={"from": "morgen"})).status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_a_period_narrows_the_views_instead_of_replacing_their_conditions(flow):
+    await as_kassier(flow)
+    now = now_utc()
+    moment = lambda days: (now - timedelta(days=days)).isoformat()  # noqa: E731
+    day = lambda days: (now - timedelta(days=days)).strftime("%Y-%m-%d")  # noqa: E731
+    await flow.db.billing_orders.insert_many([
+        # Entwürfe: erst nach sieben Tagen „alt“ - der jüngere bleibt auch mit einem Zeitraum draußen.
+        order("o-jung", invoice_status="draft", invoiced_at=moment(1), pdf_built_at=moment(1)),
+        order("o-alt", invoice_status="draft", invoiced_at=moment(20), pdf_built_at=moment(20)),
+        order("o-uralt", invoice_status="draft", invoiced_at=moment(100), pdf_built_at=moment(100)),
+        # Überfällig und ohne PDF: je einer im Zeitraum, einer davor.
+        order("o-ueber", invoiced_at=moment(20), due_on=day(10), payment_state="open", pdf_built_at=moment(20)),
+        order("o-ueber-vorher", invoiced_at=moment(100), due_on=day(90), payment_state="open", pdf_built_at=moment(100)),
+        order("o-pdf", invoiced_at=moment(20), due_on=""),
+        order("o-pdf-vorher", invoiced_at=moment(100), due_on=""),
+    ])
+    period = {"from": day(30), "to": day(0)}
+    async def refs(attention):
+        return [row["Rechnung"] for row in parse(await flow.get(EXPORT, params={"attention": attention, **period}))]
+
+    assert await refs("draft_old") == ["FA-o-alt"], "jung bleibt draußen, uralt liegt vor dem Zeitraum"
+    assert await refs("overdue") == ["FA-o-ueber"]
+    assert await refs("pdf_missing") == ["FA-o-pdf"]
+    assert {row["Rechnung"] for row in parse(await flow.get(EXPORT, params={"attention": "draft_old"}))} == {"FA-o-alt", "FA-o-uralt"}
 
 
 @pytest.mark.asyncio
