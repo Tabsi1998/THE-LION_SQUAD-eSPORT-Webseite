@@ -66,7 +66,7 @@ beforeEach(() => {
 test("der CSV-Knopf holt die Datei vom Server, mit Zeitraum; ein Zeitraum verkehrt herum sperrt ihn", async () => {
   const url = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:x");
   vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
-  vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+  vi.spyOn(window.HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
   const file = new Blob(["a"]);
   apiMock.get.mockImplementation(async (path) => {
     if (path === "/admin/finance/overview") return { data: { ...OVERVIEW, invoiced_total: 1234 } };
