@@ -142,6 +142,13 @@ test("Versionen wählen und Wort für Wort vergleichen, auch entfernter Text", a
   expect(await screen.findByTestId("rules-document")).toBeInTheDocument();
 });
 
+test("Großer Vergleich: geänderter Abschnitt steht ganz da und sagt warum", async () => {
+  serve(PAGE, { ...COMPARE, sections: [{ anchor: "fairplay", title: "§ 1 Fairplay", level: 1, status: "changed", coarse: true,
+    ops: [{ op: "del", text: "Alter langer Text" }, { op: "ins", text: "Neuer langer Text" }] }] });
+  renderPage("/liga/probe/s1/regeln?vergleich=v1");
+  expect(await screen.findByTestId("rules-compare-coarse")).toHaveTextContent("erst alt, dann neu");
+});
+
 test("Rückfall: Season ohne Regelwerk zeigt ihren Regeltext", async () => {
   serve({ ...PAGE, source: "fallback", version: null, versions: [], sections: [], fallback_text: "## Alt\nAlter Regeltext",
     changes: { base: null, new: [], changed: [], removed: [] } });

@@ -2,11 +2,10 @@
 die Liga-Leitung. Die Logik steht in ``services/league_rules.py``."""
 from __future__ import annotations
 
-import asyncio
 import io
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -15,6 +14,7 @@ from database import get_db
 from models import new_id, now_utc
 from services import league_rules as rules
 from services.league_service import LeagueProblem
+from services.rate_limit import enforce_rate_limit
 
 router = APIRouter(prefix="/api/league-rules", tags=["league-rules"])
 admin_router = APIRouter(prefix="/api/admin/league-rules", tags=["league-rules-admin"])
@@ -25,6 +25,9 @@ require_rules_editor = require_area("tournaments")
 BODY_MAX = 200_000
 ANNEXES_MAX = 26
 NOINDEX = {"X-Robots-Tag": "noindex, nofollow"}
+# PDF und Vergleich je Besucher: reichlich fürs Lesen, nicht für einen Lauf durch alle Fassungen. Bursts fängt schon nginx ab.
+HEAVY_LIMIT = 60
+HEAVY_WINDOW_SECONDS = 60
 
 
 class RuleAnnex(BaseModel):
@@ -80,23 +83,22 @@ async def _page(league: str, season: str | None, version: str | None, user: dict
     return await _call(rules.page_view(db, league_doc, season_doc, user, version_id=version))
 
 
-async def _compare(league: str, season: str | None, base: str, target: str, user: dict | None) -> dict:
+async def _compare(request: Request, league: str, season: str | None, base: str, target: str, user: dict | None) -> dict:
+    await enforce_rate_limit(request, "league_rules:heavy", HEAVY_LIMIT, HEAVY_WINDOW_SECONDS)
     db = get_db()
     league_doc, season_doc = await _call(rules.visible_scope(db, league, season, user))
     return await _call(rules.compare_view(db, league_doc, season_doc, base, target))
 
 
-async def _pdf(league: str, season: str | None, version_id: str, marks: int, user: dict | None) -> StreamingResponse:
-    from pdf_service import pdf_league_rules
+async def _pdf(request: Request, league: str, season: str | None, version_id: str, marks: int, user: dict | None) -> StreamingResponse:
     from routes.export_routes import _pdf_branding, _pdf_filename
 
+    await enforce_rate_limit(request, "league_rules:heavy", HEAVY_LIMIT, HEAVY_WINDOW_SECONDS)
     db = get_db()
     league_doc, season_doc = await _call(rules.visible_scope(db, league, season, user))
-    document = await _call(rules.pdf_document(db, league_doc, season_doc, version_id, marks=bool(marks)))
     branding = await _pdf_branding(db)
-    # Lange Regelwerke rechnen spürbar - nicht im Ablauf der übrigen Anfragen.
-    data = await asyncio.to_thread(pdf_league_rules, document, branding)
-    headers = {"Content-Disposition": f'inline; filename="{_pdf_filename(document["filename"])}"'}
+    data, name = await _call(rules.pdf_file(db, league_doc, season_doc, version_id, marks=bool(marks), branding=branding))
+    headers = {"Content-Disposition": f'inline; filename="{_pdf_filename(name)}"'}
     if not (season_doc or {}).get("visibility") == "public":
         headers.update(NOINDEX)
     return StreamingResponse(io.BytesIO(data), media_type="application/pdf", headers=headers)
@@ -109,13 +111,13 @@ async def league_rules_page(league_slug: str, version: Optional[str] = None, use
 
 
 @router.get("/leagues/{league_slug}/compare")
-async def league_rules_compare(league_slug: str, base: str, target: str, user: dict | None = Depends(get_optional_user)):
-    return await _compare(league_slug, None, base, target, user)
+async def league_rules_compare(request: Request, league_slug: str, base: str, target: str, user: dict | None = Depends(get_optional_user)):
+    return await _compare(request, league_slug, None, base, target, user)
 
 
 @router.get("/leagues/{league_slug}/versions/{version_id}/pdf")
-async def league_rules_pdf(league_slug: str, version_id: str, marks: int = 1, user: dict | None = Depends(get_optional_user)):
-    return await _pdf(league_slug, None, version_id, marks, user)
+async def league_rules_pdf(request: Request, league_slug: str, version_id: str, marks: int = 1, user: dict | None = Depends(get_optional_user)):
+    return await _pdf(request, league_slug, None, version_id, marks, user)
 
 
 @router.get("/seasons/{league_slug}/{season_slug}")
@@ -126,15 +128,15 @@ async def season_rules_page(league_slug: str, season_slug: str, version: Optiona
 
 
 @router.get("/seasons/{league_slug}/{season_slug}/compare")
-async def season_rules_compare(league_slug: str, season_slug: str, base: str, target: str,
+async def season_rules_compare(request: Request, league_slug: str, season_slug: str, base: str, target: str,
                                user: dict | None = Depends(get_optional_user)):
-    return await _compare(league_slug, season_slug, base, target, user)
+    return await _compare(request, league_slug, season_slug, base, target, user)
 
 
 @router.get("/seasons/{league_slug}/{season_slug}/versions/{version_id}/pdf")
-async def season_rules_pdf(league_slug: str, season_slug: str, version_id: str, marks: int = 1,
+async def season_rules_pdf(request: Request, league_slug: str, season_slug: str, version_id: str, marks: int = 1,
                            user: dict | None = Depends(get_optional_user)):
-    return await _pdf(league_slug, season_slug, version_id, marks, user)
+    return await _pdf(request, league_slug, season_slug, version_id, marks, user)
 
 
 @router.post("/consents")

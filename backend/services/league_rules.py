@@ -18,6 +18,7 @@ from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
 from services import game_maps, league_look
+from services.league_rules_cache import rules_cache
 from services import league_rule_blocks as blocks
 from services import league_rules_text as text
 from services import league_service as leagues
@@ -26,12 +27,16 @@ from services.league_rules_store import LEAGUE, PUBLISHED, SEASON, STAFFEL_POINT
 from services.league_scope import ONLY_LEAGUE
 from services.league_service import LeagueProblem
 from services.match_audience import responsible_ids, teams_by_id
+from services.share_image_cache import fingerprint
 
 logger = logging.getLogger("tls.league_rules")
 
 SCOPES = (LEAGUE, SEASON)
 DRAFT = "draft"
 ACTIVE_REGISTRATIONS = ("approved", "checked_in", "pending")
+# Grenzen je Fassung, mit allen Anlagen: Seite, Vergleich und PDF rechnen damit - für jede Person, die sie abruft.
+TEXT_TOTAL_MAX = 400_000
+SECTIONS_MAX = 400
 REASON_MIN = 5
 REASON_MAX = 500
 DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -168,9 +173,11 @@ async def page_view(db, league: dict, season: dict | None, user: dict | None, *,
         fallback = (season or {}).get("rules_text") or None
         return {**out, "source": "fallback" if fallback else "none", "version": None, "fallback_text": fallback,
                 "sections": [], "changes": {"base": None, "new": [], "changed": [], "removed": []}}
-    sections = _sections(version, season)
     previous = _previous(chain["rows"], version)
-    result = await _compared(previous, season, sections)
+    document = await rules_cache.get_or_make_json(
+        ("page", version["id"], (previous or {}).get("id"), (season or {}).get("id")),
+        lambda: _page_document(version, previous, season))
+    sections, result = document["sections"], document["result"]
     return {
         **out, "source": "rules", "fallback_text": None,
         "version": {**_head(version, current), "pdf_url": f"{api_path(league, season)}/versions/{version['id']}/pdf"},
@@ -178,6 +185,12 @@ async def page_view(db, league: dict, season: dict | None, user: dict | None, *,
         "changes": {"base": _head(previous, current) if previous else None,
                     **{key: result[key] for key in ("new", "changed", "removed")}},
     }
+
+
+def _page_document(version: dict, previous: dict | None, season: dict | None) -> dict:
+    """Abschnitte und Vergleich einer Fassung - unveränderlich, darum einmal gerechnet."""
+    sections = _sections(version, season)
+    return {"sections": sections, "result": text.compare(_sections(previous, season) if previous else None, sections)}
 
 
 async def _any_public_season(db, league: dict) -> bool:
@@ -196,17 +209,16 @@ async def compare_view(db, league: dict, season: dict | None, base_id: str | Non
     """Wort für Wort zwischen zwei Fassungen dieser Seite."""
     chain = await _chain(db, league, season)
     base, target = _find(chain["rows"], base_id), _find(chain["rows"], target_id)
-    return {"base": _head(base, chain["current"]), "target": _head(target, chain["current"]),
-            "sections": await asyncio.to_thread(text.diff_view, _sections(base, season), _sections(target, season))}
+    sections = await rules_cache.get_or_make_json(
+        ("compare", base["id"], target["id"], (season or {}).get("id")),
+        lambda: text.diff_view(_sections(base, season), _sections(target, season)))
+    return {"base": _head(base, chain["current"]), "target": _head(target, chain["current"]), "sections": sections}
 
 
-async def pdf_document(db, league: dict, season: dict | None, version_id: str, *, marks: bool = True) -> dict:
+def _pdf_document(league: dict, season: dict | None, version: dict, previous: dict | None, marks: bool) -> dict:
     """Alles, was das PDF einer Fassung braucht - nur aus der Fassung, kein zweiter Inhalt."""
-    chain = await _chain(db, league, season)
-    version = _find(chain["rows"], version_id)
     sections = _sections(version, season)
-    previous = _previous(chain["rows"], version)
-    result = await _compared(previous, season, sections)
+    result = text.compare(_sections(previous, season) if previous else None, sections)
     return {
         "title": version.get("title") or "Regelwerk",
         "context": " · ".join(str(part) for part in (league.get("name"), (season or {}).get("name")) if part),
@@ -215,9 +227,26 @@ async def pdf_document(db, league: dict, season: dict | None, version_id: str, *
         "sections": [{**row, "mark": result["marks"].get(row["anchor"]) if marks else None} for row in sections],
         "removed": result["removed"] if marks else [],
         "base_label": _label(previous) if previous and marks else None,
-        "filename": "_".join(str(part) for part in ("regelwerk", league.get("slug"), (season or {}).get("slug"),
-                                                    f"v{version.get('version')}") if part),
     }
+
+
+async def pdf_file(db, league: dict, season: dict | None, version_id: str, *, marks: bool, branding: dict | None) -> tuple[bytes, str]:
+    """Das PDF einer Fassung und sein Dateiname - einmal je Fassung und Markierung gebaut. Name von Liga und Season und die Marke stehen
+    in der Datei, darum auch im Schlüssel; die Fassungen ändern sich nie."""
+    chain = await _chain(db, league, season)
+    version = _find(chain["rows"], version_id)
+    previous = _previous(chain["rows"], version)
+    looks = fingerprint([league.get("name"), (season or {}).get("name"), branding])
+    key = ("pdf", version["id"], (previous or {}).get("id"), (season or {}).get("id"), marks, looks)
+
+    def build() -> bytes:
+        import pdf_service
+
+        return pdf_service.pdf_league_rules(_pdf_document(league, season, version, previous, marks), branding)
+
+    data = await rules_cache.get_or_make(key, build)
+    name = "_".join(str(part) for part in ("regelwerk", league.get("slug"), (season or {}).get("slug"), f"v{version.get('version')}") if part)
+    return data, name
 
 
 async def summary(db, league_id: str, season_id: str, user: dict | None) -> dict | None:
@@ -325,6 +354,14 @@ def _annexes(raw: list[dict] | None) -> list[dict]:
             for index, row in enumerate(raw or [])]
 
 
+def _check_size(body_md: str | None, annexes: list[dict] | None) -> None:
+    total = len(str(body_md or "")) + sum(len(str(row.get("body_md") or "")) + len(str(row.get("title") or "")) for row in annexes or [])
+    if total > TEXT_TOTAL_MAX:
+        raise LeagueProblem(f"Das Regelwerk ist zu lang: höchstens {TEXT_TOTAL_MAX:,} Zeichen mit allen Anlagen.".replace(",", "."))
+    if len(text.sections_of(body_md, annexes)) > SECTIONS_MAX:
+        raise LeagueProblem(f"Das Regelwerk hat zu viele Abschnitte: höchstens {SECTIONS_MAX} Überschriften mit allen Anlagen.")
+
+
 def _foreign_images(body_md: str | None, annexes: list[dict] | None) -> list[str]:
     """Bilder, die nicht aus dem eigenen Upload kommen: Eine fremde Adresse ließe jede Person beim Lesen bei Dritten anfragen."""
     addresses = text.image_addresses(body_md, *[row.get("body_md") for row in annexes or []])
@@ -340,6 +377,7 @@ def _check_images(body_md: str | None, annexes: list[dict] | None) -> None:
 
 async def save_draft(db, scope: str, scope_id: str, body: dict, user: dict) -> dict:
     league, season = await resolve_scope(db, scope, scope_id)
+    _check_size(body.get("body_md"), body.get("annexes"))
     _check_images(body.get("body_md"), body.get("annexes"))
     now = now_utc().isoformat()
     fields = {"title": str(body.get("title") or "").strip(), "body_md": str(body.get("body_md") or ""),
@@ -394,6 +432,7 @@ async def preview(db, scope: str, scope_id: str, body: dict) -> dict:
     """Die Seite, wie sie heute würde: mit den Bausteinen von heute, gegen die letzte Fassung. Speichert nichts."""
     league, season = await resolve_scope(db, scope, scope_id)
     annexes = _annexes(body.get("annexes"))
+    _check_size(body.get("body_md"), annexes)
     keys = text.block_keys(body.get("body_md"), *[row["body_md"] for row in annexes])
     values = {key: row["markdown"] for key, row in (await blocks.resolve(db, keys, league, season)).items()} if season else {}
     missing = blocks.NOT_FROZEN_HINT if season else blocks.NO_SEASON_HINT
@@ -420,6 +459,7 @@ def _check_publish(draft: dict, body: dict, predecessor: dict | None) -> tuple[s
     if predecessor and valid_from < str(predecessor.get("valid_from") or ""):
         raise LeagueProblem(f"„Gültig ab“ darf nicht vor dem Beginn von Version {predecessor.get('version')} liegen.")
     annexes = draft.get("annexes") or []
+    _check_size(draft.get("body_md"), annexes)
     _check_images(draft.get("body_md"), annexes)
     if not str(draft.get("body_md") or "").strip() and not any(str(row.get("body_md") or "").strip() for row in annexes):
         raise LeagueProblem("Ein leeres Regelwerk lässt sich nicht veröffentlichen.")

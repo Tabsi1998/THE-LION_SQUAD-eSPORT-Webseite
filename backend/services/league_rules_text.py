@@ -18,6 +18,10 @@ RENAME_RATIO = 0.6
 # Darüber vergleicht ``word_ops`` einen geänderten Block nicht mehr Wort für Wort, sondern zeigt ihn als alt und neu - der
 # Aufwand wächst mit dem Produkt der Längen.
 WORD_DIFF_MAX = 4_000_000
+# Über alle geänderten Abschnitte: Darüber fällt der Vergleich auf ganze Abschnitte zurück (alt, dann neu), ohne Wort für Wort.
+DIFF_WORDS_MAX = 60_000
+# So viele Paare prüft die Suche nach umbenannten Abschnitten höchstens - bei einem komplett neuen Text wären es alle mit allen.
+RENAME_PAIRS_MAX = 900
 
 _HEADING = re.compile(r"^(#{1,3})\s+(.+?)\s*#*\s*$")
 _FENCE = re.compile(r"^\s*```")
@@ -136,6 +140,8 @@ def _pairs(base: list[dict], target: list[dict]) -> dict[str, dict]:
     by_anchor = {row["anchor"]: row for row in base}
     pairs = {row["anchor"]: by_anchor[row["anchor"]] for row in target if row["anchor"] in by_anchor}
     left = [row for row in base if row["anchor"] not in pairs]
+    if len(left) * sum(1 for row in target if row["anchor"] not in pairs) > RENAME_PAIRS_MAX:
+        return pairs
     for row in target:
         if row["anchor"] in pairs or not left:
             continue
@@ -204,21 +210,34 @@ def word_ops(base: str | None, target: str | None) -> list[dict]:
     return ops
 
 
+def _differs(other: dict, row: dict) -> bool:
+    return _normal(other["body_md"]) != _normal(row["body_md"]) or _normal(other.get("title")) != _normal(row.get("title"))
+
+
+def _whole(op: str, body: str | None) -> list[dict]:
+    return [{"op": op, "text": body}] if body else []
+
+
 def diff_view(base: list[dict], target: list[dict]) -> list[dict]:
-    """Der Vergleich zweier Fassungen, Abschnitt für Abschnitt - entfernte Abschnitte am Ende, mit ihrem Text."""
+    """Der Vergleich zweier Fassungen, Abschnitt für Abschnitt - entfernte Abschnitte am Ende, mit ihrem Text. Ist er insgesamt zu groß
+    für Wort für Wort (``DIFF_WORDS_MAX``), steht ein geänderter Abschnitt ganz da, erst alt, dann neu (``coarse``)."""
     pairs = _pairs(base, target)
+    changed = {row["anchor"] for row in target if row["anchor"] in pairs and _differs(pairs[row["anchor"]], row)}
+    coarse = sum(len(pairs[anchor]["body_md"].split()) for anchor in changed) + sum(
+        len(row["body_md"].split()) for row in target if row["anchor"] in changed) > DIFF_WORDS_MAX
     rows: list[dict] = []
     for row in target:
         other = pairs.get(row["anchor"])
         head = {**_head(row), "level": row.get("level")}
         if other is None:
-            rows.append({**head, "status": "new", "ops": word_ops("", row["body_md"])})
-        elif _normal(other["body_md"]) != _normal(row["body_md"]) or _normal(other.get("title")) != _normal(row.get("title")):
-            rows.append({**head, "status": "changed", "ops": word_ops(other["body_md"], row["body_md"]),
+            rows.append({**head, "status": "new", "ops": _whole("ins", row["body_md"])})
+        elif row["anchor"] in changed:
+            ops = _whole("del", other["body_md"]) + _whole("ins", row["body_md"]) if coarse else word_ops(other["body_md"], row["body_md"])
+            rows.append({**head, "status": "changed", "ops": ops, **({"coarse": True} if coarse else {}),
                          **({"previous_title": other.get("title")} if other.get("title") != row.get("title") else {})})
         else:
             rows.append({**head, "status": "same"})
     used = {id(other) for other in pairs.values()}
-    rows += [{**_head(row), "level": row.get("level"), "status": "removed", "ops": word_ops(row["body_md"], "")}
+    rows += [{**_head(row), "level": row.get("level"), "status": "removed", "ops": _whole("del", row["body_md"])}
              for row in base if id(row) not in used]
     return rows

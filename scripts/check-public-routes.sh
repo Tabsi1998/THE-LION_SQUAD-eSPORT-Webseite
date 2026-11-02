@@ -152,6 +152,33 @@ expect_share_image_rules() {
   }
 }
 
+# Regelwerk (#1646): PDF und Vergleich haben eine Bremse je Besucher und bleiben no-store; die Seite selbst hat keine.
+expect_rules_heavy_rules() {
+  local headers limited=""
+  headers="$(visitor_headers "/api/league-rules/seasons/liga/season-1/compare" "203.0.113.9")"
+  test "$(status_of "$headers")" != "429" && test "$(header_value "$headers" "Cache-Control")" = "no-store" \
+    && test "$(header_value "$headers" "X-Content-Type-Options")" = "nosniff" || {
+    printf 'Expected the rules comparison with no-store and the security headers.\n%s\n' "$headers" >&2
+    return 1
+  }
+  for _ in {1..60}; do
+    headers="$(visitor_headers "/api/league-rules/seasons/liga/season-1/versions/v1/pdf" "203.0.113.9")"
+    if test "$(status_of "$headers")" = "429"; then
+      limited="yes"
+      break
+    fi
+  done
+  test -n "$limited" || {
+    printf 'Expected 429 after a burst of rules PDF requests from one visitor.\n%s\n' "$headers" >&2
+    return 1
+  }
+  headers="$(visitor_headers "/api/league-rules/seasons/liga/season-1" "203.0.113.9")"
+  test "$(status_of "$headers")" != "429" || {
+    printf 'The rules page itself must stay without that limit.\n%s\n' "$headers" >&2
+    return 1
+  }
+}
+
 for path in / /about /esports /tournaments /fastlap /galerie /players; do
   expect_status "$path" 200
 done
@@ -192,5 +219,6 @@ done
 expect_redirect "/esports?view=live" "https://lionsquad.at/esports?view=live" "www.lionsquad.at" "308"
 expect_nonce_csp
 expect_share_image_rules
+expect_rules_heavy_rules
 
 printf 'Public route contract passed.\n'

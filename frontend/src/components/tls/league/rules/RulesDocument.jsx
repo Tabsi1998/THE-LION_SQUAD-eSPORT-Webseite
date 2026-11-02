@@ -114,6 +114,7 @@ export function RulesComparison({ sections = [], children, testId = "rules-compa
               </Heading>
             ) : <span className="tls-rules-badge">{STATUS_WORD[row.status]}</span>}
             {row.previous_title ? <p className="mb-2 text-sm text-white/70">Hieß vorher: {row.previous_title}</p> : null}
+            {row.coarse ? <p className="mb-2 text-sm text-white/70" data-testid="rules-compare-coarse">Zu lang für Wort für Wort: Der Abschnitt steht ganz da, erst alt, dann neu.</p> : null}
             <RuleOps ops={row.ops} />
           </section>
         );
