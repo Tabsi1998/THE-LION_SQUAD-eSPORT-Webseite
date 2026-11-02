@@ -699,6 +699,12 @@ Leere Felder erben. Neben jedem Dauer-Feld steht, was ohne eigenen Wert gilt, et
 Änderst du die Matchdauer des Turniers oder die Dauer im Spiel, gilt das sofort für alle Spiele ohne eigenen Wert –
 beim nächsten **Planen** stimmen die Zeiten. Ein neues Turnier lässt die Matchdauer leer und nimmt die des Spiels.
 
+**Spiel archivieren statt löschen:** In der Spieleliste archiviert das Archiv-Symbol ein Spiel: Beim Anlegen (Turnier,
+Liga, Serie, Referenz, Co-Team, Game-Server, Station) steht es nicht mehr zur Wahl, alles Bestehende zeigt und nutzt es
+weiter, auch die Liste für die App. **Archivierte zeigen** blendet es wieder ein, dasselbe Symbol holt es zurück.
+**Löschen** geht nur, wenn nichts mehr daran hängt; sonst nennt der Dialog die Zählung (etwa „2 Turniere, 12 Maps“) und
+bietet das Archiv an.
+
 **Spiel-Daten pflegen:** **Admin → eSports → Spiele → Spiel bearbeiten**, Abschnitt **Für Turniere**. Alles ist
 freiwillig:
 
@@ -764,7 +770,9 @@ Fällt am Event Netz oder Server aus, läuft das Turnier auf Papier weiter. Daru
 
 **Map-Bibliothek je Spiel:** **Admin → eSports → Spiele**, in der Zeile des Spiels das Karten-Symbol (**Maps**). Jedes
 Spiel und jede Spielversion hat seine eigenen Maps – eine neue Version erbt keine, und gleiche Namen in zwei Spielen
-sind zwei verschiedene Maps. Eingebaut ist keine Map; ihr legt alle selbst an. **Map hinzufügen** öffnet das Blatt:
+sind zwei verschiedene Maps. Eingebaut ist keine Map; ihr legt alle selbst an. **Aus Spiel übernehmen** holt Maps aus
+einer anderen Version: Spiel wählen, Maps anhaken (schon vorhandene sind gesperrt), übernehmen. Es entstehen eigene
+Maps dieses Spiels mit demselben Bild, die Modi nur soweit dieses Spiel sie kennt. **Map hinzufügen** öffnet das Blatt:
 
 - **Name** und **Slug** (eindeutig im Spiel; bleibt beim Umbenennen gleich), **Bild** im Format 16 : 9 über
   **Hochladen** oder **Medien wählen** (nur eigene Uploads), **Notiz** und **Externe Kennung** (freiwillig).
@@ -778,12 +786,31 @@ sind zwei verschiedene Maps. Eingebaut ist keine Map; ihr legt alle selbst an. *
 
 <img src="../assets/turniere/maps-bibliothek.png" alt="Map-Bibliothek eines Spiels: Karten mit Bild, Slug, Modi und wie viele Pools die Map nutzen" width="560">
 
+**Modi ändern, ohne etwas zu sperren:**
+
+- **Modus entfernen** (Spiel bearbeiten → Für Turniere): Beim Speichern fragt die Seite mit der Zahl der betroffenen
+  Maps nach. Der Modus verschwindet dann auch aus den Maps. Gespeicherte Pools, laufende Liga-Spiele und alte Ergebnisse
+  bleiben, wie sie sind: Der Editor nennt den alten Modus („Im gespeicherten Pool steht noch …“), und gemeldet wird weiter
+  aus dem gespeicherten Pool. Erst neues Speichern des Pools nimmt ihn heraus. Steht der Modus in der Reihenfolge einer
+  Liga-Season (**Modus je Map**), ändert ihr zuerst die Reihenfolge: Einen Pool ohne diesen Modus nimmt die Season sonst nicht
+  an. Wird der Modus später wieder angelegt, haben die Maps ihn nicht mehr. Turniere und Phasen, die mit ihm planen, nehmen
+  danach den ersten Modus des Spiels.
+- **Erster Modus:** Sobald ein Spiel Modi hat, steht eine Map ohne Modus in keinem neuen Pool zur Wahl. Die Map-Seite
+  zeigt dann **Diese Maps haben noch keinen Modus**: Modi anhaken, **Allen … Maps zuordnen**, fertig. Auch der Pool-Editor
+  weist darauf hin. Bestehende Pools ohne Modus gelten unverändert weiter.
+
+**Standard-Pool je Spiel:** Auf der Map-Seite unten unter **Standard-Pool** speichert ihr je Modus eine Auswahl. Sie ist
+nur eine Vorlage: **Vorgabe des Spiels** lädt sie in Turnier, Phase, Season und Saison, gespeichert wird dort wie immer
+ein eigener Stand. Gibt es keinen Standard-Pool, lädt der Knopf alle freigegebenen, aktiven Maps. Einen Standard-Pool zu
+ändern oder zu entfernen, ändert keinen gespeicherten Pool.
+
 **Map-Pool im Turnier:** Reiter **Maps** (nur bei Turnieren mit Spiel, für Turnierleitung und Strukturrollen). Je Modus
-die Maps an- und abhaken, mit den Pfeilen sortieren; **Vorgabe des Spiels** übernimmt alle freigegebenen, aktiven Maps,
-**Alle abwählen** leert die Auswahl, **Speichern** legt den Pool an. Darunter die **Phasen**: eine Phase übernimmt den
-Pool des Turniers oder bekommt mit **Eigenen Pool festlegen** einen eigenen (etwa ein Finale mit anderen Maps,
-**Übernehmen von … Pool des Turniers** als Startpunkt). **Pool entfernen** an der Phase lässt wieder den des Turniers
-gelten. Die Turnierseite zeigt den Pool als Karten mit Bild, je Phase mit eigenem Pool einen weiteren Abschnitt.
+die Maps an- und abhaken, mit den Pfeilen sortieren; **Vorgabe des Spiels** lädt den Standard-Pool (ohne ihn alle
+freigegebenen, aktiven Maps), **Übernehmen von …** startet mit dem Pool eines anderen Turniers oder einer Liga-Season
+desselben Spiels, **Alle abwählen** leert die Auswahl, **Speichern** legt den Pool an. Darunter die **Phasen**: eine Phase
+übernimmt den Pool des Turniers oder bekommt mit **Eigenen Pool festlegen** einen eigenen (etwa ein Finale mit anderen
+Maps, **Übernehmen von … Pool des Turniers** als Startpunkt). **Pool entfernen** an der Phase lässt wieder den des
+Turniers gelten. Die Turnierseite zeigt den Pool als Karten mit Bild, je Phase mit eigenem Pool einen weiteren Abschnitt.
 
 <img src="../assets/turniere/maps-turnier-pool.png" alt="Reiter Maps: Map-Pool des Turniers je Modus und das Finale mit eigenem Pool" width="560">
 

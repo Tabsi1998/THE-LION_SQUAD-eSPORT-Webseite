@@ -7,6 +7,7 @@ from database import get_db
 from auth import get_current_user, get_optional_user, require_admin
 from models import StationCreate, StationUpdate, now_utc, new_id
 from routes.tournament_common import tournament_hidden_reason
+from services import game_usage
 from services.access_links import validate_access_link
 from services.change_events import reset_scope_cache
 from services.heat_rebuild import evaluate_after_write, reevaluate_after_release
@@ -208,6 +209,8 @@ async def create_station(body: StationCreate, me: dict = Depends(require_admin()
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     if doc.get("tournament_id"):
         await _ensure_tournament_unlocked(db, doc["tournament_id"])
+    if await game_usage.chosen_is_archived(db, doc.get("game_id")):
+        raise HTTPException(status_code=422, detail=game_usage.ARCHIVED_DETAIL)
     doc["id"] = new_id()
     doc["status"] = "free"
     doc["current_match_id"] = None
@@ -243,6 +246,8 @@ async def update_station(sid: str, body: StationUpdate, me: dict = Depends(requi
         updates["notes"] = (updates["notes"] or "").strip() or None
     if updates.get("game_id") and not await db.games.find_one({"id": updates["game_id"]}, {"id": 1}):
         raise HTTPException(status_code=404, detail="Spiel nicht gefunden")
+    if await game_usage.chosen_is_archived(db, updates.get("game_id"), current.get("game_id")):
+        raise HTTPException(status_code=422, detail=game_usage.ARCHIVED_DETAIL)
     # Protokoll wie bei den übrigen Bearbeitungen (#2112): was an den Angaben der Station geändert wurde, nicht der Betrieb.
     edited = {field: {"from": current.get(field), "to": updates[field]} for field in STATION_DETAIL_FIELDS
               if field in updates and updates[field] != current.get(field)}
@@ -384,6 +389,8 @@ async def bulk_create_stations(body: dict, me: dict = Depends(require_admin())):
     count = int(body.get("count") or 0)
     if count < 1 or count > 64:
         raise HTTPException(status_code=400, detail="Anzahl muss zwischen 1 und 64 liegen")
+    if await game_usage.chosen_is_archived(db, body.get("game_id")):
+        raise HTTPException(status_code=422, detail=game_usage.ARCHIVED_DETAIL)
     prefix = (body.get("prefix") or "Station").strip() or "Station"
     device_type = (body.get("device_type") or "switch").strip()
     notes = (body.get("notes") or "").strip() or None

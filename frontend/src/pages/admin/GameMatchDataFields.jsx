@@ -117,6 +117,7 @@ export function GameMatchDataFields({ value, onChange, testPrefix = "game-edit" 
         {modes.length > 0 && (
           <p className="text-xs text-white/45" data-testid={`${testPrefix}-modes-maps`}>
             Minuten freiwillig – ein Modus ohne Dauer dient nur den Maps (Spiele → Maps). Umbenennen behält die Zuordnung.
+            Entfernen nimmt den Modus beim Speichern auch aus den Maps; gespeicherte Pools bleiben, wie sie sind.
           </p>
         )}
       </div>

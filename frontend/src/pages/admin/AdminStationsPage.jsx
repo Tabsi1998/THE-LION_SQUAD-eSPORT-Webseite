@@ -11,6 +11,7 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useAuth } from "@/context/AuthContext";
 import { formatBracketSection, formatDeviceType, formatMatchKind, formatMatchStatus, formatScheduleGroupLabel } from "@/lib/tournamentLabels";
 import { formatDateTime } from "@/lib/datetime";
+import { isArchivedGame, selectableGames } from "@/lib/gameLabels";
 import { finderFor, sourceLabel } from "@/lib/slotSource";
 import { Pencil, Plus, Trash2, Link as LinkIcon, X as XIcon, Wand2, Play } from "lucide-react";
 import { toast } from "sonner";
@@ -511,7 +512,7 @@ function StationEditSheet({ station, onClose, onSaved }) {
     return () => { live = false; };
   }, []);
   const devices = DEVICES.some(([key]) => key === form.device_type) ? DEVICES : [...DEVICES, [form.device_type, formatDeviceType(form.device_type)]];
-  const gameOptions = [["", "Kein bestimmtes Spiel"], ...games.map((game) => [game.id, game.name || game.title || game.id])];
+  const gameOptions = [["", "Kein bestimmtes Spiel"], ...selectableGames(games, form.game_id).map((game) => [game.id, `${game.name || game.title || game.id}${isArchivedGame(game) ? " – archiviert" : ""}`])];
   if (form.game_id && !games.some((game) => game.id === form.game_id)) gameOptions.push([form.game_id, "Bisher gewähltes Spiel"]);
   const submit = async (event) => {
     event.preventDefault();

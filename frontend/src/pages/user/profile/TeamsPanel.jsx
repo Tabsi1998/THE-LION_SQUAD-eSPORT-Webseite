@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
+import { gameOptionLabel, selectableGames } from "@/lib/gameLabels";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
@@ -341,7 +342,7 @@ export function TeamsPanel() {
                   <option value="">Kein bestimmtes Spiel</option>
                   {/* Ein alter Freitext bleibt wählbar, bis jemand ein Spiel aus der Liste nimmt. */}
                   {editing.game_id && !games.some((game) => game.id === editing.game_id) ? <option value={editing.game_id}>{editing.game || `${editing.game_id} (nicht in der Liste)`}</option> : null}
-                  {games.map((game) => <option key={game.id} value={game.id}>{game.display_name || game.name}</option>)}
+                  {selectableGames(games, editing.game_id).map((game) => <option key={game.id} value={game.id}>{gameOptionLabel(game)}</option>)}
                 </select>
                 <span className="block mt-1 text-xs text-white/45" data-testid="team-squad-game-hint">Hauptspiel oder Version: In der Liga zählen beide als dasselbe Spiel.</span>
               </Field>

@@ -76,7 +76,7 @@ export function AmpPanelCard() {
   const clearPassword = async () => {
     if (!await confirm({
       title: "AMP-Passwort entfernen?",
-      description: "Ohne Passwort fragt die Website das Panel nicht mehr ab. Server im Modus „AMP-Panel“ bekommen dann einen Sync-Hinweis.",
+      description: "Ohne Passwort fragt die Website das Panel nicht mehr ab. Server mit Live-Daten vom AMP-Panel zeigen dann beim Abrufen einen Fehler.",
       confirmLabel: "Passwort entfernen",
       tone: "danger",
     })) return;
@@ -99,7 +99,7 @@ export function AmpPanelCard() {
         <span className="inline-flex items-center gap-2 min-w-0">
           <Server className="w-4 h-4 shrink-0 text-[#29B6E8]" />
           <span className="text-[11px] font-bold uppercase tracking-widest text-white/70">AMP-Panel</span>
-          <span className="text-xs text-white/45 truncate">für Server mit Sync „AMP-Panel“</span>
+          <span className="text-xs text-white/45 truncate">für Server mit Live-Daten vom AMP-Panel</span>
         </span>
         <ChevronDown className={`w-4 h-4 shrink-0 text-white/50 transition ${open ? "rotate-180" : ""}`} />
       </button>

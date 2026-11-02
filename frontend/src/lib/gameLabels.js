@@ -15,8 +15,19 @@ export function gameLabel(game) {
 
 export function gameOptionLabel(game) {
   const label = gameLabel(game);
+  const archived = isArchivedGame(game) ? " – archiviert" : "";
   if (game.kind === "edition" && game.short_name && !label.includes(game.short_name)) {
-    return `${label} (${game.short_name})`;
+    return `${label} (${game.short_name})${archived}`;
   }
-  return label;
+  return `${label}${archived}`;
+}
+
+/** Archiviert (#2129): beim Anlegen nicht mehr zur Wahl, alles Bestehende zeigt das Spiel weiter. Fehlt `status`: aktiv. */
+export function isArchivedGame(game) {
+  return game?.status === "archived";
+}
+
+/** Die Spiele für eine Auswahl: ohne archivierte - das schon gewählte bleibt drin, damit es lesbar und speicherbar ist. */
+export function selectableGames(games, currentId) {
+  return (Array.isArray(games) ? games : []).filter((game) => !isArchivedGame(game) || (currentId && game.id === currentId));
 }

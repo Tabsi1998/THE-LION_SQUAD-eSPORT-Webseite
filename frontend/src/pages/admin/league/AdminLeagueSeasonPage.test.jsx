@@ -99,6 +99,19 @@ test("Modus je Map halb gesetzt: nicht speichern, sondern sagen, was fehlt", asy
   expect(apiMock.patch).not.toHaveBeenCalled();
 });
 
+// #2129, SP2: Ein entfernter Modus bleibt in der Reihenfolge sichtbar und gilt weiter, statt still auf „frei“ zu springen.
+test("Modus je Map: ein Modus, den das Spiel nicht mehr hat, bleibt gesetzt und wird mitgeschickt", async () => {
+  const pool = { id: "p1", version: 1, stale: false, outdated_map_ids: [], modes: [{ mode: "kontrolle", label: "Kontrolle", maps: [] }] };
+  apiMock.get.mockResolvedValue({ data: { ...BODY, season: { ...SEASON, game_mode_order: ["snd", "kontrolle", "snd"] }, map_pool: pool } });
+  renderPage();
+  const select = await screen.findByTestId("mode-order-1");
+  expect(select).toHaveValue("kontrolle");
+  expect([...select.options].map((option) => option.textContent)).toContain("Kontrolle (nicht mehr im Spiel)");
+  fireEvent.click(screen.getByTestId("season-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalled());
+  expect(apiMock.patch.mock.calls[0][1].game_mode_order).toEqual(["snd", "kontrolle", "snd"]);
+});
+
 test("Staffel anlegen und Liga 2 mit eigener Teamgröße anlegen", async () => {
   apiMock.post.mockResolvedValueOnce({ data: { tournament_id: "t2", staffel: "B" } });
   renderPage();

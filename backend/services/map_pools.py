@@ -35,7 +35,11 @@ from services.game_maps import MapProblem
 
 # ``league_season``: Pool einer Liga-Season (docs/LIGA.md) - Vorlage; die Staffel bekommt beim Anlegen eine Kopie
 # als eigene Version im Scope ``tournament`` (``copy_version``), ``effective_pool`` bleibt unverändert.
-SCOPES = ("tournament", "stage", "reference_series", "league_season")
+# ``game_default``: Standard-Pool eines Spiels (#2129, SP3) - nur eine Vorlage. Die Knöpfe „Vorgabe des Spiels“ laden ihn in
+# den Editor, gespeichert wird dann wie immer ein eigener Snapshot; nichts liest ihn beim Spielen oder Melden.
+SCOPES = ("tournament", "stage", "reference_series", "league_season", game_maps.DEFAULT_POOL_SCOPE)
+# Grenze der Auswahl „Übernehmen von“ im Turnier-Pool.
+SOURCES_MAX = 20
 # Grenze je Modus gegen unkontrollierte Datenmengen - keine feste Kartenzahl.
 POOL_MAPS_MAX = 50
 NO_MODE_LABEL = "Alle Maps"
@@ -152,6 +156,47 @@ def game_summary(game: dict | None) -> dict | None:
     if not game:
         return None
     return {"id": game["id"], "name": game.get("name"), "slug": game.get("slug"), "modes": game_maps.game_modes(game)}
+
+
+async def default_pool(db, game: dict | None) -> dict | None:
+    """Der Standard-Pool des Spiels für den Knopf „Vorgabe des Spiels“ - ``None``: dann lädt er alle aktiven Maps."""
+    if not game:
+        return None
+    return view(await current(db, game_maps.DEFAULT_POOL_SCOPE, game["id"]), game_maps.DEFAULT_POOL_SCOPE)
+
+
+async def tournament_sources(db, tournament: dict) -> list[dict]:
+    """„Übernehmen von“ im Turnier-Pool (#2129, SP3): die geltenden Pools anderer Turniere und Liga-Seasons mit demselben
+    Spiel, neueste zuerst. Staffeln fehlen - sie sind Kopien ihrer Season. ``tournament``/``season`` stehen für die
+    Sichtbarkeitsprüfung der Route dabei und gehören nicht nach außen."""
+    game_id = tournament.get("game_id")
+    if not game_id:
+        return []
+    newest: dict[tuple, dict] = {}
+    async for doc in db.map_pools.find({"game_id": game_id, "scope": {"$in": ["tournament", "league_season"]}}, {"_id": 0}):
+        key = (doc.get("scope"), doc.get("scope_id"))
+        if key not in newest or (doc.get("version") or 0) > (newest[key].get("version") or 0):
+            newest[key] = doc
+    rows = sorted((doc for doc in newest.values() if not doc.get("cleared") and doc.get("scope_id") != tournament.get("id")),
+                  key=lambda doc: str(doc.get("created_at") or ""), reverse=True)
+    tournaments = {row["id"]: row for row in await db.tournaments.find(
+        {"id": {"$in": [doc["scope_id"] for doc in rows if doc["scope"] == "tournament"]}}, {"_id": 0}).to_list(None)}
+    seasons = {row["id"]: row for row in await db.league_seasons.find(
+        {"id": {"$in": [doc["scope_id"] for doc in rows if doc["scope"] == "league_season"]}},
+        {"_id": 0, "id": 1, "name": 1, "league_id": 1}).to_list(None)}
+    out: list[dict] = []
+    for doc in rows:
+        if doc["scope"] == "tournament":
+            source = tournaments.get(doc["scope_id"])
+            if not source or source.get("league_context"):
+                continue
+            out.append({"key": f"tournament:{source['id']}", "label": f"Turnier: {source.get('title') or 'ohne Titel'}",
+                        "pool": view(doc, "tournament"), "tournament": source})
+        elif seasons.get(doc["scope_id"]):
+            season = seasons[doc["scope_id"]]
+            out.append({"key": f"season:{season['id']}", "label": f"Liga-Season: {season.get('name') or 'ohne Namen'}",
+                        "pool": view(doc, "league_season"), "season": season})
+    return out
 
 
 # ---------------------------------------------------------------- Schreiben
@@ -291,7 +336,7 @@ async def tournament_overview(db, tournament: dict, *, admin: bool = False) -> d
         game = await db.games.find_one({"id": game_id}, {"_id": 0}) if game_id else None
         rows = [{**_stage_head(stage), "pool": await admin_entry(db, stage_docs.get(stage["id"]), game_id, "stage")}
                 for stage in stages]
-        return {"game": game_summary(game), "library": await library(db, game),
+        return {"game": game_summary(game), "library": await library(db, game), "default_pool": await default_pool(db, game),
                 "tournament": await admin_entry(db, own, game_id, "tournament"), "stages": rows}
     base = view(valid_for(own, game_id), "tournament")
     rows = []

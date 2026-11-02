@@ -8,11 +8,11 @@ import { CheckField } from "@/components/tls/FormFields";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
-import { gameLabel } from "@/lib/gameLabels";
-import { gameMatchDataPayload, gameMatchDataProblem, gameMatchDataToForm } from "@/lib/gameMatchData";
+import { gameLabel, gameOptionLabel, isArchivedGame, selectableGames } from "@/lib/gameLabels";
+import { gameMatchDataPayload, gameMatchDataProblem, gameMatchDataToForm, gameSavedText, modeRemovalQuestion, removedModes } from "@/lib/gameMatchData";
 import { GameMatchDataFields } from "./GameMatchDataFields";
 import { toast } from "sonner";
-import { Map as MapIcon, Pencil, Plus, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, Map as MapIcon, Pencil, Plus, Trash2 } from "lucide-react";
 
 const slugFrom = (txt) => (txt || "")
   .normalize("NFD")
@@ -31,7 +31,7 @@ const GAME_KIND_OPTIONS = [
 ];
 
 const emptyGameForm = {
-  name: "", slug: "", short_name: "", genre: "", platforms: "", cover_url: "", logo_url: "",
+  name: "", slug: "", short_name: "", cover_url: "", logo_url: "",
   kind: "standalone", parent_game_id: "", identity_source_game_id: "", inherit_player_ids: true,
   player_id_fields: [], discord_guild_id: "", discord_role_name: "",
 };
@@ -76,36 +76,67 @@ export default function AdminGamesPage() {
   const [form, setForm] = useState(emptyGameForm);
   const [editing, setEditing] = useState(null);
   const [servers, setServers] = useState([]);
+  const [showArchived, setShowArchived] = useState(false);
   const confirm = useConfirm();
   const load = useCallback(async () => { const { data } = await api.get("/games"); setList(data); }, []);
   useEffect(() => { load(); }, [load]);
   useEffect(() => { api.get("/games/discord-servers").then(({ data }) => setServers(Array.isArray(data) ? data : [])).catch(() => setServers([])); }, []);
   useApiInvalidation(load, ["games"]);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-  const parentOptions = list.filter((g) => g.kind !== "edition").map((g) => [g.id, gameLabel(g)]);
-  const identityOptions = list.map((g) => [g.id, `ID von ${gameLabel(g)}`]);
+  const parentOptions = selectableGames(list).filter((g) => g.kind !== "edition").map((g) => [g.id, gameLabel(g)]);
+  const identityOptions = selectableGames(list).map((g) => [g.id, `ID von ${gameLabel(g)}`]);
+  const archivedCount = list.filter(isArchivedGame).length;
+  const shown = list.filter((g) => showArchived || !isArchivedGame(g));
 
   const submit = async (e) => {
     e.preventDefault();
     try {
-      await api.post("/games", {
-        ...gamePayload(form),
-        platforms: form.platforms ? form.platforms.split(",").map((s) => s.trim()) : [],
-      });
+      await api.post("/games", gamePayload(form));
       toast.success("Spiel erstellt.");
       setForm(emptyGameForm);
       load();
     } catch (err) { toast.error(formatRequestError(err, "Spiel konnte nicht erstellt werden.", { slug: form.slug, name: form.name })); }
   };
 
-  const del = async (id) => {
+  const setStatus = async (game, status) => {
+    try {
+      await api.patch(`/games/${game.id}`, { status });
+      toast.success(status === "archived" ? `„${gameLabel(game)}“ archiviert.` : `„${gameLabel(game)}“ zurückgeholt.`);
+      load();
+    } catch (err) {
+      toast.error(formatRequestError(err, "Das hat nicht geklappt."));
+    }
+  };
+
+  // Löschen nur ohne Verwendung (#2129): vorab fragen, was am Spiel hängt - bei Verwendung bietet der Dialog das Archiv an.
+  const del = async (game) => {
+    let used = null;
+    try {
+      ({ data: used } = await api.get(`/games/${game.id}/usage`));
+    } catch (err) {
+      toast.error(formatRequestError(err, "Spiel konnte nicht geprüft werden."));
+      return;
+    }
+    if (used?.total) {
+      if (isArchivedGame(game)) {
+        toast.error(`„${gameLabel(game)}“ bleibt im Archiv: ${used.text}.`);
+        return;
+      }
+      if (await confirm({
+        title: `„${gameLabel(game)}“ wird noch verwendet`,
+        description: `Gelöscht werden kann es nicht: ${used.text}. Archiviert steht es beim Anlegen nicht mehr zur Wahl, alles Bestehende zeigt es weiter.`,
+        confirmLabel: "Archivieren",
+        tone: "info",
+      })) await setStatus(game, "archived");
+      return;
+    }
     if (!await confirm({
-      title: "Spiel löschen?",
-      description: "Das Spiel wird dauerhaft entfernt. Bestehende Verknüpfungen können danach unvollständig sein.",
+      title: `„${gameLabel(game)}“ löschen?`,
+      description: "Es hängt nichts daran. Das Spiel wird dauerhaft entfernt.",
       confirmLabel: "Löschen",
     })) return;
     try {
-      await api.delete(`/games/${id}`);
+      await api.delete(`/games/${game.id}`);
       toast.success("Spiel gelöscht.");
       load();
     } catch (err) {
@@ -138,8 +169,6 @@ export default function AdminGamesPage() {
           <DiscordServerField form={form} games={list} servers={servers} onChange={(v) => set("discord_guild_id", v)} testId="game-discord" />
           {form.kind !== "edition" && <Input placeholder={roleNamePlaceholder(form)} value={form.discord_role_name} onChange={(v) => set("discord_role_name", v)} testId="game-role" />}
           <Input placeholder="Kurzname (z.B. MK8DX)" value={form.short_name} onChange={(v) => set("short_name", v)} testId="game-short" />
-          <Input placeholder="Genre" value={form.genre} onChange={(v) => set("genre", v)} testId="game-genre" />
-          <Input placeholder="Plattformen (komma-getrennt)" value={form.platforms} onChange={(v) => set("platforms", v)} testId="game-platforms" />
           <ImageUpload value={form.logo_url} onChange={(v) => set("logo_url", v)} label="Logo" testId="game-logo" variant="square" endpoint="/uploads/logo?trim_empty_borders=false" allowLibrary logo />
           <ImageUpload value={form.cover_url} onChange={(v) => set("cover_url", v)} label="Cover" testId="game-cover" variant="wide" allowLibrary />
           <PlayerIdFieldsEditor value={form.player_id_fields} onChange={(v) => set("player_id_fields", v)} />
@@ -148,20 +177,27 @@ export default function AdminGamesPage() {
           </button>
         </form>
         <div className="lg:col-span-2 border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
+          {archivedCount ? (
+            <label className="flex items-center gap-2 px-4 py-2.5 border-b border-white/10 text-xs text-white/65">
+              <input type="checkbox" checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} className="accent-[#29B6E8]" data-testid="games-show-archived" />
+              Archivierte zeigen ({archivedCount})
+            </label>
+          ) : null}
           <table className="w-full text-sm">
             <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
-              <tr><th className="text-left px-4 py-3">Name</th><th className="text-left px-4 py-3">Typ</th><th className="text-left px-4 py-3">ID-Quelle</th><th></th></tr>
+              <tr><th className="text-left px-4 py-3">Name</th><th className="hidden md:table-cell text-left px-4 py-3">Typ</th><th className="hidden md:table-cell text-left px-4 py-3">ID-Quelle</th><th></th></tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {list.map((g) => (
-                <tr key={g.id}>
+              {shown.map((g) => (
+                <tr key={g.id} className={isArchivedGame(g) ? "opacity-60" : undefined} data-testid={`game-row-${g.slug}`}>
                   <td className="px-4 py-3">
                     <div className="font-semibold text-white">{gameLabel(g)}</div>
+                    {isArchivedGame(g) ? <div className="mt-0.5 text-[10px] uppercase tracking-widest text-warn" data-testid={`game-archived-${g.slug}`}>Archiviert – beim Anlegen nicht zur Wahl</div> : null}
                     {gameLabel(g) !== g.name && <div className="mt-0.5 text-[10px] uppercase tracking-widest text-white/35">Version: {g.name}</div>}
                     {g.discord_guild_id && servers.length ? <div className="mt-0.5 text-[10px] uppercase tracking-widest text-[#8EA1FF]" data-testid={`game-discord-${g.slug}`}>Discord: {servers.find((server) => server.guild_id === g.discord_guild_id)?.name || g.discord_guild_id}</div> : null}
                   </td>
-                  <td className="px-4 py-3 text-white/60">{GAME_KIND_OPTIONS.find(([v]) => v === (g.kind || "standalone"))?.[1] || "Einzelspiel"}</td>
-                  <td className="px-4 py-3 text-white/60">{g.identity_source_game?.display_name || g.identity_source_game?.name || (g.inherit_player_ids !== false && (g.parent_game?.display_name || g.parent_game?.name)) || "Eigene IDs"}</td>
+                  <td className="hidden md:table-cell px-4 py-3 text-white/60">{GAME_KIND_OPTIONS.find(([v]) => v === (g.kind || "standalone"))?.[1] || "Einzelspiel"}</td>
+                  <td className="hidden md:table-cell px-4 py-3 text-white/60">{g.identity_source_game?.display_name || g.identity_source_game?.name || (g.inherit_player_ids !== false && (g.parent_game?.display_name || g.parent_game?.name)) || "Eigene IDs"}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="inline-flex items-center gap-2">
                       {/* Map-Bibliothek (#1616): Maps mit Bild und Modi für Pools in Turnieren und Saisons. */}
@@ -171,7 +207,11 @@ export default function AdminGamesPage() {
                       <button onClick={() => setEditing(toForm(g))} className="p-1 text-white/40 hover:text-[#29B6E8]" title="Spiel bearbeiten" data-testid={`game-edit-${g.slug}`}>
                         <Pencil className="w-4 h-4" />
                       </button>
-                      <button onClick={() => del(g.id)} className="p-1 text-white/40 hover:text-[#FF3B30]" title="Spiel löschen" data-testid={`game-delete-${g.slug}`}>
+                      <button onClick={() => setStatus(g, isArchivedGame(g) ? "active" : "archived")} className="p-1 text-white/40 hover:text-warn"
+                        title={isArchivedGame(g) ? "Spiel zurückholen" : "Spiel archivieren"} aria-label={isArchivedGame(g) ? `${gameLabel(g)} zurückholen` : `${gameLabel(g)} archivieren`} data-testid={`game-archive-${g.slug}`}>
+                        {isArchivedGame(g) ? <ArchiveRestore className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
+                      </button>
+                      <button onClick={() => del(g)} className="p-1 text-white/40 hover:text-[#FF3B30]" title="Spiel löschen" data-testid={`game-delete-${g.slug}`}>
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -209,8 +249,6 @@ function toForm(game) {
     identity_source_game_id: game.identity_source_game_id || "",
     inherit_player_ids: game.inherit_player_ids !== false,
     short_name: game.short_name || "",
-    genre: game.genre || "",
-    platforms: (game.platforms || []).join(", "),
     cover_url: game.cover_url || "",
     logo_url: game.logo_url || "",
     player_id_fields: game.player_id_fields || [],
@@ -242,7 +280,6 @@ function gamePayload(form) {
     parent_game_id: isEdition ? (form.parent_game_id || null) : null,
     identity_source_game_id: isEdition ? (form.identity_source_game_id || null) : null,
     inherit_player_ids: form.inherit_player_ids !== false,
-    platforms: form.platforms ? form.platforms.split(",").map((s) => s.trim()).filter(Boolean) : [],
     player_id_fields: normalizePlayerIdFields(form.player_id_fields),
     discord_guild_id: form.discord_guild_id || null,
     discord_role_name: isEdition ? null : ((form.discord_role_name || "").trim() || null),
@@ -252,9 +289,10 @@ function gamePayload(form) {
 function EditGameModal({ game, games, servers = [], onClose, onSaved }) {
   const [form, setForm] = useState(game);
   const [saving, setSaving] = useState(false);
+  const confirm = useConfirm();
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-  const parentOptions = games.filter((g) => g.id !== form.id && g.kind !== "edition").map((g) => [g.id, gameLabel(g)]);
-  const identityOptions = games.filter((g) => g.id !== form.id).map((g) => [g.id, `ID von ${gameLabel(g)}`]);
+  const parentOptions = selectableGames(games, form.parent_game_id).filter((g) => g.id !== form.id && g.kind !== "edition").map((g) => [g.id, gameOptionLabel(g)]);
+  const identityOptions = selectableGames(games, form.identity_source_game_id).filter((g) => g.id !== form.id).map((g) => [g.id, `ID von ${gameOptionLabel(g)}`]);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -262,8 +300,20 @@ function EditGameModal({ game, games, servers = [], onClose, onSaved }) {
     if (problem) { toast.error(problem); return; }
     setSaving(true);
     try {
-      await api.patch(`/games/${form.id}`, gamePayload(form));
-      toast.success("Spiel gespeichert.");
+      const payload = gamePayload(form);
+      // Modus entfernt (#2129, SP2): vor dem Speichern fragen, mit der Zahl der betroffenen Maps - auf dem Server
+      // verschwindet er dann auch aus den Maps.
+      const removed = removedModes(game.match_data?.match_modes, payload);
+      if (removed.length) {
+        const usage = await api.get(`/games/${form.id}/usage`).then(({ data }) => data).catch(() => null);
+        const question = modeRemovalQuestion(removed, usage);
+        if (question && !await confirm({ ...question, confirmLabel: "Entfernen" })) {
+          setSaving(false);
+          return;
+        }
+      }
+      const { data } = await api.patch(`/games/${form.id}`, payload);
+      toast.success(gameSavedText(data));
       onSaved();
     } catch (err) {
       toast.error(formatRequestError(err, "Spiel konnte nicht gespeichert werden.", { slug: form.slug, name: form.name }));
@@ -279,8 +329,6 @@ function EditGameModal({ game, games, servers = [], onClose, onSaved }) {
         <Input placeholder="Slug" value={form.slug} onChange={(v) => set("slug", slugFrom(v))} required testId="game-edit-slug" />
         <Select value={form.kind} onChange={(v) => set("kind", v)} options={GAME_KIND_OPTIONS} testId="game-edit-kind" />
         <Input placeholder="Kurzname" value={form.short_name} onChange={(v) => set("short_name", v)} testId="game-edit-short" />
-        <Input placeholder="Genre" value={form.genre} onChange={(v) => set("genre", v)} testId="game-edit-genre" />
-        <Input placeholder="Plattformen (komma-getrennt)" value={form.platforms} onChange={(v) => set("platforms", v)} testId="game-edit-platforms" />
         <DiscordServerField form={form} games={games} servers={servers} onChange={(v) => set("discord_guild_id", v)} testId="game-edit-discord" />
         {form.kind !== "edition" && <Input placeholder={roleNamePlaceholder(form)} value={form.discord_role_name} onChange={(v) => set("discord_role_name", v)} testId="game-edit-role" />}
       </FormGrid>

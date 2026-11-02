@@ -9,7 +9,7 @@ import { CheckField, FieldLabel, INPUT_CLASS, SelectField, TextAreaField, TextFi
 import { GermanDateField } from "@/components/tls/GermanDateField";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { gameOptionLabel } from "@/lib/gameLabels";
+import { gameOptionLabel, selectableGames } from "@/lib/gameLabels";
 import { checkKey, warningSummary, warningsByField } from "@/lib/referenceChecks";
 import { AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
@@ -754,7 +754,7 @@ function ReferenceForm({ reference, games, memberProfiles, partners = [], lineag
         )}
         <TextField label="Turniername" value={form.title} onChange={(v) => set("title", v)} suggestions={suggestions.titles} required testId="reference-title" placeholder="z.B. Autumn Cup 2026" />
         <FormGrid>
-          <SelectField label="Spiel" value={form.game_id || ""} onChange={(v) => set("game_id", v)} options={[["", "— Spiel wählen —"], ...games.map((game) => [game.id, gameOptionLabel(game)])]} testId="reference-game" />
+          <SelectField label="Spiel" value={form.game_id || ""} onChange={(v) => set("game_id", v)} options={[["", "— Spiel wählen —"], ...selectableGames(games, form.game_id).map((game) => [game.id, gameOptionLabel(game)])]} testId="reference-game" />
           <GermanDateField id="reference-start-date" label="Datum" value={(form.start_date || "").slice(0, 10)} onChange={setDay} testId="reference-start-date" allowFuture />
         </FormGrid>
         <TextField label="Link (optional)" value={form.external_url} onChange={(v) => set("external_url", v)} placeholder="https://..." testId="reference-link" hint="Turnierseite oder Ergebnis. Weitere Links unter „Weitere Angaben“." />

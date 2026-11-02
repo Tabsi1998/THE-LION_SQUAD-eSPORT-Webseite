@@ -123,8 +123,12 @@ function Tiebreakers({ value, onChange }) {
   );
 }
 
-function ModeOrder({ modes, bestOf, value, onChange }) {
-  if (!modes.length) return null;
+function ModeOrder({ modes, poolModes = [], bestOf, value, onChange }) {
+  // Ein Modus, den das Spiel nicht mehr hat (#2129): bleibt sichtbar gesetzt und gilt weiter, neu wählen geht nicht.
+  const gone = [...new Set(value.filter((mode) => mode && !modes.some((known) => known.mode === mode)))]
+    .map((mode) => ({ mode, label: `${poolModes.find((group) => group.mode === mode)?.label || mode} (nicht mehr im Spiel)` }));
+  const choices = [...modes, ...gone];
+  if (!choices.length) return null;
   const count = Number(bestOf) || 1;
   const set = (index, mode) => {
     const next = Array.from({ length: count }, (_, at) => value[at] || "");
@@ -138,7 +142,7 @@ function ModeOrder({ modes, bestOf, value, onChange }) {
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {Array.from({ length: count }, (_, index) => (
           <SelectField key={index} label={`Map ${index + 1}`} value={value[index] || ""} onChange={(mode) => set(index, mode)}
-            options={[["", "frei"], ...modes.map((mode) => [mode.mode, mode.label])]} testId={`mode-order-${index}`} />
+            options={[["", "frei"], ...choices.map((mode) => [mode.mode, mode.label])]} testId={`mode-order-${index}`} />
         ))}
       </div>
       <p className={`text-xs ${problem ? "text-warn" : "text-white/45"}`}>{problem || "Alle frei: die Teams wählen den Modus je Map selbst."}</p>
@@ -407,7 +411,7 @@ export default function AdminLeagueSeasonPage() {
                   <TextField label="Mindestkader" type="number" min={1} max={40} value={form.min_squad_size} onChange={(value) => set("min_squad_size", value)} testId="season-form-min-squad" />
                   <TextField label="Teams je Staffel höchstens" type="number" min={2} max={20} value={form.max_staffel_size} onChange={(value) => set("max_staffel_size", value)} testId="season-form-staffel-size" />
                 </FormGrid>
-                <ModeOrder modes={modes} bestOf={form.best_of} value={form.game_mode_order} onChange={(value) => set("game_mode_order", value)} />
+                <ModeOrder modes={modes} poolModes={data.map_pool?.modes} bestOf={form.best_of} value={form.game_mode_order} onChange={(value) => set("game_mode_order", value)} />
                 <FormGrid>
                   <SelectField label="Map-Wiederholung in einer Serie" value={form.map_repeat} onChange={(value) => set("map_repeat", value)} options={MAP_REPEAT_OPTIONS}
                     hint="Ob dieselbe Map in einer Serie noch einmal gespielt werden darf. Die Meldung prüft es." testId="season-form-map-repeat" />
@@ -463,7 +467,7 @@ export default function AdminLeagueSeasonPage() {
               </div>
             </form>
 
-            <MapPoolEditor key={data.map_pool?.id || "leer"} title="Map-Pool der Season" game={data.game} library={data.library} entry={data.map_pool}
+            <MapPoolEditor key={data.map_pool?.id || "leer"} title="Map-Pool der Season" game={data.game} library={data.library} entry={data.map_pool} defaultPool={data.default_pool}
               hint="Jede neue Staffel bekommt eine Kopie; Änderungen kommen beim Übertragen an. Ohne Pool kann niemand mit Maps melden." onSave={savePool} onClear={clearPool} libraryLink testId="season-pool" />
 
             <section className="border border-white/10 rounded-sm bg-[#121212] p-4 md:p-5 space-y-4" aria-label="Ligen und Staffeln" data-testid="season-divisions">

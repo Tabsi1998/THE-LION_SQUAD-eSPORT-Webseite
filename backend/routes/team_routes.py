@@ -5,7 +5,7 @@ from typing import Optional, Literal
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from database import get_db
-from services import league_roster, moderation_standing
+from services import game_usage, league_roster, moderation_standing
 from auth import get_current_user, get_optional_user
 from models import TEAM_NAME_MAX_LENGTH, TEAM_NAME_MIN_LENGTH, TEAM_TAG_MAX_LENGTH, TEAM_TAG_MIN_LENGTH, TeamCreate, TeamUpdate, now_utc, new_id
 from services.notification_preferences import send_user_template
@@ -469,12 +469,16 @@ async def _squad_game(db, value: str | None, current: str | None = None) -> str 
     if text == (current or ""):
         return text
     if await db.games.find_one({"id": text}, {"_id": 1}):
-        return text
-    exactly = {"$regex": f"^{re.escape(text)}$", "$options": "i"}
-    game = await db.games.find_one({"$or": [{"name": exactly}, {"short_name": exactly}, {"slug": exactly}]}, {"_id": 0, "id": 1})
-    if not game:
-        raise HTTPException(status_code=400, detail=GAME_UNKNOWN)
-    return game["id"]
+        game_id = text
+    else:
+        exactly = {"$regex": f"^{re.escape(text)}$", "$options": "i"}
+        game = await db.games.find_one({"$or": [{"name": exactly}, {"short_name": exactly}, {"slug": exactly}]}, {"_id": 0, "id": 1})
+        if not game:
+            raise HTTPException(status_code=400, detail=GAME_UNKNOWN)
+        game_id = game["id"]
+    if await game_usage.chosen_is_archived(db, game_id, current):
+        raise HTTPException(status_code=422, detail=game_usage.ARCHIVED_DETAIL)
+    return game_id
 
 
 async def _staffel_without_this_game(db, game_id: str | None, registrations: list[dict]) -> dict | None:

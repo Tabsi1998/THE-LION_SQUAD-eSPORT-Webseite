@@ -6,6 +6,7 @@ from typing import Optional
 from datetime import datetime, timezone
 from database import get_db
 from auth import get_optional_user, require_area
+from services import game_usage
 from services.permissions import can_use_area, is_confirmed_admin_role
 from services.visibility import user_can_see, filter_visible
 from services.content_embed_service import resolve_content_embeds
@@ -1828,6 +1829,8 @@ async def create_reference(body: ReferenceCreate, me: dict = Depends(require_are
     doc["partner_ids"] = await partner_pages.clean_partner_ids(db, doc.get("partner_ids"))
     if doc.get("game_id") and not await db.games.find_one({"id": doc["game_id"]}, {"id": 1}):
         raise HTTPException(404, "Spiel nicht gefunden.")
+    if await game_usage.chosen_is_archived(db, doc.get("game_id")):
+        raise HTTPException(422, game_usage.ARCHIVED_DETAIL)
     await _check_reference_series(db, doc.get("series_id"))
     await _freeze_reference_members(db, doc)
     doc["id"] = new_id()
@@ -1870,6 +1873,8 @@ async def update_reference(rid: str, body: ReferenceUpdate, expected_updated_at:
     existing = await db.references.find_one({"id": rid}, {"_id": 0})
     if not existing:
         raise HTTPException(404, "Referenz nicht gefunden.")
+    if await game_usage.chosen_is_archived(db, updates.get("game_id"), existing.get("game_id")):
+        raise HTTPException(422, game_usage.ARCHIVED_DETAIL)
     # Gehört zur Saison (#1750): nie offener als alle verknüpften Saisons und Spuren - über ``series_id`` an der
     # Referenz wie über ``reference_id`` an einer Saison (#1970) -, auch wenn nur die Sichtbarkeit geändert wird. Unter
     # den Sperren dieser Saisons (alte und neue), damit eine gleichzeitige Änderung einer Saison nicht danebenläuft.

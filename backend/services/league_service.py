@@ -22,7 +22,7 @@ from zoneinfo import ZoneInfo
 from pymongo.errors import DuplicateKeyError
 
 from models import TournamentCreate, new_id, now_utc
-from services import game_maps, league_look, map_pools, pricing, staffel_guard
+from services import game_maps, game_usage, league_games, league_look, map_pools, pricing, staffel_guard
 from services.advancement_draw import sync_advancement_fields
 from services.bracket_fill_in import has_started, is_auto_bye
 from services.competition_versions import new_competition_version_fields
@@ -196,11 +196,13 @@ def _scoring(raw) -> dict:
         raise LeagueProblem(f"Punkte und Gleichstand: {exc}") from None
 
 
-def _mode_order(game: dict | None, order) -> list[str]:
+def _mode_order(game: dict | None, order, saved=None) -> list[str]:
+    """Die Reihenfolge der Modi. ``saved``: was die Season schon hat - ein Modus, der dem Spiel inzwischen entfernt wurde
+    (#2129), hält kein anderes Speichern auf; neu wählen lässt er sich nicht mehr."""
     order = [str(item).strip() for item in order or [] if str(item or "").strip()]
     if not order:
         return []
-    known = {mode["mode"] for mode in game_maps.game_modes(game)}
+    known = {mode["mode"] for mode in game_maps.game_modes(game)} | {str(item) for item in saved or []}
     if not known:
         raise LeagueProblem("Das Spiel hat keine Modi - die Reihenfolge der Modi bleibt leer.")
     unknown = [mode for mode in order if mode not in known]
@@ -242,7 +244,7 @@ def clean_season(raw: dict, existing: dict | None, game: dict | None) -> dict:
         elif key == "blocked_periods":
             value = _blocked_periods(value)
         elif key == "game_mode_order":
-            value = _mode_order(game, value)
+            value = _mode_order(game, value, (existing or {}).get("game_mode_order"))
         elif key == "scoring_rules":
             value = _scoring(value)
         out[key] = value
@@ -415,6 +417,8 @@ async def create_league(db, body: dict, user: dict) -> dict:
     game = await _game(db, body.get("game_id"))
     if not game:
         raise LeagueProblem("Spiel nicht gefunden.")
+    if game_usage.is_archived(game):
+        raise LeagueProblem(game_usage.ARCHIVED_DETAIL)
     name = _text(body.get("name"))
     if not name:
         raise LeagueProblem("Bitte einen Namen angeben.")
@@ -453,8 +457,11 @@ async def update_league(db, league: dict, body: dict) -> tuple[dict, list[str]]:
         # #2106: das Spiel ist änderbar, solange keine Season eine Staffel hat - eine Staffel spielt es schon.
         if await db.tournaments.count_documents({"league_context.league_id": league["id"], **ONLY_LEAGUE}):
             raise LeagueProblem(GAME_LOCKED, 409)
-        if not await _game(db, body["game_id"]):
+        chosen = await _game(db, body["game_id"])
+        if not chosen:
             raise LeagueProblem("Spiel nicht gefunden.")
+        if game_usage.is_archived(chosen):
+            raise LeagueProblem(game_usage.ARCHIVED_DETAIL)
         updates["game_id"] = body["game_id"]
         clear_mode_order = True
     if body.get("slug"):
@@ -943,7 +950,19 @@ async def sync_staffel(db, tournament: dict, league: dict, season: dict, divisio
     except map_pools.MapProblem as problem:
         # Die Felder oben sind schon geschrieben - das Ergebnis sagt ehrlich, dass nur der Pool fehlt.
         skipped.append({"group": "map_pool", "label": SYNC_GROUP_LABELS["map_pool"], "reason": problem.message})
+    await _note_mode_order(db, tournament, updates, skipped)
     return SyncResult(tournament["id"], tournament.get("title") or "", applied, skipped, changed)
+
+
+async def _note_mode_order(db, tournament: dict, updates: dict, skipped: list) -> None:
+    """Sagt ehrlich, wenn „Modus je Map“ der Staffel nach dem Übertragen nicht mehr gilt (#2129): Der Pool geht immer über,
+    die Reihenfolge nur vor dem ersten Ergebnis."""
+    order = updates.get("game_mode_order", tournament.get("game_mode_order"))
+    pool = await map_pools.current(db, "tournament", tournament["id"])
+    if order and pool and not league_games.effective_mode_order({"game_mode_order": order}, pool):
+        skipped.append({"group": "game_mode_order", "label": "Modus je Map",
+                        "reason": "Der Map-Pool der Staffel hat nicht mehr alle Modi ihrer Reihenfolge. Die Teams wählen den "
+                                  "Modus je Map deshalb frei; Spiele mit festgehaltenem Pool behalten ihre Reihenfolge."})
 
 
 async def _sync_pool(db, tournament: dict, season: dict, user: dict, *, locked: bool, has_result: bool,

@@ -296,9 +296,15 @@ Jedes Thema hat genau **einen** Ort:
 | Rollen und Freigaben | Admin → Mitglieder → Alle Benutzer | dieses Kapitel, [Rollen](../ROLLEN.md) |
 | Server, Updates, Sicherungen | Admin → System → Betrieb & Logs, Status | [Betrieb](../BETRIEB.md) |
 | App-Versionen, Play Store | Admin → System → App-Versionen | [Play Store](../PLAY_STORE.md) |
-| Game-Server, AMP-Zugang | Admin → System → Game-Server | dieser Abschnitt (unten) |
+| Game-Server, AMP-Zugang | Admin → eSports → Game-Server | dieser Abschnitt (unten) |
 
-**Game-Server über das AMP-Panel (#2112):** Steht ein Server auf der Sync-Quelle **AMP-Panel**, fragt die Website das
+**Game-Server pflegen:** **Live-Daten von** sagt, woher Status und Spielerzahl kommen; **Automatisch erkennen** reicht
+meistens. **Technik** (eingeklappt) braucht ihr nur, wenn das Abrufen nicht klappt: eigene Abfrage-Adresse, Abfrage-Port,
+RCON-Port. Schlägt ein Abruf fehl, steht der echte Fehler rot am Server (nur in der Verwaltung), darunter gelb, was er
+bedeutet; der Erfolg beim nächsten Abruf räumt beides weg. Das **Symbol** eines Servers kommt per Hochladen oder aus der
+Mediathek; ohne eigenes gilt das Logo des Spiels. Der Knopf **Demo-Startliste** erscheint nur in Testumgebungen.
+
+**Game-Server über das AMP-Panel (#2112):** Steht ein Server bei **Live-Daten von** auf **AMP-Panel**, fragt die Website das
 Panel nach dem Stand der Instanz (Feld **AMP-Instanz**: Name oder ID wie im Panel). Den Zugang tragt ihr oben auf der
 Game-Server-Seite im aufklappbaren Bereich **AMP-Panel** ein: **Adresse** (nur `https://`), **Benutzer** (am besten
 ein eigener mit Leserechten), **Passwort** und **Panel abfragen**. Das Passwort wird verschlüsselt gespeichert und nie
@@ -306,7 +312,7 @@ wieder gezeigt; leer lassen heißt „behalten“ – außer bei einer **neuen A
 gespeicherte gilt nur für die bisherige. Adressen der Plattform selbst (localhost, 127.x), Link-local-Adressen und
 Heimnetz-IPs als Zahl sind nicht erlaubt; ein Name, der ins Heimnetz zeigt, schon. **Verbindung testen** nennt die
 Instanzen, die das Panel kennt.
-**Passwort entfernen** (mit Rückfrage) beendet die Abfrage – Server auf „AMP-Panel“ bekommen dann einen Sync-Hinweis.
+**Passwort entfernen** (mit Rückfrage) beendet die Abfrage – Server auf „AMP-Panel“ zeigen dann beim Abrufen einen Fehler.
 
 **Shop-Preise (#2135):** Mitglieder zahlen genau, was der Verein an Printful zahlt – brutto, also Ware, Versand und
 Steuer. Im Produkt unter **Schritt 4 Preise** steht je Variante *Printful brutto*, daraus der *Mitgliederpreis*, ein

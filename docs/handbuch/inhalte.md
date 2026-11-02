@@ -946,8 +946,8 @@ der Kader im Abschnitt **Kader** der Saison.
 **Map-Pool der Saison:** Hat die Spur ein **Spiel** (bei einer Team-Liga steht der Abschnitt auch ohne, mit Hinweis),
 wählt der Vorstand auf der Seite der Saison im Abschnitt **Map-Pool der Saison** die Maps der Saison – je Modus aus der
 Map-Bibliothek des Spiels (**Admin → eSports → Spiele → Maps**, siehe [Turniere 3.14](turniere.md#314-maps-und-map-pools)).
-Anhaken, mit den Pfeilen sortieren, **Vorgabe des Spiels** nimmt alle freigegebenen Maps, **Übernehmen von … Pool der
-Saison 2025** startet mit dem Pool einer anderen Saison der Spur. **Speichern** legt eine neue Version an: Spätere
+Anhaken, mit den Pfeilen sortieren, **Vorgabe des Spiels** lädt den Standard-Pool des Spiels (ohne ihn alle freigegebenen
+Maps), **Übernehmen von … Pool der Saison 2025** startet mit dem Pool einer anderen Saison der Spur. **Speichern** legt eine neue Version an: Spätere
 Änderungen an der Bibliothek (Name, Bild, archiviert) ändern den gespeicherten Pool und alte Ergebnisse nicht. Die
 Serienseite zeigt den Pool unten als Karten mit Bild. Ohne Spiel oder ohne Pool bleibt bei den Maps der Freitext wie
 bisher.
