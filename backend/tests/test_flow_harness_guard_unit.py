@@ -16,8 +16,6 @@ import flow_mongo  # noqa: E402
     "mongodb://127.0.0.1:27017",
     "mongodb://localhost",
     "mongodb://LOCALHOST:27217/",
-    "mongodb://mongo:27017",
-    "mongodb://testnutzer:testwert@127.0.0.1:27017/?authSource=admin",
     "mongodb://127.0.0.1:27017/flowtest_probe",
 ])
 def test_these_addresses_are_allowed(url):
@@ -29,6 +27,11 @@ def test_these_addresses_are_allowed(url):
     "http://127.0.0.1:27017",
     "127.0.0.1:27017",
     "mongodb://mongodb:27017",  # der Dienst der Produktion in docker-compose.yml
+    "mongodb://mongo:27017",
+    "mongodb://testnutzer:testwert@127.0.0.1:27017/?authSource=admin",
+    "mongodb://testnutzer@127.0.0.1:27017",
+    "mongodb://127.0.0.1:27017/?replicaSet=rs0",
+    "mongodb://127.0.0.1:27017,localhost:27018",
     "mongodb://db.example.test:27017",
     "mongodb://10.0.0.5:27017",
     "mongodb://127.0.0.1:27017,db.example.test:27017",

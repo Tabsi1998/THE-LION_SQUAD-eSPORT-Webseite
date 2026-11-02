@@ -6,13 +6,14 @@ Ohne die Variable bleibt alles bei mongomock.
 
 **Eine Datenbank je Prozess, nicht je Test.** Eine Datenbank je Test hieße: rund 180 Sammlungen, 650 Indizes, 800 Dateien - je
 Test, und das Löschen wartet auf den nächsten Checkpoint. Gemessen stauten sich bei vier Prozessen 180 000 Dateien, ein
-``dropDatabase`` dauerte eine Minute und 460 Tests über 25 Minuten. Deshalb hat jeder Prozess (``-n``) eine eigene Datenbank
+``dropDatabase`` dauerte eine Minute und 460 Tests über 20 Minuten. Deshalb hat jeder Prozess (``-n``) eine eigene Datenbank
 mit eindeutigem Namen. Vor jedem Test wird sie geleert; wurden Indizes verändert, wird sie neu aufgebaut.
 
 Die Sicherung gegen Fehlbedienung steht hier und nicht verstreut in den Tests:
 
-* erlaubt sind nur die Hosts ``localhost``, ``127.0.0.1`` und ``mongo`` (Service-Container). Der Dienstname ``mongodb`` aus
-  ``docker-compose.yml`` ist absichtlich nicht dabei - so heißt auch die Datenbank der Produktion.
+* erlaubt ist genau ein Host, ``localhost`` oder ``127.0.0.1``, ohne Zugangsdaten und ohne ``replicaSet``. Der Client verbindet
+  sich direkt (``directConnection``), er folgt also keinem Hinweis des Servers auf andere Rechner. Der Dienstname ``mongodb``
+  aus ``docker-compose.yml`` ist absichtlich nicht dabei - so heißt auch die Datenbank der Produktion.
 * Die Adresse liest der Parser von pymongo, nicht ein eigener Ausdruck: Was der Client am Ende benutzt, wird geprüft.
 * Tests legen, leeren und löschen nur Datenbanken mit dem Präfix ``flowtest_``, jeder dieser Wege prüft das noch einmal.
 * Bei einem Verstoß bricht der Lauf ab, bevor er die erste Verbindung aufbaut (``conftest.pytest_configure``).
@@ -26,7 +27,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 ENV_NAME = "FLOW_MONGO_URL"
 DB_PREFIX = "flowtest_"
-ALLOWED_HOSTS = frozenset({"localhost", "127.0.0.1", "mongo"})
+ALLOWED_HOSTS = frozenset({"localhost", "127.0.0.1"})
 PRODUCTION_VALUES = frozenset({"production", "prod"})
 # Der Server antwortet lokal sofort; fehlt er, soll der Lauf nicht je Test 30 Sekunden warten.
 SERVER_TIMEOUT_MS = 5000
@@ -54,8 +55,12 @@ def check_url(url: str) -> str:
     except (PyMongoError, ValueError) as exc:
         raise FlowMongoRefused(f"{ENV_NAME}: die Adresse ist nicht lesbar ({type(exc).__name__})") from exc
     hosts = {str(host).lower() for host, _port in parsed["nodelist"]}
-    if not hosts or not hosts <= ALLOWED_HOSTS:
-        raise FlowMongoRefused(f"{ENV_NAME}: nur {', '.join(sorted(ALLOWED_HOSTS))} sind als Host erlaubt")
+    if len(parsed["nodelist"]) != 1 or not hosts <= ALLOWED_HOSTS:
+        raise FlowMongoRefused(f"{ENV_NAME}: genau ein Host, {' oder '.join(sorted(ALLOWED_HOSTS))}")
+    if parsed.get("username") or parsed.get("password"):
+        raise FlowMongoRefused(f"{ENV_NAME}: Zugangsdaten sind nicht erlaubt - ein Test-MongoDB braucht keine")
+    if parsed["options"].get("replicaSet"):
+        raise FlowMongoRefused(f"{ENV_NAME}: replicaSet ist nicht erlaubt")
     database = parsed.get("database")
     if database and not database.startswith(DB_PREFIX):
         raise FlowMongoRefused(f"{ENV_NAME}: eine Datenbank in der Adresse muss mit {DB_PREFIX} beginnen")
@@ -96,7 +101,7 @@ def new_client(url: str):
     """Ein Client wie in ``database.get_client`` - gleiche Rückgaben (Zeiten ohne Zeitzone), nur mit kurzer Wartezeit."""
     from motor.motor_asyncio import AsyncIOMotorClient
 
-    return AsyncIOMotorClient(check_url(url), serverSelectionTimeoutMS=SERVER_TIMEOUT_MS)
+    return AsyncIOMotorClient(check_url(url), serverSelectionTimeoutMS=SERVER_TIMEOUT_MS, directConnection=True)
 
 
 def _index_names(db) -> dict[str, set[str]]:
@@ -143,7 +148,7 @@ def prepare_database(database_module, url: str) -> str:
     from pymongo import MongoClient
 
     if _admin_client is None:
-        _admin_client = MongoClient(check_url(url), serverSelectionTimeoutMS=SERVER_TIMEOUT_MS, maxPoolSize=2)
+        _admin_client = MongoClient(check_url(url), serverSelectionTimeoutMS=SERVER_TIMEOUT_MS, directConnection=True, maxPoolSize=2)
     if _process_db and _wipe(_admin_client[_process_db], _baseline):
         return check_db_name(_process_db)
     if _process_db:

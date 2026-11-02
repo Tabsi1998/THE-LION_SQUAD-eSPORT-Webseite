@@ -248,7 +248,8 @@ Lastschleife“ zeigt, ob der Lasttest selbst bremst. Zugänge stehen nur in der
 Die Ablauf-Tests (`backend/tests/flow_harness.py`) laufen sonst auf mongomock: ohne Indizes und ohne echte Nebenläufigkeit.
 Mit `FLOW_MONGO_URL` laufen dieselben Tests gegen einen echten Server (#2200): Jeder Prozess bekommt eine eigene Datenbank
 `flowtest_…`, `init_indexes` läuft wie beim Start der Anwendung, jeder Test beginnt leer, am Ende ist die Datenbank weg.
-Erlaubt sind nur die Hosts `localhost`, `127.0.0.1` und `mongo`, sonst bricht der Lauf vor dem ersten Test ab.
+Erlaubt ist genau ein Host, `localhost` oder `127.0.0.1`, ohne Zugangsdaten und ohne `replicaSet`, sonst bricht der Lauf
+vor dem ersten Test ab.
 
 ```bash
 docker run -d --name flow-mongo -p 127.0.0.1:27217:27017 --tmpfs /data/db:size=4g \
