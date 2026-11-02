@@ -6,12 +6,14 @@ sehen darf (öffentlich, nicht im Entwurf; „nur Mitglieder“ nur als Vereinsm
 
 Der Einladungs-Link ist die Adresse der Team-Seite mit einem Schlüssel (``?einladung=…``). Er liegt in einer eigenen
 Sammlung ``team_invite_links`` - nicht am Team, damit ihn kein normales Mitglied über die Team-Daten mitliest. Neu
-erzeugen ersetzt den Schlüssel, der alte gilt sofort nicht mehr. Der Join-Code bleibt als Rückfall.
+erzeugen ersetzt den Schlüssel, der alte gilt sofort nicht mehr. Der Beitrittscode bleibt als Rückfall.
 """
 from __future__ import annotations
 
 import secrets
 from datetime import datetime, timezone
+
+from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
 from services.competition_read import load_competition_read_model, load_registration_matches
@@ -286,6 +288,29 @@ async def _league_entries(db, registrations: list[dict], visible: dict[str, dict
             "link": link,
         })
     return sorted(out, key=lambda row: (row["league"]["name"] or "", row["staffel_label"]))
+
+
+# ------------------------------------------------------------------ Beitrittscode
+
+JOIN_CODE_BYTES = 6
+JOIN_CODE_TRIES = 5
+
+
+def new_join_code() -> str:
+    return secrets.token_urlsafe(JOIN_CODE_BYTES)
+
+
+async def renew_join_code(db, team_id: str) -> str:
+    """Ein neuer Beitrittscode (#2128, TM10) - der alte gilt ab sofort nicht mehr. Der Code steht nie in Protokoll oder Log."""
+    for attempt in range(JOIN_CODE_TRIES):
+        code = new_join_code()
+        try:
+            await db.teams.update_one({"id": team_id}, {"$set": {"join_code": code, "updated_at": now_utc().isoformat()}})
+            return code
+        except DuplicateKeyError:  # eindeutiger Index - ein Treffer ist sehr unwahrscheinlich, aber kein Fehler
+            if attempt == JOIN_CODE_TRIES - 1:
+                raise
+    raise AssertionError("unreachable")
 
 
 # ------------------------------------------------------------------ Einladungs-Link

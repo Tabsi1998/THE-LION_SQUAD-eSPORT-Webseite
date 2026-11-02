@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Crown } from "lucide-react";
+import { Crown, Lock } from "lucide-react";
 import { resolveMediaUrl } from "@/lib/api";
 import { MascotBadge } from "@/components/tls/Logo";
 import { bandBackground, teamColorHex, TEAM_COLORS } from "@/lib/teamColors";
@@ -61,7 +61,7 @@ export function TeamFaces({ team, userId }) {
           const mine = Boolean(userId && face.id === userId);
           return (
             <li key={face.id} className="shrink-0 w-[68px] text-center" data-testid={`team-face-${face.id}`}>
-              <Link to={face.username ? `/u/${face.username}` : "#"} className="group inline-flex flex-col items-center gap-1.5" aria-label={`${name}, ${face.roleLabel}${mine ? " (du)" : ""}`}>
+              <Link to={face.username ? `/u/${encodeURIComponent(face.username)}` : "#"} className="group inline-flex flex-col items-center gap-1.5" aria-label={`${name}, ${face.roleLabel}${mine ? " (du)" : ""}`}>
                 <span className="relative inline-flex">
                   <span className="w-14 h-14 rounded-full overflow-hidden flex items-center justify-center text-sm font-black text-white ring-1 ring-white/15 group-hover:ring-[#29B6E8]/60 transition" style={face.avatar_url ? undefined : { backgroundColor: faceTone(name) }}>
                     {face.avatar_url ? <img src={resolveMediaUrl(face.avatar_url)} alt="" loading="lazy" className="w-full h-full object-cover" /> : initials(name)}
@@ -94,6 +94,11 @@ export function TeamHeader({ team, header, levelInfo, userId, actions = null, ch
           <h1 className="mt-3 font-heading text-3xl md:text-4xl font-black leading-tight break-words max-w-full" data-testid="team-name">{team.name}</h1>
           <div className="mt-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm text-white/65" data-testid="team-header-line">
             {team.tag ? <span className="font-bold tracking-wider">{team.tag}</span> : null}
+            {team.is_public === false ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-sm border border-white/15 bg-white/[0.06] text-xs font-bold text-white/85" data-testid="team-private-chip">
+                <Lock className="w-3 h-3" aria-hidden="true" /> Privat
+              </span>
+            ) : null}
             {game ? (
               <>
                 <span aria-hidden="true">·</span>

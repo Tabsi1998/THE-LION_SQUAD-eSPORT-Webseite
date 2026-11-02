@@ -43,6 +43,36 @@ async function noSideScroll(page) {
 test.describe("Abgesagtes Event", () => {
   test.skip(({ isMobile }) => Boolean(isMobile), "Breite wird hier selbst gesetzt");
 
+  // #2127: bis zum Termin bleibt es in der Liste stehen - mit Kennzeichen, ohne Plätze.
+  for (const [label, width, height] of [["Handy", 390, 844], ["PC", 1440, 900]]) {
+    test(`Liste bei ${width} px (${label}): abgesagt mit Kennzeichen unter „Kommend“`, async ({ page }, testInfo) => {
+      await page.setViewportSize({ width, height });
+      await page.clock.setFixedTime(new Date("2026-10-28T10:00:00+00:00"));
+      await page.route("**/api/**", (route) => {
+        const path = new URL(route.request().url()).pathname;
+        if (path === "/api/events") {
+          return route.fulfill(json([
+            { ...EVENT, id: "e1", max_participants: 40 },
+            { ...EVENT, id: "e2", slug: "winter-lan", name: "Winter-LAN", status: "scheduled", public_phase: { state: "announced", label: "Angekündigt" }, registration_summary: { reserved_seats: 3 } },
+          ]));
+        }
+        if (path === "/api/events/meta") return route.fulfill(json({ types: [], statuses: [] }));
+        if (path === "/api/settings/public") return route.fulfill(json({ club_name: "THE LION SQUAD", domain: "lionsquad.at" }));
+        if (path === "/api/auth/me") return route.fulfill(json({ detail: "anonym" }, 401));
+        if (path === "/api/tournaments" || path === "/api/f1/challenges") return route.fulfill(json([]));
+        return route.abort();
+      });
+      await page.goto("/events");
+      const card = page.getByTestId("event-card-herbst-lan-2026");
+      await expect(card).toHaveAttribute("data-cancelled", "1");
+      await expect(card).toContainText("Abgesagt");
+      await expect(card).not.toContainText("Plätze");
+      await expect(page.getByTestId("event-card-winter-lan")).toContainText("Plätze");
+      await noSideScroll(page);
+      await testInfo.attach(`liste-abgesagt-${width}.png`, { body: await page.screenshot({ fullPage: false }), contentType: "image/png" });
+    });
+  }
+
   test("Gast bei 390 px: „Event abgesagt“, keine Anmeldung, nichts ragt hinaus", async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await mockApi(page);

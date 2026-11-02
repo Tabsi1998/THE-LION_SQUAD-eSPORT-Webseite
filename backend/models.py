@@ -9,6 +9,7 @@ import uuid
 from match_rules import RESULT_MAX_SCORE, RESULT_MAX_TIME_MS
 # Der Passwortvertrag (#1033) steht in services/password_policy.py.
 from services.password_policy import NewPassword
+from services.usernames import username_problem
 
 
 def now_utc():
@@ -27,8 +28,22 @@ VisibilityLevel = Literal["public", "community", "members", "admins", "private"]
 DirectMessagePrivacy = Literal["everyone", "friends", "team_members", "club_members", "admins_only", "none"]
 
 
+# Anzeigename (#2126): gleich in pages/user/profile/form.js. Gespeicherte längere Namen bleiben gültig.
+DISPLAY_NAME_MAX = 50
+PREFERRED_ROLE_MAX = 40
+
+
+def _new_username(value: str) -> str:
+    """Nur beim Anlegen (#2126) - ältere Konten behalten ihren Namen."""
+    value = value.strip()
+    problem = username_problem(value)
+    if problem:
+        raise ValueError(problem)
+    return value
+
+
 class UserRegister(BaseModel):
-    username: str = Field(min_length=3, max_length=32)
+    username: str
     email: EmailStr
     password: NewPassword
     display_name: Optional[str] = None
@@ -46,6 +61,8 @@ class UserRegister(BaseModel):
     hp_fax: Optional[str] = Field(default=None, max_length=300)
     turnstile_token: Optional[str] = Field(default=None, max_length=4096)
 
+    _username_rule = field_validator("username")(_new_username)
+
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -55,15 +72,17 @@ class UserLogin(BaseModel):
 
 
 class AdminUserCreate(BaseModel):
-    username: str = Field(min_length=3, max_length=32)
+    username: str
     email: EmailStr
     password: Optional[NewPassword] = None
-    display_name: Optional[str] = None
+    display_name: Optional[str] = Field(default=None, max_length=DISPLAY_NAME_MAX)
     gender: Optional[Literal["male", "female", "diverse"]] = None
     role: Role = "player"
     is_active: bool = True
     privacy_public_profile: bool = False
     send_invite: bool = True
+
+    _username_rule = field_validator("username")(_new_username)
 
 
 class UserUpdate(BaseModel):
@@ -209,7 +228,10 @@ class MembershipUpdate(BaseModel):
     member_since_precision: Optional[MemberSincePrecision] = None
     internal_role: Optional[str] = None
     notes: Optional[str] = None
+    # Entscheidet das Mitglied selbst (#2125, PUT /membership/me/number-visibility); hier wird der Wert ignoriert.
     show_member_number_publicly: Optional[bool] = None
+    # „Ohne Mail“ beim Statuswechsel (#2125): etwa um einen Fehlklick zu korrigieren.
+    notify: Optional[bool] = None
 
 
 class MemberBenefitCreate(BaseModel):
@@ -238,29 +260,6 @@ class MemberBenefitUpdate(BaseModel):
     order_index: Optional[int] = None
 
 
-# ---------- User Socials (separate table for fine-grained visibility) ----------
-SocialPlatform = Literal[
-    "discord", "twitch", "youtube", "tiktok", "instagram", "x", "steam",
-    "epic", "psn", "xbox", "nintendo", "ea", "riot", "battlenet", "website",
-    "faceit", "startgg", "roblox", "osu", "lichess", "github", "kick", "reddit", "spotify",
-    "threads", "facebook", "linkedin", "snapchat", "pinterest", "telegram", "wargaming", "bungie",
-    "mastodon", "bluesky"
-]
-
-
-class UserSocialCreate(BaseModel):
-    platform: SocialPlatform
-    value: str
-    url: Optional[str] = None
-    visibility: VisibilityLevel = "public"
-
-
-class UserSocialUpdate(BaseModel):
-    value: Optional[str] = None
-    url: Optional[str] = None
-    visibility: Optional[VisibilityLevel] = None
-
-
 class ForgotPasswordBody(BaseModel):
     email: EmailStr
     # Spamschutz (#2067): nur von der Website; die App ruft dieselbe Adresse ohne beides auf.
@@ -281,13 +280,24 @@ class ChangePasswordBody(BaseModel):
 
 
 # ---------- Teams ----------
+# Länge von Teamname und Kürzel (#2128, TM11). Beim Ändern prüft die Route nur neue Werte (``team_routes._team_label``):
+# ein älteres, längeres Kürzel hält das Speichern anderer Felder nicht auf.
+TEAM_NAME_MIN_LENGTH, TEAM_NAME_MAX_LENGTH = 2, 60
+TEAM_TAG_MIN_LENGTH, TEAM_TAG_MAX_LENGTH = 2, 8
+
+
 class TeamCreate(BaseModel):
-    name: str
-    tag: str = Field(min_length=2, max_length=8)
+    name: str = Field(min_length=TEAM_NAME_MIN_LENGTH, max_length=TEAM_NAME_MAX_LENGTH)
+    tag: str = Field(min_length=TEAM_TAG_MIN_LENGTH, max_length=TEAM_TAG_MAX_LENGTH)
     description: Optional[str] = None
     logo_url: Optional[str] = None
     banner_url: Optional[str] = None
     discord_link: Optional[str] = None
+
+    @field_validator("name", "tag", mode="before")
+    @classmethod
+    def _no_outer_spaces(cls, value):
+        return value.strip() if isinstance(value, str) else value
 
 
 class TeamUpdate(BaseModel):
@@ -298,6 +308,8 @@ class TeamUpdate(BaseModel):
     banner_url: Optional[str] = None
     discord_link: Optional[str] = None
     social_links: Optional[dict] = None
+    # Privat (#2128, TM9): nicht in Liste, Suche und Profilen; die Teamseite sehen nur Mitglieder. Ändern darf nur die Teamleitung.
+    is_public: Optional[bool] = None
     # Team-Farbe (#1347): eine von acht ruhigen Farben oder „auto“ (Farbe des Spiels) - Unbekanntes wird abgelehnt.
     color: Optional[str] = None
 
@@ -427,6 +439,8 @@ class GameCreate(GameMatchData):
     short_name: Optional[str] = None
     logo_url: Optional[str] = None
     cover_url: Optional[str] = None
+    # Altfelder (#2111 W1, #2129 SP5): wirken nirgends und stehen nicht mehr in der Verwaltung - sie bleiben nur, damit
+    # ältere Aufrufe und gespeicherte Spiele unverändert durchgehen.
     platforms: List[str] = []
     genre: Optional[str] = None
     supports_solo: bool = True
@@ -444,6 +458,8 @@ class GameCreate(GameMatchData):
 
 
 class GameUpdate(GameMatchData):
+    # Archiviert (#2129, SP1): beim Anlegen nicht mehr zur Wahl, alles Bestehende zeigt das Spiel weiter.
+    status: Optional[Literal["active", "archived"]] = None
     name: Optional[str] = None
     slug: Optional[str] = None
     kind: Optional[GameKind] = None
@@ -673,6 +689,14 @@ class EventPlayAlongCreate(BaseModel):
     accept_costs: bool = False
 
 
+class EventRegistrationSelfUpdate(BaseModel):
+    """Die eigene Event-Anmeldung ändern (#2113, L-A3): nur Begleitpersonen und Hinweis - Status und interne Notiz
+    bleiben bei der Turnierleitung."""
+    model_config = ConfigDict(extra="forbid")
+    companion_count: Optional[int] = Field(default=None, ge=0, le=20)
+    note: Optional[str] = Field(default=None, max_length=500)
+
+
 class EventRegistrationUpdate(BaseModel):
     status: Optional[EventRegistrationStatus] = None
     companion_count: Optional[int] = Field(default=None, ge=0, le=20)
@@ -706,8 +730,20 @@ def _empty_stream_platform_to_none(value):
     return value
 
 
+def _strip_text(value):
+    return value.strip() if isinstance(value, str) else value
+
+
+# Grenzen für Turnierzahlen (#2111, TA3): geprüft wird nur, was eine Anfrage schickt - gespeicherte Turniere laden und
+# speichern weiter, auch wenn sie aus der Zeit davor andere Werte haben.
+PARTICIPANT_LIMIT = 4096
+BEST_OF_LIMIT = 99
+SEASON_WEIGHT_LIMIT = 10
+MIN_OVER_MAX = "Min. Teilnehmer darf nicht größer als Max. Teilnehmer sein."
+
+
 class TournamentCreate(BaseModel):
-    title: str
+    title: str = Field(min_length=1, max_length=200)
     slug: Optional[str] = None
     description: Optional[str] = None
     game_id: str
@@ -720,8 +756,8 @@ class TournamentCreate(BaseModel):
     team_size: int = 1
     substitutes_allowed: bool = False
     billing: Optional[BillingConfig] = None
-    max_participants: int = 32
-    min_participants: int = 2
+    max_participants: int = Field(default=32, ge=1, le=PARTICIPANT_LIMIT)
+    min_participants: int = Field(default=2, ge=1, le=PARTICIPANT_LIMIT)
     registration_enabled: bool = True
     block_club_member_registration: bool = False
     # Turnier nur mit Event-Anmeldung (#875): wirkt nur mit `event_id`.
@@ -739,7 +775,7 @@ class TournamentCreate(BaseModel):
     rules: Optional[str] = None
     prize_pool: Optional[str] = None
     prize_places: Optional[List[dict]] = None  # [{"group":"overall|winner|loser","place":1,"label":"1. Platz","value":"…"}]
-    best_of: int = 1
+    best_of: int = Field(default=1, ge=1, le=BEST_OF_LIMIT)
     bronze_match: bool = False
     # Doppel-K.-o. (#1549): kein Grand Final, eines, oder mit Reset-Spiel (Vorgabe).
     grand_final_mode: Literal["none", "single", "reset"] = "reset"
@@ -791,7 +827,7 @@ class TournamentCreate(BaseModel):
     result_confirm_minutes_online: Optional[int] = Field(default=None, ge=1, le=1440)
     result_confirm_hours_league: Optional[int] = Field(default=None, ge=1, le=336)
     # Phase 7
-    season_weight: float = 2.0
+    season_weight: float = Field(default=2.0, ge=0, le=SEASON_WEIGHT_LIMIT)
     visibility: Literal["public", "community", "members", "internal"] = "public"
     site_banner_enabled: bool = False
     # „Ohne Discord“ (#572): keine Meldung, kein Thread, kein Bracket, kein Termin im Discord.
@@ -800,6 +836,14 @@ class TournamentCreate(BaseModel):
     status: Optional[TournamentStatus] = None
 
     _normalize_stream_platform = field_validator("stream_platform", mode="before")(_empty_stream_platform_to_none)
+    _strip_title = field_validator("title", mode="before")(_strip_text)
+
+    @model_validator(mode="after")
+    def _min_not_over_max(self):
+        # Nur, wenn das Minimum ausdrücklich mitkommt (#2111, TA3) - die Vorgabe 2 bei einem Turnier für 1 bleibt erlaubt.
+        if "min_participants" in self.model_fields_set and self.min_participants > self.max_participants:
+            raise ValueError(MIN_OVER_MAX)
+        return self
 
 
 class TournamentUpdate(BaseModel):
@@ -807,7 +851,7 @@ class TournamentUpdate(BaseModel):
     # ``matchday_blocked_weeks``, ``matchday_weeks_total``, ``scoring_rules``, ``game_mode_order``,
     # ``lineup_amend_hours``) setzt nur der Liga-Service - wie bei ``TournamentCreate`` bewusst kein Feld hier,
     # unbekannte Felder verwirft Pydantic.
-    title: Optional[str] = None
+    title: Optional[str] = Field(default=None, min_length=1, max_length=200)
     slug: Optional[str] = None
     description: Optional[str] = None
     game_id: Optional[str] = None
@@ -821,8 +865,8 @@ class TournamentUpdate(BaseModel):
     team_size: Optional[int] = None
     substitutes_allowed: Optional[bool] = None
     billing: Optional[BillingConfig] = None
-    max_participants: Optional[int] = None
-    min_participants: Optional[int] = None
+    max_participants: Optional[int] = Field(default=None, ge=1, le=PARTICIPANT_LIMIT)
+    min_participants: Optional[int] = Field(default=None, ge=1, le=PARTICIPANT_LIMIT)
     registration_enabled: Optional[bool] = None
     block_club_member_registration: Optional[bool] = None
     requires_event_registration: Optional[bool] = None
@@ -838,7 +882,7 @@ class TournamentUpdate(BaseModel):
     rules: Optional[str] = None
     prize_pool: Optional[str] = None
     prize_places: Optional[List[dict]] = None
-    best_of: Optional[int] = None
+    best_of: Optional[int] = Field(default=None, ge=1, le=BEST_OF_LIMIT)
     bronze_match: Optional[bool] = None
     grand_final_mode: Optional[Literal["none", "single", "reset"]] = None
     heat_rebuild_mode: Optional[Literal["suggest", "auto"]] = None
@@ -874,12 +918,13 @@ class TournamentUpdate(BaseModel):
     no_show_minutes_online: Optional[int] = Field(default=None, ge=1, le=240)
     result_confirm_minutes_online: Optional[int] = Field(default=None, ge=1, le=1440)
     result_confirm_hours_league: Optional[int] = Field(default=None, ge=1, le=336)
-    season_weight: Optional[float] = None
+    season_weight: Optional[float] = Field(default=None, ge=0, le=SEASON_WEIGHT_LIMIT)
     visibility: Optional[Literal["public", "community", "members", "internal"]] = None
     site_banner_enabled: Optional[bool] = None
     discord_skip: Optional[bool] = None
 
     _normalize_stream_platform = field_validator("stream_platform", mode="before")(_empty_stream_platform_to_none)
+    _strip_title = field_validator("title", mode="before")(_strip_text)
 
 
 class RegistrationCreate(BaseModel):
@@ -901,7 +946,8 @@ class RegistrationUpdate(BaseModel):
     # ``POST /registrations/{id}/removal`` - die Statusroute lehnt sie mit einem Hinweis ab.
     status: Optional[Literal["pending", "approved", "rejected", "waitlist", "checked_in", "no_show",
                              "withdrawn", "disqualified"]] = None
-    seed: Optional[int] = None
+    # Setzplatz (#2111, TA15): ab 1; null nimmt ihn weg.
+    seed: Optional[int] = Field(default=None, ge=1, le=9999)
     ingame_name: Optional[str] = None
     # Grund einer Absage (#1133): steht nur in der Nachricht an die Person, nicht an der Anmeldung.
     status_reason: Optional[str] = Field(default=None, max_length=300)
@@ -1148,6 +1194,15 @@ class F1TrackUpdate(BaseModel):
     max_plausible_ms: Optional[int] = Field(default=None, ge=0)
 
 
+def _points_per_position(value):
+    """Punkte je Platz (#2130): einstellbar, aber eine Liste aus ganzen Zahlen - leer hieße still die Vorgabe."""
+    if value is None:
+        return value
+    if not value or len(value) > 100 or any(point < 0 or point > 10000 for point in value):
+        raise ValueError("Punkte je Platz: mindestens ein Wert, höchstens 100, jeweils 0 bis 10000.")
+    return value
+
+
 class F1ChallengeCreate(BaseModel):
     title: str
     slug: Optional[str] = None
@@ -1191,6 +1246,7 @@ class F1ChallengeCreate(BaseModel):
     status: Optional[TournamentStatus] = None
 
     _normalize_stream_platform = field_validator("stream_platform", mode="before")(_empty_stream_platform_to_none)
+    _check_points = field_validator("points_per_position")(_points_per_position)
 
 
 class F1ChallengeUpdate(BaseModel):
@@ -1233,6 +1289,7 @@ class F1ChallengeUpdate(BaseModel):
     change_reason: Optional[str] = Field(default=None, max_length=500)
 
     _normalize_stream_platform = field_validator("stream_platform", mode="before")(_empty_stream_platform_to_none)
+    _check_points = field_validator("points_per_position")(_points_per_position)
 
 
 class F1LapTimeCreate(BaseModel):
@@ -1273,6 +1330,11 @@ class F1GuestCreate(BaseModel):
 
 class F1GuestRename(F1GuestCreate):
     """Umbenennen (#1585) - nach der Veröffentlichung wie eine Zeitkorrektur nur mit Begründung."""
+    change_reason: Optional[str] = Field(default=None, max_length=500)
+
+
+class F1GuestDelete(BaseModel):
+    """Gast ohne Zeiten löschen (#2112) - nach der Veröffentlichung wie Umbenennen nur mit Begründung."""
     change_reason: Optional[str] = Field(default=None, max_length=500)
 
 
@@ -1383,7 +1445,6 @@ class NewsUpdate(BaseModel):
 
 
 SponsorTier = Literal["main", "platinum", "gold", "silver", "bronze"]
-SponsorContractStatus = Literal["planned", "active", "paused", "expired", "cancelled"]
 
 
 class SponsorCreate(BaseModel):
@@ -1392,8 +1453,8 @@ class SponsorCreate(BaseModel):
     link: Optional[str] = None
     description: Optional[str] = None
     tier: SponsorTier = "bronze"
+    # Ausblenden geht über ``is_active`` (#2130); die Laufzeit zählt zusätzlich, weil Dolibarr sie führt.
     is_active: bool = True
-    contract_status: SponsorContractStatus = "active"
     contract_start: Optional[str] = None
     contract_end: Optional[str] = None
     contact_name: Optional[str] = None
@@ -1417,7 +1478,6 @@ class SponsorUpdate(BaseModel):
     description: Optional[str] = None
     tier: Optional[SponsorTier] = None
     is_active: Optional[bool] = None
-    contract_status: Optional[SponsorContractStatus] = None
     contract_start: Optional[str] = None
     contract_end: Optional[str] = None
     contact_name: Optional[str] = None
@@ -1499,7 +1559,8 @@ class PartnerUpdate(BaseModel):
 # ---------- External tournament references ----------
 ReferenceVisibility = Literal["public", "community", "members", "internal"]
 ReferenceMode = Literal["online", "offline", "hybrid"]
-ReferenceStatus = Literal["planned", "active", "completed", "archived"]
+# Ausblenden geht über ``is_active`` (#2130) - der Status sagt nur, wie weit die Teilnahme ist.
+ReferenceStatus = Literal["planned", "active", "completed"]
 
 
 ReferenceEntryKind = Literal["team", "solo"]
@@ -1558,6 +1619,8 @@ class ReferenceCreate(BaseModel):
     result_url: Optional[str] = None
     description: Optional[str] = None
     highlights: Optional[str] = None
+    # Nur für die Verwaltung (#2130); Beschreibung und Highlights sind öffentlich.
+    internal_notes: Optional[str] = None
     visibility: ReferenceVisibility = "public"
     status: ReferenceStatus = "completed"
     is_active: bool = True
@@ -1595,6 +1658,7 @@ class ReferenceUpdate(BaseModel):
     result_url: Optional[str] = None
     description: Optional[str] = None
     highlights: Optional[str] = None
+    internal_notes: Optional[str] = None
     visibility: Optional[ReferenceVisibility] = None
     status: Optional[ReferenceStatus] = None
     is_active: Optional[bool] = None
@@ -2261,6 +2325,17 @@ class GalleryPhotoUpdate(BaseModel):
     original_file_size: Optional[int] = None
     width: Optional[int] = None
     height: Optional[int] = None
+
+
+# Mehr Einträge lädt die Verwaltung je Album nicht - „Alle auswählen“ schickt höchstens so viele.
+GALLERY_ALBUM_MAX_PHOTOS = 2000
+
+
+class GalleryPhotoBulk(BaseModel):
+    """Mehrere Einträge eines Albums auf einmal (#2122): aus dem Album nehmen oder in einen Abschnitt verschieben."""
+    ids: List[str] = Field(min_length=1, max_length=GALLERY_ALBUM_MAX_PHOTOS)
+    action: Literal["delete", "move"]
+    section_id: Optional[str] = None
 
 
 # ---------- Admin ----------

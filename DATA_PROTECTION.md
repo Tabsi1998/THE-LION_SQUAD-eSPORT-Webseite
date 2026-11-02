@@ -25,6 +25,14 @@
   setzt der Server ein technisch notwendiges, HttpOnly-Cookie `tls_onsite` nur unter `/api`: Turnier-Kennung, Ablauf und
   Signatur, ohne Angaben zur Person, höchstens 12 Stunden und nie über das Turnierende hinaus. Eine Anmeldung darüber
   trägt `registered_via: "onsite"`.
+- Interne Notiz an einer Event-Anmeldung (#2127): Die Turnierleitung schreibt sie auf der Seite „Anmeldungen & Einlass“.
+  Sie steht nicht in der Anmeldung der Person und nicht bei anderen Bereichen, ist aber ein Personendatum: Die Datenauskunft
+  (Art. 15 DSGVO, Schlüssel `event_registrations`) liefert sie mit; die Kontolöschung leert sie. Im Adminprotokoll steht nur
+  „geändert“, nicht der Text.
+- Person an der Tür (#2127): Die Turnierleitung trägt Personen ohne Konto mit Namen ein. Der Name steht nur bei der Leitung
+  und in ihrer Druckliste, nicht öffentlich und nicht im Adminprotokoll (dort nur die Kennung). Ohne Konto gibt es keine
+  Auskunft und Löschung über die Website: Das läuft über die Turnierleitung, die den Eintrag berichtigen oder löschen kann.
+  Nach der Frist des Adminprotokolls bleibt nur die Zählung; Name und Notizen werden gelöscht (Job `ops_retention`).
 - Partner-Plattform einer Turnierserie (#1964): Der Vorstand holt öffentliche Turniertage von der Plattform eines
   Partners (feste Adressliste, mit dem Partner abgesprochen, nur lesend). Übernommen werden nur Name wie beim
   Veranstalter (Riot-ID `Name#TAG`, Gäste ohne Tag), Platz, Punkte je Runde, Lobby, Partner im Double Up und
@@ -44,7 +52,9 @@
 ## Konto löschen: was mit welchen Daten passiert
 
 Ein Mitglied löscht sein Konto selbst (Website: Datenschutz → Meine Daten, App: Profil → Einstellungen); ein Superadmin
-kann es für jemanden tun. Die vollständige Liste je Sammlung führt `backend/services/personal_data.py`: was beim Löschen
+kann es für jemanden tun. Wer selbst löscht und noch Teamleitung, Co-Leitung oder Captain bzw. Vertreter eines Co-Teams ist,
+gibt die Rolle vorher ab (`services/erasure_blockers.py`, #2113); die Seite nennt den Weg. Die Löschung durch den Verein
+hält das nicht auf. Die vollständige Liste je Sammlung führt `backend/services/personal_data.py`: was beim Löschen
 passiert, wo die Sammlung in der Auskunft steht und warum etwas bleibt. Der Wächter `test_personal_data_map_unit.py` sucht
 alle Sammlungen im Code und verlangt jede dort – eine neue Sammlung ohne Entscheidung lässt die CI scheitern (#1029,
 #1030). Umgesetzt in `backend/routes/dsgvo_routes.py` und `backend/services/account_erasure.py`, geprüft in
@@ -65,6 +75,7 @@ alle Sammlungen im Code und verlangt jede dort – eine neue Sammlung ohne Entsc
 | Einladungen zur Mitgliedschaft und in Teams, Tokens der Mitgliedskarte, persönlicher Kalender-Link, Zugangslinks, Aufgaben im Turnier- und F1-Team, Captain einer externen Serie, Platz in der Liste „Am Start / Als Nächstes“ einer Fast Lap, Verbindung zur Mitgliederakte samt zwischengespeicherter Ehrungen, die festgehaltene Spiel-ID je Liga-Season samt Freigaben (#2108; Aufstellungen und Ergebnisse bleiben ohne sie) | gelöscht bzw. abgeschaltet |
 | Teilnahme an externen Serien (Turnierserie, Rennliga, Team-Liga), verknüpft mit dem selbst angelegten Eintrag im Mitgliederverzeichnis (#1741) | Ergebnis und Tabelle bleiben; der Teilnehmer gilt danach als extern, sein Name aus der Ergebnisliste des Veranstalters ist ausgeblendet, Aliase auf den Eintrag sind gelöscht. Zeigt die Teilnahme auf einen Eintrag aus der Mitgliederverwaltung oder der Redaktion, bleibt sie damit verknüpft – der Eintrag gehört dem Verein. In der Auskunft stehen Teilnahmen und Aliase an allen eigenen Profilen (`reference_participations`, `reference_aliases`) |
 | Teamzugehörigkeit | bleibt für Teamhistorie und Aufstellungen; das Konto heißt dort „Gelöschter User“ |
+| Aufgelöste Teams (`dissolved_teams`, #2128): Mitgliederliste, Rollen, Co-Teams bis zum Ende der 30-Tage-Frist zum Wiederherstellen | Die Person wird sofort herausgenommen und kommt beim Wiederherstellen nicht zurück; bleibt niemand übrig, endet die Frist sofort und der nächste Lauf des Jobs räumt auf. Nach der Frist bleiben nur Name und Kürzel für alte Turniere; Chat samt Anhängen, Einladungen, Mitgliederlisten sowie sonst ungenutzte Logos und Banner sind weg (Job `ops_retention`). In der Auskunft unter `dissolved_teams` |
 | Anmeldungen zu Events und Turnieren | bleiben als Zählung und für den Turnierbaum – ohne Name, E-Mail, Notiz, Discord- und Plattform-Kennung |
 | Turnier-Ergebnisse, Ergebnismeldungen, Terminvorschläge, Rundenzeiten, Saisonpunkte und -tabellen | bleiben ohne Namen (sportliche Integrität); Nachweis-Link und Notiz einer Rundenzeit gelöscht |
 | Gewinne | der Nachweis der Übergabe bleibt, die Notiz ist gelöscht |
@@ -132,6 +143,13 @@ ohne alles auf einmal im Speicher. Bewusst nicht enthalten:
   Team, Match und Turnier nur die eigenen Nachrichten. Terminvorschläge ohne Antwort und Kennung der anderen Seite.
   Kontaktanfragen nur, wenn sie angemeldet geschrieben wurden.
 - Reine Technik: Anmelde-Zwischenschritte und interne Warteschlangen.
+
+## Mitgliederliste als CSV (#2125)
+
+Die Vereinsverwaltung kann die Mitgliederliste herunterladen (`GET /api/membership/export.csv`), solange Dolibarr die
+Mitglieder nicht führt: Nummer, Name, Benutzername, E-Mail, Status, Art, Beginn und Aufgabe im Verein; keine Notizen, kein
+Verlauf. Das Protokoll hält fest, wer wann wie viele Zeilen geladen hat (`membership.export`), nie den Inhalt. Die
+heruntergeladene Datei liegt danach bei der Person, die sie geladen hat: Sie gehört nach der Arbeit gelöscht.
 
 ## Betreiberpflichten
 

@@ -565,9 +565,10 @@ Austritte, dazu der Verlauf der letzten 30 Tage als Balken. Darunter die Summe �
 
 ## 6. Wenn etwas nicht klappt
 
-Erste Anlaufstelle: **Admin → Betrieb & Logs → Ereignisse, Quelle Discord.** Dort steht jede
-Meldung mit „gesendet“, „nicht gesendet“ oder „fehlgeschlagen“ **und dem Grund in Worten**.
-Fehlgeschlagene lassen sich dort erneut senden – immer an dasselbe Ziel.
+Erste Anlaufstelle: **Admin → Betrieb & Logs → Ereignisse, Quelle E-Mail-Versand** (dort stehen auch die
+Discord-Meldungen, Zeile „discord · Server“). Dort steht jede Meldung mit „gesendet“, „nicht gesendet“ oder
+„fehlgeschlagen“ **und dem Grund in Worten**. Fehlgeschlagene lassen sich dort mit **Erneut senden** noch einmal
+schicken – immer an dasselbe Ziel. Klappt es wieder nicht, steht der Grund in der Meldung.
 
 | Fehlerbild | Ursache | Lösung |
 | --- | --- | --- |

@@ -61,9 +61,6 @@ def _sponsor_date(value) -> str | None:
 def _sponsor_active_for_pdf(sponsor: dict) -> bool:
     if sponsor.get("is_active") is False or sponsor.get("show_on_pdf") is not True:
         return False
-    status = str(sponsor.get("contract_status") or "active").strip().lower()
-    if status in {"paused", "cancelled"}:
-        return False
     today = datetime.now(timezone.utc).date().isoformat()
     start = _sponsor_date(sponsor.get("contract_start"))
     end = _sponsor_date(sponsor.get("contract_end"))
@@ -74,7 +71,7 @@ async def _pdf_sponsors(db):
     rows = await db.sponsors.find(
         {"is_active": {"$ne": False}, "show_on_pdf": True},
         {"_id": 0, "name": 1, "logo_url": 1, "dolibarr_images": 1, "link": 1, "tier": 1, "order_index": 1,
-         "is_active": 1, "contract_status": 1, "contract_start": 1, "contract_end": 1, "show_on_pdf": 1},
+         "is_active": 1, "contract_start": 1, "contract_end": 1, "show_on_pdf": 1},
     ).to_list(50)
     # PDFs sind hell: die Fassung für hellen Hintergrund aus Dolibarr, sonst der Upload (#880).
     from services import sponsor_images
@@ -277,7 +274,8 @@ async def pdf_tournament_participants(slug_or_id: str, me: dict = Depends(requir
         raise HTTPException(status_code=404)
     regs = await db.tournament_registrations.find({"tournament_id": t["id"]}, {"_id": 0}).to_list(500)
     team_ids = list({r["team_id"] for r in regs if r.get("team_id")})
-    teams = {x["id"]: x for x in await db.teams.find({"id": {"$in": team_ids}}, {"_id": 0}).to_list(500)}
+    from services.team_history import teams_by_id
+    teams = await teams_by_id(db, team_ids)
     for r in regs:
         if r.get("team_id"):
             r["team"] = teams.get(r["team_id"], {})

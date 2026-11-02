@@ -10,6 +10,7 @@ import { dissolveSentence, sameTeamName } from "@/lib/teamPage";
 // Team auflösen (#1274): ganz unten im Bearbeiten-Blatt statt rot neben „Bearbeiten“. Ein Satz sagt vorher, was
 // passiert (Mitglieder, Chat, kommende Turnier-Anmeldungen); erst mit dem richtig eingetippten Teamnamen geht der Knopf.
 // Läuft ein Turnier gerade, nennt die Vorschau es - auflösen geht dann erst, wenn die Turnierleitung es geklärt hat.
+// Weich (#2128, TM8): die Vorschau nennt die Frist; wiederherstellen geht über DissolvedTeams.jsx.
 
 export function TeamDissolveSection({ team, onDissolved }) {
   const [preview, setPreview] = useState(null);
@@ -33,7 +34,7 @@ export function TeamDissolveSection({ team, onDissolved }) {
     setError("");
     const attempt = await submitOnce(async () => {
       await api.delete(`/teams/${team.id}`, { params: { confirm: typed.trim() } });
-      toast.success(`${team.name} ist aufgelöst.`);
+      toast.success(`${team.name} ist aufgelöst und lässt sich ${preview?.restore_days || 30} Tage lang wiederherstellen.`);
       onDissolved?.();
     });
     if (attempt.started && attempt.error) setError(formatRequestError(attempt.error, "Auflösen hat nicht geklappt."));
@@ -42,7 +43,7 @@ export function TeamDissolveSection({ team, onDissolved }) {
   return (
     <section className="border border-[#FF3B30]/35 bg-[#FF3B30]/[0.04] rounded-sm p-4 space-y-3" data-testid="team-dissolve">
       <div className="font-heading font-bold text-[#FF6B6B]">Team auflösen</div>
-      <p className="text-sm text-white/70" data-testid="team-dissolve-sentence">{preview ? dissolveSentence(preview) : "Alle Mitglieder verlieren das Team und der Team-Chat wird gelöscht."}</p>
+      <p className="text-sm text-white/70" data-testid="team-dissolve-sentence">{preview ? dissolveSentence(preview) : "Alle Mitglieder verlieren das Team und der Team-Chat ist nicht mehr erreichbar."}</p>
       {blocked.length ? (
         <div className="text-sm text-white/70 border border-white/10 rounded-sm p-3 bg-black/30" data-testid="team-dissolve-blocked">
           <div className="font-bold text-white">Gerade nicht möglich:</div>

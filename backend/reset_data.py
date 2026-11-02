@@ -22,7 +22,7 @@ RESET_COLLECTIONS = [
     "club_member_profiles", "tournament_staff_assignments", "event_registrations",
     "tournament_stages", "matches_v2", "match_reports_v2",
     "match_schedule_proposals", "match_chat_messages", "direct_messages",
-    "team_chat_messages", "team_invites",
+    "team_chat_messages", "team_invites", "dissolved_teams",
     # Externe Serien (#1741)
     "reference_lineages", "reference_series", "reference_rounds", "reference_participants",
     "reference_round_results", "reference_round_result_revisions", "reference_standings",

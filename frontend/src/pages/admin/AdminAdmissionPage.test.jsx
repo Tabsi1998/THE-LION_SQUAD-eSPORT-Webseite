@@ -68,6 +68,27 @@ test("Nummer ohne Karte; eine Ablehnung steht rot mit dem Satz des Servers", asy
   expect(result).toHaveTextContent("keine Funktion im Vorstand");
 });
 
+test("zwei Geräte: alle 10 Sekunden die neuen Zahlen; scheitert ein Nachladen, bleibt der Stand (#2127)", async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  try {
+    apiMock.get.mockResolvedValue({ data: { ready: true, meetings: [{ ...MEETING, counts: COUNTS, recent: [] }] } });
+    show();
+    expect(await screen.findByTestId("admission-counts")).toHaveTextContent("1 anwesend");
+
+    apiMock.get.mockResolvedValue({ data: { ready: true, meetings: [{ ...MEETING, counts: { ...COUNTS, present: 2, quorum_reached: true }, recent: [PAULA] }] } });
+    await vi.advanceTimersByTimeAsync(10000);
+    await waitFor(() => expect(screen.getByTestId("admission-counts")).toHaveTextContent("2 anwesend"));
+    expect(screen.getByTestId("admission-row-12")).toBeInTheDocument();
+
+    apiMock.get.mockRejectedValue({ response: { data: { detail: "kurz weg" } } });
+    await vi.advanceTimersByTimeAsync(10000);
+    expect(screen.getByTestId("admission-counts")).toHaveTextContent("2 anwesend");
+    expect(screen.queryByTestId("admission-not-ready")).toBeNull();
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
 test("ohne Versammlung heute nur der Hinweis", async () => {
   apiMock.get.mockResolvedValue({ data: { ready: false, reason: "no_meeting", text: "Heute ist keine Generalversammlung, zu der du eingeladen bist.", meetings: [] } });
   show();

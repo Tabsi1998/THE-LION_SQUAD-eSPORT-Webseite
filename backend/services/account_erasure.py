@@ -32,7 +32,7 @@ from pymongo import ReturnDocument
 from models import now_utc
 from services import media_audit, uploads_inventory
 from services.image_variants import VARIANT_WIDTHS, variant_path
-from storage import PUBLIC_UPLOAD_DIR, QUARANTINE_DIR, UPLOAD_DIR
+from storage import PRIVATE_DOC_DIR, PUBLIC_UPLOAD_DIR, QUARANTINE_DIR, UPLOAD_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +57,7 @@ PURGED = (
 )
 # Angaben zur Person, die in den Daten des Adminprotokolls stehen können (#1029). Der Vorgang bleibt, die Angaben nicht.
 AUDIT_PERSONAL_KEYS = ("display_name", "username", "real_name", "first_name", "last_name", "nickname", "email", "phone", "address",
-                       "birth_date")
+                       "birth_date", "ingame_name")
 # Nachweise, die nach der Löschung bleiben, aber nicht ewig (Entscheidung zu #1029): Einwilligungen, Moderationsfälle
 # (Meldungen von und über die Person, Verwarnungen, Sperren), Ergebnismeldungen und angemeldet geschriebene Kontaktanfragen. Die Löschung setzt ``erase_after`` auf drei
 # Jahre danach; der tägliche Job ``purge_expired_records`` löscht, was abgelaufen ist. Zeilen aktiver Konten tragen das
@@ -128,6 +128,16 @@ async def _directory(db, user_id: str, now: str) -> list[str]:
     return [row[field] for row in own for field in ("photo_url", "cover_url") if row.get(field)]
 
 
+async def posts_on_own_entry(db, user_id: str) -> list[str]:
+    """Vorstandsposten, die auf den selbst angelegten Verzeichnis-Eintrag zeigen. Geht der Eintrag mit dem Konto, stehen sie ohne
+    Inhaber da - das Protokoll der Löschung nennt sie, damit der Vorstand sie neu besetzt (Aufräumen: #2174)."""
+    own = [row["id"] async for row in db.club_member_profiles.find({"user_id": user_id, "source": "member"}, {"_id": 0, "id": 1})]
+    if not own:
+        return []
+    positions = await db.board_positions.find({"$or": [{"user_id": {"$in": own}}, {"deputy_user_id": {"$in": own}}]}, {"_id": 0, "title_male": 1, "slug": 1}).to_list(50)
+    return [row.get("title_male") or row.get("slug") or "Posten" for row in positions]
+
+
 async def _series_links(db, profile_ids: list[str], now: str) -> None:
     """Externe Serien (#1741) zeigen auf Vereinsprofile, nie auf Konten. Geht das eigene Profil mit dem Konto, wird
     der Teilnehmer extern und sein Name (wie beim Veranstalter) ausgeblendet - Ergebnis und Tabelle bleiben; ein Alias
@@ -150,9 +160,9 @@ async def _applications(db, user_id: str, now: str) -> None:
 
 
 async def _registrations(db, user_id: str, now: str) -> None:
-    """Die Anmeldung bleibt als Zählung und für den Turnierbaum - ohne die Kopien von Name, Adresse und Notiz."""
+    """Die Anmeldung bleibt als Zählung und für den Turnierbaum - ohne die Kopien von Name, Adresse und Notizen."""
     await db.event_registrations.update_many(
-        {"user_id": user_id}, {"$set": {"display_name": GONE, "email": None, "note": None, "anonymized_at": now}},
+        {"user_id": user_id}, {"$set": {"display_name": GONE, "email": None, "note": None, "internal_note": None, "anonymized_at": now}},
     )
     await db.tournament_registrations.update_many(
         {"user_id": user_id}, {"$set": {"ingame_name": None, "discord": None, "platform_id": None, "notes": None, "anonymized_at": now}},
@@ -246,7 +256,7 @@ PENDING_STATUS, FAILED_STATUS = "pending", "failed"
 RETRY_LIMIT = 8
 RETRY_BASE = timedelta(hours=1)
 RETRY_MAX = timedelta(hours=24)
-SOURCE_ERASURE, SOURCE_MEDIA = "account_erasure", "media_library"
+SOURCE_ERASURE, SOURCE_MEDIA, SOURCE_DOCUMENTS = "account_erasure", "media_library", "documents"
 
 
 def _id_forms(user_id: str) -> list:
@@ -311,10 +321,11 @@ def retry_delay(attempts: int) -> timedelta:
     return min(RETRY_BASE * (2 ** min(max(0, attempts - 1), 16)), RETRY_MAX)
 
 
-async def _remove(db, name: str, scans: list[dict]) -> str | None:
-    """Datei, kleinere Fassungen und Quarantäne-Kopien weg; erst danach die Verwaltungszeilen. Liefert den Fehler."""
+async def _remove(db, name: str, scans: list[dict], *, documents: bool = False) -> str | None:
+    """Datei, kleinere Fassungen und Quarantäne-Kopien weg; erst danach die Verwaltungszeilen. Liefert den Fehler.
+    Der Ordner der Vereinsdokumente zählt nur für Dokumente - Konto und Mediathek haben dort nichts zu löschen."""
     try:
-        for base in (PUBLIC_UPLOAD_DIR, UPLOAD_DIR):
+        for base in (PUBLIC_UPLOAD_DIR, UPLOAD_DIR, *((PRIVATE_DOC_DIR,) if documents else ())):
             path = base / name
             for width in VARIANT_WIDTHS:
                 _unlink(variant_path(path, width))
@@ -385,6 +396,38 @@ async def remove_upload(db, name: str) -> str | None:
     return error
 
 
+async def retry_document_file(db, name: str, exc: BaseException) -> None:
+    """Die Datei eines gelöschten Dokuments ließ sich nicht löschen (#2125): der Aufräum-Job holt es nach und prüft vorher,
+    ob sie inzwischen wieder verwendet wird."""
+    await _remember(db, name, "", True, safe_error(exc), source=SOURCE_DOCUMENTS)
+
+
+async def document_file_in_use(db, name: str, *, without: str | None = None) -> bool:
+    """Steht die Datei an einem Dokument oder ist sie die Sponsoring-Mappe? Beide tragen den nackten Dateinamen, das findet
+    keine Suche nach Upload-Adressen. ``without``: dieses Dokument nicht mitzählen."""
+    query: dict = {"$or": [{"storage_key": name}, {"file_url": {"$regex": f"/{re.escape(name)}$"}}]}
+    if without:
+        query["id"] = {"$ne": without}
+    return bool(await db.documents.find_one(query, {"_id": 1}) or await db.settings.find_one({"pdf_key": name}, {"_id": 1}))
+
+
+async def _retry_document_file(db, name: str, now: datetime) -> int:
+    """Nachholen für ein Dokument: dieselben Prüfungen wie beim Löschen; was inzwischen wieder gebraucht wird, bleibt."""
+    needed = await document_file_in_use(db, name)
+    if not needed and not (PRIVATE_DOC_DIR / name).is_file():
+        # Alte Datei im öffentlichen Upload-Ordner: auch die Mediathek und Links in Texten zählen.
+        needed = bool(await db.media_uploads.find_one({"filename": name}, {"_id": 1}) or await media_audit.still_referenced(db, {name}))
+    if needed:
+        await db[PENDING].delete_many({"filename": name})
+        return 0
+    error = await _remove(db, name, [], documents=True)
+    if error:
+        await _remember(db, name, "", True, error, source=SOURCE_DOCUMENTS, now=now)
+        return 0
+    await db[PENDING].delete_many({"filename": name})
+    return 1
+
+
 async def _clean(db, owner_id: str, owned: set[str], untracked: set[str], now: datetime | None = None) -> int:
     """Löscht, was nirgends mehr steht. Eigene Dateien: persönliche Profile anderer verlieren den Eintrag."""
     names = owned | untracked
@@ -445,7 +488,7 @@ async def retry_file_cleanups(db, limit: int = 200, now: datetime | None = None)
     gelöscht. Ein Eintrag, der aus anderem Grund scheitert (etwa an der Datenbank), hält die übrigen nicht auf."""
     now = now or now_utc()
     removed = 0
-    rows = await db[PENDING].find(_due(now), {"_id": 0, "filename": 1, "owner_id": 1, "owned": 1}).sort(
+    rows = await db[PENDING].find(_due(now), {"_id": 0, "filename": 1, "owner_id": 1, "owned": 1, "source": 1}).sort(
         "next_attempt_at", 1).to_list(limit)
     for row in rows:
         name = row.get("filename")
@@ -453,6 +496,9 @@ async def retry_file_cleanups(db, limit: int = 200, now: datetime | None = None)
             continue
         owned, untracked = ({name}, set()) if row.get("owned") else (set(), {name})
         try:
+            if row.get("source") == SOURCE_DOCUMENTS:
+                removed += await _retry_document_file(db, name, now)
+                continue
             removed += await _clean(db, row.get("owner_id") or "", owned, untracked, now=now)
         except Exception as exc:  # noqa: BLE001 - zählt als Versuch wie jeder andere Fehler
             logger.warning("[media] Nacharbeit einer Datei abgebrochen: %s", exc.__class__.__name__)
@@ -509,6 +555,9 @@ async def erase_related(db, user: dict, now: str, erased_at: str | None = None) 
     await _applications(db, user_id, now)
     await _registrations(db, user_id, now)
     unlinked_contacts = await _records(db, user, now, until)
+    # Aufgelöste Teams (#2128, TM8): die Person kommt beim Wiederherstellen nicht zurück.
+    from services.team_forget import forget_person
+    await forget_person(db, user_id)
     await _retention(db, user_id, until)
     images = await _own_images(db, user_id, [user.get("avatar_url"), user.get("banner_url"), *directory_images])
     return {"purged_rows": purged, "images": images, "unlinked_contact_messages": unlinked_contacts}

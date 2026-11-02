@@ -2,13 +2,14 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 // Spiele (#435): „Spiel bearbeiten“ öffnet ein Seitenblatt statt eines Fensters; Speichern
-// schickt das Spiel mit Slug und Plattformen und schließt das Blatt.
+// schickt das Spiel mit Slug und schließt das Blatt.
 
 const apiMock = { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatRequestError: (_err, fallback) => fallback }));
 vi.mock("@/components/tls/AdminLayout", () => ({ AdminLayout: ({ children }) => <div>{children}</div> }));
 vi.mock("@/components/tls/ImageUpload", () => ({ ImageUpload: () => <div data-testid="image-upload" /> }));
-vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => async () => true }));
+const confirmMock = vi.fn(async () => true);
+vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => confirmMock }));
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
@@ -74,13 +75,21 @@ test("Bearbeiten öffnet das Seitenblatt mit den Werten; Speichern schickt das S
   fireEvent.click(screen.getByTestId("game-edit-mario-kart-8"));
   expect(screen.getByRole("dialog", { name: "Spiel bearbeiten" })).toBeInTheDocument();
   expect(screen.getByTestId("game-edit-name")).toHaveValue("Mario Kart 8 Deluxe");
-  expect(screen.getByTestId("game-edit-platforms")).toHaveValue("Switch");
-  expect(screen.getByTestId("game-edit-format")).toHaveValue("single_elim");
+  // Standardformat, Teamgröße und die Haken Solo/Teams/… wirkten nirgends (#2111, W1) - sie sind weg und gehen nicht mit.
+  expect(screen.queryByTestId("game-edit-format")).toBeNull();
+  expect(screen.queryByTestId("game-edit-team-size")).toBeNull();
+  expect(screen.queryByText("Zeitfahren")).toBeNull();
   expect(screen.queryByTestId("game-edit-discord")).toBeNull();
+  // Genre und Plattformen zeigte nichts an (#2129, SP5): raus aus dem Formular; was gespeichert ist, bleibt unangetastet.
+  expect(screen.queryByTestId("game-edit-genre")).toBeNull();
+  expect(screen.queryByTestId("game-edit-platforms")).toBeNull();
+  expect(screen.queryByTestId("game-genre")).toBeNull();
+  expect(screen.queryByTestId("game-platforms")).toBeNull();
 
-  fireEvent.change(screen.getByTestId("game-edit-platforms"), { target: { value: "Switch, Switch 2" } });
   fireEvent.submit(screen.getByTestId("game-sheet"));
-  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/games/g1", expect.objectContaining({ slug: "mario-kart-8", platforms: ["Switch", "Switch 2"] })));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/games/g1", expect.objectContaining({ slug: "mario-kart-8" })));
+  const body = apiMock.patch.mock.calls[0][1];
+  for (const key of ["supports_solo", "supports_teams", "default_team_size", "default_format", "genre", "platforms"]) expect(body).not.toHaveProperty(key);
   await waitFor(() => expect(screen.queryByTestId("game-sheet")).toBeNull());
 });
 
@@ -152,12 +161,100 @@ test("eine kaputte Punktetabelle wird genannt und nicht gespeichert", async () =
   expect(apiMock.patch).not.toHaveBeenCalled();
 });
 
-test("ein Modus lässt sich wieder entfernen", async () => {
-  apiMock.get.mockImplementation(async (url) => ({ data: url === "/games/discord-servers" ? [] : [{ ...GAMES[0], match_modes: [{ mode: "gp4", label: "Grand Prix", minutes: 12 }] }] }));
-  render(<MemoryRouter><AdminGamesPage /></MemoryRouter>);
-  fireEvent.click(await screen.findByTestId("game-edit-mario-kart-8"));
-  expect(screen.getByTestId("game-edit-mode-label-0")).toHaveValue("Grand Prix");
-  fireEvent.click(screen.getByTestId("game-edit-mode-remove-0"));
-  fireEvent.submit(screen.getByTestId("game-sheet"));
-  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/games/g1", expect.objectContaining({ match_modes: [] })));
+// Archivieren statt löschen (#2129, SP1).
+describe("Spiele archivieren", () => {
+  const withUsage = (usage, games = GAMES) => apiMock.get.mockImplementation(async (url) => {
+    if (url === "/games/discord-servers") return { data: [] };
+    if (url.endsWith("/usage")) return { data: usage };
+    return { data: games };
+  });
+
+  beforeEach(() => {
+    apiMock.delete.mockReset();
+    apiMock.delete.mockResolvedValue({ data: { ok: true } });
+    confirmMock.mockClear();
+  });
+
+  test("ein verwendetes Spiel: der Dialog nennt die Zählung und archiviert statt zu löschen", async () => {
+    withUsage({ total: 3, text: "2 Turniere, 1 Map" });
+    render(<MemoryRouter><AdminGamesPage /></MemoryRouter>);
+    fireEvent.click(await screen.findByTestId("game-delete-mario-kart-8"));
+    await waitFor(() => expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({
+      description: expect.stringContaining("2 Turniere, 1 Map"), confirmLabel: "Archivieren",
+    })));
+    await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/games/g1", { status: "archived" }));
+    expect(apiMock.delete).not.toHaveBeenCalled();
+  });
+
+  test("ein unbenutztes Spiel wird nach Rückfrage gelöscht", async () => {
+    withUsage({ total: 0, text: "" });
+    render(<MemoryRouter><AdminGamesPage /></MemoryRouter>);
+    fireEvent.click(await screen.findByTestId("game-delete-mario-kart-8"));
+    await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith("/games/g1"));
+    expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ confirmLabel: "Löschen" }));
+    expect(apiMock.patch).not.toHaveBeenCalled();
+  });
+
+  test("Archivierte sind ausgeblendet, lassen sich zeigen und zurückholen und stehen nicht zur Wahl", async () => {
+    const archived = { id: "g2", name: "Altspiel", slug: "altspiel", kind: "series", status: "archived" };
+    withUsage({ total: 0 }, [GAMES[0], archived]);
+    render(<MemoryRouter><AdminGamesPage /></MemoryRouter>);
+    await screen.findByTestId("game-edit-mario-kart-8");
+    expect(screen.queryByTestId("game-edit-altspiel")).toBeNull();
+
+    fireEvent.change(screen.getByTestId("game-kind"), { target: { value: "edition" } });
+    expect([...screen.getByTestId("game-parent").options].map((option) => option.value)).not.toContain("g2");
+
+    fireEvent.click(screen.getByTestId("games-show-archived"));
+    expect(screen.getByTestId("game-archived-altspiel")).toHaveTextContent("Archiviert");
+    fireEvent.click(screen.getByTestId("game-archive-altspiel"));
+    await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/games/g2", { status: "active" }));
+  });
+});
+
+describe("einen Modus entfernen (#2129, SP2)", () => {
+  const withMode = (usage) => apiMock.get.mockImplementation(async (url) => {
+    if (url === "/games/discord-servers") return { data: [] };
+    if (url.endsWith("/usage")) return { data: usage };
+    return { data: [{ ...GAMES[0], match_modes: [{ mode: "gp4", label: "Grand Prix", minutes: 12 }] }] };
+  });
+
+  async function removeAndSave() {
+    render(<MemoryRouter><AdminGamesPage /></MemoryRouter>);
+    fireEvent.click(await screen.findByTestId("game-edit-mario-kart-8"));
+    expect(screen.getByTestId("game-edit-mode-label-0")).toHaveValue("Grand Prix");
+    fireEvent.click(screen.getByTestId("game-edit-mode-remove-0"));
+    fireEvent.submit(screen.getByTestId("game-sheet"));
+  }
+
+  beforeEach(() => {
+    confirmMock.mockReset();
+    confirmMock.mockResolvedValue(true);
+  });
+
+  test("Rückfrage mit der Zahl der Maps, dann geht es zum Server", async () => {
+    withMode({ modes: { gp4: { label: "Grand Prix", maps: 3, pools: 0, seasons: 0 } } });
+    await removeAndSave();
+    await waitFor(() => expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Modus „Grand Prix“ entfernen?", description: expect.stringContaining("3 Maps verlieren"),
+    })));
+    await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/games/g1", expect.objectContaining({ match_modes: [] })));
+  });
+
+  test("wer abbricht, speichert nichts und bleibt im Formular", async () => {
+    withMode({ modes: { gp4: { label: "Grand Prix", maps: 3, pools: 1, seasons: 0 } } });
+    confirmMock.mockResolvedValue(false);
+    await removeAndSave();
+    await waitFor(() => expect(confirmMock).toHaveBeenCalled());
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(apiMock.patch).not.toHaveBeenCalled();
+    expect(screen.getByTestId("game-sheet")).toBeInTheDocument();
+  });
+
+  test("hängt nichts daran, gibt es keine Frage", async () => {
+    withMode({ modes: { gp4: { label: "Grand Prix", maps: 0, pools: 0, seasons: 0 } } });
+    await removeAndSave();
+    await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/games/g1", expect.objectContaining({ match_modes: [] })));
+    expect(confirmMock).not.toHaveBeenCalled();
+  });
 });

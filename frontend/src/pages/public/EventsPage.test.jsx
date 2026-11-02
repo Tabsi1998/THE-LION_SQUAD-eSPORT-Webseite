@@ -79,6 +79,36 @@ test("Turniere eines Events stehen aufklappbar in seiner Karte, nicht doppelt; o
   expect(apiMock.get).not.toHaveBeenCalledWith("/calendar/mine");
 });
 
+test("abgesagtes Event: bleibt in „Kommend“ mit Kennzeichen, ohne Zahl der Plätze (#2127)", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/events/meta") return { data: { types: [], statuses: [] } };
+    if (url.startsWith("/events")) {
+      return { data: [...EVENTS, { id: "e-off", slug: "abgesagt", name: "Abgesagte LAN", status: "cancelled", visibility: "public", start_date: "2099-10-20T10:00:00+02:00", max_participants: 40, has_registration: true, public_phase: { state: "cancelled", label: "Abgesagt" }, registration_summary: { reserved_seats: 0 } }] };
+    }
+    return { data: [] };
+  });
+  await renderPage();
+  const card = screen.getByTestId("event-card-abgesagt");
+  expect(card).toHaveAttribute("data-cancelled", "1");
+  expect(card).toHaveTextContent("Abgesagt");
+  expect(card).toHaveAttribute("href", "/events/abgesagt");
+  expect(card).not.toHaveTextContent("Plätze");
+  expect(screen.getByTestId("event-card-herbst-lan")).not.toHaveAttribute("data-cancelled");
+});
+
+test("externer Anmeldelink: keine Zahl der Plätze auf der Karte (#2127)", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/events/meta") return { data: { types: [], statuses: [] } };
+    if (url.startsWith("/events")) {
+      return { data: [...EVENTS, { id: "e-ext", slug: "extern", name: "Messe", status: "scheduled", visibility: "public", start_date: "2099-10-20T10:00:00+02:00", max_participants: 40, has_registration: true, registration_url: "https://example.test/tickets" }] };
+    }
+    return { data: [] };
+  });
+  await renderPage();
+  expect(screen.getByTestId("event-card-extern")).not.toHaveTextContent("Plätze");
+  expect(screen.getByTestId("event-card-extern")).not.toHaveTextContent("angemeldet");
+});
+
 test("„Zusätzlich einzeln“ zeigt das Turnier auch als Karte und bleibt am Gerät", async () => {
   await renderPage();
   await userEvent.click(screen.getByTestId("events-mode-separate"));

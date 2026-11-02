@@ -1,4 +1,4 @@
-import { changeText, companionsText, counterText, filterRows, leadCounts, matchesSearch, messagePreview, seatsText } from "./eventLead";
+import { changeText, companionsText, counterText, filterRows, leadCounts, matchesSearch, messagePreview, seatsText, waitlistHint } from "./eventLead";
 
 // Anmeldungen & Einlass (#1372): Suche, Filter, Zähler und Vorschau der Nachricht. Namen sind erfunden.
 
@@ -46,6 +46,22 @@ test("Begleitpersonen, Vorschau der Nachricht und Rückmeldung", () => {
   expect(messagePreview(1)).toMatch(/^Geht an 1 angemeldete Person/);
   expect(messagePreview(0)).toBe("Für dieses Event ist niemand angemeldet.");
   expect(changeText(ROWS[1], "checked_in")).toBe("Paula Brünner ist da.");
-  expect(changeText(ROWS[3], "registered")).toBe("Ella Wartend ist nachgerückt.");
+  expect(changeText(ROWS[3], "registered")).toBe("Ella Wartend ist nachgerückt und bekommt Bescheid.");
   expect(changeText(ROWS[0], "registered")).toBe("Max Mustermann ist wieder „noch nicht da“.");
+});
+
+test("„1 Platz frei“: nur mit Warteliste und freiem Platz, wer zuerst da war, steht oben (#2127)", () => {
+  const rows = [
+    { id: "a", display_name: "Später", status: "waitlist", seat_count: 1, created_at: "2026-10-02T10:00:00+00:00" },
+    { id: "b", display_name: "Früher", status: "waitlist", seat_count: 2, created_at: "2026-10-01T10:00:00+00:00" },
+    { id: "c", display_name: "Dabei", status: "registered", seat_count: 1 },
+  ];
+  expect(filterRows(rows, "waitlist").map((row) => row.id)).toEqual(["b", "a"]);
+  // 2 Plätze, einer belegt: frei ist einer, die Erste braucht aber zwei.
+  expect(waitlistHint(rows, 2)).toMatchObject({ free: 1, fits: false, text: "1 Platz frei · 2 auf der Warteliste", next: "Als Nächste: Früher – braucht 2 Plätze" });
+  expect(waitlistHint(rows, 3)).toMatchObject({ free: 2, fits: true, text: "2 Plätze frei · 2 auf der Warteliste", next: "Als Nächste: Früher" });
+  // Voll: kein Hinweis. Ohne Warteliste: kein Hinweis. Ohne Platzgrenze: alle könnten nachrücken.
+  expect(waitlistHint(rows, 1)).toBeNull();
+  expect(waitlistHint(rows.slice(2), 5)).toBeNull();
+  expect(waitlistHint(rows, null)).toMatchObject({ free: null, fits: true, text: "Keine Platzgrenze mehr · 2 auf der Warteliste" });
 });

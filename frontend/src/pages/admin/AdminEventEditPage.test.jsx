@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 // Event als eigene Seite (#434): Anlegen unter /admin/events/new, Bearbeiten unter
-// /admin/events/:id mit den Daten aus der Liste; Speichern führt zurück zur Liste.
+// /admin/events/:id mit dem Einzelabruf (#2127); Speichern führt zurück zur Liste.
 
 const apiMock = { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatRequestError: (_err, fallback) => fallback, resolveMediaUrl: (url) => url }));
@@ -53,7 +53,7 @@ function renderAt(path) {
 beforeEach(() => {
   apiMock.get.mockImplementation(async (url) => {
     if (url === "/events/meta") return { data: META };
-    if (url.startsWith("/events?")) return { data: EVENTS };
+    if (url === "/admin/events/ev-1") return { data: EVENTS[0] };
     return { data: [] };
   });
   apiMock.post.mockReset();
@@ -76,7 +76,7 @@ test("Neues Event: Seite mit Seitenleiste, Slug aus dem Namen, Speichern legt an
   expect(await screen.findByTestId("events-list")).toBeInTheDocument();
 });
 
-test("Bearbeiten lädt das Event aus der Liste und schickt nur die Änderung", async () => {
+test("Bearbeiten lädt das Event einzeln und schickt nur die Änderung", async () => {
   apiMock.patch.mockResolvedValue({ data: { ...EVENTS[0], name: "Halloween Night 2026" } });
   renderAt("/admin/events/ev-1");
   expect(await screen.findByRole("heading", { name: "Event bearbeiten" })).toBeInTheDocument();
@@ -94,6 +94,15 @@ test("Bearbeiten lädt das Event aus der Liste und schickt nur die Änderung", a
   expect(await screen.findByTestId("events-list")).toBeInTheDocument();
 });
 
+test("Termin verschoben: das Speichern sagt, was jetzt außerhalb liegt (#2127)", async () => {
+  toast.warning.mockClear();
+  apiMock.patch.mockResolvedValue({ data: { ...EVENTS[0], program_outside: { tournaments: 2, fastlaps: 0, items: [] } } });
+  renderAt("/admin/events/ev-1");
+  fireEvent.change(await screen.findByTestId("event-name"), { target: { value: "Halloween Night 2026" } });
+  fireEvent.submit(screen.getByTestId("event-form"));
+  await waitFor(() => expect(toast.warning).toHaveBeenCalledWith("2 Turniere liegen jetzt außerhalb des Events – bitte im Programm den Tag prüfen."));
+});
+
 test("unbekannte Kennung: Hinweis mit Weg zurück statt leerem Formular", async () => {
   renderAt("/admin/events/gibt-es-nicht");
   expect(await screen.findByTestId("event-missing")).toHaveTextContent("Event nicht gefunden");
@@ -103,7 +112,7 @@ test("unbekannte Kennung: Hinweis mit Weg zurück statt leerem Formular", async 
 test("Partner II (#469): der Partner-Haken geht als partner_ids mit", async () => {
   apiMock.get.mockImplementation(async (url) => {
     if (url === "/events/meta") return { data: META };
-    if (url.startsWith("/events?")) return { data: EVENTS };
+    if (url === "/admin/events/ev-1") return { data: EVENTS[0] };
     if (url === "/partners") return { data: [{ id: "p1", slug: "pineapps-esports", name: "PineApps eSports" }] };
     return { data: [] };
   });
@@ -125,7 +134,7 @@ const DAYS = [
 function serveEventWithDays() {
   apiMock.get.mockImplementation(async (url) => {
     if (url === "/events/meta") return { data: META };
-    if (url.startsWith("/events?")) return { data: [{ ...EVENTS[0], days: DAYS }] };
+    if (url === "/admin/events/ev-1") return { data: { ...EVENTS[0], days: DAYS } };
     return { data: [] };
   });
 }
@@ -208,7 +217,7 @@ test("Anmeldung im Discord: Vorgabe an, Hinweis bei externem Link, Abwahl geht m
   apiMock.patch.mockResolvedValue({ data: EVENTS[0] });
   apiMock.get.mockImplementation(async (url) => {
     if (url === "/events/meta") return { data: META };
-    if (url.startsWith("/events?")) return { data: [{ ...EVENTS[0], has_registration: true }] };
+    if (url === "/admin/events/ev-1") return { data: { ...EVENTS[0], has_registration: true } };
     return { data: [] };
   });
   renderAt("/admin/events/ev-1");
@@ -240,7 +249,7 @@ const PROGRAM = {
 function serveProgram(program = PROGRAM) {
   apiMock.get.mockImplementation(async (url) => {
     if (url === "/events/meta") return { data: META };
-    if (url.startsWith("/events?")) return { data: EVENTS };
+    if (url === "/admin/events/ev-1") return { data: EVENTS[0] };
     if (url === "/events/ev-1/program") return { data: program };
     return { data: [] };
   });
@@ -301,7 +310,7 @@ test("Programm bei einem neuen Event: erst speichern", async () => {
 test("Verteilen im Event: gesendet – ein zweites Mal nur Redaktion und System", async () => {
   apiMock.get.mockImplementation(async (url) => {
     if (url === "/events/meta") return { data: META };
-    if (url.startsWith("/events?")) return { data: EVENTS };
+    if (url === "/admin/events/ev-1") return { data: EVENTS[0] };
     if (url === "/settings/newsletter/state") {
       return { data: { kind: "event", source_id: "ev-1", title: "Halloween Night", visibility: "members", state: "sent", recipients: 40, sent_at: "2026-10-05T16:02:00+00:00", sent_count: 38,
         can_send: true, can_resend: false, announcement: "Mitglieder bekommen eine Meldung in der App und in der Glocke – „Nur Mitglieder“." } };
@@ -322,7 +331,7 @@ test("Beschreibung mit dem Titel am Anfang: Hinweis im Formular und beim Speiche
   const echo = { ...EVENTS[0], description: "## 🎃 Halloween Night\nGruselig gut.", banner_url: "/api/static/uploads/foto.jpg", banner_kind: "photo" };
   apiMock.get.mockImplementation(async (url) => {
     if (url === "/events/meta") return { data: META };
-    if (url.startsWith("/events?")) return { data: [echo] };
+    if (url === "/admin/events/ev-1") return { data: echo };
     return { data: [] };
   });
   apiMock.patch.mockResolvedValue({ data: echo });
@@ -340,4 +349,25 @@ test("Beschreibung mit dem Titel am Anfang: Hinweis im Formular und beim Speiche
   expect(toast.warning).toHaveBeenCalledWith(expect.stringContaining("beginnt mit dem Titel"));
   const [, patch] = apiMock.patch.mock.calls[0];
   expect(patch).toEqual({ banner_style: "logo", bring_along: ["eigener Controller", "Kopfhörer"], highlights: [{ icon: "vr", text: "VR-Ecke" }] });
+});
+
+// Austragung (#2111, W2/W3): eine Auswahl statt der Haken „Nur Online“ und „Hybrid“; online fehlen Einlass, Ort,
+// Adresse und Karte.
+test("Austragung: eine Auswahl, online ohne Einlass, Ort und Karte", async () => {
+  apiMock.patch.mockResolvedValue({ data: EVENTS[0] });
+  renderAt("/admin/events/ev-1");
+  const mode = await screen.findByTestId("event-mode");
+  expect(mode).toHaveValue("local");
+  expect(screen.queryByText("Nur Online")).toBeNull();
+  expect(screen.getByTestId("event-door-time")).toBeInTheDocument();
+  expect(screen.getByText("Karte anzeigen")).toBeInTheDocument();
+  fireEvent.change(mode, { target: { value: "online" } });
+  expect(screen.queryByTestId("event-door-time")).toBeNull();
+  expect(screen.queryByText("Karte anzeigen")).toBeNull();
+  expect(screen.queryByTestId("event-location-name")).toBeNull();
+  expect(screen.getByTestId("event-online-no-place")).toBeInTheDocument();
+  fireEvent.submit(screen.getByTestId("event-form"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1));
+  expect(apiMock.patch.mock.calls[0][1]).toMatchObject({ is_online: true });
+  expect(apiMock.patch.mock.calls[0][1]).not.toHaveProperty("is_hybrid");
 });

@@ -14,7 +14,8 @@ const SOURCE_ICONS = { uploads: UploadCloud, client: Bug, audit: ShieldCheck, em
 const SEVERITY_LABELS = { success: "OK", info: "Info", warn: "Warnung", error: "Fehler" };
 const RANGES = [["24", "24 Stunden"], ["168", "7 Tage"], ["720", "30 Tage"], ["0", "Alles"]];
 // Adminaktionen lassen sich wie früher auf der Audit-Seite nach Aktion eingrenzen.
-const AUDIT_QUICK = [["", "Alle Aktionen"], ["user.role", "Rollen"], ["tournament.staff", "Turnier-Staff"], ["f1.staff", "Fast-Lap-Staff"], ["match.", "Matches"], ["prize.", "Gewinne"], ["settings.", "Settings"]];
+// „Turniere“ (#2111, TA19): Anlegen, Speichern, Löschen und Anmeldestatus stehen jetzt auch im Protokoll.
+const AUDIT_QUICK = [["", "Alle Aktionen"], ["user.role", "Rollen"], ["tournament.", "Turniere"], ["tournament.staff", "Turnier-Staff"], ["f1.staff", "Fast-Lap-Staff"], ["match.", "Matches"], ["prize.", "Gewinne"], ["settings.", "Settings"]];
 
 export function formatEventTime(value) {
   if (!value) return "-";
@@ -34,7 +35,7 @@ export function sourceIcon(key) {
   return SOURCE_ICONS[key] || Activity;
 }
 
-export function EventRow({ row }) {
+export function EventRow({ row, onResend, resending = false }) {
   const Icon = sourceIcon(row.source);
   return (
     <article className="rounded-sm border border-white/10 bg-[#121212] p-4" data-testid={`ops-event-${row.source}`}>
@@ -55,11 +56,20 @@ export function EventRow({ row }) {
             <pre className="mt-3 max-h-40 overflow-auto whitespace-pre-wrap rounded-sm border border-white/10 bg-black/20 p-3 text-xs text-white/60">{row.detail}</pre>
           )}
         </div>
-        {row.href && (
-          <Link to={row.href} className="inline-flex shrink-0 items-center gap-2 rounded-sm border border-white/10 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-white/55 hover:border-[#29B6E8]/50 hover:text-[#29B6E8]">
-            <ExternalLink className="h-3.5 w-3.5" /> Öffnen
-          </Link>
-        )}
+        <div className="flex shrink-0 flex-wrap gap-2">
+          {/* Fehlgeschlagene Discord-Meldung (#2112): noch einmal an dasselbe Ziel. */}
+          {row.resendable && onResend && (
+            <button type="button" onClick={() => onResend(row)} disabled={resending} data-testid={`ops-event-resend-${row.id}`}
+              className="inline-flex items-center gap-2 rounded-sm border border-[#29B6E8]/40 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[#29B6E8] hover:bg-[#29B6E8]/10 disabled:opacity-40">
+              <Send className="h-3.5 w-3.5" /> {resending ? "Sende …" : "Erneut senden"}
+            </button>
+          )}
+          {row.href && (
+            <Link to={row.href} className="inline-flex shrink-0 items-center gap-2 rounded-sm border border-white/10 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-white/55 hover:border-[#29B6E8]/50 hover:text-[#29B6E8]">
+              <ExternalLink className="h-3.5 w-3.5" /> Öffnen
+            </Link>
+          )}
+        </div>
       </div>
     </article>
   );
@@ -127,6 +137,21 @@ export function OpsEventsTab() {
     }
   };
 
+  const [resending, setResending] = useState("");
+  const resend = async (row) => {
+    setResending(row.id);
+    try {
+      const { data: result } = await api.post(`/settings/discord/resend/${encodeURIComponent(row.id)}`);
+      if (result?.ok) toast.success("Meldung erneut gesendet.");
+      else toast.error(result?.error || result?.text || "Erneut senden hat nicht geklappt – der Grund steht gleich in der Liste.");
+      await load();
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail) || "Erneut senden hat nicht geklappt.");
+    } finally {
+      setResending("");
+    }
+  };
+
   const sources = data?.sources || [];
   const rows = data?.items || [];
 
@@ -188,7 +213,7 @@ export function OpsEventsTab() {
       )}
 
       <div className="space-y-3">
-        {rows.map((row) => <EventRow key={`${row.source}-${row.id}-${row.time}`} row={row} />)}
+        {rows.map((row) => <EventRow key={`${row.source}-${row.id}-${row.time}`} row={row} onResend={resend} resending={resending === row.id} />)}
         {!rows.length && (
           <div className="rounded-sm border border-white/10 bg-[#121212] p-10 text-center text-white/40" data-testid="ops-events-empty">
             {loading ? "Lade Ereignisse …" : <span className="inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[#00FF88]" /> Keine Ereignisse für diese Auswahl.</span>}

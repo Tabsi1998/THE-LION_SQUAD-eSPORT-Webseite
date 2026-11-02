@@ -125,6 +125,14 @@ def _own_profile_rows(db, user_id: str, collection, fields: tuple[str, ...]):
     return ("list", produce)
 
 
+def _dissolved_team(user_id: str):
+    def shape(row: dict) -> dict:
+        role = "leader" if row.get("leader_id") == user_id else "co_leader" if user_id in (row.get("co_leader_ids") or []) else "member"
+        fields = ("id", "name", "tag", "description", "is_public", "logo_url", "banner_url", "discord_link", "created_at", "dissolved_at", "purge_at")
+        return {**{key: row[key] for key in fields if key in row}, "my_role": role}
+    return shape
+
+
 def _chat_rows(db, user_id: str):
     async def own_chat_messages():
         for name in ("team_chat_messages", "match_chat_messages", "tournament_chat_messages"):
@@ -175,6 +183,9 @@ async def _user_data_sections(db, user_id: str) -> list[tuple[str, tuple]]:
         ("event_registrations", _rows(db.event_registrations, me)),
         ("f1_lap_times", _rows(db.f1_lap_times, me)),
         ("teams", _rows(db.teams, {"$or": [{"member_ids": user_id}, {"leader_id": user_id}]}, lambda row: _clean(row, "join_code"))),
+        # Aufgelöste Teams (#2128, TM8), solange sie wiederherstellbar sind: das Team und die eigene Rolle darin - keine
+        # Kennungen anderer Personen.
+        ("dissolved_teams", _rows(db.dissolved_teams, {"$or": [{"member_ids": user_id}, {"leader_id": user_id}]}, _dissolved_team(user_id))),
         ("team_memberships", _rows(db.team_members, me)),
         ("team_invites", _rows(db.team_invites, me)),
         ("achievements", _rows(db.user_achievements, me)),
@@ -376,13 +387,16 @@ async def _anonymize_user_data(db, user_id: str, actor_id: str, action: str) -> 
     # Druckdateien mit Gamertag (#2069): dasselbe für die zusammengesetzte Datei je Bestellposition.
     from services.shop_print_files import erase_for_user as erase_print_files
     await erase_print_files(db, user_id)
+    # Muss vor dem Aufräumen stehen: danach ist der Eintrag weg, auf den die Posten zeigen.
+    orphaned_posts = await account_erasure.posts_on_own_entry(db, user_id)
     # Alles außerhalb des Kontos (#928): Verzeichnis, Anträge, Anmeldungen, XP, Zugänge und die eigenen Bilder.
     erased = await account_erasure.erase_related(db, user, now)
     # Kontaktanfragen ohne Konto mit derselben Adresse bleiben unberührt (nicht sicher zuzuordnen) - die Zahl steht hier,
     # damit der Vorstand sie bei einem Löschwunsch per Hand prüfen kann.
     await db.audit_logs.insert_one({
         "id": new_id(), "action": action, "actor_id": actor_id, "target_id": user_id,
-        "data": {"personal_data_removed": True, "unlinked_contact_messages": erased["unlinked_contact_messages"]}, "created_at": now,
+        "data": {"personal_data_removed": True, "unlinked_contact_messages": erased["unlinked_contact_messages"],
+                 **({"board_posts_to_fill": orphaned_posts} if orphaned_posts else {})}, "created_at": now,
     })
 
 
@@ -392,10 +406,26 @@ async def export_my_data(me: dict = Depends(get_current_user)):
     return StreamingResponse(_stream(sections), media_type="application/json")
 
 
+@dsgvo_router.get("/anonymize-me/check")
+async def anonymize_me_check(me: dict = Depends(get_current_user)):
+    """Was das eigene Löschen aufhält (#2113, L-C5): Rollen in Teams und Co-Teams, je mit dem Weg - die Seite zeigt sie
+    vor der Rückfrage. Leer heißt: Löschen geht."""
+    from services import erasure_blockers
+    db = get_db()
+    rows = await erasure_blockers.blockers(db, me["id"], me.get("role"))
+    closing = await erasure_blockers.way_out(db) if rows else None
+    return {"can_erase": not rows, "blockers": rows, "message": erasure_blockers.message(rows, closing), "closing": closing}
+
+
 @dsgvo_router.post("/anonymize-me")
 async def anonymize_me(me: dict = Depends(get_current_user)):
     """Anonymize own account but keep tournament history for statistical integrity."""
     db = get_db()
+    # Erst die Rollen in Teams abgeben (#2113, L-C5) - sonst stünde ein gelöschtes Konto als Teamleitung da.
+    from services import erasure_blockers
+    rows = await erasure_blockers.blockers(db, me["id"], me.get("role"))
+    if rows:
+        raise HTTPException(409, erasure_blockers.message(rows, await erasure_blockers.way_out(db)))
     await _anonymize_user_data(db, me["id"], me["id"], "user.self_anonymize")
     return {"ok": True}
 
@@ -403,8 +433,11 @@ async def anonymize_me(me: dict = Depends(get_current_user)):
 @dsgvo_router.post("/admin/anonymize/{user_id}")
 async def admin_anonymize(user_id: str, me: dict = Depends(require_super())):
     db = get_db()
+    # Das eigene Konto läuft über die Datenschutzseite - mit denselben Regeln wie dort (#2125).
+    if user_id == me["id"]:
+        raise HTTPException(400, "Nutze für den eigenen Account die Datenschutzseite.")
     target = await db.users.find_one({"id": user_id}, {"_id": 0, "role": 1})
-    if target and target.get("role") == "superadmin" and user_id != me["id"]:
+    if target and target.get("role") == "superadmin":
         raise HTTPException(403, "Andere Superadmins dürfen nicht anonymisiert werden.")
     await _anonymize_user_data(db, user_id, me["id"], "user.admin_anonymize")
     return {"ok": True}

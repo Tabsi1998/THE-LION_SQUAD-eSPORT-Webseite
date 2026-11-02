@@ -29,10 +29,10 @@ import { seoTextPreview } from "@/lib/textPreview";
 import { headNameClass, isLongHeadName } from "@/lib/headName";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import {
-  Trophy, Flag, Medal, Shield, Calendar,
+  Trophy, Flag, Medal, Calendar,
   MapPin, Zap, TrendingUp, Lock, ExternalLink, Radio, Gamepad2, Globe,
   MessageSquare, UserPlus, UserCheck, X, Info, Cake, Crown,
-  Monitor, Keyboard, BadgeCheck, Heart, Users, Sparkles, Copy, Award, Settings,
+  Monitor, Keyboard, BadgeCheck, Heart, Users, Sparkles, Copy, Award, Settings, Target,
 } from "lucide-react";
 import { toast } from "sonner";
 import { asInstant, viennaDate } from "@/lib/vienna";
@@ -99,15 +99,6 @@ function formatPublicDate(value) {
   if (Number.isNaN(date.getTime())) return "";
   return viennaDate(date, { day: "2-digit", month: "long", year: "numeric" });
 }
-
-const ROLE_LABELS = {
-  player: "Spieler",
-  team_leader: "Teamleitung",
-  moderator: "Moderator",
-  tournament_admin: "Turnier-Admin",
-  club_admin: "Club-Admin",
-  superadmin: "Superadmin",
-};
 
 const MEMBERSHIP_TYPE_LABELS = {
   ordinary: "Ordentliches Mitglied",
@@ -296,19 +287,6 @@ export function accountGroups(profile) {
     .filter(Boolean);
   const socials = build(SOCIAL_PLATFORMS);
   const games = build(GAME_PLATFORMS);
-  // Weitere Socials (eigene Einträge unter Mein Profil → Socials) - ohne Doppelung zu den festen Feldern.
-  const seen = new Set([...socials, ...games].map((entry) => `${entry.key}:${String(entry.url || entry.value).toLowerCase()}`));
-  for (const social of profile.socials || []) {
-    const platform = String(social.platform || "").toLowerCase();
-    const value = social.value || social.url;
-    if (!value || linked.has(platform)) continue;
-    const meta = socialMeta({ platform, label: social.platform });
-    const url = social.url || socialUrl(platform, social.value) || (/^https?:\/\//i.test(String(social.value || "")) ? externalUrl(social.value) : "");
-    const dedupe = `${meta.key}:${String(url || value).toLowerCase()}`;
-    if (seen.has(dedupe)) continue;
-    seen.add(dedupe);
-    socials.push({ platform, key: meta.key, label: meta.label, color: meta.color, title: cleanHandle(value) || value, detail: meta.label, value, url, verified: false, since: "" });
-  }
   // Bestätigte Konten neuer Plattformen, die noch keine feste Gruppe haben, stehen bei den Socials.
   for (const [platform, entry] of linked) {
     if (!SOCIAL_PLATFORMS.includes(platform) && !GAME_PLATFORMS.includes(platform)) socials.push(entry);
@@ -366,7 +344,7 @@ export default function PublicProfilePage() {
     image: profile?.avatar_url || profile?.banner_url,
     type: "profile",
     robots: "noindex, follow",
-    canonical: profile?.username ? `${window.location.origin}/u/${profile.username}` : undefined,
+    canonical: profile?.username ? `${window.location.origin}/u/${encodeURIComponent(profile.username)}` : undefined,
   });
   const { hasConsent } = useCookieConsent();
 
@@ -377,7 +355,7 @@ export default function PublicProfilePage() {
   const load = useCallback(async ({ quiet = false } = {}) => {
     if (!quiet) setLoading(true);
     try {
-      const { data } = await api.get(`/users/public/${username}`, asOthers ? { params: { view_as: "public" } } : undefined);
+      const { data } = await api.get(`/users/public/${encodeURIComponent(username)}`, asOthers ? { params: { view_as: "public" } } : undefined);
       setProfile(data);
       api.get("/streams/live").then(({ data: streams }) => setLiveStreams(Array.isArray(streams) ? streams : [])).catch(() => { if (!quiet) setLiveStreams([]); });
       if (data?.id) {
@@ -478,7 +456,7 @@ export default function PublicProfilePage() {
 
   const updateFriendship = async (action) => {
     if (!user) {
-      nav(`/login?next=/u/${encodeURIComponent(profile.username)}`);
+      nav(`/login?next=${encodeURIComponent(`/u/${encodeURIComponent(profile.username)}`)}`);
       return;
     }
     try {
@@ -506,7 +484,7 @@ export default function PublicProfilePage() {
 
   const openMessage = () => {
     if (!user) {
-      nav(`/login?next=/u/${encodeURIComponent(profile.username)}`);
+      nav(`/login?next=${encodeURIComponent(`/u/${encodeURIComponent(profile.username)}`)}`);
       return;
     }
     nav(`/messages/${encodeURIComponent(profile.id)}`);
@@ -610,11 +588,6 @@ export default function PublicProfilePage() {
               <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-white/55" data-testid="profile-identity">
                 <span>@{profile.username}</span>
                 <AccountLevelPill level={level.level} />
-                {profile.role && profile.role !== "player" && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 border border-[#FFD700]/40 text-[#FFD700] text-[10px] uppercase tracking-widest rounded-sm font-bold">
-                    <Shield className="w-3 h-3" /> {labelValue(profile.role, ROLE_LABELS)}
-                  </span>
-                )}
                 {liveStream && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 border border-[#FF3B30]/50 text-[#FF3B30] text-[10px] uppercase tracking-widest rounded-sm font-bold" data-testid="profile-live-pill">
                     <Radio className="w-3 h-3 animate-live" /> Live
@@ -1202,6 +1175,8 @@ function SetupCard({ profile }) {
     { label: "Plattformen", items: listItems(profile.main_platforms?.length ? profile.main_platforms : profile.main_platform, PLATFORM_LABELS), icon: Monitor, tone: "blue" },
     { label: "Eingabe", items: listItems(profile.input_devices, INPUT_DEVICE_LABELS), icon: Keyboard, tone: "gold" },
     { label: "Abos", items: listItems(profile.gaming_subscriptions, SUBSCRIPTION_LABELS), icon: BadgeCheck, tone: "green" },
+    // Freitext (#2126): genau so, wie die Person ihn eingetragen hat.
+    { label: "Rolle", items: profile.preferred_role ? [profile.preferred_role] : [], icon: Target, tone: "white" },
     { label: "Lieblingsspiele", items: listItems(profile.favorite_games), icon: Heart, tone: "violet" },
   ].filter((group) => group.items.length);
   if (!groups.length) return null;
@@ -1221,7 +1196,7 @@ function SetupCard({ profile }) {
             </div>
             <div className="flex flex-wrap gap-1.5">
               {group.items.map((item) => (
-                <span key={item} className="inline-flex items-center rounded-sm border border-white/10 bg-white/[0.03] px-2 py-1 text-xs text-white/75">{item}</span>
+                <span key={item} className="inline-flex max-w-full items-center break-words rounded-sm border border-white/10 bg-white/[0.03] px-2 py-1 text-xs text-white/75">{item}</span>
               ))}
             </div>
           </div>

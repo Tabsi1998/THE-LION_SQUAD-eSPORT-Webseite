@@ -6,6 +6,7 @@ woran ein Stream scheitert. Hier steht sie einmal - für die öffentliche Liste
 und für die Erklärung im Admin, damit beide nie auseinanderlaufen.
 """
 from __future__ import annotations
+from services.usernames import profile_path
 
 ACTIVE_STREAM_MEMBER_STATUSES = ("active", "honorary")
 
@@ -73,6 +74,6 @@ async def homepage_visibility(db, user_ids) -> dict[str, dict]:
                 "photo_url": profile.get("photo_url"),
             }
             public = user.get("username") and user.get("privacy_public_profile") is True
-            verdict["public_profile_url"] = f"/u/{user.get('username')}" if public else None
+            verdict["public_profile_url"] = profile_path(user.get('username')) if public else None
         verdicts[user_id] = verdict
     return verdicts

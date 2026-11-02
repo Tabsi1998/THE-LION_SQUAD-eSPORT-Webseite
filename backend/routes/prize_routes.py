@@ -1,8 +1,9 @@
 """Phase 9: PrizePickup admin + user routes."""
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, Literal
 
 from database import get_db
@@ -10,6 +11,7 @@ from auth import get_current_user
 from models import now_utc, new_id
 from services.prize_service import mark_ready, mark_picked_up, revert_picked_up
 from services.visibility import user_can_see
+from services.usernames import profile_path
 
 router = APIRouter(prefix="/api/prizes", tags=["prizes"])
 
@@ -21,10 +23,52 @@ RESULT_CERTIFICATE_STATUSES = {"completed", "results_published", "archived"}
 
 class PrizeUpdate(BaseModel):
     status: Optional[PrizeStatus] = None
-    notes: Optional[str] = None
-    pickup_deadline: Optional[str] = None
-    prize_label: Optional[str] = None
-    prize_value: Optional[str] = None
+    notes: Optional[str] = Field(default=None, max_length=1000)
+    pickup_deadline: Optional[str] = Field(default=None, max_length=40)
+    prize_label: Optional[str] = Field(default=None, max_length=200)
+    prize_value: Optional[str] = Field(default=None, max_length=200)
+    # Frist zurück auf den Standard (#2112): „Offen“ ohne Frist, „Bereit“ 90 Tage ab dem Bereitstellen.
+    reset_deadline: Optional[bool] = None
+
+
+def _deadline_value(value: str | None) -> str | None:
+    """Eine von Hand gesetzte Abholfrist (#2112) als UTC-Zeitpunkt - so vergleicht sie der Ablauf-Job als Text richtig."""
+    if value in (None, ""):
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).strip())
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Die Abholfrist ist kein gültiges Datum.")
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc).isoformat()
+
+
+def _default_deadline(pickup: dict) -> dict:
+    """Die Standard-Frist (#2112): „Offen“ hat keine, „Bereit“ läuft 90 Tage ab dem Bereitstellen. Bei abgeholten oder
+    verfallenen Gewinnen gibt es nichts zurückzusetzen - dafür ist „Wieder öffnen“ da."""
+    from services.prize_service import DEFAULT_PICKUP_WINDOW_DAYS
+
+    status = pickup.get("status") or "pending"
+    if status == "pending":
+        return {"pickup_deadline": None, "pickup_deadline_custom": False}
+    if status != "ready":
+        raise HTTPException(status_code=409, detail="Die Frist lässt sich nur bei offenen oder bereiten Gewinnen zurücksetzen.")
+    try:
+        start = datetime.fromisoformat(str(pickup.get("ready_at")))
+        if start.tzinfo is None:
+            start = start.replace(tzinfo=timezone.utc)
+    except (TypeError, ValueError):
+        start = now_utc()
+    deadline = (start + timedelta(days=DEFAULT_PICKUP_WINDOW_DAYS)).astimezone(timezone.utc).isoformat()
+    return {"pickup_deadline": deadline, "pickup_deadline_custom": False}
+
+
+def _prize_label(value: str | None) -> str:
+    label = " ".join(str(value or "").split())
+    if not label:
+        raise HTTPException(status_code=400, detail="Bitte angeben, was es zu gewinnen gibt.")
+    return label
 
 
 async def _hydrate_pickups(pickups: list[dict]) -> list[dict]:
@@ -57,7 +101,7 @@ async def _hydrate_pickups(pickups: list[dict]) -> list[dict]:
             p["recipient_type"] = "user"
             p["recipient_label"] = user.get("display_name") or user.get("username") or "Unbekannter User"
             p["recipient_subtitle"] = user.get("email") or user.get("username") or ""
-            p["recipient_url"] = f"/u/{user.get('username')}" if user.get("username") else None
+            p["recipient_url"] = profile_path(user["username"]) if user.get("username") else None
         p["display_name"] = p["recipient_label"]
         p["email"] = user.get("email")
         if user:
@@ -358,11 +402,27 @@ async def update_prize(pickup_id: str, body: PrizeUpdate, me: dict = Depends(get
         return result
     # generic patch
     updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    reset = {}
+    if updates.pop("reset_deadline", None):
+        if "pickup_deadline" in updates:
+            raise HTTPException(status_code=400, detail="Entweder eine Frist setzen oder auf den Standard zurück - nicht beides.")
+        reset = _default_deadline(pickup)
+    if not updates and not reset:
+        return pickup
+    if "prize_label" in updates:
+        updates["prize_label"] = _prize_label(updates["prize_label"])
+    if "prize_value" in updates:
+        updates["prize_value"] = " ".join(updates["prize_value"].split())
+    if "pickup_deadline" in updates:
+        updates["pickup_deadline"] = _deadline_value(updates["pickup_deadline"])
+        if updates["pickup_deadline"] is None:
+            updates.pop("pickup_deadline")
+        else:
+            # Von Hand gesetzte Frist (#2123, ER1): „Bereit“ überschreibt sie nicht mit den 90 Tagen.
+            updates["pickup_deadline_custom"] = True
+    updates.update(reset)
     if not updates:
         return pickup
-    if "pickup_deadline" in updates:
-        # Von Hand gesetzte Frist (#2123, ER1): „Bereit“ überschreibt sie nicht mit den 90 Tagen.
-        updates["pickup_deadline_custom"] = True
     updates["updated_at"] = now_utc().isoformat()
     await db.prize_pickups.update_one({"id": pickup_id}, {"$set": updates})
     await _audit_prize(db, me, "prizes.update", pickup, changes=updates)
@@ -385,32 +445,39 @@ async def delete_prize(pickup_id: str, me: dict = Depends(get_current_user)):
 
 
 class PrizeCreate(BaseModel):
-    tournament_id: str
-    user_id: str
-    place: int
-    prize_label: str
-    prize_value: Optional[str] = ""
-    pickup_deadline: Optional[str] = None
+    tournament_id: str = Field(max_length=80)
+    user_id: str = Field(max_length=80)
+    place: int = Field(ge=1, le=999)
+    prize_label: str = Field(max_length=200)
+    prize_value: Optional[str] = Field(default="", max_length=200)
+    pickup_deadline: Optional[str] = Field(default=None, max_length=40)
 
 
 @router.post("")
 async def create_prize_manually(body: PrizeCreate, me: dict = Depends(get_current_user)):
+    """Einen Gewinn von Hand anlegen (#2112) - etwa einen Sonderpreis, den die Preisstruktur nicht kennt."""
     await _ensure_prize_manager(me, body.tournament_id)
     db = get_db()
-    t = await db.tournaments.find_one({"id": body.tournament_id}, {"_id": 0}) or {}
+    t = await db.tournaments.find_one({"id": body.tournament_id}, {"_id": 0, "id": 1, "title": 1, "slug": 1})
+    if not t:
+        raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    label = _prize_label(body.prize_label)
     user = await db.users.find_one({"id": body.user_id}, {"_id": 0, "id": 1})
     if not user:
         raise HTTPException(status_code=404, detail="Benutzer nicht gefunden")
+    # Doppelt wäre nur ein zweiter Hand-Gewinn (#2112): ein Strukturpreis aus dem Ergebnis (mit Preisgruppe) ist etwas
+    # anderes und bleibt daneben bestehen. Ältere Hand-Gewinne tragen noch kein ``source`` - die erkennt die fehlende Gruppe.
     existing = await db.prize_pickups.find_one({
         "tournament_id": body.tournament_id,
         "user_id": body.user_id,
         "team_id": None,
         "place": body.place,
+        "$or": [{"source": "manual"}, {"prize_group": {"$exists": False}}],
     })
     if existing:
-        raise HTTPException(status_code=409, detail="Für diesen Benutzer und Platz existiert bereits ein Gewinn")
+        raise HTTPException(status_code=409, detail="Für diese Person und diesen Platz gibt es schon einen Gewinn von Hand.")
     # Ohne eigene Frist läuft sie ab „Bereit“ (#2123, ER1).
-    deadline = body.pickup_deadline or None
+    deadline = _deadline_value(body.pickup_deadline)
     doc = {
         "id": new_id(),
         "tournament_id": body.tournament_id,
@@ -420,8 +487,9 @@ async def create_prize_manually(body: PrizeCreate, me: dict = Depends(get_curren
         "team_id": None,
         "place": body.place,
         "place_label": str(body.place),
-        "prize_label": body.prize_label,
-        "prize_value": body.prize_value or "",
+        "source": "manual",
+        "prize_label": label,
+        "prize_value": " ".join((body.prize_value or "").split()),
         "status": "pending",
         "pickup_deadline": deadline,
         "pickup_deadline_custom": bool(deadline),

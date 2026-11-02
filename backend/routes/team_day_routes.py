@@ -1,11 +1,11 @@
 """Team am Spieltag (#1192): Aufstellung wählen und „Wer ist da“ - nur bei Team-Turnieren.
 
 - ``GET    /api/team-day/{tid}``           dein Team in diesem Turnier: Aufstellung, Mitglieder, wer da ist
-- ``PUT    /api/team-day/{tid}/lineup``    Aufstellung speichern (Kapitän, Co-Kapitän; bis zum Ende des Check-ins)
+- ``PUT    /api/team-day/{tid}/lineup``    Aufstellung speichern (Teamleitung, Co-Leitung; bis zum Ende des Check-ins)
 - ``DELETE /api/team-day/{tid}/lineup``    Aufstellung zurücknehmen - dann gilt wieder das ganze Team
 - ``POST   /api/team-day/{tid}/presence``  „Ich bin da“ (jedes Mitglied, am Turniertag)
 - ``DELETE /api/team-day/{tid}/presence``  doch noch nicht da
-- ``POST   /api/team-day/{tid}/nudge``     Fehlende anstupsen (Kapitän, Co-Kapitän; höchstens alle 10 Minuten)
+- ``POST   /api/team-day/{tid}/nudge``     Fehlende anstupsen (Teamleitung, Co-Leitung; höchstens alle 10 Minuten)
 - ``GET    /api/team-day/{tid}/lineups``   für die Turnierleitung beim Check-in: Aufstellung und „da“ je Team
 """
 from __future__ import annotations
@@ -127,7 +127,7 @@ async def save_lineup(tid: str, body: LineupBody, me: dict = Depends(get_current
     if not reg or not team:
         raise HTTPException(status_code=404, detail="Dein Team ist für dieses Turnier nicht angemeldet.")
     if not team_lineup.can_lead(team, me):
-        raise HTTPException(status_code=403, detail="Die Aufstellung wählen Kapitän und Co-Kapitän.")
+        raise HTTPException(status_code=403, detail="Die Aufstellung wählen Teamleitung und Co-Leitung.")
     if not team_lineup.lineup_open(tournament, reg):
         raise HTTPException(status_code=409, detail="Die Aufstellung lässt sich nur bis zum Ende des Check-ins ändern.")
     lineup, substitutes = team_lineup.validate_lineup(team, tournament, body.lineup)
@@ -148,7 +148,7 @@ async def clear_lineup(tid: str, me: dict = Depends(get_current_user)):
     if not reg or not team:
         raise HTTPException(status_code=404, detail="Dein Team ist für dieses Turnier nicht angemeldet.")
     if not team_lineup.can_lead(team, me):
-        raise HTTPException(status_code=403, detail="Die Aufstellung wählen Kapitän und Co-Kapitän.")
+        raise HTTPException(status_code=403, detail="Die Aufstellung wählen Teamleitung und Co-Leitung.")
     if not team_lineup.lineup_open(tournament, reg):
         raise HTTPException(status_code=409, detail="Die Aufstellung lässt sich nur bis zum Ende des Check-ins ändern.")
     await db.tournament_registrations.update_one({"id": reg["id"]}, {"$unset": {"lineup": "", "substitutes": ""},
@@ -196,7 +196,7 @@ async def nudge_missing(tid: str, me: dict = Depends(get_current_user)):
     if not reg or not team:
         raise HTTPException(status_code=404, detail="Dein Team ist für dieses Turnier nicht angemeldet.")
     if not team_lineup.can_lead(team, me):
-        raise HTTPException(status_code=403, detail="Anstupsen dürfen Kapitän und Co-Kapitän.")
+        raise HTTPException(status_code=403, detail="Anstupsen dürfen Teamleitung und Co-Leitung.")
     if not team_lineup.is_tournament_day(tournament):
         raise HTTPException(status_code=409, detail="Anstupsen geht am Turniertag.")
     now = now_utc()

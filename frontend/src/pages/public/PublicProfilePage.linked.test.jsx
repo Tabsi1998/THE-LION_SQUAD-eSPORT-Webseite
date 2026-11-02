@@ -21,17 +21,18 @@ const PROFILE = {
     { platform: "discord", label: "Discord", handle: "paula", display_name: "Paula B.", linked_at: "2026-09-22T20:00:00Z", url: "https://discord.com/users/123" },
     { platform: "steam", label: "Steam", handle: "76561198000000001", display_name: "76561198000000001", linked_at: "2026-09-23T20:00:00Z", url: "https://steamcommunity.com/profiles/76561198000000001" },
   ],
-  socials: [{ platform: "Discord", value: "paula#0001" }, { platform: "Mastodon", value: "https://mastodon.example/@paula" }],
+  mastodon_handle: "paula@mastodon.example",
 };
 
 test("accountGroups: verknüpft schlägt getippt, Socials und Spielkonten getrennt, Zähler nur für bestätigte", () => {
   const groups = accountGroups(PROFILE);
-  // Mastodon ist seit Welle 3 (#547) eine bekannte Plattform - der eigene Eintrag bekommt ihren Schlüssel statt „website“.
-  expect(groups.socials.map((e) => e.key)).toEqual(["discord", "youtube", "website", "mastodon"]);
+  // Mastodon ist seit Welle 3 (#547) eine bekannte Plattform; Einträge außerhalb der Profilfelder gibt es nicht mehr (#2113).
+  expect(groups.socials.map((e) => e.key)).toEqual(["discord", "youtube", "mastodon", "website"]);
   expect(groups.socials[0]).toMatchObject({ title: "Paula B.", detail: "Discord · paula · seit 22.09.2026", verified: true, url: "https://discord.com/users/123" });
   expect(groups.socials[1]).toMatchObject({ title: "paula", detail: "YouTube", verified: false, url: "https://www.youtube.com/@paula" });
-  expect(groups.socials[2]).toMatchObject({ title: "paula.example", url: "https://paula.example/" });
-  expect(groups.socials[3]).toMatchObject({ label: "Mastodon", url: "https://mastodon.example/@paula" });
+  expect(groups.socials[2]).toMatchObject({ label: "Mastodon", url: "https://mastodon.example/@paula" });
+  expect(groups.socials[3]).toMatchObject({ title: "paula.example", url: "https://paula.example/" });
+  expect(accountGroups({ socials: [{ platform: "kick", value: "alt" }] }).socials).toEqual([]);
   expect(groups.games.map((e) => e.key)).toEqual(["steam", "psn", "nintendo"]);
   expect(groups.games[0]).toMatchObject({ title: "Steam-Profil", detail: "Steam · 76561198000000001 · seit 23.09.2026", verified: true });
   // #891: getippt, aber verlinkt; Nintendo hat keine Profilseite im Netz und bleibt zum Kopieren.

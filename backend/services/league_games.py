@@ -94,6 +94,15 @@ def _positive_int(value, fallback: int) -> int:
     return number if number >= 1 else fallback
 
 
+def effective_mode_order(tournament: dict | None, pool: dict | None) -> list[str]:
+    """Die Reihenfolge der Modi, die für dieses Spiel gilt (#2129): nur wenn der geltende Pool alle ihre Modi hat. Sonst
+    wäre keine Meldung möglich - der Pool der Staffel wechselt beim Übertragen auch nach dem ersten Ergebnis, die
+    Reihenfolge nicht; dann wählen die Teams den Modus frei. Ein festgehaltener Pool behält seine Reihenfolge."""
+    order = [str(mode) for mode in (tournament or {}).get("game_mode_order") or [] if mode]
+    known = {group["mode"] for group in _pool_modes(pool)}
+    return order if not pool or set(order) <= known else []
+
+
 async def setup(db, match: dict, tournament: dict | None = None, stage: dict | None = None) -> LeagueSetup | None:
     """Alles, was die Prüfung eines Liga-Spiels braucht - ``None``, wenn das Spiel zu keiner Staffel gehört."""
     from services.match_v2_results import result_best_of
@@ -111,14 +120,15 @@ async def setup(db, match: dict, tournament: dict | None = None, stage: dict | N
     }
     everyone = set().union(*rosters.values()) if rosters else set()
     roster_ctx = await league_roster.context_for_tournament(db, tournament, everyone)
+    pool = await map_pools.effective_pool(db, tournament, stage=stage, match=match)
     return LeagueSetup(
         tournament=tournament,
         stage=stage,
         match=match,
         best_of=await result_best_of(db, match),
         team_size=_positive_int(tournament.get("team_size"), 1),
-        mode_order=[str(mode) for mode in tournament.get("game_mode_order") or [] if mode],
-        pool=await map_pools.effective_pool(db, tournament, stage=stage, match=match),
+        mode_order=effective_mode_order(tournament, pool),
+        pool=pool,
         registrations=registrations,
         rosters=rosters,
         names={

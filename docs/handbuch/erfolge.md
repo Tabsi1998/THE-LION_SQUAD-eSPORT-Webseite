@@ -81,6 +81,9 @@ Reiter **Übersicht** (Admin → Content → Erfolge):
 - **Auswertung** mit „Warten gerade“, „Noch zu melden“, „Letzter Lauf“ und dem Knopf **Alle jetzt auswerten**. Der Knopf merkt alle
   Konten vor; abgearbeitet wird im Hintergrund. Nützlich nach einer Katalog-Änderung.
 - **Nächtlicher Abgleich** mit „Zuletzt“, „Geprüft“, „Abweichungen“, „Dabei vergeben“.
+- **Turnier-Pokale nachtragen** (nur Bereich **System**): Der Knopf **Pokale nachtragen** leitet Pokale und Banner aller
+  Turniere mit veröffentlichten Ergebnissen neu ab – etwa nach einer Korrektur alter Ergebnisse. Doppelt entsteht nichts;
+  der Lauf meldet, wie viele Turniere und Pokale es sind, und steht im Protokoll.
 
 Was die Person erlebt: Beim Freischalten feiert eine **Zeremonie** das Abzeichen (Look und Klang nach Material, Bewegung nach
 Kategorie); jede Person stellt unter **Einstellungen → Benachrichtigungen**, Kasten **Zeremonien**, ein, ob sie mit Klang und voller Bewegung gefeiert wird oder dezent (siehe
@@ -165,8 +168,9 @@ ein **Rang**, der zugleich der **Titel** ist und überall gleich heißt (Abzeich
 
 Jeder der zwölf Ränge hat einen **eigenen gezeichneten Rahmen** um das Profilbild (Web und App); im Profilkopf kommt je Rang eine
 Signatur dazu, auf Wunsch ruhig und ohne Bewegung (Einstellung „weniger Bewegung“ des Geräts). Die **Kronen** (Gold, Silber, Bronze)
-tragen die drei Personen mit den meisten Erfolgspunkten – nur Konten mit **öffentlichem Profil** –; wer eine erobert oder verliert,
-bekommt eine Meldung.
+tragen die drei Personen mit den meisten Erfolgspunkten – nur Konten mit **öffentlichem Profil** und eingeschaltetem „Erfolge
+öffentlich“ –; wer eine erobert oder verliert, bekommt eine Meldung, höchstens eine je Art in sechs Stunden. Wer „Erfolge
+öffentlich“ selbst ausschaltet, bekommt keine.
 
 **Was XP bringt** (Auszug; Quelle: Programmwerte, „Deckel“ = höchstens so oft pro Tag):
 
@@ -263,7 +267,9 @@ den Plätzen. Wird ein Ergebnis nach dem Veröffentlichen korrigiert und das Tur
 je Person und Kalendermonat die ersten **vier** Einträge voll, danach nur noch zur Hälfte. Turniere (Major, Normal, Mini) zählen immer voll.
 
 **Event-Teilnahme:** Checkt die Turnierleitung eine Person unter **Anmeldungen & Einlass** ein (**Da**), bekommt sie einen Jahreswertungs-Eintrag
-(Gewicht ×0,50 plus 5 Bonuspunkte), 60 XP und eine Erfolgs-Auswertung. Siehe [Events](events.md).
+(Gewicht ×0,50 plus 5 Bonuspunkte), 60 XP und eine Erfolgs-Auswertung. Wird der Check-in zurückgenommen, gehen Eintrag und XP wieder weg,
+auch bei mehrfachem Hin und Her nie doppelt; eine abgeschlossene Jahreswertung bleibt, schon freigeschaltete Erfolge ebenfalls. Siehe
+[Events](events.md).
 
 **Erfolge** sind Profilpunkte und fließen nicht still in die Jahreswertung. Reine Community-Aktivität zählt nicht – nur Turniere,
 Fast Laps, bestätigte Event-Teilnahmen und Korrekturen mit Grund.
@@ -294,7 +300,7 @@ in der Zeile.
 
 ### 3.8 Negativ, Vorschau, Statistik
 
-**Negativ & Vorfälle:** Fun-Erfolge für kleine Missgeschicke, bis zur Freischaltung geheim, danach im Profil sichtbar. **Vorfall
+**Negativ & Vorfälle:** Fun-Erfolge für kleine Missgeschicke, bis zur Freischaltung geheim, danach im Profil sichtbar. Von Hand eingetragene stehen außerdem unter **Strafen** bzw. **Meine Strafen**; dort liest die Person die Notiz, die du beim Eintragen schreibst. Notizen aus der Einzel- und Massenvergabe bleiben intern; was von selbst kommt (Dispute geöffnet, spät eingecheckt), ist keine Strafe. **Vorfall
 eintragen**: Person, Vorfall aus der Liste, optional eine Notiz. Darunter steht, wer welchen Fun-Erfolg hat; **Entfernen** verlangt einen Grund.
 
 **Vorschau:** Jede **Zeremonie** aus Material, Kategorie (Bewegung) und Sonderablauf (einzelner Erfolg, mehrere, Diamant, Legendär, Level-Aufstieg …)

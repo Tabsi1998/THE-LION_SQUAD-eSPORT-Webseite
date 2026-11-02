@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { API, api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminSheet } from "@/components/tls/AdminSheet";
+import { SelectField, TextField } from "@/components/tls/FormFields";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
@@ -10,8 +11,9 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useAuth } from "@/context/AuthContext";
 import { formatBracketSection, formatDeviceType, formatMatchKind, formatMatchStatus, formatScheduleGroupLabel } from "@/lib/tournamentLabels";
 import { formatDateTime } from "@/lib/datetime";
+import { isArchivedGame, selectableGames } from "@/lib/gameLabels";
 import { finderFor, sourceLabel } from "@/lib/slotSource";
-import { Plus, Trash2, Link as LinkIcon, X as XIcon, Wand2, Play } from "lucide-react";
+import { Pencil, Plus, Trash2, Link as LinkIcon, X as XIcon, Wand2, Play } from "lucide-react";
 import { toast } from "sonner";
 import { ResultWindowLoader } from "@/components/tls/results/ResultWindow";
 import { ResultUndoBar, useResultUndo } from "@/components/tls/results/ResultUndoBar";
@@ -28,6 +30,24 @@ const DEVICES = [
   ["stream_setup", "Übertragungsplatz"], ["admin_desk", "Orga-Tisch"],
 ];
 const STATUSES = ["free", "busy", "broken", "reserved"];
+
+// Welches Turnier die Stationen-Seite zeigt (#2111, TA26): Stationen gibt es vor Ort und hybrid. Diese Turniere stehen
+// oben (solange sie nicht vorbei sind), vorgewählt ist ein laufendes; alle übrigen folgen unter „Weitere Turniere“.
+const STATION_OVER = new Set(["completed", "results_published", "archived", "cancelled"]);
+const STATION_RUNNING = new Set(["check_in", "live", "paused"]);
+const stationTournament = (tournament) => ["local", "hybrid"].includes(tournament?.event_mode) && !STATION_OVER.has(tournament?.status);
+
+export function stationTournamentGroups(rows = []) {
+  const onsite = rows.filter(stationTournament);
+  const others = rows.filter((tournament) => !stationTournament(tournament));
+  return { onsite, others };
+}
+
+export function preferredStationTournament(rows = [], current = "") {
+  if (rows.some((row) => row.id === current)) return current;
+  const { onsite } = stationTournamentGroups(rows);
+  return (onsite.find((row) => STATION_RUNNING.has(row.status)) || onsite[0] || rows[0])?.id || "";
+}
 
 function stationExportUrl(tournamentId, orientation) {
   if (!tournamentId || !/^[A-Za-z0-9_-]+$/.test(String(tournamentId))) return "#";
@@ -51,6 +71,7 @@ export default function AdminStationsPage() {
   const [form, setForm] = useState({ name: "", device_type: "switch", notes: "" });
   const [bulk, setBulk] = useState({ prefix: "Station", count: 4, device_type: "switch", notes: "" });
   const [assignFor, setAssignFor] = useState(null); // station object for assignment dialog
+  const [editing, setEditing] = useState(null);
   // Das eine Ergebnis-Fenster (#1370) statt eigener Formulare je Station.
   const [resultFor, setResultFor] = useState("");
   const stationsRequestRef = useRef(0);
@@ -62,7 +83,7 @@ export default function AdminStationsPage() {
       const { data: t } = await api.get("/tournaments?include_drafts=true&managed=true");
       const rows = Array.isArray(t) ? t.filter(Boolean) : [];
       setTournaments(rows);
-      setActiveTid((current) => rows.some((row) => row.id === current) ? current : rows?.[0]?.id || "");
+      setActiveTid((current) => preferredStationTournament(rows, current));
       setPageError("");
     } catch (e) {
       setTournaments([]);
@@ -231,6 +252,7 @@ export default function AdminStationsPage() {
     (m) => !m.station_id && ["ready", "scheduled"].includes(m.status)
   );
   const occupiedMatchIds = new Set(safeArray(list).map((station) => station.current_match_id).filter(Boolean));
+  const groups = stationTournamentGroups(tournaments);
   const queuedMatches = safeArray(matches)
     .filter((m) => m.station_id && ["ready", "scheduled"].includes(m.status))
     .sort((a, b) => (Date.parse(a.scheduled_at || "") || Number.MAX_SAFE_INTEGER) - (Date.parse(b.scheduled_at || "") || Number.MAX_SAFE_INTEGER));
@@ -277,7 +299,16 @@ export default function AdminStationsPage() {
           <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Aktives Turnier</div>
           <select value={activeTid} onChange={(e) => setActiveTid(e.target.value)} data-testid="station-tournament-select" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
             {!tournaments.length && <option value="">Keine Turniere verfügbar</option>}
-            {tournaments.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
+            {groups.onsite.length > 0 && groups.others.length > 0 ? (
+              <>
+                <optgroup label="Vor Ort und hybrid">
+                  {groups.onsite.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
+                </optgroup>
+                <optgroup label="Weitere Turniere">
+                  {groups.others.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
+                </optgroup>
+              </>
+            ) : tournaments.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
           </select>
         </label>
         {(() => {
@@ -346,7 +377,7 @@ export default function AdminStationsPage() {
           {isTournamentLead && <div className="border border-white/10 rounded-sm bg-[#121212] p-5 space-y-3">
             <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Schnell-Setup</div>
             <div className="grid grid-cols-2 gap-2">
-              <input placeholder="Prefix" value={bulk.prefix} onChange={(e) => setBulk({ ...bulk, prefix: e.target.value })} className="bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+              <input placeholder="Namensanfang" aria-label="Namensanfang" value={bulk.prefix} onChange={(e) => setBulk({ ...bulk, prefix: e.target.value })} className="bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
               <input type="number" min="1" max="64" value={bulk.count} onChange={(e) => setBulk({ ...bulk, count: e.target.value })} className="bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
             </div>
             <select value={bulk.device_type} onChange={(e) => setBulk({ ...bulk, device_type: e.target.value })} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
@@ -375,7 +406,7 @@ export default function AdminStationsPage() {
             </div>
           </div>
           <div className="border border-white/10 rounded-sm bg-[#121212] p-5">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-3">Geplante Queue</div>
+            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-3">Geplante Warteschlange</div>
             <div className="space-y-1.5 max-h-[260px] overflow-y-auto">
               {plannedQueue.map((m) => (
                 <div key={m.id} className="p-2 border border-white/10 rounded-sm text-xs bg-[#0A0A0A]">
@@ -401,7 +432,12 @@ export default function AdminStationsPage() {
                     <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">{formatDeviceType(s.device_type)}</div>
                     <div className="font-heading text-lg font-bold">{s.name}</div>
                   </div>
-                  {isTournamentLead && <button onClick={() => del(s.id)} className="p-1 text-white/40 hover:text-live"><Trash2 className="w-4 h-4" /></button>}
+                  {isTournamentLead && (
+                    <div className="flex shrink-0 gap-1">
+                      <button type="button" onClick={() => setEditing(s)} aria-label={`${s.name} bearbeiten`} data-testid={`station-edit-${s.id}`} className="p-2 text-white/50 hover:text-[#29B6E8]"><Pencil className="w-4 h-4" /></button>
+                      <button type="button" onClick={() => del(s.id)} aria-label={`${s.name} löschen`} className="p-2 text-white/40 hover:text-live"><Trash2 className="w-4 h-4" /></button>
+                    </div>
+                  )}
                 </div>
                 <div className="mt-2 flex items-center gap-2 flex-wrap">
                   <StatusBadge status={s.status} />
@@ -438,6 +474,7 @@ export default function AdminStationsPage() {
         </div>
       </div>
 
+      {editing && <StationEditSheet station={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); loadStations(); }} />}
       {resultFor ? <ResultWindowLoader matchId={resultFor} onClose={() => setResultFor("")} onSaved={resultUndo.start} /> : null}
       <ResultUndoBar undo={resultUndo} />
       {/* Zuweisen als Seitenblatt (#435): die Stationen bleiben daneben sichtbar. */}
@@ -459,6 +496,44 @@ export default function AdminStationsPage() {
         </AdminSheet>
       )}
     </AdminLayout>
+  );
+}
+
+// Station bearbeiten (#2112): Name, Gerät, Spiel und Hinweis nach dem Anlegen ändern. Ein Gerät, das die Liste nicht kennt,
+// bleibt wählbar - sonst würde das Speichern es still überschreiben.
+function StationEditSheet({ station, onClose, onSaved }) {
+  const [form, setForm] = useState({ name: station.name || "", device_type: station.device_type || "switch", game_id: station.game_id || "", notes: station.notes || "" });
+  const [games, setGames] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  useEffect(() => {
+    let live = true;
+    api.get("/games").then(({ data }) => { if (live) setGames(safeArray(data)); }).catch(() => {});
+    return () => { live = false; };
+  }, []);
+  const devices = DEVICES.some(([key]) => key === form.device_type) ? DEVICES : [...DEVICES, [form.device_type, formatDeviceType(form.device_type)]];
+  const gameOptions = [["", "Kein bestimmtes Spiel"], ...selectableGames(games, form.game_id).map((game) => [game.id, `${game.name || game.title || game.id}${isArchivedGame(game) ? " – archiviert" : ""}`])];
+  if (form.game_id && !games.some((game) => game.id === form.game_id)) gameOptions.push([form.game_id, "Bisher gewähltes Spiel"]);
+  const submit = async (event) => {
+    event.preventDefault();
+    if (!form.name.trim()) { toast.error("Bitte einen Namen angeben."); return; }
+    setSaving(true);
+    try {
+      await api.patch(`/stations/${station.id}`, { name: form.name.trim(), device_type: form.device_type, game_id: form.game_id || null, notes: form.notes.trim() || null });
+      toast.success("Station gespeichert.");
+      onSaved();
+    } catch (e) {
+      toast.error(formatRequestError(e, "Station konnte nicht gespeichert werden.", { name: form.name }));
+      setSaving(false);
+    }
+  };
+  return (
+    <AdminSheet title="Station bearbeiten" eyebrow={station.name} onClose={onClose} onSubmit={submit} saving={saving} submitTestId="station-edit-save" testId="station-edit-sheet">
+      <TextField label="Name" value={form.name} onChange={(value) => set("name", value)} maxLength={120} required testId="station-edit-name" />
+      <SelectField label="Gerät" value={form.device_type} onChange={(value) => set("device_type", value)} options={devices} testId="station-edit-device" />
+      <SelectField label="Spiel" value={form.game_id} onChange={(value) => set("game_id", value)} options={gameOptions} testId="station-edit-game" />
+      <TextField label="Hinweis" value={form.notes} onChange={(value) => set("notes", value)} maxLength={500} hint="Öffentlich sichtbar, zum Beispiel „Tisch hinten links“." testId="station-edit-notes" />
+    </AdminSheet>
   );
 }
 

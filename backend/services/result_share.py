@@ -20,6 +20,7 @@ from services.profile_references import (
     _tournament_rank_for_user,
     _visible_tournament,
 )
+from services.team_history import team_by_id
 from services.tournament_path import chip_text, path_kind, tournament_path
 
 async def _tournament(db, ref: str) -> dict | None:
@@ -36,7 +37,7 @@ async def own_registrations(db, tournament: dict, user: dict) -> tuple[list[dict
     team = None
     for reg in regs:
         if reg.get("team_id") and not team:
-            team = await db.teams.find_one({"id": reg["team_id"]}, {"_id": 0, "id": 1, "name": 1, "tag": 1, "is_public": 1})
+            team = await team_by_id(db, reg["team_id"], {"_id": 0, "id": 1, "name": 1, "tag": 1, "is_public": 1})
     return regs, team
 
 

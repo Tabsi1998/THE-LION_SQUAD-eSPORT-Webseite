@@ -30,7 +30,7 @@ from services.laptime import format_lap_time, plausibility_warning, plausible_ra
 from models import (
     F1ChallengeCreate, F1ChallengeUpdate, F1TrackCreate, F1TrackUpdate,
     F1LapTimeCreate, F1LapTimeDelete, F1LapTimeUpdate,
-    F1GuestCreate, F1GuestLink, F1GuestRename, F1QueueCreate, F1QueueNext, F1QueueStart,
+    F1GuestCreate, F1GuestDelete, F1GuestLink, F1GuestRename, F1QueueCreate, F1QueueNext, F1QueueStart,
     now_utc, new_id,
 )
 
@@ -412,6 +412,11 @@ LOCKED_FOR_HELPERS = ("Die Ergebnisse sind veröffentlicht - Zeiten ändert jetz
                       "mit Begründung.")
 LOCKED_NEEDS_REASON = (f"Die Ergebnisse sind veröffentlicht - bitte begründe die Änderung (mind. {MIN_CHANGE_REASON} "
                        "Zeichen). Sie steht danach im Protokoll.")
+# Jahrespunkte entstehen nur beim Veröffentlichen (#2130): mit gewerteten Zeiten führt der Weg ins Archiv deshalb darüber -
+# oder über die Absage. Was schon im Archiv liegt, bleibt dort und bekommt von selbst keine Punkte.
+ARCHIVE_FREELY_FROM = {"results_published", "archived", "cancelled"}
+ARCHIVE_TOO_EARLY = ("Bitte zuerst „Ergebnisse veröffentlicht“ wählen: Erst dann entstehen die Saisonpunkte. Archivieren "
+                     "geht danach - oder wenn die Challenge abgesagt ist.")
 
 
 def _published_change_reason(challenge: dict, me: dict, reason: str | None) -> str | None:
@@ -767,6 +772,9 @@ async def _update_challenge_locked(cid: str, body: F1ChallengeUpdate, me: dict):
             status_code=400,
             detail="Wenn Vereinsmitglieder von der offiziellen Wertung ausgeschlossen sind, müssen Vereins-Referenzzeiten erlaubt bleiben.",
         )
+    if updates.get("status") == "archived" and existing.get("status") not in ARCHIVE_FREELY_FROM \
+            and await _participant_count(db, cid) > 0:
+        raise HTTPException(status_code=409, detail=ARCHIVE_TOO_EARLY)
     # Wertungsregeln nach der Veröffentlichung (#1584) - wie eine Zeitkorrektur: nur die Turnierleitung, mit
     # Begründung, im Protokoll, danach Gewinne und Saisonpunkte abgleichen.
     rule_fields = _changed_scoring_fields(existing, updates)
@@ -822,8 +830,13 @@ async def _update_challenge_locked(cid: str, body: F1ChallengeUpdate, me: dict):
     )
     if should_create_prizes:
         try:
-            from services.prize_service import auto_create_for_f1_challenge
-            await auto_create_for_f1_challenge(c["id"])
+            from services.prize_service import auto_create_for_f1_challenge, review_f1_prizes
+            # „Beendet“ hat vielleicht schon Gewinne angelegt, seither kann sich die Rangfolge geändert haben (#2130):
+            # Beim Veröffentlichen wird angeglichen - wer nicht mehr auf dem Platz steht, kommt auf „nach Korrektur prüfen“.
+            if c.get("status") == "results_published":
+                await review_f1_prizes(c["id"])
+            else:
+                await auto_create_for_f1_challenge(c["id"])
         except Exception:
             logger.warning("[f1] Preise für %s nicht angelegt", log_safe(cid), exc_info=True)
     stamp = now_utc().isoformat()
@@ -955,16 +968,24 @@ async def _award_f1_season_points(challenge: dict):
 async def delete_challenge(cid: str, me: dict = Depends(require_admin())):
     cid = await _resolve_cid(cid)
     async with challenge_write(cid):
-        return await _delete_challenge_locked(cid)
+        return await _delete_challenge_locked(cid, me)
 
 
-async def _delete_challenge_locked(cid: str):
+async def _delete_challenge_locked(cid: str, me: dict):
     db = get_db()
     # Frisch unter der Schreib-Sperre: der Status kann sich gerade geändert haben.
-    current = await db.f1_challenges.find_one({"id": cid}, {"_id": 0, "status": 1}) or {}
+    current = await db.f1_challenges.find_one({"id": cid}, {"_id": 0, "status": 1, "slug": 1}) or {}
+    if not current:
+        raise HTTPException(status_code=404, detail="Challenge nicht gefunden")
+    has_times = await db.f1_lap_times.count_documents({"challenge_id": cid}) > 0
     # Veröffentlichte Ergebnisse verschwinden nicht mit der Challenge (#1584) - dafür gibt es „Archiviert“.
-    if current.get("status") in LOCKED_STATUSES and await db.f1_lap_times.count_documents({"challenge_id": cid}):
+    if current.get("status") in LOCKED_STATUSES and has_times:
         raise HTTPException(status_code=409, detail="Die Ergebnisse sind veröffentlicht - eine Challenge mit Zeiten wird archiviert, nicht gelöscht.")
+    # Löschen nur für Entwürfe ohne Zeiten (#2112): an allem anderen hängen Ranglisten, Gewinne oder Ankündigungen.
+    if current.get("status") != "draft":
+        raise HTTPException(status_code=409, detail="Löschen geht nur bei einem Entwurf. Eine Challenge, die schon angekündigt war, bitte absagen oder archivieren.")
+    if has_times:
+        raise HTTPException(status_code=409, detail="Die Challenge hat schon Zeiten - sie lässt sich nicht mehr löschen. Bitte absagen oder die Ergebnisse veröffentlichen und danach archivieren.")
     await db.f1_challenges.delete_one({"id": cid})
     await db.f1_tracks.delete_many({"challenge_id": cid})
     await db.f1_lap_times.delete_many({"challenge_id": cid})
@@ -972,6 +993,9 @@ async def _delete_challenge_locked(cid: str):
     await db.f1_guests.delete_many({"challenge_id": cid})
     await db.f1_queue.delete_many({"challenge_id": cid})
     await db.prize_pickups.delete_many({"source_type": "fastlap", "fastlap_challenge_id": cid})
+    await db.audit_logs.insert_one({"id": new_id(), "action": "fastlap.challenge.delete", "actor_id": me.get("id"), "target_id": cid,
+                                    "data": {"slug": current.get("slug"), "status": current.get("status")},
+                                    "created_at": now_utc().isoformat()})
     return {"ok": True}
 
 
@@ -1237,7 +1261,7 @@ async def list_times(cid: str, track_id: str | None = None, user_id: str | None 
 async def _lap_challenge_id(time_id: str) -> str:
     lap = await get_db().f1_lap_times.find_one({"id": time_id}, {"_id": 0, "challenge_id": 1})
     if not lap:
-        raise HTTPException(404, "Lap-Time nicht gefunden")
+        raise HTTPException(404, "Zeit nicht gefunden")
     return lap.get("challenge_id")
 
 
@@ -1253,7 +1277,7 @@ async def _update_time_locked(time_id: str, body: F1LapTimeUpdate, me: dict):
     # Frisch unter der Sperre: ein Verknüpfen kann die Zeit gerade einem Konto (und der Mitglieder-Regel) gegeben haben.
     existing = await db.f1_lap_times.find_one({"id": time_id}, {"_id": 0})
     if not existing:
-        raise HTTPException(404, "Lap-Time nicht gefunden")
+        raise HTTPException(404, "Zeit nicht gefunden")
     await _require_f1_result_permission(me, existing.get("challenge_id"))
     nullable_fields = {"proof_url", "admin_note"}
     raw = body.model_dump(exclude_unset=True)
@@ -1304,7 +1328,7 @@ async def _delete_time_locked(time_id: str, body: F1LapTimeDelete | None, me: di
     db = get_db()
     existing = await db.f1_lap_times.find_one({"id": time_id}, {"_id": 0})
     if not existing:
-        raise HTTPException(404, "Lap-Time nicht gefunden")
+        raise HTTPException(404, "Zeit nicht gefunden")
     await _require_f1_result_permission(me, existing.get("challenge_id"))
     challenge = await db.f1_challenges.find_one({"id": existing.get("challenge_id")}, {"_id": 0, "status": 1}) or {}
     reason = _published_change_reason(challenge, me, body.change_reason if body else None)
@@ -1321,7 +1345,7 @@ async def export_csv(cid: str, track_id: str | None = None, me: dict = Depends(r
     cid = c["id"]
     output = io.StringIO()
     w = csv.writer(output, delimiter=";")
-    w.writerow(["Rang", "Spieler", "Discord", "Strecke", "Zeit", "Zeit (ms)", "Versuche", "Strafzeiten", "Aktualisiert"])
+    w.writerow(["Rang", "Spieler", "Strecke", "Zeit", "Zeit (ms)", "Versuche", "Strafzeiten", "Aktualisiert"])
     tracks = await db.f1_tracks.find({"challenge_id": cid}, {"_id": 0}).sort("order_index", 1).to_list(100)
     if track_id:
         tracks = [t for t in tracks if t["id"] == track_id]
@@ -1330,7 +1354,7 @@ async def export_csv(cid: str, track_id: str | None = None, me: dict = Depends(r
         for entry in lb["entries"]:
             # Jede Zelle als Text (#1584): ein Name, der mit „=“ beginnt, wird in der Tabellenkalkulation keine Formel.
             w.writerow([safe_cell(value) for value in (
-                entry["rank"], entry["display_name"], "",
+                entry["rank"], entry["display_name"],
                 tr["name"], entry["time_str"], entry["time_ms"],
                 entry["attempts"], entry["penalty_seconds"], entry["last_updated"],
             )])
@@ -1358,7 +1382,9 @@ async def list_guests(cid: str, me: dict = Depends(get_current_user)):
     cid = await _resolve_cid(cid)
     await _require_f1_result_permission(me, cid)
     rows = await db.f1_guests.find({"challenge_id": cid}, {"_id": 0}).sort("number", 1).to_list(2000)
-    return [guest_payload(row) for row in rows]
+    # Mit Zeiten (auch verknüpfte, ihre Zeiten behalten ``guest_id`` als Herkunft) lässt sich ein Gast nicht löschen (#2112).
+    with_times = {gid for gid in await db.f1_lap_times.distinct("guest_id", {"challenge_id": cid}) if gid}
+    return [{**guest_payload(row), "has_times": row["id"] in with_times} for row in rows]
 
 
 @router.post("/challenges/{cid}/guests")
@@ -1420,6 +1446,41 @@ async def _rename_guest_locked(gid: str, body: F1GuestRename, me: dict):
                                     "data": {"challenge_id": guest["challenge_id"], "reason": reason, "after_publishing": reason is not None},
                                     "created_at": stamp})
     return guest_payload({**guest, "display_name": name})
+
+
+@router.delete("/guests/{gid}")
+async def delete_guest(gid: str, body: F1GuestDelete | None = None, me: dict = Depends(get_current_user)):
+    """Einen Gast ohne Zeiten löschen (#2112) - etwa doppelt angelegt oder nie gefahren. Mit Zeiten bleibt er stehen:
+    Rangliste, Urkunde und Verknüpfung hängen an ihm. Aus „Am Start / Als Nächstes“ verschwindet er mit. Nach der
+    Veröffentlichung dieselbe Regel wie beim Umbenennen: Helfer nicht, Leitung mit Begründung."""
+    known = await get_db().f1_guests.find_one({"id": gid}, {"_id": 0, "challenge_id": 1})
+    if not known:
+        raise HTTPException(status_code=404, detail="Gast nicht gefunden")
+    async with challenge_write(known["challenge_id"]):
+        return await _delete_guest_locked(gid, body, me)
+
+
+async def _delete_guest_locked(gid: str, body: F1GuestDelete | None, me: dict):
+    db = get_db()
+    guest = await db.f1_guests.find_one({"id": gid}, {"_id": 0})
+    if not guest:
+        raise HTTPException(status_code=404, detail="Gast nicht gefunden")
+    cid = guest["challenge_id"]
+    await _require_f1_result_permission(me, cid)
+    challenge = await db.f1_challenges.find_one({"id": cid}, {"_id": 0, "status": 1}) or {}
+    reason = _published_change_reason(challenge, me, body.change_reason if body else None)
+    try:
+        async with mutation_lock(db, guests_resource(cid), wait_seconds=LAP_WAIT_SECONDS):
+            if await db.f1_lap_times.count_documents({"challenge_id": cid, "guest_id": gid}):
+                raise HTTPException(status_code=409, detail="Der Gast hat schon Zeiten - er lässt sich nicht löschen, nur umbenennen.")
+            await db.f1_queue.delete_many({"challenge_id": cid, "guest_id": gid})
+            await db.f1_guests.delete_one({"id": gid})
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail=GUESTS_BUSY)
+    await db.audit_logs.insert_one({"id": new_id(), "action": "fastlap.guest.delete", "actor_id": me.get("id"), "target_id": gid,
+                                    "data": {"challenge_id": cid, "reason": reason, "after_publishing": reason is not None},
+                                    "created_at": now_utc().isoformat()})
+    return {"ok": True}
 
 
 # --- Gast mit Konto verknüpfen (#1585, Entscheidung 14.10.2026) ---

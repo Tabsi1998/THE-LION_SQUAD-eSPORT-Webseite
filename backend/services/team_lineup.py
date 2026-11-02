@@ -2,12 +2,12 @@
 
 Fabian wollte beides (Einstellung „Team am Spieltag: beides“, keine Nutzer-Einstellung):
 
-- **Aufstellung**: Kapitän oder Co-Kapitän wählt vor dem Spieltag, wer spielt - genau so viele, wie das Turnier
+- **Aufstellung**: Teamleitung oder Co-Leitung wählt vor dem Spieltag, wer spielt - genau so viele, wie das Turnier
   Spieler je Team hat. Sind Ersatzspieler erlaubt, sind alle anderen Mitglieder Ersatz; sonst gibt es keinen.
   Änderbar bis zum Ende des Check-ins (``check_in_until``) und nie mehr, wenn das Turnier läuft. Gespeichert an der
   Team-Anmeldung (``lineup``, ``substitutes``) - die Turnierleitung sieht sie beim Check-in.
 - **Wer ist da**: Am Turniertag (Wiener Kalender, vom Start- bis zum Endtag) tippt jedes Mitglied „Ich bin da“.
-  Gezählt werden die Aufgestellten samt Ersatz, ohne Aufstellung alle Mitglieder. Der Kapitän sieht „4 von 5 da“
+  Gezählt werden die Aufgestellten samt Ersatz, ohne Aufstellung alle Mitglieder. Die Teamleitung sieht „4 von 5 da“
   und kann Fehlende anstupsen - eine Meldung, höchstens alle 10 Minuten je Team.
 
 Wer welche Nachricht bekommt (#1136): Aufruf und Spiel-Meldungen gehen an die Aufgestellten, ohne Aufstellung an
@@ -52,7 +52,7 @@ def team_size(tournament: dict) -> int:
 
 
 def can_lead(team: dict | None, user: dict | None) -> bool:
-    """Aufstellen und Anstupsen: nur Kapitän und Co-Kapitän des Teams."""
+    """Aufstellen und Anstupsen: nur Teamleitung und Co-Leitung des Teams."""
     if not team or not user:
         return False
     return team.get("leader_id") == user.get("id") or user.get("id") in (team.get("co_leader_ids") or [])

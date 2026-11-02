@@ -19,7 +19,8 @@ vi.mock("@/components/tls/ImageUpload", () => ({ ImageUpload: () => <div data-te
 vi.mock("@/components/tls/MarkdownEditor", () => ({ MarkdownEditor: ({ testId }) => <textarea data-testid={testId} readOnly /> }));
 vi.mock("@/components/tls/AccessLinksPanel", () => ({ AccessLinksPanel: () => <div data-testid="access-links" /> }));
 vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => confirmMock, usePrompt: () => promptMock }));
-vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ isAdmin: true, isTournamentLead: true, user: { id: "admin-1" } }) }));
+let isTournamentLead = true;
+vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ isAdmin: true, isTournamentLead, user: { id: "admin-1" } }) }));
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
 vi.mock("sonner", () => ({ toast: toastMock }));
 
@@ -158,7 +159,7 @@ test("Nachweis-Link nur bei http(s)", async () => {
   });
   renderPage();
   await screen.findByText("Otto");
-  const links = screen.getAllByRole("link", { name: "Proof" });
+  const links = screen.getAllByRole("link", { name: "Nachweis" });
   expect(links).toHaveLength(1);
   expect(links[0]).toHaveAttribute("href", "https://example.test/clip");
 });
@@ -256,7 +257,51 @@ test("nach dem Statuswechsel steht der Status auf Deutsch da, nicht als Kennung 
 test("Ende erreicht: die Seite sagt, dass die Leitung bestätigt", async () => {
   answerWith({ status: "live", end_date: "2026-01-01T10:00:00Z", public_phase: { state: "completed" } });
   renderPage();
-  expect(await screen.findByTestId("f1-end-reached")).toHaveTextContent("Gewinne und Saisonpunkte");
+  expect(await screen.findByTestId("f1-end-reached")).toHaveTextContent("die Ergebnisse veröffentlichen - erst dann entstehen die Saisonpunkte");
+});
+
+test("Beendet mit Zeiten: Hinweis auf die Saisonpunkte, Archivieren steht erst nach dem Veröffentlichen zur Wahl (#2130)", async () => {
+  answerWith({ status: "completed", participant_count: 3 });
+  renderPage();
+  expect(await screen.findByTestId("f1-completed-hint")).toHaveTextContent("Saisonpunkte gibt es noch keine");
+  const archived = [...screen.getByTestId("f1-status-select").options].find((option) => option.value === "archived");
+  expect(archived.disabled).toBe(true);
+  expect(archived.textContent).toContain("erst nach dem Veröffentlichen");
+});
+
+test("CSV nur für die Turnierleitung - ein Helfer bekäme sonst eine rohe 403 (#2130)", async () => {
+  answerWith({ status: "live" });
+  const lead = renderPage();
+  expect(await screen.findByTestId("f1-export-csv")).toBeInTheDocument();
+  lead.unmount();
+  isTournamentLead = false;
+  try {
+    renderPage();
+    await screen.findByRole("heading", { name: "Monza Sprint" });
+    expect(screen.queryByTestId("f1-export-csv")).toBeNull();
+  } finally {
+    isTournamentLead = true;
+  }
+});
+
+test("aus der Strafenliste: ?track= öffnet die Strecke mit der Zeit (#2130)", async () => {
+  answerWith({ status: "live", tracks: [{ id: "tr-1", name: "Spa" }, { id: "tr-2", name: "Monza" }] });
+  render(
+    <MemoryRouter initialEntries={["/admin/f1/c-1?track=tr-2"]}>
+      <Routes><Route path="/admin/f1/:id" element={<AdminF1EditPage />} /></Routes>
+    </MemoryRouter>,
+  );
+  await screen.findByRole("heading", { name: "Monza Sprint" });
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/f1/challenges/c-1/times?track_id=tr-2"));
+});
+
+test("Veröffentlicht: Archivieren ist frei (#2130)", async () => {
+  answerWith({ status: "results_published", participant_count: 3 });
+  renderPage();
+  await screen.findByRole("heading", { name: "Monza Sprint" });
+  const archived = [...screen.getByTestId("f1-status-select").options].find((option) => option.value === "archived");
+  expect(archived.disabled).toBe(false);
+  expect(screen.queryByTestId("f1-completed-hint")).toBeNull();
 });
 
 test("Strecke: Plausibilitätsgrenzen werden zu Millisekunden", async () => {
@@ -284,6 +329,34 @@ test("nach der Veröffentlichung: „Vereinsmitglieder ausschließen“ ändern 
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/f1/challenges/c-1", expect.objectContaining({ block_club_member_results: true, change_reason: "Mitglied fuhr irrtümlich offiziell" })));
 });
 
+test("Meisterschaft, Punkte je Platz und Stream stehen im Bearbeiten; geschickt wird nur, was sich ändert (#2130)", async () => {
+  answerWith({ status: "live", twitch_channel: "alt", twitch_enabled: true });
+  renderPage();
+  await screen.findByRole("heading", { name: "Monza Sprint" });
+  expect(screen.queryByTestId("f1-edit-points")).toBeNull();
+  expect(screen.getByTestId("f1-edit-stream-url")).toHaveValue("alt");
+  fireEvent.click(screen.getByTestId("f1-edit-championship"));
+  expect(screen.getByTestId("f1-edit-points")).toHaveValue("25, 18, 15, 12, 10, 8, 6, 4, 2, 1");
+  fireEvent.change(screen.getByTestId("f1-edit-points"), { target: { value: "" } });
+  fireEvent.click(screen.getByTestId("f1-edit-save"));
+  await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Bitte die Punkte je Platz eintragen, z. B. 25, 18, 15."));
+  expect(apiMock.patch).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByTestId("f1-edit-points"), { target: { value: "10, 5" } });
+  fireEvent.click(screen.getByTestId("f1-edit-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/f1/challenges/c-1", { is_championship: true, points_per_position: [10, 5] }));
+  expect(promptMock).not.toHaveBeenCalled();
+});
+
+test("nach der Veröffentlichung: Punkte je Platz ändern braucht eine Begründung (#2130)", async () => {
+  answerWith({ status: "results_published", is_championship: true, points_per_position: [10, 5] });
+  renderPage();
+  await screen.findByRole("heading", { name: "Monza Sprint" });
+  fireEvent.change(screen.getByTestId("f1-edit-points"), { target: { value: "12, 6" } });
+  promptMock.mockResolvedValueOnce("Ausschreibung sah andere Punkte vor");
+  fireEvent.click(screen.getByTestId("f1-edit-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/f1/challenges/c-1", { points_per_position: [12, 6], change_reason: "Ausschreibung sah andere Punkte vor" }));
+});
+
 test("nach der Veröffentlichung: ein neuer Preis braucht eine Begründung", async () => {
   answerWith({ status: "results_published", prize_places: [{ place: 1, label: "Platz 1", value: "Pokal" }] });
   renderPage();
@@ -303,4 +376,77 @@ test("scheitert der Abgleich, sagt die Seite es nach dem Speichern", async () =>
   await screen.findByText("Erika");
   fireEvent.click(screen.getByTestId("f1-delete-time-t-1"));
   await waitFor(() => expect(toastMock.warning).toHaveBeenCalledWith(expect.stringContaining("bitte prüfen")));
+});
+
+test("ein Entwurf lässt sich nach Rückfrage löschen (#2112), danach geht es zur Liste", async () => {
+  render(
+    <MemoryRouter initialEntries={["/admin/f1/c-1"]}>
+      <Routes>
+        <Route path="/admin/f1/:id" element={<AdminF1EditPage />} />
+        <Route path="/admin/f1" element={<div>Fast-Lap-Liste</div>} />
+      </Routes>
+    </MemoryRouter>,
+  );
+  await screen.findByRole("heading", { name: "Monza Sprint" });
+  fireEvent.click(screen.getByTestId("f1-delete-challenge"));
+  await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith("/f1/challenges/c-1"));
+  expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Entwurf löschen?" }));
+  expect(await screen.findByText("Fast-Lap-Liste")).toBeInTheDocument();
+});
+
+test("ohne Rückfrage-Ja wird nichts gelöscht; außerhalb des Entwurfs gibt es keinen Löschen-Knopf", async () => {
+  confirmMock.mockResolvedValue(false);
+  const { unmount } = renderPage();
+  await screen.findByRole("heading", { name: "Monza Sprint" });
+  fireEvent.click(screen.getByTestId("f1-delete-challenge"));
+  await waitFor(() => expect(confirmMock).toHaveBeenCalled());
+  expect(apiMock.delete).not.toHaveBeenCalled();
+  unmount();
+  answerWith({ status: "live" });
+  renderPage();
+  await screen.findByRole("heading", { name: "Monza Sprint" });
+  expect(screen.queryByTestId("f1-delete-challenge")).not.toBeInTheDocument();
+});
+
+test("Gästeliste (#2112): umbenennen und Gäste ohne Zeiten löschen", async () => {
+  const guests = [
+    { id: "g-1", display_name: "Anna", has_times: true },
+    { id: "g-2", display_name: "Ben", has_times: false },
+  ];
+  apiMock.get.mockImplementation(async (url) => {
+    if (String(url).startsWith("/f1/challenges/c-1?")) return { data: CHALLENGE };
+    if (url === "/f1/challenges/c-1/guests") return { data: guests };
+    return { data: [] };
+  });
+  promptMock.mockResolvedValueOnce("Gast 1");
+  renderPage();
+  expect(await screen.findByTestId("f1-guests-panel")).toBeInTheDocument();
+  expect(screen.queryByTestId("f1-guest-delete-g-1")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("f1-guest-rename-g-1"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/f1/guests/g-1", { display_name: "Gast 1" }));
+  fireEvent.click(screen.getByTestId("f1-guest-delete-g-2"));
+  await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith("/f1/guests/g-2"));
+});
+
+test("nach der Veröffentlichung braucht das Umbenennen eine Begründung", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (String(url).startsWith("/f1/challenges/c-1?")) return { data: { ...CHALLENGE, status: "results_published" } };
+    if (url === "/f1/challenges/c-1/guests") return { data: [{ id: "g-1", display_name: "Anna", has_times: true }] };
+    return { data: [] };
+  });
+  promptMock.mockResolvedValueOnce("Gast 1").mockResolvedValueOnce("Gast will anonym bleiben");
+  renderPage();
+  fireEvent.click(await screen.findByTestId("f1-guest-rename-g-1"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/f1/guests/g-1", { display_name: "Gast 1", change_reason: "Gast will anonym bleiben" }));
+});
+test("nach der Veröffentlichung braucht das Löschen eines Gastes eine Begründung", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (String(url).startsWith("/f1/challenges/c-1?")) return { data: { ...CHALLENGE, status: "results_published" } };
+    if (url === "/f1/challenges/c-1/guests") return { data: [{ id: "g-2", display_name: "Ben", has_times: false }] };
+    return { data: [] };
+  });
+  promptMock.mockResolvedValueOnce("Doppelt angelegt, nie gefahren");
+  renderPage();
+  fireEvent.click(await screen.findByTestId("f1-guest-delete-g-2"));
+  await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith("/f1/guests/g-2", { data: { change_reason: "Doppelt angelegt, nie gefahren" } }));
 });

@@ -3,6 +3,7 @@ import { GermanDateField } from "@/components/tls/GermanDateField";
 import { COUNTRY_OPTIONS, isCountryCode } from "@/lib/countries";
 import { GENDER_OPTIONS } from "./constants";
 import { Field, Input, Row, Section } from "./fields";
+import { PROFILE_LIMITS } from "./form";
 
 // Grunddaten (#258): ein Name statt zwei (der Nickname stand doppelt zum
 // Anzeigenamen und wurde nirgends gelesen), Land als Auswahl statt Freitext,
@@ -26,8 +27,9 @@ export function BasicTab({ form, set, setNow = set, errors = {} }) {
         <Field label="Vorname (privat)"><Input value={form.first_name} onChange={(v) => set("first_name", v)} /></Field>
         <Field label="Nachname (privat)"><Input value={form.last_name} onChange={(v) => set("last_name", v)} /></Field>
       </Row>
-      <Field label="Bio">
-        <textarea value={form.bio || ""} onChange={(e) => set("bio", e.target.value)} rows={4} data-testid="profile-bio" className="w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-3 py-2 rounded-sm text-white" />
+      <Field label="Bio" error={errors.bio} errorTestId="profile-bio-error">
+        <textarea value={form.bio || ""} onChange={(e) => set("bio", e.target.value)} rows={4} data-testid="profile-bio" aria-invalid={errors.bio ? "true" : undefined} className={`w-full bg-[#0A0A0A] border ${errors.bio ? "border-[#FF3B30]" : "border-white/10"} focus:border-[#29B6E8] px-3 py-2 rounded-sm text-white`} />
+        <p className="text-[11px] text-white/45 mt-1.5 text-right" data-testid="profile-bio-count">{(form.bio || "").length} / {PROFILE_LIMITS.bio}</p>
       </Field>
       <Row>
         <Field label="Geburtsdatum"><GermanDateField id="profile-birth-date" value={form.birth_date} onChange={(v) => setNow("birth_date", v)} testId="profile-birth-date" /></Field>

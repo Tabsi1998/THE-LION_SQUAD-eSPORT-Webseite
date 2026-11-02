@@ -239,8 +239,10 @@ async def _achievement_summaries(db, user_ids: list[str]) -> dict[str, dict]:
     """
     if not user_ids:
         return {}
+    # „Erfolge öffentlich“ aus (#2126): in der Jahreswertung bleibt der Rang, Zahl und Punkte der Erfolge stehen auf 0.
+    hidden = {row["id"] async for row in db.users.find({"id": {"$in": user_ids}, "privacy_achievements_public": False}, {"_id": 0, "id": 1})}
     awards = await db.user_achievements.find(
-        {"user_id": {"$in": user_ids}},
+        {"user_id": {"$in": [user_id for user_id in user_ids if user_id not in hidden]}},
         {"_id": 0, "user_id": 1, "tier_code": 1, "group_code": 1},
     ).to_list(50000)
     tier_codes = list({a.get("tier_code") for a in awards if a.get("tier_code")})
@@ -515,6 +517,31 @@ async def sync_tournament_points(*, tournament_id: str, source_name: str | None,
     return counts
 
 
+async def revoke_source_points(*, source_type: SourceType, source_id: str, user_id: str) -> dict:
+    """Die Punkte einer Person aus einer Quelle zurücknehmen (#2127, EV12) - etwa einen zurückgenommenen Check-in.
+
+    Abgeschlossene Wertungen bleiben, wie sie sind (wie ``sync_tournament_points``): solche Einträge bleiben stehen und
+    werden nur gezählt. Mehrfach aufgerufen ändert sich nichts mehr."""
+    db = get_db()
+    rows = await db.season_points.find(
+        {"source_type": source_type, "source_id": source_id, "user_id": user_id}, {"_id": 0, "id": 1, "season_id": 1}).to_list(None)
+    if not rows:
+        return {"removed": 0, "kept_closed": 0}
+    closed = {s["id"] for s in await db.seasons.find(
+        {"id": {"$in": sorted({row.get("season_id") for row in rows if row.get("season_id")})}, "status": {"$nin": list(OPEN_SEASON_STATUSES)}},
+        {"_id": 0, "id": 1}).to_list(None)}
+    removed = 0
+    for row in rows:
+        if row.get("season_id") in closed:
+            continue
+        written = await db.season_points.delete_one({"id": row["id"]})
+        removed += int(written.deleted_count)
+    if removed:
+        from services.discord_embed_queue import request_refresh
+        request_refresh("ranking")
+    return {"removed": removed, "kept_closed": len(rows) - removed}
+
+
 async def aggregate_leaderboard(
     *,
     season_id: str | None = None,
@@ -599,9 +626,9 @@ async def aggregate_leaderboard(
 
     if teams:
         team_ids = [r["_id"] for r in rows]
-        team_map = {t["id"]: t for t in await db.teams.find(
-            {"id": {"$in": team_ids}}, {"_id": 0, "id": 1, "name": 1, "logo_url": 1, "slug": 1}
-        ).to_list(500)}
+        # Aufgelöste Teams (#2128, TM8) behalten ihren Platz und Namen in der Wertung.
+        from services.team_history import teams_by_id
+        team_map = await teams_by_id(db, team_ids, {"_id": 0, "id": 1, "name": 1, "logo_url": 1, "slug": 1})
         breakdowns = await _leaderboard_breakdowns(
             db,
             season_id=season_id,

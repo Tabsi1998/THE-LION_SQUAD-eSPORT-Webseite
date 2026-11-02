@@ -172,8 +172,8 @@ async def submit(db, client: DolibarrClient, doc: dict) -> dict:
 async def _notify_decision(db, doc: dict) -> bool:
     """Die Person erfährt die Entscheidung genau einmal - über dieselbe Mail wie im Admin (#1444).
 
-    Mitgeteilt (``notified_at``) ist sie erst, wenn die Mail in der Warteschlange liegt oder die Person
-    Mitgliedschafts-Mails abgeschaltet hat. Vorher beansprucht ein Lauf den Antrag atomar
+    Mitgeteilt (``notified_at``) ist sie erst, wenn die Mail in der Warteschlange liegt oder die Person keine
+    Adresse hat. Vorher beansprucht ein Lauf den Antrag atomar
     (``decision_mail_claimed_at``) - zwei Läufe zugleich reihen nie zwei Mails ein - und markiert ihn als offen
     (``decision_mail_pending``). Scheitert das Einreihen (oder bricht der Lauf ab), bleibt die Markierung
     stehen und der Job holt genau diese Mail nach; Altbestand ohne Markierung fasst er nie an."""

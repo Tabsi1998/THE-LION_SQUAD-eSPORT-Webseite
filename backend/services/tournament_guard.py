@@ -149,6 +149,12 @@ async def fixed_match_count(db, tid: str, registration_id: str) -> int:
     })
 
 
+def rejection_dismissed(registration: dict | None) -> bool:
+    """Eine abgelehnte Anmeldung, die die Person aus ihrer Ansicht genommen hat (#2113). Der Eintrag bleibt: Eine neue
+    Anmeldung derselben Person oder desselben Teams geht zur Prüfung an die Turnierleitung, statt bei freiem Platz sofort
+    zu gelten - sonst hieße „entfernen und neu anmelden“: Ablehnung aufgehoben."""
+    return bool(registration) and registration.get("status") == "rejected" and bool(registration.get("rejection_dismissed_at"))
+
 def registration_removal_refused(tournament: dict) -> str:
     """Warum eine Anmeldung im festen Baum nicht einfach verschwinden darf - und was stattdessen geht (TA13)."""
     status = tournament.get("status")
@@ -164,6 +170,31 @@ def registration_removal_refused(tournament: dict) -> str:
                 "Die Turnierleitung kann die Spiele neu generieren bzw. die Runde zurücknehmen – danach geht Entfernen.")
     return ("Die Anmeldung steht im festen Turnierbaum. Bitte „Nicht erschienen“ setzen und mit „Ersetzt "
             "Nicht-Erschienen“ einen Ersatz eintragen.")
+
+
+# Löschen (#2111, TA18): nur ein Entwurf ohne Ergebnisse. Alles andere sagt man ab oder archiviert - sonst blieben
+# Pokale ohne Turnier, Jahrespunkte und Gewinne zurück. Die Liga-Staffel hat ihre eigene Regel (staffel_guard).
+DELETE_ONLY_DRAFTS = ("Löschen geht nur bei Entwürfen. Ein angekündigtes oder laufendes Turnier bitte absagen, ein "
+                      "beendetes archivieren – so bleiben Anmeldungen, Ergebnisse und Pokale nachvollziehbar.")
+DELETE_HAS_RESULTS = "Das Turnier hat schon Ergebnisse ({what}) – statt zu löschen, bitte absagen oder archivieren."
+
+
+async def delete_problem(db, tournament: dict) -> str | None:
+    """Darf das Turnier gelöscht werden? Nur als Entwurf und ohne Ergebnisse - sonst der Grund als Satz."""
+    if (tournament.get("status") or "draft") != "draft":
+        return DELETE_ONLY_DRAFTS
+    tid = tournament["id"]
+    impact = match_impact(await tournament_matches(db, {"tournament_id": tid, "is_preview": {"$ne": True}}))
+    if impact["played_count"]:
+        return DELETE_HAS_RESULTS.format(what=impact_text(impact))
+    for collection, query, what in (
+        (db.tournament_awards, {"tournament_id": tid}, "Pokale"),
+        (db.season_points, {"source_id": tid}, "Jahrespunkte"),
+        (db.prize_pickups, {"tournament_id": tid}, "Gewinne"),
+    ):
+        if await collection.count_documents(query, limit=1):
+            return DELETE_HAS_RESULTS.format(what=what)
+    return None
 
 
 SELF_UNREGISTER_FIXED = ("Du stehst schon in festen Spielen dieses Turniers – abmelden geht nur noch über die "

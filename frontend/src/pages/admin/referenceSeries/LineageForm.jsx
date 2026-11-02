@@ -4,7 +4,7 @@ import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormGrid } from "@/components/tls/AdminForm";
 import { FieldLabel, SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { KIND_OPTIONS, VISIBILITY_OPTIONS, lineageToForm, lineagePayload, resultImageOptions } from "@/lib/referenceSeries";
-import { gameOptionLabel } from "@/lib/gameLabels";
+import { gameOptionLabel, selectableGames } from "@/lib/gameLabels";
 import { moveTier, tierOrderList } from "@/lib/seriesTiers";
 import { organizerSuggestion } from "@/lib/seriesPartners";
 import { profileOf } from "@/lib/seriesKinds";
@@ -21,7 +21,7 @@ export function LineageForm({ lineage, games = [], partners = [], profiles = nul
   const [form, setForm] = useState(() => lineageToForm(lineage || {}));
   const [saving, setSaving] = useState(false);
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
-  const gameOptions = [["", "—"], ...games.map((game) => [game.id, gameOptionLabel(game)])];
+  const gameOptions = [["", "—"], ...selectableGames(games, form.game_id).map((game) => [game.id, gameOptionLabel(game)])];
   const imageOptions = resultImageOptions(form.kind, { value: form.result_image_template });
   // Art-Profil (#2024): Platzhalter je Art - eine Turnierserie zeigt keine Rennliga-Vorgabe.
   const placeholders = profileOf(profiles, form.kind)?.placeholders || {};

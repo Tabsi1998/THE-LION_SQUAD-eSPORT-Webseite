@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Bell, Check, Inbox, Trash2 } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Bell, Check, Inbox, Settings, Trash2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { NotificationRow } from "@/components/tls/NotificationRow";
@@ -36,7 +37,10 @@ export default function NotificationsPage() {
             <h1 className="mt-2 font-heading text-3xl md:text-4xl font-black uppercase flex items-center gap-3"><Bell className="w-6 h-6 text-[#29B6E8] shrink-0" /> <span className="min-w-0">Benachrichti&shy;gungen</span></h1>
             <p className="mt-1 text-sm text-white/50">{unread} ungelesen · {read} gelesen. Ein Klick öffnet das Ziel und markiert als gelesen.</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Link to="/profile?tab=notifications" data-testid="notifications-settings-link" className="inline-flex items-center gap-1.5 px-3 py-2 border border-white/15 text-white/60 rounded-sm text-[11px] font-bold uppercase tracking-wider hover:text-white hover:border-white/30">
+              <Settings className="w-3.5 h-3.5" /> Einstellen
+            </Link>
             {unread > 0 ? (
               <button type="button" onClick={feed.markAllRead} data-testid="notifications-mark-all-read" className="inline-flex items-center gap-1.5 px-3 py-2 border border-[#29B6E8]/40 text-[#29B6E8] rounded-sm text-[11px] font-bold uppercase tracking-wider hover:bg-[#29B6E8]/10">
                 <Check className="w-3.5 h-3.5" /> Alle als gelesen markieren

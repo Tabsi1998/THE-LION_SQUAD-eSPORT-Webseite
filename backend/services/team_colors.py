@@ -1,6 +1,6 @@
 """Team-Farbe (#1347): acht ruhige Farben für den Wappen-Kopf der Team-Seite.
 
-Kapitän und Co-Kapitän wählen beim Bearbeiten eine davon; ohne Wahl („auto“) nimmt der Kopf die Farbe des Spiels,
+Teamleitung und Co-Leitung wählen beim Bearbeiten eine davon; ohne Wahl („auto“) nimmt der Kopf die Farbe des Spiels,
 das das Team am meisten spielt - immer dieselbe Farbe je Spiel. Ohne Spiel bleibt es beim Vereins-Cyan. Gespeichert
 wird nur der Schlüssel; Web und App kennen dieselben Werte (frontend/src/lib/teamColors.js,
 mobile/src/lib/teamColors.ts - ein Test im Web hält alle drei gleich).

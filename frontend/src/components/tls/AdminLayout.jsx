@@ -3,7 +3,7 @@ import { INTEGRATIONS, MENU_INTEGRATIONS } from "@/lib/integrations";
 import { NavLink, useLocation, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Logo } from "@/components/tls/Logo";
-import { LayoutDashboard, Trophy, Gamepad2, Users as UsersIcon, CalendarDays, Flag, Building2, Newspaper, LogOut, ExternalLink, Menu, X, Code2, Star, Crown, Gift, Image as ImageIcon, Award, Inbox, UserCheck, Medal, FolderOpen, FileText, AlertTriangle, Handshake, BellRing, Search, Server, QrCode, Activity, ListOrdered, MessagesSquare, ChevronDown, Sticker, Smartphone, Link2, Wallet, BookOpen, Mail, Palette, Share2, LogIn, Sparkles, CalendarHeart, Egg, ScanLine, Tv, ShieldCheck, ClipboardList, ShoppingBag, Globe } from "lucide-react";
+import { LayoutDashboard, Trophy, Gamepad2, Users as UsersIcon, CalendarDays, Flag, Building2, Newspaper, LogOut, ExternalLink, Menu, X, Code2, Star, Crown, Gift, Image as ImageIcon, Award, Inbox, UserCheck, Medal, FolderOpen, FileText, AlertTriangle, Handshake, BellRing, Search, Server, QrCode, Activity, MessagesSquare, ChevronDown, Sticker, Smartphone, Link2, Wallet, BookOpen, Mail, Palette, Share2, LogIn, Sparkles, CalendarHeart, Egg, ScanLine, Tv, ShieldCheck, ClipboardList, ShoppingBag, Globe, Layers, Repeat, TrendingUp } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePublicSiteSettings } from "@/hooks/usePublicSiteSettings";
 import { OfflineBar } from "@/components/tls/OfflineBar";
@@ -28,7 +28,8 @@ export const ADMIN_GROUPS = [
     label: "Verein",
     items: [
       // Vereinsdaten sind der Reiter „Rechtliches“ der Einstellungen (Stammdaten, Dolibarr-Schalter, Rechtstexte).
-      { to: "/admin/club", label: "Vereinsdaten", icon: Building2, areas: ["system"] },
+      // Stammdaten und Kontakt pflegt auch der Vorstand (#2125); Rechtstexte ändert nur System.
+      { to: "/admin/club", label: "Vereinsdaten", icon: Building2, areas: ["system", "club"] },
       // Über uns (#406): die Leitbild-Texte der Seite „Über den Verein“; Zahlen, Spiele, Vorstand kommen aus den Daten.
       { to: "/admin/about", label: "Über uns", icon: BookOpen, areas: ["content"] },
       { to: "/admin/board", label: "Vorstand", icon: UserCheck, areas: ["club"] },
@@ -36,7 +37,8 @@ export const ADMIN_GROUPS = [
       { to: "/admin/partners", label: "Partner", icon: Handshake, areas: ["content"] },
       { to: "/admin/references", label: "Referenzen", icon: Globe, areas: ["content"] },
       // Serien (#1741): externe Wettbewerbe über eine Saison - Spur, Saison, Regeln; Termine und Tabellen folgen.
-      { to: "/admin/reference-series", label: "Serien", icon: ListOrdered, areas: ["content"] },
+      // Eigenes Symbol und Untertitel in der Suche (#2111, N1): drei Mal „Saison“ - Liga, Jahreswertung, Serien.
+      { to: "/admin/reference-series", label: "Serien", icon: Repeat, areas: ["content"], hint: "Externe Wettbewerbe über eine Saison" },
       { to: "/admin/contact", label: "Kontakt-Inbox", icon: Inbox, areas: ["club"] },
     ],
   },
@@ -75,12 +77,17 @@ export const ADMIN_GROUPS = [
     label: "eSports",
     items: [
       // Turniere, Fast Lap, Stationen: Turnierleitung und Helfer mit Einsatz (`staff`); Moderation allein nicht.
-      { to: "/admin/tournaments", label: "Turniere", icon: Trophy, areas: ["tournaments"], staff: true },
+      { to: "/admin/tournaments", label: "Turniere", icon: Trophy, areas: ["tournaments"], staff: true, hint: "Einzelne Turniere – K.-o., Gruppen, Jeder gegen jeden" },
       // Liga (docs/LIGA.md, #1622): Liga → Season → Liga N → Staffel; die Staffel selbst ist ein Turnier.
-      { to: "/admin/leagues", label: "Liga", icon: ListOrdered, areas: ["tournaments"] },
+      { to: "/admin/leagues", label: "Liga", icon: Layers, areas: ["tournaments"], hint: "Vereinsliga – Seasons, Ligen, Staffeln" },
+      // Events unter eSports (#2111, F6): sie brauchen den Bereich Turniere - Content-Leute sahen sie nie, Turnierleute
+      // suchten sie hier.
+      { to: "/admin/events", label: "Events", icon: CalendarDays, areas: ["tournaments"], hint: "LAN, Turniertage, Programm" },
+      // Teamverwaltung (#2128, TM7): Liste mit Suche, aufgelöste Teams, Beitrittscodes.
+      { to: "/admin/teams", label: "Teams", icon: UsersIcon, areas: ["tournaments", "club"], hint: "Alle Teams, aufgelöste Teams, Beitrittscodes" },
       { to: "/admin/tournament-guide", label: "Turnier-Leitfaden", icon: BookOpen, areas: ["tournaments"] },
       { to: "/admin/f1", label: "Fast Lap", icon: Flag, areas: ["tournaments"], staff: true },
-      { to: "/admin/seasons", label: "Jahreswertung", icon: Trophy, areas: ["tournaments"] },
+      { to: "/admin/seasons", label: "Jahreswertung", icon: TrendingUp, areas: ["tournaments"], hint: "Punkte über alle Turniere eines Jahres" },
       { to: "/admin/games", label: "Spiele", icon: Gamepad2, areas: ["tournaments"] },
       { to: "/admin/stations", label: "Stationen", icon: Building2, areas: ["tournaments"], staff: true },
       // TV & Beamer (#1110): Grundwerte aller Bildschirme, Link-Baukasten und die Anzeige-Schlüssel des Turnierbaum-TVs.
@@ -93,7 +100,6 @@ export const ADMIN_GROUPS = [
   {
     label: "Content",
     items: [
-      { to: "/admin/events", label: "Events", icon: CalendarDays, areas: ["tournaments"] },
       { to: "/admin/news", label: "News", icon: Newspaper, areas: ["content"] },
       // Eingesandte Fotos (#1186) gibt auch der Vorstand (Vereinsverwaltung) hier frei - ein Ort für die Freigabe.
       { to: "/admin/gallery", label: "Galerie", icon: ImageIcon, areas: ["content", "club"] },
@@ -175,6 +181,7 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/game-servers": ["server", "communityserver"],
   "/admin/prizes": ["preise", "gewinn", "gewinnabholung", "abholung"],
   "/admin/penalties": ["strafen", "fairplay"],
+  "/admin/teams": ["team", "clans", "teamleitung", "co-leitung", "beitrittscode", "join-code", "aufgelöst", "wiederherstellen", "verwaist"],
   "/admin/events": ["termine", "lan", "veranstaltungen"],
   "/admin/news": ["beitraege", "ankuendigungen"],
   "/admin/gallery": ["bilder", "fotos", "alben"],
@@ -185,7 +192,7 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/stickers": ["chat", "emoji", "fluent"],
   "/admin/advent": ["advent", "adventkalender", "türchen", "tuerchen", "weihnachten", "verlosung", "gewinnspiel", "ziehung", "quiz", "kalender"],
   "/admin/ostern": ["ostern", "ostereier", "eiersuche", "eier", "osterei", "verlosung", "gewinnspiel", "ziehung", "verstecke"],
-  "/admin/sponsors": ["unterstuetzer", "partner", "dolibarr", "kategorie", "stufe", "laufzeit", "ehemalige"],
+  "/admin/sponsors": ["unterstuetzer", "dolibarr", "kategorie", "stufe", "laufzeit", "ehemalige"],
   "/admin/partners": ["kooperationen", "netzwerk", "dolibarr", "kategorie"],
   "/admin/references": ["externe wettbewerbe", "platzierungen", "results"],
   "/admin/reference-series": ["serien", "ligen", "liga", "rennliga", "turnierserie", "team-liga", "saison", "spur", "punkteschema", "streichergebnisse", "tabelle"],
@@ -622,7 +629,11 @@ export function AdminLayout({ children }) {
                         }
                       >
                         <it.icon className="w-4 h-4 shrink-0" />
-                        <span className="truncate">{it.label}</span>
+                        <span className="min-w-0">
+                          <span className="block truncate">{it.label}</span>
+                          {/* Untertitel nur in der Suche (#2111, N1): welche „Saison“ gemeint ist. */}
+                          {searchQuery && it.hint ? <span className="block truncate text-[10px] font-normal text-white/40" data-testid={`admin-nav-hint-${it.to.split("/").pop()}`}>{it.hint}</span> : null}
+                        </span>
                       </NavLink>
                     ))}
                   </div>

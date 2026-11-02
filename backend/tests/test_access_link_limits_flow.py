@@ -135,6 +135,27 @@ async def test_the_same_person_uses_a_link_only_once_even_after_signing_off_and_
 
 
 @pytest.mark.asyncio
+async def test_the_admin_note_stays_with_the_admin(flow):
+    """#2127: Wer den Link hat, sieht Rechte und Grenzen - nicht die Notiz der Verwaltung („Presse, nur Herr X“)."""
+    event = await draft_event(flow)
+    token, link = await access_link(flow, "event", event["id"], max_uses=5)
+    await flow.db.access_links.update_one({"id": link["id"]}, {"$set": {"note": "Notiz der Verwaltung"}})
+
+    flow.act_as(None)
+    page = await flow.get(f"/api/events/{event['slug']}", params={"access": token})
+    assert page.status_code == 200, page.text
+    assert page.json()["access_link"]["grants"] == ["view", "register"]
+    assert "note" not in page.json()["access_link"] and "Notiz der Verwaltung" not in page.text
+
+    lead = await flow.add_user(role="tournament_admin", name="leitung")
+    flow.act_as(lead)
+    listed = await flow.get("/api/access-links", params={"target_type": "event", "target_id": event["id"]})
+    assert listed.status_code == 200, listed.text
+    rows = listed.json() if isinstance(listed.json(), list) else listed.json()["items"]
+    assert rows[0]["note"] == "Notiz der Verwaltung", "die Verwaltung sieht sie weiter"
+
+
+@pytest.mark.asyncio
 async def test_a_link_revoked_in_the_meantime_carries_no_registration(flow):
     from services import event_registration
 
@@ -191,3 +212,22 @@ async def test_an_expiry_sent_with_another_time_zone_is_stored_in_utc(flow):
     created = await create_access_link(body, me=staff)
 
     assert (await flow.db.access_links.find_one({"id": created["id"]}))["expires_at"] == "2026-10-20T10:00:00+00:00"
+
+
+@pytest.mark.asyncio
+async def test_a_register_link_does_not_open_a_cancelled_event(flow):
+    """#2127: Ein Zugangslink umgeht Fristen, aber keine Absage - sonst stünde jemand angemeldet bei einem abgesagten Event."""
+    event = await draft_event(flow)
+    await flow.db.events.update_one({"id": event["id"]}, {"$set": {"status": "cancelled"}})
+    token, link = await access_link(flow, "event", event["id"], max_uses=2)
+    flow.act_as(await flow.add_user(name="Anna"))
+
+    response = await flow.post(f"/api/events/{event['id']}/registrations", params={"access": token}, json={"companion_count": 0})
+
+    assert response.status_code == 409 and "abgesagt" in response.json()["detail"]
+    assert await flow.db.event_registrations.count_documents({"event_id": event["id"]}) == 0
+    assert (await stored_link(flow, link))["use_count"] == 0, "die Nutzung bleibt frei"
+    # Wird die Absage zurückgenommen, gilt der Link wieder.
+    await flow.db.events.update_one({"id": event["id"]}, {"$set": {"status": "scheduled"}})
+    again = await flow.post(f"/api/events/{event['id']}/registrations", params={"access": token}, json={"companion_count": 0})
+    assert again.status_code == 200, again.text

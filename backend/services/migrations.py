@@ -395,6 +395,89 @@ async def migrate_tournament_point_duplicates(db) -> str:
     return await season_points_cleanup.apply(db)
 
 
+async def migrate_user_socials_to_profile(db) -> str:
+    """Altdaten ``user_socials`` in die Profilfelder (#2113, L-A12) - Regeln in ``services/user_socials_migration.py``."""
+    from services import user_socials_migration
+
+    async def keep_lease() -> bool:
+        return await extend_migration_lease(db)
+
+    try:
+        return await user_socials_migration.migrate(db, keep_lease)
+    except RuntimeError as exc:
+        raise MigrationIncomplete(str(exc)) from exc
+
+
+async def migrate_squad_game_names(db) -> str:
+    """Co-Teams mit altem Freitext als Spiel (#2128): Trifft der Text genau einen Spielnamen (ohne Groß/klein), wird er zur
+    Kennung - sonst käme das Co-Team nicht in die Liga. Der Rest bleibt, wie er ist; die Zuteilung nennt ihn, und die
+    Teamleitung wählt aus der Liste. Läuft ein zweites Mal ohne Wirkung."""
+    def norm(value) -> str:
+        return " ".join(str(value or "").split()).casefold()
+
+    games = await db.games.find({}, {"_id": 0, "id": 1, "name": 1}).to_list(5000)
+    known = {game["id"] for game in games}
+    by_name: dict[str, list[str]] = {}
+    for game in games:
+        by_name.setdefault(norm(game.get("name")), []).append(game["id"])
+    moved = left = 0
+    async for squad in db.team_squads.find({"game_id": {"$nin": [None, ""]}}, {"_id": 0, "id": 1, "game_id": 1}):
+        if squad["game_id"] in known or not norm(squad["game_id"]):
+            continue
+        hits = by_name.get(norm(squad["game_id"])) or []
+        if len(hits) == 1:
+            await db.team_squads.update_one({"id": squad["id"], "game_id": squad["game_id"]}, {"$set": {"game_id": hits[0]}})
+            moved += 1
+        else:
+            left += 1
+    if left:
+        logger.warning("[migration] %s Co-Teams haben einen alten Spielnamen, der zu keinem Spiel passt", left)
+    await db.audit_logs.insert_one({
+        "id": new_id(), "action": "team.squad.game_names", "target_id": None, "actor_id": None,
+        "data": {"moved": moved, "left": left}, "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    return f"{moved} squads moved to a game id, {left} left"
+
+
+async def migrate_one_hide_field(db) -> str:
+    """Je Eintrag ein Feld zum Ausblenden: ``is_active`` (#2130). Wer heute verborgen ist, bleibt es, wer sichtbar ist, auch.
+
+    Sponsor: „Pausiert“ und „Gekündigt“ verbargen ihn in der Sponsorenliste, am TV und im PDF, also wird ``is_active`` aus;
+    alle anderen Vertragsstatus wirkten nicht, die Laufzeit zählt weiter. Danach gibt es ``contract_status`` nicht mehr.
+    Eine Ausnahme ist gewollt: Event-Seiten und Mails fragten den Vertragsstatus nie ab und zeigten solche Sponsoren
+    weiter - mit ``is_active`` aus sind sie auch dort weg. Referenz: „Archiviert“ blendete nichts aus; solche Referenzen
+    heißen jetzt „Abgeschlossen“, ``is_active`` bleibt, wie es ist.
+
+    Das Protokoll steht je Abschnitt vor dem Schreiben, mit Namen und altem Status: Bricht der Lauf ab, ist nichts
+    verloren, und der nächste Lauf nennt, was noch fehlt. Altbestand ohne ``id`` wird über ``_id`` umgestellt. Läuft ein
+    zweites Mal ohne Wirkung."""
+    async def log(**data) -> None:
+        await db.audit_logs.insert_one({
+            "id": new_id(), "action": "content.one_hide_field", "target_id": None, "actor_id": None,
+            "data": data, "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+
+    rows = await db.sponsors.find({"contract_status": {"$exists": True}}, {"id": 1, "name": 1, "is_active": 1, "contract_status": 1}).to_list(None)
+    to_hide = {
+        row["_id"]: str(row.get("contract_status") or "").strip().lower() for row in rows
+        if str(row.get("contract_status") or "").strip().lower() in {"paused", "cancelled"} and row.get("is_active") is not False
+    }
+    hidden = [{"id": row.get("id"), "name": row.get("name"), "contract_status": to_hide[row["_id"]]} for row in rows if row["_id"] in to_hide]
+    if rows:
+        await log(section="sponsors", sponsors_hidden=hidden, sponsors_cleared=len(rows))
+    for row in rows:
+        change: dict = {"$unset": {"contract_status": ""}}
+        if row["_id"] in to_hide:
+            change["$set"] = {"is_active": False}
+        await db.sponsors.update_one({"_id": row["_id"]}, change)
+
+    archived = await db.references.find({"status": "archived"}, {"_id": 0, "id": 1, "title": 1}).to_list(None)
+    if archived:
+        await log(section="references", references_renamed=archived)
+        await db.references.update_many({"status": "archived"}, {"$set": {"status": "completed"}})
+    return f"{len(hidden)} sponsors hidden, {len(rows)} contract statuses cleared, {len(archived)} references renamed"
+
+
 MIGRATIONS = (
     (1, "encrypt_legacy_integration_credentials", migrate_plaintext_secrets),
     (2, "team_leader_role_to_player", migrate_team_leader_role),
@@ -423,6 +506,12 @@ MIGRATIONS = (
     # #2123: doppelte Jahrespunkte je Turnier entfernen (services/season_points_cleanup.py, Trockenlauf
     # backend/scripts/season_points_duplicates.py).
     (18, "season_points_tournament_duplicates", migrate_tournament_point_duplicates),
+    # #2113: alte Einträge aus user_socials ziehen in die Profilfelder um (services/user_socials_migration.py).
+    (19, "user_socials_to_profile_fields", migrate_user_socials_to_profile),
+    # #2128: alter Freitext als Spiel eines Co-Teams wird zur Kennung, wenn er genau einen Spielnamen trifft.
+    (20, "squad_game_names", migrate_squad_game_names),
+    # #2130: Sponsor und Referenz blenden nur noch über ``is_active`` aus; die Sichtbarkeit bleibt, wie sie war.
+    (21, "one_hide_field", migrate_one_hide_field),
 )
 
 

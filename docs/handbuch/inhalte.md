@@ -8,7 +8,7 @@ und Partner, die Seite „Sponsor werden“, die Referenzen und die Serien (exte
 
 - **Admin → Content → News** (`/admin/news`) – Beiträge, **Neuer Beitrag** (`/admin/news/new`)
 - **Admin → Content → Galerie** (`/admin/gallery`) – Alben und **Eingesandte Fotos**
-- **Admin → Content → Medien** (`/admin/media`, Seitenname „Medien-Browser“) – alle hochgeladenen Dateien
+- **Admin → Content → Medien** (`/admin/media`) – alle hochgeladenen Dateien
 - **Admin → Verein → Über uns** (`/admin/about`) – die Texte der Seite „Über den Verein“
 - **Admin → Verein → Sponsoren** (`/admin/sponsors`) – Sponsoren und die Seite „Sponsor werden“
 - **Admin → Verein → Partner** (`/admin/partners`) – befreundete Vereine, Veranstalter, Communitys
@@ -41,7 +41,7 @@ Turnierleitung. Die Turnierleitung allein darf keine News, Galerie, Sponsoren od
 | **News** | Beitrag mit Bild, Video, Verknüpfungen, geplantem Termin, Newsletter und Discord-Meldung | Content → News |
 | **Galerie** | Alben mit Abschnitten, Bildern und Videos, an ein Event gehängt | Content → Galerie |
 | **Eingesandte Fotos** | Mitglieder schicken Fotos vom Event, ihr gebt frei oder lehnt ab | Content → Galerie, oben |
-| **Medien** | Eine Bibliothek für alles Hochgeladene, mit Drehen, Zuschneiden, Prüfen | Content → Medien |
+| **Medien** | Eine Bibliothek für alles Hochgeladene, mit Drehen, Aufräumen, Prüfen | Content → Medien |
 | **Über uns** | Leitbild, Zeitstrahl, Werte und Ziele, Vereinsfoto, Zahlen | Verein → Über uns |
 | **Sponsoren** | Logo, Stufe, Laufzeit, wo der Sponsor erscheint | Verein → Sponsoren |
 | **Sponsor werden** | Zahlen, Leistungen je Stufe, Mappe als PDF | Verein → Sponsoren, Kasten unten |
@@ -152,16 +152,39 @@ Uhr des Servers.
 
 ### 3.2 Die Medien-Bibliothek
 
-**Admin → Content → Medien** (Seite „Medien-Browser“). Hier liegt alles Hochgeladene: News-Bilder, Galerie, Sponsoren, Banner.
+**Admin → Content → Medien.** Hier liegt alles Hochgeladene: News-Bilder, Galerie, Sponsoren, Banner.
 
-- **Medien hochladen** (Bilder und Videos, Größenlimit steht an der Auswahl) und Suche nach Dateinamen.
-- Ein Klick auf eine Datei öffnet ein Blatt mit Vorschau, Angaben und **Verwendet in** (wo sie eingebaut ist), dazu **Drehen**,
-  **Zuschneiden**, **URL kopieren** und **Löschen**. „Datei endgültig löschen?“ fragt vorher nach.
-- Der **Qualitätscheck** zeigt unter anderem Kaputte Referenzen (Bildfelder zeigen auf Dateien, die es nicht mehr gibt), defekte
-  Metadaten, doppelte Dateien und Dateien ohne Verwendung. **Scopes reparieren** sortiert alte Uploads ohne saubere Kategorie ein.
-  Das braucht ihr nur bei Bedarf.
+- **Medien hochladen** (Bilder und Videos). Wie groß eine Datei sein darf, sagt der Server: Das Bildfeld zeigt seine Grenze an,
+  ist etwas zu groß, steht das in der Meldung.
+- Die Liste zeigt **alle** Dateien, je 60 auf einer Seite (**Zurück**, **Weiter**). Suche (auch nach dem ursprünglichen
+  Dateinamen) und Filter (Art, Bereich, Ungenutzt, Nicht erfasst, Duplikate) gelten für alle Dateien, nicht nur für die Seite.
+- Ein Klick auf eine Datei öffnet ein Blatt mit Vorschau, Angaben und **Verwendet in** (wo sie eingebaut ist), dazu **Links** und
+  **Rechts** (drehen), **Adresse kopieren**, **Herunterladen** und **Löschen**. „Datei endgültig löschen?“ fragt vorher nach.
+- **Drehen** fragt nach und nennt, an wie vielen Stellen das Bild steht. Danach erscheint es überall gedreht, auch die kleineren
+  Fassungen und in alten Chats. Nur gespeicherte Ergebnisse (Ergebnisblatt, Liga-Spiel) behalten ihre Adresse: Dort kann es im Browser
+  noch bis zu 30 Tage ungedreht zu sehen sein. Der Dateiname bleibt, Links in Newslettern oder auf Discord funktionieren weiter.
+  Animierte Bilder und Bilder aus der Mitgliederverwaltung lassen sich nicht drehen.
+- **Sticker** in alten Nachrichten zählen als Verwendung: Das Bild eines gelöschten Stickers bleibt, solange ein Chat es zeigt.
+- Die **Medien-Prüfung** zeigt unter anderem Verweise ins Leere (Bildfelder zeigen auf Dateien, die es nicht mehr gibt), Einträge
+  ohne Datei, doppelte Dateien und Dateien ohne Verwendung. **Alte Uploads einsortieren** ordnet alte Uploads einem Bereich zu. Das
+  braucht ihr nur bei Bedarf.
 - Überall, wo ein Bild gewählt wird (Banner, Album, Sponsorenlogo …), könnt ihr neu hochladen **oder aus den schon hochgeladenen
-  Medien wählen**.
+  Medien wählen**, mit Suche und **Mehr laden**.
+
+**Löschen** prüft vorher auch Stellen, die „Verwendet in“ nicht aufzählt, etwa die Map in einem gespeicherten Ergebnisblatt. Zeigt so eine
+Stelle die Datei noch, fragt die Mediathek nach; bestätigt ihr, fehlt das Bild dort danach.
+
+**Aufräumen** – beides fragt vorher nach und steht im Protokoll:
+
+- **Ungenutzte löschen** nennt, wie viele Dateien und wie viel Platz es sind. Beim Löschen prüft der Server jede Datei noch einmal,
+  auch in Feldern, die die Liste „Verwendet in“ nicht kennt; was inzwischen verwendet wird, bleibt und steht in der Meldung. Nie
+  gelöscht werden Uploads der letzten 24 Stunden (das Formular dazu ist vielleicht noch offen), Uploads von Mitgliedern, Dateien
+  ohne Upload-Eintrag und Kamera-Originale. Bei mehr als 500 Dateien nennt die Rückfrage „die ersten 500 von …“, die übrigen löscht
+  ein weiterer Klick.
+- **Diese Datei behalten, Kopien ersetzen** (im Blatt einer Datei mit Duplikaten): Jede Stelle, die eine inhaltsgleiche Kopie zeigt,
+  zeigt danach diese Datei, die Kopien werden gelöscht. Es bleiben: Kopien aus Uploads von Mitgliedern und Kopien, die gespeicherte
+  Ergebnisse noch zeigen (Map im Ergebnisblatt, Liga-Spiel, Preisbild) – die Meldung nennt ihre Zahl, die Zeile der Kopie trägt den
+  Hinweis „wird noch von gespeicherten Ergebnissen gezeigt“.
 
 ### 3.3 Galerie und Alben
 
@@ -171,10 +194,17 @@ Uhr des Servers.
   Event**, **Sichtbarkeit** (Öffentlich, Community, Nur Mitglieder), **Sortierung** und den Haken **Veröffentlicht**.
 - Im Album: Bilder aus der **Medienbibliothek** wählen (**Auswahl hinzufügen**) oder hochladen; **Videos** als Link (YouTube,
   Twitch, Kick, Vimeo oder direkte MP4/WebM-Adresse) mit **Vorschaubild**; **Titel / Caption** je Medium.
+- **Nachträglich ändern:** Der Stift auf einer Kachel (am Handy immer sichtbar, am PC beim Darüberfahren) öffnet
+  **Medium bearbeiten** mit **Beschriftung** und **Reihenfolge** – eine kleinere Zahl steht im Abschnitt weiter vorn.
+  Beim Hochladen wird der Dateiname zur Beschriftung; hier macht ihr daraus etwa „Siegerehrung“.
 - **Abschnitte** gliedern ein Album (zum Beispiel „Aufbau, Tag 1, Tag 2“). Löscht ihr einen Abschnitt, bleiben die Medien im
   Album unter „Ohne Abschnitt“.
 - Ein Album, das an ein Event hängt, zeigt dort seine Kachel; das Album verweist mit „Vom Event: …“ zurück.
-- Löschen eines Albums entfernt es und die zugeordneten Medien.
+- **Mehrere auf einmal:** Die Häkchen auf den Kacheln (**Alle auswählen** darüber) wählen Medien aus. Danach **Verschieben nach …**
+  oder **Aus dem Album nehmen** – mit Rückfrage und im Protokoll. Die Medienauswahl hat eine Suche; was ihr angekreuzt habt, bleibt
+  beim Suchen erhalten.
+- **Löschen** eines Albums oder Eintrags nimmt die Einträge weg, die **Dateien bleiben in den Medien** (dort löscht ihr sie, wenn
+  sie weg sollen). Nur eingesandte Fotos, die noch auf Freigabe warten, gehen mit dem Album mit.
 
 **Hinweis „Die Fotos sind da“:** Veröffentlicht ihr ein Event-Album, meldet ein Job das **einmal je Person** an die Angemeldeten
 des Events (Event-Anmeldung, Turniere des Events, Teams mit allen Mitgliedern). Er wartet, bis zehn Minuten lang keine Fotos
@@ -220,19 +250,27 @@ die Alben.
 
 ### 3.6 Sponsoren und „Sponsor werden“
 
-**Admin → Verein → Sponsoren.** Je Sponsor ein Blatt (**Sponsor bearbeiten**):
+**Admin → Verein → Sponsoren.** Sponsoren unterstützen den Verein mit Geld oder Sachleistungen; befreundete Vereine und Veranstalter
+stehen unter **Partner** (3.7). Je Sponsor ein Blatt (**Sponsor bearbeiten**):
 
-- **Name**, **Logo**, **Link (URL)**, **Tier** (main, platinum, gold, silver, bronze), **Beschreibung**, **Reihenfolge**, **Aktiv**.
-- **Vertrag:** **Vertragsstatus**, **Start**, **Ende**. Status und Laufzeit entscheiden, ob der Sponsor öffentlich erscheint; die
-  Vorschau „Ausspielung“ sagt „Wird ausgespielt“ oder „Nicht öffentlich“.
-- **Wo er erscheint:** **Auf Home**, **Im Footer**, **Events**, **TV / Anzeige**, **PDFs**, **E-Mails**. Das Tier ist nur eine Vorlage; die
+- **Name**, **Logo**, **Link (URL)**, **Stufe** (Hauptsponsor, Platin, Gold, Silber, Bronze), **Beschreibung**, **Reihenfolge**.
+- **Ausblenden** geht über einen Schalter: **Öffentlich zeigen**. Aus heißt archiviert (auch mit dem Archiv-Knopf auf der Karte):
+  überall von der Website weg, hier noch da und mit einem Klick zurückzuholen.
+- **Laufzeit:** **Start**, **Ende**. Vor dem Start ist der Sponsor noch nicht zu sehen, nach dem Ende steht er bei den ehemaligen
+  Unterstützern; die Vorschau „Ausspielung“ sagt „Wird ausgespielt“ oder „Nicht öffentlich“.
+- **Löschen** geht nur, wenn der Sponsor nirgends verwendet wird (Event-Auswahl, Sponsor je Runde); sonst nennt die Meldung, wo er
+  noch steht. Archivieren, Zurückholen und Löschen stehen im Protokoll.
+- **Wo er erscheint:** **Auf der Startseite**, **In der Fußzeile**, **Events**, **TV / Anzeige**, **PDFs**, **E-Mails**. **Vorgabe der Stufe** ist nur eine Vorlage; die
   Haken entscheiden. Mit dem Haken **Events** wählst du **Bei allen Events** oder **Bei ausgewählten Events** (dann
   mindestens eines). Nur hier wird das festgelegt – das Event zeigt die Sponsoren nur an (#1371).
 - **Ansprechpartner**, **Kontakt E-Mail**, **Telefon**, **Interne Notizen** (nie öffentlich).
 - Sponsoren am TV: Haken **TV / Anzeige**, siehe [TV und Beamer](tv.md).
 - Mit Dolibarr-Anbindung kommen Name, Stufe, Laufzeit und Kontakt von dort (diese Felder sind gesperrt); Link, Platzierungen,
   Reihenfolge und Texte bleiben hier. Logo und Banner kommen ab Vereinsmodul 1.9 aus Dolibarr. Technik: [Dolibarr](../DOLIBARR.md).
-- Pflegeknöpfe für Bilder (**Bilder migrieren**, **URLs reparieren**, **Fehlende leeren**) braucht ihr nur bei Bedarf, jeweils mit Rückfrage.
+  **Löschen** ist gesperrt, solange die Firma in der Kategorie steht: Der nächste Abgleich legte sie sonst neu an, ohne Logo und
+  Texte. Nehmt sie in Dolibarr aus der Kategorie, dann steht sie hier als ehemalig und lässt sich löschen. Archivieren geht.
+- Die Bild-Wartung (**Bilder prüfen**, **Adressen reparieren**, **Fehlende leeren**, **Externe Bilder lokal speichern**) gilt für alle
+  Bilder der Website und steht unter **Admin → System → Status**.
 - Auf der Kommandozentrale erinnert „Sponsoring läuft aus“ 30 Tage vorher.
 
 **Sponsor werden** (Kasten **Sponsor werden** unten auf derselben Seite): Einleitung, **Zahlen – nur echte** (selbst eingetragen
@@ -242,7 +280,8 @@ je Stufe) und eine **Mappe als PDF** zum Hochladen. Interessierte sehen auf der 
 
 ### 3.7 Partner
 
-**Admin → Verein → Partner.** Jeder Partner hat eine eigene Seite unter `/partners/<Name>` (die alte Adresse leitet weiter).
+**Admin → Verein → Partner.** Partner arbeiten mit dem Verein zusammen und zahlen nichts dafür; wer mit Geld oder Sachleistungen
+unterstützt, steht unter **Sponsoren** (3.6). Jeder Partner hat eine eigene Seite unter `/partners/<Name>` (die alte Adresse leitet weiter).
 
 - **Name**, Art (Verein, Messe, Community), **Kurzbeschreibung** (Partnerliste und Kopf der Seite), **Über den Partner**
   (längerer Text), Logo/Bild.
@@ -255,17 +294,23 @@ je Stufe) und eine **Mappe als PDF** zum Hochladen. Interessierte sehen auf der 
 - **Ligen und Serien mit uns:** Ist ein Partner an einer Spur oder Saison eingetragen (3.9, „Partner an Spur und Saison“),
   zeigt seine Seite die Spur mit ihren Saisons – neueste zuerst, mit Spiel, unserem Stand bzw. Endplatz und „Läuft
   gerade“; jede Saison führt zu ihrer Serienseite. Interne Spuren und Saisons erscheinen dort nie.
-- **Nur aktive Partner** erscheinen auf Serienseiten, in der Übersicht und in der Auswahl. Wird ein Partner inaktiv,
-  verschwindet er überall, ohne dass ihr Spuren oder Saisons anfassen müsst.
-- Mit Dolibarr kommen Name und Art von dort.
+- **Nur aktive Partner** erscheinen auf Serienseiten, in der Übersicht und in der Auswahl. Wird ein Partner archiviert (Archiv-Knopf
+  auf der Karte oder **Öffentlich zeigen** aus), verschwindet er überall, ohne dass ihr Spuren oder Saisons anfassen müsst. Seine
+  Verknüpfungen bleiben, auch wenn ihr eine Referenz, ein Event oder ein Turnier speichert; nach dem Zurückholen ist alles wieder da.
+  In der Auswahl steht dann „archivierter Partner bleibt verknüpft“, dort löst **Verknüpfung lösen** den Link.
+- **Löschen** geht nur, wenn der Partner nirgends verwendet wird (Referenzen, Events, Turniere, Serien, Saisons); sonst nennt die
+  Meldung, wo er noch steht. Archivieren, Zurückholen und Löschen stehen im Protokoll.
+- Mit Dolibarr kommen Name, Art und „Öffentlich zeigen“ von dort (gesperrt, mit Hinweis): Inaktiv wird der Partner, wenn die Firma in
+  Dolibarr geschlossen oder aus der Kategorie genommen wird. Löschen ist gesperrt, solange sie in der Kategorie steht. Ist sie aus der Kategorie genommen, steht der Partner als inaktiv hier und lässt sich zurückholen; der Abgleich fasst das nicht mehr an.
 
 <img src="../assets/serien/serien-partner-partnerseite.png" alt="Partnerseite: Bereich Ligen und Serien mit uns mit einer Spur, zwei Saisons, Stand, Endplatz und Läuft gerade" width="420">
 
 ### 3.8 Referenzen
 
 **Admin → Verein → Referenzen.** Eine Referenz ist eine **Turnierteilnahme des Vereins**: **Titel** (nur der Turniername),
-**Plattform**, **Format**, **Liga**, **Saison** als eigene Felder, Spiele (Mehrfachauswahl), Turnier-Webseite, Bracket/Tabelle,
-Highlights/Notizen. Dazu **Einträge**: ein **Team** mit gemeinsamer Platzierung oder mehrere **Einzelstarter** mit je eigener
+**Plattform**, **Format**, **Liga**, **Saison** als eigene Felder, Spiele (Mehrfachauswahl), Turnier-Webseite, Turnierbaum/Tabelle.
+**Beschreibung** und **Highlights** sind öffentlich (auch in der Vorschau bei Suchmaschinen); was nur euch etwas angeht, gehört in
+**Interne Notizen**. Dazu **Einträge**: ein **Team** mit gemeinsamer Platzierung oder mehrere **Einzelstarter** mit je eigener
 Platzierung, beides in derselben Teilnahme möglich. Spieler wählt ihr aus den Vereinsprofilen; externe Spieler tragt ihr als Namen ein.
 
 **Schnell-Eintrag für ein Tagesturnier:** Oben im Formular steht nur, was ein Tagesturnier braucht – **Turniername**,
@@ -273,11 +318,17 @@ Platzierung, beides in derselben Teilnahme möglich. Spieler wählt ihr aus den 
 Vereinsprofilen), **Platz von N** und optional ein **Link**. Eine neue Referenz beginnt schon mit einem Team-Eintrag.
 **Wie letztes Mal** übernimmt Spiel, Veranstalter und Teamname der zuletzt angelegten Referenz – die Spieler wählt ihr
 jedes Mal neu. Alles andere – Veranstalter
-und Partner, Liga und Saison, Format, Plattformen, Ende bei mehreren Tagen, Ort, Modus, weitere Links, Label und zweite
+und Partner, Liga und Saison, Format, Plattformen, Ende bei mehreren Tagen, Ort, Modus, weitere Links, Bezeichnung und zweite
 Feldgröße der Einträge, Status, Sichtbarkeit, Reihenfolge, Texte – klappt unter **Weitere Angaben** auf. Beim Bearbeiten
 ist der Bereich offen, wenn dort etwas steht. Vorgaben: Der Status folgt dem Datum (vorbei = abgeschlossen, später =
-geplant, heute abgeschlossen, sobald ein Eintrag einen Platz hat; maßgeblich ist der Tag beim Speichern), bis ihr ihn selbst wählt; sichtbar für alle, aktiv, Reihenfolge 0 = automatisch
+geplant, heute abgeschlossen, sobald ein Eintrag einen Platz hat; maßgeblich ist der Tag beim Speichern), bis ihr ihn selbst wählt; sichtbar für alle, öffentlich gezeigt, Reihenfolge 0 = automatisch
 nach Datum. Die Seite der Referenz zeigt nur, was ausgefüllt ist.
+
+**Die Liste** hat eine Suche (Turnier, Veranstalter, Team, Namen), Filter nach **Spiel**, **Jahr** und **Status** und Seiten mit je 25
+Einträgen. **Archivieren** (Knopf in der Zeile oder **Öffentlich zeigen** aus) nimmt die Referenz von der Website, aus den
+Profilen und aus den Erfolgen; zurückholen geht jederzeit. Der **Status** sagt nur noch, wie weit die Teilnahme ist (Laufend,
+Geplant, Abgeschlossen). **Löschen** geht nur, wenn sie zu keiner Saison gehört, nicht Hauptkarte der Vitrine ist und keine
+Mitglieder eingetragen sind. Archivieren, Zurückholen und Löschen stehen im Protokoll.
 
 <table>
 <tr>
@@ -916,8 +967,8 @@ der Kader im Abschnitt **Kader** der Saison.
 **Map-Pool der Saison:** Hat die Spur ein **Spiel** (bei einer Team-Liga steht der Abschnitt auch ohne, mit Hinweis),
 wählt der Vorstand auf der Seite der Saison im Abschnitt **Map-Pool der Saison** die Maps der Saison – je Modus aus der
 Map-Bibliothek des Spiels (**Admin → eSports → Spiele → Maps**, siehe [Turniere 3.14](turniere.md#314-maps-und-map-pools)).
-Anhaken, mit den Pfeilen sortieren, **Vorgabe des Spiels** nimmt alle freigegebenen Maps, **Übernehmen von … Pool der
-Saison 2025** startet mit dem Pool einer anderen Saison der Spur. **Speichern** legt eine neue Version an: Spätere
+Anhaken, mit den Pfeilen sortieren, **Vorgabe des Spiels** lädt den Standard-Pool des Spiels (ohne ihn alle freigegebenen
+Maps), **Übernehmen von … Pool der Saison 2025** startet mit dem Pool einer anderen Saison der Spur. **Speichern** legt eine neue Version an: Spätere
 Änderungen an der Bibliothek (Name, Bild, archiviert) ändern den gespeicherten Pool und alte Ergebnisse nicht. Die
 Serienseite zeigt den Pool unten als Karten mit Bild. Ohne Spiel oder ohne Pool bleibt bei den Maps der Freitext wie
 bisher.
@@ -1157,7 +1208,7 @@ Gezählt werden die gewerteten Läufe (Rennen und Sprint), die Pole je Runde ein
 
 **Läuft gerade:** Sobald eine Saison den Status **Läuft** hat (und sichtbar, nicht archiviert ist), erscheint sie oben
 auf der Seite **Erfolge & Referenzen** (`/references`), noch vor der Vitrine. Jede Karte zeigt den Fortschritt in
-Segmenten („6 von 10 Rennen gewertet“, „3 von 7 Spieltagen gespielt“, „2 von 5 Turnieren gewertet“), den **nächsten
+Segmenten („6 von 10 Rennen gewertet“, „3 von 7 Spieltagen gespielt“, „2 von 5 Turniertagen gewertet“), den **nächsten
 Termin** mit Flagge und unseren Platz als große Zahl – bei der Team-Liga den besten Platz eines eigenen Teams in der
 Tabelle, sonst den
 besten Platz eines Vereinsmitglieds („Noch offen“ bis zur ersten Wertung). Ein Klick führt zur Seite der Saison. Steht
@@ -1452,7 +1503,9 @@ Reihenfolge; ein Menü mit Unterpunkten klappt ihr auf und ordnet die Unterpunkt
 | **Freigeben** ist grau | Die Bildprüfung läuft noch | Warten |
 | Mitglied sieht „Fotos einsenden“ nicht | Außerhalb des Zeitfensters (bis sieben Tage nach dem Event), kein Mitglied, oder Album nicht an ein Event gehängt | Verknüpftes Event und Datum prüfen |
 | „Fotos sind da“ kam nicht | Album nicht veröffentlicht, oder noch Fotos in den letzten zehn Minuten dazugekommen | Veröffentlichen und kurz warten |
-| Bild ist plötzlich weg („Kaputte Referenzen“) | Die Datei wurde gelöscht | Medien → Qualitätscheck, neues Bild wählen |
+| Bild ist plötzlich weg („Verweise ins Leere“) | Die Datei wurde gelöscht | Medien → Medien-Prüfung, neues Bild wählen |
+| „Die Datei ist zu groß“ beim Hochladen | Über der Grenze, die das Bildfeld anzeigt | Kleinere Datei wählen; die Grenze stellt der Betreiber ein ([Betrieb](../BETRIEB.md)) |
+| Eine Datei fehlt in „Ungenutzte löschen“ | Sie ist jünger als 24 Stunden, von einem Mitglied, ohne Upload-Eintrag oder ein Kamera-Original | Einzeln im Blatt der Datei löschen |
 | Upload scheitert („zu groß oder Reverse Proxy blockiert“) | Datei über dem Limit | Verkleinern; Limit steht an der Auswahl |
 | Sponsor ist angelegt, aber nicht zu sehen | Status nicht aktiv, Laufzeit abgelaufen oder keine Platzierung | Vorschau „Ausspielung“ am Sponsor |
 | Sponsor-Felder lassen sich nicht ändern | Dolibarr führt sie | In Dolibarr ändern |
@@ -1492,7 +1545,7 @@ Im Beitrag unter **Sichtbarkeit**: **Nur Vereinsmitglieder**.
 Beim Veröffentlichen geht er von selbst hinaus; sonst im Kasten **Verteilen** mit **Jetzt senden**.
 
 **Kann ich ein Foto nachträglich entfernen?**
-Im Album das Medium löschen. In den Medien gibt es **Löschen** für die Datei selbst.
+Im Album das Medium löschen: Es verschwindet aus dem Album, die Datei bleibt. In den Medien gibt es **Löschen** für die Datei selbst.
 
 **Wo steht das Vereinsfoto?**
 Admin → Verein → Über uns, Abschnitt Vereinsfoto.

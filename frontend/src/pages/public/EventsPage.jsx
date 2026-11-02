@@ -225,18 +225,23 @@ function EventCard({ card, meta }) {
   const typeLabel = eventTypeLabel(e.event_type, meta.types);
   const descriptionPreview = plainTextPreview(e.description);
   const ownChild = card.children.some((row) => row.mine);
+  // Abgesagt (#2127, EV3): die Karte bleibt bis zum Termin stehen - gedämpft, mit Kennzeichen, ohne Zahl der Plätze.
+  const cancelled = (e.public_phase?.state || e.status) === "cancelled";
+  // Externer Anmeldelink (#2127, EV11): Plätze zählt die andere Seite, hier stünde immer 0.
+  const showsSeats = !cancelled && !e.registration_url;
   // Die Saison-Deko an Karten (Ketten, Eier) braucht unten ein freies Band: ein Link über die ganze Karte zählt dort als
   // Bedienung. Ohne Turniere ist die Karte darum selbst der Link (wie bisher), mit Turnieren hält sie Link und Knopf.
   const shell = {
     "data-testid": `event-card-${e.slug}`,
     "data-season-perch": "card",
     "data-live": e.public_phase?.state === "live" ? "1" : undefined,
+    "data-cancelled": cancelled ? "1" : undefined,
     className: `tls-card tls-reveal-item tls-card--purple group min-w-0 border border-white/10 rounded-sm bg-[#121212] overflow-hidden flex flex-col ${e.public_phase?.state === "live" ? "tls-live-frame" : ""}`,
   };
   const content = (
     <>
       {e.banner_url ? (
-        <div className="aspect-video bg-[#0A0A0A] overflow-hidden">
+        <div className={`aspect-video bg-[#0A0A0A] overflow-hidden ${cancelled ? "opacity-40 grayscale" : ""}`}>
           <LazyImg src={e.banner_url} alt="" sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw" className="w-full h-full object-contain group-hover:scale-[1.02] transition duration-500" />
         </div>
       ) : (
@@ -250,7 +255,7 @@ function EventCard({ card, meta }) {
           <PhaseBadge phase={e.public_phase || e.event_phase} status={e.status} />
           {VIcon && <VIcon className="w-3 h-3 text-honor" />}
         </div>
-        <h3 className="tls-card__title mt-2 font-heading font-black text-lg break-words">{e.name}</h3>
+        <h3 className={`tls-card__title mt-2 font-heading font-black text-lg break-words ${cancelled ? "text-white/60 line-through decoration-white/40" : ""}`}>{e.name}</h3>
         {card.mine && <div className="mt-2"><MineChip state={card.mine} testId={`event-card-mine-${e.slug}`} /></div>}
         {e.start_date && (
           <div className="mt-2 inline-flex min-w-0 items-center gap-1.5 text-xs text-white/60">
@@ -263,12 +268,12 @@ function EventCard({ card, meta }) {
             <MapPin className="w-3 h-3 shrink-0" /> <span className="min-w-0 truncate">{e.location}</span>
           </div>
         )}
-        {e.max_participants && (
+        {showsSeats && e.max_participants && (
           <div className="mt-1 inline-flex items-center gap-1.5 text-xs text-white/50">
             <UsersIcon className="w-3 h-3" /> {e.registration_summary?.reserved_seats || 0}/{e.max_participants} Plätze
           </div>
         )}
-        {e.has_registration && !e.max_participants && (
+        {showsSeats && e.has_registration && !e.max_participants && (
           <div className="mt-1 inline-flex items-center gap-1.5 text-xs text-white/50">
             <UsersIcon className="w-3 h-3" /> {e.registration_summary?.registered_count || 0} angemeldet
           </div>

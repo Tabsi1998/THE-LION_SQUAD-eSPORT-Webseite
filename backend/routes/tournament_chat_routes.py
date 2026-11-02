@@ -169,7 +169,7 @@ async def list_tournament_chat(tid: str, me: dict = Depends(get_current_user)):
     user_ids = list({m.get("user_id") for m in messages if m.get("user_id")})
     users = {u["id"]: u for u in await db.users.find(
         {"id": {"$in": user_ids}},
-        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1, "role": 1},
+        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1},
     ).to_list(200)}
     for message in messages:
         author = users.get(message.get("user_id")) or {}
@@ -178,7 +178,6 @@ async def list_tournament_chat(tid: str, me: dict = Depends(get_current_user)):
             "username": author.get("username"),
             "display_name": author.get("display_name") or author.get("username") or "Benutzer",
             "avatar_url": author.get("avatar_url"),
-            "role": author.get("role"),
         }
     return messages
 
@@ -235,6 +234,5 @@ async def post_tournament_chat(tid: str, body: TournamentChatCreate, me: dict = 
         "username": me.get("username"),
         "display_name": me.get("display_name") or me.get("username"),
         "avatar_url": me.get("avatar_url"),
-        "role": me.get("role"),
     }
     return doc

@@ -35,6 +35,32 @@ export function ownSeatsSentence(registration) {
   return `${places} reserviert${companionsPart(registration)}.`;
 }
 
+/**
+ * Kommt die Anmeldung auf die Warteliste (#2127, EV7)? Dieselbe Rechnung wie der Server: reservierte Plätze plus die
+ * eigenen über der Grenze - auch wenn es nur an den Begleitpersonen liegt. Der Satz fürs Formular, sonst leer.
+ */
+export function waitlistNotice(event, seats) {
+  const max = Number(event?.max_participants) || 0;
+  if (!max) return "";
+  const free = Math.max(max - (Number(event?.registration_summary?.reserved_seats) || 0), 0);
+  const wanted = Math.max(1, Number(seats) || 1);
+  if (wanted <= free) return "";
+  if (!free) return "Das Event ist voll – du kommst auf die Warteliste.";
+  return `Nur noch ${placesText(free)} frei – mit ${countText(wanted, "Platz", "Plätzen")} kommst du auf die Warteliste.`;
+}
+
+/**
+ * Wer öffentlich als angemeldet steht (#2127, EV10): nur Angemeldete und Eingecheckte, die Warteliste getrennt. Die
+ * Verwaltung bekommt alle Stände in einer Liste - Stornierte gehören nicht hierher, die stehen auf der Leitungsseite.
+ */
+export function participantLists(event) {
+  const rows = event?.registrations || [];
+  return {
+    active: rows.filter((row) => !row.status || row.status === "registered" || row.status === "checked_in"),
+    waitlist: [...rows.filter((row) => row.status === "waitlist"), ...(event?.waitlist_registrations || [])],
+  };
+}
+
 /** Plätze einer Anmeldung in der Teilnehmerliste: „1 Platz“, „2 Plätze“. */
 export function seatsLabel(registration) {
   return placesText(seatsOf(registration));

@@ -18,6 +18,7 @@ from services.slug_utils import find_by_slug_or_history
 from services.svg_logo import raster_url
 from services.visibility import user_can_see
 from services.private_fields import private_projection
+from services.usernames import any_case, can_be_a_username, profile_path
 
 router = APIRouter(prefix="/api/seo", tags=["seo"])
 
@@ -639,12 +640,16 @@ async def member_profile_meta(db, slug: str, base: dict, origin: str) -> dict:
 
 
 async def user_profile_meta(db, username: str, base: dict, origin: str) -> dict:
-    user = await db.users.find_one({"username": username, "privacy_public_profile": True, "is_active": True, "is_banned": {"$ne": True}}, private_projection("email"))
+    if not can_be_a_username(username):
+        raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
+    visible = {"privacy_public_profile": True, "is_active": True, "is_banned": {"$ne": True}}
+    user = await db.users.find_one({"username": username, **visible}, private_projection("email")) \
+        or await db.users.find_one({**any_case(username), **visible}, private_projection("email"), sort=[("created_at", 1)])
     if not user:
         raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
     label = user.get("display_name") or user.get("username")
     image = absolute_url(user.get("avatar_url") or user.get("banner_url") or base["image"], origin)
-    canonical = f"{origin}/u/{user.get('username') or username}"
+    canonical = f"{origin}{profile_path(user.get('username') or username)}"
     # Vorschau für Suchmaschinen und Link-Karten (#2118): Plattform und Spiele nur mit der Stufe „öffentlich“.
     from routes.user_routes import _field_visible
     platform = user.get("main_platform") if _field_visible(user, "main_platform", True) else None
@@ -843,10 +848,10 @@ def static_page_meta(slug: str, base: dict) -> dict | None:
         "events": ("Events", "Gaming Events, Vereinsabende, LAN-Partys, Messen und öffentliche Termine von THE LION SQUAD eSports in Tirol."),
         "liga": ("Liga", "Die Ligen von THE LION SQUAD: Seasons, Staffeln, Tabellen, Spielpläne und Ergebnisse je Spieltag."),
         "tournaments": ("eSports Turniere", "Aktuelle eSports Turniere von THE LION SQUAD: Anmeldung, Check-in, Brackets, Spielpläne und Ranglisten für Gaming Events in Tirol."),
-        "fastlap": ("F1 Fast Lap Challenges", "F1 und Racing Fast-Lap-Challenges von THE LION SQUAD mit Live-Leaderboards, Strecken, Zeiten und Championship-Wertung."),
+        "fastlap": ("F1 Fast Lap Challenges", "F1 und Racing Fast-Lap-Challenges von THE LION SQUAD mit Live-Ranglisten, Strecken, Zeiten und Gesamtwertung."),
         "f1": ("F1 Fast Lap Challenges", "Formel-1-Fast-Lap-Challenges, aktuelle Strecken, Bestenlisten und Racing Events von THE LION SQUAD eSports."),
         "references": ("Referenzen", "Externe Turniere, Ligen, Platzierungen, Podien und Erfolge von THE LION SQUAD eSports."),
-        "teams": ("Teams & Clans", "Teams, Squads und Clans der THE LION SQUAD Gaming Community: Profile, Mitglieder, Join-Codes und eSports Organisation."),
+        "teams": ("Teams & Clans", "Teams, Co-Teams und Clans der THE LION SQUAD Gaming Community: Profile, Mitglieder, Beitrittscodes und eSports Organisation."),
         "players": ("Community-Spieler", "Öffentliche Spielerprofile, Community-Mitglieder und aktive eSports-Profile von THE LION SQUAD."),
         "members": ("Vereinsmitglieder", "Offizielle Vereinsmitglieder von THE LION SQUAD eSports: Gaming Profile, Rollen, Teams und Community aus Tirol."),
         "membership": ("Mitgliedschaft", "Mitglied werden bei THE LION SQUAD: eSports Verein, Gaming Community, Mitgliederbereich, Events, Turniere und Vorteile in Tirol."),

@@ -7,10 +7,10 @@ steht, was das **Event** darum herum tut.
 
 **Wo im Admin:**
 
-- **Admin → Content → Events** (`/admin/events`) – die Liste mit Suche und Filtern, **Neues Event**, je Zeile **Anm.**, **Rückblick**, **Bearbeiten**
+- **Admin → eSports → Events** (`/admin/events`) – die Liste mit Suche und Filtern, **Neues Event**, je Zeile **Anm.**, **Rückblick**, **Bearbeiten**
 - **Anmeldungen & Einlass** (`/events/<name>/leitung`) – die Arbeitsseite für die Anmeldungen eines Events: Suche, „noch nicht da“,
   Einchecken, Nachrücken, Nachricht an alle, Drucken. Erreichbar über **Anm.** in der Liste und auf der Event-Seite.
-- **Admin → Content → Events → Neues Event** bzw. **Bearbeiten** (`/admin/events/new`, `/admin/events/<id>`) – das Formular mit allem unten
+- **Admin → eSports → Events → Neues Event** bzw. **Bearbeiten** (`/admin/events/new`, `/admin/events/<id>`) – das Formular mit allem unten
 - **Admin → Content → Galerie** – Alben und eingesandte Fotos, siehe [Inhalte](inhalte.md)
 
 Wer das sieht: der Bereich **Turnierleitung**. Den Newsletter zu einem Event verschickt, wer das Event bearbeiten darf; ein zweites
@@ -55,7 +55,7 @@ Mal senden nur Redaktion und System.
 
 ## 2. Einrichten Schritt für Schritt
 
-1. **Event anlegen:** Admin → Content → Events → **Neues Event**. **Name** eintragen, der **Slug** (die Adresse) entsteht daraus.
+1. **Event anlegen:** Admin → eSports → Events → **Neues Event**. **Name** eintragen, der **Slug** (die Adresse) entsteht daraus.
    Das genügt zum Speichern; das Event startet als **Entwurf** und ist nicht öffentlich (3.1).
 2. **Zeiten und Ort:** Start, Ende und Einlass setzen, den Ort eintragen. Geht das Event über mehrere Tage oder Orte, die
    Schalter dafür nutzen (3.2, 3.3).
@@ -73,7 +73,7 @@ Mal senden nur Redaktion und System.
 
 ### 3.1 Event anlegen und veröffentlichen
 
-**Admin → Content → Events → Neues Event.** Die Seite hat links die Kästen, rechts „Veröffentlichung“, „Zeiten und Plätze“ und
+**Admin → eSports → Events → Neues Event.** Die Seite hat links die Kästen, rechts „Veröffentlichung“, „Zeiten und Plätze“ und
 „Verteilen“.
 
 - **Das Event:** **Name**, **Slug**, **Beschreibung** (Markdown; HTML wird nicht roh gezeigt), **Kopfbild (Banner)**.
@@ -90,11 +90,14 @@ Mal senden nur Redaktion und System.
   bestehende Events.
 - **Sichtbarkeit:** **Öffentlich**, **Nur registrierte Community**, **Nur Vereinsmitglieder** oder **Nur intern**. Wer das Event
   nicht sehen darf, bekommt „Dieses Event ist nicht öffentlich zugänglich“.
-- **Status:** **Entwurf**, **Angekündigt**, **Anmeldung offen**, **Anmeldung geschlossen**, **Check-in offen**, **Läuft**,
-  **Pausiert**, **Beendet**, **Ergebnisse veröffentlicht**, **Archiviert**, **Abgesagt**. Für neue Events reichen **Entwurf** und
-  **Angekündigt**: Anmeldung offen, Läuft und Beendet rechnet die Seite aus den Datumsfeldern selbst. Von Hand wirken sofort
+- **Status:** **Entwurf**, **Angekündigt**, **Check-in offen**, **Läuft**, **Pausiert**, **Beendet**, **Ergebnisse veröffentlicht**,
+  **Archiviert**, **Abgesagt**. Für neue Events reichen **Entwurf** und **Angekündigt**: Ob die Anmeldung offen ist, ob das Event läuft
+  und wann es beendet ist, rechnet die Seite aus den Datumsfeldern selbst. Darum stehen **Anmeldung offen** und **Anmeldung geschlossen**
+  nicht zur Wahl (nur bei einem Event, das schon so steht). Früher schließen: **Anmeldung schließt** setzen. Von Hand wirken sofort
   Entwurf, Pausiert, Beendet, Ergebnisse veröffentlicht, Archiviert und Abgesagt; **Check-in offen** gilt bis zum Beginn.
-- **Darstellung und Sponsoren:** **Nur Online**, **Hybrid**, **Teilnehmer öffentlich anzeigen**, **Event von uns** (nur dann zeigt
+- **Austragung** (rechts unter „Zeiten und Plätze“): **Vor Ort**, **Online** oder **Hybrid (vor Ort und online)**. Bei Online
+  fehlen Einlass, Ort, Adresse und Karte – es gibt sie dort nicht.
+- **Darstellung und Sponsoren:** **Teilnehmer öffentlich anzeigen**, **Event von uns** (nur dann zeigt
   das Event Sponsoren), **Sponsoren beim Event anzeigen** und die Auswahl der Event-Sponsoren (es erscheinen nur Sponsoren mit
   Haken „Events“; leer heißt: alle Event-Sponsoren). Dazu die Partner, die auf der Partnerseite unter „Gemeinsam“ stehen.
 - **Vorschau beim Teilen:** Bei „Nur registrierte Community“ und „Nur Vereinsmitglieder“ erlaubt der Haken **Beim Teilen Titel und
@@ -104,15 +107,21 @@ Mal senden nur Redaktion und System.
   alle Anmeldungen als storniert, jede Person bekommt eine Benachrichtigung und – wenn sie Mails zu Turnier-Updates zulässt –
   die Mail „Event abgesagt“ (je Absage und Person nur einmal; Text unter E-Mail → E-Mail-Vorlagen). Offene und fehlgeschlagene Rechnungsaufträge werden storniert; eine
   schon gestellte Rechnung kommt als Prüffall in die Finanzübersicht. Die Event-Seite zeigt **Event abgesagt** statt der
-  Anmeldung. Die Zahl zählt alle bestehenden Anmeldungen, auch wenn die Anmeldung inzwischen ausgeschaltet ist. Wird die Absage
-  zurückgenommen, bleiben die Anmeldungen storniert.
+  Anmeldung; in der öffentlichen Liste bleibt das Event bis zum Termin unter **Kommend** stehen, gedämpft und mit dem Kennzeichen **Abgesagt**
+  (die Startseite zeigt es nicht mehr). Die Zahl zählt alle bestehenden Anmeldungen, auch wenn die Anmeldung inzwischen ausgeschaltet ist. Wird die Absage
+  zurückgenommen, bleiben die Anmeldungen storniert. Solange die Absage steht, lässt sich unter **Anmeldungen & Einlass** niemand wieder
+  aktivieren oder einchecken.
 - **Termin oder Ort ändern:** Gibt es Anmeldungen, fragt das Formular beim Speichern **Angemeldete informieren?**.
-  **Informieren** schickt allen (samt Warteliste) den neuen Termin und Ort, **Ohne Nachricht speichern** nur das Formular.
+  **Informieren** schickt allen (samt Warteliste) den neuen Termin und Ort, **Ohne Nachricht speichern** nur das Formular. Turniere und Fast
+  Laps bleiben auf ihrem Tag: Liegen sie danach außerhalb des Events, sagt das Speichern das, und im Programm steht bei ihnen **Liegt außerhalb
+  des Events – Tag prüfen**.
 - **Löschen:** in der Liste das Papierkorb-Symbol. Gelöscht wird endgültig und nur, wenn nichts mehr daran hängt: keine
   Anmeldung (sonst zuerst absagen), keine gestellte Rechnung (dann archivieren) und kein verknüpftes Turnier mit Anmeldungen.
   Turniere, Fast Laps und Alben bleiben, sind danach aber keinem Event mehr zugeordnet. Das Löschen steht im Protokoll.
 
-Die **Liste** hat Suche, Filter für Status, Typ und Sichtbarkeit, die Zahl der Plätze und einen **CSV**-Export der gefilterten Zeilen.
+Die **Liste** hat Suche, Filter für Status, Typ und Sichtbarkeit, die Zahl der Plätze (bei wartenden Personen auch die Warteliste und was frei
+ist) und einen **CSV**-Export der gefilterten Zeilen. Sie lädt die neuesten 100 Events; **Weitere laden** holt die nächsten. Suche und Filter
+gelten für die geladenen.
 
 ### 3.2 Mehrtägige Events
 
@@ -169,7 +178,8 @@ Im Kasten **Anmeldung** den Haken **Registrierung/Anmeldung für dieses Event an
 - **Anmeldung öffnet** und **Anmeldung schließt** (beide leer: sofort offen). Dazu **Max. Teilnehmer** unter „Zeiten und Plätze“
   (leer = unbegrenzt, sonst mindestens 1).
 - **Externer Anmeldelink:** Wer die Anmeldung woanders führt, trägt die Adresse ein; dann zeigt die Seite nur einen Knopf
-  **Anmelden** dorthin, und Kosten, Warteliste und Discord entfallen.
+  **Anmelden** dorthin, und Kosten, Warteliste und Discord entfallen. Auch **Max. Teilnehmer** und die Begleitpersonen sind dann
+  ausgeblendet, die Liste zeigt **Extern** statt der Plätze und keinen Knopf **Anm.** – die Anmeldungen stehen ja woanders.
 - **Begleitpersonen erlauben** und **Max. Begleitpersonen pro Anmeldung** (bis 20). Jede Begleitperson braucht einen Platz.
 - **Anmeldung über Discord erlauben:** an ab Werk. Mit externem Link oder Begleitpersonen gilt sie nur auf der Website.
   Einrichtung im [Discord-Kapitel](discord.md).
@@ -178,10 +188,31 @@ Im Kasten **Anmeldung** den Haken **Registrierung/Anmeldung für dieses Event an
 
 1. Auf der Event-Seite zeigt der Fakten-Kasten **Anmelden** (ohne Konto: **Einloggen zum Anmelden**). Das Formular steht unter
    **Dein Event** mit Begleitpersonen, einem optionalen Hinweis und, bei Kosten, der Summe vor dem Absenden.
-2. Ist das Event **voll**, landet die Person auf der **Warteliste**. Die Warteliste rückt **nicht von selbst** nach.
-3. Danach steht da **Du bist dabei** (oder **Warteliste**) mit der Zahl der Plätze.
+2. Ist das Event **voll** (oder reicht der Platz nur wegen der Begleitpersonen nicht), sagt das Formular das schon vorher: Der Knopf heißt
+   **Auf die Warteliste** und nennt keinen Preis. Bezahlt wird erst beim Nachrücken. Die Warteliste rückt **nicht von selbst** nach,
+   weil Plätze etwas kosten können: Die Leitung sieht den freien Platz und rückt per Knopf nach.
+3. Danach steht da **Du bist dabei** (oder **Warteliste**) mit der Zahl der Plätze. Dazu kommt eine Nachricht in der Glocke und, wenn die
+   Person Mails zu Turnier-Updates zulässt, die Mail **Event: Stand der Anmeldung** (siehe unten).
 4. **Stornieren** (leiser Link, mit Rückfrage) geht **bis zum Beginn** des Events und **nicht nach dem Check-in**. Danach bittet die
    Seite, sich an die Turnierleitung zu wenden. Die Regel gilt gleich auf Website, App und Discord.
+5. **Anmeldung ändern** (Website): Begleitpersonen und Hinweis lassen sich mit derselben Frist selbst ändern. Mehr
+   Begleitpersonen brauchen freie Plätze. Bei Kosten rechnet der Beitrag neu, solange noch keine Rechnung erstellt ist;
+   danach ändert die Begleitpersonen nur die Turnierleitung, der Hinweis geht weiter.
+6. **Wer als angemeldet steht:** Bei **Teilnehmer öffentlich anzeigen** nennt die Event-Seite unter **Angemeldet** nur, wer einen Platz hat; die
+   **Warteliste** steht getrennt darunter. Nach zwölf Namen steht **+N weitere**, ein Tipp zeigt alle.
+
+**Nachrichten zur Anmeldung** (Glocke, Push, Discord nach Einstellung und die Mail **Event: Stand der Anmeldung**, wenn die Person Mails zu
+Turnier-Updates zulässt):
+
+| Was passiert | Nachricht |
+| --- | --- |
+| Selbst angemeldet (Website, App, Discord) | **Du bist dabei** – ohne Push, die Person sieht es schon |
+| Event voll | **Warteliste** – ebenfalls ohne Push |
+| Die Leitung rückt nach | **Nachgerückt**, bei Kosten mit dem Betrag |
+| Die Leitung setzt auf **Storniert** oder **Nicht erschienen** | **Anmeldung storniert** bzw. **Nicht erschienen**, bei Kosten mit dem Satz zur Rechnung |
+| Die Leitung holt jemanden zurück oder setzt auf die Warteliste | **Du bist wieder dabei** bzw. **Warteliste** |
+
+Einchecken, **Rückgängig** und das eigene Abmelden schicken nichts. Personen ohne Konto (an der Tür eingetragen) erreicht keine Nachricht.
 
 **Anmeldungen verwalten – Anmeldungen & Einlass:** In der Events-Liste führt der Knopf **Anm.** (nur bei Events mit Anmeldung) auf die
 Seite **Anmeldungen & Einlass** (`/events/<name>/leitung`); auf der Event-Seite steht für die Turnierleitung derselbe Link. Es gibt nur
@@ -192,13 +223,30 @@ diese eine Liste der Anmeldungen.
 - **An der Tür (Handy):** Namen tippen (Groß/klein und Umlaute egal, „zoe“ findet „Zoë“), dann **Da**. Der Zähler stimmt sofort, das
   Suchfeld ist wieder leer für den nächsten Namen. Unten und in der Zeile steht 10 Sekunden lang **Rückgängig**; danach ändert ihr den **Status** in den
   Details der Person.
-- **Nachrücken:** Unter **Warteliste** der Knopf **Nachrücken**. Ist kein Platz frei, kommt „Kapazität wäre überschritten“.
-- **Details:** Ein Tipp auf den Namen zeigt Plätze, **Begleitpersonen** (mit − und +), die Notiz der Person, die Mail-Adresse **gekürzt**
-  (`p***@…`) und den **Status** zum Ändern: **Angemeldet**, **Da**, **Warteliste**, **Nicht erschienen**, **Storniert**. Am Handy
-  klappen die Details unter der Zeile auf, auf Tablet quer und PC stehen sie rechts neben der Liste.
+- **1 Platz frei:** Ist ein Platz frei und jemand wartet, steht über der Liste **1 Platz frei · 2 auf der Warteliste** mit dem Namen, der als
+  Nächstes dran ist, und **Zur Warteliste**. Die Warteliste steht in der Reihenfolge der Anmeldung.
+- **Nachrücken:** Unter **Warteliste** der Knopf **Nachrücken**. Die Person bekommt Bescheid. Ist kein Platz frei, kommt „Kapazität wäre
+  überschritten“.
+- **Details:** Ein Tipp auf den Namen zeigt Plätze, **Begleitpersonen** (mit − und +), die Notiz der Person, die **Interne Notiz** (für die
+  Leitung, **Notiz speichern**; leer speichern löscht sie. Die Person sieht sie nicht in der Anmeldung, bei einer Datenauskunft wird sie aber
+  mitgeliefert – schreibt also nur hinein, was sie lesen darf), die Mail-Adresse **gekürzt** (`p***@…`) und den **Status** zum Ändern:
+  **Angemeldet**, **Da**, **Warteliste**, **Nicht erschienen**, **Storniert**. Am Handy klappen die Details unter der Zeile auf, auf Tablet
+  quer und PC stehen sie rechts neben der Liste.
 - **Da** (eingecheckt) heißt: die Person war da. Das bringt ihr einen Eintrag in der Jahreswertung, XP und kann Erfolge
-  freischalten (siehe [Erfolge, Level und Jahreswertung](erfolge.md)).
-- **Storniert** oder **Nicht erschienen** beendet auch offene Rechnungsaufträge.
+  freischalten (siehe [Erfolge, Level und Jahreswertung](erfolge.md)). Wird **Da** zurückgenommen (auch durch **Storniert**, **Nicht erschienen**
+  oder die Absage des Events), gehen Punkte und XP zurück – auch bei mehrfachem Hin und Her nie doppelt. Eine abgeschlossene Jahreswertung
+  bleibt, wie sie ist; schon freigeschaltete Erfolge bleiben ebenfalls.
+- **Storniert** oder **Nicht erschienen** fragt vorher nach und sagt, was folgt: Offene Rechnungsaufträge werden storniert, eine schon
+  gestellte Rechnung kommt als Prüffall in die Finanzübersicht, die Person bekommt eine Nachricht.
+- **Person an der Tür:** Jemand steht ohne Anmeldung da? Knopf **Person an der Tür**, Name eintragen (dazu Begleitpersonen, wenn erlaubt),
+  **Eintragen**. Das geht ohne Konto und ohne Preis; die Person ist gleich **Da**, belegt einen Platz und steht im Protokoll. Ist das Event
+  voll, sagt die Seite das: erst **Max. Teilnehmer** erhöhen oder eine Anmeldung stornieren. Eintragungen ohne Konto stehen nicht in der
+  öffentlichen Teilnehmerliste, bekommen keine Nachricht, keine Punkte und keine Rückfrage „Wie war …?“. Ein Tipp auf den Namen zeigt
+  **Name speichern** (bei einem Tippfehler) und **Eintrag löschen**. Ohne Konto gibt es keine Datenauskunft und keine Kontolöschung: Fragt jemand
+  danach, läuft das über die Turnierleitung – sie schaut in der Liste nach, berichtigt oder löscht den Eintrag. Im Protokoll steht nur die Kennung,
+  nicht der Name. Nach der Frist des Adminprotokolls bleibt von selbst nur die Zählung; Name und Notizen werden gelöscht.
+- **CSV:** lädt die Liste des gewählten Filters herunter – Name, Status, Plätze, Begleitpersonen, Anmeldedatum. Keine Mail-Adressen, keine Notizen,
+  kein Geld. Jeder Abruf steht im Protokoll.
 - **Drucken:** öffnet die Druckansicht – Liste der Angemeldeten mit Kästchen zum Abhaken, Begleitpersonen, Warteliste,
   Druckzeit und QR-Code; auf Wunsch mit Tagesplan (Plan B auf Papier, siehe [Turniere 3.13](turniere.md#313-plan-b-auf-papier)).
 
@@ -225,7 +273,8 @@ externen Anmeldelink; bearbeiten darf ihn der Bereich **Finanzen**. Kurz:
   haken die Teilnehmenden sie selbst an.
 - **Rechnung anlegen:** **gleich nach der verbindlichen Anmeldung** oder **erst nach Freigabe in der Finanzübersicht**.
 - Der Preis wird bei der **verbindlichen** Anmeldung eingefroren; spätere Änderungen betreffen nur neue Anmeldungen. Die
-  **Warteliste** bezahlt erst beim Nachrücken.
+  **Warteliste** bezahlt erst beim Nachrücken. Holt die Leitung eine stornierte Anmeldung zurück, gilt der aktuelle Preis mit einem neuen
+  Rechnungsauftrag; gibt es schon eine Rechnung, bleibt sie, und die Änderung kommt als Prüffall in die Finanzübersicht.
 - Die Rechnung entsteht in Dolibarr, sobald der Schreibzugriff eingerichtet ist (Einstellungen → Dolibarr). Teilnehmende finden sie unter **Meine
   Rechnungen**. Alles Weitere: [Abrechnung](../ABRECHNUNG.md), [Dolibarr](../DOLIBARR.md).
 
@@ -235,7 +284,7 @@ Hat ein Event Turniere, bietet die Seite direkt **nach der Event-Anmeldung** ein
 Events in einem Schritt anmelden.
 
 - Jedes Einzel-Turnier hat einen Haken mit Tag, Uhrzeit, Spielart, Startgeld und freien Plätzen.
-- **Team-Turniere** haben keinen Haken; dort steht, dass der Kapitän das Team anmeldet, der Kapitän bekommt den Knopf **Team
+- **Team-Turniere** haben keinen Haken; dort steht, dass die Teamleitung das Team anmeldet, die Teamleitung bekommt den Knopf **Team
   anmelden**. **Fast Laps** brauchen keine Anmeldung: Man fährt einfach die Zeit.
 - Geschlossene oder deaktivierte Turniere stehen ohne Haken mit dem Grund da. Vorbeigegangene, abgesagte und Entwurfs-Turniere fehlen.
 - **Anmelden** meldet je Haken ganz normal an, mit **allen Regeln der Turnierseite**: Sperren, Fristen, Event-Pflicht, Startgeld, voll
@@ -365,6 +414,11 @@ Name, Bild und dem Ort: Event und Turniere, bei Teams mit Teamname. Wichtig für
 | Kein Anmelden-Knopf | Haken Anmeldung aus, Frist noch nicht offen oder schon vorbei, Entwurf, oder es gibt einen externen Anmeldelink | Haken, **Anmeldung öffnet** und **schließt** prüfen |
 | „Die Anmeldung ist aktuell nicht offen“ | Außerhalb der Frist | Fristen im Kasten Anmeldung ändern |
 | Person landet auf der Warteliste | Alle Plätze (mit Begleitpersonen) sind vergeben | **Max. Teilnehmer** erhöhen oder die Person unter **Anmeldungen & Einlass** nachrücken lassen |
+| Platz frei, aber niemand rückt nach | Gewollt: Plätze können etwas kosten, die Leitung entscheidet | Unter **Anmeldungen & Einlass** bei **1 Platz frei** auf **Zur Warteliste** und **Nachrücken** |
+| „Das Event ist voll“ bei **Person an der Tür** | Alle Plätze sind vergeben | **Max. Teilnehmer** erhöhen oder eine Anmeldung stornieren |
+| Knopf **Anm.** fehlt, **Extern** steht in der Liste | Das Event hat einen externen Anmeldelink | Gewollt; die Anmeldungen stehen auf der anderen Seite. Sonst den Link entfernen |
+| Status **Anmeldung geschlossen** fehlt in der Auswahl | Ob die Anmeldung offen ist, rechnet die Seite aus den Fristen | **Anmeldung schließt** auf jetzt setzen |
+| Punkte nach zurückgenommenem Check-in noch da | Die Jahreswertung ist schon abgeschlossen | Gewollt: abgeschlossene Wertungen bleiben |
 | „Kapazität wäre überschritten“ beim Nachrücken | Nicht genug freie Plätze | Plätze erhöhen oder erst eine andere Anmeldung stornieren |
 | Person kann nicht mehr stornieren | Das Event hat begonnen oder sie ist schon eingecheckt | Unter **Anmeldungen & Einlass** in den Details den Status auf **Storniert** setzen |
 | „Die Zahl der Empfänger hat sich geändert“ | Zwischen Vorschau und Senden hat sich jemand an- oder abgemeldet | Neue Zahl prüfen und noch einmal senden |
@@ -405,11 +459,12 @@ Ja. Es steht dann einzeln in der Liste.
 Nein, ein Turnier hat ein Event.
 
 **Rückt die Warteliste von selbst nach?**
-Nein. Ihr tippt unter **Anmeldungen & Einlass** bei der Person auf **Nachrücken**; der Preis wird dabei eingefroren.
+Nein, weil Plätze etwas kosten können. Die Seite **Anmeldungen & Einlass** zeigt **1 Platz frei**; ihr tippt bei der Person auf **Nachrücken**,
+der Preis wird dabei eingefroren und sie bekommt Bescheid.
 
 **Sehen Teilnehmende, wer sonst angemeldet ist?**
-Die Event-Seite zeigt eine Liste der Angemeldeten, wenn **Teilnehmer öffentlich anzeigen** an ist. Freunde sehen sich nur, wenn beide
-das erlauben (3.12).
+Die Event-Seite zeigt eine Liste der Angemeldeten und getrennt die Warteliste, wenn **Teilnehmer öffentlich anzeigen** an ist. An der Tür
+Eingetragene stehen dort nicht. Freunde sehen sich nur, wenn beide das erlauben (3.12).
 
 **Wie viele Fotos kann ein Mitglied einsenden?**
 Bis zu 20 je Album, bis sieben Tage nach dem Event; Einzelheiten in [Inhalte](inhalte.md).

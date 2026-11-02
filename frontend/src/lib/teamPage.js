@@ -5,6 +5,12 @@ import { viennaDateTime } from "@/lib/vienna";
 /** Der Name des Schlüssels in der Adresse: /teams/<id>?einladung=<schlüssel>. */
 export const INVITE_PARAM = "einladung";
 
+// Länge von Teamname und Kürzel (#2128, TM11) - dieselben Grenzen wie im Server (models.py).
+export const TEAM_NAME_MIN = 2;
+export const TEAM_NAME_MAX = 60;
+export const TEAM_TAG_MIN = 2;
+export const TEAM_TAG_MAX = 8;
+
 const OUTCOME_LABELS = { win: "Sieg", loss: "Niederlage", draw: "Unentschieden" };
 
 /** „Sieg“, „Niederlage“, „Unentschieden“ - bei Durchgängen „Platz 2“. */
@@ -45,9 +51,9 @@ export function inviteTokenFrom(search) {
 }
 
 // Wappen-Kopf (#1347): Rollen in Alltagsworten unter den Gesichtern.
-export const ROLE_LABELS = { captain: "Kapitän", co_captain: "Co-Kapitän", player: "Spieler" };
+export const ROLE_LABELS = { captain: "Teamleitung", co_captain: "Co-Leitung", player: "Mitglied" };
 
-/** Die Rolle eines Mitglieds: Kapitän (Leitung), Co-Kapitän oder Spieler. */
+/** Die Rolle eines Mitglieds: Teamleitung, Co-Leitung oder Mitglied. */
 export function memberRole(team, member) {
   if (!team || !member) return "player";
   if (team.leader_id === member.id) return "captain";
@@ -55,7 +61,7 @@ export function memberRole(team, member) {
   return "player";
 }
 
-/** Die Gesichter-Reihe: Kapitän zuerst, dann die Co-Kapitäne, dann alle anderen in ihrer Reihenfolge. */
+/** Die Gesichter-Reihe: Teamleitung zuerst, dann die Co-Leitungen, dann alle anderen in ihrer Reihenfolge. */
 export function orderedFaces(team) {
   const order = { captain: 0, co_captain: 1, player: 2 };
   return (team?.members || [])
@@ -82,13 +88,21 @@ export function dissolveSentence(preview) {
   const chat = Number(preview.chat_messages || 0);
   const parts = [
     members === 1 ? "Das Mitglied verliert das Team" : `Alle ${members} Mitglieder verlieren das Team`,
-    chat ? `der Team-Chat mit ${chat === 1 ? "einer Nachricht" : `${chat} Nachrichten`} wird gelöscht` : "der Team-Chat wird gelöscht",
+    chat ? `der Team-Chat mit ${chat === 1 ? "einer Nachricht" : `${chat} Nachrichten`} ist nicht mehr erreichbar` : "der Team-Chat ist nicht mehr erreichbar",
   ];
   const titles = (preview.withdraw || []).map((row) => `„${row.title}“`);
   if (titles.length === 1) parts.push(`die Anmeldung für ${titles[0]} wird zurückgezogen`);
   if (titles.length > 1) parts.push(`die Anmeldungen für ${titles.slice(0, -1).join(", ")} und ${titles[titles.length - 1]} werden zurückgezogen`);
   const last = parts.pop();
-  return `${parts.join(", ")} und ${last}. Fertige Turniere und Auszeichnungen bleiben.`;
+  const days = Number(preview.restore_days || 0);
+  const undo = days ? ` ${days} Tage lang lässt sich das Team wiederherstellen (zurückgezogene Anmeldungen bleiben zurückgezogen), danach ist es endgültig weg.` : "";
+  return `${parts.join(", ")} und ${last}. Fertige Turniere und Auszeichnungen bleiben.${undo}`;
+}
+
+/** Noch wie lange wiederherstellbar: „noch 1 Tag“, „noch 12 Tage“. */
+export function restoreDaysLeft(days) {
+  const left = Number(days || 0);
+  return left === 1 ? "noch 1 Tag" : `noch ${left} Tage`;
 }
 
 /** Eingetippt wie der Teamname - Groß/klein und doppelte Leerzeichen zählen nicht (wie im Server). */

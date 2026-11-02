@@ -6,24 +6,42 @@ import { VISIBILITY_GROUPS, applyGroupLevel, fieldLevel, groupLevel, visibilityG
 const contact = VISIBILITY_GROUPS.find((group) => group.k === "contact");
 
 test("ohne Einstellung ist alles oeffentlich", () => {
-  expect(fieldLevel(undefined, "email")).toBe("public");
+  expect(fieldLevel(undefined, "discord")).toBe("public");
   expect(groupLevel({}, contact)).toBe("public");
+});
+
+test("TikTok ist ohne gewählte Stufe privat, eine gewählte Stufe gilt (#2113)", () => {
+  const social = VISIBILITY_GROUPS.find((group) => group.k === "social");
+  expect(fieldLevel({}, "tiktok")).toBe("private");
+  expect(fieldLevel(undefined, "tiktok")).toBe("private");
+  expect(fieldLevel({ tiktok: "public" }, "tiktok")).toBe("public");
+  expect(groupLevel({}, social)).toBe("mixed");
+  expect(groupLevel(applyGroupLevel({}, social, "public"), social)).toBe("public");
+});
+
+test("die bevorzugte Rolle ist ohne gewählte Stufe privat, E-Mail hat keinen Schalter, Website und Abos haben einen (#2126)", () => {
+  const keys = VISIBILITY_GROUPS.flatMap((group) => group.fields.map((field) => field.k));
+  expect(keys).not.toContain("email");
+  expect(keys).toEqual(expect.arrayContaining(["website", "gaming_subscriptions", "preferred_role"]));
+  expect(fieldLevel({}, "preferred_role")).toBe("private");
+  expect(fieldLevel({}, "website")).toBe("public");
+  expect(fieldLevel({ preferred_role: "community" }, "preferred_role")).toBe("community");
 });
 
 test("die Schnellwahl setzt alle Felder der Gruppe und laesst andere Gruppen stehen", () => {
   const next = applyGroupLevel({ steam: "private" }, contact, "members");
-  expect(next).toEqual({ steam: "private", email: "members", discord: "members", city: "members", country: "members" });
+  expect(next).toEqual({ steam: "private", discord: "members", city: "members", country: "members", website: "members" });
   expect(groupLevel(next, contact)).toBe("members");
 });
 
 test("unterschiedliche Stufen in einer Gruppe heissen gemischt", () => {
-  expect(groupLevel({ email: "private" }, contact)).toBe("mixed");
+  expect(groupLevel({ discord: "private" }, contact)).toBe("mixed");
 });
 
-test("jedes der 39 Felder steht in genau einer Gruppe", () => {
+test("jedes der 42 Felder steht in genau einer Gruppe", () => {
   const keys = VISIBILITY_GROUPS.flatMap((group) => group.fields.map((field) => field.k));
   expect(new Set(keys).size).toBe(keys.length);
-  expect(keys).toHaveLength(39);
+  expect(keys).toHaveLength(42);
 });
 
 // Abgehakte Plattformen (#558) fehlen in der Sichtbarkeit; ohne Liste bleibt alles wie es ist.
@@ -33,7 +51,7 @@ test("abgehakte Plattformen fallen aus den Gruppen, leere Gruppen verschwinden",
   const keys = groups.flatMap((group) => group.fields.map((field) => field.k));
   expect(keys).not.toContain("twitch");
   expect(keys).not.toContain("psn");
-  expect(keys).toHaveLength(37);
+  expect(keys).toHaveLength(40);
   const socialKeys = VISIBILITY_GROUPS.find((group) => group.k === "social").fields.map((field) => field.k);
   expect(visibilityGroupsFor(socialKeys).some((group) => group.k === "social")).toBe(false);
 });

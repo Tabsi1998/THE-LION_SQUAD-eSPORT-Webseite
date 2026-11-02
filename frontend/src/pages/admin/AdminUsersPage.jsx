@@ -10,9 +10,11 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useModalBehavior } from "@/hooks/useModalBehavior";
 import { toast } from "sonner";
 import { AREA_HINTS, AREA_LABELS, GRANTABLE_AREAS, ROLE_AREAS, roleLabel } from "@/lib/permissions";
-import { banState, effectiveAreas, invitationText, rightsChange } from "@/lib/userRights";
+import { USERNAME_RULE_HINT, usernameProblem } from "@/lib/username";
+import { listLimitHint } from "@/lib/membershipMail";
+import { banState, effectiveAreas, invitationText, rightsChange, rightsHistoryLine } from "@/lib/userRights";
 import { viennaDate } from "@/lib/vienna";
-import { AlertTriangle, ChevronDown, Pencil, Plus, ShieldCheck, X } from "lucide-react";
+import { AlertTriangle, ChevronDown, Pencil, Plus, X } from "lucide-react";
 
 // Alle Benutzer (#1357): die Liste ist nur zum Lesen - Name, Konto-Art, Rolle als Wort, Bereiche als Schilder, gesperrt
 // ja/nein. „Bearbeiten“ öffnet ein Seitenblatt: Rolle und Freigaben ändert nur der Superadmin, erst mit „Speichern“ und
@@ -59,7 +61,7 @@ function statusText(user) {
 }
 
 export default function AdminUsersPage() {
-  const { isSuperAdmin, user: me } = useAuth();
+  const { isSuperAdmin, user: me, can } = useAuth();
   const [list, setList] = useState([]);
   const [q, setQ] = useState("");
   const [creating, setCreating] = useState(false);
@@ -95,7 +97,8 @@ export default function AdminUsersPage() {
           </button>
         )}
       </div>
-      <input placeholder="Name, Benutzername oder E-Mail suchen …" value={q} onChange={(e) => setQ(e.target.value)} data-testid="users-search" className="w-full max-w-md bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm mb-4" />
+      <input placeholder="Name, Benutzername, E-Mail oder Mitgliedsnummer suchen …" value={q} onChange={(e) => setQ(e.target.value)} data-testid="users-search" className="w-full max-w-md bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm mb-4" />
+      {listLimitHint(list.length) && <p className="mb-4 border border-[#FF9500]/40 bg-[#FF9500]/5 rounded-sm p-3 text-sm text-white/80" data-testid="users-limit-hint">{listLimitHint(list.length)}</p>}
 
       <details className="mb-5 border border-white/10 bg-[#121212] rounded-sm group" data-testid="roles-info">
         <summary className="cursor-pointer list-none px-4 py-3 flex items-center justify-between gap-3">
@@ -103,12 +106,7 @@ export default function AdminUsersPage() {
           <ChevronDown className="w-4 h-4 text-white/50 transition group-open:rotate-180" />
         </summary>
         <div className="px-4 pb-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <p className="text-xs text-white/50 max-w-2xl">Die Rolle ist die Grundstufe; einzelne Bereiche (Turnierleitung, Redaktion, Vereinsverwaltung, Finanzen) gibt der Superadmin je Person frei. Wer einen Vorstandsposten hält, hat die Vereinsverwaltung von selbst.</p>
-            <Link to="/admin/audit?action=user.role_change" className="inline-flex items-center gap-2 rounded-sm border border-white/15 px-3 py-2 text-xs font-bold uppercase tracking-wider text-white/65 hover:border-[#29B6E8]/45 hover:text-white">
-              <ShieldCheck className="h-3.5 w-3.5" /> Rollen-Protokoll
-            </Link>
-          </div>
+          <p className="text-xs text-white/50 max-w-2xl">Die Rolle ist die Grundstufe; einzelne Bereiche (Turnierleitung, Redaktion, Vereinsverwaltung, Finanzen) gibt der Superadmin je Person frei. Wer einen Vorstandsposten hält, hat die Vereinsverwaltung von selbst. Was sich bei einer Person geändert hat, steht unter „Bearbeiten“ im Rechte-Verlauf.</p>
           <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {ROLE_OPTIONS.map((role) => {
               const info = ROLE_INFO[role] || { can: [], cannot: [] };
@@ -202,15 +200,19 @@ export default function AdminUsersPage() {
       </ul>
 
       {creating && <CreateUserModal onClose={() => setCreating(false)} onCreated={load} onSaved={() => { setCreating(false); load(); }} />}
-      {editing && <UserSheet key={editing.id} target={editing} me={me} isSuperAdmin={isSuperAdmin} onClose={closeSheet} onChanged={load} />}
+      {editing && <UserSheet key={editing.id} target={editing} me={me} isSuperAdmin={isSuperAdmin} canClub={Boolean(can?.("club"))} onClose={closeSheet} onChanged={load} />}
     </AdminLayout>
   );
 }
 
 // Das Blatt eines Kontos: Konto, Rolle und Freigaben, Sperren, Mehr. Ändern nur mit „Speichern“ und Rückfrage.
-function UserSheet({ target, me, isSuperAdmin, onClose, onChanged }) {
+function UserSheet({ target, me, isSuperAdmin, canClub, onClose, onChanged }) {
   const confirm = useConfirm();
   const name = displayName(target);
+  // Profil zurücksetzen (#2112): Vereinsverwaltung, fremde Konten; Superadmin-Konten nur durch den Superadmin.
+  const canResetProfile = canClub && target.id !== me?.id && (target.role !== "superadmin" || isSuperAdmin);
+  // Die eigene Rolle ändert niemand selbst (#2125): so stuft sich der letzte Superadmin nicht aus Versehen herab.
+  const canEditRights = isSuperAdmin && target.id !== me?.id;
   const [role, setRole] = useState(target.role || "player");
   const [grants, setGrants] = useState(() => (Array.isArray(target.areas) ? target.areas.filter((area) => GRANTABLE_AREAS.includes(area)) : []));
   const [saving, setSaving] = useState(false);
@@ -225,7 +227,7 @@ function UserSheet({ target, me, isSuperAdmin, onClose, onChanged }) {
 
   const save = async (event) => {
     event.preventDefault();
-    if (!isSuperAdmin) return;
+    if (!canEditRights) return;
     if (!change.changed) {
       toast.info("Keine Änderung zum Speichern.");
       return;
@@ -291,11 +293,11 @@ function UserSheet({ target, me, isSuperAdmin, onClose, onChanged }) {
         title={name}
         eyebrow="Konto"
         onClose={onClose}
-        onSubmit={isSuperAdmin ? save : undefined}
+        onSubmit={canEditRights ? save : undefined}
         saving={saving}
         submitLabel="Speichern"
         submitTestId="user-sheet-save"
-        cancelLabel={isSuperAdmin ? "Abbrechen" : "Schließen"}
+        cancelLabel={canEditRights ? "Abbrechen" : "Schließen"}
         testId="user-sheet"
       >
         <section className="space-y-2" data-testid="user-sheet-account">
@@ -316,7 +318,7 @@ function UserSheet({ target, me, isSuperAdmin, onClose, onChanged }) {
 
         <section className="space-y-3 border-t border-white/10 pt-4" data-testid="user-sheet-rights">
           <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Rolle und Freigaben</div>
-          {isSuperAdmin ? (
+          {canEditRights ? (
             <>
               <SelectField label="Rolle" value={role} onChange={setRole} options={ROLE_OPTIONS.map((r) => [r, roleLabel(r)])} testId="user-sheet-role" />
               <div>
@@ -336,12 +338,19 @@ function UserSheet({ target, me, isSuperAdmin, onClose, onChanged }) {
               {change.changed ? <p className="text-xs text-[#FFD700]" data-testid="user-sheet-pending">{change.sentence} Gespeichert wird erst mit „Speichern“.</p> : null}
             </>
           ) : (
-            <dl className="grid grid-cols-[8rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-sm" data-testid="user-sheet-rights-read">
-              <dt className="text-white/45">Rolle</dt><dd>{roleLabel(target.role || "player")}</dd>
-              <dt className="text-white/45">Bereiche</dt><dd>{areaBadges(target).map((area) => area.label).join(", ") || "keine"}</dd>
-            </dl>
+            <>
+              <dl className="grid grid-cols-[8rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-sm" data-testid="user-sheet-rights-read">
+                <dt className="text-white/45">Rolle</dt><dd>{roleLabel(target.role || "player")}</dd>
+                <dt className="text-white/45">Bereiche</dt><dd>{areaBadges(target).map((area) => area.label).join(", ") || "keine"}</dd>
+              </dl>
+              {isSuperAdmin && <p className="text-xs text-white/50" data-testid="user-sheet-own-role">Deine eigene Rolle ändert eine andere Person mit Superadmin-Rolle.</p>}
+            </>
           )}
         </section>
+
+        {canClub && <RightsHistorySection target={target} />}
+
+        {canResetProfile && <ProfileResetSection target={target} name={name} onChanged={onChanged} />}
 
         <section className="space-y-2 border-t border-white/10 pt-4" data-testid="user-sheet-ban">
           <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Sperren</div>
@@ -385,6 +394,117 @@ function UserSheet({ target, me, isSuperAdmin, onClose, onChanged }) {
       </AdminSheet>
       {banOpen && <BanDialog target={target} onCancel={() => setBanOpen(false)} onBanned={async () => { setBanOpen(false); await onChanged(); }} />}
     </>
+  );
+}
+
+// Rechte-Verlauf (#2125): Rollen, Freigaben und Vorstandsposten dieser Person - lädt erst beim Aufklappen.
+function RightsHistorySection({ target }) {
+  const [open, setOpen] = useState(false);
+  const [state, setState] = useState({ status: "idle", items: [] });
+
+  const toggle = async () => {
+    const next = !open;
+    setOpen(next);
+    if (!next || state.status === "ready") return;
+    setState({ status: "loading", items: [] });
+    try {
+      const { data } = await api.get(`/users/${target.id}/rights-history`);
+      setState({ status: "ready", items: Array.isArray(data?.items) ? data.items : [] });
+    } catch {
+      setState({ status: "error", items: [] });
+    }
+  };
+
+  return (
+    <section className="border-t border-white/10 pt-4" data-testid="user-sheet-history">
+      <button type="button" onClick={toggle} aria-expanded={open} data-testid="user-sheet-history-toggle" className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-white/60 hover:text-white">
+        Rechte-Verlauf <ChevronDown className={`w-3.5 h-3.5 transition ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && state.status === "loading" && <p className="mt-2 text-xs text-white/45">Lade Verlauf …</p>}
+      {open && state.status === "error" && <p className="mt-2 text-xs text-[#FF6B6B]" data-testid="user-sheet-history-error">Der Verlauf lässt sich gerade nicht laden.</p>}
+      {open && state.status === "ready" && (
+        state.items.length ? (
+          <ul className="mt-3 space-y-2" data-testid="user-sheet-history-list">
+            {state.items.map((row) => (
+              <li key={row.id} className="border-l-2 border-[#29B6E8]/40 pl-3 text-sm">
+                <div className="break-words">{rightsHistoryLine(row)}</div>
+                <div className="text-xs text-white/45">{day(row.at)}{row.actor ? ` · von ${row.actor}` : ""}</div>
+              </li>
+            ))}
+          </ul>
+        ) : <p className="mt-2 text-xs text-white/45" data-testid="user-sheet-history-empty">Noch keine Änderungen an den Rechten.</p>
+      )}
+    </section>
+  );
+}
+
+// Profil zurücksetzen (#2112, Regeln #2118): nur Anzeigename, Bio, Profilbild und Banner - etwa ein anstößiger Name.
+// Immer mit Grund; er steht im Protokoll, und die Person bekommt eine Benachrichtigung mit Feldern und Grund.
+const PROFILE_RESET_FIELDS = [
+  ["display_name", "Anzeigename", "Danach steht der Benutzername da."],
+  ["bio", "Bio", ""],
+  ["avatar_url", "Profilbild", ""],
+  ["banner_url", "Banner", ""],
+];
+
+function ProfileResetSection({ target, name, onChanged }) {
+  const confirm = useConfirm();
+  const [fields, setFields] = useState([]);
+  const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
+  const trimmed = reason.trim();
+  const ready = fields.length > 0 && trimmed.length >= BAN_REASON_MIN;
+  const toggle = (field) => setFields((current) => (current.includes(field) ? current.filter((f) => f !== field) : [...current, field]));
+
+  const reset = async () => {
+    if (!ready || saving) return;
+    const labels = PROFILE_RESET_FIELDS.filter(([key]) => fields.includes(key)).map(([, label]) => label).join(", ");
+    if (!await confirm({
+      title: `Profil von ${name} zurücksetzen?`,
+      description: `Zurückgesetzt wird: ${labels}. ${name} bekommt eine Benachrichtigung mit dem Grund; er steht auch im Protokoll.`,
+      confirmLabel: "Zurücksetzen",
+      tone: "danger",
+    })) return;
+    setSaving(true);
+    try {
+      await api.patch(`/users/${target.id}`, { reset: fields, reason: trimmed });
+      toast.success(`Profil von ${name} zurückgesetzt.`);
+      setFields([]);
+      setReason("");
+      await onChanged();
+    } catch (error) {
+      toast.error(formatRequestError(error, "Das Profil konnte nicht zurückgesetzt werden."));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <section className="space-y-2 border-t border-white/10 pt-4" data-testid="user-sheet-profile-reset">
+      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Profil zurücksetzen</div>
+      <p className="text-xs text-white/50">Für unpassende Angaben. Die Person kann danach selbst neue eintragen.</p>
+      <div className="grid sm:grid-cols-2 gap-2">
+        {PROFILE_RESET_FIELDS.map(([key, label, hint]) => (
+          <label key={key} className="flex items-start gap-2 text-sm border border-white/10 rounded-sm px-3 py-2">
+            <input type="checkbox" className="mt-0.5 accent-[#29B6E8]" checked={fields.includes(key)} onChange={() => toggle(key)} data-testid={`user-sheet-reset-${key}`} />
+            <span><span className="font-semibold">{label}</span>{hint && <span className="block text-[11px] text-white/45">{hint}</span>}</span>
+          </label>
+        ))}
+      </div>
+      <label htmlFor="profile-reset-reason" className="block text-[11px] font-bold uppercase tracking-widest text-white/60">Grund (Pflicht)</label>
+      <textarea
+        id="profile-reset-reason"
+        value={reason}
+        onChange={(event) => setReason(event.target.value)}
+        maxLength={500}
+        placeholder={`Warum? Mindestens ${BAN_REASON_MIN} Zeichen - die Person liest ihn.`}
+        data-testid="user-sheet-reset-reason"
+        className="input min-h-20 resize-y"
+      />
+      <button type="button" onClick={reset} disabled={!ready || saving} data-testid="user-sheet-reset" className="tls-btn tls-btn--danger px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-40">
+        {saving ? "Setze zurück …" : "Zurücksetzen …"}
+      </button>
+    </section>
   );
 }
 
@@ -462,6 +582,11 @@ function CreateUserModal({ onClose, onSaved, onCreated }) {
 
   const submit = async (e) => {
     e.preventDefault();
+    const problem = usernameProblem(form.username);
+    if (problem) {
+      toast.error(problem);
+      return;
+    }
     setSaving(true);
     try {
       const { data } = await api.post("/users", { ...form, gender: form.gender || null });
@@ -493,7 +618,7 @@ function CreateUserModal({ onClose, onSaved, onCreated }) {
       submitTestId="create-user-submit"
       testId="create-user-sheet"
     >
-      <TextField label="Username" value={form.username} onChange={(v) => set("username", v)} required testId="create-user-username" />
+      <TextField label="Benutzername" value={form.username} onChange={(v) => set("username", v)} required hint={USERNAME_RULE_HINT} testId="create-user-username" />
       <TextField label="Anzeigename" value={form.display_name} onChange={(v) => set("display_name", v)} testId="create-user-display" />
       <TextField label="E-Mail" type="email" value={form.email} onChange={(v) => set("email", v)} required testId="create-user-email" />
       <SelectField label="Geschlecht" value={form.gender || ""} onChange={(v) => set("gender", v)} options={[["", "Keine Angabe"], ["male", "Männlich"], ["female", "Weiblich"], ["diverse", "Divers"]]} testId="create-user-gender" />

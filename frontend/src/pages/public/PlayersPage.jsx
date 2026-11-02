@@ -127,7 +127,7 @@ function PlayerGrid({ players, memberUsernames, crowns }) {
         return (
           <Link
             key={p.username}
-            to={`/u/${p.username}`}
+            to={`/u/${encodeURIComponent(p.username)}`}
             data-testid={`player-card-${p.username}`}
             className={`tls-card tls-reveal-item border ${accountLevelFrameClass(accountLevel)} rounded-sm bg-[#121212] p-4 group`}
           >

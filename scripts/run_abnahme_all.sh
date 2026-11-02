@@ -19,6 +19,7 @@
 #   ABNAHME_SHOTS     Bilder der Specs, je Spec ein Unterordner (optional)
 #   ABNAHME_SPECS     nur diese Specs, durch Leerzeichen getrennt (z. B. "tv-abnahme matchplan-abnahme")
 #   PYTHON            Python 3.11 für Seed und Bericht (Vorgabe python3)
+#   ABNAHME_PYTHON    Python mit Pillow für die Testbilder von serien-ergebnis-bild-abnahme (Vorgabe python)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

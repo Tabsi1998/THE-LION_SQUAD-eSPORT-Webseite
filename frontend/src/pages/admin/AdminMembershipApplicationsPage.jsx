@@ -14,11 +14,12 @@ import { PersonPicker } from "@/components/tls/PersonPicker";
 import { usePrompt } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
-import { Check, X as XIcon, Inbox, Eye, ExternalLink, Plus } from "lucide-react";
+import { Check, X as XIcon, Inbox, Eye, ExternalLink, Plus, Undo2 } from "lucide-react";
 import { InvitationsBox } from "./membership/InvitationsBox";
 import { JoinPageBox } from "./membership/JoinPageBox";
 import { viennaDate, viennaDateTime } from "@/lib/vienna";
 import { STATE_TONE_CLASS, applicationState } from "@/lib/applicationState";
+import { mailOutcome } from "@/lib/membershipMail";
 
 const TABS = [
   { key: "pending",  label: "Offen",      color: "#29B6E8" },
@@ -27,6 +28,8 @@ const TABS = [
   // Anträge über Dolibarr (#328): zurückgezogen oder beim Senden hängen geblieben.
   { key: "withdrawn", label: "Zurückgezogen", color: "#FF9500" },
   { key: "submitting", label: "In Übermittlung", color: "#FF9500" },
+  // Dolibarr hat den Antrag nicht angenommen (#2125) - er stand bisher in keinem Reiter.
+  { key: "failed", label: "Fehlgeschlagen", color: "#FF3B30" },
 ];
 const TAB_KEYS = new Set(TABS.map((tab) => tab.key));
 
@@ -79,8 +82,10 @@ export default function AdminMembershipApplicationsPage() {
   const decide = async (a, decision) => {
     const note = await prompt({
       title: decision === "reject" ? "Bewerbung ablehnen" : "Bewerbung annehmen",
-      description: decision === "reject" ? "Diese Begründung wird per Mail gesendet." : "Optionale interne oder externe Notiz.",
-      placeholder: decision === "reject" ? "Kurze, klare Begründung..." : "Optionale Notiz...",
+      description: decision === "reject"
+        ? "Die Person bekommt diese Begründung per Mail und als Meldung – auch wenn sie Mitgliedschafts-Mails ausgeschaltet hat."
+        : "Die Person bekommt eine Mail und eine Meldung. Was du hier schreibst, steht darin – nichts Internes. Die Mitgliedsnummer vergibt die Website, die Art kommt aus dem Antrag.",
+      placeholder: decision === "reject" ? "Kurze, klare Begründung..." : "Optional: ein Satz an die Person...",
       confirmLabel: decision === "reject" ? "Ablehnen" : "Annehmen",
       required: decision === "reject",
       tone: decision === "reject" ? "danger" : "info",
@@ -88,8 +93,27 @@ export default function AdminMembershipApplicationsPage() {
     if (note === false) return;
     if (decision === "reject" && !note) return;
     try {
-      await api.patch(`/membership/applications/${a.id}`, { decision, note: note || undefined });
-      toast.success(decision === "approve" ? "Aufgenommen." : "Abgelehnt.");
+      const { data } = await api.patch(`/membership/applications/${a.id}`, { decision, note: note || undefined });
+      const mail = mailOutcome(data?.mail);
+      const text = [decision === "approve" ? "Aufgenommen." : "Abgelehnt.", mail.text].filter(Boolean).join(" ");
+      if (mail.sent) toast.success(text);
+      else toast.warning(text);
+      setSelected(null); load();
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail) || "Das hat nicht geklappt."); }
+  };
+
+  // Zurückziehen (#2125): etwa auf Wunsch der Person - nur bei Anträgen, die die Website entscheidet.
+  const withdraw = async (a) => {
+    const note = await prompt({
+      title: "Bewerbung zurückziehen",
+      description: "Der Antrag geht auf „Zurückgezogen“, die Person bekommt eine Meldung und kann später einen neuen stellen.",
+      placeholder: "Optional: ein Satz an die Person...",
+      confirmLabel: "Zurückziehen",
+    });
+    if (note === false) return;
+    try {
+      await api.post(`/membership/applications/${a.id}/withdraw`, { note: note || undefined });
+      toast.success("Zurückgezogen.");
       setSelected(null); load();
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail) || "Das hat nicht geklappt."); }
   };
@@ -103,6 +127,7 @@ export default function AdminMembershipApplicationsPage() {
       {state.decide && <>
         <button type="button" onClick={() => decide(a, "approve")} data-testid={`${idPrefix}-approve-${a.id}`} className="text-[#00FF88] hover:underline text-xs inline-flex items-center gap-1"><Check className="w-3 h-3" /> Annehmen</button>
         <button type="button" onClick={() => decide(a, "reject")} data-testid={`${idPrefix}-reject-${a.id}`} className="text-[#FF6B6B] hover:underline text-xs inline-flex items-center gap-1"><XIcon className="w-3 h-3" /> Ablehnen</button>
+        <button type="button" onClick={() => withdraw(a)} data-testid={`${idPrefix}-withdraw-${a.id}`} className="text-white/60 hover:text-white hover:underline text-xs inline-flex items-center gap-1"><Undo2 className="w-3 h-3" /> Zurückziehen</button>
       </>}
     </div>
   );
@@ -190,6 +215,7 @@ export default function AdminMembershipApplicationsPage() {
           testId="application-sheet"
           footer={selectedState?.decide ? (
             <div className="ml-auto flex flex-wrap gap-2">
+              <button type="button" onClick={() => withdraw(selected)} data-testid="application-sheet-withdraw" className="px-4 py-2 border border-white/15 text-white/70 hover:text-white rounded-sm text-xs font-bold uppercase">Zurückziehen</button>
               <button type="button" onClick={() => decide(selected, "reject")} data-testid="application-sheet-reject" className="px-4 py-2 border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10 rounded-sm text-xs font-bold uppercase">Ablehnen</button>
               <button type="button" onClick={() => decide(selected, "approve")} data-testid="application-sheet-approve" className="px-4 py-2 bg-[#FFD700] text-black rounded-sm text-xs font-bold uppercase">Annehmen</button>
             </div>

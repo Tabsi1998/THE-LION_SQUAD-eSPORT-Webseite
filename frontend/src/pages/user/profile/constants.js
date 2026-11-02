@@ -7,7 +7,7 @@ import { Bell, CalendarPlus, Eye, Gamepad2, Globe, Info, LayoutDashboard, Settin
 export function userMenuEntries({ username = "" } = {}) {
   return [
     { key: "dashboard", to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { key: "profile", to: `/u/${username}`, label: "Mein Profil", icon: UserCircle },
+    { key: "profile", to: `/u/${encodeURIComponent(username)}`, label: "Mein Profil", icon: UserCircle },
     { key: "settings", to: "/profile", label: "Einstellungen", icon: Settings },
   ];
 }
@@ -44,7 +44,7 @@ export const TABS = SETTINGS_GROUPS.flatMap((group) => group.tabs.map((tab) => (
 
 /** Frühere Reiter von /profile, die keine Einstellungen sind - sie haben einen eigenen Ort (#1150). */
 export function tabRedirect(tab, params, username = "") {
-  const me = username ? `/u/${username}` : "/u/me";
+  const me = username ? `/u/${encodeURIComponent(username)}` : "/u/me";
   switch (tab) {
     case "teams":
       return "/teams";
@@ -106,8 +106,8 @@ export const DIRECT_MESSAGE_PRIVACY = [
   ["friends", "Nur Freunde"],
   ["team_members", "Nur gemeinsame Teammitglieder"],
   ["club_members", "Nur Vereinsmitglieder"],
-  ["admins_only", "Nur Admins"],
-  ["none", "Niemand"],
+  ["admins_only", "Nur Moderation und Admins"],
+  ["none", "Niemand außer der Moderation"],
 ];
 
 export const GENDER_OPTIONS = [
@@ -127,7 +127,7 @@ export const EMAIL_PREFERENCES = [
   { k: "achievement_recap", l: "Wochenrückblick", d: "Montags eine kurze Mail mit deinen XP, deinem Level und neuen Erfolgen – nur, wenn du in der Woche etwas erreicht hast.", defaultOn: true, channels: ["email"] },
   // Rechnungen (#841): „Deine Rechnung ist da“ - Beträge gehen nie über Discord, die Spalte zeigt dort einen Strich.
   { k: "billing_updates", l: "Rechnungen", d: "Neue Rechnung mit Betrag, Zahlungsziel und Link zum PDF in deinem Konto.", defaultOn: true, channels: ["in_app", "push", "email"] },
-  { k: "membership_updates", l: "Vereinsmitgliedschaft", d: "Bewerbung, Mitgliedsstatus und Vereinsvorteile.", defaultOn: true },
+  { k: "membership_updates", l: "Vereinsmitgliedschaft", d: "Einladungen zum Antrag, Nummern und Vereinsvorteile. Entscheidungen über deine Mitgliedschaft bekommst du immer per Mail.", defaultOn: true },
   { k: "birthday_greetings", l: "Geburtstagsgruß", d: "Einmal im Jahr eine Geburtstagsmail vom Verein.", defaultOn: true },
   { k: "community_messages", l: "Nachrichten & Erwähnungen", d: "Direktnachrichten, Team-Chat-Erwähnungen und ähnliche Community-Hinweise.", defaultOn: true },
   { k: "news_events", l: "News & Events", d: "Neue Vereinsnews, neue Events und wichtige Ankündigungen.", requiresNewsletter: true },
@@ -160,4 +160,4 @@ export const ACHIEVEMENT_ACTIONS = {
   membership_days: "Vereinsmitgliedschaft pflegen",
 };
 // Begriffe statt Rohwerten: vorher stand "LEADER" in der Teamkarte (#253).
-export const TEAM_ROLE_LABELS = { leader: "Leitung", co_leader: "Co-Leitung", member: "Mitglied" };
+export const TEAM_ROLE_LABELS = { leader: "Teamleitung", co_leader: "Co-Leitung", member: "Mitglied" };

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, formatRequestError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
-import { gameLabel } from "@/lib/gameLabels";
+import { gameLabel, isArchivedGame } from "@/lib/gameLabels";
 import { toast } from "sonner";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
@@ -40,9 +40,10 @@ const FORM_TABS = new Set(["basic", "gaming", "socials"]);
 // Regler speichern nach der Pause wie Text - jeder Zwischenwert beim Ziehen wäre sonst ein eigener Lauf.
 const SLIDER_SETTINGS = new Set(["ceremony_volume"]);
 // Beim Verlassen mit offener, ungültiger Eingabe (#1048, nach Codex-Prüfung): was fehlt und wo das Feld steht.
-const LEAVE_REASONS = { display_name: "Name ist leer.", website: "Website ist keine gültige Adresse." };
+const LEAVE_REASONS = { display_name: "Name ist leer oder zu lang.", bio: "Bio ist zu lang.", website: "Website ist keine gültige Adresse." };
 const FIELD_PLACES = {
   display_name: { tab: "basic", testId: "profile-display-name" },
+  bio: { tab: "basic", testId: "profile-bio" },
   website: { tab: "socials", testId: "profile-website" },
 };
 
@@ -243,6 +244,8 @@ export default function ProfilePage() {
       const fields = game.effective_player_id_fields || game.player_id_fields || [];
       if (!fields.length) return;
       const sourceSlug = game.identity_game_slug || game.slug;
+      // Archiviert (#2129): niemand trägt dafür neu etwas ein - eine schon gespeicherte ID bleibt sichtbar und änderbar.
+      if (isArchivedGame(game) && !Object.values(form.game_ids?.[sourceSlug] || {}).some(Boolean)) return;
       const sourceName = game.identity_game_name || gameLabel(game);
       const key = `${sourceSlug}:${fields.map((field) => field.key).join("|")}`;
       const existing = groups.get(key) || {
@@ -292,7 +295,7 @@ export default function ProfilePage() {
             <span className="mx-2 text-white/20">·</span>
             <span>@{user.username}</span>
             {/* Zurück zum eigenen Profil (#1149) - dort steht auch „So sehen dich andere“. */}
-            <Link to={`/u/${user.username}`} data-testid="settings-to-profile" className="tls-hit ml-2 inline-flex items-center gap-1 px-2 py-1 border border-white/15 text-[11px] uppercase tracking-wider hover:border-[#29B6E8] hover:text-[#29B6E8]"><UserCircle className="w-3.5 h-3.5" /> Mein Profil</Link>
+            <Link to={`/u/${encodeURIComponent(user.username)}`} data-testid="settings-to-profile" className="tls-hit ml-2 inline-flex items-center gap-1 px-2 py-1 border border-white/15 text-[11px] uppercase tracking-wider hover:border-[#29B6E8] hover:text-[#29B6E8]"><UserCircle className="w-3.5 h-3.5" /> Mein Profil</Link>
           </div>
         </div>
 

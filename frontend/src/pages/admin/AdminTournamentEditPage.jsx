@@ -14,7 +14,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useConfirm, usePrompt } from "@/components/tls/ConfirmDialog";
 import { SkeletonDetailHeader } from "@/components/tls/Skeleton";
-import { REGISTRATION_STATUS_OPTIONS, formatRegistrationStatus, formatTournamentDisplay } from "@/lib/tournamentLabels";
+import { REGISTRATION_STATUS_FILTER_OPTIONS, formatRegistrationStatus, formatTournamentDisplay } from "@/lib/tournamentLabels";
 import { LineupMark, useTeamLineups } from "@/components/tls/tournament/LineupMark";
 import { FeedbackReport } from "@/pages/admin/feedback/FeedbackReport";
 import { ParticipantAddForm } from "./tournament/ParticipantAddForm";
@@ -217,6 +217,17 @@ export default function AdminTournamentEditPage() {
     const message = placementMessage(placement);
     if (message) toast[message.tone](message.text);
   };
+  const saveSeed = async (rid, seed) => {
+    try {
+      await api.patch(`/tournaments/${id}/registrations/${rid}`, { seed });
+      toast.success(seed == null ? "Setzplatz entfernt." : `Setzplatz ${seed} gespeichert.`);
+      load();
+      return true;
+    } catch (e) {
+      toast.error(formatRequestError(e, "Setzplatz konnte nicht gespeichert werden."));
+      return false;
+    }
+  };
   const setRegCheckinStatus = async (rid, status) => {
     try {
       const { data } = await api.post(`/tournaments/${id}/registrations/${rid}/checkin`, { status });
@@ -313,7 +324,7 @@ export default function AdminTournamentEditPage() {
       .map((item) => item.message)
       .join("\n");
     if (!silent) {
-      if (data.ok && !data.warning_count) toast.success(`Planung OK: ${data.checked_matches} Matches geprüft.`);
+      if (data.ok && !data.warning_count) toast.success(`Planung in Ordnung: ${data.checked_matches === 1 ? "1 Spiel" : `${data.checked_matches} Spiele`} geprüft.`);
       else toast[data.ok ? "warning" : "error"](`${data.error_count} Konflikte, ${data.warning_count} Hinweise${lines ? `\n${lines}` : ""}`);
     }
     return data;
@@ -501,6 +512,8 @@ export default function AdminTournamentEditPage() {
   // Staffel (S18): kein Check-in, kein Auschecken, kein „Nicht erschienen“ - das löste sogar den Season-Schlüssel des
   // Co-Teams. Austritt und Disqualifikation gehen über ParticipantRemovalActions.
   const checkInTools = Boolean(t.can_check_in) && !staffel;
+  // Setzplatz (#2111, TA15): bei „Manuell“ ordnet er die Vorschau - änderbar, bis der Baum steht (Ende des Check-ins).
+  const seedEditable = Boolean(t.can_manage_participants) && !staffel && !structureFixed && ["manual", "ranking"].includes(t.seeding_mode);
   const canOperateTournament = isTournamentLead || !!t.can_manage_structure;
   const visibleStatusOptions = (isTournamentLead
     ? TOURNAMENT_STATUS_OPTIONS
@@ -630,8 +643,9 @@ export default function AdminTournamentEditPage() {
         </div>
       </div>
 
-      {/* Liga-Staffeln (#2096) haben keine Vor-Ort-Anmeldung - die Co-Teams teilt die Turnierleitung zu. */}
-      {isTournamentLead && !t.league_context && <div className="mb-5"><OnsiteAccessPanel tournamentId={t.id} /></div>}
+      {/* Liga-Staffeln (#2096) haben keine Vor-Ort-Anmeldung - die Co-Teams teilt die Turnierleitung zu. Online-Turniere
+          auch nicht (#2111, TA4): der QR-Code gilt für die Halle. */}
+      {isTournamentLead && !t.league_context && ONSITE_EVENT_MODES.has(t.event_mode) && <div className="mb-5"><OnsiteAccessPanel tournamentId={t.id} /></div>}
       {/* Staffel (S21): Zugangslinks nur zum Ansehen - angemeldet wird nicht, Co-Teams werden zugeteilt. */}
       {isTournamentLead && <div className="mb-5"><AccessLinksPanel targetType="tournament" targetId={t.id} allowRegister={!staffel} collapsible /></div>}
 
@@ -703,7 +717,7 @@ export default function AdminTournamentEditPage() {
               className="w-full rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2.5 text-sm text-white focus:border-[#29B6E8]/60 focus:outline-none"
             >
               <option value="">Alle Status ({regs.length})</option>
-              {REGISTRATION_STATUS_OPTIONS.map(([value, label]) => (
+              {REGISTRATION_STATUS_FILTER_OPTIONS.map(([value, label]) => (
                 <option key={value} value={value}>{label} ({registrationCounts[value] || 0})</option>
               ))}
             </select>
@@ -732,13 +746,19 @@ export default function AdminTournamentEditPage() {
                       <RegistrationStatusOptions fixed={inFixedBracket.has(r.id)} current={r.status} />
                     </select>
                   )}
-                  {checkInTools && r.status !== "checked_in" && !["rejected", "waitlist"].includes(r.status) && (
+                  {seedEditable && (
+                    <div className="col-span-2 flex items-center justify-between gap-2 text-[10px] font-bold uppercase tracking-wider text-white/50">
+                      <span aria-hidden="true">Setzplatz</span>
+                      <SeedField key={`${r.id}-${r.seed ?? ""}`} registration={r} onSave={(seed) => saveSeed(r.id, seed)} testId={`admin-reg-seed-mobile-${r.id}`} />
+                    </div>
+                  )}
+                  {checkInTools && r.status !== "checked_in" && !["rejected", "waitlist", "withdrawn", "disqualified"].includes(r.status) && (
                     <button type="button" onClick={() => setRegCheckinStatus(r.id, "checked_in")} className="px-2 py-2 border border-[#00FF88]/40 text-[#00FF88] rounded-sm text-[10px] font-bold uppercase">Check-in</button>
                   )}
                   {checkInTools && r.status === "checked_in" && (
                     <button type="button" onClick={() => setRegCheckinStatus(r.id, "approved")} className="px-2 py-2 border border-white/20 text-white/70 rounded-sm text-[10px] font-bold uppercase">Auschecken</button>
                   )}
-                  {checkInTools && !["checked_in", "rejected", "waitlist", "no_show"].includes(r.status) && (
+                  {checkInTools && !["checked_in", "rejected", "waitlist", "no_show", "withdrawn", "disqualified"].includes(r.status) && (
                     <button type="button" onClick={() => setRegCheckinStatus(r.id, "no_show")} className="px-2 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase">Nicht erschienen</button>
                   )}
                   <ParticipantRemovalActions tournament={t} registration={r} onDone={load} compact />
@@ -757,6 +777,7 @@ export default function AdminTournamentEditPage() {
                 <th className="text-left px-4 py-3">#</th>
                 <th className="text-left px-4 py-3">Spieler</th>
                 <th className="text-left px-4 py-3">Status</th>
+                {seedEditable && <th className="text-left px-4 py-3">Setzplatz</th>}
                 <th className="text-left px-4 py-3">Discord</th>
                 <th className="text-right px-4 py-3">Aktion</th>
               </tr>
@@ -767,6 +788,11 @@ export default function AdminTournamentEditPage() {
                   <td className="px-4 py-3 text-white/50">{i + 1}</td>
                   <td className="px-4 py-3">{r.display_name || r.user?.display_name || r.ingame_name}<EventGateMark mark={r.event_gate} /><LineupMark info={lineups[r.id]} /><OnsiteMark via={r.registered_via} /></td>
                   <td className="px-4 py-3"><RegistrationBadge status={r.status} staffel={staffel} /></td>
+                  {seedEditable && (
+                    <td className="px-4 py-3">
+                      <SeedField key={`${r.id}-${r.seed ?? ""}`} registration={r} onSave={(seed) => saveSeed(r.id, seed)} testId={`admin-reg-seed-${r.id}`} />
+                    </td>
+                  )}
                   <td className="px-4 py-3 text-white/60">{r.discord || "—"}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex flex-wrap justify-end gap-2">
@@ -775,13 +801,13 @@ export default function AdminTournamentEditPage() {
                           <RegistrationStatusOptions fixed={inFixedBracket.has(r.id)} current={r.status} />
                         </select>
                       )}
-                      {checkInTools && r.status !== "checked_in" && !["rejected", "waitlist"].includes(r.status) && (
+                      {checkInTools && r.status !== "checked_in" && !["rejected", "waitlist", "withdrawn", "disqualified"].includes(r.status) && (
                         <button type="button" onClick={() => setRegCheckinStatus(r.id, "checked_in")} className="px-2 py-1 border border-[#00FF88]/40 text-[#00FF88] rounded-sm text-[10px] font-bold uppercase">Check-in</button>
                       )}
                       {checkInTools && r.status === "checked_in" && (
                         <button type="button" onClick={() => setRegCheckinStatus(r.id, "approved")} className="px-2 py-1 border border-white/20 text-white/70 rounded-sm text-[10px] font-bold uppercase">Auschecken</button>
                       )}
-                      {checkInTools && !["checked_in", "rejected", "waitlist", "no_show"].includes(r.status) && (
+                      {checkInTools && !["checked_in", "rejected", "waitlist", "no_show", "withdrawn", "disqualified"].includes(r.status) && (
                         <button type="button" onClick={() => setRegCheckinStatus(r.id, "no_show")} className="px-2 py-1 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase">Nicht erschienen</button>
                       )}
                       <ParticipantRemovalActions tournament={t} registration={r} onDone={load} />
@@ -792,7 +818,7 @@ export default function AdminTournamentEditPage() {
                   </td>
                 </tr>
               ))}
-              {filteredRegistrations.length === 0 && <tr><td colSpan="5" className="text-center py-10 text-white/40">{regs.length === 0 ? "Keine Anmeldungen" : "Keine Anmeldungen für diesen Filter"}</td></tr>}
+              {filteredRegistrations.length === 0 && <tr><td colSpan={seedEditable ? 6 : 5} className="text-center py-10 text-white/40">{regs.length === 0 ? "Keine Anmeldungen" : "Keine Anmeldungen für diesen Filter"}</td></tr>}
             </tbody>
           </table>
           </div>
@@ -867,7 +893,7 @@ export default function AdminTournamentEditPage() {
       )}
 
       {activeTab === "staff" && isTournamentLead && (
-        <TournamentStaffPanel tournamentId={t.id} staff={staff} staffError={staffError} onChanged={load} />
+        <TournamentStaffPanel tournamentId={t.id} staff={staff} staffError={staffError} onChanged={load} stages={stages} groups={groups} stations={stations} matches={matchesV2} />
       )}
       {activeTab === "groups" && (
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -892,12 +918,51 @@ export default function AdminTournamentEditPage() {
 
 // Status je Anmeldung. Im festen Baum (#2120, TA13) nehmen Ausstehend, Abgelehnt und Warteliste die Person aus Spielen,
 // die sie behalten - das geht über „Nicht erschienen“, „Austritt eintragen“ oder „Disqualifizieren“.
-const REGISTRATION_ROW_STATUSES = ["pending", "approved", "rejected", "waitlist", "checked_in", "no_show"];
+const ONSITE_EVENT_MODES = new Set(["local", "hybrid"]);
+const REGISTRATION_ROW_STATUSES =["pending", "approved", "rejected", "waitlist", "checked_in", "no_show"];
 const LEAVES_BRACKET = new Set(["pending", "rejected", "waitlist"]);
+// Austritt und Disqualifikation (#1553) setzt nur der Umbauplan - die Auswahl zeigt sie trotzdem als aktuellen Stand
+// (#2111, TA14; vorher stand dort „Ausstehend“). Zurück geht es wie beim Nachrücken auf einen freien Platz; steht die
+// Person noch in festen Spielen, lehnt der Server ab.
+const REMOVED_STATUSES = new Set(["withdrawn", "disqualified"]);
 function RegistrationStatusOptions({ fixed, current }) {
-  return REGISTRATION_ROW_STATUSES.map((s) => (
-    <option key={s} value={s} disabled={fixed && s !== current && LEAVES_BRACKET.has(s)}>{formatRegistrationStatus(s)}</option>
-  ));
+  return [
+    ...(REMOVED_STATUSES.has(current) ? [<option key={current} value={current} disabled>{formatRegistrationStatus(current)}</option>] : []),
+    ...REGISTRATION_ROW_STATUSES.map((s) => (
+      <option key={s} value={s} disabled={fixed && s !== current && LEAVES_BRACKET.has(s)}>{formatRegistrationStatus(s)}</option>
+    )),
+  ];
+}
+
+// Setzplatz je Anmeldung (#2111, TA15): gespeichert wird beim Verlassen des Felds oder mit Enter; leer nimmt ihn weg.
+function SeedField({ registration, onSave, testId }) {
+  const [value, setValue] = useState(registration.seed == null ? "" : String(registration.seed));
+  const commit = () => {
+    const next = String(value).trim();
+    const current = registration.seed == null ? "" : String(registration.seed);
+    if (next === current) return;
+    const number = Number.parseInt(next, 10);
+    if (next !== "" && !(Number.isInteger(number) && number >= 1)) {
+      setValue(current);
+      return;
+    }
+    // Lehnt der Server ab (Platz schon vergeben), zeigt das Feld wieder, was wirklich gilt.
+    onSave(next === "" ? null : number).then((saved) => { if (!saved) setValue(current); });
+  };
+  return (
+    <input
+      type="number"
+      min="1"
+      value={value}
+      onChange={(event) => setValue(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); commit(); } }}
+      aria-label="Setzplatz"
+      placeholder="–"
+      data-testid={testId}
+      className="w-16 rounded-sm border border-white/10 bg-[#0A0A0A] px-2 py-1 text-xs text-white"
+    />
+  );
 }
 
 // Staffel (#2109, S18): ein Co-Team ist zugeteilt, nicht „angenommen“ oder „eingecheckt“ - Austritt und

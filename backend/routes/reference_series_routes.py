@@ -24,7 +24,7 @@ from models import (
     now_utc,
 )
 from services import (
-    read_spellings, reference_running_cache, reference_series, season_close, series_kinds, series_logo,
+    game_usage, read_spellings, reference_running_cache, reference_series, season_close, series_kinds, series_logo,
     series_partners,
 )
 from services.dolibarr_policy import club_today
@@ -61,9 +61,11 @@ def _completed(stored) -> dict | None:
         return None
 
 
-async def _check_game(db, game_id: str | None) -> None:
+async def _check_game(db, game_id: str | None, current: str | None = None) -> None:
     if game_id and not await db.games.find_one({"id": game_id}, {"_id": 1}):
         raise HTTPException(404, "Spiel nicht gefunden.")
+    if await game_usage.chosen_is_archived(db, game_id, current):
+        raise HTTPException(422, game_usage.ARCHIVED_DETAIL)
 
 
 async def _check_reference(db, reference_id: str | None) -> None:
@@ -151,7 +153,7 @@ async def update_lineage(lineage_id: str, body: ReferenceLineageUpdate, me: dict
     existing = await _lineage(db, lineage_id)
     raw = body.model_dump(exclude_unset=True)
     updates = {key: value for key, value in raw.items() if value is not None or key in LINEAGE_NULLABLE}
-    await _check_game(db, updates.get("game_id"))
+    await _check_game(db, updates.get("game_id"), existing.get("game_id"))
     if updates.get("logo_url") != existing.get("logo_url"):  # ein gespeichertes Logo bleibt, auch wenn es alt ist
         await series_logo.check(db, updates.get("logo_url"))
     await series_partners.clean(db, updates, existing)

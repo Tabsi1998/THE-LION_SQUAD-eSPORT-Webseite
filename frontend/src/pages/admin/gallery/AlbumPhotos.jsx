@@ -8,14 +8,17 @@ import { ImageUpload, prepareImageForUpload } from "@/components/tls/ImageUpload
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { UploadProgressPanel } from "@/components/tls/UploadProgressPanel";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { useMediaLibrary } from "@/hooks/useMediaLibrary";
+import { MediaLibraryMore, MediaLibrarySearch } from "@/components/tls/MediaLibraryControls";
 import { useUploadProgress } from "@/hooks/useUploadProgress";
 import { buildExternalGalleryPayload, galleryMediaUrl, galleryPosterUrl, isVideoLike, MEDIA_ACCEPT, mediaTypeFromItem, mediaTypeFromFile, providerLabel } from "@/lib/galleryMedia";
 import { logUploadClientFailure } from "@/lib/uploadDiagnostics";
+import { loadUploadLimits, tooLargeMessage } from "@/lib/uploadLimits";
 import { captureVideoPoster } from "@/lib/videoPoster";
 import { toast } from "sonner";
 import { Plus, Trash2, Image as ImageIcon, ArrowLeft, Upload, Link as LinkIcon, Play, Film, Layers, Pencil } from "lucide-react";
 import { SectionModal } from "./SectionModal";
-import { MAX_VIDEO_UPLOAD_MB, PROXY_UPLOAD_LIMIT_MB, UNSECTIONED_VALUE, VIDEO_MAX_BYTES, captionFromFilename, galleryPayloadFromMediaItem, mediaGroupsBySection, sectionIdFromValue, sectionTitle, sectionValue, sortSections } from "./shared";
+import { PROXY_UPLOAD_LIMIT_MB, UNSECTIONED_VALUE, captionFromFilename, galleryPayloadFromMediaItem, mediaGroupsBySection, sectionIdFromValue, sectionTitle, sectionValue, sortSections } from "./shared";
 
 export function AlbumPhotos({ album, onBack }) {
   const [photos, setPhotos] = useState([]);
@@ -25,9 +28,12 @@ export function AlbumPhotos({ album, onBack }) {
   const [uploading, setUploading] = useState(false);
   const [mediaOpen, setMediaOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
-  const [media, setMedia] = useState([]);
+  const media = useMediaLibrary("/admin/media?type=media", mediaOpen);
   const [selectedMedia, setSelectedMedia] = useState([]);
-  const [loadingMedia, setLoadingMedia] = useState(false);
+  const [editingPhoto, setEditingPhoto] = useState(null);
+  // Häkchen-Auswahl (#2122): mehrere Einträge auf einmal aus dem Album nehmen oder verschieben.
+  const [checked, setChecked] = useState([]);
+  const [bulkBusy, setBulkBusy] = useState(false);
   const confirm = useConfirm();
   const uploadProgress = useUploadProgress();
 
@@ -55,13 +61,14 @@ export function AlbumPhotos({ album, onBack }) {
     const picked = Array.from(files);
     uploadProgress.start(picked);
     setUploading(true);
+    const { video_mb: videoMb } = await loadUploadLimits();
     let ok = 0, fail = 0, originals = 0;
     for (const [index, file] of picked.entries()) {
       let kind = mediaTypeFromFile(file);
       try {
         uploadProgress.startFile(file, index, kind === "image" ? "Bild wird vorbereitet" : "Upload startet");
-        if (kind === "video" && file.size > VIDEO_MAX_BYTES) {
-          throw new Error(`Datei zu groß (max ${MAX_VIDEO_UPLOAD_MB} MB).`);
+        if (kind === "video" && file.size > videoMb * 1024 * 1024) {
+          throw new Error(tooLargeMessage(videoMb));
         }
         const uploadFile = kind === "image" ? await prepareImageForUpload(file) : file;
         const fd = new FormData();
@@ -132,17 +139,14 @@ export function AlbumPhotos({ album, onBack }) {
       } catch (err) {
         fail++;
         uploadProgress.failFile();
-        const message = formatUploadError(err, "Upload fehlgeschlagen.", {
-          appLimitMb: MAX_VIDEO_UPLOAD_MB,
-          proxyLimitMb: PROXY_UPLOAD_LIMIT_MB,
-        });
+        const message = formatUploadError(err, "Upload fehlgeschlagen.", { appLimitMb: kind === "video" ? videoMb : undefined });
         await logUploadClientFailure(err, file, {
           endpoint: "/uploads/media",
           mediaScope: "gallery",
           kind,
           message,
           phase: uploadProgress.progress?.phase,
-          appLimitMb: MAX_VIDEO_UPLOAD_MB,
+          appLimitMb: videoMb,
           proxyLimitMb: PROXY_UPLOAD_LIMIT_MB,
         });
         toast.error(`${file.name}: ${message}`);
@@ -156,7 +160,7 @@ export function AlbumPhotos({ album, onBack }) {
   const remove = async (id) => {
     if (!await confirm({
       title: "Medium löschen?",
-      description: "Der Eintrag wird aus diesem Album entfernt.",
+      description: "Der Eintrag wird aus diesem Album entfernt. Die Datei bleibt in den Medien.",
       confirmLabel: "Löschen",
     })) return;
     const previous = photos;
@@ -169,6 +173,40 @@ export function AlbumPhotos({ album, onBack }) {
       toast.error(formatApiError(err.response?.data?.detail));
       load();
     }
+  };
+  const toggleChecked = (id) => setChecked((rows) => (rows.includes(id) ? rows.filter((row) => row !== id) : [...rows, id]));
+  const runBulk = async (body, success) => {
+    setBulkBusy(true);
+    try {
+      const { data } = await api.post(`/gallery/${album.id}/photos/bulk`, { ids: checked, ...body });
+      toast.success(success(data?.count ?? checked.length));
+      setChecked([]);
+      await load();
+    } catch (err) {
+      toast.error(formatRequestError(err, "Das hat nicht geklappt."));
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+  const bulkRemove = async () => {
+    if (!await confirm({
+      title: `${checked.length} ${checked.length === 1 ? "Eintrag" : "Einträge"} aus dem Album nehmen?`,
+      description: "Die Einträge verschwinden aus diesem Album. Die Dateien bleiben in den Medien.",
+      confirmLabel: "Entfernen",
+    })) return;
+    await runBulk({ action: "delete" }, (count) => `${count} aus dem Album genommen.`);
+  };
+  const bulkMove = async (value) => {
+    if (!value) return;
+    const sectionId = sectionIdFromValue(value);
+    const name = sectionTitle(sections, sectionId);
+    if (!await confirm({
+      title: `${checked.length} ${checked.length === 1 ? "Eintrag" : "Einträge"} verschieben?`,
+      description: `Die Auswahl kommt nach „${name}“.`,
+      confirmLabel: "Verschieben",
+      tone: "info",
+    })) return;
+    await runBulk({ action: "move", section_id: sectionId }, (count) => `${count} nach „${name}“ verschoben.`);
   };
   const saveSection = async (payload) => {
     if (editingSection?.id) {
@@ -211,18 +249,9 @@ export function AlbumPhotos({ album, onBack }) {
       toast.error(formatApiError(err.response?.data?.detail));
     }
   };
-  const openMedia = async () => {
-    setMediaOpen(true);
-    setLoadingMedia(true);
+  const openMedia = () => {
     setSelectedMedia([]);
-    try {
-      const { data } = await api.get("/admin/media?type=media");
-      setMedia(data || []);
-    } catch {
-      toast.error("Medienbibliothek konnte nicht geladen werden.");
-    } finally {
-      setLoadingMedia(false);
-    }
+    setMediaOpen(true);
   };
   const toggleMedia = (item) => {
     setSelectedMedia((rows) => rows.some((x) => x.url === item.url)
@@ -317,6 +346,26 @@ export function AlbumPhotos({ album, onBack }) {
         </div>
       </div>
 
+      {photos.length > 0 && (
+        <div className="lg:sticky lg:top-0 z-10 mb-4 flex flex-wrap items-center gap-2 border border-white/10 bg-[#101010] rounded-sm p-3" data-testid="gallery-bulk-bar">
+          <span className="text-xs font-bold tabular-nums text-white/70" data-testid="gallery-bulk-count">{checked.length} von {photos.length} ausgewählt</span>
+          <button type="button" onClick={() => setChecked(checked.length === photos.length ? [] : photos.map((p) => p.id))} data-testid="gallery-bulk-all" className="min-h-10 px-3 py-2 border border-white/15 text-white/70 rounded-sm text-xs font-bold uppercase tracking-wider hover:text-white">
+            {checked.length === photos.length ? "Auswahl aufheben" : "Alle auswählen"}
+          </button>
+          {checked.length > 0 && (
+            <>
+              <select value="" disabled={bulkBusy} onChange={(e) => bulkMove(e.target.value)} aria-label="Auswahl in einen Abschnitt verschieben" data-testid="gallery-bulk-move" className="min-h-10 bg-black/40 border border-white/15 px-2 py-2 rounded-sm text-xs text-white">
+                <option value="">Verschieben nach …</option>
+                <option value={UNSECTIONED_VALUE}>Ohne Abschnitt</option>
+                {sections.map((section) => <option key={section.id} value={section.id}>{section.title}</option>)}
+              </select>
+              <button type="button" disabled={bulkBusy} onClick={bulkRemove} data-testid="gallery-bulk-remove" className="tls-btn tls-btn--danger min-h-10 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+                Aus dem Album nehmen
+              </button>
+            </>
+          )}
+        </div>
+      )}
       {photos.length === 0 ? (
         <div className="border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">Noch keine Medien. Lade Fotos oder Videos hoch, oder füge einen Video-Link hinzu.</div>
       ) : (
@@ -335,19 +384,33 @@ export function AlbumPhotos({ album, onBack }) {
               ) : (
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
                   {group.items.map((p) => (
-                    <div key={p.id} className="relative group aspect-square bg-[#0A0A0A] border border-white/10">
+                    <div key={p.id} className={`relative group aspect-square bg-[#0A0A0A] border ${checked.includes(p.id) ? "border-[#29B6E8] ring-2 ring-[#29B6E8]/30" : "border-white/10"}`}>
                       <GalleryAdminThumb item={p} />
                       <MediaBadge item={p} />
+                      <label className="absolute left-0 top-0 z-[1] flex h-9 w-9 cursor-pointer items-center justify-center">
+                        <input type="checkbox" checked={checked.includes(p.id)} onChange={() => toggleChecked(p.id)} aria-label={`${p.caption || "Medium"} auswählen`} data-testid={`gallery-photo-check-${p.id}`} className="h-5 w-5 accent-[#29B6E8]" />
+                      </label>
                       <select
                         value={sectionValue(p.section_id)}
                         onChange={(e) => moveMediaToSection(p, sectionIdFromValue(e.target.value))}
-                        className="absolute left-1 top-1 max-w-[calc(100%-2.5rem)] bg-black/75 border border-white/10 px-1.5 py-1 text-[10px] text-white opacity-0 group-hover:opacity-100 focus:opacity-100 transition rounded-sm"
+                        className="absolute left-1 top-9 max-w-[calc(100%-0.5rem)] bg-black/75 border border-white/10 px-1.5 py-1 text-[10px] text-white opacity-0 group-hover:opacity-100 focus:opacity-100 transition rounded-sm"
                         aria-label="Abschnitt ändern"
                       >
                         <option value={UNSECTIONED_VALUE}>Ohne Abschnitt</option>
                         {sections.map((section) => <option key={section.id} value={section.id}>{section.title}</option>)}
                       </select>
                       <button onClick={() => remove(p.id)} className="absolute top-1 right-1 p-1 bg-black/70 text-[#FF3B30] opacity-0 group-hover:opacity-100 transition" aria-label="Löschen"><Trash2 className="w-3.5 h-3.5" /></button>
+                      {/* Beschriftung und Reihenfolge (#2112) - am Handy immer sichtbar, am PC beim Darüberfahren. */}
+                      <button
+                        type="button"
+                        onClick={() => setEditingPhoto(p)}
+                        data-testid={`gallery-photo-edit-${p.id}`}
+                        title={p.caption || "Beschriftung und Reihenfolge"}
+                        className="absolute bottom-1 right-1 p-1 bg-black/70 text-white sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 transition"
+                        aria-label={`${p.caption || "Medium"} bearbeiten`}
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -366,13 +429,14 @@ export function AlbumPhotos({ album, onBack }) {
               </div>
               <button type="button" onClick={() => setMediaOpen(false)} className="text-white/50 hover:text-white">×</button>
             </div>
-            {loadingMedia ? (
+            <MediaLibrarySearch library={media} testId="gallery-media" />
+            {media.loading ? (
               <div className="text-white/40 py-12 text-center">Lade Medien…</div>
-            ) : media.length === 0 ? (
-              <div className="text-white/40 py-12 text-center">Keine Medien vorhanden.</div>
+            ) : media.items.length === 0 ? (
+              <div className="text-white/40 py-12 text-center">{media.search ? "Nichts gefunden." : "Keine Medien vorhanden."}</div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-                {media.map((item) => {
+                {media.items.map((item) => {
                   const active = selectedMedia.some((x) => x.url === item.url);
                   return (
                     <button
@@ -390,6 +454,7 @@ export function AlbumPhotos({ album, onBack }) {
                 })}
               </div>
             )}
+            <MediaLibraryMore library={media} testId="gallery-media" />
             <div className="mt-5 flex justify-end gap-2 border-t border-white/10 pt-4">
               <button type="button" onClick={() => setMediaOpen(false)} className="px-4 py-2 border border-white/10 text-white/60 rounded-sm text-xs uppercase tracking-wider font-bold">Abbrechen</button>
               <button type="button" onClick={addSelectedMedia} disabled={!selectedMedia.length} data-testid="photo-media-add" className="px-5 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">Auswahl hinzufügen</button>
@@ -399,6 +464,7 @@ export function AlbumPhotos({ album, onBack }) {
       )}
       {linkOpen && <VideoLinkModal onClose={() => setLinkOpen(false)} onSave={addExternalMedia} />}
       {editingSection && <SectionModal section={editingSection} onClose={() => setEditingSection(null)} onSave={saveSection} />}
+      {editingPhoto && <PhotoEditSheet photo={editingPhoto} onClose={() => setEditingPhoto(null)} onSaved={() => { setEditingPhoto(null); load(); }} />}
     </AdminLayout>
   );
 }
@@ -444,6 +510,36 @@ function MediaBadge({ item }) {
     <span className="absolute left-1 bottom-1 inline-flex items-center gap-1 rounded-sm bg-black/75 px-1.5 py-1 text-[9px] font-black uppercase tracking-widest text-white">
       <Play className="w-3 h-3 fill-current" /> {label}
     </span>
+  );
+}
+
+// Nach dem Hochladen (#2112): Beschriftung und Reihenfolge eines Mediums ändern. Die Reihenfolge zählt im Abschnitt.
+function PhotoEditSheet({ photo, onClose, onSaved }) {
+  const [caption, setCaption] = useState(photo.caption || "");
+  const [order, setOrder] = useState(String(photo.order_index ?? 0));
+  const [saving, setSaving] = useState(false);
+  const submit = async (event) => {
+    event.preventDefault();
+    const orderIndex = Number(order);
+    if (!Number.isInteger(orderIndex)) { toast.error("Reihenfolge bitte als ganze Zahl."); return; }
+    setSaving(true);
+    try {
+      await api.patch(`/gallery/photos/${photo.id}`, { caption: caption.trim(), order_index: orderIndex });
+      toast.success("Medium gespeichert.");
+      onSaved();
+    } catch (err) {
+      toast.error(formatRequestError(err, "Das Medium konnte nicht gespeichert werden."));
+      setSaving(false);
+    }
+  };
+  return (
+    <AdminSheet title="Medium bearbeiten" eyebrow="Galerie" onClose={onClose} onSubmit={submit} saving={saving} submitTestId="gallery-photo-save" testId="gallery-photo-sheet">
+      <div className="h-40 w-full overflow-hidden rounded-sm border border-white/10 bg-[#0A0A0A]">
+        <GalleryAdminThumb item={photo} />
+      </div>
+      <TextField label="Beschriftung" value={caption} onChange={setCaption} maxLength={300} placeholder="Optional – steht unter dem Bild" testId="gallery-photo-caption" />
+      <TextField label="Reihenfolge" type="number" value={order} onChange={setOrder} hint="Kleinere Zahl steht weiter vorn im Abschnitt." testId="gallery-photo-order" />
+    </AdminSheet>
   );
 }
 

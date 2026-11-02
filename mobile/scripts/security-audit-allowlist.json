@@ -13,5 +13,15 @@
     "module": "zod",
     "expires": "2027-01-26",
     "reason": "zod 3.25.76 is affected (memory exhaustion when validating oversized constrained collections; advisory range <4.6.6, checked on 2026-10-26); the only fix is zod 4.6.6, and the newest @expo/cli (57.0.31) still requires zod ^3.25.76. zod is used only inside @expo/cli on the developer machine: the dev server of `expo start` validates DevTools plugin manifests of installed packages (DevToolsPlugin.schema.js, createMCPDevToolsExtensionSchema.js). Input comes from packages of this repository, not from app users. It is not part of the app bundle. The website frontend dropped zod entirely (#2031). Re-check on expiry or when @expo/cli moves to zod 4."
+  },
+  "GHSA-3G3M-2FJR-6PW4": {
+    "module": "glob",
+    "expires": "2027-01-31",
+    "reason": "glob 13.0.6 and 7.2.3 are affected (AbortSignal cancellation does not stop the file walk; advisory range up to 14.0.1, checked on 2026-11-01); the only fix is glob 14.0.2, a new major version, and the newest expo 57 packages still require glob 13. It is reached only through the Expo command line and config tooling (@expo/cli, @expo/config, @expo/config-plugins, @expo/fingerprint, @expo/metro-config) and through jest 29. Those run on the developer machine or in CI, on patterns from this repository, and pass no AbortSignal from outside. Build and test tooling, not part of the app bundle. Re-check on expiry."
+  },
+  "GHSA-G3HV-75WG-M249": {
+    "module": "minimatch",
+    "expires": "2027-01-31",
+    "reason": "minimatch 10.2.6 and 3.1.5 are affected (denial of service through a crafted glob pattern; advisory range <11.0.1, checked on 2026-11-01); the only fix is minimatch 11.0.1, a new major version, and the newest expo 57 packages still require minimatch 10. It is reached only through glob and @expo/fingerprint in the Expo tooling and through jest 29. The patterns come from the configuration of this repository, never from outside input. Build and test tooling, not part of the app bundle. Re-check on expiry."
   }
 }

@@ -89,7 +89,7 @@ export default function AchievementSharePage() {
                   {Number(card.holders || 0) > 0 && <span className="tabular-nums" data-testid="share-rarity">{formatPercent(card.percent)} haben das</span>}
                 </div>
                 {card.description && <p className="mt-3 text-sm text-white/65">{card.description}</p>}
-                <Link to={card.user?.username ? `/u/${card.user.username}` : "/players"} className="mt-4 inline-flex items-center gap-2 text-sm hover:text-[#29B6E8]" data-testid="share-person">
+                <Link to={card.user?.username ? `/u/${encodeURIComponent(card.user.username)}` : "/players"} className="mt-4 inline-flex items-center gap-2 text-sm hover:text-[#29B6E8]" data-testid="share-person">
                   {card.user?.avatar_url ? (
                     <img src={resolveMediaUrl(card.user.avatar_url)} alt="" className="w-7 h-7 rounded-sm object-cover border border-white/15" />
                   ) : (

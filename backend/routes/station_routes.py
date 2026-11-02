@@ -7,6 +7,7 @@ from database import get_db
 from auth import get_current_user, get_optional_user, require_admin
 from models import StationCreate, StationUpdate, now_utc, new_id
 from routes.tournament_common import tournament_hidden_reason
+from services import game_usage
 from services.access_links import validate_access_link
 from services.change_events import reset_scope_cache
 from services.heat_rebuild import evaluate_after_write, reevaluate_after_release
@@ -197,6 +198,9 @@ async def list_stations(tournament_id: str | None = None, event_id: str | None =
     return await _StationView(db, user, key).rows(stations)
 
 
+STATION_DETAIL_FIELDS = ("name", "device_type", "notes", "game_id")
+
+
 @router.post("")
 async def create_station(body: StationCreate, me: dict = Depends(require_admin())):
     db = get_db()
@@ -205,6 +209,8 @@ async def create_station(body: StationCreate, me: dict = Depends(require_admin()
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     if doc.get("tournament_id"):
         await _ensure_tournament_unlocked(db, doc["tournament_id"])
+    if await game_usage.chosen_is_archived(db, doc.get("game_id")):
+        raise HTTPException(status_code=422, detail=game_usage.ARCHIVED_DETAIL)
     doc["id"] = new_id()
     doc["status"] = "free"
     doc["current_match_id"] = None
@@ -224,12 +230,27 @@ async def update_station(sid: str, body: StationUpdate, me: dict = Depends(requi
     nullable = {"tournament_id", "event_id", "game_id", "notes", "current_match_id", "current_match_type"}
     updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None or k in nullable}
     current = await db.stations.find_one({"id": sid}, {"_id": 0})
-    if current and current.get("tournament_id"):
+    if not current:
+        raise HTTPException(status_code=404, detail="Station nicht gefunden")
+    if current.get("tournament_id"):
         await _ensure_tournament_unlocked(db, current["tournament_id"])
     if updates.get("tournament_id") and not await db.tournaments.find_one({"id": updates["tournament_id"]}, {"id": 1}):
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     if updates.get("tournament_id"):
         await _ensure_tournament_unlocked(db, updates["tournament_id"])
+    if "name" in updates:
+        updates["name"] = str(updates["name"]).strip()
+        if not updates["name"]:
+            raise HTTPException(status_code=422, detail="Bitte einen Namen für die Station angeben.")
+    if "notes" in updates:
+        updates["notes"] = (updates["notes"] or "").strip() or None
+    if updates.get("game_id") and not await db.games.find_one({"id": updates["game_id"]}, {"id": 1}):
+        raise HTTPException(status_code=404, detail="Spiel nicht gefunden")
+    if await game_usage.chosen_is_archived(db, updates.get("game_id"), current.get("game_id")):
+        raise HTTPException(status_code=422, detail=game_usage.ARCHIVED_DETAIL)
+    # Protokoll wie bei den übrigen Bearbeitungen (#2112): was an den Angaben der Station geändert wurde, nicht der Betrieb.
+    edited = {field: {"from": current.get(field), "to": updates[field]} for field in STATION_DETAIL_FIELDS
+              if field in updates and updates[field] != current.get(field)}
     updates["updated_at"] = now_utc().isoformat()
     # Seit wann defekt (#1160) - für „Braucht Aufmerksamkeit“; wieder frei heißt: der Zeitpunkt fällt weg.
     if updates.get("status") == "broken" and (current or {}).get("status") != "broken":
@@ -245,6 +266,12 @@ async def update_station(sid: str, body: StationUpdate, me: dict = Depends(requi
             await _forget_call(db, previous_match, actor_id=me.get("id"))
     await db.stations.update_one({"id": sid}, change)
     reset_scope_cache()  # Live-Meldungen (#1801): Turnier und Event neu nachschlagen
+    if edited:
+        await db.audit_logs.insert_one({
+            "id": new_id(), "action": "station.update", "actor_id": me.get("id"), "target_id": sid,
+            "data": {"tournament_id": current.get("tournament_id"), "changes": edited},
+            "created_at": updates["updated_at"],
+        })
     s = await db.stations.find_one({"id": sid}, {"_id": 0})
     return s
 
@@ -362,6 +389,8 @@ async def bulk_create_stations(body: dict, me: dict = Depends(require_admin())):
     count = int(body.get("count") or 0)
     if count < 1 or count > 64:
         raise HTTPException(status_code=400, detail="Anzahl muss zwischen 1 und 64 liegen")
+    if await game_usage.chosen_is_archived(db, body.get("game_id")):
+        raise HTTPException(status_code=422, detail=game_usage.ARCHIVED_DETAIL)
     prefix = (body.get("prefix") or "Station").strip() or "Station"
     device_type = (body.get("device_type") or "switch").strip()
     notes = (body.get("notes") or "").strip() or None

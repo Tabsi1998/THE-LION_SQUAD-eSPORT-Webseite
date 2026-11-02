@@ -8,7 +8,8 @@ Map kann in mehreren Modi freigegeben sein und in anderen nicht (M:N).
 Was ein Wettbewerb daraus wählt, steht als Snapshot in ``map_pools`` (``services/map_pools.py``). Deshalb ändern
 Umbenennen, neues Bild oder Archivieren nie einen gespeicherten Pool. Gelöscht wird nur eine Map, die in keiner
 Pool-Version steht - sonst archivieren. Eine neue Spielversion erbt keine Maps von selbst; gleiche Namen in zwei Spielen
-sind zwei verschiedene Maps.
+sind zwei verschiedene Maps. „Aus <Spiel> übernehmen“ (``import_maps``) legt solche eigenen Maps an, ohne Doppel und mit
+demselben Bild (#2129, SP4).
 """
 from __future__ import annotations
 
@@ -21,6 +22,7 @@ from pydantic import BaseModel, Field, field_validator
 from pymongo.errors import DuplicateKeyError
 
 from models import GAME_MODES_MAX, now_utc
+from services.media_formats import UPLOAD_URL_VERSION
 from services.slug_utils import slugify
 
 # Grenze gegen unkontrollierte Datenmengen - keine feste Kartenzahl eines Spiels.
@@ -28,9 +30,11 @@ MAPS_PER_GAME_MAX = 200
 NAME_MAX = 80
 SLUG_MAX = 80
 # Bilder nur aus dem eigenen Upload: eine fremde Adresse ließe jede Person beim Ansehen bei Dritten anfragen.
-IMAGE_URL = re.compile(r"/api/static/uploads/[A-Za-z0-9][A-Za-z0-9_.-]{0,150}\.(png|webp|jpg|jpeg)")
+IMAGE_URL = re.compile(r"/api/static/uploads/[A-Za-z0-9][A-Za-z0-9_.-]{0,150}\.(png|webp|jpg|jpeg)" + UPLOAD_URL_VERSION)
 IMAGE_REFUSED = "Bild bitte über „Hochladen“ oder die Mediathek wählen (PNG, JPG oder WebP)."
 STATUSES = ("active", "archived")
+# Standard-Pool eines Spiels (#2129, SP3): eine Vorlage in ``map_pools``, kein Wettbewerb - zählt nicht als Verwendung.
+DEFAULT_POOL_SCOPE = "game_default"
 SLUG_TAKEN = "Der Slug „{slug}“ ist in diesem Spiel schon vergeben."
 # Was eine Map nach außen zeigt - Verwaltung und Pools lesen dieselben Felder.
 PUBLIC_FIELDS = ("id", "game_id", "slug", "name", "aliases", "image_url", "note", "external_ref", "order", "status",
@@ -118,6 +122,15 @@ class GameMapOrder(BaseModel):
     ids: List[str] = Field(min_length=1, max_length=MAPS_PER_GAME_MAX)
 
 
+class GameMapModes(BaseModel):
+    modes: List[str] = Field(min_length=1, max_length=GAME_MODES_MAX)
+
+
+class GameMapImport(BaseModel):
+    source_game_id: str = Field(min_length=1, max_length=80)
+    map_ids: List[str] = Field(min_length=1, max_length=MAPS_PER_GAME_MAX)
+
+
 class MapProblem(ValueError):
     """Eine Eingabe, die nicht passt - die Route macht daraus 422 bzw. 409 (``status``)."""
 
@@ -172,14 +185,50 @@ async def maps_of(db, game_id: str, *, active_only: bool = False) -> list[dict]:
 
 
 async def usage_counts(db, game_id: str) -> dict[str, int]:
-    """In wie vielen Pool-Versionen eine Map steht - danach richtet sich, ob sie gelöscht werden darf."""
+    """In wie vielen Pool-Versionen eine Map steht - danach richtet sich, ob sie gelöscht werden darf. Der Standard-Pool
+    des Spiels ist nur eine Vorlage und hält keine Map fest."""
     counts: dict[str, int] = {}
-    async for pool in db.map_pools.find({"game_id": game_id}, {"_id": 0, "modes": 1}):
+    async for pool in db.map_pools.find({"game_id": game_id, "scope": {"$ne": DEFAULT_POOL_SCOPE}}, {"_id": 0, "modes": 1}):
         seen = {item.get("map_id") for group in pool.get("modes") or [] for item in group.get("maps") or []}
         for map_id in seen:
             if map_id:
                 counts[map_id] = counts.get(map_id, 0) + 1
     return counts
+
+
+async def drop_modes(db, game_id: str, modes: list[str], user: dict) -> int:
+    """Modi, die das Spiel nicht mehr hat, aus seinen Maps nehmen (#2129) - wie viele Maps es traf. Gespeicherte Pools
+    bleiben: sie zeigen ihren Snapshot und melden die Änderung über ``outdated_map_ids``."""
+    if not modes:
+        return 0
+    result = await db.game_maps.update_many(
+        {"game_id": game_id, "modes": {"$in": modes}},
+        {"$pull": {"modes": {"$in": modes}}, "$set": {"updated_at": now_utc().isoformat(), "updated_by": user["id"]}})
+    return result.modified_count
+
+
+def lacks_mode(row: dict, known: set[str]) -> bool:
+    """Eine aktive Map, die in keinem Pool zur Wahl steht, weil das Spiel Modi hat und sie keinem davon zugeordnet ist."""
+    return bool(known) and row.get("status") == "active" and not known & set(row.get("modes") or [])
+
+
+async def count_without_mode(db, game: dict) -> int:
+    known = {mode["mode"] for mode in game_modes(game)}
+    return sum(1 for row in await maps_of(db, game["id"]) if lacks_mode(row, known))
+
+
+async def assign_modes(db, game: dict, modes: list[str], user: dict) -> int:
+    """Sammelaktion (#2129): alle aktiven Maps ohne Modus bekommen die gewählten Modi - wie viele es waren."""
+    wanted = clean_modes(game, modes)
+    if not wanted:
+        raise MapProblem("Bitte mindestens einen Modus wählen.")
+    known = {mode["mode"] for mode in game_modes(game)}
+    ids = [row["id"] for row in await maps_of(db, game["id"]) if lacks_mode(row, known)]
+    if not ids:
+        return 0
+    await db.game_maps.update_many({"id": {"$in": ids}, "game_id": game["id"]},
+                                   {"$set": {"modes": wanted, "updated_at": now_utc().isoformat(), "updated_by": user["id"]}})
+    return len(ids)
 
 
 def _spelling_taken(text: str, owner: str) -> MapProblem:
@@ -368,6 +417,56 @@ async def update(db, game: dict, current: dict, body: GameMapUpdate, user: dict)
         raise
     await release_keys(db, game["id"], current["id"], keep=set(spellings))
     return public_map({**current, **updates})
+
+
+def mapped_modes(source: dict, game: dict, modes: list[str] | None) -> list[str]:
+    """Die Modi einer Map im Zielspiel (#2129, SP4): gleiche Kennung oder gleicher Name. Was das Ziel nicht hat, fällt weg -
+    die Map erscheint dann im Hinweis „noch keinen Modus“."""
+    target = game_modes(game)
+    by_key = {mode["mode"]: mode["mode"] for mode in target}
+    by_label = {name_key(mode["label"]): mode["mode"] for mode in target}
+    labels = {mode["mode"]: mode["label"] for mode in game_modes(source)}
+    out: list[str] = []
+    for mode in modes or []:
+        found = by_key.get(mode) or by_label.get(name_key(labels.get(mode)))
+        if found and found not in out:
+            out.append(found)
+    return out
+
+
+async def _taken_spellings(db, game_id: str) -> set[str]:
+    rows = await db.game_maps.find({"game_id": game_id}, {"_id": 0, "name": 1, "slug": 1, "aliases": 1}).to_list(MAPS_PER_GAME_MAX + 50)
+    return {key for row in rows for key in spelling_keys(row.get("name"), row.get("slug"), row.get("aliases"))}
+
+
+async def import_candidates(db, game: dict, source: dict) -> list[dict]:
+    """Was sich aus ``source`` übernehmen lässt: die aktiven Maps, mit ``exists``, wenn das Zielspiel sie unter einer ihrer
+    Schreibweisen schon hat."""
+    taken = await _taken_spellings(db, game["id"])
+    labels = {mode["mode"]: mode["label"] for mode in game_modes(game)}
+    return [{"id": row["id"], "name": row.get("name"), "image_url": row.get("image_url"),
+             "modes": [labels[mode] for mode in mapped_modes(source, game, row.get("modes"))],
+             "exists": bool(taken & set(spelling_keys(row.get("name"), row.get("slug"), row.get("aliases"))))}
+            for row in await maps_of(db, source["id"], active_only=True)]
+
+
+async def import_maps(db, game: dict, source: dict, map_ids: list[str], user: dict, make_id) -> dict:
+    """Maps aus einer anderen Spielversion übernehmen (#2129, SP4): als eigene Maps dieses Spiels, ohne Doppel, das Bild wird
+    mitverwendet. Das Quellspiel und gespeicherte Pools bleiben unberührt. Was nicht geht, steht mit Grund in ``skipped``."""
+    wanted = set(map_ids)
+    created: list[dict] = []
+    skipped: list[dict] = []
+    for row in await maps_of(db, source["id"], active_only=True):
+        if row["id"] not in wanted:
+            continue
+        body = GameMapCreate(name=row.get("name"), slug=row.get("slug"), aliases=row.get("aliases") or [],
+                             image_url=row.get("image_url"), note=row.get("note"), external_ref=row.get("external_ref"),
+                             modes=mapped_modes(source, game, row.get("modes")))
+        try:
+            created.append(await create(db, game, body, user, make_id()))
+        except MapProblem as problem:
+            skipped.append({"id": row["id"], "name": row.get("name"), "reason": problem.message})
+    return {"created": created, "skipped": skipped}
 
 
 async def reorder(db, game: dict, ids: list[str], user: dict) -> list[dict]:

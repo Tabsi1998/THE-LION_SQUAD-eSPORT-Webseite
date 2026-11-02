@@ -86,6 +86,18 @@ def _can_rebuild_bracket_from_format(tournament: dict) -> bool:
     return True
 
 
+def _no_generator_text(tournament: dict | None) -> str:
+    """Warum es keinen Turnierbaum zum Vorausbauen gibt - und was stattdessen geht (#2111, TA28)."""
+    fmt = (tournament or {}).get("format")
+    if fmt == "swiss":
+        return ("Beim Schweizer System entsteht jede Runde einzeln über „Schweizer Runde“ – einen Turnierbaum zum "
+                "Vorausbauen gibt es nicht.")
+    if fmt in {"time_trial", "grand_prix"}:
+        return ("Zeitfahren und Rennserie bekommen im Turnier keine Spiele – Zeitfahren laufen über Fast Lap, "
+                "Rennserien über Serien.")
+    return "Für dieses Format gibt es keinen Turnierbaum zum Vorausbauen."
+
+
 # --- Bracket generation ---
 async def _build_tournament_structure_plan(
     db,
@@ -96,10 +108,7 @@ async def _build_tournament_structure_plan(
     """Generate and validate a deterministic structure without writing it."""
 
     if not _can_rebuild_bracket_from_format(tournament):
-        raise HTTPException(
-            status_code=400,
-            detail="Für dieses Format gibt es keinen automatischen Format-Bracket-Generator.",
-        )
+        raise HTTPException(status_code=400, detail=_no_generator_text(tournament))
 
     read_model = await load_competition_read_model(db, tid)
     current_structure = read_model.structure_snapshot()
@@ -126,10 +135,7 @@ async def _build_tournament_structure_plan(
         })
 
     if not stage_defaults:
-        raise HTTPException(
-            status_code=400,
-            detail="Für dieses Format ist kein Struktur-Generator aktiv.",
-        )
+        raise HTTPException(status_code=400, detail=_no_generator_text(tournament))
     generator_registrations = registrations
     engine = decision.engine
     if not body.preview and len(generator_registrations) < 2:
@@ -267,7 +273,7 @@ async def apply_tournament_structure_plan(
                 status_code=409,
                 detail={
                     "code": "structure_plan_stale",
-                    "message": "Der Basis-Hash gehört nicht zum bereits angewendeten Strukturplan.",
+                    "message": "Der Strukturplan passt nicht mehr zum aktuellen Stand – bitte die Vorschau neu planen.",
                 },
             )
         return {
@@ -324,8 +330,8 @@ async def apply_tournament_structure_plan(
             detail={
                 "code": "protected_existing_structure",
                 "message": (
-                    "Der sichere Apply-Weg ersetzt nur leere oder reine Preview-Strukturen. "
-                    "Reale Matches und laufende oder historische Turniere bleiben unverändert."
+                    "„Struktur anwenden“ ersetzt nur eine leere Struktur oder eine reine Vorschau. Echte Spiele und "
+                    "laufende oder beendete Turniere bleiben, wie sie sind."
                 ),
                 "replacement_impact": response["replacement_impact"],
             },
@@ -380,7 +386,7 @@ async def rebuild_bracket_from_tournament_format(tid: str, body: TournamentBrack
     tournament = await _ensure_tournament_unlocked(db, tid)
     await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
     if not _can_rebuild_bracket_from_format(tournament):
-        raise HTTPException(status_code=400, detail="Für dieses Format gibt es keinen automatischen Format-Bracket-Generator.")
+        raise HTTPException(status_code=400, detail=_no_generator_text(tournament))
     # Liga-Staffel (#2109): ein fester Spielplan wird nicht durch eine Vorschau ersetzt - auch nicht mit force.
     staffel_problem = await staffel_rebuild_problem(db, tournament)
     if staffel_problem:
@@ -510,10 +516,7 @@ async def rebuild_bracket_from_tournament_format(tid: str, body: TournamentBrack
             "participant_count": len(registrations),
         }
 
-    raise HTTPException(
-        status_code=400,
-        detail="Für dieses Format ist kein Struktur-Generator aktiv.",
-    )
+    raise HTTPException(status_code=400, detail=_no_generator_text(tournament))
 
 
 @router.post("/{tid}/reset-bracket")

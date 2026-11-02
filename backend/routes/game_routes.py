@@ -2,6 +2,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from database import get_db
 from auth import get_optional_user, require_admin
+from services import game_maps, game_usage
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from models import GameCreate, GameUpdate, now_utc, new_id
 
@@ -133,6 +134,16 @@ async def game_discord_server(slug_or_id: str, me: dict | None = Depends(get_opt
     return out
 
 
+@router.get("/{game_id}/usage")
+async def game_usage_route(game_id: str, me: dict = Depends(require_admin())):
+    """Wo das Spiel verwendet wird (#2129) - für die Rückfragen vor dem Löschen und vor dem Entfernen eines Modus."""
+    db = get_db()
+    game = await db.games.find_one({"id": game_id}, {"_id": 0})
+    if not game:
+        raise HTTPException(status_code=404, detail="Spiel nicht gefunden")
+    return await game_usage.usage(db, game)
+
+
 @router.post("")
 async def create_game(body: GameCreate, me: dict = Depends(require_admin())):
     db = get_db()
@@ -142,6 +153,9 @@ async def create_game(body: GameCreate, me: dict = Depends(require_admin())):
         raise HTTPException(status_code=404, detail="Hauptspiel nicht gefunden")
     if doc.get("identity_source_game_id") and not await db.games.find_one({"id": doc["identity_source_game_id"]}, {"id": 1}):
         raise HTTPException(status_code=404, detail="ID-Quelle nicht gefunden")
+    for chosen in (doc.get("parent_game_id"), doc.get("identity_source_game_id")):
+        if await game_usage.chosen_is_archived(db, chosen):
+            raise HTTPException(status_code=422, detail=game_usage.ARCHIVED_DETAIL)
     await _check_discord_guild(db, doc)
     doc["id"] = new_id()
     doc["created_at"] = now_utc().isoformat()
@@ -179,15 +193,36 @@ async def update_game(game_id: str, body: GameUpdate, me: dict = Depends(require
             raise HTTPException(status_code=400, detail="Ein Spiel kann nicht seine eigene externe ID-Quelle sein")
         if not await db.games.find_one({"id": updates["identity_source_game_id"]}, {"id": 1}):
             raise HTTPException(status_code=404, detail="ID-Quelle nicht gefunden")
+    for key in ("parent_game_id", "identity_source_game_id"):
+        if await game_usage.chosen_is_archived(db, updates.get(key), current.get(key)):
+            raise HTTPException(status_code=422, detail=game_usage.ARCHIVED_DETAIL)
     await _check_discord_guild(db, updates, current)
+    status = updates.get("status")
+    if status and status != (current.get("status") or "active"):
+        updates["archived_at"] = now_utc().isoformat() if status == game_usage.ARCHIVED else None
     updates["updated_at"] = now_utc().isoformat()
     await db.games.update_one({"id": game_id}, {"$set": updates})
     game = await db.games.find_one({"id": game_id}, {"_id": 0})
-    return game
+    if "match_modes" not in raw:
+        return game
+    # Modi geändert (#2129, SP2): wer einen Modus verliert, verliert ihn auch an den Maps - gespeicherte Pools behalten
+    # ihren Snapshot. Dazu die Zahl der Maps ohne Modus: die stehen in keinem Pool zur Wahl, bis jemand sie zuordnet.
+    known = {mode["mode"] for mode in game_maps.game_modes(game)}
+    gone = sorted({mode["mode"] for mode in game_maps.game_modes(current)} - known)
+    return {**game, "maps_cleaned": await game_maps.drop_modes(db, game_id, gone, me),
+            "maps_without_mode": await game_maps.count_without_mode(db, game)}
 
 
 @router.delete("/{game_id}")
 async def delete_game(game_id: str, me: dict = Depends(require_admin())):
+    """Löschen nur, wenn nichts mehr am Spiel hängt (#2129) - sonst 409 mit Zählung; dann archivieren."""
     db = get_db()
+    game = await db.games.find_one({"id": game_id}, {"_id": 0})
+    if not game:
+        raise HTTPException(status_code=404, detail="Spiel nicht gefunden")
+    used = await game_usage.usage(db, game)
+    if used["total"]:
+        raise HTTPException(status_code=409, detail=game_usage.still_in_use(used["text"]))
+    await db.map_pools.delete_many({"scope": game_maps.DEFAULT_POOL_SCOPE, "scope_id": game_id})
     await db.games.delete_one({"id": game_id})
     return {"ok": True}

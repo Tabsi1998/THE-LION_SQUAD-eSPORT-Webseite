@@ -24,7 +24,7 @@ vi.mock("@/components/tls/results/ResultWindow", () => ({ ResultWindowLoader: ()
 vi.mock("@/components/tls/results/ResultUndoBar", () => ({ ResultUndoBar: () => null, useResultUndo: () => ({ pending: null, show: () => {} }) }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), message: vi.fn() } }));
 
-const { default: AdminStationsPage } = await import("./AdminStationsPage");
+const { default: AdminStationsPage, preferredStationTournament, stationTournamentGroups } = await import("./AdminStationsPage");
 
 const MATCH = { id: "m1", match_key: "A1", status: "ready", station_id: null, round: 1, slots: [{ slot: 1, registration_id: "r1" }, { slot: 2, registration_id: "r2" }] };
 
@@ -124,4 +124,61 @@ test("Stationen und Spiele bleiben live: Änderungsstrom mit Ersatz-Takt", async
   await screen.findByTestId("stations-plan-schedule");
   const resources = liveRefresh.mock.calls.map(([, list, options]) => ({ list: list.join(","), fallback: options?.fallbackMs }));
   expect(resources).toContainEqual({ list: "stations,matches,tournaments", fallback: 15000 });
+});
+
+// Stationen-Seite (#2111, TA26): Turniere vor Ort und hybrid stehen oben, vorgewählt ist ein laufendes; Online- und
+// beendete Turniere folgen unter „Weitere Turniere“ statt vorgewählt zu sein.
+test("Stationen: vor Ort zuerst, ein laufendes vorgewählt, online und beendet dahinter", () => {
+  const rows = [
+    { id: "neu-online", event_mode: "online", status: "draft" },
+    { id: "vorbei", event_mode: "local", status: "completed" },
+    { id: "geplant", event_mode: "hybrid", status: "registration_open" },
+    { id: "laeuft", event_mode: "local", status: "live" },
+  ];
+  const { onsite, others } = stationTournamentGroups(rows);
+  expect(onsite.map((row) => row.id)).toEqual(["geplant", "laeuft"]);
+  expect(others.map((row) => row.id)).toEqual(["neu-online", "vorbei"]);
+  expect(preferredStationTournament(rows)).toBe("laeuft");
+  expect(preferredStationTournament(rows, "vorbei")).toBe("vorbei");
+  expect(preferredStationTournament([rows[0]])).toBe("neu-online");
+});
+
+// Station bearbeiten (#2112): Name, Gerät, Spiel und Hinweis nach dem Anlegen ändern.
+test("Station bearbeiten: Angaben vorbelegt, Spiel aus der Liste, gespeichert wird genau das", async () => {
+  const user = userEvent.setup();
+  apiMock.get.mockImplementation((url) => {
+    if (String(url) === "/games") return Promise.resolve({ data: [{ id: "g-1", name: "Mario Kart" }] });
+    if (String(url).includes("/stations")) return Promise.resolve({ data: [{ id: "st-1", name: "Tisch 1", device_type: "switch2", status: "free", notes: "Alt", game_id: null, current_match_id: null }] });
+    return Promise.resolve(routeFor(String(url)));
+  });
+  apiMock.patch.mockReset();
+  apiMock.patch.mockResolvedValue({ data: {} });
+  render(<MemoryRouter><ConfirmDialogProvider><AdminStationsPage /></ConfirmDialogProvider></MemoryRouter>);
+
+  await user.click(await screen.findByTestId("station-edit-st-1"));
+  expect(screen.getByTestId("station-edit-name")).toHaveValue("Tisch 1");
+  expect(screen.getByTestId("station-edit-device")).toHaveValue("switch2");
+  expect(screen.getByTestId("station-edit-notes")).toHaveValue("Alt");
+  await screen.findByRole("option", { name: "Mario Kart" });
+
+  await user.clear(screen.getByTestId("station-edit-name"));
+  await user.type(screen.getByTestId("station-edit-name"), "Tisch 7");
+  await user.selectOptions(screen.getByTestId("station-edit-device"), "pc");
+  await user.selectOptions(screen.getByTestId("station-edit-game"), "g-1");
+  await user.clear(screen.getByTestId("station-edit-notes"));
+  await user.click(screen.getByTestId("station-edit-save"));
+
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/stations/st-1", { name: "Tisch 7", device_type: "pc", game_id: "g-1", notes: null }));
+  await waitFor(() => expect(screen.queryByTestId("station-edit-sheet")).toBeNull());
+});
+
+test("Station bearbeiten: ein unbekanntes Gerät bleibt beim Speichern erhalten", async () => {
+  const user = userEvent.setup();
+  apiMock.get.mockImplementation((url) => {
+    if (String(url).includes("/stations")) return Promise.resolve({ data: [{ id: "st-1", name: "Tisch 1", device_type: "vr_brille", status: "free", current_match_id: null }] });
+    return Promise.resolve(routeFor(String(url)));
+  });
+  render(<MemoryRouter><ConfirmDialogProvider><AdminStationsPage /></ConfirmDialogProvider></MemoryRouter>);
+  await user.click(await screen.findByTestId("station-edit-st-1"));
+  expect(screen.getByTestId("station-edit-device")).toHaveValue("vr_brille");
 });

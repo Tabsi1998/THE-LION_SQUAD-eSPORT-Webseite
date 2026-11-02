@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import { API, api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { formatLapTime, parseLapTime, plausibilityText, showLapTime } from "@/lib/laptime";
 import { safeHttpUrl } from "@/lib/safeLink";
@@ -19,7 +19,9 @@ import { F1StaffPanel } from "./f1/F1StaffPanel";
 import { FastLapQuickEntry } from "@/components/tls/fastlap/FastLapQuickEntry";
 import { FastLapQueuePanel } from "@/components/tls/fastlap/FastLapQueuePanel";
 import { FastLapGuestLinkDialog } from "@/components/tls/fastlap/FastLapGuestLinkDialog";
+import { FastLapGuestsPanel } from "@/components/tls/fastlap/FastLapGuestsPanel";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
+import { archiveBlocked, F1_STATUS_LABELS, statusOptionsFor } from "@/lib/fastLapStatus";
 
 // Nach „Ergebnisse veröffentlicht“ (#1584) ändert nur die Turnierleitung Zeiten - mit Begründung, die im Protokoll steht.
 const LOCKED_STATUSES = new Set(["results_published", "archived"]);
@@ -32,26 +34,14 @@ function trackLimits(track) {
   return { min_plausible_ms: min, max_plausible_ms: max };
 }
 
-// „Einreichung offen/geschlossen“ nur, wenn es Online-Einreichen gibt (#1585) - bis dahin stehen sie nicht zur Wahl.
-const SUBMISSION_STATUSES = new Set(["registration_open", "registration_closed"]);
-
-const F1_STATUS_OPTIONS = [
-  ["draft", "Entwurf"],
-  ["scheduled", "Angekündigt"],
-  ["registration_open", "Einreichung offen"],
-  ["registration_closed", "Einreichung geschlossen"],
-  ["live", "Live"],
-  ["paused", "Pausiert"],
-  ["completed", "Beendet"],
-  ["results_published", "Ergebnisse veröffentlicht"],
-  ["archived", "Archiviert"],
-  ["cancelled", "Abgesagt"],
-];
-
 export default function AdminF1EditPage() {
   // Globale Aktionen nur für die Turnierleitung mit Zwei-Faktor (#1028), Helfer sehen die ihres Einsatzes.
   const { isTournamentLead } = useAuth();
   const { id } = useParams();
+  const navigate = useNavigate();
+  // Aus der Strafenliste (#2130): ?track= öffnet die Strecke, auf der die Zeit steht.
+  const [searchParams] = useSearchParams();
+  const wantedTrack = searchParams.get("track");
   const [challenge, setChallenge] = useState(null);
   const [tracks, setTracks] = useState([]);
   // Fahrer (#1354): aus der Personensuche - Name, Bild und ob Vereinsmitglied; nicht mehr die ganze Kontoliste.
@@ -78,7 +68,11 @@ export default function AdminF1EditPage() {
     const { data: c } = await api.get(`/f1/challenges/${id}?include_draft=true`);
     setChallenge(c);
     setTracks(c.tracks || []);
-    setActiveTrack((current) => (c.tracks || []).some((track) => track.id === current) ? current : c.tracks?.[0]?.id || null);
+    setActiveTrack((current) => {
+      const known = (trackId) => (c.tracks || []).some((track) => track.id === trackId);
+      if (known(current)) return current;
+      return known(wantedTrack) ? wantedTrack : c.tracks?.[0]?.id || null;
+    });
     // Jede Liste lädt für sich (#1354): fehlt ein Recht, steht an der Stelle ein Satz und der Rest geht weiter.
     if (!isTournamentLead) return;
     try {
@@ -91,7 +85,7 @@ export default function AdminF1EditPage() {
         ? formatRequestError(failure, "Dafür fehlt dir das Recht, das Fast-Lap-Team zu sehen.")
         : "Das Fast-Lap-Team lässt sich gerade nicht laden.");
     }
-  }, [id, isTournamentLead]);
+  }, [id, isTournamentLead, wantedTrack]);
 
   const loadTimes = useCallback(async () => {
     if (!activeTrack) return;
@@ -279,7 +273,7 @@ export default function AdminF1EditPage() {
       const inv = !!editTime.is_invalid;
       const note = (editTime.admin_note || "").trim();
       if ((pen > 0 || inv) && note.length < 5) {
-        toast.error("Bei Strafzeit oder Invalid-Markierung ist eine Begründung (mind. 5 Zeichen) Pflicht.");
+        toast.error("Bei Strafzeit oder ungültiger Runde ist eine Begründung (mind. 5 Zeichen) Pflicht.");
         return;
       }
       const consent = ms !== editTime.time_ms ? await plausibilityConsent(ms) : {};
@@ -313,10 +307,27 @@ export default function AdminF1EditPage() {
     })) return;
     try {
       await api.patch(`/f1/challenges/${id}`, { status });
-      toast.success(`Status: ${Object.fromEntries(F1_STATUS_OPTIONS)[status] || status}`);
+      toast.success(`Status: ${F1_STATUS_LABELS[status] || status}`);
       load();
     } catch (e) {
       toast.error(formatRequestError(e, "Challenge-Status konnte nicht gespeichert werden."));
+    }
+  };
+
+  // Löschen (#2112) nur für Entwürfe ohne Zeiten - der Server prüft das; alles andere wird abgesagt oder archiviert.
+  const deleteChallenge = async () => {
+    if (!await confirm({
+      title: "Entwurf löschen?",
+      description: `„${challenge.title}“ wird mit Strecken, Gästen und Team-Einteilung gelöscht. Das geht nur, solange noch keine Zeiten eingetragen sind.`,
+      confirmLabel: "Entwurf löschen",
+      tone: "danger",
+    })) return;
+    try {
+      await api.delete(`/f1/challenges/${challenge.id}`);
+      toast.success("Challenge gelöscht.");
+      navigate("/admin/f1");
+    } catch (err) {
+      toast.error(formatRequestError(err, "Die Challenge konnte nicht gelöscht werden."));
     }
   };
 
@@ -326,7 +337,7 @@ export default function AdminF1EditPage() {
     <AdminLayout>
       <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
         <div>
-          <Link to="/admin/f1" className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← Fast-Lap Challenges</Link>
+          <Link to="/admin/f1" className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← Fast-Lap-Challenges</Link>
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">{challenge.title}</h1>
           <div className="mt-2 flex items-center gap-3"><StatusBadge status={challenge.status} /></div>
         </div>
@@ -334,19 +345,25 @@ export default function AdminF1EditPage() {
           {isTournamentLead && (
             <div>
               <select value={challenge.status} onChange={(e) => setStatus(e.target.value)} data-testid="f1-status-select" className="bg-[#0A0A0A] border border-white/10 px-3 py-2 text-sm rounded-sm">
-                {F1_STATUS_OPTIONS
-                  .filter(([s]) => !SUBMISSION_STATUSES.has(s) || challenge.online_registration_enabled || s === challenge.status)
-                  .map(([s, label]) => <option key={s} value={s}>{label}</option>)}
+                {statusOptionsFor(challenge.status).map(([s, label]) => (
+                  <option key={s} value={s} disabled={s === "archived" && archiveBlocked(challenge)}>{s === "archived" && archiveBlocked(challenge) ? `${label} (erst nach dem Veröffentlichen)` : label}</option>
+                ))}
               </select>
-              <div className="mt-1 text-[10px] text-white/40">Manuell nur für Ausnahmen; Zeitplan automatisiert.</div>
+              <div className="mt-1 text-[10px] text-white/40">Live schaltet sich selbst, den Rest setzt ihr von Hand.</div>
             </div>
           )}
           <Link target="_blank" to={`/display/f1/${challenge.id}`} data-testid="f1-tv-admin-link" className="inline-flex items-center gap-2 px-4 py-2 border border-[#29B6E8] text-[#29B6E8] rounded-sm uppercase tracking-wider text-sm font-bold hover:bg-[#29B6E8]/10">
-            <Tv className="w-4 h-4" /> TV Modus
+            <Tv className="w-4 h-4" /> TV-Ansicht
           </Link>
-          <Link target="_blank" to={`/fastlap/${challenge.slug || challenge.id}`} className="px-4 py-2 border border-white/20 text-white rounded-sm uppercase tracking-wider text-sm font-bold hover:border-[#29B6E8]/60">Public</Link>
-          <a href={`${API}/f1/challenges/${challenge.id}/export.csv`} className="px-4 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40" target="_blank" rel="noreferrer">CSV</a>
+          <Link target="_blank" to={`/fastlap/${challenge.slug || challenge.id}`} className="px-4 py-2 border border-white/20 text-white rounded-sm uppercase tracking-wider text-sm font-bold hover:border-[#29B6E8]/60">Öffentliche Seite</Link>
+          {/* Der Export gehört der Turnierleitung (#2130) - ein Helfer bekäme nur eine rohe 403. */}
+          {isTournamentLead && <a href={`${API}/f1/challenges/${challenge.id}/export.csv`} data-testid="f1-export-csv" className="px-4 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40" target="_blank" rel="noreferrer">CSV</a>}
           <a href={`${API}/exports/f1/${challenge.id}/leaderboard.pdf${activeTrack ? `?track_id=${activeTrack}` : ""}`} className="px-4 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40" target="_blank" rel="noreferrer">PDF</a>
+          {isTournamentLead && challenge.status === "draft" && (
+            <button type="button" onClick={deleteChallenge} data-testid="f1-delete-challenge" className="inline-flex items-center gap-2 px-4 py-2 border border-live/40 text-live text-xs uppercase font-bold rounded-sm hover:bg-live/10">
+              <Trash2 className="w-3.5 h-3.5" /> Entwurf löschen
+            </button>
+          )}
         </div>
       </div>
 
@@ -357,7 +374,12 @@ export default function AdminF1EditPage() {
       )}
       {!locked && OPEN_STATUSES.has(challenge.status) && challenge.public_phase?.state === "completed" && (
         <div data-testid="f1-end-reached" className="mb-5 border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm p-3 text-sm text-white/80">
-          Die Zeit ist um. Bitte die Zeiten prüfen und den Status auf „Beendet“ oder „Ergebnisse veröffentlicht“ setzen - erst dann entstehen Gewinne und Saisonpunkte.
+          Die Zeit ist um. Bitte die Zeiten prüfen und die Ergebnisse veröffentlichen - erst dann entstehen die Saisonpunkte. „Beendet“ legt nur die Gewinne an.
+        </div>
+      )}
+      {challenge.status === "completed" && (
+        <div data-testid="f1-completed-hint" className="mb-5 border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm p-3 text-sm text-white/80">
+          Beendet: Die Gewinne sind angelegt, Saisonpunkte gibt es noch keine. Die entstehen mit „Ergebnisse veröffentlicht“; archivieren geht erst danach.
         </div>
       )}
       {isTournamentLead && <div className="mb-5"><AccessLinksPanel targetType="fastlap" targetId={challenge.id} /></div>}
@@ -464,8 +486,8 @@ export default function AdminF1EditPage() {
                   <input type="number" step="0.1" value={newTime.penalty_seconds} onChange={(e) => setNewTime({ ...newTime, penalty_seconds: e.target.value })} data-testid="f1-add-time-penalty" className="w-24 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />
                 </div>
                 <div className="flex-1 min-w-[160px]">
-                  <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Proof URL</div>
-                  <input value={newTime.proof_url} onChange={(e) => setNewTime({ ...newTime, proof_url: e.target.value })} placeholder="Screenshot/Video Link" data-testid="f1-add-time-proof" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+                  <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Nachweis-Link</div>
+                  <input value={newTime.proof_url} onChange={(e) => setNewTime({ ...newTime, proof_url: e.target.value })} placeholder="Link zu Bild oder Video" data-testid="f1-add-time-proof" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
                 </div>
                 {Number(newTime.penalty_seconds) > 0 && (
                   <div className="w-full">
@@ -475,7 +497,7 @@ export default function AdminF1EditPage() {
                       required
                       value={newTime.admin_note}
                       onChange={(e) => setNewTime({ ...newTime, admin_note: e.target.value })}
-                      placeholder="z. B. Cut Curb in Kurve 7, Lap 3 — Replay 0:42"
+                      placeholder="z. B. Kurve 7 abgekürzt, Runde 3 – im Video bei 0:42"
                       data-testid="f1-add-time-note"
                       className="w-full bg-[#0A0A0A] border border-[#FF3B30]/40 px-3 py-2 rounded-sm text-sm"
                     />
@@ -500,8 +522,8 @@ export default function AdminF1EditPage() {
                       <span className={`font-display font-bold text-lg tabular-nums ${t.is_invalid ? "line-through text-white/40" : "text-white"}`}>{showLapTime(t.time_str)}</span>
                       {(t.score_scope || "official") === "club_reference" && <span className="text-[#FFD700] border border-[#FFD700]/30 bg-[#FFD700]/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest rounded-sm">Referenz</span>}
                       {t.penalty_seconds > 0 && <span className="text-[#FF3B30] text-xs">+{t.penalty_seconds}s</span>}
-                      {t.is_invalid && <span className="text-[#FF3B30] text-[10px] font-bold uppercase tracking-widest">INVALID</span>}
-                      {safeHttpUrl(t.proof_url) && <a href={safeHttpUrl(t.proof_url)} target="_blank" rel="noreferrer" className="text-[10px] text-[#29B6E8] uppercase tracking-widest hover:underline">Proof</a>}
+                      {t.is_invalid && <span className="text-[#FF3B30] text-[10px] font-bold uppercase tracking-widest">Ungültig</span>}
+                      {safeHttpUrl(t.proof_url) && <a href={safeHttpUrl(t.proof_url)} target="_blank" rel="noreferrer" className="text-[10px] text-[#29B6E8] uppercase tracking-widest hover:underline">Nachweis</a>}
                       <button
                         onClick={() => setEditTime({
                           ...t,
@@ -523,6 +545,8 @@ export default function AdminF1EditPage() {
           ) : <div className="text-white/40 text-sm">Bitte erst eine Strecke anlegen.</div>}
         </div>
       </div>
+
+      <FastLapGuestsPanel guests={guests} locked={locked} onChanged={() => { loadGuests(); loadTimes(); loadQueue(); }} />
 
       {linkGuest && (
         <FastLapGuestLinkDialog challengeId={challenge.id} guest={linkGuest} onClose={() => setLinkGuest(null)} onLinked={() => { loadTimes(); loadGuests(); loadQueue(); }} />
@@ -561,8 +585,8 @@ export default function AdminF1EditPage() {
               )}
             </label>
             <label className="block">
-              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Proof URL</div>
-              <input value={editTime.proof_url || ""} onChange={(e) => setEditTime({ ...editTime, proof_url: e.target.value })} placeholder="Screenshot / Video" data-testid="f1-edit-time-proof" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Nachweis-Link</div>
+              <input value={editTime.proof_url || ""} onChange={(e) => setEditTime({ ...editTime, proof_url: e.target.value })} placeholder="Link zu Bild oder Video" data-testid="f1-edit-time-proof" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
             </label>
             <label className="block">
               <div className={`text-[11px] font-bold uppercase tracking-widest mb-1 ${(Number(editTime.penalty_seconds) > 0 || editTime.is_invalid) ? "text-[#FF3B30]" : "text-white/60"}`}>
@@ -576,7 +600,7 @@ export default function AdminF1EditPage() {
                 onChange={(e) => setEditTime({ ...editTime, admin_note: e.target.value })}
                 data-testid="f1-edit-time-note"
                 placeholder={(Number(editTime.penalty_seconds) > 0 || editTime.is_invalid)
-                  ? "z. B. Cut Curb T7 Lap 3 — replay 0:42"
+                  ? "z. B. Kurve 7 abgekürzt, Runde 3 – im Video bei 0:42"
                   : "optionale Notiz"}
                 className={`w-full bg-[#0A0A0A] border px-3 py-2 rounded-sm text-sm ${
                   (Number(editTime.penalty_seconds) > 0 || editTime.is_invalid) ? "border-[#FF3B30]/40" : "border-white/10"

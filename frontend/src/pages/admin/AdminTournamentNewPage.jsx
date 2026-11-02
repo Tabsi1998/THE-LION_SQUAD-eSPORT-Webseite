@@ -7,13 +7,17 @@ import { AdminFormPage, FormActions, FormGrid, FormSection } from "@/components/
 import { PartnerPicker } from "@/components/tls/PartnerPicker";
 import { EventMembershipLine } from "@/pages/admin/event/EventProgramPanel";
 import { CheckField, FieldLabel, SelectField, TextField } from "@/components/tls/FormFields";
-import { ADVANCEMENT_MODE_OPTIONS, DRAW_SHOW_MINUTES_DEFAULT, DRAW_SHOW_MINUTES_HINT, GRAND_FINAL_FORMATS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, HEAT_REBUILD_FORMATS, HEAT_REBUILD_HINT, HEAT_REBUILD_OPTIONS, advancementModeHint, drawShowMinutesPayload } from "./tournament/shared";
+import { FormatHint } from "./tournament/FormatHint";
+import { prizeGroupOptions } from "./tournament/PrizeEditor";
+import { STREAM_ADDRESS_HINT, streamPayload } from "@/lib/tournamentStream";
+import { BEST_OF_RUNS_HINT, MATCHDAY_DRAW_HINT, matchdayDrawMode, matchdayDrawOn, tournamentFieldRules } from "@/lib/tournamentFormFields";
+import { ADVANCEMENT_MODE_OPTIONS, DRAW_SHOW_MINUTES_DEFAULT, DRAW_SHOW_MINUTES_HINT, GRAND_FINAL_FORMATS, GRAND_FINAL_HINT, GRAND_FINAL_OPTIONS, HEAT_REBUILD_FORMATS, HEAT_REBUILD_HINT, HEAT_REBUILD_OPTIONS, SEEDING_OPTIONS, STREAM_PLATFORM_OPTIONS, VISIBILITY_OPTIONS, advancementModeHint, drawShowMinutesPayload } from "./tournament/shared";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
 import { normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { TOURNAMENT_FORMAT_OPTIONS } from "@/lib/tournamentLabels";
-import { gameOptionLabel } from "@/lib/gameLabels";
+import { tournamentFormatOptions } from "@/lib/tournamentLabels";
+import { gameOptionLabel, selectableGames } from "@/lib/gameLabels";
 import { RULE_PRESETS, ruleModeSummary, rulePresetKey, rulePresetWarnings } from "@/lib/tournamentRulePresets";
 import { dateWarnings } from "@/lib/tournamentDateWarnings";
 import { toast } from "sonner";
@@ -28,12 +32,6 @@ const EVENT_MODE_OPTIONS = [["online", "Online"], ["local", "Vor Ort"], ["hybrid
 const RESULT_ENTRY_MODE_OPTIONS = [["", "Automatisch (online melden Spieler, vor Ort die Turnierleitung)"], ["staff_only", "Nur Turnierleitung"], ["player_confirmed", "Beide Parteien melden"], ["hybrid", "Hybrid"]];
 const SCHEDULE_MODE_OPTIONS = [["", "Automatisch (online abstimmen, vor Ort fix)"], ["fixed_by_staff", "Fix durch Turnierleitung"], ["player_proposal", "Teilnehmer schlagen vor"], ["hybrid", "Hybrid"]];
 
-const PRIZE_GROUP_OPTIONS = [
-  ["overall", "Gesamtwertung"],
-  ["winner", "Gewinner-Bracket"],
-  ["loser", "Loser-Bracket"],
-  ["special", "Sonderpreis"],
-];
 const BRONZE_FORMATS = new Set(["single_elim"]);
 
 function buildPlanningWarnings(form, isTeam) {
@@ -47,7 +45,7 @@ function buildPlanningWarnings(form, isTeam) {
   // Die Zeiten prüft dieselbe Regel wie beim Bearbeiten (#1938).
   warnings.push(...dateWarnings(form));
   if (form.status === "scheduled" && !form.start_date) warnings.push("Angekündigte Turniere sollten eine Startzeit haben.");
-  if (form.twitch_enabled && !String(form.twitch_channel || "").trim()) warnings.push("Twitch ist aktiv, aber kein Kanal ist eingetragen.");
+  if (form.stream_embed && !String(form.stream_address || "").trim()) warnings.push("Der Stream soll auf der Turnierseite stehen, aber Kanal oder Adresse fehlt.");
   return warnings;
 }
 
@@ -74,6 +72,7 @@ export default function AdminTournamentNewPage() {
     check_in_from: "", check_in_until: "",
     start_date: "", end_date: "",
     status: "draft",
+    visibility: "public",
     site_banner_enabled: false,
     discord_skip: false,
     auto_start_enabled: false,
@@ -86,12 +85,17 @@ export default function AdminTournamentNewPage() {
       { group: "overall", place: 2, label: "2. Platz", value: "" },
       { group: "overall", place: 3, label: "3. Platz", value: "" },
     ],
-    twitch_channel: "", twitch_enabled: false, show_chat: false,
-    location: "", stream_link: "", discord_link: "",
+    stream_platform: "", stream_address: "", stream_embed: false, show_chat: false,
+    location: "", discord_link: "",
     ...(preset?.values || {}),
   }));
   const [saving, setSaving] = useState(false);
+  // Die Adresse folgt dem Titel, bis jemand sie selbst ändert (#2111, TA1) - vorher las die Abfrage den alten Stand,
+  // und die Adresse bestand nur aus dem ersten Buchstaben des Titels („/tournaments/h“).
+  const [slugTouched, setSlugTouched] = useState(false);
   const isTeam = form.team_mode === "team";
+  // Nur, was zu Format und Austragung passt (#2111).
+  const rules = tournamentFieldRules(form);
   const planningWarnings = buildPlanningWarnings(form, isTeam);
 
   const loadSources = useCallback(() => {
@@ -136,6 +140,10 @@ export default function AdminTournamentNewPage() {
     setSaving(true);
     try {
       const payload = { ...form };
+      payload.slug = autoSlug(payload.slug) || autoSlug(payload.title);
+      Object.assign(payload, streamPayload(payload));
+      delete payload.stream_address;
+      delete payload.stream_embed;
       payload.team_mode = payload.team_mode === "solo" ? "solo" : "team";
       payload.team_size = payload.team_mode === "solo" ? 1 : Number(payload.team_size || 2);
       payload.format_label = (payload.format_label || "").trim() || null;
@@ -143,6 +151,7 @@ export default function AdminTournamentNewPage() {
       if (!payload.schedule_mode) payload.schedule_mode = null;
       if (!BRONZE_FORMATS.has(payload.format)) payload.bronze_match = false;
       if (!event) payload.requires_event_registration = false;
+      if (payload.event_mode === "local") payload.auto_start_enabled = false;
       // Show-Auslosung (#1590): leer heißt Vorgabe; die Minuten zählen nur in diesem Modus.
       payload.draw_show_minutes = payload.advancement_mode === "draw_show" ? drawShowMinutesPayload(payload.draw_show_minutes) : null;
       normalizeDateTimeFields(payload, ["registration_open_from", "registration_open_until", "check_in_from", "check_in_until", "start_date", "end_date"]);
@@ -174,6 +183,16 @@ export default function AdminTournamentNewPage() {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "")
     .slice(0, 80);
+  // Beim Tippen der Adresse bleibt ein Bindestrich am Ende stehen - sonst ließe sich „herbst-cup“ nicht eintippen.
+  // Abgeschnitten wird beim Anlegen.
+  const slugInput = (value) => (value || "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/ß/g, "ss")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-/, "")
+    .slice(0, 80);
 
   return (
     <AdminLayout>
@@ -203,6 +222,8 @@ export default function AdminTournamentNewPage() {
           <>
             <FormSection title="Wann" hint="Anmeldung und Check-in wechseln zeitgesteuert. Der Live-Start bleibt bei der Turnierleitung, solange du unten nichts anderes einstellst.">
               <SelectField label="Veröffentlichung" value={form.status} onChange={(v) => set("status", v)} options={CREATE_STATUS_OPTIONS} testId="new-tr-status" />
+              {/* Sichtbarkeit gleich beim Anlegen (#2111, TA2) - vorher war jedes neue Turnier öffentlich. */}
+              <SelectField label="Sichtbarkeit" value={form.visibility} onChange={(v) => set("visibility", v)} options={VISIBILITY_OPTIONS} testId="new-tr-visibility" />
               <TextField label="Start Event/Turnier" type="datetime-local" value={form.start_date} onChange={(v) => set("start_date", v)} testId="new-tr-start" />
               <TextField label="Anmeldung endet" type="datetime-local" value={form.registration_open_until} onChange={(v) => set("registration_open_until", v)} testId="new-tr-reg-until" />
               <FormSection title="Weitere Zeiten und Sonderfälle" collapsible plain>
@@ -233,11 +254,11 @@ export default function AdminTournamentNewPage() {
       >
         <FormSection title="Das Turnier" hint="Mehr als das braucht es nicht zum Anlegen — alles Weitere lässt sich danach in Ruhe einstellen.">
           <FormGrid>
-            <TextField label="Titel" value={form.title} onChange={(v) => { set("title", v); if (!form.slug) set("slug", autoSlug(v)); }} required testId="new-tr-title" />
-            <SelectField label="Spiel" value={form.game_id} onChange={(v) => set("game_id", v)} options={[["", "— auswählen —"], ...games.map((g) => [g.id, gameOptionLabel(g)])]} required testId="new-tr-game" />
+            <TextField label="Titel" value={form.title} onChange={(v) => setForm((f) => ({ ...f, title: v, slug: slugTouched ? f.slug : autoSlug(v) }))} required testId="new-tr-title" />
+            <SelectField label="Spiel" value={form.game_id} onChange={(v) => set("game_id", v)} options={[["", "— auswählen —"], ...selectableGames(games, form.game_id).map((g) => [g.id, gameOptionLabel(g)])]} required testId="new-tr-game" />
           </FormGrid>
           <FormGrid>
-            <SelectField label="Format" value={form.format} onChange={setFormat} options={TOURNAMENT_FORMAT_OPTIONS} testId="new-tr-format" />
+            <SelectField label="Format" value={form.format} onChange={setFormat} options={tournamentFormatOptions()} hint={<FormatHint format={form.format} testId="new-tr-format-hint" />} testId="new-tr-format" />
             <SelectField label="Teilnahme" value={form.team_mode} onChange={setTeamMode} options={[["solo", "Einzelspieler"], ["team", "Team"]]} testId="new-tr-mode" />
           </FormGrid>
           <FormGrid cols={3}>
@@ -263,13 +284,14 @@ export default function AdminTournamentNewPage() {
             <CheckField label="Öffentliche Anmeldung grundsätzlich erlauben" checked={form.registration_enabled} onChange={(v) => set("registration_enabled", v)} testId="new-tr-reg-enabled" />
             <CheckField label="Automatisches Turnier-Hinweisbanner für dieses Turnier anzeigen" checked={form.site_banner_enabled} onChange={(v) => set("site_banner_enabled", v)} testId="new-tr-site-banner" accent="#FFD700" />
             <CheckField label="Ohne Discord" hint="Keine Meldung, kein Thread, kein Bracket und kein Termin im Discord – etwa für Probe- oder interne Turniere." checked={form.discord_skip} onChange={(v) => set("discord_skip", v)} testId="new-tr-discord-skip" accent="#5865F2" />
-            <CheckField label="Turnier anhand Start-/Endzeit automatisch live/beendet schalten. Für Vor-Ort-Turniere ausgeschaltet lassen." checked={form.auto_start_enabled} onChange={(v) => set("auto_start_enabled", v)} testId="new-tr-auto-start" className="md:col-span-2" />
+            {/* Vor Ort startet die Turnierleitung selbst (#2111, W4) - der Schalter fehlt dort und geht aus. */}
+            {form.event_mode !== "local" && <CheckField label="Turnier anhand Start-/Endzeit automatisch live/beendet schalten" checked={form.auto_start_enabled} onChange={(v) => set("auto_start_enabled", v)} testId="new-tr-auto-start" className="md:col-span-2" />}
           </FormGrid>
         </FormSection>
 
         <FormSection title="Darstellung und Regeln" collapsible>
           <FormGrid>
-            <TextField label="Slug (URL)" value={form.slug} onChange={(v) => set("slug", autoSlug(v))} required testId="new-tr-slug" />
+            <TextField label="Adresse (URL)" value={form.slug} onChange={(v) => { setSlugTouched(true); set("slug", slugInput(v)); }} required testId="new-tr-slug" />
             <TextField label="Plattform" value={form.platform} onChange={(v) => set("platform", v)} placeholder="z.B. Nintendo Switch" testId="new-tr-platform" />
           </FormGrid>
           <EventMembershipLine eventId={event?.id} events={event ? [event] : []} testId="new-tr-event" />
@@ -282,12 +304,19 @@ export default function AdminTournamentNewPage() {
 
         <FormSection title="Spieloptionen" collapsible>
           <FormGrid>
-            <TextField label="Best of" type="number" value={form.best_of} onChange={(v) => set("best_of", Number(v))} testId="new-tr-bestof" />
-            <SelectField label="Seeding" value={form.seeding_mode} onChange={(v) => set("seeding_mode", v)} options={[["random", "Zufall"], ["manual", "Manuell"], ["ranking", "Ranking"]]} testId="new-tr-seeding" />
+            {/* Ohne Spiele kein Best of; in Läufen heißt es „Runden je Lauf“ (#2111, TA4). */}
+            {rules.bestOf && <TextField label={rules.bestOfIsRuns ? "Runden je Lauf" : "Best of"} type="number" min="1" value={form.best_of} onChange={(v) => set("best_of", Number(v))} hint={rules.bestOfIsRuns ? BEST_OF_RUNS_HINT : undefined} testId="new-tr-bestof" />}
+            <SelectField label="Setzliste" value={form.seeding_mode} onChange={(v) => set("seeding_mode", v)} options={SEEDING_OPTIONS} testId="new-tr-seeding" />
           </FormGrid>
-          {/* Weiterkommen in vier Modi (#1548, #1590): fester Baum, Auslosung nach der Runde, Show, sofort zufällig. */}
-          <SelectField label="Weiterkommen (Gegner der nächsten Runde)" value={form.advancement_mode} onChange={(v) => set("advancement_mode", v)} options={ADVANCEMENT_MODE_OPTIONS} hint={<span data-testid="new-tr-advancement-hint">{advancementModeHint(form.advancement_mode)}</span>} testId="new-tr-advancement" />
-          {form.advancement_mode === "draw_show" && (
+          {/* Weiterkommen in vier Modi (#1548, #1590): fester Baum, Auslosung nach der Runde, Show, sofort zufällig - nur,
+              wo Sieger in ein nächstes Spiel gehen; bei Hin- und Rückrunde nur „Spieltage auslosen“ (#2111, T4). */}
+          {rules.advancement === "select" && (
+            <SelectField label="Weiterkommen (Gegner der nächsten Runde)" value={form.advancement_mode} onChange={(v) => set("advancement_mode", v)} options={ADVANCEMENT_MODE_OPTIONS} hint={<span data-testid="new-tr-advancement-hint">{advancementModeHint(form.advancement_mode)}</span>} testId="new-tr-advancement" />
+          )}
+          {rules.advancement === "matchday_draw" && (
+            <CheckField label="Spieltage auslosen" hint={MATCHDAY_DRAW_HINT} checked={matchdayDrawOn(form.advancement_mode)} onChange={(v) => set("advancement_mode", matchdayDrawMode(v))} testId="new-tr-matchday-draw" />
+          )}
+          {rules.advancement === "select" && form.advancement_mode === "draw_show" && (
             <TextField label="Show-Auslosung: Erinnerung nach Minuten" type="number" min="1" max="240" value={form.draw_show_minutes} onChange={(v) => set("draw_show_minutes", v)} placeholder={String(DRAW_SHOW_MINUTES_DEFAULT)} hint={DRAW_SHOW_MINUTES_HINT} testId="new-tr-draw-show-minutes" />
           )}
           {BRONZE_FORMATS.has(form.format) && (
@@ -306,33 +335,36 @@ export default function AdminTournamentNewPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="text-xs text-white/50">Jede Zeile erscheint als eigene Preis-Karte auf der Turnierseite.</div>
             <div className="flex flex-wrap justify-end gap-3">
-              <button type="button" onClick={() => addPrizeTop3("winner")} className="text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">+ Gewinner Top 3</button>
-              <button type="button" onClick={() => addPrizeTop3("loser")} className="text-xs font-bold uppercase tracking-wider text-[#CD7F32] hover:text-white">+ Loser Top 3</button>
+              {/* Siegerrunde und Verliererrunde nur beim Doppel-K.-o. (#2111, T5). */}
+              {rules.loserBracketPrizes && <button type="button" onClick={() => addPrizeTop3("winner")} data-testid="new-tr-prize-winner-top3" className="text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">+ Siegerrunde Top 3</button>}
+              {rules.loserBracketPrizes && <button type="button" onClick={() => addPrizeTop3("loser")} data-testid="new-tr-prize-loser-top3" className="text-xs font-bold uppercase tracking-wider text-[#CD7F32] hover:text-white">+ Verliererrunde Top 3</button>}
               <button type="button" onClick={() => set("prize_places", [...form.prize_places, { group: "overall", place: form.prize_places.length + 1, label: `Platz ${form.prize_places.length + 1}`, value: "" }])} data-testid="new-tr-prize-add" className="text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">+ Platz hinzufügen</button>
               <button type="button" onClick={() => set("prize_places", [...form.prize_places, { group: "overall", place: "last", label: "Letzter Platz", value: "" }])} data-testid="new-tr-prize-last" className="text-xs font-bold uppercase tracking-wider text-[#FFD700] hover:text-white">+ Letzter Platz</button>
             </div>
           </div>
           {form.prize_places.map((p, i) => (
             <div key={i} className="grid grid-cols-12 gap-2 items-start">
-              <select value={p.group || "overall"} onChange={(e) => updatePrize(i, { group: e.target.value })} className="col-span-12 sm:col-span-3 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm">
-                {PRIZE_GROUP_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              <select value={p.group || "overall"} onChange={(e) => updatePrize(i, { group: e.target.value })} data-testid={`new-tr-prize-group-${i}`} className="col-span-12 sm:col-span-3 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm">
+                {prizeGroupOptions(form.format, p.group).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
               </select>
               <select value={p.place} onChange={(e) => updatePrize(i, { place: e.target.value === "last" ? "last" : Number(e.target.value) || 1 })} data-testid={`new-tr-prize-place-${i}`} className="col-span-2 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm">
                 {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => <option key={n} value={n}>{n}.</option>)}
                 <option value="last">Letzter</option>
               </select>
-              <input value={p.label || ""} onChange={(e) => updatePrize(i, { label: e.target.value })} data-testid={`new-tr-prize-label-${i}`} className="col-span-4 sm:col-span-3 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm" placeholder="Label (z.B. Champion)" />
+              <input value={p.label || ""} onChange={(e) => updatePrize(i, { label: e.target.value })} data-testid={`new-tr-prize-label-${i}`} className="col-span-4 sm:col-span-3 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm" placeholder="Bezeichnung (z.B. Champion)" />
               <input value={p.value || ""} onChange={(e) => updatePrize(i, { value: e.target.value })} data-testid={`new-tr-prize-value-${i}`} className="col-span-5 sm:col-span-3 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm" placeholder="Preis (z.B. 100 €)" />
               <button type="button" onClick={() => set("prize_places", form.prize_places.filter((_, j) => j !== i))} data-testid={`new-tr-prize-remove-${i}`} className="col-span-1 text-white/40 hover:text-[#FF3B30] text-center py-2">✕</button>
             </div>
           ))}
-          <MarkdownField label="Fallback Text (freier Preis-Text, falls nicht strukturiert)" value={form.prize_pool} onChange={(v) => set("prize_pool", v)} testId="new-tr-prizes" />
+          <MarkdownField label="Freier Preistext (wenn die Plätze oben nicht reichen)" value={form.prize_pool} onChange={(v) => set("prize_pool", v)} testId="new-tr-prizes" />
         </FormSection>
 
         {/* Streaming + Links */}
         <FormSection title="Streaming und externe Links" collapsible accent="#9146FF">
           <FormGrid>
-            <TextField label="Twitch-Kanal" value={form.twitch_channel} onChange={(v) => set("twitch_channel", v)} testId="new-tr-twitch" placeholder="the_lion_squad_esports" />
+            {/* Ein Weg für den Stream (#2111, F5): Plattform und Kanal oder Adresse, ein Haken zum Zeigen. */}
+            <SelectField label="Stream-Plattform" value={form.stream_platform} onChange={(v) => set("stream_platform", v)} options={STREAM_PLATFORM_OPTIONS} testId="new-tr-stream-platform" />
+            <TextField label="Kanal oder Adresse" value={form.stream_address} onChange={(v) => set("stream_address", v)} testId="new-tr-stream-url" placeholder={STREAM_ADDRESS_HINT[form.stream_platform] || STREAM_ADDRESS_HINT[""]} />
             {/* Ort (#1371): im Event kommt er vom Event; ein eigener Ort nur ohne Event. */}
             {event ? (
               <div className="text-sm text-white/70" data-testid="new-tr-location-event">Ort: {form.location || "wie beim Event"} <span className="text-white/45">(vom Event)</span></div>
@@ -340,10 +372,9 @@ export default function AdminTournamentNewPage() {
               <TextField label="Ort" value={form.location} onChange={(v) => set("location", v)} testId="new-tr-location" placeholder="z.B. Gamers Heaven · Bregenz" />
             )}
           </FormGrid>
-          <CheckField label="Twitch-Player auf Turnierseite einbetten" checked={form.twitch_enabled} onChange={(v) => set("twitch_enabled", v)} testId="new-tr-twitch-enabled" accent="#9146FF" />
+          <CheckField label="Stream auf der Turnierseite zeigen" checked={form.stream_embed} onChange={(v) => set("stream_embed", v)} testId="new-tr-stream-embed" accent="#9146FF" />
           <CheckField label="Turnier-Chat für Teilnehmer anzeigen" checked={form.show_chat} onChange={(v) => set("show_chat", v)} testId="new-tr-chat-enabled" accent="#9146FF" />
           <FormGrid>
-            <TextField label="Externer Stream-Verweis" value={form.stream_link} onChange={(v) => set("stream_link", v)} testId="new-tr-stream" placeholder="https://…" />
             <TextField label="Discord-Einladung" value={form.discord_link} onChange={(v) => set("discord_link", v)} testId="new-tr-discord" placeholder="https://discord.com/invite/…" />
           </FormGrid>
         </FormSection>

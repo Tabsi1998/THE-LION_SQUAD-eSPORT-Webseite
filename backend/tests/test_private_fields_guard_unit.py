@@ -33,7 +33,7 @@ SHAPING_STAGES = {"$group", "$count"}
 AUSNAHMEN = {
     **{("routes/auth_routes.py", name): "Anmeldung, Registrierung, Google, Zwei-Faktor, Passwort: prüft Passwort-Hash "
        "und Zwei-Faktor-Werte; was zurückgeht, läuft durch _public_user (strip_private)"
-       for name in ("_rotate_session", "register", "login", "_unique_username", "google_session", "google_link",
+       for name in ("_rotate_session", "register", "login", "google_session", "google_link",
                     "google_unlink", "mobile_register", "mobile_login", "forgot_password", "resend_verification",
                     "verify_email", "complete_mfa_login", "setup_mfa", "enable_mfa", "disable_mfa", "change_password")},
     ("routes/auth_routes.py", "mfa_status"): "wählt die Recovery-Code-Hashes nur aus, um sie zu zählen; "

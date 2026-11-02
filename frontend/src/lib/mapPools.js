@@ -23,6 +23,21 @@ export function defaultSelection(library, modes) {
   return Object.fromEntries(list.map(({ mode }) => [keyOf(mode), eligibleMaps(library, mode).map((item) => item.id)]));
 }
 
+/** Aktive Maps, die in keinem Modus des Spiels zur Wahl stehen - der Hinweis „noch keinen Modus“ (#2129, SP2). Ohne Modi: keine. */
+export function mapsWithoutMode(library, modes) {
+  const known = (Array.isArray(modes) ? modes : []).map(({ mode }) => mode).filter(Boolean);
+  if (!known.length) return [];
+  return (Array.isArray(library) ? library : []).filter((item) => (item.status || "active") === "active"
+    && !known.some((mode) => (item.modes || []).includes(mode)));
+}
+
+/** Gruppen eines gespeicherten Pools, die das Spiel so nicht mehr hat: ein entfernter Modus oder „Alle Maps“ von vor dem ersten Modus. */
+export function outdatedGroups(entry, modes) {
+  if (!entry || entry.stale) return [];
+  const list = Array.isArray(modes) ? modes : [];
+  return (entry.modes || []).filter((group) => (group.mode ? !list.some(({ mode }) => mode === group.mode) : list.length > 0));
+}
+
 /** Die Auswahl eines gespeicherten Pools. */
 export function poolSelection(pool) {
   return Object.fromEntries((pool?.modes || []).map((group) => [keyOf(group.mode), (group.maps || []).map((item) => item.map_id)]));

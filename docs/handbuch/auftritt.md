@@ -14,7 +14,7 @@ der Cookie-Hinweis, die Jahreszeiten-Deko, der Adventkalender, die Ostereiersuch
 - Weitere Seiten, die zum Auftritt gehören: **Admin → Auftritt → Socials** (eure Kanäle und Links), **Admin → Auftritt
   → SEO & Analytics** (Suchmaschinen), **Admin → Verein → Über uns**, **News**, **Sponsoren**, **Vorstand**
 
-Die Einstellungen unter **Auftritt** und **Vereinsdaten** darf der Bereich **System** ändern, Adventkalender und
+Die Einstellungen unter **Auftritt** und die Rechtstexte unter **Vereinsdaten** darf der Bereich **System** ändern (Stammdaten und Kontakt auch die Vereinsverwaltung), Adventkalender und
 Ostereiersuche der Bereich **Content** oder **Verein**.
 
 ---
@@ -285,7 +285,7 @@ Die Startseite hat keinen eigenen Editor. Sie setzt sich aus Inhalten zusammen, 
 | Live-Banner, wenn gerade ein Turnier, Event oder Stream läuft | entsteht von selbst |
 | **Heute im Einsatz** über dem Kopf, nur an Tagen mit einem Termin einer laufenden Serie (Runde, Uhrzeit, gemeldete Vereinsfahrer/-spieler, Link zur Serienseite) | Admin → Verein → Serien: Saison auf **Läuft**, Termine und Teilnehmer der Saison |
 | Der große Kopf (Vorgabe „Ein Rudel. Eine Familie.“) und der Satz darunter | Admin → Verein → Über uns, Abschnitt **Kopf der Startseite** |
-| **Angeheftete oder neueste News** und die **nächsten Termine** mit Countdown (der große Countdown nur, wenn ein Termin in den nächsten 14 Tagen liegt) | Admin → Content → News (Haken **Anpinnen**), Admin → Content → Events; ab wann gezählt wird: Admin → Auftritt → Branding, **Countdown ab … Tagen vorher** |
+| **Angeheftete oder neueste News** und die **nächsten Termine** mit Countdown (der große Countdown nur, wenn ein Termin in den nächsten 14 Tagen liegt) | Admin → Content → News (Haken **Anpinnen**), Admin → eSports → Events; ab wann gezählt wird: Admin → Auftritt → Branding, **Countdown ab … Tagen vorher** |
 | **Jahreswertung** | Admin → eSports → Jahreswertung (die aktive Saison) |
 | **Aktuelle News** | Admin → Content → News |
 | **Zahlen** (Mitglieder, Spiele …) | Admin → Verein → Über uns: Häkchen bei den Kacheln |

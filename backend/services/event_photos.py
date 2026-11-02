@@ -105,7 +105,7 @@ async def event_audience(db, event: dict) -> set[str]:
 
     out: set[str] = set()
     rows = await db.event_registrations.find(
-        {"event_id": event["id"], "status": {"$in": list(EVENT_REGISTRATION_STATUSES)}}, {"_id": 0, "user_id": 1},
+        {"event_id": event["id"], "status": {"$in": list(EVENT_REGISTRATION_STATUSES)}, "walk_in": {"$ne": True}}, {"_id": 0, "user_id": 1},
     ).to_list(5000)
     out.update(row["user_id"] for row in rows if row.get("user_id"))
     tournament_ids = [row["id"] for row in await db.tournaments.find({"event_id": event["id"]}, {"_id": 0, "id": 1}).to_list(200)]

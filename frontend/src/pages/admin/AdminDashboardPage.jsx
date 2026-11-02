@@ -92,7 +92,8 @@ export default function AdminDashboardPage() {
   // Aufgaben und stand hier bisher ein zweites Mal.
   const kpis = [
     { label: "Spieler", value: data?.player_count, icon: UsersIcon, color: "#29B6E8" },
-    { label: "Teams", value: data?.team_count, icon: UsersIcon, color: "#29B6E8" },
+    // Die Kachel führt zur Teamverwaltung (#2128, TM7) - sofern die Person sie öffnen darf.
+    { label: "Teams", value: data?.team_count, icon: UsersIcon, color: "#29B6E8", to: may("/admin/teams") ? "/admin/teams" : null },
     { label: "Aktive Turniere", value: data?.active_tournaments, icon: Trophy, color: "#FF3B30" },
     { label: "Anmeldung offen", value: data?.registration_open, icon: GamepadIcon, color: "#00FF88" },
     { label: "Spiele heute", value: data?.today_matches, icon: Radio, color: "#FFD700" },
@@ -491,15 +492,21 @@ export default function AdminDashboardPage() {
       <div data-testid="dashboard-kpis">
         <h2 className="font-heading font-bold uppercase text-lg mb-3">Zahlen im Überblick</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {kpis.map((k) => (
-            <div key={k.label} data-testid={`kpi-${k.label}`} className="border border-white/10 rounded-sm bg-[#121212] p-4 hover:border-[#29B6E8]/40 transition">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] uppercase tracking-widest text-white/50 font-bold">{k.label}</span>
-                <k.icon className="w-4 h-4" style={{ color: k.color }} />
-              </div>
-              <div className="mt-3 font-display font-bold text-4xl text-white">{k.value ?? "—"}</div>
-            </div>
-          ))}
+          {kpis.map((k) => {
+            const tile = (
+              <>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase tracking-widest text-white/50 font-bold">{k.label}</span>
+                  <k.icon className="w-4 h-4" style={{ color: k.color }} />
+                </div>
+                <div className="mt-3 font-display font-bold text-4xl text-white">{k.value ?? "—"}</div>
+              </>
+            );
+            const look = "border border-white/10 rounded-sm bg-[#121212] p-4 hover:border-[#29B6E8]/40 transition";
+            return k.to
+              ? <Link key={k.label} to={k.to} data-testid={`kpi-${k.label}`} className={`block ${look}`}>{tile}</Link>
+              : <div key={k.label} data-testid={`kpi-${k.label}`} className={look}>{tile}</div>;
+          })}
         </div>
       </div>
       )}

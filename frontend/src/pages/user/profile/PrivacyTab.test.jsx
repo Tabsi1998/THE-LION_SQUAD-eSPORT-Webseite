@@ -44,6 +44,15 @@ describe("PrivacyTab – Erfolge öffentlich", () => {
   });
 });
 
+describe("PrivacyTab – Direktnachrichten (#2126)", () => {
+  it("sagt ehrlich, dass die Moderation trotzdem schreiben kann", () => {
+    renderTab();
+    expect(screen.getByRole("option", { name: "Nur Moderation und Admins" })).toHaveValue("admins_only");
+    expect(screen.getByRole("option", { name: "Niemand außer der Moderation" })).toHaveValue("none");
+    expect(screen.getByText(/Die Moderation erreicht dich immer/)).toBeInTheDocument();
+  });
+});
+
 describe("PrivacyTab – Freunde sehen, wo ich angemeldet bin (#1188)", () => {
   it("zeigt den wirksamen Stand und speichert beim Umschalten", () => {
     const set = renderTab({ privacy_friends_see_registrations: true });

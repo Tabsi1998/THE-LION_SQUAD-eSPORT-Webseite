@@ -306,6 +306,40 @@ async def purge_stale_attachments(now=None) -> int:
     return len(rows)
 
 
+async def delete_tournament_attachments(db, tournament_id: str, match_ids: list[str]) -> int:
+    """Turnier löschen (#2111): Dateien und Einträge aus Turnier- und Match-Chat - die Nachrichten löscht der Aufrufer."""
+    query = {"$or": [
+        {"context.type": "tournament", "context.tournament_id": tournament_id},
+        {"context.type": "match", "context.match_id": {"$in": match_ids}},
+    ]}
+    rows = await db.chat_attachments.find(query, {"_id": 0}).to_list(None)
+    for row in rows:
+        _remove_files(row)
+    if rows:
+        await db.chat_attachments.delete_many({"id": {"$in": [row["id"] for row in rows]}})
+    return len(rows)
+
+
+async def delete_team_attachments(db, team_id: str) -> int:
+    """Aufgelöstes Team nach der Frist (#2128): Dateien und Einträge aus dem Team-Chat - die Nachrichten löscht der Aufrufer.
+    Eine gesperrte Datei hält die übrigen nicht auf: ihr Eintrag bleibt, und der Fehler am Ende sagt dem Aufrufer, dass der
+    nächste Lauf nötig ist."""
+    query = {"context.type": "team", "context.team_id": team_id}
+    rows = await db.chat_attachments.find(query, {"_id": 0}).to_list(None)
+    done, failed = [], None
+    for row in rows:
+        try:
+            _remove_files(row)
+            done.append(row["id"])
+        except OSError as exc:
+            failed = exc
+    if done:
+        await db.chat_attachments.delete_many({"id": {"$in": done}})
+    if failed:
+        raise failed
+    return len(done)
+
+
 async def delete_user_attachments(db, user_id: str) -> int:
     """Kontolöschung: Dateien und Einträge weg, Nachrichten verlieren ihre Anhänge."""
     rows = await db.chat_attachments.find({"owner_id": user_id}, {"_id": 0}).to_list(None)

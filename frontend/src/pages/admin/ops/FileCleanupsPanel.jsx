@@ -8,7 +8,7 @@ import { asInstant, viennaDateTime } from "@/lib/vienna";
 // versucht es stündlich mit wachsendem Abstand und gibt nach der Grenze auf. Hier stehen die Einträge ohne
 // Konto; „Erneut versuchen“ gibt aufgegebenen eine neue Runde und versucht alles Offene sofort.
 
-const SOURCE_LABELS = { account_erasure: "Kontolöschung", media_library: "Mediathek" };
+const SOURCE_LABELS = { account_erasure: "Kontolöschung", media_library: "Mediathek", documents: "Dokumente" };
 
 function formatTime(value) {
   if (!value) return "–";

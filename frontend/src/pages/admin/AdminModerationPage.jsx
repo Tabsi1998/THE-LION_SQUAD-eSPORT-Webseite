@@ -15,6 +15,34 @@ import { viennaDateTime } from "@/lib/vienna";
 // „Berechtigt“ (#416) erledigt die Meldung und zählt als Treffer für die Stufen.
 const STATUS = ["open", "reviewing", "resolved", "justified", "dismissed"];
 const STATUS_LABEL = { open: "Offen", reviewing: "In Prüfung", resolved: "Erledigt", justified: "Berechtigt (zählt als Treffer)", dismissed: "Verworfen" };
+const CATEGORY_LABEL = { harassment: "Belästigung", spam: "Spam", hate: "Hass oder Hetze", impersonation: "Falsche Identität", privacy: "Privatsphäre", cheating: "Cheating", other: "Sonstiges" };
+const categoryLabel = (key) => CATEGORY_LABEL[key] || CATEGORY_LABEL.other;
+const personName = (user, fallback) => user?.display_name || user?.username || fallback;
+// Was sich an einer Meldung tun lässt (#2122): Knöpfe statt einer Auswahl, die sofort speichert. Jeder Knopf öffnet erst
+// die Entscheidung mit Grund. Die Wörter hängen davon ab, woher die Meldung kommt.
+const REPORT_STEPS = {
+  open: ["reviewing", "justified", "resolved", "dismissed"],
+  reviewing: ["justified", "resolved", "dismissed", "open"],
+  resolved: ["reviewing"],
+  dismissed: ["reviewing"],
+  justified: ["reviewing"],
+};
+const STEP_LABEL = { justified: "Berechtigt", resolved: "Erledigt", dismissed: "Verwerfen", open: "Wieder offen" };
+// Ein Stand, den es nicht mehr gibt (alte Meldungen), gilt als offen - sonst stünde die Karte ohne Knöpfe da.
+export const reportStatusOf = (status) => (status in REPORT_STEPS ? status : "open");
+export function reportStepLabel(status, step) {
+  if (step !== "reviewing") return STEP_LABEL[step];
+  if (reportStatusOf(status) === "open") return "In Prüfung nehmen";
+  return status === "justified" ? "Zurückstellen" : "Wieder prüfen";
+}
+export function reportStepHint(status, step, name) {
+  if (status === "justified") return "Der Treffer aus dieser Meldung wird zurückgenommen. Eine schon laufende Maßnahme hebst du danach unter „Personen“ auf.";
+  if (step === "justified") return `Zählt als Treffer gegen ${name}. Je nach Stufe folgt eine Maßnahme, etwa eine Chat-Sperre mit Nachricht an die Person.`;
+  if (step === "dismissed") return "Die Meldung wird ohne Folgen geschlossen.";
+  if (step === "resolved") return "Die Meldung wird ohne Treffer geschlossen.";
+  return "Die Meldung bleibt offen, an der Person ändert sich nichts.";
+}
+const reportNeedsReason = (report, step) => report.status === "justified" || (["justified", "dismissed"].includes(step) && !report.resolution_note);
 const TABS = [["reports", "Meldungen"], ["items", "Wortfilter-Funde"], ["filter", "Wortfilter"], ["people", "Personen"], ["levels", "Stufen"], ["images", "Bildprüfung"]];
 const SANCTION_ACTIONS = [["notice", "Hinweis"], ["warning", "Verwarnung mit Chat-Sperre"], ["suspension", "Sperre bis zur Entscheidung"]];
 const SANCTION_STATUS = { active: "läuft", lifted: "aufgehoben", expired: "abgelaufen", superseded: "durch höhere Stufe ersetzt" };
@@ -35,7 +63,7 @@ export default function AdminModerationPage() {
   };
   return (
     <AdminLayout>
-      <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Community Safety</span>
+      <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Sicherheit</span>
       <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 mb-6">Moderation</h1>
       <div className="flex flex-wrap gap-1 border-b border-white/10 mb-6">
         {TABS.map(([key, label]) => (
@@ -214,7 +242,7 @@ function PeopleTab() {
             <div className="border border-white/10 bg-[#121212] rounded-sm p-4">
               <div className="text-[11px] font-bold uppercase tracking-wider text-white/60 mb-2">Meldungen gegen die Person</div>
               <ul className="space-y-1 text-sm">
-                {detail.reports.map((report) => <li key={report.id}><span className="text-white/45 text-xs">{formatMoment(report.created_at)}</span> · {report.category} · {STATUS_LABEL[report.status] || report.status}{report.resolution_note ? ` · ${report.resolution_note}` : ""}</li>)}
+                {detail.reports.map((report) => <li key={report.id}><span className="text-white/45 text-xs">{formatMoment(report.created_at)}</span> · {categoryLabel(report.category)} · {STATUS_LABEL[report.status] || report.status}{report.resolution_note ? ` · ${report.resolution_note}` : ""}</li>)}
               </ul>
             </div>
           )}
@@ -291,7 +319,6 @@ function LevelsTab() {
 function ReportsTab() {
   const [reports, setReports] = useState([]);
   const [filter, setFilter] = useState("open");
-  const [busy, setBusy] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -304,19 +331,6 @@ function ReportsTab() {
 
   useEffect(() => { load(); }, [load]);
 
-  const update = async (report, status) => {
-    setBusy(report.id);
-    try {
-      await api.patch(`/moderation/reports/${report.id}`, { status, resolution_note: null });
-      toast.success("Moderationsstatus gespeichert.");
-      await load();
-    } catch (error) {
-      toast.error(formatRequestError(error, "Status konnte nicht gespeichert werden."));
-    } finally {
-      setBusy("");
-    }
-  };
-
   return (
     <>
       <div className="flex flex-wrap gap-2 mb-5">
@@ -324,23 +338,74 @@ function ReportsTab() {
         {STATUS.map((status) => <button key={status} type="button" onClick={() => setFilter(status)} className={`px-3 py-2 border rounded-sm text-xs font-bold uppercase ${filter === status ? "border-[#29B6E8] text-[#29B6E8]" : "border-white/10 text-white/55"}`}>{STATUS_LABEL[status]}</button>)}
       </div>
       <div className="space-y-3">
-        {reports.map((report) => (
-          <article key={report.id} className="border border-white/10 bg-[#121212] rounded-sm p-4">
-            <div className="flex flex-wrap justify-between gap-3">
-              <div>
-                <div className="text-xs font-bold uppercase tracking-wider text-[#FFD700]">{report.category} · {STATUS_LABEL[report.status] || report.status}</div>
-                <div className="mt-1 text-sm text-white/80 whitespace-pre-wrap">{report.details}</div>
-                <div className="mt-2 text-[11px] text-white/35">Meldung {report.id} · Ziel {report.target_user_id}{report.message_id ? ` · Nachricht ${report.message_id}` : ""} · {report.created_at && viennaDateTime(report.created_at)}</div>
-              </div>
-              <select value={report.status} disabled={busy === report.id} onChange={(event) => update(report, event.target.value)} className="h-10 bg-black/40 border border-white/10 px-3 text-sm">
-                {STATUS.map((status) => <option key={status} value={status}>{STATUS_LABEL[status]}</option>)}
-              </select>
-            </div>
-          </article>
-        ))}
+        {reports.map((report) => <ReportCard key={report.id} report={report} onSaved={load} />)}
         {reports.length === 0 && <div className="border border-dashed border-white/10 p-10 text-center text-white/40">Keine Meldungen in diesem Status.</div>}
       </div>
     </>
+  );
+}
+
+function ReportCard({ report, onSaved }) {
+  const [step, setStep] = useState("");
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const target = personName(report.target_user, "die Person");
+  const needsReason = step ? reportNeedsReason(report, step) : false;
+  const open = (next) => { setStep(next); setReason(""); };
+
+  const save = async (event) => {
+    event.preventDefault();
+    setBusy(true);
+    try {
+      const { data } = await api.patch(`/moderation/reports/${report.id}`, { status: step, resolution_note: reason.trim() || null });
+      if (data?.strikes_revoked) {
+        toast.success(data.sanction_active ? "Treffer zurückgenommen. Es läuft noch eine Maßnahme – die hebst du unter „Personen“ auf." : "Treffer zurückgenommen.");
+      } else if (data?.strike) {
+        toast.success(data.sanction ? `Als Treffer gezählt: ${data.sanction.label || "eine neue Stufe gilt"}.` : "Als Treffer gezählt.");
+      } else {
+        toast.success("Meldung gespeichert.");
+      }
+      setStep("");
+      await onSaved();
+    } catch (error) {
+      toast.error(formatRequestError(error, "Die Meldung konnte nicht gespeichert werden."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <article className="border border-white/10 bg-[#121212] rounded-sm p-4" data-testid={`report-${report.id}`}>
+      <div className="text-xs font-bold uppercase tracking-wider text-[#FFD700]">{categoryLabel(report.category)} · {STATUS_LABEL[reportStatusOf(report.status)]}</div>
+      <div className="mt-1 font-bold text-sm text-white">Gegen {personName(report.target_user, "ein gelöschtes Konto")}</div>
+      <div className="mt-1 text-sm text-white/80 whitespace-pre-wrap break-words">{report.details}</div>
+      {report.message_excerpt && (
+        <blockquote className="mt-2 border-l-2 border-white/20 pl-3 text-sm text-white/60 whitespace-pre-wrap break-words" data-testid={`report-message-${report.id}`}>{report.message_excerpt}</blockquote>
+      )}
+      {report.resolution_note && <div className="mt-2 text-sm text-white/70" data-testid={`report-note-${report.id}`}><span className="text-white/45">Grund:</span> {report.resolution_note}</div>}
+      <div className="mt-2 text-[11px] text-white/35">Gemeldet von {personName(report.reporter, "einem gelöschten Konto")}{report.created_at ? ` · ${viennaDateTime(report.created_at)}` : ""}</div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {REPORT_STEPS[reportStatusOf(report.status)].map((next) => (
+          <button key={next} type="button" disabled={busy} aria-pressed={step === next} onClick={() => open(next)} data-testid={`report-step-${next}-${report.id}`} className={`min-h-10 px-3 py-2 border rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-40 ${step === next ? "border-[#29B6E8] text-[#29B6E8]" : next === "justified" ? "border-[#FF9500]/50 text-[#FF9500]" : "border-white/15 text-white/70 hover:text-white"}`}>
+            {reportStepLabel(report.status, next)}
+          </button>
+        ))}
+      </div>
+      {step && (
+        <form onSubmit={save} className="mt-3 border border-white/10 bg-black/20 rounded-sm p-3 space-y-2" data-testid={`report-decision-${report.id}`}>
+          <p className="text-xs text-white/60">{reportStepHint(report.status, step, target)}</p>
+          <label className="block text-[11px] font-bold uppercase tracking-wider text-white/60">
+            {needsReason ? "Grund" : "Grund (optional)"}
+            <textarea value={reason} onChange={(event) => setReason(event.target.value)} rows={2} maxLength={2000} required={needsReason} data-testid={`report-reason-${report.id}`} className="mt-1 w-full bg-black/40 border border-white/10 px-3 py-2 rounded-sm text-sm font-normal normal-case tracking-normal text-white" />
+          </label>
+          {report.resolution_note && !needsReason && <p className="text-[11px] text-white/45">Ohne neuen Text bleibt der bisherige Grund stehen.</p>}
+          <div className="flex flex-wrap gap-2">
+            <button type="submit" disabled={busy || (needsReason && !reason.trim())} data-testid={`report-save-${report.id}`} className="min-h-10 px-4 py-2 bg-[#29B6E8] text-black rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">{busy ? "Speichere …" : "Speichern"}</button>
+            <button type="button" disabled={busy} onClick={() => setStep("")} data-testid={`report-cancel-${report.id}`} className="min-h-10 px-4 py-2 border border-white/15 text-white/70 rounded-sm text-xs font-bold uppercase tracking-wider">Abbrechen</button>
+          </div>
+        </form>
+      )}
+    </article>
   );
 }
 

@@ -50,8 +50,9 @@ LF=[W:LE:1,W:LE:2,L:G:1,L:G:2]
 FINAL=[W:G:1,W:G:2,W:LF:1,W:LF:2]"""
 CUP = {"name": "Läufe", "stage_type": "ffa_custom_bracket", "match_type": "ffa",
        "settings": {"schema": CUP_SCHEMA, "match_size": 4, "qualifiers_per_match": 2, "min_players": 2}}
-# Der gespeicherte Plan aus der alten Matchplanung (Wiener Zeit am 31.10.2026, also UTC+1): Start, eigene Dauer,
-# Station - LF ohne Station, G, LF und das Finale mit 30 statt 20 Minuten.
+# Der gespeicherte Plan aus der alten Matchplanung (Wiener Zeit am 31.10., also immer schon UTC+1): Start, eigene Dauer,
+# Station - LF ohne Station, G, LF und das Finale mit 30 statt 20 Minuten. Der Tag liegt im nächsten Jahr: Der Planer
+# plant nie in die Vergangenheit, ein festes Datum macht die Tests ab dem Tag danach rot.
 OLD_PLAN = {"A": ("15:30", None, True), "B": ("15:50", None, True), "C": ("16:10", None, True), "D": ("16:30", None, True),
             "E": ("16:50", None, True), "F": ("17:10", None, True), "LA": ("17:30", None, True), "LB": ("17:50", None, True),
             "G": ("18:10", 30, True), "LD": ("18:50", None, True), "LE": ("19:10", None, True), "LC": ("19:40", None, True),
@@ -69,7 +70,8 @@ async def flow():
 
 def vienna(clock: str) -> str:
     hour, minute = (int(part) for part in clock.split(":"))
-    return datetime(2026, 10, 31, hour - 1, minute, tzinfo=timezone.utc).isoformat()
+    year = datetime.now(timezone.utc).year + 1
+    return datetime(year, 10, 31, hour - 1, minute, tzinfo=timezone.utc).isoformat()
 
 
 async def cup(flow, *, mixed=True, preview=False, **fields):

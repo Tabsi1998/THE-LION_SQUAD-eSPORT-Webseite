@@ -6,6 +6,7 @@ from typing import Optional
 from datetime import datetime, timezone
 from database import get_db
 from auth import get_optional_user, require_area
+from services import game_usage
 from services.permissions import can_use_area, is_confirmed_admin_role
 from services.visibility import user_can_see, filter_visible
 from services.content_embed_service import resolve_content_embeds
@@ -23,7 +24,7 @@ from models import (
     PartnerCreate, PartnerUpdate, ReferenceCreate, ReferenceShowcaseSettings, ReferenceUpdate,
     GalleryAlbumCreate, GalleryAlbumUpdate,
     GallerySectionCreate, GallerySectionUpdate,
-    GalleryPhotoCreate, GalleryPhotoUpdate,
+    GalleryPhotoBulk, GalleryPhotoCreate, GalleryPhotoUpdate,
     now_utc, new_id,
 )
 from models import ReferenceCheckSettings
@@ -544,7 +545,7 @@ async def get_news(slug_or_id: str, user: dict | None = Depends(get_optional_use
         p["linked_f1_challenges"] = await _filter_linked_items(items, user, is_staff, "fastlap")
     if p.get("linked_team_ids"):
         p["linked_teams"] = await db.teams.find(
-            {"id": {"$in": p["linked_team_ids"]}}, {"_id": 0, "id": 1, "name": 1, "slug": 1, "logo_url": 1},
+            {"id": {"$in": p["linked_team_ids"]}, "is_public": {"$ne": False}}, {"_id": 0, "id": 1, "name": 1, "slug": 1, "logo_url": 1},
         ).to_list(50)
     if p.get("mentioned_user_ids"):
         users = await db.users.find(
@@ -874,6 +875,71 @@ async def news_meta(user: dict | None = Depends(get_optional_user)):
     }
 
 
+# ---------- Archivieren und Löschen (#2130) ----------
+# Sponsor, Partner und Referenz werden archiviert (``is_active`` aus): Sie verschwinden von der Website, alles bleibt
+# erhalten und lässt sich zurückholen. Gelöscht wird nur, was nirgends verwendet wird. Beides steht im Protokoll.
+
+async def _log_content(db, me: dict, action: str, target_id: str, doc: dict) -> None:
+    await db.audit_logs.insert_one({
+        "id": new_id(), "action": action, "actor_id": me.get("id"), "target_id": target_id,
+        "data": {"name": doc.get("name") or doc.get("title")}, "created_at": now_utc().isoformat(),
+    })
+
+
+async def _log_archive_change(db, me: dict, kind: str, target_id: str, before: dict, updates: dict) -> None:
+    """Protokoll, wenn der Schalter wirklich umspringt - ein Speichern mit gleichem Wert ist kein Archivieren."""
+    if "is_active" not in updates or (before.get("is_active") is not False) == (updates["is_active"] is not False):
+        return
+    await _log_content(db, me, f"{kind}.{'restore' if updates['is_active'] else 'archive'}", target_id, before)
+
+
+def _refuse_if_used(what: str, uses: list[str]) -> None:
+    if uses:
+        raise HTTPException(409, f"{what} wird noch verwendet: {', '.join(uses)}. Archiviere den Eintrag - dann ist er von "
+                                 "der Website weg und alles bleibt erhalten.")
+
+
+def _counted(count: int, one: str, many: str) -> list[str]:
+    if not count:
+        return []
+    return [f"1 {one}" if count == 1 else f"{count} {many}"]
+
+
+async def _sponsor_uses(db, sid: str) -> list[str]:
+    return [
+        *_counted(await db.events.count_documents({"sponsor_ids": sid}), "Event", "Events"),
+        *_counted(await db.tournaments.count_documents({"round_sponsors.sponsor_id": sid}), "Turnier (Sponsor je Runde)", "Turniere (Sponsor je Runde)"),
+    ]
+
+
+async def _partner_uses(db, pid: str) -> list[str]:
+    query = {"partner_ids": pid}
+    return [
+        *_counted(await db.references.count_documents(query), "Referenz", "Referenzen"),
+        *_counted(await db.events.count_documents(query), "Event", "Events"),
+        *_counted(await db.tournaments.count_documents(query), "Turnier", "Turniere"),
+        *_counted(await db.reference_lineages.count_documents(query), "Serie", "Serien"),
+        *_counted(await db.reference_series.count_documents(query), "Saison", "Saisons"),
+    ]
+
+
+async def _reference_uses(db, ref: dict) -> list[str]:
+    uses = []
+    if ref.get("series_id") or await db.reference_series.count_documents({"reference_id": ref["id"]}):
+        uses.append("gehört zu einer Saison")
+    showcase = await _get_reference_showcase(db)
+    if showcase["reference_id"] == ref["id"]:
+        uses.append("Hauptkarte der Vitrine")
+    # Alle vier Formen wie beim Mitgliederprofil (membership_routes._links_of_profile): alte Referenzen tragen die Personen
+    # nur oben oder nur als ``lineup_members``.
+    holders = [ref, *[entry for entry in ref.get("entries") or [] if isinstance(entry, dict)]]
+    profiles = {profile for holder in holders for profile in holder.get("member_profile_ids") or [] if profile}
+    profiles |= {member.get("profile_id") for holder in holders for member in holder.get("lineup_members") or []
+                 if isinstance(member, dict) and member.get("profile_id")}
+    uses.extend(_counted(len(profiles), "Mitgliederprofil", "Mitgliederprofile"))
+    return uses
+
+
 # ---------- Sponsors ----------
 
 _TIER_ORDER = {"main": 0, "platinum": 1, "gold": 2, "silver": 3, "bronze": 4}
@@ -882,7 +948,6 @@ _SPONSOR_PLACEMENT_FIELDS = (
     "show_on_home", "show_on_footer", "show_on_events",
     "show_on_tv", "show_on_pdf", "show_in_emails",
 )
-_SPONSOR_CONTRACT_STATUSES = {"planned", "active", "paused", "expired", "cancelled"}
 _TIER_PLACEMENT_DEFAULTS = {
     "main": {"show_on_home": True, "show_on_footer": True, "show_on_events": False, "show_on_tv": True, "show_on_pdf": True, "show_in_emails": True},
     "platinum": {"show_on_home": False, "show_on_footer": True, "show_on_events": False, "show_on_tv": True, "show_on_pdf": False, "show_in_emails": False},
@@ -915,13 +980,9 @@ def _clean_date(value) -> str | None:
 
 
 def _sponsor_effective_status(doc: dict) -> str:
+    """Von Hand ausblenden geht nur über ``is_active`` (#2130); die Laufzeit kommt oft aus Dolibarr und zählt zusätzlich."""
     if doc.get("is_active") is False:
         return "inactive"
-    status = str(doc.get("contract_status") or "active").strip().lower()
-    if status not in _SPONSOR_CONTRACT_STATUSES:
-        status = "active"
-    if status in {"paused", "cancelled"}:
-        return status
     today = _today_iso()
     start = _clean_date(doc.get("contract_start"))
     end = _clean_date(doc.get("contract_end"))
@@ -929,7 +990,7 @@ def _sponsor_effective_status(doc: dict) -> str:
         return "planned"
     if end and end < today:
         return "expired"
-    return "active" if status in {"active", "expired", "planned"} else status
+    return "active"
 
 
 def _sponsor_is_public_active(doc: dict) -> bool:
@@ -940,8 +1001,6 @@ def _sponsor_defaults(doc: dict) -> dict:
     """Resolve tier-based placement suggestions when fields are missing."""
     tier = _normalize_tier(doc.get("tier"))
     doc["tier"] = tier
-    status = str(doc.get("contract_status") or "active").strip().lower()
-    doc["contract_status"] = status if status in _SPONSOR_CONTRACT_STATUSES else "active"
     doc["contract_start"] = _clean_date(doc.get("contract_start"))
     doc["contract_end"] = _clean_date(doc.get("contract_end"))
     defaults = _TIER_PLACEMENT_DEFAULTS.get(tier, _TIER_PLACEMENT_DEFAULTS["bronze"])
@@ -1044,14 +1103,23 @@ async def update_sponsor(sid: str, body: SponsorUpdate, me: dict = Depends(requi
         return _sponsor_defaults(current)
     updates["updated_at"] = now_utc().isoformat()
     await db.sponsors.update_one({"id": sid}, {"$set": updates})
+    await _log_archive_change(db, me, "sponsor", sid, current, updates)
     saved = await db.sponsors.find_one({"id": sid}, {"_id": 0})
     return _sponsor_defaults(saved) if saved else {"ok": True}
 
 
 @router.delete("/sponsors/{sid}")
 async def delete_sponsor(sid: str, me: dict = Depends(require_area("content"))):
+    from services import dolibarr_sponsors
     db = get_db()
+    current = await db.sponsors.find_one({"id": sid}, {"_id": 0})
+    if not current:
+        raise HTTPException(404, "Sponsor nicht gefunden.")
+    if await dolibarr_sponsors.comes_back_on_sync(db, current):
+        raise HTTPException(409, dolibarr_sponsors.DELETE_BLOCKED.format(what="Dieser Sponsor"))
+    _refuse_if_used("Dieser Sponsor", await _sponsor_uses(db, sid))
     await db.sponsors.delete_one({"id": sid})
+    await _log_content(db, me, "sponsor.delete", sid, current)
     return {"ok": True}
 
 
@@ -1339,8 +1407,12 @@ def _reference_auto_helpers(items: list[dict]) -> dict:
     }
 
 
-async def _enrich_references(items: list[dict]) -> list[dict]:
+async def _enrich_references(items: list[dict], internal: bool = False) -> list[dict]:
+    """Für Website, App, Profil und Partnerseite - ``internal_notes`` (#2130) gehen nur mit ``internal`` an die Verwaltung."""
     db = get_db()
+    if not internal:
+        for item in items:
+            item.pop("internal_notes", None)
     helpers = await _get_reference_helpers(db)
     # Partner II (#469): Partnervereine an der Referenz, Kurzform mit Link auf die Partnerseite.
     await partner_pages.attach_partners_many(db, items)
@@ -1524,7 +1596,7 @@ async def _freeze_reference_members(db, doc: dict, existing: dict | None = None)
 
 
 def _sort_references(items: list[dict]) -> list[dict]:
-    status_rank = {"active": 0, "planned": 1, "completed": 2, "archived": 3}
+    status_rank = {"active": 0, "planned": 1, "completed": 2}
 
     def date_ts(item: dict) -> float:
         value = item.get("start_date") or item.get("end_date")
@@ -1614,13 +1686,22 @@ async def update_partner(pid: str, body: PartnerUpdate, me: dict = Depends(requi
         return current
     updates["updated_at"] = now_utc().isoformat()
     await db.partners.update_one({"id": pid}, {"$set": updates})
+    await _log_archive_change(db, me, "partner", pid, current, updates)
     return await db.partners.find_one({"id": pid}, {"_id": 0})
 
 
 @router.delete("/partners/{pid}", dependencies=PARTNER_WRITE)
 async def delete_partner(pid: str, me: dict = Depends(require_area("content"))):
+    from services import dolibarr_sponsors
     db = get_db()
+    current = await db.partners.find_one({"id": pid}, {"_id": 0})
+    if not current:
+        raise HTTPException(404, "Partner nicht gefunden.")
+    if await dolibarr_sponsors.comes_back_on_sync(db, current):
+        raise HTTPException(409, dolibarr_sponsors.DELETE_BLOCKED.format(what="Dieser Partner"))
+    _refuse_if_used("Dieser Partner", await _partner_uses(db, pid))
     await db.partners.delete_one({"id": pid})
+    await _log_content(db, me, "partner.delete", pid, current)
     return {"ok": True}
 
 
@@ -1705,7 +1786,7 @@ async def admin_update_reference_showcase(body: ReferenceShowcaseSettings, me: d
 async def admin_list_references(me: dict = Depends(require_area("content"))):
     db = get_db()
     refs = await db.references.find({}, {"_id": 0}).to_list(1000)
-    refs = _sort_references(await _enrich_references(refs))
+    refs = _sort_references(await _enrich_references(refs, internal=True))
     return {"items": refs, "summary": _reference_summary(refs)}
 
 
@@ -1828,6 +1909,8 @@ async def create_reference(body: ReferenceCreate, me: dict = Depends(require_are
     doc["partner_ids"] = await partner_pages.clean_partner_ids(db, doc.get("partner_ids"))
     if doc.get("game_id") and not await db.games.find_one({"id": doc["game_id"]}, {"id": 1}):
         raise HTTPException(404, "Spiel nicht gefunden.")
+    if await game_usage.chosen_is_archived(db, doc.get("game_id")):
+        raise HTTPException(422, game_usage.ARCHIVED_DETAIL)
     await _check_reference_series(db, doc.get("series_id"))
     await _freeze_reference_members(db, doc)
     doc["id"] = new_id()
@@ -1841,7 +1924,7 @@ async def create_reference(body: ReferenceCreate, me: dict = Depends(require_are
         doc["created_at"] = doc["updated_at"] = now_utc().isoformat()
         await db.references.insert_one(doc)
     doc.pop("_id", None)
-    return {**(await _enrich_references([doc]))[0], "check_warnings": await _reference_warnings(db, doc)}
+    return {**(await _enrich_references([doc], internal=True))[0], "check_warnings": await _reference_warnings(db, doc)}
 
 
 REFERENCE_OUTDATED = ("Die Referenz wurde inzwischen geändert - etwa beim Abschluss ihrer Saison. Bitte neu laden "
@@ -1858,18 +1941,20 @@ async def update_reference(rid: str, body: ReferenceUpdate, expected_updated_at:
     nullable_fields = {
         "organizer", "league", "season", "format", "game_id", "game_name", "team_name", "placement",
         "placement_label", "participant_count", "team_count", "start_date", "end_date", "location",
-        "external_url", "bracket_url", "match_url", "result_url", "description", "highlights", "series_id",
+        "external_url", "bracket_url", "match_url", "result_url", "description", "highlights", "internal_notes", "series_id",
     }
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
-    if "partner_ids" in updates:
-        updates["partner_ids"] = await partner_pages.clean_partner_ids(db, updates["partner_ids"])
     if updates.get("game_id") and not await db.games.find_one({"id": updates["game_id"]}, {"id": 1}):
         raise HTTPException(404, "Spiel nicht gefunden.")
     await _check_reference_series(db, updates.get("series_id"))
     existing = await db.references.find_one({"id": rid}, {"_id": 0})
     if not existing:
         raise HTTPException(404, "Referenz nicht gefunden.")
+    if "partner_ids" in updates:
+        updates["partner_ids"] = await partner_pages.clean_partner_ids(db, updates["partner_ids"], keep=existing.get("partner_ids"))
+    if await game_usage.chosen_is_archived(db, updates.get("game_id"), existing.get("game_id")):
+        raise HTTPException(422, game_usage.ARCHIVED_DETAIL)
     # Gehört zur Saison (#1750): nie offener als alle verknüpften Saisons und Spuren - über ``series_id`` an der
     # Referenz wie über ``reference_id`` an einer Saison (#1970) -, auch wenn nur die Sichtbarkeit geändert wird. Unter
     # den Sperren dieser Saisons (alte und neue), damit eine gleichzeitige Änderung einer Saison nicht danebenläuft.
@@ -1894,17 +1979,23 @@ async def update_reference(rid: str, body: ReferenceUpdate, expected_updated_at:
         res = await db.references.update_one(query, {"$set": updates})
         if res.matched_count == 0:
             raise HTTPException(409, REFERENCE_OUTDATED)
+    await _log_archive_change(db, me, "reference", rid, existing, updates)
     # Kam währenddessen eine Verknüpfung über eine weitere Saison dazu (deren Sperre hier nicht gehalten wurde), gilt
     # auch deren Sichtbarkeit sofort.
     await season_close.settle_reference(db, rid)
     saved = await db.references.find_one({"id": rid}, {"_id": 0})
-    return {**(await _enrich_references([saved]))[0], "check_warnings": await _reference_warnings(db, saved)}
+    return {**(await _enrich_references([saved], internal=True))[0], "check_warnings": await _reference_warnings(db, saved)}
 
 
 @router.delete("/references/{rid}")
 async def delete_reference(rid: str, me: dict = Depends(require_area("content"))):
     db = get_db()
+    current = await db.references.find_one({"id": rid}, {"_id": 0})
+    if not current:
+        raise HTTPException(404, "Referenz nicht gefunden.")
+    _refuse_if_used("Diese Referenz", await _reference_uses(db, current))
     await db.references.delete_one({"id": rid})
+    await _log_content(db, me, "reference.delete", rid, current)
     return {"ok": True}
 
 
@@ -2029,12 +2120,20 @@ async def delete_album(aid: str, me: dict = Depends(require_area("content"))):
     album = await db.gallery_albums.find_one({"$or": [{"id": aid}, {"slug": aid}]}, {"_id": 0, "id": 1})
     if not album:
         raise HTTPException(404, "Album nicht gefunden.")
-    await db.gallery_photos.delete_many({"album_id": album["id"]})
+    removed = await db.gallery_photos.delete_many({"album_id": album["id"]})
     await db.gallery_albums.delete_one({"id": album["id"]})
     # Eingesandte Fotos (#1186), die noch auf Freigabe warten, samt Dateien.
     from services.event_photos import delete_for_album
     await delete_for_album(db, album["id"])
+    await _audit_gallery(db, me, "gallery.album_delete", album["id"], {"entries": removed.deleted_count})
     return {"ok": True}
+
+
+async def _audit_gallery(db, me: dict, action: str, target_id: str, data: dict) -> None:
+    await db.audit_logs.insert_one({
+        "id": new_id(), "action": action, "actor_id": me.get("id"), "target_id": target_id, "data": data,
+        "created_at": now_utc().isoformat(),
+    })
 
 
 @router.post("/gallery/{aid}/sections")
@@ -2143,6 +2242,26 @@ async def update_photo(pid: str, body: GalleryPhotoUpdate, me: dict = Depends(re
     if res.matched_count == 0:
         raise HTTPException(404, "Foto nicht gefunden.")
     return await db.gallery_photos.find_one({"id": pid}, {"_id": 0})
+
+
+@router.post("/gallery/{aid}/photos/bulk")
+async def bulk_photos(aid: str, body: GalleryPhotoBulk, me: dict = Depends(require_area("content"))):
+    """Sammelaktion im Album (#2122), mit Protokoll. Betrifft nur Einträge dieses Albums. „delete“ nimmt die Einträge aus
+    dem Album - die Dateien bleiben in den Medien."""
+    db = get_db()
+    album = await db.gallery_albums.find_one({"id": aid}, {"_id": 0, "id": 1})
+    if not album:
+        raise HTTPException(404, "Album nicht gefunden.")
+    query = {"album_id": aid, "id": {"$in": body.ids}}
+    if body.action == "delete":
+        count = (await db.gallery_photos.delete_many(query)).deleted_count
+        data = {"action": "delete", "count": count}
+    else:
+        section_id = await _ensure_gallery_section_exists(db, aid, body.section_id)
+        count = (await db.gallery_photos.update_many(query, {"$set": {"section_id": section_id}})).matched_count
+        data = {"action": "move", "count": count, "section_id": section_id}
+    await _audit_gallery(db, me, "gallery.photos_bulk", aid, data)
+    return {"ok": True, "count": count}
 
 
 @router.delete("/gallery/photos/{pid}")

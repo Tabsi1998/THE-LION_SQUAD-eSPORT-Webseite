@@ -29,6 +29,7 @@ from services.totp import generate_recovery_codes, generate_totp_secret, matchin
 from services.return_path import safe_next_path
 from services.log_safe import log_safe
 from services.private_fields import strip_private
+from services.usernames import username_from_name, username_taken
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 logger = logging.getLogger("tls.auth")
@@ -210,7 +211,7 @@ def _device_identity(request: Request) -> dict:
 
 def _eligible_session_user(user: dict | None) -> dict:
     if not user:
-        raise HTTPException(status_code=401, detail="User not found")
+        raise HTTPException(status_code=401, detail="Dieses Konto gibt es nicht mehr.")
     if user.get("is_active") is False:
         raise HTTPException(status_code=403, detail="Account deaktiviert")
     if user.get("is_banned"):
@@ -699,7 +700,7 @@ async def register(body: UserRegister, request: Request, response: Response):
         return {"verification_required": True, "email": email}
     if await db.users.find_one({"email": email}):
         raise HTTPException(status_code=409, detail="E-Mail bereits registriert")
-    if await db.users.find_one({"username": username}):
+    if await username_taken(db, username):
         raise HTTPException(status_code=409, detail="Benutzername bereits vergeben")
     user_id = new_id()
     # Wortfilter (#417): ein gesperrtes Wort im Benutzernamen kommt gar nicht erst ins System.
@@ -808,14 +809,25 @@ async def _resolve_google_identity(credential: str, client_id: str) -> dict:
 
 
 async def _unique_username(db, base: str) -> str:
-    cleaned = "".join(ch for ch in (base or "").strip() if ch.isalnum() or ch in ("_", "-", " ")).replace(" ", "_")
-    cleaned = (cleaned or "player")[:20]
+    cleaned = username_from_name(base)
     candidate = cleaned
     suffix = 0
-    while await db.users.find_one({"username": candidate}):
+    while await username_taken(db, candidate):
         suffix += 1
         candidate = f"{cleaned}{suffix}"
     return candidate
+
+
+async def _google_names(db, name: str | None, email: str) -> tuple[str, str | None]:
+    """Benutzername und Anzeigename für ein neues Google-Konto (#2126). Den Namen hat die Person nicht hier getippt: Ein
+    Treffer im Wortfilter weist sie nicht ab, sondern gibt ihr einen neutralen Namen, den sie im Profil ändern kann."""
+    from services import word_filter
+    username = await _unique_username(db, name or email.split("@")[0])
+    verdict = await word_filter.check_text(db, f"{name or ''} {username}")
+    if verdict["action"] != "hold":
+        return username, name
+    username = await _unique_username(db, "player")
+    return username, username
 
 
 def _google_user_doc(email: str, name: str, picture: str | None, google_id: str | None, username: str) -> dict:
@@ -883,8 +895,8 @@ async def google_session(body: GoogleCredentialBody, request: Request, response:
             raise HTTPException(status_code=403, detail="Die Registrierung mit Google ist derzeit deaktiviert.")
         if not body.accept_privacy or not body.accept_terms:
             raise HTTPException(status_code=400, detail="Datenschutz und Nutzungsbedingungen müssen akzeptiert werden.")
-        username = await _unique_username(db, data.get("name") or email.split("@")[0])
-        user = _google_user_doc(email, data.get("name"), data.get("picture"), google_id, username)
+        username, display_name = await _google_names(db, data.get("name"), email)
+        user = _google_user_doc(email, display_name, data.get("picture"), google_id, username)
         user.update({
             "accepted_privacy": True,
             "accepted_terms": True,
@@ -998,10 +1010,14 @@ async def mobile_register(body: UserRegister, request: Request):
         return {"verification_required": True, "email": email}
     if await db.users.find_one({"email": email}):
         raise HTTPException(status_code=409, detail="E-Mail bereits registriert")
-    if await db.users.find_one({"username": username}):
+    if await username_taken(db, username):
         raise HTTPException(status_code=409, detail="Benutzername bereits vergeben")
+    user_id = new_id()
+    # Wortfilter (#417, #2126): dieselbe Prüfung wie bei der Registrierung im Web.
+    from services import word_filter
+    await word_filter.screen_field(db, username, kind="username", user_id=user_id, ref_id=user_id)
     user_doc = {
-        "id": new_id(),
+        "id": user_id,
         "email": email,
         "username": username,
         **password_fields(body.password),

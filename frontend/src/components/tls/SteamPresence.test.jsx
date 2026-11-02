@@ -22,6 +22,12 @@ test("Zähler in Worten", () => {
   expect(steamSummary({ stale: true, online_count: 3 })).toContain("veraltet");
 });
 
+test("Profil-Links sind kodiert: ein älterer Name mit Sonderzeichen bleibt erreichbar (#2126)", () => {
+  const players = [{ user_id: "u3", username: "wer#da", display_name: "Wer", state: "online", state_text: "online" }];
+  render(<MemoryRouter><SteamPresence data={{ ...DATA, players }} /></MemoryRouter>);
+  expect(screen.getByTestId("steam-presence-u3")).toHaveAttribute("href", "/u/wer%23da");
+});
+
 test("Personen mit Spiel und Profil-Link; ohne eigenes Opt-in der Weg dorthin; ohne Schlüssel nichts", () => {
   const { container } = render(<MemoryRouter><SteamPresence data={DATA} /></MemoryRouter>);
   expect(screen.getByTestId("steam-presence-summary")).toHaveTextContent("3 Mitglieder gerade in Steam");

@@ -35,7 +35,7 @@ function MeRedirect() {
   if (user === undefined) return null;
   const query = params.toString() ? `?${params.toString()}` : "";
   if (!user) return <Navigate to={`/login?next=${encodeURIComponent(`/u/me${query}`)}`} replace />;
-  return <Navigate to={`/u/${user.username}${query}`} replace />;
+  return <Navigate to={`/u/${encodeURIComponent(user.username)}${query}`} replace />;
 }
 
 function FastLapLegacyRedirect() {
@@ -50,7 +50,7 @@ function GalleryLegacyRedirect() {
 
 function PlayerLegacyRedirect() {
   const { username } = useParams();
-  return <Navigate to={`/u/${username}`} replace />;
+  return <Navigate to={`/u/${encodeURIComponent(username)}`} replace />;
 }
 
 // Turnierbaum-TV (#1110): mit Anzeige-Schlüssel im Link läuft er ohne Anmeldung - der Schlüssel erlaubt nur das
@@ -214,6 +214,7 @@ const MyPrizesPage = lazyPage(() => import("@/pages/user/MyPrizesPage"));
 const MyPenaltiesPage = lazyPage(() => import("@/pages/user/MyPenaltiesPage"));
 const AdminPrizesPage = lazyPage(() => import("@/pages/admin/AdminPrizesPage"));
 const AdminPenaltiesPage = lazyPage(() => import("@/pages/admin/AdminPenaltiesPage"));
+const AdminTeamsPage = lazyPage(() => import("@/pages/admin/AdminTeamsPage"));
 const AdminContactPage = lazyPage(() => import("@/pages/admin/AdminContactPage"));
 const AdminBoardPage = lazyPage(() => import("@/pages/admin/AdminBoardPage"));
 const AdminReferencesPage = lazyPage(() => import("@/pages/admin/AdminReferencesPage"));
@@ -393,7 +394,7 @@ function App() {
           <Route path="/admin/documents" element={<ProtectedRoute requireArea="club"><AdminDocumentsPage /></ProtectedRoute>} />
           <Route path="/admin/settings" element={<ProtectedRoute requireArea="system"><AdminSettingsPage /></ProtectedRoute>} />
           <Route path="/admin/settings/:section" element={<ProtectedRoute requireArea="system"><AdminSettingsPage /></ProtectedRoute>} />
-          <Route path="/admin/club" element={<ProtectedRoute requireArea="system"><AdminClubDataPage /></ProtectedRoute>} />
+          <Route path="/admin/club" element={<ProtectedRoute requireArea={["system", "club"]}><AdminClubDataPage /></ProtectedRoute>} />
           <Route path="/admin/seasons" element={<ProtectedRoute requireArea="tournaments"><AdminSeasonsPage /></ProtectedRoute>} />
           <Route path="/admin/logs" element={<Navigate to="/admin/ops?tab=events" replace />} />
           <Route path="/admin/ops" element={<ProtectedRoute requireArea="system"><AdminOpsPage /></ProtectedRoute>} />
@@ -450,6 +451,7 @@ function App() {
           <Route path="/admin/nav" element={<ProtectedRoute requireArea="content"><AdminNavPage /></ProtectedRoute>} />
           <Route path="/admin/prizes" element={<ProtectedRoute requireArea="tournaments"><AdminPrizesPage /></ProtectedRoute>} />
           <Route path="/admin/penalties" element={<ProtectedRoute requireArea="tournaments"><AdminPenaltiesPage /></ProtectedRoute>} />
+          <Route path="/admin/teams" element={<ProtectedRoute requireArea={["tournaments", "club"]}><AdminTeamsPage /></ProtectedRoute>} />
           <Route path="/admin/contact" element={<ProtectedRoute requireArea="club"><AdminContactPage /></ProtectedRoute>} />
           <Route path="/admin/board" element={<ProtectedRoute requireArea="club"><AdminBoardPage /></ProtectedRoute>} />
 

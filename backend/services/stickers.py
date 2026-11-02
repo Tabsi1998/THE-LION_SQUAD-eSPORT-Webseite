@@ -26,12 +26,14 @@ import re
 
 from fastapi import HTTPException
 
+from services.media_formats import UPLOAD_URL_VERSION
+
 STICKER_ROOT = pathlib.Path(__file__).resolve().parents[1] / "static" / "stickers"
 BUILTIN_CATALOG_PATH = pathlib.Path(__file__).resolve().parent / "sticker_catalog_fluent.json"
 STICKER_PREVIEW_TEXT = "[Sticker]"
 # Eigene Sticker nur aus dem eigenen Upload. Eine fremde Adresse würde beim
 # Anzeigen jeden Chatteilnehmer bei Dritten abrufen lassen.
-CUSTOM_STICKER_URL = re.compile(r"/api/static/uploads/[A-Za-z0-9][A-Za-z0-9_-]{0,150}\.(png|webp|jpg|jpeg)")
+CUSTOM_STICKER_URL = re.compile(r"/api/static/uploads/[A-Za-z0-9][A-Za-z0-9_-]{0,150}\.(png|webp|jpg|jpeg)" + UPLOAD_URL_VERSION)
 MAX_CUSTOM_PACKS = 30
 MAX_STICKERS_PER_PACK = 120
 MESSAGE_STICKER_FIELDS = ("id", "pack_id", "name", "url", "width", "height")
@@ -83,6 +85,8 @@ def public_custom_sticker(doc: dict) -> dict:
         "url": doc["url"],
         "width": doc.get("width"),
         "height": doc.get("height"),
+        # Reihenfolge im Paket (#2112): der Adminbereich zeigt und ändert sie.
+        "sort_order": doc.get("sort_order", 0),
     }
 
 
@@ -96,6 +100,15 @@ async def builtin_pack_active(db, pack_id: str) -> bool:
     return (await _builtin_states(db)).get(pack_id, True)
 
 
+def _order_key(row: dict) -> tuple:
+    """Reihenfolge, dann Anlage-Zeitpunkt; ohne Reihenfolge (ältere Einträge) gilt 0 wie im Formular."""
+    try:
+        order = int(row.get("sort_order") or 0)
+    except (TypeError, ValueError):
+        order = 0
+    return order, str(row.get("created_at") or "")
+
+
 async def list_sticker_packs(db, *, include_inactive: bool = False, user_id: str | None = None) -> list[dict]:
     """Eigene Pakete zuerst - den eigenen Löwen sucht man im Vereinschat öfter als ein Emoji. Ein Saison-Paket
     zeigt der Chat nur mit den Stickern, die ``user_id`` geschenkt bekam; der Adminbereich (``include_inactive``)
@@ -104,11 +117,14 @@ async def list_sticker_packs(db, *, include_inactive: bool = False, user_id: str
     custom = await db.sticker_packs.find(query, {"_id": 0}).sort(
         [("sort_order", 1), ("created_at", 1)],
     ).to_list(MAX_CUSTOM_PACKS)
+    custom.sort(key=_order_key)
     by_pack: dict[str, list[dict]] = {}
     if custom:
         rows = await db.stickers.find(
             {"pack_id": {"$in": [pack["id"] for pack in custom]}}, {"_id": 0},
-        ).sort([("sort_order", 1), ("created_at", 1)]).to_list(MAX_CUSTOM_PACKS * MAX_STICKERS_PER_PACK)
+        ).to_list(MAX_CUSTOM_PACKS * MAX_STICKERS_PER_PACK)
+        # Altdaten ohne Reihenfolge (#2112) zählen als 0 - Mongo sortierte ein fehlendes Feld vor jede Zahl, auch vor -5.
+        rows.sort(key=_order_key)
         for row in rows:
             by_pack.setdefault(row["pack_id"], []).append(public_custom_sticker(row))
 

@@ -17,16 +17,21 @@ gerade zählt; gleich danach ein zweites Mal geht nicht. Jede Nachricht steht mi
 """
 from __future__ import annotations
 
+import csv
+import io
 import logging
 import unicodedata
 from datetime import timedelta
+from zoneinfo import ZoneInfo
 
 from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
-from services.event_registration import seats
+from services.csv_safe import safe_cell
+from services.event_registration import SEAT_BUSY, SEAT_WAIT_SECONDS, RegistrationError, seat_resource, seats, summary, validated_companion_count
 from services.log_safe import log_safe, mask_addresses
 from services.mutation_lock import MutationLockBusy, mutation_lock
+from services.public_phase import parse_dt
 
 logger = logging.getLogger("tls.events.lead")
 
@@ -82,6 +87,8 @@ def registration_row(registration: dict, *, full: bool = True) -> dict:
             "created_at": registration.get("created_at"),
             "updated_at": registration.get("updated_at"),
         })
+    if registration.get("walk_in"):
+        row["walk_in"] = True
     return row
 
 
@@ -90,28 +97,32 @@ async def registration_detail(db, event: dict, registration_id: str) -> dict:
     registration = await db.event_registrations.find_one(
         {"id": registration_id, "event_id": event["id"]},
         {"_id": 0, "id": 1, "display_name": 1, "status": 1, "companion_count": 1, "seat_count": 1, "email": 1, "note": 1,
-         "internal_note": 1, "created_at": 1, "updated_at": 1},
+         "internal_note": 1, "walk_in": 1, "created_at": 1, "updated_at": 1},
     )
     if not registration:
         raise LeadError(404, "Anmeldung nicht gefunden")
     return {**registration_row(registration), "note": registration.get("note"), "internal_note": registration.get("internal_note")}
 
 
-def counts(registrations: list[dict]) -> dict:
+def counts(registrations: list[dict], max_participants: int | None = None) -> dict:
     """„84 von 120 da“: Personen und Plätze (mit Begleitpersonen) - erwartet sind alle Angemeldeten."""
     by_status: dict[str, list[dict]] = {}
     for registration in registrations:
         by_status.setdefault(registration.get("status") or "", []).append(registration)
     expected = by_status.get("registered", []) + by_status.get("checked_in", [])
     here = by_status.get("checked_in", [])
+    expected_seats = sum(seats(r) for r in expected)
+    # Freie Plätze (#2127, EV6): die Warteliste rückt nicht von selbst nach - die Leitung sieht „1 Platz frei“.
+    spots_left = max(int(max_participants) - expected_seats, 0) if max_participants else None
     return {
         "open": len(by_status.get("registered", [])),
         "here": len(here),
         "waitlist": len(by_status.get("waitlist", [])),
         "all": len(registrations),
         "expected": len(expected),
-        "expected_seats": sum(seats(r) for r in expected),
+        "expected_seats": expected_seats,
         "here_seats": sum(seats(r) for r in here),
+        "spots_left": spots_left,
     }
 
 
@@ -123,7 +134,7 @@ async def _registrations(db, event: dict) -> list[dict]:
     return await db.event_registrations.find(
         {"event_id": event["id"]},
         {"_id": 0, "id": 1, "user_id": 1, "display_name": 1, "status": 1, "companion_count": 1, "seat_count": 1,
-         "email": 1, "note": 1, "internal_note": 1, "created_at": 1, "updated_at": 1},
+         "email": 1, "note": 1, "internal_note": 1, "walk_in": 1, "created_at": 1, "updated_at": 1},
     ).to_list(5000)
 
 
@@ -167,7 +178,7 @@ async def lead_view(db, event: dict, *, query: str = "", filter_key: str = "open
             "max_participants": event.get("max_participants"), "allow_companions": bool(event.get("allow_companions")),
             "max_companions_per_registration": int(event.get("max_companions_per_registration") or 0),
         },
-        "counts": {**counts(registrations), "max_participants": event.get("max_participants")},
+        "counts": {**counts(registrations, event.get("max_participants")), "max_participants": event.get("max_participants")},
         "filter": filter_key,
         "registrations": [registration_row(r, full=full) for r in shown],
         "can_message": full,
@@ -175,7 +186,127 @@ async def lead_view(db, event: dict, *, query: str = "", filter_key: str = "open
     if full:
         view["message_recipients"] = len(await recipient_ids(db, event))
         view["messages"] = await message_log(db, event)
+        view["can_add_walk_in"] = walk_in_block_reason(event) is None
     return view
+
+
+WALK_IN_CLOSED = {"draft", "cancelled", "archived"}
+WALK_IN_VIA = "door"
+WALK_IN_FULL = "Das Event ist voll: kein Platz mehr frei. Erhöhe „Max. Teilnehmer“ oder storniere zuerst eine Anmeldung."
+
+
+def walk_in_block_reason(event: dict) -> str | None:
+    if event.get("status") in WALK_IN_CLOSED:
+        return "Dieses Event ist noch ein Entwurf, abgesagt oder archiviert – an der Tür kommt hier niemand dazu."
+    if not event.get("has_registration") or event.get("registration_url"):
+        return "Dieses Event führt keine Anmeldungen auf dieser Seite."
+    return None
+
+
+async def add_walk_in(db, event: dict, me: dict, *, display_name: str, companion_count: int = 0) -> dict:
+    """„Person an der Tür hinzufügen“ (#2127, EV17): ohne Konto und ohne Preis, gleich eingecheckt, mit Protokoll.
+
+    Unter derselben Platzsperre wie jede Anmeldung; ist kein Platz frei, sagt die Antwort das. Die Kennung im Feld
+    ``user_id`` gehört zu keinem Konto - sie hält nur den eindeutigen Index je Event und Person ein. Solche Einträge
+    bekommen keine Nachricht, keine Punkte und stehen nicht in der öffentlichen Teilnehmerliste."""
+    blocked = walk_in_block_reason(event)
+    if blocked:
+        raise LeadError(409, blocked)
+    name = " ".join(str(display_name or "").split())
+    if not name:
+        raise LeadError(400, "Bitte einen Namen eingeben.")
+    try:
+        companions = validated_companion_count(event, companion_count)
+    except RegistrationError as exc:
+        raise LeadError(exc.status, exc.detail)
+    registration_id = new_id()
+    now = now_utc().isoformat()
+    doc = {
+        "id": registration_id, "event_id": event["id"], "user_id": f"walkin:{registration_id}", "walk_in": True, "display_name": name,
+        "email": None, "status": "checked_in", "companion_count": companions, "seat_count": 1 + companions, "note": None,
+        "selected_positions": [], "registered_via": WALK_IN_VIA, "added_by": me["id"], "created_at": now, "updated_at": now,
+    }
+    try:
+        async with mutation_lock(db, seat_resource(event["id"]), wait_seconds=SEAT_WAIT_SECONDS):
+            taken = await summary(db, event)
+            if event.get("max_participants") and taken["reserved_seats"] + doc["seat_count"] > int(event["max_participants"]):
+                raise LeadError(400, WALK_IN_FULL)
+            await db.event_registrations.insert_one(doc)
+    except MutationLockBusy:
+        raise LeadError(409, SEAT_BUSY)
+    doc.pop("_id", None)
+    # Im Protokoll nur die Kennung: den Namen löscht man an einer Stelle, nämlich am Eintrag.
+    await db.audit_logs.insert_one({
+        "id": new_id(), "action": "event.registration.walk_in", "target_id": event["id"], "actor_id": me["id"],
+        "data": {"registration_id": registration_id, "companion_count": companions}, "created_at": now,
+    })
+    return registration_row(doc)
+
+
+async def _walk_in(db, event: dict, registration_id: str) -> dict:
+    row = await db.event_registrations.find_one({"id": registration_id, "event_id": event["id"], "walk_in": True}, {"_id": 0})
+    if not row:
+        raise LeadError(404, "Eintrag nicht gefunden.")
+    return row
+
+
+async def rename_walk_in(db, event: dict, me: dict, registration_id: str, *, display_name: str) -> dict:
+    """Den Namen eines Eintrags an der Tür berichtigen (#2127): ohne Konto geht das nur hier."""
+    row = await _walk_in(db, event, registration_id)
+    name = " ".join(str(display_name or "").split())
+    if not name:
+        raise LeadError(400, "Bitte einen Namen eingeben.")
+    now = now_utc().isoformat()
+    await db.event_registrations.update_one({"id": row["id"]}, {"$set": {"display_name": name, "updated_at": now}})
+    await db.audit_logs.insert_one({
+        "id": new_id(), "action": "event.registration.walk_in_rename", "target_id": event["id"], "actor_id": me["id"],
+        "data": {"registration_id": row["id"]}, "created_at": now,
+    })
+    return registration_row({**row, "display_name": name, "updated_at": now})
+
+
+async def delete_walk_in(db, event: dict, me: dict, registration_id: str) -> dict:
+    """Einen Eintrag an der Tür löschen (#2127): samt Name und Notizen; der Platz wird frei. Einträge mit Konto gehen
+    nicht diesen Weg - die bleiben als Zählung und werden über das Konto gelöscht."""
+    row = await _walk_in(db, event, registration_id)
+    await db.event_registrations.delete_one({"id": row["id"]})
+    await db.audit_logs.insert_one({
+        "id": new_id(), "action": "event.registration.walk_in_delete", "target_id": event["id"], "actor_id": me["id"],
+        "data": {"registration_id": row["id"]}, "created_at": now_utc().isoformat(),
+    })
+    return {"ok": True}
+
+
+CSV_HEADER = ("Name", "Status", "Plätze", "Begleitpersonen", "Angemeldet am")
+CSV_STATUS = {"registered": "Angemeldet", "checked_in": "Da", "waitlist": "Warteliste", "no_show": "Nicht erschienen", "cancelled": "Storniert"}
+VIENNA = ZoneInfo("Europe/Vienna")
+
+
+def _vienna_text(value) -> str:
+    moment = parse_dt(value)
+    return moment.astimezone(VIENNA).strftime("%d.%m.%Y %H:%M") if moment else ""
+
+
+async def export_csv(db, event: dict, me: dict, *, filter_key: str = "all") -> str:
+    """Die Teilnehmerliste als CSV (#2127, EV16): nur Name, Status und Plätze - keine Mail-Adresse, keine Notiz, kein
+    Geld. Wie die Seite nach Namen sortiert; eine Zelle wird nie zur Formel. Jeder Abruf steht im Protokoll."""
+    if filter_key not in FILTER_STATUSES:
+        raise LeadError(400, "Unbekannter Filter.")
+    statuses = FILTER_STATUSES[filter_key]
+    rows = [r for r in sorted(await _registrations(db, event), key=_sort_key) if statuses is None or r.get("status") in statuses]
+    buffer = io.StringIO()
+    writer = csv.writer(buffer, delimiter=";", lineterminator="\r\n")
+    writer.writerow(CSV_HEADER)
+    for row in rows:
+        writer.writerow([safe_cell(value) for value in (
+            row.get("display_name") or "Teilnehmer", CSV_STATUS.get(row.get("status"), row.get("status")), seats(row),
+            max(0, int(row.get("companion_count") or 0)), _vienna_text(row.get("created_at")),
+        )])
+    await db.audit_logs.insert_one({
+        "id": new_id(), "action": "event.registrations.export", "target_id": event["id"], "actor_id": me["id"],
+        "data": {"filter": filter_key, "count": len(rows)}, "created_at": now_utc().isoformat(),
+    })
+    return buffer.getvalue()
 
 
 async def _claim_event_gate(db, event: dict, now: str, since: str) -> None:

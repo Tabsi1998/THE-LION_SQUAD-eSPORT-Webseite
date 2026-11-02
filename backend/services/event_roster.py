@@ -4,7 +4,7 @@ Nie das heutige Team: wer erst nach dem Turnier einem Team beitritt, war nicht d
 Anmeldung gespeichert ist bzw. was die Mitgliedschaft mit Datum belegt:
 
 - Einzel-Anmeldung: die angemeldete Person.
-- Team-Anmeldung: wer das Team angemeldet hat (``user_id`` der Anmeldung, in der Regel der Kapitän), dazu
+- Team-Anmeldung: wer das Team angemeldet hat (``user_id`` der Anmeldung, in der Regel die Teamleitung), dazu
   - die gespeicherte Aufstellung samt Ersatz (``lineup``, ``substitutes`` an der Anmeldung, #1192), sonst
   - die Mitglieder aus ``team_members``, deren ``joined_at`` spätestens am letzten Turniertag (Wiener Tag) liegt.
     Ohne Beitrittsdatum zählt niemand - lieber eine Person zu wenig als eine, die nicht dabei war.

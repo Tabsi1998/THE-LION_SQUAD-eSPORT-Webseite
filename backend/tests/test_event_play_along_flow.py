@@ -1,6 +1,6 @@
 """„Spielst du auch mit?“ (#1184): nach der Event-Anmeldung meldet ein Schritt die Einzel-Turniere des Events in einem
 Rutsch an. Jede Anmeldung läuft einzeln durch die normale Selbstanmeldung - dieselben Regeln (voll → Warteliste,
-Event-Pflicht #875, Startgeld #319); die Summe ist die Summe der Rechnungsaufträge. Team-Turniere meldet der Kapitän auf
+Event-Pflicht #875, Startgeld #319); die Summe ist die Summe der Rechnungsaufträge. Team-Turniere meldet die Teamleitung auf
 der Turnierseite an, Fast Laps brauchen keine Anmeldung. Ohne Konto gibt es den Schritt nicht."""
 import pathlib
 import sys
@@ -93,7 +93,7 @@ async def test_several_registrations_in_one_step_with_waitlist_event_gate_and_fe
     assert entries[full["id"]]["selectable"] is True and entries[full["id"]]["full"] is True and entries[full["id"]]["spots_left"] == 0
     assert entries[cheap["id"]]["fee"]["total_cents"] == 500 and entries[cheap["id"]]["spots_left"] == 8
     assert entries[team_cup["id"]]["selectable"] is False and entries[team_cup["id"]]["team"] is True
-    assert entries[team_cup["id"]]["reason"] == "Dein Kapitän meldet das Team an." and entries[team_cup["id"]]["captain"] is False
+    assert entries[team_cup["id"]]["reason"] == "Deine Teamleitung meldet das Team an." and entries[team_cup["id"]]["captain"] is False
 
     response = await flow.post(f"/api/events/{event['id']}/play-along",
                                json={**ACCEPT, "tournament_ids": [gated["id"], full["id"], cheap["id"], team_cup["id"]]})
@@ -104,7 +104,7 @@ async def test_several_registrations_in_one_step_with_waitlist_event_gate_and_fe
     assert rows[gated["id"]]["state"] == "registered" and rows[gated["id"]]["price"]["total_cents"] == 1000
     assert rows[full["id"]]["state"] == "waitlist" and rows[full["id"]]["price"] is None
     assert rows[cheap["id"]]["state"] == "registered" and rows[cheap["id"]]["price"]["total_cents"] == 500
-    assert rows[team_cup["id"]]["state"] == "error" and "Kapitän" in rows[team_cup["id"]]["detail"]
+    assert rows[team_cup["id"]]["state"] == "error" and "Teamleitung" in rows[team_cup["id"]]["detail"]
 
     registrations = by_id(await own_registrations(flow, paula), "tournament_id")
     assert set(registrations) == {gated["id"], full["id"], cheap["id"]}, "das Team-Turnier wird nicht angemeldet"
@@ -257,7 +257,7 @@ async def test_closed_or_disabled_tournaments_stay_visible_without_a_tick_and_wi
     assert (entries[closed["id"]]["selectable"], entries[closed["id"]]["reason"]) == (False, "Anmeldung für dieses Turnier geschlossen.")
     assert (entries[disabled["id"]]["selectable"], entries[disabled["id"]]["reason"]) == (False, "Anmeldung für dieses Turnier ist deaktiviert.")
     assert (entries[late["id"]]["selectable"], entries[late["id"]]["reason"]) == (False, "Anmeldung ist bereits beendet.")
-    assert entries[team_closed["id"]]["reason"] == "Anmeldung für dieses Turnier geschlossen.", "geschlossen geht vor dem Kapitäns-Hinweis"
+    assert entries[team_closed["id"]]["reason"] == "Anmeldung für dieses Turnier geschlossen.", "geschlossen geht vor dem Teamleitungs-Hinweis"
     result = (await flow.post(f"/api/events/{event['id']}/play-along", json={**ACCEPT, "tournament_ids": [closed["id"], late["id"]]})).json()
     assert [row["state"] for row in result["results"]] == ["error", "error"]
     assert not await own_registrations(flow, paula)

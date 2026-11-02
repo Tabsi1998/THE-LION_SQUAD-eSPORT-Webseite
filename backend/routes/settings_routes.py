@@ -3,7 +3,7 @@
 import logging
 import os
 from fastapi import Query, APIRouter, HTTPException, Depends, Request, Response
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from typing import Optional, List, Literal, Dict
 from datetime import datetime, timezone
 import httpx
@@ -1660,6 +1660,60 @@ async def update_branding(body: BrandingSettings, me: dict = Depends(require_clu
     return _hide_branding_secrets(saved) if saved else {"ok": True}
 
 
+# Vereinsdaten für den Vorstand (#2125, erster Teil von #1368): Stammdaten und Kontakt pflegt die Vereinsverwaltung - in denselben
+# Feldern wie System, nichts doppelt. Rechtstexte, Hosting und Preisturniere liest sie nur (rechtliche Folgen); Branding, Geheimnisse
+# und alles andere bleiben ihr verborgen.
+CLUB_DATA_READ_ONLY = ("hosting_provider", "hosting_country", "vat_number", "tournament_terms_url", "paid_tournaments_enabled",
+                       "imprint", "privacy_policy", "legal_extra", "privacy_extra", "terms_of_use", "legal_from_dolibarr")
+
+
+class ClubDataUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    legal_name: Optional[str] = Field(default=None, max_length=300)
+    legal_form: Optional[str] = Field(default=None, max_length=300)
+    zvr_number: Optional[str] = Field(default=None, max_length=100)
+    street_address: Optional[str] = Field(default=None, max_length=300)
+    address_extra: Optional[str] = Field(default=None, max_length=300)
+    postal_code: Optional[str] = Field(default=None, max_length=40)
+    city: Optional[str] = Field(default=None, max_length=200)
+    state: Optional[str] = Field(default=None, max_length=200)
+    country: Optional[str] = Field(default=None, max_length=200)
+    registered_seat: Optional[str] = Field(default=None, max_length=200)
+    register_authority: Optional[str] = Field(default=None, max_length=300)
+    representative_name: Optional[str] = Field(default=None, max_length=200)
+    representative_role: Optional[str] = Field(default=None, max_length=200)
+    content_responsible: Optional[str] = Field(default=None, max_length=200)
+    phone: Optional[str] = Field(default=None, max_length=100)
+    privacy_contact_email: Optional[str] = Field(default=None, max_length=300)
+
+
+def _club_data_view(branding: dict) -> dict:
+    return {key: branding.get(key) for key in (*ClubDataUpdate.model_fields, *CLUB_DATA_READ_ONLY) if key in branding}
+
+
+@settings_router.get("/club-data")
+async def get_club_data(response: Response, me: dict = Depends(require_area("club", "system"))):
+    response.headers["Cache-Control"] = "no-store"
+    return _club_data_view((await get_db().settings.find_one({"id": "branding"}, {"_id": 0})) or {})
+
+
+@settings_router.put("/club-data")
+async def update_club_data(body: ClubDataUpdate, me: dict = Depends(require_area("club", "system"))):
+    db = get_db()
+    updates = body.model_dump(exclude_unset=True)
+    current = await db.settings.find_one({"id": "branding"}, {"_id": 0}) or {}
+    changed_fields = _changed_setting_fields(current, updates)
+    if not changed_fields:
+        return _club_data_view(current)
+    updates["updated_at"] = now_utc().isoformat()
+    if set(changed_fields) & PUBLIC_LEGAL_SOURCE_FIELDS:
+        updates["legal_updated_at"] = updates["updated_at"]
+    await db.settings.update_one({"id": "branding"}, {"$set": updates, "$setOnInsert": {"id": "branding"}}, upsert=True)
+    await _audit_settings_change(db, "settings.club_data.update", "branding", me["id"], changed_fields)
+    return _club_data_view(await db.settings.find_one({"id": "branding"}, {"_id": 0}) or {})
+
+
 @settings_router.post("/branding/favicon/universal")
 async def generate_universal_favicon(me: dict = Depends(require_club_admin())):
     """Standard-Favicon, das auf hell und dunkel trägt (#229): das weiße Logo auf einem Kreis in der Akzentfarbe.
@@ -2198,6 +2252,16 @@ async def update_amp(body: AmpSettings, me: dict = Depends(require_club_admin())
             updates.pop("password")
 
     current = await db.settings.find_one({"id": "amp"}, {"_id": 0}) or {}
+    # Nur eine neue Adresse: Eine schon gespeicherte darf das Speichern anderer Felder nicht sperren.
+    if updates.get("base_url") and updates["base_url"] != (current.get("base_url") or ""):
+        from services.outbound_address import outbound_block_reason
+        reason = await outbound_block_reason(updates["base_url"])
+        if reason:
+            raise HTTPException(400, reason)
+    # Neue Adresse (#2112): das gespeicherte Passwort gehört zur bisherigen - es geht nur mit neu eingetragenem Passwort.
+    if ("base_url" in updates and updates["base_url"] != (current.get("base_url") or "")
+            and secret_is_configured(current.get("password")) and "password" not in updates and not clear_password):
+        raise HTTPException(400, "Neue Adresse: bitte das Passwort neu eintragen. Das gespeicherte gilt nur für die bisherige Adresse.")
     changed_fields = _changed_setting_fields(current, updates, unset)
     if not changed_fields:
         return {"ok": True, "changed": False}
@@ -2273,18 +2337,28 @@ async def discord_resend(log_id: str, me: dict = Depends(require_club_admin())):
     entry = await db.email_logs.find_one({"id": log_id, "channel": "discord"}, {"_id": 0})
     if not entry or not entry.get("payload"):
         raise HTTPException(404, "Diese Meldung lässt sich nicht erneut senden.")
-    if entry.get("status") != "failed":
-        raise HTTPException(409, "Nur fehlgeschlagene Meldungen lassen sich erneut senden.")
+    # Atomar „failed → resending“ (#2112): ein zweiter Klick, während die erste Sendung läuft, bekommt 409 statt einer
+    # doppelten Meldung. Scheitert das Senden, steht die Meldung wieder auf „failed“.
+    claimed = await db.email_logs.update_one({"id": log_id, "channel": "discord", "status": "failed"},
+                                             {"$set": {"status": "resending"}})
+    if entry.get("status") != "failed" or not claimed.modified_count:
+        raise HTTPException(409, "Nur fehlgeschlagene Meldungen lassen sich erneut senden – diese wird gerade oder wurde schon gesendet.")
     payload = entry["payload"]
     # An das Ziel, an das sie ging - nie an ein anderes. Privat bleibt privat.
     # Eine Meldung aus einem Turnier-Thread (#572) geht zurück in diesen Thread.
-    result = await send_to(entry.get("target") or "community", payload.get("title") or "", payload.get("description") or "",
-                           color=payload.get("color") or 0x29B6E8, url=payload.get("url"), fields=payload.get("fields"),
-                           image_url=payload.get("image_url"), event_key=entry.get("event_key") or "custom",
-                           thread_id=entry.get("thread_id"), buttons=payload.get("buttons"), guild_id=entry.get("guild_id"),
-                           embed=payload.get("embed"), content=payload.get("content"))
+    try:
+        result = await send_to(entry.get("target") or "community", payload.get("title") or "", payload.get("description") or "",
+                               color=payload.get("color") or 0x29B6E8, url=payload.get("url"), fields=payload.get("fields"),
+                               image_url=payload.get("image_url"), event_key=entry.get("event_key") or "custom",
+                               thread_id=entry.get("thread_id"), buttons=payload.get("buttons"), guild_id=entry.get("guild_id"),
+                               embed=payload.get("embed"), content=payload.get("content"))
+    except Exception:
+        await db.email_logs.update_one({"id": log_id, "status": "resending"}, {"$set": {"status": "failed"}})
+        raise
     if result.get("ok"):
         await db.email_logs.update_one({"id": log_id}, {"$set": {"status": "resent", "resent_at": now_utc().isoformat()}})
+    else:
+        await db.email_logs.update_one({"id": log_id, "status": "resending"}, {"$set": {"status": "failed"}})
     return result
 
 

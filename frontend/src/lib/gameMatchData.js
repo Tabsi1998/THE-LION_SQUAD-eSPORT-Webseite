@@ -87,6 +87,53 @@ export function gameMatchDataProblem(form) {
   return points.error ? `Punktetabelle: ${points.error}` : "";
 }
 
+const count = (number, one, many) => `${number} ${number === 1 ? one : many}`;
+
+/** Die Kennung eines Modus aus seinem Namen - dieselbe Regel wie im Backend (`_game_key` in models.py). */
+export function modeKey(label) {
+  return String(label || "").normalize("NFKD").replace(/[^\p{ASCII}]/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40);
+}
+
+/** Welche Modi das Speichern entfernt (#2129): gespeicherte, die im Payload nicht mehr vorkommen - auch wer die Zeile leert. */
+export function removedModes(before, payload) {
+  const kept = new Set((payload?.match_modes || []).map((mode) => mode.mode || modeKey(mode.label)));
+  return (before || []).filter((mode) => mode.mode && !kept.has(mode.mode));
+}
+
+/**
+ * Die Rückfrage vor dem Entfernen (#2129, SP2) mit der Zahl der betroffenen Maps, aus `GET /games/{id}/usage`. `null`: nichts
+ * hängt daran, es braucht keine Frage. Ohne Zählung (Abfrage fehlgeschlagen) wird trotzdem gefragt.
+ */
+export function modeRemovalQuestion(removed, usage) {
+  if (!removed?.length) return null;
+  const title = removed.length === 1 ? `Modus „${removed[0].label}“ entfernen?` : `${removed.length} Modi entfernen?`;
+  const lasting = "Gespeicherte Map-Pools und gemeldete Ergebnisse bleiben, wie sie sind.";
+  if (!usage?.modes) return { title, description: `Die Maps verlieren ${removed.length === 1 ? "diesen Modus" : "diese Modi"}. ${lasting}` };
+  const sum = (key) => removed.reduce((total, mode) => total + (usage.modes[mode.mode]?.[key] || 0), 0);
+  const maps = sum("maps");
+  const pools = sum("pools");
+  const seasons = sum("seasons");
+  const tournaments = sum("tournaments");
+  const stages = sum("stages");
+  if (!maps && !pools && !seasons && !tournaments && !stages) return null;
+  const one = removed.length === 1;
+  const parts = [];
+  if (maps) parts.push(`${count(maps, "Map verliert", "Maps verlieren")} ${one ? "diesen Modus" : "diese Modi"} und ${maps === 1 ? "steht" : "stehen"} dafür in neuen Pools nicht mehr zur Wahl. Wird ${one ? "er" : "einer"} wieder angelegt, haben die Maps ihn nicht mehr.`);
+  const keeping = [pools ? count(pools, "gespeicherter Map-Pool", "gespeicherte Map-Pools") : "", seasons ? count(seasons, "Season", "Seasons") : ""].filter(Boolean).join(" und ");
+  parts.push(keeping ? `${keeping} ${pools + seasons === 1 ? "nutzt" : "nutzen"} ${one ? "ihn" : "sie"} weiter: Laufende Spiele melden unverändert daraus. ${lasting}` : lasting);
+  const planning = [tournaments ? count(tournaments, "Turnier", "Turniere") : "", stages ? count(stages, "Phase", "Phasen") : ""].filter(Boolean).join(" und ");
+  if (planning) parts.push(`${planning} ${tournaments + stages === 1 ? "plant" : "planen"} mit ${one ? "diesem Modus" : "diesen Modi"} und ${tournaments + stages === 1 ? "nimmt" : "nehmen"} danach den ersten Modus des Spiels.`);
+  return { title, description: parts.join(" ") };
+}
+
+/** Die Meldung nach dem Speichern - sagt, was mit den Maps passiert ist und welche jetzt keinen Modus haben. */
+export function gameSavedText(answer) {
+  const parts = ["Spiel gespeichert."];
+  if (answer?.maps_cleaned) parts.push(`Modus aus ${count(answer.maps_cleaned, "Map", "Maps")} entfernt.`);
+  if (answer?.maps_without_mode) parts.push(`${count(answer.maps_without_mode, "Map hat", "Maps haben")} noch keinen Modus – ordne sie unter Maps zu.`);
+  return parts.join(" ");
+}
+
 /**
  * Was das Spiel dem Turnierformular vorschlägt: Dauer (aus dem Modus, wenn das Turnier keine eigene hat), Best-of
  * und Laufgröße (vor Ort oder online, je nach Austragung). `tournament` ist der Formularstand.

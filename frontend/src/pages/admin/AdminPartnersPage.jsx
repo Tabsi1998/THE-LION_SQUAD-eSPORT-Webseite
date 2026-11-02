@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { CheckField, SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
-import { DolibarrSourceBlock, dolibarrLocked, useDolibarrSource } from "@/components/tls/DolibarrSourceBlock";
+import { DOLIBARR_DELETE_HINT, DolibarrSourceBlock, dolibarrKeepsEntry, dolibarrLocked, useDolibarrSource } from "@/components/tls/DolibarrSourceBlock";
 import { imageSourceText, shownLogo } from "@/lib/sponsorImages";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
-import { ExternalLink, Handshake, Pencil, Plus, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, ExternalLink, Handshake, Pencil, Plus, Trash2 } from "lucide-react";
 import { SOCIAL_PLATFORMS } from "@/lib/socialIcons";
 
 // Partner: Liste und Seitenblatt (#435). Seit der Partnerseite (#469) hat jeder Partner eine eigene
@@ -102,11 +103,25 @@ export default function AdminPartnersPage() {
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["partners", "uploads"]);
 
+  // Archivieren (#2130): von der Website weg, alles bleibt; Löschen nur, wenn der Partner nirgends verwendet wird.
   const remove = async (id) => {
-    if (!await confirm({ title: "Partner löschen?", description: "Der Partner wird dauerhaft aus der Partnerseite entfernt.", confirmLabel: "Löschen" })) return;
-    await api.delete(`/partners/${id}`);
-    toast.success("Partner gelöscht.");
-    load();
+    if (!await confirm({ title: "Partner löschen?", description: "Das lässt sich nicht rückgängig machen und geht nur, wenn der Partner nirgends verwendet wird. Sonst archivieren.", confirmLabel: "Löschen" })) return;
+    try {
+      await api.delete(`/partners/${id}`);
+      toast.success("Partner gelöscht.");
+      load();
+    } catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
+  };
+
+  const setArchived = async (partner, archived) => {
+    if (archived && !await confirm({ title: "Partner archivieren?", description: "Seine Seite und alle Hinweise auf ihn verschwinden von der Website. Der Eintrag bleibt hier zum Zurückholen stehen.", confirmLabel: "Archivieren", tone: "info" })) return;
+    try {
+      const { data } = await api.patch(`/partners/${partner.id}`, { is_active: !archived });
+      // Was zählt, ist die Antwort: Bei einem Partner, den Dolibarr führt, kann der Server den Wert verwerfen.
+      if (data?.is_active === archived) toast.error(archived ? "Der Partner bleibt aktiv: Das entscheidet Dolibarr." : "Der Partner bleibt archiviert: Das entscheidet Dolibarr.");
+      else toast.success(archived ? "Partner archiviert." : "Partner zurückgeholt.");
+      load();
+    } catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
   };
 
   return (
@@ -116,6 +131,9 @@ export default function AdminPartnersPage() {
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Verein</span>
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Partner</h1>
           <p className="mt-2 text-white/60 text-sm max-w-xl">Befreundete Vereine, Veranstalter und Communitys. Jeder Partner hat eine eigene Seite mit Kanälen, Twitch-Live, Discord, Tools und gemeinsamen News.</p>
+          <p className="mt-2 text-white/60 text-sm max-w-xl" data-testid="partner-vs-sponsor">
+            Partner arbeiten mit uns zusammen und zahlen nichts dafür. Wer den Verein mit Geld oder Sachleistungen unterstützt, steht unter <Link to="/admin/sponsors" className="text-[#29B6E8] underline-offset-2 hover:underline">Sponsoren</Link>.
+          </p>
         </div>
         <button onClick={() => setEditing(emptyPartner)} data-testid="partner-new" className="px-5 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2">
           <Plus className="w-4 h-4" /> Neuer Partner
@@ -126,7 +144,7 @@ export default function AdminPartnersPage() {
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
         {list.map((p) => (
-          <div key={p.id} className="border border-white/10 rounded-sm bg-[#121212] p-5">
+          <div key={p.id} className={`border border-white/10 rounded-sm bg-[#121212] p-5 ${p.is_active === false ? "opacity-70" : ""}`} data-testid={`partner-card-${p.id}`}>
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
                 {shownLogo(p) ? (
@@ -139,13 +157,19 @@ export default function AdminPartnersPage() {
                 <div className="min-w-0">
                   <div className="text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]">{p.kind || "Partner"}</div>
                   <div className="font-heading text-lg font-bold truncate">{p.name}</div>
-                  {p.is_active === false && <div className="text-[10px] uppercase tracking-widest text-[#FF3B30] font-bold">Inaktiv</div>}
+                  {p.is_active === false && <div className="text-[10px] uppercase tracking-widest text-[#FF3B30] font-bold">Archiviert</div>}
                   {p.source === "dolibarr" && <div className="text-[10px] uppercase tracking-widest text-[#29B6E8]/80 font-bold" data-testid={`partner-dolibarr-${p.id}`}>Aus Dolibarr</div>}
                 </div>
               </div>
               <div className="flex gap-1 shrink-0">
                 <button onClick={() => setEditing(p)} className="p-1.5 text-white/40 hover:text-[#29B6E8]"><Pencil className="w-4 h-4" /></button>
-                <button onClick={() => remove(p.id)} className="p-1.5 text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-4 h-4" /></button>
+                {/* Einen Partner aus Dolibarr blendet der Abgleich ein und aus - dort wird er auch archiviert. */}
+                {!dolibarrKeepsEntry(dolibarrSource, p) && (p.is_active === false ? (
+                  <button onClick={() => setArchived(p, false)} title="Zurückholen" aria-label="Partner zurückholen" data-testid={`partner-restore-${p.id}`} className="p-1.5 text-white/40 hover:text-[#29B6E8]"><ArchiveRestore className="w-4 h-4" /></button>
+                ) : (
+                  <button onClick={() => setArchived(p, true)} title="Archivieren" aria-label="Partner archivieren" data-testid={`partner-archive-${p.id}`} className="p-1.5 text-white/40 hover:text-brand"><Archive className="w-4 h-4" /></button>
+                ))}
+                <button onClick={() => remove(p.id)} disabled={dolibarrKeepsEntry(dolibarrSource, p)} title={dolibarrKeepsEntry(dolibarrSource, p) ? DOLIBARR_DELETE_HINT : "Partner löschen"} aria-label="Partner löschen" data-testid={`partner-delete-${p.id}`} className="p-1.5 text-white/40 hover:text-[#FF3B30] disabled:opacity-30 disabled:hover:text-white/40 disabled:cursor-not-allowed"><Trash2 className="w-4 h-4" /></button>
               </div>
             </div>
             {p.description && <p className="mt-3 text-sm text-white/60 line-clamp-2">{p.description}</p>}
@@ -193,6 +217,13 @@ function PartnerForm({ partner, locked = new Set(), onClose, onSaved }) {
   // Seitenblatt statt Fenster (#435): die Liste bleibt daneben sichtbar.
   return (
     <AdminSheet title={isNew ? "Neuer Partner" : "Partner bearbeiten"} eyebrow="Verein" onClose={onClose} onSubmit={save} saving={saving} submitTestId="partner-save" testId="partner-sheet">
+      {locked.size > 0 && (
+        <p className="text-xs text-[#29B6E8] border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-3 py-2" data-testid="partner-locked-hint">
+          {locked.has("is_active")
+            ? "Dieser Partner kommt aus Dolibarr: Name, Art und „Öffentlich zeigen“ werden dort gepflegt. Inaktiv wird er, wenn die Firma in Dolibarr geschlossen oder aus der Kategorie genommen wird. Alles andere bleibt hier."
+            : "Dieser Partner kam aus Dolibarr und steht dort nicht mehr in der Kategorie: Name und Art bleiben gesperrt, „Öffentlich zeigen“ pflegt ihr jetzt hier."}
+        </p>
+      )}
       <TextField label="Name" value={form.name} onChange={(v) => set("name", v)} required testId="partner-name" {...lock("name")} />
       <ImageUpload value={form.logo_url} onChange={(v) => set("logo_url", v)} label="Logo" testId="partner-logo" variant="square" endpoint="/uploads/logo" allowLibrary logo />
       {imageSourceText(partner?.dolibarr_image_summary) && (
@@ -206,7 +237,7 @@ function PartnerForm({ partner, locked = new Set(), onClose, onSaved }) {
         <TextField label="Typ" value={form.kind} onChange={(v) => set("kind", v)} placeholder="Verein, Messe, Community" testId="partner-kind" {...lock("kind")} />
         <TextField label="Reihenfolge" type="number" value={form.order_index} onChange={(v) => set("order_index", Number(v) || 0)} testId="partner-order" />
       </FormGrid>
-      <CheckField label="Aktiv" checked={form.is_active !== false} onChange={(v) => set("is_active", v)} testId="partner-active" />
+      <CheckField label="Öffentlich zeigen" checked={form.is_active !== false} onChange={(v) => set("is_active", v)} testId="partner-active" {...lock("is_active")} />
       <TextAreaField label="Kurzbeschreibung" value={form.description} onChange={(v) => set("description", v)} testId="partner-description" hint="Steht in der Partnerliste und im Kopf der Partnerseite." />
 
       <FormSection title="Partnerseite" hint={`Eigene Seite unter /partners/${form.slug || "…"} – Adresse, „seit“ und der längere Text.`} plain testId="partner-page-section">

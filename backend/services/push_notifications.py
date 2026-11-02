@@ -38,13 +38,14 @@ PUSH_CHANNELS = {
     "schedule_escalation": "lion_tournaments",
     # Terminvorschlag, Antwort oder Zurückziehen der anderen Seite (#2110) - wie „Ergebnis gemeldet“.
     "match_schedule": "lion_tournaments",
-    # Team am Spieltag (#1192): „Bist du schon da?“ vom Kapitän - ein Ruf zum Antreten.
+    # Team am Spieltag (#1192): „Bist du schon da?“ von der Teamleitung - ein Ruf zum Antreten.
     "team_presence_nudge": "lion_calls",
     # Check-in, Ergebnisse, Turnier-Updates, Gewinne, Event-Hinweise, „Wie war …?“ nach Turnier oder Event.
     "tournament_checkin": "lion_tournaments",
     "tournament_registration": "lion_tournaments",
     "tournament_finished": "lion_tournaments",
     "tournament_cancelled": "lion_tournaments",
+    "tournament_staff": "lion_tournaments",
     "match_result": "lion_tournaments",
     "match_report": "lion_tournaments",
     "match_dispute": "lion_tournaments",
@@ -56,6 +57,7 @@ PUSH_CHANNELS = {
     "event_member": "lion_tournaments",
     "event_board": "lion_tournaments",
     "event_message": "lion_tournaments",
+    "event_registration": "lion_tournaments",
     # Fotos vom Event (#1185) und Bescheid zu eingesandten Fotos (#1186).
     "gallery_event": "lion_tournaments",
     "gallery_member": "lion_tournaments",
@@ -75,17 +77,25 @@ PUSH_CHANNELS = {
     "friend_accept": "lion_chats",
     "team_invite": "lion_chats",
     "team_invite_accepted": "lion_chats",
+    "team_invite_declined": "lion_chats",
     "team_role_changed": "lion_chats",
     "team_leader_transferred": "lion_chats",
+    "team_member_removed": "lion_chats",
+    "team_member_left": "lion_chats",
+    "team_dissolved": "lion_chats",
+    "team_restored": "lion_chats",
+    "team_join_code_renewed": "lion_chats",
     # Vereinsintern, News, Mitgliedschaft, Rechnungen, Helferdienste.
     "news_member": "lion_club",
     "news_board": "lion_club",
     "ballot_open": "lion_club",
     "membership_update": "lion_club",
     "membership_invited": "lion_club",
+    "membership_decision": "lion_club",   # Entscheidung oder neuer Status der Mitgliedschaft (#2125)
     "jersey_number": "lion_club",   # Wunschnummer (#2034): Entscheidung des Vorstands
     "invoice_ready": "lion_club",
     "moderation": "lion_club",
+    "rights_change": "lion_club",   # Rolle, Freigabe oder Vorstandsposten geändert (#2125)
     "admin_push_test": "lion_club",
     "helper_call": "lion_club",
     "helper_reminder": "lion_club",
@@ -152,7 +162,8 @@ def _push_payload(notification: dict[str, Any], row: dict[str, Any]) -> dict[str
         return payload
     payload.update(
         title=str(notification.get("title") or "LionsAPP")[:120],
-        body=str(notification.get("body") or "")[:180],
+        # Ein eigener Text für den Sperrbildschirm, wenn die Meldung mehr trägt, als dort stehen soll (#2125).
+        body=str((notification.get("meta") or {}).get("push_body") or notification.get("body") or "")[:180],
         data={
             "notification_id": notification.get("id"),
             "kind": kind,

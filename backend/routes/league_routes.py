@@ -26,6 +26,7 @@ from models import (
     new_id,
     now_utc,
 )
+from services import game_maps
 from services import league_look
 from services import league_service as leagues
 from services import map_pools
@@ -76,7 +77,7 @@ async def admin_list_leagues(_me: dict = Depends(require_league_admin)):
     db = get_db()
     rows = await db.leagues.find({}, {"_id": 0}).sort("name", 1).to_list(200)
     seasons = await db.league_seasons.find({}, {"_id": 0}).sort("number", -1).to_list(2000)
-    games = await db.games.find({}, {"_id": 0, "id": 1, "name": 1, "slug": 1}).sort("name", 1).to_list(500)
+    games = await db.games.find({}, {"_id": 0, "id": 1, "name": 1, "slug": 1, "status": 1}).sort("name", 1).to_list(500)
     names = {game["id"]: game.get("name") for game in games}
     return {
         "leagues": [{**row, "game_name": names.get(row.get("game_id")),
@@ -117,6 +118,7 @@ async def admin_season(season_id: str, _me: dict = Depends(require_league_admin)
         "look": league_look.effective(league, season),
         "calendar": leagues.calendar_summary(season),
         "library": await map_pools.library(db, game),
+        "default_pool": await map_pools.default_pool(db, game),
         "map_pool": await map_pools.admin_entry(db, pool, league.get("game_id"), "league_season"),
         "divisions": rows,
     }
@@ -254,6 +256,14 @@ async def admin_save_season_pool(season_id: str, body: MapPoolSave, me: dict = D
     db = get_db()
     season = await _call(leagues.get_season(db, season_id))
     game = await _season_game(db, season)
+    # Nennt „Modus je Map“ einen Modus, der im neuen Pool fehlt, wäre für neue Spiele keine Meldung passend (#2129).
+    chosen = {group.mode for group in body.modes if group.map_ids}
+    missing = [mode for mode in season.get("game_mode_order") or [] if mode and mode not in chosen]
+    if missing:
+        labels = {mode["mode"]: mode["label"] for mode in game_maps.game_modes(game)}
+        names = [f"„{labels[mode]}“" for mode in dict.fromkeys(missing) if mode in labels]
+        what = ", ".join(names) if names else "ein Modus der Reihenfolge"  # dem Spiel schon entfernt: nie eine rohe Kennung
+        raise HTTPException(status_code=422, detail=f"Im neuen Pool fehlt {what}. Bitte „Modus je Map“ zuerst ändern und speichern.")
     doc = await _call(map_pools.save(db, scope="league_season", scope_id=season_id, game=game, body=body, user=me))
     await _audit(db, "league.season.map_pool.save", me, season_id, {"version": doc["version"], "pool_id": doc["id"]})
     return map_pools.saved_view(doc, "league_season", admin=True)

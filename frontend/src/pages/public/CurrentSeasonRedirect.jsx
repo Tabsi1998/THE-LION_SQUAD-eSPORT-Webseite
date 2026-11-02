@@ -165,7 +165,7 @@ function FinalRow({ row }) {
   const cls = "flex items-center gap-3 border border-white/10 bg-[#121212] rounded-sm px-4 py-3 min-w-0";
   return (
     <li>
-      {row.username ? <Link to={`/u/${row.username}`} className={`tls-card ${cls}`}>{content}</Link> : <div className={cls}>{content}</div>}
+      {row.username ? <Link to={`/u/${encodeURIComponent(row.username)}`} className={`tls-card ${cls}`}>{content}</Link> : <div className={cls}>{content}</div>}
     </li>
   );
 }

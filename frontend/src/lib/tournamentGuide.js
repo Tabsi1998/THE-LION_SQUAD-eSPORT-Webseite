@@ -28,10 +28,10 @@ export const GUIDE_STEPS = [
   },
   {
     key: "groups",
-    title: "Ab etwa 32 Teilnehmern Gruppen zu 4 bis 8, danach Turnierbaum",
+    title: "Ab etwa 32 Teilnehmern: Gruppenphase statt reinem K.-o.",
     why: "Ein reiner K.-o.-Baum mit 32 Teilnehmern ist für die Hälfte nach einem Spiel vorbei. Gruppen geben jedem mehrere Partien.",
-    how: "Format „Gruppenphase“ mit anschließender Einzelausscheidung; Gruppengröße 4 bis 8.",
-    fields: ["Format", "Gruppen", "Turnierbaum"],
+    how: "Format „Gruppenphase“; „Gruppen generieren“ fragt nach der Zahl der Gruppen – Teilnehmer geteilt durch 4 bis 8. Eine K.-o.-Runde danach gibt es im selben Turnier noch nicht; die Besten spielen sie als eigenes Turnier.",
+    fields: ["Format", "Gruppen generieren"],
   },
   {
     key: "disputes",
@@ -42,10 +42,10 @@ export const GUIDE_STEPS = [
   },
   {
     key: "matchdays",
-    title: "Ligen: Termine über Spielwochen statt starrer Uhrzeit",
-    why: "Eine Liga über Wochen lebt davon, dass Teams ihre Partie in der Woche selbst ausmachen. Eine feste Uhrzeit für alle scheitert am Alltag.",
-    how: "Format „Liga“, Spielwoche und Standardzeit setzen; Terminvorschläge der Teams einschalten. Der geltende Termin steht dann in der Partie.",
-    fields: ["Format", "Spielwoche", "Standardzeit", "Terminvorschläge"],
+    title: "Über Wochen: Termine in Spielwochen statt starrer Uhrzeit",
+    why: "Ein Turnier über Wochen lebt davon, dass Teams ihre Partie in der Woche selbst ausmachen. Eine feste Uhrzeit für alle scheitert am Alltag. Für die Vereinsliga mit Seasons und Staffeln gibt es Admin → Liga.",
+    how: "Format „Jeder gegen jeden – Hin- und Rückrunde“ (oder „– einfach“), Austragung online. Unter „Spielwochen“ Dauer, Standardtag und Standarduhrzeit setzen; „Terminplanung: Teilnehmer schlagen vor“. Der geltende Termin steht dann in der Partie.",
+    fields: ["Format", "Spielwochen", "Standarduhrzeit", "Terminplanung"],
   },
 ];
 
@@ -53,10 +53,10 @@ export const GUIDE_FORMATS = [
   { key: "single_elim", label: "Einzelausscheidung", when: "Ein Abend, ein Sieger. Wer verliert, ist draußen – schnell, aber für die Hälfte nach einem Spiel vorbei." },
   { key: "double_elim", label: "Doppel-K.-o.", when: "Eine Niederlage soll nicht sofort das Aus sein. Gut für kleine Felder mit Zeit für ein Loser Bracket." },
   { key: "swiss", label: "Schweizer System", when: "Viele Teilnehmer, kein fester Baum: Jeder spielt gleich viele Runden gegen ähnlich Starke. Übliche Gruppenphase bei Counter-Strike und Valorant." },
-  { key: "groups", label: "Gruppen und Turnierbaum", when: "Ab etwa 32 Teilnehmern: Gruppen zu 4 bis 8, die Besten in den Baum." },
-  { key: "round_robin", label: "Jeder gegen jeden", when: "Kleines Feld, alle sollen gegeneinander spielen. Die Tabelle entscheidet." },
-  { key: "league", label: "Liga mit Spielwochen", when: "Eine Saison über Wochen; jede Woche ein Spieltag, Termine machen die Teams aus." },
-  { key: "ffa", label: "Freies Feld (FFA)", when: "Alle gleichzeitig in einer Lobby – Rennen, Battle Royale, Party-Spiele. Gewertet nach Platzierung." },
+  { key: "groups", label: "Gruppenphase", when: "Ab etwa 32 Teilnehmern: Gruppen zu 4 bis 8, jeder spielt mehrere Partien. Eine K.-o.-Runde danach läuft als eigenes Turnier." },
+  { key: "round_robin", label: "Jeder gegen jeden – einfach", when: "Kleines Feld, alle sollen einmal gegeneinander spielen. Die Tabelle entscheidet." },
+  { key: "league", label: "Jeder gegen jeden über Wochen", when: "Hin- und Rückrunde über Wochen; jede Woche ein Spieltag, Termine machen die Teams aus. Die Vereinsliga mit Seasons und Staffeln läuft über Admin → Liga." },
+  { key: "ffa", label: "Mehrspieler frei", when: "Alle gleichzeitig in einer Lobby – Rennen, Battle Royale, Party-Spiele. Ein Spiel mit allen, gewertet nach Platzierung. Mehrere Runden mit Gesamtwertung gibt es noch nicht – für mehrere Läufe gibt es den „Mehrspieler freien Turnierbaum“." },
 ];
 
 // Voreinstellung (#368): dieselben Werte wie der RulePresetPicker im Formular – online melden
@@ -73,17 +73,17 @@ export const PRESET_FIELDS = ["format", "team_mode", "team_size", "best_of", "ev
 // den Spielen, die der Verein wirklich spielt. `preset` sind die Feldwerte für „Diese
 // Voreinstellung übernehmen“ (#368): Format, Teamgröße, Best-of und die Spielregel-Vorgabe.
 export const GUIDE_GAME_TYPES = [
-  { key: "team-shooter", label: "Team-Shooter 5v5", examples: "Counter-Strike 2, Valorant, Rainbow Six Siege", team: "5v5", series: "Best of 1 in Gruppen, Best of 3 in Playoffs, Finale Best of 5", format: "swiss", notes: "Map-Veto vor der Partie; die Heimseite hostet. Schweizer System für die Gruppenphase, danach Doppel-K.-o.", preset: { format: "swiss", best_of: 1, ...team(5) } },
+  { key: "team-shooter", label: "Team-Shooter 5v5", examples: "Counter-Strike 2, Valorant, Rainbow Six Siege", team: "5v5", series: "Best of 1 in Gruppen, Best of 3 in Playoffs, Finale Best of 5", format: "swiss", notes: "Map-Veto vor der Partie; die Heimseite hostet. Schweizer System für die Gruppenphase, die Playoffs als eigenes Turnier im Doppel-K.-o.", preset: { format: "swiss", best_of: 1, ...team(5) } },
   { key: "cod", label: "Call of Duty", examples: "Call of Duty (Ligaregeln)", team: "4v4", series: "Best of 5", format: "double_elim", notes: "Feste Modusfolge, etwa Hardpoint, Search & Destroy, Control.", preset: { format: "double_elim", best_of: 5, ...team(4) } },
   { key: "moba", label: "MOBA", examples: "League of Legends, Dota 2", team: "5v5", series: "Best of 1 in Gruppen, Best of 3 bis 5 in Playoffs", format: "groups", notes: "Draft-Reihenfolge und Seitenwahl in die Regeln.", preset: { format: "groups", best_of: 1, ...team(5) } },
   { key: "arcade-sport", label: "Arcade-Sport 3v3", examples: "Rocket League", team: "3v3", series: "Gruppen und Playoffs Best of 5, Finale Best of 7", format: "groups", notes: "Kurze Spiele – viele Runden an einem Abend möglich.", preset: { format: "groups", best_of: 5, ...team(3) } },
-  { key: "battle-royale", label: "Battle Royale", examples: "Fortnite, Warzone, Apex", team: "Solo, Duo oder Trio", series: "3 bis 6 Runden, Punkte je Platzierung und Abschuss", format: "ffa", notes: "Punktetabelle in die Regeln; Ergebnisse je Runde erfassen.", preset: { format: "ffa", best_of: 1, ...solo() } },
-  { key: "sport-1v1", label: "1v1 Sport", examples: "EA SPORTS FC, NBA 2K", team: "1v1", series: "Hin- und Rückspiel oder Best of 3", format: "league", notes: "Passt gut auf Liga mit Spielwochen.", preset: { format: "league", best_of: 3, ...solo() } },
+  { key: "battle-royale", label: "Battle Royale", examples: "Fortnite, Warzone, Apex", team: "Solo, Duo oder Trio", series: "Ein Spiel mit allen, gewertet nach Platzierung", format: "ffa", notes: "Mehrere Runden mit Punkten über alle gibt es noch nicht – bis dahin eine Runde je Turnier; die Punktetabelle gehört in die Regeln.", preset: { format: "ffa", best_of: 1, ...solo() } },
+  { key: "sport-1v1", label: "1v1 Sport", examples: "EA SPORTS FC, NBA 2K", team: "1v1", series: "Hin- und Rückspiel oder Best of 3", format: "league", notes: "Passt gut auf „Jeder gegen jeden über Wochen“.", preset: { format: "league", best_of: 3, ...solo() } },
   { key: "strategy-1v1", label: "1v1 Strategie", examples: "Age of Empires, StarCraft", team: "1v1", series: "Best of 3, Finale Best of 5", format: "double_elim", notes: "Fester Map-Pool ohne Wiederholung; ELO-Grenze für Amateurturniere.", preset: { format: "double_elim", best_of: 3, ...solo() } },
   { key: "fighting", label: "Fighting", examples: "Street Fighter, Tekken, Smash", team: "1v1", series: "Best of 3, ab Halbfinale Best of 5", format: "double_elim", notes: "Doppel-K.-o. ist hier Standard; Charakterwahl nach Sieg fest, Verlierer darf wechseln.", preset: { format: "double_elim", best_of: 3, ...solo() } },
-  { key: "racing", label: "Rennen auf Zeit", examples: "F1, Gran Turismo, Mario Kart", team: "Solo", series: "Zeitfahren oder Rennen mit Punkten", format: "ffa", notes: "Für Zeitfahren die Fast-Lap-Challenge nutzen; Rennen als freies Feld mit Platzierung.", preset: { format: "ffa", best_of: 1, ...solo() } },
+  { key: "racing", label: "Rennen auf Zeit", examples: "F1, Gran Turismo, Mario Kart", team: "Solo", series: "Zeitfahren oder Rennen mit Punkten", format: "ffa", notes: "Für Zeitfahren die Fast-Lap-Challenge nutzen; ein Rennen als „Mehrspieler frei“ mit Platzierung, mehrere Läufe im „Mehrspieler freien Turnierbaum“.", preset: { format: "ffa", best_of: 1, ...solo() } },
   { key: "mobile", label: "Mobil", examples: "Brawl Stars, Clash Royale", team: "1v1 bis 3v3", series: "Best of 3", format: "single_elim", notes: "Kurze Partien; Check-in besonders wichtig, weil Handys wechseln.", preset: { format: "single_elim", best_of: 3, ...solo() } },
-  { key: "party-lan", label: "Party und LAN", examples: "Mario Kart, Jackbox, Poker-Abend", team: "Solo oder Team", series: "Eine Runde oder Punkte über den Abend", format: "ffa", notes: "Vor Ort: Stationen und Check-in am Eingang; Ergebnisse trägt die Turnierleitung ein.", preset: { format: "ffa", best_of: 1, ...solo(LOCAL) } },
+  { key: "party-lan", label: "Party und LAN", examples: "Mario Kart, Jackbox, Poker-Abend", team: "Solo oder Team", series: "Eine Runde je Turnier, gewertet nach Platzierung", format: "ffa", notes: "Vor Ort: Stationen und Check-in am Eingang; Ergebnisse trägt die Turnierleitung ein.", preset: { format: "ffa", best_of: 1, ...solo(LOCAL) } },
 ];
 
 export function formatLabel(key) {

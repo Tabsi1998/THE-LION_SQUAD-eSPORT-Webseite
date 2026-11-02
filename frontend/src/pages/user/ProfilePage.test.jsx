@@ -264,7 +264,7 @@ test("die Schnellwahl Verein setzt alle Felder der Gruppe und speichert sie zusa
   await user.click(screen.getByTestId("profile-vis-group-contact-members"));
   await user.selectOptions(screen.getByTestId("profile-dm-privacy"), "friends");
 
-  for (const key of ["email", "discord", "city", "country"]) {
+  for (const key of ["discord", "city", "country", "website"]) {
     expect(screen.getByTestId(`profile-vis-${key}`)).toHaveValue("members");
   }
   expect(screen.getByTestId("profile-vis-group-contact-members")).toHaveAttribute("aria-pressed", "true");
@@ -275,7 +275,7 @@ test("die Schnellwahl Verein setzt alle Felder der Gruppe und speichert sie zusa
   // Jeder Klick speichert sofort; zusammen ergibt das genau diese Änderung - und nichts doppelt.
   const sent = Object.assign({}, ...apiMock.patch.mock.calls.map(([, body]) => body));
   expect(sent).toEqual({
-    profile_visibility: { email: "members", discord: "members", city: "members", country: "members" },
+    profile_visibility: { discord: "members", city: "members", country: "members", website: "members" },
     dm_privacy: "friends",
   });
   expect(apiMock.patch.mock.calls.length).toBeLessThanOrEqual(2);
@@ -287,7 +287,7 @@ test("ein einzelnes Feld anders als seine Gruppe zeigt die Gruppe als gemischt",
   await waitForForm();
   await openPrivacyTab(user);
 
-  await user.selectOptions(screen.getByTestId("profile-vis-email"), "private");
+  await user.selectOptions(screen.getByTestId("profile-vis-discord"), "private");
 
   expect(screen.getByTestId("profile-vis-group-contact-mixed")).toBeInTheDocument();
   expect(screen.getByTestId("profile-vis-group-contact-public")).toHaveAttribute("aria-pressed", "false");
@@ -703,7 +703,7 @@ test("Verlassen mit leerem Namen fragt im Dialog: Zurück zum Feld bleibt, Verwe
 
   await user.click(screen.getByTestId("settings-to-profile"));
   const dialog = await screen.findByTestId("confirm-dialog");
-  expect(dialog).toHaveTextContent("Nicht gespeicherte Änderungen: Name ist leer. Verwerfen und weiter?");
+  expect(dialog).toHaveTextContent("Nicht gespeicherte Änderungen: Name ist leer oder zu lang. Verwerfen und weiter?");
   expect(screen.getByTestId("confirm-dialog-confirm")).toHaveTextContent("Verwerfen und weiter");
   await user.click(screen.getByTestId("confirm-dialog-cancel"));
   expect(screen.queryByTestId("own-profile-stub")).toBeNull();

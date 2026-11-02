@@ -167,3 +167,15 @@ async def test_team_awards_and_the_team_banner_are_for_the_leadership(flow):
     flow.act_as(leader)
     deleted = await flow.client.delete("/api/teams/tm1/awards/feature")
     assert deleted.json()["featured_award"] is None
+
+
+@pytest.mark.asyncio
+async def test_rebuilding_is_for_system_only_and_logged(flow):
+    """#2112: „Pokale nachtragen“ ist ein Wartungsgriff - nur der Bereich System, mit Protokoll."""
+    flow.act_as(await flow.add_user(role="tournament_admin", name="turnier"))
+    assert (await flow.post("/api/admin/awards/rebuild")).status_code == 403
+    flow.act_as(await flow.add_user(role="superadmin", name="system"))
+    response = await flow.post("/api/admin/awards/rebuild")
+    assert response.status_code == 200, response.text
+    log = await flow.db.audit_logs.find_one({"action": "awards.rebuild"}, {"_id": 0})
+    assert log["data"] == response.json()

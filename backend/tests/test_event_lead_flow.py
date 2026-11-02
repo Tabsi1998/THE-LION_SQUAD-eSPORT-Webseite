@@ -141,6 +141,64 @@ def test_door_rows_leave_out_notes_and_mail():
     assert "note" not in full and "internal_note" not in full
 
 
+@pytest.mark.asyncio
+async def test_internal_note_only_for_the_lead_and_not_in_the_log(flow):
+    """Interne Notiz (#2127, EV15): die Leitung trägt sie ein, die Person sieht sie nicht, im Protokoll steht kein Text."""
+    leitung, event, people = await setup_event(flow)
+    flow.act_as(leitung)
+    row = next(item for item in (await lead(flow, event, filter="all"))["registrations"] if item["display_name"] == "Max Mustermann")
+    assert row["has_note"] is False
+    saved = await flow.patch(f"/api/events/{event['id']}/registrations/{row['id']}", json={"internal_note": "zahlt an der Tür"})
+    assert saved.status_code == 200 and saved.json()["internal_note"] == "zahlt an der Tür"
+    view = await lead(flow, event, filter="all")
+    assert next(item for item in view["registrations"] if item["id"] == row["id"])["has_note"] is True
+    detail = (await flow.get(f"/api/events/{event['id']}/lead/registrations/{row['id']}")).json()
+    assert detail["internal_note"] == "zahlt an der Tür"
+    audit = await flow.db.audit_logs.find_one({"action": "event.registration.update", "data.registration_id": row["id"]}, {"_id": 0})
+    assert audit["data"]["updates"] == {"internal_note": "geändert"}
+
+    flow.act_as(people["max"])
+    assert (await flow.patch(f"/api/events/{event['id']}/registrations/{row['id']}", json={"internal_note": "selbst"})).status_code == 403
+    assert "internal_note" not in (await flow.get(f"/api/events/{event['slug']}")).json()["own_registration"]
+
+    flow.act_as(leitung)
+    cleared = await flow.patch(f"/api/events/{event['id']}/registrations/{row['id']}", json={"internal_note": None})
+    assert cleared.status_code == 200 and cleared.json()["internal_note"] is None
+
+
+# --------------------------------------------------------------------------- CSV (#2127, EV16)
+@pytest.mark.asyncio
+async def test_csv_only_needed_fields_no_formulas_with_log(flow):
+    leitung, event, people = await setup_event(flow)
+    # Ein Name, den eine Tabellenkalkulation sonst als Formel läse.
+    await flow.db.event_registrations.update_one({"user_id": people["max"]["id"]}, {"$set": {"display_name": "=HYPERLINK(1)"}})
+    flow.act_as(people["paula"])
+    assert (await flow.get(f"/api/events/{event['slug']}/lead/export.csv")).status_code == 403
+
+    flow.act_as(leitung)
+    response = await flow.get(f"/api/events/{event['slug']}/lead/export.csv")
+    assert response.status_code == 200 and response.headers["content-type"].startswith("text/csv")
+    assert response.headers["cache-control"] == "private, no-store"
+    assert f'filename="anmeldungen-{event["slug"]}.csv"' in response.headers["content-disposition"]
+    text = response.content.decode("utf-8-sig")
+    lines = text.strip().splitlines()
+    assert lines[0] == "Name;Status;Plätze;Begleitpersonen;Angemeldet am"
+    assert len(lines) == 4
+    paula = next(line for line in lines if line.startswith("Paula"))
+    assert paula.startswith("Paula Brünner;Angemeldet;2;1;")
+    assert "'=HYPERLINK(1)" in text
+    for secret in ("@lionsquad-test.at", "komme später", people["paula"]["id"]):
+        assert secret not in text
+
+    audit = await flow.db.audit_logs.find_one({"action": "event.registrations.export"}, {"_id": 0})
+    assert audit["actor_id"] == leitung["id"] and audit["data"] == {"filter": "all", "count": 3}
+
+    # Der Filter der Seite gilt auch hier; ein unbekannter wird abgelehnt.
+    only_here = await flow.get(f"/api/events/{event['slug']}/lead/export.csv", params={"filter": "here"})
+    assert len(only_here.content.decode("utf-8-sig").strip().splitlines()) == 1
+    assert (await flow.get(f"/api/events/{event['slug']}/lead/export.csv", params={"filter": "x"})).status_code == 400
+
+
 # --------------------------------------------------------------------------- Suche und Filter
 @pytest.mark.asyncio
 async def test_search_and_filter_not_yet_here(flow):

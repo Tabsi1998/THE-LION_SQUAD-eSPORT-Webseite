@@ -22,6 +22,7 @@ from services.profile_references import (
     _tournament_rank_for_user,
     _visible_tournament,
 )
+from services.team_history import team_by_id, teams_by_id
 from services.tournament_path import DONE, _outcome, _slots, path_kind, tournament_path
 
 RECORD_LIMIT = 5
@@ -65,7 +66,7 @@ async def path_for(db, owner: dict, tournament_ref: str, *, public: bool) -> dic
     steps = await tournament_path(db, tournament, {reg["id"] for reg in regs}, public=public)
     rank, participant_count = await _tournament_rank_for_user(tournament["id"], owner["id"], await _team_ids_for_user(owner["id"]))
     team_reg = next((reg for reg in regs if reg.get("team_id")), None)
-    team = await db.teams.find_one({"id": team_reg["team_id"]}, {"_id": 0, "name": 1, "is_public": 1}) if team_reg else None
+    team = await team_by_id(db, team_reg["team_id"], {"_id": 0, "id": 1, "name": 1, "is_public": 1}) if team_reg else None
     team_name = (team or {}).get("name") if team and not (public and team.get("is_public") is False) else None
     share = None
     if not public:
@@ -127,7 +128,7 @@ async def record_for(db, owner: dict, *, public: bool) -> list[dict]:
     team_ids = sorted(k[5:] for k in tally if k.startswith("team:"))
     users = {u["id"]: u for u in await db.users.find({"id": {"$in": user_ids}}, {"_id": 0, "id": 1, "username": 1, "display_name": 1, "privacy_public_profile": 1,
                                                                              "is_active": 1, "is_banned": 1}).to_list(len(user_ids) or 1)}
-    teams = {t["id"]: t for t in await db.teams.find({"id": {"$in": team_ids}}, {"_id": 0, "id": 1, "name": 1, "tag": 1, "is_public": 1}).to_list(len(team_ids) or 1)}
+    teams = await teams_by_id(db, team_ids, {"_id": 0, "id": 1, "name": 1, "tag": 1, "is_public": 1})
     out = []
     for key, row in tally.items():
         if row["games"] < RECORD_MIN_GAMES:
@@ -147,6 +148,6 @@ async def record_for(db, owner: dict, *, public: bool) -> list[dict]:
             if not team or (public and team.get("is_public") is False):
                 continue
             out.append({"key": key, "kind": "team", "name": team.get("name") or "Team", "tag": team.get("tag"),
-                        "team_id": team["id"] if team.get("is_public") is not False else None, **row})
+                        "team_id": team["id"] if team.get("is_public") is not False and not team.get("dissolved") else None, **row})
     out.sort(key=lambda r: (-r["games"], -r["wins"], r["name"].lower()))
     return out[:RECORD_LIMIT]

@@ -1,4 +1,5 @@
 """User profile + admin user management routes."""
+import logging
 import os
 import secrets
 import re
@@ -25,21 +26,44 @@ from services.notification_preferences import (
     public_preferences_payload,
 )
 from services.query_filters import safe_regex
+from services.usernames import any_case, can_be_a_username, username_taken
 from services.private_fields import private_projection, strip_private
 # Die leerbaren Profilfelder (#2118): ein Blatt-Modul - auch die Kontolöschung leitet ihre Liste daraus ab.
 from services.profile_fields import USER_NULLABLE_FIELDS
 from models import (
     AreasUpdate,
-    AdminProfileReset, AdminUserCreate, UserUpdate, RoleUpdate, UserSocialCreate, UserSocialUpdate,
+    AdminProfileReset, AdminUserCreate, DISPLAY_NAME_MAX, PREFERRED_ROLE_MAX, UserUpdate, RoleUpdate,
     now_utc, new_id,
 )
 
 router = APIRouter(prefix="/api/users", tags=["users"])
+logger = logging.getLogger(__name__)
+
+# Längengrenzen der Profiltexte (#2126), gleich in pages/user/profile/form.js.
+PROFILE_TEXT_LIMITS = {"display_name": ("Anzeigename", DISPLAY_NAME_MAX), "bio": ("Bio", 1000), "preferred_role": ("Bevorzugte Rolle", PREFERRED_ROLE_MAX)}
 
 
 def _clean(u: dict) -> dict:
     """Private Kontofelder stehen zentral in services/private_fields.py (#1492)."""
     return strip_private(u)
+
+
+def _check_profile_texts(updates: dict, stored: dict) -> None:
+    """Prüft nur, was sich ändert (#2126): alte längere Werte oder ein alter leerer Name lassen sich weiter mitspeichern -
+    Web und App schicken beim Speichern auch andere Felder, und ein Konto soll daran nicht hängen bleiben."""
+    if "display_name" in updates:
+        name = (updates["display_name"] or "").strip()
+        if not name and (stored.get("display_name") or "").strip():
+            raise HTTPException(422, "Bitte gib einen Anzeigenamen ein – so heißt du überall.")
+        if updates["display_name"] != stored.get("display_name"):
+            updates["display_name"] = name or stored.get("display_name")
+    for field, (label, limit) in PROFILE_TEXT_LIMITS.items():
+        value = updates.get(field)
+        if not isinstance(value, str) or value == stored.get(field):
+            continue
+        updates[field] = value.strip()
+        if len(updates[field]) > limit:
+            raise HTTPException(422, f"{label}: höchstens {limit} Zeichen.")
 
 
 # Level (#617): eine Kurve für alles in services/levels.py, der Stand je Person in services/xp.py.
@@ -51,6 +75,7 @@ def _visibility_aliases(key: str) -> list[str]:
         "twitch": "twitch_handle",
         "youtube": "youtube_handle",
         "instagram": "instagram_handle",
+        "tiktok": "tiktok_handle",
         "x": "x_handle",
         "steam": "steam_id",
         "epic": "epic_id",
@@ -83,6 +108,8 @@ def _visibility_aliases(key: str) -> list[str]:
     aliases = [key, source_key]
     if key == "birth_date":
         aliases += ["birthdate", "birthday"]
+    if key == "main_platform":
+        aliases.append("main_platforms")   # die Stufe „Plattformen“ gilt auch für das alte Einzelfeld (#2126)
     return list(dict.fromkeys(aliases))
 
 
@@ -101,6 +128,12 @@ async def _viewer_context(db, viewer: dict | None, target_id: str) -> dict:
     return {"self": viewer.get("id") == target_id, "logged_in": True, "member": member or admin, "admin": admin}
 
 
+# Felder, die ohne gewählte Stufe nicht öffentlich sind (#2113, #2126): TikTok und die bevorzugte Rolle ließen sich pflegen,
+# erschienen aber nie im Profil und hatten keine Stufe - wer sie eingetragen hat, wurde nie gefragt. Gleich in
+# pages/user/profile/visibility.js.
+FIELD_DEFAULT_LEVELS = {"tiktok": "private", "preferred_role": "private"}
+
+
 def _field_visible(user: dict, key: str, profile_public: bool, ctx: dict | None = None) -> bool:
     """Die Stufe eines Felds gegen den Betrachter: public → alle, community → eingeloggt, members →
     Vereinsmitglieder und Admin-Team, admins → Admin-Team, private → nur die Person selbst."""
@@ -112,7 +145,7 @@ def _field_visible(user: dict, key: str, profile_public: bool, ctx: dict | None 
     if ctx.get("self"):
         return True
     visibility_map = user.get("profile_visibility") or {}
-    visibility = next((visibility_map[a] for a in _visibility_aliases(key) if a in visibility_map), "public")
+    visibility = next((visibility_map[a] for a in _visibility_aliases(key) if a in visibility_map), FIELD_DEFAULT_LEVELS.get(key, "public"))
     if visibility == "public":
         return True
     if visibility == "community":
@@ -132,6 +165,7 @@ def _visible_field(user: dict, key: str, profile_public: bool, ctx: dict | None 
         "twitch": "twitch_handle",
         "youtube": "youtube_handle",
         "instagram": "instagram_handle",
+        "tiktok": "tiktok_handle",
         "x": "x_handle",
         "steam": "steam_id",
         "epic": "epic_id",
@@ -276,6 +310,10 @@ async def _send_user_invite(user: dict, actor: dict) -> dict:
     return {"invite_url": invite_url, "invite_email": result}
 
 
+# So viele Konten zeigt die Liste; die Seiten sagen dazu, wenn es mehr sein können (lib/membersList.js).
+USERS_LIST_LIMIT = 500
+
+
 @router.get("")
 async def list_users(q: str | None = None, role: str | None = None,
                      user_type: str | None = None,
@@ -289,11 +327,15 @@ async def list_users(q: str | None = None, role: str | None = None,
             {"email": {"$regex": pattern, "$options": "i"}},
             {"display_name": {"$regex": pattern, "$options": "i"}},
         ]
+        # Die Mitgliedsnummer steht an der Mitgliedschaft (#2125).
+        numbered = await db.memberships.find({"member_number": {"$regex": pattern, "$options": "i"}}, {"_id": 0, "user_id": 1}).to_list(USERS_LIST_LIMIT)
+        if numbered:
+            query["$or"].append({"id": {"$in": [row["user_id"] for row in numbered]}})
     if role:
         query["role"] = role
     if user_type:
         query["user_type"] = user_type
-    users = await db.users.find(query, private_projection()).to_list(500)
+    users = await db.users.find(query, private_projection()).to_list(USERS_LIST_LIMIT)
     # Bulk fetch memberships
     user_ids = [u["id"] for u in users]
     members = {
@@ -400,8 +442,8 @@ async def admin_create_user(body: AdminUserCreate, me: dict = Depends(require_su
         raise HTTPException(422, "Administrativ angelegte Konten müssen per E-Mail eingeladen werden, damit die Person selbst Passwort und Einwilligungen festlegt.")
     username = body.username.strip()
     email = str(body.email).lower().strip()
-    if await db.users.find_one({"$or": [{"username": username}, {"email": email}]}, {"_id": 0, "id": 1}):
-        raise HTTPException(status_code=409, detail="Username oder E-Mail bereits vergeben")
+    if await username_taken(db, username) or await db.users.find_one({"email": email}, {"_id": 0, "id": 1}):
+        raise HTTPException(status_code=409, detail="Benutzername oder E-Mail bereits vergeben")
     user_id = new_id()
     password_setup_required = True
     doc = {
@@ -572,10 +614,15 @@ async def list_public_users(
     return out
 
 
-@router.get("/public/{username}")
+# `:path`, weil ältere Benutzernamen einen Schrägstrich enthalten können (#2126) - ihr Profil bleibt so erreichbar.
+@router.get("/public/{username:path}")
 async def get_public_profile(username: str, view_as: str | None = None, viewer: dict | None = Depends(get_optional_user)):
+    if not can_be_a_username(username):
+        raise HTTPException(status_code=404, detail="Spieler nicht gefunden")
     db = get_db()
-    u = await db.users.find_one({"username": username}, private_projection("email"))
+    # Exakt zuerst, dann jede Schreibweise (#2126): auch bei alten Doppelten („Max“, „max“) bleibt jedes Profil erreichbar.
+    u = await db.users.find_one({"username": username}, private_projection("email")) \
+        or await db.users.find_one(any_case(username), private_projection("email"), sort=[("created_at", 1)])
     if not u or u.get("is_active") is False or u.get("is_banned") is True:
         raise HTTPException(status_code=404, detail="Spieler nicht gefunden")
     # „So sehen dich andere“ (#1149): das eigene Profil so, wie es jemand ohne Anmeldung sieht - nur was die
@@ -607,7 +654,8 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
         "username": u["username"], "display_name": u.get("display_name"),
         "avatar_url": u.get("avatar_url"), "banner_url": u.get("banner_url"),
         "bio": u.get("bio") if public else None,
-        "role": u.get("role"), "created_at": u.get("created_at"),
+        # Keine Systemrolle (#2126): sie sagt Fremden, wer welche Rechte hat - die Verwaltung sieht sie unter „Alle Benutzer“.
+        "created_at": u.get("created_at"),
         "birth_date": _visible_field(u, "birth_date", public, ctx),
         "country": _visible_field(u, "country", public, ctx),
         "city": _visible_field(u, "city", public, ctx),
@@ -615,6 +663,7 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
         "twitch_handle": _visible_field(u, "twitch", public, ctx),
         "youtube_handle": _visible_field(u, "youtube", public, ctx),
         "instagram_handle": _visible_field(u, "instagram", public, ctx),
+        "tiktok_handle": _visible_field(u, "tiktok", public, ctx),
         "x_handle": _visible_field(u, "x", public, ctx),
         "steam_id": _visible_field(u, "steam", public, ctx),
         "epic_id": _visible_field(u, "epic", public, ctx),
@@ -646,6 +695,7 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
         "main_platform": _visible_field(u, "main_platform", public, ctx),
         "main_platforms": (u.get("main_platforms") or []) if _field_visible(u, "main_platforms", public, ctx) else [],
         "input_devices": (u.get("input_devices") or []) if _field_visible(u, "input_devices", public, ctx) else [],
+        "preferred_role": _visible_field(u, "preferred_role", public, ctx),
         "gaming_subscriptions": _visible_field(u, "gaming_subscriptions", public, ctx),
         "favorite_games": (u.get("favorite_games") or []) if _field_visible(u, "favorite_games", public, ctx) else [],
         "website": _visible_field(u, "website", public, ctx),
@@ -667,11 +717,6 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
         from services.friend_service import relationship_status
         base["relationship"] = await relationship_status(db, viewer.get("id"), u["id"])
         base["can_message"] = viewer.get("id") != u["id"]
-    # Public socials (separately stored UserSocial entries with visibility=public)
-    socials = await db.user_socials.find(
-        {"user_id": u["id"], "visibility": "public"},
-        {"_id": 0, "platform": 1, "value": 1, "url": 1},
-    ).to_list(50)
     # Achievements v4 (group-aware) — flat list of awarded tiers
     user_id = u["id"]
     # „Erfolge öffentlich“ aus (#619, #2118): Fremde sehen keine Erfolge und keine Zahl - die Person selbst und das
@@ -744,7 +789,8 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
         visible_reg_ids = []
         for r in regs:
             t = t_map.get(r["tournament_id"])
-            if not t:
+            # Eine Ablehnung ist keine Teilnahme (#2113) - und bliebe sonst stehen, nachdem die Person sie weggenommen hat.
+            if not t or r.get("status") == "rejected":
                 continue
             visible_reg_ids.append(r["id"])
             final_pos = r.get("final_position")
@@ -811,8 +857,9 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
         team_ids = [tm["team_id"] for tm in await db.team_members.find(
             {"user_id": user_id}, {"_id": 0}).to_list(50)]
         teams = await db.teams.find(
-            {"$or": [{"id": {"$in": team_ids}}, {"member_ids": user_id}]},
-            {"_id": 0},
+            {"$or": [{"id": {"$in": team_ids}}, {"member_ids": user_id}], "is_public": {"$ne": False}},
+            # Nur was die Team-Kachel zeigt (#2126): der Rest des Team-Eintrags gehört auf die Teamseite.
+            {"_id": 0, "id": 1, "name": 1, "tag": 1, "logo_url": 1, "description": 1},
         ).to_list(50)
     return {
         **base,
@@ -826,7 +873,6 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
         "references": references,
         "awards": awards,
         "featured_award": next((award for award in awards if award["id"] == u.get("featured_award_id")), None),
-        "socials": socials,
     }
 
 
@@ -860,9 +906,10 @@ async def update_me(
     db = get_db()
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in USER_NULLABLE_FIELDS}
-    # Wortfilter (#417): Bio und Anzeigename werden vor dem Speichern geprüft.
+    _check_profile_texts(updates, me)
+    # Wortfilter (#417): Bio, Anzeigename und bevorzugte Rolle werden vor dem Speichern geprüft.
     from services import word_filter
-    for field in ("bio", "display_name"):
+    for field in ("bio", "display_name", "preferred_role"):
         if updates.get(field):
             await word_filter.screen_field(db, updates[field], kind=field, user_id=me["id"], ref_id=me["id"])
     updates = _normalize_social_updates(updates)
@@ -937,52 +984,6 @@ async def get_my_notification_preferences(me: dict = Depends(get_current_user)):
     return payload
 
 
-# ---------- User socials ----------
-@router.get("/me/socials")
-async def list_my_socials(me: dict = Depends(get_current_user)):
-    db = get_db()
-    rows = await db.user_socials.find({"user_id": me["id"]}, {"_id": 0}).to_list(50)
-    return rows
-
-
-@router.post("/me/socials")
-async def add_my_social(body: UserSocialCreate, me: dict = Depends(get_current_user)):
-    db = get_db()
-    existing = await db.user_socials.find_one({"user_id": me["id"], "platform": body.platform})
-    if existing:
-        raise HTTPException(409, "Plattform bereits verknüpft.")
-    doc = {
-        "id": new_id(), "user_id": me["id"],
-        **body.model_dump(),
-        "created_at": now_utc().isoformat(),
-        "updated_at": now_utc().isoformat(),
-    }
-    await db.user_socials.insert_one(doc)
-    doc.pop("_id", None)
-    return doc
-
-
-@router.put("/me/socials/{social_id}")
-@router.patch("/me/socials/{social_id}")
-async def update_my_social(social_id: str, body: UserSocialUpdate, me: dict = Depends(get_current_user)):
-    db = get_db()
-    update = body.model_dump(exclude_unset=True)
-    update["updated_at"] = now_utc().isoformat()
-    res = await db.user_socials.update_one({"id": social_id, "user_id": me["id"]}, {"$set": update})
-    if res.matched_count == 0:
-        raise HTTPException(404, "Eintrag nicht gefunden.")
-    return await db.user_socials.find_one({"id": social_id}, {"_id": 0})
-
-
-@router.delete("/me/socials/{social_id}")
-async def delete_my_social(social_id: str, me: dict = Depends(get_current_user)):
-    db = get_db()
-    res = await db.user_socials.delete_one({"id": social_id, "user_id": me["id"]})
-    if res.deleted_count == 0:
-        raise HTTPException(404, "Eintrag nicht gefunden.")
-    return {"ok": True}
-
-
 @router.put("/{user_id}")
 @router.patch("/{user_id}")
 async def admin_update_user(user_id: str, body: AdminProfileReset,
@@ -992,6 +993,9 @@ async def admin_update_user(user_id: str, body: AdminProfileReset,
     Superadmin-Konten fasst nur ein Superadmin an."""
     db = get_db()
     fields = sorted(set(body.reset))
+    # Das eigene Profil ändert man im eigenen Profil (#2112) - hier nur fremde Konten.
+    if user_id == me.get("id"):
+        raise HTTPException(status_code=403, detail="Das eigene Profil änderst du unter „Einstellungen“, nicht hier.")
     target = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "role": 1})
     if not target:
         raise HTTPException(status_code=404, detail="Nutzer nicht gefunden")
@@ -1005,8 +1009,23 @@ async def admin_update_user(user_id: str, body: AdminProfileReset,
         "data": {"fields": fields, "reason": body.reason},
         "created_at": now,
     })
+    # Die Person erfährt es (#2112): was zurückgesetzt wurde und warum - in der Glocke, nicht abbestellbar per Thema.
+    from services.user_notifications import create_user_notification
+
+    labels = ", ".join(PROFILE_RESET_LABELS[field] for field in fields)
+    try:
+        await create_user_notification(
+            user_id, title="Dein Profil wurde angepasst",
+            body=f"Die Vereinsverwaltung hat zurückgesetzt: {labels}. Grund: {body.reason}",
+            url="/profile", kind="moderation", meta={"fields": fields},
+        )
+    except Exception:  # noqa: BLE001 - die Meldung darf das Zurücksetzen nicht aufhalten
+        logger.exception("Benachrichtigung zum Profil-Zurücksetzen fehlgeschlagen")
     u = await db.users.find_one({"id": user_id}, private_projection())
     return u
+
+
+PROFILE_RESET_LABELS = {"display_name": "Anzeigename", "bio": "Bio", "avatar_url": "Profilbild", "banner_url": "Banner"}
 
 
 BAN_REASON_MIN_LENGTH = 5
@@ -1079,14 +1098,34 @@ async def unban_user(user_id: str, body: BanBody | None = None, me: dict = Depen
 @router.put("/{user_id}/role")
 @router.post("/{user_id}/role")
 async def set_role(user_id: str, body: RoleUpdate, me: dict = Depends(require_super())):
+    from services.permissions import LAST_SUPERADMIN_DETAIL, ROLE_LABELS, usable_superadmins
+    from services.rights_notices import areas_snapshot, tell_rights_change
+
     db = get_db()
+    target = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "role": 1})
+    if not target:
+        raise HTTPException(status_code=404, detail="Nutzer nicht gefunden")
+    previous = target.get("role") or "player"
+    if previous == body.role:
+        return await db.users.find_one({"id": user_id}, private_projection())
+    if previous == "superadmin" and not await usable_superadmins(db, without=user_id):
+        raise HTTPException(status_code=409, detail=LAST_SUPERADMIN_DETAIL)
+    before = await areas_snapshot(db, [user_id])
     await db.users.update_one(
         {"id": user_id},
         {"$set": {"role": body.role, "roles": [body.role], "updated_at": now_utc().isoformat()}},
     )
+    # Zwei stufen sich gleichzeitig gegenseitig herab: beide sehen danach keinen mehr und nehmen es zurück.
+    if previous == "superadmin" and not await usable_superadmins(db):
+        await db.users.update_one({"id": user_id}, {"$set": {"role": previous, "roles": [previous], "updated_at": now_utc().isoformat()}})
+        raise HTTPException(status_code=409, detail=LAST_SUPERADMIN_DETAIL)
     await db.audit_logs.insert_one({"id": new_id(), "action": "user.role_change", "target_id": user_id,
-                                     "actor_id": me["id"], "data": {"role": body.role},
+                                     "actor_id": me["id"], "data": {"role": body.role, "from": previous},
                                      "created_at": now_utc().isoformat()})
+    if user_id != me["id"]:
+        after = await areas_snapshot(db, [user_id])
+        await tell_rights_change(db, user_id, f"Deine Rolle ist jetzt „{ROLE_LABELS.get(body.role, body.role)}“.",
+                                 before.get(user_id, set()), after.get(user_id, set()))
     u = await db.users.find_one({"id": user_id}, private_projection())
     return u
 
@@ -1095,6 +1134,7 @@ async def set_role(user_id: str, body: RoleUpdate, me: dict = Depends(require_su
 async def set_areas(user_id: str, body: AreasUpdate, me: dict = Depends(require_super())):
     """Freigaben je Bereich (#287): nur Turnierleitung, Redaktion, Vereinsverwaltung; System bleibt an der Rolle."""
     from services.permissions import GRANTABLE_AREAS, clean_grants
+    from services.rights_notices import areas_snapshot, tell_rights_change
 
     unknown = [a for a in body.areas if a not in GRANTABLE_AREAS]
     if unknown:
@@ -1104,12 +1144,50 @@ async def set_areas(user_id: str, body: AreasUpdate, me: dict = Depends(require_
     target = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "areas": 1})
     if not target:
         raise HTTPException(status_code=404, detail="Nutzer nicht gefunden")
+    before = await areas_snapshot(db, [user_id])
     await db.users.update_one({"id": user_id}, {"$set": {"areas": areas, "updated_at": now_utc().isoformat()}})
     await db.audit_logs.insert_one({"id": new_id(), "action": "user.areas_change", "target_id": user_id,
                                      "actor_id": me["id"], "data": {"areas": areas, "from": target.get("areas") or []},
                                      "created_at": now_utc().isoformat()})
+    if user_id != me["id"]:
+        after = await areas_snapshot(db, [user_id])
+        await tell_rights_change(db, user_id, "", before.get(user_id, set()), after.get(user_id, set()))
     u = await db.users.find_one({"id": user_id}, private_projection())
     return u
+
+
+RIGHTS_HISTORY_LIMIT = 100
+
+
+@router.get("/{user_id}/rights-history")
+async def rights_history(user_id: str, me: dict = Depends(require_area("club"))):
+    """Rechte-Verlauf einer Person (#2125): Rollen, Freigaben, Vorstandsposten - fürs Blatt unter „Alle Benutzer“, auch ohne
+    Bereich System. Nur diese Einträge und nur diese Felder, kein Griff ins ganze Protokoll."""
+    db = get_db()
+    if not await db.users.find_one({"id": user_id}, {"_id": 1}):
+        raise HTTPException(status_code=404, detail="Nutzer nicht gefunden")
+    # Ein Posten zeigt auf das Konto oder auf das Mitgliederprofil dahinter.
+    refs = [user_id, *[row["id"] async for row in db.club_member_profiles.find({"user_id": user_id}, {"_id": 0, "id": 1})]]
+    rows = await db.audit_logs.find({"$or": [
+        {"action": {"$in": ["user.role_change", "user.areas_change"]}, "target_id": user_id},
+        {"action": "board.assign", "$or": [{"data.from": {"$in": refs}}, {"data.to": {"$in": refs}}]},
+        {"action": {"$in": ["board.status", "board.delete"]}, "data.holders": {"$in": refs}},
+    ]}, {"_id": 0, "id": 1, "action": 1, "actor_id": 1, "data": 1, "created_at": 1}).sort("created_at", -1).to_list(RIGHTS_HISTORY_LIMIT)
+    actors = {row["id"]: row.get("display_name") or row.get("username") async for row in db.users.find(
+        {"id": {"$in": sorted({row["actor_id"] for row in rows if row.get("actor_id")})}}, {"_id": 0, "id": 1, "display_name": 1, "username": 1})}
+    items = []
+    for row in rows:
+        data = row.get("data") or {}
+        item = {"id": row.get("id"), "action": row.get("action"), "at": row.get("created_at"), "actor": actors.get(row.get("actor_id"))}
+        if row["action"] == "user.role_change":
+            item.update({"to": data.get("role"), "from": data.get("from")})
+        elif row["action"] == "user.areas_change":
+            item.update({"to": data.get("areas") or [], "from": data.get("from") or []})
+        else:
+            item.update({"title": data.get("title") or data.get("position"), "field": data.get("field"), "active": data.get("active"),
+                         "joined": data.get("to") in refs if row["action"] == "board.assign" else None})
+        items.append(item)
+    return {"items": items}
 
 
 @router.delete("/{user_id}")

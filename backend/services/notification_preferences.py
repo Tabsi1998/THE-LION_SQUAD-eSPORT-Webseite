@@ -43,7 +43,7 @@ OPTIONAL_EMAIL_PREFERENCES = {
     },
     "membership_updates": {
         "label": "Vereinsmitgliedschaft",
-        "description": "Bewerbung, Mitgliedsstatus und Vereinsvorteile.",
+        "description": "Einladungen zum Antrag, Nummern und Vereinsvorteile. Entscheidungen über deine Mitgliedschaft bekommst du immer per Mail.",
         "default": True,
     },
     "birthday_greetings": {
@@ -124,6 +124,7 @@ TEMPLATE_CATEGORY = {
     "checkin_closes_soon_on_site": "tournament_updates",
     "tournament_finished": "tournament_updates",
     "event_message": "tournament_updates",
+    "event_registration": "tournament_updates",
     "event_cancelled": "tournament_updates",
     "tournament_cancelled": "tournament_updates",
     "match_reminder": "match_reminders",
@@ -156,7 +157,7 @@ NOTIFICATION_KIND_CATEGORY = {
     # Aufruf beim Reservieren der Station (#1137): „Du bist dran“.
     "match_call": "match_reminders",
     "match_result": "match_reminders",
-    # Team am Spieltag (#1192): „Bist du schon da?“ vom Kapitän - wie eine Spiel-Erinnerung.
+    # Team am Spieltag (#1192): „Bist du schon da?“ von der Teamleitung - wie eine Spiel-Erinnerung.
     "team_presence_nudge": "match_reminders",
     # Ergebnis melden (#1132): „bitte bestätigen“ an die Gegenseite; Streitfälle für die Turnierleitung.
     "match_report": "match_reminders",
@@ -172,6 +173,8 @@ NOTIFICATION_KIND_CATEGORY = {
     "tournament_finished": "tournament_updates",
     # Absage (#2120): „Turnier abgesagt“ an alle, die noch mitspielen wollten.
     "tournament_cancelled": "tournament_updates",
+    # Helfer-Einsatz (#2111, TA25): „Du hilfst bei diesem Turnier als …“.
+    "tournament_staff": "tournament_updates",
     "match_chat_message": "community_messages",
     "match_chat_mention": "community_messages",
     "tournament_checkin": "tournament_updates",
@@ -186,8 +189,15 @@ NOTIFICATION_KIND_CATEGORY = {
     "friend_accept": "community_messages",
     "team_invite": "community_messages",
     "team_invite_accepted": "community_messages",
+    "team_invite_declined": "community_messages",
     "team_role_changed": "community_messages",
     "team_leader_transferred": "community_messages",
+    # Wer kommt und geht, und was mit dem Team passiert (#2128, TM5, TM8, TM10).
+    "team_member_removed": "community_messages",
+    "team_member_left": "community_messages",
+    "team_dissolved": "community_messages",
+    "team_restored": "community_messages",
+    "team_join_code_renewed": "community_messages",
     "f1_prize": "prize_updates",
     "f1_prize_reminder": "prize_updates",
     "prize_pending": "prize_updates",
@@ -212,6 +222,8 @@ NOTIFICATION_KIND_CATEGORY = {
     "event_board": "club_internal",
     # Nachricht an alle Angemeldeten eines Events (#1372) - wie andere Event-Hinweise unter Turnier-Updates.
     "event_message": "tournament_updates",
+    # Die eigene Event-Anmeldung (#2127): angemeldet, Warteliste, nachgerückt, von der Leitung storniert.
+    "event_registration": "tournament_updates",
     # Fotos vom Event (#1185): „Die Fotos sind da“ an die Teilnehmer - wie „Wie war …?“ unter Turnier-Updates,
     # Mitglieder-Alben unter „Vereinsintern“.
     "gallery_event": "tournament_updates",
@@ -228,7 +240,8 @@ NOTIFICATION_KIND_CATEGORY = {
 }
 
 
-REQUIRED_NOTIFICATION_KINDS: set[str] = set()
+# Rechte und Entscheidungen über die Mitgliedschaft (#2125): die Person muss es erfahren - kein Thema zum Abbestellen.
+REQUIRED_NOTIFICATION_KINDS: set[str] = {"rights_change", "membership_decision"}
 
 
 REQUIRED_EMAIL_TEMPLATES = {
@@ -236,6 +249,12 @@ REQUIRED_EMAIL_TEMPLATES = {
     "password_reset",
     "user_invite",
     "account_banned",  # Konto gesperrt mit Grund (#1357) - nicht abbestellbar
+    # Entscheidungen über die eigene Mitgliedschaft (#2125) - nicht abbestellbar.
+    "membership_approve",
+    "membership_reject",
+    "membership_activated",
+    "membership_deactivated",
+    "membership_blocked",
     "test",
 }
 

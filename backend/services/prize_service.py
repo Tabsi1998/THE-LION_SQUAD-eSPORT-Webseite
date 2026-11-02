@@ -95,12 +95,13 @@ async def auto_create_for_tournament(tid: str) -> int:
             if not (uid or team_id):
                 continue
             wanted.add((place, uid, team_id))
-            # idempotent
+            # idempotent - ein von Hand angelegter Gewinn (#2112, ``source: manual``) zählt nicht als dieser Strukturpreis
             existing = await db.prize_pickups.find_one({
                 "tournament_id": tid,
                 "place": place,
                 "user_id": uid,
                 "team_id": team_id,
+                "source": {"$ne": "manual"},
             })
             if existing:
                 continue
@@ -167,7 +168,7 @@ async def _review_tournament_prizes(db, tid: str, wanted: set[tuple], groups: se
 
 async def prize_recipient_ids(db, pickup: dict) -> list[str]:
     """Wer zu einem Gewinn Nachricht bekommt (#2123, ER3): die Person - bei einem Team-Gewinn ohne Person die
-    Teamleitung (Kapitän)."""
+    Teamleitung."""
     if pickup.get("user_id"):
         return [pickup["user_id"]]
     if not pickup.get("team_id"):

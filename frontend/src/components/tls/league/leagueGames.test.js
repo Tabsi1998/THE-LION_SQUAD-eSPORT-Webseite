@@ -23,6 +23,13 @@ test("Modus je Position aus der Reihenfolge, Maps aus dem Pool", () => {
   expect(modeFor(1, { ...LEAGUE, mode_order: [] })).toBe("");
 });
 
+// #2129: Gilt die Reihenfolge nicht mehr, liefert der Server sie leer - Formular und Prüfung lesen denselben Wert.
+test("ohne geltende Reihenfolge kommt der Modus aus dem Pool, jede Map auch als zweite", () => {
+  const onlyStellung = { ...LEAGUE, mode_order: [], pool: { id: "neu", modes: [LEAGUE.pool.modes[0]] } };
+  expect([1, 2].map((position) => modeFor(position, onlyStellung))).toEqual(["stellung", "stellung"]);
+  expect(mapsFor(onlyStellung.pool, modeFor(2, onlyStellung)).map((item) => item.map_id)).toEqual(["hafen", "nebel"]);
+});
+
 test("die nächste Map kommt mit dem Sieger der letzten - bis die Serie entschieden ist", () => {
   let games = startGames(LEAGUE);
   expect(games).toHaveLength(1);

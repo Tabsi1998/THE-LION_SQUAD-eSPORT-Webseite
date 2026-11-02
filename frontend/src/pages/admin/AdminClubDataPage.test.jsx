@@ -19,6 +19,8 @@ vi.mock("@/components/tls/AdminLayout", () => ({
   AdminLayout: ({ children }) => <div data-testid="admin-layout">{children}</div>,
 }));
 vi.mock("sonner", () => ({ toast: toastMock }));
+const authMock = { areas: ["system", "club"] };
+vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ can: (...wanted) => wanted.some((area) => authMock.areas.includes(area)) }) }));
 
 const AdminClubDataPage = (await import("./AdminClubDataPage")).default;
 
@@ -33,7 +35,7 @@ function mockApi(branding = { club_name: "THE LION SQUAD" }) {
   apiMock.get.mockImplementation((url) => {
     const path = String(url);
     if (path.startsWith("/admin/dolibarr/public")) return Promise.resolve({ data: DOLIBARR_PUBLIC });
-    if (path.startsWith("/settings/branding")) return Promise.resolve({ data: branding });
+    if (path.startsWith("/settings/branding") || path.startsWith("/settings/club-data")) return Promise.resolve({ data: branding });
     if (path.startsWith("/settings/public")) return Promise.resolve({ data: {} });
     return Promise.resolve({ data: [] });
   });
@@ -50,6 +52,25 @@ function renderPage() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  authMock.areas = ["system", "club"];
+});
+
+// Vorstand ohne System (#2125): Stammdaten über den schmalen Weg, Rechtstexte nur zum Lesen.
+test("der Vorstand pflegt Stammdaten und liest Rechtstexte", async () => {
+  authMock.areas = ["club"];
+  mockApi({ legal_name: "Verein", terms_of_use: "Bedingungen" });
+  renderPage();
+  const name = await screen.findByTestId("legal-name");
+  await waitFor(() => expect(name).toHaveValue("Verein"));
+  expect(apiMock.get).toHaveBeenCalledWith("/settings/club-data");
+  expect(apiMock.get).not.toHaveBeenCalledWith("/settings/branding");
+  expect(screen.getByTestId("terms-of-use")).toBeDisabled();
+  expect(screen.getByTestId("terms-of-use")).toHaveValue("Bedingungen");
+  expect(screen.getByTestId("legal-hosting")).toBeDisabled();
+  expect(screen.getByTestId("legal-paid-tournaments")).toBeDisabled();
+  await userEvent.type(screen.getByTestId("legal-phone"), "0512");
+  await userEvent.click(screen.getByTestId("legal-save"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/settings/club-data", { phone: "0512" }));
 });
 
 test("die Seite heißt Vereinsdaten und lädt die Felder aus dem Branding", async () => {

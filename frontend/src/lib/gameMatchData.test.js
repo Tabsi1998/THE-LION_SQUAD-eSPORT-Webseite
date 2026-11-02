@@ -4,9 +4,64 @@ import {
   gameMatchDataPayload,
   gameMatchDataToForm,
   gamePresets,
+  gameSavedText,
+  modeKey,
+  modeRemovalQuestion,
   parsePointsTable,
+  removedModes,
 } from "./gameMatchData";
 import { durationSourceText } from "./matchDuration";
+
+// Modus entfernen (#2129, SP2): erkennt, was wirklich verschwindet, und fragt mit Zahlen.
+describe("Modus entfernen", () => {
+  const BEFORE = [{ mode: "stellung", label: "Hardpoint" }, { mode: "snd", label: "Suchen & Zerstören" }];
+
+  it("rechnet die Kennung wie der Server", () => {
+    expect(modeKey("Grand Prix (4 Rennen)")).toBe("grand_prix_4_rennen");
+    expect(modeKey("Suchen & Zerstören")).toBe("suchen_zerstoren");
+  });
+
+  it("erkennt nur, was wirklich verschwindet", () => {
+    const kept = { match_modes: [{ mode: "stellung", label: "Neuer Name" }, { mode: "snd", label: "Suchen" }] };
+    expect(removedModes(BEFORE, kept)).toEqual([]);
+    expect(removedModes(BEFORE, { match_modes: [{ mode: "snd", label: "Suchen" }] }).map((mode) => mode.mode)).toEqual(["stellung"]);
+    expect(removedModes(BEFORE, { match_modes: [] })).toHaveLength(2);
+    // Zeile gelöscht und unter demselben Namen neu angelegt: gleiche Kennung, nichts entfernt.
+    expect(removedModes([{ mode: "snd", label: "Suchen" }], { match_modes: [{ label: "SND" }] })).toEqual([]);
+    expect(removedModes(undefined, { match_modes: [{ label: "Neu" }] })).toEqual([]);
+  });
+
+  it("fragt mit der Zahl der Maps und sagt, was bleibt", () => {
+    const usage = { modes: { stellung: { maps: 12, pools: 2, seasons: 1 } } };
+    const question = modeRemovalQuestion([BEFORE[0]], usage);
+    expect(question.title).toBe("Modus „Hardpoint“ entfernen?");
+    expect(question.description).toContain("12 Maps verlieren diesen Modus");
+    expect(question.description).toContain("2 gespeicherte Map-Pools und 1 Season nutzen ihn weiter");
+    expect(modeRemovalQuestion([BEFORE[0]], { modes: { stellung: { maps: 1, pools: 0, seasons: 0 } } }).description).toContain("1 Map verliert diesen Modus und steht");
+    expect(modeRemovalQuestion(BEFORE, { modes: { stellung: { maps: 1 }, snd: { maps: 2 } } }).title).toBe("2 Modi entfernen?");
+  });
+
+  it("ohne Betroffene keine Frage, ohne Zählung trotzdem eine", () => {
+    expect(modeRemovalQuestion([BEFORE[0]], { modes: { stellung: { maps: 0, pools: 0, seasons: 0 } } })).toBeNull();
+    expect(modeRemovalQuestion([], { modes: {} })).toBeNull();
+    expect(modeRemovalQuestion([BEFORE[0]], null).description).toContain("Die Maps verlieren diesen Modus");
+  });
+
+  it("nennt Turniere und Phasen mit diesem Modus und sagt, dass ein neuer Modus die Maps nicht zurückbringt", () => {
+    const usage = { modes: { stellung: { maps: 2, pools: 0, seasons: 0, tournaments: 2, stages: 1 } } };
+    const { description } = modeRemovalQuestion([BEFORE[0]], usage);
+    expect(description).toContain("Wird er wieder angelegt, haben die Maps ihn nicht mehr.");
+    expect(description).toContain("2 Turniere und 1 Phase planen mit diesem Modus und nehmen danach den ersten Modus des Spiels.");
+    const onlyOne = modeRemovalQuestion([BEFORE[0]], { modes: { stellung: { maps: 0, pools: 0, seasons: 0, tournaments: 1, stages: 0 } } });
+    expect(onlyOne.description).toContain("1 Turnier plant mit diesem Modus und nimmt danach");
+    expect(onlyOne.description).not.toContain("wieder angelegt");
+  });
+
+  it("die Meldung nach dem Speichern nennt Bereinigte und Maps ohne Modus", () => {
+    expect(gameSavedText({})).toBe("Spiel gespeichert.");
+    expect(gameSavedText({ maps_cleaned: 2, maps_without_mode: 1 })).toBe("Spiel gespeichert. Modus aus 2 Maps entfernt. 1 Map hat noch keinen Modus – ordne sie unter Maps zu.");
+  });
+});
 
 // Spiel-Daten (#1554): Formular ↔ API und die Vorbelegung im Turnierformular.
 

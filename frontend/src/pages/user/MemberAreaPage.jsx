@@ -354,7 +354,7 @@ function AreaHead({ user, me, discordUrl }) {
         {since || membership.internal_role ? (
           <p className="mt-2 text-sm text-white/70 flex flex-wrap gap-x-4 gap-y-1">
             {since ? <span data-testid="member-area-since">Mitglied seit <strong className="text-white">{since}</strong></span> : null}
-            {membership.internal_role ? <span>Rolle: <strong className="text-white">{membership.internal_role}</strong></span> : null}
+            {membership.internal_role ? <span>Aufgabe: <strong className="text-white">{membership.internal_role}</strong></span> : null}
           </p>
         ) : null}
         {fee ? <FeeBadge badge={fee} /> : null}

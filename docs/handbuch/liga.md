@@ -80,7 +80,16 @@ Ausblenden des Menüpunkts stellt die Redaktion unter **Admin → Content → Na
 1. **Admin → eSports → Spiele → Spiel bearbeiten**, Abschnitt **Für Turniere → Modi und Dauer**: je Modus eine Zeile,
    etwa **Stellung**, **Suchen & Zerstören**, **Kontrolle**. Minuten braucht ein Modus nur für Maps nicht.
 2. **Admin → eSports → Spiele → Maps** → **Map hinzufügen**: Name, **Bild** im Format 16 : 9 (nur eigene Uploads),
-   und die **Modi**, in denen die Map gespielt wird. Details: [Turniere, 3.14](turniere.md#314-maps-und-map-pools).
+   und die **Modi**, in denen die Map gespielt wird. Mit **Aus Spiel übernehmen** kommen Maps einer anderen Spielversion
+   samt Bild dazu; gibt es schon Maps ohne Modus, ordnet **Allen … Maps zuordnen** sie gesammelt zu. Details:
+   [Turniere, 3.14](turniere.md#314-maps-und-map-pools).
+
+Modi und Maps dürfen sich auch während einer laufenden Season ändern: Gemeldet wird immer aus dem gespeicherten Pool der
+Staffel. Wer einen Modus entfernt, bekommt vorher die Zahl der betroffenen Maps genannt; Pool und Ergebnisse bleiben.
+Nennt **Modus je Map** den Modus noch, ändert zuerst diese Reihenfolge: Einen Pool ohne ihn nimmt die Season sonst nicht an.
+Nach dem ersten Ergebnis geht beim **Übertragen** nur noch der Pool an die Staffel, nicht die Reihenfolge. Fehlt ihrem Pool
+dann ein Modus der Reihenfolge, sagt das Übertragen das, und die Teams wählen den Modus je Map frei. Spiele mit
+festgehaltenem Pool behalten ihre Reihenfolge.
 
 ### 2.2 Liga und Season anlegen
 
@@ -110,8 +119,9 @@ Ausblenden des Menüpunkts stellt die Redaktion unter **Admin → Content → Na
 Unter dem Kalender steht nach dem Speichern, welche Wochen gesperrt sind und **wie viele Teams eine Staffel höchstens
 fassen kann** (Season 1: 8 Spielwochen – höchstens 8 Teams mit nur Hinrunde).
 
-4. **Map-Pool der Season**: je Modus die Maps anhaken und sortieren, **Speichern**. Ohne Pool kann niemand mit Maps
-   melden. Jede neue Staffel bekommt eine Kopie.
+4. **Map-Pool der Season**: je Modus die Maps anhaken und sortieren, **Speichern** (**Vorgabe des Spiels** lädt den
+   Standard-Pool des Spiels, ohne ihn alle aktiven Maps). Ohne Pool kann niemand mit Maps melden. Jede neue Staffel bekommt
+   eine Kopie.
 
 ### 2.3 Liga 1 und Staffel anlegen
 
@@ -124,8 +134,9 @@ fassen kann** (Season 1: 8 Spielwochen – höchstens 8 Teams mit nur Hinrunde).
 
 ### 2.4 Co-Teams vorbereiten (Teamleitung)
 
-Das macht die Leitung des Hauptteams, nicht die Turnierleitung: **Profil → Teams** → Team wählen → **Squad** →
-Name, **Lineup / Mitspieler** (mindestens so viele wie der Mindestkader, Season 1: 4), **Captain** und **Vertreter**
+Das macht die Leitung des Hauptteams, nicht die Turnierleitung: **Teams → Deine Teams** → Team wählen → **Co-Team** →
+Name, **Spiel** aus der Liste (eines mit anderem Spiel lässt sich nicht zuteilen; Hauptspiel und Versionen zählen zusammen, ohne Spiel passt es überall), **Kader**
+(mindestens so viele wie der Mindestkader, Season 1: 4), **Captain** und **Vertreter**
 (beide aus dem Kader, verschieden) → speichern. Captain und Vertreter vereinbaren Termine, melden und bestätigen
 Ergebnisse. Alle im Kader brauchen ein Konto und müssen Mitglied des Hauptteams sein.
 
@@ -163,7 +174,7 @@ A“) mit **Season öffnen** und **Ligaseite**. Im Reiter **Bearbeiten** stehen 
 Ende, Spielwoche, Standardtermin, Teamgröße, Staffelgröße, Best of, Bestätigungsfrist, Antwortfrist auf
 Terminvorschläge, Sichtbarkeit, Regeltext) nur zum Lesen unter **Aus der Season** – ändern in der Season, dann
 **Vorgaben übertragen** (2.7). Auch den Map-Pool pflegt die Season. Anmeldung, Check-in, Discord, Preise, Jahreswertung,
-Seeding und Weiterkommen gibt es in der Staffel nicht. Änderbar bleiben Titel, Beschreibung, Banner, Partner und
+Setzliste und Weiterkommen gibt es in der Staffel nicht. Änderbar bleiben Titel, Beschreibung, Banner, Partner und
 Streaming. Die Antwortfrist ändert sich nur noch über die Season (oder Liga N) und **Vorgaben übertragen** – auch bei
 älteren Seasons: dort ist das Feld leer und jede Staffel behält ihre bisherige Frist, bis du in der Season einen Wert
 einträgst und überträgst.
@@ -315,7 +326,7 @@ Reiter **Liga** (nur, wenn die Person die Season sehen darf – sonst „Liga ·
 ### 3.6 Captain und Vertreter während der Season
 
 - **Rolle abgeben:** Captain oder Vertreter geben die eigene Rolle unter **Teams → Deine Teams** mit **Rolle
-  abgeben** selbst ab. Leitung und Co-Leitung des Hauptteams bekommen eine Nachricht und vergeben neu (Squad
+  abgeben** selbst ab. Leitung und Co-Leitung des Hauptteams bekommen eine Nachricht und vergeben neu (Co-Team
   bearbeiten). Bis dahin handelt die andere Rolle, ohne beide die Teamleitung.
 - **Teamseite:** Mitglieder sehen dort die Co-Teams mit Captain und Vertreter; Teamleitung und Rollen-Inhaber kommen
   über **Co-Teams verwalten** zur Verwaltung.
@@ -366,7 +377,8 @@ Die IDs sehen nur die Beteiligten des Spiels und die Turnierleitung, nie Gäste.
 | „… spielt in dieser Season schon in einer anderen Staffel.“ | Ein Co-Team spielt je Season nur eine Staffel | Andere Staffel wählen oder dort entfernen |
 | „Die Staffel ist voll (8 von 8 Plätzen).“ | Staffelgröße erreicht | Zweite Staffel |
 | „1 Person im Kader von … ist nicht mehr im Team – bitte erst den Kader bereinigen.“ | Jemand hat das Hauptteam verlassen | Teamleitung passt den Kader an |
-| „… ist für ein anderes Spiel eingetragen als diese Staffel.“ / „… ist archiviert …“ | Falsches oder altes Co-Team | Co-Team im Profil prüfen |
+| „… ist für ein anderes Spiel eingetragen als diese Staffel.“ / „… ist archiviert …“ | Falsches oder altes Co-Team | Co-Team unter **Teams → Deine Teams** prüfen |
+| „… hat noch einen alten Spielnamen …“ | Das Spiel wurde früher frei eingetippt und passt zu keinem Spiel der Liste | Die Teamleitung wählt es unter **Teams → Deine Teams** aus der Liste |
 | „Captain muss im Kader des Co-Teams stehen.“ / „Captain und Vertreter müssen verschiedene Personen sein.“ | Rollen falsch vergeben | Rollen im Profil neu wählen |
 | Co-Team lässt sich nicht entfernen („… Spielplan …“) | Die Staffel ist gestartet | Mit dem Co-Team klären; Spiele notfalls kampflos werten |
 | „Eine Liga-Staffel hat keine Anmeldung und keinen Check-in …“ | Status mit Anmeldung oder Check-in gewählt | **Liga starten** (oben) |

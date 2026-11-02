@@ -164,10 +164,20 @@ async def test_retention_purges_old_mail_and_audit_rows(flow):
     await flow.db.audit_logs.insert_many([{"id": "a-old", "created_at": (now_utc() - timedelta(days=800)).isoformat()}, {"id": "a-new", "created_at": old}])
     # Nachrichten an alle Angemeldeten (#1372) laufen mit der Frist des Adminprotokolls ab.
     await flow.db.event_messages.insert_many([{"id": "m-old", "created_at": (now_utc() - timedelta(days=800)).isoformat()}, {"id": "m-new", "created_at": old}])
+    # An der Tür Eingetragene (#2127, EV17): nach derselben Frist bleibt nur die Zählung; Anmeldungen mit Konto bleiben.
+    await flow.db.event_registrations.insert_many([
+        {"id": "w-old", "walk_in": True, "display_name": "Gast Alt", "internal_note": "Tel 0664", "note": "kommt später", "created_at": (now_utc() - timedelta(days=800)).isoformat()},
+        {"id": "w-new", "walk_in": True, "display_name": "Gast Neu", "internal_note": "bleibt noch", "created_at": old},
+        {"id": "r-old", "user_id": "u1", "display_name": "Konto Alt", "internal_note": "bleibt", "created_at": (now_utc() - timedelta(days=800)).isoformat()},
+    ])
     removed = await ops_alerts.purge_old_logs(flow.db)
-    assert removed == {"email_logs": 1, "audit_logs": 1, "event_messages": 1}
+    assert removed == {"email_logs": 1, "audit_logs": 1, "event_messages": 1, "walk_in_names": 1}
+    rows = {r["id"]: r for r in await flow.db.event_registrations.find({}, {"_id": 0}).to_list(10)}
+    assert {key: row["display_name"] for key, row in rows.items()} == {"w-old": "Teilnehmer", "w-new": "Gast Neu", "r-old": "Konto Alt"}
+    assert rows["w-old"]["internal_note"] is None and rows["w-old"]["note"] is None
+    assert rows["w-new"]["internal_note"] == "bleibt noch" and rows["r-old"]["internal_note"] == "bleibt"
     assert [r["id"] for r in await flow.db.event_messages.find({}, {"_id": 0}).to_list(10)] == ["m-new"]
     assert [r["id"] for r in await flow.db.email_logs.find({}, {"_id": 0}).to_list(10)] == ["e-new"]
     assert [r["id"] for r in await flow.db.audit_logs.find({}, {"_id": 0}).to_list(10)] == ["a-new"]
     await ops_alerts.save_alert_settings(flow.db, {"retention_days": {"email_logs": 7}})
-    assert (await ops_alerts.purge_old_logs(flow.db)) == {"email_logs": 1, "audit_logs": 0, "event_messages": 0}
+    assert (await ops_alerts.purge_old_logs(flow.db)) == {"email_logs": 1, "audit_logs": 0, "event_messages": 0, "walk_in_names": 0}

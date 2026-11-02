@@ -158,7 +158,7 @@ export default function EasterHuntPage() {
                   {page.fastest.map((row) => (
                     <li key={`${row.rank}-${row.username}`} className="flex items-center gap-3 py-2" data-testid={`easter-fastest-${row.rank}`}>
                       <span className="w-7 text-center font-bold text-white/50 tabular-nums">{row.rank}</span>
-                      {row.username ? <Link to={`/u/${row.username}`} className="flex-1 truncate font-semibold text-white hover:text-[#e9c46a]">{row.display_name}</Link> : <span className="flex-1 truncate font-semibold text-white">{row.display_name}</span>}
+                      {row.username ? <Link to={`/u/${encodeURIComponent(row.username)}`} className="flex-1 truncate font-semibold text-white hover:text-[#e9c46a]">{row.display_name}</Link> : <span className="flex-1 truncate font-semibold text-white">{row.display_name}</span>}
                       <span className="text-sm text-white/60 tabular-nums">{durationLabel(row.duration_seconds)}</span>
                     </li>
                   ))}

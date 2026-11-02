@@ -1,4 +1,4 @@
-import { boardSentence, clearSentence, postTitle } from "./boardRights";
+import { boardSentence, clearSentence, deleteSentence, postTitle, statusSentence } from "./boardRights";
 
 // Vorstand (#1355): der Satz vor dem Besetzen nennt die Rechte - oder dass sie aus Dolibarr kommen.
 
@@ -25,6 +25,20 @@ test("mit Dolibarr-Funktionen ist der Posten nur für die Anzeige", () => {
 test("ohne Konto oder bei inaktivem Posten keine Rechte - und der Satz sagt es", () => {
   expect(boardSentence({ person: { name: "Mara", has_account: false }, position: KASSIER })).toBe("Mara wird Kassier:in. Ohne Konto auf der Website bringt der Posten keine Rechte.");
   expect(boardSentence({ person: { name: "Mara", has_account: true }, position: { ...KASSIER, is_active: false } })).toContain("gerade inaktiv");
+});
+
+test("aktivieren und deaktivieren nennen, wer die Rechte bekommt oder verliert (#2125)", () => {
+  const held = { ...KASSIER, user: { display_name: "Erika Beispiel" } };
+  expect(statusSentence({ position: held })).toContain("Erika Beispiel verliert damit die Vereinsverwaltung");
+  expect(statusSentence({ position: { ...held, is_active: false } })).toContain("Erika Beispiel bekommt damit die Vereinsverwaltung");
+  expect(statusSentence({ position: { ...held, deputy_user: { display_name: "Mara" } } })).toContain("Erika Beispiel und Mara verlieren");
+  expect(statusSentence({ position: KASSIER })).toContain("Der Posten ist offen");
+  expect(statusSentence({ position: held, rightsFromDolibarr: true })).toContain("kommen aus Dolibarr");
+});
+
+test("löschen nennt die Inhaber (#2125)", () => {
+  expect(deleteSentence({ position: KASSIER })).toBe("„Kassier:in“ wird gelöscht.");
+  expect(deleteSentence({ position: { ...KASSIER, user: { display_name: "Erika Beispiel" } } })).toContain("Erika Beispiel ist den Posten damit los und verliert die Vereinsverwaltung");
 });
 
 test("leeren sagt, dass die Vereinsverwaltung wegfallen kann", () => {

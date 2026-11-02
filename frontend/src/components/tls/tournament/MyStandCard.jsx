@@ -23,8 +23,15 @@ export function paymentLine(price) {
   return `${amount} · die Rechnung kommt unter „Meine Rechnungen“`;
 }
 
-export function MyStandCard({ tournament: t, registration: myReg, team = null, isTeamTournament = false, canCheckIn = false, staffOnlyCheckIn = false, canUnregister = false, leagueSquad = false, onCheckin, onUnregister, busy = false, scheduleTo = "" }) {
+// Kein Link, der kommentarlos verschwindet (#2113, L-C4): warum es hier nicht weitergeht und wer es kann.
+export function unregisterNote(t, myReg, { canUnregister = false, leagueSquad = false, responsible = true } = {}) {
+  if (canUnregister || leagueSquad || FINISHED.has(t.status) || ["rejected", "withdrawn", "cancelled"].includes(myReg.status)) return null;
+  return responsible ? "Abmelden und Angaben ändern nur noch über die Turnierleitung" : "Abmelden und Angaben ändern kann nur die Teamleitung";
+}
+
+export function MyStandCard({ tournament: t, registration: myReg, team = null, isTeamTournament = false, canCheckIn = false, staffOnlyCheckIn = false, canUnregister = false, leagueSquad = false, responsible = true, canRemoveRejected = false, detailsEdit = null, onCheckin, onUnregister, onRemoveRejected, busy = false, scheduleTo = "" }) {
   if (!myReg) return null;
+  const note = unregisterNote(t, myReg, { canUnregister, leagueSquad, responsible });
   // Nach dem Check-in-Ende (#1551) steht der Baum - der Status bleibt „Check-in“, der Knopf geht weg.
   const checkinOpen = checkInState(t).open;
   const line = paymentLine(myReg.price);
@@ -39,6 +46,15 @@ export function MyStandCard({ tournament: t, registration: myReg, team = null, i
         <StatusBadge status={myReg.status} size="lg" />
       </div>
       {step >= 0 ? <StepBar steps={steps} current={step} className="tls-steps--gold mt-3" testId="tournament-my-steps" /> : null}
+      {/* Abgelehnt (#2113, L-C3): sagen, was das heißt und was jetzt geht - der Grund steht in der Nachricht. */}
+      {myReg.status === "rejected" ? (
+        <div className="mt-3 rounded-sm border border-warn/35 bg-warn/5 p-3 text-sm" data-testid="tournament-rejected-note">
+          <p className="text-white/80">Die Turnierleitung hat {isTeamTournament ? "die Anmeldung deines Teams" : "deine Anmeldung"} abgelehnt. Den Grund findest du, falls angegeben, in deiner Benachrichtigung; Fragen klärt die Turnierleitung.</p>
+          {canRemoveRejected ? (
+            <button type="button" onClick={onRemoveRejected} disabled={busy} data-testid="tournament-remove-rejected" className="tls-btn tls-btn--quiet mt-2 min-h-11 rounded-sm px-4 text-xs font-bold uppercase tracking-wider disabled:opacity-50">Anmeldung entfernen</button>
+          ) : null}
+        </div>
+      ) : null}
       <dl className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
         {isTeamTournament ? (
           <div className="flex items-start gap-2"><Users className="w-4 h-4 text-white/50 mt-0.5" /><div><dt className="text-[10px] font-bold uppercase tracking-widest text-white/50">Team</dt><dd data-testid="tournament-my-team">{team?.name ? `${team.name}${team.tag ? ` [${team.tag}]` : ""}` : "–"}</dd></div></div>
@@ -65,11 +81,14 @@ export function MyStandCard({ tournament: t, registration: myReg, team = null, i
           <button type="button" onClick={onCheckin} disabled={busy} data-testid="tournament-checkin-btn" className="tls-btn tls-btn--primary px-5 py-2.5 font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50">Jetzt einchecken</button>
         ) : null}
         {scheduleTo ? <Link to={scheduleTo} className="text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">Zum Spielplan</Link> : null}
+        {detailsEdit}
         {canUnregister ? (
           <button type="button" onClick={onUnregister} disabled={busy} data-testid="tournament-unregister-btn" className="ml-auto text-xs text-white/45 hover:text-[#FF3B30] underline underline-offset-2 disabled:opacity-50">Vom Turnier abmelden</button>
         ) : leagueSquad && !FINISHED.has(t.status) ? (
           // Liga-Staffel (#2110): ein Co-Team ist zugeteilt - abmelden kann es nur die Turnierleitung.
           <span className="ml-auto text-xs text-white/45" data-testid="tournament-unregister-league">Austritt nur über die Turnierleitung</span>
+        ) : note ? (
+          <span className="ml-auto text-xs text-white/45" data-testid="tournament-unregister-note">{note}</span>
         ) : null}
       </div>
     </section>

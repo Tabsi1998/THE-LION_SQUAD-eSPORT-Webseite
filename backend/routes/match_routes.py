@@ -521,13 +521,8 @@ async def _match_participants(match: dict, user: dict | None) -> list[dict]:
     user_ids = list({r.get("user_id") for r in regs if r.get("user_id")})
     team_ids = list({r.get("team_id") for r in regs if r.get("team_id")})
     users = await _public_user_map(user_ids)
-    teams = {
-        team["id"]: team
-        for team in await db.teams.find(
-            {"id": {"$in": team_ids}},
-            {"_id": 0, "id": 1, "name": 1, "tag": 1, "logo_url": 1, "leader_id": 1, "co_leader_ids": 1},
-        ).to_list(64)
-    }
+    from services.team_history import teams_by_id
+    teams = await teams_by_id(db, team_ids, {"_id": 0, "id": 1, "name": 1, "tag": 1, "logo_url": 1, "leader_id": 1, "co_leader_ids": 1})
 
     if match.get("slots"):
         source_slots = match.get("slots") or []
@@ -1050,7 +1045,6 @@ async def post_match_chat(match_id: str, body: MatchChatCreate, request: Request
         "username": me.get("username"),
         "display_name": me.get("display_name"),
         "avatar_url": me.get("avatar_url"),
-        "role": me.get("role"),
     }
     return doc
 

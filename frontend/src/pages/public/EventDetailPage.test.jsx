@@ -81,6 +81,86 @@ test("Anmeldung mit Kosten: Leiste Anmeldung, Bezahlen, Dabei mit dem echten Sta
   expect(await screen.findByTestId("event-register-steps")).toHaveAttribute("aria-label", "Schritt 3 von 3: Dabei");
 });
 
+// Volles Event (#2127, EV7): der Knopf sagt, was passiert - ohne Preis; die Meldung folgt dem Stand vom Server.
+describe("Anmeldung bei vollem Event", () => {
+  const offer = { enabled: true, currency: "EUR", positions: [{ key: "ticket", label: "Ticket", amount_cents: 1000, basis: "per_person", optional: false }] };
+  const open = {
+    ...base, status: "registration_open", has_registration: true, offer, max_participants: 2, allow_companions: true, max_companions_per_registration: 2,
+    public_phase: { state: "registration_open", label: "Anmeldung offen" }, registration_summary: { reserved_seats: 1, registered_count: 1 },
+  };
+  beforeEach(async () => {
+    authState.user = { id: "u1", username: "paula" };
+    apiMock.post = vi.fn();
+    (await import("sonner")).toast.success.mockClear();
+  });
+
+  test("freier Platz: Preis auf dem Knopf; zu viele Begleitpersonen: Warteliste ohne Preis", async () => {
+    renderPage(open);
+    const submit = await screen.findByTestId("event-register-submit");
+    expect(submit).toHaveTextContent("Verbindlich anmelden");
+    expect(screen.getByTestId("event-quote")).toBeInTheDocument();
+    expect(screen.queryByTestId("event-waitlist-note")).toBeNull();
+
+    fireEvent.change(screen.getByTestId("event-register-form").querySelector('input[type="number"]'), { target: { value: "1" } });
+    expect(submit).toHaveTextContent("Auf die Warteliste");
+    expect(submit).not.toHaveTextContent("€");
+    expect(screen.queryByTestId("event-quote")).toBeNull();
+    expect(screen.getByTestId("event-waitlist-note")).toHaveTextContent("Nur noch 1 Platz frei");
+    expect(screen.getByTestId("event-waitlist-note")).toHaveTextContent("Bezahlt wird erst, wenn du nachrückst.");
+  });
+
+  test("voll: die Meldung folgt dem Stand vom Server", async () => {
+    const { toast } = await import("sonner");
+    apiMock.post.mockResolvedValue({ data: { status: "waitlist" } });
+    renderPage({ ...open, registration_summary: { reserved_seats: 2, registered_count: 2 } });
+    const submit = await screen.findByTestId("event-register-submit");
+    expect(submit).toHaveTextContent("Auf die Warteliste");
+    fireEvent.click(submit);
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Du stehst auf der Warteliste. Wird ein Platz frei, bekommst du Bescheid."));
+  });
+
+  test("Platz frei: „Du bist angemeldet.“", async () => {
+    const { toast } = await import("sonner");
+    apiMock.post.mockResolvedValue({ data: { status: "registered" } });
+    renderPage(open);
+    fireEvent.click(await screen.findByTestId("event-register-submit"));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Du bist angemeldet."));
+  });
+});
+
+// Externer Anmeldelink (#2127, EV11): Plätze und Leitungsseite führt die andere Seite.
+test("externer Anmeldelink: keine Zahlen, kein Link zur Leitungsseite", async () => {
+  renderPage({ ...base, has_registration: true, registration_url: "https://example.test/tickets", max_participants: 40, can_check_in: true, registration_summary: { reserved_seats: 0, spots_left: 40 }, public_phase: { state: "registration_open", label: "Anmeldung offen" } });
+  const panel = await screen.findByTestId("event-yours");
+  expect(panel).toHaveTextContent("Registrierung möglich");
+  expect(screen.queryByTestId("event-registration-stats")).toBeNull();
+  expect(panel).not.toHaveTextContent("Freie Plätze");
+  expect(screen.queryByTestId("event-lead-link")).toBeNull();
+});
+
+// Die Liste der Anmeldungen (#2127, EV10): Warteliste getrennt, Stornierte nicht, nach 12 Namen „+N weitere“.
+test("Teilnehmerliste: Warteliste getrennt, keine Stornierten, „+N weitere“ zeigt alle", async () => {
+  const people = Array.from({ length: 14 }, (_, index) => ({ id: `p${index}`, display_name: `Person ${index}`, status: "registered", seat_count: 1 }));
+  renderPage({
+    ...base, has_registration: true,
+    registrations: [...people, { id: "s1", display_name: "Otto Storno", status: "cancelled", seat_count: 1 }, { id: "n1", display_name: "Nele Nicht", status: "no_show", seat_count: 1 }],
+    waitlist_registrations: [{ id: "w1", display_name: "Ella Wartend", status: "waitlist", seat_count: 2 }],
+  });
+  const list = await screen.findByTestId("event-participants");
+  expect(list).toHaveTextContent("Person 11");
+  expect(list).not.toHaveTextContent("Person 12");
+  expect(list).not.toHaveTextContent("Otto Storno");
+  expect(list).not.toHaveTextContent("Nele Nicht");
+  expect(list).not.toHaveTextContent("Ella Wartend");
+  expect(screen.getByTestId("event-waitlist")).toHaveTextContent("Ella Wartend");
+  expect(screen.getByTestId("event-waitlist")).toHaveTextContent("2 Plätze");
+
+  expect(screen.getByTestId("event-participants-more")).toHaveTextContent("+2 weitere");
+  fireEvent.click(screen.getByTestId("event-participants-more"));
+  expect(list).toHaveTextContent("Person 13");
+  expect(screen.queryByTestId("event-participants-more")).toBeNull();
+});
+
 // Aus der News (#1266): „Anmelden“ führt mit ?anmelden=1 hierher und öffnet das Formular.
 test("?anmelden=1: das Anmeldeformular bekommt den Fokus, ohne den Knopf zu suchen", async () => {
   authState.user = { id: "u1", username: "paula" };

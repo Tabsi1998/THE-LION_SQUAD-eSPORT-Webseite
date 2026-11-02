@@ -57,6 +57,30 @@ export function rightsChange({ name, fromRole, toRole, fromGrants = [], toGrants
   return { changed: roleChanged || grantsChanged, roleChanged, grantsChanged, gained, lost, sentence: parts.join(" "), risky };
 }
 
+function areaWords(areas) {
+  return (areas || []).length ? areas.map((area) => areaLabel(area)).join(", ") : "keine";
+}
+
+/** Eine Zeile im Rechte-Verlauf (#2125): was sich geändert hat, in Worten - nie der Rohwert aus dem Protokoll. */
+export function rightsHistoryLine(row) {
+  const post = row?.title || "Posten";
+  const role = row?.field === "deputy" ? `Vertretung für ${post}` : post;
+  switch (row?.action) {
+    case "user.role_change":
+      return row.from ? `Rolle: ${roleLabel(row.from)} → ${roleLabel(row.to)}` : `Rolle: ${roleLabel(row.to)}`;
+    case "user.areas_change":
+      return `Freigaben: ${areaWords(row.from)} → ${areaWords(row.to)}`;
+    case "board.assign":
+      return row.joined ? `Vorstand: wird ${role}` : `Vorstand: nicht mehr ${role}`;
+    case "board.status":
+      return `Vorstand: Posten ${post} ist ${row.active ? "aktiv" : "inaktiv"}`;
+    case "board.delete":
+      return `Vorstand: Posten ${post} gelöscht`;
+    default:
+      return "Rechte geändert";
+  }
+}
+
 /** Wie das Blatt den Stand der Einladung zum Mitgliedsantrag nennt. */
 export function invitationText(invitation, formatDay) {
   if (!invitation?.status) return "";

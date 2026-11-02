@@ -107,11 +107,11 @@ die Zwei-Faktor-Anmeldung bestätigt ist (Moderation ausgenommen).
 | Gruppe | Einträge (Bereich) |
 | --- | --- |
 | **Übersicht** | Dashboard (Turnierleitung, Redaktion, Vereinsverwaltung, Finanzen, System) · Mein Dienst (Helfer mit Einsatz, Moderation ohne Verwaltungsbereich) |
-| **Verein** | Vereinsdaten (System) · Über uns, Sponsoren, Partner, Referenzen, Serien (Redaktion) · Vorstand, Kontakt-Inbox (Vereinsverwaltung) |
+| **Verein** | Vereinsdaten (Vereinsverwaltung: Stammdaten und Kontakt; System: auch Rechtstexte) · Über uns, Sponsoren, Partner, Referenzen, Serien (Redaktion) · Vorstand, Kontakt-Inbox (Vereinsverwaltung) |
 | **Mitglieder** | Mitglieder (mit dem Reiter Öffentliche Profile), Bewerbungen, Mitgliedervorteile, Dokumente, Einlass (Versammlung), Alle Benutzer (Vereinsverwaltung) · Dolibarr (Vereinsverwaltung, System) |
 | **Finanzen** | Finanzübersicht (Finanzen) |
-| **eSports** | Turniere, Fast Lap, Stationen (Turnierleitung und Helfer mit Einsatz) · Turnier-Leitfaden, Jahreswertung, Spiele, TV & Beamer, Gewinne, Strafen (Turnierleitung) · Game-Server (System) |
-| **Content** | Events (Turnierleitung) · News, Medien, Navigation, Erfolge, Sticker (Redaktion) · Galerie, Adventkalender, Ostereiersuche (Redaktion, Vereinsverwaltung) · Downloads & QR (Turnierleitung, Redaktion, Vereinsverwaltung, System) |
+| **eSports** | Turniere, Fast Lap, Stationen (Turnierleitung und Helfer mit Einsatz) · Liga, Events, Turnier-Leitfaden, Jahreswertung, Spiele, TV & Beamer, Gewinne, Strafen (Turnierleitung) · Teams (Turnierleitung, Vereinsverwaltung) · Game-Server (System) |
+| **Content** | News, Medien, Navigation, Erfolge, Sticker (Redaktion) · Galerie, Adventkalender, Ostereiersuche (Redaktion, Vereinsverwaltung) · Downloads & QR (Turnierleitung, Redaktion, Vereinsverwaltung, System) |
 | **Verbindungen** | Alle Verbindungen, dazu eine Seite je Dienst (System) |
 | **E-Mail** | Newsletter, Mail-Queue, E-Mail-Vorlagen (System) |
 | **Auftritt** | Branding, Socials, SEO & Analytics, Jahreszeiten (System) |
@@ -212,6 +212,18 @@ Wichtig:
   **sperren** (mit Grund, mindestens fünf Zeichen; die Person bekommt den Grund per Mail), aber keine Rechte ändern.
 - Konten mit Adminbereich sperrt und entsperrt nur der Superadmin. Superadmin-Konten lassen sich nicht sperren, das
   eigene Konto auch nicht.
+- **Profil zurücksetzen** (Vereinsverwaltung, im Blatt eines fremden Kontos): für unpassende Angaben, etwa einen
+  anstößigen Anzeigenamen. Haken bei **Anzeigename**, **Bio**, **Profilbild** und/oder **Banner** setzen, einen **Grund**
+  eintragen (mindestens fünf Zeichen), **Zurücksetzen …** und die Rückfrage bestätigen. Die Person bekommt eine
+  Benachrichtigung mit den Feldern und dem Grund und kann selbst Neues eintragen; ohne Anzeigename steht ihr
+  Benutzername da. Der Grund steht im Protokoll, die alten Angaben nicht. Andere Felder (Einwilligungen,
+  Datenschutz-Schalter) ändert nur die Person selbst; Superadmin-Konten fasst nur der Superadmin an.
+- **Rollen bleiben intern.** Das öffentliche Profil, die Spielerliste, Chats und Freundeslisten zeigen weder die Rolle
+  noch die **Aufgabe im Verein** (Admin → Mitglieder, früher „Interne Rolle“). Die Aufgabe sieht nur das Mitglied selbst
+  und die Verwaltung.
+- **Benutzer anlegen:** Der Benutzername hat 3 bis 32 Zeichen: Buchstaben ohne Umlaute, Ziffern und `_ . -`, keine
+  Leerzeichen, mindestens ein Buchstabe oder eine Ziffer. „Max“ und „max“ gelten als derselbe Name. Das gilt nur für neue Konten: Ältere Konten behalten ihren Namen,
+  melden sich weiter mit ihrer E-Mail an und ihr Profil bleibt erreichbar. Nachträglich umbenennen lässt sich niemand.
 - Weitere Rechte-Themen (Vorstand besetzen, Dolibarr-Funktionen als Rechtequelle) stehen in [Rollen](../ROLLEN.md).
 
 ### 3.7 Helfer, Moderation – und „Mein Dienst“
@@ -270,7 +282,8 @@ Jedes Thema hat genau **einen** Ort:
 | Welches Turnierformat passt? | Admin → eSports → Turnier-Leitfaden | [Turniere](turniere.md) |
 | Fernseher und Beamer | Admin → eSports → TV & Beamer | [TV und Beamer](tv.md) |
 | Fast-Lap-Challenge | Admin → eSports → Fast Lap | [Fast Lap](fastlap.md) |
-| Event anlegen, Anmeldung, Kalender | Admin → Content → Events | [Events](events.md) |
+| Event anlegen, Anmeldung, Kalender | Admin → eSports → Events | [Events](events.md) |
+| Teams, verwaiste und aufgelöste Teams, Beitrittscodes | Admin → eSports → Teams | [Teams](teams.md) |
 | Erfolge vergeben, Level, Jahresrückblick | Admin → Content → Erfolge | [Erfolge, Level und Jahreswertung](erfolge.md) |
 | Jahreswertung (Saison, Punkte) | Admin → eSports → Jahreswertung | [Erfolge, Level und Jahreswertung](erfolge.md) |
 | Logo, Farbe, Hinweisleisten | Admin → Auftritt → Branding | [Auftritt](auftritt.md) |
@@ -283,6 +296,23 @@ Jedes Thema hat genau **einen** Ort:
 | Rollen und Freigaben | Admin → Mitglieder → Alle Benutzer | dieses Kapitel, [Rollen](../ROLLEN.md) |
 | Server, Updates, Sicherungen | Admin → System → Betrieb & Logs, Status | [Betrieb](../BETRIEB.md) |
 | App-Versionen, Play Store | Admin → System → App-Versionen | [Play Store](../PLAY_STORE.md) |
+| Game-Server, AMP-Zugang | Admin → eSports → Game-Server | dieser Abschnitt (unten) |
+
+**Game-Server pflegen:** **Live-Daten von** sagt, woher Status und Spielerzahl kommen; **Automatisch erkennen** reicht
+meistens. **Technik** (eingeklappt) braucht ihr nur, wenn das Abrufen nicht klappt: eigene Abfrage-Adresse, Abfrage-Port,
+RCON-Port. Schlägt ein Abruf fehl, steht der echte Fehler rot am Server (nur in der Verwaltung), darunter gelb, was er
+bedeutet; der Erfolg beim nächsten Abruf räumt beides weg. Das **Symbol** eines Servers kommt per Hochladen oder aus der
+Mediathek; ohne eigenes gilt das Logo des Spiels. Der Knopf **Demo-Startliste** erscheint nur in Testumgebungen.
+
+**Game-Server über das AMP-Panel (#2112):** Steht ein Server bei **Live-Daten von** auf **AMP-Panel**, fragt die Website das
+Panel nach dem Stand der Instanz (Feld **AMP-Instanz**: Name oder ID wie im Panel). Den Zugang tragt ihr oben auf der
+Game-Server-Seite im aufklappbaren Bereich **AMP-Panel** ein: **Adresse** (nur `https://`), **Benutzer** (am besten
+ein eigener mit Leserechten), **Passwort** und **Panel abfragen**. Das Passwort wird verschlüsselt gespeichert und nie
+wieder gezeigt; leer lassen heißt „behalten“ – außer bei einer **neuen Adresse**: Dann muss das Passwort neu mit, das
+gespeicherte gilt nur für die bisherige. Adressen der Plattform selbst (localhost, 127.x), Link-local-Adressen und
+Heimnetz-IPs als Zahl sind nicht erlaubt; ein Name, der ins Heimnetz zeigt, schon. **Verbindung testen** nennt die
+Instanzen, die das Panel kennt.
+**Passwort entfernen** (mit Rückfrage) beendet die Abfrage – Server auf „AMP-Panel“ zeigen dann beim Abrufen einen Fehler.
 
 **Shop-Preise (#2135):** Mitglieder zahlen genau, was der Verein an Printful zahlt – brutto, also Ware, Versand und
 Steuer. Im Produkt unter **Schritt 4 Preise** steht je Variante *Printful brutto*, daraus der *Mitgliederpreis*, ein
@@ -309,6 +339,8 @@ geändert“ auf die Leitung; wird es günstiger, bleibt die Differenz beim Vere
 | Statt einer Liste steht „Dafür fehlt dir …“ | Der Server hat die Liste abgelehnt: der Bereich fehlt, oder die Zwei-Faktor-Anmeldung | Was der Satz nennt: Freigabe erfragen (3.6) oder 2FA (2.1) |
 | Ein Menüpunkt aus einer Anleitung fehlt | Er gehört zu einem Bereich, den du nicht hast, oder es ist nur ein Reiter | Suche nutzen (3.3) |
 | Du kannst die Rolle einer Person nicht ändern | Nur der Superadmin darf das; du siehst nur Text | Superadmin fragen |
+| „Benutzername: 3 bis 32 Zeichen …“ beim Anlegen | Der Name hat Leerzeichen, Umlaute oder andere Zeichen | Name anpassen (3.6) |
+| „Benutzername oder E-Mail bereits vergeben“, obwohl der Name anders geschrieben ist | Groß- und Kleinschreibung zählen nicht: „max“ und „Max“ sind derselbe Name | Anderen Namen wählen |
 | Eine Person lässt sich nicht sperren | Superadmin-Konto, eigenes Konto, oder ein Konto mit Adminbereich (das sperrt nur der Superadmin) | Siehe 3.6 |
 | Freigabe gespeichert, die Person sieht nichts | Sie hat noch keine bestätigte Zwei-Faktor-Anmeldung, oder sie muss sich neu anmelden | 3.5 |
 | Am Event: „Zu viele Anmeldungen aus diesem Netz. Bitte versuche es in … erneut.“ | Viele Handys im selben WLAN teilen sich eine Adresse, die Grenze je Netz ist erreicht | Eine Minute warten; für das Event unter System → Zugang → **Grenze je Netz** einen Event-Zeitraum mit höherem Wert setzen ([Betrieb](../BETRIEB.md#anmelde-grenze-je-netz-für-events-1802)) |
@@ -349,5 +381,5 @@ Das Symbol oben links (drei Striche, „Admin-Menü öffnen“).
 Noch nicht. Hilfe gibt es unter Admin → System → Einrichtung & FAQ und in diesem Handbuch.
 
 **Wo verbinde ich ein Turnier mit einem Event?**
-Nur im Event: Admin → Content → Events → Event öffnen → **Programm** (**+ Turnier in diesem Event**, **+ Fast Lap**,
+Nur im Event: Admin → eSports → Events → Event öffnen → **Programm** (**+ Turnier in diesem Event**, **+ Fast Lap**,
 **Bestehendes hinzufügen**, **Lösen**). In der Eventliste erscheint **Rückblick schreiben** erst, wenn das Event vorbei ist.

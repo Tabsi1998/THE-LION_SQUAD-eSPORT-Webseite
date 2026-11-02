@@ -1,6 +1,7 @@
 import { MultiSelect } from "@/components/tls/MultiSelect";
 import { INPUT_DEVICES, PLATFORMS, SUBSCRIPTIONS } from "./constants";
 import { Field, Input, Row, Section } from "./fields";
+import { PROFILE_LIMITS } from "./form";
 import { LeagueIdNotice } from "./LeagueIdNotice";
 
 export function GamingTab({ form, set, setNow = set, setGameId, gameIdGroups }) {
@@ -19,7 +20,10 @@ export function GamingTab({ form, set, setNow = set, setGameId, gameIdGroups }) 
                   <Field label="Gaming-Abos (Game Pass, PS Plus, EA Play, …)" group>
                     <MultiSelect options={SUBSCRIPTIONS} value={form.gaming_subscriptions} onChange={(v) => setNow("gaming_subscriptions", v)} testId="profile-subs" />
                   </Field>
-                  <Field label="Bevorzugte Rolle"><Input value={form.preferred_role} onChange={(v) => set("preferred_role", v)} placeholder="z.B. IGL, Support, Driver" /></Field>
+                  <Field label="Bevorzugte Rolle">
+                    <Input value={form.preferred_role} onChange={(v) => set("preferred_role", v)} placeholder="z.B. IGL, Support, Driver" maxLength={PROFILE_LIMITS.preferred_role} testId="profile-preferred-role" />
+                    <p className="text-[11px] text-white/45 mt-1.5">Erscheint auf deinem Profil, sobald du sie unter Privatsphäre → Sonstiges freigibst. Ohne Freigabe siehst nur du sie.</p>
+                  </Field>
                   {gameIdGroups.length > 0 && (
                     <div className="border border-white/10 rounded-sm bg-[#0A0A0A] p-5 space-y-4">
                       <div>

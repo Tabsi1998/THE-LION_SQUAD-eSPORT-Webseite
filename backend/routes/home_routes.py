@@ -22,6 +22,7 @@ from services.visibility import user_can_see
 from services.news_cards import attach_result_winners
 from services.news_publish import public_news
 from services import event_days
+from services.event_public import public_competition, public_event
 from services.league_scope import NOT_LEAGUE
 from services.public_phase import derive_public_phase
 
@@ -109,7 +110,8 @@ async def _filter_rows(rows, user, kind: str | None = None):
             continue
         if not await user_can_see(user, r.get("visibility")):
             continue
-        out.append(_normalize_status(r, kind))
+        row = _normalize_status(r, kind)
+        out.append(public_event(row) if kind == "event" else public_competition(row))
     return out
 
 
@@ -577,7 +579,8 @@ async def _club_numbers(db) -> dict:
         "tournaments": await db.tournaments.count_documents(PUBLIC_TOURNAMENT_QUERY),
         "tournaments_completed": await db.tournaments.count_documents({**PUBLIC_TOURNAMENT_QUERY, "status": {"$in": ["completed", "results_published", "archived"]}}),
         "events": await db.events.count_documents({"status": {"$nin": ["draft", "cancelled"]}, "visibility": {"$in": [None, "public"]}}),
-        "participations": await db.references.count_documents({}),
+        # Nur, was öffentlich zu sehen ist (#2130): archivierte und nicht öffentliche Referenzen zählen nicht mit.
+        "participations": await db.references.count_documents({"is_active": {"$ne": False}, "visibility": {"$in": [None, "public"]}}),
         "prizes": await db.prize_pickups.count_documents({}),
         "prize_money_eur": round(prize_money, 2),
         "years_active": max(0, year - int(founded_year)) if founded_year else 0,

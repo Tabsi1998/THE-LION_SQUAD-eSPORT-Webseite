@@ -38,6 +38,16 @@ test("Programm lädt nicht: ein Satz; leeres Programm: Hinweis und die Knöpfe z
   expect(screen.queryByTestId("event-program-add")).toBeNull();
 });
 
+test("Nach einer Verschiebung: was nicht mehr in den Zeitraum passt, steht mit Hinweis da (#2127)", () => {
+  const program = {
+    tournaments: [{ id: "t1", title: "Kart-Cup", outside: true }, { id: "t2", title: "Rocket-Cup", outside: false }], fastlaps: [],
+    candidates: {}, event: { window: "am 05.12.2026" },
+  };
+  render(<MemoryRouter><EventProgramPanel eventId="ev-1" program={program} reload={() => {}} /></MemoryRouter>);
+  expect(screen.getByTestId("event-program-outside-t1")).toHaveTextContent("Liegt außerhalb des Events (am 05.12.2026) – Tag prüfen.");
+  expect(screen.queryByTestId("event-program-outside-t2")).toBeNull();
+});
+
 // Nach Codex-Prüfung: Absagen des Servers stehen als Satz da; ein Turnier mit Anmeldungen bleibt in der Liste,
 // „schon verbunden“ lädt das Programm neu.
 test("Absagen des Servers: Satz im Hinweis, Liste bleibt, bei 409 wird neu geladen", async () => {

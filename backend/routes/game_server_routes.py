@@ -10,8 +10,10 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from auth import get_optional_user, require_club_admin
 from database import get_db
+from services import game_usage
 from services.visibility import sees_member_content
 from models import new_id, now_utc
+from runtime_config import resolve_app_environment
 from services.slug_utils import apply_slug_history, slug_source_for_update, slugify, unique_slug
 from services.secret_store import decrypt_secret, encrypt_secret
 
@@ -38,7 +40,11 @@ DEMO_GAME_SERVERS = [
 
 
 def _public_sync_error(error: str) -> str:
-    return "Sync konnte den Server vom Webserver aus nicht erreichen. Letzter Status bleibt erhalten."
+    return "Die Website konnte den Server nicht erreichen. Der letzte Stand bleibt erhalten."
+
+
+# Der echte Fehler für die Verwaltung (#2129, SP7) - nie nach außen: ``_public_doc`` blendet ihn aus.
+SYNC_ERROR_MAX = 500
 
 DEMO_GAME_SERVER_SLUGS = {item["slug"] for item in DEMO_GAME_SERVERS}
 
@@ -85,7 +91,7 @@ def _public_doc(server: dict, game: dict | None = None, include_admin_fields: bo
         "amp_password", "amp_session_id", "amp_url", "amp_username", "amp_instance_name", "amp_module",
     }
     if not include_admin_fields:
-        hidden.update({"query_host", "query_port", "rcon_port", "last_sync_error", "amp_instance"})
+        hidden.update({"query_host", "query_port", "rcon_port", "last_sync_error", "last_sync_note", "amp_instance"})
     doc = {k: v for k, v in server.items() if k not in hidden}
     if server.get("access_secret"):
         doc["has_access_secret"] = True
@@ -145,9 +151,11 @@ class ServerModResource(BaseModel):
         return self
 
 
-async def _validate_game(db, game_id):
+async def _validate_game(db, game_id, current=None):
     if game_id and not await db.games.find_one({"id": game_id}, {"id": 1}):
         raise HTTPException(400, "Das ausgewählte Spiel existiert nicht mehr. Bitte erneut auswählen.")
+    if await game_usage.chosen_is_archived(db, game_id, current):
+        raise HTTPException(422, game_usage.ARCHIVED_DETAIL)
 
 
 class GameServerPayload(BaseModel):
@@ -290,6 +298,12 @@ async def admin_list_game_servers(me: dict = Depends(require_club_admin())):
     return [_public_doc(row, game_by_id.get(row.get("game_id")), include_admin_fields=True) for row in rows]
 
 
+@router.get("/admin/meta")
+async def admin_game_server_meta(me: dict = Depends(require_club_admin())):
+    """Was die Seite wissen muss (#2129, SP6): den Knopf für die Demo-Startliste gibt es nur außerhalb der Produktion."""
+    return {"demo_tools": resolve_app_environment() != "production"}
+
+
 @router.get("/{server_id}/access")
 async def get_game_server_access(server_id: str, me: dict | None = Depends(get_optional_user)):
     db = get_db()
@@ -354,8 +368,11 @@ async def update_game_server(server_id: str, body: GameServerPatch, me: dict = D
     }
     raw = body.model_dump(exclude_unset=True)
     if "game_id" in raw:
-        await _validate_game(db, raw["game_id"])
+        await _validate_game(db, raw["game_id"], existing.get("game_id"))
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
+    if updates.get("sync_provider") == "manual":
+        # Von Hand gepflegt (#2129): kein Abruf mehr, also auch kein alter Fehler und kein Hinweis dazu.
+        updates.update({"last_sync_error": None, "last_sync_note": None})
     if updates.get("access_secret"):
         updates["access_secret"] = encrypt_secret(updates["access_secret"])
     slug_source = slug_source_for_update(raw, existing, "name", fallback="server")
@@ -371,7 +388,7 @@ async def update_game_server(server_id: str, body: GameServerPatch, me: dict = D
 
 
 async def _sync_one(db, server: dict) -> dict:
-    from services.game_server_status import GameServerProbeError, probe_game_server, summarize_probe_failure
+    from services.game_server_status import GameServerProbeError, explain_connection_error, probe_game_server
     try:
         result = await probe_game_server(server)
         updates = {
@@ -401,8 +418,8 @@ async def _sync_one(db, server: dict) -> dict:
         logging.getLogger("tls.game_servers").warning("game server sync failed", exc_info=True)
     updates = {
         "last_sync_at": now_utc().isoformat(),
-        "last_sync_error": None,
-        "last_sync_note": f"{_public_sync_error(error)} {summarize_probe_failure(error)}",
+        "last_sync_error": (error or "Unbekannter Fehler.")[:SYNC_ERROR_MAX],
+        "last_sync_note": " ".join(part for part in (_public_sync_error(error), explain_connection_error(error)) if part),
         "updated_at": now_utc().isoformat(),
     }
     if not server.get("last_sync_at") and not _maintenance_active(server) and server.get("status") != "planned":
@@ -448,6 +465,9 @@ async def sync_game_server(server_id: str, me: dict = Depends(require_club_admin
 
 @router.delete("/seeded-defaults")
 async def delete_seeded_default_game_servers(me: dict = Depends(require_club_admin())):
+    # Nur in Testumgebungen (#2129) - das Anlegen der Startliste sperrt runtime_config schon beim Start der Produktion.
+    if resolve_app_environment() == "production":
+        raise HTTPException(403, "Die Demo-Startliste gibt es nur in Testumgebungen.")
     db = get_db()
     res = await db.game_servers.delete_many({
         "slug": {"$in": sorted(DEMO_GAME_SERVER_SLUGS)},

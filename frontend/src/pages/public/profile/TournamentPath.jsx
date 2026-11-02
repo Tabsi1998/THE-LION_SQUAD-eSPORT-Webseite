@@ -140,7 +140,7 @@ export function RecordCard({ username, publicView = false }) {
       <ul className="mt-3 space-y-3">
         {rows.map((row) => {
           const games = Math.max(1, row.games || row.wins + row.losses + (row.draws || 0));
-          const to = row.kind === "team" ? (row.team_id ? `/teams/${row.team_id}` : null) : (row.username ? `/u/${row.username}` : null);
+          const to = row.kind === "team" ? (row.team_id ? `/teams/${row.team_id}` : null) : (row.username ? `/u/${encodeURIComponent(row.username)}` : null);
           const name = <span className="font-semibold text-sm truncate block">{row.name}</span>;
           return (
             <li key={row.key} className="grid grid-cols-[2rem_minmax(0,1fr)_auto] gap-3 items-center" aria-label={recordLabel(row)} data-testid={`profile-record-${row.key}`}>

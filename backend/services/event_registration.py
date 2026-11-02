@@ -9,6 +9,7 @@ from pymongo.errors import DuplicateKeyError
 from models import new_id, now_utc
 from services import billing_orders, pricing
 from services.access_links import AccessLinkUsedUp, claim_access_link_use, release_access_link_use
+from services.event_notifications import notify_registration_status
 from services.permissions import is_confirmed_tournament_lead
 from services.public_phase import derive_public_phase
 from services.visibility import user_can_see
@@ -130,6 +131,9 @@ async def ensure_can_register(db, event: dict, me: dict, *, has_access: bool = F
         raise RegistrationError(404, "Event nicht gefunden")
     if not has_access and not await user_can_see(me, event.get("visibility") or "public"):
         raise RegistrationError(403, "Event ist nicht sichtbar")
+    # Ein Zugangslink umgeht Fristen, aber keine Absage (#2127).
+    if event.get("status") == "cancelled":
+        raise RegistrationError(409, "Das Event ist abgesagt – eine Anmeldung ist nicht möglich.")
     if not registration_open(event) and not register_access:
         raise RegistrationError(400, "Die Anmeldung ist aktuell nicht offen")
     if not event.get("has_registration"):
@@ -154,13 +158,16 @@ def seat_resource(event_id: str) -> str:
 
 async def register(db, event: dict, me: dict, *, companion_count: int | None = 0, note: str | None = None,
                    selected_positions: list[str] | None = None, register_access: dict | None = None, via: str = "web") -> dict:
-    """Anmelden unter der Platzsperre - jeder Weg (Website, App, Discord, Zugangslink) kommt hier durch (#1037)."""
+    """Anmelden unter der Platzsperre - jeder Weg (Website, App, Discord, Zugangslink) kommt hier durch (#1037). Der
+    Bescheid an die Person (#2127) geht erst danach hinaus, damit die Sperre nicht auf Mail und Push wartet."""
     try:
         async with mutation_lock(db, seat_resource(event["id"]), wait_seconds=SEAT_WAIT_SECONDS):
-            return await _register(db, event, me, companion_count=companion_count, note=note,
-                                   selected_positions=selected_positions, register_access=register_access, via=via)
+            doc = await _register(db, event, me, companion_count=companion_count, note=note,
+                                  selected_positions=selected_positions, register_access=register_access, via=via)
     except MutationLockBusy:
         raise SeatsBusy()
+    await notify_registration_status(db, event, doc, doc.get("status"), actor_id=me["id"])
+    return doc
 
 
 async def _register(db, event: dict, me: dict, *, companion_count: int | None, note: str | None,
@@ -206,6 +213,11 @@ async def _register(db, event: dict, me: dict, *, companion_count: int | None, n
         doc["price_snapshot"] = pricing.snapshot(price, recipient=me, source={"kind": "event", "id": event["id"], "slug": event.get("slug")},
                                                  invoice_timing=offer.get("invoice_timing") or "on_confirm")
         doc["billing_status"] = "pending"
+    elif existing:
+        # Neuanmeldung nach Storno ohne Preis (Warteliste, inzwischen kostenlos): Der alte Preis gilt nicht mehr (#2127) - sonst
+        # friert das Nachrücken keinen neuen ein, und es entsteht keine Rechnung.
+        doc["price_snapshot"] = None
+        doc["billing_status"] = None
     # Zugangslink mit Limit (#1036): die Nutzung atomar belegen, bevor die Anmeldung geschrieben wird.
     try:
         claimed = await claim_access_link_use(db, register_access, me)
@@ -239,7 +251,7 @@ async def _register(db, event: dict, me: dict, *, companion_count: int | None, n
         "target_id": event["id"],
         "actor_id": me["id"],
         "data": {"registration_id": doc["id"], "status": status, "companion_count": companions,
-                 "total_cents": doc.get("price_snapshot", {}).get("total_cents"), "via": via},
+                 "total_cents": (doc.get("price_snapshot") or {}).get("total_cents"), "via": via},
         "created_at": now,
     })
     if doc.get("price_snapshot"):
@@ -301,6 +313,117 @@ def cancel_block_reason(event: dict, registration: dict | None, now=None) -> str
 
 def can_cancel(event: dict, registration: dict | None, now=None) -> bool:
     return cancel_block_reason(event, registration, now) is None
+
+
+def edit_block_reason(event: dict, registration: dict | None, now=None) -> str | None:
+    """Warum die eigene Anmeldung nicht mehr geändert werden kann (#2113, L-A3) - ``None``, solange es geht.
+
+    Dieselbe Frist wie beim Stornieren: bis zum Beginn des Events und nicht nach dem Check-in. Danach ändert die
+    Turnierleitung."""
+    from services.public_phase import parse_dt
+
+    status = (registration or {}).get("status")
+    if status == "checked_in":
+        return "Du bist schon eingecheckt – ändern geht jetzt nur über die Turnierleitung."
+    if status not in CANCELLABLE_STATUSES:
+        return "Du bist für dieses Event nicht angemeldet."
+    if event.get("status") in FINISHED_EVENT_STATUSES:
+        return "Das Event ist vorbei – ändern geht nicht mehr."
+    start = parse_dt(event.get("start_date"))
+    if start and (parse_dt(now) if now else now_utc()) >= start:
+        return "Das Event hat schon begonnen – ändern geht jetzt nur über die Turnierleitung."
+    return None
+
+
+def can_edit(event: dict, registration: dict | None, now=None) -> bool:
+    return edit_block_reason(event, registration, now) is None
+
+
+REGISTRATION_CLOSED_COMPANIONS = "Die Anmeldung ist geschlossen – mehr Begleitpersonen trägt jetzt nur die Turnierleitung ein."
+NO_SEATS_FOR_COMPANIONS = "Für so viele Begleitpersonen ist kein Platz mehr frei – trag weniger ein oder frag die Turnierleitung."
+INVOICED_COMPANIONS = ("Deine Rechnung ist schon erstellt – die Zahl der Begleitpersonen ändert jetzt nur die Turnierleitung. "
+                       "Den Hinweis kannst du weiter selbst ändern.")
+PRICE_CHANGED = ("Die Kosten dieses Events haben sich seit deiner Anmeldung geändert – die Zahl der Begleitpersonen ändert "
+                 "jetzt die Turnierleitung. Den Hinweis kannst du weiter selbst ändern.")
+
+
+async def update_own(db, event: dict, me: dict, changes: dict, *, via: str = "web") -> dict:
+    """Die eigene Anmeldung ändern (#2113, L-A3): Begleitpersonen und Hinweis - bisher nur über Stornieren und neu
+    anmelden. Unter der Platzsperre wie die Anmeldung; mehr Begleitpersonen brauchen freie Plätze. Bei Kosten rechnet
+    der Preis neu, solange noch keine Rechnung erstellt ist - danach ändert die Begleitpersonen nur die Turnierleitung."""
+    try:
+        async with mutation_lock(db, seat_resource(event["id"]), wait_seconds=SEAT_WAIT_SECONDS):
+            return await _update_own(db, event, me, changes, via=via)
+    except MutationLockBusy:
+        raise SeatsBusy()
+
+
+async def _update_own(db, event: dict, me: dict, changes: dict, *, via: str) -> dict:
+    reg = await existing_registration(db, event, me)
+    if not reg or reg.get("status") in {"cancelled", "no_show"}:
+        raise RegistrationError(404, "Anmeldung nicht gefunden")
+    blocked = edit_block_reason(event, reg)
+    if blocked:
+        raise RegistrationError(409, blocked)
+    updates: dict = {}
+    if "note" in changes:
+        note = (changes.get("note") or "").strip() or None
+        if note != (reg.get("note") or None):
+            updates["note"] = note
+    new_seats = seats(reg)
+    if "companion_count" in changes and changes.get("companion_count") is not None:
+        companions = validated_companion_count(event, changes.get("companion_count"))
+        if companions != int(reg.get("companion_count") or 0):
+            updates["companion_count"] = companions
+            updates["seat_count"] = new_seats = 1 + companions
+    if not updates:
+        return {**reg, "unchanged": True}
+    seats_changed = "seat_count" in updates
+    active = reg.get("status") in ACTIVE_STATUSES
+    # Mehr Plätze sind eine neue Anmeldung im Kleinen - nur, solange die Anmeldung offen ist. Weniger und der Hinweis gehen.
+    if seats_changed and new_seats > seats(reg) and not registration_open(event):
+        raise RegistrationError(409, REGISTRATION_CLOSED_COMPANIONS)
+    if seats_changed and active and new_seats > seats(reg) and event.get("max_participants"):
+        counts = await summary(db, event, exclude_registration_id=reg["id"])
+        if counts["reserved_seats"] + new_seats > int(event["max_participants"]):
+            raise RegistrationError(409, NO_SEATS_FOR_COMPANIONS)
+    offer = event.get("billing") or {}
+    new_snapshot = None
+    snapshot = reg.get("price_snapshot")
+    if seats_changed and active and (pricing.is_paid(offer) or snapshot):
+        if reg.get("billing_status") not in (None, "pending"):
+            raise RegistrationError(409, INVOICED_COMPANIONS)
+        # Nur rechnen, wozu die Person schon zugesagt hat: Wer kostenlos angemeldet ist oder einem anderen Angebot
+        # zugestimmt hat, bekommt durch eine Begleitperson weniger keine neue Rechnung.
+        if not snapshot or not pricing.is_paid(offer) or int(snapshot.get("offer_version") or 0) != int(offer.get("version") or 0):
+            raise RegistrationError(409, PRICE_CHANGED)
+        try:
+            price = pricing.quote(offer, seats=new_seats, selected=reg.get("selected_positions") or [])
+        except pricing.PricingError as exc:
+            raise RegistrationError(400, str(exc))
+        if not price.get("free"):
+            new_snapshot = pricing.snapshot(price, recipient=me, source={"kind": "event", "id": event["id"], "slug": event.get("slug")},
+                                            invoice_timing=offer.get("invoice_timing") or "on_confirm")
+            updates["price_snapshot"], updates["billing_status"] = new_snapshot, "pending"
+        else:
+            updates["price_snapshot"], updates["billing_status"] = None, None
+        await billing_orders.cancel_orders_for(db, kind="event", registration_id=reg["id"], reason="Begleitpersonen geändert")
+    now = now_utc().isoformat()
+    updates["updated_at"] = now
+    await db.event_registrations.update_one({"id": reg["id"]}, {"$set": updates})
+    if new_snapshot:
+        await billing_orders.create_order(db, kind="event", source_id=event["id"], registration_id=reg["id"], user_id=me["id"],
+                                          snapshot=new_snapshot, timing=pricing.order_timing(new_snapshot, offer))
+    await db.audit_logs.insert_one({
+        "id": new_id(),
+        "action": "event.registration.self_update",
+        "target_id": event["id"],
+        "actor_id": me["id"],
+        "data": {"registration_id": reg["id"], "fields": sorted(key for key in updates if key not in {"updated_at", "price_snapshot", "billing_status"}),
+                 "companion_count": updates.get("companion_count"), "via": via},
+        "created_at": now,
+    })
+    return await db.event_registrations.find_one({"id": reg["id"]}, {"_id": 0})
 
 
 async def cancel(db, event: dict, me: dict, *, via: str = "web") -> dict:

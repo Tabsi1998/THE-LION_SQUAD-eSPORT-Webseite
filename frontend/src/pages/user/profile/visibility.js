@@ -24,10 +24,10 @@ export const VISIBILITY_GROUPS = [
     k: "contact",
     l: "Kontakt",
     fields: [
-      { k: "email", l: "E-Mail" },
       { k: "discord", l: "Discord" },
       { k: "city", l: "Wohnort" },
       { k: "country", l: "Land" },
+      { k: "website", l: "Website" },
     ],
   },
   {
@@ -63,6 +63,7 @@ export const VISIBILITY_GROUPS = [
       { k: "twitch", l: "Twitch" },
       { k: "youtube", l: "YouTube" },
       { k: "instagram", l: "Instagram" },
+      { k: "tiktok", l: "TikTok" },
       { k: "x", l: "X / Twitter" },
       { k: "github", l: "GitHub" },
       { k: "kick", l: "Kick" },
@@ -84,6 +85,8 @@ export const VISIBILITY_GROUPS = [
     fields: [
       { k: "main_platforms", l: "Plattformen" },
       { k: "input_devices", l: "Eingabegeräte" },
+      { k: "gaming_subscriptions", l: "Gaming-Abos" },
+      { k: "preferred_role", l: "Bevorzugte Rolle" },
       { k: "favorite_games", l: "Lieblingsspiele" },
     ],
   },
@@ -95,8 +98,13 @@ export function visibilityLabel(level) {
   return VISIBILITY_LEVELS.find((item) => item.k === level)?.l || level;
 }
 
+// Ohne gewählte Stufe nicht öffentlich (#2113, #2126): TikTok und die bevorzugte Rolle erschienen früher nirgends - wer sie
+// eingetragen hat, wurde nie gefragt. Gleich in backend/routes/user_routes.py (FIELD_DEFAULT_LEVELS); das Formular zeigt so
+// die wirkliche Stufe.
+const FIELD_DEFAULT_LEVELS = { tiktok: "private", preferred_role: "private" };
+
 export function fieldLevel(visibility, key) {
-  return (visibility && visibility[key]) || DEFAULT_VISIBILITY;
+  return (visibility && visibility[key]) || FIELD_DEFAULT_LEVELS[key] || DEFAULT_VISIBILITY;
 }
 
 // Eine Stufe, wenn alle Felder der Gruppe sie teilen, sonst "mixed".

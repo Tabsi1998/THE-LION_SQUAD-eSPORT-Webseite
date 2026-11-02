@@ -5,7 +5,7 @@ Pydantic meldet ungültige Eingaben auf Englisch („String should have at most 
 sind, damit Programme weiter danach unterscheiden können.
 
 Bekannte Feldnamen bekommen ein deutsches Wort davor („Nachricht: höchstens 1000 Zeichen.“), unbekannte stehen in
-Klammern dahinter („Mindestens 2 (max_participants).“) - lieber der technische Name als gar kein Hinweis, welches Feld.
+Klammern dahinter („Mindestens 2 (max_companions).“) - lieber der technische Name als gar kein Hinweis, welches Feld.
 """
 from __future__ import annotations
 
@@ -13,11 +13,14 @@ from typing import Any
 
 FIELD_LABELS = {
     "message": "Nachricht", "name": "Name", "subject": "Betreff", "email": "E-Mail", "title": "Titel", "body": "Text",
-    "text": "Text", "password": "Passwort", "new_password": "Neues Passwort", "status": "Status", "reason": "Grund",
+    "text": "Text", "tag": "Kürzel", "password": "Passwort", "new_password": "Neues Passwort", "status": "Status", "reason": "Grund",
     "description": "Beschreibung", "note": "Notiz", "username": "Benutzername", "display_name": "Anzeigename",
     "comment": "Kommentar", "phone": "Telefon", "topic": "Thema", "content": "Inhalt", "excerpt": "Auszug",
     "location": "Ort", "city": "Ort", "postal_code": "PLZ", "address": "Adresse", "first_name": "Vorname",
     "last_name": "Nachname", "birthday": "Geburtstag", "team_name": "Teamname", "gamertag": "Gamertag",
+    # Turnierzahlen (#2111, TA3)
+    "max_participants": "Max. Teilnehmer", "min_participants": "Min. Teilnehmer", "best_of": "Best of",
+    "season_weight": "Jahreswertung", "seed": "Setzplatz", "team_size": "Spieler pro Team",
 }
 
 ROOTS = {"body", "query", "path", "header", "cookie"}

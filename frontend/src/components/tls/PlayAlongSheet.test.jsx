@@ -12,7 +12,7 @@ const { PlayAlongSheet } = await import("./PlayAlongSheet");
 const SOLO = { kind: "tournament", id: "t1", slug: "lan-cup", title: "LAN-Cup", start_date: "2026-10-31T14:00:00+00:00", mode: "Einzel", game: "Rocket League",
   team: false, fee: { total_cents: 1000, currency: "EUR" }, spots_left: 3, full: false, selectable: true, reason: null, captain: false, my_status: null };
 const FULL = { ...SOLO, id: "t2", slug: "mini", title: "Mini-Cup", fee: null, spots_left: 0, full: true };
-const TEAM = { ...SOLO, id: "t3", slug: "team-cup", title: "Team-Cup", mode: "Team", team: true, fee: null, selectable: false, reason: "Dein Kapitän meldet das Team an." };
+const TEAM = { ...SOLO, id: "t3", slug: "team-cup", title: "Team-Cup", mode: "Team", team: true, fee: null, selectable: false, reason: "Deine Teamleitung meldet das Team an." };
 const LAP = { kind: "fastlap", id: "f1", slug: "lap", title: "LAN Fast Lap", mode: "Bestzeit fahren", selectable: false, reason: "Keine Anmeldung nötig – du fährst einfach deine Bestzeit." };
 const EVENT = { id: "e1", schedule: { multi_day: false } };
 
@@ -44,13 +44,13 @@ test("Haken nur bei Einzel-Turnieren; Team-Turnier und Fast Lap als Hinweis", as
   expect(box).toHaveAttribute("type", "checkbox");
   expect(screen.getByTestId("play-along-row-t1")).toHaveTextContent("Einzel · Rocket League · 10,00 € Startgeld · 3 Plätze frei");
   expect(screen.queryByTestId("play-along-check-t3")).toBeNull();
-  expect(screen.getByTestId("play-along-note-t3")).toHaveTextContent("Dein Kapitän meldet das Team an.");
+  expect(screen.getByTestId("play-along-note-t3")).toHaveTextContent("Deine Teamleitung meldet das Team an.");
   expect(screen.queryByTestId("play-along-team-t3")).toBeNull();
   expect(screen.queryByTestId("play-along-check-f1")).toBeNull();
   expect(screen.getByTestId("play-along-note-f1")).toHaveTextContent("Keine Anmeldung nötig");
 });
 
-test("Kapitäne bekommen den Link zur Team-Anmeldung", async () => {
+test("Teamleitungen bekommen den Link zur Team-Anmeldung", async () => {
   renderSheet({ entries: [{ ...TEAM, captain: true, reason: "Melde dein Team auf der Turnierseite an." }] });
   const link = await screen.findByTestId("play-along-team-t3");
   expect(link).toHaveAttribute("href", "/tournaments/team-cup");

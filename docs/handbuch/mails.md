@@ -88,12 +88,12 @@ Alle anderen sind **Themen**, die jede Person selbst an- und abschalten kann (3.
 | Thema | Wofür |
 | --- | --- |
 | **Spiel-Erinnerungen** | Startzeiten, Spiel-Hub, Check-in-nahe Hinweise, Aufruf, Ergebnis-Meldungen, Disputes |
-| **Turnier-Updates** | Anmeldung (eingegangen, bestätigt, abgelehnt, Warteliste), Check-in, Ergebnisse, „Turnier beendet“, „Turnier abgesagt“, „Event abgesagt“, „Wie war …?“ am Tag danach, Fotos vom Event („Die Fotos sind da“), Nachricht der Turnierleitung an alle Angemeldeten eines Events |
+| **Turnier-Updates** | Anmeldung (eingegangen, bestätigt, abgelehnt, Warteliste), Check-in, Ergebnisse, „Turnier beendet“, „Turnier abgesagt“, „Event abgesagt“, Stand der eigenen Event-Anmeldung (angemeldet, Warteliste, nachgerückt, von der Leitung storniert), „Wie war …?“ am Tag danach, Fotos vom Event („Die Fotos sind da“), Nachricht der Turnierleitung an alle Angemeldeten eines Events |
 | **Gewinne & Abholung** | Gewinn bereit, übergeben, Frist abgelaufen |
 | **Erfolge** | Freigeschaltete Erfolge, Kronen und neue Level – nur In-App, Push, Discord, keine Mail |
 | **Wochenrückblick** | Montags eine Mail mit XP und neuen Erfolgen, nur bei Aktivität, nur per Mail |
 | **Rechnungen** | „Deine Rechnung ist da“ – nur In-App, Push, Mail; Beträge gehen nie über Discord |
-| **Vereinsmitgliedschaft** | Bewerbung, Mitgliedsstatus, Vorteile |
+| **Vereinsmitgliedschaft** | Einladungen zum Antrag, Nummern, Vorteile. Entscheidungen über die eigene Mitgliedschaft (aufgenommen, abgelehnt, aktiv, ruhend, beendet, gesperrt) kommen immer per Mail und als Meldung, auch wenn das Thema aus ist |
 | **Geburtstagsgruß** | Einmal im Jahr eine Mail vom Verein |
 | **Nachrichten & Erwähnungen** | Direktnachrichten, Team-Chat-Erwähnungen, Freundschafts- und Team-Einladungen |
 | **News & Events** | Neue News, Events, Ankündigungen – nur mit Newsletter-Zustimmung, Standard aus |

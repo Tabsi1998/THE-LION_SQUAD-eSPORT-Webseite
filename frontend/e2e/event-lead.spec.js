@@ -27,7 +27,7 @@ async function setup(page) {
   await page.addInitScript(() => {
     window.localStorage.setItem("tls_cookie_consent_v1", JSON.stringify({ essential: true, external_media: false, analytics: false, meta: false, tiktok: false, saved_at: Date.now(), expires_at: Date.now() + 30 * 24 * 60 * 60 * 1000 }));
   });
-  const state = { rows: rows(), patches: [], messages: [], sent: null };
+  const state = { rows: rows(), patches: [], messages: [], sent: null, walkIns: [], exports: [] };
   await page.route("**/api/**", (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -36,7 +36,7 @@ async function setup(page) {
     if (url.pathname === "/api/events/herbst-lan/lead") {
       return route.fulfill(json({
         event: { id: "e1", slug: "herbst-lan", name: "Herbst-LAN 2026", start_date: "2026-10-18T08:00:00+00:00", max_participants: 20, allow_companions: true, max_companions_per_registration: 2 },
-        counts: {}, registrations: state.rows, can_message: true, message_recipients: state.rows.filter((row) => row.status !== "waitlist").length, messages: state.messages,
+        counts: {}, registrations: state.rows, can_message: true, can_add_walk_in: true, message_recipients: state.rows.filter((row) => row.status !== "waitlist").length, messages: state.messages,
       }));
     }
     const patch = url.pathname.match(/^\/api\/events\/e1\/registrations\/(r\d+)$/);
@@ -46,6 +46,27 @@ async function setup(page) {
       state.rows = state.rows.map((row) => (row.id === patch[1] ? { ...row, ...body } : row));
       return route.fulfill(json({ id: patch[1], ...body }));
     }
+    if (url.pathname === "/api/events/e1/lead/walk-in" && request.method() === "POST") {
+      const body = request.postDataJSON();
+      state.walkIns.push(body);
+      const row = { id: `w${state.walkIns.length}`, display_name: body.display_name, status: "checked_in", companion_count: body.companion_count || 0, seat_count: 1 + (body.companion_count || 0), walk_in: true, created_at: "2026-10-18T07:41:00+00:00" };
+      state.rows = [...state.rows, row].sort((a, b) => a.display_name.localeCompare(b.display_name, "de"));
+      return route.fulfill(json(row));
+    }
+    const walkIn = url.pathname.match(/^\/api\/events\/e1\/lead\/walk-in\/(w\d+)$/);
+    if (walkIn && request.method() === "PATCH") {
+      const body = request.postDataJSON();
+      state.rows = state.rows.map((row) => (row.id === walkIn[1] ? { ...row, ...body } : row));
+      return route.fulfill(json(state.rows.find((row) => row.id === walkIn[1])));
+    }
+    if (walkIn && request.method() === "DELETE") {
+      state.rows = state.rows.filter((row) => row.id !== walkIn[1]);
+      return route.fulfill(json({ ok: true }));
+    }
+    if (url.pathname === "/api/events/herbst-lan/lead/export.csv") {
+      state.exports.push(url.searchParams.get("filter"));
+      return route.fulfill({ status: 200, contentType: "text/csv; charset=utf-8", body: "Name;Status\r\nPaula;Da\r\n", headers: { "Content-Disposition": 'attachment; filename="anmeldungen-herbst-lan.csv"' } });
+    }
     if (url.pathname === "/api/events/e1/lead/message" && request.method() === "POST") {
       state.sent = request.postDataJSON();
       state.messages = [{ id: "m1", text: state.sent.text, recipient_count: state.sent.confirm_count, actor_name: "Turnierleitung", created_at: "2026-10-18T07:41:00+00:00" }];
@@ -54,6 +75,11 @@ async function setup(page) {
     return route.fulfill(json([]));
   });
   return state;
+}
+
+async function noSideScroll(page) {
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
 }
 
 test.describe("Anmeldungen & Einlass", () => {
@@ -105,4 +131,76 @@ test.describe("Anmeldungen & Einlass", () => {
     expect(state.sent).toEqual({ text: "Der Parkplatz ist gesperrt – bitte den Hintereingang nehmen.", confirm_count: 7 });
     await expect(page.getByTestId("event-lead-log")).toContainText("Der Parkplatz ist gesperrt");
   });
+
+  // #2127: „1 Platz frei“ mit Knopf statt automatischem Nachrücken, Rückfrage vor „Storniert“, interne Notiz, Person an der
+  // Tür und CSV - bei beiden Breiten, ohne seitliches Scrollen.
+  for (const [label, width, height] of [["Handy", 390, 844], ["PC", 1440, 900]]) {
+    test(`${label} (${width} px): freier Platz, Rückfrage, Notiz, Person an der Tür und CSV`, async ({ page }, testInfo) => {
+      await page.setViewportSize({ width, height });
+      const state = await setup(page);
+      await page.goto("/events/herbst-lan/leitung");
+
+      const hint = page.getByTestId("event-lead-free-hint");
+      await expect(hint).toContainText("Plätze frei · 1 auf der Warteliste");
+      await expect(hint).toContainText("Als Nächste: Tobias Rainer");
+      expect(state.patches).toEqual([]);
+      await screenshot(page, testInfo, `einlass-frei-${width}.png`);
+      await page.getByTestId("event-lead-free-open").click();
+      await page.getByTestId("event-lead-moveup-r8").click();
+      await expect(hint).toHaveCount(0);
+      expect(state.patches).toEqual([{ id: "r8", status: "registered" }]);
+
+      // Rückfrage vor „Storniert“: „Zurück“ ändert nichts, „Stornieren“ geht hinaus.
+      await page.getByTestId("event-lead-filter-open").click();
+      await page.getByTestId("event-lead-name-r3").click();
+      const details = page.getByTestId("event-lead-details").filter({ visible: true });
+      await details.getByTestId("event-lead-status").selectOption("cancelled");
+      await expect(page.getByRole("dialog")).toContainText("Rechnungsaufträge werden storniert");
+      await page.getByRole("button", { name: "Zurück" }).click();
+      expect(state.patches).toHaveLength(1);
+      await details.getByTestId("event-lead-status").selectOption("cancelled");
+      await page.getByRole("button", { name: "Stornieren" }).click();
+      await expect.poll(() => state.patches.at(-1)).toEqual({ id: "r3", status: "cancelled" });
+
+      // Interne Notiz.
+      await page.getByTestId("event-lead-filter-open").click();
+      await page.getByTestId("event-lead-name-r4").click();
+      const note = page.getByTestId("event-lead-details").filter({ visible: true });
+      await note.getByTestId("event-lead-internal-note").fill("zahlt an der Tür");
+      await note.getByTestId("event-lead-internal-note-save").click();
+      await expect.poll(() => state.patches.at(-1)).toEqual({ id: "r4", internal_note: "zahlt an der Tür" });
+
+      // Person an der Tür.
+      await page.getByTestId("event-lead-walkin-open").click();
+      const dialog = page.getByTestId("event-lead-walkin");
+      await expect(dialog).toContainText("Ohne Konto und ohne Preis");
+      await page.getByTestId("event-lead-walkin-name").fill("Gast Hofer");
+      await screenshot(page, testInfo, `einlass-tuer-${width}.png`);
+      await noSideScroll(page);
+      await page.getByTestId("event-lead-walkin-save").click();
+      await expect(dialog).toHaveCount(0);
+      expect(state.walkIns).toEqual([{ display_name: "Gast Hofer", companion_count: 0 }]);
+      await page.getByTestId("event-lead-filter-here").click();
+      await expect(page.getByTestId("event-lead-row-w1")).toContainText("An der Tür");
+
+      // CSV der gewählten Liste.
+      const download = page.waitForEvent("download");
+      await page.getByTestId("event-lead-csv").click();
+      expect((await download).suggestedFilename()).toBe("anmeldungen-herbst-lan.csv");
+      expect(state.exports).toEqual(["here"]);
+      await noSideScroll(page);
+
+      // Eintrag an der Tür: Name berichtigen, dann löschen.
+      await page.getByTestId("event-lead-name-w1").click();
+      const walkIn = page.getByTestId("event-lead-details").filter({ visible: true });
+      await walkIn.getByTestId("event-lead-walkin-edit-name").fill("Gast Hofer-Maier");
+      await walkIn.getByTestId("event-lead-walkin-edit-save").click();
+      await expect(page.getByTestId("event-lead-row-w1")).toContainText("Gast Hofer-Maier");
+      await screenshot(page, testInfo, `einlass-tuer-bearbeiten-${width}.png`);
+      await noSideScroll(page);
+      await walkIn.getByTestId("event-lead-walkin-delete").click();
+      await page.getByTestId("confirm-dialog-confirm").click();
+      await expect(page.getByTestId("event-lead-row-w1")).toHaveCount(0);
+    });
+  }
 });

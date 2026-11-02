@@ -16,8 +16,10 @@ from routes.tournament_common import (
     _audit_tournament_action,
     _ensure_tournament_unlocked,
     _get_visible_tournament,
+    _is_staff,
     _resolve_tid,
     _serialized_tournament_write,
+    tournament_hidden_reason,
 )
 from services import map_pools
 from services.game_maps import MapProblem
@@ -47,7 +49,21 @@ async def tournament_map_pools_admin(tid: str, me: dict = Depends(get_current_us
     tid = await _resolve_tid(tid)
     await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
     tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
-    return await map_pools.tournament_overview(db, tournament, admin=True)
+    overview = await map_pools.tournament_overview(db, tournament, admin=True)
+    return {**overview, "sources": await _visible_sources(db, tournament, me)}
+
+
+async def _visible_sources(db, tournament: dict, me: dict) -> list[dict]:
+    """„Übernehmen von“ (#2129): nur, was diese Person auch sonst sehen darf - Liga-Seasons nur die Leitung."""
+    out: list[dict] = []
+    for source in await map_pools.tournament_sources(db, tournament):
+        other = source.get("tournament")
+        allowed = _is_staff(me) if source.get("season") else not await tournament_hidden_reason(db, other, me)
+        if allowed:
+            out.append({key: source[key] for key in ("key", "label", "pool")})
+        if len(out) >= map_pools.SOURCES_MAX:
+            break
+    return out
 
 
 async def _writable(db, tid: str, me: dict) -> dict:
@@ -140,7 +156,7 @@ async def series_map_pool(series_id: str, access: SeriesAccess = Depends(require
             else map_pools.view(map_pools.valid_for(own, game_id), "reference_series"))
     previous = await map_pools.previous_series_pool(db, lineage, access.series) if access.is_board and game else None
     return {"game": map_pools.game_summary(game), "library": await map_pools.library(db, game), "pool": pool,
-            "previous": previous}
+            "previous": previous, "default_pool": await map_pools.default_pool(db, game)}
 
 
 async def _audit_series(db, me: dict, series_id: str, action: str, doc: dict) -> None:

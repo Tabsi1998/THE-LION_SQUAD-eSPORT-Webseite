@@ -65,7 +65,7 @@ async def test_team_admin_edits_need_the_second_factor(flow):
 
     # Die Teamleitung selbst braucht keinen Adminbereich und keine Zwei-Faktor-Anmeldung.
     flow.act_as(without_second_factor(captain))
-    assert (await flow.patch(f"/api/teams/{team['id']}", json={"description": "Vom Kapitän"})).status_code == 200
+    assert (await flow.patch(f"/api/teams/{team['id']}", json={"description": "Von der Teamleitung"})).status_code == 200
 
 
 @pytest.mark.asyncio

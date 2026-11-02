@@ -4,7 +4,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 // Anmeldungen & Einlass (#1372): Suche, Filter „noch nicht da“, Einchecken mit „Rückgängig“, Nachrücken und
 // „Nachricht an alle“ mit Vorschau und Bestätigung. Namen und Adressen sind erfunden.
 
-const apiMock = { get: vi.fn(), post: vi.fn(), patch: vi.fn() };
+const apiMock = { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, API_BASE: "", formatApiError: (value) => value }));
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { id: "s1" } }) }));
 vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <div>{children}</div> }));
@@ -12,6 +12,8 @@ vi.mock("@/components/tls/Breadcrumbs", () => ({ Breadcrumbs: () => null }));
 vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: () => {} }));
 vi.mock("@/hooks/useDocumentTitle", () => ({ useDocumentTitle: () => {} }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+const confirmMock = vi.fn(async () => true);
+vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => confirmMock }));
 const { toast } = await import("sonner");
 const EventLeadPage = (await import("./EventLeadPage")).default;
 
@@ -136,6 +138,173 @@ test("Nachricht an alle: Vorlage, Vorschau der Empfänger, erst nach Bestätigun
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/events/e1/lead/message", { text: "Der Parkplatz ist gesperrt – bitte den Hintereingang nehmen.", confirm_count: 3 }));
   await waitFor(() => expect(screen.queryByTestId("event-lead-message")).toBeNull());
   expect(toast.success).toHaveBeenCalledWith("Gesendet an 3 Personen.");
+});
+
+test("„1 Platz frei“: Hinweis mit der Warteliste, nachrücken geht nur per Knopf", async () => {
+  apiMock.patch.mockResolvedValue({ data: {} });
+  const rows = ROWS.map((row) => (row.id === "r3" ? { ...row, status: "cancelled" } : row));
+  // Plätze: Max 1 + Paula 2 = 3 von 4, also einer frei.
+  renderLead({ ...VIEW, event: { ...VIEW.event, max_participants: 4 }, registrations: rows });
+  const hint = await screen.findByTestId("event-lead-free-hint");
+  expect(hint).toHaveTextContent("1 Platz frei · 1 auf der Warteliste");
+  expect(hint).toHaveTextContent("Als Nächste: Ella Wartend");
+  expect(apiMock.patch).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByTestId("event-lead-free-open"));
+  fireEvent.click(screen.getByTestId("event-lead-moveup-r4"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/events/e1/registrations/r4", { status: "registered" }));
+  expect(toast.success).toHaveBeenCalledWith("Ella Wartend ist nachgerückt und bekommt Bescheid.");
+});
+
+test("„Storniert“ erst nach der Rückfrage, sie nennt Rechnung und Nachricht; „Zurück“ ändert nichts", async () => {
+  apiMock.patch.mockResolvedValue({ data: {} });
+  renderLead();
+  fireEvent.click(await screen.findByTestId("event-lead-name-r3"));
+  const [details] = screen.getAllByTestId("event-lead-details");
+
+  confirmMock.mockResolvedValueOnce(false);
+  fireEvent.change(within(details).getByTestId("event-lead-status"), { target: { value: "cancelled" } });
+  await waitFor(() => expect(confirmMock).toHaveBeenCalled());
+  const question = confirmMock.mock.calls[0][0];
+  expect(question.title).toBe("Anmeldung stornieren?");
+  expect(question.description).toContain("Rechnungsaufträge werden storniert");
+  expect(question.description).toContain("Die Person bekommt eine Nachricht.");
+  expect(apiMock.patch).not.toHaveBeenCalled();
+  expect(within(details).getByTestId("event-lead-status")).toHaveValue("registered");
+
+  confirmMock.mockResolvedValueOnce(true);
+  fireEvent.change(within(details).getByTestId("event-lead-status"), { target: { value: "no_show" } });
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/events/e1/registrations/r3", { status: "no_show" }));
+  expect(toast.success).toHaveBeenCalledWith("Zoë Adler: Nicht erschienen. Die Person bekommt Bescheid.");
+});
+
+test("„Warteliste“ und „Angemeldet“ brauchen keine Rückfrage", async () => {
+  confirmMock.mockClear();
+  apiMock.patch.mockResolvedValue({ data: {} });
+  renderLead();
+  fireEvent.click(await screen.findByTestId("event-lead-name-r3"));
+  const [details] = screen.getAllByTestId("event-lead-details");
+  fireEvent.change(within(details).getByTestId("event-lead-status"), { target: { value: "waitlist" } });
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/events/e1/registrations/r3", { status: "waitlist" }));
+  expect(confirmMock).not.toHaveBeenCalled();
+});
+
+test("Interne Notiz: eintragen, speichern, leeren", async () => {
+  apiMock.patch.mockResolvedValue({ data: {} });
+  renderLead();
+  fireEvent.click(await screen.findByTestId("event-lead-name-r3"));
+  const [details] = screen.getAllByTestId("event-lead-details");
+  expect(within(details).queryByTestId("event-lead-internal-note-save")).toBeNull();
+  expect(within(details).getByTestId("event-lead-internal-note-hint")).toHaveTextContent("bei einer Datenauskunft wird sie mitgeliefert");
+
+  fireEvent.change(within(details).getByTestId("event-lead-internal-note"), { target: { value: "  zahlt an der Tür " } });
+  fireEvent.click(within(details).getByTestId("event-lead-internal-note-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/events/e1/registrations/r3", { internal_note: "zahlt an der Tür" }));
+  await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Notiz gespeichert."));
+  await waitFor(() => expect(within(details).queryByTestId("event-lead-internal-note-save")).toBeNull());
+
+  fireEvent.change(within(details).getByTestId("event-lead-internal-note"), { target: { value: "" } });
+  fireEvent.click(within(details).getByTestId("event-lead-internal-note-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/events/e1/registrations/r3", { internal_note: null }));
+});
+
+test("Bestehende interne Notiz steht im Feld", async () => {
+  apiMock.get.mockImplementation((url) => Promise.resolve(url.endsWith("/lead/registrations/r2") ? { data: { id: "r2", note: null, internal_note: "Rollstuhlplatz" } } : { data: VIEW }));
+  render(
+    <MemoryRouter initialEntries={["/events/herbst-lan/leitung"]}>
+      <Routes><Route path="/events/:slug/leitung" element={<EventLeadPage />} /></Routes>
+    </MemoryRouter>,
+  );
+  fireEvent.click(await screen.findByTestId("event-lead-name-r2"));
+  const [details] = screen.getAllByTestId("event-lead-details");
+  await waitFor(() => expect(within(details).getByTestId("event-lead-internal-note")).toHaveValue("Rollstuhlplatz"));
+});
+
+test("CSV: lädt die Liste des gewählten Filters", async () => {
+  URL.createObjectURL = vi.fn(() => "blob:liste");
+  URL.revokeObjectURL = vi.fn();
+  const click = vi.spyOn(window.HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+  try {
+    apiMock.get.mockResolvedValue({ data: VIEW });
+    renderLead();
+    fireEvent.click(await screen.findByTestId("event-lead-filter-here"));
+    fireEvent.click(screen.getByTestId("event-lead-csv"));
+    await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/events/herbst-lan/lead/export.csv", { params: { filter: "here" }, responseType: "blob" }));
+    await waitFor(() => expect(click).toHaveBeenCalled());
+
+    apiMock.get.mockRejectedValueOnce(new Error("kaputt"));
+    fireEvent.click(screen.getByTestId("event-lead-csv"));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Die Liste ließ sich nicht herunterladen."));
+  } finally {
+    click.mockRestore();
+  }
+});
+
+test("Person an der Tür: Name genügt, Hinweis bei gleichem Namen, Ablehnung bleibt im Fenster", async () => {
+  renderLead({ ...VIEW, can_add_walk_in: true });
+  fireEvent.click(await screen.findByTestId("event-lead-walkin-open"));
+  expect(screen.getByTestId("event-lead-walkin-save")).toBeDisabled();
+
+  fireEvent.change(screen.getByTestId("event-lead-walkin-name"), { target: { value: "zoe adler" } });
+  expect(screen.getByTestId("event-lead-walkin-twin")).toHaveTextContent("„Zoë Adler“ steht schon in der Liste");
+
+  apiMock.post.mockRejectedValueOnce({ response: { status: 400, data: { detail: "Das Event ist voll." } } });
+  fireEvent.click(screen.getByTestId("event-lead-walkin-save"));
+  await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Das Event ist voll."));
+  expect(screen.getByTestId("event-lead-walkin")).toBeInTheDocument();
+
+  apiMock.post.mockResolvedValueOnce({ data: { id: "w1", display_name: "Gast Neu", status: "checked_in", walk_in: true } });
+  fireEvent.change(screen.getByTestId("event-lead-walkin-name"), { target: { value: " Gast Neu " } });
+  fireEvent.change(screen.getByTestId("event-lead-walkin-companions"), { target: { value: "1" } });
+  fireEvent.click(screen.getByTestId("event-lead-walkin-save"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenLastCalledWith("/events/e1/lead/walk-in", { display_name: "Gast Neu", companion_count: 1 }));
+  await waitFor(() => expect(screen.queryByTestId("event-lead-walkin")).toBeNull());
+  expect(toast.success).toHaveBeenCalledWith("Gast Neu ist da.");
+});
+
+test("Person an der Tür: ohne Freigabe vom Server kein Knopf; Eintrag ohne Konto ist gekennzeichnet", async () => {
+  renderLead({ ...VIEW, registrations: [...ROWS, { id: "w1", display_name: "Gast Tür", status: "registered", seat_count: 1, companion_count: 0, walk_in: true }] });
+  fireEvent.click(await screen.findByTestId("event-lead-name-w1"));
+  expect(screen.queryByTestId("event-lead-walkin-open")).toBeNull();
+  expect(screen.getByTestId("event-lead-row-w1")).toHaveTextContent("An der Tür");
+  const [details] = screen.getAllByTestId("event-lead-details");
+  expect(within(details).getByTestId("event-lead-walkin-note")).toHaveTextContent("ohne Konto und ohne Preis");
+  // Niemand bekommt eine Nachricht: die Rückfrage sagt das auch nicht.
+  fireEvent.change(within(details).getByTestId("event-lead-status"), { target: { value: "cancelled" } });
+  await waitFor(() => expect(confirmMock).toHaveBeenCalled());
+  expect(confirmMock.mock.lastCall[0].description).not.toContain("Nachricht");
+});
+
+test("Eintrag an der Tür: Name berichtigen und löschen; Anmeldungen mit Konto bieten das nicht an", async () => {
+  apiMock.patch.mockResolvedValue({ data: {} });
+  apiMock.delete.mockReset();
+  apiMock.delete.mockResolvedValue({ data: { ok: true } });
+  renderLead({ ...VIEW, registrations: [...ROWS, { id: "w1", display_name: "Gast Falsch", status: "registered", seat_count: 1, companion_count: 0, walk_in: true }] });
+  fireEvent.click(await screen.findByTestId("event-lead-name-r3"));
+  expect(within(screen.getAllByTestId("event-lead-details")[0]).queryByTestId("event-lead-walkin-edit")).toBeNull();
+
+  fireEvent.click(screen.getByTestId("event-lead-name-w1"));
+  const [details] = screen.getAllByTestId("event-lead-details");
+  expect(within(details).queryByTestId("event-lead-walkin-edit-save")).toBeNull();
+  fireEvent.change(within(details).getByTestId("event-lead-walkin-edit-name"), { target: { value: " Gast Richtig " } });
+  fireEvent.click(within(details).getByTestId("event-lead-walkin-edit-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/events/e1/lead/walk-in/w1", { display_name: "Gast Richtig" }));
+  await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Name geändert."));
+
+  confirmMock.mockResolvedValueOnce(false);
+  fireEvent.click(within(details).getByTestId("event-lead-walkin-delete"));
+  await waitFor(() => expect(confirmMock.mock.lastCall[0].title).toBe("Eintrag löschen?"));
+  expect(apiMock.delete).not.toHaveBeenCalled();
+  confirmMock.mockResolvedValueOnce(true);
+  fireEvent.click(within(details).getByTestId("event-lead-walkin-delete"));
+  await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith("/events/e1/lead/walk-in/w1"));
+  await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Eintrag gelöscht."));
+});
+
+test("voll: kein Hinweis auf einen freien Platz", async () => {
+  renderLead({ ...VIEW, event: { ...VIEW.event, max_participants: 4 } });
+  expect(await screen.findByTestId("event-lead-counter")).toBeInTheDocument();
+  expect(screen.queryByTestId("event-lead-free-hint")).toBeNull();
 });
 
 test("ohne Recht: Hinweis statt Liste", async () => {

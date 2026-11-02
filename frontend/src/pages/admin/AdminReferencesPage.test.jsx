@@ -54,6 +54,55 @@ beforeEach(() => {
   toastMock.success.mockReset();
 });
 
+test("Texte: Highlights sagen „öffentlich“, interne Notizen gehen mit und öffnen „Weitere Angaben“ (#2130)", async () => {
+  mockApi([{ ...LEGACY_ITEM, internal_notes: "Nur für uns", highlights: "Starker Auftritt" }]);
+  render(<MemoryRouter><AdminReferencesPage /></MemoryRouter>);
+  fireEvent.click(await screen.findByTestId("reference-edit-r1"));
+  expect(screen.getByLabelText(/Highlights \(öffentlich\)/)).toHaveValue("Starker Auftritt");
+  expect(screen.getByTestId("reference-internal-notes")).toHaveValue("Nur für uns");
+  fireEvent.change(screen.getByTestId("reference-internal-notes"), { target: { value: "  Rechnung offen " } });
+  fireEvent.click(screen.getByTestId("reference-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/references/r1", expect.objectContaining({ internal_notes: "Rechnung offen", highlights: "Starker Auftritt" })));
+});
+
+test("Archivieren und Zurückholen schalten „Aktiv“; Löschen in Verwendung zeigt den Grund (#2130)", async () => {
+  mockApi([LEGACY_ITEM, { ...LEGACY_ITEM, id: "r2", title: "Alt", display_title: "Alt", is_active: false }]);
+  render(<MemoryRouter><AdminReferencesPage /></MemoryRouter>);
+  expect(await screen.findByTestId("reference-row-r2")).toHaveTextContent("Archiviert");
+  fireEvent.click(screen.getByTestId("reference-archive-r1"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/references/r1", { is_active: false }));
+  fireEvent.click(screen.getByTestId("reference-restore-r2"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/references/r2", { is_active: true }));
+  apiMock.delete.mockRejectedValueOnce({ response: { data: { detail: "Diese Referenz wird noch verwendet: gehört zu einer Saison." } } });
+  fireEvent.click(screen.getByTestId("reference-delete-r1"));
+  await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Diese Referenz wird noch verwendet: gehört zu einer Saison."));
+});
+
+test("Liste: Suche, Filter und Seiten; eine neue Suche beginnt auf Seite 1 (#2130)", async () => {
+  const many = Array.from({ length: 30 }, (_, index) => ({ ...LEGACY_ITEM, id: `r-${index}`, title: `Cup ${index}`, display_title: `Cup ${index}`, start_date: index === 29 ? "2024-02-02" : "2026-02-02" }));
+  mockApi(many);
+  render(<MemoryRouter><AdminReferencesPage /></MemoryRouter>);
+  expect(await screen.findByTestId("reference-row-r-0")).toBeInTheDocument();
+  expect(screen.queryByTestId("reference-row-r-25")).toBeNull();
+  expect(screen.getByTestId("reference-filter-count")).toHaveTextContent("30 von 30 Referenzen");
+  fireEvent.click(screen.getByTestId("reference-page-next"));
+  expect(screen.getByTestId("reference-row-r-25")).toBeInTheDocument();
+  expect(screen.getByTestId("reference-page-info")).toHaveTextContent("Seite 2 von 2");
+
+  fireEvent.change(screen.getByTestId("reference-search"), { target: { value: "cup 7" } });
+  expect(screen.getByTestId("reference-row-r-7")).toBeInTheDocument();
+  expect(screen.getByTestId("reference-filter-count")).toHaveTextContent("1 von 30 Referenzen");
+  expect(screen.queryByTestId("reference-pages")).toBeNull();
+
+  fireEvent.change(screen.getByTestId("reference-search"), { target: { value: "" } });
+  fireEvent.change(screen.getByTestId("reference-filter-year"), { target: { value: "2024" } });
+  expect(screen.getByTestId("reference-row-r-29")).toBeInTheDocument();
+  expect(screen.getByTestId("reference-filter-count")).toHaveTextContent("1 von 30 Referenzen");
+
+  fireEvent.change(screen.getByTestId("reference-filter-status"), { target: { value: "archived" } });
+  expect(screen.getByTestId("reference-filter-empty")).toBeInTheDocument();
+});
+
 test("Neue Referenz: Felder statt Titel, zwei Einzelstarter mit je eigener Platzierung", async () => {
   mockApi([]);
   render(<MemoryRouter><AdminReferencesPage /></MemoryRouter>);

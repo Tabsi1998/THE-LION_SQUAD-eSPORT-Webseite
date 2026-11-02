@@ -121,9 +121,9 @@ test("Kopf ohne Logo: Platzhalter mit Kürzel, Farbe aus dem Server, Zeile mit S
   expect(screen.getByTestId("team-lion")).toBeInTheDocument();
   const faces = within(screen.getByTestId("team-faces")).getAllByRole("listitem").map((item) => item.getAttribute("data-testid"));
   expect(faces).toEqual(["team-face-u-cap", "team-face-u-co", "team-face-u-3"]);
-  expect(screen.getByTestId("team-face-role-u-cap")).toHaveTextContent("Kapitän");
-  expect(screen.getByTestId("team-face-role-u-co")).toHaveTextContent("Co-Kapitän");
-  expect(screen.getByTestId("team-face-role-u-3")).toHaveTextContent("Spieler");
+  expect(screen.getByTestId("team-face-role-u-cap")).toHaveTextContent("Teamleitung");
+  expect(screen.getByTestId("team-face-role-u-co")).toHaveTextContent("Co-Leitung");
+  expect(screen.getByTestId("team-face-role-u-3")).toHaveTextContent("Mitglied");
   // Du: Ecken-Klammern nur an deinem Gesicht.
   expect(within(screen.getByTestId("team-face-u-3")).getByTestId("team-face-you")).toBeInTheDocument();
   expect(within(screen.getByTestId("team-face-u-cap")).queryByTestId("team-face-you")).toBeNull();
@@ -175,6 +175,35 @@ test("Einladen-Suche: Leeren nach einer laufenden Suche zeigt danach keine Treff
   fireEvent.change(input, { target: { value: "" } });
   await act(async () => slow.resolve({ data: [{ id: "u-2", username: "pixelpanther" }] }));
   expect(screen.queryByText("@pixelpanther")).toBeNull();
+});
+
+// Offene Einladungen (#2113, L-A1): die Teamleitung sieht, wen sie eingeladen hat, und zieht nach Rückfrage zurück.
+test("offene Einladungen stehen unter der Suche und lassen sich nach Rückfrage zurückziehen", async () => {
+  apiMock.delete = vi.fn().mockResolvedValue({ data: { ok: true } });
+  apiMock.get.mockImplementation((url) => (url === "/teams/t-1/invites"
+    ? Promise.resolve({ data: [{ id: "inv-1", created_at: "2026-10-20T10:00:00Z", user: { id: "u-5", username: "nachtfuchs", display_name: "Nachtfuchs" }, inviter: { id: "u-1", username: "neonfalke", display_name: "NeonFalke" } }] })
+    : Promise.resolve({ data: [] })));
+  render(<InviteMemberPanel team={{ id: "t-1" }} />);
+  const row = await screen.findByTestId("team-pending-invite-inv-1");
+  expect(row).toHaveTextContent("Nachtfuchs");
+  expect(row).toHaveTextContent("eingeladen von NeonFalke");
+
+  confirmMock.mockResolvedValueOnce(false);
+  fireEvent.click(screen.getByTestId("team-pending-invite-withdraw-inv-1"));
+  await waitFor(() => expect(confirmMock).toHaveBeenCalledTimes(1));
+  expect(apiMock.delete).not.toHaveBeenCalled();
+
+  confirmMock.mockResolvedValueOnce(true);
+  fireEvent.click(screen.getByTestId("team-pending-invite-withdraw-inv-1"));
+  await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith("/teams/t-1/invites/inv-1"));
+  await waitFor(() => expect(screen.queryByTestId("team-pending-invites")).toBeNull());
+});
+
+test("ohne offene Einladung kein Abschnitt", async () => {
+  apiMock.get.mockResolvedValue({ data: [] });
+  render(<InviteMemberPanel team={{ id: "t-1" }} />);
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/teams/t-1/invites", expect.anything()));
+  expect(screen.queryByTestId("team-pending-invites")).toBeNull();
 });
 
 test("Einladen-Suche: ein Fehler sagt das, statt „Keine passenden Benutzer“", async () => {

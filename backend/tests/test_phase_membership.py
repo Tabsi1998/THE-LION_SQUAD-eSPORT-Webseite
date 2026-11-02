@@ -5,7 +5,6 @@ Covers:
 - Membership meta/me/admin list/upsert/history/promotion+demotion
 - Member benefits CRUD + visibility filtering
 - Public members directory + public users list + public profile
-- User socials CRUD with visibility
 - User /me PATCH with extended fields
 - Authorization: community user denied for admin endpoints
 - Email logs templates: membership_activated/deactivated/blocked
@@ -355,7 +354,7 @@ class TestPublic:
         assert d["username"] == username
         assert "is_club_member" in d
         assert "user_type" in d
-        assert "socials" in d
+        assert "socials" not in d  # Altdaten sind in den Profilfeldern (#2113)
 
 
 # ---------- USER PROFILE PATCH ----------
@@ -384,47 +383,6 @@ class TestUserUpdate:
         assert r.status_code == 200
         u = r.json()
         assert u["favorite_games"] == ["F1 24", "Mario Kart", "Rocket League"]
-
-
-# ---------- USER SOCIALS CRUD ----------
-class TestUserSocials:
-    @pytest.fixture(scope="class")
-    def social_id(self, community_session):
-        body = {
-            "platform": "twitch",
-            "value": "test_twitch_handle",
-            "url": "https://twitch.tv/test_twitch_handle",
-            "visibility": "public",
-        }
-        r = community_session.post(f"{API}/users/me/socials", json=body, timeout=20)
-        assert r.status_code == 200, r.text
-        sid = r.json()["id"]
-        yield sid
-        community_session.delete(f"{API}/users/me/socials/{sid}", timeout=20)
-
-    def test_list_socials(self, community_session, social_id):
-        r = community_session.get(f"{API}/users/me/socials", timeout=20)
-        assert r.status_code == 200
-        ids = [x["id"] for x in r.json()]
-        assert social_id in ids
-
-    def test_patch_social_visibility(self, community_session, social_id):
-        r = community_session.patch(
-            f"{API}/users/me/socials/{social_id}",
-            json={"visibility": "members"},
-            timeout=20,
-        )
-        assert r.status_code == 200
-        assert r.json()["visibility"] == "members"
-
-    def test_duplicate_platform_conflict(self, community_session, social_id):
-        # Adding same platform again should 409
-        r = community_session.post(
-            f"{API}/users/me/socials",
-            json={"platform": "twitch", "value": "another", "visibility": "public"},
-            timeout=20,
-        )
-        assert r.status_code == 409
 
 
 # ---------- EMAIL LOGS via mongo direct (best-effort) ----------

@@ -187,7 +187,7 @@ export default function MembershipApplyPage() {
           <StatusCard testId="apply-pending" icon={existing.dolibarr?.application_status === "in_review" ? Clock : Mail} color="#29B6E8"
             title={existing.dolibarr?.application_status === "in_review" ? "Antrag in Prüfung" : existing.coupled ? "Antrag eingegangen" : "Bewerbung eingegangen"}
             body={`Eingereicht am ${viennaDate(existing.created_at)}. ${existing.coupled ? "Der Verein prüft den Antrag in der Mitgliederverwaltung; du erhältst eine E-Mail, sobald entschieden ist." : "Du erhältst eine E-Mail sobald entschieden wurde."}`}
-            action={existing.coupled ? <button type="button" onClick={withdraw} data-testid="apply-withdraw" className="text-xs uppercase tracking-wider font-bold text-white/50 hover:text-[#FF3B30] inline-flex items-center gap-1"><Undo2 className="w-3.5 h-3.5" /> Antrag zurückziehen</button> : null} />
+            action={<button type="button" onClick={withdraw} data-testid="apply-withdraw" className="text-xs uppercase tracking-wider font-bold text-white/50 hover:text-[#FF3B30] inline-flex items-center gap-1"><Undo2 className="w-3.5 h-3.5" /> Antrag zurückziehen</button>} />
         ) : !showForm && status === "approved" ? (
           <StatusCard testId="apply-approved" icon={Crown} color="#FFD700" title="Du bist Mitglied 🦁" body="Willkommen im Rudel! Schau in den Mitgliederbereich für Benefits und Dokumente." />
         ) : !showForm && status === "rejected" ? (
