@@ -1,11 +1,10 @@
 # Changelog
 
-## [1.56.1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.56.0...v1.56.1) (2026-11-02)
-
+## 1.56.1 (02.11.2026)
 
 ### Fehlerbehebungen
 
-* Glocke: Wackel-Timer läuft nach dem Verlassen nicht weiter ([9f306ec](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/9f306ec4d1685bc8fc08e4bc3041e060810b6b9d))
+* Glocke: Wackel-Timer läuft nach dem Verlassen nicht weiter
 
 ## 1.56.0 (02.11.2026)
 
