@@ -1,5 +1,41 @@
 # Changelog
 
+## [1.55.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.54.2...v1.55.0) (2026-11-02)
+
+
+### Neu
+
+* Dolibarr: Kennung und Geheimnis des signierten Webhooks in der Oberfläche ([#2131](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2131)) ([54739b7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/54739b787808a0c8138e99b505bff294d573ba43))
+* Fehler melden von Fehlerseiten mit Seite, Gerät und Version ([#2131](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2131)) ([54739b7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/54739b787808a0c8138e99b505bff294d573ba43))
+* Finanzen: Umschalter Offen/Erledigt für Prüffälle ([#2131](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2131)) ([54739b7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/54739b787808a0c8138e99b505bff294d573ba43))
+* Kontakt-Inbox: Feld „zuständig“ und Antwort aus der Website ([#2131](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2131)) ([54739b7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/54739b787808a0c8138e99b505bff294d573ba43))
+* Kontakt-Inbox: Suche auf dem Server, Seiten, Standardansicht offen ([#2131](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2131)) ([54739b7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/54739b787808a0c8138e99b505bff294d573ba43))
+* Kontakt-Inbox: Verlauf zeigt, ob die Antwort versendet wurde ([#2131](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2131)) ([54739b7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/54739b787808a0c8138e99b505bff294d573ba43))
+* Kontakt-Inbox: zeigt, wer wann beantwortet hat ([#2131](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2131)) ([54739b7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/54739b787808a0c8138e99b505bff294d573ba43))
+* Kontaktanfragen: Aufbewahrungsfristen, einstellbar unter Betrieb → Alarme ([#2131](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2131)) ([54739b7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/54739b787808a0c8138e99b505bff294d573ba43))
+* Meine Rechnungen: Weg zum Kassier, Kontaktthema Rechnung ([#2131](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2131)) ([54739b7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/54739b787808a0c8138e99b505bff294d573ba43))
+* Rückmeldungen: Übersicht aller Turniere und Events mit Schnitt ([#2131](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2131)) ([54739b7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/54739b787808a0c8138e99b505bff294d573ba43))
+
+
+### Fehlerbehebungen
+
+* Dolibarr: Einwilligungstexte auch für die Vereinsverwaltung, Lesefehler mit Grund ([#2131](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2131)) ([54739b7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/54739b787808a0c8138e99b505bff294d573ba43))
+* Dolibarr: neue Webhook-Adresse erst nach Rückfrage ([#2131](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2131)) ([54739b7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/54739b787808a0c8138e99b505bff294d573ba43))
+* Dolibarr: signierte Webhooks stehen nicht mehr als fehlend da ([#2131](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2131)) ([54739b7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/54739b787808a0c8138e99b505bff294d573ba43))
+* Dolibarr: Stand-Zeilen in Wiener Zeit ([#2131](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2131)) ([54739b7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/54739b787808a0c8138e99b505bff294d573ba43))
+* Dolibarr: Texte und Admin-FAQ zeigen auf Bereiche, Rechnungsangaben und den signierten Webhook ([#2131](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2131)) ([54739b7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/54739b787808a0c8138e99b505bff294d573ba43))
+* Fehler melden: Pfad ohne Kennungen ([#2131](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2131)) ([54739b7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/54739b787808a0c8138e99b505bff294d573ba43))
+* Finanzen: „Bezahlt“ rechnet mit den echten Zahlungen, eine Gutschrift ist keine Zahlung ([#2131](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2131)) ([54739b7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/54739b787808a0c8138e99b505bff294d573ba43))
+* Finanzen: CSV-Export vollständig vom Server, mit Zeitraum ([#2131](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2131)) ([54739b7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/54739b787808a0c8138e99b505bff294d573ba43))
+* Finanzen: Gutschrift-Entwürfe zählen nicht als gutgeschrieben ([#2131](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2131)) ([54739b7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/54739b787808a0c8138e99b505bff294d573ba43))
+* Finanzen: Listen nennen „N von M“ ([#2131](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2131)) ([54739b7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/54739b787808a0c8138e99b505bff294d573ba43))
+* Finanzen: negative Beträge stimmen auf den Cent ([#2131](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2131)) ([54739b7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/54739b787808a0c8138e99b505bff294d573ba43))
+* Finanzen: Prüffall-Kachel zählt dieselbe Auswahl wie die Liste ([#2131](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2131)) ([54739b7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/54739b787808a0c8138e99b505bff294d573ba43))
+* Finanzen: Verlauf in Sätzen und Wiener Zeit, Anmeldestand in Worten ([#2131](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2131)) ([54739b7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/54739b787808a0c8138e99b505bff294d573ba43))
+* Kontakt-Inbox: Notiz speichert nur bei Änderung, eigene Meldung ([#2131](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2131)) ([54739b7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/54739b787808a0c8138e99b505bff294d573ba43))
+* Kontakt-Inbox: Themen tragen die Bezeichnung des Formulars ([#2131](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2131)) ([54739b7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/54739b787808a0c8138e99b505bff294d573ba43))
+* Kontaktformular: Namensfeld begrenzt, Meldungen auf Deutsch ([#2131](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2131)) ([54739b7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/54739b787808a0c8138e99b505bff294d573ba43))
+
 ## 1.54.2 (02.11.2026)
 
 ### Fehlerbehebungen
