@@ -5,6 +5,7 @@ deshalb vor jedem Schreiben ab, wenn nicht alles stimmt: Datenbank der Abnahme (
 öffentliche Adressen nur auf diesem Rechner."""
 import importlib.util
 import pathlib
+from datetime import date, timedelta
 
 import pytest
 
@@ -20,6 +21,19 @@ def load():
 
 GOOD = {"DB_NAME": "tls_abnahme", "APP_ENV": "development", "FRONTEND_URL": "http://127.0.0.1:24100",
         "PUBLIC_BACKEND_URL": "http://localhost:24100", "MONGO_URL": "mongodb://abnahme:nur-test@mongodb:27017/?authSource=admin"}
+
+
+@pytest.mark.parametrize("today", [date(2026, 11, 2), date(2026, 11, 3), date(2026, 11, 8), date(2031, 2, 28)])
+def test_the_season_lies_ahead_whatever_the_date(today):
+    # Der Stand läuft nicht aus (#2200): immer ein Dienstag in der Zukunft, Pause in den Spielwochen 7 und 8.
+    dates = load().season_dates(today)
+    start = date.fromisoformat(dates["start_date"][:10])
+    assert start.weekday() == 1
+    assert 8 <= (start - today).days <= 14
+    assert date.fromisoformat(dates["registration_deadline"]) == start - timedelta(days=4)
+    pause = dates["blocked_periods"][0]
+    assert (date.fromisoformat(pause["start_date"]) - start).days == 41
+    assert (date.fromisoformat(pause["end_date"]) - start).days == 54
 
 
 def test_a_local_acceptance_stack_is_fine():

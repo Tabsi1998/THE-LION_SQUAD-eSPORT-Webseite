@@ -6,11 +6,15 @@ Backend-Container weiter. Legt an - und lässt bei jedem weiteren Aufruf, was sc
 
   * Turnierleitung (Admin und Turnierleitung, beide mit Zwei-Faktor), acht Teamleitungen, 40 Spieler
   * Spiel „Call of Duty“ (falls es fehlt) mit drei Modi und fünf Test-Maps mit Platzhalterbild (Name auf Farbe)
-  * Liga „CoD-Liga“, Season 1: Start Di 10.11.2026, 10 Wochen, Weihnachtspause 21.12.-3.1., nur Hinrunde, Best of 3,
-    Teamgröße 4, Modus je Map Stellung - Suchen & Zerstören - Kontrolle, Map-Pool, Regeltext-Platzhalter,
-    Meldeschluss 6.11., Sichtbarkeit „Nur Turnierleitung“ (auf „Öffentlich“ stellt der Obmann selbst)
+  * Liga „CoD-Liga“, Season 1: Start an einem Dienstag mindestens acht Tage voraus (der Stand läuft nie aus, #2200),
+    10 Wochen, Pause „Weihnachtspause“ in den Wochen 7 und 8, nur Hinrunde, Best of 3, Teamgröße 4, Modus je Map
+    Stellung - Suchen & Zerstören - Kontrolle, Map-Pool, Regeltext-Platzhalter, Meldeschluss vier Tage vor dem Start,
+    Sichtbarkeit „Nur Turnierleitung“ (auf „Öffentlich“ stellt der Obmann selbst)
   * Liga 1, Staffel A (Entwurf) und acht Hauptteams mit je einem Co-Team (4 bis 6 im Kader, Captain und Vertreter),
     der Staffel zugeteilt - der Spielplan entsteht erst mit „Liga starten“ in der Turnierverwaltung
+  * Für den schreibenden Ablauf (liga-ablauf-abnahme.spec.js, #2200) die eigene Liga „Liga-Probelauf“ mit einer frischen
+    Season: Staffel A im Entwurf, fünf Co-Teams zugeteilt, das sechste teilt die Spec im Browser zu. Wurde die Staffel
+    schon gestartet, entsteht beim nächsten Aufruf die nächste Season - die lesende Staffel oben bleibt unberührt.
 
 Teams und Konten entstehen direkt in der Datenbank (wie Konten in seed_abnahme.py), Co-Teams, Liga, Season, Pool,
 Liga N, Staffel und Zuteilung über die Routen der App, angemeldet wie im Browser. Ein erneuter Aufruf stellt die
@@ -24,6 +28,13 @@ ABNAHME_COMPOSE_DIR):
 
 Passwort und Zwei-Faktor-Geheimnis entstehen bei jedem Lauf neu und stehen nur in der Stand-Datei
 ``.local-testing/abnahme/state-liga.json`` (nicht im Repo; anderer Ort über ABNAHME_STATE).
+
+Zeitgesteuerte Läufe sind im Abnahme-Stand aus. Einen davon stößt die Abnahme gezielt und nur für eine Staffel an, statt ihn
+für alle Specs einzuschalten (#2200). Die Antwort steht als JSON in der letzten Zeile:
+
+    python scripts/seed_abnahme_liga.py --job matchday_schedule --tournament <id>
+    python scripts/seed_abnahme_liga.py --job match_reminders --tournament <id>
+    python scripts/seed_abnahme_liga.py --job match_deadlines --tournament <id> --hours 49   # „jetzt + 49 Stunden“
 """
 from __future__ import annotations
 
@@ -36,8 +47,9 @@ import pathlib
 import secrets
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from urllib.parse import urlsplit
+from zoneinfo import ZoneInfo
 
 PROJECT = os.environ.get("ABNAHME_PROJECT", "lsw-abnahme")
 # Eigene Konten (liga-…), damit dieser Seed die Zugänge der anderen Seeds nie überschreibt.
@@ -59,15 +71,19 @@ POOL = {"stellung": ["Hafenkante", "Nebelwerk", "Salzmine", "Bahnhof Nord"],
         "kontrolle": ["Hafenkante", "Turmruine", "Salzmine"]}
 LEAGUE_NAME = "CoD-Liga"
 SEASON = {
-    "name": "Season 1", "start_date": "2026-11-10T00:00:00", "weeks_total": 10, "matchday_days": 7,
+    "name": "Season 1", "weeks_total": 10, "matchday_days": 7,
     "default_match_weekday": 6, "default_match_time": "20:00", "round_robin_legs": 1, "max_staffel_size": 8,
     "best_of": 3, "team_size": 4, "min_squad_size": 4, "game_mode_order": ["stellung", "suchen", "kontrolle"],
-    "result_confirm_hours": 48, "lineup_amend_hours": 48, "registration_deadline": "2026-11-06",
-    "blocked_periods": [{"start_date": "2026-12-21", "end_date": "2027-01-03", "label": "Weihnachtspause"}],
+    "result_confirm_hours": 48, "lineup_amend_hours": 48,
     "rules_text": ("## Regeln (Platzhalter)\n\nHier steht der Regeltext der Season: Ablauf, Termine, Maps und Modi, "
                    "Fairplay, Einspruch. Der Obmann ersetzt ihn vor dem Start."),
     "visibility": "admins",
 }
+# Die Liga des schreibenden Ablaufs (#2200): eigene Liga, damit „Liga starten“ die lesende Staffel nie berührt.
+ABLAUF_LEAGUE = "Liga-Probelauf"
+ABLAUF_ASSIGNED = 5  # zugeteilt vom Seed; das sechste Co-Team teilt die Spec im Browser zu
+ABLAUF_SEASON = {**{key: value for key, value in SEASON.items() if key != "name"}, "max_staffel_size": 6, "visibility": "public"}
+JOBS = ("matchday_schedule", "match_deadlines", "match_reminders")
 # Acht erfundene Hauptteams: Name, Kürzel, Co-Team, Kadergröße des Co-Teams, Stamm der Spielernamen.
 TEAMS = [("Nebelwölfe", "NBW", "Rudel", 4, "Nebel"), ("Sturmvögel", "STV", "Schwarm", 5, "Sturm"),
          ("Glutfüchse", "GLF", "Bau", 6, "Glut"), ("Frostluchse", "FRL", "Pfote", 4, "Frost"),
@@ -77,13 +93,43 @@ TEAMS = [("Nebelwölfe", "NBW", "Rudel", 4, "Nebel"), ("Sturmvögel", "STV", "Sc
 ENDINGS = ["Blitz", "Echo", "Funke", "Kante", "Pixel", "Zacke"]
 
 
+def season_dates(today: date | None = None) -> dict:
+    """Die festen Tage der Season - immer in der Zukunft, damit der Stand nicht ausläuft (#2200): Start ist ein Dienstag
+    mindestens acht Tage voraus, die Pause deckt die Spielwochen 7 und 8 ab, Meldeschluss vier Tage vor dem Start."""
+    today = today or datetime.now(ZoneInfo("Europe/Vienna")).date()
+    start = today + timedelta(days=(1 - today.weekday()) % 7)
+    while (start - today).days < 8:
+        start += timedelta(days=7)
+    return {
+        "start_date": f"{start.isoformat()}T00:00:00",
+        "registration_deadline": (start - timedelta(days=4)).isoformat(),
+        "blocked_periods": [{"start_date": (start + timedelta(days=41)).isoformat(),
+                             "end_date": (start + timedelta(days=54)).isoformat(), "label": "Weihnachtspause"}],
+    }
+
+
+def compose_command(root: pathlib.Path) -> tuple[list[str], pathlib.Path]:
+    compose_dir = pathlib.Path(os.environ.get("ABNAHME_COMPOSE_DIR") or root)
+    return (["docker", "compose", "-p", PROJECT, "--env-file", str(compose_dir / ".env.abnahme.example"),
+             "-f", str(compose_dir / "docker-compose.yml"), "-f", str(compose_dir / "docker-compose.abnahme.yml")], compose_dir)
+
+
+def host_job(arguments: list[str]) -> int:
+    """Einen zeitgesteuerten Lauf einmal im Backend-Container anstoßen - gezielt für eine Staffel, nicht für den Stand."""
+    compose, compose_dir = compose_command(pathlib.Path(__file__).resolve().parents[1])
+    source = pathlib.Path(__file__).read_text(encoding="utf-8")
+    completed = subprocess.run([*compose, "exec", "-T", "backend", "python", "-", "--inside-job", *arguments], input=source,
+                               text=True, encoding="utf-8", capture_output=True, cwd=compose_dir)
+    sys.stderr.write(completed.stderr[-4000:])
+    sys.stdout.write(completed.stdout[-4000:])
+    return completed.returncode
+
+
 def host_main() -> int:
     root = pathlib.Path(__file__).resolve().parents[1]
     os.environ["ABNAHME_SEED_PASSWORD"] = secrets.token_urlsafe(18)
     os.environ["ABNAHME_SEED_TOTP"] = base64.b32encode(secrets.token_bytes(20)).decode("ascii")
-    compose_dir = pathlib.Path(os.environ.get("ABNAHME_COMPOSE_DIR") or root)
-    compose = ["docker", "compose", "-p", PROJECT, "--env-file", str(compose_dir / ".env.abnahme.example"),
-               "-f", str(compose_dir / "docker-compose.yml"), "-f", str(compose_dir / "docker-compose.abnahme.yml")]
+    compose, compose_dir = compose_command(root)
     source = pathlib.Path(__file__).read_text(encoding="utf-8")
     completed = subprocess.run([*compose, "exec", "-T", "-e", "ABNAHME_SEED_PASSWORD", "-e", "ABNAHME_SEED_TOTP",
                                 "backend", "python", "-", "--inside"], input=source, text=True, encoding="utf-8",
@@ -303,12 +349,18 @@ async def ensure_league(admin: Session, game: dict, maps: dict) -> tuple[dict, d
         league = await admin.call("POST", "/api/admin/leagues", json={"name": LEAGUE_NAME, "game_id": game["id"]})
         league["seasons"] = []
     season = next((row for row in league.get("seasons") or [] if row.get("number") == 1), None)
+    dates = season_dates()
     if season:
-        # Wieder auf den Stand des Seeds - auch die Sichtbarkeit (die schaltet der Obmann in der Abnahme selbst).
-        await admin.call("PATCH", f"/api/admin/leagues/seasons/{season['id']}", json=SEASON)
+        # Wieder auf den Stand des Seeds - auch die Sichtbarkeit (die schaltet der Obmann in der Abnahme selbst). Die Tage
+        # bleiben, solange der Start noch vor uns liegt: Ein zweiter Aufruf in derselben Woche ändert nichts daran.
+        still_ahead = str(season.get("start_date") or "")[:10] > datetime.now(ZoneInfo("Europe/Vienna")).date().isoformat()
+        await admin.call("PATCH", f"/api/admin/leagues/seasons/{season['id']}", json=SEASON if still_ahead else {**SEASON, **dates})
+        if not still_ahead:
+            # Die Staffel trägt die geltenden Werte: Eine Staffel im Entwurf rückt mit, eine gestartete bleibt (LIGA.md, 1).
+            await admin.call("POST", f"/api/admin/leagues/seasons/{season['id']}/sync", json={})
     else:
-        season = await admin.call("POST", f"/api/admin/leagues/{league['id']}/seasons", json={**SEASON, "number": 1})
-    view = await admin.call("GET", f"/api/admin/leagues/seasons/{season['id']}")
+        season = await admin.call("POST", f"/api/admin/leagues/{league['id']}/seasons", json={**SEASON, **dates, "number": 1})
+    view =await admin.call("GET", f"/api/admin/leagues/seasons/{season['id']}")
     if not view.get("map_pool"):
         await admin.call("PUT", f"/api/admin/leagues/seasons/{season['id']}/map-pool", json={"modes": [
             {"mode": mode, "map_ids": [maps[name]["id"] for name in names]} for mode, names in POOL.items()]})
@@ -343,6 +395,42 @@ async def ensure_squads(admin: Session, db, game: dict, tid: str, teams: list[di
     return rows
 
 
+async def ensure_ablauf(admin: Session, db, game: dict, maps: dict, squads: list[dict]) -> dict:
+    """Die Staffel des schreibenden Ablaufs (#2200): immer eine im Entwurf. Hat die Spec die letzte gestartet, kommt die
+    nächste Season dazu - so verbraucht ein Lauf nichts, was ein anderer braucht."""
+    listing = await admin.call("GET", "/api/admin/leagues")
+    league = next((row for row in listing["leagues"] if row.get("game_id") == game["id"] and row.get("name") == ABLAUF_LEAGUE), None)
+    if not league:
+        league = await admin.call("POST", "/api/admin/leagues", json={"name": ABLAUF_LEAGUE, "game_id": game["id"]})
+        league["seasons"] = []
+    tid = season = None
+    newest = max(league.get("seasons") or [], key=lambda row: row.get("number") or 0, default=None)
+    if newest:
+        view = await admin.call("GET", f"/api/admin/leagues/seasons/{newest['id']}")
+        rows = [row for division in view["divisions"] for row in division.get("staffeln") or []]
+        draft = next((row for row in rows if row.get("status") == "draft"), None)
+        if draft:
+            tid, season = draft["tournament_id"], view["season"]
+    if not tid:
+        # Eigener Slug: Die Verwaltung führt je Season einen Link „season-link-<slug>“, die lesende Spec sucht „season-1“.
+        number = int((newest or {}).get("number") or 0) + 1
+        season = await admin.call("POST", f"/api/admin/leagues/{league['id']}/seasons", json={
+            **ABLAUF_SEASON, **season_dates(), "number": number, "name": f"Probelauf {number}", "slug": f"probelauf-{number}"})
+        await admin.call("PUT", f"/api/admin/leagues/seasons/{season['id']}/map-pool", json={"modes": [
+            {"mode": mode, "map_ids": [maps[name]["id"] for name in names]} for mode, names in POOL.items()]})
+        division = await admin.call("POST", f"/api/admin/leagues/seasons/{season['id']}/divisions", json={})
+        staffel = await admin.call("POST", f"/api/admin/leagues/divisions/{division['id']}/staffeln", json={"staffel": "A"})
+        tid = staffel["tournament_id"]
+    for row in squads[:ABLAUF_ASSIGNED]:
+        if not await db.tournament_registrations.find_one({"tournament_id": tid, "squad_id": row["squad"]["id"]}, {"_id": 1}):
+            await admin.call("POST", f"/api/tournaments/{tid}/squad-registrations",
+                             json={"team_id": row["team"]["id"], "squad_id": row["squad"]["id"]})
+    tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0, "slug": 1})
+    return {"league": {"id": league["id"], "slug": league["slug"]}, "season": {"id": season["id"], "slug": season["slug"]},
+            "tournament_id": tid, "slug": tournament.get("slug"), "assigned": ABLAUF_ASSIGNED,
+            "pool": {mode: [maps[name]["id"] for name in names] for mode, names in POOL.items()}}
+
+
 async def inside_main() -> None:
     guard_environment(os.environ)
     from database import get_db
@@ -359,6 +447,7 @@ async def inside_main() -> None:
         league, season, division, staffel = await ensure_league(admin, game, maps)
         tid = staffel.get("tournament_id")
         squads = await ensure_squads(admin, db, game, tid, teams)
+        ablauf = await ensure_ablauf(admin, db, game, maps, squads)
     finally:
         await admin.close()
     tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0, "slug": 1, "status": 1, "title": 1})
@@ -375,6 +464,7 @@ async def inside_main() -> None:
         "staffel": {"tournament_id": tid, "slug": tournament.get("slug"), "status": tournament.get("status"), "title": tournament.get("title")},
         "game": {"id": game["id"], "slug": game.get("slug")},
         "maps": {name: row["id"] for name, row in maps.items()},
+        "ablauf": ablauf,
         "teams": [{"name": row["team"]["name"], "team_id": row["team"]["id"], "squad_id": row["squad"]["id"],
                    "squad_name": row["squad"]["name"], "registration_id": row["registration"]["id"],
                    "leader": row["people"][0]["email"], "captain": by_id[row["squad"]["captain_id"]]["email"],
@@ -385,9 +475,56 @@ async def inside_main() -> None:
     for key, user in (("captain", by_id[first["squad"]["captain_id"]]), ("vice_captain", by_id[first["squad"]["vice_captain_id"]]),
                       ("member", by_id[member]), ("team_lead", first["people"][0])):
         state["accounts"][key] = {"email": user["email"], "password": password, "totp": None}
-    print(f"Liga: {league['name']} / {season.get('name')} / Liga {division.get('level')} / Staffel A "
+    # Der Ablauf spielt mit mehreren Captains (#2200) - je Co-Team ein Zugang, Reihenfolge wie in state["teams"].
+    for index, row in enumerate(squads):
+        state["accounts"][f"captain-{index}"] = {"email": by_id[row["squad"]["captain_id"]]["email"], "password": password, "totp": None}
+    print(f"Liga:{league['name']} / {season.get('name')} / Liga {division.get('level')} / Staffel A "
           f"({tournament.get('status')}), {len(squads)} Co-Teams zugeteilt. Ligaseite: /liga/{league['slug']}/{season['slug']}")
     print("ABNAHME-STATE " + json.dumps(state, ensure_ascii=False))
+
+
+async def run_job(name: str, tournament_id: str, hours: float) -> dict:
+    """Ein Lauf des echten Jobs, begrenzt auf eine Staffel - die Stände der anderen Abnahme-Specs bleiben, wie sie sind."""
+    guard_environment(os.environ)
+    from database import get_db
+    from models import now_utc
+
+    db = get_db()
+    tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0, "creation_key": 0, "billing": 0})
+    if not tournament:
+        raise SystemExit(f"Staffel {tournament_id} gibt es hier nicht.")
+    if name == "matchday_schedule":
+        from services.matchday_schedule import persist_matchday_schedule
+
+        return await persist_matchday_schedule(db, tournament)
+    if name == "match_deadlines":
+        from services import match_deadline_sweep
+
+        async def only_this_staffel(*_args, **_kwargs):
+            return [tournament] if tournament.get("status") == "live" else []
+
+        match_deadline_sweep.live_tournaments_with = only_this_staffel
+        return await match_deadline_sweep.sweep(db, now=now_utc() + timedelta(hours=hours))
+    from services import match_reminder
+
+    load_all = match_reminder.load_scheduled_matches
+
+    async def only_this_staffel_matches(*args, **kwargs):
+        return [row for row in await load_all(*args, **kwargs) if row.get("tournament_id") == tournament_id]
+
+    match_reminder.load_scheduled_matches = only_this_staffel_matches
+    return await match_reminder.schedule_match_reminders()
+
+
+def job_arguments(arguments: list[str]) -> tuple[str, str, float]:
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--job", choices=JOBS, required=True)
+    parser.add_argument("--tournament", required=True)
+    parser.add_argument("--hours", type=float, default=0.0)
+    parsed = parser.parse_args(arguments)
+    return parsed.job, parsed.tournament, parsed.hours
 
 
 if __name__ == "__main__":
@@ -395,5 +532,13 @@ if __name__ == "__main__":
         os.chdir("/app")
         sys.path.insert(0, "/app")
         asyncio.run(inside_main())
+    elif "--inside-job" in sys.argv:
+        os.chdir("/app")
+        sys.path.insert(0, "/app")
+        job, target, shift = job_arguments(sys.argv[sys.argv.index("--inside-job") + 1:])
+        print(json.dumps(asyncio.run(run_job(job, target, shift)), ensure_ascii=False))
+    elif "--job" in sys.argv:
+        job_arguments(sys.argv[1:])
+        sys.exit(host_job(sys.argv[1:]))
     else:
         sys.exit(host_main())

@@ -16,7 +16,8 @@ services:
       DB_NAME: tls_abnahme
       # Zeitgesteuerte Läufe (Mails, Erinnerungen, Statuswechsel, Discord) aus - bis auf zwei, die die Abnahme braucht
       # (#1609): gehaltene Ergebnisse veröffentlichen (result_holds, Netz unter dem 12-s-Zeitgeber) und die
-      # Show-Auslosung (draw_show: Erinnerung und Los nach der Frist). Alles andere stößt der Seed selbst an.
+      # Show-Auslosung (draw_show: Erinnerung und Los nach der Frist). Alles andere stößt der Seed selbst an - die Zeit-Jobs
+      # der Liga (Termin, Erinnerung, Fristen) nur für eine Staffel: scripts/seed_abnahme_liga.py --job (#2200).
       DISABLE_SCHEDULER: "false"
       SCHEDULER_JOBS: "result_holds,draw_show"
       # Was die zwei Jobs an Benachrichtigungen anstoßen, bleibt in der App: kein Push an Expo, keine Discord-DM,
