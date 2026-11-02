@@ -66,6 +66,27 @@ async def test_list_search_and_rights(flow):
 
 
 @pytest.mark.asyncio
+async def test_private_rows_only_link_for_those_who_can_open_them(flow):
+    leader = await flow.add_user(role="player", name="leitung")
+    rudel = await add_team(flow, "Rudel", "RDL", leader)
+    secret = await add_team(flow, "Geheim", "GHM", leader, is_public=False)
+
+    granted = await flow.add_user(role="player", name="vereinsverwaltung")
+    granted = {**granted, "areas": ["club"], "mfa_enabled": True, "auth_mfa_verified": True}
+    await flow.db.users.update_one({"id": granted["id"]}, {"$set": {"areas": ["club"], "mfa_enabled": True}})
+    flow.act_as(granted)
+    rows = {row["id"]: row for row in (await flow.get("/api/admin/teams")).json()["items"]}
+    assert rows[rudel["id"]]["can_open"] is True
+    assert rows[secret["id"]]["can_open"] is False, "die Teamseite wäre für diese Person 404"
+    assert (await flow.get(f"/api/teams/{secret['id']}")).status_code == 404
+
+    flow.act_as(await flow.add_user(role="tournament_admin", name="turnierleitung"))
+    rows = {row["id"]: row for row in (await flow.get("/api/admin/teams")).json()["items"]}
+    assert rows[secret["id"]]["can_open"] is True
+    assert (await flow.get(f"/api/teams/{secret['id']}")).status_code == 200
+
+
+@pytest.mark.asyncio
 async def test_dissolved_tab_shows_what_can_still_come_back(flow):
     leader = await flow.add_user(role="player", name="leitung")
     team = await add_team(flow, "Altes Rudel", "ALT", leader)

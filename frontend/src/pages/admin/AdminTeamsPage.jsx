@@ -27,8 +27,8 @@ const TABS = [
 
 function TeamRow({ team }) {
   const leader = team.leader?.display_name || team.leader?.username;
-  return (
-    <Link to={`/teams/${team.id}`} data-testid={`admin-team-${team.id}`} className="tls-card block border border-white/10 bg-[#121212] rounded-sm p-3 hover:border-[#29B6E8]/40">
+  const body = (
+    <>
       <div className="flex flex-wrap items-center gap-3">
         <div className="w-10 h-10 bg-[#0A0A0A] border border-white/10 rounded-sm overflow-hidden flex items-center justify-center shrink-0">
           {team.logo_url ? <img src={resolveMediaUrl(team.logo_url)} alt="" className="w-full h-full object-cover" /> : <span className="font-heading font-black text-xs text-[#29B6E8]">{team.tag}</span>}
@@ -48,8 +48,18 @@ function TeamRow({ team }) {
           {team.created_at ? <span>seit {viennaDate(team.created_at)}</span> : null}
         </div>
       </div>
-    </Link>
+    </>
   );
+  // Die Seite eines privaten Teams sehen nur Mitglieder und die Team-Verwaltung - sonst führte der Link auf „nicht gefunden“.
+  if (team.can_open === false) {
+    return (
+      <div data-testid={`admin-team-${team.id}`} className="border border-white/10 bg-[#121212] rounded-sm p-3">
+        {body}
+        <p className="mt-2 text-xs text-white/45" data-testid={`admin-team-closed-${team.id}`}>Die Teamseite sehen nur Mitglieder, Turnierleitung und Club-Admins.</p>
+      </div>
+    );
+  }
+  return <Link to={`/teams/${team.id}`} data-testid={`admin-team-${team.id}`} className="tls-card block border border-white/10 bg-[#121212] rounded-sm p-3 hover:border-[#29B6E8]/40">{body}</Link>;
 }
 
 export default function AdminTeamsPage() {

@@ -49,6 +49,14 @@ test("die Liste zeigt Teamleitung, Co-Teams, private und verwaiste Teams und fü
   expect(screen.getByTestId("admin-teams-count")).toHaveTextContent("2 Teams");
 });
 
+test("privates Team, dessen Seite die Person nicht öffnen darf: kein Link ins Leere", async () => {
+  apiMock.get.mockResolvedValue({ data: { items: [{ ...WAISE, can_open: false }], total: 1, can_restore: false, can_renew_all: false, restore_days: 30 } });
+  renderPage();
+  const row = await screen.findByTestId("admin-team-t2");
+  expect(row.tagName).toBe("DIV");
+  expect(screen.getByTestId("admin-team-closed-t2")).toHaveTextContent("nur Mitglieder");
+});
+
 test("die Suche fragt den Server und sagt, wenn nichts passt", async () => {
   serve();
   renderPage();

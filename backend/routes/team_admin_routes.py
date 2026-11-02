@@ -15,7 +15,7 @@ from pydantic import BaseModel
 
 from auth import require_area
 from database import get_db
-from routes.team_routes import TEAM_OWNER_ADMIN_ROLES, _account_gone, _public_user, _refuse, _team_admin, _team_audit, _tell
+from routes.team_routes import TEAM_OWNER_ADMIN_ROLES, _account_gone, _is_member, _is_staff, _public_user, _refuse, _team_admin, _team_audit, _tell
 from services import team_page
 from services.query_filters import safe_regex
 from services.team_dissolve import DISSOLVED_TEAM_RETENTION_DAYS, dissolved_view, is_restorable
@@ -43,7 +43,7 @@ def _page(limit: int, offset: int) -> tuple[int, int]:
     return max(1, min(int(limit or 50), LIST_LIMIT)), max(0, int(offset or 0))
 
 
-async def _active_rows(db, query: dict, limit: int, offset: int) -> list[dict]:
+async def _active_rows(db, query: dict, limit: int, offset: int, me: dict) -> list[dict]:
     teams = await db.teams.find(query, {"_id": 0, "join_code": 0}).sort("name", 1).skip(offset).limit(limit).to_list(limit)
     leaders = {row["id"]: row for row in await db.users.find(
         {"id": {"$in": sorted({team.get("leader_id") for team in teams if team.get("leader_id")})}},
@@ -62,6 +62,8 @@ async def _active_rows(db, query: dict, limit: int, offset: int) -> list[dict]:
             "leader": _public_user(leader),
             # Ohne aktive Teamleitung sitzt das Team fest - das steht in der Liste, der Admin übergibt auf der Teamseite.
             "leader_gone": _account_gone(leader),
+            # Ein privates Team zeigt seine Seite nur Mitgliedern und ``TEAM_ADMIN_ROLES`` - sonst führte die Zeile auf „nicht gefunden“.
+            "can_open": team.get("is_public") is not False or _is_staff(me) or _is_member(team, me),
         })
     return rows
 
@@ -85,7 +87,7 @@ async def list_teams(
         return {"items": rows[offset:offset + limit], "total": len(rows), "limit": limit, "offset": offset, **rights}
     query = _search(q)
     return {
-        "items": await _active_rows(db, query, limit, offset),
+        "items": await _active_rows(db, query, limit, offset, me),
         "total": await db.teams.count_documents(query),
         "limit": limit, "offset": offset, **rights,
     }
