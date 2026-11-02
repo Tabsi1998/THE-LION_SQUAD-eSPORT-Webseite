@@ -12,7 +12,9 @@ import { viennaDate } from "@/lib/vienna";
 import {
   defaultSelection,
   eligibleMaps,
+  mapsWithoutMode,
   moveMap,
+  outdatedGroups,
   poolSelection,
   sameSelection,
   selectionBody,
@@ -109,6 +111,9 @@ export function MapPoolEditor({ title, hint = "", game, library = [], entry = nu
     ? (entry.modes || []).flatMap((group) => group.maps || []).filter((item, index, all) =>
       entry.outdated_map_ids.includes(item.map_id) && all.findIndex((other) => other.map_id === item.map_id) === index)
     : [];
+  // #2129, SP2: Ein entfernter Modus bleibt im gespeicherten Pool lesbar und gilt weiter; Maps ohne Modus nennt der Hinweis.
+  const oldGroups = outdatedGroups(entry, modes);
+  const withoutMode = mapsWithoutMode(library, modes);
 
   const run = async (action) => {
     setBusy(true);
@@ -163,6 +168,17 @@ export function MapPoolEditor({ title, hint = "", game, library = [], entry = nu
       {outdated.length ? (
         <p role="status" className="rounded-sm border border-white/15 bg-white/[0.03] px-3 py-2 text-xs text-white/70" data-testid={`${testId}-outdated`}>
           Seit dem Speichern in der Bibliothek geändert: {outdated.map((item) => item.name).join(", ")}. Gespeichert bleibt der alte Stand, bis du neu speicherst.
+        </p>
+      ) : null}
+      {oldGroups.length ? (
+        <p role="status" className="rounded-sm border border-[#FFD700]/30 bg-[#FFD700]/5 px-3 py-2 text-xs text-[#FFD700]" data-testid={`${testId}-old-groups`}>
+          Im gespeicherten Pool steht noch {oldGroups.map((group) => `„${group.label || group.mode || "Alle Maps"}“ (${(group.maps || []).length})`).join(", ")} – so hat das Spiel das nicht mehr. Der Pool gilt unverändert weiter, Spiele melden weiter daraus. Erst neues Speichern ersetzt ihn durch die Auswahl unten.
+        </p>
+      ) : null}
+      {game && withoutMode.length ? (
+        <p role="status" className="rounded-sm border border-white/15 bg-white/[0.03] px-3 py-2 text-xs text-white/70" data-testid={`${testId}-without-mode`}>
+          {withoutMode.length === 1 ? "1 Map hat" : `${withoutMode.length} Maps haben`} noch keinen Modus und {withoutMode.length === 1 ? "steht" : "stehen"} hier nicht zur Wahl.
+          {libraryLink ? <> <Link to={`/admin/games/${game.id}/maps`} className="text-[#29B6E8] hover:text-white underline-offset-2 hover:underline">Zuordnen</Link></> : " Zuordnen unter Spiele → Maps."}
         </p>
       ) : null}
 

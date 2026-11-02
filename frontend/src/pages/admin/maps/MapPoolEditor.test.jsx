@@ -38,6 +38,34 @@ test("bietet je Modus nur freigegebene Maps an, die gewählten zuerst in ihrer R
   expect(screen.getByTestId("pool-save")).toBeDisabled();
 });
 
+// #2129, SP2: Bereinigter Modus und Maps ohne Modus - alles lesbar und benannt, nichts still gesperrt.
+test("ein entfernter Modus im gespeicherten Pool bleibt benannt, Speichern nimmt ihn erst bewusst heraus", () => {
+  const entry = { ...ENTRY, outdated_map_ids: [], modes: [...ENTRY.modes, { mode: "alt", label: "Alter Modus", maps: [{ map_id: "hafen", name: "Hafenkante" }] }] };
+  const { onSave } = renderEditor({ entry });
+  expect(screen.getByTestId("pool-old-groups")).toHaveTextContent("„Alter Modus“ (1)");
+  expect(screen.getByTestId("pool-old-groups")).toHaveTextContent("gilt unverändert weiter");
+  fireEvent.click(screen.getByTestId("pool-save"));
+  expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ modes: [{ mode: "snd", map_ids: ["nebel", "hafen"] }] }));
+});
+
+test("ein Pool von vor dem ersten Modus zeigt seinen Stand, ohne etwas zu verlieren", () => {
+  const entry = { ...ENTRY, outdated_map_ids: [], modes: [{ mode: null, label: "Alle Maps", maps: [{ map_id: "hafen", name: "Hafenkante" }] }] };
+  renderEditor({ entry });
+  expect(screen.getByTestId("pool-old-groups")).toHaveTextContent("„Alle Maps“ (1)");
+});
+
+test("Maps ohne Modus nennt der Editor und führt zur Bibliothek", () => {
+  renderEditor({ library: [...LIBRARY, { id: "glut", name: "Glutsenke", modes: [] }], libraryLink: true });
+  expect(screen.getByTestId("pool-without-mode")).toHaveTextContent("1 Map hat noch keinen Modus");
+  expect(within(screen.getByTestId("pool-without-mode")).getByRole("link", { name: "Zuordnen" })).toHaveAttribute("href", "/admin/games/g1/maps");
+});
+
+test("ein Spiel ohne Modi kennt keinen Hinweis auf fehlende Modi", () => {
+  renderEditor({ game: { ...GAME, modes: [] }, library: [{ id: "glut", name: "Glutsenke", modes: [] }], entry: null });
+  expect(screen.queryByTestId("pool-without-mode")).toBeNull();
+  expect(screen.queryByTestId("pool-old-groups")).toBeNull();
+});
+
 test("Reihenfolge ändern und speichern schickt die Auswahl mit der geladenen Version", async () => {
   const { onSave } = renderEditor();
   fireEvent.click(screen.getByRole("button", { name: "Hafenkante in Suchen & Zerstören nach oben" }));

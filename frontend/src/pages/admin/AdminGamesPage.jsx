@@ -9,7 +9,7 @@ import { ImageUpload } from "@/components/tls/ImageUpload";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { gameLabel, gameOptionLabel, isArchivedGame, selectableGames } from "@/lib/gameLabels";
-import { gameMatchDataPayload, gameMatchDataProblem, gameMatchDataToForm } from "@/lib/gameMatchData";
+import { gameMatchDataPayload, gameMatchDataProblem, gameMatchDataToForm, gameSavedText, modeRemovalQuestion, removedModes } from "@/lib/gameMatchData";
 import { GameMatchDataFields } from "./GameMatchDataFields";
 import { toast } from "sonner";
 import { Archive, ArchiveRestore, Map as MapIcon, Pencil, Plus, Trash2 } from "lucide-react";
@@ -289,6 +289,7 @@ function gamePayload(form) {
 function EditGameModal({ game, games, servers = [], onClose, onSaved }) {
   const [form, setForm] = useState(game);
   const [saving, setSaving] = useState(false);
+  const confirm = useConfirm();
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const parentOptions = selectableGames(games, form.parent_game_id).filter((g) => g.id !== form.id && g.kind !== "edition").map((g) => [g.id, gameOptionLabel(g)]);
   const identityOptions = selectableGames(games, form.identity_source_game_id).filter((g) => g.id !== form.id).map((g) => [g.id, `ID von ${gameOptionLabel(g)}`]);
@@ -299,8 +300,20 @@ function EditGameModal({ game, games, servers = [], onClose, onSaved }) {
     if (problem) { toast.error(problem); return; }
     setSaving(true);
     try {
-      await api.patch(`/games/${form.id}`, gamePayload(form));
-      toast.success("Spiel gespeichert.");
+      const payload = gamePayload(form);
+      // Modus entfernt (#2129, SP2): vor dem Speichern fragen, mit der Zahl der betroffenen Maps - auf dem Server
+      // verschwindet er dann auch aus den Maps.
+      const removed = removedModes(game.match_data?.match_modes, payload);
+      if (removed.length) {
+        const usage = await api.get(`/games/${form.id}/usage`).then(({ data }) => data).catch(() => null);
+        const question = modeRemovalQuestion(removed, usage);
+        if (question && !await confirm({ ...question, confirmLabel: "Entfernen" })) {
+          setSaving(false);
+          return;
+        }
+      }
+      const { data } = await api.patch(`/games/${form.id}`, payload);
+      toast.success(gameSavedText(data));
       onSaved();
     } catch (err) {
       toast.error(formatRequestError(err, "Spiel konnte nicht gespeichert werden.", { slug: form.slug, name: form.name }));

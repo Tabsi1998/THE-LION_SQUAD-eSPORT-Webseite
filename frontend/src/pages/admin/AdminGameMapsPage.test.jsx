@@ -42,6 +42,48 @@ function renderPage() {
   );
 }
 
+// #2129, SP2: Maps ohne Modus werden benannt und lassen sich gesammelt zuordnen; ein alter Modus blockiert nichts.
+describe("Maps ohne Modus", () => {
+  test("der Hinweis nennt sie, ein Klick ordnet sie allen gewählten Modi zu", async () => {
+    apiMock.post.mockResolvedValue({ data: { updated: 1 } });
+    renderPage();
+    const notice = await screen.findByTestId("game-maps-without-mode");
+    expect(notice).toHaveTextContent("Diese Maps haben noch keinen Modus");
+    expect(notice).toHaveTextContent("Nebelwerk");
+    expect(notice).not.toHaveTextContent("Glutsenke");
+    fireEvent.click(within(notice).getByTestId("game-maps-assign-stellung"));
+    fireEvent.click(within(notice).getByTestId("game-maps-assign"));
+    await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/games/g1/maps/assign-modes", { modes: ["snd"] }));
+  });
+
+  test("ohne gewählten Modus geht es nicht; ein Spiel ohne Modi braucht den Hinweis nicht", async () => {
+    const { unmount } = renderPage();
+    const notice = await screen.findByTestId("game-maps-without-mode");
+    fireEvent.click(within(notice).getByTestId("game-maps-assign-stellung"));
+    fireEvent.click(within(notice).getByTestId("game-maps-assign-snd"));
+    expect(within(notice).getByTestId("game-maps-assign")).toBeDisabled();
+    unmount();
+
+    apiMock.get.mockResolvedValue({ data: { ...BODY, game: { ...BODY.game, modes: [] } } });
+    renderPage();
+    await screen.findByRole("heading", { level: 1 });
+    expect(screen.queryByTestId("game-maps-without-mode")).toBeNull();
+  });
+
+  test("ein Modus, den das Spiel nicht mehr hat: keine rohe Kennung, das Speichern scheitert nicht daran", async () => {
+    const maps = [{ ...BODY.maps[0], modes: ["stellung", "alter_modus"] }, { ...BODY.maps[1], modes: ["alter_modus"] }];
+    apiMock.get.mockResolvedValue({ data: { ...BODY, maps } });
+    renderPage();
+    const card = await screen.findByTestId("game-map-card-hafenkante");
+    expect(card).not.toHaveTextContent("alter_modus");
+    expect(await screen.findByTestId("game-maps-without-mode")).toHaveTextContent("Nebelwerk");
+
+    fireEvent.click(screen.getByTestId("game-map-edit-hafenkante"));
+    fireEvent.submit(screen.getByTestId("game-map-sheet"));
+    await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/games/g1/maps/hafen", expect.objectContaining({ modes: ["stellung"] })));
+  });
+});
+
 test("zeigt die aktiven Maps mit Modi und Pool-Zählung, archivierte erst auf Wunsch", async () => {
   renderPage();
   expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("Maps · Probe Shooter");

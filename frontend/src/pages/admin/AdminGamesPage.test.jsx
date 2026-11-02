@@ -212,12 +212,49 @@ describe("Spiele archivieren", () => {
   });
 });
 
-test("ein Modus lässt sich wieder entfernen", async () => {
-  apiMock.get.mockImplementation(async (url) => ({ data: url === "/games/discord-servers" ? [] : [{ ...GAMES[0], match_modes: [{ mode: "gp4", label: "Grand Prix", minutes: 12 }] }] }));
-  render(<MemoryRouter><AdminGamesPage /></MemoryRouter>);
-  fireEvent.click(await screen.findByTestId("game-edit-mario-kart-8"));
-  expect(screen.getByTestId("game-edit-mode-label-0")).toHaveValue("Grand Prix");
-  fireEvent.click(screen.getByTestId("game-edit-mode-remove-0"));
-  fireEvent.submit(screen.getByTestId("game-sheet"));
-  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/games/g1", expect.objectContaining({ match_modes: [] })));
+describe("einen Modus entfernen (#2129, SP2)", () => {
+  const withMode = (usage) => apiMock.get.mockImplementation(async (url) => {
+    if (url === "/games/discord-servers") return { data: [] };
+    if (url.endsWith("/usage")) return { data: usage };
+    return { data: [{ ...GAMES[0], match_modes: [{ mode: "gp4", label: "Grand Prix", minutes: 12 }] }] };
+  });
+
+  async function removeAndSave() {
+    render(<MemoryRouter><AdminGamesPage /></MemoryRouter>);
+    fireEvent.click(await screen.findByTestId("game-edit-mario-kart-8"));
+    expect(screen.getByTestId("game-edit-mode-label-0")).toHaveValue("Grand Prix");
+    fireEvent.click(screen.getByTestId("game-edit-mode-remove-0"));
+    fireEvent.submit(screen.getByTestId("game-sheet"));
+  }
+
+  beforeEach(() => {
+    confirmMock.mockReset();
+    confirmMock.mockResolvedValue(true);
+  });
+
+  test("Rückfrage mit der Zahl der Maps, dann geht es zum Server", async () => {
+    withMode({ modes: { gp4: { label: "Grand Prix", maps: 3, pools: 0, seasons: 0 } } });
+    await removeAndSave();
+    await waitFor(() => expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Modus „Grand Prix“ entfernen?", description: expect.stringContaining("3 Maps verlieren"),
+    })));
+    await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/games/g1", expect.objectContaining({ match_modes: [] })));
+  });
+
+  test("wer abbricht, speichert nichts und bleibt im Formular", async () => {
+    withMode({ modes: { gp4: { label: "Grand Prix", maps: 3, pools: 1, seasons: 0 } } });
+    confirmMock.mockResolvedValue(false);
+    await removeAndSave();
+    await waitFor(() => expect(confirmMock).toHaveBeenCalled());
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(apiMock.patch).not.toHaveBeenCalled();
+    expect(screen.getByTestId("game-sheet")).toBeInTheDocument();
+  });
+
+  test("hängt nichts daran, gibt es keine Frage", async () => {
+    withMode({ modes: { gp4: { label: "Grand Prix", maps: 0, pools: 0, seasons: 0 } } });
+    await removeAndSave();
+    await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/games/g1", expect.objectContaining({ match_modes: [] })));
+    expect(confirmMock).not.toHaveBeenCalled();
+  });
 });
