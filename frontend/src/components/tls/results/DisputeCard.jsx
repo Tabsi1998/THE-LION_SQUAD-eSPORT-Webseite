@@ -28,9 +28,13 @@ function Photo({ photo, label }) {
 
 export function DisputeCard({ item, busy = false, highlighted = false, onKeep, onChange }) {
   const [note, setNote] = useState("");
+  const [conflictReason, setConflictReason] = useState("");
   const dispute = item?.dispute;
   if (!dispute) return null;
   const hasResult = Boolean(item.has_result);
+  // Liga (#2203): `can_decide` sagt der Server - fehlt das Feld (normale Antwort älterer Stände), bleibt es wie bisher.
+  const mayDecide = item.can_decide !== false;
+  const needsReason = Boolean(item.conflict_override) && conflictReason.trim().length < 5;
   return (
     <div className={`rounded-sm border bg-[#121212] p-4 space-y-3 ${highlighted ? "border-[#FFD700]/70 ring-2 ring-[#FFD700]/40" : "border-[#FF3B30]/40"}`} data-testid={`lead-dispute-${item.id}`} id={`fall-ds-${item.id}`}>
       <div className="flex items-start justify-between gap-3">
@@ -55,9 +59,16 @@ export function DisputeCard({ item, busy = false, highlighted = false, onKeep, o
           ))}
         </div>
       ) : null}
+      {item.conflict ? <p className="rounded-sm border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-white/85" data-testid={`lead-dispute-conflict-${item.id}`}>Du bist an diesem Spiel selbst beteiligt. Das entscheidet eine zweite berechtigte Person.</p> : null}
+      {item.conflict_override ? (
+        <label className="block rounded-sm border border-warn/40 bg-warn/10 px-3 py-2" data-testid={`lead-dispute-override-${item.id}`}>
+          <span className="mb-2 block text-sm text-white/85">Du bist an diesem Spiel selbst beteiligt. Als Superadmin geht es nur als Notausnahme, der Grund steht im Protokoll.</span>
+          <input value={conflictReason} onChange={(e) => setConflictReason(e.target.value)} maxLength={500} className="input" placeholder="Grund der Notausnahme" aria-label="Grund der Notausnahme" data-testid={`lead-dispute-reason-${item.id}`} />
+        </label>
+      ) : null}
       <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} className="input" placeholder="Begründung (freiwillig, geht an beide Seiten)" data-testid={`lead-dispute-note-${item.id}`} />
       <div className="grid grid-cols-2 gap-2">
-        <button type="button" disabled={busy} onClick={() => onKeep(note.trim() || null)} className="tls-btn tls-btn--secondary min-h-[44px] px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid={`lead-dispute-keep-${item.id}`}>
+        <button type="button" disabled={busy || !mayDecide || needsReason} onClick={() => onKeep(note.trim() || null, conflictReason.trim() || null)} className="tls-btn tls-btn--secondary min-h-[44px] px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid={`lead-dispute-keep-${item.id}`}>
           {hasResult ? "Ergebnis bleibt" : "Weiter wie bisher"}
         </button>
         <button type="button" disabled={busy || !item.can_enter} onClick={onChange} className="tls-btn tls-btn--primary min-h-[44px] px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid={`lead-dispute-change-${item.id}`}>

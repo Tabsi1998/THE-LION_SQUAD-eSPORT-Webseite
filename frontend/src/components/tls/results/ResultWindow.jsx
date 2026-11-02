@@ -44,6 +44,8 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
   const withMaps = mapsPossible && !skipMaps;
   const [mapGames, setMapGames] = useState(() => (mapsPossible ? staffStart(league) : []));
   const [reason, setReason] = useState("");
+  // Befangen (#2203): Der Superadmin darf als Notausnahme, mit Grund im Protokoll. Der Server prüft das selbst.
+  const [conflictReason, setConflictReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const panelRef = useRef(null);
@@ -98,16 +100,21 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
       setError("Bitte kurz den Grund der Korrektur angeben (mindestens 5 Zeichen).");
       return;
     }
+    if (entry.conflict_override && conflictReason.trim().length < 5) {
+      setError("Du bist an diesem Spiel selbst beteiligt: Bitte den Grund der Notausnahme angeben (mindestens 5 Zeichen).");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
       const { data } = await api.post(`/matches/${entry.id}/result${correcting ? "?force=true" : ""}`, {
+        ...(entry.conflict_override ? { conflict_reason: conflictReason.trim() } : {}),
         results: outcome.results,
         ...(withMaps ? { games: outcome.games } : {}),
         hold: true,
         reason: correcting ? reason.trim() : null,
       });
-      onSaved?.({ matchId: entry.id, hold: data?.hold || null, sentence });
+      onSaved?.({ matchId: entry.id, hold: data?.hold || null, sentence, conflictReason: entry.conflict_override ? conflictReason.trim() : null });
       onClose?.();
     } catch (err) {
       if (!correcting && err.response?.status === 409 && await resultArrived(entry.id)) {
@@ -195,6 +202,14 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
             <label className="block">
               <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Grund der Korrektur (steht im Protokoll)</span>
               <input value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} className="input" placeholder="z. B. Stand falsch abgelesen" data-testid="result-reason" />
+            </label>
+          ) : null}
+
+          {entry.conflict_override ? (
+            <label className="block rounded-sm border border-warn/40 bg-warn/10 px-3 py-2" data-testid="result-conflict">
+              <span className="block text-sm font-bold text-white">Du bist an diesem Spiel selbst beteiligt.</span>
+              <span className="mt-0.5 mb-2 block text-xs text-white/70">Das entscheidet sonst eine zweite Person. Als Superadmin geht es nur als Notausnahme, der Grund steht im Protokoll.</span>
+              <input value={conflictReason} onChange={(event) => setConflictReason(event.target.value)} maxLength={500} className="input" placeholder="Grund der Notausnahme" aria-label="Grund der Notausnahme" data-testid="result-conflict-reason" />
             </label>
           ) : null}
 
