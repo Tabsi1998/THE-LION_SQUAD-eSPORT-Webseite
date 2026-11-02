@@ -198,8 +198,12 @@ async def test_deleting_or_renaming_a_partner_clears_the_running_cache(flow):
     flow.act_as(None)
     assert _names((await flow.get(f"{PUBLIC}/running")).json()["items"][0]["organizers"]) == ["Probe Ananas Neu"]
     flow.act_as(admin)
+    # Gelöscht wird nur, was nirgends verwendet wird (#2130): erst aus der Serie nehmen.
+    refused = await flow.delete(f"/api/partners/{host['id']}")
+    assert refused.status_code == 409 and "1 Serie" in refused.json()["detail"]
+    await flow.db.reference_lineages.update_one({"id": lineage["id"]}, {"$set": {"partner_ids": [helper["id"]]}})
     deleted = await flow.delete(f"/api/partners/{host['id']}")
-    assert deleted.status_code == 200
+    assert deleted.status_code == 200, deleted.text
     flow.act_as(None)
     assert (await flow.get(f"{PUBLIC}/running")).json()["items"][0]["organizers"] == []
 

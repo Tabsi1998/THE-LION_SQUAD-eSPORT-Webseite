@@ -10,7 +10,7 @@ import { ImageUpload } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
-import { ExternalLink, Handshake, Pencil, Plus, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, ExternalLink, Handshake, Pencil, Plus, Trash2 } from "lucide-react";
 import { SOCIAL_PLATFORMS } from "@/lib/socialIcons";
 
 // Partner: Liste und Seitenblatt (#435). Seit der Partnerseite (#469) hat jeder Partner eine eigene
@@ -102,11 +102,23 @@ export default function AdminPartnersPage() {
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["partners", "uploads"]);
 
+  // Archivieren (#2130): von der Website weg, alles bleibt; Löschen nur, wenn der Partner nirgends verwendet wird.
   const remove = async (id) => {
-    if (!await confirm({ title: "Partner löschen?", description: "Der Partner wird dauerhaft aus der Partnerseite entfernt.", confirmLabel: "Löschen" })) return;
-    await api.delete(`/partners/${id}`);
-    toast.success("Partner gelöscht.");
-    load();
+    if (!await confirm({ title: "Partner löschen?", description: "Das lässt sich nicht rückgängig machen und geht nur, wenn der Partner nirgends verwendet wird. Sonst archivieren.", confirmLabel: "Löschen" })) return;
+    try {
+      await api.delete(`/partners/${id}`);
+      toast.success("Partner gelöscht.");
+      load();
+    } catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
+  };
+
+  const setArchived = async (partner, archived) => {
+    if (archived && !await confirm({ title: "Partner archivieren?", description: "Seine Seite und alle Hinweise auf ihn verschwinden von der Website. Der Eintrag bleibt hier zum Zurückholen stehen.", confirmLabel: "Archivieren", tone: "info" })) return;
+    try {
+      await api.patch(`/partners/${partner.id}`, { is_active: !archived });
+      toast.success(archived ? "Partner archiviert." : "Partner zurückgeholt.");
+      load();
+    } catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
   };
 
   return (
@@ -126,7 +138,7 @@ export default function AdminPartnersPage() {
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
         {list.map((p) => (
-          <div key={p.id} className="border border-white/10 rounded-sm bg-[#121212] p-5">
+          <div key={p.id} className={`border border-white/10 rounded-sm bg-[#121212] p-5 ${p.is_active === false ? "opacity-70" : ""}`} data-testid={`partner-card-${p.id}`}>
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
                 {shownLogo(p) ? (
@@ -139,12 +151,18 @@ export default function AdminPartnersPage() {
                 <div className="min-w-0">
                   <div className="text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]">{p.kind || "Partner"}</div>
                   <div className="font-heading text-lg font-bold truncate">{p.name}</div>
-                  {p.is_active === false && <div className="text-[10px] uppercase tracking-widest text-[#FF3B30] font-bold">Inaktiv</div>}
+                  {p.is_active === false && <div className="text-[10px] uppercase tracking-widest text-[#FF3B30] font-bold">Archiviert</div>}
                   {p.source === "dolibarr" && <div className="text-[10px] uppercase tracking-widest text-[#29B6E8]/80 font-bold" data-testid={`partner-dolibarr-${p.id}`}>Aus Dolibarr</div>}
                 </div>
               </div>
               <div className="flex gap-1 shrink-0">
                 <button onClick={() => setEditing(p)} className="p-1.5 text-white/40 hover:text-[#29B6E8]"><Pencil className="w-4 h-4" /></button>
+                {/* „Aktiv“ eines Partners aus Dolibarr führt der Abgleich - dort wird er auch archiviert. */}
+                {!dolibarrKeepsEntry(dolibarrSource, p) && (p.is_active === false ? (
+                  <button onClick={() => setArchived(p, false)} title="Zurückholen" aria-label="Partner zurückholen" data-testid={`partner-restore-${p.id}`} className="p-1.5 text-white/40 hover:text-[#29B6E8]"><ArchiveRestore className="w-4 h-4" /></button>
+                ) : (
+                  <button onClick={() => setArchived(p, true)} title="Archivieren" aria-label="Partner archivieren" data-testid={`partner-archive-${p.id}`} className="p-1.5 text-white/40 hover:text-brand"><Archive className="w-4 h-4" /></button>
+                ))}
                 <button onClick={() => remove(p.id)} disabled={dolibarrKeepsEntry(dolibarrSource, p)} title={dolibarrKeepsEntry(dolibarrSource, p) ? DOLIBARR_DELETE_HINT : "Partner löschen"} aria-label="Partner löschen" data-testid={`partner-delete-${p.id}`} className="p-1.5 text-white/40 hover:text-[#FF3B30] disabled:opacity-30 disabled:hover:text-white/40 disabled:cursor-not-allowed"><Trash2 className="w-4 h-4" /></button>
               </div>
             </div>

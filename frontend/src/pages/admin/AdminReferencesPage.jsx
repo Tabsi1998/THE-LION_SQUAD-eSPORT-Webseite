@@ -13,7 +13,7 @@ import { gameOptionLabel, selectableGames } from "@/lib/gameLabels";
 import { checkKey, warningSummary, warningsByField } from "@/lib/referenceChecks";
 import { AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
-import { ExternalLink, Flag, History, Medal, Pencil, Plus, Save, Trash2, User, Users } from "lucide-react";
+import { Archive, ArchiveRestore, ExternalLink, Flag, History, Medal, Pencil, Plus, Save, Trash2, User, Users } from "lucide-react";
 import { viennaDate, viennaDay } from "@/lib/vienna";
 import { podiumItems, yearOf } from "@/lib/referencesOverview";
 import { bestPlacement } from "@/components/tls/references/referenceParts";
@@ -254,11 +254,23 @@ export default function AdminReferencesPage() {
     setSearchParams((params) => { params.delete("edit"); return params; }, { replace: true });
   }, [editId, items, setSearchParams]);
 
+  // Archivieren (#2130): von der Website weg, alles bleibt; Löschen nur, wenn die Referenz nirgends verwendet wird.
   const remove = async (id) => {
-    if (!await confirm({ title: "Referenz löschen?", description: "Die Turnierteilnahme wird mit allen Einträgen dauerhaft entfernt.", confirmLabel: "Löschen" })) return;
-    await api.delete(`/references/${id}`);
-    toast.success("Referenz gelöscht.");
-    load();
+    if (!await confirm({ title: "Referenz löschen?", description: "Das lässt sich nicht rückgängig machen und geht nur, wenn die Referenz nirgends verwendet wird - keine Saison, keine Vitrine, keine Mitglieder eingetragen. Sonst archivieren.", confirmLabel: "Löschen" })) return;
+    try {
+      await api.delete(`/references/${id}`);
+      toast.success("Referenz gelöscht.");
+      load();
+    } catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
+  };
+
+  const setArchived = async (item, archived) => {
+    if (archived && !await confirm({ title: "Referenz archivieren?", description: "Sie verschwindet von der Website, aus den Profilen und aus den Erfolgen. Hier bleibt sie zum Zurückholen stehen.", confirmLabel: "Archivieren", tone: "info" })) return;
+    try {
+      await api.patch(`/references/${item.id}`, { is_active: !archived });
+      toast.success(archived ? "Referenz archiviert." : "Referenz zurückgeholt.");
+      load();
+    } catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
   };
 
   return (
@@ -292,7 +304,7 @@ export default function AdminReferencesPage() {
 
       <div className="space-y-3">
         {items.map((item) => (
-          <div key={item.id} className="border border-white/10 rounded-sm bg-[#121212] p-4" data-testid={`reference-row-${item.id}`}>
+          <div key={item.id} className={`border border-white/10 rounded-sm bg-[#121212] p-4 ${item.is_active === false ? "opacity-70" : ""}`} data-testid={`reference-row-${item.id}`}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/45 font-bold flex-wrap">
@@ -301,7 +313,7 @@ export default function AdminReferencesPage() {
                   {item.medal && <span className="text-[#FFD700]">{medalLabel[item.medal]}</span>}
                   <span>{formatDate(item.start_date)}</span>
                   {item.visibility !== "public" && <span className="text-[#29B6E8]">{visibilityLabel[item.visibility] || item.visibility}</span>}
-                  {item.is_active === false && <span className="text-[#FF3B30]">Inaktiv</span>}
+                  {item.is_active === false && <span className="text-[#FF3B30]">Archiviert</span>}
                 </div>
                 <h2 className="mt-1 font-heading text-xl font-black uppercase leading-tight">{item.display_title || item.title}</h2>
                 <div className="mt-1 flex flex-wrap gap-1.5">
@@ -332,7 +344,12 @@ export default function AdminReferencesPage() {
               </div>
               <div className="flex gap-1 shrink-0">
                 <button onClick={() => setEditing(item)} data-testid={`reference-edit-${item.id}`} className="p-1.5 text-white/40 hover:text-[#29B6E8]"><Pencil className="w-4 h-4" /></button>
-                <button onClick={() => remove(item.id)} className="p-1.5 text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-4 h-4" /></button>
+                {item.is_active === false ? (
+                  <button onClick={() => setArchived(item, false)} title="Zurückholen" aria-label="Referenz zurückholen" data-testid={`reference-restore-${item.id}`} className="p-1.5 text-white/40 hover:text-[#29B6E8]"><ArchiveRestore className="w-4 h-4" /></button>
+                ) : (
+                  <button onClick={() => setArchived(item, true)} title="Archivieren" aria-label="Referenz archivieren" data-testid={`reference-archive-${item.id}`} className="p-1.5 text-white/40 hover:text-brand"><Archive className="w-4 h-4" /></button>
+                )}
+                <button onClick={() => remove(item.id)} title="Löschen" aria-label="Referenz löschen" data-testid={`reference-delete-${item.id}`} className="p-1.5 text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-4 h-4" /></button>
               </div>
             </div>
           </div>

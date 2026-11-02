@@ -12,13 +12,13 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { SponsoringOfferPanel } from "@/pages/admin/sponsors/SponsoringOfferPanel";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
-import { Plus, Trash2, Upload, Pencil } from "lucide-react";
+import { Archive, ArchiveRestore, Plus, Trash2, Upload, Pencil } from "lucide-react";
 
 const TIERS = ["main", "platinum", "gold", "silver", "bronze"];
 const TIER_LABELS = { main: "Hauptsponsor", platinum: "Platin", gold: "Gold", silver: "Silber", bronze: "Bronze" };
 const TIER_COLORS = { main: "text-[#29B6E8]", platinum: "text-[#E5E4E2]", gold: "text-[#FFD700]", silver: "text-white/80", bronze: "text-[#CD7F32]" };
 const CONTRACT_STATUSES = ["active", "planned", "paused", "expired", "cancelled"];
-const CONTRACT_LABELS = { active: "Aktiv", planned: "Geplant", paused: "Pausiert", expired: "Abgelaufen", cancelled: "Gekündigt", inactive: "Inaktiv" };
+const CONTRACT_LABELS = { active: "Aktiv", planned: "Geplant", paused: "Pausiert", expired: "Abgelaufen", cancelled: "Gekündigt", inactive: "Archiviert" };
 const STATUS_CLASSES = {
   active: "bg-[#00FF88]/10 text-[#00FF88]",
   planned: "bg-[#29B6E8]/10 text-[#29B6E8]",
@@ -82,11 +82,23 @@ export default function AdminSponsorsPage() {
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["sponsors", "uploads"]);
 
+  // Archivieren (#2130): von der Website weg, alles bleibt; Löschen nur, wenn der Sponsor nirgends verwendet wird.
   const del = async (id) => {
-    if (!await confirm({ title: "Sponsor löschen?", description: "Der Sponsor wird dauerhaft entfernt.", confirmLabel: "Löschen" })) return;
-    await api.delete(`/sponsors/${id}`);
-    toast.success("Sponsor gelöscht.");
-    load();
+    if (!await confirm({ title: "Sponsor löschen?", description: "Das lässt sich nicht rückgängig machen und geht nur, wenn der Sponsor nirgends verwendet wird. Sonst archivieren.", confirmLabel: "Löschen" })) return;
+    try {
+      await api.delete(`/sponsors/${id}`);
+      toast.success("Sponsor gelöscht.");
+      load();
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+  };
+
+  const setArchived = async (sponsor, archived) => {
+    if (archived && !await confirm({ title: "Sponsor archivieren?", description: "Er verschwindet überall von der Website und bleibt hier zum Zurückholen stehen.", confirmLabel: "Archivieren", tone: "info" })) return;
+    try {
+      await api.patch(`/sponsors/${sponsor.id}`, { is_active: !archived });
+      toast.success(archived ? "Sponsor archiviert." : "Sponsor zurückgeholt.");
+      load();
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
 
   const migrate = async () => {
@@ -193,7 +205,7 @@ export default function AdminSponsorsPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {list.map((s) => (
-          <div key={s.id} className="border border-white/10 rounded-sm bg-[#121212] p-5" data-testid={`sponsor-card-${s.id}`}>
+          <div key={s.id} className={`border border-white/10 rounded-sm bg-[#121212] p-5 ${s.is_active === false ? "opacity-70" : ""}`} data-testid={`sponsor-card-${s.id}`}>
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-center gap-3 min-w-0">
                 {shownLogo(s) ? (
@@ -216,7 +228,6 @@ export default function AdminSponsorsPage() {
                     {s.show_on_tv && <span className="text-[9px] px-1.5 py-0.5 bg-[#9F7AEA]/15 text-[#BFA6FF] rounded-sm font-bold uppercase tracking-widest">TV</span>}
                     {s.show_on_pdf && <span className="text-[9px] px-1.5 py-0.5 bg-[#29B6E8]/15 text-[#8EE6FF] rounded-sm font-bold uppercase tracking-widest">PDF</span>}
                     {s.show_in_emails && <span className="text-[9px] px-1.5 py-0.5 bg-[#18C29C]/15 text-[#18C29C] rounded-sm font-bold uppercase tracking-widest">E-Mail</span>}
-                    {s.is_active === false && <span className="text-[9px] px-1.5 py-0.5 bg-[#FF3B30]/15 text-[#FF3B30] rounded-sm font-bold uppercase tracking-widest">Inaktiv</span>}
                     {s.source === "dolibarr" && <span className="text-[9px] px-1.5 py-0.5 bg-[#29B6E8]/15 text-[#29B6E8] rounded-sm font-bold uppercase tracking-widest" data-testid={`sponsor-dolibarr-${s.id}`}>Dolibarr</span>}
                     {imageSourceText(s.dolibarr_image_summary) && <span className="text-[9px] px-1.5 py-0.5 bg-[#29B6E8]/10 text-[#8EE6FF] rounded-sm font-bold uppercase tracking-widest" title={imageSourceText(s.dolibarr_image_summary)} data-testid={`sponsor-images-${s.id}`}>Bilder: Dolibarr</span>}
                   </div>
@@ -224,6 +235,11 @@ export default function AdminSponsorsPage() {
               </div>
               <div className="flex gap-1 shrink-0">
                 <button onClick={() => setEditing(s)} className="p-1.5 text-white/40 hover:text-[#29B6E8]"><Pencil className="w-4 h-4" /></button>
+                {s.is_active === false ? (
+                  <button onClick={() => setArchived(s, false)} title="Zurückholen" aria-label="Sponsor zurückholen" data-testid={`sponsor-restore-${s.id}`} className="p-1.5 text-white/40 hover:text-[#29B6E8]"><ArchiveRestore className="w-4 h-4" /></button>
+                ) : (
+                  <button onClick={() => setArchived(s, true)} title="Archivieren" aria-label="Sponsor archivieren" data-testid={`sponsor-archive-${s.id}`} className="p-1.5 text-white/40 hover:text-brand"><Archive className="w-4 h-4" /></button>
+                )}
                 <button onClick={() => del(s.id)} disabled={dolibarrKeepsEntry(dolibarrSource, s)} title={dolibarrKeepsEntry(dolibarrSource, s) ? DOLIBARR_DELETE_HINT : "Sponsor löschen"} aria-label="Sponsor löschen" data-testid={`sponsor-delete-${s.id}`} className="p-1.5 text-white/40 hover:text-[#FF3B30] disabled:opacity-30 disabled:hover:text-white/40 disabled:cursor-not-allowed"><Trash2 className="w-4 h-4" /></button>
               </div>
             </div>

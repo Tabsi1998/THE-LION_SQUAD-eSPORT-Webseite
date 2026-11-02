@@ -48,10 +48,19 @@ test("Partner aus Dolibarr: „Aktiv“ gesperrt mit Hinweis, Löschen gesperrt;
   render(<MemoryRouter><AdminPartnersPage /></MemoryRouter>);
   expect(await screen.findByTestId("partner-delete-p1")).toBeDisabled();
   expect(screen.getByTestId("partner-delete-p2")).not.toBeDisabled();
+  expect(screen.queryByTestId("partner-archive-p1")).toBeNull();
+  expect(screen.getByTestId("partner-archive-p2")).toBeInTheDocument();
   fireEvent.click(screen.getAllByRole("button").find((button) => button.querySelector("svg.lucide-pencil")));
   expect(screen.getByTestId("partner-locked-hint")).toHaveTextContent("Name, Art und „Aktiv“");
   expect(screen.getByTestId("partner-active")).toBeDisabled();
   expect(screen.getByTestId("partner-description")).not.toBeDisabled();
+});
+
+test("Archivieren schaltet „Aktiv“ aus, bei Partnern aus Dolibarr gibt es den Knopf nicht (#2130)", async () => {
+  apiMock.patch.mockResolvedValue({ data: {} });
+  render(<MemoryRouter><AdminPartnersPage /></MemoryRouter>);
+  fireEvent.click(await screen.findByTestId("partner-archive-p1"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/partners/p1", { is_active: false }));
 });
 
 test("Bearbeiten öffnet das Blatt mit den Werten des Partners, Tools inklusive", async () => {

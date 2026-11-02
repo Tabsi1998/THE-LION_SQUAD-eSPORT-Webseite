@@ -102,6 +102,25 @@ test("Sponsor aus Dolibarr lässt sich nicht löschen, solange der Schalter an i
   expect(screen.getByTestId("sponsor-delete-s1")).not.toBeDisabled();
 });
 
+test("Archivieren und Zurückholen schalten „Aktiv“; ein Sponsor in Verwendung zeigt den Grund beim Löschen (#2130)", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/admin/dolibarr/sponsors") return { data: SOURCE_OFF };
+    if (url === "/sponsors/admin") return { data: [{ id: "s4", name: "Archiv GmbH", tier: "gold", is_active: false, effective_status: "inactive" }, { id: "s5", name: "Laufend GmbH", tier: "gold", is_active: true, effective_status: "active" }] };
+    return { data: [] };
+  });
+  apiMock.patch.mockResolvedValue({ data: {} });
+  render(<MemoryRouter><AdminSponsorsPage /></MemoryRouter>);
+  expect(await screen.findByTestId("sponsor-card-s4")).toHaveTextContent("Archiviert");
+  fireEvent.click(screen.getByTestId("sponsor-archive-s5"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/sponsors/s5", { is_active: false }));
+  fireEvent.click(screen.getByTestId("sponsor-restore-s4"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/sponsors/s4", { is_active: true }));
+
+  apiMock.delete.mockRejectedValue({ response: { data: { detail: "Dieser Sponsor wird noch verwendet: 1 Event." } } });
+  fireEvent.click(screen.getByTestId("sponsor-delete-s5"));
+  await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Dieser Sponsor wird noch verwendet: 1 Event."));
+});
+
 // Event-Sponsoren (#1371): nur der Sponsor sagt, wo er erscheint - „bei allen Events“ oder „bei ausgewählten Events“.
 test("Events: bei allen leert die Auswahl, bei ausgewählten verlangt mindestens ein Event", async () => {
   apiMock.get.mockImplementation(async (url) => {

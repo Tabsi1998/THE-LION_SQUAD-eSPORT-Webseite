@@ -65,6 +65,19 @@ test("Texte: Highlights sagen „öffentlich“, interne Notizen gehen mit und �
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/references/r1", expect.objectContaining({ internal_notes: "Rechnung offen", highlights: "Starker Auftritt" })));
 });
 
+test("Archivieren und Zurückholen schalten „Aktiv“; Löschen in Verwendung zeigt den Grund (#2130)", async () => {
+  mockApi([LEGACY_ITEM, { ...LEGACY_ITEM, id: "r2", title: "Alt", display_title: "Alt", is_active: false }]);
+  render(<MemoryRouter><AdminReferencesPage /></MemoryRouter>);
+  expect(await screen.findByTestId("reference-row-r2")).toHaveTextContent("Archiviert");
+  fireEvent.click(screen.getByTestId("reference-archive-r1"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/references/r1", { is_active: false }));
+  fireEvent.click(screen.getByTestId("reference-restore-r2"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/references/r2", { is_active: true }));
+  apiMock.delete.mockRejectedValueOnce({ response: { data: { detail: "Diese Referenz wird noch verwendet: gehört zu einer Saison." } } });
+  fireEvent.click(screen.getByTestId("reference-delete-r1"));
+  await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Diese Referenz wird noch verwendet: gehört zu einer Saison."));
+});
+
 test("Neue Referenz: Felder statt Titel, zwei Einzelstarter mit je eigener Platzierung", async () => {
   mockApi([]);
   render(<MemoryRouter><AdminReferencesPage /></MemoryRouter>);
