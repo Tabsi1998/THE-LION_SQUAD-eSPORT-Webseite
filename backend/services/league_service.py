@@ -29,7 +29,7 @@ from services.bracket_fill_in import has_started, is_auto_bye
 from services.competition_versions import new_competition_version_fields
 from services.league_scope import ONLY_LEAGUE
 from services.log_safe import log_safe
-from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
+from services.mutation_lock import MutationLockBusy, league_resource, league_season_resource, mutation_lock, tournament_write_resource
 from services.tournament_purge import purge_tournament
 # Runden ≤ aktive Wochen steht im Blatt-Modul (auch für Spielplan und Turnierstart) und wird hier weitergereicht.
 from services.league_rounds import max_teams_for, rounds_needed, rounds_problem  # noqa: F401
@@ -773,7 +773,8 @@ async def _added_meanwhile(db, kind: str, target: dict, staffel_filter: dict, di
 
 async def delete_tree(db, kind: str, target: dict, *, on_staffel_deleted=None) -> dict:
     """Löscht Liga, Season oder Liga N samt leerer Entwurfs-Staffeln - alles oder nichts (Review #2106): erst die
-    Schreibsperren aller Staffeln, dann unter allen Sperren neu prüfen, dann löschen. Ist eine Staffel gerade in
+    Schreibsperren aller Staffeln, dazu die von Liga und Season (Regelwerk #1646: Veröffentlichen und Zustimmen warten, bis das Löschen
+    durch ist), dann unter allen Sperren neu prüfen, dann löschen. Ist eine Staffel oder Season gerade in
     Arbeit, wird nichts gelöscht. ``on_staffel_deleted(row)`` protokolliert jede gelöschte Staffel einzeln. Kam beim
     Löschen der Staffeln gleichzeitig eine neue Staffel, Liga N oder Season dazu, bricht es danach ab (409) - die leeren
     Staffeln sind dann schon weg und protokolliert, alles darüber bleibt. Gibt den ausgeführten Plan zurück."""
@@ -781,12 +782,17 @@ async def delete_tree(db, kind: str, target: dict, *, on_staffel_deleted=None) -
     if not plan["deletable"]:
         raise LeagueProblem(blocked_message(plan), 409)
     staffel_ids, division_ids, season_ids = _plan_ids(plan, kind, target)
-    scoped_seasons, _divisions, staffel_filter = await _delete_scope(db, kind, target)
+    _seasons, _divisions, staffel_filter = await _delete_scope(db, kind, target)
     try:
         async with AsyncExitStack() as locks:
             # Feste Reihenfolge: zwei Löschungen sperren sich nicht gegenseitig.
             for tournament_id in sorted(staffel_ids):
                 await locks.enter_async_context(mutation_lock(db, tournament_write_resource(tournament_id)))
+            # Regelwerk (#1646): Die Sperren halten bis zum letzten Löschen. Reihenfolge: Turnier, Liga, Season.
+            if kind == "league":
+                await locks.enter_async_context(mutation_lock(db, league_resource(target["id"])))
+            for season_id in sorted(season_ids):
+                await locks.enter_async_context(mutation_lock(db, league_season_resource(season_id)))
             fresh = await deletion_plan(db, kind, target)
             if not fresh["deletable"]:
                 raise LeagueProblem(blocked_message(fresh), 409)
@@ -796,23 +802,20 @@ async def delete_tree(db, kind: str, target: dict, *, on_staffel_deleted=None) -
                 await _purge_staffel(db, row["tournament_id"])
                 if on_staffel_deleted:
                     await on_staffel_deleted(row)
+            if await _added_meanwhile(db, kind, target, staffel_filter, division_ids, season_ids):
+                raise LeagueProblem(CHANGED_MEANWHILE, 409)
+            if division_ids:
+                await db.league_divisions.delete_many({"id": {"$in": sorted(division_ids)}})
+            if season_ids:
+                await db.map_pools.delete_many({"scope": "league_season", "scope_id": {"$in": sorted(season_ids)}})
+                # Liga-Kader (#2108): die festgehaltenen Spiel-IDs gehören zur Season und gehen mit ihr.
+                await db.league_rosters.delete_many({"season_id": {"$in": sorted(season_ids)}})
+                await db.league_seasons.delete_many({"id": {"$in": sorted(season_ids)}})
+            await delete_drafts(db, league_id=target["id"] if kind == "league" else None, season_ids=sorted(season_ids))
+            if kind == "league":
+                await db.leagues.delete_one({"id": target["id"]})
     except MutationLockBusy:
         raise LeagueProblem(STAFFEL_BUSY, 409) from None
-    if await _added_meanwhile(db, kind, target, staffel_filter, division_ids, season_ids):
-        raise LeagueProblem(CHANGED_MEANWHILE, 409)
-    # Veröffentlicht jemand während des Löschens, bleibt alles darüber stehen (#1646).
-    if await deletion_blockers(db, kind, target, scoped_seasons):
-        raise LeagueProblem(CHANGED_MEANWHILE, 409)
-    if division_ids:
-        await db.league_divisions.delete_many({"id": {"$in": sorted(division_ids)}})
-    if season_ids:
-        await db.map_pools.delete_many({"scope": "league_season", "scope_id": {"$in": sorted(season_ids)}})
-        # Liga-Kader (#2108): die festgehaltenen Spiel-IDs gehören zur Season und gehen mit ihr.
-        await db.league_rosters.delete_many({"season_id": {"$in": sorted(season_ids)}})
-        await db.league_seasons.delete_many({"id": {"$in": sorted(season_ids)}})
-    await delete_drafts(db, league_id=target["id"] if kind == "league" else None, season_ids=sorted(season_ids))
-    if kind == "league":
-        await db.leagues.delete_one({"id": target["id"]})
     return fresh
 
 

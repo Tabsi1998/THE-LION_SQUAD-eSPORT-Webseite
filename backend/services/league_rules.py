@@ -27,6 +27,7 @@ from services.league_rules_store import LEAGUE, PUBLISHED, SEASON, STAFFEL_POINT
 from services.league_scope import ONLY_LEAGUE
 from services.league_service import LeagueProblem
 from services.match_audience import responsible_ids, teams_by_id
+from services.mutation_lock import MutationLockBusy, league_resource, league_season_resource, mutation_lock
 from services.share_image_cache import fingerprint
 
 logger = logging.getLogger("tls.league_rules")
@@ -41,6 +42,7 @@ REASON_MIN = 5
 REASON_MAX = 500
 DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 CHANGED_MEANWHILE = "Der Entwurf wurde inzwischen geändert - bitte neu laden."
+SCOPE_BUSY = "An dieser Liga oder Season wird gerade etwas geändert - bitte gleich noch einmal."
 PUBLIC_FIELDS = ("id", "scope", "version", "title", "valid_from", "published_at", "change_reason", "requires_consent", "blocks_used")
 
 
@@ -473,6 +475,16 @@ def _check_publish(draft: dict, body: dict, predecessor: dict | None) -> tuple[s
 
 
 async def publish(db, scope: str, scope_id: str, body: dict, user: dict) -> dict:
+    """Veröffentlichen hält die Sperre von Season oder Liga: Löschen und Veröffentlichen laufen nacheinander, nie durcheinander."""
+    resource = league_resource(scope_id) if scope == LEAGUE else league_season_resource(scope_id)
+    try:
+        async with mutation_lock(db, resource):
+            return await _publish(db, scope, scope_id, body, user)
+    except MutationLockBusy:
+        raise LeagueProblem(SCOPE_BUSY, 409) from None
+
+
+async def _publish(db, scope: str, scope_id: str, body: dict, user: dict) -> dict:
     """Macht den Entwurf zur Fassung, in einem Schritt: Hat ihn inzwischen jemand geändert oder veröffentlicht, passt der Filter
     nicht mehr (409); dieselbe Nummer verhindert der eindeutige Index."""
     league, season = await resolve_scope(db, scope, scope_id)
@@ -588,6 +600,15 @@ async def admin_consents(db, league: dict, season: dict, chain: dict) -> dict | 
 
 
 async def give_consent(db, version_id: str, season_id: str, squad_id: str, user: dict) -> dict:
+    """Zustimmen hält die Sperre der Season: Eine Zustimmung hält die Season fest, das Löschen sieht sie oder sie kommt danach nicht mehr."""
+    try:
+        async with mutation_lock(db, league_season_resource(season_id)):
+            return await _give_consent(db, version_id, season_id, squad_id, user)
+    except MutationLockBusy:
+        raise LeagueProblem(SCOPE_BUSY, 409) from None
+
+
+async def _give_consent(db, version_id: str, season_id: str, squad_id: str, user: dict) -> dict:
     """Zustimmung eines Co-Teams zur gültigen Fassung. Mehrfach folgenlos (eindeutiger Index)."""
     season = await db.league_seasons.find_one({"id": season_id}, {"_id": 0})
     league = await db.leagues.find_one({"id": (season or {}).get("league_id"), "status": "active"}, {"_id": 0}) if season else None

@@ -20,6 +20,7 @@ from models import new_id, now_utc
 from services import league_roster
 from services.discord_roles import load_games, top_game
 from services.league_roster import min_squad_size
+from services.mutation_lock import league_season_resource
 
 ACTIVE_REGISTRATION_STATUSES = ("pending", "approved", "checked_in", "waitlist")
 # Plätze einer Staffel belegen wie beim Nachrücken (#1551) nur diese - die Warteliste zählt nicht mit.
@@ -43,7 +44,7 @@ def league_squad_key(tournament: dict, squad_id: str) -> str | None:
 
 def season_lock_resource(tournament: dict) -> str | None:
     season_id = (tournament.get("league_context") or {}).get("season_id")
-    return f"league_season:{season_id}:squads" if season_id else None
+    return league_season_resource(season_id) if season_id else None
 
 
 SEASON_TAKEN = "Dieses Co-Team spielt in dieser Season schon in einer anderen Staffel."
