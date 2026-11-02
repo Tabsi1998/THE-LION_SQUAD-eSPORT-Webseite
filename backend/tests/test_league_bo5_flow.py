@@ -375,4 +375,3 @@ async def test_a_new_pool_version_locks_a_map_for_new_matches_only(flow):
     confirmed = await stored(flow, held)
     assert confirmed["status"] == "completed"
     assert [game["map_name"] for game in confirmed["games"]] == [name for _mode, name in PLAYED[:3]]
-
