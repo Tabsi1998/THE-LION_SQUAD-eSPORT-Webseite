@@ -56,8 +56,8 @@ async def world(flow, seasons: int) -> tuple[dict, list[dict]]:
                                                    "body_md": "# Lang\nText", "frozen": {}})
         await flow.db.league_seasons.insert_one({"id": season_id, "league_id": league_id, "name": f"Season {index}", "slug": f"season-{index}",
                                                  "status": "active", "visibility": "public", "number": index})
-        await flow.db.tournaments.insert_one({"id": f"t{index}", "title": "Staffel", "league_context": {"league_id": league_id, "season_id": season_id,
-                                                                                                         "division_id": "d", "staffel": "A"}})
+        await flow.db.tournaments.insert_one({"id": f"t{index}", "slug": f"staffel-{index}", "title": "Staffel", "league_context": {
+            "league_id": league_id, "season_id": season_id, "division_id": f"d{index}", "staffel": "A"}})
         await flow.db.team_squads.insert_one({"id": f"q{index}", "team_id": "team", "name": f"Rudel {index}", "captain_id": captain["id"],
                                               "member_ids": [captain["id"]], "status": "active"})
         if index % 2:
