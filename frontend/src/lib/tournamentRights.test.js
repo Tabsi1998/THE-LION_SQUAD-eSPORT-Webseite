@@ -28,3 +28,11 @@ test("Phase und Gruppe; ohne Einsatz nichts", () => {
   expect(matchRights({ staff_scopes: [{ scope: "group", scope_id: "g-1", results: true }] }, OTHER).results).toBe(false);
   expect(matchRights({}, MATCH)).toEqual({ results: false, plan: false });
 });
+
+test("Termin des eigenen Spiels (#2203): direkt nur der Superadmin als Notausnahme", () => {
+  const tournament = { can_plan_matches: true, can_manage_all_results: true };
+  expect(matchRights(tournament, { id: "m", viewer_involved: true, viewer_override: false }).plan).toBe(false);
+  expect(matchRights(tournament, { id: "m", viewer_involved: true, viewer_override: true }).plan).toBe(true);
+  expect(matchRights(tournament, { id: "m", viewer_involved: false }).plan).toBe(true);
+  expect(matchRights(tournament, { id: "m" }).plan).toBe(true);
+});

@@ -257,6 +257,10 @@ export default function AdminLeagueSeasonPage() {
   const reload = useCallback(() => load(false), [load]);
   useApiInvalidation(reload, ["leagues", "map-pools"]);
 
+  // Zuständigkeiten (#2203): Der Server schickt, was diese Person hier darf - und prüft selbst noch einmal.
+  const can = (capability) => !data?.capabilities || data.capabilities.includes(capability);
+  const canSeason = can("season");
+  const canRules = can("rules");
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   const modes = useMemo(() => data?.game?.modes || [], [data]);
   const staffelCount = (data?.divisions || []).reduce((sum, division) => sum + division.staffeln.length, 0);
@@ -270,7 +274,9 @@ export default function AdminLeagueSeasonPage() {
     }
     setSaving(true);
     try {
-      const { data: saved } = await api.patch(`/admin/leagues/seasons/${seasonId}`, seasonPayload(form));
+      // Nur „Regeln veröffentlichen“ (#2203): Der Server nimmt von dieser Person nur den Regeltext an.
+      const body = canSeason ? seasonPayload(form) : { rules_text: seasonPayload(form).rules_text };
+      const { data: saved } = await api.patch(`/admin/leagues/seasons/${seasonId}`, body);
       toast.success(saved.changed?.length ? "Season gespeichert." : "Keine Änderung.");
       if (saved.visibility_applied) toast.success(`Sichtbarkeit für ${saved.visibility_applied === 1 ? "1 Staffel" : `${saved.visibility_applied} Staffeln`} geändert.`);
       setPendingSync(saved.staffeln_to_sync || 0);
@@ -373,10 +379,12 @@ export default function AdminLeagueSeasonPage() {
               </div>
             </div>
             {/* Löschen (#2106): nur als Entwurf ohne Staffel mit Co-Teams oder Spielen - sonst bietet das Blatt Archivieren an. */}
-            <button type="button" onClick={() => setDeleting({ kind: "season", target: season, name: season.name })} data-testid="season-delete"
-              className="tls-btn tls-btn--danger px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
-              <Trash2 className="w-3.5 h-3.5" aria-hidden="true" /> Season löschen
-            </button>
+            {can("manage") ? (
+              <button type="button" onClick={() => setDeleting({ kind: "season", target: season, name: season.name })} data-testid="season-delete"
+                className="tls-btn tls-btn--danger px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
+                <Trash2 className="w-3.5 h-3.5" aria-hidden="true" /> Season löschen
+              </button>
+            ) : null}
           </div>
 
           {pendingSync > 0 ? (
@@ -388,7 +396,9 @@ export default function AdminLeagueSeasonPage() {
           ) : null}
 
           <div className="space-y-6">
+            {canSeason || canRules ? (
             <form onSubmit={save} className="space-y-6" data-testid="season-form" noValidate>
+              {canSeason ? (<>
               <FormSection title="Kalender" hint="Spielwochen laufen ab dem Beginn jeweils so viele Tage. Ohne Einigung gilt der Standardtermin der Woche.">
                 <FormGrid cols={3}>
                   <TextField label="Name" maxLength={80} value={form.name} onChange={(value) => set("name", value)} testId="season-form-name" />
@@ -434,17 +444,21 @@ export default function AdminLeagueSeasonPage() {
                 </FormGrid>
               </FormSection>
 
-              <FormSection title="Regeltext und Sichtbarkeit">
-                <TextAreaField label="Regeltext" rows={8} value={form.rules_text} onChange={(value) => set("rules_text", value)} placeholder="Markdown, z. B. Ablauf, Fairplay, Map-Veto" testId="season-form-rules" />
+              </>) : null}
+              <FormSection title={canSeason ? "Regeltext und Sichtbarkeit" : "Regeltext"}>
+                {canRules ? <TextAreaField label="Regeltext" rows={8} value={form.rules_text} onChange={(value) => set("rules_text", value)} placeholder="Markdown, z. B. Ablauf, Fairplay, Map-Veto" testId="season-form-rules" /> : null}
+                {canSeason ? (
                 <FormGrid>
                   <SelectField label="Sichtbarkeit" value={form.visibility} onChange={(value) => set("visibility", value)} options={VISIBILITY_OPTIONS}
                     hint="Gilt beim Speichern sofort für Ligaseite, Menüpunkt „Liga“ und alle Staffel-Turniere – auch gesperrte." testId="season-form-visibility" />
                   <SelectField label="Stand" value={form.status} onChange={(value) => set("status", value)} options={SEASON_STATUS_OPTIONS} testId="season-form-status" />
                 </FormGrid>
+                ) : null}
               </FormSection>
 
               {/* Gestaltung (#2107): Emblem und Banner überschreiben die der Liga, leer heißt „wie die Liga“. Die Farbe
                   gehört der Liga (Stift in der Ligaübersicht). Gewinne sind reine Anzeige - kein Bezug zu XP oder Pokalen. */}
+              {canSeason ? (
               <FormSection title="Gestaltung und Gewinne" testId="season-look"
                 hint="Wirkt beim Speichern sofort auf Ligaseite, Übersicht, Teamseite und Link-Vorschau – ohne Übertragen. Das Banner bekommen auch die Staffeln (die App zeigt es beim Turnier).">
                 <FormGrid>
@@ -457,26 +471,32 @@ export default function AdminLeagueSeasonPage() {
                 <PrizeEditor rows={form.prizes} onChange={(value) => set("prizes", value)} testId="season-prizes"
                   emptyHint="Noch keine Gewinne – die Ligaseite zeigt dann keinen Block „Um was gespielt wird“." />
               </FormSection>
+              ) : null}
 
               <div className="flex flex-wrap items-center gap-3">
                 <button type="submit" disabled={saving} data-testid="season-save"
                   className="tls-btn tls-btn--primary px-5 py-2.5 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
-                  {saving ? "Speichere …" : "Season speichern"}
+                  {saving ? "Speichere …" : canSeason ? "Season speichern" : "Regeltext speichern"}
                 </button>
-                {staffelCount ? <span className="text-xs text-white/50">Die Sichtbarkeit gilt sofort; alle anderen Änderungen übernehmen bestehende Staffeln erst beim Übertragen.</span> : null}
+                {staffelCount && canSeason ? <span className="text-xs text-white/50">Die Sichtbarkeit gilt sofort; alle anderen Änderungen übernehmen bestehende Staffeln erst beim Übertragen.</span> : null}
               </div>
             </form>
+            ) : null}
 
-            <MapPoolEditor key={data.map_pool?.id || "leer"} title="Map-Pool der Season" game={data.game} library={data.library} entry={data.map_pool} defaultPool={data.default_pool}
-              hint="Jede neue Staffel bekommt eine Kopie; Änderungen kommen beim Übertragen an. Ohne Pool kann niemand mit Maps melden." onSave={savePool} onClear={clearPool} libraryLink testId="season-pool" />
+            {canSeason ? (
+              <MapPoolEditor key={data.map_pool?.id || "leer"} title="Map-Pool der Season" game={data.game} library={data.library} entry={data.map_pool} defaultPool={data.default_pool}
+                hint="Jede neue Staffel bekommt eine Kopie; Änderungen kommen beim Übertragen an. Ohne Pool kann niemand mit Maps melden." onSave={savePool} onClear={clearPool} libraryLink testId="season-pool" />
+            ) : null}
 
             <section className="border border-white/10 rounded-sm bg-[#121212] p-4 md:p-5 space-y-4" aria-label="Ligen und Staffeln" data-testid="season-divisions">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="font-heading text-xl font-bold uppercase">Ligen und Staffeln</h2>
-                <button type="button" onClick={() => setDivisionSheet({})} data-testid="division-add"
-                  className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
-                  <Plus className="w-3.5 h-3.5" aria-hidden="true" /> Liga {(data.divisions.at(-1)?.level || 0) + 1} anlegen
-                </button>
+                {canSeason ? (
+                  <button type="button" onClick={() => setDivisionSheet({})} data-testid="division-add"
+                    className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
+                    <Plus className="w-3.5 h-3.5" aria-hidden="true" /> Liga {(data.divisions.at(-1)?.level || 0) + 1} anlegen
+                  </button>
+                ) : null}
               </div>
               {!data.divisions.length ? <p className="text-sm text-white/55">Noch keine Liga. Lege Liga 1 an – darin entstehen die Staffeln.</p> : null}
               {data.divisions.map((division) => (
@@ -490,6 +510,7 @@ export default function AdminLeagueSeasonPage() {
                       <p className="text-xs text-white/55">{settingsLine(division.settings)}{Object.keys(division.overrides || {}).length ? " · weicht von der Season ab" : ""}</p>
                       <p className="text-xs text-white/55">{division.calendar.active_weeks} Spielwochen – höchstens {division.calendar.max_teams_per_staffel} Teams je Staffel</p>
                     </div>
+                    {canSeason ? (
                     <div className="flex items-center gap-1">
                       <button type="button" className={ICON_BUTTON} onClick={() => setDivisionSheet(division)} aria-label={`${division.label} bearbeiten`} data-testid={`division-edit-${division.level}`}>
                         <Pencil className="w-4 h-4" aria-hidden="true" />
@@ -503,6 +524,7 @@ export default function AdminLeagueSeasonPage() {
                         <Plus className="w-3.5 h-3.5" aria-hidden="true" /> Staffel anlegen
                       </button>
                     </div>
+                    ) : null}
                   </div>
                   {division.staffeln.length ? (
                     <ul className="mt-3 divide-y divide-white/5 rounded-sm border border-white/10 bg-[#0A0A0A]">
@@ -516,7 +538,7 @@ export default function AdminLeagueSeasonPage() {
                               Turnierverwaltung · Co-Teams zuteilen <ExternalLink className="w-3 h-3" aria-hidden="true" />
                             </Link>
                             {/* Staffel löschen (#2106) nur als Entwurf - dieselbe Sperre wie in der Turnierverwaltung prüft der Server. */}
-                            {staffel.status === "draft" ? (
+                            {staffel.status === "draft" && canSeason ? (
                               <button type="button" className={ICON_DANGER} onClick={() => setDeleting({ kind: "staffel", target: staffel, name: `${division.label} · Staffel ${staffel.staffel}` })}
                                 aria-label={`Staffel ${staffel.staffel} löschen`} data-testid={`staffel-delete-${division.level}-${staffel.staffel}`}>
                                 <Trash2 className="w-4 h-4" aria-hidden="true" />
@@ -531,8 +553,9 @@ export default function AdminLeagueSeasonPage() {
               ))}
             </section>
 
-            <SeasonRosterPanel seasonId={seasonId} />
+            {can("roster") ? <SeasonRosterPanel seasonId={seasonId} /> : null}
 
+            {canSeason ? (
             <FormSection title="Vorgaben auf Staffeln übertragen" testId="season-sync"
               hint="Regeltext und Map-Pool immer, auch bei gesperrten Staffeln; die Antwortfrist auf Terminvorschläge auch während der Season, nur nicht bei gesperrten; Termine und Kalender nur vor dem Start; Best of, Teamgröße, Mindestkader, Punkte und Fristen nur vor dem ersten Ergebnis. Die Sichtbarkeit gilt schon beim Speichern.">
               <button type="button" onClick={sync} disabled={syncing || !staffelCount} data-testid="season-sync-run"
@@ -541,6 +564,7 @@ export default function AdminLeagueSeasonPage() {
               </button>
               <SyncResults rows={syncRows} />
             </FormSection>
+            ) : null}
           </div>
 
           {divisionSheet ? (

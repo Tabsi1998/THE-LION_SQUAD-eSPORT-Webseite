@@ -171,6 +171,7 @@ PERSONAL: dict[str, Entry] = {
     "match_commendations": Entry(KEPT, ("commendations_given",), "das GG gehört zum Match wie das Ergebnis"),
     "match_proof_photos": Entry(DELETED, ("match_proof_photos",)),
     "tournament_staff_assignments": Entry(DELETED, ("tournament_staff",)),
+    "league_staff": Entry(DELETED, ("league_staff",)),
     "f1_staff_assignments": Entry(DELETED, ("f1_staff",)),
     # Captain einer externen Serie (#1741, #1749): eine Aufgabe wie im Turnier-Team - geht mit dem Konto.
     "reference_series_staff": Entry(DELETED, ("reference_series_staff",)),

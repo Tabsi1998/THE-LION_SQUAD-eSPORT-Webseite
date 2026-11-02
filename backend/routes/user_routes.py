@@ -398,6 +398,9 @@ async def mention_search(
         tournament = await db.tournaments.find_one({"id": scope_id}, {"_id": 0, "id": 1})
         if not tournament:
             raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+        from services.tournament_permissions import leads_tournament
+
+        staff = await leads_tournament(me, scope_id)  # in einer Staffel das Liga-Recht (#2203)
         regs = await db.tournament_registrations.find(
             {"tournament_id": scope_id, "status": {"$in": ["approved", "checked_in"]}},
             {"_id": 0, "user_id": 1, "team_id": 1},

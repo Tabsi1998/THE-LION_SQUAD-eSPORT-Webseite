@@ -5,11 +5,11 @@ import { prizesPayload, prizesToForm } from "@/lib/leagueLook";
 
 export const VISIBILITY_OPTIONS = [
   ["off", "Aus – niemand sieht die Liga"],
-  ["admins", "Nur Turnierleitung"],
+  ["admins", "Nur Liga-Leitung"],
   ["members", "Nur Mitglieder"],
   ["public", "Öffentlich"],
 ];
-export const VISIBILITY_SHORT = { off: "Aus", admins: "Nur Turnierleitung", members: "Nur Mitglieder", public: "Öffentlich" };
+export const VISIBILITY_SHORT = { off: "Aus", admins: "Nur Liga-Leitung", members: "Nur Mitglieder", public: "Öffentlich" };
 export const SEASON_STATUS_OPTIONS = [["draft", "Entwurf"], ["active", "Läuft"], ["completed", "Beendet"], ["archived", "Archiviert"]];
 export const WEEKDAY_OPTIONS = [["0", "Montag"], ["1", "Dienstag"], ["2", "Mittwoch"], ["3", "Donnerstag"], ["4", "Freitag"], ["5", "Samstag"], ["6", "Sonntag"]];
 export const BEST_OF_OPTIONS = [["1", "Best of 1"], ["3", "Best of 3"], ["5", "Best of 5"], ["7", "Best of 7"]];

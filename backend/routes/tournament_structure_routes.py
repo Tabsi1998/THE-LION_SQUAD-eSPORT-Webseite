@@ -241,7 +241,7 @@ async def plan_bracket_from_tournament_format(
     db = get_db()
     tid = await _resolve_tid(tid)
     tournament = await _ensure_tournament_unlocked(db, tid)
-    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
+    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES, capability="season")
     response, _matches, _stage, _read_model = await _build_tournament_structure_plan(
         db,
         tid,
@@ -263,7 +263,7 @@ async def apply_tournament_structure_plan(
     db = get_db()
     tid = await _resolve_tid(tid)
     tournament = await _ensure_tournament_unlocked(db, tid)
-    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
+    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES, capability="season")
 
     last_plan_hash = str(tournament.get("last_structure_plan_hash") or "")
     if last_plan_hash and hmac.compare_digest(last_plan_hash, body.expected_plan_hash):
@@ -384,7 +384,7 @@ async def rebuild_bracket_from_tournament_format(tid: str, body: TournamentBrack
     db = get_db()
     tid = await _resolve_tid(tid)
     tournament = await _ensure_tournament_unlocked(db, tid)
-    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
+    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES, capability="season")
     if not _can_rebuild_bracket_from_format(tournament):
         raise HTTPException(status_code=400, detail=_no_generator_text(tournament))
     # Liga-Staffel (#2109): ein fester Spielplan wird nicht durch eine Vorschau ersetzt - auch nicht mit force.
@@ -525,7 +525,7 @@ async def reset_bracket(tid: str, force: bool = False, me: dict = Depends(get_cu
     db = get_db()
     tid = await _resolve_tid(tid)
     t = await _ensure_tournament_unlocked(db, tid)
-    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
+    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES, capability="season")
     # Liga-Staffel (#2109): nach dem Start auch mit force nicht - sonst gingen alle Spiele samt Ergebnissen verloren.
     staffel_problem = await staffel_rebuild_problem(db, t)
     if staffel_problem:

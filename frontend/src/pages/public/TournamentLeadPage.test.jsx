@@ -165,3 +165,17 @@ test("hört nach dem Laden nur noch auf das eigene Turnier und sein Event", asyn
   expect(liveCalls.slice(0, 2).map((options) => options.tournamentId)).toEqual([undefined, undefined]);
   await waitFor(() => expect(liveCalls.slice(-2).map((options) => [options.tournamentId, options.eventId])).toEqual([["t1", "e1"], ["t1", "e1"]]));
 });
+
+test("Befangen (#2203): kein Eintragen, der Satz sagt warum - „nicht erschienen“ ebenso", async () => {
+  const blocked = { ...ENTRY, can_enter: false, conflict: true };
+  renderLead({
+    tournament: { id: "t1", slug: "fc-cup", title: "FC 26 Herbst-Cup" }, matches: [blocked], recent: [], counts: { open: 1 },
+    attention: [{ id: "ns-m8", kind: "no_show", title: "Nicht erschienen?", action: "no_show", match_id: "m8", station_text: "PC 4", label: "Halbfinale B", names: "TurboTina gegen Frostbiss", detail: "Frist um", participants: blocked.participants }],
+    stations: [],
+  });
+  expect(await screen.findByTestId("lead-no-show-conflict-ns-m8")).toHaveTextContent("zweite berechtigte Person");
+  expect(screen.queryByTestId("lead-no-show-r3")).toBeNull();
+  fireEvent.click(screen.getByTestId("lead-tab-results"));
+  expect(await screen.findByTestId("lead-conflict-m8")).toHaveTextContent("Selbst beteiligt");
+  expect(screen.queryByTestId("lead-enter-m8")).toBeNull();
+});

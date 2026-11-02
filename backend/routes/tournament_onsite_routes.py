@@ -5,9 +5,8 @@ Die Regeln stehen in ``services/onsite_access.py``.
 from fastapi import Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
-from auth import require_admin
 from database import get_db
-from routes.tournament_common import _audit_tournament_action, _resolve_tid
+from routes.tournament_common import _audit_tournament_action, _resolve_tid, require_lead_of
 from routes.tournament_router import router
 from services import onsite_access
 from services.rate_limit import enforce_rate_limit, release_rate_limit
@@ -64,7 +63,7 @@ async def _lead_tournament(tid: str) -> dict:
 
 
 @router.get("/{tid}/onsite-access")
-async def get_onsite_access(tid: str, me: dict = Depends(require_admin())):
+async def get_onsite_access(tid: str, me: dict = Depends(require_lead_of("manage"))):
     """Für Aushang und Verwaltung: Einstellung, Zeitfenster und die Adresse für den QR-Code."""
     db = get_db()
     tournament = await _lead_tournament(tid)
@@ -72,7 +71,7 @@ async def get_onsite_access(tid: str, me: dict = Depends(require_admin())):
 
 
 @router.put("/{tid}/onsite-access")
-async def set_onsite_access(tid: str, body: OnsiteSetting, me: dict = Depends(require_admin())):
+async def set_onsite_access(tid: str, body: OnsiteSetting, me: dict = Depends(require_lead_of("manage"))):
     db = get_db()
     tournament = await _lead_tournament(tid)
     await db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"onsite_access_enabled": body.enabled}})
@@ -83,7 +82,7 @@ async def set_onsite_access(tid: str, body: OnsiteSetting, me: dict = Depends(re
 
 
 @router.post("/{tid}/onsite-access/renew")
-async def renew_onsite_access(tid: str, me: dict = Depends(require_admin())):
+async def renew_onsite_access(tid: str, me: dict = Depends(require_lead_of("manage"))):
     """Neuer QR-Code: der alte und alle damit eingelösten Freigaben gelten ab sofort nicht mehr."""
     db = get_db()
     tournament = await _lead_tournament(tid)

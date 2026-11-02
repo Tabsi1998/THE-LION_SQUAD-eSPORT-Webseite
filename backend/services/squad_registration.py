@@ -414,7 +414,7 @@ async def active_league_registrations(db, squad_id: str) -> list[dict]:
         row["id"]: row
         for row in await db.tournaments.find(
             {"id": {"$in": sorted({reg["tournament_id"] for reg in regs if reg.get("tournament_id")})}},
-            {"_id": 0, "id": 1, "title": 1, "slug": 1, "status": 1, "game_id": 1},
+            {"_id": 0, "id": 1, "title": 1, "slug": 1, "status": 1, "game_id": 1, "league_context": 1},
         ).to_list(510)
     }
     active = []
@@ -422,5 +422,5 @@ async def active_league_registrations(db, squad_id: str) -> list[dict]:
         tournament = tournaments.get(reg.get("tournament_id") or "")
         if tournament and tournament.get("status") not in FINISHED_TOURNAMENT_STATUSES:
             active.append({**reg, "tournament_title": tournament.get("title"), "tournament_slug": tournament.get("slug"),
-                           "tournament_game_id": tournament.get("game_id")})
+                           "tournament_game_id": tournament.get("game_id"), "league_context": tournament.get("league_context")})
     return active

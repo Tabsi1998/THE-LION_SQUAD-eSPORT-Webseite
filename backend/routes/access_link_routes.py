@@ -18,6 +18,7 @@ from services.access_links import (
     parse_dt,
 )
 from services.league_scope import is_league_staffel
+from services.tournament_permissions import require_lead_for_staffel
 from services.user_notifications import build_public_url, create_user_notification
 
 router = APIRouter(prefix="/api/access-links", tags=["access-links"])
@@ -77,6 +78,20 @@ def _safe_link_payload(link: dict, target: dict | None = None) -> dict:
     return payload
 
 
+async def _without_foreign_staffeln(db, rows: list[dict], me: dict) -> list[dict]:
+    """Links zu Staffeln sieht nur, wer dort das Liga-Recht hat (#2203) - auch in der Liste ohne genanntes Ziel."""
+    from services.league_permissions import staffel_access
+    from services.league_scope import ONLY_LEAGUE
+
+    ids = sorted({row.get("target_id") for row in rows if row.get("target_type") == "tournament" and row.get("target_id")})
+    staffeln = await db.tournaments.find({"id": {"$in": ids}, **ONLY_LEAGUE}, {"_id": 0, "id": 1, "league_context": 1}).to_list(None) if ids else []
+    if not staffeln:
+        return rows
+    access = await staffel_access(db, me)
+    foreign = {row["id"] for row in staffeln if not access.covers(row)}
+    return [row for row in rows if not (row.get("target_type") == "tournament" and row.get("target_id") in foreign)]
+
+
 def _link_is_stale(link: dict) -> bool:
     expires_at = parse_dt(link.get("expires_at"))
     if expires_at and now_utc() > expires_at:
@@ -93,6 +108,8 @@ async def list_access_links(
     me: dict = Depends(require_admin()),
 ):
     db = get_db()
+    if target_type == "tournament" and target_id:
+        await require_lead_for_staffel(me, target_id)
     # TV-Schlüssel (#1110) wohnen unter TV & Beamer - hier stünden sie doppelt.
     query: dict = {"grants": {"$ne": "display"}}
     if target_type:
@@ -104,7 +121,7 @@ async def list_access_links(
     if not include_inactive:
         query["is_active"] = {"$ne": False}
     rows = await db.access_links.find(query, {"_id": 0, "token_hash": 0}).sort("created_at", -1).to_list(500)
-    return [_safe_link_payload(row) for row in rows]
+    return [_safe_link_payload(row) for row in await _without_foreign_staffeln(db, rows, me)]
 
 
 @router.post("/cleanup")
@@ -114,6 +131,8 @@ async def cleanup_access_links(
     me: dict = Depends(require_admin()),
 ):
     db = get_db()
+    if target_type == "tournament" and target_id:
+        await require_lead_for_staffel(me, target_id)
     query: dict = {"is_active": {"$ne": False}}
     if target_type:
         if target_type not in TARGET_TYPES:
@@ -122,7 +141,7 @@ async def cleanup_access_links(
     if target_id:
         query["target_id"] = target_id
     rows = await db.access_links.find(query, {"_id": 0}).to_list(1000)
-    stale_ids = [row["id"] for row in rows if _link_is_stale(row)]
+    stale_ids = [row["id"] for row in await _without_foreign_staffeln(db, rows, me) if _link_is_stale(row)]
     if not stale_ids:
         return {"ok": True, "deactivated": 0}
     now = now_utc().isoformat()
@@ -161,6 +180,8 @@ def _utc_iso(moment: datetime | None) -> str | None:
 async def create_access_link(body: AccessLinkCreate, me: dict = Depends(require_admin())):
     db = get_db()
     target = await _target_doc(body.target_type, body.target_id)
+    if body.target_type == "tournament":
+        await require_lead_for_staffel(me, body.target_id)
     bound_user = None
     if body.user_id:
         bound_user = await db.users.find_one({"id": body.user_id}, {"_id": 0, "id": 1, "email": 1, "display_name": 1, "username": 1})
@@ -235,6 +256,8 @@ async def revoke_access_link(link_id: str, me: dict = Depends(require_admin())):
     existing = await db.access_links.find_one({"id": link_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Speziallink nicht gefunden")
+    if existing.get("target_type") == "tournament":
+        await require_lead_for_staffel(me, existing.get("target_id"))
     now = now_utc().isoformat()
     await db.access_links.update_one(
         {"id": link_id},

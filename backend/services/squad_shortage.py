@@ -90,9 +90,15 @@ async def requirements(db, squad_ids: list[str]) -> dict[str, dict]:
     return out
 
 
-async def _lead_ids(db) -> list[str]:
+async def _lead_ids(db, tournament: dict) -> list[str]:
+    from services.league_scope import is_league_staffel
     from services.permissions import tournament_lead_filter
 
+    if is_league_staffel(tournament):
+        # Staffel (#2203): wer dort Kader prüft oder Teams freigibt, nicht die Turnierleitung.
+        from services.league_permissions import staff_user_ids
+
+        return sorted(await staff_user_ids(db, tournament["league_context"].get("league_id"), ("roster", "applications")))
     rows = await db.users.find(
         {**tournament_lead_filter(), "is_active": {"$ne": False}, "is_banned": {"$ne": True}}, {"_id": 0, "id": 1},
     ).to_list(200)
@@ -121,7 +127,7 @@ async def _warn(db, row: dict) -> None:
             meta={**base, "reason": "league_squad_short", "dedupe_key": dedupe},
         )
     season_id = (tournament.get("league_context") or {}).get("season_id")
-    for user_id in await _lead_ids(db):
+    for user_id in await _lead_ids(db, tournament):
         if user_id in care:
             continue
         await create_user_notification(

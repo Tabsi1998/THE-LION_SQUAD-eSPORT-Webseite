@@ -8,6 +8,8 @@ oder Dokumente pflegen sollte, brauchte den Club-Admin samt Einstellungen.
 Jetzt hängen Rechte an **Bereichen**:
 
 - ``tournaments`` – Turniere, Events, Stationen, Fast Lap, Saisons, Gewinne
+- ``leagues``     – Ligen mit Seasons, Staffeln, Kader und Spielen (#2203, docs/LIGA.md); in einer Staffel gibt
+                    ``tournaments`` nichts mehr
 - ``content``     – News, Galerie, Medien, Sponsoren, Partner, Referenzen,
                     CMS-Seiten, Navigation, Sticker, Achievements
 - ``club``        – Mitglieder, Anträge, Dokumente, Vorteile, Vorstand,
@@ -35,12 +37,13 @@ from database import get_db
 
 # „finance“ (#322): Kosten an Angeboten pflegen, Rechnungsaufträge sehen und freigeben, den Vereinsshop
 # verwalten (#1704). Kein Admin hat das pauschal - Club-Admin und Superadmin bringen es mit, andere per Freigabe.
-AREAS: tuple[str, ...] = ("tournaments", "content", "club", "finance", "system", "moderation")
-GRANTABLE_AREAS: tuple[str, ...] = ("tournaments", "content", "club", "finance")
-MFA_AREAS: frozenset[str] = frozenset({"tournaments", "content", "club", "finance", "system"})
+AREAS: tuple[str, ...] = ("tournaments", "leagues", "content", "club", "finance", "system", "moderation")
+GRANTABLE_AREAS: tuple[str, ...] = ("tournaments", "leagues", "content", "club", "finance")
+MFA_AREAS: frozenset[str] = frozenset({"tournaments", "leagues", "content", "club", "finance", "system"})
 
 AREA_LABELS: dict[str, str] = {
     "tournaments": "Turnierleitung",
+    "leagues": "Ligen",
     "content": "Redaktion",
     "club": "Vereinsverwaltung",
     "finance": "Finanzen",
@@ -51,6 +54,7 @@ AREA_LABELS: dict[str, str] = {
 ROLE_AREAS: dict[str, frozenset[str]] = {
     "superadmin": frozenset(AREAS),
     "club_admin": frozenset(AREAS),
+    # Nicht ``leagues`` (#2203): den Bereich vergibt der Superadmin einzeln, keine Migration gibt ihn.
     "tournament_admin": frozenset({"tournaments", "moderation"}),
     "moderator": frozenset({"moderation"}),
     "player": frozenset(),
@@ -88,7 +92,7 @@ def base_areas(user: dict | None) -> set[str]:
 def holds_area(user: dict | None, *areas: str) -> bool:
     """Ohne Datenbank: ein Bereich aus Rolle oder Freigabe.
 
-    Reicht für Moderation, Turnierleitung, Redaktion, Finanzen und System; die
+    Reicht für Moderation, Turnierleitung, Ligen, Redaktion, Finanzen und System; die
     Vereinsverwaltung kommt auch aus Vorstandsposten und Dolibarr - dafür ``areas_for``.
     """
     return bool(set(areas) & base_areas(user))

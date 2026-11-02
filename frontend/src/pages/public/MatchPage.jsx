@@ -125,6 +125,18 @@ function tooEarly(iso, now = Date.now()) {
 // Eigener Stand je Match und Konto (#1047): ein Wechsel des Matches oder ein echter Kontowechsel baut die Seite neu
 // auf - Chat-Entwurf, Anhänge und Eingaben gehen weg, späte Antworten laufen ins Leere. Das erste Laden der
 // Anmeldung zählt nicht als Wechsel.
+// Befangenheit (#2203): Wer hier sonst entscheiden dürfte, aber selbst beteiligt ist, sieht warum - der Server entscheidet.
+function ConflictNotice({ conflict }) {
+  return (
+    <p className="mt-5 rounded-sm border border-warn/40 bg-warn/10 px-4 py-3 text-sm text-white/85" data-testid="match-conflict">
+      <strong>Du bist an diesem Spiel selbst beteiligt.</strong>{" "}
+      {conflict.override
+        ? "Das entscheidet sonst eine zweite Person. Als Superadmin geht es nur als Notausnahme: Im Ergebnis-Fenster und im Matchplan fragt die Seite nach dem Grund, er kommt ins Protokoll."
+        : "Ergebnisse, Proteste, Strafen und den festen Termin zu diesem Spiel entscheidet eine zweite berechtigte Person. Als Captain oder Vertreter meldest du und nutzt Vorschlag und Zustimmung wie alle anderen."}
+    </p>
+  );
+}
+
 export default function MatchPage() {
   const { id } = useParams();
   const { user } = useAuth();
@@ -476,11 +488,13 @@ function MatchPageView() {
             </div>
           ) : null}
 
+          {data.conflict ? <ConflictNotice conflict={data.conflict} /> : null}
+
           {data.in_dispute && (
             <p className="mt-5 rounded-sm border border-[#FF3B30]/40 bg-[#FF3B30]/10 px-4 py-3 text-sm text-[#FFD2CF]" data-testid="match-in-dispute">
               <strong>In Klärung</strong> – zu diesem Spiel wurde ein Problem gemeldet. Die Turnierleitung prüft und entscheidet.
               {/* Die Turnierleitung entscheidet in ihrer Ansicht (#1158) - mit Meldung, Foto und Ergebnis. */}
-              {canStaffSubmit && data.tournament ? (
+              {(canStaffSubmit || data.can_decide_dispute) && data.tournament ? (
                 <Link to={`/tournaments/${data.tournament.slug || data.tournament.id}/leitung?fall=ds-${id}`} className="ml-2 font-bold text-white underline underline-offset-2" data-testid="match-dispute-decide">Streitfall entscheiden</Link>
               ) : null}
             </p>

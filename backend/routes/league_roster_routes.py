@@ -1,6 +1,6 @@
 """Liga-Kader mit Spiel-ID je Season (docs/LIGA.md, #2108) - Verwaltung und eigener Stand.
 
-- ``GET /api/admin/leagues/seasons/{season_id}/roster``: Kaderübersicht je Co-Team mit ID-Stand (Turnierleitung).
+- ``GET /api/admin/leagues/seasons/{season_id}/roster``: Kaderübersicht je Co-Team mit ID-Stand (Liga-Recht „Kader prüfen“).
 - ``POST /api/admin/leagues/seasons/{season_id}/roster/{user_id}/approve``: neue ID freigeben, mit Grund und Protokoll.
 - ``PUT /api/admin/leagues/seasons/{season_id}/roster-settings``: Stichtag für neue Spieler (Vorgabe: keiner).
 - ``GET /api/me/league-ids``: die eigene festgehaltene ID je laufender Season - für den Hinweis im Profil.
@@ -14,14 +14,15 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from auth import get_current_user, require_area
+from auth import get_current_user
 from database import get_db
 from services import league_roster
+from services.league_permissions import require_league
 
 admin_router = APIRouter(prefix="/api/admin/leagues", tags=["leagues-admin"])
 me_router = APIRouter(prefix="/api/me", tags=["leagues"])
 
-require_league_admin = require_area("tournaments")
+require_roster = require_league("roster", via="season_id")
 
 
 class RosterApproveBody(BaseModel):
@@ -40,14 +41,14 @@ async def _season(db, season_id: str) -> dict:
 
 
 @admin_router.get("/seasons/{season_id}/roster")
-async def season_roster(season_id: str, _me: dict = Depends(require_league_admin)):
+async def season_roster(season_id: str, _me: dict = Depends(require_roster)):
     db = get_db()
     return await league_roster.season_overview(db, await _season(db, season_id))
 
 
 @admin_router.post("/seasons/{season_id}/roster/{user_id}/approve")
 async def approve_roster_id(season_id: str, user_id: str, body: RosterApproveBody,
-                            me: dict = Depends(require_league_admin)):
+                            me: dict = Depends(require_roster)):
     db = get_db()
     season = await _season(db, season_id)
     try:
@@ -57,7 +58,7 @@ async def approve_roster_id(season_id: str, user_id: str, body: RosterApproveBod
 
 
 @admin_router.put("/seasons/{season_id}/roster-settings")
-async def roster_settings(season_id: str, body: RosterSettingsBody, me: dict = Depends(require_league_admin)):
+async def roster_settings(season_id: str, body: RosterSettingsBody, me: dict = Depends(require_roster)):
     db = get_db()
     season = await _season(db, season_id)
     try:

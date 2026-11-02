@@ -183,3 +183,25 @@ test("ein Captain kommt mit Zwei-Faktor in die Saison, ohne zur Einrichtung, in 
   renderAt("/admin/reference-series/s3", <ProtectedRoute requireArea="content" allowSeriesCaptain><div>saison</div></ProtectedRoute>);
   expect(screen.getAllByText("verboten").length).toBeGreaterThan(0);
 });
+
+test.each([
+  ["Zuständig", { has_league_staff: true }],
+  ["Freigabe Ligen", { areas: ["leagues"] }],
+])("Liga-Seiten (#2203): %s mit Zwei-Faktor kommt hinein", (_name, fields) => {
+  authState.user = { id: "z", role: "player", ...fields, ...mfa };
+  renderAt("/admin/leagues", <ProtectedRoute requireArea="leagues" allowLeagueStaff><div>liga</div></ProtectedRoute>);
+  expect(screen.getByText("liga")).toBeInTheDocument();
+});
+
+test("Liga-Seiten (#2203): die Turnierleitung allein nicht", () => {
+  authState.user = { id: "t", role: "tournament_admin", areas: ["tournaments", "moderation"], ...mfa };
+  renderAt("/admin/leagues", <ProtectedRoute requireArea="leagues" allowLeagueStaff><div>liga</div></ProtectedRoute>);
+  expect(screen.getByText("verboten")).toBeInTheDocument();
+  expect(screen.queryByText("liga")).toBeNull();
+});
+
+test("Zuständige ohne Zwei-Faktor gehen zur Einrichtung (#2203)", () => {
+  authState.user = { id: "z", role: "player", has_league_staff: true, mfa_enabled: false };
+  renderAt("/admin/leagues", <ProtectedRoute requireArea="leagues" allowLeagueStaff><div>liga</div></ProtectedRoute>);
+  expect(screen.queryByText("liga")).toBeNull();
+});

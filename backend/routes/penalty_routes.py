@@ -59,6 +59,7 @@ async def _forfeit_rows(db, forfeits: list[dict], team_names: dict[str, str]) ->
             "issued_by": item.get("issued_by"),
             "issued_at": item.get("issued_at"),
             "ref_id": item.get("match_id"),
+            "tournament_id": item.get("tournament_id"),
             "match_source": item.get("source"),
             "admin_url": f"/admin/tournaments/{item.get('tournament_id')}" if item.get("tournament_id") else "",
             **({"team_penalty": True, "team_name": team_name} if team_name else {}),
@@ -173,7 +174,22 @@ async def my_penalties(me: dict = Depends(get_current_user)):
     for item in items:
         item.pop("admin_url", None)
         item.pop("results_locked", None)
+        item.pop("tournament_id", None)
     return {"count": len(items), "items": items}
+
+
+async def _without_foreign_staffeln(db, items: list[dict], me: dict) -> list[dict]:
+    """Die Strafen einer Staffel gehören der Liga (#2203): Der Bereich Turnierleitung allein sieht sie im Eingang nicht."""
+    from services.league_permissions import staffel_access
+    from services.league_scope import ONLY_LEAGUE
+
+    ids = sorted({item.get("tournament_id") for item in items if item.get("tournament_id")})
+    staffeln = await db.tournaments.find({"id": {"$in": ids}, **ONLY_LEAGUE}, {"_id": 0, "id": 1, "league_context": 1}).to_list(None) if ids else []
+    if not staffeln:
+        return items
+    access = await staffel_access(db, me)
+    foreign = {row["id"] for row in staffeln if not access.covers(row)}
+    return [item for item in items if item.get("tournament_id") not in foreign]
 
 
 @admin_router.get("")
@@ -240,6 +256,7 @@ async def all_penalties(
         await _attach_issuer_names(db, team_rows)
         items.extend({**row, "user_id": None, "user_username": None, "user_display_name": None} for row in team_rows)
 
+    items = await _without_foreign_staffeln(db, items, me)
     # Die Zähler auf den Filterknöpfen gelten für alle Einträge - auch wenn gerade ein Filter aktiv ist (#2125).
     counts: dict[str, int] = {"all": len(items)}
     for item in items:

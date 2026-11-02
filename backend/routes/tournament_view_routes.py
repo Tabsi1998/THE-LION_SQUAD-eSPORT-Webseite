@@ -17,6 +17,7 @@ from services.public_phase import derive_public_phase
 from services.station_labels import attach_station_info
 from services.round_labels import TABLE_FORMATS, attach_round_labels
 from services.match_public_view import public_match_view, public_stage_view, public_tournament_view
+from services.league_permissions import READ
 from services.tournament_permissions import READ_STAFF_ROLES, require_tournament_staff_permission
 from services.matchday_schedule import build_matchday_plan, current_matchday_number
 from services.competition_read import load_competition_read_model, observe_structure_read
@@ -27,7 +28,6 @@ from services.bracket_tree import has_bracket_tree
 from routes.tournament_common import (
     _collect_plan_matches,
     _get_visible_tournament,
-    _is_staff,
     _is_tournament_staff,
     _plan_duration,
     _plan_match_label,
@@ -43,7 +43,7 @@ from routes.tournament_router import router
 async def planning_check(tid: str, me: dict = Depends(get_current_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
-    await require_tournament_staff_permission(me, tid, READ_STAFF_ROLES)
+    await require_tournament_staff_permission(me, tid, READ_STAFF_ROLES, capability=READ)
     matches, tournament = await _collect_plan_matches(db, tid)
     participant_count = await db.tournament_registrations.count_documents({
         "tournament_id": tid,
@@ -56,7 +56,7 @@ async def planning_check(tid: str, me: dict = Depends(get_current_user)):
 async def export_match_plan_csv(tid: str, me: dict = Depends(get_current_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
-    await require_tournament_staff_permission(me, tid, READ_STAFF_ROLES)
+    await require_tournament_staff_permission(me, tid, READ_STAFF_ROLES, capability=READ)
     matches, tournament = await _collect_plan_matches(db, tid)
     reg_ids = set()
     for match in matches:
@@ -204,7 +204,7 @@ async def get_bracket(tid: str, access: str | None = None, user=Depends(get_opti
             raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     else:
         t = await _get_visible_tournament(tid, user)
-    is_staff = _is_staff(user) or await _is_tournament_staff(tid, user)
+    is_staff = await _is_tournament_staff(tid, user)
     return await _build_bracket_payload(db, t, user, is_staff)
 
 
@@ -234,7 +234,7 @@ async def get_bracket_display(tid: str, key: str | None = None, table: bool = Fa
         return await _with_onsite_path(db, t, _with_table(display_bracket_payload(full), full))
     if not me:
         raise HTTPException(status_code=401, detail="Nicht angemeldet")
-    await require_tournament_staff_permission(me, tid, READ_STAFF_ROLES)
+    await require_tournament_staff_permission(me, tid, READ_STAFF_ROLES, capability=READ)
     t = await db.tournaments.find_one({"id": tid}, {"_id": 0})
     if not t:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
@@ -299,7 +299,7 @@ async def standings(tid: str, access: str | None = None, user=Depends(get_option
             raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     else:
         t = await _get_visible_tournament(tid, user)
-    is_staff = _is_staff(user) or await _is_tournament_staff(tid, user)
+    is_staff = await _is_tournament_staff(tid, user)
     return await _standing_rows(db, t, user, is_staff)
 
 

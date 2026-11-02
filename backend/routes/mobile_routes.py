@@ -21,6 +21,7 @@ from services.match_overview import operational_match_overviews, own_match_overv
 from services.profile_references import personal_profile_references
 from services import event_days
 from services.public_phase import derive_public_phase
+from services.tournament_permissions import is_staffel, leads_tournament
 from services.visibility import user_can_see
 from services.visibility import lead_can_see
 from services.app_releases import app_version_release, current_release, next_check_after, public_release, release_file, update_decision
@@ -240,13 +241,17 @@ async def _team_ids_for_user(user_id: str) -> list[str]:
 
 async def _visible_tournament(tournament: dict, user: dict | None, participant_ids: set[str] | None = None) -> bool:
     participant_ids = participant_ids or set()
-    is_staff = is_confirmed_tournament_lead(user)
+    staffel = await is_staffel(tournament.get("id"))
+    # Staffeln (#2203): die Turnierleitung sieht sie wie alle anderen, Liga-Rechte wie sonst die Leitung.
+    is_staff = await leads_tournament(user, tournament.get("id"))
     if tournament.get("status") == "draft" and not is_staff:
         return False
     if tournament.get("id") in participant_ids:
         return True
     if tournament.get("is_public") is False and not is_staff:
         return False
+    if staffel:
+        return is_staff or await user_can_see(user, tournament.get("visibility") or "public")
     return await lead_can_see(user, tournament.get("visibility") or "public")
 
 

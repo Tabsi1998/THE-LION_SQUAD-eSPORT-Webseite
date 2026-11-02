@@ -1,4 +1,4 @@
-import { adminWithoutSecondFactor, canUseArea, hasArea, hasSeriesCaptain, mfaSetupPath, roleLabel, showsDutyEntry } from "@/lib/permissions";
+import { adminWithoutSecondFactor, canUseArea, hasArea, hasLeagueStaff, hasSeriesCaptain, mfaSetupPath, needsSecondFactor, roleLabel, showsDutyEntry } from "@/lib/permissions";
 import { INTEGRATIONS, MENU_INTEGRATIONS } from "@/lib/integrations";
 import { NavLink, useLocation, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -19,7 +19,7 @@ export const ADMIN_GROUPS = [
     label: "Übersicht",
     items: [
       // Startseite für jeden Verwaltungsbereich - auch Finanzen (Kassier, #992); der Server prüft dasselbe (`require_dashboard`).
-      { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true, areas: ["tournaments", "content", "club", "finance", "system"] },
+      { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true, areas: ["tournaments", "leagues", "content", "club", "finance", "system"] },
       // „Mein Dienst“ (#1352): eigene Einsätze und Aufgaben - für Helfer mit Einsatz und für die Moderation ohne Verwaltung.
       { to: "/admin/dienst", label: "Mein Dienst", icon: ClipboardList, duty: true },
     ],
@@ -79,7 +79,7 @@ export const ADMIN_GROUPS = [
       // Turniere, Fast Lap, Stationen: Turnierleitung und Helfer mit Einsatz (`staff`); Moderation allein nicht.
       { to: "/admin/tournaments", label: "Turniere", icon: Trophy, areas: ["tournaments"], staff: true, hint: "Einzelne Turniere – K.-o., Gruppen, Jeder gegen jeden" },
       // Liga (docs/LIGA.md, #1622): Liga → Season → Liga N → Staffel; die Staffel selbst ist ein Turnier.
-      { to: "/admin/leagues", label: "Liga", icon: Layers, areas: ["tournaments"], hint: "Vereinsliga – Seasons, Ligen, Staffeln" },
+      { to: "/admin/leagues", label: "Liga", icon: Layers, areas: ["leagues"], leagueStaff: true, hint: "Vereinsliga – Seasons, Ligen, Staffeln" },
       // Events unter eSports (#2111, F6): sie brauchen den Bereich Turniere - Content-Leute sahen sie nie, Turnierleute
       // suchten sie hier.
       { to: "/admin/events", label: "Events", icon: CalendarDays, areas: ["tournaments"], hint: "LAN, Turniertage, Programm" },
@@ -173,7 +173,7 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/einlass": ["einlass", "anwesenheit", "präsenz", "praesenz", "generalversammlung", "versammlung", "scannen", "mitgliedskarte"],
   "/admin/about": ["über uns", "verein", "leitbild", "werte", "texte", "about", "gruendung", "gründung", "zweck", "gemeinnuetzig", "gemeinnützig", "zahlen", "dolibarr", "startseite", "kopf", "ein rudel"],
   "/admin/tournaments": ["bracket", "turnierbaum", "matches", "anmeldungen", "registrierungen"],
-  "/admin/leagues": ["liga", "ligen", "season", "staffel", "spielwoche", "sperrzeit", "co-team"],
+  "/admin/leagues": ["liga", "ligen", "season", "staffel", "spielwoche", "sperrzeit", "co-team", "zuständige"],
   "/admin/tournament-guide": ["leitfaden", "anleitung", "voreinstellung", "format", "check-in", "best of"],
   "/admin/f1": ["fastlap", "racing", "challenge", "challenges"],
   "/admin/seasons": ["wertung", "jahreswertung", "circuit", "saisons", "saison"],
@@ -258,14 +258,16 @@ export function navGroupsFor(user, query, disabledPlatforms = []) {
   const helper = Boolean(user?.has_staff_assignment) || (Boolean(user?.is_tournament_staff) && !hasArea(user, "tournaments"));
   // „Mein Dienst“ (#1352): wer einen Einsatz hat, Captain einer Serie ist (#1749) - oder nur moderiert und keine
   // Startseite der Verwaltung bekommt.
-  const duty = helper || hasSeriesCaptain(user) || showsDutyEntry(user);
+  const duty = helper || hasSeriesCaptain(user) || hasLeagueStaff(user) || showsDutyEntry(user);
+  // Zuständige einer Liga (#2203): wie im Server nur mit bestätigter Zwei-Faktor-Anmeldung.
+  const leagueStaff = hasLeagueStaff(user) && !needsSecondFactor(user);
   // Abgehakte Plattformen (#558) fehlen im Menü - einschalten geht unter Alle Verbindungen.
   const off = new Set(Array.isArray(disabledPlatforms) ? disabledPlatforms : []);
   return ADMIN_GROUPS.map((group) => ({
     ...group,
     items: group.items.filter((item) => {
       if (item.platform && off.has(item.platform)) return false;
-      const allowed = item.duty ? duty : canUseArea(user, ...(item.areas || [])) || (item.staff && helper);
+      const allowed = item.duty ? duty : canUseArea(user, ...(item.areas || [])) || (item.staff && helper) || (item.leagueStaff && leagueStaff);
       if (item.searchOnly && !searchQuery) return false;
       return allowed && itemMatchesQuery(item, group.label, searchQuery);
     }),

@@ -56,7 +56,7 @@ PROJECT = os.environ.get("ABNAHME_PROJECT", SHARED_PROJECT)
 # Eigene Konten (liga-…), damit dieser Seed die Zugänge der anderen Seeds nie überschreibt.
 ACCOUNTS = {
     "admin": {"email": "liga-admin@abnahme.lionsquad.at", "display_name": "Liga Admin", "role": "superadmin", "mfa": True},
-    "lead": {"email": "liga-leitung@abnahme.lionsquad.at", "display_name": "Liga Turnierleitung", "role": "tournament_admin", "mfa": True},
+    "lead": {"email": "liga-leitung@abnahme.lionsquad.at", "display_name": "Liga Turnierleitung", "role": "tournament_admin", "areas": ["leagues"], "mfa": True},
 }
 GAME = {"name": "Call of Duty", "slug": "call-of-duty", "platforms": ["pc", "ps5", "xbox"]}
 MODES = [{"mode": "stellung", "label": "Stellung"}, {"mode": "suchen", "label": "Suchen & Zerstören"},
@@ -254,7 +254,7 @@ async def ensure_accounts(db) -> dict:
     stamp = now_iso()
     password, totp_secret = credentials()
 
-    async def upsert(key: str, email: str, display_name: str, role: str, mfa: bool) -> dict:
+    async def upsert(key: str, email: str, display_name: str, role: str, mfa: bool, areas: list[str] | None = None) -> dict:
         existing = await db.users.find_one({"email": email}, {"_id": 0})
         doc = {
             "id": existing["id"] if existing else f"abnahme-liga-{key}", "email": email, "username": email.split("@")[0],
@@ -263,12 +263,14 @@ async def ensure_accounts(db) -> dict:
             "accepted_terms": True, "consent_required": False, "consent_updated_at": stamp,
             "created_at": (existing or {}).get("created_at") or stamp, "updated_at": stamp, **password_fields(password),
         }
+        if areas:
+            doc["areas"] = areas  # Der Bereich Ligen kommt nie aus der Rolle Turnierleitung (#2203) - im Probestand als Freigabe.
         if mfa:
             doc.update({"mfa_enabled": True, "mfa_secret": encrypt_secret(totp_secret), "mfa_recovery_code_hashes": []})
         await db.users.update_one({"email": email}, {"$set": doc, "$unset": {"mfa_totp_last_counter": ""}}, upsert=True)
         return doc
 
-    users = {key: await upsert(key, a["email"], a["display_name"], a["role"], a["mfa"]) for key, a in ACCOUNTS.items()}
+    users = {key: await upsert(key, a["email"], a["display_name"], a["role"], a["mfa"], a.get("areas")) for key, a in ACCOUNTS.items()}
     teams = []
     number = 0
     for *_team, stem in TEAMS:

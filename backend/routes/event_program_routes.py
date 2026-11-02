@@ -20,6 +20,7 @@ from database import get_db
 from models import F1ChallengeCreate, TournamentCreate, now_utc
 from services import event_program
 from services.change_events import reset_scope_cache
+from services.league_scope import is_league_staffel
 from services.slug_utils import find_by_slug_or_history
 
 router = APIRouter(prefix="/api/events", tags=["events"])
@@ -28,7 +29,8 @@ ENDED = {"completed", "results_published", "archived", "cancelled"}
 # Wer so angemeldet ist, hängt am Event (Event-Pflicht #875) - solange es solche Anmeldungen gibt, wird nicht gelöst.
 ACTIVE_REGISTRATIONS = ("pending", "approved", "checked_in", "waitlist")
 FREE = {"$in": [None, ""]}
-ITEM_FIELDS = {"_id": 0, "id": 1, "title": 1, "slug": 1, "status": 1, "start_date": 1, "end_date": 1, "event_id": 1}
+ITEM_FIELDS = {"_id": 0, "id": 1, "title": 1, "slug": 1, "status": 1, "start_date": 1, "end_date": 1, "event_id": 1,
+               "league_context": 1}
 
 
 class ProgramLink(BaseModel):
@@ -99,6 +101,9 @@ async def add_to_event_program(event_id: str, body: ProgramLink, me: dict = Depe
     item = await collection.find_one({"id": body.item_id}, ITEM_FIELDS)
     if not item:
         raise HTTPException(404, "Turnier nicht gefunden." if body.kind == "tournament" else "Fast Lap nicht gefunden.")
+    if is_league_staffel(item):
+        # Die Staffel gehört der Liga (#2203): Der Bereich Turnierleitung hängt sie nicht an ein Event.
+        raise HTTPException(409, "Eine Liga-Staffel gehört zu keinem Event.")
     current = item.get("event_id") or None
     if current == event["id"]:
         return {"ok": True, "item": _row(item)}

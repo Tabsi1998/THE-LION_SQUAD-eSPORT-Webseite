@@ -147,3 +147,26 @@ test("409 ohne neues Ergebnis (etwa „wird gerade eingetragen“): der Satz des
   expect(screen.getByTestId("result-error")).toHaveTextContent("dort wird gerade ein Ergebnis eingetragen");
   expect(screen.queryByTestId("result-correction-offer")).toBeNull();
 });
+
+test("Befangen als Superadmin (#2203): nur mit Grund der Notausnahme, der Grund geht mit und auch ins Rückgängig", async () => {
+  const saved = vi.fn();
+  render(<ResultWindow entry={{ ...DUEL, conflict_override: true }} onClose={() => {}} onSaved={saved} />);
+  expect(screen.getByTestId("result-conflict")).toHaveTextContent("selbst beteiligt");
+  fireEvent.click(screen.getByTestId("result-score-a-plus"));
+  await act(async () => { fireEvent.click(screen.getByTestId("result-save")); });
+  expect(screen.getByTestId("result-error")).toHaveTextContent("Notausnahme");
+  expect(apiMock.post).not.toHaveBeenCalled();
+
+  fireEvent.change(screen.getByTestId("result-conflict-reason"), { target: { value: "Sonst niemand erreichbar" } });
+  await act(async () => { fireEvent.click(screen.getByTestId("result-save")); });
+  expect(apiMock.post.mock.calls[0][1].conflict_reason).toBe("Sonst niemand erreichbar");
+  expect(saved.mock.calls[0][0].conflictReason).toBe("Sonst niemand erreichbar");
+});
+
+test("Ohne Befangenheit kein Feld und kein Grund im Aufruf (#2203)", async () => {
+  render(<ResultWindow entry={DUEL} onClose={() => {}} onSaved={() => {}} />);
+  expect(screen.queryByTestId("result-conflict")).toBeNull();
+  fireEvent.click(screen.getByTestId("result-score-a-plus"));
+  await act(async () => { fireEvent.click(screen.getByTestId("result-save")); });
+  expect(apiMock.post.mock.calls[0][1]).not.toHaveProperty("conflict_reason");
+});

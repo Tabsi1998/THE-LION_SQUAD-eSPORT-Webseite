@@ -8,6 +8,7 @@ from fastapi.responses import RedirectResponse
 from urllib.parse import quote, urlencode
 from pymongo.errors import DuplicateKeyError
 from database import get_db
+from services import league_permissions
 from services.permissions import is_confirmed_tournament_lead
 from auth import require_admin, get_optional_user
 from services.visibility import user_can_see
@@ -23,6 +24,7 @@ from services.public_phase import derive_public_phase
 from services.league_scope import is_league_staffel, league_filter, league_label
 from services.tournament_permissions import (
     assigned_tournament_ids,
+    leads_tournament,
     tournament_rights,
 )
 from services.competition_versions import (
@@ -43,6 +45,7 @@ from services import pricing, tournament_fees
 from services.advancement_draw import MODE_KEY, SETTING_KEY as LEGACY_MODE_KEY, advancement_mode_of, sync_advancement_fields
 from services.permissions import can_use_area, user_has_area
 from routes.tournament_common import (
+    require_lead_of,
     _apply_match_plan,
     _audit_tournament_action,
     _collect_match_plan,
@@ -206,6 +209,12 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
     db = get_db()
     is_admin = is_confirmed_tournament_lead(user)
     assigned_ids = await assigned_tournament_ids(user)
+    # Staffeln (#2203): Sie gehören der Liga. Wer sie leitet, sieht sie wie eine Turnierleitung ihre Turniere; die Turnierleitung
+    # sieht sie wie alle anderen.
+    staffeln = await league_permissions.staffel_access(db, user)
+    led_staffeln = staffeln.query()
+    if led_staffeln is not None:
+        assigned_ids = sorted({*assigned_ids, *[row["id"] for row in await db.tournaments.find(led_staffeln, {"_id": 0, "id": 1}).to_list(2000)]})
     can_include_drafts = bool(include_drafts and (is_admin or assigned_ids))
     q = {}
     if status:
@@ -244,7 +253,15 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
         }
     fetch_limit = max(safe_limit, min(safe_limit + max(int(offset or 0), 0) + 80, 500))
     tournaments = await db.tournaments.find(q, projection).sort("created_at", -1).to_list(fetch_limit)
-    if not is_admin:
+    if is_admin:
+        visible = []
+        for t in tournaments:
+            if not is_league_staffel(t) or t.get("id") in participant_visible_ids or t.get("id") in assigned_ids:
+                visible.append(t)
+            elif t.get("status") != "draft" and t.get("is_public") is not False and await user_can_see(user, t.get("visibility") or "public"):
+                visible.append(t)
+        tournaments = visible
+    else:
         visible = []
         for t in tournaments:
             if t.get("id") in assigned_visible_ids:
@@ -266,7 +283,7 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
     await _enrich_tournaments(tournaments, user)
     for t in tournaments:
         _expose_offer(t, finance)
-        if not is_admin:
+        if not is_admin or (is_league_staffel(t) and not staffeln.covers(t)):
             # Der Umbau-Vorschlag für die Läufe (#1550) gehört der Turnierleitung; Helfer sehen ihn am Turnier selbst.
             t.pop("heat_rebuild_plan", None)
             t.pop("heat_rebuild_dismissed", None)
@@ -289,7 +306,8 @@ async def get_tournament(slug_or_id: str, include_draft: bool = False, access: s
     t, was_old_slug = await find_by_slug_or_history(db.tournaments, slug_or_id, {"_id": 0})
     if not t:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
-    is_admin = is_confirmed_tournament_lead(user)
+    # Für die eigene Verwaltung (Pfad zur Season, Fast Laps des Events) - in einer Staffel das Liga-Recht (#2203).
+    is_admin = await leads_tournament(user, t["id"])
     access_link = await validate_access_link(db, access, "tournament", t["id"], user, "view")
     hidden = None if access_link else await tournament_hidden_reason(db, t, user)
     # Vor-Ort-Zugang (#1592): wer sonst nichts sieht, aber den QR-Code eingelöst hat, bekommt die schlanke Ansicht.
@@ -315,7 +333,7 @@ async def get_tournament(slug_or_id: str, include_draft: bool = False, access: s
         # Der Admin-Pfad der Season nur für die Verwaltung (Turnierleitung oder Strukturrechte).
         t["league_links"] = await staffel_guard.staffel_links(
             db, t, with_admin_path=is_admin or bool(t.get("can_manage_structure")))
-    if not t.get("can_manage_structure"):
+    if not t.get("can_manage_structure") and "applications" not in (t.get("league_capabilities") or []):
         # Der Umbau-Vorschlag für die Läufe (#1550) und der für Austritt/Disqualifikation (#1553) sieht nur, wer ihn
         # auch bestätigen darf (Strukturrollen).
         t.pop("heat_rebuild_plan", None)
@@ -444,7 +462,7 @@ async def create_tournament_doc(body: TournamentCreate, me: dict) -> dict:
 
 @router.put("/{tid}")
 @router.patch("/{tid}")
-async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends(require_admin()),
+async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends(require_lead_of("manage")),
                             _mutation_tid: str = Depends(_serialized_tournament_write)):
     db = get_db()
     tid = await _resolve_tid(tid)
@@ -639,7 +657,7 @@ async def _drop_matches(db, match_ids: list[str]) -> None:
 
 
 @router.delete("/{tid}")
-async def delete_tournament(tid: str, me: dict = Depends(require_admin()),
+async def delete_tournament(tid: str, me: dict = Depends(require_lead_of("season")),
                             _mutation_tid: str = Depends(_serialized_tournament_write)):
     db = get_db()
     tid = await _resolve_tid(tid)

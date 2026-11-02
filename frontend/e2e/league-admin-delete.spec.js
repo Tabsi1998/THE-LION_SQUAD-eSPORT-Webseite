@@ -5,7 +5,7 @@ const { test, expect } = require("@playwright/test");
 // etwas dranhängt, und Staffel löschen auf der Season-Seite. Bei 390 und 1440 px ohne seitliches Scrollen. Nur
 // erfundene Namen.
 
-const ADMIN = { id: "admin-1", username: "leitung", display_name: "Leitung", role: "superadmin", areas: ["tournaments"], mfa_enabled: true, auth_mfa_verified: true };
+const ADMIN = { id: "admin-1", username: "leitung", display_name: "Leitung", role: "superadmin", areas: ["tournaments", "leagues"], mfa_enabled: true, auth_mfa_verified: true };
 const RULES = { match_points: { win: 3, draw: 1, loss: 0 }, table_tiebreakers: ["score_diff", "score_for"] };
 const SEASON = {
   id: "s1", league_id: "l1", number: 1, name: "Season 1", slug: "season-1", start_date: "2026-11-09T23:00:00+00:00", weeks_total: 10,

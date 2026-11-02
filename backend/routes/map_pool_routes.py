@@ -16,7 +16,6 @@ from routes.tournament_common import (
     _audit_tournament_action,
     _ensure_tournament_unlocked,
     _get_visible_tournament,
-    _is_staff,
     _resolve_tid,
     _serialized_tournament_write,
     tournament_hidden_reason,
@@ -25,7 +24,7 @@ from services import map_pools
 from services.game_maps import MapProblem
 from services.map_pools import MapPoolSave
 from services.reference_series_access import SeriesAccess, require_series_editor
-from services.tournament_permissions import STRUCTURE_STAFF_ROLES, require_tournament_staff_permission
+from services.tournament_permissions import STRUCTURE_STAFF_ROLES, leads_tournament, require_tournament_staff_permission
 
 router = APIRouter(prefix="/api/map-pools", tags=["map-pools"])
 
@@ -47,7 +46,7 @@ async def tournament_map_pools(tid: str, user: dict | None = Depends(get_optiona
 async def tournament_map_pools_admin(tid: str, me: dict = Depends(get_current_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
-    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
+    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES, capability="season")
     tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
     overview = await map_pools.tournament_overview(db, tournament, admin=True)
     return {**overview, "sources": await _visible_sources(db, tournament, me)}
@@ -58,7 +57,9 @@ async def _visible_sources(db, tournament: dict, me: dict) -> list[dict]:
     out: list[dict] = []
     for source in await map_pools.tournament_sources(db, tournament):
         other = source.get("tournament")
-        allowed = _is_staff(me) if source.get("season") else not await tournament_hidden_reason(db, other, me)
+        # Season-Pools: Es sind immer die der eigenen Liga - wer hier ist, hat dort „Season konfigurieren“.
+        allowed = await leads_tournament(me, tournament["id"], "season") if source.get("season") \
+            else not await tournament_hidden_reason(db, other, me)
         if allowed:
             out.append({key: source[key] for key in ("key", "label", "pool")})
         if len(out) >= map_pools.SOURCES_MAX:
@@ -68,7 +69,7 @@ async def _visible_sources(db, tournament: dict, me: dict) -> list[dict]:
 
 async def _writable(db, tid: str, me: dict) -> dict:
     tournament = await _ensure_tournament_unlocked(db, tid)
-    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
+    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES, capability="season")
     return tournament
 
 

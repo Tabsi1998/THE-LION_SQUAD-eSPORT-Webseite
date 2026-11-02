@@ -13,7 +13,7 @@ from services import squad_registration
 from services.league_scope import is_league_staffel
 from services.staffel_guard import SQUAD_UNREGISTER_REFUSED, STAFFEL_REGISTRATION_REFUSED
 from services.permissions import is_confirmed_tournament_lead
-from auth import get_current_user, get_optional_user, require_area
+from auth import get_current_user, get_optional_user
 from services.access_links import AccessLinkUsedUp, claim_access_link_use, release_access_link_use, validate_access_link
 from services.match_audience import responsible_registration
 from services.registration_notifications import notify_registration_status
@@ -44,6 +44,7 @@ from services import league_roster, onsite_access, team_history, tournament_even
 from services.query_filters import safe_regex
 from services.private_fields import private_projection
 from routes.tournament_common import (
+    require_lead_of,
     TOURNAMENT_BUSY_DETAIL,
     TOURNAMENT_MUTATION_LOCKED_DETAIL,
     _apply_match_plan,
@@ -53,7 +54,6 @@ from routes.tournament_common import (
     _enrich_game_identity,
     _ensure_tournament_unlocked,
     _get_visible_tournament,
-    _is_staff,
     _is_tournament_locked,
     _is_tournament_staff,
     _missing_game_fields,
@@ -500,7 +500,7 @@ async def list_registrations(tid: str, access: str | None = None, user=Depends(g
             raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     else:
         t_doc = await _get_visible_tournament(tid, user)
-    is_staff = _is_staff(user) or await _is_tournament_staff(tid, user)
+    is_staff = await _is_tournament_staff(tid, user)
     regs = await db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0}).to_list(500)
     if not is_staff:
         # Weggenommene Ablehnung (#2113): die Person sieht wieder „Anmelden“, die Leitung sieht den Eintrag weiter.
@@ -554,7 +554,7 @@ async def list_assignable_tournament_users(tid: str, q: str | None = None, limit
                                            me: dict = Depends(get_current_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
-    await require_tournament_staff_permission(me, tid, PARTICIPANT_STAFF_ROLES)
+    await require_tournament_staff_permission(me, tid, PARTICIPANT_STAFF_ROLES, capability="applications")
     # Helfer und Turnierleitung wählen Konten nach Name und Bild; E-Mail-Adresse und Kontorolle sieht nur der Bereich
     # System (#1294) - mit bestätigter Zwei-Faktor-Anmeldung.
     from services.permissions import needs_mfa, user_has_area
@@ -919,7 +919,7 @@ async def admin_create_registration(tid: str, body: RegistrationAdminCreate,
     db = get_db()
     tid = await _resolve_tid(tid)
     tournament = await _ensure_tournament_unlocked(db, tid)
-    await require_tournament_staff_permission(me, tid, PARTICIPANT_STAFF_ROLES)
+    await require_tournament_staff_permission(me, tid, PARTICIPANT_STAFF_ROLES, capability="applications")
     if is_league_staffel(tournament):
         # Liga-Staffel (#2109): nur Co-Teams über „Co-Team zuteilen“ (mit Kader- und Season-Prüfung) - kein ganzes
         # Hauptteam und kein Ersatz an diesen Prüfungen vorbei. Diese Route kennt kein ``squad_id``.
@@ -1065,7 +1065,7 @@ async def update_registration(tid: str, reg_id: str, body: RegistrationUpdate,
     db = get_db()
     tid = await _resolve_tid(tid)
     tournament_doc = await _ensure_tournament_unlocked(db, tid)
-    await require_tournament_staff_permission(me, tid, PARTICIPANT_STAFF_ROLES)
+    await require_tournament_staff_permission(me, tid, PARTICIPANT_STAFF_ROLES, capability="applications")
     requested = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in requested.items() if v is not None}
     # Setzplatz (#2111, TA15): leer heißt „kein Setzplatz“ - deshalb darf er ausdrücklich null sein.
@@ -1090,7 +1090,7 @@ async def update_registration(tid: str, reg_id: str, body: RegistrationUpdate,
     lifts_removal = previous_status in REMOVAL_KINDS and bool(updates.get("status")) and updates["status"] != previous_status
     if lifts_removal:
         # Wer eine Disqualifikation aussprechen darf, darf sie auch aufheben - nicht weniger (#2111).
-        await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES, "tournament")
+        await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES, "tournament", capability="applications")
     seed_changed = "seed" in updates and updates["seed"] != previous_seed
     if seed_changed and await tournament_guard.structure_fixed(db, tournament_doc):
         # Der Setzplatz ordnet die Vorschau (#2111, TA15) - steht der Baum, ändert er nichts mehr.
@@ -1169,7 +1169,7 @@ async def staff_set_registration_checkin(tid: str, reg_id: str, body: dict,
     db = get_db()
     tid = await _resolve_tid(tid)
     tournament_doc = await _ensure_tournament_unlocked(db, tid)
-    await require_tournament_staff_permission(me, tid, CHECKIN_STAFF_ROLES)
+    await require_tournament_staff_permission(me, tid, CHECKIN_STAFF_ROLES, capability="matches")
     status = body.get("status")
     if status not in REGISTRATION_CHECKIN_STATUSES:
         raise HTTPException(status_code=400, detail="Ungültiger Check-in-Status")
@@ -1242,11 +1242,11 @@ async def _delete_registration_locked(db, tid: str, reg_id: str, me: dict) -> di
     if reg.get("team_id") and not reg.get("squad_id"):
         team = await db.teams.find_one({"id": reg["team_id"]}, {"_id": 0})
         is_team_manager = bool(team and _can_register_team(team, me))
-    is_staff = await has_tournament_staff_permission(me, tid, PARTICIPANT_STAFF_ROLES)
+    is_staff = await has_tournament_staff_permission(me, tid, PARTICIPANT_STAFF_ROLES, capability="applications")
     if not is_own_registration and not is_team_manager and not is_staff:
         # Co-Team (#2109): eine deutsche Begründung statt eines nackten 403.
         raise HTTPException(status_code=403, detail=SQUAD_UNREGISTER_REFUSED if reg.get("squad_id") else None)
-    if reg.get("status") == "disqualified" and not await has_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES, "tournament"):
+    if reg.get("status") == "disqualified" and not await has_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES, "tournament", capability="applications"):
         # Abmelden und neu anmelden hieße: Ausschluss aufgehoben (#2111) - dasselbe Recht wie beim Aufheben über den Status.
         raise HTTPException(status_code=409, detail=DISQUALIFIED_STAYS)
     tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
@@ -1341,7 +1341,7 @@ class SquadAssignBody(BaseModel):
 
 
 @router.get("/{tid}/squad-candidates")
-async def list_squad_candidates(tid: str, me: dict = Depends(require_area("tournaments"))):
+async def list_squad_candidates(tid: str, me: dict = Depends(require_lead_of("applications"))):
     """Für den Dialog „Co-Team zuteilen“: Hauptteams mit ihren Co-Teams und was gegen eine Zuteilung spricht."""
     db = get_db()
     tid = await _resolve_tid(tid)
@@ -1374,7 +1374,7 @@ async def _insert_squad_registration(db, tournament: dict, body: "SquadAssignBod
 
 
 @router.post("/{tid}/squad-registrations")
-async def assign_squad(tid: str, body: SquadAssignBody, me: dict = Depends(require_area("tournaments")),
+async def assign_squad(tid: str, body: SquadAssignBody, me: dict = Depends(require_lead_of("applications")),
                        _mutation_tid: str = Depends(_serialized_tournament_write)):
     """Die Turnierleitung teilt ein Co-Team der Staffel zu - als freigegebene Team-Anmeldung mit ``squad_id``."""
     db = get_db()
@@ -1404,7 +1404,7 @@ async def assign_squad(tid: str, body: SquadAssignBody, me: dict = Depends(requi
 
 
 @router.delete("/{tid}/squad-registrations/{reg_id}")
-async def remove_squad(tid: str, reg_id: str, me: dict = Depends(require_area("tournaments")),
+async def remove_squad(tid: str, reg_id: str, me: dict = Depends(require_lead_of("applications")),
                        _mutation_tid: str = Depends(_serialized_tournament_write)):
     """Zuteilung zurücknehmen - nur solange das Co-Team in keinem festen Spiel steht."""
     db = get_db()
