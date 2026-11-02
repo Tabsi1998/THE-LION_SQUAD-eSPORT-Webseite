@@ -85,6 +85,11 @@ def _positive_int(value) -> int | None:
     return number if number >= 1 else None
 
 
+def is_active_squad(squad: dict | None) -> bool:
+    """Spielt das Co-Team? Ältere Co-Teams tragen kein ``status`` - sie zählen als aktiv, wie beim Zuteilen."""
+    return ((squad or {}).get("status") or "active") == "active"
+
+
 def min_squad_size(tournament: dict) -> int:
     """Mindestkader: das Feld ``min_squad_size`` der Staffel (der Liga-Rahmen kopiert es aus Season bzw. Liga N), sonst
     die Teamgröße des Turniers - nie kleiner als sie. Der Turnierkern liest nur das Turnier, nie die Season."""
@@ -485,7 +490,7 @@ async def on_squad_members_added(db, squad: dict, user_ids, actor_id: str | None
         found = await record_members(db, ctx, added, via="squad_join", actor_id=actor_id, squad_id=squad["id"],
                                      late=ctx.deadline_passed())
         waiting = waiting_for_id(found.values())
-        if not waiting:
+        if not waiting or not is_active_squad(squad):
             continue
         try:
             await _tell_added(db, ctx, tournament, registration_of[tournament["id"]], waiting, squad["id"])
@@ -624,7 +629,7 @@ async def season_overview(db, season: dict) -> dict:
     squads = {
         row["id"]: row
         for row in await db.team_squads.find(
-            {"id": {"$in": sorted({reg["squad_id"] for reg in regs})}}, {"_id": 0, "id": 1, "member_ids": 1, "name": 1}
+            {"id": {"$in": sorted({reg["squad_id"] for reg in regs})}}, {"_id": 0, "id": 1, "member_ids": 1, "name": 1, "status": 1}
         ).to_list(500)
     } if regs else {}
     members = {uid for squad in squads.values() for uid in squad.get("member_ids") or [] if uid}
@@ -664,10 +669,10 @@ async def season_overview(db, season: dict) -> dict:
             "staffel_label": label or tournament.get("title"),
             "display_name": reg.get("display_name"),
             "players": players,
-            # Kader unter Mindestgröße (#2202): gilt nur, solange die Staffel läuft.
+            # Kader unter Mindestgröße (#2202): gilt nur für aktive Co-Teams, solange die Staffel läuft.
             "member_count": len(players),
             "min_squad_size": minimum,
-            "short": len(players) < minimum and tournament.get("status") not in FINISHED_TOURNAMENT_STATUSES,
+            "short": len(players) < minimum and is_active_squad(squad) and tournament.get("status") not in FINISHED_TOURNAMENT_STATUSES,
             "_sort": (level or 0, context.get("staffel") or "", str(reg.get("display_name") or "").lower()),
         })
     rows.sort(key=lambda row: row.pop("_sort"))

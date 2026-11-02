@@ -142,6 +142,18 @@ async def test_a_finished_staffel_tells_nobody(flow):
 
 
 @pytest.mark.asyncio
+async def test_an_archived_co_team_tells_nobody_but_keeps_the_roster_entry(flow):
+    w = await id_world(flow, without=("Ida",))
+    await flow.db.team_squads.update_one({"id": w["squad_a"]["id"]}, {"$set": {"status": "archived"}})
+
+    await set_kader(flow, w, w["squad_a"], ["Kapitaen", "Mila", "Tom", "Ida"])
+
+    assert await notes(flow, w, "Ida") == [] and await notes(flow, w, "Kapitaen") == []
+    entry = await flow.db.league_rosters.find_one({"season_id": w["season_id"], "user_id": w["users"]["Ida"]["id"]}, {"_id": 0})
+    assert entry and w["squad_a"]["id"] in entry["squad_ids"], "der Kader der Season bleibt vollständig"
+
+
+@pytest.mark.asyncio
 async def test_a_failing_notice_does_not_undo_the_change(flow, monkeypatch):
     from services import user_notifications
 

@@ -193,6 +193,60 @@ async def test_a_failing_warning_does_not_stop_the_departure(flow, monkeypatch):
     assert w["users"]["Mila"]["id"] not in (await flow.db.team_squads.find_one({"id": w["squad_a"]["id"]}))["member_ids"]
 
 
+# ---------------------------------------------------------------- Archivierte Co-Teams
+
+
+async def archive(flow, w: dict) -> None:
+    await flow.db.team_squads.update_one({"id": w["squad_a"]["id"]}, {"$set": {"status": "archived"}})
+
+
+@pytest.mark.asyncio
+async def test_an_archived_co_team_warns_nobody(flow):
+    w = await short_world(flow)
+    await archive(flow, w)
+
+    await set_kader(flow, w, "Kapitaen", "Tom")
+
+    assert await warned(flow, w["users"]["Kapitaen"]) == [] and await warned(flow, w["staff"]) == []
+
+
+@pytest.mark.asyncio
+async def test_an_archived_co_team_has_no_task_and_no_requirement(flow):
+    w = await short_world(flow)
+    await set_kader(flow, w, "Kapitaen", "Tom")
+    assert fill_task(await actions(flow, w["users"]["Kapitaen"])), "aktiv: die Aufgabe steht da"
+
+    await archive(flow, w)
+
+    assert fill_task(await actions(flow, w["users"]["Kapitaen"])) is None
+    flow.act_as(w["users"]["LoeLeitung"])
+    rows = {row["id"]: row for row in (await flow.get(f"/api/teams/{w['lions']['id']}/squads")).json()}
+    assert "league_requirement" not in rows[w["squad_a"]["id"]]
+
+
+@pytest.mark.asyncio
+async def test_the_season_overview_does_not_call_an_archived_co_team_short(flow):
+    w = await short_world(flow, make=id_world)
+    await set_kader(flow, w, "Kapitaen", "Tom")
+    await archive(flow, w)
+    flow.act_as(w["staff"])
+
+    overview = (await flow.get(f"/api/admin/leagues/seasons/{w['season_id']}/roster")).json()
+
+    assert overview["counts"]["short"] == 0
+
+
+@pytest.mark.asyncio
+async def test_a_co_team_without_status_counts_as_active(flow):
+    """Ältere Co-Teams tragen das Feld nicht - wie beim Zuteilen zählen sie als aktiv."""
+    w = await short_world(flow)
+    await flow.db.team_squads.update_one({"id": w["squad_a"]["id"]}, {"$unset": {"status": ""}})
+
+    await set_kader(flow, w, "Kapitaen", "Tom")
+
+    assert len(await warned(flow, w["users"]["Kapitaen"])) == 1
+
+
 # ---------------------------------------------------------------- Aufgabe auf der Startseite
 
 

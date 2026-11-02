@@ -1,6 +1,6 @@
 """Kader unter Mindestgröße (docs/LIGA.md, #2202): Abgänge aus einem Co-Team bleiben möglich (Entscheidung des Obmanns).
 
-Fällt der Kader eines Co-Teams, das in einer nicht beendeten Staffel steht, unter ``min_squad_size``, erfahren es die
+Fällt der Kader eines aktiven Co-Teams, das in einer nicht beendeten Staffel steht, unter ``min_squad_size``, erfahren es die
 Verantwortlichen und die Turnierleitung; ``open_shortages`` liefert den aktuellen Stand für die Aufgabe „Kader auffüllen“
 auf der Startseite. Der Stand wird nie gespeichert - reicht der Kader wieder, ist die Aufgabe weg.
 """
@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 
 from services.log_safe import log_safe
+from services.league_roster import is_active_squad
 from services.match_audience import kader_care_ids, roster_ids, teams_by_id
 from services.squad_registration import ACTIVE_REGISTRATION_STATUSES, FINISHED_TOURNAMENT_STATUSES, min_squad_size
 
@@ -29,21 +30,23 @@ async def _open_tournaments(db, registrations: list[dict]) -> dict[str, dict]:
     return {row["id"]: row for row in rows}
 
 
+async def _active_squads(db, squad_ids) -> dict[str, dict]:
+    """Die Co-Teams, die spielen - archivierte warnen nicht und verlangen nichts mehr."""
+    ids = sorted({squad_id for squad_id in squad_ids if squad_id})
+    rows = await db.team_squads.find({"id": {"$in": ids}}, {"_id": 0, "id": 1, "name": 1, "status": 1}).to_list(len(ids) + 5) if ids else []
+    return {row["id"]: row for row in rows if is_active_squad(row)}
+
+
 async def open_shortages(db, registrations: list[dict]) -> list[dict]:
     """Die Co-Teams aus diesen aktiven Anmeldungen, deren Kader gerade zu klein ist - je Zeile Staffel, Größe, Mindestgröße
     und wer davon erfährt (``kader_care_ids``). Gezählt wird, wer aufgestellt werden dürfte (``roster_ids``)."""
     rows = [reg for reg in registrations if reg.get("squad_id") and reg.get("team_id")]
     tournaments = await _open_tournaments(db, rows)
-    rows = [reg for reg in rows if reg.get("tournament_id") in tournaments]
+    squads = await _active_squads(db, [reg["squad_id"] for reg in rows])
+    rows = [reg for reg in rows if reg.get("tournament_id") in tournaments and reg["squad_id"] in squads]
     if not rows:
         return []
     teams = await teams_by_id(db, rows)
-    names = {
-        row["id"]: row.get("name")
-        for row in await db.team_squads.find(
-            {"id": {"$in": sorted({reg["squad_id"] for reg in rows})}}, {"_id": 0, "id": 1, "name": 1},
-        ).to_list(len(rows) + 5)
-    }
     out = []
     for reg in rows:
         team = teams.get(reg["team_id"])
@@ -56,7 +59,7 @@ async def open_shortages(db, registrations: list[dict]) -> list[dict]:
                 "registration_id": reg.get("id"),
                 "team_id": reg["team_id"],
                 "squad_id": reg["squad_id"],
-                "squad_name": names.get(reg["squad_id"]) or reg.get("squad_name") or "Co-Team",
+                "squad_name": squads[reg["squad_id"]].get("name") or reg.get("squad_name") or "Co-Team",
                 "display_name": reg.get("display_name"),
                 "tournament": tournament,
                 "size": size,
@@ -67,7 +70,7 @@ async def open_shortages(db, registrations: list[dict]) -> list[dict]:
 
 
 async def requirements(db, squad_ids: list[str]) -> dict[str, dict]:
-    """Je Co-Team, was die Staffel verlangt: für den Hinweis, bevor ein Abgang bestätigt wird. Nur Co-Teams in einer nicht
+    """Je Co-Team, was die Staffel verlangt: für den Hinweis, bevor ein Abgang bestätigt wird. Nur aktive Co-Teams in einer nicht
     beendeten Staffel; steht eines in mehreren Seasons, gilt die strengste Vorgabe."""
     if not squad_ids:
         return {}
@@ -75,10 +78,11 @@ async def requirements(db, squad_ids: list[str]) -> dict[str, dict]:
         {"squad_id": {"$in": sorted(squad_ids)}, "status": {"$in": list(ACTIVE_REGISTRATION_STATUSES)}}, REGISTRATION_FIELDS,
     ).to_list(500)
     tournaments = await _open_tournaments(db, regs)
+    squads = await _active_squads(db, squad_ids)
     out: dict[str, dict] = {}
     for reg in regs:
         tournament = tournaments.get(reg.get("tournament_id"))
-        if not tournament:
+        if not tournament or reg["squad_id"] not in squads:
             continue
         minimum = min_squad_size(tournament)
         if minimum > out.get(reg["squad_id"], {}).get("min_size", 0):
