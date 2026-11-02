@@ -8,20 +8,9 @@ import { StatusBadge } from "@/components/tls/StatusBadge";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { downloadCsv, formatAdminDate, normalizeSearch } from "@/lib/adminListTools";
 import { sortByNearestDate } from "@/lib/contentSort";
+import { F1_STATUS_LABELS, statusFilterOptions } from "@/lib/fastLapStatus";
 import { Plus, Flag, Search, Download } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-
-const FAST_LAP_STATUS_OPTIONS = [
-  ["", "Alle Status"],
-  ["draft", "Entwurf"],
-  ["scheduled", "Angekündigt"],
-  ["registration_open", "Einreichung offen"],
-  ["live", "Live"],
-  ["completed", "Abgeschlossen"],
-  ["results_published", "Ergebnisse online"],
-  ["archived", "Archiviert"],
-  ["cancelled", "Abgesagt"],
-];
 
 export default function AdminF1Page() {
   // Globale Aktionen nur für die Turnierleitung mit Zwei-Faktor (#1028), Helfer sehen die ihres Einsatzes.
@@ -89,7 +78,7 @@ export default function AdminF1Page() {
       filteredList.map((challenge) => [
         challenge.title,
         challenge.slug,
-        challenge.status,
+        F1_STATUS_LABELS[challenge.status] || challenge.status,
         formatAdminDate(challenge.start_date),
         challenge.track_count,
         challenge.participant_count,
@@ -124,8 +113,9 @@ export default function AdminF1Page() {
               />
             </label>
             <select value={statusFilter} onChange={(event) => updateFilterParams({ status: event.target.value })} data-testid="f1-admin-status-filter" className="rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2 text-sm">
-              {FAST_LAP_STATUS_OPTIONS.map(([value, label]) => (
-                <option key={value || "all"} value={value}>{label} ({value ? statusCounts[value] || 0 : list.length})</option>
+              <option value="">Alle Status ({list.length})</option>
+              {statusFilterOptions(statusCounts).map(([value, label]) => (
+                <option key={value} value={value}>{label} ({statusCounts[value] || 0})</option>
               ))}
             </select>
             <button
