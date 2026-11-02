@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.59.1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.59.0...v1.59.1) (2026-11-02)
+
+
+### Fehlerbehebungen
+
+* Banner und Gewinnbilder der Liga gehen für Zuständige ([#2230](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2230)) ([5f6955b](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5f6955b443f137809b9da0372867505d13d984c2))
+* Bilder im Regelwerk genauer geprüft ([#2230](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2230)) ([5f6955b](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5f6955b443f137809b9da0372867505d13d984c2))
+* Emblem der Liga geht für Zuständige ([#2230](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2230)) ([5f6955b](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5f6955b443f137809b9da0372867505d13d984c2))
+* Kontolöschung bei Bildern im Regelwerk genauer ([#2230](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2230)) ([5f6955b](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5f6955b443f137809b9da0372867505d13d984c2))
+* Liga-Seiten öffnen sich für Turnierleitung und Helfer, die zugleich Zuständige sind ([#2230](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2230)) ([5f6955b](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/5f6955b443f137809b9da0372867505d13d984c2))
+
 ## 1.59.0 (02.11.2026)
 
 ### Neu
