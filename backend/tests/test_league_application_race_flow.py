@@ -86,7 +86,8 @@ async def test_the_index_refuses_a_second_open_application_without_the_lock(flow
         pytest.skip("nur echtes MongoDB kennt den Index")
     w = await application_world(flow)
     side = w["teams"][0]
-    stored = await submitted(flow, w, side)
+    await submitted(flow, w, side)
+    stored = await flow.db.league_applications.find_one({"squad_id": side["squad"]["id"]}, {"_id": 0})
     from pymongo.errors import DuplicateKeyError
 
     with pytest.raises(DuplicateKeyError):
