@@ -231,11 +231,12 @@ async def test_a_walkover_corrected_to_a_played_result_is_withdrawn_everywhere(f
                            json={"forfeit_registration_id": second, "note": "Nicht erschienen zur Startzeit"})
     assert gone.status_code == 200, gone.text
     assert (await flow.reload(match))["forfeit_registration_id"] == second
-    # Der Eintrag „nicht erschienen“ bei der Person - aus diesem Spiel und einer aus einem anderen.
+    # Der Eintrag „nicht erschienen“ bei der Person - aus diesem Spiel und einer aus einem anderen. Je Person und Stufe gibt
+    # es nur einen Eintrag (eindeutiger Index), der aus dem anderen Spiel trägt darum eine andere Stufe.
     loser = player[second]["id"]
     await flow.db.user_achievements.insert_one({"id": "a1", "user_id": loser, "tier_code": "neg_no_show",
                                                 "context": {"match_id": match["id"], "reason": "forfeit"}})
-    await flow.db.user_achievements.insert_one({"id": "a2", "user_id": loser, "tier_code": "neg_no_show",
+    await flow.db.user_achievements.insert_one({"id": "a2", "user_id": loser, "tier_code": "neg_no_show_probe",
                                                 "context": {"match_id": "anderes-spiel", "reason": "forfeit"}})
 
     corrected = await flow.post(f"/api/matches/{match['id']}/result?force=true",
