@@ -299,7 +299,7 @@ unterstützt, steht unter **Sponsoren** (3.6). Jeder Partner hat eine eigene Sei
 - **Löschen** geht nur, wenn der Partner nirgends verwendet wird (Referenzen, Events, Turniere, Serien, Saisons); sonst nennt die
   Meldung, wo er noch steht. Archivieren, Zurückholen und Löschen stehen im Protokoll.
 - Mit Dolibarr kommen Name, Art und „Öffentlich zeigen“ von dort (gesperrt, mit Hinweis): Inaktiv wird der Partner, wenn die Firma in
-  Dolibarr geschlossen oder aus der Kategorie genommen wird. Löschen ist gesperrt, solange sie in der Kategorie steht.
+  Dolibarr geschlossen oder aus der Kategorie genommen wird. Löschen ist gesperrt, solange sie in der Kategorie steht. Ist sie aus der Kategorie genommen, steht der Partner als inaktiv hier und lässt sich zurückholen; der Abgleich fasst das nicht mehr an.
 
 <img src="../assets/serien/serien-partner-partnerseite.png" alt="Partnerseite: Bereich Ligen und Serien mit uns mit einer Spur, zwei Saisons, Stand, Endplatz und Läuft gerade" width="420">
 

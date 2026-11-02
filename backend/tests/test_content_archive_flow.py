@@ -58,6 +58,23 @@ async def test_internal_notes_reach_only_the_administration(flow):
     assert (await flow.get(f"/api/references/{rid}")).json()["highlights"] == "Toller Lauf"
 
 
+@pytest.mark.asyncio
+async def test_internal_notes_stay_out_of_every_public_route_and_need_the_content_area(flow):
+    await editor(flow)
+    await flow.db.club_member_profiles.insert_one({"id": "p-1", "slug": "anni", "display_name": "Anni Probe", "is_active": True, "visibility": "public", "is_public": True})
+    await flow.db.partners.insert_one({"id": "pa", "slug": "probe", "name": "Probe Partner", "is_active": True})
+    created = (await flow.post("/api/references", json={"title": "Herbst", "internal_notes": "GEHEIMNOTIZ", "partner_ids": ["pa"], "member_profile_ids": ["p-1"]})).json()
+    rid = created["id"]
+    flow.act_as(None)
+    for path in ("/api/references", f"/api/references/{rid}", "/api/partners/probe", "/api/members/anni", "/api/reference-series", f"/api/seo/references/{rid}"):
+        answer = await flow.get(path)
+        assert "GEHEIMNOTIZ" not in answer.text, path
+    flow.act_as(await flow.add_user(name="normal"))
+    assert (await flow.get("/api/references/admin")).status_code == 403
+    refused = await flow.post("/api/references/admin/checks/preview", json={"internal_notes": "x"})
+    assert refused.status_code == 403
+
+
 # ---------------------------------------------------------------- RF5: ein Feld, die Sichtbarkeit bleibt
 
 def _old_sponsor_status(doc: dict, today: str) -> str:

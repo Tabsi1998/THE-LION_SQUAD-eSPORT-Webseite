@@ -219,6 +219,27 @@ async def test_what_dolibarr_keeps_is_locked_and_the_sync_runs_as_before(flow, f
 
 
 @pytest.mark.asyncio
+async def test_a_partner_out_of_the_category_can_be_brought_back_and_it_sticks(flow, fake):
+    """#2130: Der Abgleich setzt ihn beim Weggang inaktiv und fasst ihn danach nicht mehr an - das Zurückholen hier gilt."""
+    await connect(flow)
+    ids = seed_categories(fake)
+    company = fake.add_thirdparty("Gamma Verein")
+    fake.categorize(company["id"], ids["partner"], ids["verein"])
+    flow.act_as(await flow.add_user(role="club_admin"))
+    assert (await flow.patch("/api/admin/dolibarr/sponsors", json={"from_dolibarr": True})).status_code == 200
+    partner = (await flow.get("/api/partners/admin")).json()[0]
+    fake.thirdparty_categories[company["id"]] = set()
+    assert (await flow.post("/api/admin/dolibarr/sponsors/refresh")).json()["partners"]["gone"] == 1
+    assert (await flow.db.partners.find_one({"id": partner["id"]}))["is_active"] is False
+
+    back = await flow.patch(f"/api/partners/{partner['id']}", json={"is_active": True, "name": "Anders"})
+    assert back.status_code == 200
+    assert back.json()["is_active"] is True and back.json()["name"] == "Gamma Verein", "Name führt weiter Dolibarr"
+    assert (await flow.post("/api/admin/dolibarr/sponsors/refresh")).status_code == 200
+    assert (await flow.db.partners.find_one({"id": partner["id"]}))["is_active"] is True
+
+
+@pytest.mark.asyncio
 async def test_daily_center_counts_sponsorships_ending_within_thirty_days(flow):
     now = datetime.now(timezone.utc)
     soon = (now + timedelta(days=10)).date().isoformat()

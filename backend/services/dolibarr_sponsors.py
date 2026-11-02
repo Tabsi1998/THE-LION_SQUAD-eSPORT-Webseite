@@ -330,7 +330,10 @@ async def locked_fields(db, doc: dict | None, fields: tuple[str, ...]) -> tuple[
     if not doc or doc.get("source") != SOURCE:
         return ()
     source = await load_source_settings(db)
-    return fields if source["from_dolibarr"] else ()
+    if not source["from_dolibarr"]:
+        return ()
+    # Aus der Kategorie genommen: Der Abgleich fasst „Aktiv“ nicht mehr an, hier lässt sich der Eintrag zurückholen (#2130).
+    return tuple(field for field in fields if field != "is_active") if doc.get("dolibarr_gone_at") else fields
 
 
 async def comes_back_on_sync(db, doc: dict | None) -> bool:

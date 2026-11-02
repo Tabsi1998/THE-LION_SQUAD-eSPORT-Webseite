@@ -116,8 +116,10 @@ export default function AdminPartnersPage() {
   const setArchived = async (partner, archived) => {
     if (archived && !await confirm({ title: "Partner archivieren?", description: "Seine Seite und alle Hinweise auf ihn verschwinden von der Website. Der Eintrag bleibt hier zum Zurückholen stehen.", confirmLabel: "Archivieren", tone: "info" })) return;
     try {
-      await api.patch(`/partners/${partner.id}`, { is_active: !archived });
-      toast.success(archived ? "Partner archiviert." : "Partner zurückgeholt.");
+      const { data } = await api.patch(`/partners/${partner.id}`, { is_active: !archived });
+      // Was zählt, ist die Antwort: Bei einem Partner, den Dolibarr führt, kann der Server den Wert verwerfen.
+      if (data?.is_active === archived) toast.error(archived ? "Der Partner bleibt aktiv: Das entscheidet Dolibarr." : "Der Partner bleibt archiviert: Das entscheidet Dolibarr.");
+      else toast.success(archived ? "Partner archiviert." : "Partner zurückgeholt.");
       load();
     } catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
   };
@@ -217,7 +219,9 @@ function PartnerForm({ partner, locked = new Set(), onClose, onSaved }) {
     <AdminSheet title={isNew ? "Neuer Partner" : "Partner bearbeiten"} eyebrow="Verein" onClose={onClose} onSubmit={save} saving={saving} submitTestId="partner-save" testId="partner-sheet">
       {locked.size > 0 && (
         <p className="text-xs text-[#29B6E8] border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-3 py-2" data-testid="partner-locked-hint">
-          Dieser Partner kommt aus Dolibarr: Name, Art und „Öffentlich zeigen“ werden dort gepflegt. Inaktiv wird er, wenn die Firma in Dolibarr geschlossen oder aus der Kategorie genommen wird. Alles andere bleibt hier.
+          {locked.has("is_active")
+            ? "Dieser Partner kommt aus Dolibarr: Name, Art und „Öffentlich zeigen“ werden dort gepflegt. Inaktiv wird er, wenn die Firma in Dolibarr geschlossen oder aus der Kategorie genommen wird. Alles andere bleibt hier."
+            : "Dieser Partner kam aus Dolibarr und steht dort nicht mehr in der Kategorie: Name und Art bleiben gesperrt, „Öffentlich zeigen“ pflegt ihr jetzt hier."}
         </p>
       )}
       <TextField label="Name" value={form.name} onChange={(v) => set("name", v)} required testId="partner-name" {...lock("name")} />
