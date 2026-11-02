@@ -29,7 +29,8 @@ RENEW_ALL_LIMIT = 5000
 class RenewAllBody(BaseModel):
     confirm: bool = False
     # Auch alle Einladungs-Links: der nächste Aufruf unter „Einladen“ legt je Team einen neuen an (``team_page.ensure_invite``).
-    renew_links: bool = True
+    # Nur auf ausdrücklichen Wunsch - das Häkchen der Seite ist vorgewählt und wird immer mitgeschickt.
+    renew_links: bool = False
 
 
 def _search(q: str | None) -> dict:

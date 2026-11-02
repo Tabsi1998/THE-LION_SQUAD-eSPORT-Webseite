@@ -128,9 +128,19 @@ async def test_renew_all_join_codes(flow, caplog):
 
     caplog.set_level(logging.INFO)
     await flow.db.team_invite_links.insert_one({"id": new_id(), "team_id": rudel["id"], "token": "AlterSchluessel"})
-    done = await flow.post(url, json={"confirm": True})
+    without_links = await flow.post(url, json={"confirm": True})
+    assert without_links.status_code == 200 and without_links.json()["links_renewed"] is False
+    assert await flow.db.team_invite_links.count_documents({}) == 1, "ohne ausdrücklichen Wunsch bleiben die Links"
+    plain = await flow.db.notifications.find_one({"kind": "team_join_code_renewed"})
+    assert "Einladungs-Link" not in plain["body"]
+    quiet = await flow.db.audit_logs.find_one({"action": "team.join_code.renew_all"}, {"_id": 0})
+    assert quiet["data"] == {"teams": 3, "invite_links_renewed": False, "invite_links_removed": 0}
+    await flow.db.notifications.delete_many({"kind": "team_join_code_renewed"})
+    await flow.db.audit_logs.delete_many({"action": "team.join_code.renew_all"})
+
+    done = await flow.post(url, json={"confirm": True, "renew_links": True})
     assert done.status_code == 200 and done.json() == {"ok": True, "renewed": 3, "links_renewed": True}
-    assert await flow.db.team_invite_links.count_documents({}) == 0, "die Vorgabe nimmt die Links mit"
+    assert await flow.db.team_invite_links.count_documents({}) == 0, "mit Häkchen gehen die Links mit"
 
     codes = {row["id"]: row["join_code"] async for row in flow.db.teams.find({}, {"_id": 0, "id": 1, "join_code": 1})}
     assert codes[rudel["id"]] != "AltCodeA" and codes[secret["id"]] != "AltCodeB" and codes[legacy["id"]]
