@@ -94,6 +94,17 @@ async def test_a_credit_note_is_no_payment_in_export_list_and_detail(flow):
 
 
 @pytest.mark.asyncio
+async def test_a_draft_credit_note_is_not_credited_yet(flow):
+    await as_kassier(flow)
+    notes = [{"id": 1, "ref": "(PROV1)", "total_cents": 2000, "status": "draft"}, {"id": 2, "ref": "AV2", "total_cents": 300, "status": "validated"}]
+    await flow.db.billing_orders.insert_one(order("o-entwurf", remaining_cents=2000, payment_state="open", payments=[], credit_notes=notes))
+    assert parse(await flow.get(EXPORT))[0]["Gutgeschrieben"] == "3,00 €"
+    assert (await flow.get("/api/admin/finance/overview")).json()["invoiced"][0]["credited_cents"] == 300
+    assert (await flow.get("/api/admin/finance/orders/o-entwurf")).json()["sums"]["credited_cents"] == 300
+    assert (await billing_orders.source_summary(flow.db, "event", "ev1"))["credited_cents"] == 300
+
+
+@pytest.mark.asyncio
 async def test_without_known_payments_the_sum_minus_rest_still_applies(flow):
     """Fehlt das Recht auf die Zahlungen in Dolibarr, steht `payments` nicht am Auftrag: dann bleibt die Rechnung über den Rest."""
     await as_kassier(flow)
