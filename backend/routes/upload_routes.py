@@ -50,7 +50,13 @@ from services.image_upload import (  # noqa: F401 - umgezogen (#1420), hier weit
 )
 from services import svg_logo
 from services.image_variants import schedule_variants
-from services.permissions import MFA_MESSAGE, admin_role_without_second_factor, is_confirmed_admin_role
+from services.permissions import (
+    MFA_MESSAGE,
+    admin_role_without_second_factor,
+    is_confirmed_admin_role,
+    is_confirmed_tournament_lead,
+    lead_without_second_factor,
+)
 from services.rate_limit import enforce_rate_limit, get_client_ip
 from storage import PRIVATE_DOC_DIR, PUBLIC_UPLOAD_DIR, ensure_directory
 from services.media_formats import (
@@ -880,8 +886,8 @@ async def upload_team_logo(request: Request, team_id: str, file: UploadFile = Fi
         if not team:
             raise HTTPException(status_code=404, detail="Team nicht gefunden")
         leads = team.get("leader_id") == me.get("id") or me.get("id") in (team.get("co_leader_ids") or [])
-        if not leads and not is_confirmed_admin_role(me, TEAM_LOGO_ADMIN_ROLES):
-            if admin_role_without_second_factor(me, TEAM_LOGO_ADMIN_ROLES):
+        if not leads and not is_confirmed_admin_role(me, TEAM_LOGO_ADMIN_ROLES) and not is_confirmed_tournament_lead(me):
+            if admin_role_without_second_factor(me, TEAM_LOGO_ADMIN_ROLES) or lead_without_second_factor(me):
                 raise HTTPException(status_code=403, detail=MFA_MESSAGE)
             raise HTTPException(status_code=403, detail="Das Logo kann nur die Leitung des Teams ändern.")
         await _enforce_upload_rate_limit(request, me, "image", "user")

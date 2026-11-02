@@ -16,7 +16,13 @@ from services.team_page import new_join_code
 from services import word_filter
 from services.log_safe import log_safe
 from services.private_fields import private_projection
-from services.permissions import MFA_MESSAGE, admin_role_without_second_factor, is_confirmed_admin_role
+from services.permissions import (
+    MFA_MESSAGE,
+    admin_role_without_second_factor,
+    is_confirmed_admin_role,
+    is_confirmed_tournament_lead,
+    lead_without_second_factor,
+)
 
 router = APIRouter(prefix="/api/teams", tags=["teams"])
 logger = logging.getLogger("tls.teams")
@@ -83,7 +89,7 @@ class TeamChatCreate(BaseModel):
 MENTION_RE = re.compile(r"@([A-Za-z0-9_.-]{2,32})")
 
 
-# Teams verwalten außer Leitung und Co-Leitung: Turnierleitung, Club-Admin, Superadmin. Moderatoren
+# Teams verwalten außer Leitung und Co-Leitung: Turnierleitung (Rolle oder Freigabe), Club-Admin, Superadmin. Moderatoren
 # moderieren (Wortfilter für Teamnamen, Bildprüfung für Logos und Banner). Mitglieder entfernen, Rollen ändern, die
 # Leitung übergeben und auflösen dürfen außer der Leitung nur Club-Admin und Superadmin. Wie jeder Adminbereich nur mit
 # bestätigter Zwei-Faktor-Anmeldung (#1469); Leitung und Co-Leitung brauchen sie für ihr eigenes Team nicht.
@@ -92,12 +98,17 @@ TEAM_OWNER_ADMIN_ROLES = ("club_admin", "superadmin")
 
 
 def _team_admin(user: dict | None, roles=TEAM_ADMIN_ROLES) -> bool:
-    return is_confirmed_admin_role(user, roles)
+    """Die Freigabe „Turnierleitung“ zählt wie die Rolle (docs/ROLLEN.md, #2202) - nur, wo die Liste die Rolle nennt."""
+    return is_confirmed_admin_role(user, roles) or ("tournament_admin" in roles and is_confirmed_tournament_lead(user))
+
+
+def _only_second_factor_missing(user: dict | None, roles=TEAM_ADMIN_ROLES) -> bool:
+    return admin_role_without_second_factor(user, roles) or ("tournament_admin" in roles and lead_without_second_factor(user))
 
 
 def _refuse(user: dict | None, detail: str, roles=TEAM_ADMIN_ROLES):
     """403 - mit dem Hinweis auf die Zwei-Faktor-Anmeldung, wenn nur sie fehlt."""
-    if admin_role_without_second_factor(user, roles):
+    if _only_second_factor_missing(user, roles):
         raise HTTPException(status_code=403, detail=MFA_MESSAGE)
     raise HTTPException(status_code=403, detail=detail)
 
@@ -344,7 +355,7 @@ def _viewer_rights(team: dict, user: dict | None) -> dict:
         # Rollen ändern und die Leitung übergeben (#2128, TM6): Teamleitung, Club-Admin, Superadmin - auch für ein Team,
         # dessen Teamleitung nicht mehr da ist.
         "can_change_roles": owns,
-        "admin_needs_second_factor": not leads and admin_role_without_second_factor(user, TEAM_ADMIN_ROLES),
+        "admin_needs_second_factor": not leads and _only_second_factor_missing(user),
     }
 
 
