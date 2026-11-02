@@ -220,6 +220,31 @@ async def test_no_reply_to_spam_without_address_or_with_a_bad_one(flow):
     assert (await flow.db.contact_messages.find_one({"id": "spam"}))["status"] == "spam"
 
 
+@pytest.mark.asyncio
+async def test_the_history_says_what_became_of_the_mail(flow, monkeypatch):
+    await flow.db.contact_messages.insert_one(message("a"))
+    flow.act_as(await club_person(flow))
+    sent = (await flow.post("/api/contact/a/reply", json={"text": "Hallo du", "request_id": "antwort-eins"})).json()
+    assert sent["replies"][0]["delivery"] == "waiting", "eingereiht, noch nicht hinaus"
+
+    async def delivery():
+        return (await inbox(flow, status="answered"))["items"][0]["replies"][0]["delivery"]
+
+    for status, expected in (("sending", "waiting"), ("sent", "sent"), ("failed", "failed"), ("skipped", "skipped")):
+        await flow.db.mail_jobs.update_one({"template_key": "contact_reply"}, {"$set": {"status": status}})
+        assert await delivery() == expected, status
+
+    # Der echte Weg: der Mailserver lehnt ab.
+    await flow.db.mail_jobs.update_one({"template_key": "contact_reply"}, {"$set": {"status": "pending"}})
+    await send_queue(monkeypatch, broken=True)
+    assert await delivery() == "failed"
+    assert (await flow.db.contact_messages.find_one({"id": "a"}))["status"] == "answered", "die Antwort bleibt im Verlauf, der Stand steht daneben"
+
+    # Versendete Aufträge räumt die Warteschlange irgendwann weg.
+    await flow.db.mail_jobs.delete_many({})
+    assert await delivery() is None
+
+
 def test_the_reply_is_in_the_catalog_and_cannot_be_unsubscribed():
     assert CATALOG["contact_reply"]["category"] == "club"
     assert "contact_reply" not in TEMPLATE_CATEGORY, "die Person hat gefragt - keine Abbestell-Kategorie"

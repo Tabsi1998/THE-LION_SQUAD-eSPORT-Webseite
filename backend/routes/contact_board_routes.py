@@ -215,6 +215,14 @@ async def list_topics():
     return [{"value": k, "label": v} for k, v in TOPIC_LABELS.items()]
 
 
+def _reply_key(cid: str, reply: dict) -> str:
+    return f"contact:{cid}:reply:{reply.get('request_id')}"
+
+
+# Der Stand des Mail-Auftrags in dem, was die Inbox unterscheidet.
+REPLY_DELIVERY = {"pending": "waiting", "sending": "waiting", "sent": "sent", "failed": "failed", "skipped": "skipped"}
+
+
 async def _with_names(db, docs: list[dict]) -> list[dict]:
     """Wer zuständig ist, wer geantwortet hat: Namen werden beim Lesen aufgelöst - nach einer Kontolöschung steht dort
     der Name des gelöschten Kontos, nie eine Kopie (#2131)."""
@@ -225,11 +233,16 @@ async def _with_names(db, docs: list[dict]) -> list[dict]:
     if ids:
         async for user in db.users.find({"id": {"$in": ids}}, {"_id": 0, "id": 1, "display_name": 1, "username": 1}):
             names[user["id"]] = user.get("display_name") or user.get("username") or ""
+    # Ob die Antwort hinausging, weiß der Auftrag in der Warteschlange: „beantwortet“ allein täuscht, wenn die Mail scheitert.
+    keys = {_reply_key(doc["id"], reply) for doc in docs for reply in doc.get("replies") or []}
+    jobs = {row["dedupe_key"]: row.get("status") for row in await db.mail_jobs.find({"dedupe_key": {"$in": sorted(keys)}}, {"_id": 0, "dedupe_key": 1, "status": 1}).to_list(None)} if keys else {}
     for doc in docs:
         doc["assigned_to_name"] = names.get(doc.get("assigned_to") or "")
         doc["answered_by_name"] = names.get(doc.get("answered_by") or "")
         for reply in doc.get("replies") or []:
             reply["by_name"] = names.get(reply.get("by") or "")
+            # Versendete Aufträge räumt die Warteschlange nach einiger Zeit weg: dann steht hier nichts mehr.
+            reply["delivery"] = REPLY_DELIVERY.get(jobs.get(_reply_key(doc["id"], reply)))
     return docs
 
 
@@ -351,7 +364,7 @@ async def _send_reply(doc: dict, reply: dict) -> None:
         ),
     )
     await mail_outbox.enqueue_mail(to=doc["email"], subject=subject, html=html, template_key="contact_reply", meta={"contact_id": doc["id"]},
-                                   dedupe_key=f"contact:{doc['id']}:reply:{reply['request_id']}")
+                                   dedupe_key=_reply_key(doc["id"], reply))
 
 
 @contact_router.post("/{cid}/reply")

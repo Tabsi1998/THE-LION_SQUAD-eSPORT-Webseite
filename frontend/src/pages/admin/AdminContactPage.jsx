@@ -61,6 +61,14 @@ function SpamCounter({ stats }) {
   );
 }
 
+// Was aus der Mail wurde: „Beantwortet“ heißt nur, dass jemand geantwortet hat - nicht, dass es angekommen ist.
+const REPLY_DELIVERY = {
+  waiting: { text: "wartet auf den Versand", tone: "text-white/60" },
+  sent: { text: "versendet", tone: "text-ok" },
+  failed: { text: "Versand gescheitert – die Person hat nichts bekommen", tone: "text-live" },
+  skipped: { text: "nicht versendet – der Mailversand ist aus", tone: "text-warn" },
+};
+
 // Der Verlauf einer Anfrage (#2131): wer wann geantwortet hat und mit welchem Wortlaut.
 function ReplyHistory({ message }) {
   const replies = message.replies || [];
@@ -75,7 +83,10 @@ function ReplyHistory({ message }) {
       <ol className="space-y-3">
         {replies.map((reply) => (
           <li key={reply.id} className="border-l-2 border-ok/40 pl-3" data-testid={`contact-reply-${reply.id}`}>
-            <div className="text-xs text-white/50">Antwort von {reply.by_name || "der Verwaltung"} · {viennaDateTime(reply.at)}</div>
+            <div className="text-xs text-white/50">
+              Antwort von {reply.by_name || "der Verwaltung"} · {viennaDateTime(reply.at)}
+              {REPLY_DELIVERY[reply.delivery] && <span className={REPLY_DELIVERY[reply.delivery].tone} data-testid={`contact-reply-delivery-${reply.id}`}> · {REPLY_DELIVERY[reply.delivery].text}</span>}
+            </div>
             <pre className="mt-1 whitespace-pre-wrap text-sm text-white/85 font-sans leading-relaxed">{reply.text}</pre>
           </li>
         ))}

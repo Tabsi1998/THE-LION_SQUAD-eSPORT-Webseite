@@ -116,6 +116,20 @@ test("„Kein Spam“ ordnet die Nachricht ein", async () => {
   expect(screen.getByTestId("contact-reply-form")).toBeInTheDocument();
 });
 
+test("der Verlauf sagt, was aus der Mail wurde", async () => {
+  const reply = (id, delivery) => ({ id, text: "Hallo", by_name: "Vera", at: "2026-10-27T12:00:00Z", delivery });
+  ROWS.open = [{ ...HUMAN, status: "answered", replies: [reply("r1", "sent"), reply("r2", "failed"), reply("r3", "skipped"), reply("r4", "waiting"), reply("r5", null)] }];
+  const user = userEvent.setup();
+  render(<AdminContactPage />);
+  await user.click(await screen.findByTestId("contact-row-m1"));
+  expect(screen.getByTestId("contact-reply-delivery-r1")).toHaveTextContent("versendet");
+  expect(screen.getByTestId("contact-reply-delivery-r2")).toHaveTextContent("Versand gescheitert");
+  expect(screen.getByTestId("contact-reply-delivery-r3")).toHaveTextContent("der Mailversand ist aus");
+  expect(screen.getByTestId("contact-reply-delivery-r4")).toHaveTextContent("wartet auf den Versand");
+  expect(screen.queryByTestId("contact-reply-delivery-r5")).toBeNull();
+  ROWS.open = [HUMAN];
+});
+
 test("die Notiz speichert nur bei einer Änderung und meldet sich als Notiz", async () => {
   apiMock.patch.mockResolvedValue({ data: { ...HUMAN, internal_note: "alt und neu" } });
   const user = userEvent.setup();
