@@ -16,7 +16,7 @@ from services.access_links import hash_access_token, new_access_token  # noqa: E
 from squad_world import make_team  # noqa: E402
 
 NOTE = "Passt nach der Arbeit"
-INTERNAL = ("note", "actor", "actor_user_id", "decision_note", "decision_user_id")
+OUTSIDE_FIELDS = {"scheduled_at", "status", "actor_registration_id"}
 
 
 @pytest_asyncio.fixture
@@ -56,8 +56,9 @@ async def test_people_outside_the_match_see_only_when_and_status(flow):
         page, listed = await proposals_as(flow, url, viewer)
         for rows in (page, listed):
             assert len(rows) == 1
+            assert set(rows[0]) == OUTSIDE_FIELDS
             assert rows[0]["scheduled_at"] and rows[0]["status"] == "pending"
-            assert not set(INTERNAL) & set(rows[0]), rows[0]
+            assert rows[0]["actor_registration_id"] == world["reg_a"]["id"]
 
 
 @pytest.mark.asyncio
@@ -67,7 +68,7 @@ async def test_a_decision_stays_inside_too(flow):
     flow.act_as(world["users"]["Falke1"])
     assert (await flow.post(f"{url}/schedule-proposals/{proposal}/decision", json={"action": "decline", "note": "Passt nicht"})).status_code == 200
     page, _listed = await proposals_as(flow, url, None)
-    assert not set(INTERNAL) & set(page[0])
+    assert set(page[0]) == OUTSIDE_FIELDS and page[0]["status"] == "declined"
 
 
 @pytest.mark.asyncio
@@ -85,6 +86,20 @@ async def test_the_lead_sees_note_and_person(flow):
     url, _proposal = await with_proposal(flow, world)
     page, _listed = await proposals_as(flow, url, world["staff"])
     assert page[0]["note"] == NOTE and page[0]["actor_user_id"] == world["users"]["Kapitaen"]["id"]
+
+
+@pytest.mark.asyncio
+async def test_a_helper_who_may_act_only_at_the_station_keeps_the_proposal_id(flow):
+    """Wer antworten darf, braucht die Kennung für die Antwort - auch mit einem Einsatz nur an der Station des Spiels."""
+    world = await league_world(flow)
+    url, proposal = await with_proposal(flow, world)
+    helper = await flow.add_user(name="Stationshilfe")
+    await flow.db.matches_v2.update_one({"id": world["match"]["id"]}, {"$set": {"station_id": "station-1"}})
+    await flow.db.tournament_staff_assignments.insert_one({
+        "id": new_id(), "tournament_id": world["tournament"]["id"], "user_id": helper["id"], "role": "station_manager",
+        "scope": "station", "scope_id": "station-1", "is_active": True})
+    page, _listed = await proposals_as(flow, url, helper)
+    assert page[0]["id"] == proposal
 
 
 # ---------------------------------------------------------------- Eingabegrenzen

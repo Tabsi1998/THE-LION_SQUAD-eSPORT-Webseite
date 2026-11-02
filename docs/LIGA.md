@@ -368,7 +368,7 @@ Meldung mit gleichem Stand → angenommen; abweichender Stand ohne `games` → e
 | Season-Stand | Start der ersten Staffel: `draft` → `active`, nur aus dem Entwurf und nur, wenn keine andere Staffel gestartet ist | `league_service.season_follows_first_staffel` |
 | Staffelgröße | Schätzung für Format `league` mit `round_robin_legs`: n·(n−1)/2·Runden statt Zweierpotenz | `tournament_common._estimated_match_count` |
 | Standardtermin | Nie in einer Sperrzeit: nächster freier Tag der Woche zur selben Uhrzeit, sonst der letzte davor, sonst kein Termin und `schedule_hint` im Plan | `matchday_schedule.default_time_for` |
-| Anmeldung, Spiel-Antworten | Eine Staffel hat auf keinem Weg eine Selbstanmeldung; `schedule_proposals` an Unbeteiligte nur mit Termin und Stand; Notizen höchstens 500, Einspruch höchstens 1000 Zeichen | `self_register`, `access_link_routes`, `_match_page_payload`, `models.py` |
+| Anmeldung, Spiel-Antworten | Eine Staffel hat auf keinem Weg eine Selbstanmeldung; `schedule_proposals` an Unbeteiligte nur mit `scheduled_at`, `status`, `actor_registration_id`; Notizen höchstens 500, Einspruch höchstens 1000 Zeichen | `self_register`, `access_link_routes`, `_match_page_payload`, `models.py` |
 
 ## 7. Nebenwirkungen „Staffel = Turnier“ (Worker A, P1)
 

@@ -632,6 +632,9 @@ async def _squad_player_of_match(db, match: dict, user: dict | None) -> bool:
     return bool(member_reg and member_reg.get("squad_id"))
 
 
+OUTSIDE_PROPOSAL_FIELDS = ("scheduled_at", "status", "actor_registration_id")
+
+
 async def _match_page_payload(match: dict, collection: str, user: dict | None = None) -> dict:
     db = get_db()
     match = await _refresh_schedule_escalation(match, collection)
@@ -646,17 +649,17 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         {"match_id": match["id"]},
         {"_id": 0},
     ).sort("created_at", -1).to_list(50)
-    # Termin und Stand sieht, wer das Spiel sieht; Notiz und Person nur, wer dazugehört, und die Leitung (#2201).
+    # Alle Felder bekommt, wer dazugehört oder das Spiel leitet (darin steckt jeder, der handeln darf: ``_can_act_for_match``
+    # verlangt Rollen, die ``_can_read_match`` mitzählt) - alle anderen nur Termin, Stand und Seite (#2201).
     involved = bool(user) and (await _can_read_match(match, user)
                                or bool(await _member_registration_for_match(db, match, user.get("id"))))
-    actors = await _public_user_map(list({p.get("actor_user_id") for p in proposals if p.get("actor_user_id")})) if involved else {}
-    for proposal in proposals:
-        proposal.pop("match_collection", None)
-        if involved:
+    if involved:
+        actors = await _public_user_map(list({p.get("actor_user_id") for p in proposals if p.get("actor_user_id")}))
+        for proposal in proposals:
+            proposal.pop("match_collection", None)
             proposal["actor"] = actors.get(proposal.get("actor_user_id"))
-        else:
-            for key in ("note", "actor_user_id", "decision_note", "decision_user_id"):
-                proposal.pop(key, None)
+    else:
+        proposals = [{key: proposal.get(key) for key in OUTSIDE_PROPOSAL_FIELDS} for proposal in proposals]
     acting_reg = await _acting_registration_for_match(match, user)
     policy = _match_policy(match, tournament, stage)
     can_submit_result = await _can_submit_result_for_match(match, user)
