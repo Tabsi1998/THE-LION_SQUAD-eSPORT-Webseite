@@ -311,7 +311,8 @@ async def test_deleting_by_hand_also_takes_the_copies(flow):
     await flow.db.mail_jobs.insert_one({"id": "j", "to": "paula@example.test", "subject": "Betreff a", "template_key": "contact_autoreply", "meta": {"contact_id": "a"}})
     await flow.db.email_logs.insert_one({"id": "l", "to": "paula@example.test", "subject": "Betreff a", "template_key": "contact_autoreply"})
     flow.act_as(await club_person(flow))
-    assert (await flow.delete("/api/contact/a")).status_code == 200
+    gone = await flow.delete("/api/contact/a")
+    assert gone.status_code == 200
     assert await flow.db.mail_jobs.count_documents({}) == 0 and await flow.db.email_logs.count_documents({}) == 0
 
 

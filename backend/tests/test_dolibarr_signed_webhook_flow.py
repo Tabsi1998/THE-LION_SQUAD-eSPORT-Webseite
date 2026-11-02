@@ -359,7 +359,8 @@ async def test_fields_in_the_interface_only_for_system_and_nothing_about_the_sec
 
     flow.act_as(club)
     assert (await flow.put("/api/admin/dolibarr/settings", json={"signed_webhook_key_id": KEY_ID, "signed_webhook_secret": SECRET})).status_code == 403
-    assert (await flow.delete("/api/admin/dolibarr/settings/signed-webhook")).status_code == 403
+    refused = await flow.delete("/api/admin/dolibarr/settings/signed-webhook")
+    assert refused.status_code == 403
 
     flow.act_as(admin)
     alone = await flow.put("/api/admin/dolibarr/settings", json={"signed_webhook_secret": SECRET})

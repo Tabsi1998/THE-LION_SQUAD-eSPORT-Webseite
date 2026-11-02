@@ -1,6 +1,6 @@
 import { Component, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { AlertTriangle, ClipboardCopy, Home, RefreshCw, X } from "lucide-react";
+import { AlertTriangle, Bug, ClipboardCopy, Home, RefreshCw, X } from "lucide-react";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { LoadNotice } from "@/components/tls/LoadState";
 import { useOptionalAuth } from "@/context/AuthContext";
@@ -138,6 +138,14 @@ function ErrorCard({ error, report }) {
           className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-4 py-2 font-bold uppercase tracking-wider rounded-sm text-xs"
         >
           <Home className="w-4 h-4" /> Startseite
+        </Link>
+        {/* Fehler melden (#2131): mit der Seite - nur der Pfad, ohne Abfrage. */}
+        <Link
+          to={`/contact?topic=report_bug&subject=${encodeURIComponent("Fehler auf der Website")}&from=${encodeURIComponent(String(report?.path || "/").split(/[?#]/)[0])}`}
+          data-testid="page-error-report"
+          className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-4 py-2 font-bold uppercase tracking-wider rounded-sm text-xs"
+        >
+          <Bug className="w-4 h-4" /> Fehler melden
         </Link>
       </div>
       {isAdmin ? <TechnicalDetails error={error} report={report} canSeeLogs={Boolean(auth?.can?.("system"))} /> : null}
