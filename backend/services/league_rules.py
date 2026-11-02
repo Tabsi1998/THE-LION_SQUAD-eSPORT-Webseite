@@ -68,13 +68,11 @@ def _upcoming(rows: list[dict]) -> dict | None:
     return next((row for row in rows if str(row.get("valid_from") or "") > today), None)
 
 
-async def _chain(db, league: dict, season: dict | None) -> dict:
-    """Alles, was auf einer Seite gilt und vergleichbar ist. Auf einer Season: die eigenen Fassungen und die der Liga bis zur
+def _chain_of(league_rows: list[dict], own: list[dict] | None) -> dict:
+    """Alles, was auf einer Seite gilt und vergleichbar ist. Auf einer Season (``own``): die eigenen Fassungen und die der Liga bis zur
     ersten eigenen gültigen - danach betrifft die Liga diese Season nicht mehr."""
-    league_rows = await _published(db, LEAGUE, league["id"])
-    if not season:
+    if own is None:
         return {"rows": league_rows, "current": _current(league_rows), "upcoming": _upcoming(league_rows)}
-    own = await _published(db, SEASON, season["id"])
     today = _today()
     first_own = next((row for row in own if str(row.get("valid_from") or "") <= today), None)
     if first_own:
@@ -85,6 +83,11 @@ async def _chain(db, league: dict, season: dict | None) -> dict:
     current = _current(own) or _current(inherited)
     upcoming = _upcoming(own) or (None if first_own else _upcoming(inherited))
     return {"rows": rows, "current": current, "upcoming": upcoming}
+
+
+async def _chain(db, league: dict, season: dict | None) -> dict:
+    league_rows = await _published(db, LEAGUE, league["id"])
+    return _chain_of(league_rows, await _published(db, SEASON, season["id"]) if season else None)
 
 
 def _frozen_values(version: dict, season: dict | None) -> dict[str, str]:
@@ -614,28 +617,66 @@ async def give_consent(db, version_id: str, season_id: str, squad_id: str, user:
     return {**doc, "replay": False}
 
 
+async def _by_id(collection, ids, query: dict | None = None, projection: dict | None = None) -> dict[str, dict]:
+    rows = await collection.find({"id": {"$in": sorted(ids)}, **(query or {})}, projection or {"_id": 0}).to_list(None)
+    return {row["id"]: row for row in rows}
+
+
 async def own_consent_tasks(db, user: dict, registrations: list[dict]) -> list[dict]:
-    """Aufgabe „Regeln zustimmen“ für die Verantwortlichen - nur, wenn sie die Season auch sehen. Der Stand kommt jedes Mal frisch."""
-    squad_rows = [row for row in registrations if row.get("squad_id")]
+    """Aufgabe „Regeln zustimmen“ für die Verantwortlichen - nur, wenn sie die Season auch sehen. Läuft bei jedem Aufruf der Startseite,
+    darum alles gesammelt: Die Zahl der Abfragen hängt nicht an der Zahl der Seasons, und der Text der Fassungen bleibt in der Datenbank."""
+    squad_rows = [row for row in registrations if row.get("squad_id") and row.get("team_id")]
     if not squad_rows:
         return []
-    tournaments = await db.tournaments.find({"id": {"$in": sorted({row["tournament_id"] for row in squad_rows})}, **ONLY_LEAGUE},
-                                            {"_id": 0, "id": 1, "league_context": 1}).to_list(None)
-    season_of = {row["id"]: row["league_context"].get("season_id") for row in tournaments}
+    tournaments = await _by_id(db.tournaments, {row["tournament_id"] for row in squad_rows}, ONLY_LEAGUE, {"_id": 0, "id": 1, "league_context": 1})
+    season_of = {row["id"]: tournaments[row["tournament_id"]]["league_context"].get("season_id")
+                 for row in squad_rows if row["tournament_id"] in tournaments}
+    if not season_of:
+        return []
+    seasons = await _by_id(db.league_seasons, {value for value in season_of.values() if value}, {"status": {"$nin": ["archived", "completed"]}})
+    # Was jemand sehen darf, hängt nur an der Sichtbarkeit - je Wert einmal fragen.
+    allowed: dict[str | None, bool] = {}
+    for season in seasons.values():
+        visibility = season.get("visibility")
+        if visibility not in allowed:
+            allowed[visibility] = await leagues.can_see_season(user, season)
+    seasons = {key: season for key, season in seasons.items() if allowed[season.get("visibility")]}
+    league_rows = await _by_id(db.leagues, {season.get("league_id") for season in seasons.values()}, {"status": "active"})
+    seasons = {key: season for key, season in seasons.items() if season.get("league_id") in league_rows}
+    if not seasons:
+        return []
+
+    versions = await db.league_rules.find(
+        {"status": PUBLISHED, "$or": [{"scope": SEASON, "scope_id": {"$in": sorted(seasons)}}, {"scope": LEAGUE, "scope_id": {"$in": sorted(league_rows)}}]},
+        {"_id": 0, "body_md": 0, "annexes": 0, "frozen": 0}).sort("version", 1).to_list(None)
+    chains = {}
+    for season_id, season in seasons.items():
+        chains[season_id] = _chain_of([row for row in versions if row["scope"] == LEAGUE and row["scope_id"] == season.get("league_id")],
+                                      [row for row in versions if row["scope"] == SEASON and row["scope_id"] == season_id])
+    demands = {season_id: _demand(chain) for season_id, chain in chains.items()}
+    mine = [row for row in squad_rows if demands.get(season_of.get(row["id"]))]
+    if not mine:
+        return []
+    teams = await teams_by_id(db, mine)
+    mine = [row for row in mine if user["id"] in responsible_ids(row, teams.get(row.get("team_id") or ""))]
+    if not mine:
+        return []
+    agreed = {(row["season_id"], row["squad_id"], row["rule_version_id"]) for row in await db.league_rule_consents.find(
+        {"season_id": {"$in": sorted(demands)}, "squad_id": {"$in": sorted({row["squad_id"] for row in mine})}},
+        {"_id": 0, "season_id": 1, "squad_id": 1, "rule_version_id": 1}).to_list(None)}
+    squads = await _by_id(db.team_squads, {row["squad_id"] for row in mine}, None, {"_id": 0, "id": 1, "name": 1})
+
     tasks: list[dict] = []
-    for season_id in sorted({value for value in season_of.values() if value}):
-        season = await db.league_seasons.find_one({"id": season_id}, {"_id": 0})
-        if not season or season.get("status") in ("archived", "completed") or not await leagues.can_see_season(user, season):
+    for row in sorted(mine, key=lambda item: (season_of[item["id"]], item["squad_id"])):
+        season_id = season_of[row["id"]]
+        covers = _covers(demands[season_id], chains[season_id])
+        if any((season_id, row["squad_id"], version_id) in agreed for version_id in covers):
             continue
-        league = await db.leagues.find_one({"id": season.get("league_id"), "status": "active"}, {"_id": 0})
-        if not league:
-            continue
-        consent = await consent_view(db, league, season, await _chain(db, league, season), user)
-        for row in (consent or {}).get("squads") or []:
-            if not row["agreed"]:
-                tasks.append({"task": "rules_consent", "season_id": season_id, "squad_id": row["squad_id"],
-                              "squad_name": row["squad_name"], "version_label": consent["label"],
-                              "title": f"{league.get('name')} {season.get('name')}", "rules_url": page_path(league, season)})
+        season, league = seasons[season_id], league_rows[seasons[season_id]["league_id"]]
+        tasks.append({"task": "rules_consent", "season_id": season_id, "squad_id": row["squad_id"],
+                      "squad_name": (squads.get(row["squad_id"]) or {}).get("name") or row.get("squad_name"),
+                      "version_label": _label(chains[season_id]["current"]),
+                      "title": f"{league.get('name')} {season.get('name')}", "rules_url": page_path(league, season)})
     return tasks
 
 
