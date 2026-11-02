@@ -50,6 +50,15 @@ def parse_csv(response) -> list[dict]:
     return list(csv.DictReader(io.StringIO(response.text.lstrip("﻿")), delimiter=";"))
 
 
+def test_without_the_payment_list_a_credit_note_is_no_payment():
+    """Fehlt das Recht auf die Zahlungen, gilt Summe minus Rest - eine angewendete Gutschrift darf davon nicht erstattbar werden."""
+    order = {"total_cents": 4000, "remaining_cents": 2000, "payment_state": "paid_reduced", "credit_notes": [{"total_cents": 1000, "status": "validated"}]}
+    assert billing_orders.paid_cents(order) == 1000
+    assert billing_orders.paid_cents({**order, "credit_notes": [{"total_cents": 1000, "status": "draft"}]}) == 2000, "ein Entwurf gleicht noch nichts aus"
+    assert billing_orders.paid_cents({**order, "credit_notes": [{"total_cents": 3000, "status": "validated"}]}) == 0, "nie unter null"
+    assert billing_orders.paid_cents({"total_cents": 4000, "remaining_cents": 1000}) == 3000, "ohne Gutschrift wie bisher"
+
+
 def test_payment_state_recognizes_a_paid_invoice_with_a_rest():
     state = dolibarr_billing.payment_state_for
     assert state("paid", 4000, 2000, "") == "paid_reduced"

@@ -9,7 +9,8 @@ from __future__ import annotations
 
 def paid_cents(order: dict, payments: list[dict] | None = None) -> int:
     """Was laut Dolibarr an Geld gekommen ist: die Summe der gebuchten Zahlungen. Eine Gutschrift
-    ist keine Zahlung. Kennt die Website die Zahlungen nicht (Recht fehlt), gilt Summe minus Rest."""
+    ist keine Zahlung. Kennt die Website die Zahlungen nicht (Recht fehlt), gilt Summe minus Rest
+    minus Gutschriften - lieber zu wenig als eine Gutschrift, die sich erstatten lässt (#2226)."""
     payments = order.get("payments") if payments is None else payments
     if payments is not None:
         return sum(int(row.get("amount_cents") or 0) for row in payments)
@@ -17,7 +18,7 @@ def paid_cents(order: dict, payments: list[dict] | None = None) -> int:
     remaining = order.get("remaining_cents")
     if remaining is None:
         return total if order.get("paid") else 0
-    return max(0, total - int(remaining))
+    return max(0, total - int(remaining) - max(0, credited_cents(order)))
 
 
 def waived_cents(order: dict) -> int:
