@@ -36,6 +36,16 @@ def test_the_season_lies_ahead_whatever_the_date(today):
     assert (date.fromisoformat(pause["end_date"]) - start).days == 54
 
 
+@pytest.mark.parametrize("env", [{}, {"ABNAHME_PROJECT": " "}, {"ABNAHME_PROJECT": "lsw-abnahme"}])
+def test_a_job_never_targets_the_shared_stack(env):
+    with pytest.raises(SystemExit):
+        load().guard_job_project(env)
+
+
+def test_a_job_runs_on_an_own_stack():
+    load().guard_job_project({"ABNAHME_PROJECT": "lsw-abnahme-2200"})
+
+
 def test_a_local_acceptance_stack_is_fine():
     load().guard_environment(GOOD)
     load().guard_environment({**GOOD, "DB_NAME": "tls_abnahme_2"})

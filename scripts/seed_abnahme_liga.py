@@ -51,7 +51,8 @@ from datetime import date, datetime, timedelta, timezone
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
-PROJECT = os.environ.get("ABNAHME_PROJECT", "lsw-abnahme")
+SHARED_PROJECT = "lsw-abnahme"
+PROJECT = os.environ.get("ABNAHME_PROJECT", SHARED_PROJECT)
 # Eigene Konten (liga-…), damit dieser Seed die Zugänge der anderen Seeds nie überschreibt.
 ACCOUNTS = {
     "admin": {"email": "liga-admin@abnahme.lionsquad.at", "display_name": "Liga Admin", "role": "superadmin", "mfa": True},
@@ -114,8 +115,18 @@ def compose_command(root: pathlib.Path) -> tuple[list[str], pathlib.Path]:
              "-f", str(compose_dir / "docker-compose.yml"), "-f", str(compose_dir / "docker-compose.abnahme.yml")], compose_dir)
 
 
+def guard_job_project(env) -> None:
+    """Ein Job verändert Spiele: nie auf den gemeinsamen Stand zielen - auch nicht aus Versehen, weil der Name fehlt."""
+    project = str(env.get("ABNAHME_PROJECT") or "").strip()
+    if not project:
+        raise SystemExit("--job braucht ABNAHME_PROJECT (der eigene Abnahme-Stand) - Abbruch.")
+    if project == SHARED_PROJECT:
+        raise SystemExit(f"{SHARED_PROJECT} ist der gemeinsame Stand, dort läuft kein --job - Abbruch.")
+
+
 def host_job(arguments: list[str]) -> int:
     """Einen zeitgesteuerten Lauf einmal im Backend-Container anstoßen - gezielt für eine Staffel, nicht für den Stand."""
+    guard_job_project(os.environ)
     compose, compose_dir = compose_command(pathlib.Path(__file__).resolve().parents[1])
     source = pathlib.Path(__file__).read_text(encoding="utf-8")
     completed = subprocess.run([*compose, "exec", "-T", "backend", "python", "-", "--inside-job", *arguments], input=source,
@@ -342,6 +353,16 @@ async def ensure_maps(admin: Session, game: dict) -> dict:
     return maps
 
 
+async def refresh_season(admin: Session, season: dict, fields: dict) -> None:
+    """Die Vorgaben einer Season wieder auf den Stand des Seeds. Die Tage bleiben, solange der Start noch vor uns liegt: Ein
+    zweiter Aufruf in derselben Woche ändert nichts daran. Sonst rücken sie vor - die Staffel trägt die geltenden Werte, eine
+    Staffel im Entwurf rückt mit, eine gestartete bleibt (docs/LIGA.md, Abschnitt 1)."""
+    still_ahead = str(season.get("start_date") or "")[:10] > datetime.now(ZoneInfo("Europe/Vienna")).date().isoformat()
+    await admin.call("PATCH", f"/api/admin/leagues/seasons/{season['id']}", json=fields if still_ahead else {**fields, **season_dates()})
+    if not still_ahead:
+        await admin.call("POST", f"/api/admin/leagues/seasons/{season['id']}/sync", json={})
+
+
 async def ensure_league(admin: Session, game: dict, maps: dict) -> tuple[dict, dict, dict, dict]:
     listing = await admin.call("GET", "/api/admin/leagues")
     league = next((row for row in listing["leagues"] if row.get("game_id") == game["id"] and row.get("name") == LEAGUE_NAME), None)
@@ -349,18 +370,12 @@ async def ensure_league(admin: Session, game: dict, maps: dict) -> tuple[dict, d
         league = await admin.call("POST", "/api/admin/leagues", json={"name": LEAGUE_NAME, "game_id": game["id"]})
         league["seasons"] = []
     season = next((row for row in league.get("seasons") or [] if row.get("number") == 1), None)
-    dates = season_dates()
     if season:
-        # Wieder auf den Stand des Seeds - auch die Sichtbarkeit (die schaltet der Obmann in der Abnahme selbst). Die Tage
-        # bleiben, solange der Start noch vor uns liegt: Ein zweiter Aufruf in derselben Woche ändert nichts daran.
-        still_ahead = str(season.get("start_date") or "")[:10] > datetime.now(ZoneInfo("Europe/Vienna")).date().isoformat()
-        await admin.call("PATCH", f"/api/admin/leagues/seasons/{season['id']}", json=SEASON if still_ahead else {**SEASON, **dates})
-        if not still_ahead:
-            # Die Staffel trägt die geltenden Werte: Eine Staffel im Entwurf rückt mit, eine gestartete bleibt (LIGA.md, 1).
-            await admin.call("POST", f"/api/admin/leagues/seasons/{season['id']}/sync", json={})
+        # Wieder auf den Stand des Seeds - auch die Sichtbarkeit (die schaltet der Obmann in der Abnahme selbst).
+        await refresh_season(admin, season, SEASON)
     else:
-        season = await admin.call("POST", f"/api/admin/leagues/{league['id']}/seasons", json={**SEASON, **dates, "number": 1})
-    view =await admin.call("GET", f"/api/admin/leagues/seasons/{season['id']}")
+        season = await admin.call("POST", f"/api/admin/leagues/{league['id']}/seasons", json={**SEASON, **season_dates(), "number": 1})
+    view = await admin.call("GET", f"/api/admin/leagues/seasons/{season['id']}")
     if not view.get("map_pool"):
         await admin.call("PUT", f"/api/admin/leagues/seasons/{season['id']}/map-pool", json={"modes": [
             {"mode": mode, "map_ids": [maps[name]["id"] for name in names]} for mode, names in POOL.items()]})
@@ -411,6 +426,7 @@ async def ensure_ablauf(admin: Session, db, game: dict, maps: dict, squads: list
         draft = next((row for row in rows if row.get("status") == "draft"), None)
         if draft:
             tid, season = draft["tournament_id"], view["season"]
+            await refresh_season(admin, season, ABLAUF_SEASON)
     if not tid:
         # Eigener Slug: Die Verwaltung führt je Season einen Link „season-link-<slug>“, die lesende Spec sucht „season-1“.
         number = int((newest or {}).get("number") or 0) + 1
@@ -478,7 +494,7 @@ async def inside_main() -> None:
     # Der Ablauf spielt mit mehreren Captains (#2200) - je Co-Team ein Zugang, Reihenfolge wie in state["teams"].
     for index, row in enumerate(squads):
         state["accounts"][f"captain-{index}"] = {"email": by_id[row["squad"]["captain_id"]]["email"], "password": password, "totp": None}
-    print(f"Liga:{league['name']} / {season.get('name')} / Liga {division.get('level')} / Staffel A "
+    print(f"Liga: {league['name']} /{season.get('name')} / Liga {division.get('level')} / Staffel A "
           f"({tournament.get('status')}), {len(squads)} Co-Teams zugeteilt. Ligaseite: /liga/{league['slug']}/{season['slug']}")
     print("ABNAHME-STATE " + json.dumps(state, ensure_ascii=False))
 

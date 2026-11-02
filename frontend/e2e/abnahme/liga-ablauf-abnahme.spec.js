@@ -170,7 +170,7 @@ test.describe("Abnahme: Liga-Ablauf gegen den echten Server", () => {
       await noSideScroll(away.page);
       await shot(away.page, `ablauf-termin-${width}.png`);
       const reminded = runJob("match_reminders");
-      expect(reminded.notifications ?? reminded.queued).toBeGreaterThan(0);
+      expect(reminded.notifications).toBeGreaterThan(0);
       const inbox = await (await away.page.request.get("/api/admin/notifications")).json();
       expect(JSON.stringify(inbox)).toContain("Match startet in 10 Minuten");
 
