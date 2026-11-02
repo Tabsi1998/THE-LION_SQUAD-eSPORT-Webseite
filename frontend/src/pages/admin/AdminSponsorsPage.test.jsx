@@ -121,6 +121,13 @@ test("Archivieren und Zurückholen schalten „Aktiv“; ein Sponsor in Verwendu
   await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Dieser Sponsor wird noch verwendet: 1 Event."));
 });
 
+test("ein Satz sagt den Unterschied zu den Partnern; die Bild-Wartung ist hier weg (#2130)", async () => {
+  mockApi(SOURCE_OFF);
+  render(<MemoryRouter><AdminSponsorsPage /></MemoryRouter>);
+  expect(await screen.findByRole("link", { name: "Partner" })).toHaveAttribute("href", "/admin/partners");
+  expect(screen.queryByText("Bilder prüfen")).toBeNull();
+});
+
 test("ein Schalter: kein Vertragsstatus mehr, die Vorschau rechnet mit Schalter und Laufzeit (#2130)", async () => {
   mockApi(SOURCE_OFF);
   render(<MemoryRouter><AdminSponsorsPage /></MemoryRouter>);

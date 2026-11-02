@@ -51,9 +51,15 @@ test("Partner aus Dolibarr: „Aktiv“ gesperrt mit Hinweis, Löschen gesperrt;
   expect(screen.queryByTestId("partner-archive-p1")).toBeNull();
   expect(screen.getByTestId("partner-archive-p2")).toBeInTheDocument();
   fireEvent.click(screen.getAllByRole("button").find((button) => button.querySelector("svg.lucide-pencil")));
-  expect(screen.getByTestId("partner-locked-hint")).toHaveTextContent("Name, Art und „Aktiv“");
+  expect(screen.getByTestId("partner-locked-hint")).toHaveTextContent("Name, Art und „Öffentlich zeigen“");
   expect(screen.getByTestId("partner-active")).toBeDisabled();
   expect(screen.getByTestId("partner-description")).not.toBeDisabled();
+});
+
+test("ein Satz sagt den Unterschied zu den Sponsoren und führt hin (#2130)", async () => {
+  render(<MemoryRouter><AdminPartnersPage /></MemoryRouter>);
+  await screen.findByText("Gamers Heaven");
+  expect(screen.getByRole("link", { name: "Sponsoren" })).toHaveAttribute("href", "/admin/sponsors");
 });
 
 test("Archivieren schaltet „Aktiv“ aus, bei Partnern aus Dolibarr gibt es den Knopf nicht (#2130)", async () => {

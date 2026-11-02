@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminSheet } from "@/components/tls/AdminSheet";
@@ -103,6 +104,9 @@ export default function AdminSponsorsPage() {
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Sponsoren</h1>
           <p className="mt-2 text-white/60 text-sm max-w-xl">
             Die Stufe bestimmt Größe und Reihenfolge. Die Laufzeit und „Öffentlich zeigen“ entscheiden, ob ein Sponsor zu sehen ist, die Haken, wo.
+          </p>
+          <p className="mt-2 text-white/60 text-sm max-w-xl" data-testid="sponsor-vs-partner">
+            Sponsoren unterstützen den Verein mit Geld oder Sachleistungen. Befreundete Vereine und Veranstalter stehen unter <Link to="/admin/partners" className="text-[#29B6E8] underline-offset-2 hover:underline">Partner</Link>.
           </p>
         </div>
         <div className="flex gap-2">

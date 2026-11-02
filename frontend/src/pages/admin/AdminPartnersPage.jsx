@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminSheet } from "@/components/tls/AdminSheet";
@@ -128,6 +129,9 @@ export default function AdminPartnersPage() {
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Verein</span>
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Partner</h1>
           <p className="mt-2 text-white/60 text-sm max-w-xl">Befreundete Vereine, Veranstalter und Communitys. Jeder Partner hat eine eigene Seite mit Kanälen, Twitch-Live, Discord, Tools und gemeinsamen News.</p>
+          <p className="mt-2 text-white/60 text-sm max-w-xl" data-testid="partner-vs-sponsor">
+            Partner arbeiten mit uns zusammen und zahlen nichts dafür. Wer den Verein mit Geld oder Sachleistungen unterstützt, steht unter <Link to="/admin/sponsors" className="text-[#29B6E8] underline-offset-2 hover:underline">Sponsoren</Link>.
+          </p>
         </div>
         <button onClick={() => setEditing(emptyPartner)} data-testid="partner-new" className="px-5 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2">
           <Plus className="w-4 h-4" /> Neuer Partner
@@ -157,7 +161,7 @@ export default function AdminPartnersPage() {
               </div>
               <div className="flex gap-1 shrink-0">
                 <button onClick={() => setEditing(p)} className="p-1.5 text-white/40 hover:text-[#29B6E8]"><Pencil className="w-4 h-4" /></button>
-                {/* „Aktiv“ eines Partners aus Dolibarr führt der Abgleich - dort wird er auch archiviert. */}
+                {/* Einen Partner aus Dolibarr blendet der Abgleich ein und aus - dort wird er auch archiviert. */}
                 {!dolibarrKeepsEntry(dolibarrSource, p) && (p.is_active === false ? (
                   <button onClick={() => setArchived(p, false)} title="Zurückholen" aria-label="Partner zurückholen" data-testid={`partner-restore-${p.id}`} className="p-1.5 text-white/40 hover:text-[#29B6E8]"><ArchiveRestore className="w-4 h-4" /></button>
                 ) : (
@@ -213,7 +217,7 @@ function PartnerForm({ partner, locked = new Set(), onClose, onSaved }) {
     <AdminSheet title={isNew ? "Neuer Partner" : "Partner bearbeiten"} eyebrow="Verein" onClose={onClose} onSubmit={save} saving={saving} submitTestId="partner-save" testId="partner-sheet">
       {locked.size > 0 && (
         <p className="text-xs text-[#29B6E8] border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-3 py-2" data-testid="partner-locked-hint">
-          Dieser Partner kommt aus Dolibarr: Name, Art und „Aktiv“ werden dort gepflegt. Inaktiv wird er, wenn die Firma in Dolibarr geschlossen oder aus der Kategorie genommen wird. Alles andere bleibt hier.
+          Dieser Partner kommt aus Dolibarr: Name, Art und „Öffentlich zeigen“ werden dort gepflegt. Inaktiv wird er, wenn die Firma in Dolibarr geschlossen oder aus der Kategorie genommen wird. Alles andere bleibt hier.
         </p>
       )}
       <TextField label="Name" value={form.name} onChange={(v) => set("name", v)} required testId="partner-name" {...lock("name")} />
@@ -229,7 +233,7 @@ function PartnerForm({ partner, locked = new Set(), onClose, onSaved }) {
         <TextField label="Typ" value={form.kind} onChange={(v) => set("kind", v)} placeholder="Verein, Messe, Community" testId="partner-kind" {...lock("kind")} />
         <TextField label="Reihenfolge" type="number" value={form.order_index} onChange={(v) => set("order_index", Number(v) || 0)} testId="partner-order" />
       </FormGrid>
-      <CheckField label="Aktiv" checked={form.is_active !== false} onChange={(v) => set("is_active", v)} testId="partner-active" {...lock("is_active")} />
+      <CheckField label="Öffentlich zeigen" checked={form.is_active !== false} onChange={(v) => set("is_active", v)} testId="partner-active" {...lock("is_active")} />
       <TextAreaField label="Kurzbeschreibung" value={form.description} onChange={(v) => set("description", v)} testId="partner-description" hint="Steht in der Partnerliste und im Kopf der Partnerseite." />
 
       <FormSection title="Partnerseite" hint={`Eigene Seite unter /partners/${form.slug || "…"} – Adresse, „seit“ und der längere Text.`} plain testId="partner-page-section">
