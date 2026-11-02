@@ -462,6 +462,9 @@ async def sync_game_server(server_id: str, me: dict = Depends(require_club_admin
 
 @router.delete("/seeded-defaults")
 async def delete_seeded_default_game_servers(me: dict = Depends(require_club_admin())):
+    # Nur in Testumgebungen (#2129) - das Anlegen der Startliste sperrt runtime_config schon beim Start der Produktion.
+    if resolve_app_environment() == "production":
+        raise HTTPException(403, "Die Demo-Startliste gibt es nur in Testumgebungen.")
     db = get_db()
     res = await db.game_servers.delete_many({
         "slug": {"$in": sorted(DEMO_GAME_SERVER_SLUGS)},
