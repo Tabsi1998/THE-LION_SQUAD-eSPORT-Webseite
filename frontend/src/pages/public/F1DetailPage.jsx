@@ -174,6 +174,7 @@ export default function F1DetailPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
         {/* Freunde bei der Fast Lap (#1188 Teil 2): „dabei“ heißt hier eine gültige Zeit - eine eigene Anmeldung gibt es nicht. */}
         <FriendsAtEvent user={user} path={`/f1/challenges/${challenge.slug || challenge.id}/friends`} scope="fastlap" over={tournamentIsOver(challenge)} accessToken={accessToken} />
+        <FastLapConditions challenge={challenge} />
         {(challenge.has_live_stream || (challenge.twitch_enabled && challenge.twitch_channel)) && (
           <section data-testid="f1-stream"><StreamEmbed source={challenge} /></section>
         )}
@@ -391,6 +392,29 @@ export default function F1DetailPage() {
         )}
       </div>
     </PublicLayout>
+  );
+}
+
+// Bedingungen (#2130): was die Turnierleitung für vergleichbare Zeiten festgelegt hat - nur, was ausgefüllt ist.
+const CONDITION_FIELDS = [["vehicle", "Fahrzeug"], ["weather", "Wetter"], ["assists_allowed", "Fahrhilfen"], ["controller_type", "Controller"], ["platform", "Plattform"]];
+
+function FastLapConditions({ challenge }) {
+  const rows = CONDITION_FIELDS
+    .map(([key, label]) => [key, label, String(challenge[key] || "").trim()])
+    .filter(([, , value]) => value);
+  if (!rows.length) return null;
+  return (
+    <section data-testid="f1-conditions" className="border border-white/10 rounded-sm bg-[#121212] p-4 sm:p-5">
+      <h2 className="font-heading text-xl font-bold uppercase mb-3 flex items-center gap-2"><Flag className="w-4 h-4 text-[#29B6E8]" /> Bedingungen</h2>
+      <dl className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-x-4 gap-y-3">
+        {rows.map(([key, label, value]) => (
+          <div key={key} className="min-w-0">
+            <dt className="text-[10px] font-bold uppercase tracking-widest text-white/45">{label}</dt>
+            <dd className="mt-0.5 text-sm text-white break-words" data-testid={`f1-condition-${key}`}>{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
   );
 }
 
