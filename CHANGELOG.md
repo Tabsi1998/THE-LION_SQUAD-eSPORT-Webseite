@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.56.1 (02.11.2026)
+
+### Fehlerbehebungen
+
+* Glocke: Wackel-Timer läuft nach dem Verlassen nicht weiter
+
+## 1.56.0 (02.11.2026)
+
+### Neu
+
+* Liga: Aufgabe „Kader auffüllen“ auf der Startseite (#2202)
+* Liga: Warnung an Team und Turnierleitung, wenn ein Kader eines aktiven Co-Teams unter die Mindestgröße fällt (#2202)
+* Liga: Zu kleine Kader und gesperrte Konten in der Kaderübersicht der Season (#2202)
+* Teams: Rückfrage warnt vor zu kleinem Liga-Kader, bevor jemand geht oder entfernt wird (#2202)
+
+### Fehlerbehebungen
+
+* Liga: Dieselbe Person steht nie auf beiden Seiten eines Spiels (#2202)
+* Liga: Ein gesperrter Captain oder Vertreter zählt nicht mehr, es handelt der andere oder die Teamleitung (#2202)
+* Liga: Ein gesperrtes Konto lässt sich nicht mehr aufstellen (#2202)
+* Liga: Gleichzeitige Aufnahme in zwei Co-Teams geht nicht mehr verloren (#2202)
+* Liga: Korrektur von Altbestand auf beiden Seiten steht im Protokoll (#2202)
+* Liga: Spätere Aufnahme ins Co-Team meldet fehlende Spiel-ID und ausstehende Freigabe an Spieler und Verantwortliche (#2202)
+* Teams: Die Freigabe Turnierleitung darf öffentliche Teams und ihre Co-Teams pflegen wie die Rolle, ohne Banner (#2202)
+
 ## 1.55.3 (02.11.2026)
 
 ### Fehlerbehebungen
