@@ -633,8 +633,12 @@ async def _settle_declined(db, tournament: dict, matches, proposals, stages) -> 
             continue
         agreed = match.get("schedule_source") == "accepted"
         unset = {"schedule_deadline_at": "", "schedule_escalated_at": "", **({} if agreed else {"schedule_status": ""})}
-        await db.matches_v2.update_one({"id": match["id"]}, {
-            "$set": {"updated_at": now_iso, **({"schedule_status": "accepted"} if agreed else {})}, "$unset": unset})
+        # Nur, wenn das Spiel noch so dasteht wie gelesen: Ein neuer Vorschlag oder ein Termin der Leitung seit dem Lesen bleibt.
+        await db.matches_v2.update_one(
+            {"id": match["id"], "schedule_status": match["schedule_status"],
+             "schedule_deadline_at": match.get("schedule_deadline_at"), "scheduled_at": match["scheduled_at"]},
+            {"$set": {"updated_at": now_iso, **({"schedule_status": "accepted"} if agreed else {})}, "$unset": unset})
+        # Dieser Lauf eskaliert das Spiel so oder so nicht: Geklappt heißt erledigt, sonst sieht es der nächste Lauf neu.
         match["schedule_status"] = "accepted" if agreed else None
 
 
@@ -654,11 +658,19 @@ async def escalate_overdue_proposals(db, tournament: dict, matches) -> int:
         return 0
     staff_ids = await _tournament_staff_user_ids(db, tournament["id"])
     title = (tournament or {}).get("title") or "Turnier"
+    escalated = 0
     for match in overdue:
         now_iso = now.isoformat()
-        await db.matches_v2.update_one({"id": match["id"]}, {"$set": {
-            "schedule_status": "escalated", "schedule_escalated_at": now_iso, "updated_at": now_iso,
-        }})
+        # Nur die Frist, die der Lauf gelesen hat: Eine Antwort seit dem Lesen hat sie beendet oder erneuert - dann keine
+        # Eskalation und keine Nachricht.
+        changed = await db.matches_v2.update_one(
+            {"id": match["id"], "schedule_status": match.get("schedule_status"),
+             "schedule_deadline_at": match.get("schedule_deadline_at"), "schedule_escalated_at": None,
+             "status": match.get("status")},
+            {"$set": {"schedule_status": "escalated", "schedule_escalated_at": now_iso, "updated_at": now_iso}})
+        if not changed.matched_count:
+            continue
+        escalated += 1
         label = match.get("match_key") or match.get("round_name") or "Spiel"
         for user_id in sorted(staff_ids):
             await create_user_notification(
@@ -672,7 +684,7 @@ async def escalate_overdue_proposals(db, tournament: dict, matches) -> int:
                       "dedupe_key": f"schedule_escalation:{match.get('id')}:{match.get('schedule_deadline_at') or ''}",
                       "match_id": match.get("id"), "tournament_id": tournament.get("id")},
             )
-    return len(overdue)
+    return escalated
 
 
 async def persist_all_matchday_schedules(db, limit: int = 50) -> dict:

@@ -499,11 +499,16 @@ async def _refresh_schedule_escalation(match: dict, collection: str) -> dict:
     try:
         dt = datetime.fromisoformat(str(deadline).replace("Z", "+00:00"))
         if now_utc() > dt:
-            await get_db()[collection].update_one(
-                {"id": match["id"]},
+            # Nur die gelesene Frist: Ein neuer Vorschlag seit dem Lesen hat eine eigene (#2201).
+            changed = await get_db()[collection].update_one(
+                {"id": match["id"], "schedule_status": status, "schedule_deadline_at": deadline},
                 {"$set": {"schedule_status": "escalated", "updated_at": now_utc().isoformat()}},
             )
-            match["schedule_status"] = "escalated"
+            if changed.matched_count:
+                match["schedule_status"] = "escalated"
+            else:
+                fresh = await get_db()[collection].find_one({"id": match["id"]}, {"_id": 0})
+                return fresh or match
     except Exception:
         logger.warning("[match] Terminfrist von %s nicht geprüft", _log_safe(match.get("id")), exc_info=True)
     return match

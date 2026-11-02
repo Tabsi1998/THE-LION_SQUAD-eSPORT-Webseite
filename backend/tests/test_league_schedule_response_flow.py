@@ -16,6 +16,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from flow_harness import make_flow  # noqa: E402
 from league_match_world import world as league_world  # noqa: E402
 from models import now_utc  # noqa: E402
+from services import matchday_schedule  # noqa: E402
 from services.matchday_schedule import persist_all_matchday_schedules  # noqa: E402
 
 
@@ -282,3 +283,104 @@ async def test_a_cup_stays_declined(flow):
     assert answer.status_code == 200, answer.text
     stored = await flow.reload(match)
     assert stored["schedule_status"] == "declined" and stored["schedule_deadline_at"] == deadline
+
+
+# ---------------------------------------------------------------- Rennen: der Lauf hat gelesen, dann handelt jemand
+
+def during_the_job(monkeypatch, action) -> None:
+    """``action`` läuft genau zwischen dem Lesen des Spieltag-Laufs und seinem Schreiben von Stand und Eskalation."""
+    real = matchday_schedule.apply_schedule_writes
+    done = []
+
+    async def write_then_interleave(db, writes):
+        written = await real(db, writes)
+        if not done:
+            done.append(True)
+            await action()
+        return written
+
+    monkeypatch.setattr(matchday_schedule, "apply_schedule_writes", write_then_interleave)
+
+
+async def old_entry(flow, world, status: str) -> None:
+    await flow.db.matches_v2.update_one({"id": world["match"]["id"]}, {"$set": {
+        "schedule_status": status, "schedule_deadline_at": (now_utc() - timedelta(hours=3)).isoformat(),
+        "scheduled_at": when(1), "schedule_source": "default", "status": "scheduled"}})
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("old_status", ["declined", "escalated"])
+async def test_a_new_proposal_during_the_job_keeps_its_status_and_deadline(flow, monkeypatch, old_status):
+    world = await live_world(flow)
+    await old_entry(flow, world, old_status)
+
+    async def captain_proposes():
+        await propose(flow, world, "Falke1", 3)
+
+    during_the_job(monkeypatch, captain_proposes)
+    await persist_all_matchday_schedules(flow.db)
+    stored = await status_of(flow, world)
+    assert stored["schedule_status"] == "proposed", "der Lauf räumt keinen Vorschlag ab, den er nicht gelesen hat"
+    assert fresh_deadline(stored) and stored.get("schedule_escalated_at") is None
+    assert await escalations(flow) == [], "die neue Frist läuft noch"
+
+    # Der Vorschlag bleibt in der Pflicht: Läuft seine Frist ab, eskaliert er wie jeder andere.
+    await expire(flow, world)
+    await persist_all_matchday_schedules(flow.db)
+    assert (await status_of(flow, world))["schedule_status"] == "escalated"
+    assert await escalations(flow)
+
+
+@pytest.mark.asyncio
+async def test_a_time_set_by_the_lead_during_the_job_is_not_settled_away(flow, monkeypatch):
+    world = await live_world(flow)
+    await old_entry(flow, world, "declined")
+    target = when(4)
+
+    async def lead_sets_time():
+        flow.act_as(world["staff"])
+        answer = await flow.patch(f"/api/matches/{world['match']['id']}", json={"scheduled_at": target})
+        assert answer.status_code == 200, answer.text
+
+    during_the_job(monkeypatch, lead_sets_time)
+    await persist_all_matchday_schedules(flow.db)
+    stored = await status_of(flow, world)
+    assert stored["schedule_status"] == "declined" and stored["schedule_deadline_at"], "der gelesene Termin gilt nicht mehr"
+    assert await escalations(flow) == []
+    await persist_all_matchday_schedules(flow.db)
+    assert (await status_of(flow, world)).get("schedule_status") is None, "der nächste Lauf sieht den neuen Stand"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("answer", ["counter", "accept"])
+async def test_an_answer_during_the_job_is_not_escalated(flow, monkeypatch, answer):
+    world = await live_world(flow)
+    first = await propose(flow, world, "Kapitaen")
+    await expire(flow, world)
+
+    async def other_side_answers():
+        body = {"action": "counter", "scheduled_at": when(3)} if answer == "counter" else {"action": "accept"}
+        await decide(flow, world, "Falke1", first, **body)
+
+    during_the_job(monkeypatch, other_side_answers)
+    await persist_all_matchday_schedules(flow.db)
+    stored = await status_of(flow, world)
+    assert stored["schedule_status"] == ("proposed" if answer == "counter" else "accepted")
+    assert stored.get("schedule_escalated_at") is None
+    assert await escalations(flow) == [], "die Leitung bekommt nichts für eine Frist, die nicht mehr gilt"
+
+
+@pytest.mark.asyncio
+async def test_opening_the_page_does_not_escalate_a_proposal_that_just_got_a_new_deadline(flow):
+    from routes.match_routes import _refresh_schedule_escalation
+
+    world = await live_world(flow)
+    await propose(flow, world, "Kapitaen")
+    await expire(flow, world)
+    read_by_the_page = await status_of(flow, world)
+    await propose(flow, world, "Falke1", 3)
+
+    seen = await _refresh_schedule_escalation(dict(read_by_the_page), "matches_v2")
+    assert seen["schedule_status"] == "proposed"
+    stored = await status_of(flow, world)
+    assert stored["schedule_status"] == "proposed" and fresh_deadline(stored)
