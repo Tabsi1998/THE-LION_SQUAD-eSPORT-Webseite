@@ -1,7 +1,7 @@
 """Die eigene Turnieranmeldung ändern (#2113, L-A2): Ingame-Name, Spieler-IDs und Discord selbst korrigieren.
 
 Bisher ging das nur über die Turnierleitung. Wer die Anmeldung ändern darf: bei Einzelanmeldungen die Person selbst, bei
-Team-Anmeldungen nur die Teamleitung (Teamleitung und Co-Leitung). Bis wann: solange die Anmeldung nicht eingecheckt ist und
+Team-Anmeldungen nur Teamleitung und Co-Leitung. Bis wann: solange die Anmeldung nicht eingecheckt ist und
 der Check-in läuft oder noch kommt - danach ändert die Turnierleitung.
 
 Liga-Staffeln: die Spiel-ID einer Season steht eingefroren im Liga-Kader (``league_rosters``, #2108). Ingame-Name und IDs

@@ -109,7 +109,7 @@ async def renew_join_code(team_id: str, me: dict = Depends(get_current_user)):
     db = get_db()
     team = await _team_or_404(db, team_id)
     if not _can_manage(team, me):
-        _refuse(me, "Den Beitrittscode erneuert die Teamleitung.")
+        _refuse(me, "Den Beitrittscode erneuern Teamleitung und Co-Leitung.")
     code = await team_page.renew_join_code(db, team_id)
     await _team_audit(db, "team.join_code.renew", team_id, me["id"], {})
     return {"join_code": code}

@@ -38,7 +38,7 @@ PUSH_CHANNELS = {
     "schedule_escalation": "lion_tournaments",
     # Terminvorschlag, Antwort oder Zurückziehen der anderen Seite (#2110) - wie „Ergebnis gemeldet“.
     "match_schedule": "lion_tournaments",
-    # Team am Spieltag (#1192): „Bist du schon da?“ vom Teamleitung - ein Ruf zum Antreten.
+    # Team am Spieltag (#1192): „Bist du schon da?“ von der Teamleitung - ein Ruf zum Antreten.
     "team_presence_nudge": "lion_calls",
     # Check-in, Ergebnisse, Turnier-Updates, Gewinne, Event-Hinweise, „Wie war …?“ nach Turnier oder Event.
     "tournament_checkin": "lion_tournaments",
