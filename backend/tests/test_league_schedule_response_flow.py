@@ -178,3 +178,107 @@ async def test_a_cup_keeps_a_deadline_set_in_the_match_settings(flow):
     second = await flow.post(f"/api/matches/{match['id']}/schedule-proposals", json={"scheduled_at": when(2)})
     assert second.status_code == 200, second.text
     assert (await flow.reload(match))["schedule_deadline_at"] == fixed
+
+
+# ---------------------------------------------------------------- D-9
+
+async def status_of(flow, world) -> dict:
+    return await flow.reload(world["match"])
+
+
+@pytest.mark.asyncio
+async def test_a_decline_keeps_the_default_time_and_does_not_escalate(flow):
+    world = await live_world(flow)
+    first = await propose(flow, world, "Kapitaen")
+    await decide(flow, world, "Falke1", first, action="decline")
+    stored = await status_of(flow, world)
+    assert stored.get("schedule_status") is None, "es gilt der Standardtermin - nicht „abgelehnt“"
+    assert stored.get("schedule_deadline_at") is None
+    assert stored["schedule_source"] == "default" and stored["scheduled_at"]
+    await persist_all_matchday_schedules(flow.db)
+    assert await escalations(flow) == []
+    flow.act_as(world["users"]["Falke1"])
+    page = (await flow.get(f"/api/matches/{world['match']['id']}/page")).json()
+    assert page["match"].get("schedule_status") is None
+
+
+@pytest.mark.asyncio
+async def test_a_decline_keeps_the_agreed_time(flow):
+    world = await live_world(flow)
+    first = await propose(flow, world, "Kapitaen")
+    accepted = await decide(flow, world, "Falke1", first, action="accept")
+    second = await propose(flow, world, "Falke1", 3)
+    await decide(flow, world, "Kapitaen", second, action="decline")
+    stored = await status_of(flow, world)
+    assert stored["schedule_status"] == "accepted" and stored.get("schedule_deadline_at") is None
+    assert stored["scheduled_at"] == accepted["scheduled_at"]
+    await persist_all_matchday_schedules(flow.db)
+    assert await escalations(flow) == []
+
+
+@pytest.mark.asyncio
+async def test_a_decline_with_another_open_proposal_stays_open(flow):
+    world = await live_world(flow)
+    first = await propose(flow, world, "Kapitaen")
+    await propose(flow, world, "Falke1", 3)
+    deadline = (await status_of(flow, world))["schedule_deadline_at"]
+    await decide(flow, world, "Falke1", first, action="decline")
+    stored = await status_of(flow, world)
+    assert stored["schedule_status"] == "proposed" and stored["schedule_deadline_at"] == deadline
+
+
+@pytest.mark.asyncio
+async def test_a_decline_without_any_time_stays_declined_and_runs_out_to_the_lead(flow):
+    """Woche von einem Tag, die den Standardtag nicht enthält: Hier fehlt wirklich ein Termin."""
+    world = await live_world(flow, matchday_days=1)
+    tournament = await flow.db.tournaments.find_one({"id": world["tournament"]["id"]}, {"_id": 0})
+    start = datetime.fromisoformat(tournament["start_date"])
+    await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"default_match_weekday": (start.weekday() + 3) % 7}})
+    first = await propose(flow, world, "Kapitaen")
+    await decide(flow, world, "Falke1", first, action="decline")
+    stored = await status_of(flow, world)
+    assert stored["schedule_status"] == "declined" and stored["schedule_deadline_at"] and not stored.get("scheduled_at")
+    await expire(flow, world)
+    await persist_all_matchday_schedules(flow.db)
+    assert (await status_of(flow, world))["schedule_status"] == "escalated"
+    notes = await escalations(flow)
+    assert notes and "Bitte einen Termin festlegen" in notes[0]["body"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("old_status", ["declined", "escalated"])
+async def test_old_declined_matches_with_a_time_are_settled_by_the_job(flow, old_status):
+    """Altbestand: abgelehnt mit stehen gebliebener Frist, obwohl ein Termin gilt - keine Nachricht, kein „abgelehnt“."""
+    world = await live_world(flow)
+    await flow.db.matches_v2.update_one({"id": world["match"]["id"]}, {"$set": {
+        "schedule_status": old_status, "schedule_deadline_at": (now_utc() - timedelta(hours=3)).isoformat(),
+        "scheduled_at": when(1), "schedule_source": "default", "status": "scheduled"}})
+    await persist_all_matchday_schedules(flow.db)
+    stored = await status_of(flow, world)
+    assert stored.get("schedule_status") is None and stored.get("schedule_deadline_at") is None
+    assert await escalations(flow) == []
+
+
+@pytest.mark.asyncio
+async def test_an_open_proposal_past_its_deadline_still_escalates(flow):
+    """Regression: Ein unbeantworteter Vorschlag meldet sich weiter bei der Leitung."""
+    world = await live_world(flow)
+    await propose(flow, world, "Kapitaen")
+    await expire(flow, world)
+    await persist_all_matchday_schedules(flow.db)
+    assert (await status_of(flow, world))["schedule_status"] == "escalated"
+    assert await escalations(flow)
+
+
+@pytest.mark.asyncio
+async def test_a_cup_stays_declined(flow):
+    """Regression: Ein Pokal hat keinen Standardtermin, die Ablehnung bleibt sichtbar und die Frist stehen."""
+    match, home, away = await online_cup(flow)
+    flow.act_as(home)
+    proposal = (await flow.post(f"/api/matches/{match['id']}/schedule-proposals", json={"scheduled_at": when(1)})).json()
+    deadline = (await flow.reload(match))["schedule_deadline_at"]
+    flow.act_as(away)
+    answer = await flow.post(f"/api/matches/{match['id']}/schedule-proposals/{proposal['id']}/decision", json={"action": "decline"})
+    assert answer.status_code == 200, answer.text
+    stored = await flow.reload(match)
+    assert stored["schedule_status"] == "declined" and stored["schedule_deadline_at"] == deadline

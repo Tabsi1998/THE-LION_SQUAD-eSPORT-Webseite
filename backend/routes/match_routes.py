@@ -858,6 +858,35 @@ async def _withdraw_proposal(db, match: dict, collection: str, proposal: dict, m
     return {"ok": True, "status": "withdrawn", "idempotent_replay": False}
 
 
+async def _status_after_decline(db, match: dict, collection: str, tournament: dict | None, stage: dict | None,
+                                now_iso: str) -> None:
+    """Der Stand nach einer Ablehnung. In Spielwochen (#2201) gilt oft trotzdem ein Termin: der vereinbarte, sonst Heimrecht
+    oder Standardtermin - dann zeigt das Spiel nicht „abgelehnt“, und keine Frist meldet sich bei der Leitung. Nur wenn
+    wirklich keiner gilt, bleibt es dabei. Andere Formate kennen keinen Standardtermin und bleiben bei „abgelehnt“."""
+    from services.matchday_schedule import plays_in_matchdays
+
+    target = getattr(db, collection)
+    if not plays_in_matchdays(tournament or {}, stage):
+        await target.update_one({"id": match["id"]}, {"$set": {"schedule_status": "declined", "updated_at": now_iso}})
+        await _rewrite_matchday_schedule(db, match.get("tournament_id"))
+        return
+    if await db.match_schedule_proposals.count_documents({"match_id": match["id"], "status": "pending"}):
+        # Ein anderer Vorschlag ist noch offen: seine Frist läuft weiter.
+        await target.update_one({"id": match["id"]}, {"$set": {"schedule_status": "proposed", "updated_at": now_iso}})
+    elif await db.match_schedule_proposals.count_documents({"match_id": match["id"], "status": "accepted"}):
+        await target.update_one({"id": match["id"]}, {"$set": {"schedule_status": "accepted", "updated_at": now_iso},
+                                                      "$unset": {"schedule_deadline_at": "", "schedule_escalated_at": ""}})
+    else:
+        await target.update_one({"id": match["id"]}, {
+            "$set": {"updated_at": now_iso},
+            "$unset": {"schedule_status": "", "schedule_deadline_at": "", "schedule_escalated_at": ""}})
+    await _rewrite_matchday_schedule(db, match.get("tournament_id"))
+    fresh = await target.find_one({"id": match["id"]}, {"_id": 0, "scheduled_at": 1, "schedule_status": 1})
+    if fresh and not fresh.get("scheduled_at") and not fresh.get("schedule_status"):
+        await target.update_one({"id": match["id"]}, {"$set": {
+            "schedule_status": "declined", "schedule_deadline_at": _schedule_deadline(match, tournament), "updated_at": now_iso}})
+
+
 @router.post("/{match_id}/schedule-proposals/{proposal_id}/decision")
 async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchScheduleProposalDecision,
                                    me: dict = Depends(get_current_user),
@@ -936,8 +965,7 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
             "decision_note": normalized_note,
             "updated_at": now_iso,
         }})
-        await getattr(db, collection).update_one({"id": match_id}, {"$set": {"schedule_status": "declined", "updated_at": now_iso}})
-        await _rewrite_matchday_schedule(db, match.get("tournament_id"))
+        await _status_after_decline(db, match, collection, tournament, stage, now_iso)
         await _tell_schedule(db, match, "declined", proposal, me, (acting_reg or {}).get("id"), normalized_note)
         return {"ok": True, "status": "declined", "idempotent_replay": False}
     if not body.scheduled_at:

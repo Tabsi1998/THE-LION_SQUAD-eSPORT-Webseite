@@ -554,6 +554,10 @@ async def persist_matchday_schedule(db, tournament: dict) -> dict:
     proposals = await db.match_schedule_proposals.find({"tournament_id": tid}, {"_id": 0, "match_collection": 0}).to_list(3000)
     writes = schedule_writes(tournament, matches, proposals, stages)
     written = await apply_schedule_writes(db, writes)
+    by_id = {match.get("id"): match for match in matches}
+    for write in writes:
+        by_id[write["match_id"]].update(write["update"])
+    await _settle_declined(db, tournament, matches, proposals, stages)
     escalated = await escalate_overdue_proposals(db, tournament, matches)
     return {"applies": True, "written": written, "escalated": escalated}
 
@@ -578,6 +582,26 @@ async def _tournament_staff_user_ids(db, tournament_id: str) -> set[str]:
     ).to_list(200)
     ids.update(row.get("user_id") for row in assignments if row.get("user_id"))
     return ids
+
+
+async def _settle_declined(db, tournament: dict, matches, proposals, stages) -> None:
+    """Altbestand (#2201): „abgelehnt“ oder eskaliert, nichts mehr offen und trotzdem ein Termin - das meldet sich nicht
+    mehr bei der Leitung und zeigt den geltenden Termin nicht als abgelehnt. Die Ablehnung selbst schreibt das sofort."""
+    open_ids = {(row or {}).get("match_id") for row in proposals or [] if (row or {}).get("status") == "pending"}
+    stage_by_id = {(stage or {}).get("id"): stage for stage in stages or []}
+    now_iso = datetime.now(timezone.utc).isoformat()
+    for match in matches or []:
+        if match.get("schedule_status") not in {"declined", "escalated"} or match.get("id") in open_ids:
+            continue
+        if not match.get("scheduled_at") or match.get("status") in FROZEN_MATCH_STATUSES:
+            continue
+        if not plays_in_matchdays(tournament, stage_by_id.get(match.get("stage_id"))):
+            continue
+        agreed = match.get("schedule_source") == "accepted"
+        unset = {"schedule_deadline_at": "", "schedule_escalated_at": "", **({} if agreed else {"schedule_status": ""})}
+        await db.matches_v2.update_one({"id": match["id"]}, {
+            "$set": {"updated_at": now_iso, **({"schedule_status": "accepted"} if agreed else {})}, "$unset": unset})
+        match["schedule_status"] = "accepted" if agreed else None
 
 
 async def escalate_overdue_proposals(db, tournament: dict, matches) -> int:
