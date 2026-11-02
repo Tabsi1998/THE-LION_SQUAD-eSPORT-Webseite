@@ -133,6 +133,8 @@ async def test_images_in_rules_count_as_used_in_every_version(flow):
     from services.media_audit import iter_usages
 
     w = await make_world(flow)
+    for name in ("plan-eins.png", "karte-zwei.png"):
+        await flow.db.media_uploads.insert_one({"id": name, "filename": name, "url": f"/api/static/uploads/{name}", "media_type": "image", "media_scope": "admin"})
     await publish(flow, w, body="# A\n![Plan](/api/static/uploads/plan-eins.png)",
                   annexes=[{"title": "B", "body_md": "![Karte](/api/static/uploads/karte-zwei.png)"}])
     await publish(flow, w, body="# A\nOhne Bild", annexes=[])

@@ -136,6 +136,8 @@ async def test_rules_only_take_images_from_our_own_uploads(flow, address):
 @pytest.mark.asyncio
 async def test_own_uploads_and_plain_links_are_fine_in_rules(flow):
     w = await make_bare_world(flow)
+    await flow.db.media_uploads.insert_one({"id": "plan-1", "filename": "plan-1.webp", "url": "/api/static/uploads/plan-1.webp", "media_type": "image",
+                                            "owner_id": w["lead"]["id"], "media_scope": "admin"})
     body = "# A\n![Plan](/api/static/uploads/plan-1.webp?v=3)\n\n[Quelle](https://bilder.example.test/plan.png)"
     saved = await flow.put(f"{season_scope(w)}/draft", json={"title": "A", "body_md": body, "annexes": []})
     assert saved.status_code == 200, saved.text

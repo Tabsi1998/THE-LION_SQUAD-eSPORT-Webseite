@@ -51,6 +51,7 @@ from services.image_upload import (  # noqa: F401 - umgezogen (#1420), hier weit
 from services import svg_logo
 from services.image_variants import schedule_variants
 from services.permissions import (
+    ADMIN_MEDIA_ROLES,
     MFA_MESSAGE,
     admin_role_without_second_factor,
     is_confirmed_admin_role,
@@ -81,10 +82,6 @@ except ImportError:  # pragma: no cover
     pass
 
 logger = logging.getLogger("tls-arena.uploads")
-# Admin-Medien (Galerie, Sponsoren, Branding, Videos, Originaldateien, Upload-Protokoll); Moderatoren
-# laden wie alle Konten eigene Bilder hoch und prüfen fremde in der Bildprüfung. Wie jeder Adminbereich nur mit
-# bestätigter Zwei-Faktor-Anmeldung (#1469); eigene Bilder gehen ohne.
-ADMIN_MEDIA_ROLES = {"admin", "tournament_admin", "club_admin", "superadmin"}
 ALLOWED_MEDIA_SCOPES = {"user", "admin", "sponsor", "branding", "gallery"}
 
 router = APIRouter(prefix="/api/uploads", tags=["uploads"])

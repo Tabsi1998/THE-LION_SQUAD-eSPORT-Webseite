@@ -8,7 +8,7 @@ const SEARCH_MIN = 2;
 const HIT = "tls-rules-hit";
 const ACTIVE_HIT = "tls-rules-hit-active";
 
-// Bilder im Editor: Die Admin-Medien gehen über die Rolle (upload_routes), Zuständigkeiten öffnen sie nicht. Wer sie nicht hat, nimmt wie jedes
+// Bilder im Editor und in der Gestaltung der Liga (#2230): Die Admin-Medien gehen über die Rolle (upload_routes), Zuständigkeiten öffnen sie nicht. Wer sie nicht hat, nimmt wie jedes
 // Konto die eigenen Bilder - sonst wäre das Hochladen auf dieser Seite für Zuständige immer ein 403.
 const ADMIN_MEDIA_ROLES = ["admin", "tournament_admin", "club_admin", "superadmin"];
 

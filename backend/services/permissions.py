@@ -40,6 +40,10 @@ from database import get_db
 AREAS: tuple[str, ...] = ("tournaments", "leagues", "content", "club", "finance", "system", "moderation")
 GRANTABLE_AREAS: tuple[str, ...] = ("tournaments", "leagues", "content", "club", "finance")
 MFA_AREAS: frozenset[str] = frozenset({"tournaments", "leagues", "content", "club", "finance", "system"})
+# Admin-Medien (Galerie, Sponsoren, Branding, Videos, Originaldateien, Upload-Protokoll); Moderatoren
+# laden wie alle Konten eigene Bilder hoch und prüfen fremde in der Bildprüfung. Wie jeder Adminbereich nur mit
+# bestätigter Zwei-Faktor-Anmeldung (#1469, ``is_confirmed_admin_role``); eigene Bilder gehen ohne.
+ADMIN_MEDIA_ROLES: frozenset[str] = frozenset({"admin", "tournament_admin", "club_admin", "superadmin"})
 
 AREA_LABELS: dict[str, str] = {
     "tournaments": "Turnierleitung",

@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.59.1 (02.11.2026)
+
+### Fehlerbehebungen
+
+* Banner und Gewinnbilder der Liga gehen für Zuständige (#2230)
+* Bilder im Regelwerk genauer geprüft (#2230)
+* Emblem der Liga geht für Zuständige (#2230)
+* Kontolöschung bei Bildern im Regelwerk genauer (#2230)
+* Liga-Seiten öffnen sich für Turnierleitung und Helfer, die zugleich Zuständige sind (#2230)
+
 ## 1.59.0 (02.11.2026)
 
 ### Neu

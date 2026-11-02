@@ -750,8 +750,8 @@ halten die Sperren der Entwürfe, die sie zeigen (`rule_draft_locks`). Bekannte 
 veröffentlicht ihn noch während des Drehens, schützt die Sperre nicht, weil sie den Entwurf noch nicht kannte. Das Fenster sind Sekundenbruchteile, und der Vorgang
 braucht zwei Schritte von Hand.
 
-**Bilder:** Im Regelwerk nur eigene Uploads (`game_maps.IMAGE_URL`). Der Server lehnt alles andere beim Speichern und Veröffentlichen mit 422 ab, die Vorschau nennt es
-(`foreign_images`), das Web lädt es nicht (`markdownLite`, Option `imageAllowed`; andere Nutzer ohne Option bleiben unverändert) und zeigt einen Link. Die CSP bleibt.
+**Bilder:** Im Regelwerk nur eigene Uploads (`game_maps.IMAGE_URL`), mit Eintrag in der Mediathek (`media_uploads`). Der Server lehnt alles andere beim Speichern und
+Veröffentlichen mit 422 ab, die Vorschau nennt es (`foreign_images`), das Web lädt es nicht (`markdownLite`, Option `imageAllowed`; andere Nutzer ohne Option bleiben unverändert) und zeigt einen Link. Die CSP bleibt.
 Im PDF steht ein eigener Upload auf eigener Zeile als Bild, alles andere als `[Bild: …]`. Die PDF-Schrift kann nur Westeuropäisches: Zeichen wie → werden umschrieben,
 Emoji fallen weg.
 

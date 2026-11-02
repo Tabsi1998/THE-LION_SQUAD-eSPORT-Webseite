@@ -208,7 +208,7 @@ PERSONAL: dict[str, Entry] = {
     "season_standings": Entry(KEPT, ("season_standings",), SPORT),
     "season_rank_snapshots": Entry(DELETED, ("season_rank_history",)),
     # Bilder und Uploads
-    "media_uploads": Entry(DELETED, ("uploads",)),
+    "media_uploads": Entry(DELETED, ("uploads",), "Bilder in veröffentlichten Regelwerk-Fassungen bleiben ohne Bezug zur Person (#2230)"),
     "media_scans": Entry(DELETED, note="Prüfvermerk der Bildprüfung zu den eigenen Uploads (stehen unter uploads)"),
     "pending_file_cleanups": Entry(DELETED, note="Merkliste für Dateien, deren Löschung nachgeholt wird (#1046): Datei, "
                                                  "Kennung des gelöschten Kontos, Status, Fehlerart ohne Pfad - weg, "

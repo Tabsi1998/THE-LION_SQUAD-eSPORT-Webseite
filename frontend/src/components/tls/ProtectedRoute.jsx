@@ -18,7 +18,9 @@ import { SkeletonDetailHeader } from "@/components/tls/Skeleton";
 // `allowSeriesCaptain` (#1749) öffnet eine Seite mit `requireArea` zusätzlich für Captains externer Serien - wie im
 // Server nur mit bestätigter Zwei-Faktor-Anmeldung; welche Serie, prüft der Server bei jedem Aufruf.
 // `allowLeagueStaff` (#2203) öffnet eine Seite für den Bereich Ligen und für Zuständige einer Liga - nur mit bestätigter
-// Zwei-Faktor-Anmeldung; welche Liga und welche Zuständigkeit, prüft der Server bei jedem Aufruf.
+// Zwei-Faktor-Anmeldung; welche Liga und welche Zuständigkeit, prüft der Server bei jedem Aufruf. Auf einer Seite mit Bereich reicht
+// die Zuständigkeit auch neben anderen Bereichen und einem Einsatz (#2230); der Turnier-Weg einer Staffel fragt keinen Bereich und
+// lässt Turnierleitung und Helfer ihren eigenen Weg gehen.
 
 export function ProtectedRoute({ children, requireArea = null, requireAdmin = false, requireClubAdmin = false, requireMember = false, requireTournamentStaff = false, adminHome: entrance = false, requireDuty = false, allowSeriesCaptain = false, allowLeagueStaff = false }) {
   const { user } = useAuth();
@@ -47,7 +49,10 @@ export function ProtectedRoute({ children, requireArea = null, requireAdmin = fa
     if (needsSecondFactor(user)) return <Navigate to={mfaSetupPath(loc.pathname)} replace />;
     return children;
   }
-  if (allowLeagueStaff && (hasLeagueStaff(user) || hasArea(user, "leagues")) && !hasArea(user, "tournaments", ...wantedAreas) && !user.has_staff_assignment) {
+  const leagueStaffEntry = wantedAreas.length
+    ? hasLeagueStaff(user) && !hasArea(user, ...wantedAreas)
+    : (hasLeagueStaff(user) || hasArea(user, "leagues")) && !hasArea(user, "tournaments") && !user.has_staff_assignment;
+  if (allowLeagueStaff && leagueStaffEntry) {
     if (needsSecondFactor(user)) return <Navigate to={mfaSetupPath(loc.pathname)} replace />;
     return children;
   }

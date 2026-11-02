@@ -326,8 +326,9 @@ je Saison Captains eintragen, die nur für diese eine Saison Ergebnisse und Scor
 Die Liga hängt am Bereich **Ligen** (`leagues`), nicht mehr an der Turnierleitung. Wer ihn hat, darf alle Ligen; Superadmin und
 Club-Admin haben ihn von selbst, andere per Freigabe. Die Rolle Turnierleitung hat ihn nicht. Zusätzlich vergibt der Bereich je Liga
 **Zuständige** mit einzelnen Zuständigkeiten: Liga verwalten, Season konfigurieren, Teams freigeben, Kader prüfen, Spiele betreuen,
-Ergebnisse korrigieren, Proteste, Strafen, Regeln veröffentlichen. Zuständige brauchen Zwei-Faktor, keinen Bereich. Jede Vergabe steht im
-Protokoll, die Person bekommt eine Meldung.
+Ergebnisse korrigieren, Proteste, Strafen, Regeln veröffentlichen. Zuständige brauchen Zwei-Faktor, keinen Bereich; die Zuständigkeit öffnet die
+Liga-Seiten auch neben anderen Bereichen und neben einem Helfer-Einsatz (#2230). Admin-Medien gibt sie nicht: Bilder laden Zuständige als eigene
+hoch. Jede Vergabe steht im Protokoll, die Person bekommt eine Meldung.
 
 **Befangenheit:** Wer in einem Spiel selbst beteiligt ist (Kader einer Seite, Captain, Vertreter, Hauptteam-Leitung), korrigiert dort
 keine Ergebnisse, entscheidet keine Proteste, verhängt keine Strafen zum Spiel und setzt keinen Termin direkt (als Captain oder Vertreter gilt Vorschlag und Zustimmung). Es entscheidet eine zweite berechtigte Person. Nur der
