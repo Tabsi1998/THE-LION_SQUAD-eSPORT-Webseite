@@ -221,6 +221,18 @@ async def test_involved_superadmin_with_reason_passes_and_is_logged(flow, method
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("reason", [12345, ["Ein langer Grund"], {"grund": "Ein langer Grund"}])
+async def test_forfeit_reason_of_another_type_counts_as_missing(flow, reason):
+    """Der Forfeit-Weg nimmt einen freien Inhalt an: Ein Grund, der kein Text ist, ist keiner - und kein 500."""
+    w = await world(flow)
+    flow.act_as({**w["users"]["Kapitaen"], "role": "superadmin"})
+    response = await flow.post(f"/api/matches/{w['match']['id']}/forfeit",
+                               json={"forfeit_registration_id": w["reg_a"]["id"], "note": "Nicht angetreten", "conflict_reason": reason})
+    assert response.status_code == 403
+    assert "Notausnahme" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
 async def test_a_second_person_decides_instead(flow):
     w = await world(flow)
     flow.act_as(await holder(flow, w, "results", user=w["users"]["Kapitaen"]))

@@ -278,7 +278,7 @@ async def require_no_conflict(db, user: dict, match: dict, *, action: str, confl
         raise HTTPException(status_code=403, detail=OWN_DECISION_DETAIL)
     if not conflict["override"]:
         raise HTTPException(status_code=403, detail=CONFLICT_DETAIL)
-    reason = (conflict_reason or "").strip()
+    reason = conflict_reason.strip() if isinstance(conflict_reason, str) else ""
     if len(reason) < CONFLICT_REASON_MIN:
         raise HTTPException(status_code=403, detail=CONFLICT_SUPERADMIN_DETAIL)
     if record:
