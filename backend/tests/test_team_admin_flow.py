@@ -106,17 +106,21 @@ async def test_renew_all_join_codes(flow, caplog):
     assert (await flow.db.teams.find_one({"id": rudel["id"]}))["join_code"] == "AltCodeA"
 
     caplog.set_level(logging.INFO)
+    await flow.db.team_invite_links.insert_one({"id": new_id(), "team_id": rudel["id"], "token": "AlterSchluessel"})
     done = await flow.post(url, json={"confirm": True})
-    assert done.status_code == 200 and done.json() == {"ok": True, "renewed": 3}
+    assert done.status_code == 200 and done.json() == {"ok": True, "renewed": 3, "links_renewed": True}
+    assert await flow.db.team_invite_links.count_documents({}) == 0, "die Vorgabe nimmt die Links mit"
 
     codes = {row["id"]: row["join_code"] async for row in flow.db.teams.find({}, {"_id": 0, "id": 1, "join_code": 1})}
     assert codes[rudel["id"]] != "AltCodeA" and codes[secret["id"]] != "AltCodeB" and codes[legacy["id"]]
     assert len(set(codes.values())) == 3
 
     row = await flow.db.audit_logs.find_one({"action": "team.join_code.renew_all"}, {"_id": 0})
-    assert row["actor_id"] == admin["id"] and row["data"] == {"teams": 3}
+    assert row["actor_id"] == admin["id"] and row["data"] == {"teams": 3, "invite_links_renewed": True, "invite_links_removed": 1}
     told = await flow.db.notifications.find({"kind": "team_join_code_renewed"}, {"_id": 0}).to_list(10)
     assert {note["user_id"] for note in told} == {first["id"], second["id"]} and len(told) == 3
+    assert "Einladungs-Link ist neu" in told[0]["body"]
+    assert "AlterSchluessel" not in str(row)
     everything = str(row) + str(told) + str(done.json()) + caplog.text
     for code in [*codes.values(), "AltCodeA", "AltCodeB"]:
         assert code not in everything, "keine Codes in Antwort, Nachricht, Protokoll und Log"

@@ -76,11 +76,12 @@ for (const [label, width, height] of WIDTHS) {
       await page.getByTestId("admin-teams-search").fill("");
       await expect(page.getByTestId("admin-team-t-1")).toBeVisible();
 
+      await expect(page.getByTestId("admin-teams-renew-links")).toBeChecked();
       await page.getByTestId("admin-teams-renew-all-button").click();
-      await expect(page.getByTestId("confirm-dialog")).toContainText("gelten sofort nicht mehr");
+      await expect(page.getByTestId("confirm-dialog")).toContainText("funktionieren dann nicht mehr");
       await page.getByTestId("confirm-dialog-confirm").click();
       await expect.poll(() => calls.filter((call) => call.path === "/api/admin/teams/join-codes/renew").length).toBe(1);
-      expect(calls.find((call) => call.path === "/api/admin/teams/join-codes/renew").body).toEqual({ confirm: true });
+      expect(calls.find((call) => call.path === "/api/admin/teams/join-codes/renew").body).toEqual({ confirm: true, renew_links: true });
 
       await page.getByTestId("admin-teams-tab-dissolved").click();
       await expect(page.getByTestId("dissolved-team-t-3")).toContainText("noch 12 Tage");

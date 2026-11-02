@@ -84,8 +84,9 @@ Teamleitung** steht rot in der Zeile – die Teamleitung hat ihr Konto gelöscht
 Club-Admin und Superadmin unter **Mitglieder verwalten** mit **Zur Teamleitung machen**.
 
 **Alle Beitrittscodes erneuern** gibt jedem Team auf einmal einen neuen Code, etwa nach einer Bereinigung – mit Rückfrage und
-Protokoll. Die alten Codes gelten sofort nicht mehr. Die Teamleitungen bekommen eine Nachricht und finden den neuen Code auf
-ihrer Teamseite unter **Einladen**. Die Einladungs-Links bleiben; einen Code zeigt die Verwaltungsseite nie.
+Protokoll. Die alten Codes gelten sofort nicht mehr. Das Häkchen **Einladungs-Links mit erneuern** ist vorgegeben: Dann gelten
+auch schon gepostete Links und gedruckte QR-Codes nicht mehr, unter **Einladen** entsteht je Team ein neuer. Die Teamleitungen
+bekommen eine Nachricht und finden Code und Link auf ihrer Teamseite; einen Code zeigt die Verwaltungsseite nie.
 
 ## 4. Wenn etwas nicht klappt
 

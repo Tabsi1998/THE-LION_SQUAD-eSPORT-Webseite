@@ -102,7 +102,15 @@ test("Alle Beitrittscodes erneuern: mit Rückfrage; ohne Ja passiert nichts; kei
   expect(apiMock.post).not.toHaveBeenCalled();
   confirmMock.mockResolvedValueOnce(true);
   fireEvent.click(button);
-  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/teams/join-codes/renew", { confirm: true }));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/teams/join-codes/renew", { confirm: true, renew_links: true }));
+  expect(confirmMock).toHaveBeenLastCalledWith(expect.objectContaining({ description: expect.stringContaining("funktionieren dann nicht mehr") }));
+
+  apiMock.post.mockClear();
+  fireEvent.click(screen.getByTestId("admin-teams-renew-links"));
+  confirmMock.mockResolvedValueOnce(true);
+  fireEvent.click(button);
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/teams/join-codes/renew", { confirm: true, renew_links: false }));
+  expect(confirmMock).toHaveBeenLastCalledWith(expect.objectContaining({ description: expect.stringContaining("bleiben, wie sie sind") }));
 });
 
 test("ohne das Recht kein Knopf „Alle erneuern“ und kein Wiederherstellen", async () => {

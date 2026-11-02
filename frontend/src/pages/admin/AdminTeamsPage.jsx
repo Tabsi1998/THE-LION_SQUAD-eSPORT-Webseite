@@ -57,6 +57,7 @@ export default function AdminTeamsPage() {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(0);
   const [renewError, setRenewError] = useState("");
+  const [renewLinks, setRenewLinks] = useState(true);
   const confirm = useConfirm();
   const { submitting, submitOnce } = useSubmissionGuard();
 
@@ -72,12 +73,14 @@ export default function AdminTeamsPage() {
   const renewAll = async () => {
     if (!await confirm({
       title: "Alle Beitrittscodes erneuern?",
-      description: "Jedes Team bekommt einen neuen Beitrittscode, die alten gelten sofort nicht mehr. Wer im Team ist, bleibt drin; Einladungs-Links bleiben, wie sie sind. Die Teamleitungen bekommen eine Nachricht und finden den neuen Code auf ihrer Teamseite unter „Einladen“. Das steht im Protokoll.",
+      description: `Jedes Team bekommt einen neuen Beitrittscode, die alten gelten sofort nicht mehr. Wer im Team ist, bleibt drin. ${renewLinks
+        ? "Auch alle Einladungs-Links werden neu: Schon gepostete Links und gedruckte QR-Codes funktionieren dann nicht mehr."
+        : "Die Einladungs-Links bleiben, wie sie sind."} Die Teamleitungen bekommen eine Nachricht und finden Code und Link auf ihrer Teamseite unter „Einladen“. Das steht im Protokoll.`,
       confirmLabel: "Alle erneuern",
     })) return;
     setRenewError("");
     const attempt = await submitOnce(async () => {
-      const { data: done } = await api.post("/admin/teams/join-codes/renew", { confirm: true });
+      const { data: done } = await api.post("/admin/teams/join-codes/renew", { confirm: true, renew_links: renewLinks });
       toast.success(`Neue Beitrittscodes für ${done.renewed} ${done.renewed === 1 ? "Team" : "Teams"}.`);
     });
     if (attempt.started && attempt.error) setRenewError(formatRequestError(attempt.error, "Die Beitrittscodes konnten nicht erneuert werden."));
@@ -159,6 +162,10 @@ export default function AdminTeamsPage() {
         <section className="mt-10 border border-honor/25 bg-honor/5 rounded-sm p-4 space-y-3 max-w-2xl" data-testid="admin-teams-renew-all">
           <div className="flex items-center gap-2 text-[11px] uppercase tracking-widest text-honor font-bold"><KeyRound className="w-4 h-4" aria-hidden="true" /> Beitrittscodes</div>
           <p className="text-sm text-white/65">Gibt allen Teams auf einmal einen neuen Beitrittscode – zum Beispiel nach einer Bereinigung. Einzelne Teams erneuern ihren Code selbst unter „Einladen“.</p>
+          <label className="flex items-center gap-3 min-h-11 cursor-pointer text-sm font-bold">
+            <input type="checkbox" checked={renewLinks} onChange={(event) => setRenewLinks(event.target.checked)} data-testid="admin-teams-renew-links" className="accent-[#29B6E8]" />
+            Einladungs-Links mit erneuern
+          </label>
           {renewError ? <AuthFormAlert id="admin-teams-renew-error">{renewError}</AuthFormAlert> : null}
           <button type="button" onClick={renewAll} disabled={submitting} data-testid="admin-teams-renew-all-button" className="tls-btn tls-btn--danger inline-flex min-h-11 items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">
             <KeyRound className="w-3.5 h-3.5" aria-hidden="true" /> {submitting ? "Erneuere…" : "Alle Beitrittscodes erneuern"}

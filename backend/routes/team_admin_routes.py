@@ -1,7 +1,8 @@
 """Teamverwaltung im Admin (#2128, TM7, TM8, TM10): alle Teams mit Suche, aufgelöste Teams, „Alle Beitrittscodes erneuern“.
 
 - ``GET  /api/admin/teams``                      aktive oder aufgelöste Teams - Turnierleitung und Vereinsverwaltung
-- ``POST /api/admin/teams/join-codes/renew``     alle Beitrittscodes neu - Club-Admin und Superadmin, mit Rückfrage und Protokoll
+- ``POST /api/admin/teams/join-codes/renew``     alle Beitrittscodes neu, auf Wunsch auch alle Einladungs-Links - Club-Admin und
+  Superadmin, mit Rückfrage und Protokoll
 
 Verwaltet wird ein einzelnes Team auf seiner Teamseite; die Liste führt dorthin. In keiner Antwort und keinem Protokoll
 steht ein Beitrittscode: die Teamleitung findet den neuen auf der Teamseite unter „Einladen“."""
@@ -27,6 +28,8 @@ RENEW_ALL_LIMIT = 5000
 
 class RenewAllBody(BaseModel):
     confirm: bool = False
+    # Auch alle Einladungs-Links: der nächste Aufruf unter „Einladen“ legt je Team einen neuen an (``team_page.ensure_invite``).
+    renew_links: bool = True
 
 
 def _search(q: str | None) -> dict:
@@ -90,7 +93,8 @@ async def list_teams(
 
 @router.post("/join-codes/renew")
 async def renew_all_join_codes(body: RenewAllBody, me: dict = Depends(require_area("club"))):
-    """Einmal alle neu - etwa nach einer Bereinigung. Die alten Codes gelten sofort nicht mehr; Einladungs-Links bleiben."""
+    """Einmal alle neu - etwa nach einer Bereinigung. Die alten Codes gelten sofort nicht mehr, auf Wunsch auch die alten
+    Einladungs-Links samt QR-Codes."""
     if not _team_admin(me, TEAM_OWNER_ADMIN_ROLES):
         _refuse(me, "Alle Beitrittscodes erneuern dürfen Club-Admin und Superadmin.", TEAM_OWNER_ADMIN_ROLES)
     if not body.confirm:
@@ -98,6 +102,8 @@ async def renew_all_join_codes(body: RenewAllBody, me: dict = Depends(require_ar
     db = get_db()
     teams = await db.teams.find({}, {"_id": 0, "id": 1, "name": 1, "tag": 1, "leader_id": 1}).to_list(RENEW_ALL_LIMIT)
     renewed = 0
+    links_removed = (await db.team_invite_links.delete_many({})).deleted_count if body.renew_links else 0
+    links_text = " Auch der Einladungs-Link ist neu – schon geteilte Links und QR-Codes gelten nicht mehr." if body.renew_links else ""
     for team in teams:
         await team_page.renew_join_code(db, team["id"])
         renewed += 1
@@ -105,12 +111,13 @@ async def renew_all_join_codes(body: RenewAllBody, me: dict = Depends(require_ar
             team.get("leader_id"),
             title=f"Neuer Beitrittscode: [{team.get('tag')}]",
             body=f"Die Vereinsverwaltung hat alle Beitrittscodes erneuert. Den neuen Code von {team.get('name')} findest du auf der "
-                 "Teamseite unter „Einladen“; der alte gilt nicht mehr.",
+                 f"Teamseite unter „Einladen“; der alte gilt nicht mehr.{links_text}",
             url=f"/teams/{team['id']}",
             kind="team_join_code_renewed",
             meta={"team_id": team["id"]},
         )
-    await _team_audit(db, "team.join_code.renew_all", None, me["id"], {"teams": renewed})
+    await _team_audit(db, "team.join_code.renew_all", None, me["id"], {"teams": renewed, "invite_links_renewed": body.renew_links,
+                                                                       "invite_links_removed": links_removed})
     from services.change_events import publish_user_change
     await publish_user_change([team["leader_id"] for team in teams if team.get("leader_id")], "teams")
-    return {"ok": True, "renewed": renewed}
+    return {"ok": True, "renewed": renewed, "links_renewed": body.renew_links}
