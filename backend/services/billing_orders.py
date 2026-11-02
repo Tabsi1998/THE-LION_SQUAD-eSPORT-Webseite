@@ -66,8 +66,25 @@ PAYMENT_STATE_LABELS = {
     "credited": "gutgeschrieben",
     "abandoned": "aufgegeben",
 }
+# Grund des Abschlusses in Dolibarr (`close_code`, #2226) als Klartext - nur für die Verwaltung, wie die Anmerkung (`close_note`).
+CLOSE_REASONS = {
+    "discount_vat": "Skonto oder Nachlass",
+    "badcustomer": "Zahlungsausfall",
+    "product_returned": "Leistung zurückgegeben",
+    "bankcharge": "Bankspesen",
+    "withholdingtax": "Quellensteuer",
+    "other": "Sonstiger Grund",
+    "abandon": "Aufgegeben",
+    "replaced": "Durch einen anderen Beleg ersetzt",
+}
 MAX_REFUND_REFERENCE = 120
 MAX_REASON = 500
+
+
+def close_reason(order: dict) -> str | None:
+    """Der Grund als Satz; ein Code, den die Website nicht kennt, wird nicht roh gezeigt. Ohne Code keiner."""
+    code = order.get("close_code")
+    return CLOSE_REASONS.get(code, "Grund in Dolibarr nachsehen") if code else None
 
 
 def booking_key(kind: str, registration_id: str, snapshot: dict | None) -> str | None:
@@ -436,11 +453,11 @@ async def source_summary(db, kind: str, source_id: str) -> dict:
 
 async def anonymize_user(db, user_id: str) -> int:
     """Kontolöschung (#322): Belege bleiben in Dolibarr (Aufbewahrung nach BAO), der Auftrag hier
-    behält Betrag, Belegnummer und Zeitpunkte - aber keinen Namen und keine E-Mail mehr. Die
-    Zuordnung Konto ↔ Geschäftspartner fällt weg."""
+    behält Betrag, Belegnummer und Zeitpunkte - aber keinen Namen, keine E-Mail und keine Anmerkung
+    zum Abschluss (freier Text, #2226) mehr. Die Zuordnung Konto ↔ Geschäftspartner fällt weg."""
     now = now_utc().isoformat()
     result = await db.billing_orders.update_many({"user_id": user_id}, {"$set": {
         "snapshot.recipient.display_name": "Gelöschter User", "snapshot.recipient.email": None, "anonymized_at": now, "updated_at": now,
-    }})
+    }, "$unset": {"close_note": ""}})
     await db.billing_customers.delete_many({"user_id": user_id})
     return int(result.modified_count)

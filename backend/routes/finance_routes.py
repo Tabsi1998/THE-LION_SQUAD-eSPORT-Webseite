@@ -58,6 +58,8 @@ def _decorate(row: dict, names: dict, people: dict) -> dict:
         row["refunded_cents"] = billing_orders.refunded_cents(row)
         row["credited_cents"] = billing_orders.credited_cents(row)
         row["waived_cents"] = billing_orders.waived_cents(row)
+        # Grund und Anmerkung (`close_note` steht schon am Auftrag): nur hier, in der Verwaltung (#2226).
+        row["close_reason"] = billing_orders.close_reason(row)
     return row
 
 
@@ -93,7 +95,7 @@ def _vienna_moment(value) -> str:
 
 EXPORT_DAY = r"^\d{4}-\d{2}-\d{2}$"
 # Nur, was der Kassier braucht - keine Adressen, keine Bankdaten, keine Dolibarr-Schlüssel.
-EXPORT_COLUMNS = ("Rechnung", "Angelegt am", "Angebot", "Person", "Betrag", "Zahlungsstand", "Bezahlt", "Gutgeschrieben", "Erlassen", "Erstattet", "Buchung", "Stand")
+EXPORT_COLUMNS = ("Rechnung", "Angelegt am", "Angebot", "Person", "Betrag", "Zahlungsstand", "Bezahlt", "Gutgeschrieben", "Erlassen", "Grund", "Erstattet", "Buchung", "Stand")
 
 
 def _export_cells(row: dict) -> tuple:
@@ -102,7 +104,7 @@ def _export_cells(row: dict) -> tuple:
     money = lambda cents: pricing.format_cents(int(cents or 0), currency)  # noqa: E731
     return (
         row.get("invoice_ref") or "", _vienna_moment(row.get("invoiced_at")), source, row.get("person") or "", money(row.get("total_cents")),
-        row.get("payment_label") or row.get("status_label") or "", money(row.get("paid_cents")), money(row.get("credited_cents")), money(row.get("waived_cents")), money(row.get("refunded_cents")),
+        row.get("payment_label") or row.get("status_label") or "", money(row.get("paid_cents")), money(row.get("credited_cents")), money(row.get("waived_cents")), row.get("close_reason") or "", money(row.get("refunded_cents")),
         "storniert" if row.get("booking_state") == "cancelled" else "aktiv", _vienna_moment(row.get("synced_at")),
     )
 
@@ -283,6 +285,7 @@ AUDIT_TEXTS = {
     "billing.thirdparty.create": "Geschäftspartner neu angelegt",
     "billing.pdfs.build_missing": "Fehlende PDFs nachgezogen",
     "billing.reconcile": "Alles abgeglichen",
+    "billing.invoice.close": "Abschluss in Dolibarr",
     "billing.settings.credit_note_draft": "Schalter „Gutschrift-Entwurf“ geändert",
     "billing.export": "Export erstellt",
     "event.registration.create": "Anmeldung angelegt",
@@ -318,6 +321,14 @@ def _german_day(value) -> str:
     return ".".join(reversed(text.split("-"))) if re.fullmatch(r"\d{4}-\d{2}-\d{2}", text) else text
 
 
+def _close_text(data: dict) -> str:
+    """Ein Eintrag „Abschluss in Dolibarr“ (#2226) in Worten - nennt den Grund, die Anmerkung steht beim Auftrag."""
+    code, previous = data.get("close_code") or "", data.get("previous_code") or ""
+    if code == previous:
+        return "Abschluss in Dolibarr: Anmerkung geändert"
+    return f"Abschluss in Dolibarr: {billing_orders.close_reason(data)}" if code else "Abschluss in Dolibarr zurückgenommen"
+
+
 def _timeline(order: dict, cases: list[dict], audit: list[dict], people: dict) -> list[dict]:
     """Was mit dem Auftrag passiert ist, in einer Reihe: Preis, Beleg, Zahlungen, Gutschriften,
     Storno, Erstattungen, Prüffälle, Freigaben - jedes Ereignis einmal, mit Zeitpunkt."""
@@ -346,6 +357,9 @@ def _timeline(order: dict, cases: list[dict], audit: list[dict], people: dict) -
         action = str(entry.get("action") or "")
         if action in ("billing.order.release", "billing.refund.record", "billing.case.resolve"):
             continue   # steht schon oben, aus den Daten des Auftrags
+        if action == "billing.invoice.close":
+            items.append({"at": entry.get("created_at"), "kind": "invoice", "text": f"{_close_text(entry.get('data') or {})} – {people.get(entry.get('actor_id'), 'System')}"})
+            continue
         if action.startswith("billing.") or action.startswith("event.registration") or action.startswith("tournament.registration"):
             items.append({"at": entry.get("created_at"), "kind": "audit", "text": f"{AUDIT_TEXTS.get(action, 'Änderung am Vorgang')} – {people.get(entry.get('actor_id'), 'System')}"})
     if order.get("sync_error"):
