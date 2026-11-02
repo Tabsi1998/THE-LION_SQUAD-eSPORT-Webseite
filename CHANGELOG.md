@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.55.1 (02.11.2026)
+
+### Dokumentation
+
+* Liga: Vertrag für den Ausbau zur Wettbewerbsplattform (#2211)
+
 ## 1.55.0 (02.11.2026)
 
 ### Neu
