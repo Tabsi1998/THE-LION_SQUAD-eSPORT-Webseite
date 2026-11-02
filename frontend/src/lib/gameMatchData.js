@@ -113,11 +113,16 @@ export function modeRemovalQuestion(removed, usage) {
   const maps = sum("maps");
   const pools = sum("pools");
   const seasons = sum("seasons");
-  if (!maps && !pools && !seasons) return null;
+  const tournaments = sum("tournaments");
+  const stages = sum("stages");
+  if (!maps && !pools && !seasons && !tournaments && !stages) return null;
+  const one = removed.length === 1;
   const parts = [];
-  if (maps) parts.push(`${count(maps, "Map verliert", "Maps verlieren")} ${removed.length === 1 ? "diesen Modus" : "diese Modi"} und ${maps === 1 ? "steht" : "stehen"} dafür in neuen Pools nicht mehr zur Wahl.`);
+  if (maps) parts.push(`${count(maps, "Map verliert", "Maps verlieren")} ${one ? "diesen Modus" : "diese Modi"} und ${maps === 1 ? "steht" : "stehen"} dafür in neuen Pools nicht mehr zur Wahl. Wird ${one ? "er" : "einer"} wieder angelegt, haben die Maps ihn nicht mehr.`);
   const keeping = [pools ? count(pools, "gespeicherter Map-Pool", "gespeicherte Map-Pools") : "", seasons ? count(seasons, "Season", "Seasons") : ""].filter(Boolean).join(" und ");
-  parts.push(keeping ? `${keeping} ${pools + seasons === 1 ? "nutzt" : "nutzen"} ${removed.length === 1 ? "ihn" : "sie"} weiter: Laufende Spiele melden unverändert daraus. ${lasting}` : lasting);
+  parts.push(keeping ? `${keeping} ${pools + seasons === 1 ? "nutzt" : "nutzen"} ${one ? "ihn" : "sie"} weiter: Laufende Spiele melden unverändert daraus. ${lasting}` : lasting);
+  const planning = [tournaments ? count(tournaments, "Turnier", "Turniere") : "", stages ? count(stages, "Phase", "Phasen") : ""].filter(Boolean).join(" und ");
+  if (planning) parts.push(`${planning} ${tournaments + stages === 1 ? "plant" : "planen"} mit ${one ? "diesem Modus" : "diesen Modi"} und ${tournaments + stages === 1 ? "nimmt" : "nehmen"} danach den ersten Modus des Spiels.`);
   return { title, description: parts.join(" ") };
 }
 

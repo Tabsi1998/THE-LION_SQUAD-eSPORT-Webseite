@@ -102,11 +102,13 @@ async def test_usage_names_the_maps_pools_and_seasons_of_each_mode(flow):
     assert saved.status_code == 200, saved.text
     league = (await flow.post("/api/admin/leagues", json={"name": "Probe Liga", "game_id": game["id"]})).json()
     await flow.db.league_seasons.insert_one({"id": new_id(), "league_id": league["id"], "game_mode_order": ["suchen"]})
+    await flow.db.tournaments.update_one({"id": tournament["id"]}, {"$set": {"game_mode": "suchen"}})
+    await flow.db.tournament_stages.insert_one({"id": new_id(), "tournament_id": tournament["id"], "settings": {"game_mode": "stellung"}})
 
     modes = (await flow.get(f"/api/games/{game['id']}/usage")).json()["modes"]
 
-    assert modes["suchen"] == {"label": "Suchen & Zerstören", "maps": 2, "pools": 1, "seasons": 1}
-    assert modes["stellung"] == {"label": "Stellung", "maps": 1, "pools": 0, "seasons": 0}
+    assert modes["suchen"] == {"label": "Suchen & Zerstören", "maps": 2, "pools": 1, "seasons": 1, "tournaments": 1, "stages": 0}
+    assert modes["stellung"] == {"label": "Stellung", "maps": 1, "pools": 0, "seasons": 0, "tournaments": 0, "stages": 1}
 
 
 @pytest.mark.asyncio

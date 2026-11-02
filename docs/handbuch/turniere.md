@@ -792,7 +792,9 @@ Maps dieses Spiels mit demselben Bild, die Modi nur soweit dieses Spiel sie kenn
   Maps nach. Der Modus verschwindet dann auch aus den Maps. Gespeicherte Pools, laufende Liga-Spiele und alte Ergebnisse
   bleiben, wie sie sind: Der Editor nennt den alten Modus („Im gespeicherten Pool steht noch …“), und gemeldet wird weiter
   aus dem gespeicherten Pool. Erst neues Speichern des Pools nimmt ihn heraus. Steht der Modus in der Reihenfolge einer
-  Liga-Season (**Modus je Map**), lasst ihn dort stehen, bis ihr Pool und Reihenfolge gemeinsam ändert.
+  Liga-Season (**Modus je Map**), ändert ihr zuerst die Reihenfolge: Einen Pool ohne diesen Modus nimmt die Season sonst nicht
+  an. Wird der Modus später wieder angelegt, haben die Maps ihn nicht mehr. Turniere und Phasen, die mit ihm planen, nehmen
+  danach den ersten Modus des Spiels.
 - **Erster Modus:** Sobald ein Spiel Modi hat, steht eine Map ohne Modus in keinem neuen Pool zur Wahl. Die Map-Seite
   zeigt dann **Diese Maps haben noch keinen Modus**: Modi anhaken, **Allen … Maps zuordnen**, fertig. Auch der Pool-Editor
   weist darauf hin. Bestehende Pools ohne Modus gelten unverändert weiter.

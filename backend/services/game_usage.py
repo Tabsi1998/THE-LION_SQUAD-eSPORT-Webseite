@@ -84,12 +84,18 @@ async def usage(db, game: dict) -> dict:
     seasons = await db.league_seasons.find({"league_id": {"$in": [row["id"] for row in leagues]}},
                                            {"_id": 0, "game_mode_order": 1}).to_list(None)
     maps = await db.game_maps.find({"game_id": game_id}, {"_id": 0, "modes": 1}).to_list(None)
+    # Turniere und Phasen mit diesem Modus: Fällt er weg, planen sie mit dem ersten Modus des Spiels (``match_duration``).
+    tournaments = await db.tournaments.find({"game_id": game_id}, {"_id": 0, "id": 1, "game_mode": 1}).to_list(None)
+    stages = await db.tournament_stages.find({"tournament_id": {"$in": [row["id"] for row in tournaments]}},
+                                             {"_id": 0, "settings.game_mode": 1}).to_list(None)
     modes = {
         mode["mode"]: {
             "label": mode["label"],
             "maps": sum(1 for row in maps if mode["mode"] in (row.get("modes") or [])),
             "pools": sum(1 for pool in pools if any(group.get("mode") == mode["mode"] for group in pool.get("modes") or [])),
             "seasons": sum(1 for season in seasons if mode["mode"] in (season.get("game_mode_order") or [])),
+            "tournaments": sum(1 for row in tournaments if row.get("game_mode") == mode["mode"]),
+            "stages": sum(1 for stage in stages if (stage.get("settings") or {}).get("game_mode") == mode["mode"]),
         }
         for mode in game_modes(game)
     }

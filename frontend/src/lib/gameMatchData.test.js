@@ -47,6 +47,16 @@ describe("Modus entfernen", () => {
     expect(modeRemovalQuestion([BEFORE[0]], null).description).toContain("Die Maps verlieren diesen Modus");
   });
 
+  it("nennt Turniere und Phasen mit diesem Modus und sagt, dass ein neuer Modus die Maps nicht zurückbringt", () => {
+    const usage = { modes: { stellung: { maps: 2, pools: 0, seasons: 0, tournaments: 2, stages: 1 } } };
+    const { description } = modeRemovalQuestion([BEFORE[0]], usage);
+    expect(description).toContain("Wird er wieder angelegt, haben die Maps ihn nicht mehr.");
+    expect(description).toContain("2 Turniere und 1 Phase planen mit diesem Modus und nehmen danach den ersten Modus des Spiels.");
+    const onlyOne = modeRemovalQuestion([BEFORE[0]], { modes: { stellung: { maps: 0, pools: 0, seasons: 0, tournaments: 1, stages: 0 } } });
+    expect(onlyOne.description).toContain("1 Turnier plant mit diesem Modus und nimmt danach");
+    expect(onlyOne.description).not.toContain("wieder angelegt");
+  });
+
   it("die Meldung nach dem Speichern nennt Bereinigte und Maps ohne Modus", () => {
     expect(gameSavedText({})).toBe("Spiel gespeichert.");
     expect(gameSavedText({ maps_cleaned: 2, maps_without_mode: 1 })).toBe("Spiel gespeichert. Modus aus 2 Maps entfernt. 1 Map hat noch keinen Modus – ordne sie unter Maps zu.");
