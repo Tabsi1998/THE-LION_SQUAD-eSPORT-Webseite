@@ -11,7 +11,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from flow_harness import make_flow  # noqa: E402
 from league_application_world import add_team, application_world, base_url, decide, inbox_url, submit, submitted  # noqa: E402
 from league_rules_world import ADMIN_LEAGUES  # noqa: E402
-from league_start_world import ok  # noqa: E402
+from league_start_world import ok, start  # noqa: E402
 from models import now_utc  # noqa: E402
 from services import account_erasure, personal_data  # noqa: E402
 from squad_world import make_squad  # noqa: E402
@@ -164,6 +164,24 @@ async def test_assign_repeats_the_check_when_the_squad_shrank(flow):
 
     assert refused.status_code == 400 and "mindestens 4" in refused.json()["detail"]
     assert (await stored(flow, application)).get("assignment") is None
+    assert await flow.db.tournament_registrations.count_documents({"squad_id": side["squad"]["id"]}) == 0
+
+
+@pytest.mark.asyncio
+async def test_assign_repeats_the_whole_check_not_only_the_staffel_part(flow):
+    """Zulassung und Spielberechtigung gelten auch beim Zuteilen: Der Kader kann sich seit dem Annehmen geändert haben."""
+    w = await application_world(flow, entry_policy="members")
+    side = w["teams"][0]
+    await flow.db.users.update_many({"id": {"$in": [user["id"] for user in side["people"]]}}, {"$set": {"is_club_member": True}})
+    application = await submitted(flow, w, side)
+    ok(await decide(flow, w, application, "accept"))
+    outsider = await flow.add_user(name="Kein Mitglied")
+    await flow.db.teams.update_one({"id": side["team"]["id"]}, {"$addToSet": {"member_ids": outsider["id"]}})
+    await flow.db.team_squads.update_one({"id": side["squad"]["id"]}, {"$addToSet": {"member_ids": outsider["id"]}})
+
+    refused = await decide(flow, w, application, "assign", tournament_id=w["tid"])
+
+    assert refused.status_code == 400 and "nur für Mitglieder" in refused.json()["detail"]
     assert await flow.db.tournament_registrations.count_documents({"squad_id": side["squad"]["id"]}) == 0
 
 
@@ -342,6 +360,24 @@ async def test_the_switch_allows_two_squads_in_one_staffel_for_both_ways(flow):
     assert direct["registration"]["squad_id"] == twin["squad"]["id"]
     again = await flow.post(f"/api/tournaments/{w['tid']}/squad-registrations", json={"team_id": twin["team"]["id"], "squad_id": twin["squad"]["id"]})
     assert again.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_two_squads_of_one_team_can_play_each_other_with_the_switch(flow):
+    """Die Staffel startet, und jeder Captain handelt für sein eigenes Co-Team."""
+    w = await application_world(flow, sibling_squads_in_staffel=True, teams=1)
+    side = w["teams"][0]
+    twin = await second_squad(flow, w, side)
+    for row in (side, twin):
+        ok(await decide(flow, w, await submitted(flow, w, row), "accept", tournament_id=w["tid"]))
+    assert (await start(flow, w)).status_code == 200
+
+    match = await flow.db.matches_v2.find_one({"tournament_id": w["tid"], "is_preview": {"$ne": True}}, {"_id": 0})
+    regs = {row["squad_id"]: row["id"] for row in await flow.db.tournament_registrations.find({"tournament_id": w["tid"]}, {"_id": 0}).to_list(5)}
+    for row in (side, twin):
+        flow.act_as(row["captain"])
+        page = ok(await flow.get(f"/api/matches/{match['id']}/page"))
+        assert page["acting_registration_id"] == regs[row["squad"]["id"]]
 
 
 @pytest.mark.asyncio

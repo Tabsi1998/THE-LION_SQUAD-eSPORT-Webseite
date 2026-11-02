@@ -942,7 +942,7 @@ zurückgezogenen Antrag und ist das Fenster offen, darf es neu einreichen.
 | `accepted` ohne Zuteilung | `waitlist` | Leitung, gibt den Platz frei |
 | `submitted`, `in_review`, `waitlist`, `accepted` ohne Zuteilung | `rejected` | Leitung, Grund mindestens fünf Zeichen |
 | `submitted`, `in_review`, `waitlist`, `accepted` ohne Zuteilung | `withdrawn` | Captain oder Vertreter |
-| `accepted` ohne Zuteilung | `accepted` mit `assignment` | Leitung, Prüfung der Staffel wird wiederholt (`build_registration`) |
+| `accepted` ohne Zuteilung | `accepted` mit `assignment` | Leitung, die Prüfung wird wiederholt (`check_squad`), dazu die der Staffel (`build_registration`) |
 
 Nichts rückt von selbst nach: Wird ein Platz frei, entscheidet die Leitung. Zugeteilt zieht niemand per Antrag zurück, das läuft über Austritt in der Teilnehmerliste.
 

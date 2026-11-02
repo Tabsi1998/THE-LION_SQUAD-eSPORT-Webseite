@@ -30,6 +30,9 @@ export function SeasonApplicationSection({ form, set }) {
         <SelectField label="Wer darf sich anmelden" value={form.entry_policy} onChange={(value) => set("entry_policy", value)} options={ENTRY_POLICY_OPTIONS}
           hint="Bei „Nur Vereinsmitglieder“ gilt das für den ganzen Kader." testId="season-form-entry-policy" />
       </FormGrid>
+      {form.entry_policy === "all" && form.visibility === "members" ? (
+        <p className="text-xs text-warn" data-testid="season-form-application-visibility-hint">Die Sichtbarkeit steht auf „Nur Mitglieder“: Externe Konten sehen die Season nicht und können sich nicht anmelden.</p>
+      ) : null}
       <Toggle label="Warteliste" hint="Sind alle Startplätze vergeben, kann die Leitung Anmeldungen auf die Warteliste setzen. Ohne Warteliste endet die Anmeldung, sobald alle Plätze weg sind. Niemand rückt von selbst nach."
         checked={form.application_waitlist} onChange={(value) => set("application_waitlist", value)} testId="season-form-application-waitlist" />
       <TextAreaField label="Regel zur Warteliste" rows={2} value={form.application_waitlist_note} onChange={(value) => set("application_waitlist_note", value)} hint="Steht öffentlich auf der Ligaseite, z. B. nach welcher Reihenfolge die Leitung entscheidet." testId="season-form-application-waitlist-note" />

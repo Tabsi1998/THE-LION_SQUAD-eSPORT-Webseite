@@ -488,6 +488,13 @@ async def assign(db, league: dict, season: dict, application_id: str, tournament
                 raise LeagueProblem(DECIDED, 409)
             if application.get("assignment"):
                 raise LeagueProblem(ASSIGNED_ALREADY, 409)
+            # Der Kader kann sich seit dem Annehmen geändert haben: dieselbe Prüfung wie beim Einreichen, dazu die der Staffel.
+            team, squad = await _load_side(db, application["squad_id"])
+            if not squad:
+                raise LeagueProblem(SQUAD_GONE, 409)
+            problems = (await check_squad(db, league, fresh, team, squad, application=application))["problems"]
+            if problems:
+                raise LeagueProblem(problems[0][1], problems[0][0])
             tournament = await _staffel_for_write(db, fresh, tournament_id)
             registration = await _insert_registration(db, tournament, application, actor)
             fields = {"assignment": await _assignment(db, tournament, registration, actor["id"])}
