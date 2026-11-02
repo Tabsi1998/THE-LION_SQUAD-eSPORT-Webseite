@@ -258,7 +258,7 @@ function MatchPageView() {
   // Liga (#1650): die eigene Aufstellung je Map nachtragen - bis zur Frist, danach über die Turnierleitung.
   const saveLineups = async (payload) => runAction(async () => {
     await api.put(`/matches/${id}/lineups`, payload);
-    toast.success("Aufstellung gespeichert.");
+    toast.success(payload.lineup ? "Teilnehmerliste gespeichert." : "Aufstellung gespeichert.");
     await load({ preserveDrafts: false });
   }, "Aufstellung konnte nicht gespeichert werden.");
 

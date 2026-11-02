@@ -3,9 +3,9 @@ import { X } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
 import { HEAT_MODES, HEAT_MODE_KEY, initialState, inputKind, resultSentence, resultsFor, tapGame } from "@/lib/resultEntry";
 import { BestOfInput, OrderInput, PointsInput, ScoreInput, WinnerInput } from "@/components/tls/results/ResultInputs";
-import { GameEditor } from "@/components/tls/league/LeagueReportForm";
+import { GameEditor, ParticipantsPicker } from "@/components/tls/league/LeagueReportForm";
 import { sidesInSlotOrder } from "@/components/tls/league/leagueGames";
-import { changeStaffGame, seriesSentence, settleStaffGames, staffPayload, staffProblem, staffStart } from "@/components/tls/league/leagueGames";
+import { changeStaffGame, isSeries, seriesSentence, settleStaffGames, staffListsStart, staffPayload, staffProblem, staffStart } from "@/components/tls/league/leagueGames";
 
 // Das eine Ergebnis-Fenster (#1156, #1370): Turnierleitung am Handy, Matchplan, Stationen und Matchseite öffnen es -
 // dieselben Felder, dieselben Wörter („Nicht erschienen“, „Aufgegeben“), derselbe Satz vor dem Speichern und danach
@@ -43,6 +43,8 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
   const [skipMaps, setSkipMaps] = useState(false);
   const withMaps = mapsPossible && !skipMaps;
   const [mapGames, setMapGames] = useState(() => (mapsPossible ? staffStart(league) : []));
+  // Teilnehmerlisten (#2204): einmal je Spiel statt je Map, je Seite freiwillig.
+  const [mapLists, setMapLists] = useState(() => staffListsStart(league));
   const [reason, setReason] = useState("");
   // Befangen (#2203): Der Superadmin darf als Notausnahme, mit Grund im Protokoll. Der Server prüft das selbst.
   const [conflictReason, setConflictReason] = useState("");
@@ -52,9 +54,9 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
   const kind = withMaps ? "maps" : inputKind(entry, heatMode);
   const outcome = useMemo(() => {
     if (!withMaps) return resultsFor(entry, kind, state);
-    const problem = staffProblem(mapGames, league);
-    return problem ? { error: problem } : staffPayload(mapGames, league);
-  }, [entry, kind, state, withMaps, mapGames, league]);
+    const problem = staffProblem(mapGames, league, mapLists);
+    return problem ? { error: problem } : staffPayload(mapGames, league, mapLists);
+  }, [entry, kind, state, withMaps, mapGames, mapLists, league]);
   const sentence = withMaps ? (outcome.results ? seriesSentence(mapGames, league) : "")
     : outcome.results ? resultSentence(entry, outcome.results) : "";
 
@@ -65,6 +67,7 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
     setSeenEntryId(entry?.id);
     setState(initialState(entry));
     setMapGames(mapsPossible ? staffStart(league) : []);
+    setMapLists(staffListsStart(league));
     setSkipMaps(false);
     setReason("");
     setError("");
@@ -185,6 +188,11 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
             <GameEditor key={game.position} staff index={index} game={game} games={mapGames} league={league}
               onChange={(next) => setMapGames((current) => settleStaffGames(changeStaffGame(current, game.position, next), league))} />
           ))}
+          {withMaps && isSeries(league) ? league.sides.map((side) => (
+            <ParticipantsPicker key={side.registration_id} roster={league.rosters?.[side.registration_id] || []} value={mapLists[side.registration_id] || []} league={league}
+              onChange={(list) => setMapLists((current) => ({ ...current, [side.registration_id]: list }))}
+              label={`Wer hat gespielt? ${side.name}`} testId={`league-staff-participants-${side.registration_id}`} />
+          )) : null}
           {kind === "score" && <ScoreInput entry={entry} state={state} onChange={setState} />}
           {kind === "bestof" && (
             <BestOfInput

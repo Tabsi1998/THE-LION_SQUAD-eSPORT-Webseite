@@ -4,6 +4,22 @@ import { viennaDay, viennaTime } from "@/lib/vienna";
 
 const WEEKDAYS = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 
+/** Teilnehmerliste einmal je Spiel (#2204): Staffeln ohne Feld bleiben bei der Aufstellung je Map. */
+export function isSeries(league) {
+  return league?.lineup_mode === "series";
+}
+
+/** Was an der Teilnehmerliste fehlt - der Satz für die Seite, sonst `null`. Nach oben offen. */
+export function participantsProblem(ids, league) {
+  const minimum = league?.lineup_min_players || 1;
+  return (ids || []).length < minimum ? `Bitte mindestens ${minimum} Personen ankreuzen, die gespielt haben.` : null;
+}
+
+/** Die Kennungen einer Liste aus Personen - für den Startstand eines Formulars. */
+export function personIds(people) {
+  return (people || []).map((person) => (typeof person === "string" ? person : person.id)).filter(Boolean);
+}
+
 /**
  * Der Standardtermin der Spielwoche als Satz (#2096): „So 15.11., 20:00“ in Wiener Zeit - oder leer ohne Wert.
  */
@@ -166,11 +182,13 @@ export function seriesSentence(games, league) {
 }
 
 /** Was an den Server geht: Ergebnis (Plätze, gewonnene Maps) und je Map Modus, Map, Sieger, Punkte, eigene Aufstellung. */
-export function reportPayload(games, league) {
+export function reportPayload(games, league, lineup = null) {
   const wins = tally(games, league.sides);
   const ordered = Object.keys(wins).sort((a, b) => wins[b] - wins[a]);
+  const series = isSeries(league);
   return {
     results: ordered.map((side, index) => ({ registration_id: side, rank: index + 1, score: wins[side] })),
+    ...(series ? { lineup: lineup || [] } : {}),
     games: games.map((game) => {
       const scores = Object.fromEntries(Object.entries(game.scores || {})
         .map(([side, value]) => [side, scoreValue(value)])
@@ -181,7 +199,7 @@ export function reportPayload(games, league) {
         map_id: game.map_id,
         winner_registration_id: game.winner,
         ...(Object.keys(scores).length ? { scores } : {}),
-        lineup: game.lineup,
+        ...(series ? {} : { lineup: game.lineup }),
       };
     }),
   };
@@ -195,15 +213,15 @@ export function confirmPayload(proposalGames, lineups, league) {
     map_id: game.map_id,
     winner: game.winner_registration_id,
     scores: {},
-    lineup: lineups[game.position] || [],
+    lineup: isSeries(league) ? [] : lineups[game.position] || [],
   }));
-  return reportPayload(games, league);
+  return reportPayload(games, league, isSeries(league) ? lineups : null);
 }
 
-/** Ein Spieler-Chip antippen: rein oder raus - nie mehr als die Teamgröße. */
+/** Ein Spieler-Chip antippen: rein oder raus - nie mehr als die Teamgröße; ohne `size` nach oben offen (#2204). */
 export function toggleLineup(lineup, userId, size) {
   if (lineup.includes(userId)) return lineup.filter((id) => id !== userId);
-  if (lineup.length >= size) return lineup;
+  if (size != null && lineup.length >= size) return lineup;
   return [...lineup, userId];
 }
 
@@ -256,10 +274,23 @@ export function settleStaffGames(games, league) {
   return settled.map((game, index) => (game.lineups ? game : { ...game, lineups: { ...(settled[index - 1]?.lineups || {}) } }));
 }
 
+/** Die Teilnehmerlisten beider Seiten als Startstand des Ergebnis-Fensters (#2204). */
+export function staffListsStart(league) {
+  return Object.fromEntries(Object.entries(league?.participants || {}).map(([side, people]) => [side, personIds(people)]));
+}
+
 /** Was fehlt: wie beim Melden, Aufstellungen je Seite aber freiwillig - wenn, dann vollständig. */
-export function staffProblem(games, league) {
+export function staffProblem(games, league, lists = {}) {
   const problem = gamesProblem(games, league, { withLineup: false });
   if (problem) return problem;
+  if (isSeries(league)) {
+    const minimum = league.lineup_min_players || 1;
+    for (const side of league.sides) {
+      const count = (lists[side.registration_id] || []).length;
+      if (count && count < minimum) return `Teilnehmerliste ${side.name}: mindestens ${minimum} Personen oder keine.`;
+    }
+    return null;
+  }
   for (const game of games) {
     for (const side of league.sides) {
       const count = (game.lineups?.[side.registration_id] || []).length;
@@ -272,8 +303,12 @@ export function staffProblem(games, league) {
 }
 
 /** Ergebnis und Maps für POST /matches/{id}/result - mit den vollständigen Aufstellungen beider Seiten. */
-export function staffPayload(games, league) {
+export function staffPayload(games, league, lists = {}) {
   const payload = reportPayload(games, league);
+  if (isSeries(league)) {
+    const lineups = Object.fromEntries(Object.entries(lists).filter(([, ids]) => (ids || []).length));
+    return { results: payload.results, games: payload.games, ...(Object.keys(lineups).length ? { lineups } : {}) };
+  }
   return {
     results: payload.results,
     games: payload.games.map(({ lineup: _ignored, ...game }, index) => {
