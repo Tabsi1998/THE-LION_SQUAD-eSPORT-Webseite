@@ -128,15 +128,15 @@ def test_old_free_text_says_what_to_do():
 async def test_migration_turns_exact_names_into_ids_and_counts_the_rest(flow):
     from services import migrations
 
-    await flow.db.games.insert_many([{"id": "bo7", "name": "Black Ops 7"}, {"id": "a1", "name": "Doppelt"}, {"id": "a2", "name": "doppelt"}])
-    rows = [("exakt", "Black Ops 7"), ("klein", "  black ops  7 "), ("kennung", "bo7"), ("fremd", "Irgendwas"), ("zweideutig", "Doppelt"), ("leer", None)]
+    await flow.db.games.insert_many([{"id": "bo7", "name": "Black Ops 7"}, {"id": "a1", "name": "Doppelt"}, {"id": "a2", "name": "doppelt"}, {"id": "ohne"}])
+    rows = [("exakt", "Black Ops 7"), ("klein", "  black ops  7 "), ("kennung", "bo7"), ("fremd", "Irgendwas"), ("zweideutig", "Doppelt"), ("leer", None), ("nichts", ""), ("leerzeichen", "   ")]
     for name, value in rows:
         await flow.db.team_squads.insert_one({"id": name, "team_id": "t1", "name": name, "game_id": value})
 
     result = await migrations.migrate_squad_game_names(flow.db)
     assert result == "2 squads moved to a game id, 2 left"
     stored = {row["id"]: row["game_id"] async for row in flow.db.team_squads.find({}, {"_id": 0, "id": 1, "game_id": 1})}
-    assert stored == {"exakt": "bo7", "klein": "bo7", "kennung": "bo7", "fremd": "Irgendwas", "zweideutig": "Doppelt", "leer": None}
+    assert stored == {"exakt": "bo7", "klein": "bo7", "kennung": "bo7", "fremd": "Irgendwas", "zweideutig": "Doppelt", "leer": None, "nichts": "", "leerzeichen": "   "}
     row = await flow.db.audit_logs.find_one({"action": "team.squad.game_names"}, {"_id": 0})
     assert row["data"] == {"moved": 2, "left": 2}
 

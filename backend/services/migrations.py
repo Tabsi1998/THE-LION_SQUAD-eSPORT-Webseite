@@ -422,7 +422,7 @@ async def migrate_squad_game_names(db) -> str:
         by_name.setdefault(norm(game.get("name")), []).append(game["id"])
     moved = left = 0
     async for squad in db.team_squads.find({"game_id": {"$nin": [None, ""]}}, {"_id": 0, "id": 1, "game_id": 1}):
-        if squad["game_id"] in known:
+        if squad["game_id"] in known or not norm(squad["game_id"]):
             continue
         hits = by_name.get(norm(squad["game_id"])) or []
         if len(hits) == 1:
