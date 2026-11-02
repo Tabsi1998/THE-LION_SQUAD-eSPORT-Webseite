@@ -24,9 +24,9 @@ function CapabilityChoice({ value, onChange, idPrefix }) {
       {LEAGUE_CAPABILITIES.map((row) => (
         <label key={row.key} className="flex min-h-[44px] cursor-pointer items-start gap-2.5 rounded-sm border border-white/10 px-3 py-2 text-sm has-[:checked]:border-[#29B6E8]/60 has-[:checked]:bg-[#29B6E8]/5 has-[:focus-visible]:outline has-[:focus-visible]:outline-1 has-[:focus-visible]:outline-[#29B6E8]">
           <input type="checkbox" className="mt-0.5 accent-[#29B6E8]" checked={value.includes(row.key)} onChange={() => toggle(row.key)} data-testid={`${idPrefix}-${row.key}`} />
-          <span className="min-w-0">
-            <span className="block font-semibold text-white">{row.label}</span>
-            <span className="block text-[11px] leading-snug text-white/55">{row.hint}</span>
+          <span className="min-w-0 font-semibold text-white">
+            {row.label}
+            <span className="block text-[11px] font-normal leading-snug text-white/55">{row.hint}</span>
           </span>
         </label>
       ))}
