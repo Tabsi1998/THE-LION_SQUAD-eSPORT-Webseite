@@ -25,4 +25,5 @@ def refunded_cents(order: dict) -> int:
 
 
 def credited_cents(order: dict) -> int:
-    return sum(int(row.get("total_cents") or 0) for row in order.get("credit_notes") or [])
+    """Was gutgeschrieben ist: ein Entwurf gleicht noch nichts aus - derselbe Maßstab wie beim Zahlungsstand (``dolibarr_billing``)."""
+    return sum(int(row.get("total_cents") or 0) for row in order.get("credit_notes") or [] if row.get("status") != "draft")

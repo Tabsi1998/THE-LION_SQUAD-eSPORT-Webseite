@@ -27,6 +27,13 @@ def test_amounts_are_whole_cents_and_never_floats():
     assert pricing.cents_from_amount(0.1 + 0.2) == 30
     assert pricing.cents_from_amount("19.995") == 2000
     assert pricing.format_cents(2050) == "20,50 €"
+    # Negative Beträge: das Vorzeichen steht vor dem ganzen Betrag, nicht nur vor den Euro.
+    assert pricing.format_cents(-250) == "-2,50 €"
+    assert pricing.format_cents(-1) == "-0,01 €"
+    assert pricing.format_cents(-100) == "-1,00 €"
+    assert pricing.format_cents(0) == "0,00 €"
+    assert pricing.format_cents(250) == "2,50 €"
+    assert pricing.format_cents(-250, "USD") == "-2,50 USD"
     with pytest.raises(pricing.PricingError):
         pricing.cents_from_amount("-1")
     with pytest.raises(pricing.PricingError):

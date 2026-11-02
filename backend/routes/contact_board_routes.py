@@ -5,7 +5,9 @@
 - /api/board: dynamic vorstand positions (defaults seeded, admin can add/disable
   /assign members).
 """
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+import re
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from pymongo import ReturnDocument
 from datetime import timedelta
@@ -14,7 +16,7 @@ from typing import Optional, Literal
 from database import get_db
 from auth import get_optional_user as get_current_user_optional, require_area
 from models import now_utc, new_id
-from services import spam_guard
+from services import contact_retention, spam_guard
 from services.slug_utils import apply_slug_history, slug_source_for_update, slugify, unique_slug
 from services.usernames import profile_path
 
@@ -22,13 +24,15 @@ from services.usernames import profile_path
 contact_router = APIRouter(prefix="/api/contact", tags=["contact"])
 
 ContactTopic = Literal[
-    "general", "membership", "volunteer", "tournament", "fastlap",
+    "general", "membership", "invoice", "volunteer", "tournament", "fastlap",
     "sponsorship", "press", "report_bug", "abuse", "other",
 ]
 
 TOPIC_LABELS = {
     "general": "Allgemeine Anfrage",
     "membership": "Mitgliedschaft",
+    # Aus „Meine Rechnungen“: stimmt etwas nicht, gibt es jetzt einen Weg zum Kassier (#2131).
+    "invoice": "Rechnung",
     # „Interesse melden“ an einer offenen Vorstandsfunktion (#1252).
     "volunteer": "Mitarbeit im Verein",
     "tournament": "Turnier-Anfrage",
@@ -43,6 +47,26 @@ TOPIC_LABELS = {
 ContactStatus = Literal["new", "in_progress", "answered", "closed", "spam"]
 # „Kein Spam“ (#2067): so lange gilt eine laufende Freigabe als in Arbeit; danach darf sie neu angestoßen werden.
 RELEASE_STALE_MINUTES = 5
+# Standardansicht der Inbox (#2131): was noch jemanden braucht.
+OPEN_STATUSES = ("new", "in_progress")
+InboxView = Literal["open", "all", "new", "in_progress", "answered", "closed", "spam"]
+INBOX_SEARCH_FIELDS = ("name", "email", "subject", "message")
+REPLY_MAX = 4000
+# Eine Antwort geht nur an eine Adresse, die aussieht wie eine: ohne Leerzeichen, Umbruch oder eine zweite Adresse dahinter.
+DELIVERABLE_ADDRESS = re.compile(r"[^\s@<>,;\"']+@[^\s@<>,;\"']+\.[^\s@<>,;\"']+")
+_CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
+
+def _plain_text(value: str | None) -> str:
+    """Text, wie ihn jemand getippt hat: Zeilenumbrüche bleiben, Steuerzeichen nicht."""
+    return _CONTROL_CHARS.sub("", str(value or "").replace("\r\n", "\n").replace("\r", "\n")).strip()
+
+
+class ContactContext(BaseModel):
+    """„Fehler melden“ (#2131): wo es passiert ist. Die Person sieht vor dem Absenden, was mitgeht."""
+    page: Optional[str] = Field(default=None, max_length=300)
+    device: Optional[str] = Field(default=None, max_length=300)
+    version: Optional[str] = Field(default=None, max_length=40)
 
 
 class ContactSubmit(BaseModel):
@@ -52,6 +76,7 @@ class ContactSubmit(BaseModel):
     subject: str = Field(min_length=2, max_length=200)
     message: str = Field(min_length=5, max_length=4000)
     related_id: Optional[str] = None  # tournament_id / event_id / etc.
+    context: Optional[ContactContext] = None
     accept_privacy: bool = Field(..., description="Must be explicitly true")
     # Spamschutz (#2067): Formular-Token, das unsichtbare Feld und - falls eingeschaltet - die Antwort von Turnstile.
     form_token: Optional[str] = Field(default=None, max_length=300)
@@ -64,7 +89,8 @@ class ContactSubmit(BaseModel):
         cleaned = value.strip()
         minimum = {"name": 2, "subject": 2, "message": 5}[info.field_name]
         if len(cleaned) < minimum:
-            raise ValueError(f"{info.field_name} ist zu kurz")
+            # Das Wort fürs Feld setzt services/validation_messages davor: „Nachricht: mindestens 5 Zeichen.“
+            raise ValueError(f"mindestens {minimum} Zeichen")
         return cleaned
 
 
@@ -98,7 +124,13 @@ async def submit_contact(body: ContactSubmit, request: Request, me=Depends(get_c
         "answered_at": None,
         "answered_by": None,
         "internal_note": "",
+        "assigned_to": None,
     }
+    doc["status_changed_at"] = doc["created_at"]
+    if body.topic == "report_bug" and body.context:
+        context = {key: _plain_text(value) for key, value in body.context.model_dump().items() if _plain_text(value)}
+        if context:
+            doc["context"] = context
     if verdict.suspect:
         # Nur der Inhalt ist verdächtig: in die Inbox als „Spam“, ohne Mail und ohne Hinweis an den Vorstand.
         # „Kein Spam“ in der Inbox holt beides nach.
@@ -183,36 +215,192 @@ async def list_topics():
     return [{"value": k, "label": v} for k, v in TOPIC_LABELS.items()]
 
 
-@contact_router.get("")
-async def list_contact_messages(status: Optional[ContactStatus] = None,
-                                 me: dict = Depends(require_area("club"))):
-    db = get_db()
-    q: dict = {}
-    if status:
-        q["status"] = status
-    docs = await db.contact_messages.find(q, {"_id": 0}).sort("created_at", -1).to_list(500)
+def _reply_key(cid: str, reply: dict) -> str:
+    return f"contact:{cid}:reply:{reply.get('request_id')}"
+
+
+# Der Stand des Mail-Auftrags in dem, was die Inbox unterscheidet.
+REPLY_DELIVERY = {"pending": "waiting", "sending": "waiting", "sent": "sent", "failed": "failed", "skipped": "skipped"}
+
+
+async def _with_names(db, docs: list[dict]) -> list[dict]:
+    """Wer zuständig ist, wer geantwortet hat: Namen werden beim Lesen aufgelöst - nach einer Kontolöschung steht dort
+    der Name des gelöschten Kontos, nie eine Kopie (#2131)."""
+    wanted = {doc.get("assigned_to") for doc in docs} | {doc.get("answered_by") for doc in docs}
+    wanted |= {reply.get("by") for doc in docs for reply in doc.get("replies") or []}
+    names: dict[str, str] = {}
+    ids = sorted(value for value in wanted if value)
+    if ids:
+        async for user in db.users.find({"id": {"$in": ids}}, {"_id": 0, "id": 1, "display_name": 1, "username": 1}):
+            names[user["id"]] = user.get("display_name") or user.get("username") or ""
+    # Ob die Antwort hinausging, weiß der Auftrag in der Warteschlange: „beantwortet“ allein täuscht, wenn die Mail scheitert.
+    keys = {_reply_key(doc["id"], reply) for doc in docs for reply in doc.get("replies") or []}
+    jobs = {row["dedupe_key"]: row.get("status") for row in await db.mail_jobs.find({"dedupe_key": {"$in": sorted(keys)}}, {"_id": 0, "dedupe_key": 1, "status": 1}).to_list(None)} if keys else {}
+    for doc in docs:
+        doc["assigned_to_name"] = names.get(doc.get("assigned_to") or "")
+        doc["answered_by_name"] = names.get(doc.get("answered_by") or "")
+        for reply in doc.get("replies") or []:
+            reply["by_name"] = names.get(reply.get("by") or "")
+            # Versendete Aufträge räumt die Warteschlange nach einiger Zeit weg: dann steht hier nichts mehr.
+            reply["delivery"] = REPLY_DELIVERY.get(jobs.get(_reply_key(doc["id"], reply)))
     return docs
+
+
+async def _contact_view(db, cid: str) -> dict:
+    doc = await db.contact_messages.find_one({"id": cid}, {"_id": 0})
+    return (await _with_names(db, [doc]))[0]
+
+
+async def _audit_contact(db, action: str, me: dict, cid: str, data: dict) -> None:
+    """Das Protokoll nennt Vorgang und Person der Verwaltung - nie Adresse oder Wortlaut der Anfrage."""
+    await db.audit_logs.insert_one({"id": new_id(), "action": action, "actor_id": me["id"], "target_id": cid, "data": data, "created_at": now_utc().isoformat()})
+
+
+@contact_router.get("")
+async def list_contact_messages(status: InboxView = "open", q: Optional[str] = Query(None, max_length=120), assigned: Optional[Literal["me", "none"]] = None,
+                                page: int = Query(1, ge=1, le=100000), limit: int = Query(50, ge=1, le=100), me: dict = Depends(require_area("club"))):
+    """Die Inbox (#2131): zuerst, was noch jemanden braucht. Suche in Name, Adresse, Betreff und Text als reiner Text;
+    die Zähler gelten immer für alle Anfragen, damit sie beim Filtern nicht springen."""
+    db = get_db()
+    query: dict = {}
+    if status == "open":
+        query["status"] = {"$in": list(OPEN_STATUSES)}
+    elif status == "all":
+        query["status"] = {"$ne": "spam"}
+    else:
+        query["status"] = status
+    if q and q.strip():
+        pattern = re.compile(re.escape(q.strip()), re.IGNORECASE)
+        query["$or"] = [{field: pattern} for field in INBOX_SEARCH_FIELDS]
+    if assigned == "me":
+        query["assigned_to"] = me["id"]
+    elif assigned == "none":
+        query["assigned_to"] = None
+    total = await db.contact_messages.count_documents(query)
+    docs = await db.contact_messages.find(query, {"_id": 0}).sort("created_at", -1).skip((page - 1) * limit).limit(limit).to_list(limit)
+    counts = {row["_id"]: int(row["n"]) async for row in db.contact_messages.aggregate([{"$group": {"_id": "$status", "n": {"$sum": 1}}}])}
+    suspicious = await db.contact_messages.count_documents({"status": "spam", "spam.reasons": {"$exists": True}, "spam.cleared_at": {"$exists": False}})
+    from services.ops_alerts import load_alert_settings
+
+    retention = (await load_alert_settings(db))["retention_days"]
+    return {"items": await _with_names(db, docs), "total": int(total), "page": page, "limit": limit, "counts": counts, "suspicious": int(suspicious),
+            "retention": {"done_days": retention["contact_done"], "spam_days": retention["contact_spam"]}}
+
+
+@contact_router.get("/assignees")
+async def list_contact_assignees(me: dict = Depends(require_area("club"))):
+    """Wer zuständig sein kann: alle mit der Vereinsverwaltung, dieselbe Regel wie der Wächter der Inbox."""
+    from services.member_announcements import club_area_user_ids
+
+    db = get_db()
+    ids = sorted(await club_area_user_ids(db))
+    rows = await db.users.find({"id": {"$in": ids}}, {"_id": 0, "id": 1, "display_name": 1, "username": 1}).to_list(500)
+    people = [{"id": row["id"], "name": row.get("display_name") or row.get("username") or "Ohne Namen"} for row in rows]
+    return sorted(people, key=lambda row: row["name"].casefold())
 
 
 class ContactPatch(BaseModel):
     status: Optional[ContactStatus] = None
-    internal_note: Optional[str] = None
+    internal_note: Optional[str] = Field(default=None, max_length=4000)
+    # Leer = niemand zuständig.
+    assigned_to: Optional[str] = Field(default=None, max_length=64)
 
 
 @contact_router.put("/{cid}")
 @contact_router.patch("/{cid}")
 async def patch_contact_message(cid: str, body: ContactPatch, me: dict = Depends(require_area("club"))):
     db = get_db()
-    updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
-    if body.status == "answered":
-        updates["answered_at"] = now_utc().isoformat()
-        updates["answered_by"] = me["id"]
+    existing = await db.contact_messages.find_one({"id": cid}, {"_id": 0, "status": 1, "assigned_to": 1})
+    if not existing:
+        raise HTTPException(404, "Nachricht nicht gefunden.")
+    data = body.model_dump(exclude_unset=True)
+    updates = {key: data[key] for key in ("status", "internal_note") if data.get(key) is not None}
+    now = now_utc().isoformat()
+    if updates.get("status") and updates["status"] != existing.get("status"):
+        # Ab hier läuft die Aufbewahrung (services/contact_retention.py).
+        updates["status_changed_at"] = now
+        if updates["status"] == "answered":
+            updates["answered_at"] = now
+            updates["answered_by"] = me["id"]
+    if "assigned_to" in data:
+        target = str(data["assigned_to"] or "").strip() or None
+        if target and target != existing.get("assigned_to"):
+            from services.member_announcements import club_area_user_ids
+
+            if target not in await club_area_user_ids(db):
+                raise HTTPException(400, "Zuständig kann nur sein, wer die Vereinsverwaltung hat.")
+        updates["assigned_to"] = target
     if not updates:
         raise HTTPException(400, "Keine Änderungen.")
-    res = await db.contact_messages.update_one({"id": cid}, {"$set": updates})
-    if res.matched_count == 0:
+    await db.contact_messages.update_one({"id": cid}, {"$set": updates})
+    if "assigned_to" in updates and updates["assigned_to"] != existing.get("assigned_to"):
+        await _audit_contact(db, "contact.assign", me, cid, {"to": updates["assigned_to"]})
+    return await _contact_view(db, cid)
+
+
+class ContactReply(BaseModel):
+    text: str = Field(min_length=2, max_length=REPLY_MAX)
+    # Kennung dieses einen Absendens: kommt es noch einmal an (Antwort verloren, Doppelklick), geht keine zweite Mail hinaus.
+    request_id: str = Field(min_length=8, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")
+
+
+async def _send_reply(doc: dict, reply: dict) -> None:
+    """Die Antwort über die Warteschlange - nur an die Adresse der Anfrage. Wortlaut und Name gehen als Text in die Mail."""
+    from email_service import _wrap
+    from services import mail_outbox
+    from services.email_delivery import html_lines
+    from services.mail_templates import render_template
+
+    subject, html = await render_template(
+        "contact_reply",
+        {"name": (doc.get("name") or "").split()[0] if (doc.get("name") or "").split() else "dort", "reply": html_lines(reply["text"]), "subject": doc.get("subject") or "", "message": html_lines(doc.get("message") or "")},
+        fallback_subject="Antwort auf deine Nachricht: {{subject}}",
+        fallback_html=_wrap(
+            "Antwort auf deine Nachricht",
+            "<p>Hallo {{name}},</p>"
+            "<div>{{reply}}</div>"
+            "<hr style='border:0;border-top:1px solid #1F2937;margin:20px 0;'/>"
+            "<p style='color:#6B7280;font-size:12px'>Deine Nachricht:</p>"
+            "<blockquote style='margin:8px 0;padding:8px 12px;border-left:3px solid #29B6E8;color:#9CA3AF;font-size:13px'>{{message}}</blockquote>",
+        ),
+    )
+    await mail_outbox.enqueue_mail(to=doc["email"], subject=subject, html=html, template_key="contact_reply", meta={"contact_id": doc["id"]},
+                                   dedupe_key=_reply_key(doc["id"], reply))
+
+
+@contact_router.post("/{cid}/reply")
+async def reply_to_contact_message(cid: str, body: ContactReply, me: dict = Depends(require_area("club"))):
+    """Antwort aus der Website (#2131): geht über die Mail-Queue an die Adresse der Anfrage, der Wortlaut steht im Verlauf,
+    der Status ist danach „beantwortet“. Nie an Spam: dort ist die Adresse nicht geprüft, erst „Kein Spam“ ordnet ein."""
+    db = get_db()
+    text = _plain_text(body.text)
+    if len(text) < 2:
+        raise HTTPException(400, "Die Antwort ist leer.")
+    doc = await db.contact_messages.find_one({"id": cid}, {"_id": 0})
+    if not doc:
         raise HTTPException(404, "Nachricht nicht gefunden.")
-    return await db.contact_messages.find_one({"id": cid}, {"_id": 0})
+    if doc.get("status") == "spam":
+        raise HTTPException(409, "Spam bekommt keine Antwort – erst „Kein Spam“ ordnet die Nachricht ein.")
+    if not DELIVERABLE_ADDRESS.fullmatch(str(doc.get("email") or "")):
+        raise HTTPException(409, "Zu dieser Nachricht gibt es keine Adresse mehr.")
+    now = now_utc().isoformat()
+    reply = {"id": new_id(), "request_id": body.request_id, "text": text, "by": me["id"], "at": now}
+    # Erst der Verlauf (bedingt, einmal je Absenden), dann die Mail mit eigenem Schlüssel: ein Neuversuch nach einem
+    # Absturz dazwischen holt die Mail nach, ohne einen zweiten Eintrag oder eine zweite Mail.
+    updated = await db.contact_messages.update_one(
+        {"id": cid, "status": {"$ne": "spam"}, "replies.request_id": {"$ne": body.request_id}},
+        {"$push": {"replies": reply}, "$set": {"status": "answered", "answered_at": now, "answered_by": me["id"], "status_changed_at": now}},
+    )
+    if updated.modified_count != 1:
+        current = await db.contact_messages.find_one({"id": cid}, {"_id": 0, "status": 1, "replies": 1})
+        earlier = next((row for row in (current or {}).get("replies") or [] if row.get("request_id") == body.request_id), None)
+        if not earlier:
+            raise HTTPException(409, "Die Nachricht wurde gerade geändert – bitte neu laden.")
+        reply = earlier
+    else:
+        await _audit_contact(db, "contact.reply", me, cid, {"reply_id": reply["id"], "chars": len(text)})
+    await _send_reply(doc, reply)
+    return await _contact_view(db, cid)
 
 
 @contact_router.post("/{cid}/not-spam")
@@ -248,9 +436,9 @@ async def mark_contact_not_spam(cid: str, me: dict = Depends(require_area("club"
     await _notify_contact(db, doc, claim_board_hint=True)
     done = now_utc().isoformat()
     await db.contact_messages.update_one({"id": cid}, {"$set": {
-        "status": "new", "spam.cleared_at": done, "spam.cleared_by": me["id"], "spam.release.state": "released",
+        "status": "new", "status_changed_at": done, "spam.cleared_at": done, "spam.cleared_by": me["id"], "spam.release.state": "released",
         "spam.release.finished_at": done}})
-    return await db.contact_messages.find_one({"id": cid}, {"_id": 0})
+    return await _contact_view(db, cid)
 
 
 @contact_router.delete("/{cid}")
@@ -259,6 +447,8 @@ async def delete_contact_message(cid: str, me: dict = Depends(require_area("club
     res = await db.contact_messages.delete_one({"id": cid})
     if res.deleted_count == 0:
         raise HTTPException(404, "Nachricht nicht gefunden.")
+    # Endgültig heißt auch: keine Kopie in Warteschlange oder Versandlog (#2131).
+    await contact_retention.forget_copies(db, [cid])
     return {"ok": True}
 
 

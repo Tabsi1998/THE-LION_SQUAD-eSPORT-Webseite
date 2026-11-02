@@ -61,9 +61,11 @@ def cents_from_amount(value) -> int:
 
 
 def format_cents(cents: int, currency: str = "EUR") -> str:
-    euros, rest = divmod(int(cents), 100)
+    value = int(cents)
+    # Das Vorzeichen getrennt: divmod runden nach unten, -250 Cent wären sonst „-3,50“.
+    euros, rest = divmod(abs(value), 100)
     symbol = "€" if currency == "EUR" else currency
-    return f"{euros},{rest:02d} {symbol}"
+    return f"{'-' if value < 0 else ''}{euros},{rest:02d} {symbol}"
 
 
 def normalize_position(raw: dict, index: int) -> dict:

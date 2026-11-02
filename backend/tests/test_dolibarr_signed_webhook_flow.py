@@ -340,12 +340,77 @@ async def test_the_secret_is_stored_encrypted_and_never_comes_back(flow, fake):
     stored = await flow.db.settings.find_one({"id": "dolibarr"})
     assert stored["signed_webhook_secret"].startswith("enc:v1:") and stored["signed_webhook_key_id"] == KEY_ID
     status = await flow.get("/api/admin/dolibarr/status")
-    assert status.json()["signed_webhook"] == {"configured": True, "source": "settings", "path": PATH}
+    assert status.json()["signed_webhook"] == {"configured": True, "source": "settings", "path": PATH, "key_id": KEY_ID, "secret_stored": True}
     assert SECRET not in status.text
     for wrong in ({"signed_webhook_key_id": "a b"}, {"signed_webhook_secret": "kurz"}):
         assert (await flow.put("/api/admin/dolibarr/settings", json=wrong)).status_code == 400
     flow.act_as(None)
     assert (await deliver(flow, body_of())).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_fields_in_the_interface_only_for_system_and_nothing_about_the_secret_in_the_log(flow, fake):
+    """#2131: Kennung und Geheimnis lassen sich unter Verbindung pflegen - nur mit System, das Geheimnis kommt nie zurück."""
+    await connect(flow)
+    admin = await flow.add_user(role="club_admin")
+    vorstand = await flow.add_user(role="player")
+    await flow.db.users.update_one({"id": vorstand["id"]}, {"$set": {"areas": ["club"]}})
+    club = {**vorstand, "areas": ["club"]}
+
+    flow.act_as(club)
+    assert (await flow.put("/api/admin/dolibarr/settings", json={"signed_webhook_key_id": KEY_ID, "signed_webhook_secret": SECRET})).status_code == 403
+    refused = await flow.delete("/api/admin/dolibarr/settings/signed-webhook")
+    assert refused.status_code == 403
+
+    flow.act_as(admin)
+    alone = await flow.put("/api/admin/dolibarr/settings", json={"signed_webhook_secret": SECRET})
+    assert alone.status_code == 400 and "Kennung" in alone.json()["detail"], "ein Geheimnis ohne Kennung täte still nichts"
+    assert (await flow.put("/api/admin/dolibarr/settings", json={"signed_webhook_key_id": KEY_ID, "signed_webhook_secret": SECRET})).status_code == 200
+    only_id = await flow.put("/api/admin/dolibarr/settings", json={"signed_webhook_key_id": "neu-2"})
+    assert only_id.status_code == 200, "die Kennung allein ändern behält das Geheimnis"
+    assert (await flow.get("/api/admin/dolibarr/status")).json()["signed_webhook"]["key_id"] == "neu-2"
+
+    flow.act_as(club)
+    seen = await flow.get("/api/admin/dolibarr/status")
+    assert seen.json()["signed_webhook"]["configured"] is True
+    assert "key_id" not in seen.json()["signed_webhook"] and "secret_stored" not in seen.json()["signed_webhook"], "nur System"
+
+    flow.act_as(admin)
+    removed = await flow.delete("/api/admin/dolibarr/settings/signed-webhook")
+    assert removed.status_code == 200
+    state = (await flow.get("/api/admin/dolibarr/status")).json()["signed_webhook"]
+    assert state == {"configured": False, "source": None, "path": PATH, "key_id": "", "secret_stored": False}
+
+    logged = await flow.db.audit_logs.find({"action": {"$regex": "^dolibarr"}}, {"_id": 0}).to_list(50)
+    assert {"dolibarr.settings", "dolibarr.signed_webhook_removed"} <= {row["action"] for row in logged}
+    assert SECRET not in str(logged) and "enc:v1:" not in str(logged), "das Protokoll nennt das Feld, nie den Wert"
+
+
+@pytest.mark.asyncio
+async def test_a_key_in_the_server_environment_keeps_priority_over_the_interface(flow, fake, monkeypatch):
+    await connect(flow)
+    other = "u" * 40
+    monkeypatch.setenv(vereine_webhooks.SECRETS_ENV, f"{KEY_ID}:{other}")
+    flow.act_as(await flow.add_user(role="club_admin"))
+    assert (await flow.put("/api/admin/dolibarr/settings", json={"signed_webhook_key_id": KEY_ID, "signed_webhook_secret": SECRET})).status_code == 200
+    state = (await flow.get("/api/admin/dolibarr/status")).json()["signed_webhook"]
+    assert state["source"] == "env" and state["secret_stored"] is True
+    settings = await vereine_webhooks.load_settings(flow.db)
+    assert vereine_webhooks.configured_secrets(settings)[KEY_ID] == other
+
+
+@pytest.mark.asyncio
+async def test_the_module_is_shown_as_able_and_stand_lines_use_vienna_time(flow, fake):
+    """#2131: „Signierte Webhooks“ steht nicht mehr als fehlend da; die Stand-Zeilen zeigen die Wiener Uhr."""
+    from routes.dolibarr_routes import _vienna_moment
+    from services.dolibarr_client import capabilities_for
+
+    assert capabilities_for({"api_version": 1})["signed_webhooks"] is True
+    assert capabilities_for(None)["signed_webhooks"] is False
+    assert _vienna_moment("2026-01-15T22:30:00+00:00") == "15.01.2026 23:30"
+    assert _vienna_moment("2026-07-15T22:30:00+00:00") == "16.07.2026 00:30", "Sommerzeit, über Mitternacht"
+    assert _vienna_moment(None) == ""
+    assert _vienna_moment("kein Datum") == "kein Datum"
 
 
 @pytest.mark.asyncio

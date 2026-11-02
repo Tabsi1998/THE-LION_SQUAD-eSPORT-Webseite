@@ -30,6 +30,12 @@ def html_value(value) -> SafeHtml:
     return SafeHtml(html_lib.escape("" if value is None else str(value), quote=True))
 
 
+def html_lines(value) -> SafeHtml:
+    """Mehrzeiliger Text für das Mail-HTML: als Text geschützt wie `html_value`, die Zeilenumbrüche werden `<br>` - das
+    verstehen auch Mailprogramme, die `white-space` nicht kennen."""
+    return SafeHtml(html_value(value).replace("\r\n", "\n").replace("\n", "<br>"))
+
+
 def header_text(value) -> str:
     """Ein Wert für Betreff und Kopfzeilen: reiner Text in einer Zeile. Zeilenumbrüche werden zu Leerzeichen -
     ein Wert kann so keine weitere Kopfzeile anhängen. Kein HTML-Schutz: der Betreff ist kein HTML."""

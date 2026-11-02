@@ -49,7 +49,7 @@ async def test_rules_have_defaults_and_are_saved_with_checks(flow):
     flow.act_as(admin)
     view = (await flow.get("/api/admin/ops/alerts")).json()
     assert view["settings"]["rules"]["error_group"] == {"discord": True, "email": False} and view["settings"]["cooldown_minutes"] == 60
-    assert view["settings"]["retention_days"] == {"email_logs": 90, "audit_logs": 730}
+    assert view["settings"]["retention_days"] == {"email_logs": 90, "audit_logs": 730, "contact_done": 365, "contact_spam": 30}
     assert [k["key"] for k in view["kinds"]] == list(ops_alerts.ALERT_KINDS) and next(k for k in view["kinds"] if k["key"] == "mail_failed")["email_allowed"] is False
     staff = await flow.add_user(role="tournament_admin", name="turnierleitung")
     flow.act_as(staff)
@@ -63,7 +63,7 @@ async def test_rules_have_defaults_and_are_saved_with_checks(flow):
     assert saved["emails"] == ["vorstand@example.test", "kassier@example.test"] and saved["cooldown_minutes"] == 30
     assert saved["rules"]["error_group"] == {"discord": True, "email": True}
     assert saved["rules"]["mail_failed"]["email"] is False, "eine Mail über kaputten Mailversand käme nicht an"
-    assert saved["retention_days"] == {"email_logs": 30, "audit_logs": 730}
+    assert saved["retention_days"] == {"email_logs": 30, "audit_logs": 730, "contact_done": 365, "contact_spam": 30}
     assert (await flow.put("/api/admin/ops/alerts", json={"emails": ["kein-mail"]})).status_code == 400
     assert (await flow.put("/api/admin/ops/alerts", json={"cooldown_minutes": 2})).status_code == 400
     assert (await flow.put("/api/admin/ops/alerts", json={"retention_days": {"email_logs": 3}})).status_code == 400
@@ -171,7 +171,7 @@ async def test_retention_purges_old_mail_and_audit_rows(flow):
         {"id": "r-old", "user_id": "u1", "display_name": "Konto Alt", "internal_note": "bleibt", "created_at": (now_utc() - timedelta(days=800)).isoformat()},
     ])
     removed = await ops_alerts.purge_old_logs(flow.db)
-    assert removed == {"email_logs": 1, "audit_logs": 1, "event_messages": 1, "walk_in_names": 1}
+    assert removed == {"email_logs": 1, "audit_logs": 1, "event_messages": 1, "walk_in_names": 1, "contact_messages": 0}
     rows = {r["id"]: r for r in await flow.db.event_registrations.find({}, {"_id": 0}).to_list(10)}
     assert {key: row["display_name"] for key, row in rows.items()} == {"w-old": "Teilnehmer", "w-new": "Gast Neu", "r-old": "Konto Alt"}
     assert rows["w-old"]["internal_note"] is None and rows["w-old"]["note"] is None
@@ -180,4 +180,4 @@ async def test_retention_purges_old_mail_and_audit_rows(flow):
     assert [r["id"] for r in await flow.db.email_logs.find({}, {"_id": 0}).to_list(10)] == ["e-new"]
     assert [r["id"] for r in await flow.db.audit_logs.find({}, {"_id": 0}).to_list(10)] == ["a-new"]
     await ops_alerts.save_alert_settings(flow.db, {"retention_days": {"email_logs": 7}})
-    assert (await ops_alerts.purge_old_logs(flow.db)) == {"email_logs": 1, "audit_logs": 0, "event_messages": 0, "walk_in_names": 0}
+    assert (await ops_alerts.purge_old_logs(flow.db)) == {"email_logs": 1, "audit_logs": 0, "event_messages": 0, "walk_in_names": 0, "contact_messages": 0}

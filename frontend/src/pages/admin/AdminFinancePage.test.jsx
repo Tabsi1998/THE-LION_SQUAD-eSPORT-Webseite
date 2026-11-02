@@ -62,6 +62,75 @@ beforeEach(() => {
   apiMock.post.mockResolvedValue({ data: { ok: true } });
 });
 
+// Export vom Server (#2131): vollständig, mit Zeitraum - nicht mehr aus dem, was die Liste gerade geladen hat.
+test("der CSV-Knopf holt die Datei vom Server, mit Zeitraum; ein Zeitraum verkehrt herum sperrt ihn", async () => {
+  const url = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:x");
+  vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+  vi.spyOn(window.HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+  const file = new Blob(["a"]);
+  apiMock.get.mockImplementation(async (path) => {
+    if (path === "/admin/finance/overview") return { data: { ...OVERVIEW, invoiced_total: 1234 } };
+    if (path === "/admin/finance/export.csv") return { data: file, headers: { "x-export-rows": "1234" } };
+    throw new Error(path);
+  });
+  const user = userEvent.setup();
+  render(<MemoryRouter><AdminFinancePage /></MemoryRouter>);
+  // Die Liste sagt, wie viele sie zeigt.
+  expect(await screen.findByTestId("finance-invoiced-count")).toHaveTextContent(/1 von 1[.,\s ]?234 Rechnungen/);
+  expect(screen.getByTestId("finance-invoiced-count")).toHaveTextContent("Vollständig ist der CSV-Export");
+
+  const from = screen.getByTestId("finance-export-from");
+  const to = screen.getByTestId("finance-export-to");
+  await user.type(from, "2027-02-01");
+  await user.type(to, "2027-01-01");
+  expect(screen.getByTestId("finance-csv")).toBeDisabled();
+  expect(screen.getByTestId("finance-export-hint")).toHaveTextContent("beginnt nach seinem Ende");
+  await user.clear(from);
+  await user.type(from, "2026-01-01");
+  await user.click(screen.getByTestId("finance-csv"));
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/admin/finance/export.csv", { params: { from: "2026-01-01", to: "2027-01-01" }, responseType: "blob" }));
+  await waitFor(() => expect(url).toHaveBeenCalledWith(file));
+  vi.restoreAllMocks();
+});
+
+test("Prüffälle: Umschalter zeigt die erledigten mit Grund, wer und wann (#2131)", async () => {
+  apiMock.get.mockImplementation(async (path, options) => {
+    if (path === "/admin/finance/overview") return { data: { ...OVERVIEW, cases_resolved: 1 } };
+    if (path === "/admin/finance/cases") {
+      expect(options.params.status).toBe("resolved");
+      return { data: { total: 1, cases: [{ id: "c9", order_id: "o2", status: "resolved", label: "Überzahlung", source: { name: "Weihnachtsfeier" }, person: "Max", total: "40,00 €",
+        resolved_at: "2026-09-24T10:00:00+00:00", resolved_by_name: "Kim Kassa", resolution: "20 € überwiesen", detail: {} }] } };
+    }
+    throw new Error(path);
+  });
+  const user = userEvent.setup();
+  render(<MemoryRouter><AdminFinancePage /></MemoryRouter>);
+  expect(await screen.findByTestId("finance-case-c1")).toBeInTheDocument();
+  expect(screen.getByTestId("finance-cases-open")).toHaveTextContent("Offen · 1");
+  await user.click(screen.getByTestId("finance-cases-resolved"));
+  const row = await screen.findByTestId("finance-resolved-c9");
+  expect(row).toHaveTextContent("von Kim Kassa: 20 € überwiesen");
+  expect(row).toHaveTextContent("24.09.");
+  expect(screen.queryByTestId("finance-case-c1")).toBeNull();
+});
+
+test("der Verlauf zeigt Wiener Uhr, ein reiner Tag bleibt ohne Uhrzeit, der Anmeldestand in Worten (#2131)", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/admin/finance/overview") return { data: OVERVIEW };
+    if (url === "/admin/finance/orders/o2") return { data: { ...DETAIL, registration: { status: "cancelled", status_label: "storniert" } } };
+    throw new Error(url);
+  });
+  const user = userEvent.setup();
+  render(<MemoryRouter><AdminFinancePage /></MemoryRouter>);
+  await user.click(await screen.findByTestId("finance-detail-o2"));
+  const detail = await screen.findByTestId("finance-detail");
+  expect(detail).toHaveTextContent("Anmeldung storniert");
+  const times = within(detail).getAllByTestId("finance-timeline-at").map((node) => node.textContent);
+  expect(times[0]).toMatch(/12:00/);   // 10:00 UTC im September
+  expect(times[1]).toMatch(/23\.0?9\.2026/);
+  expect(times[1]).not.toMatch(/:/);
+});
+
 test("der Rechnungstext steht am Auftrag, ein Zusatz geht an den Server, fehlende Konditionen werden genannt", async () => {
   const user = userEvent.setup();
   render(<MemoryRouter><AdminFinancePage /></MemoryRouter>);

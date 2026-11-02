@@ -8,7 +8,11 @@ import { asInstant, viennaDateTime } from "@/lib/vienna";
 // den Vorstand geht; Sperrfrist je Schlüssel; Testalarm; Aufbewahrung der Versandlogs und Adminaktionen.
 // Die Regeln liegen im Backend (services/ops_alerts), hier nur Anzeige und Speichern.
 
-const RETENTION_LABELS = { email_logs: "Versandlogs (Tage)", audit_logs: "Adminaktionen (Tage)" };
+const RETENTION_LABELS = {
+  email_logs: "Versandlogs (Tage)", audit_logs: "Adminaktionen (Tage)",
+  // Kontaktanfragen (#2131): ab dem letzten Statuswechsel; offene laufen nie ab.
+  contact_done: "Kontaktanfragen, erledigt (Tage)", contact_spam: "Kontaktanfragen, Spam (Tage)",
+};
 
 function formatTime(value) {
   if (!value) return "–";
@@ -117,7 +121,7 @@ export function OpsAlertsPanel() {
           {Object.entries(RETENTION_LABELS).map(([key, label]) => (
             <label key={key} className="block">
               <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Aufbewahrung: {label}</div>
-              <input type="number" min={7} max={3650} value={form.retention_days[key]} onChange={(e) => setForm((c) => ({ ...c, retention_days: { ...c.retention_days, [key]: e.target.value } }))} data-testid={`ops-retention-${key}`} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+              <input type="number" min={7} max={3650} value={form.retention_days[key] ?? ""} onChange={(e) => setForm((c) => ({ ...c, retention_days: { ...c.retention_days, [key]: e.target.value } }))} data-testid={`ops-retention-${key}`} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
             </label>
           ))}
         </div>

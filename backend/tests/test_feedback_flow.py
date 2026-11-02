@@ -115,6 +115,35 @@ async def test_events_ask_the_checked_in(flow, clock):
 
 
 @pytest.mark.asyncio
+async def test_overview_shows_number_and_average_but_keeps_the_limit_of_three(flow):
+    """#2131: alle Veranstaltungen auf einen Blick. Unter drei Antworten kein Schnitt - auch nicht versteckt im Gesamtschnitt."""
+    cup = await flow.create_tournament(title="Herbst-Cup", status="results_published", start_date="2026-10-17T12:00:00+00:00")
+    small = await flow.create_tournament(title="Mini-Cup", status="results_published", start_date="2026-10-20T12:00:00+00:00")
+    await flow.db.events.insert_one({"id": "ev1", "name": "Herbst-LAN", "slug": "herbst-lan", "start_date": "2026-09-01T12:00:00+00:00"})
+    entries = [("tournament", cup["id"], 5), ("tournament", cup["id"], 4), ("tournament", cup["id"], 3), ("tournament", small["id"], 1),
+               ("event", "ev1", 4), ("event", "ev1", 4), ("event", "ev1", 5), ("event", "ev1", 3)]
+    for kind, target, stars in entries:
+        await flow.db.feedback_entries.insert_one({"id": new_id(), "kind": kind, "target_id": target, "stars": stars, "tags": [], "text": "", "day": "2026-10-21"})
+    await flow.db.feedback_receipts.insert_one({"id": new_id(), "user_id": "u9", "kind": "event", "target_id": "ev1", "status": "declined", "day": "2026-10-21"})
+
+    flow.act_as(await flow.add_user(role="player", name="fremd"))
+    assert (await flow.get("/api/admin/feedback/overview")).status_code == 403
+    flow.act_as(await flow.add_staff())
+    data = (await flow.get("/api/admin/feedback/overview")).json()
+    assert [row["title"] for row in data["items"]] == ["Mini-Cup", "Herbst-Cup", "Herbst-LAN"], "die neuesten zuerst"
+    rows = {row["title"]: row for row in data["items"]}
+    assert rows["Mini-Cup"]["count"] == 1 and rows["Mini-Cup"]["details"] is False and rows["Mini-Cup"]["average"] is None
+    assert rows["Herbst-Cup"]["average"] == 4.0 and rows["Herbst-LAN"]["average"] == 4.0 and rows["Herbst-LAN"]["declined"] == 1
+    # Gesamtschnitt nur aus Veranstaltungen ab drei Antworten: (12 + 16) / 7 = 4,0 - die eine Sterne-Antwort zählt nicht mit.
+    assert data["summary"] == {"targets": 3, "answers": 7, "average": 4.0}, "die Antworten, die im Schnitt stecken"
+    assert "u9" not in str(data), "ohne Personen"
+
+    only_events = (await flow.get("/api/admin/feedback/overview", params={"kind": "event"})).json()
+    assert [row["target_id"] for row in only_events["items"]] == ["ev1"]
+    assert (await flow.get("/api/admin/feedback/overview", params={"kind": "unsinn"})).status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_admin_sees_no_names_and_details_only_from_three(flow, clock):
     cup, checked, played, absent, stranger = await setup_cup(flow)
     extra = []

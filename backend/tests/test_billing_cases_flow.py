@@ -136,7 +136,7 @@ async def test_cancellation_after_invoice_is_a_case_and_refunds_are_tracked_apar
     detail = (await flow.get(f"/api/admin/finance/orders/{order['id']}")).json()
     assert detail["sums"] == {"paid_cents": 4000, "refunded_cents": 2000, "credited_cents": 0, "refundable_cents": 2000}
     texts = [item["text"] for item in detail["timeline"]]
-    assert any(t.startswith("Zahlung 40,00 €") for t in texts) and any(t.startswith("Erstattung 20,00 € am 2026-09-24 (Überweisung) – Begleitperson entfallen") for t in texts)
+    assert any(t.startswith("Zahlung 40,00 €") for t in texts) and any(t.startswith("Erstattung 20,00 € am 24.09.2026 (Überweisung) – Begleitperson entfallen") for t in texts)
     assert any(t.startswith("Buchung storniert") for t in texts) and any(t.startswith("Prüffall: Storniert") for t in texts)
     assert "email" not in str(detail["order"].get("snapshot")), "keine Adressdaten im Detail"
     assert await flow.db.audit_logs.count_documents({"action": "billing.refund.record", "target_id": order["id"]}) == 1

@@ -79,8 +79,9 @@ PERSONAL: dict[str, Entry] = {
     "moderation_strikes": Entry(KEPT, ("moderation_strikes",), f"{MODERATION}; {THREE_YEARS}"),
     "moderation_sanctions": Entry(KEPT, ("moderation_sanctions",), f"{MODERATION}; {THREE_YEARS}"),
     "contact_messages": Entry(OVERWRITTEN, ("contact_messages",),
-                              f"nur angemeldet geschriebene, {THREE_YEARS}; ohne Konto mit derselben Adresse nicht sicher "
-                              "zuzuordnen - gezählt"),
+                              f"nur angemeldet geschriebene, spätestens {THREE_YEARS}; ohne Konto mit derselben Adresse nicht sicher "
+                              "zuzuordnen - gezählt. Unabhängig vom Konto laufen erledigte und Spam nach der Frist unter Betrieb → "
+                              "Alarme ab (#2131), samt Kopien der Mails"),
     "email_logs": Entry(OVERWRITTEN, ("email_logs",)),
     "mail_jobs": Entry(DELETED, note="Warteschlange des Versands; was versandt wurde, steht unter email_logs"),
     # Erfolge, XP, Mitmachaktionen

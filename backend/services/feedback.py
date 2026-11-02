@@ -235,6 +235,46 @@ async def summary(db, kind: str, target_id: str) -> dict:
     }
 
 
+OVERVIEW_LIMIT = 300
+
+
+async def overview(db, *, kind: str | None = None) -> dict:
+    """Alle Turniere und Events mit Rückmeldungen auf einen Blick (#2131): je Veranstaltung Zahl und Schnitt, die neuesten
+    zuerst. Auch hier gilt die Grenze von drei: darunter steht nur die Zahl, und solche Antworten fließen auch nicht in den
+    Gesamtschnitt - sonst ließen sie sich aus zwei Schnitten herausrechnen."""
+    match = {"kind": kind} if kind in KINDS else {}
+    rows = await db.feedback_entries.aggregate([
+        {"$match": match}, {"$group": {"_id": {"kind": "$kind", "target_id": "$target_id"}, "count": {"$sum": 1}, "stars": {"$sum": "$stars"}, "day": {"$max": "$day"}}},
+    ]).to_list(OVERVIEW_LIMIT * 4)
+    declined = {(row["_id"]["kind"], row["_id"]["target_id"]): int(row["n"]) for row in await db.feedback_receipts.aggregate([
+        {"$match": {**match, "status": "declined"}}, {"$group": {"_id": {"kind": "$kind", "target_id": "$target_id"}, "n": {"$sum": 1}}},
+    ]).to_list(OVERVIEW_LIMIT * 4)}
+    docs: dict[tuple[str, str], dict] = {}
+    for name, collection in (("tournament", db.tournaments), ("event", db.events)):
+        ids = sorted({row["_id"]["target_id"] for row in rows if row["_id"]["kind"] == name})
+        if ids:
+            async for doc in collection.find({"id": {"$in": ids}}, {"_id": 0, "id": 1, "title": 1, "name": 1, "slug": 1, "end_date": 1, "start_date": 1}):
+                docs[(name, doc["id"])] = doc
+    items = []
+    for row in rows:
+        key = (row["_id"]["kind"], row["_id"]["target_id"])
+        doc = docs.get(key) or {}
+        count = int(row["count"])
+        details = count >= MIN_FOR_DETAILS
+        last = end_day(doc) if doc else None
+        items.append({"kind": key[0], "target_id": key[1], "title": title_of(key[0], doc), "slug": doc.get("slug"), "day": last.isoformat() if last else row.get("day"),
+                      "count": count, "declined": declined.get(key, 0), "details": details, "average": round(int(row["stars"]) / count, 1) if details else None})
+    items.sort(key=lambda item: str(item["day"] or ""), reverse=True)
+    counted = [row for row in rows if int(row["count"]) >= MIN_FOR_DETAILS]
+    answers = sum(int(row["count"]) for row in counted)
+    return {
+        "items": items[:OVERVIEW_LIMIT], "total": len(items), "min_for_details": MIN_FOR_DETAILS,
+        # `answers` sind die Antworten, die im Schnitt stecken - damit die beiden Kacheln zueinander passen.
+        "summary": {"targets": len(items), "answers": answers,
+                    "average": round(sum(int(row["stars"]) for row in counted) / answers, 1) if answers else None},
+    }
+
+
 async def send_requests(db, *, now: datetime | None = None) -> dict:
     """Am Tag danach (läuft täglich): eine Meldung an alle, die dabei waren und noch nicht geantwortet haben."""
     from services.user_notifications import create_user_notification

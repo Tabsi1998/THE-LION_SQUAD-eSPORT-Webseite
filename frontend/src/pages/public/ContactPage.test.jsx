@@ -24,6 +24,54 @@ test("Thema und Betreff kommen aus der Adresse", async () => {
   expect(screen.getByTestId("contact-subject")).toHaveValue("Interesse: Jugendreferent:in");
 });
 
+test("das Namensfeld begrenzt wie der Server (#2131)", async () => {
+  render(<MemoryRouter initialEntries={["/contact"]}><ContactPage /></MemoryRouter>);
+  expect(screen.getByTestId("contact-name")).toHaveAttribute("maxlength", "120");
+});
+
+// Fehler melden (#2131): Seite, Gerät und Version gehen mit - die Person sieht es vor dem Absenden.
+test("beim Thema „Fehler melden“ steht, was mitgeht, und nur dann geht es mit", async () => {
+  const { default: userEvent } = await import("@testing-library/user-event");
+  apiMock.get.mockImplementation(async (url) => (url === "/spam-guard/token" ? { data: TOKEN } : { data: [{ value: "general", label: "Allgemeine Anfrage" }, { value: "report_bug", label: "Fehler melden" }] }));
+  apiMock.post.mockResolvedValue({ data: { ok: true, id: "c1" } });
+  const user = userEvent.setup();
+  render(<MemoryRouter initialEntries={[`/contact?topic=report_bug&from=${encodeURIComponent("/events/herbst")}&version=1.9.3`]}><ContactPage /></MemoryRouter>);
+  const box = await screen.findByTestId("contact-bug-context");
+  expect(box).toHaveTextContent("Seite: /events/herbst");
+  expect(box).toHaveTextContent("Version: 1.9.3");
+  await waitFor(() => expect(screen.getByTestId("contact-topic")).toHaveValue("report_bug"));
+  await fillContact(user);
+  await user.click(screen.getByTestId("contact-submit"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/contact/submit", expect.objectContaining({
+    context: expect.objectContaining({ page: "/events/herbst", version: "1.9.3", device: expect.any(String) }),
+  })));
+});
+
+test("die Seite geht ohne Kennung mit, auch wenn sie von Hand in der Adresse steht", async () => {
+  apiMock.get.mockImplementation(async (url) => (url === "/spam-guard/token" ? { data: TOKEN } : { data: [{ value: "report_bug", label: "Fehler melden" }] }));
+  render(<MemoryRouter initialEntries={[`/contact?topic=report_bug&from=${encodeURIComponent("/karte/pruefen/abc123")}`]}><ContactPage /></MemoryRouter>);
+  const box = await screen.findByTestId("contact-bug-context");
+  expect(box).toHaveTextContent("Seite: /karte/pruefen/…");
+  expect(box).not.toHaveTextContent("abc123");
+});
+
+test("eine fremde Adresse oder Abfrage kommt nicht als Seite mit, und ohne Fehler-Thema geht nichts mit", async () => {
+  const { default: userEvent } = await import("@testing-library/user-event");
+  apiMock.get.mockImplementation(async (url) => (url === "/spam-guard/token" ? { data: TOKEN } : { data: [{ value: "general", label: "Allgemeine Anfrage" }, { value: "report_bug", label: "Fehler melden" }] }));
+  apiMock.post.mockResolvedValue({ data: { ok: true, id: "c1" } });
+  const user = userEvent.setup();
+  const { unmount } = render(<MemoryRouter initialEntries={[`/contact?topic=report_bug&from=${encodeURIComponent("https://fremd.example/x?token=geheim")}`]}><ContactPage /></MemoryRouter>);
+  expect(await screen.findByTestId("contact-bug-context")).not.toHaveTextContent("fremd.example");
+  unmount();
+  render(<MemoryRouter initialEntries={[`/contact?from=${encodeURIComponent("/events/herbst")}`]}><ContactPage /></MemoryRouter>);
+  await screen.findByTestId("contact-topic");
+  expect(screen.queryByTestId("contact-bug-context")).toBeNull();
+  await fillContact(user);
+  await user.click(screen.getByTestId("contact-submit"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalled());
+  expect(apiMock.post.mock.calls.at(-1)[1].context).toBeUndefined();
+});
+
 // Spamschutz (#2067): Token beim Laden holen, unsichtbares Feld mitschicken, Turnstile nur bei Bedarf.
 const TOKEN = { token: "contact.1700000000.0123456789abcdef.sig", honeypot: "hp_fax", min_seconds: 0, max_age_seconds: 7200, turnstile: null };
 const TOPICS = [{ value: "general", label: "Allgemeine Anfrage" }];

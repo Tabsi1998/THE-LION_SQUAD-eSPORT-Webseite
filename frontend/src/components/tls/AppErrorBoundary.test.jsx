@@ -45,6 +45,15 @@ describe("AppErrorBoundary", () => {
     vi.useRealTimers();
   });
 
+  it("„Fehler melden“ nennt den Pfad ohne Kennungen", () => {
+    window.history.pushState({}, "", "/karte/pruefen/abc123?x=1");
+    show("/karte/pruefen/abc123");
+    const href = screen.getByTestId("page-error-report").getAttribute("href");
+    window.history.pushState({}, "", "/");
+    expect(new URL(href, "https://example.test").searchParams.get("from")).toBe("/karte/pruefen/…");
+    expect(href).not.toContain("abc123");
+  });
+
   it("zeigt bei einem Seitenfehler den Hinweis zwischen Kopf und Footer und meldet den Fehler", () => {
     show("/news");
     expect(screen.getByTestId("page-error")).toHaveTextContent("Diese Seite konnte nicht angezeigt werden");

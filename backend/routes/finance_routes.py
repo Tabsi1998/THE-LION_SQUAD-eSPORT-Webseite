@@ -8,15 +8,20 @@ versuchen“ und „Nachlesen“ prüfen zuerst, was Dolibarr schon hat.
 """
 from __future__ import annotations
 
+import csv
+import io
 import re
+from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 
 from auth import require_area
 from database import get_db
 from models import new_id, now_utc
 from services import billing_cases, billing_orders, pricing
+from services.csv_safe import safe_cell
+from services.dolibarr_policy import CLUB_TZ
 from services.dolibarr_billing import MAX_EXTRA_TEXT, assign_thirdparty, booking_facts, build_missing_pdfs, invoice_text_preview, missing_pdf_query, service_view, sync_one, terms_complete
 from services.dolibarr_client import DolibarrClient, DolibarrError, clean_base_url, load_settings, write_capable
 
@@ -74,6 +79,63 @@ async def _user_ids_matching(db, q: str) -> list[str]:
     return ids
 
 
+def _vienna_moment(value) -> str:
+    """Ein gespeicherter Zeitpunkt, wie ihn der Kassier liest: Wiener Uhr, ohne Zonenangabe."""
+    if not value:
+        return ""
+    try:
+        moment = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return str(value)
+    return (moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)).astimezone(CLUB_TZ).strftime("%d.%m.%Y %H:%M")
+
+
+EXPORT_DAY = r"^\d{4}-\d{2}-\d{2}$"
+# Nur, was der Kassier braucht - keine Adressen, keine Bankdaten, keine Dolibarr-Schlüssel.
+EXPORT_COLUMNS = ("Rechnung", "Angelegt am", "Angebot", "Person", "Betrag", "Zahlungsstand", "Bezahlt", "Gutgeschrieben", "Erstattet", "Buchung", "Stand")
+
+
+def _export_cells(row: dict) -> tuple:
+    source = (row.get("source") or {}).get("name") or row.get("source_id") or ""
+    currency = row.get("currency") or "EUR"
+    money = lambda cents: pricing.format_cents(int(cents or 0), currency)  # noqa: E731
+    return (
+        row.get("invoice_ref") or "", _vienna_moment(row.get("invoiced_at")), source, row.get("person") or "", money(row.get("total_cents")),
+        row.get("payment_label") or row.get("status_label") or "", money(row.get("paid_cents")), money(row.get("credited_cents")), money(row.get("refunded_cents")),
+        "storniert" if row.get("booking_state") == "cancelled" else "aktiv", _vienna_moment(row.get("synced_at")),
+    )
+
+
+@router.get("/export.csv")
+async def export_invoices(kind: str | None = Query(None), source: str | None = Query(None, max_length=80), q: str | None = Query(None, max_length=80),
+                          attention: str | None = Query(None, max_length=20),
+                          date_from: str | None = Query(None, alias="from", pattern=EXPORT_DAY), date_to: str | None = Query(None, alias="to", pattern=EXPORT_DAY),
+                          me: dict = Depends(require_area("finance"))):
+    """Alle Belege der Auswahl (#2131): vollständig, ohne die Grenze der Liste, auf Wunsch nach Zeitraum (Tag des Anlegens,
+    Wiener Uhr). Das Protokoll nennt die Auswahl und die Zahl der Zeilen, nie den gesuchten Namen."""
+    db = get_db()
+    user_ids = await _user_ids_matching(db, q) if q and q.strip() else None
+    try:
+        rows = await billing_orders.export_rows(db, kind=kind, source_id=source or None, user_ids=user_ids, attention=attention, date_from=date_from, date_to=date_to)
+    except ValueError as exc:
+        # Nur zwei Fälle: ein Tag, den es nicht gibt, oder ein Beginn nach dem Ende. Der eigene Text sagt es deutsch.
+        reason = str(exc) if str(exc).startswith("Der Zeitraum") else "Diesen Tag gibt es nicht."
+        raise HTTPException(400, reason)
+    names, people = await _names(db, rows)
+    buffer = io.StringIO()
+    writer = csv.writer(buffer, delimiter=";", lineterminator="\r\n")
+    writer.writerow(EXPORT_COLUMNS)
+    for row in rows:
+        writer.writerow([safe_cell(cell) for cell in _export_cells(_decorate(row, names, people))])
+    await db.audit_logs.insert_one({"id": new_id(), "action": "billing.export", "target_id": "billing", "actor_id": me["id"],
+                                    "data": {"rows": len(rows), "from": date_from, "to": date_to, "kind": kind, "source": source or None, "attention": attention, "person_filter": bool(q and q.strip())},
+                                    "created_at": now_utc().isoformat()})
+    period = "-".join(part for part in (date_from, date_to) if part)
+    filename = "-".join(part for part in ("abrechnung", period or now_utc().astimezone(CLUB_TZ).strftime("%Y-%m-%d")) if part)
+    return Response(content="﻿" + buffer.getvalue(), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="{filename}.csv"', "X-Export-Rows": str(len(rows)), "Cache-Control": "no-store"})
+
+
 @router.get("/overview")
 async def finance_overview(kind: str | None = Query(None), source: str | None = Query(None, max_length=80), q: str | None = Query(None, max_length=80),
                            attention: str | None = Query(None, max_length=20), me: dict = Depends(require_area("finance"))):
@@ -86,6 +148,8 @@ async def finance_overview(kind: str | None = Query(None), source: str | None = 
         _decorate(row, names, people)
     for row in data["invoiced"]:
         row["dolibarr_url"] = dolibarr_invoice_url(settings, row.get("invoice_id"))
+        # „bezahlt“ steht gerechnet am Beleg; die einzelnen Zahlungen zeigt erst das Detail.
+        row.pop("payments", None)
     for case in data["cases"]:
         case["source"] = names.get(case.get("source_id"))
         case["person"] = people.get(case.get("user_id"))
@@ -207,6 +271,52 @@ async def dolibarr_services(me: dict = Depends(require_area("finance"))):
 
 # ---------------------------------------------------------------- Detail und Zeitleiste (#322)
 
+# Was im Verlauf steht (#2131): Sätze statt Kennungen. Der Wächter in test_finance_export_flow.py verlangt zu jeder
+# Kennung im Code einen Satz; was hier fehlt, heißt schlicht „Änderung am Vorgang“.
+AUDIT_TEXTS = {
+    "billing.order.retry": "Neuer Versuch gestartet",
+    "billing.order.release": "Freigegeben",
+    "billing.refund.record": "Erstattung festgehalten",
+    "billing.case.resolve": "Prüffall erledigt",
+    "billing.thirdparty.assign": "Geschäftspartner zugeordnet",
+    "billing.thirdparty.create": "Geschäftspartner neu angelegt",
+    "billing.pdfs.build_missing": "Fehlende PDFs nachgezogen",
+    "billing.reconcile": "Alles abgeglichen",
+    "billing.settings.credit_note_draft": "Schalter „Gutschrift-Entwurf“ geändert",
+    "billing.export": "Export erstellt",
+    "event.registration.create": "Anmeldung angelegt",
+    "event.registration.update": "Anmeldung geändert",
+    "event.registration.self_update": "Anmeldung von der Person geändert",
+    "event.registration.cancel": "Anmeldung storniert",
+    "event.registration.walk_in": "An der Tür eingetragen",
+    "event.registration.walk_in_rename": "Name an der Tür geändert",
+    "event.registration.walk_in_delete": "Eintrag an der Tür gelöscht",
+    "tournament.registration.status": "Status der Anmeldung geändert",
+    "tournament.registration.checkin_status": "Check-in geändert",
+    "tournament.registration.self_checkin": "Selbst eingecheckt",
+    "tournament.registration.self_update": "Anmeldung von der Person geändert",
+    "tournament.registration.staff_add": "Von der Turnierleitung eingetragen",
+    "tournament.registration.delete": "Anmeldung gelöscht",
+    "tournament.registration.fill_in": "Platz aufgefüllt",
+    "tournament.registration.reopened": "Anmeldung wieder geöffnet",
+    "tournament.registration.rejection_dismissed": "Ablehnung ausgeblendet",
+    "tournament.registration.replace_slots": "Plätze getauscht",
+    "tournament.registration.seed": "Setzplatz geändert",
+    "tournament.registration.waitlist_moved_up": "Von der Warteliste nachgerückt",
+}
+# Der Stand der Anmeldung am Auftrag (Events und Turniere) in Worten.
+REGISTRATION_STATUS_LABELS = {
+    "registered": "angemeldet", "checked_in": "eingecheckt", "waitlist": "auf der Warteliste", "cancelled": "storniert", "no_show": "nicht erschienen",
+    "pending": "wartet auf Freigabe", "approved": "bestätigt", "rejected": "abgelehnt", "withdrawn": "zurückgezogen",
+}
+
+
+def _german_day(value) -> str:
+    """„2026-09-24“ → „24.09.2026“; was kein Tag ist, bleibt, wie es ist."""
+    text = str(value or "")
+    return ".".join(reversed(text.split("-"))) if re.fullmatch(r"\d{4}-\d{2}-\d{2}", text) else text
+
+
 def _timeline(order: dict, cases: list[dict], audit: list[dict], people: dict) -> list[dict]:
     """Was mit dem Auftrag passiert ist, in einer Reihe: Preis, Beleg, Zahlungen, Gutschriften,
     Storno, Erstattungen, Prüffälle, Freigaben - jedes Ereignis einmal, mit Zeitpunkt."""
@@ -225,7 +335,7 @@ def _timeline(order: dict, cases: list[dict], audit: list[dict], people: dict) -
     if order.get("booking_changed_at"):
         items.append({"at": order["booking_changed_at"], "kind": "change", "text": f"Buchung geändert: {order.get('booking_change') or ''}"})
     for refund in order.get("refunds") or []:
-        items.append({"at": refund.get("recorded_at"), "kind": "refund", "text": f"Erstattung {money(refund.get('amount_cents'))} am {refund.get('paid_on')}" + (f" ({refund['reference']})" if refund.get("reference") else "") + f" – {refund.get('reason') or ''}"})
+        items.append({"at": refund.get("recorded_at"), "kind": "refund", "text": f"Erstattung {money(refund.get('amount_cents'))} am {_german_day(refund.get('paid_on'))}" + (f" ({refund['reference']})" if refund.get("reference") else "") + f" – {refund.get('reason') or ''}"})
     for case in cases:
         items.append({"at": case.get("opened_at"), "kind": "case", "text": f"Prüffall: {case.get('label')}"})
         if case.get("status") == "resolved":
@@ -236,7 +346,7 @@ def _timeline(order: dict, cases: list[dict], audit: list[dict], people: dict) -
         if action in ("billing.order.release", "billing.refund.record", "billing.case.resolve"):
             continue   # steht schon oben, aus den Daten des Auftrags
         if action.startswith("billing.") or action.startswith("event.registration") or action.startswith("tournament.registration"):
-            items.append({"at": entry.get("created_at"), "kind": "audit", "text": f"{action} – {people.get(entry.get('actor_id'), 'System')}"})
+            items.append({"at": entry.get("created_at"), "kind": "audit", "text": f"{AUDIT_TEXTS.get(action, 'Änderung am Vorgang')} – {people.get(entry.get('actor_id'), 'System')}"})
     if order.get("sync_error"):
         items.append({"at": order.get("sync_error_at"), "kind": "error", "text": f"Dolibarr nicht lesbar: {order.get('sync_error_text') or order['sync_error']}"})
     if order.get("pdf_built_at"):
@@ -261,6 +371,8 @@ async def order_detail(order_id: str, me: dict = Depends(require_area("finance")
     async for user in db.users.find({"id": {"$in": [a for a in actor_ids if a]}}, {"_id": 0, "id": 1, "display_name": 1, "username": 1}):
         people[user["id"]] = user.get("display_name") or user.get("username")
     _decorate(order, names, people)
+    if registration:
+        registration["status_label"] = REGISTRATION_STATUS_LABELS.get(registration.get("status"), registration.get("status"))
     snapshot = order.pop("snapshot", None) or {}
     paid = billing_orders.paid_cents(order)
     return {
@@ -335,15 +447,25 @@ async def record_refund(order_id: str, body: RefundRecord, me: dict = Depends(re
 # ---------------------------------------------------------------- Prüffälle (#321)
 
 @router.get("/cases")
-async def list_cases(status: str = Query("open", pattern="^(open|resolved|all)$"), me: dict = Depends(require_area("finance"))):
+async def list_cases(status: str = Query("open", pattern="^(open|resolved|all)$"), kind: str | None = Query(None), source: str | None = Query(None, max_length=80),
+                     q: str | None = Query(None, max_length=80), me: dict = Depends(require_area("finance"))):
+    """Offene und - als Nachweis für den Kassier (#2131) - erledigte Prüffälle, in derselben Auswahl wie die Übersicht."""
     db = get_db()
-    cases = await billing_cases.list_cases(db, status)
+    user_ids = await _user_ids_matching(db, q) if q and q.strip() else None
+    selection = {"kind": kind, "source_id": source or None, "user_ids": user_ids}
+    cases = await billing_cases.list_cases(db, status, **selection)
     names, people = await _names(db, cases)
+    solvers = sorted({case["resolved_by"] for case in cases if case.get("resolved_by")} - set(people))
+    if solvers:
+        async for user in db.users.find({"id": {"$in": solvers}}, {"_id": 0, "id": 1, "display_name": 1, "username": 1}):
+            people[user["id"]] = user.get("display_name") or user.get("username")
     for case in cases:
         case["source"] = names.get(case.get("source_id"))
         case["person"] = people.get(case.get("user_id"))
         case["total"] = pricing.format_cents(int(case.get("total_cents") or 0))
-    return {"cases": cases, "kinds": {kind: meta["label"] for kind, meta in billing_cases.KINDS.items()}}
+        if case.get("status") == "resolved":
+            case["resolved_by_name"] = "Abgleich" if case.get("auto") else people.get(case.get("resolved_by"), "Finanzen")
+    return {"cases": cases, "total": await billing_cases.count_cases(db, status, **selection), "kinds": {kind: meta["label"] for kind, meta in billing_cases.KINDS.items()}}
 
 
 class CaseResolution(BaseModel):

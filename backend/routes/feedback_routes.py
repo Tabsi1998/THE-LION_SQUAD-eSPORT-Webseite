@@ -3,6 +3,7 @@
 - ``GET  /api/feedback/open``                          was du gerade bewerten kannst (auch als Zeile in „Offene Aktionen“)
 - ``POST /api/feedback/{kind}/{target_id}``            Sterne, Stichworte, ein Satz - einmal je Turnier bzw. Event
 - ``POST /api/feedback/{kind}/{target_id}/decline``    „Lieber nicht“ - dann fragt niemand mehr
+- ``GET  /api/admin/feedback/overview``                alle Turniere und Events auf einen Blick (Zahl und Schnitt)
 - ``GET  /api/admin/feedback/{kind}/{target_id}``      Auswertung für die Turnierleitung (Schnitt, Stichworte, Sätze)
 """
 from __future__ import annotations
@@ -41,6 +42,12 @@ async def give_feedback(kind: Kind, target_id: str, body: FeedbackBody, me: dict
 @router.post("/{kind}/{target_id}/decline")
 async def decline_feedback(kind: Kind, target_id: str, me: dict = Depends(get_current_user)):
     return await feedback.decline(get_db(), me, kind, target_id)
+
+
+@admin_router.get("/overview")
+async def feedback_overview(kind: Kind | None = None, _admin: dict = Depends(require_area("tournaments"))):
+    """Alle Turniere und Events mit Rückmeldungen (#2131): Zahl und Schnitt, ohne Namen - unter drei Antworten nur die Zahl."""
+    return await feedback.overview(get_db(), kind=kind)
 
 
 @admin_router.get("/{kind}/{target_id}")

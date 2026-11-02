@@ -213,6 +213,7 @@ const EventCallsTVPage = lazyPage(() => import("@/pages/display/EventCallsTVPage
 const MyPrizesPage = lazyPage(() => import("@/pages/user/MyPrizesPage"));
 const MyPenaltiesPage = lazyPage(() => import("@/pages/user/MyPenaltiesPage"));
 const AdminPrizesPage = lazyPage(() => import("@/pages/admin/AdminPrizesPage"));
+const AdminFeedbackPage = lazyPage(() => import("@/pages/admin/AdminFeedbackPage"));
 const AdminPenaltiesPage = lazyPage(() => import("@/pages/admin/AdminPenaltiesPage"));
 const AdminTeamsPage = lazyPage(() => import("@/pages/admin/AdminTeamsPage"));
 const AdminContactPage = lazyPage(() => import("@/pages/admin/AdminContactPage"));
@@ -450,6 +451,7 @@ function App() {
           <Route path="/admin/media" element={<ProtectedRoute requireArea="content"><AdminMediaPage /></ProtectedRoute>} />
           <Route path="/admin/nav" element={<ProtectedRoute requireArea="content"><AdminNavPage /></ProtectedRoute>} />
           <Route path="/admin/prizes" element={<ProtectedRoute requireArea="tournaments"><AdminPrizesPage /></ProtectedRoute>} />
+          <Route path="/admin/feedback" element={<ProtectedRoute requireArea="tournaments"><AdminFeedbackPage /></ProtectedRoute>} />
           <Route path="/admin/penalties" element={<ProtectedRoute requireArea="tournaments"><AdminPenaltiesPage /></ProtectedRoute>} />
           <Route path="/admin/teams" element={<ProtectedRoute requireArea={["tournaments", "club"]}><AdminTeamsPage /></ProtectedRoute>} />
           <Route path="/admin/contact" element={<ProtectedRoute requireArea="club"><AdminContactPage /></ProtectedRoute>} />
