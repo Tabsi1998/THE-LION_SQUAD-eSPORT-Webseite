@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.55.2](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.55.1...v1.55.2) (2026-11-02)
+
+
+### Fehlerbehebungen
+
+* Profil zeigt alle verknüpften Konten, nicht nur 20 ([#2200](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2200)) ([3776b02](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/3776b02ced88311b2c51b46464592bb84acfd35a))
+
 ## 1.55.1 (02.11.2026)
 
 ### Dokumentation
