@@ -115,6 +115,9 @@ BACKEND_TEST_ENV = {
     "DB_NAME": "tls_ci" + (f"_{FOLDER_SLUG}" if FOLDER_SLUG else ""),
     "DISABLE_SCHEDULER": "true",
 }
+# The CI job "Backend-Abläufe auf MongoDB" (#2200): the image of docker-compose.yml, on a port of its own.
+FLOW_MONGO_IMAGE = "mongo:7.0.40-jammy"
+FLOW_MONGO_PORT = 27217
 
 # The environment of the CI's compose validation and container smoke.
 # Throwaway values; nothing here reaches a real system.
@@ -1082,6 +1085,35 @@ def backend_tests(context: Context) -> str:
     return note
 
 
+def backend_mongo_flows(context: Context) -> str:
+    """The league, squad, match and map flows on a real MongoDB, as the CI job "Backend-Abläufe auf MongoDB" (#2200)."""
+    name = f"lsw-check-flow-mongo-{ROOT.name}".lower()
+    binary = docker(context)
+    context.run(binary, "rm", "--force", name, check=False, timeout=120)
+    if port_open(FLOW_MONGO_PORT):
+        raise StepSkipped(f"port {FLOW_MONGO_PORT} is taken by something else; stop it and run again")
+    # Wie in der CI: eigener Speicher und kurzer Checkpoint-Abstand, sonst wächst der Stapel gelöschter Dateien.
+    context.run(binary, "run", "--detach", "--name", name, "--publish", f"127.0.0.1:{FLOW_MONGO_PORT}:27017",
+                "--tmpfs", "/data/db:size=4g", FLOW_MONGO_IMAGE, "--wiredTigerCacheSizeGB", "1", timeout=1800)
+    context.containers.append(name)
+    deadline = time.time() + 120
+    while time.time() < deadline:
+        ping = context.run(binary, "exec", name, "mongosh", "--quiet", "--eval", "db.adminCommand({ping: 1}).ok",
+                           check=False, timeout=60)
+        if ping.returncode == 0 and ping.stdout.strip().endswith("1"):
+            break
+        time.sleep(2)
+    else:
+        raise StepFailed(f"{FLOW_MONGO_IMAGE} did not answer a ping within 120 s")
+    env = dict(BACKEND_TEST_ENV, FLOW_MONGO_URL=f"mongodb://127.0.0.1:{FLOW_MONGO_PORT}")
+    completed = context.run(venv_python(), "scripts/flow_mongo_tests.py", "--numprocesses=4", env=env, check=False, timeout=3600)
+    text = completed.stdout + completed.stderr
+    path = context.log("backend-mongo-flows", text)
+    if completed.returncode != 0:
+        raise StepFailed(f"the flows on MongoDB failed. Full output: {path}\n" + tail(completed, 30))
+    return describe_counts(pytest_counts(text))
+
+
 def backend_steps() -> list:
     return [
         Step("backend", "venv", f"Python {BACKEND_PYTHON} with both requirement files", backend_environment),
@@ -1089,6 +1121,8 @@ def backend_steps() -> list:
         Step("backend", "lint", "No undefined names, syntax hazards or unused imports", backend_lint, ("venv",)),
         Step("backend", "audit", "No known vulnerabilities in the dependencies", backend_audit, ("venv",)),
         Step("backend", "tests", f"The suite, with the {COVERAGE_FLOOR}% coverage floor", backend_tests,
+             ("venv",)),
+        Step("backend", "mongo-flows", "League, squad, match and map flows on a real MongoDB", backend_mongo_flows,
              ("venv",)),
     ]
 
