@@ -18,6 +18,7 @@ from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
 from services import league_roster
+from services.discord_roles import load_games
 
 ACTIVE_REGISTRATION_STATUSES = ("pending", "approved", "checked_in", "waitlist")
 # Plätze einer Staffel belegen wie beim Nachrücken (#1551) nur diese - die Warteliste zählt nicht mit.
@@ -128,6 +129,7 @@ def squad_problems(
     taken_teams: dict[str, str | None],
     seats_taken: int,
     other_staffel_squad_ids: set[str],
+    games: dict[str, dict] | None = None,
 ) -> list[tuple[int, str]]:
     """Alle Gründe, warum dieses Co-Team nicht in die Staffel kann - leer heißt: zuteilbar.
 
@@ -139,7 +141,11 @@ def squad_problems(
     if (squad.get("status") or "active") != "active":
         problems.append((400, f"{name} ist archiviert – nur aktive Co-Teams spielen in der Liga."))
     if tournament.get("game_id") and squad.get("game_id") and squad["game_id"] != tournament["game_id"]:
-        problems.append((400, f"{name} ist für ein anderes Spiel eingetragen als diese Staffel."))
+        if games is not None and squad["game_id"] not in games:
+            # Alter Freitext (#2128): keine Kennung, also auch nicht „ein anderes Spiel“ - der Satz sagt, was zu tun ist.
+            problems.append((400, f"{name} hat noch einen alten Spielnamen („{squad['game_id']}“) – unter Teams → Deine Teams aus der Liste wählen."))
+        else:
+            problems.append((400, f"{name} ist für ein anderes Spiel eingetragen als diese Staffel."))
     members = [uid for uid in squad.get("member_ids") or [] if uid]
     if len(members) < min_size:
         problems.append((400, f"{name} hat {len(members)} Spieler im Kader – die Liga verlangt mindestens {min_size}."))
@@ -262,6 +268,7 @@ async def candidates(db, tournament: dict) -> dict:
     # Spiel-ID je Spieler (#2108): Stand in der Season - fehlt sie, warnt der Dialog; zuteilen geht trotzdem.
     member_ids = {uid for squad in squads if squad.get("team_id") in teams for uid in squad.get("member_ids") or [] if uid}
     roster_ctx = await league_roster.context_for_tournament(db, tournament, member_ids)
+    games, _parents = await load_games(db)
     out: dict[str, dict] = {}
     for squad in squads:
         team = teams.get(squad.get("team_id"))
@@ -276,6 +283,7 @@ async def candidates(db, tournament: dict) -> dict:
             taken_teams=taken_teams,
             seats_taken=seats,
             other_staffel_squad_ids=other,
+            games=games,
         )
         entry = out.setdefault(
             team["id"],
@@ -342,6 +350,7 @@ async def build_registration(db, tournament: dict, team_id: str, squad_id: str, 
         raise SquadAssignError(404, "Co-Team nicht gefunden.")
     memberships = await db.team_members.find({"team_id": team_id}, {"_id": 0, "user_id": 1}).to_list(500)
     taken_teams, seats, other = await _staffel_state(db, tournament)
+    games, _parents = await load_games(db)
     problems = squad_problems(
         team,
         squad,
@@ -351,6 +360,7 @@ async def build_registration(db, tournament: dict, team_id: str, squad_id: str, 
         taken_teams=taken_teams,
         seats_taken=seats,
         other_staffel_squad_ids=other,
+        games=games,
     )
     if problems:
         code, text = problems[0]

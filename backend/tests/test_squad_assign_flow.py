@@ -126,6 +126,7 @@ async def test_every_check_has_a_clear_german_reason(flow):
     archived = await make_squad(flow, lions, "Alt", [users[f"Spieler{i}"] for i in (1, 2, 3, 4)], status="archived")
     await refused(lions["id"], archived["id"], 400, "archiviert")
     # anderes Spiel
+    await flow.db.games.insert_one({"id": "kart", "name": "Probe Kart"})
     other_game = await make_squad(flow, lions, "Kart", [users[f"Spieler{i}"] for i in (1, 2, 3, 4)], game_id="kart")
     await refused(lions["id"], other_game["id"], 400, "anderes Spiel")
     # zu kleiner Kader (Teamgröße 4)
