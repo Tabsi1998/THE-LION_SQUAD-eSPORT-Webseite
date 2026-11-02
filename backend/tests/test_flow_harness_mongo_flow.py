@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import pathlib
+import re
 import sys
 
 import pytest
@@ -33,7 +34,8 @@ async def flow():
 @pytest.mark.asyncio
 async def test_the_database_has_a_test_name_and_the_real_indexes(flow):
     assert flow.db.name.startswith(flow_mongo.DB_PREFIX)
-    assert (await flow.db.command("buildInfo"))["version"].startswith("7.0.")
+    compose = (pathlib.Path(__file__).resolve().parents[2] / "docker-compose.yml").read_text(encoding="utf-8")
+    assert (await flow.db.command("buildInfo"))["version"] == re.search(r"image: mongo:([\d.]+)", compose).group(1)
 
     users = await flow.db.users.index_information()
     assert any(spec.get("unique") and spec["key"] == [("email", 1)] for spec in users.values())

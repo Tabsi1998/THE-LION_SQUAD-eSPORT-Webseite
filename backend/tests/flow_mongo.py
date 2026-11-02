@@ -32,9 +32,9 @@ PRODUCTION_VALUES = frozenset({"production", "prod"})
 # Der Server antwortet lokal sofort; fehlt er, soll der Lauf nicht je Test 30 Sekunden warten.
 SERVER_TIMEOUT_MS = 5000
 
-# Die Datenbank dieses Prozesses und ihre Indizes nach init_indexes ({Sammlung: Namen der Indizes}).
+# Die Datenbank dieses Prozesses und ihre Indizes nach init_indexes ({Sammlung: index_information}).
 _process_db: str | None = None
-_baseline: dict[str, set[str]] = {}
+_baseline: dict[str, dict] = {}
 _admin_client = None
 
 
@@ -104,8 +104,9 @@ def new_client(url: str):
     return AsyncIOMotorClient(check_url(url), serverSelectionTimeoutMS=SERVER_TIMEOUT_MS, directConnection=True)
 
 
-def _index_names(db) -> dict[str, set[str]]:
-    return {name: set(db[name].index_information()) for name in db.list_collection_names()}
+def _indexes(db) -> dict[str, dict]:
+    """Je Sammlung die Indizes samt Optionen (eindeutig, Schlüssel, Teilfilter …), nicht nur ihre Namen."""
+    return {name: db[name].index_information() for name in db.list_collection_names()}
 
 
 def _build(database_module, url: str, name: str) -> None:
@@ -125,9 +126,10 @@ def _build(database_module, url: str, name: str) -> None:
         pool.submit(lambda: asyncio.run(run())).result()
 
 
-def _wipe(db, baseline: dict[str, set[str]]) -> bool:
+def _wipe(db, baseline: dict[str, dict]) -> bool:
     """Alle Dokumente weg, Sammlungen und Indizes wie nach ``init_indexes``. ``False``: Die Indizes passen nicht mehr."""
-    current = _index_names(db)
+    check_db_name(db.name)
+    current = _indexes(db)
     if any(current.get(name) != indexes for name, indexes in baseline.items()):
         return False
     for name in set(current) - set(baseline):
@@ -155,7 +157,7 @@ def prepare_database(database_module, url: str) -> str:
         _admin_client.drop_database(check_db_name(_process_db))
     _process_db = new_db_name()
     _build(database_module, url, _process_db)
-    _baseline = _index_names(_admin_client[_process_db])
+    _baseline = _indexes(_admin_client[_process_db])
     return _process_db
 
 
