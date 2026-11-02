@@ -11,6 +11,7 @@ import { SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { MapPoolView } from "@/components/tls/maps/MapPoolView";
 import { StaffelPanel } from "@/components/tls/league/public/StaffelPanel";
 import { LeagueHead, LeaguePrizes } from "@/components/tls/league/public/LeagueLook";
+import { LeagueApplicationPanel } from "@/components/tls/league/application/LeagueApplicationPanel";
 import { accentStyle } from "@/lib/leagueLook";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { renderMarkdownLite } from "@/lib/markdownLite";
@@ -150,7 +151,8 @@ export default function LeagueSeasonPage() {
         <Breadcrumbs items={[{ label: "Start", to: "/" }, { label: "Liga", to: "/liga" }, { label: title }]} className="mb-3" />
         {/* Kopf (#2107): Banner und Emblem der Season bzw. Liga, Akzentfarbe der Liga - ohne alles ein ruhiger Kopf. */}
         <LeagueHead look={data.look} eyebrow={league.game?.name} title={<>{league.name} <span className="text-white/55">{season.name}</span></>}>
-          {season.registration_deadline ? (
+          {/* Mit Selbstanmeldung (#2205) steht das Fenster unten - jede Angabe nur an einer Stelle. */}
+          {season.registration_deadline && !data.application ? (
             <p className="mt-3 text-sm text-white/60" data-testid="league-subline">
               Meldeschluss {viennaDate(dayNoon(season.registration_deadline), { day: "numeric", month: "numeric", year: "numeric" })}
             </p>
@@ -166,6 +168,8 @@ export default function LeagueSeasonPage() {
             </Fact>
           </dl>
         </LeagueHead>
+
+        {data.application ? <LeagueApplicationPanel leagueSlug={league.slug} seasonSlug={season.slug} block={data.application} /> : null}
 
         <LeaguePrizes prizes={data.prizes}
           hint={(data.divisions || []).some((division) => division.prizes?.length) ? "Ligen mit eigenen Gewinnen nennen sie bei ihrer Tabelle." : undefined} />
