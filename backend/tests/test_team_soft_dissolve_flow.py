@@ -9,12 +9,13 @@ from datetime import timedelta
 
 import pytest
 import pytest_asyncio
+from fastapi import HTTPException
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow, new_id  # noqa: E402
 from models import now_utc  # noqa: E402
-from services.team_dissolve import DISSOLVED_TEAM_RETENTION_DAYS, forget_person, purge_dissolved_teams  # noqa: E402
+from services.team_dissolve import DISSOLVED_TEAM_RETENTION_DAYS, dissolve as dissolve_team, forget_person, purge_dissolved_teams, restore, team_lock_resource  # noqa: E402
 
 
 @pytest_asyncio.fixture
@@ -259,7 +260,6 @@ async def test_real_erasure_and_export_reach_dissolved_teams(flow):
 
 @pytest.mark.asyncio
 async def test_a_new_tag_on_restore_goes_through_the_word_filter(flow, monkeypatch):
-    from fastapi import HTTPException
     from services import word_filter
 
     async def refuse(_db, text, **_kwargs):
@@ -278,7 +278,6 @@ async def test_a_new_tag_on_restore_goes_through_the_word_filter(flow, monkeypat
 
 @pytest.mark.asyncio
 async def test_a_name_that_is_forbidden_by_now_does_not_come_back(flow, monkeypatch):
-    from fastapi import HTTPException
     from services import word_filter
 
     leader, _co, _member, team, _squad = await world(flow)
@@ -314,3 +313,85 @@ async def test_what_an_admin_dissolved_only_admins_bring_back(flow):
     flow.act_as(admin)
     assert (await flow.post(f"/api/teams/{team['id']}/restore", json={})).status_code == 200
     assert await flow.db.teams.find_one({"id": team["id"]})
+
+
+@pytest.mark.asyncio
+async def test_a_second_dissolve_does_not_wipe_the_archive(flow):
+    """Prüfer-Probe: Der zweite Aufruf kommt mit einem vor dem Löschen gelesenen Team - das Archiv bleibt vollständig."""
+    leader, _co, _member, team, _squad = await world(flow)
+    await dissolve_team(flow.db, dict(team), leader)
+    first = await flow.db.dissolved_teams.find_one({"id": team["id"]}, {"_id": 0})
+    assert len(first["squads"]) == 1 and len(first["memberships"]) == 3
+
+    with pytest.raises(HTTPException) as refused:
+        await dissolve_team(flow.db, dict(team), leader)
+    assert refused.value.status_code == 404
+    assert await flow.db.dissolved_teams.find_one({"id": team["id"]}, {"_id": 0}) == first
+
+
+@pytest.mark.asyncio
+async def test_dissolving_and_restoring_wait_for_each_other(flow):
+    from services.mutation_lock import mutation_lock
+
+    await flow.db.mutation_locks.create_index("resource", unique=True)
+    leader, _co, _member, team, _squad = await world(flow)
+    async with mutation_lock(flow.db, team_lock_resource(team["id"])):
+        flow.act_as(leader)
+        busy = await flow.delete(f"/api/teams/{team['id']}", params={"confirm": team["name"]})
+        assert busy.status_code == 409 and "gerade geändert" in busy.json()["detail"]
+    assert await flow.db.teams.find_one({"id": team["id"]})
+
+
+class _FailingTeams:
+    """``teams``, dessen Einfügen scheitert - wie ein Abbruch mitten im Wiederherstellen."""
+
+    def __init__(self, real):
+        self._real = real
+
+    def __getattr__(self, name):
+        return getattr(self._real, name)
+
+    async def insert_one(self, _doc):
+        raise RuntimeError("Abbruch")
+
+
+class _FailingDb:
+    def __init__(self, real):
+        self._real = real
+        self.teams = _FailingTeams(real.teams)
+
+    def __getattr__(self, name):
+        return getattr(self._real, name)
+
+
+@pytest.mark.asyncio
+async def test_an_aborted_restore_loses_nothing_and_can_be_repeated(flow):
+    leader, _co, _member, team, squad = await world(flow)
+    await dissolve(flow, leader, team)
+    row = await flow.db.dissolved_teams.find_one({"id": team["id"]}, {"_id": 0})
+
+    with pytest.raises(RuntimeError):
+        await restore(_FailingDb(flow.db), row, leader)
+    assert await flow.db.dissolved_teams.find_one({"id": team["id"]}, {"_id": 0}) == row, "die Sicherung ist unberührt"
+    assert not await flow.db.teams.find_one({"id": team["id"]})
+
+    done = await flow.post(f"/api/teams/{team['id']}/restore")
+    assert done.status_code == 200
+    assert await flow.db.team_squads.count_documents({"id": squad["id"]}) == 1, "keine doppelten Co-Teams"
+    assert await flow.db.team_members.count_documents({"team_id": team["id"]}) == 3
+    assert not await flow.db.dissolved_teams.find_one({"id": team["id"]})
+
+
+@pytest.mark.asyncio
+async def test_a_leftover_archive_of_a_standing_team_is_cleared(flow):
+    """Abbruch nach dem Einfügen: Das Team steht, die Sicherung ist überholt - kein zweites Team, keine ewige Sperre."""
+    leader, _co, _member, team, _squad = await world(flow)
+    await dissolve(flow, leader, team)
+    row = await flow.db.dissolved_teams.find_one({"id": team["id"]}, {"_id": 0})
+    assert (await flow.post(f"/api/teams/{team['id']}/restore")).status_code == 200
+    await flow.db.dissolved_teams.insert_one(dict(row))
+
+    again = await flow.post(f"/api/teams/{team['id']}/restore")
+    assert again.status_code == 409 and "schon wiederhergestellt" in again.json()["detail"]
+    assert not await flow.db.dissolved_teams.find_one({"id": team["id"]})
+    assert await flow.db.teams.count_documents({"id": team["id"]}) == 1

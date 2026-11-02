@@ -105,8 +105,31 @@ async def dissolve_preview(db, team: dict) -> dict:
     }
 
 
+def team_lock_resource(team_id: str) -> str:
+    """Auflösen und Wiederherstellen eines Teams nacheinander - über alle Prozesse."""
+    return f"team:{team_id}:dissolve"
+
+
+TEAM_BUSY = "Das Team wird gerade geändert. Bitte gleich noch einmal versuchen."
+
+
 async def dissolve(db, team: dict, actor: dict) -> dict:
-    """Das Team auflösen - vorher prüfen, was ``dissolve_preview`` nennt."""
+    """Das Team auflösen. Zwei gleichzeitige Aufrufe laufen nacheinander; wer zweiter ist, findet kein Team mehr - sonst
+    überschriebe er das Archiv mit leeren Co-Teams und Mitgliederzeilen."""
+    from services.mutation_lock import MutationLockBusy, mutation_lock
+
+    try:
+        async with mutation_lock(db, team_lock_resource(team["id"])):
+            current = await db.teams.find_one({"id": team["id"]}, {"_id": 0})
+            if not current:
+                raise HTTPException(status_code=404, detail="Team nicht gefunden")
+            return await _dissolve_locked(db, current, actor)
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail=TEAM_BUSY) from None
+
+
+async def _dissolve_locked(db, team: dict, actor: dict) -> dict:
+    """Vorher prüfen, was ``dissolve_preview`` nennt; das Team wird direkt vor dem Sichern noch einmal gelesen."""
     preview = await dissolve_preview(db, team)
     if preview["blocked"]:
         names = ", ".join(row["title"] for row in preview["blocked"])
@@ -133,9 +156,11 @@ async def dissolve(db, team: dict, actor: dict) -> dict:
             raise HTTPException(status_code=409, detail="Eine Turnieraktion wird gerade verarbeitet. Bitte gleich noch einmal versuchen.")
 
     team_id = team["id"]
+    team = await db.teams.find_one({"id": team_id}, {"_id": 0}) or team
     now = now_utc()
     purge_at = (now + timedelta(days=DISSOLVED_TEAM_RETENTION_DAYS)).isoformat()
-    # Erst sichern, dann löschen - bricht es dazwischen ab, ist nichts verloren.
+    # Erst sichern, dann löschen - bricht es dazwischen ab, ist nichts verloren. In der Sperre mit bestehendem Team ist eine
+    # schon vorhandene Zeile nur ein Rest eines abgebrochenen Laufs, darum ersetzen statt einfügen.
     archive = {key: value for key, value in team.items() if key not in ("_id", "join_code", "members", "leader")}
     archive.update({
         "dissolved_at": now.isoformat(), "dissolved_by": actor.get("id"), "purge_at": purge_at,
@@ -216,9 +241,26 @@ async def _next_leader(db, row: dict) -> str | None:
 
 async def restore(db, row: dict, actor: dict, tag: str | None = None) -> dict:
     """Das Team zurückholen - mit neuem Beitrittscode. Zurückgezogene Anmeldungen bleiben zurückgezogen."""
+    from services.mutation_lock import MutationLockBusy, mutation_lock
+
+    try:
+        async with mutation_lock(db, team_lock_resource(row["id"])):
+            current = await db.dissolved_teams.find_one({"id": row["id"], "purged_at": {"$exists": False}}, {"_id": 0})
+            if not current:
+                raise HTTPException(status_code=404, detail="Team nicht gefunden")
+            return await _restore_locked(db, current, actor, tag)
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail=TEAM_BUSY) from None
+
+
+async def _restore_locked(db, row: dict, actor: dict, tag: str | None) -> dict:
     from services.team_page import new_join_code
 
     team_id = row["id"]
+    if await db.teams.find_one({"id": team_id}, {"_id": 1}):
+        # Rest eines Abbruchs: das Team steht schon wieder bzw. noch da - es gilt, die Sicherung ist überholt.
+        await db.dissolved_teams.delete_one({"id": team_id})
+        raise HTTPException(status_code=409, detail="Dieses Team ist schon wiederhergestellt.")
     if not is_restorable(row):
         raise HTTPException(status_code=409, detail=f"Die {DISSOLVED_TEAM_RETENTION_DAYS} Tage sind vorbei – dieses Team lässt sich nicht mehr wiederherstellen.")
     final_tag = (tag or "").strip().upper() or row.get("tag")
@@ -236,10 +278,9 @@ async def restore(db, row: dict, actor: dict, tag: str | None = None) -> dict:
     team = {key: value for key, value in row.items() if key not in (*RESTORE_ONLY_FIELDS, "_id")}
     co_leaders = [user_id for user_id in row.get("co_leader_ids") or [] if user_id != leader_id]
     team.update({"tag": final_tag, "leader_id": leader_id, "co_leader_ids": co_leaders, "join_code": new_join_code(), "updated_at": now})
-    try:
-        await db.teams.insert_one(dict(team))
-    except DuplicateKeyError:  # schon wiederhergestellt - zwei Klicks, zwei Geräte
-        raise HTTPException(status_code=409, detail="Dieses Team ist schon wiederhergestellt.") from None
+    # Das Team zuletzt und die Sicherung erst danach weg: Bricht es dazwischen ab, ist nichts verloren, und der nächste
+    # Versuch beginnt mit Co-Teams und Mitgliederzeilen von vorn.
+    await _remove_restored_parts(db, team_id)
     if row.get("squads"):
         await db.team_squads.insert_many([dict(squad) for squad in row["squads"]])
     rows = [dict(member) for member in row.get("memberships") or []]
@@ -248,6 +289,11 @@ async def restore(db, row: dict, actor: dict, tag: str | None = None) -> dict:
             member["role"] = "leader"
     if rows:
         await db.team_members.insert_many(rows)
+    try:
+        await db.teams.insert_one(dict(team))
+    except DuplicateKeyError:  # eindeutiger Beitrittscode - ein Treffer ist sehr unwahrscheinlich, ein neuer Versuch hilft
+        await _remove_restored_parts(db, team_id)
+        raise HTTPException(status_code=409, detail="Das hat gerade nicht geklappt. Bitte noch einmal versuchen.") from None
     await db.dissolved_teams.delete_one({"id": team_id})
     await db.audit_logs.insert_one({
         "id": new_id(), "action": "team.restore", "target_id": team_id, "actor_id": actor.get("id"),
@@ -263,10 +309,16 @@ async def restore(db, row: dict, actor: dict, tag: str | None = None) -> dict:
     return team
 
 
+async def _remove_restored_parts(db, team_id: str) -> None:
+    await db.team_squads.delete_many({"team_id": team_id})
+    await db.team_members.delete_many({"team_id": team_id})
+
+
 async def _final_cleanup(db, row: dict, now: str) -> None:
     """Nur Name und Kürzel bleiben - für alte Turniere; Chat und Daten sind weg."""
     if not await db.teams.find_one({"id": row["id"]}, {"_id": 1}):
         await db.team_chat_messages.delete_many({"team_id": row["id"]})
+        await _remove_restored_parts(db, row["id"])  # Rest eines abgebrochenen Wiederherstellens
     keep = {key: row.get(key) for key in GONE_AFTER_PURGE if key != "_id" and key in row}
     await db.dissolved_teams.replace_one({"id": row["id"]}, {**keep, "purged_at": now})
 
