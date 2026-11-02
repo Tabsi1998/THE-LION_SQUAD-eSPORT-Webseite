@@ -82,7 +82,8 @@ stehen nur in `.local-testing/abnahme/state-liga.json` (anderer Ort über `ABNAH
 Captain, Vertreter, einem Mitglied und der Teamleitung des ersten Co-Teams sowie je Co-Team ein Captain.
 
 Zeitgesteuerte Läufe stößt die Abnahme gezielt an, immer nur für eine Staffel – so bleiben die Stände der anderen Specs
-unberührt und `SCHEDULER_JOBS` kurz (die Antwort steht als JSON in der letzten Zeile):
+unberührt und `SCHEDULER_JOBS` kurz. Das geht nur mit eigenem `ABNAHME_PROJECT`, auf `lsw-abnahme` bricht es ab (die Antwort
+steht als JSON in der letzten Zeile):
 
 ```bash
 python scripts/seed_abnahme_liga.py --job matchday_schedule --tournament <id>   # Standardtermin schreiben
