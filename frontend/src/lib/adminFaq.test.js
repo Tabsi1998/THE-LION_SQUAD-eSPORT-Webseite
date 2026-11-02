@@ -17,6 +17,13 @@ test("Fragen sind vollständig, Wege zeigen in den Admin, Anleitungen gibt es", 
   expect(FAQ_TOPICS.map((topic) => topic.key)).toEqual(["verein", "mitglieder", "dolibarr", "esports", "discord", "email", "konten", "content", "app", "betrieb"]);
 });
 
+test("die Webhook-Frage zeigt den Weg, den es gibt: Signierter Webhook unter Verbindung (#2131)", () => {
+  const question = faqQuestions().find((row) => row.key === "webhook");
+  expect(question.a).toContain("Signierter Webhook");
+  expect(question.label).toContain("Signierter Webhook");
+  expect(question.a).not.toContain("Adresse erzeugen");
+});
+
 test("die Suche findet über Frage, Antwort und Weg - alle Wörter müssen passen", () => {
   expect(filterFaq("").length).toBe(FAQ_TOPICS.length);
   const hit = filterFaq("Webhook dolibarr");
