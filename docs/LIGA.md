@@ -690,7 +690,7 @@ neuen Felder nicht und prüfen nichts Neues.
 | `lineup_min_players` | int 1–20 | 3 | – | Mindestzahl der Teilnehmerliste, nur bei `series`. Nach oben offen |
 
 `lineup_mode` und `lineup_min_players` trägt auch die Staffel (`staffel_fields`, Gruppe `before_result`), Staffeln ohne Feld bleiben `per_map`.
-`STAFFEL_LOCKED_FIELDS` sperrt beide. Die anderen Felder liest `league_eligibility` wie den Stichtag direkt an der Season.
+`TournamentUpdate` nimmt beide nicht an. Die anderen Felder liest `league_eligibility` wie den Stichtag direkt an der Season.
 
 **Felder am Spiel** (`games.player_id_fields[]`, alle optional, ohne sie wie bisher):
 
@@ -761,13 +761,17 @@ ab `completed_at`; danach geht der Fall im Fristen-Job an die Leitung (`match_de
 bleiben gültig und lesbar. Eine Wertung (kampflos) nimmt auch die Liste weg.
 
 **Kaderänderungen im Protokoll:** Jede Änderung am Kader eines Co-Teams in einer nicht beendeten Staffel schreibt `league.squad.roster` mit `squad_id`, `added`, `removed`. Austritt und Rauswurf aus dem Hauptteam ebenso.
-**Griff von außen:** Ändert die Liga-Leitung einen Co-Team-Kader oder dessen Rollen, oder löscht sie es, bekommen Leitung und Co-Leitung des Hauptteams eine Nachricht mit wer, was, wann (Art `team_role_changed`, `meta.reason` `league_squad_edit`, Schlüssel `league-squad-edit:<squad>:<Zeitpunkt>:<user>`).
+**Griff von außen:** Ändert die Liga-Leitung einen Co-Team-Kader oder dessen Rollen (Löschen geht in einer laufenden Staffel nicht), bekommen Leitung und Co-Leitung des Hauptteams eine Nachricht mit wer, was, wann (Art `team_role_changed`, `meta.reason` `league_squad_edit`, Schlüssel `league-squad-edit:<squad>:<Zeitpunkt>:<user>`).
 
 **Antworten an das Web:** `GET /api/me/league-eligibility` (eigener Stand je Season, ohne Datum). `GET /api/teams/{tid}/squads/{sid}/eligibility`: Stand je Kaderspieler und je möglichem Neuzugang, offene Transfers, Fenster; für Teamleitung, Captain, Vertreter und Liga-Recht `roster`.
 `league_requirement` an `GET /api/teams/{id}/squads` trägt zusätzlich `max_size`, `min_age`, `transfers_open`. `GET …/seasons/{id}/roster`: `eligibility` je Spieler (`state`, `ok`, `reason`, `until`, `age`) und `counts.waiting`, `counts.age`.
 Der Block `league` der Matchseite trägt `lineup_mode`, `lineup_min_players`, `participants`, `own_lineup`, `lineup_overdue`.
 
-**Datenschutz:** `birth_date` wird nur serverseitig gelesen und geht nie in eine Antwort, eine Nachricht oder ins Protokoll einer anderen Person. Die Gegenseite sieht keinen Eignungsgrund. Eine Meldung zu einer doppelten Spiel-ID nennt keinen Inhaber.
+**Datenschutz:** `birth_date` wird nur serverseitig gelesen und geht nie in eine Antwort, eine Nachricht oder ins Protokoll einer anderen Person. Die Gegenseite sieht keinen Eignungsgrund. Eine Meldung zu einer doppelten Spiel-ID nennt keinen Inhaber. Die Auskunft enthält `league_rosters`, `league_transfers` und `league_appearances` (Spiele, in denen die Person auf einer Aufstellung oder Liste steht, nur die eigene Seite). Das Löschen des Kontos löscht Kadereinträge und Anträge; `matches_v2` bleibt als Sportdaten, das Konto heißt dort „Gelöschter User“.
+
+**Audit-Aktionen neu:** `league.squad.roster`, `league.roster.wait_waive`, `league.transfer.request|approve|reject|withdraw`, `match.lineup.overdue`.
+
+**Noch nicht gebaut, liest diese Prüfung später:** Check-in (D.2 ruft `check_participants`), Strafen (E.3 ergänzt den Stand), Selbstanmeldung (B.4 ruft `registration_problems`).
 
 ### Darf nicht beschädigt werden
 

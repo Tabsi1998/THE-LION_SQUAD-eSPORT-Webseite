@@ -46,7 +46,7 @@ machen **Captain und Vertreter** des Co-Teams – hat ein Co-Team keinen von bei
 
 So läuft eine Spielwoche: Die Woche geht von **Dienstag bis Montag**. Die Captains vereinbaren einen Termin – ohne
 Einigung gilt der **Standardtermin** (Season 1: Sonntag 20:00). Nach dem Spiel meldet eine Seite das Ergebnis **im
-Web** mit Maps und eigener Aufstellung, die andere bestätigt. Antwortet sie nicht, gilt die Meldung nach **48 Stunden**
+Web** mit Maps und hakt einmal an, wer bei ihr gespielt hat (**Teilnehmerliste**, siehe 3.3), die andere bestätigt. Antwortet sie nicht, gilt die Meldung nach **48 Stunden**
 (spätestens am Ende der Spielwoche, mindestens 24 Stunden Zeit). Die Tabelle rechnet **3 Punkte für einen Sieg,
 1 für ein Remis, 0 für eine Niederlage**; bei Gleichstand entscheiden Differenz und mehr gewonnene Maps.
 
@@ -108,13 +108,17 @@ festgehaltenem Pool behalten ihre Reihenfolge.
 | | **Meldeschluss** (nur zur Anzeige) | 6.11.2026 |
 | | **Sperrzeiten** (Von, Bis, Bezeichnung) | 21.12.2026–3.1.2027 „Weihnachtspause“ |
 | Spiel und Wertung | **Best of** | Best of 3 |
-| | **Teamgröße (je Map)** · **Mindestkader** | 4 · 4 |
+| | **Teamgröße (je Map)** · **Mindestkader** | 4 · 3 (Sollstärke 4, der Kader darf kleiner sein) |
 | | **Teams je Staffel höchstens** | 8 |
 | | **Modus je Map** (Map 1, 2, 3 – „frei“ heißt: die Teams wählen) | nach Regelwerk |
 | | **Map-Wiederholung in einer Serie** | Gleiche Map nur in anderem Modus (Vorgabe); auch „Aus – jede Map nur einmal“ oder „Immer erlaubt“ |
 | | **Punkte Sieg / Remis / Niederlage**, **Bei Punktgleichheit** | 3 / 1 / 0 · Differenz, Mehr gewonnene Maps |
-| | **Ergebnis gilt nach (Stunden)** · **Aufstellung nachtragen bis (Stunden)** | 48 · 48 |
+| | **Ergebnis gilt nach (Stunden)** · **Teilnehmerliste nachtragen bis (Stunden)** | 48 · 48 |
 | | **Antwort auf Terminvorschlag (Stunden)** – so lange hat die Gegenseite Zeit; leer heißt bei älteren Seasons „je Staffel wie bisher“ | 72 |
+| Spielberechtigung (siehe 3.9) | **Höchstkader** · **Mindestalter (Jahre)** · **Wartezeit neuer Spieler (Tage)** | 50 · 18 · 7 |
+| | **Wer gespielt hat**, **Mindestens auf der Liste** | Teilnehmerliste einmal je Spiel, 3 |
+| | **Ein Team je Season**, **Jede Spiel-ID nur einmal** | an, an |
+| | **Transferfenster** (Von, Bis, Name) | keines: ohne Fenster keine Transfers |
 | Regeltext und Sichtbarkeit | **Regeltext** (Markdown) | Regelwerk der Liga |
 | | **Sichtbarkeit** | bis zum Start *Nur Liga-Leitung* (siehe 2.8) |
 
@@ -138,19 +142,20 @@ fassen kann** (Season 1: 8 Spielwochen – höchstens 8 Teams mit nur Hinrunde).
 
 Das macht die Leitung des Hauptteams, nicht die Turnierleitung: **Teams → Deine Teams** → Team wählen → **Co-Team** →
 Name, **Spiel** aus der Liste (eines mit anderem Spiel lässt sich nicht zuteilen; Hauptspiel und Versionen zählen zusammen, ohne Spiel passt es überall), **Kader**
-(mindestens so viele wie der Mindestkader, Season 1: 4), **Captain** und **Vertreter**
+(mindestens so viele wie der Mindestkader, höchstens der Höchstkader, Vorgabe 3 bis 50), **Captain** und **Vertreter**
 (beide aus dem Kader, verschieden) → speichern. Captain und Vertreter vereinbaren Termine, melden und bestätigen
 Ergebnisse. Alle im Kader brauchen ein Konto und müssen Mitglied des Hauptteams sein.
 
 Jeder im Kader braucht außerdem die **Spiel-ID** des Spiels im Profil (**Einstellungen → Gaming → Spiel-IDs**, bei CoD
 die **Activision-ID** inklusive `#`). Die ID des Hauptspiels gilt für alle Versionen. Ohne ID kann jemand zugeteilt,
-aber nicht aufgestellt werden (3.7).
+aber nicht aufgestellt werden (3.7). Verlangt die Season ein Mindestalter, braucht jeder im Kader ein **Geburtsdatum im Profil**; sichtbar ist davon nur „erfüllt“ oder „Geburtsdatum fehlt“.
+Unter jedem Co-Team, das in einer Staffel spielt, zeigt **Spielberechtigung** die Regeln der Season, wer spielen darf und was fehlt.
 
 ### 2.5 Co-Teams zuteilen
 
 1. Season-Seite → bei der Staffel **Turnierverwaltung · Co-Teams zuteilen** → Reiter **Teilnehmer**.
 2. **Co-Team zuteilen** → Schritt 1: das **Hauptteam** wählen → Schritt 2: das **Co-Team** → **Zuteilen**.
-3. Co-Teams, die nicht passen, stehen grau mit dem Grund da (Kader zu klein, Team schon in der Staffel, Staffel voll …).
+3. Co-Teams, die nicht passen, stehen grau mit dem Grund da (Kader zu klein oder zu groß, Team schon in der Staffel, Staffel voll, Geburtsdatum fehlt, jemand steht schon in einem anderen Co-Team der Season …).
 4. Bei jedem Co-Team steht je Spieler die **Spiel-ID** (Haken) bzw. **keine ID** (gelb), darunter „Ohne gültige
    Activision-ID: …“ mit den Namen. Zuteilen geht trotzdem; diese Spieler können erst aufgestellt werden, wenn die ID
    im Profil steht. Sie und die Verantwortlichen des Co-Teams bekommen eine Nachricht.
@@ -341,13 +346,13 @@ Bestätigungs- und Nachtragsfristen ruhen in der Sperrzeit, das Einspruchsfenste
 
 ### 3.2 Ergebnisse
 
-Melden mit Maps und eigener Aufstellung (nur im Web), Bestätigen im Web oder in der App, die 48-Stunden-Regel und
+Melden mit Maps und Teilnehmerliste (nur im Web), Bestätigen im Web oder in der App, die 48-Stunden-Regel und
 was dabei geprüft wird, steht für die Captains in
 [Turniere, 3.16](turniere.md#316-liga-ergebnis-je-map-melden-für-captains) – zum Weitergeben gibt es den
 [Spickzettel](liga-captains.md). Für die Turnierleitung dazu:
 
-- **Selbst eintragen**: Reiter **Spiele** → **Ergebnis eintragen** – Stand, auf Wunsch Maps mit den Aufstellungen
-  beider Seiten; eine fehlende Seite trägt ihre Aufstellung danach selbst nach. Siehe
+- **Selbst eintragen**: Reiter **Spiele** → **Ergebnis eintragen** – Stand, auf Wunsch Maps und die Teilnehmerlisten
+  beider Seiten; eine fehlende Seite trägt ihre Liste danach selbst nach. Siehe
   [Turniere, 3.6](turniere.md#36-ergebnisse-melden-eintragen-korrigieren).
 - **Kampflos**: im Ergebnis-Fenster **Nicht erschienen** auf der fehlenden Seite. Schon eingetragene Maps fallen dabei
   weg, der alte Stand bleibt im Verlauf des Spiels. Die Wertung ist eine Teamstrafe: Captain, Vertreter und die Leitung
@@ -356,14 +361,13 @@ was dabei geprüft wird, steht für die Captains in
   es in der Liga diesen Vorschlag nicht – fehlt ein Ergebnis, meldet sich **Ergebnis fehlt**. Klärt es mit beiden Seiten
   und wertet dann selbst. Das kommt mit dem Check-in (#1652) neu.
 
-### 3.3 Aufstellung nachtragen
+### 3.3 Teilnehmerliste nachtragen
 
-Captain oder Vertreter tragen eine fehlende Aufstellung bis **48 Stunden nach dem Ergebnis** selbst nach (3.16);
-bis dahin steht bei ihnen auf der Startseite die Aufgabe „Aufstellung nachtragen“. Danach nur noch die
-Turnierleitung: am Spiel **Ergebnis korrigieren** mit Maps und Aufstellungen und einem Grund. Die Matchseite sagt der
-Seite nach der Frist „die Frist zum Nachtragen ist vorbei“ und lässt den Matchchat für **@leitung** offen – so kommt
-die Bitte zur Turnierleitung. Für die Tabelle spielt die Aufstellung keine Rolle; sie zählt für den Doppel-Einsatz
-und spätere Statistiken.
+**Am Schluss hakt jedes Team einmal an, wer gespielt hat**: alle, die mindestens eine Map gespielt haben. Mindestens drei, bei Wechseln auch sechs und mehr. Es gibt keine Eingabe vor oder je Map; Maps, Modi und Endstände bleiben je Map Pflicht. Jedes Team trägt nur seine eigene Seite ein.
+
+Fehlt nach der Bestätigung eine Liste (etwa nach einer Bestätigung in der App oder nach den 48 Stunden), **bleibt das Ergebnis gültig**. Captain oder Vertreter dieser Seite tragen die Liste bis **48 Stunden ab der Bestätigung** im Web nach; bis dahin steht bei ihnen auf der Startseite die Aufgabe. Danach bekommt ihr den Fall als Nachricht **Teilnehmerliste fehlt nach der Frist**: am Spiel **Fehlende Teilnehmerliste nachtragen (Liga-Leitung)** mit einem Grund, oder ihr entscheidet anders. Eine fehlende Liste ist keine Wertung. **Wer nicht auf der Liste steht, zählt nicht als Einsatz.** Für die Tabelle spielt die Liste keine Rolle; sie zählt für den Doppel-Einsatz und für Auszeichnungen.
+
+Staffeln, die noch **je Map** aufstellen (ältere Seasons oder **Wer gespielt hat → Aufstellung je Map**), laufen wie bisher: die eigene Aufstellung bis 48 Stunden nach dem Ergebnis, danach die Leitung mit **Ergebnis korrigieren**. Alte Spiele bleiben lesbar.
 
 ### 3.4 Einspruch und Korrektur
 
@@ -445,6 +449,26 @@ Die IDs sehen nur die Beteiligten des Spiels und die Turnierleitung, nie Gäste.
 - **Beide Seiten:** Dieselbe Person steht nie auf beiden Seiten eines Spiels, über alle Maps – beim Melden, Bestätigen,
   Nachtragen und in eurer Korrektur. Steht sie in einem alten Spiel schon auf beiden Seiten, geht die Korrektur trotzdem
   durch und steht im Protokoll; nehmt sie dabei auf der falschen Seite heraus.
+
+### 3.9 Spielberechtigung: Regeln je Season
+
+Alles sind Vorgaben, jede Season stellt sie selbst ein (2.2). Geprüft wird an einer Stelle: beim Zuteilen, bei der Aufnahme in den Kader, auf der Teilnehmerliste und später beim Check-in. Ältere Seasons tragen die Felder nicht und prüfen nichts Neues.
+
+| Regel | Was passiert |
+| --- | --- |
+| **Mindest- und Höchstkader** | Über den Höchstkader lässt sich niemand aufnehmen. Unter den Mindestkader führt nur ein Abgang: Der bleibt möglich, es gibt Warnung und Aufgabe (3.8) |
+| **Ein Team je Season** | Wer in der Season in einem anderen Co-Team steht oder stand, kommt nur per Transfer. In anderen Seasons und Ligen ist das frei |
+| **Wartezeit** | Bis zum Ende von Spieltag 1 spielen Neue sofort. Danach warten sie ab der Aufnahme so viele Tage, auch wenn der Kader dadurch zu klein ist. Wer ins selbe Co-Team zurückkommt, startet keine neue Wartezeit. Das Zuteilen eines Co-Teams durch euch startet keine |
+| **Stichtag** | Optional in der Kaderübersicht: Neue warten auf eure Freigabe, Abgänge bleiben frei (3.7) |
+| **Transferfenster** | Die Teamleitung beantragt im Fenster, ihr entscheidet. Danach gilt dieselbe Wartezeit |
+| **Mindestalter** | Prüfung über das Geburtsdatum im Profil als Selbstauskunft. Ohne Datum keine Anmeldung und keine Aufnahme. Ihr seht nur „Alter erfüllt“ oder „Geburtsdatum fehlt“, nie das Datum |
+| **Spiel-ID** | Format und Auswahl stehen am Spiel unter **Admin → Spiele → Spieler-IDs**: Format als regulärer Ausdruck, Beispiel für die Spieler, Auswahlwerte. So wird auch die **Plattform** zum Pflichtfeld, das einmal je Season festgehalten wird. Eine schon festgehaltene ID bleibt gültig. Eine doppelte ID wird abgelehnt, die Meldung nennt nie, wem sie gehört |
+
+**Wartezeit aufheben:** Season → **Kader und Spiel-IDs** → beim Spieler **Wartezeit aufheben** → Grund (mindestens fünf Zeichen). Das geht mit der Zuständigkeit **Kader prüfen** und steht im Protokoll.
+
+**Transfer:** Die Teamleitung tippt unter **Spielberechtigung** auf **Transfer beantragen**; die Person muss schon im Hauptteam stehen. Ihr seht den Antrag oben unter **Kader und Spiel-IDs**: **Genehmigen** nimmt die Person aus dem alten Co-Team und setzt sie ins neue; **Ablehnen** braucht einen Grund. Ist die Person im alten Co-Team Captain oder Vertreter, vergibt die Teamleitung die Rolle zuerst neu. Person und beide Teamleitungen bekommen eine Nachricht.
+
+**Eingriff von außen:** Ändert ihr den Kader oder die Rollen eines Co-Teams, bekommen Leitung und Co-Leitung des Hauptteams eine Nachricht: wer, was, wann. Jede Kaderänderung in einer laufenden Staffel steht im Protokoll, auch wenn die Teamleitung sie macht oder jemand das Team verlässt.
 
 ---
 
