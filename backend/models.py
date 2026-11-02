@@ -1032,6 +1032,8 @@ RESULT_MAX_ENTRIES = 256
 # Liga (docs/LIGA.md, #1650): höchstens Best of 9 Maps je Spiel, Aufstellungen in Teamgröße.
 MATCH_GAMES_MAX = 9
 MATCH_LINEUP_MAX = 20
+# Teilnehmerliste einmal je Spiel (#2204): nach oben offen, höchstens so groß wie der größte Kader.
+MATCH_PARTICIPANTS_MAX = 200
 
 
 class MatchScoreReport(BaseModel):
@@ -1047,6 +1049,8 @@ class MatchScoreReport(BaseModel):
     photo_id: Optional[str] = None
     # Liga (docs/LIGA.md, #1650): je Map Modus, Map, Sieger, Punkte und die eigene Aufstellung - sonst unbeachtet.
     games: Optional[List["MatchGameReport"]] = Field(default=None, max_length=MATCH_GAMES_MAX)
+    # Teilnehmerliste der eigenen Seite (#2204), nur in Staffeln mit ``lineup_mode: series``.
+    lineup: Optional[List[str]] = Field(default=None, max_length=MATCH_PARTICIPANTS_MAX)
 
 
 class MatchGameReport(BaseModel):
@@ -1075,9 +1079,10 @@ class MatchLineupAmendGame(BaseModel):
 
 
 class MatchLineupAmend(BaseModel):
-    """Aufstellung nachtragen (``PUT /api/matches/{id}/lineups``): je Map die eigene Seite. Die Turnierleitung nennt
-    die Seite (``registration_id``) und einen Grund."""
-    games: List[MatchLineupAmendGame] = Field(min_length=1, max_length=MATCH_GAMES_MAX)
+    """Aufstellung nachtragen (``PUT /api/matches/{id}/lineups``): je Map die eigene Seite (``games``) oder die Teilnehmerliste
+    (``lineup``, #2204). Die Turnierleitung nennt die Seite (``registration_id``) und einen Grund."""
+    games: Optional[List[MatchLineupAmendGame]] = Field(default=None, max_length=MATCH_GAMES_MAX)
+    lineup: Optional[List[str]] = Field(default=None, max_length=MATCH_PARTICIPANTS_MAX)
     registration_id: Optional[str] = Field(default=None, max_length=100)
     reason: Optional[str] = Field(default=None, max_length=500)
     # Notausnahme des Superadmins bei Befangenheit (#2203, docs/LIGA.md Abschnitt 12).
@@ -1104,6 +1109,8 @@ class MatchV2ResultSubmit(BaseModel):
     reason: Optional[str] = Field(default=None, max_length=500)
     # Liga (#1650): Maps samt Aufstellungen beider Seiten - freiwillig, sonst bleiben die Maps des Spiels.
     games: Optional[List[MatchGameAdmin]] = Field(default=None, max_length=MATCH_GAMES_MAX)
+    # Teilnehmerlisten beider Seiten (#2204), je Seite freiwillig - nur in Staffeln mit ``lineup_mode: series``.
+    lineups: Optional[Dict[str, List[str]]] = None
     # Notausnahme des Superadmins bei Befangenheit (#2203).
     conflict_reason: Optional[str] = Field(default=None, max_length=500)
 
@@ -2441,6 +2448,15 @@ class LeagueUpdate(LeagueLookFields):
     accent_color: Optional[str] = Field(default=None, max_length=9)
 
 
+class LeagueTransferWindow(BaseModel):
+    """Ein Transferfenster einer Season (#2204): Wiener Kalendertage."""
+    start_date: str
+    end_date: str
+    label: Optional[str] = Field(default=None, max_length=60)
+
+    _days = field_validator("start_date", "end_date", mode="before")(_calendar_day)
+
+
 class LeagueSeasonFields(LeagueLookFields):
     """Die Vorgaben einer Season (docs/LIGA.md, Abschnitt 2 und 3) - gemeinsam für Anlegen und Ändern. Dazu die
     Gestaltung (#2107): Emblem und Banner überschreiben die der Liga, ``prizes`` sind die Gewinne der Season."""
@@ -2458,6 +2474,15 @@ class LeagueSeasonFields(LeagueLookFields):
     best_of: Optional[Literal[1, 3, 5, 7]] = None
     team_size: Optional[int] = Field(default=None, ge=1, le=20)
     min_squad_size: Optional[int] = Field(default=None, ge=1, le=40)
+    # Spielberechtigung (#2204, docs/LIGA.md Abschnitt 12).
+    max_squad_size: Optional[int] = Field(default=None, ge=1, le=200)
+    one_team_per_season: Optional[bool] = None
+    new_player_wait_days: Optional[int] = Field(default=None, ge=0, le=60)
+    transfer_windows: Optional[List[LeagueTransferWindow]] = Field(default=None, max_length=10)
+    min_age: Optional[int] = Field(default=None, ge=0, le=99)
+    unique_game_ids: Optional[bool] = None
+    lineup_mode: Optional[Literal["series", "per_map"]] = None
+    lineup_min_players: Optional[int] = Field(default=None, ge=1, le=20)
     game_mode_order: Optional[List[str]] = Field(default=None, max_length=7)
     # Map-Wiederholung in einer Serie (#2096): nie, nur in anderem Modus (Vorgabe) oder immer.
     map_repeat: Optional[Literal["never", "other_mode", "always"]] = None

@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 
 from services.log_safe import log_safe
+from services.league_eligibility import open_window
 from services.league_roster import is_active_squad
 from services.match_audience import kader_care_ids, roster_ids, teams_by_id
 from services.squad_registration import ACTIVE_REGISTRATION_STATUSES, FINISHED_TOURNAMENT_STATUSES, min_squad_size
@@ -17,7 +18,7 @@ from services.squad_registration import ACTIVE_REGISTRATION_STATUSES, FINISHED_T
 logger = logging.getLogger("tls.squad_shortage")
 
 REGISTRATION_FIELDS = {"_id": 0, "id": 1, "tournament_id": 1, "team_id": 1, "squad_id": 1, "display_name": 1}
-TOURNAMENT_FIELDS = {"_id": 0, "id": 1, "title": 1, "status": 1, "team_size": 1, "min_squad_size": 1, "league_context": 1}
+TOURNAMENT_FIELDS = {"_id": 0, "id": 1, "title": 1, "status": 1, "team_size": 1, "min_squad_size": 1, "lineup_mode": 1, "league_context": 1}
 
 
 async def _open_tournaments(db, registrations: list[dict]) -> dict[str, dict]:
@@ -80,6 +81,7 @@ async def requirements(db, squad_ids: list[str]) -> dict[str, dict]:
     tournaments = await _open_tournaments(db, regs)
     squads = await _active_squads(db, squad_ids)
     out: dict[str, dict] = {}
+    season_of: dict[str, str] = {}
     for reg in regs:
         tournament = tournaments.get(reg.get("tournament_id"))
         if not tournament or reg["squad_id"] not in squads:
@@ -87,6 +89,20 @@ async def requirements(db, squad_ids: list[str]) -> dict[str, dict]:
         minimum = min_squad_size(tournament)
         if minimum > out.get(reg["squad_id"], {}).get("min_size", 0):
             out[reg["squad_id"]] = {"min_size": minimum, "title": tournament.get("title")}
+            season_of[reg["squad_id"]] = (tournament.get("league_context") or {}).get("season_id")
+    # Was die Season sonst noch verlangt (#2204) - nur, was sie wirklich trägt.
+    wanted = sorted({season_id for season_id in season_of.values() if season_id})
+    seasons = {row["id"]: row for row in await db.league_seasons.find({"id": {"$in": wanted}}, {"_id": 0}).to_list(len(wanted) + 1)} if wanted else {}
+    for squad_id, demand in out.items():
+        season = seasons.get(season_of.get(squad_id))
+        if not season:
+            continue
+        if season.get("max_squad_size"):
+            demand["max_size"] = season["max_squad_size"]
+        if season.get("min_age"):
+            demand["min_age"] = season["min_age"]
+        if season.get("one_team_per_season"):
+            demand["transfers_open"] = bool(open_window(season))
     return out
 
 

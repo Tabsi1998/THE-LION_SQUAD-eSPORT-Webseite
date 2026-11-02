@@ -31,6 +31,7 @@ def _submission_identity(
     note: str | None,
     force: bool,
     games: list[dict] | None = None,
+    lineups: dict | None = None,
 ) -> tuple[str, list[dict]]:
     normalized = normalize_v2_results(match, raw_results)
     parent_report_id = (match.get("result_meta") or {}).get("report_id")
@@ -45,6 +46,8 @@ def _submission_identity(
     if games is not None:
         # Liga (#1650): eine Korrektur nur der Maps ist ein eigener Eintrag - Turniere ohne Maps rechnen wie bisher.
         payload["games"] = games
+    if lineups is not None:
+        payload["lineups"] = lineups
     digest = hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
     ).hexdigest()
@@ -230,6 +233,7 @@ async def submit_v2_result(
     hold_id: str | None = None,
     games: list[dict] | None = None,
     lineups_missing: list[str] | None = None,
+    match_lineups: dict | None = None,
 ) -> dict:
     """Persist one v2 result while the caller owns the tournament write lease.
 
@@ -237,11 +241,13 @@ async def submit_v2_result(
     ``hold_id``: das Ergebnis lag 10 Sekunden für „Rückgängig“ bereit (services/result_hold) - unter dieser Kennung.
     ``games``/``lineups_missing``: Liga (#1650) - die geltenden Maps samt Aufstellungen, schon geprüft
     (services/league_games); ``None`` lässt die Maps des Spiels, wie sie sind, ``[]`` nimmt sie weg.
+    ``match_lineups``: die Teilnehmerlisten (#2204), ebenso.
 
     Jeder Weg schreibt hier und prüft hier denselben Vertrag (services/match_v2_results): die Werte samt Best-of und,
     hat das Spiel schon ein Ergebnis, Korrektur nur mit ``force`` und Grund."""
     same_games = games is None or (games == (match.get("games") or []) and
                                    sorted(lineups_missing or []) == sorted(match.get("lineups_missing") or []))
+    same_games = same_games and (match_lineups is None or match_lineups == (match.get("lineups") or {}))
     if same_games and is_v2_result_replay(match, raw_results, proof_url=proof_url, note=note):
         meta = match.get("result_meta") or {}
         report_id = meta.get("report_id")
@@ -273,7 +279,7 @@ async def submit_v2_result(
         {"_id": 0},
     ).to_list(3000)
     now_iso = now_utc().isoformat()
-    report_id, normalized_results = _submission_identity(match, raw_results, proof_url, note, force, games)
+    report_id, normalized_results = _submission_identity(match, raw_results, proof_url, note, force, games, match_lineups)
     # Die Paarung vor der Korrektur (#1553): der Anwender setzt die Plätze der Folgespiele direkt um; wer vorher
     # drinstand, soll trotzdem erfahren, dass sein Spiel neu gesetzt wurde.
     seats_before = {row["id"]: [dict(slot) for slot in row.get("slots") or []] for row in stage_matches if row.get("id")}
@@ -313,6 +319,8 @@ async def submit_v2_result(
     if games is not None:
         # Liga (#1650): Maps und fehlende Aufstellungen gehören zum Ergebnis - eine Korrektur ersetzt sie mit.
         application["match_set"].update({"games": games, "lineups_missing": sorted(lineups_missing or [])})
+    if match_lineups is not None:
+        application["match_set"]["lineups"] = match_lineups
 
     await db.match_reports_v2.update_one(
         {"id": report_id},
@@ -335,6 +343,8 @@ async def submit_v2_result(
             **({"reset_matches": reset_matches} if reset_matches else {}),
             **({"games": games} if games is not None else {}),
             **({"previous_games": match.get("games")} if games is not None and match.get("games") else {}),
+            **({"lineups": match_lineups} if match_lineups is not None else {}),
+            **({"previous_lineups": match.get("lineups")} if match_lineups is not None and match.get("lineups") else {}),
         }},
         upsert=True,
     )
@@ -347,7 +357,7 @@ async def submit_v2_result(
     from services.league_rules import match_stamp
     application["match_set"].update(await match_stamp(db, match))
     await db.matches_v2.update_one({"id": match["id"]}, {"$set": application["match_set"]})
-    if games is not None or match.get("lineup_user_ids"):
+    if games is not None or match_lineups is not None or match.get("lineup_user_ids"):
         # Liga (#1650): mit dem Ergebnis gelten nur noch seine Maps - auch ohne Maps (etwa „Nicht erschienen“).
         from services.league_games import refresh_lineup_index
         await refresh_lineup_index(db, match["id"])

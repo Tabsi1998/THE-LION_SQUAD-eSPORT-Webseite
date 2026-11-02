@@ -9,7 +9,7 @@ from fastapi.responses import StreamingResponse
 from database import get_db
 from auth import require_super, get_current_user
 from services import account_erasure
-from services.competition_privacy import registration_match_snapshot
+from services.competition_privacy import league_appearance_snapshot, registration_match_snapshot
 from models import now_utc, new_id
 
 dsgvo_router = APIRouter(prefix="/api/dsgvo", tags=["dsgvo"])
@@ -158,6 +158,9 @@ async def _user_data_sections(db, user_id: str) -> list[tuple[str, tuple]]:
         registration_ids = [row["id"] async for row in _paged(db.tournament_registrations, me) if row.get("id")]
         return await registration_match_snapshot(db, registration_ids, limit=None)
 
+    async def league_appearances():
+        return await league_appearance_snapshot(db, user_id)
+
     async def stamp():
         return now_utc().isoformat()
 
@@ -179,6 +182,9 @@ async def _user_data_sections(db, user_id: str) -> list[tuple[str, tuple]]:
         ("tournament_registrations", _rows(db.tournament_registrations, me)),
         # Liga-Kader (#2108): die festgehaltene Spiel-ID je Season samt Freigaben.
         ("league_rosters", _rows(db.league_rosters, me)),
+        ("league_transfers", _rows(db.league_transfers, me)),
+        # Spielberechtigung (#2204): Spiele, in denen die Person auf einer Aufstellung oder Teilnehmerliste steht - nur die eigene Zugehörigkeit.
+        ("league_appearances", _value(league_appearances)),
         # Regelwerk (#1646): welcher Fassung die Person für welches Co-Team zugestimmt hat.
         ("league_rule_consents", _rows(db.league_rule_consents, me)),
         ("competition_matches", _value(matches)),

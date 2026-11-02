@@ -17,9 +17,9 @@ from __future__ import annotations
 from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
-from services import league_roster
+from services import league_eligibility, league_roster
 from services.discord_roles import load_games, top_game
-from services.league_roster import min_squad_size
+from services.league_roster import active_league_registrations, min_squad_size
 from services.mutation_lock import league_season_resource
 
 ACTIVE_REGISTRATION_STATUSES = ("pending", "approved", "checked_in", "waitlist")
@@ -267,6 +267,8 @@ async def candidates(db, tournament: dict) -> dict:
     # Spiel-ID je Spieler (#2108): Stand in der Season - fehlt sie, warnt der Dialog; zuteilen geht trotzdem.
     member_ids = {uid for squad in squads if squad.get("team_id") in teams for uid in squad.get("member_ids") or [] if uid}
     roster_ctx = await league_roster.context_for_tournament(db, tournament, member_ids)
+    # Regeln der Season (#2204): dieselbe Prüfung wie beim Zuteilen, der Dialog zeigt die Gründe vorab.
+    eligibility = await league_eligibility.context_for_tournament(db, tournament, member_ids)
     games, parents = await load_games(db)
     out: dict[str, dict] = {}
     for squad in squads:
@@ -284,7 +286,7 @@ async def candidates(db, tournament: dict) -> dict:
             other_staffel_squad_ids=other,
             games=games,
             parents=parents,
-        )
+        ) + league_eligibility.registration_problems(eligibility, squad)
         entry = out.setdefault(
             team["id"],
             {
@@ -363,6 +365,8 @@ async def build_registration(db, tournament: dict, team_id: str, squad_id: str, 
         games=games,
         parents=parents,
     )
+    eligibility = await league_eligibility.context_for_tournament(db, tournament, squad.get("member_ids") or [])
+    problems += league_eligibility.registration_problems(eligibility, squad)
     if problems:
         code, text = problems[0]
         raise SquadAssignError(code, text)
@@ -405,25 +409,3 @@ async def active_league_registration(db, squad_id: str) -> dict | None:
     return active[0] if active else None
 
 
-async def active_league_registrations(db, squad_id: str) -> list[dict]:
-    """Alle solchen Anmeldungen - ein Co-Team kann in Staffeln verschiedener Seasons stehen."""
-    regs = await db.tournament_registrations.find(
-        {"squad_id": squad_id},
-        {"_id": 0, "id": 1, "tournament_id": 1},
-    ).to_list(500)
-    if not regs:
-        return []
-    tournaments = {
-        row["id"]: row
-        for row in await db.tournaments.find(
-            {"id": {"$in": sorted({reg["tournament_id"] for reg in regs if reg.get("tournament_id")})}},
-            {"_id": 0, "id": 1, "title": 1, "slug": 1, "status": 1, "game_id": 1, "league_context": 1},
-        ).to_list(510)
-    }
-    active = []
-    for reg in regs:
-        tournament = tournaments.get(reg.get("tournament_id") or "")
-        if tournament and tournament.get("status") not in FINISHED_TOURNAMENT_STATUSES:
-            active.append({**reg, "tournament_title": tournament.get("title"), "tournament_slug": tournament.get("slug"),
-                           "tournament_game_id": tournament.get("game_id"), "league_context": tournament.get("league_context")})
-    return active

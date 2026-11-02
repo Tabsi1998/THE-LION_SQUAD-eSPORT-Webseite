@@ -20,7 +20,9 @@ INTERNAL_KEYS = frozenset({"admin_note", "admin_decision_note", "admin_decision_
                            # „Nicht erschienen“ im Lauf (#1823): wer markiert ist, ist öffentlich - die Begründung nicht.
                            "no_show_notes",
                            # Liga (#1650): der Doppel-Einsatz-Index besteht aus Konto-Kennungen.
-                           "lineup_user_ids"})
+                           "lineup_user_ids",
+                           # Teilnehmerliste (#2204): Konto-Kennungen und der interne Fall bei der Leitung.
+                           "lineups", "lineup_overdue_at"})
 INTERNAL_META_KEYS = frozenset({"note", "correction_reason", "hold_id"})
 INTERNAL_RESULT_KEYS = frozenset({"user_id", "note"})
 # Liga (#1650): öffentlich je Map nur der Schnappschuss, Sieger und Punkte - Aufstellungen (Konto-Kennungen) bekommen

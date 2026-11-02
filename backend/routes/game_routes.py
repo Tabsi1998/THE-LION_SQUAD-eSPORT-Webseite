@@ -144,10 +144,20 @@ async def game_usage_route(game_id: str, me: dict = Depends(require_admin())):
     return await game_usage.usage(db, game)
 
 
+def _check_id_fields(fields: list | None) -> None:
+    """Format und Auswahl der Spiel-IDs (#2204): Ein kaputtes Muster fällt beim Speichern auf, nicht erst bei den Spielern."""
+    from services.league_roster import id_fields_problem
+
+    problem = id_fields_problem(fields)
+    if problem:
+        raise HTTPException(status_code=422, detail=problem)
+
+
 @router.post("")
 async def create_game(body: GameCreate, me: dict = Depends(require_admin())):
     db = get_db()
     doc = body.model_dump()
+    _check_id_fields(doc.get("player_id_fields"))
     doc["slug"] = await unique_slug(db.games, doc.get("slug") or doc.get("name"), fallback="spiel")
     if doc.get("parent_game_id") and not await db.games.find_one({"id": doc["parent_game_id"]}, {"id": 1}):
         raise HTTPException(status_code=404, detail="Hauptspiel nicht gefunden")
@@ -179,6 +189,7 @@ async def update_game(game_id: str, body: GameUpdate, me: dict = Depends(require
                        "points_table", "default_best_of"}
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
+    _check_id_fields(updates.get("player_id_fields"))
     slug_source = slug_source_for_update(raw, current, "name", fallback="spiel")
     if slug_source is not None:
         updates["slug"] = await unique_slug(db.games, slug_source, current_id=game_id, fallback="spiel")

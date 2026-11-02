@@ -19,6 +19,45 @@ def _privacy_match_projection(match: dict) -> dict:
     return projected
 
 
+def _own_side(row: dict, user_id: str) -> str | None:
+    """Die Seite, auf der die Person steht: Teilnehmerliste, Aufstellungen je Map (Altbestand), offene Meldungen, gehaltenes Ergebnis. Nie die
+    Gegenseite und keine andere Person."""
+    held = row.get("pending_result") if isinstance(row.get("pending_result"), dict) else {}
+    lists = [row.get("lineups"), held.get("lineups")]
+    for games in (row.get("games"), held.get("games")):
+        lists += [(game or {}).get("lineups") for game in games or []]
+    for report in row.get("reports") or []:
+        lists.append({report.get("registration_id"): report.get("lineup")})
+        lists += [(game or {}).get("lineups") for game in report.get("games") or []]
+    for lineups in lists:
+        for side, people in (lineups or {}).items():
+            if user_id in (people or []):
+                return side
+    return None
+
+
+async def league_appearance_snapshot(db, user_id: str) -> list[dict]:
+    """Für die Auskunft (#2204): Spiele, in denen die Person auf einer Aufstellung oder Teilnehmerliste steht - nur ihre eigene Seite, keine anderen
+    Personen. Gültiger Altbestand steht nur in ``games[].lineups``, in offenen Meldungen oder im gehaltenen Ergebnis und braucht ``lineup_user_ids`` nicht
+    zu tragen. Die Schlüssel dort sind Kennungen der Seiten, also lässt sich nicht danach suchen: Gelesen werden die Spiele der Staffeln, die so etwas
+    tragen, die Auswahl trifft ``_own_side``."""
+    staffeln = await db.tournaments.find({"league_context": {"$type": "object"}}, {"_id": 0, "id": 1}).to_list(5000)
+    query: dict = {"lineup_user_ids": user_id}
+    if staffeln:
+        query = {"$or": [query, {"tournament_id": {"$in": [row["id"] for row in staffeln]},
+                                 "$or": [{"games.0": {"$exists": True}}, {"reports.0": {"$exists": True}}, {"pending_result": {"$type": "object"}}]}]}
+    rows = await db.matches_v2.find(query, {"_id": 0, "id": 1, "tournament_id": 1, "status": 1, "completed_at": 1, "lineups": 1, "lineup_user_ids": 1,
+                                            "games.lineups": 1, "reports.registration_id": 1, "reports.lineup": 1, "reports.games.lineups": 1,
+                                            "pending_result.lineups": 1, "pending_result.games.lineups": 1}).to_list(None)
+    out = []
+    for row in rows:
+        side = _own_side(row, user_id)
+        if side or user_id in (row.get("lineup_user_ids") or []):
+            out.append({"match_id": row.get("id"), "tournament_id": row.get("tournament_id"), "status": row.get("status"),
+                        "completed_at": row.get("completed_at"), "registration_id": side})
+    return out
+
+
 async def registration_match_snapshot(db, registration_ids: list[str], *, limit: int = 5000) -> list[dict]:
     """Export every canonical match that references one of the registrations."""
 

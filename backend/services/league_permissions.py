@@ -241,6 +241,9 @@ def _people_in_lineups(match: dict) -> set[str]:
     for game in match.get("games") or []:
         for lineup in ((game or {}).get("lineups") or {}).values():
             people.update(lineup or [])
+    # Die Teilnehmerliste einmal je Spiel (#2204) zählt genauso.
+    for lineup in (match.get("lineups") or {}).values():
+        people.update(lineup or [])
     return {person for person in people if person}
 
 
@@ -309,7 +312,10 @@ async def held_result_refusal(db, match: dict, hold: dict) -> str | None:
     if "results" not in capabilities or (str(match.get("status") or "") == "disputed" and "disputes" not in capabilities):
         return HOLD_NO_RIGHT
     # Auch wer sich mit diesem Ergebnis selbst aufgestellt hat, gehört zum Spiel.
-    conflict = await conflict_of_interest(db, person, {**match, "games": [*(match.get("games") or []), *(hold.get("games") or [])]})
+    both = {**(hold.get("lineups") or {})}
+    for side, lineup in (match.get("lineups") or {}).items():
+        both[side] = [*(both.get(side) or []), *lineup]
+    conflict = await conflict_of_interest(db, person, {**match, "games": [*(match.get("games") or []), *(hold.get("games") or [])], "lineups": both})
     if conflict and not (conflict["override"] and hold.get("conflict_reason")):
         return HOLD_CONFLICT
     return None

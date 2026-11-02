@@ -54,6 +54,8 @@ PURGED = (
     "reference_series_staff",
     # Seit #2108: die festgehaltene Spiel-ID je Liga-Season - Aufstellungen und Ergebnisse bleiben ohne sie.
     "league_rosters",
+    # Seit #2204: Transfer-Anträge der Person.
+    "league_transfers",
     # Seit #1646: Zustimmung zu einer Regelversion - das Co-Team wird danach neu gefragt.
     "league_rule_consents",
 )

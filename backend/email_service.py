@@ -329,6 +329,12 @@ def tpl_dispute_opened(tournament_title: str, url: str) -> tuple[str, str]:
 
 
 @mail_template
+def tpl_league_notice(title: str, text: str, url: str) -> tuple[str, str]:
+    # Spielberechtigung (#2204): etwas, das jemand in der Liga tun muss oder das ohne ihn entschieden wurde.
+    return title, _wrap(title, f"<p>{text}</p>", "Ansehen", url)
+
+
+@mail_template
 def tpl_dispute_resolved(tournament_title: str, decision: str, url: str) -> tuple[str, str]:
     return f"Dispute entschieden: {tournament_title}", _wrap(
         "Dispute entschieden",
@@ -703,6 +709,7 @@ async def render_named(template_key: str, **kwargs) -> Optional[tuple[str, str]]
         "score_reported": tpl_score_reported,
         "dispute_opened": tpl_dispute_opened,
         "dispute_resolved": tpl_dispute_resolved,
+        "league_notice": tpl_league_notice,
         "tournament_finished": tpl_tournament_finished,
         "test": tpl_test,
         "match_lead_10m": tpl_match_lead_10m,

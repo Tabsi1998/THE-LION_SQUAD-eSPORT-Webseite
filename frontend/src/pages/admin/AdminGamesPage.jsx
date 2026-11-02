@@ -259,6 +259,11 @@ function toForm(game) {
   };
 }
 
+function optionList(value) {
+  const rows = Array.isArray(value) ? value : String(value || "").split(",");
+  return rows.map((row) => String(row).trim()).filter(Boolean);
+}
+
 function normalizePlayerIdFields(fields = []) {
   return (fields || [])
     .map((field) => ({
@@ -266,6 +271,11 @@ function normalizePlayerIdFields(fields = []) {
       label: field.label || field.key || "",
       help_text: field.help_text || "",
       required: field.required !== false,
+      // Spielberechtigung (#2204): Format, Beispiel, Auswahl - leer heißt „keine Vorgabe“.
+      ...(String(field.pattern || "").trim() ? { pattern: String(field.pattern).trim() } : {}),
+      ...(String(field.format_hint || "").trim() ? { format_hint: String(field.format_hint).trim() } : {}),
+      ...(optionList(field.options).length ? { options: optionList(field.options) } : {}),
+      ...(field.unique_in_season === false ? { unique_in_season: false } : {}),
     }))
     .filter((field) => field.key && field.label);
 }
@@ -385,6 +395,14 @@ function PlayerIdFieldsEditor({ value = [], onChange }) {
           <label className="col-span-12 inline-flex items-center gap-2 text-xs text-white/65">
             <input type="checkbox" checked={field.required !== false} onChange={(e) => update(idx, { required: e.target.checked })} className="accent-[#29B6E8]" />
             Pflichtfeld für Turnieranmeldung
+          </label>
+          {/* Liga (#2204): Format und Auswahl gelten für neue Werte im Profil und für die Spielberechtigung. Leer = keine Vorgabe. */}
+          <input value={field.pattern || ""} onChange={(e) => update(idx, { pattern: e.target.value })} placeholder="Format (regulärer Ausdruck), z.B. [^#]+#\d+" className="col-span-12 sm:col-span-4 bg-[#121212] border border-white/10 px-2 py-2 rounded-sm text-xs font-mono" data-testid={`game-id-field-pattern-${idx}`} />
+          <input value={field.format_hint || ""} onChange={(e) => update(idx, { format_hint: e.target.value })} placeholder="Beispiel für Spieler, z.B. Name#1234567" maxLength={120} className="col-span-12 sm:col-span-4 bg-[#121212] border border-white/10 px-2 py-2 rounded-sm text-xs" data-testid={`game-id-field-hint-${idx}`} />
+          <input value={Array.isArray(field.options) ? field.options.join(", ") : field.options || ""} onChange={(e) => update(idx, { options: e.target.value })} placeholder="Auswahl, durch Komma getrennt (etwa Plattformen)" className="col-span-12 sm:col-span-4 bg-[#121212] border border-white/10 px-2 py-2 rounded-sm text-xs" data-testid={`game-id-field-options-${idx}`} />
+          <label className="col-span-12 inline-flex items-center gap-2 text-xs text-white/65">
+            <input type="checkbox" checked={field.unique_in_season !== false} onChange={(e) => update(idx, { unique_in_season: e.target.checked })} className="accent-[#29B6E8]" />
+            Je Liga-Season nur einmal vergeben (für Auswahlfelder wirkungslos, wenn nicht eigens gesetzt)
           </label>
         </div>
       ))}

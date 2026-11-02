@@ -67,6 +67,7 @@ async def apply_forfeit(db, match: dict, forfeiting_registration_id: str, *, not
         hold_id=hold_id,
         games=[] if drop_maps else None,
         lineups_missing=[] if drop_maps else None,
+        match_lineups={} if match.get("lineups") else None,
     )
     updated = outcome.get("match") or match
     now_iso = now_utc().isoformat()

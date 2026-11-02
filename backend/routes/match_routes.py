@@ -1172,17 +1172,18 @@ async def submit_match_result(match_id: str, body: MatchV2ResultSubmit,
 async def _submit_staff_result(db, match: dict, body: MatchV2ResultSubmit, raw_results: list[dict], me: dict,
                                force: bool) -> dict:
     """Ergebnis der Turnierleitung schreiben - der Aufrufer hält Turnier- und (bei Liga) Season-Sperre."""
-    games, missing, league = await _staff_games(db, match, body, raw_results)
+    games, missing, league, lineups = await _staff_games(db, match, body, raw_results)
+    saved = league_games.with_series(games, lineups)
     if body.hold:
         # Ergebnis-Fenster (#1156): 10 Sekunden „Rückgängig“, erst danach Baum, TV und Nachrichten.
         # Notausnahme (#2203): Der Grund geht nur mit, wenn die Person wirklich befangen ist.
         conflict = await league_permissions.conflict_of_interest(db, me, match)
         held = await hold_result(db, match, raw_results, actor=me, note=body.note, proof_url=body.proof_url,
-                                 force=force, reason=body.reason, games=games, lineups_missing=missing,
+                                 force=force, reason=body.reason, games=games, lineups_missing=missing, lineups=lineups,
                                  conflict_reason=(body.conflict_reason or "").strip() if conflict else None)
-        if league and games:
-            await league_games.lock_lineup_ids(db, league, games, league.reg_ids)
-            await league_games.log_both_sides_kept(db, league, games, league.reg_ids, me.get("id"))
+        if league and saved:
+            await league_games.lock_lineup_ids(db, league, saved, league.reg_ids)
+            await league_games.log_both_sides_kept(db, league, saved, league.reg_ids, me.get("id"))
         return held
     ensure_no_hold(match)
     outcome = await submit_v2_result(
@@ -1197,39 +1198,44 @@ async def _submit_staff_result(db, match: dict, body: MatchV2ResultSubmit, raw_r
         reason=body.reason,
         games=games,
         lineups_missing=missing,
+        match_lineups=lineups,
     )
     if games is not None and match.get("games") and not outcome.get("idempotent_replay"):
         # Liga (#1650): Maps der Turnierleitung korrigiert - eigener Eintrag mit Grund im Protokoll.
         await _audit_match_action(db, "match.games.correct", match, me.get("id"), {
             "games": len(games), **({"reason": body.reason.strip()} if (body.reason or "").strip() else {}),
         })
-    if league and games and not outcome.get("idempotent_replay"):
+    if league and saved and not outcome.get("idempotent_replay"):
         # Spiel-ID je Season (#2108): erst nach dem Speichern des Ergebnisses festhalten.
-        await league_games.lock_lineup_ids(db, league, games, league.reg_ids)
-        await league_games.log_both_sides_kept(db, league, games, league.reg_ids, me.get("id"))
+        await league_games.lock_lineup_ids(db, league, saved, league.reg_ids)
+        await league_games.log_both_sides_kept(db, league, saved, league.reg_ids, me.get("id"))
     return outcome
 
 
 async def _staff_games(db, match: dict, body: MatchV2ResultSubmit,
                        raw_results: list[dict]) -> tuple[list[dict] | None, list[str] | None,
-                                                         "league_games.LeagueSetup | None"]:
+                                                         "league_games.LeagueSetup | None", dict | None]:
     """Liga (#1650): Maps der Turnierleitung prüfen. Ohne Maps bleiben die des Spiels - außer das neue Ergebnis passt
     nicht mehr zu ihnen, dann fallen sie weg (eine Korrektur des Stands ohne Maps). Andere Turniere: nichts. Dazu der
-    Liga-Aufbau, damit der Aufrufer nach dem Speichern die Spiel-IDs festhält (#2108)."""
+    Liga-Aufbau, damit der Aufrufer nach dem Speichern die Spiel-IDs festhält (#2108), und die Teilnehmerlisten (#2204)."""
     league = await league_games.setup(db, match)
     if not league:
-        return None, None, None
+        return None, None, None, None
     normalized = await checked_results(db, match, raw_results)
+    if body.games and league.is_series:
+        games, lineups, missing = league_games.admin_series(league, [game.model_dump() for game in body.games], body.lineups, normalized)
+        await league_games.check_double_use(db, league, league_games.with_series(None, lineups), set(league.reg_ids))
+        return games, missing, league, lineups
     if body.games:
         games, missing = league_games.admin_games(league, [game.model_dump() for game in body.games], normalized)
         await league_games.check_double_use(db, league, games, set(league.reg_ids))
-        return games, missing, league
+        return games, missing, league, None
     if match.get("games"):
         try:
             league_games.check_results(league, match["games"], normalized)
         except league_games.LeagueGamesError:
-            return [], [], league
-    return None, None, league
+            return [], [], league, ({} if match.get("lineups") else None)
+    return None, None, league, None
 
 
 @router.post("/{match_id}/result/undo")
@@ -1359,6 +1365,12 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
     raise HTTPException(status_code=404, detail="Match nicht gefunden")
 
 
+def _latest_own_lineup(match: dict, registration_id: str) -> list[str] | None:
+    """Die Teilnehmerliste der letzten eigenen Meldung (#2204)."""
+    own = [report for report in match.get("reports") or [] if report.get("registration_id") == registration_id]
+    return (own[-1].get("lineup") or None) if own else None
+
+
 def _latest_own_games(match: dict, registration_id: str) -> list[dict] | None:
     """Die Maps der letzten eigenen Meldung - eine gleiche Meldung mit anderen Maps ist keine Wiederholung (#1650)."""
     own = [report for report in match.get("reports") or [] if report.get("registration_id") == registration_id]
@@ -1398,15 +1410,15 @@ async def _report_v2(db, match: dict, body: MatchScoreReport, me: dict, tourname
         raise HTTPException(status_code=422, detail=str(exc))
     # Liga (docs/LIGA.md, #1650): Maps, Sieger und die eigene Aufstellung je Map - ohne Maps nur als Bestätigung.
     league = await league_games.setup(db, match, tournament, stage)
-    games = None
+    games = lineup = None
     if league:
         try:
-            games = await league_games.prepare_report(
-                db, league, [game.model_dump() for game in body.games or []], my_registration["id"], results)
+            games, lineup = await league_games.prepare_report(
+                db, league, [game.model_dump() for game in body.games or []], my_registration["id"], results, body.lineup)
         except league_games.LeagueGamesError as exc:
             raise HTTPException(status_code=exc.status_code, detail=exc.detail)
     if is_duplicate_report(match, me["id"], results) and (
-            not league or _latest_own_games(match, my_registration["id"]) == games):
+            not league or (_latest_own_games(match, my_registration["id"]) == games and _latest_own_lineup(match, my_registration["id"]) == lineup)):
         match.pop("_id", None)
         match["idempotent_replay"] = True
         return match
@@ -1417,6 +1429,8 @@ async def _report_v2(db, match: dict, body: MatchScoreReport, me: dict, tourname
                          photo_id=(photo or {}).get("id"))
     if games:
         entry["games"] = games
+    if lineup:
+        entry["lineup"] = lineup
     await getattr(db, "matches_v2").update_one(
         {"id": match["id"]},
         {"$push": {"reports": entry}, "$set": {"updated_at": now_utc().isoformat()}},
@@ -1425,7 +1439,7 @@ async def _report_v2(db, match: dict, body: MatchScoreReport, me: dict, tourname
         await league_games.remember_pool(db, league)
         await league_games.refresh_lineup_index(db, match["id"])
         # Spiel-ID je Season (#2108): erst nach dem Speichern der Meldung festhalten.
-        await league_games.lock_lineup_ids(db, league, games, {my_registration["id"]})
+        await league_games.lock_lineup_ids(db, league, league_games.with_series(games, {my_registration["id"]: lineup} if lineup else None), {my_registration["id"]})
     await _audit_match_action(db, "match.games.report" if games else "match.result.report", match, me.get("id"), {
         "result_count": len(results), **({"games": len(games)} if games else {}),
     })
@@ -1449,6 +1463,9 @@ async def _report_v2(db, match: dict, body: MatchScoreReport, me: dict, tourname
 
     final_games, missing = (league_games.consensus_games(stored.get("reports"), league.reg_ids) if league
                             else (None, []))
+    final_lineups = None
+    if league and league.is_series and final_games is not None:
+        final_lineups, missing = league_games.consensus_lineups(stored.get("reports"), league.reg_ids)
     try:
         outcome = await submit_v2_result(
             db,
@@ -1461,6 +1478,7 @@ async def _report_v2(db, match: dict, body: MatchScoreReport, me: dict, tourname
             audit_action="match.result.auto_resolution",
             games=final_games,
             lineups_missing=missing if final_games is not None else None,
+            match_lineups=final_lineups,
         )
     except MatchV2ResultError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
@@ -1496,14 +1514,14 @@ async def report_score(match_id: str, body: MatchScoreReport, me: dict = Depends
 @router.put("/{match_id}/lineups")
 async def amend_lineups(match_id: str, body: MatchLineupAmend, me: dict = Depends(get_current_user),
                         _mutation: None = Depends(_serialized_match_write)):
-    """Aufstellung nachtragen (Liga, #1650): Captain oder Vertreter der eigenen Seite bis ``lineup_amend_hours`` nach
-    dem Ergebnis; die Turnierleitung jederzeit für eine genannte Seite, mit Grund."""
+    """Aufstellung oder Teilnehmerliste nachtragen (Liga, #1650, #2204): Captain oder Vertreter der eigenen Seite bis
+    ``lineup_amend_hours`` nach dem Ergebnis; die Turnierleitung jederzeit für eine genannte Seite, mit Grund."""
     db = get_db()
     match, _collection = await _find_match_any(match_id)
     await _ensure_match_tournament_unlocked(db, match)
     league = await league_games.setup(db, match)
     if not league:
-        raise HTTPException(status_code=404, detail="Aufstellungen je Map gibt es nur bei Liga-Spielen.")
+        raise HTTPException(status_code=404, detail="Aufstellungen gibt es nur bei Liga-Spielen.")
     staff = bool(body.registration_id) and await has_match_result_permission(me, match)
     acting = None if staff else await _acting_registration_for_match(match, me)
     if not staff and not acting:
@@ -1511,13 +1529,17 @@ async def amend_lineups(match_id: str, body: MatchLineupAmend, me: dict = Depend
     if staff:
         # Als Leitung ist es eine Korrektur des Spiels (#2203): die eigene Seite trägt ohne ``registration_id`` nach.
         await league_permissions.require_no_conflict(db, me, match, action="lineups", conflict_reason=body.conflict_reason)
+    side_id = body.registration_id if staff else acting["id"]
     try:
         async with league_games.season_lock(db, league.tournament):
-            updated = await league_games.amend_lineups(
-                db, league, [game.model_dump() for game in body.games],
-                registration_id=body.registration_id if staff else acting["id"], actor_id=me["id"], staff=staff,
-                reason=body.reason,
-            )
+            if league.is_series:
+                updated = await league_games.amend_participants(
+                    db, league, body.lineup, registration_id=side_id, actor_id=me["id"], staff=staff, reason=body.reason)
+            else:
+                updated = await league_games.amend_lineups(
+                    db, league, [game.model_dump() for game in body.games or []],
+                    registration_id=side_id, actor_id=me["id"], staff=staff, reason=body.reason,
+                )
     except league_games.LeagueGamesError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
     except MutationLockBusy:

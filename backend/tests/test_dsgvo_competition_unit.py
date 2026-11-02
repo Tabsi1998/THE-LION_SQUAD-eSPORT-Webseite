@@ -39,6 +39,7 @@ class FakeCollection:
 class FakeDb:
     def __init__(self):
         self.users = FakeCollection([{"id": "u1", "email": "lion@example.at", "display_name": "Lion"}])
+        self.tournaments = FakeCollection()
         self.tournament_registrations = FakeCollection([{
             "id": "r1",
             "tournament_id": "t1",
@@ -93,7 +94,7 @@ class FakeDb:
             # Wunschnummer (#2034)
             "jersey_numbers", "jersey_number_requests",
             # Liga-Kader mit Spiel-ID je Season (#2108)
-            "league_rosters", "league_rule_consents",
+            "league_rosters", "league_transfers", "league_appearances", "league_rule_consents",
             # Shop (#1703)
             "shop_orders", "shop_order_items", "shop_carts", "shop_gamertag_files", "shop_print_files",
         ):

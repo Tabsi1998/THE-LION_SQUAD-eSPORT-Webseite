@@ -6,6 +6,7 @@ import { FormSection } from "@/components/tls/AdminForm";
 import { TextField } from "@/components/tls/FormFields";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { ID_STATE_LABELS } from "@/lib/leagueIds";
+import { ELIGIBILITY_LABELS, TRANSFER_LABELS, ageLabel, hasSeasonRules, rulesLines } from "@/lib/leagueEligibility";
 import { viennaDateTime } from "@/lib/vienna";
 import { SquadKaderSheet } from "./SquadKaderSheet";
 
@@ -35,6 +36,8 @@ function countsLine(counts = {}) {
   if (counts.missing) parts.push(`${counts.missing} ohne ID`);
   if (counts.late) parts.push(`${counts.late} warten auf Freigabe`);
   if (counts.banned) parts.push(`${counts.banned} gesperrt`);
+  if (counts.waiting) parts.push(`${counts.waiting} in der Wartezeit`);
+  if (counts.age) parts.push(`${counts.age} ohne passende Altersangabe`);
   if (counts.changed) parts.push(`${counts.changed} mit neuer ID im Profil`);
   return parts.length ? parts.join(" · ") : "Alle Spieler haben eine gültige ID.";
 }
@@ -110,7 +113,119 @@ function ApproveForm({ player, busy, onApprove, onCancel }) {
   );
 }
 
-function PlayerRow({ player, open, busy, onOpen, onClose, onApprove }) {
+// Wartezeit aufheben (#2204): nur mit Grund, er steht im Protokoll. Das erfährt die Person über ihren Stand im Profil.
+function WaiveForm({ player, busy, onWaive, onCancel }) {
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState("");
+  const submit = async (event) => {
+    event.preventDefault();
+    if (reason.trim().length < 5) {
+      setError("Bitte kurz den Grund angeben (mindestens 5 Zeichen) – er steht im Protokoll.");
+      return;
+    }
+    setError("");
+    await onWaive(reason.trim());
+  };
+  return (
+    <form onSubmit={submit} noValidate className="mt-2 space-y-2 rounded-sm border border-white/10 bg-white/[0.02] p-3" data-testid={`roster-waive-form-${player.id}`}>
+      <label className="block">
+        <span className="mb-1 block text-[11px] font-bold uppercase tracking-widest text-white/60">Grund (steht im Protokoll)</span>
+        <input value={reason} onChange={(event) => setReason(event.target.value)} className="input" maxLength={500} placeholder="z. B. Team wäre sonst nicht spielfähig" data-testid={`roster-waive-reason-${player.id}`} />
+      </label>
+      {error ? <p role="alert" className="text-xs text-warn">{error}</p> : null}
+      <div className="flex flex-wrap gap-2">
+        <button type="submit" disabled={busy} className="tls-btn tls-btn--primary min-h-[40px] rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider disabled:opacity-50" data-testid={`roster-waive-save-${player.id}`}>
+          Wartezeit aufheben
+        </button>
+        <button type="button" onClick={onCancel} disabled={busy} className="tls-btn tls-btn--quiet min-h-[40px] rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider">
+          Abbrechen
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function EligibilityLine({ player, waiving, onWaiveOpen }) {
+  const row = player.eligibility;
+  if (!row) return null;
+  const idDecides = !row.ok && row.state === player.state;
+  const age = ageLabel(row.age);
+  if (row.ok && !age) return null;
+  return (
+    <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs" data-testid={`roster-eligibility-${player.id}`} data-state={row.state}>
+      {!row.ok && !idDecides ? <span className="font-bold text-warn">{ELIGIBILITY_LABELS[row.state] || row.state}:</span> : null}
+      {!row.ok && !idDecides ? <span className="min-w-0 text-white/70 [overflow-wrap:anywhere]">{row.reason}</span> : null}
+      {row.ok && age ? <span className="text-white/50">{age}</span> : null}
+      {row.state === "waiting" && !waiving ? (
+        <button type="button" onClick={onWaiveOpen} className="tls-btn tls-btn--secondary ml-auto min-h-[36px] rounded-sm px-3 py-1 text-[11px] font-bold uppercase tracking-wider" data-testid={`roster-waive-${player.id}`}>
+          Wartezeit aufheben
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function TransferRequests({ rows, busy, onApprove, onReject }) {
+  const [refusing, setRefusing] = useState("");
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState("");
+  const pending = rows.filter((row) => row.status === "pending");
+  const done = rows.filter((row) => row.status !== "pending");
+  if (!rows.length) return null;
+  const refuse = async (event, row) => {
+    event.preventDefault();
+    if (reason.trim().length < 5) {
+      setError("Bitte kurz den Grund angeben (mindestens 5 Zeichen) – er steht im Protokoll.");
+      return;
+    }
+    setError("");
+    await onReject(row, reason.trim());
+    setRefusing("");
+    setReason("");
+  };
+  return (
+    <div className="mb-4 rounded-sm border border-white/10 bg-[#0A0A0A] p-3" data-testid="season-transfers">
+      <p className="text-[11px] font-bold uppercase tracking-widest text-white/55">Transfers</p>
+      {!pending.length ? <p className="mt-1 text-sm text-white/50">Kein Antrag offen.</p> : null}
+      <ul className="mt-2 space-y-3">
+        {pending.map((row) => (
+          <li key={row.id} className="min-w-0" data-testid={`season-transfer-${row.id}`}>
+            <p className="text-sm text-white [overflow-wrap:anywhere]"><span className="font-semibold">{row.user_name}</span>: von {row.from_squad_name || "–"} zu {row.to_squad_name || "–"}</p>
+            {refusing === row.id ? (
+              <form onSubmit={(event) => refuse(event, row)} noValidate className="mt-2 space-y-2">
+                <input value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} className="input" placeholder="Grund der Ablehnung (steht im Protokoll)" data-testid={`season-transfer-reason-${row.id}`} />
+                {error ? <p role="alert" className="text-xs text-warn">{error}</p> : null}
+                <div className="flex flex-wrap gap-2">
+                  <button type="submit" disabled={busy} className="tls-btn tls-btn--primary min-h-[40px] rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider disabled:opacity-50" data-testid={`season-transfer-reject-save-${row.id}`}>Ablehnen</button>
+                  <button type="button" onClick={() => setRefusing("")} className="tls-btn tls-btn--quiet min-h-[40px] rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider">Abbrechen</button>
+                </div>
+              </form>
+            ) : (
+              <div className="mt-1.5 flex flex-wrap gap-2">
+                <button type="button" disabled={busy} onClick={() => onApprove(row)} className="tls-btn tls-btn--primary min-h-[40px] rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider disabled:opacity-50" data-testid={`season-transfer-approve-${row.id}`}>Genehmigen</button>
+                <button type="button" disabled={busy} onClick={() => setRefusing(row.id)} className="tls-btn tls-btn--quiet min-h-[40px] rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider" data-testid={`season-transfer-reject-${row.id}`}>Ablehnen</button>
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
+      {done.length ? (
+        <details className="mt-2">
+          <summary className="tls-hit inline-flex cursor-pointer items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-white/50 hover:text-white">
+            <History className="h-3 w-3" aria-hidden="true" /> Entschieden ({done.length})
+          </summary>
+          <ul className="mt-1 space-y-1 border-l border-white/10 pl-3 text-xs text-white/60">
+            {done.map((row) => (
+              <li key={row.id} className="[overflow-wrap:anywhere]">{when(row.decided_at)} · {row.user_name}: {TRANSFER_LABELS[row.status] || row.status}{row.reason ? ` – „${row.reason}“` : ""}</li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+    </div>
+  );
+}
+
+function PlayerRow({ player, open, busy, onOpen, onClose, onApprove, waiving, onWaiveOpen, onWaive }) {
   return (
     <li className="min-w-0 px-3 py-2" data-testid={`roster-player-${player.id}`} data-state={player.state}>
       <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
@@ -132,6 +247,8 @@ function PlayerRow({ player, open, busy, onOpen, onClose, onApprove }) {
         </p>
       ) : null}
       {!player.ok && player.reason ? <p className="mt-1 text-xs text-warn">{player.reason}</p> : null}
+      <EligibilityLine player={player} waiving={waiving} onWaiveOpen={onWaiveOpen} />
+      {waiving ? <WaiveForm player={player} busy={busy} onWaive={onWaive} onCancel={onClose} /> : null}
       {player.locked_at && player.state === "locked" ? <p className="mt-0.5 text-[11px] text-white/45">festgehalten {when(player.locked_at)}</p> : null}
       {open ? <ApproveForm player={player} busy={busy} onApprove={onApprove} onCancel={onClose} /> : null}
       {(player.approvals || []).length ? (
@@ -160,6 +277,8 @@ export function SeasonRosterPanel({ seasonId }) {
   const [busy, setBusy] = useState(false);
   const [deadline, setDeadline] = useState("");
   const [editing, setEditing] = useState(null);
+  const [transfers, setTransfers] = useState([]);
+  const [waiveOpen, setWaiveOpen] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -167,6 +286,10 @@ export function SeasonRosterPanel({ seasonId }) {
       setData(body);
       setDeadline(body.season?.roster_deadline || "");
       setError("");
+      if (body.rules?.one_team_per_season) {
+        const { data: rows } = await api.get(`/admin/leagues/seasons/${seasonId}/transfers`);
+        setTransfers(Array.isArray(rows?.items) ? rows.items : []);
+      }
     } catch (err) {
       setError(formatApiError(err.response?.data?.detail));
     }
@@ -180,6 +303,31 @@ export function SeasonRosterPanel({ seasonId }) {
       await api.post(`/admin/leagues/seasons/${seasonId}/roster/${player.id}/approve`, { reason });
       toast.success(`${player.name}: neue ID gilt ab jetzt.`);
       setOpen("");
+      await load();
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail));
+    }
+    setBusy(false);
+  };
+
+  const waive = async (player, squadId, reason) => {
+    setBusy(true);
+    try {
+      await api.post(`/admin/leagues/seasons/${seasonId}/roster/${player.id}/waive-wait`, { squad_id: squadId, reason });
+      toast.success(`${player.name}: Wartezeit aufgehoben.`);
+      setWaiveOpen("");
+      await load();
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail));
+    }
+    setBusy(false);
+  };
+
+  const decideTransfer = async (row, action, reason = null) => {
+    setBusy(true);
+    try {
+      await api.post(`/admin/leagues/seasons/${seasonId}/transfers/${row.id}/${action}`, { reason });
+      toast.success(action === "approve" ? `${row.user_name}: Wechsel genehmigt.` : `${row.user_name}: Wechsel abgelehnt.`);
       await load();
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail));
@@ -201,13 +349,22 @@ export function SeasonRosterPanel({ seasonId }) {
 
   const fields = data?.fields || [];
   const label = fields.map((field) => field.label).join(", ") || "Spiel-ID";
+  // Spielberechtigung (#2204): Auch ein Spiel ohne Pflicht-ID zeigt die Spieler, wenn die Season Regeln trägt.
+  const fullView = Boolean(fields.length || hasSeasonRules(data?.rules));
+  const lines = rulesLines(data?.rules);
   return (
     <FormSection title="Kader und Spiel-IDs" testId="season-roster"
       hint={`Je Spieler die ${label}, die in dieser Season gilt – festgehalten beim Zuteilen, bei der Aufnahme ins Co-Team oder spätestens beim ersten Aufstellen. Ändert jemand sie im Profil, gilt weiter die festgehaltene, bis du die neue freigibst.`}>
       {error ? <p role="alert" className="text-sm text-warn">{error}</p> : null}
       {!data && !error ? <p className="text-sm text-white/50">Lade Kader …</p> : null}
       {data ? <ShortKaders squads={data.squads} /> : null}
-      {data && !fields.length ? (
+      {hasSeasonRules(data?.rules) && lines.length ? (
+        <ul className="mb-4 space-y-0.5 text-xs text-white/60" data-testid="season-roster-rules">
+          {lines.map((line) => <li key={line} className="[overflow-wrap:anywhere]">{line}</li>)}
+        </ul>
+      ) : null}
+      {data ? <TransferRequests rows={transfers} busy={busy} onApprove={(row) => decideTransfer(row, "approve")} onReject={(row, reason) => decideTransfer(row, "reject", reason)} /> : null}
+      {data && !fullView ? (
         <>
           <p className="text-sm text-white/55" data-testid="season-roster-free">Das Spiel dieser Liga hat keine Pflicht-ID – aufstellbar ist jeder im Kader.</p>
           {(data.squads || []).length ? (
@@ -225,7 +382,7 @@ export function SeasonRosterPanel({ seasonId }) {
           ) : null}
         </>
       ) : null}
-      {data && fields.length ? (
+      {data && fullView ? (
         <div className="space-y-4">
           <form className="flex flex-wrap items-end gap-2" noValidate onSubmit={(event) => { event.preventDefault(); saveDeadline(deadline); }} data-testid="season-roster-deadline">
             <TextField label="Stichtag für neue Spieler" type="date" value={deadline} onChange={setDeadline} className="min-w-[12rem]"
@@ -250,8 +407,10 @@ export function SeasonRosterPanel({ seasonId }) {
               <ul className="divide-y divide-white/5">
                 {squad.players.map((player) => (
                   <PlayerRow key={player.id} player={player} busy={busy} open={open === `${squad.registration_id}:${player.id}`}
-                    onOpen={() => setOpen(`${squad.registration_id}:${player.id}`)} onClose={() => setOpen("")}
-                    onApprove={(reason) => approve(player, reason)} />
+                    onOpen={() => setOpen(`${squad.registration_id}:${player.id}`)} onClose={() => { setOpen(""); setWaiveOpen(""); }}
+                    onApprove={(reason) => approve(player, reason)}
+                    waiving={waiveOpen === `${squad.registration_id}:${player.id}`} onWaiveOpen={() => setWaiveOpen(`${squad.registration_id}:${player.id}`)}
+                    onWaive={(reason) => waive(player, squad.squad_id, reason)} />
                 ))}
               </ul>
             </div>

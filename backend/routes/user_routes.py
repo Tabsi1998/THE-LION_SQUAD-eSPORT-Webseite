@@ -894,6 +894,28 @@ async def get_user(user_id: str, me: dict = Depends(get_current_user)):
     return u
 
 
+async def _check_game_id_formats(db, user_id: str, game_ids: dict | None) -> None:
+    """Format und Auswahl je Spiel (#2204): Nur neue Werte müssen passen, ein alter hält das Speichern nicht auf. Ohne Vorgabe am Spiel keine
+    Prüfung."""
+    if not game_ids:
+        return
+    from routes.tournament_common import _enrich_game_identity
+    from services.league_roster import field_problem
+
+    stored = ((await db.users.find_one({"id": user_id}, {"_id": 0, "game_ids": 1})) or {}).get("game_ids") or {}
+    slugs = sorted(game_ids)
+    for game in await db.games.find({"slug": {"$in": slugs}}, {"_id": 0}).to_list(len(slugs) + 1):
+        values = game_ids.get(game.get("slug")) or {}
+        enriched = await _enrich_game_identity(db, game)
+        for item in (enriched or {}).get("effective_player_id_fields") or []:
+            value = str(values.get(item.get("key")) or "").strip()
+            if not value or value == str((stored.get(game.get("slug")) or {}).get(item.get("key")) or "").strip():
+                continue
+            problem = field_problem(item, value)
+            if problem:
+                raise HTTPException(status_code=422, detail=problem)
+
+
 @router.put("/me")
 @router.patch("/me")
 async def update_me(
@@ -915,6 +937,7 @@ async def update_me(
     for field in ("bio", "display_name", "preferred_role"):
         if updates.get(field):
             await word_filter.screen_field(db, updates[field], kind=field, user_id=me["id"], ref_id=me["id"])
+    await _check_game_id_formats(db, me["id"], updates.get("game_ids"))
     updates = _normalize_social_updates(updates)
     if "notification_preferences" in updates:
         updates["notification_preferences"] = _normalize_notification_preferences(updates.get("notification_preferences"))
