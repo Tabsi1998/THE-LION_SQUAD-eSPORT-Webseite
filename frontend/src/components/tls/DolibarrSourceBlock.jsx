@@ -77,7 +77,7 @@ export function dolibarrLocked(source, item, fields) {
 
 /** Der nächste Abgleich legte den Eintrag wieder an (#2130) - Löschen ist erst möglich, wenn die Firma aus der Kategorie ist. */
 export function dolibarrKeepsEntry(source, item) {
-  return Boolean(source?.from_dolibarr && item?.source === "dolibarr" && !item?.dolibarr_gone_at);
+  return Boolean(source?.from_dolibarr && source?.connected !== false && item?.source === "dolibarr" && !item?.dolibarr_gone_at);
 }
 
 export const DOLIBARR_DELETE_HINT = "Kommt aus Dolibarr. Zum Löschen zuerst in Dolibarr aus der Kategorie nehmen, sonst ist der Eintrag beim nächsten Abgleich wieder da.";

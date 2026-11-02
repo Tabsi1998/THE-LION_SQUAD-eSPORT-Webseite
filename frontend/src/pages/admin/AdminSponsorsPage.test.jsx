@@ -89,6 +89,12 @@ test("Sponsor aus Dolibarr: Dolibarr-Felder gesperrt, Website-Felder frei; Hande
   expect(screen.getByTestId("sponsor-name")).not.toBeDisabled();
 });
 
+test("Anbindung aus: kein Abgleich, Löschen ist frei (#2130)", async () => {
+  mockApi({ ...SOURCE_ON, connected: false });
+  render(<MemoryRouter><AdminSponsorsPage /></MemoryRouter>);
+  expect(await screen.findByTestId("sponsor-delete-s1")).not.toBeDisabled();
+});
+
 test("Sponsor aus Dolibarr lässt sich nicht löschen, solange der Schalter an ist (#2130)", async () => {
   mockApi(SOURCE_ON);
   const on = render(<MemoryRouter><AdminSponsorsPage /></MemoryRouter>);

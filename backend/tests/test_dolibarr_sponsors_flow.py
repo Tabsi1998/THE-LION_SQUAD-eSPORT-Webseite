@@ -219,6 +219,24 @@ async def test_what_dolibarr_keeps_is_locked_and_the_sync_runs_as_before(flow, f
 
 
 @pytest.mark.asyncio
+async def test_with_the_connection_off_nothing_comes_back_and_deleting_is_free(flow, fake):
+    """#2130: Ist die Anbindung aus, läuft kein Abgleich - das Löschen ist dann nicht gesperrt, auch mit Schalter an."""
+    await connect(flow)
+    ids = seed_categories(fake)
+    company = fake.add_thirdparty("Gamma Verein")
+    fake.categorize(company["id"], ids["partner"], ids["verein"])
+    flow.act_as(await flow.add_user(role="club_admin"))
+    assert (await flow.patch("/api/admin/dolibarr/sponsors", json={"from_dolibarr": True})).status_code == 200
+    partner = (await flow.get("/api/partners/admin")).json()[0]
+    refused = await flow.delete(f"/api/partners/{partner['id']}")
+    assert refused.status_code == 409
+    await connect(flow, mode="off")
+    assert (await dolibarr_sponsors.refresh_due())["kind"] == "not_configured"
+    removed = await flow.delete(f"/api/partners/{partner['id']}")
+    assert removed.status_code == 200, removed.text
+
+
+@pytest.mark.asyncio
 async def test_a_partner_out_of_the_category_can_be_brought_back_and_it_sticks(flow, fake):
     """#2130: Der Abgleich setzt ihn beim Weggang inaktiv und fasst ihn danach nicht mehr an - das Zurückholen hier gilt."""
     await connect(flow)

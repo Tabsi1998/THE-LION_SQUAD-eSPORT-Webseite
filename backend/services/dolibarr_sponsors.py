@@ -337,11 +337,15 @@ async def locked_fields(db, doc: dict | None, fields: tuple[str, ...]) -> tuple[
 
 
 async def comes_back_on_sync(db, doc: dict | None) -> bool:
-    """Legt der nächste Abgleich den Eintrag neu an, wenn er hier gelöscht wird? Nur solange der Schalter an ist und die
-    Firma noch in der Kategorie steht."""
+    """Legt der nächste Abgleich den Eintrag neu an, wenn er hier gelöscht wird? Nur solange der Schalter an ist, die
+    Anbindung läuft und die Firma noch in der Kategorie steht. Ist die Anbindung aus, läuft kein Abgleich (``refresh_due``)."""
+    from services.dolibarr_client import load_settings
+
     if not doc or doc.get("source") != SOURCE or doc.get("dolibarr_gone_at"):
         return False
-    return (await load_source_settings(db))["from_dolibarr"]
+    if not (await load_source_settings(db))["from_dolibarr"]:
+        return False
+    return (await load_settings(db)).get("mode") != "off"
 
 
 async def admin_view(db) -> dict:
