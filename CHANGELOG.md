@@ -1,11 +1,10 @@
 # Changelog
 
-## [1.55.1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.55.0...v1.55.1) (2026-11-02)
-
+## 1.55.1 (02.11.2026)
 
 ### Dokumentation
 
-* Liga: Vertrag für den Ausbau zur Wettbewerbsplattform ([#2211](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2211)) ([b820e83](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/b820e8300b4be848795e6db56c48714e4135c816))
+* Liga: Vertrag für den Ausbau zur Wettbewerbsplattform (#2211)
 
 ## 1.55.0 (02.11.2026)
 
