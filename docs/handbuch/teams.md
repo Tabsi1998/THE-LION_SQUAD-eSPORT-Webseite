@@ -53,8 +53,9 @@ und Wertungen, an denen das Team teilnimmt, bleibt der Name sichtbar.
 ### 3.3 Co-Teams
 
 Unter **Teams → Deine Teams** → **Co-Team**: Name, **Spiel** aus der Liste, **Kader**, **Captain** und **Vertreter**. Das
-Spiel zählt für die Discord-Rollen und die Liga: Ein Co-Team mit anderem Spiel lässt sich nicht zuteilen, ohne Spiel passt es
-überall. Solange es in einer Staffel spielt, bleibt sein Spiel.
+Spiel zählt für die Discord-Rollen und die Liga: Ein Co-Team mit anderem Spiel lässt sich nicht zuteilen; Hauptspiel und
+Versionen zählen zusammen, ohne Spiel passt es überall. Solange es in einer Staffel spielt, geht ein Wechsel nur innerhalb
+desselben Hauptspiels.
 
 ### 3.4 Auflösen und wiederherstellen
 

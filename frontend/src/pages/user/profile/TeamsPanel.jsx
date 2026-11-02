@@ -343,6 +343,7 @@ export function TeamsPanel() {
                   {editing.game_id && !games.some((game) => game.id === editing.game_id) ? <option value={editing.game_id}>{editing.game || `${editing.game_id} (nicht in der Liste)`}</option> : null}
                   {games.map((game) => <option key={game.id} value={game.id}>{game.display_name || game.name}</option>)}
                 </select>
+                <span className="block mt-1 text-xs text-white/45" data-testid="team-squad-game-hint">Hauptspiel oder Version: In der Liga zählen beide als dasselbe Spiel.</span>
               </Field>
               <Field label="Kader" group>
                 <div className="grid sm:grid-cols-2 gap-2">

@@ -18,7 +18,7 @@ from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
 from services import league_roster
-from services.discord_roles import load_games
+from services.discord_roles import load_games, top_game
 
 ACTIVE_REGISTRATION_STATUSES = ("pending", "approved", "checked_in", "waitlist")
 # Plätze einer Staffel belegen wie beim Nachrücken (#1551) nur diese - die Warteliste zählt nicht mit.
@@ -130,6 +130,7 @@ def squad_problems(
     seats_taken: int,
     other_staffel_squad_ids: set[str],
     games: dict[str, dict] | None = None,
+    parents: dict[str, str | None] | None = None,
 ) -> list[tuple[int, str]]:
     """Alle Gründe, warum dieses Co-Team nicht in die Staffel kann - leer heißt: zuteilbar.
 
@@ -144,8 +145,12 @@ def squad_problems(
         if games is not None and squad["game_id"] not in games:
             # Alter Freitext (#2128): keine Kennung, also auch nicht „ein anderes Spiel“ - der Satz sagt, was zu tun ist.
             problems.append((400, f"{name} hat noch einen alten Spielnamen („{squad['game_id']}“) – unter Teams → Deine Teams aus der Liste wählen."))
-        else:
-            problems.append((400, f"{name} ist für ein anderes Spiel eingetragen als diese Staffel."))
+        elif top_game(squad["game_id"], parents or {}) != top_game(tournament["game_id"], parents or {}):
+            # Hauptspiel und Versionen gehören zusammen (docs/LIGA.md, Abschnitt Liga-Kader) - wie bei den Spiel-Rollen.
+            own = (games or {}).get(squad["game_id"], {}).get("name")
+            wanted = (games or {}).get(tournament["game_id"], {}).get("name")
+            problems.append((400, f"{name} ist für ein anderes Spiel eingetragen ({own}) – diese Staffel spielt {wanted}." if own and wanted
+                             else f"{name} ist für ein anderes Spiel eingetragen als diese Staffel."))
     members = [uid for uid in squad.get("member_ids") or [] if uid]
     if len(members) < min_size:
         problems.append((400, f"{name} hat {len(members)} Spieler im Kader – die Liga verlangt mindestens {min_size}."))
@@ -268,7 +273,7 @@ async def candidates(db, tournament: dict) -> dict:
     # Spiel-ID je Spieler (#2108): Stand in der Season - fehlt sie, warnt der Dialog; zuteilen geht trotzdem.
     member_ids = {uid for squad in squads if squad.get("team_id") in teams for uid in squad.get("member_ids") or [] if uid}
     roster_ctx = await league_roster.context_for_tournament(db, tournament, member_ids)
-    games, _parents = await load_games(db)
+    games, parents = await load_games(db)
     out: dict[str, dict] = {}
     for squad in squads:
         team = teams.get(squad.get("team_id"))
@@ -284,6 +289,7 @@ async def candidates(db, tournament: dict) -> dict:
             seats_taken=seats,
             other_staffel_squad_ids=other,
             games=games,
+            parents=parents,
         )
         entry = out.setdefault(
             team["id"],
@@ -350,7 +356,7 @@ async def build_registration(db, tournament: dict, team_id: str, squad_id: str, 
         raise SquadAssignError(404, "Co-Team nicht gefunden.")
     memberships = await db.team_members.find({"team_id": team_id}, {"_id": 0, "user_id": 1}).to_list(500)
     taken_teams, seats, other = await _staffel_state(db, tournament)
-    games, _parents = await load_games(db)
+    games, parents = await load_games(db)
     problems = squad_problems(
         team,
         squad,
@@ -361,6 +367,7 @@ async def build_registration(db, tournament: dict, team_id: str, squad_id: str, 
         seats_taken=seats,
         other_staffel_squad_ids=other,
         games=games,
+        parents=parents,
     )
     if problems:
         code, text = problems[0]

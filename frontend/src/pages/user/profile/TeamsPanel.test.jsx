@@ -93,6 +93,7 @@ test("Spiel kommt aus der Liste, die Altfelder stehen nicht mehr im Formular und
   const select = await screen.findByTestId("team-squad-game");
   await waitFor(() => expect([...select.options].map((option) => option.value)).toEqual(["", "Freitext", "g1"]));
   expect(select).toHaveValue("Freitext");
+  expect(screen.getByTestId("team-squad-game-hint")).toHaveTextContent("Hauptspiel oder Version");
   expect(screen.queryByText("Turnier")).not.toBeInTheDocument();
   expect(screen.queryByText("Jahreswertung / Circuit")).not.toBeInTheDocument();
 

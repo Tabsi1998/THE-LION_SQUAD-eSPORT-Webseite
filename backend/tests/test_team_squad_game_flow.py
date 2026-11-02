@@ -87,6 +87,7 @@ async def test_game_stays_while_the_squad_plays_in_a_league(flow):
     other = {"id": new_id(), "name": "Anderes"}
     await flow.db.games.insert_one(dict(other))
     running = await flow.create_tournament(title="Staffel", status="live", team_mode="team")
+    await flow.db.tournaments.update_one({"id": running["id"]}, {"$set": {"game_id": game["id"]}})
     await flow.db.tournament_registrations.insert_one({"id": new_id(), "tournament_id": running["id"], "team_id": team["id"],
                                                        "squad_id": squad["id"], "status": "approved"})
     url = f"/api/teams/{team['id']}/squads/{squad['id']}"
@@ -95,6 +96,9 @@ async def test_game_stays_while_the_squad_plays_in_a_league(flow):
     assert refused.status_code == 409 and "Staffel" in refused.json()["detail"]
     same = await flow.patch(url, json={"game_id": game["id"], "description": "Kader Herbst"})
     assert same.status_code == 200, "unverändert geht - das Formular schickt das Spiel immer mit"
+    version = {"id": new_id(), "name": "Probe Rush 2", "parent_game_id": game["id"]}
+    await flow.db.games.insert_one(dict(version))
+    assert (await flow.patch(url, json={"game_id": version["id"]})).status_code == 200, "dasselbe Hauptspiel passt weiter"
 
     await flow.db.tournaments.update_one({"id": running["id"]}, {"$set": {"status": "completed"}})
     assert (await flow.patch(url, json={"game_id": other["id"]})).status_code == 200
@@ -108,7 +112,7 @@ def game_texts(squad_game, staffel_game, games, parents=None):
 
     team = {"id": "t1", "member_ids": ["u1"]}
     squad = {"id": "s1", "team_id": "t1", "name": "Erste", "status": "active", "member_ids": ["u1"], "game_id": squad_game}
-    found = squad_registration.squad_problems(team, squad, {"id": "x", "game_id": staffel_game}, team_member_ids={"u1"}, games=games, **BASE_PROBLEMS)
+    found = squad_registration.squad_problems(team, squad, {"id": "x", "game_id": staffel_game}, team_member_ids={"u1"}, games=games, parents=parents, **BASE_PROBLEMS)
     return [text for _code, text in found]
 
 
@@ -138,3 +142,21 @@ async def test_migration_turns_exact_names_into_ids_and_counts_the_rest(flow):
 
     assert await migrations.migrate_squad_game_names(flow.db) == "0 squads moved to a game id, 2 left", "ein zweiter Lauf ändert nichts"
     assert (20, "squad_game_names", migrations.migrate_squad_game_names) in migrations.MIGRATIONS
+
+
+@pytest.mark.parametrize("squad_game, staffel_game", [
+    ("cod", "bo7"),  # Hauptspiel am Co-Team, Version an der Staffel
+    ("bo7", "cod"),  # Version am Co-Team, Hauptspiel an der Staffel
+    ("mw3", "bo7"),  # zwei Versionen desselben Hauptspiels
+    ("bo7", "bo7"),
+])
+def test_main_game_and_versions_belong_together(squad_game, staffel_game):
+    games = {"cod": {"id": "cod", "name": "Call of Duty"}, "bo7": {"id": "bo7", "name": "Black Ops 7"}, "mw3": {"id": "mw3", "name": "MW3"}}
+    parents = {"cod": None, "bo7": "cod", "mw3": "cod"}
+    assert game_texts(squad_game, staffel_game, games, parents) == []
+
+
+def test_another_game_names_the_expected_one():
+    games = {"cod": {"id": "cod", "name": "Call of Duty"}, "bo7": {"id": "bo7", "name": "Black Ops 7"}, "kart": {"id": "kart", "name": "Probe Kart"}}
+    parents = {"cod": None, "bo7": "cod", "kart": None}
+    assert game_texts("kart", "bo7", games, parents) == ["Erste ist für ein anderes Spiel eingetragen (Probe Kart) – diese Staffel spielt Black Ops 7."]

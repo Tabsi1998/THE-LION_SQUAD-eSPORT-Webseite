@@ -125,7 +125,7 @@ fassen kann** (Season 1: 8 Spielwochen – höchstens 8 Teams mit nur Hinrunde).
 ### 2.4 Co-Teams vorbereiten (Teamleitung)
 
 Das macht die Leitung des Hauptteams, nicht die Turnierleitung: **Teams → Deine Teams** → Team wählen → **Co-Team** →
-Name, **Spiel** aus der Liste (eines mit anderem Spiel lässt sich nicht zuteilen; ohne Spiel passt es überall), **Kader**
+Name, **Spiel** aus der Liste (eines mit anderem Spiel lässt sich nicht zuteilen; Hauptspiel und Versionen zählen zusammen, ohne Spiel passt es überall), **Kader**
 (mindestens so viele wie der Mindestkader, Season 1: 4), **Captain** und **Vertreter**
 (beide aus dem Kader, verschieden) → speichern. Captain und Vertreter vereinbaren Termine, melden und bestätigen
 Ergebnisse. Alle im Kader brauchen ein Konto und müssen Mitglied des Hauptteams sein.

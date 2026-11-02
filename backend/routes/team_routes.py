@@ -477,6 +477,17 @@ async def _squad_game(db, value: str | None, current: str | None = None) -> str 
     return game["id"]
 
 
+async def _fits_staffel(db, game_id: str | None, registration: dict) -> bool:
+    """Passt dieses Spiel weiter zur Staffel, in der das Co-Team spielt? Dieselbe Regel wie beim Zuteilen."""
+    from services.discord_roles import load_games, top_game
+
+    tournament = await db.tournaments.find_one({"id": registration.get("tournament_id")}, {"_id": 0, "game_id": 1}) or {}
+    if not game_id or not tournament.get("game_id"):
+        return True
+    _games, parents = await load_games(db)
+    return top_game(game_id, parents) == top_game(tournament["game_id"], parents)
+
+
 async def _squad_role_holder(db, team_id: str, user_id: str) -> dict | None:
     """Ein Co-Team dieses Teams, in dem die Person Captain oder Vertreter ist."""
     return await db.team_squads.find_one(
@@ -1265,11 +1276,12 @@ async def update_squad(team_id: str, squad_id: str, body: TeamSquadUpdate, me: d
     if "game_id" in updates:
         updates["game_id"] = await _squad_game(db, updates["game_id"], current.get("game_id"))
         if (updates["game_id"] or None) != (current.get("game_id") or None):
-            # Zugeteilt wurde es für das Spiel der Staffel - das bleibt, bis die Staffel vorbei ist.
+            # Zugeteilt wurde es für das Spiel der Staffel - das bleibt, bis die Staffel vorbei ist. Innerhalb desselben
+            # Hauptspiels (etwa ein alter Freitext wird zur richtigen Version) darf es sich ändern.
             from services.squad_registration import active_league_registration
 
             active = await active_league_registration(db, squad_id)
-            if active:
+            if active and not await _fits_staffel(db, updates["game_id"], active):
                 raise HTTPException(status_code=409, detail=f"Das Co-Team spielt in {active.get('tournament_title') or 'einer Liga-Staffel'} "
                                                             "– das Spiel lässt sich erst ändern, wenn die Staffel beendet ist.")
     if "member_ids" in updates:
