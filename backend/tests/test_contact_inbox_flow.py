@@ -274,6 +274,18 @@ async def test_the_values_can_be_changed_and_are_bounded(flow):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("days", [0, -5, 1])
+async def test_a_value_set_by_hand_cannot_empty_everything_at_once(flow, days):
+    await flow.db.contact_messages.insert_many([
+        message("erledigt-frisch", status="closed", status_changed_at=days_ago(3)), message("spam-frisch", status="spam", status_changed_at=days_ago(3)),
+        message("erledigt-alt", status="closed", status_changed_at=days_ago(8)), message("spam-alt", status="spam", status_changed_at=days_ago(8)),
+    ])
+    assert await contact_retention.purge_expired(flow.db, done_days=days, spam_days=days) == 2
+    left = {row["id"] async for row in flow.db.contact_messages.find({}, {"_id": 0, "id": 1})}
+    assert left == {"erledigt-frisch", "spam-frisch"}, "es gilt die Untergrenze von sieben Tagen"
+
+
+@pytest.mark.asyncio
 async def test_rows_from_before_the_rule_get_a_full_term_instead_of_going_right_away(flow):
     await flow.db.contact_messages.insert_one(message("alt", status="closed", created_at=days_ago(2000)))
     assert (await ops_alerts.purge_old_logs(flow.db))["contact_messages"] == 0

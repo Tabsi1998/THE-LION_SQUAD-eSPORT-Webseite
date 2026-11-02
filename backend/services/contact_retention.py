@@ -17,6 +17,8 @@ from models import now_utc
 
 DONE_STATUSES = ("answered", "closed")
 SPAM_STATUSES = ("spam",)
+# Dieselbe Untergrenze wie beim Speichern unter Betrieb → Alarme.
+MIN_DAYS = 7
 
 
 async def forget_copies(db, contact_ids: list[str]) -> None:
@@ -36,7 +38,8 @@ async def purge_expired(db, *, done_days: int, spam_days: int, now: datetime | N
     await db.contact_messages.update_many({"status": {"$in": everything}, "status_changed_at": {"$exists": False}}, {"$set": {"status_changed_at": current.isoformat()}})
     removed = 0
     for statuses, days in ((DONE_STATUSES, done_days), (SPAM_STATUSES, spam_days)):
-        cutoff = (current - timedelta(days=int(days))).isoformat()
+        # Auch ein von Hand gesetzter Wert (0, negativ) löscht nicht alles Erledigte auf einmal.
+        cutoff = (current - timedelta(days=max(MIN_DAYS, int(days)))).isoformat()
         # Eine laufende „Kein Spam“-Freigabe holt gerade Mails nach - die wird nicht weggeräumt.
         due = {"status": {"$in": list(statuses)}, "status_changed_at": {"$lt": cutoff}, "spam.release.state": {"$ne": "releasing"}}
         for row in await db.contact_messages.find(due, {"_id": 0, "id": 1}).to_list(None):
