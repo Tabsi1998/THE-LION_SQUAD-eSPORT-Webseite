@@ -218,10 +218,11 @@ Gutschriften, Erstattungen, Storno, Prüffälle, Freigaben.
 **Summen je Veranstaltung** (Filter „Veranstaltung“ in der Finanzübersicht): gebucht, fakturiert,
 bezahlt, offen, gutgeschrieben, erstattet – jede Belegrevision zählt einmal, stornierte Aufträge
 ohne Beleg zählen nicht mit. **CSV** exportiert die angelegten Belege für den Kassier – nur
-Nummer, Tag des Belegs, Angebot, Person, Beträge, Stand; keine Adressen, Bankdaten oder Dolibarr-Nummern.
+Nummer, Tag des Anlegens, Angebot, Person, Beträge, Stand; keine Adressen, Bankdaten oder Dolibarr-Nummern.
 Die Datei kommt vom Server (#2131) und ist **vollständig**: Die Liste auf der Seite zeigt höchstens 250
 Rechnungen und 200 offene Aufträge und sagt „N von M“; der Export hat keine Grenze. **Export von/bis**
-wählt einen Zeitraum nach dem Tag des Belegs (Wiener Uhr), für den Jahresabschluss also 1.1. bis 31.12. Die
+wählt einen Zeitraum nach dem Tag, an dem die Website den Beleg angelegt hat (Wiener Uhr). Das Rechnungsdatum in
+Dolibarr kann davon abweichen, etwa bei einem Beleg zum Jahreswechsel: Maßgeblich für die Buchhaltung bleibt Dolibarr. Die
 Beträge stehen wie auf der Seite; jeder Export steht mit Auswahl und Zeilenzahl im Protokoll.
 
 **Steuersätze bestätigt.** Was je Steuerprofil auf den Beleg käme (ohne Umsatzsteuer 0 %,

@@ -75,7 +75,8 @@ async def test_export_keeps_the_amounts_and_protects_cells_and_columns(flow):
     assert row["Gutgeschrieben"] == "'-10,50 €", "Vorzeichen getrennt und als Text geschützt"
     assert row["Buchung"] == "storniert"
     # Wiener Uhr: 10:00 UTC im Mai = 12:00, 22:30 UTC = 00:30 am nächsten Tag.
-    assert row["Rechnungsdatum"] == "04.05.2026 12:00" and row["Stand"] == "05.05.2026 00:30"
+    assert row["Angelegt am"] == "04.05.2026 12:00" and row["Stand"] == "05.05.2026 00:30"
+    assert "Rechnungsdatum" not in row, "die Website kennt nur den Tag des Anlegens, nicht das Datum auf dem Beleg"
     assert "42" not in response.text.replace("1229,56", ""), "keine Dolibarr-Kennungen"
 
 

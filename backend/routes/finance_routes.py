@@ -92,7 +92,7 @@ def _vienna_moment(value) -> str:
 
 EXPORT_DAY = r"^\d{4}-\d{2}-\d{2}$"
 # Nur, was der Kassier braucht - keine Adressen, keine Bankdaten, keine Dolibarr-Schlüssel.
-EXPORT_COLUMNS = ("Rechnung", "Rechnungsdatum", "Angebot", "Person", "Betrag", "Zahlungsstand", "Bezahlt", "Gutgeschrieben", "Erstattet", "Buchung", "Stand")
+EXPORT_COLUMNS = ("Rechnung", "Angelegt am", "Angebot", "Person", "Betrag", "Zahlungsstand", "Bezahlt", "Gutgeschrieben", "Erstattet", "Buchung", "Stand")
 
 
 def _export_cells(row: dict) -> tuple:
@@ -111,7 +111,7 @@ async def export_invoices(kind: str | None = Query(None), source: str | None = Q
                           attention: str | None = Query(None, max_length=20),
                           date_from: str | None = Query(None, alias="from", pattern=EXPORT_DAY), date_to: str | None = Query(None, alias="to", pattern=EXPORT_DAY),
                           me: dict = Depends(require_area("finance"))):
-    """Alle Belege der Auswahl (#2131): vollständig, ohne die Grenze der Liste, auf Wunsch nach Zeitraum (Tag des Belegs,
+    """Alle Belege der Auswahl (#2131): vollständig, ohne die Grenze der Liste, auf Wunsch nach Zeitraum (Tag des Anlegens,
     Wiener Uhr). Das Protokoll nennt die Auswahl und die Zahl der Zeilen, nie den gesuchten Namen."""
     db = get_db()
     user_ids = await _user_ids_matching(db, q) if q and q.strip() else None

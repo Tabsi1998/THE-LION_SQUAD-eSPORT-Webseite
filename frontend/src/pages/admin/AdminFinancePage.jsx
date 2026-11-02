@@ -77,7 +77,7 @@ export default function AdminFinancePage() {
   // Prüffälle (#2131): offen zum Abarbeiten, erledigt als Nachweis für den Kassier.
   const [caseView, setCaseView] = useState("open");
   const [resolved, setResolved] = useState(null);
-  // Zeitraum des Exports (#2131): nach dem Tag des Belegs, leer heißt alle.
+  // Zeitraum des Exports (#2131): nach dem Tag, an dem die Website den Beleg angelegt hat; leer heißt alle.
   const [exportFrom, setExportFrom] = useState("");
   const [exportTo, setExportTo] = useState("");
   const [exporting, setExporting] = useState(false);
@@ -284,7 +284,7 @@ export default function AdminFinancePage() {
             </div>
           </div>
           <p className={`mt-2 text-[11px] ${periodBackwards ? "text-[#FF9500]" : "text-white/40"}`} data-testid="finance-export-hint">
-            {periodBackwards ? "Der Zeitraum beginnt nach seinem Ende." : "Der CSV-Export enthält alle Belege dieser Auswahl – nach dem Tag des Belegs, ohne Grenze. Ohne Zeitraum alle."}
+            {periodBackwards ? "Der Zeitraum beginnt nach seinem Ende." : "Der CSV-Export enthält alle Belege dieser Auswahl, ohne Grenze. Der Zeitraum gilt für den Tag, an dem der Beleg angelegt wurde; ohne Zeitraum alle."}
           </p>
 
           <AttentionBar counts={data.attention} labels={data.attention_labels} active={filters.attention} onPick={(attention) => setFilters((f) => ({ ...f, attention }))} />
