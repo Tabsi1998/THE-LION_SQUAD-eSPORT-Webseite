@@ -156,8 +156,8 @@ export default function AdminTeamsPage() {
       </div>
 
       {data.can_renew_all ? (
-        <section className="mt-10 border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm p-4 space-y-3 max-w-2xl" data-testid="admin-teams-renew-all">
-          <div className="flex items-center gap-2 text-[11px] uppercase tracking-widest text-[#FFD700] font-bold"><KeyRound className="w-4 h-4" aria-hidden="true" /> Beitrittscodes</div>
+        <section className="mt-10 border border-honor/25 bg-honor/5 rounded-sm p-4 space-y-3 max-w-2xl" data-testid="admin-teams-renew-all">
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-widest text-honor font-bold"><KeyRound className="w-4 h-4" aria-hidden="true" /> Beitrittscodes</div>
           <p className="text-sm text-white/65">Gibt allen Teams auf einmal einen neuen Beitrittscode – zum Beispiel nach einer Bereinigung. Einzelne Teams erneuern ihren Code selbst unter „Einladen“.</p>
           {renewError ? <AuthFormAlert id="admin-teams-renew-error">{renewError}</AuthFormAlert> : null}
           <button type="button" onClick={renewAll} disabled={submitting} data-testid="admin-teams-renew-all-button" className="tls-btn tls-btn--danger inline-flex min-h-11 items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">
