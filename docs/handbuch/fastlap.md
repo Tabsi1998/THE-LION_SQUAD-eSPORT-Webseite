@@ -228,7 +228,9 @@ Trägt ihr für ein Mitglied eine Zeit ein, schlägt die Maske bei gesperrter of
 
 Im Kasten **Preise**: **+ Platz hinzufügen**, dann Platz, **Bezeichnung** und **Preis** eintragen. Zeilen ohne Preis werden
 beim Speichern ignoriert. Sobald die Challenge **Beendet** oder **Ergebnisse veröffentlicht** ist, legt die Website
-daraus die **Gewinn-Einträge** an (siehe **Admin → eSports → Gewinne**). Steht die Challenge auf **Ergebnisse
+daraus die **Gewinn-Einträge** an (siehe **Admin → eSports → Gewinne**). Hat sich zwischen **Beendet** und dem Veröffentlichen die
+Rangfolge geändert, bekommt der neue Platz seinen Gewinn; wer nicht mehr dort steht, behält seinen und steht mit **„Nach Korrektur
+prüfen“** in der Liste. Steht die Challenge auf **Ergebnisse
 veröffentlicht** und fehlen Einträge, gibt es den Knopf **Gewinne erzeugen**.
 
 ### 3.8 Bestenliste und Auswertung

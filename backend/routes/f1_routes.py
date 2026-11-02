@@ -830,8 +830,13 @@ async def _update_challenge_locked(cid: str, body: F1ChallengeUpdate, me: dict):
     )
     if should_create_prizes:
         try:
-            from services.prize_service import auto_create_for_f1_challenge
-            await auto_create_for_f1_challenge(c["id"])
+            from services.prize_service import auto_create_for_f1_challenge, review_f1_prizes
+            # „Beendet“ hat vielleicht schon Gewinne angelegt, seither kann sich die Rangfolge geändert haben (#2130):
+            # Beim Veröffentlichen wird angeglichen - wer nicht mehr auf dem Platz steht, kommt auf „nach Korrektur prüfen“.
+            if c.get("status") == "results_published":
+                await review_f1_prizes(c["id"])
+            else:
+                await auto_create_for_f1_challenge(c["id"])
         except Exception:
             logger.warning("[f1] Preise für %s nicht angelegt", log_safe(cid), exc_info=True)
     stamp = now_utc().isoformat()

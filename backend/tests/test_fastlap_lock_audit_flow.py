@@ -94,6 +94,26 @@ async def test_after_publishing_taking_a_penalty_back_needs_a_reason(flow):
     assert done.status_code == 200, done.text
 
 
+@pytest.mark.asyncio
+async def test_a_helper_cannot_take_back_a_penalty_in_another_challenge(flow):
+    _cid, _tid, driver, lead, helper = await setup(flow)
+    other, other_track = new_id(), new_id()
+    await flow.db.f1_challenges.insert_one({"id": other, "slug": f"fl-{other[:8]}", "title": "Andere", "status": "live", "visibility": "public", "unlimited_attempts": True})
+    await flow.db.f1_tracks.insert_one({"id": other_track, "challenge_id": other, "name": "Andere Strecke"})
+    lap = (await enter(flow, other, other_track, driver, penalty_seconds=5, admin_note=NOTE)).json()
+    flow.act_as(helper)
+    refused = await flow.patch(f"/api/f1/times/{lap['id']}", json={"penalty_seconds": 0, "is_invalid": False})
+    assert refused.status_code == 403
+    assert (await flow.get("/api/admin/penalties")).status_code == 403
+    rules = await flow.patch(f"/api/f1/challenges/{other}", json={"points_per_position": [1]})
+    assert rules.status_code == 403
+    assert (await flow.db.f1_lap_times.find_one({"id": lap["id"]}))["penalty_seconds"] == 5
+    flow.act_as(lead)
+    done = await flow.patch(f"/api/f1/times/{lap['id']}", json={"penalty_seconds": 0, "is_invalid": False})
+    assert done.status_code == 200 and done.json()["penalty_seconds"] == 0
+    assert await audit(flow, "fastlap.time.penalty")
+
+
 # ------------------------------------------------------------------ Sperre nach Veröffentlichung
 
 @pytest.mark.asyncio
