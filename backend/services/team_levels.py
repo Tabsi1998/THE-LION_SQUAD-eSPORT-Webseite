@@ -124,6 +124,12 @@ def top_team_id(data: dict[str, dict]) -> str | None:
     return ranked[0]["team_id"]
 
 
+def forget_cached_levels() -> None:
+    """Nach Auflösen und Wiederherstellen (#2128): der nächste Aufruf rechnet neu."""
+    _cache["at"] = None
+    _cache["data"] = None
+
+
 async def get_all_team_levels(force: bool = False) -> dict[str, dict]:
     now = datetime.now(timezone.utc)
     if not force and _cache["at"] and (now - _cache["at"]).total_seconds() < _CACHE_TTL and _cache["data"] is not None:

@@ -34,6 +34,7 @@ from pymongo.errors import DuplicateKeyError
 from models import TEAM_TAG_MAX_LENGTH, TEAM_TAG_MIN_LENGTH, new_id, now_utc
 from services.log_safe import log_safe
 from services.team_forget import forget_person  # noqa: F401 - gehört zum Vertrag dieses Moduls
+from services.team_levels import forget_cached_levels
 
 logger = logging.getLogger("tls.teams")
 
@@ -173,6 +174,7 @@ async def _dissolve_locked(db, team: dict, actor: dict) -> dict:
     await db.team_members.delete_many({"team_id": team_id})
     await db.team_squads.delete_many({"team_id": team_id})
     await db.team_invite_links.delete_many({"team_id": team_id})
+    forget_cached_levels()
     await db.team_invites.update_many({"team_id": team_id, "status": "pending"},
                                       {"$set": {"status": "cancelled", "updated_at": now.isoformat()}})
     await db.audit_logs.insert_one({
@@ -296,6 +298,7 @@ async def _restore_locked(db, row: dict, actor: dict, tag: str | None) -> dict:
         await _remove_restored_parts(db, team_id)
         raise HTTPException(status_code=409, detail="Das hat gerade nicht geklappt. Bitte noch einmal versuchen.") from None
     await db.dissolved_teams.delete_one({"id": team_id})
+    forget_cached_levels()
     await db.audit_logs.insert_one({
         "id": new_id(), "action": "team.restore", "target_id": team_id, "actor_id": actor.get("id"),
         "data": {"name": team.get("name"), "tag": final_tag, "leader_id": leader_id, "members": len(team.get("member_ids") or []),
