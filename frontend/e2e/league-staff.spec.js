@@ -132,6 +132,38 @@ for (const [name, viewport] of [["390", { width: 390, height: 844 }], ["1440", {
       await noSideScroll(page);
     });
 
+    for (const [who, user] of [
+      ["Turnierleitung", { ...LEAD, has_league_staff: true }],
+      ["ein Helfer", { ...STAFF, is_tournament_staff: true, has_staff_assignment: true }],
+    ]) {
+      test(`${who} mit Zuständigkeit kommt auf die Liga-Seite (#2230)`, async ({ page }) => {
+        await mockServer(page, user, {
+          "admin/leagues": { games: [], season_defaults: {}, can_create: false, leagues: [{ ...LEAGUE, capabilities: ["roster"] }] },
+        });
+        await page.goto("/admin/leagues");
+        await expect(page.getByTestId("season-link-season-1")).toBeVisible();
+        await expect(page).toHaveURL(/\/admin\/leagues$/);
+        await noSideScroll(page);
+      });
+    }
+
+    test("Liga verwalten: Das Banner wählt aus den eigenen Bildern, nicht aus den Admin-Medien (#2230)", async ({ page }) => {
+      await mockServer(page, STAFF, {
+        "admin/leagues": { games: [{ id: "g1", name: "Probe Shooter" }], season_defaults: {}, can_create: false, leagues: [{ ...LEAGUE, game_id: "g1", capabilities: ["manage"] }] },
+        "media**": { items: [], total: 0 },
+      });
+      const libraries = [];
+      page.on("request", (request) => {
+        if (/\/api\/(admin\/)?media/.test(request.url())) libraries.push(new URL(request.url()).pathname);
+      });
+      await page.route("**/api/admin/media**", (route) => route.fulfill({ status: 403, contentType: "application/json", body: "{}" }));
+      await page.goto("/admin/leagues");
+      await page.getByTestId("league-edit-probe").click();
+      await page.getByTestId("league-banner-library").click();
+      await expect.poll(() => libraries).toEqual(["/api/media"]);
+      await noSideScroll(page);
+    });
+
     test("die Turnierleitung allein kommt nicht auf die Liga-Seite", async ({ page }) => {
       await mockServer(page, LEAD);
       await page.goto("/admin/leagues");

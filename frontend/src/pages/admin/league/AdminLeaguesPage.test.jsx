@@ -9,6 +9,7 @@ vi.mock("@/components/tls/AdminLayout", () => ({ AdminLayout: ({ children }) => 
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
 vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => async () => true }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { role: "superadmin" } }) }));
 
 const { default: AdminLeaguesPage } = await import("./AdminLeaguesPage");
 

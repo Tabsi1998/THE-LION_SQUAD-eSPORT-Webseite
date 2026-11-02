@@ -5,7 +5,9 @@ import { useState } from "react";
 import { Monitor, Plus, Smartphone, Trash2 } from "lucide-react";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { FieldLabel, TextField } from "@/components/tls/FormFields";
+import { useAuth } from "@/context/AuthContext";
 import { resolveMediaUrl } from "@/lib/api";
+import { rulesMediaProps } from "@/lib/leagueRules";
 import { LeagueEmblem } from "@/components/tls/league/public/LeagueLook";
 import { DEFAULT_FOCUS, accentProblem, accentStyle, bannerFocus, contrastRatio, PAGE_BACKGROUND } from "@/lib/leagueLook";
 import "@/components/tls/league/public/league.css";
@@ -15,10 +17,11 @@ const ICON_DANGER = "p-1.5 text-white/50 hover:text-live focus-visible:outline f
 
 /** Emblem: quadratisch über den Logo-Upload (SVG wird bereinigt, PNG/WebP neu kodiert); Vorschau groß und klein. */
 export function EmblemField({ value, onChange, inherited = "", inheritedLabel = "", accent, testId }) {
+  const media = rulesMediaProps(useAuth().user);
   const shown = value || inherited;
   return (
     <FieldLabel label="Emblem" hint="Quadratisch, am besten SVG oder PNG mit durchsichtigem Hintergrund.">
-      <ImageUpload value={value} onChange={onChange} testId={testId} variant="square" crop="square" endpoint="/uploads/logo" allowLibrary logo logoPreview={false} />
+      <ImageUpload value={value} onChange={onChange} testId={testId} variant="square" crop="square" endpoint="/uploads/logo" allowLibrary logo logoPreview={false} {...media} />
       <div className="mt-2 flex items-end gap-3" style={accentStyle(accent)} data-testid={`${testId}-sizes`}>
         <LeagueEmblem src={shown} size={72} />
         <LeagueEmblem src={shown} size={40} />
@@ -39,6 +42,7 @@ const TARGETS = [
 /** Banner mit Fokuspunkt je Zuschnitt: ins Bild klicken setzt den Punkt für den gewählten Zuschnitt; darunter beide
  *  Zuschnitte so, wie die Ligaseite sie zeigt (Desktop 3 : 1, Handy 4 : 3) - mit dem Emblem davor. */
 export function BannerField({ url, focus, onChange, inherited = null, inheritedLabel = "", emblem = "", accent, testId }) {
+  const media = rulesMediaProps(useAuth().user);
   const [target, setTarget] = useState("desktop");
   const current = { ...DEFAULT_FOCUS, ...(focus || {}) };
   const shown = url ? { url, ...current } : inherited;
@@ -52,7 +56,7 @@ export function BannerField({ url, focus, onChange, inherited = null, inheritedL
   };
   return (
     <FieldLabel label="Banner" hint="Breitformat wie beim Event-Banner (16 : 9 reicht). Wie es zugeschnitten wird, zeigt die Vorschau.">
-      <ImageUpload value={url} onChange={(next) => onChange(next, next ? current : null)} testId={testId} variant="wide" allowLibrary />
+      <ImageUpload value={url} onChange={(next) => onChange(next, next ? current : null)} testId={testId} variant="wide" allowLibrary {...media} />
       {url ? (
         <div className="mt-3 space-y-2" data-testid={`${testId}-focus`}>
           <div className="flex flex-wrap items-center gap-2 text-xs text-white/60" role="group" aria-label="Fokuspunkt für">
@@ -132,6 +136,7 @@ export function AccentField({ value, onChange, testId = "league-accent" }) {
 
 /** Gewinne: Platz → Preis, optional mit Bild (etwa der Pokal). Reine Anzeige auf der Ligaseite. */
 export function PrizeEditor({ rows, onChange, testId = "prizes", emptyHint }) {
+  const media = rulesMediaProps(useAuth().user);
   const update = (index, key, value) => onChange(rows.map((row, at) => (at === index ? { ...row, [key]: value } : row)));
   const nextPlace = String(Math.max(0, ...rows.map((row) => Number(row.place) || 0)) + 1);
   return (
@@ -147,7 +152,7 @@ export function PrizeEditor({ rows, onChange, testId = "prizes", emptyHint }) {
               <Trash2 className="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
-          <ImageUpload value={row.image_url} onChange={(url) => update(index, "image_url", url || "")} label="Bild (freiwillig)" testId={`${testId}-image-${index}`} variant="square" allowLibrary />
+          <ImageUpload value={row.image_url} onChange={(url) => update(index, "image_url", url || "")} label="Bild (freiwillig)" testId={`${testId}-image-${index}`} variant="square" allowLibrary {...media} />
         </div>
       )) : <p className="text-xs text-white/50">{emptyHint || "Noch keine Gewinne."}</p>}
       <button type="button" onClick={() => onChange([...rows, { place: nextPlace, text: "", image_url: "" }])} data-testid={`${testId}-add`}

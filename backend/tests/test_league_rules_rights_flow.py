@@ -188,6 +188,29 @@ async def test_a_duty_puts_its_own_image_into_the_rules_without_admin_media(flow
 
 
 @pytest.mark.asyncio
+async def test_a_managing_duty_gets_the_look_of_the_league_with_own_images_only(flow, tmp_path, monkeypatch):
+    """Gestaltung (#2230): Hochladen und Mediathek der Admin-Medien bleiben zu, auch die Logo-Route nimmt keine Zuständigen. Eigene Bilder gehen."""
+    for module in (upload_routes, phase_fg_routes):
+        monkeypatch.setattr(module, "PUBLIC_UPLOAD_DIR", tmp_path)
+    monkeypatch.setattr(phase_fg_routes, "UPLOAD_DIR", tmp_path)
+    monkeypatch.setattr(media_scan, "auto_process", False)
+    w = await make_world(flow)
+    flow.act_as(await staff(flow, w["league"]["id"], ["manage", "season"]))
+    picture = io.BytesIO()
+    Image.new("RGB", (40, 40), (20, 90, 160)).save(picture, format="PNG")
+    files = {"file": ("banner.png", picture.getvalue(), "image/png")}
+    assert (await flow.post("/api/uploads/image?media_scope=admin", files=files)).status_code == 403
+    assert (await flow.post("/api/uploads/logo", files=files)).status_code == 403
+    assert (await flow.post("/api/uploads/logo?media_scope=user", files=files)).status_code == 403
+    assert (await flow.get("/api/admin/media?type=images")).status_code == 403
+    url = ok(await flow.post("/api/uploads/image", files=files))["url"]
+    saved = ok(await flow.patch(f"{ADMIN_LEAGUES}/{w['league']['id']}", json={"banner_url": url, "emblem_url": url}))
+    assert sorted(saved["changed"]) == ["banner_url", "emblem_url"]
+    prizes = [{"place": 1, "text": "Pokal", "image_url": url}]
+    assert (await flow.patch(f"{ADMIN_LEAGUES}/seasons/{w['season']['id']}", json={"prizes": prizes})).status_code == 200
+
+
+@pytest.mark.asyncio
 async def test_a_revoked_duty_stops_at_once(flow):
     w = await make_world(flow)
     person = await staff(flow, w["league"]["id"], ["rules"])
