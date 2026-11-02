@@ -88,3 +88,18 @@ test("reicht der Kader oder verlangt keine Staffel etwas, fragt nichts nach", as
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalled());
   expect(confirmMock).not.toHaveBeenCalled();
 });
+
+test("Co-Team in laufender Staffel (#2203): die Turnierleitung sieht warum und bekommt keine Knöpfe", async () => {
+  apiMock.get.mockImplementation((url) => {
+    if (url === "/teams/my") return Promise.resolve({ data: [{ ...TEAM, my_role: "member", can_manage: true }] });
+    if (url === "/teams/t1/squads") return Promise.resolve({ data: [{ ...SQUAD, can_edit: false }, { ...SQUAD, id: "s-b", name: "Rudel B", can_edit: true }] });
+    return Promise.resolve({ data: [] });
+  });
+  render(<MemoryRouter><TeamsPanel /></MemoryRouter>);
+  expect(await screen.findByTestId("team-squad-locked-s-a")).toHaveTextContent("Liga-Leitung");
+  expect(screen.queryByTestId("team-squad-locked-s-b")).toBeNull();
+  const locked = screen.getByTestId("team-squad-roles-s-a").parentElement;
+  expect(within(locked).queryAllByRole("button")).toHaveLength(0);
+  const free = screen.getByTestId("team-squad-roles-s-b").parentElement;
+  expect(within(free).getAllByRole("button").length).toBeGreaterThan(0);
+});

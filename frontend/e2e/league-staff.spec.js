@@ -22,6 +22,22 @@ const MATCH_PAGE = {
   result_entry_mode: "player_confirmed", schedule_mode: "player_proposal", conflict: { kind: "involved", override: false },
 };
 
+const SEASON_BODY = {
+  league: { id: "l1", name: "Probe-Liga", slug: "probe" },
+  season: { id: "s1", league_id: "l1", number: 1, name: "Season 1", slug: "season-1", start_date: "2026-11-09T23:00:00+00:00", weeks_total: 10, matchday_days: 7,
+    default_match_weekday: 6, default_match_time: "20:00", round_robin_legs: 1, max_staffel_size: 8, best_of: 3, team_size: 4, min_squad_size: 2, game_mode_order: [],
+    scoring_rules: { match_points: { win: 3, draw: 1, loss: 0 }, table_tiebreakers: [] }, rules_text: "", visibility: "members", status: "draft", blocked_periods: [] },
+  game: { id: "g1", name: "Probe Shooter", modes: [] },
+  calendar: { weeks: [], blocked_weeks: [], active_weeks: 10, max_teams_per_staffel: 8, rounds_needed: 7 },
+  library: [], map_pool: null, divisions: [],
+};
+const ROSTER = {
+  season: { id: "s1", name: "Season 1" }, game: { name: "Probe Shooter" }, fields: [], counts: {},
+  squads: [{ registration_id: "r9", team_id: "t9", squad_id: "s9", display_name: "Löwen · Rudel mit einem recht langen Namen", staffel_label: "Liga 1 · Staffel A", member_count: 2, min_squad_size: 2,
+    squad_status: "active", captain_id: "p1", vice_captain_id: null, member_ids: ["p1", "p2"], players: [], short: false,
+    team_members: [{ id: "p1", name: "Anna" }, { id: "p2", name: "Bert" }, { id: "p3", name: "Clara mit einem recht langen Namen" }] }],
+};
+
 async function mockServer(page, user, routes = {}) {
   await page.addInitScript(() => {
     window.localStorage.setItem("tls_cookie_consent_v1", JSON.stringify({
@@ -91,6 +107,28 @@ for (const [name, viewport] of [["390", { width: 390, height: 844 }], ["1440", {
       await page.goto("/matches/m1");
       await expect(page.getByTestId("match-conflict")).toContainText("zweite berechtigte Person");
       await expect(page.getByTestId("match-staff-result-open")).toHaveCount(0);
+      await noSideScroll(page);
+    });
+
+    test("Kader prüfen: aus der Kaderübersicht den Kader bearbeiten", async ({ page }) => {
+      await mockServer(page, STAFF, {
+        "admin/leagues/seasons/s1": { ...SEASON_BODY, capabilities: ["roster"] },
+        "admin/leagues/seasons/s1/roster": ROSTER,
+      });
+      const saved = [];
+      await page.route("**/api/teams/t9/squads/s9", async (route) => {
+        saved.push(route.request().postDataJSON());
+        await route.fulfill({ contentType: "application/json", body: "{}" });
+      });
+      await page.goto("/admin/leagues/seasons/s1");
+      await page.getByTestId("roster-edit-r9").click();
+      const sheet = page.getByTestId("kader-sheet");
+      await expect(sheet.getByTestId("kader-member-p1")).toBeDisabled();
+      await sheet.getByTestId("kader-member-p3").check();
+      await noSideScroll(page);
+      await sheet.getByTestId("kader-vice_captain_id").selectOption("p2");
+      await sheet.getByTestId("kader-save").click();
+      await expect.poll(() => saved).toEqual([{ member_ids: ["p1", "p2", "p3"], vice_captain_id: "p2" }]);
       await noSideScroll(page);
     });
 
