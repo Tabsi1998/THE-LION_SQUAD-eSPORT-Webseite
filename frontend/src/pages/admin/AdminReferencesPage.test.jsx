@@ -54,6 +54,17 @@ beforeEach(() => {
   toastMock.success.mockReset();
 });
 
+test("Texte: Highlights sagen „öffentlich“, interne Notizen gehen mit und öffnen „Weitere Angaben“ (#2130)", async () => {
+  mockApi([{ ...LEGACY_ITEM, internal_notes: "Nur für uns", highlights: "Starker Auftritt" }]);
+  render(<MemoryRouter><AdminReferencesPage /></MemoryRouter>);
+  fireEvent.click(await screen.findByTestId("reference-edit-r1"));
+  expect(screen.getByLabelText(/Highlights \(öffentlich\)/)).toHaveValue("Starker Auftritt");
+  expect(screen.getByTestId("reference-internal-notes")).toHaveValue("Nur für uns");
+  fireEvent.change(screen.getByTestId("reference-internal-notes"), { target: { value: "  Rechnung offen " } });
+  fireEvent.click(screen.getByTestId("reference-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/references/r1", expect.objectContaining({ internal_notes: "Rechnung offen", highlights: "Starker Auftritt" })));
+});
+
 test("Neue Referenz: Felder statt Titel, zwei Einzelstarter mit je eigener Platzierung", async () => {
   mockApi([]);
   render(<MemoryRouter><AdminReferencesPage /></MemoryRouter>);

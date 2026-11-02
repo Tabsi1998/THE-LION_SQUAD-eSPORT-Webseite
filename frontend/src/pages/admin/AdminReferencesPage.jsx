@@ -58,6 +58,7 @@ const emptyReference = {
   result_url: "",
   description: "",
   highlights: "",
+  internal_notes: "",
   visibility: "public",
   status: "completed",
   is_active: true,
@@ -121,6 +122,7 @@ export function referenceToForm(item) {
     location: item.location || "",
     description: item.description || "",
     highlights: item.highlights || "",
+    internal_notes: item.internal_notes || "",
     series_id: item.series_id || "",
   };
 }
@@ -612,6 +614,7 @@ function formToPayload(form) {
     result_url: form.result_url.trim() || null,
     description: form.description.trim() || null,
     highlights: form.highlights.trim() || null,
+    internal_notes: form.internal_notes.trim() || null,
     visibility: form.visibility,
     status: form.status,
     is_active: form.is_active !== false,
@@ -857,8 +860,9 @@ function ReferenceForm({ reference, games, memberProfiles, partners = [], lineag
         </FormSection>
 
         <FormSection plain title="Texte">
-          <TextAreaField label="Beschreibung" value={form.description} onChange={(v) => set("description", v)} testId="reference-description" />
-          <TextAreaField label="Highlights / Notizen" value={form.highlights} onChange={(v) => set("highlights", v)} testId="reference-highlights" />
+          <TextAreaField label="Beschreibung (öffentlich)" value={form.description} onChange={(v) => set("description", v)} testId="reference-description" hint="Steht als „Bericht“ auf der Seite der Referenz." />
+          <TextAreaField label="Highlights (öffentlich)" value={form.highlights} onChange={(v) => set("highlights", v)} testId="reference-highlights" hint="Steht auf der Seite der Referenz und in der Vorschau bei Suchmaschinen, wenn keine Beschreibung da ist." />
+          <TextAreaField label="Interne Notizen" value={form.internal_notes} onChange={(v) => set("internal_notes", v)} testId="reference-internal-notes" hint="Sieht nur die Verwaltung, erscheint nirgends öffentlich." />
         </FormSection>
       </FormSection>
     </AdminSheet>

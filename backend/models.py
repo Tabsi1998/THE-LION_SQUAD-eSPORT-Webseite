@@ -1620,6 +1620,8 @@ class ReferenceCreate(BaseModel):
     result_url: Optional[str] = None
     description: Optional[str] = None
     highlights: Optional[str] = None
+    # Nur für die Verwaltung (#2130); Beschreibung und Highlights sind öffentlich.
+    internal_notes: Optional[str] = None
     visibility: ReferenceVisibility = "public"
     status: ReferenceStatus = "completed"
     is_active: bool = True
@@ -1657,6 +1659,7 @@ class ReferenceUpdate(BaseModel):
     result_url: Optional[str] = None
     description: Optional[str] = None
     highlights: Optional[str] = None
+    internal_notes: Optional[str] = None
     visibility: Optional[ReferenceVisibility] = None
     status: Optional[ReferenceStatus] = None
     is_active: Optional[bool] = None

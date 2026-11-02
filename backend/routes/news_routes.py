@@ -1340,8 +1340,12 @@ def _reference_auto_helpers(items: list[dict]) -> dict:
     }
 
 
-async def _enrich_references(items: list[dict]) -> list[dict]:
+async def _enrich_references(items: list[dict], internal: bool = False) -> list[dict]:
+    """Für Website, App, Profil und Partnerseite - ``internal_notes`` (#2130) gehen nur mit ``internal`` an die Verwaltung."""
     db = get_db()
+    if not internal:
+        for item in items:
+            item.pop("internal_notes", None)
     helpers = await _get_reference_helpers(db)
     # Partner II (#469): Partnervereine an der Referenz, Kurzform mit Link auf die Partnerseite.
     await partner_pages.attach_partners_many(db, items)
@@ -1706,7 +1710,7 @@ async def admin_update_reference_showcase(body: ReferenceShowcaseSettings, me: d
 async def admin_list_references(me: dict = Depends(require_area("content"))):
     db = get_db()
     refs = await db.references.find({}, {"_id": 0}).to_list(1000)
-    refs = _sort_references(await _enrich_references(refs))
+    refs = _sort_references(await _enrich_references(refs, internal=True))
     return {"items": refs, "summary": _reference_summary(refs)}
 
 
@@ -1844,7 +1848,7 @@ async def create_reference(body: ReferenceCreate, me: dict = Depends(require_are
         doc["created_at"] = doc["updated_at"] = now_utc().isoformat()
         await db.references.insert_one(doc)
     doc.pop("_id", None)
-    return {**(await _enrich_references([doc]))[0], "check_warnings": await _reference_warnings(db, doc)}
+    return {**(await _enrich_references([doc], internal=True))[0], "check_warnings": await _reference_warnings(db, doc)}
 
 
 REFERENCE_OUTDATED = ("Die Referenz wurde inzwischen geändert - etwa beim Abschluss ihrer Saison. Bitte neu laden "
@@ -1861,7 +1865,7 @@ async def update_reference(rid: str, body: ReferenceUpdate, expected_updated_at:
     nullable_fields = {
         "organizer", "league", "season", "format", "game_id", "game_name", "team_name", "placement",
         "placement_label", "participant_count", "team_count", "start_date", "end_date", "location",
-        "external_url", "bracket_url", "match_url", "result_url", "description", "highlights", "series_id",
+        "external_url", "bracket_url", "match_url", "result_url", "description", "highlights", "internal_notes", "series_id",
     }
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
@@ -1903,7 +1907,7 @@ async def update_reference(rid: str, body: ReferenceUpdate, expected_updated_at:
     # auch deren Sichtbarkeit sofort.
     await season_close.settle_reference(db, rid)
     saved = await db.references.find_one({"id": rid}, {"_id": 0})
-    return {**(await _enrich_references([saved]))[0], "check_warnings": await _reference_warnings(db, saved)}
+    return {**(await _enrich_references([saved], internal=True))[0], "check_warnings": await _reference_warnings(db, saved)}
 
 
 @router.delete("/references/{rid}")
