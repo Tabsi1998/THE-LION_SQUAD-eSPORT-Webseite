@@ -10,7 +10,8 @@ Rechte hängen an Bereichen, nicht an einer Rangfolge. Eine Person kann mehrere 
 
 | Bereich | Schlüssel | Was dazugehört |
 | --- | --- | --- |
-| Turnierleitung | `tournaments` | Turniere, Events, Stationen, Fast Lap, Saisons, Spiele, Gewinne, Strafen, Zugangslinks, PDF-Exporte |
+| Turnierleitung | `tournaments` | Turniere, Events, Stationen, Fast Lap, Saisons, Spiele, Gewinne, Strafen, Zugangslinks, PDF-Exporte. Keine Liga: In einer Staffel gibt der Bereich nur noch, was jede Person lesen darf (#2203) |
+| Ligen | `leagues` | Alle Ligen, Seasons, Staffeln, Kader, Spiele und Ergebnisse der Liga, Vergabe der Zuständigen (#2203, [Rechte-Matrix](LIGA.md)) |
 | Redaktion | `content` | News, Galerie, Medien, Sponsoren, Partner, Referenzen, Serien (externe Wettbewerbe), Navigation, Sticker, Erfolge (Achievements), Seiten-Banner, Newsletter, Twitch-Streams |
 | Vereinsverwaltung | `club` | Mitglieder und öffentliche Profile (mit CSV-Export), Anträge, Dokumente (auch gesperrte Downloads), Vorteile, Vorstand, Stammdaten und Kontakt der Vereinsdaten, Kontakt-Inbox, Benutzerliste (lesen, Rechte-Verlauf, bannen mit Grund – Konten mit Adminbereich oder Admin-Rolle bannt nur der Superadmin, Superadmin-Konten niemand), Discord-Zähler |
 | Finanzen | `finance` | Kosten und Abrechnung an Events (später Turnieren), Finanzübersicht mit Rechnungsaufträgen, Freigaben (#322, docs/ABRECHNUNG.md), Rechnungsangaben: Zahlungsziel, Zahlungsart, Bankkonto, Sprache der PDFs, „Steuersätze geprüft“, „gleich freigeben“ (#1358), Vereinsshop: Produkte, Preise, Varianten, Bestellungen (#1704, docs/SHOP.md) – die übrige Dolibarr-Technik bleibt bei System |
@@ -23,12 +24,12 @@ Rechte hängen an Bereichen, nicht an einer Rangfolge. Eine Person kann mehrere 
 | --- | --- | --- |
 | Superadmin | alle; vergibt Rollen und Freigaben | Pflicht |
 | Club-Admin | alle | Pflicht (seit #291 auch für Mitgliederdaten und Einstellungen) |
-| Turnierleitung (`tournament_admin`) | Turnierleitung, Moderation | Pflicht |
+| Turnierleitung (`tournament_admin`) | Turnierleitung, Moderation. **Nicht** Ligen: den Bereich vergibt der Superadmin einzeln (#2203) | Pflicht |
 | Moderator | Moderation | nicht nötig |
 | Spieler | keiner – außer Freigaben oder Vorstandsposten | – |
 
 **Freigaben:** Der Superadmin kann einer Person einzelne Bereiche geben (Admin → Alle Benutzer):
-Turnierleitung, Redaktion, Vereinsverwaltung, Finanzen. System bleibt an Club-Admin und Superadmin gebunden.
+Turnierleitung, Ligen, Redaktion, Vereinsverwaltung, Finanzen. System bleibt an Club-Admin und Superadmin gebunden.
 Jede Freigabe steht im Audit-Log, die Person bekommt eine Meldung (#2125). Eine Freigabe zählt überall genauso wie die Rolle (#1350): Wer die
 Turnierleitung über eine Freigabe hat, arbeitet in jedem Turnier, jeder Fast Lap, an den Stationen und bei
 den Events wie mit der Rolle (Status, Turnierbaum, Anmeldungen, Check-in, Ergebnisse). Der Server prüft dafür
@@ -318,12 +319,27 @@ je Saison Captains eintragen, die nur für diese eine Saison Ergebnisse und Scor
 - **Code:** `services/reference_series_access.py` (`require_series_editor`, `SeriesAccess`), Verwaltung in
   `routes/reference_staff_routes.py`.
 
+## Liga: Bereich „Ligen“, Zuständige und Befangenheit (#2203)
+
+Die Liga hängt am Bereich **Ligen** (`leagues`), nicht mehr an der Turnierleitung. Wer ihn hat, darf alle Ligen; Superadmin und
+Club-Admin haben ihn von selbst, andere per Freigabe. Die Rolle Turnierleitung hat ihn nicht. Zusätzlich vergibt der Bereich je Liga
+**Zuständige** mit einzelnen Zuständigkeiten: Liga verwalten, Season konfigurieren, Teams freigeben, Kader prüfen, Spiele betreuen,
+Ergebnisse korrigieren, Proteste, Strafen, Regeln veröffentlichen. Zuständige brauchen Zwei-Faktor, keinen Bereich. Jede Vergabe steht im
+Protokoll, die Person bekommt eine Meldung.
+
+**Befangenheit:** Wer in einem Spiel selbst beteiligt ist (Kader einer Seite, Captain, Vertreter, Hauptteam-Leitung), korrigiert dort
+keine Ergebnisse, entscheidet keine Proteste und verhängt keine Strafen zum Spiel. Es entscheidet eine zweite berechtigte Person. Nur der
+Superadmin darf als Notausnahme, mit Pflichtgrund im Protokoll (`league.conflict.override`).
+
+**Helfer an Staffeln** lesen, ändern aber nichts. Sonstige Turniere bleiben unverändert. Die Matrix je Route steht in
+[`LIGA.md`](LIGA.md), Abschnitt 12. Code: `services/league_permissions.py`.
+
 ## Liga: Co-Team mit Captain und Vertreter (#1649)
 
 In der Liga spielt ein **Co-Team** eines Vereinsteams – Vertrag in [`LIGA.md`](LIGA.md). Jedes Co-Team hat
 höchstens einen **Captain** und einen **Vertreter**; beide stehen im Kader des Co-Teams und sind verschiedene Personen.
 
-| Was | Turnierleitung (mit Zwei-Faktor) | Teamleitung, Co-Leitung des Hauptteams | Captain | Vertreter | Kader des Co-Teams |
+| Was | Liga-Recht (Bereich Ligen oder Zuständigkeit, mit Zwei-Faktor) | Teamleitung, Co-Leitung des Hauptteams | Captain | Vertreter | Kader des Co-Teams |
 | --- | --- | --- | --- | --- | --- |
 | Co-Team einer Staffel zuteilen oder herausnehmen | ja | nein | nein | nein | nein |
 | Neue Spiel-ID freigeben, Stichtag für neue Spieler, Kaderübersicht mit IDs (#2108) | ja | nein | nein | nein | nein |
@@ -345,14 +361,14 @@ höchstens einen **Captain** und einen **Vertreter**; beide stehen im Kader des 
   ein Co-Team mit Anmeldung darin nicht löschen und sein Team nicht auflösen – egal mit welchem Status, auch
   ausgetreten oder disqualifiziert.
 - **Zuteilen** (Admin → Turnier → Teilnehmer → „Co-Team zuteilen“, `POST /api/tournaments/{tid}/squad-registrations`,
-  Bereich Turniere): Co-Team gehört zum Hauptteam, ist aktiv und fürs Spiel der Staffel, Kader mindestens Mindestkader,
+  Bereich Ligen oder Zuständigkeit „Teams freigeben“): Co-Team gehört zum Hauptteam, ist aktiv und fürs Spiel der Staffel, Kader mindestens Mindestkader,
   alle im Hauptteam, Staffel nicht voll, zwei Co-Teams desselben Teams nie in derselben Staffel, ein Co-Team je Season
   nur in einer Staffel (auch wenn eine abgelehnte, ausgetretene oder nicht erschienene Anmeldung wieder aktiv
   gesetzt wird). Die Anmeldung heißt „Team · Co-Team“; die Teamleitung meldet sie nicht selbst ab.
 - **Protokoll:** `team.squad.roles` (vorher und nachher), `league.squad.assign`, `league.squad.remove`,
   `league.roster.approve` (Grund, ohne die ID), `league.season.roster_deadline`.
 - **Spiel-ID je Season (#2108):** Die IDs der Spieler sehen nur die Person selbst (Profil), die Beteiligten des Spiels
-  (Matchseite, wie Aufstellungen) und die Turnierleitung (`/api/admin/leagues/seasons/{id}/roster`, Bereich Turniere).
+  (Matchseite, wie Aufstellungen) und wer das Liga-Recht „Kader prüfen“ hat (`/api/admin/leagues/seasons/{id}/roster`).
   Code: `services/league_roster.py`.
 - **Code:** Regel in `services/match_audience.py` (`responsible_ids`, `player_ids`, `responsible_registration`),
   Zuteilen in `services/squad_registration.py`, Rollen in `routes/team_routes.py`.
