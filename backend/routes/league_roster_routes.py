@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 
 from auth import get_current_user
 from database import get_db
-from services import league_roster
+from services import league_eligibility, league_roster
 from services.league_permissions import require_league
 
 admin_router = APIRouter(prefix="/api/admin/leagues", tags=["leagues-admin"])
@@ -31,6 +31,11 @@ class RosterApproveBody(BaseModel):
 
 class RosterSettingsBody(BaseModel):
     roster_deadline: Optional[str] = Field(default=None, max_length=10)
+
+
+class WaiveWaitBody(BaseModel):
+    squad_id: str = Field(min_length=1, max_length=100)
+    reason: str = Field(min_length=1, max_length=500)
 
 
 async def _season(db, season_id: str) -> dict:
@@ -54,6 +59,16 @@ async def approve_roster_id(season_id: str, user_id: str, body: RosterApproveBod
     try:
         return await league_roster.approve(db, season, user_id, body.reason, me)
     except league_roster.LeagueRosterError as problem:
+        raise HTTPException(status_code=problem.status_code, detail=problem.detail) from None
+
+
+@admin_router.post("/seasons/{season_id}/roster/{user_id}/waive-wait")
+async def waive_wait(season_id: str, user_id: str, body: WaiveWaitBody, me: dict = Depends(require_roster)):
+    db = get_db()
+    season = await _season(db, season_id)
+    try:
+        return await league_eligibility.waive_wait(db, season, user_id, body.squad_id, body.reason, me)
+    except league_eligibility.EligibilityError as problem:
         raise HTTPException(status_code=problem.status_code, detail=problem.detail) from None
 
 

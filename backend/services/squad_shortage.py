@@ -17,7 +17,7 @@ from services.squad_registration import ACTIVE_REGISTRATION_STATUSES, FINISHED_T
 logger = logging.getLogger("tls.squad_shortage")
 
 REGISTRATION_FIELDS = {"_id": 0, "id": 1, "tournament_id": 1, "team_id": 1, "squad_id": 1, "display_name": 1}
-TOURNAMENT_FIELDS = {"_id": 0, "id": 1, "title": 1, "status": 1, "team_size": 1, "min_squad_size": 1, "league_context": 1}
+TOURNAMENT_FIELDS = {"_id": 0, "id": 1, "title": 1, "status": 1, "team_size": 1, "min_squad_size": 1, "lineup_mode": 1, "league_context": 1}
 
 
 async def _open_tournaments(db, registrations: list[dict]) -> dict[str, dict]:

@@ -5,7 +5,8 @@ from typing import Optional, Literal
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from database import get_db
-from services import game_usage, league_roster, moderation_standing
+from services import game_usage, league_eligibility, league_roster, moderation_standing
+from services.mutation_lock import MutationLockBusy
 from auth import get_current_user, get_optional_user
 from models import TEAM_NAME_MAX_LENGTH, TEAM_NAME_MIN_LENGTH, TEAM_TAG_MAX_LENGTH, TEAM_TAG_MIN_LENGTH, TeamCreate, TeamUpdate, now_utc, new_id
 from services.notification_preferences import send_user_template
@@ -1110,15 +1111,66 @@ async def leave_team(team_id: str, me: dict = Depends(get_current_user)):
     return {"ok": True}
 
 
-async def _leave_squads(db, team_id: str, user_id: str) -> None:
+async def _leave_squads(db, team_id: str, user_id: str, actor_id: str | None = None) -> None:
     """Wer das Team verlässt, verlässt auch jeden Kader seiner Co-Teams (#1649) - sonst bliebe er Liga-Spieler. Reicht ein
-    Kader danach nicht mehr für seine Staffel, erfahren es Verantwortliche und Turnierleitung (#2202)."""
+    Kader danach nicht mehr für seine Staffel, erfahren es Verantwortliche und Turnierleitung (#2202). In einer Staffel steht es
+    im Protokoll (#2204)."""
     from services import squad_shortage
 
     before = await db.team_squads.find({"team_id": team_id, "member_ids": user_id}, {"_id": 0, "id": 1, "member_ids": 1}).to_list(200)
     await db.team_squads.update_many({"team_id": team_id, "member_ids": user_id},
                                      {"$pull": {"member_ids": user_id}, "$set": {"updated_at": now_utc().isoformat()}})
+    for squad in before:
+        if await _squad_staffeln(db, squad["id"]):
+            await _audit_squad_roster(db, team_id, actor_id or user_id, squad["id"], [], [user_id])
     await squad_shortage.warn_after_departure(db, before)
+
+
+async def _audit_squad_roster(db, team_id: str, actor_id: str | None, squad_id: str, added: list[str], removed: list[str]) -> None:
+    """Kaderänderung eines Co-Teams in einer nicht beendeten Staffel (#2204): wer rein, wer raus - für die Leitung nachvollziehbar."""
+    await _team_audit(db, "league.squad.roster", team_id, actor_id, {"squad_id": squad_id, "added": sorted(added), "removed": sorted(removed)})
+
+
+async def _tell_squad_edited(db, team: dict, before: dict, after: dict, me: dict, *, fields: list[str]) -> None:
+    """Griff von außen in ein Co-Team einer Staffel (#2204): Leitung und Co-Leitung des Hauptteams erfahren wer, was, wann. Der Kader
+    ist schon gespeichert - eine klemmende Nachricht hält das nicht auf."""
+    from services.matchday_schedule import LOCAL_TZ
+
+    added = [uid for uid in after.get("member_ids") or [] if uid not in (before.get("member_ids") or [])]
+    removed = [uid for uid in before.get("member_ids") or [] if uid not in (after.get("member_ids") or [])]
+    role_ids = [after.get(field) for field in SQUAD_ROLE_FIELDS if after.get(field) != before.get(field) and after.get(field)]
+    people = {row["id"]: row for row in await db.users.find(
+        {"id": {"$in": sorted({*added, *removed, *role_ids})}}, {"_id": 0, "id": 1, "username": 1, "display_name": 1, "is_deleted": 1}).to_list(100)}
+
+    def names(ids) -> str:
+        return ", ".join(_user_label(people.get(uid)) for uid in ids)
+
+    parts = []
+    if added:
+        parts.append(f"neu im Kader: {names(added)}")
+    if removed:
+        parts.append(f"nicht mehr im Kader: {names(removed)}")
+    for field in SQUAD_ROLE_FIELDS:
+        if after.get(field) != before.get(field):
+            parts.append(f"{SQUAD_ROLE_LABELS[field]}: {names([after[field]]) if after.get(field) else 'nicht mehr vergeben'}")
+    if not parts:
+        parts.append("Angaben geändert (" + ", ".join(sorted(fields)) + ")")
+    moment = now_utc()
+    when = moment.astimezone(LOCAL_TZ).strftime("%d.%m.%Y, %H:%M")
+    name = after.get("name") or before.get("name") or "Co-Team"
+    for user_id in sorted({team.get("leader_id"), *(team.get("co_leader_ids") or [])} - {me["id"], None}):
+        try:
+            await create_user_notification(
+                user_id,
+                title=f"Liga-Leitung hat den Kader geändert: {name}",
+                body=f"{_user_label(me)} hat am {when} im Co-Team {name} geändert: {'; '.join(parts)}.",
+                url=f"/teams/{team['id']}",
+                kind="team_role_changed",
+                meta={"team_id": team["id"], "squad_id": before.get("id"), "reason": "league_squad_edit",
+                      "dedupe_key": f"league-squad-edit:{before.get('id')}:{moment.isoformat()}:{user_id}"},
+            )
+        except Exception:  # noqa: BLE001 - siehe oben
+            logger.warning("[teams] Nachricht zum Kader an %s nicht verschickt", log_safe(user_id), exc_info=True)
 
 
 def _is_team_leader(team: dict, user_id: str) -> bool:
@@ -1158,7 +1210,7 @@ async def kick_member(team_id: str, user_id: str, me: dict = Depends(get_current
         {"$pull": {"member_ids": user_id, "co_leader_ids": user_id}, "$set": {"updated_at": now_utc().isoformat()}},
     )
     await db.team_members.delete_many({"team_id": team_id, "user_id": user_id})
-    await _leave_squads(db, team_id, user_id)
+    await _leave_squads(db, team_id, user_id, me["id"])
     await _team_audit(db, "team.kick", team_id, me["id"], {"kicked_user_id": user_id})
     await _tell(
         user_id,
@@ -1390,16 +1442,32 @@ async def update_squad(team_id: str, squad_id: str, body: TeamSquadUpdate, me: d
     updates.update({field: value for field, value in roles.items() if value})
     updates["updated_at"] = now_utc().isoformat()
     change = {"$set": updates, **({"$unset": unset} if unset else {})}
-    res = await db.team_squads.update_one(_unchanged_squad(current), change)
+    # Spielberechtigung (#2204): Neue im Kader prüft die Season - unter derselben Sperre wie das Zuteilen, damit eine Person auch
+    # bei gleichzeitigen Aufnahmen nur in einem Co-Team landet. Abgänge bleiben frei.
+    joining = [uid for uid in updates.get("member_ids") or [] if uid not in (current.get("member_ids") or [])]
+    seasons = await league_eligibility.open_seasons_of_squad(db, squad_id) if joining else []
+    try:
+        async with league_eligibility.squad_change_lock(db, [season for season, _tournament in seasons]):
+            await league_eligibility.check_roster_addition(db, seasons, squad_id, joining, len(updates.get("member_ids") or []))
+            res = await db.team_squads.update_one(_unchanged_squad(current), change)
+    except league_eligibility.EligibilityError as refusal:
+        raise HTTPException(status_code=refusal.status_code, detail=refusal.detail) from None
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail=SQUAD_CHANGED_MEANWHILE) from None
     if res.matched_count == 0:
         raise HTTPException(status_code=409, detail=SQUAD_CHANGED_MEANWHILE)
     fresh = await db.team_squads.find_one({"id": squad_id}, {"_id": 0})
     await _after_squad_roles(db, team, fresh or current, current, roles, me)
-    # Griff von außen in ein Co-Team einer Staffel (#2203): steht im Protokoll, mit den Feldern, nicht den Werten.
-    if not _leads_team(team, me) and await _squad_staffeln(db, squad_id):
-        await _team_audit(db, "league.squad.edit", team_id, me["id"], {"squad_id": squad_id, "fields": sorted(raw)})
-    # Liga-Kader (#2108): wer neu ins Co-Team kommt, während es in einer Staffel spielt, kommt in den Kader der Season.
     added = [uid for uid in (fresh or {}).get("member_ids") or [] if uid not in (current.get("member_ids") or [])]
+    gone = [uid for uid in current.get("member_ids") or [] if uid not in ((fresh or {}).get("member_ids") or [])]
+    in_staffel = bool(await _squad_staffeln(db, squad_id))
+    if in_staffel and (added or gone):
+        await _audit_squad_roster(db, team_id, me["id"], squad_id, added, gone)
+    # Griff von außen in ein Co-Team einer Staffel (#2203): steht im Protokoll, mit den Feldern, nicht den Werten. Die Teamleitung erfährt es (#2204).
+    if not _leads_team(team, me) and in_staffel:
+        await _team_audit(db, "league.squad.edit", team_id, me["id"], {"squad_id": squad_id, "fields": sorted(raw)})
+        await _tell_squad_edited(db, team, current, fresh or current, me, fields=sorted(raw))
+    # Liga-Kader (#2108): wer neu ins Co-Team kommt, während es in einer Staffel spielt, kommt in den Kader der Season.
     if added:
         await league_roster.on_squad_members_added(db, fresh, added, me.get("id"))
     # Abgänge bleiben möglich (#2202) - reicht der Kader nicht mehr für die Staffel, gibt es eine Warnung.
@@ -1440,6 +1508,7 @@ async def set_squad_roles(team_id: str, squad_id: str, body: TeamSquadRoles, me:
     # Griff von außen in ein Co-Team einer Staffel (#2203): wie beim Ändern des Co-Teams, mit den Feldern, nicht den Werten.
     elif not _leads_team(team, me) and await _squad_staffeln(db, squad_id):
         await _team_audit(db, "league.squad.edit", team_id, me["id"], {"squad_id": squad_id, "fields": sorted(requested)})
+        await _tell_squad_edited(db, team, current, fresh or current, me, fields=sorted(requested))
     return fresh
 
 

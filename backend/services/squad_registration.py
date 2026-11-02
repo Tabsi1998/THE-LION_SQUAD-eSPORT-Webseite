@@ -17,7 +17,7 @@ from __future__ import annotations
 from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
-from services import league_roster
+from services import league_eligibility, league_roster
 from services.discord_roles import load_games, top_game
 from services.league_roster import min_squad_size
 
@@ -266,6 +266,8 @@ async def candidates(db, tournament: dict) -> dict:
     # Spiel-ID je Spieler (#2108): Stand in der Season - fehlt sie, warnt der Dialog; zuteilen geht trotzdem.
     member_ids = {uid for squad in squads if squad.get("team_id") in teams for uid in squad.get("member_ids") or [] if uid}
     roster_ctx = await league_roster.context_for_tournament(db, tournament, member_ids)
+    # Regeln der Season (#2204): dieselbe Prüfung wie beim Zuteilen, der Dialog zeigt die Gründe vorab.
+    eligibility = await league_eligibility.context_for_tournament(db, tournament, member_ids)
     games, parents = await load_games(db)
     out: dict[str, dict] = {}
     for squad in squads:
@@ -283,7 +285,7 @@ async def candidates(db, tournament: dict) -> dict:
             other_staffel_squad_ids=other,
             games=games,
             parents=parents,
-        )
+        ) + league_eligibility.registration_problems(eligibility, squad)
         entry = out.setdefault(
             team["id"],
             {
@@ -362,6 +364,8 @@ async def build_registration(db, tournament: dict, team_id: str, squad_id: str, 
         games=games,
         parents=parents,
     )
+    eligibility = await league_eligibility.context_for_tournament(db, tournament, squad.get("member_ids") or [])
+    problems += league_eligibility.registration_problems(eligibility, squad)
     if problems:
         code, text = problems[0]
         raise SquadAssignError(code, text)
