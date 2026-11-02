@@ -164,13 +164,6 @@ def explain_connection_error(error: str | None) -> str | None:
     return None
 
 
-def summarize_probe_failure(error: str) -> str:
-    explanation = explain_connection_error(error)
-    if not explanation:
-        return error
-    return f"{explanation} Details: {error}"
-
-
 def _varint(value: int) -> bytes:
     out = bytearray()
     while True:

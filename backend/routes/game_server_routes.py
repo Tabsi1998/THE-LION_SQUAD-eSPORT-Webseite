@@ -13,6 +13,7 @@ from database import get_db
 from services import game_usage
 from services.visibility import sees_member_content
 from models import new_id, now_utc
+from runtime_config import resolve_app_environment
 from services.slug_utils import apply_slug_history, slug_source_for_update, slugify, unique_slug
 from services.secret_store import decrypt_secret, encrypt_secret
 
@@ -39,7 +40,11 @@ DEMO_GAME_SERVERS = [
 
 
 def _public_sync_error(error: str) -> str:
-    return "Sync konnte den Server vom Webserver aus nicht erreichen. Letzter Status bleibt erhalten."
+    return "Die Website konnte den Server nicht erreichen. Der letzte Stand bleibt erhalten."
+
+
+# Der echte Fehler für die Verwaltung (#2129, SP7) - nie nach außen: ``_public_doc`` blendet ihn aus.
+SYNC_ERROR_MAX = 500
 
 DEMO_GAME_SERVER_SLUGS = {item["slug"] for item in DEMO_GAME_SERVERS}
 
@@ -86,7 +91,7 @@ def _public_doc(server: dict, game: dict | None = None, include_admin_fields: bo
         "amp_password", "amp_session_id", "amp_url", "amp_username", "amp_instance_name", "amp_module",
     }
     if not include_admin_fields:
-        hidden.update({"query_host", "query_port", "rcon_port", "last_sync_error", "amp_instance"})
+        hidden.update({"query_host", "query_port", "rcon_port", "last_sync_error", "last_sync_note", "amp_instance"})
     doc = {k: v for k, v in server.items() if k not in hidden}
     if server.get("access_secret"):
         doc["has_access_secret"] = True
@@ -293,6 +298,12 @@ async def admin_list_game_servers(me: dict = Depends(require_club_admin())):
     return [_public_doc(row, game_by_id.get(row.get("game_id")), include_admin_fields=True) for row in rows]
 
 
+@router.get("/admin/meta")
+async def admin_game_server_meta(me: dict = Depends(require_club_admin())):
+    """Was die Seite wissen muss (#2129, SP6): den Knopf für die Demo-Startliste gibt es nur außerhalb der Produktion."""
+    return {"demo_tools": resolve_app_environment() != "production"}
+
+
 @router.get("/{server_id}/access")
 async def get_game_server_access(server_id: str, me: dict | None = Depends(get_optional_user)):
     db = get_db()
@@ -374,7 +385,7 @@ async def update_game_server(server_id: str, body: GameServerPatch, me: dict = D
 
 
 async def _sync_one(db, server: dict) -> dict:
-    from services.game_server_status import GameServerProbeError, probe_game_server, summarize_probe_failure
+    from services.game_server_status import GameServerProbeError, explain_connection_error, probe_game_server
     try:
         result = await probe_game_server(server)
         updates = {
@@ -404,8 +415,8 @@ async def _sync_one(db, server: dict) -> dict:
         logging.getLogger("tls.game_servers").warning("game server sync failed", exc_info=True)
     updates = {
         "last_sync_at": now_utc().isoformat(),
-        "last_sync_error": None,
-        "last_sync_note": f"{_public_sync_error(error)} {summarize_probe_failure(error)}",
+        "last_sync_error": (error or "Unbekannter Fehler.")[:SYNC_ERROR_MAX],
+        "last_sync_note": " ".join(part for part in (_public_sync_error(error), explain_connection_error(error)) if part),
         "updated_at": now_utc().isoformat(),
     }
     if not server.get("last_sync_at") and not _maintenance_active(server) and server.get("status") != "planned":
