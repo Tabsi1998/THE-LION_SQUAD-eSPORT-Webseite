@@ -79,7 +79,7 @@ async def test_a_used_game_refuses_deletion_with_a_count_and_stays(flow):
 @pytest.mark.asyncio
 async def test_usage_counts_series_servers_stations_teams_and_profiles(flow):
     game = await setup_game(flow)
-    for collection in ("reference_lineages", "references", "game_servers", "stations", "team_squads", "leagues"):
+    for collection in ("reference_lineages", "references", "reference_aliases", "f1_challenges", "game_servers", "stations", "team_squads", "leagues"):
         await getattr(flow.db, collection).insert_one({"id": new_id(), "game_id": game["id"]})
     mila = await flow.add_user(name="Mila")
     await flow.db.users.update_one({"id": mila["id"]}, {"$set": {"game_ids": {game["slug"]: {"id": "Probe#1"}}}})
@@ -142,6 +142,13 @@ async def test_an_archived_game_cannot_be_chosen_anew_but_keeps_what_chose_it(fl
     assert lineage.status_code == 422
     edition = await flow.post("/api/games", json={"name": "Version", "kind": "edition", "parent_game_id": game["id"]})
     assert edition.status_code == 422
+    station = await flow.post("/api/stations", json={"name": "Station 1", "device_type": "switch", "game_id": game["id"]})
+    assert station.status_code == 422 and "archiviert" in station.json()["detail"]
+    many = await flow.post("/api/stations/bulk", json={"count": 2, "game_id": game["id"]})
+    assert many.status_code == 422 and "archiviert" in many.json()["detail"]
+    assert await flow.db.stations.count_documents({"game_id": game["id"]}) == 0
+    free = await flow.post("/api/stations", json={"name": "Station 1", "device_type": "switch"})
+    assert free.status_code == 200, free.text
 
 
 @pytest.mark.asyncio

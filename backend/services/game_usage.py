@@ -26,6 +26,8 @@ USAGE_LABELS = (
     ("teams", "Co-Team", "Co-Teams"),
     ("series", "Serie", "Serien"),
     ("references", "Referenz", "Referenzen"),
+    ("name_links", "Namens-Zuordnung einer Serie", "Namens-Zuordnungen von Serien"),
+    ("challenges", "Fast-Lap-Challenge", "Fast-Lap-Challenges"),
     ("servers", "Game-Server", "Game-Server"),
     ("stations", "Station", "Stationen"),
     ("profiles", "Profil mit Spieler-ID", "Profile mit Spieler-ID"),
@@ -72,6 +74,8 @@ async def usage(db, game: dict) -> dict:
         "teams": await db.team_squads.count_documents({"game_id": game_id}),
         "series": await db.reference_lineages.count_documents({"game_id": game_id}),
         "references": await db.references.count_documents({"game_id": game_id}),
+        "name_links": await db.reference_aliases.count_documents({"game_id": game_id}),
+        "challenges": await db.f1_challenges.count_documents({"game_id": game_id}),
         "servers": await db.game_servers.count_documents({"game_id": game_id}),
         "stations": await db.stations.count_documents({"game_id": game_id}),
         "profiles": (await db.users.count_documents({f"game_ids.{game['slug']}": {"$exists": True}})
