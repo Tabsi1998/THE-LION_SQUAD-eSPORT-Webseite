@@ -49,6 +49,19 @@ describe("Markdown sicher", () => {
     expect(html).toContain("&lt;script&gt;");
   });
 
+  test("nur eigene Uploads werden als Bild geladen, fremde Adressen bleiben Link oder Text", () => {
+    const own = renderRulesMarkdown("![Plan](/api/static/uploads/plan-1.webp?v=3)");
+    expect(own).toContain('<img src="/api/static/uploads/plan-1.webp?v=3"');
+    const foreign = renderRulesMarkdown("![Plan](https://bilder.example.test/plan.png)");
+    expect(foreign).not.toContain("<img");
+    expect(foreign).toContain('<a href="https://bilder.example.test/plan.png"');
+    expect(foreign).toContain(">Plan</a>");
+    for (const address of ["//bilder.example.test/a.png", "/api/static/uploads/a.svg", "/api/static/uploads/../a.png", "/anderswo/a.png"]) {
+      expect(renderRulesMarkdown(`![Plan](${address})`)).not.toContain("<img");
+    }
+    expect(renderRulesMarkdown("![Plan](javascript:alert)")).toBe("<p>Plan</p>");
+  });
+
   test("Sprünge bleiben in der Seite, Links nach außen öffnen neu, @ wird kein Profil-Link", () => {
     const html = renderRulesMarkdown("[oben](#fairplay) [außen](https://example.org) @leitung");
     expect(html).toContain('<a href="#fairplay">oben</a>');

@@ -24,6 +24,7 @@ _FENCE = re.compile(r"^\s*```")
 _TOKEN = re.compile(r"\[\[\s*baustein\s*:\s*([a-z0-9_-]+)\s*\]\]", re.IGNORECASE)
 _WORDS = re.compile(r"\s+|\S+")
 _INLINE_MARKS = re.compile(r"\*\*|\*|`|~~|\+\+")
+_IMAGE = re.compile(r"!\[[^\]\n]*\]\(([^)\s]+)\)")
 
 
 def _plain_title(raw: str) -> str:
@@ -98,6 +99,16 @@ def fill_blocks(body: str | None, values: dict[str, str], *, missing: str | None
         return match.group(0) if value is None else f"\n\n{value}\n\n"
 
     return _TOKEN.sub(replace, str(body or ""))
+
+
+def image_addresses(*texts: str | None) -> list[str]:
+    """Die Bild-Adressen im Markdown, in der Reihenfolge ihres ersten Auftretens."""
+    found: list[str] = []
+    for value in texts:
+        for address in _IMAGE.findall(str(value or "")):
+            if address not in found:
+                found.append(address)
+    return found
 
 
 # ---------------------------------------------------------------- Vergleich

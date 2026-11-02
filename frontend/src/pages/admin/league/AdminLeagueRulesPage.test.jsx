@@ -76,6 +76,15 @@ test("Vorhandener Entwurf: speichern mit Revision, Vorschau zeigt die Seite und 
   await waitFor(() => expect(apiMock.put.mock.calls[0][1].revision).toBe(3));
 });
 
+test("Vorschau nennt fremde Bilder", async () => {
+  serve({ ...VIEW, draft: DRAFT });
+  apiMock.post.mockResolvedValue({ data: { sections: [], changes: { base: null, new: [], changed: [], removed: [] }, blocks_used: [], unknown_blocks: [],
+    foreign_images: ["https://bilder.example.test/plan.png"] } });
+  renderPage();
+  fireEvent.click(await screen.findByTestId("rules-preview"));
+  expect(await screen.findByTestId("rules-preview-foreign")).toHaveTextContent("bilder.example.test");
+});
+
 test("Veröffentlichen schickt Revision, Tag, Grund und die Wahl zur Zustimmung; ungespeichert wird erst gespeichert", async () => {
   serve({ ...VIEW, draft: DRAFT });
   apiMock.put.mockResolvedValue({ data: { ...DRAFT, revision: 4 } });

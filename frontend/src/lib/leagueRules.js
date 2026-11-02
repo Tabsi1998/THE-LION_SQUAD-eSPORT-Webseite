@@ -35,9 +35,20 @@ export function changeRows(changes) {
   ];
 }
 
+// Wie auf dem Server (`game_maps.IMAGE_URL`): Bilder nur aus dem eigenen Upload - eine fremde Adresse ließe jede Person beim Lesen bei
+// Dritten anfragen.
+const OWN_UPLOAD = /^\/api\/static\/uploads\/[A-Za-z0-9][A-Za-z0-9_.-]{0,150}\.(png|webp|jpg|jpeg)(\?v=\d+)?$/;
+
+export function isOwnUpload(address) {
+  return OWN_UPLOAD.test(String(address || ""));
+}
+
+/** Optionen für Markdown im Regelwerk - auch für die Vorschau im Editor. */
+export const RULES_MARKDOWN = { linkMentions: false, anchorLinksInPage: true, imageAllowed: isOwnUpload };
+
 /** Markdown wie überall im Projekt (maskiert, nur sichere Elemente); Sprünge bleiben in der Seite, „@“ wird kein Profil-Link. */
 export function renderRulesMarkdown(markdown) {
-  return renderMarkdownLite(markdown, { linkMentions: false, anchorLinksInPage: true });
+  return renderMarkdownLite(markdown, RULES_MARKDOWN);
 }
 
 // ---------------------------------------------------------------- Suche in der Seite

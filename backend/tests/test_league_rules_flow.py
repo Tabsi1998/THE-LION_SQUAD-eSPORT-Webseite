@@ -118,6 +118,47 @@ async def test_a_season_named_regeln_gets_no_address_that_hides_the_rules_page(f
     assert created.status_code != 200 or created.json()["slug"] != "regeln"
 
 
+@pytest.mark.parametrize("address", [
+    "https://bilder.example.test/plan.png", "//bilder.example.test/plan.png", "data:image/png;base64,AAAA", "/api/static/uploads/plan.svg",
+    "/api/static/uploads/../plan.png", "/anderswo/plan.png"])
+@pytest.mark.asyncio
+async def test_rules_only_take_images_from_our_own_uploads(flow, address):
+    w = await make_bare_world(flow)
+    target = season_scope(w)
+    picture = f"# A\n![Plan]({address})"
+    in_text = await flow.put(f"{target}/draft", json={"title": "A", "body_md": picture, "annexes": []})
+    assert in_text.status_code == 422 and "Upload" in in_text.json()["detail"]
+    in_annex = await flow.put(f"{target}/draft", json={"title": "A", "body_md": "# A", "annexes": [{"title": "B", "body_md": picture}]})
+    assert in_annex.status_code == 422
+    assert await flow.db.league_rules.count_documents({}) == 0
+
+
+@pytest.mark.asyncio
+async def test_own_uploads_and_plain_links_are_fine_in_rules(flow):
+    w = await make_bare_world(flow)
+    body = "# A\n![Plan](/api/static/uploads/plan-1.webp?v=3)\n\n[Quelle](https://bilder.example.test/plan.png)"
+    saved = await flow.put(f"{season_scope(w)}/draft", json={"title": "A", "body_md": body, "annexes": []})
+    assert saved.status_code == 200, saved.text
+
+
+@pytest.mark.asyncio
+async def test_publishing_checks_images_of_an_older_draft_too(flow):
+    w = await make_bare_world(flow)
+    target = season_scope(w)
+    draft = ok(await flow.put(f"{target}/draft", json={"title": "A", "body_md": "# A", "annexes": []}))
+    await flow.db.league_rules.update_one({"id": draft["id"]}, {"$set": {"body_md": "![Plan](https://bilder.example.test/plan.png)"}})
+    refused = await flow.post(f"{target}/publish", json={"revision": draft["revision"], "valid_from": today(), "change_reason": "Ein Grund"})
+    assert refused.status_code == 422 and "Upload" in refused.json()["detail"]
+    assert await flow.db.league_rules.count_documents({"status": "published"}) == 0
+
+
+@pytest.mark.asyncio
+async def test_preview_names_foreign_images(flow):
+    w = await make_bare_world(flow)
+    answer = ok(await flow.post(f"{season_scope(w)}/preview", json={"title": "A", "body_md": "![Plan](https://bilder.example.test/plan.png)", "annexes": []}))
+    assert answer["foreign_images"] == ["https://bilder.example.test/plan.png"]
+
+
 @pytest.mark.asyncio
 async def test_two_publications_at_once_give_one_version_and_one_conflict(flow):
     w = await make_world(flow)

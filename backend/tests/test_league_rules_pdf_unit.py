@@ -103,6 +103,32 @@ def test_html_in_the_text_stays_text():
         assert not [link for link in page.get_links() if "javascript" in str(link.get("uri"))]
 
 
+def test_an_own_upload_on_its_own_line_is_embedded_a_foreign_one_stays_a_hint(tmp_path, monkeypatch):
+    import pdf_service
+    from PIL import Image
+
+    Image.new("RGB", (40, 20), (10, 20, 30)).save(tmp_path / "plan.png")
+    monkeypatch.setattr(pdf_service, "PUBLIC_UPLOAD_DIR", tmp_path)
+    monkeypatch.setattr(pdf_service, "UPLOAD_DIR", tmp_path)
+    body = ("![Plan](/api/static/uploads/plan.png?v=2)\n\n![Fehlt](/api/static/uploads/gibtsnicht.png)\n\n"
+            "![Fremd](https://bilder.example.test/x.png)\n\nText ![Mitten](/api/static/uploads/plan.png) drin")
+    data = pdf_league_rules(document(sections=[{"anchor": "a", "title": "A", "level": 1, "kind": "main", "mark": None, "body_md": body}]))
+    assert sum(len(page.get_images()) for page in pages_of(data)) >= 1
+    words = text_of(data)
+    assert "[Bild: Fehlt]" in words and "[Bild: Fremd]" in words and "[Bild: Mitten]" in words and "[Bild: Plan]" not in words
+
+
+def test_a_broken_upload_stays_a_hint_and_does_not_break_the_file(tmp_path, monkeypatch):
+    import pdf_service
+
+    (tmp_path / "kaputt.png").write_bytes(b"kein Bild")
+    monkeypatch.setattr(pdf_service, "PUBLIC_UPLOAD_DIR", tmp_path)
+    monkeypatch.setattr(pdf_service, "UPLOAD_DIR", tmp_path)
+    body = "![Plan](/api/static/uploads/kaputt.png)"
+    data = pdf_league_rules(document(sections=[{"anchor": "a", "title": "A", "level": 1, "kind": "main", "mark": None, "body_md": body}]))
+    assert "[Bild: Plan]" in text_of(data)
+
+
 def test_inline_marks_become_only_our_own_tags():
     assert pdf_rules_inline("**fett** *schräg* `code` ~~weg~~ ++unter++") == (
         '<b>fett</b> <i>schräg</i> <font face="Courier">code</font> <strike>weg</strike> <u>unter</u>')

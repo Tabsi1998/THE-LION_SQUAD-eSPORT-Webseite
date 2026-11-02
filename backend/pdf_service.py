@@ -18,7 +18,7 @@ from reportlab.graphics import renderPDF
 from reportlab.graphics.barcode import qr
 from reportlab.graphics.shapes import Drawing
 from reportlab.platypus import (
-    HRFlowable, KeepTogether, SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
+    HRFlowable, Image as PlatypusImage, KeepTogether, SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
 )
 from PIL import Image
 
@@ -1482,6 +1482,7 @@ MARK_INK = GOLD_INK
 _RULES_PDF_SUBSTITUTES = {"→": "->", "←": "<-", "≥": ">=", "≤": "<=", "≠": "!=", "✓": "OK", "✔": "OK", "✗": "X", "✘": "X"}
 _RULES_LINK = re.compile(r"(!?)\[([^\]\n]+)\]\(([^)\s]+)\)")
 _RULES_SAFE_LINK = re.compile(r"^(https?://|mailto:|tel:)", re.IGNORECASE)
+_RULES_IMAGE_LINE = re.compile(r"^!\[[^\]\n]*\]\(([^)\s]+)\)$")
 _RULES_TABLE_DIVIDER = re.compile(r"^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$")
 
 
@@ -1582,6 +1583,24 @@ def _rules_table(rows: list[list[str]], styles: dict, width: float, anchors, mar
     return table
 
 
+def _rules_image(url: str, width: float):
+    """Ein Bild auf eigener Zeile aus dem eigenen Upload, höchstens so breit wie der Text. Fehlt die Datei oder ist sie kaputt: ``None``."""
+    path = _local_upload_path(url)
+    if not path:
+        return None
+    try:
+        with Image.open(path) as picture:
+            picture.verify()
+        with Image.open(path) as picture:
+            image_w, image_h = picture.size
+    except (OSError, ValueError, SyntaxError):
+        return None
+    scale = min(width / image_w, 16 * cm / image_h, 1)
+    flowable = PlatypusImage(str(path), width=image_w * scale, height=image_h * scale)
+    flowable.hAlign = "LEFT"
+    return flowable
+
+
 def _rules_blocks(body_md: str, styles: dict, width: float, anchors, marked: bool) -> list:
     """Markdown wie ``markdownLite`` im Web - Absätze, Listen, Zitate, Tabellen, Code. Rohes HTML bleibt Text."""
     make = _MarkedParagraph if marked else Paragraph
@@ -1621,7 +1640,12 @@ def _rules_blocks(body_md: str, styles: dict, width: float, anchors, marked: boo
         elif re.match(r"^---+$", raw):
             out.append(HRFlowable(width="100%", thickness=0.5, color=RULE, spaceBefore=4, spaceAfter=8))
         elif raw.strip():
-            out.append(_rules_para(make, raw, styles["body"], anchors))
+            own_line = _RULES_IMAGE_LINE.match(raw.strip())
+            picture = _rules_image(own_line.group(1), width) if own_line else None
+            if picture:
+                out.extend([picture, Spacer(1, 6)])
+            else:
+                out.append(_rules_para(make, raw, styles["body"], anchors))
     return out
 
 

@@ -133,8 +133,8 @@ async def test_images_in_rules_count_as_used_in_every_version(flow):
     from services.media_audit import iter_usages
 
     w = await make_world(flow)
-    await publish(flow, w, body="# A\n![Plan](/api/uploads/public/plan-eins.png)",
-                  annexes=[{"title": "B", "body_md": "![Karte](/api/uploads/public/karte-zwei.png)"}])
+    await publish(flow, w, body="# A\n![Plan](/api/static/uploads/plan-eins.png)",
+                  annexes=[{"title": "B", "body_md": "![Karte](/api/static/uploads/karte-zwei.png)"}])
     await publish(flow, w, body="# A\nOhne Bild", annexes=[])
     found = [row async for row in iter_usages(flow.db, {"plan-eins.png", "karte-zwei.png"})]
     assert {(row[0], row[2]) for row in found} >= {("league_rules", "body_md"), ("league_rules", "annexes.body_md")}, (

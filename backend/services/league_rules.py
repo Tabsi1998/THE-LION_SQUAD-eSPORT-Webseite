@@ -17,7 +17,7 @@ from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
-from services import league_look
+from services import game_maps, league_look
 from services import league_rule_blocks as blocks
 from services import league_rules_text as text
 from services import league_service as leagues
@@ -325,8 +325,22 @@ def _annexes(raw: list[dict] | None) -> list[dict]:
             for index, row in enumerate(raw or [])]
 
 
+def _foreign_images(body_md: str | None, annexes: list[dict] | None) -> list[str]:
+    """Bilder, die nicht aus dem eigenen Upload kommen: Eine fremde Adresse ließe jede Person beim Lesen bei Dritten anfragen."""
+    addresses = text.image_addresses(body_md, *[row.get("body_md") for row in annexes or []])
+    return [address for address in addresses if not game_maps.IMAGE_URL.fullmatch(address)]
+
+
+def _check_images(body_md: str | None, annexes: list[dict] | None) -> None:
+    foreign = _foreign_images(body_md, annexes)
+    if foreign:
+        raise LeagueProblem("Bilder im Regelwerk kommen nur aus dem eigenen Upload (PNG, JPG oder WebP): Bitte über „Hochladen“ oder die "
+                            f"Mediathek wählen. Eine fremde Seite geht als Link. Nicht erlaubt: {foreign[0][:80]}")
+
+
 async def save_draft(db, scope: str, scope_id: str, body: dict, user: dict) -> dict:
     league, season = await resolve_scope(db, scope, scope_id)
+    _check_images(body.get("body_md"), body.get("annexes"))
     now = now_utc().isoformat()
     fields = {"title": str(body.get("title") or "").strip(), "body_md": str(body.get("body_md") or ""),
               "annexes": _annexes(body.get("annexes")), "updated_at": now, "updated_by": user["id"]}
@@ -390,7 +404,8 @@ async def preview(db, scope: str, scope_id: str, body: dict) -> dict:
     return {"sections": [{**row, "mark": result["marks"].get(row["anchor"])} for row in sections],
             "changes": {"base": _head(previous, chain["current"]) if previous else None,
                         **{key: result[key] for key in ("new", "changed", "removed")}},
-            "blocks_used": [key for key in keys if key in blocks.BLOCKS], "unknown_blocks": blocks.unknown(keys)}
+            "blocks_used": [key for key in keys if key in blocks.BLOCKS], "unknown_blocks": blocks.unknown(keys),
+            "foreign_images": _foreign_images(body.get("body_md"), annexes)}
 
 
 def _check_publish(draft: dict, body: dict, predecessor: dict | None) -> tuple[str, str, list[str]]:
@@ -405,6 +420,7 @@ def _check_publish(draft: dict, body: dict, predecessor: dict | None) -> tuple[s
     if predecessor and valid_from < str(predecessor.get("valid_from") or ""):
         raise LeagueProblem(f"„Gültig ab“ darf nicht vor dem Beginn von Version {predecessor.get('version')} liegen.")
     annexes = draft.get("annexes") or []
+    _check_images(draft.get("body_md"), annexes)
     if not str(draft.get("body_md") or "").strip() and not any(str(row.get("body_md") or "").strip() for row in annexes):
         raise LeagueProblem("Ein leeres Regelwerk lässt sich nicht veröffentlichen.")
     keys = text.block_keys(draft.get("body_md"), *[row.get("body_md") for row in annexes])

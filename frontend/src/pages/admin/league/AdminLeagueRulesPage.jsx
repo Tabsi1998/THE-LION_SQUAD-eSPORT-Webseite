@@ -12,7 +12,7 @@ import { CheckField, TextAreaField, TextField } from "@/components/tls/FormField
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { RuleOps, RulesChanges, RulesDocument } from "@/components/tls/league/rules/RulesDocument";
-import { addAnnex, annexLabel, dayLabel, insertBlock, moveAnnex, removeAnnex, rulesApiPath } from "@/lib/leagueRules";
+import { RULES_MARKDOWN, addAnnex, annexLabel, dayLabel, insertBlock, moveAnnex, removeAnnex, rulesApiPath } from "@/lib/leagueRules";
 import { viennaDate } from "@/lib/vienna";
 
 const LONG_DAY = { day: "2-digit", month: "2-digit", year: "numeric" };
@@ -226,7 +226,7 @@ export default function AdminLeagueRulesPage() {
                     </div>
                     <p className="mt-1.5 text-xs text-white/50">Der Inhalt kommt aus den Daten der Season und wird beim Veröffentlichen eingefroren.</p>
                   </div>
-                  <MarkdownEditor value={form.body_md} onChange={(value) => change({ body_md: value })} testId="rules-body" rows={18} mentionsEnabled={false}
+                  <MarkdownEditor value={form.body_md} onChange={(value) => change({ body_md: value })} testId="rules-body" rows={18} mentionsEnabled={false} previewOptions={RULES_MARKDOWN}
                     placeholder="# § 1 Geltung" helperText="Markdown. Rohes HTML wird nicht übernommen." />
                 </FormSection>
 
@@ -244,7 +244,7 @@ export default function AdminLeagueRulesPage() {
                       </div>
                       <div className="space-y-3">
                         <TextField label="Titel der Anlage" value={annex.title} onChange={(value) => changeAnnex(index, { title: value })} maxLength={160} testId={`rules-annex-title-${index}`} />
-                        <MarkdownEditor value={annex.body_md} onChange={(value) => changeAnnex(index, { body_md: value })} testId={`rules-annex-body-${index}`} rows={8} mentionsEnabled={false}
+                        <MarkdownEditor value={annex.body_md} onChange={(value) => changeAnnex(index, { body_md: value })} testId={`rules-annex-body-${index}`} rows={8} mentionsEnabled={false} previewOptions={RULES_MARKDOWN}
                           helperText="Markdown wie im Haupttext, auch mit Bausteinen." />
                       </div>
                     </div>
@@ -266,6 +266,9 @@ export default function AdminLeagueRulesPage() {
                     <p className="mb-4 text-xs font-bold uppercase tracking-wider text-white/60">Vorschau mit den Daten von heute</p>
                     {preview.unknown_blocks?.length ? (
                       <p role="alert" className="mb-4 text-sm text-warn">Unbekannter Baustein: {preview.unknown_blocks.join(", ")}. So lässt sich nichts veröffentlichen.</p>
+                    ) : null}
+                    {preview.foreign_images?.length ? (
+                      <p role="alert" className="mb-4 break-words text-sm text-warn" data-testid="rules-preview-foreign">Fremde Bilder lassen sich nicht speichern: {preview.foreign_images.join(", ")}. Bitte über „Hochladen“ oder die Mediathek wählen.</p>
                     ) : null}
                     <RulesChanges changes={preview.changes} versionLabel="dieser Fassung" testId="rules-preview-changes" />
                     <RulesDocument sections={preview.sections} versionLabel="dieser Fassung" testId="rules-preview-document" />

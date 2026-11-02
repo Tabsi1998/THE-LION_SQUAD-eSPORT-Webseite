@@ -73,7 +73,8 @@ function renderInline(rawText, options = {}) {
     const isImage = match[1] === "!";
     const label = formatInlineText(match[2], { ...options, linkMentions: false });
     const href = sanitizeHref(match[3]);
-    if (href && isImage) {
+    // `imageAllowed` (Regelwerk, #1646): Was es verneint, wird nicht geladen und bleibt ein Link. Ohne Option wie bisher.
+    if (href && isImage && (!options.imageAllowed || options.imageAllowed(href))) {
       html += `<img src="${escapeHtml(href)}" alt="${escapeHtml(match[2])}" loading="lazy"/>`;
     } else if (href && allowedProfileLink(href, options)) {
       // Regelwerk (#1646): Ein Sprung auf einen Paragrafen bleibt in der Seite.
