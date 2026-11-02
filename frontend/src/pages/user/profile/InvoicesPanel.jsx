@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { CreditCard, Eye, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatRequestError } from "@/lib/api";
@@ -15,6 +15,9 @@ import { amountLine, dueLine, filterInvoices, invoiceLine, outageText, sourceFil
 // Konto, nicht zum Vereinsbereich (Entscheidung des Betreibers vom 23.09.): dieselbe Tafel steht im
 // Profil-Reiter „Rechnungen“ und auf /account/invoices. „Deine Rechnung ist da“ (#841) verlinkt mit
 // `?invoice=d-…`: der Beleg öffnet sich gleich im Betrachter, einmal - beim Schließen verschwindet der Zusatz.
+
+// Der Weg zum Kassier (#2131): Kontaktformular mit Thema und Betreff vorbelegt.
+const INVOICE_QUESTION = `/contact?topic=invoice&subject=${encodeURIComponent("Frage zu meiner Rechnung")}`;
 
 const TONE_CLASSES = {
   info: "border-[#29B6E8]/50 text-[#29B6E8]",
@@ -105,7 +108,10 @@ export function InvoicesPanel() {
               <div className="space-y-3">{groups.archive.map((row) => <InvoiceRow key={row.key} row={row} currency={currency} onView={setViewing} onPay={pay} />)}</div>
             </div>
           )}
-          <p className="mt-8 text-xs text-white/40">Rechnungen kommen aus der Mitgliederverwaltung des Vereins. Stimmt etwas nicht, melde dich beim Kassier.</p>
+          <p className="mt-8 text-xs text-white/40" data-testid="invoices-help">
+            Rechnungen kommen aus der Mitgliederverwaltung des Vereins. Stimmt etwas nicht?{" "}
+            <Link to={INVOICE_QUESTION} className="text-[#29B6E8] hover:underline" data-testid="invoices-contact">Schreib dem Kassier</Link>.
+          </p>
         </>
       )}
       {viewing && (

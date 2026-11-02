@@ -3,7 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { adminHome, areaList } from "@/lib/permissions";
 import { useOptionalAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
-import { Home, ArrowLeft, Calendar, Trophy, Newspaper, Medal, LogIn, RefreshCw, ClipboardList, Mail } from "lucide-react";
+import { Home, ArrowLeft, Calendar, Trophy, Newspaper, Medal, LogIn, RefreshCw, ClipboardList, Mail, Bug } from "lucide-react";
 import { LionArt } from "@/components/tls/LionArt";
 import { LION_ART_SIZE } from "@/components/tls/PublicEmptyState";
 
@@ -23,9 +23,14 @@ const QUICK_LINKS = [
   { to: "/seasons/current", label: "Jahreswertung", icon: Medal },
 ];
 
+function bugReportPath(pathname) {
+  return `/contact?topic=report_bug&subject=${encodeURIComponent("Fehler auf der Website")}&from=${encodeURIComponent(pathname || "/")}`;
+}
+
 // `title` und `primary` ersetzen Überschrift und ersten Knopf - für Angemeldete auf „Kein Zugriff“ (#1352), die keinen
 // „Anmelden“-Knopf brauchen. `primary={null}` heißt: kein erster Knopf.
 export function ErrorPage({ code = "404", detail = "", title = "", primary }) {
+  const { pathname } = useLocation();
   const base = ERROR_DEFS[code] || ERROR_DEFS["404"];
   const def = title ? { ...base, title } : base;
   useEffect(() => {
@@ -81,6 +86,12 @@ export function ErrorPage({ code = "404", detail = "", title = "", primary }) {
                 <button type="button" onClick={goBack} data-testid="error-back-btn" className="tls-hit inline-flex items-center gap-2 text-sm font-semibold text-white/60 hover:text-white">
                   <ArrowLeft className="w-4 h-4" aria-hidden="true" /> Zurück
                 </button>
+                {/* Fehler melden (#2131): mit der Seite, auf der es passiert ist - nur der Pfad, nie eine Abfrage. */}
+                {def.code !== "403" && (
+                  <Link to={bugReportPath(pathname)} data-testid="error-report-btn" className="tls-hit inline-flex items-center gap-2 text-sm font-semibold text-white/60 hover:text-white">
+                    <Bug className="w-4 h-4" aria-hidden="true" /> Fehler melden
+                  </Link>
+                )}
               </div>
               <p className="mt-6 text-xs text-white/40" data-testid="error-code">Fehler {def.code}</p>
             </div>

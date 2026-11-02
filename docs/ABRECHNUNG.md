@@ -190,7 +190,9 @@ Dolibarr noch am eingefrorenen Preis. Sie legt einen Prüffall an und sagt, was 
 Ein Fall wird **mit Grund** erledigt („Gutschrift GA2026-0003 angelegt, 20 € am 24.09.
 überwiesen“). Sieht der Abgleich, dass Dolibarr den Fall aufgelöst hat (Gutschrift über den
 ganzen Betrag, Beleg aufgegeben, Betrag stimmt wieder), erledigt er ihn selbst und schreibt das
-dazu. Offene Prüffälle stehen als Aufgabe auf der Admin-Startseite (nur für Finanzen).
+dazu. Offene Prüffälle stehen als Aufgabe auf der Admin-Startseite (nur für Finanzen). Der Umschalter
+**Offen/Erledigt** in Finanzen zeigt die erledigten als Nachweis: wer, wann, mit welchem Grund. Zähler und
+Liste folgen derselben Auswahl (Art, Veranstaltung, Person).
 
 **Gutschrift-Entwurf bei Abmeldung (#843, Schalter in Finanzen, Vorgabe aus).** Mit dem Haken
 „Gutschrift-Entwurf bei Abmeldung anlegen“ legt die Website nach einer Abmeldung mit freigegebenem
@@ -216,10 +218,14 @@ Gutschriften, Erstattungen, Storno, Prüffälle, Freigaben.
 **Summen je Veranstaltung** (Filter „Veranstaltung“ in der Finanzübersicht): gebucht, fakturiert,
 bezahlt, offen, gutgeschrieben, erstattet – jede Belegrevision zählt einmal, stornierte Aufträge
 ohne Beleg zählen nicht mit. **CSV** exportiert die angelegten Belege für den Kassier – nur
-Nummer, Angebot, Person, Beträge, Stand; keine Adressen, Bankdaten oder Dolibarr-Nummern.
+Nummer, Tag des Belegs, Angebot, Person, Beträge, Stand; keine Adressen, Bankdaten oder Dolibarr-Nummern.
+Die Datei kommt vom Server (#2131) und ist **vollständig**: Die Liste auf der Seite zeigt höchstens 250
+Rechnungen und 200 offene Aufträge und sagt „N von M“; der Export hat keine Grenze. **Export von/bis**
+wählt einen Zeitraum nach dem Tag des Belegs (Wiener Uhr), für den Jahresabschluss also 1.1. bis 31.12. Die
+Beträge stehen wie auf der Seite; jeder Export steht mit Auswahl und Zeilenzahl im Protokoll.
 
 **Steuersätze bestätigt.** Was je Steuerprofil auf den Beleg käme (ohne Umsatzsteuer 0 %,
-Normalsatz 20 %, ermäßigt 10 %), steht unter Admin → Dolibarr → Schreibzugriff. Der Haken
+Normalsatz 20 %, ermäßigt 10 %), steht unter Admin → Finanzübersicht → Rechnungsangaben. Der Haken
 „Steuersätze geprüft“ (Kassier oder Steuerberatung, mit Name und Tag) ist – neben den
 Konditionen – Voraussetzung für „Rechnungen gleich freigeben“. Ohne ihn bleibt jeder Beleg
 Entwurf; wird er zurückgenommen, geht das automatische Freigeben mit aus.

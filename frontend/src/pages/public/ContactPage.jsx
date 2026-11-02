@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
@@ -15,6 +15,18 @@ import { toast } from "sonner";
 import { Mail, MessageSquare, MapPin, Send, Check } from "lucide-react";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Was eine Fehlermeldung mitbringt: die Seite aus der Adresse (`?from=`, nur ein Pfad - nie eine fremde Adresse oder
+ * Abfrage mit möglichen Schlüsseln), das Gerät und die Version (`?version=` kommt von der App, sonst die der Website).
+ */
+function reportContext(params) {
+  const from = String(params?.get?.("from") || "");
+  const page = /^\/[^?#\s]{0,299}$/.test(from) ? from : "";
+  const wanted = String(params?.get?.("version") || "");
+  const version = /^[\w.+-]{1,40}$/.test(wanted) ? wanted : import.meta.env.VITE_APP_VERSION || "";
+  return { page, device: String(globalThis.navigator?.userAgent || "").slice(0, 300), version };
+}
 
 export default function ContactPage() {
   useDocumentTitle(
@@ -41,6 +53,9 @@ export default function ContactPage() {
     message: "",
     accept_privacy: false,
   }));
+  // „Fehler melden“ (#2131): Seite, Gerät und Version gehen mit - sichtbar, bevor etwas abgeschickt wird.
+  const bugContext = useMemo(() => reportContext(params), [params]);
+  const isBugReport = form.topic === "report_bug";
 
   const loadTopics = useCallback(() => {
     api.get("/contact/topics").then(({ data }) => setTopics(data)).catch(() => {});
@@ -78,6 +93,7 @@ export default function ContactPage() {
       email: form.email.trim(),
       subject: form.subject.trim(),
       message: form.message.trim(),
+      ...(isBugReport ? { context: bugContext } : {}),
     };
     setSubmitError("");
     const attempt = await submitOnce(async () => api.post("/contact/submit", { ...payload, ...(await guard.prepare()) }));
@@ -144,7 +160,7 @@ export default function ContactPage() {
               <h2 className="font-heading text-xl font-black uppercase mb-2">Schreib uns</h2>
               <div className="grid md:grid-cols-2 gap-4">
                 <Field id="contact-name" label="Name *" error={fieldErrors.name}>
-                  <input id="contact-name" required value={form.name} onChange={(e) => updateField("name", e.target.value)} data-testid="contact-name" aria-invalid={!!fieldErrors.name} aria-describedby={fieldErrors.name ? "contact-name-error" : undefined} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+                  <input id="contact-name" required maxLength={120} value={form.name} onChange={(e) => updateField("name", e.target.value)} data-testid="contact-name" aria-invalid={!!fieldErrors.name} aria-describedby={fieldErrors.name ? "contact-name-error" : undefined} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
                 </Field>
                 <Field id="contact-email" label="E-Mail *" error={fieldErrors.email}>
                   <input id="contact-email" type="email" required value={form.email} onChange={(e) => updateField("email", e.target.value)} data-testid="contact-email-input" aria-invalid={!!fieldErrors.email} aria-describedby={fieldErrors.email ? "contact-email-error" : undefined} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
@@ -161,6 +177,16 @@ export default function ContactPage() {
               <Field id="contact-message" label="Nachricht *" error={fieldErrors.message}>
                 <textarea id="contact-message" required minLength={5} maxLength={4000} rows={6} value={form.message} onChange={(e) => updateField("message", e.target.value)} data-testid="contact-message" aria-invalid={!!fieldErrors.message} aria-describedby={fieldErrors.message ? "contact-message-error" : undefined} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm resize-y" />
               </Field>
+              {isBugReport && (
+                <div className="border border-white/10 rounded-sm p-3 text-xs text-white/60" data-testid="contact-bug-context">
+                  <div className="font-bold text-white/75 mb-1">Das schicken wir mit, damit wir den Fehler finden:</div>
+                  <ul className="space-y-0.5 break-all">
+                    {bugContext.page && <li>Seite: {bugContext.page}</li>}
+                    <li>Gerät: {bugContext.device || "unbekannt"}</li>
+                    {bugContext.version && <li>Version: {bugContext.version}</li>}
+                  </ul>
+                </div>
+              )}
               <label className="flex items-start gap-2 text-sm text-white/70">
                 <input id="contact-privacy" type="checkbox" required checked={form.accept_privacy} onChange={(e) => updateField("accept_privacy", e.target.checked)} data-testid="contact-privacy" aria-invalid={!!fieldErrors.accept_privacy} aria-describedby={fieldErrors.accept_privacy ? "contact-privacy-error" : undefined} className="mt-1 accent-[#29B6E8]" />
                 <span>Ich habe die <Link to="/privacy" className="text-[#29B6E8] hover:underline">Datenschutzhinweise</Link> gelesen und stimme der Speicherung meiner Angaben zur Bearbeitung der Anfrage zu.{fieldErrors.accept_privacy && <span id="contact-privacy-error" role="alert" className="block mt-1 text-xs text-[#FF8A80]">{fieldErrors.accept_privacy}</span>}</span>

@@ -44,6 +44,15 @@ test("offen oben mit Bezahlen, Archiv unten ohne; Ansehen öffnet den Betrachter
   expect(screen.getByTestId("viewer")).toHaveTextContent("Rechnung FA-31 · /account/invoices/d-31/pdf");
 });
 
+test("„Stimmt etwas nicht?“ führt zum Kontaktformular mit Thema Rechnung (#2131)", async () => {
+  renderPage();
+  const link = await screen.findByTestId("invoices-contact");
+  const url = new URL(link.getAttribute("href"), "https://example.test");
+  expect(url.pathname).toBe("/contact");
+  expect(url.searchParams.get("topic")).toBe("invoice");
+  expect(url.searchParams.get("subject")).toBe("Frage zu meiner Rechnung");
+});
+
 test("Bezahlen fragt den Server und folgt seinem Ziel; ein 409 wird erklärt", async () => {
   const user = userEvent.setup();
   const assign = vi.fn();
