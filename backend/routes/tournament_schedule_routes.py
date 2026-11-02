@@ -71,7 +71,8 @@ async def apply_schedule_plan(tid: str, body: SchedulePlanApply, me: dict = Depe
     plan = await plan_for_tournament(db, tournament, now=anchor)
     if body.fingerprint != plan["fingerprint"]:
         raise HTTPException(status_code=409, detail="Der Plan hat sich inzwischen geändert - bitte noch einmal Planen.")
-    planned = {row.get("match_id") or row.get("id") for row in plan.get("assignments") or []}
+    # Der Plan setzt Termine (``assignments``) und löst sie (``releases``) - beides ändert das Spiel.
+    planned = {row.get("match_id") or row.get("id") for row in [*(plan.get("assignments") or []), *(plan.get("releases") or [])]}
     await _refuse_own_matches(db, tournament, me, await db.matches_v2.find({"id": {"$in": sorted(id_ for id_ in planned if id_)}}, {"_id": 0}).to_list(3000))
     result = await apply_plan(db, tournament, plan)
     return {**result, "assignments": plan["assignments"], "fingerprint": plan["fingerprint"]}

@@ -136,6 +136,37 @@ async def test_bulk_release_with_an_own_match_is_refused(flow):
 
 
 @pytest.mark.asyncio
+async def test_a_plan_that_frees_an_own_match_is_refused(flow, monkeypatch):
+    """Der Planer löst auch Termine (``releases``): Das eigene Spiel darf nicht über diesen Teil des Plans frei werden."""
+    from routes import tournament_schedule_routes
+
+    w = await world(flow)
+    match_id = w["match"]["id"]
+    scheduled_at = later()
+    await flow.db.matches_v2.update_one({"id": match_id}, {"$set": {"schedule_source": "planner", "scheduled_at": scheduled_at, "station_id": None}})
+    stored = await flow.db.matches_v2.find_one({"id": match_id}, {"_id": 0})
+    previous = {"schedule_source": "planner", "scheduled_at": scheduled_at, "station_id": None, "status": stored.get("status")}
+
+    async def plan_with_release(_db, _tournament, now=None):
+        return {"fingerprint": "plan", "assignments": [], "releases": [{"match_id": match_id, "previous": previous}], "warnings": []}
+
+    monkeypatch.setattr(tournament_schedule_routes, "plan_for_tournament", plan_with_release)
+    url = f"/api/tournaments/{w['tournament']['id']}/schedule/apply"
+    body = {"fingerprint": "plan", "planned_at": now_utc().isoformat()}
+
+    flow.act_as(await holder(flow, "matches", user=w["users"]["Kapitaen"]))
+    refused = await flow.post(url, json=body)
+    assert refused.status_code == 403, refused.text
+    assert "selbst beteiligt" in refused.json()["detail"]
+    assert (await flow.db.matches_v2.find_one({"id": match_id}, {"_id": 0}))["scheduled_at"] == scheduled_at
+
+    flow.act_as(await holder(flow, "matches"))
+    applied = await flow.post(url, json=body)
+    assert applied.status_code == 200, applied.text
+    assert (await flow.db.matches_v2.find_one({"id": match_id}, {"_id": 0}))["scheduled_at"] is None
+
+
+@pytest.mark.asyncio
 async def test_match_page_names_the_conflict_for_matches_too(flow):
     w = await world(flow)
     flow.act_as(await holder(flow, "matches", user=w["users"]["Kapitaen"]))
