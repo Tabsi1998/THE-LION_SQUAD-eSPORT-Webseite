@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.54.1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.54.0...v1.54.1) (2026-11-02)
+
+
+### Dokumentation
+
+* README-Bilder aktualisieren ([#2168](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2168)) ([f9f3ae0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/f9f3ae0c2c9f3bc6e26d5a3cb34dcb4f4d732837))
+
 ## 1.54.0 (02.11.2026)
 
 ### Neu
