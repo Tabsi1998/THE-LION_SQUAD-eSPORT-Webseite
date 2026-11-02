@@ -15,7 +15,8 @@ Ein Team, das die Turnierleitung ohne Person angemeldet hat, läuft über seine 
 
 Co-Team einer Liga (``squad_id`` an der Anmeldung, docs/LIGA.md Abschnitt 4, #1649): Verantwortliche sind Captain und
 Vertreter des Co-Teams; hat es keinen von beiden, handelt die Leitung und Co-Leitung des Hauptteams (niemand sperrt
-sich aus). Spieler sind der Kader des Co-Teams, die Verantwortlichen und die Leitung des Hauptteams (Matchchat und
+sich aus). Ein gesperrtes Konto zählt dabei wie eine fehlende Rolle (#2202) - sonst erreichte das Co-Team niemanden, weil
+``users_for`` Gesperrte auslässt. Spieler sind der Kader des Co-Teams, die Verantwortlichen und die Leitung des Hauptteams (Matchchat und
 Spiel-Hinweise) - nicht die übrigen Mitglieder des Hauptteams. Anmeldungen ohne ``squad_id`` bleiben genau wie oben.
 
 Gesperrte Konten bekommen keine Nachrichten (``users_for``).
@@ -28,6 +29,7 @@ from match_rules import participant_source_ids
 
 TEAM_FIELDS = {"_id": 0, "id": 1, "leader_id": 1, "co_leader_ids": 1, "member_ids": 1}
 SQUAD_FIELDS = {"_id": 0, "id": 1, "team_id": 1, "member_ids": 1, "captain_id": 1, "vice_captain_id": 1}
+ROLE_FIELDS = ("captain_id", "vice_captain_id")
 USER_FIELDS = {
     "_id": 0, "id": 1, "email": 1, "display_name": 1, "username": 1,
     "notification_preferences": 1, "newsletter_consent": 1,
@@ -73,10 +75,17 @@ async def _attach_squads(db, teams: dict[str, dict], registrations: Iterable[dic
     squad_ids = sorted({reg.get("squad_id") for reg in registrations if reg and reg.get("team_id") and reg.get("squad_id")})
     if not squad_ids:
         return
-    for squad in await db.team_squads.find({"id": {"$in": squad_ids}}, SQUAD_FIELDS).to_list(len(squad_ids) + 10):
+    squads = await db.team_squads.find({"id": {"$in": squad_ids}}, SQUAD_FIELDS).to_list(len(squad_ids) + 10)
+    holders = sorted({squad[field] for squad in squads for field in ROLE_FIELDS if squad.get(field)})
+    banned = {
+        row["id"] for row in await db.users.find(
+            {"id": {"$in": holders}, "is_banned": True}, {"_id": 0, "id": 1},
+        ).to_list(len(holders) + 10)
+    } if holders else set()
+    for squad in squads:
         team = teams.get(squad.get("team_id") or "")
         if team is not None and squad.get("id"):
-            team.setdefault("squads", {})[squad["id"]] = squad
+            team.setdefault("squads", {})[squad["id"]] = {**squad, "banned_role_ids": banned}
 
 
 def _team_leads(team: dict) -> set[str]:
@@ -93,9 +102,11 @@ def _team_people(team: dict) -> set[str]:
 
 
 def _squad_roles(squad: dict | None, team: dict) -> set[str]:
-    """Captain und Vertreter, soweit sie noch im Hauptteam sind - wer gegangen ist, gilt als fehlend (Altdaten, Rennen)."""
-    roles = {(squad or {}).get("captain_id"), (squad or {}).get("vice_captain_id")}
-    return {user_id for user_id in roles if user_id} & _team_people(team)
+    """Captain und Vertreter, soweit sie noch im Hauptteam und nicht gesperrt sind - sonst gelten sie als fehlend
+    (Altdaten, Rennen, Kontosperre)."""
+    roles = {(squad or {}).get(field) for field in ROLE_FIELDS}
+    gone = set((squad or {}).get("banned_role_ids") or ())
+    return ({user_id for user_id in roles if user_id} & _team_people(team)) - gone
 
 
 def _squad_members(squad: dict | None, team: dict) -> set[str]:

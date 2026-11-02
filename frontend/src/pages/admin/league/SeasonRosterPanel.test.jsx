@@ -55,6 +55,23 @@ test("je Co-Team die Spieler mit ID-Stand; eine neue ID im Profil wird mit Grund
   expect(toastMock.success).toHaveBeenCalledWith("Mila: neue ID gilt ab jetzt.");
 });
 
+test("ein gesperrtes Konto steht mit eigenem Stand da und bekommt keinen Knopf „freigeben“ (#2202)", async () => {
+  apiMock.get.mockResolvedValue({ data: {
+    ...BODY,
+    counts: { missing: 0, late: 0, changed: 0, banned: 1 },
+    squads: [{ ...BODY.squads[0], players: [
+      { id: "u3", name: "Ida", state: "banned", ok: false, text: "Ida#1234567", profile_text: "Neu#7654321", changed: true, reason: "Das Konto ist gesperrt.", approvals: [] },
+    ] }],
+  } });
+  render(<SeasonRosterPanel seasonId="s1" />);
+
+  await waitFor(() => expect(screen.getByTestId("roster-player-u3")).toHaveAttribute("data-state", "banned"));
+  expect(screen.getByTestId("roster-player-u3")).toHaveTextContent("gesperrt");
+  expect(screen.getByTestId("roster-player-u3")).toHaveTextContent("Das Konto ist gesperrt.");
+  expect(screen.queryByTestId("roster-approve-u3")).not.toBeInTheDocument();
+  expect(screen.getByTestId("season-roster-counts")).toHaveTextContent("1 gesperrt");
+});
+
 test("der Stichtag für neue Spieler ist eine Einstellung der Season; leer heißt kein Stichtag", async () => {
   apiMock.put.mockResolvedValue({ data: { roster_deadline: "2026-12-01" } });
   render(<SeasonRosterPanel seasonId="s1" />);

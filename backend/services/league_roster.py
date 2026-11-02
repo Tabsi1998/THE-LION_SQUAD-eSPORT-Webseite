@@ -31,14 +31,16 @@ from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
 
-FREE, LOCKED, PENDING, MISSING, LATE = "free", "locked", "pending", "missing", "late"
+FREE, LOCKED, PENDING, MISSING, LATE, BANNED = "free", "locked", "pending", "missing", "late", "banned"
 CLOSED_SEASON_STATUSES = {"completed", "archived"}
 FINISHED_TOURNAMENT_STATUSES = {"completed", "results_published", "archived", "cancelled"}
 ACTIVE_REGISTRATION_STATUSES = ("pending", "approved", "checked_in", "waitlist")
 REASON_MIN_LENGTH = 5
 LATE_REASON = "Nach dem Stichtag ins Co-Team gekommen – die Liga-Leitung muss die Spiel-ID erst freigeben."
+# Kommt auch in Meldungen an die Person und an die eigene Seite - nie an die Gegenseite (``league_games._lobby_ids``).
+BANNED_REASON = "Das Konto ist gesperrt."
 DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-PEOPLE_FIELDS = {"_id": 0, "id": 1, "display_name": 1, "username": 1, "game_ids": 1}
+PEOPLE_FIELDS = {"_id": 0, "id": 1, "display_name": 1, "username": 1, "game_ids": 1, "is_banned": 1}
 
 
 class LeagueRosterError(Exception):
@@ -160,9 +162,18 @@ def status(ctx: RosterContext | None, user_id: str, squad_id: str | None = None)
 
     ``state``: ``free`` (Spiel ohne Pflicht-ID), ``locked`` (ID festgehalten), ``pending`` (ID im Profil, wird beim
     ersten Aufstellen festgehalten), ``missing`` (ID fehlt im Profil), ``late`` (nach dem Stichtag in dieses Co-Team
-    gekommen, wartet auf Freigabe; ohne ``squad_id``: in irgendeines). ``ok``: aufstellbar. ``text``: die ID, die in
-    der Liga gilt bzw. gelten wird - auch bei ``late`` bleibt die festgehaltene dieselbe. ``changed``: das Profil nennt
-    inzwischen eine andere ID als die festgehaltene."""
+    gekommen, wartet auf Freigabe; ohne ``squad_id``: in irgendeines), ``banned`` (Konto gesperrt - geht jedem anderen
+    Stand vor, auch in Spielen ohne Pflicht-ID; die Spiel-ID bleibt, was sie ist). ``ok``: aufstellbar. ``text``: die
+    ID, die in der Liga gilt bzw. gelten wird - auch bei ``late`` bleibt die festgehaltene dieselbe. ``changed``: das
+    Profil nennt inzwischen eine andere ID als die festgehaltene."""
+    row = _id_status(ctx, user_id, squad_id)
+    if ctx and (ctx.people.get(user_id) or {}).get("is_banned") is True:
+        return {**row, "state": BANNED, "ok": False, "reason": BANNED_REASON}
+    return row
+
+
+def _id_status(ctx: RosterContext | None, user_id: str, squad_id: str | None = None) -> dict:
+    """Nur der Stand der Spiel-ID, ohne die Kontosperre - für Festhalten und Freigabe, die an der ID hängen."""
     person = (ctx.people.get(user_id) if ctx else None) or {}
     base = {"id": user_id, "name": person_name(person), "state": FREE, "ok": True, "text": None,
             "profile_text": None, "changed": False, "reason": None, "locked_at": None}
@@ -191,6 +202,12 @@ def status(ctx: RosterContext | None, user_id: str, squad_id: str | None = None)
 
 def statuses(ctx: RosterContext | None, user_ids, squad_id: str | None = None) -> dict[str, dict]:
     return {user_id: status(ctx, user_id, squad_id) for user_id in user_ids or [] if user_id}
+
+
+def waiting_for_id(rows) -> list[dict]:
+    """Wer etwas an der Spiel-ID tun oder abwarten muss. Gesperrte zählen nicht: Eine Nachricht hilft ihnen nicht weiter,
+    und „ID fehlt“ wäre falsch."""
+    return [row for row in rows if not row["ok"] and row["state"] != BANNED]
 
 
 # ---------------------------------------------------------------- Festhalten
@@ -309,7 +326,7 @@ async def lock_lineup(db, ctx: RosterContext | None, user_ids, actor_id: str | N
     from routes.tournament_common import _profile_player_ids
 
     for user_id in sorted({uid for uid in user_ids or [] if uid}):
-        if status(ctx, user_id)["state"] != PENDING:
+        if _id_status(ctx, user_id)["state"] != PENDING:
             continue
         values = picked(ctx.fields, _profile_player_ids(ctx.people.get(user_id), ctx.game))
         if await _lock(db, ctx, user_id, values, via="lineup", actor_id=actor_id):
@@ -323,7 +340,7 @@ async def after_assign(db, tournament: dict, registration: dict, squad: dict, ac
     members = [uid for uid in squad.get("member_ids") or [] if uid]
     ctx = await context_for_tournament(db, tournament, members)
     found = await record_members(db, ctx, members, via="assign", actor_id=actor_id, squad_id=squad.get("id"))
-    missing = [row for row in found.values() if not row["ok"]]
+    missing = waiting_for_id(found.values())
     if missing and ctx:
         await _tell_missing(db, ctx, tournament, registration, missing)
     return found
@@ -434,7 +451,7 @@ async def approve(db, season: dict, user_id: str, reason: str | None, actor: dic
         raise LeagueRosterError("Für das Spiel dieser Liga gibt es keine Pflicht-ID.", 409)
     from routes.tournament_common import _profile_player_ids
 
-    before = status(ctx, user_id)
+    before = _id_status(ctx, user_id)
     values = picked(ctx.fields, _profile_player_ids(ctx.people.get(user_id), ctx.game))
     if not complete(values):
         raise LeagueRosterError(f"Im Profil fehlt noch: {labels(ctx.fields)} – erst eintragen, dann freigeben.")
@@ -562,7 +579,7 @@ async def season_overview(db, season: dict) -> dict:
             "_sort": (level or 0, context.get("staffel") or "", str(reg.get("display_name") or "").lower()),
         })
     rows.sort(key=lambda row: row.pop("_sort"))
-    counts = {state: 0 for state in (MISSING, LATE)}
+    counts = {state: 0 for state in (MISSING, LATE, BANNED)}
     changed = 0
     for row in rows:
         for player in row["players"]:

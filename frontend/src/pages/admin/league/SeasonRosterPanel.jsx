@@ -17,6 +17,7 @@ const STATE_CLASS = {
   pending: "border-[#29B6E8]/40 text-[#29B6E8]",
   missing: "border-warn/50 text-warn",
   late: "border-warn/50 text-warn",
+  banned: "border-warn/50 text-warn",
   free: "border-white/15 text-white/55",
 };
 
@@ -32,12 +33,13 @@ function countsLine(counts = {}) {
   const parts = [];
   if (counts.missing) parts.push(`${counts.missing} ohne ID`);
   if (counts.late) parts.push(`${counts.late} warten auf Freigabe`);
+  if (counts.banned) parts.push(`${counts.banned} gesperrt`);
   if (counts.changed) parts.push(`${counts.changed} mit neuer ID im Profil`);
   return parts.length ? parts.join(" · ") : "Alle Spieler haben eine gültige ID.";
 }
 
 function canApprove(player) {
-  return Boolean(player.profile_text) && (player.changed || player.state === "late" || player.state === "pending");
+  return player.state !== "banned" && Boolean(player.profile_text) && (player.changed || player.state === "late" || player.state === "pending");
 }
 
 function ApproveForm({ player, busy, onApprove, onCancel }) {

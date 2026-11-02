@@ -720,8 +720,9 @@ def _games_view(games: list[dict] | None, people: dict[str, dict], with_lineups:
     return out
 
 
-def _lobby_ids(setup: LeagueSetup) -> list[dict]:
-    """Je Seite die Spieler mit der Spiel-ID, die in der Season gilt - leer bei Spielen ohne Pflicht-ID."""
+def _lobby_ids(setup: LeagueSetup, side_id: str | None, staff: bool) -> list[dict]:
+    """Je Seite die Spieler mit der Spiel-ID, die in der Season gilt - leer bei Spielen ohne Pflicht-ID. Eine Sperre bleibt
+    bei der eigenen Seite und der Leitung: Für die Gegenseite fehlt der gesperrte Spieler in der Liste."""
     if not setup.roster or not getattr(setup.roster, "fields", None):
         return []
     out = []
@@ -729,6 +730,8 @@ def _lobby_ids(setup: LeagueSetup) -> list[dict]:
         players = []
         for user_id in setup.rosters.get(reg_id) or set():
             state = (setup.id_status.get(reg_id) or {}).get(user_id) or {}
+            if state.get("state") == league_roster.BANNED and reg_id != side_id and not staff:
+                continue
             players.append({"id": user_id, "name": state.get("name") or "Spieler", "text": state.get("text"),
                             "ok": bool(state.get("ok", True)), "reason": state.get("reason")})
         players.sort(key=lambda row: row["name"].lower())
@@ -822,7 +825,7 @@ async def page_block(db, setup: LeagueSetup, *, side_id: str | None, can_act: bo
             else {}
         ),
         # Spiel-IDs beider Seiten für die Lobby (#2108) - nur Beteiligte und Turnierleitung, wie Aufstellungen.
-        "lobby_ids": _lobby_ids(setup) if sees_lineups else [],
+        "lobby_ids": _lobby_ids(setup, side_id, staff) if sees_lineups else [],
         "id_label": league_roster.labels(setup.roster.fields) if setup.roster and setup.roster.fields else None,
         "games": _games_view(match.get("games"), people, sees_lineups),
         "lineups_missing": list(match.get("lineups_missing") or []),

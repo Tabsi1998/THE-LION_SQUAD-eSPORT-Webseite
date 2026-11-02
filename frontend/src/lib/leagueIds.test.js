@@ -1,4 +1,4 @@
-import { blockedPlayers, idText, leagueIdNotice, missingIdsLine, profileValues } from "./leagueIds";
+import { blockedPlayers, ID_STATE_LABELS, idText, leagueIdNotice, missingIdsLine, profileValues } from "./leagueIds";
 
 const FIELDS = [{ key: "activision_id", label: "Activision-ID" }];
 const ENTRY = {
@@ -52,4 +52,12 @@ test("gesperrte Spieler und fehlende IDs werden benannt", () => {
   expect(missingIdsLine([{ name: "Ida", ok: false }, { name: "Tom", ok: true }], "Activision-ID"))
     .toBe("Ohne gültige Activision-ID: Ida. Zuteilen geht trotzdem – aufgestellt werden kann erst, wer die ID hat.");
   expect(missingIdsLine([{ name: "Tom", ok: true }])).toBe("");
+});
+
+test("ein gesperrtes Konto ist keine fehlende ID: eigener Satz im Zuteilen-Dialog (#2202)", () => {
+  expect(missingIdsLine([{ name: "Ida", ok: false, state: "banned" }], "Activision-ID"))
+    .toBe("Konto gesperrt: Ida – nicht aufstellbar.");
+  expect(missingIdsLine([{ name: "Ida", ok: false, state: "banned" }, { name: "Tom", ok: false, state: "missing" }], "Activision-ID"))
+    .toBe("Ohne gültige Activision-ID: Tom. Zuteilen geht trotzdem – aufgestellt werden kann erst, wer die ID hat. Konto gesperrt: Ida – nicht aufstellbar.");
+  expect(ID_STATE_LABELS.banned).toBe("gesperrt");
 });

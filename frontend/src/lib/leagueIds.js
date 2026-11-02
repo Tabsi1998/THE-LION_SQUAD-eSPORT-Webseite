@@ -7,6 +7,7 @@ export const ID_STATE_LABELS = {
   pending: "im Profil – wird beim ersten Aufstellen festgehalten",
   missing: "fehlt",
   late: "wartet auf Freigabe",
+  banned: "gesperrt",
   free: "keine Pflicht-ID",
 };
 
@@ -68,8 +69,12 @@ export function blockedPlayers(roster = []) {
 
 /** Kurzer Satz für den Zuteilen-Dialog: wem die ID fehlt. */
 export function missingIdsLine(players = [], label = "Spiel-ID") {
-  const missing = players.filter((player) => !player.ok);
-  if (!missing.length) return "";
-  const names = missing.map((player) => player.name).join(", ");
-  return `Ohne gültige ${label}: ${names}. Zuteilen geht trotzdem – aufgestellt werden kann erst, wer die ID hat.`;
+  const missing = players.filter((player) => !player.ok && player.state !== "banned");
+  const banned = players.filter((player) => player.state === "banned");
+  const parts = [];
+  if (missing.length) {
+    parts.push(`Ohne gültige ${label}: ${missing.map((player) => player.name).join(", ")}. Zuteilen geht trotzdem – aufgestellt werden kann erst, wer die ID hat.`);
+  }
+  if (banned.length) parts.push(`Konto gesperrt: ${banned.map((player) => player.name).join(", ")} – nicht aufstellbar.`);
+  return parts.join(" ");
 }
