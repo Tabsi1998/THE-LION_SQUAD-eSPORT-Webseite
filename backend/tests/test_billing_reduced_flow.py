@@ -13,7 +13,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from dolibarr_fake import FakeDolibarr  # noqa: E402
 from flow_harness import make_flow  # noqa: E402
-from services import billing_cases, billing_orders, dolibarr_billing, dolibarr_client, invoice_notice  # noqa: E402
+from services import billing_cases, billing_orders, dolibarr_billing, dolibarr_client, invoice_notice, tournament_fees  # noqa: E402
 from test_billing_dolibarr_flow import TERMS, book, connect, order_of, paid_event, person  # noqa: E402
 
 CONFIRMED = {"invoice_auto_validate": True, "tax_confirmed_at": "2026-09-23T10:00:00+00:00", **TERMS}
@@ -228,3 +228,8 @@ async def test_offset_payment_is_counted_once_and_never_beyond_the_booked_paymen
     flow.act_as(kassier)
     too_much = await flow.post(f"/api/admin/finance/orders/{order['id']}/refunds", json={"amount_cents": 2001, "paid_on": "2026-09-24", "reason": "über dem Gebuchten"})
     assert too_much.status_code == 400 and "höchstens 20,00" in too_much.json()["detail"]
+
+
+def test_tournament_start_fee_shows_the_person_a_known_state_too():
+    price = tournament_fees.public_price({"price_snapshot": {"total_cents": 4000, "currency": "EUR", "positions": []}, "billing_status": "paid", "payment_state": "paid_reduced", "invoice_ref": "FA-1"})
+    assert price["billing_status"] == "paid" and price["payment_state"] == "paid"

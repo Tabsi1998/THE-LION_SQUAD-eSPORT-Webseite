@@ -265,3 +265,17 @@ async def test_a_changed_booking_keeps_its_case_and_warns_about_the_price(flow, 
     assert order["status"] == "held" and "Preis prüfen" in order["note"]
     [case] = await billing_cases.cases_for_order(flow.db, order["id"])
     assert case["kind"] == "changed_after_invoice" and case["status"] == "open", "der Preis passt nicht mehr, das entscheidet die Finanzverwaltung"
+
+
+@pytest.mark.asyncio
+async def test_a_deleted_draft_of_a_start_fee_cleans_the_tournament_registration(flow, fake):
+    await connect(flow, **TERMS)
+    await flow.db.tournament_registrations.insert_one({"id": "tr-1", "tournament_id": "t-1", "status": "approved", "billing_status": "invoiced", "invoice_id": 4711, "invoice_ref": "(PROV4711)",
+                                                       "invoice_status": "draft", "payment_state": "draft", "price_snapshot": {"total_cents": 2500, "hash": "h1", "positions": []}})
+    await flow.db.billing_orders.insert_one({"id": "o-t", "kind": "tournament", "source_id": "t-1", "registration_id": "tr-1", "user_id": "u-1", "status": "invoiced", "total_cents": 2500, "currency": "EUR",
+                                             "booking_key": "tournament:tr-1:h1", "invoice_id": 4711, "invoice_ref": "(PROV4711)", "invoice_status": "draft", "payment_state": "draft"})
+    assert (await billing_orders.sync_due())["removed"] == 1
+    assert (await flow.db.billing_orders.find_one({"id": "o-t"}, {"_id": 0}))["status"] == "held"
+    reg = await flow.db.tournament_registrations.find_one({"id": "tr-1"}, {"_id": 0})
+    assert reg["billing_status"] == "pending" and "invoice_id" not in reg and "invoice_ref" not in reg and "payment_state" not in reg and reg["price_snapshot"]["total_cents"] == 2500
+    assert (await billing_repair.repair_missing_orders(flow.db))["repaired"] == 0, "kein zweiter Auftrag von selbst"
