@@ -309,9 +309,12 @@ async def record_members(db, ctx: RosterContext | None, user_ids, *, via: str, a
                 doc.update(_lock_fields(ctx, values, via=via, actor_id=actor_id, now=now))
             try:
                 await db.league_rosters.insert_one(doc)
+                continue
             except DuplicateKeyError:
-                pass
-            continue
+                # Eine gleichzeitige Aufnahme war schneller (#2202): Ihr Eintrag gilt, dieses Co-Team kommt per $addToSet dazu.
+                entry = await db.league_rosters.find_one({"season_id": ctx.season_id, "user_id": user_id}, {"_id": 0})
+                if not entry:
+                    continue
         known = set(entry.get("squad_ids") or [])
         waiting = set(entry.get("late_squad_ids") or [])
         change: dict = {}
