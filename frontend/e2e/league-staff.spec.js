@@ -87,7 +87,7 @@ for (const [name, viewport] of [["390", { width: 390, height: 844 }], ["1440", {
     });
 
     test("befangen: die Matchseite sagt warum, ohne Knopf zum Eintragen", async ({ page }) => {
-      await mockServer(page, STAFF, { "matches/m1/page": MATCH_PAGE });
+      await mockServer(page, STAFF, { "matches/m1/page": MATCH_PAGE, "matches/m1/chat": [] });
       await page.goto("/matches/m1");
       await expect(page.getByTestId("match-conflict")).toContainText("zweite berechtigte Person");
       await expect(page.getByTestId("match-staff-result-open")).toHaveCount(0);

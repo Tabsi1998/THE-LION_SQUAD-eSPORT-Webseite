@@ -83,7 +83,7 @@ const CANDIDATES = {
 const TOURNAMENT = {
   id: "t1", slug: "cod-liga-a", title: "CoD-Liga Season 1 · Liga 1 · Staffel A", format: "league", team_mode: "team", team_size: 4,
   status: "draft", game_id: "g1", league_context: { league_id: "l1", season_id: "s1", division_id: "d1", staffel: "A" },
-  can_use_staff_tools: true, can_manage_structure: true, can_manage: true, is_tournament_lead: true,
+  can_use_staff_tools: true, can_manage_structure: true, can_manage_participants: true, can_manage: true, is_tournament_lead: true,
 };
 
 // ---------------------------------------------------------------- Season-Seite
