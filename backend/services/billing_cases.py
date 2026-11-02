@@ -96,11 +96,29 @@ async def cases_for_order(db, order_id: str) -> list[dict]:
     return [case_view(row) for row in rows]
 
 
-async def list_cases(db, status: str = "open", limit: int = 200) -> list[dict]:
-    query = {} if status == "all" else {"status": status}
-    rows = await db.billing_cases.find(query, {"_id": 0}).sort("opened_at", -1 if status == "resolved" else 1).to_list(limit)
+def case_query(status: str = "open", *, kind: str | None = None, source_id: str | None = None, user_ids: list[str] | None = None) -> dict:
+    """Die Auswahl von Finanzen (#2131): Liste und Zähler lesen dieselbe Abfrage, sonst nennt die Kachel etwas anderes als die Liste."""
+    query: dict = {} if status == "all" else {"status": status}
+    if kind in ("event", "tournament"):
+        query["source_kind"] = kind
+    if source_id:
+        query["source_id"] = source_id
+    if user_ids is not None:
+        query["user_id"] = {"$in": list(user_ids)}
+    return query
+
+
+async def list_cases(db, status: str = "open", limit: int = 200, *, kind: str | None = None, source_id: str | None = None, user_ids: list[str] | None = None) -> list[dict]:
+    query = case_query(status, kind=kind, source_id=source_id, user_ids=user_ids)
+    # Erledigte nach dem Tag der Erledigung: der Kassier sucht zuerst, was zuletzt erledigt wurde.
+    order = ("resolved_at", -1) if status == "resolved" else ("opened_at", 1)
+    rows = await db.billing_cases.find(query, {"_id": 0}).sort(*order).to_list(limit)
     return [case_view(row) for row in rows]
 
 
+async def count_cases(db, status: str = "open", *, kind: str | None = None, source_id: str | None = None, user_ids: list[str] | None = None) -> int:
+    return int(await db.billing_cases.count_documents(case_query(status, kind=kind, source_id=source_id, user_ids=user_ids)))
+
+
 async def open_count(db) -> int:
-    return int(await db.billing_cases.count_documents({"status": "open"}))
+    return await count_cases(db, "open")

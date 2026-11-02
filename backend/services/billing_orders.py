@@ -32,7 +32,7 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 from pymongo.errors import DuplicateKeyError
 
@@ -338,6 +338,16 @@ def _row_query(*, kind: str | None = None, source_id: str | None = None, user_id
     return query
 
 
+def invoiced_row_query(*, kind: str | None = None, source_id: str | None = None, user_ids: list[str] | None = None, attention: str | None = None) -> dict:
+    base = _row_query(kind=kind, source_id=source_id, user_ids=user_ids)
+    return {**base, **attention_query(attention)} if attention in ATTENTION else {**base, "status": "invoiced"}
+
+
+# So viele Zeilen zeigt die Übersicht (#2131): die Seite nennt „N von M“, vollständig ist der Export.
+OPEN_LIST_LIMIT = 200
+INVOICED_LIST_LIMIT = 250
+
+
 async def overview(db, *, kind: str | None = None, source_id: str | None = None, user_ids: list[str] | None = None, attention: str | None = None) -> dict:
     """Für die Finanzübersicht (#322): Zahlen je Status, die offenen Aufträge, die angelegten Belege
     mit Zahlungsstand, die offenen Prüffälle. `attention` (#842) zeigt nur die Belege eines Blicks."""
@@ -347,16 +357,45 @@ async def overview(db, *, kind: str | None = None, source_id: str | None = None,
     by_status: dict[str, int] = {}
     async for row in db.billing_orders.aggregate([{"$match": base}, {"$group": {"_id": "$status", "n": {"$sum": 1}, "cents": {"$sum": "$total_cents"}}}]):
         by_status[row["_id"]] = {"count": int(row["n"]), "total_cents": int(row.get("cents") or 0)}
-    open_orders = await db.billing_orders.find({**base, "status": {"$in": list(OPEN_STATUSES) + ["held", "failed"]}}, {"_id": 0, "snapshot": 0}).sort("created_at", 1).to_list(200)
-    invoiced_query = {**base, **attention_query(attention)} if attention in ATTENTION else {**base, "status": "invoiced"}
-    invoiced = await db.billing_orders.find(invoiced_query, {"_id": 0, "snapshot": 0, "payments": 0}).sort("updated_at", -1).to_list(250)
-    cases = await billing_cases.list_cases(db, "open")
-    if base:
-        cases = [case for case in cases if (not source_id or case.get("source_id") == source_id) and (kind not in ("event", "tournament") or case.get("source_kind") == kind)
-                 and (user_ids is None or case.get("user_id") in user_ids)]
+    open_query = {**base, "status": {"$in": list(OPEN_STATUSES) + ["held", "failed"]}}
+    open_orders = await db.billing_orders.find(open_query, {"_id": 0, "snapshot": 0}).sort("created_at", 1).limit(OPEN_LIST_LIMIT).to_list(OPEN_LIST_LIMIT)
+    invoiced_query = invoiced_row_query(kind=kind, source_id=source_id, user_ids=user_ids, attention=attention)
+    invoiced = await db.billing_orders.find(invoiced_query, {"_id": 0, "snapshot": 0, "payments": 0}).sort("updated_at", -1).limit(INVOICED_LIST_LIMIT).to_list(INVOICED_LIST_LIMIT)
+    # Kachel und Liste (#2131) lesen dieselbe Auswahl; die Liste kürzt, der Zähler nicht.
+    selection = {"kind": kind, "source_id": source_id, "user_ids": user_ids}
+    cases = await billing_cases.list_cases(db, "open", **selection)
     return {"by_status": by_status, "labels": STATUS_LABELS, "payment_labels": PAYMENT_STATE_LABELS, "open": open_orders, "invoiced": invoiced,
-            "cases": cases, "cases_open": await billing_cases.open_count(db),
+            "open_total": int(await db.billing_orders.count_documents(open_query)), "invoiced_total": int(await db.billing_orders.count_documents(invoiced_query)),
+            "cases": cases, "cases_open": await billing_cases.count_cases(db, "open", **selection), "cases_resolved": await billing_cases.count_cases(db, "resolved", **selection),
             "attention": await attention_counts(db, base), "attention_labels": ATTENTION, "attention_active": attention if attention in ATTENTION else ""}
+
+
+def export_period(date_from: str | None, date_to: str | None) -> dict:
+    """Der Zeitraum eines Exports als Bedingung auf den Beleg: von 00:00 bis einschließlich 24:00 nach der Wiener Uhr.
+    Ohne Angaben keine Bedingung. ValueError bei einem Tag, den es nicht gibt, oder „von“ nach „bis“."""
+    from services.dolibarr_policy import CLUB_TZ
+
+    def day_start(text: str) -> datetime:
+        return datetime.strptime(text, "%Y-%m-%d").replace(tzinfo=CLUB_TZ)
+
+    start = day_start(date_from) if date_from else None
+    end = day_start(date_to) if date_to else None
+    if start and end and start > end:
+        raise ValueError("Der Zeitraum beginnt nach seinem Ende.")
+    period: dict = {}
+    if start:
+        period["$gte"] = start.astimezone(timezone.utc).isoformat()
+    if end:
+        # Rechnen mit Zone heißt Wanduhr: der nächste Wiener Mitternacht, auch am Tag der Zeitumstellung (23 oder 25 Stunden).
+        period["$lt"] = (end + timedelta(days=1)).astimezone(timezone.utc).isoformat()
+    return {"invoiced_at": period} if period else {}
+
+
+async def export_rows(db, *, kind: str | None = None, source_id: str | None = None, user_ids: list[str] | None = None, attention: str | None = None,
+                      date_from: str | None = None, date_to: str | None = None) -> list[dict]:
+    """Alle Belege der Auswahl für den Export (#2131) - ohne die Grenze der Liste, nach dem Tag des Belegs sortiert."""
+    query = {**invoiced_row_query(kind=kind, source_id=source_id, user_ids=user_ids, attention=attention), **export_period(date_from, date_to)}
+    return await db.billing_orders.find(query, {"_id": 0, "snapshot": 0, "payments": 0}).sort([("invoiced_at", 1), ("invoice_ref", 1)]).to_list(None)
 
 
 async def source_summary(db, kind: str, source_id: str) -> dict:

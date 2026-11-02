@@ -7,8 +7,8 @@ import { AdminLayout } from "@/components/tls/AdminLayout";
 import { SkeletonTable } from "@/components/tls/Skeleton";
 import { TableScroll } from "@/components/tls/TableScroll";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { ATTENTION_ORDER, PAYMENT_TONE, csvFilename, formatCents, parseEuro, sourcesFrom, summaryLines, syncLine, toCsv } from "@/lib/billing";
-import { viennaDateTime } from "@/lib/vienna";
+import { ATTENTION_ORDER, PAYMENT_TONE, csvFilename, formatCents, parseEuro, shownOf, sourcesFrom, summaryLines, syncLine } from "@/lib/billing";
+import { viennaDate, viennaDateTime } from "@/lib/vienna";
 import { InvoiceDetailsTab } from "./finance/InvoiceDetailsTab";
 
 // Finanzübersicht (#322): Rechnungsaufträge nach Status - was fehlt, was wartet, was frei zu
@@ -74,20 +74,38 @@ export default function AdminFinancePage() {
   const [knownSources, setKnownSources] = useState([]);
   const [detail, setDetail] = useState(null);
   const [caseReason, setCaseReason] = useState({});
+  // Prüffälle (#2131): offen zum Abarbeiten, erledigt als Nachweis für den Kassier.
+  const [caseView, setCaseView] = useState("open");
+  const [resolved, setResolved] = useState(null);
+  // Zeitraum des Exports (#2131): nach dem Tag des Belegs, leer heißt alle.
+  const [exportFrom, setExportFrom] = useState("");
+  const [exportTo, setExportTo] = useState("");
+  const [exporting, setExporting] = useState(false);
 
-  const load = useCallback(() => {
+  const selection = useCallback(() => {
     const params = {};
     if (filters.kind) params.kind = filters.kind;
     if (filters.source) params.source = filters.source;
     if (filters.q.trim()) params.q = filters.q.trim();
+    return params;
+  }, [filters.kind, filters.source, filters.q]);
+
+  const load = useCallback(() => {
+    const params = selection();
     if (filters.attention) params.attention = filters.attention;
     api.get("/admin/finance/overview", { params }).then(({ data: next }) => {
       setData(next);
       setError("");
       setKnownSources((current) => sourcesFrom([...current.map((s) => ({ source_id: s.id, kind: s.kind, source: { name: s.name } })), ...(next.open || []), ...(next.invoiced || [])]));
     }).catch((err) => setError(formatRequestError(err, "Finanzübersicht konnte nicht geladen werden.")));
-  }, [filters]);
+  }, [selection, filters.attention]);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (caseView !== "resolved") return;
+    setResolved(null);
+    api.get("/admin/finance/cases", { params: { ...selection(), status: "resolved" } }).then(({ data: next }) => setResolved(next))
+      .catch((err) => { setResolved({ cases: [], total: 0 }); toast.error(formatRequestError(err, "Erledigte Prüffälle konnten nicht geladen werden.")); });
+  }, [caseView, selection]);
   useApiInvalidation(load, ["events", "billing", "dolibarr"]);
 
   const run = async (key, request, message) => {
@@ -115,17 +133,32 @@ export default function AdminFinancePage() {
     }
   };
 
-  const downloadCsv = () => {
-    const csv = toCsv(data?.invoiced || []);
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = csvFilename(new Date(), filters.attention);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
+  // Der Export kommt vom Server (#2131): alle Belege der Auswahl und des Zeitraums, nicht nur die geladene Liste.
+  const periodBackwards = !!exportFrom && !!exportTo && exportFrom > exportTo;
+  const downloadCsv = async () => {
+    if (exporting || periodBackwards) return;
+    setExporting(true);
+    try {
+      const params = selection();
+      if (filters.attention) params.attention = filters.attention;
+      if (exportFrom) params.from = exportFrom;
+      if (exportTo) params.to = exportTo;
+      const { data: file, headers } = await api.get("/admin/finance/export.csv", { params, responseType: "blob" });
+      const url = URL.createObjectURL(file);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = csvFilename(new Date(), filters.attention, { from: exportFrom, to: exportTo });
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      const rows = Number(headers?.["x-export-rows"]);
+      toast.success(Number.isFinite(rows) ? `Export erstellt: ${rows === 1 ? "1 Beleg" : `${rows.toLocaleString("de-AT")} Belege`}.` : "Export erstellt.");
+    } catch (err) {
+      toast.error(err?.response?.status === 400 ? "Bitte den Zeitraum prüfen." : formatRequestError(err, "Der Export hat nicht geklappt."));
+    } finally {
+      setExporting(false);
+    }
   };
 
   const status = data?.by_status || {};
@@ -149,8 +182,8 @@ export default function AdminFinancePage() {
           <button type="button" disabled={!!busy} onClick={() => run("reconcile", () => api.post("/admin/finance/reconcile"), (r) => `Abgeglichen: ${r?.data?.looked ?? 0} Belege gelesen, ${r?.data?.cases ?? 0} Prüffälle.`)} className="inline-flex items-center gap-2 px-4 py-2 border border-white/20 text-white/80 font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40" data-testid="finance-reconcile">
             <RefreshCw className="w-3.5 h-3.5" /> Alles abgleichen
           </button>
-          <button type="button" disabled={!data?.invoiced?.length} onClick={downloadCsv} className="inline-flex items-center gap-2 px-4 py-2 border border-white/20 text-white/80 font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40" data-testid="finance-csv">
-            <Download className="w-3.5 h-3.5" /> CSV
+          <button type="button" disabled={!data || exporting || periodBackwards} onClick={downloadCsv} className="inline-flex items-center gap-2 px-4 py-2 border border-white/20 text-white/80 font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40" data-testid="finance-csv">
+            <Download className="w-3.5 h-3.5" /> {exporting ? "Export läuft …" : "CSV"}
           </button>
         </div>}
       </div>
@@ -176,7 +209,7 @@ export default function AdminFinancePage() {
             <Stat label="Wartet auf Freigabe" value={status.held?.count || 0} tone="text-[#29B6E8]" />
             <Stat label="Bereit für Dolibarr" value={status.ready?.count || 0} tone="text-[#00FF88]" />
             <Stat label="Gescheitert" value={status.failed?.count || 0} tone={status.failed?.count ? "text-[#FF3B30]" : "text-white"} />
-            <Stat label="Prüffälle" value={data.cases_open || 0} tone={data.cases_open ? "text-[#FF3B30]" : "text-white"} testId="finance-cases-count" />
+            <Stat label="Prüffälle offen" value={data.cases_open || 0} tone={data.cases_open ? "text-[#FF3B30]" : "text-white"} testId="finance-cases-count" />
           </div>
 
           <div className={`mt-4 border rounded-sm p-4 text-sm flex items-start gap-3 ${data.dolibarr?.write_capable ? "border-[#00FF88]/30" : "border-[#FFD700]/40 bg-[#FFD700]/5"}`} data-testid="finance-dolibarr">
@@ -239,7 +272,20 @@ export default function AdminFinancePage() {
             {(filters.kind || filters.source || filters.q || filters.attention) && (
               <button type="button" onClick={() => setFilters({ kind: "", source: "", q: "", attention: "" })} className="px-3 py-1.5 border border-white/20 text-white/70 rounded-sm uppercase tracking-wider font-bold" data-testid="finance-filter-clear">Filter löschen</button>
             )}
+            <div className="flex flex-wrap items-end gap-3 sm:ml-auto" data-testid="finance-export-period">
+              <label className="flex flex-col gap-1">
+                <span className="uppercase tracking-wider text-white/45 font-bold">Export von</span>
+                <input type="date" value={exportFrom} onChange={(ev) => setExportFrom(ev.target.value)} className="bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm" data-testid="finance-export-from" />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="uppercase tracking-wider text-white/45 font-bold">bis</span>
+                <input type="date" value={exportTo} onChange={(ev) => setExportTo(ev.target.value)} className="bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm" data-testid="finance-export-to" />
+              </label>
+            </div>
           </div>
+          <p className={`mt-2 text-[11px] ${periodBackwards ? "text-[#FF9500]" : "text-white/40"}`} data-testid="finance-export-hint">
+            {periodBackwards ? "Der Zeitraum beginnt nach seinem Ende." : "Der CSV-Export enthält alle Belege dieser Auswahl – nach dem Tag des Belegs, ohne Grenze. Ohne Zeitraum alle."}
+          </p>
 
           <AttentionBar counts={data.attention} labels={data.attention_labels} active={filters.attention} onPick={(attention) => setFilters((f) => ({ ...f, attention }))} />
 
@@ -258,11 +304,23 @@ export default function AdminFinancePage() {
             </div>
           )}
 
-          {/* Prüffälle (#321): was die Website nicht selbst auflösen darf. */}
-          {!!cases.length && (
+          {/* Prüffälle (#321): was die Website nicht selbst auflösen darf; erledigte bleiben als Nachweis lesbar (#2131). */}
+          {(!!cases.length || data.cases_resolved > 0 || caseView === "resolved") && (
             <div className="mt-8" data-testid="finance-cases">
-              <h2 className="font-heading text-xl font-black uppercase text-[#FF3B30]">Prüffälle</h2>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="font-heading text-xl font-black uppercase text-[#FF3B30]">Prüffälle</h2>
+                <div className="flex gap-1" role="group" aria-label="Welche Prüffälle">
+                  {[["open", `Offen · ${data.cases_open || 0}`], ["resolved", `Erledigt · ${data.cases_resolved || 0}`]].map(([key, label]) => (
+                    <button key={key} type="button" aria-pressed={caseView === key} onClick={() => setCaseView(key)} data-testid={`finance-cases-${key}`}
+                      className={`px-3 py-1.5 border rounded-sm text-[11px] font-bold uppercase tracking-wider ${caseView === key ? "border-[#29B6E8] text-[#29B6E8] bg-[#29B6E8]/10" : "border-white/15 text-white/55 hover:text-white"}`}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {caseView === "resolved" ? <ResolvedCases data={resolved} onOpen={openDetail} /> : (<>
               <p className="mt-1 text-xs text-white/45">Hier ist Buchung und Beleg auseinandergelaufen. Die Website ändert nichts still – ihr entscheidet in Dolibarr und erledigt den Fall hier mit Grund.</p>
+              {!cases.length && <div className="mt-3 text-sm text-white/50" data-testid="finance-cases-none">Keine offenen Prüffälle in dieser Auswahl.</div>}
               <div className="mt-3 space-y-3">
                 {cases.map((item) => (
                   <div key={item.id} className="border border-[#FF3B30]/30 bg-[#FF3B30]/5 rounded-sm p-4 text-sm" data-testid={`finance-case-${item.id}`}>
@@ -283,6 +341,7 @@ export default function AdminFinancePage() {
                   </div>
                 ))}
               </div>
+              </>)}
             </div>
           )}
 
@@ -346,6 +405,9 @@ export default function AdminFinancePage() {
               </tbody>
             </table>
           </TableScroll>
+          {data.open_total > data.open.length && (
+            <p className="mt-2 text-xs text-[#FFD700]" data-testid="finance-open-count">Angezeigt: {shownOf(data.open.length, data.open_total)} offenen Aufträgen – die ältesten zuerst.</p>
+          )}
 
           {filters.attention && !data.invoiced?.length && (
             <div className="mt-8 text-sm text-white/50" data-testid="finance-attention-empty">Kein Beleg in dieser Auswahl.</div>
@@ -354,6 +416,9 @@ export default function AdminFinancePage() {
             <div className="mt-8">
               <h2 className="font-heading text-xl font-black uppercase">{filters.attention ? `Angelegte Rechnungen · ${capitalize(data.attention_labels?.[filters.attention] || "")}` : "Angelegte Rechnungen"}</h2>
               <p className="mt-1 text-xs text-white/45">Nummer, Freigabe und Zahlungen kommen aus Dolibarr; offene Belege liest die Website alle zehn Minuten nach, bezahlte einmal am Tag. Der Stand daneben sagt, wie frisch das ist.</p>
+              <p className={`mt-1 text-xs ${data.invoiced_total > data.invoiced.length ? "text-[#FFD700]" : "text-white/45"}`} data-testid="finance-invoiced-count">
+                Angezeigt: {shownOf(data.invoiced.length, data.invoiced_total)} Rechnungen{data.invoiced_total > data.invoiced.length ? " – die zuletzt geänderten. Vollständig ist der CSV-Export." : "."}
+              </p>
               <TableScroll label="Angelegte Rechnungen" testId="finance-invoiced-scroll" className="mt-3">
                 <table className="w-full min-w-[52rem] text-sm">
                   <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
@@ -382,7 +447,7 @@ export default function AdminFinancePage() {
                             <div className={PAYMENT_TONE[row.payment_state] || "text-white/80"} data-testid={`finance-payment-${row.id}`}>
                               {row.payment_label || (row.paid ? "bezahlt" : INVOICE_STATUS[row.invoice_status] || row.invoice_status)}
                               {row.payment_state === "partial" && row.remaining_cents != null && <span className="text-white/50"> · {formatCents(row.remaining_cents, row.currency)} offen</span>}
-                              {row.payment_state === "overdue" && row.due_on && <span className="text-white/50"> · fällig {row.due_on}</span>}
+                              {row.payment_state === "overdue" && row.due_on && <span className="text-white/50"> · fällig {viennaDate(row.due_on)}</span>}
                             </div>
                             {(row.credited_cents > 0 || row.refunded_cents > 0) && (
                               <div className="text-[11px] text-white/50">{row.credited_cents > 0 ? `gutgeschrieben ${formatCents(row.credited_cents, row.currency)}` : ""}{row.credited_cents > 0 && row.refunded_cents > 0 ? " · " : ""}{row.refunded_cents > 0 ? `erstattet ${formatCents(row.refunded_cents, row.currency)}` : ""}</div>
@@ -434,6 +499,37 @@ function CaseFacts({ item }) {
   return <div className="mt-1 text-[11px] text-white/50" data-testid={`finance-case-facts-${item.id}`}>{bits.join(" · ")}</div>;
 }
 
+// Erledigte Prüffälle (#2131): was es war, wer es wann erledigt hat und mit welchem Grund - nur zum Nachlesen.
+function ResolvedCases({ data, onOpen }) {
+  if (!data) return <SkeletonTable rows={2} columns={3} className="mt-3" label="Lade erledigte Prüffälle" />;
+  const rows = data.cases || [];
+  if (!rows.length) return <div className="mt-3 text-sm text-white/50" data-testid="finance-resolved-none">Keine erledigten Prüffälle in dieser Auswahl.</div>;
+  return (
+    <div className="mt-3 space-y-3" data-testid="finance-resolved">
+      <p className="text-xs text-white/45">Angezeigt: {shownOf(rows.length, data.total)} erledigten Fällen, der zuletzt erledigte zuerst.</p>
+      {rows.map((item) => (
+        <div key={item.id} className="border border-white/10 bg-[#121212] rounded-sm p-4 text-sm" data-testid={`finance-resolved-${item.id}`}>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="font-bold text-white">{item.label} <span className="text-white/50 font-normal">· {item.source?.name || item.source_id} · {item.person || item.user_id} · {item.total}</span></div>
+              <div className="mt-1 text-xs text-white/70">Erledigt {viennaDateTime(item.resolved_at, { dateStyle: "short", timeStyle: "short" })} von {item.resolved_by_name}{item.resolution ? `: ${item.resolution}` : ""}</div>
+              <CaseFacts item={item} />
+            </div>
+            <button type="button" onClick={() => onOpen(item.order_id)} className="text-[11px] uppercase tracking-wider font-bold text-[#29B6E8] hover:underline">Auftrag ansehen</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Der Verlauf (#2131) in Wiener Uhr; ein reiner Tag (Zahlung aus Dolibarr) bleibt ein Tag - ohne erfundene Uhrzeit.
+function timelineMoment(value) {
+  const text = String(value || "");
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return viennaDate(text);
+  return viennaDateTime(text, { dateStyle: "short", timeStyle: "short" }) || text;
+}
+
 // Kennung einer Erstattungs-Erfassung (#1034): Wer dieselbe Eingabe nochmals abschickt (Antwort verloren, Netz
 // weg), bekommt keinen zweiten Eintrag. Jede Änderung im Formular ist eine neue Erfassung.
 const newRefundRequestId = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -460,7 +556,7 @@ function OrderDetail({ detail, busy, paymentLabels, onClose, onResync, onRefund 
           <h2 className="font-heading text-xl font-black uppercase mt-1">{order.source?.name || order.source_id} · {order.person || order.user_id}</h2>
           <div className="text-xs text-white/50 mt-1">
             {order.invoice_ref ? `Beleg ${order.invoice_ref} · ` : ""}{paymentLabels[order.payment_state] || order.status_label}
-            {registration ? ` · Anmeldung ${registration.status}${registration.seat_count ? `, ${registration.seat_count} Personen` : ""}` : ""}
+            {registration ? ` · Anmeldung ${registration.status_label || registration.status}${registration.seat_count ? `, ${registration.seat_count} Personen` : ""}` : ""}
           </div>
           {order.pdf_missing && (
             <div className="mt-2 text-xs text-[#FFD700]" data-testid="finance-detail-pdf-missing">
@@ -497,7 +593,7 @@ function OrderDetail({ detail, busy, paymentLabels, onClose, onResync, onRefund 
           <ol className="mt-2 text-xs space-y-1.5" data-testid="finance-detail-timeline">
             {timeline.map((item, index) => (
               <li key={`${item.at}-${index}`} className="flex gap-3">
-                <span className="text-white/40 shrink-0 tabular-nums w-28">{String(item.at).slice(0, 16).replace("T", " ")}</span>
+                <span className="text-white/40 shrink-0 tabular-nums w-28" data-testid="finance-timeline-at">{timelineMoment(item.at)}</span>
                 <span className={item.kind === "error" || item.kind === "case" ? "text-[#FF3B30]" : item.kind === "payment" ? "text-[#00FF88]" : "text-white/80"}>{item.text}</span>
               </li>
             ))}
