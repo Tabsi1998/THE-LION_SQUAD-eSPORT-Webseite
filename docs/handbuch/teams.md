@@ -73,7 +73,7 @@ Nach dem Auflösen:
 frühere Teamleitung selbst aufgelöst hat, von ihr unter **Teams → Deine Teams**. Was ein Admin aufgelöst hat, holen nur Admins
 zurück. Name und Kürzel laufen dabei durch den Wortfilter. Mitglieder, Co-Teams und Chat sind wieder da, dazu ein **neuer Beitrittscode**
 und ein neuer Link. Hat ein anderes Team das Kürzel inzwischen, fragt die Seite nach einem neuen. Hat die frühere Teamleitung
-ihr Konto gelöscht, übernimmt die Co-Leitung, sonst ein Mitglied.
+ihr Konto gelöscht oder ist es abgeschaltet, übernimmt die Co-Leitung, sonst ein Mitglied – diese Person bekommt eine eigene Nachricht.
 
 Nach den 30 Tagen räumt der tägliche Job auf: Chat samt Anhängen, Einladungen, Kader und Mitgliederlisten sind weg, Logo und
 Banner auch, wenn sie sonst nirgends stehen (Bilder aus der Mediathek bleiben). Nur Name und Kürzel bleiben für alte Turniere. Löscht jemand sein Konto, ist die Person sofort auch aus aufgelösten Teams heraus.

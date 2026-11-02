@@ -269,6 +269,27 @@ async def test_erasure_removes_the_person_from_dissolved_teams(flow):
 
 
 @pytest.mark.asyncio
+async def test_a_new_lead_on_restore_gets_its_own_note_and_the_old_role_is_cleared(flow):
+    leader, co, member, team, _squad = await world(flow)
+    await flow.db.team_members.update_one({"team_id": team["id"], "user_id": leader["id"]}, {"$set": {"role": "leader"}})
+    await dissolve(flow, leader, team)
+    await flow.db.users.update_one({"id": leader["id"]}, {"$set": {"is_active": False}})
+
+    flow.act_as(await flow.add_user(role="club_admin", name="vorstand"))
+    assert (await flow.post(f"/api/teams/{team['id']}/restore")).status_code == 200
+
+    back = await flow.db.teams.find_one({"id": team["id"]}, {"_id": 0})
+    assert back["leader_id"] == co["id"] and leader["id"] not in back["co_leader_ids"]
+    roles = {row["user_id"]: row["role"] async for row in flow.db.team_members.find({"team_id": team["id"]}, {"_id": 0})}
+    assert roles[co["id"]] == "leader" and roles[leader["id"]] == "member", "die abgeschaltete Teamleitung behält die Rolle nicht"
+    own = await flow.db.notifications.find({"user_id": co["id"]}, {"_id": 0}).to_list(10)
+    kinds = [note["kind"] for note in own]
+    assert "team_leader_transferred" in kinds and "team_restored" not in kinds
+    assert "Teamleitung" in next(note for note in own if note["kind"] == "team_leader_transferred")["title"]
+    assert await flow.db.notifications.find_one({"user_id": member["id"], "kind": "team_restored"})
+
+
+@pytest.mark.asyncio
 async def test_erasing_the_last_person_ends_the_deadline(flow):
     leader, co, member, team, _squad = await world(flow)
     await dissolve(flow, leader, team)

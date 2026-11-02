@@ -192,10 +192,10 @@ async def _dissolve_locked(db, team: dict, actor: dict) -> dict:
     return {"ok": True, "withdrawn": len(preview["withdraw"]), "restore_until": purge_at}
 
 
-async def _tell_members(team: dict, actor: dict, **note) -> None:
+async def _tell_members(team: dict, actor: dict, *, skip: str | None = None, **note) -> None:
     from services.user_notifications import create_user_notification
 
-    for user_id in sorted(set(team.get("member_ids") or []) - {actor.get("id")}):
+    for user_id in sorted(set(team.get("member_ids") or []) - {actor.get("id"), skip}):
         try:
             await create_user_notification(user_id, meta={"team_id": team["id"]}, **note)
         except Exception:  # noqa: BLE001 - das Team ist schon aufgelöst bzw. zurück; eine Nachricht hält das nicht auf
@@ -290,8 +290,11 @@ async def _restore_locked(db, row: dict, actor: dict, tag: str | None) -> dict:
     for member in rows:
         if member.get("user_id") == leader_id:
             member["role"] = "leader"
-    if rows:
-        await db.team_members.insert_many(rows)
+        elif member.get("user_id") == row.get("leader_id"):
+            member["role"] = "member"  # die frühere Teamleitung führt nicht mehr: ihr Konto ist abgeschaltet
+    if not any(member.get("user_id") == leader_id for member in rows):
+        rows.append({"team_id": team_id, "user_id": leader_id, "role": "leader", "joined_at": now})
+    await db.team_members.insert_many(rows)
     try:
         await db.teams.insert_one(dict(team))
     except DuplicateKeyError:  # eindeutiger Beitrittscode - ein Treffer ist sehr unwahrscheinlich, ein neuer Versuch hilft
@@ -305,9 +308,14 @@ async def _restore_locked(db, row: dict, actor: dict, tag: str | None) -> dict:
                  "leader_changed": leader_id != row.get("leader_id")},
         "created_at": now,
     })
-    await _tell_members(team, actor, title=f"[{final_tag}] ist wieder da",
+    new_lead = leader_id if leader_id != row.get("leader_id") else None
+    await _tell_members(team, actor, skip=new_lead, title=f"[{final_tag}] ist wieder da",
                         body=f"{team.get('name')} wurde wiederhergestellt – du bist wieder dabei.",
                         url=f"/teams/{team_id}", kind="team_restored")
+    if new_lead and new_lead != actor.get("id"):
+        await _tell_members({"id": team_id, "member_ids": [new_lead]}, actor, title=f"Du hast jetzt die Teamleitung: [{final_tag}]",
+                            body=f"{team.get('name')} wurde wiederhergestellt. Die frühere Teamleitung ist nicht mehr aktiv – die Leitung liegt jetzt bei dir.",
+                            url=f"/teams/{team_id}", kind="team_leader_transferred")
     from services.change_events import publish_user_change
     await publish_user_change(list(team.get("member_ids") or []), "teams")
     return team
