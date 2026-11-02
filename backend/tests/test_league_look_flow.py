@@ -39,7 +39,7 @@ async def flow():
 
 async def uploaded(flow, *urls):
     for url in urls:
-        await flow.db.media_uploads.insert_one({"id": url, "url": url, "media_type": "image"})
+        await flow.db.media_uploads.insert_one({"id": url, "url": url, "filename": url, "media_type": "image"})
 
 
 async def setup(flow):

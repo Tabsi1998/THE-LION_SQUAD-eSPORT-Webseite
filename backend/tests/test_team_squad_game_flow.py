@@ -96,7 +96,7 @@ async def test_game_stays_while_the_squad_plays_in_a_league(flow):
     assert refused.status_code == 409 and "Staffel" in refused.json()["detail"]
     same = await flow.patch(url, json={"game_id": game["id"], "description": "Kader Herbst"})
     assert same.status_code == 200, "unverändert geht - das Formular schickt das Spiel immer mit"
-    version = {"id": new_id(), "name": "Probe Rush 2", "parent_game_id": game["id"]}
+    version = {"id": new_id(), "name": "Probe Rush 2", "slug": "probe-rush-2", "parent_game_id": game["id"]}
     await flow.db.games.insert_one(dict(version))
     assert (await flow.patch(url, json={"game_id": version["id"]})).status_code == 200, "dasselbe Hauptspiel passt weiter"
 
@@ -128,7 +128,7 @@ def test_old_free_text_says_what_to_do():
 async def test_migration_turns_exact_names_into_ids_and_counts_the_rest(flow):
     from services import migrations
 
-    await flow.db.games.insert_many([{"id": "bo7", "name": "Black Ops 7"}, {"id": "a1", "name": "Doppelt"}, {"id": "a2", "name": "doppelt"}, {"id": "ohne"}])
+    await flow.db.games.insert_many([{"id": "bo7", "slug": "bo7", "name": "Black Ops 7"}, {"id": "a1", "slug": "a1", "name": "Doppelt"}, {"id": "a2", "slug": "a2", "name": "doppelt"}, {"id": "ohne", "slug": "ohne"}])
     rows = [("exakt", "Black Ops 7"), ("klein", "  black ops  7 "), ("kennung", "bo7"), ("fremd", "Irgendwas"), ("zweideutig", "Doppelt"), ("leer", None), ("nichts", ""), ("leerzeichen", "   ")]
     for name, value in rows:
         await flow.db.team_squads.insert_one({"id": name, "team_id": "t1", "name": name, "game_id": value})
