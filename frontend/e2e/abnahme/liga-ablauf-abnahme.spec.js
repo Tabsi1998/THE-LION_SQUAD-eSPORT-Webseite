@@ -83,7 +83,7 @@ async function proposeAndAccept(home, away, matchId, when) {
   await expect(away.page.locator('[data-testid^="match-proposal-status-"]').first()).toContainText("angenommen");
 }
 
-/** Melden im Web: je Map die erste Map aus dem Pool, der Sieger, die eigene Aufstellung (die nächste Map übernimmt sie). */
+/** Melden im Web: je Map die erste Map aus dem Pool und der Sieger, dann einmal die Teilnehmerliste der eigenen Seite (#2204). */
 async function report(page, matchId, winner, maps) {
   await page.goto(`/matches/${matchId}`);
   await expect(page.getByTestId("match-report-form")).toBeVisible();
@@ -91,11 +91,9 @@ async function report(page, matchId, winner, maps) {
     const position = index + 1;
     await page.getByTestId(`league-game-${position}-map-${mapId}`).click();
     await page.getByTestId(`league-game-${position}-winner-${winner}`).click();
-    if (position === 1) {
-      const chips = page.getByTestId("league-game-1-lineup").getByRole("button");
-      for (let chip = 0; chip < 4; chip += 1) await chips.nth(chip).click();
-    }
   }
+  const chips = page.getByTestId("league-participants").getByRole("button");
+  for (let chip = 0; chip < 4; chip += 1) await chips.nth(chip).click();
   await expect(page.getByTestId("match-report-sentence")).toContainText("2:0");
   await noSideScroll(page);
   await page.getByTestId("match-report-submit").click();
@@ -174,13 +172,13 @@ test.describe("Abnahme: Liga-Ablauf gegen den echten Server", () => {
       const inbox = await (await away.page.request.get("/api/admin/notifications")).json();
       expect(JSON.stringify(inbox)).toContain("Match startet in 10 Minuten");
 
-      // Melden mit Maps und Aufstellung, die Gegenseite bestätigt mit ihrer Aufstellung.
+      // Melden mit Maps und Teilnehmerliste, die Gegenseite bestätigt mit ihrer Liste.
       await report(home.page, match.id, match.home, MAPS_OF_SERIES());
       await shot(home.page, `ablauf-gemeldet-${width}.png`);
       await away.page.goto(`/matches/${match.id}`);
       await expect(away.page.getByTestId("match-report-state")).toHaveAttribute("data-status", "confirm");
-      const firstLineup = away.page.getByTestId("league-confirm-lineup-1").getByRole("button");
-      for (let chip = 0; chip < 4; chip += 1) await firstLineup.nth(chip).click();
+      const firstLineup = away.page.getByTestId("league-confirm-participants").getByRole("button");
+      for (let chip = 0; chip < 3; chip += 1) await firstLineup.nth(chip).click();
       await noSideScroll(away.page);
       await away.page.getByTestId("match-report-confirm").click();
       await expect(away.page.getByTestId("match-outcome")).toBeVisible();
@@ -302,7 +300,19 @@ test.describe("Abnahme: Liga-Ablauf gegen den echten Server", () => {
     await expect(home.page.getByTestId("match-outcome")).toBeVisible();
     const row = (await (await lead.page.request.get(`/api/matches/${match.id}/page`)).json()).match;
     expect(row.status).toBe("completed");
-    for (const person of [lead, home]) {
+
+    // Die Gegenseite hat nicht geantwortet: Das Ergebnis gilt, ihr Captain trägt die Teilnehmerliste im Web nach (#2204).
+    const away = await as(browser, testInfo, match.awayRole, viewport);
+    await away.page.goto(`/matches/${match.id}`);
+    await expect(away.page.getByTestId(`league-participants-${match.away}`)).toContainText("Teilnehmerliste fehlt noch");
+    await expect(away.page.getByTestId("league-lineup-amend")).toContainText("Das Ergebnis gilt");
+    const chips = away.page.getByTestId("league-amend-participants").getByRole("button");
+    for (let chip = 0; chip < 3; chip += 1) await chips.nth(chip).click();
+    await noSideScroll(away.page);
+    await away.page.getByTestId("league-amend-save").click();
+    await expect(away.page.getByTestId("league-lineup-amend")).toContainText("Teilnehmerliste ändern");
+
+    for (const person of [lead, home, away]) {
       expect(person.problems).toEqual([]);
       await person.close();
     }

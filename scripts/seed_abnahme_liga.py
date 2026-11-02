@@ -262,6 +262,8 @@ async def ensure_accounts(db) -> dict:
             "privacy_policy_version": "2026-08-26", "terms_version": "2026-08-26", "accepted_privacy": True,
             "accepted_terms": True, "consent_required": False, "consent_updated_at": stamp,
             "created_at": (existing or {}).get("created_at") or stamp, "updated_at": stamp, **password_fields(password),
+            # Spielberechtigung (#2204): Neue Seasons verlangen ein Mindestalter - erfundenes Datum, wie alles hier.
+            "birth_date": "1990-03-03",
         }
         if areas:
             doc["areas"] = areas  # Der Bereich Ligen kommt nie aus der Rolle Turnierleitung (#2203) - im Probestand als Freigabe.
