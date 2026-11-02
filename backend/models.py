@@ -1117,13 +1117,13 @@ ScheduleProposalAction = Literal["accept", "decline", "counter", "withdraw"]
 
 class MatchScheduleProposalCreate(BaseModel):
     scheduled_at: datetime
-    note: Optional[str] = None
+    note: Optional[str] = Field(default=None, max_length=500)
 
 
 class MatchScheduleProposalDecision(BaseModel):
     action: ScheduleProposalAction
     scheduled_at: Optional[datetime] = None
-    note: Optional[str] = None
+    note: Optional[str] = Field(default=None, max_length=500)
 
 
 class MatchChatCreate(BaseModel):
@@ -1157,10 +1157,10 @@ class MatchV2Update(BaseModel):
 
 
 class MatchDispute(BaseModel):
-    reason: str
+    reason: str = Field(max_length=1000)  # wie das Formular der Website
     # „Problem melden“ (#1158): Grund zum Antippen und ein Foto, vorher über /matches/{id}/proof-photos hochgeladen.
-    category: Optional[str] = None
-    photo_id: Optional[str] = None
+    category: Optional[str] = Field(default=None, max_length=40)
+    photo_id: Optional[str] = Field(default=None, max_length=120)
 
 
 class MatchDisputeDecision(BaseModel):

@@ -244,8 +244,12 @@ async def test_match_page_and_chat_carry_no_account_role(flow):
         flow.act_as(viewer)
         page = await flow.get(f"/api/matches/{world['match']['id']}/page")
         assert page.status_code == 200, page.text
-        actors = [proposal["actor"] for proposal in page.json()["schedule_proposals"]]
-        assert actors and all(actor and "role" not in actor for actor in actors)
+        proposals = page.json()["schedule_proposals"]
+        assert proposals
+        if viewer is None:
+            assert all("actor" not in proposal for proposal in proposals), "Gäste sehen Termin und Stand, keine Person (#2201)"
+        else:
+            assert all(proposal["actor"] and "role" not in proposal["actor"] for proposal in proposals)
         chat = await flow.get(f"/api/matches/{world['match']['id']}/chat")
         assert chat.status_code == 200, chat.text
         assert chat.json() and all("role" not in (message.get("author") or {}) for message in chat.json())

@@ -641,10 +641,17 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         {"match_id": match["id"]},
         {"_id": 0},
     ).sort("created_at", -1).to_list(50)
-    actors = await _public_user_map(list({p.get("actor_user_id") for p in proposals if p.get("actor_user_id")}))
+    # Termin und Stand sieht, wer das Spiel sieht; Notiz und Person nur, wer dazugehört, und die Leitung (#2201).
+    involved = bool(user) and (await _can_read_match(match, user)
+                               or bool(await _member_registration_for_match(db, match, user.get("id"))))
+    actors = await _public_user_map(list({p.get("actor_user_id") for p in proposals if p.get("actor_user_id")})) if involved else {}
     for proposal in proposals:
-        proposal["actor"] = actors.get(proposal.get("actor_user_id"))
         proposal.pop("match_collection", None)
+        if involved:
+            proposal["actor"] = actors.get(proposal.get("actor_user_id"))
+        else:
+            for key in ("note", "actor_user_id", "decision_note", "decision_user_id"):
+                proposal.pop(key, None)
     acting_reg = await _acting_registration_for_match(match, user)
     policy = _match_policy(match, tournament, stage)
     can_submit_result = await _can_submit_result_for_match(match, user)

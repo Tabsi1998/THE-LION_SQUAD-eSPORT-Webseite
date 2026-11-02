@@ -748,6 +748,9 @@ async def self_register(db, t: dict, body: RegistrationCreate, me: dict, registe
     tid = t["id"]
     if _is_tournament_locked(t):
         raise HTTPException(status_code=423, detail=TOURNAMENT_MUTATION_LOCKED_DETAIL)
+    # Liga-Staffel (#2109): nur Co-Teams über „Co-Team zuteilen“ - eine Selbstanmeldung gibt es dort auf keinem Weg.
+    if is_league_staffel(t):
+        raise HTTPException(status_code=400, detail=STAFFEL_REGISTRATION_REFUSED)
     if not body.accept_rules or not body.accept_privacy:
         raise HTTPException(status_code=400, detail="Regeln und Datenschutz müssen akzeptiert werden.")
     registration_error = _registration_error(t)
