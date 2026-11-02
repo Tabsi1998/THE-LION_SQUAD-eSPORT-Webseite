@@ -47,8 +47,16 @@ async def _names(db, rows: list[dict]) -> tuple[dict, dict]:
     return names, people
 
 
+# Das Event oder Turnier gibt es nicht mehr: ein Satz statt der internen Kennung (#2226).
+SOURCE_GONE = "Angebot nicht mehr vorhanden"
+
+
+def _source(row: dict, names: dict) -> dict:
+    return names.get(row.get("source_id")) or {"name": SOURCE_GONE, "slug": None, "kind": row.get("kind") or row.get("source_kind")}
+
+
 def _decorate(row: dict, names: dict, people: dict) -> dict:
-    row["source"] = names.get(row.get("source_id"))
+    row["source"] = _source(row, names)
     row["person"] = people.get(row.get("user_id"))
     row["status_label"] = billing_orders.STATUS_LABELS.get(row.get("status"), row.get("status"))
     row["total"] = pricing.format_cents(int(row.get("total_cents") or 0), row.get("currency") or "EUR")
@@ -99,7 +107,7 @@ EXPORT_COLUMNS = ("Rechnung", "Angelegt am", "Angebot", "Person", "Betrag", "Zah
 
 
 def _export_cells(row: dict) -> tuple:
-    source = (row.get("source") or {}).get("name") or row.get("source_id") or ""
+    source = (row.get("source") or {}).get("name") or SOURCE_GONE
     currency = row.get("currency") or "EUR"
     money = lambda cents: pricing.format_cents(int(cents or 0), currency)  # noqa: E731
     return (
@@ -154,7 +162,7 @@ async def finance_overview(kind: str | None = Query(None), source: str | None = 
         # „bezahlt“ steht gerechnet am Beleg; die einzelnen Zahlungen zeigt erst das Detail.
         row.pop("payments", None)
     for case in data["cases"]:
-        case["source"] = names.get(case.get("source_id"))
+        case["source"] = _source(case, names)
         case["person"] = people.get(case.get("user_id"))
         case["total"] = pricing.format_cents(int(case.get("total_cents") or 0))
     # Rechnungstext vorab (#370): so kämen die Zeilen auf den Beleg - solange keiner existiert,
@@ -479,7 +487,7 @@ async def list_cases(status: str = Query("open", pattern="^(open|resolved|all)$"
         async for user in db.users.find({"id": {"$in": solvers}}, {"_id": 0, "id": 1, "display_name": 1, "username": 1}):
             people[user["id"]] = user.get("display_name") or user.get("username")
     for case in cases:
-        case["source"] = names.get(case.get("source_id"))
+        case["source"] = _source(case, names)
         case["person"] = people.get(case.get("user_id"))
         case["total"] = pricing.format_cents(int(case.get("total_cents") or 0))
         if case.get("status") == "resolved":
