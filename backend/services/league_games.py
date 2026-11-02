@@ -10,7 +10,8 @@ Gespeichert wird am Spiel (``matches_v2``):
 - ``games``: die geltenden Maps (``MatchGame``) - beim Bestätigen, durch die 48-h-Automatik oder die Turnierleitung,
 - ``reports[].games``: die Sicht der jeweiligen Meldung bis zur Bestätigung,
 - ``lineups_missing``: Seiten ohne Aufstellung (Bestätigung aus der App, Automatik),
-- ``lineup_user_ids``: alle Aufgestellten aus ``games`` und offenen Meldungen - für die Doppel-Einsatz-Prüfung,
+- ``lineups``: die Teilnehmerliste je Seite, wenn die Staffel ``lineup_mode: series`` trägt (#2204) - einmal je Spiel, nicht je Map,
+- ``lineup_user_ids``: alle Aufgestellten aus ``games``, ``lineups`` und offenen Meldungen - für die Doppel-Einsatz-Prüfung,
 - ``map_pool_id``: der Pool, aus dem gemeldet wurde (beim ersten Melden, wenn leer).
 
 Alle Prüfungen stehen hier und melden sich auf Deutsch (``LeagueGamesError``). Turniere ohne ``league_context``
@@ -24,7 +25,7 @@ import math
 from dataclasses import dataclass, field
 from typing import Any
 
-from services import league_roster, map_pools
+from services import league_eligibility, league_roster, map_pools
 from services.match_audience import registrations_for_match, responsible_user_ids, roster_ids, teams_by_id, users_for
 from services.matchday_schedule import matchday_number_of
 
@@ -34,6 +35,12 @@ CONFIRM_DIFFERENT_DETAIL = (
     "nicht stimmt, bitte über „Problem melden“ Einspruch einlegen."
 )
 LINEUP_MISSING_TEXT = "Bitte Aufstellung im Web nachtragen."
+# Teilnehmerliste einmal je Spiel (#2204): Staffeln ohne ``lineup_mode`` bleiben bei der Aufstellung je Map.
+SERIES, PER_MAP = "series", "per_map"
+SERIES_APP_DETAIL = "Bitte im Web mit Maps und Teilnehmerliste melden."
+SERIES_MISSING_TITLE = "Teilnehmerliste fehlt noch"
+SERIES_MISSING_TEXT = ("Das Ergebnis gilt. Bitte im Web eintragen, wer gespielt hat – das geht für Captain und Vertreter bis zum "
+                       "Ablauf der Frist. Wer nicht auf der Liste steht, zählt nicht als Einsatz.")
 NO_POOL_DETAIL = "Für diese Staffel ist noch kein Map-Pool hinterlegt – bitte die Turnierleitung fragen."
 DEFAULT_AMEND_HOURS = 48
 # Ein Spiel mit festem Ergebnis: seine Maps gelten, offene Meldungen nicht mehr (Doppel-Einsatz-Index).
@@ -46,6 +53,10 @@ class LeagueGamesError(Exception):
         super().__init__(detail)
         self.detail = detail
         self.status_code = status_code
+
+
+def lineup_mode_of(tournament: dict | None) -> str:
+    return SERIES if (tournament or {}).get("lineup_mode") == SERIES else PER_MAP
 
 
 def is_league(tournament: dict | None) -> bool:
@@ -71,6 +82,17 @@ class LeagueSetup:
     # Stichtag gilt je Co-Team) und der Kontext zum Festhalten.
     id_status: dict[str, dict[str, dict]] = field(default_factory=dict)
     roster: Any = None
+    # Teilnehmerliste einmal je Spiel (#2204) und ihre Mindestzahl.
+    lineup_mode: str = PER_MAP
+    min_players: int = 1
+
+    @property
+    def is_series(self) -> bool:
+        return self.lineup_mode == SERIES
+
+    @property
+    def app_detail(self) -> str:
+        return SERIES_APP_DETAIL if self.is_series else APP_DETAIL
 
     @property
     def reg_ids(self) -> list[str]:
@@ -119,7 +141,8 @@ async def setup(db, match: dict, tournament: dict | None = None, stage: dict | N
         reg["id"]: roster_ids(reg, teams.get(reg.get("team_id") or "")) for reg in registrations if reg.get("id")
     }
     everyone = set().union(*rosters.values()) if rosters else set()
-    roster_ctx = await league_roster.context_for_tournament(db, tournament, everyone)
+    # Die eine Prüfung (#2204): über dem Stand der Spiel-ID liegen die Regeln der Season - ohne Regeln bleibt es der ID-Stand.
+    eligibility = await league_eligibility.context_for_tournament(db, tournament, everyone)
     pool = await map_pools.effective_pool(db, tournament, stage=stage, match=match)
     return LeagueSetup(
         tournament=tournament,
@@ -138,11 +161,13 @@ async def setup(db, match: dict, tournament: dict | None = None, stage: dict | N
         },
         map_repeat=map_repeat_of(tournament),
         id_status={
-            reg["id"]: league_roster.statuses(roster_ctx, rosters.get(reg["id"]) or set(), reg.get("squad_id"))
+            reg["id"]: league_eligibility.statuses(eligibility, rosters.get(reg["id"]) or set(), reg.get("squad_id"))
             for reg in registrations
             if reg.get("id")
         },
-        roster=roster_ctx,
+        roster=eligibility.roster if eligibility else None,
+        lineup_mode=lineup_mode_of(tournament),
+        min_players=_positive_int(tournament.get("lineup_min_players"), 1),
     )
 
 
@@ -225,6 +250,45 @@ def _lineup(setup: LeagueSetup, registration_id: str, raw, label: str, position:
         if state and not state["ok"] and user_id not in kept:
             raise LeagueGamesError(f"{label}: {state['name']} kann nicht aufgestellt werden – {state['reason']}")
     return ids
+
+
+def _listed_before(setup: LeagueSetup, registration_id: str) -> set[str]:
+    """Wer auf der Teilnehmerliste dieser Seite schon steht: am Spiel, in ihrer letzten Meldung, im gehaltenen Ergebnis."""
+    from services.v2_match_flows import latest_reports
+
+    match = setup.match
+    out = set((match.get("lineups") or {}).get(registration_id) or [])
+    out.update((latest_reports(match.get("reports")).get(registration_id) or {}).get("lineup") or [])
+    held = match.get("pending_result")
+    if isinstance(held, dict):
+        out.update((held.get("lineups") or {}).get(registration_id) or [])
+    return out
+
+
+def _participants(setup: LeagueSetup, registration_id: str, raw) -> list[str]:
+    """Die Teilnehmerliste einer Seite prüfen - dieselbe Prüfung, die der Check-in nutzt (D.2)."""
+    try:
+        return league_eligibility.check_participants(
+            setup.id_status.get(registration_id) or {}, raw, minimum=setup.min_players,
+            roster=setup.rosters.get(registration_id) or set(), side=setup.names.get(registration_id, "Team"),
+            kept=_listed_before(setup, registration_id))
+    except league_eligibility.EligibilityError as problem:
+        raise LeagueGamesError(problem.detail, problem.status_code) from None
+
+
+def with_series(games: list[dict] | None, lineups: dict | None) -> list[dict]:
+    """Maps plus Teilnehmerliste als Eintrag ohne Map: So lesen Doppel-Einsatz, „beide Seiten“ und Festhalten beides gleich."""
+    return [*(games or []), *([{"lineups": lineups}] if lineups else [])]
+
+
+def participants(match: dict) -> list[str]:
+    """Wer als Einsatz zählt (#2204, liest #2214): die geltende Teilnehmerliste, im Altbestand die Aufstellungen der Maps. Wer nicht
+    darauf steht, zählt nicht."""
+    ids: set[str] = set()
+    for game in with_series(match.get("games"), match.get("lineups")):
+        for lineup in (game.get("lineups") or {}).values():
+            ids.update(user_id for user_id in lineup or [] if user_id)
+    return sorted(ids)
 
 
 def _lined_up_before(setup: LeagueSetup, registration_id: str, position: int) -> set[str]:
@@ -402,12 +466,13 @@ def _lineup_sources(match: dict) -> list[list[dict]]:
     from services.v2_match_flows import latest_reports
 
     if match.get("games") or match.get("results") or str(match.get("status") or "") in DECIDED_STATUSES:
-        sources = [match.get("games") or []]
+        sources = [with_series(match.get("games"), match.get("lineups"))]
     else:
-        sources = [report.get("games") or [] for report in latest_reports(match.get("reports")).values()]
+        sources = [with_series(report.get("games"), {key: report["lineup"]} if report.get("lineup") else None)
+                   for key, report in latest_reports(match.get("reports")).items()]
     held = match.get("pending_result")
-    if isinstance(held, dict) and held.get("games"):
-        sources.append(held["games"])
+    if isinstance(held, dict) and (held.get("games") or held.get("lineups")):
+        sources.append(with_series(held.get("games"), held.get("lineups")))
     return sources
 
 
@@ -529,7 +594,7 @@ async def check_double_use(db, setup: LeagueSetup, games: list[dict], registrati
 async def refresh_lineup_index(db, match_id: str) -> None:
     """``lineup_user_ids`` nach dem Stand am Spiel neu setzen (nach Meldung, Ergebnis, Nachtrag, Rückgängig)."""
     match = await db.matches_v2.find_one(
-        {"id": match_id}, {"_id": 0, "games": 1, "reports": 1, "results": 1, "status": 1, "pending_result": 1}
+        {"id": match_id}, {"_id": 0, "games": 1, "lineups": 1, "reports": 1, "results": 1, "status": 1, "pending_result": 1}
     )
     if not match:
         return
@@ -555,13 +620,14 @@ async def tell_missing_lineups(db, match: dict, registration_ids: list[str]) -> 
     if not registration_ids:
         return
     registrations = [reg for reg in await registrations_for_match(db, match) if reg.get("id") in set(registration_ids)]
-    tournament = await db.tournaments.find_one({"id": match.get("tournament_id")}, {"_id": 0, "title": 1}) or {}
+    tournament = await db.tournaments.find_one({"id": match.get("tournament_id")}, {"_id": 0, "title": 1, "lineup_mode": 1}) or {}
     label = match.get("round_name") or match.get("matchday_label") or "dein Spiel"
+    series = lineup_mode_of(tournament) == SERIES
     for user in await users_for(db, await responsible_user_ids(db, registrations)):
         await create_user_notification(
             user["id"],
-            "Aufstellung fehlt noch",
-            f"{tournament.get('title') or 'Liga'} · {label}: {LINEUP_MISSING_TEXT}",
+            SERIES_MISSING_TITLE if series else "Aufstellung fehlt noch",
+            f"{tournament.get('title') or 'Liga'} · {label}: {SERIES_MISSING_TEXT if series else LINEUP_MISSING_TEXT}",
             url=f"/matches/{match.get('id')}",
             kind="match_result",
             meta={
@@ -577,17 +643,29 @@ async def tell_missing_lineups(db, match: dict, registration_ids: list[str]) -> 
 
 
 async def prepare_report(
-    db, setup: LeagueSetup, raw_games: list[dict] | None, own_registration_id: str, results: list[dict]
-) -> list[dict] | None:
-    """Eine Meldung eines Liga-Spiels prüfen. Mit Maps: alles nach dem Vertrag, die eigene Aufstellung je Map, passend
-    zur Meldung der Gegenseite (sonst 409 mit Hinweis auf Einspruch). Ohne Maps (die App): nur als Bestätigung einer
-    vorhandenen Meldung mit gleichem Stand - sonst 422 „Bitte im Web mit Maps und Aufstellung melden“."""
+    db, setup: LeagueSetup, raw_games: list[dict] | None, own_registration_id: str, results: list[dict],
+    lineup: list[str] | None = None,
+) -> tuple[list[dict] | None, list[str] | None]:
+    """Eine Meldung eines Liga-Spiels prüfen. Mit Maps: alles nach dem Vertrag, die eigene Aufstellung je Map oder - mit
+    ``lineup_mode: series`` - die Teilnehmerliste der eigenen Seite, passend zur Meldung der Gegenseite (sonst 409 mit Hinweis auf
+    Einspruch). Ohne Maps (die App): nur als Bestätigung einer vorhandenen Meldung mit gleichem Stand - sonst 422 „Bitte im Web mit
+    Maps und Aufstellung melden“. Liefert Maps und Liste."""
     from services.v2_match_flows import latest_reports, reports_conflict
 
     others = [
         report for key, report in latest_reports(setup.match.get("reports")).items() if key != own_registration_id
     ]
     other = others[-1] if others else None
+    if raw_games and setup.is_series:
+        games = normalize_games(setup, [{**game, "lineups": {}} for game in raw_games])
+        check_results(setup, games, results)
+        if other and other.get("games") and not same_outcome(other["games"], games):
+            raise LeagueGamesError(CONFIRM_DIFFERENT_DETAIL, 409)
+        ids = _participants(setup, own_registration_id, lineup)
+        listed = with_series(None, {own_registration_id: ids})
+        check_both_sides(setup, listed, {own_registration_id})
+        await check_double_use(db, setup, listed, {own_registration_id})
+        return games, ids
     if raw_games:
         items = [
             {**game, "lineups": {own_registration_id: game.get("lineup")} if game.get("lineup") else {}}
@@ -600,12 +678,12 @@ async def prepare_report(
         if other and other.get("games") and not same_outcome(other["games"], games):
             raise LeagueGamesError(CONFIRM_DIFFERENT_DETAIL, 409)
         await check_double_use(db, setup, games, {own_registration_id})
-        return games
+        return games, None
     if not other or not other.get("games"):
-        raise LeagueGamesError(APP_DETAIL)
+        raise LeagueGamesError(setup.app_detail)
     if reports_conflict([other, {"registration_id": own_registration_id, "results": results}]):
-        raise LeagueGamesError(APP_DETAIL)
-    return None
+        raise LeagueGamesError(setup.app_detail)
+    return None, None
 
 
 def consensus_games(reports: list[dict] | None, registration_ids: list[str]) -> tuple[list[dict] | None, list[str]]:
@@ -626,6 +704,19 @@ def consensus_games(reports: list[dict] | None, registration_ids: list[str]) -> 
     return games, missing_lineups(games, registration_ids)
 
 
+def consensus_lineups(reports: list[dict] | None, registration_ids: list[str]) -> tuple[dict[str, list[str]], list[str]]:
+    """Die Teilnehmerlisten aus den letzten Meldungen je Seite - dazu die Seiten, denen eine fehlt (Bestätigung aus der App)."""
+    from services.v2_match_flows import latest_reports
+
+    latest = latest_reports(reports)
+    lineups = {reg_id: latest[reg_id]["lineup"] for reg_id in registration_ids if (latest.get(reg_id) or {}).get("lineup")}
+    return lineups, missing_participants(lineups, registration_ids)
+
+
+def missing_participants(lineups: dict | None, registration_ids: list[str]) -> list[str]:
+    return [reg_id for reg_id in registration_ids if not (lineups or {}).get(reg_id)]
+
+
 def admin_games(setup: LeagueSetup, raw_games: list[dict], results: list[dict]) -> tuple[list[dict], list[str]]:
     """Maps der Turnierleitung (Eintragen oder Korrektur): Aufstellungen beider Seiten, je Seite freiwillig."""
     sides = set(setup.reg_ids)
@@ -634,10 +725,23 @@ def admin_games(setup: LeagueSetup, raw_games: list[dict], results: list[dict]) 
     return games, missing_lineups(games, setup.reg_ids)
 
 
+def admin_series(setup: LeagueSetup, raw_games: list[dict], raw_lineups: dict | None, results: list[dict]) -> tuple[list[dict], dict[str, list[str]], list[str]]:
+    """Dasselbe mit Teilnehmerliste (#2204): die Maps ohne Aufstellung, dazu die Listen beider Seiten, je Seite freiwillig."""
+    sides = set(setup.reg_ids)
+    if not isinstance(raw_lineups or {}, dict) or any(key not in sides for key in raw_lineups or {}):
+        raise LeagueGamesError("Eine Teilnehmerliste gehört zu einer der beiden Seiten des Spiels.")
+    games = normalize_games(setup, [{**game, "lineups": {}} for game in raw_games])
+    check_results(setup, games, results)
+    lineups = {key: _participants(setup, key, value) for key, value in (raw_lineups or {}).items() if value}
+    check_both_sides(setup, with_series(None, lineups), sides)
+    return games, lineups, missing_participants(lineups, setup.reg_ids)
+
+
 # ---------------------------------------------------------------- Aufstellung nachtragen
 
 
 AMEND_CLOSED_DETAIL = "Die Frist zum Nachtragen ist vorbei – ändern kann die Aufstellung jetzt nur die Turnierleitung."
+SERIES_AMEND_CLOSED = "Die Frist zum Nachtragen ist vorbei – die Liga-Leitung hat den Fall bekommen. Das Ergebnis bleibt gültig."
 REASON_MIN_LENGTH = 5
 
 
@@ -669,6 +773,54 @@ def amend_deadline_for(tournament: dict | None, match: dict):
         return None
     tournament = tournament or {}
     return response_deadline(tournament, done, _positive_int(tournament.get("lineup_amend_hours"), DEFAULT_AMEND_HOURS))
+
+
+async def amend_participants(
+    db, setup: LeagueSetup, lineup: list[str] | None, *, registration_id: str, actor_id: str, staff: bool, reason: str | None
+) -> dict:
+    """Die Teilnehmerliste einer Seite nachtragen (#2204): Captain oder Vertreter bis ``lineup_amend_hours`` ab der Bestätigung, danach
+    die Leitung - sie immer mit Grund. Das Ergebnis bleibt unberührt."""
+    from models import new_id, now_utc
+
+    match = setup.match
+    if not match.get("games"):
+        raise LeagueGamesError("Für dieses Spiel steht noch kein Ergebnis fest – die Liste kommt mit der Meldung.", 409)
+    if registration_id not in setup.reg_ids:
+        raise LeagueGamesError("Diese Seite spielt in diesem Spiel nicht.")
+    reason_text = (reason or "").strip()
+    if staff:
+        if len(reason_text) < REASON_MIN_LENGTH:
+            raise LeagueGamesError(f"Bitte einen Grund angeben (mindestens {REASON_MIN_LENGTH} Zeichen).")
+    else:
+        deadline = amend_deadline(setup)
+        if deadline and now_utc() > deadline:
+            raise LeagueGamesError(SERIES_AMEND_CLOSED, 409)
+    ids = _participants(setup, registration_id, lineup)
+    listed = with_series(None, {registration_id: ids})
+    check_both_sides(setup, listed, {registration_id})
+    await check_double_use(db, setup, listed, {registration_id})
+    current = match.get("lineups")
+    lineups = {**(current or {}), registration_id: ids}
+    missing = missing_participants(lineups, setup.reg_ids)
+    change: dict = {"$set": {"lineups": lineups, "lineups_missing": missing, "updated_at": now_utc().isoformat()}}
+    if not missing:
+        change["$unset"] = {"lineup_overdue_at": ""}
+    stored = await db.matches_v2.update_one({"id": match["id"], "lineups": current}, change)
+    if not stored.matched_count:
+        raise LeagueGamesError("Das Spiel hat sich gerade geändert – bitte neu laden und noch einmal speichern.", 409)
+    await lock_lineup_ids(db, setup, listed, {registration_id})
+    await refresh_lineup_index(db, match["id"])
+    await log_both_sides_kept(db, setup, listed, {registration_id}, actor_id)
+    await db.audit_logs.insert_one({
+        "id": new_id(),
+        "action": "match.lineup.amend",
+        "target_id": match.get("tournament_id"),
+        "actor_id": actor_id,
+        "data": {"match_id": match["id"], "registration_id": registration_id, "by_staff": staff, "people": len(ids),
+                 **({"reason": reason_text} if reason_text else {})},
+        "created_at": now_utc().isoformat(),
+    })
+    return await db.matches_v2.find_one({"id": match["id"]}, {"_id": 0})
 
 
 async def amend_lineups(
@@ -786,8 +938,11 @@ def _lobby_ids(setup: LeagueSetup, side_id: str | None, staff: bool) -> list[dic
             state = (setup.id_status.get(reg_id) or {}).get(user_id) or {}
             if state.get("state") == league_roster.BANNED and reg_id != side_id and not staff:
                 continue
+            # Die Gegenseite sieht nur den Stand der Spiel-ID, nie einen Grund aus den Regeln der Season (#2204).
+            own = reg_id == side_id or staff
             players.append({"id": user_id, "name": state.get("name") or "Spieler", "text": state.get("text"),
-                            "ok": bool(state.get("ok", True)), "reason": state.get("reason")})
+                            "ok": bool(state.get("ok", True) if own else state.get("id_ok", True)),
+                            "reason": state.get("reason") if own else state.get("id_reason")})
         players.sort(key=lambda row: row["name"].lower())
         out.append({"registration_id": reg_id, "name": setup.names.get(reg_id), "players": players})
     return out
@@ -839,6 +994,9 @@ async def page_block(db, setup: LeagueSetup, *, side_id: str | None, can_act: bo
         for game in games:
             for lineup in (game.get("lineups") or {}).values():
                 wanted.update(lineup or [])
+    for lineup in (match.get("lineups") or {}).values():
+        wanted.update(lineup or [])
+    wanted.update((own_report or {}).get("lineup") or [])
     people = {}
     if wanted:
         for user in await db.users.find(
@@ -861,7 +1019,15 @@ async def page_block(db, setup: LeagueSetup, *, side_id: str | None, can_act: bo
             "lineup_blocked": None if state.get("ok", True) else state.get("reason"),
         }
 
+    def named(user_ids) -> list[dict]:
+        return [people.get(user_id) or {"id": user_id, "name": "Spieler"} for user_id in user_ids or []]
+
     return {
+        "lineup_mode": setup.lineup_mode,
+        "lineup_min_players": setup.min_players if setup.is_series else None,
+        "participants": {reg_id: named(lineup) for reg_id, lineup in (match.get("lineups") or {}).items()} if sees_lineups else {},
+        "own_lineup": named((match.get("lineups") or {}).get(side_id) or (own_report or {}).get("lineup")) if side_id else [],
+        "lineup_overdue": bool(match.get("lineup_overdue_at")) and sees_lineups,
         "best_of": setup.best_of,
         "needed": setup.needed,
         "team_size": setup.team_size,
@@ -889,7 +1055,7 @@ async def page_block(db, setup: LeagueSetup, *, side_id: str | None, can_act: bo
         ),
         "can_amend_lineup": bool(can_act and side_id and open_window),
         "amend_until": deadline.isoformat() if deadline else None,
-        "app_detail": APP_DETAIL,
+        "app_detail": setup.app_detail,
         "default_time": default_time(setup),
         "map_repeat": setup.map_repeat,
     }

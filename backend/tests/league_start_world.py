@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 
+from league_match_world import OLD_RULES
 from models import now_utc
 from squad_world import make_team
 
@@ -46,7 +47,7 @@ async def build(flow, teams: int, **season) -> dict:
     flow.act_as(lead)
     game = ok(await flow.post("/api/games", json=GAME))
     league = ok(await flow.post(ADMIN, json={"name": "Probe-Liga", "game_id": game["id"]}))
-    season_row = ok(await flow.post(f"{ADMIN}/{league['id']}/seasons", json=season_body(**season)))
+    season_row = ok(await flow.post(f"{ADMIN}/{league['id']}/seasons", json={**OLD_RULES, **season_body(**season)}))
     division = ok(await flow.post(f"{ADMIN}/seasons/{season_row['id']}/divisions", json={}))
     tid = await add_staffel(flow, lead, division["id"], teams, game=game, prefix="A")
     return {"lead": lead, "game": game, "league": league, "season": season_row, "division": division, "tid": tid}

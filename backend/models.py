@@ -1032,6 +1032,8 @@ RESULT_MAX_ENTRIES = 256
 # Liga (docs/LIGA.md, #1650): höchstens Best of 9 Maps je Spiel, Aufstellungen in Teamgröße.
 MATCH_GAMES_MAX = 9
 MATCH_LINEUP_MAX = 20
+# Teilnehmerliste einmal je Spiel (#2204): nach oben offen, höchstens so groß wie der größte Kader.
+MATCH_PARTICIPANTS_MAX = 200
 
 
 class MatchScoreReport(BaseModel):
@@ -1047,6 +1049,8 @@ class MatchScoreReport(BaseModel):
     photo_id: Optional[str] = None
     # Liga (docs/LIGA.md, #1650): je Map Modus, Map, Sieger, Punkte und die eigene Aufstellung - sonst unbeachtet.
     games: Optional[List["MatchGameReport"]] = Field(default=None, max_length=MATCH_GAMES_MAX)
+    # Teilnehmerliste der eigenen Seite (#2204), nur in Staffeln mit ``lineup_mode: series``.
+    lineup: Optional[List[str]] = Field(default=None, max_length=MATCH_PARTICIPANTS_MAX)
 
 
 class MatchGameReport(BaseModel):
@@ -1075,9 +1079,10 @@ class MatchLineupAmendGame(BaseModel):
 
 
 class MatchLineupAmend(BaseModel):
-    """Aufstellung nachtragen (``PUT /api/matches/{id}/lineups``): je Map die eigene Seite. Die Turnierleitung nennt
-    die Seite (``registration_id``) und einen Grund."""
-    games: List[MatchLineupAmendGame] = Field(min_length=1, max_length=MATCH_GAMES_MAX)
+    """Aufstellung nachtragen (``PUT /api/matches/{id}/lineups``): je Map die eigene Seite (``games``) oder die Teilnehmerliste
+    (``lineup``, #2204). Die Turnierleitung nennt die Seite (``registration_id``) und einen Grund."""
+    games: Optional[List[MatchLineupAmendGame]] = Field(default=None, max_length=MATCH_GAMES_MAX)
+    lineup: Optional[List[str]] = Field(default=None, max_length=MATCH_PARTICIPANTS_MAX)
     registration_id: Optional[str] = Field(default=None, max_length=100)
     reason: Optional[str] = Field(default=None, max_length=500)
     # Notausnahme des Superadmins bei Befangenheit (#2203, docs/LIGA.md Abschnitt 12).
@@ -1104,6 +1109,8 @@ class MatchV2ResultSubmit(BaseModel):
     reason: Optional[str] = Field(default=None, max_length=500)
     # Liga (#1650): Maps samt Aufstellungen beider Seiten - freiwillig, sonst bleiben die Maps des Spiels.
     games: Optional[List[MatchGameAdmin]] = Field(default=None, max_length=MATCH_GAMES_MAX)
+    # Teilnehmerlisten beider Seiten (#2204), je Seite freiwillig - nur in Staffeln mit ``lineup_mode: series``.
+    lineups: Optional[Dict[str, List[str]]] = None
     # Notausnahme des Superadmins bei Befangenheit (#2203).
     conflict_reason: Optional[str] = Field(default=None, max_length=500)
 

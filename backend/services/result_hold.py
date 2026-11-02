@@ -96,7 +96,7 @@ def _no_show(match: dict, results: list[dict]) -> str | None:
 async def hold_result(db, match: dict, raw_results: list[dict], *, actor: dict, note: str | None,
                       proof_url: str | None, force: bool, reason: str | None,
                       games: list[dict] | None = None, lineups_missing: list[str] | None = None,
-                      conflict_reason: str | None = None) -> dict:
+                      conflict_reason: str | None = None, lineups: dict | None = None) -> dict:
     """Ein Ergebnis für 10 Sekunden bereitlegen. Prüft alles wie beim Speichern - Fehler kommen sofort zurück."""
     actor_id = actor["id"]
     normalized = await checked_results(db, match, raw_results)
@@ -132,6 +132,8 @@ async def hold_result(db, match: dict, raw_results: list[dict], *, actor: dict, 
         "publish_at": (now + timedelta(seconds=HOLD_SECONDS + GRACE_SECONDS)).isoformat(),
         # Liga (#1650): geprüfte Maps samt Aufstellungen gehen mit dem Ergebnis raus.
         **({"games": games, "lineups_missing": lineups_missing or []} if games is not None else {}),
+        # Teilnehmerlisten (#2204) ebenso.
+        **({"lineups": lineups} if lineups is not None else {}),
         # Notausnahme des Superadmins (#2203): Beim Veröffentlichen zählt, dass sie beim Ablegen gesetzt war.
         **({"conflict_reason": conflict_reason} if conflict_reason else {}),
     }
@@ -243,6 +245,7 @@ async def _publish_one(db, match_id: str, hold_id: str | None, moment: str) -> b
                 reason=hold.get("reason"), hold_id=hold_id,
                 games=hold.get("games") if "games" in hold else None,
                 lineups_missing=hold.get("lineups_missing") if "games" in hold else None,
+                match_lineups=hold.get("lineups") if "lineups" in hold else None,
             )
     except MatchV2ResultError as exc:
         # Inzwischen hat sich etwas geändert (etwa ein Folgespiel läuft schon): nichts schreiben, Bescheid geben.
@@ -401,7 +404,8 @@ async def _revert_published(db, match: dict, *, actor_id: str, hold_id: str | No
         "$set": {"results": [], "result_meta": None, "completed_at": None, "completed_by": None,
                  "status": _open_status(match), "updated_at": now_iso},
         # Liga (#1650): die geltenden Maps gehören zum Ergebnis - offene Meldungen bleiben, der Index folgt ihnen.
-        **({"$unset": {"games": "", "lineups_missing": ""}} if "games" in match or "lineups_missing" in match else {}),
+        **({"$unset": {"games": "", "lineups_missing": "", "lineups": "", "lineup_overdue_at": ""}}
+           if "games" in match or "lineups_missing" in match or "lineups" in match else {}),
     })
     if "games" in match or match.get("lineup_user_ids"):
         from services.league_games import refresh_lineup_index
