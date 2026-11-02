@@ -116,7 +116,11 @@ export function TeamInviteSheet({ team, onClose, onCodeRenewed }) {
       {joinCode ? (
         <section className="border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm p-4" data-testid="team-join-code-box">
           <div className="text-[11px] uppercase tracking-widest text-[#FFD700] font-bold">Beitrittscode</div>
-          <p className="mt-1 text-xs text-white/55">Falls der Link nicht geht: Code auf der Team-Seite unter „Team beitreten“ eingeben.</p>
+          <p className="mt-1 text-xs text-white/55" data-testid="team-join-code-hint">
+            {team.is_public === false
+              ? "Das Team ist privat: Außenstehende sehen die Teamseite nicht und können den Code dort nicht eingeben. Lade über den Link oder persönlich ein."
+              : "Falls der Link nicht geht: Code auf der Team-Seite unter „Team beitreten“ eingeben."}
+          </p>
           <div className="mt-2 flex gap-2">
             <code className="flex-1 min-w-0 break-all bg-black/40 border border-white/10 px-3 py-2 rounded-sm text-sm" data-testid="team-join-code-value">{joinCode}</code>
             <button type="button" onClick={() => copy(joinCode, "Beitrittscode kopiert.")} aria-label="Beitrittscode kopieren" className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm"><Copy className="w-4 h-4" /></button>

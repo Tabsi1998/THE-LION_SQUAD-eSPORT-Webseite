@@ -32,7 +32,8 @@ export function TeamJoinCard({ teamId, token, user, onJoined }) {
     return (
       <section className="border border-white/15 bg-[#121212] rounded-sm p-4" data-testid="team-join-invalid">
         <div className="font-bold">Dieser Einladungs-Link gilt nicht mehr</div>
-        <p className="mt-1 text-sm text-white/60">Frag im Team nach einem neuen Link – oder gib den Beitrittscode unter „Team beitreten“ ein.</p>
+        {/* Ein privates Team zeigt sich ohne gültigen Link gar nicht - dann gibt es auch kein „Team beitreten“. */}
+        <p className="mt-1 text-sm text-white/60">{check.team ? "Frag im Team nach einem neuen Link – oder gib den Beitrittscode unter „Team beitreten“ ein." : "Frag im Team nach einem neuen Link."}</p>
       </section>
     );
   }

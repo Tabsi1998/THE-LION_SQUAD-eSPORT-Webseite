@@ -36,7 +36,8 @@ Nichts einzurichten. Ein neues Team ist öffentlich. Name 2–60 Zeichen, Kürze
 
 Unter **Einladen** stehen drei Wege: **Einladungs-Link** mit QR-Code, **Beitrittscode** und die Suche nach einer Person.
 **Neuen Link erzeugen** und **Beitrittscode erneuern** fragen nach; danach gilt der alte nicht mehr, wer schon im Team ist,
-bleibt. Link und Code sind unabhängig: Einen zu erneuern ändert den anderen nicht. Der Code steht nie im Protokoll, dort
+bleibt. Link und Code sind unabhängig: Einen zu erneuern ändert den anderen nicht. In einem **privaten** Team hilft der Code
+Außenstehenden nicht, weil sie die Teamseite nicht sehen – das Blatt sagt es dort auch; es bleiben Link und persönliche Einladung. Der Code steht nie im Protokoll, dort
 steht nur, dass und von wem er erneuert wurde.
 
 Die Teamleitung bekommt eine Nachricht, wenn jemand beitritt oder geht; wer entfernt wird, erfährt es auch. Beitritte,

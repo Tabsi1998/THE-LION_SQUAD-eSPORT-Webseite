@@ -178,6 +178,30 @@ test("Beitrittscode erneuern fragt nach und zeigt den neuen Code", async () => {
   expect(await screen.findByTestId("team-join-code-value")).toHaveTextContent("N3uCode");
 });
 
+// Privat (#2128, TM9): Außenstehende sehen die Teamseite nicht - das Blatt verspricht nichts, was dort nicht geht.
+test("Einladen im privaten Team: der Hinweis zum Beitrittscode sagt, was geht", async () => {
+  serve({ ...TEAM, is_public: false });
+  const { unmount } = renderAt("/teams/t-1");
+  fireEvent.click(await screen.findByTestId("team-invite-open"));
+  expect(await screen.findByTestId("team-join-code-hint")).toHaveTextContent("Das Team ist privat");
+  unmount();
+
+  serve();
+  renderAt("/teams/t-1");
+  fireEvent.click(await screen.findByTestId("team-invite-open"));
+  expect(await screen.findByTestId("team-join-code-hint")).toHaveTextContent("Falls der Link nicht geht");
+});
+
+test("alter Link zu einem privaten Team: kein Verweis auf „Team beitreten“", async () => {
+  authState.user = { id: "u-9", username: "kiwikomet" };
+  const missing = Object.assign(new Error("404"), { response: { status: 404 } });
+  serve(TEAM, { "/teams/t-1": missing, "/teams/t-1/invite-link/check": missing });
+  renderAt("/teams/t-1?einladung=AltesToken");
+  const card = await screen.findByTestId("team-join-invalid");
+  expect(card).toHaveTextContent("Frag im Team nach einem neuen Link.");
+  expect(card).not.toHaveTextContent("Team beitreten");
+});
+
 // Schalter „öffentlich/privat“ (#2128, TM9): nur die Teamleitung; der Hinweis sagt, was privat bedeutet.
 test("Teamleitung stellt das Team auf privat, der Hinweis nennt die Folgen; Co-Leitung sieht den Schalter nicht", async () => {
   serve();
