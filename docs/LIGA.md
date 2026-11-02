@@ -181,7 +181,7 @@ Ablauf (`services/league_roster.py`):
 - **Sichtbarkeit:** die IDs der Spieler stehen im Block `league` der Matchseite (`roster[].game_id_text`,
   `lobby_ids`) nur für Beteiligte des Spiels und die Turnierleitung – wie Aufstellungen. Die eigene ID je laufender
   Season steht unter `GET /api/me/league-ids` (Hinweis im Profil). Die Kaderübersicht
-  (`GET /api/admin/leagues/seasons/{id}/roster`) sieht nur die Turnierleitung.
+  (`GET /api/admin/leagues/seasons/{id}/roster`) sieht nur, wer das Liga-Recht „Kader prüfen“ hat.
 - **Datenschutz:** Die Auskunft enthält `league_rosters`; das Löschen des Kontos löscht die Einträge
   (`account_erasure.PURGED`) – Aufstellungen und Ergebnisse bleiben ohne sie.
 
@@ -464,7 +464,7 @@ gemeinsam, damit das Heimrecht fair bleibt.
 
 - **Schalter ist die Season-Sichtbarkeit** (Vorgabe `off`), kein globaler Schalter. Die Navigation zeigt „Liga“ nur,
   wenn die öffentliche Lese-API für die Person mindestens eine Season liefert.
-- **APIs (P1):** Verwaltung `/api/admin/leagues` (`require_area("tournaments")`): `GET ""` (Ligen mit Seasons, Spiele,
+- **APIs (P1):** Verwaltung `/api/admin/leagues` (Bereich `leagues` oder Zuständigkeit, Abschnitt 12): `GET ""` (Ligen mit Seasons, Spiele,
   Vorgaben), `POST ""`, `PATCH /{league_id}`, `POST /{league_id}/seasons`, `GET|PATCH /seasons/{id}` (mit Kalender,
   Map-Pool, Liga N samt Staffeln), `PUT|DELETE /seasons/{id}/map-pool`, `POST /seasons/{id}/sync`,
   `POST /seasons/{id}/divisions`, `PATCH /divisions/{id}`, `POST /divisions/{id}/staffeln`; seit #2106
@@ -477,7 +477,7 @@ gemeinsam, damit das Heimrecht fair bleibt.
 | `league_seasons.visibility` | Ligaseite | Staffel-Turniere (`visibility`, `is_public`) |
 | --- | --- | --- |
 | `off` | 404 | `internal`, `false`, Status bleibt `draft` |
-| `admins` | nur Turnierleitung | `internal`, `false` |
+| `admins` | nur Bereich Ligen und Zuständige dieser Liga | `internal`, `false` |
 | `members` | wie Turnier-Sichtbarkeit `members` | `members`, `true` |
 | `public` | alle | `public`, `true` |
 
