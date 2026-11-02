@@ -286,6 +286,8 @@ AUDIT_TEXTS = {
     "billing.pdfs.build_missing": "Fehlende PDFs nachgezogen",
     "billing.reconcile": "Alles abgeglichen",
     "billing.invoice.close": "Abschluss in Dolibarr",
+    "billing.invoice.removed": "Entwurf in Dolibarr gelöscht",
+    "billing.order.dismiss": "Keine neue Rechnung",
     "billing.settings.credit_note_draft": "Schalter „Gutschrift-Entwurf“ geändert",
     "billing.export": "Export erstellt",
     "event.registration.create": "Anmeldung angelegt",
@@ -338,6 +340,8 @@ def _timeline(order: dict, cases: list[dict], audit: list[dict], people: dict) -
         items.append({"at": order["released_at"], "kind": "release", "text": f"Freigegeben von {people.get(order.get('released_by'), 'Finanzen')}"})
     if order.get("invoiced_at"):
         items.append({"at": order["invoiced_at"], "kind": "invoice", "text": f"Beleg in Dolibarr: {order.get('invoice_ref') or '–'}"})
+    for removed in order.get("removed_invoices") or []:
+        items.append({"at": removed.get("at"), "kind": "invoice", "text": f"Entwurf {removed.get('invoice_ref') or ''} in Dolibarr gelöscht"})
     for payment in order.get("payments") or []:
         items.append({"at": payment.get("date") or order.get("synced_at"), "kind": "payment", "text": f"Zahlung {money(payment.get('amount_cents'))}" + (f" ({payment['type']})" if payment.get("type") else "") + (f" – {payment['ref']}" if payment.get("ref") else "")})
     for note in order.get("credit_notes") or []:
@@ -355,7 +359,7 @@ def _timeline(order: dict, cases: list[dict], audit: list[dict], people: dict) -
             items.append({"at": case.get("resolved_at"), "kind": "case_resolved", "text": f"Prüffall erledigt ({who}): {case.get('resolution') or ''}"})
     for entry in audit:
         action = str(entry.get("action") or "")
-        if action in ("billing.order.release", "billing.refund.record", "billing.case.resolve"):
+        if action in ("billing.order.release", "billing.refund.record", "billing.case.resolve", "billing.invoice.removed"):
             continue   # steht schon oben, aus den Daten des Auftrags
         if action == "billing.invoice.close":
             items.append({"at": entry.get("created_at"), "kind": "invoice", "text": f"{_close_text(entry.get('data') or {})} – {people.get(entry.get('actor_id'), 'System')}"})
@@ -518,6 +522,19 @@ async def release_billing_order(order_id: str, me: dict = Depends(require_area("
                                     "data": {"registration_id": order.get("registration_id"), "total_cents": order.get("total_cents")},
                                     "created_at": now_utc().isoformat()})
     return updated
+
+
+@router.post("/orders/{order_id}/dismiss")
+async def dismiss_removed_order(order_id: str, me: dict = Depends(require_area("finance"))):
+    """Der Entwurf ist in Dolibarr gelöscht (#2226), und es soll keine neue Rechnung geben. Das Gegenstück zu „Freigeben“."""
+    db = get_db()
+    order = await db.billing_orders.find_one({"id": order_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(404, "Auftrag nicht gefunden.")
+    if order.get("status") != "held" or not order.get("removed_invoices"):
+        raise HTTPException(409, "Zu diesem Auftrag wurde kein Entwurf gelöscht.")
+    await billing_orders.dismiss_removed(db, order, me["id"])
+    return {"ok": True}
 
 
 class InvoiceExtraText(BaseModel):

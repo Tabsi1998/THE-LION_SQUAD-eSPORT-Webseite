@@ -647,9 +647,60 @@ async def _review_cases(db, order: dict, state: dict, payments: list[dict] | Non
     return opened
 
 
+# Was am Auftrag zum Beleg gehört: Ist der Entwurf in Dolibarr gelöscht, gibt es das alles nicht mehr (#2226).
+INVOICE_FIELDS = ("invoice_id", "invoice_ref", "invoice_status", "invoice_type", "paid", "paid_at", "remaining", "total", "remote_total_cents", "remaining_cents",
+                  "due_on", "credit_notes", "payment_state", "payments", "close_code", "close_note", "invoiced_at", "synced_at",
+                  "sync_error", "sync_error_text", "sync_error_at", "pdf_built_at", "pdf_source", "pdf_missing", "pdf_error", "pdf_error_text", "pdf_error_at", "pdf_attempts",
+                  "invoice_notice_due_at", "credit_note_due_at", "credit_note_claim_at")
+# Prüffälle, die am Beleg hängen - mit dem gelöschten Entwurf sind sie gegenstandslos. „Buchung nach dem Beleg geändert“ bleibt:
+# Der eingefrorene Preis passt dann nicht mehr, das entscheidet die Finanzverwaltung.
+DRAFT_CASES = ("invoice_gone", "amount_mismatch", "recipient_mismatch", "cancelled_after_invoice")
+
+
+async def _draft_is_gone(client: DolibarrClient, order: dict, exc: DolibarrError) -> bool:
+    """Beweist dieses „nicht gefunden“, dass der Entwurf weg ist? Nur bei einem Entwurf, nur wenn Dolibarr selbst geantwortet hat
+    (eine Fehlerangabe im Text - die Seite „Not Found“ eines Webservers davor ist kein Beweis), und nur wenn Dolibarr auch über
+    die Auftragskennung nichts findet. Scheitert dieser zweite Blick, kommt sein Fehler nach oben: Dann ist nichts bewiesen."""
+    if exc.kind != "not_found" or exc.detail is None or order.get("invoice_status") != "draft":
+        return False
+    return not await client.invoices_by_ref_ext(ref_ext_for(order))
+
+
+async def _remove_draft(db, order: dict) -> bool:
+    """Der Entwurf ist in Dolibarr gelöscht: Der Beleg gilt als entfernt. Offene Prüffälle dazu sind erledigt, die Anmeldung steht
+    wieder ohne Beleg da. Neu abgerechnet wird nicht von selbst - sonst käme ein gelöschter Entwurf immer wieder: Der Auftrag wartet auf
+    die Freigabe der Finanzverwaltung (und findet über ``ref_ext`` einen Beleg, den Dolibarr doch noch hat). Bei stornierter Buchung ist er zu Ende."""
+    from services import billing_cases
+
+    now = now_utc().isoformat()
+    cancelled = order.get("booking_state") == "cancelled"
+    ref = str(order.get("invoice_ref") or order.get("invoice_id"))
+    note = "" if cancelled else f"Entwurf {ref} wurde in Dolibarr gelöscht. Soll neu abgerechnet werden: „Freigeben“. Sonst: „Keine neue Rechnung“."
+    if order.get("booking_changed_at") and not cancelled:
+        note += " Die Buchung wurde nach dem Beleg geändert – Preis prüfen."
+    done = await db.billing_orders.update_one(
+        {"id": order["id"], "status": "invoiced", "invoice_id": order["invoice_id"]},
+        {"$set": {"status": "cancelled" if cancelled else "held", "note": note, "attempts": 0, "updated_at": now},
+         "$unset": {field: "" for field in INVOICE_FIELDS},
+         "$push": {"removed_invoices": {"invoice_id": order["invoice_id"], "invoice_ref": ref, "at": now}}})
+    if done.modified_count != 1:
+        return False
+    collection = {"event": db.event_registrations, "tournament": db.tournament_registrations}.get(order.get("kind"))
+    if collection is not None:
+        await collection.update_one({"id": order["registration_id"]}, {"$set": {"billing_status": "cancelled" if cancelled else "pending"},
+                                                                       "$unset": {"invoice_id": "", "invoice_ref": "", "invoice_status": "", "payment_state": ""}})
+    for kind in DRAFT_CASES:
+        await billing_cases.auto_resolve(db, order["id"], kind, f"Der Entwurf {ref} ist in Dolibarr gelöscht.")
+    await db.audit_logs.insert_one({"id": new_id(), "action": "billing.invoice.removed", "target_id": order["id"], "actor_id": None,
+                                    "data": {"registration_id": order.get("registration_id"), "invoice_id": order["invoice_id"], "invoice_ref": ref}, "created_at": now})
+    logger.info("[billing] Entwurf %s zu Auftrag %s ist in Dolibarr gelöscht", ref, order["id"])
+    return True
+
+
 async def sync_one(db, settings: dict, client: DolibarrClient, order: dict, counts: dict | None = None) -> dict | None:
     """Einen Beleg samt Zahlungen und Gutschriften nachlesen. Nicht lesbar → sichtbar am Auftrag
-    (`sync_error`), nie still; verschwunden → Prüffall. Gibt den Stand zurück, None ohne."""
+    (`sync_error`), nie still; freigegebener Beleg verschwunden → Prüffall; gelöschter Entwurf → entfernt
+    (#2226). Gibt den Stand zurück, None ohne."""
     from services import billing_cases
 
     counts = counts if counts is not None else {"looked": 0, "changed": 0, "paid": 0, "cases": 0, "errors": 0}
@@ -665,6 +716,14 @@ async def sync_one(db, settings: dict, client: DolibarrClient, order: dict, coun
                 raise
             payments = None   # Zahlungen darf der Website-Benutzer nicht lesen: dann gilt Summe minus Rest.
     except DolibarrError as exc:
+        try:
+            if await _draft_is_gone(client, order, exc):
+                if await _remove_draft(db, order):
+                    counts["removed"] = counts.get("removed", 0) + 1
+                    counts["changed"] += 1
+                return None
+        except DolibarrError as second:
+            exc = second
         counts["errors"] += 1
         await db.billing_orders.update_one({"id": order["id"]}, {"$set": {"sync_error": exc.kind, "sync_error_text": exc.text, "sync_error_at": now}})
         if exc.kind == "not_found":

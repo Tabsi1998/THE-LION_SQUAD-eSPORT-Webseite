@@ -9,7 +9,8 @@ und bringt jeden Auftrag einen Schritt weiter. Was er dafür braucht, sagt der S
 - ``waiting_link``          die Person hat noch keinen Geschäftspartner in Dolibarr
 - ``waiting_review``        in Dolibarr gibt es schon einen Geschäftspartner mit derselben E-Mail -
                             die Finanzverwaltung ordnet zu oder lässt neu anlegen
-- ``held``                  Rechnungszeitpunkt „erst nach Freigabe“ - wartet auf die Finanzverwaltung
+- ``held``                  Rechnungszeitpunkt „erst nach Freigabe“ oder der Entwurf wurde in Dolibarr gelöscht
+                            (``removed_invoices``, #2226) - wartet auf die Finanzverwaltung
 - ``invoiced``              Beleg in Dolibarr angelegt (``invoice_id``, ``invoice_ref``, ``invoice_status``,
                             ``paid``, ``payment_state``) - der Stand wird regelmäßig nachgelesen
 - ``cancelled``             Buchung storniert, bevor ein Beleg entstand
@@ -183,6 +184,19 @@ async def release_order(db, order_id: str, actor_id: str) -> dict | None:
     """Rechnungszeitpunkt „bewusst später“: die Freigabe durch die Finanzverwaltung."""
     await db.billing_orders.update_one({"id": order_id, "status": "held"}, {"$set": {"status": "pending", "released_by": actor_id, "released_at": now_utc().isoformat(), "updated_at": now_utc().isoformat()}})
     return await db.billing_orders.find_one({"id": order_id}, {"_id": 0})
+
+
+async def dismiss_removed(db, order: dict, actor_id: str) -> None:
+    """Der Entwurf ist in Dolibarr gelöscht (#2226), und es soll keine neue Rechnung geben: Der Auftrag ist zu Ende,
+    die Anmeldung bleibt, ihr Preis zählt nicht mehr."""
+    now = now_utc().isoformat()
+    await db.billing_orders.update_one({"id": order["id"], "status": "held"}, {"$set": {
+        "status": "cancelled", "cancel_reason": "Entwurf in Dolibarr gelöscht, keine neue Rechnung", "note": "", "updated_at": now}})
+    collection = {"event": db.event_registrations, "tournament": db.tournament_registrations}.get(order.get("kind"))
+    if collection is not None:
+        await collection.update_one({"id": order["registration_id"]}, {"$set": {"billing_status": "cancelled"}})
+    await db.audit_logs.insert_one({"id": new_id(), "action": "billing.order.dismiss", "target_id": order["id"], "actor_id": actor_id,
+                                    "data": {"registration_id": order.get("registration_id"), "total_cents": order.get("total_cents")}, "created_at": now})
 
 
 async def classify_due(limit: int = 100) -> dict:
@@ -430,6 +444,8 @@ async def source_summary(db, kind: str, source_id: str) -> dict:
     totals = {"booked_cents": 0, "invoiced_cents": 0, "paid_cents": 0, "open_cents": 0, "credited_cents": 0, "waived_cents": 0, "refunded_cents": 0,
               "orders": 0, "cancelled_orders": 0, "cases_open": 0}
     async for order in db.billing_orders.find({"kind": kind, "source_id": source_id}, {"_id": 0, "snapshot": 0}):
+        if order.get("status") == "held" and order.get("removed_invoices"):
+            continue   # Entwurf in Dolibarr gelöscht (#2226): zählt erst wieder, wenn neu abgerechnet wird.
         totals["orders"] += 1
         if order.get("status") == "cancelled":
             totals["cancelled_orders"] += 1
