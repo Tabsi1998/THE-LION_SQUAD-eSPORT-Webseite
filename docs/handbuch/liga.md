@@ -161,7 +161,8 @@ Start. Bis dahin ist der Spielplan eine Vorschau und wird bei jeder Änderung ne
 
 Oben in der Turnierverwaltung der Staffel: **Liga starten**. Damit wird der Spielplan fest (Season 1 mit acht Teams:
 sieben Spieltage zu je vier Spielen, Heimrecht ausgeglichen, Spieltag 7 nach der Weihnachtspause in Woche 9) und die
-Staffel steht auf **Live**. Ab jetzt können die Captains Termine vorschlagen und melden.
+Staffel steht auf **Live**. Ab jetzt können die Captains Termine vorschlagen und melden. Mit der ersten Staffel springt
+die Season von *Entwurf* auf *Läuft*, ein von Hand gesetzter Stand bleibt.
 
 - Kein **Check-in** und keine Anmeldung – die Co-Teams sind zugeteilt, niemand checkt ein. Die Status-Auswahl oben
   bietet für eine Staffel nur Entwurf, Live, Pausiert, Beendet, Ergebnisse veröffentlicht, Archiviert und Abgesagt.
@@ -275,8 +276,17 @@ Bestätigungs- und Nachtragsfristen ruhen in der Sperrzeit, das Einspruchsfenste
   und Vertreter der anderen Seite (ohne beide an deren Teamleitung) – ins Postfach und per Push, Thema
   „Match-Erinnerungen“. Trägt die Turnierleitung selbst einen Termin vor, erfahren es beide Seiten. Erinnerungen vor
   Fristen kommen später (#1647).
+- **Termin oder Best of direkt am Spiel ändern:** steht mit altem und neuem Wert im Protokoll, und Captain und Vertreter
+  beider Seiten bekommen eine Nachricht – je Änderung eine.
 - **Eigener Vorschlag:** steht bei der eigenen Seite als „wartet auf die Gegenseite“ mit **Zurückziehen**; annehmen
   kann ihn nur die Gegenseite. Zurückgezogen ist kein Vorschlag mehr offen – keine Antwortfrist, keine Eskalation.
+- **Antwortfrist:** Jeder neue Vorschlag und Gegenvorschlag bekommt eine neue Frist, Annehmen beendet sie. Läuft sie ab,
+  steht das Spiel auf „Turnierleitung nötig“ und ihr bekommt eine Nachricht.
+- **Ablehnen:** Gilt danach ein Termin (der vereinbarte oder der Standardtermin), bleibt es dabei: kein „abgelehnt“ am
+  Spiel, keine Frist, keine Nachricht an euch. Nur wenn wirklich kein Termin gilt, läuft die Frist weiter.
+- **Standardtermin in einer Sperrzeit:** Fällt der Standardtag hinein, gilt zur selben Uhrzeit der nächste freie Tag der
+  Woche, sonst der letzte davor. Hat die Woche keinen freien Tag, steht im Matchplan unter **Spielwochen** ein Hinweis
+  statt eines Termins – dann legt ihr ihn fest.
 - **Startseite:** Offene Vorschläge der Gegenseite stehen bei Captain und Vertreter unter **Offene Aktionen** als
   „Terminvorschlag beantworten“ – auf der Website und in der App.
 
@@ -290,7 +300,12 @@ was dabei geprüft wird, steht für die Captains in
 - **Selbst eintragen**: Reiter **Spiele** → **Ergebnis eintragen** – Stand, auf Wunsch Maps mit den Aufstellungen
   beider Seiten; eine fehlende Seite trägt ihre Aufstellung danach selbst nach. Siehe
   [Turniere, 3.6](turniere.md#36-ergebnisse-melden-eintragen-korrigieren).
-- **Kampflos**: im Ergebnis-Fenster **Nicht erschienen** auf der fehlenden Seite.
+- **Kampflos**: im Ergebnis-Fenster **Nicht erschienen** auf der fehlenden Seite. Schon eingetragene Maps fallen dabei
+  weg, der alte Stand bleibt im Verlauf des Spiels. Die Wertung ist eine Teamstrafe: Captain, Vertreter und die Leitung
+  des Hauptteams sehen sie unter **Meine Strafen**, in **Admin → Strafen** steht sie einmal unter dem Co-Team.
+- **Kein automatisches „Nicht erschienen?“**: Ohne Check-in sagt ein Termin nichts darüber, ob jemand da war. Deshalb gibt
+  es in der Liga diesen Vorschlag nicht – fehlt ein Ergebnis, meldet sich **Ergebnis fehlt**. Klärt es mit beiden Seiten
+  und wertet dann selbst. Das kommt mit dem Check-in (#1652) neu.
 
 ### 3.3 Aufstellung nachtragen
 
@@ -385,6 +400,8 @@ Die IDs sehen nur die Beteiligten des Spiels und die Turnierleitung, nie Gäste.
 | „Turnier kann ohne spielbares Match nicht gestartet werden.“ | Eine ältere Staffel steht noch im Check-in | Status oben auf **Entwurf**, dann **Liga starten** |
 | „Best of: Kommt aus der Season – dort ändern und übertragen.“ (ebenso andere Felder, auch die Antwortfrist) | Wert gibt die Season vor | In der Season ändern, dann **Vorgaben übertragen** |
 | „In einer Liga-Staffel spielen nur Co-Teams …“ | Teilnehmer ohne Co-Team eingetragen | **Co-Team zuteilen** |
+| „Eine Liga-Staffel hat keine Anmeldung – Co-Teams teilt die Turnierleitung zu.“ | Zugangslink mit Anmelderecht für eine Staffel | Link nur zum Ansehen anlegen, Co-Team zuteilen |
+| „Der Spielplan dieser Staffel steht – zurücksetzen oder neu aufbauen geht nur vor dem Start …“ | Spielplan oder Phase einer gestarteten Staffel neu aufbauen oder löschen | Einzelne Spiele im Reiter **Spiele** korrigieren |
 | „Diese Staffel hat schon begonnen oder Spiele – Löschen geht nur vor dem Start …“ | Gestartete Staffel löschen | Status **Abgesagt** oder **Archiviert** |
 | „Löschen geht nicht: … hat schon Co-Teams zugeteilt / hat schon begonnen oder Spiele / ist kein Entwurf mehr. Archivieren statt löschen …“ | Liga, Season oder Liga N hängt schon etwas an | Im Blatt **Archivieren** (2.9) |
 | „Bitte einen Grund angeben (mindestens 5 Zeichen) …“ | Löschen ohne Grund | Grund eintragen |
@@ -419,7 +436,8 @@ Team spielfrei.
 Im Kader ja, aber nicht am selben Spieltag in zwei Aufstellungen derselben Season.
 
 **Was, wenn ein Team nicht antritt?**
-Die Turnierleitung wertet das Spiel kampflos (Ergebnis-Fenster → **Nicht erschienen** auf der fehlenden Seite).
+Die Turnierleitung wertet das Spiel kampflos (Ergebnis-Fenster → **Nicht erschienen** auf der fehlenden Seite). Von
+selbst schlägt der Server das in der Liga nicht vor (3.2).
 
 **Zählt die Aufstellung für die Tabelle?**
 Nein, nur das Ergebnis. Die Aufstellung ist für Doppel-Einsatz und spätere Statistik da.

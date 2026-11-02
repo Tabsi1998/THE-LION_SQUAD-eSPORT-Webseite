@@ -475,7 +475,8 @@ Zeit aufgerufen: die geplante Zeit), online 15 Minuten ab Spielbeginn –, schl�
 **Braucht Aufmerksamkeit** mit den Knöpfen **<Name> nicht erschienen** (die Seite verliert nur dieses Spiel, mit Grund
 im Protokoll und unter ihren Strafen) und **+5 Min. verlängern**. Die Fristen stellt ihr im Turnier unter
 **Erweiterte Spieloptionen → Fristen** ein (leer heißt Standard); eine Phase kann sie in ihren Einstellungen
-überschreiben.
+überschreiben. Sobald eine Seite gemeldet hat, verschwindet der Fall, dann zählt die Meldung. **Liga-Staffeln** haben
+diesen Vorschlag nicht, dort meldet sich **Ergebnis fehlt** ([Liga leiten, 3.2](liga.md#32-ergebnisse)).
 
 Im **Lauf mit mehr als zwei Spielern** wertet **<Name> nicht erschienen** nicht den ganzen Lauf: Nur diese Person wird
 markiert, der Lauf bleibt offen und wird mit den Anwesenden gefahren (Karte und Nachricht sagen „Lauf bleibt offen“).
@@ -848,6 +849,9 @@ anderes an der Season, tragen bestehende Staffeln noch die alten Werte, bis ihr 
 Regeltext und Map-Pool gehen immer (ein entfernter Pool verschwindet nur vor dem ersten Ergebnis), Termine und
 Kalender nur vor dem Start, Best of, Teamgröße, Mindestkader, Punkte und Fristen nur vor dem ersten Ergebnis – was nicht mehr
 geht, steht mit Grund da.
+
+**Stand der Season:** Mit dem Start der ersten Staffel springt sie von selbst von *Entwurf* auf *Läuft* (steht im
+Protokoll). Einen von Hand gesetzten Stand fasst das nicht an.
 
 Staffeln zählen nicht für Jahreswertung, Turnier-Pokale, Löwen-Rang-XP für Teilnahme und Podest und die Team-Stufe;
 gespielte und gewonnene Spiele zählen weiter. Auf Startseite, im öffentlichen Kalender und in der Turnierliste der
