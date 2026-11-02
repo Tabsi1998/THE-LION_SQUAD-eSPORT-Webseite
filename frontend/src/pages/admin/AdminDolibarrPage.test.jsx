@@ -277,6 +277,114 @@ test("ohne gespeicherten Schlüssel gibt es nichts zu entfernen", async () => {
   expect(screen.queryByTestId("dolibarr-key-remove")).toBeNull();
   expect(screen.queryByTestId("dolibarr-write-key-remove")).toBeNull();
 });
+// Signierter Webhook (#2131): Felder unter Verbindung, Geheimnis nur schreiben, jede Änderung mit Rückfrage.
+test("signierter Webhook: Kennung steht da, das Geheimnis nie; Speichern und Entfernen fragen nach", async () => {
+  authState.areas = ["system"];
+  const signed = { configured: true, source: "settings", path: "/api/integrations/dolibarr/vereine-webhook", key_id: "website", secret_stored: true };
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/admin/dolibarr/status") return { data: { ...STATUS, signed_webhook: signed } };
+    if (url === "/admin/dolibarr/consent-texts") return { data: [] };
+    throw new Error(url);
+  });
+  apiMock.put.mockResolvedValue({ data: { ok: true } });
+  apiMock.delete.mockResolvedValue({ data: { ok: true } });
+  const user = userEvent.setup();
+  renderPage();
+  await user.click(await screen.findByTestId("dolibarr-tab-connection"));
+  expect(await screen.findByTestId("dolibarr-signed-key-id")).toHaveValue("website");
+  const secret = screen.getByTestId("dolibarr-signed-secret");
+  expect(secret).toHaveAttribute("type", "password");
+  expect(secret).toHaveValue("");
+  expect(screen.getByTestId("dolibarr-signed-path")).toHaveTextContent("/api/integrations/dolibarr/vereine-webhook");
+  expect(screen.getByTestId("dolibarr-signed-save")).toBeDisabled();
+
+  await user.type(secret, "s".repeat(40));
+  confirmMock.mockResolvedValueOnce(false);
+  await user.click(screen.getByTestId("dolibarr-signed-save"));
+  expect(apiMock.put).not.toHaveBeenCalled();
+  await user.click(screen.getByTestId("dolibarr-signed-save"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/admin/dolibarr/settings", { signed_webhook_key_id: "website", signed_webhook_secret: "s".repeat(40) }));
+  expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Geheimnis ersetzen?" }));
+  await waitFor(() => expect(screen.getByTestId("dolibarr-signed-secret")).toHaveValue(""));
+
+  await user.click(screen.getByTestId("dolibarr-signed-remove"));
+  await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith("/admin/dolibarr/settings/signed-webhook"));
+});
+
+test("steht der Schlüssel in der Server-Umgebung, sagt die Seite das", async () => {
+  authState.areas = ["system"];
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/admin/dolibarr/status") return { data: { ...STATUS, signed_webhook: { configured: true, source: "env", path: "/x", key_id: "", secret_stored: false } } };
+    if (url === "/admin/dolibarr/consent-texts") return { data: [] };
+    throw new Error(url);
+  });
+  const user = userEvent.setup();
+  renderPage();
+  await user.click(await screen.findByTestId("dolibarr-tab-connection"));
+  expect(await screen.findByTestId("dolibarr-signed-env")).toHaveTextContent("Vorrang");
+  expect(screen.getByTestId("dolibarr-signed-state")).toHaveTextContent("Server-Umgebung");
+  expect(screen.queryByTestId("dolibarr-signed-remove")).toBeNull();
+});
+
+test("„Neue Adresse erzeugen“ fragt nach, wenn schon ein Token eingerichtet ist (#2131)", async () => {
+  authState.areas = ["system"];
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/admin/dolibarr/status") return { data: { ...STATUS, webhook_configured: true } };
+    if (url === "/admin/dolibarr/consent-texts") return { data: [] };
+    throw new Error(url);
+  });
+  apiMock.post.mockResolvedValue({ data: { ok: true, path: "/api/integrations/dolibarr/webhook/neu" } });
+  const user = userEvent.setup();
+  renderPage();
+  await user.click(await screen.findByTestId("dolibarr-tab-connection"));
+  confirmMock.mockResolvedValueOnce(false);
+  await user.click(await screen.findByTestId("dolibarr-webhook-new"));
+  expect(apiMock.post).not.toHaveBeenCalled();
+  await user.click(screen.getByTestId("dolibarr-webhook-new"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/dolibarr/webhook-token"));
+  expect(await screen.findByTestId("dolibarr-webhook-path")).toHaveTextContent("/webhook/neu");
+});
+
+test("ohne Token erzeugt der Knopf die Adresse ohne Rückfrage", async () => {
+  authState.areas = ["system"];
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/admin/dolibarr/status") return { data: STATUS };
+    if (url === "/admin/dolibarr/consent-texts") return { data: [] };
+    throw new Error(url);
+  });
+  apiMock.post.mockResolvedValue({ data: { ok: true, path: "/api/integrations/dolibarr/webhook/erst" } });
+  const user = userEvent.setup();
+  renderPage();
+  await user.click(await screen.findByTestId("dolibarr-tab-connection"));
+  await user.click(await screen.findByTestId("dolibarr-webhook-new"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalled());
+  expect(confirmMock).not.toHaveBeenCalled();
+});
+
+test("Einwilligungstexte: Lesefehler nennt den Grund statt „im Modul anlegen“ (#2131)", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/admin/dolibarr/status") return { data: STATUS };
+    if (url === "/admin/dolibarr/links") return { data: [] };
+    if (url === "/admin/dolibarr/consent-texts") return { data: { error: "forbidden", text: "Dem API-Benutzer fehlt ein Recht", texts: [] } };
+    throw new Error(url);
+  });
+  const user = userEvent.setup();
+  renderPage();
+  await user.click(await screen.findByTestId("dolibarr-tab-features"));
+  expect(await screen.findByTestId("dolibarr-consent-error")).toHaveTextContent("Dem API-Benutzer fehlt ein Recht");
+  expect(screen.queryByTestId("dolibarr-consent-empty")).toBeNull();
+});
+
+test("Texte zeigen auf die richtige Stelle (#2131): Bereiche im Ablauf, Rechnungsangaben bei den Konditionen", async () => {
+  authState.areas = ["system", "club"];
+  const user = userEvent.setup();
+  renderPage();
+  expect(await screen.findByText(/legt der Superadmin fest/)).toHaveTextContent("Unter Bereiche legt der Superadmin fest");
+  await user.click(screen.getByTestId("dolibarr-tab-features"));
+  expect(await screen.findByTestId("dolibarr-invoices-to-details")).toHaveAttribute("href", "/admin/finance?tab=rechnungsangaben");
+  expect(screen.getByTestId("dolibarr-invoices-to-connection")).toHaveAttribute("href", "/admin/dolibarr?tab=connection");
+});
+
 test("neue Adresse verlangt den API-Schlüssel neu; ein entfernter Schreib-Schlüssel wird gemeldet (#2112)", async () => {
   authState.areas = ["system"];
   apiMock.get.mockImplementation(async (url) => {

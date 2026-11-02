@@ -44,6 +44,7 @@ export default function AdminDolibarrPage() {
   const [status, setStatus] = useState(null);
   // Mitgliederverzeichnis aus der Einwilligung (#410 Nachtrag): die Einwilligungstexte des Vereins zur Auswahl.
   const [consentTexts, setConsentTexts] = useState([]);
+  const [consentError, setConsentError] = useState("");
   const [links, setLinks] = useState([]);
   const [preview, setPreview] = useState(null);
   const [busy, setBusy] = useState("");
@@ -52,6 +53,9 @@ export default function AdminDolibarrPage() {
   const [writeKey, setWriteKey] = useState("");
   const [testResult, setTestResult] = useState(null);
   const [webhookPath, setWebhookPath] = useState("");
+  // Signierter Webhook (#2131): die Kennung steht wieder da, das Geheimnis nie.
+  const [signedKeyId, setSignedKeyId] = useState("");
+  const [signedSecret, setSignedSecret] = useState("");
   const [policyMap, setPolicyMap] = useState({});
   const [policyPreview, setPolicyPreview] = useState(null);
   const [manualChoice, setManualChoice] = useState({});
@@ -62,8 +66,13 @@ export default function AdminDolibarrPage() {
     try {
       const { data } = await api.get("/admin/dolibarr/status");
       if (data?.mode && data.mode !== "off") {
-        api.get("/admin/dolibarr/consent-texts").then((result) => setConsentTexts(Array.isArray(result?.data) ? result.data : [])).catch(() => setConsentTexts([]));
+        // Scheitert das Lesen, sagt die Auswahl warum - statt zu behaupten, im Modul fehle etwas (#2131).
+        api.get("/admin/dolibarr/consent-texts").then((result) => {
+          setConsentTexts(Array.isArray(result?.data) ? result.data : []);
+          setConsentError(Array.isArray(result?.data) ? "" : result?.data?.text || "Dolibarr antwortet nicht.");
+        }).catch((err) => { setConsentTexts([]); setConsentError(formatApiError(err.response?.data?.detail)); });
       }
+      setSignedKeyId(data?.signed_webhook?.key_id || "");
       setStatus(data);
       setForm((current) => ({ ...current, base_url: data.base_url || "", instance: data.instance || "", entity: data.entity || 1, environment: data.environment || "production" }));
       if (!policyDirtyRef.current) setPolicyMap(data.policy?.map || {});
@@ -156,7 +165,39 @@ export default function AdminDolibarrPage() {
     const result = await run("test", () => api.post("/admin/dolibarr/test"));
     if (result) setTestResult(result.data);
   };
+  // Signierter Webhook (#2131): Speichern und Entfernen ändern, ob Dolibarr-Meldungen noch ankommen - also mit Rückfrage.
+  const saveSignedWebhook = async () => {
+    const replacing = !!status?.signed_webhook?.secret_stored && !!signedSecret;
+    const ok = await confirm({
+      title: replacing ? "Geheimnis ersetzen?" : "Signierten Webhook speichern?",
+      description: "Meldungen aus Dolibarr gelten nur, wenn Kennung und Geheimnis dort genauso stehen. Das Geheimnis liegt danach verschlüsselt auf dem Server und wird nie wieder angezeigt.",
+      confirmLabel: "Speichern", tone: "info",
+    });
+    if (!ok) return;
+    const payload = { signed_webhook_key_id: signedKeyId.trim(), ...(signedSecret ? { signed_webhook_secret: signedSecret } : {}) };
+    const result = await saveSettings(payload, "Signierter Webhook gespeichert.");
+    if (result) setSignedSecret("");
+  };
+  const removeSignedWebhook = async () => {
+    const ok = await confirm({
+      title: "Signierten Webhook entfernen?",
+      description: "Kennung und Geheimnis werden gelöscht. Meldungen aus Dolibarr gelten dann nicht mehr; der Abgleich holt alle 10 Minuten auf. Was in der Server-Umgebung steht, bleibt.",
+      confirmLabel: "Entfernen", tone: "danger",
+    });
+    if (!ok) return;
+    const result = await run("remove-signed", () => api.delete("/admin/dolibarr/settings/signed-webhook"), "Signierter Webhook entfernt.");
+    if (result) setSignedSecret("");
+  };
   const newWebhook = async () => {
+    // Das neue Token ersetzt das alte sofort (#2131): ein schon eingerichteter Webhook in Dolibarr läuft dann ins Leere.
+    if (status?.webhook_configured) {
+      const ok = await confirm({
+        title: "Neue Adresse erzeugen?",
+        description: "Die bisherige Adresse gilt dann nicht mehr. Bis du in Dolibarr die neue einträgst, kommen von dort keine Meldungen an; der Abgleich holt alle 10 Minuten auf.",
+        confirmLabel: "Neue Adresse erzeugen",
+      });
+      if (!ok) return;
+    }
     const result = await run("webhook", () => api.post("/admin/dolibarr/webhook-token"), "Neues Token erzeugt – die Adresse steht unten, sie wird nur jetzt gezeigt.");
     if (result) setWebhookPath(result.data.path);
   };
@@ -269,7 +310,7 @@ export default function AdminDolibarrPage() {
               <li><strong>Verbindung</strong> eintragen und testen (nur „System“).</li>
               <li>Modus <strong>Vorschau</strong>: Dolibarr wird gelesen, nichts wird übernommen.</li>
               <li>Unter <strong>Umstellung</strong> die Vorschau ansehen, Mitgliedsarten zuordnen, Konten bestätigen.</li>
-              <li>Unter <strong>Funktionen</strong> legt der Superadmin fest, welche Funktion die Vereinsverwaltung öffnet.</li>
+              <li>Unter <strong>Bereiche</strong> legt der Superadmin fest, welche Funktion die Vereinsverwaltung öffnet.</li>
               <li>Modus <strong>Live</strong>. Zurück geht jederzeit: „Aus“ stoppt die Übernahme, der letzte Stand bleibt.</li>
             </ol>
           </Panel>
@@ -390,7 +431,7 @@ export default function AdminDolibarrPage() {
       )}
 
       {tab === "features" && (
-        <FeaturesTab status={status} busy={busy} run={run} consentTexts={consentTexts} canSystem={canSystem} />
+        <FeaturesTab status={status} busy={busy} run={run} consentTexts={consentTexts} consentError={consentError} canSystem={canSystem} />
       )}
 
       {tab === "policy" && (
@@ -534,9 +575,34 @@ export default function AdminDolibarrPage() {
               </div>
               <p className="mt-4 text-xs text-white/45">Zuordnung per E-Mail, Mitgliederverzeichnis, Feldzuordnung und Beitrittsanträge: Reiter <button type="button" onClick={() => setTab("features")} className="text-[#29B6E8] hover:underline">Funktionen</button>.</p>
             </Panel>
-            <Panel title="Benachrichtigung aus Dolibarr (Webhook)">
-              <p className="text-xs text-white/45 mb-3">Optional. Dolibarr meldet, dass sich ein Mitglied geändert hat; die Website liest dann nach. Ohne Webhook holt der Abgleich alle 10 Minuten auf. {status?.webhook_configured ? "Ein Token ist eingerichtet." : "Noch kein Token."}</p>
-              <button type="button" onClick={newWebhook} disabled={!!busy} className="px-4 py-2 border border-white/20 text-white/80 font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40">Neue Adresse erzeugen</button>
+            <Panel title="Signierter Webhook">
+              <div className="space-y-3" data-testid="dolibarr-signed-webhook">
+                <p className="text-xs text-white/55">Empfohlen. Dolibarr meldet Änderungen sofort, die Website prüft die Signatur und liest dann nach. Ohne Webhook holt der Abgleich alle 10 Minuten auf.</p>
+                <p className={`text-xs ${status?.signed_webhook?.configured ? "text-[#00FF88]" : "text-[#FFD700]"}`} data-testid="dolibarr-signed-state">
+                  {status?.signed_webhook?.source === "env" ? "Eingerichtet in der Server-Umgebung." : status?.signed_webhook?.configured ? "Eingerichtet." : "Noch nicht eingerichtet."}
+                </p>
+                <div className="text-xs text-white/65">
+                  Im Vereinsmodul unter <strong>Einrichtung → Vereine → Webhooks</strong> diese Adresse eintragen und Kennung und Geheimnis von dort hier übernehmen:
+                  <div className="mt-1 font-mono break-all border border-white/10 rounded-sm p-2" data-testid="dolibarr-signed-path">{window.location.origin}{status?.signed_webhook?.path}</div>
+                </div>
+                <Field label="Schlüssel-Kennung" value={signedKeyId} onChange={setSignedKeyId} testId="dolibarr-signed-key-id" />
+                <Field label={`Geheimnis${status?.signed_webhook?.secret_stored ? " (gespeichert – leer lassen, um es zu behalten)" : " (mindestens 32 Zeichen)"}`} value={signedSecret} onChange={setSignedSecret} type="password" testId="dolibarr-signed-secret" />
+                {status?.signed_webhook?.source === "env" && (
+                  <p className="text-xs text-white/45" data-testid="dolibarr-signed-env">In der Server-Umgebung steht schon ein Schlüssel (DOLIBARR_WEBHOOK_SECRETS). Er gilt weiter und hat bei gleicher Kennung Vorrang.</p>
+                )}
+                <p className="text-xs text-white/40">Das Geheimnis wird verschlüsselt gespeichert und nie wieder angezeigt.</p>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" disabled={!!busy || !signedKeyId.trim() || (!signedSecret && !status?.signed_webhook?.secret_stored) || (!signedSecret && signedKeyId.trim() === (status?.signed_webhook?.key_id || ""))} onClick={saveSignedWebhook} data-testid="dolibarr-signed-save"
+                    className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40">Speichern</button>
+                  {(status?.signed_webhook?.secret_stored || status?.signed_webhook?.key_id) && (
+                    <button type="button" disabled={!!busy} onClick={removeSignedWebhook} data-testid="dolibarr-signed-remove" className="px-4 py-2 border border-live/40 text-live font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-live/10 disabled:opacity-40">Entfernen</button>
+                  )}
+                </div>
+              </div>
+            </Panel>
+            <Panel title="Alter Webhook-Weg (Token in der Adresse)">
+              <p className="text-xs text-white/45 mb-3">Bleibt nur bis zur Umstellung auf den signierten Webhook; abschalten unter <button type="button" onClick={() => setTab("features")} className="text-[#29B6E8] hover:underline">Funktionen</button>. {status?.webhook_configured ? "Ein Token ist eingerichtet." : "Noch kein Token."}</p>
+              <button type="button" onClick={newWebhook} disabled={!!busy} data-testid="dolibarr-webhook-new" className="px-4 py-2 border border-white/20 text-white/80 font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40">Neue Adresse erzeugen</button>
               {webhookPath && <div className="mt-3 text-xs font-mono break-all border border-[#FFD700]/30 rounded-sm p-2" data-testid="dolibarr-webhook-path">{window.location.origin}{webhookPath}</div>}
             </Panel>
           </div>

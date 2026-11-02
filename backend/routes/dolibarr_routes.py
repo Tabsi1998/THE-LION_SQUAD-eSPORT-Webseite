@@ -15,6 +15,7 @@ import re
 
 import hmac
 import secrets
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -28,7 +29,7 @@ from services.dolibarr_client import (
     write_capable,
 )
 from services.dolibarr_links import OPEN_STATUSES, LinkConflict, close_link, link_for_user, note_candidate, verify_link
-from services.dolibarr_policy import DERIVABLE_AREAS, areas_from_functions, clean_policy_map, policy_active
+from services.dolibarr_policy import CLUB_TZ, DERIVABLE_AREAS, areas_from_functions, clean_policy_map, policy_active
 from services import dolibarr_identity, dolibarr_participations, vereine_webhooks
 from services.dolibarr_sync import DEFAULT_FIELD_MAP, FIELD_MAP_COLUMNS, STATE_ID, apply_summary, migration_preview, queue_member, run_sync, sync_state
 from services.log_safe import log_safe
@@ -51,6 +52,17 @@ async def _audit(actor_id: str | None, action: str, target_id: str, data: dict |
 
 def _error(exc: DolibarrError) -> HTTPException:
     return HTTPException(502, f"Dolibarr: {exc.text}")
+
+
+def _vienna_moment(value) -> str:
+    """Gespeichert wird UTC; die Stand-Zeile liest ein Mensch in Tirol (#2131)."""
+    if not value:
+        return ""
+    try:
+        moment = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return str(value)
+    return (moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)).astimezone(CLUB_TZ).strftime("%d.%m.%Y %H:%M")
 
 
 # ---------------------------------------------------------------- Stand (Vereinsverwaltung und System)
@@ -98,7 +110,7 @@ async def _features(db, settings: dict) -> list[dict]:
     elif not member_mode:
         member_state = f"Modul {state.get('module_version') or '–'} – braucht Vereine 1.4.0; bis dahin Einladungscode"
     elif member_access.get("ok") is False:
-        member_state = f"Recht fehlt · seit {str(member_access.get('at') or '')[:16].replace('T', ' ')}"
+        member_state = f"Recht fehlt · seit {_vienna_moment(member_access.get('at'))}"
     else:
         member_state = "an (bestätigte Zuordnung reicht)"
     # Mitgliederverzeichnis aus der Einwilligung (#410 Nachtrag): eigener Code oder der des Moduls fürs Website-Profil.
@@ -108,7 +120,7 @@ async def _features(db, settings: dict) -> list[dict]:
     directory_without_account = await db.club_member_profiles.count_documents({"source": "dolibarr", "user_id": None})
     facts_state = "an" if branding.get("legal_from_dolibarr") else "aus"
     if facts.get("fetched_at"):
-        facts_state += f" · Stand {str(facts['fetched_at'])[:16].replace('T', ' ')}"
+        facts_state += f" · Stand {_vienna_moment(facts['fetched_at'])}"
     elif mode != "off":
         facts_state += " · noch nie gelesen (Rechtliches → „Jetzt nachlesen“)"
     mode_state = {"live": "Modus Live", "preview": "Modus Vorschau (liest, übernimmt nichts)", "off": "aus"}.get(mode, mode)
@@ -176,9 +188,9 @@ async def _features(db, settings: dict) -> list[dict]:
         {"key": "webhook", "label": "Benachrichtigung aus Dolibarr (signierter Webhook)", "enabled": signed_source is not None,
          "state": {"env": "eingerichtet (Server-Umgebung)", "settings": "eingerichtet"}.get(signed_source or "", "aus (Abgleich alle 10 Minuten)"),
          "hint": f"Dolibarr meldet Änderungen sofort, sonst holt der Abgleich alle 10 Minuten auf. Im Vereinsmodul unter Einrichtung → Vereine → "
-                 f"Webhooks die Adresse {vereine_webhooks.PATH} eintragen; Schlüssel-Kennung und Geheimnis kommen in die Server-Umgebung "
-                 f"({vereine_webhooks.SECRETS_ENV}).",
-         "where": connection, "where_label": "Verbindung → Webhook"},
+                 f"Webhooks die Adresse {vereine_webhooks.PATH} eintragen; Schlüssel-Kennung und Geheimnis trägt „System“ unter Verbindung → "
+                 f"Signierter Webhook ein oder hinterlegt sie in der Server-Umgebung ({vereine_webhooks.SECRETS_ENV}), die bei gleicher Kennung Vorrang hat.",
+         "where": connection, "where_label": "Verbindung → Signierter Webhook"},
         {"key": "legacy_webhook", "label": "Alter Webhook-Weg (Token in der Adresse)", "enabled": legacy_active,
          "state": "an" if legacy_active else ("abgeschaltet" if not vereine_webhooks.legacy_enabled(settings) else "aus (kein Token)"),
          "hint": "Bleibt nur bis zur Umstellung auf signierte Webhooks. Erst im Vereinsmodul den signierten Webhook einrichten, dann hier abschalten.",
@@ -196,6 +208,11 @@ async def dolibarr_status(me: dict = Depends(require_area("club", "system"))):
         links[row["_id"]] = row["n"]
     unmapped = await db.memberships.count_documents({"source": "dolibarr", "dolibarr.type_unmapped": True})
     policy = settings.get("function_policy") or {}
+    signed_webhook = {"configured": vereine_webhooks.secret_source(settings) is not None,
+                      "source": vereine_webhooks.secret_source(settings), "path": vereine_webhooks.PATH}
+    if await user_has_area(me, "system"):
+        # Die Felder unter Verbindung (#2131): die Kennung zum Wiedererkennen, vom Geheimnis nur, ob eines gespeichert ist.
+        signed_webhook.update({"key_id": str(settings.get("signed_webhook_key_id") or ""), "secret_stored": secret_is_configured(settings.get("signed_webhook_secret"))})
     return {
         "mode": settings["mode"],
         "environment": settings["environment"],
@@ -214,8 +231,7 @@ async def dolibarr_status(me: dict = Depends(require_area("club", "system"))):
         "invoice_terms": invoice_terms_view(settings),
         "webhook_configured": secret_is_configured(settings.get("webhook_token")),
         # Signierte Webhooks (#1540): ob ein Geheimnis da ist und woher - nie das Geheimnis selbst.
-        "signed_webhook": {"configured": vereine_webhooks.secret_source(settings) is not None,
-                           "source": vereine_webhooks.secret_source(settings), "path": vereine_webhooks.PATH},
+        "signed_webhook": signed_webhook,
         "legacy_webhook_enabled": vereine_webhooks.legacy_enabled(settings),
         "auto_link_verified_email": bool(settings.get("auto_link_verified_email")),
         "applications_enabled": bool(settings.get("applications_enabled")),
@@ -437,15 +453,16 @@ class DolibarrSettingsUpdate(BaseModel):
 
 
 @admin_router.get("/consent-texts")
-async def dolibarr_consent_texts(me: dict = Depends(require_area("system"))):
-    """Die Einwilligungstexte des Vereins (Code, Bezeichnung) - für die Auswahl, welche das Verzeichnis steuert."""
+async def dolibarr_consent_texts(me: dict = Depends(require_area("club", "system"))):
+    """Die Einwilligungstexte des Vereins (Code, Bezeichnung) - für die Auswahl, welche das Verzeichnis steuert. Auch für
+    die Vereinsverwaltung (#2131): sie stellt die Auswahl unter Funktionen ein. Scheitert das Lesen, sagt ``text`` warum."""
     settings = await load_settings(get_db())
     if settings.get("mode") == "off":
         return []
     try:
         texts = await DolibarrClient(settings).consent_texts()
     except DolibarrError as exc:
-        return {"error": exc.kind, "texts": []}
+        return {"error": exc.kind, "text": exc.text, "texts": []}
     return [{"code": str(t.get("code") or ""), "label": str(t.get("label") or t.get("code") or ""), "version": t.get("version")} for t in texts if t.get("code")]
 
 
@@ -507,6 +524,8 @@ async def update_dolibarr_settings(body: DolibarrSettingsUpdate, me: dict = Depe
         secret = data["signed_webhook_secret"].strip()
         if len(secret) < vereine_webhooks.MIN_SECRET_LENGTH:
             raise HTTPException(400, f"Das Geheimnis hat mindestens {vereine_webhooks.MIN_SECRET_LENGTH} Zeichen.")
+        if not updates.get("signed_webhook_key_id", current.get("signed_webhook_key_id")):
+            raise HTTPException(400, "Zum Geheimnis gehört die Schlüssel-Kennung aus dem Vereinsmodul.")
         updates["signed_webhook_secret"] = encrypt_secret(secret)
     if "legacy_webhook_enabled" in data:
         updates["legacy_webhook_enabled"] = bool(data["legacy_webhook_enabled"])
@@ -592,6 +611,17 @@ async def clear_dolibarr_write_key(me: dict = Depends(require_area("system"))):
         updates["write_enabled"] = False
     await db.settings.update_one({"id": SETTINGS_ID}, {"$set": updates}, upsert=True)
     await _audit(me["id"], "dolibarr.write_key_removed", SETTINGS_ID, {"write_enabled": updates.get("write_enabled", current.get("write_enabled"))})
+    return {"ok": True}
+
+
+@admin_router.delete("/settings/signed-webhook")
+async def clear_signed_webhook(me: dict = Depends(require_area("system"))):
+    """Kennung und Geheimnis des signierten Webhooks aus den Einstellungen entfernen (#2131). Was in der Server-Umgebung
+    steht, bleibt - das ändert nur, wer auf den Server darf. Das Protokoll nennt nur, dass sie weg sind."""
+    db = get_db()
+    await db.settings.update_one({"id": SETTINGS_ID}, {"$set": {"signed_webhook_key_id": "", "signed_webhook_secret": "", "updated_at": now_utc().isoformat(),
+                                                                "updated_by": me["id"]}}, upsert=True)
+    await _audit(me["id"], "dolibarr.signed_webhook_removed", SETTINGS_ID)
     return {"ok": True}
 
 

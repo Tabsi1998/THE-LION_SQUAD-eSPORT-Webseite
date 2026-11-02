@@ -56,7 +56,7 @@ function FeatureTitle({ feature }) {
   );
 }
 
-export function FeaturesTab({ status, busy, run, consentTexts = [], canSystem = false }) {
+export function FeaturesTab({ status, busy, run, consentTexts = [], consentError = "", canSystem = false }) {
   const features = status?.features || [];
   const [source, setSource, reloadSource] = useDolibarrSource();
   const [categories, setCategories] = useState(null);
@@ -176,7 +176,9 @@ export function FeaturesTab({ status, busy, run, consentTexts = [], canSystem = 
                         <option value={status.directory_consent_code}>{status.directory_consent_code} (im Modul nicht mehr gefunden)</option>
                       )}
                     </select>
-                    {!consentTexts.length && <div className="text-xs text-[#FFD700] mt-1">Keine Einwilligungstexte gelesen – im Modul unter Einrichtung → Vereine → Einwilligungen anlegen.</div>}
+                    {consentError ? <div className="text-xs text-[#FF3B30] mt-1" data-testid="dolibarr-consent-error">Einwilligungstexte nicht lesbar: {consentError}</div>
+                      : status?.mode === "off" ? <div className="text-xs text-white/45 mt-1" data-testid="dolibarr-consent-off">Die Anbindung ist aus – erst mit Verbindung gibt es hier eine Auswahl.</div>
+                        : !consentTexts.length ? <div className="text-xs text-[#FFD700] mt-1" data-testid="dolibarr-consent-empty">Im Modul stehen noch keine Einwilligungstexte – unter Einrichtung → Vereine → Einwilligungen anlegen.</div> : null}
                   </div>
                   <div data-testid="dolibarr-directory-fields">
                     <div className="font-bold text-xs">Felder des Website-Profils → Spalten des Verzeichnisses</div>
@@ -207,7 +209,7 @@ export function FeaturesTab({ status, busy, run, consentTexts = [], canSystem = 
               )}
 
               {feature.key === "invoices" && canSystem && (
-                <p className="ml-6 text-xs text-white/45">Steuersätze, Konditionen und der optionale zweite Schlüssel: <Link to="/admin/dolibarr?tab=connection" className="text-[#29B6E8] hover:text-white" data-testid="dolibarr-invoices-to-connection">Verbindung → Schreibzugriff</Link>.</p>
+                <p className="ml-6 text-xs text-white/45">Steuersätze und Konditionen: <Link to="/admin/finance?tab=rechnungsangaben" className="text-[#29B6E8] hover:text-white" data-testid="dolibarr-invoices-to-details">Finanzübersicht → Rechnungsangaben</Link>. Rechte des Website-Benutzers und der optionale zweite Schlüssel: <Link to="/admin/dolibarr?tab=connection" className="text-[#29B6E8] hover:text-white" data-testid="dolibarr-invoices-to-connection">Verbindung → Schreibzugriff</Link>.</p>
               )}
             </li>
           );
