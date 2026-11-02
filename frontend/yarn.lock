@@ -1138,10 +1138,10 @@
   resolved "https://registry.yarnpkg.com/@tiptap/extension-bold/-/extension-bold-3.32.1.tgz#0bb1fedba03a07316123941ae5a5c273b04553ef"
   integrity sha512-mQFAKhUXdOQHjueSfhf1+rsbWORLMxr/UG0L8RhEF83npTxD4a0yq8MaJKLCgFZKp4OULajMxoVg7wTFQT/NUA==
 
-"@tiptap/extension-bubble-menu@3.32.0", "@tiptap/extension-bubble-menu@3.32.1":
-  version "3.32.0"
-  resolved "https://registry.yarnpkg.com/@tiptap/extension-bubble-menu/-/extension-bubble-menu-3.32.0.tgz#abcf7123f309d39f65634ca3d249cbec8190020f"
-  integrity sha512-X3ll8i9Z8QNvt7+tcqlwopJG+68ugO13Av0Ox4Ico+jXcTnFdDuKQJBSI9sLuMR5vTQOeTHhKYXhjF88aahMSA==
+"@tiptap/extension-bubble-menu@3.32.1":
+  version "3.32.1"
+  resolved "https://registry.yarnpkg.com/@tiptap/extension-bubble-menu/-/extension-bubble-menu-3.32.1.tgz#db6a05c6117c4ddef5aff98dff88519b2b039836"
+  integrity sha512-Zt5k0dRgaLiWdnl6p0iXyrsh4HEcnfQjkL5nAHcViURMHun5tqpc8oGNYtNxxkF+9wHKNBhIfYgsUeXTZKQJeg==
   dependencies:
     "@floating-ui/dom" "^1.0.0"
 
@@ -1170,10 +1170,10 @@
   resolved "https://registry.yarnpkg.com/@tiptap/extension-dropcursor/-/extension-dropcursor-3.32.1.tgz#34bd75f6e451295bf80d810b389720a286c62c2c"
   integrity sha512-xdXH67DAryheNS3RAkt/9WBJ8OZ/oGyedNiyxvUsD9Np7WwS8IZ0d3fUYjiUQ9axdE1nnPCD08XSYd+O53XD8w==
 
-"@tiptap/extension-floating-menu@3.32.0", "@tiptap/extension-floating-menu@3.32.1":
-  version "3.32.0"
-  resolved "https://registry.yarnpkg.com/@tiptap/extension-floating-menu/-/extension-floating-menu-3.32.0.tgz#3ded3db6981c88f2af59ab8acdaec6cc0336fa1a"
-  integrity sha512-AzKCWceL+4Q1pTc8Whw1kPqN/aYGPQ70/jXPsblWl501t/pXi6Kz0Pi/NggKkuu73VGjykh68YYf/dcOJ/mPZQ==
+"@tiptap/extension-floating-menu@3.32.1":
+  version "3.32.1"
+  resolved "https://registry.yarnpkg.com/@tiptap/extension-floating-menu/-/extension-floating-menu-3.32.1.tgz#181174b29588b3c42dc7ee1fafe40d7799e013eb"
+  integrity sha512-mbfd7g0O+KcPkUWc/WCmzwQdNIk0egTbj32na2CnB65ZHwBcS0MIULFbgGuEkof6IW0wc5wcI71tPLMT46b9kQ==
 
 "@tiptap/extension-gapcursor@3.32.1":
   version "3.32.1"
