@@ -337,6 +337,7 @@ def normalize_games(
             f"Best of {setup.best_of}: eine Seite braucht {setup.needed} gewonnene "
             f"{'Map' if setup.needed == 1 else 'Maps'}."
         )
+    check_both_sides(setup, games, allowed_lineups)
     return games
 
 
@@ -421,13 +422,36 @@ def lineup_union(match: dict) -> list[str]:
 
 
 def _sides_of(match: dict, user_id: str) -> set[str]:
-    sides: set[str] = set()
-    for games in _lineup_sources(match):
+    return _sides_by_person(_lineup_sources(match)).get(user_id, set())
+
+
+def _sides_by_person(sources: list[list[dict]]) -> dict[str, set[str]]:
+    """Je Person die Seiten, für die sie in diesen Maps aufgestellt ist."""
+    sides: dict[str, set[str]] = {}
+    for games in sources:
         for game in games:
             for reg_id, lineup in (game.get("lineups") or {}).items():
-                if user_id in (lineup or []):
-                    sides.add(reg_id)
+                for user_id in lineup or []:
+                    if user_id:
+                        sides.setdefault(user_id, set()).add(reg_id)
     return sides
+
+
+def check_both_sides(setup: LeagueSetup, games: list[dict], own_sides) -> None:
+    """Dieselbe Person steht nie auf beiden Seiten desselben Spiels (#2202) - über alle Maps. ``own_sides``: die Seiten, deren
+    Aufstellung ``games`` neu setzt; für die anderen zählt, was am Spiel gilt (etwa die Meldung der Gegenseite beim
+    Bestätigen). Altbestand: Wer dort schon auf beiden Seiten steht, hält keine Korrektur auf - sonst käme ein altes Spiel
+    nicht mehr aus diesem Stand heraus."""
+    stored = _sides_by_person(_lineup_sources(setup.match))
+    own = set(own_sides)
+    for user_id, sides in sorted(_sides_by_person([games]).items()):
+        if not sides & own or len(stored.get(user_id, set())) > 1:
+            continue
+        if len(sides | (stored.get(user_id, set()) - own)) > 1:
+            state = next((setup.id_status[side][user_id] for side in sides if user_id in setup.id_status.get(side, {})), None)
+            name = (state or {}).get("name") or "Eine Person"
+            raise LeagueGamesError(f"{name} steht schon in der Aufstellung der anderen Seite – dieselbe Person spielt nie "
+                                   "auf beiden Seiten eines Spiels.")
 
 
 async def check_double_use(db, setup: LeagueSetup, games: list[dict], registration_ids: set[str] | list[str]) -> None:
@@ -657,6 +681,7 @@ async def amend_lineups(
         }
         for game in games
     ]
+    check_both_sides(setup, new_games, {registration_id})
     await check_double_use(db, setup, new_games, {registration_id})
     missing = missing_lineups(new_games, setup.reg_ids)
     stored = await db.matches_v2.update_one(
