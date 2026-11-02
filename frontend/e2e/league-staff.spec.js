@@ -13,6 +13,15 @@ const LEAGUE = { id: "l1", name: "Probe-Liga mit einem recht langen Namen", slug
 const ROW = { user_id: "u1", display_name: "Erika Beispiel mit recht langem Namen", capabilities: ["results", "disputes", "matches"], second_factor: true };
 const NO_MFA_ROW = { user_id: "u2", display_name: "Max Muster", capabilities: ["roster"], second_factor: false };
 
+const MATCH_PAGE = {
+  tournament: { id: "t1", slug: "liga-a", title: "Probe-Liga · Staffel A" },
+  match: { id: "m1", match_key: "L1", status: "scheduled", slots: [{ slot: 1, registration_id: "a" }, { slot: 2, registration_id: "b" }] },
+  participants: [{ slot: 1, registration_id: "a", display_name: "Löwen · Rudel A" }, { slot: 2, registration_id: "b", display_name: "Falken · Horst" }],
+  matchday_label: "Spieltag 1", schedule_proposals: [], collection: "matches_v2", can_act: true, can_player_report_result: false,
+  can_submit_result: false, can_staff_submit_result: false, can_dispute: false, event_mode: "online",
+  result_entry_mode: "player_confirmed", schedule_mode: "player_proposal", conflict: { kind: "involved", override: false },
+};
+
 async function mockServer(page, user, routes = {}) {
   await page.addInitScript(() => {
     window.localStorage.setItem("tls_cookie_consent_v1", JSON.stringify({
@@ -74,6 +83,14 @@ for (const [name, viewport] of [["390", { width: 390, height: 844 }], ["1440", {
       await expect(page.getByTestId("league-add")).toHaveCount(0);
       await expect(page.getByTestId("league-staff-probe")).toHaveCount(0);
       await expect(page.getByTestId("league-delete-probe")).toHaveCount(0);
+      await noSideScroll(page);
+    });
+
+    test("befangen: die Matchseite sagt warum, ohne Knopf zum Eintragen", async ({ page }) => {
+      await mockServer(page, STAFF, { "matches/m1/page": MATCH_PAGE });
+      await page.goto("/matches/m1");
+      await expect(page.getByTestId("match-conflict")).toContainText("zweite berechtigte Person");
+      await expect(page.getByTestId("match-staff-result-open")).toHaveCount(0);
       await noSideScroll(page);
     });
 
