@@ -49,6 +49,20 @@ test("Zurücknehmen fragt nach, nimmt Strafe und „ungültig“ weg und lädt n
   await waitFor(() => expect(apiMock.get.mock.calls.length).toBeGreaterThanOrEqual(2));
 });
 
+test("eine ungültige Runde mit Strafzeit: der Dialog nennt, dass beides wegfällt", async () => {
+  confirmMock.mockResolvedValue(false);
+  renderPage([{ ...LAP, kind: "lap_invalid", label: "Runde ungültig", is_invalid: true, penalty_seconds: 5 }]);
+  fireEvent.click(await screen.findByTestId("pen-take-back-lap-1"));
+  await waitFor(() => expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ description: expect.stringContaining("Die Strafzeit (+5s) und „ungültig“ fallen weg") })));
+});
+
+test("nur Strafzeit: der Dialog nennt nur die Strafzeit", async () => {
+  confirmMock.mockResolvedValue(false);
+  renderPage([{ ...LAP, penalty_seconds: 5, is_invalid: false }]);
+  fireEvent.click(await screen.findByTestId("pen-take-back-lap-1"));
+  await waitFor(() => expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ description: expect.stringContaining("„+5s Strafzeit“ fällt weg") })));
+});
+
 test("Abbrechen ändert nichts", async () => {
   confirmMock.mockResolvedValue(false);
   renderPage([LAP]);

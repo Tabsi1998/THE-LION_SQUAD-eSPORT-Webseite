@@ -47,10 +47,13 @@ export default function AdminPenaltiesPage() {
   // Begründung - dann gleicht der Server Gewinne und Saisonpunkte an.
   const takeBack = async (p) => {
     const body = { penalty_seconds: 0, is_invalid: false };
+    // Eine Runde kann beides tragen - dann fallen auch beide weg, und das soll vorher dastehen.
+    const both = p.is_invalid && Number(p.penalty_seconds) > 0;
+    const falling = both ? `Die Strafzeit (+${p.penalty_seconds}s) und „ungültig“ fallen weg` : `„${p.label}“ fällt weg`;
     if (p.results_locked) {
       const reason = await prompt({
         title: "Begründung nötig",
-        description: "Die Ergebnisse sind veröffentlicht. Die Strafe zurückzunehmen geht nur mit Begründung (mind. 10 Zeichen) - sie steht im Protokoll, Gewinne und Saisonpunkte werden angeglichen.",
+        description: `Die Ergebnisse sind veröffentlicht. ${falling}. Das geht nur mit Begründung (mind. 10 Zeichen) - sie steht im Protokoll, Gewinne und Saisonpunkte werden angeglichen.`,
         placeholder: "z. B. Video zeigt: Runde war sauber",
         confirmLabel: "Zurücknehmen",
         required: true,
@@ -60,7 +63,7 @@ export default function AdminPenaltiesPage() {
       body.change_reason = text;
     } else if (!await confirm({
       title: "Strafe zurücknehmen?",
-      description: `„${p.label}“ fällt weg, die Zeit zählt wieder normal. Das steht im Protokoll.`,
+      description: `${falling}, die Zeit zählt wieder normal. Das steht im Protokoll.`,
       confirmLabel: "Zurücknehmen",
       tone: "info",
     })) return;
