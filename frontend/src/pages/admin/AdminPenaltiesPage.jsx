@@ -156,7 +156,7 @@ function Row({ p, onTakeBack }) {
               {p.user_display_name || p.user_username}
             </Link>
           ) : (
-            <span className="font-bold">—</span>
+            <span className="font-bold break-words" data-testid={`pen-team-${p.ref_id}`}>{p.team_name || "—"}</span>
           )}
           <div className="text-[10px] uppercase tracking-widest" style={{ color: meta.color }}>{meta.label}</div>
         </div>

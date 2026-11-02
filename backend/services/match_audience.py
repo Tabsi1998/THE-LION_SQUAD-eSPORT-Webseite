@@ -147,6 +147,39 @@ def playing_ids(registration: dict | None, team: dict | None = None) -> set[str]
     return player_ids(registration, team)
 
 
+def team_penalty_ids(registration: dict | None, team: dict | None) -> set[str]:
+    """Wer die Teamstrafe eines Co-Teams sieht (#2201): Captain und Vertreter, dazu immer die Leitung des Hauptteams - sie
+    trägt das Team. Nicht der übrige Kader: die Strafe trifft das Co-Team, nicht die einzelne Person. Ohne Co-Team niemand
+    (dort gilt die Person der Anmeldung)."""
+    if not registration or not team or not registration.get("squad_id"):
+        return set()
+    leads = {user_id for user_id in _team_leads(team) if user_id}
+    return _squad_roles(_squad_of(registration, team), team) | leads
+
+
+async def team_penalty_registrations(db, user_id: str | None) -> list[dict]:
+    """Die Co-Team-Anmeldungen, deren Teamstrafen diese Person sieht (``team_penalty_ids``)."""
+    if not user_id:
+        return []
+    squads = await db.team_squads.find(
+        {"$or": [{"captain_id": user_id}, {"vice_captain_id": user_id}]}, {"_id": 0, "id": 1},
+    ).to_list(100)
+    teams = await db.teams.find({"$or": [{"leader_id": user_id}, {"co_leader_ids": user_id}]}, {"_id": 0, "id": 1}).to_list(100)
+    memberships = await db.team_members.find(
+        {"user_id": user_id, "role": {"$in": ["leader", "co_leader"]}}, {"_id": 0, "team_id": 1},
+    ).to_list(100)
+    squad_ids = [row["id"] for row in squads if row.get("id")]
+    team_ids = sorted({row["id"] for row in teams if row.get("id")} | {row["team_id"] for row in memberships if row.get("team_id")})
+    if not squad_ids and not team_ids:
+        return []
+    candidates = await db.tournament_registrations.find(
+        {"squad_id": {"$type": "string"}, "$or": [{"squad_id": {"$in": squad_ids}}, {"team_id": {"$in": team_ids}}]},
+        {"_id": 0, "id": 1, "team_id": 1, "squad_id": 1, "display_name": 1, "team_name": 1, "squad_name": 1},
+    ).to_list(1000)
+    by_team = await teams_by_id(db, candidates)
+    return [reg for reg in candidates if user_id in team_penalty_ids(reg, by_team.get(reg.get("team_id") or ""))]
+
+
 def may_act(registration: dict | None, team: dict | None, user_id: str | None) -> bool:
     """Darf diese Person für die Anmeldung handeln (einchecken, melden, Dispute, Termin)?"""
     return bool(user_id and user_id in responsible_ids(registration, team))
