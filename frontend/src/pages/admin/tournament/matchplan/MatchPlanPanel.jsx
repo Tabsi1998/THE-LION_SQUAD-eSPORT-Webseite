@@ -6,9 +6,9 @@ import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { buildTimeline, knownStations, scheduleDelay } from "@/lib/matchTimeline";
 import { dependencyGraph } from "@/lib/matchFlow";
 import { matchDurationSource } from "@/lib/matchDuration";
-import { applySchedulePlan, moveMatch, releaseSchedule, requestSchedulePlan, updateMatchPlan } from "@/lib/schedulePlan";
+import { applySchedulePlan, emergencyFields, moveMatch, releaseSchedule, requestSchedulePlan, updateMatchPlan } from "@/lib/schedulePlan";
 import { countOf } from "@/lib/schedulePlanText";
-import { useConfirm } from "@/components/tls/ConfirmDialog";
+import { useConfirm, usePrompt } from "@/components/tls/ConfirmDialog";
 import { matchRights } from "@/lib/tournamentRights";
 import { planViewMode } from "@/lib/matchPlanMode";
 import { viennaTime } from "@/lib/vienna";
@@ -61,6 +61,7 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
   const [matchdays, setMatchdays] = useState(null);
   const [planError, setPlanError] = useState("");
   const confirm = useConfirm();
+  const askReason = usePrompt();
   const [remoteError, setRemoteError] = useState("");
   const [queue, setQueue] = useState(null);
   const [busyStation, setBusyStation] = useState("");
@@ -197,7 +198,9 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
   };
 
   const move = async (item, next) => {
-    const result = await moveMatch(item.id, { start: next.start, stationId: next.laneId });
+    const emergency = await emergencyFields(matchById.get(item.id), askReason);
+    if (!emergency) return { ok: false, message: "Abgebrochen – ohne Grund bleibt der Termin." };
+    const result = await moveMatch(item.id, { start: next.start, stationId: next.laneId, emergency });
     if (result.ok) {
       setPreview(null);
       await onChanged?.();
@@ -207,7 +210,9 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
   };
 
   const saveMatch = async (item, body) => {
-    const result = await updateMatchPlan(item.id, body);
+    const emergency = await emergencyFields(matchById.get(item.id), askReason);
+    if (!emergency) return { ok: false, message: "Abgebrochen – ohne Grund bleibt der Termin." };
+    const result = await updateMatchPlan(item.id, { ...body, ...emergency });
     if (result.ok) {
       toast.success(`${item.key} gespeichert.`);
       setPreview(null);
@@ -231,7 +236,9 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
   const canEditMatch = (match) => Boolean(match) && matchRights(tournament, match).plan;
 
   const release = async (item) => {
-    const result = await moveMatch(item.id, { release: true });
+    const emergency = await emergencyFields(matchById.get(item.id), askReason);
+    if (!emergency) return;
+    const result = await moveMatch(item.id, { release: true, emergency });
     if (!result.ok) {
       toast.error(result.message);
       return;
@@ -335,6 +342,13 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
       <DelayBanner delay={delay} canPlan={canPlan} onReplan={startPreview} forecastOnly={liveLocal} />
       {planError && <PlanNotice tone="error" testId="mp-plan-error">Der Planer hat nicht geantwortet: {planError} Gezeigt wird der gespeicherte Plan.</PlanNotice>}
       {note && <PlanNotice testId="mp-plan-note">{note}</PlanNotice>}
+      {matches.some((match) => match.viewer_involved) && (
+        <PlanNotice testId="mp-own-matches">
+          {matches.some((match) => match.viewer_override)
+            ? "An einem Spiel bist du selbst beteiligt: Den Termin setzt sonst eine zweite Person, als Superadmin nur mit Grund im Protokoll."
+            : "An einem Spiel bist du selbst beteiligt: Den Termin setzt eine zweite berechtigte Person. Als Captain oder Vertreter nutzt du Vorschlag und Zustimmung auf der Matchseite."}
+        </PlanNotice>
+      )}
       <PlanSettings
         tournament={tournament}
         mode={mode}

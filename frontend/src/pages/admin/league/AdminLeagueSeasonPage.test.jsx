@@ -260,3 +260,26 @@ test("Liga N: eigene Gewinne nur, wenn sie sich ändern; leer heißt wie die Sea
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/admin/leagues/divisions/d1",
     { nickname: null, overrides: {}, status: "active", prizes: [{ place: 1, text: "Aufstieg", image_url: null }] }));
 });
+
+test("Zuständigkeit „Regeln veröffentlichen“ (#2203): nur der Regeltext, und nur er geht an den Server", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...BODY, capabilities: ["rules"] } });
+  renderPage();
+  const rules = await screen.findByTestId("season-form-rules");
+  for (const id of ["season-form-name", "season-form-visibility", "season-pool", "season-sync", "division-add", "season-delete"]) {
+    expect(screen.queryByTestId(id), id).toBeNull();
+  }
+  fireEvent.change(rules, { target: { value: "## Neue Regeln" } });
+  fireEvent.click(screen.getByTestId("season-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/admin/leagues/seasons/s1", { rules_text: "## Neue Regeln" }));
+});
+
+test("Zuständigkeit „Kader prüfen“ (#2203): kein Formular, Liga N und Staffeln nur zum Ansehen", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...BODY, capabilities: ["roster"] } });
+  renderPage();
+  expect(await screen.findByTestId("season-divisions")).toBeInTheDocument();
+  expect(screen.queryByTestId("season-form")).toBeNull();
+  for (const id of ["division-edit-1", "division-delete-1", "staffel-add-1", "staffel-delete-1-A", "season-delete"]) {
+    expect(screen.queryByTestId(id), id).toBeNull();
+  }
+  expect(screen.getByTestId("staffel-manage-1-A")).toBeInTheDocument();
+});

@@ -300,7 +300,7 @@ export function TeamsPanel() {
                           <div className="text-[10px] uppercase tracking-widest text-[#FFD700]">{squadStatusLabel(squad.status)}</div>
                           <h4 className="font-heading font-bold text-lg">{squad.name}</h4>
                         </div>
-                        {canEditSquads && (
+                        {canEditSquads && squad.can_edit !== false && (
                           <div className="flex gap-1">
                             <button type="button" onClick={() => setEditing({ ...emptySquad, ...squad })} className="p-1 text-white/45 hover:text-[#29B6E8]"><Pencil className="w-3.5 h-3.5" /></button>
                             <button type="button" onClick={() => deleteSquad(squad)} className="p-1 text-white/45 hover:text-[#FF3B30]"><Trash2 className="w-3.5 h-3.5" /></button>
@@ -308,6 +308,9 @@ export function TeamsPanel() {
                         )}
                       </div>
                       <p className="text-xs text-white/55 mt-1" data-testid={`team-squad-game-${squad.id}`}>{squadGameLabel(squad)}</p>
+                      {canEditSquads && squad.can_edit === false ? (
+                        <p className="text-xs text-white/55 mt-1" data-testid={`team-squad-locked-${squad.id}`}>Spielt in einer laufenden Staffel: Kader und Rollen ändern jetzt nur die Teamleitung und die Liga-Leitung.</p>
+                      ) : null}
                       {squad.description && <p className="text-sm text-white/55 mt-2">{squad.description}</p>}
                       <p className="text-xs text-white/55 mt-2 break-words" data-testid={`team-squad-roles-${squad.id}`}>{rolesSummary(squad, squad.members)}</p>
                       {roleOf(squad, myId) ? (

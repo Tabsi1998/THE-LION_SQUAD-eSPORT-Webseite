@@ -378,15 +378,15 @@ function App() {
           <Route path="/admin/tv" element={<ProtectedRoute requireArea="tournaments"><AdminTvPage /></ProtectedRoute>} />
           {/* Aushang zum Vor-Ort-Zugang (#1592): eigenes Blatt ohne Admin-Rahmen, zum Drucken. */}
           <Route path="/admin/tournaments/:id/aushang" element={<ProtectedRoute requireArea="tournaments"><AdminOnsitePosterPage /></ProtectedRoute>} />
-          <Route path="/admin/tournaments/:id" element={<ProtectedRoute requireTournamentStaff><AdminTournamentEditPage /></ProtectedRoute>} />
+          <Route path="/admin/tournaments/:id" element={<ProtectedRoute requireTournamentStaff allowLeagueStaff><AdminTournamentEditPage /></ProtectedRoute>} />
           <Route path="/admin/f1" element={<ProtectedRoute requireTournamentStaff><AdminF1Page /></ProtectedRoute>} />
           <Route path="/admin/f1/new" element={<ProtectedRoute requireArea="tournaments"><AdminF1NewPage /></ProtectedRoute>} />
           <Route path="/admin/f1/:id" element={<ProtectedRoute requireTournamentStaff><AdminF1EditPage /></ProtectedRoute>} />
           <Route path="/admin/games" element={<ProtectedRoute requireArea="tournaments"><AdminGamesPage /></ProtectedRoute>} />
           <Route path="/admin/games/:gameId/maps" element={<ProtectedRoute requireArea="tournaments"><AdminGameMapsPage /></ProtectedRoute>} />
-          <Route path="/admin/leagues" element={<ProtectedRoute requireArea="tournaments"><AdminLeaguesPage /></ProtectedRoute>} />
-          <Route path="/admin/leagues/seasons/:seasonId" element={<ProtectedRoute requireArea="tournaments"><AdminLeagueSeasonPage /></ProtectedRoute>} />
-          <Route path="/admin/leagues/rules/:scope/:scopeId" element={<ProtectedRoute requireArea="tournaments"><AdminLeagueRulesPage /></ProtectedRoute>} />
+          <Route path="/admin/leagues" element={<ProtectedRoute requireArea="leagues" allowLeagueStaff><AdminLeaguesPage /></ProtectedRoute>} />
+          <Route path="/admin/leagues/seasons/:seasonId" element={<ProtectedRoute requireArea="leagues" allowLeagueStaff><AdminLeagueSeasonPage /></ProtectedRoute>} />
+          <Route path="/admin/leagues/rules/:scope/:scopeId" element={<ProtectedRoute requireArea="leagues" allowLeagueStaff><AdminLeagueRulesPage /></ProtectedRoute>} />
           <Route path="/admin/users" element={<ProtectedRoute requireArea="club"><AdminUsersPage /></ProtectedRoute>} />
           <Route path="/admin/stations" element={<ProtectedRoute requireTournamentStaff><AdminStationsPage /></ProtectedRoute>} />
           <Route path="/admin/events" element={<ProtectedRoute requireArea="tournaments"><AdminEventsPage /></ProtectedRoute>} />

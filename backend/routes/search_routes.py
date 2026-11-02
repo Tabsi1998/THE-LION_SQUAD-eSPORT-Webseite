@@ -7,7 +7,8 @@ from database import get_db
 from services.permissions import is_confirmed_tournament_lead
 from models import now_utc
 from services.public_phase import derive_public_phase
-from services.league_scope import league_label
+from services.league_scope import is_league_staffel, league_label
+from services.tournament_permissions import leads_tournament
 from services.visibility import user_can_see
 from services.visibility import lead_can_see
 from services.query_filters import safe_regex
@@ -59,9 +60,14 @@ async def _search_tournaments(db, pattern: str, user: dict | None, limit: int) -
     out = []
     is_staff = is_confirmed_tournament_lead(user)
     for row in rows:
-        if not is_staff and (row.get("status") == "draft" or row.get("is_public") is False):
+        # Staffeln (#2203): die Turnierleitung sieht sie wie alle anderen, Liga-Rechte wie sonst die Leitung.
+        staffel = is_league_staffel(row)
+        leads = await leads_tournament(user, row.get("id")) if staffel else is_staff
+        if not leads and (row.get("status") == "draft" or row.get("is_public") is False):
             continue
-        if not await lead_can_see(user, row.get("visibility") or "public"):
+        if not leads and staffel and not await user_can_see(user, row.get("visibility") or "public"):
+            continue
+        if not staffel and not await lead_can_see(user, row.get("visibility") or "public"):
             continue
         phase = derive_public_phase(row, "tournament")
         status_label = phase.get("label") or row.get("status")

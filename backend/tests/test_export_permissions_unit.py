@@ -43,7 +43,8 @@ def test_operational_pdf_exports_require_the_tournament_area():
         dependency = _depends_parameter(endpoint, "me")
         closure_values = [cell.cell_contents for cell in (dependency.__closure__ or [])]
 
-        assert ("tournaments",) in closure_values
+        # Seit #2203 fragt der Wächter je Turnier: normal der Bereich Turnierleitung, in einer Staffel das Liga-Recht.
+        assert ("tournaments",) in closure_values or "require_lead_of" in dependency.__qualname__
         assert not any(isinstance(value, tuple) and "moderation" in value for value in closure_values)
 
 

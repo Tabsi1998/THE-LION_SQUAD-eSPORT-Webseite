@@ -35,9 +35,17 @@ class FakeStaffAssignments:
         return FakeCursor([doc for doc in self.docs if _matches(doc, query)])
 
 
+class FakeTournaments:
+    """Kein Turnier ist eine Staffel - hier geht es um normale Turniere."""
+
+    async def find_one(self, _query, _projection=None):
+        return {"id": "t1"}
+
+
 class FakeDb:
     def __init__(self, docs):
         self.tournament_staff_assignments = FakeStaffAssignments(docs)
+        self.tournaments = FakeTournaments()
 
 
 def _matches(doc, query):
@@ -55,7 +63,16 @@ def _matches(doc, query):
 
 
 def test_global_tournament_staff_does_not_need_assignment(monkeypatch):
-    monkeypatch.setattr(perms, "get_db", lambda: pytest.fail("global roles must not query assignments"))
+    class NoAssignments(FakeDb):
+        @property
+        def tournament_staff_assignments(self):
+            return pytest.fail("global roles must not query assignments")
+
+        @tournament_staff_assignments.setter
+        def tournament_staff_assignments(self, _value):
+            pass
+
+    monkeypatch.setattr(perms, "get_db", lambda: NoAssignments([]))
 
     allowed = asyncio.run(perms.has_tournament_staff_permission(
         {"id": "u1", "role": "tournament_admin", "mfa_enabled": True, "auth_mfa_verified": True},

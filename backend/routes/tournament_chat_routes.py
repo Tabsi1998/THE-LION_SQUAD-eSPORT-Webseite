@@ -5,6 +5,7 @@ import re
 from fastapi import HTTPException, Depends
 from pydantic import BaseModel, Field
 from database import get_db
+from services.league_scope import is_league_staffel
 from services.permissions import is_tournament_lead
 from services import moderation_standing
 from auth import get_current_user
@@ -16,7 +17,6 @@ from services.log_safe import log_safe
 from routes.tournament_common import (
     TOURNAMENT_MUTATION_LOCKED_DETAIL,
     _get_visible_tournament,
-    _is_staff,
     _is_tournament_locked,
     _is_tournament_staff,
     _resolve_tid,
@@ -36,7 +36,7 @@ class TournamentChatCreate(BaseModel):
 async def _can_use_tournament_chat(tournament: dict, user: dict | None) -> bool:
     if not user:
         return False
-    if _is_staff(user) or await _is_tournament_staff(tournament["id"], user):
+    if await _is_tournament_staff(tournament["id"], user):
         return True
     if tournament.get("show_chat") is not True:
         return False
@@ -120,7 +120,7 @@ async def _notify_tournament_mentions(db, tournament: dict, sender: dict, messag
     for member in candidates:
         if member.get("id") == sender.get("id"):
             continue
-        if member.get("id") not in allowed_ids and not is_tournament_lead(member):
+        if member.get("id") not in allowed_ids and (is_league_staffel(tournament) or not is_tournament_lead(member)):
             continue
         await create_user_notification(
             member["id"],

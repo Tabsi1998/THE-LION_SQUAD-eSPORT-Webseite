@@ -138,11 +138,11 @@ async def can_see(db, doc: dict, user: dict | None) -> bool:
     if not match:
         return False
     from services.match_audience import player_user_ids, registrations_for_match
-    from services.tournament_permissions import has_match_result_permission, is_global_tournament_staff
+    from services.tournament_permissions import has_match_result_permission
 
     if user.get("id") in await player_user_ids(db, await registrations_for_match(db, match)):
         return True
-    return is_global_tournament_staff(user) or await has_match_result_permission(user, match)
+    return await has_match_result_permission(user, match, capability=("results", "disputes"))
 
 
 def _remove_files(doc: dict) -> None:

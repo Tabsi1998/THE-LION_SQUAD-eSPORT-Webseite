@@ -7,6 +7,7 @@ const apiMock = { get: vi.fn(), post: vi.fn(), patch: vi.fn(), put: vi.fn(), del
 vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (detail) => String(detail || "Fehler"), formatRequestError: () => "Fehler", resolveMediaUrl: (url) => url || "" }));
 vi.mock("@/components/tls/AdminLayout", () => ({ AdminLayout: ({ children }) => <div>{children}</div> }));
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
+vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => async () => true }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const { default: AdminLeaguesPage } = await import("./AdminLeaguesPage");
@@ -157,4 +158,27 @@ test("Gestaltung: vorhandenes Emblem und Banner stehen in der Vorschau, Entferne
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/admin/leagues/l1", expect.objectContaining({
     banner_focus: { x: 20, y: 70, mobile_x: 25, mobile_y: 50 } })));
   expect(apiMock.patch.mock.calls[0][1]).not.toHaveProperty("emblem_url");
+});
+
+test("Zuständige (#2203): kein Anlegen und Löschen, nur die Knöpfe der eigenen Zuständigkeit", async () => {
+  const [league] = BODY.leagues;
+  apiMock.get.mockResolvedValue({ data: { ...BODY, can_create: false, leagues: [{ ...league, capabilities: ["roster"] }] } });
+  renderPage();
+  expect(await screen.findByTestId("season-link-season-1")).toBeInTheDocument();
+  for (const id of ["league-add", "league-steps", "league-edit-probe-shooter", "league-delete-probe-shooter", "league-staff-probe-shooter", "season-add-probe-shooter"]) {
+    expect(screen.queryByTestId(id), id).toBeNull();
+  }
+});
+
+test("„Liga verwalten“ ohne Bereich (#2203): bearbeiten und Zuständige lesen, aber kein Löschen", async () => {
+  const [league] = BODY.leagues;
+  apiMock.get.mockResolvedValueOnce({ data: { ...BODY, can_create: false, leagues: [{ ...league, capabilities: ["manage"] }] } });
+  apiMock.get.mockResolvedValue({ data: { staff: [], can_grant: false } });
+  renderPage();
+  fireEvent.click(await screen.findByTestId("league-staff-probe-shooter"));
+  expect(await screen.findByTestId("league-staff-sheet")).toBeInTheDocument();
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/admin/leagues/l1/staff"));
+  expect(screen.getByTestId("league-edit-probe-shooter")).toBeInTheDocument();
+  expect(screen.queryByTestId("league-delete-probe-shooter")).toBeNull();
+  expect(screen.queryByTestId("league-staff-add")).toBeNull();
 });

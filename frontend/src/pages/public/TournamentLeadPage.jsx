@@ -152,10 +152,10 @@ export default function TournamentLeadPage() {
   };
 
   // Streitfall entscheiden (#1158): „Ergebnis bleibt“ mit einem Tipp - beide Seiten bekommen die Entscheidung.
-  const keepResult = async (item, note) => {
+  const keepResult = async (item, note, conflictReason) => {
     setDeciding(true);
     try {
-      await api.post(`/matches/${item.id}/dispute/decision`, { decision: "keep", note });
+      await api.post(`/matches/${item.id}/dispute/decision`, { decision: "keep", note, ...(conflictReason ? { conflict_reason: conflictReason } : {}) });
       toast.success("Entschieden – beide Seiten bekommen Bescheid.");
       await load();
     } catch (err) {
@@ -237,7 +237,7 @@ export default function TournamentLeadPage() {
             {data && cases === 0 ? <div className="rounded-sm border border-white/10 bg-[#121212] p-6 text-center text-white/50" data-testid="lead-attention-empty">Gerade hängt nichts.</div> : null}
             {draws.map((card) => <DrawCard key={card.id} card={card} now={data?.now} highlighted={fall === card.id} busy={deciding} onDraw={() => drawNow(card)} />)}
             {attention.map((item) => (item.kind === "dispute" && byId[item.match_id]?.dispute ? (
-              <DisputeCard key={item.id} item={byId[item.match_id]} busy={deciding} highlighted={fall === item.id} onKeep={(note) => keepResult(byId[item.match_id], note)} onChange={() => openEntry(item.match_id)} />
+              <DisputeCard key={item.id} item={byId[item.match_id]} busy={deciding} highlighted={fall === item.id} onKeep={(note, conflictReason) => keepResult(byId[item.match_id], note, conflictReason)} onChange={() => openEntry(item.match_id)} />
             ) : (
               <AttentionRow
                 key={item.id}
@@ -245,6 +245,7 @@ export default function TournamentLeadPage() {
                 highlighted={fall === item.id}
                 busy={deciding}
                 canEnter={Boolean(byId[item.match_id]?.can_enter)}
+                conflict={Boolean(byId[item.match_id]?.conflict || byId[item.match_id]?.conflict_override)}
                 moving={movingId === item.id}
                 stations={freeStations}
                 onEnter={() => openEntry(item.match_id)}
@@ -353,7 +354,7 @@ function DrawCard({ card, now, highlighted, busy, onDraw }) {
   );
 }
 
-function AttentionRow({ item, highlighted, busy, canEnter, moving, stations, onEnter, onMove, onMoveTo, onNoShow }) {
+function AttentionRow({ item, highlighted, busy, canEnter, conflict = false, moving, stations, onEnter, onMove, onMoveTo, onNoShow }) {
   const bad = item.kind === "station_broken";
   return (
     <div id={`fall-${item.id}`} className={`rounded-sm border bg-[#121212] p-3 ${highlighted ? "border-[#FFD700]/70 ring-2 ring-[#FFD700]/40" : bad ? "border-[#FF3B30]/45" : "border-[#FFD700]/45"}`} data-testid={`lead-case-${item.id}`}>
@@ -372,7 +373,10 @@ function AttentionRow({ item, highlighted, busy, canEnter, moving, stations, onE
           <button type="button" disabled={busy} onClick={onEnter} className="tls-btn tls-btn--primary shrink-0 min-h-[44px] px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid={`lead-case-enter-${item.id}`}>Eintragen</button>
         ) : null}
       </div>
-      {item.action === "no_show" ? (
+      {item.action === "no_show" && conflict ? (
+        <p className="mt-3 border-t border-white/10 pt-3 text-xs text-white/60" data-testid={`lead-no-show-conflict-${item.id}`}>Du bist an diesem Spiel selbst beteiligt – das entscheidet eine zweite berechtigte Person.</p>
+      ) : null}
+      {item.action === "no_show" && !conflict ? (
         <div className="mt-3 flex flex-wrap gap-2 border-t border-white/10 pt-3" data-testid={`lead-no-show-${item.id}`}>
           {(item.participants || []).map((side) => (
             <button key={side.registration_id} type="button" disabled={busy} onClick={() => onNoShow({ action: "confirm", registration_id: side.registration_id })} className="tls-btn tls-btn--secondary min-h-[44px] min-w-0 max-w-full px-3 py-2 rounded-sm text-left text-xs font-bold [overflow-wrap:anywhere]" data-testid={`lead-no-show-${side.registration_id}`}>
@@ -418,6 +422,8 @@ function LeadRow({ item, onEnter }) {
         <span className="shrink-0 text-[11px] font-bold uppercase tracking-wider text-[#29B6E8]" data-testid={`lead-held-${item.id}`}>{held.mine ? "gespeichert" : `${held.actor_name} trägt ein`}</span>
       ) : item.can_enter ? (
         <button type="button" onClick={onEnter} className="tls-btn tls-btn--primary shrink-0 min-h-[44px] px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid={`lead-enter-${item.id}`}>Eintragen</button>
+      ) : item.conflict ? (
+        <span className="shrink-0 max-w-[9rem] text-right text-[11px] leading-snug text-white/55" data-testid={`lead-conflict-${item.id}`}>Selbst beteiligt – entscheidet jemand anderes</span>
       ) : null}
     </div>
   );

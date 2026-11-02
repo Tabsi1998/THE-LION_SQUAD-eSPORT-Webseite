@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, Check, History, IdCard } from "lucide-react";
+import { AlertTriangle, Check, History, IdCard, Users } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { FormSection } from "@/components/tls/AdminForm";
@@ -7,6 +7,7 @@ import { TextField } from "@/components/tls/FormFields";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { ID_STATE_LABELS } from "@/lib/leagueIds";
 import { viennaDateTime } from "@/lib/vienna";
+import { SquadKaderSheet } from "./SquadKaderSheet";
 
 // Kader und Spiel-IDs einer Season (docs/LIGA.md, #2108): je Co-Team die Spieler mit der ID, die in der Season gilt.
 // Ändert jemand die ID im Profil, gilt weiter die festgehaltene, bis die Liga-Leitung die neue freigibt (mit Grund,
@@ -56,6 +57,16 @@ function ShortKaders({ squads = [] }) {
         ))}
       </ul>
     </div>
+  );
+}
+
+// Kader bearbeiten (#2203): Solange die Staffel läuft, geht das außer dem eigenen Team nur von hier aus.
+function EditKaderButton({ squad, onOpen }) {
+  if (!squad.squad_id) return null;
+  return (
+    <button type="button" onClick={() => onOpen(squad)} className="tls-btn tls-btn--quiet inline-flex min-h-[40px] shrink-0 items-center gap-1.5 rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider" data-testid={`roster-edit-${squad.registration_id}`}>
+      <Users className="h-3.5 w-3.5" aria-hidden="true" /> Kader bearbeiten
+    </button>
   );
 }
 
@@ -148,6 +159,7 @@ export function SeasonRosterPanel({ seasonId }) {
   const [open, setOpen] = useState("");
   const [busy, setBusy] = useState(false);
   const [deadline, setDeadline] = useState("");
+  const [editing, setEditing] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -196,7 +208,22 @@ export function SeasonRosterPanel({ seasonId }) {
       {!data && !error ? <p className="text-sm text-white/50">Lade Kader …</p> : null}
       {data ? <ShortKaders squads={data.squads} /> : null}
       {data && !fields.length ? (
-        <p className="text-sm text-white/55" data-testid="season-roster-free">Das Spiel dieser Liga hat keine Pflicht-ID – aufstellbar ist jeder im Kader.</p>
+        <>
+          <p className="text-sm text-white/55" data-testid="season-roster-free">Das Spiel dieser Liga hat keine Pflicht-ID – aufstellbar ist jeder im Kader.</p>
+          {(data.squads || []).length ? (
+            <ul className="mt-3 divide-y divide-white/5 rounded-sm border border-white/10 bg-[#0A0A0A]" data-testid="season-roster-plain">
+              {data.squads.map((squad) => (
+                <li key={squad.registration_id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+                  <span className="min-w-0">
+                    <span className="block font-semibold text-white [overflow-wrap:anywhere]">{squad.display_name}</span>
+                    <span className="block text-xs text-white/55">{squad.staffel_label} · {squad.member_count} im Kader</span>
+                  </span>
+                  <EditKaderButton squad={squad} onOpen={setEditing} />
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </>
       ) : null}
       {data && fields.length ? (
         <div className="space-y-4">
@@ -213,9 +240,12 @@ export function SeasonRosterPanel({ seasonId }) {
           {!data.squads.length ? <p className="text-sm text-white/50">Noch kein Co-Team zugeteilt.</p> : null}
           {data.squads.map((squad) => (
             <div key={squad.registration_id} className="min-w-0 rounded-sm border border-white/10 bg-[#0A0A0A]" data-testid={`roster-squad-${squad.registration_id}`}>
-              <div className="border-b border-white/10 px-3 py-2">
-                <p className="text-[11px] font-bold uppercase tracking-widest text-white/45">{squad.staffel_label}</p>
-                <p className="font-bold text-white [overflow-wrap:anywhere]">{squad.display_name}</p>
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-bold uppercase tracking-widest text-white/45">{squad.staffel_label}</p>
+                  <p className="font-bold text-white [overflow-wrap:anywhere]">{squad.display_name}</p>
+                </div>
+                <EditKaderButton squad={squad} onOpen={setEditing} />
               </div>
               <ul className="divide-y divide-white/5">
                 {squad.players.map((player) => (
@@ -228,6 +258,7 @@ export function SeasonRosterPanel({ seasonId }) {
           ))}
         </div>
       ) : null}
+      {editing ? <SquadKaderSheet squad={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} /> : null}
     </FormSection>
   );
 }

@@ -122,3 +122,20 @@ test("Liga-Spiel (#2107): das Emblem der Season klein vor dem Spieltag", async (
   expect(emblem.querySelector("img")).toHaveAttribute("src", "/api/static/uploads/season.png");
   resetLeagueTrail();
 });
+
+test("Befangen (#2203): die Seite sagt warum, ohne Knopf zum Eintragen", async () => {
+  renderMatch({ ...BASE, league: LEAGUE, conflict: { kind: "involved", override: false } });
+  expect(await screen.findByTestId("match-conflict")).toHaveTextContent("zweite berechtigte Person");
+  expect(screen.queryByTestId("match-staff-result-open")).toBeNull();
+});
+
+test("Befangener Superadmin (#2203): die Seite nennt die Notausnahme", async () => {
+  renderMatch({ ...BASE, league: LEAGUE, conflict: { kind: "involved", override: true } });
+  expect(await screen.findByTestId("match-conflict")).toHaveTextContent("Notausnahme");
+});
+
+test("Ohne Befangenheit kein Hinweis (#2203)", async () => {
+  renderMatch({ ...BASE, league: LEAGUE, conflict: null });
+  await screen.findByRole("heading", { level: 1 });
+  expect(screen.queryByTestId("match-conflict")).toBeNull();
+});

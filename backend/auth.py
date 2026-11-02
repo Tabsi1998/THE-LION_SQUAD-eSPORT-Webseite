@@ -511,7 +511,7 @@ def require_any_admin():
 def require_dashboard():
     """Startseite der Verwaltung (#1353, #992): jeder Verwaltungsbereich - auch Finanzen (Kassier), mit Zwei-Faktor.
     Spiegel von ``ADMIN_AREAS`` im Web (Menüeintrag „Dashboard“, Seiten-Schutz von /admin)."""
-    return require_area("tournaments", "content", "club", "finance", "system")
+    return require_area("tournaments", "leagues", "content", "club", "finance", "system")
 
 
 def require_admin():

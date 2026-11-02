@@ -103,7 +103,8 @@ def test_v2_match_update_exact_replay_skips_write(monkeypatch):
         "admin_note": "bestehend",
     }
     matches = _MutableMatchCollection(match)
-    db = SimpleNamespace(matches_v2=matches)
+    # Kein Turnier gefunden: keine Liga-Staffel, also keine Befangenheit (#2203).
+    db = SimpleNamespace(matches_v2=matches, tournaments=SimpleNamespace(find_one=AsyncMock(return_value=None)))
 
     monkeypatch.setattr(match_routes, "get_db", lambda: db)
     monkeypatch.setattr(match_routes, "_ensure_match_tournament_unlocked", AsyncMock())

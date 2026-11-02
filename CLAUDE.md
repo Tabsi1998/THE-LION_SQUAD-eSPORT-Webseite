@@ -32,9 +32,9 @@ Weitere Doku: [`DOCS.md`](DOCS.md).
 **Backend**
 - `server.py` (App, Middleware, Router; Health unter `/api/health/live` und `/ready`), `auth.py`
   (Sitzungen, Wächter), `routes/` (eine Datei je Gebiet), `services/` (Logik).
-- **Rechte nach Bereichen** (`services/permissions.py`: `tournaments`, `content`, `club`, `system`,
-  `moderation`), Wächter `require_area(...)` in `auth.py`. Neue Admin-Route = Bereich wählen, nie nach
-  Rang. Matrix in `docs/ROLLEN.md`.
+- **Rechte nach Bereichen** (`services/permissions.py`: `tournaments`, `leagues`, `content`, `club`, `finance`,
+  `system`, `moderation`), Wächter `require_area(...)` in `auth.py`. Neue Admin-Route = Bereich wählen, nie nach
+  Rang. Matrix in `docs/ROLLEN.md`. In einer Liga-Staffel gilt das Liga-Recht (`services/league_permissions.py`).
 - **Zeit:** der Server läuft in UTC, Vereinstage sind Wiener Tage – nie `date.today()`, sondern
   `dolibarr_policy.club_today()` oder `LOCAL_TZ`.
 - Werte aus Anfragen kommen nur über `services/log_safe.py` ins Protokoll.

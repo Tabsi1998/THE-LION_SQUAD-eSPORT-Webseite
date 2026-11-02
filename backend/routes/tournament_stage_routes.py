@@ -37,13 +37,15 @@ from services import tournament_guard
 from services.staffel_guard import staffel_rebuild_problem
 from services.match_public_view import public_match_view, public_stage_view
 from services.round_labels import attach_round_labels
+from services.league_permissions import involved_match_ids
+from services.league_scope import is_league_staffel
+from services.permissions import is_superadmin
 from routes.tournament_common import (
     _apply_match_plan,
     _audit_tournament_action,
     _collect_match_plan,
     _ensure_tournament_unlocked,
     _get_visible_tournament,
-    _is_staff,
     _is_tournament_staff,
     _resolve_tid,
     _serialized_tournament_write,
@@ -64,7 +66,7 @@ async def list_tournament_stages(tid: str, user=Depends(get_optional_user)):
         {"tournament_id": tid},
         {"_id": 0},
     ).sort("number", 1).to_list(200)
-    if _is_staff(user) or await _is_tournament_staff(tid, user):
+    if await _is_tournament_staff(tid, user):
         return [{key: value for key, value in stage.items() if key != "creation_key"} for stage in stages]
     return [public_stage_view(stage) for stage in stages]
 
@@ -96,7 +98,7 @@ async def create_tournament_stage(tid: str, body: TournamentStageCreate,
     db = get_db()
     tid = await _resolve_tid(tid)
     await _ensure_tournament_unlocked(db, tid)
-    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
+    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES, capability="season")
     doc = body.model_dump()
     _sync_stage_settings(doc.get("settings"))
     creation_digest = hashlib.sha256(
@@ -146,7 +148,7 @@ async def update_tournament_stage(tid: str, stage_id: str, body: TournamentStage
     db = get_db()
     tid = await _resolve_tid(tid)
     await _ensure_tournament_unlocked(db, tid)
-    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
+    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES, capability="season")
     current = await db.tournament_stages.find_one({"id": stage_id, "tournament_id": tid}, {"_id": 0})
     if not current:
         raise HTTPException(status_code=404, detail="Phase nicht gefunden")
@@ -179,7 +181,7 @@ async def delete_tournament_stage(tid: str, stage_id: str, force: bool = False, 
     db = get_db()
     tid = await _resolve_tid(tid)
     tournament = await _ensure_tournament_unlocked(db, tid)
-    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
+    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES, capability="season")
     stage = await db.tournament_stages.find_one({"id": stage_id, "tournament_id": tid}, {"_id": 0})
     if not stage:
         raise HTTPException(status_code=404, detail="Phase nicht gefunden")
@@ -227,7 +229,13 @@ async def list_tournament_matches_v2(tid: str, stage_id: str | None = None,
     # Runden wie im Baum (#1860): „Winner Runde 2“, „Loser Runde 1“ - etwa für den Kasten „Auslosung“ der Verwaltung.
     stages = await db.tournament_stages.find({"tournament_id": tid}, {"_id": 0, "id": 1, "stage_type": 1}).to_list(200)
     attach_round_labels(matches, stages, tournament)
-    if _is_staff(user) or await _is_tournament_staff(tid, user):
+    if await _is_tournament_staff(tid, user):
+        # Staffel (#2203): Der Plan sagt je Spiel, ob die Person dort beteiligt ist - der Server entscheidet trotzdem.
+        if is_league_staffel(tournament):
+            own = await involved_match_ids(db, user, tournament, matches)
+            for match in matches:
+                match["viewer_involved"] = match["id"] in own
+                match["viewer_override"] = match["id"] in own and is_superadmin(user)
         return matches
     # Ohne Turnier-Recht dieselbe Sicht wie auf der Spielseite und im Turnierbaum.
     viewer_id = (user or {}).get("id")
@@ -240,7 +248,7 @@ async def recalculate_tournament_matches_v2_advancement(tid: str, stage_id: str 
                                                         _mutation_tid: str = Depends(_serialized_tournament_write)):
     db = get_db()
     tid = await _resolve_tid(tid)
-    await require_tournament_staff_permission(me, tid, RESULT_STAFF_ROLES)
+    await require_tournament_staff_permission(me, tid, RESULT_STAFF_ROLES, capability="results")
     # Ein gesperrtes Turnier ändert auch das Weiterkommen nicht mehr (#2120, TA10).
     await _ensure_tournament_unlocked(db, tid)
     q = {"tournament_id": tid}
@@ -320,7 +328,7 @@ async def generate_tournament_stage_matches(tid: str, stage_id: str, force: bool
     db = get_db()
     tid = await _resolve_tid(tid)
     await _ensure_tournament_unlocked(db, tid)
-    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
+    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES, capability="season")
     tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
     if not tournament:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
@@ -422,7 +430,7 @@ async def draw_tournament_stage(tid: str, stage_id: str, body: StageRedrawPayloa
     ``tournament.draw.done`` mit Person, dazu das Live-Ereignis ``draw_done``."""
     db = get_db()
     tid = await _resolve_tid(tid)
-    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
+    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES, capability="season")
     tournament = await _ensure_tournament_unlocked(db, tid)
     stage = await db.tournament_stages.find_one({"id": stage_id, "tournament_id": tid}, {"_id": 0})
     if not stage:
@@ -445,7 +453,7 @@ async def redraw_tournament_stage(tid: str, stage_id: str, body: StageRedrawPayl
     Person, Zeitpunkt und Ergebnis, dazu das Live-Ereignis ``draw_done``."""
     db = get_db()
     tid = await _resolve_tid(tid)
-    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES)
+    await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES, capability="season")
     tournament = await _ensure_tournament_unlocked(db, tid)
     stage = await db.tournament_stages.find_one({"id": stage_id, "tournament_id": tid}, {"_id": 0})
     if not stage:

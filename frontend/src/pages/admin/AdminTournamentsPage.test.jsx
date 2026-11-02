@@ -6,7 +6,7 @@ import { MemoryRouter } from "react-router-dom";
 // die der Server dann ablehnt.
 
 const apiMock = { get: vi.fn(), post: vi.fn(), delete: vi.fn() };
-const authState = { isAdmin: false, isTournamentLead: false };
+const authState = { isAdmin: false, isTournamentLead: false, user: { role: "tournament_admin", areas: ["tournaments", "leagues"], mfa_enabled: true, auth_mfa_verified: true } };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatRequestError: (_error, fallback) => fallback, resolveMediaUrl: (value) => value || "" }));
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => authState }));
 vi.mock("@/components/tls/AdminLayout", () => ({ AdminLayout: ({ children }) => <div>{children}</div> }));
@@ -111,4 +111,16 @@ test("Turnierliste: Archiv nur im Filter, Suche nach „K.-o.“, Status in Wort
   expect(screen.getByText("Eigenes Turnier")).toBeInTheDocument();
   fireEvent.click(screen.getByTitle("Anmeldung öffnen"));
   await vi.waitFor(() => expect(toastSpy).toHaveBeenCalledWith("Status: Anmeldung offen"));
+});
+
+test("eine Staffel: die Turnierleitung ohne Bereich Ligen bekommt keine Knöpfe zum Ändern (#2203)", async () => {
+  apiMock.get.mockResolvedValue({ data: [STAFFEL, { ...STAFFEL, id: "t-live", slug: "liga-b", title: "Laufende Staffel", status: "live" }, { ...OWN, status: "draft" }] });
+  authState.isTournamentLead = true;
+  const before = authState.user;
+  authState.user = { ...before, areas: ["tournaments"] };
+  render(<MemoryRouter><AdminTournamentsPage /></MemoryRouter>);
+  await screen.findByText("Laufende Staffel");
+  expect(screen.getAllByTitle("Löschen")).toHaveLength(1);
+  expect(screen.queryByTitle("Pause")).toBeNull();
+  authState.user = before;
 });

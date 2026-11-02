@@ -27,14 +27,34 @@ export async function applySchedulePlan(tournamentId, plan) {
 }
 
 /**
+ * Termin des eigenen Spiels (#2203): Als befangener Superadmin nur mit Grund. `{}` ohne Befangenheit, `null` bei Abbruch oder zu kurzem
+ * Grund (dann schickt niemand etwas), sonst das Feld für den Server. Der Server prüft selbst.
+ */
+export async function emergencyFields(match, askReason) {
+  if (!match?.viewer_override) return {};
+  const reason = await askReason({
+    title: "Notausnahme: Du bist an diesem Spiel beteiligt",
+    description: "Den Termin setzt sonst eine zweite Person. Als Superadmin geht es nur mit einem Grund von mindestens fünf Zeichen, er steht im Protokoll.",
+    placeholder: "Grund der Notausnahme",
+    confirmLabel: "Termin setzen",
+    required: true,
+  });
+  const text = typeof reason === "string" ? reason.trim() : "";
+  return text.length >= 5 ? { conflict_reason: text } : null;
+}
+
+/**
  * Ein Spiel auf eine Zeit und Station legen (Ziehen auf der Zeitleiste oder Tastatur, #1557) - über den bestehenden
  * Weg PATCH /matches/:id. Der Server macht daraus einen festen Termin (`manual`) und lehnt eine belegte Station mit 409
  * ab. `release: true` löst den festen Termin: ohne Zeit plant der Planer das Spiel beim nächsten Mal wieder.
  */
-export async function moveMatch(matchId, { start, stationId, release = false } = {}) {
-  const body = release
-    ? { scheduled_at: null }
-    : { scheduled_at: new Date(start).toISOString(), station_id: stationId && stationId !== "none" ? stationId : null };
+export async function moveMatch(matchId, { start, stationId, release = false, emergency = {} } = {}) {
+  const body = {
+    ...(release
+      ? { scheduled_at: null }
+      : { scheduled_at: new Date(start).toISOString(), station_id: stationId && stationId !== "none" ? stationId : null }),
+    ...emergency,
+  };
   try {
     await api.patch(`/matches/${encodeURIComponent(matchId)}`, body);
     return { ok: true };

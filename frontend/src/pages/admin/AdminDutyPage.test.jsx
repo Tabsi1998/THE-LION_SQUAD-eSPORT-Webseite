@@ -80,3 +80,19 @@ test("Captain ohne Zwei-Faktor: Hinweis mit Weg zur Einrichtung", async () => {
   expect(await screen.findByTestId("duty-series-mfa")).toHaveTextContent("Zwei-Faktor");
   authState.user = { id: "u", role: "player", mfa_enabled: true, auth_mfa_verified: true };
 });
+
+test("Zuständige (#2203): „Meine Ligen“ mit den Zuständigkeiten - kein leerer Einsatz-Satz", async () => {
+  authState.user = { id: "z", role: "player", has_league_staff: true, mfa_enabled: true, auth_mfa_verified: true };
+  renderWith({ assignments: [], series: [], moderation: null, lead_today: [], leagues: [{ id: "l1", name: "Probeliga", slug: "probeliga", capabilities: ["results", "roster"] }] });
+  expect(await screen.findByTestId("duty-league-l1")).toHaveTextContent("Probeliga");
+  expect(screen.getByTestId("duty-league-l1")).toHaveTextContent("Ergebnisse korrigieren · Kader prüfen");
+  expect(screen.getByTestId("duty-league-l1")).toHaveAttribute("href", "/admin/leagues");
+  expect(screen.queryByTestId("duty-empty")).toBeNull();
+  expect(screen.queryByTestId("duty-leagues-mfa")).toBeNull();
+});
+
+test("Zuständige ohne Zwei-Faktor (#2203): der Weg zur Einrichtung", async () => {
+  authState.user = { id: "z", role: "player", has_league_staff: true, mfa_enabled: false };
+  renderWith({ assignments: [], series: [], moderation: null, lead_today: [], leagues: [] });
+  expect(await screen.findByTestId("duty-leagues-mfa")).toHaveTextContent("Zwei-Faktor");
+});

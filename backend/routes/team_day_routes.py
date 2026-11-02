@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field
 from auth import get_current_user
 from database import get_db
 from models import now_utc
-from routes.tournament_common import _is_staff, _resolve_tid
+from routes.tournament_common import _resolve_tid
 from services import team_lineup
 from services.tournament_permissions import CHECKIN_STAFF_ROLES, has_tournament_staff_permission
 from services.user_notifications import create_user_notification
@@ -235,7 +235,7 @@ async def staff_lineups(tid: str, me: dict = Depends(get_current_user)):
     """Für die Turnierleitung beim Check-in: Aufstellung und „da“ je Team-Anmeldung."""
     db = get_db()
     tid = await _resolve_tid(tid)
-    if not (_is_staff(me) or await has_tournament_staff_permission(me, tid, CHECKIN_STAFF_ROLES)):
+    if not await has_tournament_staff_permission(me, tid, CHECKIN_STAFF_ROLES, capability="matches"):
         raise HTTPException(status_code=403, detail="Nur für die Turnierleitung.")
     tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0}) or {}
     if not team_lineup.is_team_tournament(tournament):

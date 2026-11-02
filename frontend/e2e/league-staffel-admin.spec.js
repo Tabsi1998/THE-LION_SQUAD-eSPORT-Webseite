@@ -4,7 +4,7 @@ const { test, expect } = require("@playwright/test");
 // Status ohne Anmeldung/Check-in, Reiter „Tabelle“ und das Formular mit den Season-Werten nur lesend. Bei 390 und
 // 1440 px ohne seitliches Scrollen. Nur erfundene Namen.
 
-const ADMIN = { id: "admin-1", username: "leitung", display_name: "Leitung", role: "superadmin", areas: ["tournaments"], mfa_enabled: true, auth_mfa_verified: true };
+const ADMIN = { id: "admin-1", username: "leitung", display_name: "Leitung", role: "superadmin", areas: ["tournaments", "leagues"], mfa_enabled: true, auth_mfa_verified: true };
 const STAFFEL = {
   id: "t1", slug: "probe-liga-season-1-liga-1-a", title: "Probe-Liga Season 1 · Liga 1 · Staffel A", status: "draft",
   format: "league", team_mode: "team", team_size: 4, min_participants: 2, max_participants: 8, best_of: 3, game_id: "g1",
@@ -16,7 +16,7 @@ const STAFFEL = {
   league_context: { league_id: "l1", season_id: "s1", division_id: "d1", staffel: "A" }, league_label: "Liga · Staffel A",
   league_links: { league_name: "Probe-Liga", season_name: "Season 1", division_label: "Liga 1", staffel: "A",
     season_admin_path: "/admin/leagues/seasons/s1", public_path: "/liga/probe-shooter/season-1" },
-  can_manage_structure: true, can_manage_results: true, can_manage_all_results: true, can_plan_matches: true, staff_scopes: [],
+  can_edit_staffel: true, can_manage_structure: true, can_manage_results: true, can_manage_all_results: true, can_plan_matches: true, staff_scopes: [],
   can_check_in: true, can_manage_participants: true, can_assign_stations: false, can_use_staff_tools: true,
 };
 const REGS = [

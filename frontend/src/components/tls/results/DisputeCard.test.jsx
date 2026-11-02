@@ -58,3 +58,20 @@ test("ohne Ergebnis heißt es „Weiter wie bisher“ und „Ergebnis eintragen�
   expect(screen.getByTestId("lead-dispute-keep-m1")).toHaveTextContent("Weiter wie bisher");
   expect(screen.getByTestId("lead-dispute-change-m1")).toHaveTextContent("Ergebnis eintragen");
 });
+
+test("Befangen (#2203): Hinweis statt Entscheidung, der Knopf bleibt zu", () => {
+  const keep = vi.fn();
+  render(<DisputeCard item={{ ...ITEM, can_enter: false, can_decide: false, conflict: true }} onKeep={keep} onChange={() => {}} />);
+  expect(screen.getByTestId("lead-dispute-conflict-m1")).toHaveTextContent("zweite berechtigte Person");
+  expect(screen.getByTestId("lead-dispute-keep-m1")).toBeDisabled();
+  expect(screen.getByTestId("lead-dispute-change-m1")).toBeDisabled();
+});
+
+test("Befangener Superadmin (#2203): „Ergebnis bleibt“ erst mit Grund der Notausnahme", () => {
+  const keep = vi.fn();
+  render(<DisputeCard item={{ ...ITEM, can_decide: true, conflict_override: true }} onKeep={keep} onChange={() => {}} />);
+  expect(screen.getByTestId("lead-dispute-keep-m1")).toBeDisabled();
+  fireEvent.change(screen.getByTestId("lead-dispute-reason-m1"), { target: { value: "Sonst niemand erreichbar" } });
+  fireEvent.click(screen.getByTestId("lead-dispute-keep-m1"));
+  expect(keep).toHaveBeenCalledWith(null, "Sonst niemand erreichbar");
+});

@@ -100,7 +100,11 @@ async def test_the_admin_list_names_the_team_once(flow):
     users = world["users"]
     await flow.db.team_squads.update_one({"id": world["squad_a"]["id"]}, {"$set": {"vice_captain_id": users["Mila"]["id"]}})
     await forfeited(flow, world)
+    # Der Eingang hängt am Bereich Turnierleitung, die Strafen einer Staffel gehören der Liga (#2203): nur mit beidem.
+    flow.act_as(await flow.add_user(role="tournament_admin", name="Nur Turniere"))
+    assert "match_forfeit" not in (await flow.get("/api/admin/penalties?kind=match_forfeit")).json()["counts"]
     admin = await flow.add_user(role="tournament_admin", name="Oberleitung")
+    admin["areas"] = ["leagues"]
     flow.act_as(admin)
     answer = await flow.get("/api/admin/penalties?kind=match_forfeit")
     assert answer.status_code == 200, answer.text

@@ -15,7 +15,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from services.daily_center import club_day_window
-from services.permissions import can_use_area, is_confirmed_tournament_lead
+from services.league_scope import NOT_LEAGUE
+from services.permissions import can_use_area, is_confirmed_tournament_lead, needs_mfa
 
 # Vorbei: dort gibt es für Helfer nichts mehr zu tun.
 FINISHED_STATUSES = ("completed", "results_published", "archived", "cancelled")
@@ -122,6 +123,7 @@ async def lead_today_rows(db, now: datetime | None = None, limit: int = 50) -> l
     """Für die Turnierleitung über alle Turniere: was heute läuft oder heute beginnt."""
     window = club_day_window(now)
     query = {
+        **NOT_LEAGUE,  # Die Turnierleitung leitet keine Staffeln (#2203).
         "status": {"$nin": ["draft", *FINISHED_STATUSES]},
         "$or": [
             {"status": {"$in": list(RUNNING_STATUSES)}},
@@ -142,8 +144,17 @@ async def duty_overview(db, user: dict, now: datetime | None = None) -> dict:
         moderation = {"open_reports": await db.user_reports.count_documents({"status": "open"})}
     from services.reference_series_access import captain_series
 
+    from services.league_permissions import capabilities_of, has_leagues_area, staffed_league_ids
+
+    league_rows = []
+    # Ligen (#2203): Wer zuständig ist, findet hier seine Ligen. Mit dem Bereich stehen sie im Menü.
+    if not has_leagues_area(user) and not needs_mfa(user):
+        wanted = sorted(await staffed_league_ids(db, user))
+        async for row in db.leagues.find({"id": {"$in": wanted}}, {"_id": 0, "id": 1, "name": 1, "slug": 1}):
+            league_rows.append({**row, "capabilities": sorted(await capabilities_of(db, user, row["id"]))})
     return {
         "assignments": await helper_rows(db, user, now),
+        "leagues": sorted(league_rows, key=lambda row: str(row.get("name") or "").casefold()),
         # Externe Serien (#1749): wo die Person heute Captain ist - „Meine Serien“.
         "series": await captain_series(db, user),
         "moderation": moderation,

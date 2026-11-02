@@ -94,9 +94,11 @@ def last_event_occurred_at() -> str | None:
 def visibility_scope_for_user(user: dict | None) -> str:
     """Den staff-Strom bekommen Admin-Rollen und die Turnierleitung aus Rolle oder Freigabe (#1350) - beide nur mit
     bestätigter Zwei-Faktor-Anmeldung (#1469). Helfer-Einsätze je Turnier und Moderation bleiben beim öffentlichen."""
-    from services.permissions import is_confirmed_admin_role, is_confirmed_tournament_lead
+    from services.permissions import holds_area, is_confirmed_admin_role, is_confirmed_tournament_lead, needs_mfa
 
     if is_confirmed_admin_role(user, STAFF_STREAM_ROLES) or is_confirmed_tournament_lead(user):
+        return "staff"
+    if holds_area(user, "leagues") and not needs_mfa(user):  # der Bereich Ligen (#2203), wie die Turnierleitung
         return "staff"
     return "public"
 

@@ -4,10 +4,12 @@ import logging
 
 from fastapi import HTTPException, Depends
 from database import get_db
-from auth import get_current_user, require_admin
+from auth import get_current_user
+from services.league_permissions import READ
 from services.tournament_permissions import READ_STAFF_ROLES, require_tournament_staff_permission
 from models import TournamentStaffAssignmentCreate, TournamentStaffAssignmentUpdate, now_utc, new_id
 from routes.tournament_common import (
+    require_lead_of,
     _audit_tournament_action,
     _resolve_tid,
     _serialized_tournament_write,
@@ -85,7 +87,7 @@ async def _enrich_staff_assignments(assignments: list[dict]) -> list[dict]:
 async def list_tournament_staff(tid: str, me: dict = Depends(get_current_user)):
     db = get_db()
     tid = await _resolve_tid(tid)
-    await require_tournament_staff_permission(me, tid, READ_STAFF_ROLES)
+    await require_tournament_staff_permission(me, tid, READ_STAFF_ROLES, capability=READ)
     assignments = await db.tournament_staff_assignments.find(
         {"tournament_id": tid},
         {"_id": 0},
@@ -95,7 +97,7 @@ async def list_tournament_staff(tid: str, me: dict = Depends(get_current_user)):
 
 @router.post("/{tid}/staff")
 async def create_tournament_staff(tid: str, body: TournamentStaffAssignmentCreate,
-                                  me: dict = Depends(require_admin()),
+                                  me: dict = Depends(require_lead_of("manage")),
                                   _mutation_tid: str = Depends(_serialized_tournament_write)):
     db = get_db()
     tid = await _resolve_tid(tid)
@@ -143,7 +145,7 @@ async def create_tournament_staff(tid: str, body: TournamentStaffAssignmentCreat
 @router.patch("/{tid}/staff/{assignment_id}")
 @router.put("/{tid}/staff/{assignment_id}")
 async def update_tournament_staff(tid: str, assignment_id: str, body: TournamentStaffAssignmentUpdate,
-                                  me: dict = Depends(require_admin()),
+                                  me: dict = Depends(require_lead_of("manage")),
                                   _mutation_tid: str = Depends(_serialized_tournament_write)):
     db = get_db()
     tid = await _resolve_tid(tid)
@@ -183,7 +185,7 @@ async def update_tournament_staff(tid: str, assignment_id: str, body: Tournament
 
 
 @router.delete("/{tid}/staff/{assignment_id}")
-async def delete_tournament_staff(tid: str, assignment_id: str, me: dict = Depends(require_admin()),
+async def delete_tournament_staff(tid: str, assignment_id: str, me: dict = Depends(require_lead_of("manage")),
                                   _mutation_tid: str = Depends(_serialized_tournament_write)):
     db = get_db()
     tid = await _resolve_tid(tid)

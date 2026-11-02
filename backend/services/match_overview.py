@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from services.competition_read import load_match_reports, load_matches_by_query
 from services.match_audience import acting_registration_ids as acting_ids_for
 from services.station_labels import attach_station_info
+from services.league_scope import NOT_LEAGUE
 from services.tournament_permissions import RESULT_STAFF_ROLES, is_global_tournament_staff
 from services.tournament_rules import match_policy, players_can_report
 from services.v2_match_flows import REPORT_CLOSED_STATUSES, report_state
@@ -319,6 +320,17 @@ def _assignment_matches(assignment: dict, match: dict) -> bool:
     return bool(field and match.get(field) == scope_id)
 
 
+async def _staffeln_with_results(db, user: dict) -> list[str]:
+    from services.league_permissions import can, staffel_access
+
+    query = (await staffel_access(db, user)).query()
+    if query is None:
+        return []
+    rows = await db.tournaments.find({**query, "status": {"$in": sorted(ACTIVE_OPERATION_TOURNAMENT_STATUSES)}},
+                                     {"_id": 0, "id": 1, "league_context": 1}).to_list(500)
+    return [row["id"] for row in rows if await can(user, "results", row["league_context"].get("league_id"), db=db)]
+
+
 async def operational_match_overviews(
     db,
     user: dict,
@@ -337,11 +349,9 @@ async def operational_match_overviews(
             },
             {"_id": 0, "tournament_id": 1, "scope": 1, "scope_id": 1},
         ).to_list(250)
-        if not assignments:
-            return []
 
     assigned_ids = list({row.get("tournament_id") for row in assignments if row.get("tournament_id")})
-    tournament_query: dict = {"status": {"$in": sorted(ACTIVE_OPERATION_TOURNAMENT_STATUSES)}}
+    tournament_query: dict = {"status": {"$in": sorted(ACTIVE_OPERATION_TOURNAMENT_STATUSES)}, **NOT_LEAGUE}
     if not global_staff:
         tournament_query["id"] = {"$in": assigned_ids}
     active_tournaments = await db.tournaments.find(
@@ -349,6 +359,9 @@ async def operational_match_overviews(
         {"_id": 0, "id": 1},
     ).to_list(500)
     tournament_ids = [row["id"] for row in active_tournaments if row.get("id")]
+    # Staffeln nur mit Liga-Recht (#2203): weder der Bereich Turnierleitung noch ein Helfer-Einsatz gibt dort Ergebnisse.
+    league_ids = await _staffeln_with_results(db, user)
+    tournament_ids += league_ids
     if not tournament_ids:
         return []
 
@@ -359,7 +372,7 @@ async def operational_match_overviews(
     candidates = [
         match for match in await _matches_for_query(db, query)
         if match.get("id") not in exclude_match_ids
-        and (global_staff or any(
+        and (global_staff or match.get("tournament_id") in league_ids or any(
             row.get("tournament_id") == match.get("tournament_id") and _assignment_matches(row, match)
             for row in assignments
         ))

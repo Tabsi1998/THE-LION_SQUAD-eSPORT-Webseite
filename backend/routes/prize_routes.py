@@ -122,7 +122,7 @@ async def _ensure_prize_manager(user: dict, tournament_id: str | None) -> None:
         if needs_mfa(user):
             raise HTTPException(status_code=403, detail=MFA_MESSAGE)
         return
-    if tournament_id and await has_tournament_staff_permission(user, tournament_id, {"organizer"}):
+    if tournament_id and await has_tournament_staff_permission(user, tournament_id, {"organizer"}, capability="manage"):
         return
     if tournament_id:
         raise HTTPException(status_code=403, detail="Gewinne dieses Turniers verwaltet die Turnierleitung oder der Organisator des Turniers.")

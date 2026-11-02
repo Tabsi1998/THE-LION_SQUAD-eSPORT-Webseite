@@ -878,7 +878,7 @@ test("ein Turnier vor Ort fragt die Vor-Ort-Anmeldung weiter ab, ein Online-Turn
 });
 
 // Liga-Staffel in der Turnierverwaltung (#2109): nur, was die Liga braucht.
-const STAFFEL = { ...TOURNAMENT, title: "Probe-Liga Season 1 · Liga 1 · Staffel A", status: "draft", format: "league", team_mode: "team",
+const STAFFEL = { ...TOURNAMENT, can_edit_staffel: true, title: "Probe-Liga Season 1 · Liga 1 · Staffel A", status: "draft", format: "league", team_mode: "team",
   game_id: "g-1", league_context: { league_id: "l1", season_id: "s1", division_id: "d1", staffel: "A" },
   league_links: { league_name: "Probe-Liga", season_name: "Season 1", division_label: "Liga 1", staffel: "A",
     season_admin_path: "/admin/leagues/seasons/s1", public_path: "/liga/probe-liga/season-1" } };
@@ -1206,4 +1206,13 @@ test("Ausgeschiedene haben keine Check-in-Knöpfe", async () => {
   await screen.findAllByText("Max Muster");
   expect(screen.queryByRole("button", { name: "Check-in" })).toBeNull();
   expect(screen.queryByRole("button", { name: "Nicht erschienen" })).toBeNull();
+});
+
+// Bereich Ligen und Zuständige (#2203): In einer Staffel zählt, was der Server für diese Person schickt - nicht der Bereich Turnierleitung.
+test("Staffel: die Turnierleitung allein bekommt weder Bearbeiten noch Team noch Zugangslinks", async () => {
+  serveStaffel({ can_edit_staffel: false, can_manage_structure: false, can_manage_participants: false });
+  await screen.findByRole("heading", { name: STAFFEL.title });
+  expect(screen.queryByTestId("admin-tr-tab-edit")).toBeNull();
+  expect(screen.queryByTestId("admin-tr-tab-staff")).toBeNull();
+  expect(screen.queryByTestId("admin-tr-status-select")).toBeNull();
 });

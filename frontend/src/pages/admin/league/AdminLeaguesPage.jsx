@@ -1,8 +1,9 @@
 // Liga verwalten (docs/LIGA.md, #1622): Einstieg unter /admin/leagues. Eine Liga je Spiel, darin die Seasons - jede
-// Season öffnet ihre eigene Seite mit Vorgaben, Sperrzeiten, Map-Pool, Liga N und Staffeln. Nur die Turnierleitung.
+// Season öffnet ihre eigene Seite mit Vorgaben, Sperrzeiten, Map-Pool, Liga N und Staffeln. Für den Bereich Ligen und
+// Zuständige (#2203): Der Server schickt je Liga `capabilities`, danach richten sich die Knöpfe; er prüft selbst noch einmal.
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ChevronRight, Pencil, Plus, Trash2 } from "lucide-react";
+import { ChevronRight, Pencil, Plus, Trash2, Users } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminSheet } from "@/components/tls/AdminSheet";
@@ -15,6 +16,7 @@ import { ACTIVE_STATUS_OPTIONS, SEASON_STATUS_OPTIONS, VISIBILITY_SHORT, leagueL
 import { accentProblem, accentStyle } from "@/lib/leagueLook";
 import { LeagueEmblem } from "@/components/tls/league/public/LeagueLook";
 import { LeagueDeleteSheet } from "./LeagueDeleteSheet";
+import { LeagueStaffSheet } from "./LeagueStaffSheet";
 import { AccentField, BannerField, EmblemField } from "./LeagueLookFields";
 import { toast } from "sonner";
 
@@ -170,6 +172,9 @@ export default function AdminLeaguesPage() {
 
   const leagues = data?.leagues || [];
   const games = data?.games || [];
+  // Bereich Ligen (#2203): Liga anlegen und löschen. Fehlt die Angabe (älterer Server), entscheidet die Antwort des Servers.
+  const canCreate = data?.can_create !== false;
+  const can = (league, capability) => !league.capabilities || league.capabilities.includes(capability);
   return (
     <AdminLayout>
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
@@ -177,7 +182,7 @@ export default function AdminLeaguesPage() {
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase">Liga</h1>
           <p className="mt-2 text-sm text-white/60">Eine Staffel ist ein Turnier: Spielwochen, Termine, Ergebnisse und Tabelle laufen in der Turnierverwaltung. Hier legst du den Rahmen fest.</p>
         </div>
-        {data ? (
+        {data && canCreate ? (
           <button type="button" onClick={() => setSheet({ kind: "league" })} disabled={!games.length} data-testid="league-add"
             className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 disabled:opacity-50">
             <Plus className="w-3.5 h-3.5" aria-hidden="true" /> Liga anlegen
@@ -185,17 +190,19 @@ export default function AdminLeaguesPage() {
         ) : null}
       </div>
 
-      <ol className="mb-8 grid gap-x-6 gap-y-2 text-sm text-white/70 sm:grid-cols-2" data-testid="league-steps" aria-label="So entsteht eine Liga">
-        {STEPS.map((step, index) => (
-          <li key={step} className="flex gap-3">
-            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[#29B6E8]/50 text-[11px] font-bold tabular-nums text-[#29B6E8]">{index + 1}</span>
-            <span className="min-w-0">{step}</span>
-          </li>
-        ))}
-      </ol>
+      {canCreate ? (
+        <ol className="mb-8 grid gap-x-6 gap-y-2 text-sm text-white/70 sm:grid-cols-2" data-testid="league-steps" aria-label="So entsteht eine Liga">
+          {STEPS.map((step, index) => (
+            <li key={step} className="flex gap-3">
+              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[#29B6E8]/50 text-[11px] font-bold tabular-nums text-[#29B6E8]">{index + 1}</span>
+              <span className="min-w-0">{step}</span>
+            </li>
+          ))}
+        </ol>
+      ) : null}
 
       {error ? <p className="text-sm text-warn" role="alert" data-testid="league-error">{error}</p> : null}
-      {data && !games.length ? <p className="mb-4 text-sm text-white/60">Zuerst ein Spiel anlegen – unter <Link to="/admin/games" className="text-[#29B6E8] hover:underline">Spiele</Link>.</p> : null}
+      {data && canCreate && !games.length ? <p className="mb-4 text-sm text-white/60">Zuerst ein Spiel anlegen – unter <Link to="/admin/games" className="text-[#29B6E8] hover:underline">Spiele</Link>.</p> : null}
       {data && !leagues.length ? (
         <p className="border border-dashed border-white/15 rounded-sm px-4 py-6 text-sm text-white/60" data-testid="league-empty">
           Noch keine Liga. Lege eine je Spiel an – etwa die CoD-Liga – und darin die erste Season.
@@ -213,19 +220,33 @@ export default function AdminLeaguesPage() {
                 {league.description ? <p className="mt-1 text-xs text-white/60 break-words">{league.description}</p> : null}
               </div>
               <div className="flex items-center gap-1">
-                <button type="button" className={ICON_BUTTON} onClick={() => setSheet({ kind: "edit", league })} aria-label={`${league.name} bearbeiten`} data-testid={`league-edit-${league.slug}`}>
-                  <Pencil className="w-4 h-4" aria-hidden="true" />
-                </button>
-                <button type="button" className={ICON_DANGER} onClick={() => setSheet({ kind: "delete", league })} aria-label={`${league.name} löschen`} data-testid={`league-delete-${league.slug}`}>
-                  <Trash2 className="w-4 h-4" aria-hidden="true" />
-                </button>
-                <button type="button" onClick={() => setSheet({ kind: "season", league })} data-testid={`season-add-${league.slug}`}
-                  className="tls-btn tls-btn--quiet ml-1 px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
-                  <Plus className="w-3.5 h-3.5" aria-hidden="true" /> Season anlegen
-                </button>
+                {can(league, "manage") ? (
+                  <button type="button" className={ICON_BUTTON} onClick={() => setSheet({ kind: "edit", league })} aria-label={`${league.name} bearbeiten`} data-testid={`league-edit-${league.slug}`}>
+                    <Pencil className="w-4 h-4" aria-hidden="true" />
+                  </button>
+                ) : null}
+                {canCreate ? (
+                  <button type="button" className={ICON_DANGER} onClick={() => setSheet({ kind: "delete", league })} aria-label={`${league.name} löschen`} data-testid={`league-delete-${league.slug}`}>
+                    <Trash2 className="w-4 h-4" aria-hidden="true" />
+                  </button>
+                ) : null}
+                {can(league, "manage") ? (
+                  <>
+                    <button type="button" onClick={() => setSheet({ kind: "staff", league })} data-testid={`league-staff-${league.slug}`}
+                      className="tls-btn tls-btn--quiet ml-1 px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5" aria-hidden="true" /> Zuständige
+                    </button>
+                    <button type="button" onClick={() => setSheet({ kind: "season", league })} data-testid={`season-add-${league.slug}`}
+                      className="tls-btn tls-btn--quiet ml-1 px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
+                      <Plus className="w-3.5 h-3.5" aria-hidden="true" /> Season anlegen
+                    </button>
+                  </>
+                ) : null}
                 {/* Regelwerk (#1646): liga-weit, jede Season ohne eigenes erbt es. */}
-                <Link to={`/admin/leagues/rules/league/${league.id}`} data-testid={`league-rules-link-${league.slug}`}
-                  className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider">Regelwerk</Link>
+                {can(league, "rules") ? (
+                  <Link to={`/admin/leagues/rules/league/${league.id}`} data-testid={`league-rules-link-${league.slug}`}
+                    className="tls-btn tls-btn--quiet ml-1 px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider">Regelwerk</Link>
+                ) : null}
               </div>
             </header>
             {league.seasons.length ? (
@@ -261,6 +282,7 @@ export default function AdminLeaguesPage() {
         <LeagueDeleteSheet kind="league" target={sheet.league} name={sheet.league.name} onClose={() => setSheet(null)}
           onDeleted={() => { setSheet(null); load(); }} onArchive={() => archive(sheet.league)} />
       ) : null}
+      {sheet?.kind === "staff" ? <LeagueStaffSheet league={sheet.league} onClose={() => setSheet(null)} /> : null}
       {sheet?.kind === "season" ? (
         <SeasonSheet league={sheet.league} defaults={data?.season_defaults || {}} onClose={() => setSheet(null)}
           onSaved={(season) => { setSheet(null); navigate(`/admin/leagues/seasons/${season.id}`); }} />

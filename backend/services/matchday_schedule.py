@@ -607,7 +607,11 @@ OPEN_SCHEDULE_STATUSES = frozenset({"proposed", "declined", "escalated"})
 
 async def _tournament_staff_user_ids(db, tournament_id: str) -> set[str]:
     from services.permissions import tournament_lead_filter
+    from services.tournament_permissions import tournament_lead_user_ids
 
+    league_staff = await tournament_lead_user_ids(db, tournament_id, ("matches", "manage"))
+    if league_staff is not None:
+        return league_staff  # Staffel (#2203): die Liga-Rechte, nicht die Turnierleitung.
     leads = await db.users.find({**tournament_lead_filter(), "is_active": True, "is_banned": {"$ne": True}}, {"_id": 0, "id": 1}).to_list(200)
     ids = {row.get("id") for row in leads if row.get("id")}
     assignments = await db.tournament_staff_assignments.find(

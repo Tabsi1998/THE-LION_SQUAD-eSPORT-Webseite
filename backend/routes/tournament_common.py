@@ -4,7 +4,7 @@ Hier liegt, was mehrere Fachmodule brauchen: Sichtbarkeit und Berechtigung,
 Sperren, Audit, Vorschauen und der Planungsbericht. Dieses Modul hat keinen
 Router und importiert kein Fachmodul - so kann kein Ringimport entstehen.
 """
-from fastapi import HTTPException
+from fastapi import Depends, HTTPException, Request
 from typing import Optional
 from datetime import datetime, timedelta, timezone
 import math
@@ -14,7 +14,9 @@ from database import get_db
 from services.visibility import user_can_see
 from services.station_labels import attach_station_info
 from services.match_duration import effective_match_duration, load_duration_game
-from services.tournament_permissions import READ_STAFF_ROLES, has_tournament_staff_permission
+from auth import get_current_user
+from services.league_permissions import READ
+from services.tournament_permissions import READ_STAFF_ROLES, has_tournament_staff_permission, require_tournament_lead
 from services.tournament_rules import match_policy, tournament_modes
 from services.permissions import is_confirmed_tournament_lead
 from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
@@ -399,7 +401,22 @@ def _is_staff(user: dict | None) -> bool:
 
 
 async def _is_tournament_staff(tid: str, user: dict | None, roles: set[str] | None = None) -> bool:
-    return await has_tournament_staff_permission(user, tid, roles or READ_STAFF_ROLES)
+    """Leitung oder Helfer dieses Turniers (lesen). Steht auch für die Turnierleitung: Sie zählt hier mit - außer in einer
+    Liga-Staffel, dort gelten die Liga-Rechte (#2203)."""
+    return await has_tournament_staff_permission(user, tid, roles or READ_STAFF_ROLES, capability=READ)
+
+
+def require_lead_of(capability, param: str = "tid"):
+    """Wächter für Routen, die ein Turnier in der Adresse tragen und bei normalen Turnieren den Bereich Turnierleitung
+    verlangen. In einer Staffel gilt stattdessen das Liga-Recht ``capability`` (#2203, docs/LIGA.md Abschnitt 12)."""
+
+    async def dep(request: Request, user: dict = Depends(get_current_user)) -> dict:
+        reference = request.path_params.get(param)
+        row = await get_db().tournaments.find_one({"$or": [{"id": reference}, {"slug": reference}]}, {"_id": 0, "id": 1})
+        await require_tournament_lead(user, (row or {}).get("id"), capability)
+        return user
+
+    return dep
 
 
 def _is_tournament_locked(tournament: dict | None) -> bool:
@@ -453,7 +470,7 @@ async def tournament_hidden_reason(db, t: dict, user: dict | None) -> int | None
     Leitung und zugeordnete Helfer sehen alles. Teilnehmende sehen ihr Turnier immer - auch „Nur Mitglieder“ und „nicht
     öffentlich“ (etwa über den Vor-Ort-Zugang angemeldete Begleitpersonen); mit der Abmeldung endet das. Alle anderen
     nach der Sichtbarkeit. Was am Turnier hängt (das Event), bleibt hinter ``hide_unseen_event_links``."""
-    if _is_staff(user) or await _is_tournament_staff(t["id"], user):
+    if await _is_tournament_staff(t["id"], user):
         return None
     if t.get("status") == "draft":
         return 404

@@ -99,16 +99,18 @@ async def test_taking_someone_out_of_the_kader_stays_possible_and_warns(flow):
 
 
 @pytest.mark.asyncio
-async def test_a_grant_counts_as_tournament_lead_for_the_warning(flow):
+async def test_the_warning_goes_to_league_rights_not_to_the_tournament_lead(flow):
     w = await short_world(flow)
     granted = await flow.add_user(role="player", name="Freigabe")
-    await flow.db.users.update_one({"id": granted["id"]}, {"$set": {"areas": ["tournaments"]}})
+    await flow.db.users.update_one({"id": granted["id"]}, {"$set": {"areas": ["leagues"]}})
+    tournaments_only = await flow.add_user(role="tournament_admin", name="NurTurniere")
     banned = await flow.add_staff(name="GesperrteLeitung")
     await flow.db.users.update_one({"id": banned["id"]}, {"$set": {"is_banned": True}})
 
     await set_kader(flow, w, "Kapitaen", "Tom")
 
     assert len(await warned(flow, granted)) == 1
+    assert await warned(flow, tournaments_only) == []
     assert await warned(flow, banned) == []
 
 

@@ -126,3 +126,13 @@ test("ein Spiel ohne Pflicht-ID braucht keinen Kader-Abgleich", async () => {
   await waitFor(() => expect(screen.getByTestId("season-roster-free")).toBeInTheDocument());
   expect(screen.queryByTestId("season-roster-deadline")).not.toBeInTheDocument();
 });
+
+test("Kader bearbeiten (#2203): die Kaderübersicht öffnet das Blatt, auch ohne Pflicht-ID", async () => {
+  const squad = { registration_id: "r9", team_id: "t9", squad_id: "s9", display_name: "Löwen · Rudel Z", staffel_label: "Liga 1", member_count: 1, min_squad_size: 1,
+    squad_status: "active", captain_id: null, vice_captain_id: null, member_ids: ["p1"], team_members: [{ id: "p1", name: "Anna" }], players: [] };
+  apiMock.get.mockResolvedValue({ data: { season: { id: "s1" }, fields: [], squads: [squad], counts: {} } });
+  render(<SeasonRosterPanel seasonId="s1" />);
+  fireEvent.click(await screen.findByTestId("roster-edit-r9"));
+  expect(await screen.findByTestId("kader-sheet")).toBeInTheDocument();
+  expect(screen.getByTestId("kader-member-p1")).toBeChecked();
+});

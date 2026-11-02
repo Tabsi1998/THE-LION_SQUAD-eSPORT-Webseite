@@ -1089,17 +1089,19 @@ async def apply_banner(db, league: dict, season: dict) -> int:
 
 async def can_see_season(user: dict | None, season: dict) -> bool:
     """Ligaseite lesen nach der Sichtbarkeit der Season (docs/LIGA.md, Abschnitt 10): ``off`` niemand (404),
-    ``admins`` nur die Turnierleitung, ``members`` wie die Turnier-Sichtbarkeit „Nur Mitglieder“, ``public`` alle."""
+    ``admins`` nur wer in dieser Liga Rechte hat, ``members`` dazu Mitglieder, ``public`` alle. Der Bereich Turnierleitung
+    zählt hier nicht (#2203)."""
     visibility = season.get("visibility") or "off"
     if visibility == "public":
         return True
-    if visibility == "members":
-        from services.visibility import lead_can_see
-        return await lead_can_see(user, "members")
-    if visibility == "admins":
-        from services.permissions import can_use_area
-        return await can_use_area(user, "tournaments")
-    return False
+    if visibility not in ("members", "admins"):
+        return False
+    from services.league_permissions import ANY, can
+    from services.visibility import user_can_see
+
+    if await can(user, ANY, season.get("league_id")):
+        return True
+    return visibility == "members" and await user_can_see(user, "members")
 
 
 PUBLIC_SEASON_FIELDS = ("id", "number", "name", "slug", "status", "start_date", "weeks_total", "blocked_periods",
