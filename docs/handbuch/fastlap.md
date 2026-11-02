@@ -36,7 +36,9 @@ Challenge macht, darf dort **Zeiten eintragen und ändern**, aber keine Challeng
 | --- | --- | --- |
 | **Challenge** | Titel, Beschreibung, Banner, Fahrzeug, Wetter, Fahrhilfen, Controller, Plattform, Sichtbarkeit (das Event: im Event unter „Programm“) | Challenge öffnen, Formular oben |
 | **Strecken** | Eine oder mehrere Strecken mit Bild, Land, Zielzeit und Reihenfolge | Challenge öffnen, Kasten „Strecken“ |
-| **Championship** | Mehrere Strecken, Punkte nach Platz je Strecke, dazu eine Gesamtwertung | Haken „Championship“ beim Anlegen |
+| **Meisterschaft** | Mehrere Strecken, Punkte nach Platz je Strecke (einstellbar), dazu eine Gesamtwertung | Haken „Meisterschaft“ beim Anlegen oder im Formular |
+| **Bedingungen** | Fahrzeug, Wetter, Fahrhilfen, Controller und Plattform öffentlich im Kasten „Bedingungen“ | Formular, Kasten „Strecke und Regeln“ |
+| **Stream** | Stream auf der Seite der Challenge | Formular, Kasten „Stream“ |
 | **Zeiten** | Zeit, Strafsekunden, Beleg, ungültig markieren | Challenge öffnen, Kasten „Zeiten eintragen“ |
 | **Vor Ort** | Schnelleingabe mit Ziffernblock, Gäste ohne Konto, Liste „Am Start / Als Nächstes“ | Challenge öffnen, ganz oben (siehe 3.12) |
 | **Vereins-Referenzzeiten** | Zeiten von Vereinsmitgliedern außer Wertung als „Zielzeit zum Schlagen“ | Formular, Kasten „Teilnahme und Vereins-Referenzzeiten“ |
@@ -56,9 +58,12 @@ Challenge macht, darf dort **Zeiten eintragen und ändern**, aber keine Challeng
 2. Im Kasten **Die Challenge** einen **Titel** eintragen. Der **Slug (URL)** füllt sich von selbst und ist der Name in
    der Adresse (`/fastlap/…`). Titel und Slug genügen zum Anlegen.
 3. Im Kasten **Strecke und Regeln** tragt ihr ein, was die Fahrer wissen müssen: **Fahrzeug**, **Wetter**,
-   **Fahrhilfen**, **Controller-Typ**, **Plattform**. Wer alle gleich fahren lässt, bekommt vergleichbare Zeiten.
-4. Soll es **mehrere Strecken** mit Punkten geben, setzt jetzt den Haken **Championship (mehrere Strecken + Punkte
-   pro Platz)**. Ihn gibt es nur beim Anlegen. Im Formular zum Bearbeiten ist er nicht mehr da.
+   **Fahrhilfen**, **Controller-Typ**, **Plattform**. Wer alle gleich fahren lässt, bekommt vergleichbare Zeiten. Was
+   ausgefüllt ist, steht öffentlich im Kasten **Bedingungen**.
+4. Soll es **mehrere Strecken** mit Punkten geben, setzt den Haken **Meisterschaft**. Darunter erscheint **Punkte je
+   Platz** (Vorgabe 25, 18, 15, 12, 10, 8, 6, 4, 2, 1; Platz 1 zuerst, durch Komma getrennt). Beides geht auch später noch im
+   Formular der Challenge. Im Kasten **Stream** wählt ihr Plattform und Kanal oder Adresse; mit dem Haken erscheint der
+   Stream auf der Seite der Challenge.
 5. **Versuche je Person und Strecke** steht auf **3**. Tragt eine andere Zahl ein (zum Beispiel 10) oder lasst das Feld
    leer – dann sind die Versuche unbegrenzt. Ungültige Runden zählen mit.
 6. Rechts unter **Veröffentlichung und Zeitplan**: **Sichtbarkeit** (Öffentlich / Nur registrierte Community / Nur
@@ -94,14 +99,19 @@ Wer Zeiten eintragen soll, ohne sonst etwas verwalten zu dürfen:
 ### 2.4 Freigeben
 
 Setzt den **Status** der Challenge (Auswahl rechts oben auf der Challenge-Seite) auf **Angekündigt**, sobald sie sichtbar sein
-soll. **Live** schaltet sich mit dem **Start** von selbst. **Beendet** setzt die Turnierleitung von Hand, wenn die Zeiten
-geprüft sind: Erst dann entstehen die Gewinn-Einträge, mit **Ergebnisse veröffentlicht** auch die Jahreswertungs-Punkte.
-Öffentlich steht nach dem **Ende** trotzdem schon „Beendet“, und auf der Challenge-Seite im Admin erinnert ein Hinweis
-daran, den Status zu setzen.
+soll. **Live** schaltet sich mit dem **Start** von selbst. **Beendet** und **Ergebnisse veröffentlicht** setzt die
+Turnierleitung von Hand, wenn die Zeiten geprüft sind: **Beendet** legt die Gewinn-Einträge an, erst **Ergebnisse
+veröffentlicht** vergibt auch die Jahreswertungs-Punkte. Öffentlich steht nach dem **Ende** trotzdem schon „Beendet“, und auf
+der Challenge-Seite im Admin erinnert ein Hinweis daran, die Ergebnisse zu veröffentlichen.
+
+**Archivieren** geht mit gewerteten Zeiten erst nach **Ergebnisse veröffentlicht** (oder wenn die Challenge **Abgesagt** ist) –
+sonst gäbe es nie Jahreswertungs-Punkte. In der Auswahl steht **Archiviert** bis dahin grau mit „erst nach dem
+Veröffentlichen“. Was schon archiviert ist, bleibt, wie es ist: Punkte kommen dort nur, wenn ihr bewusst wieder
+**Ergebnisse veröffentlicht** wählt, und zwar in die dann aktive Saison.
 
 **Entwurf löschen:** Solange die Challenge ein **Entwurf** ohne Zeiten ist, steht oben **Entwurf löschen** (mit
 Rückfrage, im Protokoll). Strecken, Gäste und Team-Einteilung gehen mit. Eine Challenge, die schon angekündigt war oder
-Zeiten hat, wird nicht gelöscht – setzt sie auf **Abgesagt** oder **Archiviert**.
+Zeiten hat, wird nicht gelöscht – sagt sie ab oder veröffentlicht die Ergebnisse und archiviert sie danach.
 
 ---
 
@@ -113,19 +123,20 @@ Zeiten hat, wird nicht gelöscht – setzt sie auf **Abgesagt** oder **Archivier
 | --- | --- |
 | **Entwurf** | nur im Admin |
 | **Angekündigt** | sichtbar, noch nicht gestartet |
-| **Einreichung offen** / **Einreichung geschlossen** | die Anzeige „Online-Einreichung“ auf der öffentlichen Seite (siehe 3.3); in der Auswahl nur, wenn **Online-Einreichung öffentlich anzeigen** an ist |
+| **Einreichung offen** / **Einreichung geschlossen** | nur noch bei alten Challenges, die diesen Status schon tragen (siehe 3.3) |
 | **Live** | läuft |
 | **Pausiert** | angehalten |
 | **Beendet** | vorbei, die Ergebnisse sind sichtbar, die Gewinn-Einträge entstehen (setzt die Turnierleitung) |
 | **Ergebnisse veröffentlicht** | offiziell, löst die Jahreswertungs-Punkte aus, die Zeiten sind gesperrt (siehe 3.11) |
-| **Archiviert** / **Abgesagt** | abgelegt |
+| **Archiviert** | abgelegt, geht mit gewerteten Zeiten erst nach dem Veröffentlichen |
+| **Abgesagt** | findet nicht statt |
 
 **Sichtbarkeit** (Öffentlich, Nur registrierte Community, Nur Vereinsmitglieder, Nur intern) bestimmt, wer die
 Challenge sehen darf, unabhängig vom Status. Zu einem Event gehört die Challenge, wenn sie **im Event** angelegt oder
 hinzugefügt wird (Event → **Programm** → **+ Fast Lap** oder **Bestehendes hinzufügen**, seit #1371); im Formular steht nur
 „Gehört zu … – ändern im Event“. Das braucht auch die Hallen-Tafel am TV.
 
-### 3.2 Wertung: Strecken und Championship
+### 3.2 Wertung: Strecken und Meisterschaft
 
 - **Eine Strecke:** Die Rangliste ist die beste Zeit je Fahrer. Die **wirksame Zeit** ist Rundenzeit **plus
   Strafsekunden** (auf Tausendstel gerundet). Ungültig markierte Zeiten und Vereins-Referenzzeiten zählen nicht.
@@ -138,10 +149,10 @@ hinzugefügt wird (Event → **Programm** → **+ Fast Lap** oder **Bestehendes 
   **Gewinnen, Jahreswertung und Erfolgen** zählen sie nicht – dort reihen sich nur Konten. Fährt ein Gast die beste Zeit,
   bekommt den Preis für Platz 1 die schnellste Person mit Konto (Entscheidung des Vereins, 14.10.2026). Wird der Gast
   später mit einem Konto verknüpft (3.12), zählt er ab dann voll.
-- **Championship:** Auf jeder Strecke gibt es nach Platz Punkte: Platz 1 bekommt 25, dann 18, 15, 12, 10, 8, 6, 4, 2
-  und Platz 10 einen Punkt. Alles darunter keinen. Die Punkte werden über alle Strecken addiert. Bei Gleichstand
-  entscheiden die Siege. Das ist die **Gesamtwertung**, die auf der öffentlichen Seite als „Championship
-  Gesamtwertung“ steht. Die Punktetabelle lässt sich im Admin nicht ändern.
+- **Meisterschaft:** Auf jeder Strecke gibt es nach Platz Punkte. Die Vorgabe: Platz 1 bekommt 25, dann 18, 15, 12, 10, 8, 6,
+  4, 2 und Platz 10 einen Punkt, alles darunter keinen. Unter **Punkte je Platz** stellt ihr das je Challenge ein. Die
+  Punkte werden über alle Strecken addiert, bei Gleichstand entscheiden die Siege. Das ist die **Gesamtwertung** auf der
+  öffentlichen Seite. Die Jahreswertung rechnet davon unabhängig nach dem Platz.
 - **Jahreswertung:** Im Kasten **Jahreswertung** wählt ihr, wie stark die Challenge in die Jahreswertung eingeht:
   Fast Lap Standard (x1.00), Fun-Challenge (x0.75), Event/Check-in Wertung (x0.50), Mini-Wertung (x1.25),
   Normal-Turnier nah (x2.00), Keine Jahreswertung (x0.00) oder ein **eigener Faktor**. Die Punkte werden vergeben,
@@ -150,14 +161,9 @@ hinzugefügt wird (Event → **Programm** → **+ Fast Lap** oder **Bestehendes 
 
 ### 3.3 Online-Einreichung
 
-Online einreichen können Fahrer noch nicht; der Haken ist bei neuen Challenges aus, und solange er aus ist, steht
-nirgends „Einreichung offen“.
-
-Im Kasten **Veröffentlichung und Zeitplan** gibt es den Haken **Online-Einreichung öffentlich anzeigen** mit
-**öffnet** und **endet**. Er steuert, ob auf der öffentlichen Seite ein Hinweis mit den Einreichungs-Zeiten steht. Zeiten
-selbst tragen weiterhin Turnierleitung und Fast-Lap-Team ein (3.4). Ein Fahrer kann in der Oberfläche keine
-Zeit selbst anlegen. Ist der Haken aus, steht auf der Seite „Zeiten werden durch Admins oder Moderatoren
-eingetragen.“
+Online einreichen können Fahrer noch nicht (kommt mit #1278). Bis dahin gibt es dafür keinen Haken, und die Website
+verspricht auch kein Formular. Zeiten tragen Turnierleitung und Fast-Lap-Team ein (3.4). Bei alten Challenges bleibt, was
+gespeichert ist; die App zeigt dort noch den alten Hinweis, bis sie nachgezogen ist.
 
 ### 3.4 Zeiten eintragen
 
@@ -189,16 +195,21 @@ Bei jeder Zeit in der Liste gibt es ein Stift-Symbol. Im Fenster **Zeit bearbeit
 
 - **Zeit (m:ss.SSS)** und **Strafsekunden**,
 - **Wertung** (offiziell oder Vereins-Referenz),
-- **Proof URL**,
+- **Nachweis-Link**,
 - eine **Notiz**: Mit Strafe oder ungültig ist es die **Begründung** (Pflicht, mindestens 5 Zeichen), **die der Fahrer
   sieht**. Sonst ist es eine **interne Admin-Notiz**,
 - **Als ungültig markieren (zählt nicht für Rangliste)**. Die Zeit bleibt in der Liste stehen, durchgestrichen,
-  mit dem Vermerk „INVALID“, und zählt nicht für die Rangliste.
+  mit dem Vermerk „Ungültig“, und zählt nicht für die Rangliste.
 
 Mit dem Mülleimer löscht ihr eine Zeit ganz (mit Rückfrage, im Admin und auf der öffentlichen Seite). Besser als
 Löschen ist **ungültig markieren**, denn dann ist nachvollziehbar, was passiert ist. Eintragen, Ändern, Löschen und
 Strafen stehen im **Protokoll** (**Admin → System → Betrieb & Logs → Ereignisse**, Adminaktionen), mit Person und Zeitpunkt; die Strafen-Liste nennt als
 Aussteller, wer die Strafe gesetzt hat.
+
+**Strafen im Überblick:** Unter **Admin → eSports → Strafen** führt **Öffnen** zur Challenge, gleich auf die richtige Strecke.
+**Zurücknehmen** nimmt Strafzeit und „ungültig“ weg, die Zeit zählt wieder normal; nach der Veröffentlichung geht das nur mit
+Begründung (3.11). Einen eigenen Einspruch gibt es nicht: Fahrer stellen unter **Meine Strafen** mit **Rückfrage stellen**
+eine Frage über das Kontaktformular, die Antwort kommt von euch. Ändert ihr danach etwas, ist das eine normale Korrektur.
 
 ### 3.6 Vereins-Referenzzeiten
 
@@ -215,26 +226,28 @@ Trägt ihr für ein Mitglied eine Zeit ein, schlägt die Maske bei gesperrter of
 
 ### 3.7 Preise und Gewinne
 
-Im Kasten **Preise**: **+ Platz hinzufügen**, dann Platz, **Label** und **Preis** eintragen. Zeilen ohne Preis werden
+Im Kasten **Preise**: **+ Platz hinzufügen**, dann Platz, **Bezeichnung** und **Preis** eintragen. Zeilen ohne Preis werden
 beim Speichern ignoriert. Sobald die Challenge **Beendet** oder **Ergebnisse veröffentlicht** ist, legt die Website
-daraus die **Gewinn-Einträge** an (siehe **Admin → eSports → Gewinne**). Steht die Challenge auf **Ergebnisse
+daraus die **Gewinn-Einträge** an (siehe **Admin → eSports → Gewinne**). Hat sich zwischen **Beendet** und dem Veröffentlichen die
+Rangfolge geändert, bekommt der neue Platz seinen Gewinn; wer nicht mehr dort steht, behält seinen und steht mit **„Nach Korrektur
+prüfen“** in der Liste. Steht die Challenge auf **Ergebnisse
 veröffentlicht** und fehlen Einträge, gibt es den Knopf **Gewinne erzeugen**.
 
 ### 3.8 Bestenliste und Auswertung
 
-Auf der öffentlichen Seite der Challenge: eine **Strecken-Rangliste** je Strecke und, bei Championship, die
+Auf der öffentlichen Seite der Challenge: eine **Strecken-Rangliste** je Strecke und, bei einer Meisterschaft, die
 **Gesamtwertung** mit Punkten. Sobald die Challenge **Beendet**, **Ergebnisse veröffentlicht** oder **Archiviert** ist,
-steht unter der Tabelle **Downloads** (am Handy eine aufklappbare Zeile): **Ergebnis-PDF**, bei Championship
-**Gesamtwertung-PDF**, und wer angemeldet unter den ersten vier steht, **Meine Urkunde**. **TV / Beamer Modus**, alle
+steht unter der Tabelle **Downloads** (am Handy eine aufklappbare Zeile): **Ergebnis-PDF**, bei einer Meisterschaft
+**Gesamtwertung-PDF**, und wer angemeldet unter den ersten vier steht, **Meine Urkunde**. **TV / Beamer**, alle
 **Urkunden** und die Spalte **Urkunde** in der Tabelle sehen nur die Leitung der Challenge und Konten mit dem Bereich
 Turniere. Die **Turnierleitung** sieht **Urkunden jetzt drucken** und in der Tabelle **Drucken** für die ersten vier
-schon, während die Challenge läuft – für Gäste genauso. Im Admin stehen oben auf der Challenge-Seite **CSV** (die Bestzeit je Fahrer und Strecke) und **PDF**
+schon, während die Challenge läuft – für Gäste genauso. Im Admin stehen oben auf der Challenge-Seite **CSV** (die Bestzeit je Fahrer und Strecke, nur für die Turnierleitung) und **PDF**
 (Rangliste, für die gewählte Strecke). Die Liste aller Challenges exportiert ihr mit **CSV**.
 
 ### 3.9 Bestzeit-Moment
 
 - **Auf dem TV:** Ansicht **Fast Lap** im Baukasten unter **Admin → eSports → TV & Beamer**, oder für die Leitung in der Challenge der Knopf
-  **TV / Beamer Modus**. Kommt eine neue Bestzeit, liegt etwa drei Sekunden ein Moment „Neue Bestzeit!“ über der Liste mit Bild,
+  **TV / Beamer**. Kommt eine neue Bestzeit, liegt etwa drei Sekunden ein Moment „Neue Bestzeit!“ über der Liste mit Bild,
   Name, Zeit, Abstand und dem bisherigen Halter, ein Glanz läuft einmal darüber. Danach rutscht die Zeile an ihren
   Platz. Ein Sponsor-Moment läuft dazwischen mit, wenn er eingeschaltet ist. Steht jemand in der Liste „Am Start / Als
   Nächstes“ (3.12), zeigt das TV über der Rangliste, wer gerade fährt (mit Station und „Versuch 2 von 3“) und wer als
@@ -262,10 +275,10 @@ Jahreswertungs-Punkte an die neue Rangfolge an: Wer neu auf einem Preisplatz ste
 der nicht mehr passt, wird **nicht entzogen**, sondern steht unter **Admin → eSports → Gewinne** mit dem Vermerk
 **„Nach Korrektur prüfen“**. Die Punkte bleiben in der Saison, in der sie vergeben wurden. Dasselbe gilt, wenn ihr
 nach der Veröffentlichung eine Wertungsregel ändert – **Vereinsmitglieder aus offizieller Wertung ausschließen**,
-**Championship**, Punkte je Platz, **Preise** oder das Gewicht der **Jahreswertung** (auch nur mit Begründung).
+**Meisterschaft**, **Punkte je Platz**, **Preise** oder das Gewicht der **Jahreswertung** (auch nur mit Begründung).
 Schaltet ihr „Vereinsmitglieder ausschließen“ wieder ab, kommen genau die Zeiten zurück in die offizielle Wertung, die
 die Regel verschoben hat. Lässt sich der Abgleich einmal nicht durchführen, bleibt die Korrektur gespeichert, die Seite
-meldet „Gewinne und Saisonpunkte … bitte prüfen“, und das Protokoll hält es fest. Eine veröffentlichte Challenge mit Zeiten lässt sich nicht löschen – archiviert sie. Vor dem
+meldet „Gewinne und Saisonpunkte … bitte prüfen“, und das Protokoll hält es fest. Eine veröffentlichte Challenge mit Zeiten lässt sich nicht löschen – archiviert sie; die Punkte bleiben. Vor dem
 Veröffentlichen fragt die Seite nach. Wer den Status wieder zurücksetzt, öffnet die Zeiten – auch das steht im
 Protokoll.
 
@@ -334,6 +347,7 @@ prüfen“. Ein zweites Verknüpfen mit demselben Konto ändert nichts, ein ande
 | „Zeit prüfen … Trotzdem speichern?“ / „wirkt unplausibel“ | Die Zeit liegt außerhalb der plausiblen Grenzen der Strecke | Zeit prüfen; stimmt sie, **Trotzdem speichern**. Grenzen bei der Strecke unter **Plausibel ab / bis** |
 | „Die Ergebnisse sind veröffentlicht …“ | Die Challenge steht auf **Ergebnisse veröffentlicht** oder **Archiviert** | Nur die Turnierleitung ändert noch, mit Begründung (mind. 10 Zeichen) |
 | „Zielzeit bitte als m:ss.mmm angeben“ | Dasselbe bei der Zielzeit einer Strecke | Zum Beispiel `1:32.450` |
+| „Bitte zuerst „Ergebnisse veröffentlicht“ wählen …“ | Archivieren vor dem Veröffentlichen, obwohl es gewertete Zeiten gibt | Erst **Ergebnisse veröffentlicht** wählen, dann **Archiviert**; oder **Abgesagt**, wenn es keine Wertung geben soll |
 | „Bei Strafzeit ist eine Begründung (mind. 5 Zeichen) Pflicht.“ | Strafe oder ungültig ohne Begründung | Im Feld **Begründung** mindestens fünf Zeichen eintragen |
 | „Bitte zuerst den Fahrer suchen und wählen.“ | Der Fahrer wurde nur getippt, nicht aus der Liste gewählt | Namen tippen und in der Trefferliste anklicken |
 | „Maximale Anzahl Versuche erreicht …“ / „Alle 3 Versuche gefahren“ | Die Challenge hat begrenzte Versuche | Bei den Einstellungen **Versuche je Person und Strecke** erhöhen oder leeren (unbegrenzt) |
@@ -347,8 +361,7 @@ prüfen“. Ein zweites Verknüpfen mit demselben Konto ändert nichts, ein ande
 | „Keine Fast-Lap-Berechtigung für diese Aktion“ | Die Person ist weder Turnierleitung noch im Fast-Lap-Team (oder pausiert) | Im Kasten **Fast-Lap-Team** hinzufügen oder **Aktivieren** |
 | Der Menüpunkt „Fast Lap“ fehlt | Die Person hat keinen Zugang zur Turnierleitung und keinen Einsatz | Zum Fast-Lap-Team machen lassen (siehe 2.3) |
 | Die Challenge ist öffentlich nicht zu sehen | Status **Entwurf** oder Sichtbarkeit zu eng | Status auf **Angekündigt** stellen, **Sichtbarkeit** prüfen |
-| Der Haken **Championship** fehlt beim Bearbeiten | Er ist nur beim Anlegen da | Neue Challenge mit dem Haken anlegen |
-| Keine Jahreswertungs-Punkte | Der Status steht noch nicht auf **Ergebnisse veröffentlicht**, oder der Faktor ist 0 | Status setzen, Faktor im Kasten **Jahreswertung** prüfen |
+| Keine Jahreswertungs-Punkte | Der Status steht noch nicht auf **Ergebnisse veröffentlicht**, oder der Faktor ist 0. Alte Challenges, die von **Beendet** direkt ins Archiv gingen, haben auch keine | Status setzen, Faktor im Kasten **Jahreswertung** prüfen. Bei alten Archiv-Einträgen landen die Punkte in der gerade aktiven Saison, also nur bewusst nachholen |
 | Keine Gewinn-Einträge | Der Status ist vor **Beendet**, oder es sind keine Preise eingetragen | Status prüfen, im Kasten **Preise** Preise eintragen |
 | Keine Discord-Meldung | Die Zeit war keine neue offizielle Bestzeit, oder die Fast-Lap-Meldungen sind nicht eingerichtet | Unter **Admin → Verbindungen → Discord → Reiter „Meldungen“** prüfen |
 | Nach Löschen einer Strecke fehlen Zeiten | Mit der Strecke werden alle ihre Zeiten gelöscht | Gibt es nicht zurück. Vorher exportieren (**CSV**) |
@@ -358,8 +371,8 @@ prüfen“. Ein zweites Verknüpfen mit demselben Konto ändert nichts, ein ande
 ## 5. Häufige Fragen
 
 **Können Fahrer ihre Zeit selbst eintragen?**
-Nein. Zeiten tragen die Turnierleitung und das Fast-Lap-Team ein. Der Beleg (Screenshot oder Video) kommt als Link in
-die **Proof URL**.
+Nein. Zeiten tragen die Turnierleitung und das Fast-Lap-Team ein. Der Beleg (Bild oder Video) kommt als Link in
+den **Nachweis-Link**.
 
 **Was ist der Unterschied zwischen ungültig, Strafe und Löschen?**
 Eine **Strafe** addiert Sekunden zur Zeit. **Ungültig** nimmt die Zeit aus der Rangliste, sie bleibt in der Liste

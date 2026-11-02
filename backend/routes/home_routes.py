@@ -579,7 +579,8 @@ async def _club_numbers(db) -> dict:
         "tournaments": await db.tournaments.count_documents(PUBLIC_TOURNAMENT_QUERY),
         "tournaments_completed": await db.tournaments.count_documents({**PUBLIC_TOURNAMENT_QUERY, "status": {"$in": ["completed", "results_published", "archived"]}}),
         "events": await db.events.count_documents({"status": {"$nin": ["draft", "cancelled"]}, "visibility": {"$in": [None, "public"]}}),
-        "participations": await db.references.count_documents({}),
+        # Nur, was öffentlich zu sehen ist (#2130): archivierte und nicht öffentliche Referenzen zählen nicht mit.
+        "participations": await db.references.count_documents({"is_active": {"$ne": False}, "visibility": {"$in": [None, "public"]}}),
         "prizes": await db.prize_pickups.count_documents({}),
         "prize_money_eur": round(prize_money, 2),
         "years_active": max(0, year - int(founded_year)) if founded_year else 0,

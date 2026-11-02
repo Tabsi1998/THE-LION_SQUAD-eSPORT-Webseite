@@ -5,7 +5,7 @@ import { AdminLayout } from "@/components/tls/AdminLayout";
 import { CheckField } from "@/components/tls/FormFields";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { KIND_OPTIONS, STATUS_LABELS, visibleLineages } from "@/lib/referenceSeries";
+import { KIND_OPTIONS, STATUS_LABELS, VISIBILITY_OPTIONS, visibleLineages } from "@/lib/referenceSeries";
 import { LineageForm } from "./referenceSeries/LineageForm";
 import { SeriesForm } from "./referenceSeries/SeriesForm";
 import { profileOf } from "@/lib/seriesKinds";
@@ -19,6 +19,7 @@ import { Archive, ArchiveRestore, Layers, ListOrdered, Pencil, Plus } from "luci
 // Termine, Teilnehmer, Ergebnisse und Captains kommen auf die Seite der Saison (#1742 ff.).
 
 const KIND_LABELS = Object.fromEntries(KIND_OPTIONS);
+const VISIBILITY_LABELS = Object.fromEntries(VISIBILITY_OPTIONS);
 const PUBLISH_LABELS = { review: "Freigabe durch den Vorstand", direct: "Captain direkt" };
 const STATUS_TONE = { active: "text-ok", planned: "text-brand", archived: "text-quiet" };
 
@@ -136,7 +137,7 @@ export default function AdminReferenceSeriesPage() {
                       <span className={STATUS_TONE[series.status] || ""}>{STATUS_LABELS[series.status] || series.status}</span>
                       <span>{PUBLISH_LABELS[series.publish_mode] || series.publish_mode}</span>
                       <span>Regeln v{series.rules_version || 1}</span>
-                      {series.visibility && series.visibility !== "public" && <span className="text-[#29B6E8]">{series.visibility}</span>}
+                      {series.visibility && series.visibility !== "public" && <span className="text-[#29B6E8]">{VISIBILITY_LABELS[series.visibility] || series.visibility}</span>}
                     </div>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">

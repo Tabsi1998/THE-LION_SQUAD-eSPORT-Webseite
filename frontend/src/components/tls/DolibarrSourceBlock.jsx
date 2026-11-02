@@ -71,5 +71,13 @@ export function DolibarrSourceBlock({ source, onChange, onSynced, kind = "sponso
 
 export function dolibarrLocked(source, item, fields) {
   if (!source?.from_dolibarr || item?.source !== "dolibarr") return new Set();
-  return new Set(fields);
+  // Aus der Kategorie genommen (#2130): Der Abgleich fasst „Aktiv“ nicht mehr an - wie auf dem Server.
+  return new Set(item.dolibarr_gone_at ? fields.filter((field) => field !== "is_active") : fields);
 }
+
+/** Der nächste Abgleich legte den Eintrag wieder an (#2130) - Löschen ist erst möglich, wenn die Firma aus der Kategorie ist. */
+export function dolibarrKeepsEntry(source, item) {
+  return Boolean(source?.from_dolibarr && source?.connected !== false && item?.source === "dolibarr" && !item?.dolibarr_gone_at);
+}
+
+export const DOLIBARR_DELETE_HINT = "Kommt aus Dolibarr. Zum Löschen zuerst in Dolibarr aus der Kategorie nehmen, sonst ist der Eintrag beim nächsten Abgleich wieder da.";

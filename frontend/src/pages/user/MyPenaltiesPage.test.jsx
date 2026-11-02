@@ -48,6 +48,13 @@ test("eine erfolgreiche leere Antwort ist „Saubere Weste“", async () => {
   expect(screen.queryByTestId("public-error-state")).toBeNull();
 });
 
+test("Rückfrage führt ins Kontaktformular, mit passendem Thema und Betreff (#2130)", async () => {
+  apiMock.get.mockResolvedValue({ data: { count: 2, items: [PENALTY, { ...PENALTY, ref_id: "pen-2", kind: "match_forfeit", context_title: "Herbst-Cup", context_subtitle: "Match #4" }] } });
+  renderPage();
+  expect(await screen.findByTestId("penalty-question-pen-1")).toHaveAttribute("href", `/contact?topic=fastlap&subject=${encodeURIComponent("Rückfrage zur Strafe: Fast Lap Herbst")}`);
+  expect(screen.getByTestId("penalty-question-pen-2")).toHaveAttribute("href", `/contact?topic=tournament&subject=${encodeURIComponent("Rückfrage zur Strafe: Herbst-Cup · Match #4")}`);
+});
+
 test("ein gescheitertes Nachladen lässt die Strafen stehen und sagt es", async () => {
   apiMock.get.mockResolvedValueOnce({ data: { count: 1, items: [PENALTY] } }).mockRejectedValueOnce(serverError());
   renderPage();

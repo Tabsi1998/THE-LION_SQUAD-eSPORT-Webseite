@@ -412,6 +412,11 @@ LOCKED_FOR_HELPERS = ("Die Ergebnisse sind veröffentlicht - Zeiten ändert jetz
                       "mit Begründung.")
 LOCKED_NEEDS_REASON = (f"Die Ergebnisse sind veröffentlicht - bitte begründe die Änderung (mind. {MIN_CHANGE_REASON} "
                        "Zeichen). Sie steht danach im Protokoll.")
+# Jahrespunkte entstehen nur beim Veröffentlichen (#2130): mit gewerteten Zeiten führt der Weg ins Archiv deshalb darüber -
+# oder über die Absage. Was schon im Archiv liegt, bleibt dort und bekommt von selbst keine Punkte.
+ARCHIVE_FREELY_FROM = {"results_published", "archived", "cancelled"}
+ARCHIVE_TOO_EARLY = ("Bitte zuerst „Ergebnisse veröffentlicht“ wählen: Erst dann entstehen die Saisonpunkte. Archivieren "
+                     "geht danach - oder wenn die Challenge abgesagt ist.")
 
 
 def _published_change_reason(challenge: dict, me: dict, reason: str | None) -> str | None:
@@ -767,6 +772,9 @@ async def _update_challenge_locked(cid: str, body: F1ChallengeUpdate, me: dict):
             status_code=400,
             detail="Wenn Vereinsmitglieder von der offiziellen Wertung ausgeschlossen sind, müssen Vereins-Referenzzeiten erlaubt bleiben.",
         )
+    if updates.get("status") == "archived" and existing.get("status") not in ARCHIVE_FREELY_FROM \
+            and await _participant_count(db, cid) > 0:
+        raise HTTPException(status_code=409, detail=ARCHIVE_TOO_EARLY)
     # Wertungsregeln nach der Veröffentlichung (#1584) - wie eine Zeitkorrektur: nur die Turnierleitung, mit
     # Begründung, im Protokoll, danach Gewinne und Saisonpunkte abgleichen.
     rule_fields = _changed_scoring_fields(existing, updates)
@@ -822,8 +830,13 @@ async def _update_challenge_locked(cid: str, body: F1ChallengeUpdate, me: dict):
     )
     if should_create_prizes:
         try:
-            from services.prize_service import auto_create_for_f1_challenge
-            await auto_create_for_f1_challenge(c["id"])
+            from services.prize_service import auto_create_for_f1_challenge, review_f1_prizes
+            # „Beendet“ hat vielleicht schon Gewinne angelegt, seither kann sich die Rangfolge geändert haben (#2130):
+            # Beim Veröffentlichen wird angeglichen - wer nicht mehr auf dem Platz steht, kommt auf „nach Korrektur prüfen“.
+            if c.get("status") == "results_published":
+                await review_f1_prizes(c["id"])
+            else:
+                await auto_create_for_f1_challenge(c["id"])
         except Exception:
             logger.warning("[f1] Preise für %s nicht angelegt", log_safe(cid), exc_info=True)
     stamp = now_utc().isoformat()
@@ -972,7 +985,7 @@ async def _delete_challenge_locked(cid: str, me: dict):
     if current.get("status") != "draft":
         raise HTTPException(status_code=409, detail="Löschen geht nur bei einem Entwurf. Eine Challenge, die schon angekündigt war, bitte absagen oder archivieren.")
     if has_times:
-        raise HTTPException(status_code=409, detail="Die Challenge hat schon Zeiten - sie lässt sich nicht mehr löschen, nur archivieren.")
+        raise HTTPException(status_code=409, detail="Die Challenge hat schon Zeiten - sie lässt sich nicht mehr löschen. Bitte absagen oder die Ergebnisse veröffentlichen und danach archivieren.")
     await db.f1_challenges.delete_one({"id": cid})
     await db.f1_tracks.delete_many({"challenge_id": cid})
     await db.f1_lap_times.delete_many({"challenge_id": cid})
@@ -1248,7 +1261,7 @@ async def list_times(cid: str, track_id: str | None = None, user_id: str | None 
 async def _lap_challenge_id(time_id: str) -> str:
     lap = await get_db().f1_lap_times.find_one({"id": time_id}, {"_id": 0, "challenge_id": 1})
     if not lap:
-        raise HTTPException(404, "Lap-Time nicht gefunden")
+        raise HTTPException(404, "Zeit nicht gefunden")
     return lap.get("challenge_id")
 
 
@@ -1264,7 +1277,7 @@ async def _update_time_locked(time_id: str, body: F1LapTimeUpdate, me: dict):
     # Frisch unter der Sperre: ein Verknüpfen kann die Zeit gerade einem Konto (und der Mitglieder-Regel) gegeben haben.
     existing = await db.f1_lap_times.find_one({"id": time_id}, {"_id": 0})
     if not existing:
-        raise HTTPException(404, "Lap-Time nicht gefunden")
+        raise HTTPException(404, "Zeit nicht gefunden")
     await _require_f1_result_permission(me, existing.get("challenge_id"))
     nullable_fields = {"proof_url", "admin_note"}
     raw = body.model_dump(exclude_unset=True)
@@ -1315,7 +1328,7 @@ async def _delete_time_locked(time_id: str, body: F1LapTimeDelete | None, me: di
     db = get_db()
     existing = await db.f1_lap_times.find_one({"id": time_id}, {"_id": 0})
     if not existing:
-        raise HTTPException(404, "Lap-Time nicht gefunden")
+        raise HTTPException(404, "Zeit nicht gefunden")
     await _require_f1_result_permission(me, existing.get("challenge_id"))
     challenge = await db.f1_challenges.find_one({"id": existing.get("challenge_id")}, {"_id": 0, "status": 1}) or {}
     reason = _published_change_reason(challenge, me, body.change_reason if body else None)
@@ -1332,7 +1345,7 @@ async def export_csv(cid: str, track_id: str | None = None, me: dict = Depends(r
     cid = c["id"]
     output = io.StringIO()
     w = csv.writer(output, delimiter=";")
-    w.writerow(["Rang", "Spieler", "Discord", "Strecke", "Zeit", "Zeit (ms)", "Versuche", "Strafzeiten", "Aktualisiert"])
+    w.writerow(["Rang", "Spieler", "Strecke", "Zeit", "Zeit (ms)", "Versuche", "Strafzeiten", "Aktualisiert"])
     tracks = await db.f1_tracks.find({"challenge_id": cid}, {"_id": 0}).sort("order_index", 1).to_list(100)
     if track_id:
         tracks = [t for t in tracks if t["id"] == track_id]
@@ -1341,7 +1354,7 @@ async def export_csv(cid: str, track_id: str | None = None, me: dict = Depends(r
         for entry in lb["entries"]:
             # Jede Zelle als Text (#1584): ein Name, der mit „=“ beginnt, wird in der Tabellenkalkulation keine Formel.
             w.writerow([safe_cell(value) for value in (
-                entry["rank"], entry["display_name"], "",
+                entry["rank"], entry["display_name"],
                 tr["name"], entry["time_str"], entry["time_ms"],
                 entry["attempts"], entry["penalty_seconds"], entry["last_updated"],
             )])

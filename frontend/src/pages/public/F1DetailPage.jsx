@@ -16,7 +16,6 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { Award, Tv, Trophy, Flag, Calendar, Trash2, FileDown, ChevronDown } from "lucide-react";
-import { formatDateTime, getRegistrationState, hasOnlineRegistration } from "@/lib/datetime";
 import { renderMarkdownLite } from "@/lib/markdownLite";
 import { safeHttpUrl } from "@/lib/safeLink";
 import { seoTextPreview } from "@/lib/textPreview";
@@ -56,7 +55,7 @@ export default function F1DetailPage() {
   const [board, setBoard] = useState(null);
   const [championship, setChampionship] = useState(null);
   const [tab, setTab] = useState("track"); // track | championship
-  const seoDescription = seoTextPreview(challenge?.description || challenge?.rules, "F1 Fast-Lap-Challenge von THE LION SQUAD mit Leaderboard, Strecken und Championship-Wertung.");
+  const seoDescription = seoTextPreview(challenge?.description || challenge?.rules, "F1 Fast-Lap-Challenge von THE LION SQUAD mit Rangliste, Strecken und Gesamtwertung.");
   useDocumentTitle(challenge?.title || "Fast Lap", seoDescription, {
     image: challenge?.banner_url,
     canonical: challenge?.slug ? `${window.location.origin}/fastlap/${challenge.slug}` : undefined,
@@ -105,8 +104,6 @@ export default function F1DetailPage() {
 
   if (!challenge) return <PublicLayout><PublicLoadingState label="Lade Fast Lap" /></PublicLayout>;
 
-  const hasOnlineSubmission = hasOnlineRegistration(challenge);
-  const registration = hasOnlineSubmission ? getRegistrationState(challenge, "Einreichung") : null;
   const showResultPdf = PUBLIC_RESULT_STATUSES.has(challenge.status);
   // Knöpfe nur, wo sie gebraucht werden (#1277): TV/Beamer und alle Urkunden nur für die Leitung der Fast Lap
   // (Zuteilung mit Zeit-Recht) und Konten mit dem Bereich Turniere; alle anderen bekommen „Downloads“.
@@ -125,7 +122,7 @@ export default function F1DetailPage() {
           <Link to="/fastlap" className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← Fast Lap Challenges</Link>
           <div className="mt-2 flex flex-wrap items-center gap-3 mb-3">
             <PhaseBadge phase={challenge.public_phase} status={challenge.status} size="lg" />
-            {challenge.is_championship && <span className="text-[11px] font-bold uppercase tracking-wider text-[#FFD700] border border-[#FFD700]/40 px-2 py-1 rounded-sm">Championship</span>}
+            {challenge.is_championship && <span className="text-[11px] font-bold uppercase tracking-wider text-[#FFD700] border border-[#FFD700]/40 px-2 py-1 rounded-sm">Meisterschaft</span>}
           </div>
           <div className="flex items-start justify-between gap-3">
             <h1 data-testid="f1-challenge-title" className="font-heading text-4xl md:text-6xl font-black uppercase leading-tight min-w-0 break-words">{challenge.title}</h1>
@@ -138,23 +135,6 @@ export default function F1DetailPage() {
               <Calendar className="w-3.5 h-3.5" /> Teil von {challenge.event.name}
             </Link>
           )}
-          {registration && (
-            <div className={`mt-5 border rounded-sm px-4 py-3 text-sm max-w-3xl ${
-              registration.canRegister
-                ? "border-[#00FF88]/30 bg-[#00FF88]/5 text-[#00FF88]"
-                : registration.state === "scheduled"
-                  ? "border-[#29B6E8]/30 bg-[#29B6E8]/5 text-[#29B6E8]"
-                  : "border-white/10 bg-[#121212] text-white/60"
-            }`}>
-              <div className="font-bold uppercase tracking-wider text-xs">{registration.label}</div>
-              <div className="mt-1 text-white/55">
-                {challenge.registration_open_from && <span>Öffnet: {formatDateTime(challenge.registration_open_from)}</span>}
-                {challenge.registration_open_from && challenge.registration_open_until && <span className="mx-2 text-white/20">·</span>}
-                {challenge.registration_open_until && <span>Endet: {formatDateTime(challenge.registration_open_until)}</span>}
-                {!challenge.registration_open_from && !challenge.registration_open_until && <span>Zeiten werden durch Admins oder Moderatoren eingetragen.</span>}
-              </div>
-            </div>
-          )}
           {/* Aus dem Kasten wird ein Satz (#1277) - nur, wenn Mitglieder hier wirklich außer Wertung fahren. */}
           {challenge.block_club_member_results && challenge.allow_club_reference_times !== false && (
             <p data-testid="f1-reference-note" className="mt-4 text-sm text-white/60">Vereinsmitglieder fahren außer Wertung mit.</p>
@@ -162,7 +142,7 @@ export default function F1DetailPage() {
           {isLead && (
             <div className="mt-6 flex flex-wrap gap-3" data-testid="f1-lead-tools">
               <Link to={`/display/f1/${challenge.id}${activeTrack ? `?track=${activeTrack}` : ""}`} target="_blank" data-testid="f1-tv-link" className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-5 py-2.5 font-bold uppercase tracking-wider rounded-sm">
-                <Tv className="w-4 h-4" /> TV / Beamer Modus
+                <Tv className="w-4 h-4" /> TV / Beamer
               </Link>
               {showCertificates && (
                 <a
@@ -194,6 +174,7 @@ export default function F1DetailPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
         {/* Freunde bei der Fast Lap (#1188 Teil 2): „dabei“ heißt hier eine gültige Zeit - eine eigene Anmeldung gibt es nicht. */}
         <FriendsAtEvent user={user} path={`/f1/challenges/${challenge.slug || challenge.id}/friends`} scope="fastlap" over={tournamentIsOver(challenge)} accessToken={accessToken} />
+        <FastLapConditions challenge={challenge} />
         {(challenge.has_live_stream || (challenge.twitch_enabled && challenge.twitch_channel)) && (
           <section data-testid="f1-stream"><StreamEmbed source={challenge} /></section>
         )}
@@ -363,7 +344,7 @@ export default function F1DetailPage() {
           <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
             <div className="p-4 border-b border-white/10 flex items-center gap-2">
               <Trophy className="w-4 h-4 text-[#FFD700]" />
-              <h3 className="font-heading text-xl font-bold">Championship Gesamtwertung</h3>
+              <h3 className="font-heading text-xl font-bold">Gesamtwertung der Meisterschaft</h3>
             </div>
             <table className="w-full text-sm">
               <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
@@ -414,10 +395,33 @@ export default function F1DetailPage() {
   );
 }
 
+// Bedingungen (#2130): was die Turnierleitung für vergleichbare Zeiten festgelegt hat - nur, was ausgefüllt ist.
+const CONDITION_FIELDS = [["vehicle", "Fahrzeug"], ["weather", "Wetter"], ["assists_allowed", "Fahrhilfen"], ["controller_type", "Controller"], ["platform", "Plattform"]];
+
+function FastLapConditions({ challenge }) {
+  const rows = CONDITION_FIELDS
+    .map(([key, label]) => [key, label, String(challenge[key] || "").trim()])
+    .filter(([, , value]) => value);
+  if (!rows.length) return null;
+  return (
+    <section data-testid="f1-conditions" className="border border-white/10 rounded-sm bg-[#121212] p-4 sm:p-5">
+      <h2 className="font-heading text-xl font-bold uppercase mb-3 flex items-center gap-2"><Flag className="w-4 h-4 text-[#29B6E8]" /> Bedingungen</h2>
+      <dl className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-x-4 gap-y-3">
+        {rows.map(([key, label, value]) => (
+          <div key={key} className="min-w-0">
+            <dt className="text-[10px] font-bold uppercase tracking-widest text-white/45">{label}</dt>
+            <dd className="mt-0.5 text-sm text-white break-words" data-testid={`f1-condition-${key}`}>{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
 const DOWNLOAD_LINK = "tls-btn tls-btn--secondary inline-flex items-center gap-2 px-3 py-2 text-xs font-bold uppercase tracking-wider rounded-sm";
 
 /**
- * „Downloads“ (#1277): für alle erst mit Ergebnissen - Ergebnis-PDF, bei einer Championship die Gesamtwertung, angemeldet
+ * „Downloads“ (#1277): für alle erst mit Ergebnissen - Ergebnis-PDF, bei einer Meisterschaft die Gesamtwertung, angemeldet
  * die eigene Urkunde (Urkunden gibt es für die ersten vier Plätze). Am Handy eine aufklappbare Zeile, ab sm offen.
  */
 function FastLapDownloads({ challenge, activeTrack, accessToken, user, board, championship }) {
@@ -637,7 +641,7 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
           <button disabled={saving} data-testid="fastlap-submit" className="tls-btn tls-btn--primary px-4 py-2 font-bold uppercase tracking-wider rounded-sm text-sm disabled:opacity-50">Speichern</button>
         </div>
         <div className="mt-2 grid md:grid-cols-2 gap-2">
-          <input value={form.proof_url} onChange={(e) => set("proof_url", e.target.value)} placeholder="Proof URL optional" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+          <input value={form.proof_url} onChange={(e) => set("proof_url", e.target.value)} placeholder="Nachweis-Link (optional)" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
           <input value={form.admin_note} onChange={(e) => set("admin_note", e.target.value)} placeholder={Number(form.penalty_seconds) > 0 ? "Begründung für Strafe" : "Notiz optional"} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
         </div>
         {forceReferenceScope && <div className="mt-2 text-[10px] text-[#FFD700] uppercase tracking-widest">Vereinsmitglied: nur Referenzzeit möglich.</div>}
@@ -658,7 +662,7 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
                   <span>#{time.attempt_number || "-"}</span>
                   {(time.score_scope || "official") === "club_reference" && <span className="text-[#FFD700]">Referenz</span>}
                   {time.penalty_seconds > 0 && <span className="text-[#FF3B30]">+{time.penalty_seconds}s</span>}
-                  {safeHttpUrl(time.proof_url) && <a href={safeHttpUrl(time.proof_url)} target="_blank" rel="noreferrer" className="text-[#29B6E8] hover:underline">Proof</a>}
+                  {safeHttpUrl(time.proof_url) && <a href={safeHttpUrl(time.proof_url)} target="_blank" rel="noreferrer" className="text-[#29B6E8] hover:underline">Nachweis</a>}
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">

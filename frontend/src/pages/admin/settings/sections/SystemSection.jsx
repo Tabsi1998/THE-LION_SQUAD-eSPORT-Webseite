@@ -1,5 +1,6 @@
 // Einstellungen (#223): Abschnitt „Systemstatus“ – nur Darstellung; Zustand und Handler bleiben in AdminSettingsPage.
 import { SystemCard } from "../fields";
+import { ImageMaintenancePanel } from "../ImageMaintenancePanel";
 import { RefreshCw } from "lucide-react";
 import { viennaDateTime } from "@/lib/vienna";
 
@@ -33,6 +34,7 @@ export function SystemSection({ systemStatus, load }) {
           </div>
         </div>
       )}
+      <ImageMaintenancePanel />
     </div>
   );
 }

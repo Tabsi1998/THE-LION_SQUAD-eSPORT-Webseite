@@ -57,6 +57,26 @@ beforeEach(() => {
   apiMock.get.mockReset();
 });
 
+test("Bedingungen: nur, was ausgefüllt ist; ohne Angaben kein Kasten (#2130)", async () => {
+  mockApi(challengeWith({ vehicle: "Red Bull", assists_allowed: "ABS an", controller_type: "  ", weather: null, platform: "PS5" }));
+  renderPage();
+  const box = await screen.findByTestId("f1-conditions");
+  expect(box).toHaveTextContent("Fahrzeug");
+  expect(screen.getByTestId("f1-condition-vehicle")).toHaveTextContent("Red Bull");
+  expect(screen.getByTestId("f1-condition-assists_allowed")).toHaveTextContent("ABS an");
+  expect(screen.getByTestId("f1-condition-platform")).toHaveTextContent("PS5");
+  expect(screen.queryByTestId("f1-condition-weather")).toBeNull();
+  expect(screen.queryByTestId("f1-condition-controller_type")).toBeNull();
+});
+
+test("Online-Einreichung: kein Versprechen ohne Formular, auch bei alten Daten; ohne Bedingungen kein Kasten (#2130)", async () => {
+  mockApi(challengeWith({ status: "live", online_registration_enabled: true, registration_enabled: true, registration_open_from: "2026-01-01T10:00:00Z" }));
+  renderPage();
+  await screen.findByTestId("f1-challenge-title");
+  expect(screen.queryByText(/Einreichung/)).toBeNull();
+  expect(screen.queryByTestId("f1-conditions")).toBeNull();
+});
+
 test("Gast: kein TV-Knopf, keine Urkunden-Spalte, Downloads mit Ergebnis-PDF ohne Urkunde", async () => {
   mockApi(challengeWith());
   renderPage();

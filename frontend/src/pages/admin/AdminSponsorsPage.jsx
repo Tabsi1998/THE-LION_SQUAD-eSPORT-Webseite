@@ -1,30 +1,28 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { CheckField, SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { GermanDateField } from "@/components/tls/GermanDateField";
-import { DolibarrSourceBlock, dolibarrLocked, useDolibarrSource } from "@/components/tls/DolibarrSourceBlock";
+import { DOLIBARR_DELETE_HINT, DolibarrSourceBlock, dolibarrKeepsEntry, dolibarrLocked, useDolibarrSource } from "@/components/tls/DolibarrSourceBlock";
 import { imageSourceText, shownLogo } from "@/lib/sponsorImages";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { SponsoringOfferPanel } from "@/pages/admin/sponsors/SponsoringOfferPanel";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
-import { Plus, Trash2, Upload, Pencil } from "lucide-react";
+import { Archive, ArchiveRestore, Plus, Trash2, Pencil } from "lucide-react";
 
 const TIERS = ["main", "platinum", "gold", "silver", "bronze"];
 const TIER_LABELS = { main: "Hauptsponsor", platinum: "Platin", gold: "Gold", silver: "Silber", bronze: "Bronze" };
 const TIER_COLORS = { main: "text-[#29B6E8]", platinum: "text-[#E5E4E2]", gold: "text-[#FFD700]", silver: "text-white/80", bronze: "text-[#CD7F32]" };
-const CONTRACT_STATUSES = ["active", "planned", "paused", "expired", "cancelled"];
-const CONTRACT_LABELS = { active: "Aktiv", planned: "Geplant", paused: "Pausiert", expired: "Abgelaufen", cancelled: "Gekündigt", inactive: "Inaktiv" };
+const STATUS_LABELS = { active: "Aktiv", planned: "Geplant", expired: "Abgelaufen", inactive: "Archiviert" };
 const STATUS_CLASSES = {
   active: "bg-[#00FF88]/10 text-[#00FF88]",
   planned: "bg-[#29B6E8]/10 text-[#29B6E8]",
-  paused: "bg-[#FFD700]/10 text-[#FFD700]",
   expired: "bg-white/10 text-white/60",
-  cancelled: "bg-[#FF3B30]/10 text-[#FF3B30]",
   inactive: "bg-[#FF3B30]/10 text-[#FF3B30]",
 };
 const TIER_DEFAULTS = {
@@ -36,23 +34,25 @@ const TIER_DEFAULTS = {
 };
 
 const PLACEMENT_LABELS = [
-  ["show_on_home", "Home"],
-  ["show_on_footer", "Footer"],
+  ["show_on_home", "Startseite"],
+  ["show_on_footer", "Fußzeile"],
   ["show_on_events", "Events"],
   ["show_on_tv", "TV"],
   ["show_on_pdf", "PDF"],
   ["show_in_emails", "E-Mail"],
 ];
 
-function effectiveSponsorStatus(sponsor) {
-  if (sponsor?.effective_status) return sponsor.effective_status;
+// Dieselbe Rechnung wie auf dem Server (#2130): der Schalter „Öffentlich zeigen“, dazu die Laufzeit.
+function formSponsorStatus(sponsor) {
   if (sponsor?.is_active === false) return "inactive";
-  const status = sponsor?.contract_status || "active";
-  if (status === "paused" || status === "cancelled") return status;
   const today = new Date().toISOString().slice(0, 10);
   if (sponsor?.contract_start && sponsor.contract_start > today) return "planned";
   if (sponsor?.contract_end && sponsor.contract_end < today) return "expired";
-  return status === "expired" || status === "planned" ? "active" : status;
+  return "active";
+}
+
+function effectiveSponsorStatus(sponsor) {
+  return sponsor?.effective_status || formSponsorStatus(sponsor);
 }
 
 function formatDate(value) {
@@ -65,11 +65,6 @@ export default function AdminSponsorsPage() {
   const [events, setEvents] = useState([]);
   const [editing, setEditing] = useState(null);
   const [creating, setCreating] = useState(false);
-  const [migrating, setMigrating] = useState(false);
-  const [auditing, setAuditing] = useState(false);
-  const [normalizing, setNormalizing] = useState(false);
-  const [clearingMissing, setClearingMissing] = useState(false);
-  const [imageAudit, setImageAudit] = useState(null);
   const confirm = useConfirm();
   // Sponsoren aus Dolibarr (#405): Schalter, Stand und welche Felder Dolibarr führt.
   const [dolibarrSource, setDolibarrSource] = useDolibarrSource();
@@ -82,84 +77,39 @@ export default function AdminSponsorsPage() {
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["sponsors", "uploads"]);
 
+  // Archivieren (#2130): von der Website weg, alles bleibt; Löschen nur, wenn der Sponsor nirgends verwendet wird.
   const del = async (id) => {
-    if (!await confirm({ title: "Sponsor löschen?", description: "Der Sponsor wird dauerhaft entfernt.", confirmLabel: "Löschen" })) return;
-    await api.delete(`/sponsors/${id}`);
-    toast.success("Sponsor gelöscht.");
-    load();
-  };
-
-  const migrate = async () => {
-    if (!await confirm({ title: "Externe Bilder lokal speichern?", description: "Externe Bild-URLs werden heruntergeladen und durch lokale Upload-URLs ersetzt.", confirmLabel: "Migrieren", tone: "info" })) return;
-    setMigrating(true);
+    if (!await confirm({ title: "Sponsor löschen?", description: "Das lässt sich nicht rückgängig machen und geht nur, wenn der Sponsor nirgends verwendet wird. Sonst archivieren.", confirmLabel: "Löschen" })) return;
     try {
-      const { data } = await api.post("/uploads/migrate-external-images");
-      const total = Object.values(data.summary || {}).reduce((s, v) => s + (v.updated || 0), 0);
-      toast.success(`${total} Bilder lokal gespeichert.`);
-      auditImages();
+      await api.delete(`/sponsors/${id}`);
+      toast.success("Sponsor gelöscht.");
       load();
-    } catch (e) { toast.error(formatApiError(e.response?.data?.detail) || "Fehler"); }
-    setMigrating(false);
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
 
-  const auditImages = async () => {
-    setAuditing(true);
+  const setArchived = async (sponsor, archived) => {
+    if (archived && !await confirm({ title: "Sponsor archivieren?", description: "Er verschwindet überall von der Website und bleibt hier zum Zurückholen stehen.", confirmLabel: "Archivieren", tone: "info" })) return;
     try {
-      const { data } = await api.get("/uploads/audit-images");
-      setImageAudit(data);
-      const s = data.summary || {};
-      toast.success(`Bilder geprüft: ${s.local_ok || 0} ok, ${s.legacy_local || 0} alte URLs, ${s.missing_file || 0} fehlend, ${s.external || 0} extern.`);
-    } catch (e) { toast.error(formatApiError(e.response?.data?.detail) || "Bildprüfung fehlgeschlagen."); }
-    setAuditing(false);
-  };
-
-  const normalizeImages = async () => {
-    if (!await confirm({ title: "Bild-URLs reparieren?", description: "Alte lokale Bildpfade werden auf /api/static/uploads/... normalisiert.", confirmLabel: "Reparieren", tone: "info" })) return;
-    setNormalizing(true);
-    try {
-      const { data } = await api.post("/uploads/normalize-image-urls");
-      setImageAudit(data);
-      toast.success(`${data.summary?.normalized || 0} Bild-URLs normalisiert.`);
+      await api.patch(`/sponsors/${sponsor.id}`, { is_active: !archived });
+      toast.success(archived ? "Sponsor archiviert." : "Sponsor zurückgeholt.");
       load();
-    } catch (e) { toast.error(formatApiError(e.response?.data?.detail) || "Normalisierung fehlgeschlagen."); }
-    setNormalizing(false);
-  };
-
-  const clearMissingImages = async () => {
-    if (!await confirm({ title: "Fehlende Bilder leeren?", description: "Bildfelder, die auf nicht mehr vorhandene Upload-Dateien zeigen, werden geleert.", confirmLabel: "Bereinigen" })) return;
-    setClearingMissing(true);
-    try {
-      const { data } = await api.post("/uploads/clear-missing-image-refs");
-      setImageAudit(data);
-      toast.success(`${data.summary?.cleared_missing || 0} kaputte Bild-Verknüpfung(en) geleert.`);
-      load();
-    } catch (e) { toast.error(formatApiError(e.response?.data?.detail) || "Bereinigung fehlgeschlagen."); }
-    setClearingMissing(false);
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
 
   return (
     <AdminLayout>
       <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
         <div>
-          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Partner</span>
+          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Verein</span>
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Sponsoren</h1>
           <p className="mt-2 text-white/60 text-sm max-w-xl">
-            Tier steuert Größe und Reihenfolge. Vertragsstatus und Laufzeit entscheiden, ob ein Sponsor öffentlich ausgespielt wird; die Haken entscheiden die Platzierungen.
+            Die Stufe bestimmt Größe und Reihenfolge. Die Laufzeit und „Öffentlich zeigen“ entscheiden, ob ein Sponsor zu sehen ist, die Haken, wo.
+          </p>
+          <p className="mt-2 text-white/60 text-sm max-w-xl" data-testid="sponsor-vs-partner">
+            Sponsoren unterstützen den Verein mit Geld oder Sachleistungen. Befreundete Vereine und Veranstalter stehen unter <Link to="/admin/partners" className="text-[#29B6E8] underline-offset-2 hover:underline">Partner</Link>.
           </p>
         </div>
         <div className="flex gap-2">
-          <button onClick={auditImages} disabled={auditing} data-testid="sponsor-audit-images-btn" className="px-4 py-2.5 border border-white/20 text-white/80 font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2 hover:border-[#FFD700] hover:text-[#FFD700] disabled:opacity-50 text-xs">
-            {auditing ? "Prüfe…" : "Bilder prüfen"}
-          </button>
-          <button onClick={normalizeImages} disabled={normalizing} data-testid="sponsor-normalize-images-btn" className="px-4 py-2.5 border border-white/20 text-white/80 font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2 hover:border-[#29B6E8] hover:text-[#29B6E8] disabled:opacity-50 text-xs">
-            {normalizing ? "Repariere…" : "URLs reparieren"}
-          </button>
-          <button onClick={clearMissingImages} disabled={clearingMissing} data-testid="sponsor-clear-missing-images-btn" className="px-4 py-2.5 border border-white/20 text-white/80 font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2 hover:border-[#FF3B30] hover:text-[#FF3B30] disabled:opacity-50 text-xs">
-            {clearingMissing ? "Bereinige…" : "Fehlende leeren"}
-          </button>
-          <button onClick={migrate} disabled={migrating} data-testid="sponsor-migrate-btn" className="px-4 py-2.5 border border-white/20 text-white/80 font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2 hover:border-[#29B6E8] hover:text-[#29B6E8] disabled:opacity-50 text-xs">
-            <Upload className="w-4 h-4" /> {migrating ? "Migriere…" : "Bilder migrieren"}
-          </button>
           <button onClick={() => setCreating(true)} data-testid="sponsor-new-btn" className="px-5 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2"><Plus className="w-4 h-4" /> Neuer Sponsor</button>
         </div>
       </div>
@@ -169,31 +119,9 @@ export default function AdminSponsorsPage() {
       {/* Sponsor werden (#1254): was Interessierte auf der Sponsoren-Seite über die Stufen lesen. */}
       <SponsoringOfferPanel />
 
-      {imageAudit?.summary && (
-        <div className="mb-6 border border-white/10 bg-[#0A0A0A] rounded-sm p-4">
-          <div className="text-[11px] font-bold uppercase tracking-widest text-white/50 mb-3">Bildprüfung</div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 text-xs">
-            {[
-              ["OK", imageAudit.summary.local_ok],
-              ["Alte URLs", imageAudit.summary.legacy_local],
-              ["Repariert", imageAudit.summary.normalized],
-              ["Extern", imageAudit.summary.external],
-              ["Datei fehlt", imageAudit.summary.missing_file],
-              ["Ungültig", imageAudit.summary.invalid_local],
-              ["Sonstige", imageAudit.summary.other],
-            ].map(([label, value]) => (
-              <div key={label} className="border border-white/10 rounded-sm px-3 py-2">
-                <div className="text-white/45 uppercase tracking-wider font-bold">{label}</div>
-                <div className="font-display text-lg text-white mt-1">{value || 0}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {list.map((s) => (
-          <div key={s.id} className="border border-white/10 rounded-sm bg-[#121212] p-5" data-testid={`sponsor-card-${s.id}`}>
+          <div key={s.id} className={`border border-white/10 rounded-sm bg-[#121212] p-5 ${s.is_active === false ? "opacity-70" : ""}`} data-testid={`sponsor-card-${s.id}`}>
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-center gap-3 min-w-0">
                 {shownLogo(s) ? (
@@ -208,15 +136,14 @@ export default function AdminSponsorsPage() {
                   <div className="font-heading text-lg font-bold truncate">{s.name}</div>
                   <div className="flex gap-1 mt-1 flex-wrap">
                     <span className={`text-[9px] px-1.5 py-0.5 rounded-sm font-bold uppercase tracking-widest ${STATUS_CLASSES[effectiveSponsorStatus(s)] || STATUS_CLASSES.inactive}`}>
-                      {CONTRACT_LABELS[effectiveSponsorStatus(s)] || effectiveSponsorStatus(s)}
+                      {STATUS_LABELS[effectiveSponsorStatus(s)] || effectiveSponsorStatus(s)}
                     </span>
-                    {s.show_on_home && <span className="text-[9px] px-1.5 py-0.5 bg-[#29B6E8]/15 text-[#29B6E8] rounded-sm font-bold uppercase tracking-widest">Home</span>}
-                    {s.show_on_footer && <span className="text-[9px] px-1.5 py-0.5 bg-white/10 text-white/70 rounded-sm font-bold uppercase tracking-widest">Footer</span>}
+                    {s.show_on_home && <span className="text-[9px] px-1.5 py-0.5 bg-[#29B6E8]/15 text-[#29B6E8] rounded-sm font-bold uppercase tracking-widest">Startseite</span>}
+                    {s.show_on_footer && <span className="text-[9px] px-1.5 py-0.5 bg-white/10 text-white/70 rounded-sm font-bold uppercase tracking-widest">Fußzeile</span>}
                     {s.show_on_events && <span className="text-[9px] px-1.5 py-0.5 bg-[#FFD700]/15 text-[#FFD700] rounded-sm font-bold uppercase tracking-widest">Events</span>}
                     {s.show_on_tv && <span className="text-[9px] px-1.5 py-0.5 bg-[#9F7AEA]/15 text-[#BFA6FF] rounded-sm font-bold uppercase tracking-widest">TV</span>}
                     {s.show_on_pdf && <span className="text-[9px] px-1.5 py-0.5 bg-[#29B6E8]/15 text-[#8EE6FF] rounded-sm font-bold uppercase tracking-widest">PDF</span>}
                     {s.show_in_emails && <span className="text-[9px] px-1.5 py-0.5 bg-[#18C29C]/15 text-[#18C29C] rounded-sm font-bold uppercase tracking-widest">E-Mail</span>}
-                    {s.is_active === false && <span className="text-[9px] px-1.5 py-0.5 bg-[#FF3B30]/15 text-[#FF3B30] rounded-sm font-bold uppercase tracking-widest">Inaktiv</span>}
                     {s.source === "dolibarr" && <span className="text-[9px] px-1.5 py-0.5 bg-[#29B6E8]/15 text-[#29B6E8] rounded-sm font-bold uppercase tracking-widest" data-testid={`sponsor-dolibarr-${s.id}`}>Dolibarr</span>}
                     {imageSourceText(s.dolibarr_image_summary) && <span className="text-[9px] px-1.5 py-0.5 bg-[#29B6E8]/10 text-[#8EE6FF] rounded-sm font-bold uppercase tracking-widest" title={imageSourceText(s.dolibarr_image_summary)} data-testid={`sponsor-images-${s.id}`}>Bilder: Dolibarr</span>}
                   </div>
@@ -224,7 +151,12 @@ export default function AdminSponsorsPage() {
               </div>
               <div className="flex gap-1 shrink-0">
                 <button onClick={() => setEditing(s)} className="p-1.5 text-white/40 hover:text-[#29B6E8]"><Pencil className="w-4 h-4" /></button>
-                <button onClick={() => del(s.id)} className="p-1.5 text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-4 h-4" /></button>
+                {s.is_active === false ? (
+                  <button onClick={() => setArchived(s, false)} title="Zurückholen" aria-label="Sponsor zurückholen" data-testid={`sponsor-restore-${s.id}`} className="p-1.5 text-white/40 hover:text-[#29B6E8]"><ArchiveRestore className="w-4 h-4" /></button>
+                ) : (
+                  <button onClick={() => setArchived(s, true)} title="Archivieren" aria-label="Sponsor archivieren" data-testid={`sponsor-archive-${s.id}`} className="p-1.5 text-white/40 hover:text-brand"><Archive className="w-4 h-4" /></button>
+                )}
+                <button onClick={() => del(s.id)} disabled={dolibarrKeepsEntry(dolibarrSource, s)} title={dolibarrKeepsEntry(dolibarrSource, s) ? DOLIBARR_DELETE_HINT : "Sponsor löschen"} aria-label="Sponsor löschen" data-testid={`sponsor-delete-${s.id}`} className="p-1.5 text-white/40 hover:text-[#FF3B30] disabled:opacity-30 disabled:hover:text-white/40 disabled:cursor-not-allowed"><Trash2 className="w-4 h-4" /></button>
               </div>
             </div>
             {(s.contract_start || s.contract_end || s.contact_name) && (
@@ -263,7 +195,6 @@ function SponsorForm({ sponsor, events = [], locked = new Set(), onClose, onSave
     link: sponsor?.link || "", description: sponsor?.description || "",
     tier: initialTier,
     is_active: sponsor?.is_active !== false,
-    contract_status: sponsor?.contract_status || "active",
     contract_start: sponsor?.contract_start || "",
     contract_end: sponsor?.contract_end || "",
     contact_name: sponsor?.contact_name || "",
@@ -342,14 +273,13 @@ function SponsorForm({ sponsor, events = [], locked = new Set(), onClose, onSave
           </p>
         )}
         <FormGrid>
-          <SelectField label="Tier" value={form.tier} onChange={setTier} options={TIERS.map((t) => [t, TIER_LABELS[t]])} testId="sponsor-tier" {...lock("tier")} />
+          <SelectField label="Stufe" value={form.tier} onChange={setTier} options={TIERS.map((t) => [t, TIER_LABELS[t]])} testId="sponsor-tier" {...lock("tier")} />
           <TextField label="Reihenfolge" type="number" value={form.order_index ?? 0} onChange={(v) => set("order_index", parseInt(v, 10) || 0)} testId="sponsor-order" />
         </FormGrid>
       </FormSection>
 
-      <FormSection title="Vertrag und Kontakt" hint="Vertragsstatus und Laufzeit entscheiden, ob der Sponsor öffentlich ausgespielt wird.">
-        <FormGrid cols={3}>
-          <SelectField label="Vertragsstatus" value={form.contract_status} onChange={(v) => set("contract_status", v)} options={CONTRACT_STATUSES.map((status) => [status, CONTRACT_LABELS[status]])} testId="sponsor-contract-status" />
+      <FormSection title="Laufzeit und Kontakt" hint="Vor dem Start ist der Sponsor noch nicht zu sehen, nach dem Ende steht er bei den ehemaligen Unterstützern.">
+        <FormGrid>
           <GermanDateField id="sponsor-contract-start" label="Start" value={(form.contract_start || "").slice(0, 10)} onChange={(v) => set("contract_start", v)} testId="sponsor-contract-start" allowFuture {...lock("contract_start")} />
           <GermanDateField id="sponsor-contract-end" label="Ende" value={(form.contract_end || "").slice(0, 10)} onChange={(v) => set("contract_end", v)} testId="sponsor-contract-end" allowFuture {...lock("contract_end")} />
         </FormGrid>
@@ -360,16 +290,16 @@ function SponsorForm({ sponsor, events = [], locked = new Set(), onClose, onSave
         </FormGrid>
       </FormSection>
 
-      <FormSection title="Sichtbarkeit" hint="Haken entscheiden live. Tier-Standard ist nur eine schnelle Vorlage.">
+      <FormSection title="Sichtbarkeit" hint="Die Haken gelten sofort. „Vorgabe der Stufe“ setzt sie auf einen Schlag.">
         <div className="flex justify-end">
           <button type="button" onClick={() => applyTierDefaults()} className="px-3 py-1.5 border border-[#29B6E8]/40 text-[#29B6E8] text-[10px] font-bold uppercase tracking-wider rounded-sm hover:bg-[#29B6E8]/10">
-            Tier-Standard
+            Vorgabe der Stufe
           </button>
         </div>
         <FormGrid cols={3}>
-          <CheckField label="Aktiv" checked={form.is_active !== false} onChange={(v) => set("is_active", v)} testId="sponsor-active" />
-          <CheckField label="Auf Home" checked={form.show_on_home === true} onChange={(v) => setPlacement("show_on_home", v)} testId="sponsor-show-home" />
-          <CheckField label="Im Footer" checked={form.show_on_footer === true} onChange={(v) => setPlacement("show_on_footer", v)} testId="sponsor-show-footer" />
+          <CheckField label="Öffentlich zeigen" hint="Aus = archiviert: überall weg, hier noch da." checked={form.is_active !== false} onChange={(v) => set("is_active", v)} testId="sponsor-active" />
+          <CheckField label="Auf der Startseite" checked={form.show_on_home === true} onChange={(v) => setPlacement("show_on_home", v)} testId="sponsor-show-home" />
+          <CheckField label="In der Fußzeile" checked={form.show_on_footer === true} onChange={(v) => setPlacement("show_on_footer", v)} testId="sponsor-show-footer" />
           <CheckField label="Events" checked={form.show_on_events === true} onChange={(v) => setPlacement("show_on_events", v)} testId="sponsor-show-events" accent="#FFD700" />
           <CheckField label="TV / Anzeige" checked={form.show_on_tv === true} onChange={(v) => setPlacement("show_on_tv", v)} testId="sponsor-show-tv" accent="#9F7AEA" />
           <CheckField label="PDFs" checked={form.show_on_pdf === true} onChange={(v) => setPlacement("show_on_pdf", v)} testId="sponsor-show-pdf" />
@@ -417,16 +347,16 @@ function SponsorForm({ sponsor, events = [], locked = new Set(), onClose, onSave
 }
 
 function SponsorPlacementPreview({ sponsor }) {
-  const status = effectiveSponsorStatus(sponsor);
+  const status = formSponsorStatus(sponsor);
   const enabled = PLACEMENT_LABELS.filter(([key]) => sponsor[key] === true);
-  const visible = sponsor.is_active !== false && status === "active";
+  const visible = status === "active";
   return (
     <div className="border border-white/10 rounded-sm bg-[#080808] p-3" data-testid="sponsor-placement-preview">
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Vorschau Ausspielung</div>
           <p className="mt-1 text-[10px] text-white/40">
-            Öffentlich sichtbar nur bei aktivem Vertrag innerhalb der Laufzeit.
+            Öffentlich sichtbar, wenn „Öffentlich zeigen“ an ist und die Laufzeit passt.
           </p>
         </div>
         <span className={`text-[9px] px-2 py-1 rounded-sm font-bold uppercase tracking-widest ${visible ? STATUS_CLASSES.active : STATUS_CLASSES[status] || STATUS_CLASSES.inactive}`}>

@@ -350,12 +350,16 @@ def partner_badge(doc: dict) -> dict:
     return {"id": doc.get("id"), "slug": doc.get("slug"), "name": doc.get("name"), "logo_url": sponsor_images.pick(doc, "logo")[0], "kind": doc.get("kind")}
 
 
-async def clean_partner_ids(db, ids) -> list[str]:
-    """Nur echte, aktive Partner - in der Reihenfolge des Formulars, ohne Doppelte."""
+async def clean_partner_ids(db, ids, keep=None) -> list[str]:
+    """Nur echte, aktive Partner - in der Reihenfolge des Formulars, ohne Doppelte. ``keep``: was schon am Dokument steht,
+    bleibt auch archiviert verknüpft (#2130) - sonst fehlte nach dem Zurückholen der Link. Neu dazu kommt nur, wer aktiv
+    ist; nach außen geht ein archivierter Partner ohnehin nicht (``attach_partners``)."""
     wanted = list(dict.fromkeys(str(item).strip() for item in (ids or []) if str(item or "").strip()))
     if not wanted:
         return []
-    found = {row["id"] for row in await db.partners.find({"id": {"$in": wanted}, "is_active": {"$ne": False}}, {"_id": 0, "id": 1}).to_list(len(wanted))}
+    already = set(keep or [])
+    rows = await db.partners.find({"id": {"$in": wanted}}, {"_id": 0, "id": 1, "is_active": 1}).to_list(len(wanted))
+    found = {row["id"] for row in rows if row.get("is_active") is not False or row["id"] in already}
     return [item for item in wanted if item in found]
 
 

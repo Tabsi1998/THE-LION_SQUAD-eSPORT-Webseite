@@ -195,7 +195,7 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/stickers": ["chat", "emoji", "fluent"],
   "/admin/advent": ["advent", "adventkalender", "türchen", "tuerchen", "weihnachten", "verlosung", "gewinnspiel", "ziehung", "quiz", "kalender"],
   "/admin/ostern": ["ostern", "ostereier", "eiersuche", "eier", "osterei", "verlosung", "gewinnspiel", "ziehung", "verstecke"],
-  "/admin/sponsors": ["unterstuetzer", "partner", "dolibarr", "kategorie", "stufe", "laufzeit", "ehemalige"],
+  "/admin/sponsors": ["unterstuetzer", "dolibarr", "kategorie", "stufe", "laufzeit", "ehemalige"],
   "/admin/partners": ["kooperationen", "netzwerk", "dolibarr", "kategorie"],
   "/admin/references": ["externe wettbewerbe", "platzierungen", "results"],
   "/admin/reference-series": ["serien", "ligen", "liga", "rennliga", "turnierserie", "team-liga", "saison", "spur", "punkteschema", "streichergebnisse", "tabelle"],

@@ -329,6 +329,104 @@ async def test_after_publishing_scoring_rules_change_only_with_a_reason(flow):
 
 
 @pytest.mark.asyncio
+async def test_championship_and_points_per_place_can_be_edited_and_are_checked(flow):
+    """#2130: Meisterschaft, Punkte je Platz und Stream gehen auch im Bearbeiten; die Wertung rechnet sofort neu."""
+    cid, _tid, anna, bert, _laps = await published(flow)
+    before = {row["user_id"]: row["total_points"] async for row in flow.db.season_points.find({}, {"_id": 0})}
+    for broken in ([], [-1], [1] * 101, [10001]):
+        refused = await flow.patch(f"/api/f1/challenges/{cid}", json={"points_per_position": broken, "change_reason": REASON})
+        assert refused.status_code == 422, (broken, refused.text)
+    saved = await flow.patch(f"/api/f1/challenges/{cid}", json={"is_championship": True, "points_per_position": [7, 3], "change_reason": REASON})
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["points_per_position"] == [7, 3]
+    standings = (await flow.get(f"/api/f1/challenges/{cid}/championship")).json()["standings"]
+    assert {row["user_id"]: row["points"] for row in standings} == {anna["id"]: 7, bert["id"]: 3}
+    rows = await flow.db.audit_logs.find({"action": "fastlap.challenge.rules"}, {"_id": 0}).to_list(5)
+    assert sorted(rows[0]["data"]["fields"]) == ["is_championship", "points_per_position"]
+    # Die Jahrespunkte hängen am Platz, nicht an diesen Punkten - sie bleiben, was sie waren.
+    assert {row["user_id"]: row["total_points"] async for row in flow.db.season_points.find({}, {"_id": 0})} == before
+    stream = await flow.patch(f"/api/f1/challenges/{cid}", json={"stream_platform": "twitch", "stream_url": "https://www.twitch.tv/probe",
+                                                                 "twitch_channel": "probe", "has_live_stream": True, "twitch_enabled": True})
+    assert stream.status_code == 200, stream.text
+    assert stream.json()["has_live_stream"] is True and stream.json()["twitch_channel"] == "probe"
+    cleared = await flow.patch(f"/api/f1/challenges/{cid}", json={"stream_platform": None, "stream_url": None, "twitch_channel": None,
+                                                                  "has_live_stream": False, "twitch_enabled": False})
+    assert cleared.status_code == 200 and cleared.json()["stream_url"] is None and cleared.json()["has_live_stream"] is False
+
+
+async def completed_with_prizes(flow, **extra):
+    """Anna 1:20 plus 5 s Strafe, Bert 1:22: Bert führt - und „Beendet“ legt seinen Gewinn an."""
+    lead = await flow.add_staff()
+    flow.act_as(lead)
+    await flow.db.seasons.insert_one({"id": "s-1", "name": "Wertung", "status": "active"})
+    await flow.db.f1_challenges.insert_one({"id": "c1", "slug": "c1", "title": "Eins", "status": "live", "visibility": "public", "unlimited_attempts": True,
+                                            "prize_places": [{"place": 1, "label": "Sieg", "value": "Pokal"}], **extra})
+    await flow.db.f1_tracks.insert_one({"id": "t1", "challenge_id": "c1", "name": "A"})
+    anna, bert = await flow.add_user(name="anna"), await flow.add_user(name="bert")
+    lap = (await flow.post("/api/f1/challenges/c1/times", json={"user_id": anna["id"], "track_id": "t1", "time_ms": 80000, "penalty_seconds": 5, "admin_note": "Kurve abgekuerzt"})).json()
+    await flow.post("/api/f1/challenges/c1/times", json={"user_id": bert["id"], "track_id": "t1", "time_ms": 82000})
+    done = await flow.patch("/api/f1/challenges/c1", json={"status": "completed"})
+    assert done.status_code == 200, done.text
+    return anna, bert, lap
+
+
+@pytest.mark.asyncio
+async def test_taking_a_penalty_back_after_completed_leaves_one_winner_when_published(flow):
+    """#2130: Der neue Sieger bekommt den Gewinn, der alte behält seinen mit Prüfhinweis - nie zwei Sieger ohne Hinweis."""
+    anna, bert, lap = await completed_with_prizes(flow)
+    assert await pickups(flow, "c1") == [(1, bert["id"], False)]
+    taken = await flow.patch(f"/api/f1/times/{lap['id']}", json={"penalty_seconds": 0, "is_invalid": False})
+    assert taken.status_code == 200, taken.text
+    published_now = await flow.patch("/api/f1/challenges/c1", json={"status": "results_published"})
+    assert published_now.status_code == 200, published_now.text
+    assert await pickups(flow, "c1") == sorted([(1, anna["id"], False), (1, bert["id"], True)])
+    stale = await flow.db.prize_pickups.find_one({"user_id": bert["id"]}, {"_id": 0})
+    assert "nicht mehr auf diesem Platz" in stale["review_note"] and stale["status"] == "pending", "nie entzogen"
+
+
+@pytest.mark.asyncio
+async def test_changing_points_after_completed_is_reviewed_when_published(flow):
+    """#2130: Dasselbe, wenn sich die Gesamtwertung einer Meisterschaft durch andere Punkte je Platz dreht."""
+    lead = await flow.add_staff()
+    flow.act_as(lead)
+    await flow.db.seasons.insert_one({"id": "s-1", "name": "Wertung", "status": "active"})
+    await flow.db.f1_challenges.insert_one({"id": "c2", "slug": "c2", "title": "Zwei", "status": "live", "visibility": "public", "unlimited_attempts": True, "is_championship": True,
+                                            "points_per_position": [10, 1], "prize_places": [{"place": 1, "label": "Sieg", "value": "Pokal"}]})
+    await flow.db.f1_tracks.insert_many([{"id": "t1", "challenge_id": "c2", "name": "A", "order_index": 0}, {"id": "t2", "challenge_id": "c2", "name": "B", "order_index": 1}, {"id": "t3", "challenge_id": "c2", "name": "C", "order_index": 2}])
+    anna, bert, carl = await flow.add_user(name="anna"), await flow.add_user(name="bert"), await flow.add_user(name="carl")
+    # Mit den Punkten 10, 1 gewinnt Carl (zweimal Platz 1, einmal Platz 2).
+    for tid, order in (("t1", (carl, anna, bert)), ("t2", (carl, bert, anna)), ("t3", (anna, carl, bert))):
+        for offset, person in enumerate(order):
+            saved = await flow.post("/api/f1/challenges/c2/times", json={"user_id": person["id"], "track_id": tid, "time_ms": 80000 + offset * 1000})
+            assert saved.status_code == 200, saved.text
+    done = await flow.patch("/api/f1/challenges/c2", json={"status": "completed"})
+    assert done.status_code == 200, done.text
+    assert await pickups(flow, "c2") == [(1, carl["id"], False)]
+    # Andere Punkte: Platz 3 zählt jetzt am meisten - Bert (zweimal Platz 3 und einmal Platz 2) zieht vorbei.
+    changed = await flow.patch("/api/f1/challenges/c2", json={"points_per_position": [0, 1, 10]})
+    assert changed.status_code == 200, changed.text
+    published_now = await flow.patch("/api/f1/challenges/c2", json={"status": "results_published"})
+    assert published_now.status_code == 200, published_now.text
+    assert await pickups(flow, "c2") == sorted([(1, bert["id"], False), (1, carl["id"], True)])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("broken", [[], [-1], [10001], [1.5], ["x"], list(range(101)), "25"])
+async def test_points_per_place_are_checked_when_saving(flow, broken):
+    flow.act_as(await flow.add_staff())
+    await flow.db.f1_challenges.insert_one({"id": "c1", "slug": "c1", "title": "Eins", "status": "live", "visibility": "public"})
+    answer = await flow.patch("/api/f1/challenges/c1", json={"points_per_position": broken})
+    assert answer.status_code == 422, answer.text
+
+
+@pytest.mark.asyncio
+async def test_a_new_challenge_rejects_empty_points_per_place(flow):
+    flow.act_as(await flow.add_staff())
+    answer = await flow.post("/api/f1/challenges", json={"title": "Neu", "points_per_position": []})
+    assert answer.status_code == 422, answer.text
+
+
+@pytest.mark.asyncio
 async def test_a_challenge_with_weight_zero_awards_no_season_points(flow):
     await published(flow, season_weight=0)
     assert await flow.db.season_points.count_documents({}) == 0

@@ -34,7 +34,7 @@ function filled(value) {
 }
 
 const MORE_TEXT_FIELDS = ["organizer", "league", "season", "format", "game_name", "location", "bracket_url", "match_url", "result_url",
-  "description", "highlights", "series_id"];
+  "description", "highlights", "internal_notes", "series_id"];
 
 /** Steht unter „Weitere Angaben“ etwas, das vom Tagesturnier abweicht? Dann ist der Bereich beim Öffnen offen. */
 export function hasMoreDetails(form, today) {

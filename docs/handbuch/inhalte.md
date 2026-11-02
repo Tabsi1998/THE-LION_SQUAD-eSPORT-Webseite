@@ -250,19 +250,27 @@ die Alben.
 
 ### 3.6 Sponsoren und „Sponsor werden“
 
-**Admin → Verein → Sponsoren.** Je Sponsor ein Blatt (**Sponsor bearbeiten**):
+**Admin → Verein → Sponsoren.** Sponsoren unterstützen den Verein mit Geld oder Sachleistungen; befreundete Vereine und Veranstalter
+stehen unter **Partner** (3.7). Je Sponsor ein Blatt (**Sponsor bearbeiten**):
 
-- **Name**, **Logo**, **Link (URL)**, **Tier** (main, platinum, gold, silver, bronze), **Beschreibung**, **Reihenfolge**, **Aktiv**.
-- **Vertrag:** **Vertragsstatus**, **Start**, **Ende**. Status und Laufzeit entscheiden, ob der Sponsor öffentlich erscheint; die
-  Vorschau „Ausspielung“ sagt „Wird ausgespielt“ oder „Nicht öffentlich“.
-- **Wo er erscheint:** **Auf Home**, **Im Footer**, **Events**, **TV / Anzeige**, **PDFs**, **E-Mails**. Das Tier ist nur eine Vorlage; die
+- **Name**, **Logo**, **Link (URL)**, **Stufe** (Hauptsponsor, Platin, Gold, Silber, Bronze), **Beschreibung**, **Reihenfolge**.
+- **Ausblenden** geht über einen Schalter: **Öffentlich zeigen**. Aus heißt archiviert (auch mit dem Archiv-Knopf auf der Karte):
+  überall von der Website weg, hier noch da und mit einem Klick zurückzuholen.
+- **Laufzeit:** **Start**, **Ende**. Vor dem Start ist der Sponsor noch nicht zu sehen, nach dem Ende steht er bei den ehemaligen
+  Unterstützern; die Vorschau „Ausspielung“ sagt „Wird ausgespielt“ oder „Nicht öffentlich“.
+- **Löschen** geht nur, wenn der Sponsor nirgends verwendet wird (Event-Auswahl, Sponsor je Runde); sonst nennt die Meldung, wo er
+  noch steht. Archivieren, Zurückholen und Löschen stehen im Protokoll.
+- **Wo er erscheint:** **Auf der Startseite**, **In der Fußzeile**, **Events**, **TV / Anzeige**, **PDFs**, **E-Mails**. **Vorgabe der Stufe** ist nur eine Vorlage; die
   Haken entscheiden. Mit dem Haken **Events** wählst du **Bei allen Events** oder **Bei ausgewählten Events** (dann
   mindestens eines). Nur hier wird das festgelegt – das Event zeigt die Sponsoren nur an (#1371).
 - **Ansprechpartner**, **Kontakt E-Mail**, **Telefon**, **Interne Notizen** (nie öffentlich).
 - Sponsoren am TV: Haken **TV / Anzeige**, siehe [TV und Beamer](tv.md).
 - Mit Dolibarr-Anbindung kommen Name, Stufe, Laufzeit und Kontakt von dort (diese Felder sind gesperrt); Link, Platzierungen,
   Reihenfolge und Texte bleiben hier. Logo und Banner kommen ab Vereinsmodul 1.9 aus Dolibarr. Technik: [Dolibarr](../DOLIBARR.md).
-- Pflegeknöpfe für Bilder (**Bilder migrieren**, **URLs reparieren**, **Fehlende leeren**) braucht ihr nur bei Bedarf, jeweils mit Rückfrage.
+  **Löschen** ist gesperrt, solange die Firma in der Kategorie steht: Der nächste Abgleich legte sie sonst neu an, ohne Logo und
+  Texte. Nehmt sie in Dolibarr aus der Kategorie, dann steht sie hier als ehemalig und lässt sich löschen. Archivieren geht.
+- Die Bild-Wartung (**Bilder prüfen**, **Adressen reparieren**, **Fehlende leeren**, **Externe Bilder lokal speichern**) gilt für alle
+  Bilder der Website und steht unter **Admin → System → Status**.
 - Auf der Kommandozentrale erinnert „Sponsoring läuft aus“ 30 Tage vorher.
 
 **Sponsor werden** (Kasten **Sponsor werden** unten auf derselben Seite): Einleitung, **Zahlen – nur echte** (selbst eingetragen
@@ -272,7 +280,8 @@ je Stufe) und eine **Mappe als PDF** zum Hochladen. Interessierte sehen auf der 
 
 ### 3.7 Partner
 
-**Admin → Verein → Partner.** Jeder Partner hat eine eigene Seite unter `/partners/<Name>` (die alte Adresse leitet weiter).
+**Admin → Verein → Partner.** Partner arbeiten mit dem Verein zusammen und zahlen nichts dafür; wer mit Geld oder Sachleistungen
+unterstützt, steht unter **Sponsoren** (3.6). Jeder Partner hat eine eigene Seite unter `/partners/<Name>` (die alte Adresse leitet weiter).
 
 - **Name**, Art (Verein, Messe, Community), **Kurzbeschreibung** (Partnerliste und Kopf der Seite), **Über den Partner**
   (längerer Text), Logo/Bild.
@@ -285,17 +294,23 @@ je Stufe) und eine **Mappe als PDF** zum Hochladen. Interessierte sehen auf der 
 - **Ligen und Serien mit uns:** Ist ein Partner an einer Spur oder Saison eingetragen (3.9, „Partner an Spur und Saison“),
   zeigt seine Seite die Spur mit ihren Saisons – neueste zuerst, mit Spiel, unserem Stand bzw. Endplatz und „Läuft
   gerade“; jede Saison führt zu ihrer Serienseite. Interne Spuren und Saisons erscheinen dort nie.
-- **Nur aktive Partner** erscheinen auf Serienseiten, in der Übersicht und in der Auswahl. Wird ein Partner inaktiv,
-  verschwindet er überall, ohne dass ihr Spuren oder Saisons anfassen müsst.
-- Mit Dolibarr kommen Name und Art von dort.
+- **Nur aktive Partner** erscheinen auf Serienseiten, in der Übersicht und in der Auswahl. Wird ein Partner archiviert (Archiv-Knopf
+  auf der Karte oder **Öffentlich zeigen** aus), verschwindet er überall, ohne dass ihr Spuren oder Saisons anfassen müsst. Seine
+  Verknüpfungen bleiben, auch wenn ihr eine Referenz, ein Event oder ein Turnier speichert; nach dem Zurückholen ist alles wieder da.
+  In der Auswahl steht dann „archivierter Partner bleibt verknüpft“, dort löst **Verknüpfung lösen** den Link.
+- **Löschen** geht nur, wenn der Partner nirgends verwendet wird (Referenzen, Events, Turniere, Serien, Saisons); sonst nennt die
+  Meldung, wo er noch steht. Archivieren, Zurückholen und Löschen stehen im Protokoll.
+- Mit Dolibarr kommen Name, Art und „Öffentlich zeigen“ von dort (gesperrt, mit Hinweis): Inaktiv wird der Partner, wenn die Firma in
+  Dolibarr geschlossen oder aus der Kategorie genommen wird. Löschen ist gesperrt, solange sie in der Kategorie steht. Ist sie aus der Kategorie genommen, steht der Partner als inaktiv hier und lässt sich zurückholen; der Abgleich fasst das nicht mehr an.
 
 <img src="../assets/serien/serien-partner-partnerseite.png" alt="Partnerseite: Bereich Ligen und Serien mit uns mit einer Spur, zwei Saisons, Stand, Endplatz und Läuft gerade" width="420">
 
 ### 3.8 Referenzen
 
 **Admin → Verein → Referenzen.** Eine Referenz ist eine **Turnierteilnahme des Vereins**: **Titel** (nur der Turniername),
-**Plattform**, **Format**, **Liga**, **Saison** als eigene Felder, Spiele (Mehrfachauswahl), Turnier-Webseite, Bracket/Tabelle,
-Highlights/Notizen. Dazu **Einträge**: ein **Team** mit gemeinsamer Platzierung oder mehrere **Einzelstarter** mit je eigener
+**Plattform**, **Format**, **Liga**, **Saison** als eigene Felder, Spiele (Mehrfachauswahl), Turnier-Webseite, Turnierbaum/Tabelle.
+**Beschreibung** und **Highlights** sind öffentlich (auch in der Vorschau bei Suchmaschinen); was nur euch etwas angeht, gehört in
+**Interne Notizen**. Dazu **Einträge**: ein **Team** mit gemeinsamer Platzierung oder mehrere **Einzelstarter** mit je eigener
 Platzierung, beides in derselben Teilnahme möglich. Spieler wählt ihr aus den Vereinsprofilen; externe Spieler tragt ihr als Namen ein.
 
 **Schnell-Eintrag für ein Tagesturnier:** Oben im Formular steht nur, was ein Tagesturnier braucht – **Turniername**,
@@ -303,11 +318,17 @@ Platzierung, beides in derselben Teilnahme möglich. Spieler wählt ihr aus den 
 Vereinsprofilen), **Platz von N** und optional ein **Link**. Eine neue Referenz beginnt schon mit einem Team-Eintrag.
 **Wie letztes Mal** übernimmt Spiel, Veranstalter und Teamname der zuletzt angelegten Referenz – die Spieler wählt ihr
 jedes Mal neu. Alles andere – Veranstalter
-und Partner, Liga und Saison, Format, Plattformen, Ende bei mehreren Tagen, Ort, Modus, weitere Links, Label und zweite
+und Partner, Liga und Saison, Format, Plattformen, Ende bei mehreren Tagen, Ort, Modus, weitere Links, Bezeichnung und zweite
 Feldgröße der Einträge, Status, Sichtbarkeit, Reihenfolge, Texte – klappt unter **Weitere Angaben** auf. Beim Bearbeiten
 ist der Bereich offen, wenn dort etwas steht. Vorgaben: Der Status folgt dem Datum (vorbei = abgeschlossen, später =
-geplant, heute abgeschlossen, sobald ein Eintrag einen Platz hat; maßgeblich ist der Tag beim Speichern), bis ihr ihn selbst wählt; sichtbar für alle, aktiv, Reihenfolge 0 = automatisch
+geplant, heute abgeschlossen, sobald ein Eintrag einen Platz hat; maßgeblich ist der Tag beim Speichern), bis ihr ihn selbst wählt; sichtbar für alle, öffentlich gezeigt, Reihenfolge 0 = automatisch
 nach Datum. Die Seite der Referenz zeigt nur, was ausgefüllt ist.
+
+**Die Liste** hat eine Suche (Turnier, Veranstalter, Team, Namen), Filter nach **Spiel**, **Jahr** und **Status** und Seiten mit je 25
+Einträgen. **Archivieren** (Knopf in der Zeile oder **Öffentlich zeigen** aus) nimmt die Referenz von der Website, aus den
+Profilen und aus den Erfolgen; zurückholen geht jederzeit. Der **Status** sagt nur noch, wie weit die Teilnahme ist (Laufend,
+Geplant, Abgeschlossen). **Löschen** geht nur, wenn sie zu keiner Saison gehört, nicht Hauptkarte der Vitrine ist und keine
+Mitglieder eingetragen sind. Archivieren, Zurückholen und Löschen stehen im Protokoll.
 
 <table>
 <tr>

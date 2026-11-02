@@ -13,7 +13,8 @@ import { gameOptionLabel, selectableGames } from "@/lib/gameLabels";
 import { checkKey, warningSummary, warningsByField } from "@/lib/referenceChecks";
 import { AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
-import { ExternalLink, Flag, History, Medal, Pencil, Plus, Save, Trash2, User, Users } from "lucide-react";
+import { Archive, ArchiveRestore, ExternalLink, Flag, History, Medal, Pencil, Plus, Save, Search, Trash2, User, Users } from "lucide-react";
+import { filterReferences, pageOf, REFERENCE_STATUS_FILTERS, referenceFilterOptions } from "@/lib/referenceAdminList";
 import { viennaDate, viennaDay } from "@/lib/vienna";
 import { podiumItems, yearOf } from "@/lib/referencesOverview";
 import { bestPlacement } from "@/components/tls/references/referenceParts";
@@ -31,7 +32,7 @@ import { anyPlacement, countKey, hasMoreDetails, lastReference, likeLastTime, qu
 
 const VISIBILITY_OPTIONS = [["public", "Öffentlich"], ["community", "Community"], ["members", "Vereinsmitglieder"], ["internal", "Intern"]];
 const MODE_OPTIONS = [["online", "Online"], ["offline", "Vor Ort"], ["hybrid", "Hybrid"]];
-const STATUS_OPTIONS = [["active", "Laufend"], ["planned", "Geplant"], ["completed", "Abgeschlossen"], ["archived", "Archiviert"]];
+const STATUS_OPTIONS = [["active", "Laufend"], ["planned", "Geplant"], ["completed", "Abgeschlossen"]];
 const KIND_OPTIONS = [["team", "Team"], ["solo", "Einzelstarter"]];
 const medalLabel = { gold: "Gold", silver: "Silber", bronze: "Bronze" };
 const visibilityLabel = Object.fromEntries(VISIBILITY_OPTIONS);
@@ -58,6 +59,7 @@ const emptyReference = {
   result_url: "",
   description: "",
   highlights: "",
+  internal_notes: "",
   visibility: "public",
   status: "completed",
   is_active: true,
@@ -121,6 +123,7 @@ export function referenceToForm(item) {
     location: item.location || "",
     description: item.description || "",
     highlights: item.highlights || "",
+    internal_notes: item.internal_notes || "",
     series_id: item.series_id || "",
   };
 }
@@ -216,6 +219,13 @@ export default function AdminReferencesPage() {
   const [editing, setEditing] = useState(null);
   const confirm = useConfirm();
   const suggestions = useMemo(() => buildReferenceSuggestions(items, helperSettings), [items, helperSettings]);
+  // Suche, Filter und Seiten (#2130): die Liste kann bis zu 1000 Einträge haben.
+  const [filters, setFilters] = useState({ query: "", game: "", year: "", status: "" });
+  const [page, setPage] = useState(1);
+  const setFilter = (key, value) => { setFilters((current) => ({ ...current, [key]: value })); setPage(1); };
+  const filterOptions = useMemo(() => referenceFilterOptions(items), [items]);
+  const filtered = useMemo(() => filterReferences(items, filters), [items, filters]);
+  const visible = pageOf(filtered, page);
 
   const load = useCallback(async () => {
     const [{ data: refs }, { data: gameRows }, { data: profileRows }, { data: helpers }, partnerRows, seasonRows] = await Promise.all([
@@ -252,11 +262,23 @@ export default function AdminReferencesPage() {
     setSearchParams((params) => { params.delete("edit"); return params; }, { replace: true });
   }, [editId, items, setSearchParams]);
 
+  // Archivieren (#2130): von der Website weg, alles bleibt; Löschen nur, wenn die Referenz nirgends verwendet wird.
   const remove = async (id) => {
-    if (!await confirm({ title: "Referenz löschen?", description: "Die Turnierteilnahme wird mit allen Einträgen dauerhaft entfernt.", confirmLabel: "Löschen" })) return;
-    await api.delete(`/references/${id}`);
-    toast.success("Referenz gelöscht.");
-    load();
+    if (!await confirm({ title: "Referenz löschen?", description: "Das lässt sich nicht rückgängig machen und geht nur, wenn die Referenz nirgends verwendet wird - keine Saison, keine Vitrine, keine Mitglieder eingetragen. Sonst archivieren.", confirmLabel: "Löschen" })) return;
+    try {
+      await api.delete(`/references/${id}`);
+      toast.success("Referenz gelöscht.");
+      load();
+    } catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
+  };
+
+  const setArchived = async (item, archived) => {
+    if (archived && !await confirm({ title: "Referenz archivieren?", description: "Sie verschwindet von der Website, aus den Profilen und aus den Erfolgen. Hier bleibt sie zum Zurückholen stehen.", confirmLabel: "Archivieren", tone: "info" })) return;
+    try {
+      await api.patch(`/references/${item.id}`, { is_active: !archived });
+      toast.success(archived ? "Referenz archiviert." : "Referenz zurückgeholt.");
+      load();
+    } catch (err) { toast.error(formatApiError(err.response?.data?.detail)); }
   };
 
   return (
@@ -288,9 +310,33 @@ export default function AdminReferencesPage() {
       <ReferenceHelperAdmin helpers={helperSettings} onSaved={(helpers) => { setHelperSettings(helpers); load(); }} />
       <ReferenceCheckAdmin items={items} onEdit={(id) => setEditing(items.find((item) => item.id === id) || null)} />
 
+      {items.length > 0 && (
+        <div className="mb-4 rounded-sm border border-white/10 bg-[#121212] p-3" data-testid="reference-filters">
+          <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-[minmax(16rem,1fr)_14rem_8rem_11rem] gap-2">
+            <label className="relative block sm:col-span-3 lg:col-span-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" aria-hidden="true" />
+              <input value={filters.query} onChange={(e) => setFilter("query", e.target.value)} placeholder="Turnier, Veranstalter, Team oder Name suchen" aria-label="Referenzen suchen" data-testid="reference-search" className="w-full rounded-sm border border-white/10 bg-[#0A0A0A] py-2 pl-9 pr-3 text-sm focus:border-[#29B6E8] focus:outline-none" />
+            </label>
+            <select value={filters.game} onChange={(e) => setFilter("game", e.target.value)} aria-label="Nach Spiel filtern" data-testid="reference-filter-game" className="min-w-0 rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2 text-sm">
+              <option value="">Alle Spiele</option>
+              {filterOptions.games.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+            <select value={filters.year} onChange={(e) => setFilter("year", e.target.value)} aria-label="Nach Jahr filtern" data-testid="reference-filter-year" className="min-w-0 rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2 text-sm">
+              <option value="">Alle Jahre</option>
+              {filterOptions.years.map((value) => <option key={value} value={value}>{value}</option>)}
+            </select>
+            <select value={filters.status} onChange={(e) => setFilter("status", e.target.value)} aria-label="Nach Status filtern" data-testid="reference-filter-status" className="min-w-0 rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2 text-sm">
+              <option value="">Alle Status</option>
+              {REFERENCE_STATUS_FILTERS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          </div>
+          <div className="mt-2 text-xs text-white/45" data-testid="reference-filter-count">{filtered.length} von {items.length} Referenzen</div>
+        </div>
+      )}
+
       <div className="space-y-3">
-        {items.map((item) => (
-          <div key={item.id} className="border border-white/10 rounded-sm bg-[#121212] p-4" data-testid={`reference-row-${item.id}`}>
+        {visible.rows.map((item) => (
+          <div key={item.id} className={`border border-white/10 rounded-sm bg-[#121212] p-4 ${item.is_active === false ? "opacity-70" : ""}`} data-testid={`reference-row-${item.id}`}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/45 font-bold flex-wrap">
@@ -299,7 +345,7 @@ export default function AdminReferencesPage() {
                   {item.medal && <span className="text-[#FFD700]">{medalLabel[item.medal]}</span>}
                   <span>{formatDate(item.start_date)}</span>
                   {item.visibility !== "public" && <span className="text-[#29B6E8]">{visibilityLabel[item.visibility] || item.visibility}</span>}
-                  {item.is_active === false && <span className="text-[#FF3B30]">Inaktiv</span>}
+                  {item.is_active === false && <span className="text-[#FF3B30]">Archiviert</span>}
                 </div>
                 <h2 className="mt-1 font-heading text-xl font-black uppercase leading-tight">{item.display_title || item.title}</h2>
                 <div className="mt-1 flex flex-wrap gap-1.5">
@@ -322,7 +368,7 @@ export default function AdminReferencesPage() {
                 {(item.external_url || item.bracket_url || item.match_url || item.result_url) && (
                   <div className="mt-2 flex flex-wrap gap-2">
                     <RefLink href={item.external_url} label="Turnier" />
-                    <RefLink href={item.bracket_url} label="Bracket" />
+                    <RefLink href={item.bracket_url} label="Turnierbaum" />
                     <RefLink href={item.match_url} label="Match" />
                     <RefLink href={item.result_url} label="Ergebnis" />
                   </div>
@@ -330,13 +376,27 @@ export default function AdminReferencesPage() {
               </div>
               <div className="flex gap-1 shrink-0">
                 <button onClick={() => setEditing(item)} data-testid={`reference-edit-${item.id}`} className="p-1.5 text-white/40 hover:text-[#29B6E8]"><Pencil className="w-4 h-4" /></button>
-                <button onClick={() => remove(item.id)} className="p-1.5 text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-4 h-4" /></button>
+                {item.is_active === false ? (
+                  <button onClick={() => setArchived(item, false)} title="Zurückholen" aria-label="Referenz zurückholen" data-testid={`reference-restore-${item.id}`} className="p-1.5 text-white/40 hover:text-[#29B6E8]"><ArchiveRestore className="w-4 h-4" /></button>
+                ) : (
+                  <button onClick={() => setArchived(item, true)} title="Archivieren" aria-label="Referenz archivieren" data-testid={`reference-archive-${item.id}`} className="p-1.5 text-white/40 hover:text-brand"><Archive className="w-4 h-4" /></button>
+                )}
+                <button onClick={() => remove(item.id)} title="Löschen" aria-label="Referenz löschen" data-testid={`reference-delete-${item.id}`} className="p-1.5 text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-4 h-4" /></button>
               </div>
             </div>
           </div>
         ))}
         {items.length === 0 && <div className="text-center py-16 border border-dashed border-white/15 rounded-sm text-white/40 font-display tracking-widest">NOCH KEINE REFERENZEN</div>}
+        {items.length > 0 && filtered.length === 0 && <div className="text-center py-12 border border-dashed border-white/15 rounded-sm text-white/45" data-testid="reference-filter-empty">Keine Referenz passt zu dieser Suche.</div>}
       </div>
+
+      {visible.pages > 1 && (
+        <nav className="mt-4 flex items-center justify-between gap-3" aria-label="Seiten der Referenzliste" data-testid="reference-pages">
+          <button type="button" onClick={() => setPage(visible.page - 1)} disabled={visible.page <= 1} data-testid="reference-page-back" className="px-3 py-2 border border-white/15 rounded-sm text-xs font-bold uppercase tracking-wider text-white/70 hover:text-white disabled:opacity-40">Zurück</button>
+          <span className="text-xs text-white/55 tabular-nums" data-testid="reference-page-info">Seite {visible.page} von {visible.pages}</span>
+          <button type="button" onClick={() => setPage(visible.page + 1)} disabled={visible.page >= visible.pages} data-testid="reference-page-next" className="px-3 py-2 border border-white/15 rounded-sm text-xs font-bold uppercase tracking-wider text-white/70 hover:text-white disabled:opacity-40">Weiter</button>
+        </nav>
+      )}
 
       {editing && <ReferenceForm reference={editing} games={games} memberProfiles={memberProfiles} partners={partners} lineages={lineages} suggestions={suggestions} items={items} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
     </AdminLayout>
@@ -449,7 +509,7 @@ function ReferenceHelperAdmin({ helpers, onSaved }) {
           <HelperTextArea label="Veranstalter" value={form.organizers} onChange={(v) => set("organizers", v)} rows={7} />
           <HelperTextArea label="Freie Spielnamen" value={form.game_names} onChange={(v) => set("game_names", v)} />
           <HelperTextArea label="Team-Namen" value={form.team_names} onChange={(v) => set("team_names", v)} />
-          <HelperTextArea label="Platzierungslabels" value={form.placement_labels} onChange={(v) => set("placement_labels", v)} />
+          <HelperTextArea label="Bezeichnungen der Platzierung" value={form.placement_labels} onChange={(v) => set("placement_labels", v)} />
           <HelperTextArea label="Orte" value={form.locations} onChange={(v) => set("locations", v)} />
         </div>
         <button type="button" onClick={save} disabled={saving} className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">
@@ -612,6 +672,7 @@ function formToPayload(form) {
     result_url: form.result_url.trim() || null,
     description: form.description.trim() || null,
     highlights: form.highlights.trim() || null,
+    internal_notes: form.internal_notes.trim() || null,
     visibility: form.visibility,
     status: form.status,
     is_active: form.is_active !== false,
@@ -833,14 +894,14 @@ function ReferenceForm({ reference, games, memberProfiles, partners = [], lineag
           </FormGrid>
           <FieldWarnings messages={warningsAt("end_date")} testId="reference-end-date-warnings" />
           <FormGrid cols={3}>
-            <TextField label="Bracket / Tabelle" value={form.bracket_url} onChange={(v) => set("bracket_url", v)} placeholder="https://..." testId="reference-bracket-url" />
+            <TextField label="Turnierbaum / Tabelle" value={form.bracket_url} onChange={(v) => set("bracket_url", v)} placeholder="https://..." testId="reference-bracket-url" />
             <TextField label="Match-Webseite" value={form.match_url} onChange={(v) => set("match_url", v)} placeholder="https://..." testId="reference-match-url" />
             <TextField label="Ergebnis-Link" value={form.result_url} onChange={(v) => set("result_url", v)} placeholder="https://..." testId="reference-result-url" />
           </FormGrid>
         </FormSection>
 
         {form.entries.length > 0 && (
-          <FormSection plain title="Zu den Einträgen" hint="Label der Platzierung, externe Spieler ohne Vereinsprofil und die zweite Feldgröße.">
+          <FormSection plain title="Zu den Einträgen" hint="Bezeichnung der Platzierung, externe Spieler ohne Vereinsprofil und die zweite Feldgröße.">
             {form.entries.map((entry, index) => (
               <EntryDetails key={entry.key} entry={entry} index={index} suggestions={suggestions} onChange={(patch) => setEntry(entry.key, patch)} />
             ))}
@@ -852,13 +913,14 @@ function ReferenceForm({ reference, games, memberProfiles, partners = [], lineag
             <SelectField label="Status" value={status} onChange={(v) => { setStatusTouched(true); set("status", v); }} options={STATUS_OPTIONS} testId="reference-status" hint={statusTouched ? undefined : "Automatisch nach dem Datum."} />
             <SelectField label="Sichtbarkeit" value={form.visibility} onChange={(v) => set("visibility", v)} options={VISIBILITY_OPTIONS} testId="reference-visibility" />
             <TextField label="Reihenfolge" type="number" value={form.order_index} onChange={(v) => set("order_index", v)} testId="reference-order" hint="0 = automatisch nach Datum." />
-            <CheckField label="Aktiv" checked={form.is_active !== false} onChange={(v) => set("is_active", v)} testId="reference-active" className="self-end pb-2" />
+            <CheckField label="Öffentlich zeigen" hint="Aus = archiviert." checked={form.is_active !== false} onChange={(v) => set("is_active", v)} testId="reference-active" className="self-end pb-2" />
           </FormGrid>
         </FormSection>
 
         <FormSection plain title="Texte">
-          <TextAreaField label="Beschreibung" value={form.description} onChange={(v) => set("description", v)} testId="reference-description" />
-          <TextAreaField label="Highlights / Notizen" value={form.highlights} onChange={(v) => set("highlights", v)} testId="reference-highlights" />
+          <TextAreaField label="Beschreibung (öffentlich)" value={form.description} onChange={(v) => set("description", v)} testId="reference-description" hint="Steht als „Bericht“ auf der Seite der Referenz." />
+          <TextAreaField label="Highlights (öffentlich)" value={form.highlights} onChange={(v) => set("highlights", v)} testId="reference-highlights" hint="Steht auf der Seite der Referenz und in der Vorschau bei Suchmaschinen, wenn keine Beschreibung da ist." />
+          <TextAreaField label="Interne Notizen" value={form.internal_notes} onChange={(v) => set("internal_notes", v)} testId="reference-internal-notes" hint="Sieht nur die Verwaltung, erscheint nirgends öffentlich." />
         </FormSection>
       </FormSection>
     </AdminSheet>
@@ -920,7 +982,7 @@ function EntryDetails({ entry, index, suggestions, onChange }) {
       <div className="text-[11px] font-bold uppercase tracking-widest text-white/55">Eintrag {index + 1} · {who}</div>
       <TextField label={isSolo ? "Externer Spieler (falls kein Vereinsprofil)" : "Weitere externe Spieler"} value={entry.lineup_text} onChange={(v) => onChange({ lineup_text: v })} placeholder={isSolo ? "Name" : "Name 1, Name 2, Name 3"} testId={`reference-entry-${index}-lineup`} />
       <FormGrid>
-        <TextField label="Label" value={entry.placement_label} onChange={(v) => onChange({ placement_label: v })} placeholder="z.B. Podium" suggestions={suggestions.placementLabels} testId={`reference-entry-${index}-label`} />
+        <TextField label="Bezeichnung der Platzierung" value={entry.placement_label} onChange={(v) => onChange({ placement_label: v })} placeholder="z.B. Podium" suggestions={suggestions.placementLabels} testId={`reference-entry-${index}-label`} />
         {other === "participant_count"
           ? <TextField label="Teilnehmer" type="number" min="1" value={entry.participant_count} onChange={(v) => onChange({ participant_count: v })} testId={`reference-entry-${index}-participants`} />
           : <TextField label="Teams" type="number" min="1" value={entry.team_count} onChange={(v) => onChange({ team_count: v })} testId={`reference-entry-${index}-teams`} />}

@@ -1104,7 +1104,7 @@ async def update_event(event_id: str, body: EventUpdate, me: dict = Depends(requ
     _refuse_event_sponsor_choice(raw)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     if "partner_ids" in updates:
-        updates["partner_ids"] = await partner_pages.clean_partner_ids(db, updates["partner_ids"])
+        updates["partner_ids"] = await partner_pages.clean_partner_ids(db, updates["partner_ids"], keep=existing.get("partner_ids"))
     billing = await _billing_updates(raw, existing, me)
     if billing is not None:
         updates["billing"] = billing

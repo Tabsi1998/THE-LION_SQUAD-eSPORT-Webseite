@@ -40,6 +40,60 @@ test("Neuer Partner öffnet das Seitenblatt, Speichern legt an und schließt es"
   expect(apiMock.get.mock.calls.filter(([url]) => url === "/partners/admin")).toHaveLength(2);
 });
 
+test("Partner aus Dolibarr: „Aktiv“ gesperrt mit Hinweis, Löschen gesperrt; von Hand bleibt alles frei (#2130)", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/admin/dolibarr/sponsors") return { data: { from_dolibarr: true, connected: true, fetched_at: "2026-10-01T10:00:00Z", locked: { partners: ["name", "kind", "is_active"] } } };
+    return { data: [{ id: "p1", slug: "aus-dolibarr", name: "Aus Dolibarr", source: "dolibarr", is_active: true }, { id: "p2", slug: "von-hand", name: "Von Hand", is_active: true }] };
+  });
+  render(<MemoryRouter><AdminPartnersPage /></MemoryRouter>);
+  expect(await screen.findByTestId("partner-delete-p1")).toBeDisabled();
+  expect(screen.getByTestId("partner-delete-p2")).not.toBeDisabled();
+  expect(screen.queryByTestId("partner-archive-p1")).toBeNull();
+  expect(screen.getByTestId("partner-archive-p2")).toBeInTheDocument();
+  fireEvent.click(screen.getAllByRole("button").find((button) => button.querySelector("svg.lucide-pencil")));
+  expect(screen.getByTestId("partner-locked-hint")).toHaveTextContent("Name, Art und „Öffentlich zeigen“");
+  expect(screen.getByTestId("partner-active")).toBeDisabled();
+  expect(screen.getByTestId("partner-description")).not.toBeDisabled();
+});
+
+test("ein Satz sagt den Unterschied zu den Sponsoren und führt hin (#2130)", async () => {
+  render(<MemoryRouter><AdminPartnersPage /></MemoryRouter>);
+  await screen.findByText("Gamers Heaven");
+  expect(screen.getByRole("link", { name: "Sponsoren" })).toHaveAttribute("href", "/admin/sponsors");
+});
+
+test("Archivieren schaltet „Aktiv“ aus, bei Partnern aus Dolibarr gibt es den Knopf nicht (#2130)", async () => {
+  apiMock.patch.mockResolvedValue({ data: {} });
+  render(<MemoryRouter><AdminPartnersPage /></MemoryRouter>);
+  fireEvent.click(await screen.findByTestId("partner-archive-p1"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/partners/p1", { is_active: false }));
+});
+
+test("nicht mehr in der Kategorie: zurückholen geht, „Öffentlich zeigen“ ist frei; verwirft der Server den Wert, sagt die Seite es (#2130)", async () => {
+  const { toast } = await import("sonner");
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/admin/dolibarr/sponsors") return { data: { from_dolibarr: true, connected: true, fetched_at: "2026-10-01T10:00:00Z", locked: { partners: ["name", "kind", "is_active"] } } };
+    return { data: [{ id: "p1", slug: "weg", name: "Weg Verein", source: "dolibarr", dolibarr_gone_at: "2026-10-01", is_active: false }] };
+  });
+  apiMock.patch.mockReset();
+  apiMock.patch.mockResolvedValueOnce({ data: { id: "p1", is_active: true } });
+  render(<MemoryRouter><AdminPartnersPage /></MemoryRouter>);
+  fireEvent.click(await screen.findByTestId("partner-restore-p1"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/partners/p1", { is_active: true }));
+  await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Partner zurückgeholt."));
+
+  toast.success.mockClear();
+  apiMock.patch.mockResolvedValueOnce({ data: { id: "p1", is_active: false } });
+  fireEvent.click(screen.getByTestId("partner-restore-p1"));
+  await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Der Partner bleibt archiviert: Das entscheidet Dolibarr."));
+  expect(toast.success).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getAllByRole("button").find((button) => button.querySelector("svg.lucide-pencil")));
+  expect(screen.getByTestId("partner-locked-hint")).toHaveTextContent("nicht mehr in der Kategorie");
+  expect(screen.getByTestId("partner-active")).not.toBeDisabled();
+  expect(screen.getByTestId("partner-name")).toBeDisabled();
+});
+
 test("Bearbeiten öffnet das Blatt mit den Werten des Partners, Tools inklusive", async () => {
   render(<MemoryRouter><AdminPartnersPage /></MemoryRouter>);
   await screen.findByText("Gamers Heaven");

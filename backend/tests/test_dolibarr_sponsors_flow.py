@@ -171,14 +171,100 @@ async def test_switch_reads_dolibarr_into_the_lists_locks_its_fields_and_keeps_w
 
 
 @pytest.mark.asyncio
+async def test_what_dolibarr_keeps_is_locked_and_the_sync_runs_as_before(flow, fake):
+    """#2130: „Aktiv“ eines Partners führt Dolibarr; Löschen ist gesperrt, solange die Firma in der Kategorie steht."""
+    await connect(flow)
+    ids = seed_categories(fake)
+    company = fake.add_thirdparty("Gamma Verein", url="https://gamma.test")
+    sponsor = fake.add_thirdparty("Alpha Energy", "office@alpha.test", array_options={"options_sponsor_end": RUNNING_UNTIL})
+    fake.categorize(company["id"], ids["partner"], ids["verein"])
+    fake.categorize(sponsor["id"], ids["sponsor"], ids["gold"])
+    flow.act_as(await flow.add_user(role="club_admin"))
+    switched = await flow.patch("/api/admin/dolibarr/sponsors", json={"from_dolibarr": True})
+    assert switched.json()["result"]["partners"]["created"] == 1 and switched.json()["result"]["sponsors"]["created"] == 1
+    assert "is_active" in switched.json()["view"]["locked"]["partners"]
+    partner = (await flow.get("/api/partners/admin")).json()[0]
+    alpha = (await flow.get("/api/sponsors/admin")).json()[0]
+
+    # Der Haken von Hand greift nicht - er hielte nur bis zum nächsten Abgleich. Andere Felder bleiben frei.
+    saved = await flow.patch(f"/api/partners/{partner['id']}", json={"is_active": False, "description": "Freunde"})
+    assert saved.json()["is_active"] is True and saved.json()["description"] == "Freunde"
+
+    # Löschen: gesperrt mit Hinweis, der Eintrag bleibt samt Texten.
+    for path, what in ((f"/api/partners/{partner['id']}", "Dieser Partner"), (f"/api/sponsors/{alpha['id']}", "Dieser Sponsor")):
+        refused = await flow.delete(path)
+        assert refused.status_code == 409 and refused.json()["detail"].startswith(f"{what} kommt aus Dolibarr")
+    assert await flow.db.partners.count_documents({"id": partner["id"], "description": "Freunde"}) == 1
+
+    # Der Abgleich läuft unverändert: Felder aus Dolibarr nach, geschlossene Firma wird inaktiv.
+    fake.thirdparties[company["id"]]["status"] = "0"
+    again = await flow.post("/api/admin/dolibarr/sponsors/refresh")
+    assert again.status_code == 200, again.text
+    assert again.json()["partners"] == {"created": 0, "updated": 1, "gone": 0, "total": 1}
+    assert again.json()["sponsors"] == {"created": 0, "updated": 1, "gone": 0, "total": 1}
+    stored = await flow.db.partners.find_one({"id": partner["id"]}, {"_id": 0})
+    assert stored["is_active"] is False and stored["description"] == "Freunde"
+
+    # Aus der Kategorie genommen: Der Abgleich fasst den Eintrag nicht mehr an, Löschen geht.
+    fake.thirdparty_categories[sponsor["id"]] = set()
+    assert (await flow.post("/api/admin/dolibarr/sponsors/refresh")).json()["sponsors"]["gone"] == 1
+    removed = await flow.delete(f"/api/sponsors/{alpha['id']}")
+    assert removed.status_code == 200, removed.text
+
+    # Schalter aus: alles ist wieder von Hand pflegbar - auch „Aktiv“ und Löschen.
+    assert (await flow.patch("/api/admin/dolibarr/sponsors", json={"from_dolibarr": False})).status_code == 200
+    assert (await flow.patch(f"/api/partners/{partner['id']}", json={"is_active": True})).json()["is_active"] is True
+    removed = await flow.delete(f"/api/partners/{partner['id']}")
+    assert removed.status_code == 200, removed.text
+
+
+@pytest.mark.asyncio
+async def test_with_the_connection_off_nothing_comes_back_and_deleting_is_free(flow, fake):
+    """#2130: Ist die Anbindung aus, läuft kein Abgleich - das Löschen ist dann nicht gesperrt, auch mit Schalter an."""
+    await connect(flow)
+    ids = seed_categories(fake)
+    company = fake.add_thirdparty("Gamma Verein")
+    fake.categorize(company["id"], ids["partner"], ids["verein"])
+    flow.act_as(await flow.add_user(role="club_admin"))
+    assert (await flow.patch("/api/admin/dolibarr/sponsors", json={"from_dolibarr": True})).status_code == 200
+    partner = (await flow.get("/api/partners/admin")).json()[0]
+    refused = await flow.delete(f"/api/partners/{partner['id']}")
+    assert refused.status_code == 409
+    await connect(flow, mode="off")
+    assert (await dolibarr_sponsors.refresh_due())["kind"] == "not_configured"
+    removed = await flow.delete(f"/api/partners/{partner['id']}")
+    assert removed.status_code == 200, removed.text
+
+
+@pytest.mark.asyncio
+async def test_a_partner_out_of_the_category_can_be_brought_back_and_it_sticks(flow, fake):
+    """#2130: Der Abgleich setzt ihn beim Weggang inaktiv und fasst ihn danach nicht mehr an - das Zurückholen hier gilt."""
+    await connect(flow)
+    ids = seed_categories(fake)
+    company = fake.add_thirdparty("Gamma Verein")
+    fake.categorize(company["id"], ids["partner"], ids["verein"])
+    flow.act_as(await flow.add_user(role="club_admin"))
+    assert (await flow.patch("/api/admin/dolibarr/sponsors", json={"from_dolibarr": True})).status_code == 200
+    partner = (await flow.get("/api/partners/admin")).json()[0]
+    fake.thirdparty_categories[company["id"]] = set()
+    assert (await flow.post("/api/admin/dolibarr/sponsors/refresh")).json()["partners"]["gone"] == 1
+    assert (await flow.db.partners.find_one({"id": partner["id"]}))["is_active"] is False
+
+    back = await flow.patch(f"/api/partners/{partner['id']}", json={"is_active": True, "name": "Anders"})
+    assert back.status_code == 200
+    assert back.json()["is_active"] is True and back.json()["name"] == "Gamma Verein", "Name führt weiter Dolibarr"
+    assert (await flow.post("/api/admin/dolibarr/sponsors/refresh")).status_code == 200
+    assert (await flow.db.partners.find_one({"id": partner["id"]}))["is_active"] is True
+
+
+@pytest.mark.asyncio
 async def test_daily_center_counts_sponsorships_ending_within_thirty_days(flow):
     now = datetime.now(timezone.utc)
     soon = (now + timedelta(days=10)).date().isoformat()
     later = (now + timedelta(days=40)).date().isoformat()
     await flow.db.sponsors.insert_many([
-        {"id": "a", "name": "A", "contract_end": soon, "is_active": True, "contract_status": "active"},
-        {"id": "b", "name": "B", "contract_end": later, "is_active": True, "contract_status": "active"},
-        {"id": "c", "name": "C", "contract_end": soon, "is_active": True, "contract_status": "paused"},
+        {"id": "a", "name": "A", "contract_end": soon, "is_active": True},
+        {"id": "b", "name": "B", "contract_end": later, "is_active": True},
         {"id": "d", "name": "D", "contract_end": soon, "is_active": False},
         {"id": "e", "name": "E", "contract_end": (now - timedelta(days=1)).date().isoformat(), "is_active": True},
     ])

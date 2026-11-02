@@ -11,7 +11,7 @@ ein Eintrag mit ``source: "dolibarr"`` und ``dolibarr_id``. Ein von Hand angeleg
 demselben Namen wird übernommen statt verdoppelt und behält sein Logo.
 
 Was von Dolibarr kommt (und im Admin gesperrt ist, solange der Schalter an ist): Name, Stufe bzw.
-Art, Laufzeit, E-Mail und Telefon der Firma. Was auf der Website bleibt: Logo, Link (Dolibarr füllt
+Art, Laufzeit, E-Mail und Telefon der Firma, bei Partnern auch „Aktiv“. Was auf der Website bleibt: Logo, Link (Dolibarr füllt
 ihn nur, wenn er leer ist), Platzierungen, Reihenfolge, Beschreibung, Ansprechpartner, Notizen.
 
 Ab Vereine 1.9.0 kommen auch Logo und Banner je für hellen und dunklen Hintergrund aus dem Vereinsmodul
@@ -46,7 +46,11 @@ START_FIELDS = ("options_sponsor_start", "options_sponsoring_start")
 END_FIELDS = ("options_sponsor_end", "options_sponsoring_end")
 # Diese Felder kommen aus Dolibarr - der Admin kann sie nicht überschreiben, solange der Schalter an ist.
 SPONSOR_LOCKED_FIELDS = ("name", "tier", "contract_start", "contract_end", "contact_email", "contact_phone")
-PARTNER_LOCKED_FIELDS = ("name", "kind")
+# „Aktiv“ schreibt der Abgleich bei Partnern jede Stunde neu (#2130) - ein Haken von Hand hielte nicht.
+PARTNER_LOCKED_FIELDS = ("name", "kind", "is_active")
+# Löschen hilft nicht, solange die Firma in Dolibarr steht: der Abgleich legt sie neu an, ohne Logo und Texte (#2130).
+DELETE_BLOCKED = ("{what} kommt aus Dolibarr: Beim nächsten Abgleich wäre der Eintrag wieder da, nur ohne Logo und Texte. Nimm "
+                  "die Firma in Dolibarr aus der Kategorie, dann bleibt er hier als ehemalig stehen und lässt sich löschen.")
 
 
 def _as_int(value) -> int | None:
@@ -211,7 +215,7 @@ async def apply_sponsors(db, companies: dict[int, dict], *, today: str | None = 
             updated += 1
         else:
             doc = {"id": new_id(), "created_at": stamp, "updated_at": stamp, "tier": company.get("tier") or "bronze", "is_active": True,
-                   "contract_status": "active", "order_index": 0, "event_ids": [], "logo_url": None, "description": None, **values}
+                   "order_index": 0, "event_ids": [], "logo_url": None, "description": None, **values}
             await db.sponsors.insert_one(doc)
             created += 1
     # Nicht mehr in der Kategorie: Sponsoring endet heute - der Eintrag bleibt (ehemalige Unterstützer).
@@ -326,7 +330,22 @@ async def locked_fields(db, doc: dict | None, fields: tuple[str, ...]) -> tuple[
     if not doc or doc.get("source") != SOURCE:
         return ()
     source = await load_source_settings(db)
-    return fields if source["from_dolibarr"] else ()
+    if not source["from_dolibarr"]:
+        return ()
+    # Aus der Kategorie genommen: Der Abgleich fasst „Aktiv“ nicht mehr an, hier lässt sich der Eintrag zurückholen (#2130).
+    return tuple(field for field in fields if field != "is_active") if doc.get("dolibarr_gone_at") else fields
+
+
+async def comes_back_on_sync(db, doc: dict | None) -> bool:
+    """Legt der nächste Abgleich den Eintrag neu an, wenn er hier gelöscht wird? Nur solange der Schalter an ist, die
+    Anbindung läuft und die Firma noch in der Kategorie steht. Ist die Anbindung aus, läuft kein Abgleich (``refresh_due``)."""
+    from services.dolibarr_client import load_settings
+
+    if not doc or doc.get("source") != SOURCE or doc.get("dolibarr_gone_at"):
+        return False
+    if not (await load_source_settings(db))["from_dolibarr"]:
+        return False
+    return (await load_settings(db)).get("mode") != "off"
 
 
 async def admin_view(db) -> dict:
