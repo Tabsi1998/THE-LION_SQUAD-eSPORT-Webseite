@@ -1,7 +1,7 @@
 """Match/Score/Dispute routes."""
 import logging
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from pymongo import ReturnDocument
 from fastapi import APIRouter, HTTPException, Depends, Request
@@ -443,10 +443,20 @@ async def _rewrite_matchday_schedule(db, tournament_id: str | None) -> None:
         await persist_matchday_schedule(db, tournament)
 
 
+def _is_future(value) -> bool:
+    try:
+        moment = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return (moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)) > now_utc()
+
+
 def _schedule_deadline(match: dict, tournament: dict | None = None) -> str:
-    value = match.get("schedule_deadline_at") or (match.get("settings") or {}).get("schedule_deadline_at")
-    if value:
-        return value
+    """Die Antwortfrist eines neuen Vorschlags oder Gegenvorschlags. Die am Spiel gespeicherte gehört zum vorigen
+    Vorschlag (#2201) - nur eine fest eingestellte Frist in ``settings`` gilt weiter, solange sie nicht abgelaufen ist."""
+    fixed = (match.get("settings") or {}).get("schedule_deadline_at")
+    if fixed and _is_future(fixed):
+        return fixed
     hours = int((tournament or {}).get("match_schedule_response_hours") or (match.get("settings") or {}).get("schedule_response_hours") or 72)
     # Liga (P2, docs/LIGA.md): Zeit in einer Sperrzeit zählt nicht mit - ohne Sperrzeiten genau „jetzt + Stunden“.
     from services.matchday_schedule import response_deadline
@@ -793,7 +803,7 @@ async def create_schedule_proposal(match_id: str, body: MatchScheduleProposalCre
         "schedule_status": "proposed",
         "schedule_deadline_at": _schedule_deadline(match, tournament),
         "updated_at": now_iso,
-    }})
+    }, "$unset": {"schedule_escalated_at": ""}})
     doc.pop("_id", None)
     doc.pop("match_collection", None)
     doc["idempotent_replay"] = False
@@ -837,9 +847,10 @@ async def _withdraw_proposal(db, match: dict, collection: str, proposal: dict, m
         # oder Standardtermin (der Planer schreibt ihn gleich nach).
         if await db.match_schedule_proposals.count_documents({"match_id": match["id"], "status": "accepted"}):
             change = {"$set": {"schedule_status": "accepted", "updated_at": now_iso},
-                      "$unset": {"schedule_deadline_at": ""}}
+                      "$unset": {"schedule_deadline_at": "", "schedule_escalated_at": ""}}
         else:
-            change = {"$set": {"updated_at": now_iso}, "$unset": {"schedule_status": "", "schedule_deadline_at": ""}}
+            change = {"$set": {"updated_at": now_iso},
+                      "$unset": {"schedule_status": "", "schedule_deadline_at": "", "schedule_escalated_at": ""}}
         await getattr(db, collection).update_one({"id": match["id"]}, change)
         await _rewrite_matchday_schedule(db, match.get("tournament_id"))
     # Wer handelt, ist die eigene Seite - oder die Turnierleitung ohne Seite: dann erfahren es beide Seiten.
@@ -915,7 +926,7 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
             "schedule_written_at": now_iso,
             "status": "scheduled" if match.get("status") in {"pending", "ready", "preview"} else match.get("status"),
             "updated_at": now_iso,
-        }})
+        }, "$unset": {"schedule_deadline_at": "", "schedule_escalated_at": ""}})  # Der Termin steht: keine Frist mehr.
         await _tell_schedule(db, match, "accepted", proposal, me, (acting_reg or {}).get("id"), normalized_note)
         return {"ok": True, "status": "accepted", "scheduled_at": scheduled_at, "idempotent_replay": False}
     if body.action == "decline":
@@ -960,7 +971,7 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
         "schedule_status": "proposed",
         "schedule_deadline_at": _schedule_deadline(match, tournament),
         "updated_at": now_iso,
-    }})
+    }, "$unset": {"schedule_escalated_at": ""}})
     counter.pop("_id", None)
     counter.pop("match_collection", None)
     counter["idempotent_replay"] = False
