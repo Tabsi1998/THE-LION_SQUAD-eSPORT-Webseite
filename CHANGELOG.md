@@ -1,20 +1,19 @@
 # Changelog
 
-## [1.59.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.58.0...v1.59.0) (2026-11-02)
-
+## 1.59.0 (02.11.2026)
 
 ### Neu
 
-* Auskunft: Spiele auf einer Teilnehmerliste oder Aufstellung, nur mit der eigenen Seite ([#2204](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2204)) ([2d48564](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/2d48564b3038df1eae89d742d20e84f8fad98850))
-* Liga: Fehlende Teilnehmerliste innerhalb von 48 Stunden im Web nachtragen, danach Fall bei der Leitung, das Ergebnis bleibt gültig ([#2204](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2204)) ([2d48564](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/2d48564b3038df1eae89d742d20e84f8fad98850))
-* Liga: Mail bei fehlender Teilnehmerliste, Griff von außen, Transfer und Wartezeit ([#2204](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2204)) ([2d48564](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/2d48564b3038df1eae89d742d20e84f8fad98850))
-* Liga: Regeln zur Spielberechtigung je Season: Mindest- und Höchstkader, ein Team, Wartezeit, Mindestalter, Transferfenster, eindeutige Spiel-ID ([#2204](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2204)) ([2d48564](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/2d48564b3038df1eae89d742d20e84f8fad98850))
-* Liga: Spielberechtigung je Spieler auf der Team-Seite und in der Kaderübersicht, eigener Stand im Profil ([#2204](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2204)) ([2d48564](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/2d48564b3038df1eae89d742d20e84f8fad98850))
-* Liga: Teamleitung erfährt Änderungen der Liga-Leitung am Kader, Kaderänderungen stehen im Protokoll ([#2204](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2204)) ([2d48564](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/2d48564b3038df1eae89d742d20e84f8fad98850))
-* Liga: Teilnehmerliste einmal je Spiel statt Aufstellung je Map, mindestens drei, nach oben offen ([#2204](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2204)) ([2d48564](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/2d48564b3038df1eae89d742d20e84f8fad98850))
-* Liga: Transfers im Fenster beantragen und von der Leitung entscheiden lassen, die Nachricht nennt den Tag, ab dem die Person spielen darf ([#2204](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2204)) ([2d48564](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/2d48564b3038df1eae89d742d20e84f8fad98850))
-* Liga: Wartezeit neuer Spieler nach Spieltag 1 und nach jedem Transfer, Aufhebung durch die Leitung mit Pflichtgrund ([#2204](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2204)) ([2d48564](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/2d48564b3038df1eae89d742d20e84f8fad98850))
-* Spiele: Format, Beispiel und Auswahl je Spieler-ID-Feld, auch für die Plattform ([#2204](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2204)) ([2d48564](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/2d48564b3038df1eae89d742d20e84f8fad98850))
+* Auskunft: Spiele auf einer Teilnehmerliste oder Aufstellung, nur mit der eigenen Seite (#2204)
+* Liga: Fehlende Teilnehmerliste innerhalb von 48 Stunden im Web nachtragen, danach Fall bei der Leitung, das Ergebnis bleibt gültig (#2204)
+* Liga: Mail bei fehlender Teilnehmerliste, Griff von außen, Transfer und Wartezeit (#2204)
+* Liga: Regeln zur Spielberechtigung je Season: Mindest- und Höchstkader, ein Team, Wartezeit, Mindestalter, Transferfenster, eindeutige Spiel-ID (#2204)
+* Liga: Spielberechtigung je Spieler auf der Team-Seite und in der Kaderübersicht, eigener Stand im Profil (#2204)
+* Liga: Teamleitung erfährt Änderungen der Liga-Leitung am Kader, Kaderänderungen stehen im Protokoll (#2204)
+* Liga: Teilnehmerliste einmal je Spiel statt Aufstellung je Map, mindestens drei, nach oben offen (#2204)
+* Liga: Transfers im Fenster beantragen und von der Leitung entscheiden lassen, die Nachricht nennt den Tag, ab dem die Person spielen darf (#2204)
+* Liga: Wartezeit neuer Spieler nach Spieltag 1 und nach jedem Transfer, Aufhebung durch die Leitung mit Pflichtgrund (#2204)
+* Spiele: Format, Beispiel und Auswahl je Spieler-ID-Feld, auch für die Plattform (#2204)
 
 ## 1.58.0 (02.11.2026)
 
