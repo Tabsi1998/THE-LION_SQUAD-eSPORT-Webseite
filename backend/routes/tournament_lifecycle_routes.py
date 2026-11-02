@@ -3,6 +3,8 @@
 Dazu, was im Turnierablauf am Bildschirm gebraucht wird (Meilenstein 60): „Pause bis“ beim Status „Pausiert“ (#1123)
 und der Sponsor je Runde für „Runde 2 präsentiert von“ (#1125) - beides nur durch die Turnierleitung.
 """
+import logging
+
 from fastapi import HTTPException, Depends
 from pydantic import BaseModel, ConfigDict, Field
 from database import get_db
@@ -22,6 +24,7 @@ from services.tv_display import ROUND_SPONSOR_MAX, pause_until_value, round_spon
 from models import now_utc
 from services.log_safe import log_safe
 from services.league_scope import is_league_staffel
+from services.league_service import season_follows_first_staffel
 from services.staffel_guard import staffel_status_problem
 from services.change_events import reset_scope_cache
 from services.public_phase import parse_dt
@@ -40,6 +43,8 @@ from routes.tournament_common import (
 )
 from routes.tournament_router import router
 
+
+logger = logging.getLogger("tls.tournament")
 
 LOCKABLE_TOURNAMENT_STATUSES = {"completed", "results_published", "archived", "cancelled"}
 # Erneutes Veröffentlichen, dessen Punkte in einer abgeschlossenen Jahreswertung stehen (#2123): nichts geändert.
@@ -434,6 +439,13 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
         )
     elif pause_set or pause_unset:
         await _save_pause(db, me, tid, pause_set, pause_unset)
+
+    if prev != status and status == "live":
+        # Liga (#2201): der Start der ersten Staffel stellt die Season auf „Läuft“. Der Start gilt auch ohne das.
+        try:
+            await season_follows_first_staffel(db, t, prev, me.get("id"))
+        except Exception:  # noqa: BLE001
+            logger.warning("Season-Stand beim Start nicht nachgezogen tournament=%s", log_safe(tid), exc_info=True)
 
     # ---------- Season Points + Badges on results_published ----------
     season_points_note = None
