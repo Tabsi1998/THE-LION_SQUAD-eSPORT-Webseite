@@ -1,28 +1,26 @@
 # Changelog
 
-## [1.58.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.57.0...v1.58.0) (2026-11-02)
-
+## 1.58.0 (02.11.2026)
 
 ### Neu
 
-* Liga: eigene Regelseite je Liga und Season mit Inhaltsverzeichnis, Suche und Links auf Paragrafen ([#1646](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1646)) ([e973ec1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e973ec1acf1378e52352dbeef7aaca7d5b9cf946))
-* Liga: geänderte Paragrafen markiert, Liste „Neu in Version X“ und Vergleich Wort für Wort mit jeder alten Version ([#1646](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1646)) ([e973ec1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e973ec1acf1378e52352dbeef7aaca7d5b9cf946))
-* Liga: Hinweis „Daten geändert, neue Version vorbereiten“ bei geändertem Map-Pool oder geänderter Modusfolge ([#1646](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1646)) ([e973ec1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e973ec1acf1378e52352dbeef7aaca7d5b9cf946))
-* Liga: Regelwerk als PDF je Version, mit Version und Datum auf jeder Seite ([#1646](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1646)) ([e973ec1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e973ec1acf1378e52352dbeef7aaca7d5b9cf946))
-* Liga: Regelwerk in der Verwaltung pflegen, mit Vorschau, Anlagen und Bausteinen für Map-Pool und Modusfolge ([#1646](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1646)) ([e973ec1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e973ec1acf1378e52352dbeef7aaca7d5b9cf946))
-* Liga: Spiel merkt sich die gültige Regelversion beim Ergebnis ([#1646](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1646)) ([e973ec1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e973ec1acf1378e52352dbeef7aaca7d5b9cf946))
-* Liga: unveränderliche Versionen des Regelwerks mit Gültig-ab und Änderungsgrund ([#1646](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1646)) ([e973ec1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e973ec1acf1378e52352dbeef7aaca7d5b9cf946))
-* Liga: Zuständige mit „Regeln veröffentlichen“ pflegen das Regelwerk ihrer Liga, auch ohne Bereich und mit eigenen Bildern ([#1646](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1646)) ([e973ec1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e973ec1acf1378e52352dbeef7aaca7d5b9cf946))
-* Liga: Zustimmung je Regelversion mit Aufgabe auf der Startseite, Spiele laufen trotzdem weiter ([#1646](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1646)) ([e973ec1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e973ec1acf1378e52352dbeef7aaca7d5b9cf946))
-* Suche und Sitemap finden das Regelwerk der Liga ([#1646](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1646)) ([e973ec1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e973ec1acf1378e52352dbeef7aaca7d5b9cf946))
-
+* Liga: eigene Regelseite je Liga und Season mit Inhaltsverzeichnis, Suche und Links auf Paragrafen (#1646)
+* Liga: geänderte Paragrafen markiert, Liste „Neu in Version X“ und Vergleich Wort für Wort mit jeder alten Version (#1646)
+* Liga: Hinweis „Daten geändert, neue Version vorbereiten“ bei geändertem Map-Pool oder geänderter Modusfolge (#1646)
+* Liga: Regelwerk als PDF je Version, mit Version und Datum auf jeder Seite (#1646)
+* Liga: Regelwerk in der Verwaltung pflegen, mit Vorschau, Anlagen und Bausteinen für Map-Pool und Modusfolge (#1646)
+* Liga: Spiel merkt sich die gültige Regelversion beim Ergebnis (#1646)
+* Liga: unveränderliche Versionen des Regelwerks mit Gültig-ab und Änderungsgrund (#1646)
+* Liga: Zuständige mit „Regeln veröffentlichen“ pflegen das Regelwerk ihrer Liga, auch ohne Bereich und mit eigenen Bildern (#1646)
+* Liga: Zustimmung je Regelversion mit Aufgabe auf der Startseite, Spiele laufen trotzdem weiter (#1646)
+* Suche und Sitemap finden das Regelwerk der Liga (#1646)
 
 ### Fehlerbehebungen
 
-* Liga: Regelwerk nimmt Bilder nur aus dem eigenen Upload und lädt keine fremden ([#1646](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1646)) ([e973ec1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e973ec1acf1378e52352dbeef7aaca7d5b9cf946))
-* Liga: Season oder Liga mit veröffentlichtem Regelwerk oder Zustimmungen lässt sich nur noch archivieren ([#1646](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1646)) ([e973ec1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e973ec1acf1378e52352dbeef7aaca7d5b9cf946))
-* Liga: Zuteilen eines Co-Teams täuscht keine Zustimmung zu Regeln und Datenschutz mehr vor ([#1646](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1646)) ([e973ec1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e973ec1acf1378e52352dbeef7aaca7d5b9cf946))
-* Mediathek: Bilder einer veröffentlichten Regelversion lassen sich nicht drehen oder löschen, ihr Text wird nicht umgeschrieben ([#1646](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1646)) ([e973ec1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e973ec1acf1378e52352dbeef7aaca7d5b9cf946))
+* Liga: Regelwerk nimmt Bilder nur aus dem eigenen Upload und lädt keine fremden (#1646)
+* Liga: Season oder Liga mit veröffentlichtem Regelwerk oder Zustimmungen lässt sich nur noch archivieren (#1646)
+* Liga: Zuteilen eines Co-Teams täuscht keine Zustimmung zu Regeln und Datenschutz mehr vor (#1646)
+* Mediathek: Bilder einer veröffentlichten Regelversion lassen sich nicht drehen oder löschen, ihr Text wird nicht umgeschrieben (#1646)
 
 ## 1.57.0 (02.11.2026)
 
