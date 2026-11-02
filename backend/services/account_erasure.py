@@ -282,19 +282,34 @@ def _personal(collection: str, document: dict) -> bool:
                for name, base, _fields in PERSONAL_PLACES)
 
 
-async def _usage(db, names: set[str]) -> tuple[set[str], dict[str, list]]:
+async def _usage(db, names: set[str]) -> tuple[set[str], dict[str, list], set[str]]:
     """Wo die Dateien noch stehen (``media_audit.iter_usages``, dieselbe Liste wie die Mediathek).
 
-    Liefert die Dateien, die außerhalb persönlicher Profile verwendet werden, und je Datei die Stellen in persönlichen
-    Profilen als ``(Sammlung, _id, Feld)``."""
+    Liefert die Dateien, die außerhalb persönlicher Profile verwendet werden, je Datei die Stellen in persönlichen
+    Profilen als ``(Sammlung, _id, Feld)`` und die Dateien, die eine unveränderliche Stelle zeigt (``media_audit.is_frozen``)."""
     elsewhere: set[str] = set()
     personal: dict[str, list] = {}
+    frozen: set[str] = set()
     async for collection, document, field, name, text in media_audit.iter_usages(db, names):
+        if media_audit.is_frozen(collection, document):
+            frozen.add(name)
         if not _personal(collection, document):
             elsewhere.add(name)
         elif not text:
             personal.setdefault(name, []).append((collection, document["_id"], field))
-    return elsewhere, personal
+    return elsewhere, personal, frozen
+
+
+async def _forget_person(db, owner_id: str, names: set[str], scans: dict[str, list[dict]]) -> None:
+    """Bilder in veröffentlichten Regelwerk-Fassungen bleiben, nur der Bezug zur Person fällt weg: an der Verwaltungszeile und am Eintrag der
+    Bildprüfung. Datei und Fassung bleiben unverändert. Ohne Konto (Nachlauf der Mediathek) gibt es niemanden zu vergessen."""
+    if not owner_id or not names:
+        return
+    await db.media_uploads.update_many({"filename": {"$in": sorted(names)}, "owner_id": {"$in": _id_forms(owner_id)}},
+                                       {"$set": {"owner_id": None, "owner_role": None, "original_filename": None}})
+    scan_ids = [scan["_id"] for name in names for scan in scans.get(name, [])]
+    if scan_ids:
+        await db.media_scans.update_many({"_id": {"$in": scan_ids}}, {"$set": {"owner_id": None}})
 
 
 def _unlink(path: pathlib.Path) -> None:
@@ -443,8 +458,9 @@ async def _clean(db, owner_id: str, owned: set[str], untracked: set[str], now: d
     names = owned | untracked
     if not names:
         return 0
-    elsewhere, personal = await _usage(db, names)
+    elsewhere, personal, frozen = await _usage(db, names)
     scans = await _scans(db, owner_id, names)
+    await _forget_person(db, owner_id, frozen, scans)
     removed = 0
     for name in sorted(names):
         if name in elsewhere or (name in untracked and name in personal):
@@ -466,12 +482,14 @@ async def _own_images(db, user_id: str, urls: list[str | None]) -> int:
     Quarantäne der Bildprüfung und die Verwaltungszeilen. Was noch verwendet wird, bleibt.
 
     Eigen ist, was das Konto hochgeladen hat (#1039). Eine Datei im eigenen Profil, die einem anderen Konto oder dem
-    Verein gehört, bleibt; eine ältere ohne Verwaltungszeile geht, wenn sie sonst nirgends steht."""
+    Verein gehört, bleibt; eine ältere ohne Verwaltungszeile geht, wenn sie sonst nirgends steht. Für den Verein
+    hochgeladene Dateien bleiben, zeigt sie eine veröffentlichte Regelwerk-Fassung, aber ohne Bezug zur Person (``_forget_person``)."""
     owned: set[str] = set()
-    query = {"owner_id": {"$in": _id_forms(user_id)}, "media_scope": "user"}
-    async for row in db.media_uploads.find(query, {"_id": 0, "filename": 1}):
+    for_club: set[str] = set()
+    query = {"owner_id": {"$in": _id_forms(user_id)}}
+    async for row in db.media_uploads.find(query, {"_id": 0, "filename": 1, "media_scope": 1}):
         if media_audit._filename_from_upload_path(str(row.get("filename") or "")):
-            owned.add(row["filename"])
+            (owned if row.get("media_scope") == "user" else for_club).add(row["filename"])
     profile = {uploads_inventory.upload_filename(str(url or "")) for url in urls} - {None}
     profile = {name for name in profile if media_audit._filename_from_upload_path(name)} - owned
     owners: dict[str, set[str]] = {name: set() for name in profile}
@@ -481,7 +499,12 @@ async def _own_images(db, user_id: str, urls: list[str | None]) -> int:
                 owners[row["filename"]].add(str(row["owner_id"]))
     untracked = {name for name in profile if not owners[name]}
     owned |= {name for name in profile if owners[name] == {str(user_id)}}
-    return await _clean(db, user_id, owned, untracked)
+    removed = await _clean(db, user_id, owned, untracked)
+    for_club -= owned
+    if for_club:
+        _elsewhere, _personal_places, frozen = await _usage(db, for_club)
+        await _forget_person(db, user_id, frozen, await _scans(db, user_id, frozen) if frozen else {})
+    return removed
 
 
 def _due(now: datetime) -> dict:

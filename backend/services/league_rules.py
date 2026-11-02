@@ -17,7 +17,7 @@ from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
-from services import game_maps, league_look
+from services import game_maps, league_look, media_audit, uploads_inventory
 from services.league_rules_cache import rules_cache
 from services import league_rule_blocks as blocks
 from services import league_rules_text as text
@@ -28,6 +28,7 @@ from services.league_scope import ONLY_LEAGUE
 from services.league_service import LeagueProblem
 from services.match_audience import responsible_ids, teams_by_id
 from services.mutation_lock import MutationLockBusy, league_resource, league_season_resource, mutation_lock
+from services.permissions import ADMIN_MEDIA_ROLES, is_confirmed_admin_role
 from services.share_image_cache import fingerprint
 
 logger = logging.getLogger("tls.league_rules")
@@ -44,6 +45,8 @@ DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 CHANGED_MEANWHILE = "Der Entwurf wurde inzwischen geändert - bitte neu laden."
 SCOPE_BUSY = "An dieser Liga oder Season wird gerade etwas geändert - bitte gleich noch einmal."
 PUBLIC_FIELDS = ("id", "scope", "version", "title", "valid_from", "published_at", "change_reason", "requires_consent", "blocks_used")
+# Eine Adresse in den eigenen Upload - auch andere Seiten haben Ordner namens „uploads“, die gehen als Link.
+OWN_UPLOAD_ADDRESS = re.compile(r"(?:^|/)api/(?:static/)?uploads/|^/?(?:static/)?uploads/")
 
 
 # ---------------------------------------------------------------- Lesen
@@ -372,24 +375,66 @@ def _foreign_images(body_md: str | None, annexes: list[dict] | None) -> list[str
     return [address for address in addresses if not game_maps.IMAGE_URL.fullmatch(address)]
 
 
-def _check_images(body_md: str | None, annexes: list[dict] | None) -> None:
+def _upload_files(body_md: str | None, annexes: list[dict] | None) -> dict[str, str]:
+    """Die Dateien aus dem Upload, die der Text nennt: Name → Adresse. Dieselbe Sicht wie die Verwendungssuche - dort zählt jede Adresse."""
+    found: dict[str, str] = {}
+    for value in (body_md, *[row.get("body_md") for row in annexes or []]):
+        for address in media_audit.urls_in_text(value):
+            name = uploads_inventory.upload_filename(address)
+            if name:
+                found.setdefault(name, address)
+    return found
+
+
+async def _unusable_files(db, body_md: str | None, annexes: list[dict] | None, user: dict | None, kept: set[str]) -> list[str]:
+    """Adressen, die nicht in den Text dürfen. Jede Datei braucht ihren Eintrag in der Mediathek. Mit ``user`` zählt auch, wem sie gehört: Ohne
+    Medienrolle nur eigene Bilder - außer sie stehen schon im Text (``kept``)."""
+    files = _upload_files(body_md, annexes)
+    if not files:
+        return []
+    names = sorted(files)
+    rows = await db.media_uploads.find({"$or": [{"filename": {"$in": names}}, {"raster_filename": {"$in": names}}]},
+                                       {"_id": 0, "filename": 1, "raster_filename": 1, "media_scope": 1, "owner_id": 1}).to_list(None)
+    any_owner = user is None or is_confirmed_admin_role(user, ADMIN_MEDIA_ROLES)
+    refused = []
+    for name, address in files.items():
+        entries = [row for row in rows if name in (row.get("filename"), row.get("raster_filename"))]
+        if not entries:
+            # Eine kleinere Fassung hat keinen eigenen Eintrag, zählt aber als ihr Original - im Text steht immer das Original.
+            if OWN_UPLOAD_ADDRESS.search(address) or media_audit.VARIANT_NAME.match(name):
+                refused.append(address)
+        elif not any_owner and name not in kept and not any(
+                row.get("media_scope") == "user" and str(row.get("owner_id")) == str(user["id"]) for row in entries):
+            refused.append(address)
+    return refused
+
+
+async def _refused_images(db, body_md: str | None, annexes: list[dict] | None, user: dict | None, kept: set[str]) -> list[str]:
     foreign = _foreign_images(body_md, annexes)
-    if foreign:
+    return foreign + [address for address in await _unusable_files(db, body_md, annexes, user, kept) if address not in foreign]
+
+
+async def _check_images(db, body_md: str | None, annexes: list[dict] | None, user: dict | None = None, kept: set[str] | None = None) -> None:
+    refused = await _refused_images(db, body_md, annexes, user, kept or set())
+    if refused:
         raise LeagueProblem("Bilder im Regelwerk kommen nur aus dem eigenen Upload (PNG, JPG oder WebP): Bitte über „Hochladen“ oder die "
-                            f"Mediathek wählen. Eine fremde Seite geht als Link. Nicht erlaubt: {foreign[0][:80]}")
+                            f"Mediathek wählen. Eine fremde Seite geht als Link. Nicht erlaubt: {refused[0][:80]}")
 
 
-async def save_draft(db, scope: str, scope_id: str, body: dict, user: dict) -> dict:
+async def save_draft(db, scope: str, scope_id: str, body: dict, user: dict, *, carried: set[str] | None = None) -> dict:
+    """``carried``: Dateien, die aus einer vorhandenen Fassung kommen - wie alles, was schon im gespeicherten Entwurf steht."""
     league, season = await resolve_scope(db, scope, scope_id)
     _check_size(body.get("body_md"), body.get("annexes"))
-    _check_images(body.get("body_md"), body.get("annexes"))
+    existing = await draft_of(db, scope, scope_id)
+    # Ohne Entwurf heißt eine Revision: Der gelesene ist inzwischen veröffentlicht oder verworfen.
+    if body.get("revision") != existing.get("revision") if existing else body.get("revision"):
+        raise LeagueProblem(CHANGED_MEANWHILE, 409)
+    kept = set(carried or ()) | set(_upload_files((existing or {}).get("body_md"), (existing or {}).get("annexes")))
+    await _check_images(db, body.get("body_md"), body.get("annexes"), user, kept)
     now = now_utc().isoformat()
     fields = {"title": str(body.get("title") or "").strip(), "body_md": str(body.get("body_md") or ""),
               "annexes": _annexes(body.get("annexes")), "updated_at": now, "updated_by": user["id"]}
-    existing = await draft_of(db, scope, scope_id)
     if existing is None:
-        if body.get("revision"):  # der gelesene Entwurf ist inzwischen veröffentlicht oder verworfen
-            raise LeagueProblem(CHANGED_MEANWHILE, 409)
         doc = {"id": new_id(), "scope": scope, "scope_id": scope_id, "league_id": league["id"],
                "season_id": (season or {}).get("id"), "status": DRAFT, "version": None, "revision": 1, **fields,
                "created_at": now, "created_by": user["id"]}
@@ -398,8 +443,6 @@ async def save_draft(db, scope: str, scope_id: str, body: dict, user: dict) -> d
         except DuplicateKeyError:
             raise LeagueProblem(CHANGED_MEANWHILE, 409) from None
         return doc
-    if body.get("revision") != existing.get("revision"):
-        raise LeagueProblem(CHANGED_MEANWHILE, 409)
     saved = await db.league_rules.find_one_and_update(
         {"id": existing["id"], "status": DRAFT, "revision": existing["revision"]},
         {"$set": fields, "$inc": {"revision": 1}}, return_document=ReturnDocument.AFTER)
@@ -420,8 +463,8 @@ async def draft_from_version(db, scope: str, scope_id: str, version_id: str | No
     source = (_find(chain["rows"], version_id) if version_id else (own[-1] if own else chain["current"]))
     if not source:
         raise LeagueProblem("Es gibt noch keine Fassung, aus der sich ein Entwurf vorbereiten ließe.", 404)
-    return await save_draft(db, scope, scope_id, {"title": source.get("title"), "body_md": source.get("body_md"),
-                                                  "annexes": source.get("annexes")}, user)
+    return await save_draft(db, scope, scope_id, {"title": source.get("title"), "body_md": source.get("body_md"), "annexes": source.get("annexes")},
+                            user, carried=set(_upload_files(source.get("body_md"), source.get("annexes"))))
 
 
 async def discard_draft(db, scope: str, scope_id: str) -> dict:
@@ -432,10 +475,12 @@ async def discard_draft(db, scope: str, scope_id: str) -> dict:
     return doc
 
 
-async def preview(db, scope: str, scope_id: str, body: dict) -> dict:
-    """Die Seite, wie sie heute würde: mit den Bausteinen von heute, gegen die letzte Fassung. Speichert nichts."""
+async def preview(db, scope: str, scope_id: str, body: dict, user: dict) -> dict:
+    """Die Seite, wie sie heute würde: mit den Bausteinen von heute, gegen die letzte Fassung. Speichert nichts. Nennt dieselben Bilder, die das
+    Speichern ablehnt."""
     league, season = await resolve_scope(db, scope, scope_id)
     annexes = _annexes(body.get("annexes"))
+    draft = await draft_of(db, scope, scope_id) or {}
     _check_size(body.get("body_md"), annexes)
     keys = text.block_keys(body.get("body_md"), *[row["body_md"] for row in annexes])
     values = {key: row["markdown"] for key, row in (await blocks.resolve(db, keys, league, season)).items()} if season else {}
@@ -448,7 +493,7 @@ async def preview(db, scope: str, scope_id: str, body: dict) -> dict:
             "changes": {"base": _head(previous, chain["current"]) if previous else None,
                         **{key: result[key] for key in ("new", "changed", "removed")}},
             "blocks_used": [key for key in keys if key in blocks.BLOCKS], "unknown_blocks": blocks.unknown(keys),
-            "foreign_images": _foreign_images(body.get("body_md"), annexes)}
+            "foreign_images": await _refused_images(db, body.get("body_md"), annexes, user, set(_upload_files(draft.get("body_md"), draft.get("annexes"))))}
 
 
 def _check_publish(draft: dict, body: dict, predecessor: dict | None) -> tuple[str, str, list[str]]:
@@ -464,7 +509,6 @@ def _check_publish(draft: dict, body: dict, predecessor: dict | None) -> tuple[s
         raise LeagueProblem(f"„Gültig ab“ darf nicht vor dem Beginn von Version {predecessor.get('version')} liegen.")
     annexes = draft.get("annexes") or []
     _check_size(draft.get("body_md"), annexes)
-    _check_images(draft.get("body_md"), annexes)
     if not str(draft.get("body_md") or "").strip() and not any(str(row.get("body_md") or "").strip() for row in annexes):
         raise LeagueProblem("Ein leeres Regelwerk lässt sich nicht veröffentlichen.")
     keys = text.block_keys(draft.get("body_md"), *[row.get("body_md") for row in annexes])
@@ -494,6 +538,7 @@ async def _publish(db, scope: str, scope_id: str, body: dict, user: dict) -> dic
     own = await _published(db, scope, scope_id)
     predecessor = own[-1] if own else None
     reason, valid_from, keys = _check_publish(draft, body, predecessor)
+    await _check_images(db, draft.get("body_md"), draft.get("annexes"))  # nur der Eintrag: Wer was hineingestellt hat, zählte beim Speichern
     frozen: dict[str, dict] = {}
     if keys:
         for row in await _seasons_to_freeze(db, league, season):

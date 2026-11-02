@@ -205,3 +205,53 @@ test("Zuständige ohne Zwei-Faktor gehen zur Einrichtung (#2203)", () => {
   renderAt("/admin/leagues", <ProtectedRoute requireArea="leagues" allowLeagueStaff><div>liga</div></ProtectedRoute>);
   expect(screen.queryByText("liga")).toBeNull();
 });
+
+// #2230: Auf den Liga-Seiten reicht die Zuständigkeit, auch neben anderen Bereichen und neben einem Einsatz - wie im Server.
+const LEAD_ON_DUTY = { role: "tournament_admin", areas: ["tournaments", "moderation"], is_tournament_staff: true, has_league_staff: true };
+const HELPER_ON_DUTY = { role: "player", areas: [], is_tournament_staff: true, has_staff_assignment: true, has_league_staff: true };
+
+describe.each([
+  ["Turnierleitung", LEAD_ON_DUTY],
+  ["Helfer", HELPER_ON_DUTY],
+  ["Turnierleitung mit Einsatz", { ...LEAD_ON_DUTY, has_staff_assignment: true }],
+  ["Moderator", { role: "moderator", areas: ["moderation"], has_league_staff: true }],
+  ["Redaktion", { role: "player", areas: ["content"], has_league_staff: true }],
+])("Liga-Seiten mit Zuständigkeit (#2230): %s", (_name, fields) => {
+  const page = <ProtectedRoute requireArea="leagues" allowLeagueStaff><div>liga</div></ProtectedRoute>;
+
+  test("mit Zwei-Faktor kommt hinein", () => {
+    authState.user = { id: "z", ...fields, ...mfa };
+    renderAt("/admin/leagues", page);
+    expect(screen.getByText("liga")).toBeInTheDocument();
+  });
+
+  test("ohne Zwei-Faktor geht zur Einrichtung, nicht auf „Kein Zugriff“", () => {
+    authState.user = { id: "z", ...fields, mfa_enabled: false };
+    renderAt("/admin/leagues", page);
+    expect(screen.getByTestId("mfa-setup")).toBeInTheDocument();
+    expect(screen.queryByText("liga")).toBeNull();
+  });
+});
+
+test("Liga-Seiten: ein Helfer ohne Zuständigkeit bleibt draußen", () => {
+  authState.user = { id: "h", role: "player", areas: [], is_tournament_staff: true, has_staff_assignment: true, ...mfa };
+  renderAt("/admin/leagues", <ProtectedRoute requireArea="leagues" allowLeagueStaff><div>liga</div></ProtectedRoute>);
+  expect(screen.getByText("verboten")).toBeInTheDocument();
+});
+
+// Der Turnier-Weg einer Staffel fragt keinen Bereich: Hier bleibt die Bedingung, wie sie war - auch für Personen mit beidem.
+test.each([
+  ["Zuständig", { role: "player", has_league_staff: true, ...mfa }, "staffel"],
+  ["Zuständig ohne Zwei-Faktor", { role: "player", has_league_staff: true, mfa_enabled: false }, "mfa-setup"],
+  ["Freigabe Ligen", { role: "player", areas: ["leagues"], ...mfa }, "staffel"],
+  ["Turnierleitung und zuständig", { ...LEAD_ON_DUTY, ...mfa }, "staffel"],
+  ["Turnierleitung und zuständig, ohne Zwei-Faktor", { ...LEAD_ON_DUTY, mfa_enabled: false }, "mfa-setup"],
+  ["Helfer und zuständig, ohne Zwei-Faktor", { ...HELPER_ON_DUTY, mfa_enabled: false }, "staffel"],
+  ["Helfer", { role: "player", is_tournament_staff: true, has_staff_assignment: true, mfa_enabled: false }, "staffel"],
+  ["Spieler", { role: "player" }, "verboten"],
+])("Turnier-Weg einer Staffel: %s bleibt wie vorher", (_name, user, expected) => {
+  authState.user = { id: "z", ...user };
+  renderAt("/admin/tournaments/t1", <ProtectedRoute requireTournamentStaff allowLeagueStaff><div>staffel</div></ProtectedRoute>);
+  if (expected === "mfa-setup") expect(screen.getByTestId("mfa-setup")).toBeInTheDocument();
+  else expect(screen.getByText(expected)).toBeInTheDocument();
+});

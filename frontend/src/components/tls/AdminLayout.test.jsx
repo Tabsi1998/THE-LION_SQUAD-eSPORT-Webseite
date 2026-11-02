@@ -209,6 +209,22 @@ test.each([
   expect(visible(user)).toEqual(expected);
 });
 
+// #2230: Der Einstieg ist da, wo die Seite aufgeht - auch neben Turnierleitung und Einsatz, ohne Zwei-Faktor nur „Mein Dienst“.
+test.each([
+  ["Turnierleitung", { role: "tournament_admin", areas: ["tournaments", "moderation"] }],
+  ["Helfer", { role: "player", has_staff_assignment: true, is_tournament_staff: true }],
+])("%s und zuständig: Liga und „Mein Dienst“ im Menü", (_name, fields) => {
+  const targets = visible({ ...fields, has_league_staff: true, ...MFA });
+  expect(targets).toEqual(expect.arrayContaining(["/admin/dienst", "/admin/leagues"]));
+  const withoutFactor = visible({ ...fields, has_league_staff: true });
+  expect(withoutFactor).toContain("/admin/dienst");
+  expect(withoutFactor).not.toContain("/admin/leagues");
+});
+
+test("Turnierleitung ohne Zuständigkeit: keine Liga im Menü", () => {
+  expect(visible({ role: "tournament_admin", areas: ["tournaments", "moderation"], ...MFA })).not.toContain("/admin/leagues");
+});
+
 test("Redaktion und Vereinsverwaltung sehen keine Turnierseiten, auch nicht „Mein Dienst“", () => {
   for (const areas of [["content"], ["club"], ["finance"]]) {
     const targets = visible({ role: "player", areas, ...MFA });

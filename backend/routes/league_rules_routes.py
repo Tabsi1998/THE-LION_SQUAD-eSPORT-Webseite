@@ -200,8 +200,8 @@ async def admin_discard_draft(scope: str, scope_id: str, me: dict = Depends(requ
 
 
 @admin_router.post("/{scope}/{scope_id}/preview")
-async def admin_preview(scope: str, scope_id: str, body: RuleText, _me: dict = Depends(require_rules_editor)):
-    return await _call(rules.preview(get_db(), _scope(scope), scope_id, body.model_dump()))
+async def admin_preview(scope: str, scope_id: str, body: RuleText, me: dict = Depends(require_rules_editor)):
+    return await _call(rules.preview(get_db(), _scope(scope), scope_id, body.model_dump(), me))
 
 
 @admin_router.post("/{scope}/{scope_id}/publish")
