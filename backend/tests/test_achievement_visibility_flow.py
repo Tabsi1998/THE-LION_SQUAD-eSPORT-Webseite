@@ -228,7 +228,10 @@ async def test_erfolg_der_woche_und_laufband(flow):
     visibility.reset_rarity_cache()
 
     flow.act_as(None)
-    week = (await flow.get("/api/achievements/week")).json()
+    # Eigene Routen für Woche und Laufband gibt es nicht mehr (#2130) - beides kommt mit der Übersicht.
+    assert (await flow.get("/api/achievements/week")).status_code in (404, 405)
+    assert (await flow.get("/api/achievements/recent")).status_code in (404, 405)
+    week = (await flow.get("/api/achievements/overview")).json()["week"]
     assert week["week_key"] == key and week["from"] == start.isoformat() and week["to"] == end.isoformat()
     assert week["award"]["tier_code"] == tournament_tier["code"] and week["award"]["user"]["username"] == "ben", "am wenigsten Leute haben es"
     assert week["award"]["holders"] == 1 and week["award"]["percent"] == round(100 / 3, 1)
@@ -236,13 +239,13 @@ async def test_erfolg_der_woche_und_laufband(flow):
     assert "id" in week["award"]["user"] and "email" not in week["award"]["user"]
     # Festgelegt bleibt festgelegt - auch wenn Ben sein Profil danach schließt; erst force rechnet neu.
     await flow.db.users.update_one({"id": ben["id"]}, {"$set": {"privacy_public_profile": False}})
-    assert (await flow.get("/api/achievements/week")).json()["award"]["user"]["username"] == "ben"
+    assert (await flow.get("/api/achievements/overview")).json()["week"]["award"]["user"]["username"] == "ben"
     fresh = await visibility.achievement_of_week(flow.db, force=True)
     assert fresh["award"]["user"]["username"] == "anna" and fresh["award"]["tier_code"] == "matches_played_1"
     stored = await flow.db.settings.find_one({"id": "achievement_of_week"}, {"_id": 0})
     assert stored["week_key"] == key and stored["award"]["tier_code"] == "matches_played_1"
 
-    recent = (await flow.get("/api/achievements/recent?limit=10")).json()
+    recent = (await flow.get("/api/achievements/overview")).json()["recent"]
     names = {(r["user"]["username"], r["tier_code"]) for r in recent}
     assert ("anna", "matches_played_1") in names
     assert not any(r["user"]["username"] in ("ben", "dora") for r in recent), "nur öffentliche Profile"

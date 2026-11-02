@@ -10,7 +10,6 @@ Public/User endpoints (prefix /api/achievements):
   GET  /api/achievements/me/summary        — Dashboard-Kachel: Level, Als Nächstes, letzte Freischaltung
   GET  /api/achievements/overview          — Kategorien, Seltenheit, Geheim-Zähler, Woche, Laufband (#619)
   GET  /api/achievements/leaderboard       — Punkte (je Kategorie/Zeitraum) oder Level
-  GET  /api/achievements/week, /recent     — Erfolg der Woche, neueste Freischaltungen
   GET  /api/achievements/award/{id}        — Daten einer öffentlichen Vergabe für die Teilen-Seite
   GET  /api/achievements/share/{id}.png    — Teilen-Karte 1200×630 (Pillow)
 
@@ -184,18 +183,6 @@ async def shared_award_card(award_id: str):
     png = share_images.get_or_draw(("achievement", award_id), payload, lambda: render_card(payload))
     return Response(content=png, media_type="image/png",
                     headers={"Content-Disposition": f'inline; filename="achievement-{award_id}.png"'})
-
-
-@router.get("/week")
-async def achievement_of_week():
-    """Der Erfolg der Woche (#619) - dieselbe Kachel für Web, App und Discord (E12)."""
-    return await visibility.achievement_of_week(get_db())
-
-
-@router.get("/recent")
-async def recent_unlocks(limit: int = 20):
-    """Die neuesten Freischaltungen öffentlicher Profile (#619) - das Laufband."""
-    return await visibility.recent_unlocks(get_db(), limit)
 
 
 @router.post("/evaluate")
