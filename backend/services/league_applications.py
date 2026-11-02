@@ -294,6 +294,14 @@ async def _load(db, season_id: str, application_id: str) -> dict:
     return application
 
 
+async def _left_over(db, application: dict) -> dict | None:
+    """Brach ein früherer Versuch nach dem Schreiben der Anmeldung ab, steht sie ohne Zuteilung am Antrag. Sie gilt: Annehmen und Zuteilen schließen ab, statt an ihr zu scheitern."""
+    if application.get("assignment"):
+        return None
+    return await db.tournament_registrations.find_one(
+        {"league_squad_key": f"{application['season_id']}:{application['squad_id']}", "application_id": application["id"], "status": {"$in": list(SEAT_STATUSES)}}, {"_id": 0})
+
+
 async def _move(db, application: dict, status: str, actor_id: str | None, *, fields: dict | None = None, reason: str | None = None, keep_active: bool = True) -> dict:
     """Der Statuswechsel mit Bedingung auf den alten Stand. Antwortet mit 409, wenn inzwischen etwas anderes geschah."""
     now = now_utc().isoformat()
@@ -320,7 +328,7 @@ async def withdraw(db, league: dict, season: dict, application_id: str, user: di
         application = await _load(db, season["id"], application_id)
         if application["status"] not in OPEN_STATUSES:
             raise LeagueProblem(DECIDED, 409)
-        if application.get("assignment"):
+        if application.get("assignment") or await _left_over(db, application):
             raise LeagueProblem(WITHDRAW_ASSIGNED, 409)
         now = now_utc().isoformat()
         done = await _move(db, application, WITHDRAWN, user["id"], fields={"withdrawn_by": user["id"], "withdrawn_at": now}, keep_active=False)
@@ -347,7 +355,7 @@ async def reject(db, league: dict, season: dict, application_id: str, reason: st
         application = await _load(db, season["id"], application_id)
         if application["status"] not in OPEN_STATUSES:
             raise LeagueProblem(DECIDED, 409)
-        if application.get("assignment"):
+        if application.get("assignment") or await _left_over(db, application):
             raise LeagueProblem(ASSIGNED_ALREADY, 409)
         now = now_utc().isoformat()
         done = await _move(db, application, REJECTED, actor["id"], reason=text, keep_active=False,
@@ -364,7 +372,7 @@ async def waitlist(db, league: dict, season: dict, application_id: str, reason: 
         application = await _load(db, season["id"], application_id)
         if application["status"] not in (SUBMITTED, IN_REVIEW, ACCEPTED):
             raise LeagueProblem(DECIDED, 409)
-        if application.get("assignment"):
+        if application.get("assignment") or await _left_over(db, application):
             raise LeagueProblem(ASSIGNED_ALREADY, 409)
         if not fresh.get("application_waitlist"):
             raise LeagueProblem(NO_WAITLIST, 409)
@@ -439,36 +447,53 @@ async def _after_assign(db, tournament: dict, registration: dict, actor: dict, r
     return sorted(row["name"] for row in league_roster.waiting_for_id(ids.values()))
 
 
+async def _staffel_to_lock(db, season_id: str, application_id: str, tournament_id: str | None) -> str | None:
+    """Die Staffel eines abgebrochenen Versuchs geht vor: Dort steht die Anmeldung schon."""
+    application = await db.league_applications.find_one({"id": application_id, "season_id": season_id}, {"_id": 0})
+    left_over = await _left_over(db, application) if application else None
+    return left_over["tournament_id"] if left_over else tournament_id
+
+
+async def _place(db, season: dict, application: dict, tournament_id: str | None, actor: dict, fields: dict, left_over: dict | None) -> tuple[dict, dict | None, dict | None]:
+    """Anmeldung und Antrag gehören zusammen, eine Transaktion gibt es nicht: Scheitert der Antrag, fällt die neue Anmeldung wieder weg. Bleibt sie trotzdem stehen, hilft ``_left_over``."""
+    tournament = registration = None
+    if left_over:
+        tournament, registration = await _load_staffel(db, season, left_over["tournament_id"]), left_over
+    elif tournament_id:
+        tournament = await _staffel_for_write(db, season, tournament_id)
+        registration = await _insert_registration(db, tournament, application, actor)
+    try:
+        if registration:
+            fields = {**fields, "assignment": await _assignment(db, tournament, registration, actor["id"])}
+        done = await _move(db, application, ACCEPTED, actor["id"], fields=fields)
+    except Exception:
+        if registration and not left_over:
+            await db.tournament_registrations.delete_one({"id": registration["id"]})
+        raise
+    return done, tournament, registration
+
+
 async def accept(db, league: dict, season: dict, application_id: str, tournament_id: str | None, actor: dict, *, refresh_previews) -> dict:
     """Annehmen, mit ``tournament_id`` gleich zuteilen. Der letzte Platz geht unter der Season-Sperre nur einmal weg."""
-    registration = None
-    tournament = None
-    async with _staffel_lock(db, tournament_id):
+    async with _staffel_lock(db, await _staffel_to_lock(db, season["id"], application_id, tournament_id)):
         async with _season_lock(db, season["id"]):
             fresh = await league_service.get_season(db, season["id"])
             application = await _load(db, season["id"], application_id)
             if application["status"] not in (SUBMITTED, IN_REVIEW, WAITLIST):
                 raise LeagueProblem(DECIDED, 409)
-            if (await seat_stats(db, fresh))["full"]:
+            left_over = await _left_over(db, application)
+            if not left_over and (await seat_stats(db, fresh))["full"]:
                 raise LeagueProblem(SEATS_TAKEN, 409)
             team, squad = await _load_side(db, application["squad_id"])
             if not squad:
                 raise LeagueProblem(SQUAD_GONE, 409)
-            problems = (await check_squad(db, league, fresh, team, squad, application=application))["problems"]
-            if problems:
-                raise LeagueProblem(problems[0][1], problems[0][0])
+            if not left_over:
+                problems = (await check_squad(db, league, fresh, team, squad, application=application))["problems"]
+                if problems:
+                    raise LeagueProblem(problems[0][1], problems[0][0])
             now = now_utc().isoformat()
             fields = {"decided_by": actor["id"], "decided_at": now, "decision_reason": None}
-            if tournament_id:
-                tournament = await _staffel_for_write(db, fresh, tournament_id)
-                registration = await _insert_registration(db, tournament, application, actor)
-                fields["assignment"] = await _assignment(db, tournament, registration, actor["id"])
-            try:
-                done = await _move(db, application, ACCEPTED, actor["id"], fields=fields)
-            except LeagueProblem:
-                if registration:
-                    await db.tournament_registrations.delete_one({"id": registration["id"]})
-                raise
+            done, tournament, registration = await _place(db, fresh, application, tournament_id, actor, fields, left_over)
         ids_missing = await _after_assign(db, tournament, registration, actor, refresh_previews) if registration else []
     await _audit(db, "accept", done, actor["id"], **({"tournament_id": tournament_id} if tournament_id else {}))
     await _tell_status(db, league, season, done, ACCEPTED, squad=squad)
@@ -479,7 +504,7 @@ async def assign(db, league: dict, season: dict, application_id: str, tournament
     """Einen angenommenen Antrag einer Staffel zuteilen - erst hier entsteht die Anmeldung."""
     if not tournament_id:
         raise LeagueProblem("Bitte eine Staffel wählen.")
-    async with _staffel_lock(db, tournament_id):
+    async with _staffel_lock(db, await _staffel_to_lock(db, season["id"], application_id, tournament_id)):
         async with _season_lock(db, season["id"]):
             fresh = await league_service.get_season(db, season["id"])
             application = await _load(db, season["id"], application_id)
@@ -491,17 +516,12 @@ async def assign(db, league: dict, season: dict, application_id: str, tournament
             team, squad = await _load_side(db, application["squad_id"])
             if not squad:
                 raise LeagueProblem(SQUAD_GONE, 409)
-            problems = (await check_squad(db, league, fresh, team, squad, application=application))["problems"]
-            if problems:
-                raise LeagueProblem(problems[0][1], problems[0][0])
-            tournament = await _staffel_for_write(db, fresh, tournament_id)
-            registration = await _insert_registration(db, tournament, application, actor)
-            fields = {"assignment": await _assignment(db, tournament, registration, actor["id"])}
-            try:
-                done = await _move(db, application, ACCEPTED, actor["id"], fields=fields)
-            except LeagueProblem:
-                await db.tournament_registrations.delete_one({"id": registration["id"]})
-                raise
+            left_over = await _left_over(db, application)
+            if not left_over:
+                problems = (await check_squad(db, league, fresh, team, squad, application=application))["problems"]
+                if problems:
+                    raise LeagueProblem(problems[0][1], problems[0][0])
+            done, tournament, registration = await _place(db, fresh, application, tournament_id, actor, {}, left_over)
         ids_missing = await _after_assign(db, tournament, registration, actor, refresh_previews)
     await _audit(db, "assign", done, actor["id"], tournament_id=tournament_id)
     await _tell_status(db, league, season, done, "assigned")
@@ -604,11 +624,11 @@ async def _left_staffel(db, rows: list[dict]) -> set[str]:
 
 def team_answer(application: dict) -> dict:
     """Die Antwort an Captain und Vertreter nach dem Einreichen oder Zurückziehen: ohne Kennungen der Leitung."""
-    return {**own_view(application, responsible=True), "rule_consent": application.get("rule_consent")}
+    return {**own_view(application, responsible=True, can_act=True), "rule_consent": application.get("rule_consent")}
 
 
-def own_view(application: dict | None, *, responsible: bool, left: bool = False) -> dict | None:
-    """Ein Antrag für das eigene Team. Grund und Rückzug nur für die Verantwortlichen, der Kader sieht den Stand."""
+def own_view(application: dict | None, *, responsible: bool, can_act: bool = False, left: bool = False) -> dict | None:
+    """Ein Antrag für das eigene Team. Der Kader sieht den Stand, ``responsible`` (Captain, Vertreter, Hauptteam-Leitung) auch den Grund, zurückziehen darf nur ``can_act`` (``may_apply``)."""
     if not application:
         return None
     out = {"id": application["id"], "status": application["status"], "submitted_at": application.get("submitted_at"),
@@ -616,7 +636,7 @@ def own_view(application: dict | None, *, responsible: bool, left: bool = False)
     if responsible:
         out.update(decided_at=application.get("decided_at"), decision_reason=application.get("decision_reason"),
                    rules_label=f"Version {(application.get('rule_consent') or {}).get('version')}" if application.get("rule_consent") else None,
-                   can_withdraw=application["status"] in OPEN_STATUSES and not application.get("assignment"))
+                   can_withdraw=can_act and application["status"] in OPEN_STATUSES and not application.get("assignment"))
     return out
 
 
@@ -670,7 +690,7 @@ async def my_view(db, league: dict, season: dict, user: dict) -> dict:
         row = {"squad_id": squad["id"], "squad_name": squad.get("name"), "team_id": team["id"], "team_name": team.get("name"),
                "display_name": squad_registration.display_name(team, squad), "member_count": len([uid for uid in squad.get("member_ids") or [] if uid]),
                "can_apply": can_apply, "state": application["status"] if application else OPEN_TO_APPLY if state == OPEN else NOT_APPLIED,
-               "application": own_view(application, responsible=can_apply or user["id"] in _leads(team), left=bool(application and application["id"] in gone))}
+               "application": own_view(application, responsible=can_apply or user["id"] in _leads(team), can_act=can_apply, left=bool(application and application["id"] in gone))}
         if can_apply:
             check = await check_squad(db, league, season, team, squad) if state == OPEN and not active else {"problems": [], "warnings": []}
             row.update(problems=[text for _code, text in check["problems"]], warnings=check["warnings"],
@@ -704,8 +724,9 @@ async def my_applications(db, user: dict) -> list[dict]:
             continue
         league = await db.leagues.find_one({"id": season.get("league_id")}, {"_id": 0, "name": 1, "slug": 1}) or {}
         squad = by_id[squad_id]
-        responsible = user["id"] in {squad.get("captain_id"), squad.get("vice_captain_id")} or user["id"] in _leads(teams[squad["team_id"]])
-        items.append({**own_view(application, responsible=responsible, left=application["id"] in gone), "squad_id": squad_id, "season_id": season_id, "title": _season_title(league, season),
+        can_act = await may_apply(db, user, squad)
+        responsible = can_act or user["id"] in _leads(teams[squad["team_id"]])
+        items.append({**own_view(application, responsible=responsible, can_act=can_act, left=application["id"] in gone), "squad_id": squad_id, "season_id": season_id, "title": _season_title(league, season),
                       "url": f"/liga/{league.get('slug')}/{season.get('slug')}"})
     return items
 
@@ -796,8 +817,21 @@ async def scrub_person(db, user_id: str) -> int:
     return done
 
 
-EXPORT_FIELDS = ("id", "season_id", "league_id", "team_id", "squad_id", "squad_name", "status", "submitted_at", "rule_consent", "privacy_consent", "decided_at", "decision_reason", "withdrawn_at")
+EXPORT_FIELDS = ("id", "season_id", "league_id", "team_id", "squad_id", "squad_name", "status", "submitted_at", "decided_at", "decision_reason", "withdrawn_at")
 
 
 def export_query(user_id: str) -> dict:
-    return {"$or": [{"applied_by": user_id}, {"withdrawn_by": user_id}, {"rule_consent.user_id": user_id}, {"privacy_consent.user_id": user_id}]}
+    """Alle Anträge, in denen die Person steht: eingereicht, zugestimmt, zurückgezogen oder als Leitung entschieden und zugeteilt."""
+    return {"$or": [{"applied_by": user_id}, {"withdrawn_by": user_id}, {"rule_consent.user_id": user_id}, {"privacy_consent.user_id": user_id},
+                    {"decided_by": user_id}, {"assignment.assigned_by": user_id}, {"history.by": user_id}]}
+
+
+def export_row(user_id: str):
+    """Ohne Kennungen anderer: nur die eigenen Zustimmungen und die eigenen Schritte im Verlauf."""
+    def shape(row: dict) -> dict:
+        out = {key: row.get(key) for key in EXPORT_FIELDS}
+        for key in ("rule_consent", "privacy_consent"):
+            out[key] = row[key] if (row.get(key) or {}).get("user_id") == user_id else None
+        out["my_steps"] = [{key: step[key] for key in ("status", "at", "reason") if key in step} for step in row.get("history") or [] if step.get("by") == user_id]
+        return out
+    return shape

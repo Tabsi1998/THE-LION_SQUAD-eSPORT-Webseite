@@ -498,6 +498,29 @@ async def test_a_squad_member_sees_the_state_but_not_the_checks_or_the_reason(fl
 
 
 @pytest.mark.asyncio
+async def test_the_team_lead_reads_the_reason_but_is_not_offered_the_withdrawal(flow):
+    w = await application_world(flow, teams=2)
+    side, other = w["teams"]
+    rejected = await submitted(flow, w, side)
+    ok(await decide(flow, w, rejected, "reject", reason="Kader passt noch nicht"))
+    running = await submitted(flow, w, other)
+
+    flow.act_as(side["lead"])
+    row = ok(await flow.get(f"{base_url(w)}/application"))["squads"][0]
+    assert row["application"]["decision_reason"] == "Kader passt noch nicht"
+    assert ok(await flow.get("/api/me/league-applications"))["items"][0]["decision_reason"] == "Kader passt noch nicht"
+
+    flow.act_as(other["lead"])
+    row = ok(await flow.get(f"{base_url(w)}/application"))["squads"][0]
+    item = ok(await flow.get("/api/me/league-applications"))["items"][0]
+    assert row["application"]["can_withdraw"] is False and item["can_withdraw"] is False
+    assert (await flow.post(f"{base_url(w)}/applications/{running['id']}/withdraw", json={})).status_code == 403
+
+    flow.act_as(other["captain"])
+    assert ok(await flow.get("/api/me/league-applications"))["items"][0]["can_withdraw"] is True
+
+
+@pytest.mark.asyncio
 async def test_a_team_lead_without_a_role_sees_the_hint(flow):
     w = await application_world(flow, teams=0)
     side = await add_team(flow, w, "Ohne")

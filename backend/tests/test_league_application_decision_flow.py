@@ -627,7 +627,47 @@ async def test_export_contains_the_own_application_without_the_lead(flow):
 
     assert [row["id"] for row in rows] == [application["id"]] and kind == "list"
     assert rows[0]["decision_reason"] == "Passt noch nicht"
+    assert rows[0]["rule_consent"]["user_id"] == side["captain"]["id"] and rows[0]["privacy_consent"]["user_id"] == side["captain"]["id"]
+    assert [step["status"] for step in rows[0]["my_steps"]] == ["submitted"]
     assert w["lead"]["id"] not in str(rows)
+
+
+async def exported(flow, user_id: str) -> list[dict]:
+    from routes.dsgvo_routes import _user_data_sections
+
+    _kind, produce = dict(await _user_data_sections(flow.db, user_id))["league_applications"]
+    return [row async for row in produce()]
+
+
+@pytest.mark.asyncio
+async def test_export_shows_the_lead_their_own_steps_without_the_team(flow):
+    w = await application_world(flow)
+    side = w["teams"][0]
+    application = await submitted(flow, w, side)
+    ok(await decide(flow, w, application, "review"))
+    ok(await decide(flow, w, application, "accept", tournament_id=w["tid"]))
+
+    rows = await exported(flow, w["lead"]["id"])
+
+    assert [row["id"] for row in rows] == [application["id"]]
+    assert [step["status"] for step in rows[0]["my_steps"]] == ["in_review", "accepted"]
+    assert rows[0]["rule_consent"] is None and rows[0]["privacy_consent"] is None
+    assert side["captain"]["id"] not in str(rows)
+
+
+@pytest.mark.asyncio
+async def test_export_for_a_vice_who_withdrew_leaves_out_the_captains_consent(flow):
+    w = await application_world(flow)
+    side = w["teams"][0]
+    application = await submitted(flow, w, side)
+    flow.act_as(side["vice"])
+    ok(await flow.post(f"{base_url(w)}/applications/{application['id']}/withdraw", json={}))
+
+    rows = await exported(flow, side["vice"]["id"])
+
+    assert [row["id"] for row in rows] == [application["id"]] and rows[0]["withdrawn_at"]
+    assert [step["status"] for step in rows[0]["my_steps"]] == ["withdrawn"]
+    assert rows[0]["rule_consent"] is None and side["captain"]["id"] not in str(rows)
 
 
 @pytest.mark.asyncio

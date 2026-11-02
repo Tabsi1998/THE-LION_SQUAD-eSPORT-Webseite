@@ -183,8 +183,8 @@ async def _user_data_sections(db, user_id: str) -> list[tuple[str, tuple]]:
         # Liga-Kader (#2108): die festgehaltene Spiel-ID je Season samt Freigaben.
         ("league_rosters", _rows(db.league_rosters, me)),
         ("league_transfers", _rows(db.league_transfers, me)),
-        # Selbstanmeldung (#2205): eigene Anträge samt Zustimmung, ohne Kennungen der Leitung.
-        ("league_applications", _rows(db.league_applications, league_applications.export_query(user_id), _pick(*league_applications.EXPORT_FIELDS))),
+        # Selbstanmeldung (#2205): Anträge, in denen die Person steht, mit den eigenen Zustimmungen und Schritten, ohne Kennungen anderer.
+        ("league_applications", _rows(db.league_applications, league_applications.export_query(user_id), league_applications.export_row(user_id))),
         # Spielberechtigung (#2204): Spiele, in denen die Person auf einer Aufstellung oder Teilnehmerliste steht - nur die eigene Zugehörigkeit.
         ("league_appearances", _value(league_appearances)),
         # Regelwerk (#1646): welcher Fassung die Person für welches Co-Team zugestimmt hat.
