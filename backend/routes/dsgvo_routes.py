@@ -8,7 +8,7 @@ from fastapi.responses import StreamingResponse
 
 from database import get_db
 from auth import require_super, get_current_user
-from services import account_erasure
+from services import account_erasure, league_applications
 from services.competition_privacy import league_appearance_snapshot, registration_match_snapshot
 from models import now_utc, new_id
 
@@ -183,6 +183,8 @@ async def _user_data_sections(db, user_id: str) -> list[tuple[str, tuple]]:
         # Liga-Kader (#2108): die festgehaltene Spiel-ID je Season samt Freigaben.
         ("league_rosters", _rows(db.league_rosters, me)),
         ("league_transfers", _rows(db.league_transfers, me)),
+        # Selbstanmeldung (#2205): eigene Anträge samt Zustimmung, ohne Kennungen der Leitung.
+        ("league_applications", _rows(db.league_applications, league_applications.export_query(user_id), _pick(*league_applications.EXPORT_FIELDS))),
         # Spielberechtigung (#2204): Spiele, in denen die Person auf einer Aufstellung oder Teilnehmerliste steht - nur die eigene Zugehörigkeit.
         ("league_appearances", _value(league_appearances)),
         # Regelwerk (#1646): welcher Fassung die Person für welches Co-Team zugestimmt hat.

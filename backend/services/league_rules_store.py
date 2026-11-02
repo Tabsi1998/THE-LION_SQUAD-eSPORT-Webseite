@@ -30,11 +30,16 @@ async def deletion_blockers(db, kind: str, target: dict, seasons: list[dict]) ->
         {"scope": SEASON, "scope_id": {"$in": ids}, "status": PUBLISHED}, {"_id": 0, "scope_id": 1}).to_list(None)}
     agreed = {row["season_id"] for row in await db.league_rule_consents.find(
         {"season_id": {"$in": ids}}, {"_id": 0, "season_id": 1}).to_list(None)}
+    # Selbstanmeldung (#2205): Anträge sind Nachweise wie die Zustimmungen - sie bleiben auch, wenn das Konto dahinter weg ist.
+    applied = {row["season_id"] for row in await db.league_applications.find(
+        {"season_id": {"$in": ids}}, {"_id": 0, "season_id": 1}).to_list(None)}
     for season in seasons:
         if season["id"] in published:
             out.append(f"Das Regelwerk von {season.get('name')} hat veröffentlichte Versionen")
         if season["id"] in agreed:
             out.append(f"Zu {season.get('name')} gibt es Zustimmungen zum Regelwerk")
+        if season["id"] in applied:
+            out.append(f"Zu {season.get('name')} gibt es Anmeldungen")
     return out
 
 

@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pydantic import BaseModel, Field
 from pymongo.errors import DuplicateKeyError
 from database import get_db
-from services import squad_registration
+from services import league_applications, squad_registration
 from services.league_scope import is_league_staffel
 from services.staffel_guard import SQUAD_UNREGISTER_REFUSED, STAFFEL_REGISTRATION_REFUSED
 from services.permissions import is_confirmed_tournament_lead
@@ -1278,6 +1278,8 @@ async def _delete_registration_locked(db, tid: str, reg_id: str, me: dict) -> di
         return None
     await tournament_fees.close_price(db, reg, "Abmeldung")
     await db.tournament_registrations.delete_one({"id": reg_id})
+    if reg.get("squad_id"):
+        await league_applications.clear_assignment(db, reg_id, me.get("id"))
     await _move_up_from_waitlist(db, tid, me.get("id"))
     await _audit_tournament_action(
         db,
@@ -1386,6 +1388,8 @@ async def assign_squad(tid: str, body: SquadAssignBody, me: dict = Depends(requi
     try:
         async with (mutation_lock(db, season_resource) if season_resource else contextlib.nullcontext()):
             reg = await _insert_squad_registration(db, tournament, body, me)
+            # Sonderweg (#2205): Liegt ein offener Antrag des Co-Teams vor, gilt er damit als angenommen.
+            await league_applications.link_admin_assignment(db, tournament, reg, me.get("id"))
     except MutationLockBusy:
         raise HTTPException(status_code=409, detail=TOURNAMENT_BUSY_DETAIL)
     reg.pop("_id", None)
@@ -1417,6 +1421,7 @@ async def remove_squad(tid: str, reg_id: str, me: dict = Depends(require_lead_of
         raise HTTPException(status_code=409, detail="Der Spielplan steht schon – das Co-Team bitte über „Austritt "
                                                     "eintragen“ in der Teilnehmerliste herausnehmen.")
     await db.tournament_registrations.delete_one({"id": reg_id, "tournament_id": tid})
+    await league_applications.clear_assignment(db, reg_id, me.get("id"))
     await _audit_tournament_action(db, "league.squad.remove", me.get("id"), tid, {
         "registration_id": reg_id, "team_id": reg.get("team_id"), "squad_id": reg.get("squad_id"), "squad_name": reg.get("squad_name"),
     })

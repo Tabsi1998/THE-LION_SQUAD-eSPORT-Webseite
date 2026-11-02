@@ -86,6 +86,7 @@ async def dissolve_preview(db, team: dict) -> dict:
         else:
             withdraw.append(card)
     # Auch ausgetretene oder disqualifizierte Co-Teams stehen bis zum Ende der Staffel in Tabelle und Spielplan.
+    from services.league_applications import open_application_of
     from services.squad_registration import active_league_registration
 
     listed = {row["registration_id"] for row in blocked}
@@ -96,6 +97,11 @@ async def dissolve_preview(db, team: dict) -> dict:
             blocked.append({"registration_id": active["id"], "tournament_id": active.get("tournament_id"), "slug": active.get("tournament_slug"),
                             "title": active.get("tournament_title") or "Liga-Staffel", "start_date": None,
                             "reason": LEAGUE_SQUAD_REASON})
+        # Selbstanmeldung (#2205): Ein offener Antrag hängt am Co-Team - erst zurückziehen.
+        application = await open_application_of(db, squad["id"])
+        if application:
+            blocked.append({"registration_id": application["id"], "tournament_id": None, "slug": None, "title": application.get("display_name") or "Liga-Anmeldung",
+                            "start_date": None, "reason": "Für dieses Co-Team läuft eine Anmeldung in der Liga – bitte sie zuerst zurückziehen."})
     chat = await db.team_chat_messages.count_documents({"team_id": team["id"], "deleted_at": {"$exists": False}})
     return {
         "member_count": len(team.get("member_ids") or []),

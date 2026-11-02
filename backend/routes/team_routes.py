@@ -1625,6 +1625,11 @@ async def delete_squad(team_id: str, squad_id: str, me: dict = Depends(get_curre
         title = active.get("tournament_title") or "einer Liga-Staffel"
         raise HTTPException(status_code=409, detail=f"Das Co-Team spielt in {title} – löschen geht erst, wenn die "
                                                     "Turnierleitung die Zuteilung zurückgenommen hat oder die Staffel beendet ist.")
+    # Selbstanmeldung (#2205): Ein offener Antrag hängt am Co-Team - erst zurückziehen.
+    from services.league_applications import open_application_of
+
+    if await open_application_of(db, squad_id):
+        raise HTTPException(status_code=409, detail="Für dieses Co-Team läuft eine Anmeldung in der Liga – bitte sie zuerst zurückziehen.")
     res = await db.team_squads.delete_one({"id": squad_id, "team_id": team_id})
     if res.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Co-Team nicht gefunden")

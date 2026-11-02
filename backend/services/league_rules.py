@@ -624,17 +624,34 @@ async def _give_consent(db, version_id: str, season_id: str, squad_id: str, user
     team = (await teams_by_id(db, [registration])).get(registration.get("team_id") or "")
     if user["id"] not in responsible_ids(registration, team):
         raise LeagueProblem("Zustimmen dürfen Captain und Vertreter des Co-Teams.", 403)
-    key = {"rule_version_id": version["id"], "season_id": season_id, "squad_id": squad_id, "user_id": user["id"]}
+    return await record_consent(db, league["id"], version, season_id, squad_id, registration.get("team_id"), user["id"])
+
+
+async def record_consent(db, league_id: str, version: dict, season_id: str, squad_id: str, team_id: str | None, user_id: str) -> dict:
+    """Eine Zustimmung festhalten. Mehrfach folgenlos (eindeutiger Index). Aufrufer halten die Sperre der Season."""
+    key = {"rule_version_id": version["id"], "season_id": season_id, "squad_id": squad_id, "user_id": user_id}
     existing = await db.league_rule_consents.find_one(key, {"_id": 0})
     if existing:
         return {**existing, "replay": True}
-    doc = {"id": new_id(), **key, "version": version.get("version"), "league_id": league["id"],
-           "team_id": registration.get("team_id"), "created_at": now_utc().isoformat()}
+    doc = {"id": new_id(), **key, "version": version.get("version"), "league_id": league_id,
+           "team_id": team_id, "created_at": now_utc().isoformat()}
     try:
         await db.league_rule_consents.insert_one(dict(doc))
     except DuplicateKeyError:
         return {**doc, "replay": True}
     return {**doc, "replay": False}
+
+
+async def current_version(db, league: dict, season: dict) -> dict | None:
+    """Die Fassung, die heute für diese Season gilt - eigene, sonst die der Liga. ``None``: Es gibt keine, auch wenn ein Regeltext da ist."""
+    return (await _chain(db, league, season))["current"]
+
+
+def version_view(league: dict, season: dict, version: dict) -> dict:
+    """Was die Anmeldung über eine Fassung zeigt: Titel, Stand und die Wege zu Text und PDF."""
+    return {"version_id": version["id"], "version": version.get("version"), "label": _label(version), "title": version.get("title"),
+            "valid_from": version.get("valid_from"), "url": page_path(league, season),
+            "pdf_url": f"{api_path(league, season)}/versions/{version['id']}/pdf"}
 
 
 async def _by_id(collection, ids, query: dict | None = None, projection: dict | None = None) -> dict[str, dict]:

@@ -37,6 +37,9 @@ Regelwerk der Liga (docs/LIGA.md, #1646): `/liga/<liga>/regeln` und `/liga/<liga
 eine ihrer Seasons sichtbar ist). `members`: erreichbar, aber `noindex` mit neutraler Vorschaukarte, das PDF mit `X-Robots-Tag: noindex`. Alte Fassungen (`?version=`) und der Vergleich (`?vergleich=`) sind nie indexiert.
 `POST /api/league-rules/consents` verlangt eine Anmeldung und Verantwortung für das Co-Team. `/compare` und `/versions/<id>/pdf` haben eine Bremse je Besucher (nginx-Zone `tls_rules_heavy`, im Server 60 je Minute) und bleiben `no-store`.
 
+Selbstanmeldung der Liga (docs/LIGA.md, #2205): `GET /api/leagues/<liga>/<season>` trägt für alle nur Fenster-Stand und freie Plätze, keine Personen und keine Anträge. `/liga/<liga>/<season>/anmelden` verlangt eine Anmeldung und ist nicht in der Sitemap;
+`GET …/application`, `POST …/applications` und `POST …/applications/<id>/withdraw` verlangen eine Anmeldung und folgen `league_seasons.visibility` (unsichtbar 404), Schreiben dürfen nur Captain und Vertreter. `GET /api/me/league-applications` zeigt nur die eigenen Co-Teams.
+
 ## Oeffentlich, aber bewusst nicht indexiert
 
 Diese Routen bleiben erreichbar, damit Menschen sie verwenden und Crawler `noindex, follow` lesen koennen. Sie stehen nicht in der Sitemap:
