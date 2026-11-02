@@ -71,11 +71,13 @@ test.describe("Turnierleitung am Handy", () => {
     await expect(page.getByTestId("result-sentence")).toHaveText("NeonFalke gewinnt 2:1 – weiter ins Finale");
     await testInfo.attach("turnierleitung-fenster-390.png", { body: await page.screenshot(), contentType: "image/png" });
     await page.getByTestId("result-save").click();
+    await expect.poll(() => posts.length).toBeGreaterThanOrEqual(1);
     expect(posts[0]).toEqual({ path: "/api/matches/m1/result", body: { results: [{ registration_id: "r1", rank: 1, score: 2 }, { registration_id: "r2", rank: 2, score: 1 }], hold: true, reason: null } });
     await expect(page.getByTestId("result-undo-sentence")).toHaveText("NeonFalke gewinnt 2:1 – weiter ins Finale");
     await expect(page.getByTestId("result-undo")).toContainText("Rückgängig (10)");
 
     await page.getByTestId("result-undo").click();
+    await expect.poll(() => posts.length).toBeGreaterThanOrEqual(2);
     expect(posts[1]).toEqual({ path: "/api/matches/m1/result/undo", body: { hold_id: "h1" } });
     await expect(page.getByTestId("result-undo-bar")).toHaveCount(0);
 
