@@ -42,7 +42,8 @@ async def drafted(flow, name="paula"):
     event = await paid_event(flow, kassier)
     who = await person(flow, name)
     booked = await book(flow, who, event, companions=1)
-    assert (await billing_orders.classify_due())["invoiced"] == 1
+    result = await billing_orders.classify_due()
+    assert result["invoiced"] == 1
     order = await order_of(flow, booked)
     assert order["invoice_status"] == "draft" and order["payment_state"] == "draft"
     return kassier, event, who, booked, order
@@ -91,8 +92,10 @@ async def test_a_deleted_draft_leaves_lists_and_sums_and_closes_its_case(flow, f
     assert any(f"Entwurf {ref} in Dolibarr gelöscht" in text for text in texts) and not any("nicht lesbar" in text for text in texts)
 
     # Nichts legt ihn von selbst neu an: weder der Job noch das Nachholen fehlender Aufträge.
-    assert (await billing_orders.classify_due())["looked"] == 0
-    assert (await billing_repair.repair_missing_orders(flow.db))["repaired"] == 0
+    result = await billing_orders.classify_due()
+    assert result["looked"] == 0
+    result = await billing_repair.repair_missing_orders(flow.db)
+    assert result["repaired"] == 0
     assert len(fake.posts) == posts_before and await flow.db.billing_orders.count_documents({"registration_id": booked["id"]}) == 1
 
     flow.act_as(paula)
@@ -109,8 +112,10 @@ async def test_billing_again_is_a_decision_of_the_finance_team(flow, fake):
     await billing_orders.sync_due()
 
     flow.act_as(kassier)
-    assert (await flow.post(f"/api/admin/finance/orders/{order['id']}/release")).status_code == 200
-    assert (await billing_orders.classify_due())["invoiced"] == 1
+    result = await flow.post(f"/api/admin/finance/orders/{order['id']}/release")
+    assert result.status_code == 200
+    result = await billing_orders.classify_due()
+    assert result["invoiced"] == 1
     order = await order_of(flow, booked)
     assert order["status"] == "invoiced" and order["invoice_id"] != old_id and order["invoice_status"] == "draft" and not order["note"]
     assert (await registration(flow, booked))["billing_status"] == "invoiced"
@@ -124,12 +129,14 @@ async def test_billing_again_is_a_decision_of_the_finance_team(flow, fake):
 async def test_no_new_invoice_closes_the_order_for_good(flow, fake):
     kassier, event, paula, booked, order = await drafted(flow)
     flow.act_as(kassier)
-    assert (await flow.post(f"/api/admin/finance/orders/{order['id']}/dismiss")).status_code == 409, "der Beleg steht noch"
+    result = await flow.post(f"/api/admin/finance/orders/{order['id']}/dismiss")
+    assert result.status_code == 409, "der Beleg steht noch"
     fake.remove(order["invoice_id"])
     await billing_orders.sync_due()
 
     flow.act_as(paula)
-    assert (await flow.post(f"/api/admin/finance/orders/{order['id']}/dismiss")).status_code == 403
+    result = await flow.post(f"/api/admin/finance/orders/{order['id']}/dismiss")
+    assert result.status_code == 403
 
     flow.act_as(kassier)
     done = await flow.post(f"/api/admin/finance/orders/{order['id']}/dismiss")
@@ -139,18 +146,21 @@ async def test_no_new_invoice_closes_the_order_for_good(flow, fake):
     assert (await registration(flow, booked))["billing_status"] == "cancelled"
     assert await flow.db.audit_logs.count_documents({"action": "billing.order.dismiss", "target_id": order["id"], "actor_id": kassier["id"]}) == 1
     assert (await flow.get("/api/admin/finance/overview")).json()["open"] == []
-    assert (await flow.post(f"/api/admin/finance/orders/{order['id']}/dismiss")).status_code == 409
+    result = await flow.post(f"/api/admin/finance/orders/{order['id']}/dismiss")
+    assert result.status_code == 409
 
     # Ein gewöhnlicher Auftrag, der auf Freigabe wartet, lässt sich so nicht wegklicken.
     await flow.db.billing_orders.insert_one({"id": "o-held", "kind": "event", "source_id": event["id"], "registration_id": "r-x", "user_id": paula["id"], "status": "held", "total_cents": 100})
-    assert (await flow.post("/api/admin/finance/orders/o-held/dismiss")).status_code == 409
+    result = await flow.post("/api/admin/finance/orders/o-held/dismiss")
+    assert result.status_code == 409
 
 
 @pytest.mark.asyncio
 async def test_a_deleted_draft_of_a_cancelled_booking_ends_the_case(flow, fake):
     kassier, event, paula, booked, order = await drafted(flow)
     flow.act_as(paula)
-    assert (await flow.client.delete(f"/api/events/{event['id']}/registrations/me")).status_code == 200
+    result = await flow.client.delete(f"/api/events/{event['id']}/registrations/me")
+    assert result.status_code == 200
     [case] = await billing_cases.cases_for_order(flow.db, order["id"])
     assert case["kind"] == "cancelled_after_invoice" and case["status"] == "open"
 
@@ -230,7 +240,8 @@ async def test_the_second_look_by_order_reference_must_agree(flow, fake):
     row = fake.core_invoices.pop(order["invoice_id"])
     row["id"] = 9001
     fake.core_invoices[9001] = row
-    assert not (await billing_orders.sync_due()).get("removed")
+    result = await billing_orders.sync_due()
+    assert not result.get("removed")
     assert (await order_of(flow, booked))["status"] == "invoiced"
 
     # Scheitert der zweite Blick an der Verbindung, ist auch nichts bewiesen - und kein Prüffall nötig.
@@ -258,7 +269,8 @@ async def test_reading_by_hand_shows_the_removal_too(flow, fake):
 async def test_a_changed_booking_keeps_its_case_and_warns_about_the_price(flow, fake):
     kassier, event, _, booked, order = await drafted(flow)
     flow.act_as(kassier)
-    assert (await flow.patch(f"/api/events/{event['id']}/registrations/{booked['id']}", json={"companion_count": 0})).status_code == 200
+    result = await flow.patch(f"/api/events/{event['id']}/registrations/{booked['id']}", json={"companion_count": 0})
+    assert result.status_code == 200
     fake.remove(order["invoice_id"])
     await billing_orders.sync_due()
     order = await order_of(flow, booked)
@@ -274,8 +286,10 @@ async def test_a_deleted_draft_of_a_start_fee_cleans_the_tournament_registration
                                                        "invoice_status": "draft", "payment_state": "draft", "price_snapshot": {"total_cents": 2500, "hash": "h1", "positions": []}})
     await flow.db.billing_orders.insert_one({"id": "o-t", "kind": "tournament", "source_id": "t-1", "registration_id": "tr-1", "user_id": "u-1", "status": "invoiced", "total_cents": 2500, "currency": "EUR",
                                              "booking_key": "tournament:tr-1:h1", "invoice_id": 4711, "invoice_ref": "(PROV4711)", "invoice_status": "draft", "payment_state": "draft"})
-    assert (await billing_orders.sync_due())["removed"] == 1
+    result = await billing_orders.sync_due()
+    assert result["removed"] == 1
     assert (await flow.db.billing_orders.find_one({"id": "o-t"}, {"_id": 0}))["status"] == "held"
     reg = await flow.db.tournament_registrations.find_one({"id": "tr-1"}, {"_id": 0})
     assert reg["billing_status"] == "pending" and "invoice_id" not in reg and "invoice_ref" not in reg and "payment_state" not in reg and reg["price_snapshot"]["total_cents"] == 2500
-    assert (await billing_repair.repair_missing_orders(flow.db))["repaired"] == 0, "kein zweiter Auftrag von selbst"
+    result = await billing_repair.repair_missing_orders(flow.db)
+    assert result["repaired"] == 0, "kein zweiter Auftrag von selbst"

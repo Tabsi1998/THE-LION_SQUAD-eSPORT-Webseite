@@ -41,7 +41,8 @@ async def invoiced(flow, kassier, name="paula"):
     event = await paid_event(flow, kassier)
     who = await person(flow, name)
     booked = await book(flow, who, event, companions=1)
-    assert (await billing_orders.classify_due())["invoiced"] == 1
+    result = await billing_orders.classify_due()
+    assert result["invoiced"] == 1
     return event, who, booked, await order_of(flow, booked)
 
 
@@ -125,7 +126,8 @@ async def test_changes_are_kept_in_the_timeline_without_copying_the_free_text(fl
     assert [text for text in await timeline(flow, order["id"]) if "Abschluss" in text] == ["Abschluss in Dolibarr: Sonstiger Grund – System"]
 
     fake.core_invoices[order["invoice_id"]].update(close_code="discount_vat", close_note="Skonto vereinbart")
-    assert (await billing_orders.reconcile_due())["changed"] == 1
+    result = await billing_orders.reconcile_due()
+    assert result["changed"] == 1
     assert (await order_of(flow, booked))["close_note"] == "Skonto vereinbart"
     lines = [text for text in await timeline(flow, order["id"]) if "Abschluss" in text]
     assert len(lines) == 2 and billing_orders.CLOSE_REASONS["discount_vat"] in lines[1]
@@ -176,7 +178,8 @@ async def test_account_deletion_removes_the_note_for_good_and_the_export_names_i
     [exported] = export["billing_orders"]
     assert exported["close_note"] == NOTE and exported["close_code"] == "other"
 
-    assert await billing_orders.anonymize_user(flow.db, paula["id"]) == 1
+    result = await billing_orders.anonymize_user(flow.db, paula["id"])
+    assert result == 1
     order = await order_of(flow, booked)
     assert "close_note" not in order and order["close_code"] == "other", "Grund als Nachweis, der freie Text ist weg"
 

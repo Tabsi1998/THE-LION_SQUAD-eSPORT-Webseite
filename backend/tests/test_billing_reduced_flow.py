@@ -41,7 +41,8 @@ async def invoiced(flow, kassier, name="paula", companions=1):
     event = await paid_event(flow, kassier)
     who = await person(flow, name)
     booked = await book(flow, who, event, companions=companions)
-    assert (await billing_orders.classify_due())["invoiced"] == 1
+    result = await billing_orders.classify_due()
+    assert result["invoiced"] == 1
     return event, who, booked, await order_of(flow, booked)
 
 
@@ -70,7 +71,8 @@ async def test_reduction_without_any_payment_opens_nothing_and_refunds_nothing(f
     fake.core_invoices[order["invoice_id"]]["date_lim_reglement"] = int(time.time()) - 40 * 86400
     fake.close_reduced(order["invoice_id"], code="other", note="Vorstand erlässt den Betrag")
 
-    assert (await billing_orders.sync_due())["paid"] == 1
+    result = await billing_orders.sync_due()
+    assert result["paid"] == 1
     order = await order_of(flow, booked)
     assert order["payment_state"] == "paid_reduced" and order["paid"] is True and order["remaining_cents"] == 4000
     assert order["invoice_status"] == "paid"
@@ -78,8 +80,10 @@ async def test_reduction_without_any_payment_opens_nothing_and_refunds_nothing(f
     reg = await flow.db.event_registrations.find_one({"id": booked["id"]}, {"_id": 0})
     assert reg["billing_status"] == "paid" and reg["payment_state"] == "paid_reduced"
     assert (await billing_orders.attention_counts(flow.db))["overdue"] == 0, "auch nach dem Zahlungsziel keine Mahnliste"
-    assert (await billing_orders.sync_due())["looked"] == 0, "erledigt: nicht mehr alle zehn Minuten"
-    assert (await billing_orders.reconcile_due())["looked"] == 1, "aber der tägliche Abgleich liest ihn neu"
+    result = await billing_orders.sync_due()
+    assert result["looked"] == 0, "erledigt: nicht mehr alle zehn Minuten"
+    result = await billing_orders.reconcile_due()
+    assert result["looked"] == 1, "aber der tägliche Abgleich liest ihn neu"
 
     flow.act_as(kassier)
     overview = (await flow.get("/api/admin/finance/overview")).json()
@@ -148,7 +152,8 @@ async def test_existing_wrong_states_heal_at_the_next_read_without_a_migration(f
     fake.pay(order["invoice_id"], 20)
     fake.close_reduced(order["invoice_id"])
     await flow.db.billing_orders.update_one({"id": order["id"]}, {"$set": {"payment_state": "partial", "invoice_status": "paid", "paid": True, "remaining_cents": 2000}})
-    assert (await billing_orders.sync_due())["looked"] == 1
+    result = await billing_orders.sync_due()
+    assert result["looked"] == 1
     assert (await order_of(flow, booked))["payment_state"] == "paid_reduced"
 
 
