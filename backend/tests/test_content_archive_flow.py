@@ -220,6 +220,66 @@ async def test_sponsors_and_references_have_one_switch_left(flow):
     assert refused.status_code == 422
 
 
+# ---------------------------------------------------------------- Archivierter Partner bleibt verknüpft
+
+async def archived_partner(flow, pid="pa"):
+    await flow.db.partners.insert_one({"id": pid, "slug": pid, "name": f"Probe {pid}", "is_active": False})
+
+
+@pytest.mark.asyncio
+async def test_saving_a_reference_keeps_an_archived_partner_but_cannot_add_one(flow):
+    await editor(flow)
+    await flow.db.partners.insert_one({"id": "pa", "slug": "pa", "name": "Probe Verein", "is_active": True})
+    ref = (await flow.post("/api/references", json={"title": "Cup", "partner_ids": ["pa"]})).json()
+    assert ref["partner_ids"] == ["pa"]
+    archived = await flow.patch("/api/partners/pa", json={"is_active": False})
+    assert archived.json()["is_active"] is False
+
+    saved = await flow.patch(f"/api/references/{ref['id']}", json={"title": "Cup 2", "partner_ids": ["pa"]})
+    assert saved.json()["partner_ids"] == ["pa"], "Verknüpfung weg"
+    assert saved.json()["partners"] == [], "nach außen kein archivierter Partner"
+    refused = await flow.delete("/api/partners/pa")
+    assert refused.status_code == 409 and "1 Referenz" in refused.json()["detail"]
+    restored = await flow.patch("/api/partners/pa", json={"is_active": True})
+    assert restored.status_code == 200
+    assert [partner["id"] for partner in (await flow.get(f"/api/references/{ref['id']}")).json()["partners"]] == ["pa"]
+
+    await archived_partner(flow, "pb")
+    added = await flow.patch(f"/api/references/{ref['id']}", json={"partner_ids": ["pa", "pb", "gibt-es-nicht"]})
+    assert added.json()["partner_ids"] == ["pa"], "neu dazu nur aktive"
+    other = await flow.post("/api/references", json={"title": "Neu", "partner_ids": ["pb"]})
+    assert other.json()["partner_ids"] == []
+
+
+@pytest.mark.asyncio
+async def test_events_tournaments_and_series_keep_an_archived_partner(flow):
+    await editor(flow)
+    admin = await flow.add_user(role="superadmin", name="alles")
+    flow.act_as(admin)
+    await archived_partner(flow)
+    await archived_partner(flow, "pb")
+    await flow.db.events.insert_one({"id": "e-1", "slug": "e-1", "name": "LAN", "status": "scheduled", "partner_ids": ["pa"]})
+    event = await flow.patch("/api/events/e-1", json={"partner_ids": ["pa", "pb"]})
+    assert event.status_code == 200, event.text
+    assert event.json()["partner_ids"] == ["pa"]
+
+    await flow.create_tournament(id="t-1", slug="t-1", partner_ids=["pa"])
+    tournament = await flow.patch("/api/tournaments/t-1", json={"partner_ids": ["pa", "pb"]})
+    assert tournament.status_code == 200, tournament.text
+    assert (await flow.db.tournaments.find_one({"id": "t-1"}))["partner_ids"] == ["pa"]
+
+    await flow.db.reference_lineages.insert_one({"id": "l-1", "slug": "l-1", "title": "Spur", "kind": "series", "partner_ids": ["pa"], "partner_roles": {"pa": "organizer"}})
+    lineage = await flow.patch("/api/reference-series/admin/lineages/l-1", json={"partner_ids": ["pa", "pb"]})
+    assert lineage.status_code == 200, lineage.text
+    stored = await flow.db.reference_lineages.find_one({"id": "l-1"})
+    assert stored["partner_ids"] == ["pa"] and stored["partner_roles"] == {"pa": "organizer"}
+
+    await flow.db.reference_series.insert_one({"id": "s-1", "lineage_id": "l-1", "season": "2026", "season_slug": "2026", "status": "planned", "partner_ids": ["pa"], "partner_roles": {"pa": "contributor"}})
+    series = await flow.patch("/api/reference-series/admin/series/s-1", json={"partner_ids": ["pa", "pb"]})
+    assert series.status_code == 200, series.text
+    assert (await flow.db.reference_series.find_one({"id": "s-1"}))["partner_ids"] == ["pa"]
+
+
 # ---------------------------------------------------------------- RF4: archivieren, löschen nur unbenutzt, Protokoll
 
 @pytest.mark.asyncio

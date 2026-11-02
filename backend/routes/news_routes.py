@@ -1940,14 +1940,14 @@ async def update_reference(rid: str, body: ReferenceUpdate, expected_updated_at:
     }
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
-    if "partner_ids" in updates:
-        updates["partner_ids"] = await partner_pages.clean_partner_ids(db, updates["partner_ids"])
     if updates.get("game_id") and not await db.games.find_one({"id": updates["game_id"]}, {"id": 1}):
         raise HTTPException(404, "Spiel nicht gefunden.")
     await _check_reference_series(db, updates.get("series_id"))
     existing = await db.references.find_one({"id": rid}, {"_id": 0})
     if not existing:
         raise HTTPException(404, "Referenz nicht gefunden.")
+    if "partner_ids" in updates:
+        updates["partner_ids"] = await partner_pages.clean_partner_ids(db, updates["partner_ids"], keep=existing.get("partner_ids"))
     if await game_usage.chosen_is_archived(db, updates.get("game_id"), existing.get("game_id")):
         raise HTTPException(422, game_usage.ARCHIVED_DETAIL)
     # Gehört zur Saison (#1750): nie offener als alle verknüpften Saisons und Spuren - über ``series_id`` an der

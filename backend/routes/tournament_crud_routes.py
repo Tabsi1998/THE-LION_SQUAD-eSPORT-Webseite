@@ -474,7 +474,7 @@ async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends
         if (raw_updates.pop("event_id") or None) != (existing.get("event_id") or None):
             raise HTTPException(status_code=400, detail=EVENT_LINK_ONLY_IN_EVENT)
     if "partner_ids" in raw_updates:
-        raw_updates["partner_ids"] = await partner_pages.clean_partner_ids(db, raw_updates["partner_ids"])
+        raw_updates["partner_ids"] = await partner_pages.clean_partner_ids(db, raw_updates["partner_ids"], keep=existing.get("partner_ids"))
     if "format_label" in raw_updates:
         raw_updates["format_label"] = (raw_updates.get("format_label") or "").strip() or None
     if "award_images" in raw_updates:

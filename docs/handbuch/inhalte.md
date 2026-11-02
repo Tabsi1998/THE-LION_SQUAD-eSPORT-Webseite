@@ -295,7 +295,9 @@ unterstützt, steht unter **Sponsoren** (3.6). Jeder Partner hat eine eigene Sei
   zeigt seine Seite die Spur mit ihren Saisons – neueste zuerst, mit Spiel, unserem Stand bzw. Endplatz und „Läuft
   gerade“; jede Saison führt zu ihrer Serienseite. Interne Spuren und Saisons erscheinen dort nie.
 - **Nur aktive Partner** erscheinen auf Serienseiten, in der Übersicht und in der Auswahl. Wird ein Partner archiviert (Archiv-Knopf
-  auf der Karte oder **Öffentlich zeigen** aus), verschwindet er überall, ohne dass ihr Spuren oder Saisons anfassen müsst.
+  auf der Karte oder **Öffentlich zeigen** aus), verschwindet er überall, ohne dass ihr Spuren oder Saisons anfassen müsst. Seine
+  Verknüpfungen bleiben, auch wenn ihr eine Referenz, ein Event oder ein Turnier speichert; nach dem Zurückholen ist alles wieder da.
+  In der Auswahl steht dann „archivierter Partner bleibt verknüpft“, dort löst **Verknüpfung lösen** den Link.
 - **Löschen** geht nur, wenn der Partner nirgends verwendet wird (Referenzen, Events, Turniere, Serien, Saisons); sonst nennt die
   Meldung, wo er noch steht. Archivieren, Zurückholen und Löschen stehen im Protokoll.
 - Mit Dolibarr kommen Name, Art und „Öffentlich zeigen“ von dort (gesperrt, mit Hinweis): Inaktiv wird der Partner, wenn die Firma in
