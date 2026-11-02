@@ -48,7 +48,7 @@ async def task_counts(db, now: datetime | None = None) -> dict:
         "billing_cases": await db.billing_cases.count_documents({"status": "open"}),
         # Sponsoring läuft in den nächsten 30 Tagen aus (#405) - rechtzeitig verlängern oder verabschieden.
         "sponsors_expiring": await db.sponsors.count_documents({
-            "is_active": {"$ne": False}, "contract_status": {"$nin": ["paused", "cancelled"]},
+            "is_active": {"$ne": False},
             "contract_end": {"$gte": now.date().isoformat(), "$lte": (now + timedelta(days=SPONSOR_WARNING_DAYS)).date().isoformat()},
         }),
     }

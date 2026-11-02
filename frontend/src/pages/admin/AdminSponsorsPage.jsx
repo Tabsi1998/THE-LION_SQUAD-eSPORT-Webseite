@@ -17,14 +17,11 @@ import { Archive, ArchiveRestore, Plus, Trash2, Upload, Pencil } from "lucide-re
 const TIERS = ["main", "platinum", "gold", "silver", "bronze"];
 const TIER_LABELS = { main: "Hauptsponsor", platinum: "Platin", gold: "Gold", silver: "Silber", bronze: "Bronze" };
 const TIER_COLORS = { main: "text-[#29B6E8]", platinum: "text-[#E5E4E2]", gold: "text-[#FFD700]", silver: "text-white/80", bronze: "text-[#CD7F32]" };
-const CONTRACT_STATUSES = ["active", "planned", "paused", "expired", "cancelled"];
-const CONTRACT_LABELS = { active: "Aktiv", planned: "Geplant", paused: "Pausiert", expired: "Abgelaufen", cancelled: "Gekündigt", inactive: "Archiviert" };
+const STATUS_LABELS = { active: "Aktiv", planned: "Geplant", expired: "Abgelaufen", inactive: "Archiviert" };
 const STATUS_CLASSES = {
   active: "bg-[#00FF88]/10 text-[#00FF88]",
   planned: "bg-[#29B6E8]/10 text-[#29B6E8]",
-  paused: "bg-[#FFD700]/10 text-[#FFD700]",
   expired: "bg-white/10 text-white/60",
-  cancelled: "bg-[#FF3B30]/10 text-[#FF3B30]",
   inactive: "bg-[#FF3B30]/10 text-[#FF3B30]",
 };
 const TIER_DEFAULTS = {
@@ -44,15 +41,17 @@ const PLACEMENT_LABELS = [
   ["show_in_emails", "E-Mail"],
 ];
 
-function effectiveSponsorStatus(sponsor) {
-  if (sponsor?.effective_status) return sponsor.effective_status;
+// Dieselbe Rechnung wie auf dem Server (#2130): der Schalter „Öffentlich zeigen“, dazu die Laufzeit.
+function formSponsorStatus(sponsor) {
   if (sponsor?.is_active === false) return "inactive";
-  const status = sponsor?.contract_status || "active";
-  if (status === "paused" || status === "cancelled") return status;
   const today = new Date().toISOString().slice(0, 10);
   if (sponsor?.contract_start && sponsor.contract_start > today) return "planned";
   if (sponsor?.contract_end && sponsor.contract_end < today) return "expired";
-  return status === "expired" || status === "planned" ? "active" : status;
+  return "active";
+}
+
+function effectiveSponsorStatus(sponsor) {
+  return sponsor?.effective_status || formSponsorStatus(sponsor);
 }
 
 function formatDate(value) {
@@ -156,7 +155,7 @@ export default function AdminSponsorsPage() {
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Partner</span>
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Sponsoren</h1>
           <p className="mt-2 text-white/60 text-sm max-w-xl">
-            Tier steuert Größe und Reihenfolge. Vertragsstatus und Laufzeit entscheiden, ob ein Sponsor öffentlich ausgespielt wird; die Haken entscheiden die Platzierungen.
+            Die Stufe bestimmt Größe und Reihenfolge. Die Laufzeit und „Öffentlich zeigen“ entscheiden, ob ein Sponsor zu sehen ist, die Haken, wo.
           </p>
         </div>
         <div className="flex gap-2">
@@ -220,7 +219,7 @@ export default function AdminSponsorsPage() {
                   <div className="font-heading text-lg font-bold truncate">{s.name}</div>
                   <div className="flex gap-1 mt-1 flex-wrap">
                     <span className={`text-[9px] px-1.5 py-0.5 rounded-sm font-bold uppercase tracking-widest ${STATUS_CLASSES[effectiveSponsorStatus(s)] || STATUS_CLASSES.inactive}`}>
-                      {CONTRACT_LABELS[effectiveSponsorStatus(s)] || effectiveSponsorStatus(s)}
+                      {STATUS_LABELS[effectiveSponsorStatus(s)] || effectiveSponsorStatus(s)}
                     </span>
                     {s.show_on_home && <span className="text-[9px] px-1.5 py-0.5 bg-[#29B6E8]/15 text-[#29B6E8] rounded-sm font-bold uppercase tracking-widest">Home</span>}
                     {s.show_on_footer && <span className="text-[9px] px-1.5 py-0.5 bg-white/10 text-white/70 rounded-sm font-bold uppercase tracking-widest">Footer</span>}
@@ -279,7 +278,6 @@ function SponsorForm({ sponsor, events = [], locked = new Set(), onClose, onSave
     link: sponsor?.link || "", description: sponsor?.description || "",
     tier: initialTier,
     is_active: sponsor?.is_active !== false,
-    contract_status: sponsor?.contract_status || "active",
     contract_start: sponsor?.contract_start || "",
     contract_end: sponsor?.contract_end || "",
     contact_name: sponsor?.contact_name || "",
@@ -363,9 +361,8 @@ function SponsorForm({ sponsor, events = [], locked = new Set(), onClose, onSave
         </FormGrid>
       </FormSection>
 
-      <FormSection title="Vertrag und Kontakt" hint="Vertragsstatus und Laufzeit entscheiden, ob der Sponsor öffentlich ausgespielt wird.">
-        <FormGrid cols={3}>
-          <SelectField label="Vertragsstatus" value={form.contract_status} onChange={(v) => set("contract_status", v)} options={CONTRACT_STATUSES.map((status) => [status, CONTRACT_LABELS[status]])} testId="sponsor-contract-status" />
+      <FormSection title="Laufzeit und Kontakt" hint="Vor dem Start ist der Sponsor noch nicht zu sehen, nach dem Ende steht er bei den ehemaligen Unterstützern.">
+        <FormGrid>
           <GermanDateField id="sponsor-contract-start" label="Start" value={(form.contract_start || "").slice(0, 10)} onChange={(v) => set("contract_start", v)} testId="sponsor-contract-start" allowFuture {...lock("contract_start")} />
           <GermanDateField id="sponsor-contract-end" label="Ende" value={(form.contract_end || "").slice(0, 10)} onChange={(v) => set("contract_end", v)} testId="sponsor-contract-end" allowFuture {...lock("contract_end")} />
         </FormGrid>
@@ -383,7 +380,7 @@ function SponsorForm({ sponsor, events = [], locked = new Set(), onClose, onSave
           </button>
         </div>
         <FormGrid cols={3}>
-          <CheckField label="Aktiv" checked={form.is_active !== false} onChange={(v) => set("is_active", v)} testId="sponsor-active" />
+          <CheckField label="Öffentlich zeigen" hint="Aus = archiviert: überall weg, hier noch da." checked={form.is_active !== false} onChange={(v) => set("is_active", v)} testId="sponsor-active" />
           <CheckField label="Auf Home" checked={form.show_on_home === true} onChange={(v) => setPlacement("show_on_home", v)} testId="sponsor-show-home" />
           <CheckField label="Im Footer" checked={form.show_on_footer === true} onChange={(v) => setPlacement("show_on_footer", v)} testId="sponsor-show-footer" />
           <CheckField label="Events" checked={form.show_on_events === true} onChange={(v) => setPlacement("show_on_events", v)} testId="sponsor-show-events" accent="#FFD700" />
@@ -433,16 +430,16 @@ function SponsorForm({ sponsor, events = [], locked = new Set(), onClose, onSave
 }
 
 function SponsorPlacementPreview({ sponsor }) {
-  const status = effectiveSponsorStatus(sponsor);
+  const status = formSponsorStatus(sponsor);
   const enabled = PLACEMENT_LABELS.filter(([key]) => sponsor[key] === true);
-  const visible = sponsor.is_active !== false && status === "active";
+  const visible = status === "active";
   return (
     <div className="border border-white/10 rounded-sm bg-[#080808] p-3" data-testid="sponsor-placement-preview">
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Vorschau Ausspielung</div>
           <p className="mt-1 text-[10px] text-white/40">
-            Öffentlich sichtbar nur bei aktivem Vertrag innerhalb der Laufzeit.
+            Öffentlich sichtbar, wenn „Öffentlich zeigen“ an ist und die Laufzeit passt.
           </p>
         </div>
         <span className={`text-[9px] px-2 py-1 rounded-sm font-bold uppercase tracking-widest ${visible ? STATUS_CLASSES.active : STATUS_CLASSES[status] || STATUS_CLASSES.inactive}`}>

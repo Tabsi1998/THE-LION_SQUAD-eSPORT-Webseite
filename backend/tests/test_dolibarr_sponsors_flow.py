@@ -222,9 +222,8 @@ async def test_daily_center_counts_sponsorships_ending_within_thirty_days(flow):
     soon = (now + timedelta(days=10)).date().isoformat()
     later = (now + timedelta(days=40)).date().isoformat()
     await flow.db.sponsors.insert_many([
-        {"id": "a", "name": "A", "contract_end": soon, "is_active": True, "contract_status": "active"},
-        {"id": "b", "name": "B", "contract_end": later, "is_active": True, "contract_status": "active"},
-        {"id": "c", "name": "C", "contract_end": soon, "is_active": True, "contract_status": "paused"},
+        {"id": "a", "name": "A", "contract_end": soon, "is_active": True},
+        {"id": "b", "name": "B", "contract_end": later, "is_active": True},
         {"id": "d", "name": "D", "contract_end": soon, "is_active": False},
         {"id": "e", "name": "E", "contract_end": (now - timedelta(days=1)).date().isoformat(), "is_active": True},
     ])

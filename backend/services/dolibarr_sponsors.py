@@ -215,7 +215,7 @@ async def apply_sponsors(db, companies: dict[int, dict], *, today: str | None = 
             updated += 1
         else:
             doc = {"id": new_id(), "created_at": stamp, "updated_at": stamp, "tier": company.get("tier") or "bronze", "is_active": True,
-                   "contract_status": "active", "order_index": 0, "event_ids": [], "logo_url": None, "description": None, **values}
+                   "order_index": 0, "event_ids": [], "logo_url": None, "description": None, **values}
             await db.sponsors.insert_one(doc)
             created += 1
     # Nicht mehr in der Kategorie: Sponsoring endet heute - der Eintrag bleibt (ehemalige Unterstützer).

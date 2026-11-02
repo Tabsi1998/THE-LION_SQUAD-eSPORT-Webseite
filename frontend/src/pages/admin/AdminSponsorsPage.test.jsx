@@ -121,6 +121,24 @@ test("Archivieren und Zurückholen schalten „Aktiv“; ein Sponsor in Verwendu
   await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Dieser Sponsor wird noch verwendet: 1 Event."));
 });
 
+test("ein Schalter: kein Vertragsstatus mehr, die Vorschau rechnet mit Schalter und Laufzeit (#2130)", async () => {
+  mockApi(SOURCE_OFF);
+  render(<MemoryRouter><AdminSponsorsPage /></MemoryRouter>);
+  fireEvent.click((await screen.findByTestId("sponsor-card-s2")).querySelector("button"));
+  expect(screen.queryByTestId("sponsor-contract-status")).toBeNull();
+  const preview = screen.getByTestId("sponsor-placement-preview");
+  expect(preview).toHaveTextContent("Wird ausgespielt");
+  fireEvent.click(screen.getByTestId("sponsor-active"));
+  expect(preview).toHaveTextContent("Nicht öffentlich");
+  fireEvent.click(screen.getByTestId("sponsor-active"));
+  fireEvent.change(screen.getByTestId("sponsor-contract-end"), { target: { value: "2020-01-01" } });
+  expect(preview).toHaveTextContent("Nicht öffentlich");
+  apiMock.patch.mockResolvedValue({ data: {} });
+  fireEvent.click(screen.getByTestId("sponsor-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalled());
+  expect(apiMock.patch.mock.calls[0][1]).not.toHaveProperty("contract_status");
+});
+
 // Event-Sponsoren (#1371): nur der Sponsor sagt, wo er erscheint - „bei allen Events“ oder „bei ausgewählten Events“.
 test("Events: bei allen leert die Auswahl, bei ausgewählten verlangt mindestens ein Event", async () => {
   apiMock.get.mockImplementation(async (url) => {

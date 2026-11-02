@@ -24,7 +24,7 @@ import "@/components/tls/references/references.css";
 // oder Einzelstarter). Die Logik steht in lib/referencesOverview.js; fremde Namen erscheinen hier nie.
 
 const modeLabels = { online: "Online", offline: "Vor Ort", hybrid: "Hybrid" };
-const statusLabels = { active: "Laufend", planned: "Geplant", completed: "Abgeschlossen", archived: "Archiviert" };
+const statusLabels = { active: "Laufend", planned: "Geplant", completed: "Abgeschlossen" };
 
 // Die Gruppierung der Chronik lebt in lib/referencesOverview.js; hier bleibt sie für ältere Aufrufer erreichbar.
 export { timelineGroups } from "@/lib/referencesOverview";

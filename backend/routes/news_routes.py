@@ -943,7 +943,6 @@ _SPONSOR_PLACEMENT_FIELDS = (
     "show_on_home", "show_on_footer", "show_on_events",
     "show_on_tv", "show_on_pdf", "show_in_emails",
 )
-_SPONSOR_CONTRACT_STATUSES = {"planned", "active", "paused", "expired", "cancelled"}
 _TIER_PLACEMENT_DEFAULTS = {
     "main": {"show_on_home": True, "show_on_footer": True, "show_on_events": False, "show_on_tv": True, "show_on_pdf": True, "show_in_emails": True},
     "platinum": {"show_on_home": False, "show_on_footer": True, "show_on_events": False, "show_on_tv": True, "show_on_pdf": False, "show_in_emails": False},
@@ -976,13 +975,9 @@ def _clean_date(value) -> str | None:
 
 
 def _sponsor_effective_status(doc: dict) -> str:
+    """Von Hand ausblenden geht nur über ``is_active`` (#2130); die Laufzeit kommt oft aus Dolibarr und zählt zusätzlich."""
     if doc.get("is_active") is False:
         return "inactive"
-    status = str(doc.get("contract_status") or "active").strip().lower()
-    if status not in _SPONSOR_CONTRACT_STATUSES:
-        status = "active"
-    if status in {"paused", "cancelled"}:
-        return status
     today = _today_iso()
     start = _clean_date(doc.get("contract_start"))
     end = _clean_date(doc.get("contract_end"))
@@ -990,7 +985,7 @@ def _sponsor_effective_status(doc: dict) -> str:
         return "planned"
     if end and end < today:
         return "expired"
-    return "active" if status in {"active", "expired", "planned"} else status
+    return "active"
 
 
 def _sponsor_is_public_active(doc: dict) -> bool:
@@ -1001,8 +996,6 @@ def _sponsor_defaults(doc: dict) -> dict:
     """Resolve tier-based placement suggestions when fields are missing."""
     tier = _normalize_tier(doc.get("tier"))
     doc["tier"] = tier
-    status = str(doc.get("contract_status") or "active").strip().lower()
-    doc["contract_status"] = status if status in _SPONSOR_CONTRACT_STATUSES else "active"
     doc["contract_start"] = _clean_date(doc.get("contract_start"))
     doc["contract_end"] = _clean_date(doc.get("contract_end"))
     defaults = _TIER_PLACEMENT_DEFAULTS.get(tier, _TIER_PLACEMENT_DEFAULTS["bronze"])
@@ -1598,7 +1591,7 @@ async def _freeze_reference_members(db, doc: dict, existing: dict | None = None)
 
 
 def _sort_references(items: list[dict]) -> list[dict]:
-    status_rank = {"active": 0, "planned": 1, "completed": 2, "archived": 3}
+    status_rank = {"active": 0, "planned": 1, "completed": 2}
 
     def date_ts(item: dict) -> float:
         value = item.get("start_date") or item.get("end_date")

@@ -439,6 +439,34 @@ async def migrate_squad_game_names(db) -> str:
     return f"{moved} squads moved to a game id, {left} left"
 
 
+async def migrate_one_hide_field(db) -> str:
+    """Je Eintrag ein Feld zum Ausblenden: ``is_active`` (#2130). Wer heute verborgen ist, bleibt es, wer sichtbar ist, auch.
+
+    Sponsor: „Pausiert“ und „Gekündigt“ verbargen ihn, also wird ``is_active`` aus; alle anderen Vertragsstatus wirkten
+    nicht, die Laufzeit zählt weiter. Danach gibt es ``contract_status`` nicht mehr. Referenz: „Archiviert“ blendete nichts
+    aus; solche Referenzen heißen jetzt „Abgeschlossen“, ``is_active`` bleibt, wie es ist. Was umgestellt wurde, steht mit
+    Namen und altem Status im Protokoll. Läuft ein zweites Mal ohne Wirkung."""
+    hidden: list[dict] = []
+    cleared = 0
+    async for doc in db.sponsors.find({"contract_status": {"$exists": True}}, {"_id": 0, "id": 1, "name": 1, "is_active": 1, "contract_status": 1}):
+        status = str(doc.get("contract_status") or "").strip().lower()
+        hide = status in {"paused", "cancelled"} and doc.get("is_active") is not False
+        change: dict = {"$unset": {"contract_status": ""}}
+        if hide:
+            change["$set"] = {"is_active": False}
+            hidden.append({"id": doc.get("id"), "name": doc.get("name"), "contract_status": status})
+        await db.sponsors.update_one({"id": doc["id"]}, change)
+        cleared += 1
+    renamed = await db.references.update_many({"status": "archived"}, {"$set": {"status": "completed"}})
+    references = getattr(renamed, "modified_count", 0) or 0
+    await db.audit_logs.insert_one({
+        "id": new_id(), "action": "content.one_hide_field", "target_id": None, "actor_id": None,
+        "data": {"sponsors_hidden": hidden, "sponsors_cleared": cleared, "references_renamed": references},
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    return f"{len(hidden)} sponsors hidden, {cleared} contract statuses cleared, {references} references renamed"
+
+
 MIGRATIONS = (
     (1, "encrypt_legacy_integration_credentials", migrate_plaintext_secrets),
     (2, "team_leader_role_to_player", migrate_team_leader_role),
@@ -471,6 +499,8 @@ MIGRATIONS = (
     (19, "user_socials_to_profile_fields", migrate_user_socials_to_profile),
     # #2128: alter Freitext als Spiel eines Co-Teams wird zur Kennung, wenn er genau einen Spielnamen trifft.
     (20, "squad_game_names", migrate_squad_game_names),
+    # #2130: Sponsor und Referenz blenden nur noch über ``is_active`` aus; die Sichtbarkeit bleibt, wie sie war.
+    (21, "one_hide_field", migrate_one_hide_field),
 )
 
 

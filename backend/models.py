@@ -1445,7 +1445,6 @@ class NewsUpdate(BaseModel):
 
 
 SponsorTier = Literal["main", "platinum", "gold", "silver", "bronze"]
-SponsorContractStatus = Literal["planned", "active", "paused", "expired", "cancelled"]
 
 
 class SponsorCreate(BaseModel):
@@ -1454,8 +1453,8 @@ class SponsorCreate(BaseModel):
     link: Optional[str] = None
     description: Optional[str] = None
     tier: SponsorTier = "bronze"
+    # Ausblenden geht über ``is_active`` (#2130); die Laufzeit zählt zusätzlich, weil Dolibarr sie führt.
     is_active: bool = True
-    contract_status: SponsorContractStatus = "active"
     contract_start: Optional[str] = None
     contract_end: Optional[str] = None
     contact_name: Optional[str] = None
@@ -1479,7 +1478,6 @@ class SponsorUpdate(BaseModel):
     description: Optional[str] = None
     tier: Optional[SponsorTier] = None
     is_active: Optional[bool] = None
-    contract_status: Optional[SponsorContractStatus] = None
     contract_start: Optional[str] = None
     contract_end: Optional[str] = None
     contact_name: Optional[str] = None
@@ -1561,7 +1559,8 @@ class PartnerUpdate(BaseModel):
 # ---------- External tournament references ----------
 ReferenceVisibility = Literal["public", "community", "members", "internal"]
 ReferenceMode = Literal["online", "offline", "hybrid"]
-ReferenceStatus = Literal["planned", "active", "completed", "archived"]
+# Ausblenden geht über ``is_active`` (#2130) - der Status sagt nur, wie weit die Teilnahme ist.
+ReferenceStatus = Literal["planned", "active", "completed"]
 
 
 ReferenceEntryKind = Literal["team", "solo"]

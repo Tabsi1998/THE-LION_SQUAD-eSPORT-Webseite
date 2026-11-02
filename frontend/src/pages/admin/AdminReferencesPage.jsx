@@ -31,7 +31,7 @@ import { anyPlacement, countKey, hasMoreDetails, lastReference, likeLastTime, qu
 
 const VISIBILITY_OPTIONS = [["public", "Öffentlich"], ["community", "Community"], ["members", "Vereinsmitglieder"], ["internal", "Intern"]];
 const MODE_OPTIONS = [["online", "Online"], ["offline", "Vor Ort"], ["hybrid", "Hybrid"]];
-const STATUS_OPTIONS = [["active", "Laufend"], ["planned", "Geplant"], ["completed", "Abgeschlossen"], ["archived", "Archiviert"]];
+const STATUS_OPTIONS = [["active", "Laufend"], ["planned", "Geplant"], ["completed", "Abgeschlossen"]];
 const KIND_OPTIONS = [["team", "Team"], ["solo", "Einzelstarter"]];
 const medalLabel = { gold: "Gold", silver: "Silber", bronze: "Bronze" };
 const visibilityLabel = Object.fromEntries(VISIBILITY_OPTIONS);
@@ -872,7 +872,7 @@ function ReferenceForm({ reference, games, memberProfiles, partners = [], lineag
             <SelectField label="Status" value={status} onChange={(v) => { setStatusTouched(true); set("status", v); }} options={STATUS_OPTIONS} testId="reference-status" hint={statusTouched ? undefined : "Automatisch nach dem Datum."} />
             <SelectField label="Sichtbarkeit" value={form.visibility} onChange={(v) => set("visibility", v)} options={VISIBILITY_OPTIONS} testId="reference-visibility" />
             <TextField label="Reihenfolge" type="number" value={form.order_index} onChange={(v) => set("order_index", v)} testId="reference-order" hint="0 = automatisch nach Datum." />
-            <CheckField label="Aktiv" checked={form.is_active !== false} onChange={(v) => set("is_active", v)} testId="reference-active" className="self-end pb-2" />
+            <CheckField label="Öffentlich zeigen" hint="Aus = archiviert." checked={form.is_active !== false} onChange={(v) => set("is_active", v)} testId="reference-active" className="self-end pb-2" />
           </FormGrid>
         </FormSection>
 
