@@ -3,7 +3,10 @@
 - ``GET /api/admin/leagues/seasons/{season_id}/roster``: Kaderübersicht je Co-Team mit ID-Stand (Liga-Recht „Kader prüfen“).
 - ``POST /api/admin/leagues/seasons/{season_id}/roster/{user_id}/approve``: neue ID freigeben, mit Grund und Protokoll.
 - ``PUT /api/admin/leagues/seasons/{season_id}/roster-settings``: Stichtag für neue Spieler (Vorgabe: keiner).
+- ``POST /api/admin/leagues/seasons/{season_id}/roster/{user_id}/waive-wait``: Wartezeit aufheben, mit Grund und Protokoll (#2204).
+- ``GET /api/admin/leagues/seasons/{season_id}/transfers``, ``POST …/{id}/approve``, ``…/reject``: Transfers entscheiden (#2204).
 - ``GET /api/me/league-ids``: die eigene festgehaltene ID je laufender Season - für den Hinweis im Profil.
+- ``GET /api/me/league-eligibility``: der eigene Stand je Season, ohne Datum (#2204).
 
 Die Logik steht in ``services/league_roster.py``.
 """
@@ -16,8 +19,9 @@ from pydantic import BaseModel, Field
 
 from auth import get_current_user
 from database import get_db
-from services import league_eligibility, league_roster
+from services import league_eligibility, league_roster, league_transfers
 from services.league_permissions import require_league
+from services.mutation_lock import MutationLockBusy
 
 admin_router = APIRouter(prefix="/api/admin/leagues", tags=["leagues-admin"])
 me_router = APIRouter(prefix="/api/me", tags=["leagues"])
@@ -80,6 +84,44 @@ async def roster_settings(season_id: str, body: RosterSettingsBody, me: dict = D
         return await league_roster.set_deadline(db, season, body.roster_deadline, me)
     except league_roster.LeagueRosterError as problem:
         raise HTTPException(status_code=problem.status_code, detail=problem.detail) from None
+
+
+class TransferDecisionBody(BaseModel):
+    reason: Optional[str] = Field(default=None, max_length=500)
+
+
+@admin_router.get("/seasons/{season_id}/transfers")
+async def season_transfers(season_id: str, _me: dict = Depends(require_roster)):
+    db = get_db()
+    await _season(db, season_id)
+    return {"items": await league_transfers.for_season(db, season_id)}
+
+
+@admin_router.post("/seasons/{season_id}/transfers/{transfer_id}/approve")
+async def approve_transfer(season_id: str, transfer_id: str, body: TransferDecisionBody, me: dict = Depends(require_roster)):
+    db = get_db()
+    season = await _season(db, season_id)
+    try:
+        return await league_transfers.approve(db, season, transfer_id, body.reason, me)
+    except league_eligibility.EligibilityError as problem:
+        raise HTTPException(status_code=problem.status_code, detail=problem.detail) from None
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail=league_transfers.BUSY) from None
+
+
+@admin_router.post("/seasons/{season_id}/transfers/{transfer_id}/reject")
+async def reject_transfer(season_id: str, transfer_id: str, body: TransferDecisionBody, me: dict = Depends(require_roster)):
+    db = get_db()
+    season = await _season(db, season_id)
+    try:
+        return await league_transfers.reject(db, season, transfer_id, body.reason, me)
+    except league_eligibility.EligibilityError as problem:
+        raise HTTPException(status_code=problem.status_code, detail=problem.detail) from None
+
+
+@me_router.get("/league-eligibility")
+async def my_league_eligibility(me: dict = Depends(get_current_user)):
+    return {"items": await league_eligibility.my_status(get_db(), me)}
 
 
 @me_router.get("/league-ids")

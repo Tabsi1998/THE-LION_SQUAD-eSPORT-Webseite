@@ -208,6 +208,31 @@ def person_name(person: dict | None) -> str:
     return (person or {}).get("display_name") or (person or {}).get("username") or "Spieler"
 
 
+MAX_ID_LENGTH = 200
+
+
+def id_fields_problem(fields: list | None) -> str | None:
+    """Passen die Angaben am Spiel (``player_id_fields[]``, #2204)? Ein Satz für die Verwaltung, sonst ``None``."""
+    for item in fields or []:
+        if not isinstance(item, dict):
+            continue
+        label = item.get("label") or item.get("key") or "Feld"
+        pattern = item.get("pattern")
+        if pattern:
+            if len(str(pattern)) > MAX_ID_LENGTH:
+                return f"{label}: Das Format darf höchstens {MAX_ID_LENGTH} Zeichen lang sein."
+            try:
+                re.compile(str(pattern))
+            except re.error:
+                return f"{label}: Das Format ist kein gültiger regulärer Ausdruck."
+        if len(str(item.get("format_hint") or "")) > 120:
+            return f"{label}: Das Beispiel darf höchstens 120 Zeichen lang sein."
+        options = item.get("options")
+        if options is not None and (not isinstance(options, list) or len(options) > 30):
+            return f"{label}: Bitte höchstens 30 Auswahlwerte eintragen."
+    return None
+
+
 def field_problem(item: dict, value) -> str | None:
     """Passt der Wert zu Format und Auswahl des Spiels (``player_id_fields[]``, #2204)? Felder ohne beides prüfen nichts.
     Liefert einen Satz, der sagt, was zu tun ist - sonst ``None``. Ein kaputtes Muster sperrt niemanden aus."""
@@ -220,7 +245,7 @@ def field_problem(item: dict, value) -> str | None:
     if not pattern or not text:
         return None
     try:
-        ok = re.fullmatch(str(pattern), text) is not None
+        ok = len(text) <= MAX_ID_LENGTH and re.fullmatch(str(pattern), text) is not None
     except re.error:
         logger.warning("[liga] Ungültiges Format am Feld %s", log_safe(item.get("key")))
         return None
@@ -829,6 +854,10 @@ async def season_overview(db, season: dict) -> dict:
         for row in await db.users.find({"id": {"$in": team_people}}, {"_id": 0, "id": 1, "display_name": 1, "username": 1}).to_list(len(team_people) + 1)
     } if team_people else {}
     ctx = await context_for_season(db, season, members)
+    # Spielberechtigung (#2204): dieselbe Prüfung wie überall. Das Geburtsdatum bleibt im Server, hier steht nur der Stand.
+    from services import league_eligibility
+
+    eligibility = await league_eligibility.context_for_season(db, season, members)
     divisions = {
         row["id"]: row
         for row in await db.league_divisions.find(
@@ -853,7 +882,8 @@ async def season_overview(db, season: dict) -> dict:
             f"Staffel {context.get('staffel')}" if context.get("staffel") else None) if part)
         squad = squads.get(reg.get("squad_id")) or {}
         players = [
-            {**status(ctx, uid, reg.get("squad_id")), "approvals": _approvals_view((ctx.entries if ctx else {}).get(uid), names)}
+            {**status(ctx, uid, reg.get("squad_id")), "approvals": _approvals_view((ctx.entries if ctx else {}).get(uid), names),
+             "eligibility": league_eligibility.public_row(league_eligibility.status(eligibility, uid, reg.get("squad_id")))}
             for uid in squad.get("member_ids") or [] if uid
         ]
         players.sort(key=lambda row: row["name"].lower())
@@ -881,19 +911,22 @@ async def season_overview(db, season: dict) -> dict:
         })
     rows.sort(key=lambda row: row.pop("_sort"))
     counts = {state: 0 for state in (MISSING, LATE, BANNED)}
-    changed = 0
+    changed = waiting = age = 0
     for row in rows:
         for player in row["players"]:
             if player["state"] in counts:
                 counts[player["state"]] += 1
             changed += 1 if player["changed"] else 0
+            waiting += 1 if player["eligibility"]["state"] == league_eligibility.WAITING else 0
+            age += 1 if player["eligibility"]["state"] in (league_eligibility.AGE_MISSING, league_eligibility.AGE_NOT_MET_STATE) else 0
     return {
+        "rules": league_eligibility.rules_view(season),
         "season": {"id": season["id"], "name": season.get("name"), "status": season.get("status"),
                    "roster_deadline": (ctx.deadline if ctx else None) or season.get("roster_deadline")},
         "game": {"name": ((ctx.game if ctx else None) or {}).get("display_name")},
         "fields": [{"key": item["key"], "label": item.get("label") or item["key"]} for item in (ctx.fields if ctx else [])],
         "squads": rows,
-        "counts": {**counts, "changed": changed, "short": sum(1 for row in rows if row["short"])},
+        "counts": {**counts, "changed": changed, "waiting": waiting, "age": age, "short": sum(1 for row in rows if row["short"])},
     }
 
 

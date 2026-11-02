@@ -1478,6 +1478,71 @@ async def update_squad(team_id: str, squad_id: str, body: TeamSquadUpdate, me: d
     return fresh
 
 
+async def _squad_or_404(db, team_id: str, squad_id: str) -> tuple[dict, dict]:
+    team = await db.teams.find_one({"id": team_id}, {"_id": 0})
+    squad = await db.team_squads.find_one({"id": squad_id, "team_id": team_id}, {"_id": 0}) if team else None
+    if not squad:
+        raise HTTPException(status_code=404, detail="Co-Team nicht gefunden")
+    return team, squad
+
+
+@router.get("/{team_id}/squads/{squad_id}/eligibility")
+async def squad_eligibility(team_id: str, squad_id: str, me: dict = Depends(get_current_user)):
+    """Spielberechtigung im Co-Team (#2204): für Teamleitung, Liga-Leitung mit „Kader prüfen“, Captain und Vertreter. Nie ein Geburtsdatum."""
+    from services import league_transfers
+
+    db = get_db()
+    team, squad = await _squad_or_404(db, team_id, squad_id)
+    can_edit = await _may_change_squad(db, team, squad_id, me)
+    if not can_edit and me["id"] not in {squad.get("captain_id"), squad.get("vice_captain_id")}:
+        raise HTTPException(status_code=403, detail="Das sehen Teamleitung, Captain und Vertreter.")
+    return await league_eligibility.squad_view(db, team, squad, can_edit=can_edit, transfers=league_transfers.for_squad)
+
+
+class SquadTransferBody(BaseModel):
+    user_id: str = Field(min_length=1, max_length=100)
+
+
+@router.post("/{team_id}/squads/{squad_id}/transfers")
+async def request_squad_transfer(team_id: str, squad_id: str, body: SquadTransferBody, me: dict = Depends(get_current_user)):
+    """Einen Transfer ins Co-Team beantragen (#2204): darf, wer den Kader ändern darf; die Liga-Leitung entscheidet."""
+    from services import league_transfers
+
+    db = get_db()
+    team, squad = await _squad_or_404(db, team_id, squad_id)
+    if not await _may_change_squad(db, team, squad_id, me):
+        await _refuse_squad(db, team, squad_id, me, "Keine Berechtigung")
+    try:
+        return await league_transfers.request(db, team, squad, body.user_id, me)
+    except league_eligibility.EligibilityError as refusal:
+        raise HTTPException(status_code=refusal.status_code, detail=refusal.detail) from None
+
+
+@router.get("/{team_id}/squads/{squad_id}/transfers")
+async def list_squad_transfers(team_id: str, squad_id: str, me: dict = Depends(get_current_user)):
+    from services import league_transfers
+
+    db = get_db()
+    team, _squad = await _squad_or_404(db, team_id, squad_id)
+    if not await _may_change_squad(db, team, squad_id, me):
+        await _refuse_squad(db, team, squad_id, me, "Keine Berechtigung")
+    return {"items": await league_transfers.for_squad(db, squad_id)}
+
+
+@router.delete("/{team_id}/squads/{squad_id}/transfers/{transfer_id}")
+async def withdraw_squad_transfer(team_id: str, squad_id: str, transfer_id: str, me: dict = Depends(get_current_user)):
+    from services import league_transfers
+
+    db = get_db()
+    team, _squad = await _squad_or_404(db, team_id, squad_id)
+    if not await _may_change_squad(db, team, squad_id, me):
+        await _refuse_squad(db, team, squad_id, me, "Keine Berechtigung")
+    try:
+        return await league_transfers.withdraw(db, squad_id, transfer_id, me)
+    except league_eligibility.EligibilityError as refusal:
+        raise HTTPException(status_code=refusal.status_code, detail=refusal.detail) from None
+
+
 @router.put("/{team_id}/squads/{squad_id}/roles")
 async def set_squad_roles(team_id: str, squad_id: str, body: TeamSquadRoles, me: dict = Depends(get_current_user)):
     """Captain und Vertreter eines Co-Teams vergeben (#1649): Hauptteam-Leitung, Co-Leitung oder Admin - mit Protokoll.

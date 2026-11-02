@@ -158,6 +158,16 @@ async def _user_data_sections(db, user_id: str) -> list[tuple[str, tuple]]:
         registration_ids = [row["id"] async for row in _paged(db.tournament_registrations, me) if row.get("id")]
         return await registration_match_snapshot(db, registration_ids, limit=None)
 
+    async def league_appearances():
+        rows = await db.matches_v2.find(
+            {"lineup_user_ids": user_id},
+            {"_id": 0, "id": 1, "tournament_id": 1, "status": 1, "completed_at": 1, "lineups": 1},
+        ).to_list(5000)
+        return [{"match_id": row.get("id"), "tournament_id": row.get("tournament_id"), "status": row.get("status"),
+                 "completed_at": row.get("completed_at"),
+                 "registration_id": next((side for side, people in (row.get("lineups") or {}).items() if user_id in people), None)}
+                for row in rows]
+
     async def stamp():
         return now_utc().isoformat()
 
@@ -179,6 +189,9 @@ async def _user_data_sections(db, user_id: str) -> list[tuple[str, tuple]]:
         ("tournament_registrations", _rows(db.tournament_registrations, me)),
         # Liga-Kader (#2108): die festgehaltene Spiel-ID je Season samt Freigaben.
         ("league_rosters", _rows(db.league_rosters, me)),
+        ("league_transfers", _rows(db.league_transfers, me)),
+        # Spielberechtigung (#2204): Spiele, in denen die Person auf einer Aufstellung oder Teilnehmerliste steht - nur die eigene Zugehörigkeit.
+        ("league_appearances", _value(league_appearances)),
         ("competition_matches", _value(matches)),
         ("event_registrations", _rows(db.event_registrations, me)),
         ("f1_lap_times", _rows(db.f1_lap_times, me)),

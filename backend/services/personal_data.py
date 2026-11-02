@@ -165,7 +165,9 @@ PERSONAL: dict[str, Entry] = {
     # Liga-Kader (#2108): die Spiel-ID, die je Season gilt, mit Zeitpunkt und Freigaben der Liga-Leitung.
     "league_rosters": Entry(DELETED, ("league_rosters",), "festgehaltene Spiel-ID je Liga-Season; Aufstellungen und "
                             "Ergebnisse bleiben ohne sie"),
-    "matches_v2": Entry(KEPT, ("competition_matches",), SPORT),
+    # Transfer-Anträge in der Liga (#2204): Sie gehören zur Person.
+    "league_transfers": Entry(DELETED, ("league_transfers",), "Anträge auf Wechsel des Co-Teams je Liga-Season; Aufstellungen und Ergebnisse bleiben ohne sie"),
+    "matches_v2": Entry(KEPT, ("competition_matches", "league_appearances"), SPORT),
     "match_reports_v2": Entry(KEPT, ("match_reports",), f"Ergebnismeldung als Nachweis des Ergebnisses; {THREE_YEARS}"),
     "match_schedule_proposals": Entry(KEPT, ("schedule_proposals",), "Terminvereinbarung zum Match als Nachweis"),
     "match_commendations": Entry(KEPT, ("commendations_given",), "das GG gehört zum Match wie das Ergebnis"),

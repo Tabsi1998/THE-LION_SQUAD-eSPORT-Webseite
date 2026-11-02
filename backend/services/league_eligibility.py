@@ -172,6 +172,95 @@ def check_participants(rows: dict[str, dict], user_ids, *, minimum: int, roster:
     return ids
 
 
+def public_row(row: dict) -> dict:
+    """Was Team-Seite und Kaderübersicht sehen: kein Datum, keine Spiel-ID."""
+    return {key: row.get(key) for key in ("id", "name", "state", "ok", "reason", "until", "age")}
+
+
+def open_window(season: dict | None, today: str | None = None) -> dict | None:
+    """Das Transferfenster, das gerade offen ist - ``None``: keines. Kalendertage in Wiener Zeit, beide Enden zählen."""
+    day = today or club_today()
+    for window in (season or {}).get("transfer_windows") or []:
+        if str(window.get("start_date")) <= day <= str(window.get("end_date")):
+            return window
+    return None
+
+
+def rules_view(season: dict | None) -> dict:
+    """Die Regeln einer Season für die Anzeige - fehlt ein Feld, gibt es die Regel nicht."""
+    season = season or {}
+    return {
+        "min_squad_size": season.get("min_squad_size"),
+        "max_squad_size": season.get("max_squad_size"),
+        "one_team_per_season": bool(season.get("one_team_per_season")),
+        "new_player_wait_days": season.get("new_player_wait_days") or 0,
+        "min_age": _rule_min_age(season),
+        "roster_deadline": season.get("roster_deadline"),
+        "unique_game_ids": bool(season.get("unique_game_ids")),
+        "lineup_mode": season.get("lineup_mode") or "per_map",
+        "lineup_min_players": season.get("lineup_min_players"),
+        "transfer_windows": season.get("transfer_windows") or [],
+        "transfer_open": bool(open_window(season)),
+    }
+
+
+async def _candidate_rows(db, season: dict, tournament: dict, squad: dict, team: dict) -> list[dict]:
+    """Wer aus dem Hauptteam ins Co-Team kommen könnte - mit dem, was dagegen spricht. Kein Datum, keine ID."""
+    members = set(squad.get("member_ids") or [])
+    people = [uid for uid in team.get("member_ids") or [] if uid and uid not in members]
+    ctx = await context_for_tournament(db, tournament, people)
+    if not ctx or not people:
+        return []
+    others = await _other_squad_ids(db, season, squad["id"], people, ctx.roster.entries) if season.get("one_team_per_season") else {}
+    rows = []
+    for user_id in people:
+        reason = None
+        if user_id in others:
+            reason = "Steht oder stand in dieser Season in einem anderen Co-Team. Ein Wechsel geht nur als Transfer."
+        elif ctx.ages.get(user_id) == AGE_NO_DATE:
+            reason = AGE_MISSING_REASON
+        elif ctx.ages.get(user_id) == AGE_NOT_MET_STATE:
+            reason = AGE_NOT_MET
+        rows.append({"id": user_id, "name": league_roster.person_name(ctx.roster.people.get(user_id)), "can_add": reason is None,
+                     "needs_transfer": user_id in others, "reason": reason})
+    return sorted(rows, key=lambda row: row["name"].lower())
+
+
+async def squad_view(db, team: dict, squad: dict, *, can_edit: bool, transfers) -> dict:
+    """Für die Team-Seite: je Season Regeln, Stand der Spieler, mögliche Neuzugänge und Transfers. ``transfers``: liest die Anträge."""
+    seasons = []
+    for season, tournament in await open_seasons_of_squad(db, squad.get("id")):
+        members = [uid for uid in squad.get("member_ids") or [] if uid]
+        ctx = await context_for_tournament(db, tournament, members)
+        players = sorted((public_row(row) for row in statuses(ctx, members, squad["id"]).values()), key=lambda row: row["name"].lower())
+        seasons.append({
+            "season_id": season["id"],
+            "title": season.get("name"),
+            "rules": {**rules_view(season), "min_squad_size": league_roster.min_squad_size(tournament)},
+            "players": players,
+            "candidates": await _candidate_rows(db, season, tournament, squad, team) if can_edit else [],
+            "transfers": await transfers(db, squad["id"], season["id"]),
+            "can_edit": can_edit,
+        })
+    return {"seasons": seasons}
+
+
+async def my_status(db, user: dict) -> list[dict]:
+    """Der eigene Stand je Season, in der die Person gerade in einem Co-Team steht. Ohne Datum."""
+    user_id = user["id"]
+    squads = await db.team_squads.find({"member_ids": user_id, "status": {"$ne": "archived"}}, {"_id": 0, "id": 1, "name": 1}).to_list(100)
+    items = []
+    for squad in squads:
+        for season, tournament in await open_seasons_of_squad(db, squad["id"]):
+            ctx = await context_for_tournament(db, tournament, [user_id])
+            league = await db.leagues.find_one({"id": season.get("league_id")}, {"_id": 0, "name": 1}) or {}
+            row = status(ctx, user_id, squad["id"])
+            items.append({"season_id": season["id"], "title": " · ".join(part for part in (league.get("name"), season.get("name")) if part),
+                          "squad_id": squad["id"], "squad_name": squad.get("name"), "min_age": _rule_min_age(season),
+                          **{key: row.get(key) for key in ("state", "ok", "reason", "until", "age")}})
+    return items
+
+
 # ---------------------------------------------------------------- Kader und Anmeldung
 
 

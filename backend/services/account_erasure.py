@@ -54,6 +54,8 @@ PURGED = (
     "reference_series_staff",
     # Seit #2108: die festgehaltene Spiel-ID je Liga-Season - Aufstellungen und Ergebnisse bleiben ohne sie.
     "league_rosters",
+    # Seit #2204: Transfer-Anträge der Person.
+    "league_transfers",
 )
 # Angaben zur Person, die in den Daten des Adminprotokolls stehen können (#1029). Der Vorgang bleibt, die Angaben nicht.
 AUDIT_PERSONAL_KEYS = ("display_name", "username", "real_name", "first_name", "last_name", "nickname", "email", "phone", "address",
