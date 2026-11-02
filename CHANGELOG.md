@@ -1,5 +1,34 @@
 # Changelog
 
+## 1.57.0 (02.11.2026)
+
+### Neu
+
+* Finanzen zeigt bei Abzug den erlassenen Betrag in Liste, Details, Summen und CSV (#2226)
+* Grund und Anmerkung des Abschlusses aus Dolibarr stehen in Finanzen und im Verlauf, nur für die Verwaltung (#2226)
+* Liga: „Meine Ligen“ unter „Mein Dienst“ für Zuständige (#2203)
+* Liga: Co-Teams in laufenden Staffeln ändern nur das eigene Team und die Liga-Leitung, mit „Kader bearbeiten“ in der Kaderübersicht (#2203)
+* Liga: Den Termin des eigenen Spiels setzt eine zweite Person, Beteiligte nutzen Vorschlag und Zustimmung (#2203)
+* Liga: Eigener Bereich „Ligen“ mit Zwei-Faktor, der Bereich Turniere gibt in Staffeln nichts mehr (#2203)
+* Liga: Wer am Spiel beteiligt ist, entscheidet dort nicht; Notausnahme nur für den Superadmin mit Grund (#2203)
+* Liga: Zuständige je Liga mit einzelnen Zuständigkeiten vergeben (#2203)
+* Nach gelöschtem Entwurf wählt Finanzen zwischen „Freigeben“ und „Keine neue Rechnung“ (#2226)
+
+### Fehlerbehebungen
+
+* „Bezahlt (mit Abzug)“ wird als eigener Stand gezeigt statt als teilweise bezahlt oder überfällig (#2226)
+* „Meine Rechnungen“ zeigt bei bezahlten Belegen keinen offenen Rest mehr (#2226)
+* Ein in Dolibarr gelöschter Entwurf verschwindet aus den Rechnungen und Summen, sein Prüffall ist erledigt (#2226)
+* Ein verschwundener freigegebener Beleg verweist auf den Prüffall statt auf „404“ (#2226)
+* Finanzen zeigt „Angebot nicht mehr vorhanden“ statt einer internen Kennung (#2226)
+* Liga: Gehaltene Ergebnisse gehen nicht hinaus, wenn das Recht inzwischen fehlt oder Befangenheit besteht (#2203)
+* Liga: Helfer ändern in Staffeln keine Ergebnisse mehr (#2203)
+* Liga: Meldungen zu Streitfällen, Terminen und zu kleinen Kadern gehen an die Liga-Leitung (#2203)
+
+### Dokumentation
+
+* Abrechnung und Handbuch nennen den passenden Weg in der Kassa (#2226)
+
 ## 1.56.1 (02.11.2026)
 
 ### Fehlerbehebungen
