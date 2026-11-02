@@ -72,6 +72,21 @@ async def stored(flow, rule_id: str) -> dict:
     return await flow.db.league_rules.find_one({"id": rule_id}, {"_id": 0, "body_md": 1, "annexes": 1})
 
 
+# ---------------------------------------------------------------- Kontolöschung
+
+@pytest.mark.asyncio
+async def test_a_published_version_keeps_the_file_of_a_deleted_account(flow, public):
+    """Eine Fassung ändert sich nie (#1646, #2230): Das Bild einer gelöschten Person bleibt samt Eintrag, solange eine Fassung es zeigt."""
+    person = await flow.add_user(name="Geht")
+    await add_file(flow, public, "ihres.webp", png())
+    await flow.db.media_uploads.update_one({"filename": "ihres.webp"}, {"$set": {"owner_id": person["id"], "media_scope": "user"}})
+    await add_rule(flow, "fertig", status="published", image="ihres.webp")
+    assert await media_audit.still_referenced(flow.db, {"ihres.webp"}) == {"ihres.webp"}
+    assert await account_erasure._own_images(flow.db, person["id"], []) == 0
+    assert (public / "ihres.webp").is_file()
+    assert await flow.db.media_uploads.count_documents({"filename": "ihres.webp"}) == 1
+
+
 # ---------------------------------------------------------------- Duplikate
 
 @pytest.mark.asyncio
