@@ -1340,7 +1340,7 @@ async def export_csv(cid: str, track_id: str | None = None, me: dict = Depends(r
     cid = c["id"]
     output = io.StringIO()
     w = csv.writer(output, delimiter=";")
-    w.writerow(["Rang", "Spieler", "Discord", "Strecke", "Zeit", "Zeit (ms)", "Versuche", "Strafzeiten", "Aktualisiert"])
+    w.writerow(["Rang", "Spieler", "Strecke", "Zeit", "Zeit (ms)", "Versuche", "Strafzeiten", "Aktualisiert"])
     tracks = await db.f1_tracks.find({"challenge_id": cid}, {"_id": 0}).sort("order_index", 1).to_list(100)
     if track_id:
         tracks = [t for t in tracks if t["id"] == track_id]
@@ -1349,7 +1349,7 @@ async def export_csv(cid: str, track_id: str | None = None, me: dict = Depends(r
         for entry in lb["entries"]:
             # Jede Zelle als Text (#1584): ein Name, der mit „=“ beginnt, wird in der Tabellenkalkulation keine Formel.
             w.writerow([safe_cell(value) for value in (
-                entry["rank"], entry["display_name"], "",
+                entry["rank"], entry["display_name"],
                 tr["name"], entry["time_str"], entry["time_ms"],
                 entry["attempts"], entry["penalty_seconds"], entry["last_updated"],
             )])

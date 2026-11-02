@@ -231,6 +231,8 @@ async def test_the_export_writes_names_as_text(flow):
     csv_text = (await flow.get(f"/api/f1/challenges/{cid}/export.csv")).text
     assert ";'=HYPERLINK(1);" in csv_text
     assert ";=HYPERLINK" not in csv_text
+    # Die immer leere Spalte „Discord“ ist weg (#2130).
+    assert csv_text.splitlines()[0] == "Rang;Spieler;Strecke;Zeit;Zeit (ms);Versuche;Strafzeiten;Aktualisiert"
 
 
 @pytest.mark.asyncio
