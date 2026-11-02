@@ -186,17 +186,25 @@ async def release_order(db, order_id: str, actor_id: str) -> dict | None:
     return await db.billing_orders.find_one({"id": order_id}, {"_id": 0})
 
 
-async def dismiss_removed(db, order: dict, actor_id: str) -> None:
+async def waits_after_removed_draft(db, *, kind: str, registration_id: str) -> bool:
+    """Wartet die Anmeldung darauf, dass die Finanzverwaltung über einen gelöschten Entwurf entscheidet (#2226)?"""
+    return await db.billing_orders.find_one({"kind": kind, "registration_id": registration_id, "status": "held", "removed_invoices": {"$exists": True}}, {"_id": 0, "id": 1}) is not None
+
+
+async def dismiss_removed(db, order: dict, actor_id: str) -> bool:
     """Der Entwurf ist in Dolibarr gelöscht (#2226), und es soll keine neue Rechnung geben: Der Auftrag ist zu Ende,
-    die Anmeldung bleibt, ihr Preis zählt nicht mehr."""
+    die Anmeldung bleibt, ihr Preis zählt nicht mehr. ``False``: Der Auftrag wartet nicht mehr, dann ändert sich nichts."""
     now = now_utc().isoformat()
-    await db.billing_orders.update_one({"id": order["id"], "status": "held"}, {"$set": {
+    done = await db.billing_orders.update_one({"id": order["id"], "status": "held"}, {"$set": {
         "status": "cancelled", "cancel_reason": "Entwurf in Dolibarr gelöscht, keine neue Rechnung", "note": "", "updated_at": now}})
-    collection = {"event": db.event_registrations, "tournament": db.tournament_registrations}.get(order.get("kind"))
+    if done.modified_count != 1:
+        return False
+    collection ={"event": db.event_registrations, "tournament": db.tournament_registrations}.get(order.get("kind"))
     if collection is not None:
         await collection.update_one({"id": order["registration_id"]}, {"$set": {"billing_status": "cancelled"}})
     await db.audit_logs.insert_one({"id": new_id(), "action": "billing.order.dismiss", "target_id": order["id"], "actor_id": actor_id,
                                     "data": {"registration_id": order.get("registration_id"), "total_cents": order.get("total_cents")}, "created_at": now})
+    return True
 
 
 async def classify_due(limit: int = 100) -> dict:

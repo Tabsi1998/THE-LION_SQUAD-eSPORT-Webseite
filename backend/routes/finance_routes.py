@@ -541,7 +541,8 @@ async def dismiss_removed_order(order_id: str, me: dict = Depends(require_area("
         raise HTTPException(404, "Auftrag nicht gefunden.")
     if order.get("status") != "held" or not order.get("removed_invoices"):
         raise HTTPException(409, "Zu diesem Auftrag wurde kein Entwurf gelöscht.")
-    await billing_orders.dismiss_removed(db, order, me["id"])
+    if not await billing_orders.dismiss_removed(db, order, me["id"]):
+        raise HTTPException(409, "Dieser Auftrag wartet nicht mehr auf eine Entscheidung.")
     return {"ok": True}
 
 

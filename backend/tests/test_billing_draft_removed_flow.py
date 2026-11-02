@@ -156,6 +156,46 @@ async def test_no_new_invoice_closes_the_order_for_good(flow, fake):
 
 
 @pytest.mark.asyncio
+async def test_a_person_cannot_restart_billing_while_finance_decides(flow, fake):
+    """Solange die Finanzverwaltung über den gelöschten Entwurf entscheidet, entsteht durch eine Änderung der Person kein neuer Beleg."""
+    kassier, event, paula, booked, order = await drafted(flow)
+    fake.remove(order["invoice_id"])
+    await billing_orders.sync_due()
+
+    flow.act_as(paula)
+    url = f"/api/events/{event['id']}/registrations/me"
+    refused = await flow.patch(url, json={"companion_count": 0})
+    assert refused.status_code == 409, refused.text
+    assert "Abrechnung" in refused.json()["detail"]
+    stored = await flow.db.billing_orders.find_one({"id": order["id"]}, {"_id": 0})
+    assert stored["status"] == "held"
+    assert await flow.db.billing_orders.count_documents({"registration_id": booked["id"]}) == 1
+    assert (await billing_orders.classify_due())["invoiced"] == 0
+    assert (await registration(flow, booked))["companion_count"] == 1
+    assert (await flow.patch(url, json={"note": "Komme etwas später"})).status_code == 200, "den Hinweis ändert die Person weiter selbst"
+
+    flow.act_as(kassier)
+    assert (await flow.post(f"/api/admin/finance/orders/{order['id']}/release")).status_code == 200
+    flow.act_as(paula)
+    assert (await flow.patch(url, json={"companion_count": 0})).status_code == 200, "nach der Freigabe geht es wieder"
+
+
+@pytest.mark.asyncio
+async def test_no_new_invoice_loses_cleanly_against_a_release(flow, fake):
+    """Beide Knöpfe gleichzeitig: Beide haben „wartet“ gelesen, die Freigabe war zuerst da. Dann ändert „Keine neue Rechnung“ gar nichts."""
+    kassier, _, _, booked, order = await drafted(flow)
+    fake.remove(order["invoice_id"])
+    await billing_orders.sync_due()
+    read_before = await flow.db.billing_orders.find_one({"id": order["id"]}, {"_id": 0})
+    await billing_orders.release_order(flow.db, order["id"], kassier["id"])
+
+    assert await billing_orders.dismiss_removed(flow.db, read_before, kassier["id"]) is False
+    assert (await flow.db.billing_orders.find_one({"id": order["id"]}, {"_id": 0}))["status"] == "pending"
+    assert (await registration(flow, booked))["billing_status"] == "pending", "die Anmeldung wird nicht storniert, der Auftrag läuft weiter"
+    assert await flow.db.audit_logs.count_documents({"action": "billing.order.dismiss", "target_id": order["id"]}) == 0
+
+
+@pytest.mark.asyncio
 async def test_a_deleted_draft_of_a_cancelled_booking_ends_the_case(flow, fake):
     kassier, event, paula, booked, order = await drafted(flow)
     flow.act_as(paula)

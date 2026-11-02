@@ -343,6 +343,8 @@ REGISTRATION_CLOSED_COMPANIONS = "Die Anmeldung ist geschlossen – mehr Begleit
 NO_SEATS_FOR_COMPANIONS = "Für so viele Begleitpersonen ist kein Platz mehr frei – trag weniger ein oder frag die Turnierleitung."
 INVOICED_COMPANIONS = ("Deine Rechnung ist schon erstellt – die Zahl der Begleitpersonen ändert jetzt nur die Turnierleitung. "
                        "Den Hinweis kannst du weiter selbst ändern.")
+BILLING_IN_REVIEW_COMPANIONS = ("Deine Abrechnung wird gerade geprüft – die Zahl der Begleitpersonen ändert jetzt nur die Turnierleitung. "
+                                "Den Hinweis kannst du weiter selbst ändern.")
 PRICE_CHANGED = ("Die Kosten dieses Events haben sich seit deiner Anmeldung geändert – die Zahl der Begleitpersonen ändert "
                  "jetzt die Turnierleitung. Den Hinweis kannst du weiter selbst ändern.")
 
@@ -393,6 +395,9 @@ async def _update_own(db, event: dict, me: dict, changes: dict, *, via: str) -> 
     if seats_changed and active and (pricing.is_paid(offer) or snapshot):
         if reg.get("billing_status") not in (None, "pending"):
             raise RegistrationError(409, INVOICED_COMPANIONS)
+        # Entwurf in Dolibarr gelöscht (#2226): Neu abgerechnet wird nur über die Entscheidung der Finanzverwaltung, nicht über diesen Weg.
+        if await billing_orders.waits_after_removed_draft(db, kind="event", registration_id=reg["id"]):
+            raise RegistrationError(409, BILLING_IN_REVIEW_COMPANIONS)
         # Nur rechnen, wozu die Person schon zugesagt hat: Wer kostenlos angemeldet ist oder einem anderen Angebot
         # zugestimmt hat, bekommt durch eine Begleitperson weniger keine neue Rechnung.
         if not snapshot or not pricing.is_paid(offer) or int(snapshot.get("offer_version") or 0) != int(offer.get("version") or 0):

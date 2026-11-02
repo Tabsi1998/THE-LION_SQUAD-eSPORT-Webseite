@@ -203,7 +203,7 @@ Entwürfe dürfen weg.
 Auftragskennung nicht, gilt der Beleg als entfernt: Er verschwindet aus „Angelegte Rechnungen“ und den Summen, ein Prüffall dazu
 ist erledigt, das steht im Protokoll und im Verlauf. Die Anmeldung bleibt, nur ohne Beleg. Neu angelegt wird nichts von selbst:
 Der Auftrag steht bei den offenen mit **Freigeben** (legt einen neuen Beleg an) und **Keine neue Rechnung** (beendet den Auftrag,
-die Person sieht den Betrag als storniert). War die Buchung schon storniert, ist er ohne weiteres Zutun zu Ende. Wurde die Buchung
+die Person sieht den Betrag als storniert). Bis dahin ändert die Begleitpersonen nur die Turnierleitung. War die Buchung schon storniert, ist er ohne weiteres Zutun zu Ende. Wurde die Buchung
 nach dem Beleg geändert, bleibt dieser Prüffall offen: Vor dem Freigeben den Preis prüfen. Ein Verbindungsfehler oder die
 Fehlerseite eines Webservers davor beweisen nichts, dann bleibt alles, wie es ist. Bei einem **freigegebenen** Beleg bleibt es beim
 Prüffall unten.
