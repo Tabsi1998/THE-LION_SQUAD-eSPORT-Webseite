@@ -56,7 +56,7 @@ export function SeriesMapPoolSection({ series }) {
       key={data.pool?.id || "neu"}
       title="Map-Pool der Saison"
       hint="Die Maps, die in dieser Saison gespielt werden – je Modus aus der Bibliothek des Spiels. Die Serienseite zeigt sie mit Bild."
-      game={data.game} library={data.library} entry={data.pool} sources={sources} libraryLink
+      game={data.game} library={data.library} entry={data.pool} sources={sources} defaultPool={data.default_pool} libraryLink
       onSave={save} onClear={clear} testId="series-map-pool"
     />
   );

@@ -60,6 +60,40 @@ test("Maps ohne Modus nennt der Editor und führt zur Bibliothek", () => {
   expect(within(screen.getByTestId("pool-without-mode")).getByRole("link", { name: "Zuordnen" })).toHaveAttribute("href", "/admin/games/g1/maps");
 });
 
+// #2129, SP3: Der Knopf heißt weiter „Vorgabe des Spiels“ und lädt den Standard-Pool, ohne ihn wie bisher alle aktiven Maps.
+describe("Vorgabe des Spiels", () => {
+  const DEFAULT = { id: "d1", version: 2, modes: [{ mode: "snd", label: "Suchen & Zerstören", maps: [{ map_id: "hafen", name: "Hafenkante" }] }] };
+  const selected = (mode) => within(screen.getByTestId(`pool-mode-${mode}`)).getAllByRole("checkbox").filter((box) => box.checked).length;
+
+  test("lädt den Standard-Pool", () => {
+    renderEditor({ entry: null, defaultPool: DEFAULT });
+    expect(screen.getByTestId("pool-defaults")).toHaveTextContent("Vorgabe des Spiels");
+    expect(screen.getByTestId("pool-defaults")).toHaveAttribute("title", "Lädt den Standard-Pool des Spiels");
+    fireEvent.click(screen.getByTestId("pool-defaults"));
+    expect(selected("snd")).toBe(1);
+    expect(selected("stellung")).toBe(0);
+  });
+
+  test("ohne Standard-Pool wie bisher alle aktiven Maps", () => {
+    renderEditor({ entry: null });
+    expect(screen.getByTestId("pool-defaults")).toHaveAttribute("title", "Lädt alle aktiven Maps des Spiels");
+    fireEvent.click(screen.getByTestId("pool-defaults"));
+    expect(selected("snd")).toBe(2);
+    expect(selected("stellung")).toBe(1);
+  });
+
+  test("ist nichts aus dem Standard-Pool mehr wählbar, gelten ebenfalls alle aktiven", () => {
+    renderEditor({ entry: null, defaultPool: { ...DEFAULT, modes: [{ mode: "snd", label: "S", maps: [{ map_id: "weg", name: "Weg" }] }] } });
+    fireEvent.click(screen.getByTestId("pool-defaults"));
+    expect(selected("snd")).toBe(2);
+  });
+
+  test("die Bibliothek selbst nennt den Knopf anders und braucht keine Vorlage", () => {
+    renderEditor({ entry: null, defaultsLabel: "Alle aktiven Maps" });
+    expect(screen.getByTestId("pool-defaults")).toHaveTextContent("Alle aktiven Maps");
+  });
+});
+
 test("ein Spiel ohne Modi kennt keinen Hinweis auf fehlende Modi", () => {
   renderEditor({ game: { ...GAME, modes: [] }, library: [{ id: "glut", name: "Glutsenke", modes: [] }], entry: null });
   expect(screen.queryByTestId("pool-without-mode")).toBeNull();

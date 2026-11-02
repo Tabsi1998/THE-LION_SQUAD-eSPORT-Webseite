@@ -31,6 +31,28 @@ function renderPanel() {
   return render(<MemoryRouter><MapPoolPanel tournamentId="t1" /></MemoryRouter>);
 }
 
+// #2129, SP3: „Übernehmen von“ gibt es jetzt auch im Pool des Turniers - und die Vorgabe des Spiels lädt den Standard-Pool.
+test("der Pool des Turniers übernimmt von anderen Turnieren und Seasons desselben Spiels", async () => {
+  const other = { id: "o1", version: 1, modes: [{ mode: "snd", label: "Suchen & Zerstören", maps: [{ map_id: "hafen", name: "Hafenkante" }] }] };
+  apiMock.get.mockResolvedValue({ data: { game: GAME, library: LIBRARY, tournament: null, stages: [], sources: [{ key: "tournament:x", label: "Turnier: Probe Cup", pool: other }] } });
+  renderPanel();
+  const select = await screen.findByTestId("tournament-pool-copy");
+  expect([...select.options].map((option) => option.textContent)).toEqual(["Übernehmen von …", "Turnier: Probe Cup"]);
+  fireEvent.change(select, { target: { value: "tournament:x" } });
+  expect(screen.getByRole("checkbox", { name: "Hafenkante in Suchen & Zerstören" })).toBeChecked();
+  expect(screen.getByRole("checkbox", { name: "Nebelwerk in Suchen & Zerstören" })).not.toBeChecked();
+});
+
+test("eine Phase bietet zuerst den Pool ihres Turniers, dann die übrigen", async () => {
+  const other = { id: "o1", version: 1, modes: [] };
+  apiMock.get.mockResolvedValue({ data: { game: GAME, library: LIBRARY, tournament: POOL, sources: [{ key: "season:x", label: "Liga-Season: Season 1", pool: other }],
+    stages: [{ stage_id: "s1", name: "Gruppenphase", number: 1, pool: null }] } });
+  renderPanel();
+  fireEvent.click(await screen.findByTestId("stage-pool-edit-s1"));
+  const select = await screen.findByTestId("stage-pool-s1-copy");
+  expect([...select.options].map((option) => option.textContent)).toEqual(["Übernehmen von …", "Pool des Turniers", "Liga-Season: Season 1"]);
+});
+
 test("zeigt den Pool des Turniers und je Phase, woher ihr Pool kommt", async () => {
   renderPanel();
   await screen.findByTestId("tournament-pool");

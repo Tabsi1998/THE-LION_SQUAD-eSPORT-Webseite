@@ -1,6 +1,7 @@
 // Pool-Editor der Verwaltung (#1616) - für Turnier, Phase und Saison einer Referenzen-Serie. Je Modus des Spiels nur
 // die dort freigegebenen, aktiven Maps; gewählte zuerst in ihrer Reihenfolge (Pfeile), dann die übrigen. Knöpfe:
-// Vorgabe des Spiels übernehmen, aus einer Quelle kopieren (Turnier → Phase, Vorsaison → Saison), alle abwählen,
+// Vorgabe des Spiels übernehmen (Standard-Pool, sonst alle aktiven), aus einer Quelle kopieren (anderes Turnier oder
+// Season → Turnier, Turnier → Phase, Vorsaison → Saison), alle abwählen,
 // Speichern (neue Version, mit der geladenen Version gegen gleichzeitiges Überschreiben) und Pool entfernen.
 // Gespeichert ist ein Snapshot: was sich in der Bibliothek seither geändert hat, steht als Hinweis da und kommt erst mit
 // dem nächsten Speichern in den Pool. Die Regeln prüft der Server noch einmal (services/map_pools.py).
@@ -25,7 +26,7 @@ import "@/components/tls/maps/maps.css";
 
 const keyOf = (mode) => mode ?? "";
 const ORIGIN_TEXT = { tournament: "Pool des Turniers", stage: "eigener Pool der Phase", reference_series: "Pool der Saison",
-  league_season: "Pool der Liga-Season" };
+  league_season: "Pool der Liga-Season", game_default: "Standard-Pool des Spiels" };
 
 /** Die Auswahl eines gespeicherten Pools, beschränkt auf das, was heute noch wählbar ist (aktiv, im Modus frei). */
 function startSelection(entry, library, modes) {
@@ -97,8 +98,8 @@ function ModeGroup({ mode, label, library, selected, onToggle, onMove, disabled,
   );
 }
 
-export function MapPoolEditor({ title, hint = "", game, library = [], entry = null, sources = [], onSave, onClear, canEdit = true,
-  libraryLink = false, testId = "map-pool-editor" }) {
+export function MapPoolEditor({ title, hint = "", game, library = [], entry = null, sources = [], defaultPool = null, onSave, onClear, canEdit = true,
+  libraryLink = false, defaultsLabel = "Vorgabe des Spiels", testId = "map-pool-editor" }) {
   const modes = useMemo(() => game?.modes || [], [game]);
   const [selection, setSelection] = useState(() => startSelection(entry, library, modes));
   const [busy, setBusy] = useState(false);
@@ -131,6 +132,11 @@ export function MapPoolEditor({ title, hint = "", game, library = [], entry = nu
   const copyFrom = (key) => {
     const source = sources.find((item) => item.key === key);
     if (source) setSelection(startSelection({ ...source.pool, stale: false }, library, modes));
+  };
+  // Vorgabe des Spiels (#2129, SP3): der Standard-Pool, soweit seine Maps heute wählbar sind - sonst wie bisher alle aktiven.
+  const loadDefaults = () => {
+    const fromDefault = defaultPool ? startSelection({ ...defaultPool, stale: false }, library, modes) : null;
+    setSelection(fromDefault && selectionCount(fromDefault) ? fromDefault : defaultSelection(library, modes));
   };
 
   let status = "Noch kein Pool";
@@ -185,9 +191,10 @@ export function MapPoolEditor({ title, hint = "", game, library = [], entry = nu
       {game && library.length > 0 ? (
         <>
           <div className="flex flex-wrap items-center gap-2">
-            <button type="button" disabled={disabled} onClick={() => setSelection(defaultSelection(library, modes))} data-testid={`${testId}-defaults`}
+            <button type="button" disabled={disabled} onClick={loadDefaults} data-testid={`${testId}-defaults`}
+              title={defaultPool ? "Lädt den Standard-Pool des Spiels" : "Lädt alle aktiven Maps des Spiels"}
               className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">
-              Vorgabe des Spiels
+              {defaultsLabel}
             </button>
             {sources.length ? (
               <select value="" disabled={disabled} onChange={(event) => copyFrom(event.target.value)} data-testid={`${testId}-copy`} aria-label="Pool übernehmen von"

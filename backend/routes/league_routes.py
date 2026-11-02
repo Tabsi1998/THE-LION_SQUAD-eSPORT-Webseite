@@ -117,6 +117,7 @@ async def admin_season(season_id: str, _me: dict = Depends(require_league_admin)
         "look": league_look.effective(league, season),
         "calendar": leagues.calendar_summary(season),
         "library": await map_pools.library(db, game),
+        "default_pool": await map_pools.default_pool(db, game),
         "map_pool": await map_pools.admin_entry(db, pool, league.get("game_id"), "league_season"),
         "divisions": rows,
     }

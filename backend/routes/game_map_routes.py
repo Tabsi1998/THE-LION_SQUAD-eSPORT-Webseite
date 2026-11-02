@@ -8,8 +8,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from auth import require_admin
 from database import get_db
 from models import new_id
-from services import game_maps
-from services.game_maps import GameMapCreate, GameMapModes, GameMapOrder, GameMapUpdate, MapProblem
+from routes.game_routes import _enrich_games
+from services import game_maps, map_pools
+from services.game_maps import DEFAULT_POOL_SCOPE, GameMapCreate, GameMapImport, GameMapModes, GameMapOrder, GameMapUpdate, MapProblem
+from services.map_pools import MapPoolSave
 
 router = APIRouter(prefix="/api/games", tags=["game-maps"])
 
@@ -44,7 +46,73 @@ async def list_game_maps(game_id: str, me: dict = Depends(require_admin())):
         "maps": [{**game_maps.public_map(row), "in_pools": used.get(row["id"], 0)}
                  for row in await game_maps.maps_of(db, game["id"])],
         "limit": game_maps.MAPS_PER_GAME_MAX,
+        "default_pool": await map_pools.admin_entry(db, await map_pools.current(db, DEFAULT_POOL_SCOPE, game["id"]), game["id"],
+                                                    DEFAULT_POOL_SCOPE),
     }
+
+
+# ---------------------------------------------------------------- Standard-Pool (#2129, SP3)
+
+@router.put("/{game_id}/default-pool")
+async def save_default_pool(game_id: str, body: MapPoolSave, me: dict = Depends(require_admin())):
+    db = get_db()
+    game = await _game(db, game_id)
+    try:
+        doc = await map_pools.save(db, scope=DEFAULT_POOL_SCOPE, scope_id=game["id"], game=game, body=body, user=me)
+    except MapProblem as problem:
+        raise _refuse(problem) from None
+    return map_pools.saved_view(doc, DEFAULT_POOL_SCOPE, admin=True)
+
+
+@router.delete("/{game_id}/default-pool")
+async def clear_default_pool(game_id: str, me: dict = Depends(require_admin())):
+    db = get_db()
+    game = await _game(db, game_id)
+    try:
+        await map_pools.clear(db, scope=DEFAULT_POOL_SCOPE, scope_id=game["id"], user=me)
+    except MapProblem as problem:
+        raise _refuse(problem) from None
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------- Aus einer anderen Spielversion übernehmen (#2129, SP4)
+
+@router.get("/{game_id}/maps/import-sources")
+async def map_import_sources(game_id: str, me: dict = Depends(require_admin())):
+    """Die anderen Spiele mit aktiven Maps; Hauptspiel und Versionen derselben Reihe zuerst. Auch archivierte: gerade die
+    alte Version ist die übliche Quelle."""
+    db = get_db()
+    game = await _game(db, game_id)
+    games = _enrich_games(await db.games.find({}, {"_id": 0}).to_list(500))
+    family = game.get("parent_game_id") or game["id"]
+    rows = []
+    for other in games:
+        if other["id"] == game["id"]:
+            continue
+        count = await db.game_maps.count_documents({"game_id": other["id"], "status": "active"})
+        if count:
+            related = family in (other["id"], other.get("parent_game_id"))
+            rows.append({"id": other["id"], "name": other.get("display_name") or other.get("name"), "maps": count, "related": related})
+    return sorted(rows, key=lambda row: (not row["related"], str(row["name"]).casefold()))
+
+
+@router.get("/{game_id}/maps/import-sources/{source_id}")
+async def map_import_candidates(game_id: str, source_id: str, me: dict = Depends(require_admin())):
+    db = get_db()
+    game = await _game(db, game_id)
+    source = await _game(db, source_id)
+    return {"source": {"id": source["id"], "name": source.get("name")},
+            "maps": await game_maps.import_candidates(db, game, source)}
+
+
+@router.post("/{game_id}/maps/import")
+async def import_game_maps(game_id: str, body: GameMapImport, me: dict = Depends(require_admin())):
+    db = get_db()
+    game = await _game(db, game_id)
+    if body.source_game_id == game["id"]:
+        raise HTTPException(status_code=422, detail="Bitte ein anderes Spiel als Quelle wählen.")
+    source = await _game(db, body.source_game_id)
+    return await game_maps.import_maps(db, game, source, body.map_ids, me, new_id)
 
 
 @router.post("/{game_id}/maps")

@@ -467,7 +467,7 @@ export default function AdminLeagueSeasonPage() {
               </div>
             </form>
 
-            <MapPoolEditor key={data.map_pool?.id || "leer"} title="Map-Pool der Season" game={data.game} library={data.library} entry={data.map_pool}
+            <MapPoolEditor key={data.map_pool?.id || "leer"} title="Map-Pool der Season" game={data.game} library={data.library} entry={data.map_pool} defaultPool={data.default_pool}
               hint="Jede neue Staffel bekommt eine Kopie; Änderungen kommen beim Übertragen an. Ohne Pool kann niemand mit Maps melden." onSave={savePool} onClear={clearPool} libraryLink testId="season-pool" />
 
             <section className="border border-white/10 rounded-sm bg-[#121212] p-4 md:p-5 space-y-4" aria-label="Ligen und Staffeln" data-testid="season-divisions">

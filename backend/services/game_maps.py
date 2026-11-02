@@ -8,7 +8,8 @@ Map kann in mehreren Modi freigegeben sein und in anderen nicht (M:N).
 Was ein Wettbewerb daraus wählt, steht als Snapshot in ``map_pools`` (``services/map_pools.py``). Deshalb ändern
 Umbenennen, neues Bild oder Archivieren nie einen gespeicherten Pool. Gelöscht wird nur eine Map, die in keiner
 Pool-Version steht - sonst archivieren. Eine neue Spielversion erbt keine Maps von selbst; gleiche Namen in zwei Spielen
-sind zwei verschiedene Maps.
+sind zwei verschiedene Maps. „Aus <Spiel> übernehmen“ (``import_maps``) legt solche eigenen Maps an, ohne Doppel und mit
+demselben Bild (#2129, SP4).
 """
 from __future__ import annotations
 
@@ -123,6 +124,11 @@ class GameMapOrder(BaseModel):
 
 class GameMapModes(BaseModel):
     modes: List[str] = Field(min_length=1, max_length=GAME_MODES_MAX)
+
+
+class GameMapImport(BaseModel):
+    source_game_id: str = Field(min_length=1, max_length=80)
+    map_ids: List[str] = Field(min_length=1, max_length=MAPS_PER_GAME_MAX)
 
 
 class MapProblem(ValueError):
@@ -411,6 +417,56 @@ async def update(db, game: dict, current: dict, body: GameMapUpdate, user: dict)
         raise
     await release_keys(db, game["id"], current["id"], keep=set(spellings))
     return public_map({**current, **updates})
+
+
+def mapped_modes(source: dict, game: dict, modes: list[str] | None) -> list[str]:
+    """Die Modi einer Map im Zielspiel (#2129, SP4): gleiche Kennung oder gleicher Name. Was das Ziel nicht hat, fällt weg -
+    die Map erscheint dann im Hinweis „noch keinen Modus“."""
+    target = game_modes(game)
+    by_key = {mode["mode"]: mode["mode"] for mode in target}
+    by_label = {name_key(mode["label"]): mode["mode"] for mode in target}
+    labels = {mode["mode"]: mode["label"] for mode in game_modes(source)}
+    out: list[str] = []
+    for mode in modes or []:
+        found = by_key.get(mode) or by_label.get(name_key(labels.get(mode)))
+        if found and found not in out:
+            out.append(found)
+    return out
+
+
+async def _taken_spellings(db, game_id: str) -> set[str]:
+    rows = await db.game_maps.find({"game_id": game_id}, {"_id": 0, "name": 1, "slug": 1, "aliases": 1}).to_list(MAPS_PER_GAME_MAX + 50)
+    return {key for row in rows for key in spelling_keys(row.get("name"), row.get("slug"), row.get("aliases"))}
+
+
+async def import_candidates(db, game: dict, source: dict) -> list[dict]:
+    """Was sich aus ``source`` übernehmen lässt: die aktiven Maps, mit ``exists``, wenn das Zielspiel sie unter einer ihrer
+    Schreibweisen schon hat."""
+    taken = await _taken_spellings(db, game["id"])
+    labels = {mode["mode"]: mode["label"] for mode in game_modes(game)}
+    return [{"id": row["id"], "name": row.get("name"), "image_url": row.get("image_url"),
+             "modes": [labels[mode] for mode in mapped_modes(source, game, row.get("modes"))],
+             "exists": bool(taken & set(spelling_keys(row.get("name"), row.get("slug"), row.get("aliases"))))}
+            for row in await maps_of(db, source["id"], active_only=True)]
+
+
+async def import_maps(db, game: dict, source: dict, map_ids: list[str], user: dict, make_id) -> dict:
+    """Maps aus einer anderen Spielversion übernehmen (#2129, SP4): als eigene Maps dieses Spiels, ohne Doppel, das Bild wird
+    mitverwendet. Das Quellspiel und gespeicherte Pools bleiben unberührt. Was nicht geht, steht mit Grund in ``skipped``."""
+    wanted = set(map_ids)
+    created: list[dict] = []
+    skipped: list[dict] = []
+    for row in await maps_of(db, source["id"], active_only=True):
+        if row["id"] not in wanted:
+            continue
+        body = GameMapCreate(name=row.get("name"), slug=row.get("slug"), aliases=row.get("aliases") or [],
+                             image_url=row.get("image_url"), note=row.get("note"), external_ref=row.get("external_ref"),
+                             modes=mapped_modes(source, game, row.get("modes")))
+        try:
+            created.append(await create(db, game, body, user, make_id()))
+        except MapProblem as problem:
+            skipped.append({"id": row["id"], "name": row.get("name"), "reason": problem.message})
+    return {"created": created, "skipped": skipped}
 
 
 async def reorder(db, game: dict, ids: list[str], user: dict) -> list[dict]:

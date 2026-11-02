@@ -61,7 +61,9 @@ export function MapPoolPanel({ tournamentId, canEdit = true }) {
   if (error) return <p className="text-sm text-white/60" data-testid="map-pool-panel-error">{error}</p>;
   if (!data) return <p className="text-sm text-white/50">Lade Maps …</p>;
   const tournamentPool = data.tournament && !data.tournament.stale ? data.tournament : null;
-  const sources = tournamentPool ? [{ key: "tournament", label: "Pool des Turniers", pool: tournamentPool }] : [];
+  // „Übernehmen von“ (#2129, SP3): andere Turniere und Liga-Seasons desselben Spiels; eine Phase zuerst vom eigenen Turnier.
+  const others = Array.isArray(data.sources) ? data.sources : [];
+  const sources = [...(tournamentPool ? [{ key: "tournament", label: "Pool des Turniers", pool: tournamentPool }] : []), ...others];
 
   return (
     <div className="space-y-4" data-testid="map-pool-panel">
@@ -69,7 +71,7 @@ export function MapPoolPanel({ tournamentId, canEdit = true }) {
         key={`t-${data.tournament?.id || "neu"}`}
         title="Map-Pool des Turniers"
         hint="Gilt für alle Phasen ohne eigenen Pool. Ein Speichern ist eine neue Version – Spiele, die eine Version festhalten, behalten sie."
-        game={data.game} library={data.library} entry={data.tournament} canEdit={canEdit} libraryLink
+        game={data.game} library={data.library} entry={data.tournament} sources={others} defaultPool={data.default_pool} canEdit={canEdit} libraryLink
         onSave={save("")}
         onClear={clear("", { title: "Map-Pool entfernen?", description: "Phasen ohne eigenen Pool haben dann keine Maps mehr. Gespeicherte Versionen bleiben nachlesbar.", confirmLabel: "Entfernen" })}
         testId="tournament-pool"
@@ -98,7 +100,7 @@ export function MapPoolPanel({ tournamentId, canEdit = true }) {
                   <MapPoolEditor
                     key={`s-${row.stage_id}-${row.pool?.id || "neu"}`}
                     title={`Eigener Pool · ${row.name || `Phase ${row.number}`}`}
-                    game={data.game} library={data.library} entry={row.pool} sources={sources} canEdit={canEdit}
+                    game={data.game} library={data.library} entry={row.pool} sources={sources} defaultPool={data.default_pool} canEdit={canEdit}
                     onSave={save(`/stages/${row.stage_id}`)}
                     onClear={clear(`/stages/${row.stage_id}`, { title: "Eigenen Pool der Phase entfernen?", description: "Danach gilt wieder der Pool des Turniers.", confirmLabel: "Entfernen" })}
                     testId={`stage-pool-${row.stage_id}`}
