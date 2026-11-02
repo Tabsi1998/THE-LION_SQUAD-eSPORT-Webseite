@@ -40,6 +40,20 @@ test("Neuer Partner öffnet das Seitenblatt, Speichern legt an und schließt es"
   expect(apiMock.get.mock.calls.filter(([url]) => url === "/partners/admin")).toHaveLength(2);
 });
 
+test("Partner aus Dolibarr: „Aktiv“ gesperrt mit Hinweis, Löschen gesperrt; von Hand bleibt alles frei (#2130)", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/admin/dolibarr/sponsors") return { data: { from_dolibarr: true, connected: true, fetched_at: "2026-10-01T10:00:00Z", locked: { partners: ["name", "kind", "is_active"] } } };
+    return { data: [{ id: "p1", slug: "aus-dolibarr", name: "Aus Dolibarr", source: "dolibarr", is_active: true }, { id: "p2", slug: "von-hand", name: "Von Hand", is_active: true }] };
+  });
+  render(<MemoryRouter><AdminPartnersPage /></MemoryRouter>);
+  expect(await screen.findByTestId("partner-delete-p1")).toBeDisabled();
+  expect(screen.getByTestId("partner-delete-p2")).not.toBeDisabled();
+  fireEvent.click(screen.getAllByRole("button").find((button) => button.querySelector("svg.lucide-pencil")));
+  expect(screen.getByTestId("partner-locked-hint")).toHaveTextContent("Name, Art und „Aktiv“");
+  expect(screen.getByTestId("partner-active")).toBeDisabled();
+  expect(screen.getByTestId("partner-description")).not.toBeDisabled();
+});
+
 test("Bearbeiten öffnet das Blatt mit den Werten des Partners, Tools inklusive", async () => {
   render(<MemoryRouter><AdminPartnersPage /></MemoryRouter>);
   await screen.findByText("Gamers Heaven");

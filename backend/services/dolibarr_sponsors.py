@@ -11,7 +11,7 @@ ein Eintrag mit ``source: "dolibarr"`` und ``dolibarr_id``. Ein von Hand angeleg
 demselben Namen wird übernommen statt verdoppelt und behält sein Logo.
 
 Was von Dolibarr kommt (und im Admin gesperrt ist, solange der Schalter an ist): Name, Stufe bzw.
-Art, Laufzeit, E-Mail und Telefon der Firma. Was auf der Website bleibt: Logo, Link (Dolibarr füllt
+Art, Laufzeit, E-Mail und Telefon der Firma, bei Partnern auch „Aktiv“. Was auf der Website bleibt: Logo, Link (Dolibarr füllt
 ihn nur, wenn er leer ist), Platzierungen, Reihenfolge, Beschreibung, Ansprechpartner, Notizen.
 
 Ab Vereine 1.9.0 kommen auch Logo und Banner je für hellen und dunklen Hintergrund aus dem Vereinsmodul
@@ -46,7 +46,11 @@ START_FIELDS = ("options_sponsor_start", "options_sponsoring_start")
 END_FIELDS = ("options_sponsor_end", "options_sponsoring_end")
 # Diese Felder kommen aus Dolibarr - der Admin kann sie nicht überschreiben, solange der Schalter an ist.
 SPONSOR_LOCKED_FIELDS = ("name", "tier", "contract_start", "contract_end", "contact_email", "contact_phone")
-PARTNER_LOCKED_FIELDS = ("name", "kind")
+# „Aktiv“ schreibt der Abgleich bei Partnern jede Stunde neu (#2130) - ein Haken von Hand hielte nicht.
+PARTNER_LOCKED_FIELDS = ("name", "kind", "is_active")
+# Löschen hilft nicht, solange die Firma in Dolibarr steht: der Abgleich legt sie neu an, ohne Logo und Texte (#2130).
+DELETE_BLOCKED = ("{what} kommt aus Dolibarr: Beim nächsten Abgleich wäre der Eintrag wieder da, nur ohne Logo und Texte. Nimm "
+                  "die Firma in Dolibarr aus der Kategorie, dann bleibt er hier als ehemalig stehen und lässt sich löschen.")
 
 
 def _as_int(value) -> int | None:
@@ -327,6 +331,14 @@ async def locked_fields(db, doc: dict | None, fields: tuple[str, ...]) -> tuple[
         return ()
     source = await load_source_settings(db)
     return fields if source["from_dolibarr"] else ()
+
+
+async def comes_back_on_sync(db, doc: dict | None) -> bool:
+    """Legt der nächste Abgleich den Eintrag neu an, wenn er hier gelöscht wird? Nur solange der Schalter an ist und die
+    Firma noch in der Kategorie steht."""
+    if not doc or doc.get("source") != SOURCE or doc.get("dolibarr_gone_at"):
+        return False
+    return (await load_source_settings(db))["from_dolibarr"]
 
 
 async def admin_view(db) -> dict:

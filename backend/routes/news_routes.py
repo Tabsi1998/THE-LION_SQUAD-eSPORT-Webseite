@@ -1051,7 +1051,11 @@ async def update_sponsor(sid: str, body: SponsorUpdate, me: dict = Depends(requi
 
 @router.delete("/sponsors/{sid}")
 async def delete_sponsor(sid: str, me: dict = Depends(require_area("content"))):
+    from services import dolibarr_sponsors
     db = get_db()
+    current = await db.sponsors.find_one({"id": sid}, {"_id": 0})
+    if await dolibarr_sponsors.comes_back_on_sync(db, current):
+        raise HTTPException(409, dolibarr_sponsors.DELETE_BLOCKED.format(what="Dieser Sponsor"))
     await db.sponsors.delete_one({"id": sid})
     return {"ok": True}
 
@@ -1624,7 +1628,11 @@ async def update_partner(pid: str, body: PartnerUpdate, me: dict = Depends(requi
 
 @router.delete("/partners/{pid}", dependencies=PARTNER_WRITE)
 async def delete_partner(pid: str, me: dict = Depends(require_area("content"))):
+    from services import dolibarr_sponsors
     db = get_db()
+    current = await db.partners.find_one({"id": pid}, {"_id": 0})
+    if await dolibarr_sponsors.comes_back_on_sync(db, current):
+        raise HTTPException(409, dolibarr_sponsors.DELETE_BLOCKED.format(what="Dieser Partner"))
     await db.partners.delete_one({"id": pid})
     return {"ok": True}
 

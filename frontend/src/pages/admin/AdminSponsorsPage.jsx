@@ -5,7 +5,7 @@ import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { CheckField, SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { GermanDateField } from "@/components/tls/GermanDateField";
-import { DolibarrSourceBlock, dolibarrLocked, useDolibarrSource } from "@/components/tls/DolibarrSourceBlock";
+import { DOLIBARR_DELETE_HINT, DolibarrSourceBlock, dolibarrKeepsEntry, dolibarrLocked, useDolibarrSource } from "@/components/tls/DolibarrSourceBlock";
 import { imageSourceText, shownLogo } from "@/lib/sponsorImages";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
@@ -224,7 +224,7 @@ export default function AdminSponsorsPage() {
               </div>
               <div className="flex gap-1 shrink-0">
                 <button onClick={() => setEditing(s)} className="p-1.5 text-white/40 hover:text-[#29B6E8]"><Pencil className="w-4 h-4" /></button>
-                <button onClick={() => del(s.id)} className="p-1.5 text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-4 h-4" /></button>
+                <button onClick={() => del(s.id)} disabled={dolibarrKeepsEntry(dolibarrSource, s)} title={dolibarrKeepsEntry(dolibarrSource, s) ? DOLIBARR_DELETE_HINT : "Sponsor löschen"} aria-label="Sponsor löschen" data-testid={`sponsor-delete-${s.id}`} className="p-1.5 text-white/40 hover:text-[#FF3B30] disabled:opacity-30 disabled:hover:text-white/40 disabled:cursor-not-allowed"><Trash2 className="w-4 h-4" /></button>
               </div>
             </div>
             {(s.contract_start || s.contract_end || s.contact_name) && (

@@ -89,6 +89,19 @@ test("Sponsor aus Dolibarr: Dolibarr-Felder gesperrt, Website-Felder frei; Hande
   expect(screen.getByTestId("sponsor-name")).not.toBeDisabled();
 });
 
+test("Sponsor aus Dolibarr lässt sich nicht löschen, solange der Schalter an ist (#2130)", async () => {
+  mockApi(SOURCE_ON);
+  const on = render(<MemoryRouter><AdminSponsorsPage /></MemoryRouter>);
+  expect(await screen.findByTestId("sponsor-delete-s1")).toBeDisabled();
+  expect(screen.getByTestId("sponsor-delete-s1")).toHaveAttribute("title", expect.stringContaining("aus der Kategorie"));
+  expect(screen.getByTestId("sponsor-delete-s2")).not.toBeDisabled();
+  on.unmount();
+  mockApi(SOURCE_OFF);
+  render(<MemoryRouter><AdminSponsorsPage /></MemoryRouter>);
+  await screen.findByTestId("dolibarr-source-off");
+  expect(screen.getByTestId("sponsor-delete-s1")).not.toBeDisabled();
+});
+
 // Event-Sponsoren (#1371): nur der Sponsor sagt, wo er erscheint - „bei allen Events“ oder „bei ausgewählten Events“.
 test("Events: bei allen leert die Auswahl, bei ausgewählten verlangt mindestens ein Event", async () => {
   apiMock.get.mockImplementation(async (url) => {

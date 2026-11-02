@@ -4,7 +4,7 @@ import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { CheckField, SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
-import { DolibarrSourceBlock, dolibarrLocked, useDolibarrSource } from "@/components/tls/DolibarrSourceBlock";
+import { DOLIBARR_DELETE_HINT, DolibarrSourceBlock, dolibarrKeepsEntry, dolibarrLocked, useDolibarrSource } from "@/components/tls/DolibarrSourceBlock";
 import { imageSourceText, shownLogo } from "@/lib/sponsorImages";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
@@ -145,7 +145,7 @@ export default function AdminPartnersPage() {
               </div>
               <div className="flex gap-1 shrink-0">
                 <button onClick={() => setEditing(p)} className="p-1.5 text-white/40 hover:text-[#29B6E8]"><Pencil className="w-4 h-4" /></button>
-                <button onClick={() => remove(p.id)} className="p-1.5 text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-4 h-4" /></button>
+                <button onClick={() => remove(p.id)} disabled={dolibarrKeepsEntry(dolibarrSource, p)} title={dolibarrKeepsEntry(dolibarrSource, p) ? DOLIBARR_DELETE_HINT : "Partner löschen"} aria-label="Partner löschen" data-testid={`partner-delete-${p.id}`} className="p-1.5 text-white/40 hover:text-[#FF3B30] disabled:opacity-30 disabled:hover:text-white/40 disabled:cursor-not-allowed"><Trash2 className="w-4 h-4" /></button>
               </div>
             </div>
             {p.description && <p className="mt-3 text-sm text-white/60 line-clamp-2">{p.description}</p>}
@@ -193,6 +193,11 @@ function PartnerForm({ partner, locked = new Set(), onClose, onSaved }) {
   // Seitenblatt statt Fenster (#435): die Liste bleibt daneben sichtbar.
   return (
     <AdminSheet title={isNew ? "Neuer Partner" : "Partner bearbeiten"} eyebrow="Verein" onClose={onClose} onSubmit={save} saving={saving} submitTestId="partner-save" testId="partner-sheet">
+      {locked.size > 0 && (
+        <p className="text-xs text-[#29B6E8] border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-3 py-2" data-testid="partner-locked-hint">
+          Dieser Partner kommt aus Dolibarr: Name, Art und „Aktiv“ werden dort gepflegt. Inaktiv wird er, wenn die Firma in Dolibarr geschlossen oder aus der Kategorie genommen wird. Alles andere bleibt hier.
+        </p>
+      )}
       <TextField label="Name" value={form.name} onChange={(v) => set("name", v)} required testId="partner-name" {...lock("name")} />
       <ImageUpload value={form.logo_url} onChange={(v) => set("logo_url", v)} label="Logo" testId="partner-logo" variant="square" endpoint="/uploads/logo" allowLibrary logo />
       {imageSourceText(partner?.dolibarr_image_summary) && (
@@ -206,7 +211,7 @@ function PartnerForm({ partner, locked = new Set(), onClose, onSaved }) {
         <TextField label="Typ" value={form.kind} onChange={(v) => set("kind", v)} placeholder="Verein, Messe, Community" testId="partner-kind" {...lock("kind")} />
         <TextField label="Reihenfolge" type="number" value={form.order_index} onChange={(v) => set("order_index", Number(v) || 0)} testId="partner-order" />
       </FormGrid>
-      <CheckField label="Aktiv" checked={form.is_active !== false} onChange={(v) => set("is_active", v)} testId="partner-active" />
+      <CheckField label="Aktiv" checked={form.is_active !== false} onChange={(v) => set("is_active", v)} testId="partner-active" {...lock("is_active")} />
       <TextAreaField label="Kurzbeschreibung" value={form.description} onChange={(v) => set("description", v)} testId="partner-description" hint="Steht in der Partnerliste und im Kopf der Partnerseite." />
 
       <FormSection title="Partnerseite" hint={`Eigene Seite unter /partners/${form.slug || "…"} – Adresse, „seit“ und der längere Text.`} plain testId="partner-page-section">
