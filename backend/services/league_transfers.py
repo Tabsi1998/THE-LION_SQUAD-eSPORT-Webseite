@@ -1,5 +1,6 @@
 """Transfers in der Liga (docs/LIGA.md, Abschnitt 12, B.3, #2204): Wer in einer Season schon für ein Co-Team spielt oder gespielt hat, wechselt
-nur im Transferfenster und nur mit Genehmigung der Liga-Leitung. Danach gilt dieselbe Wartezeit wie für jeden neuen Spieler.
+nur im Transferfenster und nur mit Genehmigung der Liga-Leitung. Danach wartet die Person **immer** die Wartezeit der Season (Entscheidung Nr. 71,
+Regelwerk § 4.6), auch vor dem Ende von Spieltag 1 und auch im Co-Team, in dem sie früher schon stand. Aufheben kann das nur die Leitung mit Pflichtgrund.
 
 Ein Transfer ist nur nötig, wenn die Season ``one_team_per_season`` trägt. Alle Entscheidungen stehen im Protokoll. Beantragen darf, wer den
 Kader des Ziel-Co-Teams ändern darf; die Person steht schon im Hauptteam - dort stimmt sie durch ihren Beitritt zu.
@@ -13,6 +14,8 @@ from database import get_db
 from models import new_id, now_utc
 from services import league_eligibility, league_roster
 from services.league_mail import send_league_mail
+from services.matchday_schedule import LOCAL_TZ
+from services.matchday_schedule import LOCAL_TZ
 from services.dolibarr_policy import club_today
 
 PENDING, APPROVED, REJECTED, WITHDRAWN = "pending", "approved", "rejected", "withdrawn"
@@ -116,8 +119,8 @@ async def _decide(db, row: dict, status: str, actor: dict, reason: str | None) -
 
 
 async def approve(db, season: dict, transfer_id: str, reason: str | None, actor: dict) -> dict:
-    """Genehmigen: unter der Season-Sperre aus dem alten Co-Team ins neue, mit Wartezeit nach Spieltag 1 und Warnung, falls der alte Kader zu
-    klein wird. Prüft Alter, Höchstkader und Rolle noch einmal; der Wechsel selbst ist genehmigt."""
+    """Genehmigen: unter der Season-Sperre aus dem alten Co-Team ins neue, immer mit der Wartezeit der Season ab jetzt und mit Warnung, falls der
+    alte Kader zu klein wird. Prüft Alter, Höchstkader und Rolle noch einmal; der Wechsel selbst ist genehmigt."""
     from services import squad_shortage
 
     async with league_eligibility.squad_change_lock(db, [season]):
@@ -147,12 +150,14 @@ async def approve(db, season: dict, transfer_id: str, reason: str | None, actor:
             await db.team_squads.update_one({"id": source["id"]}, {"$pull": {"member_ids": user_id}, "$set": {"updated_at": row["decided_at"]}})
         await db.team_squads.update_one({"id": target["id"]}, {"$addToSet": {"member_ids": user_id}, "$set": {"updated_at": row["decided_at"]}})
         ctx = await league_roster.context_for_tournament(db, tournament, [user_id])
-        wait = bool(season.get("new_player_wait_days")) and league_roster.first_matchday_over(tournament)
-        await league_roster.record_members(db, ctx, [user_id], via="transfer", actor_id=actor.get("id"), squad_id=target["id"], wait=wait)
+        await league_roster.record_members(db, ctx, [user_id], via="transfer", actor_id=actor.get("id"), squad_id=target["id"],
+                                           wait=bool(season.get("new_player_wait_days")))
+        until = league_roster.wait_until(ctx, user_id, target["id"])
     await _audit(db, "league.transfer.approve", row, actor.get("id"), **({"reason": row["reason"]} if row["reason"] else {}))
     url = f"/teams/{team['id']}"
     leads = {*await _team_leads(db, team["id"]), *await _team_leads(db, (source or {}).get("team_id"))}
-    await _tell({user_id, *leads}, title="Transfer genehmigt", body=f"Die Liga-Leitung hat den Wechsel ins Co-Team {target.get('name') or ''} genehmigt.",
+    waits = f" Die Person darf ab {until.astimezone(LOCAL_TZ).strftime('%d.%m.%Y, %H:%M')} spielen." if until else ""
+    await _tell({user_id, *leads}, title="Transfer genehmigt", body=f"Die Liga-Leitung hat den Wechsel ins Co-Team {target.get('name') or ''} genehmigt.{waits}",
                 url=url, reason="league_transfer_approved", row=row, status=APPROVED)
     if source:
         await squad_shortage.warn_after_departure(db, [source])

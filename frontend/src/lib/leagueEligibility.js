@@ -50,7 +50,7 @@ export function rulesLines(rules) {
   }
   if (rules.one_team_per_season) lines.push("Jede Person spielt in dieser Season nur für ein Team.");
   if (rules.min_age) lines.push(`Mindestalter: ${rules.min_age} Jahre, laut Geburtsdatum im Profil.`);
-  if (rules.new_player_wait_days) lines.push(`Neue Spieler warten ab dem Ende von Spieltag 1 ${rules.new_player_wait_days} Tage.`);
+  if (rules.new_player_wait_days) lines.push(`Neue Spieler warten ab dem Ende von Spieltag 1 ${rules.new_player_wait_days} Tage, nach einem Transfer immer.`);
   if (rules.roster_deadline) lines.push(`Stichtag für neue Spieler: ${dayText(rules.roster_deadline)}.`);
   if (rules.one_team_per_season) {
     const windows = rules.transfer_windows || [];

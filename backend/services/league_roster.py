@@ -318,7 +318,8 @@ def wait_until(ctx: RosterContext | None, user_id: str, squad_id: str | None):
     days = (ctx.season or {}).get("new_player_wait_days") if ctx else None
     entry = ctx.entries.get(user_id) if ctx else None
     start = ((entry or {}).get("wait_from") or {}).get(squad_id) if squad_id else None
-    if not days or not start or any(row.get("squad_id") == squad_id for row in entry.get("wait_waivers") or []):
+    # Eine Aufhebung gilt für die Wartezeit, die zu ihr lief: Ein späterer Transfer ins selbe Co-Team wartet neu.
+    if not days or not start or any(row.get("squad_id") == squad_id and str(row.get("at")) >= str(start) for row in entry.get("wait_waivers") or []):
         return None
     try:
         moment = datetime.fromisoformat(str(start).replace("Z", "+00:00"))
@@ -470,7 +471,8 @@ async def record_members(db, ctx: RosterContext | None, user_ids, *, via: str, a
     stand, wartet er dort auf Freigabe (``late_squad_ids``) - der Wiedereintritt ins selbe Co-Team ist nicht „spät“,
     das Zuteilen durch die Leitung hebt es für dieses Co-Team auf. Fehlt die festgehaltene ID und steht sie im Profil,
     wird sie festgehalten (nicht, solange die Person hier wartet). ``wait``: Die Wartezeit der Season beginnt, ebenfalls nur
-    beim ersten Eintritt in dieses Co-Team (#2204). Liefert den Stand danach je Person."""
+    beim ersten Eintritt in dieses Co-Team; ein genehmigter Transfer (``via="transfer"``) startet sie immer neu (#2204). Liefert den Stand danach
+    je Person."""
     if not ctx:
         return {}
     if not ctx.fields and not ctx.tracks_players:
@@ -519,6 +521,8 @@ async def record_members(db, ctx: RosterContext | None, user_ids, *, via: str, a
             waiting.discard(squad_id)
         if squad_id and via == "assign" and squad_id in (entry.get("wait_from") or {}):
             change["$unset"] = {f"wait_from.{squad_id}": ""}
+        if via == "transfer" and wait_set:
+            change.setdefault("$set", {}).update(wait_set)
         if change:
             change["$set"] = {**change.get("$set", {}), "updated_at": now}
             await db.league_rosters.update_one({"season_id": ctx.season_id, "user_id": user_id}, change)

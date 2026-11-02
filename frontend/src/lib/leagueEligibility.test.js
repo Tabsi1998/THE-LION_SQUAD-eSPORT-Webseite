@@ -10,7 +10,7 @@ test("jede Regel steht in einem eigenen Satz, ohne Regel nichts", () => {
   expect(lines).toContain("Kader: 3 bis 50 Spieler");
   expect(lines).toContain("nur für ein Team");
   expect(lines).toContain("Mindestalter: 18 Jahre");
-  expect(lines).toContain("7 Tage");
+  expect(lines).toContain("7 Tage, nach einem Transfer immer");
   expect(lines).toContain("1.3.2027");
   expect(lines).toContain("Frühjahr: 1.4.2027 bis 7.4.2027 (gerade offen)");
   expect(rulesLines({ one_team_per_season: true, transfer_windows: [] }).join()).toContain("Transfers gibt es in dieser Season nicht");

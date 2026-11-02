@@ -55,7 +55,7 @@ export function SeasonEligibilitySection({ form, set }) {
         <TextField label="Mindestalter (Jahre)" type="number" min={0} max={99} value={form.min_age} onChange={(value) => set("min_age", value)}
           hint="Selbstauskunft: Geburtsdatum im Profil" testId="season-form-min-age" />
         <TextField label="Wartezeit neuer Spieler (Tage)" type="number" min={0} max={60} value={form.new_player_wait_days} onChange={(value) => set("new_player_wait_days", value)}
-          hint="ab Aufnahme, gilt nach dem Ende von Spieltag 1" testId="season-form-wait-days" />
+          hint="ab Aufnahme: Neue nach dem Ende von Spieltag 1, Transfers immer" testId="season-form-wait-days" />
       </FormGrid>
       <FormGrid cols={2}>
         <SelectField label="Wer gespielt hat" value={form.lineup_mode} onChange={(value) => set("lineup_mode", value)} options={LINEUP_OPTIONS}

@@ -166,7 +166,7 @@ async def test_the_waiting_time_holds_only_in_its_squad_and_a_waiver_lifts_it(fl
     await joined(flow, w, "Tom", days_ago=1, squad="squad_b")
     assert (await state_of(flow, w, "Tom", "squad_a"))["ok"] is True
 
-    await joined(flow, w, "Mila", days_ago=1, waivers=[{"squad_id": w["squad_a"]["id"], "at": "x", "by": "y", "reason": "Ausnahme"}])
+    await joined(flow, w, "Mila", days_ago=1, waivers=[{"squad_id": w["squad_a"]["id"], "at": now_utc().isoformat(), "by": "y", "reason": "Ausnahme"}])
     assert (await state_of(flow, w, "Mila"))["ok"] is True
 
 

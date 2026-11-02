@@ -13,7 +13,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from flow_harness import make_flow  # noqa: E402
 from league_match_world import staffel  # noqa: E402
 from models import now_utc  # noqa: E402
-from squad_world import squad_registration  # noqa: E402
+from squad_world import make_squad, squad_registration  # noqa: E402
 from test_league_eligibility_flow import born, rules, state_of  # noqa: E402
 from test_league_roster_flow import id_world, roster_entry  # noqa: E402
 from test_league_squad_rules_flow import ADULT  # noqa: E402
@@ -93,17 +93,104 @@ async def test_a_transfer_moves_the_player_after_the_approval(flow):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(("over", "days", "waits"), [(False, 7, False), (True, 7, True), (True, 0, False)])
-async def test_the_same_waiting_time_applies(flow, over, days, waits):
+@pytest.mark.parametrize(("over", "days", "waits"), [(False, 7, True), (True, 7, True), (False, 3, True), (True, 0, False), (False, 0, False)])
+async def test_a_transfer_always_waits_also_before_the_end_of_matchday_one(flow, over, days, waits):
+    """Entscheidung Nr. 71 (Regelwerk § 4.6): Anders als ein gewöhnlicher Neuzugang wartet ein Transfer immer, nur eine 0 schaltet es aus."""
     w = await transfer_world(flow, matchday_one_over=over, new_player_wait_days=days)
     row = (await ask(flow, w)).json()
     flow.act_as(w["staff"])
 
-    assert (await flow.post(f"{admin_url(w)}/{row['id']}/approve", json={})).status_code == 200
+    approved = await flow.post(f"{admin_url(w)}/{row['id']}/approve", json={})
 
+    assert approved.status_code == 200, approved.text
     state = await state_of(flow, w, "Ida")
     assert (state["state"] == "waiting") is waits
+    assert bool(state["until"]) is waits
     assert bool((await roster_entry(flow, w, "Ida") or {}).get("wait_from")) is waits
+    told = await flow.db.notifications.find_one({"meta.reason": "league_transfer_approved", "user_id": w["users"]["Ida"]["id"]}, {"_id": 0})
+    assert ("darf ab" in told["body"]) is waits
+
+
+async def transfer_ida(flow, w: dict) -> dict:
+    row = (await ask(flow, w)).json()
+    flow.act_as(w["staff"])
+    approved = await flow.post(f"{admin_url(w)}/{row['id']}/approve", json={})
+    assert approved.status_code == 200, approved.text
+    return row
+
+
+@pytest.mark.asyncio
+async def test_somebody_who_already_left_the_other_squad_waits_the_same(flow):
+    w = await transfer_world(flow, new_player_wait_days=7)
+    ida = w["users"]["Ida"]["id"]
+    await flow.db.league_rosters.insert_one({"id": "e", "season_id": w["season_id"], "user_id": ida, "squad_ids": [w["squad_b"]["id"]]})
+    await flow.db.team_squads.update_one({"id": w["squad_b"]["id"]}, {"$pull": {"member_ids": ida}})
+
+    row = await transfer_ida(flow, w)
+
+    assert row["from_squad_id"] == w["squad_b"]["id"]
+    assert (await state_of(flow, w, "Ida"))["state"] == "waiting"
+
+
+@pytest.mark.asyncio
+async def test_a_transfer_back_into_a_known_squad_waits_again(flow):
+    """Der Wiedereintritt startet keine neue Wartezeit - ein genehmigter Transfer schon, auch nach einer früheren Aufhebung."""
+    w = await transfer_world(flow, new_player_wait_days=7)
+    ida = w["users"]["Ida"]["id"]
+    earlier = (now_utc() - timedelta(days=20)).isoformat()
+    await flow.db.league_rosters.insert_one({
+        "id": "e", "season_id": w["season_id"], "user_id": ida, "squad_ids": [w["squad_a"]["id"], w["squad_b"]["id"]],
+        "squad_joined_at": {w["squad_a"]["id"]: earlier}, "wait_from": {w["squad_a"]["id"]: earlier},
+        "wait_waivers": [{"squad_id": w["squad_a"]["id"], "at": earlier, "by": "x", "reason": "früher aufgehoben"}]})
+
+    await transfer_ida(flow, w)
+
+    entry = await roster_entry(flow, w, "Ida")
+    assert entry["wait_from"][w["squad_a"]["id"]] > earlier
+    assert entry["squad_joined_at"][w["squad_a"]["id"]] == earlier, "die erste Aufnahme bleibt"
+    assert (await state_of(flow, w, "Ida"))["state"] == "waiting"
+
+
+@pytest.mark.asyncio
+async def test_the_league_office_lifts_the_wait_of_a_transfer_only_with_a_reason(flow):
+    w = await transfer_world(flow, new_player_wait_days=7)
+    await transfer_ida(flow, w)
+    url = f"/api/admin/leagues/seasons/{w['season_id']}/roster/{w['users']['Ida']['id']}/waive-wait"
+
+    assert (await flow.post(url, json={"squad_id": w["squad_a"]["id"], "reason": "kurz"})).status_code == 422
+    lifted = await flow.post(url, json={"squad_id": w["squad_a"]["id"], "reason": "Team wäre sonst nicht spielfähig"})
+
+    assert lifted.status_code == 200, lifted.text
+    assert (await state_of(flow, w, "Ida"))["ok"] is True
+
+
+@pytest.mark.asyncio
+async def test_an_ordinary_newcomer_still_plays_right_away_before_the_end_of_matchday_one(flow):
+    w = await transfer_world(flow, new_player_wait_days=7)
+    await rules(flow, w, one_team_per_season=False)
+    flow.act_as(w["users"]["LoeLeitung"])
+    current = (await flow.db.team_squads.find_one({"id": w["squad_a"]["id"]}))["member_ids"]
+
+    added = await flow.patch(squad_url(w), json={"member_ids": [*current, w["users"]["LoeLeitung"]["id"]]})
+
+    assert added.status_code == 200, added.text
+    assert (await state_of(flow, w, "LoeLeitung"))["ok"] is True
+
+
+@pytest.mark.asyncio
+async def test_assigning_a_squad_after_matchday_one_starts_no_wait(flow):
+    w = await transfer_world(flow, matchday_one_over=True, new_player_wait_days=7)
+    await rules(flow, w, one_team_per_season=False)
+    third = await staffel(flow, w["season_id"], "C")
+    await flow.db.tournaments.update_one({"id": third["id"]}, {"$set": {"start_date": (now_utc() - timedelta(days=30)).isoformat(), "matchday_days": 7}})
+    rudel = await make_squad(flow, w["falcons"], "Horst Zwei", [w["users"]["FalLeitung"], w["users"]["Falke2"]], game_id="probe-shooter")
+    flow.act_as(w["staff"])
+
+    answer = await flow.post(f"/api/tournaments/{third['id']}/squad-registrations", json={"team_id": w["falcons"]["id"], "squad_id": rudel["id"]})
+
+    assert answer.status_code == 200, answer.text
+    entry = await flow.db.league_rosters.find_one({"season_id": w["season_id"], "user_id": w["users"]["FalLeitung"]["id"]}, {"_id": 0})
+    assert not entry.get("wait_from")
 
 
 @pytest.mark.asyncio
