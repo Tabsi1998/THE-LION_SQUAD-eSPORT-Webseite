@@ -22,7 +22,7 @@ def ok(response, code: int = 200):
 
 def season_body(**extra) -> dict:
     start = (now_utc() + timedelta(days=8)).date().isoformat()
-    return {"start_date": f"{start}T00:00:00", "weeks_total": 24, "round_robin_legs": 1, "best_of": 3, "team_size": 4,
+    return {**OLD_RULES, "start_date": f"{start}T00:00:00", "weeks_total": 24, "round_robin_legs": 1, "best_of": 3, "team_size": 4,
             "max_staffel_size": 16, "rules_text": "Regeln der Probe-Season", "visibility": "admins", **extra}
 
 
