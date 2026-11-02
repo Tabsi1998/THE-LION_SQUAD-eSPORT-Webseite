@@ -77,6 +77,22 @@ class RosterContext:
         return bool(self.deadline) and club_today() > self.deadline
 
 
+def _positive_int(value) -> int | None:
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return None
+    return number if number >= 1 else None
+
+
+def min_squad_size(tournament: dict) -> int:
+    """Mindestkader: das Feld ``min_squad_size`` der Staffel (der Liga-Rahmen kopiert es aus Season bzw. Liga N), sonst
+    die Teamgröße des Turniers - nie kleiner als sie. Der Turnierkern liest nur das Turnier, nie die Season."""
+    team_size = _positive_int(tournament.get("team_size")) or 1
+    value = _positive_int(tournament.get("min_squad_size"))
+    return max(value or team_size, team_size)
+
+
 # ---------------------------------------------------------------- Laden
 
 
@@ -601,8 +617,6 @@ def _approvals_view(entry: dict | None, names: dict[str, str]) -> list[dict]:
 
 async def season_overview(db, season: dict) -> dict:
     """Kaderübersicht je Co-Team mit ID-Stand - für die Season-Seite der Liga-Leitung."""
-    from services.squad_registration import min_squad_size
-
     tournaments, regs = await _season_registrations(db, season["id"])
     squads = {
         row["id"]: row
