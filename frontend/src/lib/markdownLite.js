@@ -73,10 +73,13 @@ function renderInline(rawText, options = {}) {
     const isImage = match[1] === "!";
     const label = formatInlineText(match[2], { ...options, linkMentions: false });
     const href = sanitizeHref(match[3]);
-    if (href && isImage) {
+    // `imageAllowed` (Regelwerk, #1646): Was es verneint, wird nicht geladen und bleibt ein Link. Ohne Option wie bisher.
+    if (href && isImage && (!options.imageAllowed || options.imageAllowed(href))) {
       html += `<img src="${escapeHtml(href)}" alt="${escapeHtml(match[2])}" loading="lazy"/>`;
     } else if (href && allowedProfileLink(href, options)) {
-      html += `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+      // Regelwerk (#1646): Ein Sprung auf einen Paragrafen bleibt in der Seite.
+      const external = options.anchorLinksInPage && href.startsWith("#") ? "" : ' target="_blank" rel="noopener noreferrer"';
+      html += `<a href="${escapeHtml(href)}"${external}>${label}</a>`;
     } else {
       html += label;
     }

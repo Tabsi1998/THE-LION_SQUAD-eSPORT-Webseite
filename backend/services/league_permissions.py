@@ -130,14 +130,14 @@ async def _league_of(db, kind: str, value: str | None) -> str | None:
     raise ValueError(kind)
 
 
-def require_league(capability, via: str = "league_id"):
+def require_league(capability, via: str = "league_id", param: str | None = None):
     """Wächter für Routen der Liga: die Liga kommt aus der Adresse (``via``: ``league_id``, ``season_id``, ``division_id``
-    oder ``tournament_id``). Unbekannte Kennungen beantwortet die Route mit 404 - aber nur für den Bereich, Zuständige
-    sehen 403 und erfahren nicht, was es gibt."""
+    oder ``tournament_id``; ``param``, wenn das Adressfeld anders heißt). Unbekannte Kennungen beantwortet die Route mit 404 - aber nur
+    für den Bereich, Zuständige sehen 403 und erfahren nicht, was es gibt."""
 
     async def dep(request: Request, user: dict = Depends(get_current_user)) -> dict:
         db = get_db()
-        league_id = await _league_of(db, via, request.path_params.get(via))
+        league_id = await _league_of(db, via, request.path_params.get(param or via))
         if await can(user, capability, league_id, db=db):
             return user
         raise await refuse(db, user, league_id)

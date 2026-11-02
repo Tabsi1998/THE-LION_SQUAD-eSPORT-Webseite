@@ -111,6 +111,8 @@ dem Knopf „Liga starten“, die Ligaseite bei 390 und 1440 px und ohne Anmeldu
 dann bei 390 und 1440 px Terminvorschlag und Annahme durch zwei Captains, Erinnerung, Melden mit Maps und Teilnehmerliste,
 Bestätigen, Tabelle und Ligaseite als Gast, Einspruch, Entscheidung und Korrektur der Leitung, zuletzt die
 48-Stunden-Automatik mit Nachtrag der Liste. Für die Zeit-Jobs braucht sie `ABNAHME_PROJECT` (der Stand) und `PYTHON`.
+`liga-regeln-abnahme.spec.js` (gleiche Stand-Datei, #1646) schreibt zwei Versionen des Regelwerks mit Baustein und Anlage; ein Gast liest bei 390
+und 1440 px Text, Markierung, Vergleich und PDF, ein Captain stimmt zu.
 Ohne `ABNAHME=1` überspringt der normale Testlauf diese Tests.
 `ABNAHME_SHOTS` legt Bilder ab (optional). Anmeldungen: Die Tests merken sich die Sitzung je Konto
 (`.local-testing/abnahme/sessions-…/`) und melden sich nur neu an, wenn sie nicht mehr gilt - nie zweimal mit einem

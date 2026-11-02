@@ -225,6 +225,7 @@ export function MarkdownEditor({
   mentionsEnabled = true,
   mentionScope,
   mentionScopeId,
+  previewOptions,
 }) {
   const [mode, setMode] = useState("visual");
   const [htmlInput, setHtmlInput] = useState("");
@@ -238,7 +239,7 @@ export function MarkdownEditor({
   const imageInputRef = useRef(null);
   const prompt = usePrompt();
   const syncingRef = useRef(false);
-  const preview = useMemo(() => renderMarkdownLite(value), [value]);
+  const preview = useMemo(() => renderMarkdownLite(value, previewOptions), [value, previewOptions]);
   const mentionSearch = useMentionSearch(mentionsEnabled ? visualMention?.query || "" : "", {
     scope: mentionScope,
     scopeId: mentionScopeId,

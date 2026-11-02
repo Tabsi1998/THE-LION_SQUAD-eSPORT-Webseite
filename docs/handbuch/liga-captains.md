@@ -32,6 +32,14 @@ Termin oder Best of eures Spiels, bekommt ihr ebenfalls eine Nachricht.
 Eine kampflose Niederlage steht als Teamstrafe bei Captain, Vertreter und der Leitung des Hauptteams unter **Meine
 Strafen**. Notiz und Name eines Terminvorschlags sehen nur die beiden Seiten und die Turnierleitung.
 
+## Regeln
+
+Die Regeln stehen auf der Ligaseite unter **Regeln**, mit Inhaltsverzeichnis, Suche und PDF. Oben steht, was **neu in dieser Version** ist, geänderte
+Paragrafen haben einen Strich am Rand und das Wort „Geändert“. Ältere Versionen und ein Vergleich Wort für Wort stehen auf derselben Seite.
+
+Verlangt die Leitung eine **Zustimmung**, siehst du als Captain oder Vertreter auf der Startseite unter **Offene Aktionen** „Regeln zustimmen“ und auf der
+Regelseite den Knopf **Zustimmen**. Die Zustimmung gilt für euer Co-Team und genau diese Version. Fehlt sie, könnt ihr trotzdem spielen und melden.
+
 ## Activision-ID
 
 - **Jeder im Kader** braucht die **Activision-ID** (inklusive `#`) im Profil: **Einstellungen → Gaming → Spiel-IDs**

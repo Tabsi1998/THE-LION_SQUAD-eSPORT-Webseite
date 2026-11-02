@@ -10,6 +10,11 @@ test("„Kader auffüllen“ führt zur Teamseite (#2202)", () => {
   expect(action.href).toBe("/teams/t1");
 });
 
+test("„Regeln zustimmen“ führt zur Regelseite (#1646)", () => {
+  const [action] = dashboardActions({ me: { actions: [{ id: "rules-consent-s1-q1", type: "rules_consent", target_type: "league_rules", rules_url: "/liga/probe/s1/regeln" }] } });
+  expect(action.href).toBe("/liga/probe/s1/regeln");
+});
+
 function payload() {
   return {
     me: {

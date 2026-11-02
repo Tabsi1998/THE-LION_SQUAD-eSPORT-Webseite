@@ -23,12 +23,13 @@ from pymongo.errors import DuplicateKeyError
 
 from models import TournamentCreate, new_id, now_utc
 from services import game_maps, game_usage, league_games, league_look, map_pools, pricing, staffel_guard
+from services.league_rules_store import delete_drafts, deletion_blockers, staffel_rules
 from services.advancement_draw import sync_advancement_fields
 from services.bracket_fill_in import has_started, is_auto_bye
 from services.competition_versions import new_competition_version_fields
 from services.league_scope import ONLY_LEAGUE
 from services.log_safe import log_safe
-from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
+from services.mutation_lock import MutationLockBusy, league_resource, league_season_resource, mutation_lock, tournament_write_resource
 from services.tournament_purge import purge_tournament
 # Runden ≤ aktive Wochen steht im Blatt-Modul (auch für Spielplan und Turnierstart) und wird hier weitergereicht.
 from services.league_rounds import max_teams_for, rounds_needed, rounds_problem  # noqa: F401
@@ -91,7 +92,7 @@ STAFFEL_VISIBILITY = {
     "members": ("members", True),
     "public": ("public", True),
 }
-RESERVED_SLUGS = frozenset({"admin", "neu", "new"})
+RESERVED_SLUGS = frozenset({"admin", "neu", "new", "regeln"})
 STAFFEL_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 
@@ -631,6 +632,8 @@ async def create_season(db, league: dict, body: dict, user: dict) -> dict:
         number = int((newest or {}).get("number") or 0) + 1
     name = fields.pop("name", None) or f"Season {number}"
     slug = fields.pop("slug", None) or slugify(name, fallback=f"season-{number}", max_length=80)
+    if slug in RESERVED_SLUGS:  # aus dem Namen abgeleitet - „Regeln“ darf die Regelseite nicht verdecken (#1646)
+        slug = f"season-{number}"
     await _season_unique(db, league["id"], None, number, slug)
     look = await _look(db, {key: value for key, value in body.items() if value is not None}, league_look.SEASON_FIELDS)
     doc = {**new_season_settings(fields), **look}
@@ -755,6 +758,8 @@ async def deletion_plan(db, kind: str, target: dict) -> dict:
         status = season.get("status") or "draft"
         if status != "draft":
             blockers.append(f"{season.get('name')} ist kein Entwurf mehr ({SEASON_STATUS_TEXT.get(status, status)})")
+    # Regelwerk (#1646): Veröffentlichte Fassungen und Zustimmungen sind Nachweise - nur Entwürfe gehen mit.
+    blockers += await deletion_blockers(db, kind, target, seasons)
     staffeln = await db.tournaments.find({**staffel_filter, **ONLY_LEAGUE},
                                          {"_id": 0, "id": 1, "title": 1, "status": 1, "league_context": 1}
                                          ).to_list(None)
@@ -819,7 +824,8 @@ async def _added_meanwhile(db, kind: str, target: dict, staffel_filter: dict, di
 
 async def delete_tree(db, kind: str, target: dict, *, on_staffel_deleted=None) -> dict:
     """Löscht Liga, Season oder Liga N samt leerer Entwurfs-Staffeln - alles oder nichts (Review #2106): erst die
-    Schreibsperren aller Staffeln, dann unter allen Sperren neu prüfen, dann löschen. Ist eine Staffel gerade in
+    Schreibsperren aller Staffeln, dazu die von Liga und Season (Regelwerk #1646: Veröffentlichen und Zustimmen warten, bis das Löschen
+    durch ist), dann unter allen Sperren neu prüfen, dann löschen. Ist eine Staffel oder Season gerade in
     Arbeit, wird nichts gelöscht. ``on_staffel_deleted(row)`` protokolliert jede gelöschte Staffel einzeln. Kam beim
     Löschen der Staffeln gleichzeitig eine neue Staffel, Liga N oder Season dazu, bricht es danach ab (409) - die leeren
     Staffeln sind dann schon weg und protokolliert, alles darüber bleibt. Gibt den ausgeführten Plan zurück."""
@@ -833,6 +839,11 @@ async def delete_tree(db, kind: str, target: dict, *, on_staffel_deleted=None) -
             # Feste Reihenfolge: zwei Löschungen sperren sich nicht gegenseitig.
             for tournament_id in sorted(staffel_ids):
                 await locks.enter_async_context(mutation_lock(db, tournament_write_resource(tournament_id)))
+            # Regelwerk (#1646): Die Sperren halten bis zum letzten Löschen. Reihenfolge: Turnier, Liga, Season.
+            if kind == "league":
+                await locks.enter_async_context(mutation_lock(db, league_resource(target["id"])))
+            for season_id in sorted(season_ids):
+                await locks.enter_async_context(mutation_lock(db, league_season_resource(season_id)))
             fresh = await deletion_plan(db, kind, target)
             if not fresh["deletable"]:
                 raise LeagueProblem(blocked_message(fresh), 409)
@@ -842,19 +853,20 @@ async def delete_tree(db, kind: str, target: dict, *, on_staffel_deleted=None) -
                 await _purge_staffel(db, row["tournament_id"])
                 if on_staffel_deleted:
                     await on_staffel_deleted(row)
+            if await _added_meanwhile(db, kind, target, staffel_filter, division_ids, season_ids):
+                raise LeagueProblem(CHANGED_MEANWHILE, 409)
+            if division_ids:
+                await db.league_divisions.delete_many({"id": {"$in": sorted(division_ids)}})
+            if season_ids:
+                await db.map_pools.delete_many({"scope": "league_season", "scope_id": {"$in": sorted(season_ids)}})
+                # Liga-Kader (#2108): die festgehaltenen Spiel-IDs gehören zur Season und gehen mit ihr.
+                await db.league_rosters.delete_many({"season_id": {"$in": sorted(season_ids)}})
+                await db.league_seasons.delete_many({"id": {"$in": sorted(season_ids)}})
+            await delete_drafts(db, league_id=target["id"] if kind == "league" else None, season_ids=sorted(season_ids))
+            if kind == "league":
+                await db.leagues.delete_one({"id": target["id"]})
     except MutationLockBusy:
         raise LeagueProblem(STAFFEL_BUSY, 409) from None
-    if await _added_meanwhile(db, kind, target, staffel_filter, division_ids, season_ids):
-        raise LeagueProblem(CHANGED_MEANWHILE, 409)
-    if division_ids:
-        await db.league_divisions.delete_many({"id": {"$in": sorted(division_ids)}})
-    if season_ids:
-        await db.map_pools.delete_many({"scope": "league_season", "scope_id": {"$in": sorted(season_ids)}})
-        # Liga-Kader (#2108): die festgehaltenen Spiel-IDs gehören zur Season und gehen mit ihr.
-        await db.league_rosters.delete_many({"season_id": {"$in": sorted(season_ids)}})
-        await db.league_seasons.delete_many({"id": {"$in": sorted(season_ids)}})
-    if kind == "league":
-        await db.leagues.delete_one({"id": target["id"]})
     return fresh
 
 
@@ -896,6 +908,8 @@ async def create_staffel(db, division: dict, staffel: str | None, user: dict) ->
     if not season.get("start_date"):
         raise LeagueProblem("Die Season braucht zuerst den Beginn der ersten Spielwoche.")
     fields = staffel_fields(league, season, division)
+    # Regelwerk (#1646): statt des Regeltexts der Hinweis auf die Regelseite, sobald es eines gibt.
+    fields["rules"] = await staffel_rules(db, league, season)
     problem = rounds_problem(fields["max_participants"], fields["round_robin_legs"], fields["matchday_weeks_total"],
                              fields["matchday_blocked_weeks"])
     if problem:
@@ -983,6 +997,8 @@ async def sync_staffel(db, tournament: dict, league: dict, season: dict, divisio
     """Überträgt die Vorgaben auf eine Staffel - je Gruppe nur, wenn sie noch darf (docs/LIGA.md, Abschnitt 3).
     Eine gesperrte Staffel (``locked_at``) bekommt nur noch, was immer gilt (Sichtbarkeit, Regeltext, Map-Pool)."""
     wanted = staffel_fields(league, season, division)
+    # Regelwerk (#1646): Übertragen schreibt nicht den alten Regeltext zurück.
+    wanted["rules"] = await staffel_rules(db, league, season)
     applied: list[str] = []
     skipped: list[dict] = []
     updates: dict = {}

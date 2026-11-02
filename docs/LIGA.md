@@ -598,7 +598,7 @@ je Person läuft über den Index `user_id`, Löschen des Kontos und Auskunft (`p
 | Ergebnisse korrigieren | `results` | Ergebnis eintragen und korrigieren, Rückgängig, kampflos, nicht erschienen, Aufstellung nachtragen als Leitung |
 | Proteste | `disputes` | Streitfälle entscheiden (zusammen mit `results` auch über eine Korrektur) |
 | Strafen | `sanctions` | Vorgesehen für E.3, heute noch ohne eigene Route |
-| Regeln veröffentlichen | `rules` | Regeltext der Season, ab B.2 die Versionen |
+| Regeln veröffentlichen | `rules` | Regeltext der Season, Regelwerk der Liga und der Season: Entwurf, Vorschau, Veröffentlichen, Stand der Zustimmungen, Hinweis „Daten geändert“ (B.2) |
 
 Regeln: Wer den Bereich hat, darf alle Ligen. Zuständige haben nur ihre Liga und nur ihre Zuständigkeiten. Liga anlegen und löschen
 und die Vergabe der Zuständigen brauchen den Bereich. Vergabe mit Protokoll (`league.staff.grant`, `league.staff.update`,
@@ -635,6 +635,7 @@ Zugriff, außer „lesen“ steht in der Zeile. Prüfung: `backend/tests/test_le
 | `POST …/divisions/{id}/staffeln`, `DELETE …/staffeln/{tid}` | `season` | – | – |
 | `GET …/seasons/{id}/roster`, `POST …/roster/{uid}/approve`, `PUT …/roster-settings` | `roster` | – | – |
 | `GET …/{id}/staff` | `manage` | – | – |
+| `GET`, `PUT …/draft`, `DELETE …/draft`, `POST …/draft/from-version`, `…/preview`, `…/publish` unter `/api/admin/league-rules/{league\|league_season}/{id}` | `rules`; die Liga kommt aus der Adresse, bei einer Season aus der gespeicherten Season | – | – |
 | `PATCH`, `PUT …/roles`, `DELETE /api/teams/{id}/squads/{sid}` eines Co-Teams in nicht beendeter Staffel | `roster` oder eigenes Team | – | – |
 | `PUT`, `DELETE …/{id}/staff/{uid}` | nur Bereich | – | – |
 | Staffel: `PATCH`, `POST /lock`, `/unlock`, `/status`, `PUT /pause`, `/round-sponsors`, `/onsite-access` | `manage` | – | – |
@@ -666,6 +667,121 @@ Jahreswertung, Spiele und Map-Bibliothek bleiben beim Bereich `tournaments`. Die
 **Antworten an das Web:** `GET /api/tournaments/{tid}` schickt bei Staffeln `league_capabilities[]` und `can_edit_staffel`; die
 Matchseite `conflict` (`{"kind": "involved", "override": bool}` oder `null`); `matches-v2` einer Staffel für die Leitung `viewer_involved` und `viewer_override`; die Verwaltung je Liga `capabilities[]`. `GET /api/auth/me`
 schickt `has_league_staff`.
+
+### Regelwerk (Paket B.2, #1646)
+
+Logik in `services/league_rules.py` (Daten, Rechte, Ablauf), `services/league_rules_text.py` (Abschnitte, Anker, Vergleich, ohne
+Datenbank), `services/league_rule_blocks.py` (Bausteine), `services/league_rules_store.py` (was `league_service` braucht, ohne
+Import-Kreis), `pdf_service.pdf_league_rules`. Routen in `routes/league_rules_routes.py`.
+
+**`league_rules`** – eine Zeile je Fassung, Muster `map_pools`:
+
+| Feld | Typ | Bedeutung |
+| --- | --- | --- |
+| `scope`, `scope_id` | `"league"` \| `"league_season"`, str | liga-weit oder je Season; die Season erbt die Liga, solange sie keine eigene gültige Fassung hat |
+| `league_id`, `season_id` | str, str \| `null` | zur Einordnung |
+| `status` | `"draft"` \| `"published"` | je `scope` höchstens ein Entwurf |
+| `version` | int \| `null` | Nummer ab 1, erst beim Veröffentlichen, je `scope` eigene Zählung |
+| `revision` | int | nur im Entwurf: schützt vor gleichzeitigem Überschreiben |
+| `title` | str ≤ 160 | Titel des Regelwerks |
+| `body_md` | str ≤ 200 000 | Markdown mit Bausteinen |
+| `annexes` | `[{key, title, body_md}]`, höchstens 26 | Anlagen; `key` = „A“, „B“ … aus der Reihenfolge |
+| `frozen` | `{season_id: {block: {label, markdown, source}}}` | eingefrorene Bausteine; je Season, bei `scope: league` für jede Season, die nicht archiviert ist |
+| `blocks_used` | `[str]` | im Text verwendete Bausteine |
+| `valid_from` | `YYYY-MM-DD` | Wiener Kalendertag; nie vor heute und nie vor dem der Vorgänger-Fassung |
+| `change_reason` | str 5–500 | Änderungsgrund |
+| `requires_consent` | bool | muss der Fassung neu zugestimmt werden |
+| `created_at`, `created_by`, `updated_at`, `updated_by`, `published_at`, `published_by` | | Autor und Zeiten; öffentlich nur `published_at` |
+
+Indizes: `id` eindeutig; (`scope`, `scope_id`, `version`) eindeutig, nur für `published`; (`scope`, `scope_id`) eindeutig, nur für
+`draft`. Eine veröffentlichte Fassung ändert niemand mehr: jedes Schreiben filtert auf `status: "draft"`, und das Veröffentlichen
+setzt Stand und Nummer in einem Schritt.
+
+**Gültig** ist je `scope` die höchste Nummer mit `valid_from` ≤ heute (Wien). Für eine Season zuerst die eigene, sonst die der Liga,
+sonst `rules_text` als Rückfall (`source: "fallback"`). Eine Fassung mit späterem `valid_from` heißt `upcoming`, und bis dahin gilt die davor.
+
+**Abschnitte und Anker:** Jede Überschrift (`#` bis `###`) beginnt einen Abschnitt. Der Anker ist der Slug der Überschrift, stabil,
+solange sie gleich bleibt; doppelte zählen weiter (`-2`). Text vor der ersten Überschrift: `einleitung`. Eine Anlage ist ein Abschnitt
+`anlage-a`, ihre Überschriften `anlage-a-<slug>`. Die Abschnitte kommen vom Server, Web und PDF zeigen dieselben.
+
+**Bausteine:** `[[baustein:map_pool]]` (Tabelle Modus und Maps aus dem Pool `league_season`), `[[baustein:mode_order]]` (Liste aus
+`game_mode_order` mit den Namen der Modi). Unbekannte lehnt das Veröffentlichen mit 422 ab. Neue Bausteine stehen in
+`league_rule_blocks.BLOCKS` (für #2218 die Waffenliste). Beim Veröffentlichen wird das Markdown des Bausteins eingefroren; alte
+Fassungen zeigen ihren Stand von damals. Ohne Season (Seite der Liga) oder bei einer Season, die erst nach dem Veröffentlichen dazukam,
+steht dort ein Hinweis statt einer Liste.
+
+**Reihenfolge:** Fassungen folgen ihrer Geltung (`valid_from`, am selben Tag die zuletzt veröffentlichte), nicht dem Tag der Veröffentlichung. Eine Season erbt die Liga-Fassungen, die
+vor ihrer ersten eigenen gelten, auch wenn die eigene früher veröffentlicht wurde; spätere Liga-Fassungen gehören nicht zu ihrer Kette.
+
+**Vergleich:** Abschnitte gleichen Ankers werden ohne Rücksicht auf Leerraum verglichen; übrige paaren sich bei ähnlichem Text (Überschrift
+umbenannt = geändert). Ergebnis `{new, changed, removed}` gegen die Vorgänger-Fassung, auf der Season in der Reihe aus Liga und Season.
+Der Wort-für-Wort-Vergleich (`ops: [{op: "eq"|"ins"|"del", text}]`) geht mit jeder alten Fassung und zeigt auch entfernten Text.
+
+**Datenänderung:** Die Verwaltung vergleicht die Bausteine der letzten Fassung mit dem heutigen Stand der Quellen (`data_changes`). Nur
+ein Vorschlag: „Neue Version vorbereiten“ legt einen Entwurf an, nichts veröffentlicht sich selbst.
+
+**`league_rule_consents`:** `id`, `rule_version_id`, `version`, `league_id`, `season_id`, `squad_id`, `team_id`, `user_id`,
+`created_at`. Eindeutig: (`rule_version_id`, `season_id`, `squad_id`, `user_id`); dazu Index `user_id` und (`season_id`, `squad_id`).
+Zustimmen darf, wer für das Co-Team verantwortlich ist (`match_audience.responsible_ids`), und zwar nur der gültigen Fassung. Offen ist
+sie für ein Co-Team mit aktiver Anmeldung, wenn es der letzten gültigen Fassung mit `requires_consent` (oder einer neueren) nicht zugestimmt
+hat. Dann gibt es die Aufgabe `me.actions[]` `type: "rules_consent"` (`target_type: "league_rules"`, `rules_url`, kein `target_id`:
+Apps ohne neuen Build zeigen die Zeile ohne Pfeil) und den Hinweis auf der Regelseite. **Nichts blockiert:** Melden, Aufstellen und
+Spielen laufen weiter. Kontolöschung: gelöscht (`account_erasure.PURGED`), Auskunft: ja.
+
+**Startseite:** `own_consent_tasks` lädt Seasons, Ligen, Fassungen (ohne Text), Teams und Zustimmungen gesammelt, die Zahl der Abfragen hängt nicht an der Zahl der Seasons.
+
+**Am Spiel:** `matches_v2.rule_version_id` (optional) setzt `submit_v2_result` beim ersten Festschreiben eines Ergebnisses einer Staffel;
+eine Korrektur lässt es stehen, das Zurücknehmen entfernt es. Andere Formate schreiben das Feld nie.
+
+**`accepted_rules`, `accepted_privacy`:** Beim Zuteilen eines Co-Teams schreibt der Server beide `false`, die Zustimmung zu den Regeln steht allein in
+`league_rule_consents`. An Anmeldungen liest beide Felder kein Code; alte Zeilen bleiben unberührt, andere Anmeldewege auch.
+
+**Unveränderlich auch von außen:** Die Mediathek schreibt veröffentlichte Fassungen nicht um (`media_audit.is_frozen`) und lässt die Bild-Migration dort aus.
+Eine Datei, die eine veröffentlichte Fassung zeigt, lässt sich nicht drehen und nicht löschen, auch nicht mit Bestätigung (409); beim Duplikat ersetzen bleibt die
+Kopie stehen. Entwürfe ändern sich mit. Eine Season oder Liga mit veröffentlichter Fassung oder mit Zustimmungen lässt sich nicht löschen (409, Grund im `delete-plan`,
+Hinweis auf Archivieren), nur Entwürfe gehen mit.
+
+**Sperren:** Veröffentlichen und Zustimmen halten die Sperre ihrer Season (`mutation_lock.league_season_resource`, dieselbe wie beim Zuteilen), das liga-weite
+Regelwerk die der Liga (`league_resource`). Das Löschen hält nach den Staffeln die der Liga und aller Seasons bis zum letzten Schritt. Ist eine besetzt: 409,
+bitte noch einmal. Die Mediathek schreibt nur mit der Bedingung `status: "draft"` (`media_audit.write_guard`, auch die Bild-Migration); Drehen und Löschen einer Datei
+halten die Sperren der Entwürfe, die sie zeigen (`rule_draft_locks`). Bekannte Grenze: Speichert jemand genau in diesem Moment einen Entwurf neu mit dieser Datei und
+veröffentlicht ihn noch während des Drehens, schützt die Sperre nicht, weil sie den Entwurf noch nicht kannte. Das Fenster sind Sekundenbruchteile, und der Vorgang
+braucht zwei Schritte von Hand.
+
+**Bilder:** Im Regelwerk nur eigene Uploads (`game_maps.IMAGE_URL`). Der Server lehnt alles andere beim Speichern und Veröffentlichen mit 422 ab, die Vorschau nennt es
+(`foreign_images`), das Web lädt es nicht (`markdownLite`, Option `imageAllowed`; andere Nutzer ohne Option bleiben unverändert) und zeigt einen Link. Die CSP bleibt.
+Im PDF steht ein eigener Upload auf eigener Zeile als Bild, alles andere als `[Bild: …]`. Die PDF-Schrift kann nur Westeuropäisches: Zeichen wie → werden umschrieben,
+Emoji fallen weg.
+
+**Rechenlast:** Je Fassung höchstens 400 000 Zeichen und 400 Abschnitte mit allen Anlagen (`TEXT_TOTAL_MAX`, `SECTIONS_MAX`, 422). Über 60 000 Wörtern in geänderten
+Abschnitten fällt der Vergleich auf ganze Abschnitte zurück (`coarse`, alt und neu), die Suche nach umbenannten Abschnitten prüft höchstens 900 Paare. PDF, Vergleich und Seite
+werden je unveränderlicher Fassung einmal gerechnet (`league_rules_cache`, 64 MB je Prozess, gleichzeitige Abrufe warten auf eine Rechnung); die Sichtbarkeit prüft die Route
+jedes Mal vorher, die Vorschau bleibt ohne Speicher. PDF und Vergleich: 60 Abrufe je Minute und Besucher im Server (`enforce_rate_limit`), in nginx Zone `tls_rules_heavy`
+gegen Bursts.
+
+**Staffel:** Gibt es für eine Season ein Regelwerk (eigenes oder der Liga), steht in `tournaments.rules` statt `rules_text` nur der
+Hinweis auf die Regelseite. Das schreibt das Veröffentlichen sofort und das Übertragen (`SYNC_GROUPS.always`).
+
+**Routen**
+
+| Route | Wer | Zweck |
+| --- | --- | --- |
+| `GET /api/league-rules/leagues/{liga}` und `/seasons/{liga}/{season}` (`?version=<id>`) | wie Season-Sichtbarkeit | Regelseite: `source`, `version`, `sections`, `changes`, `versions`, `upcoming`, `fallback_text`, `consent` |
+| `GET …/compare?base=<id>&target=<id>` | ebenso | Wort-für-Wort-Vergleich zweier Fassungen dieser Seite |
+| `GET …/versions/{id}/pdf` (`?marks=0`) | ebenso | PDF der Fassung, mit Version und Datum auf jeder Seite, ohne `marks=0` mit Markierung |
+| `POST /api/league-rules/consents` | angemeldet, verantwortlich | Zustimmung `{version_id, season_id, squad_id}`; mehrfach folgenlos |
+| `GET /api/admin/league-rules/{scope}/{id}` | Zuständigkeit `rules` oder Bereich `leagues` | Entwurf, Fassungen, Geerbtes, Bausteine, `data_changes`, Stand der Zustimmungen |
+| `PUT …/draft`, `POST …/draft/from-version`, `DELETE …/draft` | ebenso | Entwurf speichern, aus einer Fassung vorbereiten, verwerfen |
+| `POST …/preview` | ebenso | Vorschau mit heutigen Bausteinen und Änderungen zur letzten Fassung |
+| `POST …/publish` | ebenso | `{revision, valid_from, change_reason, requires_consent}`; 409 bei gleichzeitigem Veröffentlichen |
+
+`GET /api/leagues/{liga}/{season}` trägt zusätzlich `rules`: `{source, version, valid_from, url, pdf_url, consent_open}` oder `null`.
+`require_rules_editor` prüft das über `require_league`: Die Liga steht nie im Inhalt, eine Fassung aus einer anderen Liga ist im Geltungsbereich nicht zu finden (404). Die
+Web-Route öffnet wie die anderen Liga-Seiten mit `allowLeagueStaff`, der Server bleibt maßgeblich. Eine Befangenheit gibt es beim Veröffentlichen nicht, das Regelwerk ist kein eigenes
+Spiel. Bilder: Die Admin-Medien gehen über die Rolle, Zuständige ohne sie laden im Editor eigene Bilder hoch und sehen nur diese (`rulesMediaProps`).
+
+**Seiten:** `/liga/<liga>/regeln` und `/liga/<liga>/<season>/regeln` (Season-Slug `regeln` ist reserviert), Pflege unter
+`/admin/leagues/rules/{scope}/{id}`. Protokoll: `league.rules.draft`, `.draft_discard`, `.publish`, `.consent`, ohne Volltext.
 
 ### B.3 Spielberechtigung (#2204)
 

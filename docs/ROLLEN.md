@@ -377,6 +377,9 @@ höchstens einen **Captain** und einen **Vertreter**; beide stehen im Kader des 
 Spielberechtigung (#2204): Die Zuständigkeit „Kader prüfen“ (`roster`) hebt auch die Wartezeit auf (`POST …/roster/{uid}/waive-wait`, Pflichtgrund, `league.roster.wait_waive`) und entscheidet Transfers
 (`GET`, `POST …/seasons/{id}/transfers…`, `league.transfer.*`). Beantragen darf, wer den Kader des Ziel-Co-Teams ändern darf. Den eigenen Stand und den des Kaders (`GET /api/teams/{tid}/squads/{sid}/eligibility`)
 sehen Teamleitung, Co-Leitung, Captain, Vertreter und `roster`; vom Alter nur „erfüllt“ oder „Geburtsdatum fehlt“. Eine Teilnehmerliste tragen Captain oder Vertreter der eigenen Seite bis 48 Stunden ab der Bestätigung nach, danach die Liga-Leitung mit `results` und Grund.
+- **Regelwerk (#1646):** Pflegen und veröffentlichen, den Stand der Zustimmungen und den Hinweis „Daten geändert“ sehen darf der Bereich `leagues` oder die Zuständigkeit
+  `rules` in dieser Liga, mit bestätigter Zwei-Faktor-Anmeldung. Die Rolle `tournament_admin` und die Freigabe `tournaments` geben dort nichts. Zustimmen dürfen die
+  Verantwortlichen des Co-Teams: Captain und Vertreter, ohne beide die Leitung des Hauptteams. Die Turnierleitung stimmt nicht für ein Co-Team zu.
 - **Spiel-ID je Season (#2108):** Die IDs der Spieler sehen nur die Person selbst (Profil), die Beteiligten des Spiels
   (Matchseite, wie Aufstellungen) und wer das Liga-Recht „Kader prüfen“ hat (`/api/admin/leagues/seasons/{id}/roster`).
   Code: `services/league_roster.py`.

@@ -47,7 +47,7 @@ def notice_text(source: str, state: dict, order: dict) -> dict:
     cents = state.get("remote_total_cents") if state.get("remote_total_cents") is not None else order.get("total_cents")
     amount = euro(cents)
     due = day_text(state.get("due_on") or "")
-    paid = state.get("invoice_status") == "paid" or state.get("payment_state") == "paid"
+    paid = state.get("invoice_status") == "paid" or state.get("payment_state") in ("paid", "paid_reduced")
     if paid:
         body = f"{source}: {amount} – schon bezahlt, danke!"
     elif due:

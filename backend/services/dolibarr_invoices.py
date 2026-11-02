@@ -82,7 +82,8 @@ def view_invoice(raw: dict, settings: dict) -> dict:
         "date": raw.get("date") or None,
         "due_date": raw.get("due_date") or None,
         "total": raw.get("total"),
-        "remaining": raw.get("remaining"),
+        # Bezahlt ist bezahlt (#2226): bei „Bezahlt (mit Abzug)“ lässt Dolibarr einen Rest stehen - offen ist er nicht.
+        "remaining": 0 if status == "paid" else raw.get("remaining"),
         "status": status,
         "status_label": STATUS_LABELS.get(status, status),
         "overdue": bool(raw.get("overdue")),
@@ -268,6 +269,8 @@ async def list_invoices(user: dict, db=None) -> dict:
         invoices = cached.get("invoices") or []
         for row in invoices:
             row["can_pay"] = False   # bezahlt wird nur gegen einen frischen Stand
+            if row.get("status") == "paid":
+                row["remaining"] = 0   # ein Stand von vor #2226 kann hier noch einen Rest tragen
         return {
             "connected": True, "available": False, "reason": exc.kind, "reason_text": exc.text,
             "as_of": cached.get("as_of"), "invoices": invoices, "summary": summarize(invoices), "currency": "EUR",

@@ -243,6 +243,11 @@ export default function AdminLeaguesPage() {
                     </button>
                   </>
                 ) : null}
+                {/* Regelwerk (#1646): liga-weit, jede Season ohne eigenes erbt es. */}
+                {can(league, "rules") ? (
+                  <Link to={`/admin/leagues/rules/league/${league.id}`} data-testid={`league-rules-link-${league.slug}`}
+                    className="tls-btn tls-btn--quiet ml-1 px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider">Regelwerk</Link>
+                ) : null}
               </div>
             </header>
             {league.seasons.length ? (

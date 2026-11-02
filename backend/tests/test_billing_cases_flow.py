@@ -93,7 +93,7 @@ async def test_partial_payments_project_open_partial_paid_without_double_countin
     [row] = overview["invoiced"]
     assert row["payment_label"] == "bezahlt" and row["paid_cents"] == 4000 and "payments" not in row
     summary = (await flow.get(f"/api/admin/finance/sources/event/{event['id']}")).json()
-    assert summary == {"booked_cents": 4000, "invoiced_cents": 4000, "paid_cents": 4000, "open_cents": 0, "credited_cents": 0, "refunded_cents": 0,
+    assert summary == {"booked_cents": 4000, "invoiced_cents": 4000, "paid_cents": 4000, "open_cents": 0, "credited_cents": 0, "waived_cents": 0, "refunded_cents": 0,
                        "orders": 1, "cancelled_orders": 0, "cases_open": 0}
     flow.act_as(paula)
     own = (await flow.get(f"/api/events/{event['slug']}")).json()["own_registration"]
@@ -134,7 +134,7 @@ async def test_cancellation_after_invoice_is_a_case_and_refunds_are_tracked_apar
     assert first.status_code == 200 and first.json()["refund"]["amount_cents"] == 2000 and first.json()["resolved_case"] is None
     assert (await flow.post(f"/api/admin/finance/orders/{order['id']}/refunds", json={"amount_cents": 2500, "paid_on": "2026-09-25", "reason": "Rest"})).status_code == 400
     detail = (await flow.get(f"/api/admin/finance/orders/{order['id']}")).json()
-    assert detail["sums"] == {"paid_cents": 4000, "refunded_cents": 2000, "credited_cents": 0, "refundable_cents": 2000}
+    assert detail["sums"] == {"paid_cents": 4000, "refunded_cents": 2000, "credited_cents": 0, "waived_cents": 0, "refundable_cents": 2000}
     texts = [item["text"] for item in detail["timeline"]]
     assert any(t.startswith("Zahlung 40,00 €") for t in texts) and any(t.startswith("Erstattung 20,00 € am 24.09.2026 (Überweisung) – Begleitperson entfallen") for t in texts)
     assert any(t.startswith("Buchung storniert") for t in texts) and any(t.startswith("Prüffall: Storniert") for t in texts)
@@ -266,7 +266,7 @@ async def test_summary_per_event_and_filters_and_who_may_look(flow, fake):
 
     flow.act_as(kassier)
     summary = (await flow.get(f"/api/admin/finance/sources/event/{event['id']}")).json()
-    assert summary == {"booked_cents": 6000, "invoiced_cents": 6000, "paid_cents": 1000, "open_cents": 5000, "credited_cents": 0, "refunded_cents": 0,
+    assert summary == {"booked_cents": 6000, "invoiced_cents": 6000, "paid_cents": 1000, "open_cents": 5000, "credited_cents": 0, "waived_cents": 0, "refunded_cents": 0,
                        "orders": 3, "cancelled_orders": 1, "cases_open": 0}
     filtered = (await flow.get(f"/api/admin/finance/overview?source={event['id']}")).json()
     assert filtered["summary"] == summary and len(filtered["invoiced"]) == 2

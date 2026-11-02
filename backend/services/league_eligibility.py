@@ -306,12 +306,12 @@ def locks_squad_changes(season: dict | None) -> bool:
 async def squad_change_lock(db, seasons: list[dict]):
     """Dieselbe Sperre wie beim Zuteilen (``league_season:<id>:squads``), je Season in fester Reihenfolge - so landet eine
     Person auch bei gleichzeitigen Aufnahmen nur in einem Co-Team. Seasons ohne diese Regeln sperren nichts."""
-    from services.mutation_lock import mutation_lock
+    from services.mutation_lock import league_season_resource, mutation_lock
 
     held = []
     try:
         for season_id in sorted(row["id"] for row in seasons if locks_squad_changes(row)):
-            lock = mutation_lock(db, f"league_season:{season_id}:squads")
+            lock = mutation_lock(db, league_season_resource(season_id))
             await lock.__aenter__()
             held.append(lock)
         yield

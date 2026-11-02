@@ -72,6 +72,20 @@ test("Kopf mit Zeitraum, Spielwoche, Punkten und Pausen", async () => {
   expect(screen.getByTestId("league-map-pool")).toHaveTextContent("Hafenkante");
 });
 
+test("Regelwerk (#1646): Link mit Version und Stand plus PDF statt des Aufklappblocks, offene Zustimmung sagt es", async () => {
+  const rules = { source: "rules", version: 2, label: "Version 2", valid_from: "2026-11-03", url: "/liga/probe-liga/season-1/regeln",
+    pdf_url: "/api/league-rules/seasons/probe-liga/season-1/versions/v2/pdf", consent_open: true };
+  apiMock.get.mockImplementation((url) => (url === "/leagues/probe-liga/season-1"
+    ? Promise.resolve({ data: { ...SEASON_VIEW, rules } }) : Promise.resolve({ data: STAFFEL("A") })));
+  renderPage();
+  const link = await screen.findByTestId("league-rules-link");
+  expect(within(link).getByRole("link", { name: /Regeln/ })).toHaveAttribute("href", "/liga/probe-liga/season-1/regeln");
+  expect(screen.getByTestId("league-rules-version")).toHaveTextContent("Version 2 · gültig ab 03.11.2026");
+  expect(screen.getByTestId("league-rules-pdf")).toHaveAttribute("href", "/api/league-rules/seasons/probe-liga/season-1/versions/v2/pdf");
+  expect(screen.getByTestId("league-rules-consent")).toHaveTextContent("noch nicht zugestimmt");
+  expect(screen.queryByTestId("league-rules")).toBeNull();
+});
+
 test("Staffel: Tabelle, laufende Woche offen, Pause sichtbar, Ergebnis mit Maps und Teamseiten", async () => {
   renderPage();
   const staffel = await screen.findByTestId("league-staffel-A");

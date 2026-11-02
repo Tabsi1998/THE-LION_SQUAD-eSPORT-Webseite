@@ -3,8 +3,8 @@
 // Sichtbar nach der Season (Lese-API) - unsichtbar heißt wie „gibt es nicht“.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
-import { CalendarClock, Coffee, ListOrdered, Map as MapIcon, ScrollText, Timer } from "lucide-react";
-import { api } from "@/lib/api";
+import { CalendarClock, Coffee, FileText, ListOrdered, Map as MapIcon, ScrollText, Timer } from "lucide-react";
+import { API, api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { SkeletonDetailHeader } from "@/components/tls/Skeleton";
@@ -25,6 +25,24 @@ function Fact({ icon: Icon, label, children, testId }) {
       </dt>
       <dd className="mt-1 text-sm text-white/85">{children}</dd>
     </div>
+  );
+}
+
+function LeagueRulesLink({ rules }) {
+  return (
+    <section className="tls-league-rules mt-14 flex flex-wrap items-center justify-between gap-3 border border-white/10 bg-[#121212] rounded-sm px-4 py-3" data-testid="league-rules-link">
+      <div className="min-w-0">
+        <Link to={rules.url} className="inline-flex items-center gap-2 font-heading text-lg font-bold uppercase hover:underline">
+          <ScrollText className="h-4 w-4 tls-league-accent" aria-hidden="true" /> Regeln
+        </Link>
+        <p className="mt-1 text-sm text-white/70" data-testid="league-rules-version">{rules.label} · gültig ab {viennaDate(dayNoon(rules.valid_from), { day: "2-digit", month: "2-digit", year: "numeric" })}</p>
+        {rules.consent_open ? <p className="mt-1 text-sm font-semibold text-warn" data-testid="league-rules-consent">Dein Co-Team hat noch nicht zugestimmt. Spiele laufen trotzdem weiter.</p> : null}
+      </div>
+      <a href={`${API}${rules.pdf_url.replace(/^\/api/, "")}`} target="_blank" rel="noopener noreferrer" data-testid="league-rules-pdf"
+        className="tls-btn tls-btn--secondary inline-flex items-center gap-2 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider">
+        <FileText className="h-4 w-4" aria-hidden="true" /> PDF
+      </a>
+    </section>
   );
 }
 
@@ -158,7 +176,8 @@ export default function LeagueSeasonPage() {
           ))
           : <p className="mt-12 text-white/60" data-testid="league-no-divisions">Die Ligen werden gerade eingeteilt.</p>}
 
-        {rules ? (
+        {/* Regelwerk (#1646): eigene Seite mit Version und Stand; ohne Regelwerk bleibt der Regeltext wie bisher. */}
+        {data.rules ? <LeagueRulesLink rules={data.rules} /> : rules ? (
           <details className="tls-league-rules mt-14 border border-white/10 bg-[#121212] rounded-sm" data-testid="league-rules">
             <summary className="flex cursor-pointer items-center gap-2 px-4 py-3 font-heading text-lg font-bold uppercase">
               <ScrollText className="h-4 w-4 tls-league-accent" aria-hidden="true" /> Regeln

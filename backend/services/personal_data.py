@@ -167,6 +167,9 @@ PERSONAL: dict[str, Entry] = {
                             "Ergebnisse bleiben ohne sie"),
     # Transfer-Anträge in der Liga (#2204): Sie gehören zur Person.
     "league_transfers": Entry(DELETED, ("league_transfers",), "Anträge auf Wechsel des Co-Teams je Liga-Season; Aufstellungen und Ergebnisse bleiben ohne sie"),
+    # Regelwerk (#1646): wer für ein Co-Team welcher Fassung zugestimmt hat. Ohne Konto ohne Zweck - das Co-Team wird neu gefragt.
+    "league_rule_consents": Entry(DELETED, ("league_rule_consents",), "Zustimmung zu einer Regelversion je Co-Team und Season; "
+                                  "die Regelversion selbst bleibt"),
     "matches_v2": Entry(KEPT, ("competition_matches", "league_appearances"), SPORT),
     "match_reports_v2": Entry(KEPT, ("match_reports",), f"Ergebnismeldung als Nachweis des Ergebnisses; {THREE_YEARS}"),
     "match_schedule_proposals": Entry(KEPT, ("schedule_proposals",), "Terminvereinbarung zum Match als Nachweis"),
@@ -242,7 +245,7 @@ CLUB_CONTENT = frozenset({
     # belegten Schreibweisen der Maps (ohne Person).
     "game_maps", "map_pools", "game_map_keys",
     # Liga (docs/LIGA.md, #1622): Liga, Season und Liga N - Vereinsinhalt wie Turniere, nur die Kennung, wer angelegt hat.
-    "leagues", "league_seasons", "league_divisions",
+    "leagues", "league_seasons", "league_divisions", "league_rules",
     # Shop-Katalog (#1703): Produkte, Varianten, Druckdateien, Designs (#1708) und die Printful-Zuordnung - nur die
     # Kennung, wer angelegt bzw. geändert hat.
     "shop_products", "shop_variants", "shop_designs", "shop_design_profiles", "shop_design_colors",

@@ -3,14 +3,20 @@ import { asInstant, viennaDateTime } from "@/lib/vienna";
 // der CSV-Export für den Kassier (ohne Formel-Injektion) und die Summenzeile je Veranstaltung.
 
 export const PAYMENT_TONE = {
-  draft: "text-[#FFD700]", open: "text-white/80", partial: "text-[#29B6E8]", paid: "text-[#00FF88]",
+  draft: "text-[#FFD700]", open: "text-white/80", partial: "text-[#29B6E8]", paid: "text-[#00FF88]", paid_reduced: "text-[#00FF88]",
   overdue: "text-[#FF3B30]", overpaid: "text-[#FF3B30]", credited: "text-white/60", abandoned: "text-white/40",
 };
 
 export const SUMMARY_FIELDS = [
   ["booked_cents", "gebucht"], ["invoiced_cents", "fakturiert"], ["paid_cents", "bezahlt"],
-  ["open_cents", "offen"], ["credited_cents", "gutgeschrieben"], ["refunded_cents", "erstattet"],
+  ["open_cents", "offen"], ["credited_cents", "gutgeschrieben"], ["waived_cents", "erlassen"], ["refunded_cents", "erstattet"],
 ];
+
+// Das Angebot gibt es nicht mehr: ein Satz statt der internen Kennung (#2226). Der Server schickt ihn auch selbst.
+export const SOURCE_GONE = "Angebot nicht mehr vorhanden";
+export function sourceName(row) {
+  return row?.source?.name || SOURCE_GONE;
+}
 
 export function formatCents(cents, currency = "EUR") {
   const value = Number.isFinite(Number(cents)) ? Number(cents) : 0;
@@ -35,14 +41,16 @@ export function sourcesFrom(rows) {
   for (const row of rows || []) {
     const id = row?.source_id;
     if (!id || seen.has(id)) continue;
-    seen.set(id, { id, kind: row.kind || row.source_kind || row.source?.kind || "event", name: row.source?.name || id });
+    seen.set(id, { id, kind: row.kind || row.source_kind || row.source?.kind || "event", name: sourceName(row) });
   }
   return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name, "de"));
 }
 
 export function summaryLines(summary) {
   if (!summary) return [];
-  return SUMMARY_FIELDS.map(([key, label]) => ({ key, label, value: formatCents(summary[key] || 0) }));
+  // „erlassen“ (#2226) gibt es nur bei einem Abschluss mit Abzug - sonst bleibt die Zeile bei ihren sechs Zahlen.
+  return SUMMARY_FIELDS.filter(([key]) => key !== "waived_cents" || summary[key] > 0)
+    .map(([key, label]) => ({ key, label, value: formatCents(summary[key] || 0) }));
 }
 
 // Wo Belege hängen (#842): die drei Blicke - im Dateinamen des Exports, in der Tageszentrale in Worten.
@@ -77,6 +85,8 @@ export function firstAttention(counts) {
 
 // „Stand von Dolibarr: 23.09., 11:40“ - oder der Fehler, wenn der letzte Abgleich nicht lesen konnte.
 export function syncLine(row) {
+  // Ein Entwurf verschwindet in diesem Fall (#2226); ein freigegebener Beleg wird zum Prüffall.
+  if (row?.sync_error === "not_found") return { tone: "text-[#FF3B30]", text: "In Dolibarr nicht mehr gefunden – siehe Prüffall" };
   if (row?.sync_error) return { tone: "text-[#FF3B30]", text: `Dolibarr nicht lesbar: ${row.sync_error_text || row.sync_error}` };
   if (!row?.synced_at) return { tone: "text-white/40", text: "noch nicht nachgelesen" };
   const at = asInstant(row.synced_at);

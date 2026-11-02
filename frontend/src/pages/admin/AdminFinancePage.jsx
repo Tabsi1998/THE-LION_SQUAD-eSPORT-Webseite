@@ -7,7 +7,7 @@ import { AdminLayout } from "@/components/tls/AdminLayout";
 import { SkeletonTable } from "@/components/tls/Skeleton";
 import { TableScroll } from "@/components/tls/TableScroll";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { ATTENTION_ORDER, PAYMENT_TONE, csvFilename, formatCents, parseEuro, shownOf, sourcesFrom, summaryLines, syncLine } from "@/lib/billing";
+import { ATTENTION_ORDER, PAYMENT_TONE, csvFilename, formatCents, parseEuro, shownOf, sourceName, sourcesFrom, summaryLines, syncLine } from "@/lib/billing";
 import { viennaDate, viennaDateTime } from "@/lib/vienna";
 import { InvoiceDetailsTab } from "./finance/InvoiceDetailsTab";
 
@@ -292,7 +292,7 @@ export default function AdminFinancePage() {
           {data.summary && (
             <div className="mt-4 border border-white/10 rounded-sm bg-[#121212] p-4" data-testid="finance-source-summary">
               <div className="text-[10px] uppercase tracking-[0.25em] text-white/45 font-bold">Summen der Veranstaltung · {data.summary.orders} Aufträge{data.summary.cancelled_orders ? `, ${data.summary.cancelled_orders} storniert` : ""}</div>
-              <div className="mt-2 grid gap-2 sm:grid-cols-3 lg:grid-cols-6">
+              <div className={`mt-2 grid gap-2 sm:grid-cols-3 ${data.summary.waived_cents > 0 ? "lg:grid-cols-7" : "lg:grid-cols-6"}`}>
                 {summaryLines(data.summary).map((line) => (
                   <div key={line.key} data-testid={`finance-sum-${line.key}`}>
                     <div className="font-display font-bold tabular-nums text-white">{line.value}</div>
@@ -326,7 +326,7 @@ export default function AdminFinancePage() {
                   <div key={item.id} className="border border-[#FF3B30]/30 bg-[#FF3B30]/5 rounded-sm p-4 text-sm" data-testid={`finance-case-${item.id}`}>
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
-                        <div className="font-bold text-white">{item.label} <span className="text-white/50 font-normal">· {item.source?.name || item.source_id} · {item.person || item.user_id} · {item.total}</span></div>
+                        <div className="font-bold text-white">{item.label} <span className="text-white/50 font-normal">· {sourceName(item)} · {item.person || item.user_id} · {item.total}</span></div>
                         <div className="mt-1 text-xs text-white/70">{item.todo}</div>
                         <CaseFacts item={item} />
                       </div>
@@ -360,7 +360,7 @@ export default function AdminFinancePage() {
                 {data.open.map((row) => (
                   <tr key={row.id} data-testid={`finance-order-${row.id}`}>
                     <td className="px-4 py-3">
-                      {row.source?.slug ? <Link to={row.source.kind === "tournament" ? `/tournaments/${row.source.slug}` : `/events/${row.source.slug}`} className="text-white hover:text-[#29B6E8]">{row.source.name}</Link> : row.source?.name || row.source_id}
+                      {row.source?.slug ? <Link to={row.source.kind === "tournament" ? `/tournaments/${row.source.slug}` : `/events/${row.source.slug}`} className="text-white hover:text-[#29B6E8]">{row.source.name}</Link> : sourceName(row)}
                       <div className="text-[11px] text-white/40">{viennaDateTime(row.created_at, { dateStyle: "medium", timeStyle: "short" })}</div>
                       {Array.isArray(row.invoice_text) && (
                         <InvoiceTextEditor row={row} busy={busy} onSave={(text) => run(`text-${row.id}`, () => api.put(`/admin/finance/orders/${row.id}/text`, { extra_text: text }), "Rechnungstext gespeichert.")} />
@@ -374,9 +374,20 @@ export default function AdminFinancePage() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       {row.status === "held" && (
-                        <button type="button" disabled={!!busy} onClick={() => run(row.id, () => api.post(`/admin/finance/orders/${row.id}/release`), "Auftrag freigegeben.")} className="px-3 py-1.5 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-40" data-testid={`finance-release-${row.id}`}>
-                          Freigeben
-                        </button>
+                        <div className="flex flex-col items-end gap-1.5">
+                          <button type="button" disabled={!!busy} onClick={() => run(row.id, () => api.post(`/admin/finance/orders/${row.id}/release`), "Auftrag freigegeben.")} className="px-3 py-1.5 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-40" data-testid={`finance-release-${row.id}`}>
+                            Freigeben
+                          </button>
+                          {!!row.removed_invoices?.length && (
+                            // Entwurf in Dolibarr gelöscht (#2226): neu abrechnen oder den Auftrag beenden - beides entscheidet die Finanzverwaltung.
+                            <>
+                              <button type="button" disabled={!!busy} onClick={() => run(row.id, () => api.post(`/admin/finance/orders/${row.id}/dismiss`), "Keine neue Rechnung – Auftrag beendet.")} className="text-[11px] uppercase tracking-wider font-bold text-white/60 hover:text-white disabled:opacity-40" data-testid={`finance-dismiss-${row.id}`}>
+                                Keine neue Rechnung
+                              </button>
+                              <button type="button" onClick={() => openDetail(row.id)} className="text-[11px] uppercase tracking-wider font-bold text-[#29B6E8] hover:underline" data-testid={`finance-detail-${row.id}`}>Details</button>
+                            </>
+                          )}
+                        </div>
                       )}
                       {row.status === "failed" && (
                         <button type="button" disabled={!!busy} onClick={() => run(row.id, () => api.post(`/admin/finance/orders/${row.id}/retry`), "Auftrag neu gestartet.")} className="px-3 py-1.5 border border-[#FF3B30]/50 text-[#FF3B30] rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-40" data-testid={`finance-retry-${row.id}`}>
@@ -440,7 +451,7 @@ export default function AdminFinancePage() {
                             {row.invoice_ref || "–"}
                             {row.booking_state === "cancelled" && <div className="text-[11px] text-[#FF3B30] font-sans">Buchung storniert</div>}
                           </td>
-                          <td className="px-4 py-3 text-white/80">{row.source?.name || row.source_id}</td>
+                          <td className="px-4 py-3 text-white/80">{sourceName(row)}</td>
                           <td className="px-4 py-3 text-white/80">{row.person || row.user_id}</td>
                           <td className="px-4 py-3 text-right font-display font-bold tabular-nums">{row.total}</td>
                           <td className="px-4 py-3">
@@ -448,7 +459,9 @@ export default function AdminFinancePage() {
                               {row.payment_label || (row.paid ? "bezahlt" : INVOICE_STATUS[row.invoice_status] || row.invoice_status)}
                               {row.payment_state === "partial" && row.remaining_cents != null && <span className="text-white/50"> · {formatCents(row.remaining_cents, row.currency)} offen</span>}
                               {row.payment_state === "overdue" && row.due_on && <span className="text-white/50"> · fällig {viennaDate(row.due_on)}</span>}
+                              {row.waived_cents > 0 && <span className="text-white/50"> · {formatCents(row.waived_cents, row.currency)} erlassen</span>}
                             </div>
+                            <CloseInfo order={row} />
                             {(row.credited_cents > 0 || row.refunded_cents > 0) && (
                               <div className="text-[11px] text-white/50">{row.credited_cents > 0 ? `gutgeschrieben ${formatCents(row.credited_cents, row.currency)}` : ""}{row.credited_cents > 0 && row.refunded_cents > 0 ? " · " : ""}{row.refunded_cents > 0 ? `erstattet ${formatCents(row.refunded_cents, row.currency)}` : ""}</div>
                             )}
@@ -484,6 +497,17 @@ export default function AdminFinancePage() {
   );
 }
 
+// Grund und Anmerkung des Abschlusses in Dolibarr (#2226): freier Text, kommt nur in die Verwaltung und wird als reiner Text gezeigt.
+function CloseInfo({ order }) {
+  if (!order.close_reason && !order.close_note) return null;
+  return (
+    <div className="mt-1 text-[11px] text-white/60 max-w-[24rem] whitespace-pre-wrap break-words" data-testid={`finance-close-${order.id}`}>
+      {order.close_reason && <div>Grund: {order.close_reason}</div>}
+      {order.close_note && <div>Anmerkung: {order.close_note}</div>}
+    </div>
+  );
+}
+
 function CaseFacts({ item }) {
   const d = item.detail || {};
   const bits = [];
@@ -511,7 +535,7 @@ function ResolvedCases({ data, onOpen }) {
         <div key={item.id} className="border border-white/10 bg-[#121212] rounded-sm p-4 text-sm" data-testid={`finance-resolved-${item.id}`}>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <div className="font-bold text-white">{item.label} <span className="text-white/50 font-normal">· {item.source?.name || item.source_id} · {item.person || item.user_id} · {item.total}</span></div>
+              <div className="font-bold text-white">{item.label} <span className="text-white/50 font-normal">· {sourceName(item)} · {item.person || item.user_id} · {item.total}</span></div>
               <div className="mt-1 text-xs text-white/70">Erledigt {viennaDateTime(item.resolved_at, { dateStyle: "short", timeStyle: "short" })} von {item.resolved_by_name}{item.resolution ? `: ${item.resolution}` : ""}</div>
               <CaseFacts item={item} />
             </div>
@@ -553,11 +577,12 @@ function OrderDetail({ detail, busy, paymentLabels, onClose, onResync, onRefund 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="text-[10px] uppercase tracking-[0.25em] text-[#29B6E8] font-bold">Auftrag</div>
-          <h2 className="font-heading text-xl font-black uppercase mt-1">{order.source?.name || order.source_id} · {order.person || order.user_id}</h2>
+          <h2 className="font-heading text-xl font-black uppercase mt-1 break-words">{sourceName(order)} · {order.person || order.user_id}</h2>
           <div className="text-xs text-white/50 mt-1">
             {order.invoice_ref ? `Beleg ${order.invoice_ref} · ` : ""}{paymentLabels[order.payment_state] || order.status_label}
             {registration ? ` · Anmeldung ${registration.status_label || registration.status}${registration.seat_count ? `, ${registration.seat_count} Personen` : ""}` : ""}
           </div>
+          <CloseInfo order={order} />
           {order.pdf_missing && (
             <div className="mt-2 text-xs text-[#FFD700]" data-testid="finance-detail-pdf-missing">
               PDF fehlt: {order.pdf_error_text || order.pdf_error} Der Abgleich versucht es stündlich wieder, „Fehlende PDFs nachziehen“ sofort.
@@ -584,6 +609,7 @@ function OrderDetail({ detail, busy, paymentLabels, onClose, onResync, onRefund 
           <div className="mt-3 grid grid-cols-2 gap-2 text-xs" data-testid="finance-detail-sums">
             <div><span className="text-white/45">bezahlt</span> <span className="tabular-nums text-white">{formatCents(sums.paid_cents, order.currency)}</span></div>
             <div><span className="text-white/45">gutgeschrieben</span> <span className="tabular-nums text-white">{formatCents(sums.credited_cents, order.currency)}</span></div>
+            {sums.waived_cents > 0 && <div><span className="text-white/45">erlassen</span> <span className="tabular-nums text-white">{formatCents(sums.waived_cents, order.currency)}</span></div>}
             <div><span className="text-white/45">erstattet</span> <span className="tabular-nums text-white">{formatCents(sums.refunded_cents, order.currency)}</span></div>
             <div><span className="text-white/45">noch erstattbar</span> <span className="tabular-nums text-white">{formatCents(sums.refundable_cents, order.currency)}</span></div>
           </div>

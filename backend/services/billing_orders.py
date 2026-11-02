@@ -9,7 +9,8 @@ und bringt jeden Auftrag einen Schritt weiter. Was er dafür braucht, sagt der S
 - ``waiting_link``          die Person hat noch keinen Geschäftspartner in Dolibarr
 - ``waiting_review``        in Dolibarr gibt es schon einen Geschäftspartner mit derselben E-Mail -
                             die Finanzverwaltung ordnet zu oder lässt neu anlegen
-- ``held``                  Rechnungszeitpunkt „erst nach Freigabe“ - wartet auf die Finanzverwaltung
+- ``held``                  Rechnungszeitpunkt „erst nach Freigabe“ oder der Entwurf wurde in Dolibarr gelöscht
+                            (``removed_invoices``, #2226) - wartet auf die Finanzverwaltung
 - ``invoiced``              Beleg in Dolibarr angelegt (``invoice_id``, ``invoice_ref``, ``invoice_status``,
                             ``paid``, ``payment_state``) - der Stand wird regelmäßig nachgelesen
 - ``cancelled``             Buchung storniert, bevor ein Beleg entstand
@@ -24,7 +25,7 @@ Profil-Update erzeugt einen Auftrag - nur die bestätigte Buchung mit Preis-Snap
 Buchung storniert oder geändert, obwohl der Beleg existiert, bleibt der Auftrag ``invoiced`` und
 bekommt einen **Prüffall** (``services/billing_cases``); ``booking_state`` sagt, dass die Buchung
 weg ist. Zahlungen liest die Website nur (Dolibarr ist führend): ``payment_state`` ist die Sicht
-darauf - offen, teilweise bezahlt, bezahlt, überfällig, Überzahlung, gutgeschrieben, aufgegeben.
+darauf - offen, teilweise bezahlt, bezahlt, bezahlt mit Abzug, überfällig, Überzahlung, gutgeschrieben, aufgegeben.
 **Erstattungen** sind kein Beleg und keine Gutschrift: Die Finanzverwaltung erfasst am Auftrag,
 was tatsächlich zurücküberwiesen wurde (Betrag, Tag, Referenz), nie mehr als bezahlt ist.
 """
@@ -38,7 +39,7 @@ from pymongo.errors import DuplicateKeyError
 
 from database import get_db
 from models import new_id, now_utc
-from services.billing_amounts import credited_cents, paid_cents, refunded_cents
+from services.billing_amounts import credited_cents, paid_cents, refunded_cents, waived_cents
 
 logger = logging.getLogger("tls.billing")
 
@@ -60,13 +61,31 @@ PAYMENT_STATE_LABELS = {
     "open": "offen",
     "partial": "teilweise bezahlt",
     "paid": "bezahlt",
+    "paid_reduced": "bezahlt mit Abzug",
     "overdue": "überfällig",
     "overpaid": "Überzahlung",
     "credited": "gutgeschrieben",
     "abandoned": "aufgegeben",
 }
+# Grund des Abschlusses in Dolibarr (`close_code`, #2226) als Klartext - nur für die Verwaltung, wie die Anmerkung (`close_note`).
+CLOSE_REASONS = {
+    "discount_vat": "Skonto oder Nachlass",
+    "badcustomer": "Zahlungsausfall",
+    "product_returned": "Leistung zurückgegeben",
+    "bankcharge": "Bankspesen",
+    "withholdingtax": "Quellensteuer",
+    "other": "Sonstiger Grund",
+    "abandon": "Aufgegeben",
+    "replaced": "Durch einen anderen Beleg ersetzt",
+}
 MAX_REFUND_REFERENCE = 120
 MAX_REASON = 500
+
+
+def close_reason(order: dict) -> str | None:
+    """Der Grund als Satz; ein Code, den die Website nicht kennt, wird nicht roh gezeigt. Ohne Code keiner."""
+    code = order.get("close_code")
+    return CLOSE_REASONS.get(code, "Grund in Dolibarr nachsehen") if code else None
 
 
 def booking_key(kind: str, registration_id: str, snapshot: dict | None) -> str | None:
@@ -165,6 +184,27 @@ async def release_order(db, order_id: str, actor_id: str) -> dict | None:
     """Rechnungszeitpunkt „bewusst später“: die Freigabe durch die Finanzverwaltung."""
     await db.billing_orders.update_one({"id": order_id, "status": "held"}, {"$set": {"status": "pending", "released_by": actor_id, "released_at": now_utc().isoformat(), "updated_at": now_utc().isoformat()}})
     return await db.billing_orders.find_one({"id": order_id}, {"_id": 0})
+
+
+async def waits_after_removed_draft(db, *, kind: str, registration_id: str) -> bool:
+    """Wartet die Anmeldung darauf, dass die Finanzverwaltung über einen gelöschten Entwurf entscheidet (#2226)?"""
+    return await db.billing_orders.find_one({"kind": kind, "registration_id": registration_id, "status": "held", "removed_invoices": {"$exists": True}}, {"_id": 0, "id": 1}) is not None
+
+
+async def dismiss_removed(db, order: dict, actor_id: str) -> bool:
+    """Der Entwurf ist in Dolibarr gelöscht (#2226), und es soll keine neue Rechnung geben: Der Auftrag ist zu Ende,
+    die Anmeldung bleibt, ihr Preis zählt nicht mehr. ``False``: Der Auftrag wartet nicht mehr, dann ändert sich nichts."""
+    now = now_utc().isoformat()
+    done = await db.billing_orders.update_one({"id": order["id"], "status": "held"}, {"$set": {
+        "status": "cancelled", "cancel_reason": "Entwurf in Dolibarr gelöscht, keine neue Rechnung", "note": "", "updated_at": now}})
+    if done.modified_count != 1:
+        return False
+    collection ={"event": db.event_registrations, "tournament": db.tournament_registrations}.get(order.get("kind"))
+    if collection is not None:
+        await collection.update_one({"id": order["registration_id"]}, {"$set": {"billing_status": "cancelled"}})
+    await db.audit_logs.insert_one({"id": new_id(), "action": "billing.order.dismiss", "target_id": order["id"], "actor_id": actor_id,
+                                    "data": {"registration_id": order.get("registration_id"), "total_cents": order.get("total_cents")}, "created_at": now})
+    return True
 
 
 async def classify_due(limit: int = 100) -> dict:
@@ -301,7 +341,7 @@ async def add_refund(db, order: dict, actor_id: str, *, amount_cents: int, paid_
 ATTENTION = {"pdf_missing": "PDF fehlt", "draft_old": "Entwurf seit mehr als 7 Tagen", "overdue": "überfällig"}
 DRAFT_DAYS = 7
 # Was nicht mehr offen ist, ist nie überfällig - auch wenn das Zahlungsziel vorbei ist.
-NOT_OPEN_STATES = ("paid", "credited", "abandoned", "overpaid")
+NOT_OPEN_STATES = ("paid", "paid_reduced", "credited", "abandoned", "overpaid")
 
 
 def attention_query(name: str, now=None) -> dict:
@@ -408,10 +448,12 @@ async def export_rows(db, *, kind: str | None = None, source_id: str | None = No
 
 async def source_summary(db, kind: str, source_id: str) -> dict:
     """Die Zahlen einer Veranstaltung (#322), getrennt statt in einen Topf: gebucht, fakturiert,
-    bezahlt, offen, gutgeschrieben, erstattet - jede Belegrevision nur einmal."""
-    totals = {"booked_cents": 0, "invoiced_cents": 0, "paid_cents": 0, "open_cents": 0, "credited_cents": 0, "refunded_cents": 0,
+    bezahlt, offen, gutgeschrieben, erlassen, erstattet - jede Belegrevision nur einmal."""
+    totals = {"booked_cents": 0, "invoiced_cents": 0, "paid_cents": 0, "open_cents": 0, "credited_cents": 0, "waived_cents": 0, "refunded_cents": 0,
               "orders": 0, "cancelled_orders": 0, "cases_open": 0}
     async for order in db.billing_orders.find({"kind": kind, "source_id": source_id}, {"_id": 0, "snapshot": 0}):
+        if order.get("status") == "held" and order.get("removed_invoices"):
+            continue   # Entwurf in Dolibarr gelöscht (#2226): zählt erst wieder, wenn neu abgerechnet wird.
         totals["orders"] += 1
         if order.get("status") == "cancelled":
             totals["cancelled_orders"] += 1
@@ -424,6 +466,7 @@ async def source_summary(db, kind: str, source_id: str) -> dict:
             paid = paid_cents(order)
             totals["paid_cents"] += paid
             totals["credited_cents"] += credited_cents(order)
+            totals["waived_cents"] += waived_cents(order)
             if order.get("payment_state") in ("open", "partial", "overdue"):
                 remaining = order.get("remaining_cents")
                 totals["open_cents"] += max(0, int(remaining)) if remaining is not None else max(0, total - paid)
@@ -434,11 +477,11 @@ async def source_summary(db, kind: str, source_id: str) -> dict:
 
 async def anonymize_user(db, user_id: str) -> int:
     """Kontolöschung (#322): Belege bleiben in Dolibarr (Aufbewahrung nach BAO), der Auftrag hier
-    behält Betrag, Belegnummer und Zeitpunkte - aber keinen Namen und keine E-Mail mehr. Die
-    Zuordnung Konto ↔ Geschäftspartner fällt weg."""
+    behält Betrag, Belegnummer und Zeitpunkte - aber keinen Namen, keine E-Mail und keine Anmerkung
+    zum Abschluss (freier Text, #2226) mehr. Die Zuordnung Konto ↔ Geschäftspartner fällt weg."""
     now = now_utc().isoformat()
     result = await db.billing_orders.update_many({"user_id": user_id}, {"$set": {
         "snapshot.recipient.display_name": "Gelöschter User", "snapshot.recipient.email": None, "anonymized_at": now, "updated_at": now,
-    }})
+    }, "$unset": {"close_note": ""}})
     await db.billing_customers.delete_many({"user_id": user_id})
     return int(result.modified_count)
