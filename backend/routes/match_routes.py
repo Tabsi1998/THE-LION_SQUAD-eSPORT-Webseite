@@ -1300,11 +1300,10 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
         await require_tournament_staff_permission(
             me, v2_match["tournament_id"], CHECKIN_STAFF_ROLES, "match", match_id, capability="matches"
         )
-        # Termin des eigenen Spiels (#2203): setzt eine zweite Person, der Superadmin nur als Notausnahme mit Grund.
-        await league_permissions.require_no_conflict(db, me, v2_match, action="match_plan", conflict_reason=body.conflict_reason)
         nullable_fields = {"scheduled_at", "station_id", "admin_note", "map", "best_of", "duration_minutes"}
         raw = body.model_dump(exclude_unset=True)
-        raw.pop("conflict_reason", None)
+        # Termin des eigenen Spiels (#2203): setzt eine zweite Person, der Superadmin nur als Notausnahme mit Grund.
+        await league_permissions.require_no_conflict(db, me, v2_match, action="match_plan", conflict_reason=raw.pop("conflict_reason", None))
         for result_field in ("score_a", "score_b", "winner_id"):
             raw.pop(result_field, None)
         updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}

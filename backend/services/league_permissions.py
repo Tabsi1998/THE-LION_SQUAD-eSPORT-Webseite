@@ -298,7 +298,8 @@ async def held_result_refusal(db, match: dict, hold: dict) -> str | None:
     tournament = await db.tournaments.find_one({"id": match.get("tournament_id")}, {"_id": 0, "league_context": 1})
     if not is_league_staffel(tournament):
         return None
-    account = await db.users.find_one({"id": hold.get("actor_id")}, {"_id": 0})
+    account = await db.users.find_one({"id": hold.get("actor_id")},
+                                      {"_id": 0, "id": 1, "role": 1, "areas": 1, "is_active": 1, "is_banned": 1, "mfa_enabled": 1})
     if not account or account.get("is_active") is False or account.get("is_banned"):
         return HOLD_NO_ACCOUNT
     if not account.get("mfa_enabled"):
