@@ -43,14 +43,6 @@ SEASON = {"start_date": "2026-11-12T00:00:00", "weeks_total": 18, "blocked_perio
           "default_match_weekday": 6, "default_match_time": "20:00", "visibility": "admins"}
 
 
-@pytest.fixture(autouse=True)
-def _fixed_proposal_clock(monkeypatch):
-    """„Nicht in der Vergangenheit“ (#2124) rechnet ab dem 1.9.2026 statt ab heute."""
-    import services.schedule_proposal_time as proposal_time
-
-    monkeypatch.setattr(proposal_time, "now_utc", lambda: datetime(2026, 9, 1, tzinfo=timezone.utc))
-
-
 @pytest_asyncio.fixture
 async def flow():
     instance, shutdown = make_flow()
@@ -63,6 +55,12 @@ async def flow():
 def ok(response, code: int = 200):
     assert response.status_code == code, response.text
     return response.json()
+
+
+def refused(response, text: str) -> None:
+    """Abgelehnt, und zwar aus genau diesem Grund - ein anderer Fehler täte sonst so, als wäre die Regel geprüft."""
+    assert response.status_code == 422, response.text
+    assert text in response.json()["detail"], response.text
 
 
 # ---------------------------------------------------------------- Aufbau über die Routen
@@ -256,28 +254,28 @@ async def test_invalid_reports_are_refused_and_leave_the_match_untouched(flow):
 
     # 2:2 entscheidet keine Serie.
     level = report(world, home, away, (2, 2), home, [home, away, home, away])
-    assert (await flow.post(url, json=level)).status_code in (400, 409, 422)
+    refused(await flow.post(url, json=level), "Best of 5: der Sieger braucht genau 3 gewonnene Spiele.")
 
     # Falscher Modus an Position 2: der Plan verlangt dort „bombe“.
     wrong_mode = report(world, home, away, (3, 0), home, series(home, away, (3, 0)))
     wrong_mode["games"][1].update({"mode": "zone", "map_id": world["maps"]["Delta"]["id"]})
-    assert (await flow.post(url, json=wrong_mode)).status_code in (400, 409, 422)
+    refused(await flow.post(url, json=wrong_mode), "Map 2: gespielt wird hier Bombe.")
 
     # Eine Map nach der Entscheidung: bei 3:0 gibt es keine vierte.
     extra = report(world, home, away, (3, 0), home, series(home, away, (3, 0)))
     extra["games"].append({**extra["games"][0], "position": 4, "map_id": world["maps"]["Beta"]["id"]})
-    assert (await flow.post(url, json=extra)).status_code in (400, 409, 422)
+    refused(await flow.post(url, json=extra), "Nach Map 3 stand der Sieger schon fest")
 
     # Die Bibliothek kennt „Delta“ nicht für „bombe“, der Pool also auch nicht.
     locked_combo = report(world, home, away, (3, 0), home, series(home, away, (3, 0)))
     locked_combo["games"][1]["map_id"] = world["maps"]["Delta"]["id"]
-    assert (await flow.post(url, json=locked_combo)).status_code in (400, 409, 422)
+    refused(await flow.post(url, json=locked_combo), "Map 2: diese Map ist im Pool")
 
-    # Und auch der Pool selbst nimmt die Kombination nicht an.
+    # Und auch der Pool selbst nimmt die Kombination nicht an: vollständig, nur „Delta“ für „bombe“ dazu.
     flow.act_as(world["lead"])
-    refused = await flow.put(f"{ADMIN}/seasons/{world['season']['id']}/map-pool",
-                             json={"modes": [{"mode": "bombe", "map_ids": [world["maps"]["Delta"]["id"]]}]})
-    assert refused.status_code in (400, 409, 422)
+    with_delta = {**POOL, "bombe": [*POOL["bombe"], "Delta"]}
+    refused(await flow.put(f"{ADMIN}/seasons/{world['season']['id']}/map-pool", json=pool_body(world["maps"], with_delta)),
+            "Die Map „Delta“ ist für Bombe nicht freigegeben.")
 
     after = await stored(flow, match)
     assert after["status"] != "completed"
@@ -364,7 +362,7 @@ async def test_a_new_pool_version_locks_a_map_for_new_matches_only(flow):
     flow.act_as(captain(world, home))
     url = f"/api/matches/{fresh['id']}/report"
     locked = await flow.post(url, json=report(world, home, away, (3, 0), home, series(home, away, (3, 0))))
-    assert locked.status_code in (400, 409, 422), locked.text
+    refused(locked, "Map 1: diese Map ist im Pool")
     allowed = [("flagge", "Beta"), ("bombe", "Beta"), ("zone", "Delta")]
     ok(await flow.post(url, json=report(world, home, away, (3, 0), home, series(home, away, (3, 0)), played=allowed)))
 
