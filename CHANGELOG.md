@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.54.1 (02.11.2026)
+
+### Dokumentation
+
+* README-Bilder aktualisieren (#2168)
+
 ## 1.54.0 (02.11.2026)
 
 ### Neu
