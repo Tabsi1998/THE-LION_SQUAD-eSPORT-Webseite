@@ -23,7 +23,7 @@ from pymongo.errors import DuplicateKeyError
 
 from models import TournamentCreate, new_id, now_utc
 from services import game_maps, game_usage, league_games, league_look, map_pools, pricing, staffel_guard
-from services.league_rules_store import delete_for, staffel_rules
+from services.league_rules_store import delete_drafts, deletion_blockers, staffel_rules
 from services.advancement_draw import sync_advancement_fields
 from services.bracket_fill_in import has_started, is_auto_bye
 from services.competition_versions import new_competition_version_fields
@@ -707,6 +707,8 @@ async def deletion_plan(db, kind: str, target: dict) -> dict:
         status = season.get("status") or "draft"
         if status != "draft":
             blockers.append(f"{season.get('name')} ist kein Entwurf mehr ({SEASON_STATUS_TEXT.get(status, status)})")
+    # Regelwerk (#1646): Veröffentlichte Fassungen und Zustimmungen sind Nachweise - nur Entwürfe gehen mit.
+    blockers += await deletion_blockers(db, kind, target, seasons)
     staffeln = await db.tournaments.find({**staffel_filter, **ONLY_LEAGUE},
                                          {"_id": 0, "id": 1, "title": 1, "status": 1, "league_context": 1}
                                          ).to_list(None)
@@ -779,7 +781,7 @@ async def delete_tree(db, kind: str, target: dict, *, on_staffel_deleted=None) -
     if not plan["deletable"]:
         raise LeagueProblem(blocked_message(plan), 409)
     staffel_ids, division_ids, season_ids = _plan_ids(plan, kind, target)
-    _seasons, _divisions, staffel_filter = await _delete_scope(db, kind, target)
+    scoped_seasons, _divisions, staffel_filter = await _delete_scope(db, kind, target)
     try:
         async with AsyncExitStack() as locks:
             # Feste Reihenfolge: zwei Löschungen sperren sich nicht gegenseitig.
@@ -798,6 +800,9 @@ async def delete_tree(db, kind: str, target: dict, *, on_staffel_deleted=None) -
         raise LeagueProblem(STAFFEL_BUSY, 409) from None
     if await _added_meanwhile(db, kind, target, staffel_filter, division_ids, season_ids):
         raise LeagueProblem(CHANGED_MEANWHILE, 409)
+    # Veröffentlicht jemand während des Löschens, bleibt alles darüber stehen (#1646).
+    if await deletion_blockers(db, kind, target, scoped_seasons):
+        raise LeagueProblem(CHANGED_MEANWHILE, 409)
     if division_ids:
         await db.league_divisions.delete_many({"id": {"$in": sorted(division_ids)}})
     if season_ids:
@@ -805,8 +810,7 @@ async def delete_tree(db, kind: str, target: dict, *, on_staffel_deleted=None) -
         # Liga-Kader (#2108): die festgehaltenen Spiel-IDs gehören zur Season und gehen mit ihr.
         await db.league_rosters.delete_many({"season_id": {"$in": sorted(season_ids)}})
         await db.league_seasons.delete_many({"id": {"$in": sorted(season_ids)}})
-    # Regelwerk (#1646): nur Entwurfs-Seasons lassen sich löschen - ihre Fassungen und Zustimmungen gehen mit.
-    await delete_for(db, league_id=target["id"] if kind == "league" else None, season_ids=sorted(season_ids))
+    await delete_drafts(db, league_id=target["id"] if kind == "league" else None, season_ids=sorted(season_ids))
     if kind == "league":
         await db.leagues.delete_one({"id": target["id"]})
     return fresh

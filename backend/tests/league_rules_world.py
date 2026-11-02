@@ -27,6 +27,16 @@ def in_days(days: int) -> str:
     return (date.fromisoformat(club_today()) + timedelta(days=days)).isoformat()
 
 
+async def make_bare_world(flow, **season) -> dict:
+    """Nur Liga und Season, ohne Staffel: Das lässt sich löschen, solange die Regeln es zulassen."""
+    lead = await flow.add_staff()
+    flow.act_as(lead)
+    game = ok(await flow.post("/api/games", json=GAME))
+    league = ok(await flow.post(ADMIN_LEAGUES, json={"name": "Regel-Liga", "game_id": game["id"]}))
+    row = ok(await flow.post(f"{ADMIN_LEAGUES}/{league['id']}/seasons", json=season_body(**season)))
+    return {"lead": lead, "game": game, "league": league, "season": row}
+
+
 async def make_world(flow, *, visibility: str = "public", teams: int = 2, **season) -> dict:
     lead = await flow.add_staff()
     flow.act_as(lead)

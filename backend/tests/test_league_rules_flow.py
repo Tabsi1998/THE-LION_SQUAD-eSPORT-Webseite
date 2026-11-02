@@ -12,7 +12,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
 from league_rules_world import (  # noqa: E402
-    ADMIN_LEAGUES, BODY, in_days, league_page, league_scope, make_world, publish, save_pool, season_page, season_scope, today,
+    ADMIN_LEAGUES, BODY, in_days, league_page, league_scope, make_bare_world, make_world, publish, save_pool, season_page, season_scope, today,
 )
 from league_start_world import ok  # noqa: E402
 from services import league_rules  # noqa: E402
@@ -514,15 +514,68 @@ async def test_the_address_regeln_is_reserved_for_the_rules_page(flow):
     assert answer.status_code == 422
 
 
+async def remove(flow, world: dict, url: str):
+    flow.act_as(world["lead"])
+    return await flow.client.request("DELETE", url, json={"reason": "Testweise aufräumen"})
+
+
 @pytest.mark.asyncio
-async def test_deleting_a_season_or_league_takes_its_rules_along(flow):
-    w = await make_world(flow, teams=2)
-    await publish(flow, w)
-    await publish(flow, w, scope=league_scope(w))
-    # Eine Staffel mit Co-Teams hält die Season - für den Test ohne.
-    await flow.db.tournament_registrations.delete_many({"tournament_id": w["tid"]})
-    await flow.db.tournaments.update_one({"id": w["tid"]}, {"$unset": {"league_squad_key": ""}})
+async def test_a_season_with_a_published_version_cannot_be_deleted(flow):
+    w = await make_bare_world(flow)
+    version = await publish(flow, w, body="# A\nText", annexes=[])
+    url = f"{ADMIN_LEAGUES}/seasons/{w['season']['id']}"
+    plan = ok(await flow.get(f"{url}/delete-plan"))
+    assert plan["deletable"] is False and "Regelwerk" in plan["blockers"][0]
+    refused = await remove(flow, w, url)
+    assert refused.status_code == 409 and "Archivieren" in refused.json()["detail"]
+    assert await flow.db.league_rules.find_one({"id": version["id"]}, {"_id": 1})
+    assert await flow.db.league_seasons.find_one({"id": w["season"]["id"]}, {"_id": 1})
+
+
+@pytest.mark.asyncio
+async def test_a_league_with_a_published_version_cannot_be_deleted(flow):
+    w = await make_bare_world(flow)
+    version = await publish(flow, w, scope=league_scope(w), body="# A\nText", annexes=[])
+    url = f"{ADMIN_LEAGUES}/{w['league']['id']}"
+    plan = ok(await flow.get(f"{url}/delete-plan"))
+    assert plan["deletable"] is False and "Regelwerk" in " ".join(plan["blockers"])
+    assert (await remove(flow, w, url)).status_code == 409
+    assert await flow.db.league_rules.find_one({"id": version["id"]}, {"_id": 1})
+
+
+@pytest.mark.asyncio
+async def test_a_league_is_also_held_by_the_published_version_of_one_of_its_seasons(flow):
+    w = await make_bare_world(flow)
+    await publish(flow, w, body="# A\nText", annexes=[])
+    assert (await remove(flow, w, f"{ADMIN_LEAGUES}/{w['league']['id']}")).status_code == 409
+    assert await flow.db.leagues.find_one({"id": w["league"]["id"]}, {"_id": 1})
+
+
+@pytest.mark.asyncio
+async def test_a_season_that_only_inherits_the_league_can_go(flow):
+    w = await make_bare_world(flow)
+    version = await publish(flow, w, scope=league_scope(w), body="# A\nText", annexes=[])
+    deleted = await remove(flow, w, f"{ADMIN_LEAGUES}/seasons/{w['season']['id']}")
+    assert deleted.status_code == 200, deleted.text
+    assert await flow.db.league_rules.find_one({"id": version["id"]}, {"_id": 1}), "die Fassung der Liga bleibt"
+
+
+@pytest.mark.asyncio
+async def test_a_consent_of_the_season_holds_it_too(flow):
+    w = await make_bare_world(flow)
+    await flow.db.league_rule_consents.insert_one({"id": "z1", "season_id": w["season"]["id"], "squad_id": "q", "user_id": "u", "rule_version_id": "v"})
+    url = f"{ADMIN_LEAGUES}/seasons/{w['season']['id']}"
+    assert "Zustimmung" in " ".join(ok(await flow.get(f"{url}/delete-plan"))["blockers"])
+    assert (await remove(flow, w, url)).status_code == 409
+    assert await flow.db.league_rule_consents.count_documents({}) == 1
+
+
+@pytest.mark.asyncio
+async def test_drafts_go_with_the_season_and_the_league(flow):
+    w = await make_bare_world(flow)
     flow.act_as(w["lead"])
-    deleted = await flow.client.request("DELETE", f"{ADMIN_LEAGUES}/{w['league']['id']}", json={"reason": "Testweise aufräumen"})
+    ok(await flow.put(f"{season_scope(w)}/draft", json={"title": "A", "body_md": "# A", "annexes": []}))
+    ok(await flow.put(f"{league_scope(w)}/draft", json={"title": "B", "body_md": "# B", "annexes": []}))
+    deleted = await remove(flow, w, f"{ADMIN_LEAGUES}/{w['league']['id']}")
     assert deleted.status_code == 200, deleted.text
     assert await flow.db.league_rules.count_documents({}) == 0
