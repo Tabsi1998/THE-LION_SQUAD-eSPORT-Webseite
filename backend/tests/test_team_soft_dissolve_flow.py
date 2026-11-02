@@ -320,7 +320,11 @@ async def test_real_erasure_and_export_reach_dissolved_teams(flow):
     flow.act_as(leader)
     export = (await flow.get("/api/dsgvo/export-my-data")).json()
     assert [row["id"] for row in export["dissolved_teams"]] == [team["id"]]
-    assert "memberships" not in export["dissolved_teams"][0] and "squads" not in export["dissolved_teams"][0]
+    shown = export["dissolved_teams"][0]
+    assert shown["my_role"] == "leader" and shown["name"] == team["name"] and shown["purge_at"]
+    for other in ("memberships", "squads", "member_ids", "co_leader_ids", "leader_id", "dissolved_by"):
+        assert other not in shown, "keine Kennungen anderer Personen"
+    assert _co["id"] not in str(shown)
     flow.act_as(member)
     assert (await flow.get("/api/dsgvo/export-my-data")).json()["dissolved_teams"] == []
 
