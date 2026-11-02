@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.56.1 (02.11.2026)
+
+### Fehlerbehebungen
+
+* Glocke: Wackel-Timer läuft nach dem Verlassen nicht weiter
+
 ## 1.56.0 (02.11.2026)
 
 ### Neu
