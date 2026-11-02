@@ -412,6 +412,11 @@ LOCKED_FOR_HELPERS = ("Die Ergebnisse sind veröffentlicht - Zeiten ändert jetz
                       "mit Begründung.")
 LOCKED_NEEDS_REASON = (f"Die Ergebnisse sind veröffentlicht - bitte begründe die Änderung (mind. {MIN_CHANGE_REASON} "
                        "Zeichen). Sie steht danach im Protokoll.")
+# Jahrespunkte entstehen nur beim Veröffentlichen (#2130): mit gewerteten Zeiten führt der Weg ins Archiv deshalb darüber -
+# oder über die Absage. Was schon im Archiv liegt, bleibt dort und bekommt von selbst keine Punkte.
+ARCHIVE_FREELY_FROM = {"results_published", "archived", "cancelled"}
+ARCHIVE_TOO_EARLY = ("Bitte zuerst „Ergebnisse veröffentlicht“ wählen: Erst dann entstehen die Saisonpunkte. Archivieren "
+                     "geht danach - oder wenn die Challenge abgesagt ist.")
 
 
 def _published_change_reason(challenge: dict, me: dict, reason: str | None) -> str | None:
@@ -767,6 +772,9 @@ async def _update_challenge_locked(cid: str, body: F1ChallengeUpdate, me: dict):
             status_code=400,
             detail="Wenn Vereinsmitglieder von der offiziellen Wertung ausgeschlossen sind, müssen Vereins-Referenzzeiten erlaubt bleiben.",
         )
+    if updates.get("status") == "archived" and existing.get("status") not in ARCHIVE_FREELY_FROM \
+            and await _participant_count(db, cid) > 0:
+        raise HTTPException(status_code=409, detail=ARCHIVE_TOO_EARLY)
     # Wertungsregeln nach der Veröffentlichung (#1584) - wie eine Zeitkorrektur: nur die Turnierleitung, mit
     # Begründung, im Protokoll, danach Gewinne und Saisonpunkte abgleichen.
     rule_fields = _changed_scoring_fields(existing, updates)
@@ -972,7 +980,7 @@ async def _delete_challenge_locked(cid: str, me: dict):
     if current.get("status") != "draft":
         raise HTTPException(status_code=409, detail="Löschen geht nur bei einem Entwurf. Eine Challenge, die schon angekündigt war, bitte absagen oder archivieren.")
     if has_times:
-        raise HTTPException(status_code=409, detail="Die Challenge hat schon Zeiten - sie lässt sich nicht mehr löschen, nur archivieren.")
+        raise HTTPException(status_code=409, detail="Die Challenge hat schon Zeiten - sie lässt sich nicht mehr löschen. Bitte absagen oder die Ergebnisse veröffentlichen und danach archivieren.")
     await db.f1_challenges.delete_one({"id": cid})
     await db.f1_tracks.delete_many({"challenge_id": cid})
     await db.f1_lap_times.delete_many({"challenge_id": cid})

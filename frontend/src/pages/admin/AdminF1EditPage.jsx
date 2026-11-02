@@ -21,6 +21,7 @@ import { FastLapQueuePanel } from "@/components/tls/fastlap/FastLapQueuePanel";
 import { FastLapGuestLinkDialog } from "@/components/tls/fastlap/FastLapGuestLinkDialog";
 import { FastLapGuestsPanel } from "@/components/tls/fastlap/FastLapGuestsPanel";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
+import { archiveBlocked, F1_STATUS_LABELS, statusOptionsFor } from "@/lib/fastLapStatus";
 
 // Nach „Ergebnisse veröffentlicht“ (#1584) ändert nur die Turnierleitung Zeiten - mit Begründung, die im Protokoll steht.
 const LOCKED_STATUSES = new Set(["results_published", "archived"]);
@@ -32,22 +33,6 @@ function trackLimits(track) {
   if (Number.isNaN(min) || Number.isNaN(max)) return null;
   return { min_plausible_ms: min, max_plausible_ms: max };
 }
-
-// „Einreichung offen/geschlossen“ nur, wenn es Online-Einreichen gibt (#1585) - bis dahin stehen sie nicht zur Wahl.
-const SUBMISSION_STATUSES = new Set(["registration_open", "registration_closed"]);
-
-const F1_STATUS_OPTIONS = [
-  ["draft", "Entwurf"],
-  ["scheduled", "Angekündigt"],
-  ["registration_open", "Einreichung offen"],
-  ["registration_closed", "Einreichung geschlossen"],
-  ["live", "Live"],
-  ["paused", "Pausiert"],
-  ["completed", "Beendet"],
-  ["results_published", "Ergebnisse veröffentlicht"],
-  ["archived", "Archiviert"],
-  ["cancelled", "Abgesagt"],
-];
 
 export default function AdminF1EditPage() {
   // Globale Aktionen nur für die Turnierleitung mit Zwei-Faktor (#1028), Helfer sehen die ihres Einsatzes.
@@ -315,7 +300,7 @@ export default function AdminF1EditPage() {
     })) return;
     try {
       await api.patch(`/f1/challenges/${id}`, { status });
-      toast.success(`Status: ${Object.fromEntries(F1_STATUS_OPTIONS)[status] || status}`);
+      toast.success(`Status: ${F1_STATUS_LABELS[status] || status}`);
       load();
     } catch (e) {
       toast.error(formatRequestError(e, "Challenge-Status konnte nicht gespeichert werden."));
@@ -353,11 +338,11 @@ export default function AdminF1EditPage() {
           {isTournamentLead && (
             <div>
               <select value={challenge.status} onChange={(e) => setStatus(e.target.value)} data-testid="f1-status-select" className="bg-[#0A0A0A] border border-white/10 px-3 py-2 text-sm rounded-sm">
-                {F1_STATUS_OPTIONS
-                  .filter(([s]) => !SUBMISSION_STATUSES.has(s) || challenge.online_registration_enabled || s === challenge.status)
-                  .map(([s, label]) => <option key={s} value={s}>{label}</option>)}
+                {statusOptionsFor(challenge.status).map(([s, label]) => (
+                  <option key={s} value={s} disabled={s === "archived" && archiveBlocked(challenge)}>{s === "archived" && archiveBlocked(challenge) ? `${label} (erst nach dem Veröffentlichen)` : label}</option>
+                ))}
               </select>
-              <div className="mt-1 text-[10px] text-white/40">Manuell nur für Ausnahmen; Zeitplan automatisiert.</div>
+              <div className="mt-1 text-[10px] text-white/40">Live schaltet sich selbst, den Rest setzt ihr von Hand.</div>
             </div>
           )}
           <Link target="_blank" to={`/display/f1/${challenge.id}`} data-testid="f1-tv-admin-link" className="inline-flex items-center gap-2 px-4 py-2 border border-[#29B6E8] text-[#29B6E8] rounded-sm uppercase tracking-wider text-sm font-bold hover:bg-[#29B6E8]/10">
@@ -381,7 +366,12 @@ export default function AdminF1EditPage() {
       )}
       {!locked && OPEN_STATUSES.has(challenge.status) && challenge.public_phase?.state === "completed" && (
         <div data-testid="f1-end-reached" className="mb-5 border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm p-3 text-sm text-white/80">
-          Die Zeit ist um. Bitte die Zeiten prüfen und den Status auf „Beendet“ oder „Ergebnisse veröffentlicht“ setzen - erst dann entstehen Gewinne und Saisonpunkte.
+          Die Zeit ist um. Bitte die Zeiten prüfen und die Ergebnisse veröffentlichen - erst dann entstehen die Saisonpunkte. „Beendet“ legt nur die Gewinne an.
+        </div>
+      )}
+      {challenge.status === "completed" && (
+        <div data-testid="f1-completed-hint" className="mb-5 border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm p-3 text-sm text-white/80">
+          Beendet: Die Gewinne sind angelegt, Saisonpunkte gibt es noch keine. Die entstehen mit „Ergebnisse veröffentlicht“; archivieren geht erst danach.
         </div>
       )}
       {isTournamentLead && <div className="mb-5"><AccessLinksPanel targetType="fastlap" targetId={challenge.id} /></div>}

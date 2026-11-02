@@ -10,6 +10,7 @@ import { normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
 import { EventMembershipLine } from "@/pages/admin/event/EventProgramPanel";
 import { toast } from "sonner";
 import { attemptsPayload } from "@/lib/fastLapEvent";
+import { LIVE_HINT } from "@/lib/fastLapStatus";
 
 const CREATE_STATUS_OPTIONS = [
   ["draft", "Entwurf"],
@@ -121,7 +122,7 @@ export default function AdminF1NewPage() {
         testId="f1-new-form"
         aside={(
           <>
-            <FormSection title="Veröffentlichung und Zeitplan" hint="Live und Beendet werden anhand von Start/Ende automatisch geschaltet.">
+            <FormSection title="Veröffentlichung und Zeitplan" hint={LIVE_HINT}>
               <EventMembershipLine eventId={event?.id} events={event ? [event] : []} testId="f1-new-event" />
               <SelectField label="Sichtbarkeit" value={form.visibility} onChange={(v) => set("visibility", v)} options={VISIBILITY_OPTIONS} testId="f1-new-visibility" />
               <SelectField label="Veröffentlichung" value={form.status} onChange={(v) => set("status", v)} options={CREATE_STATUS_OPTIONS} testId="f1-new-status" />

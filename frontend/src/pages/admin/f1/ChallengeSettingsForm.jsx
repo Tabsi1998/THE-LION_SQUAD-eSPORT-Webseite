@@ -11,6 +11,7 @@ import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { usePrompt } from "@/components/tls/ConfirmDialog";
 import { toast } from "sonner";
 import { attemptsField, attemptsPayload } from "@/lib/fastLapEvent";
+import { LIVE_HINT } from "@/lib/fastLapStatus";
 
 // Nach „Ergebnisse veröffentlicht“ (#1584) ändern Wertungsregeln Rangfolge, Gewinne oder Saisonpunkte - nur mit
 // Begründung; danach gleicht der Server Gewinne und Punkte an. Dieselbe Liste wie SCORING_FIELDS in f1_routes.py.
@@ -129,7 +130,7 @@ export function ChallengeSettingsForm({ challenge, onSaved }) {
       <FormColumns
         aside={(
           <>
-            <FormSection title="Veröffentlichung und Zeitplan" hint="Live und Beendet werden anhand von Start/Ende automatisch geschaltet.">
+            <FormSection title="Veröffentlichung und Zeitplan" hint={LIVE_HINT}>
               {/* Event als Klammer (#1371): verbunden wird nur im Event. */}
               <EventMembershipLine eventId={form.event_id} events={events} testId="f1-edit-event" />
               <SelectField label="Sichtbarkeit" value={form.visibility} onChange={(v) => set("visibility", v)} options={[["public", "Öffentlich"], ["community", "Nur registrierte Community"], ["members", "Nur Vereinsmitglieder"], ["internal", "Nur intern"]]} testId="f1-edit-visibility" />

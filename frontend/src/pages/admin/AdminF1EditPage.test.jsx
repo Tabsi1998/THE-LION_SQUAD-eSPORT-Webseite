@@ -256,7 +256,25 @@ test("nach dem Statuswechsel steht der Status auf Deutsch da, nicht als Kennung 
 test("Ende erreicht: die Seite sagt, dass die Leitung bestätigt", async () => {
   answerWith({ status: "live", end_date: "2026-01-01T10:00:00Z", public_phase: { state: "completed" } });
   renderPage();
-  expect(await screen.findByTestId("f1-end-reached")).toHaveTextContent("Gewinne und Saisonpunkte");
+  expect(await screen.findByTestId("f1-end-reached")).toHaveTextContent("die Ergebnisse veröffentlichen - erst dann entstehen die Saisonpunkte");
+});
+
+test("Beendet mit Zeiten: Hinweis auf die Saisonpunkte, Archivieren steht erst nach dem Veröffentlichen zur Wahl (#2130)", async () => {
+  answerWith({ status: "completed", participant_count: 3 });
+  renderPage();
+  expect(await screen.findByTestId("f1-completed-hint")).toHaveTextContent("Saisonpunkte gibt es noch keine");
+  const archived = [...screen.getByTestId("f1-status-select").options].find((option) => option.value === "archived");
+  expect(archived.disabled).toBe(true);
+  expect(archived.textContent).toContain("erst nach dem Veröffentlichen");
+});
+
+test("Veröffentlicht: Archivieren ist frei (#2130)", async () => {
+  answerWith({ status: "results_published", participant_count: 3 });
+  renderPage();
+  await screen.findByRole("heading", { name: "Monza Sprint" });
+  const archived = [...screen.getByTestId("f1-status-select").options].find((option) => option.value === "archived");
+  expect(archived.disabled).toBe(false);
+  expect(screen.queryByTestId("f1-completed-hint")).toBeNull();
 });
 
 test("Strecke: Plausibilitätsgrenzen werden zu Millisekunden", async () => {
