@@ -578,6 +578,8 @@ async def create_season(db, league: dict, body: dict, user: dict) -> dict:
         number = int((newest or {}).get("number") or 0) + 1
     name = fields.pop("name", None) or f"Season {number}"
     slug = fields.pop("slug", None) or slugify(name, fallback=f"season-{number}", max_length=80)
+    if slug in RESERVED_SLUGS:  # aus dem Namen abgeleitet - „Regeln“ darf die Regelseite nicht verdecken (#1646)
+        slug = f"season-{number}"
     await _season_unique(db, league["id"], None, number, slug)
     look = await _look(db, {key: value for key, value in body.items() if value is not None}, league_look.SEASON_FIELDS)
     doc = {**SEASON_DEFAULTS, **fields, **look}

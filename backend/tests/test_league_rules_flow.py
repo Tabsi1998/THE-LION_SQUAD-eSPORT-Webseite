@@ -72,7 +72,8 @@ async def test_a_published_version_cannot_be_changed_by_any_route(flow):
         "revision": version["revision"], "valid_from": today(), "change_reason": "Nochmal veröffentlichen"})
     assert again.status_code == 409
     # ... nichts zum Verwerfen, und ein neuer Entwurf ist eine neue Zeile.
-    assert (await flow.delete(f"{target}/draft")).status_code == 404
+    nothing = await flow.delete(f"{target}/draft")
+    assert nothing.status_code == 404
     draft = ok(await flow.put(f"{target}/draft", json={"title": "Geändert", "body_md": "# Neu\nNeu", "annexes": []}))
     assert draft["id"] != version["id"]
     assert await flow.db.league_rules.find_one({"id": version["id"]}, {"_id": 0}) == before
@@ -87,6 +88,34 @@ async def test_saving_with_an_old_revision_is_refused(flow):
     stale = await flow.put(f"{target}/draft", json={"title": "C", "body_md": "# C\nC", "annexes": [], "revision": first["revision"]})
     assert stale.status_code == 409
     assert "inzwischen" in stale.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_a_stale_editor_does_not_bring_a_published_draft_back(flow):
+    w = await make_world(flow)
+    version = await publish(flow, w)
+    stale = await flow.put(f"{season_scope(w)}/draft", json={
+        "title": "Alt", "body_md": "# Alt\nStand von vorhin", "annexes": [], "revision": version["revision"]})
+    assert stale.status_code == 409
+    assert await flow.db.league_rules.count_documents({"status": "draft"}) == 0
+
+
+@pytest.mark.asyncio
+async def test_blocks_in_annexes_are_frozen_too(flow):
+    w = await make_world(flow)
+    version = await publish(flow, w, body="# A\nText", annexes=[{"title": "Maps", "body_md": "[[baustein:map_pool]]"}])
+    assert version["blocks_used"] == ["map_pool"]
+    flow.act_as(None)
+    page = ok(await flow.get(season_page(w)))
+    assert "Hafenkante" in section(page, "anlage-a")["body_md"]
+
+
+@pytest.mark.asyncio
+async def test_a_season_named_regeln_gets_no_address_that_hides_the_rules_page(flow):
+    w = await make_world(flow)
+    created = await flow.post(f"{ADMIN_LEAGUES}/{w['league']['id']}/seasons",
+                              json={"name": "Regeln", "number": 7, "start_date": f"{in_days(40)}T00:00:00"})
+    assert created.status_code != 200 or created.json()["slug"] != "regeln"
 
 
 @pytest.mark.asyncio

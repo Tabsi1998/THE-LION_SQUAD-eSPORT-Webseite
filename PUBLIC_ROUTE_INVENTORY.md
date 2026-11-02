@@ -26,10 +26,16 @@ Dynamische Sitemap-Routen sind auf veroeffentlichte/oeffentliche Datensaetze beg
 - `/references/<id>`
 - `/galerie/<slug>`
 - `/liga` und `/liga/<liga>/<season>` - nur Seasons mit Sichtbarkeit `public`; `/liga` nur, wenn es mindestens eine gibt
+- `/liga/<liga>/<season>/regeln` (#1646) - nur Seasons mit Sichtbarkeit `public`, die ein Regelwerk haben (eigenes oder das der Liga)
 
 `backend/routes/setup_routes.py` verwaltet die statische Sitemap-Liste und wendet Veroeffentlichungs-/Sichtbarkeitsfilter auf dynamische Datensaetze an. Die Slug-Historie leitet auf den aktuellen kanonischen Slug weiter.
 
 Liga (docs/LIGA.md, #1622): Eine Staffel ist ein Turnier und folgt den Regeln von `/tournaments/<slug>` - in der Sitemap nur, solange sie oeffentlich und kein Entwurf ist (Season-Sichtbarkeit `public`). Die Liga selbst liest die Website ueber `GET /api/leagues` und `GET /api/leagues/<liga>/<season>`; beide liefern nur Seasons, die die Person nach `league_seasons.visibility` sehen darf (`off` antwortet 404), dazu `GET /api/leagues/<liga>/<season>/staffeln/<staffel>` (Tabelle, Spielwochen, Ergebnisse - nur sichtbare Staffeln). Die Ligaseite `/liga/<liga>/<season>` (P5, #1625) ist bei `members` erreichbar, aber `noindex` mit neutraler Vorschau; bei `admins` und `off` liefert die Vorschau 404 und die Seite sagt „Liga nicht gefunden“. Der Menüpunkt „Liga“ erscheint nur, wenn die Lese-API der Person eine Season zeigt.
+
+Regelwerk der Liga (docs/LIGA.md, #1646): `/liga/<liga>/regeln` und `/liga/<liga>/<season>/regeln` lesen `GET /api/league-rules/leagues/<liga>` bzw.
+`GET /api/league-rules/seasons/<liga>/<season>`, dazu `/compare` und `/versions/<id>/pdf` unter denselben Adressen - alles nach `league_seasons.visibility`, unsichtbar antwortet 404 (die Seite der Liga, sobald
+eine ihrer Seasons sichtbar ist). `members`: erreichbar, aber `noindex` mit neutraler Vorschaukarte, das PDF mit `X-Robots-Tag: noindex`. Alte Fassungen (`?version=`) und der Vergleich (`?vergleich=`) sind nie indexiert.
+`POST /api/league-rules/consents` verlangt eine Anmeldung und Verantwortung für das Co-Team.
 
 ## Oeffentlich, aber bewusst nicht indexiert
 

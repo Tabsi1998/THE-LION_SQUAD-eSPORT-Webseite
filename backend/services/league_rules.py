@@ -331,6 +331,8 @@ async def save_draft(db, scope: str, scope_id: str, body: dict, user: dict) -> d
               "annexes": _annexes(body.get("annexes")), "updated_at": now, "updated_by": user["id"]}
     existing = await draft_of(db, scope, scope_id)
     if existing is None:
+        if body.get("revision"):  # der gelesene Entwurf ist inzwischen veröffentlicht oder verworfen
+            raise LeagueProblem(CHANGED_MEANWHILE, 409)
         doc = {"id": new_id(), "scope": scope, "scope_id": scope_id, "league_id": league["id"],
                "season_id": (season or {}).get("id"), "status": DRAFT, "version": None, "revision": 1, **fields,
                "created_at": now, "created_by": user["id"]}
