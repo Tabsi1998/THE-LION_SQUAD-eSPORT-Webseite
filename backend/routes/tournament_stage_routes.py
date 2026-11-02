@@ -34,6 +34,7 @@ from services.match_v2_results import (
 )
 from models import TournamentStageCreate, TournamentStageUpdate, now_utc, new_id
 from services import tournament_guard
+from services.staffel_guard import staffel_rebuild_problem
 from services.match_public_view import public_match_view, public_stage_view
 from services.round_labels import attach_round_labels
 from routes.tournament_common import (
@@ -182,6 +183,10 @@ async def delete_tournament_stage(tid: str, stage_id: str, force: bool = False, 
     stage = await db.tournament_stages.find_one({"id": stage_id, "tournament_id": tid}, {"_id": 0})
     if not stage:
         raise HTTPException(status_code=404, detail="Phase nicht gefunden")
+    # Liga-Staffel (#2201): der Spielplan einer gestarteten Staffel bleibt - auch mit force.
+    staffel_problem = await staffel_rebuild_problem(db, tournament)
+    if staffel_problem:
+        raise HTTPException(status_code=409, detail=staffel_problem)
     # Eine Phase mit echten Spielen (#2120): nach dem Ende gar nicht, sonst nur mit Bestätigung samt Zahl.
     finished = tournament_guard.finished_problem(tournament)
     if finished:
@@ -322,6 +327,10 @@ async def generate_tournament_stage_matches(tid: str, stage_id: str, force: bool
     stage = await db.tournament_stages.find_one({"id": stage_id, "tournament_id": tid}, {"_id": 0})
     if not stage:
         raise HTTPException(status_code=404, detail="Phase nicht gefunden")
+    # Liga-Staffel (#2201): der Spielplan einer gestarteten Staffel bleibt - auch mit force.
+    staffel_problem = await staffel_rebuild_problem(db, tournament)
+    if staffel_problem:
+        raise HTTPException(status_code=409, detail=staffel_problem)
     finished = tournament_guard.finished_problem(tournament)
     if finished:
         raise HTTPException(status_code=409, detail=finished)
