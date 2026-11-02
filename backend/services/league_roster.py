@@ -560,11 +560,31 @@ async def _reachable_responsibles(db, registration: dict) -> list[str]:
     return sorted(row["id"] for row in people)
 
 
+async def _tell_id_problem(db, tournament: dict, registration: dict, row: dict) -> None:
+    """Die ID steht im Profil, passt aber nicht (Format, schon vergeben, #2204): Die Person und die Verantwortlichen erfahren, was zu tun
+    ist. Der Grund nennt nie, wem eine ID gehört."""
+    from services.user_notifications import create_user_notification
+
+    name = registration.get("display_name") or tournament.get("title") or "Liga"
+    url = f"/tournaments/{tournament.get('slug') or tournament.get('id')}"
+    meta = {"tournament_id": tournament.get("id"), "reason": "league_id_problem"}
+    await create_user_notification(row["id"], "Spiel-ID prüfen", f"{tournament.get('title') or 'Liga'}: {row['reason']}", url="/profile?tab=gaming",
+                                   kind="tournament_registration", meta={**meta, "dedupe_key": f"league-id-problem:{tournament.get('id')}:{row['id']}"})
+    for user_id in await _reachable_responsibles(db, registration):
+        await create_user_notification(user_id, "Spiel-ID im Co-Team prüfen", f"{name}: {row['name']} – {row['reason']}", url=url,
+                                       kind="tournament_registration", meta={**meta, "dedupe_key": f"league-id-problem-team:{registration.get('id')}:{row['id']}:{user_id}"})
+
+
 async def _tell_missing(db, ctx: RosterContext, tournament: dict, registration: dict, missing: list[dict]) -> None:
     from services.user_notifications import create_user_notification
 
     title = tournament.get("title") or "Liga"
     what = labels(ctx.fields)
+    for row in [row for row in missing if row["state"] in (FORMAT, TAKEN)]:
+        await _tell_id_problem(db, tournament, registration, row)
+    missing = [row for row in missing if row["state"] not in (FORMAT, TAKEN)]
+    if not missing:
+        return
     for row in missing:
         await _tell_player_id_missing(ctx, tournament, row["id"])
     names = ", ".join(row["name"] for row in missing)
@@ -591,6 +611,9 @@ async def _tell_added(db, ctx: RosterContext, tournament: dict, registration: di
 
     name = registration.get("display_name") or tournament.get("title") or "Liga"
     what = labels(ctx.fields)
+    for row in [row for row in rows if row["state"] in (FORMAT, TAKEN)]:
+        await _tell_id_problem(db, tournament, registration, row)
+    rows = [row for row in rows if row["state"] not in (FORMAT, TAKEN)]
     for row in rows:
         if row["state"] == MISSING:
             await _tell_player_id_missing(ctx, tournament, row["id"])

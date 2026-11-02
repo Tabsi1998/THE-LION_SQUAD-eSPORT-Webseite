@@ -283,6 +283,8 @@ async def own_match_tasks(db, user: dict, registrations: list[dict]) -> list[dic
     summaries = await compact_match_overviews(db, [match for _task, match, _when in tasks], acting)
     return [
         {"task": task, "match_id": match.get("id"), "until": when if task == "lineup" else None,
+         # Teilnehmerliste einmal je Spiel (#2204): Der Text der Aufgabe sagt, was fehlt.
+         "series": (tournaments.get(match.get("tournament_id")) or {}).get("lineup_mode") == "series",
          "proposed_at": when if task == "schedule" else None,
          "tournament_title": summary.get("tournament_title"), "opponent_name": summary.get("opponent_name") or ""}
         for (task, match, when), summary in zip(tasks, summaries)

@@ -512,7 +512,7 @@ def _match_task_actions(tasks: list[dict]) -> list[dict]:
         actions.append({
             "id": f"match-{kind}-{task.get('match_id')}",
             "type": "match_schedule" if kind == "schedule" else "match_lineup",
-            "label": "Terminvorschlag beantworten" if kind == "schedule" else "Aufstellung nachtragen",
+            "label": "Terminvorschlag beantworten" if kind == "schedule" else ("Teilnehmerliste nachtragen" if task.get("series") else "Aufstellung nachtragen"),
             "detail": detail or "Liga-Spiel",
             "target_type": "match",
             "target_id": task.get("match_id"),

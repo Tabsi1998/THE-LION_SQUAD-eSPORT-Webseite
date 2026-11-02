@@ -15,7 +15,7 @@ from league_match_world import staffel  # noqa: E402
 from models import now_utc  # noqa: E402
 from squad_world import squad_registration  # noqa: E402
 from test_league_eligibility_flow import born, rules, state_of  # noqa: E402
-from test_league_roster_flow import id_world, roster_entry  # noqa: E402
+from test_league_roster_flow import id_world, roster_entry, set_id  # noqa: E402
 
 ADULT = "1990-05-05"
 
@@ -236,6 +236,22 @@ async def test_lifting_the_wait_needs_a_reason_and_the_right(flow):
     assert log["data"]["reason"] == body["reason"] and log["data"]["user_id"] == w["users"]["Ida"]["id"]
     again = await flow.post(url, json=body)
     assert again.status_code == 409, "es gibt nichts mehr aufzuheben"
+
+
+@pytest.mark.asyncio
+async def test_a_wrong_or_taken_id_gets_its_own_message_without_the_owner(flow):
+    w = await rule_world(flow, unique_game_ids=True)
+    await flow.db.games.update_one({"id": "probe-main"}, {"$set": {"player_id_fields": [
+        {"key": "activision_id", "label": "Activision-ID", "required": True, "pattern": r"[^#]+#\d+", "format_hint": "Name#123"}]}})
+    await set_id(flow, w["users"]["Ida"], "falsch")
+
+    assert (await set_members(flow, w, "squad_a", "Kapitaen", "Mila", "Tom", "Ida")).status_code == 200
+
+    rows = await notes(flow, "league_id_problem")
+    assert w["users"]["Ida"]["id"] in {row["user_id"] for row in rows}
+    assert w["users"]["Kapitaen"]["id"] in {row["user_id"] for row in rows}
+    assert all("Name#123" in row["body"] for row in rows)
+    assert all("Stichtag" not in row["body"] for row in rows)
 
 
 # ---------------------------------------------------------------- Protokoll und Griff von außen

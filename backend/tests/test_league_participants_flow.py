@@ -343,6 +343,19 @@ async def test_the_sweep_leaves_open_deadlines_and_other_formats_alone(flow):
     assert not await flow.db.notifications.find_one({"meta.reason": "lineup_overdue"})
 
 
+@pytest.mark.asyncio
+async def test_the_task_on_the_start_page_says_list_instead_of_lineup(flow):
+    w = await series_world(flow)
+    await confirmed_without_list(flow, w)
+    flow.act_as(w["captain_h"])
+
+    dashboard = await flow.get("/api/mobile/dashboard")
+
+    assert dashboard.status_code == 200, dashboard.text
+    actions = [row for row in dashboard.json()["me"]["actions"] if row["type"] == "match_lineup"]
+    assert [row["label"] for row in actions] == ["Teilnehmerliste nachtragen"]
+
+
 # ---------------------------------------------------------------- Liga-Leitung
 
 
