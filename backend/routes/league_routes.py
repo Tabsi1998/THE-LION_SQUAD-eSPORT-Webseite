@@ -106,7 +106,7 @@ async def admin_list_leagues(me: dict = Depends(require_any_league)):
                      "seasons": [_season_head(season) for season in seasons if season["league_id"] == row["id"]]}
                     for row in rows],
         "games": games,
-        "season_defaults": {key: value for key, value in leagues.SEASON_DEFAULTS.items()
+        "season_defaults": {key: value for key, value in leagues.new_season_settings({}).items()
                             if key not in ("scoring_rules",)},
     }
 

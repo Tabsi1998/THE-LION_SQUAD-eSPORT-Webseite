@@ -63,7 +63,21 @@ SEASON_DEFAULTS: dict = {
     "visibility": "off",
     "status": "draft",
 }
-SEASON_FIELDS = tuple(SEASON_DEFAULTS) + ("name", "slug", "number", "start_date")
+# Spielberechtigung (#2204, docs/LIGA.md Abschnitt 12): Vorgaben nur für **neue** Seasons. Seasons von vorher tragen die Felder nicht
+# und prüfen nichts Neues - darum stehen sie nicht in SEASON_DEFAULTS, die jeder Lesevorgang darüberlegt.
+SEASON_RULE_DEFAULTS: dict = {
+    "max_squad_size": 50,
+    "one_team_per_season": True,
+    "new_player_wait_days": 7,
+    "transfer_windows": [],
+    "min_age": 18,
+    "unique_game_ids": True,
+    "lineup_mode": "series",
+    "lineup_min_players": 3,
+}
+NEW_SEASON_MIN_SQUAD = 3
+SERIES = "series"
+SEASON_FIELDS = tuple(SEASON_DEFAULTS) + tuple(SEASON_RULE_DEFAULTS) + ("name", "slug", "number", "start_date")
 OVERRIDE_FIELDS = ("best_of", "team_size", "min_squad_size", "max_staffel_size", "scoring_rules",
                    "match_schedule_response_hours")
 # Seasons von vor #2106 tragen keine Antwortfrist: dann behält jede Staffel ihre eigene (``staffel_fields``).
@@ -220,9 +234,40 @@ def _blocked_periods(periods) -> list[dict]:
     return sorted(out, key=lambda item: (item["start_date"], item["end_date"]))
 
 
-def _check_squad(team_size: int, min_squad: int | None, where: str) -> None:
-    if min_squad is not None and int(min_squad) < int(team_size):
+def _check_squad(settings: dict, where: str) -> None:
+    """Je Map braucht es mindestens die Teamgröße im Kader; mit Teilnehmerliste die Mindestzahl der Liste (#2204)."""
+    min_squad, team_size = settings.get("min_squad_size"), int(settings.get("team_size") or 1)
+    if min_squad is None:
+        return
+    if settings.get("lineup_mode") == SERIES:
+        players = int(settings.get("lineup_min_players") or 1)
+        if int(min_squad) < players:
+            raise LeagueProblem(f"{where}: Der Mindestkader ({min_squad}) ist kleiner als die Mindestzahl der Teilnehmerliste ({players}).")
+    elif int(min_squad) < team_size:
         raise LeagueProblem(f"{where}: Der Mindestkader ({min_squad}) ist kleiner als die Teamgröße ({team_size}).")
+    most = settings.get("max_squad_size")
+    if most is not None and int(most) < int(min_squad):
+        raise LeagueProblem(f"{where}: Der Höchstkader ({most}) ist kleiner als der Mindestkader ({min_squad}).")
+
+
+def _transfer_windows(windows) -> list[dict]:
+    out = []
+    for window in windows or []:
+        item = window.model_dump() if hasattr(window, "model_dump") else dict(window)
+        if str(item["end_date"]) < str(item["start_date"]):
+            raise LeagueProblem("Transferfenster: Das Ende liegt vor dem Beginn.")
+        label = _text(item.get("label"))
+        out.append({"start_date": item["start_date"], "end_date": item["end_date"], **({"label": label} if label else {})})
+    return sorted(out, key=lambda item: (item["start_date"], item["end_date"]))
+
+
+def new_season_settings(fields: dict) -> dict:
+    """Vorgaben einer neuen Season: die Regeln plus der Mindestkader, der zu ihrem Modus passt."""
+    settings = {**SEASON_DEFAULTS, **SEASON_RULE_DEFAULTS, **fields}
+    if settings.get("min_squad_size") is None:
+        settings["min_squad_size"] = (max(NEW_SEASON_MIN_SQUAD, int(settings["lineup_min_players"]))
+                                      if settings["lineup_mode"] == SERIES else int(settings["team_size"]))
+    return settings
 
 
 def clean_season(raw: dict, existing: dict | None, game: dict | None) -> dict:
@@ -247,13 +292,15 @@ def clean_season(raw: dict, existing: dict | None, game: dict | None) -> dict:
             value = _mode_order(game, value, (existing or {}).get("game_mode_order"))
         elif key == "scoring_rules":
             value = _scoring(value)
+        elif key == "transfer_windows":
+            value = _transfer_windows(value)
         out[key] = value
-    if out.get("team_size") and out.get("min_squad_size") is None and existing and \
+    mode = out.get("lineup_mode") or (existing or {}).get("lineup_mode")
+    if mode != SERIES and out.get("team_size") and out.get("min_squad_size") is None and existing and \
             int(existing.get("min_squad_size") or 0) < int(out["team_size"]):
         out["min_squad_size"] = int(out["team_size"])  # der Mindestkader wächst mit der Teamgröße mit
-    merged = {**SEASON_DEFAULTS, **(existing or {}), **out}
-    team_size = int(merged.get("team_size") or 1)
-    _check_squad(team_size, merged.get("min_squad_size"), "Season")
+    merged = {**SEASON_DEFAULTS, **existing, **out} if existing else new_season_settings(out)
+    _check_squad(merged, "Season")
     if merged.get("slug") in RESERVED_SLUGS:
         raise LeagueProblem("Diese Kurzadresse ist reserviert - bitte eine andere wählen.")
     return out
@@ -265,7 +312,7 @@ def clean_overrides(raw: dict | None, season: dict) -> dict:
     if "scoring_rules" in out:
         out["scoring_rules"] = _scoring(out["scoring_rules"])
     merged = effective_settings(season, {"overrides": out})
-    _check_squad(merged["team_size"], merged["min_squad_size"], "Liga N")
+    _check_squad(merged, "Liga N")
     return out
 
 
@@ -277,8 +324,9 @@ def effective_settings(season: dict, division: dict | None) -> dict:
             merged[key] = value
     merged["team_size"] = int(merged.get("team_size") or 1)
     own_min = ((division or {}).get("overrides") or {}).get("min_squad_size")
-    if merged.get("min_squad_size") is None or (own_min is None and merged["min_squad_size"] < merged["team_size"]):
-        # Der Mindestkader der Season wächst mit einer größeren Teamgröße der Liga N mit.
+    if merged.get("min_squad_size") is None or (
+            own_min is None and merged.get("lineup_mode") != SERIES and merged["min_squad_size"] < merged["team_size"]):
+        # Der Mindestkader der Season wächst mit einer größeren Teamgröße der Liga N mit - nicht mit Teilnehmerliste (#2204).
         merged["min_squad_size"] = merged["team_size"]
     if not merged.get("scoring_rules"):
         merged["scoring_rules"] = normalize_rules({})
@@ -334,6 +382,11 @@ def staffel_fields(league: dict, season: dict, division: dict) -> dict:
         "map_repeat": settings.get("map_repeat") or "other_mode",
         "lineup_amend_hours": settings["lineup_amend_hours"],
     }
+    # Teilnehmerliste (#2204): nur, wenn die Season die Regel trägt - ohne Feld bleibt die Staffel bei der Aufstellung je Map.
+    if settings.get("lineup_mode"):
+        fields["lineup_mode"] = settings["lineup_mode"]
+        if settings["lineup_mode"] == SERIES:
+            fields["lineup_min_players"] = int(settings.get("lineup_min_players") or SEASON_RULE_DEFAULTS["lineup_min_players"])
     # Antwortfrist (#2106, F3): nur, wenn Season oder Liga N sie wirklich tragen - eine ältere Season ohne den Wert
     # überschreibt die Frist ihrer Staffeln nicht mit der Vorgabe.
     if settings.get(RESPONSE_HOURS) is not None:
@@ -352,7 +405,7 @@ SYNC_GROUPS: dict[str, tuple[str, ...]] = {
                      "max_participants"),
     # Teamgröße und Mindestkader gehen immer gemeinsam - so bleibt min_squad_size ≥ team_size am Turnier.
     "before_result": ("best_of", "team_size", "min_squad_size", "scoring_rules", "game_mode_order", "map_repeat",
-                      "result_confirm_hours_league", "lineup_amend_hours"),
+                      "result_confirm_hours_league", "lineup_amend_hours", "lineup_mode", "lineup_min_players"),
 }
 SYNC_GROUP_LABELS = {
     "always": "Sichtbarkeit und Regeltext",
@@ -580,11 +633,9 @@ async def create_season(db, league: dict, body: dict, user: dict) -> dict:
     slug = fields.pop("slug", None) or slugify(name, fallback=f"season-{number}", max_length=80)
     await _season_unique(db, league["id"], None, number, slug)
     look = await _look(db, {key: value for key, value in body.items() if value is not None}, league_look.SEASON_FIELDS)
-    doc = {**SEASON_DEFAULTS, **fields, **look}
+    doc = {**new_season_settings(fields), **look}
     if doc.get("scoring_rules") is None:
         doc["scoring_rules"] = normalize_rules({})
-    if doc.get("min_squad_size") is None:
-        doc["min_squad_size"] = int(doc["team_size"])
     doc.update({"id": new_id(), "league_id": league["id"], "number": number, "name": name, "slug": slug,
                 "created_at": _now(), "created_by": user["id"], "updated_at": _now()})
     try:
@@ -601,7 +652,7 @@ async def update_season(db, season: dict, body: dict) -> tuple[dict, list[str]]:
     for key in ("name", "slug", "number", "start_date", "weeks_total", "matchday_days", "default_match_weekday",
                 "default_match_time", "round_robin_legs", "max_staffel_size", "best_of", "team_size",
                 "min_squad_size", "result_confirm_hours", "lineup_amend_hours", "visibility", "status", "map_repeat",
-                RESPONSE_HOURS):
+                RESPONSE_HOURS, *SEASON_RULE_DEFAULTS):
         if key in fields and fields[key] is None:
             fields.pop(key)  # Pflichtfelder bleiben, wie sie sind
     if "scoring_rules" in fields and fields["scoring_rules"] is None:

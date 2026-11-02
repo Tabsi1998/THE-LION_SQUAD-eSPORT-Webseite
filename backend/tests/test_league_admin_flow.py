@@ -86,7 +86,7 @@ async def test_a_season_starts_with_the_documented_defaults(flow):
     assert season["weeks_total"] == 10 and season["matchday_days"] == 7
     assert season["default_match_weekday"] == 6 and season["default_match_time"] == "20:00"
     assert season["round_robin_legs"] == 1 and season["max_staffel_size"] == 8
-    assert season["best_of"] == 3 and season["team_size"] == 4 and season["min_squad_size"] == 4
+    assert season["best_of"] == 3 and season["team_size"] == 4 and season["min_squad_size"] == 3
     assert season["result_confirm_hours"] == 48 and season["lineup_amend_hours"] == 48
     assert season["visibility"] == "off" and season["status"] == "draft"
     assert season["scoring_rules"] == normalize_rules({})
@@ -146,7 +146,7 @@ async def test_creating_a_staffel_copies_every_setting_into_the_tournament(flow)
 
 @pytest.mark.asyncio
 async def test_division_overrides_win_over_the_season(flow):
-    _admin, _game, _league, season, _division, _maps = await setup_league(flow)
+    _admin, _game, _league, season, _division, _maps = await setup_league(flow, season={"lineup_mode": "per_map"})
     second = await flow.post(f"{ADMIN}/seasons/{season['id']}/divisions", json={
         "nickname": "Elite", "overrides": {"best_of": 5, "team_size": 5, "max_staffel_size": 6,
                                            "scoring_rules": {"match_points": {"win": 2, "draw": 1, "loss": 0}}}})
@@ -269,7 +269,7 @@ async def test_sync_refuses_a_calendar_that_no_longer_fits(flow):
 
 @pytest.mark.asyncio
 async def test_season_input_is_checked(flow):
-    _admin, _game, league, season, _division, _maps = await setup_league(flow)
+    _admin, _game, league, season, _division, _maps = await setup_league(flow, season={"lineup_mode": "per_map"})
     url = f"{ADMIN}/seasons/{season['id']}"
     response = await flow.patch(url, json={"best_of": 4})
     assert response.status_code == 422

@@ -92,9 +92,12 @@ def is_active_squad(squad: dict | None) -> bool:
 
 def min_squad_size(tournament: dict) -> int:
     """Mindestkader: das Feld ``min_squad_size`` der Staffel (der Liga-Rahmen kopiert es aus Season bzw. Liga N), sonst
-    die Teamgröße des Turniers - nie kleiner als sie. Der Turnierkern liest nur das Turnier, nie die Season."""
+    die Teamgröße des Turniers - nie kleiner als sie, außer mit Teilnehmerliste (#2204): Dort ist die Teamgröße nur die
+    Sollstärke. Der Turnierkern liest nur das Turnier, nie die Season."""
     team_size = _positive_int(tournament.get("team_size")) or 1
     value = _positive_int(tournament.get("min_squad_size"))
+    if tournament.get("lineup_mode") == "series":
+        return value or team_size
     return max(value or team_size, team_size)
 
 

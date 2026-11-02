@@ -2441,6 +2441,15 @@ class LeagueUpdate(LeagueLookFields):
     accent_color: Optional[str] = Field(default=None, max_length=9)
 
 
+class LeagueTransferWindow(BaseModel):
+    """Ein Transferfenster einer Season (#2204): Wiener Kalendertage."""
+    start_date: str
+    end_date: str
+    label: Optional[str] = Field(default=None, max_length=60)
+
+    _days = field_validator("start_date", "end_date", mode="before")(_calendar_day)
+
+
 class LeagueSeasonFields(LeagueLookFields):
     """Die Vorgaben einer Season (docs/LIGA.md, Abschnitt 2 und 3) - gemeinsam für Anlegen und Ändern. Dazu die
     Gestaltung (#2107): Emblem und Banner überschreiben die der Liga, ``prizes`` sind die Gewinne der Season."""
@@ -2458,6 +2467,15 @@ class LeagueSeasonFields(LeagueLookFields):
     best_of: Optional[Literal[1, 3, 5, 7]] = None
     team_size: Optional[int] = Field(default=None, ge=1, le=20)
     min_squad_size: Optional[int] = Field(default=None, ge=1, le=40)
+    # Spielberechtigung (#2204, docs/LIGA.md Abschnitt 12).
+    max_squad_size: Optional[int] = Field(default=None, ge=1, le=200)
+    one_team_per_season: Optional[bool] = None
+    new_player_wait_days: Optional[int] = Field(default=None, ge=0, le=60)
+    transfer_windows: Optional[List[LeagueTransferWindow]] = Field(default=None, max_length=10)
+    min_age: Optional[int] = Field(default=None, ge=0, le=99)
+    unique_game_ids: Optional[bool] = None
+    lineup_mode: Optional[Literal["series", "per_map"]] = None
+    lineup_min_players: Optional[int] = Field(default=None, ge=1, le=20)
     game_mode_order: Optional[List[str]] = Field(default=None, max_length=7)
     # Map-Wiederholung in einer Serie (#2096): nie, nur in anderem Modus (Vorgabe) oder immer.
     map_repeat: Optional[Literal["never", "other_mode", "always"]] = None
