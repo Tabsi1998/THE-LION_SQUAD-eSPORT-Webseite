@@ -7,6 +7,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { Link } from "react-router-dom";
 import { GameServerIcon } from "@/components/tls/GameServerIcon";
+import { ImageUpload } from "@/components/tls/ImageUpload";
 import { serverResourceLabels } from "@/lib/serverResources";
 import { viennaDateTime } from "@/lib/vienna";
 import { gameOptionLabel, selectableGames } from "@/lib/gameLabels";
@@ -53,8 +54,8 @@ const emptyForm = {
 
 const statusLabels = { online: "Online", offline: "Offline", maintenance: "Wartung", planned: "Geplant" };
 const visibilityLabels = { public: "Öffentlich", community: "Nur eingeloggte Community", members: "Nur Vereinsmitglieder", internal: "Intern / versteckt" };
-const syncLabels = { auto_public: "Automatisch erkennen", amp: "AMP-Panel", minecraft: "Minecraft Query", steam_a2s: "Steam/A2S Query", rcon: "TCP / RCON erreichbar", manual: "Manuelle Pflege" };
-const secretLabels = { none: "Kein Kennwort", password: "Passwort", invite_code: "Invite-Code", whitelist: "Whitelist / Freischaltung", discord: "Im Discord" };
+const syncLabels = { auto_public: "Automatisch erkennen", amp: "AMP-Panel", minecraft: "Minecraft-Server abfragen", steam_a2s: "Steam-Server abfragen", rcon: "Nur prüfen, ob erreichbar", manual: "Von Hand pflegen" };
+const secretLabels = { none: "Kein Kennwort", password: "Passwort", invite_code: "Einladungscode", whitelist: "Freischaltung nötig", discord: "Im Discord" };
 const modeLabels = { auto: "Automatisch", maintenance: "Wartung", planned: "Geplant" };
 
 function syncText(server) {
@@ -155,7 +156,13 @@ export default function AdminGameServersPage() {
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(null);
   const [diagnostics, setDiagnostics] = useState({});
+  // Der Knopf für die Demo-Startliste gehört in Testumgebungen (#2129, SP6) - das sagt der Server.
+  const [demoTools, setDemoTools] = useState(false);
   const confirm = useConfirm();
+
+  useEffect(() => {
+    api.get("/game-servers/admin/meta").then(({ data }) => setDemoTools(data?.demo_tools === true)).catch(() => setDemoTools(false));
+  }, []);
 
   const load = useCallback(() => {
     api.get("/game-servers/admin").then(({ data }) => setServers(data || [])).catch(() => setServers([]));
@@ -219,8 +226,12 @@ export default function AdminGameServersPage() {
 
   const remove = async (server) => {
     if (!await confirm({ title: "Server löschen?", description: `${server.name} wird dauerhaft entfernt.`, confirmLabel: "Löschen" })) return;
-    await api.delete(`/game-servers/${server.id}`);
-    toast.success("Server gelöscht.");
+    try {
+      await api.delete(`/game-servers/${server.id}`);
+      toast.success("Server gelöscht.");
+    } catch (e) {
+      toast.error(formatApiError(e.response?.data?.detail) || "Server konnte nicht gelöscht werden.");
+    }
     load();
   };
 
@@ -228,11 +239,11 @@ export default function AdminGameServersPage() {
     setSyncing(server.id);
     try {
       const { data } = await api.post(`/game-servers/${server.id}/sync`);
-      if (data.ok) toast.success("Serverdaten synchronisiert.");
-      else toast("Sync geprüft. Hinweis wurde am Server gespeichert.");
+      if (data.ok) toast.success("Serverdaten aktualisiert.");
+      else toast.error("Abruf fehlgeschlagen – der Grund steht am Server.");
       load();
     } catch (e) {
-      toast.error(formatApiError(e.response?.data?.detail) || "Sync fehlgeschlagen.");
+      toast.error(formatApiError(e.response?.data?.detail) || "Abruf fehlgeschlagen.");
     } finally {
       setSyncing(null);
     }
@@ -242,11 +253,11 @@ export default function AdminGameServersPage() {
     setSyncing("all");
     try {
       const { data } = await api.post("/game-servers/sync");
-      if (data.failed) toast(`${data.failed} von ${data.processed} Servern haben einen Sync-Hinweis bekommen.`);
-      else toast.success(`${data.processed} Server synchronisiert.`);
+      if (data.failed) toast.error(`${data.failed} von ${data.processed} Servern ließen sich nicht abrufen – der Grund steht am Server.`);
+      else toast.success(`${data.processed} Server aktualisiert.`);
       load();
     } catch (e) {
-      toast.error(formatApiError(e.response?.data?.detail) || "Sync fehlgeschlagen.");
+      toast.error(formatApiError(e.response?.data?.detail) || "Abruf fehlgeschlagen.");
     } finally {
       setSyncing(null);
     }
@@ -258,10 +269,10 @@ export default function AdminGameServersPage() {
       const { data } = await api.get(`/game-servers/${server.id}/diagnostics`);
       setDiagnostics((prev) => ({ ...prev, [server.id]: data }));
       const reachable = (data.candidates || []).some((item) => item.tcp_ok);
-      if (reachable) toast.success("Diagnose fertig: mindestens eine Adresse erreichbar.");
-      else toast("Diagnose fertig: keine Adresse vom Backend erreichbar.");
+      if (reachable) toast.success("Verbindungstest fertig: mindestens eine Adresse ist erreichbar.");
+      else toast.error("Verbindungstest fertig: die Website erreicht keine der Adressen.");
     } catch (e) {
-      toast.error(formatApiError(e.response?.data?.detail) || "Diagnose fehlgeschlagen.");
+      toast.error(formatApiError(e.response?.data?.detail) || "Verbindungstest fehlgeschlagen.");
     } finally {
       setSyncing(null);
     }
@@ -303,18 +314,20 @@ export default function AdminGameServersPage() {
     <AdminLayout>
       <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4 mb-6">
         <div className="min-w-0">
-          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Community</span>
+          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">eSports</span>
           <h1 className="font-heading text-2xl sm:text-3xl md:text-4xl font-black uppercase mt-1 break-words">Game-Server</h1>
           <p className="mt-2 text-white/60 text-sm max-w-2xl">
-            Server sichtbar pflegen, Zugriff steuern und Live-Werte automatisch über öffentliche Game-Server-Abfragen synchronisieren.
+            Server pflegen und festlegen, wer sie sieht. Status und Spielerzahl holt sich die Website automatisch vom Server.
           </p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 xl:flex gap-2 w-full xl:w-auto">
-          <button onClick={removeSeededDefaults} className="w-full sm:w-auto px-4 py-2.5 border border-[#FFD700]/45 text-[#FFD700] rounded-sm font-bold uppercase tracking-wider">
-            Demo-Startliste
-          </button>
-          <button onClick={syncAll} disabled={syncing === "all"} className="w-full sm:w-auto px-4 py-2.5 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm font-bold uppercase tracking-wider inline-flex items-center justify-center gap-2 disabled:opacity-50">
-            <RefreshCw className={`w-4 h-4 ${syncing === "all" ? "animate-spin" : ""}`} /> Alle syncen
+          {demoTools ? (
+            <button onClick={removeSeededDefaults} data-testid="server-demo-remove" className="w-full sm:w-auto px-4 py-2.5 border border-[#FFD700]/45 text-[#FFD700] rounded-sm font-bold uppercase tracking-wider">
+              Demo-Startliste
+            </button>
+          ) : null}
+          <button onClick={syncAll} disabled={syncing === "all"} data-testid="server-sync-all" className="w-full sm:w-auto px-4 py-2.5 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm font-bold uppercase tracking-wider inline-flex items-center justify-center gap-2 disabled:opacity-50">
+            <RefreshCw className={`w-4 h-4 ${syncing === "all" ? "animate-spin" : ""}`} /> Alle aktualisieren
           </button>
           <button onClick={startCreate} className="w-full sm:w-auto px-5 py-2.5 bg-[#29B6E8] text-black rounded-sm font-bold uppercase tracking-wider inline-flex items-center justify-center gap-2">
             <Plus className="w-4 h-4" /> Server anlegen
@@ -343,7 +356,7 @@ export default function AdminGameServersPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
             <Field label="Name" value={form.name} onChange={(v) => set("name", v)} required />
-            <Field label="Slug" value={form.slug} onChange={(v) => set("slug", v)} placeholder="automatisch wenn leer" />
+            <Field label="Kurzadresse" value={form.slug} onChange={(v) => set("slug", v)} placeholder="automatisch wenn leer" />
             <label className="block">
               <span className="text-[11px] uppercase tracking-widest text-white/45 font-bold">Spiel-Verknüpfung</span>
               <select value={form.game_id} onChange={(e) => set("game_id", e.target.value)} className="mt-1 w-full bg-[#0A0A0A] border border-white/10 rounded-sm px-3 py-2 text-sm">
@@ -352,7 +365,7 @@ export default function AdminGameServersPage() {
                 {selectableGames(games, form.game_id).map((game) => <option key={game.id} value={game.id}>{gameOptionLabel(game)}</option>)}
               </select>
             </label>
-            <Field label="Spielname fallback" value={form.game_name} onChange={(v) => set("game_name", v)} placeholder="z.B. Rust" />
+            <Field label="Spielname ohne Verknüpfung" value={form.game_name} onChange={(v) => set("game_name", v)} placeholder="z.B. Rust" />
             <label className="block">
               <span className="text-[11px] uppercase tracking-widest text-white/45 font-bold">Betrieb</span>
               <div className="mt-1 grid grid-cols-3 gap-1 rounded-sm border border-white/10 bg-[#0A0A0A] p-1">
@@ -375,7 +388,7 @@ export default function AdminGameServersPage() {
               </select>
             </label>
             <Field label="Adresse" value={form.address} onChange={(v) => set("address", v)} placeholder="gameserver.lionsquad.at:25565" />
-            <Field label="Connect-Link" value={form.connect_url} onChange={(v) => set("connect_url", v)} placeholder="steam://connect/..." />
+            <Field label="Link zum Verbinden" value={form.connect_url} onChange={(v) => set("connect_url", v)} placeholder="steam://connect/..." />
             <label className="block">
               <span className="text-[11px] uppercase tracking-widest text-white/45 font-bold">Zugang</span>
               <select value={form.access_secret_kind} onChange={(e) => set("access_secret_kind", e.target.value)} className="mt-1 w-full bg-[#0A0A0A] border border-white/10 rounded-sm px-3 py-2 text-sm">
@@ -383,7 +396,7 @@ export default function AdminGameServersPage() {
               </select>
             </label>
             {form.access_secret_kind !== "none" && form.access_secret_kind !== "whitelist" && form.access_secret_kind !== "discord" && (
-              <Field label={form.access_secret_kind === "invite_code" ? "Invite-Code / neuer Code" : "Passwort / neues Passwort"} type="password" value={form.access_secret} onChange={(v) => set("access_secret", v)} placeholder={editing?.has_access_secret ? "gespeichert, leer lassen" : ""} />
+              <Field label={form.access_secret_kind === "invite_code" ? "Einladungscode / neuer Code" : "Passwort / neues Passwort"} type="password" value={form.access_secret} onChange={(v) => set("access_secret", v)} placeholder={editing?.has_access_secret ? "gespeichert, leer lassen" : ""} />
             )}
             {form.access_secret_kind !== "none" && (
               <Field label="Zugangs-Hinweis" value={form.access_label} onChange={(v) => set("access_label", v)} placeholder="z.B. Code im Discord, Passwort kopieren" />
@@ -398,31 +411,43 @@ export default function AdminGameServersPage() {
                 <p className="text-xs text-white/55">Das Logo des ausgewählten Spiels wird automatisch übernommen. Ein eigenes Server-Icon hat Vorrang. Ohne Bild erscheint das Server-Symbol.</p>
                 <Link to="/admin/games" className="text-xs text-[#29B6E8] underline">Spiele und Logos verwalten</Link>
               </div>
-              <Field label="Eigenes Server-Icon (optional)" value={form.server_icon_url} onChange={(v) => set("server_icon_url", v)} placeholder="leer = Spielelogo" />
+              <div className="w-full sm:w-72" data-testid="server-icon-upload">
+                <ImageUpload value={form.server_icon_url} onChange={(value) => set("server_icon_url", value || "")} label="Eigenes Server-Icon (optional)" testId="server-icon" variant="square"
+                  endpoint="/uploads/logo?trim_empty_borders=false" allowLibrary logo logoPreview={false} />
+              </div>
             </div>
             <Field label="Karten-Link" value={form.map_url} onChange={(v) => set("map_url", v)} placeholder="Dynmap, BattleMetrics, Karte..." />
             <Field label="Externe Statusseite" value={form.external_status_url} onChange={(v) => set("external_status_url", v)} placeholder="z.B. BattleMetrics/Serverliste" />
             <label className="block">
-              <span className="text-[11px] uppercase tracking-widest text-white/45 font-bold">Sync-Quelle</span>
+              <span className="text-[11px] uppercase tracking-widest text-white/45 font-bold">Live-Daten von</span>
               <select value={form.sync_provider} onChange={(e) => set("sync_provider", e.target.value)} className="mt-1 w-full bg-[#0A0A0A] border border-white/10 rounded-sm px-3 py-2 text-sm">
                 {Object.entries(syncLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
               </select>
               {form.sync_provider === "amp" && <span className="mt-1 block text-xs text-white/45" data-testid="amp-sync-hint">Den Zugang zum Panel trägst du oben unter „AMP-Panel“ ein.</span>}
             </label>
-            {form.sync_provider !== "manual" && (
-              <>
-                <Field label="Interne Sync-Adresse" value={form.query_host} onChange={(v) => set("query_host", v)} placeholder="leer = öffentliche Adresse, z.B. host.docker.internal" />
-                <Field label="AMP-Instanz" value={form.amp_instance} onChange={(v) => set("amp_instance", v)} placeholder="Name oder ID der Instanz im AMP-Panel" />
-                <Field label="Sync-Port" type="number" value={form.query_port} onChange={(v) => set("query_port", v)} placeholder="z.B. 25565" />
-              </>
+            {form.sync_provider === "amp" && (
+              <Field label="AMP-Instanz" value={form.amp_instance} onChange={(v) => set("amp_instance", v)} placeholder="Name oder ID der Instanz im AMP-Panel" />
             )}
-            {form.sync_provider === "rcon" && (
-              <Field label="RCON-Port" type="number" value={form.rcon_port} onChange={(v) => set("rcon_port", v)} />
+            {/* Technik (#2129, SP6): nur nötig, wenn die Abfrage von selbst nicht klappt - deshalb eingeklappt. */}
+            {form.sync_provider !== "manual" && (
+              <details className="md:col-span-2 xl:col-span-4 border border-white/10 rounded-sm p-3" data-testid="server-technik">
+                <summary className="cursor-pointer select-none text-[11px] uppercase tracking-widest text-white/60 font-bold">Technik – nur nötig, wenn das Abrufen nicht klappt</summary>
+                <div className="mt-3 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                  <Field label="Abfrage-Adresse" value={form.query_host} onChange={(v) => set("query_host", v)} placeholder="leer = die Adresse oben" />
+                  <Field label="Abfrage-Port" type="number" value={form.query_port} onChange={(v) => set("query_port", v)} placeholder="z.B. 25565" />
+                  {form.sync_provider === "rcon" && (
+                    <Field label="RCON-Port" type="number" value={form.rcon_port} onChange={(v) => set("rcon_port", v)} />
+                  )}
+                  {form.sync_provider !== "amp" && (
+                    <Field label="AMP-Instanz" value={form.amp_instance} onChange={(v) => set("amp_instance", v)} placeholder="nur für das AMP-Panel" />
+                  )}
+                </div>
+              </details>
             )}
             {form.sync_provider === "manual" && (
               <>
                 <div className="block">
-                  <span className="text-[11px] uppercase tracking-widest text-white/45 font-bold">Manueller Live-Status</span>
+                  <span className="text-[11px] uppercase tracking-widest text-white/45 font-bold">Status von Hand</span>
                   <div className="mt-1 grid grid-cols-2 gap-1 rounded-sm border border-white/10 bg-[#0A0A0A] p-1">
                     {["online", "offline"].map((value) => (
                       <button
@@ -522,8 +547,8 @@ export default function AdminGameServersPage() {
                 </div>
               </div>
               <div className="grid grid-cols-4 sm:flex gap-1 shrink-0 w-full sm:w-auto">
-                <button onClick={() => syncOne(server)} disabled={syncing === server.id || server.sync_provider === "manual"} title="Live-Daten synchronisieren" className="min-h-10 inline-flex items-center justify-center p-2 border border-white/10 sm:border-transparent rounded-sm text-white/45 hover:text-[#29B6E8] disabled:opacity-30"><RefreshCw className={`w-4 h-4 ${syncing === server.id ? "animate-spin" : ""}`} /></button>
-                <button onClick={() => diagnose(server)} disabled={syncing === `${server.id}:diagnose`} title="Netzwerkdiagnose" className="min-h-10 inline-flex items-center justify-center p-2 border border-white/10 sm:border-transparent rounded-sm text-white/45 hover:text-[#FFD700] disabled:opacity-30"><Network className={`w-4 h-4 ${syncing === `${server.id}:diagnose` ? "animate-pulse" : ""}`} /></button>
+                <button onClick={() => syncOne(server)} disabled={syncing === server.id || server.sync_provider === "manual"} title="Live-Daten jetzt abrufen" className="min-h-10 inline-flex items-center justify-center p-2 border border-white/10 sm:border-transparent rounded-sm text-white/45 hover:text-[#29B6E8] disabled:opacity-30"><RefreshCw className={`w-4 h-4 ${syncing === server.id ? "animate-spin" : ""}`} /></button>
+                <button onClick={() => diagnose(server)} disabled={syncing === `${server.id}:diagnose`} title="Verbindung testen" className="min-h-10 inline-flex items-center justify-center p-2 border border-white/10 sm:border-transparent rounded-sm text-white/45 hover:text-[#FFD700] disabled:opacity-30"><Network className={`w-4 h-4 ${syncing === `${server.id}:diagnose` ? "animate-pulse" : ""}`} /></button>
                 <button onClick={() => startEdit(server)} title="Bearbeiten" className="min-h-10 inline-flex items-center justify-center p-2 border border-white/10 sm:border-transparent rounded-sm text-white/45 hover:text-[#29B6E8]"><Pencil className="w-4 h-4" /></button>
                 <button onClick={() => remove(server)} title="Löschen" className="min-h-10 inline-flex items-center justify-center p-2 border border-white/10 sm:border-transparent rounded-sm text-white/45 hover:text-[#FF3B30]"><Trash2 className="w-4 h-4" /></button>
               </div>
@@ -531,8 +556,8 @@ export default function AdminGameServersPage() {
             <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2 text-xs">
               <Info label="Adresse" value={server.address || "-"} />
               <Info label="Spieler" value={`${server.player_count || 0}${server.max_players != null ? `/${server.max_players}` : ""}`} />
-              <Info label="Sync" value={syncText(server)} />
-              <Info label="Letzter Sync" value={server.last_sync_at ? viennaDateTime(server.last_sync_at) : "noch nie"} />
+              <Info label="Live-Daten" value={syncText(server)} />
+              <Info label="Zuletzt abgerufen" value={server.last_sync_at ? viennaDateTime(server.last_sync_at) : "noch nie"} />
             </div>
             <div className="mt-3 grid grid-cols-3 sm:flex sm:flex-wrap gap-2">
               {Object.entries(modeLabels).map(([mode, label]) => (
@@ -548,7 +573,7 @@ export default function AdminGameServersPage() {
               ))}
             </div>
             {server.last_sync_note && <div className="mt-3 border border-[#FFD700]/25 bg-[#FFD700]/10 text-[#FFD700] rounded-sm px-3 py-2 text-xs">{server.last_sync_note}</div>}
-            {server.last_sync_error && <div className="mt-3 border border-[#FF3B30]/30 bg-[#FF3B30]/10 text-[#FF8A80] rounded-sm px-3 py-2 text-xs">{server.last_sync_error}</div>}
+            {server.last_sync_error && <div role="alert" data-testid={`server-sync-error-${server.slug || server.id}`} className="mt-3 border border-[#FF3B30]/30 bg-[#FF3B30]/10 text-[#FF8A80] rounded-sm px-3 py-2 text-xs break-words">Letzter Abruf fehlgeschlagen: {server.last_sync_error}</div>}
             {diagnostics[server.id] && <DiagnosticsPanel data={diagnostics[server.id]} />}
             {server.description && <p className="mt-3 text-sm text-white/55 line-clamp-2">{server.description}</p>}
           </article>
@@ -561,7 +586,7 @@ export default function AdminGameServersPage() {
 function DiagnosticsPanel({ data }) {
   return (
     <div className="mt-3 border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm p-3 text-xs min-w-0">
-      <div className="font-bold uppercase tracking-widest text-[#FFD700]">Netzwerkdiagnose</div>
+      <div className="font-bold uppercase tracking-widest text-[#FFD700]">Verbindungstest</div>
       <div className="mt-2 text-white/60 break-words">{data.recommendation}</div>
       <div className="mt-3 space-y-2">
         {(data.candidates || []).map((item, index) => (

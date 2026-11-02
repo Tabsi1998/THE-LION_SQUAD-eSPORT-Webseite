@@ -185,7 +185,7 @@ export default function AdminGamesPage() {
           ) : null}
           <table className="w-full text-sm">
             <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
-              <tr><th className="text-left px-4 py-3">Name</th><th className="text-left px-4 py-3">Typ</th><th className="text-left px-4 py-3">ID-Quelle</th><th></th></tr>
+              <tr><th className="text-left px-4 py-3">Name</th><th className="hidden md:table-cell text-left px-4 py-3">Typ</th><th className="hidden md:table-cell text-left px-4 py-3">ID-Quelle</th><th></th></tr>
             </thead>
             <tbody className="divide-y divide-white/5">
               {shown.map((g) => (
@@ -196,8 +196,8 @@ export default function AdminGamesPage() {
                     {gameLabel(g) !== g.name && <div className="mt-0.5 text-[10px] uppercase tracking-widest text-white/35">Version: {g.name}</div>}
                     {g.discord_guild_id && servers.length ? <div className="mt-0.5 text-[10px] uppercase tracking-widest text-[#8EA1FF]" data-testid={`game-discord-${g.slug}`}>Discord: {servers.find((server) => server.guild_id === g.discord_guild_id)?.name || g.discord_guild_id}</div> : null}
                   </td>
-                  <td className="px-4 py-3 text-white/60">{GAME_KIND_OPTIONS.find(([v]) => v === (g.kind || "standalone"))?.[1] || "Einzelspiel"}</td>
-                  <td className="px-4 py-3 text-white/60">{g.identity_source_game?.display_name || g.identity_source_game?.name || (g.inherit_player_ids !== false && (g.parent_game?.display_name || g.parent_game?.name)) || "Eigene IDs"}</td>
+                  <td className="hidden md:table-cell px-4 py-3 text-white/60">{GAME_KIND_OPTIONS.find(([v]) => v === (g.kind || "standalone"))?.[1] || "Einzelspiel"}</td>
+                  <td className="hidden md:table-cell px-4 py-3 text-white/60">{g.identity_source_game?.display_name || g.identity_source_game?.name || (g.inherit_player_ids !== false && (g.parent_game?.display_name || g.parent_game?.name)) || "Eigene IDs"}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="inline-flex items-center gap-2">
                       {/* Map-Bibliothek (#1616): Maps mit Bild und Modi für Pools in Turnieren und Saisons. */}
