@@ -108,9 +108,9 @@ Admin, bei 1440 und 375 px. `liga-abnahme.spec.js` (Stand aus `seed_abnahme_liga
 `ABNAHME_STATE=…/state-liga.json`): Verwaltung „Liga“, Season mit Pause und Pool, Staffel A mit acht Co-Teams und
 dem Knopf „Liga starten“, die Ligaseite bei 390 und 1440 px und ohne Anmeldung „Liga nicht gefunden“ – nur lesend.
 `liga-ablauf-abnahme.spec.js` (gleiche Stand-Datei, #2200) schreibt: Co-Team zuteilen, „Liga starten“, Standardtermin,
-dann bei 390 und 1440 px Terminvorschlag und Annahme durch zwei Captains, Erinnerung, Melden mit Maps und Aufstellung,
+dann bei 390 und 1440 px Terminvorschlag und Annahme durch zwei Captains, Erinnerung, Melden mit Maps und Teilnehmerliste,
 Bestätigen, Tabelle und Ligaseite als Gast, Einspruch, Entscheidung und Korrektur der Leitung, zuletzt die
-48-Stunden-Automatik. Für die Zeit-Jobs braucht sie `ABNAHME_PROJECT` (der Stand) und `PYTHON`.
+48-Stunden-Automatik mit Nachtrag der Liste. Für die Zeit-Jobs braucht sie `ABNAHME_PROJECT` (der Stand) und `PYTHON`.
 `liga-regeln-abnahme.spec.js` (gleiche Stand-Datei, #1646) schreibt zwei Versionen des Regelwerks mit Baustein und Anlage; ein Gast liest bei 390
 und 1440 px Text, Markierung, Vergleich und PDF, ein Captain stimmt zu.
 Ohne `ABNAHME=1` überspringt der normale Testlauf diese Tests.

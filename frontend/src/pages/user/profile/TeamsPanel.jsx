@@ -11,6 +11,8 @@ import { useOptionalAuth } from "@/context/AuthContext";
 import { TEAM_ROLE_LABELS } from "./constants";
 import { DissolvedTeamRow } from "@/pages/public/team/DissolvedTeams";
 import { SQUAD_ROLES, isLocked, roleChoices, roleOf, rolesSummary, squadGameLabel, squadStatusLabel } from "@/components/tls/league/squadRoles";
+import { SquadEligibilityPanel } from "@/components/tls/league/SquadEligibilityPanel";
+import { requirementHint } from "@/lib/leagueEligibility";
 
 const emptySquad = {
   name: "",
@@ -330,6 +332,7 @@ export function TeamsPanel() {
                           );
                         })}
                       </div>
+                      {squad.league_requirement ? <SquadEligibilityPanel teamId={activeId} squad={squad} /> : null}
                     </div>
                   ))}
                   {squads.length === 0 && <div className="sm:col-span-2 text-center py-10 text-white/35 border border-dashed border-white/10 rounded-sm">Noch keine Co-Teams für dieses Team.</div>}
@@ -360,6 +363,8 @@ export function TeamsPanel() {
                 <span className="block mt-1 text-xs text-white/45" data-testid="team-squad-game-hint">Hauptspiel oder Version: In der Liga zählen beide als dasselbe Spiel.</span>
               </Field>
               <Field label="Kader" group>
+                {/* Spielberechtigung (#2204): sagt vorab, was die Season verlangt - der Server prüft es beim Speichern. */}
+                {requirementHint(editing.league_requirement) ? <p className="mb-2 text-xs text-white/55" data-testid="team-squad-requirement">{requirementHint(editing.league_requirement)}</p> : null}
                 <div className="grid sm:grid-cols-2 gap-2">
                   {(activeTeam.members || []).map((m) => {
                     const checked = (editing.member_ids || []).includes(m.id);

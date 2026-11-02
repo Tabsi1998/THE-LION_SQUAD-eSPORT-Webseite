@@ -10,6 +10,7 @@ import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
+import { SeasonEligibilitySection } from "./SeasonEligibilitySection";
 import { SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -435,14 +436,16 @@ export default function AdminLeagueSeasonPage() {
                 <FormGrid cols={3}>
                   <TextField label="Ergebnis gilt nach (Stunden)" type="number" min={1} max={336} value={form.result_confirm_hours} onChange={(value) => set("result_confirm_hours", value)}
                     hint="ohne Antwort der Gegenseite" testId="season-form-confirm" />
-                  <TextField label="Aufstellung nachtragen bis (Stunden)" type="number" min={1} max={336} value={form.lineup_amend_hours} onChange={(value) => set("lineup_amend_hours", value)}
-                    hint="nach dem Ergebnis" testId="season-form-amend" />
+                  <TextField label={form.lineup_mode === "series" ? "Teilnehmerliste nachtragen bis (Stunden)" : "Aufstellung nachtragen bis (Stunden)"} type="number" min={1} max={336} value={form.lineup_amend_hours} onChange={(value) => set("lineup_amend_hours", value)}
+                    hint={form.lineup_mode === "series" ? "ab der Bestätigung, danach geht der Fall an die Leitung" : "nach dem Ergebnis"} testId="season-form-amend" />
                   {/* Antwortfrist (#2106, F3): früher je Staffel; leer bei älteren Seasons - dann behält jede Staffel ihre. */}
                   <TextField label="Antwort auf Terminvorschlag (Stunden)" type="number" min={1} max={720} value={form.match_schedule_response_hours}
                     onChange={(value) => set("match_schedule_response_hours", value)} placeholder="leer: je Staffel wie bisher"
                     hint="So lange hat die Gegenseite Zeit; gilt für neue Vorschläge" testId="season-form-response" />
                 </FormGrid>
               </FormSection>
+
+              <SeasonEligibilitySection form={form} set={set} />
 
               </>) : null}
               <FormSection title={canSeason ? "Regeltext und Sichtbarkeit" : "Regeltext"}>

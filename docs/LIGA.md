@@ -557,7 +557,7 @@ competition_sanctions ──▶ league_eligibility (Aufstellung, Check-in, Anmel
 | Echte Tests | A.2 | `flow_harness.py` wahlweise gegen MongoDB, schreibende Abnahme-Spec | CI, `docker-compose.abnahme.yml` |
 | Bereich `leagues`, `league_staff` | B.1 | Zuständigkeiten je Liga, Befangenheit | `permissions.py`, `tournament_permissions.py` |
 | `league_rules` | B.2 | Versionen, Zustimmung, Spiel merkt sich die Version | `rules` der Staffel, `rules_text` als Rückfall |
-| `league_eligibility.py` | B.3 | Eine Prüfung für Anmeldung, Aufstellung, Check-in | `league_roster.py`, `league_games._lineup` |
+| `league_eligibility.py` | B.3 | Eine Prüfung für Anmeldung, Kaderaufnahme, Teilnehmerliste, Check-in | `league_roster.py`, `league_games._lineup` |
 | `league_applications` | B.4 | Antrag je Season, die Staffel steht erst nach Genehmigung fest | `squad_problems`, `build_registration` |
 | Modus-Felder | C.1 | Status, Ergebnisregel | `games.match_modes[]`, Dauerplanung bleibt |
 | `season_readiness` | C.2 | Vorab-Prüfung vor der Veröffentlichung | `map_pools`, `game_mode_order` |
@@ -782,6 +782,113 @@ Spiel. Bilder: Die Admin-Medien gehen über die Rolle, Zuständige ohne sie lade
 
 **Seiten:** `/liga/<liga>/regeln` und `/liga/<liga>/<season>/regeln` (Season-Slug `regeln` ist reserviert), Pflege unter
 `/admin/leagues/rules/{scope}/{id}`. Protokoll: `league.rules.draft`, `.draft_discard`, `.publish`, `.consent`, ohne Volltext.
+
+### B.3 Spielberechtigung (#2204)
+
+`services/league_eligibility.py` ist **die eine Prüfung** für Anmeldung, Kaderaufnahme, Teilnehmerliste und später den Check-in
+(D.2 ruft `league_eligibility.check_participants` auf). Der Stand der Spiel-ID bleibt in `league_roster.status`, die Eignung legt
+sich darüber. Kein Wert eines Titels steht im Code. **Ohne Feld verhält sich alles wie vorher:** Seasons von vor B.3 tragen die
+neuen Felder nicht und prüfen nichts Neues.
+
+**Einstellungen an `league_seasons`** (Bereich `leagues` oder Zuständigkeit `season`; Vorgabe nur beim Anlegen einer neuen Season):
+
+| Feld | Typ | Vorgabe neu | Fehlt | Bedeutung |
+| --- | --- | --- | --- | --- |
+| `min_squad_size` | int | 3 | `team_size` | Mindestkader. Bei `lineup_mode: series` darf er unter `team_size` liegen, nie unter `lineup_min_players` |
+| `max_squad_size` | int 1–200 | 50 | keine Grenze | Höchstkader. Gilt bei Zuteilen, Aufnahme, Transfer |
+| `one_team_per_season` | bool | `true` | `false` | Eine Person steht in einer Season nur in einem Co-Team. In anderen Seasons und Ligen frei |
+| `new_player_wait_days` | int 0–60 | 7 | keine Wartezeit | Wartezeit nach dem Ende von Spieltag 1, 0 = aus |
+| `roster_deadline` | Kalendertag | keiner | keiner | Wie bisher: Neue warten auf Freigabe, Abgänge frei (`roster-settings`, `roster`) |
+| `transfer_windows` | `[{start_date, end_date, label?}]` | `[]` | `[]` | Wiener Kalendertage, höchstens 10. Leer: Es gibt keine Transfers |
+| `min_age` | int 0–99 | 18 | keine Prüfung | Mindestalter am Prüftag, 0 = aus. Selbstauskunft über `users.birth_date` |
+| `unique_game_ids` | bool | `true` | `false` | Jede Spiel-ID nur einmal je Season |
+| `lineup_mode` | `series` \| `per_map` | `series` | `per_map` | Teilnehmerliste einmal je Spiel oder Aufstellung je Map wie bisher |
+| `lineup_min_players` | int 1–20 | 3 | – | Mindestzahl der Teilnehmerliste, nur bei `series`. Nach oben offen |
+
+`lineup_mode` und `lineup_min_players` trägt auch die Staffel (`staffel_fields`, Gruppe `before_result`), Staffeln ohne Feld bleiben `per_map`.
+`TournamentUpdate` nimmt beide nicht an. Die anderen Felder liest `league_eligibility` wie den Stichtag direkt an der Season.
+
+**Felder am Spiel** (`games.player_id_fields[]`, alle optional, ohne sie wie bisher):
+
+| Feld | Typ | Bedeutung |
+| --- | --- | --- |
+| `pattern` | str ≤ 200 | Regulärer Ausdruck für den ganzen Wert. Der Server prüft beim Speichern, ob er gültig ist |
+| `format_hint` | str ≤ 120 | Beispiel oder Beschreibung, steht im Profil und in jeder Meldung zum Format |
+| `options` | `[str]`, höchstens 30 | Auswahl statt Freitext. So wird die **Plattform** zum Feld: Pflicht über `required`, einmal je Season festgehalten wie jede ID |
+| `unique_in_season` | bool | `false` nimmt das Feld aus der Eindeutigkeit aus (Vorgabe: Felder mit `options` sind ausgenommen, alle anderen dabei) |
+
+Das Profil lehnt beim Speichern nur Werte ab, die neu sind und nicht zu `pattern` oder `options` passen. Fehlen beide, gibt es keine Prüfung.
+
+**Felder an `league_rosters`:**
+
+| Feld | Bedeutung |
+| --- | --- |
+| `squad_joined_at` | `{squad_id: ISO}`: erste Aufnahme je Co-Team, wird nie überschrieben |
+| `wait_from` | `{squad_id: ISO}`: Beginn der Wartezeit in diesem Co-Team. Gesetzt bei Aufnahme nach dem Ende von Spieltag 1 und bei jedem genehmigten Transfer (dort immer neu), nie beim Zuteilen durch die Leitung |
+| `wait_waivers` | `[{squad_id, at, by, reason}]`: Aufhebungen der Leitung. Eine gilt nur für die Wartezeit, die zu ihr lief |
+| `id_keys` | `[str]`: normalisierte IDs für den eindeutigen Teilindex (`season_id`, `id_keys`), nur in Seasons mit `unique_game_ids`. Fehlt das Feld, greift der Index nicht |
+
+**Neue Sammlung `league_transfers`:** `id`, `season_id`, `league_id`, `user_id`, `from_squad_id`, `to_squad_id`, `to_team_id`, `status`
+(`pending`, `approved`, `rejected`, `withdrawn`), `requested_by`, `requested_at`, `decided_by`, `decided_at`, `reason`. Ein offener Antrag je Person und Season
+(eindeutiger Teilindex). Löschen des Kontos löscht die Zeilen, die Auskunft enthält sie.
+
+**Stand einer Person** (`league_eligibility.status`, Vorrang in dieser Reihenfolge): `banned`, `other_team`, `age_missing`, `age_not_met`,
+`waiting`, dann der ID-Stand `late`, `missing`, `format`, `taken`, `pending`, `locked`, `free`. `ok`: spielberechtigt. Dazu `until` bei `waiting` und
+`age`: `null` (keine Regel), `met` oder `missing`. Für das Unterschreiten gibt es außerhalb der Person selbst nur den Stand `age_not_met` ohne Zahl.
+
+**Regeln je Einstellung:**
+
+| Regel | Wann | Meldung sagt |
+| --- | --- | --- |
+| `max_squad_size` | Zuteilen, Aufnahme, Transfer (422) | wie viele erlaubt sind |
+| `min_squad_size` | Zuteilen (wie bisher). Abgang bleibt möglich, Warnung und Aufgabe aus #2202 | wie viele fehlen |
+| `one_team_per_season` | Zuteilen, Aufnahme (409): schon in einem anderen Co-Team oder dort gestanden, solange dieses in der Season angemeldet ist. Teilnehmerliste: aktuell in zwei Co-Teams | dass ein Transfer nötig ist |
+| `min_age` | Zuteilen, Aufnahme, Transfer (422), Teilnehmerliste | „Geburtsdatum fehlt“ mit Weg ins Profil, sonst „erfüllt die Altersvorgabe nicht“. Nie ein Datum |
+| `new_player_wait_days` | Teilnehmerliste, Check-in. Aufnahme bleibt möglich, Hinweis an Person und Verantwortliche. Neuzugang erst nach dem Ende von Spieltag 1, Transfer immer | bis wann gewartet wird |
+| Spiel-ID, Format, Eindeutigkeit | Festhalten, Freigabe, Teilnehmerliste. Eine schon festgehaltene ID bleibt gültig. Meldung nennt nie, wem die ID gehört | was zu tun ist |
+| Transferfenster | Antrag (409 außerhalb). Entscheidung auch nach dem Fenster | wann es offen ist |
+
+**Spieltag 1** endet mit `matchday_schedule.tournament_matchday_window(staffel, 1).end`. Wartezeit ist `wait_from + new_player_wait_days` in Wiener Zeit.
+Ein gewöhnlicher Neuzugang spielt bis zum Ende von Spieltag 1 sofort, danach wartet er ab der Aufnahme. Der Wiedereintritt ins selbe Co-Team startet keine neue Wartezeit. Ein genehmigter **Transfer wartet immer** ab der Kaderaufnahme (Entscheidung Nr. 71, Regelwerk § 4.6): auch vor dem Ende von Spieltag 1, auch wenn die Person das alte Co-Team schon verlassen hat, auch im Co-Team, in dem sie früher stand. Das Zuteilen eines Co-Teams durch die Leitung startet keine Wartezeit. Aufhebung: `POST /api/admin/leagues/seasons/{id}/roster/{uid}/waive-wait` mit
+`squad_id` und `reason` (mindestens fünf Zeichen), Recht `roster`, Protokoll `league.roster.wait_waive`.
+
+**Transfers:** `POST /api/teams/{tid}/squads/{sid}/transfers` mit `user_id` (Recht wie Kader ändern, 409 außerhalb des Fensters, Person muss im Hauptteam
+stehen), `GET` dasselbe, `DELETE …/transfers/{id}` zieht zurück. Leitung: `GET /api/admin/leagues/seasons/{id}/transfers`,
+`POST …/transfers/{id}/approve`, `…/reject` mit `reason`, Recht `roster`. Genehmigen läuft unter der Season-Sperre `league_season:{id}:squads`:
+prüft Alter, Höchstkader und Rolle im alten Co-Team, nimmt aus dem alten und setzt ins neue Co-Team, startet die Wartezeit, benachrichtigt Person und beide Teamleitungen samt dem Tag, ab dem sie spielen darf, warnt bei zu kleinem Kader. Protokoll `league.transfer.request`, `.approve`,
+`.reject`, `.withdraw`. Ein Transfer ist nur nötig, wenn `one_team_per_season` gilt.
+
+**Teilnehmerliste** (`lineup_mode: series`):
+
+| Feld | Inhalt |
+| --- | --- |
+| `matches_v2.lineups` | `{registration_id: [user_id]}`: wer gespielt hat, geltend ab der Bestätigung. Nur für Beteiligte und Liga-Leitung sichtbar, `INTERNAL_KEYS` |
+| `reports[].lineup` | die Liste der eigenen Seite in dieser Meldung |
+| `lineups_missing` | Seiten ohne Liste, wie bisher |
+| `lineup_user_ids` | Vereinigung aus `games[].lineups`, `lineups` und offenen Meldungen. Die Doppel-Einsatz-Prüfung liest weiter hier |
+| `lineup_overdue_at` | Frist abgelaufen, Fall bei der Leitung (Art `match_attention`, `meta.reason` `lineup_overdue`, Recht `matches` oder `results`), intern |
+
+Melden und Bestätigen im Web: `games` wie bisher ohne Aufstellung, dazu `lineup: [user_id]` der eigenen Seite. Mindestens `lineup_min_players`, nach oben offen, nur spielberechtigte
+Kaderspieler (Altbestand der Seite bleibt), nie auf beiden Seiten. Die App bestätigt ohne `games` und ohne Liste: Das Ergebnis gilt, die Seite landet in `lineups_missing`. Die
+Automatik nach 48 h übernimmt die Liste der Meldung. Nachtrag: `PUT /api/matches/{id}/lineups` mit `{lineup: [user_id]}`, Captain oder Vertreter, nur die eigene Seite, bis `lineup_amend_hours`
+ab `completed_at`; danach geht der Fall im Fristen-Job an die Leitung (`match_deadline_sweep.sweep_overdue_lineups`), die mit Grund nachträgt. Das Ergebnis bleibt immer gültig. Leitung:
+`POST /result` mit `lineups: {registration_id: [user_id]}`, je Seite freiwillig. Wer nicht auf der Liste steht, zählt nicht als Einsatz (`league_games.participants`, liest #2214). `games[].lineups` in Staffeln mit `per_map`
+bleiben gültig und lesbar. Eine Wertung (kampflos) nimmt auch die Liste weg.
+
+**Kaderänderungen im Protokoll:** Jede Änderung am Kader eines Co-Teams in einer nicht beendeten Staffel schreibt `league.squad.roster` mit `squad_id`, `added`, `removed`. Austritt und Rauswurf aus dem Hauptteam ebenso.
+**Griff von außen:** Ändert die Liga-Leitung einen Co-Team-Kader oder dessen Rollen (Löschen geht in einer laufenden Staffel nicht), bekommen Leitung und Co-Leitung des Hauptteams eine Nachricht mit wer, was, wann (Art `team_role_changed`, `meta.reason` `league_squad_edit`, Schlüssel `league-squad-edit:<squad>:<Zeitpunkt>:<user>`).
+
+**Mail:** Vorlage `league_notice` (Einstellung wie Spiel-Hinweise): Teilnehmerliste fehlt, Griff von außen, Transfer entschieden, Wartezeit der eigenen Person. Sonst bleibt es bei Postfach, Push und Discord.
+
+**Antworten an das Web:** `GET /api/me/league-eligibility` (eigener Stand je Season, ohne Datum). `GET /api/teams/{tid}/squads/{sid}/eligibility`: Stand je Kaderspieler und je möglichem Neuzugang, offene Transfers, Fenster; für Teamleitung, Captain, Vertreter und Liga-Recht `roster`.
+`league_requirement` an `GET /api/teams/{id}/squads` trägt zusätzlich `max_size`, `min_age`, `transfers_open`. `GET …/seasons/{id}/roster`: `eligibility` je Spieler (`state`, `ok`, `reason`, `until`, `age`) und `counts.waiting`, `counts.age`.
+Der Block `league` der Matchseite trägt `lineup_mode`, `lineup_min_players`, `participants`, `own_lineup`, `lineup_overdue`.
+
+**Datenschutz:** Die Liga-Prüfung und ihre Antworten nennen nie ein Datum oder Alter der Person, weder Stand, Team-Seite, Kaderübersicht, Fehlertext, Nachricht, Mail noch Protokoll. Gelesen wird `users.birth_date` dafür an einer Stelle (`league_eligibility._ages`), heraus kommen nur `met`, `missing` oder der Stand `age_not_met` (Wächter: `test_league_birth_date_guard_unit.py`). Das öffentliche Profil kann das Feld nach der freiwilligen Sichtbarkeits-Einstellung der Person selbst zeigen (`user_routes._visible_field`); das ist kein Liga-Weg und von dieser Regel nicht berührt. Die Gegenseite sieht keinen Eignungsgrund. Eine Meldung zu einer doppelten Spiel-ID nennt keinen Inhaber. Die Auskunft enthält `league_rosters`, `league_transfers` und `league_appearances` (Spiele, in denen die Person auf einer Teilnehmerliste, in `games[].lineups` oder einer offenen Meldung steht, auch ohne `lineup_user_ids`, nur die eigene Seite). Das Löschen des Kontos löscht Kadereinträge und Anträge; `matches_v2` bleibt als Sportdaten, das Konto heißt dort „Gelöschter User“.
+
+**Audit-Aktionen neu:** `league.squad.roster`, `league.roster.wait_waive`, `league.transfer.request|approve|reject|withdraw`, `match.lineup.overdue`.
+
+**Noch nicht gebaut, liest diese Prüfung später:** Check-in (D.2 ruft `check_participants`), Strafen (E.3 ergänzt den Stand), Selbstanmeldung (B.4 ruft `registration_problems`).
 
 ### Darf nicht beschädigt werden
 

@@ -8,8 +8,11 @@ import {
   confirmPayload,
   followLineups,
   gamesProblem,
+  isSeries,
   mapsFor,
   modeLabel,
+  participantsProblem,
+  personIds,
   poolModes,
   repeatedMap,
   reportPayload,
@@ -26,17 +29,32 @@ import {
 const chip = (active) => `inline-flex min-h-[40px] max-w-full items-center gap-1.5 rounded-sm border px-3 py-1.5 text-sm ${
   active ? "border-[#29B6E8] bg-[#29B6E8]/15 text-white" : "border-white/15 bg-[#0A0A0A] text-white/70 hover:border-white/35"}`;
 
-/** Spieler-Chips: genau `size` aus dem Kader antippen. Wer ohne gültige Spiel-ID nicht aufgestellt werden kann
- * (#2108), steht grau mit Grund darunter; ein schon Aufgestellter bleibt abwählbar. */
-export function LineupPicker({ roster = [], value = [], size = 1, onChange, label = "Aufstellung", testId }) {
-  const full = value.length >= size;
+/** Teilnehmerliste einmal je Spiel (#2204): alle ankreuzen, die mindestens eine Map gespielt haben - nach oben offen. */
+export function ParticipantsPicker({ roster = [], value = [], league, onChange, label = "Wer hat gespielt?", testId = "league-participants" }) {
+  return (
+    <div className="space-y-1.5">
+      <LineupPicker roster={roster} value={value} size={null} minimum={league?.lineup_min_players || 1} onChange={onChange} label={label} testId={testId} />
+      <p className="text-xs text-white/50" data-testid={`${testId}-hint`}>
+        Kreuze alle an, die mindestens eine Map gespielt haben. Mindestens {league?.lineup_min_players || 1}, bei Wechseln auch mehr. Wer fehlt, zählt nicht als Einsatz.
+      </p>
+    </div>
+  );
+}
+
+/** Spieler-Chips: genau `size` aus dem Kader antippen, ohne `size` so viele wie nötig ab `minimum`. Wer ohne gültige Spiel-ID nicht
+ * aufgestellt werden kann (#2108) oder nach den Regeln der Season nicht spielen darf (#2204), steht grau mit Grund darunter; ein schon
+ * Aufgestellter bleibt abwählbar. */
+export function LineupPicker({ roster = [], value = [], size = 1, minimum = null, onChange, label = "Aufstellung", testId }) {
+  const open = size == null;
+  const full = !open && value.length >= size;
+  const enough = open ? value.length >= (minimum || 1) : value.length === size;
   const blocked = blockedPlayers(roster);
   const reasonId = useId();
   return (
     <div role="group" aria-label={label} data-testid={testId}>
       <div className="mb-1.5 flex items-center justify-between gap-2 text-[11px] font-bold uppercase tracking-widest text-white/55">
         <span className="inline-flex items-center gap-1.5"><Users className="h-3.5 w-3.5" /> {label}</span>
-        <span className={value.length === size ? "text-ok" : "text-white/45"}>{value.length}/{size}</span>
+        <span className={enough ? "text-ok" : "text-white/45"} data-testid={testId ? `${testId}-count` : undefined}>{open ? `${value.length} · mindestens ${minimum || 1}` : `${value.length}/${size}`}</span>
       </div>
       <div className="flex flex-wrap gap-1.5">
         {roster.map((person) => {
@@ -69,7 +87,7 @@ export function LineupPicker({ roster = [], value = [], size = 1, onChange, labe
       {blocked.length > 0 && (
         <ul id={reasonId} className="mt-1.5 space-y-0.5 text-xs text-warn" data-testid={testId ? `${testId}-blocked` : undefined}>
           {blocked.map((person) => (
-            <li key={person.id} className="break-words [overflow-wrap:anywhere]">Nicht aufstellbar: {person.name} – {person.reason}</li>
+            <li key={person.id} className="break-words [overflow-wrap:anywhere]">{open ? "Nicht eintragbar" : "Nicht aufstellbar"}: {person.name} – {person.reason}</li>
           ))}
         </ul>
       )}
@@ -144,7 +162,7 @@ export function GameEditor({ game, league, onChange, index, staff = false, games
           Punkte eintragen (freiwillig)
         </button>
       )}
-      {staff ? (
+      {isSeries(league) ? null : staff ? (
         // Turnierleitung (#1650): Aufstellungen beider Seiten, je Seite freiwillig.
         league.sides.map((side) => (
           <LineupPicker key={side.registration_id} roster={league.rosters?.[side.registration_id] || []}
@@ -183,17 +201,19 @@ export function GamesSummary({ games = [], league }) {
 
 function ConfirmWithLineup({ league, state, busy, readOnly, onReport, onWrongResult }) {
   const proposal = league.proposal_games || [];
+  const series = isSeries(league);
   const [lineups, setLineups] = useState(() => Object.fromEntries(proposal.map((game) => [game.position, []])));
+  const [list, setList] = useState(() => personIds(league.own_lineup));
   const [error, setError] = useState("");
   const games = proposal.map((game) => ({ position: game.position, lineup: lineups[game.position] || [] }));
   const confirm = async () => {
-    const problem = gamesProblem(games, league, { needMaps: false });
+    const problem = series ? participantsProblem(list, league) : gamesProblem(games, league, { needMaps: false });
     if (problem) {
       setError(problem);
       return;
     }
     setError("");
-    await onReport({ ...confirmPayload(proposal, lineups, league), screenshot_url: null, note: null });
+    await onReport({ ...confirmPayload(proposal, series ? list : lineups, league), screenshot_url: null, note: null });
   };
   return (
     <div className="mt-2 space-y-3">
@@ -206,7 +226,7 @@ function ConfirmWithLineup({ league, state, busy, readOnly, onReport, onWrongRes
         <p className="text-xs opacity-80" data-testid="match-report-lead-confirms">Bestätigen können Captain und Vertreter.</p>
       ) : (
         <>
-          {proposal.map((game) => (
+          {series ? <ParticipantsPicker roster={league.roster} value={list} league={league} onChange={setList} testId="league-confirm-participants" label="Wer hat bei euch gespielt?" /> : proposal.map((game) => (
             <LineupPicker key={game.position} roster={league.roster} value={lineups[game.position] || []} size={league.team_size}
               label={`Deine Aufstellung Map ${game.position}`} testId={`league-confirm-lineup-${game.position}`}
               onChange={(lineup) => setLineups((current) => followLineups(current, game.position, lineup))} />
@@ -230,6 +250,8 @@ export function LeagueReportForm({ league, state = null, busy = false, readOnly 
   const status = state?.status || "open";
   const [editing, setEditing] = useState(status === "open");
   const [games, setGames] = useState(() => startGames(league));
+  const series = isSeries(league);
+  const [list, setList] = useState(() => personIds(league.own_lineup));
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const [seenStatus, setSeenStatus] = useState(status);
@@ -237,7 +259,7 @@ export function LeagueReportForm({ league, state = null, busy = false, readOnly 
     setSeenStatus(status);
     setEditing(status === "open");
   }
-  const problem = gamesProblem(games, league);
+  const problem = series ? gamesProblem(games, league, { withLineup: false }) || participantsProblem(list, league) : gamesProblem(games, league);
   const sentence = seriesSentence(games, league);
 
   const change = (position, game) => setGames((current) => settleGames(changeGame(current, position, game), league));
@@ -249,7 +271,7 @@ export function LeagueReportForm({ league, state = null, busy = false, readOnly 
       return;
     }
     setError("");
-    const done = await onReport({ ...reportPayload(games, league), screenshot_url: null, note: note.trim() || null });
+    const done = await onReport({ ...reportPayload(games, league, list), screenshot_url: null, note: note.trim() || null });
     if (done) setNote("");
   };
 
@@ -273,6 +295,7 @@ export function LeagueReportForm({ league, state = null, busy = false, readOnly 
           ) : (
             games.map((game, index) => <GameEditor key={game.position} index={index} game={game} games={games} league={league} onChange={(next) => change(game.position, next)} />)
           )}
+          {series && league.pool ? <ParticipantsPicker roster={league.roster} value={list} league={league} onChange={setList} /> : null}
           <input value={note} onChange={(event) => setNote(event.target.value)} maxLength={1000} className="input" placeholder="Notiz für die Turnierleitung (freiwillig)" data-testid="match-report-note" />
           <p className={`rounded-sm border px-3 py-2 text-sm font-bold ${sentence && !problem ? "border-[#29B6E8]/35 bg-[#29B6E8]/10 text-[#BFE9F8]" : "border-white/10 bg-white/5 text-white/45"}`} data-testid="match-report-sentence" aria-live="polite">
             {problem || sentence}
@@ -280,7 +303,7 @@ export function LeagueReportForm({ league, state = null, busy = false, readOnly 
           {error && <p className="text-sm text-warn" role="alert" data-testid="match-report-error">{error}</p>}
           <div className="flex flex-wrap items-center gap-3">
             <button disabled={busy} className="tls-btn tls-btn--primary min-h-[44px] px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid="match-report-submit">Ergebnis melden</button>
-            <p className="text-xs text-white/50">Die Gegenseite bestätigt und stellt dabei ihre Aufstellung auf. Ohne Antwort gilt dein Ergebnis nach 48 Stunden.</p>
+            <p className="text-xs text-white/50">{series ? "Die Gegenseite bestätigt und trägt ein, wer bei ihr gespielt hat." : "Die Gegenseite bestätigt und stellt dabei ihre Aufstellung auf."} Ohne Antwort gilt dein Ergebnis nach 48 Stunden.</p>
           </div>
         </form>
       )}

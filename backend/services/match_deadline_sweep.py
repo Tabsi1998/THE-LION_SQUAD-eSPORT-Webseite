@@ -143,11 +143,19 @@ async def _auto_confirm(db, tournament: dict, match_id: str, stage: dict | None,
             # Liga (#1650): die Maps der Erstmeldung gelten mit; die Gegenseite trägt ihre Aufstellung nach.
             games = [dict(game) for game in report.get("games") or []] or None
             missing = league_missing(match, games)
+            # Teilnehmerliste (#2204): Die Liste der Meldung gilt, die Gegenseite trägt ihre nach. Ohne Maps keine Liga-Meldung.
+            lineups = None
+            if games and tournament.get("lineup_mode") == "series":
+                from services.league_games import missing_participants
+
+                lineups = {report.get("registration_id"): report["lineup"]} if report.get("lineup") else {}
+                sides = [slot["registration_id"] for slot in match.get("slots") or [] if slot.get("registration_id")]
+                missing = missing_participants(lineups, sides)
             try:
                 await submit_v2_result(
                     db, match, report.get("results") or [], actor_id=report.get("user_id"),
                     proof_url=report.get("proof_url"), note=None, force=False, audit_action="match.result.auto_confirm",
-                    games=games, lineups_missing=missing if games else None,
+                    games=games, lineups_missing=missing if games else None, match_lineups=lineups,
                 )
             except MatchV2ResultError as exc:
                 await _audit(db, "match.result.auto_confirm_failed", match, {"detail": str(exc)[:200]})
@@ -168,6 +176,48 @@ async def _auto_confirm(db, tournament: dict, match_id: str, stage: dict | None,
     except Exception:  # noqa: BLE001 - die Anzeige holt es beim nächsten Abruf
         logger.debug("Live-Meldung für Match %s nicht verschickt", match_id, exc_info=True)
     return 1
+
+
+async def sweep_overdue_lineups(db, *, now: datetime) -> int:
+    """Frist für die Teilnehmerliste abgelaufen (#2204): Der Fall geht einmal an die Leitung. Das Ergebnis bleibt gültig, es gibt keine
+    Wertung. Trägt jemand nach, ist der Fall erledigt."""
+    from services.league_games import amend_deadline_for
+    from services.league_permissions import staff_user_ids
+    from services.user_notifications import create_user_notification
+
+    tournaments = await db.tournaments.find(
+        {"league_context": {"$type": "object"}, "lineup_mode": "series", "status": {"$nin": ["archived", "cancelled"]}},
+        {"_id": 0, "id": 1, "title": 1, "slug": 1, "league_context": 1, "lineup_amend_hours": 1, "blocked_periods": 1, "matchday_blocked_weeks": 1,
+         "start_date": 1, "matchday_days": 1},
+    ).to_list(500)
+    count = 0
+    for tournament in tournaments:
+        matches = await db.matches_v2.find(
+            {"tournament_id": tournament["id"], "lineups_missing.0": {"$exists": True}, "status": {"$in": ["completed", "forfeit"]},
+             "games.0": {"$exists": True}, "lineup_overdue_at": None},
+            {"_id": 0, "id": 1, "tournament_id": 1, "completed_at": 1, "lineups_missing": 1, "round_name": 1, "matchday_label": 1},
+        ).to_list(500)
+        for match in matches:
+            deadline = amend_deadline_for(tournament, match)
+            if not deadline or deadline >= now:
+                continue
+            marked = await db.matches_v2.update_one({"id": match["id"], "lineup_overdue_at": None}, {"$set": {"lineup_overdue_at": now.isoformat()}})
+            if not marked.modified_count:
+                continue
+            count += 1
+            await _audit(db, "match.lineup.overdue", match, {"sides": match.get("lineups_missing")})
+            label = match.get("round_name") or match.get("matchday_label") or "ein Spiel"
+            staff = await staff_user_ids(db, tournament["league_context"].get("league_id"), ("matches", "results"))
+            for user_id in sorted(staff):
+                await create_user_notification(
+                    user_id, "Teilnehmerliste fehlt nach der Frist",
+                    f"{tournament.get('title') or 'Liga'} · {label}: Eine Seite hat ihre Teilnehmerliste nicht nachgetragen. Das Ergebnis bleibt "
+                    "gültig. Bitte auf der Matchseite entscheiden und mit Grund eintragen.",
+                    url=f"/matches/{match['id']}", kind="match_attention",
+                    meta={"category": "tournament_updates", "tournament_id": tournament["id"], "match_id": match["id"],
+                          "reason": "lineup_overdue", "dedupe_key": f"lineup-overdue:{match['id']}"},
+                )
+    return count
 
 
 async def sweep(db, *, now: datetime | None = None) -> dict:
@@ -196,4 +246,5 @@ async def sweep(db, *, now: datetime | None = None) -> dict:
             info = no_show_deadline(match, tournament, stage)
             if info and info["due_at"] <= now and not match.get("no_show_proposal"):
                 proposed += await _propose_no_show(db, tournament, match, info, now)
-    return {"proposed": proposed, "confirmed": confirmed}
+    overdue = await sweep_overdue_lineups(db, now=now)
+    return {"proposed": proposed, "confirmed": confirmed, "overdue_lineups": overdue}

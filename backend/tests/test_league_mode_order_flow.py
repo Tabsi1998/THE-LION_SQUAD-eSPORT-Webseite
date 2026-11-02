@@ -14,7 +14,7 @@ import pytest_asyncio
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
-from league_match_world import GAME_ID, ids, two_nil, world  # noqa: E402
+from league_match_world import GAME_ID, OLD_RULES, ids, two_nil, world  # noqa: E402
 from models import new_id, now_utc  # noqa: E402
 
 MODES = [{"mode": "stellung", "label": "Stellung"}, {"mode": "suchen", "label": "Suchen & Zerstören"}]
@@ -43,7 +43,7 @@ async def real_season(flow, w, *, order=("stellung", "suchen"), with_result=True
     league = await flow.post("/api/admin/leagues", json={"name": "Probe Liga", "game_id": GAME_ID})
     assert league.status_code == 200, league.text
     season = await flow.post(f"/api/admin/leagues/{league.json()['id']}/seasons",
-                             json={"name": "Season 1", "start_date": "2030-01-07T18:00:00+00:00", "game_mode_order": list(order), "best_of": 3, "team_size": 2})
+                             json={**OLD_RULES, "name": "Season 1", "start_date": "2030-01-07T18:00:00+00:00", "game_mode_order": list(order), "best_of": 3, "team_size": 2})
     assert season.status_code == 200, season.text
     season_id = season.json()["id"]
     division = await flow.post(f"/api/admin/leagues/seasons/{season_id}/divisions", json={"level": 1})

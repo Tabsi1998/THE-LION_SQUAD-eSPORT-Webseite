@@ -14,6 +14,8 @@ from models import now_utc
 from squad_world import make_squad, make_team, squad_registration
 
 GAME_ID = "probe-shooter"
+# Eine Season mit den Regeln von vor #2204: Aufstellung je Map, keine Altersprüfung, keine Wartezeit. Für Tests, die nicht diese Regeln prüfen.
+OLD_RULES = {"lineup_mode": "per_map", "min_age": 0, "new_player_wait_days": 0, "one_team_per_season": False, "unique_game_ids": False}
 POOL = [
     {
         "mode": "stellung",

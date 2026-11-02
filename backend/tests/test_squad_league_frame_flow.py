@@ -26,7 +26,7 @@ async def flow():
 
 @pytest.mark.asyncio
 async def test_a_staffel_of_the_league_frame_takes_squads_with_its_own_minimum(flow):
-    admin, game, _league, season, division, _maps = await setup_league(flow, season={"min_squad_size": 5})
+    admin, game, _league, season, division, _maps = await setup_league(flow, season={"min_squad_size": 5, "min_age": 0})
     created = await flow.post(f"{ADMIN}/divisions/{division['id']}/staffeln", json={})
     assert created.status_code == 200, created.text
     staffel = await flow.db.tournaments.find_one({"id": created.json()["tournament_id"]}, {"_id": 0})

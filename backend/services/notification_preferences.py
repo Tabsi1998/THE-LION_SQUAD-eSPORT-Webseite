@@ -130,6 +130,7 @@ TEMPLATE_CATEGORY = {
     "match_reminder": "match_reminders",
     "match_lead_10m": "match_reminders",
     "score_reported": "match_reminders",
+    "league_notice": "match_reminders",
     "dispute_opened": "match_reminders",
     "dispute_resolved": "match_reminders",
     "prize_ready": "prize_updates",

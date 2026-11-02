@@ -279,7 +279,7 @@ async def test_the_public_season_lists_only_staffeln_the_person_could_open(flow)
 
 @pytest.mark.asyncio
 async def test_the_staffel_carries_its_minimum_squad_from_season_or_division(flow):
-    admin, season, division, staffel = await setup_staffel(flow, season={"team_size": 4, "min_squad_size": 6})
+    admin, season, division, staffel = await setup_staffel(flow, season={"team_size": 4, "min_squad_size": 6, "lineup_mode": "per_map"})
     assert staffel["min_squad_size"] == 6
     elite = (await flow.post(f"{ADMIN}/seasons/{season['id']}/divisions", json={"overrides": {"team_size": 5}})).json()
     grown = (await flow.post(f"{ADMIN}/divisions/{elite['id']}/staffeln", json={})).json()
