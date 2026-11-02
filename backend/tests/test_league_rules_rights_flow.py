@@ -172,6 +172,7 @@ async def test_a_duty_puts_its_own_image_into_the_rules_without_admin_media(flow
     """Die Admin-Medien gehen über die Rolle, Zuständigkeiten öffnen sie nicht. Das eigene Bild reicht fürs Regelwerk."""
     for module in (upload_routes, phase_fg_routes):
         monkeypatch.setattr(module, "PUBLIC_UPLOAD_DIR", tmp_path)
+    monkeypatch.setattr(phase_fg_routes, "UPLOAD_DIR", tmp_path)  # die Mediathek schaut zuerst, ob es diesen Ordner gibt
     monkeypatch.setattr(media_scan, "auto_process", False)
     w = await make_world(flow)
     flow.act_as(await staff(flow, w["league"]["id"], ["rules"]))
