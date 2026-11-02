@@ -104,6 +104,48 @@ async def test_the_server_tells_web_and_app_the_right(flow, kind, manage, edit):
     assert rights["admin_needs_second_factor"] is False
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind,expected", [
+    ("freigabe_turniere", REFUSED), ("moderator_mit_freigabe", REFUSED), ("rolle_turnierleitung", ALLOWED), ("club_admin", ALLOWED),
+    ("freigabe_redaktion", REFUSED), ("spieler", REFUSED),
+])
+async def test_the_banner_stays_with_the_role(flow, kind, expected):
+    w = await team_world(flow)
+    flow.act_as(await account(flow, kind))
+
+    response = await flow.patch(f"/api/teams/{w['team']['id']}", json={"banner_url": "/uploads/neu.webp"})
+
+    assert response.status_code == expected
+    stored = await flow.db.teams.find_one({"id": w["team"]["id"]}, {"_id": 0})
+    assert (stored.get("banner_url") == "/uploads/neu.webp") is (expected == ALLOWED)
+
+
+@pytest.mark.asyncio
+async def test_a_grant_may_not_clear_the_banner_but_may_send_it_unchanged(flow):
+    w = await team_world(flow)
+    await flow.db.teams.update_one({"id": w["team"]["id"]}, {"$set": {"banner_url": "/uploads/alt.webp"}})
+    flow.act_as(await account(flow, "freigabe_turniere"))
+
+    cleared = await flow.patch(f"/api/teams/{w['team']['id']}", json={"banner_url": None})
+    same = await flow.patch(f"/api/teams/{w['team']['id']}", json={"banner_url": "/uploads/alt.webp", "description": "Neu"})
+
+    assert cleared.status_code == REFUSED
+    assert same.status_code == ALLOWED, "eine ältere Maske schickt den Wert unverändert mit"
+    assert (await flow.db.teams.find_one({"id": w["team"]["id"]}, {"_id": 0}))["banner_url"] == "/uploads/alt.webp"
+
+
+@pytest.mark.asyncio
+async def test_the_team_leadership_keeps_the_banner(flow):
+    leader = await flow.add_user(role="player", name="bannerleitung")
+    team = {"id": new_id(), "name": "Banner", "tag": "BNR", "leader_id": leader["id"], "co_leader_ids": [], "member_ids": [leader["id"]]}
+    await flow.db.teams.insert_one(dict(team))
+    flow.act_as(leader)
+
+    response = await flow.patch(f"/api/teams/{team['id']}", json={"banner_url": "/uploads/neu.webp"})
+
+    assert response.status_code == ALLOWED
+
+
 # ---------------------------------------------------------------- Inhalte bleiben zu
 
 

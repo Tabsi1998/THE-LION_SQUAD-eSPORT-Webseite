@@ -531,6 +531,7 @@ function TeamDetail({ id }) {
           onSaved={() => { setEditing(null); load(); }}
           canDissolve={canDissolve}
           canChangeVisibility={canChangeRoles}
+          canEditBanner={canEdit}
           onDissolved={() => nav("/teams")}
         />
       )}
@@ -656,7 +657,7 @@ function TeamChat({ team, user }) {
   );
 }
 
-function TeamModal({ team, onClose, onSaved, canDissolve = false, canChangeVisibility = false, onDissolved }) {
+function TeamModal({ team, onClose, onSaved, canDissolve = false, canChangeVisibility = false, canEditBanner = true, onDissolved }) {
   const isNew = !team?.id;
   const [form, setForm] = useState({ ...emptyTeam, ...team });
   const { submitting: saving, submitOnce } = useSubmissionGuard();
@@ -670,7 +671,7 @@ function TeamModal({ team, onClose, onSaved, canDissolve = false, canChangeVisib
         tag: form.tag.trim().toUpperCase(),
         description: form.description || null,
         logo_url: form.logo_url || null,
-        banner_url: form.banner_url || null,
+        ...(canEditBanner ? { banner_url: form.banner_url || null } : {}),
         discord_link: form.discord_link || null,
         ...(isNew ? {} : { color: form.color || AUTO_COLOR }),
         ...(!isNew && canChangeVisibility ? { is_public: form.is_public !== false } : {}),
@@ -709,7 +710,7 @@ function TeamModal({ team, onClose, onSaved, canDissolve = false, canChangeVisib
         <Field label="Kürzel"><Input value={form.tag} onChange={(v) => set("tag", v.toUpperCase().slice(0, TEAM_TAG_MAX))} required minLength={TEAM_TAG_MIN} maxLength={TEAM_TAG_MAX} testId="team-tag" placeholder="TLS" /></Field>
         <Field label="Beschreibung"><textarea value={form.description || ""} onChange={(e) => set("description", e.target.value)} rows={3} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
         <Field label="Logo" group><ImageUpload value={form.logo_url || ""} onChange={(v) => set("logo_url", v)} testId="team-logo" variant="square" crop="square" allowLibrary {...teamLogoUpload(team)} /></Field>
-        <Field label="Banner" group><ImageUpload value={form.banner_url || ""} onChange={(v) => set("banner_url", v)} testId="team-banner" variant="wide" crop="banner" allowLibrary /></Field>
+        {canEditBanner ? <Field label="Banner" group><ImageUpload value={form.banner_url || ""} onChange={(v) => set("banner_url", v)} testId="team-banner" variant="wide" crop="banner" allowLibrary /></Field> : null}
         <Field label="Discord-Link"><Input value={form.discord_link || ""} onChange={(v) => set("discord_link", v)} placeholder="https://discord.gg/..." /></Field>
         {!isNew && <TeamColorPicker value={form.color || AUTO_COLOR} onChange={(v) => set("color", v)} />}
         {!isNew && canChangeVisibility ? (

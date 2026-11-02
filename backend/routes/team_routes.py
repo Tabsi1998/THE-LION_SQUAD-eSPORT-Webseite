@@ -120,7 +120,7 @@ def _can_manage(team: dict, user: dict) -> bool:
 def _can_edit_team(team: dict, user: dict) -> bool:
     """Die Pflege aus docs/ROLLEN.md (#2202): Team bearbeiten und Co-Teams. Dort zählt die Freigabe „Turnierleitung“ wie die
     Rolle - nur bei öffentlichen Teams, denn sie öffnet keine Inhalte: Chat, private Teams, Beitrittscode und Einladungen
-    bleiben bei ``_can_manage`` und ``_is_staff``."""
+    bleiben bei ``_can_manage`` und ``_is_staff``, ebenso das Banner."""
     return _can_manage(team, user) or (team.get("is_public") is not False and is_confirmed_tournament_lead(user))
 
 
@@ -990,6 +990,9 @@ async def update_team(team_id: str, body: TeamUpdate, me: dict = Depends(get_cur
     nullable_fields = {"description", "logo_url", "banner_url", "discord_link", "social_links"}
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
+    # Das Banner bleibt bei der Rolle (#2202): Die Freigabe darf es nicht ändern, eine ältere Maske schickt es unverändert mit.
+    if "banner_url" in updates and (updates["banner_url"] or None) != (team.get("banner_url") or None) and not _can_manage(team, me):
+        _refuse(me, "Das Banner ändern Teamleitung, Co-Leitung und die Rolle Turnierleitung.")
     if "name" in updates:
         updates["name"] = _team_label(updates["name"], team.get("name"), "Der Name", TEAM_NAME_MIN_LENGTH, TEAM_NAME_MAX_LENGTH)
     if "tag" in updates:

@@ -226,7 +226,7 @@ beim Löschen des Kontos fällt der Link weg. Code: `services/personal_calendar.
 
 Die Team-Seite in Web und App folgt dem Server: Team bearbeiten und Co-Teams dürfen Leitung, Co-Leitung, Turnierleitung,
 Club-Admin und Superadmin; die Freigabe Turnierleitung zählt dabei nur für diese Pflege samt Team-Logo und nur bei öffentlichen
-Teams (`can_edit_team`, #2202) – Team-Chat, private Teams, Beitrittscode und Einladungen bleiben bei der Rolle. Mitglieder entfernen Leitung, Co-Leitung, Club-Admin und Superadmin; auflösen, Rollen
+Teams (`can_edit_team`, #2202) – Team-Banner, Team-Chat, private Teams, Beitrittscode und Einladungen bleiben bei der Rolle. Mitglieder entfernen Leitung, Co-Leitung, Club-Admin und Superadmin; auflösen, Rollen
 ändern, die Leitung übergeben und öffentlich/privat schalten Leitung, Club-Admin und Superadmin; ein aufgelöstes Team
 wiederherstellen Club-Admin und Superadmin, die frühere Leitung nur nach eigenem Auflösen (#2128). Die Teamliste im Admin sehen die Bereiche
 Turnierleitung und Vereinsverwaltung; alle Beitrittscodes erneuern Club-Admin und Superadmin. Moderatoren sehen auf fremden Team-Seiten keine Verwaltungs-Knöpfe. Die Admin-Rollen zählen
