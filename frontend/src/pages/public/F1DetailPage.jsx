@@ -16,7 +16,6 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { Award, Tv, Trophy, Flag, Calendar, Trash2, FileDown, ChevronDown } from "lucide-react";
-import { formatDateTime, getRegistrationState, hasOnlineRegistration } from "@/lib/datetime";
 import { renderMarkdownLite } from "@/lib/markdownLite";
 import { safeHttpUrl } from "@/lib/safeLink";
 import { seoTextPreview } from "@/lib/textPreview";
@@ -105,8 +104,6 @@ export default function F1DetailPage() {
 
   if (!challenge) return <PublicLayout><PublicLoadingState label="Lade Fast Lap" /></PublicLayout>;
 
-  const hasOnlineSubmission = hasOnlineRegistration(challenge);
-  const registration = hasOnlineSubmission ? getRegistrationState(challenge, "Einreichung") : null;
   const showResultPdf = PUBLIC_RESULT_STATUSES.has(challenge.status);
   // Knöpfe nur, wo sie gebraucht werden (#1277): TV/Beamer und alle Urkunden nur für die Leitung der Fast Lap
   // (Zuteilung mit Zeit-Recht) und Konten mit dem Bereich Turniere; alle anderen bekommen „Downloads“.
@@ -137,23 +134,6 @@ export default function F1DetailPage() {
             <Link to={`/events/${challenge.event.slug || challenge.event.id}`} className="tls-btn tls-btn--secondary mt-4 inline-flex items-center gap-2 px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">
               <Calendar className="w-3.5 h-3.5" /> Teil von {challenge.event.name}
             </Link>
-          )}
-          {registration && (
-            <div className={`mt-5 border rounded-sm px-4 py-3 text-sm max-w-3xl ${
-              registration.canRegister
-                ? "border-[#00FF88]/30 bg-[#00FF88]/5 text-[#00FF88]"
-                : registration.state === "scheduled"
-                  ? "border-[#29B6E8]/30 bg-[#29B6E8]/5 text-[#29B6E8]"
-                  : "border-white/10 bg-[#121212] text-white/60"
-            }`}>
-              <div className="font-bold uppercase tracking-wider text-xs">{registration.label}</div>
-              <div className="mt-1 text-white/55">
-                {challenge.registration_open_from && <span>Öffnet: {formatDateTime(challenge.registration_open_from)}</span>}
-                {challenge.registration_open_from && challenge.registration_open_until && <span className="mx-2 text-white/20">·</span>}
-                {challenge.registration_open_until && <span>Endet: {formatDateTime(challenge.registration_open_until)}</span>}
-                {!challenge.registration_open_from && !challenge.registration_open_until && <span>Zeiten werden durch Admins oder Moderatoren eingetragen.</span>}
-              </div>
-            </div>
           )}
           {/* Aus dem Kasten wird ein Satz (#1277) - nur, wenn Mitglieder hier wirklich außer Wertung fahren. */}
           {challenge.block_club_member_results && challenge.allow_club_reference_times !== false && (

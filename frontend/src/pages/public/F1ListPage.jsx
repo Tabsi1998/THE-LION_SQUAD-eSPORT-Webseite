@@ -10,7 +10,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { Flag, Users, Clock, ChevronRight } from "lucide-react";
-import { formatDate, getRegistrationState, hasOnlineRegistration } from "@/lib/datetime";
+import { formatDate } from "@/lib/datetime";
 import { sortByNearestDate } from "@/lib/contentSort";
 
 export default function F1ListPage() {
@@ -68,7 +68,6 @@ export default function F1ListPage() {
 }
 
 function FastLapCard({ challenge: c }) {
-  const registration = hasOnlineRegistration(c) ? getRegistrationState(c, "Einreichung") : null;
   return (
     <Link
       to={`/fastlap/${c.slug || c.id}`}
@@ -103,13 +102,6 @@ function FastLapCard({ challenge: c }) {
             {c.platform && <span className="inline-flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-[#29B6E8]" /> {c.platform}</span>}
             {c.start_date && <span className="inline-flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-[#29B6E8]" /> Start {formatDate(c.start_date)}</span>}
           </div>
-          {registration && (
-            <div className={`mt-3 text-[11px] uppercase tracking-widest font-bold ${
-              registration.canRegister ? "text-[#00FF88]" : registration.state === "scheduled" ? "text-[#29B6E8]" : "text-white/45"
-            }`}>
-              {registration.label}
-            </div>
-          )}
         </div>
         <ChevronRight className="tls-card__arrow w-6 h-6 shrink-0 text-white/30" />
       </div>
