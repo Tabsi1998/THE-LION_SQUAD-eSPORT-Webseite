@@ -698,7 +698,8 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
     plans_as_lead = bool(user) and await has_match_result_permission(user, match, capability="matches")
     schedule_block = await league_schedule.page_block(
         db, match, tournament, acting_reg=acting_reg, involved=involved, lead=plans_as_lead,
-        can_lead_set=plans_as_lead and (not conflict or conflict["override"]), proposals=proposals)
+        # Befangen (auch der Superadmin): das Feld fehlt hier - die Notausnahme mit Grund geht über den Matchplan.
+        can_lead_set=plans_as_lead and not conflict, proposals=proposals)
     round_number = match.get("matchday_number") or match.get("round")
     league_like = (tournament or {}).get("format") in {"league", "round_robin"} or (stage or {}).get("stage_type") in {"league", "round_robin_groups", "ffa_league"}
     matchday_label = match.get("matchday_label") or match.get("round_name")
