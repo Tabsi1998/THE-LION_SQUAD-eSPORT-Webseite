@@ -173,3 +173,13 @@ test("archivierte Modi verschwinden, alle Modi nicht wählbar heißt: keine Grup
   expect(screen.getByTestId("pool-defaults")).toBeDisabled();
   expect(screen.getByTestId("pool-save")).toBeDisabled();
 });
+
+// #2266: Das Symbol des Modus steht am Kopf jeder Gruppe; hat es sich am Spiel geändert, sagt der Editor es wie bei Maps.
+test("Modus-Symbol im Kopf, „Symbol geändert“ bei veraltetem Pool", () => {
+  const game = { ...GAME, modes: [{ ...GAME.modes[0] }, { ...GAME.modes[1], icon_url: "/api/static/uploads/snd.png" }] };
+  renderEditor({ game, entry: { ...ENTRY, outdated_modes: ["snd"] } });
+  expect(screen.getByTestId("pool-mode-snd-icon")).toHaveAttribute("data-icon", "image");
+  expect(screen.getByTestId("pool-mode-stellung-icon")).toHaveAttribute("data-icon", "placeholder");
+  expect(screen.getByTestId("pool-mode-snd-icon-changed")).toHaveTextContent("Symbol geändert – mit dem nächsten Speichern übernommen.");
+  expect(screen.queryByTestId("pool-mode-stellung-icon-changed")).toBeNull();
+});

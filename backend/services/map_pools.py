@@ -143,11 +143,24 @@ async def outdated_map_ids(db, doc: dict | None) -> list[str]:
 
 
 async def admin_entry(db, doc: dict | None, game_id: str | None, origin: str) -> dict | None:
-    """Ein Pool für die Verwaltung: Lesevertrag plus ``stale`` (anderes Spiel) und ``outdated_map_ids``."""
+    """Ein Pool für die Verwaltung: Lesevertrag plus ``stale`` (anderes Spiel), ``outdated_map_ids`` und ``outdated_modes`` (#2266)."""
     if not doc:
         return None
     return {**saved_view(doc, origin, admin=True), "stale": doc.get("game_id") != game_id,
-            "outdated_map_ids": await outdated_map_ids(db, doc)}
+            "outdated_map_ids": await outdated_map_ids(db, doc), "outdated_modes": await outdated_modes(db, doc)}
+
+
+async def outdated_modes(db, doc: dict | None) -> list[str]:
+    """Modi des Pools, deren Symbol sich am Spiel seither geändert hat (#2266) - neu, anders oder entfernt. Wie bei den Maps nur ein
+    Hinweis: Erst das nächste Speichern übernimmt das Symbol."""
+    if not doc or not doc.get("game_id"):
+        return []
+    game = await db.games.find_one({"id": doc["game_id"]}, {"_id": 0, "match_modes": 1})
+    if not game:
+        return []
+    known = {mode["mode"] for mode in game_maps.game_modes(game)}
+    return [group["mode"] for group in doc.get("modes") or []
+            if group.get("mode") in known and (group.get("icon_url") or None) != game_modes.icon_of(game, group["mode"])]
 
 
 async def library(db, game: dict | None) -> list[dict]:

@@ -261,3 +261,20 @@ async def test_a_league_game_keeps_the_icon_from_the_pool(flow):
     flow.act_as(None)
     page = (await flow.get(f"/api/matches/{w['match']['id']}")).json()
     assert page["games"][0]["mode_icon_url"] == icon
+
+
+@pytest.mark.asyncio
+async def test_the_admin_sees_when_a_saved_pool_has_an_outdated_icon(flow):
+    chef = await lead(flow)
+    await add_game(flow)
+    await add_maps(flow)
+    first, second = await upload(flow, "alt.png"), await upload(flow, "neu.png")
+    assert (await patch_modes(flow, with_icon(first))).status_code == 200
+    version = await save_pool(flow, await flow.db.games.find_one({"id": "spiel"}, {"_id": 0}), chef)
+    held = await flow.db.map_pools.find_one({"id": version["id"]}, {"_id": 0})
+    assert (await map_pools.admin_entry(flow.db, held, "spiel", "tournament"))["outdated_modes"] == []
+
+    assert (await patch_modes(flow, with_icon(second, key="suchen", modes=with_icon(None)))).status_code == 200
+
+    entry = await map_pools.admin_entry(flow.db, held, "spiel", "tournament")
+    assert entry["outdated_modes"] == ["stellung", "suchen"], "Symbol entfernt und Symbol neu: beides ein Hinweis"

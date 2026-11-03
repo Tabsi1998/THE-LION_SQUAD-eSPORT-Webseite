@@ -62,7 +62,7 @@ function Thumb({ item }) {
   );
 }
 
-function ModeGroup({ mode, label, icon, library, selected, kept = [], onToggle, onMove, disabled, testId }) {
+function ModeGroup({ mode, label, icon, iconChanged = false, library, selected, kept = [], onToggle, onMove, disabled, testId }) {
   // Inaktive Maps (#2207) nur, wo der gespeicherte Pool sie in diesem Modus schon hat.
   const choices = choosableMaps(library, mode, kept);
   const byId = Object.fromEntries(choices.map((item) => [item.id, item]));
@@ -75,6 +75,11 @@ function ModeGroup({ mode, label, icon, library, selected, kept = [], onToggle, 
         {mode ? <ModeIcon src={icon} size="sm" testId={`${testId}-mode-${mode}-icon`} /> : null}
         {name} <span className="ml-1 normal-case tracking-normal font-semibold text-white/45 tabular-nums">{selected.length} von {choices.length}</span>
       </legend>
+      {iconChanged ? (
+        <p role="status" className="mb-2 text-xs text-white/60" data-testid={`${testId}-mode-${mode}-icon-changed`}>
+          Symbol geändert – mit dem nächsten Speichern übernommen.
+        </p>
+      ) : null}
       {choices.length === 0 ? (
         <p className="text-xs text-white/45">Keine aktive Map ist für diesen Modus freigegeben.</p>
       ) : (
@@ -243,7 +248,8 @@ export function MapPoolEditor({ title, hint = "", game, library = [], entry = nu
           </div>
           <div className="grid gap-3 lg:grid-cols-2">
             {groups.map(({ mode, label, icon_url: icon }) => (
-              <ModeGroup key={keyOf(mode) || "alle"} mode={mode} label={label} icon={icon} library={library} selected={selection[keyOf(mode)] || []}
+              <ModeGroup key={keyOf(mode) || "alle"} mode={mode} label={label} icon={icon} library={library}
+                iconChanged={Boolean(mode) && !entry?.stale && (entry?.outdated_modes || []).includes(mode)} selected={selection[keyOf(mode)] || []}
                 kept={baseline[keyOf(mode)] || []}
                 onToggle={(m, id) => setSelection((current) => toggleMap(current, m, id))}
                 onMove={(m, id, delta) => setSelection((current) => moveMap(current, m, id, delta))}
