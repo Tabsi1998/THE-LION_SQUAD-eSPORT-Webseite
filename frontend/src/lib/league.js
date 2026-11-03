@@ -26,6 +26,7 @@ export const SYNC_GROUP_TEXT = {
   before_start: "Termine und Kalender",
   before_result: "Best of, Teamgröße, Mindestkader, Punkte und Fristen",
   map_pool: "Map-Pool",
+  loadout_bans: "Sperrliste",
 };
 
 const number = (value) => (value === "" || value == null ? null : Number(value));
