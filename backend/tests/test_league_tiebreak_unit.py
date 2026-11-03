@@ -226,6 +226,16 @@ def test_the_table_end_orders_by_exit_and_puts_disqualified_last():
     assert rows["w1"]["points"] == 6 and rows["w1"]["rank"] == 1
 
 
+def test_the_result_pdf_names_who_left():
+    from pdf_service import _pdf_standings_tables
+
+    rows = [{"rank": 1, "display_name": "Nordlicht", "score_diff": 2}, {"rank": 2, "display_name": "Steinbock",
+                                                                     "score_diff": 0, "exit": {"kind": "withdrawn"}},
+            {"rank": 3, "display_name": "Eisfuchs", "score_diff": 0, "exit": {"kind": "disqualified"}}]
+    names = [row[1] for row in _pdf_standings_tables({"format": "league"}, rows)[0]["rows"]]
+    assert names == ["Nordlicht", "Steinbock (ausgetreten)", "Eisfuchs (disqualifiziert)"]
+
+
 # ---------------------------------------------------------------- Weiche und Vorgaben
 
 def _random_season(seed: int) -> tuple[list[dict], list[dict]]:

@@ -1280,6 +1280,8 @@
 td.tv-standings__rank { font-weight: 800; color: var(--tv-muted); }
 /* Ein Name, eine Zeile: sonst schiebt ein langer Name die Zeilen aus der Tabelle (64 Spieler in acht Gruppen). */
 .tv-standings__name { text-align: left; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 600; }
+/* Liga-Staffel (E.1, #1625): am Tabellenende „ausgetreten“ bzw. „disqualifiziert“ - leiser als der Name. */
+.tv-standings__exit { color: var(--tv-muted); font-weight: 500; }
 .tv-standings--groups[data-compact="1"] .tv-standings__row { font-size: var(--tv-fs-name-min); }
 .tv-standings--groups[data-compact="1"] .tv-standings__title { font-size: var(--tv-fs-name); line-height: var(--tv-lh-name); }
 .tv-standings--groups[data-compact="1"] .tv-standings__block { padding: calc(var(--tv-u) * 0.9) calc(var(--tv-u) * 1.2); gap: calc(var(--tv-u) * 0.4); }

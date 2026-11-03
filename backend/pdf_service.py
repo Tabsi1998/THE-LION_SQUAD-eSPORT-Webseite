@@ -781,6 +781,16 @@ def _pdf_group_title(group: dict, index: int) -> str:
     return f"Gruppe {str(group['group_key']).upper()}" if group.get("group_key") else f"Gruppe {index + 1}"
 
 
+_EXIT_SUFFIX = {"withdrawn": "ausgetreten", "disqualified": "disqualifiziert"}
+
+
+def _standing_name(row: dict) -> str:
+    """Der Name in der Rangliste - am Tabellenende einer Liga-Staffel mit „(ausgetreten)“ bzw. „(disqualifiziert)“ (E.1)."""
+    name = str(row.get("display_name") or "Teilnehmer")
+    suffix = _EXIT_SUFFIX.get(((row.get("exit") or {}) if isinstance(row.get("exit"), dict) else {}).get("kind"))
+    return f"{name} ({suffix})" if suffix else name
+
+
 def _pdf_standings_tables(tournament: dict, rows: list) -> list[dict]:
     """Die Tabellen des Ergebnis-PDFs (#2121): je Gruppe eine (mit Namen), sonst eine; Spalten je Art der Tabelle, der
     Namenskopf „Team“ bei Team-Turnieren."""
@@ -800,7 +810,7 @@ def _pdf_standings_tables(tournament: dict, rows: list) -> list[dict]:
             "wide": [index for index, (label, _keys, _fmt) in enumerate(columns) if label == "Erreicht"],
             "headers": ["Platz", name_head, *[label for label, _keys, _fmt in columns]],
             "rows": [
-                [str(row.get("rank", "")), str(row.get("display_name") or "Teilnehmer"),
+                [str(row.get("rank", "")), _standing_name(row),
                  *[fmt(_first(row, *keys)) for _label, keys, fmt in columns]]
                 for row in section_rows
             ],
