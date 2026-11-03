@@ -7,6 +7,7 @@ export const GAME_TABS = [
   { key: "ids", label: "Spiel-IDs" },
   { key: "modi", label: "Modi" },
   { key: "maps", label: "Maps" },
+  { key: "ausruestung", label: "Ausrüstung" },
 ];
 
 export const GAME_KIND_OPTIONS = [

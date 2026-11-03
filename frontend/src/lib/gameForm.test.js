@@ -6,7 +6,7 @@ import { gameMatchDataPayload, gameMatchDataToForm } from "./gameMatchData";
 // Spielseite (#2249): Reiter per Adresse, und je Reiter genau seine Felder - kein Reiter überschreibt, was ein anderer pflegt.
 
 test("Reiter per Adresse: #allgemein, #ids, #modi, #maps; Unbekanntes und leer heißen Allgemein", () => {
-  expect(GAME_TABS.map((tab) => tab.key)).toEqual(["allgemein", "ids", "modi", "maps"]);
+  expect(GAME_TABS.map((tab) => tab.key)).toEqual(["allgemein", "ids", "modi", "maps", "ausruestung"]);
   expect(tabFromHash("#modi")).toBe("modi");
   expect(tabFromHash("#MAPS")).toBe("maps");
   expect(tabFromHash("#ids")).toBe("ids");

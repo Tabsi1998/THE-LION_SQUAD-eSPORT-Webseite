@@ -20,6 +20,7 @@ from models import new_id, now_utc
 from services import game_maps, league_look, media_audit, uploads_inventory
 from services.league_rules_cache import rules_cache
 from services import league_rule_blocks as blocks
+from services import markdown_text
 from services import league_rules_text as text
 from services import league_service as leagues
 from services.dolibarr_policy import club_today
@@ -94,14 +95,17 @@ async def _chain(db, league: dict, season: dict | None) -> dict:
     return _chain_of(league_rows, await _published(db, SEASON, season["id"]) if season else None)
 
 
-def _frozen_values(version: dict, season: dict | None) -> dict[str, str]:
+def _frozen_values(version: dict, season: dict | None, variant: str = "markdown", plain: bool = False) -> dict[str, str]:
+    """Die eingefrorenen Bausteine - ``variant`` ``text``: die Fassung ohne Bilder (PDF, Wort-Vergleich, #2218), sonst ``markdown``.
+    ``plain``: die geschützten Zeichen der Bausteinwerte als echte Zeichen - für den Wort-Vergleich, der Text und kein Markdown zeigt."""
     frozen = (version.get("frozen") or {}).get((season or {}).get("id") or "") or {}
-    return {key: row.get("markdown") or "" for key, row in frozen.items()}
+    values = {key: (row.get(variant) if row.get(variant) is not None else row.get("markdown")) or "" for key, row in frozen.items()}
+    return {key: markdown_text.plain(value) for key, value in values.items()} if plain else values
 
 
-def _sections(version: dict, season: dict | None) -> list[dict]:
+def _sections(version: dict, season: dict | None, variant: str = "markdown", plain: bool = False) -> list[dict]:
     """Die Abschnitte einer Fassung auf dieser Seite - mit den eingefrorenen Bausteinen."""
-    values = _frozen_values(version, season)
+    values = _frozen_values(version, season, variant, plain)
     missing = blocks.NOT_FROZEN_HINT if season else blocks.NO_SEASON_HINT
     return text.sections_of(version.get("body_md"), version.get("annexes"),
                             fill=lambda body: text.fill_blocks(body, values, missing=missing))
@@ -218,14 +222,14 @@ async def compare_view(db, league: dict, season: dict | None, base_id: str | Non
     base, target = _find(chain["rows"], base_id), _find(chain["rows"], target_id)
     sections = await rules_cache.get_or_make_json(
         ("compare", base["id"], target["id"], (season or {}).get("id")),
-        lambda: text.diff_view(_sections(base, season), _sections(target, season)))
+        lambda: text.diff_view(_sections(base, season, blocks.TEXT, plain=True), _sections(target, season, blocks.TEXT, plain=True)))
     return {"base": _head(base, chain["current"]), "target": _head(target, chain["current"]), "sections": sections}
 
 
 def _pdf_document(league: dict, season: dict | None, version: dict, previous: dict | None, marks: bool) -> dict:
-    """Alles, was das PDF einer Fassung braucht - nur aus der Fassung, kein zweiter Inhalt."""
-    sections = _sections(version, season)
-    result = text.compare(_sections(previous, season) if previous else None, sections)
+    """Alles, was das PDF einer Fassung braucht - nur aus der Fassung, kein zweiter Inhalt. Bausteine in ihrer Fassung ohne Bilder (#2218)."""
+    sections = _sections(version, season, blocks.TEXT)
+    result = text.compare(_sections(previous, season, blocks.TEXT) if previous else None, sections)
     return {
         "title": version.get("title") or "Regelwerk",
         "context": " · ".join(str(part) for part in (league.get("name"), (season or {}).get("name")) if part),
@@ -314,14 +318,31 @@ async def data_changes(db, league: dict, season: dict | None, version: dict | No
     rows: list[dict] = []
     for row in seasons:
         frozen = _frozen_values(version, row)
+        frozen_text = _frozen_values(version, row, blocks.TEXT, plain=True)
         for key, now in (await blocks.resolve(db, keys, league, row)).items():
             before = frozen.get(key)
             if before == now["markdown"]:
                 continue
+            # Markiert wird Wort für Wort in der Fassung ohne Bilder (#2218) - geändert ist, was sich im Markdown samt Bild änderte.
             rows.append({"block": key, "label": now["label"], "season_id": row["id"], "season_name": row.get("name"),
                          "status": "missing" if before is None else "changed", "before": before or "", "after": now["markdown"],
-                         "ops": text.word_ops(before or "", now["markdown"])})
+                         "ops": text.word_ops(frozen_text.get(key) or "", markdown_text.plain(now.get(blocks.TEXT) or now["markdown"]))})
     return {"version_id": version["id"], "version": version.get("version"), "label": _label(version), "rows": rows} if rows else None
+
+
+async def block_state(db, league: dict, season: dict, key: str) -> dict:
+    """Für die Verwaltung einer Datenquelle (Sperrliste, #2218): Steht der Baustein in der letzten Fassung dieser Season, und zeigt sie noch
+    den heutigen Stand? Nur ein Hinweis - eine neue Fassung bereitet die Leitung im Regelwerk vor."""
+    own = await _published(db, SEASON, season["id"])
+    current = (await _chain(db, league, season))["current"]
+    latest = own[-1] if own else (current if current and current.get("scope") == LEAGUE else None)
+    if not latest or key not in (latest.get("blocks_used") or []):
+        return {"uses_block": False, "outdated": False, "version": None, "admin_url": None}
+    changes = await data_changes(db, league, season, latest)
+    outdated = any(row["block"] == key and row["season_id"] == season["id"] for row in (changes or {}).get("rows") or [])
+    scope, scope_id = (SEASON, season["id"]) if latest.get("scope") == SEASON else (LEAGUE, league["id"])
+    return {"uses_block": True, "outdated": outdated, "version": latest.get("version"),
+            "admin_url": f"/admin/leagues/rules/{scope}/{scope_id}"}
 
 
 async def _names(db, user_ids: set[str]) -> dict[str, str]:
@@ -548,6 +569,8 @@ async def _publish(db, scope: str, scope_id: str, body: dict, user: dict) -> dic
         doc = await db.league_rules.find_one_and_update(
             {"id": draft["id"], "status": DRAFT, "revision": draft["revision"]},
             {"$set": {"status": PUBLISHED, "version": int((predecessor or {}).get("version") or 0) + 1, "frozen": frozen,
+                      # Bilder der eingefrorenen Bausteine (#2218): Die Mediathek dreht und löscht sie nicht, solange die Fassung steht.
+                      "frozen_images": blocks.frozen_images(frozen),
                       "blocks_used": keys, "valid_from": valid_from, "change_reason": reason,
                       "requires_consent": bool(body.get("requires_consent")), "published_at": now, "published_by": user["id"],
                       "updated_at": now}},

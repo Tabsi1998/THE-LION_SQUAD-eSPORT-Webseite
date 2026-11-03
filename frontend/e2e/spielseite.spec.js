@@ -99,10 +99,10 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await expect(page.getByTestId("game-page-title")).toHaveText("Probe Shooter");
     await expect(page.getByRole("tab", { selected: true })).toHaveText("Allgemein");
     await expect(page.getByTestId("game-edit-name")).toHaveValue("Probe Shooter");
-    // Vier Reiter passen auch bei 390 px in die Leiste; erst ein fünfter (C.4) bringt Wischen und Hinweis.
+    // Fünf Reiter seit C.4 (Ausrüstung, #2218): Passen sie nicht in die Leiste, wird gewischt - dann steht der Hinweis da; am PC passen alle.
     const tabs = await page.getByTestId("game-tabs").evaluate((node) => node.scrollWidth - node.clientWidth);
-    expect(tabs).toBeLessThanOrEqual(1);
-    await expect(page.getByTestId("game-tabs-hint")).toHaveCount(0);
+    if (width >= 768) expect(tabs).toBeLessThanOrEqual(1);
+    await expect(page.getByTestId("game-tabs-hint")).toHaveCount(tabs > 1 ? 1 : 0);
     await noSideScroll(page);
     await shot(page, `spielseite-allgemein-${width}.png`);
 
