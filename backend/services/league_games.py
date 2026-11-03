@@ -25,7 +25,7 @@ import math
 from dataclasses import dataclass, field
 from typing import Any
 
-from services import league_eligibility, league_roster, map_pools
+from services import league_eligibility, league_result_rules, league_roster, map_pools
 from services.match_audience import registrations_for_match, responsible_user_ids, roster_ids, teams_by_id, users_for
 from services.matchday_schedule import matchday_number_of
 
@@ -85,6 +85,19 @@ class LeagueSetup:
     # Teilnehmerliste einmal je Spiel (#2204) und ihre Mindestzahl.
     lineup_mode: str = PER_MAP
     min_players: int = 1
+    # Ergebnisregeln (C.3, #1617): Punkte je Map Pflicht und die Fotos am Spiel, auf die eine Map verweisen darf.
+    scores_required: bool = False
+    proof_ids: set[str] = field(default_factory=set)
+    # Der Regelstand, mit dem geprüft wird: der der Staffel - beim Bestätigen der der Erstmeldung (``use_snapshot``).
+    result_rules: dict = field(default_factory=dict)
+
+    def rule_snapshot(self) -> dict:
+        """Was eine Meldung als ihren Regelstand festhält."""
+        return {"result_rules": dict(self.result_rules), "scores_required": self.scores_required}
+
+    def use_snapshot(self, held: dict) -> None:
+        self.result_rules = dict(held.get("result_rules") or {})
+        self.scores_required = bool(held.get("scores_required"))
 
     @property
     def is_series(self) -> bool:
@@ -168,6 +181,9 @@ async def setup(db, match: dict, tournament: dict | None = None, stage: dict | N
         roster=eligibility.roster if eligibility else None,
         lineup_mode=lineup_mode_of(tournament),
         min_players=_positive_int(tournament.get("lineup_min_players"), 1),
+        scores_required=league_result_rules.scores_required(tournament),
+        proof_ids=await league_result_rules.attached_proofs(db, match.get("id")),
+        result_rules=league_result_rules.snapshot(tournament)["result_rules"],
     )
 
 
@@ -330,12 +346,15 @@ def normalize_games(
     *,
     required_lineups: set[str] | frozenset = frozenset(),
     allowed_lineups: set[str] | frozenset = frozenset(),
+    staff: bool = False,
+    skip_rules: bool = False,
 ) -> list[dict]:
     """Die gemeldeten Maps nach dem Vertrag prüfen und in die gespeicherte Form bringen (``MatchGame``).
 
-    ``items``: ``{position, mode, map_id, winner_registration_id, scores, lineups: {registration_id: [user_id]}}``.
-    ``required_lineups``: Seiten, deren Aufstellung jede Map haben muss; ``allowed_lineups``: Seiten, die eine haben
-    dürfen (die eigene beim Melden, beide bei der Turnierleitung)."""
+    ``items``: ``{position, mode, map_id, winner_registration_id, scores, lineups: {registration_id: [user_id]}}`` und die
+    freiwilligen Zusatzfelder (C.3). ``required_lineups``: Seiten, deren Aufstellung jede Map haben muss; ``allowed_lineups``:
+    Seiten, die eine haben dürfen (die eigene beim Melden, beide bei der Turnierleitung). ``staff``: die Leitung (darf eine Map
+    zusprechen); ``skip_rules``: Ergebnisregel und Punktepflicht übergehen (nur Superadmin mit Grund, nie Best of)."""
     if not setup.pool:
         raise LeagueGamesError(NO_POOL_DETAIL)
     if not items:
@@ -375,6 +394,7 @@ def normalize_games(
         if not isinstance(scores_raw, dict) or any(key not in sides for key in scores_raw):
             raise LeagueGamesError(f"{label}: Punkte gehören zu den beiden Seiten des Spiels.")
         scores = {key: _score(value, label) for key, value in scores_raw.items() if value is not None and value != ""}
+        extras = _checked_extras(setup, item, mode, winner, scores, label, staff=staff, skip_rules=skip_rules)
         lineups_raw = item.get("lineups") or {}
         if not isinstance(lineups_raw, dict) or any(key not in allowed_lineups for key in lineups_raw):
             raise LeagueGamesError(f"{label}: eine Aufstellung gibt nur die eigene Seite an.")
@@ -394,6 +414,7 @@ def normalize_games(
                 "winner_registration_id": winner,
                 "scores": scores,
                 "lineups": lineups,
+                **extras,
             }
         )
     if max(wins.values() or [0]) < setup.needed:
@@ -403,6 +424,23 @@ def normalize_games(
         )
     check_both_sides(setup, games, allowed_lineups)
     return games
+
+
+def _checked_extras(setup: LeagueSetup, item: dict, mode: str | None, winner: str, scores: dict, label: str, *,
+                    staff: bool, skip_rules: bool) -> dict:
+    """Zusatzfelder und Ergebnisregel einer Map (C.3, #1617). Eine zugesprochene Map hat keine Punkte und keine Regel."""
+    try:
+        extras = league_result_rules.game_extras(item, label=label, sides=setup.reg_ids, staff=staff, proof_ids=setup.proof_ids)
+        if extras.get("decision") == league_result_rules.AWARDED:
+            if scores:
+                raise league_result_rules.RuleProblem(f"{label}: Eine zugesprochene Map hat keine Punkte.")
+        elif not skip_rules:
+            loser = next((side for side in setup.reg_ids if side != winner), "")
+            league_result_rules.check_map(league_result_rules.rule_for(setup.result_rules, mode), scores, winner, loser, label=label,
+                                          names=setup.names, required=setup.scores_required)
+    except league_result_rules.RuleProblem as problem:
+        raise LeagueGamesError(problem.detail, problem.status_code) from None
+    return extras
 
 
 def derived_results(setup: LeagueSetup, games: list[dict]) -> list[dict]:
@@ -649,7 +687,7 @@ async def tell_missing_lineups(db, match: dict, registration_ids: list[str]) -> 
 
 async def prepare_report(
     db, setup: LeagueSetup, raw_games: list[dict] | None, own_registration_id: str, results: list[dict],
-    lineup: list[str] | None = None,
+    lineup: list[str] | None = None, photo_id: str | None = None,
 ) -> tuple[list[dict] | None, list[str] | None]:
     """Eine Meldung eines Liga-Spiels prüfen. Mit Maps: alles nach dem Vertrag, die eigene Aufstellung je Map oder - mit
     ``lineup_mode: series`` - die Teilnehmerliste der eigenen Seite, passend zur Meldung der Gegenseite (sonst 409 mit Hinweis auf
@@ -661,6 +699,13 @@ async def prepare_report(
         report for key, report in latest_reports(setup.match.get("reports")).items() if key != own_registration_id
     ]
     other = others[-1] if others else None
+    if photo_id:
+        # Das Foto dieser Meldung hängt die Route gleich an - eine Map darf schon darauf verweisen (C.3).
+        setup.proof_ids = {*setup.proof_ids, photo_id}
+    if other and other.get("games"):
+        # Es gilt die Regel der Erstmeldung (C.3) - wie bei der App-Bestätigung und der 48-h-Automatik, die ihre Maps übernehmen.
+        setup.use_snapshot(league_result_rules.snapshot_of(other))
+    raw_games = _scores_from_other(setup, raw_games, other)
     if raw_games and setup.is_series:
         games = normalize_games(setup, [{**game, "lineups": {}} for game in raw_games])
         check_results(setup, games, results)
@@ -689,6 +734,19 @@ async def prepare_report(
     if reports_conflict([other, {"registration_id": own_registration_id, "results": results}]):
         raise LeagueGamesError(setup.app_detail)
     return None, None
+
+
+def _scores_from_other(setup: LeagueSetup, raw_games: list[dict] | None, other: dict | None) -> list[dict] | None:
+    """Bestätigen ohne Punkte (C.3): Es zählen ohnehin die Punkte der ersten Meldung - mit Regeln oder Punktepflicht prüft der
+    Server daher mit ihnen, sonst scheiterte jede Bestätigung. Ohne Regeln bleibt die Meldung, wie sie kam."""
+    if not raw_games or not (other or {}).get("games") or not (setup.scores_required or setup.result_rules):
+        return raw_games
+    theirs = {game.get("position"): game.get("scores") or {} for game in other["games"]}
+    out = []
+    for game in raw_games:
+        own = {key: value for key, value in (game.get("scores") or {}).items() if value is not None and value != ""}
+        out.append(game if own or not theirs.get(game.get("position")) else {**game, "scores": dict(theirs[game.get("position")])})
+    return out
 
 
 def consensus_games(reports: list[dict] | None, registration_ids: list[str]) -> tuple[list[dict] | None, list[str]]:
@@ -722,20 +780,22 @@ def missing_participants(lineups: dict | None, registration_ids: list[str]) -> l
     return [reg_id for reg_id in registration_ids if not (lineups or {}).get(reg_id)]
 
 
-def admin_games(setup: LeagueSetup, raw_games: list[dict], results: list[dict]) -> tuple[list[dict], list[str]]:
+def admin_games(setup: LeagueSetup, raw_games: list[dict], results: list[dict], *,
+                skip_rules: bool = False) -> tuple[list[dict], list[str]]:
     """Maps der Turnierleitung (Eintragen oder Korrektur): Aufstellungen beider Seiten, je Seite freiwillig."""
     sides = set(setup.reg_ids)
-    games = normalize_games(setup, raw_games, allowed_lineups=sides)
+    games = normalize_games(setup, raw_games, allowed_lineups=sides, staff=True, skip_rules=skip_rules)
     check_results(setup, games, results)
     return games, missing_lineups(games, setup.reg_ids)
 
 
-def admin_series(setup: LeagueSetup, raw_games: list[dict], raw_lineups: dict | None, results: list[dict]) -> tuple[list[dict], dict[str, list[str]], list[str]]:
+def admin_series(setup: LeagueSetup, raw_games: list[dict], raw_lineups: dict | None, results: list[dict], *,
+                 skip_rules: bool = False) -> tuple[list[dict], dict[str, list[str]], list[str]]:
     """Dasselbe mit Teilnehmerliste (#2204): die Maps ohne Aufstellung, dazu die Listen beider Seiten, je Seite freiwillig."""
     sides = set(setup.reg_ids)
     if not isinstance(raw_lineups or {}, dict) or any(key not in sides for key in raw_lineups or {}):
         raise LeagueGamesError("Eine Teilnehmerliste gehört zu einer der beiden Seiten des Spiels.")
-    games = normalize_games(setup, [{**game, "lineups": {}} for game in raw_games])
+    games = normalize_games(setup, [{**game, "lineups": {}} for game in raw_games], staff=True, skip_rules=skip_rules)
     check_results(setup, games, results)
     lineups = {key: _participants(setup, key, value) for key, value in (raw_lineups or {}).items() if value}
     check_both_sides(setup, with_series(None, lineups), sides)
@@ -918,6 +978,9 @@ def _games_view(games: list[dict] | None, people: dict[str, dict], with_lineups:
                         "scores",
                     )
                 },
+                # Zusatzfelder (C.3) nur, wenn gesetzt; den Nachweis sehen nur Beteiligte und Leitung - wie Aufstellungen.
+                **{key: game[key] for key in ("status", "replay_reason", "decision", "host_registration_id") if game.get(key)},
+                **({"proof_id": game["proof_id"]} if with_lineups and game.get("proof_id") else {}),
                 "lineups": (
                     {
                         reg_id: [people.get(user_id) or {"id": user_id, "name": "Spieler"} for user_id in lineup or []]
@@ -977,11 +1040,13 @@ def default_time(setup: LeagueSetup) -> str | None:
     return moment.isoformat() if moment else None
 
 
-async def page_block(db, setup: LeagueSetup, *, side_id: str | None, can_act: bool, staff: bool = False) -> dict:
+async def page_block(db, setup: LeagueSetup, *, side_id: str | None, can_act: bool, staff: bool = False,
+                     can_override: bool = False) -> dict:
     """Was die Matchseite zum Melden, Bestätigen, Nachtragen und Anzeigen braucht. ``side_id``: die Anmeldung, zu der
     die Person gehört (sonst ``None``); ``can_act``: sie darf für diese Seite handeln; ``staff``: Turnierleitung - sie
-    bekommt dazu die Kader beider Seiten fürs Ergebnis-Fenster. Aufstellungen sehen nur Beteiligte und die Leitung;
-    Gäste bekommen Maps, Sieger und Punkte wie in der Staffel-API."""
+    bekommt dazu die Kader beider Seiten fürs Ergebnis-Fenster; ``can_override``: sie darf eine Ergebnisregel übergehen
+    (Superadmin, C.3). Aufstellungen sehen nur Beteiligte und die Leitung; Gäste bekommen Maps, Sieger und Punkte wie in der
+    Staffel-API."""
     sees_lineups = bool(side_id) or staff
     from models import now_utc
     from services.v2_match_flows import latest_reports
@@ -990,6 +1055,9 @@ async def page_block(db, setup: LeagueSetup, *, side_id: str | None, can_act: bo
     latest = latest_reports(match.get("reports"))
     own_report = latest.get(side_id) if side_id else None
     other_reports = [report for key, report in latest.items() if key != side_id]
+    # Regelstand fürs Formular (C.3): Wer bestätigt, wird nach der Regel der Erstmeldung geprüft; sonst gilt die der Staffel.
+    proposal = other_reports[-1] if side_id and other_reports else None
+    held = league_result_rules.snapshot_of(proposal) if (proposal or {}).get("games") else setup.rule_snapshot()
     roster = sorted(setup.rosters.get(side_id) or set()) if side_id else []
     wanted = set(roster)
     if staff:
@@ -1063,6 +1131,12 @@ async def page_block(db, setup: LeagueSetup, *, side_id: str | None, can_act: bo
         "app_detail": setup.app_detail,
         "default_time": default_time(setup),
         "map_repeat": setup.map_repeat,
+        # Ergebnisregeln (C.3, #1617): je Modus des Pools, Punktepflicht, Positionen nach dem Serienende.
+        "result_rules": {group["mode"]: rule for group in _pool_modes(setup.pool)
+                         if (rule := league_result_rules.rule_for(held["result_rules"], group["mode"]))},
+        "scores_required": held["scores_required"],
+        "not_played": league_result_rules.not_played(match.get("games"), setup.best_of),
+        "can_override_rules": bool(staff and can_override),
     }
 
 

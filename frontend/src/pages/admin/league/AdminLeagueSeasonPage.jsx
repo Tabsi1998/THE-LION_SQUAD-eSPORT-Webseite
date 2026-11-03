@@ -27,6 +27,7 @@ import { accentStyle, prizesPayload, prizesToForm } from "@/lib/leagueLook";
 import { selectableModes } from "@/lib/gameMatchData";
 import { LeagueEmblem } from "@/components/tls/league/public/LeagueLook";
 import { SeasonRosterPanel } from "./SeasonRosterPanel";
+import { SeasonResultRulesPanel } from "./SeasonResultRulesPanel";
 import { SeasonScheduleRulesPanel } from "./SeasonScheduleRulesPanel";
 import { dayNoon, viennaDate } from "@/lib/vienna";
 import {
@@ -542,6 +543,9 @@ export default function AdminLeagueSeasonPage() {
               visibility={season.visibility} canEdit={canSeason} overrideReason={overrideReason} onOverrideReason={canSeason ? setOverrideReason : undefined}
               onSaved={reload} />
 
+
+            {/* Ergebnisregeln (C.3, #1617): eigene Speichern-Taste, Hinweis aufs Übertragen wie beim Season-Formular. */}
+            <SeasonResultRulesPanel seasonId={seasonId} canEdit={canSeason} onSaved={setPendingSync} />
 
             <section className="border border-white/10 rounded-sm bg-[#121212] p-4 md:p-5 space-y-4" aria-label="Ligen und Staffeln" data-testid="season-divisions">
               <div className="flex flex-wrap items-center justify-between gap-3">

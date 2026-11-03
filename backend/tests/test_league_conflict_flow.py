@@ -123,6 +123,8 @@ async def test_tournaments_without_league_know_no_conflict(flow):
 
 ROUTES = [
     ("POST", "/api/matches/{match}/result", "results", "RESULT"),
+    # Ergebnisregel übergehen (C.3, #1617): auch dann entscheidet im eigenen Spiel eine zweite Person.
+    ("POST", "/api/matches/{match}/result", "results", "OVERRIDE"),
     ("POST", "/api/matches/{match}/result/undo", "results", {}),
     ("POST", "/api/matches/{match}/forfeit", "results", "FORFEIT"),
     ("POST", "/api/tournaments/{tid}/lead/no-show/{match}", "results", "NOSHOW"),
@@ -135,6 +137,8 @@ def conflict_call(w, url, body, **extra):
     a = w["reg_a"]["id"]
     if body == "RESULT":
         body = result_body(w)
+    elif body == "OVERRIDE":
+        body = {**result_body(w), "rule_override_reason": "Server stürzte ab"}
     elif body == "FORFEIT":
         body = {"forfeit_registration_id": a, "note": "Nicht angetreten"}
     elif body == "NOSHOW":
