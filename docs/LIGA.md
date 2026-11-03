@@ -1302,7 +1302,7 @@ Abschussserien); gespeichert wird er erst auf Knopfdruck. Eine Kategorie mit Ein
 | `id`, `game_id` | str | Kennung, Spiel |
 | `category` | str | Kennung einer Kategorie des Spiels |
 | `name` | str 1–80 | je Spiel und Kategorie nur einmal (ohne Groß und klein, Leerraum zusammengefasst; 409) |
-| `image_url` | str \| `null` | nur eigener Upload (`game_maps.IMAGE_URL`), sonst 422; frühere stehen in `image_history` |
+| `image_url` | str \| `null` | nur eigener Upload (`game_maps.IMAGE_URL`) mit Eintrag in `media_uploads`; ohne Medienrolle (`ADMIN_MEDIA_ROLES`) nur eigene mit `media_scope: "user"` – wie im Regelwerk (#2230), auch beim Import; ein Bild, das der Eintrag schon trägt oder aus der Quelle mitbringt, braucht nur den Eintrag. Sonst 422. Frühere stehen in `image_history` |
 | `note` | str ≤ 500 | nur für die Verwaltung |
 | `weapon_ids` | [str] | nur Rolle `attachment`: Waffen dieses Spiels, zu denen der Aufsatz passt. **Leer = passt zu jeder Waffe** |
 | `status` | `active` \| `inactive` \| `archived` | Zustand wie bei Maps (C.2), fehlt = aktiv |

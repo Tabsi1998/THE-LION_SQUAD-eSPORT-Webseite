@@ -18,7 +18,8 @@ from pydantic import BaseModel, Field, field_validator
 from pymongo.errors import DuplicateKeyError
 
 from models import now_utc
-from services import game_maps
+from services import game_maps, uploads_inventory
+from services.permissions import ADMIN_MEDIA_ROLES, is_confirmed_admin_role
 from services.slug_utils import slugify
 
 # Grenzen gegen unkontrollierte Datenmengen - keine feste Zahl eines Spiels.
@@ -248,6 +249,34 @@ def _clean_image(value) -> str | None:
         raise EquipmentProblem(problem.message) from None
 
 
+IMAGE_UNKNOWN = "Das Bild steht nicht in der Mediathek – bitte über „Hochladen“ oder die Mediathek wählen."
+IMAGE_NOT_OWN = "Ohne Medienrechte gehen nur eigene hochgeladene Bilder – bitte über „Hochladen“ wählen."
+
+
+def _file_of(url: str | None) -> str | None:
+    return uploads_inventory.upload_filename(str(url or "")) if url else None
+
+
+async def checked_image(db, value, user: dict | None, *, kept=()) -> str | None:
+    """Das Bild eines Eintrags - dieselbe Prüfung wie im Regelwerk (#2230): eigener Upload mit Eintrag in der Mediathek, und ohne Medienrolle
+    nur eigene (``media_scope: "user"``). ``kept``: Adressen, die der Eintrag schon trägt bzw. aus der Quelle mitbringt - für sie zählt nur
+    der Eintrag in der Mediathek, nicht, wem er gehört."""
+    image = _clean_image(value)
+    name = _file_of(image)
+    if not name:
+        return image
+    rows = await db.media_uploads.find({"$or": [{"filename": name}, {"raster_filename": name}]},
+                                       {"_id": 0, "media_scope": 1, "owner_id": 1}).to_list(None)
+    if not rows:
+        raise EquipmentProblem(IMAGE_UNKNOWN)
+    kept_names = {_file_of(url) for url in kept if url}
+    if user is None or name in kept_names or is_confirmed_admin_role(user, ADMIN_MEDIA_ROLES):
+        return image
+    if not any(row.get("media_scope") == "user" and str(row.get("owner_id")) == str(user.get("id")) for row in rows):
+        raise EquipmentProblem(IMAGE_NOT_OWN)
+    return image
+
+
 async def _clean_weapons(db, game: dict, categories: list[dict], role: str | None, ids: list[str] | None) -> list[str]:
     """Die Waffen eines Aufsatzes: jede einmal, nur Waffen dieses Spiels. Andere Arten tragen keine (422, wenn doch)."""
     wanted = list(dict.fromkeys(str(value or "").strip() for value in ids or [] if str(value or "").strip()))
@@ -276,14 +305,16 @@ async def _check_name(db, game_id: str, category: dict, name: str, current_id: s
         raise _taken(name, category["label"])
 
 
-async def create(db, game: dict, body: EquipmentCreate, user: dict, new_id: str, *, categories: list[dict] | None = None) -> dict:
+async def create(db, game: dict, body: EquipmentCreate, user: dict, new_id: str, *, categories: list[dict] | None = None,
+                 kept=()) -> dict:
+    """``kept``: Bilder, die der Eintrag aus einer Quelle mitbringt (Import) - sie brauchen nur ihren Eintrag in der Mediathek."""
     categories = categories if categories is not None else await categories_of(db, game["id"])
     category = next((row for row in categories if row["key"] == body.category), None)
     if not category:
         raise EquipmentProblem("Diese Kategorie gibt es in diesem Spiel nicht - bitte neu laden.")
     if await db.game_equipment.count_documents({"game_id": game["id"]}) >= ITEMS_PER_GAME_MAX:
         raise EquipmentProblem(f"Höchstens {ITEMS_PER_GAME_MAX} Einträge je Spiel - archivierte zählen mit.")
-    image = _clean_image(body.image_url)
+    image = await checked_image(db, body.image_url, user, kept=kept)
     weapons = await _clean_weapons(db, game, categories, category["role"], body.weapon_ids)
     await _check_name(db, game["id"], category, body.name)
     now = now_utc().isoformat()
@@ -308,7 +339,8 @@ async def update(db, game: dict, current: dict, body: EquipmentUpdate, user: dic
         await _check_name(db, game["id"], category, raw["name"], current["id"])
         updates.update({"name": raw["name"], "name_key": name_key(raw["name"])})
     if "image_url" in raw:
-        updates["image_url"] = _clean_image(raw["image_url"])
+        updates["image_url"] = await checked_image(db, raw["image_url"], user,
+                                                   kept=[current.get("image_url"), *(current.get("image_history") or [])])
         old = current.get("image_url")
         if old and old != updates["image_url"]:
             # Frühere Bilder bleiben verwendet (Mediathek): gespeicherte Sperrlisten zeigen den Eintrag wie damals.
@@ -415,7 +447,8 @@ async def import_items(db, game: dict, source: dict, item_ids: list[str], user: 
         body = EquipmentCreate(category=target["key"], name=row.get("name"), image_url=row.get("image_url"), note=row.get("note"),
                                weapon_ids=weapons)
         try:
-            created.append(await create(db, game, body, user, make_id(), categories=target_cats))
+            # Das Bild der Quelle braucht seinen Eintrag in der Mediathek; wem es gehört, zählt nicht - es steht schon in der Bibliothek.
+            created.append(await create(db, game, body, user, make_id(), categories=target_cats, kept=[row.get("image_url")]))
         except EquipmentProblem as problem:
             skipped.append({"id": row["id"], "name": row.get("name"), "reason": problem.message})
     return {"created": created, "skipped": skipped, "categories": target_cats}

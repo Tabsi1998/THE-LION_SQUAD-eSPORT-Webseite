@@ -15,6 +15,10 @@ CATEGORIES = [{"label": "Waffen", "role": "weapon"}, {"label": "Aufsätze", "rol
 
 async def add_library(flow, w: dict) -> dict:
     """Legt Kategorien und Einträge an und gibt die Einträge nach Namen zurück (``w["items"]``)."""
+    for url in (IMAGE, PERK_IMAGE):
+        # Nur Bilder mit Eintrag in der Mediathek nimmt die Bibliothek (wie das Regelwerk, #2230).
+        await flow.db.media_uploads.insert_one({"id": url, "filename": url.rsplit("/", 1)[-1], "url": url, "media_type": "image",
+                                                "media_scope": "admin", "owner_role": "admin"})
     flow.act_as(w["lead"])
     base = f"/api/games/{w['game']['id']}/equipment"
     cats = {row["label"]: row["key"] for row in ok(await flow.put(f"{base}/categories", json={"categories": CATEGORIES}))["categories"]}

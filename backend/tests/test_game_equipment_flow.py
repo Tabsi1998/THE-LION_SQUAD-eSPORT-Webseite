@@ -29,7 +29,16 @@ async def flow():
         await shutdown()
 
 
+async def register(flow, *urls: str, scope: str = "admin", owner: str | None = None) -> None:
+    """Bilder in der Mediathek eintragen - nur solche nimmt die Bibliothek (wie das Regelwerk, #2230)."""
+    for url in urls:
+        name = url.rsplit("/", 1)[-1]
+        await flow.db.media_uploads.insert_one({"id": new_id(), "filename": name, "url": url, "media_type": "image",
+                                                "media_scope": scope, "owner_id": owner, "owner_role": "admin"})
+
+
 async def setup(flow, categories=CATEGORIES) -> dict:
+    await register(flow, IMAGE, "/api/static/uploads/neu-2.png")
     admin = await flow.add_staff()
     flow.act_as(admin)
     game = ok(await flow.post("/api/games", json=GAME))
@@ -117,6 +126,50 @@ async def test_a_foreign_image_and_an_unknown_category_are_refused(flow):
     assert foreign.status_code == 422 and "Hochladen" in foreign.json()["detail"]
     unknown = await flow.post(url(w), json={"category": "gibt-es-nicht", "name": "Fremd"})
     assert unknown.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_an_image_needs_its_entry_in_the_media_library(flow):
+    """Nur das Format zu prüfen reicht nicht (Review C.4): Eine Adresse ohne Eintrag in der Mediathek nimmt die Bibliothek nicht."""
+    w = await setup(flow)
+    unknown = await flow.post(url(w), json={"category": w["cats"]["Waffen"], "name": "Ohne Eintrag",
+                                            "image_url": "/api/static/uploads/gibt-es-nicht.webp"})
+    weapon = await add(flow, w, "Waffen", "Blitz 9")
+    changed = await flow.patch(url(w, f"/{weapon['id']}"), json={"image_url": "/api/static/uploads/gibt-es-nicht.webp"})
+    assert (unknown.status_code, changed.status_code) == (422, 422)
+    assert "Mediathek" in unknown.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_without_a_media_role_only_own_uploads_go_in(flow):
+    """Wie im Regelwerk (#2230): Wer die Bibliothek über eine Freigabe pflegt, aber keine Medienrolle hat, nimmt nur eigene Bilder."""
+    w = await setup(flow)
+    keeper = await flow.add_user(name="Freigabe Turnierleitung")
+    await flow.db.users.update_one({"id": keeper["id"]}, {"$set": {"areas": ["tournaments"]}})
+    keeper["areas"] = ["tournaments"]
+    own, other = "/api/static/uploads/eigen-3.png", "/api/static/uploads/fremd-4.png"
+    await register(flow, own, scope="user", owner=keeper["id"])
+    await register(flow, other, scope="user", owner="jemand-anders")
+    weapon = await add(flow, w, "Waffen", "Blitz 9", image_url=IMAGE)
+    flow.act_as(keeper)
+    created = await flow.post(url(w), json={"category": w["cats"]["Waffen"], "name": "Eigen", "image_url": own})
+    refused = await flow.post(url(w), json={"category": w["cats"]["Waffen"], "name": "Fremd", "image_url": other})
+    club = await flow.post(url(w), json={"category": w["cats"]["Waffen"], "name": "Verein", "image_url": IMAGE})
+    renamed = await flow.patch(url(w, f"/{weapon['id']}"), json={"name": "Blitz X", "image_url": IMAGE})
+    assert created.status_code == 200, created.text
+    assert (refused.status_code, club.status_code) == (422, 422)
+    assert renamed.status_code == 200, "ein Bild, das der Eintrag schon hat, bleibt"
+
+
+@pytest.mark.asyncio
+async def test_import_skips_an_image_without_entry_in_the_media_library(flow):
+    w = await setup(flow)
+    await flow.db.game_equipment.insert_one({"id": "alt", "game_id": w["game"]["id"], "category": w["cats"]["Perks"], "name": "Altbild",
+                                             "name_key": "altbild", "image_url": "/api/static/uploads/weg-5.webp", "status": "active",
+                                             "weapon_ids": []})
+    target = ok(await flow.post("/api/games", json={**GAME, "name": "Probe Shooter 2"}))
+    result = ok(await flow.post(f"/api/games/{target['id']}/equipment/import", json={"source_game_id": w["game"]["id"], "item_ids": ["alt"]}))
+    assert result["created"] == [] and "Mediathek" in result["skipped"][0]["reason"]
 
 
 @pytest.mark.asyncio
