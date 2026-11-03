@@ -5,7 +5,7 @@
 // damals. Keine eingebauten Hersteller-Maps: jede Map legt die Verwaltung selbst an.
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Archive, ArchiveRestore, ArrowLeft, ArrowDown, ArrowUp, Copy, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowDown, ArrowUp, Copy, Pencil, Plus, Trash2 } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminSheet } from "@/components/tls/AdminSheet";
@@ -15,9 +15,10 @@ import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MapCard } from "@/components/tls/maps/MapPoolView";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { mapFormPayload, mapToForm, mapsWithoutMode } from "@/lib/mapPools";
+import { mapFormPayload, mapStatusOf, mapToForm, mapsWithoutMode } from "@/lib/mapPools";
 import { modeStatusOf } from "@/lib/gameMatchData";
 import { MapPoolEditor } from "./maps/MapPoolEditor";
+import { MapStatusActions } from "./maps/MapStatusActions";
 import { MapImportSheet } from "./maps/MapImportSheet";
 import { toast } from "sonner";
 
@@ -178,8 +179,6 @@ export default function AdminGameMapsPage() {
     [ids[from], ids[to]] = [ids[to], ids[from]];
     act(() => api.put(`/games/${gameId}/maps/order`, { ids }));
   };
-  const setStatus = (item, status) => act(() => api.patch(`/games/${gameId}/maps/${item.id}`, { status }),
-    status === "archived" ? "Map archiviert." : "Map zurückgeholt.");
   const remove = async (item) => {
     if (!await confirm({ title: `„${item.name}“ löschen?`, description: "Die Map stand noch in keinem Pool und wird dauerhaft entfernt.", confirmLabel: "Löschen" })) return;
     act(() => api.delete(`/games/${gameId}/maps/${item.id}`), "Map gelöscht.");
@@ -254,14 +253,16 @@ export default function AdminGameMapsPage() {
                 // Nur Modi, die das Spiel noch hat - nie eine rohe Kennung.
                 const itemModes = item.modes.filter((mode) => labels[mode]);
                 return (
-                  <li key={item.id} className={`border border-white/10 rounded-sm bg-[#121212] p-2 ${archived ? "opacity-60" : ""}`}
+                  <li key={item.id} className={`border border-white/10 rounded-sm bg-[#121212] p-2 ${archived ? "opacity-60" : mapStatusOf(item) === "inactive" ? "opacity-80" : ""}`}
                     data-testid={`game-map-card-${item.slug}`} data-slug={item.slug}>
                     <MapCard item={item} index={index} position={archived ? null : index + 1}
                       sizes="(min-width: 1280px) 280px, (min-width: 1024px) 30vw, (min-width: 640px) 45vw, 100vw" />
                     <div className="mt-2 space-y-1 px-1">
                       <div className="flex items-center justify-between gap-2 text-[11px] text-white/45">
                         <span className="truncate">{item.slug}</span>
-                        <span className="shrink-0 tabular-nums">{archived ? "Archiviert · " : ""}{poolsText(item.in_pools)}</span>
+                        <span className="shrink-0 tabular-nums" data-testid={`game-map-state-${item.slug}`}>
+                          {archived ? "Archiviert · " : mapStatusOf(item) === "inactive" ? "Inaktiv · " : ""}{poolsText(item.in_pools)}
+                        </span>
                       </div>
                       <div className="flex flex-wrap gap-1 min-h-[1.25rem]">
                         {itemModes.length ? itemModes.map((mode) => (
@@ -275,10 +276,8 @@ export default function AdminGameMapsPage() {
                         </span>
                         <span className="flex items-center">
                           <button type="button" className={ICON_BUTTON} onClick={() => setEditing(item)} aria-label={`${item.name} bearbeiten`} data-testid={`game-map-edit-${item.slug}`}><Pencil className="w-4 h-4" /></button>
-                          <button type="button" className={ICON_BUTTON} onClick={() => setStatus(item, archived ? "active" : "archived")}
-                            aria-label={archived ? `${item.name} zurückholen` : `${item.name} archivieren`} data-testid={`game-map-archive-${item.slug}`}>
-                            {archived ? <ArchiveRestore className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
-                          </button>
+                          {/* Zustand (#2207): deaktivieren, aktivieren, archivieren - mit Rückfrage, die betroffene Seasons nennt. */}
+                          <MapStatusActions gameId={gameId} item={item} onChanged={load} />
                           <button type="button" className={ICON_BUTTON.replace("hover:text-[#29B6E8]", "hover:text-[#FF3B30]")} onClick={() => remove(item)} disabled={item.in_pools > 0}
                             title={item.in_pools > 0 ? "Steht in einem gespeicherten Pool – archivieren statt löschen" : "Löschen"}
                             aria-label={`${item.name} löschen`} data-testid={`game-map-delete-${item.slug}`}><Trash2 className="w-4 h-4" /></button>

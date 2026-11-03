@@ -57,6 +57,11 @@ ROUTES = [
     route("PATCH", "/api/admin/leagues/seasons/{season}", "rules", {"rules_text": "Neue Regeln"}),
     route("PUT", "/api/admin/leagues/seasons/{season}/map-pool", "season", POOL_BODY),
     route("DELETE", "/api/admin/leagues/seasons/{season}/map-pool", "season"),
+    # Maps und Pools (#2207, C.2)
+    route("GET", "/api/admin/leagues/seasons/{season}/map-pool/versions", ANY),
+    route("GET", "/api/admin/leagues/seasons/{season}/map-pool/compare?base=1&target=1", ANY),
+    route("POST", "/api/admin/leagues/seasons/{season}/map-pool/remove-map", "season", {"map_id": "map-hafen", "reason": "Grund genug"}),
+    route("GET", "/api/admin/leagues/seasons/{season}/readiness", ANY),
     route("POST", "/api/admin/leagues/seasons/{season}/sync", "season"),
     # Ergebnisregeln (C.3, #1617)
     route("GET", "/api/admin/leagues/seasons/{season}/result-rules", ANY),

@@ -20,10 +20,16 @@ def ok(response, code: int = 200):
     return response.json()
 
 
+# Eine Season mit Sichtbarkeit anzulegen heißt veröffentlichen (#2207): Der Aufbau hat noch keinen Pool und keine Liga N, also nimmt
+# der Superadmin die Notausnahme. Die Prüfung selbst testet test_league_pools_flow.py.
+SETUP_OVERRIDE = {"readiness_override_reason": "Testaufbau ohne Prüfung"}
+
+
 def season_body(**extra) -> dict:
     start = (now_utc() + timedelta(days=8)).date().isoformat()
-    return {**OLD_RULES, "start_date": f"{start}T00:00:00", "weeks_total": 24, "round_robin_legs": 1, "best_of": 3, "team_size": 4,
+    body = {**OLD_RULES, "start_date": f"{start}T00:00:00", "weeks_total": 24, "round_robin_legs": 1, "best_of": 3, "team_size": 4,
             "max_staffel_size": 16, "rules_text": "Regeln der Probe-Season", "visibility": "admins", **extra}
+    return {**body, **SETUP_OVERRIDE} if body.get("visibility") not in (None, "off") else body
 
 
 async def add_staffel(flow, lead: dict, division_id: str, teams: int, *, game: dict, prefix: str) -> str:

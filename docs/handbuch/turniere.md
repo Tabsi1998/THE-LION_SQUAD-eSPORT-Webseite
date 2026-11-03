@@ -798,8 +798,11 @@ Maps dieses Spiels mit demselben Bild, die Modi nur soweit dieses Spiel sie kenn
 - **Modi:** dieselben Modi wie bei der Spieldauer (siehe 3.12) – kein zweites Modussystem. Eine Map kann in mehreren
   Modi freigegeben sein und in anderen nicht; nur dort lässt sie sich in einen Pool wählen. Hat das Spiel keine Modi,
   gilt die Map für jeden Pool.
-- Die Pfeile ändern die **Reihenfolge**, das Archiv-Symbol **archiviert** (und holt zurück). **Löschen** geht nur, solange
-  die Map in keinem gespeicherten Pool stand – sonst archivieren. Die Karte sagt, in wie vielen Pools sie steht.
+- Die Pfeile ändern die **Reihenfolge**, das Pause-Symbol **deaktiviert** (und aktiviert wieder), das Archiv-Symbol
+  **archiviert** (und holt zurück). *Inaktiv*: in keinen neuen Pool wählbar, wo sie schon steht, bleibt sie gültig und im
+  Pool-Editor mit „inaktiv“ markiert. Vor dem Deaktivieren und Archivieren nennt eine Rückfrage die Liga-Seasons, in deren Pool
+  die Map steht – nur als Hinweis. **Löschen** geht nur, solange die Map in keinem gespeicherten Pool und keinem Spiel stand –
+  sonst archivieren. Die Karte sagt, in wie vielen Pools sie steht.
 
 <img src="../assets/turniere/maps-bibliothek.png" alt="Map-Bibliothek eines Spiels: Karten mit Bild, Slug, Modi und wie viele Pools die Map nutzen" width="560">
 

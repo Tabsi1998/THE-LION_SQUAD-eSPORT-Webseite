@@ -17,6 +17,9 @@ import { SelectField, TextAreaField, TextField } from "@/components/tls/FormFiel
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { MapPoolEditor } from "@/pages/admin/maps/MapPoolEditor";
+import { PoolMapLock } from "@/pages/admin/maps/PoolMapLock";
+import { PoolVersionCompare } from "@/pages/admin/maps/PoolVersionCompare";
+import { SeasonReadinessPanel } from "./SeasonReadinessPanel";
 import { LeagueDeleteSheet } from "./LeagueDeleteSheet";
 import { BannerField, EmblemField, PrizeEditor } from "./LeagueLookFields";
 import { accentStyle, prizesPayload, prizesToForm } from "@/lib/leagueLook";
@@ -36,7 +39,10 @@ import {
   VISIBILITY_OPTIONS,
   VISIBILITY_SHORT,
   WEEKDAY_OPTIONS,
+  longestSeries,
   modeOrderProblem,
+  orderLengthNote,
+  sameOrder,
   overridesPayload,
   overridesToForm,
   seasonPayload,
@@ -129,7 +135,7 @@ function Tiebreakers({ value, onChange }) {
   );
 }
 
-function ModeOrder({ modes, poolModes = [], bestOf, value, onChange }) {
+function ModeOrder({ modes, poolModes = [], bestOf, value, onChange, note = "" }) {
   // Ein Modus, den das Spiel nicht mehr hat (#2129): bleibt sichtbar gesetzt und gilt weiter, neu wählen geht nicht.
   const gone = [...new Set(value.filter((mode) => mode && !modes.some((known) => known.mode === mode)))]
     .map((mode) => ({ mode, label: `${poolModes.find((group) => group.mode === mode)?.label || mode} (nicht mehr im Spiel)` }));
@@ -141,7 +147,8 @@ function ModeOrder({ modes, poolModes = [], bestOf, value, onChange }) {
     next[index] = mode;
     onChange(next);
   };
-  const problem = modeOrderProblem(value, bestOf);
+  // Altbestand (#2207): Eine gespeicherte Reihenfolge, die nicht zur Serie passt, nennt der Hinweis statt eines Fehlers.
+  const problem = note ? "" : modeOrderProblem(value, bestOf);
   return (
     <fieldset className="space-y-1.5" data-testid="season-mode-order">
       <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60">Modus je Map</legend>
@@ -151,7 +158,9 @@ function ModeOrder({ modes, poolModes = [], bestOf, value, onChange }) {
             options={[["", "frei"], ...choices.map((mode) => [mode.mode, mode.label])]} testId={`mode-order-${index}`} />
         ))}
       </div>
-      <p className={`text-xs ${problem ? "text-warn" : "text-white/45"}`}>{problem || "Alle frei: die Teams wählen den Modus je Map selbst."}</p>
+      {note ? <p className="text-xs text-warn" data-testid="season-mode-order-note">{note}</p> : (
+        <p className={`text-xs ${problem ? "text-warn" : "text-white/45"}`}>{problem || "Alle frei: die Teams wählen den Modus je Map selbst."}</p>
+      )}
     </fieldset>
   );
 }
@@ -172,9 +181,10 @@ function DivisionSheet({ division, season, onClose, onSaved }) {
       // Eigene Gewinne (#2107) nur, wenn sie sich ändern - leer heißt wieder „wie die Season“.
       const ownPrizes = prizesPayload(prizes);
       if (JSON.stringify(ownPrizes) !== JSON.stringify(prizesPayload(prizesToForm(division?.prizes)))) body.prizes = ownPrizes;
-      if (division) await api.patch(`/admin/leagues/divisions/${division.id}`, body);
-      else await api.post(`/admin/leagues/seasons/${season.id}/divisions`, body);
+      const response = division ? await api.patch(`/admin/leagues/divisions/${division.id}`, body)
+        : await api.post(`/admin/leagues/seasons/${season.id}/divisions`, body);
       toast.success(division ? "Liga gespeichert." : "Liga angelegt.");
+      (response?.data?.warnings || []).forEach((text) => toast.warning(text));
       onSaved();
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail));
@@ -247,6 +257,7 @@ export default function AdminLeagueSeasonPage() {
   const [syncing, setSyncing] = useState(false);
   const [divisionSheet, setDivisionSheet] = useState(null);
   const [deleting, setDeleting] = useState(null);
+  const [overrideReason, setOverrideReason] = useState("");
   const navigate = useNavigate();
 
   const load = useCallback(async (resetForm = false) => {
@@ -272,9 +283,18 @@ export default function AdminLeagueSeasonPage() {
   const modes = useMemo(() => selectableModes(data?.game?.modes, data?.season?.game_mode_order), [data]);
   const staffelCount = (data?.divisions || []).reduce((sum, division) => sum + division.staffeln.length, 0);
 
+  // „Modus je Map“ ist so lang wie die längste Serie (#2207): Best of der Season oder einer Liga N.
+  const longest = longestSeries(form?.best_of, data?.divisions);
+  // Altbestand (#2207): Eine gespeicherte Reihenfolge, die nicht zur Serie passt, bleibt unverändert speicherbar. Geprüft wird nur, was
+  // jemand geändert hat - der Server lehnt im Entwurf ab und warnt in einer laufenden Season.
+  const savedOrder = data?.season?.game_mode_order || [];
+  const orderEdited = form ? !sameOrder(form.game_mode_order, savedOrder) : false;
+  const bestOfEdited = form ? String(form.best_of) !== String(data?.season?.best_of) : false;
+  const draft = (data?.season?.status || "draft") === "draft";
+  const orderNote = form && !orderEdited ? orderLengthNote(savedOrder, longest) : "";
   const save = async (event) => {
     event.preventDefault();
-    const problem = modeOrderProblem(form.game_mode_order, form.best_of);
+    const problem = orderEdited || (draft && bestOfEdited) ? modeOrderProblem(form.game_mode_order, longest) : "";
     if (problem) {
       toast.error(problem);
       return;
@@ -282,9 +302,13 @@ export default function AdminLeagueSeasonPage() {
     setSaving(true);
     try {
       // Nur „Regeln veröffentlichen“ (#2203): Der Server nimmt von dieser Person nur den Regeltext an.
-      const body = canSeason ? seasonPayload(form) : { rules_text: seasonPayload(form).rules_text };
+      const body = canSeason ? seasonPayload(form, longest, savedOrder) : { rules_text: seasonPayload(form).rules_text };
+      // Notausnahme des Superadmins beim Veröffentlichen trotz Problemen (#2207) - der Server prüft selbst.
+      if (canSeason && overrideReason.trim()) body.readiness_override_reason = overrideReason.trim();
       const { data: saved } = await api.patch(`/admin/leagues/seasons/${seasonId}`, body);
       toast.success(saved.changed?.length ? "Season gespeichert." : "Keine Änderung.");
+      (saved.warnings || []).forEach((text) => toast.warning(text));
+      setOverrideReason("");
       if (saved.visibility_applied) toast.success(`Sichtbarkeit für ${saved.visibility_applied === 1 ? "1 Staffel" : `${saved.visibility_applied} Staffeln`} geändert.`);
       setPendingSync(saved.staffeln_to_sync || 0);
       await load(true);
@@ -346,8 +370,9 @@ export default function AdminLeagueSeasonPage() {
 
   const savePool = async (body) => {
     try {
-      await api.put(`/admin/leagues/seasons/${seasonId}/map-pool`, body);
+      const response = await api.put(`/admin/leagues/seasons/${seasonId}/map-pool`, body);
       toast.success("Map-Pool gespeichert.");
+      (response?.data?.warnings || []).forEach((text) => toast.warning(text));
       await reload();
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail));
@@ -428,7 +453,7 @@ export default function AdminLeagueSeasonPage() {
                   <TextField label="Mindestkader" type="number" min={1} max={40} value={form.min_squad_size} onChange={(value) => set("min_squad_size", value)} testId="season-form-min-squad" />
                   <TextField label="Teams je Staffel höchstens" type="number" min={2} max={20} value={form.max_staffel_size} onChange={(value) => set("max_staffel_size", value)} testId="season-form-staffel-size" />
                 </FormGrid>
-                <ModeOrder modes={modes} poolModes={data.map_pool?.modes} bestOf={form.best_of} value={form.game_mode_order} onChange={(value) => set("game_mode_order", value)} />
+                <ModeOrder modes={modes} poolModes={data.map_pool?.modes} bestOf={longest} value={form.game_mode_order} onChange={(value) => set("game_mode_order", value)} note={orderNote} />
                 <FormGrid>
                   <SelectField label="Map-Wiederholung in einer Serie" value={form.map_repeat} onChange={(value) => set("map_repeat", value)} options={MAP_REPEAT_OPTIONS}
                     hint="Ob dieselbe Map in einer Serie noch einmal gespielt werden darf. Die Meldung prüft es." testId="season-form-map-repeat" />
@@ -506,6 +531,15 @@ export default function AdminLeagueSeasonPage() {
               <MapPoolEditor key={data.map_pool?.id || "leer"} title="Map-Pool der Season" game={data.game} library={data.library} entry={data.map_pool} defaultPool={data.default_pool}
                 hint="Jede neue Staffel bekommt eine Kopie; Änderungen kommen beim Übertragen an. Ohne Pool kann niemand mit Maps melden." onSave={savePool} onClear={clearPool} libraryLink testId="season-pool" />
             ) : null}
+            {/* C.2 (#2207): Map sperren, Versionen vergleichen, Prüfung vor der Veröffentlichung - eigenständige Bausteine. */}
+            {canSeason && data.map_pool && !data.map_pool.stale ? (
+              <PoolMapLock endpoint={`/admin/leagues/seasons/${seasonId}/map-pool/remove-map`} pool={data.map_pool} onDone={reload} testId="season-pool-lock" />
+            ) : null}
+            <PoolVersionCompare baseUrl={`/admin/leagues/seasons/${seasonId}/map-pool`} version={data.map_pool?.version} testId="season-pool-compare" />
+            <SeasonReadinessPanel seasonId={seasonId} version={`${season.updated_at}-${data.map_pool?.version ?? 0}-${data.divisions.length}-${staffelCount}`}
+              visibility={season.visibility} canEdit={canSeason} overrideReason={overrideReason} onOverrideReason={canSeason ? setOverrideReason : undefined}
+              onSaved={reload} />
+
 
             {/* Ergebnisregeln (C.3, #1617): eigene Speichern-Taste, Hinweis aufs Übertragen wie beim Season-Formular. */}
             <SeasonResultRulesPanel seasonId={seasonId} canEdit={canSeason} onSaved={setPendingSync} />

@@ -247,12 +247,12 @@ async def test_a_season_keeps_its_mode_order_after_a_mode_is_removed(flow):
     game = await new_game(flow, match_modes=MODES)
     league = (await flow.post("/api/admin/leagues", json={"name": "Probe Liga", "game_id": game["id"]})).json()
     season = await flow.post(f"/api/admin/leagues/{league['id']}/seasons",
-                             json={"name": "Season 1", "start_date": "2030-01-07T18:00:00+00:00", "game_mode_order": ["stellung", "suchen"]})
+                             json={"name": "Season 1", "start_date": "2030-01-07T18:00:00+00:00", "game_mode_order": ["stellung", "suchen", "stellung"]})
     assert season.status_code == 200, season.text
     await remove_like_before(flow, game, MODES[:1])
 
     # Ein anderes Speichern mit der alten Reihenfolge scheitert nicht am entfernten Modus - neu wählen geht aber nicht.
-    kept = await flow.patch(f"/api/admin/leagues/seasons/{season.json()['id']}", json={"name": "Season Eins", "game_mode_order": ["stellung", "suchen"]})
+    kept = await flow.patch(f"/api/admin/leagues/seasons/{season.json()['id']}", json={"name": "Season Eins", "game_mode_order": ["stellung", "suchen", "stellung"]})
     assert kept.status_code == 200, kept.text
-    refused = await flow.patch(f"/api/admin/leagues/seasons/{season.json()['id']}", json={"game_mode_order": ["stellung", "gibt_es_nicht"]})
+    refused = await flow.patch(f"/api/admin/leagues/seasons/{season.json()['id']}", json={"game_mode_order": ["stellung", "gibt_es_nicht", "stellung"]})
     assert refused.status_code == 422

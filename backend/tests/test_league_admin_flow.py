@@ -212,7 +212,7 @@ async def test_sync_before_the_start_applies_everything(flow):
     staffel = await _staffel(flow, division)
 
     changed = await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={
-        "visibility": "public", "rules_text": "Neu", "best_of": 5, "weeks_total": 12, "default_match_time": "19:30"})
+        "visibility": "public", "readiness_override_reason": "Testaufbau ohne Prüfung", "rules_text": "Neu", "best_of": 5, "weeks_total": 12, "default_match_time": "19:30"})
     assert changed.status_code == 200, changed.text
     assert changed.json()["staffeln_to_sync"] == 1
     untouched = await flow.db.tournaments.find_one({"id": staffel["id"]}, {"_id": 0})
@@ -243,7 +243,7 @@ async def test_sync_keeps_the_calendar_after_the_start_and_the_scoring_after_the
                                          "slots": []})
 
     await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={
-        "visibility": "members", "rules_text": "Später", "best_of": 5, "weeks_total": 12})
+        "visibility": "members", "readiness_override_reason": "Testaufbau ohne Prüfung", "rules_text": "Später", "best_of": 5, "weeks_total": 12})
     result = (await flow.post(f"{ADMIN}/seasons/{season['id']}/sync")).json()["staffeln"][0]
 
     assert sorted(item["group"] for item in result["skipped"]) == ["before_result", "before_start"]
@@ -287,7 +287,7 @@ async def test_season_input_is_checked(flow):
     assert response.status_code == 422
     bad_points = await flow.patch(url, json={"scoring_rules": {"table_tiebreakers": ["los"]}})
     assert bad_points.status_code == 422 and "Gleichstand" in bad_points.json()["detail"]
-    ok = await flow.patch(url, json={"game_mode_order": ["snd", "stellung"], "team_size": 5})
+    ok = await flow.patch(url, json={"game_mode_order": ["snd", "stellung", "snd"], "team_size": 5})
     assert ok.status_code == 200, ok.text
     assert ok.json()["min_squad_size"] == 5  # Mindestkader wächst mit der Teamgröße mit
     duplicate = await flow.post(f"{ADMIN}/{league['id']}/seasons", json={**SEASON_ONE, "number": 1})
@@ -542,7 +542,7 @@ async def test_hidden_league_fields_are_refused_unchanged_values_pass(flow):
 
 @pytest.mark.asyncio
 async def test_the_season_admin_path_goes_only_to_the_management(flow):
-    _admin, _game, _league, _season, division, _maps = await setup_league(flow, season={"visibility": "public"})
+    _admin, _game, _league, _season, division, _maps = await setup_league(flow, season={"visibility": "public", "readiness_override_reason": "Testaufbau ohne Prüfung"})
     staffel = await _staffel(flow, division)
     await flow.db.tournaments.update_one({"id": staffel["id"]}, {"$set": {"status": "live"}})  # sichtbar, kein Entwurf
     flow.act_as(await flow.add_user(name="Mitglied"))

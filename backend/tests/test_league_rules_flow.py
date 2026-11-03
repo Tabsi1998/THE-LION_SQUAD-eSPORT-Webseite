@@ -341,7 +341,7 @@ async def test_an_old_version_stays_readable_and_a_foreign_one_is_not_found(flow
     assert "Erste Fassung" in section(old, "a")["body_md"]
     assert (await flow.get(season_page(w), params={"version": "unbekannt"})).status_code == 404
     flow.act_as(w["lead"])
-    other = ok(await flow.post(f"{ADMIN_LEAGUES}/{w['league']['id']}/seasons", json={"visibility": "public",
+    other = ok(await flow.post(f"{ADMIN_LEAGUES}/{w['league']['id']}/seasons", json={"visibility": "public", "readiness_override_reason": "Testaufbau ohne Prüfung",
                                                                                      "start_date": f"{in_days(40)}T00:00:00"}))
     flow.act_as(None)
     foreign = await flow.get(f"/api/league-rules/seasons/{w['league']['slug']}/{other['slug']}", params={"version": first["id"]})
@@ -378,7 +378,7 @@ async def test_blocks_of_a_league_version_are_frozen_per_season(flow):
     assert "Hafenkante" not in section(league, "maps")["body_md"]
     assert "je Season" in section(league, "maps")["body_md"]
     flow.act_as(w["lead"])
-    later = ok(await flow.post(f"{ADMIN_LEAGUES}/{w['league']['id']}/seasons", json={"visibility": "public",
+    later = ok(await flow.post(f"{ADMIN_LEAGUES}/{w['league']['id']}/seasons", json={"visibility": "public", "readiness_override_reason": "Testaufbau ohne Prüfung",
                                                                                      "start_date": f"{in_days(40)}T00:00:00"}))
     flow.act_as(None)
     fresh = ok(await flow.get(f"/api/league-rules/seasons/{w['league']['slug']}/{later['slug']}"))
@@ -545,7 +545,7 @@ async def test_the_league_page_needs_one_visible_season(flow):
     flow.act_as(None)
     assert (await flow.get(league_page(w))).status_code == 404
     flow.act_as(w["lead"])
-    ok(await flow.patch(f"{ADMIN_LEAGUES}/seasons/{w['season']['id']}", json={"visibility": "public"}))
+    ok(await flow.patch(f"{ADMIN_LEAGUES}/seasons/{w['season']['id']}", json={"visibility": "public", "readiness_override_reason": "Testaufbau ohne Prüfung"}))
     flow.act_as(None)
     assert (await flow.get(league_page(w))).status_code == 200
 
