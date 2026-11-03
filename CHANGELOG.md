@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.65.1 (03.11.2026)
+
+### Fehlerbehebungen
+
+* Ausrüstung: ungespeicherte Änderungen in Eintrags-, Kategorien- und Import-Blatt fragen beim Verlassen und beim Reiterwechsel nach (#2218)
+* Regelwerk liefert Bausteine ohne Schutzzeichen aus, Namen und freier Text erscheinen wie geschrieben (#2218)
+* Regelwerk speichert Bausteine im Klartext, keine Schutzzeichen in Fassungen, Veröffentlichen-Antwort und „Daten geändert“ (#2218)
+* Regelwerk: keine fremden Links über Backslash-Adressen (#2218)
+
 ## 1.65.0 (03.11.2026)
 
 ### Neu
