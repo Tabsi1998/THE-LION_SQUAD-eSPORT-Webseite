@@ -75,7 +75,7 @@ async def test_a_league_can_be_corrected_and_its_address_stays_once_a_season_was
     assert (await flow.patch(url, json={"status": "active"})).json()["status"] == "active"
 
     # Einmal sichtbar, bleibt die Adresse - auch wenn die Season danach wieder „aus“ ist.
-    assert (await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"visibility": "admins"})).status_code == 200
+    assert (await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"visibility": "admins", "readiness_override_reason": "Testaufbau ohne Prüfung"})).status_code == 200
     assert (await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"visibility": "off"})).status_code == 200
     refused = await flow.patch(url, json={"slug": "probe-sued"})
     assert refused.status_code == 409

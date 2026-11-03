@@ -449,7 +449,8 @@ async def test_withdrawing_an_application_of_another_season_is_404(flow):
     side = w["teams"][0]
     application = await submitted(flow, w, side)
     flow.act_as(w["lead"])
-    other = ok(await flow.post(f"{ADMIN_LEAGUES}/{w['league']['id']}/seasons", json={"name": "Season Zwei", "start_date": "2030-01-08T00:00:00", "visibility": "public"}))
+    other = ok(await flow.post(f"{ADMIN_LEAGUES}/{w['league']['id']}/seasons", json={"name": "Season Zwei", "start_date": "2030-01-08T00:00:00", "visibility": "public",
+                                                                                         "readiness_override_reason": "Testaufbau ohne Prüfung"}))
     flow.act_as(side["captain"])
 
     answer = await flow.post(f"/api/leagues/{w['league']['slug']}/{other['slug']}/applications/{application['id']}/withdraw", json={})

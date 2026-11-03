@@ -13,7 +13,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from flow_harness import make_flow, new_id  # noqa: E402
 
 ADMIN = "/api/admin/leagues"
-SEASON_ONE = {"start_date": "2026-11-10T00:00:00", "visibility": "public",
+SEASON_ONE = {"start_date": "2026-11-10T00:00:00", "visibility": "public", "readiness_override_reason": "Testaufbau ohne Prüfung",
               "blocked_periods": [{"start_date": "2026-12-21", "end_date": "2027-01-03", "label": "Weihnachtspause"}],
               "scoring_rules": {"match_points": {"win": 3, "draw": 0, "loss": 0}}}
 PAGE = "/api/leagues/probe-shooter/season-1"

@@ -43,9 +43,13 @@ async def real_season(flow, w, *, order=("stellung", "suchen"), with_result=True
     league = await flow.post("/api/admin/leagues", json={"name": "Probe Liga", "game_id": GAME_ID})
     assert league.status_code == 200, league.text
     season = await flow.post(f"/api/admin/leagues/{league.json()['id']}/seasons",
-                             json={**OLD_RULES, "name": "Season 1", "start_date": "2030-01-07T18:00:00+00:00", "game_mode_order": list(order), "best_of": 3, "team_size": 2})
+                             json={**OLD_RULES, "name": "Season 1", "start_date": "2030-01-07T18:00:00+00:00", "best_of": 3, "team_size": 2,
+                                   # Seit #2207 so lang wie die Serie - zyklisch dasselbe wie die kurze Reihenfolge.
+                                   "game_mode_order": [order[index % len(order)] for index in range(3)] if order else []})
     assert season.status_code == 200, season.text
     season_id = season.json()["id"]
+    # Die Season läuft (die Staffel spielt schon): eine kürzere Reihenfolge ist dann nur eine Warnung (#2207).
+    await flow.db.league_seasons.update_one({"id": season_id}, {"$set": {"status": "active"}})
     division = await flow.post(f"/api/admin/leagues/seasons/{season_id}/divisions", json={"level": 1})
     assert division.status_code == 200, division.text
     await flow.db.tournaments.update_one({"id": w["tournament"]["id"]}, {"$set": {"league_context": {

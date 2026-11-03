@@ -55,6 +55,8 @@ SEASON_ONE = {
     "rules_text": "## Regeln\nPlatzhalter für den Regeltext der Season.",
     "registration_deadline": "2026-11-06",
     "visibility": "admins",
+    # Veröffentlichen prüft seit #2207 Pool, Regelwerk und Staffeln - der Aufbau kommt erst danach.
+    "readiness_override_reason": "Testaufbau ohne Prüfung",
 }
 # Acht erfundene Hauptteams mit je einem Co-Team (4 bis 6 im Kader).
 TEAMS = [("Nebelwölfe", "Rudel"), ("Sturmvögel", "Schwarm"), ("Glutfüchse", "Bau"), ("Frostluchse", "Pfote"),

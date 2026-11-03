@@ -41,7 +41,8 @@ CHRISTMAS = [{"start_date": "2026-12-21", "end_date": "2027-01-03", "label": "We
 SEASON = {"start_date": "2026-11-12T00:00:00", "weeks_total": 18, "blocked_periods": CHRISTMAS, "round_robin_legs": 1,
           "best_of": 5, "team_size": 4, "max_staffel_size": 16, "game_mode_order": MODE_PLAN,
           "scoring_rules": {"match_points": {"win": 3, "draw": 0, "loss": 0}}, "rules_text": "Regeln der Probe-Season",
-          "default_match_weekday": 6, "default_match_time": "20:00", "visibility": "admins"}
+          "default_match_weekday": 6, "default_match_time": "20:00", "visibility": "admins",
+          "readiness_override_reason": "Testaufbau ohne Prüfung"}
 
 
 @pytest_asyncio.fixture
