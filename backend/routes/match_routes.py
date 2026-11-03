@@ -1443,6 +1443,8 @@ async def _report_v2(db, match: dict, body: MatchScoreReport, me: dict, tourname
                          photo_id=(photo or {}).get("id"))
     if games:
         entry["games"] = games
+        # Der Regelstand, mit dem geprüft wurde (C.3): Bestätigungen richten sich nach ihm, nicht nach einer späteren Regel.
+        entry[league_result_rules.SNAPSHOT_KEY] = league.rule_snapshot()
     if lineup:
         entry["lineup"] = lineup
     await getattr(db, "matches_v2").update_one(

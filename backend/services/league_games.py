@@ -88,6 +88,16 @@ class LeagueSetup:
     # Ergebnisregeln (C.3, #1617): Punkte je Map Pflicht und die Fotos am Spiel, auf die eine Map verweisen darf.
     scores_required: bool = False
     proof_ids: set[str] = field(default_factory=set)
+    # Der Regelstand, mit dem geprüft wird: der der Staffel - beim Bestätigen der der Erstmeldung (``use_snapshot``).
+    result_rules: dict = field(default_factory=dict)
+
+    def rule_snapshot(self) -> dict:
+        """Was eine Meldung als ihren Regelstand festhält."""
+        return {"result_rules": dict(self.result_rules), "scores_required": self.scores_required}
+
+    def use_snapshot(self, held: dict) -> None:
+        self.result_rules = dict(held.get("result_rules") or {})
+        self.scores_required = bool(held.get("scores_required"))
 
     @property
     def is_series(self) -> bool:
@@ -173,6 +183,7 @@ async def setup(db, match: dict, tournament: dict | None = None, stage: dict | N
         min_players=_positive_int(tournament.get("lineup_min_players"), 1),
         scores_required=league_result_rules.scores_required(tournament),
         proof_ids=await league_result_rules.attached_proofs(db, match.get("id")),
+        result_rules=league_result_rules.snapshot(tournament)["result_rules"],
     )
 
 
@@ -425,7 +436,7 @@ def _checked_extras(setup: LeagueSetup, item: dict, mode: str | None, winner: st
                 raise league_result_rules.RuleProblem(f"{label}: Eine zugesprochene Map hat keine Punkte.")
         elif not skip_rules:
             loser = next((side for side in setup.reg_ids if side != winner), "")
-            league_result_rules.check_map(league_result_rules.rule_for(setup.tournament, mode), scores, winner, loser, label=label,
+            league_result_rules.check_map(league_result_rules.rule_for(setup.result_rules, mode), scores, winner, loser, label=label,
                                           names=setup.names, required=setup.scores_required)
     except league_result_rules.RuleProblem as problem:
         raise LeagueGamesError(problem.detail, problem.status_code) from None
@@ -691,6 +702,9 @@ async def prepare_report(
     if photo_id:
         # Das Foto dieser Meldung hängt die Route gleich an - eine Map darf schon darauf verweisen (C.3).
         setup.proof_ids = {*setup.proof_ids, photo_id}
+    if other and other.get("games"):
+        # Es gilt die Regel der Erstmeldung (C.3) - wie bei der App-Bestätigung und der 48-h-Automatik, die ihre Maps übernehmen.
+        setup.use_snapshot(league_result_rules.snapshot_of(other))
     raw_games = _scores_from_other(setup, raw_games, other)
     if raw_games and setup.is_series:
         games = normalize_games(setup, [{**game, "lineups": {}} for game in raw_games])
@@ -725,7 +739,7 @@ async def prepare_report(
 def _scores_from_other(setup: LeagueSetup, raw_games: list[dict] | None, other: dict | None) -> list[dict] | None:
     """Bestätigen ohne Punkte (C.3): Es zählen ohnehin die Punkte der ersten Meldung - mit Regeln oder Punktepflicht prüft der
     Server daher mit ihnen, sonst scheiterte jede Bestätigung. Ohne Regeln bleibt die Meldung, wie sie kam."""
-    if not raw_games or not (other or {}).get("games") or not (setup.scores_required or setup.tournament.get("result_rules")):
+    if not raw_games or not (other or {}).get("games") or not (setup.scores_required or setup.result_rules):
         return raw_games
     theirs = {game.get("position"): game.get("scores") or {} for game in other["games"]}
     out = []
@@ -1041,6 +1055,9 @@ async def page_block(db, setup: LeagueSetup, *, side_id: str | None, can_act: bo
     latest = latest_reports(match.get("reports"))
     own_report = latest.get(side_id) if side_id else None
     other_reports = [report for key, report in latest.items() if key != side_id]
+    # Regelstand fürs Formular (C.3): Wer bestätigt, wird nach der Regel der Erstmeldung geprüft; sonst gilt die der Staffel.
+    proposal = other_reports[-1] if side_id and other_reports else None
+    held = league_result_rules.snapshot_of(proposal) if (proposal or {}).get("games") else setup.rule_snapshot()
     roster = sorted(setup.rosters.get(side_id) or set()) if side_id else []
     wanted = set(roster)
     if staff:
@@ -1116,8 +1133,8 @@ async def page_block(db, setup: LeagueSetup, *, side_id: str | None, can_act: bo
         "map_repeat": setup.map_repeat,
         # Ergebnisregeln (C.3, #1617): je Modus des Pools, Punktepflicht, Positionen nach dem Serienende.
         "result_rules": {group["mode"]: rule for group in _pool_modes(setup.pool)
-                         if (rule := league_result_rules.rule_for(setup.tournament, group["mode"]))},
-        "scores_required": setup.scores_required,
+                         if (rule := league_result_rules.rule_for(held["result_rules"], group["mode"]))},
+        "scores_required": held["scores_required"],
         "not_played": league_result_rules.not_played(match.get("games"), setup.best_of),
         "can_override_rules": bool(staff and can_override),
     }

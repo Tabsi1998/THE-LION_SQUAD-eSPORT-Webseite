@@ -119,9 +119,8 @@ def _same(rule: dict | None) -> dict | None:
 # ---------------------------------------------------------------- Prüfen je Map
 
 
-def rule_for(tournament: dict | None, mode: str | None) -> dict | None:
-    """Die geltende Regel einer Map: die der Staffel für diesen Modus - ohne Feld oder Modus keine."""
-    rules = (tournament or {}).get("result_rules")
+def rule_for(rules: dict | None, mode: str | None) -> dict | None:
+    """Die geltende Regel einer Map aus einem Regelstand ``{mode: rule}`` - ohne Stand oder Modus keine."""
     if not mode or not isinstance(rules, dict):
         return None
     rule = rules.get(mode)
@@ -130,6 +129,26 @@ def rule_for(tournament: dict | None, mode: str | None) -> dict | None:
 
 def scores_required(tournament: dict | None) -> bool:
     return bool((tournament or {}).get("scores_required"))
+
+
+SNAPSHOT_KEY = "result_rule_snapshot"
+# Meldung ohne Schnappschuss (vor C.3): prüft nichts Neues.
+EMPTY_SNAPSHOT = {"result_rules": {}, "scores_required": False}
+
+
+def snapshot(tournament: dict | None) -> dict:
+    """Der Regelstand der Staffel jetzt - eine Meldung hält ihn fest (``result_rule_snapshot``)."""
+    rules = (tournament or {}).get("result_rules")
+    return {"result_rules": dict(rules) if isinstance(rules, dict) else {}, "scores_required": scores_required(tournament)}
+
+
+def snapshot_of(report: dict | None) -> dict:
+    """Der Regelstand, mit dem eine Meldung geprüft wurde - Altbestand ohne Feld: keiner."""
+    held = (report or {}).get(SNAPSHOT_KEY)
+    if not isinstance(held, dict):
+        return dict(EMPTY_SNAPSHOT)
+    rules = held.get("result_rules")
+    return {"result_rules": dict(rules) if isinstance(rules, dict) else {}, "scores_required": bool(held.get("scores_required"))}
 
 
 def override_reason(user: dict | None, raw) -> str | None:

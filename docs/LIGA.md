@@ -1122,6 +1122,12 @@ trotzdem einen Sieger der Map (Datenmodell ohne Map-Remis, offene Fachfrage). Be
 
 - **Bestätigen:** Es zählen die Punkte der ersten Meldung (unverändert). Schickt die bestätigende Seite keine Punkte, prüft der
   Server mit denen der Gegenseite – sonst scheiterte jede Bestätigung an der Punktepflicht. Die App bestätigt ohne Maps wie bisher.
+- **Regelstand der Erstmeldung:** Jede Meldung mit Maps hält fest, mit welchem Regelstand sie geprüft wurde
+  (`reports[].result_rule_snapshot = {result_rules, scores_required}`). Es gilt die Regel, die bei der Erstmeldung galt: Die
+  Bestätigung im Browser prüft mit dem Schnappschuss der Meldung der Gegenseite, App-Bestätigung und 48-h-Automatik übernehmen deren
+  schon geprüfte Maps. Ein Regelwechsel dazwischen (Übertragen) ändert daran nichts. Meldungen ohne Schnappschuss (Altbestand)
+  prüfen nichts Neues. Die Matchseite zeigt der bestätigenden Seite den Regelstand der Erstmeldung. Die Korrektur der Leitung
+  (`/result`) prüft immer die aktuelle Regel der Staffel.
 - **Best of** (unverändert): Siegschwelle ⌊N/2⌋+1, keine Map nach der Entscheidung; im BO5 ohne Remis nur 3:0, 3:1, 3:2.
 - **Korrektur der Leitung** (`/result`, auch mit `force`): dieselben Prüfungen. Übergehen darf nur der Superadmin mit
   `rule_override_reason` (mindestens fünf Zeichen) – nur Ergebnisregel und Punktepflicht, nie Best of, Pool oder Aufstellung.
