@@ -982,6 +982,83 @@ Befangenheit gilt hier nicht (wie beim Zuteilen, Abschnitt B.1). Der Eingang zei
 
 **Audit-Aktionen neu:** `league.application.submit`, `.withdraw`, `.review`, `.accept`, `.reject`, `.waitlist`, `.assign`.
 
+### C.1 Spielmodi (#2206)
+
+Modi bleiben in `games.match_modes[]`, kein zweites Modussystem. C.1 **speichert, prüft und zeigt** die neuen Felder. Endstände
+gegen die Ergebnisregel prüft erst C.3 (#1617), ebenso das Übernehmen der Regel in die Season. Kein Wert eines Titels steht im
+Code; Beispiele in Seeds und Tests sind erfunden. Logik in `models.GameMatchMode`, `services/game_modes.py` (Zustand, Auswahl),
+`services/game_usage.py` (Verwendung). **Migration: keine.**
+
+**Felder je Modus** (alle neuen optional; fehlt ein Feld, wird es nicht geschrieben und alles verhält sich wie vorher):
+
+| Feld | Typ | Fehlt | Bedeutung |
+| --- | --- | --- | --- |
+| `mode` | str ≤ 40 | aus dem Namen | Kennung und Identität des Modus. Maps, Pools, Reihenfolgen, Turniere und Spiele zeigen auf sie |
+| `label` | str 1–60 | Pflicht | Name, darf sich ändern |
+| `minutes`, `per_game` | wie bisher | wie bisher | Dauerplanung (#1554), unverändert |
+| `status` | `active` \| `inactive` \| `archived` | `active` | Zustand, siehe unten |
+| `description` | str ≤ 500 | – | Beschreibung; wie alle Spieldaten über `GET /api/games` lesbar |
+| `players_per_side` | int 1–64 | – | Spielerzahl je Seite |
+| `format` | str ≤ 60 | – | Freitext, etwa die Regel-Variante des Modus |
+| `result_rule` | Objekt | keine Regel | Ergebnisregel, siehe unten |
+
+**`result_rule`** (gespeichert und angezeigt, noch nicht angewandt):
+
+| Feld | Typ | Regel |
+| --- | --- | --- |
+| `kind` | `score` \| `rounds` \| `highest` | Pflicht. `score`: Punkte bis zum Ziel. `rounds`: Runden gewinnen. `highest`: höherer Endstand gewinnt, ohne Ziel |
+| `target` | int 1–100 000 | Pflicht bei `score` und `rounds` (Zielpunkte bzw. Rundensiege), bei `highest` nicht erlaubt |
+| `round_limit` | int 1–999 | nur bei `rounds`, mindestens `target` |
+| `time_limit_minutes` | int 1–600 | Zeitlimit je Map, freiwillig |
+| `draw_allowed` | bool | Remis erlaubt, Vorgabe `false` |
+| `overtime` | bool | Verlängerung bei Gleichstand, Vorgabe `false` |
+
+Unpassendes lehnt der Server mit 422 und deutschem Satz ab, gekürzt oder still verworfen wird nichts, auch kein unbekanntes Feld
+in `result_rule`.
+
+**Namen:** Innerhalb eines Spiels heißt jeder Modus anders (ohne Groß und klein, Leerraum zusammengefasst), sonst 422 beim Anlegen
+und Ändern. Gleiche Namen aus Altbestand bleiben speicherbar, solange keine neue Dublette dazukommt.
+
+**Zustände:**
+
+| Zustand | Neu wählbar | Verwaltung | Bestehendes |
+| --- | --- | --- | --- |
+| `active` (oder fehlt) | ja | sichtbar | – |
+| `inactive` | nein: neuer Map-Pool, Modus je Map der Season, Spielmodus des Turniers oder einer Phase | in Auswahllisten nur, wo er schon gesetzt ist, mit „(inaktiv)“ | bleibt gültig und sichtbar |
+| `archived` | nein, dazu keine neue Zuordnung an Maps | zusätzlich aus allen Auswahllisten ausgeblendet, außer wo er schon gesetzt ist | bleibt gültig und sichtbar |
+
+- „Neu“ heißt: Der Wert war vorher nicht gesetzt. Ein schon gesetzter Modus hält kein anderes Speichern auf (Muster
+  `game_usage.chosen_is_archived`): ein Pool mit dem Modus in seiner geltenden Version, eine Season mit ihm in `game_mode_order`, ein
+  Turnier mit ihm als `game_mode`, eine Phase mit ihm in `settings.game_mode`, eine Map mit ihm in `modes`. Wechselt ein Turnier das
+  Spiel, ist nichts „schon gesetzt“: Der mitgenommene `game_mode` wird gegen das neue Spiel geprüft, auch ohne `game_mode` im Aufruf.
+- **Unberührt:** fertige und laufende Spiele, festgehaltene Pools (`map_pool_id`), `effective_pool`, `map_pools.allowed`, das
+  Kopieren Season → Staffel (`copy_version`), `GET /api/games` (inaktive und archivierte Modi stehen weiter in `match_modes`) und
+  die Dauerplanung: `match_duration.game_mode` nimmt wie bisher den gewählten Modus, sonst den ersten, ohne Blick auf den Zustand.
+- **Meldeformular:** Es zeigt die Modi des geltenden oder festgehaltenen Pools. Ein inaktiver Modus darin bleibt meldbar, bis ein
+  neuer Pool ohne ihn gespeichert ist. So bricht eine laufende Season nicht ab.
+- Die Referenz-Ligen (`team_league_maps.py`) lesen die Modi unverändert.
+
+**Entfernen:** Nur ein unbenutzter Modus lässt sich entfernen, auch direkt über die API (`PATCH`/`PUT /api/games/{id}`, auch
+`match_modes: null`). Verwendet heißt (`game_usage.mode_usage`): steht in einer Version eines Map-Pools des Spiels (jede Version,
+außer dem Standard-Pool `game_default`), in `game_mode_order` einer Season oder Staffel, als `game_mode` eines Turniers, in
+`settings.game_mode` einer Phase, in `games[]`, einer Meldung oder einem gehaltenen Ergebnis eines Spiels oder in einem
+Ergebnisblatt einer Referenz-Serie des Spiels. Sonst 409: „Der Modus „…“ wird verwendet (…). Entfernen geht nicht – stell ihn auf
+inaktiv oder archiviert.“ Die Zuordnung an Maps zählt nicht als Verwendung: Ein unbenutzter Modus verschwindet beim Entfernen wie
+bisher auch aus den Maps (Rückfrage mit Zahl). `GET /api/games/{id}/usage` trägt je Modus zusätzlich `pool_versions`, `staffeln`,
+`matches`, `references` und `in_use`.
+
+**Umbenennen:** Die Kennung `mode` ist die Identität und ändert sich nie. Die Verwaltung schickt sie bei jedem Speichern mit.
+Ein Eintrag ohne Kennung, dessen Name einem bestehenden Modus gleicht (ohne Groß und klein), bekommt dessen Kennung; passt er zu
+mehreren noch freien Modi (Altbestand), gibt es 422 statt einer geratenen Kennung. Jeder andere
+Eintrag ohne Kennung ist ein neuer Modus; ein alter Modus, dessen Kennung fehlt, gilt als entfernt (siehe oben). Eine neue Kennung
+für einen verwendeten Modus gibt es also nicht. Gelesen werden Modi überall über die Kennung; Namen stehen nur als Schnappschuss
+in Pools (`label`) und Spielen (`mode_label`) und bleiben dort, wie sie waren.
+
+**App:** liest `match_modes` nicht, nur `map_pool.modes` (Schnappschuss). Antworten bekommen nur Felder dazu.
+
+**Bekannte Grenze:** Prüfen und Schreiben beim Entfernen sind zwei Schritte. Speichert jemand in genau diesem Moment einen Pool mit
+dem Modus, kann der Pool auf einen entfernten Modus zeigen. Das ist der Zustand von vor C.1 und wird gelesen wie bisher.
+
 ### Darf nicht beschädigt werden
 
 Jedes Paket prüft das per Regressionstest:

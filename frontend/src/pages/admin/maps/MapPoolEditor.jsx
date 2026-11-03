@@ -10,6 +10,7 @@ import { Link } from "react-router-dom";
 import { ArrowDown, ArrowUp, Map as MapIcon, Trash2 } from "lucide-react";
 import { LazyImg } from "@/components/tls/LazyImg";
 import { viennaDate } from "@/lib/vienna";
+import { modeStatusOf, selectableModes } from "@/lib/gameMatchData";
 import {
   defaultSelection,
   eligibleMaps,
@@ -100,21 +101,27 @@ function ModeGroup({ mode, label, library, selected, onToggle, onMove, disabled,
 
 export function MapPoolEditor({ title, hint = "", game, library = [], entry = null, sources = [], defaultPool = null, onSave, onClear, canEdit = true,
   libraryLink = false, defaultsLabel = "Vorgabe des Spiels", testId = "map-pool-editor" }) {
-  const modes = useMemo(() => game?.modes || [], [game]);
+  const allModes = useMemo(() => game?.modes || [], [game]);
+  // Inaktive und archivierte Modi (#2206) kommen in keinen neuen Pool - nur, was der gespeicherte Pool schon hat, bleibt zur Wahl.
+  const kept = useMemo(() => (entry && !entry.stale ? (entry.modes || []).filter((group) => (group.maps || []).length).map((group) => group.mode) : []), [entry]);
+  const modes = useMemo(() => selectableModes(allModes, kept), [allModes, kept]);
+  const hiddenInactive = allModes.filter((mode) => modeStatusOf(mode) === "inactive" && !kept.includes(mode.mode));
   const [selection, setSelection] = useState(() => startSelection(entry, library, modes));
   const [busy, setBusy] = useState(false);
   const baseline = useMemo(() => (entry && !entry.stale ? poolSelection(entry) : {}), [entry]);
   const dirty = !sameSelection(baseline, selection) || Boolean(entry?.stale);
   const count = selectionCount(selection);
   const disabled = !canEdit || busy;
-  const groups = modes.length ? modes : [{ mode: null, label: "" }];
+  // Hat das Spiel Modi, aber keiner ist wählbar, gibt es keine Gruppe „Alle Maps“ - der Server nähme sie nicht an.
+  const groups = modes.length ? modes : allModes.length ? [] : [{ mode: null, label: "" }];
+  const noModeLeft = groups.length === 0;
   const outdated = (entry?.outdated_map_ids || []).length && !entry?.stale
     ? (entry.modes || []).flatMap((group) => group.maps || []).filter((item, index, all) =>
       entry.outdated_map_ids.includes(item.map_id) && all.findIndex((other) => other.map_id === item.map_id) === index)
     : [];
   // #2129, SP2: Ein entfernter Modus bleibt im gespeicherten Pool lesbar und gilt weiter; Maps ohne Modus nennt der Hinweis.
-  const oldGroups = outdatedGroups(entry, modes);
-  const withoutMode = mapsWithoutMode(library, modes);
+  const oldGroups = outdatedGroups(entry, allModes);
+  const withoutMode = mapsWithoutMode(library, allModes);
 
   const run = async (action) => {
     setBusy(true);
@@ -181,6 +188,16 @@ export function MapPoolEditor({ title, hint = "", game, library = [], entry = nu
           Im gespeicherten Pool steht noch {oldGroups.map((group) => `„${group.label || group.mode || "Alle Maps"}“ (${(group.maps || []).length})`).join(", ")} – so hat das Spiel das nicht mehr. Der Pool gilt unverändert weiter, Spiele melden weiter daraus. Erst neues Speichern ersetzt ihn durch die Auswahl unten.
         </p>
       ) : null}
+      {game && library.length > 0 && noModeLeft ? (
+        <p role="status" className="rounded-sm border border-warn/30 bg-warn/5 px-3 py-2 text-xs text-warn" data-testid={`${testId}-no-modes`}>
+          Kein Modus von {game.name} steht für einen neuen Pool zur Wahl – alle sind inaktiv oder archiviert. Aktivieren unter Spiele → Spiel bearbeiten.
+        </p>
+      ) : null}
+      {game && hiddenInactive.length ? (
+        <p role="status" className="rounded-sm border border-white/15 bg-white/[0.03] px-3 py-2 text-xs text-white/70" data-testid={`${testId}-inactive`}>
+          Inaktiv und hier nicht zur Wahl: {hiddenInactive.map((mode) => `„${mode.label || mode.mode}“`).join(", ")}. Wieder aktivieren unter Spiele → Spiel bearbeiten.
+        </p>
+      ) : null}
       {game && withoutMode.length ? (
         <p role="status" className="rounded-sm border border-white/15 bg-white/[0.03] px-3 py-2 text-xs text-white/70" data-testid={`${testId}-without-mode`}>
           {withoutMode.length === 1 ? "1 Map hat" : `${withoutMode.length} Maps haben`} noch keinen Modus und {withoutMode.length === 1 ? "steht" : "stehen"} hier nicht zur Wahl.
@@ -191,13 +208,13 @@ export function MapPoolEditor({ title, hint = "", game, library = [], entry = nu
       {game && library.length > 0 ? (
         <>
           <div className="flex flex-wrap items-center gap-2">
-            <button type="button" disabled={disabled} onClick={loadDefaults} data-testid={`${testId}-defaults`}
+            <button type="button" disabled={disabled || noModeLeft} onClick={loadDefaults} data-testid={`${testId}-defaults`}
               title={defaultPool ? "Lädt den Standard-Pool des Spiels" : "Lädt alle aktiven Maps des Spiels"}
               className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">
               {defaultsLabel}
             </button>
             {sources.length ? (
-              <select value="" disabled={disabled} onChange={(event) => copyFrom(event.target.value)} data-testid={`${testId}-copy`} aria-label="Pool übernehmen von"
+              <select value="" disabled={disabled || noModeLeft} onChange={(event) => copyFrom(event.target.value)} data-testid={`${testId}-copy`} aria-label="Pool übernehmen von"
                 className="bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-2 py-1.5 rounded-sm text-xs text-white focus:outline-none">
                 <option value="">Übernehmen von …</option>
                 {sources.map((source) => <option key={source.key} value={source.key}>{source.label}</option>)}
@@ -227,7 +244,7 @@ export function MapPoolEditor({ title, hint = "", game, library = [], entry = nu
               <Trash2 className="w-3.5 h-3.5" aria-hidden="true" /> Pool entfernen
             </button>
           ) : null}
-          <button type="button" disabled={busy || !dirty || count === 0} onClick={save} data-testid={`${testId}-save`}
+          <button type="button" disabled={busy || !dirty || count === 0 || noModeLeft} onClick={save} data-testid={`${testId}-save`}
             className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
             {busy ? "Speichere …" : "Speichern"}
           </button>

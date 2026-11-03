@@ -13,7 +13,7 @@ from services.permissions import is_confirmed_tournament_lead
 from auth import require_admin, get_optional_user
 from services.visibility import user_can_see
 from services.visibility import hide_unseen_event_links, lead_can_see
-from services import game_usage, partner_pages, staffel_guard, tournament_guard
+from services import game_modes, game_usage, partner_pages, staffel_guard, tournament_guard
 from services.access_links import (
     public_access_link_payload,
     touch_access_link,
@@ -399,10 +399,15 @@ async def create_tournament_doc(body: TournamentCreate, me: dict) -> dict:
                 apply_competition_version_read_defaults(existing)
                 return {**existing, "auto_generated_bracket": None, "idempotent_replay": True}
             # Validate game
-            if not await db.games.find_one({"id": body.game_id}):
+            chosen_game = await db.games.find_one({"id": body.game_id}, {"_id": 0, "id": 1, "match_modes": 1})
+            if not chosen_game:
                 raise HTTPException(status_code=400, detail="Spiel nicht gefunden")
             if await game_usage.chosen_is_archived(db, body.game_id):
                 raise HTTPException(status_code=422, detail=game_usage.ARCHIVED_DETAIL)
+            # Spielmodus (#2206): ein inaktiver oder archivierter steht für ein neues Turnier nicht zur Wahl.
+            mode_problem = game_modes.choice_problem(chosen_game, [body.game_mode])
+            if mode_problem:
+                raise HTTPException(status_code=422, detail=mode_problem)
             doc = body.model_dump()
             # Teilnahme und Teamgröße wie beim Speichern prüfen (#2111, TA3): ein Team-Turnier ohne Größe hat 2.
             if doc.get("team_mode") == "team" and "team_size" not in body.model_fields_set:
@@ -472,6 +477,16 @@ async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends
     if await game_usage.chosen_is_archived(db, body.game_id, existing.get("game_id")):
         raise HTTPException(status_code=422, detail=game_usage.ARCHIVED_DETAIL)
     raw_updates = body.model_dump(exclude_unset=True)
+    # Spielmodus (#2206): neu wählen nur aktive; der schon gesetzte bleibt gültig, auch wenn er inzwischen inaktiv ist. Wechselt
+    # das Spiel, ist nichts „schon gesetzt“ - ein mitgenommener Modus wird gegen das neue Spiel geprüft, auch ohne ``game_mode``.
+    mode_game_id = raw_updates.get("game_id") or existing.get("game_id")
+    same_game = mode_game_id == existing.get("game_id")
+    wanted_mode = raw_updates["game_mode"] if "game_mode" in raw_updates else existing.get("game_mode")
+    if wanted_mode and mode_game_id and ("game_mode" in raw_updates or not same_game):
+        mode_game = await db.games.find_one({"id": mode_game_id}, {"_id": 0, "match_modes": 1})
+        mode_problem = game_modes.choice_problem(mode_game, [wanted_mode], [existing.get("game_mode")] if same_game else [])
+        if mode_problem:
+            raise HTTPException(status_code=422, detail=mode_problem)
     # Status nur über den Ablauf (#2109): ``POST /status`` prüft Spielplan, Check-in und schreibt ins Protokoll - das
     # Formular nicht. Derselbe Status stört nicht, ein anderer wird abgelehnt (alle Turniere).
     problem = staffel_guard.status_problem(raw_updates, existing) or staffel_guard.staffel_update_problem(

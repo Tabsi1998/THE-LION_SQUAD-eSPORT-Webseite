@@ -20,6 +20,7 @@ import { MapPoolEditor } from "@/pages/admin/maps/MapPoolEditor";
 import { LeagueDeleteSheet } from "./LeagueDeleteSheet";
 import { BannerField, EmblemField, PrizeEditor } from "./LeagueLookFields";
 import { accentStyle, prizesPayload, prizesToForm } from "@/lib/leagueLook";
+import { selectableModes } from "@/lib/gameMatchData";
 import { LeagueEmblem } from "@/components/tls/league/public/LeagueLook";
 import { SeasonRosterPanel } from "./SeasonRosterPanel";
 import { dayNoon, viennaDate } from "@/lib/vienna";
@@ -265,7 +266,8 @@ export default function AdminLeagueSeasonPage() {
   const canSeason = can("season");
   const canRules = can("rules");
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
-  const modes = useMemo(() => data?.game?.modes || [], [data]);
+  // Modus je Map (#2206): inaktive und archivierte Modi nur, wo die Season sie schon hat.
+  const modes = useMemo(() => selectableModes(data?.game?.modes, data?.season?.game_mode_order), [data]);
   const staffelCount = (data?.divisions || []).reduce((sum, division) => sum + division.staffeln.length, 0);
 
   const save = async (event) => {

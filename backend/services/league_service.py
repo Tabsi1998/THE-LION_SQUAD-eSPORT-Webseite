@@ -22,7 +22,7 @@ from zoneinfo import ZoneInfo
 from pymongo.errors import DuplicateKeyError
 
 from models import TournamentCreate, new_id, now_utc
-from services import game_maps, game_usage, league_games, league_look, map_pools, pricing, staffel_guard
+from services import game_maps, game_modes, game_usage, league_games, league_look, map_pools, pricing, staffel_guard
 from services.league_rules_store import delete_drafts, deletion_blockers, staffel_rules
 from services.advancement_draw import sync_advancement_fields
 from services.bracket_fill_in import has_started, is_auto_bye
@@ -231,6 +231,10 @@ def _mode_order(game: dict | None, order, saved=None) -> list[str]:
     unknown = [mode for mode in order if mode not in known]
     if unknown:
         raise LeagueProblem("Unbekannter Modus in der Reihenfolge der Modi.")
+    # Inaktiv oder archiviert (#2206): neu wählen geht nicht, was die Season schon hat, bleibt.
+    problem = game_modes.choice_problem(game, order, saved or ())
+    if problem:
+        raise LeagueProblem(f"Modus je Map: {problem}")
     return order
 
 

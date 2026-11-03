@@ -9,7 +9,7 @@ from auth import require_admin
 from database import get_db
 from models import new_id
 from routes.game_routes import _enrich_games
-from services import game_maps, map_pools
+from services import game_maps, game_modes, map_pools
 from services.game_maps import DEFAULT_POOL_SCOPE, GameMapCreate, GameMapImport, GameMapModes, GameMapOrder, GameMapUpdate, MapProblem
 from services.map_pools import MapPoolSave
 
@@ -42,7 +42,7 @@ async def list_game_maps(game_id: str, me: dict = Depends(require_admin())):
     used = await game_maps.usage_counts(db, game["id"])
     return {
         "game": {"id": game["id"], "name": game.get("name"), "slug": game.get("slug"), "kind": game.get("kind"),
-                 "modes": game_maps.game_modes(game)},
+                 "modes": game_modes.entries(game)},
         "maps": [{**game_maps.public_map(row), "in_pools": used.get(row["id"], 0)}
                  for row in await game_maps.maps_of(db, game["id"])],
         "limit": game_maps.MAPS_PER_GAME_MAX,
