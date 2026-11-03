@@ -1,14 +1,13 @@
 # Changelog
 
-## [1.65.1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.65.0...v1.65.1) (2026-11-03)
-
+## 1.65.1 (03.11.2026)
 
 ### Fehlerbehebungen
 
-* Ausrüstung: ungespeicherte Änderungen in Eintrags-, Kategorien- und Import-Blatt fragen beim Verlassen und beim Reiterwechsel nach ([#2218](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2218)) ([24c7953](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/24c79534274659e3671f8fa915a057eb01d3af47))
-* Regelwerk liefert Bausteine ohne Schutzzeichen aus, Namen und freier Text erscheinen wie geschrieben ([#2218](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2218)) ([24c7953](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/24c79534274659e3671f8fa915a057eb01d3af47))
-* Regelwerk speichert Bausteine im Klartext, keine Schutzzeichen in Fassungen, Veröffentlichen-Antwort und „Daten geändert“ ([#2218](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2218)) ([24c7953](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/24c79534274659e3671f8fa915a057eb01d3af47))
-* Regelwerk: keine fremden Links über Backslash-Adressen ([#2218](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2218)) ([24c7953](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/24c79534274659e3671f8fa915a057eb01d3af47))
+* Ausrüstung: ungespeicherte Änderungen in Eintrags-, Kategorien- und Import-Blatt fragen beim Verlassen und beim Reiterwechsel nach (#2218)
+* Regelwerk liefert Bausteine ohne Schutzzeichen aus, Namen und freier Text erscheinen wie geschrieben (#2218)
+* Regelwerk speichert Bausteine im Klartext, keine Schutzzeichen in Fassungen, Veröffentlichen-Antwort und „Daten geändert“ (#2218)
+* Regelwerk: keine fremden Links über Backslash-Adressen (#2218)
 
 ## 1.65.0 (03.11.2026)
 
