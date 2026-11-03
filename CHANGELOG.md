@@ -1,5 +1,36 @@
 # Changelog
 
+## [1.60.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.59.1...v1.60.0) (2026-11-03)
+
+
+### Neu
+
+* Die Kennung eines Spielmodus bleibt beim Umbenennen gleich, auch über die API ([#2206](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2206)) ([dede53b](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/dede53b1c2bf168f0947ff0935a11819ee7b97ab))
+* Inaktive Spielmodi stehen für neue Map-Pools, Modus je Map, Turniere und Phasen nicht mehr zur Wahl ([#2206](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2206)) ([dede53b](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/dede53b1c2bf168f0947ff0935a11819ee7b97ab))
+* Liga: „Co-Team zuteilen“ verweist den Superadmin für die Notausnahme in den Eingang ([#2245](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2245)) ([324f5cf](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/324f5cfcb0240aea97e853485709745b65e72216))
+* Liga: Anmeldefenster, Startplätze, Warteliste, Zulassung und Datenschutz-Hinweis je Season einstellbar ([#2205](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2205)) ([b399653](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/b3996530d1886fc89a594ef8c72f72dddaece5d7))
+* Liga: Co-Teams melden sich selbst auf der Ligaseite an, geführt in vier Schritten ([#2205](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2205)) ([b399653](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/b3996530d1886fc89a594ef8c72f72dddaece5d7))
+* Liga: Eingang für die Leitung mit Prüfen, Annehmen, Ablehnen mit Grund, Warteliste und Zuteilung zu Liga und Staffel ([#2205](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2205)) ([b399653](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/b3996530d1886fc89a594ef8c72f72dddaece5d7))
+* Liga: Eingang zeigt beim eigenen Team keine Knöpfe, der Superadmin entscheidet nur mit Grund ([#2245](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2245)) ([324f5cf](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/324f5cfcb0240aea97e853485709745b65e72216))
+* Liga: Ligaseite zeigt Anmeldefenster und freie Startplätze für alle, Stand und Zurückziehen für das eigene Co-Team ([#2205](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2205)) ([b399653](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/b3996530d1886fc89a594ef8c72f72dddaece5d7))
+* Liga: Nachricht und Mail bei eingereicht, angenommen, abgelehnt, Warteliste und zurückgezogen ([#2205](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2205)) ([b399653](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/b3996530d1886fc89a594ef8c72f72dddaece5d7))
+* Liga: Prüfung im Klartext vor dem Einreichen, Zustimmung zu Regeln und Datenschutz wird nachweisbar gespeichert ([#2205](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2205)) ([b399653](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/b3996530d1886fc89a594ef8c72f72dddaece5d7))
+* Liga: Schalter je Season für zwei Co-Teams eines Hauptteams in derselben Staffel ([#2205](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2205)) ([b399653](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/b3996530d1886fc89a594ef8c72f72dddaece5d7))
+* Liga: Team-Seite zeigt den Stand der Anmeldung je Co-Team ([#2205](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2205)) ([b399653](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/b3996530d1886fc89a594ef8c72f72dddaece5d7))
+* Liga: Über die Anmeldung des eigenen Teams entscheidet eine zweite Person ([#2245](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2245)) ([324f5cf](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/324f5cfcb0240aea97e853485709745b65e72216))
+* Spielmodi haben Zustand (aktiv, inaktiv, archiviert), Beschreibung, Spieler je Seite, Format und Ergebnisregel ([#2206](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2206)) ([dede53b](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/dede53b1c2bf168f0947ff0935a11819ee7b97ab))
+* Verwendete Spielmodi lassen sich nur deaktivieren oder archivieren, nicht entfernen ([#2206](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2206)) ([dede53b](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/dede53b1c2bf168f0947ff0935a11819ee7b97ab))
+
+
+### Fehlerbehebungen
+
+* Datenschutz: Auskunft und Kontolöschung kennen die Liga-Anmeldungen ([#2205](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2205)) ([b399653](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/b3996530d1886fc89a594ef8c72f72dddaece5d7))
+
+
+### Dokumentation
+
+* Handbuch für Leitung und Captains zur Selbstanmeldung ([#2205](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2205)) ([b399653](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/b3996530d1886fc89a594ef8c72f72dddaece5d7))
+
 ## 1.59.1 (02.11.2026)
 
 ### Fehlerbehebungen
