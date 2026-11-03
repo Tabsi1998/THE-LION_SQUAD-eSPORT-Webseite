@@ -35,6 +35,8 @@ TARGETS: list[tuple[str, list[str]]] = [
     ("f1_challenges", ["banner_url", "cover_url"]),
     ("f1_tracks", ["image_url"]),
     ("game_maps", ["image_url"]),
+    # Ausrüstung je Spiel (#2218): Waffen, Aufsätze, übrige Ausrüstung.
+    ("game_equipment", ["image_url"]),
     ("seasons", ["banner_url"]),
     ("gallery_albums", ["cover_url"]),
     ("gallery_photos", ["image_url", "thumbnail_url", "video_url"]),
@@ -80,6 +82,11 @@ USAGE_TARGETS: list[tuple[str, list[str]]] = [
     # Ergebnisblatt kommt immer aus einem Pool-Snapshot oder der Bibliothek - darum zählen diese beiden, die Blätter
     # selbst muss die Mediathek nicht durchsuchen. Eine Map aus einem Spiel lässt sich nicht löschen (``in_results``).
     ("game_maps", ["image_history"]),
+    # Sperrlisten (#2218): wie die Map-Pools ein Schnappschuss von damals, dazu frühere Bilder der Einträge.
+    ("loadout_bans", ["entries.image_url", "entries.attachments.image_url"]),
+    ("game_equipment", ["image_history"]),
+    # Bilder in eingefrorenen Bausteinen einer Regelwerk-Fassung (#2218) - unveränderlich wie der Text (``is_frozen``).
+    ("league_rules", ["frozen_images"]),
     # Gewinnbilder der Liga (#2107) je Season und Liga N.
     ("league_seasons", ["prizes.image_url"]),
     ("league_divisions", ["prizes.image_url"]),
@@ -102,6 +109,7 @@ COLLECTION_LABELS = {
     "gallery_albums": "Galerie-Album", "gallery_photos": "Galerie-Foto", "member_benefits": "Mitgliedervorteil",
     "club_member_profiles": "Vereinsprofil", "advent_doors": "Adventkalender", "stickers": "Sticker",
     "game_servers": "Spielserver", "game_maps": "Map", "map_pools": "Map-Pool",
+    "game_equipment": "Ausrüstung", "loadout_bans": "Sperrliste",
     "reference_lineages": "Spur", "reference_series": "Saison",
     "leagues": "Liga", "league_seasons": "Liga-Season", "league_divisions": "Liga N", "league_rules": "Regelwerk",
     "direct_messages": "Direktnachricht", "team_chat_messages": "Team-Chat", "tournament_chat_messages": "Turnier-Chat",
@@ -120,6 +128,8 @@ FIELD_LABELS = {
     "modes.icon_url": "Symbol eines Modus", "match_modes.icon_url": "Symbol eines Modus",
     "image_history": "früheres Bild", "emblem_url": "Emblem", "prizes.image_url": "Bild eines Gewinns",
     "body_md": "Text", "annexes.body_md": "Text einer Anlage",
+    "entries.image_url": "Bild eines Eintrags", "entries.attachments.image_url": "Bild eines Aufsatzes",
+    "frozen_images": "Bild in einem Baustein",
     **{f"dolibarr_images.{kind}.{variant}.url":
        f"{kind.capitalize()} aus der Mitgliederverwaltung ({'dunkler' if variant == 'dark' else 'heller'} Hintergrund)"
        for kind in ("logo", "banner") for variant in ("dark", "light")},
@@ -162,6 +172,7 @@ SCOPE_TARGETS: list[tuple[str, list[str], str]] = [
     ("f1_challenges", ["banner_url", "cover_url"], "admin"),
     ("f1_tracks", ["image_url"], "admin"),
     ("game_maps", ["image_url"], "admin"),
+    ("game_equipment", ["image_url"], "admin"),
     ("seasons", ["banner_url"], "admin"),
     ("member_benefits", ["image_url"], "admin"),
     ("club_member_profiles", ["photo_url", "cover_url"], "admin"),
@@ -328,28 +339,32 @@ async def iter_usages(db, names: set[str]):
 # Standard-Pool eines Spiels ist nur eine Vorlage.
 FROZEN_POOL_FIELD = "modes.icon_url"
 FROZEN_POOL_PREFIX = "Map-Pool"
+# Sammlungen, deren Zeilen nie umgeschrieben werden: jede Version einer Sperrliste ist unveränderlich (#2218), Spiele halten sie fest.
+FROZEN_COLLECTIONS = frozenset({"loadout_bans"})
 
 
 def is_frozen(collection: str, document: dict, field: str | None = None) -> bool:
-    """Darf diese Stelle nie umgeschrieben werden? Eine veröffentlichte Regelversion ist unveränderlich (#1646), ein Entwurf nicht.
-    Dazu das Symbol eines Modus in einer Pool-Version (#2266) - ``field`` sagt, welche Stelle gemeint ist."""
+    """Darf diese Stelle nie umgeschrieben werden? Eine veröffentlichte Regelversion ist unveränderlich (#1646), ein Entwurf nicht; jede
+    Version einer Sperrliste ebenso (#2218). Dazu das Symbol eines Modus in einer Pool-Version (#2266) - ``field`` sagt, welche Stelle
+    gemeint ist."""
+    if collection in FROZEN_COLLECTIONS:
+        return True
     if collection == "league_rules":
         return document.get("status") == "published"
     return collection == "map_pools" and field == FROZEN_POOL_FIELD and document.get("scope") != "game_default"
 
 
-def _frozen_place(collection: str, document: dict) -> str:
-    if collection == "map_pools":
-        return f"{FROZEN_POOL_PREFIX}, Version {document.get('version')}"
+def _frozen_label(collection: str, document: dict) -> str:
+    if collection == "loadout_bans":
+        return f"Sperrliste, Version {document.get('version')}"
     return f"{document.get('title') or 'Regelwerk'}, Version {document.get('version')}"
 
 
 async def frozen_usages(db, filename: str) -> list[str]:
     """Die unveränderlichen Stellen, die eine Datei zeigen - als Text für die Meldung. Solange es sie gibt, bleibt die Datei, wie sie ist."""
-    return sorted({_frozen_place(collection, document)
+    return sorted({_frozen_label(collection, document)
                    async for collection, document, field, _name, _text in iter_usages(db, {filename})
                    if is_frozen(collection, document, field)})
-
 
 def write_guard(collection: str) -> dict:
     """Die Bedingung fürs Schreiben: Im Regelwerk nur auf Entwürfe. Wird einer zwischen Lesen und Schreiben veröffentlicht, trifft das Schreiben
@@ -375,9 +390,9 @@ def frozen_message(places: list[str], action: str) -> str:
     if pools and len(pools) == len(places):
         return (f"Die Datei ist das Symbol eines Modus in einem gespeicherten Map-Pool ({'; '.join(places)}) und lässt sich deshalb nicht "
                 f"{action}. Ein gespeicherter Pool bleibt unverändert. Für ein neues Symbol bitte am Modus ein anderes Bild wählen.")
-    return (f"Die Datei steht in einer veröffentlichten Regelversion ({'; '.join(places)}) und lässt sich deshalb nicht {action}. "
-            "Eine veröffentlichte Version bleibt unverändert. Für ein neues Bild bitte eine neue Version veröffentlichen.")
-
+    return (f"Die Datei steht in einer veröffentlichten Regelversion, gespeicherten Sperrliste oder einem gespeicherten Map-Pool "
+            f"({'; '.join(places)}) und lässt sich deshalb nicht {action}. Eine solche Version bleibt unverändert. Für ein neues Bild bitte "
+            "eine neue Version speichern bzw. veröffentlichen.")
 
 async def rewrite_field(collection, row_id, path: str, change, extra: dict | None = None, guard: dict | None = None) -> bool:
     """Ändert die Werte unter einem Feldpfad einer Zeile (``replace_values``). Liest dafür das ganze Feld der obersten

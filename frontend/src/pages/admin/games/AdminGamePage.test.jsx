@@ -25,6 +25,10 @@ const SERVERS = [
   { guild_id: "4", name: "Weg", role: "sub", enabled: false, left: true },
 ];
 const MAPS = { game: { id: "g1", name: "Mario Kart 8 Deluxe", slug: "mario-kart-8", modes: [] }, maps: [], limit: 200, default_pool: null };
+// Ausrüstung (C.4, #2218): fünfter Reiter, speichert je Eintrag sofort.
+const EQUIPMENT = { game: { id: "g1", name: "Mario Kart 8 Deluxe", modes: [] }, categories: [{ key: "waffen", label: "Waffen", role: "weapon", count: 1 }],
+  items: [{ id: "w1", category: "waffen", name: "Probewaffe", status: "active", in_lists: 0, weapon_ids: [] }], limit: 1000, categories_limit: 20,
+  suggested_categories: [], attachments_without_weapon: [] };
 
 let game;
 let servers;
@@ -35,6 +39,7 @@ function serve() {
     if (url === "/games") return { data: [game, { id: "p1", name: "Call of Duty", slug: "cod", kind: "series" }] };
     if (url === "/games/g1/usage") return { data: usage };
     if (url === "/games/g1/maps") return { data: MAPS };
+    if (url === "/games/g1/equipment") return { data: EQUIPMENT };
     if (url === "/games/g1" || url === "/games/mario-kart-8") return { data: game };
     throw Object.assign(new Error("nicht da"), { response: { status: 404 } });
   });
@@ -75,7 +80,7 @@ describe("Reiter", () => {
     const { unmount } = renderPage();
     expect(await screen.findByTestId("game-page-title")).toHaveTextContent("Mario Kart 8 Deluxe");
     expect(screen.getByTestId("game-tab-allgemein")).toHaveAttribute("aria-selected", "true");
-    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Allgemein", "Spiel-IDs", "Modi", "Maps"]);
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Allgemein", "Spiel-IDs", "Modi", "Maps", "Ausrüstung"]);
     expect(screen.getByTestId("game-edit-name")).toHaveValue("Mario Kart 8 Deluxe");
     unmount();
 
@@ -88,6 +93,18 @@ describe("Reiter", () => {
     expect(await screen.findByTestId("game-maps-empty")).toBeInTheDocument();
     expect(apiMock.get).toHaveBeenCalledWith("/games/mario-kart-8");
     expect(apiMock.get).toHaveBeenCalledWith("/games/g1/maps");
+  });
+
+  test("#ausruestung öffnet die Bibliothek; sie speichert sofort, also kein Punkt und keine Rückfrage beim Verlassen", async () => {
+    renderPage("/admin/games/g1#ausruestung");
+    expect(await screen.findByTestId("equipment-row-w1")).toHaveTextContent("Probewaffe");
+    expect(screen.getByTestId("game-tab-ausruestung")).toHaveAttribute("aria-selected", "true");
+    expect(apiMock.get).toHaveBeenCalledWith("/games/g1/equipment");
+    expect(screen.queryByTestId("game-tab-dirty-ausruestung")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("game-form-ausruestung")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("game-page-back"));
+    expect(await screen.findByTestId("games-list")).toBeInTheDocument();
+    expect(confirmMock).not.toHaveBeenCalled();
   });
 
   test("ein Klick und die Pfeiltasten wechseln den Reiter und schreiben ihn in die Adresse", async () => {

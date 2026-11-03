@@ -51,7 +51,8 @@ export function isOwnUpload(address) {
 }
 
 /** Optionen für Markdown im Regelwerk - auch für die Vorschau im Editor. */
-export const RULES_MARKDOWN = { linkMentions: false, anchorLinksInPage: true, imageAllowed: isOwnUpload };
+// `blockText` (#2218): Namen in Bausteinen bleiben Text - wie im PDF; der frei geschriebene Regeltext bleibt unberührt.
+export const RULES_MARKDOWN = { linkMentions: false, anchorLinksInPage: true, imageAllowed: isOwnUpload, blockText: true };
 
 /** Markdown wie überall im Projekt (maskiert, nur sichere Elemente); Sprünge bleiben in der Seite, „@“ wird kein Profil-Link. */
 export function renderRulesMarkdown(markdown) {

@@ -1479,21 +1479,21 @@ def pdf_qr_sign(
 
 # Randstrich und Hinweis der geänderten Abschnitte: Der Strich trägt die Farbe, das Wort „GEÄNDERT“ sagt es auch ohne Farbe.
 MARK_INK = GOLD_INK
-_RULES_PDF_SUBSTITUTES = {"→": "->", "←": "<-", "≥": ">=", "≤": "<=", "≠": "!=", "✓": "OK", "✔": "OK", "✗": "X", "✘": "X",
-                          # Harmlose Ersatzzeichen der Bausteine (league_rule_blocks.plain, #2271).
-                          "∗": "*", "＋": "+"}
-# Symbol eines Modus im Baustein (#2266, ``league_rule_blocks.ICON_ALT``): Das Web zeigt es, das PDF lässt es weg.
-RULES_ICON_ALT = "Modus-Symbol"
+_RULES_PDF_SUBSTITUTES = {"→": "->", "←": "<-", "≥": ">=", "≤": "<=", "≠": "!=", "✓": "OK", "✔": "OK", "✗": "X", "✘": "X"}
 _RULES_LINK = re.compile(r"(!?)\[([^\]\n]+)\]\(([^)\s]+)\)")
 _RULES_SAFE_LINK = re.compile(r"^(https?://|mailto:|tel:)", re.IGNORECASE)
 _RULES_IMAGE_LINE = re.compile(r"^!\[[^\]\n]*\]\(([^)\s]+)\)$")
 _RULES_TABLE_DIVIDER = re.compile(r"^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$")
 
 
-def _rules_pdf_text(value) -> str:
+def _rules_pdf_text(value, keep_block: bool = False) -> str:
     """Die Standardschrift kann nur Westeuropäisches: Bekannte Zeichen bekommen eine Umschreibung, Emoji fallen weg."""
     out = []
     for char in str(value or ""):
+        if _is_block_char(char):
+            # Geschütztes Zeichen eines Bausteins (#2218): als Text das echte Zeichen; pdf_rules_inline hält es bis zum Schluss geschützt.
+            out.append(char if keep_block else _RULES_BLOCK_CHARS[ord(char) - _RULES_PROTECT_BASE])
+            continue
         try:
             char.encode("cp1252")
             out.append(char)
@@ -1511,20 +1511,34 @@ def _rules_inline_marks(raw: str) -> str:
     return re.sub(r"\*(.+?)\*", r"<i>\1</i>", html)
 
 
+# Bausteinwerte (Namen aus Bibliothek und Modus, #2218): Ihre Steuerzeichen stehen als Zeichen aus dem privaten Bereich da
+# (``services.markdown_text``), die keine Regel trifft. Erst hier am Ende werden sie wieder das echte, maskierte Zeichen. Der frei
+# geschriebene Text bleibt unberührt, auch ein Backslash darin.
+_RULES_BLOCK_CHARS = "\\`*_[]()!~+"
+_RULES_PROTECT_BASE = 0xE000
+
+
+def _is_block_char(char: str) -> bool:
+    return _RULES_PROTECT_BASE <= ord(char) < _RULES_PROTECT_BASE + len(_RULES_BLOCK_CHARS)
+
+
+def _rules_restore(markup: str) -> str:
+    return "".join(escape(_RULES_BLOCK_CHARS[ord(char) - _RULES_PROTECT_BASE]) if _is_block_char(char) else char for char in markup)
+
+
 def pdf_rules_inline(raw: str, anchors=frozenset()) -> str:
     """Eine Zeile Markdown als Absatz-Markup - alles maskiert, nur unsere Tags; Links nur auf sichere Ziele oder eigene Anker,
-    Bilder als Hinweis (das PDF lädt nichts nach)."""
-    text = _rules_pdf_text(raw)
+    Bilder als Hinweis (das PDF lädt nichts nach). Geschützte Zeichen aus Bausteinen kommen als Text heraus."""
+    return _rules_restore(_rules_inline(_rules_pdf_text(raw, keep_block=True), anchors))
+
+
+def _rules_inline(text: str, anchors) -> str:
     out = ""
     last = 0
     for match in _RULES_LINK.finditer(text):
         out += _rules_inline_marks(text[last:match.start()])
         label = _rules_inline_marks(match.group(2))
         target = match.group(3)
-        if match.group(1) and match.group(2) == RULES_ICON_ALT:
-            # Das Symbol eines Modus ist Schmuck vor dem Namen - im PDF ohne Hinweis und ohne Lücke.
-            last = match.end() + (1 if text[match.end():match.end() + 1] == " " else 0)
-            continue
         if match.group(1):
             out += f"[Bild: {escape(match.group(2))}]"
         elif _RULES_SAFE_LINK.match(target) or (target.startswith("#") and target[1:] in anchors):

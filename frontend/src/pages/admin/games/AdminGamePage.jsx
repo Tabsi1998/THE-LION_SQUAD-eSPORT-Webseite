@@ -1,9 +1,10 @@
 // Spielseite der Verwaltung (#2249) unter /admin/games/<Spiel>: alles zu einem Spiel an einem Ort, in Reitern Allgemein,
-// Spiel-IDs, Modi und Maps (per Adresse ansteuerbar: #allgemein, #ids, #modi, #maps). Vorher verteilt auf die Seitenleiste
-// „Spiel bearbeiten“ und eine eigene Map-Seite (die alte Adresse /admin/games/<Spiel>/maps leitet hierher weiter).
+// Spiel-IDs, Modi, Maps und Ausrüstung (per Adresse ansteuerbar: #allgemein, #ids, #modi, #maps, #ausruestung). Vorher verteilt auf
+// die Seitenleiste „Spiel bearbeiten“ und eigene Seiten (die alten Adressen …/maps und …/equipment leiten hierher weiter).
 //
 // Speichern je Reiter: jeder Reiter mit Formular hält seinen Entwurf, solange die Seite offen ist - ein Reiterwechsel verliert
-// nichts, der Reiter trägt dann einen Punkt. Wer die Seite mit Ungespeichertem verlässt, wird gefragt. Maps speichern sofort.
+// nichts, der Reiter trägt dann einen Punkt. Wer die Seite mit Ungespeichertem verlässt, wird gefragt. Maps und Ausrüstung speichern
+// sofort.
 // Ein weiterer Reiter (etwa „Ausrüstung“ mit C.4) braucht einen Eintrag in GAME_TABS (lib/gameForm.js) und eines in PANELS unten.
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
@@ -25,6 +26,7 @@ import { GameGeneralTab } from "./GameGeneralTab";
 import { GameIdsTab } from "./GameIdsTab";
 import { GameModesTab } from "./GameModesTab";
 import { GameMapsTab } from "./GameMapsTab";
+import { EquipmentLibrary } from "./equipment/EquipmentLibrary";
 import { toast } from "sonner";
 
 const SAVE_LABELS = { allgemein: "Allgemein speichern", ids: "Spiel-IDs speichern", modi: "Modi speichern" };
@@ -222,6 +224,8 @@ export default function AdminGamePage() {
     ids: () => <GameIdsTab gameId={game.id} kind={game.kind} form={formOf("ids")} onChange={setForm("ids")} games={games} />,
     modi: () => <GameModesTab form={formOf("modi")} onChange={setForm("modi")} usage={usage} />,
     maps: () => <GameMapsTab gameId={game.id} reloadKey={mapsKey} onOpenModes={() => selectTab("modi")} />,
+    // Ausrüstung (C.4, #2218): speichert je Eintrag sofort wie die Maps - kein Entwurf, also kein Punkt und keine Rückfrage beim Verlassen.
+    ausruestung: () => <EquipmentLibrary gameId={game.id} />,
   } : {};
   const hasForm = Boolean(FORMS[tab]);
 

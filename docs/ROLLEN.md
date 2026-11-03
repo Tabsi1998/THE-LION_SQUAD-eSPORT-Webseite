@@ -342,6 +342,10 @@ im Verlauf des Antrags und im Protokoll.
 **Helfer an Staffeln** lesen, ändern aber nichts. Sonstige Turniere bleiben unverändert. Die Matrix je Route steht in
 [`LIGA.md`](LIGA.md), Abschnitt 12. Code: `services/league_permissions.py`.
 
+**Ausrüstung und Sperrliste (#2218):** Die Bibliothek (Waffen, Aufsätze, Ausrüstung je Spiel) pflegt wie die Maps die **Turnierleitung**
+(`tournaments`). Die Sperrliste einer Season speichert und entfernt, wer **Season konfigurieren** hat oder den Bereich Ligen; lesen und
+Versionen vergleichen darf jede Zuständigkeit der Liga. Öffentlich steht sie nur auf der Ligaseite einer sichtbaren Season und im Regelwerk.
+
 ## Liga: Co-Team mit Captain und Vertreter (#1649)
 
 In der Liga spielt ein **Co-Team** eines Vereinsteams – Vertrag in [`LIGA.md`](LIGA.md). Jedes Co-Team hat
