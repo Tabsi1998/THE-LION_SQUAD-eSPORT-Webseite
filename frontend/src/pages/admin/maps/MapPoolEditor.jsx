@@ -5,7 +5,7 @@
 // Speichern (neue Version, mit der geladenen Version gegen gleichzeitiges Überschreiben) und Pool entfernen.
 // Gespeichert ist ein Snapshot: was sich in der Bibliothek seither geändert hat, steht als Hinweis da und kommt erst mit
 // dem nächsten Speichern in den Pool. Die Regeln prüft der Server noch einmal (services/map_pools.py).
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowDown, ArrowUp, Map as MapIcon, Trash2 } from "lucide-react";
 import { LazyImg } from "@/components/tls/LazyImg";
@@ -38,6 +38,11 @@ function ModesPlace({ game, libraryLink }) {
   return <>auf der <Link to={gamePageUrl(game.id, "modi")} className="text-[#29B6E8] hover:text-white underline-offset-2 hover:underline" data-testid="pool-modes-link">Spielseite im Reiter Modi</Link></>;
 }
 
+/** Die Modi einer Auswahl, die Maps haben - als Schlüssel. */
+function withMapsOf(selection) {
+  return Object.entries(selection || {}).filter(([, ids]) => (ids || []).length).map(([key]) => key);
+}
+
 /** Die Auswahl eines gespeicherten Pools, beschränkt auf das, was heute noch wählbar ist (aktiv, im Modus frei). */
 function startSelection(entry, library, modes) {
   if (!entry || entry.stale) return {};
@@ -61,7 +66,7 @@ function Thumb({ item }) {
   );
 }
 
-function ModeGroup({ mode, label, library, selected, kept = [], onToggle, onMove, disabled, testId }) {
+function ModeGroup({ mode, label, library, selected, kept = [], onToggle, onMove, disabled, testId, aside = null, labelNode = null }) {
   // Inaktive Maps (#2207) nur, wo der gespeicherte Pool sie in diesem Modus schon hat.
   const choices = choosableMaps(library, mode, kept);
   const byId = Object.fromEntries(choices.map((item) => [item.id, item]));
@@ -70,8 +75,9 @@ function ModeGroup({ mode, label, library, selected, kept = [], onToggle, onMove
   return (
     <fieldset className="border border-white/10 rounded-sm bg-[#0A0A0A] p-3" data-testid={`${testId}-mode-${mode ?? "alle"}`}>
       <legend className="px-1 text-[11px] font-bold uppercase tracking-widest text-white/70">
-        {name} <span className="ml-1 normal-case tracking-normal font-semibold text-white/45 tabular-nums">{selected.length} von {choices.length}</span>
+        {labelNode || name} <span className="ml-1 normal-case tracking-normal font-semibold text-white/45 tabular-nums">{selected.length} von {choices.length}</span>
       </legend>
+      {aside ? <div className="mb-2">{aside}</div> : null}
       {choices.length === 0 ? (
         <p className="text-xs text-white/45">Keine aktive Map ist für diesen Modus freigegeben.</p>
       ) : (
@@ -112,22 +118,46 @@ function ModeGroup({ mode, label, library, selected, kept = [], onToggle, onMove
   );
 }
 
+// Season-Seite (#2267): Mit `pickModes` stehen oben die Modi des Spiels zum Anhaken - angehakt heißt „die Season spielt diesen Modus“,
+// darunter erscheinen nur die Gruppen der angehakten Modi. Ein abgehakter Modus fällt beim Speichern aus dem Pool; seine Auswahl bleibt
+// bis dahin gemerkt, ein neuer Haken bringt sie zurück. `onModesChange({picked, withMaps})` meldet die Modi nach oben (Ergebnisregeln,
+// „Modus je Map“), `onDirtyChange` Ungespeichertes (Punkt am Reiter). `modeAside(mode)` steht unter dem Namen eines Modus,
+// `renderModeLabel(mode, label)` ersetzt den Namen (Platz für das Modus-Symbol, #2266).
 export function MapPoolEditor({ title, hint = "", game, library = [], entry = null, sources = [], defaultPool = null, onSave, onClear, canEdit = true,
-  libraryLink = false, defaultsLabel = "Vorgabe des Spiels", testId = "map-pool-editor" }) {
+  libraryLink = false, defaultsLabel = "Vorgabe des Spiels", saveLabel = "Speichern", testId = "map-pool-editor", pickModes = false, onModesChange, onDirtyChange, modeAside,
+  renderModeLabel }) {
   const allModes = useMemo(() => game?.modes || [], [game]);
   // Inaktive und archivierte Modi (#2206) kommen in keinen neuen Pool - nur, was der gespeicherte Pool schon hat, bleibt zur Wahl.
   const kept = useMemo(() => (entry && !entry.stale ? (entry.modes || []).filter((group) => (group.maps || []).length).map((group) => group.mode) : []), [entry]);
   const modes = useMemo(() => selectableModes(allModes, kept), [allModes, kept]);
   const hiddenInactive = allModes.filter((mode) => modeStatusOf(mode) === "inactive" && !kept.includes(mode.mode));
-  const [selection, setSelection] = useState(() => startSelection(entry, library, modes));
+  const [rawSelection, setSelection] = useState(() => startSelection(entry, library, modes));
+  const [picked, setPicked] = useState(() => withMapsOf(startSelection(entry, library, modes)));
   const [busy, setBusy] = useState(false);
   const baseline = useMemo(() => (entry && !entry.stale ? poolSelection(entry) : {}), [entry]);
+  // Hat das Spiel Modi, aber keiner ist wählbar, gibt es keine Gruppe „Alle Maps“ - der Server nähme sie nicht an.
+  const allGroups = modes.length ? modes : allModes.length ? [] : [{ mode: null, label: "" }];
+  const picking = pickModes && modes.length > 0;
+  const groups = picking ? allGroups.filter(({ mode }) => picked.includes(keyOf(mode))) : allGroups;
+  const selection = useMemo(() => (picking ? Object.fromEntries(Object.entries(rawSelection).filter(([key]) => picked.includes(key))) : rawSelection),
+    [picking, rawSelection, picked]);
   const dirty = !sameSelection(baseline, selection) || Boolean(entry?.stale);
   const count = selectionCount(selection);
   const disabled = !canEdit || busy;
-  // Hat das Spiel Modi, aber keiner ist wählbar, gibt es keine Gruppe „Alle Maps“ - der Server nähme sie nicht an.
-  const groups = modes.length ? modes : allModes.length ? [] : [{ mode: null, label: "" }];
-  const noModeLeft = groups.length === 0;
+  const noModeLeft = allGroups.length === 0;
+  // In der Reihenfolge der Modi des Spiels, egal in welcher Reihenfolge angehakt wurde.
+  const groupKeys = allGroups.map(({ mode }) => keyOf(mode));
+  const withMaps = groupKeys.filter((key) => (selection[key] || []).length).join("|");
+  const pickedKeys = picking ? groupKeys.filter((key) => picked.includes(key)) : groupKeys;
+  useEffect(() => { onModesChange?.({ picked: pickedKeys, withMaps: withMaps ? withMaps.split("|") : [] }); },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- gemeldet wird nur, wenn sich Haken oder Modi mit Maps ändern
+    [pickedKeys.join("|"), withMaps]);
+  useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
+  const pickSelection = (next) => {
+    setSelection(next);
+    if (picking) setPicked(withMapsOf(next));
+  };
+  const togglePicked = (key) => setPicked((current) => (current.includes(key) ? current.filter((item) => item !== key) : [...current, key]));
   const outdated = (entry?.outdated_map_ids || []).length && !entry?.stale
     ? (entry.modes || []).flatMap((group) => group.maps || []).filter((item, index, all) =>
       entry.outdated_map_ids.includes(item.map_id) && all.findIndex((other) => other.map_id === item.map_id) === index)
@@ -151,12 +181,12 @@ export function MapPoolEditor({ title, hint = "", game, library = [], entry = nu
   });
   const copyFrom = (key) => {
     const source = sources.find((item) => item.key === key);
-    if (source) setSelection(startSelection({ ...source.pool, stale: false }, library, modes));
+    if (source) pickSelection(startSelection({ ...source.pool, stale: false }, library, modes));
   };
   // Vorgabe des Spiels (#2129, SP3): der Standard-Pool, soweit seine Maps heute wählbar sind - sonst wie bisher alle aktiven.
   const loadDefaults = () => {
     const fromDefault = defaultPool ? startSelection({ ...defaultPool, stale: false }, library, modes) : null;
-    setSelection(fromDefault && selectionCount(fromDefault) ? fromDefault : defaultSelection(library, modes));
+    pickSelection(fromDefault && selectionCount(fromDefault) ? fromDefault : defaultSelection(library, modes));
   };
 
   let status = "Noch kein Pool";
@@ -233,15 +263,37 @@ export function MapPoolEditor({ title, hint = "", game, library = [], entry = nu
                 {sources.map((source) => <option key={source.key} value={source.key}>{source.label}</option>)}
               </select>
             ) : null}
-            <button type="button" disabled={disabled || count === 0} onClick={() => setSelection({})} data-testid={`${testId}-none`}
+            <button type="button" disabled={disabled || count === 0} onClick={() => setSelection(picking ? Object.fromEntries(Object.keys(rawSelection).filter((key) => !picked.includes(key)).map((key) => [key, rawSelection[key]])) : {})} data-testid={`${testId}-none`}
               className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">
               Alle abwählen
             </button>
           </div>
+          {picking ? (
+            <fieldset className="space-y-2" data-testid={`${testId}-modes`}>
+              <legend className="text-[11px] font-bold uppercase tracking-widest text-white/70">Welche Modi spielt die Season?</legend>
+              <p className="text-xs text-white/50">Haken setzen – darunter wählst du je Modus die Maps. Ein Modus ohne Haken kommt nicht in den Pool.</p>
+              <div className="flex flex-wrap gap-2">
+                {modes.map(({ mode, label }) => {
+                  const key = keyOf(mode);
+                  const on = picked.includes(key);
+                  const maps = (rawSelection[key] || []).length;
+                  return (
+                    <label key={key} className={`inline-flex min-h-[44px] cursor-pointer select-none items-center gap-2 rounded-sm border px-3 py-1.5 text-sm focus-within:outline focus-within:outline-1 focus-within:outline-[#29B6E8] ${on ? "border-[#29B6E8]/70 bg-[#29B6E8]/10 text-white" : "border-white/10 bg-[#0A0A0A] text-white/65"}`}>
+                      <input type="checkbox" checked={on} disabled={disabled} onChange={() => togglePicked(key)} className="accent-[#29B6E8]" data-testid={`${testId}-pick-${key}`} />
+                      {renderModeLabel ? renderModeLabel(mode, label || mode) : (label || mode)}
+                      {on ? <span className={`text-xs tabular-nums ${maps ? "text-white/55" : "text-warn"}`}>{maps ? `${maps} ${maps === 1 ? "Map" : "Maps"}` : "noch keine Map"}</span> : null}
+                    </label>
+                  );
+                })}
+              </div>
+              {!picked.length ? <p className="text-xs text-warn" data-testid={`${testId}-pick-none`}>Noch kein Modus angehakt – ohne Modus gibt es keinen Pool.</p> : null}
+            </fieldset>
+          ) : null}
           <div className="grid gap-3 lg:grid-cols-2">
             {groups.map(({ mode, label }) => (
               <ModeGroup key={keyOf(mode) || "alle"} mode={mode} label={label} library={library} selected={selection[keyOf(mode)] || []}
-                kept={baseline[keyOf(mode)] || []}
+                kept={baseline[keyOf(mode)] || []} aside={modeAside?.(mode) || null}
+                labelNode={renderModeLabel && mode != null ? renderModeLabel(mode, label || mode) : null}
                 onToggle={(m, id) => setSelection((current) => toggleMap(current, m, id))}
                 onMove={(m, id, delta) => setSelection((current) => moveMap(current, m, id, delta))}
                 disabled={disabled} testId={testId} />
@@ -260,7 +312,7 @@ export function MapPoolEditor({ title, hint = "", game, library = [], entry = nu
           ) : null}
           <button type="button" disabled={busy || !dirty || count === 0 || noModeLeft} onClick={save} data-testid={`${testId}-save`}
             className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
-            {busy ? "Speichere …" : "Speichern"}
+            {busy ? "Speichere …" : saveLabel}
           </button>
         </div>
       ) : null}

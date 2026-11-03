@@ -147,7 +147,9 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     test("Season: Sperrliste je Modus und Aufsätze an einer Waffe, neue Version", async ({ page }) => {
       await page.setViewportSize({ width, height });
       const calls = await mock(page);
-      await page.goto("/admin/leagues/seasons/s1");
+      // Reiter „Regelwerk und Sperrliste“ (#2267), angesteuert über den Abschnitt.
+      await page.goto("/admin/leagues/seasons/s1#sperrliste");
+      await expect(page.getByTestId("season-tab-regelwerk")).toHaveAttribute("aria-selected", "true");
       const panel = page.getByTestId("season-bans");
       await expect(panel.getByTestId("season-bans-head")).toContainText("Version 1 · 3 Zeilen");
       await expect(panel.getByTestId("season-bans-rules-outdated")).toContainText("Version 2");

@@ -2,8 +2,8 @@
 from fastapi import APIRouter, HTTPException, Depends
 from database import get_db
 from auth import get_optional_user, require_admin
-from services import game_maps, game_modes, game_usage
-from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
+from services import game_id_keys, game_maps, game_modes, game_usage
+from services.slug_utils import apply_slug_history, find_by_slug_or_history, slugify, unique_slug
 from models import GameCreate, GameUpdate, now_utc, new_id
 
 router = APIRouter(prefix="/api/games", tags=["games"])
@@ -193,6 +193,26 @@ async def _refuse_used_removal(db, current: dict, modes: list[dict] | None) -> N
             raise HTTPException(status_code=409, detail=game_usage.mode_in_use_text(mode["label"], counts))
 
 
+ID_SOURCE_FIELDS = ("player_id_fields", "identity_source_game_id", "parent_game_id", "inherit_player_ids", "kind", "slug")
+
+
+async def _lost_id_keys(db, current: dict, updates: dict, confirmed: set[str]) -> dict[str, int]:
+    """Verliert das Spiel einen Schlüssel, unter dem schon Spieler-IDs stehen (#2249)? Verglichen werden die effektiven Felder und
+    die effektive ID-Quelle vor und nach dem Speichern - ein entferntes Feld, ein anderer Schlüssel („PSN-ID“ zu „psn_id“), eine
+    andere ID-Quelle, ein anderes Hauptspiel oder Erben aus. Ohne Bestätigung 409 mit der Zahl der Personen; bestätigt: die
+    Zählung fürs Protokoll. Ohne gespeicherte IDs fällt ein Schlüssel einfach weg."""
+    if not any(key in updates for key in ID_SOURCE_FIELDS):
+        return {}
+    by_id = await game_id_keys.games_by_id(db)
+    after = {**current, **{key: updates[key] for key in ID_SOURCE_FIELDS if key in updates}}
+    used = await game_id_keys.lost_keys(db, current, after, by_id)
+    open_keys = {key: count for key, count in used.items() if key not in confirmed}
+    if open_keys:
+        source = game_id_keys.source_of(current, {**by_id, current["id"]: current})
+        fields = [*(current.get("player_id_fields") or []), *(source.get("player_id_fields") or [])]
+        raise HTTPException(status_code=409, detail=game_id_keys.in_use_detail(fields, open_keys))
+    return used
+
 @router.put("/{game_id}")
 @router.patch("/{game_id}")
 async def update_game(game_id: str, body: GameUpdate, me: dict = Depends(require_admin())):
@@ -206,6 +226,7 @@ async def update_game(game_id: str, body: GameUpdate, me: dict = Depends(require
                        "match_modes", "players_per_run_local", "players_per_run_online", "station_devices", "setup_minutes",
                        "points_table", "default_best_of"}
     raw = body.model_dump(exclude_unset=True)
+    confirmed = set(raw.pop("confirm_removed_keys", None) or [])
     if raw.get("match_modes"):
         # Kennung bleibt (#2206): ein Eintrag ohne Kennung mit dem Namen eines bestehenden Modus behält dessen Kennung.
         try:
@@ -223,9 +244,12 @@ async def update_game(game_id: str, body: GameUpdate, me: dict = Depends(require
         await _refuse_used_removal(db, current, raw["match_modes"])
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     _check_id_fields(updates.get("player_id_fields"), current.get("player_id_fields"))
-    slug_source = slug_source_for_update(raw, current, "name", fallback="spiel")
-    if slug_source is not None:
-        updates["slug"] = await unique_slug(db.games, slug_source, current_id=game_id, fallback="spiel")
+    # Die Adresse folgt dem Namen nicht mehr (#2249): Unter dem Slug stehen die Spieler-IDs (``users.game_ids.<slug>``), ein
+    # neuer Name darf sie nicht unbemerkt unlesbar machen. Nur ein ausdrücklich anderer Slug ändert sie - mit Rückfrage, wenn
+    # darunter schon IDs stehen (``_lost_id_keys``).
+    updates.pop("slug", None)
+    if raw.get("slug") and slugify(raw["slug"], "spiel") != slugify(current.get("slug"), "spiel"):
+        updates["slug"] = await unique_slug(db.games, raw["slug"], current_id=game_id, fallback="spiel")
         apply_slug_history(current, updates)
     if updates.get("parent_game_id"):
         if updates["parent_game_id"] == game_id:
@@ -240,12 +264,17 @@ async def update_game(game_id: str, body: GameUpdate, me: dict = Depends(require
     for key in ("parent_game_id", "identity_source_game_id"):
         if await game_usage.chosen_is_archived(db, updates.get(key), current.get(key)):
             raise HTTPException(status_code=422, detail=game_usage.ARCHIVED_DETAIL)
+    lost_keys = await _lost_id_keys(db, current, updates, confirmed)
     await _check_discord_guild(db, updates, current)
     status = updates.get("status")
     if status and status != (current.get("status") or "active"):
         updates["archived_at"] = now_utc().isoformat() if status == game_usage.ARCHIVED else None
     updates["updated_at"] = now_utc().isoformat()
     await db.games.update_one({"id": game_id}, {"$set": updates})
+    if lost_keys:
+        await db.audit_logs.insert_one({
+            "id": new_id(), "action": "game.player_id_fields.remove", "target_id": game_id, "actor_id": me.get("id"),
+            "data": {"keys": lost_keys}, "created_at": now_utc().isoformat()})
     game = await db.games.find_one({"id": game_id}, {"_id": 0})
     if "match_modes" not in raw:
         return game

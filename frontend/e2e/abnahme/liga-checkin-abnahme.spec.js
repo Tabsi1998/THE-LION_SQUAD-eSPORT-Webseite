@@ -69,7 +69,9 @@ test.describe("Abnahme: Liga-Check-in gegen den echten Server", () => {
 
   test("Leitung: Check-in der Season speichern, Regelwerk mit Zustimmungspflicht, Staffel starten", async ({ browser }, testInfo) => {
     const lead = await as(browser, testInfo, "lead", { width: 1440, height: 900 });
-    await lead.page.goto(`/admin/leagues/seasons/${ablauf.season.id}`);
+    // Der Kasten steht im Reiter „Termine“ der Season-Seite (#2267), Sprungmarke #checkin.
+    await lead.page.goto(`/admin/leagues/seasons/${ablauf.season.id}#checkin`);
+    await expect(lead.page.getByTestId("season-tab-termine")).toHaveAttribute("aria-selected", "true");
     const panel = lead.page.getByTestId("season-checkin-rules");
     await expect(panel).toBeVisible();
     await expect(lead.page.getByTestId("checkin-rules-min")).toHaveValue("3");

@@ -11,6 +11,7 @@ gespeicherte Pools und Seasons behalten ihn - sie zeigen auf ihren Snapshot.
 """
 from __future__ import annotations
 
+from services import game_id_keys
 from services.game_maps import DEFAULT_POOL_SCOPE, game_modes
 
 ARCHIVED = "archived"
@@ -31,7 +32,7 @@ USAGE_LABELS = (
     ("challenges", "Fast-Lap-Challenge", "Fast-Lap-Challenges"),
     ("servers", "Game-Server", "Game-Server"),
     ("stations", "Station", "Stationen"),
-    ("profiles", "Profil mit Spieler-ID", "Profile mit Spieler-ID"),
+    ("profiles", "Person mit Spieler-ID", "Personen mit Spieler-ID"),
 )
 
 
@@ -81,8 +82,9 @@ async def usage(db, game: dict) -> dict:
         "challenges": await db.f1_challenges.count_documents({"game_id": game_id}),
         "servers": await db.game_servers.count_documents({"game_id": game_id}),
         "stations": await db.stations.count_documents({"game_id": game_id}),
-        "profiles": (await db.users.count_documents({f"game_ids.{game['slug']}": {"$exists": True}})
-                     if game.get("slug") else 0),
+        # Wer eine Spiel-ID an diesem Spiel hat (#2249): Profil unter dem eigenen Slug und dort, wo die ID-Quelle die eigenen
+        # Schlüssel speichert, dazu der Liga-Kader - anonymisierte Konten nicht.
+        "profiles": await game_id_keys.deletion_people(db, game),
     }
     seasons = await db.league_seasons.find({"league_id": {"$in": [row["id"] for row in leagues]}},
                                            {"_id": 0, "game_mode_order": 1}).to_list(None)
@@ -104,7 +106,9 @@ async def usage(db, game: dict) -> dict:
         }
         for mode in game_modes(game)
     }
-    return {"counts": counts, "total": sum(counts.values()), "text": usage_text(counts), "modes": modes}
+    # Je ID-Feld, wie viele Personen darunter schon eine ID haben (#2249) - die Rückfrage vor dem Entfernen nennt die Zahl.
+    id_fields = await game_id_keys.usage_by_key(db, game)
+    return {"counts": counts, "total": sum(counts.values()), "text": usage_text(counts), "modes": modes, "id_fields": id_fields}
 
 
 # Was einen Modus „verwendet“ (#2206, C.1): Dann lässt er sich nur noch deaktivieren oder archivieren, nicht entfernen.

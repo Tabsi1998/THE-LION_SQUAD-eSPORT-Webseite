@@ -65,7 +65,7 @@ Indizes: `id` eindeutig, `slug` eindeutig, `game_id`.
 | `result_confirm_hours` | int 1–336 | ja | 48 |
 | `lineup_amend_hours` | int 1–336 | ja | 48 – Nachtragsfrist der eigenen Aufstellung nach dem Ergebnis |
 | `match_schedule_response_hours` | int 1–720 | nein | 72 – Antwortfrist auf Terminvorschläge (#2106, F3); fehlt (Seasons von vorher) = jede Staffel behält ihre |
-| `rules_text` | str (Markdown) | nein | Regeltext der Season (Textfeld, #1646 später) |
+| `rules_text` | str (Markdown) | nein | Regeltext der Season - Altbestand; seit #2267 ohne Eingabefeld, die Season-Seite zeigt ihn nur noch zum Lesen, solange es kein Regelwerk gibt |
 | `registration_deadline` | Kalendertag | nein | Meldeschluss, nur Anzeige (Season 1: 6.11.) |
 | `visibility` | `"off"` \| `"admins"` \| `"members"` \| `"public"` | ja | **`off`** |
 | `status` | `"draft"` \| `"active"` \| `"completed"` \| `"archived"` | ja | `draft` |
@@ -835,7 +835,7 @@ neuen Felder nicht und prüfen nichts Neues.
 
 | Feld | Typ | Bedeutung |
 | --- | --- | --- |
-| `key` | str | Pflicht, je Spiel eindeutig (#2249): Unter ihm stehen die IDs der Spieler (`users.game_ids.<spiel>.<key>`). Doppelt oder leer: 422; was schon doppelt oder leer gespeichert ist (Altbestand), hält ein anderes Speichern nicht auf. Die Verwaltung ändert einen gespeicherten Schlüssel nie, auch keinen nicht kanonischen („PSN-ID“), und schickt fremde Angaben am Feld unverändert zurück |
+| `key` | str | Pflicht, je Spiel eindeutig (#2249): Unter ihm stehen die IDs der Spieler (`users.game_ids.<spiel>.<key>`). Doppelt oder leer: 422; was schon doppelt oder leer gespeichert ist (Altbestand), hält ein anderes Speichern nicht auf. Die Verwaltung ändert einen gespeicherten Schlüssel nie, auch keinen nicht kanonischen („PSN-ID“) oder leeren, und schickt fremde Angaben am Feld unverändert zurück. **Speicherort:** Das Profil speichert alle Felder, die für ein Spiel gelten, unter dem Slug seiner **effektiven ID-Quelle** (`identity_source_game_id`, sonst bei `inherit_player_ids` das Hauptspiel, sonst das Spiel selbst), der Kader in `league_rosters.player_ids`. **Wegfallen** darf ein Schlüssel, unter dem schon IDs stehen, nur mit `confirm_removed_keys: [key]` im `PATCH` - verglichen werden die effektiven Felder und die effektive Quelle vor und nach dem Speichern, also auch bei anderer ID-Quelle, anderem Hauptspiel, ausgeschaltetem Erben oder einem ausdrücklich geänderten Slug (ein neuer Name ändert den Slug eines bestehenden Spiels nicht); gezählt wird nur, wer den Wert danach unter keinem lesbaren Pfad mehr hat. Sonst 409 mit `detail: {code: "id_keys_in_use", keys: {key: Personen}, message}`. Gezählt wird je Person einmal (ohne anonymisierte Konten) mit `distinct` auf genau dem Pfad. Bestätigt schreibt der Server `game.player_id_fields.remove` mit `{keys: {key: Personen}}` ins Protokoll; `GET /api/games/{id}/usage` trägt die Zahlen als `id_fields`, und `counts.profiles` zählt fürs Löschen auch IDs unter der ID-Quelle und Kader-Einträge des Spiels (Index `league_rosters.game_id`). Ohne gespeicherte IDs fällt ein Feld einfach weg |
 | `pattern` | str ≤ 200 | Regulärer Ausdruck für den ganzen Wert. Der Server prüft beim Speichern, ob er gültig ist |
 | `format_hint` | str ≤ 120 | Beispiel oder Beschreibung, steht im Profil und in jeder Meldung zum Format |
 | `options` | `[str]`, höchstens 30 | Auswahl statt Freitext. So wird die **Plattform** zum Feld: Pflicht über `required`, einmal je Season festgehalten wie jede ID |
@@ -1185,8 +1185,8 @@ nichts auf. Notausnahme nur für den Superadmin mit `readiness_override_reason` 
 Protokoll `league.season.readiness_override` mit Grund und den Codes. Von `members` auf `public` (schon veröffentlicht) und zurück auf
 `admins` oder `off` prüft nichts. Bekannte Grenze: Prüfen und Schreiben sind zwei Schritte.
 
-**Verwaltung:** Season-Seite mit Abschnitt „Prüfung vor der Veröffentlichung“ (Probleme, Warnungen, Mindestgröße je Modus mit Feld
-zum Überschreiben, beim Superadmin das Feld für den Grund), „Map sperren“ und „Versionen vergleichen“ am Map-Pool. Maps einer
+**Verwaltung:** Season-Seite (#2267, Abschnitt „Season-Seite der Verwaltung“): „Was fehlt noch?“ im Reiter Überblick (Probleme, Warnungen,
+jeder Punkt mit Sprung an seine Stelle, beim Superadmin das Feld für den Grund), im Reiter Spielbetrieb „Mindestgröße anpassen“ je Modus, „Map sperren“ und „Versionen vergleichen“ am Map-Pool. Maps einer
 Bibliothek: Knopf „Deaktivieren“ mit Rückfrage, die betroffene Seasons nennt.
 
 **App:** liest nur den Snapshot `map_pool.modes` und keine Map-Zustände. Antworten bekommen nur Felder dazu.
@@ -1746,3 +1746,34 @@ Veröffentlichen wie jeder Baustein. Der dynamische Umbau des Regelwerks ist #22
 
 **Haken für D.3:** `match_flow.veto_pending(match, tournament)` – zwischen `ready_at` und Start; liefert heute `False`. D.3 setzt dort den
 Zustandsautomaten des Vetos ein, der Start bleibt der Schritt danach.
+
+### Season-Seite der Verwaltung (#2267)
+
+`/admin/leagues/seasons/{id}` in Reitern nach dem Muster der Spielseite (#2249). Nur Oberfläche: **Daten und API unverändert**, jeder
+Reiter schickt seine Felder an `PATCH /api/admin/leagues/seasons/{id}` (Teil-Anfrage, `exclude_unset`). Welcher Reiter welches Feld
+trägt, steht in `frontend/src/lib/seasonTabs.js` (`TAB_FIELDS`, `TAB_PAYLOAD_KEYS`); ein Test verlangt, dass jedes Feld von
+`seasonToForm` und `seasonPayload` genau einem Reiter gehört (#2023 „jede Angabe an genau einer Stelle“).
+
+| Reiter | Sprungmarke | Inhalt | Speichern |
+| --- | --- | --- | --- |
+| Überblick | (keine), `#pruefung`, `#gestaltung` | Ablaufleiste, „Was fehlt noch?“ (`season_readiness`), Name, Sichtbarkeit und Stand mit Wirkung, Hinweis „Regelwerk muss freigegeben werden“, Gestaltung und Gewinne | `name`, `visibility`, `status`, Gestaltung, `prizes` (+ `readiness_override_reason`) |
+| Spielbetrieb | `#spielbetrieb`, `#modi`, `#mindestgroesse`, `#ergebnisregeln`, `#serie` | Modi der Season anhaken = Modi mit Maps im Pool, je Modus Maps und Bedarf; Map sperren, Versionen; Mindestgröße; Ergebnisregeln der angehakten Modi; Serie; Fristen nach dem Spiel | `best_of`, `team_size`, `game_mode_order`, `map_repeat`, `result_confirm_hours`, `lineup_amend_hours`; Pool, Mindestgröße und Ergebnisregeln eigene Knöpfe |
+| Termine | `#termine`, `#kalender`, `#terminregeln`, `#checkin` | Kalender, Sperrzeiten, Antwortfrist, Terminregeln (D.1), Check-in-Regeln (D.2, #1652) | Kalenderfelder, `blocked_periods`, `match_schedule_response_hours`; Terminregeln und Check-in eigene Knöpfe |
+| Anmeldung und Kader | `#anmeldung`, `#selbstanmeldung`, `#spielberechtigung`, `#anmeldungen`, `#kader` | Selbstanmeldung (B.4), Kader und Spielberechtigung (B.3, mit Mindestkader), Eingang, Kaderübersicht; Platz für die Plattform (#2270) | Felder von B.3/B.4, `min_squad_size`, `registration_deadline` (nur ohne Anmeldefenster sichtbar) |
+| Tabelle | `#tabelle`, `#punkte`, `#gleichstand` | Punkte, Gleichstand, Ausscheiden (E.1), Gleichstände der Staffeln | `scoring_rules` |
+| Regelwerk und Sperrliste | `#regelwerk`, `#sperrliste` | Stand des Regelwerks (B.2) mit Weg dorthin, Sperrliste (C.4) | Sperrliste eigener Knopf |
+| Ligen und Staffeln | `#ligen`, `#staffeln`, `#uebertragen` | Liga N, Staffeln, Staffelgröße, Vorgaben übertragen | `max_staffel_size` |
+
+- **Ungespeichertes:** Punkt am Reiter (auch ein geänderter, nicht gespeicherter Pool), beim Reiterwechsel eine Rückfrage mit
+  „Jetzt speichern“ / „Später speichern“ (die Eingabe bleibt), beim Verlassen der Seite die Rückfrage der Spielseite. Besuchte Reiter
+  bleiben geladen, Bausteine mit eigenem Speichern verlieren beim Wechsel nichts. Nach dem Speichern nimmt der Reiter den neuen Stand
+  an, ungespeicherte andere Reiter behalten ihre Eingaben (`rebaseForm`).
+- **Ablaufleiste** (`seasonPhases`): Vorbereitung bis zum Anmeldefenster, Anmeldung im Fenster (ohne Fenster „ohne Selbstanmeldung“),
+  Einteilung bis zum Start, Spielbetrieb ab gestarteter Staffel (mit Spielwoche), Abschluss bei Stand `completed`/`archived` oder wenn
+  alle Staffeln fertig sind. Der Stand bleibt die bewusste Schaltung der Leitung.
+- **Regeltext:** kein Eingabefeld mehr. Mit Regelwerk ausgeblendet, ohne steht ein Hinweis mit Weg zum Regelwerk und der alte Text zum
+  Lesen. Gelöscht wird nichts.
+- **Beiname der Liga N:** Hinweis, wenn er die Stufe wiederholt („Liga 1“ → Titel „Liga 1 · Liga 1“).
+- **Links:** Nachrichten zu neuen Anmeldungen zeigen weiter auf `#anmeldungen`, „Transfer beantragt“ auf `#kader`, „Zurück“ im
+  Regelwerk auf `#regelwerk`. Unbekannte Marken öffnen den Überblick.
+- Vorbereitet für F.2 „Season aus Vorgänger übernehmen“: der Knopf kommt neben „Season löschen“.
