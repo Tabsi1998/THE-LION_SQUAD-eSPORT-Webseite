@@ -333,6 +333,43 @@ describe("Spiel-IDs", () => {
     fireEvent.click(screen.getByTestId("game-save-ids"));
     await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/games/g1", { player_id_fields: [], identity_source_game_id: "p1", inherit_player_ids: false }));
   });
+
+  // Codex-Prüfung zu fix/2249-id-schluessel: Eine andere ID-Quelle (oder Erben aus) lässt geerbte IDs verschwinden - der Server
+  // antwortet mit 409 und der Zahl, die Seite fragt mit genau diesem Text und schickt bestätigt die Schlüssel mit.
+  const LOST = { response: { status: 409, data: { detail: {
+    code: "id_keys_in_use", keys: { activision_id: 4, plattform: 2 },
+    message: "Unter „Activision ID“ (4 Personen), „Plattform“ (2 Personen) sind schon Spieler-IDs gespeichert.",
+  } } } };
+
+  test("andere ID-Quelle mit gespeicherten IDs: Rückfrage mit Zahl, bestätigt geht es mit den Schlüsseln", async () => {
+    game = { ...GAME, kind: "edition", parent_game_id: "p1", identity_source_game_id: "p1", player_id_fields: [{ key: "plattform", label: "Plattform" }] };
+    apiMock.patch.mockRejectedValueOnce(LOST).mockResolvedValue({ data: game });
+    renderPage("/admin/games/g1#ids");
+    fireEvent.change(await screen.findByTestId("game-edit-identity-source"), { target: { value: "" } });
+    fireEvent.click(screen.getByTestId("game-edit-inherit-ids"));
+    fireEvent.click(screen.getByTestId("game-save-ids"));
+    await waitFor(() => expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Spieler-IDs gehen verloren", description: expect.stringContaining("„Activision ID“ (4 Personen)"),
+    })));
+    await waitFor(() => expect(apiMock.patch).toHaveBeenLastCalledWith("/games/g1", expect.objectContaining({
+      inherit_player_ids: false, confirm_removed_keys: ["activision_id", "plattform"],
+    })));
+    await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Spiel-IDs gespeichert."));
+  });
+
+  test("anderes Hauptspiel in Allgemein, Rückfrage abgebrochen: nichts gespeichert, der Entwurf bleibt", async () => {
+    game = { ...GAME, kind: "edition", parent_game_id: "p1" };
+    apiMock.patch.mockRejectedValueOnce(LOST);
+    confirmMock.mockResolvedValue(false);
+    renderPage("/admin/games/g1");
+    fireEvent.change(await screen.findByTestId("game-edit-kind"), { target: { value: "standalone" } });
+    fireEvent.click(screen.getByTestId("game-save-allgemein"));
+    await waitFor(() => expect(confirmMock).toHaveBeenCalled());
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(apiMock.patch).toHaveBeenCalledTimes(1);
+    expect(toastMock.error).not.toHaveBeenCalled();
+    expect(screen.getByTestId("game-tab-dirty-allgemein")).toBeInTheDocument();
+  });
 });
 
 describe("Modi", () => {
