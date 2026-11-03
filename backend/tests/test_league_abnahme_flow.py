@@ -20,7 +20,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
-from league_match_world import OLD_RULES  # noqa: E402
+from league_match_world import OLD_RULES, without_score_duty  # noqa: E402
 from squad_world import make_team  # noqa: E402
 
 ADMIN = "/api/admin/leagues"
@@ -98,6 +98,7 @@ async def build_league(flow) -> dict:
         maps[name] = ok(await flow.post(f"/api/games/{game['id']}/maps", json={"name": name, "modes": modes}))
     league = ok(await flow.post(ADMIN, json={"name": "CoD-Liga", "game_id": game["id"]}))
     season = ok(await flow.post(f"{ADMIN}/{league['id']}/seasons", json={**OLD_RULES, **SEASON_ONE}))
+    await without_score_duty(flow, season)
     ok(await flow.put(f"{ADMIN}/seasons/{season['id']}/map-pool", json={"modes": [
         {"mode": mode, "map_ids": [maps[name]["id"] for name in names]} for mode, names in POOL.items()]}))
     division = ok(await flow.post(f"{ADMIN}/seasons/{season['id']}/divisions", json={}))

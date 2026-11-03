@@ -48,15 +48,19 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
   const [reason, setReason] = useState("");
   // Befangen (#2203): Der Superadmin darf als Notausnahme, mit Grund im Protokoll. Der Server prüft das selbst.
   const [conflictReason, setConflictReason] = useState("");
+  // Ergebnisregel übergehen (C.3, #1617): die Liga-Leitung mit „Ergebnisse“, mit Grund im Protokoll - nie Best of, Pool oder
+  // Aufstellung. Im eigenen Spiel entscheidet eine zweite Person (Befangenheit wie oben).
+  const [ruleOverride, setRuleOverride] = useState("");
+  const overriding = Boolean(league?.can_override_rules) && ruleOverride.trim().length >= 5;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const panelRef = useRef(null);
   const kind = withMaps ? "maps" : inputKind(entry, heatMode);
   const outcome = useMemo(() => {
     if (!withMaps) return resultsFor(entry, kind, state);
-    const problem = staffProblem(mapGames, league, mapLists);
+    const problem = staffProblem(mapGames, league, mapLists, { skipRules: overriding });
     return problem ? { error: problem } : staffPayload(mapGames, league, mapLists);
-  }, [entry, kind, state, withMaps, mapGames, mapLists, league]);
+  }, [entry, kind, state, withMaps, mapGames, mapLists, league, overriding]);
   const sentence = withMaps ? (outcome.results ? seriesSentence(mapGames, league) : "")
     : outcome.results ? resultSentence(entry, outcome.results) : "";
 
@@ -114,6 +118,7 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
         ...(entry.conflict_override ? { conflict_reason: conflictReason.trim() } : {}),
         results: outcome.results,
         ...(withMaps ? { games: outcome.games } : {}),
+        ...(withMaps && overriding ? { rule_override_reason: ruleOverride.trim() } : {}),
         hold: true,
         reason: correcting ? reason.trim() : null,
       });
@@ -210,6 +215,14 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
             <label className="block">
               <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Grund der Korrektur (steht im Protokoll)</span>
               <input value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} className="input" placeholder="z. B. Stand falsch abgelesen" data-testid="result-reason" />
+            </label>
+          ) : null}
+
+          {withMaps && league?.can_override_rules ? (
+            <label className="block rounded-sm border border-white/10 bg-white/5 px-3 py-2" data-testid="result-rule-override">
+              <span className="block text-sm font-bold text-white">Ergebnisregel übergehen (Liga-Leitung, mit Grund)</span>
+              <span className="mt-0.5 mb-2 block text-xs text-white/70">Nur wenn ein Endstand wirklich so war und nicht zur Regel passt. Best of, Pool und Aufstellung gelten trotzdem; der Grund steht im Protokoll.</span>
+              <input value={ruleOverride} onChange={(event) => setRuleOverride(event.target.value)} maxLength={500} className="input" placeholder="Grund, mindestens 5 Zeichen" aria-label="Grund für das Übergehen der Ergebnisregel" data-testid="result-rule-override-reason" />
             </label>
           ) : null}
 

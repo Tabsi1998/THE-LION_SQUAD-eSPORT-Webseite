@@ -12,6 +12,7 @@ import { StaggerIn } from "@/components/tls/motion";
 import { useChangedKeys, useFlipRows } from "@/hooks/useLiveChanges";
 import { standingSignature } from "@/lib/liveChanges";
 import { LazyImg } from "@/components/tls/LazyImg";
+import { notPlayedText } from "../leagueResultRules";
 import {
   SOURCE_LABELS,
   matchWhen,
@@ -34,28 +35,41 @@ function TeamName({ side, won }) {
   ) : <span className={`tls-league-match__team ${tone}`} title={side.name}>{side.name}</span>;
 }
 
-function MapChips({ match }) {
+/** Zusatz einer Map (C.3, #1617) - wie auf der Matchseite. */
+function mapNote(game) {
+  if (game.decision === "awarded") return "zugesprochen";
+  return game.status === "replayed" ? "wiederholt" : "";
+}
+
+export function MapChips({ match }) {
   if (!match.games?.length) return null;
   return (
-    <ol className="tls-league-maps" aria-label="Maps">
-      {match.games.map((game) => {
-        const side = game.winner_registration_id === match.home?.registration_id ? "home"
-          : game.winner_registration_id === match.away?.registration_id ? "away" : null;
-        const winner = side === "home" ? match.home?.name : side === "away" ? match.away?.name : null;
-        return (
-          <li key={game.position} className="tls-league-map" data-side={side || undefined}
-            title={`Map ${game.position}: ${game.map_name || "Map"}${winner ? ` – ${winner}` : ""}`}>
-            <span className="tls-league-map__thumb" aria-hidden="true">
-              {game.map_image_url ? <LazyImg src={game.map_image_url} alt="" sizes="56px" widths={[160]} className="h-full w-full object-cover" /> : null}
-            </span>
-            <span className="min-w-0">
-              <span className="block truncate text-[11px] font-semibold text-white/85">{game.map_name || `Map ${game.position}`}</span>
-              <span className="block truncate text-[10px] text-white/45">{winner ? `für ${winner}` : "offen"}</span>
-            </span>
-          </li>
-        );
-      })}
-    </ol>
+    <>
+      <ol className="tls-league-maps" aria-label="Maps">
+        {match.games.map((game) => {
+          const side = game.winner_registration_id === match.home?.registration_id ? "home"
+            : game.winner_registration_id === match.away?.registration_id ? "away" : null;
+          const winner = side === "home" ? match.home?.name : side === "away" ? match.away?.name : null;
+          const note = mapNote(game);
+          const why = note === "wiederholt" && game.replay_reason ? `: ${game.replay_reason}` : "";
+          return (
+            <li key={game.position} className="tls-league-map" data-side={side || undefined} data-testid={`league-map-${match.id}-${game.position}`}
+              title={`Map ${game.position}: ${game.map_name || "Map"}${winner ? ` – ${winner}` : ""}${note ? ` · ${note}${why}` : ""}`}>
+              <span className="tls-league-map__thumb" aria-hidden="true">
+                {game.map_image_url ? <LazyImg src={game.map_image_url} alt="" sizes="56px" widths={[160]} className="h-full w-full object-cover" /> : null}
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-[11px] font-semibold text-white/85">{game.map_name || `Map ${game.position}`}</span>
+                <span className="block truncate text-[10px] text-white/45">{winner ? `für ${winner}` : "offen"}{note ? ` · ${note}` : ""}</span>
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+      {(match.not_played || []).length ? (
+        <p className="text-[10px] text-white/45" data-testid={`league-maps-${match.id}-not-played`}>{notPlayedText(match.not_played)}</p>
+      ) : null}
+    </>
   );
 }
 
