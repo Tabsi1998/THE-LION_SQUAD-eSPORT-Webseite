@@ -29,6 +29,7 @@ const MAPS = { game: { id: "g1", name: "Mario Kart 8 Deluxe", slug: "mario-kart-
 const EQUIPMENT = { game: { id: "g1", name: "Mario Kart 8 Deluxe", modes: [] }, categories: [{ key: "waffen", label: "Waffen", role: "weapon", count: 1 }],
   items: [{ id: "w1", category: "waffen", name: "Probewaffe", status: "active", in_lists: 0, weapon_ids: [] }], limit: 1000, categories_limit: 20,
   suggested_categories: [], attachments_without_weapon: [] };
+const IMPORT_ITEMS = [{ id: "a1", name: "Altwaffe", category_label: "Waffen", exists: false }, { id: "a2", name: "Altschild", category_label: "Perks", exists: false }];
 
 let game;
 let servers;
@@ -40,6 +41,8 @@ function serve() {
     if (url === "/games/g1/usage") return { data: usage };
     if (url === "/games/g1/maps") return { data: MAPS };
     if (url === "/games/g1/equipment") return { data: EQUIPMENT };
+    if (url === "/games/g1/equipment/import-sources") return { data: [{ id: "g0", name: "Vorgänger", items: 2 }] };
+    if (url === "/games/g1/equipment/import-sources/g0") return { data: { items: IMPORT_ITEMS } };
     if (url === "/games/g1" || url === "/games/mario-kart-8") return { data: game };
     throw Object.assign(new Error("nicht da"), { response: { status: 404 } });
   });
@@ -105,6 +108,87 @@ describe("Reiter", () => {
     fireEvent.click(screen.getByTestId("game-page-back"));
     expect(await screen.findByTestId("games-list")).toBeInTheDocument();
     expect(confirmMock).not.toHaveBeenCalled();
+  });
+
+  // Folge-Review C.4: Ein offenes Blatt mit Änderungen ist „ungespeichert“ - Punkt am Reiter und Rückfrage beim Verlassen.
+  test("ein geändertes Eintrags-Blatt zeigt den Punkt und fragt beim Verlassen; unverändert oder geschlossen nicht", async () => {
+    confirmMock.mockResolvedValue(false);
+    renderPage("/admin/games/g1#ausruestung");
+    fireEvent.click(await screen.findByTestId("equipment-edit-w1"));
+    expect(screen.queryByTestId("game-tab-dirty-ausruestung")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByTestId("equipment-name"), { target: { value: "Probewaffe neu" } });
+    expect(await screen.findByTestId("game-tab-dirty-ausruestung")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("game-page-back"));
+    await waitFor(() => expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ description: expect.stringContaining("Ausrüstung") })));
+    expect(screen.queryByTestId("games-list")).not.toBeInTheDocument();
+    // Zurück auf den alten Stand: kein Punkt mehr.
+    fireEvent.change(screen.getByTestId("equipment-name"), { target: { value: "Probewaffe" } });
+    await waitFor(() => expect(screen.queryByTestId("game-tab-dirty-ausruestung")).not.toBeInTheDocument());
+  });
+
+  test("ein geändertes Kategorien-Blatt zählt ebenso, Schließen verwirft es", async () => {
+    renderPage("/admin/games/g1#ausruestung");
+    fireEvent.click(await screen.findByTestId("equipment-categories"));
+    fireEvent.change(screen.getByLabelText("Name der Kategorie 1"), { target: { value: "Primärwaffen" } });
+    expect(await screen.findByTestId("game-tab-dirty-ausruestung")).toBeInTheDocument();
+    fireEvent.click(within(screen.getByTestId("equipment-categories-sheet")).getByRole("button", { name: "Abbrechen" }));
+    await waitFor(() => expect(screen.queryByTestId("game-tab-dirty-ausruestung")).not.toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("game-page-back"));
+    expect(await screen.findByTestId("games-list")).toBeInTheDocument();
+    expect(confirmMock).not.toHaveBeenCalled();
+  });
+
+  // Folge-Review C.4: Auch ein anderer Reiter verwirft das offene Blatt - darum dieselbe Rückfrage.
+  test("Reiterwechsel mit geändertem Blatt fragt nach; „Zurück“ bleibt beim Blatt, „Verwerfen“ wechselt", async () => {
+    confirmMock.mockResolvedValue(false);
+    renderPage("/admin/games/g1#ausruestung");
+    fireEvent.click(await screen.findByTestId("equipment-edit-w1"));
+    fireEvent.change(screen.getByTestId("equipment-name"), { target: { value: "Probewaffe neu" } });
+    expect(await screen.findByTestId("game-tab-dirty-ausruestung")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("game-tab-allgemein"));
+    await waitFor(() => expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ description: expect.stringContaining("Ausrüstung") })));
+    expect(screen.getByTestId("game-tab-ausruestung")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("equipment-name")).toHaveValue("Probewaffe neu");
+
+    confirmMock.mockResolvedValue(true);
+    fireEvent.click(screen.getByTestId("game-tab-allgemein"));
+    await waitFor(() => expect(screen.getByTestId("game-tab-allgemein")).toHaveAttribute("aria-selected", "true"));
+    await waitFor(() => expect(screen.queryByTestId("game-tab-dirty-ausruestung")).not.toBeInTheDocument());
+    expect(confirmMock).toHaveBeenCalledTimes(2);
+  });
+
+  test("das Import-Blatt: die geladene Vorauswahl ist keine Änderung, ein abgewählter Eintrag schon", async () => {
+    renderPage("/admin/games/g1#ausruestung");
+    fireEvent.click(await screen.findByTestId("equipment-import"));
+    expect(await screen.findByTestId("equipment-import-row-a2")).toBeInTheDocument();
+    expect(screen.getByLabelText("Altschild")).toBeChecked();
+    expect(screen.queryByTestId("game-tab-dirty-ausruestung")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Altschild"));
+    expect(await screen.findByTestId("game-tab-dirty-ausruestung")).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Altschild"));
+    await waitFor(() => expect(screen.queryByTestId("game-tab-dirty-ausruestung")).not.toBeInTheDocument());
+    fireEvent.click(screen.getByLabelText("Altschild"));
+    expect(await screen.findByTestId("game-tab-dirty-ausruestung")).toBeInTheDocument();
+    fireEvent.click(within(screen.getByTestId("equipment-import-sheet")).getByRole("button", { name: "Abbrechen" }));
+    await waitFor(() => expect(screen.queryByTestId("game-tab-dirty-ausruestung")).not.toBeInTheDocument());
+  });
+
+  test("Reiterwechsel aus einem geänderten Import-Blatt fragt nach; „Zurück“ behält die Auswahl, „Verwerfen“ wechselt", async () => {
+    confirmMock.mockResolvedValue(false);
+    renderPage("/admin/games/g1#ausruestung");
+    fireEvent.click(await screen.findByTestId("equipment-import"));
+    expect(await screen.findByTestId("equipment-import-row-a2")).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Altschild"));
+    expect(await screen.findByTestId("game-tab-dirty-ausruestung")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("game-tab-modi"));
+    await waitFor(() => expect(confirmMock).toHaveBeenCalledTimes(1));
+    expect(screen.getByTestId("game-tab-ausruestung")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByLabelText("Altschild")).not.toBeChecked();
+
+    confirmMock.mockResolvedValue(true);
+    fireEvent.click(screen.getByTestId("game-tab-modi"));
+    await waitFor(() => expect(screen.getByTestId("game-tab-modi")).toHaveAttribute("aria-selected", "true"));
+    await waitFor(() => expect(screen.queryByTestId("game-tab-dirty-ausruestung")).not.toBeInTheDocument());
   });
 
   test("ein Klick und die Pfeiltasten wechseln den Reiter und schreiben ihn in die Adresse", async () => {

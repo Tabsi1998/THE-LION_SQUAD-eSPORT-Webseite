@@ -400,30 +400,64 @@ def _image(entry: dict) -> str:
 
 
 def _where(entry: dict) -> str:
-    return ", ".join(entry.get("mode_labels") or []) or ALL_MODES
+    return ", ".join(entry.get("modes") or []) or ALL_MODES
 
 
-def block(doc: dict | None) -> dict:
-    """Markdown mit Bildern (Web) und ohne (PDF, Vergleich) samt Herkunft - aus genau dieser Version."""
+def block_data(doc: dict | None) -> dict:
+    """Der Baustein strukturiert, im Klartext (Folge-Review C.4): so wird er eingefroren. Erst ``render_block`` macht beim Darstellen
+    Markdown daraus. ``{"list": bool, "groups": [{label, entries: [{name, image_url, modes}]}], "weapons": [{name, image_url, attachments,
+    modes}]}`` - ``modes`` sind die Namen der Modi, leer = alle."""
     if not doc or doc.get("cleared"):
-        return {"markdown": NO_LIST, "text": NO_LIST, "source": {"loadout_ban_id": None}}
-    web, text = [INTRO], [INTRO]
-    items = [entry for entry in doc.get("entries") or [] if (entry.get("kind") or ITEM) == ITEM]
-    groups: dict[str, list[dict]] = {}
-    for entry in items:
-        groups.setdefault(entry.get("category_label") or "Ausrüstung", []).append(entry)
-    for label, rows in groups.items():
-        web += ["", f"**{_cell(label)}**", "", "| Bild | Name | Gilt in |", "| --- | --- | --- |"]
-        web += [f"| {_image(row)} | {_cell(row.get('name'))} | {_cell(_where(row))} |" for row in rows]
-        text += ["", f"**{_cell(label)}**", ""]
-        text += [f"- {_cell(row.get('name'))} – gilt in: {_cell(_where(row))}" for row in rows]
-    weapons = [entry for entry in doc.get("entries") or [] if entry.get("kind") == ATTACHMENTS]
+        return {"list": False, "groups": [], "weapons": []}
+    groups: list[dict] = []
+    for entry in doc.get("entries") or []:
+        if (entry.get("kind") or ITEM) != ITEM:
+            continue
+        label = entry.get("category_label") or "Ausrüstung"
+        group = next((row for row in groups if row["label"] == label), None)
+        if group is None:
+            group = {"label": label, "entries": []}
+            groups.append(group)
+        group["entries"].append({"name": entry.get("name") or "", "image_url": entry.get("image_url"),
+                                 "modes": list(entry.get("mode_labels") or [])})
+    weapons = [{"name": entry.get("name") or "", "image_url": entry.get("image_url"), "modes": list(entry.get("mode_labels") or []),
+                "attachments": [item.get("name") or "" for item in entry.get("attachments") or []]}
+               for entry in doc.get("entries") or [] if entry.get("kind") == ATTACHMENTS]
+    return {"list": True, "groups": groups, "weapons": weapons}
+
+
+def block_source(doc: dict | None) -> dict:
+    if not doc or doc.get("cleared"):
+        return {"loadout_ban_id": None}
+    return {"loadout_ban_id": doc.get("id"), "loadout_ban_version": doc.get("version")}
+
+
+def render_block(data: dict, variant: str = "markdown") -> str:
+    """Markdown fürs Darstellen: ``markdown`` mit Bildern (Web), ``text`` ohne (PDF, Vergleich). Namen als Bausteinwerte geschützt
+    (``text_cell``) - das ist nur Darstellungs-Zwischenformat, gespeichert wird ``block_data``."""
+    if not data.get("list"):
+        return NO_LIST
+    web = variant != "text"
+    lines = [INTRO]
+    for group in data.get("groups") or []:
+        lines += ["", f"**{_cell(group.get('label'))}**", ""]
+        if web:
+            lines += ["| Bild | Name | Gilt in |", "| --- | --- | --- |"]
+            lines += [f"| {_image(row)} | {_cell(row.get('name'))} | {_cell(_where(row))} |" for row in group.get("entries") or []]
+        else:
+            lines += [f"- {_cell(row.get('name'))} – gilt in: {_cell(_where(row))}" for row in group.get("entries") or []]
+    weapons = data.get("weapons") or []
     if weapons:
-        web += ["", f"**{ATTACHMENTS_TITLE}**", "", "| Bild | Waffe | Gesperrte Aufsätze | Gilt in |", "| --- | --- | --- | --- |"]
-        text += ["", f"**{ATTACHMENTS_TITLE}**", ""]
+        lines += ["", f"**{ATTACHMENTS_TITLE}**", ""]
+        if web:
+            lines += ["| Bild | Waffe | Gesperrte Aufsätze | Gilt in |", "| --- | --- | --- | --- |"]
         for row in weapons:
-            names = ", ".join(_cell(item.get("name")) for item in row.get("attachments") or [])
-            web.append(f"| {_image(row)} | {_cell(row.get('name'))} | {names} | {_cell(_where(row))} |")
-            text.append(f"- {_cell(row.get('name'))}: {names} – gilt in: {_cell(_where(row))}")
-    return {"markdown": "\n".join(web), "text": "\n".join(text),
-            "source": {"loadout_ban_id": doc.get("id"), "loadout_ban_version": doc.get("version")}}
+            names = ", ".join(_cell(name) for name in row.get("attachments") or [])
+            lines.append(f"| {_image(row)} | {_cell(row.get('name'))} | {names} | {_cell(_where(row))} |" if web
+                         else f"- {_cell(row.get('name'))}: {names} – gilt in: {_cell(_where(row))}")
+    return "\n".join(lines)
+
+
+def block_images(data: dict) -> list[str]:
+    rows = [row for group in data.get("groups") or [] for row in group.get("entries") or []] + list(data.get("weapons") or [])
+    return [row["image_url"] for row in rows if row.get("image_url")]
