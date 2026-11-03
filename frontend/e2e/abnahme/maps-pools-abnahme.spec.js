@@ -65,7 +65,8 @@ test.describe("Abnahme: Maps und Pools gegen den echten Server", () => {
       const context = await browser.newContext({ baseURL: testInfo.project.use.baseURL, viewport: { width, height }, locale: "de-AT", timezoneId: "Europe/Vienna" });
       const page = await context.newPage();
       await signIn(page, "admin");
-      const problems = watch(page, { allow: expected });
+      // Die Konsole meldet die erwartete 409 beim blockierten Veröffentlichen als Ladefehler.
+      const problems = watch(page, { allow: expected, allowConsole: (text) => /status of 409/.test(text) });
       const seasonId = anmeldung.season.id;
       const name = `Probekarte ${stamp} ${width}`;
 

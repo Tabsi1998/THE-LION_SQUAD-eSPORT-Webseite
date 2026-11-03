@@ -103,7 +103,7 @@ export function SeasonReadinessPanel({ seasonId, version, visibility = "off", ca
                     <li key={key || "alle"} className="grid grid-cols-[1fr_auto] items-end gap-2 rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2" data-testid={`${testId}-row-${key || "alle"}`}>
                       <div className="min-w-0 text-sm">
                         <div className="truncate font-semibold text-white">{row.label}</div>
-                        <div className={`text-xs tabular-nums ${short ? "text-live" : "text-white/55"}`}>{row.have} von mindestens {row.needed} Maps</div>
+                        <div className={`text-xs tabular-nums ${short ? "text-live" : "text-white/55"}`}>{row.have} von mindestens {row.needed} {row.needed === 1 ? "Map" : "Maps"}</div>
                       </div>
                       {canEdit ? (
                         <TextField label="Mindestens" type="number" min={1} max={50} value={form[key] ?? ""} placeholder={String(row.derived)}
