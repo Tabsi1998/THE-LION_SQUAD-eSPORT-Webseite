@@ -74,6 +74,9 @@ async def test_a_transfer_moves_the_player_after_the_approval(flow):
     assert row["status"] == "pending" and row["from_squad_id"] == w["squad_b"]["id"] and row["to_squad_id"] == w["squad_a"]["id"]
     ida = w["users"]["Ida"]["id"]
     assert ida in await squad_members(flow, w, "squad_b"), "vor der Genehmigung ändert sich nichts"
+    # Season-Seite mit Reitern (#2267): Der Link führt direkt in die Kaderübersicht, wo die Leitung entscheidet.
+    asked_note = await flow.db.notifications.find_one({"meta.reason": "league_transfer_requested"}, {"_id": 0})
+    assert asked_note["url"] == f"/admin/leagues/seasons/{w['season_id']}#kader"
 
     flow.act_as(w["staff"])
     listed = await flow.get(admin_url(w))

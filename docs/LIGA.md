@@ -65,7 +65,7 @@ Indizes: `id` eindeutig, `slug` eindeutig, `game_id`.
 | `result_confirm_hours` | int 1–336 | ja | 48 |
 | `lineup_amend_hours` | int 1–336 | ja | 48 – Nachtragsfrist der eigenen Aufstellung nach dem Ergebnis |
 | `match_schedule_response_hours` | int 1–720 | nein | 72 – Antwortfrist auf Terminvorschläge (#2106, F3); fehlt (Seasons von vorher) = jede Staffel behält ihre |
-| `rules_text` | str (Markdown) | nein | Regeltext der Season (Textfeld, #1646 später) |
+| `rules_text` | str (Markdown) | nein | Regeltext der Season - Altbestand; seit #2267 ohne Eingabefeld, die Season-Seite zeigt ihn nur noch zum Lesen, solange es kein Regelwerk gibt |
 | `registration_deadline` | Kalendertag | nein | Meldeschluss, nur Anzeige (Season 1: 6.11.) |
 | `visibility` | `"off"` \| `"admins"` \| `"members"` \| `"public"` | ja | **`off`** |
 | `status` | `"draft"` \| `"active"` \| `"completed"` \| `"archived"` | ja | `draft` |
@@ -1185,8 +1185,8 @@ nichts auf. Notausnahme nur für den Superadmin mit `readiness_override_reason` 
 Protokoll `league.season.readiness_override` mit Grund und den Codes. Von `members` auf `public` (schon veröffentlicht) und zurück auf
 `admins` oder `off` prüft nichts. Bekannte Grenze: Prüfen und Schreiben sind zwei Schritte.
 
-**Verwaltung:** Season-Seite mit Abschnitt „Prüfung vor der Veröffentlichung“ (Probleme, Warnungen, Mindestgröße je Modus mit Feld
-zum Überschreiben, beim Superadmin das Feld für den Grund), „Map sperren“ und „Versionen vergleichen“ am Map-Pool. Maps einer
+**Verwaltung:** Season-Seite (#2267, Abschnitt „Season-Seite der Verwaltung“): „Was fehlt noch?“ im Reiter Überblick (Probleme, Warnungen,
+jeder Punkt mit Sprung an seine Stelle, beim Superadmin das Feld für den Grund), im Reiter Spielbetrieb „Mindestgröße anpassen“ je Modus, „Map sperren“ und „Versionen vergleichen“ am Map-Pool. Maps einer
 Bibliothek: Knopf „Deaktivieren“ mit Rückfrage, die betroffene Seasons nennt.
 
 **App:** liest nur den Snapshot `map_pool.modes` und keine Map-Zustände. Antworten bekommen nur Felder dazu.
@@ -1609,3 +1609,34 @@ der Stand `live` ist, das Ende vorbei und noch offene Spiele da sind; sonst fäl
 Leitung sieht in Mein Dienst (`ended_live[]`: `{id, title, end_date, open_matches, admin_url, league}`) und in der Turnierliste den Hinweis
 „Läuft laut Stand noch, Ende war am … – beenden?“ mit Weg in die Verwaltung. Umgestellt wird nie automatisch. Turnierleitung sieht Turniere
 ohne Liga, Liga-Leitung mit `manage` die Staffeln ihrer Ligen.
+
+### Season-Seite der Verwaltung (#2267)
+
+`/admin/leagues/seasons/{id}` in Reitern nach dem Muster der Spielseite (#2249). Nur Oberfläche: **Daten und API unverändert**, jeder
+Reiter schickt seine Felder an `PATCH /api/admin/leagues/seasons/{id}` (Teil-Anfrage, `exclude_unset`). Welcher Reiter welches Feld
+trägt, steht in `frontend/src/lib/seasonTabs.js` (`TAB_FIELDS`, `TAB_PAYLOAD_KEYS`); ein Test verlangt, dass jedes Feld von
+`seasonToForm` und `seasonPayload` genau einem Reiter gehört (#2023 „jede Angabe an genau einer Stelle“).
+
+| Reiter | Sprungmarke | Inhalt | Speichern |
+| --- | --- | --- | --- |
+| Überblick | (keine), `#pruefung`, `#gestaltung` | Ablaufleiste, „Was fehlt noch?“ (`season_readiness`), Name, Sichtbarkeit und Stand mit Wirkung, Hinweis „Regelwerk muss freigegeben werden“, Gestaltung und Gewinne | `name`, `visibility`, `status`, Gestaltung, `prizes` (+ `readiness_override_reason`) |
+| Spielbetrieb | `#spielbetrieb`, `#modi`, `#mindestgroesse`, `#ergebnisregeln`, `#serie` | Modi der Season anhaken = Modi mit Maps im Pool, je Modus Maps und Bedarf; Map sperren, Versionen; Mindestgröße; Ergebnisregeln der angehakten Modi; Serie; Fristen nach dem Spiel | `best_of`, `team_size`, `game_mode_order`, `map_repeat`, `result_confirm_hours`, `lineup_amend_hours`; Pool, Mindestgröße und Ergebnisregeln eigene Knöpfe |
+| Termine | `#termine`, `#kalender`, `#terminregeln` | Kalender, Sperrzeiten, Antwortfrist, Terminregeln (D.1); Platz für Check-in-Regeln (D.2) | Kalenderfelder, `blocked_periods`, `match_schedule_response_hours`; Terminregeln eigener Knopf |
+| Anmeldung und Kader | `#anmeldung`, `#selbstanmeldung`, `#spielberechtigung`, `#anmeldungen`, `#kader` | Selbstanmeldung (B.4), Kader und Spielberechtigung (B.3, mit Mindestkader), Eingang, Kaderübersicht; Platz für die Plattform (#2270) | Felder von B.3/B.4, `min_squad_size`, `registration_deadline` (nur ohne Anmeldefenster sichtbar) |
+| Tabelle | `#tabelle`, `#punkte`, `#gleichstand` | Punkte, Gleichstand, Ausscheiden (E.1), Gleichstände der Staffeln | `scoring_rules` |
+| Regelwerk und Sperrliste | `#regelwerk`, `#sperrliste` | Stand des Regelwerks (B.2) mit Weg dorthin, Sperrliste (C.4) | Sperrliste eigener Knopf |
+| Ligen und Staffeln | `#ligen`, `#staffeln`, `#uebertragen` | Liga N, Staffeln, Staffelgröße, Vorgaben übertragen | `max_staffel_size` |
+
+- **Ungespeichertes:** Punkt am Reiter (auch ein geänderter, nicht gespeicherter Pool), beim Reiterwechsel eine Rückfrage mit
+  „Jetzt speichern“ / „Später speichern“ (die Eingabe bleibt), beim Verlassen der Seite die Rückfrage der Spielseite. Besuchte Reiter
+  bleiben geladen, Bausteine mit eigenem Speichern verlieren beim Wechsel nichts. Nach dem Speichern nimmt der Reiter den neuen Stand
+  an, ungespeicherte andere Reiter behalten ihre Eingaben (`rebaseForm`).
+- **Ablaufleiste** (`seasonPhases`): Vorbereitung bis zum Anmeldefenster, Anmeldung im Fenster (ohne Fenster „ohne Selbstanmeldung“),
+  Einteilung bis zum Start, Spielbetrieb ab gestarteter Staffel (mit Spielwoche), Abschluss bei Stand `completed`/`archived` oder wenn
+  alle Staffeln fertig sind. Der Stand bleibt die bewusste Schaltung der Leitung.
+- **Regeltext:** kein Eingabefeld mehr. Mit Regelwerk ausgeblendet, ohne steht ein Hinweis mit Weg zum Regelwerk und der alte Text zum
+  Lesen. Gelöscht wird nichts.
+- **Beiname der Liga N:** Hinweis, wenn er die Stufe wiederholt („Liga 1“ → Titel „Liga 1 · Liga 1“).
+- **Links:** Nachrichten zu neuen Anmeldungen zeigen weiter auf `#anmeldungen`, „Transfer beantragt“ auf `#kader`, „Zurück“ im
+  Regelwerk auf `#regelwerk`. Unbekannte Marken öffnen den Überblick.
+- Vorbereitet für F.2 „Season aus Vorgänger übernehmen“: der Knopf kommt neben „Season löschen“.

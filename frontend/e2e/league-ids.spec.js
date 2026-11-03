@@ -180,7 +180,7 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
         if (path === "/admin/leagues/seasons/s1") return SEASON_PAGE;
         return undefined;
       }, ADMIN);
-      await page.goto("/admin/leagues/seasons/s1");
+      await page.goto("/admin/leagues/seasons/s1#kader");
       await expect(page.getByTestId("season-roster-counts")).toContainText("1 ohne ID · 1 warten auf Freigabe · 1 mit neuer ID im Profil");
       await expect(page.getByTestId("roster-changed-u1")).toContainText("MilaNeuMitLangerKennung#7654321");
       await page.getByTestId("roster-approve-u1").click();
@@ -201,7 +201,7 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
         if (path === "/admin/leagues/seasons/s1") return SEASON_PAGE;
         return undefined;
       }, ADMIN);
-      await page.goto("/admin/leagues/seasons/s1");
+      await page.goto("/admin/leagues/seasons/s1#kader");
       await expect(page.getByTestId("season-roster-short")).toContainText("1 von mindestens 4 Spielern");
       await expect(page.getByTestId("roster-player-u9")).toContainText("gesperrt");
       await expect(page.getByTestId("season-roster-counts")).toContainText("1 gesperrt");

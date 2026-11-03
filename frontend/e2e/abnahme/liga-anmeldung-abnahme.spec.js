@@ -89,13 +89,14 @@ test.describe("Abnahme: Selbstanmeldung gegen den echten Server", () => {
     await guest.close();
 
     const lead = await as(browser, testInfo, "lead", LARGE);
-    await lead.page.goto(adminUrl());
+    // Reiter „Anmeldung und Kader“ (#2267).
+    await lead.page.goto(`${adminUrl()}#selbstanmeldung`);
     await expect(lead.page.getByTestId("season-applications")).toHaveCount(0);
     await lead.page.getByTestId("season-form-application-opens").fill(localInput(new Date(Date.now() - 60 * 60 * 1000)));
     await lead.page.getByTestId("season-form-application-closes").fill(localInput(new Date(Date.now() + 48 * 60 * 60 * 1000)));
     await lead.page.getByTestId("season-form-application-slots").fill("3");
     await lead.page.getByTestId("season-form-application-waitlist-note").fill("Wird ein Platz frei, entscheidet die Leitung nach dem Eingang.");
-    await lead.page.getByTestId("season-save").click();
+    await lead.page.getByTestId("season-save-anmeldung").click();
     await expect(lead.page.getByTestId("season-applications-stats")).toContainText("0 von 3 Startplätzen belegt");
     await noSideScroll(lead.page);
     await shot(lead.page, "anmeldung-einstellungen-1440.png");
@@ -154,7 +155,7 @@ test.describe("Abnahme: Selbstanmeldung gegen den echten Server", () => {
 
   test("Leitung: annehmen mit und ohne Staffel, zwei gleichzeitig auf den letzten Platz, Warteliste, ablehnen, zuteilen", async ({ browser }, testInfo) => {
     const lead = await as(browser, testInfo, "lead", LARGE);
-    await lead.page.goto(adminUrl());
+    await lead.page.goto(`${adminUrl()}#anmeldungen`);
     await expect(lead.page.getByTestId("season-applications-stats")).toContainText("5 offen");
     const items = (await (await lead.page.request.get(inboxApi())).json()).items;
     const appOf = (index) => items.find((row) => row.squad_id === state.teams[index].squad_id && row.status === "submitted").id;

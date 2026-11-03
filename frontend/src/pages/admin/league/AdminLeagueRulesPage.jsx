@@ -15,6 +15,7 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { RuleOps, RulesChanges, RulesDocument } from "@/components/tls/league/rules/RulesDocument";
 import { RULES_MARKDOWN, addAnnex, annexLabel, dayLabel, insertBlock, moveAnnex, removeAnnex, rulesApiPath, rulesMediaProps } from "@/lib/leagueRules";
 import { viennaDate } from "@/lib/vienna";
+import { seasonAnchorUrl } from "@/lib/seasonTabs";
 
 const LONG_DAY = { day: "2-digit", month: "2-digit", year: "numeric" };
 const QUIET = "tls-btn tls-btn--quiet inline-flex items-center gap-1.5 rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider disabled:opacity-50";
@@ -173,7 +174,8 @@ export default function AdminLeagueRulesPage() {
     await load();
   });
 
-  const back = view?.season ? `/admin/leagues/seasons/${view.season.id}` : "/admin/leagues";
+  // Zurück in den Reiter „Regelwerk und Sperrliste“ der Season (#2267).
+  const back = view?.season ? seasonAnchorUrl(view.season.id, "regelwerk") : "/admin/leagues";
   const canPublish = publish.change_reason.trim().length >= REASON_MIN && publish.valid_from && !busy;
   return (
     <AdminLayout>

@@ -143,7 +143,8 @@ test.describe("Liga: Ergebnisregeln der Season", () => {
         if (request.method() !== "GET") return route.fulfill(json({ ok: true }));
         return route.fulfill(json(["/api/settings/public", "/api/home/about", "/api/chats/unread", "/api/seasonal/active"].includes(path) ? {} : []));
       });
-      await page.goto("/admin/leagues/seasons/s1");
+      // Reiter Spielbetrieb, Abschnitt Ergebnisregeln (#2267).
+      await page.goto("/admin/leagues/seasons/s1#ergebnisregeln");
 
       const panel = page.getByTestId("season-result-rules");
       await expect(panel).toBeVisible();

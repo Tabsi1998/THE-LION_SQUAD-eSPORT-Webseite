@@ -899,12 +899,11 @@ gewohnt. Den Rahmen legst du unter **Admin → eSports → Liga** an (nur Turnie
 
 1. **Liga anlegen:** Name und Spiel, etwa „CoD-Liga“.
 2. **Season anlegen:** nur der Beginn der ersten Spielwoche (00:00 Uhr Wien). Danach auf der Seite der Season die
-   Vorgaben festlegen: Wochen gesamt (mit Sperrwochen), Spielwoche in Tagen, Standardtag und -zeit, Runden (nur Hinrunde
-   oder Hin- und Rückrunde), **Sperrzeiten** wie die Weihnachtspause, Meldeschluss, Best of, Teamgröße, Mindestkader,
-   Teams je Staffel, Modus je Map, Punkte und Gleichstand, Fristen, **Regeltext** und **Sichtbarkeit**. Der Kalender
-   darunter zeigt nach dem Speichern, welche Wochen gesperrt sind (mehr als die Hälfte ihrer Tage in einer Sperrzeit)
+   Vorgaben in ihren Reitern festlegen (Überblick, Spielbetrieb, Termine, Anmeldung und Kader, Tabelle, Regelwerk und Sperrliste,
+   Ligen und Staffeln – Einzelheiten im [Liga-Handbuch, 2.2](liga.md#22-liga-und-season-anlegen)). Der Kalender im Reiter
+   Termine zeigt nach dem Speichern, welche Wochen gesperrt sind (mehr als die Hälfte ihrer Tage in einer Sperrzeit)
    und wie viele Teams eine Staffel höchstens fassen kann.
-3. **Map-Pool der Season** wählen – jede neue Staffel bekommt eine Kopie.
+3. **Modi und Maps der Season** im Reiter Spielbetrieb anhaken – jede neue Staffel bekommt eine Kopie des Map-Pools.
 4. **Liga 1 anlegen**, bei Bedarf mit Beiname und eigenen Werten (Best of, Teamgröße, Mindestkader, Teams je Staffel,
    Punkte); leer heißt „wie die Season“.
 5. **Staffel anlegen:** legt das Turnier als Entwurf mit allen Vorgaben an – ohne offene Anmeldung, ohne Discord, ohne

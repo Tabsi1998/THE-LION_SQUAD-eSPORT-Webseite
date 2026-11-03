@@ -1,12 +1,14 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
-// Eine Season verwalten (docs/LIGA.md, #1622): Vorgaben mit Sperrzeiten speichern, Kalender ablesen, Liga N anlegen,
-// Staffel anlegen und zur Turnierverwaltung springen, Vorgaben übertragen mit Grund für das, was nicht mehr darf.
+// Eine Season verwalten (docs/LIGA.md, #1622) - seit #2267 in Reitern: Überblick mit Ablauf und Prüfung, Speichern je Reiter (nur die
+// eigenen Felder), Punkt bei Ungespeichertem, Rückfrage beim Reiterwechsel, Sprungmarken (auch die alte #anmeldungen), Kalender,
+// Modus je Map, Liga N und Staffeln, Übertragen, Löschen und Archivieren.
 const apiMock = { get: vi.fn(), post: vi.fn(), patch: vi.fn(), put: vi.fn(), delete: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (detail) => String(detail || "Fehler"), formatRequestError: () => "Fehler", resolveMediaUrl: (url) => url || "" }));
 vi.mock("@/components/tls/AdminLayout", () => ({ AdminLayout: ({ children }) => <div>{children}</div> }));
-vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => async () => true }));
+const confirmMock = vi.fn();
+vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => confirmMock }));
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
 const toastMock = { success: vi.fn(), error: vi.fn(), warning: vi.fn() };
 vi.mock("sonner", () => ({ toast: toastMock }));
@@ -19,7 +21,7 @@ const SEASON = {
   id: "s1", league_id: "l1", number: 1, name: "Season 1", slug: "season-1", start_date: "2026-11-09T23:00:00+00:00", weeks_total: 10,
   matchday_days: 7, default_match_weekday: 6, default_match_time: "20:00", round_robin_legs: 1, max_staffel_size: 8, best_of: 3,
   team_size: 4, min_squad_size: 4, game_mode_order: [], scoring_rules: RULES, result_confirm_hours: 48, lineup_amend_hours: 48,
-  rules_text: "", registration_deadline: null, visibility: "off", status: "draft",
+  rules_text: "", registration_deadline: null, visibility: "off", status: "draft", updated_at: "2026-11-01T10:00:00Z",
   blocked_periods: [{ start_date: "2026-12-21", end_date: "2027-01-03", label: "Weihnachtspause" }],
 };
 const weeks = Array.from({ length: 10 }, (_, index) => ({ number: index + 1, start_day: "2026-11-10", end_day: "2026-11-16", blocked: index === 6 || index === 7 }));
@@ -40,120 +42,205 @@ const BODY = {
 const READINESS = { ok: false, superadmin: true, max_maps: 3, total: null, requirements: [], warnings: [],
   problems: [{ code: "pool_missing", text: "Die Season hat keinen Map-Pool." }] };
 
+let body = BODY;
+let extra = {};
+function routeGet(url) {
+  if (url in extra) return Promise.resolve({ data: extra[url] });
+  if (url.endsWith("/readiness")) return Promise.resolve({ data: READINESS });
+  if (url === "/admin/leagues/seasons/s1") return Promise.resolve({ data: body });
+  return Promise.resolve({ data: {} });
+}
+
 beforeEach(() => {
-  for (const fn of [...Object.values(apiMock), ...Object.values(toastMock)]) fn.mockReset();
-  apiMock.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith("/readiness") ? READINESS : BODY }));
+  for (const fn of [...Object.values(apiMock), ...Object.values(toastMock), confirmMock]) fn.mockReset();
+  body = BODY;
+  extra = {};
+  confirmMock.mockResolvedValue(true);
+  apiMock.get.mockImplementation(routeGet);
   apiMock.patch.mockResolvedValue({ data: { ...SEASON, changed: ["weeks_total"], staffeln_to_sync: 1 } });
   apiMock.post.mockResolvedValue({ data: {} });
 });
 
-function renderPage() {
+function Where() {
+  const location = useLocation();
+  return <span data-testid="where">{location.pathname}{location.hash}</span>;
+}
+
+function renderPage(hash = "") {
   return render(
-    <MemoryRouter initialEntries={["/admin/leagues/seasons/s1"]}>
+    <MemoryRouter initialEntries={[`/admin/leagues/seasons/s1${hash}`]}>
       <Routes>
-        <Route path="/admin/leagues/seasons/:seasonId" element={<AdminLeagueSeasonPage />} />
+        <Route path="/admin/leagues/seasons/:seasonId" element={<><AdminLeagueSeasonPage /><Where /></>} />
         <Route path="/admin/leagues" element={<p data-testid="leagues-page">Übersicht</p>} />
       </Routes>
     </MemoryRouter>,
   );
 }
 
-/** GET liefert die Season - und für `…/delete-plan` den angegebenen Plan (#2106). */
-function withPlan(plan) {
-  apiMock.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith("/delete-plan") ? plan : BODY }));
-}
+const panel = (key) => screen.getByTestId(`season-panel-${key}`);
 
-test("die Prüfung steht auf der Seite, der Grund der Notausnahme geht mit dem Veröffentlichen mit (#2207)", async () => {
+// ---------------------------------------------------------------- Reiter (#2267)
+
+test("Reiter per Sprungmarke: ohne Marke der Überblick, #termine öffnet Termine, die alte Marke #anmeldungen den Reiter Anmeldung", async () => {
+  const first = renderPage();
+  expect(await screen.findByTestId("season-tab-ueberblick")).toHaveAttribute("aria-selected", "true");
+  expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(
+    ["Überblick", "Spielbetrieb", "Termine", "Anmeldung und Kader", "Tabelle", "Regelwerk und Sperrliste", "Ligen und Staffeln"]);
+  first.unmount();
+  const second = renderPage("#termine");
+  expect(await screen.findByTestId("season-form-weeks")).toBeInTheDocument();
+  expect(screen.getByTestId("season-tab-termine")).toHaveAttribute("aria-selected", "true");
+  second.unmount();
+  renderPage("#anmeldungen");
+  expect(await screen.findByTestId("season-tab-anmeldung")).toHaveAttribute("aria-selected", "true");
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/admin/leagues/seasons/s1/applications"));
+});
+
+test("Überblick: Ablaufleiste, Sichtbarkeit und Stand mit einem Satz, was sie bewirken", async () => {
+  renderPage();
+  expect(await screen.findByTestId("season-phases")).toBeInTheDocument();
+  expect(screen.getAllByTestId(/^season-phase-/).map((row) => row.textContent)).toEqual(expect.arrayContaining([expect.stringContaining("Vorbereitung")]));
+  expect(screen.getByTestId("season-visibility-effect")).toHaveTextContent("Niemand sieht die Season");
+  fireEvent.change(screen.getByTestId("season-form-visibility"), { target: { value: "members" } });
+  expect(screen.getByTestId("season-visibility-effect")).toHaveTextContent("Veröffentlicht für angemeldete Mitglieder");
+  expect(await screen.findByTestId("season-visibility-blocked")).toBeInTheDocument();
+  expect(screen.getByTestId("season-status-effect")).toHaveTextContent("Nur jetzt lässt sich die Season noch löschen");
+});
+
+test("die Prüfung steht im Überblick, jeder Punkt springt in seinen Reiter, der Grund der Notausnahme geht mit dem Veröffentlichen mit", async () => {
   renderPage();
   expect(await screen.findByTestId("season-readiness-problems")).toHaveTextContent("keinen Map-Pool");
   fireEvent.change(screen.getByTestId("season-readiness-override"), { target: { value: "Saisonstart trotz Lücke" } });
   fireEvent.change(screen.getByTestId("season-form-visibility"), { target: { value: "members" } });
-  fireEvent.click(screen.getByTestId("season-save"));
-
+  fireEvent.click(screen.getByTestId("season-save-ueberblick"));
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalled());
-  expect(apiMock.patch.mock.calls[0][1]).toMatchObject({ visibility: "members", readiness_override_reason: "Saisonstart trotz Lücke" });
+  expect(apiMock.patch.mock.calls[0][1]).toEqual({ name: "Season 1", visibility: "members", status: "draft", emblem_url: null, banner_url: null,
+    banner_focus: null, prizes: null, readiness_override_reason: "Saisonstart trotz Lücke" });
+
+  fireEvent.click(screen.getByTestId("season-readiness-problems-go-pool_missing"));
+  await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/admin/leagues/seasons/s1#modi"));
+  expect(screen.getByTestId("season-tab-spielbetrieb")).toHaveAttribute("aria-selected", "true");
+});
+
+test("Speichern je Reiter: Termine schickt nur Termine - ungespeicherte Tabelle bleibt mit Punkt erhalten", async () => {
+  renderPage("#tabelle");
+  fireEvent.change(await screen.findByTestId("season-form-points-win"), { target: { value: "2" } });
+  expect(screen.getByTestId("season-tab-dirty-tabelle")).toBeInTheDocument();
+
+  // Reiterwechsel mit Ungespeichertem: Rückfrage - „Später speichern“ wechselt, die Eingabe bleibt.
+  confirmMock.mockResolvedValueOnce(false);
+  fireEvent.click(screen.getByTestId("season-tab-termine"));
+  await waitFor(() => expect(screen.getByTestId("season-tab-termine")).toHaveAttribute("aria-selected", "true"));
+  expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ title: "„Tabelle“ ist nicht gespeichert", confirmLabel: "Jetzt speichern" }));
+  expect(apiMock.patch).not.toHaveBeenCalled();
+
+  fireEvent.change(screen.getByTestId("season-form-weeks"), { target: { value: "11" } });
+  fireEvent.click(screen.getByTestId("blocked-add"));
+  fireEvent.click(screen.getByTestId("season-save-termine"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalled());
+  const [url, sent] = apiMock.patch.mock.calls[0];
+  expect(url).toBe("/admin/leagues/seasons/s1");
+  expect(sent).toEqual({ start_date: "2026-11-09T23:00:00.000Z", weeks_total: 11, matchday_days: 7, default_match_weekday: 6, default_match_time: "20:00",
+    round_robin_legs: 1, blocked_periods: [{ start_date: "2026-12-21", end_date: "2027-01-03", label: "Weihnachtspause" }], match_schedule_response_hours: null });
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Termine gespeichert."));
+  expect(screen.getByTestId("season-tab-dirty-tabelle")).toBeInTheDocument();
+  expect(screen.getByTestId("season-form-points-win")).toHaveValue(2);
+});
+
+test("Rückfrage beim Reiterwechsel: „Jetzt speichern“ speichert den Reiter und wechselt dann", async () => {
+  renderPage("#tabelle");
+  fireEvent.change(await screen.findByTestId("season-form-points-win"), { target: { value: "2" } });
+  fireEvent.click(screen.getByTestId("season-tab-ligen"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalled());
+  expect(Object.keys(apiMock.patch.mock.calls[0][1])).toEqual(["scoring_rules"]);
+  expect(apiMock.patch.mock.calls[0][1].scoring_rules.match_points).toEqual({ win: 2, draw: 1, loss: 0 });
+  await waitFor(() => expect(screen.getByTestId("season-tab-ligen")).toHaveAttribute("aria-selected", "true"));
+});
+
+test("Verwerfen setzt nur den Reiter zurück", async () => {
+  renderPage("#termine");
+  fireEvent.change(await screen.findByTestId("season-form-weeks"), { target: { value: "12" } });
+  expect(within(panel("termine")).getByTestId("season-unsaved-termine")).toBeInTheDocument();
+  fireEvent.click(within(panel("termine")).getByTestId("admin-form-cancel"));
+  expect(screen.getByTestId("season-form-weeks")).toHaveValue(10);
+  expect(screen.queryByTestId("season-tab-dirty-termine")).toBeNull();
+});
+
+// ---------------------------------------------------------------- Spielbetrieb: Modi an einer Stelle
+
+test("Spielbetrieb: Modi der Season anhaken, Ergebnisregeln nur für sie, Hinweis wenn Reihenfolge und Pool nicht passen", async () => {
+  const library = [{ id: "hafen", name: "Hafenkante", modes: ["snd", "stellung"] }];
+  const pool = { id: "p1", version: 1, stale: false, outdated_map_ids: [], modes: [{ mode: "snd", label: "Suchen & Zerstören", maps: [{ map_id: "hafen", name: "Hafenkante" }] }] };
+  body = { ...BODY, library, map_pool: pool, season: { ...SEASON, game_mode_order: ["snd", "stellung", "snd"] } };
+  extra["/admin/leagues/seasons/s1/result-rules"] = { scores_required: true, staffeln: 0, rules: [
+    { mode: "snd", label: "Suchen & Zerstören", status: "active", season_rule: null, game_rule: null, differs: false },
+    { mode: "stellung", label: "Stellung", status: "active", season_rule: null, game_rule: null, differs: false }] };
+  renderPage("#spielbetrieb");
+  expect(await screen.findByTestId("season-pool-pick-snd")).toBeChecked();
+  expect(screen.getByTestId("season-pool-pick-stellung")).not.toBeChecked();
+  expect(await screen.findByTestId("result-rules-snd")).toBeInTheDocument();
+  expect(screen.queryByTestId("result-rules-stellung")).toBeNull();
+  expect(screen.getByTestId("season-mode-order-hints")).toHaveTextContent("„Stellung“ steht in „Modus je Map“, hat aber keine Maps im Pool.");
+
+  fireEvent.click(screen.getByTestId("season-pool-pick-stellung"));
+  expect(await screen.findByTestId("result-rules-stellung")).toBeInTheDocument();
+  // Ungespeicherter Pool: Punkt am Reiter.
+  fireEvent.click(within(screen.getByTestId("season-pool-mode-stellung")).getByLabelText("Hafenkante in Stellung"));
+  expect(screen.getByTestId("season-tab-dirty-spielbetrieb")).toBeInTheDocument();
+  expect(screen.queryByTestId("season-mode-order-hints")).toBeNull();
+
+  // Nur der Pool ist ungespeichert: Der Reiterwechsel fragt trotzdem - „Zurück zum Map-Pool“ bleibt, „Später speichern“ wechselt.
+  confirmMock.mockResolvedValueOnce(true);
+  fireEvent.click(screen.getByTestId("season-tab-termine"));
+  await waitFor(() => expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Modi und Maps sind nicht gespeichert" })));
+  expect(screen.getByTestId("season-tab-spielbetrieb")).toHaveAttribute("aria-selected", "true");
+  confirmMock.mockResolvedValueOnce(false);
+  fireEvent.click(screen.getByTestId("season-tab-termine"));
+  await waitFor(() => expect(screen.getByTestId("season-tab-termine")).toHaveAttribute("aria-selected", "true"));
+  expect(screen.getByTestId("season-tab-dirty-spielbetrieb")).toBeInTheDocument();
 });
 
 test("eine laufende Season mit alter, zu kurzer Reihenfolge lässt sich speichern - unverändert, mit Warnung (#2207)", async () => {
   const running = { ...SEASON, status: "active", game_mode_order: ["snd", "stellung"] };
-  apiMock.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith("/readiness") ? READINESS : { ...BODY, season: running } }));
-  apiMock.patch.mockResolvedValue({ data: { ...running, changed: ["name"], staffeln_to_sync: 0, warnings: ["Modus je Map: Die Reihenfolge hat 2 Einträge."] } });
-  renderPage();
+  body = { ...BODY, season: running };
+  apiMock.patch.mockResolvedValue({ data: { ...running, changed: ["team_size"], staffeln_to_sync: 0, warnings: ["Modus je Map: Die Reihenfolge hat 2 Einträge."] } });
+  renderPage("#spielbetrieb");
   expect(await screen.findByTestId("season-mode-order-note")).toHaveTextContent("2 Einträge");
-  fireEvent.change(screen.getByTestId("season-form-name"), { target: { value: "Season Eins" } });
-  fireEvent.click(screen.getByTestId("season-save"));
+  fireEvent.change(screen.getByTestId("season-form-team-size"), { target: { value: "5" } });
+  fireEvent.click(screen.getByTestId("season-save-spielbetrieb"));
 
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalled());
   expect(apiMock.patch.mock.calls[0][1].game_mode_order).toEqual(["snd", "stellung"]);
+  expect(apiMock.patch.mock.calls[0][1].team_size).toBe(5);
   expect(toastMock.error).not.toHaveBeenCalled();
   await waitFor(() => expect(toastMock.warning).toHaveBeenCalledWith("Modus je Map: Die Reihenfolge hat 2 Einträge."));
 });
 
-test("in einem Entwurf hält eine geänderte, halb gesetzte Reihenfolge das Speichern auf (#2207)", async () => {
-  renderPage();
+test("Modus je Map halb gesetzt: nicht speichern, sondern sagen, was fehlt (#2207)", async () => {
+  renderPage("#spielbetrieb");
   fireEvent.change(await screen.findByTestId("mode-order-0"), { target: { value: "snd" } });
-  fireEvent.click(screen.getByTestId("season-save"));
+  expect(screen.getByTestId("season-mode-order")).toHaveTextContent("Bitte für jede Map einen Modus wählen");
+  fireEvent.click(screen.getByTestId("season-save-spielbetrieb"));
   await waitFor(() => expect(toastMock.error).toHaveBeenCalled());
   expect(apiMock.patch).not.toHaveBeenCalled();
 });
 
 test("„Modus je Map“ ist so lang wie die längste Serie einer Liga N (#2207)", async () => {
-  const body = { ...BODY, divisions: [{ ...BODY.divisions[0], overrides: { best_of: 5 } }] };
-  apiMock.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith("/readiness") ? READINESS : body }));
-  renderPage();
+  body = { ...BODY, divisions: [{ ...BODY.divisions[0], overrides: { best_of: 5 } }] };
+  renderPage("#spielbetrieb");
   expect(await screen.findByTestId("mode-order-4")).toBeInTheDocument();
-});
-
-test("zeigt Kopf, Kalender mit Sperrwochen und die Staffel mit Weg zur Turnierverwaltung", async () => {
-  renderPage();
-  expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("Probe-Liga · Season 1");
-  expect(apiMock.get).toHaveBeenCalledWith("/admin/leagues/seasons/s1");
-  expect(screen.getByTestId("season-calendar")).toHaveTextContent("8 Spielwochen");
-  expect(screen.getByTestId("season-calendar")).toHaveTextContent("höchstens 8 Teams");
-  expect(screen.getByTestId("blocked-label-0")).toHaveValue("Weihnachtspause");
-  expect(screen.getByTestId("staffel-manage-1-A")).toHaveAttribute("href", "/admin/tournaments/t1");
-  expect(screen.getByTestId("staffel-1-A")).toHaveTextContent("3 von 8 Teams");
-});
-
-test("speichert die Vorgaben und bietet danach das Übertragen an", async () => {
-  apiMock.post.mockResolvedValue({ data: { staffeln: [{ tournament_id: "t1", title: "Staffel A", applied: ["always"], changed: ["rules"],
-    skipped: [{ group: "before_start", label: "Termine und Kalender", reason: "Die Staffel hat schon begonnen." }] }] } });
-  renderPage();
-  fireEvent.change(await screen.findByTestId("season-form-weeks"), { target: { value: "11" } });
-  fireEvent.click(screen.getByTestId("blocked-add"));
-  fireEvent.click(screen.getByTestId("season-save"));
-  await waitFor(() => expect(apiMock.patch).toHaveBeenCalled());
-  const [url, body] = apiMock.patch.mock.calls[0];
-  expect(url).toBe("/admin/leagues/seasons/s1");
-  expect(body.weeks_total).toBe(11);
-  expect(body.blocked_periods).toEqual([{ start_date: "2026-12-21", end_date: "2027-01-03", label: "Weihnachtspause" }]);
-  expect(body.start_date).toBe("2026-11-09T23:00:00.000Z");
-
-  fireEvent.click(await screen.findByTestId("season-sync-now"));
-  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/leagues/seasons/s1/sync"));
-  const results = await screen.findByTestId("sync-results");
-  expect(results).toHaveTextContent("1 Wert übernommen");
-  expect(results).toHaveTextContent("Nicht übertragen – Termine und Kalender: Die Staffel hat schon begonnen.");
-});
-
-test("Modus je Map halb gesetzt: nicht speichern, sondern sagen, was fehlt", async () => {
-  renderPage();
-  fireEvent.change(await screen.findByTestId("mode-order-0"), { target: { value: "snd" } });
-  expect(screen.getByTestId("season-mode-order")).toHaveTextContent("Bitte für jede Map einen Modus wählen");
-  fireEvent.click(screen.getByTestId("season-save"));
-  await waitFor(() => expect(toastMock.error).toHaveBeenCalled());
-  expect(apiMock.patch).not.toHaveBeenCalled();
 });
 
 // #2129, SP2: Ein entfernter Modus bleibt in der Reihenfolge sichtbar und gilt weiter, statt still auf „frei“ zu springen.
 test("Modus je Map: ein Modus, den das Spiel nicht mehr hat, bleibt gesetzt und wird mitgeschickt", async () => {
   const pool = { id: "p1", version: 1, stale: false, outdated_map_ids: [], modes: [{ mode: "kontrolle", label: "Kontrolle", maps: [] }] };
-  apiMock.get.mockResolvedValue({ data: { ...BODY, season: { ...SEASON, game_mode_order: ["snd", "kontrolle", "snd"] }, map_pool: pool } });
-  renderPage();
+  body = { ...BODY, season: { ...SEASON, game_mode_order: ["snd", "kontrolle", "snd"] }, map_pool: pool };
+  renderPage("#spielbetrieb");
   const select = await screen.findByTestId("mode-order-1");
   expect(select).toHaveValue("kontrolle");
   expect([...select.options].map((option) => option.textContent)).toContain("Kontrolle (nicht mehr im Spiel)");
-  fireEvent.click(screen.getByTestId("season-save"));
+  fireEvent.change(screen.getByTestId("season-form-team-size"), { target: { value: "5" } });
+  fireEvent.click(screen.getByTestId("season-save-spielbetrieb"));
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalled());
   expect(apiMock.patch.mock.calls[0][1].game_mode_order).toEqual(["snd", "kontrolle", "snd"]);
 });
@@ -162,33 +249,124 @@ test("Modus je Map: ein Modus, den das Spiel nicht mehr hat, bleibt gesetzt und 
 test("Modus je Map: inaktive nur, wo die Season sie schon hat", async () => {
   const game = { ...BODY.game, modes: [{ mode: "snd", label: "Suchen & Zerstören", status: "inactive" }, { mode: "stellung", label: "Stellung" },
     { mode: "alt", label: "Altmodus", status: "archived" }] };
-  apiMock.get.mockResolvedValue({ data: { ...BODY, game, season: { ...SEASON, game_mode_order: ["snd", "stellung", "snd"] } } });
-  const first = renderPage();
+  body = { ...BODY, game, season: { ...SEASON, game_mode_order: ["snd", "stellung", "snd"] } };
+  const first = renderPage("#spielbetrieb");
   const select = await screen.findByTestId("mode-order-0");
   expect(select).toHaveValue("snd");
   expect([...select.options].map((option) => option.textContent)).toEqual(["frei", "Suchen & Zerstören (inaktiv)", "Stellung"]);
-  apiMock.get.mockResolvedValue({ data: { ...BODY, game } });
+  body = { ...BODY, game };
   first.unmount();
-  renderPage();
+  renderPage("#spielbetrieb");
   const fresh = await screen.findByTestId("mode-order-0");
   expect([...fresh.options].map((option) => option.textContent)).toEqual(["frei", "Stellung"]);
 });
 
+// ---------------------------------------------------------------- Termine, Anmeldung, Regelwerk
+
+test("Termine: Kalender mit Sperrwochen", async () => {
+  renderPage("#termine");
+  expect(await screen.findByTestId("season-calendar")).toHaveTextContent("8 Spielwochen");
+  expect(screen.getByTestId("season-calendar")).toHaveTextContent("höchstens 8 Teams");
+  expect(screen.getByTestId("blocked-label-0")).toHaveValue("Weihnachtspause");
+});
+
+test("Anmeldung und Kader: Mindestkader steht beim Höchstkader, Meldeschluss nur ohne Anmeldefenster", async () => {
+  renderPage("#anmeldung");
+  fireEvent.change(await screen.findByTestId("season-form-min-squad"), { target: { value: "5" } });
+  expect(screen.getByTestId("season-form-deadline")).toBeInTheDocument();
+  fireEvent.change(screen.getByTestId("season-form-application-opens"), { target: { value: "2026-11-01T10:00" } });
+  expect(screen.queryByTestId("season-form-deadline")).toBeNull();
+  fireEvent.change(screen.getByTestId("season-form-application-opens"), { target: { value: "" } });
+  fireEvent.click(screen.getByTestId("season-save-anmeldung"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalled());
+  const sent = apiMock.patch.mock.calls[0][1];
+  expect(sent.min_squad_size).toBe(5);
+  expect(sent).not.toHaveProperty("weeks_total");
+  expect(sent).not.toHaveProperty("visibility");
+});
+
+test("Regelwerk: kein Freitextfeld mehr - mit Regelwerk nur der Stand, ohne ein Hinweis und der alte Text zum Lesen", async () => {
+  body = { ...BODY, season: { ...SEASON, rules_text: "## Alte Regeln" } };
+  extra["/admin/league-rules/league_season/s1"] = { current: null, inherited: null, versions: [], draft: null, data_changes: null };
+  const first = renderPage("#regelwerk");
+  expect(await screen.findByTestId("season-rules-missing")).toBeInTheDocument();
+  expect(screen.getByTestId("season-rules-legacy")).toHaveTextContent("## Alte Regeln");
+  expect(screen.queryByTestId("season-form-rules")).toBeNull();
+  expect(screen.getByTestId("season-rules-link")).toHaveAttribute("href", "/admin/leagues/rules/league_season/s1");
+  first.unmount();
+
+  extra["/admin/league-rules/league_season/s1"] = { current: { label: "Version 2", valid_from: "2026-11-01" }, inherited: null, versions: [{}], draft: null,
+    data_changes: { label: "Version 2", rows: [{ block: "map_pool" }] } };
+  renderPage("#regelwerk");
+  await waitFor(() => expect(screen.getByTestId("season-rules-state")).toHaveTextContent("Gültig: Version 2, gilt ab 01.11.2026"));
+  expect(screen.queryByTestId("season-rules-legacy")).toBeNull();
+  expect(screen.queryByTestId("season-rules-missing")).toBeNull();
+  // Im Überblick: „Regelwerk muss freigegeben werden“.
+  fireEvent.click(screen.getByTestId("season-tab-ueberblick"));
+  expect(await screen.findByTestId("season-rules-notice")).toHaveTextContent("Regelwerk muss freigegeben werden");
+  expect(screen.getByTestId("season-rules-notice")).toHaveTextContent("1 Baustein");
+});
+
+// ---------------------------------------------------------------- Ligen und Staffeln
+
+test("Ligen und Staffeln: Staffel mit Weg zur Turnierverwaltung, Vorgaben übertragen", async () => {
+  apiMock.post.mockResolvedValue({ data: { staffeln: [{ tournament_id: "t1", title: "Staffel A", applied: ["always"], changed: ["rules"],
+    skipped: [{ group: "before_start", label: "Termine und Kalender", reason: "Die Staffel hat schon begonnen." }] }] } });
+  renderPage("#ligen");
+  expect(await screen.findByTestId("staffel-manage-1-A")).toHaveAttribute("href", "/admin/tournaments/t1");
+  expect(screen.getByTestId("staffel-1-A")).toHaveTextContent("3 von 8 Teams");
+  fireEvent.click(screen.getByTestId("season-sync-run"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/leagues/seasons/s1/sync"));
+  const results = await screen.findByTestId("sync-results");
+  expect(results).toHaveTextContent("1 Wert übernommen");
+  expect(results).toHaveTextContent("Nicht übertragen – Termine und Kalender: Die Staffel hat schon begonnen.");
+});
+
+test("nach dem Speichern bietet die Seite das Übertragen an - in jedem Reiter", async () => {
+  renderPage("#ligen");
+  fireEvent.change(await screen.findByTestId("season-form-staffel-size"), { target: { value: "6" } });
+  fireEvent.click(screen.getByTestId("season-save-ligen"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/admin/leagues/seasons/s1", { max_staffel_size: 6 }));
+  apiMock.post.mockResolvedValue({ data: { staffeln: [{ tournament_id: "t1", title: "Staffel A", applied: ["always"], changed: ["rules"], skipped: [] }] } });
+  fireEvent.click(await screen.findByTestId("season-sync-now"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/leagues/seasons/s1/sync"));
+  // Das Ergebnis steht dort, wo übertragen wurde - oben, nicht versteckt in einem anderen Reiter.
+  expect(within(await screen.findByTestId("season-sync-top")).getByTestId("sync-results")).toHaveTextContent("Staffel A");
+});
+
 test("Staffel anlegen und Liga 2 mit eigener Teamgröße anlegen", async () => {
   apiMock.post.mockResolvedValueOnce({ data: { tournament_id: "t2", staffel: "B" } });
-  renderPage();
+  renderPage("#ligen");
   fireEvent.click(await screen.findByTestId("staffel-add-1"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/leagues/divisions/d1/staffeln", {}));
 
   fireEvent.click(screen.getByTestId("division-add"));
   const sheet = screen.getByTestId("division-sheet");
   fireEvent.change(within(sheet).getByTestId("division-nickname"), { target: { value: "Elite" } });
+  expect(within(sheet).getByTestId("division-nickname")).toBeInTheDocument();
   fireEvent.change(within(sheet).getByTestId("override-team-size"), { target: { value: "5" } });
   fireEvent.click(within(sheet).getByTestId("division-save"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/leagues/seasons/s1/divisions", { nickname: "Elite", overrides: { team_size: 5 } }));
 });
 
+test("Beiname „Liga 1“: freundlicher Hinweis, dass die Stufe von selbst zählt (#2267)", async () => {
+  body = { ...BODY, divisions: [{ ...BODY.divisions[0], nickname: "Liga 1", label: "Liga 1 · Liga 1" }] };
+  renderPage("#ligen");
+  expect(await screen.findByTestId("division-nickname-repeat-1")).toHaveTextContent("wiederholt die Stufe");
+  fireEvent.click(screen.getByTestId("division-edit-1"));
+  const sheet = screen.getByTestId("division-sheet");
+  expect(within(sheet).getByTestId("division-nickname-repeat")).toHaveTextContent("„Liga 1 · Liga 1“");
+  fireEvent.change(within(sheet).getByTestId("division-nickname"), { target: { value: "Elite" } });
+  expect(within(sheet).queryByTestId("division-nickname-repeat")).toBeNull();
+  expect(sheet).toHaveTextContent("Anzeige: „Liga 1 · Elite“");
+});
+
 // ---------------------------------------------------------------- Korrigieren, archivieren, löschen (#2106)
+
+/** GET liefert die Season - und für `…/delete-plan` den angegebenen Plan (#2106). */
+function withPlan(plan) {
+  apiMock.get.mockImplementation((url) => (url.endsWith("/delete-plan") ? Promise.resolve({ data: plan }) : routeGet(url)));
+}
 
 test("Season löschen: Bestätigung in der Seite mit Auflistung und Grund, danach zurück zur Übersicht", async () => {
   const confirmSpy = vi.spyOn(window, "confirm");
@@ -218,9 +396,9 @@ test("409 beim Löschen: das Blatt holt den Plan neu und bietet Archivieren an",
     staffeln: [{ tournament_id: "t1", title: "Staffel A", staffel: "A" }] };
   const blockedPlan = { ...deletable, deletable: false, staffeln: [], blockers: ["Staffel A hat schon Co-Teams zugeteilt"] };
   let plans = 0;
-  apiMock.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith("/delete-plan") ? (plans++ ? blockedPlan : deletable) : BODY }));
+  apiMock.get.mockImplementation((url) => (url.endsWith("/delete-plan") ? Promise.resolve({ data: plans++ ? blockedPlan : deletable }) : routeGet(url)));
   apiMock.delete.mockRejectedValue({ response: { status: 409, data: { detail: "Löschen geht nicht: Staffel A hat schon Co-Teams zugeteilt." } } });
-  renderPage();
+  renderPage("#ligen");
   fireEvent.click(await screen.findByTestId("division-delete-1"));
   await screen.findByTestId("league-delete-list");
   fireEvent.change(screen.getByTestId("league-delete-reason"), { target: { value: "Doppelt angelegt" } });
@@ -234,7 +412,7 @@ test("Liga N mit gespielter Staffel: Archivieren statt löschen, mit Knopf", asy
   withPlan({ kind: "division", id: "d1", name: "Liga 1", deletable: false, archived: false, seasons: [], divisions: [], staffeln: [],
     blockers: ["Probe-Liga Season 1 · Liga 1 · Staffel A hat schon begonnen oder Spiele"] });
   apiMock.patch.mockResolvedValue({ data: { id: "d1", status: "archived" } });
-  renderPage();
+  renderPage("#ligen");
   fireEvent.click(await screen.findByTestId("division-delete-1"));
   const blocked = await screen.findByTestId("league-delete-blocked");
   expect(blocked).toHaveTextContent("Archivieren statt löschen");
@@ -247,7 +425,7 @@ test("Liga N mit gespielter Staffel: Archivieren statt löschen, mit Knopf", asy
 
 test("Staffel im Entwurf direkt auf der Season-Seite löschen - mit Hinweis auf die zugeteilten Co-Teams", async () => {
   apiMock.delete.mockResolvedValue({ data: { ok: true } });
-  renderPage();
+  renderPage("#ligen");
   fireEvent.click(await screen.findByTestId("staffel-delete-1-A"));
   const list = await screen.findByTestId("league-delete-list");
   expect(list).toHaveTextContent("Die 3 zugeteilten Co-Teams werden dabei aus der Staffel genommen.");
@@ -258,15 +436,15 @@ test("Staffel im Entwurf direkt auf der Season-Seite löschen - mit Hinweis auf 
 });
 
 test("eine gestartete Staffel hat keinen Löschknopf - dort gilt Abgesagt oder Archiviert", async () => {
-  apiMock.get.mockResolvedValue({ data: { ...BODY, divisions: [{ ...BODY.divisions[0], staffeln: [{ ...BODY.divisions[0].staffeln[0], status: "live" }] }] } });
-  renderPage();
+  body = { ...BODY, divisions: [{ ...BODY.divisions[0], staffeln: [{ ...BODY.divisions[0].staffeln[0], status: "live" }] }] };
+  renderPage("#ligen");
   await screen.findByTestId("staffel-1-A");
   expect(screen.queryByTestId("staffel-delete-1-A")).toBeNull();
 });
 
 test("Liga N bearbeiten schickt den Stand mit, Antwortfrist je Liga N und als Season-Wert", async () => {
   apiMock.patch.mockResolvedValue({ data: {} });
-  renderPage();
+  renderPage("#ligen");
   fireEvent.click(await screen.findByTestId("division-edit-1"));
   const sheet = screen.getByTestId("division-sheet");
   fireEvent.change(within(sheet).getByTestId("division-status"), { target: { value: "archived" } });
@@ -276,43 +454,44 @@ test("Liga N bearbeiten schickt den Stand mit, Antwortfrist je Liga N und als Se
     { nickname: null, overrides: { match_schedule_response_hours: 24 }, status: "archived" }));
 
   apiMock.patch.mockResolvedValue({ data: { ...SEASON, changed: [], staffeln_to_sync: 0 } });
+  fireEvent.click(screen.getByTestId("season-tab-termine"));
   // Season von vor #2106: das Feld ist leer und bleibt beim Speichern leer.
-  expect(screen.getByTestId("season-form-response")).toHaveValue(null);
-  fireEvent.click(screen.getByTestId("season-save"));
+  expect(await screen.findByTestId("season-form-response")).toHaveValue(null);
+  fireEvent.click(screen.getByTestId("season-save-termine"));
   await waitFor(() => expect(apiMock.patch).toHaveBeenLastCalledWith("/admin/leagues/seasons/s1", expect.objectContaining({ match_schedule_response_hours: null })));
-  await waitFor(() => expect(screen.getByTestId("season-save")).toHaveTextContent("Season speichern"));
+  await waitFor(() => expect(screen.getByTestId("season-save-termine")).toHaveTextContent("Termine speichern"));
   fireEvent.change(screen.getByTestId("season-form-response"), { target: { value: "48" } });
-  fireEvent.click(screen.getByTestId("season-save"));
+  fireEvent.click(screen.getByTestId("season-save-termine"));
   await waitFor(() => expect(apiMock.patch).toHaveBeenLastCalledWith("/admin/leagues/seasons/s1", expect.objectContaining({ match_schedule_response_hours: 48 })));
 });
 
 test("Fehler beim Anlegen der Staffel steht als Meldung da", async () => {
   apiMock.post.mockRejectedValueOnce({ response: { data: { detail: "Mit bis zu 9 Teams braucht die Staffel 9 Spielwochen" } } });
-  renderPage();
+  renderPage("#ligen");
   fireEvent.click(await screen.findByTestId("staffel-add-1"));
   await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Mit bis zu 9 Teams braucht die Staffel 9 Spielwochen"));
 });
 
-// Gestaltung und Gewinne (#2107): Season-Gewinne im Formular, eigene Gewinne je Liga N, Emblem/Banner der Liga als Erbe.
-test("Gewinne der Season gehen mit dem Speichern mit, leere Zeilen fallen weg", async () => {
+// Gestaltung und Gewinne (#2107): im Überblick; Season-Gewinne im Formular, eigene Gewinne je Liga N, Emblem/Banner der Liga als Erbe.
+test("Gewinne der Season gehen mit „Überblick speichern“ mit, leere Zeilen fallen weg", async () => {
   apiMock.patch.mockResolvedValue({ data: { ...SEASON, changed: ["prizes"], staffeln_to_sync: 0 } });
-  apiMock.get.mockResolvedValue({ data: { ...BODY, league: { ...BODY.league, emblem_url: "/api/static/uploads/liga.png" },
-    look: { emblem_url: "/api/static/uploads/liga.png", banner: null, accent_color: null } } });
+  body = { ...BODY, league: { ...BODY.league, emblem_url: "/api/static/uploads/liga.png" },
+    look: { emblem_url: "/api/static/uploads/liga.png", banner: null, accent_color: null } };
   renderPage();
   const look = await screen.findByTestId("season-look");
   expect(within(look).getByTestId("season-emblem-sizes").querySelector("img")).toHaveAttribute("src", expect.stringContaining("liga.png"));
   fireEvent.click(within(look).getByTestId("season-prizes-add"));
   fireEvent.change(within(look).getByTestId("season-prizes-text-0"), { target: { value: "Pokal und Trikot" } });
   fireEvent.click(within(look).getByTestId("season-prizes-add"));
-  fireEvent.click(screen.getByTestId("season-save"));
+  fireEvent.click(screen.getByTestId("season-save-ueberblick"));
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/admin/leagues/seasons/s1", expect.objectContaining({
     prizes: [{ place: 1, text: "Pokal und Trikot", image_url: null }], emblem_url: null, banner_url: null })));
 });
 
 test("Liga N: eigene Gewinne nur, wenn sie sich ändern; leer heißt wie die Season", async () => {
   apiMock.patch.mockResolvedValue({ data: {} });
-  apiMock.get.mockResolvedValue({ data: { ...BODY, season: { ...SEASON, prizes: [{ place: 1, text: "Pokal" }] } } });
-  renderPage();
+  body = { ...BODY, season: { ...SEASON, prizes: [{ place: 1, text: "Pokal" }] } };
+  renderPage("#ligen");
   fireEvent.click(await screen.findByTestId("division-edit-1"));
   const sheet = screen.getByTestId("division-sheet");
   expect(within(sheet).getByTestId("division-prizes")).toHaveTextContent("Wie die Season: 1. Pokal");
@@ -323,27 +502,30 @@ test("Liga N: eigene Gewinne nur, wenn sie sich ändern; leer heißt wie die Sea
     { nickname: null, overrides: {}, status: "active", prizes: [{ place: 1, text: "Aufstieg", image_url: null }] }));
 });
 
-test("Zuständigkeit „Regeln veröffentlichen“ (#2203): nur der Regeltext, und nur er geht an den Server", async () => {
-  apiMock.get.mockResolvedValue({ data: { ...BODY, capabilities: ["rules"] } });
-  renderPage();
-  const rules = await screen.findByTestId("season-form-rules");
-  expect(screen.getByTestId("season-rules-link")).toHaveAttribute("href", "/admin/leagues/rules/league_season/s1");
-  for (const id of ["season-form-name", "season-form-visibility", "season-pool", "season-sync", "division-add", "season-delete"]) {
+// ---------------------------------------------------------------- Zuständigkeiten (#2203)
+
+test("Zuständigkeit „Regeln veröffentlichen“: Weg zum Regelwerk, kein Formular der Season", async () => {
+  body = { ...BODY, capabilities: ["rules"] };
+  renderPage("#regelwerk");
+  expect(await screen.findByTestId("season-rules-link")).toHaveAttribute("href", "/admin/leagues/rules/league_season/s1");
+  expect(screen.queryByTestId("season-tab-termine")).toBeNull();
+  expect(screen.queryByTestId("season-tab-anmeldung")).toBeNull();
+  for (const id of ["season-form-name", "season-form-visibility", "season-pool", "season-sync", "division-add", "season-delete", "season-form-rules"]) {
     expect(screen.queryByTestId(id), id).toBeNull();
   }
-  fireEvent.change(rules, { target: { value: "## Neue Regeln" } });
-  fireEvent.click(screen.getByTestId("season-save"));
-  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/admin/leagues/seasons/s1", { rules_text: "## Neue Regeln" }));
 });
 
-test("Zuständigkeit „Kader prüfen“ (#2203): kein Formular, Liga N und Staffeln nur zum Ansehen", async () => {
-  apiMock.get.mockResolvedValue({ data: { ...BODY, capabilities: ["roster"] } });
-  renderPage();
+test("Zuständigkeit „Kader prüfen“: kein Formular, Liga N und Staffeln nur zum Ansehen, Kader im Reiter Anmeldung", async () => {
+  body = { ...BODY, capabilities: ["roster"] };
+  renderPage("#ligen");
   expect(await screen.findByTestId("season-divisions")).toBeInTheDocument();
-  expect(screen.queryByTestId("season-form")).toBeNull();
+  expect(screen.queryByTestId("season-form-ligen")).toBeNull();
   expect(screen.queryByTestId("season-rules-link")).toBeNull();
   for (const id of ["division-edit-1", "division-delete-1", "staffel-add-1", "staffel-delete-1-A", "season-delete"]) {
     expect(screen.queryByTestId(id), id).toBeNull();
   }
   expect(screen.getByTestId("staffel-manage-1-A")).toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("season-tab-anmeldung"));
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/admin/leagues/seasons/s1/roster"));
+  expect(screen.queryByTestId("season-form-anmeldung")).toBeNull();
 });
