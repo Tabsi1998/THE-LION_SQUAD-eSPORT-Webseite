@@ -2,9 +2,9 @@
 from fastapi import APIRouter, HTTPException, Depends
 from database import get_db
 from auth import get_optional_user, require_admin
-from services import game_id_keys, game_maps, game_modes, game_usage
+from services import game_id_keys, game_maps, game_modes, game_usage, league_result_rules, mode_icons
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slugify, unique_slug
-from models import GameCreate, GameUpdate, now_utc, new_id
+from models import GameCreate, GameUpdate, normalize_rule, now_utc, new_id
 
 router = APIRouter(prefix="/api/games", tags=["games"])
 
@@ -41,9 +41,42 @@ def _game_display_name(game: dict, parent: dict | None = None) -> str:
     return f"{parent_name}: {name}"
 
 
+def _readable_mode(mode):
+    """Ein Modus im heutigen Vertrag: Zeitlimit in Sekunden, Einstellungen und Regeltext ohne Zeichen des Zwischenformats der Bausteine
+    (Altbestand, #2271) - beim Lesen, ohne Migration."""
+    if not isinstance(mode, dict):
+        return mode
+    out = dict(mode)
+    if isinstance(out.get("result_rule"), dict):
+        out["result_rule"] = normalize_rule(out["result_rule"])
+    if "settings" in out or "rules_text" in out:
+        entry = league_result_rules.settings_entry(out) or {}
+        if "settings" in out:
+            out["settings"] = entry.get("settings") or []
+        if "rules_text" in out:
+            out["rules_text"] = entry.get("rules_text")
+    return out
+
+
+def _readable_modes(game: dict) -> None:
+    """Altbestand beim Lesen umrechnen (#2271), siehe ``_readable_mode``."""
+    modes = game.get("match_modes")
+    if isinstance(modes, list):
+        game["match_modes"] = [_readable_mode(mode) for mode in modes]
+
+
+async def _check_icons(db, modes: list | None, me: dict, current: dict | None = None) -> None:
+    """Symbole je Modus (#2266): nur eigene Uploads - was ein Modus schon trägt, bleibt an diesem Modus speicherbar."""
+    try:
+        await mode_icons.check(db, modes, me, mode_icons.icons_of(current))
+    except mode_icons.IconProblem as problem:
+        raise HTTPException(status_code=422, detail=str(problem)) from None
+
+
 def _enrich_games(games: list[dict]) -> list[dict]:
     by_id = {game.get("id"): game for game in games if game.get("id")}
     for game in games:
+        _readable_modes(game)
         parent = by_id.get(game.get("parent_game_id"))
         source = _effective_identity_source(game, by_id)
         game["display_name"] = _game_display_name(game, parent)
@@ -162,6 +195,7 @@ async def create_game(body: GameCreate, me: dict = Depends(require_admin())):
     duplicate = game_modes.duplicate_name_problem(doc.get("match_modes"))
     if duplicate:
         raise HTTPException(status_code=422, detail=duplicate)
+    await _check_icons(db, doc.get("match_modes"), me)
     doc["slug"] = await unique_slug(db.games, doc.get("slug") or doc.get("name"), fallback="spiel")
     if doc.get("parent_game_id") and not await db.games.find_one({"id": doc["parent_game_id"]}, {"id": 1}):
         raise HTTPException(status_code=404, detail="Hauptspiel nicht gefunden")
@@ -242,6 +276,7 @@ async def update_game(game_id: str, body: GameUpdate, me: dict = Depends(require
             raise HTTPException(status_code=422, detail=duplicate)
     if "match_modes" in raw:
         await _refuse_used_removal(db, current, raw["match_modes"])
+        await _check_icons(db, raw["match_modes"], me, current)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     _check_id_fields(updates.get("player_id_fields"), current.get("player_id_fields"))
     # Die Adresse folgt dem Namen nicht mehr (#2249): Unter dem Slug stehen die Spieler-IDs (``users.game_ids.<slug>``), ein

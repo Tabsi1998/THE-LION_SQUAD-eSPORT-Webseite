@@ -33,7 +33,9 @@ INTERNAL_RESULT_KEYS = frozenset({"user_id", "note"})
 PUBLIC_GAME_FIELDS = ("position", "mode", "mode_label", "map_id", "map_name", "map_image_url", "winner_registration_id",
                       "scores",
                       # Zusatzfelder je Map (C.3, #1617), nur wenn gesetzt. Der Nachweis (``proof_id``) bleibt privat.
-                      "status", "replay_reason", "decision", "host_registration_id")
+                      "status", "replay_reason", "decision", "host_registration_id",
+                      # Symbol des Modus (#2266), Schnappschuss wie ``mode_label``.
+                      "mode_icon_url")
 
 
 def public_games(games: list | None) -> list:

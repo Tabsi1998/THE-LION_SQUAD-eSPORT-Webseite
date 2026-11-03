@@ -100,7 +100,9 @@ OVERRIDE_FIELDS = ("best_of", "team_size", "min_squad_size", "max_staffel_size",
 # Seasons von vor #2106 tragen keine Antwortfrist: dann behält jede Staffel ihre eigene (``staffel_fields``).
 RESPONSE_HOURS = "match_schedule_response_hours"
 # Ergebnisregeln (C.3, #1617): gepflegt über …/result-rules, nicht über das Season-Formular; gelten nur für neue Eingaben.
-RESULT_RULE_FIELDS = ("result_rules", "scores_required")
+RESULT_RULE_FIELDS = ("result_rules", "scores_required",
+                      # Einstellungen und Regeltext je Modus (#2271): dieselbe Kopie, dieselbe Gruppe.
+                      "mode_settings")
 # Ab hier hat eine Staffel begonnen: Termine und Kalender bleiben dann, wie sie sind.
 PRE_START_STATUSES = frozenset({"draft", "scheduled", "registration_open", "registration_closed", "check_in"})
 # Sichtbarkeit der Season → Sichtbarkeit der Staffel-Turniere (docs/LIGA.md, Abschnitt 10).
@@ -481,7 +483,7 @@ SYNC_GROUPS: dict[str, tuple[str, ...]] = {
 SYNC_GROUP_LABELS = {
     "always": "Sichtbarkeit und Regeltext",
     "running": "Antwortfrist auf Terminvorschläge",
-    "result_rules": "Ergebnisregeln und Punktepflicht",
+    "result_rules": "Ergebnisregeln, Einstellungen und Punktepflicht",
     "schedule": "Terminregeln",
     "before_start": "Termine und Kalender",
     "before_result": "Best of, Teamgröße, Mindestkader, Punkte und Fristen",
@@ -1110,7 +1112,9 @@ async def _has_result(db, tournament_id: str) -> bool:
 
 
 def _pool_maps(pool: dict | None) -> list:
-    return [(group.get("mode"), [item.get("map_id") for item in group.get("maps") or []])
+    """Was beim Übertragen als „gleicher Pool“ zählt: je Modus die Maps und das Symbol des Schnappschusses (#2266, Prüfung Codex) - eine
+    Season, die ihren Pool nur wegen eines neuen Symbols neu speichert, gibt die neue Version an die Staffeln weiter."""
+    return [(group.get("mode"), group.get("icon_url") or None, [item.get("map_id") for item in group.get("maps") or []])
             for group in (pool or {}).get("modes") or []]
 
 

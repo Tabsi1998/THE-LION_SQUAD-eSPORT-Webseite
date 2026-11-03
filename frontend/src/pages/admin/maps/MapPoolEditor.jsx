@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowDown, ArrowUp, Map as MapIcon, Trash2 } from "lucide-react";
 import { LazyImg } from "@/components/tls/LazyImg";
+import { ModeIcon } from "@/components/tls/ModeIcon";
 import { viennaDate } from "@/lib/vienna";
 import { modeStatusOf, selectableModes } from "@/lib/gameMatchData";
 import { gamePageUrl } from "@/lib/gameForm";
@@ -66,7 +67,7 @@ function Thumb({ item }) {
   );
 }
 
-function ModeGroup({ mode, label, library, selected, kept = [], onToggle, onMove, disabled, testId, aside = null, labelNode = null }) {
+function ModeGroup({ mode, label, icon, iconChanged = false, library, selected, kept = [], onToggle, onMove, disabled, testId, aside = null, labelNode = null }) {
   // Inaktive Maps (#2207) nur, wo der gespeicherte Pool sie in diesem Modus schon hat.
   const choices = choosableMaps(library, mode, kept);
   const byId = Object.fromEntries(choices.map((item) => [item.id, item]));
@@ -74,9 +75,16 @@ function ModeGroup({ mode, label, library, selected, kept = [], onToggle, onMove
   const name = label || "Alle Maps";
   return (
     <fieldset className="border border-white/10 rounded-sm bg-[#0A0A0A] p-3" data-testid={`${testId}-mode-${mode ?? "alle"}`}>
-      <legend className="px-1 text-[11px] font-bold uppercase tracking-widest text-white/70">
+      <legend className="inline-flex items-center gap-2 px-1 text-[11px] font-bold uppercase tracking-widest text-white/70">
+        {/* Modus-Symbol (#2266): das des Spiels - beim Speichern kommt es als Schnappschuss in den Pool. */}
+        {mode ? <ModeIcon src={icon} size="sm" testId={`${testId}-mode-${mode}-icon`} /> : null}
         {labelNode || name} <span className="ml-1 normal-case tracking-normal font-semibold text-white/45 tabular-nums">{selected.length} von {choices.length}</span>
       </legend>
+      {iconChanged ? (
+        <p role="status" className="mb-2 text-xs text-white/60" data-testid={`${testId}-mode-${mode}-icon-changed`}>
+          Symbol geändert – mit dem nächsten Speichern übernommen.
+        </p>
+      ) : null}
       {aside ? <div className="mb-2">{aside}</div> : null}
       {choices.length === 0 ? (
         <p className="text-xs text-white/45">Keine aktive Map ist für diesen Modus freigegeben.</p>
@@ -142,6 +150,8 @@ export function MapPoolEditor({ title, hint = "", game, library = [], entry = nu
   const selection = useMemo(() => (picking ? Object.fromEntries(Object.entries(rawSelection).filter(([key]) => picked.includes(key))) : rawSelection),
     [picking, rawSelection, picked]);
   const dirty = !sameSelection(baseline, selection) || Boolean(entry?.stale);
+  // Nur ein geändertes Modus-Symbol (#2266): kein ungespeicherter Entwurf, aber Speichern muss gehen, sonst erreicht es nie Season und Staffeln.
+  const iconsOutdated = !entry?.stale && (entry?.outdated_modes || []).some((mode) => Object.prototype.hasOwnProperty.call(selection, keyOf(mode)));
   const count = selectionCount(selection);
   const disabled = !canEdit || busy;
   const noModeLeft = allGroups.length === 0;
@@ -273,13 +283,14 @@ export function MapPoolEditor({ title, hint = "", game, library = [], entry = nu
               <legend className="text-[11px] font-bold uppercase tracking-widest text-white/70">Welche Modi spielt die Season?</legend>
               <p className="text-xs text-white/50">Haken setzen – darunter wählst du je Modus die Maps. Ein Modus ohne Haken kommt nicht in den Pool.</p>
               <div className="flex flex-wrap gap-2">
-                {modes.map(({ mode, label }) => {
+                {modes.map(({ mode, label, icon_url: icon }) => {
                   const key = keyOf(mode);
                   const on = picked.includes(key);
                   const maps = (rawSelection[key] || []).length;
                   return (
                     <label key={key} className={`inline-flex min-h-[44px] cursor-pointer select-none items-center gap-2 rounded-sm border px-3 py-1.5 text-sm focus-within:outline focus-within:outline-1 focus-within:outline-[#29B6E8] ${on ? "border-[#29B6E8]/70 bg-[#29B6E8]/10 text-white" : "border-white/10 bg-[#0A0A0A] text-white/65"}`}>
                       <input type="checkbox" checked={on} disabled={disabled} onChange={() => togglePicked(key)} className="accent-[#29B6E8]" data-testid={`${testId}-pick-${key}`} />
+                      <ModeIcon src={icon} size="xs" testId={`${testId}-pick-${key}-icon`} />
                       {renderModeLabel ? renderModeLabel(mode, label || mode) : (label || mode)}
                       {on ? <span className={`text-xs tabular-nums ${maps ? "text-white/55" : "text-warn"}`}>{maps ? `${maps} ${maps === 1 ? "Map" : "Maps"}` : "noch keine Map"}</span> : null}
                     </label>
@@ -290,8 +301,9 @@ export function MapPoolEditor({ title, hint = "", game, library = [], entry = nu
             </fieldset>
           ) : null}
           <div className="grid gap-3 lg:grid-cols-2">
-            {groups.map(({ mode, label }) => (
-              <ModeGroup key={keyOf(mode) || "alle"} mode={mode} label={label} library={library} selected={selection[keyOf(mode)] || []}
+            {groups.map(({ mode, label, icon_url: icon }) => (
+              <ModeGroup key={keyOf(mode) || "alle"} mode={mode} label={label} icon={icon} library={library} selected={selection[keyOf(mode)] || []}
+                iconChanged={Boolean(mode) && !entry?.stale && (entry?.outdated_modes || []).includes(mode)}
                 kept={baseline[keyOf(mode)] || []} aside={modeAside?.(mode) || null}
                 labelNode={renderModeLabel && mode != null ? renderModeLabel(mode, label || mode) : null}
                 onToggle={(m, id) => setSelection((current) => toggleMap(current, m, id))}
@@ -310,7 +322,7 @@ export function MapPoolEditor({ title, hint = "", game, library = [], entry = nu
               <Trash2 className="w-3.5 h-3.5" aria-hidden="true" /> Pool entfernen
             </button>
           ) : null}
-          <button type="button" disabled={busy || !dirty || count === 0 || noModeLeft} onClick={save} data-testid={`${testId}-save`}
+          <button type="button" disabled={busy || !(dirty || iconsOutdated) || count === 0 || noModeLeft} onClick={save} data-testid={`${testId}-save`}
             className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
             {busy ? "Speichere …" : saveLabel}
           </button>

@@ -46,3 +46,11 @@ test("eine Karte nennt auf Wunsch ihre Position im Pool", () => {
   render(<MapCard item={{ name: "Glutsenke" }} position={3} />);
   expect(screen.getByTestId("map-card-position")).toHaveTextContent("3");
 });
+
+test("Modus-Symbol (#2266): aus dem Snapshot, ohne Bild das neutrale Symbol", () => {
+  const pool = { ...POOL, modes: [{ ...POOL.modes[0], icon_url: "/api/static/uploads/stellung.png" }, POOL.modes[1]] };
+  render(<MapPoolView pool={pool} />);
+  const icons = screen.getAllByTestId("map-pool-mode-icon");
+  expect(icons.map((icon) => icon.getAttribute("data-icon"))).toEqual(["image", "placeholder"]);
+  expect(icons[0].querySelector("img").getAttribute("src")).toContain("stellung.png");
+});

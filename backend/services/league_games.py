@@ -227,6 +227,14 @@ def _mode_label(pool: dict | None, mode: str | None) -> str:
     return str(mode or "")
 
 
+def _mode_icon(pool: dict | None, mode: str | None) -> str | None:
+    """Das Symbol des Modus aus dem Pool (#2266) - Schnappschuss wie der Name, ``None`` ohne Symbol."""
+    for group in (pool or {}).get("modes") or []:
+        if mode and group.get("mode") == mode:
+            return group.get("icon_url") or None
+    return None
+
+
 def _map_snapshot(pool: dict | None, mode: str | None, map_id: str) -> dict:
     for group in (pool or {}).get("modes") or []:
         if group.get("mode") == mode:
@@ -403,11 +411,14 @@ def normalize_games(
             if reg_id not in lineups:
                 raise LeagueGamesError(f"{label}: bitte die eigene Aufstellung angeben ({setup.team_size} Spieler).")
         snapshot = _map_snapshot(setup.pool, mode, map_id)
+        icon = _mode_icon(setup.pool, mode)
         games.append(
             {
                 "position": position,
                 "mode": mode,
                 "mode_label": _mode_label(setup.pool, mode) if mode else None,
+                # Symbol des Modus (#2266): nur wenn der Pool eines hält.
+                **({"mode_icon_url": icon} if icon else {}),
                 "map_id": map_id,
                 "map_name": snapshot.get("name"),
                 "map_image_url": snapshot.get("image_url"),
@@ -979,7 +990,7 @@ def _games_view(games: list[dict] | None, people: dict[str, dict], with_lineups:
                     )
                 },
                 # Zusatzfelder (C.3) nur, wenn gesetzt; den Nachweis sehen nur Beteiligte und Leitung - wie Aufstellungen.
-                **{key: game[key] for key in ("status", "replay_reason", "decision", "host_registration_id") if game.get(key)},
+                **{key: game[key] for key in ("mode_icon_url", "status", "replay_reason", "decision", "host_registration_id") if game.get(key)},
                 **({"proof_id": game["proof_id"]} if with_lineups and game.get("proof_id") else {}),
                 "lineups": (
                     {

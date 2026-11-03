@@ -10,6 +10,8 @@ from match_rules import RESULT_MAX_SCORE, RESULT_MAX_TIME_MS
 # Der Passwortvertrag (#1033) steht in services/password_policy.py.
 from services.password_policy import NewPassword
 from services.usernames import username_problem
+# Zeichen des Zwischenformats der Regelwerk-Bausteine (#2218) fallen aus eingegebenem Text weg (Prüfung Codex zu #2271).
+from services.markdown_text import strip_protected
 
 
 def now_utc():
@@ -340,20 +342,56 @@ RESULT_TARGET_MAX = 100_000
 MODE_DESCRIPTION_MAX = 500
 MODE_FORMAT_MAX = 60
 # Felder aus C.1 (#2206): fehlen sie, werden sie nicht geschrieben - alte Spiele bleiben Zeichen für Zeichen gleich.
-MODE_EXTRA_FIELDS = ("status", "description", "players_per_side", "format", "result_rule")
+MODE_RULES_TEXT_MAX = 1000
+# Felder aus C.1 (#2206): fehlen sie, werden sie nicht geschrieben - alte Spiele bleiben Zeichen für Zeichen gleich. Dazu das
+# Symbol (#2266), freie Einstellungen und der Regeltext je Modus (#2271).
+MODE_EXTRA_FIELDS = ("status", "description", "players_per_side", "format", "result_rule", "icon_url", "settings", "rules_text")
+# Zeiten der Ergebnisregel in Sekunden (#2271): Zeitlimit je Map bis 600 Minuten, Zeit je Runde bis eine Stunde.
+TIME_LIMIT_SECONDS_MAX = 36_000
+ROUND_TIME_SECONDS_MAX = 3_600
+# Altbestand (vor #2271): Zeitlimit in ganzen Minuten. Beim Lesen in Sekunden umgerechnet, nie mehr geschrieben.
+LEGACY_TIME_LIMIT = "time_limit_minutes"
+
+
+def rule_time_limit_seconds(rule: dict | None) -> int | None:
+    """Das Zeitlimit je Map einer gespeicherten Regel in Sekunden - auch aus dem Altbestand in Minuten (#2271)."""
+    if not isinstance(rule, dict):
+        return None
+    seconds = rule.get("time_limit_seconds")
+    if isinstance(seconds, (int, float)) and not isinstance(seconds, bool) and seconds > 0:
+        return int(seconds)
+    minutes = rule.get(LEGACY_TIME_LIMIT)
+    if isinstance(minutes, (int, float)) and not isinstance(minutes, bool) and minutes > 0:
+        return int(minutes * 60)
+    return None
+
+
+def normalize_rule(rule: dict | None) -> dict | None:
+    """Eine gespeicherte Regel im heutigen Vertrag: das Zeitlimit in Sekunden statt in Minuten (Altbestand, #2271)."""
+    if not isinstance(rule, dict) or LEGACY_TIME_LIMIT not in rule:
+        return rule
+    out = {key: value for key, value in rule.items() if key != LEGACY_TIME_LIMIT}
+    seconds = rule_time_limit_seconds(rule)
+    if seconds:
+        out["time_limit_seconds"] = seconds
+    return out
 
 
 class GameModeResultRule(BaseModel):
     """Ergebnisregel eines Modus (#2206, C.1) - nur gespeichert und angezeigt; angewandt wird sie erst mit C.3 (#1617).
     ``score``: Punkte bis zum Ziel, ``rounds``: Runden gewinnen (höchstens ``round_limit``), ``highest``: höherer Endstand
-    gewinnt. Keine Werte eines Titels: Ziel und Grenzen trägt die Verwaltung je Spiel ein."""
+    gewinnt. Keine Werte eines Titels: Ziel und Grenzen trägt die Verwaltung je Spiel ein.
+
+    Zeiten in Sekunden (#2271): ``time_limit_seconds`` je Map, ``round_time_seconds`` je Runde (nur Angabe für Regelwerk und
+    Anzeige). Ein Aufruf mit ``time_limit_minutes`` (Altbestand) wird umgerechnet - geschrieben werden nur Sekunden."""
     # Unbekannte Felder werden nicht still verworfen (Prüfung #2206): ``_known`` sagt es auf Deutsch, ``forbid`` sichert ab.
     model_config = ConfigDict(extra="forbid")
 
     kind: Literal["score", "rounds", "highest"]
     target: Optional[int] = Field(default=None, ge=1, le=RESULT_TARGET_MAX)
     round_limit: Optional[int] = Field(default=None, ge=1, le=999)
-    time_limit_minutes: Optional[int] = Field(default=None, ge=1, le=600)
+    time_limit_seconds: Optional[int] = Field(default=None, ge=1, le=TIME_LIMIT_SECONDS_MAX)
+    round_time_seconds: Optional[int] = Field(default=None, ge=1, le=ROUND_TIME_SECONDS_MAX)
     draw_allowed: bool = False
     overtime: bool = False
 
@@ -361,11 +399,18 @@ class GameModeResultRule(BaseModel):
     @classmethod
     def _known(cls, value):
         if isinstance(value, dict):
-            unknown = sorted(str(key) for key in value if key not in cls.model_fields)
+            unknown = sorted(str(key) for key in value if key not in cls.model_fields and key != LEGACY_TIME_LIMIT)
             if unknown:
                 names = ", ".join(f"„{key[:40]}“" for key in unknown[:5])
                 raise ValueError(f"Ergebnisregel: unbekanntes Feld {names}. Erlaubt sind kind, target, round_limit, "
-                                 "time_limit_minutes, draw_allowed und overtime.")
+                                 "time_limit_seconds, round_time_seconds, draw_allowed und overtime.")
+            if LEGACY_TIME_LIMIT in value:
+                minutes = value.get(LEGACY_TIME_LIMIT)
+                value = {key: item for key, item in value.items() if key != LEGACY_TIME_LIMIT}
+                if minutes is not None and value.get("time_limit_seconds") is None:
+                    if isinstance(minutes, bool) or not isinstance(minutes, (int, float)) or not 1 <= minutes <= 600:
+                        raise ValueError("Ergebnisregel: Zeitlimit von 1 bis 600 Minuten – oder leer lassen.")
+                    value["time_limit_seconds"] = int(minutes * 60)
         return value
 
     @model_validator(mode="after")
@@ -385,6 +430,92 @@ class GameModeResultRule(BaseModel):
         return {key: value for key, value in handler(self).items() if value is not None}
 
 
+MODE_SETTINGS_MAX = 40
+SETTING_LABEL_MAX = 60
+SETTING_TEXT_MAX = 120
+SETTING_GROUP_MAX = 40
+SETTING_UNITS = ("seconds", "minutes", "points", "toggle", "text")
+SETTING_NUMBER_MAX = 1_000_000
+
+
+class GameModeSetting(BaseModel):
+    """Eine freie Einstellung eines Modus (#2271), etwa eine Lobby-Einstellung: Bezeichnung, Wert, Einheit und Gruppe. Keine Werte
+    eines Titels im Code. ``key`` bleibt beim Umbenennen gleich (die Season vergleicht über ihn); fehlt er, kommt er aus dem Namen.
+
+    Wert je Einheit: ``seconds`` ganze Sekunden, ``minutes`` und ``points`` Zahl, ``toggle`` an/aus, ``text`` oder ohne Einheit
+    Text."""
+    model_config = ConfigDict(extra="forbid")
+
+    key: Optional[str] = Field(default=None, max_length=40)
+    label: str = Field(min_length=1, max_length=SETTING_LABEL_MAX)
+    value: Any = None
+    unit: Optional[Literal["seconds", "minutes", "points", "toggle", "text"]] = None
+    group: Optional[str] = Field(default=None, max_length=SETTING_GROUP_MAX)
+
+    @field_validator("label", mode="before")
+    @classmethod
+    def _label(cls, value):
+        return " ".join(strip_protected(value).split())
+
+    @field_validator("group", mode="before")
+    @classmethod
+    def _group(cls, value):
+        return (" ".join(strip_protected(value).split()) or None) if value is not None else None
+
+    @model_validator(mode="after")
+    def _fits(self):
+        name = self.label
+        value = self.value
+        if self.unit == "toggle":
+            if not isinstance(value, bool):
+                raise ValueError(f"Einstellung „{name}“: bitte an oder aus wählen.")
+        elif self.unit in ("seconds", "minutes", "points"):
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise ValueError(f"Einstellung „{name}“: bitte eine Zahl angeben.")
+            if not -SETTING_NUMBER_MAX <= value <= SETTING_NUMBER_MAX:
+                raise ValueError(f"Einstellung „{name}“: Zahl zu groß.")
+            if self.unit == "seconds":
+                if not float(value).is_integer() or value < 0:
+                    raise ValueError(f"Einstellung „{name}“: Sekunden als ganze Zahl ab 0 (z. B. 1:30 = 90).")
+                self.value = int(value)
+            elif float(value).is_integer():
+                self.value = int(value)
+        else:
+            if isinstance(value, bool) or value is None or isinstance(value, (dict, list)):
+                raise ValueError(f"Einstellung „{name}“: bitte einen Wert angeben.")
+            text = " ".join(strip_protected(value).split())
+            if not text:
+                raise ValueError(f"Einstellung „{name}“: bitte einen Wert angeben.")
+            if len(text) > SETTING_TEXT_MAX:
+                raise ValueError(f"Einstellung „{name}“: Wert höchstens {SETTING_TEXT_MAX} Zeichen.")
+            self.value = text
+        given = _game_key(self.key)
+        self.key = given or _game_key(name) or "einstellung"
+        return self
+
+    @model_serializer(mode="wrap")
+    def _dump(self, handler):
+        return {key: value for key, value in handler(self).items() if key in ("key", "label", "value") or value is not None}
+
+
+def clean_mode_settings(value):
+    """Die Einstellungen eines Modus: höchstens ``MODE_SETTINGS_MAX``, jeder Schlüssel einmal - ein neuer, gleich lautender Name
+    bekommt eine Nummer dazu. Leer heißt: nicht schreiben."""
+    if value is None:
+        return None
+    if len(value) > MODE_SETTINGS_MAX:
+        raise ValueError(f"Höchstens {MODE_SETTINGS_MAX} Einstellungen je Modus.")
+    seen: set[str] = set()
+    for setting in value:
+        key, number = setting.key, 2
+        while key in seen:
+            key = f"{setting.key[:36]}_{number}"
+            number += 1
+        setting.key = key
+        seen.add(key)
+    return value or None
+
+
 class GameMatchMode(BaseModel):
     """Ein Spielmodus mit Dauer (#1554): „Grand Prix 4 Rennen“ 12 Min. je Spiel, oder 4 Min. je Einzelspiel (``per_game``),
     dann zählt Best-of als Erwartungswert (siehe ``services/match_duration.py``). Die Minuten sind freiwillig (#1616):
@@ -402,6 +533,11 @@ class GameMatchMode(BaseModel):
     players_per_side: Optional[int] = Field(default=None, ge=1, le=64)
     format: Optional[str] = Field(default=None, max_length=MODE_FORMAT_MAX)
     result_rule: Optional[GameModeResultRule] = None
+    # Quadratisches Symbol (#2266): nur eigener Upload, geprüft in ``services/mode_icons.py``. Fehlt = Platzhalter.
+    icon_url: Optional[str] = Field(default=None, max_length=300)
+    # Freie Einstellungen und kurzer Regeltext (#2271) - die Season übernimmt beides als Kopie (C.3).
+    settings: Optional[List[GameModeSetting]] = None
+    rules_text: Optional[str] = Field(default=None, max_length=MODE_RULES_TEXT_MAX)
     # Kam die Kennung mit der Anfrage? Ohne sie sucht ``update_game`` einen bestehenden Modus gleichen Namens (#2206).
     _key_given: bool = PrivateAttr(default=False)
 
@@ -409,6 +545,21 @@ class GameMatchMode(BaseModel):
     @classmethod
     def _label(cls, value):
         return str(value or "").strip()
+
+    @field_validator("icon_url", mode="before")
+    @classmethod
+    def _icon(cls, value):
+        return (str(value).strip() or None) if value is not None else None
+
+    @field_validator("rules_text", mode="before")
+    @classmethod
+    def _rules_text(cls, value):
+        return (strip_protected(value).strip() or None) if value is not None else None
+
+    @field_validator("settings", mode="after")
+    @classmethod
+    def _settings(cls, value):
+        return clean_mode_settings(value)
 
     @field_validator("description", mode="before")
     @classmethod

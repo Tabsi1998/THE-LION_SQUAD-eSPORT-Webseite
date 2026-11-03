@@ -6,28 +6,35 @@ import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { FormSection } from "@/components/tls/AdminForm";
 import { CheckField, SelectField, TextField } from "@/components/tls/FormFields";
+import { ModeIcon } from "@/components/tls/ModeIcon";
 import { RESULT_RULE_KINDS, RESULT_TARGET_MAX, resultRuleText } from "@/lib/gameMatchData";
+import {
+  ROUND_TIME_SECONDS_MAX, TIME_LIMIT_SECONDS_MAX, durationInput, entryPayload, entryToForm, parseDuration, ruleTimeLimitSeconds, settingProblem,
+  settingValueText, settingsDiff, settingsMissing,
+} from "@/lib/modeSettings";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { ModeSettingsEditor } from "../ModeSettingsEditor";
 
 const text = (value) => (value === null || value === undefined ? "" : String(value));
 const blank = (value) => String(value ?? "").trim() === "";
 const whole = (value) => (blank(value) ? null : Math.trunc(Number(value)));
 
-/** Eine Regel als Formularzeile - leer heißt „keine Regel“. */
-function ruleToRow(rule) {
+/** Eine Regel als Formularzeile - leer heißt „keine Regel“. Zeiten als „10“ (Minuten) oder „1:30“ (#2271). */
+export function ruleToRow(rule) {
   return {
-    kind: text(rule?.kind), target: text(rule?.target), limit: text(rule?.round_limit), time: text(rule?.time_limit_minutes),
-    draw: Boolean(rule?.draw_allowed), overtime: Boolean(rule?.overtime),
+    kind: text(rule?.kind), target: text(rule?.target), limit: text(rule?.round_limit), time: durationInput(ruleTimeLimitSeconds(rule)),
+    round: durationInput(rule?.round_time_seconds), draw: Boolean(rule?.draw_allowed), overtime: Boolean(rule?.overtime),
   };
 }
 
-/** Die Zeile als Regel für den Server - dieselbe Form wie am Modus (C.1). */
+/** Die Zeile als Regel für den Server - dieselbe Form wie am Modus (C.1), Zeiten in Sekunden. */
 export function rowToRule(row) {
   if (!row.kind) return null;
   const rule = { kind: row.kind };
   if (row.kind !== "highest") rule.target = whole(row.target);
   if (row.kind === "rounds" && !blank(row.limit)) rule.round_limit = whole(row.limit);
-  if (!blank(row.time)) rule.time_limit_minutes = whole(row.time);
+  if (!blank(row.time)) rule.time_limit_seconds = parseDuration(row.time);
+  if (!blank(row.round)) rule.round_time_seconds = parseDuration(row.round);
   rule.draw_allowed = row.draw;
   rule.overtime = row.overtime;
   return rule;
@@ -44,14 +51,80 @@ export function rowProblem(row, label) {
     if (!(limit >= 1 && limit <= 999)) return `${where}: Rundenlimit von 1 bis 999 – oder leer lassen.`;
     if (limit < target) return `${where}: Das Rundenlimit (${limit}) ist kleiner als das Ziel (${target}).`;
   }
-  if (!blank(row.time) && !(whole(row.time) >= 1 && whole(row.time) <= 600)) return `${where}: Zeitlimit von 1 bis 600 Minuten – oder leer lassen.`;
+  if (!blank(row.time)) {
+    const time = parseDuration(row.time);
+    if (!time || time > TIME_LIMIT_SECONDS_MAX) return `${where}: Zeitlimit als Minuten:Sekunden (z. B. 1:30, 90 s oder 10) bis 600 Minuten – oder leer lassen.`;
+  }
+  if (!blank(row.round)) {
+    const round = parseDuration(row.round);
+    if (!round || round > ROUND_TIME_SECONDS_MAX) return `${where}: Zeit je Runde als Minuten:Sekunden (z. B. 1:45) bis 60 Minuten – oder leer lassen.`;
+  }
   return "";
+}
+
+/** Was an den Einstellungen der Season für einen Modus nicht passt (#2271). */
+function settingsRowProblem(form, label) {
+  for (const row of (form?.settings || []).filter((item) => !blank(item.label) || !blank(item.value))) {
+    const problem = settingProblem(row);
+    if (problem) return `Modus „${label}“: ${problem}`;
+  }
+  return "";
+}
+
+/** Je Modus, was die Season an Einstellungen speichert - `null` heißt keine. */
+export function settingsPayload(rows, forms) {
+  return Object.fromEntries(rows.map((row) => [row.mode, entryPayload(forms[row.mode])]));
+}
+
+// Je Modus die Einstellungen der Season: Abweichungen markiert, „Vom Spiel übernehmen“ holt die des Spiels.
+function SeasonModeSettings({ row, form, onChange, canEdit, id }) {
+  const own = entryPayload(form);
+  const diff = settingsDiff(own || {}, row.game_settings || {});
+  const missing = settingsMissing(own || {}, row.game_settings || {});
+  const textDiffers = String(own?.rules_text || "") !== String(row.game_settings?.rules_text || "");
+  const differs = Object.keys(diff).length > 0 || missing.length > 0 || textDiffers;
+  // Offen, sobald etwas abweicht - und offen, bis man es selbst schließt: „Vom Spiel übernehmen“ klappt die Werte nicht weg.
+  const [open, setOpen] = useState(differs);
+  useEffect(() => { if (differs) setOpen(true); }, [differs]);
+  if (!canEdit) {
+    if (!own) return null;
+    return (
+      <ul className="mt-2 space-y-0.5 text-xs text-white/70" data-testid={`${id}-settings-read`}>
+        {(own.settings || []).map((setting) => (
+          <li key={setting.key || setting.label}>{setting.group ? `${setting.group} · ` : ""}{setting.label}: {settingValueText(setting)}</li>
+        ))}
+        {own.rules_text ? <li className="text-white/55">{own.rules_text}</li> : null}
+      </ul>
+    );
+  }
+  return (
+    <details className="group mt-3 rounded-sm border border-white/10 bg-white/[0.02]" open={open} onToggle={(event) => setOpen(event.currentTarget.open)}
+      data-testid={`${id}-settings-box`}>
+      <summary className="tls-hit flex min-h-[44px] cursor-pointer list-none flex-wrap items-center gap-2 px-3 py-2 text-[11px] font-bold uppercase tracking-widest text-white/65 [&::-webkit-details-marker]:hidden">
+        Einstellungen und eigene Regeln
+        <span className="normal-case tracking-normal font-semibold text-white/45">{(own?.settings || []).length} Einstellungen</span>
+        {differs ? <span className="normal-case tracking-normal text-warn" data-testid={`${id}-settings-differs`}>weicht vom Spiel ab</span> : null}
+      </summary>
+      <div className="space-y-3 border-t border-white/10 p-3">
+        <ModeSettingsEditor value={form} onChange={onChange} diff={diff} testPrefix={`${id}-settings`} />
+        {missing.length ? (
+          <p className="text-xs text-warn" data-testid={`${id}-settings-missing`}>Das Spiel hat dazu: {missing.map((setting) => setting.label).join(", ")}.</p>
+        ) : null}
+        {differs && row.game_settings ? (
+          <button type="button" onClick={() => onChange(entryToForm(row.game_settings))} data-testid={`${id}-settings-adopt`}
+            className="tls-btn tls-btn--quiet rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider">Einstellungen vom Spiel übernehmen</button>
+        ) : null}
+      </div>
+    </details>
+  );
 }
 
 // `modes` (Season-Seite #2267): nur diese Modi zeigen - die Modi der Season. Gespeichert werden weiter die Regeln aller Modi.
 export function SeasonResultRulesPanel({ seasonId, canEdit = true, onSaved, modes }) {
   const [data, setData] = useState(null);
   const [rows, setRows] = useState({});
+  const [settings, setSettings] = useState({});
+  const [settingsTouched, setSettingsTouched] = useState(false);
   const [required, setRequired] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -62,6 +135,9 @@ export function SeasonResultRulesPanel({ seasonId, canEdit = true, onSaved, mode
       const rules = Array.isArray(body?.rules) ? body.rules : [];
       setData({ ...body, rules });
       setRows(Object.fromEntries(rules.map((row) => [row.mode, ruleToRow(row.season_rule)])));
+      // Ältere Seasons ohne Kopie (`settings_held: false`) zeigen die Werte des Spiels - gespeichert wird erst, wenn jemand etwas ändert.
+      setSettings(Object.fromEntries(rules.map((row) => [row.mode, entryToForm(body?.settings_held ? row.season_settings : row.game_settings)])));
+      setSettingsTouched(false);
       setRequired(Boolean(body?.scores_required));
       setError("");
     } catch (err) {
@@ -72,10 +148,14 @@ export function SeasonResultRulesPanel({ seasonId, canEdit = true, onSaved, mode
   useApiInvalidation(load, ["leagues"]);
 
   const set = (mode, patch) => setRows((current) => ({ ...current, [mode]: { ...current[mode], ...patch } }));
+  const setModeSettings = (mode, next) => {
+    setSettings((current) => ({ ...current, [mode]: next }));
+    setSettingsTouched(true);
+  };
 
   const save = async () => {
     for (const row of data.rules) {
-      const problem = rowProblem(rows[row.mode], row.label);
+      const problem = rowProblem(rows[row.mode], row.label) || settingsRowProblem(settings[row.mode], row.label);
       if (problem) {
         setError(problem);
         return;
@@ -85,7 +165,9 @@ export function SeasonResultRulesPanel({ seasonId, canEdit = true, onSaved, mode
     setSaving(true);
     try {
       const rules = Object.fromEntries(data.rules.map((row) => [row.mode, rowToRule(rows[row.mode])]).filter(([, rule]) => rule));
-      const { data: saved } = await api.put(`/admin/leagues/seasons/${seasonId}/result-rules`, { scores_required: required, rules });
+      const body = { scores_required: required, rules };
+      if (data.settings_held || settingsTouched) body.settings = settingsPayload(data.rules, settings);
+      const { data: saved } = await api.put(`/admin/leagues/seasons/${seasonId}/result-rules`, body);
       toast.success(saved.changed ? "Ergebnisregeln gespeichert." : "Keine Änderung.");
       onSaved?.(saved.staffeln_to_sync || 0);
       await load();
@@ -108,7 +190,7 @@ export function SeasonResultRulesPanel({ seasonId, canEdit = true, onSaved, mode
           return (
             <li key={row.mode} className="min-w-0 rounded-sm border border-white/10 bg-[#0A0A0A] p-3" data-testid={id}>
               <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <span className="font-bold text-white">{row.label}{row.status !== "active" ? <span className="ml-2 text-xs font-normal text-white/50">({row.status === "removed" ? "dem Spiel entfernt" : row.status === "inactive" ? "inaktiv" : "archiviert"})</span> : null}</span>
+                <span className="inline-flex min-w-0 items-center gap-2 font-bold text-white"><ModeIcon src={row.icon_url} size="sm" testId={`${id}-icon`} />{row.label}{row.status !== "active" ? <span className="ml-2 text-xs font-normal text-white/50">({row.status === "removed" ? "dem Spiel entfernt" : row.status === "inactive" ? "inaktiv" : "archiviert"})</span> : null}</span>
                 {row.differs ? <span className="text-xs font-bold text-warn" data-testid={`${id}-differs`}>weicht vom Spiel ab</span> : null}
               </div>
               <p className="mt-1 text-xs text-white/55 [overflow-wrap:anywhere]" data-testid={`${id}-game`}>Spiel: {resultRuleText(row.game_rule) || "keine Regel"}</p>
@@ -123,7 +205,12 @@ export function SeasonResultRulesPanel({ seasonId, canEdit = true, onSaved, mode
                       <TextField label="Höchstens Runden" type="number" min={1} max={999} value={form.limit} onChange={(value) => set(row.mode, { limit: value })} hint="leer: kein Limit" testId={`${id}-limit`} />
                     ) : null}
                     {form.kind ? (
-                      <TextField label="Zeitlimit (Min.)" type="number" min={1} max={600} value={form.time} onChange={(value) => set(row.mode, { time: value })} hint="leer: Map endet nur beim Ziel" testId={`${id}-time`} />
+                      <TextField label="Zeitlimit je Map" value={form.time} onChange={(value) => set(row.mode, { time: value })} placeholder="z. B. 10 oder 1:30"
+                        hint="Minuten, 1:30 oder 90 s; leer: Map endet nur beim Ziel" testId={`${id}-time`} />
+                    ) : null}
+                    {form.kind ? (
+                      <TextField label="Zeit je Runde" value={form.round} onChange={(value) => set(row.mode, { round: value })} placeholder="z. B. 1:45"
+                        hint="Nur Angabe für Regelwerk und Anzeige" testId={`${id}-round-time`} />
                     ) : null}
                   </div>
                   {form.kind ? (
@@ -140,6 +227,8 @@ export function SeasonResultRulesPanel({ seasonId, canEdit = true, onSaved, mode
               ) : (
                 <p className="mt-1 text-xs text-white/75" data-testid={`${id}-season`}>Season: {resultRuleText(row.season_rule) || "keine Regel"}</p>
               )}
+              <SeasonModeSettings row={row} form={settings[row.mode] || entryToForm(null)} onChange={(next) => setModeSettings(row.mode, next)}
+                canEdit={canEdit} id={id} />
             </li>
           );
         })}
