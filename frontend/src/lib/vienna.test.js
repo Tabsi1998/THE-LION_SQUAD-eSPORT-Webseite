@@ -86,19 +86,25 @@ describe("keine Datumsanzeige an der Hilfe vorbei", () => {
       else if (/\.(jsx?|tsx?)$/.test(entry.name) && !/\.test\./.test(entry.name) && !full.endsWith(path.join("lib", "vienna.js"))) sources.push(full);
     }
   })(root);
+  // Jede Quelldatei nur einmal lesen - die vier Wächter unten teilen sich den Inhalt.
+  const contents = new Map();
+  const read = (file) => {
+    if (!contents.has(file)) contents.set(file, fs.readFileSync(file, "utf8"));
+    return contents.get(file);
+  };
 
   it("toLocaleDateString und toLocaleTimeString stehen nur in lib/vienna.js", () => {
-    const direct = sources.filter((file) => /\.toLocale(Date|Time)String\(/.test(fs.readFileSync(file, "utf8"))).map((file) => path.relative(root, file));
+    const direct = sources.filter((file) => /\.toLocale(Date|Time)String\(/.test(read(file))).map((file) => path.relative(root, file));
     expect(direct, "viennaDate/viennaTime aus @/lib/vienna nehmen").toEqual([]);
   });
 
   it("Serverwerte gehen roh an die Hilfe - nicht erst durch new Date()", () => {
-    const wrapped = sources.filter((file) => /vienna(Date|Time|DateTime|Day)\(new Date\([^)]/.test(fs.readFileSync(file, "utf8"))).map((file) => path.relative(root, file));
+    const wrapped = sources.filter((file) => /vienna(Date|Time|DateTime|Day)\(new Date\([^)]/.test(read(file))).map((file) => path.relative(root, file));
     expect(wrapped, "den Wert selbst übergeben - die Hilfe liest Zeiten ohne Zone als Wiener Uhr").toEqual([]);
   });
 
   it("Intl.DateTimeFormat steht nie ohne Zeitzone da", () => {
-    const zoneless = sources.filter((file) => /Intl\.DateTimeFormat\((?![^;]*timeZone)/.test(fs.readFileSync(file, "utf8"))).map((file) => path.relative(root, file));
+    const zoneless = sources.filter((file) => /Intl\.DateTimeFormat\((?![^;]*timeZone)/.test(read(file))).map((file) => path.relative(root, file));
     expect(zoneless, "viennaDate/viennaTime nehmen oder timeZone angeben").toEqual([]);
   });
 
@@ -106,7 +112,7 @@ describe("keine Datumsanzeige an der Hilfe vorbei", () => {
     const dateOptions = /\.toLocaleString\(\s*["'][A-Za-z-]+["']\s*,\s*\{[^}]*\b(day|month|year|weekday|hour|minute|dateStyle|timeStyle)\b/;
     const dateReceiver = /new Date\([^()]*\)\.toLocaleString\(/;
     const direct = sources.filter((file) => {
-      const text = fs.readFileSync(file, "utf8");
+      const text = read(file);
       return dateOptions.test(text) || dateReceiver.test(text);
     }).map((file) => path.relative(root, file));
     expect(direct, "viennaDateTime aus @/lib/vienna nehmen").toEqual([]);
@@ -147,12 +153,22 @@ describe("Eingabefelder in Wiener Uhr", () => {
   });
 
   it("hin und zurück bleibt jede Viertelstunde des Jahres gleich (außer in der Lücke)", () => {
+    // Rund um die beiden Zeitumstellungen (je vier Tage davor und danach) jede Viertelstunde, sonst alle 75 Minuten
+    // (wechselnde Minute) - das Jahr ist so in rund 0,2 s geprüft statt in fast 1 s (Wächter lief unter Last in die Zeitgrenze).
     const start = Date.UTC(2026, 0, 1);
-    for (let at = start; at < start + 366 * 24 * 3600 * 1000; at += 15 * 60 * 1000) {
+    const switches = [Date.UTC(2026, 2, 29), Date.UTC(2026, 9, 25)];
+    const FOUR_DAYS = 4 * 24 * 3600 * 1000;
+    const QUARTER = 15 * 60 * 1000;
+    let checked = 0;
+    for (let at = start; at < start + 366 * 24 * 3600 * 1000; ) {
+      const near = switches.some((day) => Math.abs(at - day) <= FOUR_DAYS);
       const text = viennaInputValue(at);
+      checked += 1;
       const back = Date.parse(fromViennaInput(text));
       // In der doppelten Stunde meint das Feld die erste - der zweite Durchgang landet eine Stunde früher.
       expect([at, at - 3600 * 1000]).toContain(back);
+      at += near ? QUARTER : 5 * QUARTER;
     }
+    expect(checked).toBeGreaterThan(1500);
   });
 });

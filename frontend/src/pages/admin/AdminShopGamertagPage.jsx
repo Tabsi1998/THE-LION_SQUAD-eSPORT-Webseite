@@ -235,7 +235,13 @@ function toPayload(values) {
 function RulesForm({ data, busy, onSave }) {
   const [values, setValues] = useState(data.rules);
   const [reason, setReason] = useState("");
-  useEffect(() => setValues(data.rules), [data.rules]);
+  // Nur wenn der Server neue Regeln liefert (nach dem Speichern), das Formular neu füllen - nicht schon beim ersten Anzeigen,
+  // sonst überschreibt der verspätete Abgleich Eingaben, die schon getippt wurden.
+  const [seenRules, setSeenRules] = useState(data.rules);
+  if (seenRules !== data.rules) {
+    setSeenRules(data.rules);
+    setValues(data.rules);
+  }
   const set = (key, value) => setValues((now) => ({ ...now, [key]: value }));
   const payload = toPayload(values);
   const numbersValid = NUMBER_FIELDS.every((field) => Number.isFinite(payload[field.key]) && payload[field.key] > 0);
