@@ -8,6 +8,7 @@ import { SelectField, TextAreaField, TextField } from "@/components/tls/FormFiel
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { equipmentPayload, equipmentToForm, matchesSearch, roleOf, ROLE_HINTS, statusOf } from "@/lib/loadoutBans";
 import { toast } from "sonner";
+import { useReportDirty } from "./useReportDirty";
 
 function WeaponPicker({ weapons, value, onChange }) {
   const [search, setSearch] = useState("");
@@ -40,9 +41,11 @@ function WeaponPicker({ weapons, value, onChange }) {
   );
 }
 
-export function EquipmentItemSheet({ game, categories, items, item, initialCategory, onClose, onSaved }) {
-  const [form, setForm] = useState(() => ({ ...equipmentToForm(item), category: item?.category || initialCategory || categories[0]?.key || "" }));
+export function EquipmentItemSheet({ game, categories, items, item, initialCategory, onClose, onSaved, onDirtyChange }) {
+  const [initial] = useState(() => ({ ...equipmentToForm(item), category: item?.category || initialCategory || categories[0]?.key || "" }));
+  const [form, setForm] = useState(initial);
   const [saving, setSaving] = useState(false);
+  useReportDirty(JSON.stringify(form) !== JSON.stringify(initial), onDirtyChange);
   const role = roleOf(categories, form.category);
   const weapons = useMemo(() => {
     const keys = new Set(categories.filter((row) => row.role === "weapon").map((row) => row.key));

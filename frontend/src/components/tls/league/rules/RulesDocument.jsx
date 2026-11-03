@@ -3,7 +3,7 @@
 import { Fragment, forwardRef, useMemo } from "react";
 import { Link2 } from "lucide-react";
 import { toast } from "sonner";
-import { changeRows, renderRulesMarkdown } from "@/lib/leagueRules";
+import { changeRows, renderRulesSection } from "@/lib/leagueRules";
 import "./rules.css";
 
 const MARK_WORD = { new: "Neu", changed: "Geändert" };
@@ -15,7 +15,7 @@ function copyLink(anchor) {
 }
 
 function Section({ row, marks, versionLabel, annexStart }) {
-  const html = useMemo(() => renderRulesMarkdown(row.body_md), [row.body_md]);
+  const html = useMemo(() => renderRulesSection(row.body_md), [row.body_md]);
   const mark = marks ? row.mark : null;
   const Heading = `h${Math.min(row.level + 1, 4)}`;
   return (

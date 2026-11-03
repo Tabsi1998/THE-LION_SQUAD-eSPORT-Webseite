@@ -6,6 +6,7 @@ import { AdminSheet } from "@/components/tls/AdminSheet";
 import { SelectField } from "@/components/tls/FormFields";
 import { countText } from "@/lib/loadoutBans";
 import { toast } from "sonner";
+import { useReportDirty } from "./useReportDirty";
 
 export function equipmentImportText(result) {
   const created = result?.created?.length || 0;
@@ -15,12 +16,20 @@ export function equipmentImportText(result) {
   return parts.join(" ");
 }
 
-export function EquipmentImportSheet({ game, onClose, onDone }) {
+function samePicks(left, right) {
+  return left.length === right.length && left.every((id) => right.includes(id));
+}
+
+export function EquipmentImportSheet({ game, onClose, onDone, onDirtyChange }) {
   const [sources, setSources] = useState(null);
   const [sourceId, setSourceId] = useState("");
+  const [firstSource, setFirstSource] = useState("");
   const [candidates, setCandidates] = useState(null);
   const [picked, setPicked] = useState([]);
+  const [suggested, setSuggested] = useState([]);
   const [saving, setSaving] = useState(false);
+  // Ungespeichert (#2218): ein anderes Spiel gewählt oder die Auswahl geändert - die geladene Vorauswahl selbst ist keine Änderung.
+  useReportDirty(sources !== null && (sourceId !== firstSource || (candidates !== null && !samePicks(picked, suggested))), onDirtyChange);
 
   useEffect(() => {
     let live = true;
@@ -30,6 +39,7 @@ export function EquipmentImportSheet({ game, onClose, onDone }) {
         const rows = Array.isArray(data) ? data : [];
         setSources(rows);
         setSourceId(rows[0]?.id || "");
+        setFirstSource(rows[0]?.id || "");
       })
       .catch((err) => { if (live) { setSources([]); toast.error(formatApiError(err.response?.data?.detail)); } });
     return () => { live = false; };
@@ -43,8 +53,10 @@ export function EquipmentImportSheet({ game, onClose, onDone }) {
       .then(({ data }) => {
         if (!live) return;
         const rows = Array.isArray(data?.items) ? data.items : [];
+        const free = rows.filter((row) => !row.exists).map((row) => row.id);
         setCandidates(rows);
-        setPicked(rows.filter((row) => !row.exists).map((row) => row.id));
+        setPicked(free);
+        setSuggested(free);
       })
       .catch((err) => { if (live) { setCandidates([]); toast.error(formatApiError(err.response?.data?.detail)); } });
     return () => { live = false; };
