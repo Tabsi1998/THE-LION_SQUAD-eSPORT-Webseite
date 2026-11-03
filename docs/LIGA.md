@@ -1168,6 +1168,8 @@ Für F.1: `league_schedule.open_overdue(db, season_id)` liefert die offenen Fäl
 `scheduled_at`, `window {start, end}`, `remaining`, `request_until`, `can_request`, `request_hint` (warum nicht), `requests[]` mit Namen und
 `can_answer`/`can_withdraw`, `history[]` mit Namen, `home_rule_at` (wann ein offener Heimvorschlag gilt), `can_lead_set`, `own_registration_id`.
 
+**Datenschutz:** Anträge und Historie stehen nur in `matches_v2` (keine eigene Sammlung). Auskunft `league_schedule` (`league_schedule.export_snapshot`): je Spiel die eigenen Anträge mit Grund, als Seite entschiedene nur mit der eigenen Antwort, als Leitung nur Vorgang, Stand und Zeit; Historie ebenso, Einträge der Leitung nur Art und Zeit. Kontolöschung (`league_schedule.scrub_person`): `requested_by`, `decided_by`, `approvals[].user_id`, `schedule_history[].by` und `.requested_by` werden `null`, Termin und Grund bleiben.
+
 **Aufgaben:** `me.actions[]` `type: "match_reschedule"` („Verschiebung beantworten“, `target_type: "match"`) für die andere Seite eines offenen
 Antrags. **Mein Dienst** (`/api/users/me/duty`): `overdue_matches[]` für Liga-Leitung mit `matches` oder `results` (Spiel, Staffel, Termin,
 seit wann) und `ended_live[]` (siehe unten).

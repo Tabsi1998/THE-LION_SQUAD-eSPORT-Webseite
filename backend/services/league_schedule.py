@@ -606,3 +606,77 @@ async def open_overdue(db, season_id: str) -> list[dict]:
     return await db.matches_v2.find(overdue_query(tournament_ids), {
         "_id": 0, "id": 1, "tournament_id": 1, "scheduled_at": 1, "result_overdue_at": 1, "round": 1, "matchday_number": 1,
         "slots": 1, "status": 1}).sort("scheduled_at", 1).to_list(1000)
+
+
+# ---------------------------------------------------------------- Datenschutz (Auskunft, Kontolöschung)
+
+def privacy_query(user_id: str) -> dict:
+    """Spiele, in deren Anträgen oder Historie die Person steht."""
+    return {"$or": [{"reschedule_requests.requested_by": user_id}, {"reschedule_requests.decided_by": user_id},
+                    {"reschedule_requests.approvals.user_id": user_id}, {"schedule_history.by": user_id},
+                    {"schedule_history.requested_by": user_id}]}
+
+
+def _export_request(row: dict, user_id: str) -> dict | None:
+    """Eigener Antrag mit Grund; als Seite entschieden nur die eigene Antwort; als Leitung (ohne Seite) nur der Vorgang."""
+    if row.get("requested_by") == user_id:
+        return {"id": row.get("id"), "role": "requested", "status": row.get("status"), "from_at": row.get("from_at"),
+                "to_at": row.get("to_at"), "reason": row.get("reason"), "at": row.get("requested_at")}
+    if row.get("decided_by") == user_id and row.get("decided_registration_id"):
+        return {"id": row.get("id"), "role": "decided", "status": row.get("status"), "from_at": row.get("from_at"),
+                "to_at": row.get("to_at"), "decision_note": row.get("decision_note"), "at": row.get("decided_at")}
+    if row.get("decided_by") == user_id:
+        return {"id": row.get("id"), "role": "lead", "status": row.get("status"), "at": row.get("decided_at")}
+    if any((approval or {}).get("user_id") == user_id for approval in row.get("approvals") or []):
+        return {"id": row.get("id"), "role": "approved", "status": row.get("status"), "at": row.get("decided_at")}
+    return None
+
+
+def _export_history(entry: dict, user_id: str) -> dict | None:
+    if entry.get("requested_by") == user_id:
+        return {"kind": entry.get("kind"), "at": entry.get("at"), "from": entry.get("from"), "to": entry.get("to"),
+                "reason": entry.get("reason")}
+    if entry.get("by") != user_id:
+        return None
+    if not entry.get("registration_id"):
+        return {"kind": entry.get("kind"), "at": entry.get("at")}  # als Leitung: der Vorgang ohne Inhalt
+    return {"kind": entry.get("kind"), "at": entry.get("at"), "from": entry.get("from"), "to": entry.get("to")}
+
+
+async def export_snapshot(db, user_id: str) -> list[dict]:
+    """Für die Auskunft (``league_schedule``): je Spiel die eigenen Anträge und Schritte - ohne Kennungen anderer."""
+    out = []
+    for match in await db.matches_v2.find(privacy_query(user_id), {
+            "_id": 0, "id": 1, "tournament_id": 1, "reschedule_requests": 1, "schedule_history": 1}).to_list(None):
+        requests = [row for row in (_export_request(row, user_id) for row in match.get("reschedule_requests") or [] if isinstance(row, dict)) if row]
+        history = [row for row in (_export_history(row, user_id) for row in match.get("schedule_history") or [] if isinstance(row, dict)) if row]
+        if requests or history:
+            out.append({"match_id": match.get("id"), "tournament_id": match.get("tournament_id"), "requests": requests, "history": history})
+    return out
+
+
+async def scrub_person(db, user_id: str) -> int:
+    """Kontolöschung: Anträge und Historie bleiben (sportlicher Ablauf, Gründe), die Kennung der Person fällt heraus."""
+    done = 0
+    for match in await db.matches_v2.find(privacy_query(user_id), {"_id": 0, "id": 1, "reschedule_requests": 1,
+                                                                    "schedule_history": 1}).to_list(None):
+        requests = []
+        for row in match.get("reschedule_requests") or []:
+            row = dict(row)
+            for key in ("requested_by", "decided_by"):
+                if row.get(key) == user_id:
+                    row[key] = None
+            row["approvals"] = [{**approval, "user_id": None} if (approval or {}).get("user_id") == user_id else approval
+                                for approval in row.get("approvals") or []]
+            requests.append(row)
+        history = [{**entry, **{key: None for key in ("by", "requested_by") if entry.get(key) == user_id}}
+                   for entry in match.get("schedule_history") or []]
+        update = {}
+        if "reschedule_requests" in match:
+            update["reschedule_requests"] = requests
+        if "schedule_history" in match:
+            update["schedule_history"] = history
+        if update:
+            await db.matches_v2.update_one({"id": match["id"]}, {"$set": update})
+            done += 1
+    return done
