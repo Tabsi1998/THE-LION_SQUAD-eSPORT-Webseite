@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.62.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.61.0...v1.62.0) (2026-11-03)
+
+
+### Neu
+
+* Ergebnisregel übergehen durch die Liga-Leitung mit Grund ([#1617](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1617)) ([28e8817](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/28e8817b02805259ec2d368a8851ec08e443121d))
+* Ergebnisregeln und Punktepflicht in den Season-Einstellungen ([#1617](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1617)) ([28e8817](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/28e8817b02805259ec2d368a8851ec08e443121d))
+* Liga prüft den Endstand je Map gegen Ergebnisregel und Sieger ([#1617](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1617)) ([28e8817](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/28e8817b02805259ec2d368a8851ec08e443121d))
+* Matchseite und Ligaseite zeigen wiederholte, zugesprochene und nicht gespielte Maps ([#1617](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1617)) ([28e8817](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/28e8817b02805259ec2d368a8851ec08e443121d))
+* Meldeformular zeigt die Ergebnisregel je Map und prüft vorab ([#1617](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1617)) ([28e8817](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/28e8817b02805259ec2d368a8851ec08e443121d))
+* Season hält die Ergebnisregeln der Modi fest, Punkte je Map Pflicht ([#1617](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1617)) ([28e8817](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/28e8817b02805259ec2d368a8851ec08e443121d))
+
 ## 1.61.0 (03.11.2026)
 
 ### Neu
