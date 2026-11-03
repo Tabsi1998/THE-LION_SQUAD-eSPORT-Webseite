@@ -3,6 +3,7 @@
 import { fromViennaInput, viennaDay } from "@/lib/vienna";
 import { applicationPayload, applicationToForm } from "@/lib/leagueApplications";
 import { prizesPayload, prizesToForm } from "@/lib/leagueLook";
+import { divisionPlatformPayload, divisionPlatformToForm } from "@/lib/leaguePlatform";
 
 export const VISIBILITY_OPTIONS = [
   ["off", "Aus – niemand sieht die Liga"],
@@ -204,7 +205,8 @@ export function overridesPayload(form) {
   if (form.points_win !== "" || form.points_draw !== "" || form.points_loss !== "") {
     out.scoring_rules = { match_points: { win: number(form.points_win) ?? 3, draw: number(form.points_draw) ?? 1, loss: number(form.points_loss) ?? 0 } };
   }
-  return out;
+  // Plattform je Season (#2270): mitschicken, sonst ginge die Abweichung der Liga N beim nächsten Speichern verloren.
+  return { ...out, ...divisionPlatformPayload(form) };
 }
 
 export function overridesToForm(overrides = {}) {
@@ -218,6 +220,7 @@ export function overridesToForm(overrides = {}) {
     points_win: points ? String(points.win) : "",
     points_draw: points ? String(points.draw) : "",
     points_loss: points ? String(points.loss) : "",
+    ...divisionPlatformToForm(overrides),
   };
 }
 

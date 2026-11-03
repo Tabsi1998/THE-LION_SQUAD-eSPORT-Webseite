@@ -286,6 +286,27 @@ test("Liga N bearbeiten schickt den Stand mit, Antwortfrist je Liga N und als Se
   await waitFor(() => expect(apiMock.patch).toHaveBeenLastCalledWith("/admin/leagues/seasons/s1", expect.objectContaining({ match_schedule_response_hours: 48 })));
 });
 
+test("Plattform je Season (#2270): eigener Kasten, Liga N weicht im Blatt ab und behält die Abweichung beim Speichern", async () => {
+  const platform = { settings: { platform_field: "platform", allowed_platforms: ["PC"], crossplay: null, input_device: null },
+    fields: [{ key: "platform", label: "Plattform", options: ["PC", "PlayStation"], retired: [], required: true }], field_missing: false,
+    input_devices: [], game: { id: "g1", name: "Probe Shooter" }, divisions: [] };
+  const body = { ...BODY, divisions: [{ ...BODY.divisions[0], overrides: { allowed_platforms: ["PlayStation"], crossplay: false } }] };
+  apiMock.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith("/platform") ? platform : url.endsWith("/readiness") ? READINESS : body }));
+  apiMock.patch.mockResolvedValue({ data: {} });
+  renderPage();
+
+  expect(await screen.findByTestId("season-platform")).toBeInTheDocument();
+  fireEvent.click(await screen.findByTestId("division-edit-1"));
+  const sheet = screen.getByTestId("division-sheet");
+  expect(await within(sheet).findByTestId("override-platform-own")).toBeChecked();
+  expect(within(sheet).getByTestId("override-platforms-PlayStation")).toBeChecked();
+  fireEvent.change(within(sheet).getByTestId("override-best-of"), { target: { value: "5" } });
+  fireEvent.click(within(sheet).getByTestId("division-save"));
+
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/admin/leagues/divisions/d1",
+    { nickname: null, overrides: { best_of: 5, allowed_platforms: ["PlayStation"], crossplay: false }, status: "active" }));
+});
+
 test("Fehler beim Anlegen der Staffel steht als Meldung da", async () => {
   apiMock.post.mockRejectedValueOnce({ response: { data: { detail: "Mit bis zu 9 Teams braucht die Staffel 9 Spielwochen" } } });
   renderPage();
