@@ -27,6 +27,7 @@ import { MatchReportForm } from "@/components/tls/tournament/MatchReportForm";
 import { LeagueReportForm } from "@/components/tls/league/LeagueReportForm";
 import { defaultTimeText, lineupAmendClosed, sidesInSlotOrder } from "@/components/tls/league/leagueGames";
 import { LeagueGamesView, LeagueLobbyIds, LineupAmendForm, StaffLineupAmend } from "@/components/tls/league/LeagueGamesView";
+import { ScheduleChangePanel } from "@/components/tls/league/ScheduleChangePanel";
 import { LiveQueueStatus } from "@/components/tls/live/LiveQueueStatus";
 import { MatchCallBox } from "@/components/tls/tournament/MatchCallBox";
 import { ProblemReportForm } from "@/components/tls/results/ProblemReportForm";
@@ -576,7 +577,7 @@ function MatchPageView() {
                 </form>
               ) : showFixedScheduleNotice ? (
                 <p className="mt-3 text-sm text-white/55">Termin und Station werden durch die Turnierleitung festgelegt. Rückfragen bitte im Matchchat mit <button type="button" onClick={addStaffMention} className="text-[#29B6E8] font-bold hover:text-white">@leitung</button> markieren.</p>
-              ) : (
+              ) : data.schedule_block?.fixed ? null : (
                 <p className="mt-3 text-sm text-white/50">Termine können Teilnehmer, Team-Captains und Turnierleitung vorschlagen, sofern die Terminabstimmung aktiv ist.</p>
               )}
 
@@ -616,8 +617,10 @@ function MatchPageView() {
                   </div>
                   );
                 })}
-                {!latestProposal && (data.schedule_proposals || []).length === 0 && <div className="text-sm text-white/40">Noch kein Terminvorschlag vorhanden.</div>}
+                {!latestProposal && (data.schedule_proposals || []).length === 0 && !data.schedule_block?.fixed && <div className="text-sm text-white/40">Noch kein Terminvorschlag vorhanden.</div>}
               </div>
+              {/* Liga-Termine (#2194): Verschiebung, Grenzen und Verlauf - nur Beteiligte und Leitung bekommen den Block. */}
+              <ScheduleChangePanel block={data.schedule_block} matchId={id} busy={busy} run={runAction} onChanged={() => load({ preserveDrafts: false })} onAskLead={canUseChat ? askStaff : null} />
             </div>
             )}
           </div>

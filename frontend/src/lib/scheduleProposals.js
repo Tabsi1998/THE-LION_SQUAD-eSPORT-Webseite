@@ -13,6 +13,9 @@ export const PROPOSAL_STATUS_LABELS = {
 export function proposalStatusLabel(proposal) {
   const status = String(proposal?.status || "");
   if (status === "pending" && proposal?.kind === "counter") return "Gegenvorschlag, offen";
+  // Liga-Termine (#2194): nach der Frist ohne Antwort gilt der Heimvorschlag; die übrigen sind damit erledigt.
+  if (status === "accepted" && proposal?.decision_rule === "home_rule") return "gilt nach der 72-h-Regel";
+  if (status === "declined" && proposal?.decision_rule) return "erledigt – anderer Termin steht";
   return PROPOSAL_STATUS_LABELS[status] || "unbekannt";
 }
 
