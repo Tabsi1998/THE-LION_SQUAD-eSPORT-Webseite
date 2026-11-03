@@ -1,5 +1,38 @@
 # Changelog
 
+## [1.61.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.60.0...v1.61.0) (2026-11-03)
+
+
+### Neu
+
+* Beim Deaktivieren oder Archivieren einer Map nennt eine Rückfrage die Seasons, in deren Map-Pool sie steht ([#2207](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2207)) ([0978a41](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/0978a41a6bacd92e9f484239774c2d39c29f478b))
+* Datenschutz: Verschiebungsanträge und Termin-Verlauf in Auskunft und Kontolöschung ([#2194](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2194)) ([08d7177](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/08d7177247a8997df80a50fe6ae022292f906fbe))
+* Liga-Termine: Erinnerung bei nie gemeldeten Spielen, danach „überfällig“ bei der Liga-Leitung in Mein Dienst ([#2194](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2194)) ([08d7177](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/08d7177247a8997df80a50fe6ae022292f906fbe))
+* Liga-Termine: Termin-Verlauf am Spiel und „Termin festlegen“ der Liga-Leitung mit Grund ([#2194](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2194)) ([08d7177](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/08d7177247a8997df80a50fe6ae022292f906fbe))
+* Liga-Termine: unbeantworteter Terminvorschlag der Heimseite gilt nach 72 Stunden (je Season einstellbar) ([#2194](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2194)) ([08d7177](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/08d7177247a8997df80a50fe6ae022292f906fbe))
+* Liga-Termine: Verschiebung mit Grund beantragen, die Gegenseite stimmt zu, Grenzen im Klartext auf der Matchseite ([#2194](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2194)) ([08d7177](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/08d7177247a8997df80a50fe6ae022292f906fbe))
+* Liga: „Modus je Map“ muss so lang sein wie die längste Serie der Season ([#2207](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2207)) ([0978a41](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/0978a41a6bacd92e9f484239774c2d39c29f478b))
+* Liga: „Nur Liga-Leitung“ ist Vorschau, die Prüfung vor der Veröffentlichung greift erst bei „Nur Mitglieder“ oder „Öffentlich“ ([#2207](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2207)) ([0978a41](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/0978a41a6bacd92e9f484239774c2d39c29f478b))
+* Liga: Map in einem Schritt aus dem Pool der Season nehmen und auf alle Staffeln übertragen, mit Grund im Protokoll ([#2207](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2207)) ([0978a41](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/0978a41a6bacd92e9f484239774c2d39c29f478b))
+* Liga: Mindestgröße je Modus im Map-Pool, abgeleitet und je Season überschreibbar, mit Warnung beim Speichern ([#2207](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2207)) ([0978a41](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/0978a41a6bacd92e9f484239774c2d39c29f478b))
+* Liga: Prüfung vor der Veröffentlichung – eine Season mit Problemen lässt sich nicht sichtbar schalten, Notausnahme nur für den Superadmin ([#2207](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2207)) ([0978a41](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/0978a41a6bacd92e9f484239774c2d39c29f478b))
+* Liga: Zwei Versionen des Map-Pools einer Season vergleichen ([#2207](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2207)) ([0978a41](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/0978a41a6bacd92e9f484239774c2d39c29f478b))
+* Maps lassen sich deaktivieren – sie kommen in keinen neuen Pool, wo sie schon stehen bleiben sie gültig ([#2207](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2207)) ([0978a41](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/0978a41a6bacd92e9f484239774c2d39c29f478b))
+* Mein Dienst und Turnierliste: Hinweis „Läuft laut Stand noch, Ende war am … – beenden?“ ([#2194](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2194)) ([08d7177](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/08d7177247a8997df80a50fe6ae022292f906fbe))
+* Startseite: Aufgabe „Verschiebung beantworten“ für Captain und Vertreter ([#2194](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2194)) ([08d7177](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/08d7177247a8997df80a50fe6ae022292f906fbe))
+* Turniere laufen nach dem eingetragenen Ende öffentlich weiter, solange Spiele offen sind ([#2194](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2194)) ([08d7177](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/08d7177247a8997df80a50fe6ae022292f906fbe))
+* Verwaltung: Terminregeln je Season (72-h-Regel, Verschiebungen, Erinnerung, überfällig) ([#2194](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2194)) ([08d7177](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/08d7177247a8997df80a50fe6ae022292f906fbe))
+
+
+### Fehlerbehebungen
+
+* „Aus Spiel übernehmen“ zählt Maps ohne Zustand als aktiv ([#2207](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2207)) ([0978a41](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/0978a41a6bacd92e9f484239774c2d39c29f478b))
+
+
+### Dokumentation
+
+* Handbuch Liga-Leitung und Captains: Termine, Verschiebung, überfällige Spiele ([#2194](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2194)) ([08d7177](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/08d7177247a8997df80a50fe6ae022292f906fbe))
+
 ## 1.60.0 (03.11.2026)
 
 ### Neu
