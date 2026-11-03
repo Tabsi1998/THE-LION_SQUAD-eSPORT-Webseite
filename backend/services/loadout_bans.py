@@ -21,7 +21,7 @@ from models import GAME_MODES_MAX, new_id, now_utc
 from services import game_equipment as library
 from services import game_maps, game_modes
 from services.game_equipment import ARCHIVED, ATTACHMENT, INACTIVE, WEAPON, EquipmentProblem
-from services.league_rule_blocks import text_cell
+from services.markdown_text import text_cell
 
 SEASON, TOURNAMENT = "league_season", "tournament"
 SCOPES = (SEASON, TOURNAMENT)

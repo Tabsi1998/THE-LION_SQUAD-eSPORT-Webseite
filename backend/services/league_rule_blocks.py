@@ -12,24 +12,14 @@ from dataclasses import dataclass
 from typing import Awaitable, Callable
 
 from services import game_maps, map_pools
+from services.markdown_text import text_cell
 
 # Steht, wo ein Baustein zu einer Season gehört, die Seite aber keine hat oder die Season erst später dazukam.
 NO_SEASON_HINT = "*Dieser Baustein gilt je Season - er steht auf den Regeln der jeweiligen Season.*"
 NOT_FROZEN_HINT = "*Für diese Season noch nicht festgehalten.*"
 
 
-# Zeichen, die im Markdown von Web (markdownLite, Option ``escapes``) und PDF (``pdf_rules_inline``) etwas auslösen. Ein Name aus Bibliothek
-# oder Modus ist Text: Davor steht ein Backslash, beide Darstellungen zeigen das Zeichen dann so, wie es ist (Review #2218).
-MARKDOWN_SPECIAL = "\\`*_[]()!~+"
-
-
-def text_cell(value) -> str:
-    """Ein Name als Markdown-Text: Leerraum zusammengefasst, ein senkrechter Strich (zerlegte sonst die Tabelle) wird „/“, alle übrigen
-    Steuerzeichen bekommen einen Backslash - so wird „[x](https://…)“ nie ein Link und „**x**“ nie fett."""
-    text = " ".join(str(value or "").replace("|", "/").split())
-    return "".join(f"\\{char}" if char in MARKDOWN_SPECIAL else char for char in text)
-
-
+# Namen aus Bibliothek oder Modus sind Text (Review #2218): ``text_cell`` maskiert die Steuerzeichen (Blatt-Modul ``markdown_text``).
 _cell = text_cell
 
 
