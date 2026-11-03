@@ -46,6 +46,7 @@ from routes.league_routes import admin_router as league_admin_router, router as 
 from routes.league_roster_routes import admin_router as league_roster_admin_router, me_router as league_roster_me_router
 from routes.league_application_routes import admin_router as league_application_admin_router, me_router as league_application_me_router, router as league_application_router
 from routes.league_rules_routes import admin_router as league_rules_admin_router, router as league_rules_router
+from routes.league_table_routes import admin_router as league_table_admin_router
 from routes.game_server_routes import router as game_server_router
 from routes.access_link_routes import router as access_link_router
 from routes.admin_picker_routes import router as admin_picker_router
@@ -359,6 +360,7 @@ app.include_router(league_application_me_router)  # Stand der eigenen Co-Teams (
 app.include_router(league_application_router)  # Selbstanmeldung: einreichen, zurückziehen (#2205)
 app.include_router(league_rules_admin_router)  # Regelwerk pflegen (docs/LIGA.md, #1646)
 app.include_router(league_rules_router)  # Regelwerk lesen, PDF, Zustimmung (#1646)
+app.include_router(league_table_admin_router)  # Tabelle: Entscheid der Leitung, beide nicht erschienen (#1625)
 app.include_router(game_server_router)
 app.include_router(access_link_router)
 app.include_router(admin_picker_router)

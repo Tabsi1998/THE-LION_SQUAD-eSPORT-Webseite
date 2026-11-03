@@ -65,6 +65,8 @@ def public_match(match: dict, names: dict, scheduled: dict | None = None) -> dic
         "away": _side(match, 1, names, results if done else {}),
         "winner_registration_id": winner if done else None,
         "forfeit": bool(match.get("forfeit_registration_id")) or match.get("status") == "forfeit",
+        # Beide nicht erschienen (E.1, #1625): beide verlieren, kein Sieger.
+        "double_forfeit": bool(match.get("double_forfeit")) and match.get("status") == "forfeit",
         "games": [{key: game.get(key) for key in PUBLIC_GAME_FIELDS}
                   for game in sorted(match.get("games") or [], key=lambda game: game.get("position") or 0)
                   if isinstance(game, dict)] if done else [],

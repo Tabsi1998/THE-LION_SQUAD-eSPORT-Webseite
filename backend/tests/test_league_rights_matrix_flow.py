@@ -142,6 +142,12 @@ ROUTES = [
     route("POST", "/api/tournaments/{tid}/matches-v2/recalculate-advancement", "results"),
     route("POST", "/api/matches/{match}/dispute/decision", "disputes", {"decision": "keep", "note": "Bleibt so"}),
     route("POST", "/api/matches/{match}/dispute", "disputes", {"reason": "Falsches Ergebnis"}),
+    # Tabelle (E.1, #1625): Entscheid der Leitung, beide nicht erschienen
+    route("GET", "/api/admin/leagues/staffeln/{tid}/table", ANY),
+    route("PUT", "/api/admin/leagues/staffeln/{tid}/table-decision", "results", {"registration_ids": ["x", "y"], "reason": "Grund genug"}),
+    route("DELETE", "/api/admin/leagues/staffeln/{tid}/table-decision/nix", "results", DELETE_BODY),
+    route("POST", "/api/admin/leagues/staffeln/{tid}/matches/{match}/double-no-show", "results", {"note": "Beide nicht da"}),
+    route("DELETE", "/api/admin/leagues/staffeln/{tid}/matches/{match}/double-no-show", "results", DELETE_BODY),
     # PDF
     route("GET", "/api/exports/tournaments/{tid}/participants.pdf", ANY),
     route("GET", "/api/exports/tournaments/{tid}/checkin.pdf", ANY),

@@ -85,7 +85,8 @@ async def test_the_season_page_lists_divisions_and_staffeln_with_tournament_ids(
     page = (await flow.get("/api/leagues/probe-shooter/season-1")).json()
     assert page["league"]["name"] == "Probe-Liga"
     assert page["season"]["rules_text"] == "Regeltext"
-    assert page["season"]["match_points"] == {"win": 3, "draw": 1, "loss": 0}
+    # Neue Seasons ohne Remis (E.1, #1625): 3/0/0.
+    assert page["season"]["match_points"] == {"win": 3, "draw": 0, "loss": 0}
     assert "visibility" not in page["season"] and "created_by" not in page["season"]
     division = page["divisions"][0]
     assert division["label"] == "Liga 1 · Elite"
