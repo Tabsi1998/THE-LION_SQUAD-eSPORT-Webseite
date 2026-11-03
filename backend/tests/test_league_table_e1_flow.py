@@ -229,3 +229,43 @@ async def test_both_no_show_lose_and_the_lead_can_set_the_game_again(flow):
     await result(flow, other, 2, 1)
     refused = await flow.post(f"{TABLE}/{staffel['id']}/matches/{other['id']}/double-no-show", json={"note": "Beide nicht da"})
     assert refused.status_code == 409
+
+
+NOTE = {"note": "Beide Teams nicht in der Lobby"}
+
+
+@pytest.mark.asyncio
+async def test_both_no_show_only_before_the_game_starts_and_with_the_side_effects(flow, monkeypatch):
+    """Codex zu E.1: nicht nach Spielbeginn, nicht mit Meldung oder gehaltenem Ergebnis - und dieselben Nebenwirkungen wie
+    beim kampflos (Station frei, Discord vorgemerkt), auch beim Neu ansetzen."""
+    from services import discord_bracket, station_runtime
+
+    _admin, _league, staffel = await setup(flow)
+    refreshed, released = [], []
+    monkeypatch.setattr(discord_bracket, "request_refresh", lambda tid: refreshed.append(tid))
+
+    async def release(_db, match, _collection):
+        released.append(match["id"])
+    monkeypatch.setattr(station_runtime, "release_station_for_match", release)
+    first, second = (await matches_of(flow, staffel, 1))[:2]
+    side = first["slots"][0]["registration_id"]
+    url = f"{TABLE}/{staffel['id']}/matches/{first['id']}/double-no-show"
+    original = await flow.db.matches_v2.find_one({"id": first["id"]}, {"_id": 0})
+    for change in ({"status": "in_progress", "started_at": now_utc().isoformat()}, {"status": "waiting_result"},
+                   {"started_at": now_utc().isoformat()},
+                   {"reports": [{"registration_id": side, "results": [{"registration_id": side, "rank": 1}]}]},
+                   {"pending_result": {"id": "hold-1", "results": []}}):
+        await flow.db.matches_v2.update_one({"id": first["id"]}, {"$set": change})
+        refused = await flow.post(url, json=NOTE)
+        assert refused.status_code == 409, change
+        await flow.db.matches_v2.replace_one({"id": first["id"]}, dict(original))
+    assert refreshed == [] and released == []
+
+    await flow.db.matches_v2.update_one({"id": second["id"]}, {"$set": {"station_id": "station-1"}})
+    url = f"{TABLE}/{staffel['id']}/matches/{second['id']}/double-no-show"
+    response = await flow.post(url, json=NOTE)
+    assert response.status_code == 200, response.text
+    assert released == [second["id"]] and refreshed == [staffel["id"]]
+    undone = await flow.client.request("DELETE", url, json={"reason": "Neuer Termin vereinbart"})
+    assert undone.status_code == 200, undone.text
+    assert refreshed == [staffel["id"], staffel["id"]]

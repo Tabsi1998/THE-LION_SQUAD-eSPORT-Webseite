@@ -10,16 +10,20 @@ die Schreibwege und was die Verwaltung dazu sieht.
 from __future__ import annotations
 
 import copy
+import logging
 
 from models import new_id, now_utc
 from services.competition_standings import table_rules
 from services.league_scope import is_league_staffel
 from services.v2_match_flows import FORFEIT_NOTE_MIN_LENGTH, filled_slots
 
+logger = logging.getLogger("tls.league_table")
+
 REASON_MIN = 5
 REASON_MAX = 500
 DECISION_LIMIT = 50
-OPEN_STATUSES = frozenset({"pending", "ready", "scheduled", "waiting_result", "in_progress"})
+# Nur vor dem Spiel: was läuft oder auf ein Ergebnis wartet, hat begonnen.
+OPEN_STATUSES = frozenset({"pending", "ready", "scheduled"})
 
 
 class TableProblem(Exception):
@@ -159,7 +163,39 @@ def check_double_no_show(tournament: dict | None, match: dict) -> list[str]:
         raise TableProblem("Das Spiel ist schon so gewertet.", 409)
     if str(match.get("status") or "pending") not in OPEN_STATUSES or match.get("results"):
         raise TableProblem("Das Spiel hat schon ein Ergebnis - erst zurücknehmen, dann neu werten.", 409)
+    # Nur vor dem Spiel (Codex zu E.1): wer schon spielt, gemeldet hat oder ein Ergebnis bereitliegen hat, ist erschienen.
+    if match.get("started_at"):
+        raise TableProblem("Das Spiel hat schon begonnen - „beide nicht erschienen“ geht nur vorher.", 409)
+    if match.get("reports"):
+        raise TableProblem("Zu diesem Spiel liegt schon eine Meldung vor - bitte über das Ergebnis entscheiden.", 409)
+    if isinstance(match.get("pending_result"), dict):
+        raise TableProblem("Für dieses Spiel liegt gerade ein Ergebnis bereit - erst „Rückgängig“, dann neu werten.", 409)
     return sides
+
+
+async def after_change(db, tournament: dict, before: dict, *, scored: bool) -> None:
+    """Dieselben Nebenwirkungen wie beim kampflos (``v2_result_submission._finish_result_side_effects``): Station und
+    Aufruf frei, Discord-Baum vorgemerkt, Anzeige-Ereignis für Web und TV, Stand der Wettbewerbsstruktur. ``scored``:
+    gewertet (sonst neu angesetzt). Keine dieser Folgen hält die Wertung auf."""
+    from services import discord_bracket, station_runtime
+    from services.change_events import publish_tournament_event
+    from services.competition_versions import persist_competition_versions
+
+    tid = tournament.get("id")
+    if scored and (before.get("station_id") or before.get("called_at")):
+        try:
+            await station_runtime.release_station_for_match(db, before, "matches_v2")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Station release failed for match=%s type=%s", before.get("id"), type(exc).__name__)
+    try:
+        discord_bracket.request_refresh(str(tid or ""))
+    except Exception:  # noqa: BLE001
+        logger.debug("Discord-Baum für Turnier %s nicht vorgemerkt", tid, exc_info=True)
+    try:
+        await publish_tournament_event(str(tid or ""), "walkover" if scored else "result_corrected", match_ids=[before.get("id")])
+        await persist_competition_versions(db, tournament, "graph")
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Double no-show follow-up failed for match=%s type=%s", before.get("id"), type(exc).__name__)
 
 
 def note_text(value) -> str:

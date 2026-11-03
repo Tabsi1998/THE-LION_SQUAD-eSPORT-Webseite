@@ -155,6 +155,7 @@ async def admin_double_no_show(tournament_id: str, match_id: str, body: DoubleNo
         raise HTTPException(status_code=409, detail=BUSY) from None
     for side in sides:
         await record_walkover_incident(db, match, side, me["id"])
+    await league_table.after_change(db, tournament, match, scored=True)
     await _audit(db, "match.forfeit.double", me, tournament_id, {"match_id": match_id, "registration_ids": sides,
                                                                  "note_length": len(note)})
     await publish_api_change("POST", f"/api/matches/{match_id}/result", 200)
@@ -174,7 +175,7 @@ async def admin_undo_double_no_show(tournament_id: str, match_id: str, body: Tab
     try:
         reason = league_table.reason_text(body.reason)
         async with mutation_lock(db, tournament_write_resource(tournament_id)):
-            await _staffel(db, tournament_id)
+            tournament = await _staffel(db, tournament_id)
             match = await _match(db, tournament_id, match_id)
             if not (match.get("double_forfeit") and match.get("status") == "forfeit"):
                 raise league_table.TableProblem("Das Spiel ist nicht als „beide nicht erschienen“ gewertet.", 409)
@@ -189,6 +190,7 @@ async def admin_undo_double_no_show(tournament_id: str, match_id: str, body: Tab
         raise HTTPException(status_code=409, detail=BUSY) from None
     for side in sides:
         await revoke_walkover_incident(db, match_id, side)
+    await league_table.after_change(db, tournament, match, scored=False)
     await _audit(db, "match.forfeit.double.undo", me, tournament_id, {"match_id": match_id, "reason": reason})
     await publish_api_change("DELETE", f"/api/matches/{match_id}/result", 200)
     return await _match(db, tournament_id, match_id)
