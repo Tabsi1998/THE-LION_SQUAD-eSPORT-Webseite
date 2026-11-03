@@ -152,21 +152,40 @@ function OwnCheckin({ block, matchId, busy, run, onChanged, onAskLead }) {
 }
 
 function StartBlock({ block, matchId, busy, run, onChanged }) {
+  const [conflictReason, setConflictReason] = useState("");
+  const [problem, setProblem] = useState("");
   if (!["ready", "veto"].includes(block.state)) return null;
-  const start = () => run(async () => {
-    await api.post(`/matches/${matchId}/checkin/start`, {});
-    toast.success("Gestartet – Map 1 läuft. Viel Erfolg!");
-    await onChanged();
-  }, "Starten hat nicht geklappt.");
+  // Startet die Leitung (keine eigene Seite) ihr eigenes Spiel, geht das nur als Notausnahme des Superadmins mit Grund (#2203) -
+  // wie beim Eintragen für eine Seite; sonst antwortet der Server 403.
+  const needsConflictReason = !block.own_registration_id && Boolean(block.lead?.conflict?.override);
+  const start = () => {
+    if (needsConflictReason && conflictReason.trim().length < REASON_MIN) return setProblem("Als Notausnahme braucht es einen Grund (mindestens fünf Zeichen).");
+    setProblem("");
+    return run(async () => {
+      await api.post(`/matches/${matchId}/checkin/start`, needsConflictReason ? { conflict_reason: conflictReason.trim() } : {});
+      toast.success("Gestartet – Map 1 läuft. Viel Erfolg!");
+      await onChanged();
+    }, "Starten hat nicht geklappt.");
+  };
   return (
     <div className="mt-5 rounded-sm border border-[#00D26A]/40 bg-[#00D26A]/5 p-4" data-testid="checkin-start">
       {block.can_start ? (
         <>
+          {needsConflictReason ? (
+            <>
+              <p className="mb-3 text-xs text-warn" data-testid="checkin-start-conflict">Du bist an diesem Spiel selbst beteiligt – als Superadmin startest du nur als Notausnahme mit Grund.</p>
+              <label className="mb-3 block text-xs text-white/60">
+                Grund für die Notausnahme
+                <input value={conflictReason} maxLength={500} onChange={(event) => setConflictReason(event.target.value)} className="input mt-1 w-full" data-testid="checkin-start-conflict-reason" />
+              </label>
+            </>
+          ) : null}
           <button type="button" disabled={busy} onClick={start} data-testid="checkin-start-button"
             className="tls-btn tls-btn--primary inline-flex min-h-12 items-center gap-2 rounded-sm px-5 py-3 text-sm font-bold uppercase tracking-wider disabled:opacity-50">
             <Play className="h-4 w-4" aria-hidden="true" /> Spiel starten – Map 1 läuft
           </button>
           <p className="mt-2 text-xs text-white/60">Ab jetzt zählt die Spielzeit; der Termin lässt sich nicht mehr verschieben.</p>
+          {problem ? <p className="mt-2 text-xs text-warn" role="alert" data-testid="checkin-start-problem">{problem}</p> : null}
         </>
       ) : (
         <p className="text-sm text-white/80" data-testid="checkin-start-hint">{block.start_hint || "Starten geht erst, wenn beide Seiten eingecheckt sind."}</p>

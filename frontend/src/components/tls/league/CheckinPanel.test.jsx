@@ -148,6 +148,19 @@ test("Superadmin im eigenen Spiel: Notausnahme braucht den zweiten Grund", async
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/checkin", expect.objectContaining({ conflict_reason: "Niemand sonst da" })));
 });
 
+test("Superadmin im eigenen Spiel startet nur als Notausnahme mit Grund", async () => {
+  const lead = { can_enter: true, conflict: { kind: "involved", override: true }, rosters: {} };
+  const both = [{ ...OWN, own: false, checked_in: true, present_count: 2 }, { ...OTHER, checked_in: true, present_count: 3 }];
+  renderPanel({ ...BLOCK, state: "ready", own_registration_id: null, roster: [], can_checkin: false, sides: both, can_start: true, start_hint: null, ready_at: LATER, lead });
+  expect(screen.getByTestId("checkin-start-conflict")).toHaveTextContent("Notausnahme");
+  fireEvent.click(screen.getByTestId("checkin-start-button"));
+  expect(screen.getByTestId("checkin-start-problem")).toHaveTextContent("Grund");
+  expect(apiMock.post).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByTestId("checkin-start-conflict-reason"), { target: { value: "Niemand sonst da" } });
+  fireEvent.click(screen.getByTestId("checkin-start-button"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/matches/m1/checkin/start", { conflict_reason: "Niemand sonst da" }));
+});
+
 test("ohne Block nichts", () => {
   const { container } = renderPanel(null);
   expect(container).toBeEmptyDOMElement();
