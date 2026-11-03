@@ -191,6 +191,24 @@ async def test_costs_are_shown_first_and_billed_like_the_form(flow):
     assert await flow.db.billing_orders.count_documents({}) == 1
 
 
+@pytest.mark.asyncio
+async def test_back_after_cancelling_with_an_invoice_names_no_amount(flow):
+    """Abgemeldet und wieder angemeldet, obwohl die Rechnung schon gestellt ist (#2184): kein zweiter Auftrag, ein Prüffall für die
+    Finanzverwaltung - und die Antwort nennt keinen Betrag, der so nicht abgerechnet wird."""
+    boss = await admin(flow)
+    paid = await make_event(flow, boss, name="LAN mit Essen", billing=OFFER)
+    await person(flow, "paula", discord_id=DISCORD_ID)
+    await discord_registration.handle_button(flow.db, DISCORD_ID, f"tls:reg:event:{paid['id']}")
+    [reg] = await registrations(flow, paid["id"])
+    await flow.db.billing_orders.update_many({"registration_id": reg["id"]}, {"$set": {"status": "invoiced", "invoice_ref": "RE-1", "invoice_status": "validated"}})
+    await discord_registration.handle_button(flow.db, DISCORD_ID, f"tls:unreg:event:{paid['id']}")
+
+    back = await discord_registration.handle_button(flow.db, DISCORD_ID, f"tls:reg:event:{paid['id']}")
+    assert "angemeldet" in text_of(back) and "Kosten" not in text_of(back) and "20,00" not in text_of(back)
+    assert await flow.db.billing_orders.count_documents({"registration_id": reg["id"]}) == 1
+    assert await flow.db.billing_cases.count_documents({"registration_id": reg["id"], "kind": "changed_after_invoice", "status": "open"}) == 1
+
+
 # ---------------------------------------------------------------- Turniere
 
 async def make_tournament(flow, boss, *, team_size=1, event=None, gate=False, **extra):

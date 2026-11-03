@@ -18,6 +18,7 @@ from models import RegistrationCreate
 from services import event_days, event_registration, pricing, tournament_event_gate, tournament_fees, tournament_guard
 from services.discord_registration_rules import CUSTOM_ID_PATTERN, custom_id, enabled, event_blocker, tournament_blocker
 from services.discord_texts import LINK_PATH, NOT_LINKED, answer
+from services.event_notifications import price_to_bill
 from services.event_registration import RegistrationError
 from services.private_fields import private_projection
 from services.visibility import user_can_see
@@ -339,8 +340,10 @@ async def confirm(db, discord_user_id, kind: str, item_id: str, then: str | None
             text = f"🕐 Du stehst auf der Warteliste für „{name}“ (Platz {counts['waitlist_count']})."
         else:
             text = f"✅ Du bist angemeldet: „{name}“."
-        if doc.get("price_snapshot"):
-            text += f"\nKosten: {pricing.describe(doc['price_snapshot'])} – die Rechnung kommt über die Website."
+        # Nur ein Preis, der jetzt abgerechnet wird - nach einem Storno mit schon gestelltem Beleg prüft das die Finanzverwaltung (#2184).
+        billed = price_to_bill(doc)
+        if billed:
+            text += f"\nKosten: {pricing.describe(billed)} – die Rechnung kommt über die Website."
         buttons = list(link)
         if then:
             tournament = await _find_tournament(db, then)

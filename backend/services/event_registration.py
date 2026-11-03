@@ -19,6 +19,10 @@ from services.mutation_lock import MutationLockBusy, mutation_lock
 # Bereich (Rolle oder Freigabe); die Rollenliste bleibt nur als Auskunft.
 STAFF_ROLES = {"tournament_admin", "club_admin", "superadmin"}
 ACTIVE_STATUSES = {"registered", "checked_in"}
+ENDED_STATUSES = {"cancelled", "no_show"}
+# Der Grund im Prüffall der Finanzverwaltung, wenn eine beendete Anmeldung trotz Beleg zurückkommt (#2127, #2184).
+REBOOKED_SELF = "Nach Storno selbst neu angemeldet"
+REBOOKED_BY_LEAD = "Anmeldung wieder aktiviert"
 
 
 class RegistrationError(Exception):
@@ -207,9 +211,16 @@ async def _register(db, event: dict, me: dict, *, companion_count: int | None, n
         "registered_via": via,
         "updated_at": now,
     }
+    # Nach Storno neu angemeldet, obwohl der Beleg schon existiert (#2184): kein neuer Preis, kein zweiter Auftrag - wie beim
+    # Reaktivieren durch die Leitung bekommt die Finanzverwaltung einen Prüffall, die Anmeldung trägt wieder den Beleg.
+    invoiced = None
+    if existing and status == "registered" and not price.get("free"):
+        invoiced = await billing_orders.invoiced_order(db, kind="event", registration_id=existing["id"])
     # Eingefroren wird nur eine verbindliche Anmeldung - die Warteliste bekommt ihren Preis beim
     # Nachrücken (Admin setzt „registered“), nicht jetzt.
-    if status == "registered" and not price.get("free"):
+    if invoiced:
+        doc.update(billing_orders.rebooked_fields(invoiced))
+    elif status == "registered" and not price.get("free"):
         doc["price_snapshot"] = pricing.snapshot(price, recipient=me, source={"kind": "event", "id": event["id"], "slug": event.get("slug")},
                                                  invoice_timing=offer.get("invoice_timing") or "on_confirm")
         doc["billing_status"] = "pending"
@@ -254,7 +265,10 @@ async def _register(db, event: dict, me: dict, *, companion_count: int | None, n
                  "total_cents": (doc.get("price_snapshot") or {}).get("total_cents"), "via": via},
         "created_at": now,
     })
-    if doc.get("price_snapshot"):
+    if invoiced:
+        await billing_orders.note_change_after_invoice(db, kind="event", registration_id=doc["id"], reason=REBOOKED_SELF,
+                                                       new_total_cents=int(price.get("total_cents") or 0))
+    elif doc.get("price_snapshot"):
         await billing_orders.create_order(db, kind="event", source_id=event["id"], registration_id=doc["id"], user_id=me["id"],
                                           snapshot=doc["price_snapshot"], timing=pricing.order_timing(doc["price_snapshot"], offer))
     return doc

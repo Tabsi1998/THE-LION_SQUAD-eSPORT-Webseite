@@ -180,6 +180,25 @@ async def note_change_after_invoice(db, *, kind: str, registration_id: str, reas
     })
 
 
+def invoice_fields(source: dict) -> dict:
+    """Was die Anmeldung vom Beleg trägt - aus dem gelesenen Stand oder aus dem Auftrag, die Felder heißen gleich."""
+    return {"billing_status": "paid" if source.get("paid") else "invoiced", "invoice_id": source.get("invoice_id"), "invoice_ref": source.get("invoice_ref"),
+            "invoice_status": source.get("invoice_status"), "payment_state": source.get("payment_state")}
+
+
+async def invoiced_order(db, *, kind: str, registration_id: str) -> dict | None:
+    """Der Auftrag, zu dem es in Dolibarr einen Beleg gibt - Entwurf, freigegeben, bezahlt, auch mit Abzug. Ein in Dolibarr
+    gelöschter Entwurf (#2226) zählt nicht mehr: Sein Auftrag wartet oder ist zu."""
+    return await db.billing_orders.find_one({"kind": kind, "registration_id": registration_id, "status": "invoiced"}, {"_id": 0})
+
+
+def rebooked_fields(order: dict) -> dict:
+    """Nach einem Storno wieder dabei, obwohl der Beleg schon existiert (#2127 Leitung, #2184 selbst neu angemeldet): Die
+    Anmeldung bekommt keinen neuen Preis, sondern wieder den des Belegs und seinen Stand - wie nach dem nächsten Abgleich.
+    Den Prüffall dazu öffnet ``note_change_after_invoice``; ein zweiter Auftrag entsteht nicht."""
+    return {**({"price_snapshot": order["snapshot"]} if order.get("snapshot") else {}), **invoice_fields(order)}
+
+
 async def release_order(db, order_id: str, actor_id: str) -> dict | None:
     """Rechnungszeitpunkt „bewusst später“: die Freigabe durch die Finanzverwaltung."""
     await db.billing_orders.update_one({"id": order_id, "status": "held"}, {"$set": {"status": "pending", "released_by": actor_id, "released_at": now_utc().isoformat(), "updated_at": now_utc().isoformat()}})

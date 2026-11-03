@@ -27,13 +27,23 @@ ENDED = {"cancelled", "no_show"}
 COST_ENDED = ("Ein offener Kostenbeitrag wird nicht verrechnet; wurde schon eine Rechnung gestellt, meldet sich der Verein bei dir.")
 
 
-def _cost_line(registration: dict) -> str:
-    """Der Satz zum Kostenbeitrag - nur, wenn wirklich abgerechnet wird. Kommt die Rechnung erst nach der Freigabe in der
-    Finanzübersicht, steht sie noch nicht in „Meine Rechnungen“."""
+def price_to_bill(registration: dict) -> dict | None:
+    """Der Preis, der mit diesem Schritt abgerechnet wird - nur ein gerade eingefrorener (noch ohne Beleg). Trägt die Anmeldung
+    schon einen Beleg, ist sie nach einem Storno zurückgekommen, und die Finanzverwaltung prüft ihn (#2184): Dann nennt keine
+    Nachricht einen Betrag, der so vielleicht nicht gilt. Storniert: ebenfalls keiner."""
     snapshot = registration.get("price_snapshot") or {}
-    cents = int(snapshot.get("total_cents") or 0)
-    if cents <= 0 or registration.get("billing_status") == "cancelled":
+    if int(snapshot.get("total_cents") or 0) <= 0 or registration.get("billing_status") not in (None, "pending"):
+        return None
+    return snapshot
+
+
+def _cost_line(registration: dict) -> str:
+    """Der Satz zum Kostenbeitrag - nur, wenn wirklich abgerechnet wird (``price_to_bill``). Kommt die Rechnung erst nach der
+    Freigabe in der Finanzübersicht, steht sie noch nicht in „Meine Rechnungen“."""
+    snapshot = price_to_bill(registration)
+    if not snapshot:
         return ""
+    cents = int(snapshot["total_cents"])
     amount = pricing.format_cents(cents, snapshot.get("currency") or "EUR")
     later = snapshot.get("invoice_timing") not in (None, "on_confirm")
     invoice = "Die Rechnung bekommst du später unter „Meine Rechnungen“." if later else "Die Rechnung findest du unter „Meine Rechnungen“."

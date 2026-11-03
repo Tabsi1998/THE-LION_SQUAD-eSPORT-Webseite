@@ -37,6 +37,7 @@ from datetime import datetime, timedelta, timezone
 
 from models import new_id, now_utc
 from services.billing_amounts import paid_cents
+from services.billing_orders import invoice_fields
 from services.billing_facts import booking_facts, source_label
 from services.discord_plain_text import _without_tags
 from services.dolibarr_client import DolibarrClient, DolibarrError, instance_key, write_capable
@@ -524,13 +525,9 @@ async def _mark_invoiced(db, order: dict, state: dict, *, payments: list[dict] |
     }, "$unset": {"sync_error": "", "sync_error_at": ""},
         # Zahlungen neu gelesen: eine schon vorbereitete Erstattung rechnet neu (#1034, ``billing_orders.add_refund``).
         "$inc": {"money_rev": 1}})
-    billing_status = "paid" if state.get("paid") else "invoiced"
     collection = {"event": db.event_registrations, "tournament": db.tournament_registrations}.get(order.get("kind"))
     if collection is not None:
-        await collection.update_one({"id": order["registration_id"]}, {"$set": {
-            "billing_status": billing_status, "invoice_id": state["invoice_id"], "invoice_ref": state["invoice_ref"], "invoice_status": state["invoice_status"],
-            "payment_state": state.get("payment_state"),
-        }})
+        await collection.update_one({"id": order["registration_id"]}, {"$set": invoice_fields(state)})
 
 
 async def create_invoice_for(db, settings: dict, client: DolibarrClient, order: dict) -> dict:
