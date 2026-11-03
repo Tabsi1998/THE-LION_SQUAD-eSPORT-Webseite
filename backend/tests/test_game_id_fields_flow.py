@@ -211,7 +211,8 @@ async def test_a_version_whose_ids_live_under_its_source_or_in_a_roster_is_not_d
     member = await flow.add_user(role="user", name="Probe Kader 5")
     await flow.db.league_rosters.insert_one({"id": "r5", "season_id": "s5", "user_id": member["id"], "game_id": empty["id"],
                                              "player_ids": {"activision_id": "probe#5"}})
-    assert (await flow.delete(f"/api/games/{empty['id']}")).status_code == 409
+    second = await flow.delete(f"/api/games/{empty['id']}")
+    assert second.status_code == 409
 
 
 @pytest.mark.asyncio
@@ -224,5 +225,7 @@ async def test_anonymized_accounts_never_count_and_odd_keys_still_work(flow):
     await flow.db.league_rosters.insert_one({"id": "rx", "season_id": "sx", "user_id": gone["id"], "game_id": game["id"],
                                              "player_ids": {"probe": "weg"}})
     assert (await flow.get(f"/api/games/{game['id']}/usage")).json()["id_fields"] == {"probe": 0, "alt.id": 0}
-    assert (await flow.patch(f"/api/games/{game['id']}", json={"player_id_fields": [field("probe")]})).status_code == 200
-    assert (await flow.patch(f"/api/games/{game['id']}", json={"player_id_fields": []})).status_code == 200
+    one = await flow.patch(f"/api/games/{game['id']}", json={"player_id_fields": [field("probe")]})
+    assert one.status_code == 200
+    none = await flow.patch(f"/api/games/{game['id']}", json={"player_id_fields": []})
+    assert none.status_code == 200
