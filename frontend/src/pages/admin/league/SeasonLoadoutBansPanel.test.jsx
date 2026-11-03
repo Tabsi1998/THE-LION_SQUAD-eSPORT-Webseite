@@ -26,7 +26,8 @@ const BODY = {
     { id: "w1", category: "waffen", name: "Blitz 9", status: "active", weapon_ids: [] },
     { id: "w2", category: "waffen", name: "Donner 4", status: "active", weapon_ids: [] },
     { id: "a1", category: "aufsaetze", name: "Rotpunkt", status: "active", weapon_ids: ["w1"] },
-    { id: "a2", category: "aufsaetze", name: "Griff", status: "active", weapon_ids: [] },
+    { id: "a2", category: "aufsaetze", name: "Griff", status: "active", weapon_ids: ["w1", "w2"] },
+    { id: "a3", category: "aufsaetze", name: "Kompensator", status: "active", weapon_ids: [] },
     { id: "p1", category: "perks", name: "Leise Sohlen", status: "inactive", weapon_ids: [] },
   ],
   list: LIST,
@@ -64,10 +65,11 @@ test("je Modus sperren, an einer Waffe einzelne Aufsätze, speichern als neue Ve
   const blitz = await screen.findByTestId("season-bans-item-w1");
   // Blitz 9 nur noch in „Suchen“ gesperrt.
   fireEvent.click(within(blitz).getByLabelText("Suchen"));
-  // An Donner 4 passt Griff (ohne Zuordnung), Rotpunkt nicht.
+  // An Donner 4 passt Griff (zugeordnet), Rotpunkt nicht, Kompensator ohne Waffe zu keiner (Obmann, 03.11.).
   fireEvent.click(screen.getByTestId("season-bans-open-w2"));
   const donner = screen.getByTestId("season-bans-attachments-w2");
   expect(within(donner).queryByLabelText("Rotpunkt")).not.toBeInTheDocument();
+  expect(within(donner).queryByLabelText("Kompensator")).not.toBeInTheDocument();
   fireEvent.click(within(donner).getByLabelText("Griff"));
   // Inaktiv und nicht auf der Liste: nicht neu sperrbar.
   expect(screen.getByTestId("season-bans-toggle-p1")).toBeDisabled();

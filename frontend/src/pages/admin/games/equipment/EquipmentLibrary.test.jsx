@@ -61,10 +61,29 @@ test("je Kategorie die Einträge mit Zustand, Sperrlisten und bei Aufsätzen den
   expect(screen.queryByTestId("equipment-row-a2")).not.toBeInTheDocument();
   fireEvent.click(screen.getByTestId("equipment-show-archived"));
   expect(screen.getByTestId("equipment-row-a2")).toHaveTextContent("Archiviert · auf 1 Sperrliste");
-  expect(screen.getByTestId("equipment-row-a2")).toHaveTextContent("passt zu jeder Waffe");
+  expect(screen.getByTestId("equipment-row-a2")).toHaveTextContent("keiner Waffe zugeordnet – passt zu keiner");
   // Auf einer Sperrliste: archivieren statt löschen.
   expect(screen.getByTestId("equipment-delete-w1")).toBeDisabled();
   expect(screen.getByTestId("equipment-delete-p1")).not.toBeDisabled();
+});
+
+// Obmann, 03.11.: Ohne Waffe passt ein Aufsatz zu keiner - der Hinweis nennt ihn und ordnet allen die gewählten Waffen zu.
+test("Aufsätze ohne Waffe: Hinweis und Zuordnung in einem Schritt", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...BODY, attachments_without_weapon: [{ id: "a3", name: "Kompensator" }] } });
+  apiMock.post.mockResolvedValue({ data: { updated: 1 } });
+  renderPage();
+  const notice = await screen.findByTestId("equipment-without-weapon");
+  expect(notice).toHaveTextContent("Kompensator");
+  expect(within(notice).getByTestId("equipment-assign")).toBeDisabled();
+  fireEvent.click(within(notice).getByTestId("equipment-assign-w1"));
+  fireEvent.click(within(notice).getByTestId("equipment-assign"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/games/g1/equipment/assign-weapons", { weapon_ids: ["w1"] }));
+});
+
+test("ohne Aufsätze ohne Waffe kein Hinweis", async () => {
+  renderPage();
+  await screen.findByTestId("equipment-group-waffen");
+  expect(screen.queryByTestId("equipment-without-weapon")).not.toBeInTheDocument();
 });
 
 test("Suche und Kategorie grenzen ein", async () => {
@@ -84,7 +103,7 @@ test("ein Aufsatz wird mit Kategorie, Bild und Waffen angelegt", async () => {
   const sheet = screen.getByTestId("equipment-sheet");
   fireEvent.change(within(sheet).getByTestId("equipment-name"), { target: { value: "  Laser  " } });
   fireEvent.change(within(sheet).getByTestId("equipment-image"), { target: { value: "/api/static/uploads/laser.png" } });
-  expect(within(sheet).getByTestId("equipment-weapons")).toHaveTextContent("passt zu jeder Waffe");
+  expect(within(sheet).getByTestId("equipment-weapons-count")).toHaveTextContent("passt dann zu keiner Waffe");
   fireEvent.click(within(sheet).getByLabelText(/Donner 4/));
   fireEvent.click(within(sheet).getByTestId("equipment-save"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/games/g1/equipment", {

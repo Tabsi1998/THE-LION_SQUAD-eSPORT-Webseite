@@ -22,14 +22,15 @@ const WEAPONS = Array.from({ length: 24 }, (_, index) => ({
 }));
 const ATTACHMENTS = Array.from({ length: 30 }, (_, index) => ({
   id: `a${index}`, category: "aufsaetze", name: index === 0 ? `Rotpunkt ${LONG}` : `Aufsatz ${index + 1}`, image_url: null,
-  status: "active", in_lists: 0, weapon_ids: index % 3 === 0 ? [] : [`w${index % 4}`],
+  // Ohne Waffe passt ein Aufsatz zu keiner (Obmann, 03.11.) - der letzte steht dafür im Hinweis.
+  status: "active", in_lists: 0, weapon_ids: index === 29 ? [] : [...new Set([`w${index % 4}`, "w1"])],
 }));
 const PERKS = Array.from({ length: 12 }, (_, index) => ({
   id: `p${index}`, category: "perks", name: `Perk ${index + 1}`, image_url: null, status: index === 11 ? "archived" : "active", in_lists: 0, weapon_ids: [],
 }));
 const ITEMS = [...WEAPONS, ...ATTACHMENTS, ...PERKS];
 const LIBRARY = { game: { id: "g1", name: "Probe Shooter", slug: "probe-shooter", modes: MODES }, categories: CATEGORIES, items: ITEMS, limit: 1000,
-  categories_limit: 20, suggested_categories: [] };
+  categories_limit: 20, suggested_categories: [], attachments_without_weapon: [{ id: "a29", name: "Aufsatz 30" }] };
 
 const LIST = {
   id: "v1", version: 1, saved_at: "2026-11-01T10:00:00+00:00", stale: false, outdated_item_ids: [], origin: "league_season",
@@ -104,6 +105,8 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       await expect(page.getByTestId("equipment-group-waffen").getByRole("listitem")).toHaveCount(24);
       await expect(page.getByTestId("equipment-row-w0")).toContainText("auf 1 Sperrliste");
       await expect(page.getByTestId("equipment-delete-w0")).toBeDisabled();
+      await expect(page.getByTestId("equipment-without-weapon")).toContainText("Aufsatz 30");
+      await expect(page.getByTestId("equipment-row-a29")).toContainText("passt zu keiner");
       await expect(page.getByTestId("equipment-row-p11")).toHaveCount(0);
       await noSideScroll(page);
       // Lange Namen brechen um, die Knöpfe bleiben in der Zeile.

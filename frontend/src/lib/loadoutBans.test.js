@@ -13,10 +13,11 @@ const LIBRARY = [
 ];
 const MODES = [{ mode: "stellung", label: "Stellung" }, { mode: "suchen", label: "Suchen", status: "archived" }];
 
-test("ein Aufsatz ohne Zuordnung passt zu jeder Waffe, sonst nur zu seinen", () => {
+test("ein Aufsatz passt nur zu seinen Waffen, ohne Zuordnung zu keiner (Obmann, 03.11.)", () => {
   expect(fitsWeapon(LIBRARY[2], "w1")).toBe(true);
   expect(fitsWeapon(LIBRARY[2], "w2")).toBe(false);
-  expect(fitsWeapon(LIBRARY[3], "w2")).toBe(true);
+  expect(fitsWeapon(LIBRARY[3], "w2")).toBe(false);
+  expect(fitsWeapon({ name: "ohne Feld" }, "w1")).toBe(false);
 });
 
 test("Suche findet jedes Wort ohne Groß und klein", () => {

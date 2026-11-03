@@ -221,8 +221,11 @@ def _attachments(weapon: dict, category: dict, entry: BanEntryIn, rows: dict, by
         item = rows.get(item_id)
         if not item or (by_key.get(item.get("category")) or {}).get("role") != ATTACHMENT:
             raise EquipmentProblem(f"Bei „{weapon.get('name')}“ steht etwas, das kein Aufsatz dieses Spiels ist.")
+        # Ein Aufsatz passt nur zu den Waffen, denen er zugeordnet ist - ohne Zuordnung zu keiner (Obmann, 03.11.).
         fits = item.get("weapon_ids") or []
-        if fits and weapon["id"] not in fits:
+        if not fits:
+            raise EquipmentProblem(f"Der Aufsatz „{item.get('name')}“ ist keiner Waffe zugeordnet – bitte in der Bibliothek erst die Waffen wählen.")
+        if weapon["id"] not in fits:
             raise EquipmentProblem(f"Der Aufsatz „{item.get('name')}“ passt nicht zu „{weapon.get('name')}“.")
         problem = _status_problem(item, (weapon["id"], item_id) in kept_attached)
         if problem:

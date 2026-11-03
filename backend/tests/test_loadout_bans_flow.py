@@ -76,6 +76,8 @@ async def test_each_entry_is_checked_with_a_german_sentence(flow):
         ([item(w, "Blitz 9", ["gibt-es-nicht"])], "Unbekannter Modus"),
         ([attachments(w, "Leise Sohlen", ["Griff"])], "keine Waffe"),
         ([attachments(w, "Donner 4", ["Rotpunkt"])], "passt nicht zu „Donner 4“"),
+        # Ohne zugeordnete Waffe passt ein Aufsatz zu keiner (Obmann, 03.11.).
+        ([attachments(w, "Donner 4", ["Kompensator"])], "keiner Waffe zugeordnet"),
         ([attachments(w, "Donner 4", [])], "mindestens einen Aufsatz"),
         ([attachments(w, "Donner 4", ["Blitz 9"])], "kein Aufsatz"),
         ([item(w, "Donner 4"), attachments(w, "Donner 4", ["Lauf"])], "in allen Modi gesperrt"),

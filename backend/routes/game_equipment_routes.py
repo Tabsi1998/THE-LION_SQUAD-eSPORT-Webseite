@@ -10,7 +10,8 @@ from database import get_db
 from models import new_id, now_utc
 from routes.game_routes import _enrich_games
 from services import game_equipment, game_modes
-from services.game_equipment import (CategoriesSave, EquipmentCreate, EquipmentImport, EquipmentProblem, EquipmentUpdate)
+from services.game_equipment import (CategoriesSave, EquipmentCreate, EquipmentImport, EquipmentProblem, EquipmentUpdate,
+                                     EquipmentWeapons)
 
 router = APIRouter(prefix="/api/games", tags=["game-equipment"])
 
@@ -46,11 +47,13 @@ async def list_game_equipment(game_id: str, me: dict = Depends(require_admin()))
     categories = await game_equipment.categories_of(db, game["id"])
     used = await game_equipment.usage_counts(db, game["id"])
     counts = await game_equipment.category_counts(db, game["id"])
+    items = await game_equipment.items_of(db, game["id"], categories=categories)
     return {
         "game": {"id": game["id"], "name": game.get("name"), "slug": game.get("slug"), "modes": game_modes.entries(game)},
         "categories": [{**row, "count": counts.get(row["key"], 0)} for row in categories],
-        "items": [{**game_equipment.public_item(row), "in_lists": used.get(row["id"], 0)}
-                  for row in await game_equipment.items_of(db, game["id"], categories=categories)],
+        "items": [{**game_equipment.public_item(row), "in_lists": used.get(row["id"], 0)} for row in items],
+        # Ohne Waffe passt ein Aufsatz zu keiner (Obmann, 03.11.) - die Verwaltung weist darauf hin wie bei Maps ohne Modus.
+        "attachments_without_weapon": game_equipment.without_weapon(items, categories),
         "limit": game_equipment.ITEMS_PER_GAME_MAX,
         "categories_limit": game_equipment.CATEGORIES_MAX,
         "suggested_categories": [dict(row) for row in game_equipment.SUGGESTED_CATEGORIES],
@@ -67,6 +70,19 @@ async def save_equipment_categories(game_id: str, body: CategoriesSave, me: dict
         raise _refuse(problem) from None
     await _audit(db, "game.equipment.categories", me, game["id"], {"keys": [row["key"] for row in saved]})
     return {"categories": saved}
+
+
+@router.post("/{game_id}/equipment/assign-weapons")
+async def assign_equipment_weapons(game_id: str, body: EquipmentWeapons, me: dict = Depends(require_admin())):
+    """Sammelaktion: Aufsätze ohne Waffe bekommen die gewählten Waffen (wie „Maps ohne Modus“)."""
+    db = get_db()
+    game = await _game(db, game_id)
+    try:
+        updated = await game_equipment.assign_weapons(db, game, body.weapon_ids, me)
+    except EquipmentProblem as problem:
+        raise _refuse(problem) from None
+    await _audit(db, "game.equipment.assign_weapons", me, game["id"], {"weapons": len(body.weapon_ids), "updated": updated})
+    return {"updated": updated}
 
 
 @router.get("/{game_id}/equipment/import-sources")

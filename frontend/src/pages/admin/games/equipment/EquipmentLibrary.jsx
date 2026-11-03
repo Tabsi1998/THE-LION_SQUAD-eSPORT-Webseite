@@ -24,11 +24,40 @@ function listsText(count) {
 }
 
 function fitsText(item, weaponNames) {
-  const ids = item.weapon_ids || [];
-  if (!ids.length) return "passt zu jeder Waffe";
-  const names = ids.map((id) => weaponNames.get(id)).filter(Boolean);
+  const names = (item.weapon_ids || []).map((id) => weaponNames.get(id)).filter(Boolean);
+  if (!names.length) return "";
   const shown = names.slice(0, 3).join(", ");
-  return names.length > 3 ? `passt zu ${shown} und ${names.length - 3} weiteren` : `passt zu ${shown || "einer gelöschten Waffe"}`;
+  return names.length > 3 ? `passt zu ${shown} und ${names.length - 3} weiteren` : `passt zu ${shown}`;
+}
+
+// Aufsätze ohne Waffe (Obmann, 03.11.): Sie passen zu keiner Waffe und lassen sich an keiner einzeln sperren. Wie „Maps ohne Modus“
+// nennt der Hinweis sie und ordnet allen auf einmal die gewählten Waffen zu.
+function WithoutWeaponNotice({ rows, weapons, onAssign }) {
+  const [chosen, setChosen] = useState([]);
+  const names = rows.slice(0, 5).map((row) => row.name).join(", ");
+  const more = rows.length > 5 ? ` und ${rows.length - 5} weitere` : "";
+  const toggle = (id) => setChosen((list) => (list.includes(id) ? list.filter((key) => key !== id) : [...list, id]));
+  return (
+    <section className="mt-5 space-y-2 rounded-sm border border-warn/30 bg-warn/5 p-3" aria-label="Aufsätze ohne Waffe" data-testid="equipment-without-weapon">
+      <p className="text-sm font-semibold text-warn">Diese Aufsätze passen noch zu keiner Waffe</p>
+      <p className="text-xs text-white/70 break-words">{names}{more}. An einer Waffe einzeln sperren lassen sie sich erst mit Zuordnung.</p>
+      {weapons.length ? (
+        <div className="flex max-h-40 flex-wrap items-center gap-2 overflow-y-auto pr-1">
+          {weapons.map((weapon) => (
+            <label key={weapon.id} className="inline-flex max-w-full cursor-pointer items-center gap-2 rounded-sm border border-white/15 bg-[#0A0A0A] px-2.5 py-1 text-xs text-white/80">
+              <input type="checkbox" checked={chosen.includes(weapon.id)} onChange={() => toggle(weapon.id)} className="accent-[#29B6E8]"
+                data-testid={`equipment-assign-${weapon.id}`} />
+              <span className="break-words">{weapon.name}</span>
+            </label>
+          ))}
+        </div>
+      ) : <p className="text-xs text-white/60">Noch keine Waffe angelegt.</p>}
+      <button type="button" disabled={!chosen.length} onClick={() => onAssign(chosen)} data-testid="equipment-assign"
+        className="tls-btn tls-btn--primary rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">
+        {rows.length === 1 ? "Dem Aufsatz zuordnen" : `Allen ${rows.length} Aufsätzen zuordnen`}
+      </button>
+    </section>
+  );
 }
 
 function ItemRow({ item, role, weaponNames, onEdit, onStatus, onDelete }) {
@@ -43,7 +72,9 @@ function ItemRow({ item, role, weaponNames, onEdit, onStatus, onDelete }) {
           {status !== "active" ? <span className="font-semibold text-warn">{status === "inactive" ? "Inaktiv · " : "Archiviert · "}</span> : null}
           {listsText(item.in_lists)}
         </p>
-        {role === "attachment" ? <p className="mt-0.5 text-[11px] text-white/60 break-words">{fitsText(item, weaponNames)}</p> : null}
+        {role === "attachment" ? (fitsText(item, weaponNames)
+          ? <p className="mt-0.5 text-[11px] text-white/60 break-words">{fitsText(item, weaponNames)}</p>
+          : <p className="mt-0.5 text-[11px] font-semibold text-warn">keiner Waffe zugeordnet – passt zu keiner</p>) : null}
         {item.note ? <p className="mt-0.5 text-[11px] italic text-white/50 break-words">{item.note}</p> : null}
       </div>
       <div className="flex shrink-0 flex-col items-end sm:flex-row sm:items-center">
@@ -125,6 +156,12 @@ export function EquipmentLibrary({ gameId, onGame }) {
     if (!await confirm({ title: `„${item.name}“ löschen?`, description: "Er stand auf keiner Sperrliste und wird dauerhaft entfernt.", confirmLabel: "Löschen" })) return;
     act(() => api.delete(`/games/${gameId}/equipment/${item.id}`), "Eintrag gelöscht.");
   };
+  const assignWeapons = (weaponIds) => act(async () => {
+    const { data: body } = await api.post(`/games/${gameId}/equipment/assign-weapons`, { weapon_ids: weaponIds });
+    toast.success(body.updated === 1 ? "1 Aufsatz zugeordnet." : `${body.updated} Aufsätze zugeordnet.`);
+  });
+  const lonely = data?.attachments_without_weapon || [];
+  const assignable = items.filter((item) => weaponNames.has(item.id) && statusOf(item) !== "archived");
 
   if (error) return <p className="mt-6 text-white/60" role="alert" data-testid="equipment-missing">{error}</p>;
   if (!data) return <p className="mt-6 text-sm text-white/60">Lade Ausrüstung …</p>;
@@ -160,6 +197,7 @@ export function EquipmentLibrary({ gameId, onGame }) {
         </div>
       ) : (
         <>
+          {lonely.length ? <WithoutWeaponNotice rows={lonely} weapons={assignable} onAssign={assignWeapons} /> : null}
           <div className="mt-5 flex flex-wrap items-center gap-2">
             <label className="relative min-w-0 flex-1 basis-56">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/45" aria-hidden="true" />

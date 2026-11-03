@@ -16,8 +16,8 @@ function WeaponPicker({ weapons, value, onChange }) {
   return (
     <fieldset className="space-y-2" data-testid="equipment-weapons">
       <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60">Passt zu</legend>
-      <p className="text-xs text-white/60">
-        {value.length ? `${value.length === 1 ? "1 Waffe" : `${value.length} Waffen`} gewählt.` : "Keine Waffe gewählt – der Aufsatz passt zu jeder Waffe."}
+      <p className={`text-xs ${value.length ? "text-white/60" : "font-semibold text-warn"}`} data-testid="equipment-weapons-count">
+        {value.length ? `${value.length === 1 ? "1 Waffe" : `${value.length} Waffen`} gewählt.` : "Keine Waffe gewählt – der Aufsatz passt dann zu keiner Waffe."}
       </p>
       {weapons.length > 8 ? (
         <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Waffe suchen"

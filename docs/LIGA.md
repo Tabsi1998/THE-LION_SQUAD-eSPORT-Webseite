@@ -1304,7 +1304,7 @@ Abschussserien); gespeichert wird er erst auf Knopfdruck. Eine Kategorie mit Ein
 | `name` | str 1–80 | je Spiel und Kategorie nur einmal (ohne Groß und klein, Leerraum zusammengefasst; 409) |
 | `image_url` | str \| `null` | nur eigener Upload (`game_maps.IMAGE_URL`) mit Eintrag in `media_uploads`; ohne Medienrolle (`ADMIN_MEDIA_ROLES`) nur eigene mit `media_scope: "user"` – wie im Regelwerk (#2230), auch beim Import; ein Bild, das der Eintrag schon trägt oder aus der Quelle mitbringt, braucht nur den Eintrag. Sonst 422. Frühere stehen in `image_history` |
 | `note` | str ≤ 500 | nur für die Verwaltung |
-| `weapon_ids` | [str] | nur Rolle `attachment`: Waffen dieses Spiels, zu denen der Aufsatz passt. **Leer = passt zu jeder Waffe** |
+| `weapon_ids` | [str] | nur Rolle `attachment`: Waffen dieses Spiels, zu denen der Aufsatz passt. **Leer = passt zu keiner Waffe** (Obmann, 03.11.): Speichern geht, an einer Waffe sperren lässt er sich erst mit Zuordnung. `GET …/equipment` nennt sie in `attachments_without_weapon`, `POST …/equipment/assign-weapons {weapon_ids}` ordnet allen nicht archivierten auf einmal Waffen zu (Protokoll `game.equipment.assign_weapons`) |
 | `status` | `active` \| `inactive` \| `archived` | Zustand wie bei Maps (C.2), fehlt = aktiv |
 | `archived_at`, `created_at`, `created_by`, `updated_at`, `updated_by` | | |
 
@@ -1320,8 +1320,9 @@ Höchstens 1000 Einträge je Spiel, archivierte zählen mit. Indizes: `id` einde
 statt löschen“. Wird eine unbenutzte Waffe gelöscht, fällt sie aus den `weapon_ids` der Aufsätze.
 
 **Aus einer anderen Spielversion übernehmen:** wie bei Maps. Die Kategorie passt über Kennung oder Namen; fehlt sie im Ziel, wird sie
-mit Name und Rolle angelegt (wenn noch Platz ist). Aufsätze bekommen die Waffen des Ziels mit gleichem Namen. Das Bild wird mitverwendet.
-Was schon da ist oder nicht passt, steht mit Grund in `skipped`.
+mit Name und Rolle angelegt (wenn noch Platz ist). Aufsätze bekommen die Waffen des Ziels mit gleichem Namen; gibt es keine davon, kommen sie
+ohne Zuordnung (passen dann zu keiner, Hinweis in der Bibliothek). Das Bild wird mitverwendet. Was schon da ist oder nicht passt, steht mit
+Grund in `skipped`.
 
 **Sperrliste** (`loadout_bans`): jedes Speichern legt eine neue, unveränderliche Version an. `scope` `league_season` (Vorlage) oder
 `tournament` (Kopie der Staffel). Felder: `id`, `scope`, `scope_id`, `tournament_id`, `game_id`, `version`, `cleared`, `note`,
@@ -1336,7 +1337,7 @@ Was schon da ist oder nicht passt, steht mit Grund in `skipped`.
 
 Je Eintrag höchstens eine Zeile je Art, höchstens 500 Zeilen. Prüfung beim Speichern (422 mit deutschem Satz): Eintrag gehört zum Spiel,
 Zustand wie oben, Modi des Spiels (`game_modes.choice_problem`, ein schon gesetzter inaktiver Modus bleibt), `attachments` nur an Waffen,
-jeder Aufsatz passt zur Waffe (`weapon_ids` leer oder mit der Waffe), keine Aufsatz-Zeile an einer Waffe, die in allen Modi ganz gesperrt
+jeder Aufsatz ist der Waffe zugeordnet (`weapon_ids` mit der Waffe; leer: „keiner Waffe zugeordnet“), keine Aufsatz-Zeile an einer Waffe, die in allen Modi ganz gesperrt
 ist. Leere Liste: 422 „… oder die Sperrliste entfernen“. `expected_version` schützt wie beim Pool (0 = bisher keine).
 
 **Season → Staffel → Spiel:** Eine neue Staffel bekommt die geltende Version als eigene (`copy_version`, unter der Pool-Sperre der

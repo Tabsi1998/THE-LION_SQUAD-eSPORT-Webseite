@@ -173,6 +173,30 @@ async def test_import_skips_an_image_without_entry_in_the_media_library(flow):
 
 
 @pytest.mark.asyncio
+async def test_attachments_without_weapon_get_weapons_in_one_step(flow):
+    """Wie „Maps ohne Modus“: Aufsätze ohne Waffe passen zu keiner; ein Schritt ordnet ihnen die gewählten Waffen zu (Obmann, 03.11.)."""
+    w = await setup(flow)
+    blitz, donner = await add(flow, w, "Waffen", "Blitz 9"), await add(flow, w, "Waffen", "Donner 4")
+    perk = await add(flow, w, "Perks", "Leise Sohlen")
+    lone = [await add(flow, w, "Aufsätze", name) for name in ("Griff", "Lauf")]
+    done = await add(flow, w, "Aufsätze", "Rotpunkt", weapon_ids=[blitz["id"]])
+    archived = await add(flow, w, "Aufsätze", "Alt")
+    ok(await flow.patch(url(w, f"/{archived['id']}"), json={"status": "archived"}))
+
+    answer = ok(await flow.post(url(w, "/assign-weapons"), json={"weapon_ids": [blitz["id"], donner["id"]]}))
+    assert answer["updated"] == 2
+    for row in lone:
+        assert (await flow.db.game_equipment.find_one({"id": row["id"]}))["weapon_ids"] == [blitz["id"], donner["id"]]
+    assert (await flow.db.game_equipment.find_one({"id": done["id"]}))["weapon_ids"] == [blitz["id"]], "Zugeordnete bleiben"
+    assert (await flow.db.game_equipment.find_one({"id": archived["id"]}))["weapon_ids"] == [], "Archivierte bleiben"
+    assert ok(await flow.get(url(w)))["attachments_without_weapon"] == []
+    wrong = await flow.post(url(w, "/assign-weapons"), json={"weapon_ids": [perk["id"]]})
+    empty = await flow.post(url(w, "/assign-weapons"), json={"weapon_ids": []})
+    assert (wrong.status_code, empty.status_code) == (422, 422)
+    assert await flow.db.audit_logs.count_documents({"action": "game.equipment.assign_weapons"}) == 1
+
+
+@pytest.mark.asyncio
 async def test_an_attachment_belongs_to_weapons_of_the_same_game_only(flow):
     w = await setup(flow)
     weapon = await add(flow, w, "Waffen", "Blitz 9")
@@ -180,7 +204,9 @@ async def test_an_attachment_belongs_to_weapons_of_the_same_game_only(flow):
     scope = await add(flow, w, "Aufsätze", "Rotpunkt", weapon_ids=[weapon["id"], weapon["id"]])
     assert scope["weapon_ids"] == [weapon["id"]]
     grip = await add(flow, w, "Aufsätze", "Griff")
-    assert grip["weapon_ids"] == [], "leer heißt: passt zu jeder Waffe"
+    assert grip["weapon_ids"] == [], "speichern geht - leer heißt aber: passt zu keiner Waffe"
+    listed = ok(await flow.get(url(w)))
+    assert listed["attachments_without_weapon"] == [{"id": grip["id"], "name": "Griff"}]
     no_weapon = await flow.post(url(w), json={"category": w["cats"]["Aufsätze"], "name": "Lauf", "weapon_ids": [perk["id"]]})
     assert no_weapon.status_code == 422
     on_perk = await flow.post(url(w), json={"category": w["cats"]["Perks"], "name": "Zäh", "weapon_ids": [weapon["id"]]})
@@ -275,8 +301,11 @@ async def test_import_brings_categories_weapons_and_their_attachments(flow):
 
     result = ok(await flow.post(f"{target_url}/import", json={"source_game_id": w["game"]["id"],
                                                                "item_ids": [scope["id"], weapon["id"], perk["id"], lonely["id"], archived["id"]]}))
-    assert sorted(row["name"] for row in result["created"]) == ["Blitz 9", "Leise Sohlen", "Rotpunkt"]
-    assert [row["name"] for row in result["skipped"]] == ["Lauf"], "ohne seine Waffe hieße leer „passt zu jeder“"
+    assert sorted(row["name"] for row in result["created"]) == ["Blitz 9", "Lauf", "Leise Sohlen", "Rotpunkt"]
+    assert result["skipped"] == []
+    # Ohne seine Waffe kommt der Aufsatz ohne Zuordnung - er passt dann zu keiner, und die Bibliothek weist darauf hin.
+    assert next(row for row in result["created"] if row["name"] == "Lauf")["weapon_ids"] == []
+    assert [row["name"] for row in ok(await flow.get(target_url))["attachments_without_weapon"]] == ["Lauf"]
     new_weapon = next(row for row in result["created"] if row["name"] == "Blitz 9")
     new_scope = next(row for row in result["created"] if row["name"] == "Rotpunkt")
     assert new_scope["weapon_ids"] == [new_weapon["id"]] and new_weapon["image_url"] == IMAGE

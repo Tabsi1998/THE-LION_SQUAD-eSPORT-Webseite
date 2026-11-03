@@ -1,8 +1,8 @@
 """Aufbau für die Tests der Sperrliste (docs/LIGA.md, C.4 #2218): eine Bibliothek im Spiel der Liga aus ``league_rules_world``.
 Erfundene Namen.
 
-Kategorien Waffen, Aufsätze, Perks. Waffen „Blitz 9“ (mit Bild) und „Donner 4“, Aufsätze „Rotpunkt“ (nur Blitz), „Griff“ (jede Waffe)
-und „Lauf“ (nur Donner), Perk „Leise Sohlen“ (mit Bild).
+Kategorien Waffen, Aufsätze, Perks. Waffen „Blitz 9“ (mit Bild) und „Donner 4“, Aufsätze „Rotpunkt“ (nur Blitz), „Griff“ (beide Waffen),
+„Lauf“ (nur Donner) und „Kompensator“ (keiner Waffe zugeordnet - passt zu keiner), Perk „Leise Sohlen“ (mit Bild).
 """
 from __future__ import annotations
 
@@ -30,8 +30,10 @@ async def add_library(flow, w: dict) -> dict:
     await add("Waffen", "Blitz 9", image_url=IMAGE)
     await add("Waffen", "Donner 4")
     await add("Aufsätze", "Rotpunkt", weapon_ids=[items["Blitz 9"]["id"]])
-    await add("Aufsätze", "Griff")
+    await add("Aufsätze", "Griff", weapon_ids=[items["Blitz 9"]["id"], items["Donner 4"]["id"]])
     await add("Aufsätze", "Lauf", weapon_ids=[items["Donner 4"]["id"]])
+    # Ohne Waffe passt ein Aufsatz zu keiner (Obmann, 03.11.).
+    await add("Aufsätze", "Kompensator")
     await add("Perks", "Leise Sohlen", image_url=PERK_IMAGE)
     w.update(items=items, cats=cats, library_url=base)
     return items

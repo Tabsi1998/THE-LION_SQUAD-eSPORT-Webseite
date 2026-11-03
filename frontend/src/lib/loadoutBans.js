@@ -5,7 +5,7 @@
 export const ROLE_LABELS = { weapon: "Waffe", attachment: "Aufsatz", item: "Ausrüstung" };
 export const ROLE_HINTS = {
   weapon: "Kann Aufsätze haben; an ihr lassen sich einzelne Aufsätze sperren.",
-  attachment: "Passt zu den gewählten Waffen – ohne Wahl zu jeder.",
+  attachment: "Passt nur zu den gewählten Waffen – ohne Wahl zu keiner.",
   item: "Perks, Ausrüstung, Abschussserien und alles andere.",
 };
 export const ALL_MODES = "alle Modi";
@@ -29,10 +29,9 @@ export function roleOf(categories = [], key) {
   return categories.find((row) => row.key === key)?.role || null;
 }
 
-/** Passt ein Aufsatz zu dieser Waffe? Ohne Zuordnung passt er zu jeder. */
+/** Passt ein Aufsatz zu dieser Waffe? Nur, wenn er ihr zugeordnet ist - ohne Zuordnung zu keiner (Obmann, 03.11.). */
 export function fitsWeapon(attachment, weaponId) {
-  const fits = attachment?.weapon_ids || [];
-  return !fits.length || fits.includes(weaponId);
+  return (attachment?.weapon_ids || []).includes(weaponId);
 }
 
 /** Suchen über Namen: jedes Wort muss vorkommen. */

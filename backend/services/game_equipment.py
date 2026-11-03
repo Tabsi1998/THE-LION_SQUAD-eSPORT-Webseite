@@ -370,6 +370,32 @@ async def delete(db, game: dict, current: dict) -> None:
                                         {"$pull": {"weapon_ids": current["id"]}})
 
 
+# ---------------------------------------------------------------- Aufsätze ohne Waffe (Obmann, 03.11.: ohne Zuordnung passt keiner)
+
+def without_weapon(items: list[dict], categories: list[dict]) -> list[dict]:
+    """Aktive und inaktive Aufsätze ohne zugeordnete Waffe - sie passen zu keiner Waffe; die Verwaltung weist darauf hin."""
+    keys = {row["key"] for row in categories if row["role"] == ATTACHMENT}
+    return [{"id": row["id"], "name": row.get("name")} for row in items
+            if row.get("category") in keys and status_of(row) != ARCHIVED and not row.get("weapon_ids")]
+
+
+async def assign_weapons(db, game: dict, weapon_ids: list[str], user: dict) -> int:
+    """Sammelaktion wie „Maps ohne Modus“: Alle nicht archivierten Aufsätze ohne Waffe bekommen die gewählten Waffen - wie viele es waren."""
+    categories = await categories_of(db, game["id"])
+    weapons = await _clean_weapons(db, game, categories, ATTACHMENT, weapon_ids)
+    if not weapons:
+        raise EquipmentProblem("Bitte mindestens eine Waffe wählen.")
+    ids = [row["id"] for row in without_weapon(await items_of(db, game["id"], categories=categories), categories)]
+    if ids:
+        await db.game_equipment.update_many({"id": {"$in": ids}, "game_id": game["id"]},
+                                            {"$set": {"weapon_ids": weapons, "updated_at": now_utc().isoformat(), "updated_by": user["id"]}})
+    return len(ids)
+
+
+class EquipmentWeapons(BaseModel):
+    weapon_ids: List[str] = Field(default_factory=list, max_length=ITEMS_PER_GAME_MAX)
+
+
 # ---------------------------------------------------------------- Aus einer anderen Spielversion übernehmen
 
 def _target_category(source_cat: dict | None, targets: list[dict]) -> dict | None:
@@ -439,11 +465,7 @@ async def import_items(db, game: dict, source: dict, item_ids: list[str], user: 
             weapons = [found["id"] for found in await db.game_equipment.find(
                 {"game_id": game["id"], "category": {"$in": weapon_keys}, "name_key": {"$in": sorted(names)}},
                 {"_id": 0, "id": 1}).to_list(None)]
-            if not weapons:
-                # Leer hieße „passt zu jeder Waffe“ - das wäre mehr als in der Quelle.
-                skipped.append({"id": row["id"], "name": row.get("name"),
-                                "reason": "Keine seiner Waffen gibt es hier - bitte die Waffen mit übernehmen."})
-                continue
+            # Ohne seine Waffen im Ziel kommt der Aufsatz ohne Zuordnung: Er passt dann zu keiner, die Bibliothek weist darauf hin.
         body = EquipmentCreate(category=target["key"], name=row.get("name"), image_url=row.get("image_url"), note=row.get("note"),
                                weapon_ids=weapons)
         try:

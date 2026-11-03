@@ -112,9 +112,11 @@ wird – ein Verstoß läuft über Einspruch und Strafe.
    Spielseite). Zuerst **Kategorien**: Ohne Kategorien gibt es einen Vorschlag (Waffen, Aufsätze, Perks, Ausrüstung, Abschussserien), den
    du anpasst und speicherst. Die **Art** entscheidet: An einer *Waffe* lassen sich einzelne Aufsätze sperren, ein *Aufsatz* passt zu Waffen,
    alles andere ist *sonstige Ausrüstung*. Hat eine Kategorie Einträge, bleibt ihre Art und sie lässt sich nicht entfernen.
-2. **Einträge:** **Eintrag hinzufügen** – Name, Bild 16 : 9 (nur Upload oder Mediathek), bei Aufsätzen **Passt zu** (keine Wahl heißt: zu
-   jeder Waffe). Suche und Kategorie-Knöpfe helfen bei vielen Einträgen. **Aus Spiel übernehmen** holt Einträge einer anderen Spielversion,
-   fehlende Kategorien kommen mit, Aufsätze finden ihre Waffen über den Namen (Waffen also mit übernehmen).
+2. **Einträge:** **Eintrag hinzufügen** – Name, Bild 16 : 9 (nur Upload oder Mediathek; ohne Medienrechte nur eigene Bilder), bei Aufsätzen
+   **Passt zu**: Ein Aufsatz passt nur zu den gewählten Waffen, **ohne Wahl zu keiner**. Aufsätze ohne Waffe nennt oben ein gelber Hinweis;
+   dort Waffen anhaken und **Allen … Aufsätzen zuordnen** (wie „Maps ohne Modus“). Suche und Kategorie-Knöpfe helfen bei vielen Einträgen.
+   **Aus Spiel übernehmen** holt Einträge einer anderen Spielversion, fehlende Kategorien kommen mit, Aufsätze finden ihre Waffen über den
+   Namen (Waffen also mit übernehmen, sonst kommen sie ohne Waffe).
 3. **Zustand:** *Deaktivieren* (Ein/Aus-Symbol): kommt auf keine neue Sperrliste, wo er steht, bleibt er. *Archivieren*: zusätzlich
    ausgeblendet. Was auf einer gespeicherten Sperrliste steht, lässt sich nicht löschen, nur archivieren.
 4. **Sperrliste der Season:** auf der Season-Seite, Abschnitt **Sperrliste**. Haken bei **sperren**, darunter **Gilt in**: allen Modi oder

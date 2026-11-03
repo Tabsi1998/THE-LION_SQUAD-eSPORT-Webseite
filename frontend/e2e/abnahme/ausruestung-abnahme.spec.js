@@ -7,7 +7,8 @@ const { ENABLED, STATE_FILE, state, signIn, watch } = require("./abnahmeSession"
 // Ausrüstung und Sperrliste (#2218, docs/LIGA.md „C.4 Ausrüstung“) gegen den echten Server, ohne nachgestellte API. Stand aus
 // scripts/seed_abnahme_liga.py (ABNAHME_STATE auf dessen Stand-Datei): Spiel „Call of Duty“ und die öffentliche Season der
 // Liga-Anmeldung mit Regelwerk und Staffel A.
-// 1. Bibliothek: eine Waffe mit synthetischem Bild, zwei Aufsätze dazu - einer davon im Browser angelegt.
+// 1. Bibliothek: eine Waffe mit synthetischem Bild, zwei Aufsätze dazu - einer ohne Waffe (Hinweis, Zuordnung in einem Schritt), einer im
+//    Browser angelegt.
 // 2. Season: Sperrliste im Browser setzen (Waffe nur in einem Modus, ein Aufsatz an der Waffe), auf die Staffel übertragen.
 // 3. Regelwerk mit Baustein „Sperrliste“ in Anlage A veröffentlichen; danach die Liste ändern - der Abschnitt meldet „alte Liste“,
 //    das Regelwerk schlägt eine neue Version mit markierten Unterschieden vor, sie wird mit neuer Zustimmung veröffentlicht.
@@ -117,6 +118,12 @@ test.describe("Abnahme: Ausrüstung und Sperrliste gegen den echten Server", () 
 
     // Der zweite Aufsatz im Browser: Seitenblatt, Waffe suchen und wählen.
     await page.goto(`/admin/games/${game.id}/equipment`);
+    // Ohne Waffe passt der Griff zu keiner (Obmann, 03.11.): Der Hinweis nennt ihn, ein Schritt ordnet ihn der Waffe zu.
+    const notice = page.getByTestId("equipment-without-weapon");
+    await expect(notice).toContainText(GRIP);
+    await notice.getByTestId(`equipment-assign-${weapon.id}`).check();
+    await notice.getByTestId("equipment-assign").click();
+    await expect(notice).toHaveCount(0);
     await page.getByTestId(`equipment-add-${role("attachment").key}`).click();
     const sheet = page.getByTestId("equipment-sheet");
     await sheet.getByTestId("equipment-name").fill(SCOPE);
@@ -125,7 +132,7 @@ test.describe("Abnahme: Ausrüstung und Sperrliste gegen den echten Server", () 
     await sheet.getByRole("checkbox", { name: WEAPON }).check();
     await sheet.getByTestId("equipment-save").click();
     await page.getByTestId("equipment-search").fill(stamp);
-    await expect(page.getByText(`passt zu ${WEAPON}`)).toBeVisible();
+    await expect(page.getByText(`passt zu ${WEAPON}`)).toHaveCount(2);
     await expect(page.getByTestId(`equipment-row-${weapon.id}`).locator("img")).toHaveAttribute("src", /uploads/);
     await noSideScroll(page);
     await shot(page, "ausruestung-bibliothek-abnahme.png");
