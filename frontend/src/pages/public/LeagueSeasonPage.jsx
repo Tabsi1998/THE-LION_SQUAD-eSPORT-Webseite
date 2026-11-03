@@ -1,5 +1,5 @@
 // Ligaseite (docs/LIGA.md, P5, #1625) unter /liga/<liga>/<season>: Kopf mit Zeitraum, Spielwoche, Standardtermin,
-// Sperrzeiten und Punkten, darunter je Liga N die Staffeln (Tabelle, Spielplan, Ergebnisse), dann Regeltext und Map-Pool.
+// Sperrzeiten und Punkten, darunter je Liga N die Staffeln (Tabelle, Spielplan, Ergebnisse), dann Regeltext, Map-Pool und Sperrliste.
 // Sichtbar nach der Season (Lese-API) - unsichtbar heißt wie „gibt es nicht“.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
@@ -9,6 +9,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { MapPoolView } from "@/components/tls/maps/MapPoolView";
+import { LoadoutBansView } from "@/components/tls/league/LoadoutBansView";
 import { StaffelPanel } from "@/components/tls/league/public/StaffelPanel";
 import { LeagueHead, LeaguePrizes } from "@/components/tls/league/public/LeagueLook";
 import { LeagueApplicationPanel } from "@/components/tls/league/application/LeagueApplicationPanel";
@@ -193,6 +194,8 @@ export default function LeagueSeasonPage() {
 
         <MapPoolView pool={data.map_pool} title="Map-Pool" hint="Diese Maps sind in der Season erlaubt." icon={MapIcon}
           className="mt-14" testId="league-map-pool" />
+        {/* Sperrliste (#2218): nur, was die Season veröffentlicht - ohne Liste kein Block. */}
+        <LoadoutBansView list={data.loadout_bans} testId="league-loadout-bans" />
       </div>
     </PublicLayout>
   );

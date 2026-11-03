@@ -51,12 +51,21 @@ export function isOwnUpload(address) {
   return OWN_UPLOAD.test(String(address || ""));
 }
 
-/** Optionen für Markdown im Regelwerk - auch für die Vorschau im Editor. */
+/** Optionen für Markdown im Regelwerk - auch für die Vorschau im Editor (dort der Text, wie er geschrieben ist). */
 export const RULES_MARKDOWN = { linkMentions: false, anchorLinksInPage: true, imageAllowed: isOwnUpload };
 
 /** Markdown wie überall im Projekt (maskiert, nur sichere Elemente); Sprünge bleiben in der Seite, „@“ wird kein Profil-Link. */
 export function renderRulesMarkdown(markdown) {
   return renderMarkdownLite(markdown, RULES_MARKDOWN);
+}
+
+// Abschnitte, wie die API sie ausliefert (#2218): Namen in Bausteinen mit Backslash-Escapes, ein Backslash im freien Text verdoppelt -
+// `escapes` zeigt beides, wie geschrieben; ein Name wird nie Link oder fett. Wie im PDF.
+const SECTION_MARKDOWN = { ...RULES_MARKDOWN, escapes: true };
+
+/** Ein Abschnitt der Regelseite oder der Vorschau aus `sections[].body_md`. */
+export function renderRulesSection(markdown) {
+  return renderMarkdownLite(markdown, SECTION_MARKDOWN);
 }
 
 // ---------------------------------------------------------------- Suche in der Seite

@@ -34,6 +34,7 @@ import { MatchCallBox } from "@/components/tls/tournament/MatchCallBox";
 import { ProblemReportForm } from "@/components/tls/results/ProblemReportForm";
 import { OwnDisputes } from "@/components/tls/results/OwnDisputes";
 import { ResultWindow } from "@/components/tls/results/ResultWindow";
+import { DoubleNoShowAction } from "@/components/tls/league/DoubleNoShowAction";
 import { ResultUndoBar, useResultUndo } from "@/components/tls/results/ResultUndoBar";
 import { isOwnProposal, proposalStatusLabel, waitingForOtherSide } from "@/lib/scheduleProposals";
 import { useLeagueTrail } from "@/hooks/useLeagueTrail";
@@ -545,6 +546,8 @@ function MatchPageView() {
                   <p className="text-xs text-white/50">{data.result_entry.has_result ? "Korrigieren geht nur mit Grund – er steht im Protokoll." : "Mit „Nicht erschienen“ und „Aufgegeben“ je Seite. Danach 10 Sekunden „Rückgängig“."}</p>
                 </div>
               )}
+              {/* Liga-Staffel (E.1, #1625): beide nicht erschienen werten oder das Spiel neu ansetzen. */}
+              {data.league && canStaffSubmit ? <DoubleNoShowAction match={match} conflict={data.conflict} onDone={() => load()} /> : null}
               {canStaffSubmit && data.result_entry?.hold ? (
                 <p className="text-sm text-[#29B6E8]" data-testid="match-staff-result-held">{data.result_entry.hold.mine ? "Gespeichert – in wenigen Sekunden geht es raus." : `${data.result_entry.hold.actor_name} trägt gerade das Ergebnis ein.`}</p>
               ) : null}

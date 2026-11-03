@@ -12,6 +12,7 @@ import { StaggerIn } from "@/components/tls/motion";
 import { useChangedKeys, useFlipRows } from "@/hooks/useLiveChanges";
 import { standingSignature } from "@/lib/liveChanges";
 import { LazyImg } from "@/components/tls/LazyImg";
+import { hidesDraws, tiebreakOrder } from "@/lib/leagueTable";
 import { notPlayedText } from "../leagueResultRules";
 import {
   SOURCE_LABELS,
@@ -87,7 +88,7 @@ function MatchRow({ match }) {
       </div>
       <div className="tls-league-match__meta">
         {match.done
-          ? <span>{match.forfeit ? "kampflos" : "gespielt"}</span>
+          ? <span>{match.double_forfeit ? "beide nicht erschienen" : match.forfeit ? "kampflos" : "gespielt"}</span>
           : <span>{matchWhen(match)}{match.scheduled_at && SOURCE_LABELS[match.schedule_source] ? ` · ${SOURCE_LABELS[match.schedule_source]}` : ""}</span>}
         <Link to={`/matches/${match.id}`} className="inline-flex items-center gap-1 text-brand hover:text-white">
           Spiel <ExternalLink className="h-3 w-3" aria-hidden="true" />
@@ -147,6 +148,7 @@ export function StaffelPanel({ leagueSlug, seasonSlug, staffel }) {
   useLiveRefresh(load, ["tournaments", "matches"], { fallbackMs: 15000, tournamentId: staffel.tournament_id });
 
   const rows = useMemo(() => (Array.isArray(data?.standings) ? data.standings : []), [data]);
+  const tableRules = data?.staffel?.table_rules || null;
   const changed = useChangedKeys(rows, standingKey, standingSignature);
   const registerRow = useFlipRows(rows, standingKey);
   const weeks = data?.weeks || [];
@@ -169,7 +171,13 @@ export function StaffelPanel({ leagueSlug, seasonSlug, staffel }) {
       <div className="min-w-0 space-y-6">
         <StaggerIn className="tls-league-table" aria-label={`Tabelle Staffel ${staffel.staffel}`}>
           <StandingsTable rows={rows} kind="team_league" changed={changed} registerRow={registerRow}
-            label={`Tabelle Staffel ${staffel.staffel}`} mineLabel="Dein Team" />
+            label={`Tabelle Staffel ${staffel.staffel}`} mineLabel="Dein Team" hideDraws={hidesDraws(tableRules, rows)} />
+          {/* Reihenfolge bei Punktgleichheit (E.1, #1625) - dieselbe, nach der der Server sortiert. */}
+          {tableRules?.tiebreakers?.length ? (
+            <p className="mt-2 text-[11px] text-white/45" data-testid={`league-tiebreak-order-${staffel.staffel}`}>
+              Reihenfolge: {tiebreakOrder(tableRules.tiebreakers)}
+            </p>
+          ) : null}
         </StaggerIn>
         <section aria-labelledby={`league-teams-${staffel.staffel}`}>
           <h4 id={`league-teams-${staffel.staffel}`} className="tls-league-subhead"><Users className="h-4 w-4" aria-hidden="true" /> Teams</h4>

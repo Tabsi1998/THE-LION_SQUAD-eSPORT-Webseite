@@ -61,7 +61,7 @@ Indizes: `id` eindeutig, `slug` eindeutig, `game_id`.
 | `game_mode_order` | `[str]` | nein | `[]` = Modus je Map frei; sonst Modus je Position (zyklisch) |
 | `map_repeat` | `"never"` \| `"other_mode"` \| `"always"` | ja | `"other_mode"`: dieselbe Map in einer Serie nur in einem anderen Modus (#2096); `"never"` jede Map einmal, `"always"` frei |
 | `pool_min_maps` | `[{mode, min_maps}]` | nein | fehlt = abgeleitet aus Reihenfolge, Best of und `map_repeat` (C.2, Abschnitt 12) |
-| `scoring_rules` | dict | ja | `normalize_rules({})` aus `services/scoring_rules.py`; gelesen werden nur `match_points` (3/1/0) und `table_tiebreakers` |
+| `scoring_rules` | dict | ja | neue Seasons `league_default_rules()` aus `services/scoring_rules.py`; gelesen werden `match_points` und `table_tiebreakers`, seit E.1 auch `head_to_head_criteria`, `allow_draws`, `forfeit_score`, `exit_rule` (Abschnitt 12) |
 | `result_confirm_hours` | int 1–336 | ja | 48 |
 | `lineup_amend_hours` | int 1–336 | ja | 48 – Nachtragsfrist der eigenen Aufstellung nach dem Ergebnis |
 | `match_schedule_response_hours` | int 1–720 | nein | 72 – Antwortfrist auf Terminvorschläge (#2106, F3); fehlt (Seasons von vorher) = jede Staffel behält ihre |
@@ -235,7 +235,7 @@ Altbestand auf beiden Seiten durch, nur mit `match_id` und Anzahl, ohne Personen
 | Wochen gesamt, Sperrzeiten, Spielwoche, Standardtag/-zeit | Season | 10 · keine · 7 Tage · So 20:00 |
 | Runden (1 = Hinrunde, 2 = Hin/Rück) | Season | 1 |
 | Staffelgröße max., Best of, Teamgröße, Mindestkader | Season, Liga N überschreibt | 8 · 3 · 4 · 4 |
-| Punkte Sieg/Remis/Niederlage, Gleichstand | Season (`scoring_rules`), Liga N überschreibt | 3/1/0 · `score_diff`, `score_for` |
+| Punkte Sieg/Remis/Niederlage, Gleichstand, Remis, Default-Win, Ausscheiden (E.1) | Season (`scoring_rules`), Liga N überschreibt | neue Seasons 3/0/0 · direkter Vergleich, Differenz, Maps, Leitung · kein Remis · Best of · alle Spiele für die Gegner (ältere: 3/1/0 · `score_diff`, `score_for`) |
 | Modus je Position | Season | frei |
 | Bestätigungsfrist, Aufstellungs-Nachtrag | Season | 48 h · 48 h |
 | Antwortfrist auf Terminvorschläge (#2106) | Season, Liga N überschreibt | 72 h |
@@ -458,7 +458,6 @@ gemeinsam, damit das Heimrecht fair bleibt.
 | Versioniertes Regelwerk | #1646 (Stufe 1: `rules_text`) |
 | Gastteams anderer Vereine | #1665: Konten ohne Mitgliedschaft melden sich seit B.4 an (`entry_policy`), Gast-Plakette in Tabelle und Profil folgt |
 | Solo-Ligen (`participant_kind="solo"`) | #1629 |
-| Direkter Vergleich als Gleichstandsregel | #1559 |
 | Discord-Meldungen der Liga (Spieltag, Saisonende) | eigenes Folgepaket |
 | Map-Pool je Liga N, Statistik je Map/Spieler | später |
 
@@ -565,6 +564,7 @@ competition_sanctions ──▶ league_eligibility (Aufstellung, Check-in, Anmel
 | Modus-Felder | C.1 | Status, Ergebnisregel | `games.match_modes[]`, Dauerplanung bleibt |
 | `season_readiness` | C.2 | Vorab-Prüfung vor der Veröffentlichung | `map_pools`, `game_mode_order` |
 | Ergebnisregeln | C.3 | Prüfung in `normalize_games`, nur mit gesetzter Regel | `games[]` |
+| `game_equipment`, `loadout_bans` | C.4 | Bibliothek je Spiel, Sperrliste in Versionen, Baustein `loadout_bans` | `game_maps`, `map_pools`, `league_rule_blocks` |
 | `matches_v2.flow`, `match_flow.py` | D.2 | Stand abgeleitet, kein neuer globaler `status`; setzt `started_at` | `no_show_deadline`, `call_view` |
 | `matches_v2.veto`, `planned_games[]` | D.3 | Zustandsautomat auf dem Server, gleiche Schlüssel wie `games[]` | `map_pools.allowed`, `map_pool_id` |
 | `matches_v2.incidents[]` | D.5 | Abbruch, Pause, Rehost, Wiederholung, Entscheidung | `games[]` |
@@ -645,6 +645,8 @@ Zugriff, außer „lesen“ steht in der Zeile. Prüfung: `backend/tests/test_le
 | `PUT …/seasons/{id}/result-rules` (C.3) | `season` | – | – |
 | `POST …/seasons/{id}/map-pool/remove-map` (#2207) | `season` | – | – |
 | `GET …/seasons/{id}/map-pool/versions`, `…/map-pool/compare`, `…/readiness` (#2207) | jede Zuständigkeit der Liga | – | – |
+| `PUT`, `DELETE …/seasons/{id}/loadout-bans` (#2218) | `season` | – | – |
+| `GET …/seasons/{id}/loadout-bans`, `…/loadout-bans/compare` (#2218) | jede Zuständigkeit der Liga | – | – |
 | `POST …/seasons/{id}/divisions`, `PATCH`, `DELETE …/divisions/{id}`, `GET …/delete-plan` | `season` | – | – |
 | `POST …/divisions/{id}/staffeln`, `DELETE …/staffeln/{tid}` | `season` | – | – |
 | `GET …/seasons/{id}/roster`, `POST …/roster/{uid}/approve`, `PUT …/roster-settings` | `roster` | – | – |
@@ -669,6 +671,9 @@ Zugriff, außer „lesen“ steht in der Zeile. Prüfung: `backend/tests/test_le
 | Spiel: `POST /result` bei offenem Streitfall | `results` und `disputes` | ja | – |
 | Spiel: `POST /dispute` (ohne eigene Seite) | `disputes` | nein | – |
 | Spiel: `POST /proof-photos` als Leitung, `matches-v2/recalculate-advancement` | `results` | nein | – |
+| `GET /api/admin/leagues/staffeln/{tid}/table` (E.1) | jede Zuständigkeit | – | – |
+| `PUT …/staffeln/{tid}/table-decision`, `DELETE …/table-decision/{id}` (E.1) | `results` | ja, eigenes Team | – |
+| `POST`, `DELETE …/staffeln/{tid}/matches/{mid}/double-no-show` (E.1) | `results` | ja | – |
 | PDF-Exporte und Ergebnis-Vorabzug einer Staffel | jede Zuständigkeit | – | – |
 | Zugangslinks, TV-Schlüssel, Stationen, Gewinne an einer Staffel | zusätzlich zum Bereich `tournaments`: `manage` | – | – |
 | Öffentliche Ligaseite, Staffel, Spielplan, Tabelle, Matchseite | nach Sichtbarkeit; Sichtbarkeit `admins` nur mit Liga-Recht | – | lesen |
@@ -680,7 +685,7 @@ seiner Liga. Die Liga-Leitung bearbeitet aus der Kaderübersicht der Season („
 abgeben geht weiter. Alle anderen Teams und Co-Teams, auch nach dem Ende der Staffel, bleiben wie bisher.
 
 **Bewusst unverändert:** Die übrige Team-Verwaltung (`team_routes.py`, Team-Admin-Rollen) bleibt ein eigener Rechtebereich.
-Jahreswertung, Spiele und Map-Bibliothek bleiben beim Bereich `tournaments`. Die Moderation bleibt getrennt.
+Jahreswertung, Spiele, Map-Bibliothek und Ausrüstungs-Bibliothek (#2218) bleiben beim Bereich `tournaments`. Die Moderation bleibt getrennt.
 
 **Antworten an das Web:** `GET /api/tournaments/{tid}` schickt bei Staffeln `league_capabilities[]` und `can_edit_staffel`; die
 Matchseite `conflict` (`{"kind": "involved", "override": bool}` oder `null`); `matches-v2` einer Staffel für die Leitung `viewer_involved` und `viewer_override`; die Verwaltung je Liga `capabilities[]`. `GET /api/auth/me`
@@ -723,8 +728,8 @@ solange sie gleich bleibt; doppelte zählen weiter (`-2`). Text vor der ersten �
 `anlage-a`, ihre Überschriften `anlage-a-<slug>`. Die Abschnitte kommen vom Server, Web und PDF zeigen dieselben.
 
 **Bausteine:** `[[baustein:map_pool]]` (Tabelle Modus und Maps aus dem Pool `league_season`), `[[baustein:mode_order]]` (Liste aus
-`game_mode_order` mit den Namen der Modi). Unbekannte lehnt das Veröffentlichen mit 422 ab. Neue Bausteine stehen in
-`league_rule_blocks.BLOCKS` (für #2218 die Waffenliste). Beim Veröffentlichen wird das Markdown des Bausteins eingefroren; alte
+`game_mode_order` mit den Namen der Modi), `[[baustein:loadout_bans]]` (Sperrliste, C.4). Unbekannte lehnt das Veröffentlichen mit 422
+ab. Neue Bausteine stehen in `league_rule_blocks.BLOCKS`. Beim Veröffentlichen wird das Markdown des Bausteins eingefroren; alte
 Fassungen zeigen ihren Stand von damals. Ohne Season (Seite der Liga) oder bei einer Season, die erst nach dem Veröffentlichen dazukam,
 steht dort ein Hinweis statt einer Liste.
 
@@ -1270,6 +1275,233 @@ die Punktefelder ohne „freiwillig“ und prüfen vorab mit denselben Sätzen (
 Der Block `league` der Matchseite trägt dazu `result_rules` (nur Modi des Pools) und `scores_required`.
 
 **Map-Wiederholung** (Nr. 15) gibt es seit #2096 (`map_repeat` an Season und Staffel, Vorgabe `other_mode`); C.3 baut nichts dazu.
+
+### C.4 Ausrüstung (#2218)
+
+Waffen, Aufsätze und übrige Ausrüstung stehen einmal je Spiel in einer Bibliothek (Muster `game_maps`), die Season wählt daraus eine
+**Sperrliste** in unveränderlichen Versionen (Muster `map_pools`). Alles ist erlaubt außer dem, was auf der Sperrliste steht. Logik in
+`services/game_equipment.py` (Kategorien, Bibliothek, Import) und `services/loadout_bans.py` (Versionen, Vergleich, Staffel und Spiel,
+Baustein). Routen in `routes/game_equipment_routes.py` und `routes/league_loadout_routes.py`. Kein Wert eines Titels steht im Code.
+Verwaltung: Reiter **Ausrüstung** der Spielseite (`/admin/games/<Spiel>#ausruestung`, #2249; `…/equipment` leitet dorthin) und Abschnitt
+„Sperrliste“ der Season.
+**Migration: keine.** Ohne Sperrliste verhält sich alles wie vorher.
+
+**Grenze:** Das System prüft nicht, was im Spiel benutzt wird. Verstöße laufen über Protest und Strafe.
+
+**Kategorien je Spiel** (`game_equipment_categories`, eine Zeile je Spiel: `{game_id, categories[], updated_at, updated_by}`):
+
+| Feld | Typ | Regel |
+| --- | --- | --- |
+| `key` | str ≤ 40 | Kennung aus dem Namen beim Anlegen, ändert sich nie |
+| `label` | str 1–40 | Name, je Spiel nur einmal (ohne Groß und klein) |
+| `role` | `weapon` \| `attachment` \| `item` | Waffe (kann Aufsätze haben), Aufsatz (passt zu Waffen), sonstige Ausrüstung |
+
+Höchstens 20 Kategorien. Ohne Kategorien bietet die Verwaltung einen Vorschlag an (Waffen, Aufsätze, Perks, Ausrüstung,
+Abschussserien); gespeichert wird er erst auf Knopfdruck. Eine Kategorie mit Einträgen lässt sich nicht entfernen und ihre Rolle nicht
+ändern (409), umbenennen geht.
+
+**Einträge** (`game_equipment`):
+
+| Feld | Typ | Regel |
+| --- | --- | --- |
+| `id`, `game_id` | str | Kennung, Spiel |
+| `category` | str | Kennung einer Kategorie des Spiels |
+| `name` | str 1–80 | je Spiel und Kategorie nur einmal (ohne Groß und klein, Leerraum zusammengefasst; 409) |
+| `image_url` | str \| `null` | nur eigener Upload (`game_maps.IMAGE_URL`) mit Eintrag in `media_uploads`; ohne Medienrolle (`ADMIN_MEDIA_ROLES`) nur eigene mit `media_scope: "user"` – wie im Regelwerk (#2230), auch beim Import; ein Bild, das der Eintrag schon trägt oder aus der Quelle mitbringt, braucht nur den Eintrag. Sonst 422. Frühere stehen in `image_history` |
+| `note` | str ≤ 500 | nur für die Verwaltung |
+| `weapon_ids` | [str] | nur Rolle `attachment`: Waffen dieses Spiels, zu denen der Aufsatz passt. **Leer = passt zu keiner Waffe** (Obmann, 03.11.): Speichern geht, an einer Waffe sperren lässt er sich erst mit Zuordnung. `GET …/equipment` nennt sie in `attachments_without_weapon`, `POST …/equipment/assign-weapons {weapon_ids}` ordnet allen nicht archivierten auf einmal Waffen zu (Protokoll `game.equipment.assign_weapons`) |
+| `status` | `active` \| `inactive` \| `archived` | Zustand wie bei Maps (C.2), fehlt = aktiv |
+| `archived_at`, `created_at`, `created_by`, `updated_at`, `updated_by` | | |
+
+Höchstens 1000 Einträge je Spiel, archivierte zählen mit. Indizes: `id` eindeutig; (`game_id`, `category`, `name_key`) eindeutig.
+
+| Zustand | Neu auf eine Sperrliste | Verwaltung | Bestehendes |
+| --- | --- | --- | --- |
+| `active` | ja | sichtbar | – |
+| `inactive` | nein. Steht er in der geltenden Version derselben Season (gleiche Art, bei Aufsätzen an derselben Waffe), bleibt er beim nächsten Speichern erlaubt | sichtbar mit „inaktiv“ | bleibt gültig |
+| `archived` | nein, auch nicht in derselben Liste | nur mit „Archivierte zeigen“; der Editor nimmt ihn mit Hinweis heraus | bleibt gültig |
+
+**Löschen** nur, wenn der Eintrag in keiner Version einer Sperrliste steht (auch nicht als Aufsatz), sonst 409 „… bitte archivieren
+statt löschen“. Wird eine unbenutzte Waffe gelöscht, fällt sie aus den `weapon_ids` der Aufsätze.
+
+**Aus einer anderen Spielversion übernehmen:** wie bei Maps. Die Kategorie passt über Kennung oder Namen; fehlt sie im Ziel, wird sie
+mit Name und Rolle angelegt (wenn noch Platz ist). Aufsätze bekommen die Waffen des Ziels mit gleichem Namen; gibt es keine davon, kommen sie
+ohne Zuordnung (passen dann zu keiner, Hinweis in der Bibliothek). Das Bild wird mitverwendet. Was schon da ist oder nicht passt, steht mit
+Grund in `skipped`.
+
+**Sperrliste** (`loadout_bans`): jedes Speichern legt eine neue, unveränderliche Version an. `scope` `league_season` (Vorlage) oder
+`tournament` (Kopie der Staffel). Felder: `id`, `scope`, `scope_id`, `tournament_id`, `game_id`, `version`, `cleared`, `note`,
+`created_at`, `created_by`, `entries[]`. Index (`scope`, `scope_id`, `version`) eindeutig wie bei Pools: gleichzeitiges Speichern wird 409.
+
+| Feld je Eintrag | Inhalt |
+| --- | --- |
+| `kind` | `item`: der Eintrag ist gesperrt. `attachments`: nur bei Waffen – die Waffe bleibt erlaubt, die genannten Aufsätze sind an ihr gesperrt |
+| `item_id`, `name`, `category`, `category_label`, `role`, `image_url` | Schnappschuss des Eintrags von damals |
+| `modes`, `mode_labels` | Modi, in denen die Sperre gilt; leer = alle Modi |
+| `attachments[]` | nur bei `attachments`: `{item_id, name, image_url}`, mindestens einer |
+
+Je Eintrag höchstens eine Zeile je Art, höchstens 500 Zeilen. Prüfung beim Speichern (422 mit deutschem Satz): Eintrag gehört zum Spiel,
+Zustand wie oben, Modi des Spiels (`game_modes.choice_problem`, ein schon gesetzter inaktiver Modus bleibt), `attachments` nur an Waffen,
+jeder Aufsatz ist der Waffe zugeordnet (`weapon_ids` mit der Waffe; leer: „keiner Waffe zugeordnet“), keine Aufsatz-Zeile an einer Waffe, die in allen Modi ganz gesperrt
+ist. Leere Liste: 422 „… oder die Sperrliste entfernen“. `expected_version` schützt wie beim Pool (0 = bisher keine).
+
+**Season → Staffel → Spiel:** Eine neue Staffel bekommt die geltende Version als eigene (`copy_version`, unter der Pool-Sperre der
+Season). „Vorgaben auf Staffeln übertragen“ überträgt sie immer, auch auf gesperrte und laufende Staffeln (eigene Gruppe `loadout_bans`
+„Sperrliste“). Hat die Season keine mehr, fällt die Kopie der Staffel nur vor dem ersten Ergebnis und nicht gesperrt weg. Das Spiel hält
+seine Version fest: `matches_v2.loadout_ban_id` (optional) setzt das erste Festschreiben eines Ergebnisses einer Staffel, zusammen mit
+`rule_version_id` – die Kennung der geltenden Version oder ausdrücklich `null` für „keine Liste“. Eine Korrektur lässt es stehen,
+„Rückgängig“ nimmt es mit. Ein Fehler beim Ermitteln wird nicht verschluckt. Gilt für ein Spiel: Vermerk vorhanden → diese Version bzw.
+keine; ohne Vermerk und fertig (`completed`, `forfeit`, Altbestand vor C.4) → keine; sonst die Version der Staffel → keine. Andere Formate
+schreiben das Feld nie.
+
+**Regelwerk:** Baustein `[[baustein:loadout_bans]]` „Sperrliste“ (für Anlage A gedacht, steht überall). Je Kategorie eine Tabelle mit
+Bild, Name und „Gilt in“, danach die Aufsätze an erlaubten Waffen. Ohne Sperrliste: „Für diese Season ist keine Sperrliste hinterlegt –
+alles ist erlaubt.“ **Eingefroren wird strukturiert im Klartext** (Folge-Review): je Baustein `{label, source, data}` – für die Sperrliste
+`data = {list, groups: [{label, entries: [{name, image_url, modes}]}], weapons: [{name, image_url, attachments, modes}]}`, für den Map-Pool
+`{rows: [{label, maps}]}`, für die Modusfolge `{labels}`. Markdown entsteht erst beim Darstellen (`league_rule_blocks.value`): `markdown`
+mit Bildern (Web, Vorschau) und `text` ohne Bilder (PDF, Wort-Vergleich). Ältere Fassungen tragen statt `data` das fertige `markdown`/`text`
+und werden so weiter gelesen. Namen aus Bibliothek und Modus sind Text: Beim Darstellen ersetzt `markdown_text.text_cell` jedes Steuerzeichen
+(`` \`*_[]()!~+ ``, „|“ wird „/“) durch ein Zeichen aus dem privaten Unicode-Bereich (`U+E000`…), das keine Markdown-Regel trifft – in
+allen Bausteinen. Dieses Zwischenformat bleibt auf dem Server: Das PDF (`pdf_rules_inline`) setzt das echte Zeichen ein, und `sections[].body_md`
+von Regelseite und Vorschau geht durch `markdown_text.served` – Namen mit Markdown-Backslash-Escapes, ein Backslash im frei geschriebenen
+Text verdoppelt. Das Web (`renderRulesSection`, `markdownLite` mit `escapes`, auch in Codeblöcken und Adressen) zeigt so beides, wie es
+geschrieben ist; der Editor zeigt den Text ohne `escapes`. Gespeicherte Fassungen, die Antwort des Veröffentlichens, „Daten geändert“
+(`before`, `after`, `ops`) und der Vergleich sind Klartext (`markdown_text.plain`). Altbestand mit Schutzzeichen wird beim Lesen
+zurückgewandelt bzw. ausgeliefert wie neu; in keiner API-Antwort steht ein Zeichen aus `U+E000`…`U+E00F`. Eingegeben (freier Text,
+Titel, Namen im Baustein) fällt ein Zeichen aus diesem Bereich weg (`strip_protected`). Ein Name wird so nie Link oder Formatierung, und
+der frei geschriebene Regeltext bleibt unberührt, auch ein Backslash darin. Jede Fassung friert so ihre Liste ein. Eine geänderte Sperrliste ergibt den Hinweis „Daten geändert“ (B.2) mit markierten
+Unterschieden; die Leitung bereitet daraus eine neue Fassung vor, gibt sie frei und wählt `requires_consent`. Bilder eingefrorener
+Bausteine stehen zusätzlich in `league_rules.frozen_images` (nur veröffentlichte Fassungen): Die Mediathek dreht und löscht sie nicht.
+
+**Rechte und Routen** (Protokoll je Änderung, ohne Werte aus der Anfrage):
+
+| Route | Recht | Zweck |
+| --- | --- | --- |
+| `GET /api/games/{id}/equipment` | Bereich `tournaments` (wie Maps) | Spiel mit Modi, Kategorien, Einträge mit `in_lists`, `limit`, `suggested_categories` |
+| `PUT /api/games/{id}/equipment/categories` | ebenso | `{categories: [{key?, label, role}]}`; Protokoll `game.equipment.categories` |
+| `POST`, `PATCH`, `DELETE /api/games/{id}/equipment[/{item}]` | ebenso | Eintrag anlegen, ändern (auch `status`), löschen; `game.equipment.create/.update/.delete` |
+| `GET …/equipment/import-sources[/{source}]`, `POST …/equipment/import` | ebenso | aus anderer Spielversion; `game.equipment.import` |
+| `GET /api/admin/leagues/seasons/{id}/loadout-bans` | jede Zuständigkeit der Liga | Spiel, Kategorien, Bibliothek (aktiv und inaktiv), geltende Version mit `stale` und `outdated_item_ids`, Versionen, Stand im Regelwerk |
+| `PUT …/loadout-bans` | `season` | neue Version; Antwort mit `staffeln_to_sync`; `league.season.loadout_bans.save` |
+| `DELETE …/loadout-bans` | `season` | entfernen (Version mit `cleared`); `league.season.loadout_bans.clear` |
+| `GET …/loadout-bans/compare?base=<Nr>&target=<Nr>` | jede Zuständigkeit der Liga | `{base, target, added[], removed[], changed[], same}` je Zeile (`kind`, `item_id`) |
+
+**Öffentlich** nur, was die Season zeigt: `GET /api/leagues/{liga}/{season}` trägt `loadout_bans` (Lesevertrag `{id, version, saved_at,
+entries[]}` ohne `note` und Autor, `null` ohne Liste), die Regelseite den Baustein. Die Bibliothek selbst ist nie öffentlich.
+
+**Datenschutz:** Alle drei Sammlungen sind Vereinsinhalt (`personal_data.CLUB_CONTENT`), nur die Kennung, wer angelegt oder gespeichert
+hat. Bilder: `game_equipment.image_url` und `.image_history`, `loadout_bans.entries.image_url` und `.entries.attachments.image_url`
+stehen in den Verwendungsstellen der Mediathek (`media_audit`); die Kontolöschung behält sie, solange sie dort stehen. Jede Version einer
+Sperrliste ist unveränderlich (`media_audit.FROZEN_COLLECTIONS`): Ein Bild darin lässt sich nicht drehen und nicht löschen (409), Duplikat-
+Ersetzen und Bild-Migration schreiben sie nicht um. In der Bibliothek darf sich ein Bild ändern.
+
+**App:** liest nichts davon, Antworten bekommen nur Felder dazu.
+
+### E.1 Tabelle (#1625)
+
+Tabellen-Regeln einer Liga-Staffel: direkter Vergleich mit Mini-Tabelle, Default-Win, beide nicht erschienen, Ausscheiden
+(Austritt, Auflösung, Disqualifikation), Punktabzug und Entscheid der Leitung. Das ist der Tiebreaker-Teil von #1559 für
+Liga-Staffeln; Swiss, Playoffs und Heimrecht bleiben dort. Rechenkern in `services/competition_standings.py` (`_league_rows`),
+Regeln in `services/scoring_rules.py`, Entscheide und „beide nicht erschienen“ in `services/league_table.py`, Routen in
+`routes/league_table_routes.py`. **Migration: keine.** Kein Wert eines Titels steht im Code.
+
+**Weiche:** Ohne `scoring_rules` am Turnier rechnet die Tabelle wie bisher (`_round_robin_rows`). Mit `scoring_rules`
+(nur Liga-Staffeln, `format` `league` oder `round_robin`) rechnet `_league_rows`; mit den Vorgaben für fehlende Felder
+ergibt das genau die alte Reihenfolge (Regressionstest). Gruppen, Swiss, K.-o. und FFA bleiben unverändert. Alle Leser gehen
+über `standings_for_structure` bzw. `public_standings`: Turnierseite, Ligaseite (`/api/leagues/…/staffeln/…`), TV, PDF,
+App (`/api/tournaments/{id}/standings`), Plätze (`placements_for_structure`) und Discord.
+
+**Neue Felder in `scoring_rules`** (je Season, Liga N überschreibt wie bisher, Übertragen in der Gruppe `before_result`):
+
+| Feld | Werte | Fehlt (alte Seasons) | Vorgabe neuer Liga-Seasons |
+| --- | --- | --- | --- |
+| `table_tiebreakers` | Liste aus `head_to_head`, `score_diff`, `score_for`, `wins`, `lead_decision` | `score_diff`, `score_for` | `head_to_head`, `score_diff`, `score_for`, `lead_decision` (Nr. 25) |
+| `head_to_head_criteria` | Liste aus `points`, `score_diff`, `score_for`, mindestens eines | `points`, `score_diff`, `score_for` | ebenso (Nr. 42) |
+| `allow_draws` | bool | `true` | `false` – die Tabelle zeigt keine Spalte „U“; Ergebnis der Leitung, Meldung und App-Bestätigung lehnen einen geteilten Platz mit 422 ab (`match_v2_results.checked_results` → `match_rules.match_allows_draw`). Das gilt für die Serie; ob eine einzelne Map unentschieden enden darf, sagt die Ergebnisregel des Modus (`draw_allowed`, C.3, `league_games.normalize_games`) – beide Prüfungen laufen nacheinander |
+| `forfeit_score` | `recorded` \| `best_of` | `recorded` (wie eingetragen) | `best_of`: Sieger bekommt ⌊Best of/2⌋+1 Maps, der andere 0 (BO5 3:0, Nr. 26) |
+| `exit_rule` | `half` \| `all_for_opponents` | `half` (50-%-Regel) | `all_for_opponents` (Kommentar 02.11., Nr. 43, Nr. 48) |
+| `match_points` | wie bisher | 3/1/0 | 3/0/0 |
+
+Punkte zählen immer zuerst. `points`, `score_diff`, `score_for` und `wins` meinen Punkte, Map-Differenz, gewonnene Maps und Siege.
+
+**Reihenfolge bei Punktgleichheit** – die Kriterien in der Reihenfolge von `table_tiebreakers`:
+
+- Ein Gesamtkriterium (`score_diff`, `score_for`, `wins`) teilt die Gruppe nach dem Wert über alle Spiele.
+- `head_to_head`: Mini-Tabelle nur aus den Spielen der Gruppe untereinander (zwei Teams: direkter Vergleich), sortiert nach
+  `head_to_head_criteria`. Teilt sie die Gruppe, wird für jede Restgruppe mit mindestens zwei Teams die Mini-Tabelle neu
+  gerechnet, nur mit den Spielen der Restgruppe. Teilt sie nicht mehr, geht es mit dem nächsten Kriterium weiter (Gesamtwerte).
+  Der direkte Vergleich zählt nur, wenn **alle** Spiele der Gruppe untereinander gespielt sind (Entscheidung des Obmanns,
+  03.11.); steht eines noch aus, wird das Kriterium übersprungen und es geht mit dem nächsten weiter. Maßgeblich ist der ganze
+  Spielplan der Staffel, auch für die Tabelle des vorigen Spieltags (Bewegung). Annullierte Spiele zählen nicht mit.
+- `lead_decision`: steht ein echter Gleichstand nach allen Kriterien, gilt die Reihenfolge der Leitung, wenn sie für genau diese
+  Gruppe besteht (siehe unten). Ohne Entscheid teilen sich die Teams den Platz (1, 2, 2, 4), wie bisher.
+- Nie entscheidet der Name oder die Reihenfolge der Anmeldung.
+
+**Spiele in der Tabelle** (nur Spiele mit Stand `completed` oder `forfeit`):
+
+| Fall | Erkennung | Wertung |
+| --- | --- | --- |
+| Kampflos (Default-Win) | Stand `forfeit`, eine Seite mit `forfeit` | Sieg/Niederlage; mit `forfeit_score: best_of` Maps ⌊Best of/2⌋+1 : 0 (Best of am Spiel, sonst am Turnier). Zeile zählt `forfeit_won` bzw. `forfeit_lost` |
+| Beide nicht erschienen (Nr. 27) | `double_forfeit: true`, beide Seiten mit `forfeit` | beide verlieren: Niederlagenpunkte, keine Maps, `forfeit_lost` +1; Form „N“ für beide |
+| Ausgeschiedenes Team (`exit_rule: all_for_opponents`) | Anmeldung `withdrawn` oder `disqualified` | **jedes** Spiel des Teams, auch gespielte, zählt wie ein Default-Win für den Gegner. Das echte Ergebnis bleibt am Spiel und auf Spielplan und Matchseite sichtbar |
+| Zwei ausgeschiedene Teams gegeneinander (Nr. 48) | beide `withdrawn`/`disqualified` | zählt für keinen, auch nicht als gespielt |
+
+**Tabellenende (Nr. 43, nur mit `all_for_opponents`):** Ausgeschiedene stehen unter allen anderen, ohne Rücksicht auf Punkte.
+Zuerst Ausgetretene und Aufgelöste, darunter Disqualifizierte; innerhalb jeweils wer später ausschied (`removal.at`) weiter
+oben. Eine Auflösung trägt die Leitung als Austritt ein (Grund „Team aufgelöst“). Mit `half` bleibt alles wie bisher
+(annulliert oder kampflos verloren, Platz nach Punkten).
+
+**Ausscheiden (`tournament_events.plan_removal`):** Mit `all_for_opponents` gibt es in Staffeln keine Annullierung mehr: alle
+offenen Spiele werden kampflos verloren gewertet (wie bisher ab der Hälfte), die gespielten bleiben unverändert am Spiel; den Rest
+macht die Tabelle. Modus des Plans `opponents`, Satz „alle Spiele zählen für die Gegner, das Team steht am Tabellenende“.
+Andere Formate und Staffeln mit `half` unverändert.
+
+**Punktabzug (vorbereitet für E.3):** `tournaments.point_deductions: [{id, registration_id, points > 0, reason, source,
+sanction_id?, created_at, created_by}]`. Die Tabelle zieht die Summe je Anmeldung von den Punkten ab (`deducted_points`), in der
+Mini-Tabelle zählt er nicht. Gelesen wird nur mit `scoring_rules`. Geschrieben wird es in E.1 nirgends; den Grund zeigt die
+Tabelle nicht öffentlich.
+
+**Entscheid der Leitung** (`tournaments.table_decisions: [{id, registration_ids, reason, decided_by, decided_at}]`):
+
+- `GET /api/admin/leagues/staffeln/{tid}/table` (jede Zuständigkeit der Liga): Tabelle wie öffentlich, dazu `ties` (Gruppen mit
+  geteiltem Platz, die die Leitung ordnen darf), `decisions` (mit `applies`: gilt gerade) und `can_decide`
+  (`lead_decision` in den Regeln). Je Gleichstand und Entscheid `own_team` (die Person gehört zu einer Seite) und
+  `superadmin`: Die Verwaltung zeigt bei `own_team` ohne Superadmin „Über dein eigenes Team entscheidet eine andere Person.“
+  statt der Knöpfe, dem Superadmin das Feld „Grund für die Notausnahme“ (ab fünf Zeichen, geht als `conflict_reason` mit).
+  Die Matchseite nimmt dafür ihr `conflict` (`{kind, override}`) – ebenso bei „beide nicht erschienen“.
+- `PUT /api/admin/leagues/staffeln/{tid}/table-decision` `{registration_ids, reason, conflict_reason?}` – Zuständigkeit
+  `results`. Nur für einen echten Gleichstand: die Menge muss genau einer Gruppe mit geteiltem Platz entsprechen (ein älterer
+  Entscheid für dieselbe Menge zählt dabei nicht), sonst 409. Grund mindestens fünf Zeichen. Befangen ist, wer zu einer der
+  Seiten gehört (`require_no_side_conflict`, Notausnahme Superadmin mit Grund). Ersetzt einen Entscheid für dieselbe Menge.
+  Protokoll `league.table.decision`.
+- `DELETE /api/admin/leagues/staffeln/{tid}/table-decision/{decision_id}` `{reason, conflict_reason?}` – `results`,
+  Befangenheit wie beim Festlegen (Seiten des Entscheids, Notausnahme `table_decision_remove`), Protokoll
+  `league.table.decision.remove`.
+- Ein Entscheid gilt nur, solange genau diese Teams nach allen Kriterien gleich stehen. Ändert ein Ergebnis das, gilt er nicht mehr
+  (`applies: false`) und bleibt zur Nachvollziehbarkeit stehen.
+- Öffentlich trägt die Zeile `tiebreak: "lead_decision"` und `lead_decision: {reason, decided_at}`; die Tabelle zeigt
+  „Platz durch Entscheid der Leitung“ mit dem Grund.
+
+**Beide nicht erschienen** (`POST /api/admin/leagues/staffeln/{tid}/matches/{mid}/double-no-show` `{note, conflict_reason?}`,
+Zuständigkeit `results`, Befangenheit wie beim Ergebnis): nur in einer Staffel, nur für ein Spiel mit zwei Seiten **vor dem
+Spiel** – Stand `pending`, `ready` oder `scheduled`, ohne `started_at`, ohne Meldung (`reports`), ohne gehaltenes Ergebnis
+(`pending_result`) und ohne Ergebnis, sonst 409.
+Schreibt `status: "forfeit"`, `double_forfeit: true`, `results` beide mit `rank: 2, forfeit: true`, `games: []`, Begründung wie
+beim Forfeit (mindestens fünf Zeichen) und je Seite den Eintrag „nicht erschienen“. Protokoll `match.forfeit.double`. Danach
+dieselben Folgen wie beim kampflos (`league_table.after_change`): Station und Aufruf frei, Discord-Baum vorgemerkt,
+Anzeige-Ereignis, Stand der Wettbewerbsstruktur; beim Neu ansetzen ebenso (ohne Station).
+**Neu ansetzen:** `DELETE` auf dieselbe Adresse `{reason, conflict_reason?}` (Befangenheit wie beim Werten, Notausnahme
+`double_no_show_undo` im Protokoll) setzt das Spiel zurück (ohne Ergebnis, Stand `scheduled` mit Termin,
+sonst `ready`), Protokoll `match.forfeit.double.undo`; den Termin setzt die Leitung danach wie gewohnt.
+
+**Antworten (nur zusätzlich, die App bleibt ohne Build lauffähig):** Jede Zeile einer Staffel-Tabelle trägt dazu `tiebreak`
+(`head_to_head`, `score_diff`, `score_for`, `wins`, `lead_decision` oder `null`), `forfeit_won`, `forfeit_lost`,
+`deducted_points`, `exit` (`{kind, at}` oder `null`) und `lead_decision`. Die Staffel der Ligaseite trägt `table_rules`
+(`allow_draws`, `tiebreakers`, `head_to_head_criteria`, `forfeit_score`, `exit_rule`).
+
+**Darstellung (Entscheidung 15.10.):** Platz und Zone, kein öffentliches Rating, Hervorhebung in Cyan (Gold bleibt dem
+Season-Meister, F.1). Bei Gleichstand ein kleiner Hinweis, was entschied („Direkter Vergleich“, „Map-Differenz“, „Mehr Maps“,
+„Mehr Siege“, „Entscheid der Leitung“), „kampflos“ bei Default-Wins, am Tabellenende „Ausgetreten“ bzw. „Disqualifiziert“.
 
 ### Darf nicht beschädigt werden
 

@@ -1,9 +1,10 @@
 // Spielseite der Verwaltung (#2249) unter /admin/games/<Spiel>: alles zu einem Spiel an einem Ort, in Reitern Allgemein,
-// Spiel-IDs, Modi und Maps (per Adresse ansteuerbar: #allgemein, #ids, #modi, #maps). Vorher verteilt auf die Seitenleiste
-// „Spiel bearbeiten“ und eine eigene Map-Seite (die alte Adresse /admin/games/<Spiel>/maps leitet hierher weiter).
+// Spiel-IDs, Modi, Maps und Ausrüstung (per Adresse ansteuerbar: #allgemein, #ids, #modi, #maps, #ausruestung). Vorher verteilt auf
+// die Seitenleiste „Spiel bearbeiten“ und eigene Seiten (die alten Adressen …/maps und …/equipment leiten hierher weiter).
 //
 // Speichern je Reiter: jeder Reiter mit Formular hält seinen Entwurf, solange die Seite offen ist - ein Reiterwechsel verliert
-// nichts, der Reiter trägt dann einen Punkt. Wer die Seite mit Ungespeichertem verlässt, wird gefragt. Maps speichern sofort.
+// nichts, der Reiter trägt dann einen Punkt. Wer die Seite mit Ungespeichertem verlässt, wird gefragt. Maps und Ausrüstung speichern
+// sofort.
 // Ein weiterer Reiter (etwa „Ausrüstung“ mit C.4) braucht einen Eintrag in GAME_TABS (lib/gameForm.js) und eines in PANELS unten.
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
@@ -25,6 +26,7 @@ import { GameGeneralTab } from "./GameGeneralTab";
 import { GameIdsTab } from "./GameIdsTab";
 import { GameModesTab } from "./GameModesTab";
 import { GameMapsTab } from "./GameMapsTab";
+import { EquipmentLibrary } from "./equipment/EquipmentLibrary";
 import { toast } from "sonner";
 
 const SAVE_LABELS = { allgemein: "Allgemein speichern", ids: "Spiel-IDs speichern", modi: "Modi speichern" };
@@ -98,6 +100,7 @@ export default function AdminGamePage() {
   const [drafts, setDrafts] = useState({});
   const [saving, setSaving] = useState("");
   const [mapsKey, setMapsKey] = useState(0);
+  const [equipmentDirty, setEquipmentDirty] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -131,7 +134,11 @@ export default function AdminGamePage() {
   const saved = useMemo(() => (game ? Object.fromEntries(Object.entries(FORMS).map(([key, toForm]) => [key, toForm(game)])) : {}), [game]);
   const formOf = (key) => drafts[key] ?? saved[key];
   const setForm = (key) => (next) => setDrafts((current) => ({ ...current, [key]: next }));
-  const dirty = Object.fromEntries(Object.keys(FORMS).map((key) => [key, Boolean(drafts[key] && saved[key] && !sameForm(drafts[key], saved[key]))]));
+  // Ausrüstung (#2218) speichert je Eintrag sofort - ungespeichert ist nur ein offenes Blatt mit Änderungen (es meldet sich selbst).
+  const dirty = {
+    ...Object.fromEntries(Object.keys(FORMS).map((key) => [key, Boolean(drafts[key] && saved[key] && !sameForm(drafts[key], saved[key]))])),
+    ausruestung: equipmentDirty,
+  };
   const dirtyLabels = GAME_TABS.filter((entry) => dirty[entry.key]).map((entry) => entry.label);
   const discard = (key) => setDrafts((current) => {
     const rest = { ...current };
@@ -168,7 +175,21 @@ export default function AdminGamePage() {
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirtyLabels.length]);
 
-  const selectTab = (key) => navigate({ pathname: location.pathname, search: location.search, hash: key === GAME_TABS[0].key ? "" : `#${key}` }, { replace: true });
+  // Ein offenes Ausrüstungs-Blatt (#2218) hängt am Reiter: Ein anderer Reiter verwirft es - darum dieselbe Rückfrage wie beim Verlassen.
+  // Die Formulare der übrigen Reiter bleiben dagegen beim Wechsel erhalten.
+  const selectTab = async (key) => {
+    if (key !== tab && tab === "ausruestung" && equipmentDirty) {
+      const leave = await confirm({
+        title: "Nicht gespeicherte Änderungen",
+        description: "In Ausrüstung ist noch etwas nicht gespeichert. Wechselst du den Reiter, geht es verloren.",
+        confirmLabel: "Verwerfen und weiter",
+        cancelLabel: "Zurück zum Blatt",
+        tone: "danger",
+      });
+      if (!leave) return;
+    }
+    navigate({ pathname: location.pathname, search: location.search, hash: key === GAME_TABS[0].key ? "" : `#${key}` }, { replace: true });
+  };
 
   const finish = async (key, text) => {
     await load();
@@ -222,6 +243,9 @@ export default function AdminGamePage() {
     ids: () => <GameIdsTab gameId={game.id} kind={game.kind} form={formOf("ids")} onChange={setForm("ids")} games={games} />,
     modi: () => <GameModesTab form={formOf("modi")} onChange={setForm("modi")} usage={usage} />,
     maps: () => <GameMapsTab gameId={game.id} reloadKey={mapsKey} onOpenModes={() => selectTab("modi")} />,
+    // Ausrüstung (C.4, #2218): speichert je Eintrag sofort wie die Maps. Ist ein Blatt mit Änderungen offen, meldet es das: Punkt am
+    // Reiter und Rückfrage beim Verlassen.
+    ausruestung: () => <EquipmentLibrary gameId={game.id} onDirtyChange={setEquipmentDirty} />,
   } : {};
   const hasForm = Boolean(FORMS[tab]);
 

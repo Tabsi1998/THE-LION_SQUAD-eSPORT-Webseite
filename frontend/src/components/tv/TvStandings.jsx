@@ -57,7 +57,10 @@ function TableBlock({ title, rows, columns, nameLabel, final, startRank = 0, tes
               style={{ "--tv-i": startRank + index }}
             >
               <td className="tv-standings__rank font-display">{row.rank}</td>
-              <td className="tv-standings__name" data-tv-name="1">{row.display_name || "Teilnehmer"}</td>
+              <td className="tv-standings__name" data-tv-name="1">
+                {row.display_name || "Teilnehmer"}
+                {row.exit?.kind ? <span className="tv-standings__exit"> · {row.exit.kind === "disqualified" ? "disqualifiziert" : "ausgetreten"}</span> : null}
+              </td>
               {columns.map((column) => (
                 <td key={column.key} className={`tv-standings__num ${column.strong ? "tv-standings__num--strong font-display" : ""}`}>{standingCell(column, row)}</td>
               ))}

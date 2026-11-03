@@ -104,8 +104,22 @@ async def result_best_of(db, match: dict) -> int:
 
 
 async def checked_results(db, match: dict, raw_results: list[dict]) -> list[dict]:
-    """Der Eingang für jedes neue Ergebnis und jede Meldung: der ganze Vertrag samt Best-of des Spiels."""
+    """Der Eingang für jedes neue Ergebnis und jede Meldung: der ganze Vertrag samt Best-of des Spiels. In einer
+    Liga-Staffel ohne Remis (``scoring_rules.allow_draws: false``, E.1 #1625) gibt es keinen geteilten Platz."""
+    if await _league_draws_off(db, match):
+        match = {**match, "allow_draws": False}
     return normalize_v2_results(match, raw_results, best_of=await result_best_of(db, match))
+
+
+async def _league_draws_off(db, match: dict) -> bool:
+    if not match.get("tournament_id"):
+        return False
+    from services.competition_standings import table_rules
+    from services.league_scope import is_league_staffel
+
+    tournament = await db.tournaments.find_one({"id": match["tournament_id"]},
+                                               {"_id": 0, "id": 1, "league_context": 1, "scoring_rules": 1})
+    return is_league_staffel(tournament) and (table_rules(tournament) or {}).get("allow_draws") is False
 
 
 def public_recalculation_error(match: dict) -> dict:

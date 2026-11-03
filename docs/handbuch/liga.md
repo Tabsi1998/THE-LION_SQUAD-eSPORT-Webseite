@@ -47,8 +47,9 @@ machen **Captain und Vertreter** des Co-Teams – hat ein Co-Team keinen von bei
 So läuft eine Spielwoche: Die Woche geht von **Dienstag bis Montag**. Die Captains vereinbaren einen Termin – ohne
 Einigung gilt der **Standardtermin** (Season 1: Sonntag 20:00). Nach dem Spiel meldet eine Seite das Ergebnis **im
 Web** mit Maps und hakt einmal an, wer bei ihr gespielt hat (**Teilnehmerliste**, siehe 3.3), die andere bestätigt. Antwortet sie nicht, gilt die Meldung nach **48 Stunden**
-(spätestens am Ende der Spielwoche, mindestens 24 Stunden Zeit). Die Tabelle rechnet **3 Punkte für einen Sieg,
-1 für ein Remis, 0 für eine Niederlage**; bei Gleichstand entscheiden Differenz und mehr gewonnene Maps.
+(spätestens am Ende der Spielwoche, mindestens 24 Stunden Zeit). Die Tabelle rechnet in neuen Seasons **3 Punkte für
+einen Sieg, 0 für eine Niederlage, ohne Remis**; bei Punktgleichheit entscheiden der **direkte Vergleich**, dann
+Map-Differenz und gewonnene Maps, zuletzt die Liga-Leitung (siehe 3.5). Alles stellt die Season ein.
 
 Season 1 im Kalender (10 Wochen, nur Hinrunde, acht Teams = sieben Spieltage):
 
@@ -103,6 +104,46 @@ blendet sie zusätzlich aus. Vor beidem fragt die Verwaltung nach und nennt die 
 steht – das ist nur ein Hinweis, gesperrt wird nichts. Soll eine kaputte Map wirklich aus einer laufenden Season raus, geht
 das in der Season mit **Map aus dem Pool nehmen** (2.2, Schritt 5).
 
+### 2.1a Ausrüstung und Sperrliste
+
+Grundsatz: **Alles ist erlaubt außer dem, was auf der Sperrliste der Season steht.** Die Website prüft nicht, was im Spiel benutzt
+wird – ein Verstoß läuft über Einspruch und Strafe.
+
+1. **Bibliothek:** **Admin → eSports → Spiele → Zahnrad → Reiter Ausrüstung** (`/admin/games/<Spiel>#ausruestung`), auch aus der Season
+   über **Sperrliste → Bibliothek pflegen**. Der Reiter speichert je Eintrag sofort – es gibt nichts „Ungespeichertes“. Zuerst **Kategorien**: Ohne Kategorien gibt es einen Vorschlag (Waffen, Aufsätze, Perks, Ausrüstung, Abschussserien), den
+   du anpasst und speicherst. Die **Art** entscheidet: An einer *Waffe* lassen sich einzelne Aufsätze sperren, ein *Aufsatz* passt zu Waffen,
+   alles andere ist *sonstige Ausrüstung*. Hat eine Kategorie Einträge, bleibt ihre Art und sie lässt sich nicht entfernen.
+2. **Einträge:** **Eintrag hinzufügen** – Name, Bild 16 : 9 (nur Upload oder Mediathek; ohne Medienrechte nur eigene Bilder), bei Aufsätzen
+   **Passt zu**: Ein Aufsatz passt nur zu den gewählten Waffen, **ohne Wahl zu keiner**. Aufsätze ohne Waffe nennt oben ein gelber Hinweis;
+   dort Waffen anhaken und **Allen … Aufsätzen zuordnen** (wie „Maps ohne Modus“). Suche und Kategorie-Knöpfe helfen bei vielen Einträgen.
+   **Aus Spiel übernehmen** holt Einträge einer anderen Spielversion, fehlende Kategorien kommen mit, Aufsätze finden ihre Waffen über den
+   Namen (Waffen also mit übernehmen, sonst kommen sie ohne Waffe).
+3. **Zustand:** *Deaktivieren* (Ein/Aus-Symbol): kommt auf keine neue Sperrliste, wo er steht, bleibt er. *Archivieren*: zusätzlich
+   ausgeblendet. Was auf einer gespeicherten Sperrliste steht, lässt sich nicht löschen, nur archivieren.
+4. **Sperrliste der Season:** auf der Season-Seite, Abschnitt **Sperrliste**. Haken bei **sperren**, darunter **Gilt in**: allen Modi oder
+   einzelnen. Bei einer Waffe öffnet **Aufsätze einzeln sperren** die passenden Aufsätze – die Waffe bleibt erlaubt, nur diese Aufsätze nicht.
+   Ein Aufsatz in seiner eigenen Kategorie gesperrt gilt an jeder Waffe. **Nur gesperrte** zeigt, was schon auf der Liste steht.
+5. **Speichern** legt eine neue **Version** an. Bestehende Staffeln bekommen sie mit **Jetzt übertragen** (auch gesperrte und laufende),
+   neue Staffeln gleich beim Anlegen. Ein Spiel hält die Version fest, die bei seinem Ergebnis galt. **Versionen vergleichen** zeigt neu
+   gesperrt, geändert und wieder erlaubt.
+6. **Regelwerk:** Steht der Baustein **Sperrliste** im Regelwerk, sagt der Abschnitt, ob die letzte Fassung noch den alten Stand zeigt.
+   **Neue Version vorbereiten** führt ins Regelwerk; dort sind die Unterschiede markiert, du gibst frei und wählst, ob neu zugestimmt werden
+   muss (2.11). Jede Fassung friert ihre Liste ein.
+
+Öffentlich steht die Liste auf der Ligaseite unter dem Map-Pool, nur wenn die Season sichtbar ist. Rechte: Bibliothek wie Maps (Bereich
+Turnierleitung), Sperrliste mit **Season konfigurieren** (lesen: jede Zuständigkeit der Liga).
+
+<table>
+<tr>
+<td><img src="../assets/liga/ausruestung-bibliothek.png" alt="Bibliothek Ausrüstung: Kategorie-Knöpfe, Suche, je Kategorie Einträge mit Bild, Zustand und „auf N Sperrlisten“" width="560"></td>
+<td><img src="../assets/liga/ausruestung-bibliothek-handy.png" alt="Dieselbe Bibliothek am Handy mit 390 px, lange Namen brechen um" width="220"></td>
+</tr>
+<tr>
+<td><img src="../assets/liga/sperrliste-season.png" alt="Abschnitt Sperrliste der Season: Hinweis aufs Regelwerk, gesperrte Waffe mit Modus, Aufsätze an einer Waffe" width="560"></td>
+<td><img src="../assets/liga/sperrliste-ligaseite-handy.png" alt="Ligaseite am Handy: Sperrliste nach Kategorien, Aufsätze an erlaubten Waffen" width="220"></td>
+</tr>
+</table>
+
 ### 2.2 Liga und Season anlegen
 
 1. **Admin → eSports → Liga → Liga anlegen**: Name (etwa „CoD-Liga“) und Spiel.
@@ -122,7 +163,12 @@ das in der Season mit **Map aus dem Pool nehmen** (2.2, Schritt 5).
 | | **Teams je Staffel höchstens** | 8 |
 | | **Modus je Map** (Map 1, 2, 3 – „frei“ heißt: die Teams wählen). So viele Felder wie die längste Serie: Spielt eine Liga N Best of 5, sind es fünf. Entweder alle frei oder jedes belegt | nach Regelwerk |
 | | **Map-Wiederholung in einer Serie** | Gleiche Map nur in anderem Modus (Vorgabe); auch „Aus – jede Map nur einmal“ oder „Immer erlaubt“ |
-| | **Punkte Sieg / Remis / Niederlage**, **Bei Punktgleichheit** | 3 / 1 / 0 · Differenz, Mehr gewonnene Maps |
+| | **Punkte Sieg / Remis / Niederlage** | 3 / 0 / 0 (neue Seasons; ältere: 3 / 1 / 0) |
+| | **Bei Punktgleichheit** (in der Reihenfolge des Anklickens) | Direkter Vergleich, Map-Differenz, Mehr gewonnene Maps, Entscheid der Leitung |
+| | **Direkter Vergleich (Mini-Tabelle)** – erscheint mit dem direkten Vergleich | Punkte, Map-Differenz, Gewonnene Maps |
+| | **Kampflos (Default-Win)** | Maps des Best of (BO3 2:0, BO5 3:0) |
+| | **Austritt, Auflösung, Disqualifikation** | Alle Spiele zählen für die Gegner, Team ans Tabellenende |
+| | **Remis erlaubt** | aus |
 | | **Ergebnis gilt nach (Stunden)** · **Teilnehmerliste nachtragen bis (Stunden)** | 48 · 48 |
 | | **Antwort auf Terminvorschlag (Stunden)** – so lange hat die Gegenseite Zeit; leer heißt bei älteren Seasons „je Staffel wie bisher“ | 72 |
 | Spielberechtigung (siehe 3.9) | **Höchstkader** · **Mindestalter (Jahre)** · **Wartezeit neuer Spieler (Tage)** | 50 · 18 · 7 |
@@ -442,8 +488,9 @@ Das dürfen der Bereich **Ligen** und Zuständige mit **Regeln veröffentlichen*
 1. **Neuen Entwurf beginnen.** Titel und Text in Markdown. Jede Überschrift wird ein Abschnitt mit eigenem Link. Bleibt sie gleich, bleibt auch
    der Link über alle Versionen gleich.
 2. **Anlagen** bekommen ihren Buchstaben aus der Reihenfolge (Anlage A, B, C …) und stehen eigens im Inhaltsverzeichnis.
-3. **Bausteine:** Die Knöpfe **Map-Pool** und **Modusfolge** setzen eine Marke in den Text, etwa `[[baustein:map_pool]]`. Der Inhalt kommt aus den
-   Daten der Season. Tippe die Listen also nicht ab.
+3. **Bausteine:** Die Knöpfe **Map-Pool**, **Modusfolge** und **Sperrliste** setzen eine Marke in den Text, etwa `[[baustein:map_pool]]`. Der Inhalt
+   kommt aus den Daten der Season. Tippe die Listen also nicht ab. Die **Sperrliste** (`[[baustein:loadout_bans]]`, gedacht für Anlage A) zeigt im
+   Web Bilder, im PDF eine schlichte Liste (2.1a).
 4. **Vorschau** zeigt die Seite mit den Daten von heute und den Änderungen zur letzten Version.
 5. **Veröffentlichen:** **Gültig ab**, **Änderungsgrund** (steht öffentlich dabei) und die Wahl, ob **Captains neu zustimmen** müssen. Danach lässt sich
    die Version nicht mehr ändern. Die Bausteine werden eingefroren: alte Versionen zeigen ihre Listen von damals, im Web und im PDF.
@@ -564,9 +611,14 @@ was dabei geprüft wird, steht für die Captains in
 - **Kampflos**: im Ergebnis-Fenster **Nicht erschienen** auf der fehlenden Seite. Schon eingetragene Maps fallen dabei
   weg, der alte Stand bleibt im Verlauf des Spiels. Die Wertung ist eine Teamstrafe: Captain, Vertreter und die Leitung
   des Hauptteams sehen sie unter **Meine Strafen**, in **Admin → Strafen** steht sie einmal unter dem Co-Team.
+- **Beide nicht erschienen**: am Spiel **Beide nicht erschienen** (nur in einer Staffel, nur ohne Ergebnis, mit
+  Begründung). Beide verlieren, keine Punkte, keine Maps, je Seite ein Eintrag „nicht erschienen“; im Spielplan steht
+  „beide nicht erschienen“. Wollt ihr das Spiel doch nachholen: am selben Spiel **Neu ansetzen** mit Grund – das Spiel ist
+  wieder offen, den Termin setzt ihr wie gewohnt. Recht: **Ergebnisse korrigieren**, nicht im eigenen Spiel.
 - **„Nicht erschienen?“ nur als Vorschlag**: Mit Check-in (2.7b, 3.1b) schlägt der Server nach dem Fenster vor, wenn eine Seite
-  fehlt – gewertet wird nie von selbst, ihr entscheidet. Ohne Check-in sagt ein Termin nichts darüber, ob jemand da war: Dann
-  gibt es keinen Vorschlag, **Ergebnis fehlt** meldet sich, klärt es mit beiden Seiten und wertet selbst.
+  fehlt – gewertet wird nie von selbst, ihr entscheidet (kampflos, nachtragen, verlängern; fehlen beide: **Beide nicht
+  erschienen**). Ohne Check-in sagt ein Termin nichts darüber, ob jemand da war: Dann gibt es keinen Vorschlag, **Ergebnis
+  fehlt** meldet sich, klärt es mit beiden Seiten und wertet selbst.
 
 ### 3.3 Teilnehmerliste nachtragen
 
@@ -603,7 +655,40 @@ Staffeln, die noch **je Map** aufstellen (ältere Seasons oder **Wer gespielt ha
 
 Die Tabelle steht auf der Ligaseite je Staffel (und in der Turnierverwaltung): Punkte, Spiele, Differenz, Form der
 letzten fünf Spiele, Bewegung seit dem letzten Spieltag. Darunter die Spielwochen mit Pause und Reserve, jedes Spiel
-mit Termin, Ergebnis, Sieger und den Maps – ohne Aufstellungen.
+mit Termin, Ergebnis, Sieger und den Maps – ohne Aufstellungen. Website, App, TV, Druck und Ergebnis-PDF zeigen dieselbe
+Reihenfolge.
+
+<img src="../assets/liga/liga-tabelle-gleichstand-pc.png" alt="Staffel-Tabelle: unter den Namen klein Direkter Vergleich, kampflos gewonnen, Platz durch Entscheid der Leitung mit Grund und am Ende Ausgetreten; darunter die Reihenfolge bei Punktgleichheit" width="560">
+
+**Punktgleichheit** (Reihenfolge stellt die Season ein, siehe 2.2):
+
+1. **Direkter Vergleich**: nur die Spiele der gleichstehenden Teams untereinander (bei drei und mehr eine
+   **Mini-Tabelle**) – Punkte, Map-Differenz, gewonnene Maps. Trennt sie nur einen Teil ab, wird für die übrigen die
+   Mini-Tabelle **neu gerechnet**, nur mit ihren Spielen. Der direkte Vergleich zählt nur, wenn **alle Spiele** der
+   gleichstehenden Teams untereinander gespielt sind – steht eines noch aus, entscheidet gleich der nächste Punkt.
+2. Dann **Map-Differenz** und **gewonnene Maps** über alle Spiele.
+3. Stehen Teams danach in allem gleich, **teilen sie sich den Platz** (1, 2, 2, 4) – bis die Leitung entscheidet.
+
+Unter dem Namen steht klein, was den Platz entschied („Direkter Vergleich“, „Map-Differenz“ …), dazu
+„kampflos gewonnen/verloren“ und am Ende der Tabelle **Ausgetreten** bzw. **Disqualifiziert**. Unter der Tabelle steht
+die Reihenfolge der Kriterien.
+
+**Entscheid der Leitung:** Admin → Liga → Season → **Tabelle und Gleichstand**. Je gestarteter Staffel stehen dort die
+geteilten Plätze. **Reihenfolge festlegen** → mit den Pfeilen sortieren → **Grund** (mindestens fünf Zeichen, steht
+öffentlich an der Tabelle: „Platz durch Entscheid der Leitung: …“) → **Festlegen**. Das geht nur bei echtem Gleichstand und
+nur für alle Teams auf diesem Platz; über das eigene Team entscheidet eine andere Person. Recht: **Ergebnisse
+korrigieren**. Ändert ein späteres Ergebnis den Gleichstand, gilt der Entscheid nicht mehr (Hinweis **Gilt nicht mehr**)
+und bleibt zur Nachvollziehbarkeit stehen; **Zurücknehmen** löscht ihn mit Grund.
+
+<img src="../assets/liga/liga-gleichstand-entscheid-handy.png" alt="Season-Verwaltung am Handy, Feld Tabelle und Gleichstand: Platz 4 geteilt mit Knopf Reihenfolge festlegen, darunter ein älterer Entscheid mit Gilt nicht mehr und Zurücknehmen" width="300">
+
+**Austritt, Auflösung, Disqualifikation:** In der Teilnehmerliste der Staffel **Austritt eintragen** bzw.
+**Disqualifizieren** (eine Auflösung tragt ihr als Austritt mit Grund „Team aufgelöst“ ein). Mit der Vorgabe neuer
+Seasons zählen dann **alle** Spiele des Teams für die Gegner, auch schon gespielte – wie ein kampfloser Sieg (Maps des Best
+of). Offene Spiele werden kampflos gewertet. Die echten Ergebnisse bleiben im Spielplan und auf der Matchseite sichtbar.
+Das Team steht am Tabellenende: wer später ausschied, weiter oben; Disqualifizierte immer darunter. Ein Spiel zwischen
+zwei ausgeschiedenen Teams zählt für keinen. Ältere Seasons rechnen weiter mit der 50-%-Regel, bis ihr die Einstellung
+ändert und überträgt (nur vor dem ersten Ergebnis).
 
 Staffel- und Spielseite führen zurück zur Ligaseite: Brotkrumen **Liga · Season · Staffel** und auf der Staffel der
 Reiter **Liga** (nur, wenn die Person die Season sehen darf – sonst „Liga · Staffel A“ ohne Link).
@@ -776,6 +861,7 @@ Zum Abhaken in dieser Reihenfolge – jeder Punkt mit dem Klickweg von oben.
 - [ ] **Best of 3**, **Teamgröße 4**, Mindestkader, **Modus je Map** laut Regelwerk, Punkte 3/1/0 – 2.2
 - [ ] **Regelwerk** veröffentlicht, Bausteine für Map-Pool und Modusfolge gesetzt – 2.11
 - [ ] **Map-Pool der Season** gespeichert – 2.2
+- [ ] **Ausrüstung** in der Bibliothek, **Sperrliste der Season** gespeichert und als Baustein im Regelwerk – 2.1a
 - [ ] **Prüfung vor der Veröffentlichung** ohne Probleme – 2.8
 - [ ] **Liga 1** und **Staffel A** angelegt (bei mehr als acht Teams auch Staffel B) – 2.3
 - [ ] Alle **Co-Teams** angelegt, jeder im Kader hat ein **Konto** und ist im Hauptteam – 2.4

@@ -388,6 +388,13 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
   font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
   color: var(--tls-brand); background: rgb(var(--tls-brand-rgb) / 0.12);
 }
+/* Liga-Staffel (E.1, #1625): was den Gleichstand entschied, kampflos, Abzug, Ausscheiden - klein unter dem Namen. */
+.tls-standing-notes { display: flex; flex-wrap: wrap; gap: 2px 8px; margin-top: 2px; font-size: 11px; line-height: 1.3; color: var(--tls-muted); }
+.tls-standing-note { overflow-wrap: anywhere; }
+.tls-standing-note[data-tone="decision"], .tls-standing-note[data-tone="tiebreak"] { color: rgb(var(--tls-brand-rgb) / 0.9); }
+.tls-standing-note[data-tone="exit"] { color: rgb(var(--tls-warn-rgb)); font-weight: 600; }
+.tls-standing-note__reason { color: var(--tls-muted); }
+.tls-standing-row:has(.tls-standing-note[data-tone="exit"]) .tls-standing-name { color: rgb(255 255 255 / 0.6); }
 .tls-standing-move {
   display: inline-flex; align-items: center; gap: 1px; font-family: 'Rajdhani', 'Bahnschrift Condensed', sans-serif;
   font-size: 12px; font-weight: 700; line-height: 1;

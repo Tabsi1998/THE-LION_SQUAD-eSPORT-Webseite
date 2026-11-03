@@ -1,5 +1,44 @@
 # Changelog
 
+## 1.65.1 (03.11.2026)
+
+### Fehlerbehebungen
+
+* Ausrüstung: ungespeicherte Änderungen in Eintrags-, Kategorien- und Import-Blatt fragen beim Verlassen und beim Reiterwechsel nach (#2218)
+* Regelwerk liefert Bausteine ohne Schutzzeichen aus, Namen und freier Text erscheinen wie geschrieben (#2218)
+* Regelwerk speichert Bausteine im Klartext, keine Schutzzeichen in Fassungen, Veröffentlichen-Antwort und „Daten geändert“ (#2218)
+* Regelwerk: keine fremden Links über Backslash-Adressen (#2218)
+
+## 1.65.0 (03.11.2026)
+
+### Neu
+
+* „Beide nicht erschienen“ vor dem Spiel werten und neu ansetzen in der Staffel (#1625)
+* Austritt in der Liga-Staffel – alle Spiele zählen für die Gegner statt 50-%-Regel (#1625)
+* Entscheid der Leitung bei echtem Gleichstand mit Grund (#1625)
+* Liga-Staffel ohne Remis lehnt ein Remis beim Eintragen ab (#1625)
+* Liga-Tabelle mit direktem Vergleich (nur wenn die Gruppe alle Spiele gespielt hat), kampflos und Tabellenende (#1625)
+* Liga-Tabelle zeigt, was bei Gleichstand entschied, kampflos und ausgeschiedene Teams (#1625)
+* Neue Liga-Seasons mit den entschiedenen Tabellenregeln (#1625)
+* Tabellenregeln je Season für Liga-Staffeln: direkter Vergleich, Mini-Tabelle, Remis, Default-Win, Ausscheiden (#1625)
+* TV, Druck und Ergebnis-PDF nennen ausgeschiedene Teams (#1625)
+
+## 1.64.0 (03.11.2026)
+
+### Neu
+
+* Aufsätze ohne Waffe passen zu keiner – Hinweis und Zuordnung in einem Schritt (#2218)
+* Ausrüstungs-Bibliothek je Spiel mit Kategorien, Bild, Zustand und Import aus einer anderen Spielversion (#2218)
+* Baustein „Sperrliste“ im Regelwerk – mit Bildern im Web, als Liste im PDF, Hinweis auf eine neue Version (#2218)
+* Ligaseite zeigt die Sperrliste der Season (#2218)
+* Sperrliste der Season je Modus und je Waffe mit unveränderlichen Versionen für Staffel und Spiel (#2218)
+* Spielseite mit Reiter „Ausrüstung“ (#2218)
+
+### Fehlerbehebungen
+
+* Namen in Bausteinen des Regelwerks werden nie zu Link oder Formatierung, auch im PDF (#2218)
+* Übertragen nennt auch Terminregeln und Ergebnisregeln (#2218)
+
 ## 1.63.0 (03.11.2026)
 
 ### Neu

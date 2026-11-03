@@ -1,6 +1,6 @@
 import {
   addAnnex, annexLabel, changeRows, clearHits, dayLabel, findRanges, insertBlock, moveAnnex, paintHits, removeAnnex, renderRulesMarkdown,
-  rulesApiPath, rulesMediaProps, rulesPagePath, tocOf,
+  renderRulesSection, rulesApiPath, rulesMediaProps, rulesPagePath, tocOf,
 } from "./leagueRules";
 
 const SECTIONS = [
@@ -60,6 +60,15 @@ describe("Markdown sicher", () => {
       expect(renderRulesMarkdown(`![Plan](${address})`)).not.toContain("<img");
     }
     expect(renderRulesMarkdown("![Plan](javascript:alert)")).toBe("<p>Plan</p>");
+  });
+
+  test("ausgelieferte Abschnitte: Namen mit Escapes bleiben Text, freier Text wie geschrieben; der Editor zeigt den Text roh (#2218)", () => {
+    // So kommt `sections[].body_md` von der API (services/markdown_text.served).
+    const section = renderRulesSection("| Name | Gilt in |\n| --- | --- |\n| Schild \\[Test\\] \\*x\\* | alle |\n\nPfad C:\\\\Daten und \\\\_frei\\\\_");
+    expect(section).toContain("<td>Schild [Test] *x*</td>");
+    expect(section).toContain("Pfad C:\\Daten und \\_frei\\_");
+    expect(section).not.toContain("<em>");
+    expect(renderRulesMarkdown("Pfad C:\\Daten und \\_frei\\_")).toContain("Pfad C:\\Daten und \\_frei\\_");
   });
 
   test("Sprünge bleiben in der Seite, Links nach außen öffnen neu, @ wird kein Profil-Link", () => {

@@ -119,6 +119,10 @@ zwei Anträge gehen gleichzeitig auf den letzten Platz, die Leitung nimmt an, se
 mit Ergebnisregel an, verwendet ihn im Pool der Season „Liga-Anmeldung“ und überträgt ihn auf die Staffel. Entfernen wird abgelehnt
 (Schloss, 409), nach dem Deaktivieren steht er in keinem neuen Pool zur Wahl (422), Staffel und Ligaseite zeigen ihn weiter. Die
 Seed-Modi bleiben unberührt; jeder Lauf legt zwei Modi dazu, ab 19 Modi überspringt die Spec (Stand neu aufsetzen).
+`liga-tabelle-abnahme.spec.js` (gleiche Stand-Datei, #1625) startet die Staffel der „Liga-Probelauf“, trägt Spieltag 1 so ein, dass
+zwei Sieger gleich stehen, legt in der Season-Verwaltung die Reihenfolge mit Grund fest, trägt einen Austritt ein (alle Spiele für
+die Gegner, Tabellenende) und wertet ein Spiel „beide nicht erschienen“ samt „Neu ansetzen“; die Ligaseite liest ein Gast bei 390
+und 1440 px. Sie braucht wie `liga-ablauf-abnahme` eine Staffel im Entwurf, also einen frischen Seed davor.
 `spielseite-abnahme.spec.js` (gleiche Stand-Datei, #2249) öffnet je Breite die Spielseite über das Zahnrad, legt im Reiter Modi
 einen Modus an, im Reiter Maps eine Map und gibt sie per Häkchen in zwei Modi frei, deaktiviert den Modus und prüft die
 Weiterleitung der alten Map-Adresse; Map und Modus räumt sie danach wieder weg.
@@ -126,6 +130,10 @@ Weiterleitung der alten Map-Adresse; Map und Modus räumt sie danach wieder weg.
 Ergebnisregeln ein und überträgt sie auf die laufende Staffel; je Breite meldet ein Captain einen falschen Endstand (vom Server und
 vom Formular abgelehnt) und dann den richtigen, die Gegenseite bestätigt ohne Punkte; die Korrektur der Leitung prüft dieselbe Regel
 und übergeht sie nur mit Grund.
+`ausruestung-abnahme.spec.js` (gleiche Stand-Datei, #2218) legt im Spiel „Call of Duty“ eine Waffe mit erfundenem Bild und Aufsätze an
+(Reiter „Ausrüstung“ der Spielseite, Hinweis „Aufsätze ohne Waffe“),
+setzt die Sperrliste der Season „Liga-Anmeldung“ im Browser, überträgt sie, veröffentlicht das Regelwerk mit Baustein „Sperrliste“, ändert
+die Liste und bestätigt den Vorschlag einer neuen Version; ein Gast liest Ligaseite, Regelwerk und PDF bei 390 und 1440 px.
 `liga-checkin-abnahme.spec.js` (gleiche Stand-Datei, #1652, braucht eine Staffel „Liga-Probelauf“ im Entwurf - also den Seed davor) schreibt: Die
 Leitung speichert den Check-in der Season, veröffentlicht ein Regelwerk mit Zustimmungspflicht und startet die Staffel; bei 390 px lehnt die Seite
 den Check-in ohne Zustimmung ab, zwei Captains stimmen zu und checken in zwei Browser-Kontexten ein, zu wenige Anwesende lehnt der Server ab; bei
