@@ -78,32 +78,36 @@ async def application_inbox(season_id: str, me: dict = Depends(require_applicati
 
 
 @admin_router.post("/{season_id}/applications/{application_id}/review")
-async def review_application(season_id: str, application_id: str, me: dict = Depends(require_applications)):
+async def review_application(season_id: str, application_id: str, body: LeagueApplicationDecision | None = None,
+                             me: dict = Depends(require_applications)):
     league, season = await _scope(season_id)
-    return _answer(await _call(applications.review(get_db(), league, season, application_id, me)))
+    return _answer(await _call(applications.review(get_db(), league, season, application_id, me,
+                                                  conflict_reason=body.conflict_reason if body else None)))
 
 
 @admin_router.post("/{season_id}/applications/{application_id}/accept")
 async def accept_application(season_id: str, application_id: str, body: LeagueApplicationDecision, me: dict = Depends(require_applications)):
     league, season = await _scope(season_id)
     return _answer(await _call(applications.accept(get_db(), league, season, application_id, body.tournament_id, me,
-                                                  refresh_previews=_refresh_tournament_previews_after_registration)))
+                                                  refresh_previews=_refresh_tournament_previews_after_registration,
+                                                  conflict_reason=body.conflict_reason)))
 
 
 @admin_router.post("/{season_id}/applications/{application_id}/reject")
 async def reject_application(season_id: str, application_id: str, body: LeagueApplicationDecision, me: dict = Depends(require_applications)):
     league, season = await _scope(season_id)
-    return _answer(await _call(applications.reject(get_db(), league, season, application_id, body.reason, me)))
+    return _answer(await _call(applications.reject(get_db(), league, season, application_id, body.reason, me, conflict_reason=body.conflict_reason)))
 
 
 @admin_router.post("/{season_id}/applications/{application_id}/waitlist")
 async def waitlist_application(season_id: str, application_id: str, body: LeagueApplicationDecision, me: dict = Depends(require_applications)):
     league, season = await _scope(season_id)
-    return _answer(await _call(applications.waitlist(get_db(), league, season, application_id, body.reason, me)))
+    return _answer(await _call(applications.waitlist(get_db(), league, season, application_id, body.reason, me, conflict_reason=body.conflict_reason)))
 
 
 @admin_router.post("/{season_id}/applications/{application_id}/assign")
 async def assign_application(season_id: str, application_id: str, body: LeagueApplicationDecision, me: dict = Depends(require_applications)):
     league, season = await _scope(season_id)
     return _answer(await _call(applications.assign(get_db(), league, season, application_id, body.tournament_id, me,
-                                                  refresh_previews=_refresh_tournament_previews_after_registration)))
+                                                  refresh_previews=_refresh_tournament_previews_after_registration,
+                                                  conflict_reason=body.conflict_reason)))

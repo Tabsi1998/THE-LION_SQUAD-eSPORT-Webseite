@@ -616,6 +616,13 @@ Veröffentlichen noch einmal; passt es nicht mehr, fällt es weg (`match.result.
 beim Ablegen gesetzt war. `decided_by` ist für E.3: Einen Einspruch entscheidet nie die Person, die die Ausgangsentscheidung
 traf, auch nicht der Superadmin. Die eigene Seite handelt weiter als Captain oder Vertreter (melden, bestätigen, Termin).
 
+**Befangenheit bei der Anmeldung** (#2245, Entscheidung Nr. 73; `league_permissions.side_conflict(db, user, side)`): Dieselbe Regel für die
+Seite eines Antrags (B.4): Kader des Co-Teams, Captain, Vertreter, Leitung und Co-Leitung des Hauptteams und wer den Antrag eingereicht hat.
+Über die Anmeldung des eigenen Teams entscheidet eine zweite Person: Prüfen, Annehmen, Ablehnen, Warteliste und Zuteilen antworten sonst 403.
+Notausnahme wie oben (Superadmin, `conflict_reason`, mindestens fünf Zeichen). 403 und Notausnahme teilen sich beide Prüfungen in
+`override_reason`, das Protokoll `league.conflict.override` schreibt `record_override`. Das bloße Zuteilen eines Co-Teams ohne Antrag kennt keine
+Befangenheit. Nimmt es einen offenen Antrag an (Sonderweg), gilt die Regel auch dort.
+
 **Helfer an Staffeln:** `organizer`, `referee`, `scorekeeper`, `station_manager` und `stream_operator` lesen in Staffeln wie bisher
 (`READ_STAFF_ROLES`), ändern dort aber nichts. Andere Turniere bleiben unverändert.
 
@@ -643,8 +650,9 @@ Zugriff, außer „lesen“ steht in der Zeile. Prüfung: `backend/tests/test_le
 | Staffel: `DELETE`, `bracket/*`, `reset-bracket`, `stages*`, `swiss/*`, `groups/generate`, `heat-rebuild/*`, Map-Pool | `season` | – | – |
 | Staffel: `POST`, `PUT`, `DELETE /staff` | `manage` | – | – |
 | Staffel: `GET /staff`, `/lead`, `/planning-check`, `/match-plan.csv`, `/bracket/display`, `/schedule/deadlines`, Chat, Teilnehmer intern | jede Zuständigkeit | – | lesen |
-| Staffel: `squad-candidates`, `squad-registrations`, `registrations` schreiben, `removal*`, `assignable-users` | `applications` | – | – |
-| `GET …/seasons/{id}/applications`, `POST …/applications/{aid}/review`, `/accept`, `/reject`, `/waitlist`, `/assign` | `applications` | – | – |
+| Staffel: `squad-candidates`, `squad-registrations`, `registrations` schreiben, `removal*`, `assignable-users` | `applications` | `POST squad-registrations` nur, wenn das Co-Team einen offenen Antrag hat | – |
+| `GET …/seasons/{id}/applications` | `applications` | – | – |
+| `POST …/applications/{aid}/review`, `/accept`, `/reject`, `/waitlist`, `/assign` | `applications` | ja, eigenes Team | – |
 | Staffel: `registrations/{id}/checkin`, `print/checkin`, `schedule/plan`, `/apply`, `/release`, `live-queue/*`, Team-Tag `lineups` | `matches` | – | – |
 | Spiel: `PATCH` (Termin und Betreuung), `schedule/apply` und `/release` mit eigenem Spiel | `matches` | ja, im Sammellauf ohne Notausnahme | – |
 | Spiel: Terminvorschläge entscheiden und zurückziehen | `matches`; Beteiligte nur als Captain oder Vertreter wie jede Seite | ja | – |
@@ -925,7 +933,7 @@ teilt Liga N und Staffel zu. Erst dann entsteht die `tournament_registrations`-Z
 | `decided_by`, `decided_at`, `decision_reason` | str, ISO, str | Letzte Entscheidung der Leitung. Der Grund ist beim Ablehnen Pflicht |
 | `withdrawn_by`, `withdrawn_at` | str, ISO | Rückzug |
 | `assignment` | `{division_id, tournament_id, staffel, label, registration_id, assigned_by, assigned_at}` | Zuteilung, fehlt bis dahin. Tritt das Co-Team aus der Staffel aus, bleibt sie stehen, die Antworten sagen `staffel_left` bzw. `assignment.left`, der Platz ist frei |
-| `history` | `[{status, by, at, reason?}]` | Jeder Schritt |
+| `history` | `[{status, by, at, reason?, conflict_reason?}]` | Jeder Schritt. `conflict_reason`: Grund einer Notausnahme des Superadmins (#2245) |
 | `created_at`, `updated_at` | ISO | |
 
 Indizes: `id` eindeutig, `active_key` eindeutig (sparse), (`season_id`, `status`), `squad_id`, `applied_by`.
@@ -953,7 +961,8 @@ Mindestkader ist hier der kleinste aller aktiven Liga N. Beim Zuteilen zählt de
 **Zustimmung:** Beim Einreichen schickt das Web `rule_version_id` (die Fassung, die es zeigt), `accept_rules` und `accept_privacy`. Passt die Fassung nicht mehr: 409. `rules_text` gilt hier nicht als Regelwerk, weil dazu keine Version existiert: Ohne gültige Fassung geht keine Anmeldung, die Prüfung nennt es.
 Beim Zuteilen aus einem Antrag schreibt `build_registration` `accepted_rules` und `accepted_privacy` auf `true`, `registered_via: "league_application"`, `source: "league_application"`, `application_id`. Das Zuteilen ohne Antrag schreibt weiter `false`.
 
-**Sonderweg:** Teilt die Leitung ein Co-Team mit offenem Antrag direkt zu, gilt der Antrag als angenommen und zeigt die Zuteilung. Nimmt sie die Zuteilung zurück, bleibt der Antrag angenommen, ohne Zuteilung, und belegt einen Platz, bis sie neu zuteilt oder ablehnt.
+**Sonderweg:** Teilt die Leitung ein Co-Team mit offenem Antrag direkt zu, gilt der Antrag als angenommen und zeigt die Zuteilung (Protokoll `league.application.accept` mit `via: "squad_assign"`). Nimmt sie die Zuteilung zurück, bleibt der Antrag angenommen, ohne Zuteilung, und belegt einen Platz, bis sie neu zuteilt oder ablehnt.
+Weil das Zuteilen hier über den Antrag entscheidet, gilt die Befangenheit (siehe unten): Die befangene Person bekommt 403, bevor eine Anmeldung entsteht. `POST /api/tournaments/{tid}/squad-registrations` nimmt dafür `conflict_reason` an; der Dialog „Co-Team zuteilen“ fragt nicht danach, die Absage verweist den Superadmin in den Eingang. Ohne offenen Antrag bleibt das Zuteilen ohne Befangenheit.
 
 **Sperren:** Einreichen, Rückzug und Entscheidungen halten `league_season_resource`. Beim Zuteilen zuerst die Turnier-Sperre, dann diese. Besetzt: 409. Der Status wechselt nur mit Bedingung auf den alten Stand.
 
@@ -968,15 +977,21 @@ Beim Zuteilen aus einem Antrag schreibt `build_registration` `accepted_rules` un
 | `POST /api/leagues/{liga}/{season}/applications` | Captain, Vertreter | Einreichen `{squad_id, rule_version_id, accept_rules, accept_privacy}`. Fremdes oder unbekanntes Co-Team: 403 |
 | `POST /api/leagues/{liga}/{season}/applications/{id}/withdraw` | Captain, Vertreter dieses Co-Teams | Zurückziehen |
 | `GET /api/me/league-applications` | angemeldet | Letzter Antrag je eigenem Co-Team, je Season, für die Team-Seite |
-| `GET /api/admin/leagues/seasons/{id}/applications` | `applications` | Eingang: `items[]`, `stats`, `divisions[]` |
-| `POST …/seasons/{id}/applications/{aid}/review` | `applications` | In Prüfung |
-| `POST …/accept` (`{tournament_id?}`), `/reject` (`{reason}`), `/waitlist` (`{reason?}`), `/assign` (`{tournament_id}`) | `applications` | Entscheiden und zuteilen. Antrag oder Staffel aus einer anderen Season: 404 |
+| `GET /api/admin/leagues/seasons/{id}/applications` | `applications` | Eingang: `items[]` (je Antrag `own_team`, `history[].conflict_reason`), `superadmin`, `stats`, `divisions[]` |
+| `POST …/seasons/{id}/applications/{aid}/review` (`{conflict_reason?}`) | `applications`, nicht befangen | In Prüfung |
+| `POST …/accept` (`{tournament_id?, conflict_reason?}`), `/reject` (`{reason, conflict_reason?}`), `/waitlist` (`{reason?, conflict_reason?}`), `/assign` (`{tournament_id, conflict_reason?}`) | `applications`, nicht befangen | Entscheiden und zuteilen. Antrag oder Staffel aus einer anderen Season: 404 |
 
-Befangenheit gilt hier nicht (wie beim Zuteilen, Abschnitt B.1). Der Eingang zeigt mit `own_team`, wenn es das eigene Team ist.
+**Befangenheit** (#2245, Entscheidung Nr. 73, Regel in Abschnitt B.1): Über die Anmeldung des eigenen Teams entscheidet eine zweite Person. Befangen sind Kader des Co-Teams,
+Captain, Vertreter, Leitung und Co-Leitung des Hauptteams und wer den Antrag eingereicht hat, auch mit Zuständigkeit `applications` oder Bereich `leagues`. Prüfen, Annehmen, Ablehnen,
+Warteliste und Zuteilen antworten ihnen 403 („Über dein eigenes Team entscheidet eine andere Person.“), geprüft vor allem anderen und unter der Season-Sperre direkt vor dem Schreiben noch einmal (auch im Sonderweg), der Antrag bleibt unverändert. Kaderänderungen laufen nicht unter dieser Sperre. Anträge anderer Teams
+derselben Season entscheidet die Person weiter. Der Superadmin geht als Notausnahme durch, mit `conflict_reason` (mindestens fünf Zeichen, sonst 403). Der Grund steht im Verlauf
+(`history[].conflict_reason`), im Protokoll der Entscheidung (`league.application.*`, `data.conflict_override`) und unter `league.conflict.override` (`action: "application_<schritt>"`).
+Der Eingang meldet `own_team` nach derselben Regel (`belongs_to_side`) und `superadmin`: Beim eigenen Team stehen statt der Knöpfe der Satz, beim Superadmin dazu das Feld
+„Grund für die Notausnahme“.
 
 **Benachrichtigungen:** Art `tournament_registration`, `meta.reason` `league_application_submitted`, `_accepted`, `_rejected`, `_waitlist`, `_assigned`, `_withdrawn`, Schlüssel `league-application:<id>:<status>:<schritt>:<user>`. An Captain und Vertreter (ohne beide die Hauptteam-Leitung), bei `submitted` und `withdrawn` auch an die Leitung (`applications`). Mail über `send_league_mail`.
 
-**Datenschutz:** Gäste sehen Fenster und freie Plätze, keine Anträge. Andere Teams sehen nichts von einem Antrag. Den Grund einer Ablehnung sehen Captain, Vertreter, Leitung und Co-Leitung des Hauptteams und die Liga-Leitung, zurückziehen dürfen nur Captain und Vertreter (`can_withdraw`). Auskunft: `league_applications`, in denen die Person steht, mit den eigenen Zustimmungen und eigenen Schritten (`my_steps`), ohne Kennungen anderer. Wer nur als Liga-Leitung handelte, bekommt wie im Adminprotokoll nur den Vorgang (Kennung des Antrags, Season, Schritt, Zeitpunkt), ohne Team und Grund. Kontolöschung: Der Antrag gehört dem Co-Team und bleibt, die Kennung der Person fällt überall heraus (`applied_by`, Zustimmungen, `withdrawn_by`, `decided_by`, `history[].by`). Kein Geburtsdatum in Antworten.
+**Datenschutz:** Gäste sehen Fenster und freie Plätze, keine Anträge. Andere Teams sehen nichts von einem Antrag. Den Grund einer Ablehnung sehen Captain, Vertreter, Leitung und Co-Leitung des Hauptteams und die Liga-Leitung, zurückziehen dürfen nur Captain und Vertreter (`can_withdraw`). Auskunft: `league_applications`, in denen die Person steht, mit den eigenen Zustimmungen und eigenen Schritten (`my_steps`), ohne Kennungen anderer. Wer nur als Liga-Leitung handelte, bekommt wie im Adminprotokoll nur den Vorgang (Kennung des Antrags, Season, Schritt, Zeitpunkt), ohne Team und Grund. Kontolöschung: Der Antrag gehört dem Co-Team und bleibt, die Kennung der Person fällt überall heraus (`applied_by`, Zustimmungen, `withdrawn_by`, `decided_by`, `history[].by`). Den Grund einer Notausnahme (`history[].conflict_reason`) enthält die Auskunft der Liga-Leitung nicht (Vorgang ohne Inhalt wie im Adminprotokoll), bei der Kontolöschung bleibt er im Verlauf, ohne Person. Kein Geburtsdatum in Antworten.
 
 **Löschen:** Eine Season mit Anträgen lässt sich nicht löschen (`delete-plan`, Hinweis auf Archivieren). Ein Co-Team mit offenem Antrag lässt sich erst nach dem Rückzug löschen, ein Hauptteam mit solchem Co-Team nicht auflösen.
 

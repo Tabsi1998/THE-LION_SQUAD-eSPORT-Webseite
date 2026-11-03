@@ -26,7 +26,7 @@ const MINE = {
 };
 const ROW = {
   id: "a1", status: "submitted", squad_id: "sq1", team_id: "t1", display_name: "Loewen Langername · Rudel Alpha mit sehr langem Namen", submitted_at: "2026-11-02T18:00:00+00:00", applied_by_name: "Mila Mustermann", rules_version: 2, rules_at: "2026-11-02T18:00:00+00:00",
-  privacy_at: "2026-11-02T18:00:00+00:00", member_count: 5, captain_name: "Mila Mustermann", vice_name: "Tom Beispiel", problems: ["Rudel Alpha: Geburtsdatum fehlt bei Tom Beispiel. Bitte im eigenen Profil eintragen, dann geht die Anmeldung."], warnings: ["Ida: Die Spiel-ID fehlt im Profil."], shared_with: [], own_team: true,
+  privacy_at: "2026-11-02T18:00:00+00:00", member_count: 5, captain_name: "Mila Mustermann", vice_name: "Tom Beispiel", problems: ["Rudel Alpha: Geburtsdatum fehlt bei Tom Beispiel. Bitte im eigenen Profil eintragen, dann geht die Anmeldung."], warnings: ["Ida: Die Spiel-ID fehlt im Profil."], shared_with: [], own_team: false,
   history: [{ status: "submitted", at: "2026-11-02T18:00:00+00:00", by_name: "Mila Mustermann" }, { status: "in_review", at: "2026-11-02T19:00:00+00:00", by_name: "Leitung" }],
 };
 const INBOX = {
@@ -153,5 +153,35 @@ for (const [width, height] of WIDTHS) {
       await expect(page.getByTestId("season-form-application-opens")).toHaveValue("2026-11-01T18:00");
       await noSideScroll(page);
     });
+
+    // Befangenheit (#2245): Über das eigene Team entscheidet eine zweite Person, der Superadmin nur mit Grund für die Notausnahme.
+    for (const superadmin of [false, true]) {
+      test(`Leitung: eigenes Team im Eingang (${superadmin ? "Superadmin" : "Zuständige"})`, async ({ page }) => {
+        let body = null;
+        await mock(page, superadmin ? ADMIN : { ...ADMIN, role: "user", areas: ["leagues"] }, (path, request) => {
+          if (path === "/admin/leagues/seasons/s1") return ADMIN_SEASON;
+          if (path === "/admin/leagues/seasons/s1/applications") return { ...INBOX, superadmin, items: [{ ...ROW, own_team: true }, { ...ROW, id: "a2", own_team: false, problems: [] }] };
+          if (path === "/admin/leagues/seasons/s1/applications/a1/accept" && request.method() === "POST") {
+            body = request.postDataJSON();
+            return { id: "a1", status: "accepted" };
+          }
+          return undefined;
+        });
+        await page.goto("/admin/leagues/seasons/s1#anmeldungen");
+        await expect(page.getByTestId("application-own-team-a1")).toHaveText("Über dein eigenes Team entscheidet eine andere Person.");
+        await expect(page.getByTestId("application-accept-a2")).toBeEnabled();
+        if (!superadmin) {
+          await expect(page.getByTestId("application-accept-a1")).toHaveCount(0);
+          await expect(page.getByTestId("application-conflict-reason-a1")).toHaveCount(0);
+          await noSideScroll(page);
+          return;
+        }
+        await expect(page.getByTestId("application-accept-a1")).toBeDisabled();
+        await page.getByTestId("application-conflict-reason-a1").fill("Sonst ist niemand erreichbar");
+        await noSideScroll(page);
+        await page.getByTestId("application-accept-a1").click();
+        await expect.poll(() => body).toEqual({ conflict_reason: "Sonst ist niemand erreichbar" });
+      });
+    }
   });
 }

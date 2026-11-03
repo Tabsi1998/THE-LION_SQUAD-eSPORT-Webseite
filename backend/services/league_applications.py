@@ -21,12 +21,13 @@ from models import new_id, now_utc
 from services import league_eligibility, league_roster, league_rules, league_service, squad_registration
 from services.discord_roles import load_games, top_game
 from services.league_mail import send_league_mail
-from services.league_permissions import staff_user_ids
+from services.league_permissions import belongs_to_side, record_override, require_no_side_conflict, side_of, staff_user_ids
 from services.league_scope import ONLY_LEAGUE
 from services.league_service import LeagueProblem
 from services.log_safe import log_safe
 from services.match_audience import responsible_ids, teams_by_id
 from services.mutation_lock import MutationLockBusy, league_season_resource, mutation_lock, tournament_write_resource
+from services.permissions import is_superadmin
 from services.visibility import user_can_see
 
 logger = logging.getLogger("tls.league_applications")
@@ -63,6 +64,9 @@ GONE = "Diesen Antrag gibt es nicht."
 BUSY = "An dieser Season wird gerade etwas geändert. Bitte gleich noch einmal versuchen."
 STAFFEL_GONE = "Diese Staffel gehört nicht zu dieser Season."
 SQUAD_GONE = "Das Co-Team gibt es nicht mehr."
+# Der Dialog „Co-Team zuteilen“ fragt nach keinem Grund: Die Notausnahme geht über den Eingang, dort steht das Feld (#2245).
+ADMIN_WAY_OVERRIDE = ("Über dein eigenes Team entscheidet eine andere Person. Das Co-Team hat einen offenen Antrag: Als Superadmin geht es nur "
+                      "als Notausnahme mit Grund, im Eingang der Season unter „Anmeldungen“.")
 
 
 # ---------------------------------------------------------------- Fenster und Plätze
@@ -238,6 +242,27 @@ async def _audit(db, action: str, application: dict, actor_id: str | None, **dat
     })
 
 
+async def _audit_decision(db, action: str, application: dict, actor: dict, override: str | None, **data) -> None:
+    """Das Protokoll einer Entscheidung. Eine Notausnahme (#2245) steht mit Grund dabei und wie im Spiel unter ``league.conflict.override``."""
+    await _audit(db, action, application, actor.get("id"), **data, **({"conflict_override": override} if override else {}))
+    if override:
+        await record_override(db, actor, action=f"application_{action}", target_id=application.get("season_id"), reason=override,
+                              application_id=application.get("id"))
+
+
+async def _no_conflict(db, season: dict, application_id: str, actor: dict, conflict_reason: str | None) -> str | None:
+    """Über die Anmeldung des eigenen Teams entscheidet eine zweite Person (B.4, Entscheidung Nr. 73) - geprüft vor allem anderen, damit
+    die befangene Person schnell 403 bekommt und nicht mehr erfährt als „nicht du“. Unter der Sperre prüft ``_recheck`` noch einmal. Gibt den Grund einer
+    Notausnahme zurück."""
+    return await _recheck(db, await _load(db, season["id"], application_id), actor, conflict_reason)
+
+
+async def _recheck(db, application: dict, actor: dict, conflict_reason: str | None) -> str | None:
+    """Dieselbe Prüfung mit dem unter der Season-Sperre frisch geladenen Antrag, direkt vor dem Schreiben: Wer seit der Vorabprüfung in den Kader kam,
+    wird hier aufgehalten. Kaderänderungen selbst laufen nicht unter dieser Sperre (bekannte Grenze, #2245)."""
+    return await require_no_side_conflict(db, actor, side_of(application), conflict_reason=conflict_reason)
+
+
 async def submit(db, league: dict, season: dict, body: dict, user: dict) -> dict:
     """Einreichen: unter der Sperre der Season noch einmal alles prüfen, dann Antrag und Zustimmung schreiben. Wirft ``LeagueProblem``."""
     if not body.get("accept_rules") or not body.get("accept_privacy"):
@@ -302,10 +327,12 @@ async def _left_over(db, application: dict) -> dict | None:
         {"league_squad_key": f"{application['season_id']}:{application['squad_id']}", "application_id": application["id"], "status": {"$in": list(SEAT_STATUSES)}}, {"_id": 0})
 
 
-async def _move(db, application: dict, status: str, actor_id: str | None, *, fields: dict | None = None, reason: str | None = None, keep_active: bool = True) -> dict:
-    """Der Statuswechsel mit Bedingung auf den alten Stand. Antwortet mit 409, wenn inzwischen etwas anderes geschah."""
+async def _move(db, application: dict, status: str, actor_id: str | None, *, fields: dict | None = None, reason: str | None = None, keep_active: bool = True,
+                override: str | None = None) -> dict:
+    """Der Statuswechsel mit Bedingung auf den alten Stand. Antwortet mit 409, wenn inzwischen etwas anderes geschah. ``override``: der Grund einer Notausnahme
+    des Superadmins (#2245), er steht im Verlauf."""
     now = now_utc().isoformat()
-    step = {"status": status, "by": actor_id, "at": now, **({"reason": reason} if reason else {})}
+    step = {"status": status, "by": actor_id, "at": now, **({"reason": reason} if reason else {}), **({"conflict_reason": override} if override else {})}
     update: dict = {"$set": {"status": status, "updated_at": now, **(fields or {})}, "$push": {"history": step}}
     if not keep_active:
         update["$unset"] = {"active_key": ""}
@@ -337,39 +364,45 @@ async def withdraw(db, league: dict, season: dict, application_id: str, user: di
     return done
 
 
-async def review(db, league: dict, season: dict, application_id: str, actor: dict) -> dict:
+async def review(db, league: dict, season: dict, application_id: str, actor: dict, *, conflict_reason: str | None = None) -> dict:
+    override = await _no_conflict(db, season, application_id, actor, conflict_reason)
     async with _season_lock(db, season["id"]):
         application = await _load(db, season["id"], application_id)
+        override = await _recheck(db, application, actor, conflict_reason)
         if application["status"] != SUBMITTED:
             raise LeagueProblem(DECIDED, 409)
-        done = await _move(db, application, IN_REVIEW, actor["id"])
-    await _audit(db, "review", done, actor["id"])
+        done = await _move(db, application, IN_REVIEW, actor["id"], override=override)
+    await _audit_decision(db, "review", done, actor, override)
     return done
 
 
-async def reject(db, league: dict, season: dict, application_id: str, reason: str | None, actor: dict) -> dict:
+async def reject(db, league: dict, season: dict, application_id: str, reason: str | None, actor: dict, *, conflict_reason: str | None = None) -> dict:
+    override = await _no_conflict(db, season, application_id, actor, conflict_reason)
     text = (reason or "").strip()
     if len(text) < REASON_MIN:
         raise LeagueProblem(f"Bitte einen Grund angeben (mindestens {REASON_MIN} Zeichen). Das Team liest ihn.")
     async with _season_lock(db, season["id"]):
         application = await _load(db, season["id"], application_id)
+        override = await _recheck(db, application, actor, conflict_reason)
         if application["status"] not in OPEN_STATUSES:
             raise LeagueProblem(DECIDED, 409)
         if application.get("assignment") or await _left_over(db, application):
             raise LeagueProblem(ASSIGNED_ALREADY, 409)
         now = now_utc().isoformat()
-        done = await _move(db, application, REJECTED, actor["id"], reason=text, keep_active=False,
+        done = await _move(db, application, REJECTED, actor["id"], reason=text, keep_active=False, override=override,
                            fields={"decided_by": actor["id"], "decided_at": now, "decision_reason": text})
-    await _audit(db, "reject", done, actor["id"], reason=text)
+    await _audit_decision(db, "reject", done, actor, override, reason=text)
     await _tell_status(db, league, season, done, REJECTED)
     return done
 
 
-async def waitlist(db, league: dict, season: dict, application_id: str, reason: str | None, actor: dict) -> dict:
+async def waitlist(db, league: dict, season: dict, application_id: str, reason: str | None, actor: dict, *, conflict_reason: str | None = None) -> dict:
+    override = await _no_conflict(db, season, application_id, actor, conflict_reason)
     text = (reason or "").strip() or None
     async with _season_lock(db, season["id"]):
         fresh = await league_service.get_season(db, season["id"])
         application = await _load(db, season["id"], application_id)
+        override = await _recheck(db, application, actor, conflict_reason)
         if application["status"] not in (SUBMITTED, IN_REVIEW, ACCEPTED):
             raise LeagueProblem(DECIDED, 409)
         if application.get("assignment") or await _left_over(db, application):
@@ -379,8 +412,9 @@ async def waitlist(db, league: dict, season: dict, application_id: str, reason: 
         if not _waitlist_has_room(fresh, await seat_stats(db, fresh)):
             raise LeagueProblem(WAITLIST_FULL, 409)
         now = now_utc().isoformat()
-        done = await _move(db, application, WAITLIST, actor["id"], reason=text, fields={"decided_by": actor["id"], "decided_at": now, "decision_reason": text})
-    await _audit(db, "waitlist", done, actor["id"], **({"reason": text} if text else {}))
+        done = await _move(db, application, WAITLIST, actor["id"], reason=text, override=override,
+                           fields={"decided_by": actor["id"], "decided_at": now, "decision_reason": text})
+    await _audit_decision(db, "waitlist", done, actor, override, **({"reason": text} if text else {}))
     await _tell_status(db, league, season, done, WAITLIST)
     return done
 
@@ -462,7 +496,8 @@ async def _left_over_under_lock(db, application: dict, tournament_id: str | None
     return left_over
 
 
-async def _place(db, season: dict, application: dict, tournament_id: str | None, actor: dict, fields: dict, left_over: dict | None) -> tuple[dict, dict | None, dict | None]:
+async def _place(db, season: dict, application: dict, tournament_id: str | None, actor: dict, fields: dict, left_over: dict | None,
+                 override: str | None = None) -> tuple[dict, dict | None, dict | None]:
     """Anmeldung und Antrag gehören zusammen, eine Transaktion gibt es nicht: Scheitert der Antrag, fällt die neue Anmeldung wieder weg. Bleibt sie trotzdem stehen, hilft ``_left_over``."""
     tournament = registration = None
     if left_over:
@@ -473,7 +508,7 @@ async def _place(db, season: dict, application: dict, tournament_id: str | None,
     try:
         if registration:
             fields = {**fields, "assignment": await _assignment(db, tournament, registration, actor["id"])}
-        done = await _move(db, application, ACCEPTED, actor["id"], fields=fields)
+        done = await _move(db, application, ACCEPTED, actor["id"], fields=fields, override=override)
     except Exception:
         if registration and not left_over:
             await db.tournament_registrations.delete_one({"id": registration["id"]})
@@ -481,13 +516,16 @@ async def _place(db, season: dict, application: dict, tournament_id: str | None,
     return done, tournament, registration
 
 
-async def accept(db, league: dict, season: dict, application_id: str, tournament_id: str | None, actor: dict, *, refresh_previews) -> dict:
+async def accept(db, league: dict, season: dict, application_id: str, tournament_id: str | None, actor: dict, *, refresh_previews,
+                 conflict_reason: str | None = None) -> dict:
     """Annehmen, mit ``tournament_id`` gleich zuteilen. Der letzte Platz geht unter der Season-Sperre nur einmal weg."""
+    override = await _no_conflict(db, season, application_id, actor, conflict_reason)
     locked_id = await _staffel_to_lock(db, season["id"], application_id, tournament_id)
     async with _staffel_lock(db, locked_id):
         async with _season_lock(db, season["id"]):
             fresh = await league_service.get_season(db, season["id"])
             application = await _load(db, season["id"], application_id)
+            override = await _recheck(db, application, actor, conflict_reason)
             if application["status"] not in (SUBMITTED, IN_REVIEW, WAITLIST):
                 raise LeagueProblem(DECIDED, 409)
             left_over = await _left_over_under_lock(db, application, tournament_id, locked_id)
@@ -501,15 +539,17 @@ async def accept(db, league: dict, season: dict, application_id: str, tournament
                 raise LeagueProblem(problems[0][1], problems[0][0])
             now = now_utc().isoformat()
             fields = {"decided_by": actor["id"], "decided_at": now, "decision_reason": None}
-            done, tournament, registration = await _place(db, fresh, application, tournament_id, actor, fields, left_over)
+            done, tournament, registration = await _place(db, fresh, application, tournament_id, actor, fields, left_over, override)
         ids_missing = await _after_assign(db, tournament, registration, actor, refresh_previews) if registration else []
-    await _audit(db, "accept", done, actor["id"], **({"tournament_id": tournament_id} if tournament_id else {}))
+    await _audit_decision(db, "accept", done, actor, override, **({"tournament_id": tournament_id} if tournament_id else {}))
     await _tell_status(db, league, season, done, ACCEPTED, squad=squad)
     return {**done, "ids_missing": ids_missing}
 
 
-async def assign(db, league: dict, season: dict, application_id: str, tournament_id: str | None, actor: dict, *, refresh_previews) -> dict:
+async def assign(db, league: dict, season: dict, application_id: str, tournament_id: str | None, actor: dict, *, refresh_previews,
+                 conflict_reason: str | None = None) -> dict:
     """Einen angenommenen Antrag einer Staffel zuteilen - erst hier entsteht die Anmeldung."""
+    override = await _no_conflict(db, season, application_id, actor, conflict_reason)
     if not tournament_id:
         raise LeagueProblem("Bitte eine Staffel wählen.")
     locked_id = await _staffel_to_lock(db, season["id"], application_id, tournament_id)
@@ -517,6 +557,7 @@ async def assign(db, league: dict, season: dict, application_id: str, tournament
         async with _season_lock(db, season["id"]):
             fresh = await league_service.get_season(db, season["id"])
             application = await _load(db, season["id"], application_id)
+            override = await _recheck(db, application, actor, conflict_reason)
             if application["status"] != ACCEPTED:
                 raise LeagueProblem(DECIDED, 409)
             if application.get("assignment"):
@@ -529,27 +570,53 @@ async def assign(db, league: dict, season: dict, application_id: str, tournament
             problems = (await check_squad(db, league, fresh, team, squad, application=application, seated=bool(left_over)))["problems"]
             if problems:
                 raise LeagueProblem(problems[0][1], problems[0][0])
-            done, tournament, registration = await _place(db, fresh, application, tournament_id, actor, {}, left_over)
+            done, tournament, registration = await _place(db, fresh, application, tournament_id, actor, {}, left_over, override)
         ids_missing = await _after_assign(db, tournament, registration, actor, refresh_previews)
-    await _audit(db, "assign", done, actor["id"], tournament_id=tournament_id)
+    await _audit_decision(db, "assign", done, actor, override, tournament_id=tournament_id)
     await _tell_status(db, league, season, done, "assigned")
     return {**done, "ids_missing": ids_missing}
 
 
 # ---------------------------------------------------------------- Sonderweg: Zuteilen ohne Antrag
 
-async def link_admin_assignment(db, tournament: dict, registration: dict, actor_id: str | None) -> None:
-    """Teilt die Leitung ein Co-Team mit offenem Antrag direkt zu, gilt der Antrag als angenommen. Ohne Antrag passiert nichts. Aufrufer halten die Sperre."""
+async def _open_for_admin_way(db, tournament: dict, squad_id: str | None) -> dict | None:
+    """Der offene Antrag ohne Zuteilung, den das Zuteilen per Sonderweg annehmen würde."""
     season_id = (tournament.get("league_context") or {}).get("season_id")
-    if not season_id or not registration.get("squad_id"):
+    if not season_id or not squad_id:
+        return None
+    application = await db.league_applications.find_one({"active_key": f"{season_id}:{squad_id}"}, {"_id": 0})
+    return None if not application or application.get("assignment") else application
+
+
+async def admin_assignment_conflict(db, tournament: dict, squad_id: str | None, actor: dict, conflict_reason: str | None = None) -> str | None:
+    """Sonderweg: Zuteilen kennt keine Befangenheit (B.1) - nimmt es aber einen offenen Antrag an, entscheidet es über die Anmeldung, und dann
+    gilt dieselbe Regel wie im Eingang (#2245). 403 vor dem Schreiben; gibt den Grund einer Notausnahme zurück. Aufrufer halten die Sperre."""
+    application = await _open_for_admin_way(db, tournament, squad_id)
+    if not application:
+        return None
+    return await require_no_side_conflict(db, actor, side_of(application), conflict_reason=conflict_reason, superadmin_detail=ADMIN_WAY_OVERRIDE)
+
+
+async def link_admin_assignment(db, tournament: dict, registration: dict, actor: dict, override: str | None = None) -> None:
+    """Teilt die Leitung ein Co-Team mit offenem Antrag direkt zu, gilt der Antrag als angenommen. Ohne Antrag passiert nichts. Aufrufer halten die Sperre
+    und haben ``admin_assignment_conflict`` gefragt."""
+    application = await _open_for_admin_way(db, tournament, registration.get("squad_id"))
+    if not application:
         return
-    application = await db.league_applications.find_one({"active_key": f"{season_id}:{registration['squad_id']}"}, {"_id": 0})
-    if not application or application.get("assignment"):
-        return
+    try:
+        # Noch einmal direkt vor dem Schreiben (wie ``_recheck``); ``override`` ist der schon geprüfte Grund. Bei 403 fällt die neue Anmeldung wieder weg.
+        override = await require_no_side_conflict(db, actor, side_of(application), conflict_reason=override, superadmin_detail=ADMIN_WAY_OVERRIDE)
+    except Exception:
+        await db.tournament_registrations.delete_one({"id": registration["id"]})
+        raise
+    actor_id = actor.get("id")
     now = now_utc().isoformat()
     fields = {"assignment": await _assignment(db, tournament, registration, actor_id), "decided_by": actor_id, "decided_at": now}
-    with contextlib.suppress(LeagueProblem):
-        await _move(db, application, ACCEPTED, actor_id, fields=fields)
+    try:
+        done = await _move(db, application, ACCEPTED, actor_id, fields=fields, override=override)
+    except LeagueProblem:
+        return
+    await _audit_decision(db, "accept", done, actor, override, tournament_id=tournament.get("id"), via="squad_assign")
 
 
 async def clear_assignment(db, registration_id: str, actor_id: str | None) -> None:
@@ -768,6 +835,9 @@ async def inbox(db, league: dict, season: dict, user: dict) -> dict:
         people |= {step.get("by") for step in row.get("history") or []}
     names = await _names(db, people)
     gone = await _left_staffel(db, rows)
+    # Befangenheit (#2245): dieselbe Regel wie beim Entscheiden, mit den Teams samt Co-Teams aus ``teams_by_id``.
+    sides = {row["id"]: side_of(row) for row in rows}
+    side_teams = await teams_by_id(db, sides.values())
     open_rows = [(row, squads[row["squad_id"]]) for row in rows if row["status"] in OPEN_STATUSES and row["squad_id"] in squads]
     items = []
     for row in rows:
@@ -790,14 +860,17 @@ async def inbox(db, league: dict, season: dict, user: dict) -> dict:
             "captain_name": names.get((squad or {}).get("captain_id")), "vice_name": names.get((squad or {}).get("vice_captain_id")),
             "problems": [text for _code, text in check["problems"]], "warnings": check["warnings"],
             "shared_with": shared,
-            "own_team": user["id"] in {*((squad or {}).get("member_ids") or []), (team or {}).get("leader_id"), *((team or {}).get("co_leader_ids") or [])},
-            "history": [{"status": step.get("status"), "at": step.get("at"), "by_name": names.get(step.get("by")) or "Gelöschter User", "reason": step.get("reason")}
+            "own_team": belongs_to_side(user, sides[row["id"]], side_teams.get(row["team_id"])),
+            "history": [{"status": step.get("status"), "at": step.get("at"), "by_name": names.get(step.get("by")) or "Gelöschter User", "reason": step.get("reason"),
+                         "conflict_reason": step.get("conflict_reason")}
                         for step in row.get("history") or []],
         })
     divisions = await db.league_divisions.find({"season_id": season["id"], "status": "active"}, {"_id": 0}).sort("level", 1).to_list(50)
     staffeln = await league_service.staffeln_of(db, season["id"])
     return {
         "items": items,
+        # Beim eigenen Team (``own_team``) darf nur der Superadmin, als Notausnahme mit Grund.
+        "superadmin": is_superadmin(user),
         "stats": await seat_stats(db, season),
         "configured": bool(window_state(season)),
         "window": window_state(season),

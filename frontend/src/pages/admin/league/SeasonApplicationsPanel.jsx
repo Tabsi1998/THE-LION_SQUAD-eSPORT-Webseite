@@ -6,7 +6,7 @@ import { AlertTriangle, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { FormSection } from "@/components/tls/AdminForm";
-import { SelectField, TextAreaField } from "@/components/tls/FormFields";
+import { SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { ApplicationStateBadge } from "@/components/tls/league/application/LeagueApplicationPanel";
 import { APPLICATION_STATES, statsLine } from "@/lib/leagueApplications";
@@ -15,6 +15,7 @@ import { viennaDateTime } from "@/lib/vienna";
 const WHEN = { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" };
 const BUTTON = "inline-flex min-h-[40px] items-center rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider disabled:opacity-50";
 const REASON_MIN = 5;
+const OWN_TEAM = "Über dein eigenes Team entscheidet eine andere Person.";
 const OPEN_GROUPS = [
   { key: "open", title: "Neu und in Prüfung", statuses: ["submitted", "in_review"] },
   { key: "waitlist", title: "Warteliste", statuses: ["waitlist"] },
@@ -40,45 +41,66 @@ function Notes({ row }) {
       ) : null}
       {row.warnings?.length ? <ul className="mt-2 space-y-0.5 text-xs text-white/60">{row.warnings.map((text) => <li key={text} className="[overflow-wrap:anywhere]">{text}</li>)}</ul> : null}
       {row.shared_with?.length ? <p className="mt-2 text-xs text-white/60 [overflow-wrap:anywhere]">Gleiche Spieler stehen auch im Antrag von: {row.shared_with.join(", ")}.</p> : null}
-      {row.own_team ? <p className="mt-2 text-xs font-semibold text-white/70">Dein eigenes Team.</p> : null}
     </>
   );
 }
 
-function RowActions({ row, options, busy, act }) {
+// Befangenheit (#2245, Entscheidung Nr. 73): Über das eigene Team entscheidet eine zweite Person. Der Server prüft dieselbe Regel, hier nur die Anzeige.
+function OwnTeamNote({ row }) {
+  return <p className="text-sm font-semibold text-white/80" data-testid={`application-own-team-${row.id}`}>{OWN_TEAM}</p>;
+}
+
+function RowActions({ row, options, busy, act, superadmin }) {
   const [staffel, setStaffel] = useState("");
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState("");
+  const [conflictReason, setConflictReason] = useState("");
   const unassigned = row.status === "accepted" && !row.assignment;
   const deciding = ["submitted", "in_review", "waitlist"].includes(row.status);
   if (!deciding && !unassigned) return null;
+  if (row.own_team && !superadmin) return <div className="mt-3"><OwnTeamNote row={row} /></div>;
+  // Nur der Superadmin darf beim eigenen Team, als Notausnahme: Jeder Knopf schickt den Grund mit und geht erst mit fünf Zeichen.
+  const override = row.own_team ? conflictReason.trim() : "";
+  const blocked = busy || (row.own_team && override.length < REASON_MIN);
+  const send = (action, body) => act(row, action, override ? { ...body, conflict_reason: override } : body);
   return (
     <div className="mt-3 space-y-3">
+      {row.own_team ? (
+        <div className="max-w-xl space-y-2 rounded-sm border border-warn/40 p-3">
+          <OwnTeamNote row={row} />
+          <TextField label="Grund für die Notausnahme" required value={conflictReason} onChange={setConflictReason} maxLength={500} testId={`application-conflict-reason-${row.id}`}
+            hint="Als Superadmin geht es trotzdem, mit mindestens fünf Zeichen. Der Grund steht im Verlauf und im Protokoll." />
+        </div>
+      ) : null}
       {options.length ? (
         <SelectField label={unassigned ? "Staffel" : "Staffel (geht auch später)"} value={staffel} onChange={setStaffel} testId={`application-staffel-${row.id}`} className="max-w-md"
           options={[["", "Staffel wählen …"], ...options]} />
       ) : <p className="text-xs text-white/55">Noch keine Staffel angelegt. Annehmen geht, zuteilen später.</p>}
       <div className="flex flex-wrap gap-2">
         {deciding ? (
-          <button type="button" disabled={busy} onClick={() => act(row, "accept", staffel ? { tournament_id: staffel } : {})} className={`tls-btn tls-btn--primary ${BUTTON}`} data-testid={`application-accept-${row.id}`}>Annehmen</button>
+          <button type="button" disabled={blocked} onClick={() => send("accept", staffel ? { tournament_id: staffel } : {})} className={`tls-btn tls-btn--primary ${BUTTON}`} data-testid={`application-accept-${row.id}`}>Annehmen</button>
         ) : (
-          <button type="button" disabled={busy || !staffel} onClick={() => act(row, "assign", { tournament_id: staffel })} className={`tls-btn tls-btn--primary ${BUTTON}`} data-testid={`application-assign-${row.id}`}>Zuteilen</button>
+          <button type="button" disabled={blocked || !staffel} onClick={() => send("assign", { tournament_id: staffel })} className={`tls-btn tls-btn--primary ${BUTTON}`} data-testid={`application-assign-${row.id}`}>Zuteilen</button>
         )}
-        {row.status === "submitted" ? <button type="button" disabled={busy} onClick={() => act(row, "review", {})} className={`tls-btn tls-btn--quiet ${BUTTON}`} data-testid={`application-review-${row.id}`}>In Prüfung nehmen</button> : null}
-        {row.status !== "waitlist" ? <button type="button" disabled={busy} onClick={() => act(row, "waitlist", {})} className={`tls-btn tls-btn--quiet ${BUTTON}`} data-testid={`application-waitlist-${row.id}`}>Warteliste</button> : null}
+        {row.status === "submitted" ? <button type="button" disabled={blocked} onClick={() => send("review", {})} className={`tls-btn tls-btn--quiet ${BUTTON}`} data-testid={`application-review-${row.id}`}>In Prüfung nehmen</button> : null}
+        {row.status !== "waitlist" ? <button type="button" disabled={blocked} onClick={() => send("waitlist", {})} className={`tls-btn tls-btn--quiet ${BUTTON}`} data-testid={`application-waitlist-${row.id}`}>Warteliste</button> : null}
         <button type="button" disabled={busy} onClick={() => setRejecting((value) => !value)} aria-expanded={rejecting} className={`tls-btn tls-btn--danger ${BUTTON}`} data-testid={`application-reject-open-${row.id}`}>Ablehnen</button>
       </div>
       {rejecting ? (
         <div className="max-w-xl space-y-2">
           <TextAreaField label="Grund (Pflicht, das Team liest ihn)" rows={2} value={reason} onChange={setReason} testId={`application-reason-${row.id}`} />
-          <button type="button" disabled={busy || reason.trim().length < REASON_MIN} onClick={() => act(row, "reject", { reason: reason.trim() })} className={`tls-btn tls-btn--danger ${BUTTON}`} data-testid={`application-reject-send-${row.id}`}>Ablehnung senden</button>
+          <button type="button" disabled={blocked || reason.trim().length < REASON_MIN} onClick={() => send("reject", { reason: reason.trim() })} className={`tls-btn tls-btn--danger ${BUTTON}`} data-testid={`application-reject-send-${row.id}`}>Ablehnung senden</button>
         </div>
       ) : null}
     </div>
   );
 }
 
-function ApplicationRow({ row, options, busy, act }) {
+function historyLine(step) {
+  return `${when(step.at)}: ${APPLICATION_STATES[step.status]?.label || step.status}, ${step.by_name}${step.reason ? `, ${step.reason}` : ""}${step.conflict_reason ? ` (Notausnahme: ${step.conflict_reason})` : ""}`;
+}
+
+function ApplicationRow({ row, options, busy, act, superadmin }) {
   return (
     <li className="rounded-sm border border-white/10 bg-[#0A0A0A] p-3" data-testid={`application-${row.id}`}>
       <div className="flex flex-wrap items-center gap-2">
@@ -99,11 +121,11 @@ function ApplicationRow({ row, options, busy, act }) {
       ) : null}
       {row.decision_reason ? <p className="mt-1 text-sm text-white/75 [overflow-wrap:anywhere]">Grund: {row.decision_reason}{row.decided_by_name ? ` (${row.decided_by_name})` : ""}</p> : null}
       <Notes row={row} />
-      <RowActions row={row} options={options} busy={busy} act={act} />
+      <RowActions row={row} options={options} busy={busy} act={act} superadmin={superadmin} />
       {row.history?.length > 1 ? (
         <details className="mt-2 text-xs text-white/55">
           <summary className="cursor-pointer">Verlauf</summary>
-          <ul className="mt-1 space-y-0.5">{row.history.map((step, index) => <li key={index}>{when(step.at)}: {APPLICATION_STATES[step.status]?.label || step.status}, {step.by_name}{step.reason ? `, ${step.reason}` : ""}</li>)}</ul>
+          <ul className="mt-1 space-y-0.5">{row.history.map((step, index) => <li key={index} className="[overflow-wrap:anywhere]">{historyLine(step)}</li>)}</ul>
         </details>
       ) : null}
     </li>
@@ -163,7 +185,7 @@ export function SeasonApplicationsPanel({ seasonId, version }) {
           return (
             <div key={group.key} className="space-y-2">
               <h3 className="text-[11px] font-bold uppercase tracking-widest text-white/60">{group.title} ({rows.length})</h3>
-              <ul className="space-y-2">{rows.map((row) => <ApplicationRow key={row.id} row={row} options={options} busy={busy} act={act} />)}</ul>
+              <ul className="space-y-2">{rows.map((row) => <ApplicationRow key={row.id} row={row} options={options} busy={busy} act={act} superadmin={Boolean(data.superadmin)} />)}</ul>
             </div>
           );
         })}

@@ -116,7 +116,62 @@ test("Gründe, Warnungen und das eigene Team stehen im Klartext da", async () =>
   expect(row).toHaveTextContent("Rudel hat 2 Spieler.");
   expect(row).toHaveTextContent("Tom: Spiel-ID fehlt.");
   expect(row).toHaveTextContent("Falken · Horst");
-  expect(row).toHaveTextContent("Dein eigenes Team");
+  expect(row).toHaveTextContent("Über dein eigenes Team entscheidet eine andere Person.");
+});
+
+// Befangenheit (#2245): Über das eigene Team entscheidet eine zweite Person, der Superadmin nur als Notausnahme mit Grund.
+test("beim eigenen Team stehen statt der Knöpfe ein Satz", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...BODY, items: [{ ...ROW, own_team: true }, { ...ROW, id: "a2", squad_id: "s2", own_team: false }] } });
+  renderPanel();
+
+  expect(await screen.findByTestId("application-own-team-a1")).toHaveTextContent("Über dein eigenes Team entscheidet eine andere Person.");
+  for (const id of ["application-accept-a1", "application-review-a1", "application-waitlist-a1", "application-reject-open-a1", "application-staffel-a1", "application-conflict-reason-a1"]) {
+    expect(screen.queryByTestId(id)).toBeNull();
+  }
+  expect(screen.getByTestId("application-accept-a2")).toBeInTheDocument();
+  expect(screen.queryByTestId("application-own-team-a2")).toBeNull();
+});
+
+test("auch ein angenommener Antrag des eigenen Teams wird nicht selbst zugeteilt", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...BODY, items: [{ ...ROW, status: "accepted", own_team: true }] } });
+  renderPanel();
+
+  await screen.findByTestId("application-own-team-a1");
+  expect(screen.queryByTestId("application-assign-a1")).toBeNull();
+});
+
+test("der Superadmin entscheidet beim eigenen Team nur mit Grund für die Notausnahme", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...BODY, superadmin: true, items: [{ ...ROW, own_team: true }] } });
+  renderPanel();
+
+  const field = await screen.findByTestId("application-conflict-reason-a1");
+  expect(screen.getByTestId("application-a1")).toHaveTextContent("Grund für die Notausnahme");
+  expect(screen.getByTestId("application-accept-a1")).toBeDisabled();
+  expect(screen.getByTestId("application-review-a1")).toBeDisabled();
+  fireEvent.change(field, { target: { value: "  Sonst niemand da " } });
+  fireEvent.click(screen.getByTestId("application-accept-a1"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/leagues/seasons/s1/applications/a1/accept", { conflict_reason: "Sonst niemand da" }));
+
+  fireEvent.click(screen.getByTestId("application-reject-open-a1"));
+  fireEvent.change(screen.getByTestId("application-reason-a1"), { target: { value: "Kader zu klein" } });
+  fireEvent.click(screen.getByTestId("application-reject-send-a1"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/leagues/seasons/s1/applications/a1/reject", { reason: "Kader zu klein", conflict_reason: "Sonst niemand da" }));
+});
+
+test("ohne Bezug zum Team fragt der Eingang den Superadmin nach keinem Grund", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...BODY, superadmin: true } });
+  renderPanel();
+
+  fireEvent.click(await screen.findByTestId("application-accept-a1"));
+  expect(screen.queryByTestId("application-conflict-reason-a1")).toBeNull();
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/leagues/seasons/s1/applications/a1/accept", {}));
+});
+
+test("der Verlauf zeigt eine Notausnahme mit Grund", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...BODY, items: [{ ...ROW, status: "in_review", history: [...ROW.history, { status: "in_review", at: "2026-11-03T10:00:00+00:00", by_name: "Chefin", conflict_reason: "Sonst niemand da" }] }] } });
+  renderPanel();
+
+  expect(await screen.findByTestId("application-a1")).toHaveTextContent("Notausnahme: Sonst niemand da");
 });
 
 test("abgelehnt und zurückgezogen stehen eingeklappt, ohne Knöpfe", async () => {
