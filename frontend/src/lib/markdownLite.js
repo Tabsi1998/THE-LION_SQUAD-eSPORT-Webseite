@@ -62,29 +62,44 @@ function formatInlineText(rawText, options = {}) {
   return options.linkMentions === false ? html : linkMentions(html, options);
 }
 
-// `blockText` (Regelwerk, #2218): Werte aus Bausteinen (Namen aus Bibliothek und Modus) tragen ihre Steuerzeichen als Zeichen aus dem
-// privaten Bereich von Unicode (services/markdown_text.py) - keine Regel trifft sie, erst am Schluss werden sie das echte Zeichen. So wird ein
-// Name nie Link oder fett, und der frei geschriebene Text bleibt unberührt, auch ein Backslash darin. Dasselbe Zeichen-Set wie im PDF.
+// `escapes` (Regelwerk, #2218): Die API liefert Werte aus Bausteinen (Namen aus Bibliothek und Modus) mit Markdown-Backslash-Escapes und den
+// frei geschriebenen Text mit verdoppeltem Backslash (services/markdown_text.served). Ein Escape wird hier zuerst ein Zeichen aus dem
+// privaten Bereich von Unicode - keine Regel trifft es -, erst am Schluss das echte Zeichen. So wird ein Name nie Link oder fett, und der
+// freie Text erscheint, wie er geschrieben ist, auch ein Backslash darin. Dasselbe Zeichen-Set wie auf dem Server und im PDF.
 const BLOCK_TEXT_CHARS = "\\`*_[]()!~+";
 const PROTECT_BASE = 0xe000;
+// Der Bereich gehört dem Zwischenformat: Was so ankommt, fällt weg (wie services/markdown_text.RESERVED).
+const RESERVED = /[-]/g;
+const ESCAPE = /\\([\\`*_[\]()!~+])/g;
 
-/** Ein Text so, wie der Server ihn als Bausteinwert einsetzt (für Tests und Vorschauen). */
-export function protectBlockText(text) {
-  return [...String(text ?? "")].map((char) => {
-    const index = BLOCK_TEXT_CHARS.indexOf(char);
-    return index >= 0 ? String.fromCharCode(PROTECT_BASE + index) : char;
-  }).join("");
+/** Ein Name so, wie die API ihn als Bausteinwert ausliefert (für Tests und Vorschauen). */
+export function escapeBlockText(text) {
+  return [...String(text ?? "")].map((char) => (BLOCK_TEXT_CHARS.includes(char) ? `\\${char}` : char)).join("");
+}
+
+function protectEscapes(markdown) {
+  return markdown.replace(RESERVED, "").replace(ESCAPE, (_, char) => String.fromCharCode(PROTECT_BASE + BLOCK_TEXT_CHARS.indexOf(char)));
+}
+
+function realChar(char) {
+  const index = char.charCodeAt(0) - PROTECT_BASE;
+  return index >= 0 && index < BLOCK_TEXT_CHARS.length ? BLOCK_TEXT_CHARS[index] : char;
+}
+
+/** Die geschützten Zeichen als echte Zeichen - im Text (für Adressen), ohne HTML-Maskierung. */
+function restorePlain(text) {
+  return [...text].map(realChar).join("");
 }
 
 function restoreBlockText(html) {
   return [...html].map((char) => {
-    const index = char.charCodeAt(0) - PROTECT_BASE;
-    return index >= 0 && index < BLOCK_TEXT_CHARS.length ? escapeHtml(BLOCK_TEXT_CHARS[index]) : char;
+    const real = realChar(char);
+    return real === char ? char : escapeHtml(real);
   }).join("");
 }
 
 function renderInline(rawText, options = {}) {
-  if (options.blockText) return restoreBlockText(renderInlinePlain(rawText, options));
+  if (options.escapes) return restoreBlockText(renderInlinePlain(rawText, options));
   return renderInlinePlain(rawText, options);
 }
 
@@ -98,7 +113,8 @@ function renderInlinePlain(rawText, options = {}) {
     html += formatInlineText(rawText.slice(lastIndex, match.index), options);
     const isImage = match[1] === "!";
     const label = formatInlineText(match[2], { ...options, linkMentions: false });
-    const href = sanitizeHref(match[3]);
+    // Mit `escapes` erst die echten Zeichen, dann prüfen: „/\fremd“ bleibt so auch hier kein Link auf eine fremde Seite.
+    const href = sanitizeHref(options.escapes ? restorePlain(match[3]) : match[3]);
     // `imageAllowed` (Regelwerk, #1646): Was es verneint, wird nicht geladen und bleibt ein Link. Ohne Option wie bisher.
     if (href && isImage && (!options.imageAllowed || options.imageAllowed(href))) {
       html += `<img src="${escapeHtml(href)}" alt="${escapeHtml(match[2])}" loading="lazy"/>`;
@@ -119,7 +135,7 @@ function renderInlinePlain(rawText, options = {}) {
 export function renderMarkdownLite(md, options = {}) {
   if (!md) return "";
 
-  const lines = String(md).split(/\r?\n/);
+  const lines = (options.escapes ? protectEscapes(String(md)) : String(md)).split(/\r?\n/);
   let html = "";
   let inList = null;
   let inCodeBlock = false;
@@ -131,8 +147,8 @@ export function renderMarkdownLite(md, options = {}) {
   };
   const closeCodeBlock = () => {
     const code = escapeHtml(codeLines.join("\n"));
-    // Bausteinwerte (#2218) auch im Codeblock als echte Zeichen.
-    html += `<pre><code>${options.blockText ? restoreBlockText(code) : code}</code></pre>`;
+    // Bausteinwerte und Backslashes (#2218) auch im Codeblock als echte Zeichen.
+    html += `<pre><code>${options.escapes ? restoreBlockText(code) : code}</code></pre>`;
     codeLines = [];
     inCodeBlock = false;
   };

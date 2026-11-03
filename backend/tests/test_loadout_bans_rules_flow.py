@@ -108,7 +108,51 @@ async def test_a_version_frozen_with_protection_characters_reads_as_plain_text(f
     flow.act_as(None)
     pdf = await flow.get(f"{season_page(w)}/versions/{first['id']}/pdf")
     words = "\n".join(sheet.get_text() for sheet in __import__("pymupdf").open(stream=pdf.content, filetype="pdf"))
-    assert "Altname [x]" in words
+    assert "Altname [x]" in words and not protected(words)
+
+
+def escaped(name: str) -> str:
+    """So steht ein Name im ausgelieferten Markdown: jedes Markdown-Steuerzeichen mit Backslash (Folge-Review #2218)."""
+    return "".join(f"\\{char}" if char in "\\`*_[]()!~+" else char for char in name)
+
+
+@pytest.mark.asyncio
+async def test_the_public_page_and_the_preview_deliver_no_protection_characters(flow):
+    """Folge-Review #2218: Auch ``sections[].body_md`` der öffentlichen Seite und der Vorschau trägt keine Schutzzeichen. Namen im Baustein
+    kommen mit Markdown-Backslash-Escapes, ein Backslash im frei geschriebenen Text verdoppelt - so zeigt das Web beides, wie geschrieben.
+    Ein eingegebenes Schutzzeichen im freien Text fällt weg."""
+    w = await ready(flow)
+    flow.act_as(w["lead"])
+    special = ok(await flow.post(w["library_url"], json={"category": w["cats"]["Perks"], "name": SPECIAL}))
+    ok(await save_bans(flow, w, [*standard(w), {"item_id": special["id"], "kind": "item", "modes": []}]))
+    # Optional-Fund: Ein eingegebenes Schutzzeichen im Namen wird nicht gespeichert.
+    cloak = ok(await flow.post(w["library_url"], json={"category": w["cats"]["Perks"], "name": "Mantel", "note": "ab"}))
+    assert cloak["name"] == "Mantel" and cloak["note"] == "ab"
+    body = "Vorwort mit C:\\Daten und \\_frei\\_ \ue000\ue003.\n\n# § 1 Fairplay\nFair spielen.\n"
+    preview = ok(await flow.post(f"{season_scope(w)}/preview", json={"title": "A", "body_md": body, "annexes": ANNEX}))
+    assert not protected(preview) and contains(preview, escaped(SPECIAL))
+    assert contains(preview, "Vorwort mit C:\\\\Daten und \\\\_frei\\\\_ .")
+    version = await publish(flow, w, body=body, annexes=ANNEX)
+    flow.act_as(None)
+    for page in (ok(await flow.get(season_page(w))), ok(await flow.get(f"{season_page(w)}?version={version['id']}"))):
+        assert not protected(page) and escaped(SPECIAL) in annex_body(page)
+        assert page["sections"][0]["body_md"] == "Vorwort mit C:\\\\Daten und \\\\_frei\\\\_ ."
+
+
+@pytest.mark.asyncio
+async def test_an_old_version_with_protection_characters_is_delivered_without_them(flow):
+    """Altbestand mit Schutzzeichen in ``frozen`` (nach #2272): die öffentliche Seite liefert ihn mit Backslash-Escapes aus."""
+    from services import markdown_text
+
+    w = await ready(flow)
+    ok(await save_bans(flow, w, standard(w)))
+    first = await publish(flow, w, body=BODY, annexes=ANNEX)
+    name = markdown_text.text_cell("Altname [x]")
+    await flow.db.league_rules.update_one({"id": first["id"]}, {"$set": {f"frozen.{w['season']['id']}.loadout_bans": {
+        "label": "Sperrliste", "source": {}, "markdown": f"- {name}", "text": f"- {name}"}}})
+    flow.act_as(None)
+    page = ok(await flow.get(season_page(w)))
+    assert not protected(page) and annex_body(page) == "- Altname \\[x\\]"
 
 
 @pytest.mark.asyncio

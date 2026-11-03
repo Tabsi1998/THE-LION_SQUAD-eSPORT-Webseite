@@ -19,6 +19,7 @@ from pymongo.errors import DuplicateKeyError
 
 from models import now_utc
 from services import game_maps, uploads_inventory
+from services.markdown_text import strip_protected
 from services.permissions import ADMIN_MEDIA_ROLES, is_confirmed_admin_role
 from services.slug_utils import slugify
 
@@ -56,7 +57,8 @@ class EquipmentProblem(ValueError):
 
 
 def _text(value) -> str:
-    return " ".join(str(value or "").split())
+    # Ohne Zeichen aus dem Bereich der Schutzzeichen des Regelwerks (#2218) - die gehören dem Zwischenformat der Bausteine.
+    return " ".join(strip_protected(value).split())
 
 
 def name_key(value) -> str:

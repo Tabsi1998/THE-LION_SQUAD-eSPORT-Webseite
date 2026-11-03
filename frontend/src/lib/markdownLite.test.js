@@ -1,4 +1,8 @@
-import { protectBlockText, renderMarkdownLite } from "./markdownLite";
+import { escapeBlockText, renderMarkdownLite } from "./markdownLite";
+
+// Wie der Server ausliefert (services/markdown_text.served): Backslash im freien Text verdoppelt, Bausteinwerte mit Backslash-Escapes.
+const served = (free) => free.replace(/\\/g, "\\\\");
+const hasProtection = (html) => [...html].some((char) => char.charCodeAt(0) >= 0xe000 && char.charCodeAt(0) <= 0xe00f);
 
 test("news mentions only link to profiles confirmed as public", () => {
   const html = renderMarkdownLite(
@@ -23,25 +27,34 @@ test("ohne Option bleibt jedes sichere Bild ein Bild (News, Events, Turniertexte
   expect(renderMarkdownLite("![Plan](https://bilder.example.test/plan.png)")).toContain('<img src="https://bilder.example.test/plan.png"');
 });
 
-// Regelwerk (#2218, Review): Namen aus Bibliothek und Modus stehen im Baustein mit geschützten Steuerzeichen - sie bleiben Text. Der frei
-// geschriebene Regeltext bleibt unberührt: Ein Backslash darin steht da, wie er geschrieben ist.
-test("mit `blockText` bleiben Bausteinwerte Text, auch in Tabellen; freier Text behält seine Backslashes", () => {
-  const options = { blockText: true, linkMentions: false };
-  const name = protectBlockText("[Klick](https://evil.example) **fett** `code` \\pfad");
+// Regelwerk (#2218, Folge-Review): Die API liefert Namen aus Bibliothek und Modus mit Backslash-Escapes - sie bleiben Text. Der frei
+// geschriebene Regeltext kommt mit verdoppeltem Backslash und erscheint so, wie er geschrieben ist.
+test("mit `escapes` bleiben Bausteinwerte Text, auch in Tabellen; freier Text behält seine Backslashes", () => {
+  const options = { escapes: true, linkMentions: false };
+  const name = escapeBlockText("[Klick](https://evil.example) **fett** `code` \\pfad");
   const html = renderMarkdownLite(`| Name | Gilt in |\n| --- | --- |\n| ${name} | alle |`, options);
   expect(html).not.toContain("href=");
   expect(html).not.toContain("<strong>");
   expect(html).not.toContain("<code>");
   expect(html).toContain("[Klick](https://evil.example) **fett** `code` \\pfad");
   expect(renderMarkdownLite("![Blitz 9](/api/static/uploads/b.png) **echt**", options)).toContain("<strong>echt</strong>");
-  expect(renderMarkdownLite("Pfad C:\\Daten\\[x] und \\_frei\\_", options)).toContain("Pfad C:\\Daten\\[x] und \\_frei\\_");
+  const free = "Pfad C:\\Daten\\[x] und \\_frei\\_ \\\\ende `a\\*b`";
+  expect(renderMarkdownLite(served(free), options)).toBe(renderMarkdownLite(free));
+  expect(hasProtection(renderMarkdownLite(served(free), options))).toBe(false);
 });
 
-// Folge-Review C.4: Auch in einem Codeblock kommt kein Schutzzeichen heraus.
-test("mit `blockText` zeigt auch ein Codeblock die Bausteinwerte als echte Zeichen", () => {
-  const html = renderMarkdownLite(`\`\`\`\n${protectBlockText("Schild [Test] *x*")}\n\`\`\``, { blockText: true });
-  expect(html).toContain("Schild [Test] *x*");
-  expect([...html].some((char) => char.charCodeAt(0) >= 0xe000 && char.charCodeAt(0) <= 0xf8ff)).toBe(false);
+test("mit `escapes` zeigt auch ein Codeblock Bausteinwerte und Backslashes als echte Zeichen", () => {
+  const html = renderMarkdownLite(`\`\`\`\n${escapeBlockText("Schild [Test] *x*")} ${served("C:\\a")}\n\`\`\``, { escapes: true });
+  expect(html).toContain("Schild [Test] *x* C:\\a");
+  expect(hasProtection(html)).toBe(false);
+});
+
+test("mit `escapes` wird ein Backslash im freien Text kein fremder Link, ein eingeschmuggeltes Schutzzeichen fällt weg", () => {
+  const options = { escapes: true, linkMentions: false };
+  expect(renderMarkdownLite(served("[Klick](/\\evil.example)"), options)).not.toContain("href=");
+  expect(renderMarkdownLite(served("[Regeln](#regeln)"), { ...options, anchorLinksInPage: true })).toContain('href="#regeln"');
+  const html = renderMarkdownLite(`A\ue000\ue002B\ue00b`, options);
+  expect(html).toBe("<p>AB</p>");
 });
 
 test("protokoll-relative Links auf fremde Seiten werden kein Link", () => {

@@ -193,10 +193,15 @@ async def page_view(db, league: dict, season: dict | None, user: dict | None, *,
     return {
         **out, "source": "rules", "fallback_text": None,
         "version": {**_head(version, current), "pdf_url": f"{api_path(league, season)}/versions/{version['id']}/pdf"},
-        "sections": [{**row, "mark": result["marks"].get(row["anchor"])} for row in sections],
+        "sections": _served(sections, result),
         "changes": {"base": _head(previous, current) if previous else None,
                     **{key: result[key] for key in ("new", "changed", "removed")}},
     }
+
+
+def _served(sections: list[dict], result: dict) -> list[dict]:
+    """Abschnitte für die API: Markierung dazu, ``body_md`` ohne Schutzzeichen - Namen mit Backslash-Escapes (Folge-Review #2218)."""
+    return [{**row, "body_md": markdown_text.served(row["body_md"]), "mark": result["marks"].get(row["anchor"])} for row in sections]
 
 
 def _page_document(version: dict, previous: dict | None, season: dict | None) -> dict:
@@ -381,8 +386,8 @@ async def admin_view(db, scope: str, scope_id: str) -> dict:
 
 def _annexes(raw: list[dict] | None) -> list[dict]:
     """Die Anlagen mit ihrem Buchstaben aus der Reihenfolge."""
-    return [{"key": chr(ord("A") + index), "title": str(row.get("title") or "").strip(), "body_md": str(row.get("body_md") or "")}
-            for index, row in enumerate(raw or [])]
+    return [{"key": chr(ord("A") + index), "title": markdown_text.strip_protected(row.get("title")).strip(),
+             "body_md": markdown_text.strip_protected(row.get("body_md"))} for index, row in enumerate(raw or [])]
 
 
 def _check_size(body_md: str | None, annexes: list[dict] | None) -> None:
@@ -456,7 +461,8 @@ async def save_draft(db, scope: str, scope_id: str, body: dict, user: dict, *, c
     kept = set(carried or ()) | set(_upload_files((existing or {}).get("body_md"), (existing or {}).get("annexes")))
     await _check_images(db, body.get("body_md"), body.get("annexes"), user, kept)
     now = now_utc().isoformat()
-    fields = {"title": str(body.get("title") or "").strip(), "body_md": str(body.get("body_md") or ""),
+    # Ein eingegebenes Schutzzeichen (Zwischenformat der Bausteine, #2218) wird nicht gespeichert.
+    fields = {"title": markdown_text.strip_protected(body.get("title")).strip(), "body_md": markdown_text.strip_protected(body.get("body_md")),
               "annexes": _annexes(body.get("annexes")), "updated_at": now, "updated_by": user["id"]}
     if existing is None:
         doc = {"id": new_id(), "scope": scope, "scope_id": scope_id, "league_id": league["id"],
@@ -513,7 +519,7 @@ async def preview(db, scope: str, scope_id: str, body: dict, user: dict) -> dict
     chain = await _chain(db, league, season)
     previous = chain["rows"][-1] if chain["rows"] else None
     result = await _compared(previous, season, sections)
-    return {"sections": [{**row, "mark": result["marks"].get(row["anchor"])} for row in sections],
+    return {"sections": _served(sections, result),
             "changes": {"base": _head(previous, chain["current"]) if previous else None,
                         **{key: result[key] for key in ("new", "changed", "removed")}},
             "blocks_used": [key for key in keys if key in blocks.BLOCKS], "unknown_blocks": blocks.unknown(keys),
