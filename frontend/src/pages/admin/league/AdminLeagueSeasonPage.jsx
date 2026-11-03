@@ -217,6 +217,17 @@ export default function AdminLeagueSeasonPage() {
   // Reiter wechseln: Ungespeichertes bleibt, die Seite fragt aber einmal, ob jetzt gespeichert werden soll.
   const go = async (anchor) => {
     const next = seasonTarget(`#${anchor}`).tab;
+    // Der Map-Pool speichert für sich („Modi und Maps speichern“): Er bleibt beim Wechsel erhalten, die Seite sagt es aber.
+    if (next !== tab && tab === "spielbetrieb" && poolDirty && !formDirty[tab]) {
+      const stay = await confirm({
+        title: "Modi und Maps sind nicht gespeichert",
+        description: "Der Map-Pool bleibt erhalten, solange die Seite offen ist – der Reiter trägt dann einen Punkt. Gespeichert wird er mit „Modi und Maps speichern“.",
+        confirmLabel: "Zurück zum Map-Pool",
+        cancelLabel: "Später speichern",
+        tone: "info",
+      });
+      if (stay) return;
+    }
     if (next !== tab && formDirty[tab] && SAVE_LABELS[tab]) {
       const now = await confirm({
         title: `„${labelOf(tab)}“ ist nicht gespeichert`,

@@ -188,6 +188,16 @@ test("Spielbetrieb: Modi der Season anhaken, Ergebnisregeln nur für sie, Hinwei
   fireEvent.click(within(screen.getByTestId("season-pool-mode-stellung")).getByLabelText("Hafenkante in Stellung"));
   expect(screen.getByTestId("season-tab-dirty-spielbetrieb")).toBeInTheDocument();
   expect(screen.queryByTestId("season-mode-order-hints")).toBeNull();
+
+  // Nur der Pool ist ungespeichert: Der Reiterwechsel fragt trotzdem - „Zurück zum Map-Pool“ bleibt, „Später speichern“ wechselt.
+  confirmMock.mockResolvedValueOnce(true);
+  fireEvent.click(screen.getByTestId("season-tab-termine"));
+  await waitFor(() => expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Modi und Maps sind nicht gespeichert" })));
+  expect(screen.getByTestId("season-tab-spielbetrieb")).toHaveAttribute("aria-selected", "true");
+  confirmMock.mockResolvedValueOnce(false);
+  fireEvent.click(screen.getByTestId("season-tab-termine"));
+  await waitFor(() => expect(screen.getByTestId("season-tab-termine")).toHaveAttribute("aria-selected", "true"));
+  expect(screen.getByTestId("season-tab-dirty-spielbetrieb")).toBeInTheDocument();
 });
 
 test("eine laufende Season mit alter, zu kurzer Reihenfolge lässt sich speichern - unverändert, mit Warnung (#2207)", async () => {
