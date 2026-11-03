@@ -130,8 +130,9 @@ test.describe("Abnahme: Liga-Check-in gegen den echten Server", () => {
     await expect(home.page.getByTestId("checkin-hint")).toContainText("Das Regelwerk hat sich geändert");
     await expect(home.page.getByTestId("checkin-rules-link")).toHaveAttribute("href", `/liga/${ablauf.league.slug}/${ablauf.season.slug}/regeln`);
     await expect(home.page.getByTestId("checkin-submit")).toHaveCount(0);
-    // Erst einchecken, dann melden (Codex zu D.2): statt des Meldeformulars steht der Satz, wer fehlt.
-    await expect(home.page.getByTestId("match-report-hint")).toContainText("eure Seite hat noch nicht eingecheckt");
+    // Erst einchecken, dann melden (Codex zu D.2): statt des Meldeformulars steht der Satz, wer fehlt - hier beide Seiten.
+    await expect(home.page.getByTestId("match-report-hint")).toContainText("eure Seite und");
+    await expect(home.page.getByTestId("match-report-hint")).toContainText("haben noch nicht eingecheckt");
     await expect(home.page.getByTestId("match-report-form")).toHaveCount(0);
     await noSideScroll(home.page);
     await shot(home.page, "checkin-regelwerk-390.png");
@@ -208,21 +209,24 @@ test.describe("Abnahme: Liga-Check-in gegen den echten Server", () => {
   test("Fensterablauf: der Job legt nur den Vorschlag an, die Leitung entscheidet", async ({ browser }, testInfo) => {
     const expire = shared.expire;
     const home = await as(browser, testInfo, expire.homeRole, { width: 390, height: 844 });
+    const lead = await as(browser, testInfo, "lead", { width: 1440, height: 900 });
     await consent(home, expire.homeSquad);
+
+    // Die Leitung legt den Termin so, dass das Fenster in anderthalb Minuten zu ist - vor dem Check-in der Heimseite, denn ein
+    // Check-in vor einem neuen Termin zählt nicht mehr (E.1). Danach ist das Fenster wirklich zu, für den Job wie für jede
+    // Seite im Browser: Die Gastseite fehlt, der Job schlägt vor, wertet aber nichts.
+    const moved = await api(lead.page, "PATCH", `/api/matches/${expire.id}`, {
+      scheduled_at: new Date(Date.now() - 13.5 * MINUTE).toISOString(), schedule_reason: "Abnahme: Fenster läuft ab" });
+    expect(moved.status(), await moved.text()).toBe(200);
     await home.page.goto(`/matches/${expire.id}`);
-    const roster = (await (await home.page.request.get(`/api/matches/${expire.id}/page`)).json()).checkin.roster.filter((row) => !row.blocked);
+    const block = (await (await home.page.request.get(`/api/matches/${expire.id}/page`)).json()).checkin;
+    const roster = block.roster.filter((row) => !row.blocked);
     for (const person of roster.slice(0, 3)) await home.page.getByTestId(`checkin-roster-${person.id}`).check();
     await home.page.getByTestId("checkin-submit").click();
     await expect(home.page.getByTestId(`checkin-side-${expire.home}`)).toHaveAttribute("data-checked", "true");
     expect(home.problems).toEqual([]);
     await home.close();
-
-    // Die Leitung legt den Termin 16 Minuten zurück: Das Fenster ist damit wirklich zu - für den Job wie für jede Seite im
-    // Browser. Die Gastseite fehlt, der Job schlägt vor, wertet aber nichts.
-    const lead = await as(browser, testInfo, "lead", { width: 1440, height: 900 });
-    const moved = await api(lead.page, "PATCH", `/api/matches/${expire.id}`, {
-      scheduled_at: new Date(Date.now() - 16 * MINUTE).toISOString(), schedule_reason: "Abnahme: Fenster abgelaufen" });
-    expect(moved.status(), await moved.text()).toBe(200);
+    await lead.page.waitForTimeout(Math.max(0, new Date(block.window.closes_at).getTime() - Date.now()) + 2000);
     const counts = runJob("match_deadlines", 0);
     expect(counts.proposed).toBe(1);
     expect(runJob("match_deadlines", 0).proposed, "genau ein Vorschlag").toBe(0);

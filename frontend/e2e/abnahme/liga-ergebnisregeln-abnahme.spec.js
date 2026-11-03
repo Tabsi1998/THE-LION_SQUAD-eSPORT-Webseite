@@ -53,6 +53,21 @@ async function post(page, url, data) {
   return page.request.post(url, { data, headers: csrf ? { "X-CSRF-Token": decodeURIComponent(csrf) } : {} });
 }
 
+/** Erst einchecken, dann melden (D.2, #1652): die Leitung legt den Termin auf gleich, jede Seite hakt ihre ersten Anwesenden an. */
+async function checkInBoth(lead, home, away, matchId) {
+  const csrf = (await lead.page.context().cookies()).find((cookie) => cookie.name === "csrf_token")?.value || "";
+  const moved = await lead.page.request.fetch(`/api/matches/${matchId}`, {
+    method: "PATCH", headers: { "X-CSRF-Token": decodeURIComponent(csrf) },
+    data: { scheduled_at: new Date(Date.now() + 5 * 60_000).toISOString(), schedule_reason: "Abnahme: Termin jetzt" } });
+  expect(moved.status(), await moved.text()).toBe(200);
+  for (const person of [home, away]) {
+    const page = await (await person.page.request.get(`/api/matches/${matchId}/page`)).json();
+    const roster = page.checkin.roster.filter((row) => !row.blocked).slice(0, page.checkin.min_present);
+    const done = await post(person.page, `/api/matches/${matchId}/checkin`, { present: roster.map((row) => row.id) });
+    expect(done.status(), await done.text()).toBe(200);
+  }
+}
+
 function reportBody(match, map2) {
   const [stellung, suchen] = [ablauf.pool.stellung[0], ablauf.pool.suchen[1]];
   return {
@@ -105,6 +120,7 @@ test.describe("Abnahme: Ergebnisregeln gegen den echten Server", () => {
       const match = await openMatch(lead.page, round);
       const home = await as(browser, testInfo, match.homeRole, viewport);
       const away = await as(browser, testInfo, match.awayRole, viewport);
+      await checkInBoth(lead, home, away, match.id);
 
       // Der Server ist maßgeblich: 7:5 bei höchstens 11 Runden lehnt er mit deutschem Satz ab, auch ohne Formular.
       await home.page.goto(`/matches/${match.id}`);
