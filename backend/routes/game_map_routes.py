@@ -9,7 +9,7 @@ from auth import require_admin
 from database import get_db
 from models import new_id
 from routes.game_routes import _enrich_games
-from services import game_maps, game_modes, map_pools
+from services import game_maps, game_modes, league_pool_check, map_pools
 from services.game_maps import DEFAULT_POOL_SCOPE, GameMapCreate, GameMapImport, GameMapModes, GameMapOrder, GameMapUpdate, MapProblem
 from services.map_pools import MapPoolSave
 
@@ -146,15 +146,33 @@ async def assign_game_map_modes(game_id: str, body: GameMapModes, me: dict = Dep
         raise _refuse(problem) from None
 
 
+@router.get("/{game_id}/maps/{map_id}/usage")
+async def game_map_usage(game_id: str, map_id: str, me: dict = Depends(require_admin())):
+    """Wo die Map gerade gilt (#2207): Zahl der Pool-Versionen und die Seasons (Entwurf oder laufend), in deren geltendem Pool
+    sie steht - für die Rückfrage vor dem Deaktivieren und Archivieren."""
+    db = get_db()
+    game = await _game(db, game_id)
+    current = await _map(db, game, map_id)
+    return {"pools": (await game_maps.usage_counts(db, game["id"])).get(current["id"], 0),
+            "affected_seasons": await league_pool_check.affected_seasons(db, game["id"], current["id"])}
+
+
 @router.patch("/{game_id}/maps/{map_id}")
 async def update_game_map(game_id: str, map_id: str, body: GameMapUpdate, me: dict = Depends(require_admin())):
     db = get_db()
     game = await _game(db, game_id)
     current = await _map(db, game, map_id)
     try:
-        return await game_maps.update(db, game, current, body, me)
+        saved = await game_maps.update(db, game, current, body, me)
     except MapProblem as problem:
         raise _refuse(problem) from None
+    # Deaktivieren oder archivieren (#2207): Warnung, keine Sperre - der Pool laufender Seasons gilt weiter.
+    status = game_maps.status_of(saved)
+    affected = []
+    if body.status in (game_maps.INACTIVE, game_maps.ARCHIVED) and body.status != game_maps.status_of(current):
+        affected = await league_pool_check.affected_seasons(db, game["id"], current["id"])
+    return {**saved, "affected_seasons": affected,
+            "warning": league_pool_check.affected_warning(saved.get("name") or "", status, affected)}
 
 
 @router.delete("/{game_id}/maps/{map_id}")
