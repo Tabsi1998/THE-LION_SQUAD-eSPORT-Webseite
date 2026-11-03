@@ -687,6 +687,12 @@ async def record_consent(db, league_id: str, version: dict, season_id: str, squa
     return {**doc, "replay": False}
 
 
+async def rules_state(db, league: dict, season: dict) -> dict:
+    """``{current, upcoming}`` für die Prüfung vor der Veröffentlichung (#2207): die heute gültige Fassung und die nächste."""
+    chain = await _chain(db, league, season)
+    return {"current": chain["current"], "upcoming": chain["upcoming"]}
+
+
 async def current_version(db, league: dict, season: dict) -> dict | None:
     """Die Fassung, die heute für diese Season gilt - eigene, sonst die der Liga. ``None``: Es gibt keine, auch wenn ein Regeltext da ist."""
     return (await _chain(db, league, season))["current"]
