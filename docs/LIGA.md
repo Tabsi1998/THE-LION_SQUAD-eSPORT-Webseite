@@ -730,12 +730,13 @@ solange sie gleich bleibt; doppelte zählen weiter (`-2`). Text vor der ersten �
 **Bausteine:** `[[baustein:map_pool]]` (Tabelle Modus und Maps aus dem Pool `league_season`), `[[baustein:mode_order]]` (Liste aus
 `game_mode_order` mit den Namen der Modi), `[[baustein:loadout_bans]]` (Sperrliste, C.4), `[[baustein:mode_settings]]` (#2271: je Modus
 fett der Name, darunter Zeitlimit je Map und Zeit je Runde aus `result_rules`, die Einstellungen aus `mode_settings` als Tabelle
-Gruppe · Einstellung · Wert und der Regeltext als Zitat; ältere Seasons ohne Kopie lesen die des Spiels, Modi ohne Angaben fehlen). Die
-Daten baut `league_rule_blocks.mode_settings_data` als Klartext, die Darstellung `render_mode_settings` setzt jeden Wert aus der
-Verwaltung über `markdown_text.text_cell` (kein Link, keine Auszeichnung, keine Tabellenspalte) – so lässt sich das Einfrieren später
-auf Daten umstellen. `map_pool`, `mode_order` und `mode_settings` zeigen im Web das Symbol des Modus (`markdown`), die Fassung ohne
-Bilder (`text`, PDF und Vergleich) nicht (siehe C.1). Unbekannte lehnt das Veröffentlichen mit 422 ab. Neue Bausteine stehen in
-`league_rule_blocks.BLOCKS`. Beim Veröffentlichen wird das Markdown des Bausteins eingefroren; alteFassungen zeigen ihren Stand von damals. Ohne Season (Seite der Liga) oder bei einer Season, die erst nach dem Veröffentlichen dazukam,
+Gruppe · Einstellung · Wert und der Regeltext als Zitat; ältere Seasons ohne Kopie lesen die des Spiels, Modi ohne Angaben fehlen). Wie
+jeder Baustein liefert er Daten im Klartext (`league_rule_blocks.mode_settings_data`, eingefroren als `data`); erst die Darstellung
+(`render_mode_settings`) setzt jeden Wert aus der Verwaltung über `markdown_text.text_cell` (kein Link, keine Auszeichnung, keine
+Tabellenspalte). `map_pool`, `mode_order` und `mode_settings` tragen das Symbol des Modus in `data` (nur wenn gesetzt) und zeigen es im
+Web (`markdown`), die Fassung ohne Bilder (`text`, PDF und Vergleich) nicht (siehe C.1); `images` meldet es für `frozen_images`.
+Unbekannte lehnt das Veröffentlichen mit 422 ab. Neue Bausteine stehen in `league_rule_blocks.BLOCKS`. Beim Veröffentlichen werden die
+Daten des Bausteins eingefroren; alte Fassungen zeigen ihren Stand von damals. Ohne Season (Seite der Liga) oder bei einer Season, die erst nach dem Veröffentlichen dazukam,
 steht dort ein Hinweis statt einer Liste.
 
 **Reihenfolge:** Fassungen folgen ihrer Geltung (`valid_from`, am selben Tag die zuletzt veröffentlichte), nicht dem Tag der Veröffentlichung. Eine Season erbt die Liga-Fassungen, die
@@ -1411,13 +1412,20 @@ schreiben das Feld nie.
 
 **Regelwerk:** Baustein `[[baustein:loadout_bans]]` „Sperrliste“ (für Anlage A gedacht, steht überall). Je Kategorie eine Tabelle mit
 Bild, Name und „Gilt in“, danach die Aufsätze an erlaubten Waffen. Ohne Sperrliste: „Für diese Season ist keine Sperrliste hinterlegt –
-alles ist erlaubt.“ Der Baustein liefert zwei Fassungen: `markdown` mit Bildern (Web, Vorschau, Hinweis „Daten geändert“) und `text`
-ohne Bilder (PDF, Wort-Vergleich). Beide werden beim Veröffentlichen eingefroren; ältere eingefrorene Bausteine ohne `text` nehmen
-`markdown`. Namen aus Bibliothek und Modus sind Text: `markdown_text.text_cell` ersetzt jedes Steuerzeichen (`` \`*_[]()!~+ ``,
-„|“ wird „/“) durch ein Zeichen aus dem privaten Unicode-Bereich (`U+E000`…), das keine Markdown-Regel trifft – in allen Bausteinen, auch
-Map-Pool und Modusfolge. Erst die Darstellung setzt das echte Zeichen ein: Web (`markdownLite` mit `blockText`), PDF (`pdf_rules_inline`),
-Wort-Vergleich (`markdown_text.plain`). Ein Name wird so nie Link oder Formatierung, und der frei geschriebene Regeltext bleibt unberührt,
-auch ein Backslash darin. Jede Fassung friert so ihre Liste ein. Eine geänderte Sperrliste ergibt den Hinweis „Daten geändert“ (B.2) mit markierten
+alles ist erlaubt.“ **Eingefroren wird strukturiert im Klartext** (Folge-Review): je Baustein `{label, source, data}` – für die Sperrliste
+`data = {list, groups: [{label, entries: [{name, image_url, modes}]}], weapons: [{name, image_url, attachments, modes}]}`, für den Map-Pool
+`{rows: [{label, maps}]}`, für die Modusfolge `{labels}`. Markdown entsteht erst beim Darstellen (`league_rule_blocks.value`): `markdown`
+mit Bildern (Web, Vorschau) und `text` ohne Bilder (PDF, Wort-Vergleich). Ältere Fassungen tragen statt `data` das fertige `markdown`/`text`
+und werden so weiter gelesen. Namen aus Bibliothek und Modus sind Text: Beim Darstellen ersetzt `markdown_text.text_cell` jedes Steuerzeichen
+(`` \`*_[]()!~+ ``, „|“ wird „/“) durch ein Zeichen aus dem privaten Unicode-Bereich (`U+E000`…), das keine Markdown-Regel trifft – in
+allen Bausteinen. Dieses Zwischenformat bleibt auf dem Server: Das PDF (`pdf_rules_inline`) setzt das echte Zeichen ein, und `sections[].body_md`
+von Regelseite und Vorschau geht durch `markdown_text.served` – Namen mit Markdown-Backslash-Escapes, ein Backslash im frei geschriebenen
+Text verdoppelt. Das Web (`renderRulesSection`, `markdownLite` mit `escapes`, auch in Codeblöcken und Adressen) zeigt so beides, wie es
+geschrieben ist; der Editor zeigt den Text ohne `escapes`. Gespeicherte Fassungen, die Antwort des Veröffentlichens, „Daten geändert“
+(`before`, `after`, `ops`) und der Vergleich sind Klartext (`markdown_text.plain`). Altbestand mit Schutzzeichen wird beim Lesen
+zurückgewandelt bzw. ausgeliefert wie neu; in keiner API-Antwort steht ein Zeichen aus `U+E000`…`U+E00F`. Eingegeben (freier Text,
+Titel, Namen im Baustein) fällt ein Zeichen aus diesem Bereich weg (`strip_protected`). Ein Name wird so nie Link oder Formatierung, und
+der frei geschriebene Regeltext bleibt unberührt, auch ein Backslash darin. Jede Fassung friert so ihre Liste ein. Eine geänderte Sperrliste ergibt den Hinweis „Daten geändert“ (B.2) mit markierten
 Unterschieden; die Leitung bereitet daraus eine neue Fassung vor, gibt sie frei und wählt `requires_consent`. Bilder eingefrorener
 Bausteine stehen zusätzlich in `league_rules.frozen_images` (nur veröffentlichte Fassungen): Die Mediathek dreht und löscht sie nicht.
 

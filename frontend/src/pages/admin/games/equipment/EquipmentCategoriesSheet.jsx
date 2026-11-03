@@ -6,13 +6,16 @@ import { api, formatApiError } from "@/lib/api";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { categoriesPayload, categoriesProblem, ROLE_LABELS } from "@/lib/loadoutBans";
 import { toast } from "sonner";
+import { useReportDirty } from "./useReportDirty";
 
 const ICON_BUTTON = "p-1.5 rounded-sm text-white/60 hover:text-[#29B6E8] disabled:opacity-30 disabled:hover:text-white/60 focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]";
 const ROLE_OPTIONS = Object.entries(ROLE_LABELS);
 
-export function EquipmentCategoriesSheet({ game, categories, suggested = [], limit = 20, onClose, onSaved }) {
-  const [rows, setRows] = useState(() => (categories.length ? categories : suggested).map((row) => ({ ...row, count: row.count || 0 })));
+export function EquipmentCategoriesSheet({ game, categories, suggested = [], limit = 20, onClose, onSaved, onDirtyChange }) {
+  const [initial] = useState(() => (categories.length ? categories : suggested).map((row) => ({ ...row, count: row.count || 0 })));
+  const [rows, setRows] = useState(initial);
   const [saving, setSaving] = useState(false);
+  useReportDirty(JSON.stringify(rows) !== JSON.stringify(initial), onDirtyChange);
   const set = (index, key, value) => setRows((list) => list.map((row, position) => (position === index ? { ...row, [key]: value } : row)));
   const move = (index, delta) => setRows((list) => {
     const next = [...list];

@@ -212,7 +212,8 @@ async def test_the_block_shows_times_settings_and_rule_with_icon_on_the_web_only
     stored_season = await flow.db.league_seasons.find_one({"id": season["id"]}, {"_id": 0})
 
     block = (await league_rule_blocks.resolve(flow.db, ["mode_settings"], stored_league, stored_season))["mode_settings"]
-    markdown, text = block["markdown"], block["text"]
+    markdown = league_rule_blocks.value("mode_settings", block, "markdown")
+    text = league_rule_blocks.value("mode_settings", block, "text")
 
     assert f"![Modus-Symbol]({icon}) **Suche**" in markdown
     assert "- Zeitlimit je Map: 1:30 Min." in markdown and "- Zeit je Runde: 1:45 Min." in markdown
@@ -228,6 +229,10 @@ async def test_the_block_shows_times_settings_and_rule_with_icon_on_the_web_only
     assert text == markdown.replace(f"![Modus-Symbol]({icon}) ", "")
     assert pdf_rules_inline(text.splitlines()[0]) == "<b>Suche</b>"
     assert block["source"] == {"modes": ["suche"]}
+    # Eingefroren werden Daten im Klartext - kein Markdown, kein Schutzzeichen (Folge-Review #2218).
+    assert "markdown" not in block and block["data"]["rows"][0]["icon_url"] == icon
+    assert all(ord(char) < 0xE000 or ord(char) > 0xF8FF for char in str(block["data"]))
+    assert league_rule_blocks.BLOCKS["mode_settings"].images(block["data"]) == [icon]
 
 
 def test_the_block_data_is_plain_text_without_protection_marks():
@@ -237,10 +242,11 @@ def test_the_block_data_is_plain_text_without_protection_marks():
 
     data = league_rule_blocks.mode_settings_data(game, season)
 
-    assert data == [{"mode": "a", "label": "A*", "icon_url": "/api/static/uploads/a.png", "time_limit_seconds": None, "round_time_seconds": None,
-                     "settings": [{"key": "x", "label": "**x** [y](z)", "value": "1 | 2", "unit": None, "group": None}], "rules_text": []}]
+    assert data == {"rows": [{"mode": "a", "label": "A*", "time_limit_seconds": None, "round_time_seconds": None,
+                              "settings": [{"key": "x", "label": "**x** [y](z)", "value": "1 | 2", "unit": None, "group": None}],
+                              "rules_text": [], "icon_url": "/api/static/uploads/a.png"}]}
     assert all(ord(char) < 0xE000 or ord(char) > 0xF8FF for char in str(data))
-    assert league_rule_blocks.render_mode_settings([], images=True) == league_rule_blocks.NO_SETTINGS
+    assert league_rule_blocks.render_mode_settings({"rows": []}, "markdown") == league_rule_blocks.NO_SETTINGS
 
 
 @pytest.mark.asyncio
@@ -255,13 +261,16 @@ async def test_map_pool_and_mode_order_blocks_show_the_icon(flow):
     stored_season = await flow.db.league_seasons.find_one({"id": season["id"]}, {"_id": 0})
 
     blocks = await league_rule_blocks.resolve(flow.db, ["map_pool", "mode_order"], stored_league, stored_season)
+    show = lambda key, variant: league_rule_blocks.plain_value(key, blocks[key], variant)  # noqa: E731
 
-    assert f"| ![Modus-Symbol]({icon}) Suche | Hafen |" in blocks["map_pool"]["markdown"]
-    assert "| Suche | Hafen |" in blocks["map_pool"]["text"]
-    assert f"- Map 1: ![Modus-Symbol]({icon}) Suche" in blocks["mode_order"]["markdown"]
-    assert "- Map 1: Suche" in blocks["mode_order"]["text"]
-    assert "- Map 2: Frei" in blocks["mode_order"]["markdown"], "ohne Symbol nur der Name"
-    assert league_rule_blocks._icon("/api/static/uploads/logo.svg", True) == "", "das Regelwerk zeigt nur Raster-Bilder"
+    assert f"| ![Modus-Symbol]({icon}) Suche | Hafen |" in show("map_pool", "markdown")
+    assert "| Suche | Hafen |" in show("map_pool", "text")
+    assert f"- Map 1: ![Modus-Symbol]({icon}) Suche" in show("mode_order", "markdown")
+    assert "- Map 1: Suche" in show("mode_order", "text")
+    assert "- Map 2: Frei" in show("mode_order", "markdown"), "ohne Symbol nur der Name"
+    assert blocks["mode_order"]["data"]["icons"] == [icon, ""]
+    assert league_rule_blocks.BLOCKS["map_pool"].images(blocks["map_pool"]["data"]) == [icon]
+    assert league_rule_blocks._icon("/api/static/uploads/logo.svg", "markdown") == "", "das Regelwerk zeigt nur Raster-Bilder"
 
 
 @pytest.mark.asyncio
@@ -281,3 +290,7 @@ async def test_a_published_version_freezes_the_icon_in_the_media_library(flow):
               if media_audit.is_frozen(collection, document, field)}
     assert ("league_rules", "frozen_images") in places
     assert await media_audit.frozen_usages(flow.db, "symbol-regel.png")
+    # Die Vorschau der Verwaltung zeigt den Baustein mit Symbol (Web).
+    preview = await flow.post(f"{url}/preview", json={"title": "Regeln", "body_md": "# Modi\n[[baustein:mode_settings]]", "annexes": []})
+    assert preview.status_code == 200, preview.text
+    assert f"![Modus-Symbol]({icon}) **Suche**" in str(preview.json()["sections"])
