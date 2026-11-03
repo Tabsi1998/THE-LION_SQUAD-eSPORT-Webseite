@@ -28,6 +28,7 @@ import { LeagueReportForm } from "@/components/tls/league/LeagueReportForm";
 import { defaultTimeText, lineupAmendClosed, sidesInSlotOrder } from "@/components/tls/league/leagueGames";
 import { LeagueGamesView, LeagueLobbyIds, LineupAmendForm, StaffLineupAmend } from "@/components/tls/league/LeagueGamesView";
 import { ScheduleChangePanel } from "@/components/tls/league/ScheduleChangePanel";
+import { CheckinPanel } from "@/components/tls/league/CheckinPanel";
 import { LiveQueueStatus } from "@/components/tls/live/LiveQueueStatus";
 import { MatchCallBox } from "@/components/tls/tournament/MatchCallBox";
 import { ProblemReportForm } from "@/components/tls/results/ProblemReportForm";
@@ -407,6 +408,12 @@ function MatchPageView() {
         </div>
 
         {data.call && <MatchCallBox call={data.call} />}
+        {/* Liga-Check-in (#1652): Stand, Countdown, Anwesende und Start - nur Beteiligte und Leitung bekommen den Block. */}
+        {data.checkin ? (
+          <CheckinPanel block={data.checkin} matchId={id} busy={busy} run={runAction} onChanged={() => load({ preserveDrafts: false })}
+            onAskLead={canUseChat ? askStaff : null}
+            leadUrl={data.tournament ? `/tournaments/${data.tournament.slug || data.tournament.id}/leitung?fall=ns-${id}` : null} />
+        ) : null}
         {/* Vor Ort (#1556): wo und wann das Spiel laut Warteschlange dran ist - den Aufruf selbst zeigt die Karte darüber. */}
         {!finished && isV2 && data.tournament?.id && data.event_mode && data.event_mode !== "online" ? (
           <LiveQueueStatus tournamentId={data.tournament.id} eventId={data.tournament.event_id} matchId={id} hideCalled className="mt-6" />
