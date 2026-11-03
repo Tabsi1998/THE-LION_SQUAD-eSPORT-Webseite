@@ -1637,8 +1637,8 @@ in UTC, Wiener Zeit steht nur in Texten; die Sommerzeit ändert am Fenster nicht
 
 | Feld | Inhalt |
 | --- | --- |
-| `checkin.<registration_id>` | `{at, updated_at, user_id, present: [user_id], via: "side" \| "lead", by, reason, rule_version_id}` – wer wann für die Seite eingecheckt hat, die Anwesenden, bei der Leitung Person und Grund, die Regelfassung von damals |
-| `ready_at` | ISO, einmal gesetzt, sobald beide Seiten eingecheckt sind (Nr. 40) |
+| `checkin.<registration_id>` | `{at, updated_at, user_id, present: [user_id], via: "side" \| "lead", by, reason, rule_version_id, for_at}` – wer wann für die Seite eingecheckt hat, die Anwesenden, bei der Leitung Person und Grund, die Regelfassung von damals, der Termin, für den der Check-in gilt |
+| `ready_at`, `ready_for` | ISO, einmal je Termin gesetzt, sobald beide Seiten eingecheckt sind (Nr. 40); `ready_for` = der Termin, für den es galt |
 | `start` | `{at, by, registration_id, via: "side" \| "lead"}` – der festgehaltene Beginn; zugleich `started_at` und `status: "in_progress"` am Spiel |
 | `notices` | `{open: <Termin>, closing: <Termin>}` – welche Erinnerung für welchen Termin schon ging |
 
@@ -1657,12 +1657,12 @@ schreibt wie der Stationsstart `in_progress` – App und TV zeigen „Läuft“ 
   öffnet erst um …“ bzw. „Der Check-in ist seit … geschlossen – das entscheidet die Liga-Leitung“ (409, nur Seiten); Anwesende: nur Kader,
   jede Person einmal, mindestens `min_present`, nur spielberechtigt (`league_eligibility.check_participants`, Grund im Klartext, 422).
 - **Regelwerks-Sperre:** Hat das Co-Team der Seite der geforderten Fassung (B.2, `requires_consent`) nicht zugestimmt, gibt es keinen Check-in
-  – auch nicht durch die Leitung: 409 „Das Regelwerk hat sich geändert – bitte erst zustimmen.“ mit dem Weg zur Fassung (`rules_url`). Die
-  Matchseite zeigt denselben Satz vor dem Klick.
+  – auch nicht durch die Leitung (Entscheidung Nr. 86): 409 „Das Regelwerk hat sich geändert – bitte erst zustimmen.“ mit dem Weg zur Fassung
+  (`rules_url`). Die Matchseite zeigt denselben Satz vor dem Klick.
 - **Ergänzen bis Fensterende:** ein erneuter Aufruf derselben Seite ersetzt die Liste (`updated_at`), `at` bleibt; dieselbe Liste antwortet
   `idempotent_replay`. Nach Fensterende ergänzt nur die Leitung.
 - Geschrieben wird unter der Turniersperre (`_serialized_match_write`) mit Bedingung auf den gelesenen Stand der Seite, `started_at` und `status`;
-  gleichzeitige Klicks beider Seiten gehen beide durch, `ready_at` setzt genau einmal (Bedingung „beide da und `ready_at` leer“). Ein zweiter
+  gleichzeitige Klicks beider Seiten gehen beide durch, `ready_at` setzt genau einmal je Termin (Bedingung „beide da und `ready_for` ≠ Termin“). Ein zweiter
   gleichzeitiger Klick derselben Seite bekommt 409 „Gerade hat sich am Check-in etwas geändert – bitte neu laden.“
 - Protokoll `match.checkin` (`registration_id`, `count`, `via`, `rule_version_id`, bei der Leitung `reason`). Nachrichten (Art `match_schedule`,
   Thema Match-Erinnerungen): an die Verantwortlichen der Gegenseite „… ist eingecheckt“ (`meta.reason` `checkin_side`, Schlüssel
@@ -1687,6 +1687,14 @@ erschienen – Check-in bis … nicht erfolgt“, Teamstrafe wie bei jedem Kampf
 `checked_in`). Ein begonnenes Spiel (`started_at`) oder eins mit Meldung bekommt nie einen Vorschlag (laufendes BO5 ist kein Nichtantritt).
 Alte Vorschläge ohne Regel `check_in` räumt der Job wie seit #2201 ab.
 
+**Neuer Termin, „Beide nicht erschienen“ (E.1):** Jeder Check-in trägt den Termin, für den er galt (`for_at`); setzt die Leitung einen
+anderen Termin (`PATCH`, auch nach „Neu ansetzen“), zählen die alten Check-ins nicht mehr, beide Seiten checken für den neuen Termin neu ein,
+„beide da“ gilt wieder einmal (`ready_for`). Ein offener Vorschlag aus dem alten Fenster zeigt keine Karte mehr (die Karte prüft das Fenster
+live) und fällt im nächsten Lauf weg (`match.no_show.cleared`, Grund `rescheduled`); nach dem neuen Fenster kommt er neu. Fehlen beide Seiten,
+nennt der Vorschlag beide; die Leitung wertet dann über „Beide nicht erschienen“ (E.1, Nr. 27) oder trägt nach. Eine Wertung „beide nicht
+erschienen“ oder „kampflos“ beendet den Stand (`finished`); nach „Neu ansetzen“ ist das Spiel wieder offen, die Check-ins gelten erst mit dem
+neuen Termin.
+
 **Erinnerungen** (`league_checkin_sweep.sweep`, im Fristen-Job mit denselben laufenden Turnieren): bei Öffnung des Fensters „Check-in offen“ an
 die Verantwortlichen beider Seiten, die noch nicht eingecheckt sind (Art `match_call` – Push mit Vibration wie „Du bist dran“, Schlüssel
 `checkin-open:<spiel>:<termin>`), `remind_minutes_before_close` Minuten vor Schluss „Noch … Minuten“ an Seiten ohne Check-in
@@ -1695,8 +1703,8 @@ In einer Sperrzeit läuft nichts.
 
 **Matchseite** `checkin` (nur Staffeln mit Regeln, nur Beteiligte und Leitung, sonst `null`): `rules`, `state`, `scheduled_at`, `window
 {opens_at, closes_at}`, `ready_at`, `started_at`, `sides[]` je Seite `{registration_id, name, own, checked_in, at, via, present: [{id, name}],
-present_count, consent_open, rules_url, lead_reason}` (die Anwesenden sehen beide Seiten und die Leitung, wie Aufstellungen; einen
-Eignungsgrund sieht nur die eigene Seite), `own_registration_id`, `can_checkin`, `checkin_hint` (warum nicht), `roster[]` der eigenen Seite
+present_count, consent_open, rules_url, lead_reason}` (die Anwesenden sehen beide Seiten mit Namen und die Leitung, wie Aufstellungen –
+Entscheidung Nr. 85; einen Eignungsgrund sieht nur die eigene Seite), `own_registration_id`, `can_checkin`, `checkin_hint` (warum nicht), `roster[]` der eigenen Seite
 `{id, name, blocked}` (Grund im Klartext, nicht wählbar), `min_present`, `can_start`, `start_hint`, `proposal` (`{due_at, missing: [name]}` oder
 `null`), `lead {can_enter, conflict, rosters: {registration_id: [{id, name, blocked}]}}` für die Leitung.
 

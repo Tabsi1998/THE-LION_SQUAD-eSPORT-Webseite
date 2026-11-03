@@ -93,6 +93,12 @@ def test_state_follows_the_window_and_the_sides():
     assert state(match(flow=done(HOME, AWAY), started_at=AT), t, utc("2026-10-25T00:50:00")) == match_flow.RUNNING
     assert state(match(status="in_progress"), t, utc("2026-10-25T00:50:00")) == match_flow.RUNNING
     assert state(match(status="forfeit"), t, utc("2026-10-25T00:50:00")) == match_flow.FINISHED
+    # Neuer Termin (E.1 „Neu ansetzen“, Leitung): ein Check-in von früher zählt nicht mehr - ohne ``for_at`` (Altbestand) gilt er weiter.
+    dated = {"checkin": {HOME: {"present": ["a", "b", "c"], "via": "side", "for_at": AT},
+                         AWAY: {"present": ["x", "y", "z"], "via": "side", "for_at": "2026-10-24T00:45:00+00:00"}}}
+    assert match_flow.missing_sides(match(flow=dated)) == [AWAY]
+    assert match_flow.missing_sides(match(flow=dated, scheduled_at="2026-10-26T18:00:00+00:00")) == [HOME, AWAY]
+    assert match_flow.missing_sides(match(flow=done(HOME, AWAY), scheduled_at="2026-10-26T18:00:00+00:00")) == []
     assert state(match(scheduled_at=None), t, utc("2026-10-25T00:50:00")) == match_flow.NO_TIME
     assert state(match(), staffel(checkin_rules=None), utc("2026-10-25T00:50:00")) == match_flow.NONE
     assert state(match(slots=[{"slot": 1, "registration_id": HOME}]), t, utc("2026-10-25T00:50:00")) == match_flow.NONE

@@ -119,7 +119,7 @@ async def _propose_no_show(db, tournament: dict, match: dict, info: dict, now: d
 def _league_proposal_stale(tournament: dict, match: dict) -> str | None:
     """Warum ein offener Liga-Vorschlag weg darf: ohne Regel ``check_in`` stammt er aus der Zeit vor dem Check-in (#2201); mit ihr
     ist er erledigt, sobald die fehlenden Seiten eingecheckt sind (D.2, die Leitung hat sie nachgetragen). Sonst ``None``."""
-    from services.match_flow import missing_sides
+    from services.match_flow import missing_sides, no_show_info
 
     proposal = match.get("no_show_proposal")
     if not isinstance(proposal, dict) or proposal.get("decision"):
@@ -127,7 +127,13 @@ def _league_proposal_stale(tournament: dict, match: dict) -> str | None:
     if proposal.get("rule") != "check_in":
         return "league_without_check_in"
     wanted = set(proposal.get("missing_registration_ids") or []) or set(missing_sides(match))
-    return "checked_in" if not (wanted & set(missing_sides(match))) else None
+    if not (wanted & set(missing_sides(match))):
+        return "checked_in"
+    # Neuer Termin (Leitung, „Neu ansetzen“ aus E.1): der Vorschlag gehört zum alten Fenster - nach dem neuen kommt er neu.
+    info = no_show_info(match, tournament)
+    if not info or info["due_at"].isoformat() != str(proposal.get("due_at") or ""):
+        return "rescheduled"
+    return None
 
 
 async def _clear_league_proposal(db, tournament: dict, match: dict) -> None:

@@ -152,10 +152,13 @@ def _filled(match: dict | None) -> list[str]:
 
 
 def checkins(match: dict | None) -> dict[str, dict]:
-    """Die Check-ins je Seite - nur die, deren Seite noch im Spiel steht."""
+    """Die Check-ins je Seite - nur die, deren Seite noch im Spiel steht und die zum geltenden Termin gehören (``for_at``): Setzt
+    die Leitung einen neuen Termin (auch nach „Neu ansetzen“, E.1), zählt ein Check-in von früher nicht mehr."""
     raw = ((match or {}).get("flow") or {}).get("checkin") or {}
     seated = set(_filled(match))
-    return {key: value for key, value in raw.items() if isinstance(value, dict) and key in seated}
+    current = _iso((match or {}).get("scheduled_at"))
+    return {key: value for key, value in raw.items()
+            if isinstance(value, dict) and key in seated and ("for_at" not in value or value.get("for_at") == current)}
 
 
 def missing_sides(match: dict | None) -> list[str]:
@@ -372,23 +375,29 @@ async def check_in(db, match: dict, tournament: dict | None, setup: Sides, *, re
             and (via == SIDE or previous.get("reason") == reason_text):
         return {"side": previous, "ready": not missing_sides(match), "idempotent_replay": True}
     now_iso = now.isoformat()
+    for_at = _iso(match.get("scheduled_at"))
     entry = {
         "at": (previous or {}).get("at") or now_iso, "updated_at": now_iso, "user_id": user.get("id"), "present": ids, "via": via,
         "by": user.get("id") if via == LEAD else None, "reason": reason_text,
-        "rule_version_id": (consent or {}).get("version_id"),
+        "rule_version_id": (consent or {}).get("version_id"), "for_at": for_at,
     }
+    # Ein Eintrag zu einem früheren Termin zählt nicht mehr (``checkins``) - überschrieben wird er mit Bedingung auf seinen Stand.
+    stored = ((match.get("flow") or {}).get("checkin") or {}).get(registration_id) or {}
     written = await db.matches_v2.update_one(
         {"id": match["id"], "started_at": None, "status": {"$in": sorted(OPEN_MATCH_STATUSES)}, "reports.0": {"$exists": False},
-         f"flow.checkin.{registration_id}.updated_at": (previous or {}).get("updated_at")},
+         "scheduled_at": match.get("scheduled_at"),
+         f"flow.checkin.{registration_id}.updated_at": (stored if isinstance(stored, dict) else {}).get("updated_at")},
         {"$set": {f"flow.checkin.{registration_id}": entry, "updated_at": now_iso},
          "$addToSet": {"flow.user_ids": {"$each": sorted({user.get("id"), *ids} - {None})}}})
     if not written.matched_count:
         raise FlowProblem(CHANGED_DETAIL)
-    fresh = await db.matches_v2.find_one({"id": match["id"]}, {"_id": 0, "flow": 1, "slots": 1}) or {}
+    fresh = await db.matches_v2.find_one({"id": match["id"]}, {"_id": 0, "flow": 1, "slots": 1, "scheduled_at": 1}) or {}
     ready = not missing_sides({**match, **fresh})
     became_ready = False
     if ready:
-        marked = await db.matches_v2.update_one({"id": match["id"], "flow.ready_at": None}, {"$set": {"flow.ready_at": now_iso}})
+        # „Beide da“ genau einmal je Termin: Bedingung auf den Termin, für den es zuletzt galt.
+        marked = await db.matches_v2.update_one({"id": match["id"], "flow.ready_for": {"$ne": for_at}},
+                                                {"$set": {"flow.ready_at": now_iso, "flow.ready_for": for_at}})
         became_ready = bool(getattr(marked, "modified_count", 0))
     await _audit(db, "match.checkin.lead" if via == LEAD else "match.checkin", match, user.get("id"),
                  {"registration_id": registration_id, "count": len(ids), "via": via, "rule_version_id": entry["rule_version_id"],
@@ -505,6 +514,11 @@ async def page_block(db, match: dict, tournament: dict | None, *, acting_reg: di
     proposal = match.get("no_show_proposal") if isinstance(match.get("no_show_proposal"), dict) else None
     if proposal and (proposal.get("decision") or proposal.get("rule") != "check_in"):
         proposal = None
+    if proposal:
+        # Nur, solange das Fenster wirklich zu ist (nach einem neuen Termin räumt der Fristen-Job den alten Vorschlag ab).
+        due = no_show_info(match, tournament)
+        if not due or due["due_at"] > now:
+            proposal = None
     missing_ids = missing_sides(match)
 
     def side_view(reg: dict) -> dict:
@@ -631,9 +645,11 @@ def privacy_query(user_id: str) -> dict:
 async def export_snapshot(db, user_id: str) -> list[dict]:
     """Für die Auskunft (``league_checkin``): je Spiel die eigenen Schritte - als Leitung nur der Vorgang."""
     out = []
-    for match in await db.matches_v2.find(privacy_query(user_id), {"_id": 0, "id": 1, "tournament_id": 1, "flow": 1, "slots": 1}).to_list(None):
+    for match in await db.matches_v2.find(privacy_query(user_id), {"_id": 0, "id": 1, "tournament_id": 1, "flow": 1}).to_list(None):
         steps = []
-        for registration_id, entry in checkins(match).items():
+        # Alle Einträge, auch zu früheren Terminen und ausgeschiedenen Seiten - die Auskunft nennt jeden Schritt der Person.
+        raw = ((match.get("flow") or {}).get("checkin") or {}).items()
+        for registration_id, entry in ((key, value) for key, value in raw if isinstance(value, dict)):
             if entry.get("via") == SIDE and entry.get("user_id") == user_id:
                 steps.append({"role": "checked_in", "side": registration_id, "at": entry.get("at"), "updated_at": entry.get("updated_at"),
                               "present_count": len(entry.get("present") or [])})

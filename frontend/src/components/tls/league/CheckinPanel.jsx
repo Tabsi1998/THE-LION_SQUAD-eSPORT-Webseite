@@ -259,8 +259,8 @@ export function CheckinPanel({ block, matchId, busy, run, onChanged, onAskLead, 
 
       {block.proposal ? (
         <p className="mt-4 rounded-sm border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-white/85" data-testid="checkin-proposal">
-          <strong>Check-in abgelaufen</strong> – {block.proposal.missing?.join(" und ") || "eine Seite"} hat nicht eingecheckt (Fenster bis {clock(block.proposal.due_at)}).
-          {" "}Die Liga-Leitung entscheidet: kampflos werten, die Seite nachtragen oder verlängern. Gewertet wird nichts von selbst.
+          <strong>Check-in abgelaufen</strong> – {block.proposal.missing?.join(" und ") || "eine Seite"} {(block.proposal.missing || []).length > 1 ? "haben" : "hat"} nicht eingecheckt (Fenster bis {clock(block.proposal.due_at)}).
+          {" "}Die Liga-Leitung entscheidet: {(block.proposal.missing || []).length > 1 ? "„Beide nicht erschienen“, die Seiten nachtragen oder verlängern" : "kampflos werten, die Seite nachtragen oder verlängern"}. Gewertet wird nichts von selbst.
           {block.lead && leadUrl ? <Link to={leadUrl} className="tls-hit ml-2 font-bold text-white underline underline-offset-2" data-testid="checkin-proposal-decide">Nicht erschienen entscheiden</Link> : null}
         </p>
       ) : null}

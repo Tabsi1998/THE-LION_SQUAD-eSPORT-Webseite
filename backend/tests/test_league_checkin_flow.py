@@ -78,6 +78,19 @@ async def sweep(flow, world, minutes: float):
     return await match_deadline_sweep.sweep(flow.db, now=now_utc() + timedelta(minutes=minutes))
 
 
+async def shift(flow, world, minutes: float) -> None:
+    """Die Zeit „vorspulen“: Termin verschieben, die Check-ins gehören weiter zu ihm (``for_at``) - anders als ein neuer Termin der
+    Leitung, der sie aufhebt (eigener Test)."""
+    stored = await flow.reload(world["match"])
+    when = at(minutes)
+    update = {"scheduled_at": when}
+    for registration_id in ((stored.get("flow") or {}).get("checkin") or {}):
+        update[f"flow.checkin.{registration_id}.for_at"] = when
+    if (stored.get("flow") or {}).get("ready_for"):
+        update["flow.ready_for"] = when
+    await flow.db.matches_v2.update_one({"id": mid(world)}, {"$set": update})
+
+
 # ---------------------------------------------------------------- Check-in einer Seite
 
 @pytest.mark.asyncio
@@ -357,7 +370,7 @@ async def test_after_the_window_the_job_proposes_and_the_lead_decides(flow):
     assert (await checkin(flow, world, "Kapitaen", "Kapitaen", "Mila")).status_code == 200
     assert (await sweep(flow, world, 14))["proposed"] == 0, "das Fenster ist noch offen"
     # Das Fenster ist seit einer Minute zu - für Job und Seite gleichermaßen.
-    await flow.db.matches_v2.update_one({"id": mid(world)}, {"$set": {"scheduled_at": at(-16)}})
+    await shift(flow, world, -16)
     first = await sweep(flow, world, 0)
     assert first["proposed"] == 1
     stored = await flow.reload(world["match"])
@@ -426,6 +439,34 @@ async def test_the_lead_extends_the_window_and_the_side_can_still_check_in(flow)
 
 
 @pytest.mark.asyncio
+async def test_a_new_time_from_the_lead_voids_old_checkins_and_the_proposal(flow):
+    """E.1 „Neu ansetzen“ und jeder neue Termin der Leitung: alte Check-ins zählen nicht mehr, der alte Vorschlag fällt weg, „beide da“
+    gilt für den neuen Termin wieder einmal."""
+    world = await checkin_world(flow)
+    assert (await checkin(flow, world, "Kapitaen", "Kapitaen", "Mila")).status_code == 200
+    await flow.db.matches_v2.update_one({"id": mid(world)}, {"$set": {"scheduled_at": at(-16)}})
+    assert (await sweep(flow, world, 0))["proposed"] == 1
+    flow.act_as(world["lead"])
+    assert "no_show" in {row["kind"] for row in (await flow.get(f"/api/tournaments/{world['tournament']['id']}/lead")).json()["attention"]}
+    moved = await flow.patch(f"/api/matches/{mid(world)}", json={"scheduled_at": at(60), "schedule_reason": "Nachholtermin"})
+    assert moved.status_code == 200, moved.text
+    assert (await flow.reload(world["match"]))["no_show_proposal"], "noch da - aber ohne Wirkung"
+    assert "no_show" not in {row["kind"] for row in (await flow.get(f"/api/tournaments/{world['tournament']['id']}/lead")).json()["attention"]}
+    block = (await page(flow, world, "Kapitaen"))["checkin"]
+    assert block["state"] == "waiting" and block["sides"][0]["checked_in"] is False and block["proposal"] is None
+    assert (await sweep(flow, world, 0))["proposed"] == 0
+    cleared = await flow.db.audit_logs.find_one({"action": "match.no_show.cleared"}, {"_id": 0})
+    assert cleared["data"]["reason"] == "rescheduled" and (await flow.reload(world["match"])).get("no_show_proposal") is None
+    # Zum neuen Termin checken beide neu ein - „beide da“ meldet sich wieder.
+    await flow.db.matches_v2.update_one({"id": mid(world)}, {"$set": {"scheduled_at": at(0)}})
+    assert (await checkin(flow, world, "Kapitaen", "Kapitaen", "Tom")).status_code == 200
+    second = await checkin(flow, world, "Falke1", "Falke1", "Falke2")
+    assert second.status_code == 200 and second.json()["ready"] is True
+    assert await flow.db.notifications.count_documents({"meta.reason": "checkin_ready"}) == 2
+    assert (await sweep(flow, world, 30))["proposed"] == 0, "beide da zum neuen Termin"
+
+
+@pytest.mark.asyncio
 async def test_old_proposals_without_check_in_are_still_cleared(flow):
     world = await checkin_world(flow, rules=None)
     await flow.db.matches_v2.update_one({"id": mid(world)}, {"$set": {"scheduled_at": at(-24 * 60), "no_show_proposal": {
@@ -461,8 +502,8 @@ async def test_reminders_go_once_per_time_at_opening_and_before_the_end(flow):
     assert [row["user_id"] for row in late] == [world["users"]["Falke1"]["id"]]
     assert (await league_checkin_sweep.sweep(flow.db, [tournament], now=now_utc() + timedelta(minutes=12)))["closing"] == 0
 
-    # Ein neuer Termin erinnert neu.
-    await flow.db.matches_v2.update_one({"id": mid(world)}, {"$set": {"scheduled_at": at(120)}})
+    # Ein neuer Termin erinnert neu (die Zeit „vorgespult“, der Check-in gehört weiter dazu).
+    await shift(flow, world, 120)
     moved = await league_checkin_sweep.sweep(flow.db, [tournament], now=now_utc() + timedelta(minutes=106))
     assert moved["open"] == 1, "die eingecheckte Seite braucht keine Erinnerung mehr"
     full = await sweep(flow, world, 106)
