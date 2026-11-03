@@ -94,9 +94,16 @@ export function modeOrderProblem(order, bestOf) {
   return filled.length === Number(bestOf) ? "" : "Bitte für jede Map einen Modus wählen – oder alle frei lassen.";
 }
 
-/** Das Formular als Anfrage. ``season`` ist der gespeicherte Stand: die übrigen Punkte-Regeln bleiben, wie sie sind. */
-export function seasonPayload(form) {
-  const order = (form.game_mode_order || []).slice(0, Number(form.best_of) || 0);
+/** Die längste Serie der Season (#2207): Best of der Season oder einer aktiven Liga N mit eigenem Best of. So lang ist „Modus je Map“. */
+export function longestSeries(bestOf, divisions = []) {
+  const own = (divisions || []).filter((row) => (row.status || "active") === "active").map((row) => Number(row.overrides?.best_of) || 0);
+  return Math.max(Number(bestOf) || 1, ...own);
+}
+
+/** Das Formular als Anfrage. ``season`` ist der gespeicherte Stand: die übrigen Punkte-Regeln bleiben, wie sie sind. ``maps``: Länge von
+ * „Modus je Map“, Vorgabe das Best of der Season. */
+export function seasonPayload(form, maps = form.best_of) {
+  const order = (form.game_mode_order || []).slice(0, Number(maps) || 0);
   return {
     name: form.name.trim() || null,
     start_date: form.start_day ? fromViennaInput(`${form.start_day}T00:00`) : null,

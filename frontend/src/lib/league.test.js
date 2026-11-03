@@ -1,4 +1,4 @@
-import { deletionGroups, modeOrderProblem, overridesPayload, overridesToForm, seasonPayload, seasonToForm, settingsLine, syncSummary, weekdayName } from "./league";
+import { deletionGroups, longestSeries, modeOrderProblem, overridesPayload, overridesToForm, seasonPayload, seasonToForm, settingsLine, syncSummary, weekdayName } from "./league";
 
 // Liga verwalten (docs/LIGA.md, #1622): Formular ↔ Anfrage. Der Beginn ist ein Wiener Kalendertag (00:00 Wien).
 
@@ -37,6 +37,15 @@ test("Modus je Map: alle frei oder jede Position belegt", () => {
   expect(modeOrderProblem(["snd", "stellung", "snd"], 3)).toBe("");
   expect(seasonPayload({ ...seasonToForm(SEASON), game_mode_order: ["snd", "", "snd"] }).game_mode_order).toEqual([]);
   expect(seasonPayload({ ...seasonToForm(SEASON), game_mode_order: ["snd", "stellung", "snd", "x"] }).game_mode_order).toEqual(["snd", "stellung", "snd"]);
+});
+
+test("Modus je Map ist so lang wie die längste Serie aus Season und aktiven Liga N (#2207)", () => {
+  expect(longestSeries(3, [])).toBe(3);
+  expect(longestSeries("3", [{ overrides: { best_of: 5 } }, { overrides: {} }])).toBe(5);
+  expect(longestSeries(3, [{ status: "archived", overrides: { best_of: 7 } }])).toBe(3);
+  const order = ["snd", "stellung", "snd", "stellung", "snd"];
+  expect(seasonPayload({ ...seasonToForm(SEASON), game_mode_order: order }, 5).game_mode_order).toEqual(order);
+  expect(seasonPayload({ ...seasonToForm(SEASON), game_mode_order: order }).game_mode_order).toEqual(["snd", "stellung", "snd"]);
 });
 
 test("Liga N: nur abweichende Werte, leer heißt wie die Season", () => {

@@ -8,7 +8,7 @@ vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (detail) => String(d
 vi.mock("@/components/tls/AdminLayout", () => ({ AdminLayout: ({ children }) => <div>{children}</div> }));
 vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => async () => true }));
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
-const toastMock = { success: vi.fn(), error: vi.fn() };
+const toastMock = { success: vi.fn(), error: vi.fn(), warning: vi.fn() };
 vi.mock("sonner", () => ({ toast: toastMock }));
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { role: "superadmin" } }) }));
 
@@ -36,9 +36,13 @@ const BODY = {
   }],
 };
 
+// Prüfung vor der Veröffentlichung (#2207): eigener Abruf der Seite.
+const READINESS = { ok: false, superadmin: true, max_maps: 3, total: null, requirements: [], warnings: [],
+  problems: [{ code: "pool_missing", text: "Die Season hat keinen Map-Pool." }] };
+
 beforeEach(() => {
   for (const fn of [...Object.values(apiMock), ...Object.values(toastMock)]) fn.mockReset();
-  apiMock.get.mockResolvedValue({ data: BODY });
+  apiMock.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith("/readiness") ? READINESS : BODY }));
   apiMock.patch.mockResolvedValue({ data: { ...SEASON, changed: ["weeks_total"], staffeln_to_sync: 1 } });
   apiMock.post.mockResolvedValue({ data: {} });
 });
@@ -58,6 +62,24 @@ function renderPage() {
 function withPlan(plan) {
   apiMock.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith("/delete-plan") ? plan : BODY }));
 }
+
+test("die Prüfung steht auf der Seite, der Grund der Notausnahme geht mit dem Veröffentlichen mit (#2207)", async () => {
+  renderPage();
+  expect(await screen.findByTestId("season-readiness-problems")).toHaveTextContent("keinen Map-Pool");
+  fireEvent.change(screen.getByTestId("season-readiness-override"), { target: { value: "Vorschau für die Leitung" } });
+  fireEvent.change(screen.getByTestId("season-form-visibility"), { target: { value: "admins" } });
+  fireEvent.click(screen.getByTestId("season-save"));
+
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalled());
+  expect(apiMock.patch.mock.calls[0][1]).toMatchObject({ visibility: "admins", readiness_override_reason: "Vorschau für die Leitung" });
+});
+
+test("„Modus je Map“ ist so lang wie die längste Serie einer Liga N (#2207)", async () => {
+  const body = { ...BODY, divisions: [{ ...BODY.divisions[0], overrides: { best_of: 5 } }] };
+  apiMock.get.mockImplementation((url) => Promise.resolve({ data: url.endsWith("/readiness") ? READINESS : body }));
+  renderPage();
+  expect(await screen.findByTestId("mode-order-4")).toBeInTheDocument();
+});
 
 test("zeigt Kopf, Kalender mit Sperrwochen und die Staffel mit Weg zur Turnierverwaltung", async () => {
   renderPage();
