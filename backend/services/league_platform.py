@@ -82,9 +82,10 @@ def _label(item: dict | None) -> str:
 
 
 def _division_label(division: dict) -> str:
-    from services.league_service import division_label
-
-    return division_label(division)
+    """„Liga 1“ bzw. „Liga 1 · Elite“ - wie ``league_service.division_label``, hier ohne Import (kein Import-Kreis)."""
+    nickname = " ".join(str(division.get("nickname") or "").split())
+    base = f"Liga {division.get('level')}"
+    return f"{base} · {nickname}" if nickname else base
 
 
 def _bool_or_none(value):
