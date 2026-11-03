@@ -645,6 +645,7 @@ Zugriff, außer „lesen“ steht in der Zeile. Prüfung: `backend/tests/test_le
 | `POST …/seasons/{id}/divisions`, `PATCH`, `DELETE …/divisions/{id}`, `GET …/delete-plan` | `season` | – | – |
 | `POST …/divisions/{id}/staffeln`, `DELETE …/staffeln/{tid}` | `season` | – | – |
 | `GET …/seasons/{id}/roster`, `POST …/roster/{uid}/approve`, `PUT …/roster-settings` | `roster` | – | – |
+| `GET`, `PUT …/seasons/{id}/schedule-rules` (Terminregeln, #2194) | `season` | – | – |
 | `GET …/{id}/staff` | `manage` | – | – |
 | `GET`, `PUT …/draft`, `DELETE …/draft`, `POST …/draft/from-version`, `…/preview`, `…/publish` unter `/api/admin/league-rules/{league\|league_season}/{id}` | `rules`; die Liga kommt aus der Adresse, bei einer Season aus der gespeicherten Season | – | – |
 | `PATCH`, `PUT …/roles`, `DELETE /api/teams/{id}/squads/{sid}` eines Co-Teams in nicht beendeter Staffel | `roster` oder eigenes Team | – | – |
@@ -659,6 +660,7 @@ Zugriff, außer „lesen“ steht in der Zeile. Prüfung: `backend/tests/test_le
 | Staffel: `registrations/{id}/checkin`, `print/checkin`, `schedule/plan`, `/apply`, `/release`, `live-queue/*`, Team-Tag `lineups` | `matches` | – | – |
 | Spiel: `PATCH` (Termin und Betreuung), `schedule/apply` und `/release` mit eigenem Spiel | `matches` | ja, im Sammellauf ohne Notausnahme | – |
 | Spiel: Terminvorschläge entscheiden und zurückziehen | `matches`; Beteiligte nur als Captain oder Vertreter wie jede Seite | ja | – |
+| Spiel: `POST /reschedule`, `POST /reschedule/{rid}/decision` (Verschiebung, #2194) | keins – nur Captain oder Vertreter einer Seite (Seitenrecht wie beim Melden); die Leitung legt den Termin über `PATCH` fest (`matches`) | `PATCH`: ja (Notausnahme `conflict_reason`) | – |
 | Spiel: `POST /result`, `/result/undo`, `/forfeit`, `PUT /lineups` als Leitung, `POST …/lead/no-show/{id}` | `results` | ja | – |
 | Spiel: `POST /dispute/decision` | `disputes` | ja | – |
 | Spiel: `POST /result` bei offenem Streitfall | `results` und `disputes` | ja | – |
@@ -1175,3 +1177,94 @@ Jedes Paket prüft das per Regressionstest:
 Datenmodell und API passen zusammen, Rechte greifen, die Oberfläche trägt den ganzen Ablauf, Fehler sind verständlich,
 Daten bleiben erhalten. Dazu Tests für Haupt- und Fehlerfälle, gleichzeitige Aktionen, Protokoll, Lauf gegen echtes MongoDB,
 Browserlauf mit echter API bei 390 und 1440 px, App kompatibel, Doku und Handbuch aktuell. Mongomock allein reicht nicht.
+
+### D.1 Termine (#2194)
+
+Regelwerk § 7, Entscheidungen Nr. 17, 18 und 28. Logik in `services/league_schedule.py` (Regeln, Verschiebung, Historie, Matchseite),
+`services/league_schedule_sweep.py` (Zeit-Job), Routen in `routes/league_schedule_routes.py`. **Migration: keine.** Ohne `schedule_rules`
+an der Staffel verhält sich alles wie vorher (Heimrecht sofort, keine Verschiebung, keine Erinnerung). Nur Staffeln tragen die Regeln.
+
+**Einstellung `schedule_rules`** an `league_seasons` und `tournaments` (Staffel), ein Objekt. Neue Seasons bekommen die Vorgabe, ältere
+nichts. Gepflegt unter `GET|PUT /api/admin/leagues/seasons/{id}/schedule-rules` (Zuständigkeit `season`), das Speichern schreibt sofort
+auf alle nicht gesperrten Staffeln der Season (eigene Gruppe `schedule` beim Übertragen, wie `running` auch nach dem Start, `staffel_fields` beim Anlegen). Protokoll
+`league.season.schedule_rules` mit altem und neuem Wert.
+
+| Feld | Typ | Vorgabe | Bedeutung |
+| --- | --- | --- | --- |
+| `home_rule` | bool | `true` | Nr. 17: unbeantworteter Vorschlag des Heimteams gilt nach der Frist |
+| `home_rule_hours` | int 1–336 | 72 | Frist ab dem Vorschlag, Sperrzeiten zählen nicht (`response_deadline`) |
+| `reschedule_notice_hours` | int 0–336 | 24 | Nr. 18: Antrag spätestens so viele Stunden vor dem geltenden Termin |
+| `reschedule_max` | int 0–10 | 2 | Verschiebungen je Spiel durch beide Teams, 0 = nur die Leitung |
+| `reschedule_same_week` | bool | `true` | Der neue Termin liegt in der Spielwoche des Spiels |
+| `result_reminder_hours` | int 1–336 | 24 | Nr. 28: so lange nach dem Termin ohne Meldung geht die Erinnerung an beide Seiten |
+| `result_overdue_hours` | int 1–720 | 48 | danach ist das Spiel bei der Leitung „überfällig“; nie kleiner als die Erinnerung |
+
+**Fester Termin:** Ein Termin steht fest, wenn das Spiel `scheduled_at` hat und `schedule_source` `accepted` (Einigung, 72-h-Regel,
+Verschiebung) oder `manual` (Leitung) ist. Davor gilt die Ersteinigung über Terminvorschläge wie bisher (der Standardtermin ist kein
+fester Termin). Steht er fest, nimmt eine Staffel mit Regeln keinen neuen Vorschlag, keinen Gegenvorschlag und keine Annahme mehr an
+(409 „Der Termin steht fest – für einen anderen Termin bitte eine Verschiebung beantragen.“); `can_propose_schedule` ist dann `false`.
+Ablehnen und Zurückziehen gehen weiter. Wird ein Vorschlag angenommen, schließen die übrigen offenen dieses Spiels mit `declined`
+(`decision_rule: "agreed_elsewhere"`).
+
+**72-h-Regel (Nr. 17)** im Fristen-Job (`match_deadline_sweep.sweep` ruft `league_schedule_sweep.sweep`): Ein offener Vorschlag der
+Heimseite (`slots[0]`) gilt, wenn `home_rule` an ist, die Frist ab `created_at` abgelaufen ist, der Termin in der Spielwoche liegt,
+nicht in einer Sperrzeit, noch in der Zukunft ist, und das Spiel noch keinen festen Termin hat und nicht begonnen ist. Dann:
+Vorschlag `accepted` mit `decision_rule: "home_rule"`, Spiel `scheduled_at`, `schedule_source: "accepted"`, `schedule_status: "accepted"`,
+Historie `home_rule`, Nachricht an die Verantwortlichen beider Seiten (Art `match_schedule`, `meta.reason` `schedule_home_rule`,
+Schlüssel `schedule-home-rule:<vorschlag>`). Sonst gilt der Standardtermin. Mit Regeln zählt ein offener Heimvorschlag im Spieltag-Lauf
+nicht mehr sofort (`resolve_matchday_time` ohne Zweig „home“); ohne Regeln bleibt es beim Heimrecht wie bisher. Idempotent: geschrieben
+wird nur, solange der Vorschlag `pending` ist, unter der Turniersperre.
+
+**Verschiebung (Nr. 18)** – eigene Art am Spiel, getrennt von `match_schedule_proposals`:
+
+| Feld an `matches_v2` | Inhalt |
+| --- | --- |
+| `reschedule_requests[]` | `{id, status, from_at, to_at, reason, requested_by, requested_registration_id, requested_at, approvals[{registration_id, user_id, at}], decided_by, decided_registration_id, decided_at, decision_note}` |
+| `status` je Antrag | `pending`, `accepted`, `declined`, `withdrawn`, `expired` (alter Termin vorbei), `superseded` (Termin anders gesetzt) |
+| `reschedule_count` | angenommene Verschiebungen der Teams |
+| `schedule_history[]` | `{id, at, kind, by, registration_id, from, to, reason, request_id}`, höchstens 50, neueste zuletzt |
+
+Arten der Historie: `agreement` (Einigung), `home_rule` (72-h-Regel), `default` (Standardtermin), `reschedule` (Verschiebung), `lead`
+(Leitung). Beide Felder und `result_reminded_at`, `result_overdue_at` sind intern (`match_public_view.INTERNAL_KEYS`); die Matchseite gibt sie
+mit Namen im Block `schedule_block` an Beteiligte und Leitung.
+
+| Route | Wer | Prüfung |
+| --- | --- | --- |
+| `POST /api/matches/{id}/reschedule` `{scheduled_at, reason}` | Captain oder Vertreter einer Seite | Staffel mit Regeln, fester Termin, nicht begonnen, kein offener Antrag, `reschedule_count < reschedule_max`, jetzt ≤ Termin − `reschedule_notice_hours`, neuer Termin in der Zukunft (5 Minuten), nicht in einer Sperrzeit, anders als der alte, bei `reschedule_same_week` in der Spielwoche, Grund 5–500 Zeichen |
+| `POST /api/matches/{id}/reschedule/{rid}/decision` `{action, note?}` | `accept`, `decline`: Captain oder Vertreter der **anderen** Seite; `withdraw`: die beantragende Seite | Antrag offen, Termin unverändert seit dem Antrag (sonst `superseded`, 409), alter Termin noch nicht erreicht (sonst `expired`, 409), beim Annehmen Grenze und Sperrzeit noch einmal |
+
+Jede Grenze antwortet 409 mit deutschem Satz; was darüber geht, sagt der Satz: „Das entscheidet die Liga-Leitung – bitte im Matchchat
+@leitung schreiben.“ Annehmen setzt `scheduled_at`, `schedule_source: "accepted"`, erhöht `reschedule_count` mit Bedingung auf den alten
+Termin und den Zähler, schreibt Historie `reschedule` mit Grund und beiden Zustimmungen. Gleichzeitige Anträge oder Annahmen: Turniersperre
+plus Bedingung im Schreiben, die zweite Anfrage bekommt 409. Nachrichten an die andere Seite (Art `match_schedule`, `meta.reason`
+`reschedule_requested|accepted|declined|withdrawn`, Schlüssel `match-reschedule:<antrag>:<schritt>`). Protokoll `match.reschedule.request`,
+`.accept`, `.decline`, `.withdraw` mit Grund, ohne Personen außer `actor_id`.
+
+**Leitung:** Alles darüber (später, öfter, wochenübergreifend) setzt die Leitung über `PATCH /api/matches/{id}` (`matches`, Befangenheit wie
+Nr. 62, Superadmin-Notausnahme mit `conflict_reason`). Neu ist das freiwillige Feld `schedule_reason` (≤ 500): Es steht in der Historie
+(`lead`) und im Protokoll `match.plan.change`. Ein neuer Termin der Leitung beendet offene Anträge (`superseded`) und hebt `result_reminded_at`
+und `result_overdue_at` auf. Die Matchseite bietet der Leitung dafür ein eigenes Feld mit Grund (`schedule_block.can_lead_set`).
+
+**Überfällig (Nr. 28)** im selben Job: Ein Spiel einer Staffel mit Regeln, beide Seiten fest, Termin vorbei, ohne Meldung und ohne Ergebnis
+(Status `ready` oder `scheduled`): nach `result_reminder_hours` einmal `result_reminded_at` und Nachricht an die Verantwortlichen beider Seiten
+(`meta.reason` `result_missing_reminder`, Schlüssel `result-reminder:<spiel>:<termin>`), nach `result_overdue_hours` `result_overdue_at`,
+Nachricht an die Liga-Leitung (`matches`, `results`; Art `match_attention`, `meta.reason` `result_overdue`) und Protokoll
+`match.result.overdue`. In einer Sperrzeit läuft nichts. Erledigt ist der Fall mit Ergebnis, Wertung oder neuem Termin der Leitung.
+Für F.1: `league_schedule.open_overdue(db, season_id)` liefert die offenen Fälle einer Season; ohne Entscheidung darüber kein Saisonabschluss.
+
+**Matchseite** `schedule_block` (nur Staffeln mit Regeln, nur Beteiligte und Leitung, sonst `null`): `rules`, `fixed`, `source`,
+`scheduled_at`, `window {start, end}`, `remaining`, `request_until`, `can_request`, `request_hint` (warum nicht), `requests[]` mit Namen und
+`can_answer`/`can_withdraw`, `history[]` mit Namen, `home_rule_at` (wann ein offener Heimvorschlag gilt), `can_lead_set`, `own_registration_id`.
+
+**Datenschutz:** Anträge und Historie stehen nur in `matches_v2` (keine eigene Sammlung). Auskunft `league_schedule` (`league_schedule.export_snapshot`): je Spiel die eigenen Anträge mit Grund, als Seite entschiedene nur mit der eigenen Antwort, als Leitung nur Vorgang, Stand und Zeit; Historie ebenso, Einträge der Leitung nur Art und Zeit. Kontolöschung (`league_schedule.scrub_person`): `requested_by`, `decided_by`, `approvals[].user_id`, `schedule_history[].by` und `.requested_by` werden `null`, Termin und Grund bleiben.
+
+**Aufgaben:** `me.actions[]` `type: "match_reschedule"` („Verschiebung beantworten“, `target_type: "match"`) für die andere Seite eines offenen
+Antrags. **Mein Dienst** (`/api/users/me/duty`): `overdue_matches[]` für Liga-Leitung mit `matches` oder `results` (Spiel, Staffel, Termin,
+seit wann) und `ended_live[]` (siehe unten).
+
+**Turnier nach dem Ende noch „Live“ (für alle Turniere):** Der Fristen-Job hält am Turnier `running_past_end` (bool) aktuell: `true`, solange
+der Stand `live` ist, das Ende vorbei und noch offene Spiele da sind; sonst fällt das Feld weg. `derive_public_phase` zeigt dann weiter
+„Läuft“ (Karte, Band, Detailseite), ohne eigene Abfrage. Sind alle Spiele fertig, zeigt die Seite „Beendet“, der Stand bleibt `live`: Die
+Leitung sieht in Mein Dienst (`ended_live[]`: `{id, title, end_date, open_matches, admin_url, league}`) und in der Turnierliste den Hinweis
+„Läuft laut Stand noch, Ende war am … – beenden?“ mit Weg in die Verwaltung. Umgestellt wird nie automatisch. Turnierleitung sieht Turniere
+ohne Liga, Liga-Leitung mit `manage` die Staffeln ihrer Ligen.

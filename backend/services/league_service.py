@@ -28,6 +28,7 @@ from services.advancement_draw import sync_advancement_fields
 from services.bracket_fill_in import has_started, is_auto_bye
 from services.competition_versions import new_competition_version_fields
 from services.league_scope import ONLY_LEAGUE
+from services.league_schedule import DEFAULTS as SCHEDULE_RULE_DEFAULTS
 from services.log_safe import log_safe
 from services.mutation_lock import MutationLockBusy, league_resource, league_season_resource, mutation_lock, tournament_write_resource
 from services.tournament_purge import purge_tournament
@@ -416,6 +417,9 @@ def staffel_fields(league: dict, season: dict, division: dict) -> dict:
         fields[RESPONSE_HOURS] = int(settings[RESPONSE_HOURS])
     # Ergebnisregeln (C.3, #1617): nur, wenn die Season sie trägt - ältere Seasons prüfen nichts Neues.
     fields.update({key: season[key] for key in RESULT_RULE_FIELDS if key in season})
+    # Terminregeln (#2194): nur, wenn die Season sie trägt - ohne sie bleibt die Staffel beim Heimrecht wie vorher.
+    if isinstance(season.get("schedule_rules"), dict):
+        fields["schedule_rules"] = dict(season["schedule_rules"])
     return fields
 
 
@@ -427,6 +431,8 @@ SYNC_GROUPS: dict[str, tuple[str, ...]] = {
     "running": (RESPONSE_HOURS,),
     # Ergebnisregeln (C.3): wie „laufend“ - sie prüfen nur neue Eingaben, gespeicherte Ergebnisse bleiben.
     "result_rules": RESULT_RULE_FIELDS,
+    # Terminregeln (#2194): wie die Antwortfrist auch während der Season, eigene Gruppe - ältere Seasons ohne Regeln lassen sie aus.
+    "schedule": ("schedule_rules",),
     "before_start": ("start_date", "end_date", "matchday_days", "default_match_weekday", "default_match_time",
                      "round_robin_legs", "matchday_blocked_weeks", "blocked_periods", "matchday_weeks_total",
                      "max_participants"),
@@ -438,6 +444,7 @@ SYNC_GROUP_LABELS = {
     "always": "Sichtbarkeit und Regeltext",
     "running": "Antwortfrist auf Terminvorschläge",
     "result_rules": "Ergebnisregeln und Punktepflicht",
+    "schedule": "Terminregeln",
     "before_start": "Termine und Kalender",
     "before_result": "Best of, Teamgröße, Mindestkader, Punkte und Fristen",
     "map_pool": "Map-Pool",
@@ -668,6 +675,8 @@ async def create_season(db, league: dict, body: dict, user: dict) -> dict:
         doc["scoring_rules"] = normalize_rules({})
     # Ergebnisregeln (C.3, #1617): die neue Season hält die Regeln der Modi fest, Punkte je Map sind Pflicht.
     doc.update(league_result_rules.new_season_fields(game))
+    # Terminregeln (#2194, docs/LIGA.md D.1): Vorgabe nur für neue Seasons, gepflegt über …/schedule-rules.
+    doc.setdefault("schedule_rules", dict(SCHEDULE_RULE_DEFAULTS))
     doc.update({"id": new_id(), "league_id": league["id"], "number": number, "name": name, "slug": slug,
                 "created_at": _now(), "created_by": user["id"], "updated_at": _now()})
     try:

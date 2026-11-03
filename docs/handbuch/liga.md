@@ -257,6 +257,25 @@ mehr geht, steht je Staffel mit Grund da:
 | Termine und Kalender (Beginn, Wochen, Sperrzeiten, Standardtermin, Runden, Staffelgröße) | nur vor dem Start |
 | Best of, Teamgröße, Mindestkader, Punkte, Modus je Map, Map-Wiederholung, Fristen | nur vor dem ersten Ergebnis |
 | Sichtbarkeit | sofort beim Speichern, ohne Übertragen |
+| Terminregeln (Kasten „Termine und Verschiebungen“) | sofort beim Speichern des Kastens; gesperrte Staffeln beim Übertragen |
+
+### 2.7a Termine und Verschiebungen (Regelwerk § 7)
+
+Auf der Season-Seite steht der Kasten **Termine und Verschiebungen** (Zuständigkeit „Season konfigurieren“). Er hat ein eigenes
+**Terminregeln speichern** und gilt sofort für alle Staffeln der Season. Neue Seasons bekommen die Vorgaben; eine ältere Season
+sagt „Diese Season ist älter als die Terminregeln“ – dort gilt ein Vorschlag der Heimseite sofort und es gibt keine
+Verschiebung, bis ihr einmal speichert.
+
+| Feld | Vorgabe | Wirkung |
+| --- | --- | --- |
+| **72-h-Regel** (an/aus) und **Frist (Stunden)** | an, 72 | Antwortet die Gastseite nicht auf einen Vorschlag der Heimseite, gilt er nach der Frist – nur in der Spielwoche, nicht in einer Sperrzeit, nur in der Zukunft. Sonst gilt der Standardtermin. Sperrzeiten zählen nicht mit |
+| **Verschieben bis (Stunden vor dem Termin)** | 24 | später beantragen geht nicht mehr |
+| **Verschiebungen je Spiel** | 2 | 0 heißt: nur die Leitung verschiebt |
+| **Verschieben nur innerhalb der Spielwoche** | an | wochenübergreifend entscheidet die Leitung |
+| **Erinnerung ohne Ergebnis** | 24 h nach dem Termin | Nachricht an Captain und Vertreter beider Seiten |
+| **Überfällig nach** | 48 h nach dem Termin | das Spiel steht bei euch unter **Mein Dienst → Braucht deine Entscheidung** |
+
+Alles, was über diese Grenzen geht (später, öfter, in eine andere Woche), legt die Liga-Leitung fest – siehe 3.1.
 
 ### 2.8 Sichtbarkeit
 
@@ -435,6 +454,35 @@ Bestätigungs- und Nachtragsfristen ruhen in der Sperrzeit, das Einspruchsfenste
   statt eines Termins – dann legt ihr ihn fest.
 - **Startseite:** Offene Vorschläge der Gegenseite stehen bei Captain und Vertreter unter **Offene Aktionen** als
   „Terminvorschlag beantworten“ – auf der Website und in der App.
+
+**Mit Terminregeln (2.7a):**
+
+- **Fester Termin:** Haben sich beide Seiten geeinigt (oder galt die 72-h-Regel, oder habt ihr ihn gesetzt), steht der
+  Termin fest. Neue Vorschläge gehen dann nicht mehr – nur noch die **Verschiebung**. Der Standardtermin allein ist kein
+  fester Termin: Bis zu einer Einigung bleibt die Terminabstimmung offen.
+- **72-h-Regel:** Läuft die Frist für einen Vorschlag der Heimseite ohne Antwort ab, gilt er; beide Seiten bekommen eine
+  Nachricht, im Verlauf steht „72-h-Regel“. Die Matchseite sagt vorher, ab wann er gilt.
+- **Verschiebung:** Auf der Matchseite unter **Termin und Verschiebung**: Eine Seite beantragt mit neuem Termin und
+  **Grund**, die andere stimmt zu oder lehnt ab. Die Seite zeigt die Grenze im Klartext („Noch 1 Verschiebung möglich,
+  beantragen bis Sa 14.11. 20:00“). Später, öfter oder in eine andere Woche geht nur über euch – die Captains sehen dann
+  den Hinweis auf @leitung im Matchchat.
+- **Termin festlegen:** Mit „Spiele betreuen“ steht auf der Matchseite **Termin festlegen (Liga-Leitung)** mit Pflichtgrund.
+  Er gilt sofort, offene Anträge sind damit erledigt, beide Seiten bekommen eine Nachricht. Im eigenen Spiel legt ihn eine
+  zweite Person fest (Befangenheit, 2.11); der Superadmin nur als Notausnahme mit Grund im Matchplan.
+- **Verlauf:** Jede Änderung steht unter **Verlauf** – Einigung, 72-h-Regel, Standardtermin, Verschiebung, Liga-Leitung,
+  mit Person und Grund. Sehen können ihn nur die beiden Seiten und die Leitung.
+- **Überfällig:** Ist ein Spiel nach dem Termin nie gemeldet, erinnert die Seite beide Seiten (Vorgabe nach 24 Stunden);
+  nach der zweiten Frist steht es unter **Mein Dienst → Braucht deine Entscheidung**, und ihr bekommt eine Nachricht.
+  Entscheiden heißt: Ergebnis eintragen, kampflos werten oder einen neuen Termin festlegen. Ohne Entscheidung schließt
+  die Season später nicht ab.
+
+### 3.1a Turnier nach dem Ende noch „Live“
+
+Gilt für alle Turniere: Steht ein Turnier nach seinem eingetragenen Ende noch auf **Live**, sagt es euch **Mein Dienst**
+(und die Startseite der Verwaltung) unter **Braucht deine Entscheidung**: „Läuft laut Stand noch, Ende war am … – beenden?“.
+Sind noch Spiele offen, zeigt die öffentliche Seite weiter **Läuft**; sind alle fertig, zeigt sie **Beendet**, und ihr stellt
+auf „Beendet“ bzw. „Ergebnisse veröffentlichen“ – erst dann gelten Gewinne und Saisonpunkte. Umgestellt wird nie von
+selbst. Die Turnierliste zeigt denselben Hinweis neben dem Stand.
 
 ### 3.2 Ergebnisse
 

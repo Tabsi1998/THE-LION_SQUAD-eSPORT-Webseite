@@ -76,6 +76,7 @@ from services.user_notifications import create_user_notification
 from services.v2_result_submission import submit_v2_result
 from services import league_games
 from services import league_result_rules
+from services import league_schedule
 from services.v2_match_flows import (
     REPORT_CLOSED_STATUSES,
     dispute_entry,
@@ -691,7 +692,15 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
     can_decide = not conflict or conflict["override"]
     can_submit_result = can_decide and await _can_submit_result_for_match(match, user)
     can_player_report = bool(acting_reg and _players_can_report(policy) and _accepts_reports(match))
-    can_propose_schedule = bool(user and await _can_act_for_match(match, user) and _schedule_proposals_enabled(policy))
+    can_manage_schedule = bool(user and await _can_act_for_match(match, user) and _schedule_proposals_enabled(policy))
+    # Liga-Termine (#2194): Steht der Termin fest, gibt es keinen neuen Vorschlag mehr - alte offene lassen sich weiter
+    # ablehnen und zurückziehen (``can_manage_schedule``, so liest es auch die App).
+    can_propose_schedule = can_manage_schedule and not league_schedule.blocks_proposals(tournament, match)
+    plans_as_lead = bool(user) and await has_match_result_permission(user, match, capability="matches")
+    schedule_block = await league_schedule.page_block(
+        db, match, tournament, acting_reg=acting_reg, involved=involved, lead=plans_as_lead,
+        # Befangen (auch der Superadmin): das Feld fehlt hier - die Notausnahme mit Grund geht über den Matchplan.
+        can_lead_set=plans_as_lead and not conflict, proposals=proposals)
     round_number = match.get("matchday_number") or match.get("round")
     league_like = (tournament or {}).get("format") in {"league", "round_robin"} or (stage or {}).get("stage_type") in {"league", "round_robin_groups", "ffa_league"}
     matchday_label = match.get("matchday_label") or match.get("round_name")
@@ -762,7 +771,7 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         "can_submit_result": can_submit_result,
         "can_staff_submit_result": can_submit_result,
         "can_propose_schedule": can_propose_schedule,
-        "can_manage_schedule": can_propose_schedule,
+        "can_manage_schedule": can_manage_schedule,
         "can_dispute": bool(acting_reg and window["open"]),
         "dispute_until": window["until"],
         "in_dispute": str(match.get("status") or "") == "disputed",
@@ -780,6 +789,7 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         "matchday": round_number,
         "matchday_label": matchday_label,
         "league": league_block,
+        "schedule_block": schedule_block,
     }
 
 
@@ -818,6 +828,8 @@ async def create_schedule_proposal(match_id: str, body: MatchScheduleProposalCre
         raise HTTPException(status_code=403, detail="Terminvorschläge sind für dieses Match nicht aktiviert")
     if not await _can_act_for_match(match, me):
         raise HTTPException(status_code=403, detail="Nur Teilnehmer, Team-Captains oder Turnierleitung dürfen Termine vorschlagen")
+    if league_schedule.blocks_proposals(tournament, match):
+        raise HTTPException(status_code=409, detail=league_schedule.FIXED_DETAIL)
     _refuse_blocked_moment(tournament, body.scheduled_at)
     now_iso = now_utc().isoformat()
     normalized_note = (body.note or "").strip() or None
@@ -988,6 +1000,8 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
         return response
     if proposal.get("status") != "pending":
         raise HTTPException(status_code=409, detail="Über diesen Terminvorschlag wurde bereits entschieden")
+    if body.action in {"accept", "counter"} and league_schedule.blocks_proposals(tournament, match):
+        raise HTTPException(status_code=409, detail=league_schedule.FIXED_DETAIL)
     if body.action == "accept":
         scheduled_at = proposal.get("scheduled_at")
         # Abgelaufen (#2124): ein Termin, der schon vorbei ist, lässt sich nicht mehr annehmen.
@@ -1007,6 +1021,8 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
             "status": "scheduled" if match.get("status") in {"pending", "ready", "preview"} else match.get("status"),
             "updated_at": now_iso,
         }, "$unset": {"schedule_deadline_at": "", "schedule_escalated_at": ""}})  # Der Termin steht: keine Frist mehr.
+        # Liga-Termine (#2194): Einigung in die Historie; mit Regeln schließen die übrigen offenen Vorschläge.
+        await league_schedule.after_agreement(db, match, tournament, proposal, me, (acting_reg or {}).get("id"))
         await _tell_schedule(db, match, "accepted", proposal, me, (acting_reg or {}).get("id"), normalized_note)
         return {"ok": True, "status": "accepted", "scheduled_at": scheduled_at, "idempotent_replay": False}
     if body.action == "decline":
@@ -1281,7 +1297,7 @@ async def get_match(match_id: str, user: dict | None = Depends(get_optional_user
     return public_match_view(m, (user or {}).get("id"))
 
 
-async def _record_plan_change(db, before: dict, after: dict, me: dict) -> None:
+async def _record_plan_change(db, before: dict, after: dict, me: dict, reason: str | None = None) -> None:
     """Termin oder Best of je Spiel von der Turnierleitung geändert (#2201): immer ins Protokoll, mit altem und neuem Wert.
     In Spielwochen erfahren es die Verantwortlichen beider Seiten; sonst plant die Leitung am Stück um, dort keine Nachricht."""
     changes = {}
@@ -1291,7 +1307,8 @@ async def _record_plan_change(db, before: dict, after: dict, me: dict) -> None:
         changes["best_of"] = {"from": before.get("best_of"), "to": after.get("best_of")}
     if not changes:
         return
-    await _audit_match_action(db, "match.plan.change", after, me.get("id"), {"changes": changes})
+    await _audit_match_action(db, "match.plan.change", after, me.get("id"),
+                              {"changes": changes, **({"reason": reason} if reason else {})})
     from services.matchday_schedule import plays_in_matchdays
 
     tournament = await db.tournaments.find_one({"id": after.get("tournament_id")}, {"_id": 0, "creation_key": 0, "billing": 0})
@@ -1322,6 +1339,8 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
         raw = body.model_dump(exclude_unset=True)
         # Termin des eigenen Spiels (#2203): setzt eine zweite Person, der Superadmin nur als Notausnahme mit Grund.
         await league_permissions.require_no_conflict(db, me, v2_match, action="match_plan", conflict_reason=raw.pop("conflict_reason", None))
+        # Grund zum Termin (#2194): in Historie und Protokoll, nie am Spiel selbst.
+        schedule_reason = " ".join(str(raw.pop("schedule_reason", None) or "").split()) or None
         for result_field in ("score_a", "score_b", "winner_id"):
             raw.pop(result_field, None)
         updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
@@ -1372,7 +1391,8 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
             # hält schon ``_serialized_match_write``; sie ist nicht wiedereintrittsfähig, also direkt auswerten.
             from services.heat_rebuild import evaluate_after_write
             await evaluate_after_write(db, v2_match.get("tournament_id"), actor_id=me.get("id"), trigger="match_update")
-        await _record_plan_change(db, before, updated, me)
+        await _record_plan_change(db, before, updated, me, schedule_reason)
+        await league_schedule.lead_changed(db, before, updated, me, schedule_reason)
         return {**updated, "idempotent_replay": False}
     raise HTTPException(status_code=404, detail="Match nicht gefunden")
 

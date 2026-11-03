@@ -92,7 +92,10 @@ def derive_public_phase(doc: dict, kind: str = "content", now: datetime | None =
             "now": now.isoformat(),
         }
 
-    if end and now >= end:
+    # Länger als geplant (#2194): Stand ausdrücklich „live“ und noch offene Spiele (``running_past_end`` hält der Fristen-Job
+    # aktuell, services/tournament_overrun) - dann läuft es weiter, ohne eigene Abfrage je Karte.
+    overrun = normalized_status == "live" and doc.get("running_past_end") is True
+    if end and now >= end and not overrun:
         return {
             "state": "completed",
             "label": _label("completed"),
@@ -125,14 +128,17 @@ def derive_public_phase(doc: dict, kind: str = "content", now: datetime | None =
     # Ausdrücklich gesetzter Status „live“ (#1881): zeigt „Läuft“, auch ohne oder vor dem Startzeitpunkt.
     # Ende, manuelle Status und die Tagespause mehrtägiger Events (oben) gehen vor.
     if normalized_status == "live" or (start and now >= start):
+        # Nach dem Ende (läuft länger, #2194) gibt es keinen Countdown mehr bis zu einem Ende, das schon vorbei ist.
+        past_end = bool(overrun and end and now >= end)
         return {
             "state": "live",
             "label": _label("live"),
             "raw_status": raw_status,
-            "target_at": _iso(end),
-            "next_transition_at": _iso(end),
-            "countdown_kind": "ends",
+            "target_at": None if past_end else _iso(end),
+            "next_transition_at": None if past_end else _iso(end),
+            "countdown_kind": None if past_end else "ends",
             "now": now.isoformat(),
+            **({"past_end": True} if past_end else {}),
         }
 
     # Check-in beendet, Baum steht (#1551): der Status bleibt „Check-in“, nach außen ist bis zum Start geschlossen.
